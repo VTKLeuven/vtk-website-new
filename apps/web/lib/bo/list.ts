@@ -77,8 +77,8 @@ export function groupDossiers(
       make(status, nl ? labelNl : labelEn, list.filter((d) => d.status === status)),
     ).filter((g) => g.dossiers.length > 0);
   }
-  // Per maand van de activiteit, oudste eerst; zonder datum achteraan.
-  const month = (d: XDossier) => d.eventDate?.slice(0, 7) ?? "";
+  // Per maand van het budget (de BO), oudste eerst; zonder datum achteraan.
+  const month = (d: XDossier) => d.date?.slice(0, 7) ?? "";
   const keys = [...new Set(list.map(month))].sort((a, b) => (!a ? 1 : !b ? -1 : a.localeCompare(b)));
   return keys.map((key) => {
     const label = key

@@ -2461,9 +2461,32 @@ a.vtk-shortcut-tile:hover {
   font-size: 12.5px;
 }
 
+.vtk-code-picker-footer {
+  flex-wrap: wrap;
+}
+
 .vtk-code-picker-footer > span {
+  flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+/* "Ook voor volgende bestanden met ...": een eigen regel boven de knop. */
+.vtk-code-picker-remember {
+  display: flex;
+  flex-basis: 100%;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.vtk-code-picker-remember input {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--ink);
 }
 
 .vtk-code-picker-apply {
@@ -3327,6 +3350,248 @@ a.vtk-shortcut-tile:hover {
   min-width: min(100%, 220px);
 }
 
+/* "Resultaten per post": een kader voor op een slide (BoSummary.tsx). Alles
+   staat erin, ook de datum, zodat één schermafbeelding volstaat. */
+.vtk-bo-sum {
+  display: grid;
+  gap: 16px;
+  padding: 20px 22px 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  container: bo-sum / inline-size;
+}
+
+.vtk-bo-sum-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+}
+
+.vtk-bo-sum-head h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.vtk-admin-main .vtk-bo-sum-head p {
+  margin: 0;
+  color: var(--body) !important;
+  font-size: 13px;
+}
+
+.vtk-bo-sum-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.vtk-bo-sum-kpi {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.vtk-bo-sum-kpi .l {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vtk-bo-sum-kpi .v {
+  color: var(--body);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-bo-sum-kpi .v b {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.vtk-bo-sum-kpi .vtk-bo-sum-pct {
+  font-size: 14px;
+}
+
+/* De percentages in de kleuren van het oude rekenblad. */
+.vtk-bo-sum-pct {
+  display: inline-block;
+  min-width: 48px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--body);
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.vtk-bo-sum-pct[data-tone='down'] {
+  background: var(--danger-bg);
+  color: var(--danger-ink);
+}
+
+.vtk-bo-sum-pct[data-tone='low'] {
+  background: var(--low-bg);
+  color: var(--low-ink);
+}
+
+.vtk-bo-sum-pct[data-tone='ok'] {
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+}
+
+/* Twee kolommen vakken, zodat alle posten op één scherm passen. */
+.vtk-bo-sum-cols {
+  columns: 2;
+  column-gap: 28px;
+}
+
+/* `fixed`: de getallen krijgen een vaste breedte en de naam de rest, zodat een
+   tabel nooit breder wordt dan haar kolom. */
+.vtk-bo-sum-table {
+  width: 100%;
+  margin: 0 0 14px;
+  border-collapse: collapse;
+  break-inside: avoid;
+  table-layout: fixed;
+  font-size: 13px;
+}
+
+.vtk-bo-sum-table caption {
+  padding: 0 0 4px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.vtk-admin-main .vtk-bo-sum-table :is(th, td) {
+  padding: 4px 6px;
+  border-top: 1px solid var(--rule-soft);
+  background: none;
+  vertical-align: middle;
+}
+
+.vtk-admin-main .vtk-bo-sum-table thead th {
+  border-top: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-align: left;
+  text-transform: none;
+}
+
+/* Afbreken met een koppelteken waar het moet ("Studenten-welkom"), niet midden
+   in een lettergreep. */
+.vtk-bo-sum-table tbody th {
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.vtk-bo-sum-table thead .short {
+  display: none;
+}
+
+.vtk-bo-sum-table tbody th {
+  color: var(--ink);
+  font-weight: 600;
+  text-align: left;
+}
+
+.vtk-admin-main .vtk-bo-sum-table .num {
+  width: 62px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.vtk-admin-main .vtk-bo-sum-table .pct {
+  width: 62px;
+  text-align: right;
+}
+
+.vtk-bo-sum-table tr[data-empty] th,
+.vtk-bo-sum-table tr[data-empty] td,
+.vtk-bo-sum-table .none {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.vtk-bo-sum-table .none {
+  font-size: 12px;
+}
+
+.vtk-admin-main .vtk-bo-sum-foot {
+  margin: 0;
+  font-size: 11.5px;
+}
+
+@container bo-sum (max-width: 720px) {
+  .vtk-bo-sum-cols {
+    columns: 1;
+  }
+
+  .vtk-bo-sum-kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container bo-sum (max-width: 420px) {
+  .vtk-admin-main .vtk-bo-sum-table .num {
+    width: 40px;
+  }
+
+  .vtk-admin-main .vtk-bo-sum-table .pct {
+    width: 54px;
+  }
+
+  .vtk-admin-main .vtk-bo-sum-table :is(th, td) {
+    padding-inline: 4px;
+  }
+
+  .vtk-bo-sum-table thead .long {
+    display: none;
+  }
+
+  .vtk-bo-sum-table thead .short {
+    display: inline;
+  }
+
+  .vtk-bo-sum-table .vtk-bo-sum-pct {
+    min-width: 0;
+    padding-inline: 6px;
+  }
+}
+
+/* De afwijking als tekst naast de stand (StatusNote): groen beter, rood slechter. */
+.vtk-bo-devtext {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-bo-devtext[data-tone='up'] {
+  color: var(--ok-ink);
+}
+
+.vtk-bo-devtext[data-tone='down'] {
+  color: var(--danger-ink);
+}
+
 .vtk-bo-strip {
   display: flex;
   flex-wrap: wrap;
@@ -3524,6 +3789,7 @@ a.vtk-shortcut-tile:hover {
   font-weight: 600;
 }
 
+.vtk-bo-l-dd svg,
 .vtk-bo-postedit-open svg {
   width: 12px;
   height: 12px;
@@ -3602,6 +3868,11 @@ a.vtk-shortcut-tile:hover {
 .vtk-bo-pill[data-tone='low'] {
   background: var(--low-bg);
   color: var(--low-ink);
+}
+
+.vtk-bo-pill[data-tone='down'] {
+  background: var(--danger-bg);
+  color: var(--danger-ink);
 }
 
 .vtk-bo-pill[data-tone='ok'] {
@@ -4178,6 +4449,7 @@ a.vtk-shortcut-tile:hover {
 .vtk-bo-l-dd {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   padding: 6px 11px;
   border: 1px solid var(--line-2);
   border-radius: 10px;

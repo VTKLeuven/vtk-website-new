@@ -8795,6 +8795,10 @@ model BoDocument {
   /// Een resultaat zonder budget op het BO: "grocomeet" (versneld
   /// goedgekeurd) of "geen" (geen budget nodig). Null = er hoort een budget bij.
   budgetWaiver   String?
+  /// Groep 5 zette dit bestand uit het overzicht ("Niet meetellen"): een oude
+  /// versie, een kopie, iets wat er niet hoort. In Drive verandert er niets, en
+  /// de scan zet het niet terug. Null = telt mee.
+  hiddenAt       DateTime? @db.Timestamptz(3)
 
   firstSeenAt  DateTime  @default(now()) @db.Timestamptz(3)
   lastSeenAt   DateTime  @db.Timestamptz(3)

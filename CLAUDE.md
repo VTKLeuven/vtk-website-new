@@ -174,6 +174,9 @@ herkenning van bestandsnamen of het uitlezen van de rekenbladen komt.
   activiteit kan bij twee posten horen (`postKeys`). Tel over posten heen één
   keer per `dossier.key`, en zoek een dossier met `findDossier`: de sleutel
   bevat de posten en verandert na "Post wijzigen".
+- **Alles rekent op de BO-datum (`Dossier.date`)**, niet op de datum uit het
+  rekenblad (`eventDate`, enkel ter info): open sinds, komt nog, tot resultaat.
+  Dat is een keuze van Groep 5; zet het niet terug op de activiteit.
 
 # MCP-server voor agents
 

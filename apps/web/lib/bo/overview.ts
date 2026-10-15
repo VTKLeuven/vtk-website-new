@@ -56,6 +56,8 @@ export async function loadBoOverview(
     pairedBudgetId: row.pairedBudgetId,
     postKeysOverride: row.postKeys ?? [],
     budgetWaiver: row.budgetWaiver,
+    hidden: row.hiddenAt !== null,
+    driveFileId: row.driveFileId,
   }));
 
   return {

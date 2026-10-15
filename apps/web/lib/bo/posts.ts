@@ -9,11 +9,12 @@ import { normalizeKey } from "./names";
  * - elke post en werkgroep (sleutel `g:<groupId>`);
  * - de vier rollen van Groep 5, die elk hun eigen budgetten indienen: Praeses,
  *   Vice-praeses, Secretaris en Beheer;
- * - Jaarwerkingen (Halftime, Studentenwelkom) en Overige, voor wat niet bij
- *   één post hoort.
+ * - elke jaarwerking (Kanweek, Halftime, Skireis, Studentenwelkom, ...), zoals
+ *   in het rekenblad waarmee Groep 5 dit vroeger bijhield;
+ * - Overige, voor wat niet bij één post hoort.
  *
- * Die laatste zes staan hier in code en niet in de databank: het zijn vaste
- * vakken van het overzicht, geen posten met leden. Zie docs/design-decisions.md
+ * Die vakken staan hier in code en niet in de databank: het zijn vaste vakken
+ * van het overzicht, geen posten met leden. Zie docs/design-decisions.md
  * ("Bestuursorgaan: posten, rollen en categorieën").
  */
 
@@ -23,7 +24,7 @@ export type ExtraPost = {
   nameEn: string;
   /** Schrijfwijzen die vanzelf bij dit vak horen, genormaliseerd. */
   aliases: string[];
-  section: "g5" | "extra";
+  section: "g5" | "jaarwerking" | "extra";
   /**
    * Voor een verzamelvak: zet de naam uit het bestand voor de activiteit
    * ("Halftime GoGlobal"), anders weet niemand meer waarover het ging.
@@ -36,12 +37,26 @@ export const BO_EXTRA_POSTS: readonly ExtraPost[] = [
   { key: "x:vice", nameNl: "Vice-praeses", nameEn: "Vice-president", aliases: ["vice", "vicepraeses", "vicepreses", "vp"], section: "g5" },
   { key: "x:secretaris", nameNl: "Secretaris", nameEn: "Secretary", aliases: ["secretaris", "secretariaat", "secr"], section: "g5" },
   { key: "x:beheer", nameNl: "Beheer", nameEn: "Finance", aliases: ["beheer", "penning", "penningmeester"], section: "g5" },
+  ...(
+    [
+      ["kanweek", "Kanweek"],
+      ["parttime", "Parttime"],
+      ["halftime", "Halftime"],
+      ["fulltime", "Fulltime"],
+      ["overtime", "Overtime"],
+      ["duplex", "Duplex"],
+      ["triplex", "Triplex"],
+      ["skireis", "Skireis"],
+      ["studentenwelkom", "Studentenwelkom"],
+    ] as const
+  ).map(([key, name]): ExtraPost => ({ key: `x:${key}`, nameNl: name, nameEn: name, aliases: [key], section: "jaarwerking" })),
+  // Een jaarwerking die er (nog) niet bij staat; de naam gaat voor de activiteit.
   {
     key: "x:jaarwerkingen",
-    nameNl: "Jaarwerkingen",
-    nameEn: "Yearly events",
-    aliases: ["jaarwerkingen", "jaarwerking", "halftime", "studentenwelkom"],
-    section: "extra",
+    nameNl: "Andere jaarwerking",
+    nameEn: "Other yearly event",
+    aliases: ["jaarwerkingen", "jaarwerking", "jw"],
+    section: "jaarwerking",
     prefixActivity: true,
   },
   { key: "x:overige", nameNl: "Overige", nameEn: "Other", aliases: ["overige", "overig", "varia"], section: "extra", prefixActivity: true },
@@ -131,6 +146,13 @@ export type SplitPost = {
 };
 
 /**
+ * Een woord dat zegt welk soort post volgt, niet welke: "WG_Mechanix",
+ * "JW - Halftime". Dan is het volgende woord de post. Niet "werkgroepen": dat
+ * is de naam voor alle werkgroepen samen (het werkgroepenfeestje).
+ */
+const KIND_WORDS = new Set(["wg", "werkgroep", "jw", "jaarwerking"]);
+
+/**
  * Post en activiteit uit de stukken van een naam. Staat er een spatie of een
  * streepje waar een underscore hoorde ("Sport VTKlimmen", "Statix-Talks"), dan
  * is het eerste woord de post zodra dat woord een post is, en schuift de rest
@@ -149,8 +171,25 @@ export function splitPost(
     return { label, postKeys: keys, activity: prefixed ? [label, rest].filter(Boolean).join(" ") : rest };
   };
 
+  // "WG_Mechanix_Day": het eerste woord van de activiteit is de post.
+  if (KIND_WORDS.has(normalizeKey(post)) && activity && !aliases.has(normalizeKey(post))) {
+    const [first, ...rest] = activity.split(/[\s-]+/).filter(Boolean);
+    const keys = first ? resolvePostKeys(first, posts, aliases) : [];
+    if (keys.length > 0) return withPrefix(first, keys, rest.join(" ") || null);
+  }
+
   const whole = resolvePostKeys(post, posts, aliases);
   if (whole.length > 0) return withPrefix(post, whole, activity);
+
+  // "WG - Mechanix" in één stuk.
+  const kindWords = post.split(/[\s-]+/).filter(Boolean);
+  if (kindWords.length > 1 && KIND_WORDS.has(normalizeKey(kindWords[0]))) {
+    const keys = resolvePostKeys(kindWords[1], posts, aliases);
+    if (keys.length > 0) {
+      const rest = [...kindWords.slice(2), activity].filter(Boolean).join(" ");
+      return withPrefix(kindWords[1], keys, rest || null);
+    }
+  }
 
   const words = post.split(/[\s-]+/).filter(Boolean);
   if (words.length > 1) {
@@ -171,25 +210,44 @@ export function postName(key: string, posts: readonly PostCandidate[], nl: boole
   return post ? (nl ? post.nameNl : post.nameEn) : null;
 }
 
+export type PostOption = {
+  key: string;
+  name: string;
+  /** De kop in de keuzelijst. */
+  group: string;
+  section: "g5" | "post" | "werkgroep" | "jaarwerking" | "extra";
+  /**
+   * Een vak voor uitzonderingen (Groep 5 als geheel, Andere jaarwerking,
+   * Overige): kiesbaar, maar in het overzicht per post enkel wanneer er iets
+   * in zit.
+   */
+  catchAll?: true;
+};
+
 /** Alle posten en vakken waaruit Groep 5 kan kiezen, met hun sleutel. */
 export function postOptions(
   posts: readonly (PostCandidate & { type?: string; active?: boolean; orderInPraesidium?: number })[],
   nl: boolean,
-): { key: string; name: string; group: string }[] {
+): PostOption[] {
   const g5 = posts.find((p) => p.code === "GROEP5");
-  return [
-    ...(g5 ? [{ key: `g:${g5.id}`, name: nl ? g5.nameNl : g5.nameEn, group: "Groep 5" }] : []),
-    ...BO_EXTRA_POSTS.filter((p) => p.section === "g5").map((p) => ({ key: p.key, name: nl ? p.nameNl : p.nameEn, group: "Groep 5" })),
-    ...posts
-      .filter((p) => p.code !== "GROEP5" && p.type !== "WERKGROEP" && p.active !== false)
-      .map((p) => ({ key: `g:${p.id}`, name: nl ? p.nameNl : p.nameEn, group: nl ? "Posten" : "Posts" })),
-    ...posts
-      .filter((p) => p.type === "WERKGROEP" && p.active !== false)
-      .map((p) => ({ key: `g:${p.id}`, name: nl ? p.nameNl : p.nameEn, group: nl ? "Werkgroepen" : "Working groups" })),
-    ...BO_EXTRA_POSTS.filter((p) => p.section === "extra").map((p) => ({
+  const extra = (section: ExtraPost["section"], group: string): PostOption[] =>
+    BO_EXTRA_POSTS.filter((p) => p.section === section).map((p) => ({
       key: p.key,
       name: nl ? p.nameNl : p.nameEn,
-      group: nl ? "Jaarwerkingen en overige" : "Yearly events and other",
-    })),
+      group,
+      section,
+      ...(p.prefixActivity ? { catchAll: true as const } : {}),
+    }));
+  return [
+    ...(g5 ? [{ key: `g:${g5.id}`, name: nl ? g5.nameNl : g5.nameEn, group: "Groep 5", section: "g5" as const, catchAll: true as const }] : []),
+    ...extra("g5", "Groep 5"),
+    ...posts
+      .filter((p) => p.code !== "GROEP5" && p.type !== "WERKGROEP" && p.active !== false)
+      .map((p) => ({ key: `g:${p.id}`, name: nl ? p.nameNl : p.nameEn, group: nl ? "Posten" : "Posts", section: "post" as const })),
+    ...posts
+      .filter((p) => p.type === "WERKGROEP" && p.active !== false)
+      .map((p) => ({ key: `g:${p.id}`, name: nl ? p.nameNl : p.nameEn, group: nl ? "Werkgroepen" : "Working groups", section: "werkgroep" as const })),
+    ...extra("jaarwerking", nl ? "Jaarwerkingen" : "Yearly events"),
+    ...extra("extra", nl ? "Overige" : "Other"),
   ];
 }

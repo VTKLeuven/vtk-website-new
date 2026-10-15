@@ -48,6 +48,10 @@ export type DocInput = {
   pairedBudgetId: string | null;
   /** Met de hand gekozen posten voor dit bestand; leeg = uit de naam. */
   postKeysOverride?: readonly string[];
+  /** Groep 5 zette het uit het overzicht ("Niet meetellen"); telt nergens mee. */
+  hidden?: boolean;
+  /** Hetzelfde bestand in twee BO-mappen (een snelkoppeling) is één bestand. */
+  driveFileId?: string;
   /** Een resultaat zonder budget op het BO: "grocomeet" of "geen". */
   budgetWaiver?: string | null;
 };
@@ -85,6 +89,8 @@ export type DocView = {
   waiver: string | null;
   /** De posten van dit bestand zijn met de hand gekozen. */
   overridden: boolean;
+  /** Andere BO's waar hetzelfde bestand ook stond; het telt op de eerste. */
+  alsoIn: string[];
 };
 
 export type DossierStatus =
@@ -107,12 +113,17 @@ export type Dossier = {
   budgets: DocView[];
   results: DocView[];
   status: DossierStatus;
-  eventDate: Date | null;
   /**
-   * Een datum uit het rekenblad die niet bij de BO past (een sjabloon van vorig
-   * jaar, een tikfout): getoond, maar niet gebruikt om te rekenen.
+   * De datum van de BO waarop het (eerste) budget passeerde, of zonder budget
+   * het resultaat. Hierop rekent alles: open sinds, komt nog, tot resultaat,
+   * de maand. Null enkel bij een schriftelijke goedkeuring.
    */
-  dateIgnored: Date | null;
+  date: Date | null;
+  /**
+   * De datum van de activiteit uit het rekenblad, enkel ter info. Een datum die
+   * niet bij de BO's past (een oud sjabloon gaf 2004), valt weg.
+   */
+  eventDate: Date | null;
   location: string | null;
   /** Zie `DocView.waiver`. */
   waiver: string | null;
@@ -124,9 +135,9 @@ export type Dossier = {
   /** Resultaat min budget; positief is beter dan gepland. */
   devCents: number | null;
   vtkSharePercent: number | null;
-  /** Dagen tussen de activiteit en de BO waarop het resultaat passeerde. */
+  /** Dagen tussen de BO van het budget en die van het resultaat. */
   lagDays: number | null;
-  /** Bij een open resultaat: dagen sinds de activiteit, of sinds het budget zonder datum. */
+  /** Bij een open resultaat: dagen sinds de BO van het budget. */
   overdueDays: number | null;
   /** Het budget plant slechter dan de begroting. */
   overAllocation: boolean;
@@ -160,7 +171,7 @@ export type Stats = {
   oldest: { key: string; activity: string; days: number } | null;
 };
 
-export type PostSection = "g5" | "post" | "werkgroep" | "extra" | "unknown";
+export type PostSection = "g5" | "post" | "werkgroep" | "jaarwerking" | "extra" | "unknown";
 
 export type PostBlock = {
   key: string;
@@ -241,6 +252,8 @@ type Classified = {
   postLabel: string;
   activity: string;
   activityKey: string;
+  /** Uit de naam ("_v2"); 0 zonder. Bij twee versies op dezelfde BO wint de hoogste. */
+  version: number;
 };
 
 const DAY = 86_400_000;
@@ -290,7 +303,7 @@ export function statsOf(dossiers: readonly StatsInput[]): Stats {
   };
 }
 
-const SECTION_ORDER: Record<PostSection, number> = { g5: 0, post: 1, werkgroep: 2, extra: 3, unknown: 4 };
+const SECTION_ORDER: Record<PostSection, number> = { g5: 0, post: 1, werkgroep: 2, jaarwerking: 3, extra: 4, unknown: 5 };
 
 export function buildOverview(
   docs: readonly DocInput[],
@@ -304,7 +317,15 @@ export function buildOverview(
   const classified: Classified[] = [];
   const unclassified: BoOverview["unclassified"] = [];
 
-  for (const doc of docs) {
+  // Oudste BO eerst: staat een bestand in twee BO-mappen, dan telt de eerste.
+  const ordered = [...docs].sort(
+    (a, b) => (a.meeting.date?.getTime() ?? Number.MAX_SAFE_INTEGER) - (b.meeting.date?.getTime() ?? Number.MAX_SAFE_INTEGER),
+  );
+  const byFile = new Map<string, Classified>();
+  /** De rij die wegviel voor een eerdere rij van hetzelfde bestand, naar die rij. */
+  const sameAs = new Map<string, string>();
+  for (const doc of ordered) {
+    if (doc.hidden) continue;
     const parsed = parseDocumentName(doc.name);
     const kind = parsed.kind ?? doc.folderKind;
     const label = meetingLabel(doc.meeting, nl);
@@ -330,8 +351,11 @@ export function buildOverview(
       }
     }
     const postKeys = override.length > 0 ? [...override] : split.postKeys.length > 0 ? split.postKeys : [`l:${normalizeKey(split.label)}`];
-    const activity = split.activity ?? doc.sheetTitle ?? doc.name;
-    classified.push({
+    // Met de hand een post gekozen voor een naam die geen post is ("Eetstand
+    // Wiskundeweek" bij Onthaal): dan hoort die naam bij de activiteit.
+    const kept = override.length > 0 && split.postKeys.length === 0 && /[a-z]/i.test(split.label) ? split.label : null;
+    const activity = [kept, split.activity].filter(Boolean).join(" ") || doc.sheetTitle || split.label || doc.name;
+    const item: Classified = {
       doc,
       view: {
         id: doc.id,
@@ -349,13 +373,23 @@ export function buildOverview(
         paired: Boolean(doc.pairedBudgetId),
         waiver: kind === "RESULT" ? (doc.budgetWaiver ?? null) : null,
         overridden: override.length > 0,
+        alsoIn: [],
       },
       year: parsed.year ?? doc.meeting.workingYear,
       postKeys,
       postLabel: split.label,
       activity,
       activityKey: normalizeKey(activity),
-    });
+      version: parsed.version ?? 0,
+    };
+    const same = doc.driveFileId ? byFile.get(doc.driveFileId) : undefined;
+    if (same) {
+      same.view.alsoIn.push(label);
+      sameAs.set(doc.id, same.doc.id);
+      continue;
+    }
+    if (doc.driveFileId) byFile.set(doc.driveFileId, item);
+    classified.push(item);
   }
 
   // Wat bij elkaar hoort: zelfde jaar en activiteit, en minstens één post
@@ -383,7 +417,7 @@ export function buildOverview(
     }
   }
   classified.forEach((c, i) => {
-    const budget = c.doc.pairedBudgetId ? index.get(c.doc.pairedBudgetId) : undefined;
+    const budget = c.doc.pairedBudgetId ? index.get(sameAs.get(c.doc.pairedBudgetId) ?? c.doc.pairedBudgetId) : undefined;
     if (budget !== undefined && c.view.kind === "RESULT") join(i, budget);
   });
   const groups = new Map<number, Classified[]>();
@@ -392,8 +426,10 @@ export function buildOverview(
     groups.set(root, [...(groups.get(root) ?? []), c]);
   });
 
+  // Op volgorde van de BO; op dezelfde BO de hoogste versie laatst, want het
+  // laatste budget is het budget dat telt.
   const byMeeting = (a: Classified, b: Classified) =>
-    (a.view.meetingDate?.getTime() ?? 0) - (b.view.meetingDate?.getTime() ?? 0);
+    (a.view.meetingDate?.getTime() ?? 0) - (b.view.meetingDate?.getTime() ?? 0) || a.version - b.version;
   const todayStart = dayStart(today);
 
   const built: { dossier: Dossier; postLabel: string; inYear: boolean }[] = [];
@@ -409,30 +445,27 @@ export function buildOverview(
       ? [...new Set(budgetItems.flatMap((c) => c.postKeys))]
       : [...new Set(items.flatMap((c) => c.postKeys))];
 
-    // Een datum die niet bij de BO past, telt niet: een sjabloon van vorig jaar
-    // gaf anders "8043 dagen open".
+    // Alles rekent op de BO, niet op de datum in het rekenblad: die ontbrak vaak,
+    // en een oud sjabloon gaf "8043 dagen open". Groep 5 wilde het zo.
+    const date = budgetItems[0]?.view.meetingDate ?? resultItems[0]?.view.meetingDate ?? null;
     const meetingTimes = items.map((c) => c.view.meetingDate?.getTime()).filter((t): t is number => t !== undefined);
     let eventDate = lastBudget?.doc.eventDate ?? lastResult?.doc.eventDate ?? null;
-    let dateIgnored: Date | null = null;
     if (eventDate && meetingTimes.length > 0) {
       const earliest = Math.min(...meetingTimes) - 180 * DAY;
       const latest = Math.max(...meetingTimes) + 400 * DAY;
-      if (eventDate.getTime() < earliest || eventDate.getTime() > latest) {
-        dateIgnored = eventDate;
-        eventDate = null;
-      }
+      if (eventDate.getTime() < earliest || eventDate.getTime() > latest) eventDate = null;
     }
 
     const waiver = resultItems.find((c) => c.view.waiver)?.view.waiver ?? null;
     let status: DossierStatus;
     if (resultItems.length > 0) status = budgetItems.length > 0 || waiver ? "DONE" : "NO_BUDGET";
-    else status = eventDate && dayStart(eventDate) >= todayStart ? "UPCOMING" : "OPEN";
+    // Een budget voor een BO die nog moet komen: dan wacht nog niemand op een resultaat.
+    else status = date && dayStart(date) > todayStart ? "UPCOMING" : "OPEN";
 
     const budgetCents = lastBudget?.doc.budgetTotalCents ?? null;
     const resultCents = lastResult?.doc.resultTotalCents ?? null;
     const allocationCents = lastBudget?.doc.allocationCents ?? lastResult?.doc.allocationCents ?? null;
     const resultDate = lastResult?.view.meetingDate ?? null;
-    const since = eventDate ?? budgetItems[0]?.view.meetingDate ?? null;
     const resultLines = lastResult?.doc.lines ?? [];
     const lines = resultLines.length > 0 ? resultLines : (lastBudget?.doc.lines ?? []);
     const dates = items.map((c) => c.view.meetingDate?.getTime() ?? 0);
@@ -446,8 +479,8 @@ export function buildOverview(
         budgets: budgetItems.map((c) => c.view),
         results: resultItems.map((c) => c.view),
         status,
+        date,
         eventDate,
-        dateIgnored,
         location: lastBudget?.doc.location ?? lastResult?.doc.location ?? null,
         waiver,
         overridden: items.some((c) => c.view.overridden),
@@ -456,8 +489,8 @@ export function buildOverview(
         allocationCents,
         devCents: status === "DONE" && budgetItems.length > 0 && budgetCents !== null && resultCents !== null ? resultCents - budgetCents : null,
         vtkSharePercent: (lastResult ?? lastBudget)?.doc.vtkSharePercent ?? null,
-        lagDays: resultDate && eventDate ? days(eventDate, resultDate) : null,
-        overdueDays: status === "OPEN" && since ? Math.max(0, days(since, today)) : null,
+        lagDays: resultDate && date && budgetItems.length > 0 ? Math.max(0, days(date, resultDate)) : null,
+        overdueDays: status === "OPEN" && date ? Math.max(0, days(date, today)) : null,
         overAllocation: budgetCents !== null && allocationCents !== null && budgetCents < allocationCents,
         lines,
         lastSeen: dates.length > 0 ? new Date(Math.max(...dates)) : null,

@@ -237,6 +237,51 @@ export async function unpairBoResultAction(formData: FormData): Promise<SaveStat
 }
 
 /**
+ * "Niet meetellen": een bestand uit het overzicht halen (een oude versie, een
+ * kopie, iets wat niet in de BO-map hoort). Drive blijft zoals het is, en de
+ * scan zet het niet terug; terugzetten kan onder Instellingen. Hetzelfde
+ * bestand in twee BO's volgt mee.
+ */
+export async function hideBoDocumentAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("bestuursorgaan.manage");
+  // Eén bestand, of alle bestanden van een activiteit, met komma's.
+  const ids = field(formData, "docIds").split(",").filter(Boolean);
+  const docs = await prisma.boDocument.findMany({ where: { id: { in: ids } }, select: { id: true, driveFileId: true, name: true } });
+  if (docs.length === 0) return saveError("DOCUMENT_NOT_FOUND");
+  await prisma.boDocument.updateMany({
+    where: { driveFileId: { in: docs.map((d) => d.driveFileId) } },
+    data: { hiddenAt: new Date() },
+  });
+  for (const doc of docs) {
+    await logAudit({
+      action: "update",
+      entity: "boDocument",
+      entityId: doc.id,
+      target: doc.name,
+      summary: "Telt niet meer mee in het overzicht van de budgetten en resultaten",
+    });
+  }
+  revalidateBo();
+  return saveOk();
+}
+
+export async function restoreBoDocumentAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("bestuursorgaan.manage");
+  const doc = await prisma.boDocument.findUnique({ where: { id: field(formData, "docId") }, select: { id: true, driveFileId: true, name: true } });
+  if (!doc) return saveError("DOCUMENT_NOT_FOUND");
+  await prisma.boDocument.updateMany({ where: { driveFileId: doc.driveFileId }, data: { hiddenAt: null } });
+  await logAudit({
+    action: "update",
+    entity: "boDocument",
+    entityId: doc.id,
+    target: doc.name,
+    summary: "Telt weer mee in het overzicht van de budgetten en resultaten",
+  });
+  revalidateBo();
+  return saveOk();
+}
+
+/**
  * Welke weergave iemand verkiest: de verkenner of de lijst. Per account, zodat
  * ze op elk toestel dezelfde is. Geen toast bij succes: de weergave wisselt
  * zichtbaar, en dat is de bevestiging (zoals het speldje in de zijbalk).

@@ -119,6 +119,28 @@ export function DeleteButton({ children, ...common }: Common & { children: React
   );
 }
 
+/**
+ * Zelfde flow, als een kale knop met de klasse van de beller: voor een actie
+ * die naast een andere tekstknop in eigen opmaak staat ("Post wijzigen" en
+ * "Niet meetellen" op /admin/bestuursorgaan).
+ */
+export function ConfirmTextButton({
+  className,
+  ariaLabel,
+  children,
+  ...common
+}: Common & { className: string; ariaLabel?: string; children: ReactNode }) {
+  const { confirming, setConfirming, pending, onConfirm } = useConfirmFlow(common);
+  return (
+    <>
+      <button type="button" className={className} aria-label={ariaLabel} onClick={() => setConfirming(true)}>
+        {children}
+      </button>
+      <Dialog {...common} open={confirming} pending={pending} onConfirm={onConfirm} onCancel={() => setConfirming(false)} />
+    </>
+  );
+}
+
 function Dialog({
   title,
   description,

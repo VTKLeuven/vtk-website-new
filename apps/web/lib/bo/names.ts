@@ -45,9 +45,26 @@ export type ParsedDocumentName = {
   post: string | null;
   /** Al de rest, leesbaar gemaakt: de activiteit. */
   activity: string | null;
+  /**
+   * Een nieuwe versie van hetzelfde bestand ("_v2", "versie 3", "(1)",
+   * "_final", "Kopie van ..."): het getal, of 100 voor een woord als "final".
+   * Weg wanneer de naam er geen noemt.
+   */
+  version?: number;
 };
 
 const EXTENSION = /\.(xlsx|xlsm|xls|ods|csv|pdf|docx?)\s*$/i;
+
+/**
+ * Een versie achteraan is geen deel van de activiteit: "werkgroepen-feestje_v2"
+ * is een nieuwe versie van "werkgroepen-feestje", geen tweede feestje. Altijd
+ * na een scheidingsteken, zodat een woord dat op "v2" eindigt het niet is.
+ */
+const VERSION_SUFFIX =
+  /[\s_-]+(?:(?:v|versie|version)\s*\.?\s*(\d{1,2})|\((\d{1,2})\)|(final|finaal|definitief|aangepast|updated?|kopie|copy))$/i;
+
+/** "Kopie van ..." of "Copy of ...": Drive zet dat voor een gedupliceerd bestand. */
+const COPY_PREFIX = /^(?:kopie van|copy of)\s+/i;
 
 /**
  * Het jaar vooraan, in elke schrijfwijze die we tegenkwamen: "26-27", "26_27",
@@ -75,6 +92,18 @@ function leadingKind(segment: string): { kind: BoKind; rest: string } | null {
 
 export function parseDocumentName(raw: string): ParsedDocumentName {
   let rest = raw.trim().replace(EXTENSION, "").trim();
+
+  let version: number | undefined;
+  const copy = COPY_PREFIX.exec(rest);
+  if (copy) {
+    rest = rest.slice(copy[0].length);
+    version = 1;
+  }
+  for (let match = VERSION_SUFFIX.exec(rest); match && match.index > 0; match = VERSION_SUFFIX.exec(rest)) {
+    const n = match[1] ?? match[2];
+    version = Math.max(version ?? 0, n ? Number(n) : 100);
+    rest = rest.slice(0, match.index);
+  }
 
   let year: number | null = null;
   const prefix = YEAR_PREFIX.exec(rest);
@@ -120,7 +149,7 @@ export function parseDocumentName(raw: string): ParsedDocumentName {
 
   const post = segments[0] ?? null;
   const activity = segments.slice(1).join(" ").replace(/\s+/g, " ").trim() || null;
-  return { year, kind, post, activity };
+  return version === undefined ? { year, kind, post, activity } : { year, kind, post, activity, version };
 }
 
 /** "Budgetten" en "Resultaten", ook als "Budgetten Statix" of "resultaat". */
@@ -164,7 +193,9 @@ export type ParsedMeetingName = {
  */
 export function parseMeetingFolderName(name: string): ParsedMeetingName | null {
   const trimmed = name.trim();
-  const date = /(\d{1,2})\s*[/.]\s*(\d{1,2})(?:\s*[/.]\s*\d{2,4})?\s*$/.exec(trimmed);
+  // "20/09", "20.09" of "30-06"; een streepje met spaties ("BO 5 - 20/09") is
+  // de scheiding tussen nummer en datum, geen deel van de datum.
+  const date = /(\d{1,2})(?:\s*[/.]\s*|-)(\d{1,2})(?:\s*[/.]\s*\d{2,4})?\s*$/.exec(trimmed);
   const day = date ? Number(date[1]) : null;
   const month = date ? Number(date[2]) : null;
   const validDate = day !== null && month !== null && day >= 1 && day <= 31 && month >= 1 && month <= 12;
@@ -172,11 +203,16 @@ export function parseMeetingFolderName(name: string): ParsedMeetingName | null {
   if (/schriftelijk/i.test(trimmed)) {
     return { kind: "WRITTEN", number: null, day: validDate ? day : null, month: validDate ? month : null };
   }
-  const bo = /^BO\s*(\d+)\b(.*)$/i.exec(trimmed);
-  if (!bo) return null;
+  if (!/^BO(?![a-z])/i.test(trimmed)) return null;
+  const kind = /begroting/i.test(trimmed) ? "BUDGET_MEETING" : "MEETING";
+  // Een getal dat meteen een datum is ("BO 30/08", "BO 30-08"), is geen
+  // nummer: dat gaf "BO 30" terwijl het jaar aan BO 9 zat.
+  const bo = /^BO\s*(\d+)(?!\s*[/.]\s*\d|-\d)\b/i.exec(trimmed);
+  // Zonder nummer en zonder datum is het geen vergadering ("BO's oud").
+  if (!bo && !validDate) return null;
   return {
-    kind: /begroting/i.test(bo[2]) ? "BUDGET_MEETING" : "MEETING",
-    number: Number(bo[1]),
+    kind,
+    number: bo ? Number(bo[1]) : null,
     day: validDate ? day : null,
     month: validDate ? month : null,
   };

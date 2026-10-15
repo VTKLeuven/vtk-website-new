@@ -3,7 +3,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { findDossier, SECTIONS, type ExplorerData, type Stats, type XDossier, type XMeeting, type XPost } from "@/lib/bo/explorer";
-import { dossierNotes, Files, Lines, linesOf, PostLinks, StatusPill, Tiles, Timeline, useFormat, type Fmt, type Locale, type Sheet } from "./BoParts";
+import { dossierNotes, Files, HideDossierButton, Lines, linesOf, PostLinks, StatusNote, statusNote, StatusPill, Tiles, Timeline, useFormat, type Fmt, type Locale, type Sheet } from "./BoParts";
 import { ChangePosts, type PostChoice } from "./BoReview";
 
 /*
@@ -24,14 +24,14 @@ import { ChangePosts, type PostChoice } from "./BoReview";
 
 type Tab = "posten" | "bos" | "open";
 
-/** Hoe lang een resultaat al uitblijft, als filter in de tab Open. */
+/** Hoe lang een resultaat al uitblijft sinds de BO van het budget, als filter in de tab Open. */
 const AGES = [
   { key: "alle", nl: "Alles open", en: "Everything open", test: () => true },
-  { key: "geen-datum", nl: "Zonder datum", en: "Without a date", test: (d: XDossier) => !d.eventDate },
-  { key: "2-maanden", nl: "Meer dan 2 maanden", en: "More than 2 months", test: (d: XDossier) => Boolean(d.eventDate) && (d.overdueDays ?? 0) >= 61 },
-  { key: "1-maand", nl: "1 tot 2 maanden", en: "1 to 2 months", test: (d: XDossier) => Boolean(d.eventDate) && (d.overdueDays ?? 0) >= 28 && (d.overdueDays ?? 0) < 61 },
-  { key: "2-weken", nl: "2 tot 4 weken", en: "2 to 4 weeks", test: (d: XDossier) => Boolean(d.eventDate) && (d.overdueDays ?? 0) >= 14 && (d.overdueDays ?? 0) < 28 },
-  { key: "recent", nl: "Minder dan 2 weken", en: "Less than 2 weeks", test: (d: XDossier) => Boolean(d.eventDate) && (d.overdueDays ?? 0) < 14 },
+  { key: "2-maanden", nl: "Meer dan 2 maanden", en: "More than 2 months", test: (d: XDossier) => Boolean(d.date) && (d.overdueDays ?? 0) >= 61 },
+  { key: "1-maand", nl: "1 tot 2 maanden", en: "1 to 2 months", test: (d: XDossier) => Boolean(d.date) && (d.overdueDays ?? 0) >= 28 && (d.overdueDays ?? 0) < 61 },
+  { key: "2-weken", nl: "2 tot 4 weken", en: "2 to 4 weeks", test: (d: XDossier) => Boolean(d.date) && (d.overdueDays ?? 0) >= 14 && (d.overdueDays ?? 0) < 28 },
+  { key: "recent", nl: "Minder dan 2 weken", en: "Less than 2 weeks", test: (d: XDossier) => Boolean(d.date) && (d.overdueDays ?? 0) < 14 },
+  { key: "schriftelijk", nl: "Schriftelijk", en: "In writing", test: (d: XDossier) => !d.date },
 ] as const;
 
 export function BoExplorer({
@@ -103,6 +103,9 @@ export function BoExplorer({
 
   const statusPill = (d: XDossier) => <StatusPill dossier={d} f={f} />;
 
+
+  // Onder de naam: waar en wanneer, en wat bij de stand hoort ("16 dagen",
+  // "+€ 3,49"); rechts enkel het woord van de stand.
   const row = (d: XDossier, sub: ReactNode, amount: number | null) => (
     <button
       key={d.key + (typeof sub === "string" ? sub : "")}
@@ -116,7 +119,10 @@ export function BoExplorer({
         <span className="tabular-nums">{f.euro0(amount ?? 0)}</span>
       </span>
       <span className="vtk-bo-item-r2">
-        <span>{sub}</span>
+        <span>
+          {sub}
+          {statusNote(d, f) && <> · {statusNote(d, f)}</>}
+        </span>
         {statusPill(d)}
       </span>
     </button>
@@ -198,7 +204,7 @@ export function BoExplorer({
       (a, b) =>
         order[a.status] - order[b.status] ||
         (a.status === "OPEN" ? (b.overdueDays ?? 0) - (a.overdueDays ?? 0) : 0) ||
-        (a.status === "UPCOMING" ? (a.eventDate ?? "").localeCompare(b.eventDate ?? "") : 0) ||
+        (a.status === "UPCOMING" ? (a.date ?? "").localeCompare(b.date ?? "") : 0) ||
         lastDate(b).localeCompare(lastDate(a)),
     );
     midHead = (
@@ -211,7 +217,7 @@ export function BoExplorer({
       </>
     );
     mid = list.map((d) => {
-      const date = d.eventDate ? f.day(d.eventDate) : nl ? "geen datum" : "no date";
+      const date = d.date ? `BO ${f.day(d.date)}` : nl ? "schriftelijk" : "in writing";
       // Gedeeld met een andere post: zeg met wie, anders lijkt het dubbel.
       const others = d.postNames.filter((_, i) => d.postKeys[i] !== post.key);
       return row(d, others.length ? `${date} · ${nl ? "met" : "with"} ${others.join(" + ")}` : date, d.resultCents ?? d.budgetCents);
@@ -294,7 +300,6 @@ export function BoExplorer({
         <div><dt>{nl ? "voorbij en afgerond" : "past and closed"}</dt><dd>{f.pct(g.pct)}</dd></div>
         <div><dt>{nl ? "resultaat open" : "result missing"}</dt><dd>{g.open}</dd></div>
         <div><dt>{nl ? "netto gebudgetteerd" : "net budgeted"}</dt><dd>{f.euro0(g.sumBudget)}</dd></div>
-        <div><dt>{nl ? "afwijking afgerond" : "deviation, closed"}</dt><dd>{f.signed0(g.sumDev)}</dd></div>
         <div><dt>{nl ? "gem. tot resultaat" : "avg. until result"}</dt><dd>{g.avgLagDays === null ? "–" : `${g.avgLagDays} d`}</dd></div>
       </dl>
       {switcher}
@@ -354,16 +359,25 @@ export function BoExplorer({
   );
 }
 
-/** Rechts in de rij van een post: wat open staat, of een vinkje als alles binnen is. */
+/**
+ * Rechts in de rij van een post: hoeveel resultaten binnen zijn van wat al
+ * voorbij is ("3/4"), in de kleuren van het overzicht onderaan (rood onder 50%,
+ * oranje onder 100%, groen als alles binnen is), of een streepje als er nog
+ * niets voorbij is.
+ */
 function PostMark({ stats: s, nl }: { stats: Stats; nl: boolean }) {
-  if (s.open > 0) return <span className="vtk-bo-pill" data-tone="low">{s.open} open</span>;
-  if (s.due > 0) return <span className="vtk-bo-prow-ok" aria-label={nl ? "alles binnen" : "all in"}>✓</span>;
-  return <span className="vtk-bo-prow-none" aria-label={nl ? "nog niets voorbij" : "nothing past yet"}>–</span>;
+  if (s.due === 0) return <span className="vtk-bo-prow-none" aria-label={nl ? "nog niets voorbij" : "nothing past yet"}>–</span>;
+  return (
+    <span className="vtk-bo-pill tabular-nums" data-tone={s.pct === null ? undefined : s.pct >= 1 ? "ok" : s.pct >= 0.5 ? "low" : "down"}>
+      {s.done}/{s.due}
+    </span>
+  );
 }
 
 function postTitle(s: Stats, nl: boolean): string {
   const parts = [
     s.due ? (nl ? `${s.done} van ${s.due} voorbij en afgerond` : `${s.done} of ${s.due} past and closed`) : nl ? "Nog niets voorbij" : "Nothing past yet",
+    s.open ? (nl ? `${s.open} resultaat open` : `${s.open} result missing`) : null,
     s.upcoming ? (nl ? `${s.upcoming} komen nog` : `${s.upcoming} upcoming`) : null,
   ];
   return parts.filter(Boolean).join(", ");
@@ -512,13 +526,24 @@ function DossierDetail({
               errorMessages={errorMessages}
             />
           )}
+          <HideDossierButton dossier={d} nl={nl} errorMessages={errorMessages} />
         </div>
         <h2 className="text-xl font-bold tracking-tight">{d.activity}</h2>
         <div className="flex flex-wrap items-center gap-2 text-xs text-vtk-muted">
           <StatusPill dossier={d} f={f} />
+          <StatusNote dossier={d} f={f} />
           <span>
-            {d.eventDate ? f.day(d.eventDate, true) : nl ? "Geen datum in het budget" : "No date in the budget"}
-            {d.location && ` · ${d.location}`}
+            {[
+              d.budgets[0]
+                ? nl
+                  ? `Budget op ${d.budgets[0].meetingLabel}${d.date ? ` (${f.day(d.date, true)})` : ""}`
+                  : `Budget at ${d.budgets[0].meetingLabel}${d.date ? ` (${f.day(d.date, true)})` : ""}`
+                : null,
+              d.eventDate ? (nl ? `activiteit ${f.day(d.eventDate)}` : `activity ${f.day(d.eventDate)}`) : null,
+              d.location,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
         </div>
       </div>

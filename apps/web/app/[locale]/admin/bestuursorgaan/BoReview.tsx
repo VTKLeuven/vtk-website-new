@@ -9,7 +9,7 @@ import { ExternalLinkIcon, PencilIcon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
 import { SAVE_IDLE } from "@/lib/saveState";
 import { assignBoPostsAction, pairBoResultAction } from "@/app/actions/bestuursorgaan";
-import type { Locale } from "./BoParts";
+import { HideFileButton, type Locale } from "./BoParts";
 
 /*
  * "Na te kijken": wat een beslissing van Groep 5 vraagt voor het overzicht
@@ -79,7 +79,7 @@ export function BoReview({
       {open && (
         <div className="vtk-bo-review-body">
           {data.unknownPosts.length > 0 && (
-            <Group title={nl ? "Welke post is dit?" : "Which post is this?"} hint={nl ? "Kies er één of meer. Een naam onthoudt de site voor de volgende bestanden; een datum of een getal enkel voor dit bestand." : "Pick one or more. A name is remembered for the next files; a date or a number only for this file."}>
+            <Group title={nl ? "Welke post is dit?" : "Which post is this?"} hint={nl ? "Kies er één of meer; dat geldt voor dit bestand. Is de naam altijd die post (zoals WERKGROEPEN), vink dan ook de volgende bestanden aan." : "Pick one or more; that applies to this file. If the name always means that post (like WERKGROEPEN), tick the later files too."}>
               {data.unknownPosts.map((post) => (
                 <Row
                   key={post.key}
@@ -99,6 +99,11 @@ export function BoReview({
                       errorMessages={errorMessages}
                     />
                   }
+                  actions={
+                    post.files.length === 1 ? (
+                      <HideFileButton docId={post.files[0].id} name={post.files[0].name} nl={nl} errorMessages={errorMessages} />
+                    ) : null
+                  }
                 />
               ))}
             </Group>
@@ -111,6 +116,7 @@ export function BoReview({
                   title={item.activity}
                   text={`${item.postName} · ${item.meetingLabel}`}
                   control={<PairBudget locale={locale} item={item} errorMessages={errorMessages} />}
+                  actions={<HideFileButton docId={item.resultId} name={item.activity} nl={nl} errorMessages={errorMessages} />}
                 />
               ))}
             </Group>
@@ -118,14 +124,26 @@ export function BoReview({
           {data.unclassified.length > 0 && (
             <Group title={nl ? "Budget of resultaat?" : "Budget or result?"} hint={nl ? "De naam zegt het niet en het bestand staat niet in Budgetten of Resultaten. Zet het woord Budget of Resultaat in de naam, of verplaats het naar een van die mappen." : "The name does not say and the file is not in Budgetten or Resultaten. Put the word Budget or Resultaat in the name, or move it into one of those folders."}>
               {data.unclassified.map((doc) => (
-                <Row key={doc.id} title={doc.name} text={doc.meetingLabel} control={<DriveLink href={doc.webUrl} name={doc.name} nl={nl} />} />
+                <Row
+                  key={doc.id}
+                  title={doc.name}
+                  text={doc.meetingLabel}
+                  control={<DriveLink href={doc.webUrl} name={doc.name} nl={nl} />}
+                  actions={<HideFileButton docId={doc.id} name={doc.name} nl={nl} errorMessages={errorMessages} />}
+                />
               ))}
             </Group>
           )}
           {data.unreachable.length > 0 && (
             <Group title={nl ? "Niet te openen" : "Cannot be opened"} hint={nl ? `Deel het bestand of de map erboven met ${driveSubject ?? "het Drive-account"}; de bedragen staan er dan bij de volgende ronde.` : `Share the file or the folder above it with ${driveSubject ?? "the Drive account"}; the amounts appear on the next round.`}>
               {data.unreachable.map((doc) => (
-                <Row key={doc.id} title={doc.name} text={doc.meetingLabel} control={<DriveLink href={doc.webUrl} name={doc.name} nl={nl} />} />
+                <Row
+                  key={doc.id}
+                  title={doc.name}
+                  text={doc.meetingLabel}
+                  control={<DriveLink href={doc.webUrl} name={doc.name} nl={nl} />}
+                  actions={<HideFileButton docId={doc.id} name={doc.name} nl={nl} errorMessages={errorMessages} />}
+                />
               ))}
             </Group>
           )}
@@ -147,14 +165,17 @@ function Group({ title, hint, children }: { title: string; hint: string; childre
   );
 }
 
-function Row({ title, text, control }: { title: string; text: string; control: ReactNode }) {
+function Row({ title, text, control, actions }: { title: string; text: string; control: ReactNode; actions?: ReactNode }) {
   return (
     <li className="vtk-bo-review-row">
       <span className="min-w-0 flex-1">
         <b className="block break-words text-sm text-vtk-ink">{title}</b>
         <span className="block break-all text-xs text-vtk-muted">{text}</span>
       </span>
-      <span className="vtk-bo-review-control">{control}</span>
+      <span className="vtk-bo-review-control">
+        {control}
+        {actions}
+      </span>
     </li>
   );
 }
@@ -206,6 +227,11 @@ export function AssignPosts({
   options: SearchPickerOption[];
   label?: string;
   docIds: string[];
+  /**
+   * `naam`: standaard enkel deze bestanden, met een vinkje om de naam te
+   * onthouden voor de volgende. `bestand`: enkel deze bestanden, zonder vinkje
+   * (een naam zonder letters, of "Post wijzigen").
+   */
   scope: "naam" | "bestand";
   value?: string[];
   errorMessages: Record<string, string>;
@@ -226,12 +252,13 @@ export function AssignPosts({
       ariaLabel={nl ? `Posten voor ${label ?? "dit bestand"}` : `Posts for ${label ?? "this file"}`}
       applyLabel={nl ? "Toepassen" : "Apply"}
       clearText={scope === "bestand" ? (nl ? "Niets aangevinkt: de posten komen weer uit de naam." : "Nothing ticked: the posts come from the name again.") : undefined}
+      rememberLabel={scope === "naam" && label ? (nl ? `Ook voor volgende bestanden met "${label}"` : `Also for later files with "${label}"`) : undefined}
       emptyText={(q) => (nl ? `Geen post past bij "${q}".` : `No post matches "${q}".`)}
-      onApply={(keys) =>
+      onApply={(keys, remember) =>
         save(
           assignBoPostsAction,
-          { scope, label: label ?? "", docIds: docIds.join(","), postKeys: keys.join(",") },
-          scope === "naam"
+          { scope: remember ? "naam" : "bestand", label: label ?? "", docIds: docIds.join(","), postKeys: keys.join(",") },
+          remember
             ? nl
               ? `"${label}" gekoppeld; elk bestand met die naam volgt mee.`
               : `"${label}" linked; every file with that name follows.`

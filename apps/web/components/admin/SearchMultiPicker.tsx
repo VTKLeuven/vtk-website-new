@@ -27,6 +27,7 @@ export function SearchMultiPicker({
   applyLabel,
   emptyText,
   clearText,
+  rememberLabel,
   disabled = false,
   attention = false,
   autoOpen = false,
@@ -35,7 +36,8 @@ export function SearchMultiPicker({
   options: readonly SearchPickerOption[];
   /** De keuze zoals ze nu bewaard is. */
   value: readonly string[];
-  onApply: (values: string[]) => void;
+  /** `remember`: of het vinkje van `rememberLabel` aanstond. */
+  onApply: (values: string[], remember: boolean) => void;
   placeholder: string;
   searchPlaceholder: string;
   ariaLabel: string;
@@ -43,6 +45,11 @@ export function SearchMultiPicker({
   emptyText: (query: string) => string;
   /** Wat leeg toepassen doet, in de voet zodra alles uitgevinkt is. */
   clearText?: string;
+  /**
+   * Een vinkje in de voet, standaard uit: de keuze ook onthouden voor wat
+   * later komt ("Ook voor volgende bestanden met ..."). Zonder: geen vinkje.
+   */
+  rememberLabel?: string;
   disabled?: boolean;
   attention?: boolean;
   autoOpen?: boolean;
@@ -52,6 +59,7 @@ export function SearchMultiPicker({
   const [open, setOpen] = useState(autoOpen);
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<string[]>([...value]);
+  const [remember, setRemember] = useState(false);
   const [highlighted, setHighlighted] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -89,6 +97,7 @@ export function SearchMultiPicker({
   function openList() {
     if (disabled) return;
     setPicked([...value]);
+    setRemember(false);
     setQuery("");
     setHighlighted(0);
     setOpen(true);
@@ -106,7 +115,7 @@ export function SearchMultiPicker({
   }
 
   function apply() {
-    onApply(picked);
+    onApply(picked, remember);
     close(true);
   }
 
@@ -205,6 +214,12 @@ export function SearchMultiPicker({
             {visible.length === 0 ? <p className="vtk-code-picker-empty">{emptyText(query.trim())}</p> : null}
           </div>
           <div className="vtk-code-picker-footer">
+            {rememberLabel ? (
+              <label className="vtk-code-picker-remember">
+                <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+                {rememberLabel}
+              </label>
+            ) : null}
             <span>
               {picked.length
                 ? picked.map((v) => options.find((o) => o.value === v)?.label ?? v).join(" + ")

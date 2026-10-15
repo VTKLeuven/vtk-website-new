@@ -129,15 +129,29 @@ keer; wie een som maakt over posten heen, ontdubbelt op `dossier.key`.
 Wat de site niet herkent, staat bij "Na te kijken", met een doorzoekbare lijst
 waarin je één of meer posten aanvinkt:
 
-- een **schrijfwijze** (`WERKGROEPEN`, `Eetstand`) koppel je één keer en die
-  keuze (`BoPostAlias.postKeys`) geldt voor elk volgend bestand;
-- een naam **zonder letters** (enkel een datum, of geen post) vraagt het per
-  activiteit, want een datum zegt niets over het volgende bestand.
+- standaard geldt de keuze **enkel voor dat bestand** (`BoDocument.postKeys`).
+  Een naam die geen post bleek ("Eetstand" bij Onthaal), blijft dan deel van de
+  activiteit: "Eetstand Wiskundeweek";
+- vink je "Ook voor volgende bestanden met ..." aan, dan wordt het een
+  **schrijfwijze** (`BoPostAlias.postKeys`) die voor elk volgend bestand geldt,
+  zoals `WERKGROEPEN`. Een naam zonder letters (enkel een datum) heeft dat
+  vinkje niet.
 
 Zit de naam ernaast, dan zet "Post wijzigen" in het detail van een activiteit
 de post(en) voor al haar bestanden (`BoDocument.postKeys`); dat wint van de
 naam en van een koppeling, en leeg toepassen zet het terug. Zonder keuze
 verdwijnt er niets: de bestanden staan dan onder "Niet herkend".
+
+**Een versie** achteraan de naam (`_v2`, `versie 3`, `(1)`, `_final`) of
+"Kopie van" vooraan valt weg uit de activiteit (`ParsedDocumentName.version`):
+de versies staan onder één activiteit, en het laatste budget telt (op dezelfde
+BO de hoogste versie).
+
+**Niet meetellen** haalt een bestand (of alle bestanden van een activiteit) uit
+het overzicht: `BoDocument.hiddenAt`, voor elke rij met hetzelfde
+`driveFileId`. `buildOverview` slaat het over, ook bij Na te kijken. De scan
+raakt die kolom niet aan, dus het blijft weg; terugzetten gebeurt onder
+Instellingen ("Niet meegeteld").
 
 **Budget en resultaat horen samen** wanneer jaar en activiteit gelijk zijn en ze
 minstens één post gemeen hebben, na het wegvegen van hoofdletters, accenten en
@@ -165,20 +179,22 @@ O.
 | Budget          | Totaal, kolom Budget, van het laatste budget                |
 | Resultaat       | Totaal, kolom Resultaat, van het laatste resultaat          |
 | Stand           | resultaat min budget; anders de status                      |
-| datum           | de cel onder "Datum" in Info (bij een bereik de eerste dag) |
+| activiteit op   | de cel onder "Datum" in Info (bij een bereik de eerste dag); enkel ter info |
 | plaats          | de cel onder "Locatie" in Info                              |
 | VTK draagt 50%  | de regel VTK onder "Verdeling", wanneer die kleiner is dan 1 |
 | Bedragen        | elke regel boven "Inkomsten" (inkomst) en tussen "Inkomsten" en "Uitgaven" (kost), uit het laatste resultaat, anders uit het budget; een regel die op nul bleef, valt weg |
 
-Een budget zonder resultaat is "Resultaat open" zodra de datum uit het budget
-voorbij is, of wanneer het budget er geen noemt; met een datum in de toekomst
-staat er "Op 6 nov".
+**De datum die telt, is die van de BO** waarop het eerste budget passeerde
+(`Dossier.date`), niet die uit het rekenblad. Een budget zonder resultaat is
+"Resultaat open" vanaf die BO, en "Open · 12 d" zijn de dagen sindsdien. Een
+budget op een BO die nog moet komen, staat als "BO op 22 okt". Enkel een
+schriftelijke goedkeuring heeft geen BO-datum ("Open · schriftelijk").
 
-Een datum die niet bij de BO's van het dossier past (meer dan 180 dagen voor de
-eerste of 400 dagen na de laatste), telt niet: dat is een oud sjabloon. De
-activiteit rekent dan zonder datum, en het detail noemt de genegeerde datum
-(`Dossier.dateIgnored`). Een jaar buiten 2000 tot 2100 laat `figures.ts` al bij
-het lezen vallen.
+De datum uit het rekenblad (`Dossier.eventDate`) staat enkel ter info in het
+detail en de tijdlijn, en ook dat enkel wanneer ze bij de BO's past (niet meer
+dan 180 dagen voor de eerste of 400 dagen na de laatste; anders is het een oud
+sjabloon). Een jaar buiten 2000 tot 2100 laat `figures.ts` al bij het lezen
+vallen.
 
 ## De twee weergaven
 
@@ -200,7 +216,7 @@ URL (`history.pushState`): het hele werkingsjaar kwam al mee met de pagina.
 | `tab`         | `bos` of `open`; zonder: Posten                            |
 | `post`        | de post (`g:<groupId>`, een vak als `x:vice`, of `l:<schrijfwijze>` als de site de post niet kent) |
 | `bo`          | de id van een `BoMeeting`                                  |
-| `leeftijd`    | in Open: `geen-datum`, `2-maanden`, `1-maand`, `2-weken`, `recent` |
+| `leeftijd`    | in Open, sinds de BO van het budget: `2-maanden`, `1-maand`, `2-weken`, `recent`, `schriftelijk` |
 | `activiteit`  | de sleutel van een dossier: jaar, posten (met `+`) en activiteit, gescheiden door een verticale streep. Wijzigt de post, dan vindt `findDossier` dezelfde activiteit in hetzelfde jaar terug |
 | `blad`        | `tijdlijn` of `bestanden`; zonder: Bedragen               |
 
@@ -215,9 +231,17 @@ of een activiteit opent dan haar formulier), en daarnaast:
 | `grafiek`     | `1`: de grafiek in plaats van de tabel                     |
 | `postblad`    | in het postformulier: `bos` of `posten`; zonder: Activiteiten |
 
-"Voorbij en afgerond" telt enkel activiteiten waarvan de datum voorbij is of die
-geen datum hebben; "gem. tot resultaat" is het aantal dagen tussen de activiteit
-en de BO waarop het resultaat passeerde.
+"Voorbij en afgerond" telt enkel budgetten waarvan de BO al was (of die
+schriftelijk goedgekeurd werden); "gem. tot resultaat" is het aantal dagen
+tussen de BO van het budget en die van het resultaat. In de linkerkolom staat
+dat per post als "3/4".
+
+**Resultaten per post** onderaan (`BoSummary.tsx`, `lib/bo/summary.ts`) toont
+dezelfde cijfers voor elke post en elk vak, ook zonder budget, met de totalen
+voor VTK en de werkgroepen (een activiteit telt bij de werkgroepen wanneer al
+haar posten werkgroepen zijn). Een vak voor uitzonderingen (Groep 5 als
+geheel, Andere jaarwerking, Overige: `PostOption.catchAll`) staat er enkel
+wanneer er iets in zit.
 
 ---
 
@@ -254,6 +278,15 @@ en de BO waarop het resultaat passeerde.
 - **Zoek eerst op de naam, dan op de groep.** De keuzelijst zocht ook in de
   groepsnaam, en "overige" vond zo eerst Jaarwerkingen ("Jaarwerkingen en
   overige"); Enter vinkte dan de verkeerde aan.
+- **Een datum meteen na "BO" is geen nummer.** Een map "BO 30/08" werd "BO 30"
+  terwijl het jaar aan BO 9 zat. `parseMeetingFolderName` leest een getal dat
+  meteen door `/`, `.` of een streepje zonder spaties gevolgd wordt als datum;
+  "BO 5 - 20/09" blijft BO 5. De scan zet het nummer bij elke ronde opnieuw,
+  dus een foute rij herstelt zich vanzelf.
+- **Hetzelfde bestand kan in twee BO-mappen staan** (een snelkoppeling). Dat
+  zijn twee rijen in `BoDocument` (per BO één), maar `buildOverview` toont het
+  één keer, op de eerste BO, met "ook in BO x" (`DocView.alsoIn`). Een
+  koppeling naar de weggevallen rij volgt mee.
 - **Een fout in de scan breekt de groepssync niet.** De worker roept beide in
   dezelfde ronde aan, maar de statuscode volgt enkel de groepssync; een fout in
   de BO-scan staat op `/admin/bestuursorgaan`.

@@ -11346,11 +11346,14 @@ Hoe het werkt staat in `docs/bestuursorgaan.md`; dit zijn de keuzes erachter.
 - **Een register, geen momentopname.** Verdwijnt een map of een bestand uit
   Drive, dan blijft het staan met "niet meer in Drive": wat langs het BO
   passeerde, is gebeurd, ook als iemand de map later opruimt.
-- **Een resultaat is open zodra de activiteit voorbij is, niet zodra het budget
-  passeerde.** De datum komt uit het blok Info van het budget. Een budget voor
-  de 24 urenloop in april staat in oktober dus als "Op 22 apr" en niet als
-  achterstand; zonder datum telt het wel als open, want dan weet niemand of het
-  al had moeten binnenkomen.
+- **Alles rekent op de datum van de BO, niet op de datum van de activiteit**
+  (oktober 2026, op vraag van Groep 5). Een resultaat is open zodra het budget
+  op een BO passeerde, en "12 d" betekent twaalf dagen sinds die BO. Eerst
+  rekende de site op de datum uit het blok Info van het rekenblad, maar die
+  ontbrak bij een groot deel van de budgetten, en een oud sjabloon gaf "8043
+  dagen open". De BO-datum is er altijd en zegt wat Groep 5 wil weten: hoe lang
+  wachten we al op dit resultaat. De datum uit het rekenblad staat nog ter info
+  in het detail. Enkel een budget op een BO die nog moet komen, "komt nog".
 - **Het lopende werkingsjaar en het vorige.** De resultaten van vorig jaar
   komen nog binnen in de eerste BO's van het nieuwe, en hun budgetten staan in
   de map van vorig jaar. De jaarmap zoekt de site zelf ("2026 - 2027 ..."), zodat
@@ -11373,11 +11376,15 @@ BO ruimer dan een `Group`. Wat Groep 5 vroeg, en waarom het zo gebouwd is:
   dient eigen budgetten in, en één blok "Groep 5" verborg wie wat openliet.
   `26-27_Budget_Vice_LOKO` herkent de site daarom vanzelf; Groep 5 zelf blijft
   kiesbaar voor wat het hele dagelijks bestuur aangaat.
-- **Jaarwerkingen en Overige** zijn twee vakken voor wat niet bij één post
-  hoort: Halftime en Studentenwelkom, en "random" zoals het de vraag was.
-  `26-27_Budget_Halftime_GoGlobal` wordt de activiteit "Halftime GoGlobal" in
-  Jaarwerkingen: de naam van de jaarwerking gaat voor de activiteit, anders
-  weet niemand meer waarover "GoGlobal" ging.
+- **Elke jaarwerking is een eigen vak** (Kanweek, Parttime, Halftime,
+  Fulltime, Overtime, Duplex, Triplex, Skireis, Studentenwelkom), onder de kop
+  Jaarwerkingen, zoals in het rekenblad waarmee Groep 5 dit vroeger bijhield.
+  Eén vak "Jaarwerkingen" was eerst gebouwd, maar dan zie je niet welke
+  jaarwerking achterloopt. Voor een jaarwerking die er niet bij staat, is er
+  "Andere jaarwerking"; `JW_...` en `WG_...` in een naam lezen als het soort,
+  met de post erna.
+- **Overige** is een vak voor wat niet bij één post hoort ("random", zoals het
+  de vraag was).
 - **Die zes vakken staan in code** (`BO_EXTRA_POSTS` in `lib/bo/posts.ts`), niet
   als `Group`: ze hebben geen leden, geen pagina en geen werkingsjaar, en
   zouden als groep in elke ledenlijst en elk rechtenscherm opduiken. Een vak en
@@ -11395,29 +11402,61 @@ BO ruimer dan een `Group`. Wat Groep 5 vroeg, en waarom het zo gebouwd is:
   ongedaan te maken bij Bestanden.
 - **De post van één activiteit kan je met de hand wijzigen** ("Post wijzigen"
   in het detail, in beide weergaven), voor alle bestanden van die activiteit.
-  Dat wint van de naam; leeg toepassen zet de naam weer in charge. Een
-  schrijfwijze koppelen geldt voor elk volgend bestand; dit enkel voor deze.
+  Dat wint van de naam; leeg toepassen zet de naam weer in charge.
+- **Een post kiezen bij "Na te kijken" geldt standaard enkel voor dat bestand.**
+  "2026/09/07 Eetstand Wiskundeweek Begroting" hoort bij Onthaal, maar
+  "Eetstand" is daarom geen schrijfwijze van Onthaal. Wie wil dat de naam ook
+  voor volgende bestanden geldt (WERKGROEPEN), vinkt dat aan. Eerst was het
+  omgekeerd, en dan werd elk volgend bestand met die naam stil bij de verkeerde
+  post gezet. De naam die geen post bleek, blijft deel van de activiteit
+  ("Eetstand Wiskundeweek").
+- **Een nieuwe versie is geen nieuwe activiteit.** `_v2`, `versie 3`, `(1)`,
+  `_final` en "Kopie van ..." vallen weg uit de activiteit; de versies staan
+  samen onder één activiteit en de laatste (op dezelfde BO de hoogste) telt.
+  Zonder dat stond "werkgroepen-feestje" naast "werkgroepen-feestje v2", allebei
+  open.
+- **Wat er niet hoort, haal je weg met "Niet meetellen"**, per bestand (bij
+  Bestanden en bij Na te kijken) of voor een hele activiteit (in de kop van het
+  detail). Drive verandert niet en de scan zet het niet terug
+  (`BoDocument.hiddenAt`); terugzetten kan onder Instellingen, bij "Niet
+  meegeteld". Wegdoen vraagt een bevestiging die zegt wat er verdwijnt,
+  terugzetten niet: daar gaat niets bij verloren.
 - **Een jaartal anders geschreven is nog altijd 26-27**: `26_27`, `2627`,
   `2026-2027` en `26 - 27` herkent de site, net als een datum vooraan
   (`2026/09/07 Eetstand ... Begroting`) en een streepje waar een underscore
   hoorde (`Statix-Talks`). Dezelfde regel als hierboven: niemand hoeft te
   hernoemen om in het overzicht te staan.
-- **Een datum die niet bij de BO's past, telt niet.** Een rekenblad op een oud
-  sjabloon gaf "1/9/2004", en de activiteit stond 8043 dagen te laat. Ligt de
-  datum meer dan een half jaar voor de eerste BO van het dossier of meer dan
-  400 dagen na de laatste, dan rekent de site alsof er geen datum staat en zegt
-  ze in het detail welke datum ze negeerde. Een jaar buiten 2000 tot 2100 (een
-  typfout als "5/3/20026") valt al bij het lezen weg.
+- **Een datum uit het rekenblad die niet bij de BO's past, toont de site niet**
+  (meer dan een half jaar voor de eerste BO of 400 dagen na de laatste: een oud
+  sjabloon). Een jaar buiten 2000 tot 2100 (een typfout als "5/3/20026") valt
+  al bij het lezen weg; dat hield eerst de hele scan tegen.
 - **"Na te kijken" staat dicht**, als één regel met de aantallen. Open stond het
   als een lange lijst boven de cijfers, en die kwamen pas na een scroll in
   beeld. De keuzes erin zijn doorzoekbare lijsten (`SearchPicker`,
   `SearchMultiPicker`), geen kale `<select>` van veertig posten.
 - **De linkerkolom van de verkenner is één regel per post, per vak** (Groep 5,
   Posten, Werkgroepen, Jaarwerkingen en overige, Niet herkend), met rechts
-  amber "2 open", een vinkje als alles binnen is, of een streepje als er nog
-  niets voorbij is. Twee regels met een balkje en "7/7" waren te druk, en die
-  breuk zei weinig: zonder open resultaat is ze altijd vol. De details staan in
-  de tooltip en in de kop van het middelste paneel.
+  "3/4": hoeveel resultaten binnen zijn van wat al voorbij is, in dezelfde
+  kleuren als het overzicht per post (rood onder 50%, oranje onder 100%, groen
+  als alles binnen is), of een streepje als er nog niets voorbij is. Twee
+  regels met een balkje waren te druk; "2 open" alleen zei te weinig, want 2
+  van 3 is iets anders dan 2 van 20.
+- **De stand is altijd een van vier woorden**: Open, Komt nog, Afgerond, Geen
+  budget, elk met een vaste kleur. Wat erbij hoort (hoeveel dagen, de
+  afwijking, "via grocomeet") staat als tekst naast de BO-datum. Eerst stonden
+  "Open · 16 d", "Op 3 nov", "Via grocomeet", "Afgerond" en "+€ 3,49" allemaal
+  als pil in dezelfde kolom, en dat las als een raadsel.
+- **Onderaan staat "Resultaten per post"**, gemaakt voor een schermafbeelding
+  op de wekelijkse slide waarmee Groep 5 posten aanspreekt. Het volgt het oude
+  rekenblad: per post de gepasseerde budgetten, de resultaten, wat mist en het
+  percentage in rood, oranje of groen, elke post ook zonder budget, en
+  bovenaan de totalen voor VTK en voor de werkgroepen. Alles staat in één
+  kader, met de datum en de laatste BO erin, zodat één schermafbeelding volstaat.
+- **De afwijking staat niet in de balk met de cijfers van het jaar.** Een som
+  van meevallers en tegenvallers over alle posten zei Groep 5 niets; per
+  activiteit en per post staat ze er wel.
+- **Hetzelfde bestand in twee BO-mappen is één bestand** (een snelkoppeling): het
+  telt op de eerste BO, en het detail zegt waar het ook stond.
 
 ## Bestuursorgaan: de verkenner
 
@@ -11434,11 +11473,11 @@ https://claude.ai/artifact/VpxcbRLcNKHuuaxpYKnejB
   post naar de andere. Zonder gekozen activiteit toont het rechterpaneel de
   cijfers van de post of de BO, zodat het nooit leeg staat.
 - **Het percentage per post telt enkel wat voorbij is.** "7/9 · 78%" betekent:
-  van de negen activiteiten die al plaatsvonden (of geen datum hebben), hebben
-  er zeven een resultaat. Een budget voor april drukt het percentage in oktober
-  niet.
-- **Open is een eigen tab, ingedeeld naar hoe lang het al duurt**: minder dan
-  twee weken, twee tot vier, een tot twee maanden, langer, en zonder datum. Een
+  van de negen budgetten die al op een BO passeerden, hebben er zeven een
+  resultaat. Een budget voor een BO die nog komt, drukt het percentage niet.
+- **Open is een eigen tab, ingedeeld naar hoe lang het al duurt** sinds de BO
+  van het budget: minder dan twee weken, twee tot vier, een tot twee maanden,
+  langer, en schriftelijk goedgekeurd (zonder BO-datum). Een
   achterstand van drie dagen is geen probleem, een van drie maanden wel; een
   lijst zonder die indeling maakt ze even zwaar.
 - **Per activiteit de posten uit het rekenblad** (Zaal, Drank, Inkom), budget en

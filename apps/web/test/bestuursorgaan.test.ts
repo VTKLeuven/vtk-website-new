@@ -14,6 +14,7 @@ import {
 import { postOptions, resolvePost, resolvePostKeys, splitPost } from "@/lib/bo/posts";
 import { findDossier, toExplorerData } from "@/lib/bo/explorer";
 import { groupByMeeting, groupDossiers, matchesFilters } from "@/lib/bo/list";
+import { buildSummary } from "@/lib/bo/summary";
 
 /*
  * Het overzicht van het Bestuursorgaan. De namen hieronder komen letterlijk uit
@@ -46,6 +47,21 @@ describe("bestandsnamen", () => {
     expect(parseDocumentName(name)).toEqual(expected);
   });
 
+  it.each([
+    ["26-27_BUDGET_WERKGROEPEN_werkgroepen-feestje_v2", "werkgroepen-feestje", 2],
+    ["26-27_Budget_Sport_VTKlimmen versie 3.xlsx", "VTKlimmen", 3],
+    ["26-27_Budget_Sport_VTKlimmen (1).xlsx", "VTKlimmen", 1],
+    ["26-27_Budget_Sport_VTKlimmen_final", "VTKlimmen", 100],
+    ["Kopie van 26-27_Budget_Sport_VTKlimmen", "VTKlimmen", 1],
+    ["26-27_Budget_Sport_VTKlimmen", "VTKlimmen", undefined],
+    // Een woord dat op v2 eindigt, of een activiteit die enkel een versie is, blijft.
+    ["26-27_Budget_IT_Serverv2", "Serverv2", undefined],
+  ])("haalt de versie uit %s", (name, activity, version) => {
+    const parsed = parseDocumentName(name);
+    expect(parsed.activity).toBe(activity);
+    expect(parsed.version).toBe(version);
+  });
+
   it("ziet 'Budget' in een activiteit niet als het soort", () => {
     expect(parseDocumentName("26-27_Resultaat_IT_Budget_Router").kind).toBe("RESULT");
     expect(parseDocumentName("26-27_Resultaat_IT_Budget_Router").activity).toBe("Budget Router");
@@ -70,12 +86,17 @@ describe("mappen", () => {
     ["BO 7 - 4/10", { kind: "MEETING", number: 7, day: 4, month: 10 }],
     ["BO 4 - Begrotings BO - 11/09", { kind: "BUDGET_MEETING", number: 4, day: 11, month: 9 }],
     ["Schriftelijke goedkeuring", { kind: "WRITTEN", number: null, day: null, month: null }],
+    // Een datum meteen na BO is geen nummer: dit is geen "BO 30".
+    ["BO 30/08", { kind: "MEETING", number: null, day: 30, month: 8 }],
+    ["BO 30-06", { kind: "MEETING", number: null, day: 30, month: 6 }],
+    ["BO5 - 20/09", { kind: "MEETING", number: 5, day: 20, month: 9 }],
   ])("%s", (name, expected) => {
     expect(parseMeetingFolderName(name)).toEqual(expected);
   });
 
   it("slaat een map over die geen vergadering is", () => {
     expect(parseMeetingFolderName("Sjablonen")).toBeNull();
+    expect(parseMeetingFolderName("BO's oud")).toBeNull();
   });
 
   it("vindt het werkingsjaar van een jaarmap", () => {
@@ -169,17 +190,39 @@ describe("posten", () => {
     expect(splitPost("Kringraad", "LOKO", all, none)).toEqual({ label: "Kringraad", postKeys: [], activity: "LOKO" });
   });
 
-  it("zet de naam van een jaarwerking voor de activiteit", () => {
-    expect(splitPost("Halftime", "GoGlobal", POSTS, none)).toEqual({ label: "Halftime", postKeys: ["x:jaarwerkingen"], activity: "Halftime GoGlobal" });
-    expect(splitPost("Studentenwelkom", null, POSTS, none)).toEqual({ label: "Studentenwelkom", postKeys: ["x:jaarwerkingen"], activity: "Studentenwelkom" });
-    // Wie het vak zelf noemt, krijgt het niet nog eens in de activiteit.
+  it("geeft elke jaarwerking haar eigen vak", () => {
+    expect(splitPost("Halftime", "GoGlobal", POSTS, none)).toEqual({ label: "Halftime", postKeys: ["x:halftime"], activity: "GoGlobal" });
+    expect(splitPost("Studentenwelkom", null, POSTS, none)).toEqual({ label: "Studentenwelkom", postKeys: ["x:studentenwelkom"], activity: null });
+    expect(splitPost("Skireis", "Bus", POSTS, none)).toEqual({ label: "Skireis", postKeys: ["x:skireis"], activity: "Bus" });
+    // Een jaarwerking die er niet bij staat: de naam gaat voor de activiteit.
     expect(splitPost("Jaarwerkingen", "Galabal", POSTS, none)).toEqual({ label: "Jaarwerkingen", postKeys: ["x:jaarwerkingen"], activity: "Galabal" });
+  });
+
+  it("leest WG en JW als het soort post, met de post erna", () => {
+    const all = [...POSTS, ...WERKGROEPEN];
+    expect(splitPost("WG", "Statix Day", all, none)).toEqual({ label: "Statix", postKeys: ["g:statix"], activity: "Day" });
+    expect(splitPost("WG - Statix", "Day", all, none)).toEqual({ label: "Statix", postKeys: ["g:statix"], activity: "Day" });
+    expect(splitPost("JW", "Halftime GoGlobal", all, none)).toEqual({ label: "Halftime", postKeys: ["x:halftime"], activity: "GoGlobal" });
+    // "WERKGROEPEN" is alle werkgroepen samen, geen soort.
+    expect(splitPost("WERKGROEPEN", "feestje", all, none).postKeys).toEqual([]);
   });
 
   it("biedt de posten aan per vak, Groep 5 met haar rollen eerst", () => {
     const options = postOptions([...POSTS, ...WERKGROEPEN], true);
     expect(options.slice(0, 5).map((o) => o.name)).toEqual(["Groep 5", "Praeses", "Vice-praeses", "Secretaris", "Beheer"]);
-    expect([...new Set(options.map((o) => o.group))]).toEqual(["Groep 5", "Posten", "Werkgroepen", "Jaarwerkingen en overige"]);
+    expect([...new Set(options.map((o) => o.group))]).toEqual(["Groep 5", "Posten", "Werkgroepen", "Jaarwerkingen", "Overige"]);
+    expect(options.filter((o) => o.group === "Jaarwerkingen").map((o) => o.name)).toEqual([
+      "Kanweek",
+      "Parttime",
+      "Halftime",
+      "Fulltime",
+      "Overtime",
+      "Duplex",
+      "Triplex",
+      "Skireis",
+      "Studentenwelkom",
+      "Andere jaarwerking",
+    ]);
   });
 });
 
@@ -380,20 +423,29 @@ describe("budgetten en resultaten samenleggen", () => {
     expect(dossier.results.map((r) => r.meetingLabel)).toEqual(["BO 9"]);
   });
 
-  it("onderscheidt een activiteit die nog komt van een waarvan het resultaat ontbreekt", () => {
+  it("rekent op de BO van het budget, niet op de datum in het rekenblad", () => {
+    // Vandaag 10 september: BO 5 was, BO 12 komt nog.
+    const today = new Date(Date.UTC(2026, 8, 10));
     const overview = buildOverview(
       [
-        doc("26-27_Budget_Acti_VTKarttornooi", { eventDate: new Date(Date.UTC(2026, 10, 4)) }),
-        doc("26-27_Budget_Onthaal_Eerstejaarsreceptie", { eventDate: new Date(Date.UTC(2026, 8, 16)) }),
-        doc("26-27_Budget_Cultuur_VTKwis"),
+        // Een activiteit in november op een BO die al was: open sinds die BO.
+        doc("26-27_Budget_Acti_VTKarttornooi", { bo: 5, eventDate: new Date(Date.UTC(2026, 10, 4)) }),
+        doc("26-27_Budget_Cultuur_VTKwis", { bo: 5 }),
+        // Op een BO die nog moet komen: niemand wacht al op een resultaat.
+        doc("26-27_Budget_Onthaal_Eerstejaarsreceptie", { bo: 12 }),
       ],
       POSTS,
       new Map(),
       2026,
-      TODAY,
+      today,
     );
-    const status = Object.fromEntries(overview.posts.flatMap((p) => p.dossiers.map((d) => [d.activity, d.status])));
-    expect(status).toEqual({ VTKarttornooi: "UPCOMING", Eerstejaarsreceptie: "OPEN", VTKwis: "OPEN" });
+    const dossiers = overview.posts.flatMap((p) => p.dossiers);
+    const status = Object.fromEntries(dossiers.map((d) => [d.activity, [d.status, d.overdueDays]]));
+    expect(status).toEqual({ VTKarttornooi: ["OPEN", 5], VTKwis: ["OPEN", 5], Eerstejaarsreceptie: ["UPCOMING", null] });
+    expect(dossiers.find((d) => d.activity === "VTKarttornooi")).toMatchObject({
+      date: new Date(Date.UTC(2026, 8, 5)),
+      eventDate: new Date(Date.UTC(2026, 10, 4)),
+    });
     expect(overview.totals.open).toBe(2);
   });
 
@@ -455,9 +507,9 @@ describe("budgetten en resultaten samenleggen", () => {
       ["Praeses", "g5"],
       ["Vice-praeses", "g5"],
       ["Sport", "post"],
-      ["Jaarwerkingen", "extra"],
+      ["Halftime", "jaarwerking"],
     ]);
-    expect(overview.posts[3].dossiers[0].activity).toBe("Halftime GoGlobal");
+    expect(overview.posts[3].dossiers[0].activity).toBe("GoGlobal");
   });
 
   it("telt een budget van twee posten bij elk, en één keer in het totaal", () => {
@@ -477,6 +529,66 @@ describe("budgetten en resultaten samenleggen", () => {
     expect(cultuur.dossiers[0]).toMatchObject({ postKeys: ["g:cult", "g:onth"], status: "DONE", devCents: 5000 });
     expect(overview.global).toMatchObject({ budgets: 1, done: 1, sumBudget: -30000 });
     expect(overview.pairable).toEqual([]);
+  });
+
+  it("maakt van een tweede versie een nieuwe versie van hetzelfde budget", () => {
+    const overview = buildOverview(
+      [
+        doc("26-27_Budget_Sport_VTKlimmen", { bo: 5, budgetTotalCents: -37094 }),
+        doc("26-27_Budget_Sport_VTKlimmen_v2", { bo: 5, budgetTotalCents: -39400 }),
+      ],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    const dossiers = overview.posts.flatMap((p) => p.dossiers);
+    expect(dossiers).toHaveLength(1);
+    // Op dezelfde BO wint de hoogste versie.
+    expect(dossiers[0]).toMatchObject({ activity: "VTKlimmen", budgetCents: -39400 });
+    expect(dossiers[0].budgets.map((b) => b.name)).toEqual(["26-27_Budget_Sport_VTKlimmen", "26-27_Budget_Sport_VTKlimmen_v2"]);
+  });
+
+  it("telt hetzelfde bestand in twee BO-mappen één keer, op de eerste BO", () => {
+    const overview = buildOverview(
+      [
+        doc("26-27_Budget_Vice_Praesidiumweekend", { bo: 30, driveFileId: "same" }),
+        doc("26-27_Budget_Vice_Praesidiumweekend", { bo: 1, driveFileId: "same" }),
+      ],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    const [dossier] = overview.posts[0].dossiers;
+    expect(dossier.budgets.map((b) => [b.meetingLabel, b.alsoIn])).toEqual([["BO 1", ["BO 30"]]]);
+    expect(overview.global.budgets).toBe(1);
+  });
+
+  it("laat een bestand dat niet meetelt overal weg", () => {
+    const overview = buildOverview(
+      [doc("26-27_Budget_Sport_VTKlimmen", { budgetTotalCents: -21000 }), doc("Offerte karting", { hidden: true }), doc("26-27_Budget_Sport_Oud", { hidden: true })],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    expect(overview.posts.flatMap((p) => p.dossiers.map((d) => d.activity))).toEqual(["VTKlimmen"]);
+    expect(overview.unclassified).toEqual([]);
+    expect(overview.global.budgets).toBe(1);
+  });
+
+  it("houdt een naam die geen post is bij de activiteit, wanneer de post met de hand gekozen is", () => {
+    const overview = buildOverview(
+      [doc("2026/09/07 Eetstand Wiskundeweek Begroting", { postKeysOverride: ["g:onth"] })],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    expect(overview.posts.map((p) => p.name)).toEqual(["Onthaal"]);
+    expect(overview.posts[0].dossiers[0].activity).toBe("Eetstand Wiskundeweek");
+    expect(overview.unknownPosts).toEqual([]);
   });
 
   it("volgt een post die met de hand gekozen is, boven de naam", () => {
@@ -499,7 +611,7 @@ describe("budgetten en resultaten samenleggen", () => {
     expect(overview.global).toMatchObject({ done: 1, due: 1 });
   });
 
-  it("negeert een datum die niet bij de BO's past, zoals uit een oud sjabloon", () => {
+  it("toont geen datum uit het rekenblad die niet bij de BO's past, zoals uit een oud sjabloon", () => {
     const meetings: MeetingInput[] = [5].map((nr) => ({
       id: `m2026-${nr}`,
       name: `BO ${nr}`,
@@ -521,8 +633,7 @@ describe("budgetten en resultaten samenleggen", () => {
     );
     const [dossier] = overview.posts[0].dossiers;
     expect(dossier.eventDate).toBeNull();
-    expect(dossier.dateIgnored).toEqual(new Date(Date.UTC(2004, 8, 1)));
-    // Open sinds het budget (5 sep), niet sinds 2004.
+    // Open sinds de BO van het budget (5 sep), niet sinds 2004.
     expect(dossier).toMatchObject({ status: "OPEN", overdueDays: 40 });
   });
 
@@ -586,28 +697,29 @@ describe("de cijfers van de verkenner", () => {
   }));
 
   it("telt per post enkel wat voorbij is, en rekent dagen tot het resultaat", () => {
+    // Vandaag 10 september.
     const overview = buildOverview(
       [
-        // Afgerond: activiteit 1 sep, resultaat op BO 9 (9 sep): 8 dagen.
-        doc("26-27_Budget_IT_Router", { bo: 5, eventDate: new Date(Date.UTC(2026, 8, 1)), budgetTotalCents: -40000, allocationCents: -45000 }),
+        // Afgerond: budget op BO 5 (5 sep), resultaat op BO 9 (9 sep): 4 dagen.
+        doc("26-27_Budget_IT_Router", { bo: 5, budgetTotalCents: -40000, allocationCents: -45000 }),
         doc("26-27_Resultaat_IT_Router", { bo: 9, resultTotalCents: -38000 }),
-        // Open: activiteit 1 okt, vandaag 15 okt: 14 dagen.
-        doc("26-27_Budget_IT_Server", { bo: 7, eventDate: new Date(Date.UTC(2026, 9, 1)), budgetTotalCents: -120000, allocationCents: -100000 }),
-        // Komt nog: telt niet mee in het percentage.
-        doc("26-27_Budget_IT_Hackathon", { bo: 7, eventDate: new Date(Date.UTC(2026, 10, 20)), budgetTotalCents: -5000 }),
+        // Open: budget op BO 7 (7 sep): 3 dagen.
+        doc("26-27_Budget_IT_Server", { bo: 7, budgetTotalCents: -120000, allocationCents: -100000 }),
+        // Op BO 11, die nog komt: telt niet mee in het percentage.
+        doc("26-27_Budget_IT_Hackathon", { bo: 11, budgetTotalCents: -5000 }),
       ],
       POSTS,
       new Map(),
       2026,
-      TODAY,
+      new Date(Date.UTC(2026, 8, 10)),
       true,
       meetings,
     );
     const [it] = overview.posts;
-    expect(it.stats).toMatchObject({ due: 2, done: 1, pct: 0.5, open: 1, upcoming: 1, sumDev: 2000, better: 1, avgLagDays: 8, overAllocation: 1 });
-    expect(it.stats.oldest).toMatchObject({ activity: "Server", days: 14 });
+    expect(it.stats).toMatchObject({ due: 2, done: 1, pct: 0.5, open: 1, upcoming: 1, sumDev: 2000, better: 1, avgLagDays: 4, overAllocation: 1 });
+    expect(it.stats.oldest).toMatchObject({ activity: "Server", days: 3 });
     const router = it.dossiers.find((d) => d.activity === "Router")!;
-    expect(router).toMatchObject({ devCents: 2000, lagDays: 8, overdueDays: null });
+    expect(router).toMatchObject({ devCents: 2000, lagDays: 4, overdueDays: null });
     expect(overview.global.pct).toBe(0.5);
   });
 
@@ -657,7 +769,8 @@ describe("de cijfers van de verkenner", () => {
 
 
 describe("de lijstweergave", () => {
-  const meetings: MeetingInput[] = [5, 9].map((nr) => ({
+  // BO 35 valt op 5 oktober en BO 70 op 9 november: Date.UTC telt door.
+  const meetings: MeetingInput[] = [5, 9, 35, 70].map((nr) => ({
     id: `m2026-${nr}`,
     name: `BO ${nr}`,
     kind: "MEETING",
@@ -670,10 +783,10 @@ describe("de lijstweergave", () => {
   const data = toExplorerData(
     buildOverview(
       [
-        doc("26-27_Budget_IT_Router", { bo: 5, eventDate: new Date(Date.UTC(2026, 8, 1)), budgetTotalCents: -40000 }),
+        doc("26-27_Budget_IT_Router", { bo: 5, budgetTotalCents: -40000 }),
         doc("26-27_Resultaat_IT_Router", { bo: 9, resultTotalCents: -45000 }),
-        doc("26-27_Budget_IT_Server", { bo: 5, eventDate: new Date(Date.UTC(2026, 9, 1)), budgetTotalCents: -120000, allocationCents: -100000 }),
-        doc("26-27_Budget_Sport_VTKlimmen", { bo: 9, eventDate: new Date(Date.UTC(2026, 10, 20)), budgetTotalCents: -21000 }),
+        doc("26-27_Budget_IT_Server", { bo: 35, budgetTotalCents: -120000, allocationCents: -100000 }),
+        doc("26-27_Budget_Sport_VTKlimmen", { bo: 70, budgetTotalCents: -21000 }),
       ],
       POSTS,
       new Map(),
@@ -724,8 +837,63 @@ describe("de lijstweergave", () => {
   it("geeft per BO de bestanden die er passeerden, nieuwste BO eerst", () => {
     const groups = groupByMeeting(data.dossiers, data.meetings);
     expect(groups.map((g) => [g.meeting.label, g.rows.map((r) => `${r.doc.kind} ${r.dossier.activity}`)])).toEqual([
-      ["BO 9", ["BUDGET VTKlimmen", "RESULT Router"]],
-      ["BO 5", ["BUDGET Router", "BUDGET Server"]],
+      ["BO 70", ["BUDGET VTKlimmen"]],
+      ["BO 35", ["BUDGET Server"]],
+      ["BO 9", ["RESULT Router"]],
+      ["BO 5", ["BUDGET Router"]],
     ]);
+  });
+});
+
+describe("het overzicht per post (voor de slide)", () => {
+  const meetings: MeetingInput[] = [5, 9, 40].map((nr) => ({
+    id: `m2026-${nr}`,
+    name: `BO ${nr}`,
+    kind: "MEETING",
+    number: nr,
+    date: new Date(Date.UTC(2026, 8, nr)),
+    workingYear: 2026,
+    webUrl: "https://drive.google.com/drive/folders/x",
+    missing: false,
+  }));
+  const posts = [...POSTS, ...WERKGROEPEN];
+  // Vandaag 15 oktober: BO 40 valt op 10 oktober, dus die was al.
+  const data = toExplorerData(
+    buildOverview(
+      [
+        doc("26-27_Budget_IT_Router", { bo: 5 }),
+        doc("26-27_Resultaat_IT_Router", { bo: 9 }),
+        doc("26-27_Budget_IT_Server", { bo: 9 }),
+        doc("26-27_Budget_Statix_Talks", { bo: 9 }),
+        doc("26-27_Budget_Kringraad_Iets", { bo: 40 }),
+      ],
+      posts,
+      new Map(),
+      2026,
+      TODAY,
+      true,
+      meetings,
+    ),
+    2026,
+    TODAY,
+  );
+  const summary = buildSummary(data, postOptions(posts, true));
+  const rows = Object.fromEntries(summary.sections.flatMap((s) => s.rows.map((r) => [r.name, [r.due, r.done, r.missing, r.pct]])));
+
+  it("toont elke post, ook zonder budget, en een vak voor uitzonderingen enkel als het gebruikt wordt", () => {
+    expect(rows.IT).toEqual([2, 1, 1, 0.5]);
+    expect(rows.Sport).toEqual([0, 0, 0, null]);
+    expect(rows.Halftime).toEqual([0, 0, 0, null]);
+    expect(rows.Overige).toBeUndefined();
+    expect(rows["Groep 5"]).toBeUndefined();
+    // Een naam die de site niet kent, staat er ook, onder Niet herkend.
+    expect(summary.sections.at(-1)).toMatchObject({ section: "unknown", rows: [{ name: "Kringraad", due: 1 }] });
+  });
+
+  it("splitst de totalen in VTK en werkgroepen, en noemt de laatste BO", () => {
+    expect(summary.total).toMatchObject({ due: 4, done: 1 });
+    expect(summary.vtk).toMatchObject({ due: 3, done: 1 });
+    expect(summary.werkgroepen).toMatchObject({ due: 1, done: 0, pct: 0 });
+    expect(summary.lastMeeting).toBe("BO 40");
   });
 });

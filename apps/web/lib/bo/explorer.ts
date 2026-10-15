@@ -11,9 +11,9 @@ import type { BoKind, MeetingKind } from "./names";
 
 export type XDoc = Omit<DocView, "meetingDate"> & { meetingDate: string | null };
 
-export type XDossier = Omit<Dossier, "eventDate" | "dateIgnored" | "lastSeen" | "budgets" | "results"> & {
+export type XDossier = Omit<Dossier, "date" | "eventDate" | "lastSeen" | "budgets" | "results"> & {
+  date: string | null;
   eventDate: string | null;
-  dateIgnored: string | null;
   /** De namen van `postKeys`, in dezelfde volgorde, samen als "Cultuur + Onthaal". */
   postNames: string[];
   postName: string;
@@ -46,15 +46,15 @@ export function toExplorerData(overview: BoOverview, year: number, today: Date):
   const seen = new Set<string>();
   const dossiers: XDossier[] = [];
   for (const p of overview.posts) {
-    for (const { eventDate, dateIgnored, lastSeen, budgets, results, ...rest } of p.dossiers) {
+    for (const { date, eventDate, lastSeen, budgets, results, ...rest } of p.dossiers) {
       void lastSeen; // enkel om op te sorteren; de volgorde zit al in de lijst
       if (seen.has(rest.key)) continue;
       seen.add(rest.key);
       const postNames = rest.postKeys.map((key) => names.get(key) ?? key);
       dossiers.push({
         ...rest,
+        date: iso(date),
         eventDate: iso(eventDate),
-        dateIgnored: iso(dateIgnored),
         postNames,
         postName: postNames.join(" + "),
         budgets: budgets.map(doc),
@@ -91,6 +91,7 @@ export const SECTIONS: readonly [PostSection, string, string][] = [
   ["g5", "Groep 5", "Groep 5"],
   ["post", "Posten", "Posts"],
   ["werkgroep", "Werkgroepen", "Working groups"],
-  ["extra", "Jaarwerkingen en overige", "Yearly events and other"],
+  ["jaarwerking", "Jaarwerkingen", "Yearly events"],
+  ["extra", "Overige", "Other"],
   ["unknown", "Niet herkend", "Not recognised"],
 ];

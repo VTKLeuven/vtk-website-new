@@ -14,7 +14,7 @@ import {
   type ListFilter,
   type ListGroup,
 } from "@/lib/bo/list";
-import { dossierNotes, Files, Lines, linesOf, PostLinks, Progress, StatusPill, sumLines, Timeline, useFormat, type Fmt, type Locale, type Sheet } from "./BoParts";
+import { dossierNotes, Files, HideDossierButton, Lines, linesOf, PostLinks, Progress, StatusNote, StatusPill, sumLines, Timeline, useFormat, type Fmt, type Locale, type Sheet } from "./BoParts";
 import { ChangePosts, type PostChoice } from "./BoReview";
 
 /*
@@ -40,7 +40,7 @@ const GROUP_LABELS: Record<ListGroup, [string, string]> = {
   post: ["Post", "Post"],
   bo: ["BO", "Meeting"],
   stand: ["Stand", "Status"],
-  maand: ["Maand van de activiteit", "Month of the activity"],
+  maand: ["Maand van het budget", "Month of the budget"],
 };
 
 type PostSheet = "activiteiten" | "bos" | "posten";
@@ -305,6 +305,16 @@ export function BoList({
   );
 }
 
+/** De stand: het woord in de pil, en wat erbij hoort als tekst ernaast. */
+function Stand({ d, f }: { d: XDossier; f: Fmt }) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-vtk-muted">
+      <StatusPill dossier={d} f={f} />
+      <StatusNote dossier={d} f={f} />
+    </span>
+  );
+}
+
 function sumOf(list: XDossier[], pick: (d: XDossier) => number | null): number {
   return list.reduce((total, d) => total + (pick(d) ?? 0), 0);
 }
@@ -383,8 +393,9 @@ function GroupHead({
   );
 }
 
-function boRange(d: XDossier): string {
-  const parts = d.budgets.map((b) => b.meetingLabel).join(", ");
+/** "BO 5 (20 sep) → BO 9": waar het budget en het resultaat passeerden, met de datum die telt. */
+function boRange(d: XDossier, f: Fmt): string {
+  const parts = d.budgets.map((b, i) => (i === 0 && b.meetingDate ? `${b.meetingLabel} (${f.day(b.meetingDate)})` : b.meetingLabel)).join(", ");
   const result = d.results.at(-1);
   return [parts, result ? `→ ${result.meetingLabel}` : ""].filter(Boolean).join(" ") || "–";
 }
@@ -409,7 +420,7 @@ function GroupTable({
   const { nl } = f;
   const groups = groupDossiers(list, group, data.posts, nl);
   const showPost = group !== "post";
-  const span = showPost ? 4 : 3;
+  const span = showPost ? 3 : 2;
   // Een activiteit van twee posten staat in twee groepen, maar telt één keer.
   const total = [...new Map(groups.flatMap((g) => g.dossiers).map((d) => [d.key, d])).values()];
   const all = statsOf(total);
@@ -423,7 +434,6 @@ function GroupTable({
             <th>{nl ? "Activiteit" : "Activity"}</th>
             {showPost && <th>Post</th>}
             <th>BO</th>
-            <th>{nl ? "Datum" : "Date"}</th>
             <th className="num">Budget</th>
             <th className="num">{nl ? "Resultaat" : "Result"}</th>
             <th>{nl ? "Stand" : "Status"}</th>
@@ -463,11 +473,10 @@ function GroupTable({
                       )}
                     </td>
                     {showPost && <td data-label="Post">{d.postName}</td>}
-                    <td data-label="BO" className="text-xs">{boRange(d)}</td>
-                    <td data-label={nl ? "Datum" : "Date"} className="text-xs tabular-nums">{d.eventDate ? f.day(d.eventDate) : "–"}</td>
+                    <td data-label="BO" className="text-xs">{boRange(d, f)}</td>
                     <td data-label="Budget" className="num">{f.euro(d.budgetCents)}</td>
                     <td data-label={nl ? "Resultaat" : "Result"} className="num">{d.results.length ? f.euro(d.resultCents) : "–"}</td>
-                    <td data-label={nl ? "Stand" : "Status"}><StatusPill dossier={d} f={f} /></td>
+                    <td data-label={nl ? "Stand" : "Status"}><Stand d={d} f={f} /></td>
                   </tr>
                 ))}
             </Fragment>
@@ -562,7 +571,7 @@ function MeetingTable({
                       </td>
                       <td data-label={nl ? "Bedrag" : "Amount"} className="num">{f.euro(doc.totalCents)}</td>
                       <td data-label={nl ? "Resultaat" : "Result"} className="num">{doc.kind === "BUDGET" && d.results.length ? f.euro(d.resultCents) : ""}</td>
-                      <td data-label={nl ? "Stand" : "Status"}><StatusPill dossier={d} f={f} /></td>
+                      <td data-label={nl ? "Stand" : "Status"}><Stand d={d} f={f} /></td>
                     </tr>
                   ))}
               </Fragment>
@@ -707,7 +716,7 @@ function DossierForm({
     log.push({
       date: today,
       title: nl ? "Nog geen resultaat" : "No result yet",
-      text: d.overdueDays !== null ? `${d.overdueDays} ${nl ? (d.eventDate ? "dagen na de activiteit" : "dagen na het budget") : d.eventDate ? "days after the activity" : "days after the budget"}` : "",
+      text: d.overdueDays !== null ? `${d.overdueDays} ${nl ? "dagen na het budget" : "days after the budget"}` : "",
     });
   }
   log.sort((a, b) => b.date.localeCompare(a.date));
@@ -727,6 +736,7 @@ function DossierForm({
               {nl ? "Openen in Drive" : "Open in Drive"}
             </a>
           )}
+          <HideDossierButton dossier={d} nl={nl} errorMessages={errorMessages} className="vtk-bo-l-dd" />
         </div>
         <span className="vtk-bo-l-status" aria-label={nl ? "Stadium" : "Stage"}>
           {steps.map(([label, i]) => (
@@ -773,7 +783,7 @@ function DossierForm({
                 )}
               </span>
             </Field>
-            <Field label={nl ? "Datum" : "Date"}>{d.eventDate ? f.day(d.eventDate, true) : <span className="text-vtk-muted">{nl ? "Niet ingevuld" : "Not filled in"}</span>}</Field>
+            <Field label={nl ? "Activiteit op" : "Activity on"}>{d.eventDate ? f.day(d.eventDate, true) : <span className="text-vtk-muted">{nl ? "Niet in het rekenblad" : "Not in the spreadsheet"}</span>}</Field>
             <Field label={nl ? "Budget op" : "Budget at"}>{d.budgets.length ? d.budgets.map(meetingLink).reduce<ReactNode[]>((acc, el, i) => (i ? [...acc, ", ", el] : [el]), []) : "–"}</Field>
             <Field label={nl ? "Locatie" : "Location"}>{d.location ?? <span className="text-vtk-muted">{nl ? "Niet ingevuld" : "Not filled in"}</span>}</Field>
             <Field label={nl ? "Resultaat op" : "Result at"}>{d.results.length ? d.results.map(meetingLink) : <span className="text-vtk-muted">{nl ? "Nog niet" : "Not yet"}</span>}</Field>
@@ -782,7 +792,7 @@ function DossierForm({
               {d.overAllocation && <span className="vtk-bo-pill ml-1.5" data-tone="low">{nl ? "budget erboven" : "budget above"}</span>}
             </Field>
             <Field label={nl ? "Stand" : "Status"}>
-              <StatusPill dossier={d} f={f} />
+              <Stand d={d} f={f} />
             </Field>
             <Field label={nl ? "VTK-aandeel" : "VTK share"}>{d.vtkSharePercent !== null ? `${d.vtkSharePercent}%` : "100%"}</Field>
           </div>
@@ -922,7 +932,6 @@ function PostForm({ post, data, sheet, f, go }: { post: XPost; data: ExplorerDat
                 <tr>
                   <th>{nl ? "Activiteit" : "Activity"}</th>
                   <th>BO</th>
-                  <th>{nl ? "Datum" : "Date"}</th>
                   <th className="num">Budget</th>
                   <th className="num">{nl ? "Resultaat" : "Result"}</th>
                   <th>{nl ? "Stand" : "Status"}</th>
@@ -936,11 +945,10 @@ function PostForm({ post, data, sheet, f, go }: { post: XPost; data: ExplorerDat
                         {d.activity}
                       </button>
                     </td>
-                    <td data-label="BO" className="text-xs">{boRange(d)}</td>
-                    <td data-label={nl ? "Datum" : "Date"} className="text-xs tabular-nums">{d.eventDate ? f.day(d.eventDate) : "–"}</td>
+                    <td data-label="BO" className="text-xs">{boRange(d, f)}</td>
                     <td data-label="Budget" className="num">{f.euro(d.budgetCents)}</td>
                     <td data-label={nl ? "Resultaat" : "Result"} className="num">{d.results.length ? f.euro(d.resultCents) : "–"}</td>
-                    <td data-label={nl ? "Stand" : "Status"}><StatusPill dossier={d} f={f} /></td>
+                    <td data-label={nl ? "Stand" : "Status"}><Stand d={d} f={f} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -990,7 +998,7 @@ function MeetingForm({ meeting: m, data, f, go }: { meeting: XMeeting; data: Exp
                   <PostLinks dossier={d} className="" onPost={(key) => go({ post: key, bo: null, activiteit: null })} />
                 </td>
                 <td data-label={nl ? "Bedrag" : "Amount"} className="num">{f.euro(doc.totalCents)}</td>
-                <td data-label={nl ? "Stand" : "Status"}><StatusPill dossier={d} f={f} /></td>
+                <td data-label={nl ? "Stand" : "Status"}><Stand d={d} f={f} /></td>
               </tr>
             ))}
           </tbody>

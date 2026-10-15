@@ -1,12 +1,12 @@
 "use client";
 
 import { Fragment, type ReactNode } from "react";
-import { ConfirmIconButton } from "@/components/ui/DeleteIconButton";
+import { ConfirmIconButton, ConfirmTextButton } from "@/components/ui/DeleteIconButton";
 import { IconAnchor } from "@/components/ui/IconButton";
-import { ExternalLinkIcon, UndoIcon } from "@/components/ui/icons";
+import { ExternalLinkIcon, EyeOffIcon, UndoIcon } from "@/components/ui/icons";
 import { formatAmount } from "@/lib/rekeningen/expenses";
 import type { BoLine, XDoc, XDossier } from "@/lib/bo/explorer";
-import { unpairBoResultAction } from "@/app/actions/bestuursorgaan";
+import { hideBoDocumentAction, unpairBoResultAction } from "@/app/actions/bestuursorgaan";
 import { figuresErrorText } from "./messages";
 
 /*
@@ -52,54 +52,63 @@ export function Progress({ value }: { value: number | null }) {
   );
 }
 
+/**
+ * De stand van een activiteit, altijd een van vier woorden met een vaste kleur:
+ * Open (amber), Komt nog (grijs), Afgerond (groen), Geen budget. Wat erbij hoort
+ * (hoeveel dagen, de afwijking, "via grocomeet") staat als tekst in
+ * `StatusNote`, niet in de pil: vijf soorten labels in één kolom lazen als een
+ * raadsel.
+ */
 export function StatusPill({ dossier: d, f }: { dossier: XDossier; f: Fmt }) {
   const { nl } = f;
   switch (d.status) {
     case "DONE":
-      if (d.waiver === "grocomeet")
-        return (
-          <span className="vtk-bo-pill" data-tone="ok" title={nl ? "Geen budget op het BO: versneld goedgekeurd door de grocomeet" : "No budget at the meeting: approved early by the grocomeet"}>
-            {nl ? "Via grocomeet" : "Via grocomeet"}
-          </span>
-        );
-      if (d.waiver === "geen")
-        return (
-          <span className="vtk-bo-pill" data-tone="ok" title={nl ? "Geen budget nodig" : "No budget needed"}>
-            {nl ? "Zonder budget" : "Without budget"}
-          </span>
-        );
-      if (d.devCents === null) return <span className="vtk-bo-pill" data-tone="ok">{nl ? "Afgerond" : "Closed"}</span>;
+      return <span className="vtk-bo-pill" data-tone="ok">{nl ? "Afgerond" : "Closed"}</span>;
+    case "UPCOMING":
       return (
-        <span className="vtk-bo-dev" data-tone={d.devCents > 0 ? "up" : d.devCents < 0 ? "down" : undefined} title={nl ? "Resultaat min budget" : "Result minus budget"}>
+        <span className="vtk-bo-pill" title={nl ? "Het budget staat op een BO die nog moet komen" : "The budget is on a meeting still to come"}>
+          {nl ? "Komt nog" : "Upcoming"}
+        </span>
+      );
+    case "OPEN":
+      return <span className="vtk-bo-pill" data-tone="low">Open</span>;
+    case "NO_BUDGET":
+      // Een resultaat van 25-26 op een BO van 26-27: zijn budget passeerde
+      // voor de site meelas, en dat is geen fout.
+      return d.results[0]?.workingYear !== d.year ? (
+        <span className="vtk-bo-pill">{nl ? "Budget vorig jaar" : "Budget last year"}</span>
+      ) : (
+        <span className="vtk-bo-pill" data-tone="low">{nl ? "Geen budget" : "No budget"}</span>
+      );
+  }
+}
+
+export function StatusNote({ dossier, f }: { dossier: XDossier; f: Fmt }) {
+  return statusNote(dossier, f);
+}
+
+/** Wat bij de stand hoort, als tekst: "16 dagen", "+€ 3,49", "via grocomeet". Null als er niets bij te zeggen valt. */
+export function statusNote(d: XDossier, f: Fmt): ReactNode {
+  const { nl } = f;
+  switch (d.status) {
+    case "OPEN":
+      if (!d.date) return <span>{nl ? "schriftelijk" : "in writing"}</span>;
+      return (
+        <span className="tabular-nums" title={nl ? "Dagen sinds de BO van het budget" : "Days since the meeting of the budget"}>
+          {d.overdueDays === 1 ? (nl ? "1 dag" : "1 day") : `${d.overdueDays ?? 0} ${nl ? "dagen" : "days"}`}
+        </span>
+      );
+    case "DONE":
+      if (d.waiver === "grocomeet") return <span>{nl ? "via grocomeet" : "via grocomeet"}</span>;
+      if (d.waiver === "geen") return <span>{nl ? "zonder budget" : "without a budget"}</span>;
+      if (d.devCents === null) return null;
+      return (
+        <span className="vtk-bo-devtext" data-tone={d.devCents > 0 ? "up" : d.devCents < 0 ? "down" : undefined} title={nl ? "Resultaat min budget" : "Result minus budget"}>
           {f.signed(d.devCents)}
         </span>
       );
-    case "UPCOMING":
-      return <span className="vtk-bo-pill">{nl ? `Op ${f.day(d.eventDate)}` : `On ${f.day(d.eventDate)}`}</span>;
-    case "OPEN":
-      return (
-        <span
-          className="vtk-bo-pill"
-          data-tone="low"
-          title={d.eventDate ? (nl ? `De activiteit was op ${f.day(d.eventDate, true)}` : `The activity was on ${f.day(d.eventDate, true)}`) : nl ? "Het budget noemt geen datum" : "The budget names no date"}
-        >
-          {d.eventDate ? `Open · ${d.overdueDays ?? 0} d` : nl ? "Open · geen datum" : "Open · no date"}
-        </span>
-      );
-    case "NO_BUDGET":
-      return (
-        // Een resultaat van 25-26 op een BO van 26-27: zijn budget passeerde
-        // voor de site meelas, en dat is geen fout.
-        <span className="vtk-bo-pill" data-tone={d.results[0]?.workingYear !== d.year ? undefined : "low"}>
-          {d.results[0]?.workingYear !== d.year
-            ? nl
-              ? `Budget van ${String(d.year % 100).padStart(2, "0")}-${String((d.year + 1) % 100).padStart(2, "0")}`
-              : `Budget from ${d.year}`
-            : nl
-              ? "Geen budget gevonden"
-              : "No budget found"}
-        </span>
-      );
+    default:
+      return null;
   }
 }
 
@@ -140,11 +149,6 @@ export function dossierNotes(d: XDossier, f: Fmt): string[] {
       ? nl
         ? "De post is met de hand gekozen en komt niet uit de naam van het bestand."
         : "The post was chosen by hand and does not come from the file name."
-      : null,
-    d.dateIgnored
-      ? nl
-        ? `Het rekenblad noemt ${f.day(d.dateIgnored, true)} als datum. Dat past niet bij de BO's van dit budget (een oud sjabloon?), dus de site rekent alsof er geen datum staat.`
-        : `The spreadsheet gives ${f.day(d.dateIgnored, true)} as the date. That does not fit the meetings of this budget (an old template?), so the site treats it as having no date.`
       : null,
   ].filter((note): note is string => Boolean(note));
 }
@@ -323,7 +327,7 @@ export function Timeline({ dossier: d, f, onMeeting }: { dossier: XDossier; f: F
       text: (
         <>
           <b>{nl ? "Vandaag" : "Today"}</b>: {nl ? "nog geen resultaat" : "no result yet"}
-          {d.overdueDays !== null && `, ${d.overdueDays} ${nl ? (d.eventDate ? "dagen na de activiteit" : "dagen na het budget") : d.eventDate ? "days after the activity" : "days after the budget"}`}
+          {d.overdueDays !== null && `, ${d.overdueDays} ${nl ? "dagen na het budget" : "days after the budget"}`}
         </>
       ),
     });
@@ -352,12 +356,101 @@ export function Timeline({ dossier: d, f, onMeeting }: { dossier: XDossier; f: F
   );
 }
 
+/** Wat "Niet meetellen" uitlegt, voor een bestand of een hele activiteit. */
+function hideText(nl: boolean, what: string, lastOf: string | null): string {
+  const gone = lastOf
+    ? nl
+      ? ` Het is het enige bestand van "${lastOf}", dus die activiteit verdwijnt mee uit de lijst.`
+      : ` It is the only file of "${lastOf}", so that activity disappears from the list too.`
+    : "";
+  return nl
+    ? `${what} telt dan niet meer mee: niet in de lijst, niet in de cijfers en niet bij Na te kijken.${gone} In Drive verandert er niets, en de volgende scan zet het niet terug. Terugzetten kan onder Instellingen, bij "Niet meegeteld".`
+    : `${what} no longer counts: not in the list, not in the numbers and not under To review.${gone} Nothing changes in Drive, and the next scan does not bring it back. You can restore it under Settings, at "Not counted".`;
+}
+
+/** "Niet meetellen" als icoon, voor één bestand in een lijst. */
+export function HideFileButton({
+  docId,
+  name,
+  activity,
+  lastFile,
+  nl,
+  errorMessages,
+}: {
+  docId: string;
+  name: string;
+  /** De activiteit, wanneer dit haar enige bestand is: dan verdwijnt ze mee. */
+  activity?: string;
+  lastFile?: boolean;
+  nl: boolean;
+  errorMessages: Record<string, string>;
+}) {
+  return (
+    <ConfirmIconButton
+      action={hideBoDocumentAction}
+      fields={{ docIds: docId }}
+      icon={<EyeOffIcon />}
+      label={nl ? "Niet meetellen" : "Do not count"}
+      srLabel={nl ? `Niet meetellen: ${name}` : `Do not count: ${name}`}
+      title={nl ? "Dit bestand niet meetellen?" : "Stop counting this file?"}
+      description={hideText(nl, nl ? `Het bestand "${name}"` : `The file "${name}"`, lastFile && activity ? activity : null)}
+      confirmLabel={nl ? "Niet meetellen" : "Do not count"}
+      cancelLabel={nl ? "Annuleren" : "Cancel"}
+      successMessage={nl ? `"${name}" telt niet meer mee.` : `"${name}" no longer counts.`}
+      errorMessages={errorMessages}
+    />
+  );
+}
+
+/** "Niet meetellen" voor een hele activiteit, naast "Post wijzigen". */
+export function HideDossierButton({
+  dossier: d,
+  nl,
+  errorMessages,
+  className = "vtk-bo-postedit-open",
+}: {
+  dossier: XDossier;
+  nl: boolean;
+  errorMessages: Record<string, string>;
+  className?: string;
+}) {
+  const docs = [...d.budgets, ...d.results];
+  return (
+    <ConfirmTextButton
+      className={className}
+      ariaLabel={nl ? `Niet meetellen: ${d.activity}` : `Do not count: ${d.activity}`}
+      action={hideBoDocumentAction}
+      fields={{ docIds: docs.map((doc) => doc.id).join(",") }}
+      title={nl ? `"${d.activity}" niet meetellen?` : `Stop counting "${d.activity}"?`}
+      description={hideText(
+        nl,
+        docs.length === 1
+          ? nl
+            ? `Het bestand "${docs[0].name}"`
+            : `The file "${docs[0].name}"`
+          : nl
+            ? `De ${docs.length} bestanden van "${d.activity}" (${docs.map((doc) => doc.name).join(", ")})`
+            : `The ${docs.length} files of "${d.activity}" (${docs.map((doc) => doc.name).join(", ")})`,
+        null,
+      )}
+      confirmLabel={nl ? "Niet meetellen" : "Do not count"}
+      cancelLabel={nl ? "Annuleren" : "Cancel"}
+      successMessage={nl ? `"${d.activity}" telt niet meer mee.` : `"${d.activity}" no longer counts.`}
+      errorMessages={errorMessages}
+    >
+      <EyeOffIcon />
+      {nl ? "Niet meetellen" : "Do not count"}
+    </ConfirmTextButton>
+  );
+}
+
 export function Files({ dossier: d, f, errorMessages }: { dossier: XDossier; f: Fmt; errorMessages: Record<string, string> }) {
   const { nl } = f;
   const file = (doc: XDoc) => {
     const notes = [
       doc.kind === "BUDGET" ? "Budget" : nl ? "Resultaat" : "Result",
       doc.meetingLabel,
+      doc.alsoIn.length ? (nl ? `ook in ${doc.alsoIn.join(", ")}` : `also in ${doc.alsoIn.join(", ")}`) : null,
       doc.paired ? (nl ? "met de hand bij het budget gezet" : "linked to the budget by hand") : null,
       doc.waiver === "grocomeet" ? (nl ? "zonder budget: versneld goedgekeurd door de grocomeet" : "without a budget: approved early by the grocomeet") : null,
       doc.waiver === "geen" ? (nl ? "zonder budget: geen budget nodig" : "without a budget: none needed") : null,
@@ -395,6 +488,14 @@ export function Files({ dossier: d, f, errorMessages }: { dossier: XDossier; f: 
             errorMessages={errorMessages}
           />
         )}
+        <HideFileButton
+          docId={doc.id}
+          name={doc.name}
+          activity={d.activity}
+          lastFile={d.budgets.length + d.results.length === 1}
+          nl={nl}
+          errorMessages={errorMessages}
+        />
         <IconAnchor
           href={doc.webUrl}
           target="_blank"

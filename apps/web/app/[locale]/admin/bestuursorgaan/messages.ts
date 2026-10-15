@@ -26,8 +26,8 @@ export function boErrorMessages(locale: Locale): Record<string, string> {
       ? "Deze koppeling bestaat niet meer; iemand anders heeft ze net verwijderd."
       : "This link no longer exists; someone else just removed it.",
     DOCUMENT_NOT_FOUND: nl
-      ? "Dit resultaat staat niet meer in het overzicht. Herlaad de pagina."
-      : "This result is no longer in the overview. Reload the page.",
+      ? "Dit bestand staat niet meer in het overzicht. Herlaad de pagina."
+      : "This file is no longer in the overview. Reload the page.",
     BUDGET_REQUIRED: nl ? "Niet opgeslagen: kies een budget." : "Not saved: choose a budget.",
   };
 }

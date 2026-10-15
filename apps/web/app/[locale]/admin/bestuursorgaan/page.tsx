@@ -14,8 +14,10 @@ import { getBoConfig, getScanStatus, type BoScanStatus } from "@/lib/bo/settings
 import { deleteBoPostAliasAction } from "@/app/actions/bestuursorgaan";
 import { BO_VIEW_SCREEN, parseBoView } from "@/lib/bo/views";
 import { BoViews } from "./BoViews";
-import { BoSettingsForm, ScanButton } from "./BoControls";
+import { BoSettingsForm, RestoreFileButton, ScanButton } from "./BoControls";
 import { BoReview } from "./BoReview";
+import { BoSummary } from "./BoSummary";
+import { buildSummary } from "@/lib/bo/summary";
 import { postName, postOptions } from "@/lib/bo/posts";
 import { boErrorMessages } from "./messages";
 
@@ -60,7 +62,7 @@ export default async function BestuursorgaanPage({
   const year = parseWorkingYear(sp.jaar);
   const today = new Date();
 
-  const [{ overview, years }, google, config, scan, posts, aliases, viewPreference] = await Promise.all([
+  const [{ overview, years }, google, config, scan, posts, aliases, viewPreference, hidden] = await Promise.all([
     loadBoOverview(year, nl, today),
     getGoogleStatus(),
     getBoConfig(),
@@ -73,6 +75,14 @@ export default async function BestuursorgaanPage({
     prisma.userViewPreference.findUnique({
       where: { userId_screen: { userId: session.user.id, screen: BO_VIEW_SCREEN } },
       select: { view: true },
+    }),
+    // Wat niet meetelt, over alle jaren: één rij per bestand, ook als het in
+    // twee BO's stond.
+    prisma.boDocument.findMany({
+      where: { hiddenAt: { not: null } },
+      orderBy: { hiddenAt: "desc" },
+      distinct: ["driveFileId"],
+      select: { id: true, name: true, webUrl: true, hiddenAt: true, meeting: { select: { name: true, workingYear: true } } },
     }),
   ]);
   const errorMessages = boErrorMessages(locale);
@@ -161,6 +171,8 @@ export default async function BestuursorgaanPage({
         />
       )}
 
+      {data.dossiers.length > 0 && <BoSummary summary={buildSummary(data, choices)} year={formatWorkingYear(year)} nl={nl} />}
+
       <AdminDisclosure
         defaultOpen={!hasFolder}
         summary={
@@ -168,8 +180,8 @@ export default async function BestuursorgaanPage({
             <span className="block font-semibold text-vtk-ink">{nl ? "Instellingen" : "Settings"}</span>
             <span className="block text-xs text-vtk-muted">
               {nl
-                ? `Waar de BO-map staat, en ${aliases.length} ${aliases.length === 1 ? "postnaam" : "postnamen"} die met de hand gekoppeld zijn.`
-                : `Where the board folder is, and ${aliases.length} post names linked by hand.`}
+                ? `Waar de BO-map staat, ${aliases.length} ${aliases.length === 1 ? "postnaam" : "postnamen"} die met de hand gekoppeld zijn, en ${hidden.length} ${hidden.length === 1 ? "bestand dat" : "bestanden die"} niet meetellen.`
+                : `Where the board folder is, ${aliases.length} post names linked by hand, and ${hidden.length} files that do not count.`}
             </span>
           </span>
         }
@@ -229,6 +241,31 @@ export default async function BestuursorgaanPage({
                       successMessage={nl ? "Koppeling verwijderd." : "Link removed."}
                       errorMessages={errorMessages}
                     />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="grid gap-2">
+            <h3 className="text-sm font-semibold text-vtk-ink">{nl ? "Niet meegeteld" : "Not counted"}</h3>
+            {hidden.length === 0 ? (
+              <p className="text-sm text-vtk-muted">
+                {nl
+                  ? 'Nog niets. Met "Niet meetellen" bij een bestand of activiteit haal je een oude versie of een kopie uit het overzicht; in Drive verandert er niets.'
+                  : 'Nothing yet. "Do not count" on a file or activity takes an old version or a copy out of the overview; nothing changes in Drive.'}
+              </p>
+            ) : (
+              <ul className="divide-y divide-[var(--rule-soft)] rounded-xl border border-vtk-blue/10">
+                {hidden.map((doc) => (
+                  <li key={doc.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+                    <span className="min-w-0 flex-1">
+                      <span className="block break-words font-semibold text-vtk-ink">{doc.name}</span>
+                      <span className="block text-xs text-vtk-muted">
+                        {doc.meeting.name}, {formatWorkingYear(doc.meeting.workingYear)}
+                        {doc.hiddenAt && (nl ? ` · weggezet op ${moment(doc.hiddenAt.toISOString(), nl)}` : ` · put away on ${moment(doc.hiddenAt.toISOString(), nl)}`)}
+                      </span>
+                    </span>
+                    <RestoreFileButton docId={doc.id} name={doc.name} locale={locale} errorMessages={errorMessages} />
                   </li>
                 ))}
               </ul>
