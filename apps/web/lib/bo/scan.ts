@@ -140,6 +140,7 @@ class Scan {
       skippedFolders: [],
       unreachable: [],
       read: 0,
+      failed: [],
     };
   }
 
@@ -324,11 +325,19 @@ class Scan {
             }
           : {}),
       };
-      await prisma.boDocument.upsert({
-        where: { meetingId_driveFileId: { meetingId, driveFileId: item.file.id } },
-        create: { meetingId, driveFileId: item.file.id, ...fields },
-        update: fields,
-      });
+      try {
+        await prisma.boDocument.upsert({
+          where: { meetingId_driveFileId: { meetingId, driveFileId: item.file.id } },
+          create: { meetingId, driveFileId: item.file.id, ...fields },
+          update: fields,
+        });
+      } catch (err) {
+        // Eén vreemd bestand mag de rest van de BO-map niet tegenhouden. Het
+        // staat in de status, en de fout gaat naar de monitoring.
+        console.error("[bestuursorgaan] bestand niet bewaard", item.file.name, err);
+        Sentry.captureException(err, { extra: { file: item.file.name } });
+        this.status.failed?.push(item.file.name);
+      }
     }
 
     await prisma.boDocument.updateMany({

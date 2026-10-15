@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { currentWorkingYear, formatWorkingYear } from "@/lib/workingYear";
 import { normalizeKey, parseDriveId } from "@/lib/bo/names";
+import { EXTRA_POST_KEYS } from "@/lib/bo/posts";
 import { scanBestuursorgaan } from "@/lib/bo/scan";
 import { getBoConfig, saveBoConfig } from "@/lib/bo/settings";
 import { BO_VIEW_SCREEN, BO_VIEWS } from "@/lib/bo/views";
@@ -79,29 +80,68 @@ export async function saveBoSettingsAction(_prev: SaveState, formData: FormData)
   return saveOk();
 }
 
-/** "Vice" is Groep 5: geldt voor elk bestand met die schrijfwijze. */
-export async function saveBoPostAliasAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+/** De postsleutels uit het formulier, enkel die van een bestaande post of een vast vak. */
+async function validPostKeys(raw: string): Promise<string[] | null> {
+  const keys = [...new Set(raw.split(",").map((k) => k.trim()).filter(Boolean))];
+  const groupIds = keys.filter((k) => k.startsWith("g:")).map((k) => k.slice(2));
+  const found = groupIds.length
+    ? new Set((await prisma.group.findMany({ where: { id: { in: groupIds } }, select: { id: true } })).map((g) => g.id))
+    : new Set<string>();
+  const ok = keys.every((k) => EXTRA_POST_KEYS.has(k) || (k.startsWith("g:") && found.has(k.slice(2))));
+  return ok ? keys : null;
+}
+
+/**
+ * Bij welke post(en) een bestand hoort. Twee manieren:
+ *
+ * - `scope=naam`: voor een schrijfwijze ("Biomedix", "WERKGROEPEN"); geldt voor
+ *   elk bestand met die naam, ook de volgende.
+ * - `scope=bestand`: enkel voor deze bestanden (een naam met enkel een datum,
+ *   of een activiteit die bij een andere post hoort dan haar naam zegt). Met
+ *   een lege keuze valt de keuze weg en telt de naam weer.
+ */
+export async function assignBoPostsAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requirePermission("bestuursorgaan.manage");
+
+  const scope = field(formData, "scope") === "bestand" ? "bestand" : "naam";
+  const postKeys = await validPostKeys(field(formData, "postKeys"));
+  if (!postKeys) return saveError("GROUP_REQUIRED");
+
+  if (scope === "bestand") {
+    const docIds = field(formData, "docIds").split(",").filter(Boolean);
+    const docs = await prisma.boDocument.findMany({ where: { id: { in: docIds } }, select: { driveFileId: true, name: true } });
+    if (docs.length === 0) return saveError("DOCUMENT_NOT_FOUND");
+    // Hetzelfde bestand in twee BO's is één bestand: beide rijen volgen.
+    await prisma.boDocument.updateMany({
+      where: { driveFileId: { in: docs.map((d) => d.driveFileId) } },
+      data: { postKeys },
+    });
+    await logAudit({
+      action: "update",
+      entity: "boDocument",
+      entityId: docIds[0],
+      target: docs[0].name,
+      summary: postKeys.length ? `Posten met de hand gekozen: ${postKeys.join(", ")}` : "Posten terug uit de naam",
+    });
+    revalidateBo();
+    return saveOk();
+  }
 
   const label = field(formData, "label");
   const key = normalizeKey(label);
-  const groupId = field(formData, "groupId");
   if (!key) return saveError("INVALID_INPUT");
-  if (!groupId) return saveError("GROUP_REQUIRED");
-  const group = await prisma.group.findUnique({ where: { id: groupId }, select: { nameNl: true } });
-  if (!group) return saveError("GROUP_REQUIRED");
-
+  if (postKeys.length === 0) return saveError("GROUP_REQUIRED");
   await prisma.boPostAlias.upsert({
     where: { key },
-    create: { key, label, groupId },
-    update: { groupId },
+    create: { key, label, postKeys },
+    update: { postKeys },
   });
   await logAudit({
     action: "update",
     entity: "boPostAlias",
     entityId: key,
     target: label,
-    summary: `"${label}" in de BO-bestanden is ${group.nameNl}`,
+    summary: `"${label}" in de BO-bestanden is ${postKeys.join(", ")}`,
   });
   revalidateBo();
   return saveOk();
@@ -133,16 +173,33 @@ export async function pairBoResultAction(_prev: SaveState, formData: FormData): 
 
   const resultId = field(formData, "resultId");
   const budgetId = field(formData, "budgetId");
-  const [result, budget] = await Promise.all([
-    prisma.boDocument.findUnique({ where: { id: resultId }, select: { driveFileId: true, name: true } }),
-    budgetId ? prisma.boDocument.findUnique({ where: { id: budgetId }, select: { name: true } }) : null,
-  ]);
+  const result = await prisma.boDocument.findUnique({ where: { id: resultId }, select: { driveFileId: true, name: true } });
   if (!result) return saveError("DOCUMENT_NOT_FOUND");
-  if (!budget) return saveError("BUDGET_REQUIRED");
 
+  // Geen budget op het BO: versneld goedgekeurd door de grocomeet, of er hoefde
+  // er geen te zijn. Dan telt het resultaat als afgerond, zonder afwijking.
+  const waiver = /^waiver:(grocomeet|geen)$/.exec(budgetId)?.[1];
+  if (waiver) {
+    await prisma.boDocument.updateMany({
+      where: { driveFileId: result.driveFileId },
+      data: { budgetWaiver: waiver, pairedBudgetId: null },
+    });
+    await logAudit({
+      action: "update",
+      entity: "boDocument",
+      entityId: resultId,
+      target: result.name,
+      summary: waiver === "grocomeet" ? "Resultaat zonder budget: versneld goedgekeurd door de grocomeet" : "Resultaat zonder budget: geen budget nodig",
+    });
+    revalidateBo();
+    return saveOk();
+  }
+
+  const budget = budgetId ? await prisma.boDocument.findUnique({ where: { id: budgetId }, select: { name: true } }) : null;
+  if (!budget) return saveError("BUDGET_REQUIRED");
   await prisma.boDocument.updateMany({
     where: { driveFileId: result.driveFileId },
-    data: { pairedBudgetId: budgetId },
+    data: { pairedBudgetId: budgetId, budgetWaiver: null },
   });
   await logAudit({
     action: "update",
@@ -166,14 +223,14 @@ export async function unpairBoResultAction(formData: FormData): Promise<SaveStat
   if (!result) return saveError("DOCUMENT_NOT_FOUND");
   await prisma.boDocument.updateMany({
     where: { driveFileId: result.driveFileId },
-    data: { pairedBudgetId: null },
+    data: { pairedBudgetId: null, budgetWaiver: null },
   });
   await logAudit({
     action: "update",
     entity: "boDocument",
     entityId: resultId,
     target: result.name,
-    summary: "Handmatige koppeling aan een budget ongedaan gemaakt",
+    summary: "Koppeling aan een budget (of de uitzondering zonder budget) ongedaan gemaakt",
   });
   revalidateBo();
   return saveOk();

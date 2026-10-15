@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { statsOf } from "@/lib/bo/dossiers";
-import type { ExplorerData, Stats, XDoc, XDossier, XMeeting, XPost } from "@/lib/bo/explorer";
+import { findDossier, SECTIONS, type ExplorerData, type Stats, type XDoc, type XDossier, type XMeeting, type XPost } from "@/lib/bo/explorer";
 import {
   groupByMeeting,
   groupDossiers,
@@ -14,7 +14,8 @@ import {
   type ListFilter,
   type ListGroup,
 } from "@/lib/bo/list";
-import { Files, Lines, linesOf, Progress, StatusPill, sumLines, Timeline, useFormat, type Fmt, type Locale, type Sheet } from "./BoParts";
+import { dossierNotes, Files, Lines, linesOf, PostLinks, Progress, StatusPill, sumLines, Timeline, useFormat, type Fmt, type Locale, type Sheet } from "./BoParts";
+import { ChangePosts, type PostChoice } from "./BoReview";
 
 /*
  * De lijstweergave van /admin/bestuursorgaan, naast de verkenner: zoals Odoo
@@ -49,11 +50,13 @@ export function BoList({
   data,
   locale,
   errorMessages,
+  posts,
   switcher,
 }: {
   data: ExplorerData;
   locale: Locale;
   errorMessages: Record<string, string>;
+  posts: readonly PostChoice[];
   switcher: ReactNode;
 }) {
   const f = useFormat(locale);
@@ -69,7 +72,7 @@ export function BoList({
     .filter((x): x is ListFilter => (LIST_FILTERS as readonly string[]).includes(x));
   const query = params.get("zoek") ?? "";
   const graph = params.get("grafiek") === "1";
-  const dossier = data.dossiers.find((d) => d.key === params.get("activiteit")) ?? null;
+  const dossier = findDossier(data.dossiers, params.get("activiteit"));
   const meeting = data.meetings.find((m) => m.id === params.get("bo")) ?? null;
   const post = data.posts.find((p) => p.key === params.get("post")) ?? null;
   const sheetParam = params.get("blad");
@@ -137,6 +140,8 @@ export function BoList({
         today={data.today}
         f={f}
         errorMessages={errorMessages}
+        posts={posts}
+        locale={locale}
         go={go}
       />
     );
@@ -405,8 +410,10 @@ function GroupTable({
   const groups = groupDossiers(list, group, data.posts, nl);
   const showPost = group !== "post";
   const span = showPost ? 4 : 3;
-  const total = groups.flatMap((g) => g.dossiers);
+  // Een activiteit van twee posten staat in twee groepen, maar telt één keer.
+  const total = [...new Map(groups.flatMap((g) => g.dossiers).map((d) => [d.key, d])).values()];
   const all = statsOf(total);
+  const sectionOf = (g: (typeof groups)[number]) => data.posts.find((p) => p.key === g.postKey)?.section;
   if (groups.length === 0) return <Empty f={f} />;
   return (
     <div className="vtk-bo-l-wrap">
@@ -423,8 +430,13 @@ function GroupTable({
           </tr>
         </thead>
         <tbody>
-          {groups.map((g) => (
+          {groups.map((g, i) => (
             <Fragment key={g.key}>
+              {group === "post" && sectionOf(g) !== (i > 0 ? sectionOf(groups[i - 1]) : undefined) && (
+                <tr className="vtk-bo-l-sec">
+                  <td colSpan={span + 3}>{SECTIONS.find(([key]) => key === sectionOf(g))?.[nl ? 1 : 2]}</td>
+                </tr>
+              )}
               <GroupHead
                 label={g.label}
                 count={g.dossiers.length}
@@ -444,6 +456,11 @@ function GroupTable({
                         {d.activity}
                       </button>
                       {d.budgets.length > 1 && <span className="vtk-bo-pill ml-1.5">{nl ? `${d.budgets.length} budgetten` : `${d.budgets.length} budgets`}</span>}
+                      {!showPost && d.postKeys.length > 1 && (
+                        <span className="block text-xs text-vtk-muted">
+                          {nl ? "met" : "with"} {d.postNames.filter((_, j) => d.postKeys[j] !== g.postKey).join(" + ")}
+                        </span>
+                      )}
                     </td>
                     {showPost && <td data-label="Post">{d.postName}</td>}
                     <td data-label="BO" className="text-xs">{boRange(d)}</td>
@@ -645,6 +662,8 @@ function DossierForm({
   today,
   f,
   errorMessages,
+  posts,
+  locale,
   go,
 }: {
   dossier: XDossier;
@@ -652,6 +671,8 @@ function DossierForm({
   today: string;
   f: Fmt;
   errorMessages: Record<string, string>;
+  posts: readonly PostChoice[];
+  locale: Locale;
   go: Go;
 }) {
   const { nl } = f;
@@ -731,11 +752,26 @@ function DossierForm({
             <p className="vtk-bo-kicker">{d.postName}</p>
             <h2 className="text-2xl font-bold tracking-tight">{d.activity}</h2>
           </div>
+          {dossierNotes(d, f).map((note) => (
+            <p key={note} className="vtk-bo-note">
+              {note}
+            </p>
+          ))}
           <div className="vtk-bo-l-fields">
-            <Field label="Post">
-              <button type="button" className="vtk-bo-link" onClick={() => go({ post: d.postKey, bo: null, activiteit: null })}>
-                {d.postName}
-              </button>
+            <Field label={d.postKeys.length > 1 ? (nl ? "Posten" : "Posts") : "Post"}>
+              <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <PostLinks dossier={d} className="" onPost={(key) => go({ post: key, bo: null, activiteit: null })} />
+                {posts.length > 0 && (
+                  <ChangePosts
+                    locale={locale}
+                    posts={posts}
+                    docIds={[...d.budgets, ...d.results].map((doc) => doc.id)}
+                    value={d.postKeys}
+                    activity={d.activity}
+                    errorMessages={errorMessages}
+                  />
+                )}
+              </span>
             </Field>
             <Field label={nl ? "Datum" : "Date"}>{d.eventDate ? f.day(d.eventDate, true) : <span className="text-vtk-muted">{nl ? "Niet ingevuld" : "Not filled in"}</span>}</Field>
             <Field label={nl ? "Budget op" : "Budget at"}>{d.budgets.length ? d.budgets.map(meetingLink).reduce<ReactNode[]>((acc, el, i) => (i ? [...acc, ", ", el] : [el]), []) : "–"}</Field>
@@ -792,7 +828,7 @@ function DossierForm({
 function PostForm({ post, data, sheet, f, go }: { post: XPost; data: ExplorerData; sheet: PostSheet; f: Fmt; go: Go }) {
   const { nl } = f;
   const s = post.stats;
-  const list = data.dossiers.filter((d) => d.postKey === post.key).sort((a, b) => lastMeetingDate(b).localeCompare(lastMeetingDate(a)));
+  const list = data.dossiers.filter((d) => d.postKeys.includes(post.key)).sort((a, b) => lastMeetingDate(b).localeCompare(lastMeetingDate(a)));
   const meetings = data.meetings.filter((m) => m.postKeys.includes(post.key));
   const docsAt = (m: XMeeting, kind: "budgets" | "results") =>
     m[kind]
@@ -950,10 +986,8 @@ function MeetingForm({ meeting: m, data, f, go }: { meeting: XMeeting; data: Exp
                   </button>
                   <span className="block break-all text-xs text-vtk-muted">{doc.name}</span>
                 </td>
-                <td data-label="Post">
-                  <button type="button" className="vtk-bo-link" onClick={(event) => { event.stopPropagation(); go({ post: d.postKey, bo: null, activiteit: null }); }}>
-                    {d.postName}
-                  </button>
+                <td data-label="Post" data-row-action onClick={(event) => event.stopPropagation()}>
+                  <PostLinks dossier={d} className="" onPost={(key) => go({ post: key, bo: null, activiteit: null })} />
                 </td>
                 <td data-label={nl ? "Bedrag" : "Amount"} className="num">{f.euro(doc.totalCents)}</td>
                 <td data-label={nl ? "Stand" : "Status"}><StatusPill dossier={d} f={f} /></td>

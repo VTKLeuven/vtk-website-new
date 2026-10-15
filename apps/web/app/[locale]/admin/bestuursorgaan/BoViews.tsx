@@ -8,6 +8,7 @@ import { saveBoViewAction } from "@/app/actions/bestuursorgaan";
 import { BoExplorer } from "./BoExplorer";
 import { BoList } from "./BoList";
 import type { Locale } from "./BoParts";
+import type { PostChoice } from "./BoReview";
 
 /*
  * De twee weergaven van /admin/bestuursorgaan en de schakelaar ertussen. De
@@ -19,11 +20,14 @@ export function BoViews({
   data,
   locale,
   errorMessages,
+  posts,
   initialView,
 }: {
   data: ExplorerData;
   locale: Locale;
   errorMessages: Record<string, string>;
+  /** Waaruit "Post wijzigen" kiest, in beide weergaven. */
+  posts: readonly PostChoice[];
   initialView: BoView;
 }) {
   const nl = locale === "nl";
@@ -60,8 +64,8 @@ export function BoViews({
   );
 
   return view === "lijst" ? (
-    <BoList data={data} locale={locale} errorMessages={errorMessages} switcher={switcher} />
+    <BoList data={data} locale={locale} errorMessages={errorMessages} posts={posts} switcher={switcher} />
   ) : (
-    <BoExplorer data={data} locale={locale} errorMessages={errorMessages} switcher={switcher} />
+    <BoExplorer data={data} locale={locale} errorMessages={errorMessages} posts={posts} switcher={switcher} />
   );
 }

@@ -169,6 +169,11 @@ herkenning van bestandsnamen of het uitlezen van de rekenbladen komt.
   `?post=`, `?bo=` en `?activiteit=`, en een klik gaat niet langs de server: het
   hele jaar komt mee bij het laden. Wie welke verkiest, staat per account in
   `UserViewPreference`. Zie `docs/design-decisions.md`.
+- **Een post is hier meer dan een `Group`**: ook de vier rollen van Groep 5,
+  Jaarwerkingen en Overige (`BO_EXTRA_POSTS` in `lib/bo/posts.ts`), en een
+  activiteit kan bij twee posten horen (`postKeys`). Tel over posten heen één
+  keer per `dossier.key`, en zoek een dossier met `findDossier`: de sleutel
+  bevat de posten en verandert na "Post wijzigen".
 
 # MCP-server voor agents
 

@@ -72,7 +72,25 @@ function text(cell: Cell | undefined): string | null {
   return value && !PLACEHOLDER.test(value) ? value : null;
 }
 
+/** Wat in een kolom INTEGER past; een bedrag daarboven is een tikfout of een datum. */
+const MAX_CENTS = 2_000_000_000;
+
 function cents(cell: Cell | undefined): number | null {
+  const value = rawCents(cell);
+  return value !== null && Math.abs(value) <= MAX_CENTS ? value : null;
+}
+
+/**
+ * Een datum enkel als ze in deze eeuw valt. Een cel met "5/3/20026" werd het
+ * jaar 20026, en dat weigerde de databank (en hield de hele scan tegen).
+ */
+function sane(date: Date | null): Date | null {
+  if (!date || Number.isNaN(date.getTime())) return null;
+  const year = date.getUTCFullYear();
+  return year >= 2000 && year <= 2100 ? date : null;
+}
+
+function rawCents(cell: Cell | undefined): number | null {
   if (!cell) return null;
   const value = cell.value;
   if (value.kind === "number") return Math.round(value.value * 100);
@@ -96,7 +114,7 @@ function dateOf(cell: Cell | undefined): Date | null {
   }
   if (value.kind === "text") {
     // "6/7/2027-18/7/2027" (een reis): de eerste dag.
-    const match = /^\s*(\d{1,2})\s*[/.-]\s*(\d{1,2})\s*[/.-]\s*(\d{2,4})/.exec(value.text);
+    const match = /^\s*(\d{1,2})\s*[/.-]\s*(\d{1,2})\s*[/.-]\s*(\d{2,4})(?!\d)/.exec(value.text);
     if (match) {
       const year = Number(match[3]) < 100 ? 2000 + Number(match[3]) : Number(match[3]);
       const date = new Date(Date.UTC(year, Number(match[2]) - 1, Number(match[1])));
@@ -195,7 +213,7 @@ export function figuresFromSheet(sheet: Sheet): Figures | null {
   return {
     sheetPost: text(at(sheet, 1, 1)),
     sheetTitle: text(at(sheet, 1, 3)),
-    eventDate: dateOf(below("datum")),
+    eventDate: sane(dateOf(below("datum"))),
     budgetIncomeCents: value("inkomsten", overview.budgetCol),
     budgetExpenseCents: value("uitgaven", overview.budgetCol),
     budgetTotalCents: value("totaal", overview.budgetCol),

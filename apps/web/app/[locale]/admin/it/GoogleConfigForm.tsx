@@ -86,7 +86,7 @@ export function GoogleConfigForm({ status }: { status: GoogleStatus }) {
               name="driveSubject"
               type="email"
               defaultValue={status.driveSubject ?? ""}
-              placeholder="bo-scan@vtk.be"
+              placeholder="Empty: scan off. For example bo-scan@vtk.be"
             />
             <p className="mt-1 text-xs text-zinc-500">
               The account the site impersonates to read the BO folder on the shared drive

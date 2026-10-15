@@ -11329,9 +11329,11 @@ Hoe het werkt staat in `docs/bestuursorgaan.md`; dit zijn de keuzes erachter.
   een budget in te dienen, zou betekenen dat een deel in Drive staat en een deel
   op de site. Wat in Drive fout staat (een naam zonder soort, een map die niet
   gedeeld is), meldt het scherm bij "Na te kijken"; rechtzetten doe je in Drive.
-  Enkel twee beslissingen bewaart de site zelf, omdat ze nergens in Drive
-  passen: welke post een naam als "Vice" is, en bij welk budget een resultaat
-  hoort waarvan de naam op niets lijkt.
+  Enkel een paar beslissingen bewaart de site zelf, omdat ze nergens in Drive
+  passen: welke post(en) een naam als "WERKGROEPEN" is, bij welke post een
+  bestand hoort als zijn naam het mis heeft, bij welk budget een resultaat
+  hoort waarvan de naam op niets lijkt, en dat een resultaat zonder budget
+  mocht (zie hieronder).
 - **De naam wint van de map.** Een bestand `26-27_Budget_Statix_Ontbijt` in een
   map Resultaten is een budget; het scherm noemt wel waar het stond. De naam
   typt iemand bewust, in welke map iets belandt is een sleepbeweging. Zegt de
@@ -11357,6 +11359,65 @@ Hoe het werkt staat in `docs/bestuursorgaan.md`; dit zijn de keuzes erachter.
   rustige register van het shiftenoverzicht (één tabel met een kopregel per
   post); dat toonde wat er was, maar je kon niet verder klikken dan het rekenblad
   in Drive, en er stond geen percentage en niets per BO.
+
+## Bestuursorgaan: posten, rollen en categorieën
+
+Na de eerste week met echte bestanden (oktober 2026) bleek "een post" voor het
+BO ruimer dan een `Group`. Wat Groep 5 vroeg, en waarom het zo gebouwd is:
+
+- **Het scherm heet "Budgetten & Resultaten"**, in de zijbalk en als titel.
+  "Bestuursorgaan" is de vergadering, niet wat je er komt zoeken. De URL
+  (`/admin/bestuursorgaan`), het recht en de rol blijven: een label wijzigen is
+  geen reden om bladwijzers en rechten te breken.
+- **Groep 5 is vier vakken: Praeses, Vice-praeses, Secretaris en Beheer.** Elk
+  dient eigen budgetten in, en één blok "Groep 5" verborg wie wat openliet.
+  `26-27_Budget_Vice_LOKO` herkent de site daarom vanzelf; Groep 5 zelf blijft
+  kiesbaar voor wat het hele dagelijks bestuur aangaat.
+- **Jaarwerkingen en Overige** zijn twee vakken voor wat niet bij één post
+  hoort: Halftime en Studentenwelkom, en "random" zoals het de vraag was.
+  `26-27_Budget_Halftime_GoGlobal` wordt de activiteit "Halftime GoGlobal" in
+  Jaarwerkingen: de naam van de jaarwerking gaat voor de activiteit, anders
+  weet niemand meer waarover "GoGlobal" ging.
+- **Die zes vakken staan in code** (`BO_EXTRA_POSTS` in `lib/bo/posts.ts`), niet
+  als `Group`: ze hebben geen leden, geen pagina en geen werkingsjaar, en
+  zouden als groep in elke ledenlijst en elk rechtenscherm opduiken. Een vak en
+  een post met dezelfde naam: het vak wint.
+- **Een budget kan bij twee posten horen** (`26-27_Budget Cultuur+Onthaal_...`).
+  Het staat dan bij elk van beide posten, en telt in elk totaal (het jaar, een
+  BO, de lijst) één keer. De site herkent `+`, `&`, `/`, `,` en " en " zelf,
+  maar enkel als elk deel een post is; anders vraagt ze het. Een naam als
+  `WERKGROEPEN` hangt Groep 5 één keer aan de werkgroepen die meedoen.
+- **Een resultaat zonder budget kan mogen.** De grocomeet keurt soms iets
+  versneld goed (de 5G-router), en dan komt er nooit een budget op het BO. Bij
+  "Na te kijken" kies je dan "Versneld goedgekeurd door de grocomeet" of "Geen
+  budget nodig" in plaats van een budget: het resultaat telt als afgerond,
+  zonder afwijking (er is niets om mee te vergelijken), en de keuze is
+  ongedaan te maken bij Bestanden.
+- **De post van één activiteit kan je met de hand wijzigen** ("Post wijzigen"
+  in het detail, in beide weergaven), voor alle bestanden van die activiteit.
+  Dat wint van de naam; leeg toepassen zet de naam weer in charge. Een
+  schrijfwijze koppelen geldt voor elk volgend bestand; dit enkel voor deze.
+- **Een jaartal anders geschreven is nog altijd 26-27**: `26_27`, `2627`,
+  `2026-2027` en `26 - 27` herkent de site, net als een datum vooraan
+  (`2026/09/07 Eetstand ... Begroting`) en een streepje waar een underscore
+  hoorde (`Statix-Talks`). Dezelfde regel als hierboven: niemand hoeft te
+  hernoemen om in het overzicht te staan.
+- **Een datum die niet bij de BO's past, telt niet.** Een rekenblad op een oud
+  sjabloon gaf "1/9/2004", en de activiteit stond 8043 dagen te laat. Ligt de
+  datum meer dan een half jaar voor de eerste BO van het dossier of meer dan
+  400 dagen na de laatste, dan rekent de site alsof er geen datum staat en zegt
+  ze in het detail welke datum ze negeerde. Een jaar buiten 2000 tot 2100 (een
+  typfout als "5/3/20026") valt al bij het lezen weg.
+- **"Na te kijken" staat dicht**, als één regel met de aantallen. Open stond het
+  als een lange lijst boven de cijfers, en die kwamen pas na een scroll in
+  beeld. De keuzes erin zijn doorzoekbare lijsten (`SearchPicker`,
+  `SearchMultiPicker`), geen kale `<select>` van veertig posten.
+- **De linkerkolom van de verkenner is één regel per post, per vak** (Groep 5,
+  Posten, Werkgroepen, Jaarwerkingen en overige, Niet herkend), met rechts
+  amber "2 open", een vinkje als alles binnen is, of een streepje als er nog
+  niets voorbij is. Twee regels met een balkje en "7/7" waren te druk, en die
+  breuk zei weinig: zonder open resultaat is ze altijd vol. De details staan in
+  de tooltip en in de kop van het middelste paneel.
 
 ## Bestuursorgaan: de verkenner
 

@@ -20,7 +20,8 @@ export function matchesFilters(d: XDossier, filters: readonly ListFilter[], quer
   if (filters.length === 0) return true;
   return filters.some(
     (f) =>
-      (f === "open" && d.status === "OPEN") ||
+      // Een resultaat zonder budget van vorig jaar is geen achterstand.
+      (f === "open" && (d.status === "OPEN" || (d.status === "NO_BUDGET" && d.results[0]?.workingYear === d.year))) ||
       (f === "komt" && d.status === "UPCOMING") ||
       (f === "af" && d.status === "DONE") ||
       (f === "slechter" && (d.devCents ?? 0) < 0) ||
@@ -68,7 +69,7 @@ export function groupDossiers(
 
   if (group === "post") {
     return posts
-      .map((p) => make(p.key, p.name, list.filter((d) => d.postKey === p.key), p.key))
+      .map((p) => make(p.key, p.name, list.filter((d) => d.postKeys.includes(p.key)), p.key))
       .filter((g) => g.dossiers.length > 0);
   }
   if (group === "stand") {

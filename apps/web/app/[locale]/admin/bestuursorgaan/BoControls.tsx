@@ -1,16 +1,8 @@
 "use client";
 
-import { useTransition } from "react";
-import { Input, Label, Select } from "@vtk/ui";
+import { Input, Label } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
-import { useToast } from "@/components/ui/toast";
-import { SAVE_IDLE, type SaveAction } from "@/lib/saveState";
-import {
-  pairBoResultAction,
-  saveBoPostAliasAction,
-  saveBoSettingsAction,
-  scanBestuursorgaanAction,
-} from "@/app/actions/bestuursorgaan";
+import { saveBoSettingsAction, scanBestuursorgaanAction } from "@/app/actions/bestuursorgaan";
 
 type Locale = "nl" | "en";
 
@@ -31,126 +23,6 @@ export function ScanButton({ locale, errorMessages }: { locale: Locale; errorMes
     >
       <input type="hidden" name="locale" value={locale} />
     </SaveForm>
-  );
-}
-
-/**
- * Een keuzelijst die bij elke wijziging meteen opslaat, zoals de bijnamen van
- * het shiftenoverzicht: een rij in "Na te kijken" is één beslissing, geen
- * formulier met een aparte opslaan-knop.
- */
-function useSaveOnChange(
-  action: SaveAction,
-  locale: Locale,
-  errorMessages: Record<string, string>,
-  successMessage: string,
-) {
-  const nl = locale === "nl";
-  const showToast = useToast();
-  const [pending, startTransition] = useTransition();
-  function save(fields: Record<string, string>) {
-    startTransition(async () => {
-      const data = new FormData();
-      for (const [key, value] of Object.entries(fields)) data.set(key, value);
-      const result = await action(SAVE_IDLE, data);
-      if (result.status === "error") {
-        showToast({
-          message:
-            errorMessages[result.code] ?? result.detail ?? (nl ? "Niet opgeslagen: er ging iets mis." : "Not saved: something went wrong."),
-          variant: "error",
-          duration: 0,
-        });
-        return;
-      }
-      showToast({ message: successMessage, variant: "success" });
-    });
-  }
-  return { pending, save };
-}
-
-export type PostOption = { id: string; name: string };
-
-/** "Vice" in de bestandsnamen is ... (een post kiezen). */
-export function PostAliasSelect({
-  locale,
-  label,
-  posts,
-  errorMessages,
-}: {
-  locale: Locale;
-  label: string;
-  posts: PostOption[];
-  errorMessages: Record<string, string>;
-}) {
-  const nl = locale === "nl";
-  const { pending, save } = useSaveOnChange(
-    saveBoPostAliasAction,
-    locale,
-    errorMessages,
-    nl ? `"${label}" gekoppeld; elk bestand met die naam volgt mee.` : `"${label}" linked; every file with that name follows.`,
-  );
-  return (
-    <Select
-      aria-label={nl ? `Welke post is "${label}"?` : `Which post is "${label}"?`}
-      defaultValue=""
-      disabled={pending}
-      onChange={(event) => {
-        if (event.target.value) save({ label, groupId: event.target.value });
-      }}
-      className="h-9 w-56 py-1 text-sm"
-    >
-      <option value="" disabled>
-        {nl ? "Kies de post" : "Choose the post"}
-      </option>
-      {posts.map((post) => (
-        <option key={post.id} value={post.id}>
-          {post.name}
-        </option>
-      ))}
-    </Select>
-  );
-}
-
-export type BudgetOption = { id: string; label: string };
-
-/** Een resultaat zonder budget bij een budget van dezelfde post zetten. */
-export function PairBudgetSelect({
-  locale,
-  resultId,
-  candidates,
-  errorMessages,
-}: {
-  locale: Locale;
-  resultId: string;
-  candidates: BudgetOption[];
-  errorMessages: Record<string, string>;
-}) {
-  const nl = locale === "nl";
-  const { pending, save } = useSaveOnChange(
-    pairBoResultAction,
-    locale,
-    errorMessages,
-    nl ? "Resultaat bij het budget gezet." : "Result linked to the budget.",
-  );
-  return (
-    <Select
-      aria-label={nl ? "Bij welk budget hoort dit resultaat?" : "Which budget does this result belong to?"}
-      defaultValue=""
-      disabled={pending}
-      onChange={(event) => {
-        if (event.target.value) save({ resultId, budgetId: event.target.value });
-      }}
-      className="h-9 w-64 py-1 text-sm"
-    >
-      <option value="" disabled>
-        {nl ? "Kies het budget" : "Choose the budget"}
-      </option>
-      {candidates.map((candidate) => (
-        <option key={candidate.id} value={candidate.id}>
-          {candidate.label}
-        </option>
-      ))}
-    </Select>
   );
 }
 

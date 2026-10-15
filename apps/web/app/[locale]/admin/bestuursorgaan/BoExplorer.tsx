@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
-import type { ExplorerData, Stats, XDossier, XMeeting, XPost } from "@/lib/bo/explorer";
-import { Files, Lines, linesOf, Progress, StatusPill, Tiles, Timeline, useFormat, type Fmt, type Locale, type Sheet } from "./BoParts";
+import { findDossier, SECTIONS, type ExplorerData, type Stats, type XDossier, type XMeeting, type XPost } from "@/lib/bo/explorer";
+import { dossierNotes, Files, Lines, linesOf, PostLinks, StatusPill, Tiles, Timeline, useFormat, type Fmt, type Locale, type Sheet } from "./BoParts";
+import { ChangePosts, type PostChoice } from "./BoReview";
 
 /*
  * De verkenner van /admin/bestuursorgaan: drie panelen naast elkaar.
@@ -37,11 +38,14 @@ export function BoExplorer({
   data,
   locale,
   errorMessages,
+  posts,
   switcher,
 }: {
   data: ExplorerData;
   locale: Locale;
   errorMessages: Record<string, string>;
+  /** Waaruit "Post wijzigen" kiest. */
+  posts: readonly PostChoice[];
   /** De schakelaar naar de lijst, naast de cijfers van het jaar. */
   switcher?: ReactNode;
 }) {
@@ -64,7 +68,7 @@ export function BoExplorer({
     data.meetings[0];
   const meeting = data.meetings.find((m) => m.id === params.get("bo")) ?? defaultMeeting;
   const age = AGES.find((a) => a.key === params.get("leeftijd")) ?? AGES[0];
-  const dossier = dossiers.get(params.get("activiteit") ?? "") ?? null;
+  const dossier = findDossier(data.dossiers, params.get("activiteit"));
   const sheetParam = params.get("blad");
   const sheet: Sheet = sheetParam === "tijdlijn" || sheetParam === "bestanden" ? sheetParam : "bedragen";
   // Op een smal scherm: het diepste paneel dat gekozen is.
@@ -121,27 +125,29 @@ export function BoExplorer({
   // ---- links ----
   let left: ReactNode;
   if (tab === "posten") {
-    left = data.posts.map((p) => (
-      <button
-        key={p.key}
-        type="button"
-        className="vtk-bo-item"
-        aria-current={p.key === post?.key ? "true" : undefined}
-        onClick={() => go({ tab: null, post: p.key, activiteit: null })}
-      >
-        <span className="vtk-bo-item-r1">
-          <b>{p.name}</b>
-          <span className="tabular-nums">{f.pct(p.stats.pct)}</span>
-        </span>
-        <span className="vtk-bo-item-r2">
-          <Progress value={p.stats.pct} />
-          <span>
-            {p.stats.due ? `${p.stats.done}/${p.stats.due}` : nl ? "niets voorbij" : "nothing past"}
-            {p.stats.open > 0 && ` · ${p.stats.open} open`}
-          </span>
-        </span>
-      </button>
-    ));
+    // Eén regel per post, per vak: de naam, en rechts wat aandacht vraagt.
+    left = SECTIONS.map(([section, labelNl, labelEn]) => {
+      const items = data.posts.filter((p) => p.section === section);
+      if (items.length === 0) return null;
+      return (
+        <div key={section} className="vtk-bo-pgroup" role="group" aria-label={nl ? labelNl : labelEn}>
+          <div className="vtk-bo-section">{nl ? labelNl : labelEn}</div>
+          {items.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              className="vtk-bo-prow"
+              aria-current={p.key === post?.key ? "true" : undefined}
+              title={postTitle(p.stats, nl)}
+              onClick={() => go({ tab: null, post: p.key, activiteit: null })}
+            >
+              <span className="n">{p.name}</span>
+              <PostMark stats={p.stats} nl={nl} />
+            </button>
+          ))}
+        </div>
+      );
+    });
   } else if (tab === "bos") {
     left = data.meetings.map((m) => (
       <button
@@ -186,7 +192,7 @@ export function BoExplorer({
   let midHead: ReactNode = null;
   let mid: ReactNode = null;
   if (tab === "posten" && post) {
-    const list = data.dossiers.filter((d) => d.postKey === post.key);
+    const list = data.dossiers.filter((d) => d.postKeys.includes(post.key));
     const order = { OPEN: 0, UPCOMING: 1, DONE: 2, NO_BUDGET: 2 } as const;
     list.sort(
       (a, b) =>
@@ -204,9 +210,12 @@ export function BoExplorer({
         </span>
       </>
     );
-    mid = list.map((d) =>
-      row(d, d.eventDate ? f.day(d.eventDate) : nl ? "geen datum" : "no date", d.resultCents ?? d.budgetCents),
-    );
+    mid = list.map((d) => {
+      const date = d.eventDate ? f.day(d.eventDate) : nl ? "geen datum" : "no date";
+      // Gedeeld met een andere post: zeg met wie, anders lijkt het dubbel.
+      const others = d.postNames.filter((_, i) => d.postKeys[i] !== post.key);
+      return row(d, others.length ? `${date} · ${nl ? "met" : "with"} ${others.join(" + ")}` : date, d.resultCents ?? d.budgetCents);
+    });
   } else if (tab === "bos" && meeting) {
     const part = (items: XMeeting["budgets"], label: string) => (
       <>
@@ -261,7 +270,9 @@ export function BoExplorer({
         f={f}
         errorMessages={errorMessages}
         onSheet={(s) => go({ blad: s === "bedragen" ? null : s }, false)}
-        onPost={() => go({ tab: null, post: dossier.postKey, activiteit: null })}
+        posts={posts}
+        locale={locale}
+        onPost={(key) => go({ tab: null, post: key, activiteit: null })}
         onMeeting={(id) => go({ tab: "bos", bo: id })}
       />
     );
@@ -341,6 +352,21 @@ export function BoExplorer({
       </div>
     </div>
   );
+}
+
+/** Rechts in de rij van een post: wat open staat, of een vinkje als alles binnen is. */
+function PostMark({ stats: s, nl }: { stats: Stats; nl: boolean }) {
+  if (s.open > 0) return <span className="vtk-bo-pill" data-tone="low">{s.open} open</span>;
+  if (s.due > 0) return <span className="vtk-bo-prow-ok" aria-label={nl ? "alles binnen" : "all in"}>✓</span>;
+  return <span className="vtk-bo-prow-none" aria-label={nl ? "nog niets voorbij" : "nothing past yet"}>–</span>;
+}
+
+function postTitle(s: Stats, nl: boolean): string {
+  const parts = [
+    s.due ? (nl ? `${s.done} van ${s.due} voorbij en afgerond` : `${s.done} of ${s.due} past and closed`) : nl ? "Nog niets voorbij" : "Nothing past yet",
+    s.upcoming ? (nl ? `${s.upcoming} komen nog` : `${s.upcoming} upcoming`) : null,
+  ];
+  return parts.filter(Boolean).join(", ");
 }
 
 function lastDate(d: XDossier): string {
@@ -439,6 +465,8 @@ function DossierDetail({
   sheet,
   f,
   errorMessages,
+  posts,
+  locale,
   onSheet,
   onPost,
   onMeeting,
@@ -447,8 +475,10 @@ function DossierDetail({
   sheet: Sheet;
   f: Fmt;
   errorMessages: Record<string, string>;
+  posts: readonly PostChoice[];
+  locale: Locale;
   onSheet: (sheet: Sheet) => void;
-  onPost: () => void;
+  onPost: (key: string) => void;
   onMeeting: (id: string) => void;
 }) {
   const { nl } = f;
@@ -464,14 +494,25 @@ function DossierDetail({
         ? `Gedeeld met een andere kring: VTK draagt ${d.vtkSharePercent}% van het totaal.`
         : `Shared with another association: VTK carries ${d.vtkSharePercent}% of the total.`
       : null,
+    ...dossierNotes(d, f),
   ].filter(Boolean);
 
   return (
     <div className="grid gap-4">
       <div className="grid gap-1">
-        <button type="button" className="vtk-bo-kicker vtk-bo-link justify-self-start" onClick={onPost}>
-          {d.postName}
-        </button>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <PostLinks dossier={d} onPost={onPost} />
+          {posts.length > 0 && (
+            <ChangePosts
+              locale={locale}
+              posts={posts}
+              docIds={[...d.budgets, ...d.results].map((doc) => doc.id)}
+              value={d.postKeys}
+              activity={d.activity}
+              errorMessages={errorMessages}
+            />
+          )}
+        </div>
         <h2 className="text-xl font-bold tracking-tight">{d.activity}</h2>
         <div className="flex flex-wrap items-center gap-2 text-xs text-vtk-muted">
           <StatusPill dossier={d} f={f} />

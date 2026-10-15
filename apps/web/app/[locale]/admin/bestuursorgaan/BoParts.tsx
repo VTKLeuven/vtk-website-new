@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { ConfirmIconButton } from "@/components/ui/DeleteIconButton";
 import { IconAnchor } from "@/components/ui/IconButton";
 import { ExternalLinkIcon, UndoIcon } from "@/components/ui/icons";
@@ -56,6 +56,18 @@ export function StatusPill({ dossier: d, f }: { dossier: XDossier; f: Fmt }) {
   const { nl } = f;
   switch (d.status) {
     case "DONE":
+      if (d.waiver === "grocomeet")
+        return (
+          <span className="vtk-bo-pill" data-tone="ok" title={nl ? "Geen budget op het BO: versneld goedgekeurd door de grocomeet" : "No budget at the meeting: approved early by the grocomeet"}>
+            {nl ? "Via grocomeet" : "Via grocomeet"}
+          </span>
+        );
+      if (d.waiver === "geen")
+        return (
+          <span className="vtk-bo-pill" data-tone="ok" title={nl ? "Geen budget nodig" : "No budget needed"}>
+            {nl ? "Zonder budget" : "Without budget"}
+          </span>
+        );
       if (d.devCents === null) return <span className="vtk-bo-pill" data-tone="ok">{nl ? "Afgerond" : "Closed"}</span>;
       return (
         <span className="vtk-bo-dev" data-tone={d.devCents > 0 ? "up" : d.devCents < 0 ? "down" : undefined} title={nl ? "Resultaat min budget" : "Result minus budget"}>
@@ -89,6 +101,52 @@ export function StatusPill({ dossier: d, f }: { dossier: XDossier; f: Fmt }) {
         </span>
       );
   }
+}
+
+/** De post(en) van een activiteit als links, "Cultuur + Onthaal". */
+export function PostLinks({
+  dossier: d,
+  onPost,
+  className = "vtk-bo-kicker",
+}: {
+  dossier: XDossier;
+  onPost: (key: string) => void;
+  className?: string;
+}) {
+  return (
+    <span className={className}>
+      {d.postKeys.map((key, i) => (
+        <Fragment key={key}>
+          {i > 0 && " + "}
+          <button type="button" className="vtk-bo-link" onClick={() => onPost(key)}>
+            {d.postNames[i]}
+          </button>
+        </Fragment>
+      ))}
+    </span>
+  );
+}
+
+/** Wat over een activiteit te weten valt en niet in een bedrag past. */
+export function dossierNotes(d: XDossier, f: Fmt): string[] {
+  const { nl } = f;
+  return [
+    d.postKeys.length > 1
+      ? nl
+        ? `Hoort bij ${d.postNames.join(" en ")}: het telt bij elk van hen mee, en één keer in het totaal.`
+        : `Belongs to ${d.postNames.join(" and ")}: it counts for each of them, and once in the total.`
+      : null,
+    d.overridden
+      ? nl
+        ? "De post is met de hand gekozen en komt niet uit de naam van het bestand."
+        : "The post was chosen by hand and does not come from the file name."
+      : null,
+    d.dateIgnored
+      ? nl
+        ? `Het rekenblad noemt ${f.day(d.dateIgnored, true)} als datum. Dat past niet bij de BO's van dit budget (een oud sjabloon?), dus de site rekent alsof er geen datum staat.`
+        : `The spreadsheet gives ${f.day(d.dateIgnored, true)} as the date. That does not fit the meetings of this budget (an old template?), so the site treats it as having no date.`
+      : null,
+  ].filter((note): note is string => Boolean(note));
 }
 
 export function Tiles({ items }: { items: [string, string, string?][] }) {
@@ -301,6 +359,9 @@ export function Files({ dossier: d, f, errorMessages }: { dossier: XDossier; f: 
       doc.kind === "BUDGET" ? "Budget" : nl ? "Resultaat" : "Result",
       doc.meetingLabel,
       doc.paired ? (nl ? "met de hand bij het budget gezet" : "linked to the budget by hand") : null,
+      doc.waiver === "grocomeet" ? (nl ? "zonder budget: versneld goedgekeurd door de grocomeet" : "without a budget: approved early by the grocomeet") : null,
+      doc.waiver === "geen" ? (nl ? "zonder budget: geen budget nodig" : "without a budget: none needed") : null,
+      doc.overridden ? (nl ? "posten met de hand gekozen" : "posts chosen by hand") : null,
       doc.folderConflict ? (doc.kind === "BUDGET" ? (nl ? "stond in Resultaten" : "was in Resultaten") : nl ? "stond in Budgetten" : "was in Budgetten") : null,
       doc.missing ? (nl ? "niet meer in Drive" : "no longer in Drive") : null,
       doc.figuresError ? figuresErrorText(doc.figuresError, nl) : null,
@@ -311,7 +372,7 @@ export function Files({ dossier: d, f, errorMessages }: { dossier: XDossier; f: 
           <b className="break-words">{doc.name}</b>
           <span className="block text-xs text-vtk-muted">{notes.join(" · ")}</span>
         </span>
-        {doc.paired && (
+        {(doc.paired || doc.waiver) && (
           <ConfirmIconButton
             action={unpairBoResultAction}
             fields={{ resultId: doc.id }}
@@ -320,9 +381,13 @@ export function Files({ dossier: d, f, errorMessages }: { dossier: XDossier; f: 
             srLabel={nl ? `Koppeling ongedaan maken: ${doc.name}` : `Undo link: ${doc.name}`}
             title={nl ? "Koppeling ongedaan maken?" : "Undo the link?"}
             description={
-              nl
-                ? `Het resultaat "${doc.name}" staat dan weer los van dit budget en komt terug bij Na te kijken. Er wordt niets in Drive gewijzigd.`
-                : `The result "${doc.name}" is separated from this budget again and returns to To review. Nothing changes in Drive.`
+              doc.waiver
+                ? nl
+                  ? `Het resultaat "${doc.name}" telt dan weer als resultaat zonder budget en komt terug bij Na te kijken. Er wordt niets in Drive gewijzigd.`
+                  : `The result "${doc.name}" counts as a result without a budget again and returns to To review. Nothing changes in Drive.`
+                : nl
+                  ? `Het resultaat "${doc.name}" staat dan weer los van dit budget en komt terug bij Na te kijken. Er wordt niets in Drive gewijzigd.`
+                  : `The result "${doc.name}" is separated from this budget again and returns to To review. Nothing changes in Drive.`
             }
             confirmLabel={nl ? "Ongedaan maken" : "Undo"}
             cancelLabel={nl ? "Annuleren" : "Cancel"}

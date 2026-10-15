@@ -11,8 +11,8 @@ import {
   parseYearFolderName,
   resolveMeetingDate,
 } from "@/lib/bo/names";
-import { resolvePost, splitPost } from "@/lib/bo/posts";
-import { toExplorerData } from "@/lib/bo/explorer";
+import { postOptions, resolvePost, resolvePostKeys, splitPost } from "@/lib/bo/posts";
+import { findDossier, toExplorerData } from "@/lib/bo/explorer";
 import { groupByMeeting, groupDossiers, matchesFilters } from "@/lib/bo/list";
 
 /*
@@ -33,6 +33,15 @@ describe("bestandsnamen", () => {
     ["26-27_Resultaat_Vice_Teambuilding_Onthaaldagen", { year: 2026, kind: "RESULT", post: "Vice", activity: "Teambuilding Onthaaldagen" }],
     ["25-26_Resultaat_Onthaal_flyers.xlsx", { year: 2025, kind: "RESULT", post: "Onthaal", activity: "flyers" }],
     ["Budget Sport VTKlimmen", { year: null, kind: "BUDGET", post: "Sport", activity: "VTKlimmen" }],
+    // Het jaar anders geschreven dan 26-27.
+    ["26_27_Resultaat_Internationaal_Introduction Cantus", { year: 2026, kind: "RESULT", post: "Internationaal", activity: "Introduction Cantus" }],
+    ["2627_Budget_Biomedix_SportActivity", { year: 2026, kind: "BUDGET", post: "Biomedix", activity: "SportActivity" }],
+    ["2026-2027_Budget_IT_5G router", { year: 2026, kind: "BUDGET", post: "IT", activity: "5G router" }],
+    ["26 - 27 Budget IT Router", { year: 2026, kind: "BUDGET", post: "IT", activity: "Router" }],
+    // Een datum vooraan en het soort achteraan.
+    ["2026/09/07 Eetstand Wiskundeweek Begroting", { year: null, kind: "BUDGET", post: "Eetstand", activity: "Wiskundeweek" }],
+    // Het soort en de post in één stuk, met twee posten.
+    ["26-27_Budget Cultuur+Onthaal_Jeneverwandeling", { year: 2026, kind: "BUDGET", post: "Cultuur+Onthaal", activity: "Jeneverwandeling" }],
   ])("%s", (name, expected) => {
     expect(parseDocumentName(name)).toEqual(expected);
   });
@@ -103,8 +112,13 @@ const POSTS: PostRow[] = [
   { id: "sport", code: "SPORT", slug: "sport", nameNl: "Sport", nameEn: "Sports", orderInPraesidium: 14, type: "PRAESIDIUM" },
 ];
 
+const WERKGROEPEN: PostRow[] = [
+  { id: "statix", code: "STATIX", slug: "statix", nameNl: "Statix", nameEn: "Statix", orderInPraesidium: 0, type: "WERKGROEP" },
+  { id: "biomedix", code: "BIOMEDIX", slug: "biomedix", nameNl: "Biomedix", nameEn: "Biomedix", orderInPraesidium: 0, type: "WERKGROEP" },
+];
+
 describe("posten", () => {
-  const none = new Map<string, string>();
+  const none = new Map<string, string[]>();
 
   it("herkent een naam, een code en een afkorting", () => {
     expect(resolvePost("Onthaal", POSTS, none)).toBe("onth");
@@ -121,14 +135,51 @@ describe("posten", () => {
     expect(resolvePost("Cult", twins, none)).toBeNull();
   });
 
-  it("volgt een alias van Groep 5", () => {
-    expect(resolvePost("Vice", POSTS, none)).toBeNull();
-    expect(resolvePost("Vice", POSTS, new Map([["vice", "g5"]]))).toBe("g5");
+  it("volgt een alias van Groep 5, ook naar twee posten", () => {
+    expect(resolvePostKeys("Kringraad", POSTS, none)).toEqual([]);
+    expect(resolvePost("Kringraad", POSTS, new Map([["kringraad", ["g:g5"]]]))).toBe("g5");
+    expect(resolvePostKeys("WERKGROEPEN", POSTS, new Map([["werkgroepen", ["g:statix", "g:biomedix"]]]))).toEqual([]);
+    expect(resolvePostKeys("WERKGROEPEN", [...POSTS, ...WERKGROEPEN], new Map([["werkgroepen", ["g:statix", "g:biomedix"]]]))).toEqual([
+      "g:statix",
+      "g:biomedix",
+    ]);
   });
 
-  it("splitst een post met een spatie in plaats van een underscore", () => {
-    expect(splitPost("Sport VTKlimmen", null, POSTS, none)).toEqual({ label: "Sport", groupId: "sport", activity: "VTKlimmen" });
-    expect(splitPost("Vice", "LOKO", POSTS, none)).toEqual({ label: "Vice", groupId: null, activity: "LOKO" });
+  it("kent de vier rollen van Groep 5 en de vakken Jaarwerkingen en Overige", () => {
+    expect(resolvePostKeys("Praeses", POSTS, none)).toEqual(["x:praeses"]);
+    expect(resolvePostKeys("Vice", POSTS, none)).toEqual(["x:vice"]);
+    expect(resolvePostKeys("Secretaris", POSTS, none)).toEqual(["x:secretaris"]);
+    expect(resolvePostKeys("Beheer", POSTS, none)).toEqual(["x:beheer"]);
+    expect(resolvePostKeys("Overige", POSTS, none)).toEqual(["x:overige"]);
+    // De rol van Groep 5 wint van een post met dezelfde naam.
+    const withBeheer = [...POSTS, { ...POSTS[1], id: "beheer", code: "BEHEER", slug: "beheer", nameNl: "Beheer", nameEn: "Management" }];
+    expect(resolvePostKeys("Beheer", withBeheer, none)).toEqual(["x:beheer"]);
+  });
+
+  it("herkent twee posten in één naam, maar enkel als beide bestaan", () => {
+    expect(resolvePostKeys("Cultuur+Onthaal", POSTS, none)).toEqual(["g:cult", "g:onth"]);
+    expect(resolvePostKeys("Cultuur & Onthaal", POSTS, none)).toEqual(["g:cult", "g:onth"]);
+    expect(resolvePostKeys("Cultuur+Kringraad", POSTS, none)).toEqual([]);
+  });
+
+  it("splitst een post met een spatie of streepje in plaats van een underscore", () => {
+    const all = [...POSTS, ...WERKGROEPEN];
+    expect(splitPost("Sport VTKlimmen", null, all, none)).toEqual({ label: "Sport", postKeys: ["g:sport"], activity: "VTKlimmen" });
+    expect(splitPost("Statix-Talks", null, all, none)).toEqual({ label: "Statix", postKeys: ["g:statix"], activity: "Talks" });
+    expect(splitPost("Kringraad", "LOKO", all, none)).toEqual({ label: "Kringraad", postKeys: [], activity: "LOKO" });
+  });
+
+  it("zet de naam van een jaarwerking voor de activiteit", () => {
+    expect(splitPost("Halftime", "GoGlobal", POSTS, none)).toEqual({ label: "Halftime", postKeys: ["x:jaarwerkingen"], activity: "Halftime GoGlobal" });
+    expect(splitPost("Studentenwelkom", null, POSTS, none)).toEqual({ label: "Studentenwelkom", postKeys: ["x:jaarwerkingen"], activity: "Studentenwelkom" });
+    // Wie het vak zelf noemt, krijgt het niet nog eens in de activiteit.
+    expect(splitPost("Jaarwerkingen", "Galabal", POSTS, none)).toEqual({ label: "Jaarwerkingen", postKeys: ["x:jaarwerkingen"], activity: "Galabal" });
+  });
+
+  it("biedt de posten aan per vak, Groep 5 met haar rollen eerst", () => {
+    const options = postOptions([...POSTS, ...WERKGROEPEN], true);
+    expect(options.slice(0, 5).map((o) => o.name)).toEqual(["Groep 5", "Praeses", "Vice-praeses", "Secretaris", "Beheer"]);
+    expect([...new Set(options.map((o) => o.group))]).toEqual(["Groep 5", "Posten", "Werkgroepen", "Jaarwerkingen en overige"]);
   });
 });
 
@@ -247,6 +298,14 @@ describe("bedragen uit het rekenblad", () => {
     expect("figures" in result && result.figures.vtkSharePercent).toBe(50);
   });
 
+  it("laat een onmogelijke datum weg in plaats van te falen", async () => {
+    // Een typfout in het jaar gaf "+020026-03-05", en Postgres weigerde de rij.
+    const typo = figuresFromXlsx(await workbook([{ sheet: "Blad1", data: templateRows({ date: "5/3/20026" }) }]));
+    expect("figures" in typo && typo.figures.eventDate).toBeNull();
+    const serial = figuresFromXlsx(await workbook([{ sheet: "Blad1", data: templateRows({ date: new Date(Date.UTC(20026, 2, 5)) }) }]));
+    expect("figures" in serial && serial.figures.eventDate).toBeNull();
+  });
+
   it("neemt de eerste dag van een datumbereik en negeert het sjabloon", async () => {
     const trip = figuresFromXlsx(await workbook([{ sheet: "Blad1", data: templateRows({ date: "6/7/2027-18/7/2027" }) }]));
     expect("figures" in trip && trip.figures.eventDate).toEqual(new Date(Date.UTC(2027, 6, 6)));
@@ -357,19 +416,114 @@ describe("budgetten en resultaten samenleggen", () => {
   });
 
   it("vraagt welke post een onbekende naam is, en volgt daarna de alias", () => {
-    const docs = [
-      doc("26-27_Resultaat_Vice_LOKOMidweek"),
-      doc("26-27_Resultaat_Vice_Teambuilding_Onthaaldagen"),
-    ];
+    const docs = [doc("26-27_Resultaat_Kringraad_LOKOMidweek"), doc("26-27_Resultaat_Kringraad_Teambuilding_Onthaaldagen")];
     const before = buildOverview(docs, POSTS, new Map(), 2026, TODAY);
     expect(before.unknownPosts).toEqual([
-      { key: "vice", label: "Vice", files: ["26-27_Resultaat_Vice_LOKOMidweek", "26-27_Resultaat_Vice_Teambuilding_Onthaaldagen"] },
+      {
+        key: "kringraad",
+        label: "Kringraad",
+        files: docs.map((d) => ({ id: d.id, name: d.name })),
+        perDocument: false,
+      },
     ]);
-    expect(before.posts[0].name).toBe("Vice");
+    expect(before.posts[0]).toMatchObject({ name: "Kringraad", section: "unknown" });
 
-    const after = buildOverview(docs, POSTS, new Map([["vice", "g5"]]), 2026, TODAY);
+    const after = buildOverview(docs, POSTS, new Map([["kringraad", ["g:g5"]]]), 2026, TODAY);
     expect(after.unknownPosts).toEqual([]);
-    expect(after.posts[0].name).toBe("Groep 5");
+    expect(after.posts[0]).toMatchObject({ name: "Groep 5", section: "g5" });
+  });
+
+  it("vraagt een naam met enkel een datum per bestand", () => {
+    const overview = buildOverview([doc("2026/09/07 Begroting")], POSTS, new Map(), 2026, TODAY);
+    expect(overview.unknownPosts.map((u) => u.perDocument)).toEqual([true]);
+  });
+
+  it("zet de rollen van Groep 5 voor de posten, en Jaarwerkingen achteraan", () => {
+    const overview = buildOverview(
+      [
+        doc("26-27_Budget_Halftime_GoGlobal"),
+        doc("26-27_Budget_Sport_VTKlimmen"),
+        doc("26-27_Budget_Praeses_Faculteitsetentje"),
+        doc("26-27_Budget_Vice_LOKO"),
+      ],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    expect(overview.posts.map((p) => [p.name, p.section])).toEqual([
+      ["Praeses", "g5"],
+      ["Vice-praeses", "g5"],
+      ["Sport", "post"],
+      ["Jaarwerkingen", "extra"],
+    ]);
+    expect(overview.posts[3].dossiers[0].activity).toBe("Halftime GoGlobal");
+  });
+
+  it("telt een budget van twee posten bij elk, en één keer in het totaal", () => {
+    const overview = buildOverview(
+      [
+        doc("26-27_Budget Cultuur+Onthaal_Jeneverwandeling", { budgetTotalCents: -30000, eventDate: new Date(Date.UTC(2026, 9, 1)) }),
+        doc("26-27_Resultaat_Cultuur_Jeneverwandeling", { bo: 9, resultTotalCents: -25000 }),
+      ],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    expect(overview.posts.map((p) => p.name)).toEqual(["Cultuur", "Onthaal"]);
+    const [cultuur, onthaal] = overview.posts;
+    expect(cultuur.dossiers[0].key).toBe(onthaal.dossiers[0].key);
+    expect(cultuur.dossiers[0]).toMatchObject({ postKeys: ["g:cult", "g:onth"], status: "DONE", devCents: 5000 });
+    expect(overview.global).toMatchObject({ budgets: 1, done: 1, sumBudget: -30000 });
+    expect(overview.pairable).toEqual([]);
+  });
+
+  it("volgt een post die met de hand gekozen is, boven de naam", () => {
+    const overview = buildOverview(
+      [doc("26-27_Budget_Sport_Cantus", { postKeysOverride: ["g:cult"] })],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    expect(overview.posts.map((p) => p.name)).toEqual(["Cultuur"]);
+    expect(overview.posts[0].dossiers[0]).toMatchObject({ overridden: true });
+  });
+
+  it("rondt een resultaat af dat versneld door de grocomeet ging, zonder afwijking", () => {
+    const result = doc("26-27_Resultaat_IT_5G router", { bo: 9, resultTotalCents: -12000, budgetWaiver: "grocomeet" });
+    const overview = buildOverview([result], POSTS, new Map(), 2026, TODAY);
+    expect(overview.pairable).toEqual([]);
+    expect(overview.posts[0].dossiers[0]).toMatchObject({ status: "DONE", waiver: "grocomeet", devCents: null });
+    expect(overview.global).toMatchObject({ done: 1, due: 1 });
+  });
+
+  it("negeert een datum die niet bij de BO's past, zoals uit een oud sjabloon", () => {
+    const meetings: MeetingInput[] = [5].map((nr) => ({
+      id: `m2026-${nr}`,
+      name: `BO ${nr}`,
+      kind: "MEETING",
+      number: nr,
+      date: new Date(Date.UTC(2026, 8, nr)),
+      workingYear: 2026,
+      webUrl: "https://drive.google.com/drive/folders/x",
+      missing: false,
+    }));
+    const overview = buildOverview(
+      [doc("26-27_Budget_Sport_VTKlimmen", { eventDate: new Date(Date.UTC(2004, 8, 1)) })],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+      true,
+      meetings,
+    );
+    const [dossier] = overview.posts[0].dossiers;
+    expect(dossier.eventDate).toBeNull();
+    expect(dossier.dateIgnored).toEqual(new Date(Date.UTC(2004, 8, 1)));
+    // Open sinds het budget (5 sep), niet sinds 2004.
+    expect(dossier).toMatchObject({ status: "OPEN", overdueDays: 40 });
   });
 
   it("stelt voor een resultaat zonder budget de open budgetten van de post voor, en volgt een handmatige koppeling", () => {
@@ -379,7 +533,7 @@ describe("budgetten en resultaten samenleggen", () => {
 
     const loose = buildOverview([budget, result], posts, new Map(), 2026, TODAY);
     expect(loose.pairable).toHaveLength(1);
-    expect(loose.pairable[0].candidates).toEqual([{ id: budget.id, label: "SN Achitectuurontwerp (BO 5)" }]);
+    expect(loose.pairable[0].candidates).toEqual([{ id: budget.id, label: "SN Achitectuurontwerp (BO 5)", group: "Bedrijvenrelaties" }]);
 
     const paired = buildOverview([budget, { ...result, pairedBudgetId: budget.id }], posts, new Map(), 2026, TODAY);
     expect(paired.pairable).toEqual([]);
@@ -558,6 +712,13 @@ describe("de lijstweergave", () => {
       "Oktober 2026",
       "November 2026",
     ]);
+  });
+
+  it("vindt een activiteit terug nadat haar post veranderde", () => {
+    const router = data.dossiers.find((d) => d.activity === "Router")!;
+    expect(findDossier(data.dossiers, router.key)).toBe(router);
+    expect(findDossier(data.dossiers, router.key.replace("g:it", "g:sport"))).toBe(router);
+    expect(findDossier(data.dossiers, "2026|g:it|bestaatniet")).toBeNull();
   });
 
   it("geeft per BO de bestanden die er passeerden, nieuwste BO eerst", () => {

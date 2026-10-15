@@ -67,6 +67,8 @@ export type BoScanStatus = {
   unreachable: string[];
   /** Hoeveel rekenbladen deze scan (opnieuw) las; ongewijzigde slaat hij over. */
   read: number;
+  /** Bestanden die niet bewaard konden worden; de rest van de scan liep door. */
+  failed?: string[];
 };
 
 export async function getScanStatus(): Promise<BoScanStatus | null> {

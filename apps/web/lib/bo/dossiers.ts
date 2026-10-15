@@ -1,6 +1,6 @@
 import type { BoLine } from "./figures";
 import { normalizeKey, parseDocumentName, type BoKind, type MeetingKind } from "./names";
-import { resolvePost, splitPost, type PostAliases, type PostCandidate } from "./posts";
+import { BO_EXTRA_POSTS, postName, resolvePostKeys, splitPost, type PostAliases, type PostCandidate } from "./posts";
 
 /*
  * Van losse bestanden naar wat het BO wil weten: per post, per activiteit, is
@@ -46,6 +46,10 @@ export type DocInput = {
   figuresError: string | null;
   missing: boolean;
   pairedBudgetId: string | null;
+  /** Met de hand gekozen posten voor dit bestand; leeg = uit de naam. */
+  postKeysOverride?: readonly string[];
+  /** Een resultaat zonder budget op het BO: "grocomeet" of "geen". */
+  budgetWaiver?: string | null;
 };
 
 /** Een map in de BO-map, ook zonder bestanden: een BO waar niets passeerde, telt ook. */
@@ -77,6 +81,10 @@ export type DocView = {
   figuresError: string | null;
   missing: boolean;
   paired: boolean;
+  /** Een resultaat waarvoor geen budget op het BO hoefde (zie `budgetWaiver`). */
+  waiver: string | null;
+  /** De posten van dit bestand zijn met de hand gekozen. */
+  overridden: boolean;
 };
 
 export type DossierStatus =
@@ -91,7 +99,8 @@ export type DossierStatus =
 
 export type Dossier = {
   key: string;
-  postKey: string;
+  /** Meestal één; twee bij "Cultuur+Onthaal" of wanneer Groep 5 er twee koos. */
+  postKeys: string[];
   activity: string;
   /** Het werkingsjaar uit de naam ("26-27"), anders dat van de vergadering. */
   year: number;
@@ -99,7 +108,16 @@ export type Dossier = {
   results: DocView[];
   status: DossierStatus;
   eventDate: Date | null;
+  /**
+   * Een datum uit het rekenblad die niet bij de BO past (een sjabloon van vorig
+   * jaar, een tikfout): getoond, maar niet gebruikt om te rekenen.
+   */
+  dateIgnored: Date | null;
   location: string | null;
+  /** Zie `DocView.waiver`. */
+  waiver: string | null;
+  /** De posten werden met de hand gekozen, niet uit de naam gehaald. */
+  overridden: boolean;
   budgetCents: number | null;
   resultCents: number | null;
   allocationCents: number | null;
@@ -142,9 +160,13 @@ export type Stats = {
   oldest: { key: string; activity: string; days: number } | null;
 };
 
+export type PostSection = "g5" | "post" | "werkgroep" | "extra" | "unknown";
+
 export type PostBlock = {
   key: string;
   groupId: string | null;
+  /** Waar de post in de linkerkolom staat. */
+  section: PostSection;
   /** De naam van de post, of de schrijfwijze uit de bestanden als de site de post niet kent. */
   name: string;
   dossiers: Dossier[];
@@ -170,9 +192,18 @@ export type MeetingView = {
   postKeys: string[];
 };
 
-export type UnknownPost = { key: string; label: string; files: string[] };
+export type UnknownPost = {
+  key: string;
+  label: string;
+  files: { id: string; name: string }[];
+  /**
+   * Geen woord maar een datum of een getal ("2026/09/07"): dat is geen
+   * schrijfwijze om te onthouden, dus kies je per bestand.
+   */
+  perDocument: boolean;
+};
 
-export type PairCandidate = { id: string; label: string };
+export type PairCandidate = { id: string; label: string; group: string };
 export type Pairable = { result: DocView; activity: string; postName: string; candidates: PairCandidate[] };
 
 export type BoOverview = {
@@ -206,11 +237,10 @@ type Classified = {
   doc: DocInput;
   view: DocView;
   year: number;
-  postKey: string;
+  postKeys: string[];
   postLabel: string;
-  groupId: string | null;
   activity: string;
-  key: string;
+  activityKey: string;
 };
 
 const DAY = 86_400_000;
@@ -260,6 +290,8 @@ export function statsOf(dossiers: readonly StatsInput[]): Stats {
   };
 }
 
+const SECTION_ORDER: Record<PostSection, number> = { g5: 0, post: 1, werkgroep: 2, extra: 3, unknown: 4 };
+
 export function buildOverview(
   docs: readonly DocInput[],
   posts: readonly PostRow[],
@@ -276,19 +308,29 @@ export function buildOverview(
     const parsed = parseDocumentName(doc.name);
     const kind = parsed.kind ?? doc.folderKind;
     const label = meetingLabel(doc.meeting, nl);
+    const override = (doc.postKeysOverride ?? []).filter(Boolean);
     const postLabel = parsed.post ?? doc.sheetPost;
-    if (!kind || !postLabel) {
+    // Zonder soort weet de site niet wat het is; zonder post vraagt ze die per
+    // bestand (bij Na te kijken), want daar valt nog iets aan te doen.
+    if (!kind) {
       if (doc.meeting.workingYear === year && !doc.missing) {
         unclassified.push({ id: doc.id, name: doc.name, webUrl: doc.webUrl, meetingLabel: label });
       }
       continue;
     }
-    const split = parsed.post
+    let split = parsed.post
       ? splitPost(parsed.post, parsed.activity, posts, aliases)
-      : { label: postLabel, groupId: resolvePost(postLabel, posts, aliases), activity: parsed.activity };
+      : { label: postLabel ?? "", postKeys: resolvePostKeys(postLabel ?? "", posts, aliases), activity: parsed.activity };
+    // Een post die de naam niet noemt, maar het blad wel ("26-27_Development_ECC"
+    // heeft er een, een naam met enkel een datum niet).
+    if (split.postKeys.length === 0 && doc.sheetPost) {
+      const fromSheet = resolvePostKeys(doc.sheetPost, posts, aliases);
+      if (fromSheet.length > 0 && !/[a-z]/i.test(split.label)) {
+        split = { label: doc.sheetPost, postKeys: fromSheet, activity: [parsed.post, parsed.activity].filter(Boolean).join(" ") || null };
+      }
+    }
+    const postKeys = override.length > 0 ? [...override] : split.postKeys.length > 0 ? split.postKeys : [`l:${normalizeKey(split.label)}`];
     const activity = split.activity ?? doc.sheetTitle ?? doc.name;
-    const postKey = split.groupId ? `g:${split.groupId}` : `l:${normalizeKey(split.label)}`;
-    const docYear = parsed.year ?? doc.meeting.workingYear;
     classified.push({
       doc,
       view: {
@@ -305,49 +347,85 @@ export function buildOverview(
         figuresError: doc.figuresError,
         missing: doc.missing,
         paired: Boolean(doc.pairedBudgetId),
+        waiver: kind === "RESULT" ? (doc.budgetWaiver ?? null) : null,
+        overridden: override.length > 0,
       },
-      year: docYear,
-      postKey,
+      year: parsed.year ?? doc.meeting.workingYear,
+      postKeys,
       postLabel: split.label,
-      groupId: split.groupId,
       activity,
-      key: `${docYear}|${postKey}|${normalizeKey(activity)}`,
+      activityKey: normalizeKey(activity),
     });
   }
 
-  // Een resultaat dat met de hand bij een budget gezet werd, volgt dat budget.
-  const byId = new Map(classified.map((c) => [c.doc.id, c]));
-  for (const c of classified) {
-    const budget = c.doc.pairedBudgetId ? byId.get(c.doc.pairedBudgetId) : undefined;
-    if (budget && c.view.kind === "RESULT") {
-      c.key = budget.key;
-      c.postKey = budget.postKey;
-      c.postLabel = budget.postLabel;
-      c.groupId = budget.groupId;
+  // Wat bij elkaar hoort: zelfde jaar en activiteit, en minstens één post
+  // gemeen ("Cultuur+Onthaal_Jeneverwandeling" en "Cultuur_Jeneverwandeling"
+  // zijn één activiteit). Een resultaat dat met de hand bij een budget gezet
+  // werd, volgt dat budget.
+  const parent = classified.map((_, i) => i);
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  const join = (a: number, b: number) => {
+    parent[find(a)] = find(b);
+  };
+  const index = new Map(classified.map((c, i) => [c.doc.id, i]));
+  const buckets = new Map<string, number[]>();
+  classified.forEach((c, i) => {
+    const bucket = `${c.year}|${c.activityKey}`;
+    buckets.set(bucket, [...(buckets.get(bucket) ?? []), i]);
+  });
+  for (const members of buckets.values()) {
+    for (let a = 0; a < members.length; a += 1) {
+      for (let b = a + 1; b < members.length; b += 1) {
+        const x = classified[members[a]];
+        const y = classified[members[b]];
+        if (x.postKeys.some((k) => y.postKeys.includes(k))) join(members[a], members[b]);
+      }
     }
   }
+  classified.forEach((c, i) => {
+    const budget = c.doc.pairedBudgetId ? index.get(c.doc.pairedBudgetId) : undefined;
+    if (budget !== undefined && c.view.kind === "RESULT") join(i, budget);
+  });
+  const groups = new Map<number, Classified[]>();
+  classified.forEach((c, i) => {
+    const root = find(i);
+    groups.set(root, [...(groups.get(root) ?? []), c]);
+  });
 
   const byMeeting = (a: Classified, b: Classified) =>
     (a.view.meetingDate?.getTime() ?? 0) - (b.view.meetingDate?.getTime() ?? 0);
-
-  const dossiers = new Map<string, Classified[]>();
-  for (const c of classified) {
-    const items = dossiers.get(c.key) ?? [];
-    items.push(c);
-    dossiers.set(c.key, items);
-  }
-
   const todayStart = dayStart(today);
-  const built: { dossier: Dossier; groupId: string | null; postLabel: string; inYear: boolean }[] = [];
-  for (const [key, items] of dossiers) {
+
+  const built: { dossier: Dossier; postLabel: string; inYear: boolean }[] = [];
+  for (const items of groups.values()) {
     const budgetItems = items.filter((c) => c.view.kind === "BUDGET").sort(byMeeting);
     const resultItems = items.filter((c) => c.view.kind === "RESULT").sort(byMeeting);
     const lastBudget = budgetItems.at(-1);
     const lastResult = resultItems.at(-1);
-    const eventDate = lastBudget?.doc.eventDate ?? lastResult?.doc.eventDate ?? null;
+    // De posten en de naam komen uit het budget (dat kwam eerst); een resultaat
+    // dat met de hand gekoppeld werd, volgt ze.
+    const lead = budgetItems[0] ?? items[0];
+    const postKeys = budgetItems.length > 0
+      ? [...new Set(budgetItems.flatMap((c) => c.postKeys))]
+      : [...new Set(items.flatMap((c) => c.postKeys))];
 
+    // Een datum die niet bij de BO past, telt niet: een sjabloon van vorig jaar
+    // gaf anders "8043 dagen open".
+    const meetingTimes = items.map((c) => c.view.meetingDate?.getTime()).filter((t): t is number => t !== undefined);
+    let eventDate = lastBudget?.doc.eventDate ?? lastResult?.doc.eventDate ?? null;
+    let dateIgnored: Date | null = null;
+    if (eventDate && meetingTimes.length > 0) {
+      const earliest = Math.min(...meetingTimes) - 180 * DAY;
+      const latest = Math.max(...meetingTimes) + 400 * DAY;
+      if (eventDate.getTime() < earliest || eventDate.getTime() > latest) {
+        dateIgnored = eventDate;
+        eventDate = null;
+      }
+    }
+
+    const waiver = resultItems.find((c) => c.view.waiver)?.view.waiver ?? null;
     let status: DossierStatus;
-    if (resultItems.length > 0) status = budgetItems.length > 0 ? "DONE" : "NO_BUDGET";
+    if (resultItems.length > 0) status = budgetItems.length > 0 || waiver ? "DONE" : "NO_BUDGET";
     else status = eventDate && dayStart(eventDate) >= todayStart ? "UPCOMING" : "OPEN";
 
     const budgetCents = lastBudget?.doc.budgetTotalCents ?? null;
@@ -357,25 +435,26 @@ export function buildOverview(
     const since = eventDate ?? budgetItems[0]?.view.meetingDate ?? null;
     const resultLines = lastResult?.doc.lines ?? [];
     const lines = resultLines.length > 0 ? resultLines : (lastBudget?.doc.lines ?? []);
-
-    // De naam van de activiteit uit het budget: dat kwam eerst en bepaalde ze.
-    const lead = budgetItems[0] ?? items[0];
     const dates = items.map((c) => c.view.meetingDate?.getTime() ?? 0);
+
     built.push({
       dossier: {
-        key,
-        postKey: lead.postKey,
+        key: `${lead.year}|${[...postKeys].sort().join("+")}|${lead.activityKey}`,
+        postKeys,
         activity: lead.activity,
         year: lead.year,
         budgets: budgetItems.map((c) => c.view),
         results: resultItems.map((c) => c.view),
         status,
         eventDate,
+        dateIgnored,
         location: lastBudget?.doc.location ?? lastResult?.doc.location ?? null,
+        waiver,
+        overridden: items.some((c) => c.view.overridden),
         budgetCents,
         resultCents,
         allocationCents,
-        devCents: status === "DONE" && budgetCents !== null && resultCents !== null ? resultCents - budgetCents : null,
+        devCents: status === "DONE" && budgetItems.length > 0 && budgetCents !== null && resultCents !== null ? resultCents - budgetCents : null,
         vtkSharePercent: (lastResult ?? lastBudget)?.doc.vtkSharePercent ?? null,
         lagDays: resultDate && eventDate ? days(eventDate, resultDate) : null,
         overdueDays: status === "OPEN" && since ? Math.max(0, days(since, today)) : null,
@@ -383,52 +462,66 @@ export function buildOverview(
         lines,
         lastSeen: dates.length > 0 ? new Date(Math.max(...dates)) : null,
       },
-      groupId: lead.groupId,
       postLabel: lead.postLabel,
       inYear: items.some((c) => c.doc.meeting.workingYear === year),
     });
   }
 
   const postsById = new Map(posts.map((p) => [p.id, p]));
+  const sectionOf = (key: string): PostSection => {
+    if (key.startsWith("x:")) return BO_EXTRA_POSTS.find((p) => p.key === key)?.section ?? "extra";
+    if (key.startsWith("l:")) return "unknown";
+    const post = postsById.get(key.slice(2));
+    if (!post) return "unknown";
+    if (post.code === "GROEP5") return "g5";
+    return post.type === "WERKGROEP" ? "werkgroep" : "post";
+  };
+  const orderOf = (key: string): number => {
+    const extra = BO_EXTRA_POSTS.findIndex((p) => p.key === key);
+    if (extra >= 0) return 100 + extra;
+    return postsById.get(key.slice(2))?.orderInPraesidium ?? 0;
+  };
+
   const blocks = new Map<string, PostBlock>();
   const unknown = new Map<string, UnknownPost>();
-  for (const { dossier, groupId, postLabel, inYear } of built) {
+  for (const { dossier, postLabel, inYear } of built) {
     if (!inYear) continue;
-    const post = groupId ? postsById.get(groupId) : undefined;
-    const block = blocks.get(dossier.postKey) ?? {
-      key: dossier.postKey,
-      groupId,
-      name: post ? (nl ? post.nameNl : post.nameEn) : postLabel,
-      dossiers: [],
-      open: 0,
-      stats: statsOf([]),
-    };
-    block.dossiers.push(dossier);
-    if (dossier.status === "OPEN") block.open += 1;
-    blocks.set(dossier.postKey, block);
+    for (const key of dossier.postKeys) {
+      const block = blocks.get(key) ?? {
+        key,
+        groupId: key.startsWith("g:") ? key.slice(2) : null,
+        section: sectionOf(key),
+        name: postName(key, posts, nl) ?? (postLabel || (nl ? "Zonder post" : "No post")),
+        dossiers: [],
+        open: 0,
+        stats: statsOf([]),
+      };
+      block.dossiers.push(dossier);
+      if (dossier.status === "OPEN") block.open += 1;
+      blocks.set(key, block);
+    }
 
-    if (!groupId) {
-      const key = normalizeKey(postLabel);
-      const entry = unknown.get(key) ?? { key, label: postLabel, files: [] };
+    if (dossier.postKeys.some((k) => k.startsWith("l:"))) {
+      // Een naam onthoudt de site voor de volgende bestanden; een naam zonder
+      // letters (enkel een datum, of niets) niet, die vraagt ze per activiteit.
+      const perDocument = !/[a-z]/.test(normalizeKey(postLabel));
+      const key = perDocument ? `${normalizeKey(postLabel)}#${dossier.key}` : normalizeKey(postLabel);
+      const entry = unknown.get(key) ?? { key, label: postLabel, files: [], perDocument };
       for (const doc of [...dossier.budgets, ...dossier.results]) {
-        if (doc.workingYear === year) entry.files.push(doc.name);
+        if (doc.workingYear === year && !doc.missing) entry.files.push({ id: doc.id, name: doc.name });
       }
       unknown.set(key, entry);
     }
   }
 
-  const sortedBlocks = [...blocks.values()].sort((a, b) => {
-    const pa = a.groupId ? postsById.get(a.groupId) : undefined;
-    const pb = b.groupId ? postsById.get(b.groupId) : undefined;
-    // Eerst de praesidiumposten in hun vaste volgorde, dan de werkgroepen, dan
-    // wat de site niet herkent.
-    const rank = (p: PostRow | undefined) => (!p ? 2 : p.type === "WERKGROEP" ? 1 : 0);
-    return (
-      rank(pa) - rank(pb) ||
-      (pa?.orderInPraesidium ?? 0) - (pb?.orderInPraesidium ?? 0) ||
-      a.name.localeCompare(b.name, "nl")
-    );
-  });
+  const sortedBlocks = [...blocks.values()].sort(
+    (a, b) =>
+      SECTION_ORDER[a.section] - SECTION_ORDER[b.section] ||
+      // Groep 5 zelf voor haar vier rollen.
+      (a.key.startsWith("g:") ? 0 : 1) - (b.key.startsWith("g:") ? 0 : 1) ||
+      orderOf(a.key) - orderOf(b.key) ||
+      a.name.localeCompare(b.name, "nl"),
+  );
   for (const block of sortedBlocks) {
     block.dossiers.sort(
       (a, b) =>
@@ -437,34 +530,36 @@ export function buildOverview(
     block.stats = statsOf(block.dossiers);
   }
 
-  // Een resultaat zonder budget, met wat het zou kunnen zijn: een budget van
-  // dezelfde post en hetzelfde jaar ("26-27") dat nog geen resultaat heeft. Een
-  // resultaat van 25-26 krijgt dus geen budget van dit jaar voorgesteld; zijn
-  // budget passeerde vóór de site meelas, en dat zegt de tabel al.
+  // Elk dossier één keer, ook als het bij twee posten hoort.
+  const yearDossiers = built.filter((b) => b.inYear).map((b) => b.dossier);
+  const nameOf = (key: string) => postName(key, posts, nl) ?? blocks.get(key)?.name ?? key.replace(/^l:/, "");
+
+  // Een resultaat zonder budget, met wat het zou kunnen zijn: elk budget van
+  // hetzelfde jaar ("26-27") dat nog geen resultaat heeft, dat van dezelfde
+  // post bovenaan. Een resultaat van 25-26 krijgt dus geen budget van dit jaar
+  // voorgesteld; zijn budget passeerde vóór de site meelas.
   const pairable: Pairable[] = [];
-  for (const block of sortedBlocks) {
-    for (const dossier of block.dossiers) {
-      if (dossier.status !== "NO_BUDGET") continue;
-      const result = dossier.results.at(-1);
-      if (!result || result.paired || result.workingYear !== year) continue;
-      const candidates = built
-        .map((b) => b.dossier)
-        .filter(
-          (d) =>
-            d.postKey === dossier.postKey &&
-            d.results.length === 0 &&
-            d.budgets.length > 0 &&
-            d.year === dossier.year,
-        )
-        .map((d) => ({ id: d.budgets.at(-1)!.id, label: `${d.activity} (${d.budgets.at(-1)!.meetingLabel})` }));
-      if (candidates.length > 0) {
-        pairable.push({ result, activity: dossier.activity, postName: block.name, candidates });
-      }
-    }
+  for (const dossier of yearDossiers) {
+    if (dossier.status !== "NO_BUDGET") continue;
+    const result = dossier.results.at(-1);
+    if (!result || result.paired || result.workingYear !== year || dossier.year !== year) continue;
+    const candidates = built
+      .map((b) => b.dossier)
+      .filter((d) => d.results.length === 0 && d.budgets.length > 0 && d.year === dossier.year)
+      .sort(
+        (a, b) =>
+          Number(b.postKeys.some((k) => dossier.postKeys.includes(k))) - Number(a.postKeys.some((k) => dossier.postKeys.includes(k))) ||
+          a.activity.localeCompare(b.activity, "nl"),
+      )
+      .map((d) => ({
+        id: d.budgets.at(-1)!.id,
+        label: `${d.activity} (${d.budgets.at(-1)!.meetingLabel})`,
+        group: d.postKeys.map(nameOf).join(" + "),
+      }));
+    pairable.push({ result, activity: dossier.activity, postName: dossier.postKeys.map(nameOf).join(" + "), candidates });
   }
 
   // Per BO: wat er passeerde, uit de dossiers van dit jaar.
-  const yearDossiers = sortedBlocks.flatMap((b) => b.dossiers);
   const meetingViews: MeetingView[] = meetings
     .filter((m) => m.workingYear === year)
     .map((m) => {
@@ -488,7 +583,7 @@ export function buildOverview(
         sumBudget: sum(budgets.map(({ doc }) => doc.totalCents)),
         sumResult: sum(results.map(({ doc }) => doc.totalCents)),
         sumDev: sum(results.map(({ dossier }) => dossier.devCents)),
-        postKeys: [...new Set([...budgets, ...results].map(({ dossier }) => dossier.postKey))],
+        postKeys: [...new Set([...budgets, ...results].flatMap(({ dossier }) => dossier.postKeys))],
       };
     })
     // Nieuwste eerst; de schriftelijke goedkeuring heeft geen datum en staat onderaan.

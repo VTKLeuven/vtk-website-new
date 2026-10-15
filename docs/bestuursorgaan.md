@@ -2,10 +2,10 @@
 
 Elke week passeren op het Bestuursorgaan (BO) de budgetten en resultaten van de
 posten. Die staan op de gedeelde drive Praesidium, in een vaste structuur.
-`/admin/bestuursorgaan` (in de zijbalk onder Beheer) leest die map en toont in
-een verkenner met drie panelen per post en per BO welke budgetten er al
-passeerden, of er al een resultaat is, en de bedragen uit de rekenbladen, tot op
-de post (Zaal, Drank) toe.
+`/admin/bestuursorgaan` (in de zijbalk onder Beheer als "Budgetten &
+Resultaten") leest die map en toont in een verkenner met drie panelen per post
+en per BO welke budgetten er al passeerden, of er al een resultaat is, en de
+bedragen uit de rekenbladen, tot op de post (Zaal, Drank) toe.
 
 Dit document beschrijft **hoe het werkt en waar het misloopt**. Het waarom van de
 keuzes (enkel Groep 5, de naam wint, niets terugschrijven) staat in
@@ -51,7 +51,8 @@ niets. Wat in Drive fout staat, zet je in Drive recht; het overzicht zegt waar.
 | `apps/web/app/api/google/maintenance/route.ts`   | Waar de worker de scan om het halfuur start                        |
 | `apps/web/lib/bo/list.ts`                        | Filteren en groeperen voor de lijstweergave (puur, getest)         |
 | `apps/web/lib/bo/views.ts`                       | De twee weergaven en de sleutel van de voorkeur                    |
-| `apps/web/app/[locale]/admin/bestuursorgaan/`    | Het scherm: `BoViews.tsx` kiest tussen `BoExplorer.tsx` en `BoList.tsx`; wat ze delen staat in `BoParts.tsx` |
+| `apps/web/app/[locale]/admin/bestuursorgaan/`    | Het scherm: `BoViews.tsx` kiest tussen `BoExplorer.tsx` en `BoList.tsx`; wat ze delen staat in `BoParts.tsx`, "Na te kijken" en "Post wijzigen" in `BoReview.tsx` |
+| `apps/web/components/admin/SearchMultiPicker.tsx` | De doorzoekbare keuzelijst met meer dan één keuze (twee posten)   |
 | `apps/web/app/actions/bestuursorgaan.ts`         | Nu lezen, de map instellen, posten en resultaten koppelen          |
 
 Het recht is `bestuursorgaan.manage`, via de rol `bestuursorgaan` aan Groep 5.
@@ -106,20 +107,48 @@ daarnaast aanvaardt, omdat het in de map van 26-27 voorkwam:
 | `26-27_Development_ECC` in Budgetten          | geen soort in de naam: de map beslist          |
 | `26-27_Budget_Statix_Ontbijt` in Resultaten   | **de naam wint**, en het scherm noemt de map   |
 | `Budget Sport VTKlimmen`                      | spaties in plaats van underscores              |
+| `26_27_...`, `2627_...`, `2026-2027_...`      | het jaar mag anders geschreven zijn            |
+| `2026/09/07 Eetstand Wiskundeweek Begroting`  | een datum vooraan valt weg; "Begroting" achteraan is een budget |
+| `26-27_Budget_Statix-Talks`                   | een streepje waar een underscore hoorde: Statix, activiteit Talks |
+| `26-27_Budget Cultuur+Onthaal_Jeneverwandeling` | soort en post in één stuk, en twee posten   |
 
 **De post** wordt herkend aan de naam, de code of de slug van een post, en aan
 een afkorting die van precies één post het begin is (`Acti` is Activiteiten).
-Wat de site niet herkent (`Vice`, `Secretaris`), staat bij "Na te kijken";
-Groep 5 kiest één keer de post en die keuze (`BoPostAlias`) geldt voor elk
-volgend bestand. Zonder keuze verdwijnt er niets: de bestanden staan dan onder
-hun eigen schrijfwijze in de tabel.
+Daarnaast zijn er zes vaste vakken die geen `Group` zijn (`BO_EXTRA_POSTS` in
+`lib/bo/posts.ts`): de vier rollen van Groep 5 (Praeses, Vice-praeses,
+Secretaris, Beheer) en Jaarwerkingen (met Halftime en Studentenwelkom) en
+Overige. Een post heet in de code een **sleutel**: `g:<groupId>` voor een post
+of werkgroep, `x:vice` en zo voor een vak, en `l:<schrijfwijze>` voor een naam
+die de site (nog) niet kent.
 
-**Budget en resultaat horen samen** wanneer jaar, post en activiteit gelijk zijn,
-na het wegvegen van hoofdletters, accenten en leestekens
-(`Familie- en vriendencantus` is `Familie en Vriendencantus`). Lijkt een
-resultaat op geen enkel budget, dan staat het bij "Na te kijken" met de open
-budgetten van dezelfde post en hetzelfde jaar, en kiest Groep 5 er één
-(`BoDocument.pairedBudgetId`).
+Een activiteit kan bij **meer dan één post** horen (`Dossier.postKeys`):
+`Cultuur+Onthaal` (ook met `&`, `/`, `,` of " en ") wordt beide, maar enkel als
+elk deel herkend wordt. Ze staat dan bij elke post en telt in elk totaal één
+keer; wie een som maakt over posten heen, ontdubbelt op `dossier.key`.
+
+Wat de site niet herkent, staat bij "Na te kijken", met een doorzoekbare lijst
+waarin je één of meer posten aanvinkt:
+
+- een **schrijfwijze** (`WERKGROEPEN`, `Eetstand`) koppel je één keer en die
+  keuze (`BoPostAlias.postKeys`) geldt voor elk volgend bestand;
+- een naam **zonder letters** (enkel een datum, of geen post) vraagt het per
+  activiteit, want een datum zegt niets over het volgende bestand.
+
+Zit de naam ernaast, dan zet "Post wijzigen" in het detail van een activiteit
+de post(en) voor al haar bestanden (`BoDocument.postKeys`); dat wint van de
+naam en van een koppeling, en leeg toepassen zet het terug. Zonder keuze
+verdwijnt er niets: de bestanden staan dan onder "Niet herkend".
+
+**Budget en resultaat horen samen** wanneer jaar en activiteit gelijk zijn en ze
+minstens één post gemeen hebben, na het wegvegen van hoofdletters, accenten en
+leestekens (`Familie- en vriendencantus` is `Familie en Vriendencantus`;
+`Cultuur+Onthaal_Jeneverwandeling` en `Cultuur_Jeneverwandeling` zijn één
+activiteit). Lijkt een resultaat op geen enkel budget, dan staat het bij "Na te
+kijken" met de open budgetten van hetzelfde jaar, die van dezelfde post
+bovenaan, en kiest Groep 5 er één (`BoDocument.pairedBudgetId`), of zegt ze dat
+er geen budget op het BO kwam: "Versneld goedgekeurd door de grocomeet" of "Geen
+budget nodig" (`BoDocument.budgetWaiver`). Dan telt het resultaat als afgerond,
+zonder afwijking.
 
 ## De bedragen
 
@@ -145,6 +174,12 @@ Een budget zonder resultaat is "Resultaat open" zodra de datum uit het budget
 voorbij is, of wanneer het budget er geen noemt; met een datum in de toekomst
 staat er "Op 6 nov".
 
+Een datum die niet bij de BO's van het dossier past (meer dan 180 dagen voor de
+eerste of 400 dagen na de laatste), telt niet: dat is een oud sjabloon. De
+activiteit rekent dan zonder datum, en het detail noemt de genegeerde datum
+(`Dossier.dateIgnored`). Een jaar buiten 2000 tot 2100 laat `figures.ts` al bij
+het lezen vallen.
+
 ## De twee weergaven
 
 Er zijn twee weergaven van dezelfde gegevens: de **verkenner** (drie panelen) en
@@ -163,10 +198,10 @@ URL (`history.pushState`): het hele werkingsjaar kwam al mee met de pagina.
 | ------------- | ---------------------------------------------------------- |
 | `jaar`        | het werkingsjaar (de jaarbalk bovenaan, een gewone link)   |
 | `tab`         | `bos` of `open`; zonder: Posten                            |
-| `post`        | de post (`g:<groupId>`, of `l:<schrijfwijze>` als de site de post niet kent) |
+| `post`        | de post (`g:<groupId>`, een vak als `x:vice`, of `l:<schrijfwijze>` als de site de post niet kent) |
 | `bo`          | de id van een `BoMeeting`                                  |
 | `leeftijd`    | in Open: `geen-datum`, `2-maanden`, `1-maand`, `2-weken`, `recent` |
-| `activiteit`  | de sleutel van een dossier: jaar, post en activiteit, gescheiden door een verticale streep |
+| `activiteit`  | de sleutel van een dossier: jaar, posten (met `+`) en activiteit, gescheiden door een verticale streep. Wijzigt de post, dan vindt `findDossier` dezelfde activiteit in hetzelfde jaar terug |
 | `blad`        | `tijdlijn` of `bestanden`; zonder: Bedragen               |
 
 De lijst leest dezelfde `post`, `bo`, `activiteit` en `blad` (een post, een BO
@@ -206,6 +241,19 @@ en de BO waarop het resultaat passeerde.
   opnieuw.
 - **De bedragen zijn netto.** Totaal is inkomsten min uitgaven, dus een kost is
   negatief. "Stand" is resultaat min budget: positief is beter dan gepland.
+- **Eén onmogelijke waarde hield de hele scan tegen.** Een cel "5/3/20026" werd
+  het jaar 20026, Postgres weigerde `+020026-03-05`, en geen enkel bestand werd
+  nog bewaard. Nu valt zo'n datum weg (`sane()` in `figures.ts`, ook voor
+  bedragen boven de grens van een `Int`), en wordt elk bestand apart bewaard:
+  wat toch faalt, staat bij "Niet bewaard" onder de scanregel en in Sentry,
+  de rest loopt door.
+- **De sleutel van een activiteit bevat haar posten.** Na "Post wijzigen" bestaat
+  de sleutel in de URL niet meer; zoek een dossier daarom altijd met
+  `findDossier`, niet met een gelijkheid op `key`, anders sluit het detail net
+  na het opslaan.
+- **Zoek eerst op de naam, dan op de groep.** De keuzelijst zocht ook in de
+  groepsnaam, en "overige" vond zo eerst Jaarwerkingen ("Jaarwerkingen en
+  overige"); Enter vinkte dan de verkeerde aan.
 - **Een fout in de scan breekt de groepssync niet.** De worker roept beide in
   dezelfde ronde aan, maar de statuscode volgt enkel de groepssync; een fout in
   de BO-scan staat op `/admin/bestuursorgaan`.

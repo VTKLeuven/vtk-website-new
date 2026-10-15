@@ -49,6 +49,16 @@ export type ParsedDocumentName = {
 
 const EXTENSION = /\.(xlsx|xlsm|xls|ods|csv|pdf|docx?)\s*$/i;
 
+/**
+ * Het jaar vooraan, in elke schrijfwijze die we tegenkwamen: "26-27", "26_27",
+ * "2627", "26 27" en "2026-2027". Het tweede getal moet het jaar na het eerste
+ * zijn, zodat "2026/09/07" (een datum) er niet als jaar doorglipt.
+ */
+const YEAR_PREFIX = /^(?:20)?(\d{2})\s*[-_./ ]?\s*(?:20)?(\d{2})(?=[\s_:-]|$)/;
+
+/** Een datum vooraan ("2026/09/07 Eetstand ..."): geen post, geen activiteit. */
+const DATE_PREFIX = /^(?:\d{4}[/.-]\d{1,2}[/.-]\d{1,2}|\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})(?=[\s_:-]|$)[\s_:-]*/;
+
 function kindOf(segment: string): BoKind | null {
   const key = normalizeKey(segment);
   if (key === "budget" || key === "budgetten") return "BUDGET";
@@ -56,14 +66,23 @@ function kindOf(segment: string): BoKind | null {
   return null;
 }
 
+/** "Budget Cultuur+Onthaal" (een spatie waar een underscore hoorde): het soort en de rest. */
+function leadingKind(segment: string): { kind: BoKind; rest: string } | null {
+  const match = /^(budgetten|budget|resultaten|resultaat)[\s-]+(.+)$/i.exec(segment);
+  if (!match) return null;
+  return { kind: kindOf(match[1])!, rest: match[2].trim() };
+}
+
 export function parseDocumentName(raw: string): ParsedDocumentName {
   let rest = raw.trim().replace(EXTENSION, "").trim();
 
   let year: number | null = null;
-  const prefix = /^(\d{2})\s*-\s*(\d{2})(?=[\s_:]|$)/.exec(rest);
+  const prefix = YEAR_PREFIX.exec(rest);
   if (prefix && (Number(prefix[1]) + 1) % 100 === Number(prefix[2])) {
     year = 2000 + Number(prefix[1]);
     rest = rest.slice(prefix[0].length);
+  } else {
+    rest = rest.replace(DATE_PREFIX, "");
   }
 
   let segments = rest
@@ -74,7 +93,8 @@ export function parseDocumentName(raw: string): ParsedDocumentName {
   if (segments.length === 1) segments = segments[0].split(/\s+/);
 
   // Het soort staat vooraan, of na de post. Verder zoeken niet: "Budget" als
-  // woord in een activiteit is geen soort.
+  // woord in een activiteit is geen soort. Wel het laatste woord: "Eetstand
+  // Wiskundeweek Begroting" is een budget.
   let kind: BoKind | null = null;
   for (let i = 0; i < Math.min(2, segments.length); i += 1) {
     const found = kindOf(segments[i]);
@@ -82,6 +102,19 @@ export function parseDocumentName(raw: string): ParsedDocumentName {
       kind = found;
       segments = [...segments.slice(0, i), ...segments.slice(i + 1)];
       break;
+    }
+    const lead = leadingKind(segments[i]);
+    if (lead) {
+      kind = lead.kind;
+      segments = [...segments.slice(0, i), lead.rest, ...segments.slice(i + 1)];
+      break;
+    }
+  }
+  if (!kind && segments.length > 0) {
+    const last = normalizeKey(segments.at(-1)!);
+    if (kindOf(segments.at(-1)!) || last === "begroting") {
+      kind = last === "begroting" ? "BUDGET" : kindOf(segments.at(-1)!);
+      segments = segments.slice(0, -1);
     }
   }
 

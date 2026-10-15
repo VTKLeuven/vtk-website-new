@@ -932,9 +932,6 @@ model Group {
   /// Taken van een andere post die het aanspreekpunt voor deze post zijn
   /// ("IT-contact voor Theokot").
   tasksFor                 GroupTask[]                @relation("GroupTaskFor")
-  /// Hoe deze post in de bestandsnamen van het Bestuursorgaan heet wanneer de
-  /// site dat niet zelf herkent ("Vice" voor Groep 5).
-  boPostAliases            BoPostAlias[]
 }
 
 model GroupMembership {
@@ -8792,6 +8789,12 @@ model BoDocument {
   /// Een resultaat dat Groep 5 met de hand bij een budget zette, omdat de
   /// namen te ver uiteenlopen om vanzelf te koppelen.
   pairedBudgetId String?
+  /// Met de hand gekozen posten voor dit bestand (`g:<groupId>`, of een vak
+  /// zoals `x:overige`), wanneer de naam het niet zegt. Leeg = uit de naam.
+  postKeys       String[] @default([])
+  /// Een resultaat zonder budget op het BO: "grocomeet" (versneld
+  /// goedgekeurd) of "geen" (geen budget nodig). Null = er hoort een budget bij.
+  budgetWaiver   String?
 
   firstSeenAt  DateTime  @default(now()) @db.Timestamptz(3)
   lastSeenAt   DateTime  @db.Timestamptz(3)
@@ -8808,18 +8811,17 @@ model BoDocument {
 }
 
 /// Hoe een post in de bestandsnamen heet wanneer de site dat niet zelf
-/// herkent: "Vice" en "Secretaris" zijn Groep 5. Eén keer gekoppeld, geldt het
-/// voor elk bestand met die schrijfwijze, ook de volgende.
+/// herkent: "WERKGROEPEN" is Overige, "Biomedix" een werkgroep. Eén keer
+/// gekoppeld, geldt het voor elk bestand met die schrijfwijze, ook de volgende.
 model BoPostAlias {
   /// De schrijfwijze, genormaliseerd met `normalizeKey`.
   key       String   @id
   /// De eerste schrijfwijze zoals ze in een bestandsnaam stond, om te tonen.
   label     String
-  groupId   String
+  /// Eén of meer posten: `g:<groupId>` voor een post of werkgroep, of een vak
+  /// uit `lib/bo/posts.ts` (`x:vice`, `x:jaarwerkingen`, `x:overige`). Geen
+  /// vreemde sleutel: een sleutel die niet meer bestaat, telt gewoon niet.
+  postKeys  String[] @default([])
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
-
-  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
-
-  @@index([groupId])
 }

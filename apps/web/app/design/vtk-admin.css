@@ -2447,6 +2447,40 @@ a.vtk-shortcut-tile:hover {
   background: color-mix(in srgb, var(--yellow) 10%, var(--paper));
 }
 
+/* Meer dan één keuze (SearchMultiPicker): aanvinken in de lijst, toepassen in
+   de voet, die zegt wat je gaat bewaren. */
+.vtk-code-picker-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 8px 8px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--body);
+  font-size: 12.5px;
+}
+
+.vtk-code-picker-footer > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.vtk-code-picker-apply {
+  flex: none;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.vtk-code-picker-apply:disabled {
+  opacity: 0.45;
+}
+
 /* ---------------------------------------------------------------------------
    Het rekeningstelsel (/admin/boekhoudcodes, AccountingCodesEditor.tsx).
 
@@ -3192,6 +3226,107 @@ a.vtk-shortcut-tile:hover {
    docs/design-decisions.md ("Bestuursorgaan: de verkenner").
    --------------------------------------------------------------------------- */
 
+/* "Na te kijken": dicht één regel met de aantallen, zodat het de cijfers niet
+   onder zich begraaft; open per soort een register met rechts de keuze. */
+.vtk-bo-review {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-bo-review-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  width: 100%;
+  padding: 11px 16px;
+  border: 0;
+  border-radius: 18px;
+  background: none;
+  color: var(--ink);
+  font-size: 14px;
+  text-align: left;
+}
+
+.vtk-bo-review-head:hover {
+  background: color-mix(in srgb, var(--paper) 60%, transparent);
+}
+
+.vtk-bo-review-counts {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  min-width: 0;
+  color: var(--body);
+  font-size: 13px;
+}
+
+.vtk-bo-review-counts > span {
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-bo-review-head .chev {
+  flex: none;
+  margin-left: auto;
+  color: var(--muted);
+  transition: transform 150ms ease;
+}
+
+.vtk-bo-review[data-open='true'] .chev {
+  transform: rotate(180deg);
+}
+
+/* Smal: de aantallen op hun eigen regel onder de titel, niet in een kolom ernaast. */
+@media (max-width: 640px) {
+  .vtk-bo-review-counts {
+    flex-basis: 100%;
+    order: 3;
+    padding-left: 20px;
+  }
+}
+
+.vtk-bo-review-body {
+  display: grid;
+  gap: 18px;
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.vtk-bo-review-group {
+  display: grid;
+  gap: 8px;
+}
+
+.vtk-bo-review-group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.vtk-bo-review-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 8px 12px;
+}
+
+.vtk-bo-review-row + .vtk-bo-review-row {
+  border-top: 1px solid var(--rule-soft);
+}
+
+.vtk-bo-review-control {
+  display: flex;
+  flex: 0 1 280px;
+  justify-content: flex-end;
+  min-width: min(100%, 220px);
+}
+
 .vtk-bo-strip {
   display: flex;
   flex-wrap: wrap;
@@ -3227,14 +3362,19 @@ a.vtk-shortcut-tile:hover {
   container: bo-explorer / inline-size;
 }
 
+/* Geen `overflow: hidden`: de keuzelijst van "Post wijzigen" moet over de rand
+   kunnen hangen. De ronde hoeken van de koppen staan daarom op de koppen zelf. */
 .vtk-bo-explorer {
   display: grid;
   grid-template-columns: 200px 270px minmax(0, 1fr);
   min-height: 560px;
-  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--surface);
+}
+
+.vtk-bo-pane:first-child > .vtk-bo-pane-head {
+  border-top-left-radius: 17px;
 }
 
 .vtk-bo-pane {
@@ -3304,6 +3444,100 @@ a.vtk-shortcut-tile:hover {
 .vtk-bo-item[aria-current='true'] {
   background: color-mix(in srgb, var(--chart-1) 9%, var(--surface));
   box-shadow: inset 3px 0 0 var(--chart-1);
+}
+
+/* Een post in de linkerkolom: één regel, de naam en rechts wat aandacht vraagt
+   (amber "2 open", een vinkje als alles binnen is, een streepje als er nog
+   niets voorbij is). Per vak een kop; geen lijn tussen de regels. */
+.vtk-bo-pgroup + .vtk-bo-pgroup {
+  margin-top: 4px;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.vtk-bo-prow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 12px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-size: 13px;
+  text-align: left;
+}
+
+.vtk-bo-prow .n {
+  min-width: 0;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+
+.vtk-bo-prow:hover {
+  background: var(--paper);
+}
+
+.vtk-bo-prow[aria-current='true'] {
+  background: color-mix(in srgb, var(--chart-1) 9%, var(--surface));
+  box-shadow: inset 3px 0 0 var(--chart-1);
+}
+
+.vtk-bo-prow .vtk-bo-pill {
+  padding: 1px 7px;
+  font-size: 11px;
+}
+
+.vtk-bo-prow-ok,
+.vtk-bo-prow-none {
+  flex: none;
+  width: 18px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.vtk-bo-prow-ok {
+  color: var(--ok-ink);
+  font-weight: 700;
+}
+
+.vtk-bo-prow-none {
+  color: var(--muted);
+}
+
+.vtk-bo-pgroup .vtk-bo-section {
+  padding-top: 10px;
+}
+
+/* "Post wijzigen" in het detail van een activiteit. */
+.vtk-bo-postedit-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--body);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.vtk-bo-postedit-open svg {
+  width: 12px;
+  height: 12px;
+}
+
+.vtk-bo-postedit-open:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.vtk-bo-postedit {
+  display: block;
+  flex-basis: 100%;
+  width: min(100%, 340px);
 }
 
 .vtk-bo-item-r1,
@@ -3748,6 +3982,10 @@ a.vtk-shortcut-tile:hover {
 }
 
 @container bo-explorer (max-width: 760px) {
+  .vtk-bo-explorer .vtk-bo-pane > .vtk-bo-pane-head {
+    border-radius: 17px 17px 0 0;
+  }
+
   .vtk-bo-explorer {
     grid-template-columns: minmax(0, 1fr);
     min-height: 0;
@@ -4044,7 +4282,19 @@ a.vtk-shortcut-tile:hover {
 }
 
 .vtk-bo-l-row:hover td {
-  background: #f7f9fc;
+  background: color-mix(in srgb, var(--paper) 55%, var(--surface));
+}
+
+/* Bij groeperen op post: een kop per vak (Groep 5, Posten, ...). */
+.vtk-bo-l-table tr.vtk-bo-l-sec td {
+  padding: 14px 12px 5px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .vtk-bo-l-title {

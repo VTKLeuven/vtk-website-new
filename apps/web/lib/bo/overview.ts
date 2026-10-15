@@ -24,7 +24,7 @@ export async function loadBoOverview(
     prisma.group.findMany({
       select: { id: true, code: true, slug: true, nameNl: true, nameEn: true, orderInPraesidium: true, type: true },
     }),
-    prisma.boPostAlias.findMany({ select: { key: true, groupId: true } }),
+    prisma.boPostAlias.findMany({ select: { key: true, postKeys: true } }),
     prisma.boMeeting.findMany({ distinct: ["workingYear"], select: { workingYear: true } }),
     prisma.boMeeting.findMany({ where: { workingYear: year } }),
   ]);
@@ -54,13 +54,15 @@ export async function loadBoOverview(
     figuresError: row.figuresError,
     missing: row.missingSince !== null || row.meeting.missingSince !== null,
     pairedBudgetId: row.pairedBudgetId,
+    postKeysOverride: row.postKeys ?? [],
+    budgetWaiver: row.budgetWaiver,
   }));
 
   return {
     overview: buildOverview(
       docs,
       posts,
-      new Map(aliases.map((a) => [a.key, a.groupId])),
+      new Map(aliases.map((a) => [a.key, a.postKeys ?? []])),
       year,
       today,
       nl,
