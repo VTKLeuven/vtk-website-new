@@ -9,12 +9,9 @@ export type UrenloopClockLabels = {
   hours: string;
   minutes: string;
   seconds: string;
-  /** "op de piste, nog", gevolgd door de resterende tijd. */
-  onTrackLeft: string;
+  /** Onder de ronden, tijdens de race en na de finish: "rondjes". */
   laps: string;
   km: string;
-  /** Onder het eindtotaal: "ronden in 24 uur". */
-  lapsTotal: string;
   kilometres: string;
   /** Na de finish zonder stand: onder de duur van de race. */
   finished: string;
@@ -122,9 +119,6 @@ export function UrenloopClock({
       <div className="fp-ul-clock is-pair">
         <span className="fp-ul-group">
           <b>{formatHms(elapsed)}</b>
-          <i>
-            {labels.onTrackLeft} {formatHms(endsAt - now)}
-          </i>
         </span>
         {laps ? (
           <span className="fp-ul-group is-yellow">
@@ -155,7 +149,7 @@ export function UrenloopClock({
       {laps ? (
         <span className="fp-ul-group is-yellow">
           <b>{laps}</b>
-          <i>{labels.lapsTotal}</i>
+          <i>{labels.laps}</i>
         </span>
       ) : null}
       {km ? (

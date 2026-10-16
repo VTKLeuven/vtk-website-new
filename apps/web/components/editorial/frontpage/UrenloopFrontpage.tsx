@@ -140,19 +140,19 @@ function Scoreboard({ stats, nl }: { stats: UrenloopStatsPayload; nl: boolean })
   const cells = [
     stats.fastestLap[0] && {
       key: "fastest",
-      label: nl ? "Snelste ronde" : "Fastest lap",
+      label: nl ? "Snelste rondje" : "Fastest lap",
       value: stats.fastestLap[0].time,
       name: stats.fastestLap[0].name,
     },
     stats.mostLaps[0] && {
       key: "most",
-      label: nl ? "Meeste ronden" : "Most laps",
+      label: nl ? "Meeste rondjes" : "Most laps",
       value: lapsText(stats.mostLaps[0].laps),
       name: stats.mostLaps[0].name,
     },
     stats.firstYearMostLaps[0] && {
       key: "firstYear",
-      label: nl ? "Beste eerstejaars" : "Best first-year",
+      label: nl ? "Beste eerstejaar" : "Best first-year",
       value: lapsText(stats.firstYearMostLaps[0].laps),
       name: stats.firstYearMostLaps[0].name,
     },
@@ -256,12 +256,8 @@ export function UrenloopFrontpage({ values, locale, base, now, urenloop }: Front
             hours: nl ? "uur" : "hours",
             minutes: "min",
             seconds: "sec",
-            onTrackLeft: nl ? "op de piste, nog" : "on the track, left",
-            laps: nl ? "ronden" : "laps",
+            laps: nl ? "rondjes" : "laps",
             km: "km",
-            lapsTotal: nl
-              ? `ronden in ${raceHourCount(startsAt, endsAt)} uur`
-              : `laps in ${raceHourCount(startsAt, endsAt)} hours`,
             kilometres: nl ? "kilometer" : "kilometres",
             finished: nl ? "gelopen" : "run",
           }}

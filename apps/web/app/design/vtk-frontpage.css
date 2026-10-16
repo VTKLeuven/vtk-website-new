@@ -128,14 +128,18 @@
   text-shadow: 0 4px 50px rgba(10, 15, 31, 0.55);
 }
 
+/* Het label onder een getal staat op de foto zelf, zonder paneel: daarom groter,
+   lichter en met een schaduw, anders verdwijnt het in een licht stuk foto. */
 .vtk-design .fp-ul-group i {
-  margin-top: clamp(8px, 1vw, 14px);
+  margin-top: clamp(10px, 1.1vw, 16px);
   padding-left: 0.06em;
-  color: var(--on-dark-muted);
-  font-size: clamp(10px, 0.9vw, 12px);
+  color: var(--paper);
+  font-size: clamp(12px, 1.05vw, 14.5px);
   font-style: normal;
-  letter-spacing: 0.16em;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+  text-shadow: 0 1px 12px rgba(10, 15, 31, 0.85), 0 0 2px rgba(10, 15, 31, 0.6);
 }
 
 .vtk-design .fp-ul-group.is-yellow b {
