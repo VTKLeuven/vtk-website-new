@@ -8,6 +8,7 @@ import type { Locale } from "@vtk/i18n";
 import { Button, Card } from "@vtk/ui";
 import { sharedMomentTime } from "@/lib/calendar/moments";
 import { DiscordIcon } from "@/components/ui/icons";
+import { commuFormHref, getCommuRequestForm, requestsByEvent } from "@/lib/commu/requests";
 import { EventRow } from "./EventRow";
 import { FilterPill } from "./FilterPill";
 
@@ -57,6 +58,27 @@ export default async function AdminCalendar({
     orderBy: { start: showPast ? "desc" : "asc" },
     take: 100,
   });
+
+  // Communicatie aanvragen kan enkel voor wat nog komt, en pas als het
+  // aanvraagformulier online staat.
+  const commuForm = showPast ? null : await getCommuRequestForm();
+  const commuRequests =
+    commuForm?.status === "PUBLISHED"
+      ? await requestsByEvent(
+          commuForm,
+          events.map((event) => event.id)
+        )
+      : null;
+  const commuFor = (eventId: string) => {
+    if (!commuForm || !commuRequests) return null;
+    const requested = commuRequests.has(eventId);
+    return {
+      requested,
+      href: requested
+        ? `${base}/admin/commu-aanvragen`
+        : commuFormHref(commuForm.slug, { evenement: eventId }),
+    };
+  };
 
   const tag = nl ? "nl-BE" : "en-GB";
   const zone = "Europe/Brussels";
@@ -187,6 +209,7 @@ export default async function AdminCalendar({
                   interested: e._count.interests + e._count.guestInterests,
                   when: whenLabel(e),
                   heroWeek: e.heroWeek,
+                  commu: commuFor(e.id),
                 }}
               />
             ))}

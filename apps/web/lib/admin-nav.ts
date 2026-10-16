@@ -34,6 +34,9 @@ export type NavGuard = {
   ticketing?: boolean;
   /** Formulieren-tab: zichtbaar bij een eigen formulier-grant of een globale formulier-permissie. */
   forms?: boolean;
+  /** Commu-aanvragen: elke post (om aan te vragen) en wie de aanvragen opvolgt
+   *  (de grants op het aanvraagformulier); zie lib/commu/requests.ts. */
+  commuRequests?: boolean;
   /** Werkgroepen-tab: zichtbaar voor beheerders (werkgroepen.manage) en voor leden
    *  van een werkgroep (die zien enkel hun eigen werkgroep, enkel de infotekst). */
   werkgroep?: boolean;
@@ -183,6 +186,9 @@ export function getAdminNav(): NavEntry[] {
     ]),
     // Alles wat de kring naar buiten stuurt, en het beeld dat ze publiceert.
     group('communicatie', [
+      // Bovenaan: dit is het werk dat binnenkomt. Elke post ziet het item om
+      // zijn evenementen aan te vragen; commu ziet er alle aanvragen.
+      item('commuRequests', '/commu-aanvragen', { commuRequests: true }),
       // Twee dingen die allebei "mailinglijst" heten en bewust naast elkaar
       // staan zodat wie het ene zoekt het andere ziet: de opt-in nieuwsbrieven
       // naar studenten (export + Brevo), en de eigen adressen van de kring

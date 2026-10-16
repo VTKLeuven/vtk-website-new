@@ -26,6 +26,7 @@ export const FORM_FIELD_TYPES = [
   "FILE",
   "CONSENT",
   "PROFILE",
+  "CALENDAR_EVENT",
 ] as const;
 
 export type FormFieldType = (typeof FORM_FIELD_TYPES)[number];
@@ -52,12 +53,47 @@ export const PROFILE_FIELDS = [
 export type ProfileField = (typeof PROFILE_FIELDS)[number];
 
 /**
+ * Wat een evenementveld mee kan invullen wanneer de bezoeker een evenement
+ * kiest. De waarde in `fills` is de code van het doelveld; welk type dat veld
+ * moet hebben, staat in {@link EVENT_FILL_TARGET_TYPES}.
+ */
+export const EVENT_FILL_KEYS = [
+  "TITLE",
+  "DATE",
+  "START_TIME",
+  "END_TIME",
+  "LOCATION",
+  "POST",
+] as const;
+export type EventFillKey = (typeof EVENT_FILL_KEYS)[number];
+
+export const EVENT_FILL_TARGET_TYPES: Record<EventFillKey, readonly string[]> = {
+  TITLE: ["SHORT_TEXT", "LONG_TEXT"],
+  DATE: ["DATE"],
+  START_TIME: ["TIME"],
+  END_TIME: ["TIME"],
+  LOCATION: ["SHORT_TEXT", "LONG_TEXT"],
+  // Een keuzeveld waarvan de optiecodes de slugs van de posten zijn; staat de
+  // post er niet tussen, dan komt zijn naam in "Andere, namelijk".
+  POST: ["SINGLE_CHOICE", "DROPDOWN"],
+};
+
+/**
  * Hoe een veld zijn antwoord opslaat. Bepaalt of een typewissel toegelaten is
  * wanneer er al antwoorden zijn: binnen dezelfde vorm mag het (kort naar lang
  * tekst), erbuiten niet (keuze naar getal), want dan staat het bestaande
  * antwoord in de verkeerde kolom.
  */
-export type StorageKind = "TEXT" | "NUMBER" | "DATE" | "BOOLEAN" | "OPTIONS" | "FILE";
+export type StorageKind =
+  | "TEXT"
+  | "NUMBER"
+  | "DATE"
+  | "BOOLEAN"
+  | "OPTIONS"
+  | "FILE"
+  // Bewaard als tekst, maar die tekst is een event-id: een vrij tekstveld met
+  // antwoorden mag er niet naartoe wisselen, en omgekeerd ook niet.
+  | "EVENT";
 
 const STORAGE_BY_TYPE: Record<FormFieldType, StorageKind> = {
   SHORT_TEXT: "TEXT",
@@ -76,6 +112,7 @@ const STORAGE_BY_TYPE: Record<FormFieldType, StorageKind> = {
   MULTIPLE_CHOICE: "OPTIONS",
   DROPDOWN: "OPTIONS",
   FILE: "FILE",
+  CALENDAR_EVENT: "EVENT",
 };
 
 export function storageKindFor(type: string): StorageKind {
@@ -162,6 +199,12 @@ const profileConfig = commonConfig.extend({
   profileField: z.enum(PROFILE_FIELDS),
 });
 
+const fieldCode = z.string().regex(/^[a-z0-9_]{1,48}$/);
+
+const eventConfig = commonConfig.extend({
+  fills: z.record(z.enum(EVENT_FILL_KEYS), fieldCode).nullish(),
+});
+
 const CONFIG_SCHEMAS = {
   SHORT_TEXT: textConfig,
   LONG_TEXT: longTextConfig,
@@ -179,6 +222,7 @@ const CONFIG_SCHEMAS = {
   FILE: fileConfig,
   CONSENT: commonConfig,
   PROFILE: profileConfig,
+  CALENDAR_EVENT: eventConfig,
 } as const;
 
 export type FormFieldConfig = {
@@ -210,6 +254,7 @@ export type FormFieldConfig = {
   maxSizeMb?: number | null;
   allowedExtensions?: string[] | null;
   profileField?: ProfileField | null;
+  fills?: Partial<Record<EventFillKey, string>> | null;
 };
 
 export const DEFAULT_FILE_MAX_SIZE_MB = 10;

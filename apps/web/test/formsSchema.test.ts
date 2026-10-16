@@ -97,3 +97,28 @@ describe('config valideren', () => {
     ).toMatchObject({ maxFiles: 3, maxSizeMb: 10, allowedExtensions: ['pdf', 'png'] });
   });
 });
+
+describe('evenementveld', () => {
+  it('bewaart een event-id en wisselt niet met een tekstveld', () => {
+    // Een vrije tekst is geen event-id: zo'n wissel zou bestaande antwoorden
+    // laten verwijzen naar evenementen die niet bestaan.
+    expect(storageKindFor('CALENDAR_EVENT')).toBe('EVENT');
+    expect(canChangeTypeWithAnswers('SHORT_TEXT', 'CALENDAR_EVENT')).toBe(false);
+    expect(canChangeTypeWithAnswers('CALENDAR_EVENT', 'SHORT_TEXT')).toBe(false);
+  });
+
+  it('aanvaardt een fills-config met veldcodes', () => {
+    expect(
+      validateFieldConfig('CALENDAR_EVENT', { fills: { TITLE: 'naam', DATE: 'datum', POST: 'post' } })
+    ).toMatchObject({ fills: { TITLE: 'naam', DATE: 'datum', POST: 'post' } });
+  });
+
+  it('weigert een onbekend attribuut of een ongeldige code', () => {
+    expect(() => validateFieldConfig('CALENDAR_EVENT', { fills: { PRICE: 'prijs' } })).toThrow(
+      'INVALID_FIELD_CONFIG'
+    );
+    expect(() => validateFieldConfig('CALENDAR_EVENT', { fills: { TITLE: 'Naam!' } })).toThrow(
+      'INVALID_FIELD_CONFIG'
+    );
+  });
+});

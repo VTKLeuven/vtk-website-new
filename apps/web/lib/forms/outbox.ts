@@ -55,7 +55,10 @@ export async function answerLines(
     const label = locale === "en" && field.labelEn ? field.labelEn : field.labelNl;
     let value = "";
 
-    if (answer.valueOptions.length > 0) {
+    if (field.type === "CALENDAR_EVENT") {
+      // De momentopname, niet het id: dat zegt de ontvanger niets.
+      value = answer.otherText ?? answer.valueText ?? "";
+    } else if (answer.valueOptions.length > 0) {
       value = answer.valueOptions
         .map((code) => {
           const option = field.options.find((candidate) => candidate.code === code);

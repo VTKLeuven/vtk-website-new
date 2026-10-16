@@ -72,8 +72,12 @@ Dit is de reden dat verschillende keuzes eruitzien zoals ze eruitzien:
 ## Bestandsoverzicht
 
 ### Domeinlogica (`apps/web/lib/forms/`)
-- `schema.ts`: de zestien veldtypes, hun config, de opslagvorm per type, en het
+- `schema.ts`: de zeventien veldtypes, hun config, de opslagvorm per type, en het
   afleiden van stabiele codes. Puur, dus gedeeld met de client.
+- `eventFill.ts` / `eventChoices.ts`: het evenementveld (zie "Een evenement uit
+  de kalender"). Het eerste is puur en gedeeld, het tweede leest de kalender.
+- `review.ts`: de beoordeling van een inzending bijwerken, met logboek; gedeeld
+  door het detail en door /admin/commu-aanvragen.
 - `visibility.ts`: welke velden zichtbaar zijn, plus kringdetectie voor de
   editor. Ook puur en gedeeld.
 - `surface.ts`: alles wat nodig is om het formulier te tonen (velden,
@@ -112,6 +116,10 @@ Daarnaast rendert `components/site/PageView.tsx` het paneel op een contentpagina
 - `page.tsx`, `nieuw/page.tsx`
 - `[formId]/{page,instellingen,velden,inzendingen,groepjes,toegang}`
 - `[formId]/inzendingen/[entryId]`: detail met opvolging
+
+Een formulier kan ook een eigen overzicht elders in de admin hebben:
+`/admin/commu-aanvragen` leest de inzendingen van de commu-aanvraag als
+planning (`lib/commu/requests.ts`) en linkt per rij naar het detail hierboven.
 
 ### API (`apps/web/app/api/forms/`)
 - `[formId]/uploads`: een bestand uploaden vóór het indienen
@@ -206,6 +214,44 @@ formulier, en een formulier staat op hoogstens een pagina.
 - **De MCP-server kan dit niet.** `form` in `lib/mcp/create.ts` is `.strict()` en
   kent geen `pageId`: een agent kan dus geen formulier op een pagina laten
   verschijnen.
+
+## Een evenement uit de kalender
+
+Het veldtype `CALENDAR_EVENT` laat de invuller een evenement uit de kalender
+kiezen. Het is gebouwd voor de commu-aanvraag (zie `docs/design-decisions.md`,
+"Commu-aanvraag"), maar is een gewoon veldtype dat elk formulier kan gebruiken.
+
+- **Wat er te kiezen valt:** de komende evenementen die gepubliceerd zijn, plus de
+  concepten van de eigen posten, met die van de eigen post bovenaan. Dezelfde
+  regel geldt bij het indienen (`resolveEventAnswers`), maar daar zonder
+  datumgrens: wie na het evenement nog iets aanvult, mag het laten staan. Wat
+  de inzending al had, blijft altijd geldig.
+- **Het vult andere velden mee in.** De config `fills` zegt welk veld de titel,
+  de datum, het begin- en einduur, de locatie en de post krijgt. Het doelveld moet
+  van een passend type zijn (`EVENT_FILL_TARGET_TYPES`). De post kiest de optie
+  waarvan de code de slug van de post is, en anders de vrije tekst bij "Andere".
+  Die velden blijven gewone, aanpasbare antwoorden: een andere keuze overschrijft
+  enkel wat leeg is of nog de waarde van het vorige evenement draagt.
+- **Opslag:** het id in `valueText`, en een momentopname "titel (datum)" in
+  `otherText`. De export, de PDF en de mail tonen die momentopname, zodat een
+  hernoemd of verwijderd evenement de inzending niet onleesbaar maakt.
+- **`?evenement=<id>`** in de link vult het veld (en dus de rest) al in; dat is
+  gewoon de prefill met de veldcode als sleutel.
+- **Eigen opslagvorm (`EVENT`):** een tekstveld met antwoorden kan geen
+  evenementveld worden en omgekeerd, want een vrije tekst is geen event-id.
+
+## Meerdere inzendingen, elk apart te bewerken
+
+Staan `allowMultipleSubmissions` en `allowEditAfterSubmit` allebei aan, dan
+opent het formulier telkens leeg (een nieuwe inzending) en open je een eerdere
+met `?inzending=<id>`. Daarvoor opende het altijd de laatste inzending, zodat een
+tweede indienen die eerste overschreef. `inzending` is daardoor een
+gereserveerde prefill-sleutel.
+
+**`submitFormAction` controleert dat een meegestuurde `entryId` van de indiener
+is** (`canEditEntry`): de eigen inzending, en enkel een concept of wanneer
+bewerken na indienen mag. Zonder die check overschreef wie een `entryId`
+meestuurde elke inzending van het formulier.
 
 ## Springen tussen secties
 

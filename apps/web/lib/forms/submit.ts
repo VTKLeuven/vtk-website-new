@@ -17,6 +17,8 @@ export type AnswerRow = {
   fieldCode: string;
   type: string;
   value: AnswerValue;
+  /** Bij een evenementveld: de momentopname "titel (datum)". */
+  otherText?: string | null;
 };
 
 export type PendingUpload = {
@@ -38,8 +40,23 @@ function answerData(row: AnswerRow) {
       row.type === "DATE" && value.text ? new Date(`${value.text}T00:00:00Z`) : null,
     valueBool: value.checked ?? null,
     valueOptions: value.options ?? [],
-    otherText: null as string | null,
+    otherText: row.otherText ?? null,
   };
+}
+
+/**
+ * Mag deze bezoeker deze bestaande inzending opnieuw indienen? Enkel de eigen
+ * inzending, en enkel een concept of wanneer het formulier bewerken na indienen
+ * toelaat. Zonder deze check overschreef wie een `entryId` meestuurde elke
+ * inzending van het formulier.
+ */
+export function canEditEntry(
+  entry: { submittedById: string | null; status: string },
+  userId: string | null,
+  form: { allowEditAfterSubmit: boolean }
+): boolean {
+  if (!userId || entry.submittedById !== userId) return false;
+  return entry.status === "DRAFT" || form.allowEditAfterSubmit;
 }
 
 type ReserveOutcome =

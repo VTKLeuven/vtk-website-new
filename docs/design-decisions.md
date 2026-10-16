@@ -11776,3 +11776,47 @@ heeft in zijn account, krijgt de dag ervoor om **12u** een mail. Regels in
   `/api/mail/uitschrijven`, en een scanner post niet. Uitschrijven gaat meteen
   naar Brevo, net als het vinkje op /account, en `/uitschrijven` staat open
   tijdens de onboarding- en studiebevestigingsgate.
+
+## Commu-aanvraag
+
+Oktober 2026. Posten meldden hun evenementen bij communicatie aan met een Google
+Form ("Evenementen form x Acti-script") met de tekstjes in een losse Google
+Sheet. Dat is nu een formulier op de site met een overzicht voor commu op
+/admin/commu-aanvragen.
+
+- **Een gewoon formulier, geen eigen model.** De aanvraag is een formulier uit
+  de formulierenmodule (slug `commu-aanvraag`, aangemaakt met
+  `npm run forms:commu`). Commu past de vragen zelf aan in de formulierbouwer;
+  de site kent enkel de vaste veldcodes die het overzicht leest. Welk formulier
+  het is, staat in de instelling `communicatie.requestForm`.
+- **Een evenement kies je uit de kalender, maar het hoeft niet.** De megafoon bij
+  een evenement in /admin/kalender en op /admin/commu-aanvragen opent het
+  formulier met dat evenement ingevuld, en daarmee ook de naam, de datum, de uren,
+  de locatie en de post. Leeg laten en alles zelf invullen kan nog, voor wat
+  (nog) niet in de kalender staat. Hangt een aanvraag aan een evenement, dan
+  volgt ze het: verschuift het evenement, dan verschuift ze mee naar de juiste
+  week.
+- **De vragen zijn die van de Google Form**, met de sprong per post naar een
+  eigen "Soort evenement" (Activiteiten, Onthaal, Internationaal); een andere
+  post komt in "Andere" en gaat meteen naar de communicatievragen. Begin- en
+  einduur staan bij het evenement in plaats van bij de communicatievragen,
+  omdat het evenement ze invult.
+- **De tekstjes staan in het formulier, niet in een Sheet.** Je kan een aanvraag
+  later aanvullen; elk bezoek aan het formulier is een nieuwe aanvraag, een oude
+  open je via "Bewerken" op /admin/commu-aanvragen.
+- **Status: Nieuw, Ingepland, Niet opgenomen.** Dat is de gewone beoordeling van
+  een inzending, enkel anders gelabeld; een eigen statusveld zou een tweede
+  waarheid naast die van de formulierenmodule zijn. Commu zet ze per rij.
+- **Een post ziet de status** van de aanvragen voor zijn eigen evenementen, ook
+  wanneer een collega van de post ze indiende. Bewerken kan enkel wie ze
+  indiende.
+- **Wie wat ziet, komt uit de rechten op het formulier**, niet uit een eigen
+  permissie. Communicatie is eigenaar (alle leden beheren de inzendingen), IT en
+  Groep 5 zien alles via `forms.manageAll`, en commu zet er zelf iemand bij via
+  "Toegang". Elke post (`calendar.create`) ziet het item om aan te vragen.
+- **"Nog geen aanvraag":** onder de aanvragen staan de gepubliceerde evenementen
+  van de komende drie weken zonder aanvraag, zodat commu weet wie ze nog moet
+  aanspreken.
+- **Bewust niet gebouwd:** een deadline (hoeveel dagen vooraf je moet aanvragen),
+  het importeren van de oude Google-antwoorden, en een eigen mail; de melding aan
+  communicatie@vtk.be is de gewone melding van een formulier.

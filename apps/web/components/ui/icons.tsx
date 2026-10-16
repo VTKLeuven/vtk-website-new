@@ -322,3 +322,23 @@ export function DiscordIcon() {
     </svg>
   );
 }
+
+/**
+ * Communicatie aanvragen voor een evenement. Met `done` krijgt de megafoon een
+ * vinkje: de aanvraag is er al. Die toestand hoort in het icoon zelf en niet
+ * enkel in de tooltip.
+ */
+export function MegaphoneIcon({ done = false }: { done?: boolean } = {}) {
+  return done ? (
+    <Icon>
+      <path d="m3 10 13-4.2v10.4L3 13v-3z" />
+      <path d="M10 15.4a2.6 2.6 0 1 1-5-1.4" />
+      <path d="m15.5 19.5 2 2 4-4" />
+    </Icon>
+  ) : (
+    <Icon>
+      <path d="m3 11 18-5v12L3 14v-3z" />
+      <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
+    </Icon>
+  );
+}

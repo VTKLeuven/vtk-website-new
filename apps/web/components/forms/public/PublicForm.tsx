@@ -12,6 +12,7 @@ import { trackFormSubmitted } from "@/lib/analytics-client";
 import { visibleFieldIds, type AnswerValue, type VisibilityCondition } from "@/lib/forms/visibility";
 import { steps as branchSteps, type BranchOption, type BranchSection } from "@/lib/forms/branching";
 import { DEFAULT_FILE_MAX_FILES } from "@/lib/forms/schema";
+import { applyEventFill } from "@/lib/forms/eventFill";
 
 export type PublicSection = {
   id: string;
@@ -50,6 +51,10 @@ const ERROR_MESSAGES: Record<string, [string, string]> = {
   OTHER_NOT_ALLOWED: ["Vrije tekst kan hier niet.", "Free text is not allowed here."],
   TOO_MANY_FILES: ["Je koos te veel bestanden.", "You chose too many files."],
   FILE_TYPE: ["Dit bestandstype is niet toegelaten.", "This file type is not allowed."],
+  UNKNOWN_EVENT: [
+    "Dit evenement kan je niet (meer) kiezen. Kies een ander of laat het leeg.",
+    "You cannot pick this event (any more). Choose another one or leave it empty.",
+  ],
 };
 
 function errorText(code: string, nl: boolean): string {
@@ -182,6 +187,21 @@ export function PublicForm({
   const requiredFields = (stepBySections ? stepFields : visibleFields).filter(
     (field) => field.required
   );
+  // Een evenement kiezen vult ook andere velden in (titel, datum, uren, ...);
+  // die kunnen in een andere sectie staan, dus dit kent alle velden.
+  function onAnswer(field: FieldWithSection, next: AnswerValue) {
+    if (field.type !== "CALENDAR_EVENT") {
+      setAnswers((current) => ({ ...current, [field.id]: next }));
+      return;
+    }
+    const choices = field.events ?? [];
+    setAnswers((current) => {
+      const previous = choices.find((choice) => choice.id === current[field.id]?.text) ?? null;
+      const chosen = choices.find((choice) => choice.id === next.text) ?? null;
+      return applyEventFill(current, fields, field, chosen, previous);
+    });
+  }
+
   const doneCount = requiredFields.filter((field) =>
     field.type === "FILE"
       ? (files[field.id]?.length ?? 0) > 0
@@ -344,14 +364,14 @@ export function PublicForm({
           section={sections.find((entry) => entry.id === formSteps[currentStep]?.sectionId) ?? null}
           fields={stepFields}
           locale={locale}
-          {...{ formId, answers, setAnswers, files, setFiles, errors, nl }}
+          {...{ formId, answers, onAnswer, files, setFiles, errors, nl }}
         />
       ) : null}
 
       {stepBySections ? null : (
         <FieldGroup
           fields={visibleFields.filter((field) => !field.sectionId)}
-          {...{ formId, locale, answers, setAnswers, files, setFiles, errors, nl }}
+          {...{ formId, locale, answers, onAnswer, files, setFiles, errors, nl }}
         />
       )}
 
@@ -369,7 +389,7 @@ export function PublicForm({
             {description ? <p className="vtk-form-section-intro">{description}</p> : null}
             <FieldGroup
               fields={inSection}
-              {...{ formId, locale, answers, setAnswers, files, setFiles, errors, nl }}
+              {...{ formId, locale, answers, onAnswer, files, setFiles, errors, nl }}
             />
           </section>
         );
@@ -462,7 +482,7 @@ function FieldGroup({
   formId,
   locale,
   answers,
-  setAnswers,
+  onAnswer,
   files,
   setFiles,
   errors,
@@ -472,7 +492,7 @@ function FieldGroup({
   formId: string;
   locale: "nl" | "en";
   answers: Record<string, AnswerValue>;
-  setAnswers: (next: (current: Record<string, AnswerValue>) => Record<string, AnswerValue>) => void;
+  onAnswer: (field: FieldWithSection, next: AnswerValue) => void;
   files: Record<string, UploadedFile[]>;
   setFiles: (next: (current: Record<string, UploadedFile[]>) => Record<string, UploadedFile[]>) => void;
   errors: Record<string, string>;
@@ -520,7 +540,7 @@ function FieldGroup({
             locale={locale}
             error={error}
             value={answers[field.id] ?? {}}
-            onChange={(next) => setAnswers((current) => ({ ...current, [field.id]: next }))}
+            onChange={(next) => onAnswer(field, next)}
           />
         );
       })}
@@ -535,7 +555,7 @@ function StepView({
   formId,
   locale,
   answers,
-  setAnswers,
+  onAnswer,
   files,
   setFiles,
   errors,
@@ -546,7 +566,7 @@ function StepView({
   formId: string;
   locale: "nl" | "en";
   answers: Record<string, AnswerValue>;
-  setAnswers: (next: (current: Record<string, AnswerValue>) => Record<string, AnswerValue>) => void;
+  onAnswer: (field: FieldWithSection, next: AnswerValue) => void;
   files: Record<string, UploadedFile[]>;
   setFiles: (next: (current: Record<string, UploadedFile[]>) => Record<string, UploadedFile[]>) => void;
   errors: Record<string, string>;
@@ -569,7 +589,7 @@ function StepView({
       {description ? <p className="vtk-form-section-intro">{description}</p> : null}
       <FieldGroup
         fields={fields}
-        {...{ formId, locale, answers, setAnswers, files, setFiles, errors, nl }}
+        {...{ formId, locale, answers, onAnswer, files, setFiles, errors, nl }}
       />
     </section>
   );
@@ -601,6 +621,10 @@ function rejectionText(reason: string, nl: boolean): string {
         : "You just sent several entries. Please try again later.";
     case "ALREADY_SUBMITTED":
       return nl ? "Je diende dit formulier al in." : "You already submitted this form.";
+    case "ENTRY_NOT_EDITABLE":
+      return nl
+        ? "Deze inzending kan je niet meer wijzigen. Herlaad de pagina om een nieuwe in te dienen."
+        : "You can no longer change this entry. Reload the page to submit a new one.";
     default:
       return nl ? "Versturen is niet gelukt." : "Sending failed.";
   }

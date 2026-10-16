@@ -7,6 +7,7 @@ import { requireSession } from '@/lib/session';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import { canAccessAnyTicketEvent } from '@/lib/ticketing/authorization';
 import { canAccessAnyForm } from '@/lib/forms/authorization';
+import { canSeeCommuRequests } from '@/lib/commu/requests';
 import { isExternalUrl } from '@/lib/href';
 import { getAdminNav, type NavGuard, type NavLeaf } from '@/lib/admin-nav';
 import { ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/adminNavCookie';
@@ -50,6 +51,7 @@ export default async function AdminLayout({
   // Zelfde redenering als bij ticketing: een grant op één formulier is genoeg om
   // de tab te zien, ook zonder een van de globale formulierpermissies.
   const canAccessForms = session.user.isSuperAdmin || (await canAccessAnyForm());
+  const canAccessCommuRequests = await canSeeCommuRequests();
 
   // Is de gebruiker lid van minstens één werkgroep (huidig werkingsjaar)? Zij
   // krijgen de Werkgroepen-tab om enkel hun eigen infotekst te bewerken.
@@ -67,6 +69,7 @@ export default async function AdminLayout({
     // niet van de gewone admin-permissies. canAccessTickets dekt superadmins al.
     if (guard.ticketing) return canAccessTickets;
     if (guard.forms) return canAccessForms;
+    if (guard.commuRequests) return canAccessCommuRequests;
     // Werkgroepen-tab: beheerders óf gewone werkgroepleden.
     if (guard.werkgroep) return session.permissions.includes('werkgroepen.manage') || werkgroepMember;
     if (guard.anyPerm) return guard.anyPerm.some((p) => session.permissions.includes(p));

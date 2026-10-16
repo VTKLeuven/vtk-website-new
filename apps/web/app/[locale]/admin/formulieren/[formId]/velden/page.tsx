@@ -5,6 +5,7 @@ import { requireFormCapability } from "@/lib/forms/authorization";
 import { FieldEditor, type EditorField } from "@/components/forms/admin/FieldEditor";
 import type { AdminLocale } from "@/components/forms/admin/format";
 import { optionAnswerCounts } from "@/lib/forms/optionAnswerCounts";
+import { loadEventChoices } from "@/lib/forms/eventChoices";
 
 export default async function FormFieldsPage({
   params,
@@ -14,7 +15,7 @@ export default async function FormFieldsPage({
   const { locale: localeParam, formId } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: AdminLocale = localeParam;
-  const { form } = await requireFormCapability(formId, "MANAGE_FORM");
+  const { session, form } = await requireFormCapability(formId, "MANAGE_FORM");
 
   const [sections, fields, optionAnswers] = await Promise.all([
     prisma.formSection.findMany({ where: { formId }, orderBy: { sortOrder: "asc" } }),
@@ -34,6 +35,10 @@ export default async function FormFieldsPage({
   ]);
 
   const answerCounts = optionAnswerCounts(optionAnswers);
+  // Enkel nodig voor de preview van een evenementveld.
+  const eventChoices = fields.some((field) => field.type === "CALENDAR_EVENT")
+    ? await loadEventChoices({ groupIds: session.groups.map((group) => group.id), locale })
+    : [];
 
   const editorFields: EditorField[] = fields.map((field) => ({
     id: field.id,
@@ -84,6 +89,7 @@ export default async function FormFieldsPage({
         }))}
         fields={editorFields}
         branching={{ enabled: form.stepBySections }}
+        eventChoices={eventChoices}
       />
     </div>
   );

@@ -21,6 +21,12 @@ export type EventRowData = {
   /** Wanneer het doorgaat, al geschreven door de server. */
   when: { main: string; sub: string | null };
   heroWeek: HeroWeekPlacement;
+  /**
+   * Communicatie aanvragen voor dit evenement: naar het formulier, of (al
+   * aangevraagd) naar het overzicht. Weggelaten bij voorbije evenementen en
+   * zolang het aanvraagformulier niet online staat.
+   */
+  commu?: { href: string; requested: boolean } | null;
 };
 
 /**
@@ -108,7 +114,7 @@ export function EventRow({
         </td>
       ) : null}
       <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-        <EventRowActions locale={locale} id={event.id} title={event.title} />
+        <EventRowActions locale={locale} id={event.id} title={event.title} commu={event.commu ?? null} />
       </td>
     </tr>
   );

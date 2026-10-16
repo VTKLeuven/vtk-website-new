@@ -327,3 +327,39 @@ describe('overgeslagen secties', () => {
     expect(result.errors).toEqual({});
   });
 });
+
+describe('evenementveld', () => {
+  const evenement = field({ id: 'evenement', type: 'CALENDAR_EVENT' });
+
+  it('aanvaardt een toegelaten evenement', () => {
+    const result = validateSubmission({
+      fields: [evenement],
+      conditions: [],
+      answers: { evenement: { text: 'ev-1' } },
+      eventIds: new Set(['ev-1']),
+    });
+    expect(result.errors).toEqual({});
+    expect(result.cleaned.evenement).toEqual({ text: 'ev-1' });
+  });
+
+  it('weigert een evenement dat de indiener niet mag kiezen', () => {
+    const result = validateSubmission({
+      fields: [evenement],
+      conditions: [],
+      answers: { evenement: { text: 'concept-van-een-andere-post' } },
+      eventIds: new Set(['ev-1']),
+    });
+    expect(result.errors).toEqual({ evenement: 'UNKNOWN_EVENT' });
+  });
+
+  it('laat een leeg, niet verplicht evenementveld toe', () => {
+    const result = validateSubmission({
+      fields: [evenement],
+      conditions: [],
+      answers: {},
+      eventIds: new Set(),
+    });
+    expect(result.errors).toEqual({});
+    expect(result.cleaned).toEqual({});
+  });
+});

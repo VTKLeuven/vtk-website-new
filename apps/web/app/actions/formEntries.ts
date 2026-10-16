@@ -13,9 +13,11 @@ import {
 } from "@/lib/forms/publicForm";
 import { claimedOptionCodes, validateSubmission } from "@/lib/forms/validation";
 import { saveFormEntry } from "@/lib/forms/submit";
+import { resolveEventAnswers } from "@/lib/forms/eventChoices";
 import type { AnswerValue } from "@/lib/forms/visibility";
 import { extensionOf } from "@/lib/forms/uploadToken";
 import { logFormAudit } from "@/lib/forms/audit";
+import { updateEntryReview } from "@/lib/forms/review";
 import { answerLines } from "@/lib/forms/outbox";
 import { fillPlaceholders } from "@/lib/forms/mail";
 import { sendMail, smtpConfigured } from "@/lib/email";
@@ -59,6 +61,8 @@ function refresh(locale: "nl" | "en", formId: string, entryId?: string) {
   revalidatePath(`${prefix}/admin/formulieren/${formId}/inzendingen`);
   if (entryId) revalidatePath(`${prefix}/admin/formulieren/${formId}/inzendingen/${entryId}`);
   revalidatePath(`${prefix}/admin/formulieren/${formId}`);
+  // Het overzicht van de commu-aanvragen leest dezelfde inzendingen.
+  revalidatePath(`${prefix}/admin/commu-aanvragen`);
 }
 
 /** Titel van het formulier, voor een leesbare regel in het adminlogboek. */
@@ -78,12 +82,6 @@ export async function saveEntryReviewAction(
     const entryId = value(formData, "entryId");
     const { session } = await requireFormCapability(formId, "MANAGE_ENTRIES");
 
-    const entry = await prisma.formEntry.findFirst({
-      where: { id: entryId, formId },
-      select: { id: true, reviewStatus: true },
-    });
-    if (!entry) throw new Error("ENTRY_NOT_FOUND");
-
     const reviewStatus = reviewSchema.parse(value(formData, "reviewStatus") || "NEW");
     const note = value(formData, "internalNote").slice(0, 5_000) || null;
     const reviewerEmail = value(formData, "reviewerEmail").toLowerCase();
@@ -98,27 +96,13 @@ export async function saveEntryReviewAction(
       reviewerId = reviewer.id;
     }
 
-    await prisma.$transaction(async (tx) => {
-      await tx.formEntry.update({
-        where: { id: entryId },
-        data: { reviewStatus, internalNote: note, reviewerId },
-      });
-      await logFormAudit(tx, {
-        formId,
-        actorUserId: session.user.id,
-        action: "FORM_ENTRY_REVIEWED",
-        entityType: "FormEntry",
-        entityId: entryId,
-        metadata: { from: entry.reviewStatus, to: reviewStatus },
-      });
-    });
-
-    await logAudit({
-      action: "update",
-      entity: "formEntry",
-      entityId: entryId,
-      target: await formTitle(formId),
-      summary: `inzending beoordeeld: ${entry.reviewStatus} naar ${reviewStatus}`,
+    await updateEntryReview({
+      formId,
+      entryId,
+      actorUserId: session.user.id,
+      reviewStatus,
+      internalNote: note,
+      reviewerId,
     });
 
     refresh(locale, formId, entryId);
@@ -342,6 +326,7 @@ type StoredAnswer = {
   valueNumber: number | null;
   valueBool: boolean | null;
   valueOptions: string[];
+  otherText?: string | null;
   field: { type: string };
 };
 
@@ -410,6 +395,7 @@ async function saveManagedEntry(input: ManagedEntryInput): Promise<BehalfResult>
               valueNumber: true,
               valueBool: true,
               valueOptions: true,
+              otherText: true,
               field: { select: { type: true } },
             },
           },
@@ -450,11 +436,26 @@ async function saveManagedEntry(input: ManagedEntryInput): Promise<BehalfResult>
         })
       : [];
 
+  // Een evenementveld: enkel wat deze beheerder mag zien, plus wat de
+  // inzending al had. De momentopname gaat mee in het antwoord.
+  const answers = input.answers as Record<string, AnswerValue>;
+  const eventSnapshots = await resolveEventAnswers({
+    groupIds: session.groups.map((group) => group.id),
+    ids: full.fields
+      .filter((field) => field.type === "CALENDAR_EVENT")
+      .map((field) => answers[field.id]?.text?.trim())
+      .filter((id): id is string => Boolean(id)),
+    alreadyChosen: (existing?.answers ?? [])
+      .filter((answer) => answer.field.type === "CALENDAR_EVENT" && answer.valueText)
+      .map((answer) => answer.valueText as string),
+  });
+
   const validation = validateSubmission({
     fields,
     conditions: formConditions(full),
-    answers: input.answers as Record<string, AnswerValue>,
+    answers,
     fileCounts,
+    eventIds: new Set(eventSnapshots.keys()),
     sections: full.stepBySections ? full.sections : undefined,
     branchOptions: full.stepBySections
       ? [
@@ -483,6 +484,7 @@ async function saveManagedEntry(input: ManagedEntryInput): Promise<BehalfResult>
       fieldCode: answer.fieldCode,
       type: answer.field.type,
       value: storedAnswerValue(answer),
+      otherText: answer.otherText ?? null,
     }));
 
   const result = await saveFormEntry({
@@ -495,12 +497,19 @@ async function saveManagedEntry(input: ManagedEntryInput): Promise<BehalfResult>
     isTest: existing?.isTest ?? false,
     requestFingerprint: existing?.requestFingerprint ?? null,
     answers: [
-      ...Object.entries(validation.cleaned).map(([fieldId, answerValue]) => ({
-        fieldId,
-        fieldCode: fieldById.get(fieldId)?.code ?? fieldId,
-        type: fieldById.get(fieldId)?.type ?? "SHORT_TEXT",
-        value: answerValue,
-      })),
+      ...Object.entries(validation.cleaned).map(([fieldId, answerValue]) => {
+        const type = fieldById.get(fieldId)?.type ?? "SHORT_TEXT";
+        return {
+          fieldId,
+          fieldCode: fieldById.get(fieldId)?.code ?? fieldId,
+          type,
+          value: answerValue,
+          otherText:
+            type === "CALENDAR_EVENT" && answerValue.text
+              ? (eventSnapshots.get(answerValue.text) ?? null)
+              : null,
+        };
+      }),
       ...retainedAnswers,
     ],
     // Bestaande uploads blijven aan de inzending hangen. Geen uploadtokens

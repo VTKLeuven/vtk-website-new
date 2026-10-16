@@ -15,7 +15,13 @@ import {
 } from "@/lib/forms/antiSpam";
 import { formAvailability, loadPublicForm } from "@/lib/forms/publicForm";
 import { claimedOptionCodes, validateSubmission } from "@/lib/forms/validation";
-import { findDuplicateEntry, saveFormEntry, type PendingUpload } from "@/lib/forms/submit";
+import {
+  canEditEntry,
+  findDuplicateEntry,
+  saveFormEntry,
+  type PendingUpload,
+} from "@/lib/forms/submit";
+import { resolveEventAnswers } from "@/lib/forms/eventChoices";
 import { verifyUploadToken, extensionOf } from "@/lib/forms/uploadToken";
 import { enqueueFormMail } from "@/lib/forms/outbox";
 import type { AnswerValue } from "@/lib/forms/visibility";
@@ -87,6 +93,30 @@ export async function submitFormAction(rawPayload: unknown): Promise<FormSubmitR
       return { status: "rejected", reason: "RATE_LIMITED" };
     }
 
+    // Een bestaande inzending opnieuw indienen mag enkel voor de eigen
+    // inzending, en enkel als ze nog te bewerken valt. Wat de vorige versie als
+    // evenement had, blijft daarbij geldig (zie resolveEventAnswers).
+    let previousEventIds: string[] = [];
+    if (payload.entryId) {
+      const existing = await prisma.formEntry.findFirst({
+        where: { id: payload.entryId, formId: full.id },
+        select: {
+          submittedById: true,
+          status: true,
+          answers: { select: { fieldId: true, valueText: true } },
+        },
+      });
+      if (!existing || !canEditEntry(existing, session?.user.id ?? null, full)) {
+        return { status: "rejected", reason: "ENTRY_NOT_EDITABLE" };
+      }
+      const eventFieldIds = new Set(
+        full.fields.filter((field) => field.type === "CALENDAR_EVENT").map((field) => field.id)
+      );
+      previousEventIds = existing.answers
+        .filter((answer) => eventFieldIds.has(answer.fieldId) && answer.valueText)
+        .map((answer) => answer.valueText as string);
+    }
+
     const ownEntries = session
       ? await prisma.formEntry.count({
           where: {
@@ -141,6 +171,19 @@ export async function submitFormAction(rawPayload: unknown): Promise<FormSubmitR
     }
 
     const answers = payload.answers as Record<string, AnswerValue>;
+
+    // Een evenementveld aanvaardt enkel een evenement dat deze indiener mag
+    // zien; de momentopname gaat mee in het antwoord.
+    const chosenEventIds = full.fields
+      .filter((field) => field.type === "CALENDAR_EVENT")
+      .map((field) => answers[field.id]?.text?.trim())
+      .filter((id): id is string => Boolean(id));
+    const eventSnapshots = await resolveEventAnswers({
+      groupIds: session?.groups.map((group) => group.id) ?? [],
+      ids: chosenEventIds,
+      alreadyChosen: previousEventIds,
+    });
+
     const validation = validateSubmission({
       fields: full.fields.map((field) => ({
         id: field.id,
@@ -165,6 +208,7 @@ export async function submitFormAction(rawPayload: unknown): Promise<FormSubmitR
       ),
       answers,
       fileCounts,
+      eventIds: new Set(eventSnapshots.keys()),
       // Een sectie die het pad niet aandoet, telt als verborgen: haar velden
       // zijn niet verplicht en hun antwoord wordt niet bewaard.
       sections: full.stepBySections ? full.sections : undefined,
@@ -197,12 +241,17 @@ export async function submitFormAction(rawPayload: unknown): Promise<FormSubmitR
       locale: payload.locale === "en" ? "EN" : "NL",
       isTest: payload.isTest && Boolean(session),
       requestFingerprint: ipAddress ? createRequestFingerprint(ipAddress) : null,
-      answers: Object.entries(validation.cleaned).map(([fieldId, value]) => ({
-        fieldId,
-        fieldCode: fieldById.get(fieldId)?.code ?? fieldId,
-        type: fieldById.get(fieldId)?.type ?? "SHORT_TEXT",
-        value,
-      })),
+      answers: Object.entries(validation.cleaned).map(([fieldId, value]) => {
+        const type = fieldById.get(fieldId)?.type ?? "SHORT_TEXT";
+        return {
+          fieldId,
+          fieldCode: fieldById.get(fieldId)?.code ?? fieldId,
+          type,
+          value,
+          otherText:
+            type === "CALENDAR_EVENT" && value.text ? (eventSnapshots.get(value.text) ?? null) : null,
+        };
+      }),
       uploads: uploads.filter((upload) => validation.visible.has(upload.fieldId)),
       claimedOptions: claimedOptionCodes(
         full.fields.map((field) => ({

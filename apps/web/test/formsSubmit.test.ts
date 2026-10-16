@@ -8,7 +8,7 @@ vi.mock("@vtk/db", () => ({
   prisma: { $transaction: mocks.transaction },
 }));
 
-import { saveFormEntry, type SubmitInput } from "@/lib/forms/submit";
+import { canEditEntry, saveFormEntry, type SubmitInput } from "@/lib/forms/submit";
 
 const input: SubmitInput = {
   formId: "form-1",
@@ -103,5 +103,30 @@ describe("quota bij het bewerken van een inzending", () => {
     });
     expect(quota).toEqual({ oud: 1, nieuw: 1 });
     expect(updateEntry).not.toHaveBeenCalled();
+  });
+});
+
+describe("canEditEntry", () => {
+  const own = { submittedById: "user-1", status: "SUBMITTED" };
+
+  it("laat de eigen inzending bewerken wanneer het formulier dat toelaat", () => {
+    expect(canEditEntry(own, "user-1", { allowEditAfterSubmit: true })).toBe(true);
+  });
+
+  it("weigert de inzending van iemand anders", () => {
+    // Dit was het gat: een meegestuurd entryId overschreef elke inzending van
+    // het formulier, ongeacht wie ze indiende.
+    expect(canEditEntry(own, "user-2", { allowEditAfterSubmit: true })).toBe(false);
+    expect(canEditEntry({ submittedById: null, status: "SUBMITTED" }, null, { allowEditAfterSubmit: true })).toBe(false);
+  });
+
+  it("weigert een ingediende inzending wanneer bewerken uit staat", () => {
+    expect(canEditEntry(own, "user-1", { allowEditAfterSubmit: false })).toBe(false);
+  });
+
+  it("laat een eigen concept altijd verder invullen", () => {
+    expect(
+      canEditEntry({ submittedById: "user-1", status: "DRAFT" }, "user-1", { allowEditAfterSubmit: false })
+    ).toBe(true);
   });
 });

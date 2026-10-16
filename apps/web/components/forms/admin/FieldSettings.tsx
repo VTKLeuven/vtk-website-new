@@ -9,9 +9,12 @@ import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
 import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import {
   canChangeTypeWithAnswers,
+  EVENT_FILL_KEYS,
+  EVENT_FILL_TARGET_TYPES,
   isChoiceType,
   isMultiChoiceType,
   parseFieldConfig,
+  type EventFillKey,
   type FormFieldConfig,
 } from "@/lib/forms/schema";
 import type { AdminLocale } from "./format";
@@ -40,7 +43,7 @@ export const TYPE_GROUPS = [
     key: "data",
     nl: "Gegevens",
     en: "Data",
-    types: ["NUMBER", "DATE", "TIME", "FILE", "PROFILE", "CONSENT"],
+    types: ["NUMBER", "DATE", "TIME", "FILE", "PROFILE", "CALENDAR_EVENT", "CONSENT"],
   },
 ] as const;
 
@@ -61,6 +64,16 @@ const TYPE_LABELS: Record<string, [string, string]> = {
   FILE: ["Bestand", "File"],
   CONSENT: ["Toestemming", "Consent"],
   PROFILE: ["Uit het profiel", "From the profile"],
+  CALENDAR_EVENT: ["Evenement uit de kalender", "Calendar event"],
+};
+
+const EVENT_FILL_LABELS: Record<EventFillKey, [string, string]> = {
+  TITLE: ["Naam van het evenement", "Name of the event"],
+  DATE: ["Datum", "Date"],
+  START_TIME: ["Beginuur", "Start time"],
+  END_TIME: ["Einduur", "End time"],
+  LOCATION: ["Locatie", "Location"],
+  POST: ["Post", "Post"],
 };
 
 export function typeLabel(type: string, locale: AdminLocale): string {
@@ -489,6 +502,49 @@ export function FieldSettings({
                 ? "Wordt voorgevuld uit het profiel van wie ingelogd is, en gecontroleerd op vorm."
                 : "Pre-filled from the profile of whoever is logged in, and checked for shape."}
             </span>
+          </div>
+        </fieldset>
+      ) : null}
+
+      {draft.type === "CALENDAR_EVENT" ? (
+        <fieldset className="form-admin-fieldset">
+          <legend>{nl ? "Mee invullen" : "Fill in along"}</legend>
+          <p className="ticket-admin-help">
+            {nl
+              ? "Kiest de invuller een evenement, dan komen deze gegevens in de vragen die je hier aanduidt. Ze blijven aanpasbaar. Voor de post: geef de opties als code de slug van de post (activiteiten, onthaal, ...); een post zonder eigen optie komt in \"Andere\"."
+              : "When someone picks an event, these details go into the questions you choose here. They stay editable. For the post: give the options the post slug as code (activiteiten, onthaal, ...); a post without its own option goes into \"Other\"."}
+          </p>
+          <div className="ticket-admin-form-grid">
+            {EVENT_FILL_KEYS.map((key) => {
+              const candidates = otherFields.filter(
+                (field) => !field.archivedAt && EVENT_FILL_TARGET_TYPES[key].includes(field.type)
+              );
+              return (
+                <div className="ticket-admin-field" key={key}>
+                  <label htmlFor={`fill-${key}-${draft.id ?? "new"}`}>
+                    {EVENT_FILL_LABELS[key][nl ? 0 : 1]}
+                  </label>
+                  <ThemedSelect
+                    id={`fill-${key}-${draft.id ?? "new"}`}
+                    name={`fill-${key}-${draft.id ?? "new"}`}
+                    value={config.fills?.[key] ?? ""}
+                    onChange={(code) => {
+                      const fills = { ...(config.fills ?? {}) };
+                      if (code) fills[key] = code;
+                      else delete fills[key];
+                      setConfig({ fills });
+                    }}
+                    options={[
+                      { value: "", label: nl ? "Niet invullen" : "Do not fill" },
+                      ...candidates.map((field) => ({
+                        value: field.code,
+                        label: (locale === "en" && field.labelEn) || field.labelNl || field.code,
+                      })),
+                    ]}
+                  />
+                </div>
+              );
+            })}
           </div>
         </fieldset>
       ) : null}

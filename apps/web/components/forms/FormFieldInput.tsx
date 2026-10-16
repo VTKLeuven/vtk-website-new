@@ -9,6 +9,7 @@ import {
   type FormFieldConfig,
 } from "@/lib/forms/schema";
 import { ThemedSelect } from "@/components/ui/ThemedSelect";
+import type { EventChoice } from "@/lib/forms/eventFill";
 
 /**
  * Eén veld, zoals de bezoeker het ziet.
@@ -41,6 +42,8 @@ export type PublicFormField = {
   required: boolean;
   config: FormFieldConfig;
   options: PublicFormOption[];
+  /** Bij een evenementveld: de evenementen waaruit de bezoeker kiest. */
+  events?: EventChoice[];
 };
 
 export type FieldLocale = "nl" | "en";
@@ -261,6 +264,49 @@ export function FormFieldInput({
           ]}
         />
       );
+
+    case "CALENDAR_EVENT": {
+      const events = field.events ?? [];
+      const nl = locale === "nl";
+      // Eigen evenementen bovenaan: wie een aanvraag doet, zoekt bijna altijd
+      // iets van de eigen post, en die zit anders tussen honderd andere.
+      const ownEvents = events.filter((event) => event.own);
+      const otherEvents = events.filter((event) => !event.own);
+      const toOption = (event: EventChoice, group: string) => ({
+        value: event.id,
+        group,
+        label: event.draft ? `${event.label} (${nl ? "concept" : "draft"})` : event.label,
+      });
+      return (
+        <ThemedSelect
+          id={inputId}
+          name={inputId}
+          variant="public"
+          disabled={disabled}
+          required={field.required}
+          ariaDescribedBy={describedById}
+          invalid={invalid}
+          value={value.text ?? ""}
+          onChange={(selected) => onChange({ text: selected || null })}
+          options={[
+            { value: "", label: nl ? "Kies een evenement" : "Choose an event" },
+            ...ownEvents.map((event) => toOption(event, nl ? "Van jouw post" : "From your post")),
+            ...otherEvents.map((event) =>
+              toOption(
+                event,
+                ownEvents.length > 0
+                  ? nl
+                    ? "Andere evenementen"
+                    : "Other events"
+                  : nl
+                    ? "Komende evenementen"
+                    : "Upcoming events"
+              )
+            ),
+          ]}
+        />
+      );
+    }
 
     case "SINGLE_CHOICE":
     case "MULTIPLE_CHOICE": {

@@ -13,6 +13,7 @@ import { PromoteWaitlistForm } from "@/components/forms/admin/PromoteWaitlistFor
 import { FormStatusBadge } from "@/components/forms/admin/FormStatusBadge";
 import { formBase, formatDateTime, type AdminLocale } from "@/components/forms/admin/format";
 import { parseFieldConfig } from "@/lib/forms/schema";
+import { attachEventChoices } from "@/lib/forms/eventChoices";
 import type { AnswerValue } from "@/lib/forms/visibility";
 
 export default async function FormEntryDetailPage({
@@ -25,7 +26,7 @@ export default async function FormEntryDetailPage({
   const locale: AdminLocale = localeParam;
   const nl = locale === "nl";
   const base = formBase(locale);
-  const { form, capabilities } = await requireFormCapability(formId, "VIEW_ENTRIES");
+  const { session, form, capabilities } = await requireFormCapability(formId, "VIEW_ENTRIES");
 
   const [entry, fields, sections] = await Promise.all([
     prisma.formEntry.findFirst({
@@ -60,7 +61,11 @@ export default async function FormEntryDetailPage({
   const selectedByField = new Map(
     entry.answers.map((answer) => [answer.fieldId, new Set(answer.valueOptions)])
   );
-  const editorFields = fields
+  const eventFieldIds = new Set(
+    fields.filter((field) => field.type === "CALENDAR_EVENT").map((field) => field.id)
+  );
+  const editorFields = await attachEventChoices(
+    fields
     .filter((field) => !field.archivedAt)
     .map((field) => ({
       id: field.id,
@@ -96,7 +101,16 @@ export default async function FormEntryDetailPage({
               ? Math.max(0, option.quotaLimit - option.quotaUsed)
               : null,
         })),
-    }));
+    })),
+    {
+      groupIds: session.groups.map((group) => group.id),
+      locale,
+      // Het gekozen evenement blijft in de lijst staan, ook als het voorbij is.
+      includeIds: entry.answers
+        .filter((answer) => eventFieldIds.has(answer.fieldId) && answer.valueText)
+        .map((answer) => answer.valueText as string),
+    }
+  );
   const initialAnswers: Record<string, AnswerValue> = Object.fromEntries(
     entry.answers.map((answer) => [
       answer.fieldId,

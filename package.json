@@ -33,7 +33,8 @@
     "import:pages": "dotenv -e .env -- tsx scripts/import-pages.ts",
     "import:gsm": "dotenv -e .env -- tsx scripts/import-driver-phones.ts",
     "probe:elixir": "dotenv -e .env -- tsx --conditions=react-server scripts/elixir-probe.ts",
-    "explain:access": "dotenv -e .env -- tsx scripts/explain-access.ts"
+    "explain:access": "dotenv -e .env -- tsx scripts/explain-access.ts",
+    "forms:commu": "dotenv -e .env -- tsx scripts/create-commu-request-form.ts"
   },
   "engines": {
     "node": ">=22.0.0"

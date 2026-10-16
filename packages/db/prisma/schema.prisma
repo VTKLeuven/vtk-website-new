@@ -218,6 +218,10 @@ enum FormFieldType {
   // Komt uit het profiel van het ingelogde lid (r-nummer, studierichting, jaar);
   // welk veld precies staat in de config.
   PROFILE
+  // Een evenement uit de kalender. Het antwoord is het id in `valueText`, met
+  // een momentopname van titel en datum in `otherText`; de config zegt welke
+  // andere velden het mee invult (titel, datum, uren, locatie, post).
+  CALENDAR_EVENT
 }
 
 enum FormFieldConditionOperator {
@@ -6832,7 +6836,10 @@ model FormAnswer {
   valueBool    Boolean?
   /// Optiecodes bij een keuzeveld.
   valueOptions String[]  @default([])
-  /// De vrije tekst bij "Andere, namelijk ...".
+  /// Bij CALENDAR_EVENT: de momentopname "titel, datum" van het gekozen
+  /// evenement, zodat de export leesbaar blijft wanneer het event hernoemd of
+  /// verwijderd wordt. (De vrije tekst bij "Andere, namelijk ..." staat in
+  /// `valueText`, niet hier.)
   otherText    String?
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)

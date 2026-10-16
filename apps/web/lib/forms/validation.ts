@@ -53,6 +53,12 @@ export type ValidationInput = {
    */
   sections?: readonly BranchSection[];
   branchOptions?: readonly BranchOption[];
+  /**
+   * De evenementen die de indiener mag kiezen bij een `CALENDAR_EVENT`-veld
+   * (`resolveEventAnswers`). Weglaten betekent: niet controleren, zoals in de
+   * client, die de lijst al enkel uit toegelaten evenementen opbouwt.
+   */
+  eventIds?: ReadonlySet<string>;
 };
 
 export type ValidationResult = {
@@ -86,7 +92,8 @@ function validateOne(
   field: ValidationField,
   config: FormFieldConfig,
   value: AnswerValue,
-  fileInfo?: { count: number; extensions: string[] }
+  fileInfo?: { count: number; extensions: string[] },
+  eventIds?: ReadonlySet<string>
 ): string | null {
   switch (field.type) {
     case "SHORT_TEXT":
@@ -203,6 +210,12 @@ function validateOne(
       return null;
     }
 
+    case "CALENDAR_EVENT": {
+      const id = value.text?.trim() ?? "";
+      if (!id) return null;
+      return !eventIds || eventIds.has(id) ? null : "UNKNOWN_EVENT";
+    }
+
     default:
       return null;
   }
@@ -260,7 +273,7 @@ export function validateSubmission(input: ValidationInput): ValidationResult {
       continue;
     }
 
-    const error = validateOne(field, config, value, fileInfo);
+    const error = validateOne(field, config, value, fileInfo, input.eventIds);
     if (error) {
       errors[field.id] = error;
       continue;

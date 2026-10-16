@@ -31,6 +31,7 @@ import type { PublicFormField } from "@/components/forms/FormFieldInput";
 import { isChoiceType, parseFieldConfig, type FormFieldConfig } from "@/lib/forms/schema";
 import { visibleFieldIds, type AnswerValue } from "@/lib/forms/visibility";
 import { groupBySections } from "@/lib/forms/groupBySections";
+import { applyEventFill, type EventChoice } from "@/lib/forms/eventFill";
 import type { AdminLocale } from "./format";
 import { FieldSettings, TYPE_GROUPS, typeLabel } from "./FieldSettings";
 
@@ -249,12 +250,15 @@ export function FieldEditor({
   sections: initialSections,
   fields: initialFields,
   branching,
+  eventChoices = [],
 }: {
   formId: string;
   locale: AdminLocale;
   sections: EditorSection[];
   fields: EditorField[];
   branching: BranchingContext;
+  /** De evenementen voor een evenementveld in de preview. */
+  eventChoices?: EventChoice[];
 }) {
   const nl = locale === "nl";
   const router = useRouter();
@@ -554,7 +558,18 @@ export function FieldEditor({
   // De preview toont het formulier zoals een bezoeker het krijgt, inclusief het
   // verbergen van velden waarvan de voorwaarde niet klopt.
   const [previewAnswers, setPreviewAnswers] = useState<Record<string, AnswerValue>>({});
-  const previewFields = active.map((field) => toPublicField(toDraft(field), field.id));
+  const previewFields = active.map((field) => {
+    const preview = toPublicField(toDraft(field), field.id);
+    return field.type === "CALENDAR_EVENT" ? { ...preview, events: eventChoices } : preview;
+  });
+  // Het meevullen werkt op de echte veldcodes; de preview gebruikt de id's.
+  const fillFields = active.map((field) => ({
+    id: field.id,
+    code: field.code,
+    type: field.type,
+    config: parseFieldConfig(field.type, field.config),
+    options: field.options,
+  }));
   const visible = visibleFieldIds(
     active.map((field) => ({ id: field.id, type: field.type })),
     active.flatMap((field) =>
@@ -578,7 +593,17 @@ export function FieldEditor({
         field={field}
         locale={locale}
         value={previewAnswers[field.id] ?? {}}
-        onChange={(next) => setPreviewAnswers((current) => ({ ...current, [field.id]: next }))}
+        onChange={(next) =>
+          setPreviewAnswers((current) => {
+            const fillField = fillFields.find((candidate) => candidate.id === field.id);
+            if (field.type !== "CALENDAR_EVENT" || !fillField) {
+              return { ...current, [field.id]: next };
+            }
+            const previous = eventChoices.find((choice) => choice.id === current[field.id]?.text) ?? null;
+            const chosen = eventChoices.find((choice) => choice.id === next.text) ?? null;
+            return applyEventFill(current, fillFields, fillField, chosen, previous);
+          })
+        }
         shuffleSeed="preview"
       />
     );

@@ -29,6 +29,8 @@ export type ExportAnswer = {
   valueDate: Date | null;
   valueBool: boolean | null;
   valueOptions: string[];
+  /** Bij een evenementveld: de momentopname "titel (datum)". */
+  otherText?: string | null;
 };
 
 export type ExportEntry = {
@@ -76,6 +78,10 @@ export function answerToText(
       .join(" | ");
   }
   if (!answer) return "";
+
+  // Het id zegt niemand iets; de momentopname blijft leesbaar, ook wanneer het
+  // evenement intussen hernoemd of verwijderd werd.
+  if (field.type === "CALENDAR_EVENT") return answer.otherText ?? answer.valueText ?? "";
 
   if (isChoiceType(field.type)) {
     const chosen = answer.valueOptions.map((code) => {

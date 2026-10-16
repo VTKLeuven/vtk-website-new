@@ -4,6 +4,8 @@ import { prisma } from "@vtk/db";
 import type { Locale } from "@vtk/i18n";
 import { getCurrentSession } from "@/lib/session";
 import { parseFieldConfig } from "./schema";
+import { loadEventChoices } from "./eventChoices";
+import { applyEventFill, type EventChoice } from "./eventFill";
 import {
   daysUntilClose,
   formAvailability,
@@ -28,7 +30,16 @@ import type { AnswerValue } from "./visibility";
 /** Een veld zoals de renderer het verwacht, met de sectie waarin het staat. */
 export type SurfaceField = ReturnType<typeof toPublicFields>[number] & {
   sectionId: string | null;
+  /** Enkel bij een evenementveld. */
+  events?: EventChoice[];
 };
+
+/**
+ * Prefill-sleutel die geen veld invult maar een eigen, bestaande inzending
+ * opent: `?inzending=<id>`. Gereserveerd, dus een veld met code `inzending`
+ * kan je niet via een link invullen.
+ */
+export const ENTRY_PREFILL_KEY = "inzending";
 
 export type FormSurface = {
   form: PublicFormData;
@@ -54,7 +65,7 @@ export type FormSurface = {
  *
  * `prefill` zijn de queryparameters van de pagina waarop het formulier staat:
  * `?shift=vroeg` vult dat veld alvast in, om een half ingevuld formulier gericht
- * te kunnen delen.
+ * te kunnen delen. `?inzending=<id>` opent een eigen inzending om te bewerken.
  */
 export async function buildFormSurface(
   form: PublicFormData,
@@ -90,21 +101,53 @@ export async function buildFormSurface(
     locale,
   });
 
+  // Een gevraagde eigen inzending (`?inzending=<id>`), mits ze nog te bewerken
+  // valt: een concept, of een ingediende wanneer bewerken na indienen mag.
+  const requestedId = first(prefill[ENTRY_PREFILL_KEY]);
+  const requested = requestedId
+    ? (ownEntries.find(
+        (entry) =>
+          entry.id === requestedId &&
+          (entry.status === "DRAFT" || form.allowEditAfterSubmit)
+      ) ?? null)
+    : null;
+
   // Een bewerkbare inzending wint van "je diende al in": dan is de bedoeling
-  // dat je ze opnieuw ziet staan.
+  // dat je ze opnieuw ziet staan. Mag je meerdere keren indienen, dan is een
+  // nieuw bezoek een nieuwe inzending; een oude open je via `?inzending=`.
   const editable =
-    form.allowEditAfterSubmit && submitted.length > 0 && session ? submitted[0] : null;
-  const working = draft ?? editable;
+    form.allowEditAfterSubmit && !form.allowMultipleSubmissions && submitted.length > 0 && session
+      ? submitted[0]
+      : null;
+  const working = requested ?? draft ?? editable;
+  const editingSubmitted = working?.status === "SUBMITTED";
 
   const blocked =
     availability !== "OPEN" &&
     availability !== "WAITLIST" &&
-    !(editable && availability === "ALREADY_SUBMITTED") &&
+    !(editingSubmitted && availability === "ALREADY_SUBMITTED") &&
     !(canPreview && availability === "DRAFT");
+
+  // De evenementen voor een evenementveld, plus het evenement dat al in de
+  // bewaarde inzending staat (ook als het intussen voorbij is).
+  const eventFieldIds = new Set(
+    form.fields.filter((field) => field.type === "CALENDAR_EVENT").map((field) => field.id)
+  );
+  const events =
+    eventFieldIds.size > 0
+      ? await loadEventChoices({
+          groupIds: session?.groups.map((group) => group.id) ?? [],
+          locale,
+          includeIds: (working?.answers ?? [])
+            .filter((answer) => eventFieldIds.has(answer.fieldId) && answer.valueText)
+            .map((answer) => answer.valueText as string),
+        })
+      : [];
 
   const fields = toPublicFields(form, locale).map((field) => ({
     ...field,
     sectionId: form.fields.find((row) => row.id === field.id)?.sectionId ?? null,
+    ...(eventFieldIds.has(field.id) ? { events } : {}),
   }));
 
   // Voorinvullen: eerst wat er al bewaard is, dan het profiel, dan de
@@ -159,9 +202,21 @@ export async function buildFormSurface(
   // Prefill-links. Bewust niet voor bestanden en toestemming: die moet de
   // bezoeker zelf geven, en een vinkje dat via een link al aanstaat is geen
   // toestemming.
+  const prefilledEvents: string[] = [];
   for (const field of form.fields) {
     if (initialAnswers[field.id]) continue;
     if (field.type === "FILE" || field.type === "CONSENT") continue;
+    if (field.code === ENTRY_PREFILL_KEY) continue;
+    if (field.type === "CALENDAR_EVENT") {
+      // Enkel een evenement dat ook in de keuzelijst staat; de rest van het
+      // formulier volgt het hieronder.
+      const id = first(prefill[field.code]);
+      if (id && events.some((event) => event.id === id)) {
+        initialAnswers[field.id] = { text: id };
+        prefilledEvents.push(field.id);
+      }
+      continue;
+    }
     const raw = prefill[field.code];
     const given = (Array.isArray(raw) ? raw[0] : raw)?.slice(0, 500);
     if (!given) continue;
@@ -192,6 +247,16 @@ export async function buildFormSurface(
     initialAnswers[field.id] = { text: given };
   }
 
+  // Een evenement uit de link vult de velden in die het hoort in te vullen, net
+  // zoals een keuze in de lijst dat doet. Wat al uit de link of het profiel kwam,
+  // blijft staan: applyEventFill overschrijft enkel lege velden.
+  let filled = initialAnswers;
+  for (const fieldId of prefilledEvents) {
+    const eventField = fields.find((field) => field.id === fieldId);
+    const chosen = events.find((event) => event.id === filled[fieldId]?.text) ?? null;
+    if (eventField) filled = applyEventFill(filled, fields, eventField, chosen, null);
+  }
+
   return {
     form,
     locale,
@@ -201,10 +266,15 @@ export async function buildFormSurface(
     offersRequestedLocale: offersLocale(form, locale),
     fields,
     conditions: formConditions(form),
-    initialAnswers,
+    initialAnswers: filled,
     entryId: working?.id ?? null,
     allowDrafts: form.allowDrafts && Boolean(session),
     hasDraft: Boolean(draft),
     closingIn: daysUntilClose(form.closesAt),
   };
+}
+
+function first(value: string | string[] | undefined): string | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return raw?.trim().slice(0, 100) || null;
 }

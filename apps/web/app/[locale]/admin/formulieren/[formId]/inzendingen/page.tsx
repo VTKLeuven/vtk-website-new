@@ -12,6 +12,7 @@ import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import { MailingPanel } from "@/components/forms/admin/MailingPanel";
 import { AddEntryPanel, ExportPanel } from "@/components/forms/admin/EntryTools";
 import { formConditions, loadPublicForm, toPublicFields } from "@/lib/forms/publicForm";
+import { attachEventChoices } from "@/lib/forms/eventChoices";
 import {
   formBase,
   formatDateTime,
@@ -46,7 +47,7 @@ export default async function FormEntriesPage({
   const locale: AdminLocale = localeParam;
   const nl = locale === "nl";
   const base = formBase(locale);
-  const { form, capabilities } = await requireFormCapability(formId, "VIEW_ENTRIES");
+  const { session, form, capabilities } = await requireFormCapability(formId, "VIEW_ENTRIES");
 
   const review = REVIEW_STATUSES.includes(filters.beoordeling as (typeof REVIEW_STATUSES)[number])
     ? (filters.beoordeling as (typeof REVIEW_STATUSES)[number])
@@ -172,13 +173,16 @@ export default async function FormEntriesPage({
   const publicForm = capabilities.includes("MANAGE_ENTRIES")
     ? await loadPublicForm(form.slug)
     : null;
-  const publicFields = publicForm
-    ? toPublicFields(publicForm, locale).map((field) => ({
-        ...field,
-        sectionId: field.sectionId,
-        sortOrder: publicForm.fields.find((candidate) => candidate.id === field.id)?.sortOrder ?? 0,
-      }))
-    : [];
+  const publicFields = await attachEventChoices(
+    publicForm
+      ? toPublicFields(publicForm, locale).map((field) => ({
+          ...field,
+          sectionId: field.sectionId,
+          sortOrder: publicForm.fields.find((candidate) => candidate.id === field.id)?.sortOrder ?? 0,
+        }))
+      : [],
+    { groupIds: session.groups.map((group) => group.id), locale }
+  );
   const conditions = publicForm ? formConditions(publicForm) : [];
   const sections =
     publicForm?.sections.map((section) => ({

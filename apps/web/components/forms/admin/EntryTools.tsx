@@ -10,6 +10,7 @@ import {
 import { useToast } from "@/components/ui/toast";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { FormFieldBlock } from "@/components/forms/FormFieldBlock";
+import { applyEventFill } from "@/lib/forms/eventFill";
 import type { PublicFormField } from "@/components/forms/FormFieldInput";
 import { visibleFieldIds, type AnswerValue, type VisibilityCondition } from "@/lib/forms/visibility";
 import {
@@ -93,7 +94,15 @@ function EntryAnswerFields({
               }
               value={answers[field.id] ?? {}}
               onChange={(next) =>
-                setAnswers((current) => ({ ...current, [field.id]: next }))
+                setAnswers((current) => {
+                  if (field.type !== "CALENDAR_EVENT") return { ...current, [field.id]: next };
+                  // Een ander evenement kiezen vult de andere velden mee in,
+                  // zoals op het publieke formulier.
+                  const choices = field.events ?? [];
+                  const previous = choices.find((choice) => choice.id === current[field.id]?.text) ?? null;
+                  const chosen = choices.find((choice) => choice.id === next.text) ?? null;
+                  return applyEventFill(current, fields, field, chosen, previous);
+                })
               }
             />
           ))}
