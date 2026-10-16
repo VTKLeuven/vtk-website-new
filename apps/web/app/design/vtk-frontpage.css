@@ -16,11 +16,16 @@
 --------------------------------------------------------------------------- */
 
 /* ---------------------------------------------------------------------------
-   24 urenloop: open middle photo (VTK stand & baton exchange) + bottom strip.
+   24 urenloop: het racebord.
 
-   Top-left carries the headline and CTA; the middle stays open so the stand
-   with Obelix and the baton exchange on the track remain visible; a borderless
-   strip at the bottom carries the countdown and live race figures.
+   De klok is de hero. Vóór de start telt ze af tot het startschot, tijdens de
+   race toont ze de tijd op de piste naast het aantal ronden, na de finish het
+   eindtotaal. Titel, klok, urenbalk en (tijdens en na de race) de scorebordrij
+   vormen één blok onderaan, zodat het standje bovenaan op de foto vrij blijft.
+
+   Bewust zonder serif-accent, zonder pil boven de klok en zonder knoppen: titel
+   en klok zijn samen één link. Zie docs/design-decisions.md, "De 24
+   urenloop-frontpage".
 --------------------------------------------------------------------------- */
 .vtk-design .home-dark-zone:has(.fp-urenloop) .home-hero-photo {
   object-position: center 38%;
@@ -30,27 +35,17 @@
   background:
     linear-gradient(
       to bottom,
-      rgba(10, 15, 31, 0.62) 0,
-      rgba(10, 15, 31, 0.08) 38%,
-      rgba(10, 15, 31, 0.22) 65%,
-      rgba(8, 13, 28, 0.88) 100%
+      rgba(10, 15, 31, 0.66) 0,
+      rgba(10, 15, 31, 0.12) 26%,
+      rgba(10, 15, 31, 0.16) 42%,
+      rgba(8, 12, 26, 0.9) 84%
     ),
-    linear-gradient(
-      95deg,
-      rgba(9, 12, 24, 0.82) 0%,
-      rgba(9, 12, 24, 0.18) 50%,
-      rgba(9, 12, 24, 0.08) 100%
-    );
+    linear-gradient(95deg, rgba(9, 12, 24, 0.55) 0%, rgba(9, 12, 24, 0.08) 60%);
 }
 
 .vtk-design .fp-urenloop {
   grid-template-columns: minmax(0, 1fr);
   padding-top: clamp(52px, 6vw, 70px);
-}
-
-.vtk-design .fp-urenloop:has(.hero-week) {
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 396px);
-  gap: clamp(32px, 4vw, 52px);
 }
 
 @media (min-width: 981px) {
@@ -60,237 +55,335 @@
   }
 }
 
-.vtk-design .fp-urenloop .hero-week-wash {
-  inset: -24px -40px -32px -36px;
-  border-radius: 44px;
-  filter: blur(28px);
+.vtk-design .fp-ul-block {
+  justify-content: flex-end;
+  gap: 18px;
+  min-width: 0;
 }
 
-.vtk-design .fp-urenloop .hero-week-head {
-  margin-bottom: 10px;
-}
-
-.vtk-design .fp-urenloop .hero-week-head h3 {
-  font-size: 13.5px;
-}
-
-.vtk-design .fp-urenloop .hero-week-head .range,
-.vtk-design .fp-urenloop .hero-week-head .all {
-  font-size: 11.5px;
-}
-
-.vtk-design .fp-urenloop .hero-week-days {
-  column-gap: 12px;
-}
-
-.vtk-design .fp-urenloop .hero-week-day {
-  padding: 8px 0;
-}
-
-.vtk-design .fp-urenloop .hero-week-day.empty {
-  padding: 5px 0;
-}
-
-.vtk-design .fp-urenloop .hero-week-label .num,
-.vtk-design .fp-urenloop .hero-week-day.today .hero-week-label .num {
-  min-width: 22px;
-  font-size: 16.5px;
-}
-
-.vtk-design .fp-urenloop .hero-week-day.empty .num {
-  font-size: 14.5px;
-}
-
-.vtk-design .fp-urenloop .hero-week-label .dow {
-  font-size: 11.5px;
-}
-
-.vtk-design .fp-urenloop .hero-week-evs {
-  gap: 8px;
-}
-
-.vtk-design .fp-urenloop .hero-week-ev {
-  gap: 8px;
-}
-
-.vtk-design .fp-urenloop .hero-week-ev .title {
-  font-size: 13.5px;
-  line-height: 1.3;
-}
-
-.vtk-design .fp-urenloop .hero-week-ev .body small,
-.vtk-design .fp-urenloop .hero-week-ev .time,
-.vtk-design .fp-urenloop .hero-week-none,
-.vtk-design .fp-urenloop .hero-week-more {
-  font-size: 11.5px;
-}
-
-.vtk-design .fp-urenloop-main {
-  gap: clamp(108px, 12.5vw, 148px);
-}
-
-.vtk-design .fp-urenloop-copy {
-  max-width: 540px;
-}
-
-.vtk-design .fp-urenloop h1 {
-  margin: 0;
-}
-
-.vtk-design .fp-urenloop .hero-cta {
-  margin-top: 20px;
-}
-
-.vtk-design .fp-urenloop-strip {
-  position: relative;
-  margin-top: auto;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 24px;
-  align-items: end;
-  padding-top: 22px;
-  background-image: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.18),
-    rgba(255, 255, 255, 0.03) 78%,
-    transparent
-  );
-  background-size: 100% 1px;
-  background-repeat: no-repeat;
-  background-position: top left;
-}
-
-.vtk-design .fp-urenloop-strip:has(.fp-urenloop-figures) {
-  grid-template-columns: auto 1fr;
-  gap: 48px;
-}
-
-.vtk-design .fp-clock-head {
-  color: var(--on-dark-muted);
-  font-size: 13px;
-  margin-bottom: 8px;
-}
-
-.vtk-design .fp-clock-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--yellow);
-  margin-right: 8px;
-  vertical-align: middle;
-}
-
-/* Inline countdown for the bottom strip: plain tabular figures on the photo,
-   without glass tiles around the hours. */
-.vtk-design .fp-countdown-inline {
-  display: flex;
-  align-items: baseline;
-  gap: clamp(18px, 3vw, 34px);
-  flex-wrap: wrap;
-  border: 0;
-  padding: 0;
-}
-
-.vtk-design .fp-countdown-inline .fp-count {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.vtk-design .fp-countdown-inline .n {
-  color: var(--paper);
-  font-size: clamp(38px, 4.8vw, 58px);
-  font-weight: 600;
-  line-height: 0.95;
-  letter-spacing: -0.04em;
-  font-variant-numeric: tabular-nums;
-  text-shadow: 0 2px 30px rgba(10, 15, 31, 0.45);
-}
-
-.vtk-design .fp-countdown-inline .l {
-  color: var(--on-dark-muted);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-/* The big variant (kept for [[24urenloop]] content blocks): no card around it. */
-.vtk-design .fp-countdown-big {
-  margin-top: 14px;
-  display: flex;
-  justify-content: center;
-  gap: clamp(18px, 4vw, 54px);
-  border: 0;
-  padding: 0;
-}
-
-.vtk-design .fp-countdown-big .fp-count {
+/* Titel en klok samen: één link, op een vaste afstand van elkaar. */
+.vtk-design .fp-ul-link {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
+  gap: clamp(24px, 3vw, 40px);
+  color: inherit;
+  text-decoration: none;
+  border-radius: 12px;
 }
 
-.vtk-design .fp-countdown-big .n {
+.vtk-design .fp-ul-link:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 10px;
+}
+
+.vtk-design .fp-urenloop .fp-ul-title {
+  margin: 0;
+  max-width: 1000px;
   color: var(--paper);
-  font-size: clamp(56px, 11vw, 132px);
-  font-weight: 600;
-  line-height: 0.9;
-  letter-spacing: -0.05em;
-  font-variant-numeric: tabular-nums;
-  text-shadow: 0 2px 40px rgba(10, 15, 31, 0.55);
+  font-size: clamp(46px, 7.4vw, 108px);
+  font-weight: 700;
+  line-height: 0.93;
+  letter-spacing: -0.045em;
+  text-shadow: 0 2px 40px rgba(10, 15, 31, 0.45);
+  text-wrap: balance;
 }
 
-.vtk-design .fp-countdown-big .l {
+.vtk-design .fp-ul-accent {
+  color: var(--yellow);
+  text-decoration: underline 3px transparent;
+  text-underline-offset: 0.12em;
+  transition: text-decoration-color 160ms ease;
+}
+
+.vtk-design .fp-ul-link:hover .fp-ul-accent {
+  text-decoration-color: currentColor;
+}
+
+.vtk-design .fp-ul-clock {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.vtk-design .fp-ul-clock-part {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.vtk-design .fp-ul-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.vtk-design .fp-ul-group b {
+  color: var(--paper);
+  font-size: clamp(44px, 11.5vw, 160px);
+  font-weight: 700;
+  line-height: 0.84;
+  letter-spacing: -0.055em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 4px 50px rgba(10, 15, 31, 0.55);
+}
+
+.vtk-design .fp-ul-group i {
+  margin-top: clamp(8px, 1vw, 14px);
+  padding-left: 0.06em;
   color: var(--on-dark-muted);
-  font-size: 12px;
+  font-size: clamp(10px, 0.9vw, 12px);
+  font-style: normal;
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
-.vtk-design .fp-urenloop .fp-countdown-passed {
-  margin-top: 14px;
-  border: 0;
-  padding: 0;
+.vtk-design .fp-ul-group.is-yellow b {
   color: var(--yellow);
-  font-size: clamp(28px, 5vw, 44px);
-  font-weight: 600;
 }
 
-.vtk-design .fp-urenloop-figures {
-  display: flex;
+.vtk-design .fp-ul-colon {
+  padding: 0 2px;
+  color: rgba(255, 255, 255, 0.32);
+  font-size: clamp(34px, 8.7vw, 122px);
+  font-weight: 300;
+  line-height: 0.9;
+}
+
+/* Tijdens en na de race: twee getallen naast elkaar, iets kleiner dan de klok. */
+.vtk-design .fp-ul-clock.is-pair {
   flex-wrap: wrap;
-  gap: clamp(28px, 4.5vw, 56px);
+  gap: 20px clamp(32px, 4.5vw, 64px);
 }
 
-.vtk-design .fp-urenloop-figure {
-  display: flex;
-  flex-direction: column;
+.vtk-design .fp-ul-clock.is-pair .fp-ul-group b {
+  font-size: clamp(52px, 9.6vw, 136px);
 }
 
-.vtk-design .fp-urenloop-figure .n {
-  font-size: clamp(24px, 3vw, 34px);
-  font-weight: 600;
-  color: var(--yellow);
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
+/* De urenbalk: één vakje per uur van de race. */
+.vtk-design .fp-ul-bar {
+  position: relative;
+  margin-top: 24px;
 }
 
-.vtk-design .fp-urenloop-figure .l {
-  font-size: 13px;
+.vtk-design .fp-ul-segments,
+.vtk-design .fp-ul-hours {
+  display: grid;
+  grid-template-columns: repeat(var(--fp-ul-hours, 24), minmax(0, 1fr));
+}
+
+.vtk-design .fp-ul-segments {
+  gap: 4px;
+}
+
+.vtk-design .fp-ul-seg {
+  height: 10px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.vtk-design .fp-ul-seg[data-state="done"] {
+  background: var(--yellow);
+}
+
+.vtk-design .fp-ul-seg[data-state="now"] {
+  background: linear-gradient(
+    90deg,
+    var(--yellow) var(--fp-ul-fill, 0%),
+    rgba(255, 255, 255, 0.2) var(--fp-ul-fill, 0%)
+  );
+}
+
+.vtk-design .fp-ul-hours {
+  position: relative;
+  margin-top: 8px;
   color: var(--on-dark-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-design .fp-ul-hours span {
+  white-space: nowrap;
+}
+
+.vtk-design .fp-ul-hours .is-start,
+.vtk-design .fp-ul-hours .is-end {
+  color: var(--paper);
+  font-weight: 500;
+}
+
+.vtk-design .fp-ul-hours .is-end {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.vtk-design .fp-ul-place {
   margin-top: 4px;
+  color: var(--on-dark-muted);
+  font-size: 12px;
+}
+
+/* Live, of een stand die niet meer binnenkomt: een markering boven het lopende uur. */
+.vtk-design .fp-ul-mark {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--paper);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.vtk-design .fp-ul-mark.is-warn {
+  color: #ffcf8a;
+}
+
+.vtk-design .fp-ul-mark-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: #ff5a4f;
+}
+
+.vtk-design .fp-ul-mark.is-warn .fp-ul-mark-dot {
+  background: #ffcf8a;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vtk-design .fp-ul-seg[data-state="now"] {
+    animation: fp-ul-blink 1.6s ease-in-out infinite;
+  }
+
+  .vtk-design .fp-ul-mark:not(.is-warn) .fp-ul-mark-dot {
+    animation: fp-ul-pulse 1.8s ease-out infinite;
+  }
+}
+
+@keyframes fp-ul-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes fp-ul-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 90, 79, 0.55);
+  }
+  80%,
+  100% {
+    box-shadow: 0 0 0 9px rgba(255, 90, 79, 0);
+  }
+}
+
+/* De scorebordrij, tijdens en na de race. */
+.vtk-design .fp-ul-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 8px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.vtk-design .fp-ul-board > div {
+  min-width: 0;
+  padding: 14px 18px 0 0;
+}
+
+.vtk-design .fp-ul-board dt {
+  color: var(--on-dark-muted);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.vtk-design .fp-ul-board dd {
+  margin: 0;
+}
+
+.vtk-design .fp-ul-board b {
+  display: block;
+  margin-top: 6px;
+  color: var(--yellow);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-design .fp-ul-board dd span {
+  display: block;
+  margin-top: 6px;
+  color: var(--paper);
+  font-size: 13.5px;
+}
+
+/* Het uur vlak voor de finish botst op de einddatum zodra de balk smaller wordt. */
+@media (max-width: 1100px) {
+  .vtk-design .fp-ul-hours .is-late {
+    visibility: hidden;
+  }
 }
 
 @media (max-width: 980px) {
-  .vtk-design .fp-urenloop-main {
-    gap: 48px;
+  /* `.home-hero` is hier `display: contents`, dus het blok zelf draagt de
+     hoogte: de foto blijft boven de klok zichtbaar, zoals op een laptop. */
+  .vtk-design .fp-ul-block {
+    min-height: calc(60 * var(--vtk-dvh, 1dvh));
+  }
+}
+
+@media (max-width: 640px) {
+  .vtk-design .fp-ul-clock,
+  .vtk-design .fp-ul-clock-part {
+    gap: 4px;
   }
 
-  .vtk-design .fp-urenloop-strip,
-  .vtk-design .fp-urenloop-strip:has(.fp-urenloop-figures) {
-    grid-template-columns: 1fr;
-    gap: 24px;
+  .vtk-design .fp-ul-colon {
+    padding: 0;
+  }
+
+  .vtk-design .fp-ul-clock.is-pair {
+    flex-direction: column;
+  }
+
+  .vtk-design .fp-ul-segments {
+    gap: 2px;
+  }
+
+  .vtk-design .fp-ul-seg {
+    height: 8px;
+  }
+
+  .vtk-design .fp-ul-hours {
+    font-size: 10.5px;
+  }
+
+  .vtk-design .fp-ul-hours span:not(.is-start):not(.is-end) {
+    visibility: hidden;
+  }
+
+  .vtk-design .fp-ul-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vtk-design .fp-ul-board > div {
+    padding: 12px 10px 4px 0;
+  }
+
+  .vtk-design .fp-ul-board b {
+    font-size: 22px;
+  }
+
+  .vtk-design .fp-ul-board dd span {
+    font-size: 12.5px;
   }
 }
 

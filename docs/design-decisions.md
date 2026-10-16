@@ -3206,6 +3206,36 @@ liedjesboek ("Glory, glory, wij zijn VTK!", "Het verstand zit aan deze kant").
   Leuven."). Dit oogt voller en balanceert de hoogte van het weekoverzicht aan
   de rechterkant van de hero.
 
+### De 24 urenloop-frontpage: het racebord
+
+De frontpage van de 24 urenloop (`UrenloopFrontpage.tsx`) is in oktober 2026
+opnieuw ontworpen, in drie rondes op een bord met de volledige homepage voor
+vier momenten: dagen ervoor, racedag, live 's nachts en de eindstand. Gekozen
+werd het **racebord**: de klok is de hero.
+
+- **Eén blok onderaan de foto.** Titel, klok, urenbalk en (tijdens en na de
+  race) de scorebordrij staan samen onderaan; het standje bovenaan de foto
+  blijft vrij. De klok volgt de titel op een vaste afstand van 40 px. Een
+  versie met de titel bovenaan en de klok los onderaan liet een strook lege
+  foto tussen beide en werd afgekeurd.
+- **De klok wisselt met de race.** Vóór de start telt ze af tot het startschot
+  (dagen, uur, min, sec), tijdens de race toont ze de tijd op de piste naast het
+  aantal ronden, na de finish het eindtotaal en de kilometers. Ze telt in
+  seconden: een reuzeklok die een minuut stilstaat, leest als kapot. Tijdens de
+  race vraagt de pagina elke minuut nieuwe cijfers op (`router.refresh()`,
+  enkel in een zichtbaar tabblad); de cache van de stand is even lang.
+- **De urenbalk vervangt de pil.** Eén vakje per uur van de race, met start en
+  finish als datum aan de uiteinden en de plaats eronder. Live, een bevroren
+  slotuur of een stand die niet meer binnenkomt, staat als markering boven het
+  lopende uur, niet als pil boven de klok.
+- **Bewust weggelaten:** het cursieve serif-accent ("the night is ours." staat
+  in hetzelfde lettertype als de titel, enkel in het geel), de knoppen (titel en
+  klok zijn samen één link naar de pagina van de 24 urenloop) en de kalender
+  (de rij snelle links houdt Kalender en Shiften één klik weg). Alle drie zijn
+  zo bekeken en teruggedraaid; zet ze niet terug.
+- Wat vóór de start bij de klok stond (losse cijfers, een subtekst), is
+  geschrapt; het enige vrije veld dat erbij kwam, is de plaats.
+
 ### Aftermovies op de homepage
 
 - Dezelfde `media.aftermovies`-instelling als de /media-pagina, te beheren via

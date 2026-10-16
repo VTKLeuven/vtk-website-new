@@ -150,10 +150,20 @@ export function ctaFrom(
   url: string | undefined,
   base: string,
 ): { label: string; href: string; external: boolean } | null {
-  if (!label || !url) return null;
-  if (/^https?:\/\//.test(url)) return { label, href: url, external: true };
+  if (!label) return null;
+  const link = frontpageHref(url, base);
+  return link ? { label, ...link } : null;
+}
+
+/** The destination half of `ctaFrom`, for a front page that links a block instead of a button. */
+export function frontpageHref(
+  url: string | undefined,
+  base: string,
+): { href: string; external: boolean } | null {
+  if (!url) return null;
+  if (/^https?:\/\//.test(url)) return { href: url, external: true };
   const path = url.startsWith("/") ? url : `/${url}`;
-  return { label, href: `${base}${path}`, external: false };
+  return { href: `${base}${path}`, external: false };
 }
 
 /**

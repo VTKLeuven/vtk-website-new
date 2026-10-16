@@ -56,11 +56,11 @@ describe('readFieldValues', () => {
 
   it('houdt enkel gevulde velden over die de layout kent', () => {
     const values = readFieldValues(
-      { titleNl: 'Test', leegVeld: '   ', onbekend: 'x', stat1Value: '530 m' },
+      { titleNl: 'Test', leegVeld: '   ', onbekend: 'x', place: 'Atletiekpiste Sportkot' },
       schema,
     );
     expect(values.titleNl).toBe('Test');
-    expect(values.stat1Value).toBe('530 m');
+    expect(values.place).toBe('Atletiekpiste Sportkot');
     // Niet gedeclareerd door deze layout, dus genegeerd.
     expect(values.onbekend).toBeUndefined();
   });

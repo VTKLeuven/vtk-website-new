@@ -1,296 +1,302 @@
-import { HERO_WEEK_MIN_FOR_WINDOW } from "@/lib/calendar/heroWeek";
-import { countdownParts } from "@/lib/countdown";
+import type { CSSProperties, ReactNode } from "react";
+import Link from "@/components/ui/Link";
 import { pickField } from "@/lib/frontpage/fields";
-import { HOME_AGENDA_DIM_DEFAULT } from "@/lib/frontpage/registry";
+import {
+  HOUR_LABEL_STEP,
+  hourLabelIndexes,
+  hourSegments,
+  hoursRun,
+  raceHourCount,
+  type RacePhase,
+} from "@/lib/urenloop/raceClock";
 import {
   resolvePublicUrenloopState,
   type UrenloopStatsPayload,
 } from "@/lib/urenloop/stats";
-import { Cta, ctaFrom, type FrontpageProps } from "./context";
-import { Countdown } from "./Countdown";
-import { HeroWeek } from "./HeroWeek";
+import { frontpageHref, type FrontpageProps } from "./context";
+import { UrenloopClock } from "./UrenloopClock";
 
-function formatKm(km: number, nl: boolean): string {
-  const fixed = km.toFixed(1);
-  return nl ? fixed.replace(".", ",") : fixed;
+const TIME_ZONE = "Europe/Brussels";
+const DAY_MS = 24 * 3_600_000;
+
+function formatTime(date: Date, nl: boolean): string {
+  return new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
+    timeZone: TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
 }
 
-function formatClockMoment(date: Date, nl: boolean): string {
-  try {
-    const dayPart = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
-      timeZone: "Europe/Brussels",
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-    })
-      .format(date)
-      .replace(/\./g, "");
-    const timePart = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
-      timeZone: "Europe/Brussels",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(date);
-    return nl ? `${dayPart} om ${timePart}` : `${dayPart} at ${timePart}`;
-  } catch {
-    return "";
-  }
+/** "di 20 okt, 20:00": het begin en het einde van de urenbalk. */
+function formatMoment(date: Date, nl: boolean): string {
+  const day = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
+    timeZone: TIME_ZONE,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  })
+    .format(date)
+    .replace(/\./g, "");
+  return `${day}, ${formatTime(date, nl)}`;
 }
 
-function formatShortTime(iso: string, nl: boolean): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  try {
-    return new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
-      timeZone: "Europe/Brussels",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(d);
-  } catch {
-    return "";
-  }
+function formatNumber(n: number, nl: boolean, decimals = 0): string {
+  return new Intl.NumberFormat(nl ? "nl-BE" : "en-GB", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(n);
 }
 
-function liveFiguresFrom(
-  stats: UrenloopStatsPayload,
-  nl: boolean,
-): Array<{ value: string; label: string }> {
-  const kmText = `${formatKm(stats.totals.km, nl)} km`;
-  const totalLabel = nl ? `Ronden (${kmText})` : `Laps (${kmText})`;
+type Marker = { text: string; warn: boolean };
 
-  const figures: Array<{ value: string; label: string }> = [
-    {
-      value: String(stats.totals.laps),
-      label: totalLabel,
+/**
+ * De urenbalk onder de klok: één vakje per uur van de race, met start en finish
+ * aan de uiteinden en de plaats eronder. Tijdens de race staat er een
+ * markering boven het lopende uur; die vervangt de pil die eerst boven de klok
+ * stond.
+ */
+function RaceBar({
+  startsAt,
+  endsAt,
+  now,
+  phase,
+  marker,
+  place,
+  nl,
+}: {
+  startsAt: Date;
+  endsAt: Date;
+  now: Date;
+  phase: RacePhase;
+  marker: Marker | null;
+  place: string | undefined;
+  nl: boolean;
+}) {
+  const count = raceHourCount(startsAt, endsAt);
+  const run = hoursRun(startsAt, endsAt, now);
+  const segments = hourSegments(count, run, phase);
+  const columns = { "--fp-ul-hours": count } as CSSProperties;
+  const progress =
+    phase === "before"
+      ? nl
+        ? "Nog niet gestart"
+        : "Not started yet"
+      : phase === "final"
+        ? nl
+          ? "Afgelopen"
+          : "Finished"
+        : nl
+          ? `Uur ${Math.min(count, Math.floor(run) + 1)} van ${count}`
+          : `Hour ${Math.min(count, Math.floor(run) + 1)} of ${count}`;
+
+  return (
+    <div className="fp-ul-bar">
+      {marker ? (
+        <span
+          className={`fp-ul-mark${marker.warn ? " is-warn" : ""}`}
+          style={{ left: `${Math.min(96, Math.max(4, (run / count) * 100)).toFixed(2)}%` }}
+        >
+          <span className="fp-ul-mark-dot" aria-hidden="true" />
+          {marker.text}
+        </span>
+      ) : null}
+      <div className="fp-ul-segments" style={columns} role="img" aria-label={progress}>
+        {segments.map((segment, i) => (
+          <span
+            key={i}
+            className="fp-ul-seg"
+            data-state={segment.state}
+            style={
+              segment.state === "now"
+                ? ({ "--fp-ul-fill": `${Math.round(segment.fill * 100)}%` } as CSSProperties)
+                : undefined
+            }
+          />
+        ))}
+      </div>
+      <div className="fp-ul-hours" style={columns}>
+        {hourLabelIndexes(count).map((i) => (
+          <span
+            key={i}
+            className={i === 0 ? "is-start" : count - i <= HOUR_LABEL_STEP + 1 ? "is-late" : undefined}
+            style={{ gridColumn: `${i + 1} / span ${Math.min(HOUR_LABEL_STEP, count - i)}` }}
+          >
+            {i === 0
+              ? formatMoment(startsAt, nl)
+              : formatTime(new Date(startsAt.getTime() + i * 3_600_000), nl)}
+          </span>
+        ))}
+        <span className="is-end">{formatMoment(endsAt, nl)}</span>
+      </div>
+      {place ? <div className="fp-ul-place">{place}</div> : null}
+    </div>
+  );
+}
+
+/** De eerste plaats per klassement, naast elkaar; een leeg klassement valt weg. */
+function Scoreboard({ stats, nl }: { stats: UrenloopStatsPayload; nl: boolean }) {
+  const lapsText = (laps: number) => formatNumber(laps, nl);
+  const cells = [
+    stats.fastestLap[0] && {
+      key: "fastest",
+      label: nl ? "Snelste ronde" : "Fastest lap",
+      value: stats.fastestLap[0].time,
+      name: stats.fastestLap[0].name,
     },
-  ];
+    stats.mostLaps[0] && {
+      key: "most",
+      label: nl ? "Meeste ronden" : "Most laps",
+      value: lapsText(stats.mostLaps[0].laps),
+      name: stats.mostLaps[0].name,
+    },
+    stats.firstYearMostLaps[0] && {
+      key: "firstYear",
+      label: nl ? "Beste eerstejaars" : "Best first-year",
+      value: lapsText(stats.firstYearMostLaps[0].laps),
+      name: stats.firstYearMostLaps[0].name,
+    },
+    stats.groups[0] && {
+      key: "group",
+      label: nl ? "Beste groep" : "Best group",
+      value: lapsText(stats.groups[0].laps),
+      name: stats.groups[0].name,
+    },
+  ].filter((cell): cell is { key: string; label: string; value: string; name: string } => Boolean(cell));
 
-  const topGroup = stats.groups[0];
-  const topLaps = stats.mostLaps[0];
-  const topFastest = stats.fastestLap[0];
-
-  if (topGroup) {
-    figures.push({
-      value: topGroup.name,
-      label: nl
-        ? `Beste groep · ${topGroup.laps} ${topGroup.laps === 1 ? "ronde" : "ronden"}`
-        : `Leading group · ${topGroup.laps} ${topGroup.laps === 1 ? "lap" : "laps"}`,
-    });
-  } else if (topLaps) {
-    figures.push({
-      value: String(topLaps.laps),
-      label: nl
-        ? `Meeste ronden · ${topLaps.name}`
-        : `Most laps · ${topLaps.name}`,
-    });
-  }
-
-  if (topFastest) {
-    figures.push({
-      value: topFastest.time,
-      label: nl
-        ? `Snelste ronde · ${topFastest.name}`
-        : `Fastest lap · ${topFastest.name}`,
-    });
-  } else if (topGroup && topLaps) {
-    figures.push({
-      value: String(topLaps.laps),
-      label: nl
-        ? `Meeste ronden · ${topLaps.name}`
-        : `Most laps · ${topLaps.name}`,
-    });
-  }
-
-  return figures;
+  if (cells.length === 0) return null;
+  return (
+    <dl className="fp-ul-board">
+      {cells.map((cell) => (
+        <div key={cell.key}>
+          <dt>{cell.label}</dt>
+          <dd>
+            <b>{cell.value}</b>
+            <span>{cell.name}</span>
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
 /**
- * The 24-urenloop front page.
+ * De 24-urenloop-frontpage: het racebord.
  *
- * Keeps the middle of the photo open so the VTK stand and baton exchange stay
- * in full view, with the headline and CTA top-left, the week calendar top-right
- * before the start, and a borderless strip at the bottom carrying the countdown
- * and live race figures.
+ * Titel en klok vormen samen één link, met de urenbalk en tijdens de race de
+ * scorebordrij eronder, als één blok onderaan de foto. De klok is de hero: ze
+ * telt af tot het startschot, toont tijdens de race de tijd op de piste naast
+ * het aantal ronden en na de finish het eindtotaal. Start en finish komen uit
+ * Beheer → 24 urenloop, de stand van de piste-laptop.
+ *
+ * Gekozen uit een reeks richtingen, met een paar bewuste weglatingen: geen
+ * serif-accent, geen pil boven de klok, geen knoppen en geen kalender. Zie
+ * docs/design-decisions.md, "De 24 urenloop-frontpage".
  */
-export function UrenloopFrontpage({
-  values,
-  locale,
-  base,
-  now,
-  weekEvents,
-  signedIn,
-  urenloop,
-}: FrontpageProps) {
+export function UrenloopFrontpage({ values, locale, base, now, urenloop }: FrontpageProps) {
   const nl = locale === "nl";
 
-  const config = urenloop?.config ?? {
-    startsAt: values.startsAt ?? null,
-    endsAt: values.endsAt ?? null,
-    showResultsUntil: null,
-  };
-  const publicState = resolvePublicUrenloopState(
-    config,
-    urenloop?.stats ?? null,
-    now,
-  );
+  const config = urenloop?.config ?? { startsAt: null, endsAt: null, showResultsUntil: null };
+  const publicState = resolvePublicUrenloopState(config, urenloop?.stats ?? null, now);
+  const race = publicState && publicState.phase !== "countdown" ? publicState : null;
 
-  const startsAt = config.startsAt
-    ? new Date(config.startsAt)
-    : values.startsAt
-      ? new Date(values.startsAt)
-      : null;
-  const endsAt =
-    publicState && (publicState.phase === "live" || publicState.phase === "final")
-      ? publicState.endsAt
-      : config.endsAt
-        ? new Date(config.endsAt)
-        : values.endsAt
-          ? new Date(values.endsAt)
-          : null;
+  const startsAt = config.startsAt ? new Date(config.startsAt) : null;
+  const plannedEnd = race?.endsAt ?? (config.endsAt ? new Date(config.endsAt) : null);
+  const endsAt = plannedEnd ?? (startsAt ? new Date(startsAt.getTime() + DAY_MS) : null);
 
-  const hasLiveOrFinalStats =
-    publicState?.phase === "live" || publicState?.phase === "final";
-  const started = hasLiveOrFinalStats || (startsAt ? now >= startsAt : false);
-  const finished =
-    publicState?.phase === "final" || (endsAt ? now >= endsAt : false);
-  const target = !started ? startsAt : endsAt;
+  const phase: RacePhase =
+    race?.phase === "final" || (endsAt && now >= endsAt)
+      ? "final"
+      : race || (startsAt && now >= startsAt)
+        ? "live"
+        : "before";
 
-  const title =
-    pickField(values, "title", locale) ?? (nl ? "24 urenloop," : "24-hour run,");
-  const accent =
-    pickField(values, "accent", locale) ??
-    pickField(values, "hook", locale) ??
-    "the night is ours.";
-  const subtitle = pickField(values, "subtitle", locale);
+  const title = pickField(values, "title", locale) ?? (nl ? "24 urenloop," : "24-hour run,");
+  const accent = pickField(values, "accent", locale) ?? "the night is ours.";
+  const link = frontpageHref(values.primaryUrl ?? "/24-urenloop", base);
 
-  const primaryLabel =
-    pickField(values, "primaryLabel", locale) ??
-    (nl ? "Kom supporteren" : "Come cheer us on");
-  const primaryUrl = values.primaryUrl ?? "/24-urenloop";
-  const primary = ctaFrom(primaryLabel, primaryUrl, base);
-
-  const secondary = ctaFrom(
-    pickField(values, "secondaryLabel", locale),
-    values.secondaryUrl,
-    base,
-  );
-
-  const staticFigures = [1, 2, 3]
-    .map((i) => ({
-      value: values[`stat${i}Value`],
-      label: pickField(values, `stat${i}Label`, locale),
-    }))
-    .filter((f): f is { value: string; label: string | undefined } => Boolean(f.value));
-
-  const figures =
-    publicState && (publicState.phase === "live" || publicState.phase === "final")
-      ? liveFiguresFrom(publicState.stats, nl)
-      : staticFigures;
-
-  const heading = !started
-    ? nl
-      ? "Start binnen"
-      : "Starts in"
-    : finished
-      ? nl
-        ? "Afgelopen"
-        : "Finished"
-      : nl
-        ? "We lopen nog"
-        : "Still running";
-
-  let stamp = "";
-  if (!started && startsAt) {
-    stamp = formatClockMoment(startsAt, nl);
-  } else if (finished && endsAt) {
-    stamp = formatClockMoment(endsAt, nl);
-  } else if (publicState && (publicState.phase === "live" || publicState.phase === "final")) {
-    const t = formatShortTime(
-      publicState.stats.frozenAt ?? publicState.stats.generatedAt,
-      nl,
-    );
-    if (t) {
-      stamp = publicState.stats.frozenAt
-        ? nl
-          ? `stand om ${t}`
-          : `standings at ${t}`
-        : nl
-          ? `bijgewerkt om ${t}`
-          : `updated at ${t}`;
+  const stats = race?.stats ?? null;
+  let marker: Marker | null = null;
+  if (phase === "live" && startsAt && endsAt) {
+    const hour = Math.min(raceHourCount(startsAt, endsAt), Math.floor(hoursRun(startsAt, endsAt, now)) + 1);
+    if (race?.stale) {
+      const at = formatTime(race.receivedAt, nl);
+      marker = { text: nl ? `cijfers van ${at}` : `numbers from ${at}`, warn: true };
+    } else if (stats?.frozenAt) {
+      marker = {
+        text: nl ? "stand bevroren voor het slotuur" : "standings frozen for the final hour",
+        warn: false,
+      };
+    } else {
+      marker = { text: nl ? `live, uur ${hour}` : `live, hour ${hour}`, warn: false };
     }
   }
 
-  return (
-    <section className="home-hero fp-urenloop">
-      <div className="fp-urenloop-main">
-        <div className="fp-urenloop-copy">
-          <h1>
-            {title}
-            {accent ? (
-              <>
-                <br />
-                <span className="serif">{accent}</span>
-              </>
-            ) : null}
-          </h1>
-          {subtitle ? <p className="hero-sub">{subtitle}</p> : null}
-          {primary || secondary ? (
-            <div className="hero-cta">
-              <Cta cta={primary} className="btn btn-primary arrow" />
-              <Cta cta={secondary} className="btn btn-ghost" />
-            </div>
-          ) : null}
-        </div>
-
-        <div className="fp-urenloop-strip">
-          <div className="fp-clock">
-            <div className="fp-clock-head">
-              <span className="fp-clock-dot" aria-hidden="true" />
-              {heading}
-              {stamp ? ` (${stamp})` : ""}
-            </div>
-            {target ? (
-              <Countdown
-                targetIso={target.toISOString()}
-                initial={countdownParts(target, now)}
-                labels={{
-                  days: nl ? "dagen" : "days",
-                  hours: nl ? "uren" : "hours",
-                  minutes: nl ? "min" : "min",
-                  passed: "00",
-                }}
-                variant="inline"
-                zeroWhenPassed
-              />
-            ) : null}
-          </div>
-
-          {figures.length > 0 ? (
-            <div className="fp-urenloop-figures">
-              {figures.map((f, i) => (
-                <div className="fp-urenloop-figure" key={i}>
-                  <span className="n">{f.value}</span>
-                  {f.label ? <span className="l">{f.label}</span> : null}
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      {!started ? (
-        <HeroWeek
-          events={weekEvents}
-          now={now}
-          locale={locale}
-          base={base}
-          signedIn={signedIn}
-          dim={HOME_AGENDA_DIM_DEFAULT}
-          nextEventsLimit={HERO_WEEK_MIN_FOR_WINDOW}
-          maxDays={4}
+  const heading: ReactNode = (
+    <>
+      <h1 className="fp-ul-title">
+        {title}
+        {accent ? (
+          <>
+            <br />
+            <span className="fp-ul-accent">{accent}</span>
+          </>
+        ) : null}
+      </h1>
+      {startsAt && endsAt ? (
+        <UrenloopClock
+          phase={phase}
+          startsAtIso={startsAt.toISOString()}
+          endsAtIso={endsAt.toISOString()}
+          nowIso={now.toISOString()}
+          laps={stats ? formatNumber(stats.totals.laps, nl) : undefined}
+          km={stats ? formatNumber(stats.totals.km, nl, 1) : undefined}
+          labels={{
+            days: nl ? "dagen" : "days",
+            hours: nl ? "uur" : "hours",
+            minutes: "min",
+            seconds: "sec",
+            onTrackLeft: nl ? "op de piste, nog" : "on the track, left",
+            laps: nl ? "ronden" : "laps",
+            km: "km",
+            lapsTotal: nl
+              ? `ronden in ${raceHourCount(startsAt, endsAt)} uur`
+              : `laps in ${raceHourCount(startsAt, endsAt)} hours`,
+            kilometres: nl ? "kilometer" : "kilometres",
+            finished: nl ? "gelopen" : "run",
+          }}
         />
       ) : null}
+    </>
+  );
+
+  return (
+    <section className="home-hero fp-urenloop">
+      <div className="fp-ul-block">
+        {link?.external ? (
+          <a href={link.href} className="fp-ul-link">
+            {heading}
+          </a>
+        ) : link ? (
+          <Link href={link.href} className="fp-ul-link">
+            {heading}
+          </Link>
+        ) : (
+          <div className="fp-ul-link">{heading}</div>
+        )}
+        {startsAt && endsAt ? (
+          <RaceBar
+            startsAt={startsAt}
+            endsAt={endsAt}
+            now={now}
+            phase={phase}
+            marker={marker}
+            place={values.place}
+            nl={nl}
+          />
+        ) : null}
+        {stats && phase !== "before" ? <Scoreboard stats={stats} nl={nl} /> : null}
+      </div>
     </section>
   );
 }

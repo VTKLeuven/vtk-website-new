@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { countdownParts, type CountdownParts } from "@/lib/countdown";
 
 /**
- * A ticking countdown, shared by the front pages that want one.
+ * A ticking countdown in minutes, for the `[[24urenloop]]` block on a content page.
+ *
+ * The 24-urenloop front page has its own clock in seconds (`UrenloopClock`).
  *
  * `initial` comes from the server so the first render here produces exactly the
  * same output and no hydration mismatch follows; after that this component
@@ -18,16 +20,10 @@ export function Countdown({
   targetIso,
   initial,
   labels,
-  variant = "panel",
-  zeroWhenPassed = false,
 }: {
   targetIso: string;
   initial: CountdownParts;
   labels: { days: string; hours: string; minutes: string; passed: string };
-  /** "panel" sits in a dark-glass card; "big" is the page's centrepiece; "inline" sits on a bottom strip. */
-  variant?: "panel" | "big" | "inline";
-  /** Keep 00/00/00 on screen after the target moment instead of swapping to a text message. */
-  zeroWhenPassed?: boolean;
 }) {
   const [parts, setParts] = useState<CountdownParts>(initial);
 
@@ -39,28 +35,17 @@ export function Countdown({
     return () => clearInterval(id);
   }, [targetIso]);
 
-  if (parts.passed && !zeroWhenPassed) {
+  if (parts.passed) {
     return <div className="fp-countdown-passed">{labels.passed}</div>;
   }
 
-  const displayDays = parts.passed ? 0 : parts.days;
-  const displayHours = parts.passed ? 0 : parts.hours;
-  const displayMinutes = parts.passed ? 0 : parts.minutes;
-
-  const variantClass =
-    variant === "big"
-      ? " fp-countdown-big"
-      : variant === "inline"
-        ? " fp-countdown-inline"
-        : "";
-
   return (
-    <div className={`fp-countdown${variantClass}`}>
+    <div className="fp-countdown">
       {(
         [
-          [displayDays, labels.days],
-          [displayHours, labels.hours],
-          [displayMinutes, labels.minutes],
+          [parts.days, labels.days],
+          [parts.hours, labels.hours],
+          [parts.minutes, labels.minutes],
         ] as const
       ).map(([value, label]) => (
         <div className="fp-count" key={label}>
