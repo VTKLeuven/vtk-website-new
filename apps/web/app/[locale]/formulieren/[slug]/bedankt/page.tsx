@@ -5,6 +5,7 @@ import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { getCurrentSession } from "@/lib/session";
+import { ENTRY_PREFILL_KEY } from "@/lib/forms/surface";
 
 import "@/app/design/vtk-forms.css";
 
@@ -47,12 +48,22 @@ export default async function FormThanksPage({
   if (!form) notFound();
 
   const session = await getCurrentSession();
-  const canEdit =
-    form.allowEditAfterSubmit &&
-    session &&
-    (await prisma.formEntry.count({
-      where: { formId: form.id, submittedById: session.user.id, status: "SUBMITTED" },
-    })) > 0;
+  // De inzending die net binnenkwam (of net bewerkt werd) is de laatst
+  // gewijzigde. Mag je meerdere keren indienen, dan opent het formulier zonder
+  // `?inzending=` een nieuwe, lege inzending; de knop moet dus naar deze wijzen.
+  const latest =
+    form.allowEditAfterSubmit && session
+      ? await prisma.formEntry.findFirst({
+          where: { formId: form.id, submittedById: session.user.id, status: "SUBMITTED" },
+          orderBy: { updatedAt: "desc" },
+          select: { id: true },
+        })
+      : null;
+  const editHref = latest
+    ? `${base}/formulieren/${form.slug}${
+        form.allowMultipleSubmissions ? `?${ENTRY_PREFILL_KEY}=${latest.id}` : ""
+      }`
+    : null;
 
   const thanks =
     (locale === "en" ? form.thankYouEn ?? form.thankYouNl : form.thankYouNl) ??
@@ -104,8 +115,8 @@ export default async function FormThanksPage({
         ) : null}
 
         <div className="vtk-form-actions">
-          {canEdit ? (
-            <Link className="vtk-form-login" href={`${base}/formulieren/${form.slug}`}>
+          {editHref ? (
+            <Link className="vtk-form-login" href={editHref}>
               {nl ? "Mijn inzending bekijken of aanpassen" : "View or change my entry"}
             </Link>
           ) : null}

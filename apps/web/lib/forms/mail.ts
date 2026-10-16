@@ -302,12 +302,8 @@ export function draftReminderMail(input: {
         nl ? "Inzending nog niet verstuurd" : "Entry not yet submitted",
       )}${mailParagraph(greeting)}${mailParagraphHtml(
         nl
-          ? `Je begon aan "<strong>${escapeHtml(
-              input.formTitle,
-            )}</strong>", maar je inzending werd nog niet voltooid.`
-          : `You started "<strong>${escapeHtml(
-              input.formTitle,
-            )}</strong>", but your submission was not finalized.`,
+          ? `Je begon aan "${input.formTitle}", maar je inzending werd nog niet voltooid.`
+          : `You started "${input.formTitle}", but your submission was not finalized.`,
       )}${mailNoticeBox(
         nl ? `Het formulier sluit op ${deadline}.` : `The form closes on ${deadline}.`,
         nl ? "Sluitingsmoment" : "Deadline",

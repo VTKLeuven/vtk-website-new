@@ -14,6 +14,7 @@ import { FormStatusBadge } from "@/components/forms/admin/FormStatusBadge";
 import { formBase, formatDateTime, type AdminLocale } from "@/components/forms/admin/format";
 import { parseFieldConfig } from "@/lib/forms/schema";
 import { attachEventChoices } from "@/lib/forms/eventChoices";
+import { COMMU_STATUS_LABELS, getCommuRequestForm } from "@/lib/commu/requests";
 import type { AnswerValue } from "@/lib/forms/visibility";
 
 export default async function FormEntryDetailPage({
@@ -58,6 +59,16 @@ export default async function FormEntryDetailPage({
   );
 
   const canManage = capabilities.includes("MANAGE_ENTRIES");
+  // De commu-aanvraag noemt haar statussen "Ingepland" en "Niet opgenomen" op
+  // /admin/commu-aanvragen; hier moeten ze hetzelfde heten.
+  const statusLabels =
+    (await getCommuRequestForm())?.id === formId
+      ? {
+          NEW: COMMU_STATUS_LABELS.NEW[nl ? 0 : 1],
+          ACCEPTED: COMMU_STATUS_LABELS.ACCEPTED[nl ? 0 : 1],
+          REJECTED: COMMU_STATUS_LABELS.REJECTED[nl ? 0 : 1],
+        }
+      : undefined;
   const selectedByField = new Map(
     entry.answers.map((answer) => [answer.fieldId, new Set(answer.valueOptions)])
   );
@@ -176,7 +187,11 @@ export default async function FormEntryDetailPage({
           </p>
         </div>
         <div className="ticket-admin-row-actions">
-          <FormStatusBadge status={entry.reviewStatus} locale={locale} />
+          <FormStatusBadge
+            status={entry.reviewStatus}
+            locale={locale}
+            label={statusLabels?.[entry.reviewStatus]}
+          />
           {entry.waitlisted ? (
             <span className="ticket-admin-status" data-tone="warning">
               {nl ? "Op de wachtlijst" : "On the waiting list"}
@@ -293,6 +308,7 @@ export default async function FormEntryDetailPage({
             reviewStatus={entry.reviewStatus}
             internalNote={entry.internalNote}
             reviewerEmail={entry.reviewer?.email ?? ""}
+            statusLabels={statusLabels}
           />
 
           <section className="ticket-admin-section ticket-admin-section-compact">

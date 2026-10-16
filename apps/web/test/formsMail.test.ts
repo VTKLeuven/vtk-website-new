@@ -124,3 +124,21 @@ describe('overige mails', () => {
     );
   });
 });
+
+describe("geen HTML als tekst in de meldingen", () => {
+  it("toont de naam en de titel zonder zichtbare tags of dubbel ge-escapete tekens", () => {
+    const mail = notificationMail({
+      formTitle: "Quiz & Cantus",
+      slug: "quiz",
+      recipients: ["communicatie@vtk.be"],
+      submitterName: "Aisha Rahman",
+      submitterEmail: null,
+      answers: [],
+      entryCount: 1,
+    });
+    // De naam staat vet (`mailParagraphHtml`), maar nooit als zichtbare tag.
+    expect(mail.html).not.toContain("&lt;strong&gt;");
+    expect(mail.html).not.toContain("&amp;amp;");
+    expect(mail.html).toContain('<strong>Aisha Rahman</strong> vulde "Quiz &amp; Cantus" in:');
+  });
+});

@@ -62,7 +62,17 @@ export function filledTooFast(startedAt: unknown, now = Date.now()): boolean {
   return now - started < MIN_FILL_SECONDS * 1000;
 }
 
-/** Enkel voor de teller hierboven; nooit opgeslagen naast de inzending. */
-export function rateLimitKey(formId: string, ipAddress: string | null): string {
-  return `${formId}:${ipAddress ?? "onbekend"}`;
+/**
+ * Enkel voor de teller hierboven; nooit opgeslagen naast de inzending.
+ *
+ * Een ingelogd lid telt per persoon, niet per IP: een praesidium dat tijdens
+ * een vergadering op hetzelfde wifi zijn commu-aanvragen indient en aanvult,
+ * zit samen achter één adres en botste anders na tien inzendingen op de limiet.
+ */
+export function rateLimitKey(
+  formId: string,
+  ipAddress: string | null,
+  userId: string | null = null
+): string {
+  return userId ? `${formId}:user:${userId}` : `${formId}:${ipAddress ?? "onbekend"}`;
 }

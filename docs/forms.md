@@ -95,7 +95,8 @@ Dit is de reden dat verschillende keuzes eruitzien zoals ze eruitzien:
 - `pdf.ts`: de PDF-export.
 - `mail.ts` / `outbox.ts`: de teksten en de wachtrij.
 - `translation.ts`: wat er nog niet vertaald is.
-- `antiSpam.ts`: honeypot, limiet per IP, minimale invultijd.
+- `antiSpam.ts`: honeypot, limiet per IP (per persoon voor een ingelogd lid, zodat een
+  praesidium op hetzelfde wifi niet op elkaars limiet botst), minimale invultijd.
 - `uploadToken.ts`: de ondertekende verwijzing naar een geüpload bestand.
 - `audit.ts`: één plek die naar `FormAuditLog` schrijft.
 - `grouping/`: de groepjesmaker: `algorithm.ts` (puur), `roles.ts` (welke rol

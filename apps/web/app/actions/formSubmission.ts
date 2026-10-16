@@ -89,7 +89,10 @@ export async function submitFormAction(rawPayload: unknown): Promise<FormSubmitR
       requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       requestHeaders.get("x-real-ip") ||
       null;
-    if (!payload.asDraft && !withinRateLimit(rateLimitKey(payload.formId, ipAddress))) {
+    if (
+      !payload.asDraft &&
+      !withinRateLimit(rateLimitKey(payload.formId, ipAddress, session?.user.id ?? null))
+    ) {
       return { status: "rejected", reason: "RATE_LIMITED" };
     }
 

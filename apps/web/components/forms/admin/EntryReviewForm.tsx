@@ -18,6 +18,7 @@ export function EntryReviewForm({
   reviewStatus,
   internalNote,
   reviewerEmail,
+  statusLabels,
 }: {
   locale: AdminLocale;
   formId: string;
@@ -25,6 +26,12 @@ export function EntryReviewForm({
   reviewStatus: string;
   internalNote: string | null;
   reviewerEmail: string;
+  /**
+   * Eigen namen voor de drie statussen, voor een formulier dat ze elders al zo
+   * noemt (de commu-aanvraag: Nieuw, Ingepland, Niet opgenomen). Anders heet
+   * dezelfde status op twee schermen anders.
+   */
+  statusLabels?: Record<"NEW" | "ACCEPTED" | "REJECTED", string>;
 }) {
   const nl = locale === "nl";
 
@@ -74,9 +81,15 @@ export function EntryReviewForm({
               name="reviewStatus"
               defaultValue={reviewStatus}
               options={[
-                { value: "NEW", label: nl ? "Nieuw" : "New" },
-                { value: "ACCEPTED", label: nl ? "Geaccepteerd" : "Accepted" },
-                { value: "REJECTED", label: nl ? "Geweigerd" : "Rejected" },
+                { value: "NEW", label: statusLabels?.NEW ?? (nl ? "Nieuw" : "New") },
+                {
+                  value: "ACCEPTED",
+                  label: statusLabels?.ACCEPTED ?? (nl ? "Geaccepteerd" : "Accepted"),
+                },
+                {
+                  value: "REJECTED",
+                  label: statusLabels?.REJECTED ?? (nl ? "Geweigerd" : "Rejected"),
+                },
               ]}
             />
           </div>
