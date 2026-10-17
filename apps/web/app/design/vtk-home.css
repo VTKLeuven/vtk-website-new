@@ -1106,9 +1106,9 @@
   border-bottom: 0;
 }
 
-/* Volle-breedte banden (aftermovies, evenementen, career, POC's) dragen elk een
-   margin-top om los te komen van de paper-sectie erboven ("Wat we doen"). Twee
-   banden na elkaar mogen die marge niet houden: een paper-gat tussen navy en
+/* Volle-breedte banden (aftermovies, evenementen, shiften, career, POC's) dragen
+   elk een margin-top om los te komen van een paper-sectie erboven. Twee banden
+   na elkaar mogen die marge niet houden: een paper-gat tussen navy en
    lichtblauw leest als een fout. Volgt een band direct op een andere band, dan
    raken ze elkaar met een strakke naad (margin-top 0). De marge blijft enkel
    wanneer een band op paper volgt. De navy openingsuren tellen hier ook als
@@ -1116,6 +1116,19 @@
 .vtk-design .band + .band,
 .vtk-design .hours-strip + .band {
   margin-top: 0;
+}
+
+/* Tussen twee banden van dezelfde kleur is er geen naad, enkel één lang vlak.
+   Dat gebeurt wanneer de band ertussen wegvalt: zonder POC's raken de
+   lichtblauwe evenementen de lichtblauwe shiften, zonder shiften raakt de navy
+   POC-band de navy aftermovies, en zonder evenementen raken de navy
+   openingsuren de volgende navy band. Dan komt het paper-gat terug als
+   scheiding. */
+.vtk-design .events-band + .shift-band,
+.vtk-design .poc-band + .aftermovie-band,
+.vtk-design .hours-strip + .poc-band,
+.vtk-design .hours-strip + .aftermovie-band {
+  margin-top: clamp(84px, 10vw, 120px);
 }
 
 .vtk-design .sec-head,
@@ -1280,8 +1293,8 @@
   letter-spacing: 0.08em;
 }
 
-/* Fotokop op de aanbod-kaarten: elke werking opent met beeld onder een lichte
-   navy scrim (fotografie-richting), in dezelfde 16:9 als de affiche op een
+/* Fotokop op de aanbod-kaarten: elke werking opent met haar eigen foto, zonder
+   scrim (er staat geen tekst op), in dezelfde 16:9 als de affiche op een
    eventkaart. Werkingen zonder foto vallen terug op het gestreepte
    placeholder-patroon, zodat het ritme blijft kloppen en meteen zichtbaar is
    waar nog beeld ontbreekt. */
@@ -1296,24 +1309,8 @@
   object-fit: cover;
 }
 
-.vtk-design .acard-media::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    115deg,
-    rgba(10, 15, 31, 0.5) 0%,
-    rgba(14, 26, 54, 0.16) 55%,
-    rgba(14, 26, 54, 0) 100%
-  );
-}
-
 .vtk-design .acard-media-ph {
   background: repeating-linear-gradient(-45deg, var(--paper-2) 0 8px, var(--paper) 8px 16px);
-}
-
-.vtk-design .acard-media-ph::after {
-  content: none;
 }
 
 .vtk-design .career {
@@ -1574,13 +1571,14 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Aftermovies (navy band), opkomende evenementen en jouw POC's (lichtblauw).
+   Aftermovies (navy band), opkomende evenementen en shiften (lichtblauw), POC's
+   (navy).
 
-   Het bandenritme onder "Wat we doen" wisselt bewust af: paper (wat we doen) ->
-   navy (aftermovies) -> lichtblauw (evenementen) -> navy (career) -> lichtblauw
-   (POC's) -> paper (partners). De POC-band is persoonlijk en valt weg voor wie
-   uitgelogd is; daarom staat ze ná career en niet ervoor. Zou ze ervoor staan,
-   dan botsten twee navy banden zodra ze verschijnt.
+   Het bandenritme wisselt bewust af: navy (openingsuren) -> lichtblauw
+   (evenementen) -> navy (POC's) -> lichtblauw (shiften) -> navy (aftermovies)
+   -> paper (wat we doen) -> navy (career) -> paper (partners). De POC's en de
+   shiften kunnen wegvallen; wat er dan tegen elkaar komt, staat bij
+   `.band + .band`. Zie docs/design-decisions.md.
    --------------------------------------------------------------------------- */
 
 /* Zelfde opzet als .career-band: ::before draagt de volle-breedte navy vulling,
@@ -1735,7 +1733,7 @@
   background: var(--paper-2);
 }
 
-/* POC-band: navy band met technisch patroon, tussen de evenementen en "Wat we doen". */
+/* POC-band: navy band met technisch patroon, tussen de evenementen en de shiften. */
 .vtk-design .poc-band {
   position: relative;
   z-index: 0;
@@ -1814,9 +1812,12 @@
   color: var(--paper);
 }
 
+/* Vaste kolommen van 148px: met `minmax(.., 1fr)` sprong de maat in stappen
+   met het aantal kolommen dat paste (119, 142 of 174px op een desktop). Een rij
+   staat links en vult zelden de breedte, dus een rest rechts valt niet op. */
 .vtk-design .poc-wall-faces {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  grid-template-columns: repeat(auto-fill, 148px);
   gap: 20px 16px;
   list-style: none;
   margin: 0;
@@ -1853,7 +1854,7 @@
 }
 
 .vtk-design .poc-wall-initial {
-  font-size: 24px;
+  font-size: 30px;
   font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--paper);
@@ -2598,6 +2599,10 @@
   .vtk-design .poc-wall-row {
     grid-template-columns: 1fr;
     gap: 16px;
+  }
+  /* Op een telefoon wel vullen: vaste 148px liet op 320px één portret per rij. */
+  .vtk-design .poc-wall-faces {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   }
   .vtk-design .poc-elect-panel {
     grid-template-columns: 1fr;

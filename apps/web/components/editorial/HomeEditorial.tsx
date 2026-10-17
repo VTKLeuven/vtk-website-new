@@ -440,6 +440,9 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
 
   const aanbodTabs = tabs.filter((t) => t.slug !== "").slice(0, 6);
   const quickLinks = [
+    { k: nl ? "Kalender" : "Calendar", v: nl ? "Kalender" : "Calendar", m: nl ? "Alle events" : "All events", href: `${base}/kalender` },
+    { k: nl ? "Werk" : "Work", v: "Shiften", m: nl ? "Help mee" : "Join a shift", href: `${base}/shift` },
+    { k: nl ? "Koop" : "Buy", v: "Tickets", m: nl ? "Voor onze events" : "For our events", href: `${base}/tickets` },
     {
       k: nl ? "Eten" : "Eat",
       v: "Theokot",
@@ -453,19 +456,11 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       href: "https://cudi.vtk.be",
     },
     {
-      k: nl ? "Tweedehands" : "Second-hand",
-      v: nl ? "Tweedehands Boeken" : "Second-hand Books",
-      m: nl ? "Koop & verkoop" : "Buy & sell",
-      href: "https://cudi.vtk.be/vtk/secondhand",
-    },
-    {
       k: nl ? "Reserveer" : "Reserve",
       v: nl ? "Tijdsloten Cudi" : "Cudi Time Slots",
       m: nl ? "Praktische tools" : "Practical tools",
       href: "https://cudi.vtk.be/vtk/account/slots",
     },
-    { k: nl ? "Werk" : "Work", v: "Shiften", m: nl ? "Help mee" : "Join a shift", href: `${base}/shift` },
-    { k: nl ? "Kalender" : "Calendar", v: nl ? "Kalender" : "Calendar", m: nl ? "Alle events" : "All events", href: `${base}/kalender` },
   ];
 
   const fallbackAanbod = [
@@ -758,6 +753,35 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         myProgrammes={myProgrammeNames}
       />
 
+      {shiftsBandSetting.visible && (
+        <FrontpageShiftBand
+          locale={locale}
+          base={base}
+          shifts={shiftBandItems}
+          postNames={postNames}
+          signedIn={Boolean(session)}
+          totalOpenSpots={totalOpenSpots}
+          userName={session?.user?.name ?? null}
+          t={getDictionary(locale).shift}
+        />
+      )}
+
+      {aftermovies.length > 0 && (
+        <section className="section band aftermovie-band">
+          <div className="sec-head">
+            <h2>{nl ? "Aftermovies." : "Aftermovies."}</h2>
+            <div className="meta">
+              {nl ? "Beelden van de afgelopen jaren" : "Footage from past years"} ·{" "}
+              <Link href={`${base}/media`}>{nl ? "alle media" : "all media"}</Link>
+            </div>
+          </div>
+          <AftermovieGrid
+            items={aftermovies}
+            playLabel={nl ? "Video afspelen" : "Play video"}
+          />
+        </section>
+      )}
+
       <section className="section">
         <div className="sec-head">
           <h2>{nl ? "Wat we doen." : "What we do."}</h2>
@@ -808,35 +832,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           })}
         </div>
       </section>
-
-      {aftermovies.length > 0 && (
-        <section className="section band aftermovie-band">
-          <div className="sec-head">
-            <h2>{nl ? "Aftermovies." : "Aftermovies."}</h2>
-            <div className="meta">
-              {nl ? "Beelden van de afgelopen jaren" : "Footage from past years"} ·{" "}
-              <Link href={`${base}/media`}>{nl ? "alle media" : "all media"}</Link>
-            </div>
-          </div>
-          <AftermovieGrid
-            items={aftermovies}
-            playLabel={nl ? "Video afspelen" : "Play video"}
-          />
-        </section>
-      )}
-
-      {shiftsBandSetting.visible && (
-        <FrontpageShiftBand
-          locale={locale}
-          base={base}
-          shifts={shiftBandItems}
-          postNames={postNames}
-          signedIn={Boolean(session)}
-          totalOpenSpots={totalOpenSpots}
-          userName={session?.user?.name ?? null}
-          t={getDictionary(locale).shift}
-        />
-      )}
 
       <section className="section band career-band">
         <div className="sec-head">

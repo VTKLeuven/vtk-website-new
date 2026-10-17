@@ -334,10 +334,11 @@ the design language into the application instead of copying mockup content.
   footer share the same `--navy` so the dark chrome reads as one system. The
   lower half of the page alternates navy and light-blue (`--paper-2`) bands:
   **Openingsuren** (navy) → **Aankomende evenementen** (`--paper-2`) → **POC's**
-  (navy, when shown) → **Wat we doen** (paper) → **Aftermovies** (navy) →
-  **Shiften** (`--paper-2`, when shown) → **VTK Career** (navy) →
-  **Hoofdpartners** (paper). The events come before "Wat we doen" on purpose:
-  what is coming up this week matters more than the standing offer. The navy bands (openingsuren, aftermovies, career)
+  (navy, when shown) → **Shiften** (`--paper-2`, when shown) → **Aftermovies**
+  (navy) → **Wat we doen** (paper) → **VTK Career** (navy) →
+  **Hoofdpartners** (paper). The events and the open shifts come before "Wat we
+  doen" on purpose: what is coming up this week matters more than the standing
+  offer. The navy bands (openingsuren, aftermovies, career)
   carry the full-bleed `::before` navy fill plus the shared `::after` technical
   pattern, each with its own crop of `technisch-pattern.svg` so no two bands show
   the same wallpaper. The openingsuren band follows the Nieuws band (or the
@@ -350,9 +351,13 @@ the design language into the application instead of copying mockup content.
   panels are dark glass
   (`rgba(255,255,255,.06)` fill, `.14` white border), headings go `--paper`,
   muted text uses `--on-dark-muted`, and the primary button inverts like on the
-  hero. The **POC's** band can disappear (hidden in /admin/pocs, or no
-  representatives for this visitor), so it never sits between two navy bands:
-  were it there, those two would collide the moment it disappears. See
+  hero. The **POC's** and **Shiften** bands can disappear (POC's hidden in
+  /admin/pocs or no representatives for this visitor; no shifts this week), and
+  then two bands of the same colour meet (events + shifts, POC's +
+  aftermovies, or the opening hours + the next navy band when there are no
+  events). Only those same-colour pairs get the paper gap back (the rule under
+  `.band + .band` in `vtk-home.css`), because two equal bands without a gap
+  read as one long field. See
   `docs/design-decisions.md` for the section ordering rationale.
 - News (`components/editorial/NewsBand.tsx`, `lib/news`): the featured post on
   the left (usually the word from the praeses, as a letter) and the rest as the
@@ -377,9 +382,10 @@ the design language into the application instead of copying mockup content.
   compute "now" on the Brussels clock, not with `getHours()`. An evening without
   a closing time is hatched, never given an invented end. See
   `docs/design-decisions.md`.
-- Photography: content cards open with a real photo under a navy scrim, never a
-  decorative illustration. Aanbod cards ("Wat we doen") carry a photo header
-  (16:9, light 115deg scrim) and are uniform: every card in the grid gets the
+- Photography: content cards open with a real photo, never a decorative
+  illustration; a scrim only goes where text sits on the photo. Aanbod cards
+  ("Wat we doen") carry a photo header (16:9, no scrim: the light 115deg one
+  that was there read as a dark haze and was removed) and are uniform: every card in the grid gets the
   same photo-header + white-body treatment, no card is singled out as a
   featured/mini-hero (that was reviewed and removed). Below that header they
   follow the event card deliberately: same 16:9 crop, same title size with the

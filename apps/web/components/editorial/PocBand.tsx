@@ -46,7 +46,7 @@ export type PocBandGroup = {
 };
 
 /** De maat waarop `.poc-wall-face` staat; zie vtk-home.css. */
-const FACE_PX = 140;
+const FACE_PX = 148;
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);

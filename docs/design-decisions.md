@@ -3140,19 +3140,27 @@ afwisselen (zie ook de styling-sectie in `CLAUDE.md`). De volgorde van de
 onderste helft is een ontwerpkeuze, geen toeval:
 
 - **Openingsuren** (navy) → **Aankomende evenementen** (lichtblauw) → **POC's**
-  (navy, wanneer ze getoond wordt) → **Wat we doen** (paper) → **Aftermovies**
-  (navy + technisch patroon) → **Shiften** (lichtblauw, wanneer aan) → **VTK
-  Career** (navy) → **Hoofdpartners** (paper).
+  (navy, wanneer ze getoond wordt) → **Shiften** (lichtblauw, wanneer aan en er
+  shiften zijn) → **Aftermovies** (navy + technisch patroon) → **Wat we doen**
+  (paper) → **VTK Career** (navy) → **Hoofdpartners** (paper).
+- **Waarom de shiften vóór "Wat we doen"?** Sinds oktober 2026 op vraag van de
+  kring, om dezelfde reden als de evenementen hieronder: de open shiften van
+  deze week vragen iets van wie kijkt, en dat mag niet onder het vaste aanbod
+  verdwijnen. "Wat we doen" en de shiften zijn daarvoor van plaats gewisseld.
 - **Waarom de evenementen vóór "Wat we doen"?** Sinds september 2026 op vraag
   van de kring: wat er deze week te doen is, is voor wie de homepage opent
   dringender dan het vaste aanbod, dat het hele jaar hetzelfde blijft. De
   evenementen volgen daardoor direct op de navy openingsuren, met een strakke
   naad (`.hours-strip + .band`) in plaats van een paper-gat ertussen.
-- **De POC-band staat nooit tussen twee navy banden.** Ze kan wegvallen
-  (verborgen in /admin/pocs, of geen vertegenwoordigers voor wie kijkt), en dan
-  zouden die twee tegen elkaar botsen (navy tegen navy, geen naad). Tussen de
-  lichtblauwe evenementen en het paper van "Wat we doen" klopt het ritme in beide
-  gevallen.
+- **Wat er gebeurt als de POC's of de shiften wegvallen.** Beide kunnen
+  wegvallen: de POC's verborgen in /admin/pocs of zonder vertegenwoordigers
+  voor wie kijkt, de shiften wanneer er deze week geen zijn. Zonder POC's raken
+  de lichtblauwe evenementen de lichtblauwe shiften, zonder shiften raakt de
+  navy POC-band de navy aftermovies, en zonder evenementen raken de navy
+  openingsuren de volgende navy band. Twee banden van dezelfde kleur hebben geen
+  naad en lezen als één lang vlak, dus krijgen enkel die paren het paper-gat
+  terug (de regel onder `.band + .band` in `vtk-home.css`). Elke andere
+  combinatie houdt de strakke naad.
 
 ### De frontpage: het donkere blok bovenaan
 
@@ -7678,9 +7686,11 @@ headertab is `titleNl` letterlijk `labelNl`, dus stond er "→ Info" boven "Info
 Enkel de terugvalkaarten (een lege database) hebben een label dat iets toevoegt,
 en daar blijft het staan.
 
-Wat de aanbod-kaart wél apart houdt, is de lichte navy scrim over de foto
-(115 graden): een werking is een plek om te verkennen, een evenement is iets op
-een datum. Dat verschil mag klein blijven.
+De foto draagt geen scrim. Er stond een lichte navy scrim van 115 graden over,
+om een werking (een plek om te verkennen) te onderscheiden van een evenement
+(iets op een datum), maar op de kaarten las die als een donkere waas over de
+foto. Een scrim hoort enkel waar er tekst op de foto staat, en hier staat de
+tekst in de witte body eronder. Hij is in oktober 2026 op vraag weggehaald.
 
 ### De homepagekaart en de kalenderkaart zijn dezelfde kaart
 
