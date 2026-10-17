@@ -31,6 +31,7 @@ export function AdminNav({
   pinLabels,
   collapsed,
   collapseLabels,
+  searchLabels,
 }: {
   title: string;
   nodes: NavNode[];
@@ -38,6 +39,7 @@ export function AdminNav({
   pinLabels: PinLabels;
   collapsed: boolean;
   collapseLabels: { collapse: string; expand: string; shortcut: string };
+  searchLabels: { open: string; placeholder: string; empty: string };
 }) {
   const showToast = useToast();
   const { error, ...labels } = pinLabels;
@@ -48,6 +50,7 @@ export function AdminNav({
       nodes={nodes}
       icons={icons}
       collapse={{ initial: collapsed, onChange: rememberCollapsed, labels: collapseLabels }}
+      search={{ labels: searchLabels }}
       pins={{
         keys: pinnedKeys,
         labels,

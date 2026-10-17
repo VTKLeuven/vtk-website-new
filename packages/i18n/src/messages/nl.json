@@ -498,6 +498,9 @@
     "collapseNav": "Zijbalk inklappen",
     "expandNav": "Zijbalk uitklappen",
     "collapseNavShortcut": "[ of Ctrl+B",
+    "searchNav": "Tabs zoeken",
+    "searchNavPlaceholder": "Zoek een tab of groep",
+    "searchNavEmpty": "Geen tab gevonden voor",
     "takedowns": "Verwijderverzoeken",
     "feedback": "Feedback Website",
     "urenloop": "24 urenloop"

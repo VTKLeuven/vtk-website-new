@@ -19,8 +19,29 @@
   text-transform: uppercase;
 }
 
+/* Smal: de uitklapknop met het zoekicoon ernaast. */
+.vtk-admin-nav-bar {
+  display: flex;
+  gap: 8px;
+}
+
+.vtk-admin-nav-bar-search {
+  appearance: none;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
 .vtk-admin-nav-toggle {
   appearance: none;
+  flex: 1;
+  min-width: 0;
   width: 100%;
   display: flex;
   align-items: center;
@@ -58,13 +79,66 @@
   display: flex;
 }
 
+/* Het zoekveld bovenaan de zijbalk. Een knop die eruitziet als een veld: het
+   echte veld staat in het venster dat ze opent (AdminNavSearch.tsx), zodat
+   zoeken ook werkt met de zijbalk ingeklapt of dicht op een telefoon. */
+.vtk-admin-nav-search {
+  appearance: none;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.vtk-admin-nav-search:hover,
+.vtk-admin-nav-search:focus-visible {
+  border-color: color-mix(in oklab, var(--ink, #0a0f1f) 22%, transparent);
+  color: var(--ink);
+}
+
+.vtk-admin-nav-search-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vtk-admin-nav-kbd {
+  flex: none;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 @media (min-width: 860px) {
   .vtk-admin-nav-sticky {
     will-change: transform;
   }
 
-  .vtk-admin-nav-toggle {
+  .vtk-admin-nav-bar {
     display: none;
+  }
+
+  .vtk-admin-nav-search {
+    display: flex;
   }
 
   .vtk-admin-nav {
@@ -300,6 +374,7 @@
   }
 
   .vtk-admin-nav-sticky[data-collapsed='true'] > .vtk-admin-nav-head,
+  .vtk-admin-nav-sticky[data-collapsed='true'] > .vtk-admin-nav-search,
   .vtk-admin-nav-sticky[data-collapsed='true'] > .vtk-admin-nav {
     display: none;
   }
@@ -458,4 +533,109 @@
   background: var(--paper-2);
   color: var(--ink);
   font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------------
+   Het zoekvenster (Ctrl/Cmd+K). Een `<dialog>` in de top layer, dus los van de
+   transform van de zijbalk; de kleuren erven gewoon van de pagina.
+   --------------------------------------------------------------------------- */
+
+.vtk-admin-search {
+  /* Bovenaan verankerd en niet gecentreerd: anders springt het veld bij elke
+     letter op en neer terwijl de lijst eronder korter wordt. */
+  width: min(560px, calc(100% - 32px));
+  max-width: none;
+  max-height: none;
+  margin: 12vh auto auto;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface, #ffffff);
+  color: var(--ink);
+  box-shadow: 0 24px 60px -24px rgba(10, 15, 31, 0.45);
+  overflow: hidden;
+}
+
+.vtk-admin-search::backdrop {
+  background: var(--scrim, rgba(10, 15, 31, 0.45));
+}
+
+.vtk-admin-search-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.vtk-admin-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  /* 16px en niet kleiner: iOS zoomt anders in bij het focussen op het veld. */
+  font-size: 16px;
+}
+
+.vtk-admin-search-input::placeholder {
+  color: var(--muted);
+}
+
+.vtk-admin-search-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: min(420px, 60vh);
+  padding: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.vtk-admin-search-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: 999px;
+  color: color-mix(in oklab, var(--ink, #0a0f1f) 72%, transparent);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.vtk-admin-search-option[aria-selected='true'] {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.vtk-admin-search-option[aria-current='page'] {
+  font-weight: 600;
+}
+
+.vtk-admin-search-option-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vtk-admin-search-option-group {
+  flex: none;
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.vtk-admin-search-empty {
+  margin: 0;
+  padding: 18px 20px;
+  color: var(--muted);
+  font-size: 13.5px;
 }

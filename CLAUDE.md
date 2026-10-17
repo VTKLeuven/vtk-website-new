@@ -686,6 +686,13 @@ the design language into the application instead of copying mockup content.
     `apps/logistiek/lib/admin-nav-cookie.ts`); bouw daar geen eigen inklapknop
     of zwevende "Tabs"-knop meer naast. De sneltoets `[` of Ctrl/Cmd+B zit in
     `AdminNav` zelf.
+  - **Tabs zoeken gaat met Ctrl/Cmd+K, in elke stand van de zijbalk.** Het veld
+    bovenaan de zijbalk (in de rail een icoon, smal een knop naast het menu)
+    opent een `<dialog>` in `packages/ui/src/AdminNavSearch.tsx`; de rangschikking
+    staat apart in `admin-nav-match.ts`. Bouw er geen filter in de zijbalk zelf
+    van: ingeklapt of dicht op een telefoon is er dan niets om in te typen, en de
+    sneltoets moet ook dan werken. Optioneel via de prop `search`, zoals `pins` en
+    `collapse`; de uitleendienst en de Fakbar geven die (nog) niet mee.
   - **Het mediabeheer (`/admin/media`) stuurt niemand naar Immich.** Tabbladen
     zoals bij Tickets, en Foto's in twee panelen (albumlijst links in de layout
     van de route-groep `(fotos)`, het album rechts). Verbergen en verwijderen

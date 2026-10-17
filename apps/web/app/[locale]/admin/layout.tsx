@@ -136,6 +136,11 @@ export default async function AdminLayout({
               expand: adminDict.expandNav,
               shortcut: adminDict.collapseNavShortcut,
             }}
+            searchLabels={{
+              open: adminDict.searchNav,
+              placeholder: adminDict.searchNavPlaceholder,
+              empty: adminDict.searchNavEmpty,
+            }}
           />
         </aside>
         <section className="vtk-admin-main">{children}</section>

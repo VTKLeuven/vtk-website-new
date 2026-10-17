@@ -4,7 +4,16 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useEffectEvent, useId, useRef, useState, useTransition, type ReactNode } from 'react';
 
+import {
+  AdminNavSearchDialog,
+  SearchIcon,
+  isSearchShortcut,
+  useSearchShortcutLabel,
+  type AdminNavSearch,
+} from './AdminNavSearch';
 import './admin-nav.css';
+
+export type { AdminNavSearch } from './AdminNavSearch';
 
 export type AdminNavItem = {
   key: string;
@@ -65,6 +74,7 @@ export type AdminNavProps = {
   icons?: Record<string, ReactNode>;
   pins?: AdminNavPins;
   collapse?: AdminNavCollapse;
+  search?: AdminNavSearch;
 };
 
 const TOP_GAP = 96;
@@ -274,7 +284,7 @@ function flatten(nodes: AdminNavNode[]): AdminNavItem[] {
   return nodes.flatMap((node) => (node.type === 'item' ? [node.item] : node.items));
 }
 
-export function AdminNav({ title, nodes, icons = {}, pins, collapse }: AdminNavProps) {
+export function AdminNav({ title, nodes, icons = {}, pins, collapse, search }: AdminNavProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(collapse?.initial ?? false);
   const stickyRef = useSmartSticky<HTMLDivElement>(collapsed);
@@ -283,10 +293,15 @@ export function AdminNav({ title, nodes, icons = {}, pins, collapse }: AdminNavP
   const activeHref = activeHrefFor(nodes, pathname);
   const current = activeLabel(nodes, activeHref, title);
 
+  const [searchOpen, setSearchOpen] = useState(false);
+  const shortcutLabel = useSearchShortcutLabel();
+  const searchTip = search ? withShortcut(search.labels.open, shortcutLabel ?? undefined) : '';
+
   const [previousPath, setPreviousPath] = useState(pathname);
   if (pathname !== previousPath) {
     setPreviousPath(pathname);
     if (open) setOpen(false);
+    if (searchOpen) setSearchOpen(false);
   }
 
   const toggleCollapsed = (next: boolean) => {
@@ -308,6 +323,19 @@ export function AdminNav({ title, nodes, icons = {}, pins, collapse }: AdminNavP
     window.addEventListener('keydown', onShortcut);
     return () => window.removeEventListener('keydown', onShortcut);
   }, [hasCollapse]);
+
+  // Op elke breedte en in elke stand van de zijbalk, ook ingeklapt.
+  const onSearchShortcut = useEffectEvent((event: KeyboardEvent) => {
+    if (!isSearchShortcut(event)) return;
+    event.preventDefault();
+    setSearchOpen(!searchOpen);
+  });
+  const hasSearch = Boolean(search);
+  useEffect(() => {
+    if (!hasSearch) return;
+    window.addEventListener('keydown', onSearchShortcut);
+    return () => window.removeEventListener('keydown', onSearchShortcut);
+  }, [hasSearch]);
 
   const pinState = usePins(pins);
   // Eén context voor elke rij, zodat de rijen zelf niets over de prop hoeven te
@@ -331,6 +359,20 @@ export function AdminNav({ title, nodes, icons = {}, pins, collapse }: AdminNavP
           </button>
         )}
       </div>
+      {search && (
+        <button
+          type="button"
+          className="vtk-admin-nav-search"
+          title={searchTip}
+          aria-haspopup="dialog"
+          aria-keyshortcuts="Control+K Meta+K"
+          onClick={() => setSearchOpen(true)}
+        >
+          <SearchIcon />
+          <span className="vtk-admin-nav-search-label">{search.labels.open}</span>
+          {shortcutLabel && <kbd className="vtk-admin-nav-kbd">{shortcutLabel}</kbd>}
+        </button>
+      )}
       {collapse && collapsed && (
         <AdminRail
           title={title}
@@ -341,18 +383,34 @@ export function AdminNav({ title, nodes, icons = {}, pins, collapse }: AdminNavP
           expandLabel={collapse.labels.expand}
           expandTip={withShortcut(collapse.labels.expand, collapse.labels.shortcut)}
           onExpand={() => toggleCollapsed(false)}
+          search={search ? { label: search.labels.open, tip: searchTip, onOpen: () => setSearchOpen(true) } : null}
         />
       )}
-      <button
-        type="button"
-        className={`vtk-admin-nav-toggle${open ? ' is-open' : ''}`}
-        aria-expanded={open}
-        aria-controls={panelId}
-        onClick={() => setOpen((currentOpen) => !currentOpen)}
-      >
-        <span className="vtk-admin-nav-toggle-label">{current}</span>
-        <Chevron open={open} />
-      </button>
+      <div className="vtk-admin-nav-bar">
+        <button
+          type="button"
+          className={`vtk-admin-nav-toggle${open ? ' is-open' : ''}`}
+          aria-expanded={open}
+          aria-controls={panelId}
+          onClick={() => setOpen((currentOpen) => !currentOpen)}
+        >
+          <span className="vtk-admin-nav-toggle-label">{current}</span>
+          <Chevron open={open} />
+        </button>
+        {/* Smal staat het veld er niet; dan opent dit icoon hetzelfde venster. */}
+        {search && (
+          <button
+            type="button"
+            className="vtk-admin-nav-bar-search"
+            title={search.labels.open}
+            aria-label={search.labels.open}
+            aria-haspopup="dialog"
+            onClick={() => setSearchOpen(true)}
+          >
+            <SearchIcon />
+          </button>
+        )}
+      </div>
       <nav id={panelId} className={`vtk-admin-nav${open ? ' is-open' : ''}`} aria-label={title}>
         {pinCtx && (
           <PinnedSection nodes={nodes} activeHref={activeHref} icons={icons} pins={pinCtx.pins} state={pinCtx.state} />
@@ -377,6 +435,16 @@ export function AdminNav({ title, nodes, icons = {}, pins, collapse }: AdminNavP
           )
         )}
       </nav>
+      {search && (
+        <AdminNavSearchDialog
+          open={searchOpen}
+          onClose={() => setSearchOpen(false)}
+          nodes={nodes}
+          icons={icons}
+          activeHref={activeHref}
+          labels={search.labels}
+        />
+      )}
     </div>
   );
 }
@@ -580,6 +648,7 @@ function AdminRail({
   expandLabel,
   expandTip,
   onExpand,
+  search,
 }: {
   title: string;
   nodes: AdminNavNode[];
@@ -590,6 +659,8 @@ function AdminRail({
   /** De tooltip: het label, met de sneltoets erachter wanneer de app die geeft. */
   expandTip: string;
   onExpand: () => void;
+  /** Het zoekicoon onder de uitklapknop; null zonder zoeken. */
+  search: { label: string; tip: string; onOpen: () => void } | null;
 }) {
   const pathname = usePathname();
   const railRef = useRef<HTMLDivElement>(null);
@@ -638,6 +709,23 @@ function AdminRail({
             {expandTip}
           </span>
         </div>
+        {search && (
+          <div className="vtk-admin-rail-slot">
+            <button
+              type="button"
+              className="vtk-admin-rail-btn"
+              aria-label={search.label}
+              aria-haspopup="dialog"
+              aria-keyshortcuts="Control+K Meta+K"
+              onClick={search.onOpen}
+            >
+              <SearchIcon />
+            </button>
+            <span className="vtk-admin-rail-tip" aria-hidden>
+              {search.tip}
+            </span>
+          </div>
+        )}
         <span className="vtk-admin-rail-sep" aria-hidden />
         {pinned.map((item) => (
           <RailLink key={`pin-${item.key}`} item={item} icons={icons} active={isActive(activeHref, item)} pinned />

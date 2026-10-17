@@ -498,6 +498,9 @@
     "collapseNav": "Collapse sidebar",
     "expandNav": "Expand sidebar",
     "collapseNavShortcut": "[ or Ctrl+B",
+    "searchNav": "Search tabs",
+    "searchNavPlaceholder": "Search for a tab or group",
+    "searchNavEmpty": "No tab found for",
     "takedowns": "Takedown requests",
     "feedback": "Website feedback",
     "urenloop": "24-hour run"
