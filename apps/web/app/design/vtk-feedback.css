@@ -5,15 +5,23 @@
 /* ── Het formulier uit het accountmenu (Dopl in een iframe) ───────────────── */
 
 /* Boven de sitekop (z-index 50) en boven de uitklappanelen (60): het paneel
-   wordt vanuit dat menu geopend en mag er niet onder verdwijnen. */
+   wordt vanuit dat menu geopend en mag er niet onder verdwijnen.
+
+   De modal draait de laptopzoom van `:root` terug (zie `--vtk-zoom` in
+   vtk-base.css). Safari past die 0,9 in een iframe twee keer toe: de pagina van
+   Dopl kreeg een kader van 90% en vulde daar zelf weer maar 90% van, zodat het
+   formulier links in de modal stond met een brede witte strook rechts. Chrome
+   deed het goed. Op 100% is er niets meer om dubbel te tellen; daarom hier ook
+   `dvh` zonder de variabele, die net die zoom compenseert. */
 .vtk-feedback-backdrop {
   position: fixed;
   inset: 0;
   z-index: 130;
+  zoom: calc(1 / var(--vtk-zoom, 1));
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: calc(6 * var(--vtk-dvh, 1dvh)) 16px 16px;
+  padding: 6dvh 16px 16px;
   background: rgba(10, 15, 31, 0.55);
   overflow-y: auto;
 }
@@ -42,7 +50,7 @@
   display: block;
   width: 100%;
   height: 560px;
-  max-height: calc(82 * var(--vtk-dvh, 1dvh));
+  max-height: 82dvh;
   border: 0;
   opacity: 0;
   transition: opacity 150ms ease;
