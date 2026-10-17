@@ -360,6 +360,7 @@ import {
   mailMessageBox,
   mailNoticeBox,
   mailParagraph,
+  mailParagraphHtml,
 } from "@/lib/mailDesign";
 
 export function newRentalNotificationMail(input: {
@@ -436,7 +437,7 @@ export function newRentalNotificationMail(input: {
     lang: "nl",
     title: subject,
     rows: `${mailHeaderRow({ kicker: "Theokot Verhuur" })}${mailContentRow(
-      `${mailHeading("Nieuwe verhuuraanvraag")}${mailParagraph(
+      `${mailHeading("Nieuwe verhuuraanvraag")}${mailParagraphHtml(
         `Er is een nieuwe aanvraag binnengekomen voor de zaalverhuur van Theokot door <strong>${escapeHtml(
           rental.responsibleName,
         )}</strong>:`,

@@ -237,4 +237,15 @@ describe("de mail naar info@vtk.be", () => {
     expect(text).toContain("Van: Jef Vermeulen <jef@vtk.be>");
     expect(text).toContain("Hallo");
   });
+
+  it("zet de naam vet in de opgemaakte mail, en niet als letterlijke <strong>", () => {
+    const { html } = contactMailBody({
+      name: "Jef & <Co>",
+      email: "jef@vtk.be",
+      subject: "Vraag",
+      message: "Hallo",
+    });
+    expect(html).toContain("van <strong>Jef &amp; &lt;Co&gt;</strong>:");
+    expect(html).not.toContain("&lt;strong&gt;");
+  });
 });

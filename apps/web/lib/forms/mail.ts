@@ -43,9 +43,9 @@ export function answersAsText(lines: readonly AnswerLine[]): string {
 }
 
 import {
+  escapeHtml,
   MAIL_COLOR,
   MAIL_FONT,
-  escapeHtml,
   mailButton,
   mailContentRow,
   mailDateStub,
@@ -56,6 +56,7 @@ import {
   mailInfoTable,
   mailNoticeBox,
   mailParagraph,
+  mailParagraphHtml,
   mailPill,
 } from "@/lib/mailDesign";
 
@@ -203,7 +204,7 @@ export function notificationMail(input: {
     lang: "nl",
     title: subject,
     rows: `${mailHeaderRow({ kicker: "VTK Formulieren" })}${mailContentRow(
-      `${mailHeading("Nieuwe inzending")}${mailParagraph(
+      `${mailHeading("Nieuwe inzending")}${mailParagraphHtml(
         `<strong>${escapeHtml(who)}</strong> vulde "${escapeHtml(input.formTitle)}" in:`,
       )}${mailInfoTable([...input.answers])}<div style="margin:22px 0 10px">${mailButton(
         formUrl(input.slug, "nl"),
@@ -239,7 +240,7 @@ export function digestMail(input: {
     lang: "nl",
     title: subject,
     rows: `${mailHeaderRow({ kicker: "VTK Formulieren" })}${mailContentRow(
-      `${mailHeading("Overzicht inzendingen")}${mailParagraph(
+      `${mailHeading("Overzicht inzendingen")}${mailParagraphHtml(
         `Er kwamen <strong>${input.count}</strong> nieuwe inzending(en) binnen voor "${escapeHtml(
           input.formTitle,
         )}".`,
@@ -299,7 +300,7 @@ export function draftReminderMail(input: {
     rows: `${mailHeaderRow({ kicker: "VTK Formulieren" })}${mailContentRow(
       `${mailHeading(
         nl ? "Inzending nog niet verstuurd" : "Entry not yet submitted",
-      )}${mailParagraph(greeting)}${mailParagraph(
+      )}${mailParagraph(greeting)}${mailParagraphHtml(
         nl
           ? `Je begon aan "<strong>${escapeHtml(
               input.formTitle,

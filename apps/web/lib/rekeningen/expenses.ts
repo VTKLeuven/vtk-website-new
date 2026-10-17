@@ -407,6 +407,7 @@ import {
   mailInfoTable,
   mailNoticeBox,
   mailParagraph,
+  mailParagraphHtml,
 } from "@/lib/mailDesign";
 
 export function expenseMailDraft(expense: {
@@ -437,7 +438,7 @@ export function expenseMailDraft(expense: {
     lang: "nl",
     title: subject,
     rows: `${mailHeaderRow({ kicker: "VTK Rekeningen" })}${mailContentRow(
-      `${mailHeading("Rekening voor boekhouding")}${mailParagraph("Dag,")}${mailParagraph(
+      `${mailHeading("Rekening voor boekhouding")}${mailParagraph("Dag,")}${mailParagraphHtml(
         `In bijlage vind je de rekening "<strong>${escapeHtml(
           expense.description,
         )}</strong>" van <strong>${escapeHtml(expense.payerName)}</strong> voor post <strong>${escapeHtml(

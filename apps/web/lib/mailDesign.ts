@@ -113,6 +113,21 @@ export function mailParagraph(
   return `<p style="margin:16px 0;font-family:${MAIL_FONT};font-size:15.5px;line-height:1.6;color:${color}${extraStyle}">${escapeHtml(text)}</p>`;
 }
 
+/**
+ * Dezelfde alinea, maar met opmaak erin (een naam in `<strong>`). `mailParagraph`
+ * escapet zijn tekst, dus daar kwam `<strong>` letterlijk in de mail te staan.
+ * Hier gaat de HTML ongewijzigd mee: escape elke waarde die je erin zet met
+ * `escapeHtml`, want dit is vaak wat een bezoeker zelf intikte.
+ */
+export function mailParagraphHtml(
+  html: string,
+  options?: { muted?: boolean; style?: string },
+): string {
+  const color = options?.muted ? MAIL_COLOR.muted : MAIL_COLOR.body;
+  const extraStyle = options?.style ? `;${options.style}` : "";
+  return `<p style="margin:16px 0;font-family:${MAIL_FONT};font-size:15.5px;line-height:1.6;color:${color}${extraStyle}">${html}</p>`;
+}
+
 /** Een gekleurde pil-badge (geel, navy of neutraal). */
 export function mailPill(
   text: string,

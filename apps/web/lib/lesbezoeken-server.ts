@@ -157,6 +157,7 @@ import {
   mailHeading,
   mailInfoTable,
   mailParagraph,
+  mailParagraphHtml,
 } from "@/lib/mailDesign";
 
 /** Onderwerp en tekst van de melding, los van het versturen. */
@@ -193,7 +194,7 @@ export function newLesbezoekNotificationMail(visit: NewLesbezoekInput): {
     lang: "nl",
     title: subject,
     rows: `${mailHeaderRow({ kicker: "VTK Lesbezoeken" })}${mailContentRow(
-      `${mailHeading("Nieuwe lesbezoekaanvraag")}${mailParagraph(
+      `${mailHeading("Nieuwe lesbezoekaanvraag")}${mailParagraphHtml(
         `Er is een nieuwe aanvraag voor een lesbezoek binnengekomen van <strong>${escapeHtml(
           visit.organisation.name,
         )}</strong>:`,

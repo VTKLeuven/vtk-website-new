@@ -253,6 +253,7 @@ import {
   mailInfoTable,
   mailMessageBox,
   mailParagraph,
+  mailParagraphHtml,
 } from "@/lib/mailDesign";
 
 /**
@@ -289,7 +290,7 @@ export function contactMailBody(message: ContactMessage): {
     lang: "nl",
     title: subject,
     rows: `${mailHeaderRow({ kicker: "VTK Contact" })}${mailContentRow(
-      `${mailHeading("Contactformulier")}${mailParagraph(
+      `${mailHeading("Contactformulier")}${mailParagraphHtml(
         `Er is een nieuw bericht binnengekomen via het contactformulier van <strong>${escapeHtml(
           message.name,
         )}</strong>:`,
