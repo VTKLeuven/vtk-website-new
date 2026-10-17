@@ -2582,6 +2582,59 @@ avond werk voor niets.
   aantreedt. Nu blijft hij staan: hij verwijderen zou mail doen bouncen die naar
   een adres uit die periode gestuurd wordt.
 
+## Kalender: de agenda en de week
+
+De kalender heeft drie weergaven: het raster met affiches (de standaard), de
+agenda en de week. De agenda en de week zijn in oktober 2026 herwerkt; vijf
+richtingen werden in een canvas naast elkaar gelegd.
+
+### De agenda blijft een maandraster
+
+Een lijst per dag (zoals /shift) en twee weken naast elkaar als agendaboek
+(zoals de week in de homepagehero) werden bekeken en afgewezen: de agenda moet
+als een kalender blijven aanvoelen. Wat er wel veranderde:
+
+- **Geen paneel naast het raster.** Een dagpaneel rechts nam net de breedte af
+  waar het raster al tekort aan had. De dag die je aanklikt, klapt onder zijn
+  week open, met dezelfde kaarten als in het raster (affiche, ster, agenda,
+  tickets). Op een telefoon werkt het net zo.
+- **Een dagcel is breder.** Het raster neemt de volle breedte, het weeknummer
+  staat in de maandagcel in plaats van in een eigen kolom, en zaterdag en zondag
+  zijn smaller, omdat daar bij de kring zelden iets staat.
+- **Het uur staat in een eigen kolom, de titel loopt eronder door.** Uur en
+  titel stonden op één regel, en een lang woord liep dan in de cel ernaast. Er
+  is ook geen "+2" meer: een cel groeit mee, want de dag klapt toch open.
+- **Geen lijst "Eerstvolgend" meer onder het raster.** Die herhaalde wat er in
+  het raster al stond.
+
+Het venster blijft vier weken (zie `AGENDA_WEEKS`), niet een kalendermaand.
+
+### De week is een tijdlijn
+
+De week zette elk evenement als kaart onder zijn dag. Een evenement van vijf
+dagen stond er vijf keer, en je zag niet wanneer op de dag iets viel of wat met
+elkaar botst. Nu is het een uuras, in de taal van de openingsuren op de
+homepage (gele nu-lijn, arcering voor wat verder loopt dan het venster):
+
+- **Wat de hele dag duurt of over dagen doorloopt, is één balk bovenaan.**
+- **Het venster is 12:00 tot 02:00.** Bijna alles van de kring valt 's middags
+  of 's avonds; een vroeger of later evenement rekt het venster op, tot
+  hoogstens 06:00.
+- **Wat voor 06:00 begint, staat bij de avond ervoor.** Een feestje dat om
+  01:00 begint, hoort bij de avond waarop iedereen vertrok.
+- **Overlappende blokken staan naast elkaar.** Trapsgewijs over elkaar heen
+  (het eerste voorstel) liet van het onderste blok enkel losse letters zien.
+
+De regels staan in `lib/calendar/weekTimeline.ts`, met tests.
+
+### De laatste weergave wordt onthouden
+
+Wie de week of de agenda kiest, krijgt die de volgende keer terug. Dat zit in
+een cookie (`vtk-kalender-weergave`, zie `lib/calendar/viewCookie.ts`) en niet
+in het account: de pagina leest hem op de server, zodat de kalender meteen in
+de juiste weergave rendert en de juiste periode ophaalt, en het werkt ook
+zonder aan te melden.
+
 ## Kalender: categorieën en agenda-feeds
 
 ### De site is de enige bron; geen koppeling met de Google-agenda

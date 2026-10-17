@@ -1169,8 +1169,8 @@ export function KalenderEditorialView({
           {
             top,
             height,
-            zIndex: 2 + block.lane,
             '--lane': block.lane,
+            '--lanes': block.lanes,
             '--cat': cat?.colour,
           } as React.CSSProperties
         }

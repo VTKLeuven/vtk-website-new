@@ -583,6 +583,12 @@ the design language into the application instead of copying mockup content.
     enkel wanneer `TheokotRental.purposePublic` aan staat. Zet er geen
     onbeantwoorde aanvraag bij en geef er geen velden aan mee die je niet toont:
     alles wat de client krijgt, staat in de HTML. Zie `docs/design-decisions.md`.
+  - **De agenda op /kalender blijft een maandraster, de week is een tijdlijn.**
+    Geen paneel naast het raster: de aangeklikte dag klapt onder zijn week open
+    met de kaarten van het raster. In de week staat wat de hele dag of over dagen
+    loopt één keer als balk bovenaan, en overlappende blokken staan naast
+    elkaar. De laatst gekozen weergave zit in een cookie die de server leest
+    (`lib/calendar/viewCookie.ts`). Zie `docs/design-decisions.md`.
   - **The event tile lives in `apps/web/app/design/vtk-eventcard.css` and is
     shared** by the `/kalender` grid and the homepage band "Aankomende
     evenementen"; both import that file, and `.ev-grid` belongs to it too. Do not

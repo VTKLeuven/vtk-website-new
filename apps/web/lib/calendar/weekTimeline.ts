@@ -56,8 +56,9 @@ export type TimelineBar<T> = {
 
 /**
  * Een evenement als blok in de kolom van een dag. `from` en `to` zijn uren
- * vanaf middernacht van die dag (na middernacht dus boven 24); `lane` is hoeveel
- * trappen het opschuift omdat het overlapt met een blok dat eerder begon.
+ * vanaf middernacht van die dag (na middernacht dus boven 24). Blokken die
+ * overlappen, staan naast elkaar: `lane` is de baan van dit blok en `lanes`
+ * het aantal banen in zijn groep, zoals in `lib/calendarLayout.ts`.
  */
 export type TimelineBlock<T> = {
   event: T;
@@ -66,6 +67,7 @@ export type TimelineBlock<T> = {
   from: number;
   to: number;
   lane: number;
+  lanes: number;
   /** Het blok loopt verder dan het venster van de tijdlijn. */
   runsOn: boolean;
 };
@@ -142,7 +144,7 @@ function occurrencesOn<T extends CalendarInterval>(events: T[], day: Date) {
 export function weekTimeline<T extends CalendarInterval>(events: T[], days: Date[], now: Date): WeekTimeline<T> {
   const bars = timelineBars(events, days);
 
-  const raw: Array<Array<Omit<TimelineBlock<T>, 'lane' | 'runsOn'>>> = days.map(() => []);
+  const raw: Array<Array<Omit<TimelineBlock<T>, 'lane' | 'lanes' | 'runsOn'>>> = days.map(() => []);
   days.forEach((day, index) => {
     for (const occurrence of occurrencesOn(events, day)) {
       let column = index;
@@ -175,6 +177,7 @@ export function weekTimeline<T extends CalendarInterval>(events: T[], days: Date
       from: block.from,
       to: block.to,
       lane: block.lane,
+      lanes: block.lanes,
       runsOn: block.to > to,
     }))
   );

@@ -2408,18 +2408,21 @@
   background-color: color-mix(in srgb, var(--yellow) 6%, var(--surface));
 }
 
-/* Een blok dat overlapt met een eerder begonnen blok, schuift een trede op en
-   ligt erboven, met een witte rand ertussen. Naast elkaar in halve breedtes
-   bleef er in een kolom van 170 pixels geen leesbare titel over. */
+/* Blokken die overlappen, staan naast elkaar in hun eigen baan, zoals in de
+   kalenders van het beheer (`lib/calendarLayout.ts`). Trapsgewijs over elkaar
+   heen liet van het onderste blok enkel een paar losse letters zien. Een smal
+   blok laat zijn uur weg; de titel blijft, en de tooltip draagt de rest. */
 .vtk-design .kal-tl-block {
+  container-type: inline-size;
   position: absolute;
-  left: calc(5px + var(--lane, 0) * 16px);
-  right: 5px;
+  z-index: 2;
+  left: calc(4px + (100% - 8px) * var(--lane, 0) / var(--lanes, 1));
+  width: calc((100% - 8px) / var(--lanes, 1) - 2px);
   display: flex;
   flex-direction: column;
   gap: 1px;
   min-width: 0;
-  padding: 5px 8px 6px 9px;
+  padding: 5px 7px 6px;
   overflow: hidden;
   border: 1px solid var(--line-2);
   border-radius: 9px;
@@ -2429,11 +2432,9 @@
   text-decoration: none;
 }
 
-/* `!important` omdat de stapelvolgorde inline staat (een later blok ligt
-   hoger); bij hover en focus moet het blok er toch bovenop. */
 .vtk-design .kal-tl-block:hover,
 .vtk-design .kal-tl-block:focus-visible {
-  z-index: 20 !important;
+  z-index: 20;
   border-color: color-mix(in srgb, var(--navy) 34%, transparent);
   background: var(--surface);
 }
@@ -2478,11 +2479,14 @@
   white-space: nowrap;
 }
 
+/* Afbreken met een koppelteken: in een smalle baan brak "Looptraining" anders
+   zonder streepje midden in het woord. */
 .vtk-design .kal-tl-block b {
   font-size: 13px;
   font-weight: 600;
   line-height: 1.25;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
 .vtk-design .kal-tl-block small {
@@ -2493,6 +2497,16 @@
 
 .vtk-design .kal-tl-aud {
   font-size: 9.5px;
+}
+
+@container (max-width: 84px) {
+  .vtk-design .kal-tl-time {
+    display: none;
+  }
+
+  .vtk-design .kal-tl-block b {
+    font-size: 12px;
+  }
 }
 
 .vtk-design .kal-tl-now {

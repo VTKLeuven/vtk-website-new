@@ -50,7 +50,7 @@ describe('the week as a timeline', () => {
     expect(timeline.days.map((blocks) => blocks.length)).toEqual([1, 1, 1, 1, 0, 0, 0]);
   });
 
-  it('steps an overlapping event aside instead of drawing it over the other', () => {
+  it('puts overlapping events side by side instead of drawing one over the other', () => {
     const timeline = weekTimeline(
       [
         event('bowling', '2026-10-14T19:00:00', '2026-10-14T22:00:00'),
@@ -61,8 +61,8 @@ describe('the week as a timeline', () => {
       days,
       now
     );
-    const lanes = Object.fromEntries(timeline.days[2]!.map((block) => [block.event.id, block.lane]));
-    expect(lanes).toEqual({ lunch: 0, bowling: 0, launch: 1, run: 2 });
+    const lanes = Object.fromEntries(timeline.days[2]!.map((block) => [block.event.id, [block.lane, block.lanes]]));
+    expect(lanes).toEqual({ lunch: [0, 1], bowling: [0, 3], launch: [1, 3], run: [2, 3] });
   });
 
   it('keeps a party that starts after midnight on the evening everyone left', () => {
