@@ -376,7 +376,6 @@ export type HoursBand = {
   dayLabel: string;
   /** Het weekend: de cursusdienst toont dan de uren van volgende week. */
   nextWeek: boolean;
-  hasOpenEnd: boolean;
   /** Kolommen van het weekrooster: zondag eerst, zie docs/design-decisions.md. */
   columns: number;
   services: HoursBandService[];
@@ -442,7 +441,6 @@ export function buildHoursBand(inputs: ReadonlyArray<HoursServiceInput>, now: Da
     now: moment.visible ? { left: pct(moment.position), label: formatMinutes(clock.minutes) } : null,
     dayLabel,
     nextWeek: clock.weekday >= 5,
-    hasOpenEnd: weeks.some((week) => week.some((day) => day.some((window) => window.end === null))),
     columns: days.length,
     services,
   };

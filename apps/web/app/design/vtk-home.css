@@ -2722,10 +2722,27 @@
   min-width: 0;
 }
 
+/* Naam en uitleg naast het logo in plaats van eronder: dat scheelt per dienst
+   een regel, en de status leest dan als eerste regel onder de kop. */
+.vtk-design .hours-id-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
 .vtk-design .hours-logo {
   display: block;
+  flex: none;
   width: auto;
   height: var(--logo-h);
+}
+
+.vtk-design .hours-id-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .vtk-design .hours-id-text {
@@ -2758,7 +2775,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 6px 0 0;
+  margin: 0;
   color: var(--paper);
   font-size: 13.5px;
   font-weight: 600;
@@ -2982,44 +2999,6 @@
   color: var(--yellow);
 }
 
-.vtk-design .hours-legend {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 22px;
-  margin: 16px 0 0;
-  padding: 0;
-  color: var(--on-dark-muted);
-  font-size: 12px;
-  list-style: none;
-}
-
-.vtk-design .hours-legend li {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.vtk-design .hours-legend-swatch {
-  width: 22px;
-  height: 10px;
-  border-radius: 3px;
-  background: var(--paper);
-}
-
-.vtk-design .hours-legend-swatch[data-kind="tail"] {
-  box-sizing: border-box;
-  border: 1px dashed rgba(255, 255, 255, 0.35);
-  background: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.35) 0 1px, transparent 1px 5px);
-}
-
-.vtk-design .hours-legend-swatch[data-kind="now"] {
-  width: 2px;
-  height: 12px;
-  border-radius: 0;
-  background: var(--yellow);
-}
-
 /* Smaller dan een laptop: de dienst boven haar tijdlijn in plaats van ernaast,
    met per dienst een eigen tijdas. Een gedeelde kolom van 250px liet de
    tijdlijn hier te smal om een uur op te lezen. */
@@ -3031,20 +3010,6 @@
   .vtk-design .hours-service {
     display: block;
     padding: 18px 0;
-  }
-
-  .vtk-design .hours-id {
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 14px;
-  }
-
-  .vtk-design .hours-logo {
-    width: 64px;
-    height: auto;
-    max-height: var(--logo-h);
-    object-fit: contain;
-    object-position: left top;
   }
 
   .vtk-design .hours-mobile-label {

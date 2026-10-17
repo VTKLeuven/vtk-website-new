@@ -108,7 +108,7 @@ export function OpeningHoursBand({
       <div className="sec-head">
         <h2 id="hours-title">{nl ? "Openingsuren." : "Opening hours."}</h2>
         <div className="meta">
-          {meta} · {nl ? "rooster van " : "schedule for "}
+          {meta} ·{" "}
           <span className="hours-week-label" data-next={band.nextWeek || undefined}>
             {weekLabel.toLowerCase()}
           </span>
@@ -136,21 +136,25 @@ export function OpeningHoursBand({
           return (
             <article key={service.key} className="hours-service" aria-labelledby={`hours-${service.key}`}>
               <div className="hours-id">
-                {logo ? (
-                  <Image
-                    className="hours-logo"
-                    src={logo.src}
-                    width={logo.width}
-                    height={logo.height}
-                    alt=""
-                    style={{ "--logo-h": `${logo.height}px` } as CSSProperties}
-                  />
-                ) : null}
+                <div className="hours-id-head">
+                  {logo ? (
+                    <Image
+                      className="hours-logo"
+                      src={logo.src}
+                      width={logo.width}
+                      height={logo.height}
+                      alt=""
+                      style={{ "--logo-h": `${logo.height}px` } as CSSProperties}
+                    />
+                  ) : null}
+                  <div className="hours-id-name">
+                    <h3 id={`hours-${service.key}`} className="hours-name">
+                      {service.name}
+                    </h3>
+                    {service.subtitle ? <p className="hours-sub">{service.subtitle}</p> : null}
+                  </div>
+                </div>
                 <div className="hours-id-text">
-                  <h3 id={`hours-${service.key}`} className="hours-name">
-                    {service.name}
-                  </h3>
-                  {service.subtitle ? <p className="hours-sub">{service.subtitle}</p> : null}
                   <p className="hours-status" data-state={service.status.state}>
                     {service.status.label}
                   </p>
@@ -214,25 +218,6 @@ export function OpeningHoursBand({
           );
         })}
       </div>
-
-      <ul className="hours-legend" aria-hidden>
-        <li>
-          <span className="hours-legend-swatch" data-kind="active" />
-          {nl ? "Nu open" : "Open now"}
-        </li>
-        {band.hasOpenEnd ? (
-          <li>
-            <span className="hours-legend-swatch" data-kind="tail" />
-            {nl ? "Sluitingsuur varieert per avond" : "Closing time varies per night"}
-          </li>
-        ) : null}
-        {band.now ? (
-          <li>
-            <span className="hours-legend-swatch" data-kind="now" />
-            {nl ? "Nu" : "Now"}
-          </li>
-        ) : null}
-      </ul>
     </section>
   );
 }
