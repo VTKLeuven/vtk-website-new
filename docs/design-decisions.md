@@ -3391,6 +3391,45 @@ links, tot tegen de kaartrand (`.poc-elect-photo`).
   openingsuren zijn momenteel niet beschikbaar". Zo breekt de homepage nooit,
   ook niet bij een koude cache terwijl cudi plat ligt.
 
+### Openingsuren: vandaag als tijdlijn, de week als rooster
+
+De band toonde drie kaarten (Theokot, cursusdienst, 't ElixIr), elk met een lijst
+van vijf dagen en de zin "… is momenteel gesloten :(". Je zag er niet aan wanneer
+iets opengaat, en een tweede venster op een dag (de cursusdienst van 12:30 tot
+14:00 en van 18:00 tot 19:00) paste er niet in.
+
+Nu staat per dienst vandaag als tijdlijn op een gedeelde tijdas met een gele
+nu-lijn, en daaronder de week als rij met de uren in tekst
+(`components/editorial/OpeningHoursBand.tsx`, uitgerekend in
+`lib/openingHoursWeek.ts`).
+
+- **Waarom deze vorm.** Bekeken zijn eerst drie richtingen: één weektabel, enkel
+  vandaag als tijdlijn met dagknoppen, en kaarten met de status voorop. Daarna
+  twee combinaties: elke dag als tijdlijn, en deze. De tabel duidde vandaag te
+  zwak aan en kon geen twee vensters op een dag aan. De tijdlijn alleen verstopte
+  de andere dagen achter een klik. Elke dag als tijdlijn maakte van de korte
+  vensters van de cursusdienst smalle streepjes waarvan je het uur moest
+  afschatten. Vandaag wil je zien, de rest van de week wil je exact lezen.
+- **De status zegt wanneer het verandert**: "Open tot 18:00", "Opent maandag om
+  10:30", "Vanavond weer open van 18:00 tot 19:00". Niet enkel open of dicht.
+- **Zondag staat vooraan in de week.** 't ElixIr begint haar week op zondagavond,
+  en op zaterdag leest de rij zo in volgorde: morgen, en dan volgende week.
+  Zaterdag krijgt enkel een kolom wanneer er dan iets open is.
+- **Een avond zonder sluitingsuur loopt gearceerd uit.** 't ElixIr opent om 22:00
+  en sluit wanneer ze sluit. De balk heeft een vast stuk van twee uur en is daarna
+  gearceerd tot het einde van de as (3:00), in de tekentaal van het technische
+  patroon. Er komt geen verzonnen sluitingsuur.
+- **Na middernacht hoort de nacht nog bij gisteravond.** Tot 3:00 toont de
+  tijdlijn de vorige dag, met de nu-lijn in het gearceerde stuk.
+- **Geen uren raden.** De cursusdienst geeft één week (in het weekend de
+  volgende). Op vrijdagavond staat ze dus op "Gesloten", niet op "Opent maandag"
+  met de uren van een week die cudi nog niet gaf.
+- **De klok is die van Brussel.** De oude kaarten rekenden met `getHours()` van de
+  server, en die draait op UTC.
+- **De logo's** staan als lichte versies voor navy in `public/openingsuren/`. Het
+  Theokot houdt zijn rood. Van de cursusdienst staat enkel het hoofd van de kat
+  erin, want de volledige tekening wordt op deze grootte een vlek.
+
 ### Snelle knoppen staan op mobiel vóór de eventkaart
 
 Op een breed scherm staan de hero-tekst en de eventkaart naast elkaar, en ligt de

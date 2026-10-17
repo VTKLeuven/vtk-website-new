@@ -17,6 +17,7 @@ import {
   OPENING_HOURS_SERVICE_CONFIG,
   readOpeningHoursSetting,
 } from "@/lib/openingHoursSettings";
+import { parseHoursWindows } from "@/lib/openingHoursWeek";
 
 const TIME_ZONE = "Europe/Brussels";
 
@@ -104,11 +105,14 @@ export function elixirScheduleFromSetting(value: unknown): OpeningWindowSchedule
   const entries = entriesForService(setting, "elixir", "nl");
   const schedule = [...CLOSED_ELIXIR_SCHEDULE];
   entries.forEach((entry, index) => {
-    const match = entry.hours.match(/(?:^|\s)([01]\d|2[0-3]):([0-5]\d)(?:\s|$)/);
-    if (!match) return;
+    // Dezelfde lezing als de band op de homepage, zodat de balk en de status
+    // hetzelfde uur zien. "22h-..." stond zo in productie en las hier als
+    // gesloten, terwijl de kaart "vanaf 22h-..." toonde.
+    const opening = parseHoursWindows(entry.hours)[0];
+    if (!opening) return;
     const day = OPENING_HOURS_SERVICE_CONFIG.elixir.days[index];
     if (!day) return;
-    schedule[day.mondayIndex] = Number(match[1]) * 60 + Number(match[2]);
+    schedule[day.mondayIndex] = opening.start;
   });
   return schedule;
 }

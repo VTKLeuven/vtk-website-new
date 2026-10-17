@@ -368,6 +368,15 @@ the design language into the application instead of copying mockup content.
   /nieuws is an agenda per week with the /tickets filter chips and a rail; a
   word from the praeses opens with the author's square portrait. See
   `docs/design-decisions.md`.
+- Opening hours (`components/editorial/OpeningHoursBand.tsx`,
+  `lib/openingHoursWeek.ts`): per service, today as a timeline with a yellow
+  now-line, and the week as a row of exact times underneath (Sunday first). Do
+  not go back to one card per service with a list of days: it hid what is open
+  now and could not show a second window on a day. Read hours with
+  `parseHoursWindows`, never with `parseHoursRange` (first window only), and
+  compute "now" on the Brussels clock, not with `getHours()`. An evening without
+  a closing time is hatched, never given an invented end. See
+  `docs/design-decisions.md`.
 - Photography: content cards open with a real photo under a navy scrim, never a
   decorative illustration. Aanbod cards ("Wat we doen") carry a photo header
   (16:9, light 115deg scrim) and are uniform: every card in the grid gets the

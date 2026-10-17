@@ -18,6 +18,10 @@
   --body: #34405e;
   /* Muted text on a navy/ink ground (intentional dark bands only). */
   --on-dark-muted: #b7c0dc;
+  /* Open en gesloten als pin op een navy band (de openingsuren). Lichter dan
+     op wit, zodat ze op navy blijven lezen. */
+  --status-open-on-dark: #52d98b;
+  --status-closed-on-dark: #e58a70;
   /* Grafieken (/admin/mailinglijsten, /admin/shiftenoverzicht). Drie categorische kleuren in vaste
      volgorde, samen gevalideerd tegen --surface op kleurenblindheid (elk paar
      dE >= 11,9) en op onderscheid bij gewoon zicht; hertune ze enkel met die

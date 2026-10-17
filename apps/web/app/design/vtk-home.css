@@ -2632,96 +2632,32 @@
   }
 }
 
-/* Auto-fit: drie kaarten naast elkaar, maar de rij blijft kloppen wanneer er
-   eentje wegvalt (het Theokot rendert enkel met een instelling). */
-.vtk-design .hours-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 18px;
-  padding: 0;
-}
+/* Openingsuren: per dienst vandaag als tijdlijn, de week als rooster eronder
+   (components/editorial/OpeningHoursBand.tsx). Drie losse kaarten met elk een
+   lijst van vijf dagen lieten niet zien wat er nu open is, en een tweede venster
+   op een dag paste er niet in. Zie docs/design-decisions.md.
 
-.vtk-design .hours-col {
+   De tijdlijn rekent in procenten van een gedeelde as (`--l`, `--w`, `--x`,
+   uitgerekend in lib/openingHoursWeek.ts); `--hours-span` is het aantal uren
+   op die as, voor de rasterlijnen. */
+.vtk-design .hours-panel {
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.06);
-  padding: 28px;
+  padding: 0 24px;
+  font-variant-numeric: tabular-nums;
 }
 
-.vtk-design .hours-col.section-hours-bg {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--paper);
+.vtk-design .hours-axis,
+.vtk-design .hours-service {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  column-gap: 24px;
 }
 
-.vtk-design .hours-col h3 {
-  margin: 0 0 8px;
-  font-size: 28px;
-  letter-spacing: -0.02em;
-  font-weight: 600;
-}
-
-.vtk-design .hours-col .sub,
-.vtk-design .hours-col .status {
-  color: var(--on-dark-muted);
-  font-size: 13px;
-}
-
-.vtk-design .hours-col.section-hours-bg .sub {
-  color: var(--on-dark-muted);
-}
-
-.vtk-design .hours-col .status {
-  margin: 18px 0;
-  font-weight: 600;
-}
-
-/* Statusgroen/-rood iets lichter dan op wit, zodat ze op navy blijven lezen. */
-.vtk-design .hours-col .status::before {
-  content: "";
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  margin-right: 8px;
-  border-radius: 50%;
-  background: #52d98b;
-}
-
-.vtk-design .hours-col .status.closed::before {
-  background: #e58a70;
-}
-
-/* Derde toestand: open of niet is niet te zeggen (zie 't Elixir na middernacht). */
-.vtk-design .hours-col .status.maybe::before {
-  background: var(--yellow);
-}
-
-.vtk-design .hours-col .hours-note {
-  margin: 34px 0 0;
-  color: var(--on-dark-muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.vtk-design .hours-col .hours-note + .hours-note {
-  margin-top: 10px;
-}
-
-.vtk-design .hours-col .hours-note a,
-.vtk-design .hours-col .hours-link {
-  color: var(--paper);
-  font-weight: 500;
-  text-decoration: underline;
-  text-decoration-color: var(--yellow);
-  text-underline-offset: 3px;
-}
-
-.vtk-design .hours-col .hours-note a:hover,
-.vtk-design .hours-col .hours-link:hover {
-  color: var(--yellow);
-}
-
-.vtk-design .hours-col .hours-period {
-  margin: -3px 0 8px;
+.vtk-design .hours-axis-label {
+  align-self: end;
+  padding-bottom: 12px;
   color: var(--yellow);
   font-size: 11px;
   font-weight: 700;
@@ -2729,27 +2665,477 @@
   text-transform: uppercase;
 }
 
-.vtk-design .hours-list {
+/* De as als maatlijn uit een technische tekening: een lijn met streepjes. */
+.vtk-design .hours-axis-track {
+  position: relative;
+  height: 56px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.32);
+}
+
+.vtk-design .hours-tick {
+  position: absolute;
+  bottom: 0;
+  left: var(--l);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--on-dark-muted);
+  font-size: 11px;
+}
+
+.vtk-design .hours-tick::after {
+  content: "";
+  width: 1px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.vtk-design .hours-now-tag {
+  position: absolute;
+  top: 8px;
+  left: var(--l);
+  transform: translateX(-50%);
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.vtk-design .hours-service {
+  padding: 18px 0 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.vtk-design .hours-axis + .hours-service {
+  border-top: 0;
+}
+
+.vtk-design .hours-id {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.vtk-design .hours-logo {
+  display: block;
+  width: auto;
+  height: var(--logo-h);
+}
+
+.vtk-design .hours-id-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.vtk-design .hours-name {
+  margin: 0;
+  color: var(--paper);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.vtk-design .hours-sub,
+.vtk-design .hours-extra,
+.vtk-design .hours-note,
+.vtk-design .hours-cta-hint {
+  margin: 0;
+  color: var(--on-dark-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.vtk-design .hours-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 0;
+  color: var(--paper);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.vtk-design .hours-status::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--status-open-on-dark);
+}
+
+.vtk-design .hours-status[data-state="closed"]::before {
+  background: var(--status-closed-on-dark);
+}
+
+/* Open of niet is niet te zeggen (zie 't ElixIr na middernacht). */
+.vtk-design .hours-status[data-state="maybe"]::before {
+  background: var(--yellow);
+}
+
+.vtk-design .hours-status[data-state="unavailable"]::before {
+  background: var(--on-dark-muted);
+}
+
+/* Onder de pin, niet onder de rand: de uitleg hoort bij de status. */
+.vtk-design .hours-extra {
+  padding-left: 15px;
+}
+
+.vtk-design .hours-cta {
+  margin-top: 4px;
+  color: var(--paper);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--yellow);
+  text-underline-offset: 3px;
+}
+
+.vtk-design .hours-cta:hover {
+  color: var(--yellow);
+}
+
+.vtk-design .hours-days {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.vtk-design .hours-track {
+  position: relative;
+  height: 40px;
+  border-radius: 8px;
+  background-color: color-mix(in srgb, var(--yellow) 6%, transparent);
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: calc(100% / var(--hours-span)) 100%;
+}
+
+.vtk-design .hours-track-empty {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%);
+  color: var(--on-dark-muted);
+  font-size: 12.5px;
+}
+
+/* Elke balk is een container: is hij te smal voor zijn uren, dan verhuist het
+   label naar naast de balk. Hoe smal dat is, hangt af van de schermbreedte en
+   is dus pas in de browser gekend. */
+.vtk-design .hours-bar {
+  container: hours-bar / inline-size;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--l);
+  width: var(--w);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding: 0 9px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--paper);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Het venster waarin "nu" valt. */
+.vtk-design .hours-bar[data-active] {
+  border-color: var(--paper);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.vtk-design .hours-bar[data-kind="open-end"] {
+  border-radius: 8px 0 0 8px;
+}
+
+/* Een avond zonder sluitingsuur loopt gearceerd uit, in de tekentaal van het
+   technische patroon: open, maar niet gekend tot wanneer. */
+.vtk-design .hours-bar[data-kind="tail"] {
+  --hatch: rgba(255, 255, 255, 0.3);
+  border: 1px dashed var(--hatch);
+  border-left: 0;
+  border-radius: 0 8px 8px 0;
+  background: repeating-linear-gradient(-45deg, var(--hatch) 0 1px, transparent 1px 7px);
+}
+
+.vtk-design .hours-bar[data-tail="open"] {
+  --hatch: color-mix(in srgb, var(--paper) 60%, transparent);
+}
+
+.vtk-design .hours-bar[data-tail="maybe"] {
+  --hatch: color-mix(in srgb, var(--yellow) 80%, transparent);
+}
+
+.vtk-design .hours-bar-text {
+  overflow: hidden;
+}
+
+.vtk-design .hours-bar-tag {
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 10px);
+  transform: translateY(-50%);
+  color: var(--paper);
+}
+
+.vtk-design .hours-bar[data-side="before"] .hours-bar-tag {
+  right: calc(100% + 8px);
+  left: auto;
+}
+
+@container hours-bar (max-width: 88px) {
+  .vtk-design .hours-bar-text {
+    display: none;
+  }
+
+  .vtk-design .hours-bar-tag {
+    display: block;
+  }
+}
+
+.vtk-design .hours-now {
+  position: absolute;
+  z-index: 1;
+  top: -4px;
+  bottom: -4px;
+  left: var(--l);
+  width: 2px;
+  margin-left: -1px;
+  background: var(--yellow);
+}
+
+/* De week in tekst: de exacte uren, en een tweede venster op een eigen regel.
+   Zondag staat vooraan, zoals 't ElixIr haar week begint. */
+.vtk-design .hours-week {
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 7px 16px;
+  grid-template-columns: repeat(var(--hours-cols), minmax(0, 1fr));
+  margin: 14px 0 0;
+  padding: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  list-style: none;
+}
+
+.vtk-design .hours-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 10px 10px;
+  color: var(--on-dark-muted);
   font-size: 13px;
 }
 
-.vtk-design .hours-list dt {
-  color: var(--on-dark-muted);
+.vtk-design .hours-cell[data-today] {
+  background: color-mix(in srgb, var(--yellow) 8%, transparent);
+  box-shadow: inset 0 2px 0 var(--yellow);
+  color: var(--paper);
+  font-weight: 600;
+}
+
+.vtk-design .hours-cell-day {
+  margin-bottom: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-.vtk-design .hours-list dd {
-  text-align: right;
+.vtk-design .hours-cell[data-today] .hours-cell-day {
+  color: var(--yellow);
+  font-weight: 700;
 }
 
-.vtk-design .hours-list dt.today,
-.vtk-design .hours-list dd.today,
-.vtk-design .hours-list .today {
+.vtk-design .hours-cell-time {
+  white-space: nowrap;
+}
+
+.vtk-design .hours-cell-closed {
+  display: block;
+  width: 12px;
+  height: 1px;
+  margin-top: 9px;
+  background: color-mix(in srgb, var(--on-dark-muted) 45%, transparent);
+}
+
+.vtk-design .hours-mobile-label,
+.vtk-design .hours-ticks {
+  display: none;
+}
+
+.vtk-design .hours-strip .hours-week-label[data-next] {
   color: var(--yellow);
-  font-weight: 600;
+}
+
+.vtk-design .hours-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 22px;
+  margin: 16px 0 0;
+  padding: 0;
+  color: var(--on-dark-muted);
+  font-size: 12px;
+  list-style: none;
+}
+
+.vtk-design .hours-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vtk-design .hours-legend-swatch {
+  width: 22px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--paper);
+}
+
+.vtk-design .hours-legend-swatch[data-kind="tail"] {
+  box-sizing: border-box;
+  border: 1px dashed rgba(255, 255, 255, 0.35);
+  background: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.35) 0 1px, transparent 1px 5px);
+}
+
+.vtk-design .hours-legend-swatch[data-kind="now"] {
+  width: 2px;
+  height: 12px;
+  border-radius: 0;
+  background: var(--yellow);
+}
+
+/* Smaller dan een laptop: de dienst boven haar tijdlijn in plaats van ernaast,
+   met per dienst een eigen tijdas. Een gedeelde kolom van 250px liet de
+   tijdlijn hier te smal om een uur op te lezen. */
+@media (max-width: 980px) {
+  .vtk-design .hours-axis {
+    display: none;
+  }
+
+  .vtk-design .hours-service {
+    display: block;
+    padding: 18px 0;
+  }
+
+  .vtk-design .hours-id {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .vtk-design .hours-logo {
+    width: 64px;
+    height: auto;
+    max-height: var(--logo-h);
+    object-fit: contain;
+    object-position: left top;
+  }
+
+  .vtk-design .hours-mobile-label {
+    display: block;
+    margin: 16px 0 6px;
+    color: var(--yellow);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .vtk-design .hours-mobile-label[data-week] {
+    color: var(--on-dark-muted);
+  }
+
+  .vtk-design .hours-mobile-label[data-week][data-next] {
+    color: var(--yellow);
+  }
+
+  .vtk-design .hours-ticks {
+    display: block;
+    position: relative;
+    height: 13px;
+    margin-top: 6px;
+  }
+
+  .vtk-design .hours-ticks .hours-tick {
+    top: 0;
+    bottom: auto;
+    font-size: 10px;
+  }
+
+  .vtk-design .hours-ticks .hours-tick::after {
+    display: none;
+  }
+
+  .vtk-design .hours-week {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .vtk-design .hours-panel {
+    padding: 0 16px;
+  }
+
+  .vtk-design .hours-track {
+    height: 32px;
+    border-radius: 6px;
+  }
+
+  .vtk-design .hours-bar {
+    padding: 0 6px;
+    border-radius: 6px;
+    font-size: 11px;
+  }
+
+  .vtk-design .hours-bar[data-kind="open-end"] {
+    border-radius: 6px 0 0 6px;
+  }
+
+  .vtk-design .hours-bar[data-kind="tail"] {
+    border-radius: 0 6px 6px 0;
+  }
+
+  .vtk-design .hours-ticks .hours-tick[data-minor] {
+    display: none;
+  }
+
+  /* Twee vensters kort na elkaar (de cursusdienst 's middags en 's avonds):
+     het label van het eerste liep hier tegen de tweede balk. De uren staan net
+     eronder in het rooster. */
+  .vtk-design .hours-bar[data-crowded] .hours-bar-tag {
+    display: none;
+  }
+
+  /* Zes kolommen van 50px laten "12:30–14:00" niet toe; drie wel. */
+  .vtk-design .hours-week {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .vtk-design .hours-cell {
+    padding: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 12.5px;
+  }
+
+  .vtk-design .hours-cell-day {
+    font-size: 10.5px;
+  }
 }
 
 .vtk-design .partners {
@@ -2806,8 +3192,7 @@
 
 @media (max-width: 980px) {
   .vtk-design .home-hero,
-  .vtk-design .career,
-  .vtk-design .hours-grid {
+  .vtk-design .career {
     grid-template-columns: 1fr;
   }
 

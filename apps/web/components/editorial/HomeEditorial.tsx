@@ -57,19 +57,14 @@ import type { FrontpageShift } from "@/components/editorial/frontpage/context";
 import { getCachedUrenloopData } from "@/lib/urenloop/server";
 import { currentWorkingYear } from "@/lib/workingYear";
 import { AftermovieGrid, type AftermovieGridItem } from "./AftermovieGrid";
-import {
-  dutchDayNameForDate,
-  entryForDate,
-  isClosedHours,
-  isOpenAt,
-  shortDayLabel,
-} from "./hoursUtils";
+import { entryForDate, isClosedHours } from "./hoursUtils";
 import {
   entriesForService,
-  isBrusselsWeekend,
   openingHoursNote,
   readOpeningHoursSetting,
 } from "@/lib/openingHoursSettings";
+import { buildHoursBand, weekFromEntries, weekFromOpeningTimes } from "@/lib/openingHoursWeek";
+import { OpeningHoursBand } from "./OpeningHoursBand";
 
 import "@/app/design/vtk-home.css";
 import "@/app/design/vtk-eventcard.css";
@@ -93,11 +88,6 @@ type CareerSetting = {
 };
 
 const ELIXIR_NAME = "'t ElixIr";
-
-/** Gesloten-melding op een openingsurenkaart, met de naam van de dienst erin. */
-function closedLabel(name: string, nl: boolean): string {
-  return nl ? `${name} is momenteel gesloten :(` : `${name} is currently closed :(`;
-}
 
 function formatTime(d: Date, locale: Locale): string {
   return d.toLocaleTimeString(locale === "nl" ? "nl-BE" : "en-GB", {
@@ -370,9 +360,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     "cursusdienst",
   );
   const elixir = readOpeningHoursSetting(map.get("home.openingHours.elixir"), "elixir");
-  const theokotEntries = entriesForService(theokot, "theokot", locale);
-  const elixirHoursEntries = entriesForService(elixir, "elixir", locale);
-  const cursusUnavailable = cursusEntries === null;
   const career = map.get("home.career") as CareerSetting | undefined;
   const user = session?.user
     ? {
@@ -397,18 +384,10 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   // neither can contain a quote, because storageKeyPath percent-encodes.
   const heroPhoto = frontpagePhoto(frontpage.module, publicUrl(frontpage.values.photo));
 
-  const theoToday = entryForDate(theokotEntries, now, locale);
-  const theoOpen = theoToday && isOpenAt(theoToday.hours, now);
   const curToday = cursusEntries ? entryForDate(cursusEntries, now, locale) : undefined;
-  const curOpen = curToday && !isClosedHours(curToday.hours) && isOpenAt(curToday.hours, now);
-  // De titel is "Openingsuren Theokot"; de kaartkop en de gesloten-melding
-  // gebruiken enkel de naam zelf.
-  const theokotName = pick(theokot.titleNl, theokot.titleEn, locale)
-    .replace(/^Openingsuren\s+/i, "")
-    .replace(/\s+opening hours$/i, "");
-  const cursusName = pick(cursusdienst.titleNl, cursusdienst.titleEn, locale)
-    .replace(/^Openingsuren\s+/i, "")
-    .replace(/\s+opening hours$/i, "");
+  // De titel is "Openingsuren Theokot"; de band toont enkel de naam zelf.
+  const serviceName = (title: string) =>
+    title.replace(/^Openingsuren\s+/i, "").replace(/\s+opening hours$/i, "");
 
   // De geluidsmeting is de bron zodra ze vers is; het uurrooster is de fallback
   // wanneer de meting ontbreekt of te oud is (worker plat, integratie niet
@@ -418,21 +397,46 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   const elixirSchedule = elixirScheduleFromSetting(map.get("home.openingHours.elixir"));
   const elixirPhase = openingWindowPhase(now, elixirSchedule);
   const elixirLive = barStatus && !barStatus.stale && elixirPhase !== "closed" ? barStatus : null;
-  const elixirOpen = elixirLive ? elixirLive.isOpen : elixirPhase === "evening";
-  // Zonder meting weten we na middernacht niet of ze al toe is: dan "mogelijk
-  // nog open" in plaats van een harde bewering.
-  const elixirMaybeOpen = !elixirLive && elixirPhase === "after-midnight";
-  const elixirEntries = elixirHoursEntries.map((entry) => ({
-    ...entry,
-    hours: isClosedHours(entry.hours)
-      ? entry.hours
-      : `${nl ? "vanaf" : "from"} ${entry.hours.match(/([01]\d|2[0-3]):[0-5]\d/)?.[0] ?? entry.hours}`,
-  }));
-  const showingNextWeek = isBrusselsWeekend(now);
-  const nextWeekLabel = nl ? "Volgende week" : "Next week";
-  const theokotNote = openingHoursNote(theokot, locale);
-  const cursusNote = openingHoursNote(cursusdienst, locale);
-  const elixirNote = openingHoursNote(elixir, locale);
+  const hoursBand = buildHoursBand(
+    [
+      {
+        key: "theokot",
+        name: serviceName(pick(theokot.titleNl, theokot.titleEn, locale)),
+        subtitle: pick(theokot.subtitleNl, theokot.subtitleEn, locale),
+        note: openingHoursNote(theokot, locale),
+        week: weekFromEntries(entriesForService(theokot, "theokot", locale)),
+        recurring: true,
+      },
+      {
+        key: "cursusdienst",
+        name: serviceName(pick(cursusdienst.titleNl, cursusdienst.titleEn, locale)),
+        subtitle: pick(cursusdienst.subtitleNl, cursusdienst.subtitleEn, locale),
+        note: openingHoursNote(cursusdienst, locale),
+        // Komt live van cudi.vtk.be: één week, en `null` wanneer cudi plat lag
+        // en er ook niets gecachet was.
+        week: cursusEntries ? weekFromEntries(cursusEntries) : null,
+        recurring: false,
+      },
+      {
+        key: "elixir",
+        name: serviceName(pick(elixir.titleNl, elixir.titleEn, locale)) || ELIXIR_NAME,
+        subtitle: pick(elixir.subtitleNl, elixir.subtitleEn, locale),
+        note: openingHoursNote(elixir, locale),
+        // Uit hetzelfde venster als de live-status, zodat balk en status
+        // hetzelfde uur zien.
+        week: weekFromOpeningTimes(elixirSchedule),
+        recurring: true,
+        elixir: {
+          phase: elixirPhase,
+          live: elixirLive
+            ? { isOpen: elixirLive.isOpen, measuredAt: new Date(elixirLive.lastUpdated) }
+            : null,
+        },
+      },
+    ],
+    now,
+    locale,
+  );
 
   const aanbodTabs = tabs.filter((t) => t.slug !== "").slice(0, 6);
   const quickLinks = [
@@ -573,136 +577,19 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         <NewsBand entries={newsEntries} locale={locale} base={base} now={now} />
       ) : null}
 
-      {(theokot || cursusEntries || cursusUnavailable) && (
-        <section className="hours-strip">
-          <div className="sec-head">
-            <h2>{nl ? "Openingsuren." : "Opening hours."}</h2>
-            <div className="meta">
-              {now.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", {
-                weekday: "short",
-                day: "2-digit",
-                month: "short",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </div>
-          </div>
-          <div className="hours-grid">
-            <div className="hours-col">
-              <h3>{theokotName}</h3>
-              <div className="sub">
-                {pick(theokot.subtitleNl, theokot.subtitleEn, locale)}
-              </div>
-              <div className={`status${theoOpen ? "" : " closed"}`}>
-                {theoOpen ? (nl ? "Nu open" : "Open now") : closedLabel(theokotName, nl)}
-              </div>
-              {showingNextWeek ? <div className="hours-period">{nextWeekLabel}</div> : null}
-              <dl className="hours-list">
-                {theokotEntries.map((row, i) => {
-                  const todayCls = row.dayNl === dutchDayNameForDate(now) ? "today" : "";
-                  return (
-                    <div key={i} style={{ display: "contents" }}>
-                      <dt className={todayCls}>{shortDayLabel(row, locale)}</dt>
-                      <dd className={todayCls}>{row.hours}</dd>
-                    </div>
-                  );
-                })}
-              </dl>
-              {theokotNote ? <p className="hours-note">{theokotNote}</p> : null}
-            </div>
-            <div className="hours-col section-hours-bg">
-              <h3>{cursusName}</h3>
-              {cursusEntries ? (
-                <>
-                  <div className="sub">{pick(cursusdienst.subtitleNl, cursusdienst.subtitleEn, locale)}</div>
-                  <div className={`status${curOpen ? "" : " closed"}`}>
-                    {curOpen ? (nl ? "Nu open" : "Open now") : closedLabel(cursusName, nl)}
-                  </div>
-                  {showingNextWeek ? <div className="hours-period">{nextWeekLabel}</div> : null}
-                  <dl className="hours-list">
-                    {cursusEntries.map((row, i) => {
-                      const todayCls = row.dayNl === dutchDayNameForDate(now) ? "today" : "";
-                      return (
-                        <div key={i} style={{ display: "contents" }}>
-                          <dt className={todayCls}>{shortDayLabel(row, locale)}</dt>
-                          <dd className={todayCls}>{row.hours}</dd>
-                        </div>
-                      );
-                    })}
-                  </dl>
-                  {cursusNote ? <p className="hours-note">{cursusNote}</p> : null}
-                </>
-              ) : (
-                <div className="sub">
-                  {nl
-                    ? "De cursusdienst openingsuren zijn momenteel niet beschikbaar."
-                    : "The course shop opening hours are currently unavailable."}
-                </div>
-              )}
-              <p className="hours-note">
-                {nl ? (
-                  <>
-                    Vergeet{" "}
-                    <a
-                      href="https://cudi.vtk.be/vtk/account/slots"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hours-link"
-                      {...umamiEvent(OUTBOUND_EVENT, { bestemming: "cudi.vtk.be", vanaf: "openingsuren" })}
-                    >
-                      hier
-                    </a>{" "}
-                    geen tijdslot te boeken! Zonder een tijdslot kan je je boeken niet ophalen!
-                  </>
-                ) : (
-                  <>
-                    Don&apos;t forget to book a time slot{" "}
-                    <a
-                      href="https://cudi.vtk.be/vtk/account/slots"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hours-link"
-                      {...umamiEvent(OUTBOUND_EVENT, { bestemming: "cudi.vtk.be", vanaf: "openingsuren" })}
-                    >
-                      here
-                    </a>
-                    ! Without a time slot you cannot pick up your books!
-                  </>
-                )}
-              </p>
-            </div>
-            <div className="hours-col">
-              <h3>{pick(elixir.titleNl, elixir.titleEn, locale) || ELIXIR_NAME}</h3>
-              <div className="sub">{pick(elixir.subtitleNl, elixir.subtitleEn, locale)}</div>
-              <div
-                className={`status${elixirOpen ? "" : elixirMaybeOpen ? " maybe" : " closed"}`}
-              >
-                {elixirOpen
-                  ? nl
-                    ? "Nu open"
-                    : "Open now"
-                  : elixirMaybeOpen
-                    ? nl
-                      ? "Mogelijk nog open"
-                      : "Possibly still open"
-                    : closedLabel(ELIXIR_NAME, nl)}
-              </div>
-              <dl className="hours-list">
-                {elixirEntries.map((row, i) => {
-                  const todayCls = row.dayNl === dutchDayNameForDate(now) ? "today" : "";
-                  return (
-                    <div key={i} style={{ display: "contents" }}>
-                      <dt className={todayCls}>{shortDayLabel(row, locale)}</dt>
-                      <dd className={todayCls}>{row.hours}</dd>
-                    </div>
-                  );
-                })}
-              </dl>
-              {elixirNote ? <p className="hours-note">{elixirNote}</p> : null}
-            </div>
-          </div>
-        </section>
-      )}
+      <OpeningHoursBand
+        band={hoursBand}
+        meta={now.toLocaleString(dateTag, {
+          timeZone: "Europe/Brussels",
+          weekday: "short",
+          day: "2-digit",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        })}
+        locale={locale}
+        base={base}
+      />
 
       {eventCards.length > 0 && (
         <section className="section band events-band">
