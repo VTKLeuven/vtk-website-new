@@ -4,9 +4,11 @@ import { KalenderEditorialView } from "@/components/editorial/KalenderEditorialV
 import { calendarLabels, feedBaseUrlFor, listCalendarCategories } from "@/lib/calendar/categories";
 import { viewerPrefersOwnAudiences } from "@/lib/calendar/audience";
 import { loadOpeningCalendarEvents } from "@/lib/calendar/publicEvents";
+import { CALENDAR_VIEW_COOKIE, parseCalendarView } from "@/lib/calendar/viewCookie";
 import { getCurrentSession } from "@/lib/session";
 import { hasLocale } from "@/lib/locale";
 import type { Locale } from "@vtk/i18n";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
 import "@/app/design/vtk-base.css";
@@ -28,12 +30,13 @@ export default async function KalenderPage({ params }: { params: Promise<{ local
   const { locale: localeParam } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
+  const view = parseCalendarView((await cookies()).get(CALENDAR_VIEW_COOKIE)?.value);
 
   const [categories, prefersOwnAudiences, session, initialEvents] = await Promise.all([
     listCalendarCategories(),
     viewerPrefersOwnAudiences(),
     getCurrentSession(),
-    loadOpeningCalendarEvents("all"),
+    loadOpeningCalendarEvents("all", view),
   ]);
 
   return (
@@ -46,6 +49,7 @@ export default async function KalenderPage({ params }: { params: Promise<{ local
         defaultOnlyMyAudiences={prefersOwnAudiences}
         signedIn={Boolean(session)}
         initialEvents={initialEvents}
+        initialView={view}
       />
     </div>
   );

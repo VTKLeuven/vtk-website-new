@@ -1,6 +1,13 @@
 /** Monday-first month grid cells (42 days) for editorial calendar. */
 
 import { leadMoment, NIGHT_EVENT_MAX_MS, type EventMoment } from '@/lib/calendar/moments';
+import type { CalendarView } from '@/lib/calendar/viewCookie';
+
+/**
+ * Hoeveel weken de agenda vooruit toont. Zes rijen van 132 pixels waren hoger
+ * dan het scherm van een 13-inch laptop; vier passen er samen met de kop op.
+ */
+export const AGENDA_WEEKS = 4;
 
 export type GridDay = {
   date: Date;
@@ -95,11 +102,15 @@ export function dayRange(days: Date[]): { start: Date; end: Date } {
 }
 
 /**
- * Het bereik dat de kalender bij het openen toont: het maandraster rond `now`,
- * want het affichesraster is de standaardweergave. De pagina haalt precies dit
- * bereik al op de server op, zodat de eerste HTML de kaarten al bevat.
+ * Het bereik dat de kalender bij het openen toont, in de weergave waarin hij
+ * opent: het maandraster rond `now` voor het affichesraster (de standaard), de
+ * vier weken vanaf deze week voor de agenda, en deze week voor de week. De
+ * pagina haalt precies dit bereik al op de server op, zodat de eerste HTML de
+ * evenementen al bevat; de browser rekent met dezelfde functies.
  */
-export function openingRange(now: Date): { start: Date; end: Date } {
+export function openingRange(now: Date, view: CalendarView = 'grid'): { start: Date; end: Date } {
+  if (view === 'week') return dayRange(weekGridDays(now));
+  if (view === 'agenda') return dayRange(rollingWeeksGridCells(now, AGENDA_WEEKS).map((cell) => cell.date));
   return dayRange(monthGridCells(now.getFullYear(), now.getMonth()).map((cell) => cell.date));
 }
 

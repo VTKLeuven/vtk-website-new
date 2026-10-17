@@ -3,7 +3,9 @@ import { KalenderEditorialView } from "@/components/editorial/KalenderEditorialV
 import { calendarLabels, feedBaseUrlFor, listCalendarCategories } from "@/lib/calendar/categories";
 import { viewerPrefersOwnAudiences } from "@/lib/calendar/audience";
 import { loadOpeningCalendarEvents } from "@/lib/calendar/publicEvents";
+import { CALENDAR_VIEW_COOKIE, parseCalendarView } from "@/lib/calendar/viewCookie";
 import { getCurrentSession } from "@/lib/session";
+import { cookies } from "next/headers";
 
 import "@/app/design/vtk-base.css";
 import "@/app/design/vtk-event.css";
@@ -21,10 +23,11 @@ export async function CategoryCalendar({ locale, slug }: { locale: Locale; slug:
   // niet op de kalenderpagina staat, filtert daar niets. Wijkt dit af, dan geeft
   // de server andere evenementen mee dan de browser verwacht.
   const filter = categories.some((category) => category.slug === slug) ? slug : "all";
+  const view = parseCalendarView((await cookies()).get(CALENDAR_VIEW_COOKIE)?.value);
   const [prefersOwnAudiences, session, initialEvents] = await Promise.all([
     viewerPrefersOwnAudiences(),
     getCurrentSession(),
-    loadOpeningCalendarEvents(filter),
+    loadOpeningCalendarEvents(filter, view),
   ]);
   const labels = calendarLabels(locale);
 
@@ -38,6 +41,7 @@ export async function CategoryCalendar({ locale, slug }: { locale: Locale; slug:
         defaultOnlyMyAudiences={prefersOwnAudiences}
         signedIn={Boolean(session)}
         initialEvents={initialEvents}
+        initialView={view}
       />
     </div>
   );

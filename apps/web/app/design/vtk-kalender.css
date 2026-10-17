@@ -74,16 +74,6 @@
   padding: 24px 32px 96px;
 }
 
-/* Legende en abonneren staan als band bovenaan; het raster krijgt de volle
-   breedte. Stonden ze rechts, dan hield een dagcel geen 130 pixels over en paste
-   er geen enkele eventtitel meer in. */
-.vtk-design .kal-main {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 24px;
-  align-items: start;
-}
-
 .vtk-design .toolbar {
   display: grid;
   grid-template-columns: auto 1fr auto auto;
@@ -859,25 +849,6 @@
   border-top: 1px solid var(--line);
 }
 
-.vtk-design .agenda-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 18px;
-  margin-bottom: 20px;
-}
-
-.vtk-design .agenda-head h2 {
-  font-size: clamp(30px, 4vw, 46px);
-  font-weight: 600;
-  letter-spacing: -0.025em;
-}
-
-.vtk-design .agenda-head div {
-  color: var(--muted);
-  font-size: 13px;
-}
-
 .vtk-design .agenda-list {
   border-top: 0;
 }
@@ -943,168 +914,12 @@
     grid-template-columns: 1fr;
   }
 
-  .vtk-design .agenda-head {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
-
-/* ---------------------------------------------------------------------------
-   Maandraster op een telefoon.
-
-   Het raster viel hier uiteen in 42 cellen onder elkaar: een lijst van veertig
-   lege regels waar je doorheen moest scrollen om één evenement te vinden. Het
-   blijft nu een echt raster van zeven kolommen; de cellen worden vierkantjes met
-   het dagnummer en een stip per evenement, en de dag die je aantikt klapt eronder
-   open. Dat is hoe elke agenda-app op een telefoon werkt, en het past.
-   --------------------------------------------------------------------------- */
-
-/* Het aanraakvlak en de stippen bestaan alleen op smal scherm. */
-.vtk-design .cal-cell-tap,
-.vtk-design .cal-dots,
-.vtk-design .cal-day {
-  display: none;
 }
 
 @media (max-width: 720px) {
   .vtk-design .kal-wrap {
     padding-left: 16px;
     padding-right: 16px;
-  }
-
-  .vtk-design .cal {
-    gap: 0;
-    border-radius: 16px;
-    overflow: hidden;
-  }
-
-  .vtk-design .cal-header {
-    display: contents;
-  }
-
-  .vtk-design .cal-header > div {
-    padding: 8px 0;
-    font-size: 10px;
-    text-align: center;
-  }
-
-  .vtk-design .cal-cell {
-    position: relative;
-    min-height: 0;
-    aspect-ratio: 1;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    padding: 2px;
-  }
-
-  /* De eventpillen passen niet in een vakje van deze grootte; de stippen
-     vervangen ze en de details lees je in het dagpaneel eronder. */
-  .vtk-design .cal-cell .ev-pill {
-    display: none;
-  }
-
-  .vtk-design .cal-cell .num {
-    margin: 0;
-    font-size: 13px;
-  }
-
-  .vtk-design .cal-cell.today .num {
-    padding: 3px 6px;
-    border-radius: 999px;
-  }
-
-  .vtk-design .cal-cell.selected {
-    background: var(--paper-2);
-    box-shadow: inset 0 0 0 2px var(--ink);
-  }
-
-  .vtk-design .cal-dots {
-    display: flex;
-    gap: 3px;
-    height: 6px;
-    align-items: center;
-  }
-
-  .vtk-design .cal-dot {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--cat, var(--navy));
-  }
-
-  /* Over de hele cel, zodat de tikzone groot genoeg is voor een duim. */
-  .vtk-design .cal-cell-tap {
-    display: block;
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    border: 0;
-    background: none;
-    cursor: pointer;
-  }
-
-  .vtk-design .cal-day {
-    display: block;
-    margin-top: 18px;
-  }
-
-  /* Geen `text-transform: capitalize`: dat zet ook de maand in hoofdletters
-     ("12 Augustus"), en maandnamen zijn in het Nederlands kleingeschreven. Enkel
-     de eerste letter gaat om, en dat doen we in de component. */
-  .vtk-design .cal-day h3 {
-    font-size: 17px;
-    font-weight: 600;
-  }
-
-  .vtk-design .cal-day-empty {
-    margin-top: 8px;
-    color: var(--muted);
-    font-size: 14px;
-  }
-
-  .vtk-design .cal-day-list {
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-top: 12px;
-    padding: 0;
-  }
-
-  .vtk-design .cal-day-list a {
-    display: block;
-    padding: 12px 14px;
-    border: 1px solid var(--line);
-    border-left: 4px solid var(--cat, var(--navy));
-    border-radius: 12px;
-    background: var(--surface);
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .vtk-design .cal-day-list b {
-    display: block;
-    font-size: 15px;
-    font-weight: 600;
-  }
-
-  .vtk-design .cal-day-list a > span {
-    display: block;
-    margin-top: 3px;
-    color: var(--muted);
-    font-size: 13px;
-  }
-
-  .vtk-design .cal-day-audience {
-    display: inline-block;
-    margin-top: 8px;
-    padding: 2px 9px;
-    border-radius: 999px;
-    background: var(--cat);
-    color: #fff;
-    font-size: 11px;
-    font-weight: 600;
   }
 }
 
@@ -1250,35 +1065,6 @@
 .vtk-design .category-filter.on::before,
 .vtk-design .audience-filter.on::before {
   background: currentColor;
-}
-
-/* Doelgroeplabel op een eventpil in het maandraster. Staat boven de titel, want
-   "voor wie is dit" bepaalt of de rest van de regel je nog aanbelangt. */
-.vtk-design .ev-pill .ev-audience {
-  display: inline-block;
-  margin-bottom: 3px;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--cat);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  line-height: 1.5;
-  white-space: nowrap;
-}
-
-/* Zelfde label in de agendalijst, naast de titel. */
-.vtk-design .ag-title .ag-audience {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--cat);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  vertical-align: middle;
 }
 
 @media (max-width: 720px) {
@@ -1523,220 +1309,6 @@
   .vtk-design .ev-preview-actions .btn {
     padding-inline: 10px;
     font-size: 12px;
-  }
-}
-
-/* ---------------------------------------------------------------------------
-   De rij in "Eerstvolgend" en in de lijstweergave.
-
-   De volledige beschrijving stond hier ooit uitgeschreven; ze liep over vijf
-   regels, zei zelden wat het evenement is en duwde de rijen zo ver uit elkaar
-   dat er nog drie op een scherm pasten. In haar plaats staat nu de affiche.
-
-   De rij is daarom geen anker meer maar een `article`: de ster is een knop, en
-   een knop in een anker is ongeldige HTML. De titel is de link en spant zich
-   over de kaart; de ster ligt erboven.
-   --------------------------------------------------------------------------- */
-
-.vtk-design .ag-media {
-  position: relative;
-  display: block;
-  overflow: hidden;
-  border-radius: 14px;
-  aspect-ratio: 16 / 10;
-  /* De strepen van een ontbrekende foto; ze komen hier in de praktijk niet voor
-     omdat de server terugvalt op de standaardfoto, maar een leeg vak terwijl de
-     foto laadt hoort geen wit gat te zijn. */
-  background: repeating-linear-gradient(135deg, var(--paper-2) 0 10px, var(--paper) 10px 20px);
-}
-
-.vtk-design .ag-media img {
-  object-fit: cover;
-}
-
-.vtk-design .ag-link {
-  color: inherit;
-  text-decoration: none;
-}
-
-/* Het klikvlak van de hele rij. Ligt onder de ster (die staat op z-index 1), dus
-   een tik op de ster duidt aan dat je komt en opent het evenement niet. */
-.vtk-design .ag-link::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 18px;
-}
-
-.vtk-design .ag-row:focus-within {
-  border-color: var(--line-2);
-}
-
-.vtk-design .ag-link:focus-visible::after {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
-}
-
-/* Dezelfde ster als op de homepagekaarten: groot genoeg om op een telefoon te
-   raken (Apple en Google vragen allebei minstens 44 px) zonder als knop op te
-   vallen. Het evenement is het onderwerp, dit is een handeling ernaast. */
-.vtk-design .ag-star {
-  position: relative;
-  z-index: 1;
-  display: inline-grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  color: var(--muted);
-  transition:
-    color 140ms ease,
-    background-color 140ms ease;
-}
-
-.vtk-design .ag-star::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 44px;
-  height: 44px;
-  transform: translate(-50%, -50%);
-}
-
-.vtk-design .ag-star:hover {
-  background: var(--paper-2);
-  color: var(--ink);
-}
-
-/* Aangeduid: geel, de kleur die op deze site "actief" betekent. */
-.vtk-design .ag-star[aria-pressed='true'] {
-  background: var(--yellow);
-  color: var(--ink);
-}
-
-.vtk-design .ag-star[data-pending] {
-  opacity: 0.6;
-}
-
-.vtk-design .ag-star:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
-}
-
-@media (max-width: 960px) {
-  .vtk-design .ag-row {
-    grid-template-columns: 68px minmax(0, 1fr) auto;
-    grid-template-areas:
-      'media media media'
-      'date title star'
-      'tag tag tag';
-    gap: 14px;
-    padding: 16px;
-  }
-
-  .vtk-design .ag-row:hover {
-    padding: 16px;
-  }
-
-  .vtk-design .ag-media {
-    grid-area: media;
-    aspect-ratio: 16 / 9;
-  }
-
-  .vtk-design .ag-date {
-    grid-area: date;
-  }
-
-  .vtk-design .ag-title {
-    grid-area: title;
-  }
-
-  .vtk-design .ag-tag {
-    grid-area: tag;
-    justify-self: start;
-  }
-
-  .vtk-design .ag-star {
-    grid-area: star;
-  }
-
-  /* Het pijltje is decoratie naast een kaart die in haar geheel aanklikbaar is;
-     op een telefoon is die ruimte de titel meer waard. */
-  .vtk-design .ag-go {
-    display: none;
-  }
-}
-
-/* Multi-day events share a row across the seven day columns. */
-.vtk-design .cal-week {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  position: relative;
-}
-.vtk-design .cal-span-space {
-  height: calc(var(--span-lanes) * 29px);
-  flex-shrink: 0;
-}
-.vtk-design .cal-spans {
-  position: absolute;
-  top: 42px;
-  left: 0;
-  right: 0;
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  grid-auto-rows: 25px;
-  row-gap: 4px;
-  pointer-events: none;
-}
-.vtk-design .cal-span {
-  min-width: 0;
-  margin: 0 4px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  border-left: 3px solid var(--cat, var(--navy));
-  background: color-mix(in oklab, var(--cat, var(--navy)) 18%, var(--paper));
-  color: var(--ink);
-  font-size: 12px;
-  line-height: 17px;
-  font-weight: 600;
-  text-decoration: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  pointer-events: auto;
-}
-.vtk-design .cal-span:hover {
-  background: color-mix(in oklab, var(--cat, var(--navy)) 30%, var(--paper));
-}
-.vtk-design .cal-span:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 1px;
-}
-.vtk-design .cal-span.continues-before {
-  margin-left: 0;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-}
-.vtk-design .cal-span.continues-after {
-  margin-right: 0;
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-@media (max-width: 720px) {
-  .vtk-design .cal-week .cal-cell {
-    aspect-ratio: auto;
-    min-height: calc(52px + var(--span-lanes) * 29px);
-    justify-content: flex-start;
-    padding-top: 6px;
-  }
-  .vtk-design .cal-spans {
-    top: 48px;
-  }
-  .vtk-design .cal-span {
-    font-size: 10px;
-    padding-inline: 4px;
   }
 }
 
@@ -2011,41 +1583,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------------------------------------------------------------------------
-   Week en agenda in de taal van het raster.
-
-   Het raster (`.ev-card`, vtk-eventcard.css) is de eerste weergave die iemand
-   ziet, en de week en de agenda lazen daarnaast als een andere site: een
-   vierkant kader met monospace kapitalen, een kleurstreep links op elk
-   evenement en een gevuld blok in de themakleur. Ze nemen nu de onderdelen van
-   de kaart over: de datum als pin (weekdag, getal, maand; geel is vandaag), het
-   thema als stip met een woord, de doelgroep als gevulde pil, de titel met de
-   gele streep, en witte kaarten met een haarlijn die bij hover licht optillen.
-   Enkel de affiche blijft weg in de week: zeven smalle kolommen met een foto per
-   evenement worden een scrollwand, en in de week zoek je op datum, niet op beeld.
-   --------------------------------------------------------------------------- */
-
-.vtk-design .week-cal {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.vtk-design .week-day {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-}
-
-.vtk-design .week-day > header {
-  display: flex;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--line);
-}
-
-/* De pin van `.ev-card-pin`, maar in de stroom en niet over een foto. */
-.vtk-design .week-pin,
+/* De datum in de lijstrij: de pin van `.ev-card-pin`, maar in de stroom en niet
+   over een foto. */
 .vtk-design .ag-date {
   display: grid;
   flex: none;
@@ -2060,12 +1599,6 @@
   text-align: center;
 }
 
-.vtk-design .week-day.today .week-pin {
-  border-color: var(--yellow);
-  background: var(--yellow);
-}
-
-.vtk-design .week-pin b,
 .vtk-design .ag-date b {
   display: block;
   font-family: var(--mono);
@@ -2077,7 +1610,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.vtk-design .week-pin i,
 .vtk-design .ag-date i {
   font-family: var(--mono);
   font-size: 9.5px;
@@ -2086,99 +1618,6 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
-}
-
-.vtk-design .week-day.today .week-pin i {
-  color: rgba(10, 15, 31, 0.62);
-}
-
-.vtk-design .week-events {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.vtk-design .week-empty {
-  color: var(--muted);
-  font-size: 12.5px;
-}
-
-.vtk-design .week-event {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  padding: 12px 13px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--surface);
-  color: var(--ink);
-  text-decoration: none;
-  transition:
-    transform 140ms ease,
-    border-color 140ms ease,
-    box-shadow 140ms ease;
-}
-
-.vtk-design .week-event:hover {
-  transform: translateY(-2px);
-  border-color: var(--line-2);
-  box-shadow: 0 12px 26px -18px rgba(14, 26, 54, 0.6);
-}
-
-.vtk-design .week-event:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
-}
-
-.vtk-design .week-event-tags {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 5px 8px;
-  margin-bottom: 7px;
-}
-
-.vtk-design .week-event-tags .ev-card-cat {
-  font-size: 12px;
-}
-
-/* De gele streep onder de titel, even breed als de titel zelf. */
-.vtk-design .week-event-title {
-  width: fit-content;
-  max-width: 100%;
-  font-size: 14.5px;
-  font-weight: 600;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-  overflow-wrap: anywhere;
-}
-
-.vtk-design .week-event-title::after {
-  content: '';
-  display: block;
-  width: 100%;
-  height: 3px;
-  margin-top: 6px;
-  border-radius: 2px;
-  background: var(--yellow);
-}
-
-.vtk-design .week-event-when {
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.4;
-  font-variant-numeric: tabular-nums;
-}
-
-.vtk-design .week-event .ev-going {
-  align-self: flex-start;
-  margin-top: 6px;
-  padding: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 400;
 }
 
 /* Het maandraster: dezelfde witte kaart per evenement, en het thema als stip
@@ -2233,10 +1672,6 @@
   font-size: 12.5px;
 }
 
-.vtk-design .ag-media {
-  aspect-ratio: 16 / 9;
-}
-
 .vtk-design .ag-tag {
   padding: 0;
   border: 0;
@@ -2253,44 +1688,885 @@
   }
 }
 
-@media (max-width: 1000px) {
-  .vtk-design .week-cal {
-    grid-template-columns: repeat(7, minmax(150px, 1fr));
-    overflow-x: auto;
-    padding-bottom: 8px;
+/* ---------------------------------------------------------------------------
+   De agenda: vier weken als maandraster, en de dag die je aanklikt klapt onder
+   zijn week open met de kaarten van het raster erin.
+
+   Er staat geen paneel meer naast het raster en er is geen weekkolom: een
+   dagcel was zo smal dat het uur en de titel naast elkaar in de cel ernaast
+   liepen. Het weekend is smaller, want daar staat bij de kring zelden iets, en
+   elke pixel die het afstaat, gaat naar een weekdag. Het uur staat in een eigen
+   kolom en de titel loopt eronder door in plaats van af te kappen. Zie
+   `renderMonth` in KalenderEditorialView en docs/design-decisions.md.
+   --------------------------------------------------------------------------- */
+
+.vtk-design .kal-month {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 2px 6px rgba(14, 26, 54, 0.03);
+}
+
+.vtk-design .kal-month-cols {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) repeat(2, minmax(0, 0.72fr));
+}
+
+.vtk-design .kal-month-head {
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-2);
+}
+
+.vtk-design .kal-month-head span {
+  padding: 10px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.vtk-design .kal-month-week + .kal-month-week {
+  border-top: 1px solid var(--line);
+}
+
+/* De balken krijgen elk een eigen rij tussen het dagnummer en de regels; zonder
+   balken valt die rij weg (de lege terugval van `var`). De rij ligt boven de
+   opengeklapte dag, zodat het pijltje van de open dag over diens rand valt. */
+.vtk-design .kal-month-row {
+  position: relative;
+  z-index: 1;
+  grid-template-rows: 40px var(--kal-month-lanes,) minmax(96px, auto);
+}
+
+/* Elke cel is een knop over de volle hoogte van de week: de dag zelf is het
+   klikvlak, de regels en de balken liggen erboven. */
+.vtk-design .kal-month-day {
+  position: relative;
+  grid-row: 1 / -1;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.vtk-design .kal-month-day + .kal-month-day {
+  border-left: 1px solid var(--line);
+}
+
+.vtk-design .kal-month-day:hover {
+  background: color-mix(in srgb, var(--paper) 45%, var(--surface));
+}
+
+.vtk-design .kal-month-day.is-today {
+  background: color-mix(in srgb, var(--yellow) 7%, var(--surface));
+}
+
+.vtk-design .kal-month-day.is-open {
+  background: var(--paper);
+  box-shadow: inset 0 3px 0 var(--navy);
+}
+
+/* Het pijltje dat de open cel met de dag eronder verbindt. */
+.vtk-design .kal-month-day.is-open::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  width: 16px;
+  height: 16px;
+  margin-left: -8px;
+  background: var(--paper);
+  transform: rotate(45deg);
+}
+
+.vtk-design .kal-month-day:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: -2px;
+}
+
+.vtk-design .kal-month-num {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-row: 1;
+  align-self: start;
+  justify-self: start;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  margin: 9px 0 0 9px;
+  padding: 0 6px;
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.vtk-design .kal-month-num.is-past {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.vtk-design .kal-month-num.is-today {
+  background: var(--yellow);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.vtk-design .kal-month-num.is-open {
+  background: var(--navy);
+  color: var(--paper);
+}
+
+/* Het weeknummer in de maandagcel, en niet in een eigen kolom: die kostte elke
+   dag een stukje breedte. */
+.vtk-design .kal-month-wk {
+  position: relative;
+  z-index: 1;
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
+  justify-self: end;
+  margin: 14px 12px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* Wat over meerdere dagen doorloopt: één balk, met de kleur van het thema als
+   stip zoals overal, en niet als getinte vulling. */
+.vtk-design .kal-month-span {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-self: center;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  height: 24px;
+  margin: 0 6px;
+  padding: 0 9px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.vtk-design .kal-month-span::before,
+.vtk-design .kal-month-run::before,
+.vtk-design .kal-tl-bar::before {
+  content: '';
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--cat, var(--chart-context));
+}
+
+.vtk-design .kal-month-span-title,
+.vtk-design .kal-tl-bar-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* De periode wijkt eerst als er geen plaats is; de titel pas daarna. */
+.vtk-design .kal-month-span small,
+.vtk-design .kal-tl-bar small {
+  flex: 0 100 auto;
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.vtk-design .kal-month-span:hover,
+.vtk-design .kal-tl-bar:hover {
+  background: color-mix(in srgb, var(--navy) 9%, var(--paper-2));
+}
+
+.vtk-design .kal-month-span:focus-visible,
+.vtk-design .kal-tl-bar:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.vtk-design .kal-month-span.continues-before,
+.vtk-design .kal-tl-bar.continues-before {
+  margin-left: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.vtk-design .kal-month-span.continues-after,
+.vtk-design .kal-tl-bar.continues-after {
+  margin-right: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.vtk-design .kal-month-span.is-past,
+.vtk-design .kal-tl-bar.is-past {
+  color: var(--muted);
+}
+
+.vtk-design .kal-month-items {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  align-content: start;
+  gap: 1px;
+  min-width: 0;
+  padding: 4px 5px 10px;
+  pointer-events: none;
+}
+
+/* Het uur in een eigen kolom en de titel ernaast, die onder zichzelf doorloopt.
+   Op één regel naast elkaar liep een lang woord in de cel ernaast. */
+.vtk-design .kal-month-ev {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 7px;
+  padding: 4px 6px;
+  border-radius: 7px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.3;
+  text-decoration: none;
+  pointer-events: auto;
+}
+
+.vtk-design .kal-month-ev:hover {
+  background: var(--paper);
+}
+
+.vtk-design .kal-month-ev:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+
+.vtk-design .kal-month-ev time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.vtk-design .kal-month-ev time::before,
+.vtk-design .kal-tl-time::before {
+  content: '';
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--cat, var(--chart-context));
+}
+
+.vtk-design .kal-month-ev b {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+.vtk-design .kal-month-ev.is-past b {
+  color: var(--body);
+  font-weight: 500;
+}
+
+.vtk-design .kal-month-ev.is-past time::before {
+  opacity: 0.55;
+}
+
+/* De doelgroep blijft een gevulde pil, zoals op de kaart: die moet luid zijn. */
+.vtk-design .kal-month-aud,
+.vtk-design .kal-tl-aud {
+  justify-self: start;
+  align-self: flex-start;
+  margin-top: 3px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--cat);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.vtk-design .kal-month-aud {
+  grid-column: 2;
+}
+
+/* Enkel op een telefoon, zie onderaan. */
+.vtk-design .kal-month-dots,
+.vtk-design .kal-month-hint {
+  display: none;
+}
+
+/* De opengeklapte dag: dezelfde kaarten als in het raster, op papier onder de
+   week waar ze bij horen. */
+.vtk-design .kal-month-open {
+  position: relative;
+  padding: 20px 20px 22px;
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+  box-shadow: inset 0 10px 16px -14px rgba(14, 26, 54, 0.35);
+  scroll-margin: 96px 0 24px;
+}
+
+.vtk-design .kal-month-open-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-bottom: 14px;
+}
+
+.vtk-design .kal-month-open-head h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.vtk-design .kal-month-open-count {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.vtk-design .kal-month-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.vtk-design .kal-month-tag.is-past {
+  background: var(--surface);
+  color: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.vtk-design .kal-month-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  margin-left: auto;
+  padding: 0 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.vtk-design .kal-month-close:hover {
+  border-color: var(--ink);
+}
+
+.vtk-design .kal-month-close svg {
+  width: 14px;
+  height: 14px;
+}
+
+.vtk-design .kal-month-runs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: -4px 0 16px;
+}
+
+.vtk-design .kal-month-runs > span {
+  margin-right: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.vtk-design .kal-month-run {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.vtk-design .kal-month-run:hover {
+  border-color: var(--line-2);
+}
+
+.vtk-design .kal-month-run small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.vtk-design .kal-month-none {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* Vier kaarten naast elkaar in plaats van drie: de dag staat op de volle
+   breedte van het raster. Deze regel is specifieker dan die van `.ev-grid`,
+   dus de kleinere schermen staan hier ook. */
+.vtk-design .kal-month-open .ev-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+@media (max-width: 1100px) {
+  .vtk-design .kal-month-open .ev-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
-/* Op een telefoon wordt de week een lijst: per dag de pin links en de
-   evenementen ernaast, met een haarlijn tussen de dagen. */
+@media (max-width: 1000px) {
+  .vtk-design .kal-month-open .ev-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Op een telefoon past er geen regel in een cel. Het raster blijft zeven gelijke
+   kolommen met het dagnummer en een stip per evenement, de balken worden een
+   dun lijntje, en de dag die je aantikt klapt eronder open zoals op een groot
+   scherm. */
 @media (max-width: 720px) {
-  .vtk-design .week-cal {
+  .vtk-design .kal-month-cols {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+
+  .vtk-design .kal-month-head span {
+    padding: 8px 0;
+    font-size: 10px;
+    text-align: center;
+  }
+
+  .vtk-design .kal-month-row {
+    grid-template-rows: 34px var(--kal-month-lanes-sm,) minmax(18px, auto);
+  }
+
+  .vtk-design .kal-month-num {
+    justify-self: center;
+    margin: 5px 0 0;
+  }
+
+  .vtk-design .kal-month-wk,
+  .vtk-design .kal-month-ev,
+  .vtk-design .kal-month-span small,
+  .vtk-design .kal-month-span-title {
+    display: none;
+  }
+
+  .vtk-design .kal-month-span {
+    height: 5px;
+    margin: 0 2px;
+    padding: 0;
+    border-radius: 3px;
+    background: var(--cat, var(--chart-context));
+  }
+
+  .vtk-design .kal-month-span::before {
+    display: none;
+  }
+
+  .vtk-design .kal-month-items {
+    padding: 2px 0 6px;
+  }
+
+  .vtk-design .kal-month-dots {
     display: flex;
-    flex-direction: column;
-    gap: 0;
-    overflow: visible;
-    padding-bottom: 0;
+    justify-content: center;
+    gap: 3px;
   }
 
-  .vtk-design .week-day {
-    display: grid;
-    grid-template-columns: 58px minmax(0, 1fr);
-    gap: 14px;
-    padding: 14px 0;
-    border-bottom: 1px solid var(--line);
+  .vtk-design .kal-month-dots span {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--cat, var(--navy));
   }
 
-  .vtk-design .week-day:first-child {
-    padding-top: 0;
+  .vtk-design .kal-month-hint {
+    display: block;
+    margin: 10px 2px 0;
+    color: var(--muted);
+    font-size: 13px;
   }
 
-  .vtk-design .week-day > header {
-    padding-bottom: 0;
-    border-bottom: 0;
+  .vtk-design .kal-month-open {
+    padding: 16px 14px 18px;
   }
+}
 
-  /* Op de middellijn van de pin (58 px) en links, niet gecentreerd in de kolom. */
-  .vtk-design .week-empty {
-    padding-top: 19px;
+@media (max-width: 620px) {
+  .vtk-design .kal-month-open .ev-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* ---------------------------------------------------------------------------
+   De week als tijdlijn: een uuras met de evenementen als blokken op hun uur,
+   wat de hele dag duurt of over dagen doorloopt als één balk bovenaan, en een
+   gele nu-lijn, in de taal van de openingsuren op de homepage.
+
+   De weekweergave zette elk evenement als kaart onder zijn dag, dus een week
+   van vijf dagen stond er vijf keer en je zag niet wanneer op de dag iets viel.
+   De rekenregels staan in lib/calendar/weekTimeline.ts. Op een telefoon schuift
+   de tijdlijn opzij, met de uren vast aan de linkerkant.
+   --------------------------------------------------------------------------- */
+
+.vtk-design .kal-tl-scroll {
+  position: relative;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 2px 6px rgba(14, 26, 54, 0.03);
+}
+
+.vtk-design .kal-tl {
+  min-width: 760px;
+}
+
+.vtk-design .kal-tl-cols {
+  display: grid;
+  grid-template-columns: var(--kal-tl-cols);
+}
+
+.vtk-design .kal-tl-head {
+  border-bottom: 1px solid var(--line);
+}
+
+.vtk-design .kal-tl-corner,
+.vtk-design .kal-tl-allday-label,
+.vtk-design .kal-tl-gutter {
+  position: sticky;
+  left: 0;
+  z-index: 25;
+  background: var(--surface);
+}
+
+.vtk-design .kal-tl-day {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  min-width: 0;
+  padding: 14px 12px 12px;
+  border-left: 1px solid var(--line);
+}
+
+.vtk-design .kal-tl-day span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vtk-design .kal-tl-day b {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-design .kal-tl-day.is-past b {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.vtk-design .kal-tl-day.is-today {
+  background: color-mix(in srgb, var(--yellow) 10%, var(--surface));
+  box-shadow: inset 0 3px 0 var(--yellow);
+}
+
+.vtk-design .kal-tl-day.is-today span {
+  color: var(--ink);
+}
+
+.vtk-design .kal-tl-day em {
+  margin-left: auto;
+  align-self: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.vtk-design .kal-tl-allday {
+  border-bottom: 1px solid var(--line);
+}
+
+.vtk-design .kal-tl-allday-label {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding-left: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.vtk-design .kal-tl-allday-col {
+  grid-row: 1 / -1;
+  border-left: 1px solid var(--line);
+}
+
+.vtk-design .kal-tl-allday-col.is-today {
+  background: color-mix(in srgb, var(--yellow) 6%, var(--surface));
+}
+
+.vtk-design .kal-tl-bar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-self: center;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  height: 26px;
+  margin: 0 6px;
+  padding: 0 10px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.vtk-design .kal-tl-body {
+  position: relative;
+}
+
+.vtk-design .kal-tl-gutter span {
+  position: absolute;
+  right: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  transform: translateY(-50%);
+}
+
+/* Het eerste uur staat tegen de bovenrand; gecentreerd op de lijn viel het half
+   in de kop erboven. */
+.vtk-design .kal-tl-gutter span:first-child {
+  transform: translateY(3px);
+}
+
+/* De urenlijnen zijn de achtergrond van de kolom, één per uur. */
+.vtk-design .kal-tl-col {
+  position: relative;
+  border-left: 1px solid var(--line);
+  background-image: linear-gradient(var(--rule-soft) 1px, transparent 1px);
+  background-size: 100% var(--kal-tl-hour);
+}
+
+.vtk-design .kal-tl-col.is-today {
+  background-color: color-mix(in srgb, var(--yellow) 6%, var(--surface));
+}
+
+/* Een blok dat overlapt met een eerder begonnen blok, schuift een trede op en
+   ligt erboven, met een witte rand ertussen. Naast elkaar in halve breedtes
+   bleef er in een kolom van 170 pixels geen leesbare titel over. */
+.vtk-design .kal-tl-block {
+  position: absolute;
+  left: calc(5px + var(--lane, 0) * 16px);
+  right: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 5px 8px 6px 9px;
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  background: var(--paper);
+  box-shadow: 0 0 0 2px var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+/* `!important` omdat de stapelvolgorde inline staat (een later blok ligt
+   hoger); bij hover en focus moet het blok er toch bovenop. */
+.vtk-design .kal-tl-block:hover,
+.vtk-design .kal-tl-block:focus-visible {
+  z-index: 20 !important;
+  border-color: color-mix(in srgb, var(--navy) 34%, transparent);
+  background: var(--surface);
+}
+
+.vtk-design .kal-tl-block:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+/* Jij komt: de gele rail van een uitgelichte kaart. */
+.vtk-design .kal-tl-block.is-mine {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    inset 3px 0 0 var(--yellow);
+}
+
+.vtk-design .kal-tl-block.is-past {
+  opacity: 0.72;
+}
+
+/* Loopt verder dan het venster: de onderkant arceert uit, in de tekentaal van
+   het technische patroon, zoals een avond zonder sluitingsuur bij de
+   openingsuren. */
+.vtk-design .kal-tl-block.runs-on {
+  border-bottom-style: dashed;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  background:
+    linear-gradient(var(--paper), var(--paper)) top / 100% calc(100% - 22px) no-repeat,
+    repeating-linear-gradient(-45deg, color-mix(in srgb, var(--navy) 16%, transparent) 0 1px, transparent 1px 7px),
+    var(--paper);
+}
+
+.vtk-design .kal-tl-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.vtk-design .kal-tl-block b {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.vtk-design .kal-tl-block small {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.3;
+}
+
+.vtk-design .kal-tl-aud {
+  font-size: 9.5px;
+}
+
+.vtk-design .kal-tl-now {
+  position: absolute;
+  left: -1px;
+  right: 0;
+  z-index: 15;
+  height: 2px;
+  margin-top: -1px;
+  background: var(--yellow);
+  box-shadow: 0 0 0 0.5px color-mix(in srgb, var(--ink) 30%, transparent);
+  pointer-events: none;
+}
+
+.vtk-design .kal-tl-now::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--yellow);
+}
+
+.vtk-design .kal-tl-empty {
+  position: absolute;
+  top: 40%;
+  left: 58px;
+  right: 0;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.vtk-design .kal-tl-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.vtk-design .kal-tl-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vtk-design .kal-tl-legend-now {
+  width: 22px;
+  height: 2px;
+  background: var(--yellow);
+}
+
+.vtk-design .kal-tl-legend-mine {
+  width: 16px;
+  height: 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  background: var(--paper);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-design .kal-tl-legend-runs {
+  width: 26px;
+  height: 12px;
+  border: 1px dashed var(--line-2);
+  border-radius: 3px;
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--navy) 18%, transparent) 0 1px,
+    transparent 1px 6px
+  );
 }

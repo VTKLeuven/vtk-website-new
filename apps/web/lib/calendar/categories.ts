@@ -43,12 +43,7 @@ export function calendarLabels(locale: Locale) {
   return {
     crumbsHome: "Home",
     crumbsHere: nl ? "Kalender" : "Calendar",
-    agendaNext: nl ? "Eerstvolgend" : "Up next",
-    agendaSub: nl ? "Komende 14 dagen" : "Next 14 days",
     emptyMonth: nl ? "Geen evenementen deze maand." : "No events this month.",
-    emptyUpcoming: nl
-      ? "Niets in de komende 14 dagen. Blader verder met de pijlen hierboven."
-      : "Nothing in the next 14 days. Use the arrows above to look further ahead.",
     subscribeTitle: nl ? "Abonneren" : "Subscribe",
     subscribeSub: nl
       ? "Blijft vanzelf up-to-date in je agenda"

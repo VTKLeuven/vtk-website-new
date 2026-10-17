@@ -75,6 +75,13 @@ describe('the range the calendar opens on', () => {
     expect(end).toEqual(new Date(2026, 8, 13, 23, 59, 59, 999));
   });
 
+  it('covers the four agenda weeks or the one week when the calendar opens on those views', () => {
+    const now = new Date(2026, 9, 17, 16, 45);
+    expect(openingRange(now, 'agenda')).toEqual(dayRange(rollingWeeksGridCells(now, 4).map((cell) => cell.date)));
+    expect(openingRange(now, 'week')).toEqual(dayRange(weekGridDays(now)));
+    expect(openingRange(now, 'week').start).toEqual(new Date(2026, 9, 12));
+  });
+
   it('covers the whole month grid around today, like the default view fetches', () => {
     const range = openingRange(new Date(2026, 8, 22, 20, 5));
     const cells = monthGridCells(2026, 8);

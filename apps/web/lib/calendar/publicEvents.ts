@@ -15,6 +15,7 @@ import { focusPosition } from "@/lib/imageFocus";
 import { publishedTicketSlug, TICKET_LINK_SELECT } from "@/lib/ticketing/eventPage";
 import { getCurrentSession } from "@/lib/session";
 import { publicUrl } from "@/lib/storage";
+import type { CalendarView } from "@/lib/calendar/viewCookie";
 
 export type CalendarEventsQuery = {
   /** Enkel samen met `end`; zonder bereik komen alle gepubliceerde evenementen terug. */
@@ -153,7 +154,9 @@ export async function loadCalendarEvents(query: CalendarEventsQuery): Promise<Ca
  * de fetch in de browser binnenkomt: dat was een CLS van 0,8 op /kalender.
  *
  * `filter` is `all` of de slug van een categoriepagina, zoals de kalender het
- * zelf uit het pad afleidt.
+ * zelf uit het pad afleidt. `view` is de weergave waarin hij opent (de laatst
+ * gekozen, zie `lib/calendar/viewCookie.ts`): elke weergave toont een ander
+ * bereik.
  *
  * De server rekent en formatteert in zijn eigen tijdzone (`TZ=Europe/Brussels`
  * in de container), de kalender in die van de browser. Voor een bezoeker met
@@ -165,8 +168,9 @@ export async function loadCalendarEvents(query: CalendarEventsQuery): Promise<Ca
  */
 export async function loadOpeningCalendarEvents(
   filter: string,
+  view: CalendarView = "grid",
 ): Promise<{ key: string; events: CalendarApiEvent[] }> {
-  const range = openingRange(new Date());
+  const range = openingRange(new Date(), view);
   const onlyMyAudiences = await viewerPrefersOwnAudiences();
   const events = await loadCalendarEvents({
     ...range,
