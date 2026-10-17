@@ -862,8 +862,7 @@
       "vouchersEarnedAll": "Earned in total",
       "vouchersUsed": "Collected or used",
       "vouchersRecent": "Recently used",
-      "vouchersSandwich": "Sandwich at the pickup counter",
-      "vouchersNote": "Shifts and PAL+ sessions add up to one balance. Paper vouchers you collected at the counter count as collected, but are not listed separately."
+      "vouchersSandwich": "Sandwich at the pickup counter"
     }
   },
   "piano": {

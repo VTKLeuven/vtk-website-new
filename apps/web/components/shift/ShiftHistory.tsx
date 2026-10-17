@@ -227,7 +227,6 @@ export function ShiftHistory({
             </ul>
           </div>
         ) : null}
-        <p className="vtk-history-note">{t.vouchersNote}</p>
       </section>
 
       <div className="vtk-history-cols">

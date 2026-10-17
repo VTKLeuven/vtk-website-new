@@ -250,8 +250,7 @@
   align-items: start;
 }
 
-.vtk-history-vouchers > .vtk-history-h,
-.vtk-history-vouchers > .vtk-history-note {
+.vtk-history-vouchers > .vtk-history-h {
   grid-column: 1 / -1;
 }
 
@@ -335,14 +334,6 @@
 .vtk-history-spent b {
   color: var(--ink);
   font-variant-numeric: tabular-nums;
-}
-
-.vtk-history-note {
-  margin: 8px 0 0;
-  max-width: 72ch;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.5;
 }
 
 @media (max-width: 760px) {

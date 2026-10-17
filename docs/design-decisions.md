@@ -9417,7 +9417,8 @@ bonnetjesafschrift met wat je verdiende en uitgaf. Gekozen werd de ladder.
   het komt uit dezelfde bron als de app (`voucherOverview`), zodat site en app
   nooit een ander getal tonen. Bonnetjes die aan de balie op papier meegegeven
   worden, laten geen eigen logregel na; ze tellen mee in "opgehaald of
-  gebruikt" maar staan niet apart in de lijst, en dat staat er ook bij.
+  gebruikt" maar staan niet apart in de lijst. Een zin die dat uitlegde, is
+  op vraag weggelaten.
 
 ## Shiften afnemen
 
