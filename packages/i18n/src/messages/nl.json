@@ -856,7 +856,14 @@
       "noPost": "Geen post",
       "deducted": "Afgenomen door het beheer",
       "all": "Alle {shifts} van {year}",
-      "empty": "Je hebt nog geen shiften gedaan."
+      "empty": "Je hebt nog geen shiften gedaan.",
+      "vouchersTitle": "Je bonnetjes nu",
+      "vouchersLeft": "nog te gebruiken, alle jaren samen",
+      "vouchersEarnedAll": "Verdiend in totaal",
+      "vouchersUsed": "Opgehaald of gebruikt",
+      "vouchersRecent": "Laatst gebruikt",
+      "vouchersSandwich": "Broodje aan de afhaalbalie",
+      "vouchersNote": "Shiften en PAL+-sessies vormen samen één saldo. Bonnetjes die je aan de balie op papier meekreeg, tellen mee bij opgehaald, maar staan niet apart in de lijst."
     }
   },
   "piano": {

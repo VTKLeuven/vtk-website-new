@@ -12,6 +12,7 @@ import { shiftDeductions } from '@/lib/shift/deductions';
 import { buildShiftHistory } from '@/lib/shift/history';
 import { loadPostNames } from '@/lib/shift/postNames';
 import { praesidiumYears } from '@/lib/shift/voucherEligibility';
+import { voucherOverview } from '@/lib/app-api/vouchers';
 import { ShiftHistory } from '@/components/shift/ShiftHistory';
 
 export async function generateMetadata({
@@ -48,7 +49,9 @@ export default async function ShiftHistoryPage({
   // tellen per jaar mee in het aantal, zonder reden: die is voor het beheer
   // (`lib/shift/deductions.ts`).
   const userId = session.user.id;
-  const [participations, postNames, deductions, praesidium] = await Promise.all([
+  // Het saldo en wat ervan gebruikt is, uit dezelfde bron als de app: anders
+  // kunnen de site en de app een ander getal tonen.
+  const [participations, postNames, deductions, praesidium, vouchers] = await Promise.all([
     prisma.shiftParticipant.findMany({
       where: { userId, shift: { endTime: { lt: new Date() } } },
       select: {
@@ -60,6 +63,7 @@ export default async function ShiftHistoryPage({
     loadPostNames(locale),
     shiftDeductions({ userIds: [userId] }),
     praesidiumYears([userId]),
+    voucherOverview(userId),
   ]);
 
   const currentYear = currentWorkingYear();
@@ -94,6 +98,12 @@ export default async function ShiftHistoryPage({
           currentYear={currentYear}
           inPraesidiumNow={session.groups.some((group) => group.type === 'PRAESIDIUM')}
           postNames={postNames}
+          vouchers={{
+            balance: vouchers.balance,
+            earned: vouchers.earned,
+            used: vouchers.used,
+            spent: vouchers.history.filter((entry) => entry.kind === 'spent').slice(0, 8),
+          }}
         />
       </div>
     </div>

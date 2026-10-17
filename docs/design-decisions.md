@@ -9407,7 +9407,17 @@ bonnetjesafschrift met wat je verdiende en uitgaf. Gekozen werd de ladder.
   dat hij al in de voorverkoop zit in plaats van "nog 3 tot".
 - Het bonnetjesafschrift viel af omdat het een andere pagina is (hoeveel heb ik
   nog?) en de uitgaven aan de toog en bij Theokot nog nergens voor het lid
-  staan. Wil de kring dat ooit, dan hoort het naast deze pagina, niet erin.
+  staan.
+- **Het saldo staat er sinds oktober 2026 wel, als eigen blok "Je bonnetjes
+  nu" onder de titelkaart.** Een lid meldde via het contactformulier dat het
+  nergens op de site kon zien hoeveel bonnetjes het nog had of al gebruikte.
+  Het blok toont het saldo, wat er in totaal verdiend en wat er opgehaald of
+  gebruikt is, en de laatste keren aan de afhaalbalie of een toog. Het staat
+  los van het gekozen jaar, want het saldo telt alle jaren en PAL+ samen, en
+  het komt uit dezelfde bron als de app (`voucherOverview`), zodat site en app
+  nooit een ander getal tonen. Bonnetjes die aan de balie op papier meegegeven
+  worden, laten geen eigen logregel na; ze tellen mee in "opgehaald of
+  gebruikt" maar staan niet apart in de lijst, en dat staat er ook bij.
 
 ## Shiften afnemen
 

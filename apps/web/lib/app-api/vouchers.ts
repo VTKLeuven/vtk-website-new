@@ -80,6 +80,11 @@ export async function voucherOverview(userId: string, now = new Date()) {
   ]);
 
   const balance = outstandingVouchers(sources);
+  // Alles wat ooit verdiend werd, en wat daarvan al weg is: opgehaald aan de
+  // balie, betaald aan een toog of aan de afhaalbalie. Samen met het saldo telt
+  // dat op, ook voor wat het logboek hieronder niet kent (een uitbetaling).
+  const earned = sources.reduce((total, source) => total + source.reward, 0);
+  const used = Math.max(0, earned - balance);
   let earnedThisYear = 0;
   const history: AppVoucherEntry[] = [];
 
@@ -119,7 +124,7 @@ export async function voucherOverview(userId: string, now = new Date()) {
 
   history.sort((a, b) => b.at.localeCompare(a.at));
 
-  return { balance, earnedThisYear, history: history.slice(0, 40) };
+  return { balance, earned, used, earnedThisYear, history: history.slice(0, 40) };
 }
 
 /**

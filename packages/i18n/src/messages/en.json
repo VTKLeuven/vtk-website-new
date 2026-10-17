@@ -856,7 +856,14 @@
       "noPost": "No group",
       "deducted": "Deducted by the board",
       "all": "All {shifts} of {year}",
-      "empty": "You have not done any shifts yet."
+      "empty": "You have not done any shifts yet.",
+      "vouchersTitle": "Your vouchers now",
+      "vouchersLeft": "left to use, all years together",
+      "vouchersEarnedAll": "Earned in total",
+      "vouchersUsed": "Collected or used",
+      "vouchersRecent": "Recently used",
+      "vouchersSandwich": "Sandwich at the pickup counter",
+      "vouchersNote": "Shifts and PAL+ sessions add up to one balance. Paper vouchers you collected at the counter count as collected, but are not listed separately."
     }
   },
   "piano": {

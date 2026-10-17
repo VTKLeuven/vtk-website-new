@@ -6,6 +6,8 @@ import { formatWorkingYear } from '@/lib/workingYear';
 import { PRESALE_SHIFT_THRESHOLD } from '@/lib/ticketing/presale';
 import { SHIFT_TIERS, shiftLadderPosition } from '@/lib/shift/tiers';
 import type { HistoryYear } from '@/lib/shift/history';
+import { formatVoucherCount, formatVouchers } from '@/lib/shift/rewards';
+import type { AppVoucherEntry } from '@/lib/app-api/contract';
 import { RewardCoins } from './RewardCoins';
 
 import './shift-history.css';
@@ -38,6 +40,7 @@ export function ShiftHistory({
   currentYear,
   inPraesidiumNow,
   postNames,
+  vouchers,
 }: {
   locale: Locale;
   base: string;
@@ -48,6 +51,11 @@ export function ShiftHistory({
   /** Zit nu in een praesidiumpost, en dus al in de voorverkoop. */
   inPraesidiumNow: boolean;
   postNames: Record<string, string>;
+  /**
+   * Het saldo nu, over alle jaren en PAL+ samen, en wat er al van gebruikt is
+   * (`voucherOverview`, dezelfde bron als de app). Los van het gekozen jaar.
+   */
+  vouchers: { balance: number; earned: number; used: number; spent: AppVoucherEntry[] };
 }) {
   const dict = getDictionary(locale).shift;
   const t = dict.history;
@@ -166,6 +174,60 @@ export function ShiftHistory({
             {ladder}
           </ol>
         </div>
+      </section>
+
+      {/* Wat je nog hebt en wat al weg is. Een lid kon dat nergens op de site
+          terugvinden, enkel wat het verdiende; het saldo staat los van het
+          gekozen jaar, want het telt alle jaren samen. */}
+      <section className="vtk-history-vouchers" aria-labelledby="vtk-history-vouchers">
+        <h2 id="vtk-history-vouchers" className="vtk-history-h">
+          {t.vouchersTitle}
+        </h2>
+        <div className="vtk-history-vouchers-top">
+          <div className="vtk-history-balance">
+            <RewardCoins
+              amount={vouchers.balance}
+              display={formatVouchers(vouchers.balance, locale)}
+              label={formatVoucherCount(vouchers.balance, locale)}
+              size="lg"
+            />
+            <small>{t.vouchersLeft}</small>
+          </div>
+          <dl className="vtk-history-vouchers-sum">
+            <div>
+              <dt>{t.vouchersEarnedAll}</dt>
+              <dd>{formatVouchers(vouchers.earned, locale)}</dd>
+            </div>
+            <div>
+              <dt>{t.vouchersUsed}</dt>
+              <dd>{formatVouchers(vouchers.used, locale)}</dd>
+            </div>
+          </dl>
+        </div>
+        {vouchers.spent.length > 0 ? (
+          <div className="vtk-history-recent">
+            <h3 className="vtk-history-subh">{t.vouchersRecent}</h3>
+            <ul className="vtk-history-spent">
+              {vouchers.spent.map((entry) => (
+                <li key={entry.id}>
+                  <span className="vtk-history-spent-when">
+                    {new Date(entry.at).toLocaleDateString(intl, {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                      timeZone: TIMEZONE,
+                    })}
+                  </span>
+                  <span className="vtk-history-spent-what">
+                    {entry.id.startsWith('theokot:') ? t.vouchersSandwich : entry.label}
+                  </span>
+                  <b>&minus;{formatVouchers(entry.amount, locale)}</b>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        <p className="vtk-history-note">{t.vouchersNote}</p>
       </section>
 
       <div className="vtk-history-cols">

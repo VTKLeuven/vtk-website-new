@@ -20,11 +20,14 @@ export function RewardCoins({
   label,
   size,
   withheld = false,
+  display,
 }: {
   amount: number;
   label: string;
   size?: 'sm' | 'lg';
   withheld?: boolean;
+  /** Het getal zoals het er moet staan, bv. "2,5" voor een saldo met een half bonnetje. */
+  display?: string;
 }) {
   return (
     <span
@@ -35,7 +38,7 @@ export function RewardCoins({
       title={label}
       aria-label={label}
     >
-      {amount}
+      {display ?? amount}
       <span className="vtk-reward-coins" aria-hidden="true">
         <span className="vtk-reward-coin vtk-reward-coin-back" />
         <span className="vtk-reward-coin vtk-reward-coin-face" />
