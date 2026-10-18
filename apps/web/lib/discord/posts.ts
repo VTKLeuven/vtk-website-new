@@ -16,7 +16,7 @@ import {
   type DiscordEventPost,
   type DiscordMessage,
 } from "./eventMessage";
-import { DISCORD_MAX_ATTEMPTS, DISCORD_SENDING_STALE_MS, discordAutoPostDue } from "./rules";
+import { DISCORD_LEAD_MS, DISCORD_MAX_ATTEMPTS, DISCORD_SENDING_STALE_MS, discordAutoPostDue } from "./rules";
 
 /**
  * Evenementen naar Discord posten: vanzelf na het bewaren, vanuit de worker als
@@ -276,12 +276,14 @@ export async function autoPostEventToDiscord(eventId: string): Promise<void> {
   try {
     const event = await prisma.calendarEvent.findUnique({
       where: { id: eventId },
-      select: { publishedAt: true, imageKey: true },
+      select: { publishedAt: true, imageKey: true, start: true },
     });
-    // De snelle weg voor het gewone geval: een concept of nog geen banner.
+    // De snelle weg voor het gewone geval: een concept, nog geen banner, of
+    // meer dan twee weken weg (dan neemt de worker het later op).
     if (!event?.publishedAt || !event.imageKey) return;
+    if (event.start.getTime() - DISCORD_LEAD_MS > Date.now()) return;
     const webhooks = await prisma.discordWebhook.findMany({
-      where: { enabled: true, autoSince: { lte: event.publishedAt } },
+      where: { enabled: true },
       select: { id: true },
     });
     for (const webhook of webhooks) {
@@ -329,15 +331,24 @@ export async function processDueDiscordPosts(
   });
 
   for (const webhook of webhooks) {
+    // Dezelfde regels als `discordWaitReason`, als query: binnen de twee weken,
+    // en voor Discord nieuw geworden na de webhook. Dat laatste is
+    // max(publicatie, start min twee weken) >= autoSince, en dat is "een van
+    // de twee is het".
     const due = await prisma.calendarEvent.findMany({
       where: {
-        publishedAt: { not: null, gte: webhook.autoSince },
+        publishedAt: { not: null },
         imageKey: { not: null },
+        start: { lte: new Date(now.getTime() + DISCORD_LEAD_MS) },
         end: { gte: now },
         discordPosts: { none: { webhookId: webhook.id } },
+        OR: [
+          { publishedAt: { gte: webhook.autoSince } },
+          { start: { gte: new Date(webhook.autoSince.getTime() + DISCORD_LEAD_MS) } },
+        ],
       },
       select: { id: true },
-      orderBy: { publishedAt: "asc" },
+      orderBy: { start: "asc" },
       take: BATCH_PER_WEBHOOK,
     });
     for (const event of due) {

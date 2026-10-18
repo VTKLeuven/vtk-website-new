@@ -36,8 +36,8 @@ export function WebhookForm({
             ? "Webhook opgeslagen"
             : "Webhook saved"
           : nl
-            ? "Webhook toegevoegd. Nieuwe evenementen met een banner komen vanaf nu in het kanaal."
-            : "Webhook added. New events with a banner will now appear in the channel."
+            ? "Webhook toegevoegd. Evenementen met een banner komen voortaan twee weken op voorhand in het kanaal."
+            : "Webhook added. Events with a banner will now appear in the channel two weeks ahead."
       }
       errorMessages={{
         INVALID_INPUT: nl ? "Geef de webhook een naam." : "Give the webhook a name.",

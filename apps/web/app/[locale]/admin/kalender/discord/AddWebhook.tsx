@@ -30,8 +30,8 @@ export function AddWebhook({ locale, startOpen }: { locale: Locale; startOpen: b
         <h2 className="text-lg font-semibold text-vtk-ink">{nl ? "Webhook toevoegen" : "Add webhook"}</h2>
         <p className="mt-1 text-sm text-vtk-muted">
           {nl
-            ? "Evenementen die al gepubliceerd zijn, komen niet vanzelf in het nieuwe kanaal; die post je hieronder met de hand."
-            : "Events that are already published do not appear in the new channel by themselves; post those by hand below."}
+            ? "Evenementen komen twee weken voor ze beginnen in het kanaal, ook die al online staan. Wat nu al binnen die twee weken valt, komt niet vanzelf; dat post je hieronder met de hand."
+            : "Events appear in the channel two weeks before they start, including those already online. What already falls within those two weeks does not appear by itself; post that by hand below."}
         </p>
       </div>
       <WebhookForm

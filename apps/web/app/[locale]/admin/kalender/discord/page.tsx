@@ -11,7 +11,7 @@ import { DiscordMessagePreview } from "@/components/admin/DiscordMessagePreview"
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { discordPreview } from "@/lib/discord/posts";
-import { DISCORD_SENDING_STALE_MS, discordWaitReason } from "@/lib/discord/rules";
+import { DISCORD_SENDING_STALE_MS, discordDueAt, discordWaitReason } from "@/lib/discord/rules";
 import { discordChannelUrl } from "@/lib/discord/webhookUrl";
 import { postEventToDiscordAction } from "@/app/actions/discord";
 import { FilterPill } from "../FilterPill";
@@ -152,8 +152,24 @@ export default async function AdminDiscordWebhooks({
           tone: "wait",
           detail: nl ? "Gaat vanzelf zodra er een banner op staat." : "Goes out once it has a banner.",
         };
+      case "scheduled": {
+        const dueAt = discordDueAt(event)!;
+        return {
+          label: nl ? "Gepland" : "Scheduled",
+          tone: "muted",
+          detail: nl
+            ? `Gaat vanzelf op ${dayFmt.format(dueAt)}, twee weken op voorhand.`
+            : `Goes out on ${dayFmt.format(dueAt)}, two weeks ahead.`,
+        };
+      }
       case "before-webhook":
-        return { label: nl ? "Van voor deze webhook" : "From before this webhook", tone: "muted" };
+        return {
+          label: nl ? "Van voor deze webhook" : "From before this webhook",
+          tone: "muted",
+          detail: nl
+            ? "Zat al in de twee weken voor het begin toen de webhook erbij kwam; post het met de hand."
+            : "Was already within two weeks of its start when the webhook was added; post it by hand.",
+        };
       case "disabled":
         return { label: nl ? "Vanzelf posten staat uit" : "Automatic posting is off", tone: "muted" };
       default:
@@ -177,8 +193,8 @@ export default async function AdminDiscordWebhooks({
         <h1 className="mt-1 text-2xl font-semibold text-vtk-ink">Discord webhooks</h1>
         <p className="mt-1 max-w-2xl text-sm text-vtk-muted">
           {nl
-            ? "Nieuwe evenementen met een banner verschijnen vanzelf in deze kanalen, als VTK Kalender met het schild. Elk evenement komt hoogstens één keer in een kanaal: een latere wijziging aan titel, banner of beschrijving post niets opnieuw."
-            : "New events with a banner appear in these channels by themselves, as VTK Kalender with the shield. Each event appears in a channel at most once: a later change to the title, banner or description does not post again."}
+            ? "Evenementen met een banner verschijnen vanzelf in deze kanalen, als VTK Kalender met het schild: twee weken voor ze beginnen, of meteen wanneer ze later gepubliceerd worden. Elk evenement komt hoogstens één keer in een kanaal: een latere wijziging aan titel, banner of beschrijving post niets opnieuw."
+            : "Events with a banner appear in these channels by themselves, as VTK Kalender with the shield: two weeks before they start, or right away when they are published later than that. Each event appears in a channel at most once: a later change to the title, banner or description does not post again."}
         </p>
       </div>
 

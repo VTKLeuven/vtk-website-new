@@ -562,8 +562,8 @@ export default async function AdminFlowPreview({
         title={nl ? "Discord-post van een nieuw evenement" : "Discord post for a new event"}
         when={
           nl
-            ? "Verschijnt in elk Discord-kanaal uit /admin/kalender/discord zodra een evenement gepubliceerd is met een eigen banner, of zodra de banner er later bij komt."
-            : "Appears in every Discord channel from /admin/kalender/discord once an event is published with its own banner, or once the banner is added later."
+            ? "Verschijnt in elk Discord-kanaal uit /admin/kalender/discord twee weken voor een evenement met eigen banner begint, of meteen wanneer het later gepubliceerd wordt of de banner er later bij komt."
+            : "Appears in every Discord channel from /admin/kalender/discord two weeks before an event with its own banner starts, or right away when it is published or gets its banner later than that."
         }
         openLabel={nl ? "Toon de post" : "Show the post"}
         closeLabel={nl ? "Verberg de post" : "Hide the post"}
@@ -578,8 +578,8 @@ export default async function AdminFlowPreview({
               </li>
               <li>
                 {nl
-                  ? "Enkel wat gepubliceerd is ná het toevoegen van de webhook; oudere evenementen post je met de hand."
-                  : "Only what was published after the webhook was added; older events are posted by hand."}
+                  ? "Wat al binnen de twee weken voor zijn start viel toen de webhook erbij kwam, post je met de hand; de rest volgt vanzelf."
+                  : "What was already within two weeks of its start when the webhook was added is posted by hand; the rest follows by itself."}
               </li>
               <li>
                 {nl

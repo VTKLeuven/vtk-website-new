@@ -11701,6 +11701,12 @@ Discord knipt een avatar rond en het gewone schild verloor zo zijn hoeken), in
 groot eronder. Logica in `apps/web/lib/discord`, het bericht zelf in
 `eventMessage.ts`.
 
+- **Ten vroegste twee weken op voorhand.** Een evenement van over twee maanden
+  zegt in het kanaal nog niemand iets, en tegen dat het eraan komt, is het
+  bericht weggescrold. Het vertrekt dus wanneer het binnen de twee weken voor
+  zijn start komt, ook wanneer het al lang online staat; wat binnen die twee
+  weken gepubliceerd wordt, vertrekt meteen. De worker neemt dat elke vijf
+  minuten op, het beheer toont zo'n evenement als "Gepland" met de datum.
 - **Enkel met een eigen banner.** Een post zonder affiche is een grijs blok tekst
   tussen de berichten. Een evenement dat zonder banner gepubliceerd wordt, wacht
   dus, en verschijnt zodra de banner er later bij komt. Het beheer zegt bij zo'n
@@ -11713,11 +11719,13 @@ groot eronder. Logica in `apps/web/lib/discord`, het bericht zelf in
   zelf antwoordde dat er niets gepost is (429, 5xx), probeert de worker opnieuw;
   een time-out kan een bericht zijn dat wel aankwam, en dat blijft staan als
   mislukt met de vraag om in Discord te kijken.
-- **Enkel wat ná de webhook gepubliceerd is** (`autoSince`), en bij weer
-  aanzetten opnieuw vanaf dan. Anders gooit een nieuwe webhook de hele kalender
-  in één klap in het kanaal. De evenementen die er al stonden, post je met de
-  hand vanuit dezelfde pagina; ook zonder eigen banner, dan met de standaardfoto
-  van het thema.
+- **Niet wat al klaarlag voor de webhook bestond.** Een evenement wordt "nieuw"
+  voor Discord bij het publiceren, of twee weken voor de start als dat later is
+  (`discordDueAt`). Lag dat moment voor de webhook erbij kwam of weer aangezet
+  werd (`autoSince`), dan post je het met de hand vanuit dezelfde pagina; ook
+  zonder eigen banner, dan met de standaardfoto van het thema. Zo gooit een
+  nieuwe webhook niet alles van de komende twee weken in één klap in het kanaal,
+  terwijl wat later begint wel vanzelf volgt.
 - **Meteen na het bewaren, met de worker als vangnet.** De bewaaractie post via
   `after()`, zodat Discord het bewaren niet ophoudt; de background-worker haalt
   elke vijf minuten in wat daar niet vertrok.

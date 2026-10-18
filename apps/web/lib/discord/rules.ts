@@ -8,23 +8,33 @@
  * De regels:
  *
  * - **Gepubliceerd.** Een concept heeft geen publieke pagina om naar te linken.
+ * - **Ten vroegste twee weken op voorhand.** Een evenement van over twee
+ *   maanden zegt in het kanaal nog niemand iets, en tegen dat het eraan komt,
+ *   is het bericht weggescrold. Het vertrekt dus wanneer het binnen de twee
+ *   weken komt, ook wanneer het al lang online staat. Wat binnen de twee weken
+ *   begint, vertrekt meteen bij het publiceren.
  * - **Met een eigen banner.** Zonder affiche is een post een grijs blok tekst
  *   tussen de berichten; de banner is wat iemand doet stoppen met scrollen. Een
- *   evenement dat zonder banner gepubliceerd wordt, wacht dus, en verschijnt
- *   zodra de banner er later bij komt.
- * - **Gepubliceerd ná de webhook** (`autoSince`). Anders zou een nieuwe webhook
- *   in één klap de hele kalender in het kanaal gooien. Wat er al stond, post je
- *   met de hand.
+ *   evenement zonder banner wacht dus, en verschijnt zodra de banner er bij komt.
+ * - **Niet wat al klaarlag voor de webhook bestond** (`autoSince`). Een
+ *   evenement is "nieuw" voor Discord op zijn `discordDueAt`: het publiceren,
+ *   of twee weken voor de start als dat later is. Lag dat moment voor de
+ *   webhook er was, dan post je het met de hand. Anders gooit een nieuwe
+ *   webhook alles van de komende twee weken in één klap in het kanaal.
  * - **Nog niet voorbij.** Een aankondiging van iets dat al gedaan is, is ruis.
  * - **Eén keer per kanaal**, wat er later ook verandert. Dat bewaakt niet deze
  *   functie maar de unieke sleutel op `DiscordWebhookPost`.
  */
+
+/** Hoe lang voor de start een evenement ten vroegste in het kanaal komt. */
+export const DISCORD_LEAD_MS = 14 * 24 * 60 * 60 * 1000;
 
 export type DiscordAutoEvent = {
   /** `null` = concept. */
   publishedAt: Date | null;
   /** `null` = geen eigen banner. */
   imageKey: string | null;
+  start: Date;
   end: Date;
 };
 
@@ -33,8 +43,17 @@ export type DiscordAutoWebhook = {
   autoSince: Date;
 };
 
+/**
+ * Wanneer dit evenement voor Discord nieuw wordt: bij het publiceren, of twee
+ * weken voor de start als dat later is. `null` voor een concept.
+ */
+export function discordDueAt(event: Pick<DiscordAutoEvent, "publishedAt" | "start">): Date | null {
+  if (!event.publishedAt) return null;
+  return new Date(Math.max(event.publishedAt.getTime(), event.start.getTime() - DISCORD_LEAD_MS));
+}
+
 /** Waarom een evenement (nog) niet vanzelf vertrekt; `null` = het mag. */
-export type DiscordWaitReason = "disabled" | "draft" | "past" | "before-webhook" | "banner";
+export type DiscordWaitReason = "disabled" | "draft" | "past" | "before-webhook" | "scheduled" | "banner";
 
 export function discordWaitReason(
   event: DiscordAutoEvent,
@@ -42,11 +61,15 @@ export function discordWaitReason(
   now: Date,
 ): DiscordWaitReason | null {
   if (!webhook.enabled) return "disabled";
-  if (!event.publishedAt) return "draft";
+  const dueAt = discordDueAt(event);
+  if (!dueAt) return "draft";
   if (event.end.getTime() < now.getTime()) return "past";
-  if (event.publishedAt.getTime() < webhook.autoSince.getTime()) return "before-webhook";
-  // De banner als laatste: van de redenen hierboven is dit de enige die nog
-  // vanzelf goedkomt, dus enkel dan zegt het beheer "wacht op banner".
+  if (dueAt.getTime() < webhook.autoSince.getTime()) return "before-webhook";
+  if (dueAt.getTime() > now.getTime()) return "scheduled";
+  // De banner als laatste: van de redenen hierboven is dit de enige waar
+  // iemand nog iets aan moet doen, dus enkel dan zegt het beheer "wacht op
+  // banner". Een evenement dat nog gepland staat, kan zijn banner tegen dan
+  // nog krijgen.
   if (!event.imageKey) return "banner";
   return null;
 }

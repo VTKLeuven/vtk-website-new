@@ -220,8 +220,8 @@ export function WebhookCard({ locale, webhook }: { locale: Locale; webhook: Webh
             <span className="block text-xs text-vtk-muted">
               {enabled
                 ? nl
-                  ? `Wat sinds ${webhook.autoSinceLabel} gepubliceerd is, met banner`
-                  : `What was published since ${webhook.autoSinceLabel}, with a banner`
+                  ? `Twee weken op voorhand, met banner (aan sinds ${webhook.autoSinceLabel})`
+                  : `Two weeks ahead, with a banner (on since ${webhook.autoSinceLabel})`
                 : nl
                   ? "Uit: enkel met de hand en testberichten"
                   : "Off: only by hand and test messages"}

@@ -2198,10 +2198,12 @@ model DiscordWebhook {
   url     String  @unique
   /// Uit = er vertrekt niets meer vanzelf. Handmatig posten en testen kan wel.
   enabled Boolean @default(true)
-  /// Vanaf welk publicatiemoment een evenement hier vanzelf verschijnt. Bij het
-  /// toevoegen, en bij elke keer weer aanzetten, is dat "nu": anders zou een
-  /// nieuwe webhook in één klap de hele kalender in het kanaal gooien. Wat
-  /// ervoor gepubliceerd is, post je met de hand.
+  /// Vanaf wanneer deze webhook vanzelf post. Een evenement verschijnt twee
+  /// weken voor zijn start, of meteen wanneer het later gepubliceerd wordt;
+  /// lag dat moment voor `autoSince`, dan post je het met de hand. Bij het
+  /// toevoegen, en bij elke keer weer aanzetten, is dit "nu": anders zou een
+  /// nieuwe webhook alles van de komende twee weken in één klap in het kanaal
+  /// gooien. Zie apps/web/lib/discord/rules.ts.
   autoSince DateTime @default(now()) @db.Timestamptz(3)
 
   /// Zoals Discord de webhook kent, opgehaald bij het toevoegen. Enkel ter

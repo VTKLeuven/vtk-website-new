@@ -7,7 +7,7 @@ import {
   discordWhen,
   type DiscordEventPost,
 } from "@/lib/discord/eventMessage";
-import { discordAutoPostDue, discordWaitReason } from "@/lib/discord/rules";
+import { discordAutoPostDue, discordDueAt, discordWaitReason } from "@/lib/discord/rules";
 import { discordChannelUrl, parseDiscordWebhookUrl } from "@/lib/discord/webhookUrl";
 
 const ID = "1234567890123456789";
@@ -50,33 +50,63 @@ describe("een Discord-webhook-URL", () => {
 });
 
 describe("wanneer een evenement vanzelf in een kanaal komt", () => {
+  const day = 24 * 60 * 60 * 1000;
   const now = new Date("2026-10-18T12:00:00Z");
   const webhook = { enabled: true, autoSince: new Date("2026-10-01T00:00:00Z") };
   const event = {
     publishedAt: new Date("2026-10-10T09:00:00Z"),
     imageKey: "events/affiche.jpg",
-    end: new Date("2026-10-30T23:00:00Z"),
+    start: new Date("2026-10-25T19:00:00Z"),
+    end: new Date("2026-10-25T23:00:00Z"),
   };
+  const inDays = (days: number) => ({
+    start: new Date(now.getTime() + days * day),
+    end: new Date(now.getTime() + days * day + 4 * 3600e3),
+  });
 
-  it("post een gepubliceerd evenement met banner van na de webhook", () => {
+  it("post een gepubliceerd evenement met banner binnen de twee weken", () => {
     expect(discordWaitReason(event, webhook, now)).toBeNull();
     expect(discordAutoPostDue(event, webhook, now)).toBe(true);
   });
 
-  it("wacht op de banner, en zegt dat ook", () => {
-    expect(discordWaitReason({ ...event, imageKey: null }, webhook, now)).toBe("banner");
+  it("wacht met iets van over twee maanden tot twee weken op voorhand", () => {
+    const later = { ...event, ...inDays(60) };
+    expect(discordWaitReason(later, webhook, now)).toBe("scheduled");
+    expect(discordDueAt(later)).toEqual(new Date(later.start.getTime() - 14 * day));
+    const twoWeeksBefore = new Date(later.start.getTime() - 14 * day + 60e3);
+    expect(discordWaitReason(later, webhook, twoWeeksBefore)).toBeNull();
   });
 
-  it("gooit de kalender van voor de webhook niet in het kanaal", () => {
-    const old = { ...event, publishedAt: new Date("2026-09-01T09:00:00Z") };
-    expect(discordWaitReason(old, webhook, now)).toBe("before-webhook");
-    // Ook niet wanneer de banner er pas later bij kwam: dat blijft met de hand.
-    expect(discordWaitReason({ ...old, imageKey: null }, webhook, now)).toBe("before-webhook");
+  it("post wat al lang online staat, zodra het binnen de twee weken komt", () => {
+    // Gepubliceerd voor de webhook bestond, maar begint pas over een maand.
+    const old = { ...event, publishedAt: new Date("2026-09-01T09:00:00Z"), ...inDays(30) };
+    expect(discordWaitReason(old, webhook, now)).toBe("scheduled");
+    expect(discordWaitReason(old, webhook, new Date(old.start.getTime() - 13 * day))).toBeNull();
+  });
+
+  it("post wat binnen de twee weken gepubliceerd wordt meteen", () => {
+    const soon = { ...event, publishedAt: now, ...inDays(5) };
+    expect(discordDueAt(soon)).toEqual(now);
+    expect(discordWaitReason(soon, webhook, now)).toBeNull();
+  });
+
+  it("gooit niet alles van de komende twee weken in het kanaal bij een nieuwe webhook", () => {
+    const fresh = { enabled: true, autoSince: now };
+    const alreadyDue = { ...event, publishedAt: new Date("2026-09-01T09:00:00Z"), ...inDays(5) };
+    expect(discordWaitReason(alreadyDue, fresh, now)).toBe("before-webhook");
+    // Wat pas later binnen de twee weken komt, volgt wel vanzelf.
+    const later = { ...alreadyDue, ...inDays(20) };
+    expect(discordWaitReason(later, fresh, now)).toBe("scheduled");
+  });
+
+  it("wacht op de banner, en zegt dat pas wanneer het evenement aan de beurt is", () => {
+    expect(discordWaitReason({ ...event, imageKey: null }, webhook, now)).toBe("banner");
+    expect(discordWaitReason({ ...event, imageKey: null, ...inDays(40) }, webhook, now)).toBe("scheduled");
   });
 
   it("post geen concept, niets van voorbij en niets wanneer de webhook uit staat", () => {
     expect(discordWaitReason({ ...event, publishedAt: null }, webhook, now)).toBe("draft");
-    expect(discordWaitReason({ ...event, end: new Date("2026-10-17T00:00:00Z") }, webhook, now)).toBe("past");
+    expect(discordWaitReason({ ...event, ...inDays(-2) }, webhook, now)).toBe("past");
     expect(discordWaitReason(event, { ...webhook, enabled: false }, now)).toBe("disabled");
   });
 });
