@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getDictionary, type Locale } from "@vtk/i18n";
-import { DOPL_FEEDBACK_FORM_URL, DOPL_ORIGIN, doplFeedbackEmbedUrl } from "@/lib/feedback";
+import { DOPL_ORIGIN, doplFeedbackEmbedUrl, doplFeedbackFormUrl, type DoplFeedbackContext } from "@/lib/feedback";
 
 /**
  * "Feedback over de website", vanuit het accountmenu.
@@ -20,9 +20,21 @@ import { DOPL_FEEDBACK_FORM_URL, DOPL_ORIGIN, doplFeedbackEmbedUrl } from "@/lib
  * en de berichten `dopl:resize` en `dopl:close`, enkel van Dopl zelf.
  *
  * Het formulier van Dopl draagt zijn eigen titel en sluitknop; deze modal is
- * daarom enkel een kader, zonder tweede kop.
+ * daarom enkel een kader, zonder tweede kop. De taal van de pagina en de naam
+ * en het adres van wie ingelogd is gaan mee in de URL, zodat Dopl niet in het
+ * Engels vraagt wie je bent terwijl de site dat al weet.
  */
-export function FeedbackDialog({ locale, onClose }: { locale: Locale; onClose: () => void }) {
+export function FeedbackDialog({
+  locale,
+  name,
+  email,
+  onClose,
+}: {
+  locale: Locale;
+  name: string;
+  email: string;
+  onClose: () => void;
+}) {
   const dict = getDictionary(locale).feedback;
 
   // Naar `document.body` en niet in het accountmenu: dat paneel heeft
@@ -31,19 +43,24 @@ export function FeedbackDialog({ locale, onClose }: { locale: Locale; onClose: (
   // van het menu geknipt worden.
   if (typeof document === "undefined") return null;
 
-  return createPortal(<FeedbackFrame dict={dict} onClose={onClose} />, document.body);
+  return createPortal(
+    <FeedbackFrame dict={dict} context={{ locale, name, email }} onClose={onClose} />,
+    document.body,
+  );
 }
 
 function FeedbackFrame({
   dict,
+  context,
   onClose,
 }: {
   dict: ReturnType<typeof getDictionary>["feedback"];
+  context: DoplFeedbackContext;
   onClose: () => void;
 }) {
   const pathname = usePathname();
   const frameRef = useRef<HTMLIFrameElement>(null);
-  const [src] = useState(() => doplFeedbackEmbedUrl(window.location.origin));
+  const [src] = useState(() => doplFeedbackEmbedUrl(window.location.origin, context));
   const [height, setHeight] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -100,7 +117,7 @@ function FeedbackFrame({
         <p className="vtk-feedback-context">
           {dict.pageLabel}: <code>{pathname}</code>
           <span aria-hidden="true"> · </span>
-          <a href={DOPL_FEEDBACK_FORM_URL} target="_blank" rel="noopener noreferrer">
+          <a href={doplFeedbackFormUrl(context)} target="_blank" rel="noopener noreferrer">
             {dict.openInTab}
           </a>
           <span aria-hidden="true"> · </span>

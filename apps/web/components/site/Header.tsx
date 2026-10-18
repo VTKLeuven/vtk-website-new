@@ -164,6 +164,7 @@ export async function Header({ locale }: { locale: Locale }) {
           {session ? (
             <ProfileMenu
               name={session.user.name}
+              email={session.user.email}
               avatarUrl={publicUrl(session.user.avatarKey)}
               isAdmin={session.user.isSuperAdmin || session.permissions.length > 0}
               tools={postAdminLinks(session)}

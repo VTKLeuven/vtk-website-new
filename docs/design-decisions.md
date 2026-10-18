@@ -9131,10 +9131,23 @@ en sluitknop, dus de modal is enkel een kader; onder dat kader staan nog een
 link om het in een nieuw tabblad te openen en een sluitknop, voor wanneer Dopl
 niet laadt.
 
-**Het pad gaat niet meer vanzelf mee.** Dopl kent geen voorinvulling vanuit de
-URL, dus de modal toont de pagina waar je stond, zodat je ze kan overnemen. Wie
-dat terug automatisch wil, voegt in Dopl een voorinvulling toe; het pad hangt
-dan aan `doplFeedbackEmbedUrl` in `lib/feedback.ts`.
+**Taal, naam en adres gaan mee in de URL.** Dopl zelf is Engelstalig, maar zijn
+publieke formulier spreekt Nederlands met `?lang=nl`, en neemt `?email=` en
+`?name=` over als voorinvulling (Dopl D-142). De site geeft de taal van de pagina
+mee en, omdat enkel wie ingelogd is het accountmenu heeft, de naam en het adres
+van het account. Dopl toont die dan als één regel ("Je verstuurt dit als ...")
+met een knop om ze te wijzigen, in plaats van twee lege velden. Het adres blijft
+wijzigbaar: het is waar het antwoord van IT naartoe gaat, en dat mag een ander
+zijn. Het staat daardoor wel in de URL van de iframe, en dus in de toegangslog
+van Dopl; dat is hetzelfde adres dat bij het indienen toch naar Dopl gaat.
+
+De bevestigingsmail en de statuspagina van Dopl zijn nog Engels: die taal zou
+Dopl bij de aanvraag moeten bewaren, en dat doet het (nog) niet.
+
+**Het pad gaat niet vanzelf mee.** Het formulier heeft geen veld voor de pagina,
+dus de modal toont de pagina waar je stond, zodat je ze kan overnemen. Wie dat
+terug automatisch wil, geeft het formulier in Dopl een verborgen veld dat uit de
+URL voorinvult; het pad hangt dan aan `doplFeedbackEmbedUrl` in `lib/feedback.ts`.
 
 **Dopl moet de site toelaten.** Een inzending wordt in Dopl enkel aanvaard van
 een oorsprong in de `allowedEmbedOrigins` van het formulier (leeg = overal). Staat

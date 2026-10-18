@@ -20,6 +20,7 @@ const FeedbackDialog = dynamic(() => import("./FeedbackDialog").then((m) => m.Fe
 
 export function ProfileMenu({
   name,
+  email,
   avatarUrl = null,
   isAdmin,
   tools,
@@ -32,6 +33,8 @@ export function ProfileMenu({
   previewActive = false,
 }: {
   name: string;
+  /** Gaat mee naar het feedbackformulier van Dopl, dat er anders om vraagt. */
+  email: string;
   /** Profielfoto (`publicUrl(user.avatarKey)`); zonder foto blijft de initiaal staan. */
   avatarUrl?: string | null;
   isAdmin: boolean;
@@ -250,7 +253,12 @@ export function ProfileMenu({
       {/* Buiten het menu: de modal moet blijven staan wanneer het menu sluit,
           en bij de niet-editorial variant verdwijnt dat menu uit de DOM. */}
       {feedbackOpen ? (
-        <FeedbackDialog locale={locale} onClose={() => setFeedbackOpen(false)} />
+        <FeedbackDialog
+          locale={locale}
+          name={name}
+          email={email}
+          onClose={() => setFeedbackOpen(false)}
+        />
       ) : null}
     </div>
   );
