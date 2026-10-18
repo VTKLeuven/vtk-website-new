@@ -186,7 +186,17 @@
       animation-range: entry 15% entry 75%;
     }
 
-    .vtk-motion .prose-vtk .vtk-letter {
+    /* Een woord breekt als geheel naar de volgende regel; enkel een woord dat
+       langer is dan een hele regel, breekt tussen zijn letters. Zie
+       revealLetters. */
+    .vtk-motion .prose-vtk .vtk-letters-word {
+      display: inline-block;
+      max-width: 100%;
+    }
+
+    /* Niet in een tabel: beweging hoort bij het lezen van een tekst, en een
+       kolom vetgedrukte rijkoppen die om beurt golft, is onrust. */
+    .vtk-motion .prose-vtk .vtk-letter:not(table *) {
       display: inline-block;
       animation: vtk-letter-wave linear both;
       animation-timeline: view(block var(--motion-inset) auto);

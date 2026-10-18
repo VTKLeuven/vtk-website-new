@@ -135,6 +135,50 @@ body {
 .prose-vtk hr {
   @apply my-6 border-0 border-t border-vtk-blue/20;
 }
+/* Een Markdown-tabel (GFM) in een witte kaart met haarlijnen, de kolomkoppen in
+   kleine kapitalen zoals de deelnemerslijst van een event. De kaart is zelf de
+   horizontale scroller (de `table`-override in Markdown.tsx) en is
+   gepositioneerd: een `sr-only`-kopie van vetgedrukte tekst in een cel ankert
+   anders op de pagina, op de x van haar kolom, en een telefoon zoomt dan uit.
+
+   `overflow-wrap: normal` in de cellen: het `break-word` van `.prose-vtk` laat
+   een kolom in een smalle tabel tot op één letter krimpen, zodat namen midden
+   in een woord afbraken. Een kolom is nu minstens haar langste woord breed, en
+   wat niet past, scrolt. Een uitlijning uit de Markdown (`:---:`) komt als
+   inline stijl en wint van de `text-align` hieronder. */
+.prose-vtk .vtk-table {
+  position: relative;
+  margin: 1.5rem 0;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.prose-vtk table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.prose-vtk :is(th, td) {
+  min-width: 7rem;
+  padding: 12px 16px;
+  overflow-wrap: normal;
+  text-align: left;
+  vertical-align: top;
+}
+.prose-vtk thead th {
+  background: var(--paper-2);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.prose-vtk td {
+  border-top: 1px solid var(--line);
+  color: var(--body);
+}
 /* Een losstaande foto met een bijschrift. Het kader draagt de ronding, de rand
    en de schaduw, en het knipt; de foto beweegt en zoomt daarbinnen
    (vtk-motion.css). Stond de ronding op de foto zelf, dan viel ze bij het

@@ -203,6 +203,14 @@ export function Markdown({
 
           return <p>{paragraphChildren}</p>;
         },
+        // Een tabel staat in een eigen horizontale scroller: vier kolommen
+        // passen op een telefoon niet in de tekstkolom en duwden anders de hele
+        // pagina breder. De opmaak staat bij `.prose-vtk` in globals.css.
+        table: ({ children: tableChildren }) => (
+          <div className="vtk-table">
+            <table>{tableChildren}</table>
+          </div>
+        ),
         // Zelfde gedrag als de oude tiptap-renderer: links openen in een nieuw
         // tabblad. Interne ankers (#...) blijven in dezelfde pagina.
         a: ({ href, children: linkChildren }) => {

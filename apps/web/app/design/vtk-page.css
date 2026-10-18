@@ -592,7 +592,7 @@
    volledige tekst staat ernaast in een `sr-only`-kopie voor screenreaders. Die
    kopie is absoluut gepositioneerd en moet in dit stukje tekst blijven hangen
    in plaats van in de eerste de beste gepositioneerde voorouder. */
-.vtk-page-content .prose-vtk :is(p, li) > strong {
+.vtk-page-content .prose-vtk :is(p, li, td) > strong {
   position: relative;
   color: var(--navy);
 }

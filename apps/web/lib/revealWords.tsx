@@ -34,23 +34,34 @@ export function revealWords(text: string): ReactNode[] {
  * - **De letters gaan verborgen voor een screenreader, met de hele tekst
  *   ernaast.** Elementgrenzen midden in een woord laten sommige screenreaders
  *   de letters los uitspreken; de `sr-only`-kopie houdt "praesidium" één woord.
+ * - **De letters van een woord staan samen in een eigen span.** Elke letter is
+ *   een `inline-block` zodra ze animeert, en naast een `inline-block` mag de
+ *   regel altijd breken. Los naast elkaar brak een vetgedrukt woord dus midden
+ *   in ("al / gemene richti / ng" in een smalle tabelkolom); het woord-span
+ *   (vtk-motion.css) houdt het bij elkaar.
  */
 export const LETTER_LIMIT = 60;
 
 export function revealLetters(text: string): ReactNode {
   let index = 0;
-  const letters = [...text].map((char, i) => {
-    if (char === " ") return char;
-    const style = { "--i": index++ } as CSSProperties;
+  const words = text.split(/(\s+)/).map((part, w) => {
+    if (!part || /^\s+$/.test(part)) return part;
     return (
-      <span key={i} className="vtk-letter" style={style}>
-        {char}
+      <span key={w} className="vtk-letters-word">
+        {[...part].map((char, i) => {
+          const style = { "--i": index++ } as CSSProperties;
+          return (
+            <span key={i} className="vtk-letter" style={style}>
+              {char}
+            </span>
+          );
+        })}
       </span>
     );
   });
   return (
     <>
-      <span aria-hidden="true">{letters}</span>
+      <span aria-hidden="true">{words}</span>
       <span className="sr-only">{text}</span>
     </>
   );
