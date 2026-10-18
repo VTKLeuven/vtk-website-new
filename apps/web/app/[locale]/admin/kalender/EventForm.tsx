@@ -7,6 +7,7 @@ import { saveEventAction } from '@/app/actions/calendar';
 import { DEFAULT_EVENT_LINK_LABEL, EVENT_LINK_LABEL_MAX } from '@/lib/calendar/eventLink';
 import { MarkdownEditorField } from '@/components/editor/MarkdownEditor';
 import { SaveForm } from '@/components/ui/SaveForm';
+import { ExternalLinkIcon } from '@/components/ui/icons';
 import { saveErrorMessages } from '@/lib/saveMessages';
 import { mobileCropFrom, toImageFocus } from '@/lib/imageFocus';
 import { ORGANISER_PRESETS } from '@/lib/calendar/organiser';
@@ -430,6 +431,22 @@ export function EventForm({
                       ? 'Nieuw'
                       : 'New'}
               </span>
+              {/* De publieke pagina zoals een bezoeker ze ziet, om na te kijken
+                  of alles goed staat. In een nieuw tabblad: wat hier nog niet
+                  opgeslagen is, blijft zo staan. Toont de laatst opgeslagen
+                  versie, dus na een wijziging eerst opslaan. Een concept heeft
+                  nog geen publieke pagina; de regel hieronder zegt dat. */}
+              {isPublished && event.slug ? (
+                <a
+                  href={`${base}/kalender/${event.slug}`}
+                  target="_blank"
+                  rel="noopener"
+                  className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full border border-vtk-blue/15 px-4 text-sm font-medium text-vtk-ink transition-colors hover:border-vtk-blue/30 hover:bg-vtk-blue-soft/70"
+                >
+                  {nl ? 'Bekijk de eventpagina' : 'View the event page'}
+                  <ExternalLinkIcon />
+                </a>
+              ) : null}
               {submitButton}
               {secondaryButtons}
             </div>
@@ -441,8 +458,8 @@ export function EventForm({
                 : 'Visible on the calendar, the home page, the calendar feeds and in the app.'
               : isDraft
                 ? nl
-                  ? 'Dit evenement staat nog nergens online. Klik op Publiceren wanneer het klaar is.'
-                  : 'This event is not online anywhere yet. Click Publish when it is ready.'
+                  ? 'Dit evenement staat nog nergens online, en heeft dus ook nog geen eventpagina. Klik op Publiceren wanneer het klaar is.'
+                  : 'This event is not online anywhere yet, so it has no event page either. Click Publish when it is ready.'
                 : nl
                   ? 'Nog niets staat online. Publiceren zet het meteen op de kalender; opslaan als concept houdt het voor jezelf.'
                   : 'Nothing is online yet. Publishing puts it on the calendar at once; saving as a draft keeps it to yourself.'}
