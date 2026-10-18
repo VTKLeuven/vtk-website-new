@@ -8,6 +8,7 @@ import { Label } from "@vtk/ui";
 import { IconButton } from "@/components/ui/IconButton";
 import { TrashIcon, UploadIcon } from "@/components/ui/icons";
 import { useReportFormBusy } from "@/components/ui/formBusy";
+import { FileDropOverlay, useFileDrop } from "@/components/ui/FileDrop";
 import { storageKeyPath } from "@/lib/storageKeyPath";
 
 function mediaUrl(key: string): string {
@@ -28,6 +29,8 @@ function mediaUrl(key: string): string {
  * verschijnt: de preview toont die dan, in plaats van te beweren dat er een
  * standaardfoto is zonder ze te laten zien. Zonder `fallbackUrl` toont de
  * preview het gestreepte placeholder-patroon van de site.
+ *
+ * Op een computer is het hele veld ook een sleepzone (`useFileDrop`).
  */
 export function StorageImageField({
   defaultKey,
@@ -99,6 +102,24 @@ export function StorageImageField({
 
   useReportFormBusy(uploading);
 
+  const drop = useFileDrop({
+    accept: "image/*",
+    disabled: uploading,
+    onFiles: ([file]) => void onFile(file),
+    onReject: (reason) => {
+      setWarning(null);
+      setErr(
+        reason === "multiple"
+          ? nl
+            ? "Sleep één foto tegelijk: dit veld bewaart één foto."
+            : "Drop one photo at a time: this field holds one photo."
+          : nl
+            ? "Dat is geen afbeelding. Sleep een foto, bv. een JPG of PNG."
+            : "That is not an image. Drop a photo, such as a JPG or PNG.",
+      );
+    },
+  });
+
   async function onFile(file: File) {
     const sizeError = imageUploadSizeError(file, locale, kind === "badge" ? "badge" : "image");
     setErr(sizeError);
@@ -156,7 +177,12 @@ export function StorageImageField({
       <input type="hidden" name={`${name}__cleared`} value={cleared ? "1" : ""} />
       {/* Smal: de preview boven de knop. Naast elkaar houdt de knop op een
           telefoon nog geen tien tekens over en breekt "Foto kiezen" in tweeën. */}
-      <div className="flex flex-col items-start gap-3 sm:flex-row sm:gap-4">
+      <div {...drop.zoneProps} className="relative flex flex-col items-start gap-3 sm:flex-row sm:gap-4">
+        {drop.dragging && (
+          <FileDropOverlay className="-inset-2">
+            {nl ? "Laat los om de foto te uploaden" : "Drop to upload the photo"}
+          </FileDropOverlay>
+        )}
         <div className="relative grid aspect-[16/10] w-40 shrink-0 place-items-center overflow-hidden rounded-xl border border-vtk-blue/15">
           {shownUrl ? (
             <>
@@ -195,7 +221,7 @@ export function StorageImageField({
           )}
         </div>
         <div className="w-full min-w-0 flex-1 space-y-2">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <label
               className={`inline-flex items-center gap-2 rounded-full border border-vtk-blue/15 px-3 py-1.5 text-sm transition-colors ${
                 uploading
@@ -237,6 +263,13 @@ export function StorageImageField({
               >
                 <TrashIcon />
               </IconButton>
+            )}
+            {/* Enkel met een muis: op een telefoon sleep je geen bestanden. Met
+                een foto erin valt de zin weg; slepen vervangt ze dan nog altijd. */}
+            {!key && !uploading && (
+              <span className="hidden text-sm text-vtk-muted pointer-fine:inline">
+                {nl ? "of sleep een foto hierheen" : "or drop a photo here"}
+              </span>
             )}
           </div>
           {helpText && <p className="text-xs text-[#5c667f]">{helpText}</p>}

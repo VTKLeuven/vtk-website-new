@@ -419,6 +419,15 @@ the design language into the application instead of copying mockup content.
     `https://` terwijl hun eigen renderer een intern pad al correct afhandelde,
     dus een werkende bestemming was niet op te slaan.
 
+- Uploadvelden nemen ook een gesleept bestand aan. Gebruik `useFileDrop` en
+  `FileDropOverlay` uit `apps/web/components/ui/FileDrop.tsx`, zoals
+  `StorageImageField`, `FileField`, `ReceiptField` en `AvatarCropField` doen;
+  schrijf geen eigen `onDrop`. De hook past `accept` toe (een drop gaat niet
+  langs het filter van het systeemdialoog), en zolang er een zone op de pagina
+  staat, opent een bestand dat ernaast valt niet in het tabblad. Een eigen
+  `window`-luisteraar per zone zou de drop op elke andere zone van dezelfde
+  pagina weigeren, en /admin/home heeft er elf.
+
 - Markdown editing: gebruik
   `apps/web/components/editor/MarkdownEditor.tsx` voor alle langere,
   opgemaakte tekst die als Markdown wordt opgeslagen. Gebruik
