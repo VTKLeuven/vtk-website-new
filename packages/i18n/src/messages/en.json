@@ -320,7 +320,7 @@
     "preferenceUniversity": "University email",
     "preferencePersonal": "Personal email",
     "mailHeading": "Mailing lists",
-    "mailIntro": "Which categories would you like to receive emails about? Pick as many or as few as you like.",
+    "mailIntro": "Which categories would you like to receive emails about? Pick as many or as few as you like. With Events you also get a reminder at noon the day before an event you marked your interest in.",
     "mailUnsubscribedHeading": "You unsubscribed from our emails",
     "mailUnsubscribedHint": "You did that through the unsubscribe link at the bottom of a VTK email. While this is the case you receive no mailing list at all, not even the categories still ticked below.",
     "mailResubscribe": "I want to receive emails again",

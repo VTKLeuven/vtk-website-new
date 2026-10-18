@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { z } from "zod";
 import { prisma } from "@vtk/db";
 import { hasPermission } from "@vtk/auth";
@@ -20,6 +21,7 @@ import {
   uniqueEventSlug,
 } from "@/lib/calendar/slug";
 import { EVENT_LINK_LABEL_MAX } from "@/lib/calendar/eventLink";
+import { autoPostEventToDiscord } from "@/lib/discord/posts";
 
 const eventSchema = z.object({
   id: z.string().optional(),
@@ -407,6 +409,13 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
       target: input.titleNl,
     });
   }
+  // Net gepubliceerd met banner, of de banner kwam er net bij: dan hoort het
+  // evenement in de Discord-kanalen. Na het antwoord, want Discord mag het
+  // bewaren niet ophouden; de claim in `DiscordWebhookPost` zorgt dat een
+  // latere bewaring niets opnieuw post. Zie lib/discord/posts.ts.
+  const savedId = input.id ?? created?.id;
+  if (savedId) after(() => autoPostEventToDiscord(savedId));
+
   revalidatePath("/kalender");
   revalidatePath("/admin/kalender");
   // De categoriepagina's tonen dezelfde events; zonder dit blijft /kalender/<slug>

@@ -2013,6 +2013,9 @@ model CalendarEvent {
   /// = het evenement loopt gewoon van `start` tot `end` door. Zie
   /// `CalendarEventMoment`.
   moments        CalendarEventMoment[]
+  /// Waar dit evenement op Discord gepost is: hoogstens één keer per kanaal.
+  /// Zie `DiscordWebhookPost`.
+  discordPosts   DiscordWebhookPost[]
 
   @@index([start])
   @@index([publishedAt, announcedPushAt])
@@ -2174,6 +2177,114 @@ model CalendarFeedToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, revokedAt])
+}
+
+// -----------------------------------------------------------------------------
+// Discord-webhooks van de kalender
+//
+// Nieuwe evenementen verschijnen vanzelf in een of meer Discord-kanalen, gepost
+// als "VTK Kalender" met het schild. Beheer op /admin/kalender/discord, logica in
+// apps/web/lib/discord, de kringkeuzes in docs/design-decisions.md.
+// -----------------------------------------------------------------------------
+
+/// Een Discord-kanaal dat nieuwe evenementen uit de kalender krijgt.
+model DiscordWebhook {
+  id      String  @id @default(cuid())
+  /// De naam in het beheer, vrij te kiezen ("Studentendiscord #evenementen").
+  name    String
+  /// De volledige webhook-URL, en **een geheim**: wie ze heeft, post in het
+  /// kanaal. Ze verlaat de server nooit, ook niet naar het beheer; dat toont
+  /// enkel het kanaal. Uniek, zodat één kanaal niet elke post twee keer krijgt.
+  url     String  @unique
+  /// Uit = er vertrekt niets meer vanzelf. Handmatig posten en testen kan wel.
+  enabled Boolean @default(true)
+  /// Vanaf welk publicatiemoment een evenement hier vanzelf verschijnt. Bij het
+  /// toevoegen, en bij elke keer weer aanzetten, is dat "nu": anders zou een
+  /// nieuwe webhook in één klap de hele kalender in het kanaal gooien. Wat
+  /// ervoor gepubliceerd is, post je met de hand.
+  autoSince DateTime @default(now()) @db.Timestamptz(3)
+
+  /// Zoals Discord de webhook kent, opgehaald bij het toevoegen. Enkel ter
+  /// herkenning in het beheer.
+  discordName String?
+  channelId   String?
+  guildId     String?
+
+  /// De laatste weigering van Discord bij een post of test. Gewist zodra er weer
+  /// iets lukt, zodat het beheer enkel een fout toont die nog geldt.
+  lastError   String?
+  lastErrorAt DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  posts DiscordWebhookPost[]
+}
+
+enum DiscordPostStatus {
+  /// Geclaimd; het bericht is onderweg naar Discord.
+  SENDING
+  SENT
+  /// Discord weigerde, of antwoordde niet. Zie `error` en `retryable`.
+  FAILED
+}
+
+enum DiscordPostTrigger {
+  /// Vanzelf, na het publiceren of na het toevoegen van de banner.
+  AUTO
+  /// Met de hand vanuit /admin/kalender/discord.
+  MANUAL
+}
+
+/// Eén evenement in één Discord-kanaal.
+///
+/// **De rij is de claim.** Ze wordt aangemaakt vóór er iets naar Discord
+/// vertrekt, en `@@unique([webhookId, eventId])` laat er per kanaal maar één toe.
+/// Twee bewaringen kort na elkaar, of de bewaring en de worker tegelijk, kunnen
+/// dus nooit allebei posten. Een latere wijziging aan het evenement (een andere
+/// banner, een betere beschrijving) post niets opnieuw: de rij bestaat al.
+///
+/// Bij twijfel liever geen bericht dan twee: enkel wanneer Discord zelf
+/// antwoordde dat het niet lukte (`retryable`), probeert de worker opnieuw.
+model DiscordWebhookPost {
+  id        String @id @default(cuid())
+  webhookId String
+  eventId   String
+
+  status    DiscordPostStatus  @default(SENDING)
+  trigger   DiscordPostTrigger
+  /// Hoeveel keer er voor deze rij een bericht naar Discord vertrok.
+  attempts  Int                @default(0)
+  /// Mag de worker het opnieuw proberen? Enkel bij een antwoord van Discord dat
+  /// zegt dat er niets gepost is (te veel verzoeken, een storing). Een time-out
+  /// kan een bericht zijn dat wel aankwam, dus die probeert niemand vanzelf.
+  retryable Boolean            @default(false)
+  error     String?
+  /// Het bericht in Discord, uit het antwoord op `?wait=true`.
+  messageId String?
+  postedAt  DateTime?          @db.Timestamptz(3)
+
+  /// Welke knop er naast "Meer info" stond toen het bericht vertrok:
+  /// `tickets`, `form`, `link` of NULL (geen). De klik zelf zoekt de link
+  /// opnieuw op, zodat een verplaatste ticketverkoop niet op een 404 uitkomt.
+  linkKind  String?
+  linkLabel String?
+
+  /// Kliks per knop. Een browser telt per knop één keer (een cookie op het pad
+  /// van deze post), zodat het getal mensen benadert en geen dubbelklikken.
+  infoClicks  Int       @default(0)
+  linkClicks  Int       @default(0)
+  lastClickAt DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  webhook DiscordWebhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  event   CalendarEvent  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([webhookId, eventId])
+  @@index([eventId])
+  @@index([status])
 }
 
 // -----------------------------------------------------------------------------
@@ -7668,6 +7779,12 @@ model CalendarEventInterest {
   /// claim-dan-versturen-aanpak als bij de broodjes: eerst de markering in een
   /// voorwaardelijke update, dan pas het bericht.
   remindedAt DateTime? @db.Timestamptz(3)
+  /// Wanneer de herinneringsmail voor dit evenement vertrok: de dag ervoor om
+  /// 12u, enkel voor wie de mailinglijst Evenementen aan heeft. Los van
+  /// `remindedAt`, want de push en de mail lopen elk op hun eigen uur en hun
+  /// eigen voorwaarde. Geclaimd voor de mail vertrekt, net als `remindedAt`.
+  /// Zie apps/web/lib/calendar/interestReminder.ts.
+  mailRemindedAt DateTime? @db.Timestamptz(3)
 
   user  User          @relation("CalendarInterestUser", fields: [userId], references: [id], onDelete: Cascade)
   event CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -7679,6 +7796,7 @@ model CalendarEventInterest {
   @@index([userId, eventId])
   @@index([eventId])
   @@index([remindedAt])
+  @@index([mailRemindedAt])
 }
 
 /// "Ik kom naar dit alumni-evenement", aangeduid door iemand zonder account.

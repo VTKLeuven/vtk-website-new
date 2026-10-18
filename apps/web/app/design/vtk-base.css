@@ -32,6 +32,11 @@
   --chart-2: #eda100;
   --chart-3: #1b9e77;
   --chart-context: #98a2b8;
+  /* De voorvertoning van een Discord-post in het kalenderbeheer: de linkkleur
+     en het APP-label zoals Discord ze toont, zodat je het bericht herkent. Enkel
+     daar; nergens anders op de site hoort Discord-blauw. */
+  --discord-link: #006ce7;
+  --discord-blurple: #5865f2;
   /* Beschikbaarheid van een plaats (shiften): ruim, bijna vol, vol. Vol is
      bewust grijs en niet rood: het is geen fout maar een keuze die wegvalt, en
      in een drukke week staat het tien keer op het scherm. */

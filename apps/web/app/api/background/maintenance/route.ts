@@ -1,5 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { processDueHeroWeekNotices } from "@/lib/calendar/heroWeekNoticeMailer";
+import { processDueInterestReminderMails } from "@/lib/calendar/interestReminderMailer";
+import { processDueDiscordPosts } from "@/lib/discord/posts";
 import { processDueLesbezoekScheduledMails } from "@/lib/lesbezoeken-server";
 import { recordMailingListCounts } from "@/lib/mailingListHistory";
 import { processDueNoShows } from "@/lib/theokot-server";
@@ -46,7 +48,7 @@ export async function POST(request: Request) {
   }
 
   const now = new Date();
-  const [theokot, lesbezoeken, kalender, mailinglijsten, kaften, palPlus] = await Promise.allSettled([
+  const [theokot, lesbezoeken, kalender, mailinglijsten, kaften, palPlus, discord, interesse] = await Promise.allSettled([
     processDueNoShows(now),
     processDueLesbezoekScheduledMails(now),
     processDueHeroWeekNotices(now),
@@ -59,12 +61,19 @@ export async function POST(request: Request) {
     // Hier en niet in de shift-worker: het is één query per ronde, en een eigen
     // worker zou een eigen secret op de server vragen.
     processDuePalPlusReminders(now),
+    // Het vangnet voor de Discord-posts van nieuwe evenementen: wat na het
+    // bewaren niet vertrok, en wat Discord tijdelijk weigerde. Zie
+    // lib/discord/posts.ts.
+    processDueDiscordPosts(now),
+    // De herinneringsmail om 12u de dag voor een evenement waarin een lid
+    // interesse aanduidde; zie lib/calendar/interestReminderMailer.ts.
+    processDueInterestReminderMails(now),
   ]);
 
   // 502 zodra een van de taken viel: de healthcheck van de worker ziet dan dat
   // er iets scheelt in plaats van stil niets te doen. De andere taken zijn wel
   // gedraaid, en alle zijn idempotent, dus de volgende ronde haalt het in.
-  const failed = [theokot, lesbezoeken, kalender, mailinglijsten, kaften, palPlus].some(
+  const failed = [theokot, lesbezoeken, kalender, mailinglijsten, kaften, palPlus, discord, interesse].some(
     (task) => task.status === "rejected",
   );
   if (failed) {
@@ -75,6 +84,8 @@ export async function POST(request: Request) {
       mailinglijsten: describe(mailinglijsten),
       kaften: describe(kaften),
       palPlus: describe(palPlus),
+      discord: describe(discord),
+      interesse: describe(interesse),
     });
   }
 
@@ -86,6 +97,8 @@ export async function POST(request: Request) {
       mailinglijsten: describe(mailinglijsten),
       kaften: describe(kaften),
       palPlus: describe(palPlus),
+      discord: describe(discord),
+      interesse: describe(interesse),
     },
     { status: failed ? 502 : 200, headers: { "Cache-Control": "no-store" } },
   );

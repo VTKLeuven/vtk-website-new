@@ -50,6 +50,13 @@ export type MailInput = {
    * enige aanroeper (het rekeningenblad) heeft de bytes al in de hand.
    */
   attachments?: Array<{ filename: string; content: Buffer; contentType?: string }>;
+  /**
+   * Waar je je uitschrijft voor wat deze mail stuurde. Wordt de kop
+   * `List-Unsubscribe`, met `List-Unsubscribe-Post` erbij (RFC 8058): Gmail en
+   * Outlook tonen dan een eigen "Uitschrijven"-knop bovenaan, die met één POST
+   * naar deze URL uitschrijft. De URL moet die POST dus aankunnen zonder login.
+   */
+  listUnsubscribe?: string;
 };
 
 /**
@@ -170,6 +177,12 @@ export async function deliverMail(input: MailInput): Promise<MailDeliveryResult>
       replyTo: input.replyTo,
       messageId: input.messageId,
       attachments: input.attachments,
+      ...(input.listUnsubscribe
+        ? {
+            list: { unsubscribe: input.listUnsubscribe },
+            headers: { 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+          }
+        : {}),
     });
 
     const accepted = addressList(result.accepted);

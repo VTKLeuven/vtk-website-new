@@ -11690,3 +11690,79 @@ https://claude.ai/artifact/VpxcbRLcNKHuuaxpYKnejB
   hangt af van de schermgrootte, dit van hoe iemand werkt. Wie nog niets koos,
   krijgt de verkenner. Wisselen meldt zich niet met een toast: de weergave
   wisselt zichtbaar, en enkel een mislukte bewaring krijgt een melding.
+
+## Nieuwe evenementen in Discord
+
+Op /admin/kalender/discord hangt de kring Discord-webhooks aan de kalender. Een
+nieuw evenement verschijnt daar vanzelf, als **VTK Kalender** met het schild
+(`vtk-shield-favicon.png`), in één embed in het geel van de site met de banner
+groot eronder. Logica in `apps/web/lib/discord`, het bericht zelf in
+`eventMessage.ts`.
+
+- **Enkel met een eigen banner.** Een post zonder affiche is een grijs blok tekst
+  tussen de berichten. Een evenement dat zonder banner gepubliceerd wordt, wacht
+  dus, en verschijnt zodra de banner er later bij komt. Het beheer zegt bij zo'n
+  evenement "Wacht op banner", zodat niemand denkt dat de koppeling stuk is.
+- **Eén keer per kanaal, wat er daarna ook verandert.** Een betere beschrijving,
+  een andere banner of een verschoven uur post niets opnieuw: een kanaal waar
+  hetzelfde evenement drie keer in staat, leest niemand nog. De rij in
+  `DiscordWebhookPost` is de claim, met een unieke sleutel op (kanaal,
+  evenement). Bij twijfel liever geen bericht dan twee: enkel wanneer Discord
+  zelf antwoordde dat er niets gepost is (429, 5xx), probeert de worker opnieuw;
+  een time-out kan een bericht zijn dat wel aankwam, en dat blijft staan als
+  mislukt met de vraag om in Discord te kijken.
+- **Enkel wat ná de webhook gepubliceerd is** (`autoSince`), en bij weer
+  aanzetten opnieuw vanaf dan. Anders gooit een nieuwe webhook de hele kalender
+  in één klap in het kanaal. De evenementen die er al stonden, post je met de
+  hand vanuit dezelfde pagina; ook zonder eigen banner, dan met de standaardfoto
+  van het thema.
+- **Meteen na het bewaren, met de worker als vangnet.** De bewaaractie post via
+  `after()`, zodat Discord het bewaren niet ophoudt; de background-worker haalt
+  elke vijf minuten in wat daar niet vertrok.
+- **De knoppen tellen kliks**: "Meer info" en de inschrijf- of ticketlink lopen
+  via `/api/discord/klik/<post>/<knop>`. Een browser telt per knop één keer (een
+  cookie op het pad van die ene post, zonder identiteit), en linkvoorbeelden van
+  bots tellen niet. Zo benadert het getal hoeveel mensen klikten, en dat is wat
+  de vraag was: levert dit iets op? De bestemming wordt bij elke klik opnieuw
+  opgezocht, zodat een ticketverkoop die later een andere slug kreeg niet op een
+  404 uitkomt.
+- **De tweede knop volgt de eventpagina**: eerst de eigen ticketverkoop, dan het
+  formulier, dan de externe link (`lib/calendar/signupLink.ts`, gedeeld met de
+  herinneringsmail). Het tijdstip staat als Discord-tijdstempel, zodat Discord
+  het toont in de taal en tijdzone van wie leest, met "over 3 dagen" erbij.
+- **Voor wie alle evenementen beheert** (`calendar.manageAll`), zoals de
+  categorieën: een webhook post elk evenement van elke post, en de URL is een
+  geheim waarmee je onder de naam van de kring in een kanaal schrijft. Ze verlaat
+  de server nooit; het beheer toont enkel het kanaal. Een beschrijving die een
+  lid schreef, pingt nooit `@everyone` (`allowed_mentions` is leeg).
+
+## Een herinnering per mail de dag voor een evenement
+
+Wie interesse aanduidt in een evenement én de mailinglijst **Evenementen** aan
+heeft in zijn account, krijgt de dag ervoor om **12u** een mail. Regels in
+`apps/web/lib/calendar/interestReminder.ts`, de mail in
+`interestReminderMail.ts`, voorvertoning op /admin/it/flows.
+
+- **12u de dag ervoor**, en niet 24 uur vooraf zoals de push: een vast uur
+  waarop je de mail leest en nog iets kan regelen (een ticket, je avond
+  vrijhouden). Om middernacht of om 7u verdwijnt ze onder de rest.
+- **De lijst Evenementen is de schakelaar**, geen nieuw vinkje. Dat was de
+  vraag: wie Evenementen aan heeft, krijgt dit. De uitleg bij de mailinglijsten
+  op /account zegt het er nu bij. Een uitschrijving via een mail
+  (`mailUnsubscribedAt`) geldt ook hier, zoals voor elke lijstmail. De
+  studiebevestiging telt hier niet: het is post over iets dat het lid zelf
+  aanduidde, geen bulkmail naar studenten.
+- **Eén mail per lid per dag**, met al zijn evenementen van morgen erin; drie
+  sterren geven geen drie mails. Bij een reeks momenten telt de dag van het
+  moment dat het lid aanduidde.
+- **Wie pas na 12u interesse aanduidt, krijgt niets meer**: die besliste net
+  zelf, en een herinnering vijf minuten later is ruis.
+- **De uitschrijfknop zet de lijst Evenementen uit in het profiel**, zonder
+  login, via een ondertekende link (`lib/mailUnsubscribe.ts`) die niet vervalt.
+  De pagina vraagt eerst een klik: mailscanners van de universiteit openen elke
+  link in een mail, en een link die bij openen al uitschrijft, schrijft iedereen
+  uit. De mail draagt daarnaast `List-Unsubscribe` met one-click (RFC 8058),
+  zodat Gmail en Outlook hun eigen knop tonen; die post rechtstreeks naar
+  `/api/mail/uitschrijven`, en een scanner post niet. Uitschrijven gaat meteen
+  naar Brevo, net als het vinkje op /account, en `/uitschrijven` staat open
+  tijdens de onboarding- en studiebevestigingsgate.

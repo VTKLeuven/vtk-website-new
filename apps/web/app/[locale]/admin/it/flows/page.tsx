@@ -30,6 +30,10 @@ import {
 } from "@/lib/membership";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { mailPreviewGroups } from "@/lib/mailPreviews";
+import { UnsubscribePanel } from "@/components/profile/UnsubscribePanel";
+import { DiscordMessagePreview } from "@/components/admin/DiscordMessagePreview";
+import { discordEventMessage, DISCORD_AVATAR_PATH } from "@/lib/discord/eventMessage";
+import { siteUrl } from "@/lib/seo";
 import { FlowPreview } from "./FlowPreview";
 import { MailPreviewList } from "./MailPreviewList";
 
@@ -60,6 +64,10 @@ import { MailPreviewList } from "./MailPreviewList";
  * De regels erboven zijn geen documentatie maar afgeleide waarden: het huidige
  * academiejaar, de eerstvolgende omslag, en de eigen staat van de kijker.
  */
+/** Vaste momenten voor de Discord-voorvertoning: 2 oktober 2026, twee weken vooraf bekeken. */
+const DISCORD_SAMPLE_START = Date.parse("2026-10-02T18:00:00.000Z");
+const DISCORD_SAMPLE_NOW = Date.parse("2026-09-18T12:00:00.000Z");
+
 export default async function AdminFlowPreview({
   params,
 }: {
@@ -212,6 +220,29 @@ export default async function AdminFlowPreview({
     ? "Voorbeeld: er is niets opgeslagen."
     : "Preview: nothing was saved.";
 
+  // De Discord-post met verzonnen gegevens, door dezelfde functie als een echte
+  // post. Een vast moment, zodat "over 2 weken" niet elke dag verschuift.
+  const discordWebhooks = await prisma.discordWebhook.count();
+  const origin = siteUrl();
+  const discordSample = discordEventMessage(
+    {
+      title: "Voorbeeldcantus",
+      description:
+        "Een avond vol **liederen**, bier en nieuwe vrienden. Iedereen welkom, ook wie nog nooit een cantus meemaakte.\n\nMeer uitleg over de [codex](/kalender) op de site.",
+      start: new Date(DISCORD_SAMPLE_START),
+      end: new Date(DISCORD_SAMPLE_START + 4 * 60 * 60 * 1000),
+      allDay: false,
+      moments: [],
+      location: "Theokot",
+      organiser: "Onthaal",
+      imageUrl: `${origin}/default-event.jpg`,
+      infoUrl: `${origin}/kalender`,
+      link: { kind: "tickets", label: "Tickets kopen", url: `${origin}/tickets` },
+      siteOrigin: origin,
+    },
+    { avatarUrl: `${origin}${DISCORD_AVATAR_PATH}` },
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -220,8 +251,8 @@ export default async function AdminFlowPreview({
         </h1>
         <p className="mt-1 max-w-3xl text-sm text-[#5c667f]">
           {nl
-            ? "Alles wat je op de site zelf niet te zien krijgt: de twee schermen die een lid maar één keer ziet, en elke mail die de site opstelt. Hieronder staat per stuk wanneer het verschijnt en hoe het eruitziet. Het zijn de echte formulieren en de echte templates, maar er wordt hier niets opgeslagen en er vertrekt geen mail."
-            : "Everything you cannot see on the site itself: the two screens a member only ever sees once, and every email the site composes. Below is when each one appears and what it looks like. These are the real forms and the real templates, but nothing is saved here and no email is sent."}
+            ? "Alles wat je op de site zelf niet te zien krijgt: de schermen die een lid maar één keer of via een mail ziet, de Discord-post van een nieuw evenement, en elke mail die de site opstelt. Hieronder staat per stuk wanneer het verschijnt en hoe het eruitziet. Het zijn de echte formulieren en de echte templates, maar er wordt hier niets opgeslagen en er vertrekt niets."
+            : "Everything you cannot see on the site itself: the screens a member only sees once or through an email, the Discord post for a new event, and every email the site composes. Below is when each one appears and what it looks like. These are the real forms and the real templates, but nothing is saved here and nothing is sent."}
         </p>
       </div>
 
@@ -460,6 +491,117 @@ export default async function AdminFlowPreview({
             }
           />
         </SaveForm>
+      </FlowPreview>
+
+      <FlowPreview
+        title={nl ? "Uitschrijven voor een mailinglijst" : "Unsubscribe from a mailing list"}
+        when={
+          nl
+            ? "Verschijnt via de uitschrijfknop onderaan een mail van een mailinglijst, zoals de herinnering de dag voor een evenement."
+            : "Appears through the unsubscribe button at the bottom of a mailing-list email, such as the reminder the day before an event."
+        }
+        openLabel={nl ? "Toon het scherm" : "Show the screen"}
+        closeLabel={nl ? "Verberg het scherm" : "Hide the screen"}
+        rules={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Wanneer" : "When"}</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4">
+              <li>
+                {nl
+                  ? "Zonder login: de link draagt het lid en de lijst, ondertekend met het sitegeheim (lib/mailUnsubscribe.ts). Hij vervalt niet."
+                  : "Without signing in: the link carries the member and the list, signed with the site secret (lib/mailUnsubscribe.ts). It does not expire."}
+              </li>
+              <li>
+                {nl
+                  ? "Eerst een klik: mailscanners openen elke link in een mail en zouden anders iedereen uitschrijven. De knop van Gmail en Outlook zelf post rechtstreeks naar /api/mail/uitschrijven."
+                  : "A click first: mail scanners open every link in an email and would otherwise unsubscribe everyone. The button Gmail and Outlook show themselves posts straight to /api/mail/uitschrijven."}
+              </li>
+              <li>
+                {nl
+                  ? "Uitschrijven zet enkel die ene lijst uit in het profiel, net als het vinkje op /account, en duwt het meteen naar Brevo. Daarna toont de pagina de bevestiging."
+                  : "Unsubscribing only turns that one list off in the profile, like the checkbox on /account, and pushes it to Brevo right away. The page then shows the confirmation."}
+              </li>
+            </ul>
+          </>
+        }
+        yourState={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Jouw account" : "Your account"}</p>
+            <dl className="mt-2 space-y-1">
+              <div className="flex justify-between gap-4">
+                <dt>{dict.onboarding.categories.EVENEMENTEN}</dt>
+                <dd className="text-right">
+                  {user.mailCategories.includes("EVENEMENTEN") ? (nl ? "aan" : "on") : nl ? "uit" : "off"}
+                </dd>
+              </div>
+            </dl>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <UnsubscribePanel
+            locale={locale}
+            categoryLabel={dict.onboarding.categories.EVENEMENTEN}
+            state="confirm"
+            token=""
+            action={previewNoopAction}
+            accountHref={nl ? "/account" : "/en/account"}
+          />
+          <UnsubscribePanel
+            locale={locale}
+            categoryLabel={dict.onboarding.categories.EVENEMENTEN}
+            state="done"
+            token=""
+            action={previewNoopAction}
+            accountHref={nl ? "/account" : "/en/account"}
+          />
+        </div>
+      </FlowPreview>
+
+      <FlowPreview
+        title={nl ? "Discord-post van een nieuw evenement" : "Discord post for a new event"}
+        when={
+          nl
+            ? "Verschijnt in elk Discord-kanaal uit /admin/kalender/discord zodra een evenement gepubliceerd is met een eigen banner, of zodra de banner er later bij komt."
+            : "Appears in every Discord channel from /admin/kalender/discord once an event is published with its own banner, or once the banner is added later."
+        }
+        openLabel={nl ? "Toon de post" : "Show the post"}
+        closeLabel={nl ? "Verberg de post" : "Hide the post"}
+        rules={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Wanneer" : "When"}</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4">
+              <li>
+                {nl
+                  ? "Eén keer per kanaal per evenement (lib/discord/rules.ts). Een latere wijziging aan titel, banner of beschrijving post niets opnieuw."
+                  : "Once per channel per event (lib/discord/rules.ts). A later change to the title, banner or description does not post again."}
+              </li>
+              <li>
+                {nl
+                  ? "Enkel wat gepubliceerd is ná het toevoegen van de webhook; oudere evenementen post je met de hand."
+                  : "Only what was published after the webhook was added; older events are posted by hand."}
+              </li>
+              <li>
+                {nl
+                  ? "De knoppen lopen via een klikteller (/api/discord/klik), zodat het beheer ziet hoeveel mensen er klikten."
+                  : "The buttons go through a click counter (/api/discord/klik), so the admin sees how many people clicked."}
+              </li>
+            </ul>
+          </>
+        }
+        yourState={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Webhooks" : "Webhooks"}</p>
+            <dl className="mt-2 space-y-1">
+              <div className="flex justify-between gap-4">
+                <dt>{nl ? "Kanalen" : "Channels"}</dt>
+                <dd className="text-right">{discordWebhooks}</dd>
+              </div>
+            </dl>
+          </>
+        }
+      >
+        <DiscordMessagePreview message={discordSample} now={new Date(DISCORD_SAMPLE_NOW)} />
       </FlowPreview>
 
       <section className="space-y-4 pt-2">

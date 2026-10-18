@@ -7,6 +7,7 @@ import {
   passwordResetMail,
 } from "@/lib/accountMail";
 import { heroWeekNoticeMail } from "@/lib/calendar/heroWeekNoticeMail";
+import { interestReminderMail } from "@/lib/calendar/interestReminderMail";
 import { contactMailBody } from "@/lib/contactForm";
 import type { EmailSource } from "@/lib/email";
 import { confirmationMail, notificationMail } from "@/lib/forms/mail";
@@ -103,8 +104,8 @@ export function mailPreviewGroups(): MailPreviewGroup[] {
     {
       id: "kalender",
       title: "Kalender",
-      description: "Berichten naar de post die een evenement beheert.",
-      mails: [heroWeekNoticePreview()],
+      description: "Berichten naar de post die een evenement beheert, en de herinnering aan wie interesse aanduidde.",
+      mails: [heroWeekNoticePreview(), interestReminderPreview()],
     },
     {
       id: "account",
@@ -209,6 +210,61 @@ function ticketOrderPreview(): MailPreview {
     notes: [
       "De poster van het gekoppelde kalender-event staat er in het echt bovenaan; hier staat ze niet, want de voorvertoning laadt geen bestaande foto.",
       "De pdf met de tickets en de Apple Wallet-passen gaan als bijlage mee; de tekst noemt enkel wat er echt bij zit.",
+    ],
+  };
+}
+
+function interestReminderPreview(): MailPreview {
+  const end = new Date(SAMPLE_START.getTime() + 4 * 60 * 60 * 1000);
+  const mail = interestReminderMail({
+    locale: "nl",
+    firstName: "Voorbeeldlid",
+    events: [
+      {
+        title: "Voorbeeldcantus",
+        start: SAMPLE_START,
+        end,
+        allDay: false,
+        momentLabel: null,
+        location: "Theokot",
+        organiser: "Onthaal",
+        imageUrl: null,
+        eventUrl: "https://vtk.be/kalender/voorbeeldcantus-2026",
+        link: { label: "Tickets kopen", url: "https://vtk.be/tickets/voorbeeldcantus" },
+      },
+      {
+        title: "Voorbeeldloopweek",
+        start: new Date(SAMPLE_START.getTime() - 2 * 60 * 60 * 1000),
+        end: new Date(SAMPLE_START.getTime() - 60 * 60 * 1000),
+        allDay: false,
+        momentLabel: "Nachtloop",
+        location: "Sportkot",
+        organiser: "Sport",
+        imageUrl: null,
+        eventUrl: "https://vtk.be/kalender/voorbeeldloopweek-2026",
+        link: null,
+      },
+    ],
+    unsubscribeUrl: "https://vtk.be/uitschrijven?t=voorbeeld",
+    accountUrl: "https://vtk.be/account",
+    logoUrl: "https://vtk.be/vtk-logo.png",
+  });
+  return {
+    id: "interest-reminder",
+    title: "Morgen: je evenementen",
+    when: "De dag voor een evenement waarin het lid interesse aanduidde, om 12u Brusselse tijd. Bij een reeks momenten de dag voor het moment dat het lid aanduidde. Via de background-worker, elke vijf minuten.",
+    to: "Het lid, op zijn voorkeursadres, enkel wanneer de mailinglijst Evenementen aan staat in zijn account",
+    source: "calendar",
+    file: "lib/calendar/interestReminderMail.ts",
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+    notes: [
+      "Eén mail per lid per dag, met al zijn evenementen van morgen erin.",
+      "Wie pas na 12u de dag ervoor interesse aanduidt, krijgt geen herinnering meer: die besliste net zelf.",
+      "De knop onderaan opent /uitschrijven, dat eerst een klik vraagt; de mail draagt ook List-Unsubscribe, zodat Gmail en Outlook hun eigen uitschrijfknop tonen.",
+      "In het echt staat de banner van elk evenement bovenaan zijn kaart; hier niet, want de voorvertoning laadt geen bestaande foto.",
+      "In de taal van het lid (User.locale), met de Engelse titel wanneer die er is.",
     ],
   };
 }

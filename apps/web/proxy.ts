@@ -98,7 +98,9 @@ async function gateRedirect(request: NextRequest, internalPath: string): Promise
 
   // Pagina's die altijd leesbaar moeten zijn, zelfs tijdens onboarding of studiebevestiging
   // (zoals de privacyverklaring waar het onboardingformulier zelf naar linkt).
-  if (segment === 'privacy' || segment === 'cookies') {
+  // Uitschrijven ook: wie op de knop in een mail klikt, moet daar uitkomen, ook
+  // wanneer zijn studie nog bevestigd moet worden.
+  if (segment === 'privacy' || segment === 'cookies' || segment === 'uitschrijven') {
     return null;
   }
 

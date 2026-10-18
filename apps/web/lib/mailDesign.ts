@@ -267,3 +267,10 @@ export function mailFooterRow(text: string): string {
   return `<tr><td style="padding:16px 30px;background:${MAIL_COLOR.paper2};border-top:1px solid ${MAIL_COLOR.line};font-family:${MAIL_FONT};font-size:12px;line-height:1.5;color:${MAIL_COLOR.muted}">${escapeHtml(text)}</td></tr>`;
 }
 
+/**
+ * Dezelfde voet, maar met opmaak erin (een uitschrijflink). Escape elke waarde
+ * die je erin zet met `escapeHtml`, net als bij `mailParagraphHtml`.
+ */
+export function mailFooterRowHtml(html: string): string {
+  return `<tr><td style="padding:16px 30px;background:${MAIL_COLOR.paper2};border-top:1px solid ${MAIL_COLOR.line};font-family:${MAIL_FONT};font-size:12px;line-height:1.5;color:${MAIL_COLOR.muted}">${html}</td></tr>`;
+}

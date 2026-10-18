@@ -7,7 +7,9 @@ import { hasPermission } from "@vtk/auth";
 import type { Locale } from "@vtk/i18n";
 import { Button, Card } from "@vtk/ui";
 import { sharedMomentTime } from "@/lib/calendar/moments";
+import { DiscordIcon } from "@/components/ui/icons";
 import { EventRow } from "./EventRow";
+import { FilterPill } from "./FilterPill";
 
 export default async function AdminCalendar({
   params,
@@ -133,6 +135,16 @@ export default async function AdminCalendar({
               {nl ? "Categorieën" : "Categories"}
             </Link>
           )}
+          {/* Net als de categorieën voor wie alle evenementen beheert: een
+              webhook post elk evenement van elke post. */}
+          {canAll && (
+            <Link href={`${base}/admin/kalender/discord`}>
+              <Button variant="ghost">
+                <DiscordIcon />
+                Discord webhooks
+              </Button>
+            </Link>
+          )}
           <Link href={`${base}/admin/kalender/new`}>
             <Button>{nl ? "Nieuw evenement" : "New event"}</Button>
           </Link>
@@ -195,30 +207,5 @@ export default async function AdminCalendar({
         </table>
       </Card>
     </div>
-  );
-}
-
-function FilterPill({
-  href,
-  active,
-  children,
-}: {
-  href: string;
-  active: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      aria-current={active ? "page" : undefined}
-      className={[
-        "rounded-full border px-3 py-1.5 text-sm transition-colors",
-        active
-          ? "border-vtk-ink bg-vtk-ink text-vtk-surface"
-          : "border-vtk-blue/15 text-vtk-ink hover:border-vtk-blue/30 hover:bg-vtk-blue-soft/70",
-      ].join(" ")}
-    >
-      {children}
-    </Link>
   );
 }
