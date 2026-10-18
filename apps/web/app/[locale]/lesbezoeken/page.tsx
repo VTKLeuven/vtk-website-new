@@ -2,10 +2,13 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { getDictionary, type Locale } from "@vtk/i18n";
+import Link from "@/components/ui/Link";
 import { hasLocale } from "@/lib/locale";
 import { staticMetadata } from "@/lib/pageMetadata";
+import { getCurrentSession } from "@/lib/session";
 import { getLesbezoekConfig } from "@/lib/lesbezoeken-server";
 import { LesbezoekRequestForm } from "./LesbezoekRequestForm";
+import { MyRequests } from "./MyRequests";
 
 import "@/app/design/vtk-base.css";
 import "@/app/design/vtk-lesbezoeken.css";
@@ -23,6 +26,11 @@ import "@/app/design/vtk-lesbezoeken.css";
  * De spelregels ernaast stonden vroeger in een mail met als eerste zin "sla deze
  * mail op zodat u ze gemakkelijk terug kan vinden". Dat is precies wat een pagina
  * beter doet dan een mail.
+ *
+ * Wie wél ingelogd is, krijgt er twee dingen bij: zijn naam, e-mailadres en
+ * telefoonnummer staan al ingevuld, en boven het formulier staat wat hij eerder
+ * aanvroeg en hoe ver dat staat ("Jouw aanvragen"). Zie docs/design-decisions.md
+ * ("Lesbezoeken").
  */
 
 type Params = Promise<{ locale: string }>;
@@ -39,14 +47,47 @@ export default async function LesbezoekenPage({ params }: { params: Params }) {
   const locale: Locale = localeParam;
   const nl = locale === "nl";
   const t = getDictionary(locale).lesbezoeken;
+  const base = nl ? "" : "/en";
 
-  const [organisations, config] = await Promise.all([
+  const session = await getCurrentSession();
+  const userId = session?.user.id ?? null;
+
+  const [organisations, config, mine, profile] = await Promise.all([
     prisma.lesbezoekOrganisation.findMany({
       where: { active: true },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
     getLesbezoekConfig(),
+    // Wat dit account aanvroeg, en wat er met zijn e-mailadres binnenkwam: het
+    // formulier vroeg tot oktober 2026 geen login, dus die oude aanvragen hangen
+    // enkel aan het adres. Dat adres is bevestigd (KU Leuven of de bevestigingsmail
+    // bij registratie), dus wie hier inlogt, krijgt er ook de mails over.
+    session
+      ? prisma.lesbezoek.findMany({
+          where: {
+            OR: [
+              { requesterId: session.user.id },
+              { requesterEmail: { equals: session.user.email, mode: "insensitive" } },
+            ],
+          },
+          orderBy: { startsAt: "desc" },
+          take: 200,
+          select: {
+            id: true,
+            startsAt: true,
+            subject: true,
+            course: true,
+            audience: true,
+            status: true,
+            reviewNote: true,
+            professorMailedAt: true,
+            createdAt: true,
+            organisation: { select: { name: true } },
+          },
+        })
+      : Promise.resolve([]),
+    userId ? prisma.user.findUnique({ where: { id: userId }, select: { phone: true } }) : null,
   ]);
 
   return (
@@ -59,13 +100,27 @@ export default async function LesbezoekenPage({ params }: { params: Params }) {
       </header>
 
       <div className="vtk-page-shell">
+        {mine.length > 0 && <MyRequests rows={mine} now={new Date()} locale={locale} copy={t.mine} />}
         <div className="lb-grid">
           <section className="vtk-panel lb-panel" aria-labelledby="lb-form-title">
             <h2 id="lb-form-title">{t.formTitle}</h2>
             <p className="lb-lead">{t.formIntro}</p>
+            {!session && (
+              <p className="lb-help">
+                {t.loginHint}{" "}
+                <Link className="vtk-link" href={`${base}/inloggen?next=${encodeURIComponent(`${base}/lesbezoeken`)}`}>
+                  {t.loginLink}
+                </Link>
+              </p>
+            )}
             <LesbezoekRequestForm
               nl={nl}
               organisations={organisations}
+              defaults={
+                session
+                  ? { name: session.user.name, email: session.user.email, phone: profile?.phone ?? "" }
+                  : null
+              }
               copy={{
                 organisationLabel: t.organisationLabel,
                 organisationOther: t.organisationOther,

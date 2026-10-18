@@ -1128,6 +1128,33 @@ op de openstaande aanvragen.
 De export bevat **enkel goedgekeurde** bezoeken en is een download, geen abonneerbare
 feed: de URL draagt geen geheim, en er staan namen van professoren in.
 
+### Wie ingelogd is, ziet wat hij aanvroeg ("Jouw aanvragen")
+
+Na het indienen kreeg een aanvrager een groene toast, en daarna niets tot de mail van
+Onderwijs, die pas komt wanneer de docent antwoordde. Of een aanvraag goed aankwam en al
+bekeken was, kon je enkel navragen; dat kwam in oktober 2026 binnen als feedback. Boven
+het formulier staat daarom voor wie ingelogd is een tabel met zijn lesbezoeken en hun
+stand, met de reden erbij wanneer het niet doorging.
+
+- **Het formulier blijft zonder login.** Alles hierboven over externe aanvragers geldt
+  nog; inloggen geeft er enkel het overzicht bij, en een ingevuld naam, adres en
+  telefoonnummer. Wie niet ingelogd is, leest één zin dat dat kan.
+- **Een aanvraag hangt aan het account (`Lesbezoek.requesterId`) én aan het adres.**
+  Het account, omdat een postverantwoordelijke als contact vaak het adres van zijn post
+  opgeeft en zijn aanvragen dan toch wil terugvinden. Het adres, omdat elke aanvraag van
+  voor oktober 2026 zonder login binnenkwam. Dat adres mag vergeleken worden: een
+  account heeft een bevestigd e-mailadres (KU Leuven, of de bevestigingsmail bij
+  registratie), dus wie zo een aanvraag ziet, kreeg de mails erover sowieso.
+- **De statussen heten er zoals de aanvrager ze leest**: "Ontvangen" en "Niet
+  doorgestuurd", niet "Nieuw" en "Afgewezen door ons", om dezelfde reden als bij de
+  gebundelde mail hierboven. De kleur van de pil is wel die van het beheer.
+- **De toelichting (`reviewNote`) staat er meteen bij**, ook voor de mail vertrok. Ze is
+  geschreven om naar de aanvrager te gaan (`{reden}` in de sjablonen); wat enkel voor
+  Onderwijs is, staat bij de organisatie of de bijzonderheden, en die komen hier niet.
+- Voorbije lesbezoeken staan dichtgeklapt onder de lijst: wie terugkomt, wil weten wat
+  er nog komt.
+- Intrekken staat er niet bij; dat loopt zoals voordien via VTK Onderwijs.
+
 ---
 
 ## PAL+

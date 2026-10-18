@@ -1189,6 +1189,39 @@
     "coursesBody": "De studieprogramma's van de bachelor en de masters staan op de site van de faculteit. In de ECTS-fiche van een vak vind je het uurrooster en het adres van de coördinator.",
     "contactTitle": "Vragen?",
     "contactBody": "Mail naar",
+    "loginHint": "Ingelogd zie je hier ook wat er met je aanvragen gebeurt.",
+    "loginLink": "Inloggen",
+    "mine": {
+      "title": "Jouw aanvragen",
+      "intro": "Alles wat je indiende terwijl je ingelogd was of met het e-mailadres van je account, en waar het nu staat.",
+      "colVisit": "Lesbezoek",
+      "colClass": "Les",
+      "colWhen": "Wanneer",
+      "colStatus": "Stand",
+      "noUpcoming": "Er staat geen lesbezoek van jou meer gepland.",
+      "past": "Voorbije lesbezoeken ({count})",
+      "at": "om {time}",
+      "submitted": "Ingediend op {date}",
+      "reason": "Reden",
+      "note": "Opmerking",
+      "status": {
+        "PENDING": "Ontvangen",
+        "ASKED": "Bij de docent",
+        "APPROVED": "Goedgekeurd",
+        "DECLINED": "Geweigerd door de docent",
+        "REJECTED": "Niet doorgestuurd",
+        "CANCELLED": "Ingetrokken"
+      },
+      "detail": {
+        "PENDING": "VTK Onderwijs bekijkt je aanvraag en vraagt het daarna aan de docent.",
+        "ASKED": "We vroegen het aan de docent en laten je het antwoord weten.",
+        "ASKED_ON": "Op {date} gevraagd aan de docent. We laten je het antwoord weten.",
+        "APPROVED": "De docent gaf groen licht: er wordt iemand van jullie verwacht.",
+        "DECLINED": "",
+        "REJECTED": "VTK Onderwijs stuurde deze aanvraag niet door naar de docent.",
+        "CANCELLED": ""
+      }
+    },
     "errors": {
       "fallback": "Er ging iets mis. Probeer het opnieuw."
     }

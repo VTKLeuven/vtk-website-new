@@ -1189,6 +1189,39 @@
     "coursesBody": "The bachelor's and master's programmes are on the faculty website. A course's ECTS sheet holds the timetable and the coordinator's address.",
     "contactTitle": "Questions?",
     "contactBody": "Mail us at",
+    "loginHint": "Log in to also follow what happens to your requests here.",
+    "loginLink": "Log in",
+    "mine": {
+      "title": "Your requests",
+      "intro": "Everything you submitted while logged in or with your account's email address, and where it stands now.",
+      "colVisit": "Class visit",
+      "colClass": "Class",
+      "colWhen": "When",
+      "colStatus": "Status",
+      "noUpcoming": "None of your class visits are still coming up.",
+      "past": "Past class visits ({count})",
+      "at": "at {time}",
+      "submitted": "Submitted on {date}",
+      "reason": "Reason",
+      "note": "Note",
+      "status": {
+        "PENDING": "Received",
+        "ASKED": "With the lecturer",
+        "APPROVED": "Approved",
+        "DECLINED": "Declined by the lecturer",
+        "REJECTED": "Not forwarded",
+        "CANCELLED": "Withdrawn"
+      },
+      "detail": {
+        "PENDING": "VTK Onderwijs is reviewing your request and will then ask the lecturer.",
+        "ASKED": "We asked the lecturer and will let you know the answer.",
+        "ASKED_ON": "Asked the lecturer on {date}. We will let you know the answer.",
+        "APPROVED": "The lecturer agreed: somebody from your organisation is expected.",
+        "DECLINED": "",
+        "REJECTED": "VTK Onderwijs did not forward this request to the lecturer.",
+        "CANCELLED": ""
+      }
+    },
     "errors": {
       "fallback": "Something went wrong. Please try again."
     }

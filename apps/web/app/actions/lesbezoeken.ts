@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
-import { requirePermission } from "@/lib/session";
+import { getCurrentSession, requirePermission } from "@/lib/session";
 import {
   pickSignature,
   signatureForBody,
@@ -49,6 +49,9 @@ import {
  */
 
 const ADMIN_PATHS = ["/admin/lesbezoeken", "/en/admin/lesbezoeken"];
+
+/** De publieke pagina, met "Jouw aanvragen" van wie ingelogd is. */
+const PUBLIC_PATH = "/[locale]/lesbezoeken";
 
 /** De beheerlijst moet mee verversen, anders blijft staan wat je net wijzigde. */
 function revalidateLesbezoeken() {
@@ -129,6 +132,9 @@ export async function requestLesbezoekAction(
   if (!limiter.take(key)) return saveError("RATE_LIMITED");
 
   const request = parsed.request;
+  // Inloggen hoeft niet, maar wie het is, ziet de aanvraag terug bij "Jouw
+  // aanvragen", ook wanneer hij als contact het adres van zijn post opgaf.
+  const session = await getCurrentSession();
 
   // De organisatie: uit de keuzelijst, of een naam die de aanvrager zelf intikte.
   // Die naam eerst hoofdletter- en streepjesongevoelig opzoeken, anders staan
@@ -179,6 +185,7 @@ export async function requestLesbezoekAction(
       requesterName: request.requesterName || null,
       requesterEmail: request.requesterEmail,
       requesterPhone: request.requesterPhone,
+      requesterId: session?.user.id ?? null,
     },
     select: {
       startsAt: true,
@@ -193,6 +200,7 @@ export async function requestLesbezoekAction(
 
   await notifyNewLesbezoek(visit);
   revalidateLesbezoeken();
+  revalidatePath(PUBLIC_PATH, "page");
 
   // Geen `redirect`: het formulier blijft staan met een groene toast en een
   // zichtbare bevestiging, zodat een organisatie meteen een tweede doelgroep kan

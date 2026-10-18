@@ -169,6 +169,182 @@
 }
 
 /* -------------------------------------------------------------------------- */
+/* Publiek: jouw aanvragen                                                     */
+/* -------------------------------------------------------------------------- */
+
+/* Boven het formulier: wie terugkomt, komt meestal kijken hoe ver zijn aanvraag
+   staat. Een tabel en geen kaart per aanvraag, want een post vraagt er al snel
+   tien tegelijk aan (een per doelgroep). */
+.lb-mine {
+  padding: clamp(22px, 3vw, 32px);
+  margin-bottom: clamp(18px, 2.5vw, 28px);
+}
+
+.lb-mine-head h2 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.lb-mine-head p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.lb-mine-empty {
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.lb-mine-wrap {
+  margin-top: 18px;
+  overflow-x: auto;
+  /* Een anker voor wat absoluut gepositioneerd in de tabel staat; zie
+     CLAUDE.md over brede tabellen in een horizontale scroller. */
+  position: relative;
+}
+
+.lb-mine-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.lb-mine-table th {
+  padding: 0 12px 8px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.lb-mine-table td {
+  padding: 12px 12px 12px 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  color: var(--body);
+}
+
+.lb-mine-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.lb-mine-table th:last-child,
+.lb-mine-table td:last-child {
+  padding-right: 0;
+  width: 34%;
+}
+
+.lb-mine-main {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.lb-mine-sub {
+  display: block;
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.lb-mine-when {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lb-mine-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.lb-mine-detail {
+  margin: 0;
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.lb-mine-label {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lb-mine-past {
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.lb-mine-past summary {
+  cursor: pointer;
+  width: fit-content;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Op een telefoon worden de kolomkoppen labels per waarde, in plaats van te
+   verdwijnen; zie CLAUDE.md. */
+@media (max-width: 720px) {
+  .lb-mine-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .lb-mine-table tr {
+    display: block;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .lb-mine-table tr:last-child {
+    border-bottom: 0;
+  }
+
+  .lb-mine-table td,
+  .lb-mine-table td:last-child {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 12px;
+    width: auto;
+    padding: 4px 0;
+    border-bottom: 0;
+  }
+
+  .lb-mine-table td::before {
+    content: attr(data-label);
+    padding-top: 2px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .lb-mine-when {
+    white-space: normal;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
 /* Statussen                                                                   */
 /* -------------------------------------------------------------------------- */
 

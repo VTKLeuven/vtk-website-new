@@ -854,6 +854,7 @@ model User {
   cashRegistersAccepted  CashRegister[] @relation("CashRegisterAcceptedBy")
   expenseViews      ExpenseView[]
 
+  requestedLesbezoeken           Lesbezoek[]              @relation("LesbezoekRequester")
   createdLesbezoeken             Lesbezoek[]              @relation("LesbezoekCreatedBy")
   reviewedLesbezoeken            Lesbezoek[]              @relation("LesbezoekReviewedBy")
   createdLesbezoekScheduledMails LesbezoekScheduledMail[] @relation("LesbezoekScheduledMailCreatedBy")
@@ -7126,6 +7127,12 @@ model Lesbezoek {
   requesterName  String?
   requesterEmail String?
   requesterPhone String?
+  /// Het account waarmee de aanvraag ingediend werd, wanneer de aanvrager
+  /// ingelogd was. Daarmee staat ze bij "Jouw aanvragen" op /lesbezoeken, ook
+  /// als het contactadres hierboven een ander is dan dat van het account (het
+  /// adres van een post). Leeg zonder login en bij alles van voor oktober 2026;
+  /// die aanvragen vindt het overzicht via `requesterEmail`.
+  requesterId    String?
 
   status LesbezoekStatus @default(PENDING)
 
@@ -7147,6 +7154,7 @@ model Lesbezoek {
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
   organisation LesbezoekOrganisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  requester    User?                 @relation("LesbezoekRequester", fields: [requesterId], references: [id], onDelete: SetNull)
   reviewedBy   User?                 @relation("LesbezoekReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
   createdBy    User?                 @relation("LesbezoekCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
@@ -7157,6 +7165,7 @@ model Lesbezoek {
   @@index([organisationId, startsAt])
   /// Voedt de dubbelaanvraag-waarschuwing: dezelfde professor op dezelfde dag.
   @@index([teacherEmail, startsAt])
+  @@index([requesterId])
 }
 
 /// Een ingeplande mail rond een lesbezoek (bv. vraag naar een docent die pas

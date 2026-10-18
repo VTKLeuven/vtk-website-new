@@ -225,6 +225,27 @@ export async function exportUserData(userId: string) {
         },
         orderBy: { createdAt: "desc" },
       },
+      // Lesbezoeken die dit lid ingelogd aanvroeg. Zoals bij de formulieren
+      // enkel wat het zelf indiende en de uitkomst die het ook per mail krijgt;
+      // de mails naar de docent zijn werkinformatie van Onderwijs.
+      requestedLesbezoeken: {
+        select: {
+          status: true,
+          startsAt: true,
+          subject: true,
+          teacherNote: true,
+          course: true,
+          audience: true,
+          teacherEmail: true,
+          requesterName: true,
+          requesterEmail: true,
+          requesterPhone: true,
+          reviewNote: true,
+          createdAt: true,
+          organisation: { select: { name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      },
       doorLogs: {
         select: {
           at: true,

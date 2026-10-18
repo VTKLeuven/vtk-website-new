@@ -65,10 +65,16 @@ export function LesbezoekRequestForm({
   nl,
   copy,
   organisations,
+  defaults,
 }: {
   nl: boolean;
   copy: RequestCopy;
   organisations: { id: string; name: string }[];
+  /**
+   * Wat we al weten van wie ingelogd is. Enkel een beginwaarde: wie voor zijn
+   * post aanvraagt, zet er het adres van de post in, en dat moet kunnen.
+   */
+  defaults: { name: string; email: string; phone: string } | null;
 }) {
   const [organisation, setOrganisation] = useState("");
   const [sent, setSent] = useState(false);
@@ -146,6 +152,7 @@ export function LesbezoekRequestForm({
                 name="requesterName"
                 autoComplete="name"
                 maxLength={LESBEZOEK_LIMITS.name}
+                defaultValue={defaults?.name}
               />
             </div>
             <div className="lb-field">
@@ -157,6 +164,7 @@ export function LesbezoekRequestForm({
                 autoComplete="email"
                 maxLength={LESBEZOEK_LIMITS.email}
                 aria-describedby="lb-email-help"
+                defaultValue={defaults?.email}
                 required
               />
               <p className="lb-help" id="lb-email-help">
@@ -173,6 +181,7 @@ export function LesbezoekRequestForm({
               type="tel"
               autoComplete="tel"
               maxLength={LESBEZOEK_LIMITS.phone}
+              defaultValue={defaults?.phone || undefined}
               required
             />
           </div>
