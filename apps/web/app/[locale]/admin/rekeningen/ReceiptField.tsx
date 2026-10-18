@@ -1,11 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState, type DragEvent as ReactDragEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Label } from "@vtk/ui";
 import { IconButton } from "@/components/ui/IconButton";
 import { TrashIcon, UploadIcon } from "@/components/ui/icons";
 import { useReportFormBusy } from "@/components/ui/formBusy";
+import { FileDropOverlay, useFileDrop } from "@/components/ui/FileDrop";
 import {
   formatBytes,
   isAllowedReceiptName,
@@ -22,15 +23,10 @@ import {
  * zodat de `SaveForm` eromheen niet kan verzenden met een nog lege key: dan zou
  * je een groene toast krijgen bij een rekening zonder bonnetje.
  *
- * Op een computer is het hele veld ook een sleepzone: je sleept het bonnetje
- * rechtstreeks uit een map, in plaats van het in het systeemdialoog terug te
- * zoeken.
+ * Op een computer is het hele veld ook een sleepzone (`useFileDrop`): je sleept
+ * het bonnetje rechtstreeks uit een map, in plaats van het in het systeemdialoog
+ * terug te zoeken.
  */
-
-/** Sleept de gebruiker bestanden, en niet bv. geselecteerde tekst of een link? */
-function draggingFiles(event: { dataTransfer: DataTransfer | null }) {
-  return Array.from(event.dataTransfer?.types ?? []).includes("Files");
-}
 
 type Existing = { key: string; name: string; mime: string; size: number; previewUrl: string };
 
@@ -52,35 +48,22 @@ export function ReceiptField({
   const [previewUrl, setPreviewUrl] = useState<string | null>(existing?.previewUrl ?? null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const zoneRef = useRef<HTMLDivElement>(null);
-  // `dragenter` en `dragleave` vuren ook bij elk kind dat je overschuift; een
-  // teller houdt bij of je nog boven de zone hangt, anders flikkert de rand.
-  const dragDepth = useRef(0);
 
   useReportFormBusy(uploading);
 
-  // Mis je de zone, dan opent de browser het bestand zelf en ben je alles kwijt
-  // wat je al invulde. Een bestand dat ernaast valt, doet daarom niets.
-  useEffect(() => {
-    const outside = (event: DragEvent) =>
-      draggingFiles(event) && !zoneRef.current?.contains(event.target as Node);
-    const onDragOver = (event: DragEvent) => {
-      if (!outside(event)) return;
-      event.preventDefault();
-      if (event.dataTransfer) event.dataTransfer.dropEffect = "none";
-    };
-    const onDrop = (event: DragEvent) => {
-      if (outside(event)) event.preventDefault();
-    };
-    window.addEventListener("dragover", onDragOver);
-    window.addEventListener("drop", onDrop);
-    return () => {
-      window.removeEventListener("dragover", onDragOver);
-      window.removeEventListener("drop", onDrop);
-    };
-  }, []);
+  // Geen `accept` hier: `upload` controleert het type zelf, met een melding die
+  // de toegelaten formaten noemt.
+  const drop = useFileDrop({
+    disabled: uploading,
+    onFiles: ([file]) => void upload(file),
+    onReject: () =>
+      setError(
+        nl
+          ? "Sleep één bestand tegelijk: een rekening heeft één bonnetje."
+          : "Drop one file at a time: an expense has one receipt.",
+      ),
+  });
 
   // `SaveForm` roept na een geslaagde indiening `form.reset()` aan. Dat leegt de
   // gewone velden, maar niet deze: de key zit in door React beheerde verborgen
@@ -166,25 +149,6 @@ export function ReceiptField({
     if (inputRef.current) inputRef.current.value = "";
   }
 
-  function onDrop(event: ReactDragEvent<HTMLDivElement>) {
-    if (!draggingFiles(event)) return;
-    event.preventDefault();
-    dragDepth.current = 0;
-    setDragging(false);
-    if (uploading) return;
-    const files = event.dataTransfer.files;
-    if (files.length > 1) {
-      setError(
-        nl
-          ? "Sleep één bestand tegelijk: een rekening heeft één bonnetje."
-          : "Drop one file at a time: an expense has one receipt.",
-      );
-      return;
-    }
-    const file = files[0];
-    if (file) void upload(file);
-  }
-
   const chosenSomethingNew = value !== null && value.key !== existing?.key;
 
   return (
@@ -200,35 +164,14 @@ export function ReceiptField({
       />
 
       <div
-        ref={zoneRef}
-        onDragEnter={(event) => {
-          if (!draggingFiles(event)) return;
-          event.preventDefault();
-          dragDepth.current += 1;
-          if (!uploading) setDragging(true);
-        }}
-        onDragOver={(event) => {
-          if (!draggingFiles(event)) return;
-          event.preventDefault();
-          event.dataTransfer.dropEffect = uploading ? "none" : "copy";
-        }}
-        onDragLeave={(event) => {
-          if (!draggingFiles(event)) return;
-          dragDepth.current = Math.max(0, dragDepth.current - 1);
-          if (dragDepth.current === 0) setDragging(false);
-        }}
-        onDrop={onDrop}
-        className={`relative flex flex-col items-start gap-3 rounded-2xl border border-dashed p-3 transition-colors sm:flex-row sm:gap-4 ${
-          dragging ? "border-vtk-navy/60 bg-vtk-blue-soft" : "border-vtk-blue/20"
-        }`}
+        {...drop.zoneProps}
+        className="relative flex flex-col items-start gap-3 rounded-2xl border border-dashed border-vtk-blue/20 p-3 sm:flex-row sm:gap-4"
       >
-        {dragging && (
-          <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-2xl bg-vtk-blue-soft/90">
-            <span className="inline-flex items-center gap-2 text-sm font-medium text-vtk-navy">
-              <UploadIcon />
-              {nl ? "Laat los om het bonnetje te uploaden" : "Drop to upload the receipt"}
-            </span>
-          </div>
+        {/* Over de eigen stippelrand heen, anders staan er twee naast elkaar. */}
+        {drop.dragging && (
+          <FileDropOverlay className="-inset-px">
+            {nl ? "Laat los om het bonnetje te uploaden" : "Drop to upload the receipt"}
+          </FileDropOverlay>
         )}
         <div className="relative grid aspect-[3/4] w-28 shrink-0 place-items-center overflow-hidden rounded-xl border border-vtk-blue/15 bg-white">
           {previewUrl ? (

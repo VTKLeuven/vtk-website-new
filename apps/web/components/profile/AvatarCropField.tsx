@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@vtk/ui";
+import { FileDropOverlay, useFileDrop } from "@/components/ui/FileDrop";
 
 type Crop = { zoom: number; x: number; y: number };
 
@@ -143,6 +144,18 @@ export function AvatarCropField({
     image.src = sourceUrl;
   }
 
+  // Een foto uit een map erop slepen opent dezelfde uitsnijder als kiezen.
+  const fileDrop = useFileDrop({
+    disabled: editorOpen,
+    onFiles: ([file]) => chooseFile(file),
+    onReject: () =>
+      setError(
+        nl
+          ? "Sleep één foto tegelijk: je hebt één profielfoto."
+          : "Drop one photo at a time: you have one profile photo.",
+      ),
+  });
+
   function startDrag(event: React.PointerEvent<HTMLCanvasElement>) {
     const image = imageRef.current;
     const canvas = canvasRef.current;
@@ -227,7 +240,12 @@ export function AvatarCropField({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-4">
+      <div {...fileDrop.zoneProps} className="relative flex flex-wrap items-center gap-4">
+        {fileDrop.dragging && (
+          <FileDropOverlay className="-inset-2">
+            {nl ? "Laat los om de foto uit te snijden" : "Drop to crop the photo"}
+          </FileDropOverlay>
+        )}
         <div className="h-20 w-20 shrink-0 overflow-hidden rounded-[16px] border border-vtk-blue/10 bg-vtk-blue-soft">
           {previewUrl ? (
             // Een blob-URL van de bijsnede die nog in de browser zit; die bestaat
@@ -245,6 +263,10 @@ export function AvatarCropField({
             onChange={(event) => chooseFile(event.currentTarget.files?.[0])}
             className="block max-w-full text-sm text-[#34405e] file:mr-3 file:rounded-full file:border-0 file:bg-vtk-ink file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:opacity-90"
           />
+          {/* Enkel met een muis: op een telefoon sleep je geen bestanden. */}
+          <p className="hidden text-xs text-[#5c667f] pointer-fine:block">
+            {nl ? "Of sleep een foto hierheen." : "Or drop a photo here."}
+          </p>
           {cropReady ? (
             <p className="text-xs font-medium text-emerald-700">
               {nl ? "Uitsnede klaar om op te slaan." : "Crop ready to save."}
