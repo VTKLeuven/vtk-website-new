@@ -102,11 +102,11 @@ function post(overrides: Partial<DiscordEventPost> = {}): DiscordEventPost {
 }
 
 describe("het bericht in het kanaal", () => {
-  const message = discordEventMessage(post(), { avatarUrl: `${ORIGIN}/vtk-shield-favicon.png` });
+  const message = discordEventMessage(post(), { avatarUrl: `${ORIGIN}/vtk-discord-avatar.png` });
 
   it("staat er als VTK Kalender met het schild, en pingt nooit iemand", () => {
     expect(message.username).toBe("VTK Kalender");
-    expect(message.avatar_url).toBe(`${ORIGIN}/vtk-shield-favicon.png`);
+    expect(message.avatar_url).toBe(`${ORIGIN}/vtk-discord-avatar.png`);
     expect(message.allowed_mentions).toEqual({ parse: [] });
   });
 

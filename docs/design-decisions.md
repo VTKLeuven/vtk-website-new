@@ -11695,7 +11695,9 @@ https://claude.ai/artifact/VpxcbRLcNKHuuaxpYKnejB
 
 Op /admin/kalender/discord hangt de kring Discord-webhooks aan de kalender. Een
 nieuw evenement verschijnt daar vanzelf, als **VTK Kalender** met het schild
-(`vtk-shield-favicon.png`), in één embed in het geel van de site met de banner
+(`vtk-discord-avatar.png`: het schild kleiner en gecentreerd op wit, want
+Discord knipt een avatar rond en het gewone schild verloor zo zijn hoeken), in
+één embed in het geel van de site met de banner
 groot eronder. Logica in `apps/web/lib/discord`, het bericht zelf in
 `eventMessage.ts`.
 

@@ -27,7 +27,7 @@ export function DiscordMessagePreview({ message, now }: { message: DiscordMessag
       <div className="flex gap-3">
         {/* Dezelfde avatar die Discord ophaalt; een vast bestand, dus geen next/image. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={message.avatar_url} alt="" className="size-10 shrink-0 rounded-full bg-[var(--paper)] object-contain p-0.5" />
+        <img src={message.avatar_url} alt="" className="size-10 shrink-0 rounded-full object-cover" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2">
             <span className="font-semibold">{message.username}</span>

@@ -21,8 +21,15 @@ export const DISCORD_USERNAME = "VTK Kalender";
 /** `--yellow` uit vtk-base.css, als getal zoals Discord het wil. */
 export const DISCORD_EMBED_COLOUR = 0xffd23f;
 
-/** Het schild, ook de avatar van het bericht. Pad op de site. */
-export const DISCORD_AVATAR_PATH = "/vtk-shield-favicon.png";
+/**
+ * Het schild als avatar van het bericht. Pad op de site.
+ *
+ * Een eigen bestand en niet `vtk-shield-favicon.png`: Discord knipt een avatar
+ * rond, en dat schild loopt tot aan de rand van zijn vierkant, dus verloor het
+ * zijn bovenhoeken. Hier staat het kleiner en gecentreerd op wit, zodat het
+ * volledig binnen de cirkel valt.
+ */
+export const DISCORD_AVATAR_PATH = "/vtk-discord-avatar.png";
 
 export type DiscordLinkKind = EventSignupLinkKind;
 

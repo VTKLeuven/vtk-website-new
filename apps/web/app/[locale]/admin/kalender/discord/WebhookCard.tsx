@@ -13,6 +13,7 @@ import {
   setDiscordWebhookEnabledAction,
   testDiscordWebhookAction,
 } from "@/app/actions/discord";
+import { DISCORD_AVATAR_PATH } from "@/lib/discord/eventMessage";
 import { WebhookForm } from "./WebhookForm";
 
 export type WebhookCardData = {
@@ -108,7 +109,7 @@ export function WebhookCard({ locale, webhook }: { locale: Locale; webhook: Webh
         <div className="flex min-w-0 items-start gap-3">
           {/* Het schild waaronder elke post verschijnt. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/vtk-shield-favicon.png" alt="" className="mt-0.5 size-10 shrink-0 rounded-full bg-[var(--paper)] object-contain p-1" />
+          <img src={DISCORD_AVATAR_PATH} alt="" className="mt-0.5 size-10 shrink-0 rounded-full border border-vtk-blue/10 object-cover" />
           <div className="min-w-0">
             <h2 className="text-lg font-semibold text-vtk-ink">{webhook.name}</h2>
             <p className="text-sm text-vtk-muted">
