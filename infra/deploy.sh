@@ -50,12 +50,27 @@ log "Compose-bestand valideren"
 
 # Bouwen terwijl de huidige containers verkeer blijven serveren.
 #
+# Elke build kopieert enkel wat ze leest (haar app, de packages die ze gebruikt
+# en de manifesten), niet meer de hele repo. Een app waaraan deze deploy niets
+# verandert, is daardoor een volledige cache-hit: de build duurt seconden, het
+# image blijft hetzelfde, en `up -d` laat die container gewoon draaien. Een
+# commit aan logistiek bouwt de website dus niet meer opnieuw, en een commit die
+# enkel docs/ raakt, bouwt niets. De CI-build kiest met dezelfde regels
+# (scripts/affected-apps.mjs).
+#
 # Niet via één `docker compose build`: compose bouwt in depends_on-volgorde, en
 # omdat logistiek en fakbar van web afhangen, wachtten die twee ~6 minuten op
 # een image dat niets met hun eigen build te maken heeft. Drie losse builds
 # naast elkaar praten met dezelfde daemon, dus ze delen layercache en
 # cachemounts, maar ze wachten niet op elkaar. (Met buildx geïnstalleerd zou
 # compose dit zelf via bake doen; dat plugin staat er niet, vandaar deze lus.)
+# Welk image elke app nu heeft, om na het bouwen te kunnen zeggen welke nieuw
+# is. Compose noemt ze <project>-<service>, en het project heet infra.
+declare -A image_before
+for svc in "${BUILD_SERVICES[@]}"; do
+  image_before[$svc]="$(docker image inspect -f '{{.Id}}' "infra-$svc" 2>/dev/null || true)"
+done
+
 log "Images bouwen (${BUILD_SERVICES[*]} parallel)"
 build_jobs=()
 for svc in "${BUILD_SERVICES[@]}"; do
@@ -113,6 +128,15 @@ if [ ${#build_failed[@]} -gt 0 ]; then
   echo "::error::Build mislukt voor: ${build_failed[*]}"
   exit 1
 fi
+
+log "Wat er veranderde"
+for svc in "${BUILD_SERVICES[@]}"; do
+  if [ "$(docker image inspect -f '{{.Id}}' "infra-$svc" 2>/dev/null || true)" = "${image_before[$svc]}" ]; then
+    echo "$svc: ongewijzigd (cache), de container blijft draaien"
+  else
+    echo "$svc: nieuw image"
+  fi
+done
 
 # Eenmalige migratie van het oude IPv4-only default network. Expliciet doen
 # voorkomt dat Compose een container hergebruikt die nog naar het verwijderde

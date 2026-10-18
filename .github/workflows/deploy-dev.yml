@@ -113,6 +113,11 @@ jobs:
   build:
     name: Production build and browser smoke
     runs-on: ubuntu-latest
+    # `actions: read` om de laatste geslaagde run op te vragen; zie de stap
+    # "Determine which apps to build".
+    permissions:
+      contents: read
+      actions: read
     services:
       postgres:
         image: postgres:16
@@ -138,21 +143,67 @@ jobs:
           node-version: 22
           cache: npm
 
+      # Enkel bouwen wat deze commit raakt: een wijziging aan logistiek bouwt de
+      # website niet, en een commit die enkel docs/ aanraakt bouwt niets. Welke
+      # bestanden een app raken, leest scripts/affected-apps.mjs uit haar
+      # Dockerfile, dezelfde regels als waarop Docker op de server zijn cache
+      # baseert.
+      #
+      # Vergeleken wordt met de laatste commit waarvoor deze workflow op main
+      # volledig slaagde, niet met de vorige commit. Faalde de build van een app,
+      # dan blijft ze zo rood tot ze weer bouwt, ook wanneer de commit daarna
+      # enkel docs/ aanraakt; anders zou die commit groen zijn en mocht hij naar
+      # productie. Een PR vergelijkt met haar basis; een handmatige run bouwt
+      # alles.
+      - name: Determine which apps to build
+        id: affected
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base=""
+          if [ "$EVENT_NAME" = pull_request ]; then
+            base="$PR_BASE"
+          elif [ "$EVENT_NAME" = push ]; then
+            base="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy-dev.yml --branch main \
+              --status success --limit 1 --json headSha --jq '.[0].headSha // ""' || true)"
+          fi
+          # Enkel die ene commit ophalen: `git diff` vergelijkt twee bomen en
+          # heeft de historie ertussen niet nodig.
+          if [ -n "$base" ] && ! git fetch --no-tags --depth=1 origin "$base"; then
+            echo "::warning::Kon $base niet ophalen; alle apps worden gebouwd."
+            base=""
+          fi
+          apps="$(node scripts/affected-apps.mjs ${base:+"$base"})"
+          echo "apps=$apps" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Production build"
+            echo "Vergeleken met: ${base:-niets, dus alles}"
+            echo ""
+            echo "Te bouwen: ${apps:-geen enkele app}"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Te bouwen: ${apps:-geen enkele app} (vergeleken met ${base:-niets})"
+
       - name: Install dependencies
+        if: steps.affected.outputs.apps != ''
         run: npm ci
 
       - name: Prepare Prisma client
+        if: steps.affected.outputs.apps != ''
         run: |
           cp .env.example .env
           npm run db:generate
 
       - name: Apply migrations
+        if: steps.affected.outputs.apps != ''
         run: npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
 
       # De Turbopack-buildcache van de vorige run: die hercompileert enkel wat
       # echt veranderd is. De sleutel bevat de sha zodat elke run haar eigen
       # cache wegschrijft; restore-keys pakt de meest recente eerdere.
       - name: Cache Next build cache
+        if: steps.affected.outputs.apps != ''
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
@@ -165,28 +216,37 @@ jobs:
             next-${{ runner.os }}-
 
       - name: Build production application
+        if: steps.affected.outputs.apps != ''
+        env:
+          APPS: ${{ steps.affected.outputs.apps }}
         run: |
-          npm run build --workspace=@vtk/web
-          npm run build --workspace=@vtk/logistiek
-          npm run build --workspace=@vtk/fakbar
+          read -ra apps <<< "$APPS"
+          for app in "${apps[@]}"; do
+            npm run build --workspace="@vtk/$app"
+          done
 
+      # De browsertest draait tegen de website; zonder nieuwe build van de
+      # website valt er niets nieuws te testen.
       - name: Resolve Playwright version
         id: playwright
+        if: contains(format(' {0} ', steps.affected.outputs.apps), ' web ')
         run: |
           echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
         id: playwright-cache
+        if: contains(format(' {0} ', steps.affected.outputs.apps), ' web ')
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
 
       - name: Install Playwright Chromium
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        if: contains(format(' {0} ', steps.affected.outputs.apps), ' web ') && steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install chromium
 
       - name: Run browser security smoke
+        if: contains(format(' {0} ', steps.affected.outputs.apps), ' web ')
         run: npm run test:e2e:tickets --workspace=@vtk/web
 
   deploy:

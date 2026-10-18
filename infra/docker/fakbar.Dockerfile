@@ -35,11 +35,23 @@ COPY --from=deps /repo/packages ./packages
 # De Prisma-client hangt enkel van het schema af, dus die genereren we vóór de
 # broncode binnenkomt: zo blijft deze laag gecached zolang het schema niet
 # wijzigt, in plaats van bij elke commit opnieuw te draaien. De client landt in
-# node_modules, en node_modules zit niet in de buildcontext, dus de `COPY . .`
-# hieronder overschrijft ze niet.
+# node_modules, en node_modules zit niet in de buildcontext, dus de COPY's
+# hieronder overschrijven ze niet.
 COPY packages/db/prisma ./packages/db/prisma
 RUN npx --yes prisma generate --schema packages/db/prisma/schema.prisma
-COPY . .
+# Enkel wat deze build leest, en niet `COPY . .`: zo bouwt een deploy deze app
+# niet opnieuw wanneer er enkel iets aan de website of in docs/ veranderde (zie
+# web.Dockerfile). De packages die fakbar importeert, rechtstreeks of via een
+# andere package; een import die hier ontbreekt, laat de build luid falen, en
+# test/dockerBuildInputs.test.ts (in apps/web) vangt dat al voor de push.
+COPY package.json ./
+COPY packages/auth ./packages/auth
+COPY packages/db ./packages/db
+COPY packages/gallery ./packages/gallery
+COPY packages/mail ./packages/mail
+COPY packages/tsconfig ./packages/tsconfig
+COPY packages/ui ./packages/ui
+COPY apps/fakbar ./apps/fakbar
 RUN --mount=type=cache,target=/repo/apps/fakbar/.next/cache,sharing=locked \
   npm run build --workspace=@vtk/fakbar
 

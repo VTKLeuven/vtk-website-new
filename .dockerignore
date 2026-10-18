@@ -39,3 +39,21 @@ infra/immich/
 # De mobiele app (Expo). Die wordt door EAS gebouwd en niet in deze images; ze
 # meesturen maakt de buildcontext alleen groter.
 mobile/
+
+# Wat geen enkele image leest. De Dockerfiles kopiëren een app in zijn geheel
+# (`COPY apps/web ./apps/web`), dus stond een test hier niet in, dan bouwde een
+# commit die enkel een test aanpaste de hele website opnieuw. docs/ en de
+# ontwerpmappen veranderen vaak en horen nergens in een image; backups/ bevat
+# databasedumps (`make backup`) en hoort al helemaal niet in een buildcontext.
+# Zie scripts/affected-apps.mjs, dat dezelfde regels leest voor de CI-build.
+docs
+design
+design-proposals
+backups
+apps/*/test
+apps/*/e2e
+apps/*/test-results
+apps/*/playwright-report
+apps/*/AGENTS.md
+apps/*/CLAUDE.md
+apps/*/README.md

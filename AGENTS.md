@@ -89,6 +89,28 @@ memory (see https://github.com/vercel/next.js/discussions/77102).
   `pgrep -f postcss.js | wc -l` — if that number keeps growing, kill it.
 - `next build` uses Turbopack and is fine (single-shot, no leak).
 
+# Een deploy bouwt enkel de apps die veranderden
+
+De builder-stage van `infra/docker/{web,logistiek,fakbar}.Dockerfile` kopieert
+enkel wat die build leest: `package.json`, de packages die de app gebruikt en
+de app zelf, en niet meer `COPY . .`. Een app waaraan een commit niets
+verandert, is op de server dus een cache-hit: dezelfde image, en `up -d` laat
+die container draaien. De CI-build in `deploy-dev.yml` kiest met
+`scripts/affected-apps.mjs`, dat dezelfde Dockerfiles en `.dockerignore` leest,
+en vergelijkt met de laatste geslaagde run op main.
+
+- **Importeert logistiek of fakbar een nieuwe `@vtk/...`-package** (ook via een
+  andere package), zet dan een `COPY packages/<naam>` in haar Dockerfile.
+  `apps/web/test/dockerBuildInputs.test.ts` faalt zolang dat ontbreekt; de
+  website kopieert `packages/` in zijn geheel.
+- **Leest een app iets buiten haar eigen map en de packages**, dan moet het
+  daar als `COPY` bij: wat niet gekopieerd wordt, bestaat niet tijdens de build.
+- Wat geen image leest (docs, tests, ontwerpen), staat in `.dockerignore`, zodat
+  een commit die enkel dat raakt niets bouwt.
+- Wijzigt er iets aan de `build:`-sectie in `infra/docker-compose.yml`, dan
+  ziet de CI-build dat niet (Docker op de server wel, want build-args horen bij
+  zijn cache). Start dan een handmatige run van de workflow: die bouwt alles.
+
 # Workspace root is pinned
 
 Both `next.config.ts` files set `turbopack.root` and `outputFileTracingRoot`
