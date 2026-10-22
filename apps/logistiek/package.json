@@ -37,7 +37,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vtk/tsconfig": "*",
-    "dotenv-cli": "^7.4.2",
+    "dotenv-cli": "^11.0.0",
     "read-excel-file": "^9.3.8",
     "tailwindcss": "^4",
     "tsx": "^4.19.2",
