@@ -34,6 +34,8 @@ import { UnsubscribePanel } from "@/components/profile/UnsubscribePanel";
 import { DiscordMessagePreview } from "@/components/admin/DiscordMessagePreview";
 import { discordEventMessage, DISCORD_AVATAR_PATH } from "@/lib/discord/eventMessage";
 import { siteUrl } from "@/lib/seo";
+import { LightroomPreview } from "@/components/lightroom/LightroomPreview";
+import { getLightroomConfigStatus } from "@/lib/lightroom";
 import { FlowPreview } from "./FlowPreview";
 import { MailPreviewList } from "./MailPreviewList";
 
@@ -223,6 +225,7 @@ export default async function AdminFlowPreview({
   // De Discord-post met verzonnen gegevens, door dezelfde functie als een echte
   // post. Een vast moment, zodat "over 2 weken" niet elke dag verschuift.
   const discordWebhooks = await prisma.discordWebhook.count();
+  const lightroomConfig = await getLightroomConfigStatus();
   const origin = siteUrl();
   const discordSample = discordEventMessage(
     {
@@ -602,6 +605,58 @@ export default async function AdminFlowPreview({
         }
       >
         <DiscordMessagePreview message={discordSample} now={new Date(DISCORD_SAMPLE_NOW)} />
+      </FlowPreview>
+
+      <FlowPreview
+        title={nl ? "Lightroom-pc" : "Lightroom PC"}
+        when={
+          nl
+            ? "De toestanden van /admin/lightroom die je zelden ziet: een start die kenny weigert, het opstarten, klaar met iemand verbonden, en een pc die niet in slaapstand wil."
+            : "The states of /admin/lightroom you rarely see: a start kenny refuses, starting up, ready with someone connected, and a PC that will not go to sleep."
+        }
+        openLabel={nl ? "Toon de toestanden" : "Show the states"}
+        closeLabel={nl ? "Verberg de toestanden" : "Hide the states"}
+        rules={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Wanneer" : "When"}</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4">
+              <li>
+                {nl
+                  ? "Kenny weigert een start zolang een job beide GPU's gebruikt, iets anders de GPU openhoudt of er te weinig geheugen is (lightroom-vm, blockers)."
+                  : "Kenny refuses a start while a job uses both GPUs, something else holds the GPU or memory is short (lightroom-vm, blockers)."}
+              </li>
+              <li>
+                {nl
+                  ? "Opstarten duurt tot Windows de guest agent beantwoordt, ongeveer 4 minuten."
+                  : "Starting lasts until Windows answers the guest agent, about 4 minutes."}
+              </li>
+              <li>
+                {nl
+                  ? "Vast is het enkel wanneer Windows na 10 minuten niet in slaapstand of uit wou; de GPU blijft dan bij de VM tot IT kijkt."
+                  : "Stuck only happens when Windows would not hibernate or shut down within 10 minutes; the GPU then stays with the VM until IT looks."}
+              </li>
+            </ul>
+          </>
+        }
+        yourState={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Koppeling" : "Link"}</p>
+            <dl className="mt-2 space-y-1">
+              <div className="flex justify-between gap-4">
+                <dt>{nl ? "Kenny" : "Kenny"}</dt>
+                <dd className="text-right">
+                  {lightroomConfig.apiUrl && lightroomConfig.hasToken
+                    ? lightroomConfig.apiUrl
+                    : nl
+                      ? "nog niet ingesteld"
+                      : "not set up yet"}
+                </dd>
+              </div>
+            </dl>
+          </>
+        }
+      >
+        <LightroomPreview locale={nl ? "nl" : "en"} />
       </FlowPreview>
 
       <section className="space-y-4 pt-2">

@@ -1,0 +1,17 @@
+[Unit]
+Description=Lightroom VM API (the Lightroom PC page on the VTK site)
+After=network.target tailscaled.service lightroom-vm-watch.service
+Wants=tailscaled.service
+
+[Service]
+User=lightroom-api
+Group=lightroom-api
+ExecStart=/usr/local/bin/lightroom-api
+# Until tailscale0 has its address the bind fails; Restart tries again
+Restart=always
+RestartSec=5
+# kenny's Tailscale address: only the tailnet (the site on liv) reaches the API
+Environment=LIGHTROOM_API_LISTEN=100.114.7.25:8765
+
+[Install]
+WantedBy=multi-user.target

@@ -160,6 +160,9 @@ export const MCP_PERMISSION_POLICY = {
   // gemeld. Wie anoniem meldde, deed dat tegenover de kring en niet tegenover
   // een agent; niets ervan gaat door dit endpoint, ook niet lezend.
   "feedback.manage": { reads: [], creates: [], blocked: ["read or handle website feedback"] },
+  // De Lightroom-pc leent de GPU van llm.vtk.be; een agent die hem start of
+  // stillegt, legt de chatbot stil of iemands bewerking. Niet via MCP.
+  "lightroom.use": { reads: [], creates: [], blocked: ["start the Lightroom PC or put it to sleep"] },
 } as const satisfies Record<Permission, McpPermissionPolicy>;
 
 export function parseConfiguredPermissions(raw: string | undefined): {
