@@ -206,6 +206,9 @@ export function getAdminNav(): NavEntry[] {
       // waar de albums beheerd worden; alleen `media.manage`, want dit is de
       // enige tab die foto's echt weggooit.
       item('takedowns', '/media/verwijderverzoeken', { perm: 'media.manage' }),
+      // De Windows-pc op kenny waarop communicatie Lightroom draait: starten,
+      // zien of hij klaar is, en in slaapstand zetten.
+      item('lightroom', '/lightroom', { perm: 'lightroom.use' }),
     ]),
     // Wat VTK Onderwijs beheert hangt samen: de POC's zijn de studenten die de
     // opleiding vertegenwoordigen, het bureau is hun vergadering, en de

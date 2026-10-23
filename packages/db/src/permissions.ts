@@ -255,6 +255,13 @@ export const PERMISSIONS = [
   // onderhoudt, geen logboek, en er staan vrije teksten van leden in.
   { code: "feedback.manage", labelNl: "Websitefeedback bekijken en afhandelen", labelEn: "View and handle website feedback", category: "it" },
 
+  // De Lightroom-pc (/admin/lightroom): een Windows-VM op kenny die de GPU van
+  // llm.vtk.be leent zolang communicatie er foto's op bewerkt. Eén recht voor
+  // starten en in slaapstand zetten: wie hem start, moet hem ook kunnen
+  // stilleggen als hij klaar is. Verbinden zelf loopt via Parsec, niet via de
+  // site. Zie docs/design-decisions.md ("De Lightroom-pc").
+  { code: "lightroom.use", labelNl: "De Lightroom-pc starten en in slaapstand zetten", labelEn: "Start the Lightroom PC and put it to sleep", category: "lightroom" },
+
 ] as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[number]["code"];
