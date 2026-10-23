@@ -1,7 +1,7 @@
-import { Readable } from "node:stream";
 import { NextResponse } from "next/server";
 import { prisma } from "@vtk/db";
-import { getObjectStream } from "@vtk/storage";
+import { getObjectStream, objectResponse } from "@vtk/storage";
+import { contentDisposition } from "@/lib/contentDisposition";
 import { authErrorResponse } from "@/lib/session";
 import { canView, requireExpenseAccess } from "@/lib/rekeningen/server";
 import { RECEIPT_PREFIX } from "@/lib/rekeningen/expenses";
@@ -58,25 +58,23 @@ export async function GET(
 
   try {
     const object = await getObjectStream(expense.receiptKey, range);
-    const headers = new Headers();
-    headers.set("content-type", expense.receiptMime || object.contentType || "application/octet-stream");
-    if (object.contentLength != null) headers.set("content-length", String(object.contentLength));
-    if (object.contentRange) headers.set("content-range", object.contentRange);
-    if (object.etag) headers.set("etag", object.etag);
-    headers.set("accept-ranges", "bytes");
-    headers.set("x-content-type-options", "nosniff");
-    headers.set("referrer-policy", "no-referrer");
-    const download = new URL(request.url).searchParams.get("download") === "1";
-    const filename = expense.receiptName.replace(/["\\\r\n]/g, "_") || "bonnetje";
-    headers.set(
-      "content-disposition",
-      `${download ? "attachment" : "inline"}; filename="${filename}"`,
-    );
-    // Nooit in een gedeelde cache: dit is persoonsgebonden.
-    headers.set("cache-control", "private, max-age=300");
-    return new Response(Readable.toWeb(object.stream as Readable) as unknown as BodyInit, {
-      status: object.contentRange ? 206 : 200,
-      headers,
+    return objectResponse(request, object.stream, () => {
+      const headers = new Headers();
+      headers.set("content-type", expense.receiptMime || object.contentType || "application/octet-stream");
+      if (object.contentLength != null) headers.set("content-length", String(object.contentLength));
+      if (object.contentRange) headers.set("content-range", object.contentRange);
+      if (object.etag) headers.set("etag", object.etag);
+      headers.set("accept-ranges", "bytes");
+      headers.set("x-content-type-options", "nosniff");
+      headers.set("referrer-policy", "no-referrer");
+      const download = new URL(request.url).searchParams.get("download") === "1";
+      headers.set(
+        "content-disposition",
+        contentDisposition(download ? "attachment" : "inline", expense.receiptName || "bonnetje"),
+      );
+      // Nooit in een gedeelde cache: dit is persoonsgebonden.
+      headers.set("cache-control", "private, max-age=300");
+      return { status: object.contentRange ? 206 : 200, headers };
     });
   } catch {
     return NextResponse.json({ error: "not_found" }, { status: 404 });

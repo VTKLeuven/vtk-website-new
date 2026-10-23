@@ -1,5 +1,6 @@
 import { prisma } from "@vtk/db";
-import { getObjectStream } from "@vtk/storage";
+import { getObjectStream, objectResponse } from "@vtk/storage";
+import { contentDisposition } from "@/lib/contentDisposition";
 import { getCurrentSession } from "@/lib/session";
 import { getFormAccess } from "@/lib/forms/authorization";
 
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
  * laat daarnaast de inzender zelf zijn eigen bestand ophalen.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ formId: string; uploadId: string }> }
 ) {
   const { formId, uploadId } = await params;
@@ -38,16 +39,16 @@ export async function GET(
 
   try {
     const { stream, contentType } = await getObjectStream(upload.storageKey);
-    return new Response(stream as unknown as ReadableStream, {
+    return objectResponse(request, stream, () => ({
       headers: {
         "Content-Type": upload.contentType || contentType || "application/octet-stream",
         // `attachment`, niet `inline`: een geüpload bestand van een bezoeker
         // mag nooit als pagina in onze eigen oorsprong openen.
-        "Content-Disposition": `attachment; filename="${upload.originalName.replace(/["\\]/g, "")}"`,
+        "Content-Disposition": contentDisposition("attachment", upload.originalName),
         "Cache-Control": "private, no-store",
         "X-Content-Type-Options": "nosniff",
       },
-    });
+    }));
   } catch (error) {
     console.error("Formulierbestand ophalen mislukt", error);
     return Response.json({ error: "NOT_FOUND" }, { status: 404 });

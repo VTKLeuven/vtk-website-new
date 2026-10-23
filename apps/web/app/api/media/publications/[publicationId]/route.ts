@@ -1,5 +1,4 @@
-import { Readable } from "node:stream";
-import { getObjectStream } from "@vtk/storage";
+import { getObjectStream, objectResponse } from "@vtk/storage";
 import { getMediaContent, type MediaPublication } from "@/lib/media-content";
 
 export const dynamic = "force-dynamic";
@@ -131,21 +130,19 @@ export async function GET(
       const range = request.headers.get("range");
       const object = await getObjectStream(publication.storageKey, range);
       const { stream, contentType, contentLength, contentRange, etag, lastModified } = object;
-      const headers = new Headers({
-        "content-type": contentType || "application/pdf",
-        "content-disposition": `inline; filename="${publication.id}.pdf"`,
-        "accept-ranges": "bytes",
-        "x-content-type-options": "nosniff",
-        "cache-control": "private, max-age=3600",
-      });
-      if (contentLength != null) headers.set("content-length", String(contentLength));
-      if (contentRange) headers.set("content-range", contentRange);
-      if (etag) headers.set("etag", etag);
-      if (lastModified) headers.set("last-modified", lastModified.toUTCString());
-
-      return new Response(Readable.toWeb(stream as Readable) as unknown as BodyInit, {
-        status: contentRange ? 206 : 200,
-        headers,
+      return objectResponse(request, stream, () => {
+        const headers = new Headers({
+          "content-type": contentType || "application/pdf",
+          "content-disposition": `inline; filename="${publication.id}.pdf"`,
+          "accept-ranges": "bytes",
+          "x-content-type-options": "nosniff",
+          "cache-control": "private, max-age=3600",
+        });
+        if (contentLength != null) headers.set("content-length", String(contentLength));
+        if (contentRange) headers.set("content-range", contentRange);
+        if (etag) headers.set("etag", etag);
+        if (lastModified) headers.set("last-modified", lastModified.toUTCString());
+        return { status: contentRange ? 206 : 200, headers };
       });
     } catch {
       return errorResponse(502);

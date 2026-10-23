@@ -1,5 +1,4 @@
-import { Readable } from "node:stream";
-import { getObjectStream } from "@vtk/storage";
+import { getObjectStream, objectResponse } from "@vtk/storage";
 import { updateKey } from "@/lib/urenloopApp/config";
 import { bearerFrom, checkDeviceToken } from "@/lib/urenloopApp/devices";
 
@@ -40,23 +39,22 @@ export async function GET(
 
   try {
     const object = await getObjectStream(key, range);
-    const headers = new Headers();
-    headers.set(
-      "content-type",
-      file.endsWith(".yml") ? "text/yaml; charset=utf-8" : "application/octet-stream",
-    );
-    if (object.contentLength != null) headers.set("content-length", String(object.contentLength));
-    if (object.contentRange) headers.set("content-range", object.contentRange);
-    if (object.etag) headers.set("etag", object.etag);
-    if (object.lastModified) headers.set("last-modified", object.lastModified.toUTCString());
-    headers.set("accept-ranges", "bytes");
-    headers.set("x-content-type-options", "nosniff");
-    // latest.yml is precies het bestand dat nieuwer moet zijn dan wat de app al
-    // weet; cachen zou een update dagen kunnen ophouden.
-    headers.set("cache-control", "private, no-store");
-    return new Response(Readable.toWeb(object.stream as Readable) as unknown as BodyInit, {
-      status: object.contentRange ? 206 : 200,
-      headers,
+    return objectResponse(request, object.stream, () => {
+      const headers = new Headers();
+      headers.set(
+        "content-type",
+        file.endsWith(".yml") ? "text/yaml; charset=utf-8" : "application/octet-stream",
+      );
+      if (object.contentLength != null) headers.set("content-length", String(object.contentLength));
+      if (object.contentRange) headers.set("content-range", object.contentRange);
+      if (object.etag) headers.set("etag", object.etag);
+      if (object.lastModified) headers.set("last-modified", object.lastModified.toUTCString());
+      headers.set("accept-ranges", "bytes");
+      headers.set("x-content-type-options", "nosniff");
+      // latest.yml is precies het bestand dat nieuwer moet zijn dan wat de app al
+      // weet; cachen zou een update dagen kunnen ophouden.
+      headers.set("cache-control", "private, no-store");
+      return { status: object.contentRange ? 206 : 200, headers };
     });
   } catch {
     return new Response("Not found", { status: 404 });

@@ -1,5 +1,5 @@
-import { Readable } from "node:stream";
-import { getObjectStream } from "@vtk/storage";
+import { getObjectStream, objectResponse } from "@vtk/storage";
+import { contentDisposition } from "@/lib/contentDisposition";
 
 /**
  * Serveert opgeslagen objecten (logo's, afbeeldingen, pagina-bijlagen, foto's)
@@ -30,45 +30,36 @@ export async function GET(
   try {
     const object = await getObjectStream(key, range);
     const { stream, contentType, contentLength, contentRange, etag, lastModified } = object;
-    const headers = new Headers();
-    const type = contentType ?? "application/octet-stream";
-    headers.set("content-type", type);
-    if (contentLength != null) headers.set("content-length", String(contentLength));
-    if (contentRange) headers.set("content-range", contentRange);
-    if (etag) headers.set("etag", etag);
-    if (lastModified) headers.set("last-modified", lastModified.toUTCString());
-    headers.set("accept-ranges", "bytes");
-    headers.set("x-content-type-options", "nosniff");
-    headers.set("referrer-policy", "no-referrer");
-    const unsafeInlineType = /(?:svg\+xml|text\/html|application\/(?:xhtml\+xml|xml)|text\/xml)/i.test(type);
-    if (unsafeInlineType) {
-      // Existing objects can predate the upload hardening. A sandboxed document
-      // cannot execute in the vtk.be origin when opened directly.
-      headers.set("content-security-policy", "sandbox; default-src 'none'; style-src 'unsafe-inline'");
-    }
-    const url = new URL(request.url);
-    const requestedFilename = url.searchParams.get("filename")?.trim();
-    const forceDownload = url.searchParams.has("download");
-    const fallbackFilename = key.split("/").at(-1)?.replace(/["\\\r\n]/g, "_") || "download";
-    const filename = (requestedFilename || fallbackFilename).replace(/["\\\r\n]/g, "_");
-    const encodedFilename = encodeURIComponent(requestedFilename || fallbackFilename);
+    return objectResponse(request, stream, () => {
+      const headers = new Headers();
+      const type = contentType ?? "application/octet-stream";
+      headers.set("content-type", type);
+      if (contentLength != null) headers.set("content-length", String(contentLength));
+      if (contentRange) headers.set("content-range", contentRange);
+      if (etag) headers.set("etag", etag);
+      if (lastModified) headers.set("last-modified", lastModified.toUTCString());
+      headers.set("accept-ranges", "bytes");
+      headers.set("x-content-type-options", "nosniff");
+      headers.set("referrer-policy", "no-referrer");
+      const unsafeInlineType = /(?:svg\+xml|text\/html|application\/(?:xhtml\+xml|xml)|text\/xml)/i.test(type);
+      if (unsafeInlineType) {
+        // Existing objects can predate the upload hardening. A sandboxed document
+        // cannot execute in the vtk.be origin when opened directly.
+        headers.set("content-security-policy", "sandbox; default-src 'none'; style-src 'unsafe-inline'");
+      }
+      const url = new URL(request.url);
+      const requestedFilename = url.searchParams.get("filename")?.trim();
+      const forceDownload = url.searchParams.has("download");
+      const filename = requestedFilename || key.split("/").at(-1) || "download";
 
-    if (key.startsWith("files/") || unsafeInlineType || forceDownload) {
-      headers.set(
-        "content-disposition",
-        `attachment; filename="${filename}"; filename*=UTF-8''${encodedFilename}`
-      );
-    } else if (requestedFilename) {
-      headers.set(
-        "content-disposition",
-        `inline; filename="${filename}"; filename*=UTF-8''${encodedFilename}`
-      );
-    }
-    // Keys zijn content-adres-achtig (random hex) en dus onveranderlijk: hard cachen.
-    headers.set("cache-control", "public, max-age=31536000, immutable");
-    return new Response(Readable.toWeb(stream as Readable) as unknown as BodyInit, {
-      status: contentRange ? 206 : 200,
-      headers,
+      if (key.startsWith("files/") || unsafeInlineType || forceDownload) {
+        headers.set("content-disposition", contentDisposition("attachment", filename));
+      } else if (requestedFilename) {
+        headers.set("content-disposition", contentDisposition("inline", filename));
+      }
+      // Keys zijn content-adres-achtig (random hex) en dus onveranderlijk: hard cachen.
+      headers.set("cache-control", "public, max-age=31536000, immutable");
+      return { status: contentRange ? 206 : 200, headers };
     });
   } catch {
     // Object bestaat niet (meer): laat de <img> netjes terugvallen op zijn fallback.

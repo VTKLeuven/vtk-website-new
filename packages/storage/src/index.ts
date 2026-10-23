@@ -7,6 +7,7 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { randomBytes } from "node:crypto";
+import { once } from "node:events";
 import { extname } from "node:path";
 import { Readable } from "node:stream";
 import archiver from "archiver";
@@ -86,14 +87,30 @@ async function getClient(): Promise<{ client: S3Client; bucket: string }> {
   if (!cfg.endpoint || !cfg.accessKeyId || !cfg.secretAccessKey || !cfg.bucket) {
     throw new Error("S3 object storage is not configured; configure Hetzner in Admin -> IT");
   }
-  const client = new S3Client({
+  s.cache = { client: buildClient(cfg), bucket: cfg.bucket };
+  return s.cache;
+}
+
+/**
+ * De SDK heeft standaard geen enkele timeout en 50 sockets per client. Hangt
+ * de opslag, dan blijft elk verzoek dat al een socket had er voor altijd op
+ * wachten, en na vijftig zo'n verzoeken staat elke afbeelding van de site in de
+ * rij. `requestTimeout` loopt tot de headers van het antwoord binnen zijn (voor
+ * een upload dus over de hele body), niet over het lezen van een download: een
+ * trage lezer van een groot bestand breekt hier niet op af.
+ */
+function buildClient(cfg: S3Config): S3Client {
+  return new S3Client({
     endpoint: cfg.endpoint,
     region: cfg.region,
     credentials: { accessKeyId: cfg.accessKeyId, secretAccessKey: cfg.secretAccessKey },
     forcePathStyle: cfg.forcePathStyle,
+    requestHandler: {
+      connectionTimeout: 5_000,
+      requestTimeout: 60_000,
+      throwOnRequestTimeout: true,
+    },
   });
-  s.cache = { client, bucket: cfg.bucket };
-  return s.cache;
 }
 
 export function newStorageKey(prefix: string, originalName?: string | null): string {
@@ -158,6 +175,43 @@ export async function getObjectStream(
   };
 }
 
+/**
+ * Geeft een geopend object terug als `Response`, en laat zijn S3-verbinding
+ * nooit liggen.
+ *
+ * Een GetObject houdt zijn socket bezet tot de body gelezen of afgebroken is.
+ * Een body die niemand leest of sluit, houdt die socket dus voor altijd, en na
+ * vijftig zulke verzoeken laadt geen enkele afbeelding van de site nog. Dat
+ * gebeurde op twee manieren:
+ *
+ * - Next beantwoordt een HEAD door de GET-handler aan te roepen en de body
+ *   daarna weg te gooien, zonder hem af te breken.
+ * - Een header die gooit terwijl het object al open is: een bestandsnaam met
+ *   een gedachtestreepje of een emoji in `content-disposition`. De route gaf in
+ *   haar catch een 404 en de stream bleef open.
+ *
+ * `init` bouwt status en headers. Gooit die, dan sluit deze functie eerst de
+ * stream en gooit ze daarna door, zodat de catch van de route gewoon werkt.
+ */
+export function objectResponse(
+  request: Request,
+  stream: NodeJS.ReadableStream,
+  init: () => ResponseInit
+): Response {
+  const source = stream as Readable;
+  try {
+    const responseInit = init();
+    if (request.method === "HEAD") {
+      source.destroy();
+      return new Response(null, responseInit);
+    }
+    return new Response(Readable.toWeb(source) as unknown as BodyInit, responseInit);
+  } catch (error) {
+    source.destroy();
+    throw error;
+  }
+}
+
 export async function getObjectBuffer(key: string): Promise<Buffer> {
   const { stream } = await getObjectStream(key);
   const chunks: Buffer[] = [];
@@ -176,12 +230,7 @@ export async function getObjectBuffer(key: string): Promise<Buffer> {
  * toetsen.
  */
 export async function checkS3Connection(cfg: S3Config): Promise<void> {
-  const client = new S3Client({
-    endpoint: cfg.endpoint,
-    region: cfg.region,
-    credentials: { accessKeyId: cfg.accessKeyId, secretAccessKey: cfg.secretAccessKey },
-    forcePathStyle: cfg.forcePathStyle,
-  });
+  const client = buildClient(cfg);
   await client.send(new HeadBucketCommand({ Bucket: cfg.bucket }));
 }
 
@@ -252,17 +301,40 @@ export type ZipEntry = { key: string; name: string };
 
 // Stream a ZIP archive built from a list of S3 objects. Returns a web-stream
 // suitable for a Next.js Route Handler Response.
+//
+// Elk object gaat pas open wanneer het vorige in het archief zit. Alles meteen
+// openen hield de hele pool van vijftig S3-sockets bezet zolang de download
+// liep, en zolang laadde geen enkele afbeelding van de site. Stopt de lezer,
+// dan gaat het object dat openstaat ook dicht.
 export function streamAlbumZip(entries: ZipEntry[]): ReadableStream<Uint8Array> {
   const archive = archiver("zip", { zlib: { level: 6 } });
+  let current: Readable | undefined;
+  let closed = false;
+  const closing = new Promise<void>((resolve) => {
+    archive.once("close", () => {
+      closed = true;
+      current?.destroy();
+      resolve();
+    });
+  });
 
   (async () => {
     try {
       for (const entry of entries) {
+        if (closed) return;
         const { stream } = await getObjectStream(entry.key);
-        archive.append(stream as Readable, { name: entry.name });
+        current = stream as Readable;
+        if (closed) {
+          current.destroy();
+          return;
+        }
+        const written = once(archive, "entry");
+        archive.append(current, { name: entry.name });
+        await Promise.race([written, closing]);
       }
-      await archive.finalize();
+      if (!closed) await archive.finalize();
     } catch (err) {
+      current?.destroy();
       archive.abort();
       archive.emit("error", err);
     }

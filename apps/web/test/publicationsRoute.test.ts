@@ -6,7 +6,8 @@ const mocks = vi.hoisted(() => ({
   getMediaContent: vi.fn(),
 }));
 
-vi.mock("@vtk/storage", () => ({
+vi.mock("@vtk/storage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@vtk/storage")>()),
   getObjectStream: mocks.getObjectStream,
 }));
 

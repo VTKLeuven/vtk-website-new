@@ -5,13 +5,9 @@ import {
   getImmichGalleryDownloadTarget,
   immichGalleryStatus,
 } from "@/lib/immich-gallery";
+import { contentDisposition } from "@/lib/contentDisposition";
 
 export const dynamic = "force-dynamic";
-
-function contentDisposition(filename: string) {
-  const ascii = filename.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
-  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
-}
 
 export async function GET(
   _request: Request,
@@ -24,7 +20,7 @@ export async function GET(
     const filename = downloadFilenameFromImmichResponse(immichResponse, target.photo.filename);
     const headers = new Headers({
       "content-type": immichResponse.headers.get("content-type") || target.photo.mimeType || "application/octet-stream",
-      "content-disposition": contentDisposition(filename),
+      "content-disposition": contentDisposition("attachment", filename),
       "cache-control": "no-store",
     });
     const contentLength = immichResponse.headers.get("content-length");

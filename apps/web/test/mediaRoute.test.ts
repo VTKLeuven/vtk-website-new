@@ -5,7 +5,8 @@ const mocks = vi.hoisted(() => ({
   getObjectStream: vi.fn(),
 }));
 
-vi.mock("@vtk/storage", () => ({
+vi.mock("@vtk/storage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@vtk/storage")>()),
   getObjectStream: mocks.getObjectStream,
 }));
 
@@ -85,6 +86,42 @@ describe("GET /api/media/[...key]", () => {
     );
 
     expect(res.headers.get("content-disposition")).toContain('filename="nota_test_foo.pdf"');
+  });
+
+  it("keeps a filename with a dash or emoji in filename* instead of failing", async () => {
+    const res = await GET(
+      createRequest(`/api/media/pdfs/12345678.pdf?filename=${encodeURIComponent("Verslag – AV 🔥.pdf")}`),
+      createContext(["pdfs", "12345678.pdf"]),
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-disposition")).toBe(
+      'inline; filename="Verslag _ AV __.pdf"; filename*=UTF-8\'\'Verslag%20%E2%80%93%20AV%20%F0%9F%94%A5.pdf',
+    );
+  });
+
+  // Next beantwoordt een HEAD met de GET-handler en gooit de body weg zonder
+  // hem af te breken. Bleef de S3-stream open, dan was dat een socket minder.
+  it("closes the S3 stream on HEAD and answers without a body", async () => {
+    const stream = Readable.from(Buffer.from("%PDF-mock-content"));
+    mocks.getObjectStream.mockResolvedValue({
+      stream,
+      contentType: "application/pdf",
+      contentLength: 17,
+      contentRange: undefined,
+      etag: '"etag123"',
+      lastModified: new Date("2026-09-01T12:00:00Z"),
+    });
+
+    const res = await GET(
+      new Request("https://vtk.be/api/media/pdfs/12345678.pdf", { method: "HEAD" }),
+      createContext(["pdfs", "12345678.pdf"]),
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-length")).toBe("17");
+    expect(res.body).toBeNull();
+    expect(stream.destroyed).toBe(true);
   });
 
   it("returns 404 when the object is not found", async () => {
