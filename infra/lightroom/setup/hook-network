@@ -1,0 +1,10 @@
+#!/bin/bash
+# VTK: Docker sets the FORWARD policy to DROP, which also drops the traffic of libvirt's NAT
+# network. Let virbr0 through in DOCKER-USER (the chain Docker leaves for us) whenever the
+# default network starts. The chain is created here if Docker has not started yet.
+[ "$1" = default ] && [ "$2" = started ] || exit 0
+iptables -N DOCKER-USER 2>/dev/null
+for rule in "-i virbr0 -j ACCEPT" "-o virbr0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT"; do
+  iptables -C DOCKER-USER $rule 2>/dev/null || iptables -I DOCKER-USER $rule
+done
+exit 0

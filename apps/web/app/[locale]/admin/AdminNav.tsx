@@ -657,6 +657,15 @@ const icons: Record<string, ReactNode> = {
       <path d="M12 13.5h.01" />
     </Svg>
   ),
+  // lightroom: beeldscherm, de pc op kenny waarop communicatie foto's bewerkt
+  // (geen camera: die heeft Media er net boven al)
+  lightroom: (
+    <Svg>
+      <rect x="2" y="3" width="20" height="14" rx="2" />
+      <path d="M8 21h8" />
+      <path d="M12 17v4" />
+    </Svg>
+  ),
   // door: deur met klink
   door: (
     <Svg>

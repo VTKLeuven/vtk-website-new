@@ -1,0 +1,12 @@
+[Unit]
+Description=Lightroom VM watcher: hibernates the VM when nobody uses it and gives GPU 0 back to vLLM
+After=libvirtd.service docker.service
+Wants=libvirtd.service
+
+[Service]
+ExecStart=/usr/local/bin/lightroom-vm watch
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

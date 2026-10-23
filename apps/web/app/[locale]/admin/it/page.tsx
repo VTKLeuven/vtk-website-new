@@ -8,6 +8,9 @@ import { S3ConfigForm } from "./S3ConfigForm";
 import { SentryConfigForm } from "./SentryConfigForm";
 import { DoorConfigForm } from "./DoorConfigForm";
 import { DoorTestButton } from "./DoorTestButton";
+import { LightroomConfigForm } from "./LightroomConfigForm";
+import { LightroomTestButton } from "./LightroomTestButton";
+import { getLightroomConfigStatus } from "@/lib/lightroom";
 import { VaultConfigForm } from "./VaultConfigForm";
 import { getVaultStatus } from "@/lib/vault/config";
 import { GoogleConfigForm } from "./GoogleConfigForm";
@@ -27,12 +30,13 @@ export default async function AdminIT({
   const session = await requireSession();
   if (!session.user.isSuperAdmin) notFound();
 
-  const [s3Status, sentryStatus, doorStatus, vaultStatus, googleStatus] = await Promise.all([
+  const [s3Status, sentryStatus, doorStatus, vaultStatus, googleStatus, lightroomStatus] = await Promise.all([
     getS3Status(),
     getSentryStatus(),
     getDoorStatus(),
     getVaultStatus(),
     getGoogleStatus(),
+    getLightroomConfigStatus(),
   ]);
 
   return (
@@ -150,6 +154,46 @@ export default async function AdminIT({
                 Pings the Pi&apos;s /health endpoint with the saved secret over Tailscale.
               </p>
               <DoorTestButton />
+            </div>
+          </div>
+        </details>
+
+        {/* Lightroom PC */}
+        <details className="group rounded-2xl border border-vtk-blue/15 bg-white p-5 shadow-sm transition">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 select-none">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-vtk-ink">Lightroom PC</h2>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    lightroomStatus.hasToken && lightroomStatus.apiUrl
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-zinc-100 text-zinc-600"
+                  }`}
+                >
+                  {lightroomStatus.hasToken && lightroomStatus.apiUrl ? "Configured" : "Needs setup"}
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-zinc-500 line-clamp-1 group-open:line-clamp-none">
+                The Windows VM on kenny that borrows vLLM&apos;s GPU for Lightroom over Parsec (/admin/lightroom,
+                infra/lightroom).
+              </p>
+            </div>
+            <span className="text-zinc-400 group-open:rotate-180 transition-transform duration-200 shrink-0">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </span>
+          </summary>
+          <div className="mt-6 space-y-6 border-t border-vtk-blue/10 pt-5">
+            <LightroomConfigForm status={lightroomStatus} />
+
+            <div className="border-t border-vtk-blue/10 pt-5">
+              <h3 className="text-sm font-semibold">Test connection</h3>
+              <p className="mb-3 mt-1 text-sm text-zinc-500">
+                Asks kenny&apos;s lightroom-api for the VM&apos;s status with the saved token, over Tailscale.
+              </p>
+              <LightroomTestButton />
             </div>
           </div>
         </details>

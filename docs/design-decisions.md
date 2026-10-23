@@ -11776,3 +11776,45 @@ heeft in zijn account, krijgt de dag ervoor om **12u** een mail. Regels in
   `/api/mail/uitschrijven`, en een scanner post niet. Uitschrijven gaat meteen
   naar Brevo, net als het vinkje op /account, en `/uitschrijven` staat open
   tijdens de onboarding- en studiebevestigingsgate.
+
+## De Lightroom-pc
+
+Communicatie bewerkt foto's in Lightroom, en daar is een gewone laptop vaak te
+traag voor. Kenny, de GPU-server van IT, heeft twee RTX 3090's die llm.vtk.be
+(vLLM) en de berekeningen van IT gebruiken. De Lightroom-pc is een Windows-VM op
+kenny die één van die GPU's leent zolang iemand hem gebruikt; je bedient hem via
+Parsec op je eigen laptop. Website: `/admin/lightroom`, `apps/web/lib/lightroom*.ts`
+en `apps/web/components/lightroom/`; kenny: `infra/lightroom/`.
+
+- **De GPU wordt geleend, niet gedeeld.** Zolang de VM draait, liggen vLLM en
+  één ComfyUI-worker stil. Na 30 minuten zonder muis of toetsenbord, en zonder
+  CPU-werk zoals een export, gaat Windows in slaapstand en krijgt vLLM zijn GPU
+  terug. "Ik ben klaar" doet dat meteen.
+- **Slaapstand, geen afsluiten.** Windows schrijft zijn geheugen naar schijf en
+  komt bij de volgende start terug zoals het was, Lightroom en open bewerkingen
+  incluis. Daarom mag de timer kort zijn: wie terugkomt, verliest enkel de vier
+  minuten van het opstarten.
+- **Lopend werk op kenny gaat voor.** Kenny weigert een start zolang een job
+  beide GPU's gebruikt, iets anders de GPU openhoudt of het geheugen te krap is.
+  Een GPU losmaken die nog in gebruik is, blijft hangen in de kernel en neemt
+  elke GPU-job op kenny mee. De site zegt de reden in gewone woorden; kenny's
+  eigen zin staat eronder als detail voor IT.
+- **De site start en stopt, Parsec verbindt.** Geen deellink: bij een deellink
+  moet iemand aan de pc elke verbinding aanvaarden, en daar zit niemand. Elk lid
+  van communicatie gebruikt een eigen gratis Parsec-account dat IT als vriend
+  van het Parsec-account van de pc toevoegt, met toetsenbord, muis en "verbinden
+  zonder goedkeuring". Wie vertrekt, ontvriendt IT; er is geen gedeeld
+  wachtwoord dat dan gewijzigd moet worden. Het account van de pc staat onder
+  Admin -> IT, zodat de pagina zegt wie je als vriend toevoegt.
+- **Eén recht, `lightroom.use`.** Wie hem start, moet hem ook kunnen
+  stilleggen. De seed geeft het aan de rol van de post Communicatie; op een
+  bestaande omgeving vink je het daar aan in /admin/roles.
+- **Wie verbindt, bedient hetzelfde scherm.** Daarom toont de pagina wie via
+  Parsec verbonden is, en vraagt "Ik ben klaar" een bevestiging als er nog
+  iemand op zit.
+- **Niet in het adminlogboek.** Starten verandert niets aan de data van de site.
+  Wie startte of stopte, staat in kenny's log (`/var/log/lightroom-vm.log`) en,
+  zolang hij draait, op de pagina.
+- **De site praat over Tailscale met kenny**, zoals met de deur-Pi:
+  `lightroom-api` luistert enkel op kenny's Tailscale-adres, met een token dat
+  onder Admin -> IT -> Lightroom PC versleuteld bewaard wordt.
