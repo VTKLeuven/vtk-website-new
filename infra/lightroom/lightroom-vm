@@ -1,0 +1,734 @@
+#!/usr/bin/python3
+"""lightroom-vm: lend kenny's GPU 0 to the Windows VM for Lightroom over Parsec, and take it back.
+
+    lightroom-vm status [--json]   what is going on, and whether a start would be allowed
+    lightroom-vm start             stop vLLM (and what else holds GPU 0), hand GPU 0 to the VM, boot it
+    lightroom-vm stop              hibernate the VM, hand GPU 0 back, start vLLM again
+                                   (start and stop take --by-stdin: who asked, one line on stdin,
+                                   for the log and the status; lightroom-api passes the site user)
+    lightroom-vm watch             the daemon (lightroom-vm-watch.service): hibernates the VM after
+                                   IDLE_MINUTES without input or CPU work, and cleans up after a VM
+                                   that was shut down from inside Windows
+    lightroom-vm console on|off    maintenance: the VM without GPU, with a screen on VNC
+                                   (127.0.0.1:5911, through an SSH tunnel), to log in to Parsec or
+                                   Adobe; `off` shuts it down and puts the GPU definition back
+
+The rules follow ~/seg/kenny_seg.sh: vLLM is stopped and started again only by whoever stopped
+it, and nothing starts while a job holds the GPUs. The VM never takes GPU 0 from a process that
+has it open: the nvidia driver would hang on the unbind, and with it every GPU job on kenny.
+Configuration: /etc/lightroom-vm/lightroom-vm.conf. State: /var/lib/lightroom-vm/state.json.
+"""
+import base64
+import fcntl
+import glob
+import json
+import os
+import subprocess
+import sys
+import time
+
+import libvirt
+import libvirt_qemu
+
+CONF_FILE = '/etc/lightroom-vm/lightroom-vm.conf'
+GPU_XML = '/etc/lightroom-vm/lightroom.xml'
+CONSOLE_XML = '/etc/lightroom-vm/lightroom.console.xml'
+VNC_PASSWORD_FILE = '/etc/lightroom-vm/vnc-password'
+STATE_FILE = '/var/lib/lightroom-vm/state.json'
+LOCK_FILE = '/run/lightroom-vm.lock'
+ACTIVE_MARK = '/run/lightroom-vm/active'   # exists while the VM holds GPU 0; jobs can test for it
+LOG_FILE = '/var/log/lightroom-vm.log'
+IDLE_FILE = r'C:\ProgramData\vtk\idle.json'
+
+DEFAULTS = {
+    'VM': 'lightroom',
+    'GPU': '0000:81:00.0',            # the GPU lent to the VM; all functions of its slot go along
+    'IDLE_MINUTES': '30',             # no input and no CPU work for this long: hibernate
+    'BUSY_CPU_PERCENT': '150',        # VM CPU use (100 = one core) that counts as work, e.g. an export
+    'RAM_MARGIN_GB': '4',             # what must stay free for kenny after the VM has its memory
+    'CONNECT_URL': '',                # the Parsec link the website shows
+    'JOB_PIDFILES': '/home/it/seg/job.pid /home/it/canal-sim-render/job.pid',
+    'VLLM_CONTAINER': 'vllm',
+    # services that keep every GPU open for monitoring (beszel-agent runs `nvidia-smi -l 4`):
+    # paused for the seconds of the detach, restarted after the reattach to see GPU 0 again
+    'PAUSE_SERVICES': 'beszel-agent',
+}
+
+
+def load_conf():
+    conf = dict(DEFAULTS)
+    if os.path.exists(CONF_FILE):
+        for line in open(CONF_FILE):
+            line = line.split('#', 1)[0].strip()
+            if '=' in line:
+                k, v = line.split('=', 1)
+                conf[k.strip()] = v.strip().strip('"\'')
+    return conf
+
+
+CONF = load_conf()
+
+
+def log(msg):
+    line = f'{time.strftime("%Y-%m-%d %H:%M:%S")} {msg}'
+    print(line, file=sys.stderr, flush=True)
+    try:
+        with open(LOG_FILE, 'a') as f:
+            f.write(line + '\n')
+    except OSError:
+        pass
+
+
+class Refused(Exception):
+    """A start or stop that must not go ahead; the message says why, in the operator's words."""
+
+
+# --------------------------------------------------------------------------- state
+
+def read_state():
+    try:
+        return json.load(open(STATE_FILE))
+    except (OSError, ValueError):
+        return {'phase': 'off'}
+
+
+def write_state(state):
+    os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+    tmp = STATE_FILE + '.tmp'
+    with open(tmp, 'w') as f:
+        json.dump(state, f, indent=1)
+    os.replace(tmp, STATE_FILE)
+
+
+class Lock:
+    def __init__(self, wait=True):
+        self.wait = wait
+
+    def __enter__(self):
+        self.f = open(LOCK_FILE, 'w')
+        try:
+            fcntl.flock(self.f, fcntl.LOCK_EX | (0 if self.wait else fcntl.LOCK_NB))
+        except BlockingIOError:
+            self.f.close()
+            raise Refused('lightroom-vm is already busy starting or stopping')
+        return self
+
+    def __exit__(self, *exc):
+        self.f.close()
+
+
+# --------------------------------------------------------------------------- helpers
+
+def run(cmd, timeout=180, check=True):
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    if check and r.returncode != 0:
+        raise RuntimeError(f'{" ".join(cmd)}: {(r.stderr or r.stdout).strip()}')
+    return r.stdout
+
+
+def gpu_functions():
+    slot = CONF['GPU'].rsplit('.', 1)[0]
+    return sorted(os.path.basename(p) for p in glob.glob(f'/sys/bus/pci/devices/{slot}.*'))
+
+
+def driver_of(addr):
+    link = f'/sys/bus/pci/devices/{addr}/driver'
+    return os.path.basename(os.readlink(link)) if os.path.exists(link) else None
+
+
+def nodedev(addr):
+    return 'pci_' + addr.replace(':', '_').replace('.', '_')
+
+
+def gpu_ids():
+    """nvidia-smi index and UUID of the lent GPU (only while the nvidia driver has it)."""
+    out = run(['nvidia-smi', '--query-gpu=index,pci.bus_id,uuid', '--format=csv,noheader'])
+    for line in out.splitlines():
+        idx, bus, uuid = [x.strip() for x in line.split(',')]
+        if bus.lower().endswith(CONF['GPU'].lower()[-12:]):
+            return idx, uuid
+    raise RuntimeError(f'nvidia-smi does not list {CONF["GPU"]}')
+
+
+def device_minor():
+    info = f'/proc/driver/nvidia/gpus/{CONF["GPU"]}/information'
+    for line in open(info):
+        if line.startswith('Device Minor'):
+            return int(line.split(':')[1])
+    raise RuntimeError(f'no device minor in {info}')
+
+
+def holders_of_gpu():
+    """Every process with the lent GPU's device node open: {pid: command line}."""
+    node = f'/dev/nvidia{device_minor()}'
+    holders = {}
+    for fd_dir in glob.glob('/proc/[0-9]*/fd'):
+        pid = int(fd_dir.split('/')[2])
+        try:
+            for fd in os.listdir(fd_dir):
+                if os.readlink(f'{fd_dir}/{fd}') == node:
+                    holders[pid] = open(f'/proc/{pid}/cmdline').read().replace('\0', ' ').strip()[:120]
+                    break
+        except OSError:
+            continue
+    return holders
+
+
+def service_of(pid):
+    try:
+        for line in open(f'/proc/{pid}/cgroup'):
+            name = line.strip().rsplit('/', 1)[-1]
+            if name.endswith('.service'):
+                return name[:-len('.service')]
+    except OSError:
+        pass
+    return None
+
+
+def pause_services():
+    return CONF['PAUSE_SERVICES'].split()
+
+
+def container_of(pid):
+    try:
+        for line in open(f'/proc/{pid}/cgroup'):
+            if 'docker-' in line:
+                return line.split('docker-')[1].split('.scope')[0][:12]
+    except OSError:
+        pass
+    return None
+
+
+def docker_json(*names):
+    return json.loads(run(['docker', 'inspect', *names])) if names else []
+
+
+def running_containers():
+    out = run(['docker', 'ps', '--format', '{{.Names}}'])
+    return [n for n in out.split() if n]
+
+
+def containers_on_gpu(idx, uuid):
+    """Running containers that were given the lent GPU (all GPUs, or it by index or UUID)."""
+    found = []
+    for c in docker_json(*running_containers()):
+        for req in c['HostConfig'].get('DeviceRequests') or []:
+            ids = req.get('DeviceIDs') or []
+            if req.get('Count') == -1 or idx in ids or uuid in ids:
+                found.append(c['Name'].lstrip('/'))
+                break
+    return found
+
+
+def container_running(name):
+    r = subprocess.run(['docker', 'inspect', '-f', '{{.State.Status}}', name], capture_output=True, text=True)
+    return r.stdout.strip() in ('running', 'restarting')
+
+
+def comfy_busy(name):
+    """Jobs in a ComfyUI worker's queue, or 0 when it is not a ComfyUI container."""
+    c = docker_json(name)[0]
+    ports = (c['NetworkSettings'].get('Ports') or {}).get('8188/tcp') or []
+    if not ports:
+        return 0
+    try:
+        out = run(['curl', '-s', '-m', '3', f'http://127.0.0.1:{ports[0]["HostPort"]}/queue'], timeout=10)
+        q = json.loads(out)
+        return len(q.get('queue_running', [])) + len(q.get('queue_pending', []))
+    except (RuntimeError, ValueError, subprocess.TimeoutExpired):
+        return 0
+
+
+def jobs_running():
+    running = []
+    for pidfile in CONF['JOB_PIDFILES'].split():
+        try:
+            pid = int(open(pidfile).read().strip())
+            os.kill(pid, 0)
+            running.append(pidfile)
+        except (OSError, ValueError):
+            continue
+    return running
+
+
+def mem_available_gb():
+    for line in open('/proc/meminfo'):
+        if line.startswith('MemAvailable:'):
+            return int(line.split()[1]) / 1024 / 1024
+    return 0
+
+
+def container_mem_gb(name):
+    """Host memory a container holds now (freed when it stops)."""
+    try:
+        cid = docker_json(name)[0]['Id']
+        for path in glob.glob(f'/sys/fs/cgroup/**/docker-{cid}.scope/memory.current', recursive=True):
+            return int(open(path).read()) / 1024 ** 3
+    except (RuntimeError, IndexError, OSError, ValueError):
+        pass
+    return 0
+
+
+# --------------------------------------------------------------------------- libvirt
+
+def connect():
+    return libvirt.open('qemu:///system')
+
+
+def domain(conn):
+    return conn.lookupByName(CONF['VM'])
+
+
+def vm_active(dom):
+    return dom.isActive() == 1
+
+
+def vm_memory_gb(dom):
+    return dom.maxMemory() / 1024 / 1024
+
+
+def agent(dom, cmd, args=None, timeout=5):
+    req = {'execute': cmd}
+    if args:
+        req['arguments'] = args
+    return json.loads(libvirt_qemu.qemuAgentCommand(dom, json.dumps(req), timeout, 0))['return']
+
+
+def read_idle(dom):
+    """The guest's idle.json, or None when the agent or the reporter is not there."""
+    try:
+        h = agent(dom, 'guest-file-open', {'path': IDLE_FILE, 'mode': 'r'})
+        try:
+            data = agent(dom, 'guest-file-read', {'handle': h, 'count': 65536})
+        finally:
+            agent(dom, 'guest-file-close', {'handle': h})
+        return json.loads(base64.b64decode(data['buf-b64']).decode('utf-8-sig'))
+    except (libvirt.libvirtError, ValueError, KeyError):
+        return None
+
+
+def agent_up(dom):
+    """Whether Windows is up far enough to answer the guest agent (booted or resumed)."""
+    try:
+        agent(dom, 'guest-ping', timeout=2)
+        return True
+    except libvirt.libvirtError:
+        return False
+
+
+def cpu_seconds(dom):
+    return dom.getCPUStats(True)[0]['cpu_time'] / 1e9
+
+
+# --------------------------------------------------------------------------- preflight
+
+def blockers(dom):
+    """Why a start may not go ahead now, as (code, text) pairs (empty: it may). The site words
+    the code for its users; the text is for whoever runs lightroom-vm."""
+    why = []
+    if vm_active(dom):
+        return why
+    jobs = jobs_running()
+    if jobs:
+        why.append(('job', 'a GPU job is running (' + ', '.join(jobs) + '); it uses both GPUs'))
+    if driver_of(CONF['GPU']) != 'nvidia':
+        why.append(('gpu_detached', f'GPU {CONF["GPU"]} is not on the nvidia driver '
+                                    f'({driver_of(CONF["GPU"])}): run "lightroom-vm stop"'))
+        return why
+    idx, uuid = gpu_ids()
+    stoppable = containers_on_gpu(idx, uuid)
+    for name in stoppable:
+        n = comfy_busy(name)
+        if n:
+            why.append(('comfy_busy', f'{name} is busy ({n} job(s) in its queue)'))
+    allowed_ids = [docker_json(name)[0]['Id'] for name in stoppable]
+    users = {}      # command -> number of processes (a training run has a dozen workers)
+    for pid, cmd in holders_of_gpu().items():
+        cid = container_of(pid)
+        if cid and any(i.startswith(cid) for i in allowed_ids):
+            continue
+        if 'nvidia-persistenced' in cmd or service_of(pid) in pause_services():
+            continue
+        users[cmd] = users.get(cmd, 0) + 1
+    for cmd, n in users.items():
+        why.append(('gpu_in_use', f'GPU {idx} is in use by {cmd[:90]}' + (f' ({n} processes)' if n > 1 else '')))
+    need = vm_memory_gb(dom) + 1 + float(CONF['RAM_MARGIN_GB'])
+    have = mem_available_gb() + sum(container_mem_gb(n) for n in stoppable)
+    if have < need:
+        why.append(('memory', f'not enough free memory: {have:.1f} GB free, the VM needs {vm_memory_gb(dom):.0f} GB '
+                              f'and kenny keeps {CONF["RAM_MARGIN_GB"]} GB'))
+    return why
+
+
+# --------------------------------------------------------------------------- start / stop
+
+def wait_until(test, seconds, step=2):
+    end = time.time() + seconds
+    while time.time() < end:
+        if test():
+            return True
+        time.sleep(step)
+    return test()
+
+
+def take_gpu(state):
+    """Stop what holds GPU 0 and detach it from the host. Records what to restore in state."""
+    idx, uuid = gpu_ids()
+    for name in containers_on_gpu(idx, uuid):
+        log(f'stopping {name}')
+        state['restore'].append(name)
+        write_state(state)
+        # ComfyUI's PID 1 is bash, which ignores SIGTERM, so docker stop always waits out its
+        # timeout. Its queue was empty a moment ago; it only gets long if a job just came in.
+        grace = '120' if name == CONF['VLLM_CONTAINER'] or comfy_busy(name) else '10'
+        run(['docker', 'stop', '-t', grace, name], timeout=200)
+    run(['nvidia-smi', '-i', CONF['GPU'], '-pm', '0'], check=False)
+    paused = [s for s in pause_services()
+              if subprocess.run(['systemctl', 'is-active', '-q', s]).returncode == 0]
+    for s in paused:
+        log(f'pausing {s} for the detach')
+        run(['systemctl', 'stop', s], timeout=60)
+    try:
+        def free():
+            return not holders_of_gpu()
+        if not wait_until(free, 60):
+            raise Refused('GPU still in use after stopping its containers: ' +
+                          '; '.join(f'{p} {c}' for p, c in holders_of_gpu().items()))
+        for addr in reversed(gpu_functions()):          # audio first, the GPU last
+            if driver_of(addr) != 'vfio-pci':
+                log(f'detaching {addr} from {driver_of(addr)}')
+                run(['virsh', 'nodedev-detach', nodedev(addr)], timeout=90)
+    finally:
+        for s in paused:
+            subprocess.run(['systemctl', 'start', s], capture_output=True)
+    os.makedirs(os.path.dirname(ACTIVE_MARK), exist_ok=True)
+    open(ACTIVE_MARK, 'w').write(str(os.getpid()))
+
+
+def give_back_gpu(state):
+    """Reattach GPU 0 to the host and start again what take_gpu stopped. Never raises."""
+    problems = []
+    for addr in gpu_functions():                    # the GPU first, then its audio
+        if driver_of(addr) == 'vfio-pci':
+            log(f'reattaching {addr}')
+            try:
+                run(['virsh', 'nodedev-reattach', nodedev(addr)], timeout=90)
+            except (RuntimeError, subprocess.TimeoutExpired) as e:
+                problems.append(f'reattach {addr}: {e}')
+    if driver_of(CONF['GPU']) == 'nvidia':
+        run(['nvidia-smi', '-i', CONF['GPU'], '-pm', '1'], check=False)
+        for s in pause_services():      # their nvidia-smi only lists the GPUs it saw at start
+            if subprocess.run(['systemctl', 'is-active', '-q', s]).returncode == 0:
+                subprocess.run(['systemctl', 'restart', s], capture_output=True)
+    try:
+        os.remove(ACTIVE_MARK)
+    except FileNotFoundError:
+        pass
+    if driver_of(CONF['GPU']) != 'nvidia':
+        problems.append(f'GPU {CONF["GPU"]} is on {driver_of(CONF["GPU"])}, not nvidia: containers left stopped')
+        return problems
+    for name in state.get('restore', []):
+        if name == CONF['VLLM_CONTAINER'] and jobs_running():
+            # the job stopped nothing, so it will not start vLLM: say so rather than fight it for the GPUs
+            problems.append(f'{name} left stopped: a GPU job is running ({", ".join(jobs_running())})')
+            continue
+        log(f'starting {name}')
+        r = subprocess.run(['docker', 'start', name], capture_output=True, text=True)
+        if r.returncode != 0:
+            problems.append(f'docker start {name}: {r.stderr.strip()}')
+    state['restore'] = []
+    return problems
+
+
+def start(by=None):
+    asked = f' (asked by {by})' if by else ''
+    with Lock(wait=False):
+        conn = connect()
+        dom = domain(conn)
+        state = read_state()
+        now = time.time()
+        if vm_active(dom):
+            state['last_request'] = now            # pressing start again keeps it awake
+            write_state(state)
+            log('start: already running' + asked)
+            return state
+        why = blockers(dom)
+        if why:
+            raise Refused('; '.join(text for _, text in why))
+        log('start: taking GPU 0 for the Lightroom VM' + asked)
+        state = {'phase': 'starting', 'since': now, 'restore': [], 'message': '', 'started_by': by}
+        write_state(state)
+        try:
+            take_gpu(state)
+            dom.create()
+        except Exception as e:
+            log(f'start failed, putting everything back: {e}')
+            problems = give_back_gpu(state)
+            write_state({'phase': 'off', 'since': time.time(), 'restore': [],
+                         'message': f'start failed: {e}' + ('; ' + '; '.join(problems) if problems else '')})
+            raise
+        state.update(phase='running', since=time.time(), started_at=time.time(),
+                     last_request=time.time(), last_busy=0, idle=None, message='')
+        write_state(state)
+        log('start: VM running')
+        return state
+
+
+def stop(reason='requested'):
+    """Hibernate the VM and give GPU 0 back. `reason` goes in the log (who asked, or 'idle')."""
+    with Lock(wait=True):
+        conn = connect()
+        dom = domain(conn)
+        state = read_state()
+        if vm_active(dom):
+            state.update(phase='stopping', since=time.time(), message=f'hibernating ({reason})')
+            write_state(state)
+            log(f'stop ({reason}): hibernating the VM')
+            if not hibernate(dom):
+                state['message'] = 'the VM would not hibernate or shut down; GPU 0 stays with it'
+                state['phase'] = 'error'
+                write_state(state)
+                raise Refused(state['message'])
+        problems = give_back_gpu(state)
+        state.update(phase='off', since=time.time(), message='; '.join(problems))
+        write_state(state)
+        log('stop: done' + (' with problems: ' + state['message'] if problems else ''))
+        return state
+
+
+def hibernate(dom):
+    """Hibernate Windows (its RAM goes to its own disk); fall back to a shutdown, then power off."""
+    try:
+        dom.pMSuspendForDuration(libvirt.VIR_NODE_SUSPEND_TARGET_DISK, 0, 0)
+        if wait_until(lambda: not vm_active(dom), 300, 3):
+            log('VM hibernated')
+            return True
+        log('hibernate took over 5 minutes; asking Windows to shut down')
+    except libvirt.libvirtError as e:
+        log(f'hibernate failed ({e}); asking Windows to shut down')
+    try:
+        dom.shutdown()
+        if wait_until(lambda: not vm_active(dom), 300, 3):
+            log('VM shut down')
+            return True
+    except libvirt.libvirtError as e:
+        log(f'shutdown failed: {e}')
+    log('VM did not stop in 10 minutes: powering it off')
+    try:
+        dom.destroy()
+    except libvirt.libvirtError as e:
+        log(f'power off failed: {e}')
+    return not vm_active(dom)
+
+
+def define(conn, xml):
+    """Redefine the VM from xml, keeping its UUID (the TPM state and NVRAM hang off it)."""
+    uuid = domain(conn).UUIDString()
+    if '<uuid>' not in xml:
+        xml = xml.replace('</name>', f'</name>\n  <uuid>{uuid}</uuid>', 1)
+    conn.defineXML(xml)
+
+
+def console(on):
+    """Maintenance: swap the VM's definition between GPU (normal) and console (VGA on VNC, no GPU)."""
+    with Lock(wait=False):
+        conn = connect()
+        dom = domain(conn)
+        state = read_state()
+        if on:
+            if vm_active(dom):
+                raise Refused('the VM is running: "lightroom-vm stop" first')
+            if any(driver_of(a) == 'vfio-pci' for a in gpu_functions()):
+                raise Refused('GPU 0 is still detached: "lightroom-vm stop" first')
+            xml = open(CONSOLE_XML).read().replace('@VNC_PASSWORD@', open(VNC_PASSWORD_FILE).read().strip())
+            define(conn, xml)
+            state.update(phase='console', since=time.time(), message='maintenance console on VNC 127.0.0.1:5911')
+            write_state(state)
+            domain(conn).create()
+            log('console: VM started without GPU, screen on VNC 127.0.0.1:5911')
+        else:
+            if vm_active(dom):
+                log('console off: shutting the VM down')
+                dom.shutdown()
+                if not wait_until(lambda: not vm_active(dom), 300, 3):
+                    raise Refused('Windows did not shut down in 5 minutes; shut it down from the console')
+            define(conn, open(GPU_XML).read())
+            state.update(phase='off', since=time.time(), message='')
+            write_state(state)
+            log('console off: GPU definition back')
+
+
+# --------------------------------------------------------------------------- watch
+
+def watch():
+    log('watch: started')
+    last_cpu = None
+    while True:
+        try:
+            last_cpu = watch_once(last_cpu)
+        except Exception as e:      # the watcher must outlive any one bad round
+            log(f'watch: {type(e).__name__}: {e}')
+        time.sleep(30)
+
+
+def watch_once(last_cpu):
+    conn = connect()
+    dom = domain(conn)
+    state = read_state()
+    phase = state.get('phase', 'off')
+    now = time.time()
+
+    if phase in ('starting', 'stopping'):
+        # a start or stop is under way (it holds the lock) or died half-way (then the lock is free)
+        try:
+            with Lock(wait=False):
+                pass
+        except Refused:
+            return None
+        log(f'watch: found a {phase} that did not finish')
+        phase = 'running' if vm_active(dom) else 'off-dirty'
+
+    if phase in ('running', 'error') and not vm_active(dom):
+        log('watch: the VM is off (shut down or hibernated from Windows); giving the GPU back')
+        stop('the VM went off')
+        return None
+    if phase == 'off-dirty' or (phase == 'off' and not vm_active(dom) and
+                                any(driver_of(a) == 'vfio-pci' for a in gpu_functions())):
+        stop('cleanup')
+        return None
+    if phase != 'running' or not vm_active(dom):
+        return None     # off, or a VM someone started by hand (installing, maintenance): not ours to manage
+
+    # The VM runs. Nothing else may claim the GPUs meanwhile: a vLLM started by hand (or by a job's
+    # cleanup) would only crash-loop on one GPU, so stop it and start it once the VM is done.
+    vllm = CONF['VLLM_CONTAINER']
+    if container_running(vllm):
+        log(f'watch: {vllm} was started while the VM has GPU 0; stopping it until the VM is done')
+        subprocess.run(['docker', 'stop', '-t', '60', vllm], capture_output=True)
+        state.setdefault('restore', [])
+        if vllm not in state['restore']:
+            state['restore'].append(vllm)
+
+    cpu = (now, cpu_seconds(dom))
+    cpu_pct = 0.0
+    if last_cpu and cpu[0] > last_cpu[0]:
+        cpu_pct = 100 * (cpu[1] - last_cpu[1]) / (cpu[0] - last_cpu[0])
+    if cpu_pct >= float(CONF['BUSY_CPU_PERCENT']):
+        state['last_busy'] = now
+
+    idle = read_idle(dom)
+    prev = state.get('idle') or {}
+    if idle is not None:
+        if idle.get('seq') != prev.get('seq'):
+            idle['seen'] = now
+        else:
+            idle['seen'] = prev.get('seen', now)
+        state['idle'] = idle
+    fresh = idle is not None and now - idle['seen'] < 90
+
+    last_activity = max(state.get('started_at', now), state.get('last_request', 0), state.get('last_busy', 0))
+    if fresh:
+        last_activity = max(last_activity, now - idle['idle_seconds'])
+    state['last_activity'] = last_activity
+    state['cpu_percent'] = round(cpu_pct)
+    state['input_known'] = fresh
+    write_state(state)
+
+    if now - last_activity >= float(CONF['IDLE_MINUTES']) * 60:
+        log(f'watch: no activity for {(now - last_activity) / 60:.0f} min; hibernating')
+        stop(f'idle for {CONF["IDLE_MINUTES"]} min')
+        return None
+    return cpu
+
+
+# --------------------------------------------------------------------------- status
+
+def status():
+    conn = connect()
+    dom = domain(conn)
+    state = read_state()
+    now = time.time()
+    active = vm_active(dom)
+    phase = state.get('phase', 'off')
+    if phase == 'running' and not active:
+        phase = 'stopping'          # Windows went off on its own; the watcher gives the GPU back
+    out = {
+        'state': phase,
+        'vm': {1: 'running', 3: 'paused', 5: 'off', 7: 'pmsuspended'}.get(dom.state()[0], str(dom.state()[0])),
+        'since': state.get('since'),
+        'gpu': {a: driver_of(a) for a in gpu_functions()},
+        'vllm': 'running' if container_running(CONF['VLLM_CONTAINER']) else 'stopped',
+        'connect_url': CONF['CONNECT_URL'] if active else None,
+        'message': state.get('message') or None,
+        'idle_limit_minutes': float(CONF['IDLE_MINUTES']),
+        # Windows answers the guest agent: booted or resumed, Parsec can connect
+        'ready': active and phase == 'running' and agent_up(dom),
+        'started_by': state.get('started_by') if phase in ('starting', 'running') else None,
+    }
+    if active and phase == 'running':
+        idle_min = (now - state.get('last_activity', now)) / 60
+        out.update(idle_minutes=round(idle_min, 1),
+                   hibernate_in_minutes=round(max(0.0, float(CONF['IDLE_MINUTES']) - idle_min), 1),
+                   parsec_users=(state.get('idle') or {}).get('parsec_users'),
+                   cpu_percent=state.get('cpu_percent'))
+    try:
+        why = blockers(dom) if not active else []
+    except Exception as e:
+        why = [('check_failed', f'cannot check: {e}')]
+    if phase == 'console':
+        why = [('maintenance', 'the VM is in maintenance (lightroom-vm console off ends it)')]
+    elif active and phase != 'running':
+        why = [('maintenance', 'the VM was started outside lightroom-vm (installation or maintenance)')]
+    out['can_start'] = not active and not why
+    out['blockers'] = [text for _, text in why]
+    out['blocker_codes'] = sorted({code for code, _ in why})
+    return out
+
+
+def main():
+    args = sys.argv[1:]
+    if not args or args[0] in ('-h', '--help', 'help'):
+        print(__doc__)
+        return 0
+    if os.geteuid() != 0:
+        print('lightroom-vm must run as root (sudo lightroom-vm ...)', file=sys.stderr)
+        return 1
+    cmd = args[0]
+    by = None
+    if '--by-stdin' in args:
+        by = ''.join(c for c in sys.stdin.readline(200) if c.isprintable()).strip()[:80] or None
+    try:
+        if cmd == 'status':
+            s = status()
+            if '--json' in args:
+                print(json.dumps(s))
+            else:
+                for k, v in s.items():
+                    print(f'{k:22} {v}')
+        elif cmd == 'start':
+            start(by)
+            print(json.dumps(status()) if '--json' in args else 'started' +
+                  (f'; connect: {CONF["CONNECT_URL"]}' if CONF['CONNECT_URL'] else ''))
+        elif cmd == 'stop':
+            stop(f'asked by {by}' if by else 'requested')
+            print(json.dumps(status()) if '--json' in args else 'stopped')
+        elif cmd == 'watch':
+            watch()
+        elif cmd == 'console' and args[1:2] in (['on'], ['off']):
+            console(args[1] == 'on')
+            print('console on: ssh -L 5911:127.0.0.1:5911 kenny, then vnc://localhost:5911 '
+                  f'(password: sudo cat {VNC_PASSWORD_FILE})' if args[1] == 'on' else 'console off')
+        else:
+            print(__doc__)
+            return 2
+    except Refused as e:
+        if '--json' in args:
+            print(json.dumps({'error': str(e)}))
+        else:
+            print(f'refused: {e}', file=sys.stderr)
+        return 3
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

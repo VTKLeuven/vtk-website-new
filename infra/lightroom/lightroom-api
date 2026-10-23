@@ -1,0 +1,117 @@
+#!/usr/bin/python3
+"""lightroom-api: the HTTP side of the Lightroom PC page on the VTK site (Admin -> Lightroom-pc).
+
+    GET  /lightroom/status   the VM's state, whether Windows is ready, why a start is refused
+    POST /lightroom/start    202: starting (poll status), 409: refused, with the reasons
+    POST /lightroom/stop     202: hibernating (poll status)
+
+Every request needs `Authorization: Bearer <token>`, the token in /etc/lightroom-vm/api-token.
+start and stop take an optional JSON body {"by": "<name>"}: who pressed the button, for the log
+and for the status the site shows. Runs as the unprivileged user lightroom-api; sudo lets it run
+/usr/local/bin/lightroom-vm and nothing else (/etc/sudoers.d/lightroom-api). Listens on LISTEN,
+kenny's Tailscale address in lightroom-api.service, so only the tailnet (the site on liv) gets here.
+"""
+import hmac
+import json
+import os
+import subprocess
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+TOKEN_FILE = os.environ.get('LIGHTROOM_API_TOKEN_FILE', '/etc/lightroom-vm/api-token')
+LISTEN = os.environ.get('LIGHTROOM_API_LISTEN', '127.0.0.1:8765')
+VM = ['sudo', '-n', '/usr/local/bin/lightroom-vm']
+
+
+def vm(*args, timeout=60):
+    r = subprocess.run(VM + list(args) + ['--json'], capture_output=True, text=True, timeout=timeout)
+    try:
+        return json.loads(r.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return {'error': (r.stderr or r.stdout).strip()[-500:] or f'lightroom-vm exited {r.returncode}'}
+
+
+def in_background(cmd, by):
+    """start/stop take minutes (stopping vLLM, hibernating): run detached, the client polls status."""
+    p = subprocess.Popen(VM + [cmd, '--by-stdin'], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True, text=True)
+    p.stdin.write((by or '') + '\n')
+    p.stdin.close()
+
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = 'lightroom-api'
+
+    def send_json(self, code, body):
+        data = json.dumps(body).encode()
+        self.send_response(code)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(data)))
+        self.send_header('Cache-Control', 'no-store')
+        self.end_headers()
+        self.wfile.write(data)
+
+    def authorised(self):
+        given = self.headers.get('Authorization', '')
+        if hmac.compare_digest(given.encode(), f'Bearer {self.server.token}'.encode()):
+            return True
+        self.send_json(401, {'error': 'unauthorised'})
+        return False
+
+    def requester(self):
+        """The "by" of a JSON body, or None. Never fails a request: it is only for the log."""
+        try:
+            length = min(int(self.headers.get('Content-Length') or 0), 4096)
+            body = json.loads(self.rfile.read(length) or b'{}')
+            by = body.get('by') if isinstance(body, dict) else None
+            return ' '.join(str(by).split())[:80] if by else None
+        except (ValueError, OSError):
+            return None
+
+    def do_GET(self):
+        if not self.authorised():
+            return
+        if self.path.rstrip('/') == '/lightroom/status':
+            self.send_json(200, vm('status'))
+        else:
+            self.send_json(404, {'error': 'not found'})
+
+    def do_POST(self):
+        if not self.authorised():
+            return
+        path = self.path.rstrip('/')
+        by = self.requester()
+        if path == '/lightroom/start':
+            s = vm('status')
+            if s.get('state') == 'running':
+                in_background('start', by)      # counts as activity: keeps it awake
+                self.send_json(202, s)
+            elif s.get('state') in ('starting', 'stopping'):
+                self.send_json(409, {**s, 'error': f'the VM is {s["state"]}, try again in a minute'})
+            elif not s.get('can_start'):
+                self.send_json(409, {**s, 'error': 'cannot start now: ' + '; '.join(s.get('blockers') or [])})
+            else:
+                in_background('start', by)
+                self.send_json(202, {**s, 'state': 'starting', 'started_by': by})
+        elif path == '/lightroom/stop':
+            in_background('stop', by)
+            self.send_json(202, {'state': 'stopping'})
+        else:
+            self.send_json(404, {'error': 'not found'})
+
+    def log_message(self, fmt, *args):
+        print(f'{self.address_string()} {fmt % args}', flush=True)
+
+
+def main():
+    token = open(TOKEN_FILE).read().strip()
+    if len(token) < 24:
+        raise SystemExit(f'{TOKEN_FILE}: token too short')
+    host, port = LISTEN.rsplit(':', 1)
+    server = ThreadingHTTPServer((host, int(port)), Handler)
+    server.token = token
+    print(f'lightroom-api on {LISTEN}', flush=True)
+    server.serve_forever()
+
+
+if __name__ == '__main__':
+    main()
