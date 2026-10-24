@@ -6,15 +6,15 @@ import { LinkedRow } from "@/components/ui/LinkedRow";
 import { hasLocale } from "@/lib/locale";
 import { formatEuro } from "@/lib/rekeningen/expenses";
 import { cashRegisterAccess } from "@/lib/kassas/server";
-import { STATUS_SLUGS, statusLabel } from "@/lib/kassas/kassa";
+import { resultSharedWithPost, STATUS_SLUGS, statusLabel } from "@/lib/kassas/kassa";
 import { KassaNav } from "../KassaNav";
 import { listInclude, toListRows } from "../rows";
 
 /**
  * Wat je zelf aanvroeg en wat op een van je posten staat, ook voor wie beheert:
- * dit is de lijst van de post, niet die van Beheer. Het resultaat staat hier
- * niet; dat is het werk van Beheer, en de ticketinkomsten erin zijn niet voor
- * elk postlid zichtbaar.
+ * dit is de lijst van de post, niet die van Beheer. Het resultaat staat er pas
+ * wanneer Beheer de kassa op "doorgegeven" zet (`resultSharedWithPost`); tot
+ * dan is de telling werk van Beheer en kan een tussenstand als verlies lezen.
  */
 export default async function MijnKassas({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: localeParam } = await params;
@@ -51,8 +51,8 @@ export default async function MijnKassas({ params }: { params: Promise<{ locale:
           <h1 className="text-2xl font-semibold">{nl ? "Mijn aanvragen" : "My requests"}</h1>
           <p className="mt-1 max-w-5xl text-sm text-vtk-muted">
             {nl
-              ? "De kassa's die jij of je post aanvroeg. Zolang Beheer een aanvraag niet aanvaardde, kan je ze nog aanpassen of intrekken; daarna krijg je een mail om een ophaalmoment af te spreken."
-              : "The cash registers you or your post requested. Until Administration accepts a request, you can still change or withdraw it; after that you get an email to arrange a pick-up time."}
+              ? "De kassa's die jij of je post aanvroeg. Zolang Beheer een aanvraag niet aanvaardde, kan je ze nog aanpassen of intrekken; daarna krijg je een mail om een ophaalmoment af te spreken. Het resultaat zie je zodra Beheer de kassa geteld en doorgegeven heeft."
+              : "The cash registers you or your post requested. Until Administration accepts a request, you can still change or withdraw it; after that you get an email to arrange a pick-up time. You see the result once Administration has counted the register and passed it on."}
           </p>
         </div>
         <Link
@@ -86,6 +86,7 @@ export default async function MijnKassas({ params }: { params: Promise<{ locale:
                   <th scope="col" className="w-[140px] px-4 py-3">{nl ? "Post" : "Post"}</th>
                   <th scope="col" className="w-[130px] px-4 py-3">Status</th>
                   <th scope="col" className="w-[110px] px-4 py-3 text-right">{nl ? "Startkassa" : "Float"}</th>
+                  <th scope="col" className="w-[130px] px-4 py-3 text-right">{nl ? "Resultaat" : "Result"}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-vtk-blue/5">
@@ -123,6 +124,20 @@ export default async function MijnKassas({ params }: { params: Promise<{ locale:
                         className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-vtk-body"
                       >
                         {formatEuro(row.result.startCents, locale)}
+                      </td>
+                      <td
+                        data-label={nl ? "Resultaat" : "Result"}
+                        className="whitespace-nowrap px-4 py-3 text-right tabular-nums"
+                      >
+                        {!access.canManage && !resultSharedWithPost(row.status) ? (
+                          <span className="text-xs text-vtk-muted">{nl ? "nog niet doorgegeven" : "not passed on yet"}</span>
+                        ) : row.counted || row.result.totalCents !== 0 ? (
+                          <span className="font-semibold text-vtk-ink">{formatEuro(row.result.totalCents, locale)}</span>
+                        ) : (
+                          // Zelfde regel als het overzicht van Beheer: een niet
+                          // getelde kassa is geen kassa van € 0.
+                          <span className="text-xs text-vtk-muted">{nl ? "niet geteld" : "not counted"}</span>
+                        )}
                       </td>
                     </LinkedRow>
                   );

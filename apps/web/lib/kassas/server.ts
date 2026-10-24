@@ -12,9 +12,11 @@ import {
   normaliseCounts,
   parseCashRegisterConfig,
   registerInterval,
+  resultSharedWithPost,
   timeRangeShort,
   type CashRegisterConfig,
   type CashRegisterResult,
+  type CashRegisterStatus,
   type Interval,
   type PaymentMethod,
 } from "@/lib/kassas/kassa";
@@ -82,6 +84,18 @@ export function canView(access: CashRegisterAccess, register: Owned): boolean {
   if (access.canManage) return true;
   if (register.requestedById === access.session.user.id) return true;
   return register.groupId !== null && access.postIds.includes(register.groupId);
+}
+
+/**
+ * Het resultaat (telling, Bancontact, Payconiq, ticketverkoop, bonnen) ziet
+ * Beheer altijd, de post pas vanaf "doorgegeven" (`resultSharedWithPost`).
+ */
+export function canSeeResult(
+  access: CashRegisterAccess,
+  register: Owned & { status: CashRegisterStatus },
+): boolean {
+  if (access.canManage) return true;
+  return resultSharedWithPost(register.status) && canView(access, register);
 }
 
 /**

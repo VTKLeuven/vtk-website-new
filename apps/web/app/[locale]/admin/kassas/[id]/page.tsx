@@ -8,10 +8,12 @@ import { hasLocale } from "@/lib/locale";
 import { formatEuro, formatSubmittedOn, toDateInputValue } from "@/lib/rekeningen/expenses";
 import {
   canEditRequest,
+  canSeeResult,
   canView,
   cashRegisterAccess,
   cashRegisterMailTo,
   getCashRegisterConfig,
+  resultFor,
   sameTerminal,
   terminalsInUse,
   ticketIncomeByEvent,
@@ -39,6 +41,7 @@ import {
 import { AcceptForm, type DeviceOption } from "../AcceptForm";
 import { CountForm, type TicketOption } from "../CountForm";
 import { RequestForm } from "../RequestForm";
+import { ResultSummary } from "../ResultSummary";
 import { StatusSelect } from "../StatusSelect";
 import { kassaErrorMessages } from "../messages";
 import { postChoices } from "../posts";
@@ -68,6 +71,12 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
   const manage = access.canManage;
   const editable = canEditRequest(access, register);
   const requested = register.status === "REQUESTED";
+  // Beheer ziet het resultaat in de telling; de post enkel hier, en pas vanaf
+  // "doorgegeven".
+  const sharedResult =
+    !manage && canSeeResult(access, register)
+      ? resultFor(register, await ticketIncomeByEvent(register.ticketEvents.map((link) => link.ticketEventId)))
+      : null;
   const config = await getCashRegisterConfig();
   const errorMessages = kassaErrorMessages(locale);
   const startCounts = normaliseCounts(register.startCounts);
@@ -251,7 +260,21 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
         </section>
       )}
 
-      {!manage && !requested && (
+      {sharedResult && (
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold text-vtk-ink">{nl ? "Resultaat" : "Result"}</h2>
+            <p className="mt-1 text-sm text-vtk-muted">
+              {nl
+                ? `Beheer telde deze kassa en gaf het resultaat door. Klopt er iets niet, mail dan ${config.contactEmail}.`
+                : `Administration counted this register and passed on the result. If something looks wrong, email ${config.contactEmail}.`}
+            </p>
+          </div>
+          <ResultSummary result={sharedResult} locale={locale} />
+        </section>
+      )}
+
+      {!manage && !requested && !sharedResult && (
         <p className="rounded-2xl border border-vtk-blue/12 bg-white p-5 text-sm text-vtk-body">
           {nl
             ? `Beheer aanvaardde deze aanvraag. Spreek een ophaalmoment af met de financieel beheerders of via ${config.contactEmail}; daar kan je ook terecht als er nog iets moet veranderen.`

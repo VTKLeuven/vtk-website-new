@@ -28,6 +28,7 @@ import {
 import {
   accessFor,
   canEditRequest,
+  canSeeResult,
   canView,
   cashRegisterMailTo,
   sameTerminal,
@@ -263,6 +264,16 @@ describe("kassa's: toegang", () => {
     expect(canEditRequest(requester, pending)).toBe(true);
     expect(canEditRequest(requester, { ...pending, status: "TO_MAKE" })).toBe(false);
     expect(canEditRequest(manager, { ...pending, status: "BOOKED" })).toBe(true);
+  });
+
+  it("toont de post het resultaat pas vanaf doorgegeven, Beheer altijd", () => {
+    const counted = { ...pending, status: "COUNTED" as const };
+    expect(canSeeResult(requester, counted)).toBe(false);
+    expect(canSeeResult(requester, { ...counted, status: "PASSED_ON" })).toBe(true);
+    expect(canSeeResult(requester, { ...counted, status: "BOOKED" })).toBe(true);
+    // Doorgegeven maakt een kassa van een andere post niet zichtbaar.
+    expect(canSeeResult(requester, { ...counted, status: "PASSED_ON", groupId: "cultuur" })).toBe(false);
+    expect(canSeeResult(manager, { ...counted, status: "TO_MAKE" })).toBe(true);
   });
 
   it("geeft wie beheert ook het recht om aan te vragen", () => {

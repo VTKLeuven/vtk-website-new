@@ -8655,8 +8655,20 @@ meer ticketverkopen hangen; hun netto online verkoop (uitgegeven tickets min wat
 effectief teruggestort is, dezelfde regel als de ticketstatistieken) telt mee in
 het finaal resultaat. Het bedrag wordt telkens opnieuw berekend en niet
 opgeslagen: een terugbetaling na de telling staat zo meteen in het resultaat.
-Het resultaat staat enkel bij Beheer; een post ziet in haar eigen lijst de status
-en de startkassa, want niet elk postlid mag de omzet van een ticketverkoop zien.
+
+**De post ziet haar resultaat pas vanaf "doorgegeven" (oktober 2026).** Tot dan
+staat het enkel bij Beheer: de telling is werk in uitvoering, en een tussenstand
+(een Bancontact-bedrag dat nog niet afgelezen is, een ticketverkoop die nog niet
+gekoppeld is) leest voor een post als een verlies. Zet Beheer de kassa op
+"doorgegeven", dan ziet de post op haar kassa hetzelfde resultaatpaneel als
+Beheer onder de telling (`ResultSummary`), met de ticketverkoop erin, en in
+"Mijn aanvragen" het finaal resultaat; ook in het kasboek blijft het staan
+(`resultSharedWithPost`). De opmerking van Beheer bij de telling blijft enkel
+voor Beheer. Eerder zag een post het resultaat nooit, omdat niet elk postlid de
+omzet van een ticketverkoop zou mogen zien; Beheer vroeg het toch, en het
+doorgeven is het moment waarop zij die cijfers vrijgeven. Een kassa hoort bij
+één post, en de ticketverkoop die eraan hangt, is meestal die van dezelfde
+activiteit.
 
 **Cudi, Theokot en Fakbar zijn samen te bekijken.** Ze hebben een kassa die het
 hele semester meegaat, en het blad had er een eigen tabblad voor. In het

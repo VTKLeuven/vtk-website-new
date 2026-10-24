@@ -17,6 +17,7 @@ import {
   type PaymentMethod,
 } from "@/lib/kassas/kassa";
 import { countInputsFrom, DenominationGrid, inputsFilled, type CountInputs } from "./DenominationGrid";
+import { ResultSummary } from "./ResultSummary";
 
 export type TicketOption = {
   id: string;
@@ -216,30 +217,6 @@ export function CountForm({
   const samePost = available.filter((option) => option.samePost);
   const otherPosts = available.filter((option) => !option.samePost);
 
-  // Twee groepen, elk in een eigen kolom: de kassa zelf (begin, eind, verschil)
-  // en wat er verder binnenkwam. In één raster van twee kolommen las je ze
-  // kriskras door elkaar.
-  const resultGroups: Array<Array<{ label: string; value: string; strong?: boolean }>> = [
-    [
-      { label: nl ? "Beginkassa" : "Starting float", value: euro(result.startCents) },
-      {
-        label: nl ? "Eindkassa" : "Closing count",
-        value: result.endCents === null ? (nl ? "nog niet geteld" : "not counted yet") : euro(result.endCents),
-      },
-      {
-        label: nl ? "Resultaat kassa" : "Cash result",
-        value: result.cashCents === null ? (nl ? "nog niet geteld" : "not counted yet") : euro(result.cashCents),
-        strong: true,
-      },
-    ],
-    [
-      { label: "Bancontact", value: euro(result.bancontactCents) },
-      { label: "Payconiq", value: euro(result.payconiqCents) },
-      { label: nl ? "Ticketverkoop" : "Ticket sales", value: euro(result.ticketCents) },
-      { label: nl ? "Bonnen" : "Vouchers", value: euro(result.voucherCents) },
-    ],
-  ];
-
   return (
     <SaveForm
       action={action}
@@ -398,27 +375,7 @@ export function CountForm({
         />
       </div>
 
-      <section
-        aria-label={nl ? "Resultaat" : "Result"}
-        className="rounded-2xl border border-vtk-blue/12 bg-white p-4 shadow-[inset_3px_0_0_var(--yellow)]"
-      >
-        <div className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
-          {resultGroups.map((group, index) => (
-            <dl key={index} className="space-y-1">
-              {group.map((row) => (
-                <div key={row.label} className="flex items-baseline justify-between gap-3">
-                  <dt className={row.strong ? "font-medium text-vtk-ink" : "text-vtk-muted"}>{row.label}</dt>
-                  <dd className={`tabular-nums text-vtk-ink ${row.strong ? "font-semibold" : ""}`}>{row.value}</dd>
-                </div>
-              ))}
-            </dl>
-          ))}
-        </div>
-        <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-vtk-blue/10 pt-3">
-          <span className="text-sm font-semibold text-vtk-ink">{nl ? "Finaal resultaat" : "Final result"}</span>
-          <span className="text-xl font-semibold tabular-nums text-vtk-ink">{euro(result.totalCents)}</span>
-        </div>
-      </section>
+      <ResultSummary result={result} locale={locale} />
     </SaveForm>
   );
 }

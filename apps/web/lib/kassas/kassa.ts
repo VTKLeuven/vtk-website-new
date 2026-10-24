@@ -237,6 +237,16 @@ const STATUS_LABELS: Record<CashRegisterStatus, { nl: string; en: string }> = {
   BOOKED: { nl: "Kasboek", en: "Cash book" },
 };
 
+/**
+ * Of de post het resultaat van haar kassa al ziet: pas wanneer Beheer de kassa
+ * op "doorgegeven" zet, en daarna ook in het kasboek. Tot dan is de telling werk
+ * in uitvoering: een Bancontact-bedrag dat nog niet afgelezen is of een
+ * ticketverkoop die nog niet gekoppeld is, leest als een verlies.
+ */
+export function resultSharedWithPost(status: CashRegisterStatus): boolean {
+  return CASH_REGISTER_STATUSES.indexOf(status) >= CASH_REGISTER_STATUSES.indexOf("PASSED_ON");
+}
+
 export function statusLabel(status: CashRegisterStatus, nl: boolean): string {
   return nl ? STATUS_LABELS[status].nl : STATUS_LABELS[status].en;
 }
