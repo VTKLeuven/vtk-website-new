@@ -272,6 +272,17 @@ body {
   background: var(--surface);
 }
 
+/* De meldingen staan normaal onder de sitekop (z-index 40), en dus ook onder
+   dit scherm: een foutmelding bij het opslaan van een veeg was hier nooit te
+   zien, en "Ongedaan maken" na "Neem vorige week over" evenmin. Op dit scherm
+   komen ze erboven, onderaan boven de voetregel: bovenaan liggen de pijlen om
+   van week te wisselen. */
+:root:has(.paint-screen) .vtk-toast-viewport {
+  z-index: 70;
+  top: auto;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 52px);
+}
+
 .paint-bar {
   display: flex;
   align-items: center;

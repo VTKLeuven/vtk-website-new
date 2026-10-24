@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useOptimistic, useState, useTransition } from 'react';
+import { useCallback, useEffect, useOptimistic, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -251,47 +251,72 @@ export function TransportPlanner({
   );
 
   /**
-   * Een rit verslepen of rekken in de kalender.
+   * De ritten zoals de server ze het laatst stuurde, leesbaar vanuit een melding
+   * die er al even staat. "Ongedaan maken" zet enkel de uren terug en stuurt de
+   * rest van de rit mee zoals ze nú is: met de velden van vóór de sleep zou een
+   * chauffeur die je intussen toewees, stil weer verdwijnen.
+   */
+  const latestTrips = useRef(trips);
+  useEffect(() => {
+    latestTrips.current = trips;
+  }, [trips]);
+
+  /**
+   * Een rit verslepen of rekken in de kalender, ook naar een andere dag.
    *
    * Dezelfde actie als het formulier in het paneel, met één verschil: **slepen
    * mag meteen over een andere rit vallen**, zonder tussenstap. Slepen ís het
    * schuiven waarvoor de botsing toegelaten werd; een bevestigingsvraag per sleep
    * zou precies het gebaar breken dat het probleem oplost. Stil gebeurt het niet:
-   * de melding blijft staan tot je ze wegklikt en beide blokken worden rood.
+   * de schaduw wordt al rood tijdens het slepen, de melding blijft staan tot je
+   * ze wegklikt en beide blokken worden rood.
+   *
+   * De melding draagt "Ongedaan maken": een misgreep was anders enkel terug te
+   * draaien door de rit terug te slepen, tot op het kwartier.
    */
-  const moveBlock = useCallback(
-    (blockId: string, startAt: Date, endAt: Date) => {
-      const target = trips.find((entry) => entry.id === blockId);
-      if (!target) return;
-      // "Voor wie" blijft hier bewust achter: slepen verzet uren, en de actie
-      // raakt de post enkel aan wanneer ze die expliciet meekrijgt.
-      const { requesterChoice: _choice, requesterOther: _other, ...fields } = target.edit;
-      startTransition(async () => {
-        placeOptimistic({
-          id: blockId,
-          startAt: startAt.toISOString(),
-          endAt: endAt.toISOString(),
-        });
-        const result = await adminEditTransportAction(blockId, {
-          ...fields,
-          startAt: toDatetimeLocalValue(startAt),
-          endAt: toDatetimeLocalValue(endAt),
-          allowOverlap: true,
-        });
-        if (result.ok) {
-          showToast({
-            message: result.message ?? 'Rit verplaatst.',
-            variant: 'success',
-            duration: result.warning ? 0 : undefined,
+  const moveBlock: (blockId: string, startAt: Date, endAt: Date, undoing?: boolean) => void =
+    useCallback(
+      (blockId, startAt, endAt, undoing = false) => {
+        const target = latestTrips.current.find((entry) => entry.id === blockId);
+        if (!target) return;
+        const before = { startAt: new Date(target.startAt), endAt: new Date(target.endAt) };
+        // "Voor wie" blijft hier bewust achter: slepen verzet uren, en de actie
+        // raakt de post enkel aan wanneer ze die expliciet meekrijgt.
+        const { requesterChoice: _choice, requesterOther: _other, ...fields } = target.edit;
+        startTransition(async () => {
+          placeOptimistic({
+            id: blockId,
+            startAt: startAt.toISOString(),
+            endAt: endAt.toISOString(),
           });
-        } else {
-          showToast({ message: result.error, variant: 'error', duration: 0 });
-        }
-        router.refresh();
-      });
-    },
-    [placeOptimistic, router, showToast, trips]
-  );
+          const result = await adminEditTransportAction(blockId, {
+            ...fields,
+            startAt: toDatetimeLocalValue(startAt),
+            endAt: toDatetimeLocalValue(endAt),
+            allowOverlap: true,
+          });
+          if (result.ok) {
+            showToast({
+              message: undoing ? 'Rit teruggezet.' : (result.message ?? 'Rit verplaatst.'),
+              variant: 'success',
+              duration: result.warning ? 0 : undefined,
+              // Het terugzetten zelf krijgt geen knop meer: "ongedaan maken van
+              // ongedaan maken" is gewoon opnieuw slepen.
+              action: undoing
+                ? undefined
+                : {
+                    label: 'Ongedaan maken',
+                    onClick: () => moveBlock(blockId, before.startAt, before.endAt, true),
+                  },
+            });
+          } else {
+            showToast({ message: result.error, variant: 'error', duration: 0 });
+          }
+          router.refresh();
+        });
+      },
+      [placeOptimistic, router, showToast]
+    );
 
   /**
    * De ritten die op dit moment botsen, en een knop om ze af te gaan.

@@ -34,7 +34,7 @@ export function minutesOfDay(moment: Date): number {
 }
 
 /** Hoeveel de Belgische klok op dit moment voorloopt op UTC. */
-function brusselsOffsetMs(at: Date): number {
+export function brusselsOffsetMs(at: Date): number {
   const parts = wallClockFormatter.formatToParts(at);
   const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '00';
   const hour = get('hour') === '24' ? '00' : get('hour');

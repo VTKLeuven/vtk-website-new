@@ -19,6 +19,7 @@ import {
   availabilityFillClass,
 } from '@/lib/availability-kinds';
 import { AvailabilityNote } from './availability-note';
+import { CopyPreviousWeek } from './copy-previous-week';
 import type { AvailabilityWindow } from './availability-editor';
 
 /**
@@ -107,10 +108,13 @@ export function AvailabilityPaint({
   previousHref,
   nextHref,
   backHref,
+  previousWeekCount,
 }: {
   /** De week, als ISO-strings van UTC-middernacht. */
   days: string[];
   windows: AvailabilityWindow[];
+  /** Hoeveel vensters er vorige week stonden, voor "Neem vorige week over". */
+  previousWeekCount: number;
   /** "Week 36": wat er in de balk bovenaan staat. */
   weekLabel: string;
   /** De maandag als `YYYY-MM-DD`, voor de weeknota. */
@@ -467,7 +471,17 @@ export function AvailabilityPaint({
             "1u beschikbaar · 1u liever niet · 1u in noodgeval" nam twee regels
             en duwde de nachtknop weg. De pillen erboven zeggen al welk staaltje
             welke soort is. */}
-        {totals.length === 0 ? (
+        {/* Een lege week is het moment om vorige week over te nemen; daarna
+            niet meer, want deze voetregel heeft geen plaats voor twee dingen. Op
+            een computer staat de knop er altijd. */}
+        {totals.length === 0 && previousWeekCount > 0 ? (
+          <CopyPreviousWeek
+            week={weekValue}
+            previousCount={previousWeekCount}
+            windows={windows}
+            className="text-xs font-semibold text-vtk-navy underline underline-offset-2 disabled:opacity-60"
+          />
+        ) : totals.length === 0 ? (
           <p className="text-xs text-vtk-muted">Nog niets aangeduid</p>
         ) : (
           <p className="flex items-center gap-2.5 text-xs tabular-nums text-vtk-muted">

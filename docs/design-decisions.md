@@ -4287,6 +4287,31 @@ handelingen voor één venster, en de nota bleef in de praktijk leeg.
   die tekent of wist. Een band verslepen naar een ander uur kan dus niet, en dat
   is bewust: het midden heeft al een betekenis, en twee gebaren op dezelfde plek
   laten je raden welk van de twee je krijgt.
+- **Een klik op een venster (zonder te slepen) opent een menuutje** met de drie
+  soorten en "Weghalen". Wissen door er nog eens over te slepen vond bijna
+  niemand zelf, en van soort veranderen door eroverheen te tekenen evenmin. Beide
+  gebaren blijven werken; dit is de weg die je ziet. Weghalen vraagt daar eerst
+  bevestiging, zoals elke verwijderknop.
+- **Wat een venster wist of verandert, zegt het met "Ongedaan maken"**: wissen,
+  rekken, de soort, een week overnemen. Tekenen niet, want het nieuwe venster
+  ís de melding. Een bevestiging per sleep zou het gebaar breken waar dit scherm
+  om draait; een knop achteraf maakt een misgreep goed zonder dat. Het terugzetten
+  gaat over het hele stuk dat de wijziging raakte (`restoreAvailabilityAction`,
+  `replaceRange`): voegde de server je venster samen met dat ernaast, dan komen
+  beide terug zoals ze stonden.
+- **"Neem vorige week over"** zet je rooster van vorige week, op dezelfde uren
+  op de klok, in deze week (`copyPreviousWeekAvailabilityAction`). De meeste
+  chauffeurs rijden elke week ongeveer op dezelfde momenten, en dat telkens
+  opnieuw intekenen is het werk waardoor mensen het laten. Het **vervangt** wat
+  er al stond, want twee roosters over elkaar geven een week die geen van beide
+  is; staat er al iets, dan vraagt het eerst bevestiging. De weeknota gaat niet
+  mee: "ik ben er vrijdag niet" geldt volgende week niet vanzelf. De knop staat
+  er enkel wanneer er vorige week iets stond, en op een telefoon enkel in een
+  lege week, want de voetregel daar heeft geen plaats voor twee dingen.
+- **Wat vandaag al voorbij is, blijft in de week staan.** Het scherm laadde enkel
+  vensters die nog niet afgelopen waren, dus een venster van maandagochtend was
+  maandagmiddag weg uit de week waarin het stond. De lijst onderaan toont wel
+  enkel wat nog moet komen: die gaat over wat je nog belooft.
 
 ### Een rit of venster rek je aan beide randen, zoals in een agenda
 
@@ -4317,10 +4342,32 @@ hetzelfde tijdrooster (`TimeGrid`), en daar zit het gebaar nu één keer.
   bewaart niets.
 - **Een venster rekken volgt de regels van tekenen.** Raakt de nieuwe rand een
   venster van dezelfde soort, dan smelten ze samen; schuift ze over een andere
-  soort, dan maakt die plaats (`moveAvailabilityAction`, in één transactie met
+  soort, dan maakt die plaats (`editAvailabilityAction`, in één transactie met
   dezelfde code als toevoegen).
+- **Een rit sleep je ook naar een andere dag.** Ze bleef in haar eigen kolom, en
+  wie haar van maandag naar donderdag wou, moest de uren in het paneel gaan
+  intikken. Rekken en tekenen blijven wel in hun kolom: een venster dat je aan
+  zijn onderrand rekt, hoort niet ineens op woensdag te beginnen.
+- **De schaduw wordt rood terwijl je sleept** wanneer hetzelfde voertuig daar al
+  een goedgekeurde rit heeft, met "Botst met ..." erin. Dezelfde regel als de
+  rode blokken erna (`clashingWith` naast `conflictPartners`), zodat de schaduw
+  nooit iets anders zegt dan de kalender na het loslaten. Neerzetten mag nog
+  altijd, zie hierboven over botsen; je weet het enkel vóór in plaats van na.
+- **Na een sleep staat "Ongedaan maken" in de melding.** Een misgreep was enkel
+  terug te draaien door terug te slepen, tot op het kwartier. Het terugzetten
+  verzet enkel de uren en neemt de rest van de rit zoals ze nú is: met de velden
+  van vóór de sleep zou een chauffeur die je intussen toewees, stil verdwijnen.
+- **Het rooster scrollt mee aan de rand.** Ingezoomd staat maar een stuk van de
+  dag in beeld, en je kon een rit niet verder rekken of verslepen dan wat je zag.
+  Hoe dichter bij de rand, hoe sneller; horizontaal enkel bij verplaatsen.
 - **Enkel met een muis**, zoals al het slepen in dit rooster: op een
   touchscreen is verticaal vegen scrollen.
+- **Het rooster verspringt niet meer onder je muis.** "Nog niets ingetekend" was
+  een regel in de kop, en die verdween bij je eerste venster: de hele week
+  schoof dan 25 pixels omhoog, net wanneer je een tweede wou tekenen. De zin
+  ligt nu over het rooster. Om dezelfde reden staat het eerste uur niet meer in
+  de urenkolom: het plakte tegen het tweede, en het uur eronder zegt al waar je
+  bent, zoals in elke agenda-app.
 
 ### Formulieren in een smalle kolom kijken niet naar de schermbreedte
 

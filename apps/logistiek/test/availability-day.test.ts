@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   availabilityDayBounds,
+  availabilityWeekBounds,
   cellsForDay,
   clipOutsideDay,
   clockHourOfCell,
@@ -8,6 +9,8 @@ import {
   hoursToRanges,
   mergeRanges,
   rangeToHours,
+  replaceRange,
+  shiftWeeks,
   subtractRange,
 } from '../lib/availability-day';
 
@@ -310,5 +313,92 @@ describe('een dag herschrijven met de verschoven dagrand', () => {
       sunday.dayStart,
       sunday.dayEnd
     ).size).toBe(0);
+  });
+});
+
+describe('mergeRanges met nota', () => {
+  it('houdt de nota wanneer twee vensters samensmelten', () => {
+    const out = mergeRanges([
+      { ...ja('2026-09-02T09:00Z', '2026-09-02T12:00Z'), note: 'enkel met de auto' },
+      ja('2026-09-02T12:00Z', '2026-09-02T14:00Z'),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].note).toBe('enkel met de auto');
+  });
+});
+
+describe('availabilityWeekBounds', () => {
+  it('loopt van maandag 05:00 tot maandag 05:00, ook over het winteruur heen', () => {
+    // Week 43 van 2026: op zondag 25 oktober gaat de klok een uur terug. De
+    // grens blijft 05:00 op de klok, dus in UTC schuift ze een uur op.
+    const { weekStart, weekEnd } = availabilityWeekBounds(new Date('2026-10-19T00:00:00Z'));
+    expect(weekStart.toISOString()).toBe('2026-10-19T03:00:00.000Z');
+    expect(weekEnd.toISOString()).toBe('2026-10-26T04:00:00.000Z');
+  });
+});
+
+describe('shiftWeeks', () => {
+  it('houdt het uur op de klok over een zomeruurwissel heen', () => {
+    // Dinsdag 20 oktober 18:00 (zomertijd) wordt dinsdag 27 oktober 18:00
+    // (wintertijd), en niet 17:00: zeven keer 24 uur verder is een uur te vroeg.
+    expect(shiftWeeks(new Date('2026-10-20T16:00:00Z'), 1).toISOString()).toBe(
+      '2026-10-27T17:00:00.000Z'
+    );
+  });
+
+  it('is gewoon zeven dagen verder wanneer er geen wissel tussen ligt', () => {
+    expect(shiftWeeks(new Date('2026-09-08T16:00:00Z'), 1).toISOString()).toBe(
+      '2026-09-15T16:00:00.000Z'
+    );
+  });
+});
+
+describe('replaceRange', () => {
+  it('zet een samengevoegd venster terug zoals het stond', () => {
+    // Een venster van 10 tot 12 werd tot 14 gerekt en smolt samen met dat van
+    // 14 tot 16. Ongedaan maken zet 10 tot 14 terug zoals het was; het stuk van
+    // 14 tot 16 ligt buiten dat bereik en blijft staan.
+    const out = replaceRange(
+      [ja('2026-09-02T10:00Z', '2026-09-02T16:00Z')],
+      [ja('2026-09-02T10:00Z', '2026-09-02T12:00Z')],
+      at('2026-09-02T10:00Z'),
+      at('2026-09-02T14:00Z')
+    );
+    expect(out.map((range) => [range.startAt.toISOString(), range.endAt.toISOString()])).toEqual([
+      ['2026-09-02T10:00:00.000Z', '2026-09-02T12:00:00.000Z'],
+      ['2026-09-02T14:00:00.000Z', '2026-09-02T16:00:00.000Z'],
+    ]);
+  });
+
+  it('brengt een andere soort terug die plaats had gemaakt', () => {
+    const out = replaceRange(
+      [ja('2026-09-02T10:00Z', '2026-09-02T14:00Z')],
+      [
+        ja('2026-09-02T10:00Z', '2026-09-02T12:00Z'),
+        {
+          startAt: at('2026-09-02T12:00Z'),
+          endAt: at('2026-09-02T14:00Z'),
+          kind: 'NOOD',
+          note: 'na de les',
+        },
+      ],
+      at('2026-09-02T10:00Z'),
+      at('2026-09-02T14:00Z')
+    );
+    expect(out).toHaveLength(2);
+    expect(out[1]).toMatchObject({ kind: 'NOOD', note: 'na de les' });
+  });
+
+  it('knipt wat het neerlegt op het bereik', () => {
+    // Een venster van vorige week dat over de weekgrens liep, mag bij het
+    // overnemen niet in de week erna uitkomen.
+    const out = replaceRange(
+      [],
+      [ja('2026-09-06T20:00Z', '2026-09-07T08:00Z')],
+      at('2026-08-31T03:00Z'),
+      at('2026-09-07T03:00Z')
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].endAt.toISOString()).toBe('2026-09-07T03:00:00.000Z');
   });
 });

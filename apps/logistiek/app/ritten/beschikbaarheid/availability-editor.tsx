@@ -1,10 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useOptimistic, useState, useTransition } from 'react';
-import { Button } from '@vtk/ui';
+import { Button, ConfirmDialog } from '@vtk/ui';
 import {
   addAvailabilityAction,
-  moveAvailabilityAction,
+  editAvailabilityAction,
   removeAvailabilityAction,
 } from '@/app/actions/uitleen';
 import { QuarterDateTime } from '@/components/quarter-datetime';
@@ -14,10 +14,18 @@ import { useToast } from '@/components/ui/toast';
 import { TimeGrid } from '@/components/transport-calendar/time-grid';
 import type { AvailabilityBand } from '@/components/transport-calendar/types';
 import { formatDateTime, toDatetimeLocalValue } from '@/lib/uitleen';
-import { AVAILABILITY_KINDS, DAG_START_UUR, type AvailabilityKind } from '@/lib/availability-day';
+import {
+  AVAILABILITY_KINDS,
+  DAG_START_UUR,
+  subtractRange,
+  type AvailabilityKind,
+} from '@/lib/availability-day';
 import { AVAILABILITY_KIND_HINT, AVAILABILITY_KIND_LABEL, availabilityFillClass } from '@/lib/availability-kinds';
 import { AvailabilityNote } from './availability-note';
 import { AvailabilityPaint } from './availability-paint';
+import { snapshotOf, useOfferUndo, type AvailabilitySnapshot } from './availability-undo';
+import { BandMenu, windowLabel } from './band-menu';
+import { CopyPreviousWeek } from './copy-previous-week';
 
 /**
  * Wanneer kan je rijden (V1).
@@ -29,7 +37,12 @@ import { AvailabilityPaint } from './availability-paint';
  * Een venster dat er staat, maak je korter of langer aan zijn boven- of
  * onderrand, zoals een afspraak in een agenda. Voordien kon dat enkel door het
  * weg te halen en opnieuw te tekenen, en een uur later stoppen dan gepland is
- * precies de wijziging die het vaakst voorkomt.
+ * precies de wijziging die het vaakst voorkomt. Klik je erop zonder te slepen,
+ * dan krijg je een menuutje om de soort te kiezen of het weg te halen.
+ *
+ * Wat een venster laat verdwijnen of verandert (wissen, rekken, de soort, een
+ * week overnemen), zegt het in een melding met "Ongedaan maken". Tekenen niet:
+ * het nieuwe venster staat er, en dat is de melding.
  *
  * Het was eerst slepen om twee velden in te vullen en dan op "Toevoegen"
  * klikken. Dat leek zorgvuldig (je kon er nog een nota bij zetten) maar het
@@ -53,12 +66,21 @@ export type AvailabilityWindow = {
 /** Een venster dat nog niet van de server terugkwam; het id is tijdelijk. */
 const OPTIMISTIC_ID = 'optimistisch';
 
+/**
+ * Staat dit venster nog niet in de databank? Dan valt het nog niet aan te
+ * passen of weg te halen; even wachten is dan het juiste antwoord.
+ */
+function isPending(id: string): boolean {
+  return id.startsWith(OPTIMISTIC_ID);
+}
+
 type Optimistic =
   // `what` en niet `kind`: dat woord is hier al bezet door de soort
   // beschikbaarheid, en twee betekenissen in één object is één te veel.
   | { what: 'add'; startAt: string; endAt: string; kind: AvailabilityKind }
-  | { what: 'move'; id: string; startAt: string; endAt: string }
-  | { what: 'remove'; id: string };
+  | { what: 'edit'; id: string; startAt: string; endAt: string; kind?: AvailabilityKind }
+  | { what: 'remove'; id: string }
+  | { what: 'restore'; snapshot: AvailabilitySnapshot };
 
 export function AvailabilityEditor({
   days,
@@ -71,9 +93,15 @@ export function AvailabilityEditor({
   previousHref,
   nextHref,
   backHref,
+  now,
+  previousWeekCount,
 }: {
   /** De week, als ISO-strings van UTC-middernacht. */
   days: string[];
+  /**
+   * Je vensters vanaf het begin van deze week (of vanaf nu, als dat vroeger
+   * is): ook wat vandaag al voorbij is, zodat de week toont wat er stond.
+   */
   windows: AvailabilityWindow[];
   driverId: string;
   driverName: string;
@@ -86,6 +114,14 @@ export function AvailabilityEditor({
   previousHref: string;
   nextHref: string;
   backHref: string;
+  /**
+   * Het moment waarop de pagina gemaakt werd, als ISO-string. De lijst onderaan
+   * toont enkel wat nog moet komen; met `Date.now()` in de render zou de server
+   * en de browser daar elk een eigen antwoord op geven.
+   */
+  now: string;
+  /** Hoeveel vensters er vorige week stonden, voor "Neem vorige week over". */
+  previousWeekCount: number;
 }) {
   const showToast = useToast();
   const [pending, startTransition] = useTransition();
@@ -121,10 +157,38 @@ export function AvailabilityEditor({
    */
   const [shown, applyOptimistic] = useOptimistic(windows, (state, action: Optimistic) => {
     if (action.what === 'remove') return state.filter((window) => window.id !== action.id);
-    if (action.what === 'move') {
+    if (action.what === 'restore') {
+      // Hetzelfde als de server (`replaceRange`), zonder het samenvoegen: wat
+      // het stuk raakt, wordt erop geknipt, en de vastgelegde vensters komen
+      // terug. Het echte antwoord volgt een tel later.
+      const from = new Date(action.snapshot.startAt);
+      const to = new Date(action.snapshot.endAt);
+      const outside = state.flatMap((window) => {
+        const startAt = new Date(window.startAt);
+        const endAt = new Date(window.endAt);
+        if (startAt >= to || endAt <= from) return [window];
+        return subtractRange({ startAt, endAt, kind: window.kind }, from, to).map((piece, index) => ({
+          ...window,
+          id: `${OPTIMISTIC_ID}-${window.id}-${index}`,
+          startAt: piece.startAt.toISOString(),
+          endAt: piece.endAt.toISOString(),
+        }));
+      });
+      const restored = action.snapshot.windows.map((window, index) => ({
+        ...window,
+        id: `${OPTIMISTIC_ID}-terug-${index}`,
+      }));
+      return [...outside, ...restored].sort((a, b) => a.startAt.localeCompare(b.startAt));
+    }
+    if (action.what === 'edit') {
       return state.map((window) =>
         window.id === action.id
-          ? { ...window, startAt: action.startAt, endAt: action.endAt }
+          ? {
+              ...window,
+              startAt: action.startAt,
+              endAt: action.endAt,
+              kind: action.kind ?? window.kind,
+            }
           : window
       );
     }
@@ -139,6 +203,13 @@ export function AvailabilityEditor({
       },
     ];
   });
+
+  const offerUndo = useOfferUndo(
+    useCallback(
+      (snapshot: AvailabilitySnapshot) => applyOptimistic({ what: 'restore', snapshot }),
+      [applyOptimistic]
+    )
+  );
 
   const bands: AvailabilityBand[] = shown.map((window) => ({
     id: window.id,
@@ -170,48 +241,83 @@ export function AvailabilityEditor({
     [applyOptimistic, showToast]
   );
 
+  /** Een venster weghalen, met "Ongedaan maken" in de melding. */
   const remove = useCallback(
     (id: string) => {
+      const target = shown.find((window) => window.id === id);
+      if (!target) return;
+      const snapshot = snapshotOf(shown, new Date(target.startAt), new Date(target.endAt));
       startTransition(async () => {
         applyOptimistic({ what: 'remove', id });
         const result = await removeAvailabilityAction(id);
-        if (!result.ok) {
+        if (result.ok) {
+          offerUndo('Venster weggehaald.', snapshot);
+        } else {
           showToast({ message: result.error, variant: 'error', duration: 0 });
         }
       });
     },
-    [applyOptimistic, showToast]
+    [applyOptimistic, offerUndo, shown, showToast]
   );
 
   /**
-   * Een rand versleept: het venster krijgt die uren, met dezelfde soort en nota.
+   * Een venster andere uren of een andere soort geven: een versleepte rand, of
+   * een keuze in het menuutje.
    *
    * Optimistisch zoals toevoegen, zodat de band blijft staan waar je ze losliet.
    * Raakt ze daarbij een ander venster, dan voegt de server ze samen en komt de
-   * samengevoegde band terug met het antwoord.
+   * samengevoegde band terug met het antwoord. Wat terug te zetten valt, is het
+   * oude én het nieuwe bereik samen: rek je een venster langer, dan maakte een
+   * andere soort op dat nieuwe stuk plaats.
    */
-  const resize = useCallback(
-    (id: string, startAt: Date, endAt: Date) => {
+  const edit = useCallback(
+    (id: string, startAt: Date, endAt: Date, kind?: AvailabilityKind) => {
       // Een venster dat nog aan het opslaan is, heeft nog geen echt id.
-      if (id === OPTIMISTIC_ID) return;
+      if (isPending(id)) return;
+      const target = shown.find((window) => window.id === id);
+      if (!target) return;
+      const snapshot = snapshotOf(
+        shown,
+        new Date(Math.min(startAt.getTime(), new Date(target.startAt).getTime())),
+        new Date(Math.max(endAt.getTime(), new Date(target.endAt).getTime()))
+      );
       startTransition(async () => {
         applyOptimistic({
-          what: 'move',
+          what: 'edit',
           id,
           startAt: startAt.toISOString(),
           endAt: endAt.toISOString(),
+          kind,
         });
-        const result = await moveAvailabilityAction(id, {
+        const result = await editAvailabilityAction(id, {
           startAt: toDatetimeLocalValue(startAt),
           endAt: toDatetimeLocalValue(endAt),
+          kind,
         });
-        if (!result.ok) {
+        if (result.ok) {
+          offerUndo(
+            kind ? `Nu: ${AVAILABILITY_KIND_LABEL[kind].toLowerCase()}.` : 'Venster aangepast.',
+            snapshot
+          );
+        } else {
           showToast({ message: result.error, variant: 'error', duration: 0 });
         }
       });
     },
-    [applyOptimistic, showToast]
+    [applyOptimistic, offerUndo, shown, showToast]
   );
+
+  const resize = useCallback(
+    (id: string, startAt: Date, endAt: Date) => edit(id, startAt, endAt),
+    [edit]
+  );
+
+  /** Het venster waarvan het menuutje openstaat, en waar zijn band stond. */
+  const [menu, setMenu] = useState<{ id: string; anchor: DOMRect } | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
+  const menuWindow = menu ? (shown.find((window) => window.id === menu.id) ?? null) : null;
+  /** Het venster dat op bevestiging wacht om weggehaald te worden. */
+  const [confirmRemove, setConfirmRemove] = useState<AvailabilityWindow | null>(null);
 
   /**
    * Slepen in de week: er staat al iets op dat moment, dan haalt dit het weg;
@@ -234,7 +340,7 @@ export function AvailabilityEditor({
       if (existing && existing.kind === brush) {
         // Een venster dat nog aan het opslaan is, heeft nog geen echt id; dat kan
         // je niet weghalen. Even wachten is dan het juiste antwoord.
-        if (existing.id !== OPTIMISTIC_ID) remove(existing.id);
+        if (!isPending(existing.id)) remove(existing.id);
         return;
       }
       add({
@@ -295,21 +401,25 @@ export function AvailabilityEditor({
     </section>
   );
 
+  // De lijst gaat over wat je nog belooft; wat vandaag al voorbij is, staat
+  // enkel nog in de week erboven.
+  const upcoming = shown.filter((window) => new Date(window.endAt).getTime() >= new Date(now).getTime());
+
   const list = (
     <section>
-      <h2 className="text-sm font-semibold text-vtk-ink">Wanneer je kan rijden ({shown.length})</h2>
-      {shown.length === 0 ? (
+      <h2 className="text-sm font-semibold text-vtk-ink">Wanneer je kan rijden ({upcoming.length})</h2>
+      {upcoming.length === 0 ? (
         <p className="mt-2 text-sm text-vtk-muted">
           Nog niets ingegeven. Zolang je niets ingeeft, gaat Logistiek er niet van uit dat je niet
           kan; ze weten het gewoon niet, en bellen je dan.
         </p>
       ) : (
         <ul className="mt-3 grid gap-2">
-          {shown.map((window) => (
+          {upcoming.map((window) => (
             <li
               key={window.id}
               className={`flex flex-wrap items-center justify-between gap-3 rounded-[12px] bg-vtk-surface px-4 py-2.5 text-sm ${
-                window.id === OPTIMISTIC_ID ? 'opacity-60' : ''
+                isPending(window.id) ? 'opacity-60' : ''
               }`}
             >
               <div className="min-w-0">
@@ -326,7 +436,7 @@ export function AvailabilityEditor({
                 </p>
                 {window.note ? <p className="text-xs text-vtk-muted">{window.note}</p> : null}
               </div>
-              {window.id === OPTIMISTIC_ID ? (
+              {isPending(window.id) ? (
                 <span className="text-xs text-vtk-muted">Opslaan...</span>
               ) : (
                 <ConfirmActionButton
@@ -358,6 +468,7 @@ export function AvailabilityEditor({
       <AvailabilityPaint
         days={days}
         windows={shown}
+        previousWeekCount={previousWeekCount}
         weekLabel={weekLabel}
         weekValue={weekValue}
         note={note}
@@ -389,6 +500,10 @@ export function AvailabilityEditor({
         showDriver={false}
         onCreateRange={onCreateRange}
         onResizeBand={resize}
+        onSelectBand={(id, anchor) => {
+          // Een venster dat nog aan het opslaan is, heeft nog geen echt id.
+          if (!isPending(id)) setMenu({ id, anchor });
+        }}
         now={undefined}
         above={
           <div className="grid gap-2 px-1 pb-2">
@@ -415,12 +530,19 @@ export function AvailabilityEditor({
                   {AVAILABILITY_KIND_LABEL[kind]}
                 </button>
               ))}
+              <CopyPreviousWeek
+                week={weekValue}
+                previousCount={previousWeekCount}
+                windows={shown}
+                onRestore={(snapshot) => applyOptimistic({ what: 'restore', snapshot })}
+                className="ml-auto rounded-full border border-vtk-navy/20 px-2.5 py-1 text-xs font-semibold text-vtk-ink transition hover:border-vtk-navy/50 disabled:opacity-60"
+              />
             </div>
             <p className="text-xs text-vtk-muted">
               Sleep met de muis over een dag: het venster staat er meteen, in de gekozen soort.
-              Trek aan de boven- of onderrand om het korter of langer te maken, en sleep er nog
-              eens over met dezelfde soort om het weg te halen. Een dag loopt hier van 05:00 tot
-              05:00, dus de nacht van zaterdag op zondag staat onderaan bij zaterdag.
+              Trek aan de boven- of onderrand om het korter of langer te maken, en klik erop om de
+              soort te veranderen of het weg te halen. Een dag loopt hier van 05:00 tot 05:00, dus
+              de nacht van zaterdag op zondag staat onderaan bij zaterdag.
             </p>
           </div>
         }
@@ -429,6 +551,42 @@ export function AvailabilityEditor({
       {fields}
 
       {list}
+
+      {menu && menuWindow ? (
+        <BandMenu
+          key={menu.id}
+          entry={menuWindow}
+          anchor={menu.anchor}
+          pending={pending}
+          onClose={closeMenu}
+          onKind={(kind) => {
+            setMenu(null);
+            edit(menuWindow.id, new Date(menuWindow.startAt), new Date(menuWindow.endAt), kind);
+          }}
+          onRemove={() => {
+            setMenu(null);
+            setConfirmRemove(menuWindow);
+          }}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={confirmRemove !== null}
+        title="Venster weghalen?"
+        description={
+          confirmRemove
+            ? `${windowLabel(confirmRemove)} verdwijnt; Logistiek weet dan niet meer dat je op dat moment kan rijden. Ritten die al aan jou toegewezen zijn, blijven staan.`
+            : undefined
+        }
+        confirmLabel="Venster weghalen"
+        cancelLabel="Annuleren"
+        destructive
+        onConfirm={() => {
+          if (confirmRemove) remove(confirmRemove.id);
+          setConfirmRemove(null);
+        }}
+        onCancel={() => setConfirmRemove(null)}
+      />
     </div>
   );
 }

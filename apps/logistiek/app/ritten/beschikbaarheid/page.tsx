@@ -13,11 +13,13 @@ import {
   toDateInputValue,
 } from '@/lib/uitleen';
 import {
+  availabilityCountInRange,
   availabilityForDriver,
   availabilityNoteForWeek,
   isDriver,
   isVanDriver,
 } from '@/lib/uitleen-server';
+import { availabilityWeekBounds } from '@/lib/availability-day';
 import { AvailabilityEditor } from './availability-editor';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -44,11 +46,18 @@ export default async function BeschikbaarheidPage({
   const requested = week ? parseDateOnly(week) : null;
   const monday = requested ? startOfWeek(requested) : availabilityDefaultWeek();
 
-  const [driver, vanDriver, windows, note] = await Promise.all([
+  // Vanaf het begin van deze week, ook wat al voorbij is: een venster van
+  // maandagochtend verdween anders maandagmiddag uit de week waarin het stond.
+  // Vorige week enkel geteld, voor de knop die ze overneemt.
+  const now = new Date();
+  const { weekStart } = availabilityWeekBounds(monday);
+  const previousWeek = availabilityWeekBounds(new Date(monday.getTime() - 7 * DAY_MS));
+  const [driver, vanDriver, windows, note, previousWeekCount] = await Promise.all([
     isDriver(session.user.id),
     isVanDriver(session.user.id),
-    availabilityForDriver(session.user.id),
+    availabilityForDriver(session.user.id, weekStart < now ? weekStart : now),
     availabilityNoteForWeek(session.user.id, monday),
+    availabilityCountInRange(session.user.id, previousWeek.weekStart, previousWeek.weekEnd),
   ]);
 
   const days = Array.from({ length: 7 }, (_, index) =>
@@ -131,6 +140,8 @@ export default async function BeschikbaarheidPage({
               previousHref={hrefFor(new Date(monday.getTime() - 7 * DAY_MS))}
               nextHref={hrefFor(new Date(monday.getTime() + 7 * DAY_MS))}
               backHref="/ritten"
+              now={now.toISOString()}
+              previousWeekCount={previousWeekCount}
               days={days}
               driverId={session.user.id}
               driverName={session.user.name}

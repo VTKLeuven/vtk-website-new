@@ -39,12 +39,16 @@ import { expireOpenPayments, logistiekBaseUrl, paymentGateway } from '@/lib/paym
 import { runSerializable } from '@/lib/tx';
 import {
   availabilityDayBounds,
+  availabilityWeekBounds,
   clipOutsideDay,
   hoursToRanges,
   isAvailabilityKind,
   mergeRanges,
+  replaceRange,
+  shiftWeeks,
   subtractRange,
   type AvailabilityKind,
+  type Range,
 } from '@/lib/availability-day';
 import { writeAudit } from '@/lib/audit';
 import { notifyReservation, notifyTeamIfUrgent, notifyTransport } from '@/lib/uitleen-mail';
@@ -1066,18 +1070,20 @@ export async function addAvailabilityAction(input: {
 }
 
 /**
- * Een venster korter, langer of op een ander uur zetten: de randen die je in het
- * rooster versleept.
+ * Een venster korter of langer maken, of van soort veranderen: de randen die je
+ * in het rooster versleept, en de soort die je in het menuutje van een band
+ * kiest.
  *
  * Geen `remove` gevolgd door een `add` vanuit de browser: dat zijn twee
  * roundtrips, en faalt de tweede, dan is je venster weg in plaats van verzet.
  * Hier gebeurt het in één transactie, met dezelfde regels als bij toevoegen:
  * raakt de nieuwe rand een venster van dezelfde soort, dan smelten ze samen;
- * schuift ze over een andere soort, dan maakt die plaats. Soort en nota gaan mee.
+ * schuift ze over een andere soort, dan maakt die plaats. De nota gaat mee, en
+ * de soort ook, tenzij je er een nieuwe meegeeft.
  */
-export async function moveAvailabilityAction(
+export async function editAvailabilityAction(
   id: string,
-  input: { startAt: string; endAt: string }
+  input: { startAt: string; endAt: string; kind?: AvailabilityKind }
 ): Promise<ActionResult> {
   const session = await requireSession();
   if (!(await isVanDriver(session.user.id))) {
@@ -1086,8 +1092,11 @@ export async function moveAvailabilityAction(
 
   const range = parseAvailabilityRange(input);
   if ('error' in range) return { ok: false, error: range.error };
+  if (input.kind !== undefined && !isAvailabilityKind(input.kind)) {
+    return { ok: false, error: 'Die soort beschikbaarheid ken ik niet.' };
+  }
 
-  const moved = await runSerializable(async (tx) => {
+  const edited = await runSerializable(async (tx) => {
     // Enkel je eigen venster; het team beheert dit niet voor je.
     const row = await tx.uitleenDriverAvailability.findFirst({
       where: { id, userId: session.user.id },
@@ -1097,16 +1106,172 @@ export async function moveAvailabilityAction(
     await tx.uitleenDriverAvailability.delete({ where: { id: row.id } });
     await placeAvailabilityWindow(tx, session.user.id, {
       ...range,
-      kind: row.kind,
+      kind: input.kind ?? row.kind,
       note: row.note,
     });
     return true;
   });
-  if (!moved) return { ok: false, error: 'Dit venster bestaat niet (meer).' };
+  if (!edited) return { ok: false, error: 'Dit venster bestaat niet (meer).' };
 
   revalidatePath('/ritten/beschikbaarheid');
   revalidatePath('/beheer/vervoer/week');
   return { ok: true, message: 'Venster aangepast.' };
+}
+
+/** Hoe ver een herstel mag reiken: een week plus de nacht erna, met wat marge. */
+const MAX_RESTORE_SPAN_MS = 9 * 24 * 60 * 60 * 1000;
+/** Meer vensters in één week bestaat niet; dit is een rem op rommel, geen limiet. */
+const MAX_RESTORE_WINDOWS = 300;
+
+/**
+ * Een stuk van je beschikbaarheid terugzetten zoals het stond: de knop
+ * "Ongedaan maken" in de melding na een sleep.
+ *
+ * Het stuk en hoe het eruitzag, komen van de browser, die het net voor de
+ * wijziging vastlegde. Dat mag: het gaat enkel over je eigen vensters, en wat
+ * je hier meestuurt, had je ook gewoon kunnen intekenen. Wat buiten het stuk
+ * ligt, blijft staan (`replaceRange`), ook wanneer de server je venster bij de
+ * wijziging met dat ernaast had samengevoegd.
+ */
+export async function restoreAvailabilityAction(input: {
+  startAt: string;
+  endAt: string;
+  windows: Array<{ startAt: string; endAt: string; kind: AvailabilityKind; note: string | null }>;
+}): Promise<ActionResult> {
+  const session = await requireSession();
+  if (!(await isVanDriver(session.user.id))) {
+    return { ok: false, error: 'Enkel karchauffeurs kunnen beschikbaarheid doorgeven.' };
+  }
+
+  const from = new Date(input.startAt);
+  const to = new Date(input.endAt);
+  if (
+    !Number.isFinite(from.getTime()) ||
+    !Number.isFinite(to.getTime()) ||
+    to <= from ||
+    to.getTime() - from.getTime() > MAX_RESTORE_SPAN_MS ||
+    !Array.isArray(input.windows) ||
+    input.windows.length > MAX_RESTORE_WINDOWS
+  ) {
+    return { ok: false, error: 'Dit kan niet meer ongedaan gemaakt worden.' };
+  }
+  const wanted: Range[] = [];
+  for (const window of input.windows) {
+    const startAt = new Date(window?.startAt);
+    const endAt = new Date(window?.endAt);
+    if (!Number.isFinite(startAt.getTime()) || !Number.isFinite(endAt.getTime())) continue;
+    if (!isAvailabilityKind(window.kind)) continue;
+    const note = typeof window.note === 'string' ? window.note.trim().slice(0, 300) || null : null;
+    wanted.push({ startAt, endAt, kind: window.kind, note });
+  }
+
+  await runSerializable(async (tx) => {
+    await replaceAvailabilityRange(tx, session.user.id, wanted, from, to);
+  });
+
+  revalidatePath('/ritten/beschikbaarheid');
+  revalidatePath('/beheer/vervoer/week');
+  return { ok: true, message: 'Teruggezet zoals het stond.' };
+}
+
+/**
+ * Je beschikbaarheid van vorige week overnemen in deze week.
+ *
+ * De meeste chauffeurs hebben elke week ongeveer hetzelfde rooster, en dat
+ * telkens opnieuw intekenen is precies het werk waardoor mensen het laten.
+ * Vervangt wat er deze week al stond: twee roosters over elkaar leggen geeft
+ * een week die geen van beide is. Het scherm vraagt daarom eerst bevestiging
+ * wanneer er al iets stond, en biedt achteraf "Ongedaan maken".
+ *
+ * Dezelfde uren op de klok, ook over een zomeruurwissel heen (`shiftWeeks`), en
+ * dezelfde weekgrens als het raster: maandag 05:00. De weeknota gaat niet mee;
+ * "ik ben er vrijdag niet" van vorige week geldt deze week niet vanzelf.
+ */
+export async function copyPreviousWeekAvailabilityAction(input: {
+  /** Een dag in de week, als `YYYY-MM-DD`; de maandag volgt eruit. */
+  week: string;
+}): Promise<ActionResult> {
+  const session = await requireSession();
+  if (!(await isVanDriver(session.user.id))) {
+    return { ok: false, error: 'Enkel karchauffeurs kunnen beschikbaarheid doorgeven.' };
+  }
+
+  const day = parseDateOnly(input.week);
+  if (!day) return { ok: false, error: 'Die week begrijp ik niet.' };
+  const monday = startOfWeek(day);
+  const { weekStart, weekEnd } = availabilityWeekBounds(monday);
+  const previous = availabilityWeekBounds(new Date(monday.getTime() - 7 * 24 * 60 * 60 * 1000));
+
+  const copied = await runSerializable(async (tx) => {
+    const source = await tx.uitleenDriverAvailability.findMany({
+      where: {
+        userId: session.user.id,
+        startAt: { lt: previous.weekEnd },
+        endAt: { gt: previous.weekStart },
+      },
+      select: { startAt: true, endAt: true, kind: true, note: true },
+    });
+    if (source.length === 0) return 0;
+    // Op vorige week geknipt voor het opschuiven: een venster dat over de
+    // weekgrens liep, brengt anders een stuk van déze week mee naar de
+    // volgende.
+    const wanted = source.map((row) => ({
+      startAt: shiftWeeks(row.startAt < previous.weekStart ? previous.weekStart : row.startAt, 1),
+      endAt: shiftWeeks(row.endAt > previous.weekEnd ? previous.weekEnd : row.endAt, 1),
+      kind: row.kind,
+      note: row.note,
+    }));
+    await replaceAvailabilityRange(tx, session.user.id, wanted, weekStart, weekEnd);
+    return source.length;
+  });
+  if (copied === 0) {
+    return { ok: false, error: 'Vorige week staat er niets in om over te nemen.' };
+  }
+
+  revalidatePath('/ritten/beschikbaarheid');
+  revalidatePath('/beheer/vervoer/week');
+  return {
+    ok: true,
+    message:
+      copied === 1
+        ? '1 venster van vorige week overgenomen.'
+        : `${copied} vensters van vorige week overgenomen.`,
+  };
+}
+
+/**
+ * Wat er tussen `from` en `to` staat vervangen door `wanted`. Gedeeld door een
+ * week overnemen en ongedaan maken; het rekenwerk staat puur in
+ * `replaceRange`.
+ */
+async function replaceAvailabilityRange(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  wanted: Range[],
+  from: Date,
+  to: Date
+): Promise<void> {
+  const touching = await tx.uitleenDriverAvailability.findMany({
+    where: { userId, startAt: { lt: to }, endAt: { gt: from } },
+    select: { id: true, startAt: true, endAt: true, kind: true, note: true },
+  });
+  if (touching.length > 0) {
+    await tx.uitleenDriverAvailability.deleteMany({
+      where: { id: { in: touching.map((row) => row.id) } },
+    });
+  }
+  const ranges = replaceRange(touching, wanted, from, to);
+  if (ranges.length > 0) {
+    await tx.uitleenDriverAvailability.createMany({
+      data: ranges.map((range) => ({
+        userId,
+        startAt: range.startAt,
+        endAt: range.endAt,
+        kind: range.kind,
+        note: range.note ?? null,
+      })),
+    });
+  }
 }
 
 /** Begin en einde van een venster, als het geldige kwartieren zijn. */

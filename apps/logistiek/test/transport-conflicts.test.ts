@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { conflictPartners } from '../lib/transport-conflicts';
+import { clashingWith, conflictPartners } from '../lib/transport-conflicts';
 
 const trip = (
   id: string,
@@ -67,5 +67,29 @@ describe('conflictPartners', () => {
       trip('c', 'kar', '2026-09-05T10:00:00Z', '2026-09-05T14:00:00Z', 'CANCELLED'),
     ]);
     expect(out.size).toBe(0);
+  });
+});
+
+describe('clashingWith', () => {
+  const others = [
+    trip('a', 'kar', '2026-09-05T10:00:00Z', '2026-09-05T12:00:00Z'),
+    trip('b', 'auto', '2026-09-05T10:00:00Z', '2026-09-05T12:00:00Z'),
+    trip('c', 'kar', '2026-09-05T14:00:00Z', '2026-09-05T16:00:00Z', 'REQUESTED'),
+  ];
+
+  it('vindt de goedgekeurde rit met hetzelfde voertuig', () => {
+    const moved = trip('x', 'kar', '2026-09-05T11:00:00Z', '2026-09-05T15:00:00Z');
+    expect(clashingWith(moved, others).map((other) => other.id)).toEqual(['a']);
+  });
+
+  it('negeert de rit zelf op haar oude plek', () => {
+    // De schaduw van rit a die een half uur opschuift, botst niet met a.
+    const moved = trip('a', 'kar', '2026-09-05T10:30:00Z', '2026-09-05T12:30:00Z');
+    expect(clashingWith(moved, others)).toEqual([]);
+  });
+
+  it('zegt niets voor een aanvraag, zoals de kalender erna', () => {
+    const moved = trip('x', 'kar', '2026-09-05T11:00:00Z', '2026-09-05T15:00:00Z', 'REQUESTED');
+    expect(clashingWith(moved, others)).toEqual([]);
   });
 });

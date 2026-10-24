@@ -7,7 +7,7 @@
  * niet stil wegvegen.
  */
 
-import { startOfBrusselsDay } from './week-lanes';
+import { brusselsOffsetMs, startOfBrusselsDay } from './week-lanes';
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -92,7 +92,16 @@ export function strongestKind(a: AvailabilityKind, b: AvailabilityKind): Availab
   return KIND_STRENGTH[a] >= KIND_STRENGTH[b] ? a : b;
 }
 
-export type Range = { startAt: Date; endAt: Date; kind: AvailabilityKind };
+export type Range = {
+  startAt: Date;
+  endAt: Date;
+  kind: AvailabilityKind;
+  /**
+   * De nota bij dit venster, waar die meereist. Weggelaten waar ze er niet toe
+   * doet (het intekenraster op een telefoon kent geen nota's).
+   */
+  note?: string | null;
+};
 
 /**
  * Aaneensluitende of overlappende bereiken van **dezelfde soort** samenvoegen.
@@ -115,9 +124,17 @@ export function mergeRanges(ranges: readonly Range[]): Range[] {
       const last = out[out.length - 1];
       if (last && last.kind === kind && range.startAt.getTime() <= last.endAt.getTime()) {
         if (range.endAt.getTime() > last.endAt.getTime()) last.endAt = new Date(range.endAt);
+        // De eerste nota blijft, zoals bij `addAvailabilityAction`: samenvoegen
+        // mag "enkel met de auto" niet stil laten verdwijnen.
+        if (!last.note && range.note) last.note = range.note;
         continue;
       }
-      out.push({ startAt: new Date(range.startAt), endAt: new Date(range.endAt), kind });
+      out.push({
+        startAt: new Date(range.startAt),
+        endAt: new Date(range.endAt),
+        kind,
+        ...(range.note ? { note: range.note } : {}),
+      });
     }
   }
   return out.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
@@ -131,11 +148,13 @@ export function mergeRanges(ranges: readonly Range[]): Range[] {
  */
 export function subtractRange(range: Range, from: Date, to: Date): Range[] {
   const out: Range[] = [];
+  const note = range.note ? { note: range.note } : {};
   if (range.startAt.getTime() < from.getTime()) {
     out.push({
       startAt: new Date(range.startAt),
       endAt: new Date(Math.min(range.endAt.getTime(), from.getTime())),
       kind: range.kind,
+      ...note,
     });
   }
   if (range.endAt.getTime() > to.getTime()) {
@@ -143,6 +162,7 @@ export function subtractRange(range: Range, from: Date, to: Date): Range[] {
       startAt: new Date(Math.max(range.startAt.getTime(), to.getTime())),
       endAt: new Date(range.endAt),
       kind: range.kind,
+      ...note,
     });
   }
   return out.filter((piece) => piece.endAt.getTime() > piece.startAt.getTime());
@@ -249,4 +269,66 @@ export function cellsForDay(
     }
   }
   return out;
+}
+
+/**
+ * Het begin en het einde van een intekenweek: maandag 05:00 tot maandag 05:00.
+ *
+ * Dezelfde verschoven dagrand als `availabilityDayBounds`, want de nacht van
+ * zondag op maandag hoort bij zondag en dus nog bij deze week.
+ */
+export function availabilityWeekBounds(mondayAsUtcMidnight: Date): {
+  weekStart: Date;
+  weekEnd: Date;
+} {
+  return {
+    weekStart: availabilityDayBounds(mondayAsUtcMidnight).dayStart,
+    weekEnd: availabilityDayBounds(new Date(mondayAsUtcMidnight.getTime() + 7 * DAY_MS)).dayStart,
+  };
+}
+
+/**
+ * Hetzelfde uur op de klok, een aantal weken verder.
+ *
+ * Niet `+ 7 * 24 uur`: over een zomeruurwissel heen schuift dat een uur op, en
+ * dan wordt "dinsdag 18:00 tot 22:00" van vorige week deze week "19:00 tot
+ * 23:00". Vensters zijn uren op de klok, dus de klok blijft staan.
+ */
+export function shiftWeeks(moment: Date, weeks: number): Date {
+  const shift = weeks * 7 * DAY_MS;
+  const wall = moment.getTime() + brusselsOffsetMs(moment) + shift;
+  // Twee keer, zoals `startOfBrusselsDay`: de eerste gok gebruikt de offset van
+  // het verkeerde moment wanneer de wissel tussen beide in valt.
+  const first = wall - brusselsOffsetMs(new Date(moment.getTime() + shift));
+  return new Date(wall - brusselsOffsetMs(new Date(first)));
+}
+
+/**
+ * Wat er tussen `from` en `to` staat vervangen door `wanted`, en de rest laten.
+ *
+ * `existing` zijn de vensters die dat stuk nu raken. Wat ervan buiten het stuk
+ * valt, blijft; wat erbinnen valt, gaat weg. `wanted` wordt op het stuk
+ * geknipt, en daarna smelten aansluitende vensters van dezelfde soort samen.
+ *
+ * Twee dingen gebruiken dit: een week overnemen (`wanted` is vorige week, een
+ * week opgeschoven) en een wijziging ongedaan maken (`wanted` is hoe het stuk
+ * er voordien uitzag). Bij dat tweede is het knippen de hele truc: voegde de
+ * server je venster samen met dat ernaast, dan komt dat stuk ernaast buiten het
+ * bereik terug zoals het was, en sluit het weer aan op wat erbinnen terugkomt.
+ */
+export function replaceRange(
+  existing: readonly Range[],
+  wanted: readonly Range[],
+  from: Date,
+  to: Date
+): Range[] {
+  const outside = existing.flatMap((range) => subtractRange(range, from, to));
+  const inside = wanted
+    .map((range) => ({
+      ...range,
+      startAt: new Date(Math.max(range.startAt.getTime(), from.getTime())),
+      endAt: new Date(Math.min(range.endAt.getTime(), to.getTime())),
+    }))
+    .filter((range) => isAvailabilityKind(range.kind));
+  return mergeRanges([...outside, ...inside]);
 }

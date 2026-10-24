@@ -45,6 +45,21 @@
   flex: 1;
 }
 
+/* Een knop in de melding ("Ongedaan maken"). Tekst en geen icoon: het is de
+   enige actie in de melding, en een pijltje dat terugdraait leest niemand. */
+.vtk-toast-action {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
 .vtk-toast-close {
   flex: none;
   padding: 0 2px;

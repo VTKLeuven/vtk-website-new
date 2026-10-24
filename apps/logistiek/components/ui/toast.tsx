@@ -9,15 +9,30 @@ export type ToastInput = {
   message: string;
   /** Visuele stijl. Standaard `info`. */
   variant?: ToastVariant;
-  /** Auto-verdwijntijd in ms. `0` = blijft staan tot manueel gesloten. Standaard 4000. */
+  /**
+   * Auto-verdwijntijd in ms. `0` = blijft staan tot manueel gesloten. Standaard
+   * 4000, en 8000 met een `action`: wie "Ongedaan maken" leest, moet nog tijd
+   * hebben om erop te klikken.
+   */
   duration?: number;
+  /**
+   * Eén knop in de melding, zoals "Ongedaan maken" na een sleep. Een klik voert
+   * ze uit en sluit de melding.
+   */
+  action?: { label: string; onClick: () => void };
 };
 
-type Toast = { id: number; message: string; variant: ToastVariant };
+type Toast = {
+  id: number;
+  message: string;
+  variant: ToastVariant;
+  action?: { label: string; onClick: () => void };
+};
 
 type ShowToast = (input: ToastInput) => void;
 
 const DEFAULT_DURATION = 4000;
+const ACTION_DURATION = 8000;
 
 const ToastContext = createContext<ShowToast | null>(null);
 
@@ -46,9 +61,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const showToast = useCallback<ShowToast>(
-    ({ message, variant = 'info', duration = DEFAULT_DURATION }) => {
+    ({ message, variant = 'info', action, duration = action ? ACTION_DURATION : DEFAULT_DURATION }) => {
       const id = ++nextId.current;
-      setToasts((cur) => [...cur, { id, message, variant }]);
+      setToasts((cur) => [...cur, { id, message, variant, action }]);
       if (duration > 0) {
         setTimeout(() => dismiss(id), duration);
       }
@@ -63,6 +78,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((toast) => (
           <div key={toast.id} className={`vtk-toast vtk-toast-${toast.variant}`} role="status">
             <span className="vtk-toast-message">{toast.message}</span>
+            {toast.action ? (
+              <button
+                type="button"
+                className="vtk-toast-action"
+                onClick={() => {
+                  dismiss(toast.id);
+                  toast.action?.onClick();
+                }}
+              >
+                {toast.action.label}
+              </button>
+            ) : null}
             <button
               type="button"
               className="vtk-toast-close"

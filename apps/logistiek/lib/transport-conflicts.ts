@@ -30,22 +30,43 @@ export function conflictPartners(bookings: readonly ConflictCandidate[]): Map<st
     else partners.set(id, [other]);
   };
 
-  // Enkel goedgekeurde ritten: een aanvraag die nog beslist moet worden, houdt
-  // het voertuig niet bezet (zie "Conflicten: aanvragen mag, goedkeuren niet").
+  // Vooraf op goedgekeurd filteren scheelt paren; de regel zelf staat in `clash`.
   const approved = bookings.filter((booking) => booking.status === 'APPROVED');
   for (let i = 0; i < approved.length; i++) {
     for (let j = i + 1; j < approved.length; j++) {
       const a = approved[i];
       const b = approved[j];
-      if (a.vehicleId !== b.vehicleId) continue;
-      // Open einden: een rit die om 12:00 eindigt, laat de kar om 12:00 vrij.
-      // Dezelfde regel als `momentsOverlap` in lib/uitleen.ts, waar de
-      // validatie mee rekent.
-      if (a.startAt < b.endAt && b.startAt < a.endAt) {
+      if (clash(a, b)) {
         add(a.id, b.id);
         add(b.id, a.id);
       }
     }
   }
   return partners;
+}
+
+/**
+ * Met welke ritten deze rit zou botsen als ze op dit moment stond.
+ *
+ * Voor de schaduw tijdens het slepen: die wordt rood zodra hetzelfde voertuig
+ * daar al rijdt, en niet pas na het loslaten. Dezelfde regel als
+ * `conflictPartners`, zodat de schaduw nooit iets anders zegt dan het blok
+ * erna.
+ */
+export function clashingWith(
+  trip: ConflictCandidate,
+  others: readonly ConflictCandidate[]
+): ConflictCandidate[] {
+  return others.filter((other) => other.id !== trip.id && clash(trip, other));
+}
+
+function clash(a: ConflictCandidate, b: ConflictCandidate): boolean {
+  // Enkel goedgekeurde ritten: een aanvraag die nog beslist moet worden, houdt
+  // het voertuig niet bezet (zie "Conflicten: aanvragen mag, goedkeuren niet").
+  if (a.status !== 'APPROVED' || b.status !== 'APPROVED') return false;
+  if (a.vehicleId !== b.vehicleId) return false;
+  // Open einden: een rit die om 12:00 eindigt, laat de kar om 12:00 vrij.
+  // Dezelfde regel als `momentsOverlap` in lib/uitleen.ts, waar de validatie
+  // mee rekent.
+  return a.startAt < b.endAt && b.startAt < a.endAt;
 }

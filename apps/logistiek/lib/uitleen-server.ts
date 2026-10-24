@@ -1538,15 +1538,27 @@ export async function availabilityNotesInRange(from: Date, to: Date) {
   });
 }
 
-/** De vensters van één chauffeur, vanaf vandaag: wat hij zelf beheert. */
-export async function availabilityForDriver(userId: string, now = new Date()) {
+/** De vensters van één chauffeur, vanaf `since`: wat hij zelf beheert. */
+export async function availabilityForDriver(userId: string, since = new Date()) {
   // Vensters die al voorbij zijn, blijven in de databank staan (ze zeggen
   // achteraf wie er die dag kon), maar horen niet in de lijst waar je dingen
-  // weghaalt: die gaat over wat je nog belooft.
+  // weghaalt: die gaat over wat je nog belooft. Het scherm geeft hier het begin
+  // van de getoonde week mee wanneer dat vroeger ligt dan nu: anders verdween
+  // een venster van maandagochtend maandagmiddag uit de week waarin het stond.
   return prisma.uitleenDriverAvailability.findMany({
-    where: { userId, endAt: { gte: now } },
+    where: { userId, endAt: { gte: since } },
     select: { id: true, startAt: true, endAt: true, kind: true, note: true },
     orderBy: { startAt: 'asc' },
+  });
+}
+
+/**
+ * Hoeveel vensters er tussen twee momenten liggen; voor de knop "Neem vorige
+ * week over", die enkel verschijnt wanneer er iets over te nemen valt.
+ */
+export async function availabilityCountInRange(userId: string, from: Date, to: Date) {
+  return prisma.uitleenDriverAvailability.count({
+    where: { userId, startAt: { lt: to }, endAt: { gt: from } },
   });
 }
 
