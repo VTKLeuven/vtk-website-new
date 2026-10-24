@@ -59,13 +59,13 @@ export type TrackedIssue = {
 export function trackMagazineView(issue: TrackedIssue): void {
   const tr = tracker();
   if (!tr) return;
-  // 1. Virtuele paginaweergave voor de admin-statistieken op de site
+  // 1. Virtuele paginaweergave, zodat het nummer in het overzicht "Pages" van Umami staat
   tr.track((props) => ({
     ...props,
     url: magazineViewUrl(issue),
     title: magazineViewTitle(issue),
   }));
-  // 2. Expliciet Umami Event met specifiek publicatietype (bakske-bekeken / irreel-bekeken)
+  // 2. Het event dat /admin/media/magazines telt; het nieuws stuurt hetzelfde (zie NewsBand)
   tr.track(magazineEventName(issue.kind, "bekeken"), {
     ...magazineEventData(issue),
     titel: magazineViewTitle(issue),

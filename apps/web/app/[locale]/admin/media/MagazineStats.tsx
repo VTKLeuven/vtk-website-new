@@ -1,7 +1,6 @@
 import Link from "@/components/ui/Link";
 import { Card } from "@vtk/ui";
 import type { Locale } from "@vtk/i18n";
-import { magazineViewUrl } from "@/lib/analytics";
 import type { MediaPublication, MediaVideo } from "@/lib/media-content";
 import { magazineStats, type UmamiPeriod } from "@/lib/umami-stats";
 
@@ -236,8 +235,7 @@ function groupRows(
     group.rows.push({
       id: publication.id,
       label: nl ? publication.issueNl : publication.issueEn || publication.issueNl,
-      // Berekend op basis van de virtuele URL én het specifieke event (bakske-bekeken / irreel-bekeken).
-      views: Math.max(views[magazineViewUrl(publication)] ?? 0, views[publication.id] ?? 0),
+      views: views[publication.id] ?? 0,
       downloads: downloads[publication.id] ?? 0,
     });
     groups.set(publication.kind, group);

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { AFTERMOVIE_EVENT } from "@/lib/analytics";
+import { AFTERMOVIE_EVENT, magazineEventName } from "@/lib/analytics";
 
 /**
  * De leeskant van de statistieken: hoe vaak een nummer van 't Bakske of Ir.Reëel
@@ -29,7 +29,7 @@ export type UmamiStatsError = "not_configured" | "unreachable" | "umami_error";
 
 export type UmamiMagazineStats = {
   ok: true;
-  /** Weergaven per adres, bv. `/media/bakske/2025-2026-s2w6`. */
+  /** Weergaven per nummer-id, uit de lezer op /media en uit het nieuws samen. */
   views: Record<string, number>;
   /** Downloads per nummer-id; leeg wanneer Umami die uitsplitsing niet gaf. */
   downloads: Record<string, number>;
@@ -121,52 +121,62 @@ async function fetchJson(url: string, token?: string): Promise<unknown | null> {
 }
 
 /**
- * Een lijst `[{x, y}]` uit Umami naar een gewone tabel. Alles wat niet die vorm
- * heeft, wordt genegeerd in plaats van de hele pagina te laten struikelen: dit
- * is een externe API die we niet in de hand hebben.
+ * Lijsten `[{value, total}]` uit Umami naar één tabel, opgeteld per waarde. Alles
+ * wat niet die vorm heeft, wordt genegeerd in plaats van de hele pagina te laten
+ * struikelen: dit is een externe API die we niet in de hand hebben.
  */
-function toCounts(value: unknown, keyField: string, countField: string): Record<string, number> {
-  if (!Array.isArray(value)) return {};
+function valueCounts(...lists: unknown[]): Record<string, number> {
   const counts: Record<string, number> = {};
-  for (const row of value) {
-    if (!row || typeof row !== "object") continue;
-    const key = (row as Record<string, unknown>)[keyField];
-    const count = (row as Record<string, unknown>)[countField];
-    if (typeof key !== "string" || typeof count !== "number") continue;
-    counts[key] = (counts[key] ?? 0) + count;
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue;
+    for (const row of list) {
+      if (!row || typeof row !== "object") continue;
+      const { value, total } = row as Record<string, unknown>;
+      if (typeof value !== "string" || typeof total !== "number") continue;
+      counts[value] = (counts[value] ?? 0) + total;
+    }
   }
   return counts;
 }
 
-type CachedStats = { period: UmamiPeriod; result: UmamiStatsResult; expiresAt: number };
-let statsCache: CachedStats | null = null;
-let inflight: Promise<UmamiStatsResult> | null = null;
+type CachedStats = { result: UmamiStatsResult; expiresAt: number };
+// Per periode: wie tussen "30 dagen" en "Alles" wisselt, krijgt anders de
+// cijfers van de andere periode zolang die nog onderweg zijn.
+const statsCache = new Map<UmamiPeriod, CachedStats>();
+const inflight = new Map<UmamiPeriod, Promise<UmamiStatsResult>>();
 
 /**
- * De cijfers voor de magazines. Weergaven komen uit de paginaweergaven (elk
- * geopend nummer krijgt een eigen adres, zie `magazineViewUrl`), downloads uit
- * de gebeurtenis `magazine-download`.
+ * De cijfers voor de magazines, alle drie uit gebeurtenissen met het nummer als
+ * gegeven: `bakske-bekeken`, `bakske-download` en hun Ir.Reëel-tegenhangers.
  *
- * Die tweede is best effort: lukt ze niet, dan tonen we de weergaven zonder
- * downloads in plaats van helemaal niets.
+ * Weergaven komen bewust niet uit de paginaweergaven op `magazineViewUrl`. Die
+ * stuurt enkel de lezer op /media; een nummer dat vanuit het nieuws opent, gaat
+ * rechtstreeks naar de pdf en stuurt alleen de gebeurtenis. Bovendien gaf de
+ * paginalijst enkel de 500 drukst bezochte adressen terug, en daar viel een
+ * nummer met een handvol weergaven al na een maand buiten.
+ *
+ * Downloads en aftermovies zijn best effort: lukken ze niet, dan tonen we de
+ * weergaven zonder in plaats van helemaal niets.
  */
 export async function magazineStats(
   period: UmamiPeriod,
   now: Date = new Date(),
 ): Promise<UmamiStatsResult> {
-  const cached = statsCache;
-  if (cached && cached.period === period && cached.expiresAt > Date.now()) return cached.result;
-  if (inflight) return inflight;
+  const cached = statsCache.get(period);
+  if (cached && cached.expiresAt > Date.now()) return cached.result;
+  const pending = inflight.get(period);
+  if (pending) return pending;
 
-  inflight = loadStats(period, now)
+  const request = loadStats(period, now)
     .then((result) => {
-      statsCache = { period, result, expiresAt: Date.now() + STATS_TTL_MS };
+      statsCache.set(period, { result, expiresAt: Date.now() + STATS_TTL_MS });
       return result;
     })
     .finally(() => {
-      inflight = null;
+      inflight.delete(period);
     });
-  return inflight;
+  inflight.set(period, request);
+  return request;
 }
 
 async function loadStats(period: UmamiPeriod, now: Date): Promise<UmamiStatsResult> {
@@ -180,48 +190,38 @@ async function loadStats(period: UmamiPeriod, now: Date): Promise<UmamiStatsResu
   const range = `startAt=${since.getTime()}&endAt=${now.getTime()}`;
   const base = `${config.url}/api/websites/${encodeURIComponent(share.websiteId)}`;
 
-  // `type=path` en niet `type=url`: Umami 3.x hernoemde die metriek, en de oude
-  // naam geeft een 400 terug in plaats van een lege lijst.
-  const [urls, bakskeDownloads, irreelDownloads, legacyDownloads, bakskeViews, irreelViews, aftermoviePlays] = await Promise.all([
-    fetchJson(`${base}/metrics?${range}&type=path&limit=500`, share.token),
-    fetchJson(`${base}/event-data/values?${range}&eventName=bakske-download&propertyName=nummer`, share.token),
-    fetchJson(`${base}/event-data/values?${range}&eventName=irreel-download&propertyName=nummer`, share.token),
-    fetchJson(`${base}/event-data/values?${range}&eventName=magazine-download&propertyName=nummer`, share.token),
-    fetchJson(`${base}/event-data/values?${range}&eventName=bakske-bekeken&propertyName=nummer`, share.token),
-    fetchJson(`${base}/event-data/values?${range}&eventName=irreel-bekeken&propertyName=nummer`, share.token),
-    fetchJson(`${base}/event-data/values?${range}&eventName=${AFTERMOVIE_EVENT}&propertyName=video`, share.token),
-  ]);
+  // `event=` en niet `eventName=`: Umami 3.x hernoemde die parameter, en de oude
+  // naam wordt stil genegeerd. Dan komt er geen fout terug maar een lege lijst,
+  // waardoor elk nummer op nul stond zonder dat iets klaagde.
+  const values = (event: string, property: string) =>
+    fetchJson(
+      `${base}/event-data/values?${range}&event=${encodeURIComponent(event)}&propertyName=${property}`,
+      share.token,
+    );
 
-  if (urls === null && bakskeViews === null && irreelViews === null) return { ok: false, error: "umami_error" };
+  const [bakskeViews, irreelViews, bakskeDownloads, irreelDownloads, aftermoviePlays] =
+    await Promise.all([
+      values(magazineEventName("bakske", "bekeken"), "nummer"),
+      values(magazineEventName("ir-reeel", "bekeken"), "nummer"),
+      values(magazineEventName("bakske", "download"), "nummer"),
+      values(magazineEventName("ir-reeel", "download"), "nummer"),
+      values(AFTERMOVIE_EVENT, "video"),
+    ]);
 
-  const views: Record<string, number> = {
-    ...toCounts(urls, "x", "y"),
-  };
-
-  const bakskeViewCounts = toCounts(bakskeViews, "value", "total");
-  const irreelViewCounts = toCounts(irreelViews, "value", "total");
-  for (const [id, count] of Object.entries({ ...bakskeViewCounts, ...irreelViewCounts })) {
-    views[id] = (views[id] ?? 0) + count;
-  }
-
-  const downloads: Record<string, number> = {
-    ...toCounts(legacyDownloads, "value", "total"),
-    ...toCounts(bakskeDownloads, "value", "total"),
-    ...toCounts(irreelDownloads, "value", "total"),
-  };
+  if (bakskeViews === null && irreelViews === null) return { ok: false, error: "umami_error" };
 
   return {
     ok: true,
-    views,
-    downloads,
-    aftermovies: toCounts(aftermoviePlays, "value", "total"),
+    views: valueCounts(bakskeViews, irreelViews),
+    downloads: valueCounts(bakskeDownloads, irreelDownloads),
+    aftermovies: valueCounts(aftermoviePlays),
     since,
   };
 }
 
 /** Enkel voor tests: de gecachete waarden vergeten. */
 export function resetUmamiStatsCache(): void {
-  statsCache = null;
+  statsCache.clear();
+  inflight.clear();
   tokenCache = null;
-  inflight = null;
 }

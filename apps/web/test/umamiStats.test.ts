@@ -54,7 +54,7 @@ describe('de cijfers ophalen', () => {
     expect(result).toEqual({ ok: false, error: 'not_configured' });
   });
 
-  it('wisselt het share-id om voor een token en telt per adres', async () => {
+  it('wisselt het share-id om voor een token en telt per nummer', async () => {
     const calls = stubFetch({
       // Zo antwoordt Umami 3.2 echt: `websiteId`, niet `id`.
       '/api/share/': {
@@ -63,33 +63,62 @@ describe('de cijfers ophalen', () => {
         token: 'geheim',
         parameters: {},
       },
-      '/metrics': [
-        { x: '/media/bakske/2025-2026-s2w6', y: 412 },
-        { x: '/media/ir-reeel/2025-september', y: 88 },
-      ],
-      '/event-data/values': [{ value: 'bakske-2025-2026-s2w6', total: 17 }],
+      'event=bakske-bekeken': [{ value: 'bakske-2025-2026-s2w6', total: 412 }],
+      'event=irreel-bekeken': [{ value: 'ir-reeel-2025-september', total: 88 }],
+      'event=bakske-download': [{ value: 'bakske-2025-2026-s2w6', total: 17 }],
+      'event=aftermovie': [{ value: 'video-1', total: 5 }],
     });
 
     const result = await magazineStats('30d', now);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.views['/media/bakske/2025-2026-s2w6']).toBe(412);
-    expect(result.downloads['bakske-2025-2026-s2w6']).toBe(17);
+    expect(result.views).toEqual({
+      'bakske-2025-2026-s2w6': 412,
+      'ir-reeel-2025-september': 88,
+    });
+    expect(result.downloads).toEqual({ 'bakske-2025-2026-s2w6': 17 });
+    expect(result.aftermovies).toEqual({ 'video-1': 5 });
     // Het website-id komt uit het share-antwoord, niet uit de omgeving.
-    expect(calls.some((url) => url.includes('/api/websites/website-1/metrics'))).toBe(true);
-    // `type=path`: `type=url` is de oude naam en geeft bij Umami 3.x een 400.
-    expect(calls.some((url) => url.includes('type=path'))).toBe(true);
+    expect(calls.some((url) => url.includes('/api/websites/website-1/event-data/values'))).toBe(
+      true,
+    );
+  });
+
+  it('vraagt het event met `event=`, niet met `eventName=`', async () => {
+    // Umami 3.x negeert `eventName` stil en geeft dan een lege lijst terug:
+    // geen fout, enkel nul weergaven en nul downloads voor elk nummer.
+    const calls = stubFetch({
+      '/api/share/': { websiteId: 'website-1', token: 'geheim' },
+      '/event-data/values': [],
+    });
+    await magazineStats('30d', now);
+    const valueCalls = calls.filter((url) => url.includes('/event-data/values'));
+    expect(valueCalls.length).toBeGreaterThan(0);
+    for (const url of valueCalls) {
+      expect(url).toMatch(/[?&]event=/);
+      expect(url).not.toContain('eventName=');
+    }
+  });
+
+  it('telt de paginaweergaven niet mee', async () => {
+    // De lezer stuurt een paginaweergave én een event; het nieuws enkel het
+    // event. Beide tellen zou de lezer dubbel rekenen.
+    const calls = stubFetch({
+      '/api/share/': { websiteId: 'website-1', token: 'geheim' },
+      '/event-data/values': [],
+    });
+    await magazineStats('30d', now);
+    expect(calls.some((url) => url.includes('/metrics'))).toBe(false);
   });
 
   it('blijft werken met het oudere `id`-veld in het share-antwoord', async () => {
     const calls = stubFetch({
       '/api/share/': { id: 'oud-1', token: 'geheim' },
-      '/metrics': [],
       '/event-data/values': [],
     });
     const result = await magazineStats('30d', now);
     expect(result.ok).toBe(true);
-    expect(calls.some((url) => url.includes('/api/websites/oud-1/metrics'))).toBe(true);
+    expect(calls.some((url) => url.includes('/api/websites/oud-1/event-data/values'))).toBe(true);
   });
 
   it('stuurt naast het token ook de share-context mee', async () => {
@@ -123,40 +152,74 @@ describe('de cijfers ophalen', () => {
     // Best effort: liever de helft van de cijfers dan een lege pagina.
     stubFetch({
       '/api/share/': { id: 'website-1', token: 'geheim' },
-      '/metrics': [{ x: '/media/bakske/2025-2026-s2w6', y: 5 }],
+      'event=bakske-bekeken': [{ value: 'bakske-2025-2026-s2w6', total: 5 }],
     });
 
     const result = await magazineStats('30d', now);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.views['/media/bakske/2025-2026-s2w6']).toBe(5);
+    expect(result.views['bakske-2025-2026-s2w6']).toBe(5);
     expect(result.downloads).toEqual({});
+  });
+
+  it('meldt een fout wanneer geen enkele weergave terugkomt', async () => {
+    stubFetch({ '/api/share/': { id: 'website-1', token: 'geheim' } });
+    expect(await magazineStats('30d', now)).toEqual({ ok: false, error: 'umami_error' });
   });
 
   it('negeert rijen met een onverwachte vorm in plaats van om te vallen', async () => {
     stubFetch({
       '/api/share/': { id: 'website-1', token: 'geheim' },
-      '/metrics': [{ x: '/media/bakske/a', y: 3 }, { x: 12, y: 4 }, null, { x: '/b' }],
+      'event=bakske-bekeken': [
+        { value: 'bakske-a', total: 3 },
+        { value: 12, total: 4 },
+        null,
+        { value: 'bakske-b' },
+      ],
       '/event-data/values': { onverwacht: true },
     });
 
     const result = await magazineStats('30d', now);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.views).toEqual({ '/media/bakske/a': 3 });
+    expect(result.views).toEqual({ 'bakske-a': 3 });
     expect(result.downloads).toEqual({});
   });
 
   it('haalt niet opnieuw op binnen dezelfde periode', async () => {
     const calls = stubFetch({
       '/api/share/': { id: 'website-1', token: 'geheim' },
-      '/metrics': [{ x: '/media/bakske/a', y: 1 }],
-      '/event-data/values': [],
+      '/event-data/values': [{ value: 'bakske-a', total: 1 }],
     });
 
     await magazineStats('30d', now);
     const na = calls.length;
     await magazineStats('30d', now);
     expect(calls.length).toBe(na);
+  });
+
+  it('geeft een andere periode nooit de cijfers van de vorige', async () => {
+    // Twee aanvragen tegelijk, voor twee periodes: de tweede wachtte vroeger op
+    // de eerste en kreeg haar antwoord, ook na de cache.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('/api/share/')) {
+          return { ok: true, status: 200, json: async () => ({ websiteId: 'w', token: 't' }) };
+        }
+        const start = Number(new URL(url).searchParams.get('startAt'));
+        const total = start === periodStart('alles', now).getTime() ? 50 : 5;
+        return { ok: true, status: 200, json: async () => [{ value: 'bakske-a', total }] };
+      }),
+    );
+
+    const [kort, alles] = await Promise.all([
+      magazineStats('30d', now),
+      magazineStats('alles', now),
+    ]);
+    expect(kort.ok && kort.views['bakske-a']).toBe(10);
+    expect(alles.ok && alles.views['bakske-a']).toBe(100);
+    const opnieuw = await magazineStats('30d', now);
+    expect(opnieuw.ok && opnieuw.views['bakske-a']).toBe(10);
   });
 });
