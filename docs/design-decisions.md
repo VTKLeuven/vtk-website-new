@@ -4282,6 +4282,45 @@ handelingen voor één venster, en de nota bleef in de praktijk leeg.
   plant. Op je eigen scherm staan er helemaal geen ritten en zijn ze het enige
   wat er te zien is; vaag betekende daar "ik zie niet goed wat ik net aangeduid
   heb".
+- **Een venster dat er staat, rek je aan zijn randen.** Zie de sectie hieronder.
+  Het midden van een band blijft doen wat hierboven staat: daar begint een sleep
+  die tekent of wist. Een band verslepen naar een ander uur kan dus niet, en dat
+  is bewust: het midden heeft al een betekenis, en twee gebaren op dezelfde plek
+  laten je raden welk van de twee je krijgt.
+
+### Een rit of venster rek je aan beide randen, zoals in een agenda
+
+Op de planning kon je een rit enkel aan de onderrand langer maken, en daar was
+niets van te zien: de greep bestond, enkel de cursor verried haar. Een venster
+op je eigen beschikbaarheid kon je helemaal niet aanpassen; een uur later
+stoppen betekende het weghalen en opnieuw tekenen. Allebei gebruiken ze
+hetzelfde tijdrooster (`TimeGrid`), en daar zit het gebaar nu één keer.
+
+- **De bovenrand verzet het beginuur, de onderrand het einduur.** Bij het
+  overgaan verschijnt er een streepje tegen elke rand. Een blok lager dan 32
+  pixels (een rit van een kwartier) heeft enkel de onderrand: met twee grepen
+  blijft er te weinig over om het blok zelf vast te pakken.
+- **Een rit over middernacht rek je aan de rand die op die dag ligt.** Het
+  begin van een nachtrit staat op vrijdag, het einde op zaterdag; elk stuk heeft
+  zijn eigen greep, en de andere rand blijft liggen. Verplaatsen kan zo'n rit
+  nog altijd niet vanuit één dag, want dan verspringt het andere stuk zonder
+  dat je het ziet.
+- **Tijdens het rekken is de schaduw het blok.** Het origineel verdwijnt in die
+  kolom; met allebei zichtbaar stonden het oude en het nieuwe uur over elkaar.
+  Bij verplaatsen blijft het origineel wel vaag staan, zodat je ziet waar het
+  vandaan komt.
+- **Na het loslaten blijft het staan** (`useOptimistic`). Het sprong eerst een
+  seconde terug naar de oude plek tot de server antwoordde, en dan zie je je
+  eigen sleep mislukken voor hij lukt. Weigert de server, dan staat het weer
+  waar het stond, met de foutmelding erbij.
+- **Escape breekt een sleep af**, en een sleep die eindigt waar hij begon,
+  bewaart niets.
+- **Een venster rekken volgt de regels van tekenen.** Raakt de nieuwe rand een
+  venster van dezelfde soort, dan smelten ze samen; schuift ze over een andere
+  soort, dan maakt die plaats (`moveAvailabilityAction`, in één transactie met
+  dezelfde code als toevoegen).
+- **Enkel met een muis**, zoals al het slepen in dit rooster: op een
+  touchscreen is verticaal vegen scrollen.
 
 ### Formulieren in een smalle kolom kijken niet naar de schermbreedte
 

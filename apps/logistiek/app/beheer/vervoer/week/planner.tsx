@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useTransition } from 'react';
+import { useCallback, useOptimistic, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -232,6 +232,25 @@ export function TransportPlanner({
     : undefined;
 
   /**
+   * De ritten zoals ze er nú uitzien, met een versleepte rit al op haar nieuwe
+   * plek.
+   *
+   * Zonder dit sprong een rit bij het loslaten terug naar waar ze stond, tot de
+   * server een seconde later de nieuwe week terugstuurde; je zag je eigen sleep
+   * dus mislukken voor hij lukte. `useOptimistic` draait terug zodra de actie
+   * klaar is, en dan staan de echte uren er al: `revalidateBeheer` stuurt de
+   * nieuwe week mee met het antwoord. Weigert de server, dan staat de rit weer
+   * waar ze stond, met de foutmelding erbij.
+   */
+  const [shownBlocks, placeOptimistic] = useOptimistic(
+    blocks,
+    (state, moved: { id: string; startAt: string; endAt: string }) =>
+      state.map((block) =>
+        block.id === moved.id ? { ...block, startAt: moved.startAt, endAt: moved.endAt } : block
+      )
+  );
+
+  /**
    * Een rit verslepen of rekken in de kalender.
    *
    * Dezelfde actie als het formulier in het paneel, met één verschil: **slepen
@@ -248,6 +267,11 @@ export function TransportPlanner({
       // raakt de post enkel aan wanneer ze die expliciet meekrijgt.
       const { requesterChoice: _choice, requesterOther: _other, ...fields } = target.edit;
       startTransition(async () => {
+        placeOptimistic({
+          id: blockId,
+          startAt: startAt.toISOString(),
+          endAt: endAt.toISOString(),
+        });
         const result = await adminEditTransportAction(blockId, {
           ...fields,
           startAt: toDatetimeLocalValue(startAt),
@@ -266,7 +290,7 @@ export function TransportPlanner({
         router.refresh();
       });
     },
-    [router, showToast, trips]
+    [placeOptimistic, router, showToast, trips]
   );
 
   /**
@@ -354,7 +378,7 @@ export function TransportPlanner({
         // browser van iemand hier ook zo leest.
         draft={draft ? { startAt: draft.startAt, endAt: draft.endAt } : null}
         vehicles={vehicles}
-        blocks={blocks}
+        blocks={shownBlocks}
         driverColors={driverColors}
         selectedId={openId}
         onSelect={(id) => {

@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@vtk/db';
 import { currentWorkingYear } from '@vtk/auth';
 import {
@@ -1049,65 +1050,132 @@ export async function addAvailabilityAction(input: {
     return { ok: false, error: 'Enkel karchauffeurs kunnen beschikbaarheid doorgeven.' };
   }
 
-  const startAt = parseBrusselsDateTime(input.startAt);
-  const endAt = parseBrusselsDateTime(input.endAt);
-  if (!startAt || !endAt) return { ok: false, error: 'Kies een begin- en eindmoment.' };
-  if (endAt <= startAt) return { ok: false, error: 'Het einde ligt voor het begin.' };
-  if (!isOnQuarterHour(startAt) || !isOnQuarterHour(endAt)) {
-    return { ok: false, error: 'Kies uren op het kwartier (bv. 14:00, 14:15).' };
-  }
+  const range = parseAvailabilityRange(input);
+  if ('error' in range) return { ok: false, error: range.error };
   const kind: AvailabilityKind = isAvailabilityKind(input.kind) ? input.kind : 'JA';
 
   const note = (input.note ?? '').trim().slice(0, 300) || null;
 
-  await runSerializable(async (tx) => {
-    // Alles wat dit venster raakt. `lte`/`gte` en niet `lt`/`gt`: twee vensters
-    // die op elkaar aansluiten (12:00-14:00 en 14:00-18:00) zijn één blok van 12
-    // tot 18, en als twee banden naast elkaar zien ze eruit als een gaatje dat
-    // er niet is.
-    const touching = await tx.uitleenDriverAvailability.findMany({
-      where: { userId: session.user.id, startAt: { lte: endAt }, endAt: { gte: startAt } },
-      select: { id: true, startAt: true, endAt: true, note: true, kind: true },
-    });
-    // Dezelfde soort gaat erin op; een andere soort maakt plaats. Zonder dat
-    // tweede zou hetzelfde uur tegelijk "beschikbaar" en "enkel in noodgeval"
-    // zeggen, en dan is er geen antwoord meer.
-    const same = touching.filter((row) => row.kind === kind);
-    const others = touching.filter((row) => row.kind !== kind);
-
-    const from = same.reduce((earliest, row) => (row.startAt < earliest ? row.startAt : earliest), startAt);
-    const to = same.reduce((latest, row) => (row.endAt > latest ? row.endAt : latest), endAt);
-    // De nota van het nieuwe venster wint; die van de oude blijft staan wanneer
-    // het nieuwe er geen heeft, zodat "enkel met de auto" niet stil verdwijnt.
-    const keptNote = note ?? same.find((row) => row.note)?.note ?? null;
-
-    if (touching.length > 0) {
-      await tx.uitleenDriverAvailability.deleteMany({
-        where: { id: { in: touching.map((row) => row.id) } },
-      });
-    }
-    await tx.uitleenDriverAvailability.create({
-      data: { userId: session.user.id, startAt: from, endAt: to, kind, note: keptNote },
-    });
-    // Wat er van de andere soorten buiten dit venster lag, komt terug.
-    const remainder = others.flatMap((row) =>
-      subtractRange({ startAt: row.startAt, endAt: row.endAt, kind: row.kind }, from, to)
-    );
-    if (remainder.length > 0) {
-      await tx.uitleenDriverAvailability.createMany({
-        data: remainder.map((range) => ({
-          userId: session.user.id,
-          startAt: range.startAt,
-          endAt: range.endAt,
-          kind: range.kind,
-        })),
-      });
-    }
-  });
+  await runSerializable((tx) =>
+    placeAvailabilityWindow(tx, session.user.id, { ...range, kind, note })
+  );
 
   revalidatePath('/ritten/beschikbaarheid');
   revalidatePath('/beheer/vervoer/week');
   return { ok: true, message: 'Beschikbaarheid opgeslagen.' };
+}
+
+/**
+ * Een venster korter, langer of op een ander uur zetten: de randen die je in het
+ * rooster versleept.
+ *
+ * Geen `remove` gevolgd door een `add` vanuit de browser: dat zijn twee
+ * roundtrips, en faalt de tweede, dan is je venster weg in plaats van verzet.
+ * Hier gebeurt het in één transactie, met dezelfde regels als bij toevoegen:
+ * raakt de nieuwe rand een venster van dezelfde soort, dan smelten ze samen;
+ * schuift ze over een andere soort, dan maakt die plaats. Soort en nota gaan mee.
+ */
+export async function moveAvailabilityAction(
+  id: string,
+  input: { startAt: string; endAt: string }
+): Promise<ActionResult> {
+  const session = await requireSession();
+  if (!(await isVanDriver(session.user.id))) {
+    return { ok: false, error: 'Enkel karchauffeurs kunnen beschikbaarheid doorgeven.' };
+  }
+
+  const range = parseAvailabilityRange(input);
+  if ('error' in range) return { ok: false, error: range.error };
+
+  const moved = await runSerializable(async (tx) => {
+    // Enkel je eigen venster; het team beheert dit niet voor je.
+    const row = await tx.uitleenDriverAvailability.findFirst({
+      where: { id, userId: session.user.id },
+      select: { id: true, kind: true, note: true },
+    });
+    if (!row) return false;
+    await tx.uitleenDriverAvailability.delete({ where: { id: row.id } });
+    await placeAvailabilityWindow(tx, session.user.id, {
+      ...range,
+      kind: row.kind,
+      note: row.note,
+    });
+    return true;
+  });
+  if (!moved) return { ok: false, error: 'Dit venster bestaat niet (meer).' };
+
+  revalidatePath('/ritten/beschikbaarheid');
+  revalidatePath('/beheer/vervoer/week');
+  return { ok: true, message: 'Venster aangepast.' };
+}
+
+/** Begin en einde van een venster, als het geldige kwartieren zijn. */
+function parseAvailabilityRange(input: {
+  startAt: string;
+  endAt: string;
+}): { startAt: Date; endAt: Date } | { error: string } {
+  const startAt = parseBrusselsDateTime(input.startAt);
+  const endAt = parseBrusselsDateTime(input.endAt);
+  if (!startAt || !endAt) return { error: 'Kies een begin- en eindmoment.' };
+  if (endAt <= startAt) return { error: 'Het einde ligt voor het begin.' };
+  if (!isOnQuarterHour(startAt) || !isOnQuarterHour(endAt)) {
+    return { error: 'Kies uren op het kwartier (bv. 14:00, 14:15).' };
+  }
+  return { startAt, endAt };
+}
+
+/**
+ * Eén venster neerleggen tussen wat er al staat. Gedeeld door toevoegen en
+ * verzetten, zodat een versleepte rand precies doet wat een nieuwe sleep doet.
+ */
+async function placeAvailabilityWindow(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  window: { startAt: Date; endAt: Date; kind: AvailabilityKind; note: string | null }
+): Promise<void> {
+  const { startAt, endAt, kind, note } = window;
+  // Alles wat dit venster raakt. `lte`/`gte` en niet `lt`/`gt`: twee vensters
+  // die op elkaar aansluiten (12:00-14:00 en 14:00-18:00) zijn één blok van 12
+  // tot 18, en als twee banden naast elkaar zien ze eruit als een gaatje dat
+  // er niet is.
+  const touching = await tx.uitleenDriverAvailability.findMany({
+    where: { userId, startAt: { lte: endAt }, endAt: { gte: startAt } },
+    select: { id: true, startAt: true, endAt: true, note: true, kind: true },
+  });
+  // Dezelfde soort gaat erin op; een andere soort maakt plaats. Zonder dat
+  // tweede zou hetzelfde uur tegelijk "beschikbaar" en "enkel in noodgeval"
+  // zeggen, en dan is er geen antwoord meer.
+  const same = touching.filter((row) => row.kind === kind);
+  const others = touching.filter((row) => row.kind !== kind);
+
+  const from = same.reduce((earliest, row) => (row.startAt < earliest ? row.startAt : earliest), startAt);
+  const to = same.reduce((latest, row) => (row.endAt > latest ? row.endAt : latest), endAt);
+  // De nota van het nieuwe venster wint; die van de oude blijft staan wanneer
+  // het nieuwe er geen heeft, zodat "enkel met de auto" niet stil verdwijnt.
+  const keptNote = note ?? same.find((row) => row.note)?.note ?? null;
+
+  if (touching.length > 0) {
+    await tx.uitleenDriverAvailability.deleteMany({
+      where: { id: { in: touching.map((row) => row.id) } },
+    });
+  }
+  await tx.uitleenDriverAvailability.create({
+    data: { userId, startAt: from, endAt: to, kind, note: keptNote },
+  });
+  // Wat er van de andere soorten buiten dit venster lag, komt terug.
+  const remainder = others.flatMap((row) =>
+    subtractRange({ startAt: row.startAt, endAt: row.endAt, kind: row.kind }, from, to)
+  );
+  if (remainder.length > 0) {
+    await tx.uitleenDriverAvailability.createMany({
+      data: remainder.map((range) => ({
+        userId,
+        startAt: range.startAt,
+        endAt: range.endAt,
+        kind: range.kind,
+      })),
+    });
+  }
 }
 
 /**

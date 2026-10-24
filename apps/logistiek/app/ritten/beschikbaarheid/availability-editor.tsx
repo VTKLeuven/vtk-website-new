@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useOptimistic, useState, useTransition } from 'react';
 import { Button } from '@vtk/ui';
-import { addAvailabilityAction, removeAvailabilityAction } from '@/app/actions/uitleen';
+import {
+  addAvailabilityAction,
+  moveAvailabilityAction,
+  removeAvailabilityAction,
+} from '@/app/actions/uitleen';
 import { QuarterDateTime } from '@/components/quarter-datetime';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { LogisticsIcon } from '@/components/logistics-icon';
@@ -21,6 +25,11 @@ import { AvailabilityPaint } from './availability-paint';
  * Sleep een venster in de week en het staat er meteen; sleep er nog eens over en
  * het gaat weer weg. Dat is het gebaar van een Let's Meet, en het is wat mensen
  * hier verwachten.
+ *
+ * Een venster dat er staat, maak je korter of langer aan zijn boven- of
+ * onderrand, zoals een afspraak in een agenda. Voordien kon dat enkel door het
+ * weg te halen en opnieuw te tekenen, en een uur later stoppen dan gepland is
+ * precies de wijziging die het vaakst voorkomt.
  *
  * Het was eerst slepen om twee velden in te vullen en dan op "Toevoegen"
  * klikken. Dat leek zorgvuldig (je kon er nog een nota bij zetten) maar het
@@ -48,6 +57,7 @@ type Optimistic =
   // `what` en niet `kind`: dat woord is hier al bezet door de soort
   // beschikbaarheid, en twee betekenissen in één object is één te veel.
   | { what: 'add'; startAt: string; endAt: string; kind: AvailabilityKind }
+  | { what: 'move'; id: string; startAt: string; endAt: string }
   | { what: 'remove'; id: string };
 
 export function AvailabilityEditor({
@@ -109,20 +119,26 @@ export function AvailabilityEditor({
    * precies dan terug. Met eigen state moet je die twee zelf uit elkaar houden,
    * en dan blijft er bij een fout een venster staan dat niet bestaat.
    */
-  const [shown, applyOptimistic] = useOptimistic(windows, (state, action: Optimistic) =>
-    action.what === 'remove'
-      ? state.filter((window) => window.id !== action.id)
-      : [
-          ...state,
-          {
-            id: OPTIMISTIC_ID,
-            startAt: action.startAt,
-            endAt: action.endAt,
-            kind: action.kind,
-            note: null,
-          },
-        ]
-  );
+  const [shown, applyOptimistic] = useOptimistic(windows, (state, action: Optimistic) => {
+    if (action.what === 'remove') return state.filter((window) => window.id !== action.id);
+    if (action.what === 'move') {
+      return state.map((window) =>
+        window.id === action.id
+          ? { ...window, startAt: action.startAt, endAt: action.endAt }
+          : window
+      );
+    }
+    return [
+      ...state,
+      {
+        id: OPTIMISTIC_ID,
+        startAt: action.startAt,
+        endAt: action.endAt,
+        kind: action.kind,
+        note: null,
+      },
+    ];
+  });
 
   const bands: AvailabilityBand[] = shown.map((window) => ({
     id: window.id,
@@ -159,6 +175,36 @@ export function AvailabilityEditor({
       startTransition(async () => {
         applyOptimistic({ what: 'remove', id });
         const result = await removeAvailabilityAction(id);
+        if (!result.ok) {
+          showToast({ message: result.error, variant: 'error', duration: 0 });
+        }
+      });
+    },
+    [applyOptimistic, showToast]
+  );
+
+  /**
+   * Een rand versleept: het venster krijgt die uren, met dezelfde soort en nota.
+   *
+   * Optimistisch zoals toevoegen, zodat de band blijft staan waar je ze losliet.
+   * Raakt ze daarbij een ander venster, dan voegt de server ze samen en komt de
+   * samengevoegde band terug met het antwoord.
+   */
+  const resize = useCallback(
+    (id: string, startAt: Date, endAt: Date) => {
+      // Een venster dat nog aan het opslaan is, heeft nog geen echt id.
+      if (id === OPTIMISTIC_ID) return;
+      startTransition(async () => {
+        applyOptimistic({
+          what: 'move',
+          id,
+          startAt: startAt.toISOString(),
+          endAt: endAt.toISOString(),
+        });
+        const result = await moveAvailabilityAction(id, {
+          startAt: toDatetimeLocalValue(startAt),
+          endAt: toDatetimeLocalValue(endAt),
+        });
         if (!result.ok) {
           showToast({ message: result.error, variant: 'error', duration: 0 });
         }
@@ -342,6 +388,7 @@ export function AvailabilityEditor({
         emptyLabel="Nog niets ingetekend deze week."
         showDriver={false}
         onCreateRange={onCreateRange}
+        onResizeBand={resize}
         now={undefined}
         above={
           <div className="grid gap-2 px-1 pb-2">
@@ -371,9 +418,9 @@ export function AvailabilityEditor({
             </div>
             <p className="text-xs text-vtk-muted">
               Sleep met de muis over een dag: het venster staat er meteen, in de gekozen soort.
-              Sleep er nog eens over met dezelfde soort om het weg te halen. Een dag loopt hier
-              van 05:00 tot 05:00, dus de nacht van zaterdag op zondag staat onderaan bij
-              zaterdag.
+              Trek aan de boven- of onderrand om het korter of langer te maken, en sleep er nog
+              eens over met dezelfde soort om het weg te halen. Een dag loopt hier van 05:00 tot
+              05:00, dus de nacht van zaterdag op zondag staat onderaan bij zaterdag.
             </p>
           </div>
         }
