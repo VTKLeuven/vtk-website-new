@@ -856,6 +856,7 @@ model User {
   expensesBooked    Expense[] @relation("ExpenseBookedBy")
   cashRegistersRequested CashRegister[] @relation("CashRegisterRequestedBy")
   cashRegistersAccepted  CashRegister[] @relation("CashRegisterAcceptedBy")
+  permanentCashEntries   PermanentCashEntry[] @relation("PermanentCashEntryCreatedBy")
   expenseViews      ExpenseView[]
 
   requestedLesbezoeken           Lesbezoek[]              @relation("LesbezoekRequester")
@@ -932,6 +933,8 @@ model Group {
   mailGroupSources         MailGroupSource[]
   expenses                 Expense[]
   cashRegisters            CashRegister[]
+  /// Het kasboek van de vaste kassa (enkel Cursusdienst, Theokot, Fakbar).
+  permanentCashEntries     PermanentCashEntry[]
   /// De vaste taken van deze post (/admin/wie-doet-wat).
   tasks                    GroupTask[]                @relation("GroupTaskOwner")
   /// Taken van een andere post die het aanspreekpunt voor deze post zijn
@@ -8302,6 +8305,57 @@ model CashRegisterTicketEvent {
 
   @@id([registerId, ticketEventId])
   @@index([ticketEventId])
+}
+
+/// Wat er met een vaste kassa gebeurt: Beheer geeft geld mee, de post geeft
+/// geld af zonder dat de kassa terugkomt, of iemand telt ze.
+enum PermanentCashEntryKind {
+  HANDED_OUT
+  RETURNED
+  COUNT
+}
+
+/// Eén regel in het kasboek van een vaste kassa: de kassa die Cursusdienst,
+/// Theokot en Fakbar het hele semester houden (`PERMANENT_POST_CODES`). De winst
+/// per kwartaal volgt uit deze regels (`lib/kassas/permanent.ts`) en wordt
+/// nergens opgeslagen, zodat een rechtgezette telling meteen doorwerkt.
+model PermanentCashEntry {
+  id      String                 @id @default(cuid())
+  /// `Restrict`: een kasboek zonder post zegt niets meer, en een post
+  /// weggooien mag haar geldhistoriek niet meenemen.
+  groupId String
+  kind    PermanentCashEntryKind
+  /// De kalenderdag van de beweging of telling. Bepaalt het kwartaal; op
+  /// dezelfde dag geldt de volgorde van ingeven (`createdAt`).
+  date    DateTime               @db.Date
+
+  /// Cash in centen. Bij een telling de som van `counts`, gezet door de action.
+  cashCents Int
+  /// Stuks per coupure, zoals `CashRegister.endCounts`. Enkel bij een telling.
+  counts    Json?
+
+  /// Bonnen in de kassa (telling) of mee afgegeven aan Beheer (teruggegeven).
+  shiftVouchers           Int @default(0)
+  elixirVouchers          Int @default(0)
+  /// Wat één bon waard is, vastgeklikt uit de instellingen bij het ingeven,
+  /// zoals bij `CashRegister`.
+  shiftVoucherValueCents  Int
+  elixirVoucherValueCents Int
+
+  /// Enkel bij `RETURNED`: de volledige kassa kwam terug, dus daarna staat ze
+  /// op nul. Telt in de winst als een telling van € 0 na de teruggave.
+  closesRegister Boolean @default(false)
+  note           String?
+
+  createdById String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  group     Group @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  createdBy User? @relation("PermanentCashEntryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([groupId, date])
+  @@index([createdById])
 }
 
 // -----------------------------------------------------------------------------

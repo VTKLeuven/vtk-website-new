@@ -8675,6 +8675,62 @@ hele semester meegaat, en het blad had er een eigen tabblad voor. In het
 overzicht is dat één keuze in de postfilter, naast elke post apart. Het gaat op
 de code van de post (`PERMANENT_POST_CODES`), net als `EXPENSE_POST_SPLITS`.
 
+## Vaste kassa's van Cudi, Theokot en Fakbar (oktober 2026)
+
+Een kassa per activiteit past niet op die drie posten: daar is de kassa een
+lopende kost. Beheer geeft bij de start van het semester een kassa met geld mee,
+de post geeft tussendoor geld af zonder dat de kassa terugkomt, en op het einde
+van het kwartaal vraagt Beheer een telling om de winst van dat kwartaal te
+kennen. Dat staat nu op `/admin/kassas/vast` als een kasboek per post
+(`PermanentCashEntry`, `lib/kassas/permanent.ts`). Uit vier richtingen op een
+ontwerpbord (kasboek per post, kwartaalstaat, drie kaarten naast elkaar, het
+rekenblad) koos Beheer het kasboek per post.
+
+**De winst rekent zoals Beheer ze uitlegde: wat binnenkwam min wat uitging.**
+Binnen kwamen de afgiftes en de slottelling, uit gingen de openingstelling en
+wat meegegeven werd. De openingstelling is de laatste telling van voor het
+kwartaal; bestaat die niet, dan begon de kassa leeg. Is er op het einde van een
+kwartaal niet geteld, dan staat dat kwartaal als "geen telling" en schuift de
+winst door naar het eerste kwartaal waarin wel geteld wordt. Zo telt elke euro
+precies één keer, en de som van de kwartalen is wat de kassa in totaal opbracht.
+Een telling tussendoor verandert de som niet: ze toont enkel per telling de winst
+sinds de vorige.
+
+**Kwartaal = kalenderkwartaal, het jaar loopt van juli tot juni.** Januari tot
+maart enzovoort, de kwartalen van de boekhouding. Het kasboekjaar loopt van juli
+tot juni en niet vanaf 15 juli zoals het werkingsjaar, zodat geen kwartaal half
+in twee jaren valt.
+
+**Bonnen tellen mee aan hun waarde, vastgeklikt bij het ingeven.** Net als bij
+een gewone kassa (en zoals het tabblad CUDITHEOFAK, `=1.2*(I+J)`): een telling
+en een afgifte kunnen shifters- en elixirbonnen bevatten, en die tellen aan de
+waarde uit de instellingen op het moment van ingeven.
+
+**Beheer geeft meegeven en teruggeven in, de post telt.** Beheer geeft of krijgt
+het geld, dus enkel zij weten het bedrag zeker; de post ziet die regels wel in
+haar kasboek. Een post telt haar kassa per coupure, zoals Beheer een gewone kassa
+telt, en ziet het totaal meerekenen terwijl ze typt. Beheer kan ook zelf een
+telling ingeven, bijvoorbeeld wanneer de kassa even bij Beheer ligt.
+
+**Een post ziet haar tellingen, niet haar winst.** Om dezelfde reden als bij de
+gewone kassa's: heeft de post geld afgegeven en Beheer dat nog niet ingegeven,
+dan leest de tussenstand als een verlies. De winst staat enkel bij Beheer.
+
+**Een post past een telling aan tot veertien dagen na de datum ervan**
+(`POST_COUNT_WINDOW_DAYS`), en dateert er een hoogstens zo ver terug. Lang genoeg
+om de telling van 31 maart op 2 april in te geven of een tikfout recht te zetten,
+kort genoeg dat een kwartaal dat Beheer al afrekende niet stil verandert. Beheer
+past alles aan. Een datum in de toekomst kan niet.
+
+**De volledige kassa terug is een afgifte met een vinkje.** Komt de kassa op het
+einde van het jaar helemaal terug, dan geeft Beheer het hele bedrag in als
+teruggegeven en vinkt aan dat de kassa volledig terugkwam. Daarna staat ze op
+nul, en het volgende jaar begint van daar, niet van de laatste telling.
+
+**Op dezelfde dag geldt de volgorde van ingeven.** Een regel heeft een datum en
+geen uur; telt de post 's ochtends en geeft ze 's middags geld af, dan hoort de
+afgifte bij de volgende periode zolang ze na de telling ingegeven werd.
+
 ## Admin-navigatie: domeinen, losse modules en vastgepinde tabs
 
 De zijbalk van `/admin` telde tweeëntwintig rijen voor wie alles mag zien (IT en

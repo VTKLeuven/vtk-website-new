@@ -8,7 +8,7 @@ import { LinkedRow } from "@/components/ui/LinkedRow";
 import { hasLocale } from "@/lib/locale";
 import { currentWorkingYear, formatWorkingYear, workingYearTabs } from "@/lib/workingYear";
 import { formatEuro } from "@/lib/rekeningen/expenses";
-import { cashRegisterAccess } from "@/lib/kassas/server";
+import { cashRegisterAccess, permanentTabLabel } from "@/lib/kassas/server";
 import {
   CASH_REGISTER_STATUSES,
   PERMANENT_POST_CODES,
@@ -159,7 +159,13 @@ export default async function KassaOverzicht({
         </Link>
       </header>
 
-      <KassaNav base={base} nl={nl} active="overzicht" caps={{ request: access.canRequest, manage: true }} />
+      <KassaNav
+        base={base}
+        nl={nl}
+        active="overzicht"
+        caps={{ request: access.canRequest, manage: true }}
+        permanentLabel={permanentTabLabel(access, locale)}
+      />
 
       <nav className="flex flex-wrap items-center gap-2" aria-label={nl ? "Werkingsjaar" : "Working year"}>
         <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">

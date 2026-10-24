@@ -8,8 +8,17 @@ import { deliverWebsiteMail } from "@/lib/email";
 import { describeChanges, logAudit } from "@/lib/audit";
 import { siteBaseUrl } from "@/lib/calendar/feeds";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
-import { parseDateInput, workingYearOf } from "@/lib/rekeningen/expenses";
 import {
+  formatEuro,
+  formatSpentOn,
+  parseDateInput,
+  toDateInputValue,
+  workingYearOf,
+} from "@/lib/rekeningen/expenses";
+import { isPermanentEntryKind, postSlug, type PermanentEntryKind } from "@/lib/kassas/permanent";
+import {
+  brusselsToday,
+  canEditPermanentEntry,
   canEditRequest,
   CASH_REGISTER_CONFIG_KEY,
   cashRegisterMailTo,
@@ -22,12 +31,14 @@ import {
 import {
   activityInterval,
   cleanTerminalNames,
+  countsTotalCents,
   DENOMINATIONS,
   isCashRegisterStatus,
   normaliseCounts,
   parseAmountInput,
   parseCountInput,
   parsePick,
+  PERMANENT_POST_CODES,
   registerInterval,
   startCountsFromPicks,
   statusLabel,
@@ -599,4 +610,149 @@ export async function saveCashRegisterConfigAction(
   });
   revalidateCashRegisters();
   return saveOk();
+}
+
+// -----------------------------------------------------------------------------
+// Vaste kassa's (Cudi, Theokot, Fakbar)
+// -----------------------------------------------------------------------------
+
+const KIND_LABELS: Record<PermanentEntryKind, string> = {
+  HANDED_OUT: "meegegeven",
+  RETURNED: "teruggegeven",
+  COUNT: "telling",
+};
+
+function revalidatePermanent(id?: string) {
+  for (const path of ADMIN_PATHS) {
+    revalidatePath(`${path}/vast`);
+    if (id) revalidatePath(`${path}/vast/${id}`);
+  }
+}
+
+/**
+ * Een regel in het kasboek van een vaste kassa, nieuw of aangepast. Beheer
+ * geeft alles in; een post enkel haar eigen tellingen, gedateerd binnen
+ * `POST_COUNT_WINDOW_DAYS` (`canEditPermanentEntry`). De soort van een regel
+ * verandert niet: een telling die een afgifte had moeten zijn, verwijder je.
+ */
+export async function savePermanentEntryAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const access = await requireCashRegisterAccess();
+  const today = brusselsToday();
+  const id = text(formData, "id", 60);
+
+  const existing = id
+    ? await prisma.permanentCashEntry.findUnique({
+        where: { id },
+        include: { group: { select: { nameNl: true } } },
+      })
+    : null;
+  if (id && !existing) return saveError("NOT_FOUND");
+  if (existing && !canEditPermanentEntry(access, existing, today)) return saveError("FORBIDDEN");
+
+  const kindRaw = existing?.kind ?? text(formData, "kind", 20);
+  if (!isPermanentEntryKind(kindRaw)) return saveError("FORBIDDEN");
+  const kind: PermanentEntryKind = kindRaw;
+  const group = existing
+    ? { id: existing.groupId, nameNl: existing.group.nameNl }
+    : await prisma.group.findFirst({
+        where: { id: text(formData, "groupId", 60), code: { in: [...PERMANENT_POST_CODES] } },
+        select: { id: true, nameNl: true },
+      });
+  if (!group) return saveError("BAD_POST");
+
+  const date = parseDateInput(text(formData, "date", 10));
+  if (!date) return saveError("BAD_DATE");
+  if (date.getTime() > today.getTime()) return saveError("FUTURE_DATE");
+  if (!canEditPermanentEntry(access, { groupId: group.id, kind, date }, today)) {
+    return saveError(access.canManage || kind !== "COUNT" ? "FORBIDDEN" : "OUTSIDE_WINDOW");
+  }
+
+  const shiftVouchers = kind === "HANDED_OUT" ? 0 : parseCountInput(text(formData, "shiftVouchers", 12));
+  const elixirVouchers = kind === "HANDED_OUT" ? 0 : parseCountInput(text(formData, "elixirVouchers", 12));
+  if (shiftVouchers === undefined || elixirVouchers === undefined) return saveError("BAD_COUNT");
+
+  let cashCents: number;
+  let counts: Counts | null = null;
+  if (kind === "COUNT") {
+    const read = readCounts(formData, "c_");
+    if (read === "BAD_COUNT") return saveError("BAD_COUNT");
+    // Alles leeg is geen lege kassa maar een vergeten telling; een lege kassa
+    // tel je met een 0.
+    if (read === null) return saveError("EMPTY_COUNT");
+    counts = read;
+    cashCents = countsTotalCents(read);
+  } else {
+    const amount = parseAmountInput(text(formData, "cash", 20));
+    if (amount === undefined) return saveError("BAD_AMOUNT");
+    cashCents = amount ?? 0;
+  }
+  const closesRegister = kind === "RETURNED" && formData.get("closesRegister") === "on";
+  if (kind !== "COUNT" && cashCents === 0 && !shiftVouchers && !elixirVouchers && !closesRegister) {
+    return saveError("MISSING_AMOUNT");
+  }
+
+  const config = existing ? null : await getCashRegisterConfig();
+  const data = {
+    date,
+    cashCents,
+    counts: counts ?? Prisma.DbNull,
+    shiftVouchers: shiftVouchers ?? 0,
+    elixirVouchers: elixirVouchers ?? 0,
+    closesRegister,
+    note: text(formData, "note", 500) || null,
+  };
+  const saved = existing
+    ? await prisma.permanentCashEntry.update({ where: { id: existing.id }, data })
+    : await prisma.permanentCashEntry.create({
+        data: {
+          ...data,
+          groupId: group.id,
+          kind,
+          // Vastgeklikt zoals bij een gewone kassa: een nieuwe bonwaarde
+          // herrekent geen telling van vorig jaar.
+          shiftVoucherValueCents: config!.shiftVoucherValueCents,
+          elixirVoucherValueCents: config!.elixirVoucherValueCents,
+          createdById: access.session.user.id,
+        },
+      });
+
+  await logAudit({
+    action: existing ? "update" : "create",
+    entity: "permanentCashEntry",
+    entityId: saved.id,
+    target: `${group.nameNl}: ${KIND_LABELS[kind]} ${formatSpentOn(date)}`,
+    summary: existing
+      ? describeChanges(
+          { date: toDateInputValue(existing.date), cashCents: existing.cashCents, note: existing.note },
+          { date: toDateInputValue(date), cashCents, note: data.note },
+          { date: "datum", cashCents: "bedrag", note: "opmerking" },
+        )
+      : `${KIND_LABELS[kind]} ingegeven`,
+  });
+  revalidatePermanent(saved.id);
+  return saveOk();
+}
+
+export async function deletePermanentEntryAction(formData: FormData): Promise<SaveState> {
+  const access = await requireCashRegisterAccess();
+  const id = text(formData, "id", 60);
+  const entry = await prisma.permanentCashEntry.findUnique({
+    where: { id },
+    include: { group: { select: { code: true, nameNl: true } } },
+  });
+  if (!entry) return saveError("NOT_FOUND");
+  if (!canEditPermanentEntry(access, entry, brusselsToday())) return saveError("FORBIDDEN");
+
+  await prisma.permanentCashEntry.delete({ where: { id } });
+  await logAudit({
+    action: "delete",
+    entity: "permanentCashEntry",
+    entityId: id,
+    target: `${entry.group.nameNl}: ${KIND_LABELS[entry.kind]} ${formatSpentOn(entry.date)}`,
+    summary: `${KIND_LABELS[entry.kind]} van ${formatEuro(entry.cashCents)} verwijderd`,
+  });
+  revalidatePermanent();
+
+  const base = formData.get("locale") === "en" ? "/en" : "";
+  redirect(`${base}/admin/kassas/vast?post=${postSlug(entry.group.code)}`);
 }

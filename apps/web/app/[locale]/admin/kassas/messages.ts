@@ -1,5 +1,6 @@
 import type { Locale } from "@vtk/i18n";
 import { saveErrorMessages } from "@/lib/saveMessages";
+import { POST_COUNT_WINDOW_DAYS } from "@/lib/kassas/permanent";
 
 /**
  * Foutcodes uit `app/actions/kassas.ts` naar een melding die zegt wat er
@@ -27,6 +28,10 @@ export function kassaErrorMessages(locale: Locale): Record<string, string> {
       NOT_FOUND: "Die kassa bestaat niet meer; ververs de pagina.",
       LOCKED: "Beheer heeft deze aanvraag al aanvaard. Wil je nog iets wijzigen, mail dan naar Beheer.",
       FORBIDDEN: "Daar heb je geen rechten voor.",
+      EMPTY_COUNT: "Niet opgeslagen: vul in hoeveel stuks er van elke munt en elk briefje in de kassa zitten. Een lege kassa tel je met een 0.",
+      FUTURE_DATE: "Niet opgeslagen: die datum ligt in de toekomst.",
+      OUTSIDE_WINDOW: `Niet opgeslagen: een telling geef je in binnen ${POST_COUNT_WINDOW_DAYS} dagen. Voor een oudere telling mail je Beheer.`,
+      MISSING_AMOUNT: "Niet opgeslagen: vul het bedrag in.",
     };
   }
   return {
@@ -48,5 +53,9 @@ export function kassaErrorMessages(locale: Locale): Record<string, string> {
     NOT_FOUND: "That cash register no longer exists; refresh the page.",
     LOCKED: "Administration already accepted this request. To change anything, email Administration.",
     FORBIDDEN: "You do not have permission for that.",
+    EMPTY_COUNT: "Not saved: fill in how many of each coin and note are in the register. Count an empty register with a 0.",
+    FUTURE_DATE: "Not saved: that date is in the future.",
+    OUTSIDE_WINDOW: `Not saved: enter a count within ${POST_COUNT_WINDOW_DAYS} days. For an older count, email Administration.`,
+    MISSING_AMOUNT: "Not saved: fill in the amount.",
   };
 }

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
-import { cashRegisterAccess, getCashRegisterConfig } from "@/lib/kassas/server";
+import { cashRegisterAccess, getCashRegisterConfig, permanentTabLabel } from "@/lib/kassas/server";
 import { requestCashRegisterAction } from "@/app/actions/kassas";
 import { KassaNav } from "../KassaNav";
 import { RequestForm } from "../RequestForm";
@@ -40,7 +40,13 @@ export default async function KassaAanvragen({ params }: { params: Promise<{ loc
         </p>
       </header>
 
-      <KassaNav base={base} nl={nl} active="aanvragen" caps={{ request: true, manage: access.canManage }} />
+      <KassaNav
+        base={base}
+        nl={nl}
+        active="aanvragen"
+        caps={{ request: true, manage: access.canManage }}
+        permanentLabel={permanentTabLabel(access, locale)}
+      />
 
       <div className="rounded-2xl border border-vtk-blue/12 bg-white p-5">
         <RequestForm

@@ -141,6 +141,7 @@ export const AUDIT_ENTITIES = {
   expense: { nl: "Rekening", en: "Expense", group: "expenses" },
   cashRegister: { nl: "Kassa", en: "Cash register", group: "cashRegisters" },
   cashRegisterSettings: { nl: "Kassa-instelling", en: "Cash register setting", group: "cashRegisters" },
+  permanentCashEntry: { nl: "Vaste kassa", en: "Permanent cash register", group: "cashRegisters" },
   accountingCode: { nl: "Boekhoudcode", en: "Accounting code", group: "accounting" },
   boSettings: { nl: "Instelling Bestuursorgaan", en: "Board meeting setting", group: "bestuursorgaan" },
   boPostAlias: { nl: "Postnaam in BO-bestanden", en: "Post name in board files", group: "bestuursorgaan" },

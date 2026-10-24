@@ -2,15 +2,19 @@ import "server-only";
 
 import { prisma } from "@vtk/db";
 import type { SessionPayload } from "@vtk/auth";
+import { pick } from "@vtk/i18n";
 import { getCurrentSession, requireSession } from "@/lib/session";
 import { preferredEmail } from "@/lib/brevo/contacts";
 import { formatSpentOn } from "@/lib/rekeningen/expenses";
+import { brusselsYMD } from "@/lib/brussels";
+import { withinPostWindow, type PermanentEntryKind } from "@/lib/kassas/permanent";
 import {
   computeResult,
   DEFAULT_CASH_REGISTER_CONFIG,
   intervalsOverlap,
   normaliseCounts,
   parseCashRegisterConfig,
+  PERMANENT_POST_CODES,
   registerInterval,
   resultSharedWithPost,
   timeRangeShort,
@@ -119,6 +123,64 @@ export function cashRegisterMailTo(
   user: Parameters<typeof preferredEmail>[0] & { googleEmail: string | null },
 ): string {
   return user.googleEmail ?? preferredEmail(user);
+}
+
+// -----------------------------------------------------------------------------
+// Vaste kassa's (Cudi, Theokot, Fakbar)
+// -----------------------------------------------------------------------------
+
+export type PermanentPost = { id: string; code: string; nameNl: string; nameEn: string };
+
+/**
+ * De posten met een vaste kassa die je ziet: alle drie voor Beheer, anders die
+ * waarvan je dit werkingsjaar lid bent. In de volgorde van `PERMANENT_POST_CODES`.
+ */
+export async function permanentPostsFor(access: CashRegisterAccess): Promise<PermanentPost[]> {
+  const groups = await prisma.group.findMany({
+    where: {
+      code: { in: [...PERMANENT_POST_CODES] },
+      ...(access.canManage ? {} : { id: { in: access.postIds } }),
+    },
+    select: { id: true, code: true, nameNl: true, nameEn: true },
+  });
+  const order = (code: string) => (PERMANENT_POST_CODES as readonly string[]).indexOf(code);
+  return groups.sort((a, b) => order(a.code) - order(b.code));
+}
+
+/**
+ * Het tabblad naar de vaste kassa's: "Vaste kassa's" voor Beheer, "Kassa
+ * Theokot" voor wie in één van die posten zit, en `null` voor wie er geen heeft.
+ */
+export function permanentTabLabel(access: CashRegisterAccess, locale: "nl" | "en"): string | null {
+  const nl = locale === "nl";
+  const all = nl ? "Vaste kassa's" : "Permanent registers";
+  if (access.canManage) return all;
+  const own = access.session.groups.filter((group) =>
+    (PERMANENT_POST_CODES as readonly string[]).includes(group.code),
+  );
+  if (own.length === 0) return null;
+  if (own.length > 1) return all;
+  return `${nl ? "Kassa" : "Register"} ${pick(own[0].nameNl, own[0].nameEn, locale)}`;
+}
+
+/** Vandaag op de Brusselse kalender, als middernacht UTC zoals een `@db.Date`. */
+export function brusselsToday(now: Date = new Date()): Date {
+  const today = brusselsYMD(now);
+  return new Date(Date.UTC(today.year, today.month - 1, today.day));
+}
+
+/**
+ * Een regel van een vaste kassa aanpassen of verwijderen: Beheer altijd, de post
+ * enkel haar eigen tellingen binnen `POST_COUNT_WINDOW_DAYS`. Meegeven en
+ * teruggeven geeft Beheer in, want zij geven of krijgen het geld.
+ */
+export function canEditPermanentEntry(
+  access: CashRegisterAccess,
+  entry: { groupId: string; kind: PermanentEntryKind; date: Date },
+  today: Date,
+): boolean {
+  if (access.canManage) return true;
+  return entry.kind === "COUNT" && access.postIds.includes(entry.groupId) && withinPostWindow(entry.date, today);
 }
 
 // -----------------------------------------------------------------------------

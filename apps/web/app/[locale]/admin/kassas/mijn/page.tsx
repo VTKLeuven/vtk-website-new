@@ -5,7 +5,7 @@ import type { Locale } from "@vtk/i18n";
 import { LinkedRow } from "@/components/ui/LinkedRow";
 import { hasLocale } from "@/lib/locale";
 import { formatEuro } from "@/lib/rekeningen/expenses";
-import { cashRegisterAccess } from "@/lib/kassas/server";
+import { cashRegisterAccess, permanentTabLabel } from "@/lib/kassas/server";
 import { resultSharedWithPost, STATUS_SLUGS, statusLabel } from "@/lib/kassas/kassa";
 import { KassaNav } from "../KassaNav";
 import { listInclude, toListRows } from "../rows";
@@ -63,7 +63,13 @@ export default async function MijnKassas({ params }: { params: Promise<{ locale:
         </Link>
       </header>
 
-      <KassaNav base={base} nl={nl} active="mijn" caps={{ request: true, manage: access.canManage }} />
+      <KassaNav
+        base={base}
+        nl={nl}
+        active="mijn"
+        caps={{ request: true, manage: access.canManage }}
+        permanentLabel={permanentTabLabel(access, locale)}
+      />
 
       <section className="overflow-hidden rounded-2xl border border-vtk-blue/12 bg-white">
         {rows.length === 0 ? (

@@ -3208,8 +3208,21 @@ a.vtk-shortcut-tile:hover {
     padding: 8px 0;
   }
 
-  .vtk-kassa-table tbody td[data-wide] {
+  .vtk-kassa-table tbody td[data-wide],
+  .vtk-kassa-table tbody th[data-wide] {
     grid-column: 1 / -1;
+  }
+
+  /* De kop van een kwartaal in het kasboek van een vaste kassa: één regel over
+     de volle breedte, geen cel in het raster van twee kolommen. */
+  .vtk-kassa-table tbody tr:has(> th[data-wide]) {
+    display: block;
+  }
+
+  /* In het kasboek staat per rij maar één bedrag: meegegeven, teruggegeven of
+     een telling. Gestapeld zijn de lege kolommen enkel een label zonder waarde. */
+  .vtk-kassa-table tbody td[data-empty] {
+    display: none;
   }
 
   .vtk-admin-main .vtk-kassa-table td {
