@@ -8983,6 +8983,19 @@ overschrijving, C is cash, binnen is ontvangen en terug is teruggegeven. Ze star
 op wat de aanvrager in het formulier koos, want "overschrijving" zonder meer
 betekent daar gekozen maar nog niet betaald.
 
+### De waarborg komt per overschrijving, niet meer cash
+
+Sinds oktober 2026 biedt het aanvraagformulier voor de waarborg enkel nog
+**overschrijving** en **NVT** (posten en werkgroepen) aan; cash bij het ophalen
+van de sleutel is weg (`REQUESTABLE_DEPOSIT_CHOICES` in `lib/theokotVerhuur.ts`).
+Een aanvraag die toch cash meestuurt, bijvoorbeeld uit een tabblad dat nog van
+voor die wijziging openstond, wordt geweigerd met een melding die dat zegt, en
+niet stil omgezet naar NVT.
+
+Aanvragen die vroeger cash kozen, blijven dat: `CASH` staat nog in het enum, en
+de waarborgkolom in het beheer houdt "Cash", "C Binnen" en "C Terug", zodat zo'n
+waarborg tot het einde opgevolgd kan worden.
+
 ### Eén adres voor wie behandelt, mailt en antwoordt
 
 De instellingen hadden even een apart antwoordadres naast "wie de aanvragen
@@ -9050,8 +9063,8 @@ echte mail.
 ### Wat er níét in zit
 
 - **Geen betaling.** De waarborg wordt met de hand opgevolgd, zoals nu. Er zit
-  geen Mollie aan vast, want het bedrag komt cash of per overschrijving binnen en
-  gaat er meestal ook zo weer uit.
+  geen Mollie aan vast, want het bedrag komt per overschrijving binnen en gaat er
+  meestal ook zo weer uit.
 - **Geen automatische weigering bij een dubbele aanvraag.** Het formulier
   belooft dat een tweede aanvraag voor een bezette dag geweigerd wordt, maar de
   uitzondering ("tenzij het een post is") is precies het geval waarin een mens

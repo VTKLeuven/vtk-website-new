@@ -181,7 +181,6 @@ export default async function TheokotVerhuurPage({ params }: { params: Params })
                   sent: t.sent,
                   newRequest: t.newRequest,
                   depositTransfer: t.depositTransfer,
-                  depositCash: t.depositCash,
                   depositNvt: t.depositNvt,
                   languageNl: t.languageNl,
                   languageEn: t.languageEn,

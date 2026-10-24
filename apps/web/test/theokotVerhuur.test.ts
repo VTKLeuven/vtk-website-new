@@ -85,6 +85,16 @@ describe("een aanvraag controleren", () => {
     expect(result.request.attendees).toBe(45);
   });
 
+  it("weigert cash als waarborg, ook wanneer de vraag niet verplicht is", () => {
+    expect(parse({ deposit: "CASH" })).toEqual({ status: "error", code: "DEPOSIT_INVALID" });
+    const optional = parseRentalQuestions({ core: { deposit: { required: false } } });
+    const result = parseRentalRequest(base({ deposit: "CASH" }), optional, {
+      startsAt: new Date("2026-10-03T18:00:00Z"),
+      now: NOW,
+    });
+    expect(result).toEqual({ status: "error", code: "DEPOSIT_INVALID" });
+  });
+
   it("laat een einduur na middernacht gewoon toe", () => {
     // Dit is de regel en niet de uitzondering: een fuif die om 02:00 stopt, is
     // geen tikfout. Enkel exact hetzelfde uur kan niet.

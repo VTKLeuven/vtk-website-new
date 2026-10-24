@@ -51,6 +51,13 @@ export type RenterType = (typeof RENTER_TYPES)[number];
 export const DEPOSIT_CHOICES = ["TRANSFER", "CASH", "NVT"] as const;
 export type DepositChoice = (typeof DEPOSIT_CHOICES)[number];
 
+/**
+ * Wat het formulier nog aanbiedt. Cash staat er niet meer bij; "CASH" blijft
+ * enkel bestaan voor de aanvragen die het vroeger kozen, zodat het beheer die
+ * nog juist toont en opvolgt.
+ */
+export const REQUESTABLE_DEPOSIT_CHOICES = ["TRANSFER", "NVT"] as const satisfies readonly DepositChoice[];
+
 type Label = { nl: string; en: string };
 
 /**
@@ -391,9 +398,9 @@ export const DEFAULT_RENTAL_QUESTIONS: RentalQuestions = {
       labelNl: "Waarborg",
       labelEn: "Deposit",
       helpNl:
-        "Hoe wens je de waarborg te betalen, indien je aanvraag goedgekeurd wordt? Overschrijving: instructies volgen zodra je aanvraag goedgekeurd is. Cash: bij het ophalen van de sleutel. NVT: enkel voor posten en werkgroepen van VTK, die betalen geen waarborg.",
+        "Hoe wens je de waarborg te betalen, indien je aanvraag goedgekeurd wordt? Overschrijving: instructies volgen zodra je aanvraag goedgekeurd is. NVT: enkel voor posten en werkgroepen van VTK, die betalen geen waarborg.",
       helpEn:
-        "How would you like to pay the deposit if your request is approved? Wire transfer: instructions follow once your request has been approved. Cash: when picking up the key. N/A: only for posts and work groups of VTK, they do not pay a deposit.",
+        "How would you like to pay the deposit if your request is approved? Wire transfer: instructions follow once your request has been approved. N/A: only for posts and work groups of VTK, they do not pay a deposit.",
       required: true,
     },
     remarks: {
@@ -542,6 +549,7 @@ export type RentalErrorCode =
   | "REMARKS_REQUIRED"
   | "REMARKS_TOO_LONG"
   | "DEPOSIT_REQUIRED"
+  | "DEPOSIT_INVALID"
   | "EXTRA_REQUIRED"
   | "EXTRA_TOO_LONG"
   | "CLOSED"
@@ -685,9 +693,12 @@ export function parseRentalRequest(
   }
 
   const depositRaw = toSingleLine(raw.deposit).toUpperCase();
-  const depositChoice = (DEPOSIT_CHOICES as readonly string[]).includes(depositRaw)
+  const depositChoice = (REQUESTABLE_DEPOSIT_CHOICES as readonly string[]).includes(depositRaw)
     ? (depositRaw as DepositChoice)
     : null;
+  // Een keuze die het formulier niet meer aanbiedt (cash, uit een tabblad dat
+  // nog van voor die wijziging openstond), wordt geen stille NVT.
+  if (!depositChoice && depositRaw !== "") return { status: "error", code: "DEPOSIT_INVALID" };
   if (!depositChoice) {
     if (core.deposit.required) return { status: "error", code: "DEPOSIT_REQUIRED" };
   }

@@ -31,6 +31,8 @@ export function rentalRequestErrors(nl: boolean): Record<RentalErrorCode, string
         REMARKS_REQUIRED: "Niet verstuurd: vul de opmerkingen in.",
         REMARKS_TOO_LONG: `Niet verstuurd: de opmerkingen mogen hoogstens ${RENTAL_LIMITS.remarks} tekens zijn.`,
         DEPOSIT_REQUIRED: "Niet verstuurd: kies hoe je de waarborg wil betalen.",
+        DEPOSIT_INVALID:
+          "Niet verstuurd: de waarborg kan niet meer cash betaald worden. Kies overschrijving of NVT.",
         EXTRA_REQUIRED: "Niet verstuurd: er is nog een verplichte vraag niet ingevuld.",
         EXTRA_TOO_LONG: "Niet verstuurd: een van je antwoorden is te lang.",
         CLOSED:
@@ -61,6 +63,8 @@ export function rentalRequestErrors(nl: boolean): Record<RentalErrorCode, string
         REMARKS_REQUIRED: "Not sent: fill in the remarks.",
         REMARKS_TOO_LONG: `Not sent: the remarks may be at most ${RENTAL_LIMITS.remarks} characters.`,
         DEPOSIT_REQUIRED: "Not sent: pick how you want to pay the deposit.",
+        DEPOSIT_INVALID:
+          "Not sent: the deposit can no longer be paid in cash. Pick wire transfer or N/A.",
         EXTRA_REQUIRED: "Not sent: one of the required questions is still empty.",
         EXTRA_TOO_LONG: "Not sent: one of your answers is too long.",
         CLOSED: "Not sent: the request form is closed at the moment. Feel free to email us.",

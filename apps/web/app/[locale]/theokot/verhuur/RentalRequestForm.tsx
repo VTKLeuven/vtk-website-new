@@ -39,7 +39,6 @@ export type RentalCopy = {
   sent: string;
   newRequest: string;
   depositTransfer: string;
-  depositCash: string;
   depositNvt: string;
   languageNl: string;
   languageEn: string;
@@ -253,7 +252,6 @@ export function RentalRequestForm({
               {(
                 [
                   ["TRANSFER", copy.depositTransfer],
-                  ["CASH", copy.depositCash],
                   ["NVT", copy.depositNvt],
                 ] as const
               ).map(([value, text]) => (
