@@ -442,9 +442,8 @@ async function main() {
   // Meestal een lege container om er later rechten aan te hangen; enkele posten
   // krijgen meteen hun vaste, postspecifieke recht(en) mee (zie postRolePerms).
   const postRolePerms: Record<string, string[]> = {
-    // Communicatie beheert de publieke mediapagina (magazines, promovideo's, albums)
-    // en bewerkt foto's op de Lightroom-pc.
-    COMMUNICATIE: ["media.manage", "lightroom.use"],
+    // Communicatie beheert de publieke mediapagina (magazines, promovideo's, albums).
+    COMMUNICATIE: ["media.manage"],
     CURSUSDIENST: ["openingHours.manageOwn"],
     // De fakbar-site ('t ElixIr) heeft haar eigen app met eigen beheer; wie in de
     // post zit, beheert die. Eén permissie voor het hele beheer, net als

@@ -1,7 +1,0 @@
-#!/bin/bash
-# libvirt qemu hook (/etc/libvirt/hooks/qemu). VTK: when kenny runs out of memory, the Lightroom
-# VM is the first thing the kernel kills, before anyone's jobs (the seg training queues use 500).
-# Never call virsh from here: libvirt waits for this hook.
-[ "$1" = lightroom ] && [ "$2" = started ] || exit 0
-pid=$(cat /run/libvirt/qemu/lightroom.pid 2>/dev/null) && echo 1000 > "/proc/$pid/oom_score_adj"
-exit 0

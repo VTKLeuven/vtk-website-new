@@ -1,3 +1,0 @@
-# lightroom-api (the VTK site's Lightroom PC page) may run exactly these, nothing else.
-# --by-stdin reads who pressed the button from stdin, for the log.
-lightroom-api ALL=(root) NOPASSWD: /usr/local/bin/lightroom-vm status --json, /usr/local/bin/lightroom-vm start --by-stdin, /usr/local/bin/lightroom-vm stop --by-stdin

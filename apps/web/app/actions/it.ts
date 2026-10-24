@@ -16,7 +16,6 @@ import {
   type StoredSentry,
 } from "@/lib/runtimeConfig";
 import { DOOR_SETTING_KEY, getDoorConfig, type StoredDoor } from "@/lib/door-config";
-import { fetchLightroomStatus, LIGHTROOM_SETTING_KEY, type StoredLightroom } from "@/lib/lightroom";
 import { VAULT_SETTING_KEY, type StoredVault } from "@/lib/vault/config";
 import {
   GOOGLE_SETTING_KEY,
@@ -284,72 +283,6 @@ export async function testDoorConnectionAction(): Promise<{ ok: boolean; error?:
   } finally {
     clearTimeout(timeout);
   }
-}
-
-// -----------------------------------------------------------------------------
-// Lightroom-pc (kenny)
-// -----------------------------------------------------------------------------
-
-/**
- * Bewaart de koppeling met kenny's lightroom-api: het adres op het tailnet, het
- * token (versleuteld; leeg laten houdt het bestaande) en het Parsec-account van
- * de pc, dat /admin/lightroom noemt bij "vraag IT om je als vriend toe te voegen".
- */
-export async function saveLightroomConfigAction(
-  _prev: SaveState,
-  formData: FormData,
-): Promise<SaveState> {
-  await requireSuperAdmin();
-
-  const apiUrl = ((formData.get("apiUrl") as string) ?? "").trim().replace(/\/+$/, "");
-  const token = ((formData.get("token") as string) ?? "").trim();
-  const parsecAccount = ((formData.get("parsecAccount") as string) ?? "").trim();
-
-  if (apiUrl) {
-    try {
-      const u = new URL(apiUrl);
-      if (u.protocol !== "http:" && u.protocol !== "https:") return saveError("INVALID_URL");
-    } catch {
-      return saveError("INVALID_URL");
-    }
-  }
-  if (token && token.length < 24) return saveError("TOKEN_TOO_SHORT");
-  if (parsecAccount.length > 80) return saveError("ACCOUNT_TOO_LONG");
-
-  const existingRow = await prisma.setting.findUnique({ where: { key: LIGHTROOM_SETTING_KEY } });
-  const existing = (existingRow?.value ?? null) as unknown as StoredLightroom | null;
-
-  const value: StoredLightroom = {
-    apiUrl: apiUrl || existing?.apiUrl,
-    tokenEnc: token ? encryptSecret(token) : existing?.tokenEnc,
-    parsecAccount: parsecAccount || undefined,
-  };
-
-  await prisma.setting.upsert({
-    where: { key: LIGHTROOM_SETTING_KEY },
-    create: { key: LIGHTROOM_SETTING_KEY, value: value as unknown as Prisma.InputJsonValue },
-    update: { value: value as unknown as Prisma.InputJsonValue },
-  });
-
-  await logAudit({
-    action: "update",
-    entity: "itConfig",
-    target: "Lightroom-pc",
-    summary: `kenny op ${value.apiUrl ?? "geen adres"}${token ? ", token vervangen" : ""}`,
-  });
-
-  revalidatePath("/admin/it");
-  revalidatePath("/admin/lightroom");
-  return saveOk();
-}
-
-/** Vraagt kenny de status met de opgeslagen config, zodat IT ziet of adres en token kloppen. */
-export async function testLightroomConnectionAction(): Promise<{ ok: boolean; error?: string; summary?: string }> {
-  await requireSuperAdmin();
-  const res = await fetchLightroomStatus();
-  if (!res.ok) return { ok: false, error: res.error };
-  const s = res.status;
-  return { ok: true, summary: `state ${s.state}, ${s.canStart ? "can start" : `blocked: ${s.blockers.join(", ") || "-"}`}` };
 }
 
 // -----------------------------------------------------------------------------

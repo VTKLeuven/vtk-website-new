@@ -24,7 +24,6 @@ const CATEGORY_LABELS: Record<string, { nl: string; en: string }> = {
   piano: { nl: "Piano", en: "Piano" },
   logistiek: { nl: "Logistiek", en: "Logistics" },
   door: { nl: "Deurtoegang", en: "Door access" },
-  lightroom: { nl: "Lightroom-pc", en: "Lightroom PC" },
   vault: { nl: "Wachtwoordkluis", en: "Password vault" },
   expenses: { nl: "Rekeningen", en: "Expenses" },
   cashRegisters: { nl: "Kassa's", en: "Cash registers" },
