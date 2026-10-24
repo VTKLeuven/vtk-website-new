@@ -10,6 +10,7 @@ import {
   isAllowedReceiptName,
   isValidIban,
   normaliseIban,
+  paidStateOnMethodChange,
   parseAmountToCents,
   parseDateInput,
   parsePostOptionValue,
@@ -175,6 +176,31 @@ describe("terugbetaling voor wie geen Beheer is", () => {
     expect(
       reimbursementReference({ payerName: "Tiddo Nees ", activity: " Kantoormateriaal" }),
     ).toBe("Terugbetaling Tiddo Nees - Kantoormateriaal");
+  });
+});
+
+describe("betaalwijze wijzigen", () => {
+  const now = new Date("2026-10-24T10:00:00Z");
+
+  it("zet een rekening terug bij terug te betalen van kaart VTK naar eigen kaart", () => {
+    // Het vinkje van bij het indienen met de kaart was geen terugbetaling; bleef
+    // het staan, dan kreeg het lid zijn voorgeschoten geld nooit terug.
+    expect(paidStateOnMethodChange("VTK_CARD", "PERSONAL", now)).toEqual({
+      paidAt: null,
+      paidById: null,
+    });
+  });
+
+  it("vinkt aan zoals indienen met de kaart, van eigen kaart naar kaart VTK", () => {
+    expect(paidStateOnMethodChange("PERSONAL", "VTK_CARD", now)).toEqual({
+      paidAt: now,
+      paidById: null,
+    });
+  });
+
+  it("laat het vinkje staan zolang de betaalwijze dezelfde blijft", () => {
+    expect(paidStateOnMethodChange("PERSONAL", "PERSONAL", now)).toEqual({});
+    expect(paidStateOnMethodChange("VTK_CARD", "VTK_CARD", now)).toEqual({});
   });
 });
 

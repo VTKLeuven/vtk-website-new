@@ -92,6 +92,26 @@ export function reimbursementLabel(state: ReimbursementState, nl: boolean): stri
 export const REIMBURSEMENT_STATES: ReimbursementState[] = ["OPEN", "PAID", "CARD"];
 
 /**
+ * Wat er met het vinkje "terugbetaald" gebeurt wanneer een rekening bij het
+ * bewerken een andere betaalwijze krijgt. Met de kaart van VTK staat het vanzelf
+ * aan (er valt niets terug te betalen), maar dat vinkje is geen terugbetaling:
+ * kiest iemand achteraf "eigen kaart", dan moet het geld nog naar het lid en
+ * hoort de rekening terug bij "terug te betalen". De andere richting zet het
+ * vinkje zoals indienen met de kaart dat doet.
+ *
+ * Blijft de betaalwijze dezelfde, dan geeft dit niets terug: dan is het vinkje
+ * van wie het zette, en blijft het staan.
+ */
+export function paidStateOnMethodChange(
+  before: "VTK_CARD" | "PERSONAL",
+  after: "VTK_CARD" | "PERSONAL",
+  now: Date,
+): { paidAt?: Date | null; paidById?: null } {
+  if (before === after) return {};
+  return { paidAt: after === "VTK_CARD" ? now : null, paidById: null };
+}
+
+/**
  * De mededeling bij de overschrijving: "Terugbetaling Jan Peeters - Doopcantus".
  * Beheer tikte die vroeger voor elke terugbetaling zelf over in de bankapp.
  */

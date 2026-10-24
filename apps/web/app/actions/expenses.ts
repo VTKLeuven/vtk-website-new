@@ -26,6 +26,7 @@ import {
   formatEuro,
   isValidIban,
   normaliseIban,
+  paidStateOnMethodChange,
   parseAmountToCents,
   parseDateInput,
   parsePostOptionValue,
@@ -274,6 +275,9 @@ export async function updateExpenseAction(
   const data = {
     ...parsed,
     workingYear: workingYearOf(parsed.spentOn),
+    // Van kaart VTK naar eigen kaart: het vinkje van bij het indienen was geen
+    // terugbetaling, dus de rekening moet terug bij "terug te betalen".
+    ...paidStateOnMethodChange(existing.paymentMethod, parsed.paymentMethod, new Date()),
     ...(replaceReceipt
       ? {
           receiptKey: newKey,
@@ -309,6 +313,7 @@ export async function updateExpenseAction(
         spentOn: "datum",
         amountCents: "bedrag",
         paymentMethod: "betaalwijze",
+        paidAt: "terugbetaald",
         iban: "IBAN",
         receiptKey: "bonnetje",
       }) ?? null,
