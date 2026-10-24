@@ -464,43 +464,55 @@ function ExpenseDetailModal({
           )}
         </div>
 
-        {/* Bonnetjeskaart */}
-        <a
-          href={receiptUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center gap-3 rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/50 p-2.5 transition-colors hover:border-vtk-blue/25"
-        >
-          <span className="relative grid h-20 w-16 shrink-0 place-items-center overflow-hidden rounded-lg border border-vtk-blue/12 bg-white">
-            {isImage ? (
-              <Image
-                src={receiptUrl}
-                alt=""
-                fill
-                sizes="64px"
-                unoptimized
-                className="object-cover"
-              />
-            ) : (
-              <span className="flex flex-col items-center gap-1 text-[#5c667f]">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <path d="M14 2v6h6" />
-                </svg>
-                <span className="text-[9px] font-semibold uppercase tracking-wide">PDF</span>
+        {/* Bonnetjeskaart. De download staat naast de link en niet erin: een
+            `<a>` in een `<a>` is geen geldige HTML. */}
+        <div className="flex items-center gap-3 rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/50 p-2.5 pr-3 transition-colors hover:border-vtk-blue/25">
+          <a
+            href={receiptUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="flex min-w-0 flex-1 items-center gap-3"
+          >
+            <span className="relative grid h-20 w-16 shrink-0 place-items-center overflow-hidden rounded-lg border border-vtk-blue/12 bg-white">
+              {isImage ? (
+                <Image
+                  src={receiptUrl}
+                  alt=""
+                  fill
+                  sizes="64px"
+                  unoptimized
+                  className="object-cover"
+                />
+              ) : (
+                <span className="flex flex-col items-center gap-1 text-[#5c667f]">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <path d="M14 2v6h6" />
+                  </svg>
+                  <span className="text-[9px] font-semibold uppercase tracking-wide">PDF</span>
+                </span>
+              )}
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-medium text-vtk-ink">
+                {expense.receiptName}
               </span>
-            )}
-          </span>
-          <span className="min-w-0">
-            <span className="block truncate text-sm font-medium text-vtk-ink">
-              {expense.receiptName}
+              <span className="block text-xs text-[#5c667f]">
+                {formatBytes(expense.receiptSize, locale)} ·{" "}
+                {nl ? "openen in een nieuw tabblad" : "open in a new tab"}
+              </span>
             </span>
-            <span className="block text-xs text-[#5c667f]">
-              {formatBytes(expense.receiptSize, locale)} ·{" "}
-              {nl ? "openen in een nieuw tabblad" : "open in a new tab"}
-            </span>
-          </span>
-        </a>
+          </a>
+          <IconAnchor
+            href={`${receiptUrl}?download=1`}
+            download={expense.receiptName}
+            label={nl ? "Bonnetje downloaden" : "Download receipt"}
+            srLabel={`${nl ? "Bonnetje downloaden" : "Download receipt"}: ${expense.receiptName}`}
+            className="bg-white"
+          >
+            <DownloadIcon />
+          </IconAnchor>
+        </div>
 
         {/* Gegevenslijst */}
         <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">

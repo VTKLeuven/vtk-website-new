@@ -55,6 +55,16 @@ export function ExpenseActionBar({
         <Button type="button" variant="secondary" size="sm" onClick={() => setModal("download")}>
           {nl ? "Blad bekijken" : "View sheet"}
         </Button>
+        {/* Een kale `<a>`: de route zet zelf `Content-Disposition`, en de router
+            zou ze als pagina proberen te laden. Zonder voorbeeld, dus zonder
+            draaien; dat kan via "Blad bekijken". */}
+        <a
+          href={`/api/admin/rekeningen/${expenseId}/blad`}
+          download={mail.attachmentName}
+          className="inline-flex h-8 items-center justify-center rounded-full border border-vtk-blue/15 px-3 text-sm font-medium text-vtk-ink transition-colors hover:border-vtk-blue/30 hover:bg-vtk-blue-soft/70"
+        >
+          {nl ? "Blad downloaden" : "Download sheet"}
+        </a>
         {canSend && (
           <Button type="button" variant="ghost" size="sm" onClick={() => setModal("send")}>
             {nl ? "Naar boekhouding..." : "To the accountant..."}
