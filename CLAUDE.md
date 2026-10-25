@@ -162,6 +162,12 @@ herkenning van bestandsnamen of het uitlezen van de rekenbladen komt.
 - **Het recht is enkel voor Groep 5, ook niet voor de rol admin.** Een recht
   dat admin niet mag krijgen, staat in `ADMIN_EXCLUDED_PERMISSIONS`; de seed én
   `prisma/sync.ts` (die bij elke start draait) volgen die lijst.
+- **Een post ziet enkel haar eigen budgetten**, op "Mijn budgetten" en het
+  dashboard (`lib/bo/own.ts`), op lidmaatschap en zonder recht. Filter op de
+  server: geef zo'n pagina nooit het hele jaar mee zoals de verkenner.
+- **Wat een bestand op een BO was, zegt de naam in die BO-map**
+  (`BoDocument.linkName`, de naam van de snelkoppeling), niet de huidige naam
+  van het blad: een post hernoemt haar budgetblad later tot resultaat.
 - **De Drive-scope heeft een eigen tokenaanvraag** (`DRIVE_SCOPES`), net als
   Gmail. In `GOOGLE_SCOPES` zou een ontbrekende delegatie de groepssync stilleggen.
 - **Twee weergaven, één URL**: de verkenner (`BoExplorer.tsx`) en de lijst

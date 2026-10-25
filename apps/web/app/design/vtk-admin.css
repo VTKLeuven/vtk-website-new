@@ -4879,6 +4879,155 @@ a.vtk-shortcut-tile:hover {
 }
 
 /* ---------------------------------------------------------------------------
+   Bestuursorgaan voor de eigen post: "Mijn budgetten" (`BoOwn.tsx`) en het
+   blok "Nog naar het BO" op het dashboard (`BoDueCard.tsx`). De tabel is die
+   van de lijstweergave; een rij opent hier niets, dus geen handje en geen
+   hover.
+   --------------------------------------------------------------------------- */
+
+.vtk-bo-own {
+  display: grid;
+  gap: 26px;
+}
+
+.vtk-bo-own section {
+  display: grid;
+  gap: 10px;
+}
+
+.vtk-bo-own-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 12px;
+}
+
+.vtk-bo-own-head h2 {
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.vtk-bo-own-head span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.vtk-bo-own-empty {
+  padding: 14px 16px;
+  border: 1px dashed var(--line);
+  border-radius: 18px;
+  font-size: 13px;
+}
+
+.vtk-bo-own .vtk-bo-l-row {
+  cursor: default;
+}
+
+.vtk-bo-own .vtk-bo-l-row:hover {
+  background: var(--surface);
+}
+
+.vtk-bo-own .vtk-bo-l-row:hover td {
+  background: none;
+}
+
+/* Het icoon naar Drive maakt de eerste cel hoger; zonder dit hangt de rest van
+   de rij bovenaan (`.vtk-admin-main tbody td` zet alles op top). */
+.vtk-bo-own .vtk-bo-l-table td {
+  vertical-align: middle;
+}
+
+.vtk-bo-own-act {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.vtk-bo-due {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-bo-due-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+}
+
+.vtk-bo-due-head h2 {
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.vtk-bo-due-head a,
+.vtk-bo-due-more {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.vtk-bo-due > p {
+  max-width: 62ch;
+  font-size: 13px;
+}
+
+.vtk-bo-due-post {
+  display: grid;
+  gap: 4px;
+}
+
+.vtk-bo-due-post h3 {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vtk-bo-due-post ul {
+  display: grid;
+}
+
+.vtk-bo-due-post li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 0;
+  border-top: 1px solid var(--rule-soft);
+  font-size: 14px;
+}
+
+.vtk-bo-due-post li b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.vtk-bo-due-post li b + span {
+  display: block;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-bo-due-more {
+  justify-self: start;
+  font-size: 12.5px;
+}
+
+/* ---------------------------------------------------------------------------
    Commu-aanvragen (/admin/commu-aanvragen)
    Per week een kop met een haarlijn erboven, zoals op /shift, en daaronder de
    aanvragen van die week. Op een telefoon wordt elke rij een blok met de

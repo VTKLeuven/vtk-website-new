@@ -112,6 +112,23 @@ export function statusNote(d: XDossier, f: Fmt): ReactNode {
   }
 }
 
+/** De stand met wat erbij hoort, in één cel van een tabel. */
+export function Stand({ d, f }: { d: XDossier; f: Fmt }) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-vtk-muted">
+      <StatusPill dossier={d} f={f} />
+      <StatusNote dossier={d} f={f} />
+    </span>
+  );
+}
+
+/** Op welke BO's een activiteit passeerde: "BO 3 (30 aug) → BO 9". */
+export function boRange(d: XDossier, f: Fmt): string {
+  const parts = d.budgets.map((b, i) => (i === 0 && b.meetingDate ? `${b.meetingLabel} (${f.day(b.meetingDate)})` : b.meetingLabel)).join(", ");
+  const result = d.results.at(-1);
+  return [parts, result ? `→ ${result.meetingLabel}` : ""].filter(Boolean).join(" ") || "–";
+}
+
 /** De post(en) van een activiteit als links, "Cultuur + Onthaal". */
 export function PostLinks({
   dossier: d,
@@ -374,6 +391,7 @@ export function HideFileButton({
   name,
   activity,
   lastFile,
+  sharedSheet,
   nl,
   errorMessages,
 }: {
@@ -382,9 +400,18 @@ export function HideFileButton({
   /** De activiteit, wanneer dit haar enige bestand is: dan verdwijnt ze mee. */
   activity?: string;
   lastFile?: boolean;
+  /** Het blad is ook het budget (of het resultaat): dat gaat mee, want het is één bestand. */
+  sharedSheet?: boolean;
   nl: boolean;
   errorMessages: Record<string, string>;
 }) {
+  const what = sharedSheet
+    ? nl
+      ? `Het blad "${name}", dat budget en resultaat in één is,`
+      : `The sheet "${name}", which is both budget and result,`
+    : nl
+      ? `Het bestand "${name}"`
+      : `The file "${name}"`;
   return (
     <ConfirmIconButton
       action={hideBoDocumentAction}
@@ -393,7 +420,7 @@ export function HideFileButton({
       label={nl ? "Niet meetellen" : "Do not count"}
       srLabel={nl ? `Niet meetellen: ${name}` : `Do not count: ${name}`}
       title={nl ? "Dit bestand niet meetellen?" : "Stop counting this file?"}
-      description={hideText(nl, nl ? `Het bestand "${name}"` : `The file "${name}"`, lastFile && activity ? activity : null)}
+      description={hideText(nl, what, lastFile && activity ? activity : null)}
       confirmLabel={nl ? "Niet meetellen" : "Do not count"}
       cancelLabel={nl ? "Annuleren" : "Cancel"}
       successMessage={nl ? `"${name}" telt niet meer mee.` : `"${name}" no longer counts.`}
@@ -451,6 +478,15 @@ export function Files({ dossier: d, f, errorMessages }: { dossier: XDossier; f: 
       doc.kind === "BUDGET" ? "Budget" : nl ? "Resultaat" : "Result",
       doc.meetingLabel,
       doc.alsoIn.length ? (nl ? `ook in ${doc.alsoIn.join(", ")}` : `also in ${doc.alsoIn.join(", ")}`) : null,
+      doc.sharedSheet
+        ? doc.kind === "BUDGET"
+          ? nl
+            ? "zelfde blad als het resultaat"
+            : "same sheet as the result"
+          : nl
+            ? "zelfde blad als het budget"
+            : "same sheet as the budget"
+        : null,
       doc.paired ? (nl ? "met de hand bij het budget gezet" : "linked to the budget by hand") : null,
       doc.waiver === "grocomeet" ? (nl ? "zonder budget: versneld goedgekeurd door de grocomeet" : "without a budget: approved early by the grocomeet") : null,
       doc.waiver === "geen" ? (nl ? "zonder budget: geen budget nodig" : "without a budget: none needed") : null,
@@ -492,7 +528,8 @@ export function Files({ dossier: d, f, errorMessages }: { dossier: XDossier; f: 
           docId={doc.id}
           name={doc.name}
           activity={d.activity}
-          lastFile={d.budgets.length + d.results.length === 1}
+          lastFile={new Set([...d.budgets, ...d.results].map((other) => other.fileKey)).size === 1}
+          sharedSheet={doc.sharedSheet}
           nl={nl}
           errorMessages={errorMessages}
         />

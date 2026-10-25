@@ -1,8 +1,11 @@
 import "server-only";
 
 import { prisma } from "@vtk/db";
+import { currentWorkingYear } from "@/lib/workingYear";
 import type { BoLine } from "./figures";
 import { buildOverview, type BoOverview, type DocInput } from "./dossiers";
+import { toExplorerData } from "./explorer";
+import { ownPostKeys, ownPosts, type OwnGroup, type OwnPost } from "./own";
 
 /**
  * Het overzicht van één werkingsjaar, plus de jaren waarvoor er iets is.
@@ -32,6 +35,7 @@ export async function loadBoOverview(
   const docs: DocInput[] = rows.map((row) => ({
     id: row.id,
     name: row.name,
+    linkName: row.linkName,
     webUrl: row.webUrl,
     folderKind: row.folderKind,
     meeting: {
@@ -81,4 +85,16 @@ export async function loadBoOverview(
     ),
     years: years.map((y) => y.workingYear),
   };
+}
+
+/**
+ * De budgetten en resultaten van de posten van één lid, dit werkingsjaar (zie
+ * `lib/bo/own.ts`). Zonder post leest dit niets.
+ */
+export async function loadOwnBo(groups: readonly OwnGroup[], nl: boolean, today: Date = new Date()): Promise<OwnPost[]> {
+  const keys = ownPostKeys(groups);
+  if (keys.length === 0) return [];
+  const year = currentWorkingYear();
+  const { overview } = await loadBoOverview(year, nl, today);
+  return ownPosts(toExplorerData(overview, year, today), keys, groups, nl);
 }

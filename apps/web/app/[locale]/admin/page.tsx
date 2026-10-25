@@ -6,8 +6,11 @@ import { requireSession } from "@/lib/session";
 import { hasPermission } from "@vtk/auth";
 import { Card } from "@vtk/ui";
 import { mergeTiles } from "@/lib/dashboard-tiles";
+import { loadOwnBo } from "@/lib/bo/overview";
+import { openResults } from "@/lib/bo/own";
 import { DashboardTiles } from "./DashboardTiles";
 import { DoorOpenButton } from "./DoorOpenButton";
+import { BoDueCard } from "./bestuursorgaan/BoDueCard";
 
 export default async function AdminDashboard({
   params,
@@ -24,7 +27,7 @@ export default async function AdminDashboard({
   const groupIds = session.groups.map((g) => g.id);
   const userId = session.user.id;
 
-  const [sharedRows, prefs, personalRows] = await Promise.all([
+  const [sharedRows, prefs, personalRows, ownBo] = await Promise.all([
     prisma.dashboardTile.findMany({
       where: {
         OR: [{ scope: "GLOBAL" }, { scope: "GROUP", groupId: { in: groupIds } }],
@@ -37,6 +40,9 @@ export default async function AdminDashboard({
       where: { scope: "USER", userId },
       orderBy: { order: "asc" },
     }),
+    // De resultaten die de eigen post nog naar het BO moet brengen; zonder
+    // post leest dit niets.
+    loadOwnBo(session.groups, locale === "nl"),
   ]);
 
   const tiles = mergeTiles(
@@ -86,6 +92,8 @@ export default async function AdminDashboard({
       </header>
 
       {canOpenDoor && <DoorOpenButton locale={locale} />}
+
+      <BoDueCard posts={openResults(ownBo)} base={base} nl={locale === "nl"} />
 
       <DashboardTiles
         tiles={tiles}

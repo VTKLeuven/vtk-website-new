@@ -11806,7 +11806,47 @@ BO ruimer dan een `Group`. Wat Groep 5 vroeg, en waarom het zo gebouwd is:
   van meevallers en tegenvallers over alle posten zei Groep 5 niets; per
   activiteit en per post staat ze er wel.
 - **Hetzelfde bestand in twee BO-mappen is één bestand** (een snelkoppeling): het
-  telt op de eerste BO, en het detail zegt waar het ook stond.
+  telt op de eerste BO, en het detail zegt waar het ook stond. Behalve wanneer
+  het op de ene BO het budget en op een latere het resultaat was: zie
+  hieronder.
+- **Budget en resultaat in één blad is een budget én een resultaat** (oktober
+  2026, Stadsspel van Onthaal). Het sjabloon van de penning heeft een kolom
+  Budget en een kolom Resultaat, en een post vult vaak gewoon de tweede in,
+  hernoemt het blad tot `Resultaat` en hangt het in een latere BO. De site las
+  enkel de huidige naam en zag op BO 3 een resultaat zonder budget, terwijl in
+  de map van BO 3 nog `Budget` stond. "De naam wint" geldt nu voor de naam
+  zoals ze **in die BO-map** stond: die van de snelkoppeling, die Drive niet
+  mee hernoemt. Een blad dat in Budgetten stond en later als resultaat
+  terugkomt, was op die eerste BO het budget, ook zonder snelkoppeling (de map
+  van een werkgroep). Niemand moet dus een kopie maken om het resultaat in te
+  dienen; dezelfde regel als hierboven: niemand hernoemt of kopieert om in het
+  overzicht te staan.
+
+## Bestuursorgaan: de post ziet haar eigen budgetten
+
+In oktober 2026 kwam de vraag dat de posten zelf zien welke resultaten ze nog
+naar het BO moeten brengen, in plaats van het enkel op de wekelijkse slide te
+horen. Gekozen uit drie (een blok op het dashboard, een eigen pagina, of
+allebei): allebei.
+
+- **Op het dashboard staat enkel wat nog moet komen** ("Nog naar het BO"):
+  activiteit, de BO van het budget, hoe lang al open, en het rekenblad in
+  Drive. Daar komt elk praesidiumlid binnen, dus daar ziet een post het zonder
+  te zoeken. Zonder open resultaat staat er niets: een groen vinkje dat elke
+  dag zegt dat alles in orde is, leert je het blok te negeren.
+- **"Mijn budgetten" toont alles van de eigen post**, met de bedragen: elke
+  activiteit met haar BO's, budget, resultaat en stand, in dezelfde tabel en
+  dezelfde vier woorden als de lijst van Groep 5. Een post en Groep 5 lezen
+  over één activiteit dus hetzelfde.
+- **Het lidmaatschap beslist, geen recht.** Wie dit werkingsjaar in een post of
+  werkgroep zit, ziet die post; niets van een andere. Een recht zou betekenen
+  dat iemand het aan elke post moet hangen, en een post die het niet kreeg,
+  ziet dan niet wat ze nog moet brengen. Het zijn haar eigen rekenbladen: ze
+  staan al in haar eigen map in Drive. Het overzicht van alle posten blijft
+  `bestuursorgaan.manage`, enkel voor Groep 5.
+- **Groep 5 krijgt er haar vier vakken bij** (Praeses, Vice-praeses,
+  Secretaris, Beheer), maar enkel wanneer er iets in zit. Jaarwerkingen en
+  Overige hebben geen leden en staan bij niemand.
 
 ## Bestuursorgaan: de verkenner
 

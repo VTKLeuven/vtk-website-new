@@ -72,6 +72,8 @@ export default async function AdminLayout({
     if (guard.commuRequests) return canAccessCommuRequests;
     // Werkgroepen-tab: beheerders óf gewone werkgroepleden.
     if (guard.werkgroep) return session.permissions.includes('werkgroepen.manage') || werkgroepMember;
+    // Mijn budgetten: elk lid van een post of werkgroep, voor zijn eigen post.
+    if (guard.post) return session.groups.length > 0;
     if (guard.anyPerm) return guard.anyPerm.some((p) => session.permissions.includes(p));
     if (guard.perm) return session.permissions.includes(guard.perm);
     return true;

@@ -49,7 +49,9 @@ import { getBoConfig, getScanStatus, saveScanStatus, type BoConfig, type BoScanS
  * - **Bijna alles is een snelkoppeling.** De posten zetten hun rekenblad in hun
  *   eigen map en hangen er een snelkoppeling van in de BO-map; een werkgroep
  *   hangt er een hele map in. We volgen beide, en bewaren het doel: dat is het
- *   bestand waarvan we de bedragen lezen.
+ *   bestand waarvan we de bedragen lezen. De naam van de snelkoppeling
+ *   bewaren we ernaast (`linkName`): die blijft "Budget" heten wanneer de post
+ *   het blad later tot resultaat hernoemt.
  * - **De BO is de map in de hoofdboom waarlangs we het bestand vonden**, niet
  *   de map waar het echt staat. De map van een werkgroep heet "BO 7 - 4/10"
  *   terwijl de hoofdmap "BO 7 - 04/10" heet; dat maakt dan niet uit.
@@ -79,6 +81,12 @@ export type ScanOutcome = { skipped: ScanSkip } | { status: BoScanStatus };
 type Found = {
   file: DriveFile;
   folderKind: BoKind | null;
+  /**
+   * De naam van de snelkoppeling waarlangs we het bestand vonden. Hernoemt een
+   * post haar budget later tot resultaat, dan blijft deze naam staan: zo weten
+   * we wat het op die BO was.
+   */
+  linkName?: string;
   /** Gezet wanneer het account het doel van een snelkoppeling niet kan openen. */
   unreachable?: boolean;
 };
@@ -264,6 +272,7 @@ class Scan {
                 webViewLink: `https://drive.google.com/file/d/${targetId}/view`,
               },
               folderKind: kind,
+              linkName: child.name,
               unreachable: true,
             });
           }
@@ -275,7 +284,7 @@ class Scan {
           await this.walk(target.id, folderKind(child.name) ?? folderKind(target.name) ?? kind, depth + 1, visited, out);
           continue;
         }
-        this.collect(target, kind, out);
+        this.collect(target, kind, out, child.name);
         continue;
       }
 
@@ -288,12 +297,12 @@ class Scan {
    * of wanneer het een rekenblad in Budgetten of Resultaten is. Een offerte
    * als pdf in die map, de agenda en het verslag tellen niet.
    */
-  private collect(file: DriveFile, kind: BoKind | null, out: Map<string, Found>): void {
+  private collect(file: DriveFile, kind: BoKind | null, out: Map<string, Found>, linkName?: string): void {
     if (out.has(file.id)) return;
-    const named = parseDocumentName(file.name).kind;
+    const named = parseDocumentName(linkName ?? "").kind ?? parseDocumentName(file.name).kind;
     const isSheet = SPREADSHEET_MIMES.has(file.mimeType) || OTHER_SHEET_MIMES.has(file.mimeType);
     if (!named && !(kind && isSheet)) return;
-    out.set(file.id, { file, folderKind: kind });
+    out.set(file.id, { file, folderKind: kind, linkName });
   }
 
   private async syncDocuments(meetingId: string, found: Found[]): Promise<void> {
@@ -311,6 +320,7 @@ class Scan {
 
       const fields = {
         name: item.file.name,
+        linkName: item.linkName ?? null,
         mimeType: item.file.mimeType,
         webUrl: item.file.webViewLink ?? `https://drive.google.com/file/d/${item.file.id}/view`,
         folderKind: item.folderKind,

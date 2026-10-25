@@ -1,0 +1,11 @@
+-- De naam van de snelkoppeling waarlangs een budget of resultaat in de BO-map
+-- gevonden werd. Een post vult vaak de kolom Resultaat in hetzelfde blad als
+-- het budget en hernoemt het dan tot "Resultaat"; de snelkoppeling in de map
+-- van de eerste BO heet nog "Budget" en zegt dus wat het blad daar was.
+--
+-- Bestaande rijen krijgen NULL: de scan vult de kolom bij de volgende ronde
+-- (binnen het halfuur) voor elk bestand dat hij nog vindt. Tot dan, en voor
+-- rijen die niet meer in Drive staan, geldt wat er al gold: de naam van het
+-- blad, en voor hetzelfde blad op een latere BO in Resultaten de map
+-- (`lib/bo/dossiers.ts`).
+ALTER TABLE "BoDocument" ADD COLUMN "linkName" TEXT;

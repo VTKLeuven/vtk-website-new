@@ -514,6 +514,14 @@ const icons: Record<string, ReactNode> = {
       <path d="m9 13.5 2 2 4-4" />
     </Svg>
   ),
+  // bestuursorgaanOwn: dezelfde map, met de post erin (Mijn budgetten)
+  bestuursorgaanOwn: (
+    <Svg>
+      <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v10a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5Z" />
+      <circle cx="12" cy="12" r="2" />
+      <path d="M8.5 17.5a3.5 3.5 0 0 1 7 0" />
+    </Svg>
+  ),
   // shift: shiften -> klok
   shift: (
     <Svg>

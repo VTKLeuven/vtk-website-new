@@ -54,11 +54,14 @@ niets. Wat in Drive fout staat, zet je in Drive recht; het overzicht zegt waar.
 | `apps/web/app/[locale]/admin/bestuursorgaan/`    | Het scherm: `BoViews.tsx` kiest tussen `BoExplorer.tsx` en `BoList.tsx`; wat ze delen staat in `BoParts.tsx`, "Na te kijken" en "Post wijzigen" in `BoReview.tsx` |
 | `apps/web/components/admin/SearchMultiPicker.tsx` | De doorzoekbare keuzelijst met meer dan één keuze (twee posten)   |
 | `apps/web/app/actions/bestuursorgaan.ts`         | Nu lezen, de map instellen, posten en resultaten koppelen          |
+| `apps/web/lib/bo/own.ts`                         | Wat een post zelf ziet: haar posten, de volgorde, wat open staat (puur, getest) |
+| `apps/web/app/[locale]/admin/bestuursorgaan/mijn/` | "Mijn budgetten" voor elke post (`BoOwn.tsx`); het blok op het dashboard is `BoDueCard.tsx` |
 
 Het recht is `bestuursorgaan.manage`, via de rol `bestuursorgaan` aan Groep 5.
 De rol `admin` draagt het bewust niet (`ADMIN_EXCLUDED_PERMISSIONS` in
 `packages/db/src/permissions.ts`); de seed en de sync bij elke start slaan het
-daar over.
+daar over. Een post ziet wel haar **eigen** budgetten, zonder recht; zie "Wat
+een post zelf ziet" onderaan.
 
 ---
 
@@ -80,7 +83,10 @@ daar over.
    worden gevolgd, naar bestanden en naar mappen. Een bestand telt wanneer de
    naam zegt dat het een budget of resultaat is, of wanneer het een rekenblad in
    een map `Budgetten` of `Resultaten` is. De agenda, het verslag, de slides en
-   een offerte als pdf tellen niet.
+   een offerte als pdf tellen niet. Bij een snelkoppeling bewaart de scan het
+   doel (`name`, het bestand zelf) én de naam van de snelkoppeling
+   (`linkName`): die tweede blijft staan wanneer de post het blad later
+   hernoemt.
 4. **De bedragen**, enkel bij een Google Sheet of een xlsx. Een Sheet wordt als
    xlsx geëxporteerd, zodat één lezer (`lib/praesidiumShifts/xlsx.ts`) beide
    leest, met de laatst berekende waarde van elke formule. Een ongewijzigd
@@ -141,6 +147,27 @@ Zit de naam ernaast, dan zet "Post wijzigen" in het detail van een activiteit
 de post(en) voor al haar bestanden (`BoDocument.postKeys`); dat wint van de
 naam en van een koppeling, en leeg toepassen zet het terug. Zonder keuze
 verdwijnt er niets: de bestanden staan dan onder "Niet herkend".
+
+**Budget en resultaat kunnen één blad zijn.** Het sjabloon heeft een kolom
+Budget en een kolom Resultaat; een post vult de tweede vaak later in, hernoemt
+het blad van `Budget` naar `Resultaat` en hangt het in de map Resultaten van
+een latere BO. Wat het bestand op een BO was, beslist daarom per BO
+(`kindAt` in `dossiers.ts`):
+
+1. de naam van de snelkoppeling in die BO-map (die heet op de BO van het
+   budget nog `Budget`);
+2. anders de naam van het blad;
+3. anders de map;
+4. en een blad dat in Budgetten stond en op een latere BO als resultaat
+   terugkomt, was op die eerste BO het budget, ook als het nu `Resultaat` heet.
+   Dat vangt een werkgroep op die haar eigen map in de BO-map hangt (daarin
+   staat het blad zelf, zonder snelkoppeling die de oude naam bewaart).
+
+Het blad staat dan twee keer in het detail: als budget op de eerste BO en als
+resultaat op de latere, elk met "zelfde blad als ...". Het budget is de kolom
+Budget, het resultaat de kolom Resultaat. Een blad dat nog `Budget` heet maar
+op een latere BO in Resultaten staat, blijft volgens de naam een budget ("ook
+in BO 9").
 
 **Een versie** achteraan de naam (`_v2`, `versie 3`, `(1)`, `_final`) of
 "Kopie van" vooraan valt weg uit de activiteit (`ParsedDocumentName.version`):
@@ -285,8 +312,48 @@ wanneer er iets in zit.
   dus een foute rij herstelt zich vanzelf.
 - **Hetzelfde bestand kan in twee BO-mappen staan** (een snelkoppeling). Dat
   zijn twee rijen in `BoDocument` (per BO één), maar `buildOverview` toont het
-  één keer, op de eerste BO, met "ook in BO x" (`DocView.alsoIn`). Een
-  koppeling naar de weggevallen rij volgt mee.
+  één keer per soort, op de eerste BO, met "ook in BO x" (`DocView.alsoIn`).
+  Een koppeling naar de weggevallen rij volgt mee. Was het op de ene BO het
+  budget en op de andere het resultaat, dan zijn het er twee
+  (`DocView.sharedSheet`).
+- **De naam van het doel is niet de naam in de BO-map.** Een snelkoppeling
+  heeft haar eigen naam, en Drive past die niet aan wanneer het doel hernoemd
+  wordt. Eerst bewaarde de scan enkel de naam van het doel: Stadsspel van
+  Onthaal (26-27) heette in BO 3 nog `Budget`, maar het blad was intussen
+  `Resultaat`, dus stond er een resultaat op BO 3 en "geen budget". Vandaar
+  `BoDocument.linkName`. "Niet meetellen" werkt nog altijd per bestand: bij
+  zo'n blad verdwijnen budget en resultaat samen, en de bevestiging zegt dat.
 - **Een fout in de scan breekt de groepssync niet.** De worker roept beide in
   dezelfde ronde aan, maar de statuscode volgt enkel de groepssync; een fout in
   de BO-scan staat op `/admin/bestuursorgaan`.
+
+---
+
+## Wat een post zelf ziet
+
+Het volledige overzicht is van Groep 5. Een post ziet haar eigen budgetten en
+resultaten op twee plaatsen, allebei uit `lib/bo/own.ts`:
+
+- **"Mijn budgetten"** (`/admin/bestuursorgaan/mijn`, in de zijbalk onder
+  Beheer): per post de tabel van de lijstweergave (activiteit, BO, budget,
+  resultaat, stand), wat open staat bovenaan, het langst open eerst. Een rij
+  opent niets; het icoon opent het rekenblad in Drive.
+- **"Nog naar het BO"** op het dashboard (`/admin`): enkel de resultaten die
+  open staan, vijf per post, met de BO van het budget en hoe lang al. Zonder
+  open resultaat staat er niets.
+
+Wie wat ziet:
+
+- **Het lidmaatschap van dit werkingsjaar beslist, geen recht.** Elke post en
+  werkgroep waarvan iemand lid is (`session.groups`), als `g:<groupId>`. Wie in
+  Groep 5 zit, krijgt er de vier vakken van Groep 5 bij, maar enkel wanneer er
+  iets in zit. De jaarwerkingen en Overige hebben geen leden en staan er dus
+  nooit.
+- **Enkel de dossiers van die posten gaan naar de browser.** `ownPosts` filtert
+  op de server; de pagina krijgt nooit het hele jaar zoals de verkenner.
+- Een activiteit van twee posten (`Cultuur+Onthaal`) staat bij beide, met "met
+  Cultuur" eronder.
+- Het lopende werkingsjaar, zonder jaarbalk: het lidmaatschap is ook per jaar.
+
+Het dashboard leest hiervoor het hele overzicht van het jaar
+(`loadOwnBo`), maar enkel voor wie in een post zit.

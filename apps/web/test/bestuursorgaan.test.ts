@@ -15,6 +15,7 @@ import { postOptions, resolvePost, resolvePostKeys, splitPost } from "@/lib/bo/p
 import { findDossier, toExplorerData } from "@/lib/bo/explorer";
 import { groupByMeeting, groupDossiers, matchesFilters } from "@/lib/bo/list";
 import { buildSummary } from "@/lib/bo/summary";
+import { openResults, ownPostKeys, ownPosts } from "@/lib/bo/own";
 
 /*
  * Het overzicht van het Bestuursorgaan. De namen hieronder komen letterlijk uit
@@ -565,6 +566,84 @@ describe("budgetten en resultaten samenleggen", () => {
     expect(overview.global.budgets).toBe(1);
   });
 
+  // Stadsspel van Onthaal in 26-27: de post vulde de kolom Resultaat in het
+  // budgetblad in, hernoemde het tot "Resultaat" en hing het in BO 9. De
+  // snelkoppeling in BO 3 heet nog "Budget".
+  const stadsspel = (extra: Partial<DocInput> & { bo?: number } = {}) =>
+    doc("26-27_Resultaat_Onthaal_Stadsspel", {
+      driveFileId: "stadsspel",
+      budgetTotalCents: -6000,
+      resultTotalCents: -5123,
+      ...extra,
+    });
+
+  it("leest een blad dat later tot resultaat hernoemd werd als budget op de eerste BO", () => {
+    const overview = buildOverview(
+      [
+        stadsspel({ bo: 3, folderKind: "BUDGET", linkName: "26-27_Budget_Onthaal_Stadsspel" }),
+        stadsspel({ bo: 9, folderKind: "RESULT", linkName: "26-27_Resultaat_Onthaal_Stadsspel" }),
+      ],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    const [dossier] = overview.posts[0].dossiers;
+    expect(dossier).toMatchObject({ activity: "Stadsspel", status: "DONE", budgetCents: -6000, resultCents: -5123, devCents: 877 });
+    expect(dossier.budgets.map((b) => [b.name, b.meetingLabel, b.sharedSheet, b.folderConflict])).toEqual([
+      ["26-27_Budget_Onthaal_Stadsspel", "BO 3", true, false],
+    ]);
+    expect(dossier.results.map((r) => [r.name, r.meetingLabel, r.sharedSheet, r.alsoIn])).toEqual([
+      ["26-27_Resultaat_Onthaal_Stadsspel", "BO 9", true, []],
+    ]);
+    expect(overview.pairable).toEqual([]);
+    expect(overview.totals).toMatchObject({ budgets: 1, results: 1 });
+  });
+
+  it("volgt de map wanneer de oude naam nergens meer staat", () => {
+    // Een werkgroep hangt haar map in de BO-map: geen snelkoppeling per blad,
+    // en voor de scan de nieuwe naam liest, is er ook nog geen.
+    const overview = buildOverview(
+      [stadsspel({ bo: 3, folderKind: "BUDGET" }), stadsspel({ bo: 9, folderKind: "RESULT" })],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    const [dossier] = overview.posts[0].dossiers;
+    expect(dossier.status).toBe("DONE");
+    expect(dossier.budgets.map((b) => b.meetingLabel)).toEqual(["BO 3"]);
+    expect(dossier.results.map((r) => r.meetingLabel)).toEqual(["BO 9"]);
+  });
+
+  it("houdt een hernoemd budget open tot het resultaat op een BO komt", () => {
+    const overview = buildOverview(
+      [stadsspel({ bo: 3, folderKind: "BUDGET", linkName: "26-27_Budget_Onthaal_Stadsspel" })],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    expect(overview.posts[0].dossiers[0]).toMatchObject({ status: "OPEN", budgetCents: -6000, resultCents: null });
+    expect(overview.pairable).toEqual([]);
+  });
+
+  it("laat de naam winnen bij een budget dat op een latere BO in Resultaten belandde", () => {
+    const overview = buildOverview(
+      [
+        doc("26-27_Budget_Theokot_Frigo", { bo: 3, driveFileId: "frigo", folderKind: "BUDGET" }),
+        doc("26-27_Budget_Theokot_Frigo", { bo: 9, driveFileId: "frigo", folderKind: "RESULT" }),
+      ],
+      [...POSTS, { id: "theo", code: "THEOKOT", slug: "theokot", nameNl: "Theokot", nameEn: "Theokot", orderInPraesidium: 15, type: "PRAESIDIUM" }],
+      new Map(),
+      2026,
+      TODAY,
+    );
+    const [dossier] = overview.posts[0].dossiers;
+    expect(dossier.status).toBe("OPEN");
+    expect(dossier.budgets.map((b) => [b.meetingLabel, b.alsoIn, b.sharedSheet])).toEqual([["BO 3", ["BO 9"], false]]);
+  });
+
   it("laat een bestand dat niet meetelt overal weg", () => {
     const overview = buildOverview(
       [doc("26-27_Budget_Sport_VTKlimmen", { budgetTotalCents: -21000 }), doc("Offerte karting", { hidden: true }), doc("26-27_Budget_Sport_Oud", { hidden: true })],
@@ -895,5 +974,64 @@ describe("het overzicht per post (voor de slide)", () => {
     expect(summary.vtk).toMatchObject({ due: 3, done: 1 });
     expect(summary.werkgroepen).toMatchObject({ due: 1, done: 0, pct: 0 });
     expect(summary.lastMeeting).toBe("BO 40");
+  });
+});
+
+describe("wat een post zelf ziet", () => {
+  const ownGroups = (codes: string[]) =>
+    POSTS.filter((p) => codes.includes(p.code)).map(({ id, code, slug, nameNl, nameEn }) => ({ id, code, slug, nameNl, nameEn }));
+  const overview = buildOverview(
+    [
+      doc("26-27_Budget_Onthaal_Outdoor theokot", { bo: 2 }),
+      doc("26-27_Budget_Onthaal_Cantusconvent", { bo: 10 }),
+      doc("26-27_Budget_Onthaal_Stadsspel", { bo: 3 }),
+      doc("26-27_Resultaat_Onthaal_Stadsspel", { bo: 9 }),
+      doc("26-27_Budget_Cultuur+Onthaal_Jeneverwandeling", { bo: 5 }),
+      doc("26-27_Budget_Cultuur_Toneel", { bo: 4 }),
+      // BO 50 valt op 20 oktober, na vandaag.
+      doc("26-27_Budget_Onthaal_Halloween", { bo: 50 }),
+      doc("26-27_Budget_Vice_LOKO", { bo: 6 }),
+    ],
+    POSTS,
+    new Map(),
+    2026,
+    TODAY,
+  );
+  const data = toExplorerData(overview, 2026, TODAY);
+
+  it("toont enkel de eigen posten, met wat open staat bovenaan", () => {
+    const own = ownGroups(["ONTHAAL"]);
+    const [onthaal, ...rest] = ownPosts(data, ownPostKeys(own), own, true);
+    expect(rest).toEqual([]);
+    expect(onthaal.name).toBe("Onthaal");
+    // Het langst open eerst, dan wat nog op een BO moet passeren, dan wat af is.
+    expect(onthaal.dossiers.map((d) => [d.activity, d.status])).toEqual([
+      ["Outdoor theokot", "OPEN"],
+      ["Jeneverwandeling", "OPEN"],
+      ["Cantusconvent", "OPEN"],
+      ["Halloween", "UPCOMING"],
+      ["Stadsspel", "DONE"],
+    ]);
+    expect(onthaal.stats).toMatchObject({ due: 4, done: 1, open: 3, upcoming: 1 });
+    // Toneel is van Cultuur alleen en blijft weg.
+    expect(onthaal.dossiers.some((d) => d.activity === "Toneel")).toBe(false);
+  });
+
+  it("geeft wie in Groep 5 zit ook de vakken van Groep 5, maar enkel als er iets in zit", () => {
+    const own = ownGroups(["GROEP5"]);
+    expect(ownPostKeys(own)).toEqual(["g:g5", "x:praeses", "x:vice", "x:secretaris", "x:beheer"]);
+    // Groep 5 zelf staat er leeg bij: een post zonder budget is ook een antwoord.
+    expect(ownPosts(data, ownPostKeys(own), own, true).map((p) => [p.name, p.dossiers.length])).toEqual([
+      ["Vice-praeses", 1],
+      ["Groep 5", 0],
+    ]);
+  });
+
+  it("zet op het dashboard enkel de open resultaten", () => {
+    const own = ownGroups(["ONTHAAL", "CULTUUR", "IT"]);
+    expect(openResults(ownPosts(data, ownPostKeys(own), own, true)).map((p) => [p.name, p.dossiers.map((d) => d.activity)])).toEqual([
+      ["Cultuur", ["Toneel", "Jeneverwandeling"]],
+      ["Onthaal", ["Outdoor theokot", "Jeneverwandeling", "Cantusconvent"]],
+    ]);
   });
 });

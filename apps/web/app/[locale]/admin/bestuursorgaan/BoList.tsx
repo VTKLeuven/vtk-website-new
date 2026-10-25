@@ -14,7 +14,7 @@ import {
   type ListFilter,
   type ListGroup,
 } from "@/lib/bo/list";
-import { dossierNotes, Files, HideDossierButton, Lines, linesOf, PostLinks, Progress, StatusNote, StatusPill, sumLines, Timeline, useFormat, type Fmt, type Locale, type Sheet } from "./BoParts";
+import { boRange, dossierNotes, Files, HideDossierButton, Lines, linesOf, PostLinks, Progress, Stand, sumLines, Timeline, useFormat, type Fmt, type Locale, type Sheet } from "./BoParts";
 import { ChangePosts, type PostChoice } from "./BoReview";
 
 /*
@@ -306,15 +306,6 @@ export function BoList({
 }
 
 /** De stand: het woord in de pil, en wat erbij hoort als tekst ernaast. */
-function Stand({ d, f }: { d: XDossier; f: Fmt }) {
-  return (
-    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-vtk-muted">
-      <StatusPill dossier={d} f={f} />
-      <StatusNote dossier={d} f={f} />
-    </span>
-  );
-}
-
 function sumOf(list: XDossier[], pick: (d: XDossier) => number | null): number {
   return list.reduce((total, d) => total + (pick(d) ?? 0), 0);
 }
@@ -394,12 +385,6 @@ function GroupHead({
 }
 
 /** "BO 5 (20 sep) → BO 9": waar het budget en het resultaat passeerden, met de datum die telt. */
-function boRange(d: XDossier, f: Fmt): string {
-  const parts = d.budgets.map((b, i) => (i === 0 && b.meetingDate ? `${b.meetingLabel} (${f.day(b.meetingDate)})` : b.meetingLabel)).join(", ");
-  const result = d.results.at(-1);
-  return [parts, result ? `→ ${result.meetingLabel}` : ""].filter(Boolean).join(" ") || "–";
-}
-
 function GroupTable({
   list,
   group,

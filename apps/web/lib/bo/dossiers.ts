@@ -13,6 +13,11 @@ import { BO_EXTRA_POSTS, postName, resolvePostKeys, splitPost, type PostAliases,
  * accenten en leestekens. Lukt dat niet, dan koppelt Groep 5 met de hand
  * (`pairedBudgetId`).
  *
+ * Budget en resultaat kunnen ook één blad zijn: het sjabloon heeft een kolom
+ * Budget en een kolom Resultaat, en een post vult die tweede later in en
+ * hernoemt het blad. Wat het op een BO was, zegt dan de naam van de
+ * snelkoppeling in die BO-map (`kindAt`).
+ *
  * Daarbovenop de cijfers die de verkenner op /admin/bestuursorgaan toont: per
  * post en voor het hele jaar hoeveel voorbije activiteiten een resultaat
  * hebben, de sommen, de afwijking, en hoe lang een resultaat op zich laat
@@ -24,6 +29,8 @@ import { BO_EXTRA_POSTS, postName, resolvePostKeys, splitPost, type PostAliases,
 export type DocInput = {
   id: string;
   name: string;
+  /** De naam van de snelkoppeling in de BO-map; zie `BoDocument.linkName`. */
+  linkName?: string | null;
   webUrl: string;
   folderKind: BoKind | null;
   meeting: {
@@ -70,8 +77,11 @@ export type MeetingInput = {
 
 export type DocView = {
   id: string;
+  /** Zoals het in de BO-map staat: de naam van de snelkoppeling, anders die van het blad. */
   name: string;
   webUrl: string;
+  /** Het bestand in Drive; twee rijen met dezelfde sleutel zijn één blad. */
+  fileKey: string;
   kind: BoKind;
   /** De naam zegt het ene, de map het andere; de naam won. */
   folderConflict: boolean;
@@ -91,6 +101,8 @@ export type DocView = {
   overridden: boolean;
   /** Andere BO's waar hetzelfde bestand ook stond; het telt op de eerste. */
   alsoIn: string[];
+  /** Hetzelfde blad was op een BO het budget en op een latere het resultaat. */
+  sharedSheet: boolean;
 };
 
 export type DossierStatus =
@@ -303,6 +315,17 @@ export function statsOf(dossiers: readonly StatsInput[]): Stats {
   };
 }
 
+/**
+ * Wat een bestand op één BO was. De naam wint van de map, en de naam die daar
+ * telt, is die van de snelkoppeling in die BO-map: hernoemt een post haar
+ * budget later tot "Resultaat", dan heet de snelkoppeling op de BO van het
+ * budget nog altijd "Budget". Zegt die naam het niet, dan de naam van het
+ * blad, en dan de map.
+ */
+export function kindAt(doc: Pick<DocInput, "name" | "linkName" | "folderKind">): BoKind | null {
+  return parseDocumentName(doc.linkName ?? "").kind ?? parseDocumentName(doc.name).kind ?? doc.folderKind;
+}
+
 const SECTION_ORDER: Record<PostSection, number> = { g5: 0, post: 1, werkgroep: 2, jaarwerking: 3, extra: 4, unknown: 5 };
 
 export function buildOverview(
@@ -318,16 +341,36 @@ export function buildOverview(
   const unclassified: BoOverview["unclassified"] = [];
 
   // Oudste BO eerst: staat een bestand in twee BO-mappen, dan telt de eerste.
-  const ordered = [...docs].sort(
-    (a, b) => (a.meeting.date?.getTime() ?? Number.MAX_SAFE_INTEGER) - (b.meeting.date?.getTime() ?? Number.MAX_SAFE_INTEGER),
-  );
+  const timeOf = (doc: DocInput) => doc.meeting.date?.getTime() ?? Number.MAX_SAFE_INTEGER;
+  const ordered = [...docs].sort((a, b) => timeOf(a) - timeOf(b));
+
+  // Wat elk bestand op zijn BO was. Een blad dat in Budgetten stond en op een
+  // latere BO als resultaat terugkomt, was op die eerste BO het budget, ook als
+  // het nu "Resultaat" heet: de post hernoemde het nadien. Meestal zegt de
+  // snelkoppeling dat al (`kindAt`), maar een werkgroep hangt haar eigen map in
+  // de BO-map, en daarin staat het blad zelf, met enkel zijn nieuwe naam.
+  const kinds = new Map<string, BoKind | null>();
+  const rowsOfFile = new Map<string, DocInput[]>();
+  for (const doc of ordered) {
+    if (doc.hidden) continue;
+    kinds.set(doc.id, kindAt(doc));
+    if (doc.driveFileId) rowsOfFile.set(doc.driveFileId, [...(rowsOfFile.get(doc.driveFileId) ?? []), doc]);
+  }
+  for (const rows of rowsOfFile.values()) {
+    for (const row of rows) {
+      if (row.folderKind !== "BUDGET" || kinds.get(row.id) !== "RESULT") continue;
+      if (rows.some((other) => timeOf(other) > timeOf(row) && kinds.get(other.id) === "RESULT")) kinds.set(row.id, "BUDGET");
+    }
+  }
+
+  /** Per bestand en soort de eerste rij: een uitgesteld budget op twee BO's is één budget. */
   const byFile = new Map<string, Classified>();
   /** De rij die wegviel voor een eerdere rij van hetzelfde bestand, naar die rij. */
   const sameAs = new Map<string, string>();
   for (const doc of ordered) {
     if (doc.hidden) continue;
     const parsed = parseDocumentName(doc.name);
-    const kind = parsed.kind ?? doc.folderKind;
+    const kind = kinds.get(doc.id) ?? null;
     const label = meetingLabel(doc.meeting, nl);
     const override = (doc.postKeysOverride ?? []).filter(Boolean);
     const postLabel = parsed.post ?? doc.sheetPost;
@@ -359,10 +402,13 @@ export function buildOverview(
       doc,
       view: {
         id: doc.id,
-        name: doc.name,
+        // Zoals het in die BO-map staat. Post en activiteit komen wel uit de
+        // naam van het blad: die is het laatst rechtgezet.
+        name: doc.linkName ?? doc.name,
         webUrl: doc.webUrl,
+        fileKey: doc.driveFileId ?? doc.id,
         kind,
-        folderConflict: Boolean(parsed.kind && doc.folderKind && parsed.kind !== doc.folderKind),
+        folderConflict: Boolean(doc.folderKind && kind !== doc.folderKind),
         meetingId: doc.meeting.id,
         meetingLabel: label,
         meetingDate: doc.meeting.date,
@@ -374,6 +420,7 @@ export function buildOverview(
         waiver: kind === "RESULT" ? (doc.budgetWaiver ?? null) : null,
         overridden: override.length > 0,
         alsoIn: [],
+        sharedSheet: false,
       },
       year: parsed.year ?? doc.meeting.workingYear,
       postKeys,
@@ -382,15 +429,19 @@ export function buildOverview(
       activityKey: normalizeKey(activity),
       version: parsed.version ?? 0,
     };
-    const same = doc.driveFileId ? byFile.get(doc.driveFileId) : undefined;
+    const fileKind = `${doc.driveFileId}|${kind}`;
+    const same = doc.driveFileId ? byFile.get(fileKind) : undefined;
     if (same) {
       same.view.alsoIn.push(label);
       sameAs.set(doc.id, same.doc.id);
       continue;
     }
-    if (doc.driveFileId) byFile.set(doc.driveFileId, item);
+    if (doc.driveFileId) byFile.set(fileKind, item);
     classified.push(item);
   }
+  const kindsPerFile = new Map<string, Set<BoKind>>();
+  for (const c of classified) kindsPerFile.set(c.view.fileKey, (kindsPerFile.get(c.view.fileKey) ?? new Set()).add(c.view.kind));
+  for (const c of classified) c.view.sharedSheet = kindsPerFile.get(c.view.fileKey)!.size > 1;
 
   // Wat bij elkaar hoort: zelfde jaar en activiteit, en minstens één post
   // gemeen ("Cultuur+Onthaal_Jeneverwandeling" en "Cultuur_Jeneverwandeling"
@@ -629,7 +680,12 @@ export function buildOverview(
     unknownPosts: [...unknown.values()].filter((u) => u.files.length > 0).sort((a, b) => a.label.localeCompare(b.label, "nl")),
     unclassified,
     pairable,
-    unreachable: inYearDocs.filter((c) => c.doc.figuresError === "NO_ACCESS" && !c.doc.missing).map((c) => c.view),
+    // Eén keer per bestand, ook als het blad budget en resultaat was.
+    unreachable: [
+      ...new Map(
+        inYearDocs.filter((c) => c.doc.figuresError === "NO_ACCESS" && !c.doc.missing).map((c) => [c.view.fileKey, c.view]),
+      ).values(),
+    ],
     totals: {
       budgets: inYearDocs.filter((c) => c.view.kind === "BUDGET").length,
       results: inYearDocs.filter((c) => c.view.kind === "RESULT").length,

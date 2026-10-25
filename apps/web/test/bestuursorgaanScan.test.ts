@@ -256,6 +256,21 @@ describe("de BO-map lezen", () => {
     expect(docsIn("BO 7 - 04/10").map((d) => d.driveFileId).sort()).toEqual(["frigo", "frigo-res"]);
   });
 
+  it("bewaart de naam van de snelkoppeling naast die van het blad", async () => {
+    // De post vulde het resultaat in het budgetblad in, hernoemde het en hing
+    // het in de Resultaten van BO 7. De snelkoppeling in BO 5 heet nog Budget.
+    drive.set("frigo", { ...drive.get("frigo")!, name: "26-27_Resultaat_Theokot_Frigo" });
+    shortcut("frigo-sc7", "26-27_Resultaat_Theokot_Frigo", "m7r", "frigo", SHEET);
+    await scanBestuursorgaan();
+
+    const inBo5 = docsIn("BO 5 - 20/09").find((d) => d.driveFileId === "frigo");
+    const inBo7 = docsIn("BO 7 - 04/10").find((d) => d.driveFileId === "frigo");
+    expect(inBo5).toMatchObject({ name: "26-27_Resultaat_Theokot_Frigo", linkName: "26-27_Budget_Theokot_Frigo", folderKind: "BUDGET" });
+    expect(inBo7).toMatchObject({ name: "26-27_Resultaat_Theokot_Frigo", linkName: "26-27_Resultaat_Theokot_Frigo", folderKind: "RESULT" });
+    // Een bestand dat er zelf in staat, heeft geen snelkoppeling.
+    expect(docsIn("BO 7 - 04/10").find((d) => d.driveFileId === "frigo-res")).toMatchObject({ linkName: null });
+  });
+
   it("slaat over zolang er geen map ingesteld is", async () => {
     settings.set("bestuursorgaan.config", { rootFolderId: null, yearFolderIds: {} });
     expect(await scanBestuursorgaan()).toEqual({ skipped: "NO_FOLDER" });

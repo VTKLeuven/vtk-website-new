@@ -8941,6 +8941,11 @@ model BoDocument {
   /// tonen uit afgeleid (`lib/bo/names.ts`), zodat een betere herkenning ook
   /// de rijen van vorige weken meteen juist zet.
   name            String
+  /// De naam van de snelkoppeling in de BO-map, wanneer het bestand via een
+  /// snelkoppeling gevonden werd. Die naam blijft staan wanneer de post het
+  /// blad later hernoemt ("Budget" wordt "Resultaat"), en zegt dus wat het
+  /// bestand op deze BO was. Null bij een bestand dat er zelf in staat.
+  linkName        String?
   mimeType        String
   webUrl          String
   /// In welke map het stond: Budgetten of Resultaten. Null daarbuiten. Zegt de

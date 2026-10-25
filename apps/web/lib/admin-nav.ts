@@ -40,6 +40,8 @@ export type NavGuard = {
   /** Werkgroepen-tab: zichtbaar voor beheerders (werkgroepen.manage) en voor leden
    *  van een werkgroep (die zien enkel hun eigen werkgroep, enkel de infotekst). */
   werkgroep?: boolean;
+  /** Wie dit werkingsjaar in een post of werkgroep zit (Mijn budgetten). */
+  post?: boolean;
   /** Enkel bij exacte padmatch actief markeren (voor de dashboard-landing op /admin). */
   exact?: boolean;
 };
@@ -116,6 +118,9 @@ export function getAdminNav(): NavEntry[] {
       // De budgetten en resultaten die langs het Bestuursorgaan passeerden.
       // Enkel Groep 5 (de rol admin draagt dit recht niet).
       item('bestuursorgaan', '/bestuursorgaan', { perm: 'bestuursorgaan.manage' }),
+      // Hetzelfde voor de eigen post, voor elk lid van een post of werkgroep:
+      // welke resultaten nog naar het BO moeten.
+      item('bestuursorgaanOwn', '/bestuursorgaan/mijn', { post: true }),
     ]),
     // Theokot doet twee dingen die weinig met elkaar te maken hebben: broodjes
     // verkopen en de zaal verhuren. Later komt de uitleendienst erbij. Daarom
