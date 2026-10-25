@@ -1027,6 +1027,10 @@
       "title": "Mijn account",
       "description": "Je profiel, je tickets, je shiften en je gekoppelde toepassingen."
     },
+    "urenloopStats": {
+      "title": "Mijn 24 urenloop",
+      "description": "Elke ronde die je liep op de 24 urenloop, met je aantal, gemiddelde en snelste ronde."
+    },
     "connectedApps": {
       "title": "Verbonden apps",
       "description": "De toepassingen waaraan je toegang gaf met je VTK-account."

@@ -32,6 +32,7 @@ Het werkt ook binnen de pagina: een link naar `#shifts` terwijl je op
 | `#meetings`         | Vergaderingen (broodje voor de GM)          | enkel met een reservatie                   |
 | `#theokot`          | Gereserveerde broodjes (Theokot)            | ja                                         |
 | `#shifts`           | Mijn komende shiften                        | ja                                         |
+| `#urenloop`         | 24 urenloop: je rondes van het laatste jaar | enkel met rondes op je r-nummer            |
 | `#calendar`         | Agendafeeds (persoonlijke kalenderlinks)    | ja                                         |
 | `#door`             | Deur-shortcut                               | enkel met recht op de deur                 |
 | `#signature`        | E-mailhandtekening                          | enkel voor wie er een mag maken            |

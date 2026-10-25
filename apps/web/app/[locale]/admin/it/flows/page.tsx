@@ -34,6 +34,9 @@ import { UnsubscribePanel } from "@/components/profile/UnsubscribePanel";
 import { DiscordMessagePreview } from "@/components/admin/DiscordMessagePreview";
 import { discordEventMessage, DISCORD_AVATAR_PATH } from "@/lib/discord/eventMessage";
 import { siteUrl } from "@/lib/seo";
+import { RunnerYearPanel } from "@/components/urenloop/RunnerStats";
+import { sampleRunnerStats } from "@/lib/urenloop/laps";
+import { getRunnerStats } from "@/lib/urenloop/runnerStats";
 import { FlowPreview } from "./FlowPreview";
 import { MailPreviewList } from "./MailPreviewList";
 
@@ -133,6 +136,7 @@ export default async function AdminFlowPreview({
 
   const dict = getDictionary(locale);
   const year = currentStudyYear();
+  const ownUrenloop = await getRunnerStats(user.rNumber);
   // De ronde loopt een week achter op de jaarnaam; de gate hangt aan de ronde.
   const confirmationYear = studyConfirmationYear();
 
@@ -602,6 +606,60 @@ export default async function AdminFlowPreview({
         }
       >
         <DiscordMessagePreview message={discordSample} now={new Date(DISCORD_SAMPLE_NOW)} />
+      </FlowPreview>
+
+      <FlowPreview
+        title={nl ? "24 urenloop in het account" : "24-hour run in the account"}
+        when={
+          nl
+            ? "Verschijnt op Mijn VTK (#urenloop) en op /account/24urenloop voor wie een r-nummer in zijn profiel heeft waarop rondes staan, zodra Sport laps.csv oplaadde in /admin/24urenloop."
+            : "Appears on My VTK (#urenloop) and on /account/24urenloop for anyone with an r-number in their profile that has laps, once Sport uploaded laps.csv in /admin/24urenloop."
+        }
+        openLabel={nl ? "Toon het scherm" : "Show the screen"}
+        closeLabel={nl ? "Verberg het scherm" : "Hide the screen"}
+        rules={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Wanneer" : "When"}</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4">
+              <li>
+                {nl
+                  ? "De koppeling gebeurt bij het lezen, op User.rNumber: wie later een account maakt of zijn r-nummer invult, ziet zijn rondes vanzelf."
+                  : "The link is made when reading, on User.rNumber: anyone who creates an account or fills in their r-number later sees their laps automatically."}
+              </li>
+              <li>
+                {nl
+                  ? "De plaatsen tellen elke loper van dat jaar, ook wie geen r-nummer had; de noodrondes van niemand niet."
+                  : "Ranks count every runner of that year, including those without an r-number; emergency laps of nobody do not."}
+              </li>
+              <li>
+                {nl
+                  ? "Hieronder een verzonnen loper, niet iemands echte rondes."
+                  : "Below is an invented runner, not anyone's real laps."}
+              </li>
+            </ul>
+          </>
+        }
+        yourState={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Jouw account" : "Your account"}</p>
+            <dl className="mt-2 space-y-1">
+              <div className="flex justify-between gap-4">
+                <dt>{nl ? "r-nummer" : "r-number"}</dt>
+                <dd className="text-right">{user.rNumber ?? (nl ? "geen" : "none")}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt>{nl ? "Jaren met rondes" : "Years with laps"}</dt>
+                <dd className="text-right">
+                  {ownUrenloop.length > 0 ? ownUrenloop.map((y) => y.year).join(", ") : nl ? "geen" : "none"}
+                </dd>
+              </div>
+            </dl>
+          </>
+        }
+      >
+        <div className="vtk-admin-preview">
+          <RunnerYearPanel stats={sampleRunnerStats()} locale={locale} />
+        </div>
       </FlowPreview>
 
       <section className="space-y-4 pt-2">
