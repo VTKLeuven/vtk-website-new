@@ -338,7 +338,7 @@ resultaten op twee plaatsen, allebei uit `lib/bo/own.ts`:
   Beheer): per post de tabel van de lijstweergave (activiteit, BO, budget,
   resultaat, stand), wat open staat bovenaan, het langst open eerst. Een rij
   opent niets; het icoon opent het rekenblad in Drive.
-- **"Nog naar het BO"** op het dashboard (`/admin`): enkel de resultaten die
+- **"Nog te brengen resultaten"** op het dashboard (`/admin`): enkel de resultaten die
   open staan, vijf per post, met de BO van het budget en hoe lang al. Zonder
   open resultaat staat er niets.
 

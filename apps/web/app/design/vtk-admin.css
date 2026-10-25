@@ -4978,11 +4978,6 @@ a.vtk-shortcut-tile:hover {
   text-underline-offset: 3px;
 }
 
-.vtk-bo-due > p {
-  max-width: 62ch;
-  font-size: 13px;
-}
-
 .vtk-bo-due-post {
   display: grid;
   gap: 4px;

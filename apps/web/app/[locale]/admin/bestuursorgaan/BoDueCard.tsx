@@ -20,16 +20,10 @@ export function BoDueCard({ posts, base, nl }: { posts: OwnPost[]; base: string;
     <section className="vtk-bo-due" aria-labelledby="bo-due-title">
       <div className="vtk-bo-due-head">
         <h2 id="bo-due-title">
-          {nl ? "Nog naar het BO" : "Still due at the board meeting"}
-          {single && `: ${posts[0].name}`}
+          {nl ? "Nog te brengen resultaten" : "Results still to bring"}
         </h2>
         <Link href={href}>{nl ? "Alle budgetten van je post" : "All budgets of your post"}</Link>
       </div>
-      <p>
-        {nl
-          ? "Resultaten waarvan het budget al op een BO passeerde. Zet het rekenblad met Resultaat in de naam in de map Resultaten van een volgende BO."
-          : "Results whose budget already passed a board meeting. Put the spreadsheet with Resultaat in its name in the Resultaten folder of a next meeting."}
-      </p>
       {posts.map((post) => {
         const more = post.dossiers.length - SHOWN;
         return (

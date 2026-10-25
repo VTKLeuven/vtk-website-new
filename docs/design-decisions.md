@@ -11829,7 +11829,7 @@ naar het BO moeten brengen, in plaats van het enkel op de wekelijkse slide te
 horen. Gekozen uit drie (een blok op het dashboard, een eigen pagina, of
 allebei): allebei.
 
-- **Op het dashboard staat enkel wat nog moet komen** ("Nog naar het BO"):
+- **Op het dashboard staat enkel wat nog moet komen** ("Nog te brengen resultaten"):
   activiteit, de BO van het budget, hoe lang al open, en het rekenblad in
   Drive. Daar komt elk praesidiumlid binnen, dus daar ziet een post het zonder
   te zoeken. Zonder open resultaat staat er niets: een groen vinkje dat elke
