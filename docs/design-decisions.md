@@ -12027,3 +12027,37 @@ Sheet. Dat is nu een formulier op de site met een overzicht voor commu op
 - **Bewust niet gebouwd:** een deadline (hoeveel dagen vooraf je moet aanvragen),
   het importeren van de oude Google-antwoorden, en een eigen mail; de melding aan
   communicatie@vtk.be is de gewone melding van een formulier.
+
+## 24 urenloop: je rondes in je account
+
+Na de race laadt Sport `laps.csv` uit de export van de telapp op in
+/admin/24urenloop (recht `urenloop.manage`, dat Sport per post krijgt in
+/admin/roles). Elke loper met een r-nummer ziet daarna op Mijn VTK een kaart
+met zijn rondes, gemiddelde, snelste ronde en plaats, en op /account/24urenloop
+elke ronde met het vertrekuur.
+
+- **De koppeling is het r-nummer, bij het lezen.** `UrenloopLap.rNumber` wordt
+  vergeleken met `User.rNumber` wanneer de pagina laadt, niet bij de upload.
+  Wie pas na de race een account maakt of zijn r-nummer invult, ziet zijn
+  rondes dus vanzelf. Op naam koppelen doen we niet: twee keer dezelfde naam,
+  of een andere schrijfwijze, en iemand ziet de rondes van een ander.
+- **Enkel `laps.csv`, geen zip.** De volledige export bevat telefoonnummers,
+  mails en belnotities. De upload weigert een zip met de vraag om enkel
+  `laps.csv` te kiezen, zodat de rest nooit op de server komt.
+- **Geen namen in de database.** Een ronde draagt het r-nummer, of `anon-<n>`
+  voor een loper zonder: de naam-hash uit de export (`name_<sha1>`) bewaren we
+  niet, want die is met een lijst namen terug te rekenen. Zo tellen ook de
+  lopers zonder r-nummer mee voor de plaatsen, zonder dat ze herkenbaar zijn.
+- **De plaatsen zijn binnen VTK.** "Plaats 5 van 319" telt elke loper van de
+  ploeg met minstens één ronde, ex aequo op dezelfde plaats. Een noodronde die
+  niemand kon toewijzen (`unknown`) telt voor de ploeg, niet als loper.
+- **Meteen zichtbaar na de upload.** Er is geen aparte publicatiestap: wat
+  Sport oplaadt, is de afgesloten race. Een nieuwe upload van hetzelfde jaar
+  vervangt dat jaar volledig (een gecorrigeerde export), andere jaren blijven.
+  Verwijderen kan per jaar.
+- **Afstand is 530 m per ronde**, zoals de speedyteam-test en de data-analyse
+  (`24UL-data-analysis`) rekenen.
+- **Account verwijderen anonimiseert de rondes.** Ze blijven meetellen voor de
+  ploeg en de plaatsen van anderen, maar staan niet meer op dat r-nummer. Laadt
+  Sport daarna dezelfde export opnieuw op, dan staan ze er wel weer onder; dat is
+  de prijs van geen namen bijhouden.

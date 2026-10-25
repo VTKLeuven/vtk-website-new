@@ -847,6 +847,7 @@ model User {
   adminAuditLogs AdminAuditLog[] @relation("AdminAuditActor")
 
   urenloopDownloadEmails UrenloopDownloadEmail[] @relation("UrenloopDownloadEmailAddedBy")
+  urenloopEditionsImported UrenloopEdition[] @relation("UrenloopEditionImportedBy")
 
   kiesploegMemberships KiesploegMember[]
 
@@ -7142,6 +7143,56 @@ model UrenloopDownloadCode {
 
   @@index([email, createdAt])
   @@index([expiresAt])
+}
+
+/// Eén editie van de 24 urenloop waarvan de rondes per loper op de site staan.
+///
+/// Sport laadt na de race `laps.csv` uit de export van de telapp op in
+/// /admin/24urenloop. Een nieuwe upload voor hetzelfde jaar vervangt alle
+/// rondes van dat jaar; een ander jaar blijft staan.
+model UrenloopEdition {
+  year         Int       @id
+  /// Start van de eerste ronde: het nulpunt voor "uur 3 van de race".
+  eventStart   DateTime  @db.Timestamptz(3)
+  fileName     String?
+  importedById String?
+  importedAt   DateTime  @default(now()) @db.Timestamptz(3)
+
+  importedBy User?         @relation("UrenloopEditionImportedBy", fields: [importedById], references: [id], onDelete: SetNull)
+  laps       UrenloopLap[]
+}
+
+/// Eén gelopen ronde, uit `laps.csv`.
+///
+/// Er staat bewust geen naam in: een loper ziet zijn rondes in zijn account
+/// omdat het r-nummer daar overeenkomt met `User.rNumber`, op het moment van
+/// lezen. Wie pas later een account maakt, ziet ze dus ook. Een ronde zonder
+/// r-nummer telt mee voor de ploeg en de rangschikking, maar onder een sleutel
+/// die enkel binnen die upload iets betekent (`anon-12`), en niet onder de
+/// naam-hash van de export: een hash van een naam is met de naam terug te vinden.
+model UrenloopLap {
+  id          String   @id @default(cuid())
+  year        Int
+  /// `lap_sequence`: de ploegronde, vanaf 1.
+  sequence    Int
+  /// Het r-nummer, `anon-<n>` voor een loper zonder, of `unknown` voor een
+  /// noodronde die niemand kon toewijzen.
+  runnerKey   String
+  /// Genormaliseerd ("r0123456"); null zonder r-nummer.
+  rNumber     String?
+  startedAt   DateTime @db.Timestamptz(3)
+  endedAt     DateTime @db.Timestamptz(3)
+  /// Rondetijd in milliseconden, na de correcties uit de telapp.
+  timeMs      Int
+  raining     Boolean  @default(false)
+  /// `manual`, `camera` of `emergency`.
+  source      String
+
+  edition UrenloopEdition @relation(fields: [year], references: [year], onDelete: Cascade)
+
+  @@unique([year, sequence])
+  @@index([rNumber])
+  @@index([year, runnerKey])
 }
 
 // -----------------------------------------------------------------------------

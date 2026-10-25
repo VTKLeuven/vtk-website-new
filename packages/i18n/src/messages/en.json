@@ -1027,6 +1027,10 @@
       "title": "My account",
       "description": "Your profile, your tickets, your shifts and your connected apps."
     },
+    "urenloopStats": {
+      "title": "My 24-hour run",
+      "description": "Every lap you ran at the 24-hour run, with your count, average and fastest lap."
+    },
     "connectedApps": {
       "title": "Connected apps",
       "description": "The applications you granted access with your VTK account."

@@ -5,9 +5,16 @@ import type { Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import { utcToLocalDateTime } from "@/lib/ticketing/time";
-import { DeleteButton } from "@/components/ui/DeleteIconButton";
-import { clearUrenloopStatsAction } from "@/app/actions/urenloop";
+import { DeleteButton, DeleteIconButton } from "@/components/ui/DeleteIconButton";
+import {
+  clearUrenloopStatsAction,
+  deleteUrenloopEditionAction,
+} from "@/app/actions/urenloop";
 import { readUrenloopData } from "@/lib/urenloop/server";
+import { listUrenloopEditions } from "@/lib/urenloop/runnerStats";
+import { LAPS_CSV_COLUMNS } from "@/lib/urenloop/laps";
+import { AdminDisclosure } from "@/components/admin/AdminDisclosure";
+import { UrenloopLapsUploadForm } from "./UrenloopLapsUploadForm";
 import {
   isWithinConfiguredEdition,
   resolvePublicUrenloopState,
@@ -26,7 +33,7 @@ export default async function AdminUrenloopPage({
 
   await requirePermission("urenloop.manage");
 
-  const [{ config, stats }, activeDevices, allowedEmails] = await Promise.all([
+  const [{ config, stats }, activeDevices, allowedEmails, editions] = await Promise.all([
     readUrenloopData(),
     prisma.urenloopDeviceToken.findMany({
       where: { revokedAt: null },
@@ -36,6 +43,7 @@ export default async function AdminUrenloopPage({
     prisma.urenloopDownloadEmail.findMany({
       select: { email: true, canPublishStats: true },
     }),
+    listUrenloopEditions(),
   ]);
 
   const publishByEmail = new Map(
@@ -394,7 +402,163 @@ export default async function AdminUrenloopPage({
           </div>
         </Card>
       </section>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold">
+            {nl ? "Rondes per loper" : "Laps per runner"}
+          </h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            {nl
+              ? "Na de race laad je laps.csv uit de export van de telapp op. Elke loper met een r-nummer ziet dan in zijn account elke ronde met het uur en de tijd, zijn aantal, gemiddelde en snelste ronde. Het r-nummer koppelt de ronde aan het account; namen worden niet bewaard."
+              : "After the race, upload laps.csv from the lap-counting app's export. Every runner with an r-number then sees each lap with its time of day and lap time, their count, average and fastest lap in their account. The r-number links a lap to the account; names are not stored."}
+          </p>
+        </div>
+        <Card className="space-y-6 p-5">
+          <UrenloopLapsUploadForm locale={locale} />
+
+          {/* Het formaat staat hier en niet enkel in de README van de export:
+              raakt die zoek, of komt de export ooit uit een ander programma,
+              dan weet Sport nog wat er in het bestand moet staan. */}
+          <AdminDisclosure
+            variant="row"
+            summary={
+              <span className="text-sm font-medium text-vtk-ink">
+                {nl ? "Wat moet er in laps.csv staan?" : "What goes into laps.csv?"}
+              </span>
+            }
+          >
+            <div className="space-y-4 text-sm">
+              <ul className="list-disc space-y-1 pl-5 text-zinc-600">
+                {(nl
+                  ? [
+                      "Komma-gescheiden, met de kolomnamen op de eerste regel. De volgorde van de kolommen maakt niet uit.",
+                      "Eén regel per gelopen ronde, enkel de race zelf (geen testrondes), en één jaar per bestand.",
+                      "Tijden in UTC, ISO 8601 (2026-10-20T18:00:02.809Z). Op de site staan ze daarna in Brusselse tijd.",
+                      "Kolommen die hier niet staan, worden genegeerd. Een naam wordt nooit bewaard, ook niet als runner_name erin staat.",
+                    ]
+                  : [
+                      "Comma-separated, with the column names on the first line. Column order does not matter.",
+                      "One line per lap run, only the race itself (no test laps), and one year per file.",
+                      "Times in UTC, ISO 8601 (2026-10-20T18:00:02.809Z). The site then shows them in Brussels time.",
+                      "Columns not listed here are ignored. A name is never stored, not even when runner_name is present.",
+                    ]
+                ).map((rule) => (
+                  <li key={rule}>{rule}</li>
+                ))}
+              </ul>
+              <div className="relative overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-vtk-blue/10 text-left text-xs uppercase text-zinc-500">
+                      <th className="py-1.5 pr-4 font-medium">{nl ? "Kolom" : "Column"}</th>
+                      <th className="py-1.5 pr-4 font-medium">{nl ? "Verplicht" : "Required"}</th>
+                      <th className="py-1.5 pr-4 font-medium">{nl ? "Voorbeeld" : "Example"}</th>
+                      <th className="py-1.5 font-medium">{nl ? "Betekenis" : "Meaning"}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {LAPS_CSV_COLUMNS.map((column) => (
+                      <tr key={column.name} className="border-b border-vtk-blue/5 align-top">
+                        <td className="py-2 pr-4 font-mono text-xs text-vtk-ink">{column.name}</td>
+                        <td className="py-2 pr-4 text-zinc-600">
+                          {column.required ? (nl ? "ja" : "yes") : nl ? "nee" : "no"}
+                        </td>
+                        <td className="py-2 pr-4 font-mono text-xs text-zinc-600">{column.example}</td>
+                        <td className="py-2 text-zinc-600">{nl ? column.nl : column.en}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  {nl ? "Kleinste geldige bestand" : "Smallest valid file"}
+                </p>
+                <pre className="mt-1 overflow-x-auto rounded-lg bg-vtk-blue-soft/60 p-3 font-mono text-xs text-vtk-ink">
+                  {[
+                    LAPS_CSV_COLUMNS.filter((c) => c.required).map((c) => c.name).join(","),
+                    LAPS_CSV_COLUMNS.filter((c) => c.required).map((c) => c.example).join(","),
+                  ].join("\n")}
+                </pre>
+              </div>
+            </div>
+          </AdminDisclosure>
+
+          {editions.length > 0 ? (
+            <div className="overflow-x-auto border-t border-vtk-blue/10 pt-5">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-vtk-blue/10 text-left text-xs uppercase text-zinc-500">
+                    <th className="py-1.5 pr-4 font-medium">{nl ? "Jaar" : "Year"}</th>
+                    <th className="py-1.5 pr-4 text-right font-medium">{nl ? "Rondes" : "Laps"}</th>
+                    <th className="py-1.5 pr-4 text-right font-medium">
+                      {nl ? "Lopers met r-nummer" : "Runners with r-number"}
+                    </th>
+                    <th className="py-1.5 pr-4 text-right font-medium">
+                      {nl ? "Waarvan met account" : "Of which with account"}
+                    </th>
+                    <th className="py-1.5 pr-4 font-medium">{nl ? "Opgeladen" : "Uploaded"}</th>
+                    <th className="py-1.5 font-medium">
+                      <span className="sr-only">{nl ? "Acties" : "Actions"}</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {editions.map((edition) => (
+                    <tr key={edition.year} className="border-b border-vtk-blue/5">
+                      <td className="py-2 pr-4 font-medium">{edition.year}</td>
+                      <td className="py-2 pr-4 text-right tabular-nums">{edition.laps}</td>
+                      <td className="py-2 pr-4 text-right tabular-nums">
+                        {edition.runnersWithRNumber}
+                      </td>
+                      <td className="py-2 pr-4 text-right tabular-nums">
+                        {edition.runnersWithAccount}
+                      </td>
+                      <td className="py-2 pr-4 text-zinc-500">
+                        {dateFmt.format(edition.importedAt)}
+                        {edition.importedBy ? `, ${edition.importedBy.name}` : ""}
+                      </td>
+                      <td className="py-2 text-right">
+                        <DeleteIconButton
+                          action={deleteUrenloopEditionAction}
+                          fields={{ year: String(edition.year) }}
+                          label={nl ? "Verwijderen" : "Delete"}
+                          srLabel={
+                            nl
+                              ? `Rondes van ${edition.year} verwijderen`
+                              : `Delete laps of ${edition.year}`
+                          }
+                          title={
+                            nl
+                              ? `Rondes van ${edition.year} verwijderen?`
+                              : `Delete laps of ${edition.year}?`
+                          }
+                          description={
+                            nl
+                              ? `De ${edition.laps} rondes van ${edition.year} verdwijnen uit elk account. Andere jaren en de live tussenstand blijven staan. Je kan laps.csv later opnieuw opladen.`
+                              : `The ${edition.laps} laps of ${edition.year} disappear from every account. Other years and the live standings stay. You can upload laps.csv again later.`
+                          }
+                          confirmLabel={nl ? "Verwijderen" : "Delete"}
+                          cancelLabel={nl ? "Annuleren" : "Cancel"}
+                          successMessage={
+                            nl ? `Rondes van ${edition.year} verwijderd.` : `Laps of ${edition.year} deleted.`
+                          }
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="mt-3 text-xs text-zinc-500">
+                {nl
+                  ? "Wie geen account heeft, of een ander r-nummer in zijn profiel, ziet niets. Maakt iemand later een account met dat r-nummer, dan verschijnen zijn rondes vanzelf."
+                  : "Runners without an account, or with a different r-number in their profile, see nothing. Anyone who later creates an account with that r-number sees their laps automatically."}
+              </p>
+            </div>
+          ) : null}
+        </Card>
+      </section>
     </div>
   );
 }
-

@@ -35,6 +35,8 @@ import { AccountMembership } from './AccountMembership';
 import { siteBaseUrl } from '@/lib/calendar/feeds';
 import { currentWorkingYear, currentStudyYear, formatWorkingYear } from '@/lib/workingYear';
 import { getMembership, getMembershipConfig, membershipOffer } from '@/lib/membership';
+import { getRunnerStats } from '@/lib/urenloop/runnerStats';
+import { RunnerStatsFacts } from '@/components/urenloop/RunnerStats';
 
 export async function generateMetadata({
   params,
@@ -72,6 +74,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
     password,
     membership,
     membershipConfig,
+    urenloopYears,
   ] = await Promise.all([
     // Volledig profiel voor het bewerkbare gegevensformulier (kotadres, mails, ...).
     prisma.user.findUniqueOrThrow({
@@ -202,7 +205,12 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
     // Het lidmaatschap van dit academiejaar (betaald of nog niet).
     getMembership(session.user.id, currentStudyYear(now)),
     getMembershipConfig(),
+    // De 24 urenloop koppelt op het r-nummer; zonder rondes staat er geen kaart.
+    prisma.user
+      .findUniqueOrThrow({ where: { id: session.user.id }, select: { rNumber: true } })
+      .then((user) => getRunnerStats(user.rNumber)),
   ]);
+  const latestUrenloop = urenloopYears[0];
 
   const workingYear = currentWorkingYear(now);
   const userMemberships = memberships.map((m) => ({
@@ -432,6 +440,29 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
             <div id="shifts" className="scroll-mt-28">
               <AccountShifts locale={locale} shifts={registeredShifts} />
             </div>
+
+            {latestUrenloop && (
+              <Card id="urenloop" className="scroll-mt-28 p-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-vtk-ink">
+                      {nl ? `24 urenloop ${latestUrenloop.year}` : `24-hour run ${latestUrenloop.year}`}
+                    </h3>
+                    <p className="mt-1 text-sm text-[#5c667f]">
+                      {nl
+                        ? 'Je rondes, gekoppeld via je r-nummer.'
+                        : 'Your laps, linked through your r-number.'}
+                    </p>
+                  </div>
+                  <Link href={`${nl ? '' : '/en'}/account/24urenloop`} className="font-medium text-vtk-ink underline">
+                    {nl ? 'Al je rondes' : 'All your laps'}
+                  </Link>
+                </div>
+                <div className="mt-5">
+                  <RunnerStatsFacts stats={latestUrenloop} locale={locale} compact />
+                </div>
+              </Card>
+            )}
 
             <Card id="calendar" className="scroll-mt-28 p-6">
               <CalendarFeedTokens

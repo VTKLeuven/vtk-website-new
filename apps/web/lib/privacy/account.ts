@@ -287,12 +287,22 @@ export async function exportUserData(userId: string) {
     }),
   }));
 
+  // De rondes van de 24 urenloop hangen niet aan het account maar aan het
+  // r-nummer (zie `UrenloopLap`); ze horen toch bij deze persoon.
+  const urenloopLaps = user.rNumber
+    ? await prisma.urenloopLap.findMany({
+        where: { rNumber: user.rNumber },
+        select: { year: true, startedAt: true, endedAt: true, timeMs: true, raining: true },
+        orderBy: { startedAt: "asc" },
+      })
+    : [];
+
   return {
     generatedAt: new Date().toISOString(),
     controller: "VTK — it@vtk.be",
     notice:
       "Credentials, secrets, session tokens and ticket access tokens are excluded. Structured third-party attendee details are redacted; contact it@vtk.be for a reviewed access response covering unstructured records.",
-    user: { ...user, ticketOrders },
+    user: { ...user, ticketOrders, urenloopLaps },
   };
 }
 
@@ -330,7 +340,7 @@ async function removeObject(key: string): Promise<void> {
 export async function eraseUserData(userId: string) {
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { email: true, name: true, avatarKey: true },
+    select: { email: true, name: true, avatarKey: true, rNumber: true },
   });
   const tombstone = randomUUID();
   const deletedEmail = `deleted+${tombstone}@vtk.invalid`;
@@ -424,6 +434,15 @@ export async function eraseUserData(userId: string) {
       // zakken daardoor met één, en dat is de prijs van een echte verwijdering.
       await tx.studyConfirmation.deleteMany({ where: { userId } });
 
+      // De rondes blijven tellen voor de ploeg en de plaatsen van de anderen,
+      // maar niet meer onder dit r-nummer: een nieuwe account met hetzelfde
+      // r-nummer zou ze anders opnieuw zien.
+      if (user.rNumber) {
+        await tx.urenloopLap.updateMany({
+          where: { rNumber: user.rNumber },
+          data: { rNumber: null, runnerKey: `anon-${tombstone}` },
+        });
+      }
       await tx.doorAccessLog.updateMany({
         where: { userId },
         data: { userId: null, rNumber: null, cardName: null, reason: null },
