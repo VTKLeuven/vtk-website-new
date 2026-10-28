@@ -5,6 +5,7 @@ import { UndoIcon } from "@/components/ui/icons";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import { listAccountingCodes } from "@/lib/accounting/server";
+import { getCashRegisterConfig } from "@/lib/kassas/server";
 import {
   countUnassigned,
   getIncomeConfig,
@@ -19,13 +20,14 @@ import {
   deleteIncomeChannelCodeAction,
   deleteIncomeNameRuleAction,
   reopenIncomePeriodAction,
+  saveIncomeChannelDeviceAction,
   saveIncomeChannelLabelAction,
   saveIncomeSettingsAction,
 } from "@/app/actions/inkomsten";
 import { IncomeNav } from "../IncomeNav";
 import { incomeErrorMessages } from "../messages";
 import { SOURCE_LABELS, periodLabel } from "../shared";
-import { ChannelAccountForm, ChannelCodeForm, ChannelLabelForm, FeeCodeForm } from "./SettingsForms";
+import { ChannelAccountForm, ChannelCodeForm, ChannelDeviceForm, ChannelLabelForm, FeeCodeForm } from "./SettingsForms";
 
 /**
  * Alles over VTK zelf, ingevuld door Beheer: de kostencode, op welke rekening
@@ -41,17 +43,30 @@ export default async function IncomeSettingsPage({ params }: { params: Promise<{
   const base = nl ? "" : "/en";
   await requirePermission("income.manage");
 
-  const [config, codes, channels, rules, periods, openCount] = await Promise.all([
+  const [config, codes, channels, rules, periods, openCount, cashConfig] = await Promise.all([
     getIncomeConfig(),
     listAccountingCodes(),
     listIncomeChannels(),
     listIncomeNameRules(),
     listClosedPeriods(),
     countUnassigned(),
+    getCashRegisterConfig(),
   ]);
   const errorMessages = incomeErrorMessages(locale);
   const common = { locale, errorMessages } as const;
   const date = (value: Date) => value.toLocaleDateString(nl ? "nl-BE" : "en-GB", { timeZone: "UTC" });
+  // Een Payconiq-kanaal is een Payconiq-rekening, een SumUp-account of
+  // Europabank-terminal een Bancontact-bakje. Een toestel dat intussen hernoemd
+  // werd, blijft kiesbaar op het kanaal waar het al stond.
+  const deviceOptions = (channel: (typeof channels)[number]) => {
+    const method = channel.source === "PAYCONIQ" ? "PAYCONIQ" : "BANCONTACT";
+    const names = method === "PAYCONIQ" ? cashConfig.payconiqAccounts : cashConfig.bancontactTerminals;
+    const kept = channel.cashMethod === method && channel.cashTerminal && !names.includes(channel.cashTerminal) ? [channel.cashTerminal] : [];
+    return [...kept, ...names].map((name) => ({
+      value: `${method}|${name}`,
+      label: `${method === "PAYCONIQ" ? "Payconiq" : "Bancontact"}: ${name}`,
+    }));
+  };
 
   return (
     <div className="space-y-5">
@@ -187,6 +202,16 @@ export default async function IncomeSettingsPage({ params }: { params: Promise<{
                       </ul>
                     )}
                     <ChannelCodeForm {...common} action={addIncomeChannelCodeAction} channelId={channel.id} codes={codes} />
+                    <p className="pt-2 text-xs font-medium uppercase tracking-wide text-vtk-muted">
+                      {nl ? "Kassa's" : "Cash registers"}
+                    </p>
+                    <ChannelDeviceForm
+                      {...common}
+                      action={saveIncomeChannelDeviceAction}
+                      channelId={channel.id}
+                      value={channel.cashMethod && channel.cashTerminal ? `${channel.cashMethod}|${channel.cashTerminal}` : ""}
+                      options={deviceOptions(channel)}
+                    />
                   </>
                 ) : null}
               </li>

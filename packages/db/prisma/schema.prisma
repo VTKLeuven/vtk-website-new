@@ -8494,6 +8494,12 @@ model IncomeChannel {
   identifier   String
   /// Een eigen naam, voor het overzicht. NULL = de naam uit de export.
   label        String?
+  /// Het toestel van de kassa's dat dit kanaal is: het Bancontact-bakje of de
+  /// Payconiq-rekening, met de naam zoals in de instellingen van de kassa's en
+  /// op `CashRegisterPayment.terminal`. NULL = niet gekoppeld. Beheer vult het
+  /// in; meerdere kanalen kunnen één toestel zijn (de twee terminals van Cudi).
+  cashMethod   CashRegisterPaymentMethod?
+  cashTerminal String?
   createdAt    DateTime     @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime     @updatedAt @db.Timestamptz(3)
 

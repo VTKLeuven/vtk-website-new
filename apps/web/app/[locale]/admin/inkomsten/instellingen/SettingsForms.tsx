@@ -2,7 +2,7 @@
 
 import { useId } from "react";
 import { useRouter } from "next/navigation";
-import { Input } from "@vtk/ui";
+import { Input, Select } from "@vtk/ui";
 import { AccountingCodePicker } from "@/components/admin/AccountingCodePicker";
 import { SaveForm } from "@/components/ui/SaveForm";
 import type { AccountingCodeOption } from "@/lib/accounting/codes";
@@ -124,6 +124,54 @@ export function ChannelCodeForm({
           locale={locale}
           noneLabel={nl ? "Geen: naar Na te kijken" : "None: to To review"}
         />
+      </div>
+    </SaveForm>
+  );
+}
+
+/**
+ * Welk Bancontact-bakje of welke Payconiq-rekening van de kassa's dit kanaal
+ * is. Dan toont elke kassa met dat toestel wat de import erop zag.
+ */
+export function ChannelDeviceForm({
+  locale,
+  action,
+  errorMessages,
+  channelId,
+  value,
+  options,
+}: Common & { channelId: string; value: string; options: Array<{ value: string; label: string }> }) {
+  const nl = locale === "nl";
+  const router = useRouter();
+  const t = texts(nl);
+  const selectId = useId();
+  return (
+    <SaveForm
+      action={action}
+      submitLabel={nl ? "Toestel opslaan" : "Save device"}
+      submitVariant="ghost"
+      submitSize="sm"
+      savingLabel={t.saving}
+      savedMessage={t.saved}
+      errorMessages={errorMessages}
+      fallbackErrorMessage={t.failed}
+      resetOnSuccess={false}
+      onSuccess={() => router.refresh()}
+      className="flex flex-wrap items-end gap-2"
+    >
+      <input type="hidden" name="id" value={channelId} />
+      <div className="w-full max-w-xs text-sm">
+        <label htmlFor={selectId} className="block text-xs text-vtk-muted">
+          {nl ? "Toestel" : "Device"}
+        </label>
+        <Select id={selectId} name="device" defaultValue={value}>
+          <option value="">{nl ? "Geen" : "None"}</option>
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
       </div>
     </SaveForm>
   );

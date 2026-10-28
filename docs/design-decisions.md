@@ -12079,7 +12079,12 @@ volgt nog.
   periode op de bank kwam. Kosten en reserve staan als eigen rij. Een betaling
   met status "refunded" telt voor haar volle bedrag en de terugbetaling als eigen
   regel, ook zoals in het rekenblad. Op het vierde kwartaal van 2025 komt de
-  site tot op de cent uit op het kwartaalblad.
+  site tot op de cent uit op het kwartaalblad. De eigen poging van Beheer
+  (augustus en september 2026) telde Mollie op de betaaldatum, met het verschil
+  als "wijziging dynamische reserve". De site bleef bij de uitbetaling
+  (oktober 2026): een betaling van eind september komt soms pas in oktober op
+  de bank, en zo klopt elk kwartaal met de uittreksels. Wat nog niet
+  uitbetaald is, toont het overzicht apart.
 - **Alles over VTK zelf is data, niets staat in de code.** Welke stickers er
   zijn, op welke rekening ze storten en vanaf wanneer, onder welke code een
   sticker standaard valt, welke code de kosten krijgen, welke teksten onder
@@ -12176,6 +12181,16 @@ volgt nog.
   kosten" in het kwartaalblad. De terminal van evenementen krijgt geen
   standaardcode: tot de koppeling met de kassa's (fase 2) staat ze per dag bij
   Na te kijken.
+- **De kassacontrole vergelijkt, ze schrijft niet.** Beheer tikt bij elke kassa
+  het bedrag in dat het Bancontact-bakje of de Payconiq-rekening toont, en dat
+  blijft het bedrag van de kassa: de online inkomsten staan ernaast, met een
+  waarschuwing bij een verschil (meestal betaalde iemand op een ander
+  toestel), en "Overnemen" vult enkel een leeg veld. Zo vroeg Beheer het in
+  oktober 2026. De vergelijking telt over de uren van de kassa wanneer een
+  andere kassa dat toestel dezelfde dag had, en anders over de hele dag, zoals
+  Beheer afleest: voor en na een evenement, of het dagtotaal. Welk kanaal welk
+  toestel is, vult Beheer in; de namen van de toestellen komen uit de
+  instellingen van de kassa's, niet uit de code.
 - **Veel bestanden tegelijk, elk een eigen import.** Europabank laat enkel per
   dag downloaden, dus een kwartaal van één terminal is een negentigtal
   bestanden. Beheer kiest ze samen; de site toont wat ze samen en per bestand

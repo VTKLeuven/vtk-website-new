@@ -31,6 +31,7 @@ import {
   timeRangeShort,
   type PaymentMethod,
 } from "@/lib/kassas/kassa";
+import { kassaImportAmounts } from "@/lib/inkomsten/server";
 import {
   acceptCashRegisterAction,
   deleteCashRegisterAction,
@@ -78,6 +79,10 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
       ? resultFor(register, await ticketIncomeByEvent(register.ticketEvents.map((link) => link.ticketEventId)))
       : null;
   const config = await getCashRegisterConfig();
+  // De kassacontrole: wat de online inkomsten per toestel zagen. Enkel bij het
+  // tellen, en enkel voor wie de online inkomsten mag zien.
+  const seesIncome = access.session.user.isSuperAdmin || access.session.permissions.includes("income.manage");
+  const importAmounts = manage && !requested && seesIncome ? await kassaImportAmounts(register) : [];
   const errorMessages = kassaErrorMessages(locale);
   const startCounts = normaliseCounts(register.startCounts);
   const startCents = countsTotalCents(startCounts);
@@ -340,6 +345,8 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
             linkedTicketIds={register.ticketEvents.map((link) => link.ticketEventId)}
             note={register.note ?? ""}
             errorMessages={errorMessages}
+            importAmounts={importAmounts}
+            incomeSettingsHref={`${base}/admin/inkomsten/instellingen`}
           />
         </section>
       )}

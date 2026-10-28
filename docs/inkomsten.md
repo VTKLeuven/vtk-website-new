@@ -10,8 +10,8 @@ Fase 1, 1b en 3 zijn gebouwd: Payconiq, Mollie, SumUp en Europabank opladen,
 koppelen, Na te kijken, het overzicht per periode, een standaardcode per kanaal,
 de controlelijst met de Mollie-uitbetalingen om af te vinken, het kwartaalblad
 voor de boekhouder en het controlebestand als xlsx, en afsluiten. De
-boekhoudcodes kunnen als CSV opgeladen worden in `/admin/boekhoudcodes`. De
-koppeling met de kassa's (fase 2) nog niet.
+boekhoudcodes kunnen als CSV opgeladen worden in `/admin/boekhoudcodes`. Van
+fase 2 staat de kassacontrole; de code van een kassa en koppelregel 4 nog niet.
 
 ## Bestanden
 
@@ -23,6 +23,7 @@ koppeling met de kassa's (fase 2) nog niet.
 | `lib/inkomsten/workbook.ts` | Het kwartaalblad en het controlebestand als bladen voor `write-excel-file`. Puur. |
 | `lib/inkomsten/server.ts` | Database: opladen (met voorvertoning), opnieuw koppelen, Na te kijken, overzicht, uitbetalingen afvinken, het model voor de xlsx, lijsten. |
 | `lib/inkomsten/importSummary.ts` | De voorvertoning van meerdere gekozen bestanden samen (`combineImportSummaries`). Puur. |
+| `lib/inkomsten/kassa.ts` | De kassacontrole: het venster van een kassa (`kassaControlWindow`) en het ingetikte bedrag naast de import (`kassaCheck`). Puur; het optellen is `kassaImportAmounts` in `server.ts`. |
 | `app/actions/inkomsten.ts` | Server actions, allemaal achter `income.manage`. |
 | `app/[locale]/admin/inkomsten/` | Overzicht (met de controlelijst en de uitbetalingen), Opladen, Na te kijken, Transacties, Instellingen. |
 | `app/api/admin/inkomsten/export/route.ts` | De twee xlsx-bestanden, voor `?van=2026-07&tot=2026-09` en `?soort=boekhouder` of `?soort=controle`. |
@@ -182,6 +183,30 @@ Europabank. De rekening van een transactie is die van de laatste wissel op of
 voor haar Brusselse dag (`accountOn`); ze bepaalt de kolom in het kwartaalblad,
 niet of de transactie meetelt. De standaardcode zoekt de site op dezelfde
 manier op (`channelCodeOn`). Niets daarvan staat in de code of in een seed.
+
+## De kassacontrole
+
+Bij het tellen van een kassa (`/admin/kassas/[id]`) toont het telformulier per
+toestel wat de online inkomsten erop zagen, naast het bedrag dat Beheer
+intikte (`kassaImportAmounts`, `ImportCheckLine` in `CountForm`).
+
+- **Welk kanaal welk toestel is**, vult Beheer in bij de kanalen
+  (`IncomeChannel.cashMethod` en `cashTerminal`): een Payconiq-kanaal is een
+  Payconiq-rekening, een SumUp-account of Europabank-terminal een
+  Bancontact-bakje, met de naam uit de instellingen van de kassa's. Meerdere
+  kanalen kunnen één toestel zijn (de twee terminals van Cudi).
+- **Het venster** (`kassaControlWindow`): de uren van de kassa wanneer een
+  andere kassa dat toestel dezelfde dag had, en anders de hele dag, tot het
+  einde van een kassa die over middernacht loopt. Zo leest Beheer af: voor en
+  na een evenement, of het dagtotaal als dat evenement het enige was. Een kassa
+  zonder uren telt altijd de hele dag.
+- **Wat telt**: alle betalingen en terugbetalingen op die kanalen in dat
+  venster, ook wat "telt niet mee" kreeg: dit is wat er op het toestel
+  binnenkwam.
+- **De import schrijft nooit in een kassa.** Een verschil is een
+  waarschuwing; bij een leeg veld vult "Overnemen" het veld, en opslaan doet
+  Beheer zelf.
+- Enkel bij het tellen, en enkel voor wie ook `income.manage` heeft.
 
 ## Het kwartaalblad en het controlebestand
 

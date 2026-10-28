@@ -28,6 +28,7 @@ import {
   type MolliePayout,
 } from "./overview";
 import { periodLabel } from "./labels";
+import { kassaControlWindow, type KassaImportAmount } from "./kassa";
 import { quarterLineKey, type WorkbookGroup, type WorkbookModel, type WorkbookTransaction } from "./workbook";
 import {
   dateToMonth,
@@ -958,6 +959,61 @@ export async function listIncomeImports() {
   return imports.map((row) => ({ ...row, manualCount: manualById.get(row.id) ?? 0 }));
 }
 
+/**
+ * Wat de import per toestel zag tijdens een kassa, voor de kassacontrole: voor
+ * elk toestel waaraan Beheer een kanaal koppelde. Alle betalingen en
+ * terugbetalingen tellen, ook wat "telt niet mee" kreeg: dit is wat er op het
+ * toestel binnenkwam. Schrijft niets in de kassa.
+ */
+export async function kassaImportAmounts(register: {
+  id: string;
+  date: Date;
+  startsAt: Date | null;
+  endsAt: Date | null;
+}): Promise<KassaImportAmount[]> {
+  const channels = await prisma.incomeChannel.findMany({
+    where: { cashMethod: { not: null }, cashTerminal: { not: null } },
+    select: { id: true, cashMethod: true, cashTerminal: true },
+  });
+  if (channels.length === 0) return [];
+  const devices = new Map<string, { method: NonNullable<(typeof channels)[number]["cashMethod"]>; terminal: string; channelIds: string[] }>();
+  for (const channel of channels) {
+    if (!channel.cashMethod || !channel.cashTerminal) continue;
+    const key = `${channel.cashMethod}|${channel.cashTerminal}`;
+    const device = devices.get(key) ?? { method: channel.cashMethod, terminal: channel.cashTerminal, channelIds: [] };
+    device.channelIds.push(channel.id);
+    devices.set(key, device);
+  }
+  const sameDay = await prisma.cashRegisterPayment.findMany({
+    where: { registerId: { not: register.id }, register: { date: register.date } },
+    select: { method: true, terminal: true },
+  });
+
+  const result: KassaImportAmount[] = [];
+  for (const device of devices.values()) {
+    const sharedThatDay = sameDay.some((use) => use.method === device.method && use.terminal === device.terminal);
+    const window = kassaControlWindow(register, sharedThatDay);
+    const sum = await prisma.incomeTransaction.aggregate({
+      where: {
+        channelId: { in: device.channelIds },
+        kind: { in: ["PAYMENT", "REFUND"] },
+        occurredAt: { gte: window.start, lt: window.end },
+      },
+      _sum: { amountCents: true },
+      _count: true,
+    });
+    result.push({
+      method: device.method,
+      terminal: device.terminal,
+      cents: sum._sum.amountCents ?? 0,
+      count: sum._count,
+      window,
+      sharedThatDay,
+    });
+  }
+  return result;
+}
+
 export async function listIncomeChannels() {
   return prisma.incomeChannel.findMany({
     orderBy: [{ source: "asc" }, { identifier: "asc" }],
@@ -966,6 +1022,8 @@ export async function listIncomeChannels() {
       source: true,
       identifier: true,
       label: true,
+      cashMethod: true,
+      cashTerminal: true,
       accounts: { orderBy: { from: "asc" }, select: { from: true, bankAccount: true } },
       codes: { orderBy: { from: "asc" }, select: { from: true, accountingCode: { select: { code: true, name: true } } } },
       _count: { select: { transactions: true } },

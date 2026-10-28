@@ -29,6 +29,8 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
     PERIOD_OVERLAP: "Een deel van die periode is al afgesloten.",
     BAD_DATE: "Die datum bestaat niet.",
     ACCOUNT_REQUIRED: "Vul de rekening in.",
+    DEVICE_NOT_FOUND:
+      "Dat toestel staat niet (meer) in de instellingen van de kassa's, of past niet bij dit kanaal; ververs de pagina.",
   };
   const en: Record<IncomeErrorCode, string> = {
     NO_FILE: "Choose a file first.",
@@ -50,6 +52,7 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
     PERIOD_OVERLAP: "Part of that period is already closed.",
     BAD_DATE: "That date does not exist.",
     ACCOUNT_REQUIRED: "Fill in the account.",
+    DEVICE_NOT_FOUND: "That device is not (or no longer) in the cash register settings, or does not fit this channel; refresh the page.",
   };
   return { ...shared, ...(locale === "nl" ? nl : en) };
 }

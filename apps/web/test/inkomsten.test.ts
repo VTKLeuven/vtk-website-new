@@ -12,6 +12,7 @@ import {
 import { codeAtStart, incomeRuleText, matchTransaction, nameRuleKey, type MatchContext } from "@/lib/inkomsten/match";
 import { accountOn, computeIncomeOverview, type OverviewTransaction } from "@/lib/inkomsten/overview";
 import { combineImportSummaries } from "@/lib/inkomsten/importSummary";
+import { kassaCheck, kassaControlWindow } from "@/lib/inkomsten/kassa";
 import type { ImportSummary } from "@/lib/inkomsten/server";
 
 // Verzonnen gegevens: geen echte namen, rekeningnummers of betaal-ID's.
@@ -506,5 +507,42 @@ describe("meerdere bestanden tegelijk opladen", () => {
     const totals = combineImportSummaries([summary({ format: "mollie", source: "MOLLIE", created: 4 }), summary({ created: 1, feeRows: 0 })]);
     expect(totals.mollieWithoutFees).toBe(true);
     expect(totals.sources).toEqual(["MOLLIE", "EUROPABANK"]);
+  });
+});
+
+describe("de kassacontrole", () => {
+  // `date` is een @db.Date: middernacht UTC van de kalenderdag. Op 7 oktober
+  // 2026 is het in Brussel nog zomertijd, twee uur voor UTC.
+  const date = new Date("2026-10-07T00:00:00Z");
+  const startsAt = new Date("2026-10-07T18:00:00Z"); // 20:00
+  const endsAt = new Date("2026-10-08T01:00:00Z"); // 03:00 de dag erna
+
+  it("telt de uren van de kassa wanneer een andere kassa het toestel dezelfde dag had", () => {
+    expect(kassaControlWindow({ date, startsAt, endsAt }, true)).toEqual({ start: startsAt, end: endsAt, wholeDay: false });
+  });
+
+  it("telt anders de hele dag, tot het einde van een kassa die over middernacht loopt", () => {
+    const night = kassaControlWindow({ date, startsAt, endsAt }, false);
+    expect(night.wholeDay).toBe(true);
+    expect(night.start.toISOString()).toBe("2026-10-06T22:00:00.000Z"); // 00:00 in Brussel
+    expect(night.end).toEqual(endsAt);
+    const evening = kassaControlWindow({ date, startsAt, endsAt: new Date("2026-10-07T21:00:00Z") }, false);
+    expect(evening.end.toISOString()).toBe("2026-10-07T22:00:00.000Z"); // 24:00 in Brussel
+  });
+
+  it("telt een kassa zonder uren altijd de hele dag", () => {
+    expect(kassaControlWindow({ date, startsAt: null, endsAt: null }, true).wholeDay).toBe(true);
+  });
+
+  it("zet het ingetikte bedrag naast de import, zonder het te wijzigen", () => {
+    expect(kassaCheck(null, { cents: 0, count: 0 })).toEqual({ state: "nothing" });
+    expect(kassaCheck(null, { cents: 51240, count: 132 })).toEqual({ state: "empty", importCents: 51240 });
+    expect(kassaCheck(51240, { cents: 51240, count: 132 })).toEqual({ state: "match", importCents: 51240 });
+    expect(kassaCheck(49840, { cents: 51240, count: 132 })).toEqual({
+      state: "differs",
+      importCents: 51240,
+      typedCents: 49840,
+      differenceCents: -1400,
+    });
   });
 });

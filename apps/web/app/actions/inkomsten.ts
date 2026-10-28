@@ -5,6 +5,7 @@ import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { getCashRegisterConfig } from "@/lib/kassas/server";
 import { monthToDate, parseIncomeExport, parseMonth } from "@/lib/inkomsten/parse";
 import {
   assignUnassignedGroup,
@@ -35,7 +36,8 @@ export type IncomeErrorCode =
   | "BAD_PERIOD"
   | "PERIOD_OVERLAP"
   | "BAD_DATE"
-  | "ACCOUNT_REQUIRED";
+  | "ACCOUNT_REQUIRED"
+  | "DEVICE_NOT_FOUND";
 
 /** "1 transactie", "3 transacties". */
 function transactions(count: number): string {
@@ -360,6 +362,56 @@ export async function deleteIncomeChannelCodeAction(formData: FormData): Promise
   await logAudit({ action: "update", entity: "incomeChannel", entityId: channelId, target: channelId, summary: `standaardcode vanaf ${fromRaw} weg` });
   revalidate();
   return saveOk(changed ? `Verwijderd; ${transactions(changed)} opnieuw gekoppeld.` : undefined);
+}
+
+/**
+ * Welk toestel van de kassa's een kanaal is (de sticker "A: Evenement 2" is de
+ * Payconiq-rekening "Evenementen 2"), zodat een kassa naast het ingetikte bedrag
+ * toont wat de import op dat toestel zag. Leeg = niet gekoppeld. Een Payconiq-
+ * kanaal is een Payconiq-rekening, een SumUp-account of Europabank-terminal een
+ * Bancontact-bakje.
+ */
+export async function saveIncomeChannelDeviceAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  await requirePermission("income.manage");
+  const id = String(formData.get("id") ?? "");
+  const raw = String(formData.get("device") ?? "");
+  const channel = await prisma.incomeChannel.findUnique({
+    where: { id },
+    select: { identifier: true, source: true, cashMethod: true, cashTerminal: true },
+  });
+  if (!channel) return saveError("NOT_FOUND");
+
+  let cashMethod: "BANCONTACT" | "PAYCONIQ" | null = null;
+  let cashTerminal: string | null = null;
+  if (raw) {
+    const separator = raw.indexOf("|");
+    const method = raw.slice(0, separator);
+    const terminal = raw.slice(separator + 1);
+    const config = await getCashRegisterConfig();
+    // Een toestel dat intussen hernoemd werd, mag blijven staan waar het stond.
+    const unchanged = method === channel.cashMethod && terminal === channel.cashTerminal;
+    const fits =
+      channel.source === "PAYCONIQ"
+        ? method === "PAYCONIQ" && config.payconiqAccounts.includes(terminal)
+        : (channel.source === "SUMUP" || channel.source === "EUROPABANK") &&
+          method === "BANCONTACT" &&
+          config.bancontactTerminals.includes(terminal);
+    if (separator < 0 || !(fits || unchanged)) return saveError("DEVICE_NOT_FOUND");
+    cashMethod = method === "BANCONTACT" ? "BANCONTACT" : "PAYCONIQ";
+    cashTerminal = terminal;
+  }
+
+  await prisma.incomeChannel.update({ where: { id }, data: { cashMethod, cashTerminal } });
+  await logAudit({
+    action: "update",
+    entity: "incomeChannel",
+    entityId: id,
+    target: channel.identifier,
+    summary: cashTerminal ? `toestel ${cashMethod === "BANCONTACT" ? "Bancontact" : "Payconiq"} ${cashTerminal}` : "geen toestel",
+  });
+  revalidate();
+  revalidatePath("/admin/kassas", "layout");
+  return saveOk();
 }
 
 /** Vanaf welke dag een kanaal op welke rekening stort. */
