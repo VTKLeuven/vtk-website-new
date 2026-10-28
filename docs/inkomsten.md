@@ -22,6 +22,7 @@ koppeling met de kassa's (fase 2) nog niet.
 | `lib/inkomsten/overview.ts` | Het overzicht als pure som, de rekening op een dag, Mollie per uitbetaling (`groupMolliePayouts`), de controlelijst (`computeIncomeChecks`). |
 | `lib/inkomsten/workbook.ts` | Het kwartaalblad en het controlebestand als bladen voor `write-excel-file`. Puur. |
 | `lib/inkomsten/server.ts` | Database: opladen (met voorvertoning), opnieuw koppelen, Na te kijken, overzicht, uitbetalingen afvinken, het model voor de xlsx, lijsten. |
+| `lib/inkomsten/importSummary.ts` | De voorvertoning van meerdere gekozen bestanden samen (`combineImportSummaries`). Puur. |
 | `app/actions/inkomsten.ts` | Server actions, allemaal achter `income.manage`. |
 | `app/[locale]/admin/inkomsten/` | Overzicht (met de controlelijst en de uitbetalingen), Opladen, Na te kijken, Transacties, Instellingen. |
 | `app/api/admin/inkomsten/export/route.ts` | De twee xlsx-bestanden, voor `?van=2026-07&tot=2026-09` en `?soort=boekhouder` of `?soort=controle`. |
@@ -103,6 +104,24 @@ Nagekeken op de tabbladen van het rekenblad, met de lezers van de site:
 - **SumUp van Theokot**: de 3 vensters exact, op de mislukte betalingen na: de
   formule van het rekenblad filtert niet op status en telde € 104,60 aan
   mislukte pogingen mee.
+
+## Opladen
+
+Beheer kiest één of meer CSV's tegelijk, ook door ze te slepen: Europabank laat
+enkel per dag downloaden, dus een kwartaal van één terminal is een negentigtal
+bestanden. Eerst toont de site wat ze per bestand en samen zouden doen
+(`previewIncomeImportAction`, `combineImportSummaries`), dan pas slaat ze op.
+
+- Elk bestand wordt een eigen `IncomeImport`, zodat er één apart weg kan.
+- Eén onleesbaar bestand houdt de hele keuze tegen: de voorvertoning noemt het
+  bij naam en de knop blijft uit, en het opladen leest eerst alle bestanden
+  voor het iets bewaart.
+- In de voorvertoning staat nog niets in de database. Een dag die in twee
+  gekozen bestanden zit, telt daar toch maar één keer als nieuw: `seen` draagt
+  de sleutels van de eerdere bestanden mee. Bij het echte opladen gebeurt dat
+  vanzelf, want de bestanden gaan na elkaar.
+- Hoogstens 250 bestanden, elk tot 10 MB en samen tot 40 MB: onder de 50 MB
+  die een server action mag ontvangen (`bodySizeLimit`).
 
 ## Koppelregels
 

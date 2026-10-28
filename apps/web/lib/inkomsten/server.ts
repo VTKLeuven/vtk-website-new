@@ -240,11 +240,15 @@ export type ImportOutcome = { ok: true; summary: ImportSummary; importId: string
  * Een export lezen en, zonder `dryRun`, bewaren. Dezelfde berekening voor de
  * voorvertoning en het echte opladen, zodat wat Beheer te zien krijgt ook is
  * wat er gebeurt.
+ *
+ * `seen` draagt de sleutels van eerdere bestanden uit dezelfde keuze mee: in de
+ * voorvertoning staat nog niets in de database, en zonder dit zou een dag die in
+ * twee gekozen bestanden zit, twee keer als nieuw tellen.
  */
 export async function importIncomeExport(
   text: string,
   fileName: string,
-  options: { dryRun: boolean; userId: string | null },
+  options: { dryRun: boolean; userId: string | null; seen?: Set<string> },
 ): Promise<ImportOutcome> {
   const parsed = parseIncomeExport(text);
   if (!parsed.ok) return parsed;
@@ -283,12 +287,17 @@ export async function importIncomeExport(
       }
       continue;
     }
+    if (options.seen?.has(`${source}:${row.externalKey}`)) {
+      if (!row.derived) duplicates++;
+      continue;
+    }
     if (isLocked(row.periodMonth)) {
       if (!row.derived) locked++;
       continue;
     }
     fresh.push(row);
   }
+  for (const row of fresh) options.seen?.add(`${source}:${row.externalKey}`);
 
   // De kanalen eerst: de standaardcode van een kanaal bepaalt mee de
   // koppeling. Een nieuw kanaal heeft er nog geen.

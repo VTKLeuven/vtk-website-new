@@ -11,6 +11,8 @@ import {
 } from "@/lib/inkomsten/parse";
 import { codeAtStart, incomeRuleText, matchTransaction, nameRuleKey, type MatchContext } from "@/lib/inkomsten/match";
 import { accountOn, computeIncomeOverview, type OverviewTransaction } from "@/lib/inkomsten/overview";
+import { combineImportSummaries } from "@/lib/inkomsten/importSummary";
+import type { ImportSummary } from "@/lib/inkomsten/server";
 
 // Verzonnen gegevens: geen echte namen, rekeningnummers of betaal-ID's.
 
@@ -463,4 +465,46 @@ describe("overzicht", () => {
     expect(accountOn(accounts, "2025-08-31")).toBeNull();
   });
 
+});
+
+describe("meerdere bestanden tegelijk opladen", () => {
+  const rules = (open: number): ImportSummary["rules"] => ({ WEBSITE: 0, CODE_IN_TEXT: 0, NAME_RULE: 0, CHANNEL_DEFAULT: 0, OPEN: open });
+  const summary = (partial: Partial<ImportSummary>): ImportSummary => ({
+    format: "europabank",
+    source: "EUROPABANK",
+    fileName: "dag.csv",
+    total: 0,
+    skipped: 0,
+    ignored: 0,
+    created: 0,
+    duplicates: 0,
+    updated: 0,
+    locked: 0,
+    rules: rules(0),
+    feeRows: 0,
+    firstAt: null,
+    lastAt: null,
+    newChannels: [],
+    ...partial,
+  });
+
+  it("telt de dagbestanden samen, met elk nieuw kanaal één keer", () => {
+    const totals = combineImportSummaries([
+      summary({ total: 2, created: 2, rules: rules(2), firstAt: new Date("2026-10-09T18:05:11Z"), lastAt: new Date("2026-10-09T19:15:42Z"), newChannels: ["1000000001"] }),
+      // Uit de server action komt een datum als tekst terug.
+      summary({ total: 1, created: 1, rules: rules(1), firstAt: "2026-10-10T20:01:03.000Z" as unknown as Date, lastAt: "2026-10-10T20:01:03.000Z" as unknown as Date, newChannels: ["1000000001"] }),
+      // Dezelfde dag nog eens: al gekend.
+      summary({ total: 2, duplicates: 2 }),
+    ]);
+    expect(totals).toMatchObject({ sources: ["EUROPABANK"], total: 5, created: 3, duplicates: 2, newChannels: ["1000000001"], mollieWithoutFees: false });
+    expect(totals.rules.OPEN).toBe(3);
+    expect(totals.firstAt?.toISOString()).toBe("2026-10-09T18:05:11.000Z");
+    expect(totals.lastAt?.toISOString()).toBe("2026-10-10T20:01:03.000Z");
+  });
+
+  it("zegt het wanneer een Mollie-bestand geen kosten heeft", () => {
+    const totals = combineImportSummaries([summary({ format: "mollie", source: "MOLLIE", created: 4 }), summary({ created: 1, feeRows: 0 })]);
+    expect(totals.mollieWithoutFees).toBe(true);
+    expect(totals.sources).toEqual(["MOLLIE", "EUROPABANK"]);
+  });
 });

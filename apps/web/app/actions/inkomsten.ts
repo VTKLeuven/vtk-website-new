@@ -5,7 +5,7 @@ import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
-import { monthToDate, parseMonth } from "@/lib/inkomsten/parse";
+import { monthToDate, parseIncomeExport, parseMonth } from "@/lib/inkomsten/parse";
 import {
   assignUnassignedGroup,
   importIncomeExport,
@@ -22,6 +22,7 @@ import {
 export type IncomeErrorCode =
   | "NO_FILE"
   | "FILE_TOO_LARGE"
+  | "TOO_MANY_FILES"
   | "EMPTY"
   | "UNKNOWN_FORMAT"
   | "MOLLIE_BALANCE"
@@ -43,59 +44,103 @@ function transactions(count: number): string {
 
 /** Een export van een kwartaal is een paar honderd kilobyte; dit laat ruim marge. */
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
+/**
+ * Europabank geeft een bestand per dag, dus een semester van één terminal is
+ * al gauw honderd bestanden. Samen blijven ze onder de 50 MB die een server
+ * action mag ontvangen (`bodySizeLimit` in next.config.ts).
+ */
+const MAX_FILES = 250;
+const MAX_TOTAL_BYTES = 40 * 1024 * 1024;
 
 function revalidate(): void {
   revalidatePath("/admin/inkomsten", "layout");
 }
 
-async function readFile(formData: FormData): Promise<{ text: string; name: string } | { error: IncomeErrorCode }> {
-  const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0) return { error: "NO_FILE" };
-  if (file.size > MAX_FILE_BYTES) return { error: "FILE_TOO_LARGE" };
-  return { text: await file.text(), name: file.name };
+async function readFiles(formData: FormData): Promise<Array<{ text: string; name: string }> | { error: IncomeErrorCode }> {
+  const files = formData.getAll("file").filter((file): file is File => file instanceof File && file.size > 0);
+  if (files.length === 0) return { error: "NO_FILE" };
+  if (files.length > MAX_FILES) return { error: "TOO_MANY_FILES" };
+  const total = files.reduce((sum, file) => sum + file.size, 0);
+  if (files.some((file) => file.size > MAX_FILE_BYTES) || total > MAX_TOTAL_BYTES) return { error: "FILE_TOO_LARGE" };
+  return Promise.all(files.map(async (file) => ({ text: await file.text(), name: file.name })));
 }
 
 // -----------------------------------------------------------------------------
 // Opladen
 // -----------------------------------------------------------------------------
 
+/** Wat opladen met één bestand zou doen, of waarom de site het niet kan lezen. */
+export type ImportFilePreview =
+  | { fileName: string; ok: true; summary: ImportSummary }
+  | { fileName: string; ok: false; code: IncomeErrorCode; detail?: string };
+
 export type ImportPreviewState =
   | { status: "idle" }
-  | { status: "preview"; summary: ImportSummary }
+  | { status: "preview"; files: ImportFilePreview[] }
   | { status: "error"; code: IncomeErrorCode; detail?: string };
 
-/** Lees het bestand en zeg wat opladen zou doen, zonder iets te bewaren. */
+/**
+ * Lees de bestanden en zeg per bestand wat opladen zou doen, zonder iets te
+ * bewaren. Wat een eerder bestand van dezelfde keuze al bevat, telt in een
+ * volgend als al gekend, zoals bij het echte opladen na elkaar.
+ */
 export async function previewIncomeImportAction(formData: FormData): Promise<ImportPreviewState> {
   await requirePermission("income.manage");
-  const file = await readFile(formData);
-  if ("error" in file) return { status: "error", code: file.error };
-  const outcome = await importIncomeExport(file.text, file.name, { dryRun: true, userId: null });
-  if (!outcome.ok) return { status: "error", code: outcome.error, detail: outcome.detail };
-  return { status: "preview", summary: outcome.summary };
+  const files = await readFiles(formData);
+  if ("error" in files) return { status: "error", code: files.error };
+  const seen = new Set<string>();
+  const results: ImportFilePreview[] = [];
+  for (const file of files) {
+    const outcome = await importIncomeExport(file.text, file.name, { dryRun: true, userId: null, seen });
+    results.push(
+      outcome.ok
+        ? { fileName: file.name, ok: true, summary: outcome.summary }
+        : { fileName: file.name, ok: false, code: outcome.error, detail: outcome.detail },
+    );
+  }
+  return { status: "preview", files: results };
 }
 
+/**
+ * De gekozen bestanden opladen, na elkaar, elk als eigen import (zodat er één
+ * apart weg kan). Eerst worden ze allemaal gelezen: één onleesbaar bestand
+ * houdt de hele keuze tegen, in plaats van de helft op te laden.
+ */
 export async function importIncomeAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   const session = await requirePermission("income.manage");
-  const file = await readFile(formData);
-  if ("error" in file) return saveError(file.error);
-  const outcome = await importIncomeExport(file.text, file.name, { dryRun: false, userId: session.user.id });
-  if (!outcome.ok) return saveError(outcome.error, outcome.detail ? `Regel niet te lezen (${outcome.detail}).` : undefined);
+  const files = await readFiles(formData);
+  if ("error" in files) return saveError(files.error);
+  for (const file of files) {
+    const parsed = parseIncomeExport(file.text);
+    if (!parsed.ok) return saveError(parsed.error);
+  }
 
-  const { summary } = outcome;
-  const open = summary.rules.OPEN;
-  await logAudit({
-    action: "import",
-    entity: "incomeImport",
-    entityId: outcome.importId ?? undefined,
-    target: summary.fileName,
-    summary: `${summary.created} nieuw, ${summary.duplicates} al gekend, ${open} na te kijken`,
-  });
+  let created = 0;
+  let duplicates = 0;
+  let updated = 0;
+  let open = 0;
+  for (const file of files) {
+    const outcome = await importIncomeExport(file.text, file.name, { dryRun: false, userId: session.user.id });
+    if (!outcome.ok) return saveError(outcome.error);
+    const { summary } = outcome;
+    await logAudit({
+      action: "import",
+      entity: "incomeImport",
+      entityId: outcome.importId ?? undefined,
+      target: summary.fileName,
+      summary: `${summary.created} nieuw, ${summary.duplicates} al gekend, ${summary.rules.OPEN} na te kijken`,
+    });
+    created += summary.created;
+    duplicates += summary.duplicates;
+    updated += summary.updated;
+    open += summary.rules.OPEN;
+  }
   revalidate();
-  const parts = [`${transactions(summary.created)} nieuw`];
-  if (summary.duplicates) parts.push(`${summary.duplicates} al gekend`);
-  if (summary.updated) parts.push(`${summary.updated} nu uitbetaald`);
+  const parts = [`${transactions(created)} nieuw`];
+  if (duplicates) parts.push(`${duplicates} al gekend`);
+  if (updated) parts.push(`${updated} nu uitbetaald`);
   if (open) parts.push(`${open} na te kijken`);
-  return saveOk(`Opgeladen: ${parts.join(", ")}.`);
+  return saveOk(`Opgeladen${files.length > 1 ? ` (${files.length} bestanden)` : ""}: ${parts.join(", ")}.`);
 }
 
 /** Een import wegdoen, met alles wat ze aanmaakte. Niet in een afgesloten periode. */

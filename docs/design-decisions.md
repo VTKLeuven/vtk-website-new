@@ -12176,6 +12176,12 @@ volgt nog.
   kosten" in het kwartaalblad. De terminal van evenementen krijgt geen
   standaardcode: tot de koppeling met de kassa's (fase 2) staat ze per dag bij
   Na te kijken.
+- **Veel bestanden tegelijk, elk een eigen import.** Europabank laat enkel per
+  dag downloaden, dus een kwartaal van één terminal is een negentigtal
+  bestanden. Beheer kiest ze samen; de site toont wat ze samen en per bestand
+  doen, en bewaart ze elk als eigen import, zodat een fout bestand apart weg
+  kan. Is er één bestand onleesbaar, dan gaat er niets op: een half opgeladen
+  keuze is moeilijker op te ruimen dan opnieuw kiezen.
 - **De kosten per betaling, niet per dag.** SumUp en Europabank zetten de
   kosten op elke betaling. De site maakt er per betaling een kostenregel van,
   met dezelfde sleutel als de betaling, zodat een export die een eerdere

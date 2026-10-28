@@ -10,7 +10,9 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
   const shared = saveErrorMessages(locale);
   const nl: Record<IncomeErrorCode, string> = {
     NO_FILE: "Kies eerst een bestand.",
-    FILE_TOO_LARGE: "Dat bestand is groter dan 10 MB; een export van een kwartaal is veel kleiner.",
+    FILE_TOO_LARGE:
+      "Dat is te groot: een bestand mag tot 10 MB, een keuze samen tot 40 MB. Een export van een kwartaal is veel kleiner.",
+    TOO_MANY_FILES: "Dat zijn meer dan 250 bestanden. Laad ze in delen op, bijvoorbeeld per maand.",
     EMPTY: "Dat bestand heeft geen regels.",
     UNKNOWN_FORMAT:
       "Dat bestand herkent de site niet. Laad een CSV-export van Payconiq, Mollie, SumUp of Europabank op, met de kolomkoppen zoals ze uit het portaal komen.",
@@ -30,7 +32,8 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
   };
   const en: Record<IncomeErrorCode, string> = {
     NO_FILE: "Choose a file first.",
-    FILE_TOO_LARGE: "That file is larger than 10 MB; a quarterly export is much smaller.",
+    FILE_TOO_LARGE: "That is too large: a file can be up to 10 MB, a selection up to 40 MB together. A quarterly export is much smaller.",
+    TOO_MANY_FILES: "That is more than 250 files. Upload them in parts, for example per month.",
     EMPTY: "That file has no rows.",
     UNKNOWN_FORMAT:
       "The site does not recognise that file. Upload a CSV export from Payconiq, Mollie, SumUp or Europabank, with the column headings as they come from the portal.",
