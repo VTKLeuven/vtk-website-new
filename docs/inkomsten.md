@@ -1,22 +1,23 @@
 # Online inkomsten (`/admin/inkomsten`)
 
 De opvolger van het rekenblad "Oriëntatie Online Inkomsten" van Beheer: wat er
-via Payconiq en Mollie binnenkwam, per boekhoudcode en per bankrekening, voor de
-boekhouder. De kringkeuzes staan in `docs/design-decisions.md` ("Online
-inkomsten"); dit is de technische referentie.
+via Payconiq, Mollie, SumUp en Europabank binnenkwam, per boekhoudcode en per
+bankrekening, voor de boekhouder. De kringkeuzes staan in
+`docs/design-decisions.md` ("Online inkomsten"); dit is de technische
+referentie.
 
-Fase 1 en 1b zijn gebouwd: Payconiq en Mollie opladen, koppelen, Na te kijken,
-het overzicht per periode, een standaardcode per kanaal, de controlelijst met
-de Mollie-uitbetalingen om af te vinken, het kwartaalblad voor de boekhouder en
-het controlebestand als xlsx, en afsluiten. De boekhoudcodes
-kunnen als CSV opgeladen worden in `/admin/boekhoudcodes`. De koppeling met de
-kassa's (fase 2) en SumUp en Europabank (fase 3) nog niet.
+Fase 1, 1b en 3 zijn gebouwd: Payconiq, Mollie, SumUp en Europabank opladen,
+koppelen, Na te kijken, het overzicht per periode, een standaardcode per kanaal,
+de controlelijst met de Mollie-uitbetalingen om af te vinken, het kwartaalblad
+voor de boekhouder en het controlebestand als xlsx, en afsluiten. De
+boekhoudcodes kunnen als CSV opgeladen worden in `/admin/boekhoudcodes`. De
+koppeling met de kassa's (fase 2) nog niet.
 
 ## Bestanden
 
 | Bestand | Wat |
 |---|---|
-| `lib/inkomsten/parse.ts` | De exports lezen: CSV, bedragen, datums op de Brusselse klok, Mollie-uitbetalingsmaand. Puur. |
+| `lib/inkomsten/parse.ts` | De exports van Payconiq, Mollie, SumUp en Europabank lezen: CSV, bedragen, datums op de Brusselse klok, Mollie-uitbetalingsmaand, kosten per betaling. Puur. |
 | `lib/inkomsten/match.ts` | De koppelregels als pure functie (`matchTransaction`), en de onthouden tekst (`incomeRuleText`). |
 | `lib/inkomsten/overview.ts` | Het overzicht als pure som, de rekening op een dag, Mollie per uitbetaling (`groupMolliePayouts`), de controlelijst (`computeIncomeChecks`). |
 | `lib/inkomsten/workbook.ts` | Het kwartaalblad en het controlebestand als bladen voor `write-excel-file`. Puur. |
@@ -62,6 +63,45 @@ uitleg: daarin staat bij een betaling niet in welke uitbetaling ze zit.
 Nagekeken op het tabblad van Beheer voor het vierde kwartaal van 2025: totaal
 € 40.523,51, kosten −1.434,27, reserve −984,72, exact het kwartaalblad.
 
+**SumUp** (CSV, één per account): `Datum`, `Transactie-ID`, `Transactietype`,
+`Status`, `Totaal bedrag`, `Transactiekosten`, en het account (`email`), dat het
+kanaal is. Ontbreekt die kolom, dan komt alles op één kanaal `SumUp`.
+
+| Regel | Herkend aan | Soort |
+|---|---|---|
+| Verkoop | `Omzet` met status `Succesvol` of `Terugbetaald` | `PAYMENT`, voor het totaalbedrag |
+| Terugbetaling | `Terugbetaling` of `Terugboeking` met status `Succesvol` | `REFUND`, negatief |
+| Kosten | de kolom `Transactiekosten` van een betaling | `FEE`, één per betaling |
+| De rest | `Mislukt`, geannuleerd | overgeslagen |
+
+**Europabank** (CSV per terminal), in twee opmaken: tot maart 2026
+`Origineel bedrag (EUR)` met resultaat `Sale` of `Denied`, daarna `Bedrag` met
+transactietype `Verkoop` en resultaat `Goedgekeurd`. De dag komt uit `Datum`,
+het uur uit `Tijd` (`103804`, of `93015` zonder voorloopnul); de kolom
+`Datum en tijd` van het rekenblad wordt genegeerd. Enkel `Sale` en
+`Goedgekeurd` tellen. De `Commissie (EUR)` wordt per betaling een `FEE`-regel,
+wat haar teken ook is; interchange en schemakost niet, zoals in het rekenblad.
+Het terminalnummer is het kanaal.
+
+De kostenregels van SumUp en Europabank zijn `derived`: ze staan niet als eigen
+regel in het bestand, dus het opladen telt ze niet mee in "nieuw" of "al
+gekend". SumUp en Europabank tellen in de maand van de betaling, zoals
+Payconiq. Kaartgegevens, autorisatiecodes en het land van de kaart worden niet
+overgenomen.
+
+Nagekeken op de tabbladen van het rekenblad, met de lezers van de site:
+
+- **Europabank, terminal van evenementen** (oktober 2025 tot juni 2026): 62 van
+  de 63 vensters van "Overzicht EuropaBankEvenementen" exact. Het 63ste is de
+  Kerstmarkt, waar Beheer de bedragen van tien posten met de hand aftrekt; de
+  som van het venster zelf klopt. De commissie van het vierde kwartaal:
+  −212,27, exact.
+- **Europabank, terminals van Cudi**: 6 van de 6 vensters, en de commissie
+  (−298,63) exact.
+- **SumUp van Theokot**: de 3 vensters exact, op de mislukte betalingen na: de
+  formule van het rekenblad filtert niet op status en telde € 104,60 aan
+  mislukte pogingen mee.
+
 ## Koppelregels
 
 In `matchTransaction`, de eerste die past wint. Enkel voor `PAYMENT` en `REFUND`.
@@ -72,7 +112,7 @@ In `matchTransaction`, de eerste die past wint. Enkel voor `PAYMENT` en `REFUND`
    `mollie` voor Mollie), `MembershipPayment` of `UitleenPayment`, of een
    `providerRefundId` van `TicketRefund`. De code is de kopie op de bestelling.
    Nagekeken op live: 389 van 389 Payconiq-betalingen van de site, en elke
-   Mollie-betaling van de site.
+   Mollie-betaling van de site. SumUp en Europabank gebruikt de site niet.
 3. **Code in de tekst** (`CODE_IN_TEXT`): de Mollie-omschrijving begint met een
    code uit het register ("700100 10001 ..." of aaneen), of `reference` of
    `bulk_id` is er een.
@@ -81,9 +121,9 @@ In `matchTransaction`, de eerste die past wint. Enkel voor `PAYMENT` en `REFUND`
    `IncomeNameRule` voor die bron.
 6. **Standaardcode van het kanaal** (`CHANNEL_DEFAULT`): het kanaal heeft in de
    instellingen een standaardcode (`IncomeChannel.defaultAccountingCodeId`),
-   zoals de QR-code van Theokot onder de code van Theokot. Zo'n transactie
-   telt mee zoals elke andere, ook wanneer het kanaal op de eigen rekening van
-   een post stort.
+   zoals de QR-code en de SumUp van Theokot onder de code van Theokot, of de
+   terminals van Cudi onder die van Cudi. Zo'n transactie telt mee zoals elke
+   andere, ook wanneer het kanaal op de eigen rekening van een post stort.
 7. **Anders**: `rule` blijft `NULL`, en de transactie staat bij Na te kijken.
 
 Regel 4 (de kassa's) komt in fase 2. Ze staat vóór regel 6, zodat een
@@ -102,18 +142,22 @@ Gegroepeerd zodat één keuze veel transacties dekt (`groupKeyOf`):
 - **Per tekst** bij Mollie en bij een Payconiq-betaling met een `reference`: die
   komt van een systeem (de site, Cudi, Uniflow) en draagt een vaste tekst. Die
   tekst kan onthouden worden.
-- **Per sticker per dag** bij een Payconiq-betaling zonder referentie: wat
-  iemand daar typt ("pintje"), zegt volgende week niets. Onthouden kan hier niet.
+- **Per toestel per dag** bij een Payconiq-betaling zonder referentie en bij
+  elke betaling van SumUp of Europabank: wat iemand bij een sticker typt
+  ("pintje") zegt volgende week niets, en een kaartbetaling heeft geen tekst.
+  Onthouden kan hier niet; een toestel dat altijd voor dezelfde post dient,
+  krijgt beter een standaardcode.
 
 ## Kanalen en rekeningen
 
 Een kanaal (`IncomeChannel`) ontstaat bij de eerste import die het noemt. Beheer
 vult in de instellingen in op welke rekening het stort, vanaf welke dag
-(`IncomeChannelAccount`), en eventueel een standaardcode (enkel bij Payconiq:
-Mollie is één kanaal voor alles). De rekening van een transactie is die van de
-laatste wissel op of voor haar Brusselse dag (`accountOn`); ze bepaalt de kolom
-in het kwartaalblad, niet of de transactie meetelt. Niets daarvan staat in de
-code of in een seed.
+(`IncomeChannelAccount`), en eventueel een standaardcode (niet bij Mollie: dat
+is één kanaal voor alles). Het kanaal is de sticker bij Payconiq, het account
+bij SumUp en het terminalnummer bij Europabank. De rekening van een transactie
+is die van de laatste wissel op of voor haar Brusselse dag (`accountOn`); ze
+bepaalt de kolom in het kwartaalblad, niet of de transactie meetelt. Niets
+daarvan staat in de code of in een seed.
 
 ## Het kwartaalblad en het controlebestand
 
@@ -122,9 +166,10 @@ Het overzicht heeft twee downloads, beide xlsx met `write-excel-file`:
 - **Voor de boekhouder** (`accountantWorkbook`): het kwartaalblad zoals in het
   rekenblad van Beheer, met dezelfde kleuren en euronotatie (`SHEET_STYLE`,
   uitgelezen uit het tabblad "4e Kwartaal"). Kolommen per bron en per rekening,
-  Mollie eerst, dan een totaalblok per rekening; rijen per code in de volgorde
-  van het register, dan de kosten, de reserve, Na te kijken en TOTAAL GEHEEL.
-  Enkel bedragen.
+  in de volgorde van het rekenblad (Europabank, SumUp, Mollie, Payconiq), dan
+  een totaalblok per rekening; rijen per code in de volgorde van het register,
+  dan de kosten (van alle bronnen samen), de reserve, Na te kijken en TOTAAL
+  GEHEEL. Enkel bedragen.
 - **Het controlebestand** (`controlWorkbook`), voor Beheer: zeven tabbladen die
   de lagen van het rekenblad volgen. Kwartaalblad (hetzelfde, maar elke cel een
   `SUMIFS` op Transacties), Transacties (met de kolom Waarom, uit `reasonOf`),
@@ -191,6 +236,25 @@ fouten), dan opladen.
 - **Dubbel.** `IncomeTransaction` is uniek op bron en `externalKey` (soort plus
   ID, of een hash bij een regel zonder ID). De soort staat erin, zodat een
   terugbetaling met dezelfde ID als haar betaling niet als dubbel wegvalt.
+- **Europabank heeft geen ID.** De sleutel is een hash van terminal, datum,
+  uur, bedrag en autorisatienummer, zonder voorloopnullen: een rekenblad
+  schrapt die, het portaal niet. Zo krijgt dezelfde betaling in de oude en de
+  nieuwe opmaak dezelfde sleutel. Twee identieke regels in één bestand krijgen
+  een volgnummer; dat klopt zolang een export elke dag volledig bevat.
+- **Een datum uit een rekenblad.** Daar staat soms `2025-09-30 00:00:00` in de
+  kolom `Datum` van Europabank. De site neemt er enkel de dag uit, anders viel
+  het uur uit `Tijd` weg en stond alles om middernacht. Zo liep de eerste
+  vergelijking met Cudi mis.
+- **Mislukte betalingen bij SumUp.** De formule van het rekenblad
+  (`SUMIFS` op `Totaal bedrag` en de datum) filtert niet op status; de site
+  telt enkel wat lukte. In het tabblad van het vierde kwartaal van 2025 scheelt
+  dat € 104,60.
+- **Terugbetalingen bij SumUp en Europabank** stonden in geen enkele export
+  die we zagen. De site volgt Mollie (de verkoop voor haar volle bedrag, de
+  terugbetaling als eigen negatieve regel), maar kijk het na bij de eerste
+  echte terugbetaling.
+- **De controlelijst kijkt per bron, niet per account.** Laadt Beheer de SumUp
+  van Theokot op en vergeet die van Fakbar, dan meldt de eerste stap niets.
 - **Afgesloten.** Een import voegt niets toe aan een afgesloten periode, Na te
   kijken toont er niets uit, en een import met transacties erin kan niet weg.
 - **Formules in `write-excel-file`.** Een waarde met `type: "Formula"` begint

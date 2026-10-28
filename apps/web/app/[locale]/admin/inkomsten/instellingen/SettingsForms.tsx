@@ -18,7 +18,7 @@ function texts(nl: boolean) {
   };
 }
 
-/** De code waaronder de kosten van Mollie vallen. */
+/** De code waaronder de kosten van Mollie, SumUp en Europabank vallen. */
 export function FeeCodeForm({ locale, action, errorMessages, codes, value }: Common & { codes: AccountingCodeOption[]; value: string | null }) {
   const nl = locale === "nl";
   const router = useRouter();

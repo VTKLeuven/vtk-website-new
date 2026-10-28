@@ -7,6 +7,7 @@ import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import { formatEuro } from "@/lib/rekeningen/expenses";
 import { parseMonth } from "@/lib/inkomsten/parse";
+import { INCOME_SOURCES } from "@/lib/inkomsten/overview";
 import { countUnassigned, listIncomeTransactions, TRANSACTION_PAGE, type TransactionFilter } from "@/lib/inkomsten/server";
 import { resetIncomeAssignmentAction } from "@/app/actions/inkomsten";
 import { IncomeNav } from "../IncomeNav";
@@ -52,7 +53,7 @@ export default async function IncomeTransactionsPage({
   const one = (key: string) => (typeof query[key] === "string" ? (query[key] as string) : "");
   const sourceParam = one("bron").toUpperCase();
   const filter: TransactionFilter = {
-    source: sourceParam === "PAYCONIQ" || sourceParam === "MOLLIE" ? sourceParam : null,
+    source: INCOME_SOURCES.find((source) => source === sourceParam) ?? null,
     state: STATES[one("status")] ?? "all",
     from: parseMonth(one("van")),
     to: parseMonth(one("tot")),
@@ -90,8 +91,11 @@ export default async function IncomeTransactionsPage({
           <span className="block text-xs text-vtk-muted">{nl ? "Bron" : "Source"}</span>
           <select name="bron" defaultValue={filter.source?.toLowerCase() ?? ""} className="rounded-lg border border-vtk-blue/15 px-2 py-1.5">
             <option value="">{nl ? "Alle" : "All"}</option>
-            <option value="payconiq">Payconiq</option>
-            <option value="mollie">Mollie</option>
+            {INCOME_SOURCES.map((source) => (
+              <option key={source} value={source.toLowerCase()}>
+                {SOURCE_LABELS[source]}
+              </option>
+            ))}
           </select>
         </label>
         <label>
@@ -165,7 +169,7 @@ export default async function IncomeTransactionsPage({
                       </td>
                       <td className="px-3 py-2">
                         {SOURCE_LABELS[row.source]}
-                        {row.source === "PAYCONIQ" && row.channel ? (
+                        {row.source !== "MOLLIE" && row.channel ? (
                           <span className="block text-xs text-vtk-muted">{row.channel.label || row.channel.identifier}</span>
                         ) : null}
                       </td>

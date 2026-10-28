@@ -4,8 +4,19 @@ import { prisma } from "@vtk/db";
 import type { IncomeKind, IncomeRule, IncomeSource } from "@prisma/client";
 import { brusselsYMD, ymdKey } from "@/lib/brussels";
 import { listAccountingCodes } from "@/lib/accounting/server";
-import { codeKey, incomeRuleLabel, incomeRuleText, matchTransaction, nameRuleKey, type CodeSnapshot, type MatchContext, type WebsitePayment } from "./match";
 import {
+  codeKey,
+  incomeRuleLabel,
+  incomeRuleText,
+  matchTransaction,
+  nameRuleKey,
+  type CodeSnapshot,
+  type MatchContext,
+  type MatchResult,
+  type WebsitePayment,
+} from "./match";
+import {
+  INCOME_SOURCES,
   accountOn,
   computeIncomeChecks,
   computeIncomeOverview,
@@ -21,6 +32,7 @@ import {
   dateToMonth,
   monthToDate,
   parseIncomeExport,
+  type IncomeFormat,
   type IncomeParseError,
   type IncomeSourceCode,
   type ParsedIncomeRow,
@@ -48,7 +60,7 @@ export const INCOME_CONFIG_KEY = "income.config";
 
 export type IncomeConfig = {
   /**
-   * De code voor de kosten van Mollie (en later SumUp en Europabank). Geen
+   * De code voor de kosten van Mollie, SumUp en Europabank. Geen
    * standaard: Beheer kiest ze, net als elke andere code van de kring.
    */
   feeAccountingCodeId: string | null;
@@ -103,12 +115,13 @@ export function lockedMonthTest(periods: readonly Pick<ClosedPeriod, "from" | "t
 // Wat de koppelregels nodig hebben
 // -----------------------------------------------------------------------------
 
-/** Welke provider op de site bij welke export hoort. */
-const WEBSITE_PROVIDER: Record<IncomeSourceCode, string> = { PAYCONIQ: "bancontact", MOLLIE: "mollie" };
+/** Welke provider op de site bij welke export hoort. SumUp en Europabank gebruikt de site niet. */
+const WEBSITE_PROVIDER: Partial<Record<IncomeSourceCode, string>> = { PAYCONIQ: "bancontact", MOLLIE: "mollie" };
 
 async function websitePayments(source: IncomeSourceCode, providerIds: readonly string[]): Promise<Map<string, WebsitePayment>> {
   const provider = WEBSITE_PROVIDER[source];
   const result = new Map<string, WebsitePayment>();
+  if (!provider) return result;
   for (const ids of chunks([...new Set(providerIds)])) {
     const where = { provider, providerPaymentId: { in: ids } };
     const [tickets, memberships, uitleen] = await Promise.all([
@@ -191,7 +204,7 @@ async function nameRuleContext(): Promise<Map<string, CodeSnapshot>> {
 export type ImportRuleCounts = Record<Exclude<IncomeRule, "MANUAL"> | "OPEN", number>;
 
 export type ImportSummary = {
-  format: "payconiq" | "mollie";
+  format: IncomeFormat;
   source: IncomeSourceCode;
   fileName: string;
   /** Regels in het bestand. */
@@ -206,7 +219,10 @@ export type ImportSummary = {
   /** In een afgesloten periode: niet bewaard. */
   locked: number;
   rules: ImportRuleCounts;
-  /** Kosten- en reserveregels (enkel Mollie). */
+  /**
+   * Kosten- en reserveregels die als eigen regel in het bestand stonden
+   * (Mollie). De kosten op een betaling van SumUp of Europabank tellen niet mee.
+   */
   feeRows: number;
   firstAt: Date | null;
   lastAt: Date | null;
@@ -230,12 +246,13 @@ export async function importIncomeExport(
   if (!parsed.ok) return parsed;
   const { source } = parsed;
 
-  // Dubbel in hetzelfde bestand: de eerste telt.
+  // Dubbel in hetzelfde bestand: de eerste telt. De tellingen gaan over regels
+  // in het bestand, dus zonder de kostenregels die de parser erbij maakte.
   const unique = new Map<string, ParsedIncomeRow>();
   let duplicates = 0;
   for (const row of parsed.rows) {
-    if (unique.has(row.externalKey)) duplicates++;
-    else unique.set(row.externalKey, row);
+    if (!unique.has(row.externalKey)) unique.set(row.externalKey, row);
+    else if (!row.derived) duplicates++;
   }
   const rows = [...unique.values()];
 
@@ -255,7 +272,7 @@ export async function importIncomeExport(
   for (const row of rows) {
     const known = existing.get(row.externalKey);
     if (known) {
-      duplicates++;
+      if (!row.derived) duplicates++;
       // Eerst opgeladen voor ze uitbetaald was, nu met de uitbetaling erbij.
       if (!known.payoutReference && row.payoutReference && !isLocked(row.periodMonth)) {
         payoutUpdates.push({ id: known.id, row });
@@ -263,7 +280,7 @@ export async function importIncomeExport(
       continue;
     }
     if (isLocked(row.periodMonth)) {
-      locked++;
+      if (!row.derived) locked++;
       continue;
     }
     fresh.push(row);
@@ -297,21 +314,27 @@ export async function importIncomeExport(
     rules[match.rule ?? "OPEN"]++;
   }
 
-  const times = fresh.map((row) => row.occurredAt.getTime());
+  // Een lus en geen `Math.min(...)`: een jaar Europabank is tienduizenden regels.
+  let firstAt: Date | null = null;
+  let lastAt: Date | null = null;
+  for (const row of fresh) {
+    if (!firstAt || row.occurredAt < firstAt) firstAt = row.occurredAt;
+    if (!lastAt || row.occurredAt > lastAt) lastAt = row.occurredAt;
+  }
   const summary: ImportSummary = {
     format: parsed.format,
     source,
     fileName,
     total: parsed.total,
     skipped: parsed.skipped,
-    created: fresh.length,
+    created: fresh.filter((row) => !row.derived).length,
     duplicates,
     updated: payoutUpdates.length,
     locked,
     rules,
-    feeRows: fresh.filter((row) => row.kind === "FEE" || row.kind === "RESERVE").length,
-    firstAt: times.length ? new Date(Math.min(...times)) : null,
-    lastAt: times.length ? new Date(Math.max(...times)) : null,
+    feeRows: fresh.filter((row) => (row.kind === "FEE" || row.kind === "RESERVE") && !row.derived).length,
+    firstAt,
+    lastAt,
     newChannels,
   };
   if (options.dryRun) return { ok: true, summary, importId: null };
@@ -332,7 +355,7 @@ export async function importIncomeExport(
       fileName: fileName.slice(0, 200),
       format: parsed.format,
       rowCount: parsed.total,
-      createdCount: fresh.length,
+      createdCount: summary.created,
       duplicateCount: duplicates,
       skippedCount: parsed.skipped,
       lockedCount: locked,
@@ -422,21 +445,28 @@ export async function rematchOpenTransactions(): Promise<number> {
   });
   const open = rows.filter((row) => !isLocked(row.periodMonth ? dateToMonth(row.periodMonth) : null));
 
-  const [{ codes }, nameRules, channelCodes, payconiq, mollie] = await Promise.all([
+  const [{ codes }, nameRules, channelCodes, websites] = await Promise.all([
     codeContext(),
     nameRuleContext(),
     channelCodeContext(),
-    websitePayments("PAYCONIQ", open.filter((r) => r.source === "PAYCONIQ" && r.providerId).map((r) => r.providerId!)),
-    websitePayments("MOLLIE", open.filter((r) => r.source === "MOLLIE" && r.providerId).map((r) => r.providerId!)),
+    Promise.all(
+      INCOME_SOURCES.map(async (source) => {
+        const ids = open.flatMap((row) => (row.source === source && row.providerId ? [row.providerId] : []));
+        return [source, await websitePayments(source, ids)] as const;
+      }),
+    ),
   ]);
+  const websiteBySource = new Map(websites);
 
-  let changed = 0;
+  // Eén `updateMany` per wijziging, niet één query per rij: een nieuwe
+  // standaardcode raakt zo duizenden betalingen van een SumUp-account.
+  const updates = new Map<string, { data: MatchUpdate; ids: string[] }>();
   for (const row of open) {
     const match = matchTransaction(row, {
       codes,
       nameRules,
       channelCodes,
-      website: row.source === "PAYCONIQ" ? payconiq : mollie,
+      website: websiteBySource.get(row.source) ?? new Map(),
     });
     const same =
       match.rule === row.rule &&
@@ -445,32 +475,50 @@ export async function rematchOpenTransactions(): Promise<number> {
       match.membershipPaymentId === row.membershipPaymentId &&
       match.uitleenPaymentId === row.uitleenPaymentId;
     if (same) continue;
-    await prisma.incomeTransaction.update({
-      where: { id: row.id },
-      data: {
-        rule: match.rule,
-        accountingCode: match.code?.code ?? null,
-        accountingCodeName: match.code?.name ?? null,
-        ticketPaymentId: match.ticketPaymentId,
-        membershipPaymentId: match.membershipPaymentId,
-        uitleenPaymentId: match.uitleenPaymentId,
-      },
-    });
-    changed++;
+    const data: MatchUpdate = {
+      rule: match.rule,
+      accountingCode: match.code?.code ?? null,
+      accountingCodeName: match.code?.name ?? null,
+      ticketPaymentId: match.ticketPaymentId,
+      membershipPaymentId: match.membershipPaymentId,
+      uitleenPaymentId: match.uitleenPaymentId,
+    };
+    const key = JSON.stringify(data);
+    const update = updates.get(key);
+    if (update) update.ids.push(row.id);
+    else updates.set(key, { data, ids: [row.id] });
+  }
+
+  let changed = 0;
+  for (const { data, ids } of updates.values()) {
+    for (const batch of chunks(ids)) {
+      await prisma.incomeTransaction.updateMany({ where: { id: { in: batch } }, data });
+    }
+    changed += ids.length;
   }
   return changed;
 }
+
+type MatchUpdate = {
+  rule: MatchResult["rule"];
+  accountingCode: string | null;
+  accountingCodeName: string | null;
+  ticketPaymentId: string | null;
+  membershipPaymentId: string | null;
+  uitleenPaymentId: string | null;
+};
 
 // -----------------------------------------------------------------------------
 // Na te kijken
 // -----------------------------------------------------------------------------
 
 /**
- * Een groep transacties die met één keuze een code krijgt. Een betaling met een
- * referentie of een Mollie-betaling komt van een systeem (de site, Cudi,
+ * Een groep transacties die met één keuze een code krijgt. Een Payconiq-betaling
+ * met een referentie of een Mollie-betaling komt van een systeem (de site, Cudi,
  * Uniflow) en draagt een vaste tekst: die groeperen we op tekst, en die tekst
  * kan Beheer onthouden. Een betaling op een sticker zonder referentie typt
- * iemand zelf ("drinken"): die groeperen we per sticker per dag.
+ * iemand zelf ("drinken"), en een kaartbetaling bij SumUp of Europabank heeft
+ * geen tekst: die groeperen we per toestel per dag.
  */
 export type UnassignedGroup = {
   key: string;
@@ -501,7 +549,7 @@ function groupKeyOf(
   row: Pick<GroupRow, "source" | "channelId" | "occurredAt" | "description" | "reference">,
 ): { key: string; type: "text" | "day"; text: string | null; day: string | null } {
   const enc = encodeURIComponent;
-  if (row.source === "MOLLIE" || row.reference) {
+  if (row.source === "MOLLIE" || (row.source === "PAYCONIQ" && row.reference)) {
     const text = incomeRuleText(row.description);
     return { key: ["text", row.source, row.channelId ?? "", enc(text ?? "")].join("|"), type: "text", text, day: null };
   }
@@ -638,6 +686,8 @@ export type PayoutWithCheck = MolliePayout & {
 
 export type IncomeOverviewData = {
   overview: IncomeOverview;
+  /** De bronnen waarvan ooit iets opgeladen werd, in de volgorde van de kolommen. */
+  sources: IncomeSourceCode[];
   /** Mollie-betalingen zonder uitbetaling: die tellen pas in de maand van hun uitbetaling. */
   molliePending: { count: number; cents: number };
   /** Of er in de periode Mollie-betalingen staan, maar geen enkele kostenregel. */
@@ -723,11 +773,12 @@ export async function loadIncomeOverview(from: string, to: string): Promise<Inco
     if (row.source === "MOLLIE" && row.kind === "FEE") mollieFeeMonths.add(month);
   }
   const counted = withAccount.filter((row) => !row.excluded);
+  const inUse = new Set(sources.map((row) => row.source));
   const today = brusselsYMD(new Date());
   const checks = computeIncomeChecks({
     months: monthsBetween(from, to),
     currentMonth: `${today.year}-${String(today.month).padStart(2, "0")}`,
-    sourcesInUse: new Set(sources.map((row) => row.source)),
+    sourcesInUse: inUse,
     rowsPerSourceMonth,
     molliePaymentMonths,
     mollieFeeMonths,
@@ -746,6 +797,7 @@ export async function loadIncomeOverview(from: string, to: string): Promise<Inco
 
   return {
     overview,
+    sources: INCOME_SOURCES.filter((source) => inUse.has(source)),
     molliePending: { count: pending._count, cents: pending._sum.amountCents ?? 0 },
     mollieWithoutFees: molliePaymentMonths.size > 0 && mollieFeeMonths.size === 0,
     feeCode,
@@ -931,6 +983,7 @@ export async function countUnassigned(): Promise<number> {
 /** Waarom een transactie haar code kreeg, in woorden: de kolom "Waarom" van het controlebestand. */
 function reasonOf(
   tx: {
+    source: IncomeSource;
     kind: IncomeKind;
     rule: IncomeRule | null;
     excluded: boolean;
@@ -948,7 +1001,11 @@ function reasonOf(
   const byWhom = [tx.assignedBy?.name ? `${nl ? "door" : "by"} ${tx.assignedBy.name}` : null, when ? `${nl ? "op" : "on"} ${when}` : null]
     .filter(Boolean)
     .join(" ");
-  if (tx.kind === "FEE") return nl ? "Kosten die Mollie inhield" : "Fees withheld by Mollie";
+  if (tx.kind === "FEE") {
+    if (tx.source === "SUMUP") return nl ? "Transactiekosten van SumUp, op de betaling" : "SumUp transaction fee, on the payment";
+    if (tx.source === "EUROPABANK") return nl ? "Commissie van Europabank, op de betaling" : "Europabank commission, on the payment";
+    return nl ? "Kosten die Mollie inhield" : "Fees withheld by Mollie";
+  }
   if (tx.kind === "RESERVE") return nl ? "Reserve van Mollie" : "Mollie rolling reserve";
   if (tx.excluded) return `${nl ? "Telt niet mee, met de hand" : "Does not count, by hand"}${byWhom ? ` ${byWhom}` : ""}`;
   switch (tx.rule) {

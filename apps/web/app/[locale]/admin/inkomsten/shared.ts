@@ -5,7 +5,12 @@ import { formatEuro } from "@/lib/rekeningen/expenses";
 import { monthLabel } from "@/lib/inkomsten/labels";
 
 /** De naam van een bron, zoals ze in de kolomkop en de lijst staat. */
-export const SOURCE_LABELS: Record<IncomeSourceCode, string> = { PAYCONIQ: "Payconiq", MOLLIE: "Mollie" };
+export const SOURCE_LABELS: Record<IncomeSourceCode, string> = {
+  PAYCONIQ: "Payconiq",
+  MOLLIE: "Mollie",
+  SUMUP: "SumUp",
+  EUROPABANK: "Europabank",
+};
 
 export { monthLabel, periodLabel } from "@/lib/inkomsten/labels";
 

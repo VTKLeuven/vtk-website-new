@@ -15,7 +15,8 @@ import { AssignGroupForm } from "./AssignGroupForm";
 /**
  * Wat geen koppelregel kon plaatsen, gegroepeerd zodat één keuze veel
  * transacties dekt: een vaste tekst (Mollie, printkrediet) per tekst, een
- * sticker zonder referentie per dag. De grootste bedragen staan bovenaan.
+ * sticker zonder referentie of een terminal per dag. De grootste bedragen
+ * staan bovenaan.
  */
 export default async function IncomeReviewPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: localeParam } = await params;
@@ -39,8 +40,8 @@ export default async function IncomeReviewPage({ params }: { params: Promise<{ l
         <h1 className="text-2xl font-semibold">{nl ? "Na te kijken" : "To review"}</h1>
         <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
           {nl
-            ? "Transacties die geen koppelregel kon plaatsen. Een vaste tekst kan je onthouden; wat iemand bij een sticker intypt, staat per sticker per dag."
-            : "Transactions no matching rule could place. A fixed text can be remembered; what someone types at a sticker is grouped per sticker per day."}
+            ? "Transacties die geen koppelregel kon plaatsen. Een vaste tekst kan je onthouden; wat iemand bij een sticker intypt en een kaartbetaling bij SumUp of Europabank staan per toestel per dag. Dient een toestel altijd voor dezelfde post, geef het dan een standaardcode bij Instellingen."
+            : "Transactions no matching rule could place. A fixed text can be remembered; what someone types at a sticker and a card payment at SumUp or Europabank are grouped per device per day. If a device always serves the same post, give it a default code under Settings."}
         </p>
       </header>
 
@@ -79,7 +80,7 @@ export default async function IncomeReviewPage({ params }: { params: Promise<{ l
                       {group.channel} · {day(group.firstAt)}
                       <span className="font-normal text-vtk-muted">
                         {" "}
-                        {time(group.firstAt)} {nl ? "tot" : "to"} {time(group.lastAt)}
+                        {time(group.firstAt)} {nl ? "tot" : "to"} {time(group.lastAt)} · {SOURCE_LABELS[group.source]}
                       </span>
                     </>
                   ) : (

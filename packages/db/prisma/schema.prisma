@@ -8420,19 +8420,24 @@ model PermanentCashEntry {
 }
 
 // -----------------------------------------------------------------------------
-// Oriëntatie online inkomsten: Beheer laadt de exports van Payconiq en Mollie
-// op, de site koppelt elke transactie aan een boekhoudcode, en het overzicht
-// per periode vervangt het rekenblad "Oriëntatie Online Inkomsten".
+// Oriëntatie online inkomsten: Beheer laadt de exports van Payconiq, Mollie,
+// SumUp en Europabank op, de site koppelt elke transactie aan een
+// boekhoudcode, en het overzicht per periode vervangt het rekenblad
+// "Oriëntatie Online Inkomsten".
 // Zie docs/inkomsten.md en docs/design-decisions.md.
 // -----------------------------------------------------------------------------
 
 enum IncomeSource {
   PAYCONIQ
   MOLLIE
+  SUMUP
+  EUROPABANK
 }
 
 /// Wat een regel uit een export is. Enkel een betaling of terugbetaling krijgt
 /// een boekhoudcode; kosten en reserve hebben hun eigen regel in het overzicht.
+/// Bij SumUp en Europabank staan de kosten op de betaling zelf; de import maakt
+/// er per betaling een `FEE`-regel van.
 enum IncomeKind {
   PAYMENT
   REFUND
@@ -8457,7 +8462,7 @@ model IncomeImport {
   id             String       @id @default(cuid())
   source         IncomeSource
   fileName       String
-  /// Welk formaat de parser herkende ("payconiq", "mollie").
+  /// Welk formaat de parser herkende ("payconiq", "mollie", "sumup", "europabank").
   format         String
   /// Regels in het bestand, nieuw bewaard, al gekend, en niet meegeteld
   /// (vervallen of mislukt, of in een afgesloten periode).
@@ -8483,7 +8488,8 @@ model IncomeImport {
 model IncomeChannel {
   id                      String       @id @default(cuid())
   source                  IncomeSource
-  /// Zoals in de export: `shop_name` bij Payconiq, "Mollie" bij Mollie.
+  /// Zoals in de export: `shop_name` bij Payconiq, "Mollie" bij Mollie, het
+  /// account bij SumUp, het terminalnummer bij Europabank.
   identifier              String
   /// Een eigen naam, voor het overzicht. NULL = de naam uit de export.
   label                   String?

@@ -153,14 +153,15 @@ een gedeeld sync-stramien.
 # Online inkomsten
 
 `docs/inkomsten.md` is de referentie voor `/admin/inkomsten`: de exports van
-Payconiq en Mollie opladen en per boekhoudcode tonen, de opvolger van het
-rekenblad "Oriëntatie Online Inkomsten" van Beheer. Lees zeker de sectie
-"Vallen"; de kringkeuzes staan in `docs/design-decisions.md`.
+Payconiq, Mollie, SumUp en Europabank opladen en per boekhoudcode tonen, de
+opvolger van het rekenblad "Oriëntatie Online Inkomsten" van Beheer. Lees zeker
+de sectie "Vallen"; de kringkeuzes staan in `docs/design-decisions.md`.
 
-- **Niets over VTK zelf in de code.** Stickers, rekeningen, de kostencode en
-  onthouden teksten vult Beheer in de site in; in `lib/inkomsten` staat enkel
-  kennis over de bestanden. Zet er geen terminalnummer, rekeningnummer of code
-  in, ook niet als standaard, in een seed of in een hint bij een veld.
+- **Niets over VTK zelf in de code.** Stickers, terminals, rekeningen,
+  standaardcodes, de kostencode en onthouden teksten vult Beheer in de site in;
+  in `lib/inkomsten` staat enkel kennis over de bestanden. Zet er geen
+  terminalnummer, rekeningnummer of code in, ook niet als standaard, in een
+  seed of in een hint bij een veld.
 - **Rekenen zoals het rekenblad**: Mollie op de maand van de uitbetaling, de
   rest op de maand van de betaling, elk uur op de Brusselse klok. Een wijziging
   daaraan toets je opnieuw aan een kwartaal van Beheer.

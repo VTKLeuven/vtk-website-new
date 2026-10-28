@@ -79,6 +79,22 @@ describe("het kwartaalblad", () => {
     expect(accountRow[5]).toBe("Rekening niet ingesteld");
   });
 
+  it("zet Europabank en SumUp voor Mollie en Payconiq, zoals het rekenblad", () => {
+    const sheet = quarterSheet(
+      model([
+        tx({ accountingCode: "700110", amountCents: 100 }),
+        tx({ accountingCode: "700110", amountCents: 100, source: "MOLLIE", channel: "Mollie" }),
+        tx({ accountingCode: "700110", amountCents: 100, source: "SUMUP", channel: "kassa@voorbeeld.be", bankAccount: "BE00 0000 0000 9348" }),
+        tx({ kind: "FEE", amountCents: -1, source: "SUMUP", channel: "kassa@voorbeeld.be", bankAccount: "BE00 0000 0000 9348" }),
+        tx({ accountingCode: "700110", amountCents: 100, source: "EUROPABANK", channel: "1000000001" }),
+      ]),
+      { formulas: false },
+    );
+    expect(sheet.data[1].slice(3, 7).map(text)).toEqual(["Europabank", "SumUp", "Mollie", "Payconiq"]);
+    const fees = sheet.data.find((row) => text(row[0]) === "Financiële kosten")!;
+    expect(text(fees[4])).toBe(-0.01);
+  });
+
   it("zet de codes in de volgorde van het register, dan kosten, reserve en wat na te kijken is", () => {
     const sheet = quarterSheet(sample, { formulas: false });
     const lines = sheet.data.slice(3).map((row) => [text(row[0]), text(row[1]), text(row[2])]);

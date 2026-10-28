@@ -31,9 +31,14 @@ export const SHEET_STYLE = {
   euro: "[$€-2]\\ #,##0.00",
 } as const;
 
-/** De volgorde van de bronnen in het rekenblad: Mollie stond voor Payconiq. */
-const SOURCE_ORDER: readonly IncomeSourceCode[] = ["MOLLIE", "PAYCONIQ"];
-const SOURCE_NAMES: Record<IncomeSourceCode, string> = { MOLLIE: "Mollie", PAYCONIQ: "Payconiq" };
+/** De volgorde van de bronnen in het rekenblad: Europabank, SumUp, Mollie, dan Payconiq. */
+const SOURCE_ORDER: readonly IncomeSourceCode[] = ["EUROPABANK", "SUMUP", "MOLLIE", "PAYCONIQ"];
+const SOURCE_NAMES: Record<IncomeSourceCode, string> = {
+  EUROPABANK: "Europabank",
+  SUMUP: "SumUp",
+  MOLLIE: "Mollie",
+  PAYCONIQ: "Payconiq",
+};
 
 export type WorkbookTransaction = {
   occurredAt: Date;

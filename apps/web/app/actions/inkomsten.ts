@@ -25,7 +25,6 @@ export type IncomeErrorCode =
   | "EMPTY"
   | "UNKNOWN_FORMAT"
   | "MOLLIE_BALANCE"
-  | "NOT_YET_SUPPORTED"
   | "BAD_ROW"
   | "NOT_FOUND"
   | "CODE_NOT_FOUND"

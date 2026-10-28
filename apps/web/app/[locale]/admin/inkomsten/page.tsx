@@ -7,7 +7,7 @@ import { requirePermission } from "@/lib/session";
 import { formatEuro } from "@/lib/rekeningen/expenses";
 import { brusselsYMD } from "@/lib/brussels";
 import { parseMonth } from "@/lib/inkomsten/parse";
-import { INCOME_SOURCES, type OverviewLine } from "@/lib/inkomsten/overview";
+import type { OverviewLine } from "@/lib/inkomsten/overview";
 import { countUnassigned, loadIncomeOverview } from "@/lib/inkomsten/server";
 import { closeIncomePeriodAction, setMolliePayoutCheckAction } from "@/app/actions/inkomsten";
 import { CheckIcon, InfoIcon } from "@/components/ui/icons";
@@ -18,9 +18,10 @@ import { SOURCE_LABELS, checkText, periodLabel, quarterOptions } from "./shared"
 
 /**
  * Het overzicht dat het rekenblad "Oriëntatie Online Inkomsten" vervangt: per
- * boekhoudcode wat er in een periode via Payconiq en Mollie binnenkwam. Mollie
- * telt in de maand van de uitbetaling, zoals in het rekenblad; de rest in de
- * maand van de betaling.
+ * boekhoudcode wat er in een periode via Payconiq, Mollie, SumUp en Europabank
+ * binnenkwam, met een kolom per bron die ooit opgeladen werd. Mollie telt in de
+ * maand van de uitbetaling, zoals in het rekenblad; de rest in de maand van de
+ * betaling.
  */
 export default async function IncomeOverviewPage({
   params,
@@ -58,7 +59,7 @@ export default async function IncomeOverviewPage({
 
   const lineCells = (line: OverviewLine) => (
     <>
-      {INCOME_SOURCES.map((source) => (
+      {data.sources.map((source) => (
         <td key={source} className="px-3 py-2 text-right whitespace-nowrap tabular-nums">
           {money(line.bySource[source])}
         </td>
@@ -73,8 +74,8 @@ export default async function IncomeOverviewPage({
         <h1 className="text-2xl font-semibold">{nl ? "Online inkomsten" : "Online income"}</h1>
         <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
           {nl
-            ? "Wat er via Payconiq en Mollie binnenkwam, per boekhoudcode. Mollie telt in de maand van de uitbetaling, de rest in de maand van de betaling."
-            : "What came in through Payconiq and Mollie, per accounting code. Mollie counts in the month of the payout, the rest in the month of the payment."}
+            ? "Wat er via Payconiq, Mollie, SumUp en Europabank binnenkwam, per boekhoudcode. Mollie telt in de maand van de uitbetaling, de rest in de maand van de betaling."
+            : "What came in through Payconiq, Mollie, SumUp and Europabank, per accounting code. Mollie counts in the month of the payout, the rest in the month of the payment."}
         </p>
       </header>
 
@@ -178,7 +179,7 @@ export default async function IncomeOverviewPage({
                 <tr className="border-b border-vtk-blue/12 text-left text-xs uppercase tracking-wide text-vtk-muted">
                   <th className="px-3 py-2">{nl ? "Code" : "Code"}</th>
                   <th className="px-3 py-2">{nl ? "Naam" : "Name"}</th>
-                  {INCOME_SOURCES.map((source) => (
+                  {data.sources.map((source) => (
                     <th key={source} className="px-3 py-2 text-right">
                       {SOURCE_LABELS[source]}
                     </th>

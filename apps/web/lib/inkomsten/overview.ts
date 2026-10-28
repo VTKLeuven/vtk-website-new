@@ -8,7 +8,7 @@
 import { codeKey } from "./match";
 import type { IncomeKindCode, IncomeSourceCode } from "./parse";
 
-export const INCOME_SOURCES: readonly IncomeSourceCode[] = ["PAYCONIQ", "MOLLIE"];
+export const INCOME_SOURCES: readonly IncomeSourceCode[] = ["PAYCONIQ", "MOLLIE", "SUMUP", "EUROPABANK"];
 
 export type OverviewTransaction = {
   source: IncomeSourceCode;
@@ -40,7 +40,7 @@ export type IncomeOverview = {
 };
 
 function emptyAmounts(): SourceAmounts {
-  return { PAYCONIQ: 0, MOLLIE: 0 };
+  return { PAYCONIQ: 0, MOLLIE: 0, SUMUP: 0, EUROPABANK: 0 };
 }
 
 function emptyLine(): OverviewLine {

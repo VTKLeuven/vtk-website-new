@@ -64,8 +64,8 @@ export default async function IncomeSettingsPage({ params }: { params: Promise<{
         <h2 className="text-lg font-semibold">{nl ? "Kostencode" : "Fee code"}</h2>
         <p className="mt-1 mb-3 max-w-3xl text-sm text-vtk-muted">
           {nl
-            ? "De code voor wat Mollie inhoudt (\"Withheld fees\"): de regel met de kosten in het kwartaalblad. Staat ze nog niet in de lijst, voeg ze dan eerst toe bij Boekhoudcodes."
-            : "The code for what Mollie withholds (\"Withheld fees\"): the line with the fees in the quarter sheet. If it is not in the list yet, add it under Accounting codes first."}
+            ? "De code voor de kosten: wat Mollie inhoudt (\"Withheld fees\"), de transactiekosten van SumUp en de commissie van Europabank. Samen vormen ze de regel met de kosten in het kwartaalblad. Staat de code nog niet in de lijst, voeg ze dan eerst toe bij Boekhoudcodes."
+            : "The code for the fees: what Mollie withholds (\"Withheld fees\"), the SumUp transaction fees and the Europabank commission. Together they are the line with the fees in the quarter sheet. If the code is not in the list yet, add it under Accounting codes first."}
         </p>
         <FeeCodeForm {...common} action={saveIncomeSettingsAction} codes={codes} value={config.feeAccountingCodeId} />
       </section>
@@ -74,8 +74,8 @@ export default async function IncomeSettingsPage({ params }: { params: Promise<{
         <h2 className="text-lg font-semibold">{nl ? "Kanalen" : "Channels"}</h2>
         <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
           {nl
-            ? "Elke Payconiq-QR-code en elk profiel dat in een export voorkwam. Vul in op welke rekening het stort, vanaf welke dag: wisselt een QR-code van rekening, dan voeg je een nieuwe regel toe en houdt wat ervoor binnenkwam de oude. Dient een QR-code altijd voor dezelfde post (zoals die van Theokot), geef ze dan een standaardcode: wat erop binnenkomt en geen andere regel koppelt, krijgt die code in plaats van bij Na te kijken te staan."
-            : "Every Payconiq QR code and profile that appeared in an export. Fill in which account it pays into, from which day: if a QR code changes account, add a new row and what came in before keeps the old one. If a QR code always serves the same post (like Theokot's), give it a default code: what comes in on it and no other rule matches gets that code instead of waiting under To review."}
+            ? "Elke Payconiq-QR-code, elk SumUp-account, elke Europabank-terminal en elk Mollie-profiel dat in een export voorkwam. Vul in op welke rekening het stort, vanaf welke dag: wisselt een toestel van rekening, dan voeg je een nieuwe regel toe en houdt wat ervoor binnenkwam de oude. Dient een toestel altijd voor dezelfde post (zoals de QR-code en de SumUp van Theokot), geef het dan een standaardcode: wat erop binnenkomt en geen andere regel koppelt, krijgt die code in plaats van bij Na te kijken te staan."
+            : "Every Payconiq QR code, SumUp account, Europabank terminal and Mollie profile that appeared in an export. Fill in which account it pays into, from which day: if a device changes account, add a new row and what came in before keeps the old one. If a device always serves the same post (like Theokot's QR code and SumUp), give it a default code: what comes in on it and no other rule matches gets that code instead of waiting under To review."}
         </p>
         {channels.length === 0 ? (
           <p className="mt-3 text-sm text-vtk-muted">
@@ -136,7 +136,7 @@ export default async function IncomeSettingsPage({ params }: { params: Promise<{
                   </ul>
                 )}
                 <ChannelAccountForm {...common} action={addIncomeChannelAccountAction} channelId={channel.id} />
-                {channel.source === "PAYCONIQ" ? (
+                {channel.source !== "MOLLIE" ? (
                   <ChannelCodeForm
                     {...common}
                     action={saveIncomeChannelCodeAction}

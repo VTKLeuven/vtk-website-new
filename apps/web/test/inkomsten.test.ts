@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  SUMUP_CHANNEL,
   cleanDescription,
+  compactTime,
   parseDecimalCents,
   parseIncomeExport,
   parseLocalDateTime,
@@ -35,6 +37,29 @@ const MOLLIE_NL = [
   'Onthaaldagen,2508,700100,4-8-2025 6:14:00,mistercash,EUR,"50,00",paidout,tr_test4,AB12CD34 - 1 ticket(s) for event Onthaaldagen,,,,EUR,"50,00",12345678.2508.01,',
   'Onthaaldagen,2508,700100,5-8-2025 9:00:00,mistercash,EUR,"50,00",refunded,tr_test5,AB12CD35 - 1 ticket(s) for event Onthaaldagen,,,,EUR,"50,00",12345678.2508.01,"50,00"',
   ',2509,,6-9-2025 6:14:00,refund,EUR,"-50,00",,re_test6,AB12CD35 - 1 ticket(s) for event Onthaaldagen,,,,EUR,"-50,00",12345678.2509.01,',
+].join("\n");
+
+const SUMUP = [
+  "email,Datum,Transactie-ID,Transactietype,Status,Kaarttype,Laatste 4 cijfers,Verwerken als,Betaalmethode,Invoerwijze,Autorisatiecode,Beschrijving,Totaal bedrag,Netto verkoop,Belastingbedrag,Bedrag fooi,Transactiekosten,Uitbetaling,Uitbetaling datum,Uitbetalingsnummer,Kenmerk",
+  "kassa@voorbeeld.be,2026-10-01 00:20:00,TTEST000001,Omzet,Succesvol,VISA,4321,DEBIT,POS,CONTACTLESS,AUTHX1,,3.40,3.40,0.0,0.0,0.03,3.37,,,",
+  "kassa@voorbeeld.be,2026-10-01 12:00:00,TTEST000002,Omzet,Mislukt,VISA,4321,DEBIT,POS,CONTACTLESS,,,2.80,2.80,0.0,0.0,0.0,0.0,,,",
+  "kassa@voorbeeld.be,2026-10-02 09:15:00,TTEST000003,Terugbetaling,Succesvol,VISA,4321,DEBIT,POS,CONTACTLESS,,,3.40,3.40,0.0,0.0,0.0,-3.40,,,",
+  "kassa@voorbeeld.be,2026-10-03 18:30:00,TTEST000004,Omzet,Terugbetaald,MASTERCARD,8765,DEBIT,POS,CHIP,AUTHX2,,5.00,5.00,0.0,0.0,0.05,4.95,,,",
+].join("\n");
+
+// De opmaak tot maart 2026, zoals het tabblad van Beheer: "Datum en tijd" is een formule.
+const EUROPABANK_OUD = [
+  "Datum en tijd,Datum,Tijd,Terminal,Ticket/Uw ref,Origineel bedrag (EUR),Resterend bedrag (EUR),Betaalmiddel,Aard toeslag,Kaartnr/Tx-id,Land,Resultaat,Autorisatie nr,EB-ref,Boekingsdatum,OV-ref,Commissie (EUR),E-commerce (EUR),Interchange (EUR),Schema kost (EUR)",
+  '5-3-2026 9:30:15,5/3/2026,93015,1000000001,,"2,3","2,3",Visa,,999999******4321,BE,Sale,012345,EBREF1,6/03/2026,100,"-0,02",0,"-0,001","-0,012"',
+  "5-3-2026 10:00:00,5/3/2026,100000,1000000001,,4,4,MasterCard,,999999******8765,BE,Denied,,EBREF2,6/03/2026,100,0,0,0,0",
+].join("\n");
+
+// De opmaak van daarna: de commissie is positief, en dezelfde betaling als de eerste hierboven staat er ook in.
+const EUROPABANK_NIEUW = [
+  "Datum en tijd,Datum,Tijd,Terminal,Brand,Kaarttype,Bedrag,Commissie (EUR),Interchange (EUR),Schemakost (EUR),Applicatiekost (EUR),Uw ref,Kaart,Authorisatie nr,Land,Transactietype,Resultaat,Boekingsdatum,OV-ref",
+  '5-3-2026 9:30:15,05/03/2026,093015,1000000001,Visa,Debit,"2,3","0,02","-0,001","-0,012",0,,4321,12345,BE,Verkoop,Goedgekeurd,06/03/2026,200',
+  '6-3-2026 12:23:18,06/03/2026,122318,1000000001,Visa,Debit,1,"0,02","-0,001","-0,012",0,,4321,631875,BE,Verkoop,Goedgekeurd,09/03/2026,200',
+  '6-3-2026 12:23:18,06/03/2026,122318,1000000001,Visa,Debit,1,"0,02","-0,001","-0,012",0,,4321,631875,BE,Verkoop,Goedgekeurd,09/03/2026,200',
 ].join("\n");
 
 function rowsOf(text: string): ParsedIncomeRow[] {
@@ -153,6 +178,97 @@ describe("Mollie", () => {
     const broken = MOLLIE_EN.replace("55.00,12345678.2610.01", "veel,12345678.2610.01");
     const result = parseIncomeExport(broken);
     expect(result.ok).toBe(false);
+  });
+});
+
+describe("SumUp", () => {
+  it("telt geslaagde verkopen met hun kosten als eigen regel, en slaat mislukte over", () => {
+    const result = parseIncomeExport(SUMUP);
+    expect(result.ok && result.format).toBe("sumup");
+    if (!result.ok) return;
+    expect(result.total).toBe(4);
+    expect(result.skipped).toBe(1);
+    expect(result.rows.map((row) => [row.kind, row.amountCents, row.externalKey])).toEqual([
+      ["PAYMENT", 340, "PAYMENT:TTEST000001"],
+      ["FEE", -3, "FEE:TTEST000001"],
+      ["REFUND", -340, "REFUND:TTEST000003"],
+      ["PAYMENT", 500, "PAYMENT:TTEST000004"],
+      ["FEE", -5, "FEE:TTEST000004"],
+    ]);
+  });
+
+  it("neemt het account als kanaal en rekent op de Brusselse klok", () => {
+    const [payment, fee] = rowsOf(SUMUP);
+    expect(payment.channel).toBe("kassa@voorbeeld.be");
+    expect(payment.occurredAt.toISOString()).toBe("2026-09-30T22:20:00.000Z");
+    expect(payment.periodMonth).toBe("2026-10");
+    expect([fee.channel, fee.periodMonth]).toEqual([payment.channel, payment.periodMonth]);
+  });
+
+  it("valt zonder accountkolom terug op één kanaal", () => {
+    const withoutAccount = SUMUP.split("\n")
+      .map((line) => line.slice(line.indexOf(",") + 1))
+      .join("\n");
+    expect(rowsOf(withoutAccount)[0].channel).toBe(SUMUP_CHANNEL);
+  });
+
+  it("bewaart geen kaartgegevens of autorisatiecodes", () => {
+    const text = JSON.stringify(rowsOf(SUMUP));
+    expect(text).not.toContain("AUTHX1");
+    expect(text).not.toContain("VISA");
+  });
+});
+
+describe("Europabank", () => {
+  it("leest de oude opmaak: enkel Sale telt, en de commissie wordt een kost", () => {
+    const result = parseIncomeExport(EUROPABANK_OUD);
+    expect(result.ok && result.format).toBe("europabank");
+    if (!result.ok) return;
+    expect(result.skipped).toBe(1);
+    expect(result.rows.map((row) => [row.kind, row.amountCents, row.channel])).toEqual([
+      ["PAYMENT", 230, "1000000001"],
+      ["FEE", -2, "1000000001"],
+    ]);
+    // 9:30:15 op 5 maart, in de winter een uur voor UTC.
+    expect(result.rows[0].occurredAt.toISOString()).toBe("2026-03-05T08:30:15.000Z");
+    expect(result.rows[0].periodMonth).toBe("2026-03");
+  });
+
+  it("leest de nieuwe opmaak, waar de commissie positief staat", () => {
+    expect(rowsOf(EUROPABANK_NIEUW).map((row) => [row.kind, row.amountCents])).toEqual([
+      ["PAYMENT", 230],
+      ["FEE", -2],
+      ["PAYMENT", 100],
+      ["FEE", -2],
+      ["PAYMENT", 100],
+      ["FEE", -2],
+    ]);
+  });
+
+  it("geeft dezelfde betaling in beide opmaken dezelfde sleutel, en twee gelijke regels elk een eigen", () => {
+    const [old] = rowsOf(EUROPABANK_OUD);
+    const rows = rowsOf(EUROPABANK_NIEUW);
+    expect(rows[0].externalKey).toBe(old.externalKey);
+    expect(rows[2].externalKey).not.toBe(rows[4].externalKey);
+    expect(rowsOf(EUROPABANK_NIEUW)[4].externalKey).toBe(rows[4].externalKey);
+  });
+
+  it("leest het uur zoals Europabank het schrijft", () => {
+    expect(compactTime("103804")).toBe("10:38:04");
+    expect(compactTime("93015")).toBe("09:30:15");
+    expect(compactTime("103804.0")).toBe("10:38:04");
+    expect(compactTime("10:38")).toBeNull();
+  });
+
+  it("neemt het uur uit Tijd, ook als een rekenblad 00:00:00 achter de datum zette", () => {
+    const fromSheet = EUROPABANK_OUD.replace(",5/3/2026,93015,", ",2026-03-05 00:00:00,93015,");
+    expect(rowsOf(fromSheet)[0].occurredAt.toISOString()).toBe("2026-03-05T08:30:15.000Z");
+  });
+
+  it("bewaart geen kaartgegevens", () => {
+    const text = JSON.stringify([...rowsOf(EUROPABANK_OUD), ...rowsOf(EUROPABANK_NIEUW)]);
+    expect(text).not.toContain("******");
+    expect(text).not.toContain("EBREF1");
   });
 });
 
@@ -277,6 +393,22 @@ describe("overzicht", () => {
     expect(overview.unassigned.total).toBe(50);
     expect(overview.excluded.total).toBe(999);
     expect(overview.totals.total).toBe(350);
+  });
+
+  it("telt SumUp en Europabank in hun eigen kolom, met hun kosten bij de kosten", () => {
+    const overview = computeIncomeOverview(
+      [
+        tx({ source: "SUMUP", accountingCode: "700110", accountingCodeName: "Cultuur", amountCents: 340 }),
+        tx({ source: "SUMUP", kind: "FEE", amountCents: -3 }),
+        tx({ source: "EUROPABANK", amountCents: 230 }),
+        tx({ source: "EUROPABANK", kind: "FEE", amountCents: -2 }),
+      ],
+      new Map(),
+    );
+    expect(overview.codes[0].bySource.SUMUP).toBe(340);
+    expect(overview.unassigned.bySource.EUROPABANK).toBe(230);
+    expect(overview.fees.bySource).toMatchObject({ SUMUP: -3, EUROPABANK: -2 });
+    expect(overview.totals.total).toBe(565);
   });
 
   it("telt ook mee wat op de rekening van een post binnenkomt, met een totaal per rekening", () => {

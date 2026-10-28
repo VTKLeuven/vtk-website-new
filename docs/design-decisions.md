@@ -12070,6 +12070,8 @@ staat nu op `/admin/inkomsten` (`lib/inkomsten`, technisch in
 `docs/inkomsten.md`).
 Fase 1 (oktober 2026): Payconiq en Mollie. Fase 1b (oktober 2026): het blad voor
 de boekhouder, het controlebestand, de controlelijst en de boekhoudcodes als CSV.
+Fase 3 (oktober 2026): SumUp en Europabank. Fase 2, de koppeling met de kassa's,
+volgt nog.
 
 - **Rekenen zoals het rekenblad.** Mollie telt in de maand van de uitbetaling
   (de maand in de uitbetalingsreferentie), de rest in de maand van de betaling.
@@ -12153,6 +12155,23 @@ de boekhouder, het controlebestand, de controlelijst en de boekhoudcodes als CSV
   dekt dus het gewone gebruik. In fase 2 gaat een kassa van een andere post op
   die QR-code voor op de standaardcode, zoals de opmerking in het rekenblad het
   wilde.
+- **SumUp en Europabank rekenen zoals het rekenblad, op twee punten na.** Ze
+  tellen in de maand van de betaling, met het totaalbedrag van SumUp en het
+  originele bedrag van Europabank, en van Europabank enkel de commissie als
+  kost (geen interchange of schemakost), zoals de formules van Beheer. Anders
+  dan het rekenblad telt de site enkel SumUp-betalingen die lukten: de formule
+  van Beheer nam ook mislukte pogingen mee (€ 104,60 in het vierde kwartaal
+  van 2025). En de transactiekosten van SumUp tellen als kost; het rekenblad
+  had ze niet, omdat de SumUp van Theokot er niet in stond. Alle kosten staan
+  op één regel, onder de ene kostencode die Beheer kiest, zoals "Financiële
+  kosten" in het kwartaalblad. De terminal van evenementen krijgt geen
+  standaardcode: tot de koppeling met de kassa's (fase 2) staat ze per dag bij
+  Na te kijken.
+- **De kosten per betaling, niet per dag.** SumUp en Europabank zetten de
+  kosten op elke betaling. De site maakt er per betaling een kostenregel van,
+  met dezelfde sleutel als de betaling, zodat een export die een eerdere
+  overlapt de kosten nooit dubbel telt. Per dag optellen las korter, maar dan
+  kon een tweede, vollere export van dezelfde dag de som niet meer aanvullen.
 - **Boekhoudcodes opladen voegt toe, het verwijdert nooit.** De penning houdt de
   lijst in een rekenblad bij, dus opladen voegt toe en hernoemt. Een code die
   niet meer in het bestand staat, blijft, want ticketverkopen en bestellingen

@@ -6,6 +6,7 @@ import { FileField } from "@/components/ui/FileField";
 import { SaveForm } from "@/components/ui/SaveForm";
 import type { SaveAction } from "@/lib/saveState";
 import type { ImportPreviewState } from "@/app/actions/inkomsten";
+import { SOURCE_LABELS } from "../shared";
 
 /**
  * Een export kiezen of slepen, eerst zien wat opladen zou doen, en pas dan
@@ -66,8 +67,8 @@ export function UploadForm({
         chooseLabel={nl ? "Export kiezen" : "Choose export"}
         hint={
           nl
-            ? "Een CSV van Payconiq of de betalingenexport van Mollie. Je kan het bestand ook hierheen slepen."
-            : "A Payconiq CSV or the Mollie payments export. You can also drag the file here."
+            ? "Een CSV van Payconiq, de export van Mollie, de transacties van een SumUp-account of van een Europabank-terminal. Je kan het bestand ook hierheen slepen."
+            : "A Payconiq CSV, the Mollie export, or the transactions of a SumUp account or a Europabank terminal. You can also drag the file here."
         }
         onChange={onFiles}
       />
@@ -84,7 +85,7 @@ export function UploadForm({
       {summary && !pending ? (
         <div className="rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/40 px-4 py-3 text-sm">
           <p className="font-medium">
-            {summary.format === "payconiq" ? "Payconiq" : "Mollie"}
+            {SOURCE_LABELS[summary.source]}
             {summary.firstAt ? ` · ${day(summary.firstAt)} ${nl ? "tot" : "to"} ${day(summary.lastAt)}` : ""}
           </p>
           <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-3">
@@ -92,7 +93,7 @@ export function UploadForm({
             <Stat label={nl ? "Nieuw" : "New"} value={number(summary.created)} />
             <Stat label={nl ? "Al eerder opgeladen" : "Already uploaded"} value={number(summary.duplicates)} />
             {summary.updated ? <Stat label={nl ? "Nu uitbetaald" : "Now paid out"} value={number(summary.updated)} /> : null}
-            <Stat label={nl ? "Telt niet mee (mislukt, vervallen)" : "Does not count (failed, expired)"} value={number(summary.skipped)} />
+            <Stat label={nl ? "Telt niet mee (mislukt, vervallen, geweigerd)" : "Does not count (failed, expired, denied)"} value={number(summary.skipped)} />
             {summary.locked ? <Stat label={nl ? "In een afgesloten periode" : "In a closed period"} value={number(summary.locked)} /> : null}
             <Stat label={nl ? "Betaling van de site" : "Payment from the site"} value={number(summary.rules.WEBSITE)} />
             <Stat label={nl ? "Code in de tekst" : "Code in the text"} value={number(summary.rules.CODE_IN_TEXT)} />
@@ -107,7 +108,9 @@ export function UploadForm({
             <p className="mt-2 text-vtk-muted">
               {nl ? "Nieuw kanaal: " : "New channel: "}
               {summary.newChannels.join(", ")}.{" "}
-              {nl ? "Stel de rekening in bij Instellingen." : "Set its account under Settings."}
+              {nl
+                ? "Stel de rekening, en eventueel een standaardcode, in bij Instellingen."
+                : "Set its account, and a default code if needed, under Settings."}
             </p>
           ) : null}
           {summary.format === "mollie" && summary.feeRows === 0 && summary.created > 0 ? (

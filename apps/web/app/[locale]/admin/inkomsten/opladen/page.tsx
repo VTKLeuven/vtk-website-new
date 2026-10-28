@@ -28,8 +28,8 @@ export default async function IncomeUploadPage({ params }: { params: Promise<{ l
         <h1 className="text-2xl font-semibold">{nl ? "Online inkomsten opladen" : "Upload online income"}</h1>
         <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
           {nl
-            ? "Laad een export van Payconiq of Mollie op. Wat al eerder opgeladen werd, telt niet dubbel, dus een maand twee keer opladen kan geen kwaad. Namen en rekeningnummers van wie betaalde, worden niet bewaard."
-            : "Upload a Payconiq or Mollie export. Anything uploaded before does not count twice, so uploading a month twice does no harm. Names and account numbers of payers are not stored."}
+            ? "Laad een export van Payconiq, Mollie, SumUp of Europabank op. Wat al eerder opgeladen werd, telt niet dubbel, dus een maand twee keer opladen kan geen kwaad. Namen, rekeningnummers en kaartgegevens van wie betaalde, worden niet bewaard."
+            : "Upload an export from Payconiq, Mollie, SumUp or Europabank. Anything uploaded before does not count twice, so uploading a month twice does no harm. Names, account numbers and card details of payers are not stored."}
         </p>
       </header>
 
