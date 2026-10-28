@@ -283,7 +283,13 @@ export async function deleteCashRegisterAction(formData: FormData): Promise<Save
   if (!register) return saveError("NOT_FOUND");
   if (!canEditRequest(access, register)) return saveError("LOCKED");
 
-  await prisma.cashRegister.delete({ where: { id } });
+  // Voor de post voorwaardelijk op de status, net als bij aanpassen: aanvaardt
+  // Beheer net terwijl de post intrekt, dan verdwijnt er geen aanvaarde kassa
+  // waarover de mail al vertrokken is.
+  const deleted = await prisma.cashRegister.deleteMany({
+    where: access.canManage ? { id } : { id, status: "REQUESTED" },
+  });
+  if (deleted.count === 0) return saveError("LOCKED");
   await logAudit({
     action: "delete",
     entity: "cashRegister",
