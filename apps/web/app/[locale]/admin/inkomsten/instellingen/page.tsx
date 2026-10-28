@@ -14,10 +14,11 @@ import {
 } from "@/lib/inkomsten/server";
 import {
   addIncomeChannelAccountAction,
+  addIncomeChannelCodeAction,
   deleteIncomeChannelAccountAction,
+  deleteIncomeChannelCodeAction,
   deleteIncomeNameRuleAction,
   reopenIncomePeriodAction,
-  saveIncomeChannelCodeAction,
   saveIncomeChannelLabelAction,
   saveIncomeSettingsAction,
 } from "@/app/actions/inkomsten";
@@ -74,8 +75,8 @@ export default async function IncomeSettingsPage({ params }: { params: Promise<{
         <h2 className="text-lg font-semibold">{nl ? "Kanalen" : "Channels"}</h2>
         <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
           {nl
-            ? "Elke Payconiq-QR-code, elk SumUp-account, elke Europabank-terminal en elk Mollie-profiel dat in een export voorkwam. Vul in op welke rekening het stort, vanaf welke dag: wisselt een toestel van rekening, dan voeg je een nieuwe regel toe en houdt wat ervoor binnenkwam de oude. Dient een toestel altijd voor dezelfde post (zoals de QR-code en de SumUp van Theokot), geef het dan een standaardcode: wat erop binnenkomt en geen andere regel koppelt, krijgt die code in plaats van bij Na te kijken te staan."
-            : "Every Payconiq QR code, SumUp account, Europabank terminal and Mollie profile that appeared in an export. Fill in which account it pays into, from which day: if a device changes account, add a new row and what came in before keeps the old one. If a device always serves the same post (like Theokot's QR code and SumUp), give it a default code: what comes in on it and no other rule matches gets that code instead of waiting under To review."}
+            ? "Elke Payconiq-QR-code, elk SumUp-account, elke Europabank-terminal en elk Mollie-profiel dat in een export voorkwam. Vul in op welke rekening het stort, vanaf welke dag: wisselt een toestel van rekening, dan voeg je een nieuwe regel toe en houdt wat ervoor binnenkwam de oude. Dient een toestel voor dezelfde post (zoals de QR-code en de SumUp van Theokot), geef het dan een standaardcode vanaf een dag: wat erop binnenkomt en geen andere regel koppelt, krijgt die code in plaats van bij Na te kijken te staan. Gebruikt een andere post het toestel een tijd, voeg dan vanaf die dag een regel zonder code toe, en vanaf de dag erna weer de code."
+            : "Every Payconiq QR code, SumUp account, Europabank terminal and Mollie profile that appeared in an export. Fill in which account it pays into, from which day: if a device changes account, add a new row and what came in before keeps the old one. If a device serves the same post (like Theokot's QR code and SumUp), give it a default code from a day: what comes in on it and no other rule matches gets that code instead of waiting under To review. If another post uses the device for a while, add a row without a code from that day, and the code again from the day after."}
         </p>
         {channels.length === 0 ? (
           <p className="mt-3 text-sm text-vtk-muted">
@@ -102,6 +103,7 @@ export default async function IncomeSettingsPage({ params }: { params: Promise<{
                     placeholder={nl ? "Eigen naam (optioneel)" : "Own name (optional)"}
                   />
                 </div>
+                <p className="text-xs font-medium uppercase tracking-wide text-vtk-muted">{nl ? "Rekening" : "Account"}</p>
                 {channel.accounts.length === 0 ? (
                   <p className="text-sm text-vtk-warn">{nl ? "Nog geen rekening ingesteld." : "No account set yet."}</p>
                 ) : (
@@ -137,13 +139,55 @@ export default async function IncomeSettingsPage({ params }: { params: Promise<{
                 )}
                 <ChannelAccountForm {...common} action={addIncomeChannelAccountAction} channelId={channel.id} />
                 {channel.source !== "MOLLIE" ? (
-                  <ChannelCodeForm
-                    {...common}
-                    action={saveIncomeChannelCodeAction}
-                    channelId={channel.id}
-                    codes={codes}
-                    value={channel.defaultAccountingCodeId}
-                  />
+                  <>
+                    <p className="pt-2 text-xs font-medium uppercase tracking-wide text-vtk-muted">
+                      {nl ? "Standaardcode" : "Default code"}
+                    </p>
+                    {channel.codes.length === 0 ? (
+                      <p className="text-sm text-vtk-muted">
+                        {nl
+                          ? "Geen: wat geen andere regel koppelt, staat bij Na te kijken."
+                          : "None: what no other rule matches waits under To review."}
+                      </p>
+                    ) : (
+                      <ul className="text-sm">
+                        {channel.codes.map((entry) => {
+                          const from = entry.from.toISOString().slice(0, 10);
+                          return (
+                            <li key={from} className="flex items-center gap-3">
+                              <span className="w-32 shrink-0 tabular-nums text-vtk-muted">
+                                {nl ? "vanaf" : "from"} {date(entry.from)}
+                              </span>
+                              {entry.accountingCode ? (
+                                <span>
+                                  <span className="tabular-nums">{entry.accountingCode.code}</span> {entry.accountingCode.name}
+                                </span>
+                              ) : (
+                                <span className="text-vtk-muted">{nl ? "geen: naar Na te kijken" : "none: to To review"}</span>
+                              )}
+                              <DeleteIconButton
+                                action={deleteIncomeChannelCodeAction}
+                                fields={{ channelId: channel.id, from }}
+                                label={nl ? "Verwijderen" : "Delete"}
+                                srLabel={nl ? `Standaardcode vanaf ${date(entry.from)} verwijderen` : `Delete default code from ${date(entry.from)}`}
+                                title={nl ? "Deze standaardcode verwijderen?" : "Delete this default code?"}
+                                description={
+                                  nl
+                                    ? `Vanaf ${date(entry.from)} geldt dan weer de standaardcode ervoor, of geen. Transacties die hun code van deze regel kregen, worden opnieuw gekoppeld; wat met de hand toegewezen werd en wat in een afgesloten periode valt, blijft.`
+                                    : `From ${date(entry.from)} the default code before it applies again, or none. Transactions that got their code from this row are matched again; manual assignments and closed periods stay.`
+                                }
+                                confirmLabel={nl ? "Verwijderen" : "Delete"}
+                                cancelLabel={nl ? "Annuleren" : "Cancel"}
+                                successMessage={nl ? "Standaardcode verwijderd." : "Default code deleted."}
+                                errorMessages={errorMessages}
+                              />
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                    <ChannelCodeForm {...common} action={addIncomeChannelCodeAction} channelId={channel.id} codes={codes} />
+                  </>
                 ) : null}
               </li>
             ))}

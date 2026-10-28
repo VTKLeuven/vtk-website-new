@@ -29,9 +29,10 @@ koppeling met de kassa's (fase 2) nog niet.
 | `lib/csv.ts` | De CSV-lezer die beide gebruiken: scheidingsteken raden, aanhalingstekens volgens RFC 4180. |
 | `test/inkomsten.test.ts`, `test/inkomstenWorkbook.test.ts`, `test/accountingCodesImport.test.ts` | Parsers, koppelregels, overzicht, controlelijst, de xlsx en de codelijst, zonder database, met verzonnen gegevens. |
 
-Tabellen: `IncomeImport`, `IncomeChannel` (met de standaardcode,
-`defaultAccountingCodeId`), `IncomeChannelAccount`, `IncomeTransaction`, `IncomeNameRule`, `IncomePeriod`,
-`IncomePayoutCheck`. Instelling: `Setting` `income.config` (de kostencode).
+Tabellen: `IncomeImport`, `IncomeChannel`, `IncomeChannelAccount` (de rekening
+vanaf een dag), `IncomeChannelCode` (de standaardcode vanaf een dag),
+`IncomeTransaction`, `IncomeNameRule`, `IncomePeriod`, `IncomePayoutCheck`.
+Instelling: `Setting` `income.config` (de kostencode).
 
 ## Wat de site leest
 
@@ -120,11 +121,13 @@ In `matchTransaction`, de eerste die past wint. Enkel voor `PAYMENT` en `REFUND`
 5. **Onthouden tekst** (`NAME_RULE`): `incomeRuleText` van de omschrijving
    (kleine letters, zonder ordernummer, zonder e-mailadres) staat in
    `IncomeNameRule` voor die bron.
-6. **Standaardcode van het kanaal** (`CHANNEL_DEFAULT`): het kanaal heeft in de
-   instellingen een standaardcode (`IncomeChannel.defaultAccountingCodeId`),
-   zoals de QR-code en de SumUp van Theokot onder de code van Theokot, of de
-   terminals van Cudi onder die van Cudi. Zo'n transactie telt mee zoals elke
-   andere, ook wanneer het kanaal op de eigen rekening van een post stort.
+6. **Standaardcode van het kanaal** (`CHANNEL_DEFAULT`): het kanaal heeft op
+   de dag van de transactie een standaardcode (`IncomeChannelCode`: de laatste
+   regel op of voor die Brusselse dag, `channelCodeOn`), zoals de QR-code en de
+   SumUp van Theokot onder de code van Theokot, of de terminals van Cudi onder
+   die van Cudi. Een regel zonder code betekent: vanaf die dag geen. Zo'n
+   transactie telt mee zoals elke andere, ook wanneer het kanaal op de eigen
+   rekening van een post stort.
 7. **Anders**: `rule` blijft `NULL`, en de transactie staat bij Na te kijken.
 
 Regel 4 (de kassa's) komt in fase 2. Ze staat vóór regel 6, zodat een
@@ -153,12 +156,13 @@ Gegroepeerd zodat één keuze veel transacties dekt (`groupKeyOf`):
 
 Een kanaal (`IncomeChannel`) ontstaat bij de eerste import die het noemt. Beheer
 vult in de instellingen in op welke rekening het stort, vanaf welke dag
-(`IncomeChannelAccount`), en eventueel een standaardcode (niet bij Mollie: dat
-is één kanaal voor alles). Het kanaal is de sticker bij Payconiq, het account
-bij SumUp en het terminalnummer bij Europabank. De rekening van een transactie
-is die van de laatste wissel op of voor haar Brusselse dag (`accountOn`); ze
-bepaalt de kolom in het kwartaalblad, niet of de transactie meetelt. Niets
-daarvan staat in de code of in een seed.
+(`IncomeChannelAccount`), en eventueel een standaardcode vanaf welke dag
+(`IncomeChannelCode`; niet bij Mollie: dat is één kanaal voor alles). Het kanaal
+is de sticker bij Payconiq, het account bij SumUp en het terminalnummer bij
+Europabank. De rekening van een transactie is die van de laatste wissel op of
+voor haar Brusselse dag (`accountOn`); ze bepaalt de kolom in het kwartaalblad,
+niet of de transactie meetelt. De standaardcode zoekt de site op dezelfde
+manier op (`channelCodeOn`). Niets daarvan staat in de code of in een seed.
 
 ## Het kwartaalblad en het controlebestand
 
@@ -265,9 +269,17 @@ fouten), dan opladen.
 - **Tijd in Excel.** Een xlsx kent geen tijdzone. `wallClock` zet een tijdstip
   om naar de Brusselse muurtijd, anders staat een betaling van 00:18 op de dag
   ervoor.
-- **De standaardcode heeft geen datum.** Ze geldt voor elke transactie van het
-  kanaal buiten de afgesloten periodes, ook voor die van voor ze gekozen werd.
-  Geef ze dus enkel aan een QR-code die altijd voor dezelfde post dient, niet
-  aan een sticker die van evenement tot evenement doorgaat.
+- **De standaardcode heeft een begin, geen einde.** Een regel geldt tot de
+  volgende. Gebruikt een andere post het toestel een tijd, dan zijn het twee
+  regels: vanaf die dag zonder code, vanaf de dag erna weer met. In september
+  2026 gebruikte de cursusdienst zo een week de SumUp van Theokot
+  (€ 41.228,86). Een dag waarop beide posten het toestel gebruikten, lost de
+  standaardcode niet op: geef die dag geen code en wijs hem bij Na te kijken
+  toe, of wacht op de kassa's (fase 2). Een regel opslaan of verwijderen
+  koppelt opnieuw, buiten de afgesloten periodes. Geef een sticker die van
+  evenement tot evenement doorgaat geen standaardcode.
+- **Een standaardcode van voor de datum.** Bij de migratie naar
+  `IncomeChannelCode` kreeg een bestaande standaardcode als begin de dag van de
+  eerste transactie op dat kanaal, zodat niets wat ze al koppelde, losraakte.
 - **Niets over VTK in de code**, ook niet in een hint of een standaard: de
   kostencode, de rekeningen en de standaardcode van een QR-code vult Beheer in.

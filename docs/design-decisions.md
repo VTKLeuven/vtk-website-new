@@ -12155,6 +12155,15 @@ volgt nog.
   dekt dus het gewone gebruik. In fase 2 gaat een kassa van een andere post op
   die QR-code voor op de standaardcode, zoals de opmerking in het rekenblad het
   wilde.
+- **De standaardcode geldt vanaf een dag, zoals de rekening.** "Normaal nooit"
+  bleek één week: in september 2026 gebruikte de cursusdienst de SumUp van
+  Theokot (€ 41.228,86 van de € 42.466,47 die maand). Met één code zonder datum
+  kwam dat bij Theokot, en kon Beheer het niet meer per dag toewijzen. Nu zet
+  Beheer per toestel regels "vanaf deze dag deze code, of geen". Een week van
+  een andere post is een regel zonder code, en die dagen staan bij Na te
+  kijken, waar Beheer ze per dag een code geeft, zoals in de eigen poging. Een
+  einddatum per regel werd niet gekozen: de volgende regel is het einde, net
+  als bij de rekeningen, en zo kunnen twee regels elkaar niet overlappen.
 - **SumUp en Europabank rekenen zoals het rekenblad, op twee punten na.** Ze
   tellen in de maand van de betaling, met het totaalbedrag van SumUp en het
   originele bedrag van Europabank, en van Europabank enkel de commissie als

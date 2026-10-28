@@ -288,7 +288,17 @@ describe("koppelregels", () => {
     ]),
     codes,
     nameRules: new Map([[nameRuleKey("MOLLIE", "vtk uitleendienst"), { code: "700000", name: "Cursusdienst" }]]),
-    channelCodes: new Map([["kanaal-post", { code: "700110", name: "Cultuur" }]]),
+    channelCodes: new Map([
+      [
+        "kanaal-post",
+        [
+          { from: "2026-09-01", code: { code: "700110", name: "Cultuur" } },
+          // Een andere post gebruikte het toestel een week: vanaf die dag geen standaardcode.
+          { from: "2026-09-20", code: null },
+          { from: "2026-09-30", code: { code: "700110", name: "Cultuur" } },
+        ],
+      ],
+    ]),
   };
   const base = {
     source: "MOLLIE" as const,
@@ -298,6 +308,7 @@ describe("koppelregels", () => {
     reference: null,
     bulkId: null,
     channelId: null,
+    occurredAt: new Date("2026-10-01T10:00:00Z"),
   };
 
   it("koppelt een betaling van de site op haar ID, met de code van de bestelling", () => {
@@ -333,6 +344,19 @@ describe("koppelregels", () => {
     expect(inText.rule).toBe("CODE_IN_TEXT");
     const remembered = matchTransaction({ ...base, channelId: "kanaal-post", description: "VTK uitleendienst - 3F9A21BC" }, context);
     expect(remembered).toMatchObject({ rule: "NAME_RULE", code: { code: "700000" } });
+  });
+
+  it("neemt de standaardcode van de dag, op de Brusselse klok", () => {
+    const on = (iso: string) =>
+      matchTransaction({ ...base, source: "PAYCONIQ", channelId: "kanaal-post", occurredAt: new Date(iso) }, context);
+    // Voor de eerste regel: nog geen standaardcode.
+    expect(on("2026-08-31T12:00:00Z").rule).toBeNull();
+    expect(on("2026-09-10T12:00:00Z").code?.code).toBe("700110");
+    // In de week van de andere post: geen standaardcode, dus Na te kijken.
+    expect(on("2026-09-25T12:00:00Z").rule).toBeNull();
+    // 00:30 op 30 september in Brussel is in UTC nog 29 september.
+    expect(on("2026-09-29T22:30:00Z").code?.code).toBe("700110");
+    expect(on("2026-09-29T21:30:00Z").rule).toBeNull();
   });
 
   it("laat een kanaal zonder standaardcode na te kijken", () => {

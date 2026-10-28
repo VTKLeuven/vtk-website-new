@@ -13,11 +13,15 @@
  * post op een kanaal met een standaardcode haar eigen code.
  * Zie docs/inkomsten.md.
  */
+import { brusselsYMD, ymdKey } from "@/lib/brussels";
 import type { IncomeKindCode, IncomeSourceCode } from "./parse";
 
 export type IncomeRuleCode = "MANUAL" | "WEBSITE" | "CODE_IN_TEXT" | "NAME_RULE" | "CHANNEL_DEFAULT";
 
 export type CodeSnapshot = { code: string; name: string };
+
+/** Een standaardcode vanaf een dag ("2026-09-30"). `code` null: vanaf die dag geen. */
+export type ChannelCodeEntry = { from: string; code: CodeSnapshot | null };
 
 /** Een betaling van de site, met de code die in haar betaalinfo stond. */
 export type WebsitePayment = {
@@ -35,8 +39,8 @@ export type MatchContext = {
   codes: ReadonlyMap<string, CodeSnapshot>;
   /** Onthouden teksten, op `nameRuleKey`. */
   nameRules: ReadonlyMap<string, CodeSnapshot>;
-  /** De standaardcode per kanaal-id, voor de kanalen die er een hebben. */
-  channelCodes: ReadonlyMap<string, CodeSnapshot>;
+  /** Per kanaal-id de standaardcodes met hun vanaf-dag, voor de kanalen die er hebben. */
+  channelCodes: ReadonlyMap<string, readonly ChannelCodeEntry[]>;
 };
 
 export type MatchInput = {
@@ -47,6 +51,8 @@ export type MatchInput = {
   reference: string | null;
   bulkId: string | null;
   channelId: string | null;
+  /** Voor de standaardcode van die dag, op de Brusselse klok. */
+  occurredAt: Date;
 };
 
 export type MatchResult = {
@@ -60,6 +66,19 @@ export type MatchResult = {
 /** De sleutel waarop het register een code opzoekt: enkel cijfers. */
 export function codeKey(code: string): string {
   return code.replace(/\D/g, "");
+}
+
+/**
+ * De standaardcode van een kanaal op een dag: die van de laatste regel op of
+ * voor die dag, zoals de rekening (`accountOn`). Voor de eerste regel, of
+ * vanaf een regel zonder code, heeft het kanaal er geen.
+ */
+export function channelCodeOn(entries: readonly ChannelCodeEntry[], day: string): CodeSnapshot | null {
+  let best: ChannelCodeEntry | null = null;
+  for (const entry of entries) {
+    if (entry.from <= day && (!best || entry.from > best.from)) best = entry;
+  }
+  return best?.code ?? null;
 }
 
 /**
@@ -147,8 +166,9 @@ export function matchTransaction(input: MatchInput, context: MatchContext): Matc
   const remembered = text ? context.nameRules.get(nameRuleKey(input.source, text)) : undefined;
   if (remembered) return { ...links, rule: "NAME_RULE", code: remembered };
 
-  // 6. De standaardcode van het kanaal (de QR-code van een post).
-  const channelCode = input.channelId ? context.channelCodes.get(input.channelId) : undefined;
+  // 6. De standaardcode van het kanaal op de dag van de betaling.
+  const entries = input.channelId ? context.channelCodes.get(input.channelId) : undefined;
+  const channelCode = entries ? channelCodeOn(entries, ymdKey(brusselsYMD(input.occurredAt))) : null;
   if (channelCode) return { ...links, rule: "CHANNEL_DEFAULT", code: channelCode };
 
   return { ...none, ...links };

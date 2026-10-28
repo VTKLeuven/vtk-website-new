@@ -263,33 +263,58 @@ export async function saveIncomeChannelLabelAction(_prev: SaveState, formData: F
 }
 
 /**
- * De standaardcode van een kanaal (de QR-code van Theokot onder de code van
- * Theokot): wat erop binnenkomt en geen andere regel koppelt, krijgt die code.
- * Leeg zet zo'n betaling weer bij Na te kijken. De koppelregels lopen daarna
- * opnieuw, buiten de afgesloten periodes.
+ * Vanaf welke dag een kanaal welke standaardcode heeft (de SumUp van Theokot
+ * onder de code van Theokot). Zonder code heeft het kanaal vanaf die dag geen,
+ * en staat zo'n betaling bij Na te kijken: zo gebruikte de cursusdienst in
+ * september de SumUp van Theokot. De koppelregels lopen daarna opnieuw, buiten
+ * de afgesloten periodes.
  */
-export async function saveIncomeChannelCodeAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+export async function addIncomeChannelCodeAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requirePermission("income.manage");
-  const id = String(formData.get("id") ?? "");
-  const codeId = String(formData.get("defaultAccountingCodeId") ?? "") || null;
-  const channel = await prisma.incomeChannel.findUnique({ where: { id }, select: { identifier: true } });
+  const channelId = String(formData.get("channelId") ?? "");
+  const fromRaw = String(formData.get("from") ?? "").trim();
+  const codeId = String(formData.get("accountingCodeId") ?? "") || null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fromRaw) || Number.isNaN(Date.parse(`${fromRaw}T00:00:00Z`))) return saveError("BAD_DATE");
+  const channel = await prisma.incomeChannel.findUnique({ where: { id: channelId }, select: { identifier: true } });
   if (!channel) return saveError("NOT_FOUND");
   let code: { code: string; name: string } | null = null;
   if (codeId) {
     code = await prisma.accountingCode.findUnique({ where: { id: codeId }, select: { code: true, name: true } });
     if (!code) return saveError("CODE_NOT_FOUND");
   }
-  await prisma.incomeChannel.update({ where: { id }, data: { defaultAccountingCodeId: codeId } });
+
+  const from = new Date(`${fromRaw}T00:00:00Z`);
+  await prisma.incomeChannelCode.upsert({
+    where: { channelId_from: { channelId, from } },
+    create: { channelId, from, accountingCodeId: codeId },
+    update: { accountingCodeId: codeId },
+  });
   const changed = await rematchOpenTransactions();
   await logAudit({
     action: "update",
     entity: "incomeChannel",
-    entityId: id,
+    entityId: channelId,
     target: channel.identifier,
-    summary: code ? `standaardcode ${code.code} ${code.name}` : "geen standaardcode",
+    summary: code ? `standaardcode ${code.code} ${code.name} vanaf ${fromRaw}` : `geen standaardcode vanaf ${fromRaw}`,
   });
   revalidate();
-  return saveOk(changed ? `Opgeslagen; ${transactions(changed)} opnieuw gekoppeld.` : undefined);
+  return saveOk(changed ? `Toegevoegd; ${transactions(changed)} opnieuw gekoppeld.` : undefined);
+}
+
+/** Een standaardcode weghalen: vanaf die dag geldt weer de regel ervoor, of geen. */
+export async function deleteIncomeChannelCodeAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("income.manage");
+  const channelId = String(formData.get("channelId") ?? "");
+  const fromRaw = String(formData.get("from") ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fromRaw)) return saveError("BAD_DATE");
+  const deleted = await prisma.incomeChannelCode.deleteMany({
+    where: { channelId, from: new Date(`${fromRaw}T00:00:00Z`) },
+  });
+  if (deleted.count === 0) return saveError("NOT_FOUND");
+  const changed = await rematchOpenTransactions();
+  await logAudit({ action: "update", entity: "incomeChannel", entityId: channelId, target: channelId, summary: `standaardcode vanaf ${fromRaw} weg` });
+  revalidate();
+  return saveOk(changed ? `Verwijderd; ${transactions(changed)} opnieuw gekoppeld.` : undefined);
 }
 
 /** Vanaf welke dag een kanaal op welke rekening stort. */

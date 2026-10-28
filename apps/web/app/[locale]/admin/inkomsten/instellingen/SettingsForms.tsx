@@ -81,8 +81,8 @@ export function ChannelLabelForm({ locale, action, errorMessages, channelId, lab
 }
 
 /**
- * De standaardcode van een kanaal: wat erop binnenkomt en geen andere regel
- * koppelt, krijgt die code. Geen code laat zo'n betaling bij Na te kijken.
+ * Vanaf een dag een standaardcode voor dit kanaal, of geen: wat erop binnenkomt
+ * en geen andere regel koppelt, krijgt de code die op die dag gold.
  */
 export function ChannelCodeForm({
   locale,
@@ -90,8 +90,7 @@ export function ChannelCodeForm({
   errorMessages,
   channelId,
   codes,
-  value,
-}: Common & { channelId: string; codes: AccountingCodeOption[]; value: string | null }) {
+}: Common & { channelId: string; codes: AccountingCodeOption[] }) {
   const nl = locale === "nl";
   const router = useRouter();
   const t = texts(nl);
@@ -99,27 +98,29 @@ export function ChannelCodeForm({
   return (
     <SaveForm
       action={action}
-      submitLabel={nl ? "Code opslaan" : "Save code"}
+      submitLabel={nl ? "Code toevoegen" : "Add code"}
       submitVariant="ghost"
       submitSize="sm"
       savingLabel={t.saving}
-      savedMessage={t.saved}
+      savedMessage={nl ? "Code toegevoegd." : "Code added."}
       errorMessages={errorMessages}
       fallbackErrorMessage={t.failed}
-      resetOnSuccess={false}
       onSuccess={() => router.refresh()}
       className="flex flex-wrap items-end gap-2"
     >
-      <input type="hidden" name="id" value={channelId} />
-      <div className="w-full max-w-md text-sm">
+      <input type="hidden" name="channelId" value={channelId} />
+      <label className="text-sm">
+        <span className="block text-xs text-vtk-muted">{nl ? "Vanaf" : "From"}</span>
+        <Input type="date" name="from" required className="w-40" />
+      </label>
+      <div className="w-full max-w-sm text-sm">
         <label htmlFor={pickerId} className="block text-xs text-vtk-muted">
           {nl ? "Standaardcode" : "Default code"}
         </label>
         <AccountingCodePicker
           id={pickerId}
           codes={codes}
-          name="defaultAccountingCodeId"
-          defaultValue={value}
+          name="accountingCodeId"
           locale={locale}
           noneLabel={nl ? "Geen: naar Na te kijken" : "None: to To review"}
         />

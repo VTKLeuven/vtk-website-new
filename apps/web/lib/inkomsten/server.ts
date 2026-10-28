@@ -10,6 +10,7 @@ import {
   incomeRuleText,
   matchTransaction,
   nameRuleKey,
+  type ChannelCodeEntry,
   type CodeSnapshot,
   type MatchContext,
   type MatchResult,
@@ -177,15 +178,16 @@ async function codeContext(): Promise<{ codes: Map<string, CodeSnapshot>; order:
   };
 }
 
-/** De standaardcode per kanaal, voor de kanalen die er een hebben. */
-async function channelCodeContext(): Promise<Map<string, CodeSnapshot>> {
-  const channels = await prisma.incomeChannel.findMany({
-    where: { defaultAccountingCodeId: { not: null } },
-    select: { id: true, defaultAccountingCode: { select: { code: true, name: true } } },
+/** De standaardcodes per kanaal, met hun vanaf-dag. */
+async function channelCodeContext(): Promise<Map<string, ChannelCodeEntry[]>> {
+  const rows = await prisma.incomeChannelCode.findMany({
+    select: { channelId: true, from: true, accountingCode: { select: { code: true, name: true } } },
   });
-  const result = new Map<string, CodeSnapshot>();
-  for (const channel of channels) {
-    if (channel.defaultAccountingCode) result.set(channel.id, channel.defaultAccountingCode);
+  const result = new Map<string, ChannelCodeEntry[]>();
+  for (const row of rows) {
+    const entries = result.get(row.channelId) ?? [];
+    entries.push({ from: row.from.toISOString().slice(0, 10), code: row.accountingCode });
+    result.set(row.channelId, entries);
   }
   return result;
 }
@@ -438,6 +440,7 @@ export async function rematchOpenTransactions(): Promise<number> {
       reference: true,
       bulkId: true,
       channelId: true,
+      occurredAt: true,
       periodMonth: true,
       accountingCode: true,
       rule: true,
@@ -954,8 +957,8 @@ export async function listIncomeChannels() {
       source: true,
       identifier: true,
       label: true,
-      defaultAccountingCodeId: true,
       accounts: { orderBy: { from: "asc" }, select: { from: true, bankAccount: true } },
+      codes: { orderBy: { from: "asc" }, select: { from: true, accountingCode: { select: { code: true, name: true } } } },
       _count: { select: { transactions: true } },
     },
   });

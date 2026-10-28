@@ -2344,7 +2344,8 @@ model AccountingCode {
   ticketEvents    TicketEvent[]
   eventTemplates  TicketEventTemplate[]
   incomeNameRules IncomeNameRule[]
-  incomeChannels  IncomeChannel[]
+  /// De kanalen die deze code als standaardcode hebben, vanaf een dag.
+  incomeChannelCodes IncomeChannelCode[]
 
   @@index([parentId])
 }
@@ -8486,24 +8487,19 @@ model IncomeImport {
 /// een kanaal aan zodra een export het noemt; Beheer vult de rest in. Niets
 /// hiervan staat in de code.
 model IncomeChannel {
-  id                      String       @id @default(cuid())
-  source                  IncomeSource
+  id           String       @id @default(cuid())
+  source       IncomeSource
   /// Zoals in de export: `shop_name` bij Payconiq, "Mollie" bij Mollie, het
   /// account bij SumUp, het terminalnummer bij Europabank.
-  identifier              String
+  identifier   String
   /// Een eigen naam, voor het overzicht. NULL = de naam uit de export.
-  label                   String?
-  /// De code voor wat op dit kanaal binnenkomt en geen andere regel koppelt
-  /// (de QR-code van Theokot onder de code van Theokot). Beheer kiest ze; NULL
-  /// = zo'n betaling staat bij Na te kijken. `SetNull`: een verwijderde code
-  /// laat het kanaal zonder standaardcode.
-  defaultAccountingCodeId String?
-  createdAt               DateTime     @default(now()) @db.Timestamptz(3)
-  updatedAt               DateTime     @updatedAt @db.Timestamptz(3)
+  label        String?
+  createdAt    DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime     @updatedAt @db.Timestamptz(3)
 
-  defaultAccountingCode AccountingCode?        @relation(fields: [defaultAccountingCodeId], references: [id], onDelete: SetNull)
-  accounts              IncomeChannelAccount[]
-  transactions          IncomeTransaction[]
+  accounts     IncomeChannelAccount[]
+  codes        IncomeChannelCode[]
+  transactions IncomeTransaction[]
 
   @@unique([source, identifier])
 }
@@ -8518,6 +8514,24 @@ model IncomeChannelAccount {
   channel IncomeChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
   @@id([channelId, from])
+}
+
+/// De standaardcode van een kanaal, vanaf welke dag: wat erop binnenkomt en
+/// geen andere regel koppelt, krijgt de code van de laatste regel op of voor
+/// die dag (de SumUp van Theokot onder de code van Theokot). Zonder code
+/// (NULL) heeft het kanaal vanaf die dag geen standaardcode en staat zo'n
+/// betaling bij Na te kijken: in september 2026 gebruikte de cursusdienst de
+/// SumUp van Theokot. Een verwijderde code laat de regel staan, zonder code.
+model IncomeChannelCode {
+  channelId        String
+  from             DateTime @db.Date
+  accountingCodeId String?
+
+  channel        IncomeChannel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  accountingCode AccountingCode? @relation(fields: [accountingCodeId], references: [id], onDelete: SetNull)
+
+  @@id([channelId, from])
+  @@index([accountingCodeId])
 }
 
 /// Eén regel uit een export.
