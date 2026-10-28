@@ -12,7 +12,15 @@ import {
 import { codeAtStart, incomeRuleText, matchTransaction, nameRuleKey, type MatchContext } from "@/lib/inkomsten/match";
 import { accountOn, computeIncomeOverview, type OverviewTransaction } from "@/lib/inkomsten/overview";
 import { combineImportSummaries } from "@/lib/inkomsten/importSummary";
-import { kassaCheck, kassaControlWindow } from "@/lib/inkomsten/kassa";
+import {
+  controlSpanLabel,
+  deviceWindow,
+  importAmountOf,
+  kassaCheck,
+  kassaControlState,
+  kassaControlWindow,
+  type DeviceUse,
+} from "@/lib/inkomsten/kassa";
 import type { ImportSummary } from "@/lib/inkomsten/server";
 
 // Verzonnen gegevens: geen echte namen, rekeningnummers of betaal-ID's.
@@ -302,6 +310,21 @@ describe("koppelregels", () => {
         ],
       ],
     ]),
+    cashRegisters: new Map([
+      [
+        // Een gedeelde sticker: elke kassa heeft ze tot de volgende ze neemt.
+        "kanaal-gedeeld",
+        [
+          { id: "kassa-td", start: new Date("2026-10-01T16:00:00Z"), end: new Date("2026-10-01T22:00:00Z"), code: { code: "700100", name: "Activiteiten" } },
+          { id: "kassa-zonder-code", start: new Date("2026-10-16T15:00:00Z"), end: new Date("2026-10-16T20:00:00Z"), code: null },
+        ],
+      ],
+      [
+        // Het toestel van een post, een avond geleend door een andere post.
+        "kanaal-post",
+        [{ id: "kassa-caraoke", start: new Date("2026-10-02T16:00:00Z"), end: new Date("2026-10-03T02:00:00Z"), code: { code: "700100 10001", name: "Cantussen" } }],
+      ],
+    ]),
   };
   const base = {
     source: "MOLLIE" as const,
@@ -360,6 +383,33 @@ describe("koppelregels", () => {
     // 00:30 op 30 september in Brussel is in UTC nog 29 september.
     expect(on("2026-09-29T22:30:00Z").code?.code).toBe("700110");
     expect(on("2026-09-29T21:30:00Z").rule).toBeNull();
+  });
+
+  it("geeft een betaling op een gedeeld toestel de code van de kassa die het had, tot de volgende kassa", () => {
+    const at = (iso: string) =>
+      matchTransaction({ ...base, source: "PAYCONIQ", channelId: "kanaal-gedeeld", occurredAt: new Date(iso) }, context);
+    expect(at("2026-10-01T17:00:00Z")).toMatchObject({ rule: "CASH_REGISTER", code: { code: "700100" }, cashRegisterId: "kassa-td" });
+    // Dagen later, nog voor de volgende kassa: wie nog betaalt, hoort bij wie de sticker had.
+    expect(at("2026-10-05T12:00:00Z")).toMatchObject({ rule: "CASH_REGISTER", cashRegisterId: "kassa-td" });
+    // De volgende kassa heeft nog geen code: Na te kijken, niet de kassa ervoor.
+    expect(at("2026-10-17T12:00:00Z")).toMatchObject({ rule: null, cashRegisterId: null });
+    // Voor de eerste kassa hoort de sticker bij niemand.
+    expect(at("2026-09-30T12:00:00Z").rule).toBeNull();
+  });
+
+  it("geeft een kassa op het toestel van een post enkel tijdens haar uren voorrang", () => {
+    const at = (iso: string) =>
+      matchTransaction({ ...base, source: "PAYCONIQ", channelId: "kanaal-post", occurredAt: new Date(iso) }, context);
+    expect(at("2026-10-02T20:00:00Z")).toMatchObject({ rule: "CASH_REGISTER", code: { code: "700100 10001" }, cashRegisterId: "kassa-caraoke" });
+    expect(at("2026-10-03T08:00:00Z")).toMatchObject({ rule: "CHANNEL_DEFAULT", code: { code: "700110" }, cashRegisterId: null });
+  });
+
+  it("laat een code in de tekst voorgaan op de kassa", () => {
+    const result = matchTransaction(
+      { ...base, source: "PAYCONIQ", channelId: "kanaal-gedeeld", reference: "700100 10001", occurredAt: new Date("2026-10-01T17:00:00Z") },
+      context,
+    );
+    expect(result).toMatchObject({ rule: "CODE_IN_TEXT", cashRegisterId: null });
   });
 
   it("laat een kanaal zonder standaardcode na te kijken", () => {
@@ -469,7 +519,7 @@ describe("overzicht", () => {
 });
 
 describe("meerdere bestanden tegelijk opladen", () => {
-  const rules = (open: number): ImportSummary["rules"] => ({ WEBSITE: 0, CODE_IN_TEXT: 0, NAME_RULE: 0, CHANNEL_DEFAULT: 0, OPEN: open });
+  const rules = (open: number): ImportSummary["rules"] => ({ WEBSITE: 0, CODE_IN_TEXT: 0, CASH_REGISTER: 0, NAME_RULE: 0, CHANNEL_DEFAULT: 0, OPEN: open });
   const summary = (partial: Partial<ImportSummary>): ImportSummary => ({
     format: "europabank",
     source: "EUROPABANK",
@@ -543,6 +593,71 @@ describe("de kassacontrole", () => {
       importCents: 51240,
       typedCents: 49840,
       differenceCents: -1400,
+    });
+  });
+
+  describe("voor de lijst met afwijkingen", () => {
+    const avond = { id: "kassa-avond", date, startsAt, endsAt };
+    const use = (registerId: string, terminal: string, day = date): DeviceUse => ({
+      registerId,
+      date: new Date(day),
+      method: "BANCONTACT",
+      terminal,
+    });
+
+    it("telt enkel de uren wanneer een andere kassa hetzelfde toestel die dag had", () => {
+      const placed = deviceWindow(avond, "BANCONTACT", "Evenementen", [use("kassa-avond", "Evenementen"), use("kassa-middag", "Evenementen")]);
+      expect(placed).toEqual({ window: { start: startsAt, end: endsAt, wholeDay: false }, sharedThatDay: true });
+    });
+
+    it("telt de hele dag wanneer de andere kassa een ander toestel of een andere dag had", () => {
+      expect(deviceWindow(avond, "BANCONTACT", "Evenementen", [use("kassa-avond", "Evenementen")]).sharedThatDay).toBe(false);
+      expect(deviceWindow(avond, "BANCONTACT", "Evenementen", [use("kassa-middag", "Cudi")]).sharedThatDay).toBe(false);
+      expect(
+        deviceWindow(avond, "BANCONTACT", "Evenementen", [use("kassa-gisteren", "Evenementen", new Date("2026-10-06T00:00:00Z"))])
+          .sharedThatDay,
+      ).toBe(false);
+      expect(
+        deviceWindow(avond, "PAYCONIQ", "Evenementen", [{ ...use("kassa-middag", "Evenementen"), method: "BANCONTACT" }]).sharedThatDay,
+      ).toBe(false);
+    });
+
+    it("telt de betalingen min de terugbetalingen op de kanalen van het toestel, binnen het venster", () => {
+      const placed = deviceWindow(avond, "BANCONTACT", "Evenementen", [use("kassa-middag", "Evenementen")]);
+      const amount = importAmountOf("BANCONTACT", "Evenementen", placed, ["terminal-1", "terminal-2"], [
+        { channelId: "terminal-1", occurredAt: new Date("2026-10-07T18:05:00Z"), amountCents: 1250 },
+        { channelId: "terminal-2", occurredAt: new Date("2026-10-07T23:30:00Z"), amountCents: 800 },
+        // Een terugbetaling telt af.
+        { channelId: "terminal-1", occurredAt: new Date("2026-10-07T20:00:00Z"), amountCents: -300 },
+        // Het begin telt mee, het einde niet.
+        { channelId: "terminal-2", occurredAt: startsAt, amountCents: 100 },
+        { channelId: "terminal-2", occurredAt: endsAt, amountCents: 5000 },
+        // Voor de kassa, en op een ander toestel.
+        { channelId: "terminal-1", occurredAt: new Date("2026-10-07T15:00:00Z"), amountCents: 7000 },
+        { channelId: "sticker-theo", occurredAt: new Date("2026-10-07T19:00:00Z"), amountCents: 450 },
+      ]);
+      expect(amount).toMatchObject({ method: "BANCONTACT", terminal: "Evenementen", cents: 1850, count: 4, sharedThatDay: true });
+    });
+
+    it("geeft een toestel zonder kanaal een eigen stand", () => {
+      const placed = deviceWindow(avond, "PAYCONIQ", "Evenementen 2", []);
+      const amount = importAmountOf("PAYCONIQ", "Evenementen 2", placed, ["sticker-2"], [
+        { channelId: "sticker-2", occurredAt: new Date("2026-10-07T19:00:00Z"), amountCents: 2050 },
+      ]);
+      expect(kassaControlState(null, null)).toBe("unlinked");
+      expect(kassaControlState(2000, amount)).toBe("differs");
+      expect(kassaControlState(2050, amount)).toBe("match");
+      expect(kassaControlState(null, amount)).toBe("empty");
+    });
+
+    it("zegt over welke tijd het telde, op de Brusselse klok", () => {
+      const hours = deviceWindow(avond, "BANCONTACT", "Evenementen", [use("kassa-middag", "Evenementen")]);
+      expect(controlSpanLabel(hours, true)).toBe("van 20:00 tot 03:00");
+      const day = deviceWindow({ ...avond, startsAt: null, endsAt: null }, "BANCONTACT", "Evenementen", [use("kassa-middag", "Evenementen")]);
+      expect(controlSpanLabel(day, true)).toBe("de hele dag, ook die van een andere kassa");
+      // Zoals ze in de browser aankomt: als tekst.
+      const travelled = { ...hours, window: { ...hours.window, start: hours.window.start.toISOString() as unknown as Date } };
+      expect(controlSpanLabel(travelled, false)).toBe("from 20:00 to 03:00");
     });
   });
 });

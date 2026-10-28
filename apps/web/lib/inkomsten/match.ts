@@ -5,23 +5,28 @@
  *   1. met de hand (raakt deze functie nooit: de beller slaat die over);
  *   2. een betaling van de site, op haar betaal-ID;
  *   3. een boekhoudcode in de omschrijving, de referentie of de `bulk_id`;
+ *   4. een kassa die het toestel had, met haar code;
  *   5. een tekst die Beheer onthield;
  *   6. de standaardcode van het kanaal;
  *   7. anders: Na te kijken (`null`).
  *
- * Regel 4 (de kassa's) komt in fase 2; dan krijgt een kassa van een andere
- * post op een kanaal met een standaardcode haar eigen code.
  * Zie docs/inkomsten.md.
  */
 import { brusselsYMD, ymdKey } from "@/lib/brussels";
 import type { IncomeKindCode, IncomeSourceCode } from "./parse";
 
-export type IncomeRuleCode = "MANUAL" | "WEBSITE" | "CODE_IN_TEXT" | "NAME_RULE" | "CHANNEL_DEFAULT";
+export type IncomeRuleCode = "MANUAL" | "WEBSITE" | "CODE_IN_TEXT" | "NAME_RULE" | "CHANNEL_DEFAULT" | "CASH_REGISTER";
 
 export type CodeSnapshot = { code: string; name: string };
 
 /** Een standaardcode vanaf een dag ("2026-09-30"). `code` null: vanaf die dag geen. */
 export type ChannelCodeEntry = { from: string; code: CodeSnapshot | null };
+
+/**
+ * Een aanvaarde kassa op het toestel van een kanaal: haar uren (of de hele dag
+ * zonder uren) en haar code. `code` null: Beheer koos er nog geen.
+ */
+export type KassaSpan = { id: string; start: Date; end: Date; code: CodeSnapshot | null };
 
 /** Een betaling van de site, met de code die in haar betaalinfo stond. */
 export type WebsitePayment = {
@@ -41,6 +46,8 @@ export type MatchContext = {
   nameRules: ReadonlyMap<string, CodeSnapshot>;
   /** Per kanaal-id de standaardcodes met hun vanaf-dag, voor de kanalen die er hebben. */
   channelCodes: ReadonlyMap<string, readonly ChannelCodeEntry[]>;
+  /** Per kanaal-id met een toestel: de aanvaarde kassa's met dat toestel. */
+  cashRegisters: ReadonlyMap<string, readonly KassaSpan[]>;
 };
 
 export type MatchInput = {
@@ -51,7 +58,7 @@ export type MatchInput = {
   reference: string | null;
   bulkId: string | null;
   channelId: string | null;
-  /** Voor de standaardcode van die dag, op de Brusselse klok. */
+  /** Voor de kassa en de standaardcode van dat moment, op de Brusselse klok. */
   occurredAt: Date;
 };
 
@@ -61,6 +68,8 @@ export type MatchResult = {
   ticketPaymentId: string | null;
   membershipPaymentId: string | null;
   uitleenPaymentId: string | null;
+  /** De kassa waarvan de code komt (regel 4). */
+  cashRegisterId: string | null;
 };
 
 /** De sleutel waarop het register een code opzoekt: enkel cijfers. */
@@ -79,6 +88,25 @@ export function channelCodeOn(entries: readonly ChannelCodeEntry[], day: string)
     if (entry.from <= day && (!best || entry.from > best.from)) best = entry;
   }
   return best?.code ?? null;
+}
+
+/**
+ * De kassa die het toestel had op een moment, zoals het rekenblad met "wie de
+ * sticker had" werkte. Een toestel van een post (een kanaal met een
+ * standaardcode op die dag: de SumUp van Theokot) hoort enkel tijdens haar uren
+ * bij een kassa; daarvoor en daarna geldt de standaardcode weer. Een gedeeld
+ * toestel (de stickers en de terminal van evenementen) hoort bij een kassa vanaf
+ * haar begin tot het begin van de volgende kassa met dat toestel: wie een dag
+ * later nog betaalt, hoort bij de post die de sticker toen nog had. Voor de
+ * eerste kassa hoort het bij geen.
+ */
+export function kassaAt(spans: readonly KassaSpan[], at: Date, postDevice: boolean): KassaSpan | null {
+  if (postDevice) return spans.find((span) => span.start <= at && at < span.end) ?? null;
+  let latest: KassaSpan | null = null;
+  for (const span of spans) {
+    if (span.start <= at && (!latest || span.start > latest.start)) latest = span;
+  }
+  return latest;
 }
 
 /**
@@ -139,6 +167,7 @@ export function matchTransaction(input: MatchInput, context: MatchContext): Matc
     ticketPaymentId: null,
     membershipPaymentId: null,
     uitleenPaymentId: null,
+    cashRegisterId: null,
   };
   if (input.kind !== "PAYMENT" && input.kind !== "REFUND") return none;
 
@@ -149,6 +178,7 @@ export function matchTransaction(input: MatchInput, context: MatchContext): Matc
     ticketPaymentId: website?.ticketPaymentId ?? null,
     membershipPaymentId: website?.membershipPaymentId ?? null,
     uitleenPaymentId: website?.uitleenPaymentId ?? null,
+    cashRegisterId: null,
   };
   if (website?.code) {
     return { ...links, rule: "WEBSITE", code: { code: website.code, name: website.name ?? website.code } };
@@ -161,14 +191,20 @@ export function matchTransaction(input: MatchInput, context: MatchContext): Matc
     codeAlone(input.bulkId, context.codes);
   if (inText) return { ...links, rule: "CODE_IN_TEXT", code: inText };
 
+  // 4. Een kassa die het toestel had. Een kassa zonder code koppelt niets: wat
+  // ze had, valt door naar de regels hieronder.
+  const entries = input.channelId ? context.channelCodes.get(input.channelId) : undefined;
+  const channelCode = entries ? channelCodeOn(entries, ymdKey(brusselsYMD(input.occurredAt))) : null;
+  const spans = input.channelId ? context.cashRegisters.get(input.channelId) : undefined;
+  const kassa = spans?.length ? kassaAt(spans, input.occurredAt, channelCode !== null) : null;
+  if (kassa?.code) return { ...links, rule: "CASH_REGISTER", code: kassa.code, cashRegisterId: kassa.id };
+
   // 5. Een onthouden tekst.
   const text = incomeRuleText(input.description);
   const remembered = text ? context.nameRules.get(nameRuleKey(input.source, text)) : undefined;
   if (remembered) return { ...links, rule: "NAME_RULE", code: remembered };
 
   // 6. De standaardcode van het kanaal op de dag van de betaling.
-  const entries = input.channelId ? context.channelCodes.get(input.channelId) : undefined;
-  const channelCode = entries ? channelCodeOn(entries, ymdKey(brusselsYMD(input.occurredAt))) : null;
   if (channelCode) return { ...links, rule: "CHANNEL_DEFAULT", code: channelCode };
 
   return { ...none, ...links };

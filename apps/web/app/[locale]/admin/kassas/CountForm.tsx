@@ -9,7 +9,7 @@ import Link from "@/components/ui/Link";
 import { SaveForm } from "@/components/ui/SaveForm";
 import type { SaveAction } from "@/lib/saveState";
 import { formatEuro } from "@/lib/rekeningen/expenses";
-import { kassaCheck, type KassaImportAmount } from "@/lib/inkomsten/kassa";
+import { controlSpanLabel, kassaCheck, paymentsLabel, type KassaImportAmount } from "@/lib/inkomsten/kassa";
 import {
   amountInputValue,
   computeResult,
@@ -438,14 +438,8 @@ function ImportCheckLine({
 }) {
   const parsed = parseAmountInput(typed);
   const check = kassaCheck(typeof parsed === "number" ? parsed : null, amount);
-  const time = (value: Date) =>
-    new Date(value).toLocaleTimeString(nl ? "nl-BE" : "en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Brussels" });
-  const span = amount.window.wholeDay
-    ? (nl ? "de hele dag" : "the whole day") + (amount.sharedThatDay ? (nl ? ", ook die van een andere kassa" : ", including another register") : "")
-    : `${nl ? "van" : "from"} ${time(amount.window.start)} ${nl ? "tot" : "to"} ${time(amount.window.end)}`;
-  const payments = nl
-    ? `${amount.count} ${amount.count === 1 ? "betaling" : "betalingen"}`
-    : `${amount.count} ${amount.count === 1 ? "payment" : "payments"}`;
+  const span = controlSpanLabel(amount, nl);
+  const payments = paymentsLabel(amount.count, nl);
 
   switch (check.state) {
     case "nothing":

@@ -47,8 +47,28 @@ import {
   type PaymentMethod,
 } from "@/lib/kassas/kassa";
 import { cashRegisterAcceptedMail } from "@/lib/kassas/mail";
+import { rematchOpenTransactions } from "@/lib/inkomsten/server";
 
 const ADMIN_PATHS = ["/admin/kassas", "/en/admin/kassas"];
+
+/**
+ * De toestellen, de uren en de code van een aanvaarde kassa bepalen koppelregel
+ * 4 van de online inkomsten. Verandert er een, dan koppelen die opnieuw, buiten
+ * de afgesloten periodes. Geeft het aantal gewijzigde transacties terug.
+ */
+async function rematchIncome(): Promise<number> {
+  const changed = await rematchOpenTransactions();
+  revalidatePath("/admin/inkomsten", "layout");
+  return changed;
+}
+
+/** Een boekhoudcode die bestaat, of `null` voor geen; "missing" als ze niet (meer) bestaat. */
+async function readAccountingCode(formData: FormData): Promise<{ id: string; label: string } | null | "missing"> {
+  const id = text(formData, "accountingCodeId", 60);
+  if (!id) return null;
+  const code = await prisma.accountingCode.findUnique({ where: { id }, select: { id: true, code: true, name: true } });
+  return code ? { id: code.id, label: `${code.code} ${code.name}` } : "missing";
+}
 
 /** Beide talen en elk tabblad: het overzicht, mijn aanvragen en het detail. */
 function revalidateCashRegisters(id?: string) {
@@ -264,6 +284,8 @@ export async function updateCashRegisterRequestAction(
       REQUEST_LABELS,
     ),
   });
+  // Andere uren of een andere dag verschuiven het venster van een aanvaarde kassa.
+  if (register.status !== "REQUESTED") await rematchIncome();
   revalidateCashRegisters(id);
   return saveOk();
 }
@@ -297,6 +319,9 @@ export async function deleteCashRegisterAction(formData: FormData): Promise<Save
     target: `${register.activity} (${register.postLabel})`,
     summary: `verwijderd in status ${statusLabel(register.status, true).toLowerCase()}`,
   });
+  // Wat van deze kassa zijn code kreeg, koppelt opnieuw: bij een gedeeld toestel
+  // naar de kassa ervoor, anders naar de standaardcode of Na te kijken.
+  if (register.status !== "REQUESTED") await rematchIncome();
   revalidateCashRegisters();
 
   const base = formData.get("locale") === "en" ? "/en" : "";
@@ -357,6 +382,9 @@ export async function acceptCashRegisterAction(
   }
   const conflict = await terminalConflict(id, registerInterval(current), chosen);
   if (conflict) return saveError("TERMINAL_BUSY", `Niet aanvaard: ${conflict}.`);
+  // De code voor de online inkomsten: Beheer kiest ze hier, de post niet.
+  const code = await readAccountingCode(formData);
+  if (code === "missing") return saveError("CODE_NOT_FOUND");
 
   // Voorwaardelijk op de status: twee beheerders die tegelijk klikken, sturen
   // samen één mail en zetten de toestellen er één keer op.
@@ -367,6 +395,7 @@ export async function acceptCashRegisterAction(
         status: "TO_MAKE",
         acceptedAt: new Date(),
         acceptedById: access.session.user.id,
+        accountingCodeId: code?.id ?? null,
         ...(startCounts ? { startCounts } : {}),
       },
     });
@@ -444,12 +473,48 @@ export async function acceptCashRegisterAction(
     entity: "cashRegister",
     entityId: id,
     target,
-    summary: chosen.length
-      ? `aanvaard, met ${chosen.map((choice) => `${choice.method === "BANCONTACT" ? "Bancontact" : "Payconiq"} ${choice.terminal}`).join(" en ")}`
-      : "aanvaard",
+    summary:
+      (chosen.length
+        ? `aanvaard, met ${chosen.map((choice) => `${choice.method === "BANCONTACT" ? "Bancontact" : "Payconiq"} ${choice.terminal}`).join(" en ")}`
+        : "aanvaard") + (code ? `, code ${code.label}` : ""),
   });
+  if (chosen.length) await rematchIncome();
   revalidateCashRegisters(id);
   return saveOk(detail);
+}
+
+/**
+ * De boekhoudcode van een aanvaarde kassa wijzigen, of weghalen. Wat er op haar
+ * toestellen binnenkwam, koppelt daarna opnieuw (regel 4).
+ */
+export async function setCashRegisterCodeAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const access = await requireManager();
+  if (!access) return saveError("FORBIDDEN");
+  const id = text(formData, "id", 60);
+  const register = await prisma.cashRegister.findUnique({
+    where: { id },
+    select: { status: true, activity: true, postLabel: true },
+  });
+  if (!register) return saveError("NOT_FOUND");
+  if (register.status === "REQUESTED") return saveError("NOT_ACCEPTED");
+  const code = await readAccountingCode(formData);
+  if (code === "missing") return saveError("CODE_NOT_FOUND");
+
+  await prisma.cashRegister.update({ where: { id }, data: { accountingCodeId: code?.id ?? null } });
+  const changed = await rematchIncome();
+  await logAudit({
+    action: "update",
+    entity: "cashRegister",
+    entityId: id,
+    target: `${register.activity} (${register.postLabel})`,
+    summary: code ? `boekhoudcode ${code.label}` : "geen boekhoudcode",
+  });
+  revalidateCashRegisters(id);
+  return saveOk(
+    changed
+      ? `Opgeslagen; ${changed} ${changed === 1 ? "transactie" : "transacties"} van de online inkomsten opnieuw gekoppeld.`
+      : undefined,
+  );
 }
 
 /**
@@ -572,6 +637,8 @@ export async function saveCashRegisterCountAction(
     target: `${register.activity} (${register.postLabel})`,
     summary: "telling bijgewerkt",
   });
+  // Bij het tellen kan een bakje of rekening bijkomen of wegvallen.
+  await rematchIncome();
   revalidateCashRegisters(id);
   return saveOk();
 }

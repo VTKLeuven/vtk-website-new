@@ -11,20 +11,22 @@ koppelen, Na te kijken, het overzicht per periode, een standaardcode per kanaal,
 de controlelijst met de Mollie-uitbetalingen om af te vinken, het kwartaalblad
 voor de boekhouder en het controlebestand als xlsx, en afsluiten. De
 boekhoudcodes kunnen als CSV opgeladen worden in `/admin/boekhoudcodes`. Van
-fase 2 staat de kassacontrole; de code van een kassa en koppelregel 4 nog niet.
+fase 2 staan de kassacontrole met de lijst met afwijkingen, de code van een
+kassa en koppelregel 4.
 
 ## Bestanden
 
 | Bestand | Wat |
 |---|---|
 | `lib/inkomsten/parse.ts` | De exports van Payconiq, Mollie, SumUp en Europabank lezen: CSV, bedragen, datums op de Brusselse klok, Mollie-uitbetalingsmaand, kosten per betaling. Puur. |
-| `lib/inkomsten/match.ts` | De koppelregels als pure functie (`matchTransaction`), en de onthouden tekst (`incomeRuleText`). |
+| `lib/inkomsten/match.ts` | De koppelregels als pure functie (`matchTransaction`), de kassa die een toestel had (`kassaAt`), en de onthouden tekst (`incomeRuleText`). |
 | `lib/inkomsten/overview.ts` | Het overzicht als pure som, de rekening op een dag, Mollie per uitbetaling (`groupMolliePayouts`), de controlelijst (`computeIncomeChecks`). |
 | `lib/inkomsten/workbook.ts` | Het kwartaalblad en het controlebestand als bladen voor `write-excel-file`. Puur. |
 | `lib/inkomsten/server.ts` | Database: opladen (met voorvertoning), opnieuw koppelen, Na te kijken, overzicht, uitbetalingen afvinken, het model voor de xlsx, lijsten. |
 | `lib/inkomsten/importSummary.ts` | De voorvertoning van meerdere gekozen bestanden samen (`combineImportSummaries`). Puur. |
 | `lib/inkomsten/kassa.ts` | De kassacontrole: het venster van een kassa (`kassaControlWindow`) en het ingetikte bedrag naast de import (`kassaCheck`). Puur; het optellen is `kassaImportAmounts` in `server.ts`. |
 | `app/actions/inkomsten.ts` | Server actions, allemaal achter `income.manage`. |
+| `app/[locale]/admin/kassas/` | De code van een kassa (`AcceptForm`, `CodeForm`) en de kassacontrole in het telformulier (`CountForm`); de acties in `app/actions/kassas.ts`. |
 | `app/[locale]/admin/inkomsten/` | Overzicht (met de controlelijst en de uitbetalingen), Opladen, Na te kijken, Transacties, Instellingen. |
 | `app/api/admin/inkomsten/export/route.ts` | De twee xlsx-bestanden, voor `?van=2026-07&tot=2026-09` en `?soort=boekhouder` of `?soort=controle`. |
 | `lib/accounting/import.ts` | De lijst van boekhoudcodes als CSV lezen, en plannen wat opladen doet. Puur. |
@@ -34,7 +36,9 @@ fase 2 staat de kassacontrole; de code van een kassa en koppelregel 4 nog niet.
 Tabellen: `IncomeImport`, `IncomeChannel`, `IncomeChannelAccount` (de rekening
 vanaf een dag), `IncomeChannelCode` (de standaardcode vanaf een dag),
 `IncomeTransaction`, `IncomeNameRule`, `IncomePeriod`, `IncomePayoutCheck`.
-Instelling: `Setting` `income.config` (de kostencode).
+Op de kassa: `CashRegister.accountingCodeId`, en `IncomeTransaction.cashRegisterId`
+voor de kassa die de code gaf. Instelling: `Setting` `income.config` (de
+kostencode).
 
 ## Wat de site leest
 
@@ -138,6 +142,22 @@ In `matchTransaction`, de eerste die past wint. Enkel voor `PAYMENT` en `REFUND`
 3. **Code in de tekst** (`CODE_IN_TEXT`): de Mollie-omschrijving begint met een
    code uit het register ("700100 10001 ..." of aaneen), of `reference` of
    `bulk_id` is er een.
+4. **Een kassa** (`CASH_REGISTER`): het kanaal is een toestel van de kassa's
+   (zie De kassacontrole), en een aanvaarde kassa met een code had dat toestel
+   (`kassaAt`, met de kassa's uit `cashRegisterContext`). De transactie
+   onthoudt de kassa (`cashRegisterId`). Wanneer een kassa het toestel had,
+   hangt af van de soort toestel:
+   - **Een toestel van een post**, een kanaal met op die dag een standaardcode
+     (de SumUp van Theokot): enkel tijdens de uren van de kassa. Daarvoor en
+     daarna neemt regel 6 het weer over.
+   - **Een gedeeld toestel**, een kanaal zonder standaardcode (Evenementen 2,
+     de terminal van evenementen): vanaf het begin van de kassa tot het begin
+     van de volgende kassa met dat toestel. Wat voor de eerste kassa valt,
+     koppelt deze regel niet.
+   - Een kassa zonder uren loopt van middernacht tot middernacht van haar dag
+     (`registerInterval`).
+   - Een kassa zonder code koppelt niets: wat in haar venster valt, gaat door
+     naar regel 5 en 6. Op een gedeeld toestel sluit ze wel de kassa ervoor af.
 5. **Onthouden tekst** (`NAME_RULE`): `incomeRuleText` van de omschrijving
    (kleine letters, zonder ordernummer, zonder e-mailadres) staat in
    `IncomeNameRule` voor die bron.
@@ -150,14 +170,18 @@ In `matchTransaction`, de eerste die past wint. Enkel voor `PAYMENT` en `REFUND`
    rekening van een post stort.
 7. **Anders**: `rule` blijft `NULL`, en de transactie staat bij Na te kijken.
 
-Regel 4 (de kassa's) komt in fase 2. Ze staat vóór regel 6, zodat een
-activiteit van een andere post op de QR-code van Theokot dan haar eigen code
-krijgt in plaats van die van Theokot.
+Regel 4 staat vóór regel 6, zodat een activiteit van een andere post op de
+QR-code van Theokot haar eigen code krijgt in plaats van die van Theokot. Ze
+staat na regel 3: een betaling die zelf haar code draagt, weet het beter dan
+het uur waarop ze viel.
 
-Na een onthouden tekst, een vergeten tekst, een gewiste toewijzing of een
-gewijzigde standaardcode loopt `rematchOpenTransactions` opnieuw over alles wat
-niet met de hand gezet is, buiten de afgesloten periodes. Dat kan ook met de
-knop "Opnieuw koppelen", na een nieuwe code in het register.
+Na een onthouden tekst, een vergeten tekst, een gewiste toewijzing, een
+gewijzigde standaardcode of een ander toestel bij een kanaal loopt
+`rematchOpenTransactions` opnieuw over alles wat niet met de hand gezet is,
+buiten de afgesloten periodes. Een kassa doet hetzelfde wanneer ze aanvaard,
+gewijzigd, geteld of verwijderd wordt, of een andere code krijgt
+(`rematchIncome` in `app/actions/kassas.ts`). Dat kan ook met de knop "Opnieuw
+koppelen", na een nieuwe code in het register.
 
 ## Na te kijken
 
@@ -188,7 +212,9 @@ manier op (`channelCodeOn`). Niets daarvan staat in de code of in een seed.
 
 Bij het tellen van een kassa (`/admin/kassas/[id]`) toont het telformulier per
 toestel wat de online inkomsten erop zagen, naast het bedrag dat Beheer
-intikte (`kassaImportAmounts`, `ImportCheckLine` in `CountForm`).
+intikte (`kassaImportAmounts`, `ImportCheckLine` in `CountForm`). De lijst met
+afwijkingen (`/admin/kassas/controle`, `kassaControlList`) doet hetzelfde voor
+elke aanvaarde kassa van een werkingsjaar, per toestel een rij.
 
 - **Welk kanaal welk toestel is**, vult Beheer in bij de kanalen
   (`IncomeChannel.cashMethod` en `cashTerminal`): een Payconiq-kanaal is een
@@ -206,7 +232,31 @@ intikte (`kassaImportAmounts`, `ImportCheckLine` in `CountForm`).
 - **De import schrijft nooit in een kassa.** Een verschil is een
   waarschuwing; bij een leeg veld vult "Overnemen" het veld, en opslaan doet
   Beheer zelf.
-- Enkel bij het tellen, en enkel voor wie ook `income.manage` heeft.
+- **Eén rekening voor beide.** Het telformulier en de lijst gaan langs
+  `controlAmounts` in `server.ts`, met het venster (`deviceWindow`) en de som
+  (`importAmountOf`) puur in `kassa.ts`. De lijst vraagt vier dingen op (de
+  kassa's, de kanalen, wie welk toestel die dagen had en de transacties in de
+  vensters), niet iets per kassa. Een kassa en de lijst kunnen dus niet iets
+  anders zeggen.
+- **De standen in de lijst**: verschil, niet afgelezen (de import kent een
+  bedrag, het veld is leeg), niets in de import (wellicht ontbreekt de export
+  van die dag), geen kanaal (geen kanaal is dat toestel) en klopt. Standaard
+  staat de lijst op "verschil"; een rij opent het telformulier van die kassa
+  (`#tellen`).
+- Enkel voor wie de kassa's beheert en ook `income.manage` heeft
+  (`CashRegisterAccess.canCheckIncome`); voor anderen staat het tabblad
+  Controle er niet.
+
+## De code van een kassa
+
+Beheer kiest de code bij het aanvaarden (`AcceptForm`), niet de post bij haar
+aanvraag; de reden staat in `docs/design-decisions.md`. De kiezer staat er
+enkel wanneer de kassa een Bancontact-bakje of Payconiq-rekening vraagt, en
+"Nog geen code" mag. Later aanpassen kan op de pagina van de kassa
+(`CodeForm`, `setCashRegisterCodeAction`), zodra ze aanvaard is. Daar staat
+ook hoeveel transacties hun code van de kassa kregen, voor wie
+`income.manage` heeft. In de lijst met transacties en in het controlebestand
+staat de kassa bij de regel.
 
 ## Het kwartaalblad en het controlebestand
 
@@ -318,12 +368,23 @@ fouten), dan opladen.
   regels: vanaf die dag zonder code, vanaf de dag erna weer met. In september
   2026 gebruikte de cursusdienst zo een week de SumUp van Theokot
   (€ 41.228,86). Een dag waarop beide posten het toestel gebruikten, lost de
-  standaardcode niet op: geef die dag geen code en wijs hem bij Na te kijken
-  toe, of wacht op de kassa's (fase 2). Een regel opslaan of verwijderen
+  standaardcode niet op; een kassa met een code op dat toestel wel, want die
+  gaat tijdens haar uren voor (regel 4). Een regel opslaan of verwijderen
   koppelt opnieuw, buiten de afgesloten periodes. Geef een sticker die van
   evenement tot evenement doorgaat geen standaardcode.
 - **Een standaardcode van voor de datum.** Bij de migratie naar
   `IncomeChannelCode` kreeg een bestaande standaardcode als begin de dag van de
   eerste transactie op dat kanaal, zodat niets wat ze al koppelde, losraakte.
+- **Een gedeeld toestel blijft bij de laatste kassa.** Zonder standaardcode
+  loopt een kassa door tot de volgende kassa met dat toestel, ook weken later.
+  Dient zo'n toestel ook buiten de kassa's, dan komt dat bij de kassa ervoor.
+  Geef het dan een standaardcode: dan telt een kassa er enkel tijdens haar uren.
+- **Een toestel hernoemen.** Regel 4 en de kassacontrole vergelijken de naam van
+  het bakje of de rekening op de kassa met die op het kanaal. Een hernoemd
+  toestel in de instellingen van de kassa's verandert niets aan oude kassa's,
+  en het kanaal wijst maar naar één naam: ofwel de oude kassa's, ofwel de
+  nieuwe vinden hun transacties dan niet meer. Sluit de periodes met de oude
+  naam eerst af.
 - **Niets over VTK in de code**, ook niet in een hint of een standaard: de
-  kostencode, de rekeningen en de standaardcode van een QR-code vult Beheer in.
+  kostencode, de rekeningen, de standaardcode van een QR-code en de code van
+  een kassa vult Beheer in.

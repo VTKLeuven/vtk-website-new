@@ -2346,6 +2346,8 @@ model AccountingCode {
   incomeNameRules IncomeNameRule[]
   /// De kanalen die deze code als standaardcode hebben, vanaf een dag.
   incomeChannelCodes IncomeChannelCode[]
+  /// De kassa's die deze code kregen, voor de online inkomsten.
+  cashRegisters   CashRegister[]
 
   @@index([parentId])
 }
@@ -8315,6 +8317,11 @@ model CashRegister {
   /// Opmerking van Beheer bij het tellen. Enkel voor wie kassa's beheert.
   note String?
 
+  /// De boekhoudcode van wat er op de toestellen van deze kassa binnenkwam,
+  /// voor de online inkomsten (koppelregel 4). Beheer kiest ze bij het
+  /// aanvaarden, niet de post. NULL = nog geen: dan koppelt de kassa niets.
+  accountingCodeId String?
+
   acceptedAt         DateTime? @db.Timestamptz(3)
   acceptedById       String?
   /// Wanneer de mail met de aanvaarding vertrok. NULL bij een aanvaarding
@@ -8329,12 +8336,17 @@ model CashRegister {
   acceptedBy   User?                     @relation("CashRegisterAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
   payments     CashRegisterPayment[]
   ticketEvents CashRegisterTicketEvent[]
+  /// `SetNull`: een verwijderde code laat de kassa zonder code.
+  accountingCode     AccountingCode?     @relation(fields: [accountingCodeId], references: [id], onDelete: SetNull)
+  /// De online inkomsten die van deze kassa hun code kregen.
+  incomeTransactions IncomeTransaction[]
 
   @@index([workingYear])
   @@index([groupId])
   @@index([requestedById])
   @@index([date])
   @@index([status])
+  @@index([accountingCodeId])
 }
 
 /// Eén Bancontact-bakje of Payconiq-rekening bij een kassa, met wat erop
@@ -8448,13 +8460,14 @@ enum IncomeKind {
 
 /// Welke koppelregel de code gaf. NULL = nog niet gekoppeld (Na te kijken).
 /// `CHANNEL_DEFAULT`: de standaardcode van het kanaal, voor wat geen andere
-/// regel koppelde.
+/// regel koppelde. `CASH_REGISTER`: een kassa had het toestel (regel 4).
 enum IncomeRule {
   MANUAL
   WEBSITE
   CODE_IN_TEXT
   NAME_RULE
   CHANNEL_DEFAULT
+  CASH_REGISTER
 }
 
 /// Eén opgeladen export. Het bestand zelf wordt niet bewaard: het bevat namen
@@ -8577,6 +8590,8 @@ model IncomeTransaction {
   ticketPaymentId     String?
   membershipPaymentId String?
   uitleenPaymentId    String?
+  /// De kassa die het toestel had, als de code van haar komt (regel 4).
+  cashRegisterId      String?
   assignedById        String?
   assignedAt          DateTime?   @db.Timestamptz(3)
   createdAt           DateTime    @default(now()) @db.Timestamptz(3)
@@ -8587,6 +8602,7 @@ model IncomeTransaction {
   ticketPayment     TicketPayment?     @relation(fields: [ticketPaymentId], references: [id], onDelete: SetNull)
   membershipPayment MembershipPayment? @relation(fields: [membershipPaymentId], references: [id], onDelete: SetNull)
   uitleenPayment    UitleenPayment?    @relation(fields: [uitleenPaymentId], references: [id], onDelete: SetNull)
+  cashRegister      CashRegister?      @relation(fields: [cashRegisterId], references: [id], onDelete: SetNull)
   assignedBy        User?              @relation("IncomeAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
 
   @@unique([source, externalKey])
@@ -8597,6 +8613,7 @@ model IncomeTransaction {
   @@index([ticketPaymentId])
   @@index([membershipPaymentId])
   @@index([uitleenPaymentId])
+  @@index([cashRegisterId])
 }
 
 /// "Deze tekst hoort altijd onder deze code" (koppelregel 5).

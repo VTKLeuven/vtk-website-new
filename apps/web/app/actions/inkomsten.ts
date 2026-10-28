@@ -367,8 +367,9 @@ export async function deleteIncomeChannelCodeAction(formData: FormData): Promise
 /**
  * Welk toestel van de kassa's een kanaal is (de sticker "A: Evenement 2" is de
  * Payconiq-rekening "Evenementen 2"), zodat een kassa naast het ingetikte bedrag
- * toont wat de import op dat toestel zag. Leeg = niet gekoppeld. Een Payconiq-
- * kanaal is een Payconiq-rekening, een SumUp-account of Europabank-terminal een
+ * toont wat de import op dat toestel zag, en wat er tijdens een kassa binnenkwam
+ * haar code krijgt (regel 4). Leeg = niet gekoppeld. Een Payconiq-kanaal is een
+ * Payconiq-rekening, een SumUp-account of Europabank-terminal een
  * Bancontact-bakje.
  */
 export async function saveIncomeChannelDeviceAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
@@ -402,6 +403,7 @@ export async function saveIncomeChannelDeviceAction(_prev: SaveState, formData: 
   }
 
   await prisma.incomeChannel.update({ where: { id }, data: { cashMethod, cashTerminal } });
+  const changed = await rematchOpenTransactions();
   await logAudit({
     action: "update",
     entity: "incomeChannel",
@@ -411,7 +413,7 @@ export async function saveIncomeChannelDeviceAction(_prev: SaveState, formData: 
   });
   revalidate();
   revalidatePath("/admin/kassas", "layout");
-  return saveOk();
+  return saveOk(changed ? `Opgeslagen; ${transactions(changed)} opnieuw gekoppeld.` : undefined);
 }
 
 /** Vanaf welke dag een kanaal op welke rekening stort. */

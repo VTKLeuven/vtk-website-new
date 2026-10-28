@@ -12,10 +12,12 @@ import {
   nameRuleKey,
   type ChannelCodeEntry,
   type CodeSnapshot,
+  type KassaSpan,
   type MatchContext,
   type MatchResult,
   type WebsitePayment,
 } from "./match";
+import { registerInterval, type PaymentMethod } from "@/lib/kassas/kassa";
 import {
   INCOME_SOURCES,
   accountOn,
@@ -28,7 +30,16 @@ import {
   type MolliePayout,
 } from "./overview";
 import { periodLabel } from "./labels";
-import { kassaControlWindow, type KassaImportAmount } from "./kassa";
+import {
+  deviceKey,
+  deviceWindow,
+  importAmountOf,
+  kassaControlState,
+  type ControlRegister,
+  type DeviceUse,
+  type KassaControlState,
+  type KassaImportAmount,
+} from "./kassa";
 import { quarterLineKey, type WorkbookGroup, type WorkbookModel, type WorkbookTransaction } from "./workbook";
 import {
   dateToMonth,
@@ -193,6 +204,46 @@ async function channelCodeContext(): Promise<Map<string, ChannelCodeEntry[]>> {
   return result;
 }
 
+/**
+ * Per kanaal met een toestel: de aanvaarde kassa's met dat toestel, op begin
+ * gesorteerd, met hun code (regel 4). Ook een kassa zonder code staat erin: op
+ * een gedeeld toestel eindigt ze de kassa ervoor.
+ */
+async function cashRegisterContext(): Promise<Map<string, KassaSpan[]>> {
+  const channels = await prisma.incomeChannel.findMany({
+    where: { cashMethod: { not: null }, cashTerminal: { not: null } },
+    select: { id: true, cashMethod: true, cashTerminal: true },
+  });
+  if (channels.length === 0) return new Map();
+  const payments = await prisma.cashRegisterPayment.findMany({
+    where: { register: { status: { not: "REQUESTED" } } },
+    select: {
+      method: true,
+      terminal: true,
+      register: {
+        select: { id: true, date: true, startsAt: true, endsAt: true, accountingCode: { select: { code: true, name: true } } },
+      },
+    },
+  });
+  const byDevice = new Map<string, KassaSpan[]>();
+  for (const payment of payments) {
+    const key = `${payment.method}|${payment.terminal}`;
+    const spans = byDevice.get(key) ?? [];
+    if (!spans.some((span) => span.id === payment.register.id)) {
+      const interval = registerInterval(payment.register);
+      spans.push({ id: payment.register.id, start: interval.start, end: interval.end, code: payment.register.accountingCode });
+    }
+    byDevice.set(key, spans);
+  }
+  for (const spans of byDevice.values()) spans.sort((a, b) => a.start.getTime() - b.start.getTime());
+  const result = new Map<string, KassaSpan[]>();
+  for (const channel of channels) {
+    const spans = byDevice.get(`${channel.cashMethod}|${channel.cashTerminal}`);
+    if (spans) result.set(channel.id, spans);
+  }
+  return result;
+}
+
 async function nameRuleContext(): Promise<Map<string, CodeSnapshot>> {
   const rules = await prisma.incomeNameRule.findMany({
     select: { source: true, text: true, accountingCode: { select: { code: true, name: true } } },
@@ -310,19 +361,20 @@ export async function importIncomeExport(
   const channelIds = new Map(knownChannels.map((channel) => [channel.identifier, channel.id]));
   const newChannels = channelNames.filter((name) => !channelIds.has(name));
 
-  const [{ codes }, nameRules, website, channelCodes] = await Promise.all([
+  const [{ codes }, nameRules, website, channelCodes, cashRegisters] = await Promise.all([
     codeContext(),
     nameRuleContext(),
     websitePayments(source, fresh.flatMap((row) => (row.providerId ? [row.providerId] : []))),
     channelCodeContext(),
+    cashRegisterContext(),
   ]);
-  const context: MatchContext = { codes, nameRules, website, channelCodes };
+  const context: MatchContext = { codes, nameRules, website, channelCodes, cashRegisters };
   const matched = fresh.map((row) => ({
     row,
     match: matchTransaction({ ...row, channelId: channelIds.get(row.channel) ?? null }, context),
   }));
 
-  const rules: ImportRuleCounts = { WEBSITE: 0, CODE_IN_TEXT: 0, NAME_RULE: 0, CHANNEL_DEFAULT: 0, OPEN: 0 };
+  const rules: ImportRuleCounts = { WEBSITE: 0, CODE_IN_TEXT: 0, CASH_REGISTER: 0, NAME_RULE: 0, CHANNEL_DEFAULT: 0, OPEN: 0 };
   for (const { row, match } of matched) {
     if (row.kind !== "PAYMENT" && row.kind !== "REFUND") continue;
     rules[match.rule ?? "OPEN"]++;
@@ -404,6 +456,7 @@ export async function importIncomeExport(
         ticketPaymentId: match.ticketPaymentId,
         membershipPaymentId: match.membershipPaymentId,
         uitleenPaymentId: match.uitleenPaymentId,
+        cashRegisterId: match.cashRegisterId,
       })),
       skipDuplicates: true,
     });
@@ -430,8 +483,9 @@ export async function importIncomeExport(
 
 /**
  * Alle koppelingen die niet met de hand gezet zijn, opnieuw berekenen: na een
- * onthouden tekst, een nieuwe code in het register, of een verwijderde regel.
- * Een afgesloten periode blijft zoals ze is. Geeft het aantal wijzigingen terug.
+ * onthouden tekst, een nieuwe code in het register, een verwijderde regel, of
+ * een kassa die aanvaard, gewijzigd of verwijderd werd. Een afgesloten periode
+ * blijft zoals ze is. Geeft het aantal wijzigingen terug.
  */
 export async function rematchOpenTransactions(): Promise<number> {
   const isLocked = lockedMonthTest(await listClosedPeriods());
@@ -457,14 +511,16 @@ export async function rematchOpenTransactions(): Promise<number> {
       ticketPaymentId: true,
       membershipPaymentId: true,
       uitleenPaymentId: true,
+      cashRegisterId: true,
     },
   });
   const open = rows.filter((row) => !isLocked(row.periodMonth ? dateToMonth(row.periodMonth) : null));
 
-  const [{ codes }, nameRules, channelCodes, websites] = await Promise.all([
+  const [{ codes }, nameRules, channelCodes, cashRegisters, websites] = await Promise.all([
     codeContext(),
     nameRuleContext(),
     channelCodeContext(),
+    cashRegisterContext(),
     Promise.all(
       INCOME_SOURCES.map(async (source) => {
         const ids = open.flatMap((row) => (row.source === source && row.providerId ? [row.providerId] : []));
@@ -482,6 +538,7 @@ export async function rematchOpenTransactions(): Promise<number> {
       codes,
       nameRules,
       channelCodes,
+      cashRegisters,
       website: websiteBySource.get(row.source) ?? new Map(),
     });
     const same =
@@ -489,7 +546,8 @@ export async function rematchOpenTransactions(): Promise<number> {
       (match.code?.code ?? null) === row.accountingCode &&
       match.ticketPaymentId === row.ticketPaymentId &&
       match.membershipPaymentId === row.membershipPaymentId &&
-      match.uitleenPaymentId === row.uitleenPaymentId;
+      match.uitleenPaymentId === row.uitleenPaymentId &&
+      match.cashRegisterId === row.cashRegisterId;
     if (same) continue;
     const data: MatchUpdate = {
       rule: match.rule,
@@ -498,6 +556,7 @@ export async function rematchOpenTransactions(): Promise<number> {
       ticketPaymentId: match.ticketPaymentId,
       membershipPaymentId: match.membershipPaymentId,
       uitleenPaymentId: match.uitleenPaymentId,
+      cashRegisterId: match.cashRegisterId,
     };
     const key = JSON.stringify(data);
     const update = updates.get(key);
@@ -522,6 +581,7 @@ type MatchUpdate = {
   ticketPaymentId: string | null;
   membershipPaymentId: string | null;
   uitleenPaymentId: string | null;
+  cashRegisterId: string | null;
 };
 
 // -----------------------------------------------------------------------------
@@ -919,6 +979,7 @@ export async function listIncomeTransactions(filter: TransactionFilter) {
         excluded: true,
         channel: { select: { identifier: true, label: true } },
         ticketPayment: { select: { order: { select: { eventId: true } } } },
+        cashRegister: { select: { id: true, activity: true, postLabel: true } },
         assignedBy: { select: { name: true } },
       },
     }),
@@ -959,59 +1020,144 @@ export async function listIncomeImports() {
   return imports.map((row) => ({ ...row, manualCount: manualById.get(row.id) ?? 0 }));
 }
 
-/**
- * Wat de import per toestel zag tijdens een kassa, voor de kassacontrole: voor
- * elk toestel waaraan Beheer een kanaal koppelde. Alle betalingen en
- * terugbetalingen tellen, ook wat "telt niet mee" kreeg: dit is wat er op het
- * toestel binnenkwam. Schrijft niets in de kassa.
- */
-export async function kassaImportAmounts(register: {
-  id: string;
-  date: Date;
-  startsAt: Date | null;
-  endsAt: Date | null;
-}): Promise<KassaImportAmount[]> {
+/** Per toestel van de kassa's de kanalen die het zijn: "BANCONTACT|Evenementen" naar kanaal-ID's. */
+async function deviceChannels(): Promise<Map<string, { method: PaymentMethod; terminal: string; channelIds: string[] }>> {
   const channels = await prisma.incomeChannel.findMany({
     where: { cashMethod: { not: null }, cashTerminal: { not: null } },
     select: { id: true, cashMethod: true, cashTerminal: true },
   });
-  if (channels.length === 0) return [];
-  const devices = new Map<string, { method: NonNullable<(typeof channels)[number]["cashMethod"]>; terminal: string; channelIds: string[] }>();
+  const devices = new Map<string, { method: PaymentMethod; terminal: string; channelIds: string[] }>();
   for (const channel of channels) {
     if (!channel.cashMethod || !channel.cashTerminal) continue;
-    const key = `${channel.cashMethod}|${channel.cashTerminal}`;
+    const key = deviceKey(channel.cashMethod, channel.cashTerminal);
     const device = devices.get(key) ?? { method: channel.cashMethod, terminal: channel.cashTerminal, channelIds: [] };
     device.channelIds.push(channel.id);
     devices.set(key, device);
   }
-  const sameDay = await prisma.cashRegisterPayment.findMany({
-    where: { registerId: { not: register.id }, register: { date: register.date } },
-    select: { method: true, terminal: true },
-  });
+  return devices;
+}
 
-  const result: KassaImportAmount[] = [];
-  for (const device of devices.values()) {
-    const sharedThatDay = sameDay.some((use) => use.method === device.method && use.terminal === device.terminal);
-    const window = kassaControlWindow(register, sharedThatDay);
-    const sum = await prisma.incomeTransaction.aggregate({
+/**
+ * De kassacontrole voor veel toestellen op veel kassa's tegelijk, in twee
+ * queries: wie welk toestel die dagen had, en de transacties in de vensters.
+ * Per gevraagd toestel het bedrag, of `null` wanneer geen kanaal dat toestel
+ * is. Het rekenen zelf staat puur in `kassa.ts`.
+ */
+async function controlAmounts(
+  wanted: readonly { register: ControlRegister; method: PaymentMethod; terminal: string }[],
+  devices: ReadonlyMap<string, { channelIds: string[] }>,
+): Promise<(KassaImportAmount | null)[]> {
+  const linked = wanted.filter((item) => devices.has(deviceKey(item.method, item.terminal)));
+  if (linked.length === 0) return wanted.map(() => null);
+
+  const days = [...new Map(linked.map((item) => [item.register.date.getTime(), item.register.date])).values()];
+  const uses: DeviceUse[] = (
+    await prisma.cashRegisterPayment.findMany({
+      where: { register: { date: { in: days } } },
+      select: { registerId: true, method: true, terminal: true, register: { select: { date: true } } },
+    })
+  ).map((use) => ({ registerId: use.registerId, date: use.register.date, method: use.method, terminal: use.terminal }));
+
+  const placed = wanted.map((item) =>
+    devices.has(deviceKey(item.method, item.terminal)) ? deviceWindow(item.register, item.method, item.terminal, uses) : null,
+  );
+  const windows = wanted.flatMap((item, index) => {
+    const device = devices.get(deviceKey(item.method, item.terminal));
+    const place = placed[index];
+    return device && place
+      ? [{ channelId: { in: device.channelIds }, occurredAt: { gte: place.window.start, lt: place.window.end } }]
+      : [];
+  });
+  const transactions = await prisma.incomeTransaction.findMany({
+    where: { kind: { in: ["PAYMENT", "REFUND"] }, OR: windows },
+    select: { channelId: true, occurredAt: true, amountCents: true },
+  });
+  const onDevices = transactions.flatMap((tx) => (tx.channelId ? [{ ...tx, channelId: tx.channelId }] : []));
+
+  return wanted.map((item, index) => {
+    const device = devices.get(deviceKey(item.method, item.terminal));
+    const place = placed[index];
+    return device && place ? importAmountOf(item.method, item.terminal, place, device.channelIds, onDevices) : null;
+  });
+}
+
+/**
+ * Wat de import per toestel zag tijdens een kassa, voor het telformulier: voor
+ * elk toestel waaraan Beheer een kanaal koppelde, ook een dat (nog) niet op de
+ * kassa staat, want bij het tellen kan er een bijkomen. Schrijft niets in de
+ * kassa.
+ */
+export async function kassaImportAmounts(register: ControlRegister): Promise<KassaImportAmount[]> {
+  const devices = await deviceChannels();
+  const amounts = await controlAmounts(
+    [...devices.values()].map((device) => ({ register, method: device.method, terminal: device.terminal })),
+    devices,
+  );
+  return amounts.flatMap((amount) => (amount ? [amount] : []));
+}
+
+/** Eén toestel op één kassa in de lijst met afwijkingen. */
+export type KassaControlRow = {
+  registerId: string;
+  date: Date;
+  startsAt: Date | null;
+  endsAt: Date | null;
+  activity: string;
+  postLabel: string;
+  method: PaymentMethod;
+  terminal: string;
+  /** Wat Beheer bij het tellen intikte; `null` = nog niet afgelezen. */
+  typedCents: number | null;
+  /** `null` = geen kanaal van de online inkomsten aan dit toestel gekoppeld. */
+  amount: KassaImportAmount | null;
+  state: KassaControlState;
+};
+
+/**
+ * De lijst met afwijkingen: elk toestel op elke aanvaarde kassa van een
+ * werkingsjaar, met wat er ingetikt is naast wat de import zag. Dezelfde
+ * rekening als het telformulier (`controlAmounts`), dus de lijst en de kassa
+ * zeggen hetzelfde.
+ */
+export async function kassaControlList(year: number | "all"): Promise<KassaControlRow[]> {
+  const [registers, devices] = await Promise.all([
+    prisma.cashRegister.findMany({
       where: {
-        channelId: { in: device.channelIds },
-        kind: { in: ["PAYMENT", "REFUND"] },
-        occurredAt: { gte: window.start, lt: window.end },
+        status: { not: "REQUESTED" },
+        payments: { some: {} },
+        ...(year === "all" ? {} : { workingYear: year }),
       },
-      _sum: { amountCents: true },
-      _count: true,
-    });
-    result.push({
-      method: device.method,
-      terminal: device.terminal,
-      cents: sum._sum.amountCents ?? 0,
-      count: sum._count,
-      window,
-      sharedThatDay,
-    });
-  }
-  return result;
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        date: true,
+        startsAt: true,
+        endsAt: true,
+        activity: true,
+        postLabel: true,
+        payments: { orderBy: { sortOrder: "asc" }, select: { method: true, terminal: true, amountCents: true } },
+      },
+    }),
+    deviceChannels(),
+  ]);
+  const lines = registers.flatMap((register) => register.payments.map((payment) => ({ register, payment })));
+  const amounts = await controlAmounts(
+    lines.map(({ register, payment }) => ({ register, method: payment.method, terminal: payment.terminal })),
+    devices,
+  );
+  return lines.map(({ register, payment }, index) => ({
+    registerId: register.id,
+    date: register.date,
+    startsAt: register.startsAt,
+    endsAt: register.endsAt,
+    activity: register.activity,
+    postLabel: register.postLabel,
+    method: payment.method,
+    terminal: payment.terminal,
+    typedCents: payment.amountCents,
+    amount: amounts[index],
+    state: kassaControlState(payment.amountCents, amounts[index]),
+  }));
 }
 
 export async function listIncomeChannels() {
@@ -1065,6 +1211,7 @@ function reasonOf(
     assignedBy: { name: string } | null;
     channel: { identifier: string; label: string | null } | null;
     ticketPayment: { order: { event: { titleNl: string } } } | null;
+    cashRegister: { activity: string; postLabel: string; date: Date } | null;
     membershipPaymentId: string | null;
     uitleenPaymentId: string | null;
   },
@@ -1094,6 +1241,12 @@ function reasonOf(
       return `${nl ? "Onthouden tekst" : "Remembered text"} "${incomeRuleText(tx.description) ?? ""}"`;
     case "CHANNEL_DEFAULT":
       return `${nl ? "Standaardcode van" : "Default code of"} ${tx.channel?.label || tx.channel?.identifier || "?"}`;
+    case "CASH_REGISTER":
+      return tx.cashRegister
+        ? `${nl ? "Kassa" : "Cash register"} ${tx.cashRegister.activity} (${tx.cashRegister.postLabel}), ${tx.cashRegister.date.toLocaleDateString(nl ? "nl-BE" : "en-GB", { timeZone: "UTC" })}`
+        : nl
+          ? "Kassa"
+          : "Cash register";
     default:
       return tx.uitleenPaymentId
         ? nl
@@ -1132,6 +1285,7 @@ export async function loadIncomeWorkbookModel(from: string, to: string, nl: bool
         assignedBy: { select: { name: true } },
         channel: { select: { identifier: true, label: true } },
         ticketPayment: { select: { order: { select: { event: { select: { titleNl: true } } } } } },
+        cashRegister: { select: { activity: true, postLabel: true, date: true } },
       },
     }),
     prisma.incomeChannel.findMany({ select: { id: true, accounts: { select: { from: true, bankAccount: true } } } }),

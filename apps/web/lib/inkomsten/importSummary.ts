@@ -38,7 +38,7 @@ export function combineImportSummaries(summaries: readonly ImportSummary[]): Com
     updated: 0,
     locked: 0,
     feeRows: 0,
-    rules: { WEBSITE: 0, CODE_IN_TEXT: 0, NAME_RULE: 0, CHANNEL_DEFAULT: 0, OPEN: 0 },
+    rules: { WEBSITE: 0, CODE_IN_TEXT: 0, CASH_REGISTER: 0, NAME_RULE: 0, CHANNEL_DEFAULT: 0, OPEN: 0 },
     firstAt: null,
     lastAt: null,
     newChannels: [],

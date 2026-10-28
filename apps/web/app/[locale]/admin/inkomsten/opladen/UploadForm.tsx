@@ -134,6 +134,9 @@ export function UploadForm({
             {totals.locked ? <Stat label={nl ? "In een afgesloten periode" : "In a closed period"} value={number(totals.locked)} /> : null}
             <Stat label={nl ? "Betaling van de site" : "Payment from the site"} value={number(totals.rules.WEBSITE)} />
             <Stat label={nl ? "Code in de tekst" : "Code in the text"} value={number(totals.rules.CODE_IN_TEXT)} />
+            {totals.rules.CASH_REGISTER ? (
+              <Stat label={nl ? "Een kassa" : "A cash register"} value={number(totals.rules.CASH_REGISTER)} />
+            ) : null}
             <Stat label={nl ? "Onthouden tekst" : "Remembered text"} value={number(totals.rules.NAME_RULE)} />
             {totals.rules.CHANNEL_DEFAULT ? (
               <Stat label={nl ? "Standaardcode van het kanaal" : "Default code of the channel"} value={number(totals.rules.CHANNEL_DEFAULT)} />

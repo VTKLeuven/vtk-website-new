@@ -26,6 +26,7 @@ const RULE_LABELS: Record<string, { nl: string; en: string }> = {
   CODE_IN_TEXT: { nl: "Code in de tekst", en: "Code in the text" },
   NAME_RULE: { nl: "Onthouden tekst", en: "Remembered text" },
   CHANNEL_DEFAULT: { nl: "Standaardcode van het kanaal", en: "Default code of the channel" },
+  CASH_REGISTER: { nl: "Kassa", en: "Cash register" },
 };
 
 const KIND_LABELS: Record<string, { nl: string; en: string }> = {
@@ -209,6 +210,11 @@ export default async function IncomeTransactionsPage({
                         {eventId ? (
                           <Link href={`${base}/admin/tickets/${eventId}`} className="block text-xs text-vtk-navy underline">
                             {nl ? "Ticketverkoop" : "Ticket sale"}
+                          </Link>
+                        ) : null}
+                        {row.cashRegister ? (
+                          <Link href={`${base}/admin/kassas/${row.cashRegister.id}`} className="block text-xs text-vtk-navy underline">
+                            {row.cashRegister.activity} ({row.cashRegister.postLabel})
                           </Link>
                         ) : null}
                       </td>

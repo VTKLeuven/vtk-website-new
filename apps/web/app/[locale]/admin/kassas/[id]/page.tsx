@@ -32,14 +32,17 @@ import {
   type PaymentMethod,
 } from "@/lib/kassas/kassa";
 import { kassaImportAmounts } from "@/lib/inkomsten/server";
+import { listAccountingCodes } from "@/lib/accounting/server";
 import {
   acceptCashRegisterAction,
   deleteCashRegisterAction,
   saveCashRegisterCountAction,
+  setCashRegisterCodeAction,
   setCashRegisterStatusAction,
   updateCashRegisterRequestAction,
 } from "@/app/actions/kassas";
 import { AcceptForm, type DeviceOption } from "../AcceptForm";
+import { CodeForm } from "../CodeForm";
 import { CountForm, type TicketOption } from "../CountForm";
 import { RequestForm } from "../RequestForm";
 import { ResultSummary } from "../ResultSummary";
@@ -81,8 +84,19 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
   const config = await getCashRegisterConfig();
   // De kassacontrole: wat de online inkomsten per toestel zagen. Enkel bij het
   // tellen, en enkel voor wie de online inkomsten mag zien.
-  const seesIncome = access.session.user.isSuperAdmin || access.session.permissions.includes("income.manage");
-  const importAmounts = manage && !requested && seesIncome ? await kassaImportAmounts(register) : [];
+  const seesIncome = access.canCheckIncome;
+  const importAmounts = !requested && seesIncome ? await kassaImportAmounts(register) : [];
+  // De code voor de online inkomsten kiest Beheer, enkel voor een kassa met toestellen.
+  const hasDevices = register.wantsBancontact || register.wantsPayconiq || register.payments.length > 0;
+  const codes = manage && hasDevices ? await listAccountingCodes() : [];
+  const linkedIncome =
+    !requested && seesIncome && hasDevices
+      ? await prisma.incomeTransaction.aggregate({
+          where: { cashRegisterId: register.id },
+          _count: true,
+          _sum: { amountCents: true },
+        })
+      : null;
   const errorMessages = kassaErrorMessages(locale);
   const startCounts = normaliseCounts(register.startCounts);
   const startCents = countsTotalCents(startCounts);
@@ -234,6 +248,7 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
             id={register.id}
             startCounts={startCounts}
             {...(await deviceOptionsFor(register, config, nl))}
+            codes={codes}
             confirmDescription={
               requesterEmail
                 ? nl
@@ -262,6 +277,36 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
           <span className="text-xs text-vtk-muted">
             {nl ? "Kiezen is opslaan." : "Choosing saves it."}
           </span>
+        </section>
+      )}
+
+      {manage && !requested && hasDevices && (
+        <section className="rounded-2xl border border-vtk-blue/12 bg-white p-5">
+          <h2 className="text-base font-semibold text-vtk-ink">{nl ? "Online inkomsten" : "Online income"}</h2>
+          <p className="mt-1 mb-3 max-w-2xl text-sm text-vtk-muted">
+            {nl
+              ? "Wat er tijdens deze kassa op haar bakjes en rekeningen binnenkwam, krijgt deze code in de online inkomsten. Op een gedeeld toestel loopt de kassa tot de volgende kassa met dat toestel; op een toestel van een post enkel tijdens haar uren."
+              : "What came in on its terminals and accounts during this register gets this code in the online income. On a shared device the register runs until the next register with that device; on a post's device only during its hours."}
+          </p>
+          <CodeForm
+            locale={locale}
+            action={setCashRegisterCodeAction}
+            id={register.id}
+            codes={codes}
+            value={register.accountingCodeId}
+            errorMessages={errorMessages}
+          />
+          {linkedIncome ? (
+            <p className="mt-3 text-sm text-vtk-muted">
+              {linkedIncome._count === 0
+                ? nl
+                  ? "Nog geen transacties van de online inkomsten gekoppeld aan deze kassa."
+                  : "No online income transactions linked to this register yet."
+                : nl
+                  ? `${linkedIncome._count === 1 ? "1 transactie" : `${linkedIncome._count} transacties`} (${formatEuro(linkedIncome._sum.amountCents ?? 0, locale)}) van de online inkomsten kregen hun code van deze kassa.`
+                  : `${linkedIncome._count} online income ${linkedIncome._count === 1 ? "transaction" : "transactions"} (${formatEuro(linkedIncome._sum.amountCents ?? 0, locale)}) got their code from this register.`}
+            </p>
+          ) : null}
         </section>
       )}
 
@@ -320,7 +365,7 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
         ))}
 
       {manage && !requested && (
-        <section className="rounded-2xl border border-vtk-blue/12 bg-white p-5">
+        <section id="tellen" className="scroll-mt-24 rounded-2xl border border-vtk-blue/12 bg-white p-5">
           <h2 className="mb-4 text-base font-semibold text-vtk-ink">{nl ? "Kassa tellen" : "Count the register"}</h2>
           <CountForm
             locale={locale}

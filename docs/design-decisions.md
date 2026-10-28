@@ -12070,8 +12070,9 @@ staat nu op `/admin/inkomsten` (`lib/inkomsten`, technisch in
 `docs/inkomsten.md`).
 Fase 1 (oktober 2026): Payconiq en Mollie. Fase 1b (oktober 2026): het blad voor
 de boekhouder, het controlebestand, de controlelijst en de boekhoudcodes als CSV.
-Fase 3 (oktober 2026): SumUp en Europabank. Fase 2, de koppeling met de kassa's,
-volgt nog.
+Fase 3 (oktober 2026): SumUp en Europabank. Fase 2 (oktober 2026): de
+kassacontrole, de code van een kassa en de koppeling op de kassa die een toestel
+had.
 
 - **Rekenen zoals het rekenblad.** Mollie telt in de maand van de uitbetaling
   (de maand in de uitbetalingsreferentie), de rest in de maand van de betaling.
@@ -12101,8 +12102,9 @@ volgt nog.
   uitleg bij die instelling noemt geen code.
 - **Exact koppelen gaat voor afleiden.** Een betaling via de site koppelt op
   haar betaal-ID aan de bestelling en haar code, en een terugbetaling via de
-  terugbetaling op de site. Een code vooraan in de omschrijving telt daarna, dan
-  een onthouden tekst. Wat overblijft, staat bij Na te kijken.
+  terugbetaling op de site. Een code vooraan in de omschrijving telt daarna,
+  dan de kassa die het toestel had, een onthouden tekst en de standaardcode van
+  het kanaal. Wat overblijft, staat bij Na te kijken.
 - **Na te kijken groepeert op wat zinvol is.** Een vaste tekst (Mollie,
   printkrediet) per tekst, en die kan onthouden worden; wat iemand bij een
   sticker typt ("pintje") per sticker per dag, en dat kan niet onthouden worden.
@@ -12157,9 +12159,9 @@ volgt nog.
   Beheer bevestigde in oktober 2026 dat ook die inkomsten in het kwartaalblad
   horen, al staan ze op een eigen rekening, en dat een toestel van een post
   (zoals haar SumUp) normaal nooit voor iets anders dient: de standaardcode
-  dekt dus het gewone gebruik. In fase 2 gaat een kassa van een andere post op
-  die QR-code voor op de standaardcode, zoals de opmerking in het rekenblad het
-  wilde.
+  dekt dus het gewone gebruik. Een kassa van een andere post op die QR-code
+  gaat tijdens haar uren voor op de standaardcode, zoals de opmerking in het
+  rekenblad het wilde.
 - **De standaardcode geldt vanaf een dag, zoals de rekening.** "Normaal nooit"
   bleek één week: in september 2026 gebruikte de cursusdienst de SumUp van
   Theokot (€ 41.228,86 van de € 42.466,47 die maand). Met één code zonder datum
@@ -12179,8 +12181,8 @@ volgt nog.
   had ze niet, omdat de SumUp van Theokot er niet in stond. Alle kosten staan
   op één regel, onder de ene kostencode die Beheer kiest, zoals "Financiële
   kosten" in het kwartaalblad. De terminal van evenementen krijgt geen
-  standaardcode: tot de koppeling met de kassa's (fase 2) staat ze per dag bij
-  Na te kijken.
+  standaardcode: wat erop binnenkomt, krijgt de code van de kassa die ze had,
+  en wat buiten elke kassa valt, staat per dag bij Na te kijken.
 - **De kassacontrole vergelijkt, ze schrijft niet.** Beheer tikt bij elke kassa
   het bedrag in dat het Bancontact-bakje of de Payconiq-rekening toont, en dat
   blijft het bedrag van de kassa: de online inkomsten staan ernaast, met een
@@ -12190,7 +12192,28 @@ volgt nog.
   andere kassa dat toestel dezelfde dag had, en anders over de hele dag, zoals
   Beheer afleest: voor en na een evenement, of het dagtotaal. Welk kanaal welk
   toestel is, vult Beheer in; de namen van de toestellen komen uit de
-  instellingen van de kassa's, niet uit de code.
+  instellingen van de kassa's, niet uit de code. Een eigen tabblad Controle
+  bij de kassa's zet elke kassa met een verschil onder elkaar, zodat Beheer na
+  het opladen van een kwartaal niet elke kassa moet openen. Wat daar staat,
+  past Beheer aan op de kassa zelf, niet in de lijst: een bedrag aanpassen
+  blijft een bewuste stap per kassa.
+- **Beheer kiest de code van een kassa, bij het aanvaarden.** Niet de post in
+  haar aanvraag. In het rekenblad tikte Beheer per evenement de post, de
+  periode en de code in, en het overzicht van de kassa's had geen kolom voor
+  een code; zo blijft het (oktober 2026). Later aanpassen kan op de kassa zelf,
+  en elke wijziging koppelt opnieuw, buiten de afgesloten periodes.
+- **Een gedeeld toestel hoort bij een kassa tot de volgende kassa, een toestel
+  van een post enkel tijdens haar uren.** Het rekenblad werkte niet met de uren
+  van een activiteit maar met wie de sticker had, in periodes die op elkaar
+  aansloten: Activiteiten had Evenement 1 van 1 oktober 18:00 tot 16 oktober
+  16:59, daarna Secretaris. Wie een dag later nog betaalt, hoort bij de post
+  die de sticker toen had. Een marge rond de uren werd niet gekozen: dat is een
+  willekeurig getal, en het laat nog altijd een gat tussen twee kassa's. Op een
+  toestel van een post is het anders: daar was het voor en na de kassa van de
+  eigenaar (Caraoke tot 04:00, daarna weer de broodjesbar). Welke soort het
+  is, zegt de standaardcode: een kanaal met een standaardcode op die dag is van
+  een post. Een code in de omschrijving gaat wel voor op de kassa: die zegt
+  zelf waar de betaling bij hoort, de kassa leidt het af uit uur en toestel.
 - **Veel bestanden tegelijk, elk een eigen import.** Europabank laat enkel per
   dag downloaden, dus een kwartaal van één terminal is een negentigtal
   bestanden. Beheer kiest ze samen; de site toont wat ze samen en per bestand

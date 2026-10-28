@@ -163,7 +163,7 @@ export default async function KassaOverzicht({
         base={base}
         nl={nl}
         active="overzicht"
-        caps={{ request: access.canRequest, manage: true }}
+        caps={{ request: access.canRequest, manage: true, control: access.canCheckIncome }}
         permanentLabel={permanentTabLabel(access, locale)}
       />
 
