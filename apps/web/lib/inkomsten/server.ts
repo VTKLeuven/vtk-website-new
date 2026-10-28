@@ -211,6 +211,8 @@ export type ImportSummary = {
   total: number;
   /** Mislukt, vervallen of geannuleerd: telt nergens mee. */
   skipped: number;
+  /** De uitbetalingsregels van SumUp: hetzelfde geld als de verkoop ernaast. */
+  ignored: number;
   created: number;
   /** Al eerder opgeladen. */
   duplicates: number;
@@ -327,6 +329,7 @@ export async function importIncomeExport(
     fileName,
     total: parsed.total,
     skipped: parsed.skipped,
+    ignored: parsed.ignored,
     created: fresh.filter((row) => !row.derived).length,
     duplicates,
     updated: payoutUpdates.length,

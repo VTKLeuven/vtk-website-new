@@ -72,7 +72,8 @@ kanaal is. Ontbreekt die kolom, dan komt alles op één kanaal `SumUp`.
 | Verkoop | `Omzet` met status `Succesvol` of `Terugbetaald` | `PAYMENT`, voor het totaalbedrag |
 | Terugbetaling | `Terugbetaling` of `Terugboeking` met status `Succesvol` | `REFUND`, negatief |
 | Kosten | de kolom `Transactiekosten` van een betaling | `FEE`, één per betaling |
-| De rest | `Mislukt`, geannuleerd | overgeslagen |
+| Uitbetaling | `Uitbetaling` met status `Betaald`, dezelfde ID en hetzelfde bedrag als de verkoop | overgeslagen, apart geteld (`ignored`): hetzelfde geld nog eens |
+| De rest | `Mislukt`, `Geannuleerd` | overgeslagen |
 
 **Europabank** (CSV per terminal), in twee opmaken: tot maart 2026
 `Origineel bedrag (EUR)` met resultaat `Sale` of `Denied`, daarna `Bedrag` met

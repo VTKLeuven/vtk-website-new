@@ -45,6 +45,7 @@ const SUMUP = [
   "kassa@voorbeeld.be,2026-10-01 12:00:00,TTEST000002,Omzet,Mislukt,VISA,4321,DEBIT,POS,CONTACTLESS,,,2.80,2.80,0.0,0.0,0.0,0.0,,,",
   "kassa@voorbeeld.be,2026-10-02 09:15:00,TTEST000003,Terugbetaling,Succesvol,VISA,4321,DEBIT,POS,CONTACTLESS,,,3.40,3.40,0.0,0.0,0.0,-3.40,,,",
   "kassa@voorbeeld.be,2026-10-03 18:30:00,TTEST000004,Omzet,Terugbetaald,MASTERCARD,8765,DEBIT,POS,CHIP,AUTHX2,,5.00,5.00,0.0,0.0,0.05,4.95,,,",
+  "kassa@voorbeeld.be,2026-10-01 00:20:03,TTEST000001,Uitbetaling,Betaald,VISA,4321,DEBIT,POS,CONTACTLESS,AUTHX1,,3.40,3.40,0.0,0.0,0.03,3.37,2026-10-02,M4C PID0000001,",
 ].join("\n");
 
 // De opmaak tot maart 2026, zoals het tabblad van Beheer: "Datum en tijd" is een formule.
@@ -182,12 +183,14 @@ describe("Mollie", () => {
 });
 
 describe("SumUp", () => {
-  it("telt geslaagde verkopen met hun kosten als eigen regel, en slaat mislukte over", () => {
+  it("telt geslaagde verkopen met hun kosten als eigen regel, en slaat mislukte en uitbetalingsregels over", () => {
     const result = parseIncomeExport(SUMUP);
     expect(result.ok && result.format).toBe("sumup");
     if (!result.ok) return;
-    expect(result.total).toBe(4);
+    expect(result.total).toBe(5);
     expect(result.skipped).toBe(1);
+    // Hetzelfde geld als de verkoop ernaast: niet meegeteld, en ook niet "mislukt".
+    expect(result.ignored).toBe(1);
     expect(result.rows.map((row) => [row.kind, row.amountCents, row.externalKey])).toEqual([
       ["PAYMENT", 340, "PAYMENT:TTEST000001"],
       ["FEE", -3, "FEE:TTEST000001"],

@@ -62,6 +62,11 @@ export type IncomeParseResult =
       rows: ParsedIncomeRow[];
       /** Regels die niet meetellen: mislukt, vervallen, geannuleerd. */
       skipped: number;
+      /**
+       * Regels die geen transactie zijn, maar hetzelfde geld nog eens: de
+       * uitbetalingsregel die SumUp bij elke verkoop zet.
+       */
+      ignored: number;
       total: number;
     }
   | { ok: false; error: IncomeParseError; detail?: string };
@@ -258,7 +263,7 @@ function parsePayconiq(rows: string[][], columns: Columns): IncomeParseResult {
       channel: get(col("shop_name")).trim() || "(zonder naam)",
     });
   }
-  return { ok: true, format: "payconiq", source: "PAYCONIQ", rows: result, skipped, total: rows.length - 1 };
+  return { ok: true, format: "payconiq", source: "PAYCONIQ", rows: result, skipped, ignored: 0, total: rows.length - 1 };
 }
 
 /** Statussen van een Mollie-betaling die geld opleverden. */
@@ -345,7 +350,7 @@ function parseMollie(rows: string[][], columns: Columns): IncomeParseResult {
       channel: MOLLIE_CHANNEL,
     });
   }
-  return { ok: true, format: "mollie", source: "MOLLIE", rows: result, skipped, total: rows.length - 1 };
+  return { ok: true, format: "mollie", source: "MOLLIE", rows: result, skipped, ignored: 0, total: rows.length - 1 };
 }
 
 /** Een kostenregel bij een betaling van SumUp of Europabank: altijd negatief. */
@@ -370,8 +375,10 @@ const SUMUP_REFUND = /terugbetaling|terugboeking/;
  * transactiekosten worden een eigen kostenregel. Een verkoop die later
  * terugbetaald werd, telt voor haar volle bedrag en de terugbetaling als eigen
  * regel, zoals bij Mollie. Mislukte betalingen tellen niet: de formule van het
- * rekenblad nam ze wel mee. Kaartgegevens en autorisatiecodes worden niet
- * overgenomen.
+ * rekenblad nam ze wel mee. Naast elke verkoop zet SumUp een regel
+ * "Uitbetaling" met dezelfde ID en hetzelfde bedrag: dat is hetzelfde geld
+ * nog eens, en die regels slaat de site over zonder ze "niet meegeteld" te
+ * noemen. Kaartgegevens en autorisatiecodes worden niet overgenomen.
  */
 function parseSumUp(rows: string[][], columns: Columns): IncomeParseResult {
   const accountCol = pick(columns, "email", "e-mail", "e-mailadres", "account");
@@ -386,6 +393,7 @@ function parseSumUp(rows: string[][], columns: Columns): IncomeParseResult {
 
   const result: ParsedIncomeRow[] = [];
   let skipped = 0;
+  let ignored = 0;
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
@@ -393,6 +401,10 @@ function parseSumUp(rows: string[][], columns: Columns): IncomeParseResult {
     const type = get(typeCol).trim().toLowerCase();
     const status = get(statusCol).trim().toLowerCase();
 
+    if (type === "uitbetaling") {
+      ignored++;
+      continue;
+    }
     let kind: IncomeKindCode;
     if (SUMUP_REFUND.test(type) && status === "succesvol") kind = "REFUND";
     else if (type === "omzet" && (status === "succesvol" || status.startsWith("terugbetaald"))) kind = "PAYMENT";
@@ -427,7 +439,7 @@ function parseSumUp(rows: string[][], columns: Columns): IncomeParseResult {
     result.push(payment);
     if (fee) result.push(feeRow(payment, id, fee));
   }
-  return { ok: true, format: "sumup", source: "SUMUP", rows: result, skipped, total: rows.length - 1 };
+  return { ok: true, format: "sumup", source: "SUMUP", rows: result, skipped, ignored, total: rows.length - 1 };
 }
 
 /** Resultaten van een Europabank-transactie die geld opleverde: de oude en de nieuwe opmaak. */
@@ -510,7 +522,7 @@ function parseEuropabank(rows: string[][], columns: Columns): IncomeParseResult 
     result.push(payment);
     if (commission) result.push(feeRow(payment, key, commission));
   }
-  return { ok: true, format: "europabank", source: "EUROPABANK", rows: result, skipped, total: rows.length - 1 };
+  return { ok: true, format: "europabank", source: "EUROPABANK", rows: result, skipped, ignored: 0, total: rows.length - 1 };
 }
 
 // -----------------------------------------------------------------------------

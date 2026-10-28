@@ -94,6 +94,9 @@ export function UploadForm({
             <Stat label={nl ? "Al eerder opgeladen" : "Already uploaded"} value={number(summary.duplicates)} />
             {summary.updated ? <Stat label={nl ? "Nu uitbetaald" : "Now paid out"} value={number(summary.updated)} /> : null}
             <Stat label={nl ? "Telt niet mee (mislukt, vervallen, geweigerd)" : "Does not count (failed, expired, denied)"} value={number(summary.skipped)} />
+            {summary.ignored ? (
+              <Stat label={nl ? "Uitbetalingsregels (zelfde geld)" : "Payout rows (same money)"} value={number(summary.ignored)} />
+            ) : null}
             {summary.locked ? <Stat label={nl ? "In een afgesloten periode" : "In a closed period"} value={number(summary.locked)} /> : null}
             <Stat label={nl ? "Betaling van de site" : "Payment from the site"} value={number(summary.rules.WEBSITE)} />
             <Stat label={nl ? "Code in de tekst" : "Code in the text"} value={number(summary.rules.CODE_IN_TEXT)} />
