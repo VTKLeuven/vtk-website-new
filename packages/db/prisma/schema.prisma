@@ -941,7 +941,6 @@ model Group {
   cashRegisters            CashRegister[]
   /// Het kasboek van de vaste kassa (enkel Cursusdienst, Theokot, Fakbar).
   permanentCashEntries     PermanentCashEntry[]
-  incomeChannels           IncomeChannel[]
   /// De vaste taken van deze post (/admin/wie-doet-wat).
   tasks                    GroupTask[]               @relation("GroupTaskOwner")
   /// Taken van een andere post die het aanspreekpunt voor deze post zijn
@@ -2345,6 +2344,7 @@ model AccountingCode {
   ticketEvents    TicketEvent[]
   eventTemplates  TicketEventTemplate[]
   incomeNameRules IncomeNameRule[]
+  incomeChannels  IncomeChannel[]
 
   @@index([parentId])
 }
@@ -8441,14 +8441,14 @@ enum IncomeKind {
 }
 
 /// Welke koppelregel de code gaf. NULL = nog niet gekoppeld (Na te kijken).
-/// `OWN_ACCOUNT`: het kanaal stort op de eigen rekening van een post; zo'n
-/// transactie telt niet mee in het overzicht en krijgt geen code.
+/// `CHANNEL_DEFAULT`: de standaardcode van het kanaal, voor wat geen andere
+/// regel koppelde.
 enum IncomeRule {
   MANUAL
   WEBSITE
   CODE_IN_TEXT
   NAME_RULE
-  OWN_ACCOUNT
+  CHANNEL_DEFAULT
 }
 
 /// Eén opgeladen export. Het bestand zelf wordt niet bewaard: het bevat namen
@@ -8481,22 +8481,23 @@ model IncomeImport {
 /// een kanaal aan zodra een export het noemt; Beheer vult de rest in. Niets
 /// hiervan staat in de code.
 model IncomeChannel {
-  id           String       @id @default(cuid())
-  source       IncomeSource
+  id                      String       @id @default(cuid())
+  source                  IncomeSource
   /// Zoals in de export: `shop_name` bij Payconiq, "Mollie" bij Mollie.
-  identifier   String
+  identifier              String
   /// Een eigen naam, voor het overzicht. NULL = de naam uit de export.
-  label        String?
-  /// De post op wiens eigen rekening dit kanaal stort (de QR-code van Theokot).
-  /// Wat erop binnenkomt, telt dan niet mee. NULL = een gedeeld kanaal.
-  /// `SetNull`: een post die verdwijnt, maakt het kanaal weer gedeeld.
-  ownerGroupId String?
-  createdAt    DateTime     @default(now()) @db.Timestamptz(3)
-  updatedAt    DateTime     @updatedAt @db.Timestamptz(3)
+  label                   String?
+  /// De code voor wat op dit kanaal binnenkomt en geen andere regel koppelt
+  /// (de QR-code van Theokot onder de code van Theokot). Beheer kiest ze; NULL
+  /// = zo'n betaling staat bij Na te kijken. `SetNull`: een verwijderde code
+  /// laat het kanaal zonder standaardcode.
+  defaultAccountingCodeId String?
+  createdAt               DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime     @updatedAt @db.Timestamptz(3)
 
-  owner        Group?                 @relation(fields: [ownerGroupId], references: [id], onDelete: SetNull)
-  accounts     IncomeChannelAccount[]
-  transactions IncomeTransaction[]
+  defaultAccountingCode AccountingCode?        @relation(fields: [defaultAccountingCodeId], references: [id], onDelete: SetNull)
+  accounts              IncomeChannelAccount[]
+  transactions          IncomeTransaction[]
 
   @@unique([source, identifier])
 }

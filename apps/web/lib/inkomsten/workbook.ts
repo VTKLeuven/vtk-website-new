@@ -49,7 +49,6 @@ export type WorkbookTransaction = {
   accountingCode: string | null;
   accountingCodeName: string | null;
   excluded: boolean;
-  rule: string | null;
   /** Waarom deze regel deze code kreeg, in woorden. */
   reason: string;
 };
@@ -148,8 +147,8 @@ function euro(cents: number, style: CellObject = {}): CellObject {
 // -----------------------------------------------------------------------------
 
 /** De regel van het kwartaalblad waarin een transactie telt, of null als ze niet meetelt. */
-export function quarterLineKey(tx: Pick<WorkbookTransaction, "kind" | "accountingCode" | "excluded" | "rule">): string | null {
-  if (tx.excluded || tx.rule === "OWN_ACCOUNT") return null;
+export function quarterLineKey(tx: Pick<WorkbookTransaction, "kind" | "accountingCode" | "excluded">): string | null {
+  if (tx.excluded) return null;
   if (tx.kind === "FEE") return "Kosten";
   if (tx.kind === "RESERVE") return "Reserve";
   return tx.accountingCode ?? "Na te kijken";
@@ -158,7 +157,6 @@ export function quarterLineKey(tx: Pick<WorkbookTransaction, "kind" | "accountin
 /** De naam van een rij in het Transacties-tabblad, ook voor wat niet meetelt. */
 function lineLabel(tx: WorkbookTransaction, nl: boolean): string {
   if (tx.excluded) return nl ? "Telt niet mee" : "Does not count";
-  if (tx.rule === "OWN_ACCOUNT") return nl ? "Eigen rekening" : "Own account";
   return quarterLineKey(tx) ?? "";
 }
 

@@ -16,8 +16,6 @@ export type OverviewTransaction = {
   accountingCode: string | null;
   accountingCodeName: string | null;
   excluded: boolean;
-  /** De koppelregel; `OWN_ACCOUNT` telt niet mee, net als `excluded`. */
-  rule: string | null;
   amountCents: number;
   /** De rekening van het kanaal op de dag van de transactie; null = niet ingesteld. */
   bankAccount: string | null;
@@ -38,8 +36,6 @@ export type IncomeOverview = {
   /** Alles wat meetelt; "telt niet mee" zit er niet in. */
   totals: OverviewLine;
   excluded: OverviewLine;
-  /** Op een kanaal dat op de eigen rekening van een post stort. Telt niet mee. */
-  ownAccount: OverviewLine;
   accounts: Array<{ bankAccount: string | null; total: number }>;
 };
 
@@ -71,16 +67,11 @@ export function computeIncomeOverview(
   const reserve = emptyLine();
   const totals = emptyLine();
   const excluded = emptyLine();
-  const ownAccount = emptyLine();
   const accounts = new Map<string | null, number>();
 
   for (const tx of transactions) {
     if (tx.excluded) {
       add(excluded, tx.source, tx.amountCents);
-      continue;
-    }
-    if (tx.rule === "OWN_ACCOUNT") {
-      add(ownAccount, tx.source, tx.amountCents);
       continue;
     }
     add(totals, tx.source, tx.amountCents);
@@ -107,7 +98,6 @@ export function computeIncomeOverview(
     reserve,
     totals,
     excluded,
-    ownAccount,
     accounts: [...accounts.entries()]
       .map(([bankAccount, total]) => ({ bankAccount, total }))
       // Niet ingesteld onderaan: dat is werk, geen rekening.

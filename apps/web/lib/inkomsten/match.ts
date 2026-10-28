@@ -6,16 +6,16 @@
  *   2. een betaling van de site, op haar betaal-ID;
  *   3. een boekhoudcode in de omschrijving, de referentie of de `bulk_id`;
  *   5. een tekst die Beheer onthield;
- *   6. het kanaal stort op de eigen rekening van een post: telt niet mee;
+ *   6. de standaardcode van het kanaal;
  *   7. anders: Na te kijken (`null`).
  *
- * Regel 4 (de kassa's) komt in fase 2; dan telt ook een kassa van een andere
- * post op zo'n kanaal weer mee.
+ * Regel 4 (de kassa's) komt in fase 2; dan krijgt een kassa van een andere
+ * post op een kanaal met een standaardcode haar eigen code.
  * Zie docs/inkomsten.md.
  */
 import type { IncomeKindCode, IncomeSourceCode } from "./parse";
 
-export type IncomeRuleCode = "MANUAL" | "WEBSITE" | "CODE_IN_TEXT" | "NAME_RULE" | "OWN_ACCOUNT";
+export type IncomeRuleCode = "MANUAL" | "WEBSITE" | "CODE_IN_TEXT" | "NAME_RULE" | "CHANNEL_DEFAULT";
 
 export type CodeSnapshot = { code: string; name: string };
 
@@ -35,8 +35,8 @@ export type MatchContext = {
   codes: ReadonlyMap<string, CodeSnapshot>;
   /** Onthouden teksten, op `nameRuleKey`. */
   nameRules: ReadonlyMap<string, CodeSnapshot>;
-  /** Kanalen die op de eigen rekening van een post storten: kanaal-id naar post. */
-  ownAccountChannels: ReadonlyMap<string, string>;
+  /** De standaardcode per kanaal-id, voor de kanalen die er een hebben. */
+  channelCodes: ReadonlyMap<string, CodeSnapshot>;
 };
 
 export type MatchInput = {
@@ -147,10 +147,9 @@ export function matchTransaction(input: MatchInput, context: MatchContext): Matc
   const remembered = text ? context.nameRules.get(nameRuleKey(input.source, text)) : undefined;
   if (remembered) return { ...links, rule: "NAME_RULE", code: remembered };
 
-  // 6. Het kanaal stort op de eigen rekening van een post: geen code, telt niet mee.
-  if (input.channelId && context.ownAccountChannels.has(input.channelId)) {
-    return { ...links, rule: "OWN_ACCOUNT", code: null };
-  }
+  // 6. De standaardcode van het kanaal (de QR-code van een post).
+  const channelCode = input.channelId ? context.channelCodes.get(input.channelId) : undefined;
+  if (channelCode) return { ...links, rule: "CHANNEL_DEFAULT", code: channelCode };
 
   return { ...none, ...links };
 }

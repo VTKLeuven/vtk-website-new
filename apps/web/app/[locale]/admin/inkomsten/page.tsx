@@ -251,15 +251,6 @@ export default async function IncomeOverviewPage({
                   : `${data.molliePending.count} Mollie payments (${formatEuro(data.molliePending.cents, locale)}) not paid out yet. They count in the month of their payout, once an export lists it.`}
             </li>
           ) : null}
-          {overview.ownAccount.count > 0 ? (
-            <li>
-              <Link href={transactionsHref({ status: "eigen-rekening" })} className="underline">
-                {nl
-                  ? `${overview.ownAccount.count === 1 ? "1 transactie" : `${overview.ownAccount.count} transacties`} (${formatEuro(overview.ownAccount.total, locale)}) kwam${overview.ownAccount.count === 1 ? "" : "en"} op de eigen rekening van een post en ${overview.ownAccount.count === 1 ? "telt" : "tellen"} niet mee.`
-                  : `${overview.ownAccount.count} ${overview.ownAccount.count === 1 ? "transaction" : "transactions"} (${formatEuro(overview.ownAccount.total, locale)}) went to a post's own account and do not count.`}
-              </Link>
-            </li>
-          ) : null}
           {overview.excluded.count > 0 ? (
             <li>
               <Link href={transactionsHref({ status: "telt-niet-mee" })} className="underline">
@@ -272,7 +263,7 @@ export default async function IncomeOverviewPage({
         </ul>
       </section>
 
-      {overview.totals.count + overview.excluded.count + overview.ownAccount.count > 0 ? (
+      {overview.totals.count + overview.excluded.count > 0 ? (
         <section className="rounded-2xl border border-vtk-blue/12 bg-white p-5">
           <h2 className="text-lg font-semibold">{nl ? "Controle" : "Checks"}</h2>
           <p className="mt-1 text-sm text-vtk-muted">

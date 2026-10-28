@@ -17,7 +17,6 @@ const STATES: Record<string, TransactionFilter["state"]> = {
   "na-te-kijken": "open",
   gekoppeld: "matched",
   "telt-niet-mee": "excluded",
-  "eigen-rekening": "own",
 };
 
 const RULE_LABELS: Record<string, { nl: string; en: string }> = {
@@ -25,7 +24,7 @@ const RULE_LABELS: Record<string, { nl: string; en: string }> = {
   WEBSITE: { nl: "Betaling van de site", en: "Payment from the site" },
   CODE_IN_TEXT: { nl: "Code in de tekst", en: "Code in the text" },
   NAME_RULE: { nl: "Onthouden tekst", en: "Remembered text" },
-  OWN_ACCOUNT: { nl: "Eigen rekening van een post", en: "A post's own account" },
+  CHANNEL_DEFAULT: { nl: "Standaardcode van het kanaal", en: "Default code of the channel" },
 };
 
 const KIND_LABELS: Record<string, { nl: string; en: string }> = {
@@ -102,7 +101,6 @@ export default async function IncomeTransactionsPage({
             <option value="na-te-kijken">{nl ? "Na te kijken" : "To review"}</option>
             <option value="gekoppeld">{nl ? "Gekoppeld" : "Matched"}</option>
             <option value="telt-niet-mee">{nl ? "Telt niet mee" : "Does not count"}</option>
-            <option value="eigen-rekening">{nl ? "Eigen rekening van een post" : "A post's own account"}</option>
           </select>
         </label>
         <label>
@@ -188,11 +186,6 @@ export default async function IncomeTransactionsPage({
                       <td className="px-3 py-2">
                         {row.excluded ? (
                           <span className="text-vtk-muted">{nl ? "telt niet mee" : "does not count"}</span>
-                        ) : row.rule === "OWN_ACCOUNT" ? (
-                          <span className="text-vtk-muted">
-                            {nl ? "eigen rekening" : "own account"}
-                            {row.channel?.owner?.nameNl ? ` ${row.channel.owner.nameNl}` : ""}
-                          </span>
                         ) : row.accountingCode ? (
                           <>
                             <span className="tabular-nums">{row.accountingCode}</span>

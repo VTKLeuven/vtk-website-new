@@ -4,8 +4,6 @@ import { ConfirmIconButton, DeleteIconButton } from "@/components/ui/DeleteIconB
 import { UndoIcon } from "@/components/ui/icons";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
-import { prisma } from "@vtk/db";
-import { pick } from "@vtk/i18n";
 import { listAccountingCodes } from "@/lib/accounting/server";
 import {
   countUnassigned,
@@ -19,20 +17,20 @@ import {
   deleteIncomeChannelAccountAction,
   deleteIncomeNameRuleAction,
   reopenIncomePeriodAction,
+  saveIncomeChannelCodeAction,
   saveIncomeChannelLabelAction,
-  saveIncomeChannelOwnerAction,
   saveIncomeSettingsAction,
 } from "@/app/actions/inkomsten";
 import { IncomeNav } from "../IncomeNav";
 import { incomeErrorMessages } from "../messages";
 import { SOURCE_LABELS, periodLabel } from "../shared";
-import { ChannelAccountForm, ChannelLabelForm, ChannelOwnerForm, FeeCodeForm } from "./SettingsForms";
+import { ChannelAccountForm, ChannelCodeForm, ChannelLabelForm, FeeCodeForm } from "./SettingsForms";
 
 /**
  * Alles over VTK zelf, ingevuld door Beheer: de kostencode, op welke rekening
- * elk kanaal stort, de onthouden teksten en de afgesloten periodes. Niets
- * hiervan staat in de code; een kanaal verschijnt hier vanzelf zodra een export
- * het noemt.
+ * elk kanaal stort en onder welke code het standaard valt, de onthouden teksten
+ * en de afgesloten periodes. Niets hiervan staat in de code; een kanaal
+ * verschijnt hier vanzelf zodra een export het noemt.
  */
 export default async function IncomeSettingsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: localeParam } = await params;
@@ -42,20 +40,14 @@ export default async function IncomeSettingsPage({ params }: { params: Promise<{
   const base = nl ? "" : "/en";
   await requirePermission("income.manage");
 
-  const [config, codes, channels, rules, periods, openCount, groups] = await Promise.all([
+  const [config, codes, channels, rules, periods, openCount] = await Promise.all([
     getIncomeConfig(),
     listAccountingCodes(),
     listIncomeChannels(),
     listIncomeNameRules(),
     listClosedPeriods(),
     countUnassigned(),
-    prisma.group.findMany({
-      where: { active: true },
-      orderBy: [{ type: "asc" }, { orderInPraesidium: "asc" }, { nameNl: "asc" }],
-      select: { id: true, nameNl: true, nameEn: true },
-    }),
   ]);
-  const posts = groups.map((group) => ({ value: group.id, label: pick(group.nameNl, group.nameEn, locale) }));
   const errorMessages = incomeErrorMessages(locale);
   const common = { locale, errorMessages } as const;
   const date = (value: Date) => value.toLocaleDateString(nl ? "nl-BE" : "en-GB", { timeZone: "UTC" });
@@ -82,8 +74,8 @@ export default async function IncomeSettingsPage({ params }: { params: Promise<{
         <h2 className="text-lg font-semibold">{nl ? "Kanalen" : "Channels"}</h2>
         <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
           {nl
-            ? "Elke Payconiq-QR-code en elk profiel dat in een export voorkwam. Vul in op welke rekening het stort, vanaf welke dag: wisselt een QR-code van rekening, dan voeg je een nieuwe regel toe en houdt wat ervoor binnenkwam de oude. Stort een QR-code op de eigen rekening van een post (zoals die van Theokot), kies dan die post: wat erop binnenkomt, telt dan niet mee."
-            : "Every Payconiq QR code and profile that appeared in an export. Fill in which account it pays into, from which day: if a QR code changes account, add a new row and what came in before keeps the old one. If a QR code pays into a post's own account (like Theokot's), choose that post: what comes in on it then does not count."}
+            ? "Elke Payconiq-QR-code en elk profiel dat in een export voorkwam. Vul in op welke rekening het stort, vanaf welke dag: wisselt een QR-code van rekening, dan voeg je een nieuwe regel toe en houdt wat ervoor binnenkwam de oude. Dient een QR-code altijd voor dezelfde post (zoals die van Theokot), geef ze dan een standaardcode: wat erop binnenkomt en geen andere regel koppelt, krijgt die code in plaats van bij Na te kijken te staan."
+            : "Every Payconiq QR code and profile that appeared in an export. Fill in which account it pays into, from which day: if a QR code changes account, add a new row and what came in before keeps the old one. If a QR code always serves the same post (like Theokot's), give it a default code: what comes in on it and no other rule matches gets that code instead of waiting under To review."}
         </p>
         {channels.length === 0 ? (
           <p className="mt-3 text-sm text-vtk-muted">
@@ -145,12 +137,12 @@ export default async function IncomeSettingsPage({ params }: { params: Promise<{
                 )}
                 <ChannelAccountForm {...common} action={addIncomeChannelAccountAction} channelId={channel.id} />
                 {channel.source === "PAYCONIQ" ? (
-                  <ChannelOwnerForm
+                  <ChannelCodeForm
                     {...common}
-                    action={saveIncomeChannelOwnerAction}
+                    action={saveIncomeChannelCodeAction}
                     channelId={channel.id}
-                    ownerGroupId={channel.ownerGroupId}
-                    posts={posts}
+                    codes={codes}
+                    value={channel.defaultAccountingCodeId}
                   />
                 ) : null}
               </li>

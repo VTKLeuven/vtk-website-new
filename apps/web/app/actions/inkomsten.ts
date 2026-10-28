@@ -264,30 +264,30 @@ export async function saveIncomeChannelLabelAction(_prev: SaveState, formData: F
 }
 
 /**
- * Op wiens eigen rekening een kanaal stort (de QR-code van Theokot). Wat erop
- * binnenkomt, telt dan niet mee; leeg maakt het kanaal weer gedeeld. De
- * koppelregels lopen daarna opnieuw, buiten de afgesloten periodes.
+ * De standaardcode van een kanaal (de QR-code van Theokot onder de code van
+ * Theokot): wat erop binnenkomt en geen andere regel koppelt, krijgt die code.
+ * Leeg zet zo'n betaling weer bij Na te kijken. De koppelregels lopen daarna
+ * opnieuw, buiten de afgesloten periodes.
  */
-export async function saveIncomeChannelOwnerAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+export async function saveIncomeChannelCodeAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requirePermission("income.manage");
   const id = String(formData.get("id") ?? "");
-  const ownerGroupId = String(formData.get("ownerGroupId") ?? "") || null;
+  const codeId = String(formData.get("defaultAccountingCodeId") ?? "") || null;
   const channel = await prisma.incomeChannel.findUnique({ where: { id }, select: { identifier: true } });
   if (!channel) return saveError("NOT_FOUND");
-  let ownerName: string | null = null;
-  if (ownerGroupId) {
-    const group = await prisma.group.findUnique({ where: { id: ownerGroupId }, select: { nameNl: true } });
-    if (!group) return saveError("NOT_FOUND");
-    ownerName = group.nameNl;
+  let code: { code: string; name: string } | null = null;
+  if (codeId) {
+    code = await prisma.accountingCode.findUnique({ where: { id: codeId }, select: { code: true, name: true } });
+    if (!code) return saveError("CODE_NOT_FOUND");
   }
-  await prisma.incomeChannel.update({ where: { id }, data: { ownerGroupId } });
+  await prisma.incomeChannel.update({ where: { id }, data: { defaultAccountingCodeId: codeId } });
   const changed = await rematchOpenTransactions();
   await logAudit({
     action: "update",
     entity: "incomeChannel",
     entityId: id,
     target: channel.identifier,
-    summary: ownerName ? `stort op de eigen rekening van ${ownerName}` : "gedeeld kanaal",
+    summary: code ? `standaardcode ${code.code} ${code.name}` : "geen standaardcode",
   });
   revalidate();
   return saveOk(changed ? `Opgeslagen; ${transactions(changed)} opnieuw gekoppeld.` : undefined);

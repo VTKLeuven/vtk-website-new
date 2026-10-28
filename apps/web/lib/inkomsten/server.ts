@@ -164,13 +164,17 @@ async function codeContext(): Promise<{ codes: Map<string, CodeSnapshot>; order:
   };
 }
 
-/** Kanalen die op de eigen rekening van een post storten: kanaal-id naar de naam van de post. */
-async function ownAccountContext(): Promise<Map<string, string>> {
+/** De standaardcode per kanaal, voor de kanalen die er een hebben. */
+async function channelCodeContext(): Promise<Map<string, CodeSnapshot>> {
   const channels = await prisma.incomeChannel.findMany({
-    where: { ownerGroupId: { not: null } },
-    select: { id: true, owner: { select: { nameNl: true } } },
+    where: { defaultAccountingCodeId: { not: null } },
+    select: { id: true, defaultAccountingCode: { select: { code: true, name: true } } },
   });
-  return new Map(channels.map((channel) => [channel.id, channel.owner?.nameNl ?? ""]));
+  const result = new Map<string, CodeSnapshot>();
+  for (const channel of channels) {
+    if (channel.defaultAccountingCode) result.set(channel.id, channel.defaultAccountingCode);
+  }
+  return result;
 }
 
 async function nameRuleContext(): Promise<Map<string, CodeSnapshot>> {
@@ -265,8 +269,8 @@ export async function importIncomeExport(
     fresh.push(row);
   }
 
-  // De kanalen eerst: een kanaal dat op de eigen rekening van een post stort,
-  // bepaalt mee de koppeling. Een nieuw kanaal heeft nog geen eigenaar.
+  // De kanalen eerst: de standaardcode van een kanaal bepaalt mee de
+  // koppeling. Een nieuw kanaal heeft er nog geen.
   const channelNames = [...new Set(fresh.map((row) => row.channel))];
   const knownChannels = await prisma.incomeChannel.findMany({
     where: { source, identifier: { in: channelNames } },
@@ -275,19 +279,19 @@ export async function importIncomeExport(
   const channelIds = new Map(knownChannels.map((channel) => [channel.identifier, channel.id]));
   const newChannels = channelNames.filter((name) => !channelIds.has(name));
 
-  const [{ codes }, nameRules, website, ownAccountChannels] = await Promise.all([
+  const [{ codes }, nameRules, website, channelCodes] = await Promise.all([
     codeContext(),
     nameRuleContext(),
     websitePayments(source, fresh.flatMap((row) => (row.providerId ? [row.providerId] : []))),
-    ownAccountContext(),
+    channelCodeContext(),
   ]);
-  const context: MatchContext = { codes, nameRules, website, ownAccountChannels };
+  const context: MatchContext = { codes, nameRules, website, channelCodes };
   const matched = fresh.map((row) => ({
     row,
     match: matchTransaction({ ...row, channelId: channelIds.get(row.channel) ?? null }, context),
   }));
 
-  const rules: ImportRuleCounts = { WEBSITE: 0, CODE_IN_TEXT: 0, NAME_RULE: 0, OWN_ACCOUNT: 0, OPEN: 0 };
+  const rules: ImportRuleCounts = { WEBSITE: 0, CODE_IN_TEXT: 0, NAME_RULE: 0, CHANNEL_DEFAULT: 0, OPEN: 0 };
   for (const { row, match } of matched) {
     if (row.kind !== "PAYMENT" && row.kind !== "REFUND") continue;
     rules[match.rule ?? "OPEN"]++;
@@ -418,10 +422,10 @@ export async function rematchOpenTransactions(): Promise<number> {
   });
   const open = rows.filter((row) => !isLocked(row.periodMonth ? dateToMonth(row.periodMonth) : null));
 
-  const [{ codes }, nameRules, ownAccountChannels, payconiq, mollie] = await Promise.all([
+  const [{ codes }, nameRules, channelCodes, payconiq, mollie] = await Promise.all([
     codeContext(),
     nameRuleContext(),
-    ownAccountContext(),
+    channelCodeContext(),
     websitePayments("PAYCONIQ", open.filter((r) => r.source === "PAYCONIQ" && r.providerId).map((r) => r.providerId!)),
     websitePayments("MOLLIE", open.filter((r) => r.source === "MOLLIE" && r.providerId).map((r) => r.providerId!)),
   ]);
@@ -431,7 +435,7 @@ export async function rematchOpenTransactions(): Promise<number> {
     const match = matchTransaction(row, {
       codes,
       nameRules,
-      ownAccountChannels,
+      channelCodes,
       website: row.source === "PAYCONIQ" ? payconiq : mollie,
     });
     const same =
@@ -654,7 +658,6 @@ export async function loadIncomeOverview(from: string, to: string): Promise<Inco
         accountingCode: true,
         accountingCodeName: true,
         excluded: true,
-        rule: true,
         amountCents: true,
         occurredAt: true,
         channelId: true,
@@ -719,7 +722,7 @@ export async function loadIncomeOverview(from: string, to: string): Promise<Inco
     if (row.source === "MOLLIE" && row.kind === "PAYMENT") molliePaymentMonths.add(month);
     if (row.source === "MOLLIE" && row.kind === "FEE") mollieFeeMonths.add(month);
   }
-  const counted = withAccount.filter((row) => !row.excluded && row.rule !== "OWN_ACCOUNT");
+  const counted = withAccount.filter((row) => !row.excluded);
   const today = brusselsYMD(new Date());
   const checks = computeIncomeChecks({
     months: monthsBetween(from, to),
@@ -786,7 +789,7 @@ export async function setPayoutCheck(
 /** De transacties achter één cel van het overzicht, voor de lijst. */
 export type TransactionFilter = {
   source: IncomeSourceCode | null;
-  state: "all" | "open" | "matched" | "excluded" | "own";
+  state: "all" | "open" | "matched" | "excluded";
   from: string | null;
   to: string | null;
   code: string | null;
@@ -801,12 +804,10 @@ export async function listIncomeTransactions(filter: TransactionFilter) {
     ...(filter.state === "open"
       ? { rule: null, excluded: false, kind: { in: ["PAYMENT" as const, "REFUND" as const] } }
       : filter.state === "matched"
-        ? { rule: { notIn: ["OWN_ACCOUNT" as const] }, excluded: false }
+        ? { rule: { not: null }, excluded: false }
         : filter.state === "excluded"
           ? { excluded: true }
-          : filter.state === "own"
-            ? { rule: "OWN_ACCOUNT" as const }
-            : {}),
+          : {}),
     ...(filter.from || filter.to
       ? {
           periodMonth: {
@@ -848,7 +849,7 @@ export async function listIncomeTransactions(filter: TransactionFilter) {
         accountingCodeName: true,
         rule: true,
         excluded: true,
-        channel: { select: { identifier: true, label: true, owner: { select: { nameNl: true } } } },
+        channel: { select: { identifier: true, label: true } },
         ticketPayment: { select: { order: { select: { eventId: true } } } },
         assignedBy: { select: { name: true } },
       },
@@ -898,7 +899,7 @@ export async function listIncomeChannels() {
       source: true,
       identifier: true,
       label: true,
-      ownerGroupId: true,
+      defaultAccountingCodeId: true,
       accounts: { orderBy: { from: "asc" }, select: { from: true, bankAccount: true } },
       _count: { select: { transactions: true } },
     },
@@ -936,7 +937,7 @@ function reasonOf(
     description: string | null;
     assignedAt: Date | null;
     assignedBy: { name: string } | null;
-    channel: { owner: { nameNl: string } | null } | null;
+    channel: { identifier: string; label: string | null } | null;
     ticketPayment: { order: { event: { titleNl: string } } } | null;
     membershipPaymentId: string | null;
     uitleenPaymentId: string | null;
@@ -961,8 +962,8 @@ function reasonOf(
       return nl ? "Code in de omschrijving of de referentie" : "Code in the description or reference";
     case "NAME_RULE":
       return `${nl ? "Onthouden tekst" : "Remembered text"} "${incomeRuleText(tx.description) ?? ""}"`;
-    case "OWN_ACCOUNT":
-      return `${nl ? "Eigen rekening van" : "Own account of"} ${tx.channel?.owner?.nameNl ?? "?"}`;
+    case "CHANNEL_DEFAULT":
+      return `${nl ? "Standaardcode van" : "Default code of"} ${tx.channel?.label || tx.channel?.identifier || "?"}`;
     default:
       return tx.uitleenPaymentId
         ? nl
@@ -999,7 +1000,7 @@ export async function loadIncomeWorkbookModel(from: string, to: string, nl: bool
         membershipPaymentId: true,
         uitleenPaymentId: true,
         assignedBy: { select: { name: true } },
-        channel: { select: { identifier: true, label: true, owner: { select: { nameNl: true } } } },
+        channel: { select: { identifier: true, label: true } },
         ticketPayment: { select: { order: { select: { event: { select: { titleNl: true } } } } } },
       },
     }),
@@ -1028,7 +1029,6 @@ export async function loadIncomeWorkbookModel(from: string, to: string, nl: bool
     accountingCode: row.accountingCode,
     accountingCodeName: row.accountingCodeName,
     excluded: row.excluded,
-    rule: row.rule,
     reason: reasonOf(row, nl),
   }));
 
@@ -1058,7 +1058,7 @@ export async function loadIncomeWorkbookModel(from: string, to: string, nl: bool
     group.cents += row.amountCents;
     if (row.occurredAt > group.lastAt) group.lastAt = row.occurredAt;
     const line = quarterLineKey(transactions[index]);
-    group.codeSet.add(line === null ? (row.rule === "OWN_ACCOUNT" ? (nl ? "eigen rekening" : "own account") : nl ? "telt niet mee" : "does not count") : line);
+    group.codeSet.add(line ?? (nl ? "telt niet mee" : "does not count"));
     group.reasonSet.add(transactions[index].reason);
   });
 

@@ -169,7 +169,7 @@ describe("koppelregels", () => {
     ]),
     codes,
     nameRules: new Map([[nameRuleKey("MOLLIE", "vtk uitleendienst"), { code: "700000", name: "Cursusdienst" }]]),
-    ownAccountChannels: new Map([["kanaal-theokot", "Theokot"]]),
+    channelCodes: new Map([["kanaal-post", { code: "700110", name: "Cultuur" }]]),
   };
   const base = {
     source: "MOLLIE" as const,
@@ -202,17 +202,23 @@ describe("koppelregels", () => {
     expect(result).toMatchObject({ rule: "NAME_RULE", code: { code: "700000" }, uitleenPaymentId: "up1" });
   });
 
-  it("laat een kanaal op de eigen rekening van een post niet meetellen", () => {
-    const result = matchTransaction({ ...base, source: "PAYCONIQ", channelId: "kanaal-theokot", description: "broodje" }, context);
-    expect(result).toMatchObject({ rule: "OWN_ACCOUNT", code: null });
+  it("geeft wat geen andere regel koppelt de standaardcode van het kanaal", () => {
+    const result = matchTransaction({ ...base, source: "PAYCONIQ", channelId: "kanaal-post", description: "broodje" }, context);
+    expect(result).toMatchObject({ rule: "CHANNEL_DEFAULT", code: { code: "700110" } });
+    const refund = matchTransaction({ ...base, source: "PAYCONIQ", kind: "REFUND", channelId: "kanaal-post" }, context);
+    expect(refund).toMatchObject({ rule: "CHANNEL_DEFAULT", code: { code: "700110" } });
   });
 
-  it("laat een exacte koppeling voorgaan op de eigen rekening", () => {
-    const result = matchTransaction(
-      { ...base, source: "PAYCONIQ", channelId: "kanaal-theokot", reference: "700100 10001" },
-      context,
-    );
-    expect(result.rule).toBe("CODE_IN_TEXT");
+  it("laat een exacte koppeling en een onthouden tekst voorgaan op de standaardcode", () => {
+    const inText = matchTransaction({ ...base, source: "PAYCONIQ", channelId: "kanaal-post", reference: "700100 10001" }, context);
+    expect(inText.rule).toBe("CODE_IN_TEXT");
+    const remembered = matchTransaction({ ...base, channelId: "kanaal-post", description: "VTK uitleendienst - 3F9A21BC" }, context);
+    expect(remembered).toMatchObject({ rule: "NAME_RULE", code: { code: "700000" } });
+  });
+
+  it("laat een kanaal zonder standaardcode na te kijken", () => {
+    const result = matchTransaction({ ...base, source: "PAYCONIQ", channelId: "kanaal-zonder-code", description: "broodje" }, context);
+    expect(result).toMatchObject({ rule: null, code: null });
   });
 
   it("laat de rest na te kijken, en koppelt geen kosten", () => {
@@ -235,7 +241,6 @@ describe("overzicht", () => {
     accountingCode: null,
     accountingCodeName: null,
     excluded: false,
-    rule: null,
     amountCents: 0,
     bankAccount: "…6140",
     ...partial,
@@ -274,17 +279,19 @@ describe("overzicht", () => {
     expect(overview.totals.total).toBe(350);
   });
 
-  it("telt een transactie op de eigen rekening van een post niet mee", () => {
+  it("telt ook mee wat op de rekening van een post binnenkomt, met een totaal per rekening", () => {
     const overview = computeIncomeOverview(
       [
         tx({ accountingCode: "700100", accountingCodeName: "Activiteiten", amountCents: 500, source: "PAYCONIQ" }),
-        tx({ rule: "OWN_ACCOUNT", amountCents: 250, source: "PAYCONIQ", bankAccount: "…9348" }),
+        tx({ accountingCode: "700110", accountingCodeName: "Cultuur", amountCents: 250, source: "PAYCONIQ", bankAccount: "…9348" }),
       ],
       new Map(),
     );
-    expect(overview.totals.total).toBe(500);
-    expect(overview.ownAccount.total).toBe(250);
-    expect(overview.accounts.map((account) => account.bankAccount)).toEqual(["…6140"]);
+    expect(overview.totals.total).toBe(750);
+    expect(overview.accounts).toEqual([
+      { bankAccount: "…6140", total: 500 },
+      { bankAccount: "…9348", total: 250 },
+    ]);
   });
 
   it("kiest de rekening die op die dag gold", () => {

@@ -6,9 +6,9 @@ boekhouder. De kringkeuzes staan in `docs/design-decisions.md` ("Online
 inkomsten"); dit is de technische referentie.
 
 Fase 1 en 1b zijn gebouwd: Payconiq en Mollie opladen, koppelen, Na te kijken,
-het overzicht per periode, de eigen rekening van een post per kanaal, de
-controlelijst met de Mollie-uitbetalingen om af te vinken, het kwartaalblad voor
-de boekhouder en het controlebestand als xlsx, en afsluiten. De boekhoudcodes
+het overzicht per periode, een standaardcode per kanaal, de controlelijst met
+de Mollie-uitbetalingen om af te vinken, het kwartaalblad voor de boekhouder en
+het controlebestand als xlsx, en afsluiten. De boekhoudcodes
 kunnen als CSV opgeladen worden in `/admin/boekhoudcodes`. De koppeling met de
 kassa's (fase 2) en SumUp en Europabank (fase 3) nog niet.
 
@@ -28,8 +28,8 @@ kassa's (fase 2) en SumUp en Europabank (fase 3) nog niet.
 | `lib/csv.ts` | De CSV-lezer die beide gebruiken: scheidingsteken raden, aanhalingstekens volgens RFC 4180. |
 | `test/inkomsten.test.ts`, `test/inkomstenWorkbook.test.ts`, `test/accountingCodesImport.test.ts` | Parsers, koppelregels, overzicht, controlelijst, de xlsx en de codelijst, zonder database, met verzonnen gegevens. |
 
-Tabellen: `IncomeImport`, `IncomeChannel` (met de eigenaar, `ownerGroupId`),
-`IncomeChannelAccount`, `IncomeTransaction`, `IncomeNameRule`, `IncomePeriod`,
+Tabellen: `IncomeImport`, `IncomeChannel` (met de standaardcode,
+`defaultAccountingCodeId`), `IncomeChannelAccount`, `IncomeTransaction`, `IncomeNameRule`, `IncomePeriod`,
 `IncomePayoutCheck`. Instelling: `Setting` `income.config` (de kostencode).
 
 ## Wat de site leest
@@ -79,19 +79,21 @@ In `matchTransaction`, de eerste die past wint. Enkel voor `PAYMENT` en `REFUND`
 5. **Onthouden tekst** (`NAME_RULE`): `incomeRuleText` van de omschrijving
    (kleine letters, zonder ordernummer, zonder e-mailadres) staat in
    `IncomeNameRule` voor die bron.
-6. **Eigen rekening** (`OWN_ACCOUNT`): het kanaal heeft in de instellingen een
-   post als eigenaar (`IncomeChannel.ownerGroupId`), zoals de QR-code van
-   Theokot. Zulke transacties krijgen geen code en tellen niet mee; het
-   overzicht noemt hoeveel het er zijn.
+6. **Standaardcode van het kanaal** (`CHANNEL_DEFAULT`): het kanaal heeft in de
+   instellingen een standaardcode (`IncomeChannel.defaultAccountingCodeId`),
+   zoals de QR-code van Theokot onder de code van Theokot. Zo'n transactie
+   telt mee zoals elke andere, ook wanneer het kanaal op de eigen rekening van
+   een post stort.
 7. **Anders**: `rule` blijft `NULL`, en de transactie staat bij Na te kijken.
 
 Regel 4 (de kassa's) komt in fase 2. Ze staat vóór regel 6, zodat een
-activiteit van een andere post op de QR-code van Theokot dan toch meetelt.
+activiteit van een andere post op de QR-code van Theokot dan haar eigen code
+krijgt in plaats van die van Theokot.
 
 Na een onthouden tekst, een vergeten tekst, een gewiste toewijzing of een
-gewijzigde eigenaar loopt `rematchOpenTransactions` opnieuw over alles wat niet
-met de hand gezet is, buiten de afgesloten periodes. Dat kan ook met de knop
-"Opnieuw koppelen", na een nieuwe code in het register.
+gewijzigde standaardcode loopt `rematchOpenTransactions` opnieuw over alles wat
+niet met de hand gezet is, buiten de afgesloten periodes. Dat kan ook met de
+knop "Opnieuw koppelen", na een nieuwe code in het register.
 
 ## Na te kijken
 
@@ -107,8 +109,10 @@ Gegroepeerd zodat één keuze veel transacties dekt (`groupKeyOf`):
 
 Een kanaal (`IncomeChannel`) ontstaat bij de eerste import die het noemt. Beheer
 vult in de instellingen in op welke rekening het stort, vanaf welke dag
-(`IncomeChannelAccount`). De rekening van een transactie is die van de laatste
-wissel op of voor haar Brusselse dag (`accountOn`). Niets daarvan staat in de
+(`IncomeChannelAccount`), en eventueel een standaardcode (enkel bij Payconiq:
+Mollie is één kanaal voor alles). De rekening van een transactie is die van de
+laatste wissel op of voor haar Brusselse dag (`accountOn`); ze bepaalt de kolom
+in het kwartaalblad, niet of de transactie meetelt. Niets daarvan staat in de
 code of in een seed.
 
 ## Het kwartaalblad en het controlebestand
@@ -196,10 +200,9 @@ fouten), dan opladen.
 - **Tijd in Excel.** Een xlsx kent geen tijdzone. `wallClock` zet een tijdstip
   om naar de Brusselse muurtijd, anders staat een betaling van 00:18 op de dag
   ervoor.
-- **De eigenaar van een kanaal heeft (nog) geen datum.** Hij geldt voor elke
-  transactie van dat kanaal buiten de afgesloten periodes, ook voor die van voor
-  de dag waarop de QR-code naar de eigen rekening van de post wisselde. Staat er
-  van voor die wissel nog iets in een open periode, dan valt dat ten onrechte
-  weg.
+- **De standaardcode heeft geen datum.** Ze geldt voor elke transactie van het
+  kanaal buiten de afgesloten periodes, ook voor die van voor ze gekozen werd.
+  Geef ze dus enkel aan een QR-code die altijd voor dezelfde post dient, niet
+  aan een sticker die van evenement tot evenement doorgaat.
 - **Niets over VTK in de code**, ook niet in een hint of een standaard: de
-  kostencode, de rekeningen en de eigenaar van een QR-code vult Beheer in.
+  kostencode, de rekeningen en de standaardcode van een QR-code vult Beheer in.

@@ -27,7 +27,6 @@ const tx = (partial: Partial<WorkbookTransaction>): WorkbookTransaction => ({
   accountingCode: null,
   accountingCodeName: null,
   excluded: false,
-  rule: null,
   reason: "",
   ...partial,
 });
@@ -59,7 +58,6 @@ const sample = model([
   tx({ kind: "RESERVE", amountCents: -250, source: "MOLLIE", channel: "Mollie" }),
   tx({ amountCents: 750 }),
   tx({ amountCents: 999, excluded: true }),
-  tx({ amountCents: 400, rule: "OWN_ACCOUNT", bankAccount: "BE00 0000 0000 9348" }),
 ]);
 
 const text = (cell: unknown) => (cell && typeof cell === "object" ? (cell as CellObject).value : cell);
@@ -70,7 +68,6 @@ describe("het kwartaalblad", () => {
     expect(quarterLineKey(tx({ kind: "FEE" }))).toBe("Kosten");
     expect(quarterLineKey(tx({}))).toBe("Na te kijken");
     expect(quarterLineKey(tx({ excluded: true }))).toBeNull();
-    expect(quarterLineKey(tx({ rule: "OWN_ACCOUNT" }))).toBeNull();
   });
 
   it("zet de kolommen per bron en per rekening, Mollie eerst, en een totaalblok per rekening", () => {

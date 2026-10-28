@@ -12079,8 +12079,9 @@ de boekhouder, het controlebestand, de controlelijst en de boekhoudcodes als CSV
   regel, ook zoals in het rekenblad. Op het vierde kwartaal van 2025 komt de
   site tot op de cent uit op het kwartaalblad.
 - **Alles over VTK zelf is data, niets staat in de code.** Welke stickers er
-  zijn, op welke rekening ze storten en vanaf wanneer, welke code de kosten
-  krijgen, welke teksten onder welke code horen en welke periode afgesloten is:
+  zijn, op welke rekening ze storten en vanaf wanneer, onder welke code een
+  sticker standaard valt, welke code de kosten krijgen, welke teksten onder
+  welke code horen en welke periode afgesloten is:
   dat vult Beheer in de site in. In de code staat enkel kennis over de
   bestanden (kolommen, statussen, "Withheld fees"). Het rekenblad toonde
   waarom: in één jaar wisselden de Theokot-sticker en de stickers van
@@ -12136,16 +12137,22 @@ de boekhouder, het controlebestand, de controlelijst en de boekhoudcodes als CSV
   via Mollie binnenkwam); de bevestiging noemt ze wel. Een afgevinkte
   uitbetaling onthoudt haar bedrag: komt er later een regel bij, dan staat ze
   terug open.
-- **Wat op de eigen rekening van een post binnenkomt, telt niet mee.** Het hangt
-  af van de rekening, niet van de post. Sinds eind november 2025 stort de
-  QR-code van Theokot op de rekening van Theokot, en het rekenblad telt die
-  betalingen nergens meer; daarvoor kwamen ze op de gedeelde rekening en telden
-  ze mee onder de code van Theokot. De QR-code van Fakbar stort nog op de
-  gedeelde rekening en telt mee, onder de code van Fakbar. Beheer zet in de
-  instellingen een post als eigenaar van een QR-code die op haar eigen rekening
-  stort, en vanaf dan staan die betalingen niet meer elke dag bij Na te kijken.
-  In fase 2 gaat een kassa van een andere post op die QR-code voor, zoals de
-  opmerking in het rekenblad het wilde.
+- **Alles telt mee, ook wat op de eigen rekening van een post binnenkomt.** Het
+  rekenblad van 2025-2026 liet de dagelijkse werking van Theokot weg zodra haar
+  QR-code eind november 2025 naar de rekening van Theokot verhuisde. In haar
+  eigen poging van augustus en september 2026 telde Beheer de QR-codes en de
+  SumUp van Theokot en Fakbar wel mee, elk onder de code van de post. De site
+  volgt die laatste: een QR-code die altijd voor dezelfde post dient, krijgt in
+  de instellingen een standaardcode, en wat erop binnenkomt en geen andere regel
+  koppelt, telt onder die code. De rekening bepaalt enkel de kolom in het
+  kwartaalblad, dus het maakt niet meer uit wanneer een QR-code van rekening
+  wisselde. Een eerste versie liet zo'n kanaal als "eigen rekening" wegvallen.
+  Beheer bevestigde in oktober 2026 dat ook die inkomsten in het kwartaalblad
+  horen, al staan ze op een eigen rekening, en dat een toestel van een post
+  (zoals haar SumUp) normaal nooit voor iets anders dient: de standaardcode
+  dekt dus het gewone gebruik. In fase 2 gaat een kassa van een andere post op
+  die QR-code voor op de standaardcode, zoals de opmerking in het rekenblad het
+  wilde.
 - **Boekhoudcodes opladen voegt toe, het verwijdert nooit.** De penning houdt de
   lijst in een rekenblad bij, dus opladen voegt toe en hernoemt. Een code die
   niet meer in het bestand staat, blijft, want ticketverkopen en bestellingen

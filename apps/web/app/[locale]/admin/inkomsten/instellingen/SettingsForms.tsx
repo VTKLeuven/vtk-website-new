@@ -1,9 +1,9 @@
 "use client";
 
+import { useId } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@vtk/ui";
 import { AccountingCodePicker } from "@/components/admin/AccountingCodePicker";
-import { SearchPicker, type SearchPickerOption } from "@/components/admin/SearchPicker";
 import { SaveForm } from "@/components/ui/SaveForm";
 import type { AccountingCodeOption } from "@/lib/accounting/codes";
 import type { SaveAction } from "@/lib/saveState";
@@ -81,25 +81,25 @@ export function ChannelLabelForm({ locale, action, errorMessages, channelId, lab
 }
 
 /**
- * Op wiens eigen rekening dit kanaal stort. Een gekozen post maakt dat alles
- * wat erop binnenkomt niet meetelt; leeg is een gedeeld kanaal.
+ * De standaardcode van een kanaal: wat erop binnenkomt en geen andere regel
+ * koppelt, krijgt die code. Geen code laat zo'n betaling bij Na te kijken.
  */
-export function ChannelOwnerForm({
+export function ChannelCodeForm({
   locale,
   action,
   errorMessages,
   channelId,
-  ownerGroupId,
-  posts,
-}: Common & { channelId: string; ownerGroupId: string | null; posts: SearchPickerOption[] }) {
+  codes,
+  value,
+}: Common & { channelId: string; codes: AccountingCodeOption[]; value: string | null }) {
   const nl = locale === "nl";
   const router = useRouter();
   const t = texts(nl);
-  const options: SearchPickerOption[] = [{ value: "", label: nl ? "Niemand: gedeeld kanaal" : "Nobody: shared channel" }, ...posts];
+  const pickerId = useId();
   return (
     <SaveForm
       action={action}
-      submitLabel={nl ? "Opslaan" : "Save"}
+      submitLabel={nl ? "Code opslaan" : "Save code"}
       submitVariant="ghost"
       submitSize="sm"
       savingLabel={t.saving}
@@ -111,19 +111,18 @@ export function ChannelOwnerForm({
       className="flex flex-wrap items-end gap-2"
     >
       <input type="hidden" name="id" value={channelId} />
-      <div className="text-sm">
-        <span className="block text-xs text-vtk-muted">{nl ? "Stort op de eigen rekening van" : "Pays into the own account of"}</span>
-        <div className="w-64">
-          <SearchPicker
-            options={options}
-            name="ownerGroupId"
-            defaultValue={ownerGroupId ?? ""}
-            placeholder={nl ? "Niemand: gedeeld kanaal" : "Nobody: shared channel"}
-            searchPlaceholder={nl ? "Zoek een post" : "Search a post"}
-            ariaLabel={nl ? "Stort op de eigen rekening van" : "Pays into the own account of"}
-            emptyText={(query) => (nl ? `Geen post met "${query}"` : `No post matching "${query}"`)}
-          />
-        </div>
+      <div className="w-full max-w-md text-sm">
+        <label htmlFor={pickerId} className="block text-xs text-vtk-muted">
+          {nl ? "Standaardcode" : "Default code"}
+        </label>
+        <AccountingCodePicker
+          id={pickerId}
+          codes={codes}
+          name="defaultAccountingCodeId"
+          defaultValue={value}
+          locale={locale}
+          noneLabel={nl ? "Geen: naar Na te kijken" : "None: to To review"}
+        />
       </div>
     </SaveForm>
   );

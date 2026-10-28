@@ -97,8 +97,8 @@ export function UploadForm({
             <Stat label={nl ? "Betaling van de site" : "Payment from the site"} value={number(summary.rules.WEBSITE)} />
             <Stat label={nl ? "Code in de tekst" : "Code in the text"} value={number(summary.rules.CODE_IN_TEXT)} />
             <Stat label={nl ? "Onthouden tekst" : "Remembered text"} value={number(summary.rules.NAME_RULE)} />
-            {summary.rules.OWN_ACCOUNT ? (
-              <Stat label={nl ? "Eigen rekening van een post" : "A post's own account"} value={number(summary.rules.OWN_ACCOUNT)} />
+            {summary.rules.CHANNEL_DEFAULT ? (
+              <Stat label={nl ? "Standaardcode van het kanaal" : "Default code of the channel"} value={number(summary.rules.CHANNEL_DEFAULT)} />
             ) : null}
             <Stat label={nl ? "Na te kijken" : "To review"} value={number(summary.rules.OPEN)} />
             {summary.feeRows ? <Stat label={nl ? "Kosten en reserve" : "Fees and reserve"} value={number(summary.feeRows)} /> : null}
