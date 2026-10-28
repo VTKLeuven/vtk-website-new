@@ -12061,3 +12061,94 @@ elke ronde met het vertrekuur.
   ploeg en de plaatsen van anderen, maar staan niet meer op dat r-nummer. Laadt
   Sport daarna dezelfde export opnieuw op, dan staan ze er wel weer onder; dat is
   de prijs van geen namen bijhouden.
+
+## Online inkomsten (de opvolger van het rekenblad "Oriëntatie Online Inkomsten")
+
+Beheer maakte elk kwartaal met de hand een rekenblad voor de boekhouder: wat er
+via Payconiq en Mollie binnenkwam, onder welke code en op welke rekening. Dat
+staat nu op `/admin/inkomsten` (`lib/inkomsten`, technisch in
+`docs/inkomsten.md`).
+Fase 1 (oktober 2026): Payconiq en Mollie. Fase 1b (oktober 2026): het blad voor
+de boekhouder, het controlebestand, de controlelijst en de boekhoudcodes als CSV.
+
+- **Rekenen zoals het rekenblad.** Mollie telt in de maand van de uitbetaling
+  (de maand in de uitbetalingsreferentie), de rest in de maand van de betaling.
+  Zo rekende Beheer al, en zo is het Mollie-totaal van een periode wat er in die
+  periode op de bank kwam. Kosten en reserve staan als eigen rij. Een betaling
+  met status "refunded" telt voor haar volle bedrag en de terugbetaling als eigen
+  regel, ook zoals in het rekenblad. Op het vierde kwartaal van 2025 komt de
+  site tot op de cent uit op het kwartaalblad.
+- **Alles over VTK zelf is data, niets staat in de code.** Welke stickers er
+  zijn, op welke rekening ze storten en vanaf wanneer, welke code de kosten
+  krijgen, welke teksten onder welke code horen en welke periode afgesloten is:
+  dat vult Beheer in de site in. In de code staat enkel kennis over de
+  bestanden (kolommen, statussen, "Withheld fees"). Het rekenblad toonde
+  waarom: in één jaar wisselden de Theokot-sticker en de stickers van
+  evenementen van rekening. Een kanaal verschijnt vanzelf bij de eerste export
+  die het noemt; er is niets vooraf ingevuld.
+- **Geen kostencode als standaard.** Het rekenblad gebruikte 657000, maar die
+  code staat niet in het register (dat bevat enkel opbrengsten). Een vaste code
+  in de code zou wijzen naar iets wat de site niet kent; Beheer voegt ze toe en
+  kiest ze. Tot dan staat de kostenregel als "nog geen code gekozen". Ook de
+  uitleg bij die instelling noemt geen code.
+- **Exact koppelen gaat voor afleiden.** Een betaling via de site koppelt op
+  haar betaal-ID aan de bestelling en haar code, en een terugbetaling via de
+  terugbetaling op de site. Een code vooraan in de omschrijving telt daarna, dan
+  een onthouden tekst. Wat overblijft, staat bij Na te kijken.
+- **Na te kijken groepeert op wat zinvol is.** Een vaste tekst (Mollie,
+  printkrediet) per tekst, en die kan onthouden worden; wat iemand bij een
+  sticker typt ("pintje") per sticker per dag, en dat kan niet onthouden worden.
+  Onthouden staat standaard uit, zoals bij het BO.
+- **Periodes zijn een reeks maanden, het boekjaar ligt niet vast.** Het
+  rekenblad had augustus en september als derde kwartaal en juli apart; de site
+  biedt de kalenderkwartalen als snelkeuze, en elke andere reeks kiest Beheer.
+- **Afgesloten is afgesloten**, zoals bij de rekeningen: een import voegt er
+  niets aan toe, toewijzen kan er niet meer, en een export met transacties erin
+  kan niet weg. Heropenen kan, met een bevestiging die zegt dat de boekhouder dan
+  een nieuwe versie nodig heeft.
+- **Elke admin ziet het** (IT en Groep 5), met een gewoon recht
+  `income.manage` in de rol admin, zoals de rekeningen en de kassa's. Een eigen
+  rol enkel voor Groep 5, zoals het BO, werd overwogen en niet gekozen.
+- **Geen persoonsgegevens.** De import neemt naam en rekeningnummer van de
+  betaler niet over, haalt e-mailadressen uit omschrijvingen en bewaart het
+  bestand niet. Daardoor hoort deze tabel niet bij de gegevensexport of de
+  accountwissing.
+- **Het balansrapport van Mollie niet (nog).** Daarin staat bij een betaling
+  niet in welke uitbetaling ze zit, en dan kan de site niet per uitbetaling
+  rekenen. De site weigert het met die uitleg; de betalingenexport volstaat.
+- **De boekhouder krijgt het kwartaalblad, met zijn kleuren.** Hij wil het zoals
+  de Excel: kolommen per bron en per rekening, het totaalblok per rekening, de
+  kleuren en de euronotatie van het tabblad "4e Kwartaal". Dezelfde redenering
+  als bij de rekeningen, waar het blad van billsheet bewust behouden bleef. Het
+  is een xlsx, geen CSV, zodat Beheer er niets meer aan moet opmaken.
+- **Elke stap blijft controleerbaar, zoals in het rekenblad.** Dat was te
+  controleren omdat elke laag zichtbaar was: de export, het overzicht per
+  kanaal, het kwartaalblad met formules. Het controlebestand geeft die lagen
+  terug (de transacties met waarom ze hun code kregen, de groepen, de
+  uitbetalingen, wat niet meetelt) en rekent het kwartaalblad met formules op
+  de transacties, zodat een klik op een cel toont wat ze optelt. Het bevat wat
+  betalers typten en blijft dus bij Beheer.
+- **Een controlelijst, geen slot.** Voor het afsluiten zegt het overzicht per
+  stap of hij in orde is: een vergeten maand, ontbrekende Mollie-kosten, een
+  uitbetaling die niet afgevinkt is tegen het uittreksel, iets na te kijken, een
+  kanaal zonder rekening, geen kostencode. Afsluiten kan met open stappen, want
+  Beheer weet soms waarom een stap open staat (een maand waarin er echt niets
+  via Mollie binnenkwam); de bevestiging noemt ze wel. Een afgevinkte
+  uitbetaling onthoudt haar bedrag: komt er later een regel bij, dan staat ze
+  terug open.
+- **Wat op de eigen rekening van een post binnenkomt, telt niet mee.** Het hangt
+  af van de rekening, niet van de post. Sinds eind november 2025 stort de
+  QR-code van Theokot op de rekening van Theokot, en het rekenblad telt die
+  betalingen nergens meer; daarvoor kwamen ze op de gedeelde rekening en telden
+  ze mee onder de code van Theokot. De QR-code van Fakbar stort nog op de
+  gedeelde rekening en telt mee, onder de code van Fakbar. Beheer zet in de
+  instellingen een post als eigenaar van een QR-code die op haar eigen rekening
+  stort, en vanaf dan staan die betalingen niet meer elke dag bij Na te kijken.
+  In fase 2 gaat een kassa van een andere post op die QR-code voor, zoals de
+  opmerking in het rekenblad het wilde.
+- **Boekhoudcodes opladen voegt toe, het verwijdert nooit.** De penning houdt de
+  lijst in een rekenblad bij, dus opladen voegt toe en hernoemt. Een code die
+  niet meer in het bestand staat, blijft, want ticketverkopen en bestellingen
+  hangen eraan; de voorvertoning toont ze en verwijderen blijft een aparte,
+  bevestigde stap. Enkel een volledige lijst bepaalt de volgorde: met een
+  bestand van twee nieuwe codes zou de rest anders door elkaar geschud worden.

@@ -499,6 +499,15 @@ const icons: Record<string, ReactNode> = {
       <path d="M11 16h3" />
     </Svg>
   ),
+  // income: een munt die in een lade valt, met een pijl naar beneden
+  income: (
+    <Svg>
+      <circle cx="12" cy="7" r="4" />
+      <path d="M12 5.5v3" />
+      <path d="M3 14h4l2 3h6l2-3h4" />
+      <path d="M3 14v5a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-5" />
+    </Svg>
+  ),
   // beheer: een portefeuille (rekeningen, kassa's, boekhoudcodes, het BO)
   beheer: (
     <Svg>

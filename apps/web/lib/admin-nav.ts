@@ -115,6 +115,9 @@ export function getAdminNav(): NavEntry[] {
       // Het werk van de penning. De codes zelf kiest wie een ticketverkoop
       // maakt, in het eventformulier; hier wordt enkel de lijst beheerd.
       item('accountingCodes', '/boekhoudcodes', { perm: 'accounting.manage' }),
+      // Wat er via Payconiq en Mollie binnenkwam, per boekhoudcode: de opvolger
+      // van het rekenblad "Oriëntatie Online Inkomsten".
+      item('income', '/inkomsten', { perm: 'income.manage' }),
       // De budgetten en resultaten die langs het Bestuursorgaan passeerden.
       // Enkel Groep 5 (de rol admin draagt dit recht niet).
       item('bestuursorgaan', '/bestuursorgaan', { perm: 'bestuursorgaan.manage' }),

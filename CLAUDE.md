@@ -150,6 +150,25 @@ nieuwsbrieven naar studenten; dit zijn de ontvangende adressen van de kring
 zelf, met de posten van het werkingsjaar als bron. Geen gedeelde regels, enkel
 een gedeeld sync-stramien.
 
+# Online inkomsten
+
+`docs/inkomsten.md` is de referentie voor `/admin/inkomsten`: de exports van
+Payconiq en Mollie opladen en per boekhoudcode tonen, de opvolger van het
+rekenblad "Oriëntatie Online Inkomsten" van Beheer. Lees zeker de sectie
+"Vallen"; de kringkeuzes staan in `docs/design-decisions.md`.
+
+- **Niets over VTK zelf in de code.** Stickers, rekeningen, de kostencode en
+  onthouden teksten vult Beheer in de site in; in `lib/inkomsten` staat enkel
+  kennis over de bestanden. Zet er geen terminalnummer, rekeningnummer of code
+  in, ook niet als standaard, in een seed of in een hint bij een veld.
+- **Rekenen zoals het rekenblad**: Mollie op de maand van de uitbetaling, de
+  rest op de maand van de betaling, elk uur op de Brusselse klok. Een wijziging
+  daaraan toets je opnieuw aan een kwartaal van Beheer.
+- **Het blad voor de boekhouder en het controlebestand delen één sleutel**
+  (`quarterLineKey` in `lib/inkomsten/workbook.ts`). Verander je in welke regel
+  een transactie valt, doe het daar; anders tellen de formules van het
+  controlebestand iets anders op dan het blad dat naar de boekhouder gaat.
+
 # Bestuursorgaan
 
 `docs/bestuursorgaan.md` is de referentie voor `/admin/bestuursorgaan`: welke
