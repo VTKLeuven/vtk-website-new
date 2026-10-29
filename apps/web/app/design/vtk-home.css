@@ -42,7 +42,8 @@
    wanneer een band op paper volgt. De navy openingsuren tellen hier ook als
    band: sinds de evenementen boven "Wat we doen" staan, volgen die er direct op. */
 .vtk-design .band + .band,
-.vtk-design .hours-strip + .band {
+.vtk-design .hours-strip + .band,
+.vtk-design .vtk-blueprint-hero + .band {
   margin-top: 0;
 }
 

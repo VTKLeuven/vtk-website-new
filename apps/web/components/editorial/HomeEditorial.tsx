@@ -50,7 +50,9 @@ import {
 } from "@/lib/openingHoursSettings";
 import { buildHoursBand, weekFromEntries, weekFromOpeningTimes } from "@/lib/openingHoursWeek";
 import { OpeningHoursBand } from "./OpeningHoursBand";
+import { BlueprintHero } from "./BlueprintHero";
 
+import "@/app/design/vtk-hero.css";
 import "@/app/design/vtk-home.css";
 import "@/app/design/vtk-eventcard.css";
 import { HOME_LINK_EVENT, OUTBOUND_EVENT, umamiEvent } from "@/lib/analytics";
@@ -423,25 +425,14 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
 
   return (
     <div className="vtk-design">
-      {/* Boven de openingsuren: een lichtblauwe band, die helemaal wegvalt
+      {/* Hero: de technische bouwtekening van het logo met zes wegwijzers */}
+      <BlueprintHero locale={locale} />
+
+      {/* Onder de hero: het nieuws in een lichtblauwe band, die helemaal wegvalt
           zonder berichten of wanneer ze uitstaat in /admin/nieuws. Zie lib/news. */}
       {news.enabled ? (
         <NewsBand entries={newsEntries} locale={locale} base={base} now={now} />
       ) : null}
-
-      <OpeningHoursBand
-        band={hoursBand}
-        meta={now.toLocaleString(dateTag, {
-          timeZone: "Europe/Brussels",
-          weekday: "short",
-          day: "2-digit",
-          month: "short",
-          hour: "2-digit",
-          minute: "2-digit",
-        })}
-        locale={locale}
-        base={base}
-      />
 
       {eventCards.length > 0 && (
         <section className="section band events-band">
@@ -600,6 +591,20 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           </div>
         </section>
       )}
+
+      <OpeningHoursBand
+        band={hoursBand}
+        meta={now.toLocaleString(dateTag, {
+          timeZone: "Europe/Brussels",
+          weekday: "short",
+          day: "2-digit",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        })}
+        locale={locale}
+        base={base}
+      />
 
       <PocBand
         locale={locale}

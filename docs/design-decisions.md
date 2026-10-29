@@ -3158,21 +3158,23 @@ haar een gezicht; dit gaat over de tekst zelf.
 
 De homepage is opgebouwd uit volle-breedte banden die bewust van kleur
 afwisselen (zie ook de styling-sectie in `CLAUDE.md`). De volgorde van de
-onderste helft is een ontwerpkeuze, geen toeval:
+homepage is een ontwerpkeuze, geen toeval:
 
-- **Openingsuren** (navy) → **Aankomende evenementen** (lichtblauw) → **POC's**
-  (navy, wanneer ze getoond wordt) → **Shiften** (lichtblauw, wanneer aan en er
+- **Hero** (navy + technisch patroon + gele onderlijn) → **Nieuws** (lichtblauw, `--paper-2`) →
+  **Aankomende evenementen** (lichtblauw, `--paper-2`) → **Openingsuren** (navy) →
+  **POC's** (navy, wanneer getoond) → **Shiften** (lichtblauw, wanneer aan en er
   shiften zijn) → **Aftermovies** (navy + technisch patroon) → **Wat we doen**
   (paper) → **VTK Career** (navy) → **Hoofdpartners** (paper).
+- **Waarom de evenementen direct onder het nieuws?** Sinds eind oktober 2026:
+  evenementen en nieuws staan bovenaan omdat wat er nu en deze week speelt de
+  belangrijkste reden is om de site te bezoeken. Tussen nieuws en evenementen zorgt
+  de bovenmarge van `.events-band` voor een rustig paper-gat tussen de twee
+  `--paper-2`-banden. Zonder nieuws raakt de navy hero de evenementen direct met een
+  strakke naad (`.vtk-blueprint-hero + .band { margin-top: 0 }`).
 - **Waarom de shiften vóór "Wat we doen"?** Sinds oktober 2026 op vraag van de
-  kring, om dezelfde reden als de evenementen hieronder: de open shiften van
-  deze week vragen iets van wie kijkt, en dat mag niet onder het vaste aanbod
-  verdwijnen. "Wat we doen" en de shiften zijn daarvoor van plaats gewisseld.
-- **Waarom de evenementen vóór "Wat we doen"?** Sinds september 2026 op vraag
-  van de kring: wat er deze week te doen is, is voor wie de homepage opent
-  dringender dan het vaste aanbod, dat het hele jaar hetzelfde blijft. De
-  evenementen volgen daardoor direct op de navy openingsuren, met een strakke
-  naad (`.hours-strip + .band`) in plaats van een paper-gat ertussen.
+  kring, om dezelfde reden als de evenementen: de open shiften van deze week
+  vragen iets van wie kijkt, en dat mag niet onder het vaste aanbod verdwijnen.
+  "Wat we doen" en de shiften zijn daarvoor van plaats gewisseld.
 - **Wat er gebeurt als de POC's of de shiften wegvallen.** Beide kunnen
   wegvallen: de POC's verborgen in /admin/pocs of zonder vertegenwoordigers
   voor wie kijkt, de shiften wanneer er deze week geen zijn. Zonder POC's raken
@@ -3182,6 +3184,35 @@ onderste helft is een ontwerpkeuze, geen toeval:
   naad en lezen als één lang vlak, dus krijgen enkel die paren het paper-gat
   terug (de regel onder `.band + .band` in `vtk-home.css`). Elke andere
   combinatie houdt de strakke naad.
+
+### Hero: de bouwtekening (G1 Wegwijzer)
+
+- **Waarom een technische bouwtekening en geen foto of slogan:** De oude hero
+  met een foto van het Arenbergkasteel, slogans en marketingteksten voelde
+  generiek en vroeg constant redactioneel onderhoud. De technische bouwtekening
+  van het VTK-logo in de huisstijltaal (`technisch-pattern.svg`) ademt
+  ingenieurskunde, is tijdloos, en dient als actieve wegwijzer naar zes
+  belangrijke bestemmingen op de site (Kalender, Tickets, Broodjes links;
+  Cursusdienst, Shiften, Career rechts).
+- **Waarom links naar bestemmingen en niet naar live statussen:** Live statussen
+  (openingsuren van Theokot/Cudi/Elixir, open shiften, ticketverkoop) hebben
+  allemaal al hun eigen volwaardige banden direct onder de hero. De hero fungeert
+  als een rustige, centrale inhoudsopgave en introductie.
+- **Wat afgewezen is:** De fotokop, slogans, "De thuis voor ingenieurs in
+  Leuven", knoppen "Ontdek wat we doen" en "Eerstejaars? Start hier", de weekagenda
+  naast de tekst, open shiften in de hero, de aftelklok, gele accenten en
+  icoontjes in de labels, statuslabels rond de tekening.
+- **Animatie zonder client-JS:** Pure CSS-animaties met keyframes binnen
+  `@media (prefers-reduced-motion: no-preference)`. De omtrek tekent zich met
+  `stroke-dashoffset` vanuit de top van de K (`pathLength="1"`), de arcering veegt
+  erachter binnen via een `clip-path` wipe, knooppunten en maatlijn faden in,
+  de leiders tekenen zich en de labels komen omhoog met een subtiele translateY.
+  Zonder bewegingsvoorkeur staat het beeld meteen volledig stil.
+- **Mobiel (onder 760px):** De leiders en zwevende labels vallen weg. De
+  tekening blijft compact bovenaan staan en daaronder verschijnt een strakke lijst
+  van de zes bestemmingen met subtiele scheidingslijnen en pijltjes. Slechts een
+  van beide linksets is tegelijk in de DOM zichtbaar (`display: none` op de
+  andere), zodat een screenreader links niet dubbel voorleest.
 
 ### Aftermovies op de homepage
 

@@ -1,0 +1,337 @@
+/* ==========================================================================
+   Hero: de technische bouwtekening (G1 Wegwijzer)
+   Het logo van VTK als technische tekening op een volle-breedte navy band.
+   Pure CSS-animaties (stroke-dashoffset en clip-path wipe) bij het laden.
+   ========================================================================== */
+
+.vtk-blueprint-hero {
+  position: relative;
+  z-index: 0;
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 34px clamp(20px, 3vw, 36px) 40px;
+  color: var(--paper);
+}
+
+.vtk-blueprint-hero::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - calc(50 * var(--vtk-vw, 1vw)));
+  right: calc(50% - calc(50 * var(--vtk-vw, 1vw)));
+  background: var(--navy);
+  box-shadow: inset 0 -5px 0 var(--yellow);
+}
+
+.vtk-blueprint-hero::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - calc(50 * var(--vtk-vw, 1vw)));
+  right: calc(50% - calc(50 * var(--vtk-vw, 1vw)));
+  pointer-events: none;
+  background-image: url("/technisch-pattern.svg");
+  background-size: 880px 880px;
+  background-repeat: repeat;
+  background-position: calc(50% + 900px) -900px;
+  opacity: 0.16;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 56px,
+    #000 calc(100% - 40px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 56px,
+    #000 calc(100% - 40px),
+    transparent 100%
+  );
+}
+
+/* De box waarin de SVG en labels gepositioneerd staan */
+.vtk-blueprint-hero .g-box {
+  position: relative;
+  aspect-ratio: 1168 / 520;
+  max-width: 100%;
+  container-type: inline-size;
+}
+
+.vtk-blueprint-hero .g-box > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  color: var(--paper);
+}
+
+/* Lijnen en knooppunten van de tekening */
+.vtk-blueprint-hero .g-ln {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.vtk-blueprint-hero .g-ln.faint {
+  stroke-opacity: 0.22;
+}
+
+.vtk-blueprint-hero .g-ln.dash {
+  stroke-opacity: 0.32;
+  stroke-dasharray: 6 5;
+}
+
+.vtk-blueprint-hero .g-ln.lead {
+  stroke-opacity: 0.7;
+}
+
+.vtk-blueprint-hero .g-ln.dim {
+  stroke-opacity: 0.6;
+}
+
+.vtk-blueprint-hero .g-node {
+  fill: var(--navy);
+  stroke: currentColor;
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+
+.vtk-blueprint-hero .g-gap {
+  fill: var(--navy);
+}
+
+.vtk-blueprint-hero .g-dimtext {
+  fill: var(--on-dark-muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+}
+
+/* Het logo: gearceerd en vector-omtrek */
+.vtk-blueprint-hero .c-hatch {
+  stroke: none;
+  fill-rule: evenodd;
+}
+
+.vtk-blueprint-hero .c-out {
+  fill: none;
+  stroke: currentColor;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* Labels rond de tekening op desktop */
+.vtk-blueprint-hero .g-lab {
+  position: absolute;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 21%;
+  text-decoration: none;
+  color: inherit;
+}
+
+.vtk-blueprint-hero .g-lab.l {
+  right: 77.57%;
+  text-align: right;
+  align-items: flex-end;
+}
+
+.vtk-blueprint-hero .g-lab.r {
+  left: 77.57%;
+  text-align: left;
+  align-items: flex-start;
+}
+
+.vtk-blueprint-hero .g-lab b {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: clamp(16px, 1.8cqi, 21px);
+  font-weight: 600;
+  color: var(--paper);
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.vtk-blueprint-hero .g-lab i {
+  font-style: normal;
+  font-size: clamp(11.5px, 1.15cqi, 13.5px);
+  line-height: 1.35;
+  color: var(--on-dark-muted);
+  text-wrap: pretty;
+}
+
+.vtk-blueprint-hero .g-u {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.45);
+  padding-bottom: 2px;
+  transition: border-color 150ms ease;
+}
+
+.vtk-blueprint-hero .g-lab:hover .g-u,
+.vtk-blueprint-hero .g-lab:focus-visible .g-u {
+  border-color: var(--yellow);
+}
+
+.vtk-blueprint-hero .g-lab b svg {
+  opacity: 0;
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.vtk-blueprint-hero .g-lab:hover b svg,
+.vtk-blueprint-hero .g-lab:focus-visible b svg {
+  opacity: 1;
+  transform: translateX(3px);
+}
+
+.vtk-blueprint-hero a:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Telefoonlijst staat standaard verborgen op desktop */
+.vtk-blueprint-hero .g-list {
+  display: none;
+}
+
+/* Lijnen die zich animeren */
+.vtk-blueprint-hero .g-draw {
+  vector-effect: none;
+  stroke-width: 1.2;
+}
+
+/* Animatie bij het laden */
+@media (prefers-reduced-motion: no-preference) {
+  .vtk-blueprint-hero .g-draw {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: draw-line 1100ms cubic-bezier(0.35, 0.6, 0.2, 1) forwards;
+    animation-delay: var(--d, 0s);
+  }
+
+  .vtk-blueprint-hero .c-out.g-draw {
+    animation-duration: 1600ms;
+  }
+
+  .vtk-blueprint-hero .g-fade {
+    animation: fade 700ms ease both;
+    animation-delay: var(--d, 0s);
+  }
+
+  .vtk-blueprint-hero .g-wipe {
+    animation: wipe 1300ms cubic-bezier(0.5, 0.1, 0.2, 1) both;
+    animation-delay: var(--d, 0s);
+  }
+
+  .vtk-blueprint-hero .g-lab {
+    animation: g-rise 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation-delay: var(--d, 0s);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes draw-line {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes wipe {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes g-rise {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-50% + 8px));
+  }
+}
+
+/* Telefoonweergave onder 760px */
+@media (max-width: 760px) {
+  .vtk-blueprint-hero {
+    padding: 26px clamp(16px, 3vw, 24px) 30px;
+  }
+
+  .vtk-blueprint-hero .g-box {
+    margin-inline: -8px;
+  }
+
+  .vtk-blueprint-hero .g-lab,
+  .vtk-blueprint-hero .g-lead,
+  .vtk-blueprint-hero .g-dimtext,
+  .vtk-blueprint-hero .g-dimgrp {
+    display: none;
+  }
+
+  .vtk-blueprint-hero .g-list {
+    display: block;
+    list-style: none;
+    margin: 14px 0 0;
+    padding: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
+  }
+
+  .vtk-blueprint-hero .g-list li {
+    margin: 0;
+    padding: 0;
+  }
+
+  .vtk-blueprint-hero .g-list a {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 16px;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .vtk-blueprint-hero .g-list a:hover b,
+  .vtk-blueprint-hero .g-list a:focus-visible b {
+    color: var(--yellow);
+  }
+
+  .vtk-blueprint-hero .g-list b {
+    display: block;
+    color: var(--paper);
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+    transition: color 150ms ease;
+  }
+
+  .vtk-blueprint-hero .g-list i {
+    display: block;
+    margin-top: 2px;
+    font-style: normal;
+    font-size: 13px;
+    color: var(--on-dark-muted);
+  }
+
+  .vtk-blueprint-hero .g-list svg {
+    color: var(--on-dark-muted);
+  }
+}

@@ -78,6 +78,15 @@ export function CheckIcon() {
   );
 }
 
+export function ArrowRightIcon() {
+  return (
+    <Icon>
+      <path d="M5 12h14" />
+      <path d="m13 6 6 6-6 6" />
+    </Icon>
+  );
+}
+
 export function ExternalLinkIcon() {
   return (
     <Icon>

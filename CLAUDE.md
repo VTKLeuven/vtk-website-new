@@ -302,25 +302,36 @@ the design language into the application instead of copying mockup content.
   controls can be pill-shaped when they are CTAs or filters.
 - Tone: prefer dense editorial utility over marketing decoration. Do not add
   gradients, decorative blobs, nested cards, or oversized explanatory text.
+- Hero (`components/editorial/BlueprintHero.tsx`, `vtk-hero.css`): G1 Wegwijzer, a
+  technical blueprint drawing of the VTK logo on a full-width navy band with a 5px
+  yellow bottom rule and `technisch-pattern.svg` background (opacity 0.16). Six
+  leader lines point to site destinations (Kalender, Tickets, Broodjes on the
+  left; Cursusdienst, Shiften, Career on the right). Pure CSS keyframe animations
+  (outline draws with `stroke-dashoffset`, hatching wipes with `clip-path`,
+  nodes/dimensions fade, labels rise). On mobile (<760px), leader lines hide and
+  destinations appear as a hairline list below the drawing. Do not bring back the
+  old photo hero, slogans, countdown clock, or live status badges.
 - Band rhythm: full-width navy bands return down the page and the site-wide dark
   footer closes the bookend. Header, bands and
   footer share the same `--navy` so the dark chrome reads as one system. The
-  lower half of the page alternates navy and light-blue (`--paper-2`) bands:
-  **Openingsuren** (navy) → **Aankomende evenementen** (`--paper-2`) → **POC's**
-  (navy, when shown) → **Shiften** (`--paper-2`, when shown) → **Aftermovies**
-  (navy) → **Wat we doen** (paper) → **VTK Career** (navy) →
+  homepage alternates navy and light-blue (`--paper-2`) bands:
+  **Hero** (navy) → **Nieuws** (`--paper-2`) → **Aankomende evenementen** (`--paper-2`) →
+  **Openingsuren** (navy) → **POC's** (navy, when shown) → **Shiften** (`--paper-2`, when shown) →
+  **Aftermovies** (navy) → **Wat we doen** (paper) → **VTK Career** (navy) →
   **Hoofdpartners** (paper). The events and the open shifts come before "Wat we
   doen" on purpose: what is coming up this week matters more than the standing
-  offer. The navy bands (openingsuren, aftermovies, career)
+  offer. The navy bands (hero, openingsuren, aftermovies, career)
   carry the full-bleed `::before` navy fill plus the shared `::after` technical
   pattern, each with its own crop of `technisch-pattern.svg` so no two bands show
-  the same wallpaper. The openingsuren band follows the Nieuws band with a
-  compact heading. The full-bleed bands
+  the same wallpaper. The full-bleed bands
   (aftermovies, evenementen, career, POC's) share a `band` class: each carries a
   top margin to separate from the paper section above it, but two consecutive
   bands butt directly against each other with a crisp navy/light-blue seam
-  (`.band + .band, .hours-strip + .band { margin-top: 0 }`) rather than a paper gap; the light-blue
-  bands also keep tighter internal padding than the navy ones. On a navy band,
+  (`.band + .band, .hours-strip + .band, .vtk-blueprint-hero + .band { margin-top: 0 }`)
+  rather than a paper gap; the light-blue bands also keep tighter internal padding
+  than the navy ones. Between Nieuws and Evenementen, the margin-top on
+  `.events-band` preserves a restful paper gap between the two `--paper-2` bands;
+  without news, Evenementen touches the hero with a tight seam. On a navy band,
   panels are dark glass
   (`rgba(255,255,255,.06)` fill, `.14` white border), headings go `--paper`,
   muted text uses `--on-dark-muted`, and the primary button inverts to a

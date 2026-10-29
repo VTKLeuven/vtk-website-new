@@ -1,0 +1,1519 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hero voor vtk.be</title>
+<!-- Kopie van het ontwerpbord https://claude.ai/artifact/3LqSu6jULKf1GABVmUr3uZ (versie 5), zonder foto's: enkel het logo en het patroon staan erin. De hero (G1) werkt volledig; de foto's in nieuws en evenementen zijn leeg. Zie design/hero-bouwtekening.md. -->
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Bord: een switcher rond een nagebouwde homepage. Het bord volgt het thema
+   van de kijker; de homepage zelf is de echte, lichte site en blijft licht. */
+:root {
+  --b-bg: #f3f5f9;
+  --b-fg: #0f1422;
+  --b-muted: #5b6377;
+  --b-line: #dce1ea;
+  --b-panel: #ffffff;
+  --b-chip: #e8ecf3;
+  --b-stage: #d5dbe6;
+  --b-accent: #ffd23f;
+  --b-on-accent: #0a0f1f;
+  --b-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --b-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --b-bg: #0f121a; --b-fg: #e7eaf2; --b-muted: #9aa3b8; --b-line: #262c3a;
+    --b-panel: #161a24; --b-chip: #212736; --b-stage: #1b202c; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --b-bg: #0f121a; --b-fg: #e7eaf2; --b-muted: #9aa3b8; --b-line: #262c3a;
+  --b-panel: #161a24; --b-chip: #212736; --b-stage: #1b202c; color-scheme: dark;
+}
+body { background: var(--b-bg); color: var(--b-fg); font-family: var(--b-sans); font-size: 14px; }
+.board {
+  max-width: 1520px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  display: grid; gap: 18px;
+}
+.bh { display: grid; gap: 10px; max-width: 980px; }
+.bh h1 { margin: 0; font-size: 30px; letter-spacing: -0.025em; font-weight: 700; text-wrap: balance; }
+.bh p { margin: 0; color: var(--b-muted); font-size: 15px; line-height: 1.55; max-width: 78ch; }
+.bh .bh-not, .bh .bh-rec { color: var(--b-fg); font-size: 14px; padding: 10px 14px; border-radius: 12px; background: var(--b-panel); border: 1px solid var(--b-line); }
+.bh .bh-rec { box-shadow: inset 3px 0 0 var(--b-accent); }
+.bh .bh-src { font-size: 13px; }
+
+.r1-intro { font-size: 13px; color: var(--b-muted); }
+.r1-intro summary { cursor: pointer; font-weight: 600; }
+.r1-intro p { margin-top: 8px; font-size: 13.5px; }
+.r1 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; color: var(--b-muted); }
+.r1 > span { font-weight: 600; margin-right: 4px; }
+.r1 button { border: 1px solid var(--b-line); background: var(--b-panel); color: var(--b-fg); font: inherit; font-size: 12.5px; padding: 4px 10px; border-radius: 999px; cursor: pointer; }
+.r1 button[aria-pressed="true"] { background: var(--b-fg); color: var(--b-bg); border-color: var(--b-fg); }
+.r1 button b { font-family: var(--b-mono); font-weight: 500; margin-right: 5px; opacity: .7; }
+.picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 8px; }
+.pick {
+  display: grid; gap: 3px; align-content: start; text-align: left; cursor: pointer;
+  padding: 10px 12px 11px; border-radius: 12px; border: 1px solid var(--b-line);
+  background: var(--b-panel); color: var(--b-fg); font: inherit;
+}
+.pick:hover { border-color: var(--b-muted); }
+.pick[aria-pressed="true"] { background: var(--b-fg); color: var(--b-bg); border-color: var(--b-fg); }
+.pick .pk-id { font-family: var(--b-mono); font-size: 12px; opacity: .7; display: flex; justify-content: space-between; gap: 6px; }
+.pick .pk-rec { font-family: var(--b-sans); font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--b-accent); color: var(--b-on-accent); opacity: 1; }
+.pick .pk-name { font-weight: 650; font-size: 14.5px; }
+.pick .pk-from { font-size: 12px; opacity: .72; line-height: 1.35; }
+.pick:focus-visible, .seg button:focus-visible, .knob-btn:focus-visible, .copy:focus-visible { outline: 2px solid var(--b-accent); outline-offset: 2px; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.ctl { display: flex; align-items: center; gap: 8px; }
+.ctl > span { font-size: 12px; color: var(--b-muted); font-weight: 600; }
+.seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--b-chip); gap: 2px; }
+.seg button { border: 0; background: transparent; color: var(--b-fg); font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--b-panel); box-shadow: 0 1px 3px rgba(0,0,0,.14); font-weight: 600; }
+.knob-btn { border: 1px solid var(--b-line); background: var(--b-panel); color: var(--b-fg); font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+.knob-hint { font-size: 13px; color: var(--b-muted); }
+
+.about { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 14px 32px; padding: 16px 18px; border-radius: 14px; background: var(--b-panel); border: 1px solid var(--b-line); }
+.about h2 { margin: 0 0 6px; font-size: 20px; letter-spacing: -0.02em; }
+.about h2 small { font-family: var(--b-mono); font-weight: 500; color: var(--b-muted); font-size: 13px; margin-right: 6px; }
+.about p { margin: 0; line-height: 1.55; font-size: 14.5px; }
+.about dl { margin: 0; display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 6px 14px; font-size: 13.5px; line-height: 1.45; }
+.about dt { color: var(--b-muted); font-weight: 600; }
+.about dd { margin: 0; }
+.about dd.warn { color: var(--b-fg); font-weight: 600; }
+
+.stage { border-radius: 16px; background: var(--b-stage); border: 1px solid var(--b-line); overflow: hidden; }
+.stage.is-real { overflow-x: auto; }
+.stage-in { position: relative; overflow: hidden; }
+.stage-in.is-phone { padding-block: 28px; overflow: visible; }
+.frame { width: 1440px; transform-origin: 0 0; }
+.frame.phone { width: 390px; margin: 0 auto; border-radius: 34px; overflow: hidden; box-shadow: 0 0 0 9px #0b0e16, 0 30px 60px -28px rgba(0,0,0,.6); }
+
+.all { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 16px; }
+.mini { display: grid; gap: 8px; cursor: pointer; }
+.mini:focus-visible { outline: 2px solid var(--b-accent); outline-offset: 4px; border-radius: 12px; }
+.mini-cap { display: flex; align-items: baseline; gap: 8px; color: var(--b-fg); font-size: 14px; }
+.mini-cap b { font-family: var(--b-mono); font-weight: 500; color: var(--b-muted); }
+.mini-cap em { font-style: normal; font-size: 12px; color: var(--b-muted); }
+.mini-cap .pk-rec { font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--b-accent); color: var(--b-on-accent); }
+.mini-stage { position: relative; aspect-ratio: 1440 / 860; overflow: hidden; border-radius: 12px; border: 1px solid var(--b-line); background: #eff2f8; }
+.mini-stage .frame { position: absolute; top: 0; left: 0; pointer-events: none; }
+.mini:hover .mini-stage { border-color: var(--b-muted); }
+
+.choice { display: grid; gap: 10px; padding: 16px 18px; border-radius: 14px; background: var(--b-panel); border: 1px solid var(--b-line); }
+.choice h2 { margin: 0; font-size: 16px; }
+.choice label { font-size: 12px; font-weight: 600; color: var(--b-muted); }
+.choice textarea { width: 100%; min-height: 56px; font: inherit; font-size: 14px; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--b-line); background: var(--b-bg); color: var(--b-fg); resize: vertical; box-sizing: border-box; }
+.choice-row { display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; }
+.choice code { flex: 1 1 320px; min-width: 0; display: block; padding: 10px 12px; border-radius: 10px; background: var(--b-chip); font-family: var(--b-mono); font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; user-select: all; }
+.copy { border: 0; border-radius: 999px; padding: 0 18px; min-height: 40px; background: var(--b-fg); color: var(--b-bg); font: inherit; font-weight: 600; cursor: pointer; }
+
+@media (max-width: 760px) {
+  .about { grid-template-columns: minmax(0, 1fr); }
+  .all { grid-template-columns: minmax(0, 1fr); }
+  .bh h1 { font-size: 24px; }
+}
+
+/* ===================================================================
+   De homepage zelf: tokens uit apps/web/app/design/vtk-base.css.
+   Vast licht, zoals de site.
+   =================================================================== */
+.site {
+  --ink: #0a0f1f; --navy: #0e1a36; --paper: #eff2f8; --paper-2: #e6ecf5; --surface: #ffffff;
+  --line: rgba(14, 26, 54, 0.1); --line-2: rgba(14, 26, 54, 0.18); --yellow: #ffd23f;
+  --muted: #5c667f; --body: #34405e; --on-dark-muted: #b7c0dc;
+  --open: #52d98b; --closed: #e58a70; --open-light: #16663f;
+  --sans: Inter, ui-sans-serif, system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
+  --pattern: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NDAgNjQwIiB3aWR0aD0iNjQwIiBoZWlnaHQ9IjY0MCI+CiAgPCEtLQogICAgVGVjaG5pc2NoIHBhdHJvb24gdWl0IGRlIGh1aXNzdGlqbCAoemllIGRlc2lnbi9odWlzc3RpamwpOiBjaXJrZWxzLCByYWFrbGlqbmVuLAogICAgYXJjZXJpbmdlbiwgc3RpcHBlbGxpam5lbiwgbWFhdHBpamxlbiBlbiBrbm9vcHB1bnRlbiAtIGRlIHRla2VudGFhbCB2YW4gZWVuCiAgICB0ZWNobmlzY2hlIHBsYW4uIEJlZG9lbGQgYWxzIGFjaHRlcmdyb25kIGluIGRlIG5hdnkgYmFuZGVuLgoKICAgIE5hYWRsb29zIHRlZ2VsYmFhcjogZGUgdGVrZW5pbmcgc3RhYXQgZWVuIGtlZXIgaW4gI2FydCBlbiB3b3JkdCA5eCBnZXBsYWF0c3QKICAgICgtNjQwIC8gMCAvICs2NDAgaW4geCBlbiB5KSBlbiBhZmdla25pcHQgb3AgZGUgdGVnZWwsIHpvZGF0IGFsbGVzIHdhdCBhYW4gZGUKICAgIGVuZSByYW5kIHVpdHN0ZWVrdCBhYW4gZGUgb3ZlcmthbnQgdGVydWdrb210LiBEYWFyb20gbW9ldGVuIGFsbGUgcGVyaW9kZXMKICAgIChhcmNlcmluZywgc3RyZWVwamVzKSBkZWxlcnMgdmFuIDY0MCB6aWpuLCBhbmRlcnMgdmVyc3ByaW5ndCBkZSBmYXNlIG9wIGRlIG5hYWQuCgogICAgTGlqbmVuIHppam4gd2l0OyBkZSBzdGVya3RlIHJlZ2VsIGplIG1ldCBvcGFjaXR5IG9wIGRlIGxhYWcgZGllIGRpdCBnZWJydWlrdC4KICAtLT4KICA8ZGVmcz4KICAgIDxjbGlwUGF0aCBpZD0idGlsZSI+CiAgICAgIDxyZWN0IHdpZHRoPSI2NDAiIGhlaWdodD0iNjQwIiAvPgogICAgPC9jbGlwUGF0aD4KCiAgICA8IS0tIDQ1IGdyYWRlbiBhcmNlcmluZzsgOHg4IHJvb3N0ZXIgKDY0MCA9IDgwIHBlcmlvZGVzKSBob3VkdCBkZSBuYWFkIHNsdWl0ZW5kIC0tPgogICAgPHBhdHRlcm4gaWQ9ImhhdGNoIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIiB3aWR0aD0iOCIgaGVpZ2h0PSI4Ij4KICAgICAgPHBhdGggZD0iTTAsOCBMOCwwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iMC42IiBzdHJva2Utb3BhY2l0eT0iMC4yNiIgLz4KICAgIDwvcGF0dGVybj4KCiAgICA8ZyBpZD0iYXJ0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iMC43MiI+CiAgICAgIDwhLS0gZ2VhcmNlZXJkZSB3aWcgbGlua3Nib3ZlbiAtLT4KICAgICAgPHBhdGggZD0iTTAsMzAwIEwyNTAsNjAgTDI1MCwzMDAgWiIgZmlsbD0idXJsKCNoYXRjaCkiIHN0cm9rZT0ibm9uZSIgLz4KICAgICAgPHBhdGggZD0iTTAsMzAwIEwyNTAsNjAgTDI1MCwzMDAgWiIgc3Ryb2tlLW9wYWNpdHk9IjAuMjQiIC8+CgogICAgICA8IS0tIGdlYXJjZWVyZCBibG9ramUsIGxvb3B0IG92ZXIgZGUgb25kZXJyYW5kIC0tPgogICAgICA8cmVjdCB4PSI1MTgiIHk9IjU2NiIgd2lkdGg9IjkyIiBoZWlnaHQ9IjcyIiBmaWxsPSJ1cmwoI2hhdGNoKSIgc3Ryb2tlPSJub25lIiAvPgogICAgICA8cmVjdCB4PSI1MTgiIHk9IjU2NiIgd2lkdGg9IjkyIiBoZWlnaHQ9IjcyIiBzdHJva2Utb3BhY2l0eT0iMC4zNCIgLz4KCiAgICAgIDwhLS0gZ3JvdGUgY2lya2VsIGxpbmtzYm92ZW4sIGxvb3B0IG92ZXIgZGUgYm92ZW4tIGVuIGxpbmtlcnJhbmQgLS0+CiAgICAgIDxjaXJjbGUgY3g9IjE1MCIgY3k9IjExMCIgcj0iMjA1IiBzdHJva2Utb3BhY2l0eT0iMC40MiIgLz4KICAgICAgPGNpcmNsZSBjeD0iMTUwIiBjeT0iMTEwIiByPSIxMTgiIHN0cm9rZS1vcGFjaXR5PSIwLjI0IiAvPgoKICAgICAgPCEtLSByaW5nIHJlY2h0c2JvdmVuIC0tPgogICAgICA8Y2lyY2xlIGN4PSI1NjUiIGN5PSI4NSIgcj0iNTgiIHN0cm9rZS1vcGFjaXR5PSIwLjQyIiAvPgogICAgICA8Y2lyY2xlIGN4PSI1NjUiIGN5PSI4NSIgcj0iMjQiIHN0cm9rZS1vcGFjaXR5PSIwLjMiIC8+CgogICAgICA8IS0tIGdyb3RlIGNpcmtlbCByZWNodHNvbmRlciBtZXQgaGFydGxpam5lbiAtLT4KICAgICAgPGNpcmNsZSBjeD0iNDcwIiBjeT0iNDQwIiByPSIxNzAiIHN0cm9rZS1vcGFjaXR5PSIwLjQyIiAvPgogICAgICA8Y2lyY2xlIGN4PSI0NzAiIGN5PSI0NDAiIHI9Ijc0IiBzdHJva2Utb3BhY2l0eT0iMC4yNiIgLz4KICAgICAgPHBhdGggZD0iTTQ0Niw0NDAgSDQ5NCBNNDcwLDQxNiBWNDY0IiBzdHJva2Utb3BhY2l0eT0iMC4zIiAvPgoKICAgICAgPCEtLSBjaXJrZWwgbGlua3NvbmRlciAtLT4KICAgICAgPGNpcmNsZSBjeD0iMjA1IiBjeT0iNTQ1IiByPSI5OCIgc3Ryb2tlLW9wYWNpdHk9IjAuMzQiIC8+CiAgICAgIDxjaXJjbGUgY3g9IjMzMCIgY3k9IjMwMCIgcj0iNDYiIHN0cm9rZS1vcGFjaXR5PSIwLjI2IiAvPgoKICAgICAgPCEtLSByZWNodGhvZWsgbWV0IGRpYWdvbmFhbCAtLT4KICAgICAgPHJlY3QgeD0iMzMwIiB5PSIzMCIgd2lkdGg9IjE1MCIgaGVpZ2h0PSIxMDUiIHN0cm9rZS1vcGFjaXR5PSIwLjI4IiAvPgogICAgICA8cGF0aCBkPSJNMzMwLDMwIEw0ODAsMTM1IiBzdHJva2Utb3BhY2l0eT0iMC4xOCIgLz4KICAgICAgPHJlY3QgeD0iNjAiIHk9IjQ3MCIgd2lkdGg9IjEzMCIgaGVpZ2h0PSIxMDAiIHN0cm9rZS1vcGFjaXR5PSIwLjI0IiAvPgoKICAgICAgPCEtLSBjb25zdHJ1Y3RpZWxpam5lbiAtLT4KICAgICAgPHBhdGggZD0iTTAsMjUwIEg2NDAiIHN0cm9rZS1vcGFjaXR5PSIwLjI2IiAvPgogICAgICA8cGF0aCBkPSJNMCw0NDAgSDY0MCIgc3Ryb2tlLW9wYWNpdHk9IjAuMTgiIC8+CiAgICAgIDxwYXRoIGQ9Ik0yNTAsMCBWNjQwIiBzdHJva2Utb3BhY2l0eT0iMC4yNCIgLz4KICAgICAgPHBhdGggZD0iTTAsNjQwIEw2NDAsMCIgc3Ryb2tlLW9wYWNpdHk9IjAuMTgiIC8+CiAgICAgIDxwYXRoIGQ9Ik0tNjAsMTgwIEw0MDAsNjQwIiBzdHJva2Utb3BhY2l0eT0iMC4xNCIgLz4KCiAgICAgIDwhLS0gc3RpcHBlbGxpam5lbjsgcGVyaW9kZXMgOCBlbiAyMCBkZWxlbiA2NDAgLS0+CiAgICAgIDxwYXRoIGQ9Ik0wLDk1IEg2NDAiIHN0cm9rZS1vcGFjaXR5PSIwLjI2IiBzdHJva2UtZGFzaGFycmF5PSI0IDQiIC8+CiAgICAgIDxwYXRoIGQ9Ik00NzAsMCBWNjQwIiBzdHJva2Utb3BhY2l0eT0iMC4yNCIgc3Ryb2tlLWRhc2hhcnJheT0iMTIgOCIgLz4KICAgICAgPHBhdGggZD0iTTAsNTMwIEgzMjAiIHN0cm9rZS1vcGFjaXR5PSIwLjIiIHN0cm9rZS1kYXNoYXJyYXk9IjQgNCIgLz4KCiAgICAgIDwhLS0gbWFhdHBpamwgaG9yaXpvbnRhYWwgLS0+CiAgICAgIDxwYXRoIGQ9Ik0zNTAsMTYzIFYxODcgTTYwMCwxNjMgVjE4NyIgc3Ryb2tlLW9wYWNpdHk9IjAuMzQiIC8+CiAgICAgIDxwYXRoIGQ9Ik0zNTAsMTc1IEg2MDAiIHN0cm9rZS1vcGFjaXR5PSIwLjM0IiAvPgogICAgICA8cGF0aCBkPSJNMzU3LDE3MSBMMzUwLDE3NSBMMzU3LDE3OSBNNTkzLDE3MSBMNjAwLDE3NSBMNTkzLDE3OSIgc3Ryb2tlLW9wYWNpdHk9IjAuMzQiIC8+CgogICAgICA8IS0tIG1hYXRwaWpsIHZlcnRpY2FhbCAtLT4KICAgICAgPHBhdGggZD0iTTc4LDM4MiBIMTAyIE03OCw0NzAgVjQ3MCBNNzgsNDcwIEgxMDIiIHN0cm9rZS1vcGFjaXR5PSIwLjMiIC8+CiAgICAgIDxwYXRoIGQ9Ik05MCwzODIgVjQ3MCIgc3Ryb2tlLW9wYWNpdHk9IjAuMyIgLz4KICAgICAgPHBhdGggZD0iTTg2LDM4OSBMOTAsMzgyIEw5NCwzODkgTTg2LDQ2MyBMOTAsNDcwIEw5NCw0NjMiIHN0cm9rZS1vcGFjaXR5PSIwLjMiIC8+CgogICAgICA8IS0tIGtub29wcHVudGVuIC0tPgogICAgICA8Y2lyY2xlIGN4PSIyNTAiIGN5PSIyNTAiIHI9IjMiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC41IiBzdHJva2U9Im5vbmUiIC8+CiAgICAgIDxjaXJjbGUgY3g9IjQ3MCIgY3k9IjQ0MCIgcj0iMyIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIwLjQ1IiBzdHJva2U9Im5vbmUiIC8+CiAgICAgIDxjaXJjbGUgY3g9IjI1MCIgY3k9IjQ0MCIgcj0iMi41IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMzUiIHN0cm9rZT0ibm9uZSIgLz4KICAgICAgPGNpcmNsZSBjeD0iNDcwIiBjeT0iMjUwIiByPSIyLjUiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4zNSIgc3Ryb2tlPSJub25lIiAvPgogICAgICA8Y2lyY2xlIGN4PSIzNTAiIGN5PSIxNzUiIHI9IjQuNSIgc3Ryb2tlLW9wYWNpdHk9IjAuNCIgLz4KICAgICAgPGNpcmNsZSBjeD0iMTUwIiBjeT0iMTEwIiByPSI0LjUiIHN0cm9rZS1vcGFjaXR5PSIwLjM1IiAvPgogICAgICA8Y2lyY2xlIGN4PSIwIiBjeT0iMzAwIiByPSI0IiBzdHJva2Utb3BhY2l0eT0iMC4zIiAvPgogICAgPC9nPgogIDwvZGVmcz4KCiAgPGcgY2xpcC1wYXRoPSJ1cmwoI3RpbGUpIj4KICAgIDx1c2UgaHJlZj0iI2FydCIgeD0iLTY0MCIgeT0iLTY0MCIgLz4KICAgIDx1c2UgaHJlZj0iI2FydCIgeD0iMCIgeT0iLTY0MCIgLz4KICAgIDx1c2UgaHJlZj0iI2FydCIgeD0iNjQwIiB5PSItNjQwIiAvPgogICAgPHVzZSBocmVmPSIjYXJ0IiB4PSItNjQwIiB5PSIwIiAvPgogICAgPHVzZSBocmVmPSIjYXJ0IiB4PSIwIiB5PSIwIiAvPgogICAgPHVzZSBocmVmPSIjYXJ0IiB4PSI2NDAiIHk9IjAiIC8+CiAgICA8dXNlIGhyZWY9IiNhcnQiIHg9Ii02NDAiIHk9IjY0MCIgLz4KICAgIDx1c2UgaHJlZj0iI2FydCIgeD0iMCIgeT0iNjQwIiAvPgogICAgPHVzZSBocmVmPSIjYXJ0IiB4PSI2NDAiIHk9IjY0MCIgLz4KICA8L2c+Cjwvc3ZnPgo=");
+  --stripes: repeating-linear-gradient(135deg, var(--paper-2) 0 12px, var(--paper) 12px 24px);
+  container-type: inline-size;
+  background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.5;
+  -webkit-font-smoothing: antialiased; color-scheme: light; text-align: left;
+}
+.site *, .site *::before, .site *::after { box-sizing: border-box; }
+:where(.site) a { color: inherit; text-decoration: none; }
+.site button { font: inherit; }
+.site img { display: block; max-width: 100%; }
+.site .wrap { max-width: 1240px; margin: 0 auto; padding-left: 36px; padding-right: 36px; }
+.site .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Kop van de site */
+.sh { position: relative; z-index: 6; background: var(--navy); color: var(--paper); border-bottom: 1px solid rgba(255,255,255,.07); }
+.sh .wrap { display: flex; align-items: center; gap: 40px; min-height: 72px; }
+.sh-logo img { height: 34px; width: auto; }
+.sh-nav { display: flex; gap: 18px; flex: 1; font-size: 14px; color: rgba(250,250,247,.78); }
+.sh-nav span { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.sh-nav svg { opacity: .7; }
+.sh-tools { display: flex; align-items: center; gap: 14px; font-size: 13px; }
+.sh-search { width: 38px; height: 38px; border-radius: 999px; display: grid; place-items: center; background: rgba(255,255,255,.1); }
+.sh-lang { color: rgba(250,250,247,.45); }
+.sh-lang b { color: #fff; font-weight: 600; }
+.sh-avatar { width: 38px; height: 38px; border-radius: 999px; display: grid; place-items: center; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22); }
+.sh-login { display: inline-flex; align-items: center; height: 38px; padding: 0 16px; border-radius: 999px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22); font-weight: 600; font-size: 13.5px; }
+.sh-menu { display: none; }
+
+/* Gedeeld */
+.navyband { position: relative; isolation: isolate; background: var(--navy); color: var(--paper); }
+.navyband::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background-image: var(--pattern); background-size: 880px 880px; background-repeat: repeat;
+  background-position: var(--crop, calc(50% + 340px) -160px); opacity: .34;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 56px, #000 calc(100% - 40px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 56px, #000 calc(100% - 40px), transparent 100%);
+}
+.navyband.rule { box-shadow: inset 0 -5px 0 var(--yellow); }
+.kick { margin: 0 0 16px; font-size: 13px; color: var(--muted); }
+.navyband .kick { color: var(--on-dark-muted); }
+.h1 { margin: 0; max-width: 900px; font-size: 56px; line-height: 1.04; letter-spacing: -0.03em; font-weight: 600; text-wrap: balance; }
+.navyband .h1 { color: var(--paper); }
+.ruled { width: fit-content; max-width: 100%; }
+.ruled::after { content: ""; display: block; width: 100%; height: 3px; margin-top: 8px; border-radius: 2px; background: var(--yellow); }
+.h1.ruled::after { height: 4px; margin-top: 12px; }
+.facts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+.facts span { display: inline-flex; align-items: center; gap: 6px; }
+.navyband .facts { color: var(--on-dark-muted); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px; border-radius: 999px; font-weight: 600; font-size: 14.5px; border: 1px solid transparent; cursor: pointer; white-space: nowrap; }
+.btn-primary { background: var(--ink); color: var(--paper); }
+.btn-ghost { background: transparent; border-color: var(--line-2); color: var(--ink); }
+.navyband .btn-primary { background: var(--surface); color: var(--ink); }
+.u { border-bottom: 1px solid currentColor; font-weight: 600; }
+.u-dark { color: var(--paper); border-bottom: 1px solid rgba(255,255,255,.45); font-weight: 600; }
+.u-dark:hover { color: var(--yellow); border-color: var(--yellow); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 999px; background: var(--on-dark-muted); flex: none; }
+.dot.ok { background: var(--open); }
+.dot.closed { background: var(--closed); }
+.dot.later { background: transparent; box-shadow: inset 0 0 0 1.5px var(--on-dark-muted); }
+.datepin { display: grid; align-content: center; justify-items: center; width: 58px; height: 58px; border-radius: 14px; background: var(--yellow); color: var(--ink); text-align: center; flex: none; box-shadow: 0 8px 18px -10px rgba(8,13,28,.6); }
+.datepin b { font-family: var(--mono); font-size: 20px; font-weight: 500; line-height: 1.1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.datepin i { font-family: var(--mono); font-size: 9.5px; font-style: normal; line-height: 1.3; letter-spacing: .12em; text-transform: uppercase; color: rgba(10,15,31,.62); }
+.label-caps { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+
+@keyframes rise { from { opacity: 0; translate: 0 .6em; } }
+@keyframes rise-tilt { from { opacity: 0; translate: 0 .7em; rotate: -3deg; } }
+@keyframes fade { from { opacity: 0; } }
+@keyframes flip { from { opacity: 0; transform: perspective(600px) rotateX(-75deg); } }
+@keyframes draw-u { from { background-size: 0% 5px; } to { background-size: 100% 5px; } }
+@keyframes draw-line { to { stroke-dashoffset: 0; } }
+@keyframes wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@media (prefers-reduced-motion: no-preference) {
+  .hero .kick, .hero .h1, .hero .facts { animation: rise 620ms cubic-bezier(.2,.7,.2,1) both; }
+  .hero .h1 { animation-delay: 60ms; }
+  .hero .facts { animation-delay: 120ms; }
+}
+
+/* ---------- A · Kalenderblad ---------- */
+.hA { position: relative; z-index: 3; --crop: calc(50% - 260px) -420px; }
+.hA .wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 56px; align-items: end; padding-top: 52px; padding-bottom: 50px; }
+.hA-day { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; }
+.hA-step { width: 32px; height: 32px; border-radius: 999px; border: 1px solid rgba(255,255,255,.24); background: transparent; color: var(--paper); display: grid; place-items: center; cursor: pointer; padding: 0; }
+.hA-step:hover:not(:disabled) { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.5); }
+.hA-step:disabled { opacity: .28; cursor: default; }
+.hA-daylabel { margin-left: 6px; font-size: 13px; color: var(--on-dark-muted); }
+.hA-daylabel b { color: var(--paper); font-weight: 600; }
+.hA .facts { margin-top: 18px; font-size: 15px; }
+.hA-also { list-style: none; margin: 26px 0 0; padding: 0; max-width: 620px; border-top: 1px solid rgba(255,255,255,.14); }
+.hA-also li { display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,.14); font-size: 14px; }
+.hA-also time { color: var(--on-dark-muted); font-variant-numeric: tabular-nums; }
+.hA-also span { color: var(--paper); font-weight: 500; }
+.hA-also em { font-style: normal; display: inline-flex; align-items: center; gap: 7px; color: var(--on-dark-muted); font-size: 13px; }
+.hA-none { margin: 26px 0 0; color: var(--on-dark-muted); font-size: 14px; max-width: 520px; }
+.hA-pin { position: relative; z-index: 4; width: 200px; height: 200px; margin-bottom: -108px; border-radius: 42px; background: var(--yellow); color: var(--ink); display: grid; align-content: center; justify-items: center; text-align: center; box-shadow: 0 28px 54px -26px rgba(8,13,28,.9); transform-origin: 50% 0; }
+.hA-pin b { font-family: var(--mono); font-size: 96px; font-weight: 500; line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+.hA-pin i { font-family: var(--mono); font-size: 16px; font-style: normal; letter-spacing: .16em; text-transform: uppercase; color: rgba(10,15,31,.62); }
+.hA-pin i:first-child { margin-bottom: 4px; }
+.hA-pin i:last-child { margin-top: 6px; }
+.hA-pin:hover { box-shadow: 0 32px 60px -24px rgba(8,13,28,.95); }
+@media (prefers-reduced-motion: no-preference) { .hA-pin { animation: flip 560ms cubic-bezier(.2,.8,.2,1) both; } }
+.hA + .nb .wrap { padding-top: 64px; }
+
+/* ---------- B · Zin ---------- */
+.hB { --crop: calc(50% + 120px) -40px; }
+.hB .wrap { padding-top: 60px; padding-bottom: 58px; }
+.hB-s { margin: 0; max-width: 1100px; font-size: 62px; line-height: 1.12; letter-spacing: -0.03em; font-weight: 600; color: var(--paper); text-wrap: balance; }
+.hB-s .w { display: inline-block; }
+.hB-l { color: var(--paper); background-image: linear-gradient(var(--yellow), var(--yellow)); background-repeat: no-repeat; background-position: 0 100%; background-size: 100% 5px; padding-bottom: 4px; transition: color 160ms ease; }
+.hB-l:hover { color: var(--yellow); }
+.hB-foot { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; margin-top: 34px; font-size: 14px; color: var(--on-dark-muted); }
+.hB-foot a { display: inline-flex; align-items: center; gap: 6px; }
+@media (prefers-reduced-motion: no-preference) {
+  .hB-s .w { animation: rise-tilt 640ms cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i) * 52ms + 80ms); }
+  .hB-l { animation: draw-u 700ms cubic-bezier(.3,.7,.2,1) both; animation-delay: calc(var(--i) * 52ms + 380ms); }
+  .hB-foot { animation: fade 500ms ease both; animation-delay: 1.4s; }
+}
+
+/* ---------- C · Uitgelicht ---------- */
+.hC .wrap { padding-top: 34px; padding-bottom: 46px; }
+.hC-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; margin-bottom: 18px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 15px; border: 1px solid var(--line-2); border-radius: 999px; background: var(--surface); color: var(--body); font-size: 14px; font-weight: 600; cursor: pointer; }
+.chip:hover { border-color: var(--ink); color: var(--ink); }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.chip small { font-size: 13px; font-weight: 500; opacity: .7; font-variant-numeric: tabular-nums; }
+.hC-card { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr) 300px; overflow: hidden; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); }
+.hC-shot { position: relative; aspect-ratio: 16 / 9; background: var(--stripes); }
+.hC-shot img { width: 100%; height: 100%; object-fit: cover; }
+.hC-shot .datepin { position: absolute; top: 18px; left: 18px; width: 70px; height: 70px; border-radius: 16px; }
+.hC-shot .datepin b { font-size: 26px; }
+.hC-body { display: grid; align-content: start; gap: 12px; padding: 26px 28px; min-width: 0; }
+.hC-owner { margin: 0; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.hC-title { margin: 0; font-size: 36px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.08; text-wrap: balance; }
+.hC-sum { margin: 2px 0 0; color: var(--body); font-size: 15px; line-height: 1.6; max-width: 46ch; }
+.hC-side { display: grid; align-content: space-between; gap: 16px; padding: 22px 22px 22px; border-left: 1px solid var(--line); }
+.prices { list-style: none; margin: 6px 0 0; padding: 0; }
+.prices li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 12px; padding: 9px 0; font-size: 14.5px; }
+.prices li + li { border-top: 1px solid var(--line); }
+.prices span { font-weight: 600; color: var(--ink); }
+.prices b { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.prices small { grid-column: 1 / -1; color: var(--muted); font-size: 13px; }
+.hC-left { margin: 0; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.hC-side .btn { width: 100%; }
+.hC-soon { margin: 6px 0 0; font-size: 15px; color: var(--ink); font-weight: 600; line-height: 1.4; }
+.hC-soon small { display: block; font-weight: 400; color: var(--muted); font-size: 13px; margin-top: 4px; }
+@media (prefers-reduced-motion: no-preference) { .hC-card { animation: rise 520ms cubic-bezier(.2,.7,.2,1) both; } }
+
+/* ---------- D · Plaat ---------- */
+.hD-band { --crop: calc(50% + 520px) -300px; }
+.hD-band .wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 32px; align-items: end; padding-top: 46px; padding-bottom: 176px; }
+.hD-meta { margin: 0; color: var(--on-dark-muted); font-size: 12px; line-height: 1.9; text-align: right; text-transform: uppercase; letter-spacing: .08em; }
+.hD-meta a { text-transform: none; letter-spacing: 0; font-size: 13.5px; }
+.hD-platewrap { position: relative; z-index: 2; padding-top: 36px; padding-bottom: 40px; }
+.hD.has-band .hD-platewrap { margin-top: -150px; padding-top: 0; }
+.hD-frame { position: relative; overflow: hidden; aspect-ratio: 2.45 / 1; border: 1px solid var(--line); border-radius: 22px; background: repeating-linear-gradient(-45deg, var(--paper-2) 0 8px, var(--paper) 8px 16px); }
+.hD.has-band .hD-frame { box-shadow: 0 24px 50px -30px rgba(8,13,28,.55); }
+.hD-frame img { width: 100%; height: 100%; object-fit: cover; }
+.hD-plate { margin: 0; }
+.hD-plate figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 20px; margin-top: 12px; padding: 0 4px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.hD-plate figcaption b { color: var(--ink); font-weight: 600; }
+.hD-capline { font-size: 16px; color: var(--body); }
+.hD-capline strong { color: var(--ink); font-size: 22px; letter-spacing: -0.02em; display: block; margin-bottom: 2px; }
+@media (prefers-reduced-motion: no-preference) { .hD-frame img { animation: fade 900ms ease both; } }
+
+/* ---------- E · Register ---------- */
+.hE .wrap { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 1fr); gap: 72px; padding-top: 48px; padding-bottom: 54px; }
+.hE-lbl { margin: 0 0 14px; font-size: 12px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--ink); }
+.hE-list { list-style: none; margin: 0; padding: 0 0 0 24px; border-left: 1px solid var(--line-2); }
+.hE-list li { position: relative; }
+.hE-list button { display: block; width: 100%; text-align: left; padding: 1px 0; border: 0; background: none; cursor: pointer; font-size: 40px; line-height: 1.2; letter-spacing: -0.03em; font-weight: 600; color: #8a93a8; transition: color 150ms ease; }
+.hE-list button:hover { color: var(--body); }
+.hE-list li[aria-current] button { color: var(--ink); }
+.hE-list li[aria-current]::before { content: ""; position: absolute; left: -25.5px; top: 9px; bottom: 9px; width: 3px; border-radius: 2px; background: var(--yellow); }
+.hE-panel { padding-top: 34px; min-width: 0; }
+.hE-intro { margin: 0 0 20px; color: var(--body); font-size: 17px; line-height: 1.6; max-width: 52ch; }
+.hE-items { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.hE-items a { display: grid; grid-template-columns: minmax(0, 1fr) auto 18px; gap: 16px; align-items: center; padding: 14px 2px; border-bottom: 1px solid var(--line); }
+.hE-items a:hover b { text-decoration: underline; text-decoration-color: var(--yellow); text-decoration-thickness: 3px; text-underline-offset: 5px; }
+.hE-items b { font-size: 17px; font-weight: 600; color: var(--ink); }
+.hE-items span { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 7px; }
+.hE-items svg { color: var(--muted); }
+.hE .dot.ok { background: var(--open-light); }
+.hE-inline { display: none; }
+@media (prefers-reduced-motion: no-preference) { .hE-panel { animation: rise 420ms cubic-bezier(.2,.7,.2,1) both; } .hE-list li { animation: rise 520ms cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i) * 40ms); } }
+
+/* ---------- F · Ik ben ---------- */
+.hF { --crop: calc(50% - 40px) -620px; }
+.hF .wrap { padding-top: 50px; padding-bottom: 54px; }
+.hF-q { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.hF-q .h1 { margin-right: 10px; }
+.hF-chip { height: 58px; padding: 0 26px; border-radius: 999px; border: 1px solid rgba(255,255,255,.28); background: transparent; color: var(--paper); font-size: 21px; font-weight: 600; letter-spacing: -0.01em; cursor: pointer; transition: background 150ms ease, border-color 150ms ease; }
+.hF-chip:hover { border-color: var(--paper); background: rgba(255,255,255,.06); }
+.hF-chip[aria-pressed="true"] { background: var(--surface); border-color: var(--surface); color: var(--ink); }
+.hF-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 34px; }
+.hF-tile { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 16px; align-items: center; padding: 12px; border-radius: 18px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); transition: background 150ms ease, border-color 150ms ease; }
+.hF-tile:hover { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.3); }
+.hF-tile .ph { width: 92px; height: 92px; border-radius: 12px; overflow: hidden; background: repeating-linear-gradient(135deg, rgba(255,255,255,.08) 0 10px, rgba(255,255,255,.03) 10px 20px); }
+.hF-tile .ph img { width: 100%; height: 100%; object-fit: cover; }
+.hF-tile b { display: block; color: var(--paper); font-size: 16.5px; font-weight: 600; line-height: 1.25; letter-spacing: -0.01em; }
+.hF-tile small { display: block; margin-top: 5px; color: var(--on-dark-muted); font-size: 13.5px; line-height: 1.4; }
+.hF-note { margin: 16px 0 0; color: var(--on-dark-muted); font-size: 12.5px; }
+@media (prefers-reduced-motion: no-preference) { .hF-tile { animation: rise 460ms cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i) * 60ms); } }
+
+/* ---------- G · Bouwtekening ---------- */
+.hG { --crop: calc(50% + 900px) -900px; }
+.hG .wrap { padding-top: 34px; padding-bottom: 40px; }
+.hG .navyband::after, .hG::after { opacity: .16; }
+.g-box { position: relative; aspect-ratio: var(--ar, 1168 / 520); }
+.g-box > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.g-ln { fill: none; stroke: #fff; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.g-ln.faint { stroke-opacity: .22; }
+.g-ln.dash { stroke-opacity: .32; stroke-dasharray: 6 5; }
+.g-ln.lead { stroke-opacity: .7; }
+.g-ln.dim { stroke-opacity: .6; }
+.g-node { fill: var(--navy); stroke: #fff; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+.g-node.hot { fill: var(--yellow); stroke: var(--yellow); }
+.g-dimtext { fill: var(--on-dark-muted); font-family: var(--mono); font-size: 11px; letter-spacing: .14em; }
+.g-lab { position: absolute; transform: translateY(-50%); display: grid; gap: 2px; min-width: 0; }
+.g-lab.l { text-align: right; justify-items: end; }
+.g-lab i { font-style: normal; font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--on-dark-muted); }
+.g-lab b { display: inline-flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 600; color: var(--paper); letter-spacing: -0.01em; white-space: nowrap; }
+.g-lab:hover b { color: var(--yellow); }
+.g-tb { position: absolute; right: 0; bottom: 0; width: 24%; border: 1px solid rgba(255,255,255,.55); background: var(--navy); font-size: 13px; }
+.g-tb > div { border-top: 1px solid rgba(255,255,255,.35); padding: 5px 10px; }
+.g-tb > div:first-child { border-top: 0; }
+.g-tb span { display: block; font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--on-dark-muted); }
+.g-tb b { display: block; color: var(--paper); font-weight: 600; font-variant-numeric: tabular-nums; }
+.g-tb .g-tb-main b { font-size: 20px; letter-spacing: -0.02em; line-height: 1.1; }
+.g-tb .g-tb-grid { display: grid; grid-template-columns: 1fr 1fr; padding: 0; }
+.g-tb .g-tb-grid > div { padding: 5px 10px; }
+.g-tb .g-tb-grid > div:nth-child(2n) { border-left: 1px solid rgba(255,255,255,.35); }
+.g-tb .g-tb-grid > div:nth-child(n+3) { border-top: 1px solid rgba(255,255,255,.35); }
+.g-tb .g-tb-grid b.y { color: var(--yellow); }
+.g-list, .g-tb.m { display: none; }
+.g-draw { vector-effect: none; stroke-width: 1.2; }
+@media (prefers-reduced-motion: no-preference) {
+  .g-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw-line 1100ms cubic-bezier(.35,.6,.2,1) forwards; animation-delay: var(--d, 0s); }
+  .g-fade { animation: fade 700ms ease both; animation-delay: var(--d, 0s); }
+  .g-wipe { animation: wipe 1300ms cubic-bezier(.5,.1,.2,1) both; animation-delay: var(--d, 0s); }
+  .g-lab, .g-tb { animation: rise 520ms cubic-bezier(.2,.7,.2,1) both; animation-delay: var(--d, 0s); }
+  .g-lab { animation-name: g-rise; }
+}
+@keyframes g-rise { from { opacity: 0; transform: translateY(calc(-50% + 8px)); } }
+
+/* Ronde 2: varianten rond dezelfde tekening */
+.g-lab.nav { gap: 3px; }
+.g-lab.nav b { font-size: 21px; letter-spacing: -0.015em; }
+.g-lab.nav i { font-family: var(--sans); font-size: 13.5px; letter-spacing: 0; text-transform: none; }
+.g-lab.nav .g-u { border-bottom: 1px solid rgba(255,255,255,.45); padding-bottom: 2px; transition: border-color 150ms ease; }
+.g-lab.nav:hover .g-u { border-color: var(--yellow); }
+.g-lab.nav b svg { opacity: 0; transition: opacity 150ms ease, translate 150ms ease; }
+.g-lab.nav:hover b svg { opacity: 1; translate: 3px 0; }
+.g-list.nav li a { grid-template-columns: minmax(0, 1fr) 16px; }
+.g-list.nav b { display: block; }
+.g-list.nav i { display: block; margin-top: 2px; font-family: var(--sans); font-size: 13px; letter-spacing: 0; text-transform: none; }
+.g-list.nav svg { color: var(--on-dark-muted); }
+.g2-title { position: absolute; left: 28.25%; width: 44.52%; top: 12.6%; margin: 0; text-align: center; font-size: 40px; line-height: 1; font-weight: 600; letter-spacing: -0.03em; color: var(--paper); white-space: nowrap; }
+.g2-link { position: absolute; right: 0; bottom: 4%; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+.g2-m { display: none; }
+.g3-search { display: grid; justify-items: center; gap: 14px; max-width: 700px; margin: 0 auto; }
+.g3-field { width: 100%; display: flex; align-items: center; gap: 12px; height: 60px; padding: 0 9px 0 22px; border-radius: 999px; background: var(--surface); color: var(--ink); box-shadow: 0 18px 40px -22px rgba(0,0,0,.75); cursor: text; }
+.g3-field:focus-within { box-shadow: 0 0 0 3px var(--yellow), 0 18px 40px -22px rgba(0,0,0,.75); }
+.g3-field > svg { color: var(--muted); flex: none; }
+.g3-field input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: 500 17px/1 var(--sans); color: var(--ink); }
+.g3-field input::placeholder { color: var(--muted); }
+.g3-field button { height: 44px; padding: 0 20px; border-radius: 999px; border: 0; background: var(--ink); color: var(--paper); font-weight: 600; cursor: pointer; }
+.g3-sugg { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; }
+.g3-sugg .lbl { margin-right: 4px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--on-dark-muted); }
+.g3-sugg a { display: inline-flex; align-items: center; min-height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,.26); color: var(--paper); font-size: 13.5px; font-weight: 600; }
+.g3-sugg a:hover { border-color: var(--paper); background: rgba(255,255,255,.06); }
+.g4-note { position: absolute; left: 77.57%; top: 22.3%; width: 22.43%; display: grid; gap: 7px; }
+.g4-note i { font-style: normal; font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--on-dark-muted); }
+.g4-note h2 { margin: 0; font-size: 27px; line-height: 1.1; font-weight: 600; letter-spacing: -0.02em; color: var(--paper); text-wrap: balance; }
+.g4-note p { margin: 0; color: var(--on-dark-muted); font-size: 14.5px; line-height: 1.5; }
+.g4-note a { margin-top: 4px; width: fit-content; display: inline-flex; align-items: center; gap: 6px; }
+.g4-note.m { display: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .g2-title, .g2-link, .g4-note, .g3-search { animation: rise 600ms cubic-bezier(.2,.7,.2,1) both; animation-delay: var(--d, 1.2s); }
+}
+
+/* ---------- H · Jouw week ---------- */
+.hH .wrap { padding-top: 40px; padding-bottom: 46px; }
+.hH-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 10px 24px; margin-bottom: 24px; }
+.hH-head .h1 { font-size: 48px; }
+.hH-head p { margin: 0; color: var(--muted); font-size: 13px; }
+.hH-grid { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.stub { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 176px; overflow: hidden; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); }
+.stub-main { display: grid; grid-template-columns: 200px minmax(0, 1fr); min-width: 0; }
+.stub-shot { position: relative; background: var(--stripes); min-height: 190px; }
+.stub-shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.stub-shot .datepin { position: absolute; top: 14px; left: 14px; }
+.stub-body { display: grid; align-content: center; gap: 10px; padding: 22px 22px; min-width: 0; }
+.stub-body h3 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+.stub-tear { position: relative; display: grid; justify-items: center; align-content: center; gap: 8px; padding: 18px 14px; border-left: 2px dashed var(--line-2); text-align: center; }
+.stub-tear::before, .stub-tear::after { content: ""; position: absolute; left: -12px; width: 22px; height: 22px; border-radius: 999px; background: var(--paper); border: 1px solid var(--line); }
+.stub-tear::before { top: -12px; }
+.stub-tear::after { bottom: -12px; }
+.stub-tear b { font-size: 14px; }
+.stub-tear a { font-size: 13.5px; }
+.qr { width: 84px; height: 84px; color: var(--ink); }
+.hH-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.hH-list li { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 13px 2px; border-bottom: 1px solid var(--line); }
+.hH-ico { width: 36px; height: 36px; border-radius: 999px; display: grid; place-items: center; background: var(--paper-2); color: var(--ink); }
+.hH-ico.y { background: var(--yellow); }
+.hH-list b { display: block; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+.hH-list small { display: block; margin-top: 2px; color: var(--muted); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.hH-list em { font-style: normal; font-size: 12.5px; font-weight: 600; color: var(--body); white-space: nowrap; }
+.hH-empty { margin: 0 0 14px; color: var(--body); font-size: 15px; }
+.hH-anon { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr); gap: 28px; align-items: center; }
+.hH-anon p { margin: 14px 0 22px; color: var(--body); font-size: 17px; line-height: 1.6; max-width: 46ch; }
+.ghost { border: 1.5px dashed var(--line-2); border-radius: 22px; padding: 18px; display: grid; gap: 12px; background: repeating-linear-gradient(135deg, rgba(230,236,245,.55) 0 12px, transparent 12px 24px); }
+.ghost div { height: 14px; border-radius: 7px; background: var(--paper-2); }
+.ghost div:nth-child(1) { width: 40%; height: 22px; }
+.ghost div:nth-child(2) { width: 70%; }
+.ghost div:nth-child(3) { width: 55%; }
+@media (prefers-reduced-motion: no-preference) { .stub, .hH-list li { animation: rise 480ms cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 60ms); } }
+
+/* ---------- Wat eronder staat: nieuws en openingsuren, zoals nu ---------- */
+.nb { position: relative; z-index: 0; background: var(--paper-2); }
+.nb .wrap { padding-top: 52px; padding-bottom: 64px; }
+.sec-head { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 30px; }
+.sec-head h2 { margin: 0; font-size: 54px; line-height: 1; letter-spacing: -0.03em; font-weight: 600; }
+.sec-head .meta { font-size: 13px; color: var(--muted); }
+.sec-head .meta a { color: var(--ink); border-bottom: 1px solid var(--ink); font-weight: 600; }
+.nb-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 3fr); gap: 20px; align-items: start; }
+.nb-feat { display: grid; gap: 12px; padding: 20px 22px 22px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: inset 3px 0 0 var(--yellow); }
+.nb-kick { display: flex; justify-content: space-between; gap: 10px; align-items: center; font-size: 12px; color: var(--muted); }
+.nb-title { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+.nb-letter { margin: 0; color: var(--body); font-size: 14.5px; line-height: 1.62; display: -webkit-box; -webkit-line-clamp: 9; -webkit-box-orient: vertical; overflow: hidden; }
+.nb-feat .u { font-size: 14px; width: fit-content; }
+.nb-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.tile { overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+.tile-shot { position: relative; aspect-ratio: 16 / 9; background: var(--stripes); }
+.tile-shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.tile-body { display: grid; gap: 8px; padding: 12px 16px 16px; }
+.tile-title { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.25; }
+.tile-body p { margin: 0; color: var(--muted); font-size: 13px; }
+.hrs { --crop: calc(50% + 40px) -260px; }
+.hrs .wrap { padding-top: 44px; padding-bottom: 40px; }
+.hrs-head { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 18px; }
+.hrs-head h2 { margin: 0; font-size: 32px; font-weight: 600; letter-spacing: -0.02em; color: var(--paper); }
+.hrs-head span { font-size: 13px; color: var(--on-dark-muted); }
+.hrs-row { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 24px; align-items: center; padding: 14px 0; border-top: 1px solid rgba(255,255,255,.12); }
+.hrs-row b { display: block; color: var(--paper); font-size: 16px; font-weight: 600; }
+.hrs-row small { display: inline-flex; align-items: center; gap: 7px; color: var(--on-dark-muted); font-size: 13px; }
+.hrs-track { position: relative; height: 30px; border-radius: 8px; background: rgba(255,255,255,.05); }
+.hrs-bar { position: absolute; top: 0; bottom: 0; border-radius: 8px; background: rgba(255,255,255,.2); }
+.hrs-bar.open-end { background: repeating-linear-gradient(135deg, rgba(255,255,255,.2) 0 6px, rgba(255,255,255,.06) 6px 12px); border-radius: 8px 0 0 8px; }
+.hrs-now { position: absolute; top: -6px; bottom: -6px; width: 2px; border-radius: 2px; background: var(--yellow); }
+.site-more { padding: 26px 36px 34px; text-align: center; color: var(--muted); font-size: 13px; background: var(--paper); border-top: 1px solid var(--line); }
+
+/* Aankomende evenementen, met de tegel uit vtk-eventcard.css */
+.evb { position: relative; z-index: 0; background: var(--paper-2); }
+.evb.gap { margin-top: 96px; }
+.evb.on-paper { background: var(--paper); }
+.evb .wrap { padding-top: 52px; padding-bottom: 64px; }
+.ev-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.ev-card { position: relative; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+.ev-shot { position: relative; aspect-ratio: 16 / 9; background: var(--stripes); }
+.ev-shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ev-shot .datepin { position: absolute; right: 16px; bottom: -28px; z-index: 1; }
+.ev-body { display: flex; flex: 1; flex-direction: column; padding: 10px 16px 10px; }
+.ev-tags { display: flex; align-items: center; gap: 8px; min-height: 21px; margin-bottom: 4px; padding-right: 66px; }
+.ev-cat { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 500; color: var(--muted); }
+.ev-cat::before { content: ""; width: 7px; height: 7px; border-radius: 999px; background: var(--cat); }
+.ev-title { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.22; }
+.ev-title.ruled::after { margin-top: 7px; }
+.ev-foot { display: flex; align-items: center; gap: 10px; margin-top: auto; padding-top: 12px; }
+.ev-when { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.ev-act { display: flex; align-items: center; gap: 2px; margin-right: -6px; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.ev-act > span { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 999px; }
+.ev-act > em { font-style: normal; margin-right: 4px; }
+.ev-none { margin: 0; color: var(--body); font-size: 15px; }
+
+/* ===================================================================
+   Telefoon: de homepage reageert op haar eigen breedte.
+   =================================================================== */
+@container (max-width: 700px) {
+  .site .wrap { padding-left: 20px; padding-right: 20px; }
+  .sh .wrap { min-height: 64px; gap: 12px; justify-content: space-between; }
+  .sh-logo img { height: 30px; }
+  .sh-nav, .sh-lang { display: none; }
+  .sh-menu { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 999px; border: 1px solid rgba(255,255,255,.22); }
+  .sh-login { height: 36px; padding: 0 12px; font-size: 13px; }
+  .h1 { font-size: 34px; }
+  .h1.ruled::after { margin-top: 9px; height: 3px; }
+
+  .hA .wrap { grid-template-columns: minmax(0, 1fr); padding-top: 34px; padding-bottom: 84px; gap: 0; }
+  .hA-pin { position: absolute; right: 20px; bottom: -46px; width: 112px; height: 112px; margin: 0; border-radius: 26px; }
+  .hA-pin b { font-size: 52px; }
+  .hA-pin i { font-size: 11px; }
+  .hA .facts { font-size: 14px; }
+  .hA-also li { grid-template-columns: 96px minmax(0, 1fr); gap: 2px 12px; }
+  .hA-also em { grid-column: 2; }
+  .hA + .nb .wrap { padding-top: 70px; }
+
+  .hB .wrap { padding-top: 40px; padding-bottom: 42px; }
+  .hB-s { font-size: 34px; line-height: 1.16; }
+  .hB-l { background-size: 100% 4px; }
+
+  .hC .wrap { padding-top: 24px; padding-bottom: 32px; }
+  .hC-card { grid-template-columns: minmax(0, 1fr); border-radius: 18px; }
+  .hC-side { border-left: 0; border-top: 1px solid var(--line); }
+  .hC-body { padding: 18px 18px 16px; }
+  .hC-title { font-size: 28px; }
+
+  .hD-band .wrap { grid-template-columns: minmax(0, 1fr); padding-top: 34px; padding-bottom: 120px; }
+  .hD-meta { text-align: left; }
+  .hD.has-band .hD-platewrap { margin-top: -96px; }
+  .hD-frame { aspect-ratio: 16 / 10; border-radius: 18px; }
+  .hD-capline strong { font-size: 19px; }
+
+  .hE .wrap { grid-template-columns: minmax(0, 1fr); gap: 0; padding-top: 32px; padding-bottom: 36px; }
+  .hE-list button { font-size: 28px; padding: 3px 0; }
+  .hE-list li[aria-current]::before { top: 8px; bottom: auto; height: 30px; }
+  .hE > .wrap > .hE-panel { display: none; }
+  .hE-inline { display: block; padding: 6px 0 18px; }
+  .hE-intro { font-size: 15px; margin-bottom: 12px; }
+  .hE-items b { font-size: 15.5px; }
+
+  .hF .wrap { padding-top: 34px; padding-bottom: 38px; }
+  .hF-q { gap: 8px; }
+  .hF-q .h1 { width: 100%; margin: 0 0 6px; }
+  .hF-chip { height: 44px; padding: 0 18px; font-size: 16px; }
+  .hF-tiles { grid-template-columns: minmax(0, 1fr); gap: 10px; margin-top: 22px; }
+  .hF-tile { grid-template-columns: 64px minmax(0, 1fr); }
+  .hF-tile .ph { width: 64px; height: 64px; }
+
+  .hG .wrap { padding-top: 26px; padding-bottom: 30px; }
+  .g-box { margin-inline: -8px; }
+  .g-lab, .g-lead, .g-dimtext, .g-dimgrp { display: none; }
+  .g-box .g-tb { display: none; }
+  .g2-title, .g2-link, .g-box .g4-note { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .g2-m { display: block; }
+  .g2-m.t { margin: 0 0 6px; font-size: 34px; line-height: 1.05; font-weight: 600; letter-spacing: -0.03em; color: var(--paper); }
+  .g2-m.s { margin: 10px 0 0; font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--on-dark-muted); }
+  .g4-note.m { display: grid; position: static; width: auto; margin-top: 14px; }
+  .g3-field { height: 52px; padding-left: 16px; }
+  .g3-field input { font-size: 16px; }
+  .g3-field button { display: none; }
+  .g3-sugg { justify-content: flex-start; }
+  .g-tb.m { display: block; position: static; width: 100%; margin-top: 18px; }
+  .g-list { display: block; list-style: none; margin: 14px 0 0; padding: 0; border-top: 1px solid rgba(255,255,255,.16); }
+  .g-list li a { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.16); }
+  .g-list i { font-style: normal; font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--on-dark-muted); }
+  .g-list b { display: inline-flex; align-items: center; gap: 8px; color: var(--paper); font-weight: 600; font-size: 15px; }
+
+  .hH .wrap { padding-top: 28px; padding-bottom: 32px; }
+  .hH-head .h1 { font-size: 34px; }
+  .hH-grid, .hH-anon { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .stub { grid-template-columns: minmax(0, 1fr) 112px; }
+  .stub-main { grid-template-columns: minmax(0, 1fr); }
+  .stub-shot { min-height: 0; aspect-ratio: 16 / 9; }
+  .stub-body { padding: 14px 16px 16px; }
+  .stub-body h3 { font-size: 18px; }
+  .qr { width: 64px; height: 64px; }
+
+  .nb .wrap { padding-top: 36px; padding-bottom: 40px; }
+  .sec-head h2 { font-size: 36px; }
+  .nb-grid, .nb-tiles { grid-template-columns: minmax(0, 1fr); }
+  .nb-tiles .tile:nth-child(n+2) { display: none; }
+  .evb .wrap { padding-top: 36px; padding-bottom: 40px; }
+  .evb.gap { margin-top: 56px; }
+  .ev-grid { grid-template-columns: minmax(0, 1fr); }
+  .ev-grid .ev-card:nth-child(n+4) { display: none; }
+  .hrs-head h2 { font-size: 26px; }
+  .hrs-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .site-more { padding-inline: 20px; }
+}
+</style>
+
+<div class="board">
+  <header class="bh">
+    <h1>Hero voor vtk.be</h1>
+    <p><b>Ronde 2: de bouwtekening.</b> De tekening en de animatie zijn in alle zes gelijk; enkel wat errond staat verschilt. G staat erbij zoals in ronde 1, ter vergelijking. "Opnieuw tekenen" speelt de animatie nog eens af.</p>
+    <p class="bh-not"><b>Weg uit ronde 1:</b> de openingsuren, tickets en shiften als labels, en de titelhoek rechtsonder. Ze staan enkel nog in G, ter vergelijking.</p>
+    <p class="bh-rec"><b>Aanbeveling: G2, Maatlijn als titel.</b> De enige tekst is de naam, en die staat in de taal van de tekening zelf. Wat elke week verandert (nieuws, openingsuren, evenementen) staat al in de banden eronder, dus de hero hoeft niets te herhalen.</p>
+    <p class="bh-src">Evenementen en aantallen zijn voorbeeldinhoud; de navigatie is de echte uit /admin/home. "Nu" is donderdag 29 oktober, 12:40. De acht richtingen van ronde 1 staan nog onder het kiesvak.</p>
+    <details class="r1-intro"><summary>Uitleg bij ronde 1</summary>
+    <p>Acht richtingen voor de bovenkant van de homepage. Elke richting staat in de echte pagina: de navy kop, de hero, en daaronder het nieuws en de openingsuren zoals ze er nu staan. Ze bouwen op wat je mooi vindt aan /kalender, /tickets en de /p/-pagina's: de navy paginakop met het technisch patroon en de gele streep, de gele datumpin, de streep onder een titel, de chips, de fotoplaat en de rail.</p>
+    <p class="bh-not"><b>Bewust niet hergebruikt:</b> de Arenberg-foto, elke slogan (ook "De thuis voor ingenieurs in Leuven."), het regeltje "Vlaamse Technische Kring · KU Leuven" met het stipje, de ondertitel over events, cursussen en broodjes, de knoppen "Ontdek wat we doen" en "Eerstejaars? Start hier", de weekagenda naast de tekst, de open shiften in de hero en de aftelklok.</p>
+    <p><b>Ronde 1, aanbeveling A, Kalenderblad.</b> Het is de kop die je al mooi vindt op /tickets en /p/, met het ene ding van /kalender dat iedereen herkent, en ze zegt elke dag iets anders zonder dat iemand iets moet invullen.</p>
+    </details>
+  </header>
+
+  <div class="picker" id="picker" role="group" aria-label="Variant"></div>
+  <div class="r1" id="r1" role="group" aria-label="Ronde 1"></div>
+
+  <div class="controls" id="controls"></div>
+
+  <section class="about" id="about" aria-live="polite"></section>
+
+  <div class="stage" id="stage"></div>
+
+  <section class="choice">
+    <h2>Jouw keuze</h2>
+    <label for="note">Opmerking (komt mee in de regel hieronder)</label>
+    <textarea id="note" placeholder="Bv. G2, maar de naam kleiner, of: G1 met vier labels in plaats van zes"></textarea>
+    <div class="choice-row">
+      <code id="choiceText"></code>
+      <button class="copy" id="copy" type="button">Kopieer</button>
+    </div>
+  </section>
+</div>
+
+<script>
+const IMG = {"galabal": "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "jobfair": "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "aula": "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "trein": "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "studs": "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "theokot": "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "klas": "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "nacht": "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "logo": "data:image/png;base64,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"};
+// Data-URI's één keer omzetten naar korte blob-URL's: anders staat elke foto acht keer als tekst in het overzicht.
+for (const k in IMG) {
+  try {
+    const [head, b64] = IMG[k].split(',');
+    const bin = atob(b64), u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    IMG[k] = URL.createObjectURL(new Blob([u8], { type: head.slice(5).split(';')[0] }));
+  } catch (e) {}
+}
+
+/* ---------- Iconen (lijnstijl zoals components/ui/icons.tsx) ---------- */
+const P = {
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  pin: '<path d="M12 21s-6.5-5.8-6.5-11A6.5 6.5 0 0 1 18.5 10c0 5.2-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
+  people: '<circle cx="9" cy="8.5" r="3"/><path d="M3.5 19.5c0-3 2.5-5.3 5.5-5.3s5.5 2.3 5.5 5.3"/><path d="M15.5 5.6a3 3 0 0 1 0 5.8M17.5 14.6c1.8.7 3 2.5 3 4.9"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  ext: '<path d="M8 16L16 8M9.5 8H16v6.5"/>',
+  chevL: '<path d="M14.5 6l-6 6 6 6"/>',
+  chevR: '<path d="M9.5 6l6 6-6 6"/>',
+  chevD: '<path d="M7 10l5 5 5-5"/>',
+  search: '<circle cx="11" cy="11" r="6.3"/><path d="M20 20l-4.3-4.3"/>',
+  menu: '<path d="M4.5 7.5h15M4.5 12h15M4.5 16.5h15"/>',
+  user: '<circle cx="12" cy="8.5" r="3.6"/><path d="M5 20c.8-3.6 3.6-5.6 7-5.6s6.2 2 7 5.6"/>',
+  star: '<path d="M12 3.8l2.5 5.2 5.7.8-4.1 4 1 5.6-5.1-2.7-5.1 2.7 1-5.6-4.1-4 5.7-.8z"/>',
+  check: '<path d="M5 12.5l4.2 4.2L19 7"/>',
+  shift: '<rect x="4" y="5.5" width="16" height="14" rx="2.5"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/>',
+  cal: '<path d="M8 2v4M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
+  tix: '<path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2a2 2 0 0 0 0-4Z"/><path d="M14 6v2M14 11v2M14 16v2"/>',
+  sandwich: '<path d="m2.4 11.2 8.3-6.8a2 2 0 0 1 2.6 0l8.3 6.8"/><rect width="20" height="4" x="2" y="11" rx="1"/><path d="M3 15a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>',
+  book: '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
+  beer: '<path d="M17 11h1a3 3 0 0 1 0 6h-1"/><path d="M9 12v6M13 12v6"/><path d="M5 8v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8"/><path d="M5 8a2.5 2.5 0 0 1 .5-5c.8 0 1.6.5 2.5.5S9.4 2 11 2s2 1.5 3 1.5 1.7-.5 2.5-.5a2.5 2.5 0 0 1 .5 5z"/>',
+  case: '<path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/>',
+  ticket: '<path d="M4 8.5a2 2 0 0 0 2-2h12a2 2 0 0 0 2 2v2a1.5 1.5 0 0 0 0 3v2a2 2 0 0 0-2 2H6a2 2 0 0 0-2-2v-2a1.5 1.5 0 0 0 0-3z"/>',
+};
+function ic(name, size = 16, fill = false) {
+  return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="${fill ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name]}</svg>`;
+}
+const fact = (i, t) => `<span>${ic(i, 15)}${t}</span>`;
+
+/* ---------- Inhoud ---------- */
+const NAV = [['Info', 1], ['Broodjes', 0], ['Career', 1], ['Cursusdienst', 1], ['Eerstejaars', 1], ['Evenementen', 1], ['Studies', 1], ['Media', 0], ['Over VTK', 1]];
+
+const WEEK = {
+  normal: {
+    kickB: 'Deze week, donderdag 29 oktober',
+    iso: '44', date: '29.10.2026',
+    hours: [
+      { n: 'Theokot', v: 'Open, tot 14:00', s: 'ok', from: 11.75, to: 14 },
+      { n: 'Cursusdienst', v: 'Open, tot 17:00', s: 'ok', from: 10, to: 17 },
+      { n: "'t ElixIr", v: 'Vanavond vanaf 21:00', s: 'later', from: 21, to: null },
+    ],
+    days: [
+      { rel: 'Vandaag', long: 'donderdag 29 oktober', wd: 'do', d: '29', m: 'okt',
+        main: { title: 'Halloweencantus', time: '20:30 tot 02:00', place: 'Waaiberg', going: 126 },
+        also: [
+          { t: '18:00-20:00', n: 'PAL-sessie Analyse I, Aula 200C', v: 'Inschrijven', s: 'later' },
+          { t: '11:45-14:00', n: 'Theokot', v: 'Open', s: 'ok' },
+          { t: '10:00-17:00', n: 'Cursusdienst', v: 'Open', s: 'ok' },
+        ] },
+      { rel: 'Morgen', long: 'vrijdag 30 oktober', wd: 'vr', d: '30', m: 'okt',
+        next: 'zondag 1 november, Galabal der Ingenieurs',
+        also: [
+          { t: '11:45-14:00', n: 'Theokot', v: 'Open', s: 'ok' },
+          { t: '10:00-15:00', n: 'Cursusdienst', v: 'Open', s: 'ok' },
+          { t: 'vanaf 21:00', n: "'t ElixIr", v: 'Open', s: 'later' },
+        ] },
+      { rel: 'Zaterdag', long: 'zaterdag 31 oktober', wd: 'za', d: '31', m: 'okt',
+        next: 'zondag 1 november, Galabal der Ingenieurs', also: [], none: 'De Theokot, de cursusdienst en \'t ElixIr zijn dicht in het weekend.' },
+      { rel: 'Zondag', long: 'zondag 1 november', wd: 'zo', d: '1', m: 'nov',
+        main: { title: 'Galabal der Ingenieurs', time: '20:00 tot 03:00', place: 'Hal 5', going: 214 },
+        also: [ { t: 'tot zaterdag', n: 'Ticketverkoop Galabal', v: 'Nog 84 tickets', s: 'ok' } ] },
+      { rel: 'Maandag', long: 'maandag 2 november', wd: 'ma', d: '2', m: 'nov',
+        next: 'dinsdag 3 november, Career Talk',
+        also: [
+          { t: '11:45-14:00', n: 'Theokot', v: 'Open', s: 'ok' },
+          { t: '10:00-17:00', n: 'Cursusdienst', v: 'Open', s: 'ok' },
+        ] },
+      { rel: 'Dinsdag', long: 'dinsdag 3 november', wd: 'di', d: '3', m: 'nov',
+        main: { title: 'Career Talk: van thesis naar eerste job', time: '19:30 tot 21:00', place: 'Aula 200C', going: 58 },
+        also: [
+          { t: '11:45-14:00', n: 'Theokot', v: 'Open', s: 'ok' },
+          { t: '10:00-17:00', n: 'Cursusdienst', v: 'Open', s: 'ok' },
+        ] },
+      { rel: 'Woensdag', long: 'woensdag 4 november', wd: 'wo', d: '4', m: 'nov',
+        next: 'donderdag 5 november, Eerstejaarsavond',
+        also: [
+          { t: '11:45-14:00', n: 'Theokot', v: 'Open', s: 'ok' },
+          { t: '10:00-13:00', n: 'Cursusdienst', v: 'Open', s: 'ok' },
+        ] },
+      { rel: 'Volgende donderdag', long: 'donderdag 5 november', wd: 'do', d: '5', m: 'nov',
+        main: { title: 'Eerstejaarsavond', time: 'vanaf 21:00', place: "'t ElixIr", going: 88 },
+        also: [
+          { t: '11:45-14:00', n: 'Theokot', v: 'Open', s: 'ok' },
+          { t: '10:00-17:00', n: 'Cursusdienst', v: 'Open', s: 'ok' },
+        ] },
+    ],
+  },
+  exam: {
+    kickB: 'Examenperiode, donderdag 14 januari',
+    iso: '2', date: '14.01.2027',
+    hours: [
+      { n: 'Theokot', v: 'Open, tot 14:00', s: 'ok', from: 11.75, to: 14 },
+      { n: 'Cursusdienst', v: 'Open, tot 16:00', s: 'ok', from: 10, to: 16 },
+      { n: "'t ElixIr", v: 'Gesloten tijdens de examens', s: 'closed', from: null, to: null },
+    ],
+    days: [
+      { rel: 'Vandaag', long: 'donderdag 14 januari', wd: 'do', d: '14', m: 'jan',
+        next: 'maandag 8 februari, Semesteropening',
+        also: [
+          { t: '11:45-14:00', n: 'Theokot', v: 'Open', s: 'ok' },
+          { t: '10:00-16:00', n: 'Cursusdienst', v: 'Open', s: 'ok' },
+          { t: 'tot 6 februari', n: "'t ElixIr", v: 'Gesloten', s: 'closed' },
+        ] },
+      { rel: 'Eerstvolgende', long: 'maandag 8 februari', wd: 'ma', d: '8', m: 'feb',
+        main: { title: 'Semesteropening', time: 'vanaf 21:00', place: "'t ElixIr", going: 41 },
+        also: [ { t: 'vanaf 25 januari', n: 'Ticketverkoop Semesteropening', v: 'Nog niet', s: 'later' } ] },
+    ],
+  },
+};
+
+const SENT = {
+  normal: ['Vanavond', { l: 'Halloweencantus' }, 'in de Waaiberg, zondag het', { l: 'Galabal der Ingenieurs' }, 'in Hal 5, en dinsdag een', { l: 'Career Talk' }, 'over je eerste job.'],
+  own: ['De inschrijvingen voor de', { l: 'skireis naar Les Arcs' }, 'lopen nog tot 15 november. Wie meegaat, betaalt het voorschot', { l: 'bij de cursusdienst' }, '.'],
+  exam: ['Tijdens de examens staat er niets op de kalender. De', { l: 'cursusdienst' }, 'is open tot 16:00, de', { l: 'Theokot' }, 'tot 14:00, en op 8 februari begint het tweede semester met de', { l: 'Semesteropening' }, '.'],
+};
+
+const TICKETED = {
+  normal: [
+    { chip: 'Galabal der Ingenieurs', img: 'galabal', wd: 'zo', d: '1', m: 'nov', owner: 'Activiteiten',
+      title: 'Galabal der Ingenieurs', time: '20:00 tot 03:00', place: 'Hal 5', going: 214,
+      sum: 'Het gala van de faculteit: diner om 20:00, dansen vanaf 22:30, en de ploeg van de Theokot achter de bar. Dresscode black tie.',
+      member: [{ n: 'Lid', v: '€ 38' }, { n: 'Tafel voor tien', v: '€ 360', sub: 'Tien leden, één bestelling' }],
+      guest: [{ n: 'Niet-lid', v: '€ 45' }, { n: 'Lid', v: '€ 38', sub: 'Meld je aan voor de ledenprijs' }],
+      left: 'Nog 84 tickets', cta: 'Tickets kopen' },
+    { chip: 'Buddy-uitstap naar Gent', img: 'trein', wd: 'za', d: '7', m: 'nov', owner: 'Internationaal',
+      title: 'Buddy-uitstap naar Gent', time: '09:30 tot 19:00', place: 'Station Leuven', going: 37,
+      sum: 'Een dag Gent met je buddy: stadswandeling, lunch aan de Graslei en een rondvaart. Trein inbegrepen.',
+      member: [{ n: 'Met buddykaart', v: '€ 12' }],
+      guest: [{ n: 'Zonder buddykaart', v: '€ 18' }, { n: 'Met buddykaart', v: '€ 12', sub: 'Meld je aan om je kaart te gebruiken' }],
+      left: 'Nog 23 plaatsen', cta: 'Inschrijven' },
+    { chip: 'Career Talk', img: 'aula', wd: 'di', d: '3', m: 'nov', owner: 'Career',
+      title: 'Career Talk: van thesis naar eerste job', time: '19:30 tot 21:00', place: 'Aula 200C', going: 58,
+      sum: 'Vier alumni vertellen hoe ze van hun thesis bij hun eerste werkgever belandden. Daarna broodjes en vragen.',
+      member: [{ n: 'Student', v: 'Gratis', sub: 'Met inschrijving, broodjes inbegrepen' }],
+      guest: [{ n: 'Student', v: 'Gratis', sub: 'Met inschrijving, broodjes inbegrepen' }],
+      left: 'Nog 41 plaatsen', cta: 'Inschrijven' },
+  ],
+  exam: [
+    { chip: 'Semesteropening', img: 'studs', wd: 'ma', d: '8', m: 'feb', owner: 'Activiteiten',
+      title: 'Semesteropening', time: 'vanaf 21:00', place: "'t ElixIr", going: 41,
+      sum: 'Het tweede semester begint in \'t ElixIr, met de eerste vat van het jaar en de nieuwe ploeg achter de bar.',
+      soon: 'maandag 25 januari om 12:00' },
+  ],
+};
+
+const PHOTOS = {
+  jobfair: { img: 'jobfair', title: 'Jobfair 2026', focus: '50% 55%', alt: 'Volle gangen tussen de standen op de Jobfair',
+    meta: 'Hal 5<br>18 februari 2026<br>Foto: Media', caption: 'De Jobfair van februari in Hal 5: de gang tussen de standen, kort na de opening.' },
+  galabal: { img: 'galabal', title: 'Galabal 2026', focus: '50% 40%', alt: 'Tafels aan het diner van het Galabal',
+    meta: 'Maart 2026<br>Foto: Media', caption: 'Het diner voor het bal, een half uur voor het dansen begon.' },
+};
+
+const REG = [
+  { id: 'events', label: 'Evenementen', intro: 'Activiteiten, cantussen en uitstappen van alle posten, en de tickets die ervoor te koop zijn.',
+    items: { normal: [['Kalender', '7 activiteiten deze week'], ['Tickets', '3 verkopen lopen'], ['Cantussen', 'Vanavond om 20:30'], ['Exchange & buddies', '']],
+             exam: [['Kalender', 'Niets tot 8 februari'], ['Tickets', 'Volgende verkoop op 25 januari'], ['Cantussen', ''], ['Exchange & buddies', '']] } },
+  { id: 'theokot', label: 'Broodjes', intro: 'De Theokot maakt elke middag broodjes, van studenten voor studenten.',
+    items: { normal: [['Bestellen', ['ok', 'Open, tot 14:00']], ['Openingsuren', ''], ['De Theokot huren', '']],
+             exam: [['Bestellen', ['ok', 'Open, tot 14:00']], ['Openingsuren', ''], ['De Theokot huren', '']] } },
+  { id: 'cudi', label: 'Cursusdienst', intro: 'Je cursussen, boeken en de printer, op cudi.vtk.be.',
+    items: { normal: [['Bestel boeken', ['ok', 'Open, tot 17:00'], 1], ['Tweedehands', '', 1], ['Printer', '', 1], ['Subsidies', '', 1]],
+             exam: [['Bestel boeken', ['ok', 'Open, tot 16:00'], 1], ['Tweedehands', '', 1], ['Printer', '', 1], ['Subsidies', '', 1]] } },
+  { id: 'career', label: 'Career', intro: 'Bedrijven ontmoeten, van een talk op de campus tot de Jobfair.',
+    items: { normal: [['Jobfair', '', 1], ['Contact voor bedrijven', '', 1], ['career.vtk.be', '', 1]], exam: [['Jobfair', '', 1], ['Contact voor bedrijven', '', 1], ['career.vtk.be', '', 1]] } },
+  { id: 'studies', label: 'Studies', intro: 'Onderwijs, PAL-sessies en de samenvattingen op Burgieclan.',
+    items: { normal: [['Onderwijs', ''], ['Peer Assisted Learning', 'Vanavond om 18:00'], ['Burgieclan', '', 1]], exam: [['Onderwijs', ''], ['Peer Assisted Learning', ''], ['Burgieclan', '', 1]] } },
+  { id: 'eerstejaars', label: 'Eerstejaars', intro: 'Alles voor je eerste jaar: de onthaaldagen, je peter of meter en wie je kan aanspreken.',
+    items: { normal: [['Eerstejaarswerking', ''], ['Onthaaldagen 2026-2027', ''], ['Peter en meter werking', ''], ['Eerstejaarsverantwoordelijke', '']],
+             exam: [['Eerstejaarswerking', ''], ['Onthaaldagen 2026-2027', ''], ['Peter en meter werking', ''], ['Eerstejaarsverantwoordelijke', '']] } },
+  { id: 'info', label: 'Info', intro: 'Praktische diensten, campusvoorzieningen en tools die je semester vlotter maken.',
+    items: { normal: [['Sport', ''], ['Shiften', '9 open plaatsen'], ['Uitleendienst', ''], ['Veel gestelde vragen', ''], ['Piano reserveren', '']],
+             exam: [['Sport', ''], ['Shiften', 'Geen shiften tijdens de examens'], ['Uitleendienst', ''], ['Veel gestelde vragen', ''], ['Piano reserveren', '']] } },
+  { id: 'media', label: 'Media', intro: "Foto's en aftermovies van alles wat VTK organiseert.",
+    items: { normal: [["Foto's", ''], ['Aftermovies', '']], exam: [["Foto's", ''], ['Aftermovies', '']] } },
+  { id: 'over', label: 'Over VTK', intro: 'Wie de kring draagt: het praesidium, de werkgroepen en de jaarwerkingen.',
+    items: { normal: [['Praesidium', ''], ['Werkgroepen', ''], ['Jaarwerkingen', ''], ['Verkiezingen', ''], ['Contact', '']],
+             exam: [['Praesidium', ''], ['Werkgroepen', ''], ['Jaarwerkingen', ''], ['Verkiezingen', ''], ['Contact', '']] } },
+];
+
+const WHO = [
+  { id: 'eerstejaars', label: 'eerstejaars', tiles: {
+    normal: [['Onthaaldagen 2026-2027', 'Wat er de eerste weken gebeurt', 'studs'], ['Peter en meter', 'Een ouderejaars die je wegwijs maakt', 'theokot'], ['Eerstejaarsavond', "Donderdag 5 november, 't ElixIr", 'nacht'], ['Cursussen bestellen', 'Cursusdienst open tot 17:00', 'klas']],
+    exam: [['Onthaaldagen 2026-2027', 'Wat er de eerste weken gebeurt', 'studs'], ['Peter en meter', 'Een ouderejaars die je wegwijs maakt', 'theokot'], ['Semesteropening', "Maandag 8 februari, 't ElixIr", 'nacht'], ['Cursussen bestellen', 'Cursusdienst open tot 16:00', 'klas']] } },
+  { id: 'ouderejaars', label: 'ouderejaars', tiles: {
+    normal: [['Tickets', 'Galabal der Ingenieurs: nog 84', 'galabal'], ['Shiften', '9 open plaatsen deze week', 'theokot'], ['Burgieclan', 'Samenvattingen en examens per vak', 'klas'], ['Uitleendienst', 'Materiaal en een bestelwagen voor je activiteit', 'studs']],
+    exam: [['Tickets', 'Volgende verkoop op 25 januari', 'galabal'], ['Shiften', 'Geen shiften tijdens de examens', 'theokot'], ['Burgieclan', 'Samenvattingen en examens per vak', 'klas'], ['Uitleendienst', 'Materiaal en een bestelwagen voor je activiteit', 'studs']] } },
+  { id: 'exchange', label: 'exchange student', tiles: {
+    normal: [['Exchange & buddies', 'Koppel je aan een buddy uit Leuven', 'trein'], ['Buddy-uitstap naar Gent', 'Zaterdag 7 november, nog 23 plaatsen', 'nacht'], ['Internationale studenten', 'Praktische vragen over je eerste weken', 'studs'], ['Read vtk.be in English', 'Alles op deze site, in het Engels', '']],
+    exam: [['Exchange & buddies', 'Koppel je aan een buddy uit Leuven', 'trein'], ['Welkomstweek februari', 'Voor wie in het tweede semester start', 'nacht'], ['Internationale studenten', 'Praktische vragen over je eerste weken', 'studs'], ['Read vtk.be in English', 'Alles op deze site, in het Engels', '']] } },
+  { id: 'bedrijf', label: 'een bedrijf', tiles: {
+    normal: [['Jobfair', 'Standen voor de editie van februari 2027', 'jobfair'], ['Career Talks', 'Spreek studenten aan op de campus', 'aula'], ['Partner worden', 'Hoofdpartner of partner van een activiteit', 'galabal'], ['Contact voor bedrijven', 'career.vtk.be', 'klas']],
+    exam: [['Jobfair', 'Standen voor de editie van februari 2027', 'jobfair'], ['Career Talks', 'Spreek studenten aan op de campus', 'aula'], ['Partner worden', 'Hoofdpartner of partner van een activiteit', 'galabal'], ['Contact voor bedrijven', 'career.vtk.be', 'klas']] } },
+];
+
+const G_LABELS = {
+  normal: [
+    ['Theokot', 'Open, tot 14:00', 'ok'], ['Cursusdienst', 'Open, tot 17:00', 'ok'], ['Kalender', '7 activiteiten deze week', ''],
+    ["'t ElixIr", 'Vanavond vanaf 21:00', 'later'], ['Tickets', 'Galabal: nog 84', ''], ['Shiften', '9 open plaatsen', ''],
+  ],
+  exam: [
+    ['Theokot', 'Open, tot 14:00', 'ok'], ['Cursusdienst', 'Open, tot 16:00', 'ok'], ['Kalender', 'Niets tot 8 februari', ''],
+    ["'t ElixIr", 'Gesloten tijdens de examens', 'closed'], ['Tickets', 'Volgende verkoop op 25 januari', ''], ['Shiften', 'Geen tijdens de examens', ''],
+  ],
+};
+
+const DIRS = [
+  { id: 'A', name: 'Kalenderblad', from: 'Paginakop en datumpin van /kalender', rec: true,
+    what: 'De homepage opent met dezelfde navy kop als /tickets en elke /p/-pagina. De titel is wat er vandaag gebeurt, en de gele datumpin van een eventtegel hangt op heroformaat over de gele streep, zoals ze op een tegel over de onderrand van de affiche hangt. Met de pijltjes blader je per dag vooruit, als een scheurkalender.',
+    dl: [['Leent van', 'De paginakop (alle pagina\'s), de datumpin en de titelstreep (/kalender), de haarlijnen van de rail (/p/)'], ['Beheer', 'Niets: alles komt uit de kalender en de openingsuren.'], ['Lege dag', 'Zegt dat er niets is en noemt de eerstvolgende activiteit. Zet Week op Examenperiode.'], ['Telefoon', 'De pin wordt 112 px en hangt nog altijd over de streep.']] },
+  { id: 'B', name: 'Zin', from: 'Paginakop en de beweging van /p/',
+    what: 'Geen foto en geen knoppen: één zin over deze week, opgebouwd uit de kalender. Elke activiteit in de zin is een link, met de gele streep die zich onder de naam tekent. De woorden komen binnen zoals de koppen van een inhoudspagina.',
+    dl: [['Leent van', 'De paginakop, en de beweging van de inhoudspagina\'s: woord per woord, een streep die zich tekent'], ['Beheer', 'Automatisch, of een eigen zin in /admin/home voor een week waarin iets anders voorgaat.'], ['Lege week', 'Wordt een zin over wat er wel open is.'], ['Telefoon', 'Dezelfde zin op 34 px; de zin is de hele hero.']] },
+  { id: 'C', name: 'Uitgelicht', from: 'De ticketkaart en chips van /tickets',
+    what: 'Eén activiteit met tickets, in de vorm van de kaart op /tickets maar op heroformaat: de affiche met de datum, wat het is, en rechts de prijzen zoals deze bezoeker ze betaalt. De chips erboven wisselen tussen wat er uitgelicht staat.',
+    dl: [['Leent van', 'De kaart en de filterchips van /tickets, de titelstreep, de gele datum'], ['Beheer', 'Een vinkje "Uitgelicht op de homepage" per ticketverkoop; zonder vinkje de eerstvolgende verkoop.'], ['Lege week', 'De eerstvolgende activiteit, met het moment waarop de verkoop start.'], ['Telefoon', 'Affiche, tekst en prijzen onder elkaar.']] },
+  { id: 'D', name: 'Plaat', from: 'De fotoplaat van /p/',
+    what: 'De homepage opent met een foto van de kring zelf, onbewerkt en zonder waas, zoals de plaat op een /p/-pagina. Media kiest elke week een foto uit een album; de kop zegt waar en wanneer. Geen campusfoto: een moment van dit jaar.',
+    dl: [['Leent van', 'De fotoplaat van 2,45:1 met bijschrift (/p/), de paginakop'], ['Beheer', 'Een foto, een bijschrift en een album, in /admin/media.'], ['Lege week', 'Er is altijd een foto; zonder nieuwe keuze blijft de vorige staan.'], ['Telefoon', 'De plaat wordt 16:10, zoals op /p/.']] },
+  { id: 'E', name: 'Register', from: 'De inhoudsopgave in de rail van /p/',
+    what: 'Een inhoudsopgave van de hele site, groot gezet in de taal van de rail op /p/: een haarlijn langs links, en het gele streepje bij de categorie waar je op staat. Rechts wat eronder valt, met wat er nu speelt. Klik een woord.',
+    dl: [['Leent van', 'De rail van een inhoudspagina (/p/), de categoriepagina\'s'], ['Beheer', 'Niets: het volgt de navigatie uit /admin/home.'], ['Lege week', 'Verandert niet; enkel de statusregels rechts.'], ['Telefoon', 'Een uitklaplijst: de pagina\'s openen onder het woord.'], ['Let op', 'Dubbelt de navigatie bovenaan. Kies je deze, dan kan "Wat we doen" lager op de pagina weg.']] },
+  { id: 'F', name: 'Ik ben', from: 'Filterchips van /tickets, tegels van een categorie',
+    what: 'Vier soorten bezoekers, vier ingangen. De chips zijn die van /tickets, omgekeerd op een navy band; elke keuze toont de vier dingen die die bezoeker het vaakst zoekt, als de tegels met een vierkante foto van een categoriepagina. De keuze blijft bewaard op het toestel.',
+    dl: [['Leent van', 'De filterchips (/tickets), de tegels met vierkante foto (categoriepagina\'s), donker glas op navy'], ['Beheer', 'Per doelgroep vier tegels, in /admin/home.'], ['Lege week', 'Tegels met een status (shiften, tickets) zeggen dan wat er niet is.'], ['Telefoon', 'Chips op twee regels, tegels onder elkaar.']] },
+  { id: 'G', name: 'Bouwtekening', from: 'Het technisch patroon van elke paginakop',
+    what: 'Het technisch patroon uit elke paginakop wordt hier de hero zelf: het logo als doorsnede met arcering, hulplijnen en een maatlijn. De leiders wijzen naar wat er nu open is. Rechtsonder de titelhoek van een technische tekening, met het blad van deze week.',
+    dl: [['Leent van', 'Het technisch patroon (huisstijl), de paginakop'], ['Beheer', 'Niets: de labels komen uit openingsuren, kalender, tickets en shiften.'], ['Lege week', 'De labels zeggen wat dicht is; de tekening blijft.'], ['Telefoon', 'De tekening bovenaan, de labels als lijst eronder.'], ['Let op', 'De meest uitgesproken richting van de acht.']] },
+  { id: 'H', name: 'Jouw week', from: 'Je ticket en de ster van /kalender',
+    what: 'Voor wie aangemeld is: je tickets, waar je naartoe gaat en je shift, in de vormen die je al kent van je bestelling (een ticket met datumpin) en /kalender (de ster). Niet aangemeld zie je wat hier zou staan. Zet Bezoeker op Niet aangemeld.',
+    dl: [['Leent van', 'Het ticket uit je bestelling (/tickets), de ster en de agenda (/kalender), de haarlijnlijst'], ['Beheer', 'Niets: alles komt uit je account.'], ['Lege week', 'Zonder tickets of sterren: wat je aanduidde voor later.'], ['Telefoon', 'Ticket bovenaan, de rest als lijst.']] },
+];
+
+const DIRS2 = [
+  { id: 'G', name: 'Ronde 1', from: 'Ter vergelijking: status en titelhoek',
+    what: 'Zoals in de eerste ronde: zes leiders naar wat er nu open is of te koop staat, en de titelhoek van een technische tekening rechtsonder. Staat hier enkel om de vier nieuwe varianten tegen af te zetten.',
+    dl: [['Wat verschilt', 'Zes statuslabels (openingsuren, tickets, shiften) en de titelhoek.']] },
+  { id: 'G1', name: 'Wegwijzer', from: 'Leiders naar de delen van de site',
+    what: 'Dezelfde zes leiders, maar ze wijzen niet naar een status: ze wijzen naar de delen van de site, met een lijn onder de naam zoals bij elke tekstlink op de site, en één korte regel eronder. Career hangt aan de rechteronderhoek, op de hoogte van Broodjes; met "Gespiegeld met links" staan ook Cursusdienst en Shiften op de hoogte van Kalender en Tickets. Geen titelhoek; de naam van de kring staat klein op de maatlijn boven het logo. De hero verandert niet met de week, dus ze zegt nooit wat de openingsuren eronder al zeggen.',
+    dl: [['Leent van', 'De leiders en de maatlijn van de tekening, de navigatie uit /admin/home'], ['Beheer', 'Welke zes delen, in /admin/home.'], ['Lege week', 'Verandert niet.'], ['Telefoon', 'De tekening, daaronder de zes als lijst.']] },
+  { id: 'G2', name: 'Maatlijn als titel', from: 'De naam op de maatlijn', rec: true,
+    what: 'Geen leiders en geen tabel. De maatlijn boven het logo draagt de naam van de kring als titel, zoals een maat op een technische tekening boven haar lijn staat; de maatlijn eronder draagt de faculteit. De tekening blijft het onderwerp, en wat er deze week gebeurt staat in het nieuws eronder.',
+    dl: [['Leent van', 'De maatlijn uit de tekening: de maat staat boven de lijn, zoals op een ISO-tekening'], ['Beheer', 'Niets.'], ['Lege week', 'Verandert niet.'], ['Telefoon', 'De naam boven de tekening, de faculteit eronder.']] },
+  { id: 'G3', name: 'Zoeken', from: 'Eén leider naar het zoekveld',
+    what: 'De tekening en één taak: zoeken. Uit de onderkant van het logo loopt een leider naar het zoekveld, met eronder wat er vaak gezocht wordt. Met negen tabbladen en tientallen pagina\'s is zoeken voor veel bezoekers de snelste weg.',
+    dl: [['Leent van', 'Een leider uit de tekening, de chips van /tickets (omgekeerd op navy), /zoeken'], ['Beheer', 'De suggesties onder "Vaak gezocht", in /admin/home.'], ['Lege week', 'Andere suggesties in de examens.'], ['Telefoon', 'Het veld over de volle breedte, zonder knop.']] },
+  { id: 'G4', name: 'Eén aantekening', from: 'Eén ding dat deze week telt',
+    what: 'Eén leider in plaats van zes, naar het ene ding dat deze week telt. Standaard de eerstvolgende activiteit met tickets; een redacteur kan er een eigen aantekening van maken. De rest van de band blijft tekening.',
+    dl: [['Leent van', 'Een leider en een aantekening, zoals op een tekening'], ['Beheer', 'Automatisch, of een eigen aantekening in /admin/home.'], ['Lege week', 'In de examens: wat er open is.'], ['Telefoon', 'De aantekening onder de tekening.']] },
+  { id: 'G5', name: 'Enkel het logo', from: 'De tekening, niets erbij',
+    what: 'Alleen de tekening en de animatie: arcering, omtrek, hulplijnen en knooppunten. Geen tekst en geen links. Met Hulplijnen op Weg blijft enkel het gearceerde logo over.',
+    dl: [['Beheer', 'Niets.'], ['Lege week', 'Verandert niet.'], ['Telefoon', 'Enkel de tekening.'], ['Let op', 'Zonder zichtbare titel heeft de pagina enkel een verborgen h1 voor schermlezers; de eerste zichtbare kop is dan Nieuws.']] },
+];
+const ALLDIRS = DIRS2.concat(DIRS);
+const isR2 = id => DIRS2.some(d => d.id === id);
+
+/* ---------- Toestand ---------- */
+const STATE = { dir: 'G2', view: 'one', device: 'laptop', fit: true, week: 'normal', member: true, evBand: 'gap',
+  k: { A: { day: 0 }, B: { text: 'auto' }, C: { ev: 0 }, D: { photo: 'jobfair', head: 'band' }, E: { cat: 'events' }, F: { who: 'ouderejaars' }, G1: { right: 'asked' }, G4: { note: 'auto' }, G5: { guides: 'on' } } };
+try { const s = JSON.parse(localStorage.getItem('vtk-hero-board-2') || 'null'); if (s && s.dir) { STATE.dir = s.dir; STATE.view = s.view || 'one'; STATE.device = s.device || 'laptop'; } } catch (e) {}
+function save() { try { localStorage.setItem('vtk-hero-board-2', JSON.stringify({ dir: STATE.dir, view: STATE.view, device: STATE.device })); } catch (e) {} }
+let uid = 0;
+
+/* ---------- De site rond de hero ---------- */
+function siteHeader() {
+  return `<header class="sh"><div class="wrap">
+    <span class="sh-logo"><img src="${IMG.logo}" alt="VTK"></span>
+    <nav class="sh-nav" aria-label="Hoofdmenu">${NAV.map(([l, c]) => `<span>${l}${c ? ic('chevD', 14) : ''}</span>`).join('')}</nav>
+    <span class="sh-tools">
+      <span class="sh-search">${ic('search', 17)}</span>
+      <span class="sh-lang"><b>NL</b> / EN</span>
+      ${STATE.member ? `<span class="sh-avatar" title="Account">${ic('user', 18)}</span>` : '<span class="sh-login">Aanmelden</span>'}
+      <span class="sh-menu">${ic('menu', 20)}</span>
+    </span>
+  </div></header>`;
+}
+
+function newsBand() {
+  return `<section class="nb"><div class="wrap">
+    <div class="sec-head"><h2>Nieuws</h2><span class="meta"><a href="#">Alle nieuws</a></span></div>
+    <div class="nb-grid">
+      <article class="nb-feat">
+        <div class="nb-kick"><span class="label-caps">Woordje van de praeses</span><time>26 okt</time></div>
+        <h3 class="nb-title ruled">Vijf weken ver</h3>
+        <p class="nb-letter">Beste burgies, de eerste vijf lesweken zitten erop, en wat voor weken. De onthaaldagen braken het record van vorig jaar, de Theokot draaide op haar drukste middag meer dan zeshonderd broodjes, en op de eerste cantus moest de senior twee keer om stilte vragen. Dank aan iedereen die een shift opnam: zonder jullie gaat er geen enkele deur open. Zondag is het Galabal der Ingenieurs, en ik hoop jullie daar allemaal te zien, in pak of in jurk, met of zonder dansschoenen. Wie nog twijfelt: er zijn nog tickets, en de tafels voor tien gaan het snelst. Daarna wordt het rustiger, want de eerste tussentijdse toetsen komen eraan.</p>
+        <a class="u" href="#">Lees de hele brief</a>
+      </article>
+      <div class="nb-tiles">
+        ${[['galabal', 'Tickets', 'Galabal der Ingenieurs: de verkoop loopt', 'Nog 84 tickets'], ['theokot', 'Bakske', 'Bakske 5 ligt in de Theokot', 'Maandag 26 oktober'], ['studs', 'Album', "Foto's van de onthaaldagen", '412 foto\'s, door Media']].map(([im, k, t, s]) => `
+          <article class="tile"><div class="tile-shot"><img src="${IMG[im]}" alt=""></div>
+          <div class="tile-body"><span class="label-caps">${k}</span><h3 class="tile-title ruled">${t}</h3><p>${s}</p></div></article>`).join('')}
+      </div>
+    </div>
+  </div></section>`;
+}
+
+const EVENTS = {
+  normal: [
+    ['klas', 'do', '29', 'okt', 'Studies', '#3a5fc4', 'PAL-sessie Analyse I', '18:00, Aula 200C', 0],
+    ['nacht', 'do', '29', 'okt', 'Cantus', '#7c3aed', 'Halloweencantus', '20:30, Waaiberg', 126],
+    ['galabal', 'zo', '1', 'nov', 'Feest', '#d6336c', 'Galabal der Ingenieurs', '20:00, Hal 5', 214],
+    ['aula', 'di', '3', 'nov', 'Career', '#0f766e', 'Career Talk: van thesis naar eerste job', '19:30, Aula 200C', 58],
+    ['studs', 'do', '5', 'nov', 'Feest', '#d6336c', 'Eerstejaarsavond', "21:00, 't ElixIr", 88],
+    ['trein', 'za', '7', 'nov', 'Internationaal', '#c2570c', 'Buddy-uitstap naar Gent', '09:30, Station Leuven', 37],
+  ],
+  exam: [
+    ['studs', 'ma', '8', 'feb', 'Feest', '#d6336c', 'Semesteropening', "21:00, 't ElixIr", 41],
+  ],
+};
+function eventsBand() {
+  const list = EVENTS[STATE.week];
+  const cls = STATE.evBand === 'paper' ? 'on-paper' : 'gap';
+  return `<section class="evb ${cls}"><div class="wrap">
+    <div class="sec-head"><h2>Aankomende evenementen</h2><span class="meta"><a href="#">Volledige kalender</a></span></div>
+    <div class="ev-grid">${list.map(([im, wd, d, m, cat, col, t, when, going]) => `<article class="ev-card">
+      <div class="ev-shot"><img src="${IMG[im]}" alt=""><span class="datepin"><i>${wd}</i><b>${d}</b><i>${m}</i></span></div>
+      <div class="ev-body">
+        <div class="ev-tags"><span class="ev-cat" style="--cat:${col}">${cat}</span></div>
+        <h3 class="ev-title ruled">${t}</h3>
+        <div class="ev-foot"><span class="ev-when">${when}</span><span class="ev-act">${going >= 30 ? `<em>${going} komen</em>` : ''}<span>${ic('star', 17)}</span><span>${ic('cal', 17)}</span></span></div>
+      </div></article>`).join('')}</div>
+    ${STATE.week === 'exam' ? '<p class="ev-none" style="margin-top:18px">Tijdens de examens staat er verder niets gepland.</p>' : ''}
+  </div></section>`;
+}
+
+function hoursBand() {
+  const W = WEEK[STATE.week];
+  const pct = h => ((h - 8) / 16 * 100).toFixed(2) + '%';
+  const now = pct(12 + 40 / 60);
+  return `<section class="hrs navyband"><div class="wrap">
+    <div class="hrs-head"><h2>Openingsuren</h2><span>Vandaag, ${STATE.week === 'exam' ? 'donderdag 14 januari' : 'donderdag 29 oktober'}</span></div>
+    ${W.hours.map(h => `<div class="hrs-row"><div><b>${h.n}</b><small><span class="dot ${h.s}"></span>${h.v}</small></div>
+      <div class="hrs-track">${h.from != null ? `<span class="hrs-bar ${h.to == null ? 'open-end' : ''}" style="left:${pct(h.from)};${h.to == null ? 'right:0' : 'width:calc(' + pct(h.to) + ' - ' + pct(h.from) + ')'}"></span>` : ''}<span class="hrs-now" style="left:${now}"></span></div></div>`).join('')}
+  </div></section>
+  <div class="site-more">Daaronder ongewijzigd: POC's, shiften, aftermovies, Wat we doen, Career en partners. De openingsuren en de POC's zijn allebei navy; daar zet de bestaande regel in vtk-home.css al een paper-gat tussen.</div>`;
+}
+
+/* ---------- De acht hero's ---------- */
+function heroA() {
+  const days = WEEK[STATE.week].days;
+  const i = Math.min(STATE.k.A.day, days.length - 1);
+  const d = days[i];
+  const title = d.main ? d.main.title : `${d.rel} geen activiteiten`;
+  const facts = d.main
+    ? `<p class="facts">${fact('clock', d.main.time)}${fact('pin', d.main.place)}${fact('people', d.main.going + ' komen')}</p>`
+    : `<p class="facts"><span>Eerstvolgende:&nbsp;<a class="u-dark" href="#">${d.next}</a></span></p>`;
+  const rows = d.also.length
+    ? `<ul class="hA-also">${d.also.map(r => `<li><time>${r.t}</time><span>${r.n}</span><em><i class="dot ${r.s}"></i>${r.v}</em></li>`).join('')}</ul>`
+    : `<p class="hA-none">${d.none || ''}</p>`;
+  return `<section class="hero hA navyband rule"><div class="wrap">
+    <div class="hA-text">
+      <div class="hA-day">
+        <button class="hA-step" data-act="dayPrev" ${i === 0 ? 'disabled' : ''} aria-label="Vorige dag">${ic('chevL', 16)}</button>
+        <button class="hA-step" data-act="dayNext" ${i === days.length - 1 ? 'disabled' : ''} aria-label="Volgende dag">${ic('chevR', 16)}</button>
+        <span class="hA-daylabel"><b>${d.rel}</b>, ${d.long}</span>
+      </div>
+      <h1 class="h1 ruled">${title}</h1>
+      ${facts}
+      ${rows}
+    </div>
+    <a class="hA-pin" href="#" aria-label="${d.long} op de kalender"><i>${d.wd}</i><b>${d.d}</b><i>${d.m}</i></a>
+  </div></section>`;
+}
+
+function heroB() {
+  const key = STATE.week === 'exam' ? 'exam' : (STATE.k.B.text === 'own' ? 'own' : 'normal');
+  let n = 0;
+  const words = s => s.split(' ').filter(Boolean).map(w => `<span class="w" style="--i:${n++}">${w}</span>`).join(' ');
+  const html = SENT[key].map((tok, ti) => {
+    const glue = ti === 0 || (typeof tok === 'string' && /^[.,;:]/.test(tok)) ? '' : ' ';
+    if (typeof tok === 'string') return glue + words(tok);
+    const start = n;
+    return `${glue}<a href="#" class="hB-l" style="--i:${start}">${words(tok.l)}</a>`;
+  }).join('');
+  return `<section class="hero hB navyband rule"><div class="wrap">
+    <p class="kick">${WEEK[STATE.week].kickB}</p>
+    <h1 class="hB-s">${html}</h1>
+    <div class="hB-foot"><a class="u-dark" href="#">Alles op de kalender ${ic('arrow', 15)}</a></div>
+  </div></section>`;
+}
+
+function heroC() {
+  const list = TICKETED[STATE.week];
+  const idx = Math.min(STATE.k.C.ev, list.length - 1);
+  const ev = list[idx];
+  const chips = list.length > 1
+    ? `<div class="chips" role="group" aria-label="Uitgelicht">${list.map((e, j) => `<button class="chip" data-act="cev" data-v="${j}" aria-pressed="${j === idx}">${e.chip}</button>`).join('')}</div>` : '';
+  let side;
+  if (ev.soon) {
+    side = `<div><p class="label-caps">Tickets</p><p class="hC-soon">De verkoop start ${ev.soon}<small>Zet een herinnering, dan krijg je een mail bij de start.</small></p></div>
+      <a class="btn btn-ghost" href="#">Herinner me</a>`;
+  } else {
+    const prices = STATE.member ? ev.member : ev.guest;
+    side = `<div><p class="label-caps">Tickets</p><ul class="prices">${prices.map(p => `<li><span>${p.n}</span><b>${p.v}</b>${p.sub ? `<small>${p.sub}</small>` : ''}</li>`).join('')}</ul></div>
+      <div style="display:grid;gap:10px"><p class="hC-left">${ev.left}</p><a class="btn btn-primary" href="#">${ev.cta}</a></div>`;
+  }
+  return `<section class="hero hC"><div class="wrap">
+    <div class="hC-top"><p class="label-caps">${STATE.week === 'exam' ? 'Eerstvolgende verkoop' : 'Uitgelicht'}</p>${chips}</div>
+    <article class="hC-card">
+      <div class="hC-shot"><img src="${IMG[ev.img]}" alt=""><span class="datepin"><i>${ev.wd}</i><b>${ev.d}</b><i>${ev.m}</i></span></div>
+      <div class="hC-body">
+        <p class="hC-owner">${ev.owner}</p>
+        <h1 class="hC-title ruled">${ev.title}</h1>
+        <p class="facts">${fact('clock', ev.time)}${fact('pin', ev.place)}${fact('people', ev.going + ' komen')}</p>
+        <p class="hC-sum">${ev.sum}</p>
+      </div>
+      <aside class="hC-side">${side}</aside>
+    </article>
+  </div></section>`;
+}
+
+function heroD() {
+  const p = PHOTOS[STATE.k.D.photo];
+  const band = STATE.k.D.head === 'band';
+  const img = `<div class="hD-frame"><img src="${IMG[p.img]}" alt="${p.alt}" style="object-position:${p.focus}"></div>`;
+  if (band) {
+    return `<section class="hero hD has-band">
+      <div class="hD-band navyband rule"><div class="wrap">
+        <div><p class="kick">Foto van de week</p><h1 class="h1">${p.title}</h1></div>
+        <p class="hD-meta">${p.meta}<br><a class="u-dark" href="#">Naar het album</a></p>
+      </div></div>
+      <div class="wrap hD-platewrap"><figure class="hD-plate">${img}<figcaption><span>${p.caption}</span></figcaption></figure></div>
+    </section>`;
+  }
+  return `<section class="hero hD"><div class="wrap hD-platewrap"><figure class="hD-plate">${img}
+    <figcaption><span class="hD-capline"><strong>${p.title}</strong>${p.caption}</span><a class="u" href="#" style="align-self:end">Naar het album</a></figcaption></figure></div></section>`;
+}
+
+function regPanel(c, inline) {
+  const items = c.items[STATE.week];
+  return `<div class="${inline ? 'hE-inline' : 'hE-panel'}">
+    <p class="hE-intro">${c.intro}</p>
+    <ul class="hE-items">${items.map(([t, s, ext]) => {
+      const st = Array.isArray(s) ? `<span><i class="dot ${s[0]}"></i>${s[1]}</span>` : (s ? `<span>${s}</span>` : '<span></span>');
+      return `<li><a href="#"><b>${t}</b>${st}${ic(ext ? 'ext' : 'arrow', 16)}</a></li>`;
+    }).join('')}</ul>
+  </div>`;
+}
+function heroE() {
+  const cur = REG.find(c => c.id === STATE.k.E.cat) || REG[0];
+  return `<section class="hero hE"><div class="wrap">
+    <nav class="hE-reg" aria-label="Alles op vtk.be">
+      <p class="hE-lbl">Alles op vtk.be</p>
+      <ul class="hE-list">${REG.map((c, i) => `<li style="--i:${i}" ${c.id === cur.id ? 'aria-current="true"' : ''}><button data-act="ecat" data-v="${c.id}">${c.label}</button>${c.id === cur.id ? regPanel(c, true) : ''}</li>`).join('')}</ul>
+    </nav>
+    ${regPanel(cur, false)}
+  </div></section>`;
+}
+
+function heroF() {
+  const cur = WHO.find(w => w.id === STATE.k.F.who) || WHO[1];
+  const tiles = cur.tiles[STATE.week];
+  return `<section class="hero hF navyband rule"><div class="wrap">
+    <div class="hF-q" role="group" aria-label="Wie ben je">
+      <h1 class="h1">Ik ben</h1>
+      ${WHO.map(w => `<button class="hF-chip" data-act="who" data-v="${w.id}" aria-pressed="${w.id === cur.id}">${w.label}</button>`).join('')}
+    </div>
+    <div class="hF-tiles">${tiles.map(([t, s, im], i) => `<a class="hF-tile" href="#" style="--i:${i}"><span class="ph">${im ? `<img src="${IMG[im]}" alt="">` : ''}</span><span><b>${t}</b><small>${s}</small></span></a>`).join('')}</div>
+    <p class="hF-note">Je keuze blijft bewaard op dit toestel; je kan altijd wisselen.</p>
+  </div></section>`;
+}
+
+function heroG() {
+  const u = ++uid;
+  const s = 520 / 1152, ox = 330, oy = 96;
+  const pt = (x, y) => [+(ox + x * s).toFixed(1), +(oy + y * s).toFixed(1)];
+  const N = { notch: pt(210, 178), left: pt(0, 338), lbot: pt(0, 650), ttop: pt(590, 40), ktop: pt(912, 2), karm: pt(1150, 175), kfoot: pt(1152, 398), bowl: pt(660, 650) };
+  const L = G_LABELS[STATE.week];
+  // leiders: van een knoop naar het label
+  const leads = [
+    [N.notch, [380, 140], [272, 140]],
+    [N.left, [272, N.left[1]]],
+    [N.lbot, [272, N.lbot[1]]],
+    [N.ktop, [790, 108], [896, 108]],
+    [N.karm, [872, 188], [896, 188]],
+    [N.kfoot, [872, 262], [896, 262]],
+  ];
+  const labelPos = [[140, 'l'], [N.left[1], 'l'], [N.lbot[1], 'l'], [108, 'r'], [188, 'r'], [262, 'r']];
+  const poly = pts => 'M' + pts.map(p => p.join(' ')).join(' L');
+  const W = WEEK[STATE.week];
+  const tb = m => `<div class="g-tb ${m}" style="--d:1.9s">
+        <div class="g-tb-main"><span>Project</span><b>vtk.be</b></div>
+        <div><span>Onderwerp</span><b>Startpagina</b></div>
+        <div class="g-tb-grid">
+          <div><span>Blad</span><b class="y">week ${W.iso}</b></div>
+          <div><span>Datum</span><b>${W.date}</b></div>
+          <div><span>Schaal</span><b>1:1</b></div>
+          <div><span>Getekend</span><b>Leuven</b></div>
+        </div>
+      </div>`;
+  const lab = (i) => {
+    const [k, v, st] = L[i]; const [y, side] = labelPos[i];
+    const pos = side === 'l' ? `right:${((1168 - 262) / 1168 * 100).toFixed(2)}%` : `left:${(906 / 1168 * 100).toFixed(2)}%`;
+    return `<a class="g-lab ${side}" href="#" style="${pos};top:${(y / 520 * 100).toFixed(2)}%;--d:${(1.5 + i * 0.12).toFixed(2)}s"><i>${k}</i><b>${st ? `<span class="dot ${st}"></span>` : ''}${v}</b></a>`;
+  };
+  return `<section class="hero hG navyband rule"><div class="wrap">
+    <h1 class="sr">VTK, startpagina</h1>
+    <div class="g-box">
+      <svg viewBox="0 0 1168 520" aria-hidden="true">
+        <defs>
+          <pattern id="gh${u}" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" stroke="#fff" stroke-width="1.1" stroke-opacity=".42"/></pattern>
+          <mask id="gm${u}" maskUnits="userSpaceOnUse" x="0" y="0" width="1168" height="520" style="mask-type:alpha"><image href="${IMG.logo}" x="${ox}" y="${oy}" width="520" height="${(650 * s).toFixed(1)}"/></mask>
+          <filter id="go${u}" x="-5%" y="-5%" width="110%" height="110%">
+            <feMorphology in="SourceAlpha" operator="dilate" radius="1.3" result="d"/>
+            <feComposite in="d" in2="SourceAlpha" operator="out" result="e"/>
+            <feFlood flood-color="#ffffff" flood-opacity=".92"/>
+            <feComposite in2="e" operator="in"/>
+          </filter>
+          <marker id="ga${u}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M1 1.5 L9 5 L1 8.5" fill="none" stroke="#fff" stroke-width="1.2"/></marker>
+        </defs>
+        <g class="g-fade" style="--d:.05s">
+          <path class="g-ln dash" d="M250 ${N.lbot[1]} H930"/>
+          <path class="g-ln dash" d="M540 ${N.ktop[1]} H930"/>
+          <path class="g-ln dash" d="M380 ${N.karm[1]} H930"/>
+          <path class="g-ln dash" d="M${ox} 70 V450"/>
+          <path class="g-ln dash" d="M850 70 V450"/>
+          <circle class="g-ln dash" cx="628" cy="272" r="150"/>
+        </g>
+        <circle class="g-ln faint g-draw" pathLength="1" style="--d:.15s" cx="590" cy="246" r="236"/>
+        <path class="g-ln faint g-draw" pathLength="1" style="--d:.3s" d="M150 470 L1010 40"/>
+        <g class="g-wipe" style="--d:.35s">
+          <rect x="0" y="0" width="1168" height="520" fill="url(#gh${u})" mask="url(#gm${u})"/>
+          <image href="${IMG.logo}" x="${ox}" y="${oy}" width="520" height="${(650 * s).toFixed(1)}" filter="url(#go${u})"/>
+        </g>
+        <g class="g-dimgrp g-fade" style="--d:1.1s">
+          <path class="g-ln dim" d="M${ox} 52 V88 M850 52 V88"/>
+          <path class="g-ln dim" d="M${ox + 4} 62 H846" marker-start="url(#ga${u})" marker-end="url(#ga${u})"/>
+          <rect x="${590 - 108}" y="52" width="216" height="20" fill="#0e1a36"/>
+          <text class="g-dimtext" x="590" y="66" text-anchor="middle">WERKINGSJAAR 2026-2027</text>
+        </g>
+        ${leads.map((l, i) => `<path class="g-ln lead g-lead g-draw" pathLength="1" style="--d:${(1.2 + i * 0.12).toFixed(2)}s" d="${poly(l.length === 3 ? [l[0], l[1], l[2]] : [l[0], l[1]])}"/>`).join('')}
+        ${Object.entries(N).map(([k, p], i) => `<circle class="g-node g-fade" style="--d:${(1.0 + i * 0.05).toFixed(2)}s" cx="${p[0]}" cy="${p[1]}" r="4.5"/>`).join('')}
+      </svg>
+      ${L.map((_, i) => lab(i)).join('')}
+      ${tb('')}
+    </div>
+    <ul class="g-list">${L.map(([k, v, st]) => `<li><a href="#"><i>${k}</i><b>${st ? `<span class="dot ${st}"></span>` : ''}${v}</b></a></li>`).join('')}</ul>
+    ${tb('m')}
+  </div></section>`;
+}
+
+function qr(seed) {
+  let x = seed, cells = '';
+  const rnd = () => (x = (x * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const finder = (cx, cy) => `<rect x="${cx}" y="${cy}" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1"/><rect x="${cx + 2}" y="${cy + 2}" width="3" height="3"/>`;
+  for (let r = 0; r < 21; r++) for (let c = 0; c < 21; c++) {
+    const inF = (r < 8 && c < 8) || (r < 8 && c > 12) || (r > 12 && c < 8);
+    if (!inF && rnd() > 0.52) cells += `<rect x="${c}" y="${r}" width="1" height="1"/>`;
+  }
+  return `<svg class="qr" viewBox="-.5 -.5 22 22" fill="currentColor" aria-hidden="true">${finder(0, 0)}${finder(14, 0)}${finder(0, 14)}<g transform="translate(.5 .5) scale(.95)"></g>${cells}</svg>`;
+}
+
+function heroH() {
+  if (!STATE.member) {
+    return `<section class="hero hH"><div class="wrap"><div class="hH-anon">
+      <div><h1 class="h1 ruled">Jouw week</h1>
+        <p>Meld je aan, dan staan hier je tickets, de activiteiten waar je een ster op zette en je shiften.</p>
+        <a class="btn btn-primary" href="#">Aanmelden</a></div>
+      <div class="ghost" aria-hidden="true"><div></div><div></div><div></div></div>
+    </div></div></section>`;
+  }
+  if (STATE.week === 'exam') {
+    return `<section class="hero hH"><div class="wrap">
+      <div class="hH-head"><h1 class="h1 ruled">Jouw week</h1><p>De komende zeven dagen</p></div>
+      <div class="hH-grid">
+        <div><p class="hH-empty">Geen tickets en geen shiften tot het einde van de examens. Succes.</p>
+          <a class="u" href="#">Bekijk de kalender van februari</a></div>
+        <ul class="hH-list">
+          <li style="--i:1"><span class="hH-ico y">${ic('star', 17, true)}</span><span><b>Semesteropening</b><small>Maandag 8 februari, vanaf 21:00, 't ElixIr</small></span><em>Je komt</em></li>
+          <li style="--i:2"><span class="hH-ico">${ic('ticket', 17)}</span><span><b>Ticketverkoop Semesteropening</b><small>Maandag 25 januari om 12:00</small></span><em>Herinnering staat aan</em></li>
+        </ul>
+      </div>
+    </div></section>`;
+  }
+  return `<section class="hero hH"><div class="wrap">
+    <div class="hH-head"><h1 class="h1 ruled">Jouw week</h1><p>De komende zeven dagen</p></div>
+    <div class="hH-grid">
+      <article class="stub" style="--i:0">
+        <div class="stub-main">
+          <div class="stub-shot"><img src="${IMG.galabal}" alt=""><span class="datepin"><i>zo</i><b>1</b><i>nov</i></span></div>
+          <div class="stub-body">
+            <p class="hC-owner" style="margin:0">Activiteiten</p>
+            <h3 class="ruled">Galabal der Ingenieurs</h3>
+            <p class="facts">${fact('clock', '20:00')}${fact('pin', 'Hal 5')}</p>
+          </div>
+        </div>
+        <div class="stub-tear">${qr(44)}<b>2 tickets</b><a class="u" href="#">Toon tickets</a></div>
+      </article>
+      <ul class="hH-list">
+        <li style="--i:1"><span class="hH-ico y">${ic('star', 17, true)}</span><span><b>Halloweencantus</b><small>Vanavond 20:30, Waaiberg</small></span><em>Je komt</em></li>
+        <li style="--i:2"><span class="hH-ico">${ic('check', 17)}</span><span><b>Career Talk: van thesis naar eerste job</b><small>Dinsdag 19:30, Aula 200C</small></span><em>Ingeschreven</em></li>
+        <li style="--i:3"><span class="hH-ico">${ic('shift', 17)}</span><span><b>Shift in de Theokot</b><small>Donderdag 5 november, 11:30 tot 14:00</small></span><em>Jouw shift</em></li>
+        <li style="--i:4"><span class="hH-ico">${ic('star', 17)}</span><span><b>Buddy-uitstap naar Gent</b><small>Zaterdag 7 november, nog 23 plaatsen</small></span><em>Voor jou?</em></li>
+      </ul>
+    </div>
+  </div></section>`;
+}
+
+/* ---------- Ronde 2: dezelfde tekening, andere omgeving ---------- */
+const GS = 520 / 1152, GOX = 330;
+function gNodes(oy) {
+  const p = (x, y) => [+(GOX + x * GS).toFixed(1), +(oy + y * GS).toFixed(1)];
+  return { notch: p(210, 178), left: p(0, 338), lbot: p(0, 650), ttop: p(590, 40), ktop: p(912, 2), karm: p(1150, 175), kfoot: p(1152, 398), bowl: p(660, 650) };
+}
+const gPoly = pts => 'M' + pts.map(q => q.join(' ')).join(' L');
+function gDrawing(u, { oy = 96, H = 520, guides = true, dims = [], leads = [], extra = '' } = {}) {
+  const N = gNodes(oy), lh = +(650 * GS).toFixed(1), bot = +(oy + lh).toFixed(1);
+  const defs = `<defs>
+    <pattern id="gh${u}" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" stroke="#fff" stroke-width="1.1" stroke-opacity=".42"/></pattern>
+    <mask id="gm${u}" maskUnits="userSpaceOnUse" x="0" y="0" width="1168" height="${H}" style="mask-type:alpha"><image href="${IMG.logo}" x="${GOX}" y="${oy}" width="520" height="${lh}"/></mask>
+    <filter id="go${u}" x="-5%" y="-5%" width="110%" height="110%">
+      <feMorphology in="SourceAlpha" operator="dilate" radius="1.3" result="d"/>
+      <feComposite in="d" in2="SourceAlpha" operator="out" result="e"/>
+      <feFlood flood-color="#ffffff" flood-opacity=".92"/>
+      <feComposite in2="e" operator="in"/>
+    </filter>
+    <marker id="ga${u}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M1 1.5 L9 5 L1 8.5" fill="none" stroke="#fff" stroke-width="1.2"/></marker>
+  </defs>`;
+  const g = guides ? `<g class="g-fade" style="--d:.05s">
+      <path class="g-ln dash" d="M250 ${bot} H930"/>
+      <path class="g-ln dash" d="M540 ${N.ktop[1]} H930"/>
+      <path class="g-ln dash" d="M380 ${N.karm[1]} H930"/>
+      <path class="g-ln dash" d="M${GOX} ${oy - 26} V${bot + 60}"/>
+      <path class="g-ln dash" d="M850 ${oy - 26} V${bot + 60}"/>
+      <circle class="g-ln dash" cx="628" cy="${oy + 176}" r="150"/>
+    </g>
+    <circle class="g-ln faint g-draw" pathLength="1" style="--d:.15s" cx="590" cy="${oy + 150}" r="236"/>
+    <path class="g-ln faint g-draw" pathLength="1" style="--d:.3s" d="M150 ${oy + 374} L1010 ${oy - 56}"/>` : '';
+  const logo = `<g class="g-wipe" style="--d:.35s"><rect x="0" y="0" width="1168" height="${H}" fill="url(#gh${u})" mask="url(#gm${u})"/><image href="${IMG.logo}" x="${GOX}" y="${oy}" width="520" height="${lh}" filter="url(#go${u})"/></g>`;
+  const dimSvg = dims.map(d => `<g class="g-dimgrp g-fade" style="--d:${d.delay || 1.1}s">
+      <path class="g-ln dim" d="M${d.x1} ${d.e1[0]} V${d.e1[1]} M${d.x2} ${d.e2[0]} V${d.e2[1]}"/>
+      <path class="g-ln dim" d="M${d.x1 + 4} ${d.y} H${d.x2 - 4}" marker-start="url(#ga${u})" marker-end="url(#ga${u})"/>
+      ${d.gap ? `<rect x="${(d.x1 + d.x2) / 2 - d.gap / 2}" y="${d.y - 10}" width="${d.gap}" height="20" fill="#0e1a36"/>` : ''}
+      ${d.text ? `<text class="g-dimtext" x="${(d.x1 + d.x2) / 2}" y="${d.ty || d.y + 4}" text-anchor="middle">${d.text}</text>` : ''}
+    </g>`).join('');
+  const leadSvg = leads.map((l, i) => `<path class="g-ln lead g-lead g-draw" pathLength="1" style="--d:${(1.2 + i * 0.12).toFixed(2)}s" d="${gPoly(l)}"/>`).join('');
+  const nodes = guides ? Object.values(N).map((q, i) => `<circle class="g-node g-fade" style="--d:${(1.0 + i * 0.05).toFixed(2)}s" cx="${q[0]}" cy="${q[1]}" r="4.5"/>`).join('') : '';
+  return `<svg viewBox="0 0 1168 ${H}" aria-hidden="true">${defs}${g}${logo}${dimSvg}${leadSvg}${nodes}${extra}</svg>`;
+}
+const gSide = (side, y, H) => `${side === 'l' ? 'right' : 'left'}:77.57%;top:${(y / H * 100).toFixed(2)}%`;
+
+function heroG1() {
+  const u = ++uid, N = gNodes(96);
+  // Career hangt aan de rechteronderhoek van het logo, op de hoogte van Broodjes.
+  const rbot = [850, N.lbot[1]];
+  const mirror = STATE.k.G1.right === 'mirror';
+  const labs = [
+    ['l', 140, 'Kalender', 'Alles wat er gepland staat', [N.notch, [380, 140], [272, 140]], 'cal'],
+    ['l', N.left[1], 'Tickets', 'Lopende verkopen', [N.left, [272, N.left[1]]], 'tix'],
+    ['l', N.lbot[1], 'Broodjes', 'Bestellen bij de Theokot', [N.lbot, [272, N.lbot[1]]], 'sandwich'],
+    mirror
+      ? ['r', 140, 'Cursusdienst', 'Cursussen, boeken en de printer', [N.ktop, [790, 140], [896, 140]], 'book']
+      : ['r', 108, 'Cursusdienst', 'Cursussen, boeken en de printer', [N.ktop, [790, 108], [896, 108]], 'book'],
+    mirror
+      ? ['r', N.left[1], 'Shiften', 'Help mee achter de bar', [N.kfoot, [872, N.left[1]], [896, N.left[1]]], 'beer']
+      : ['r', 220, 'Shiften', 'Help mee achter de bar', [N.karm, [872, 220], [896, 220]], 'beer'],
+    ['r', rbot[1], 'Career', 'Bedrijven, talks en de Jobfair', [rbot, [896, rbot[1]]], 'case'],
+  ];
+  const extra = `<circle class="g-node g-fade" style="--d:1.4s" cx="${rbot[0]}" cy="${rbot[1]}" r="4.5"/>`;
+  const svg = gDrawing(u, { leads: labs.map(l => l[4]), extra, dims: [{ x1: GOX, x2: 850, y: 62, e1: [52, 88], e2: [52, 88], gap: 236, text: 'VLAAMSE TECHNISCHE KRING' }] });
+  return `<section class="hero hG navyband rule"><div class="wrap">
+    <h1 class="sr">Vlaamse Technische Kring</h1>
+    <div class="g-box">${svg}
+      ${labs.map(([side, y, t, sub, , icon], i) => `<a class="g-lab nav ${side}" href="#" style="${gSide(side, y, 520)};--d:${(1.5 + i * 0.12).toFixed(2)}s"><b><span class="g-u">${t}</span>${ic('arrow', 16)}</b><i>${sub}</i></a>`).join('')}
+    </div>
+    <ul class="g-list nav">${labs.map(([, , t, sub, , icon]) => `<li><a href="#"><span><b>${t}</b><i>${sub}</i></span>${ic('arrow', 16)}</a></li>`).join('')}</ul>
+  </div></section>`;
+}
+
+function heroG2() {
+  const u = ++uid, oy = 150, H = 540, bot = +(oy + 650 * GS).toFixed(1);
+  const svg = gDrawing(u, { oy, H, dims: [
+    { x1: GOX, x2: 850, y: 120, e1: [110, oy + 148], e2: [110, oy + 175] },
+    { x1: GOX, x2: 850, y: bot + 50, e1: [bot + 8, bot + 60], e2: [bot + 8, bot + 60], text: 'FACULTEIT INGENIEURSWETENSCHAPPEN, KU LEUVEN', ty: bot + 38, delay: 1.3 },
+  ] });
+  return `<section class="hero hG navyband rule"><div class="wrap">
+    <p class="g2-m t" aria-hidden="true">Vlaamse Technische Kring</p>
+    <div class="g-box" style="--ar:1168 / ${H}">${svg}
+      <h1 class="g2-title" style="--d:1.15s">Vlaamse Technische Kring</h1>
+      <a class="g2-link u-dark" href="#" style="--d:1.6s">Over VTK ${ic('arrow', 15)}</a>
+    </div>
+    <p class="g2-m s">Faculteit Ingenieurswetenschappen, KU Leuven</p>
+  </div></section>`;
+}
+
+function heroG3() {
+  const u = ++uid, H = 480, N = gNodes(96);
+  const extra = `<text class="g-dimtext g-lead g-fade" style="--d:1.5s" x="${N.bowl[0] + 12}" y="458">ZOEK OP VTK.BE</text>`;
+  const svg = gDrawing(u, { H, leads: [[N.bowl, [N.bowl[0], H]]], extra });
+  const sugg = STATE.week === 'exam'
+    ? ['Burgieclan', 'Cursusdienst', 'Openingsuren Theokot', 'Tickets Semesteropening']
+    : ['Tickets Galabal', 'Openingsuren Theokot', 'Burgieclan', 'Shift opnemen', 'Uitleendienst'];
+  return `<section class="hero hG navyband rule"><div class="wrap">
+    <h1 class="sr">Zoek op vtk.be</h1>
+    <div class="g-box" style="--ar:1168 / ${H}">${svg}</div>
+    <form class="g3-search" role="search" style="--d:1.4s">
+      <label class="g3-field"><span class="sr">Zoek op vtk.be</span>${ic('search', 20)}<input type="search" name="q" placeholder="Zoek een activiteit of een pagina" autocomplete="off"><button type="submit">Zoeken</button></label>
+      <div class="g3-sugg"><span class="lbl">Vaak gezocht</span>${sugg.map(t => `<a href="#">${t}</a>`).join('')}</div>
+    </form>
+  </div></section>`;
+}
+
+function heroG4() {
+  const u = ++uid, N = gNodes(96);
+  const n = STATE.k.G4.note === 'own'
+    ? { k: 'Inschrijvingen', t: 'Skireis naar Les Arcs', s: 'Nog tot 15 november. Het voorschot betaal je bij de cursusdienst.', a: 'Inschrijven' }
+    : STATE.week === 'exam'
+      ? { k: 'Examenperiode', t: 'Tot en met 30 januari', s: "De Theokot is open tot 14:00, de cursusdienst tot 16:00. 't ElixIr is dicht.", a: 'Alle openingsuren' }
+      : { k: 'Zondag 1 november', t: 'Galabal der Ingenieurs', s: 'Hal 5, vanaf 20:00. Nog 84 tickets.', a: 'Tickets kopen' };
+  const svg = gDrawing(u, { leads: [[N.karm, [878, 136], [896, 136]]] });
+  const note = m => `<div class="g4-note ${m}" style="--d:1.5s"><i>${n.k}</i><h2>${n.t}</h2><p>${n.s}</p><a class="u-dark" href="#">${n.a} ${ic('arrow', 15)}</a></div>`;
+  return `<section class="hero hG navyband rule"><div class="wrap">
+    <h1 class="sr">Vlaamse Technische Kring</h1>
+    <div class="g-box">${svg}${note('')}</div>
+    ${note('m')}
+  </div></section>`;
+}
+
+function heroG5() {
+  const u = ++uid;
+  return `<section class="hero hG navyband rule"><div class="wrap">
+    <h1 class="sr">Vlaamse Technische Kring</h1>
+    <div class="g-box">${gDrawing(u, { guides: STATE.k.G5.guides !== 'off' })}</div>
+  </div></section>`;
+}
+
+const HERO = { A: heroA, B: heroB, C: heroC, D: heroD, E: heroE, F: heroF, G: heroG, H: heroH, G1: heroG1, G2: heroG2, G3: heroG3, G4: heroG4, G5: heroG5 };
+const site = id => `<div class="site">${siteHeader()}${HERO[id]()}${newsBand()}${eventsBand()}${hoursBand()}</div>`;
+
+/* ---------- Bord ---------- */
+const $ = s => document.querySelector(s);
+const seg = (key, opts, cur) => `<span class="seg" role="group">${opts.map(([v, l]) => `<button type="button" data-set="${key}" data-v="${v}" aria-pressed="${String(cur) === String(v)}">${l}</button>`).join('')}</span>`;
+
+function renderPicker() {
+  $('#r1').innerHTML = '<span>Ronde 1</span>' + DIRS.map(d => `<button type="button" data-dir="${d.id}" aria-pressed="${STATE.view === 'one' && STATE.dir === d.id && !isR2(d.id)}"><b>${d.id}</b>${d.name}</button>`).join('');
+  $('#picker').innerHTML = DIRS2.map(d => `<button class="pick" type="button" data-dir="${d.id}" aria-pressed="${STATE.view === 'one' && STATE.dir === d.id}">
+      <span class="pk-id">${d.id}${d.rec ? '<span class="pk-rec">aanbeveling</span>' : ''}</span><span class="pk-name">${d.name}</span><span class="pk-from">${d.from}</span></button>`).join('')
+    + `<button class="pick" type="button" data-dir="all" aria-pressed="${STATE.view === 'all'}"><span class="pk-id">G tot G5</span><span class="pk-name">Alle zes naast elkaar</span><span class="pk-from">Klik er een om ze groot te zien</span></button>`;
+}
+
+function renderControls() {
+  let h = '';
+  if (STATE.view === 'one') {
+    h += `<span class="ctl"><span>Apparaat</span>${seg('device', [['laptop', 'Laptop'], ['phone', 'Telefoon']], STATE.device)}</span>`;
+    if (STATE.device === 'laptop') h += `<span class="ctl"><span>Schaal</span>${seg('fit', [['true', 'Passend'], ['false', 'Ware grootte']], STATE.fit)}</span>`;
+  }
+  h += `<span class="ctl"><span>Week</span>${seg('week', [['normal', 'Gewone week'], ['exam', 'Examenperiode']], STATE.week)}</span>`;
+  h += `<span class="ctl"><span>Evenementen onder Nieuws</span>${seg('evBand', [['gap', 'Lichtblauw, paper ertussen'], ['paper', 'Op paper']], STATE.evBand)}</span>`;
+  h += `<span class="ctl"><span>Bezoeker</span>${seg('member', [['true', 'Aangemeld'], ['false', 'Niet aangemeld']], STATE.member)}</span>`;
+  if (STATE.view === 'one') {
+    const d = STATE.dir;
+    if (d === 'A') h += `<span class="knob-hint">Blader met de pijltjes in de kop.</span>`;
+    if (d === 'B') h += `<span class="ctl"><span>Zin</span>${seg('B.text', [['auto', 'Uit de kalender'], ['own', 'Eigen zin']], STATE.k.B.text)}</span><button class="knob-btn" type="button" data-act="replay">Opnieuw afspelen</button>`;
+    if (d === 'C') h += `<span class="knob-hint">Wissel met de chips boven de kaart.</span>`;
+    if (d === 'D') h += `<span class="ctl"><span>Foto</span>${seg('D.photo', [['jobfair', 'Jobfair'], ['galabal', 'Galabal']], STATE.k.D.photo)}</span><span class="ctl"><span>Kop</span>${seg('D.head', [['band', 'Navy band erboven'], ['plain', 'Enkel bijschrift']], STATE.k.D.head)}</span>`;
+    if (d === 'E') h += `<span class="knob-hint">Klik een woord in de lijst.</span>`;
+    if (d === 'F') h += `<span class="knob-hint">Klik een chip naast "Ik ben".</span>`;
+    if (d === 'G1') h += `<span class="ctl"><span>Rechterkant</span>${seg('G1.right', [['asked', 'Career rechtsonder'], ['mirror', 'Gespiegeld met links']], STATE.k.G1.right)}</span>`;
+    if (d === 'G4') h += `<span class="ctl"><span>Aantekening</span>${seg('G4.note', [['auto', 'Eerstvolgende activiteit'], ['own', 'Eigen tekst']], STATE.k.G4.note)}</span>`;
+    if (d === 'G5') h += `<span class="ctl"><span>Hulplijnen</span>${seg('G5.guides', [['on', 'Mee'], ['off', 'Weg']], STATE.k.G5.guides)}</span>`;
+    if (d[0] === 'G') h += `<button class="knob-btn" type="button" data-act="replay">Opnieuw tekenen</button>`;
+    if (d === 'H') h += `<span class="knob-hint">Zet Bezoeker op Niet aangemeld voor de lege staat.</span>`;
+  }
+  $('#controls').innerHTML = h;
+}
+
+function renderAbout() {
+  const el = $('#about');
+  if (STATE.view === 'all') { el.hidden = true; return; }
+  el.hidden = false;
+  const d = ALLDIRS.find(x => x.id === STATE.dir);
+  el.innerHTML = `<div><h2><small>${d.id}</small>${d.name}</h2><p>${d.what}</p></div>
+    <dl>${d.dl.map(([k, v]) => `<dt>${k}</dt><dd class="${k === 'Let op' ? 'warn' : ''}">${v}</dd>`).join('')}</dl>`;
+}
+
+function renderStage() {
+  const st = $('#stage');
+  st.classList.toggle('is-real', STATE.view === 'one' && STATE.device === 'laptop' && !STATE.fit);
+  if (STATE.view === 'all') {
+    st.innerHTML = `<div class="all">${DIRS2.map(d => `<div class="mini" role="button" tabindex="0" data-pick="${d.id}" aria-label="Open richting ${d.id}, ${d.name}">
+      <div class="mini-cap"><b>${d.id}</b>${d.name}<em>${d.from}</em>${d.rec ? '<span class="pk-rec">aanbeveling</span>' : ''}</div>
+      <div class="mini-stage"><div class="frame">${site(d.id)}</div></div></div>`).join('')}</div>`;
+  } else {
+    const phone = STATE.device === 'phone';
+    st.innerHTML = `<div class="stage-in ${phone ? 'is-phone' : ''}"><div class="frame ${phone ? 'phone' : ''}">${site(STATE.dir)}</div></div>`;
+  }
+  fit();
+  observeFrames();
+}
+
+function fit() {
+  const st = $('#stage');
+  if (STATE.view === 'all') {
+    st.querySelectorAll('.mini-stage').forEach(ms => { const f = ms.firstElementChild; f.style.transform = `scale(${ms.clientWidth / 1440})`; });
+    return;
+  }
+  const inner = st.querySelector('.stage-in'), fr = st.querySelector('.frame');
+  if (!inner || !fr) return;
+  if (STATE.device === 'phone') { fr.style.transform = ''; inner.style.height = ''; inner.style.width = ''; return; }
+  const sc = STATE.fit ? Math.min(1, st.clientWidth / 1440) : 1;
+  fr.style.transform = sc < 1 ? `scale(${sc})` : '';
+  inner.style.width = (1440 * sc) + 'px';
+  inner.style.height = (fr.offsetHeight * sc) + 'px';
+}
+
+function choiceText() {
+  const d = ALLDIRS.find(x => x.id === STATE.dir);
+  const extra = { B: () => `zin ${STATE.k.B.text === 'own' ? 'eigen zin' : 'uit de kalender'}`,
+                  D: () => `foto ${STATE.k.D.photo}, kop ${STATE.k.D.head === 'band' ? 'navy band erboven' : 'enkel bijschrift'}`,
+                  G1: () => `rechterkant ${STATE.k.G1.right === 'mirror' ? 'gespiegeld met links' : 'Career rechtsonder'}`,
+                  G4: () => `aantekening ${STATE.k.G4.note === 'own' ? 'eigen tekst' : 'eerstvolgende activiteit'}`,
+                  G5: () => `hulplijnen ${STATE.k.G5.guides === 'off' ? 'weg' : 'mee'}` }[d.id];
+  let s = `Hero ${d.id === 'G' ? 'G (bouwtekening, ronde 1)' : d.id[0] === 'G' ? `bouwtekening ${d.id}` : d.id} (${d.name})${extra ? ', ' + extra() : ''}. Bekeken op ${STATE.device === 'laptop' ? 'laptop' : 'telefoon'}, ${STATE.week === 'exam' ? 'examenperiode' : 'gewone week'}, ${STATE.member ? 'aangemeld' : 'niet aangemeld'}. Evenementen direct onder Nieuws, ${STATE.evBand === 'paper' ? 'op paper' : 'lichtblauw met paper ertussen'}.`;
+  const note = $('#note').value.trim();
+  if (note) s += ` Opmerking: ${note}`;
+  return s;
+}
+function renderChoice() { $('#choiceText').textContent = choiceText(); }
+
+function render() { renderPicker(); renderControls(); renderAbout(); renderStage(); renderChoice(); save(); }
+function renderStageOnly() { renderStage(); renderChoice(); save(); }
+
+/* ---------- Gebeurtenissen ---------- */
+document.addEventListener('click', e => {
+  const pick = e.target.closest('[data-dir]');
+  if (pick) { if (pick.dataset.dir === 'all') STATE.view = 'all'; else { STATE.view = 'one'; STATE.dir = pick.dataset.dir; } render(); return; }
+  const mini = e.target.closest('[data-pick]');
+  if (mini) { STATE.view = 'one'; STATE.dir = mini.dataset.pick; render(); window.scrollTo({ top: $('#picker').offsetTop - 12, behavior: 'smooth' }); return; }
+  const set = e.target.closest('[data-set]');
+  if (set) {
+    const [a, b] = set.dataset.set.split('.'); let v = set.dataset.v;
+    if (v === 'true') v = true; else if (v === 'false') v = false;
+    if (b) STATE.k[a][b] = v; else STATE[a] = v;
+    if (a === 'week') { STATE.k.A.day = 0; STATE.k.C.ev = 0; }
+    renderControls(); renderStageOnly(); return;
+  }
+  const act = e.target.closest('[data-act]');
+  if (act) {
+    e.preventDefault();
+    const a = act.dataset.act, v = act.dataset.v;
+    if (a === 'dayPrev') STATE.k.A.day = Math.max(0, STATE.k.A.day - 1);
+    if (a === 'dayNext') STATE.k.A.day = Math.min(WEEK[STATE.week].days.length - 1, STATE.k.A.day + 1);
+    if (a === 'cev') STATE.k.C.ev = +v;
+    if (a === 'ecat') STATE.k.E.cat = v;
+    if (a === 'who') STATE.k.F.who = v;
+    renderStageOnly();
+    return;
+  }
+  if (e.target.closest('.site a')) e.preventDefault();
+});
+document.addEventListener('keydown', e => {
+  const mini = e.target.closest && e.target.closest('[data-pick]');
+  if (mini && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); mini.click(); }
+});
+$('#note').addEventListener('input', renderChoice);
+document.addEventListener('submit', e => e.preventDefault());
+$('#copy').addEventListener('click', () => {
+  const t = choiceText(), btn = $('#copy');
+  const done = ok => { btn.textContent = ok ? 'Gekopieerd' : 'Selecteer en kopieer'; setTimeout(() => (btn.textContent = 'Kopieer'), 1800); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => done(true), () => { selectChoice(); done(false); });
+  else { selectChoice(); done(false); }
+});
+function selectChoice() { const r = document.createRange(); r.selectNodeContents($('#choiceText')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+
+const ro = new ResizeObserver(() => fit());
+function observeFrames() { ro.disconnect(); ro.observe($('#stage')); document.querySelectorAll('#stage .frame').forEach(f => ro.observe(f)); }
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+window.addEventListener('load', fit);
+render();
+</script>
