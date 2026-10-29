@@ -64,6 +64,7 @@ export function AccountingCodePicker({
   required = false,
   noneLabel,
   locale,
+  onChange,
 }: {
   codes: AccountingCodeOption[];
   name: string;
@@ -77,6 +78,8 @@ export function AccountingCodePicker({
    */
   noneLabel?: string;
   locale: "nl" | "en";
+  /** Na elke keuze, met het id ("" = geen code); voor een knop die pas met een code kan. */
+  onChange?: (id: string) => void;
 }) {
   const nl = locale === "nl";
   const generatedId = useId();
@@ -161,6 +164,7 @@ export function AccountingCodePicker({
 
   function choose(next: string) {
     setValue(next);
+    onChange?.(next);
     setInvalid(false);
     close(true);
   }

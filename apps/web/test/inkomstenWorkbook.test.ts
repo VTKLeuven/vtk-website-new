@@ -139,6 +139,52 @@ describe("het kwartaalblad", () => {
     expect([header[1], header[4], header[7], header[8]]).toEqual(["Bron", "Bedrag", "Rekening", "Regel in kwartaalblad"]);
   });
 
+  it("geeft in het controlebestand elke bron met regels een eigen tabblad, na Transacties", () => {
+    expect(controlWorkbook(sample).map((sheet) => sheet.sheet)).toEqual([
+      "Kwartaalblad",
+      "Transacties",
+      "Mollie",
+      "Payconiq",
+      "Per groep",
+      "Per uitbetaling",
+      "Na te kijken",
+      "Telt niet mee",
+      "Bestanden",
+    ]);
+  });
+
+  it("zet op het tabblad van een bron haar regels en een controleblok tegen het kwartaalblad", () => {
+    const mollie = controlWorkbook(sample).find((sheet) => sheet.sheet === "Mollie")!;
+    expect(mollie.data[0].slice(0, 4).map(text)).toEqual(["Datum", "Kanaal", "Omschrijving", "Bedrag"]);
+    expect(mollie.data[0][14]).toMatchObject({ value: "Controle Mollie" });
+    // Drie regels: de betaling, de kosten en de reserve.
+    expect(mollie.data.slice(1, 4).map((row) => text(row[3]))).toEqual([55, -1.85, -2.5]);
+    const block = mollie.data.slice(1).map((row) => [text(row[14]), text(row[15])]);
+    expect(block).toEqual([
+      ["Betalingen", 'SUMIFS($D$2:$D$4,$K$2:$K$4,"Betaling",$L$2:$L$4,"ja")'],
+      ["Kosten", 'SUMIFS($D$2:$D$4,$K$2:$K$4,"Kosten",$L$2:$L$4,"ja")'],
+      ["Reserve", 'SUMIFS($D$2:$D$4,$K$2:$K$4,"Reserve",$L$2:$L$4,"ja")'],
+      ["Telt mee", 'SUMIFS($D$2:$D$4,$L$2:$L$4,"ja")'],
+      // Vijf regels in het kwartaalblad (rij 4 tot 8), dus TOTAAL GEHEEL op rij 9; Mollie is kolom D.
+      ["In het kwartaalblad", "SUM('Kwartaalblad'!D9)"],
+      ["Verschil (hoort 0 te zijn)", "ROUND(P5-P6,2)"],
+    ]);
+  });
+
+  it("telt bij een bron met twee rekeningen beide kolommen, en toont wat niet meetelt", () => {
+    const payconiq = controlWorkbook(sample).find((sheet) => sheet.sheet === "Payconiq")!;
+    const block = new Map(payconiq.data.slice(1).map((row) => [text(row[14]), text(row[15])]));
+    expect(block.get("Telt niet mee")).toBe('SUMIFS($D$2:$D$5,$L$2:$L$5,"nee")');
+    expect(block.get("In het kwartaalblad")).toBe("SUM('Kwartaalblad'!E9,'Kwartaalblad'!F9)");
+  });
+
+  it("zet de naam van het kwartaalblad tussen aanhalingstekens, ook in het Engels", () => {
+    const english = { ...model([tx({ accountingCode: "700110", amountCents: 100 })]), nl: false };
+    const payconiq = controlWorkbook(english).find((sheet) => sheet.sheet === "Payconiq")!;
+    const block = new Map(payconiq.data.slice(1).map((row) => [text(row[14]), text(row[15])]));
+    expect(block.get("In the quarter sheet")).toBe("SUM('Quarter sheet'!D5)");
+  });
+
   it("toont de Brusselse tijd, niet UTC", () => {
     // 00:18 op 1 oktober in Brussel is 22:18 op 30 september in UTC.
     expect(wallClock(new Date("2026-09-30T22:18:00Z")).toISOString()).toBe("2026-10-01T00:18:00.000Z");

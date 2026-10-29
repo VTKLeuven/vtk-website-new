@@ -13,12 +13,14 @@ import {
   importIncomeExport,
   listClosedPeriods,
   lockedMonthTest,
+  changeTransactions,
   rematchOpenTransactions,
-  resetManualAssignment,
   saveIncomeConfig,
   setPayoutCheck,
   type ImportSummary,
+  type TransactionSelection,
 } from "@/lib/inkomsten/server";
+import { paramGetter, parseTransactionFilter } from "@/lib/inkomsten/transactionFilter";
 
 /** Foutcodes die /admin/inkomsten zelf vertaalt (`messages.ts`). */
 export type IncomeErrorCode =
@@ -38,7 +40,9 @@ export type IncomeErrorCode =
   | "BAD_DATE"
   | "DAY_EMPTY"
   | "ACCOUNT_REQUIRED"
-  | "DEVICE_NOT_FOUND";
+  | "DEVICE_NOT_FOUND"
+  | "FILTER_CHANGED"
+  | "NOTHING_SELECTED";
 
 /** "1 transactie", "3 transacties". */
 function transactions(count: number): string {
@@ -237,14 +241,78 @@ export async function assignIncomeDayAction(_prev: SaveState, formData: FormData
   );
 }
 
-export async function resetIncomeAssignmentAction(formData: FormData): Promise<SaveState> {
-  await requirePermission("income.manage");
-  const id = String(formData.get("id") ?? "");
-  const result = await resetManualAssignment(id);
-  if (result !== "OK") return saveError(result);
-  await logAudit({ action: "update", entity: "incomeTransaction", entityId: id, target: id, summary: "toewijzing met de hand gewist" });
+/** Meer dan een pagina aanvinken kan niet; "alles wat aan de filter voldoet" gaat via `scope=filter`. */
+const MAX_SELECTED = 1000;
+
+/**
+ * Transacties uit de lijst met de hand een code geven, laten wegvallen
+ * (`intent=exclude`) of teruggeven aan de koppelregels (`intent=reset`): de
+ * aangevinkte (`id`, herhaald), of met `scope=filter` alles wat aan de filter
+ * voldoet (`filter`, de query van de pagina, en `expected`, hoeveel het scherm
+ * er telde).
+ */
+export async function changeIncomeTransactionsAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const session = await requirePermission("income.manage");
+  const intent = String(formData.get("intent") ?? "");
+  const accountingCodeId = String(formData.get("accountingCodeId") ?? "");
+  if (intent !== "exclude" && intent !== "reset" && !accountingCodeId) return saveError("CODE_REQUIRED");
+
+  const query = String(formData.get("filter") ?? "");
+  let selection: TransactionSelection;
+  if (formData.get("scope") === "filter") {
+    const expected = Number(formData.get("expected"));
+    if (!Number.isInteger(expected) || expected <= 0) return saveError("FILTER_CHANGED");
+    selection = { filter: parseTransactionFilter(paramGetter(new URLSearchParams(query))), expected };
+  } else {
+    selection = { ids: [...new Set(formData.getAll("id").map(String))].slice(0, MAX_SELECTED) };
+  }
+
+  const outcome = await changeTransactions(
+    selection,
+    intent === "reset" ? { reset: true } : intent === "exclude" ? { exclude: true } : { accountingCodeId },
+    session.user.id,
+  );
+  if (!outcome.ok) return saveError(outcome.error);
+
+  const what =
+    intent === "reset"
+      ? `${transactions(outcome.count)} terug naar de koppelregels`
+      : outcome.code
+        ? `${transactions(outcome.count)} toegewezen aan ${outcome.code.code} ${outcome.code.name}`
+        : `${transactions(outcome.count)}: telt niet mee`;
+  await logAudit({
+    action: "update",
+    entity: "incomeTransaction",
+    ...("ids" in selection && selection.ids.length === 1 ? { entityId: selection.ids[0] } : {}),
+    target: "ids" in selection ? (selection.ids.length === 1 ? selection.ids[0] : transactions(selection.ids.length)) : `filter ${query || "(alles)"}`,
+    summary: `${what}, met de hand`,
+  });
   revalidate();
-  return saveOk();
+
+  const notes: string[] = [];
+  if (outcome.notManual > 0) {
+    notes.push(
+      outcome.notManual === 1
+        ? "1 stond niet met de hand en volgde de regels al."
+        : `${outcome.notManual} stonden niet met de hand en volgden de regels al.`,
+    );
+  }
+  if (outcome.unlinked > 0) {
+    notes.push(
+      outcome.unlinked === 1
+        ? "Bij 1 is de koppeling met een kassa of een betaling van de site losgemaakt."
+        : `Bij ${outcome.unlinked} is de koppeling met een kassa of een betaling van de site losgemaakt.`,
+    );
+  }
+  if (outcome.locked > 0) {
+    notes.push(
+      outcome.locked === 1
+        ? "1 valt in een afgesloten maand en bleef zoals ze was."
+        : `${outcome.locked} vallen in een afgesloten maand en bleven zoals ze waren.`,
+    );
+  }
+  if (intent === "reset" && outcome.count === 0) return saveOk(["Niets stond met de hand; de koppelregels gelden al.", ...notes.slice(1)].join(" "));
+  return saveOk([`${what}.`, ...notes].join(" "));
 }
 
 export async function rematchIncomeAction(): Promise<SaveState> {

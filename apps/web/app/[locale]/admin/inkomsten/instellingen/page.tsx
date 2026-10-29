@@ -80,8 +80,8 @@ export default async function IncomeSettingsPage({ params }: { params: Promise<{
         <h2 className="text-lg font-semibold">{nl ? "Kostencode" : "Fee code"}</h2>
         <p className="mt-1 mb-3 max-w-3xl text-sm text-vtk-muted">
           {nl
-            ? "De code voor de kosten: wat Mollie inhoudt (\"Withheld fees\"), de transactiekosten van SumUp en de commissie van Europabank. Samen vormen ze de regel met de kosten in het kwartaalblad. Staat de code nog niet in de lijst, voeg ze dan eerst toe bij Boekhoudcodes."
-            : "The code for the fees: what Mollie withholds (\"Withheld fees\"), the SumUp transaction fees and the Europabank commission. Together they are the line with the fees in the quarter sheet. If the code is not in the list yet, add it under Accounting codes first."}
+            ? "De boekhoudcode voor de kosten: wat Mollie inhoudt (\"Withheld fees\"), de transactiekosten van SumUp en de commissie van Europabank. Samen vormen ze de regel met de kosten in het kwartaalblad. Staat de code nog niet in de lijst, voeg ze dan eerst toe bij Boekhoudcodes."
+            : "The accounting code for the fees: what Mollie withholds (\"Withheld fees\"), the SumUp transaction fees and the Europabank commission. Together they are the line with the fees in the quarter sheet. If the code is not in the list yet, add it under Accounting codes first."}
         </p>
         <FeeCodeForm {...common} action={saveIncomeSettingsAction} codes={codes} value={config.feeAccountingCodeId} />
       </section>

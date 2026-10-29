@@ -15,8 +15,9 @@ fase 2 staan de kassacontrole met de lijst met afwijkingen, de code van een
 kassa en koppelregel 4. Van de verfijningen: het balansrapport van Mollie,
 SumUp per uitbetaling, de controlelijst per account, een dag van 9:00 tot 9:00
 in Na te kijken, een hele dag met de hand, de code van de gekoppelde
-ticketverkoop als voorstel bij een kassa, en bij het opladen per bron een "i"
-met de kolommen die de site verwacht.
+ticketverkoop als voorstel bij een kassa, bij het opladen per bron een "i"
+met de kolommen die de site verwacht, en in Transacties elke code verbeteren,
+per rij of voor veel rijen tegelijk.
 
 ## Bestanden
 
@@ -26,17 +27,18 @@ met de kolommen die de site verwacht.
 | `lib/inkomsten/match.ts` | De koppelregels als pure functie (`matchTransaction`), de kassa die een toestel had (`kassaAt`), en de onthouden tekst (`incomeRuleText`). |
 | `lib/inkomsten/overview.ts` | Het overzicht als pure som, de rekening op een dag, de dag in Na te kijken (`reviewDay`), per uitbetaling (`groupPayouts`, `payoutState`), de controlelijst (`computeIncomeChecks`). |
 | `lib/inkomsten/workbook.ts` | Het kwartaalblad en het controlebestand als bladen voor `write-excel-file`. Puur. |
-| `lib/inkomsten/server.ts` | Database: opladen (met voorvertoning), opnieuw koppelen, Na te kijken, overzicht, uitbetalingen afvinken, het model voor de xlsx, lijsten. |
+| `lib/inkomsten/server.ts` | Database: opladen (met voorvertoning), opnieuw koppelen, Na te kijken, codes met de hand (`changeTransactions`), overzicht, uitbetalingen afvinken, het model voor de xlsx, lijsten. |
+| `lib/inkomsten/transactionFilter.ts` | De filter van Transacties uit de URL (`parseTransactionFilter`) en als Prisma-where (`transactionWhere`). Puur; de lijst en "alles wat aan de filter voldoet" gebruiken dezelfde. |
 | `lib/inkomsten/importSummary.ts` | De voorvertoning van meerdere gekozen bestanden samen (`combineImportSummaries`). Puur. |
 | `lib/inkomsten/kassa.ts` | De kassacontrole: het venster van een kassa (`kassaControlWindow`) en het ingetikte bedrag naast de import (`kassaCheck`). Puur; het optellen is `kassaImportAmounts` in `server.ts`. |
 | `app/actions/inkomsten.ts` | Server actions, allemaal achter `income.manage`. |
 | `app/[locale]/admin/kassas/` | De code van een kassa (`AcceptForm`, `CodeForm`) en de kassacontrole in het telformulier (`CountForm`); de acties in `app/actions/kassas.ts`. |
-| `app/[locale]/admin/inkomsten/` | Overzicht (met de controlelijst en de uitbetalingen), Opladen (met `FormatGuide`, de kolommen per bron), Na te kijken (met `AssignDayForm`), Transacties, Instellingen. |
+| `app/[locale]/admin/inkomsten/` | Overzicht (met de controlelijst en de uitbetalingen), Opladen (met `FormatGuide`, de kolommen per bron), Na te kijken (met `AssignDayForm`), Transacties (met `TransactionTable`: het detail per rij en de vinkjes), Instellingen. |
 | `components/ui/InfoTip.tsx` | De "i" met uitleg erachter: hoveren opent, klikken zet vast (ook op een telefoon). |
 | `app/api/admin/inkomsten/export/route.ts` | De twee xlsx-bestanden, voor `?van=2026-07&tot=2026-09` en `?soort=boekhouder` of `?soort=controle`. |
 | `lib/accounting/import.ts` | De lijst van boekhoudcodes als CSV lezen, en plannen wat opladen doet. Puur. |
 | `lib/csv.ts` | De CSV-lezer die beide gebruiken: scheidingsteken raden, aanhalingstekens volgens RFC 4180. |
-| `test/inkomsten.test.ts`, `test/inkomstenWorkbook.test.ts`, `test/accountingCodesImport.test.ts` | Parsers, koppelregels, overzicht, controlelijst, de xlsx en de codelijst, zonder database, met verzonnen gegevens. |
+| `test/inkomsten.test.ts`, `test/inkomstenWorkbook.test.ts`, `test/inkomstenTransactionFilter.test.ts`, `test/accountingCodesImport.test.ts` | Parsers, koppelregels, overzicht, controlelijst, de xlsx en de codelijst, zonder database, met verzonnen gegevens. |
 
 Tabellen: `IncomeImport`, `IncomeChannel`, `IncomeChannelAccount` (de rekening
 vanaf een dag), `IncomeChannelCode` (de standaardcode vanaf een dag),
@@ -244,6 +246,44 @@ er die dag met de hand gezet werd, terug aan de koppelregels; ook wat in Na te
 kijken voor die dag gekozen werd. Zo hoeft een dag die de cursusdienst de SumUp
 van Theokot leende, geen twee regels met een standaardcode meer.
 
+## Transacties
+
+Elke regel uit de exports, 100 per pagina, nieuwste eerst. Bovenaan staat
+hoeveel er aan de filter voldoen en hoeveel geld dat samen is; elk bedrag in
+het overzicht linkt hiernaartoe met zijn code (of Na te kijken, kosten,
+reserve) en zijn bron, zodat dat totaal hetzelfde bedrag is als de cel.
+
+De filter staat in de URL en `parseTransactionFilter` leest ze: `bron`,
+`kanaal` (een `IncomeChannel.id`), `status` (een stand: `na-te-kijken`,
+`gekoppeld`, `telt-niet-mee`, of de regel die de code gaf: `met-de-hand`,
+`site`, `code-in-tekst`, `onthouden-tekst`, `kassa`, `standaardcode`), `soort`
+(`betaling`, `terugbetaling`, `kosten`, `reserve`), `van`, `tot` (op de maand
+waarin een transactie telt), `code` en `q`. `pagina` hoort er niet bij.
+
+Een klik op een rij opent het detail, met de code zoals ze staat en de keuze om
+ze te veranderen. Vinkjes kiezen er meer; is alles op de pagina aangevinkt, dan
+kan de balk onderaan "alle die aan de filter voldoen" kiezen. Alles gaat door
+`changeTransactions`:
+
+- **Toewijzen** zet `rule: MANUAL` met de gekozen code, wat de regels ook
+  zeiden; **Telt niet mee** zet `excluded`. De koppelregels raken `MANUAL`
+  daarna niet meer aan (`rematchOpenTransactions` slaat ze over, een import
+  schrijft nooit over een bestaande rij).
+- Een koppeling met een kassa, ticketverkoop, lidgeld of de uitleendienst gaat
+  mee weg: wie de code met de hand zet, zegt dat die koppeling fout was, en de
+  kassacontrole telt de betaling dan niet meer mee. Het detail en de
+  bevestiging zeggen het vooraf, de toast achteraf hoeveel.
+- **Terug naar de regels** wist enkel wat `MANUAL` is en koppelt opnieuw; dat
+  legt ook een losgemaakte koppeling terug.
+- Kosten en reserve krijgen geen vinkje en geen code: die hebben hun eigen
+  regel. Een afgesloten maand blijft zoals ze is en telt mee in de toast.
+- **"Alles wat aan de filter voldoet" telt opnieuw op de server.** De actie
+  krijgt de filter als query en `expected`, hoeveel betalingen en
+  terugbetalingen het scherm telde (`assignable` uit `listIncomeTransactions`).
+  Kwam er sindsdien iets bij of ging er iets weg, dan weigert ze met
+  `FILTER_CHANGED` en verandert er niets: anders raakt de keuze iets anders dan
+  wat de bevestiging noemde.
+
 ## Kanalen en rekeningen
 
 Een kanaal (`IncomeChannel`) ontstaat bij de eerste import die het noemt. Beheer
@@ -323,11 +363,19 @@ Het overzicht heeft twee downloads, beide xlsx met `write-excel-file`:
   een totaalblok per rekening; rijen per code in de volgorde van het register,
   dan de kosten (van alle bronnen samen), de reserve, Na te kijken en TOTAAL
   GEHEEL. Enkel bedragen.
-- **Het controlebestand** (`controlWorkbook`), voor Beheer: zeven tabbladen die
-  de lagen van het rekenblad volgen. Kwartaalblad (hetzelfde, maar elke cel een
+- **Het controlebestand** (`controlWorkbook`), voor Beheer: tabbladen die de
+  lagen van het rekenblad volgen. Kwartaalblad (hetzelfde, maar elke cel een
   `SUMIFS` op Transacties), Transacties (met de kolom Waarom, uit `reasonOf`),
-  Per groep, Per uitbetaling, Na te kijken, Telt niet mee en Bestanden.
-  Het bevat wat betalers zelf typten, dus het gaat niet naar de boekhouder.
+  een tabblad per bron met regels in de periode (`sourceSheet`), Per groep,
+  Per uitbetaling, Na te kijken, Telt niet mee en Bestanden. Het bevat wat
+  betalers zelf typten, dus het gaat niet naar de boekhouder.
+- **Het tabblad van een bron** (Europabank, SumUp, Mollie, Payconiq) heeft de
+  kolommen van Transacties zonder Bron, en rechtsboven een controleblok met
+  formules op die regels: per soort, wat meetelt, wat niet, wat het
+  kwartaalblad voor die bron telt (de som van haar kolommen in TOTAAL GEHEEL)
+  en het verschil, afgerond op de cent. Dat verschil hoort nul te zijn.
+  Nagerekend in de preview met de Python-bibliotheek `formulas`: nul bij alle
+  vier.
 
 De regel van een transactie in het kwartaalblad is `quarterLineKey`, en die
 sleutel staat ook in kolom I van Transacties. Zo geeft elke formule exact het

@@ -1,5 +1,6 @@
 import type { YMD } from "@/lib/brussels";
-import type { IncomeSourceCode } from "@/lib/inkomsten/parse";
+import type { IncomeKindCode, IncomeSourceCode } from "@/lib/inkomsten/parse";
+import type { IncomeRuleCode } from "@/lib/inkomsten/transactionFilter";
 import type { IncomeCheck } from "@/lib/inkomsten/overview";
 import { formatEuro } from "@/lib/rekeningen/expenses";
 import { monthLabel } from "@/lib/inkomsten/labels";
@@ -13,6 +14,23 @@ export const SOURCE_LABELS: Record<IncomeSourceCode, string> = {
 };
 
 export { monthLabel, periodLabel } from "@/lib/inkomsten/labels";
+
+/** Waarom een transactie haar code heeft: de koppelregel, in de lijst en in het detail. */
+export const RULE_LABELS: Record<IncomeRuleCode, { nl: string; en: string }> = {
+  MANUAL: { nl: "Met de hand", en: "By hand" },
+  WEBSITE: { nl: "Betaling van de site", en: "Payment from the site" },
+  CODE_IN_TEXT: { nl: "Code in de tekst", en: "Code in the text" },
+  NAME_RULE: { nl: "Onthouden tekst", en: "Remembered text" },
+  CHANNEL_DEFAULT: { nl: "Standaardcode van het kanaal", en: "Default code of the channel" },
+  CASH_REGISTER: { nl: "Kassa", en: "Cash register" },
+};
+
+export const KIND_LABELS: Record<IncomeKindCode, { nl: string; en: string }> = {
+  PAYMENT: { nl: "Betaling", en: "Payment" },
+  REFUND: { nl: "Terugbetaling", en: "Refund" },
+  FEE: { nl: "Kosten", en: "Fees" },
+  RESERVE: { nl: "Reserve", en: "Reserve" },
+};
 
 /**
  * Het lopende kalenderkwartaal en de vier ervoor, als snelkeuze. Een andere

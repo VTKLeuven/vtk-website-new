@@ -6,8 +6,9 @@
  *   het tabblad "4e Kwartaal" van het rekenblad van Beheer: een kolom per bron
  *   en per bankrekening, rechts een groen totaalblok per rekening;
  * - **het controlebestand voor Beheer**: hetzelfde blad, maar elke cel is een
- *   `SUMIFS` op het tabblad Transacties, plus de tussenstappen (per groep, per
- *   Mollie-uitbetaling, wat na te kijken is, wat niet meetelt, de bestanden).
+ *   `SUMIFS` op het tabblad Transacties, plus een tabblad per bron en de
+ *   tussenstappen (per groep, per uitbetaling, wat na te kijken is, wat niet
+ *   meetelt, de bestanden).
  *
  * De kleuren komen uit dat tabblad; zie `docs/inkomsten.md`.
  *
@@ -180,12 +181,19 @@ function accountName(account: string | null, nl: boolean): string {
   return account ?? (nl ? NO_ACCOUNT_NL : NO_ACCOUNT_EN);
 }
 
-/**
- * Het kwartaalblad. Met `formulas` telt elke cel met een `SUMIFS` op het tabblad
- * Transacties (voor het controlebestand); zonder staan er de bedragen (voor de
- * boekhouder).
- */
-export function quarterSheet(model: WorkbookModel, options: { formulas: boolean }): SheetSpec {
+/** Waar het kwartaalblad begint: drie kolommen tekst, dan de bronnen; drie koprijen, dan de regels. */
+const QUARTER_FIRST_SOURCE = 3;
+const QUARTER_FIRST_DATA_ROW = 4;
+
+/** De kolommen en regels van het kwartaalblad; de tabbladen per bron zoeken er hun cellen in. */
+type QuarterLayout = {
+  counted: WorkbookTransaction[];
+  columns: QuarterColumn[];
+  accounts: string[];
+  lines: QuarterLine[];
+};
+
+function quarterLayout(model: WorkbookModel): QuarterLayout {
   const { nl } = model;
   const counted = model.transactions.filter((tx) => quarterLineKey(tx) !== null);
 
@@ -232,6 +240,17 @@ export function quarterSheet(model: WorkbookModel, options: { formulas: boolean 
   if (counted.some((tx) => quarterLineKey(tx) === "Na te kijken")) {
     lines.push({ key: "Na te kijken", post: nl ? "Na te kijken (nog geen code)" : "To review (no code yet)", main: "", analytic: "" });
   }
+  return { counted, columns, accounts, lines };
+}
+
+/**
+ * Het kwartaalblad. Met `formulas` telt elke cel met een `SUMIFS` op het tabblad
+ * Transacties (voor het controlebestand); zonder staan er de bedragen (voor de
+ * boekhouder).
+ */
+export function quarterSheet(model: WorkbookModel, options: { formulas: boolean }, layout = quarterLayout(model)): SheetSpec {
+  const { nl } = model;
+  const { counted, columns, accounts, lines } = layout;
 
   const sums = new Map<string, number>();
   for (const tx of counted) {
@@ -243,10 +262,10 @@ export function quarterSheet(model: WorkbookModel, options: { formulas: boolean 
   const headBold: CellObject = { ...head, fontWeight: "bold" };
   const totalHead: CellObject = { backgroundColor: SHEET_STYLE.totalHeadFill, textColor: SHEET_STYLE.totalHeadText };
   const row: CellObject = { backgroundColor: SHEET_STYLE.rowFill };
-  const firstSource = 3;
+  const firstSource = QUARTER_FIRST_SOURCE;
   const lastSource = firstSource + columns.length - 1;
   const firstAccount = lastSource + 1;
-  const firstDataRow = 4;
+  const firstDataRow = QUARTER_FIRST_DATA_ROW;
   const lastDataRow = firstDataRow + lines.length - 1;
   const sourceRange = (r: number) => `$${columnLetter(firstSource)}${r}:$${columnLetter(lastSource)}${r}`;
   /** De rekening per bronkolom staat in rij 3: daar zoekt het totaalblok op. */
@@ -447,6 +466,122 @@ export function transactionsSheet(model: WorkbookModel): SheetSpec {
   };
 }
 
+/** Waar het tabblad van een bron zijn totaal in het kwartaalblad vindt. */
+export type QuarterTotalCells = {
+  /** De naam van het tabblad kwartaalblad. */
+  sheet: string;
+  /** De rij TOTAAL GEHEEL, 1-gebaseerd. */
+  totalRow: number;
+  /** De kolommen van deze bron (een per rekening), als letters; leeg als niets ervan meetelt. */
+  columns: string[];
+};
+
+/** Een tabbladnaam in een formule: altijd tussen enkele aanhalingstekens. */
+function sheetRef(name: string): string {
+  return `'${name.replace(/'/g, "''")}'`;
+}
+
+/**
+ * Eén bron, zoals een tabblad van het rekenblad: haar regels met dezelfde
+ * kolommen als Transacties (zonder Bron), en rechtsboven een controleblok met
+ * formules op die regels: per soort, wat meetelt, wat niet, wat het
+ * kwartaalblad voor deze bron telt, en het verschil. Dat verschil hoort nul te
+ * zijn: is het dat niet, dan tellen het kwartaalblad en dit tabblad iets
+ * anders.
+ */
+export function sourceSheet(model: WorkbookModel, source: IncomeSourceCode, quarter: QuarterTotalCells): SheetSpec {
+  const { nl } = model;
+  const yes = nl ? "ja" : "yes";
+  const no = nl ? "nee" : "no";
+  const rows = model.transactions
+    .filter((tx) => tx.source === source)
+    .sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
+  const last = 1 + rows.length;
+  const range = (column: string) => `$${column}$2:$${column}$${last}`;
+  // Bedrag (D), Soort (K) en Telt mee (L): de kolommen hieronder, zonder Bron.
+  const amounts = range("D");
+  const kinds = range("K");
+  const counts = range("L");
+
+  const formula = (value: string, style: CellObject = {}): CellObject => ({ type: "Formula", value, format: SHEET_STYLE.euro, ...style });
+  const summary: Array<[string, CellObject]> = [];
+  const kindTotals: Record<IncomeKindCode, [string, string]> = {
+    PAYMENT: ["Betalingen", "Payments"],
+    REFUND: ["Terugbetalingen", "Refunds"],
+    FEE: ["Kosten", "Fees"],
+    RESERVE: ["Reserve", "Reserve"],
+  };
+  for (const kind of ["PAYMENT", "REFUND", "FEE", "RESERVE"] as const) {
+    if (!rows.some((tx) => tx.kind === kind && quarterLineKey(tx) !== null)) continue;
+    summary.push([
+      kindTotals[kind][nl ? 0 : 1],
+      formula(`SUMIFS(${amounts},${kinds},${quote(kindLabel(kind, nl))},${counts},${quote(yes)})`),
+    ]);
+  }
+  const countedRow = 2 + summary.length;
+  summary.push([nl ? "Telt mee" : "Counts", formula(`SUMIFS(${amounts},${counts},${quote(yes)})`, { fontWeight: "bold" })]);
+  if (rows.some((tx) => quarterLineKey(tx) === null)) {
+    summary.push([nl ? "Telt niet mee" : "Does not count", formula(`SUMIFS(${amounts},${counts},${quote(no)})`)]);
+  }
+  const quarterRow = 2 + summary.length;
+  summary.push([
+    nl ? "In het kwartaalblad" : "In the quarter sheet",
+    quarter.columns.length > 0
+      ? formula(`SUM(${quarter.columns.map((column) => `${sheetRef(quarter.sheet)}!${column}${quarter.totalRow}`).join(",")})`)
+      : euro(0),
+  ]);
+  // Afgerond op de cent: twee sommen van dezelfde bedragen in een andere volgorde
+  // verschillen anders in de vijftiende decimaal, en dat toont Excel als -0,00.
+  summary.push([
+    nl ? "Verschil (hoort 0 te zijn)" : "Difference (should be 0)",
+    formula(`ROUND(P${countedRow}-P${quarterRow},2)`, { fontWeight: "bold" }),
+  ]);
+
+  const data: SheetData = [
+    [
+      ...headerRow(
+        nl
+          ? ["Datum", "Kanaal", "Omschrijving", "Bedrag", "Maand", "Uitbetaling", "Rekening", "Regel in kwartaalblad", "Boekhoudcode", "Naam code", "Soort", "Telt mee", "Waarom"]
+          : ["Date", "Channel", "Description", "Amount", "Month", "Payout", "Account", "Quarter sheet line", "Accounting code", "Code name", "Kind", "Counts", "Why"],
+      ),
+      null,
+      ...headerRow([nl ? `Controle ${SOURCE_NAMES[source]}` : `Check ${SOURCE_NAMES[source]}`, ""]),
+    ],
+  ];
+  const height = Math.max(rows.length, summary.length);
+  for (let index = 0; index < height; index++) {
+    const tx = rows[index];
+    const line = summary[index];
+    data.push([
+      ...(tx
+        ? [
+            { value: wallClock(tx.occurredAt), type: Date, format: DATE_TIME },
+            tx.channel,
+            tx.description ?? "",
+            euro(tx.amountCents),
+            tx.periodMonth ?? "",
+            tx.payoutReference ?? "",
+            accountName(tx.bankAccount, nl),
+            lineLabel(tx, nl),
+            tx.accountingCode ?? "",
+            tx.accountingCodeName ?? "",
+            kindLabel(tx.kind, nl),
+            quarterLineKey(tx) !== null ? yes : no,
+            tx.reason,
+          ]
+        : Array<Cell>(13).fill(null)),
+      null,
+      ...(line ? [{ value: line[0], fontWeight: line[1].fontWeight }, line[1]] : [null, null]),
+    ] as Cell[]);
+  }
+  return {
+    sheet: SOURCE_NAMES[source],
+    data,
+    columns: [18, 20, 40, 12, 9, 18, 24, 20, 16, 24, 13, 9, 50, 3, 26, 14].map((width) => ({ width })),
+    stickyRowsCount: 1,
+  };
+}
+
 export function groupsSheet(model: WorkbookModel): SheetSpec {
   const { nl } = model;
   const data: SheetData = [
@@ -566,9 +701,20 @@ export function accountantWorkbook(model: WorkbookModel): SheetSpec[] {
 
 /** Het controlebestand voor Beheer: het kwartaalblad met formules, en elke tussenstap. */
 export function controlWorkbook(model: WorkbookModel): SheetSpec[] {
+  const layout = quarterLayout(model);
+  const quarter = quarterSheet(model, { formulas: true }, layout);
+  // Een tabblad per bron met regels in de periode, in de volgorde van het kwartaalblad.
+  const sources = SOURCE_ORDER.filter((source) => model.transactions.some((tx) => tx.source === source));
   return [
-    quarterSheet(model, { formulas: true }),
+    quarter,
     transactionsSheet(model),
+    ...sources.map((source) =>
+      sourceSheet(model, source, {
+        sheet: quarter.sheet,
+        totalRow: QUARTER_FIRST_DATA_ROW + layout.lines.length,
+        columns: layout.columns.flatMap((column, index) => (column.source === source ? [columnLetter(QUARTER_FIRST_SOURCE + index)] : [])),
+      }),
+    ),
     groupsSheet(model),
     payoutsSheet(model),
     filteredSheet(model, "open"),

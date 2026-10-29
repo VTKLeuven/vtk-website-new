@@ -12120,6 +12120,15 @@ had.
   plaats van twee regels met een standaardcode. Wat exact gekoppeld is (een
   betaling van de site, een code in de tekst, een onthouden tekst, een kassa),
   blijft: dat weet het beter dan de dag.
+- **Elke code is te verbeteren, zoals een cel in het rekenblad.** In de Excel
+  tikte Beheer over een foute code heen; in Transacties opent een klik op een
+  rij de code, en vinkjes geven veel rijen samen een code, tot "alles wat aan
+  de filter voldoet". Anders dan bij een hele dag gaat dat ook over een exacte
+  koppeling: wie één rij bekijkt en de code verandert, weet dat de kassa of de
+  betaling van de site het hier mis had. De koppeling met die kassa of verkoop
+  gaat dan mee weg, zodat de kassacontrole die betaling niet meer meetelt;
+  "Terug naar de regels" legt ze opnieuw. Een onthouden tekst die zelf fout
+  is, past Beheer aan in Instellingen, niet rij per rij.
 - **Periodes zijn een reeks maanden, het boekjaar ligt niet vast.** Het
   rekenblad had augustus en september als derde kwartaal en juli apart; de site
   biedt de kalenderkwartalen als snelkeuze, en elke andere reeks kiest Beheer.
@@ -12160,7 +12169,8 @@ had.
 - **Elke stap blijft controleerbaar, zoals in het rekenblad.** Dat was te
   controleren omdat elke laag zichtbaar was: de export, het overzicht per
   kanaal, het kwartaalblad met formules. Het controlebestand geeft die lagen
-  terug (de transacties met waarom ze hun code kregen, de groepen, de
+  terug (de transacties met waarom ze hun code kregen, een tabblad per bron
+  zoals de tabbladen per export in het rekenblad, de groepen, de
   uitbetalingen, wat niet meetelt) en rekent het kwartaalblad met formules op
   de transacties, zodat een klik op een cel toont wat ze optelt. Het bevat wat
   betalers typten en blijft dus bij Beheer.

@@ -31,6 +31,9 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
     ACCOUNT_REQUIRED: "Vul de rekening in.",
     DEVICE_NOT_FOUND:
       "Dat toestel staat niet (meer) in de instellingen van de kassa's, of past niet bij dit kanaal; ververs de pagina.",
+    FILTER_CHANGED:
+      "Sinds de pagina laadde, voldoen er meer of minder transacties aan de filter (een import, of iemand anders die toewees). Er is niets veranderd; ververs de pagina en kijk opnieuw.",
+    NOTHING_SELECTED: "Vink eerst een of meer transacties aan.",
   };
   const en: Record<IncomeErrorCode, string> = {
     NO_FILE: "Choose a file first.",
@@ -53,6 +56,9 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
       "That channel has no payment that day (from 9:00 to 9:00 the next morning) that can get a code by hand, or nothing that was set by hand. A payment from the site, a code in the text, a remembered text or a cash register stays as it is.",
     ACCOUNT_REQUIRED: "Fill in the account.",
     DEVICE_NOT_FOUND: "That device is not (or no longer) in the cash register settings, or does not fit this channel; refresh the page.",
+    FILTER_CHANGED:
+      "Since the page loaded, more or fewer transactions match the filter (an import, or someone else assigning). Nothing was changed; refresh the page and look again.",
+    NOTHING_SELECTED: "Tick one or more transactions first.",
   };
   return { ...shared, ...(locale === "nl" ? nl : en) };
 }

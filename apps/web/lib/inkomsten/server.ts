@@ -46,6 +46,7 @@ import {
   type KassaImportAmount,
 } from "./kassa";
 import { quarterLineKey, type WorkbookGroup, type WorkbookModel, type WorkbookTransaction } from "./workbook";
+import { ASSIGNABLE_KINDS, transactionWhere, type TransactionFilter } from "./transactionFilter";
 import {
   BALANCE_KEY,
   dateToMonth,
@@ -893,20 +894,6 @@ export async function assignChannelDay(
   return { ok: true, count: ids.length, channel: name };
 }
 
-/** Een toewijzing met de hand ongedaan maken: de koppelregels nemen het weer over. */
-export async function resetManualAssignment(id: string): Promise<"OK" | "NOT_FOUND" | "LOCKED"> {
-  const row = await prisma.incomeTransaction.findUnique({ where: { id }, select: { rule: true, periodMonth: true } });
-  if (!row || row.rule !== "MANUAL") return "NOT_FOUND";
-  const isLocked = lockedMonthTest(await listClosedPeriods());
-  if (isLocked(row.periodMonth ? dateToMonth(row.periodMonth) : null)) return "LOCKED";
-  await prisma.incomeTransaction.update({
-    where: { id },
-    data: { rule: null, excluded: false, accountingCode: null, accountingCodeName: null, assignedById: null, assignedAt: null },
-  });
-  await rematchOpenTransactions();
-  return "OK";
-}
-
 // -----------------------------------------------------------------------------
 // Overzicht
 // -----------------------------------------------------------------------------
@@ -1134,52 +1121,20 @@ export async function setPayoutCheck(
   return "OK";
 }
 
-/** De transacties achter één cel van het overzicht, voor de lijst. */
-export type TransactionFilter = {
-  source: IncomeSourceCode | null;
-  state: "all" | "open" | "matched" | "excluded";
-  from: string | null;
-  to: string | null;
-  code: string | null;
-  query: string | null;
-};
+export const TRANSACTION_PAGE = 100;
 
-export const TRANSACTION_PAGE = 300;
-
-export async function listIncomeTransactions(filter: TransactionFilter) {
-  const where = {
-    ...(filter.source ? { source: filter.source } : {}),
-    ...(filter.state === "open"
-      ? { rule: null, excluded: false, kind: { in: ["PAYMENT" as const, "REFUND" as const] } }
-      : filter.state === "matched"
-        ? { rule: { not: null }, excluded: false }
-        : filter.state === "excluded"
-          ? { excluded: true }
-          : {}),
-    ...(filter.from || filter.to
-      ? {
-          periodMonth: {
-            ...(filter.from ? { gte: monthToDate(filter.from) } : {}),
-            ...(filter.to ? { lte: monthToDate(filter.to) } : {}),
-          },
-        }
-      : {}),
-    ...(filter.code ? { accountingCode: filter.code } : {}),
-    ...(filter.query
-      ? {
-          OR: [
-            { description: { contains: filter.query, mode: "insensitive" as const } },
-            { providerId: { contains: filter.query } },
-            { reference: { contains: filter.query } },
-            { payoutReference: { contains: filter.query } },
-          ],
-        }
-      : {}),
-  };
-  const [rows, total] = await Promise.all([
+/**
+ * De transacties achter één cel van het overzicht, per pagina, met hoeveel en
+ * hoeveel geld er in totaal aan de filter voldoet. `assignable` telt enkel wat
+ * met de hand een code kan krijgen, want enkel dat raakt "alles selecteren".
+ */
+export async function listIncomeTransactions(filter: TransactionFilter, page: number) {
+  const where = transactionWhere(filter);
+  const [rows, byKind, closed] = await Promise.all([
     prisma.incomeTransaction.findMany({
       where,
-      orderBy: { occurredAt: "desc" },
+      orderBy: [{ occurredAt: "desc" }, { id: "asc" }],
+      skip: (page - 1) * TRANSACTION_PAGE,
       take: TRANSACTION_PAGE,
       select: {
         id: true,
@@ -1197,15 +1152,138 @@ export async function listIncomeTransactions(filter: TransactionFilter) {
         accountingCodeName: true,
         rule: true,
         excluded: true,
+        assignedAt: true,
+        membershipPaymentId: true,
+        uitleenPaymentId: true,
         channel: { select: { identifier: true, label: true } },
         ticketPayment: { select: { order: { select: { eventId: true } } } },
         cashRegister: { select: { id: true, activity: true, postLabel: true } },
         assignedBy: { select: { name: true } },
       },
     }),
-    prisma.incomeTransaction.count({ where }),
+    prisma.incomeTransaction.groupBy({ by: ["kind"], where, _count: { _all: true }, _sum: { amountCents: true } }),
+    listClosedPeriods(),
   ]);
-  return { rows, total };
+  const isLocked = lockedMonthTest(closed);
+  let total = 0;
+  let totalCents = 0;
+  let assignable = 0;
+  for (const group of byKind) {
+    total += group._count._all;
+    totalCents += group._sum.amountCents ?? 0;
+    if (ASSIGNABLE_KINDS.includes(group.kind)) assignable += group._count._all;
+  }
+  return {
+    rows: rows.map((row) => ({ ...row, locked: isLocked(row.periodMonth ? dateToMonth(row.periodMonth) : null) })),
+    total,
+    totalCents,
+    assignable,
+  };
+}
+
+/** Welke transacties een keuze raakt: aangevinkt, of alles wat aan een filter voldoet. */
+export type TransactionSelection = { ids: string[] } | { filter: TransactionFilter; expected: number };
+
+export type TransactionChoice = { accountingCodeId: string } | { exclude: true } | { reset: true };
+
+export type ChangeOutcome =
+  | {
+      ok: true;
+      /** Hoeveel er veranderden. */
+      count: number;
+      /** Bleef zoals het was: een afgesloten maand. */
+      locked: number;
+      /** Hing aan een kassa, een ticketverkoop, lidgeld of de uitleendienst, en nu niet meer. */
+      unlinked: number;
+      /** Bij `reset`: stond niet met de hand en volgde de regels dus al. */
+      notManual: number;
+      code: { code: string; name: string } | null;
+    }
+  | { ok: false; error: "NOT_FOUND" | "CODE_NOT_FOUND" | "LOCKED" | "FILTER_CHANGED" | "NOTHING_SELECTED" };
+
+/**
+ * Transacties met de hand een code geven, laten wegvallen ("telt niet mee"), of
+ * teruggeven aan de koppelregels: één rij uit de lijst, de aangevinkte rijen, of
+ * alles wat aan de filter voldoet.
+ *
+ * Met de hand wint van elke regel, ook van een kassa of een betaling van de
+ * site: wie de code met de hand zet, weet dat die koppeling fout was. Daarom
+ * gaat die koppeling mee weg, net als bij een hele dag; "terug naar de regels"
+ * legt ze opnieuw. Kosten en reserve krijgen hier nooit een code: die hebben
+ * hun eigen regel in het overzicht. Een afgesloten maand blijft zoals ze is.
+ */
+export async function changeTransactions(
+  selection: TransactionSelection,
+  choice: TransactionChoice,
+  userId: string | null,
+): Promise<ChangeOutcome> {
+  if ("ids" in selection && selection.ids.length === 0) return { ok: false, error: "NOTHING_SELECTED" };
+  const where =
+    "ids" in selection
+      ? { id: { in: selection.ids }, kind: { in: [...ASSIGNABLE_KINDS] } }
+      : { AND: [transactionWhere(selection.filter), { kind: { in: [...ASSIGNABLE_KINDS] } }] };
+  const rows = await prisma.incomeTransaction.findMany({
+    where,
+    select: {
+      id: true,
+      rule: true,
+      periodMonth: true,
+      ticketPaymentId: true,
+      membershipPaymentId: true,
+      uitleenPaymentId: true,
+      cashRegisterId: true,
+    },
+  });
+  // Tussen het tonen en het klikken kwam er iets bij of ging er iets weg (een
+  // import, iemand anders die toewees): dan raakt "alles" iets anders dan wat
+  // de bevestiging noemde.
+  if ("filter" in selection && rows.length !== selection.expected) return { ok: false, error: "FILTER_CHANGED" };
+  if (rows.length === 0) return { ok: false, error: "NOT_FOUND" };
+
+  const isLocked = lockedMonthTest(await listClosedPeriods());
+  const open = rows.filter((row) => !isLocked(row.periodMonth ? dateToMonth(row.periodMonth) : null));
+  const locked = rows.length - open.length;
+  if (open.length === 0) return { ok: false, error: "LOCKED" };
+
+  if ("reset" in choice) {
+    const manual = open.filter((row) => row.rule === "MANUAL");
+    for (const batch of chunks(manual.map((row) => row.id))) {
+      await prisma.incomeTransaction.updateMany({
+        where: { id: { in: batch } },
+        data: { rule: null, excluded: false, accountingCode: null, accountingCodeName: null, assignedById: null, assignedAt: null },
+      });
+    }
+    if (manual.length > 0) await rematchOpenTransactions();
+    return { ok: true, count: manual.length, locked, unlinked: 0, notManual: open.length - manual.length, code: null };
+  }
+
+  let code: { code: string; name: string } | null = null;
+  if ("accountingCodeId" in choice) {
+    code = await prisma.accountingCode.findUnique({ where: { id: choice.accountingCodeId }, select: { code: true, name: true } });
+    if (!code) return { ok: false, error: "CODE_NOT_FOUND" };
+  }
+  const unlinked = open.filter(
+    (row) => row.ticketPaymentId || row.membershipPaymentId || row.uitleenPaymentId || row.cashRegisterId,
+  ).length;
+  const now = new Date();
+  for (const batch of chunks(open.map((row) => row.id))) {
+    await prisma.incomeTransaction.updateMany({
+      where: { id: { in: batch } },
+      data: {
+        rule: "MANUAL",
+        excluded: !code,
+        accountingCode: code?.code ?? null,
+        accountingCodeName: code?.name ?? null,
+        ticketPaymentId: null,
+        membershipPaymentId: null,
+        uitleenPaymentId: null,
+        cashRegisterId: null,
+        assignedById: userId,
+        assignedAt: now,
+      },
+    });
+  }
+  return { ok: true, count: open.length, locked, unlinked, notManual: 0, code };
 }
 
 // -----------------------------------------------------------------------------

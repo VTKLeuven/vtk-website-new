@@ -59,11 +59,19 @@ export default async function IncomeOverviewPage({
   const day = (value: Date) =>
     value.toLocaleDateString(nl ? "nl-BE" : "en-GB", { day: "numeric", month: "short", timeZone: "Europe/Brussels" });
 
-  const lineCells = (line: OverviewLine) => (
+  // Een bedrag linkt naar zijn rijen in Transacties, waar het totaal bovenaan
+  // hetzelfde bedrag is; zonder `filter` (het totaal) linkt niets.
+  const lineCells = (line: OverviewLine, filter?: Record<string, string>) => (
     <>
       {data.sources.map((source) => (
         <td key={source} className="px-3 py-2 text-right whitespace-nowrap tabular-nums">
-          {money(line.bySource[source])}
+          {filter && line.bySource[source] !== 0 ? (
+            <Link href={transactionsHref({ ...filter, bron: source.toLowerCase() })} className="hover:underline">
+              {money(line.bySource[source])}
+            </Link>
+          ) : (
+            money(line.bySource[source])
+          )}
         </td>
       ))}
       <td className="px-3 py-2 text-right font-medium whitespace-nowrap tabular-nums">{money(line.total)}</td>
@@ -198,7 +206,7 @@ export default async function IncomeOverviewPage({
                       </Link>
                     </td>
                     <td className="px-3 py-2">{row.name}</td>
-                    {lineCells(row)}
+                    {lineCells(row, { code: row.code })}
                   </tr>
                 ))}
                 {overview.unassigned.count > 0 ? (
@@ -209,7 +217,7 @@ export default async function IncomeOverviewPage({
                         {nl ? `Na te kijken (${overview.unassigned.count})` : `To review (${overview.unassigned.count})`}
                       </Link>
                     </td>
-                    {lineCells(overview.unassigned)}
+                    {lineCells(overview.unassigned, { status: "na-te-kijken" })}
                   </tr>
                 ) : null}
                 {overview.fees.count > 0 ? (
@@ -222,14 +230,14 @@ export default async function IncomeOverviewPage({
                           ? "Kosten (nog geen code gekozen)"
                           : "Fees (no code chosen yet)"}
                     </td>
-                    {lineCells(overview.fees)}
+                    {lineCells(overview.fees, { soort: "kosten" })}
                   </tr>
                 ) : null}
                 {overview.reserve.count > 0 ? (
                   <tr className="border-b border-vtk-blue/8">
                     <td className="px-3 py-2" />
                     <td className="px-3 py-2">{nl ? "Wijziging dynamische reserve" : "Change in rolling reserve"}</td>
-                    {lineCells(overview.reserve)}
+                    {lineCells(overview.reserve, { soort: "reserve" })}
                   </tr>
                 ) : null}
                 <tr className="font-semibold">
