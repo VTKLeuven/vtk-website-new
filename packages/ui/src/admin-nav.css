@@ -19,6 +19,18 @@
   text-transform: uppercase;
 }
 
+/* De branding links naar de publieke homepage: niets van de standaard linkstijl (onderlijnen, kleur). */
+.vtk-admin-nav-title-link {
+  display: inline;
+  color: inherit;
+  text-decoration: none;
+}
+
+.vtk-admin-nav-title-link:hover {
+  text-decoration: none;
+  color: var(--ink);
+}
+
 .vtk-admin-nav-toggle {
   appearance: none;
   width: 100%;

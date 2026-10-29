@@ -61,6 +61,8 @@ export type AdminNavProps = {
   icons?: Record<string, ReactNode>;
   pins?: AdminNavPins;
   collapse?: AdminNavCollapse;
+  /** Waar de branding links in de kop naar linkt: de publieke homepage, niet de admin-homepage. */
+  logoHref?: string;
 };
 
 const TOP_GAP = 96;
@@ -248,7 +250,7 @@ function flatten(nodes: AdminNavNode[]): AdminNavItem[] {
   return nodes.flatMap((node) => (node.type === 'item' ? [node.item] : node.items));
 }
 
-export function AdminNav({ title, nodes, icons = {}, pins, collapse }: AdminNavProps) {
+export function AdminNav({ title, nodes, icons = {}, pins, collapse, logoHref }: AdminNavProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(collapse?.initial ?? false);
   const stickyRef = useSmartSticky<HTMLDivElement>(collapsed);
@@ -276,7 +278,13 @@ export function AdminNav({ title, nodes, icons = {}, pins, collapse }: AdminNavP
   return (
     <div className="vtk-admin-nav-sticky" ref={stickyRef} data-collapsed={collapse && collapsed ? 'true' : undefined}>
       <div className="vtk-admin-nav-head">
-        <h2 className="vtk-admin-nav-title">{title}</h2>
+        {logoHref ? (
+          <Link href={logoHref} className="vtk-admin-nav-title-link" aria-label="Terug naar de homepage">
+            <h2 className="vtk-admin-nav-title">{title}</h2>
+          </Link>
+        ) : (
+          <h2 className="vtk-admin-nav-title">{title}</h2>
+        )}
         {collapse && (
           <button
             type="button"

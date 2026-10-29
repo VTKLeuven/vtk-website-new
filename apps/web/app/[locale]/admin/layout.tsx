@@ -121,6 +121,7 @@ export default async function AdminLayout({
         <aside>
           <AdminNav
             title={dict.admin.title}
+            logoHref={String(`${base}/`)}
             nodes={nodes}
             pinnedKeys={pins.map((p) => p.key)}
             pinLabels={{
