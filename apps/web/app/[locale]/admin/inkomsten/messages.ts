@@ -15,9 +15,7 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
     TOO_MANY_FILES: "Dat zijn meer dan 250 bestanden. Laad ze in delen op, bijvoorbeeld per maand.",
     EMPTY: "Dat bestand heeft geen regels.",
     UNKNOWN_FORMAT:
-      "Dat bestand herkent de site niet. Laad een CSV-export van Payconiq, Mollie, SumUp of Europabank op, met de kolomkoppen zoals ze uit het portaal komen.",
-    MOLLIE_BALANCE:
-      "Dat is het balansrapport van Mollie. Laad de betalingenexport op: daarin staat bij elke betaling in welke uitbetaling ze zit.",
+      "Dat bestand herkent de site niet. Laad een CSV-export van Payconiq, Mollie, SumUp of Europabank op, met de kolomkoppen zoals ze uit het portaal komen; de i naast elke bron zegt welke kolommen er moeten zijn.",
     BAD_ROW: "Een regel in dat bestand is niet te lezen (datum of bedrag). Er is niets opgeladen.",
     NOT_FOUND: "Dat bestaat niet meer; ververs de pagina.",
     CODE_NOT_FOUND: "Die boekhoudcode bestaat niet meer; ververs de pagina.",
@@ -28,6 +26,8 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
     BAD_PERIOD: "Kies een geldige periode: de eerste maand mag niet na de laatste vallen.",
     PERIOD_OVERLAP: "Een deel van die periode is al afgesloten.",
     BAD_DATE: "Die datum bestaat niet.",
+    DAY_EMPTY:
+      "Dat kanaal heeft die dag (van 9:00 tot 9:00 de ochtend erna) geen betaling die met de hand een code kan krijgen, of niets wat met de hand gezet werd. Een betaling van de site, een code in de tekst, een onthouden tekst of een kassa blijft zoals ze is.",
     ACCOUNT_REQUIRED: "Vul de rekening in.",
     DEVICE_NOT_FOUND:
       "Dat toestel staat niet (meer) in de instellingen van de kassa's, of past niet bij dit kanaal; ververs de pagina.",
@@ -38,9 +38,7 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
     TOO_MANY_FILES: "That is more than 250 files. Upload them in parts, for example per month.",
     EMPTY: "That file has no rows.",
     UNKNOWN_FORMAT:
-      "The site does not recognise that file. Upload a CSV export from Payconiq, Mollie, SumUp or Europabank, with the column headings as they come from the portal.",
-    MOLLIE_BALANCE:
-      "That is the Mollie balance report. Upload the payments export: it says for each payment which payout it is in.",
+      "The site does not recognise that file. Upload a CSV export from Payconiq, Mollie, SumUp or Europabank, with the column headings as they come from the portal; the i next to each source says which columns must be there.",
     BAD_ROW: "A row in that file cannot be read (date or amount). Nothing was uploaded.",
     NOT_FOUND: "That no longer exists; refresh the page.",
     CODE_NOT_FOUND: "That accounting code no longer exists; refresh the page.",
@@ -51,6 +49,8 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
     BAD_PERIOD: "Choose a valid period: the first month cannot come after the last.",
     PERIOD_OVERLAP: "Part of that period is already closed.",
     BAD_DATE: "That date does not exist.",
+    DAY_EMPTY:
+      "That channel has no payment that day (from 9:00 to 9:00 the next morning) that can get a code by hand, or nothing that was set by hand. A payment from the site, a code in the text, a remembered text or a cash register stays as it is.",
     ACCOUNT_REQUIRED: "Fill in the account.",
     DEVICE_NOT_FOUND: "That device is not (or no longer) in the cash register settings, or does not fit this channel; refresh the page.",
   };

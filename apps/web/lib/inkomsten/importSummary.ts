@@ -19,8 +19,13 @@ export type CombinedImportSummary = {
   lastAt: Date | null;
   /** Elk nieuw kanaal één keer, ook als het in meerdere bestanden staat. */
   newChannels: string[];
-  /** Een Mollie-bestand met betalingen maar zonder één kosten- of reserveregel. */
+  /**
+   * Een betalingenexport van Mollie zonder één kosten- of reserveregel, en geen
+   * balansrapport in dezelfde keuze om de kosten te brengen.
+   */
   mollieWithoutFees: boolean;
+  /** Nieuwe of gewijzigde uitbetalingen (Mollie, SumUp). */
+  payouts: number;
 };
 
 /**
@@ -43,6 +48,7 @@ export function combineImportSummaries(summaries: readonly ImportSummary[]): Com
     lastAt: null,
     newChannels: [],
     mollieWithoutFees: false,
+    payouts: 0,
   };
   for (const summary of summaries) {
     if (!totals.sources.includes(summary.source)) totals.sources.push(summary.source);
@@ -54,6 +60,7 @@ export function combineImportSummaries(summaries: readonly ImportSummary[]): Com
     totals.updated += summary.updated;
     totals.locked += summary.locked;
     totals.feeRows += summary.feeRows;
+    totals.payouts += summary.payouts;
     for (const key of Object.keys(totals.rules) as Array<keyof ImportSummary["rules"]>) totals.rules[key] += summary.rules[key];
     const first = summary.firstAt ? new Date(summary.firstAt) : null;
     const last = summary.lastAt ? new Date(summary.lastAt) : null;
@@ -62,5 +69,6 @@ export function combineImportSummaries(summaries: readonly ImportSummary[]): Com
     for (const name of summary.newChannels) if (!totals.newChannels.includes(name)) totals.newChannels.push(name);
     if (summary.format === "mollie" && summary.feeRows === 0 && summary.created > 0) totals.mollieWithoutFees = true;
   }
+  if (summaries.some((summary) => summary.format === "mollie-balance")) totals.mollieWithoutFees = false;
   return totals;
 }

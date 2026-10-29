@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { FileField } from "@/components/ui/FileField";
+import { InfoTip } from "@/components/ui/InfoTip";
 import { SaveForm } from "@/components/ui/SaveForm";
 import type { SaveAction } from "@/lib/saveState";
 import { combineImportSummaries } from "@/lib/inkomsten/importSummary";
@@ -60,7 +61,7 @@ export function UploadForm({
       savedMessage={nl ? "Opgeladen." : "Uploaded."}
       errorMessages={errorMessages}
       fallbackErrorMessage={nl ? "Opladen mislukt." : "Upload failed."}
-      submitDisabled={pending || !totals || failed.length > 0 || totals.created + totals.updated === 0}
+      submitDisabled={pending || !totals || failed.length > 0 || totals.created + totals.updated + totals.payouts === 0}
       onSuccess={() => {
         setPreview({ status: "idle" });
         router.refresh();
@@ -76,8 +77,8 @@ export function UploadForm({
         chooseLabel={nl ? "Exports kiezen" : "Choose exports"}
         hint={
           nl
-            ? "Eén of meer CSV's: van Payconiq, de export van Mollie, de transacties van een SumUp-account of van een Europabank-terminal. Europabank geeft er een per dag: kies ze allemaal tegelijk. Je kan ze ook hierheen slepen."
-            : "One or more CSVs: from Payconiq, the Mollie export, or the transactions of a SumUp account or a Europabank terminal. Europabank gives one per day: choose them all at once. You can also drag them here."
+            ? "Eén of meer CSV's: van Payconiq, de betalingenexport en het balansrapport van Mollie, de transacties van een SumUp-account of van een Europabank-terminal. Europabank geeft er een per dag: kies ze allemaal tegelijk. Je kan ze ook hierheen slepen."
+            : "One or more CSVs: from Payconiq, the Mollie payments export and balance report, or the transactions of a SumUp account or a Europabank terminal. Europabank gives one per day: choose them all at once. You can also drag them here."
         }
         onChange={onFiles}
       />
@@ -127,9 +128,41 @@ export function UploadForm({
             <Stat label={nl ? "Nieuw" : "New"} value={number(totals.created)} />
             <Stat label={nl ? "Al eerder opgeladen" : "Already uploaded"} value={number(totals.duplicates)} />
             {totals.updated ? <Stat label={nl ? "Nu uitbetaald" : "Now paid out"} value={number(totals.updated)} /> : null}
+            {totals.payouts ? <Stat label={nl ? "Uitbetalingen, nieuw of gewijzigd" : "Payouts, new or changed"} value={number(totals.payouts)} /> : null}
             <Stat label={nl ? "Telt niet mee (mislukt, vervallen, geweigerd)" : "Does not count (failed, expired, denied)"} value={number(totals.skipped)} />
             {totals.ignored ? (
-              <Stat label={nl ? "Uitbetalingsregels (zelfde geld)" : "Payout rows (same money)"} value={number(totals.ignored)} />
+              <Stat
+                label={
+                  <span className="inline-flex items-center gap-1">
+                    {nl ? "Overgeslagen: zelfde geld" : "Skipped: same money"}
+                    <InfoTip label={nl ? "Welke regels hetzelfde geld zijn" : "Which rows are the same money"}>
+                      <p>
+                        {nl
+                          ? "Regels die geen nieuwe transactie zijn, maar geld dat al uit een andere regel komt:"
+                          : "Rows that are not a new transaction, but money that already comes from another row:"}
+                      </p>
+                      <ul className="list-disc space-y-1 pl-4">
+                        <li>
+                          {nl
+                            ? "SumUp zet naast elke verkoop een regel \"Uitbetaling\" met hetzelfde bedrag. Die geeft enkel het nummer en de dag van de uitbetaling."
+                            : "SumUp puts a \"Uitbetaling\" row with the same amount next to every sale. It only gives the payout's number and day."}
+                        </li>
+                        <li>
+                          {nl
+                            ? "Het balansrapport van Mollie noemt ook de betalingen, maar zonder hun uitbetaling: die komen uit de betalingenexport."
+                            : "The Mollie balance report also lists the payments, but without their payout: those come from the payments export."}
+                        </li>
+                        <li>
+                          {nl
+                            ? "De maandfactuur van Mollie in het balansrapport, voor een maand waarvan de kosten al uit de export per uitbetaling komen (\"Withheld fees\"): dat is dezelfde kost."
+                            : "The Mollie monthly invoice in the balance report, for a month whose fees already come from the export per payout (\"Withheld fees\"): that is the same fee."}
+                        </li>
+                      </ul>
+                    </InfoTip>
+                  </span>
+                }
+                value={number(totals.ignored)}
+              />
             ) : null}
             {totals.locked ? <Stat label={nl ? "In een afgesloten periode" : "In a closed period"} value={number(totals.locked)} /> : null}
             <Stat label={nl ? "Betaling van de site" : "Payment from the site"} value={number(totals.rules.WEBSITE)} />
@@ -156,11 +189,11 @@ export function UploadForm({
           {totals.mollieWithoutFees ? (
             <p className="mt-2 text-vtk-muted">
               {nl
-                ? "Een Mollie-bestand heeft geen kosten- of reserveregels. De betalingen krijgen een code, maar het Mollie-totaal zal niet kloppen met de bank tot de kosten er ook in zitten."
-                : "A Mollie file has no fee or reserve rows. The payments get a code, but the Mollie total will not match the bank until the fees are in too."}
+                ? "Een Mollie-bestand heeft geen kosten- of reserveregels. De betalingen krijgen een code, maar het Mollie-totaal zal niet kloppen met de bank tot de kosten er ook in zitten: laad ook het balansrapport op."
+                : "A Mollie file has no fee or reserve rows. The payments get a code, but the Mollie total will not match the bank until the fees are in too: upload the balance report as well."}
             </p>
           ) : null}
-          {totals.created + totals.updated === 0 ? (
+          {totals.created + totals.updated + totals.payouts === 0 ? (
             <p className="mt-2 text-vtk-muted">
               {nl ? (several ? "Er is niets nieuws in deze bestanden." : "Er is niets nieuws in dit bestand.") : several ? "There is nothing new in these files." : "There is nothing new in this file."}
             </p>
@@ -208,7 +241,7 @@ export function UploadForm({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value }: { label: ReactNode; value: string }) {
   return (
     <div className="flex justify-between gap-3 sm:block">
       <dt className="text-vtk-muted">{label}</dt>

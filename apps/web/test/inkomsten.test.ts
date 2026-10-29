@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  EXPORT_COLUMNS,
   SUMUP_CHANNEL,
   cleanDescription,
   compactTime,
@@ -10,7 +11,7 @@ import {
   type ParsedIncomeRow,
 } from "@/lib/inkomsten/parse";
 import { codeAtStart, incomeRuleText, matchTransaction, nameRuleKey, type MatchContext } from "@/lib/inkomsten/match";
-import { accountOn, computeIncomeOverview, type OverviewTransaction } from "@/lib/inkomsten/overview";
+import { accountOn, computeIncomeOverview, reviewDay, type OverviewTransaction } from "@/lib/inkomsten/overview";
 import { combineImportSummaries } from "@/lib/inkomsten/importSummary";
 import {
   controlSpanLabel,
@@ -50,13 +51,26 @@ const MOLLIE_NL = [
   ',2509,,6-9-2025 6:14:00,refund,EUR,"-50,00",,re_test6,AB12CD35 - 1 ticket(s) for event Onthaaldagen,,,,EUR,"-50,00",12345678.2509.01,',
 ].join("\n");
 
+// Het balansrapport: elke beweging op het saldo, niet op volgorde, met de
+// maandfactuur op het einde van de maand en een correctie van een paar cent.
+const MOLLIE_BALANCE = [
+  'Date,"Transaction type","Payment method","Transaction reference","Consumer name","Consumer bank account",Description,"Settlement amount","Settlement currency"',
+  '"2026-09-07 06:20:36",transfer,,12345678.2609.01,,,"12345678.2609.01 Payout",-1813.35,EUR',
+  '"2026-08-02 20:00:00",payment,mistercash,tr_test7,"PERSOON E",BE00000000000007,"1 ticket",50.00,EUR',
+  '"2026-08-03 06:31:33",transfer,,12345678.2608.01,,,"12345678.2608.01 Payout",-219.55,EUR',
+  '"2026-08-31 23:59:59",invoice,,,,,"Invoiced fees",-43.42,EUR',
+  '"2026-08-31 23:59:59",invoice,,MOL-XX-I0000.0000000001,,,"Invoice correction MOL-XX-I0000.0000000001",0.03,EUR',
+  '"2026-08-31 23:59:59","rolling reserves",rollingreserve,,,,"Withheld of rolling reserve",-11.00,EUR',
+  '"2026-09-30 23:59:59",invoice,,,,,"Invoiced fees",-98.75,EUR',
+].join("\n");
+
 const SUMUP = [
   "email,Datum,Transactie-ID,Transactietype,Status,Kaarttype,Laatste 4 cijfers,Verwerken als,Betaalmethode,Invoerwijze,Autorisatiecode,Beschrijving,Totaal bedrag,Netto verkoop,Belastingbedrag,Bedrag fooi,Transactiekosten,Uitbetaling,Uitbetaling datum,Uitbetalingsnummer,Kenmerk",
   "kassa@voorbeeld.be,2026-10-01 00:20:00,TTEST000001,Omzet,Succesvol,VISA,4321,DEBIT,POS,CONTACTLESS,AUTHX1,,3.40,3.40,0.0,0.0,0.03,3.37,,,",
   "kassa@voorbeeld.be,2026-10-01 12:00:00,TTEST000002,Omzet,Mislukt,VISA,4321,DEBIT,POS,CONTACTLESS,,,2.80,2.80,0.0,0.0,0.0,0.0,,,",
   "kassa@voorbeeld.be,2026-10-02 09:15:00,TTEST000003,Terugbetaling,Succesvol,VISA,4321,DEBIT,POS,CONTACTLESS,,,3.40,3.40,0.0,0.0,0.0,-3.40,,,",
   "kassa@voorbeeld.be,2026-10-03 18:30:00,TTEST000004,Omzet,Terugbetaald,MASTERCARD,8765,DEBIT,POS,CHIP,AUTHX2,,5.00,5.00,0.0,0.0,0.05,4.95,,,",
-  "kassa@voorbeeld.be,2026-10-01 00:20:03,TTEST000001,Uitbetaling,Betaald,VISA,4321,DEBIT,POS,CONTACTLESS,AUTHX1,,3.40,3.40,0.0,0.0,0.03,3.37,2026-10-02,M4C PID0000001,",
+  "kassa@voorbeeld.be,2026-10-01 00:20:03,TTEST000001,Uitbetaling,Betaald,VISA,4321,DEBIT,POS,CONTACTLESS,AUTHX1,,3.40,3.40,0.0,0.0,0.03,3.37,2026-10-02,XYZ PID0000001,",
 ].join("\n");
 
 // De opmaak tot maart 2026, zoals het tabblad van Beheer: "Datum en tijd" is een formule.
@@ -100,9 +114,9 @@ describe("bedragen, datums en tekst", () => {
   });
 
   it("haalt de maand uit een Mollie-uitbetalingsreferentie", () => {
-    expect(payoutMonth("17112539.2510.03")).toBe("2025-10");
+    expect(payoutMonth("12345678.2510.03")).toBe("2025-10");
     expect(payoutMonth("")).toBeNull();
-    expect(payoutMonth("17112539.2513.01")).toBeNull();
+    expect(payoutMonth("12345678.2513.01")).toBeNull();
   });
 
   it("haalt e-mailadressen uit een omschrijving", () => {
@@ -181,9 +195,38 @@ describe("Mollie", () => {
     expect(first.externalKey.startsWith("FEE:h:")).toBe(true);
   });
 
-  it("zegt het wanneer het balansrapport opgeladen wordt", () => {
-    const balance = 'Date,"Transaction type","Payment method","Transaction reference",Description,"Settlement amount"\n"2026-08-03 06:31:33",transfer,,1.2608.01,x,-1.00';
-    expect(parseIncomeExport(balance)).toEqual({ ok: false, error: "MOLLIE_BALANCE" });
+  describe("het balansrapport", () => {
+    it("neemt de overschrijvingen als uitbetalingen en slaat de betalingen over", () => {
+      const result = parseIncomeExport(MOLLIE_BALANCE);
+      expect(result.ok && [result.format, result.source]).toEqual(["mollie-balance", "MOLLIE"]);
+      if (!result.ok) return;
+      expect([result.total, result.ignored, result.skipped]).toEqual([7, 1, 0]);
+      expect(result.payouts).toEqual([
+        { reference: "12345678.2609.01", paidOn: "2026-09-07", amountCents: 181335 },
+        { reference: "12345678.2608.01", paidOn: "2026-08-03", amountCents: 21955 },
+      ]);
+    });
+
+    it("laat een kost of reserve meegaan met de eerstvolgende overschrijving, en een kost zonder erna wachten", () => {
+      expect(rowsOf(MOLLIE_BALANCE).map((row) => [row.kind, row.amountCents, row.payoutReference, row.periodMonth])).toEqual([
+        ["FEE", -4342, "12345678.2609.01", "2026-09"],
+        ["FEE", 3, "12345678.2609.01", "2026-09"],
+        ["RESERVE", -1100, "12345678.2609.01", "2026-09"],
+        ["FEE", -9875, null, null],
+      ]);
+    });
+
+    it("geeft een kost een vaste sleutel die zegt dat ze uit het balansrapport komt", () => {
+      const first = rowsOf(MOLLIE_BALANCE).map((row) => row.externalKey);
+      expect(rowsOf(MOLLIE_BALANCE).map((row) => row.externalKey)).toEqual(first);
+      expect(first.every((key) => key.startsWith("FEE:bal:") || key.startsWith("RESERVE:bal:"))).toBe(true);
+    });
+
+    it("bewaart geen namen of rekeningnummers", () => {
+      const text = JSON.stringify(parseIncomeExport(MOLLIE_BALANCE));
+      expect(text).not.toContain("PERSOON");
+      expect(text).not.toContain("BE00000000000007");
+    });
   });
 
   it("weigert een bestand met een onleesbaar bedrag in plaats van het over te slaan", () => {
@@ -211,6 +254,21 @@ describe("SumUp", () => {
     ]);
   });
 
+  it("geeft een verkoop het nummer van haar uitbetaling, uit de regel Uitbetaling ernaast", () => {
+    const result = parseIncomeExport(SUMUP);
+    if (!result.ok) throw new Error(result.error);
+    expect(result.rows.map((row) => [row.externalKey, row.payoutReference])).toEqual([
+      ["PAYMENT:TTEST000001", "XYZ PID0000001"],
+      ["FEE:TTEST000001", "XYZ PID0000001"],
+      ["REFUND:TTEST000003", null],
+      ["PAYMENT:TTEST000004", null],
+      ["FEE:TTEST000004", null],
+    ]);
+    expect(result.payouts).toEqual([{ reference: "XYZ PID0000001", paidOn: "2026-10-02", amountCents: null }]);
+    // De maand blijft die van de verkoop.
+    expect(result.rows[0].periodMonth).toBe("2026-10");
+  });
+
   it("neemt het account als kanaal en rekent op de Brusselse klok", () => {
     const [payment, fee] = rowsOf(SUMUP);
     expect(payment.channel).toBe("kassa@voorbeeld.be");
@@ -224,6 +282,13 @@ describe("SumUp", () => {
       .map((line) => line.slice(line.indexOf(",") + 1))
       .join("\n");
     expect(rowsOf(withoutAccount)[0].channel).toBe(SUMUP_CHANNEL);
+  });
+
+  it("herkent een bestand pas met elke verplichte kolom", () => {
+    const required = Object.values(EXPORT_COLUMNS.sumup).filter((column) => column.required);
+    expect(required.map((column) => column.names[0])).toContain("Transactie-ID");
+    const withoutId = SUMUP.replace("Transactie-ID", "Nummer");
+    expect(parseIncomeExport(withoutId)).toEqual({ ok: false, error: "UNKNOWN_FORMAT" });
   });
 
   it("bewaart geen kaartgegevens of autorisatiecodes", () => {
@@ -536,6 +601,7 @@ describe("meerdere bestanden tegelijk opladen", () => {
     firstAt: null,
     lastAt: null,
     newChannels: [],
+    payouts: 0,
     ...partial,
   });
 
@@ -557,6 +623,27 @@ describe("meerdere bestanden tegelijk opladen", () => {
     const totals = combineImportSummaries([summary({ format: "mollie", source: "MOLLIE", created: 4 }), summary({ created: 1, feeRows: 0 })]);
     expect(totals.mollieWithoutFees).toBe(true);
     expect(totals.sources).toEqual(["MOLLIE", "EUROPABANK"]);
+  });
+
+  it("zwijgt over de kosten wanneer het balansrapport mee gekozen is, en telt de uitbetalingen", () => {
+    const totals = combineImportSummaries([
+      summary({ format: "mollie", source: "MOLLIE", created: 4 }),
+      summary({ format: "mollie-balance", source: "MOLLIE", created: 3, feeRows: 3, payouts: 9 }),
+    ]);
+    expect(totals.mollieWithoutFees).toBe(false);
+    expect(totals.payouts).toBe(9);
+  });
+});
+
+describe("Na te kijken", () => {
+  it("laat een dag om 9:00 beginnen, zodat een avond tot 4 uur één groep blijft", () => {
+    // Brussel is in oktober UTC+2.
+    expect(reviewDay(new Date("2026-10-09T18:00:00Z"))).toBe("2026-10-09");
+    expect(reviewDay(new Date("2026-10-10T02:00:00Z"))).toBe("2026-10-09");
+    expect(reviewDay(new Date("2026-10-10T06:59:00Z"))).toBe("2026-10-09");
+    expect(reviewDay(new Date("2026-10-10T07:00:00Z"))).toBe("2026-10-10");
+    // Over de maandgrens: de nacht van 30 september hoort bij 30 september.
+    expect(reviewDay(new Date("2026-09-30T23:30:00Z"))).toBe("2026-09-30");
   });
 });
 

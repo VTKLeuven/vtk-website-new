@@ -5,6 +5,7 @@
  * een kolom gelijk is aan wat er via die bron binnenkwam (bij Mollie: wat er in
  * die maanden uitbetaald werd).
  */
+import { brusselsMinutesOfDay, brusselsYMD, ymdKey } from "@/lib/brussels";
 import { codeKey } from "./match";
 import type { IncomeKindCode, IncomeSourceCode } from "./parse";
 
@@ -121,17 +122,38 @@ export function accountOn(
 }
 
 // -----------------------------------------------------------------------------
-// Mollie per uitbetaling
+// Na te kijken: de dag
+// -----------------------------------------------------------------------------
+
+/**
+ * Een dag in Na te kijken loopt van 9:00 tot 9:00 de volgende ochtend, zoals
+ * in het script van de eigen poging van Beheer (`DAY_START_HOUR`): een avond
+ * die tot 4 uur loopt, blijft zo één groep. Enkel voor het groeperen; de
+ * maand waarin een transactie telt, verandert er niet door.
+ */
+export const REVIEW_DAY_START_HOUR = 9;
+
+/** De dag van een transactie in Na te kijken, "2026-10-09", op de Brusselse klok. */
+export function reviewDay(at: Date): string {
+  const ymd = brusselsYMD(at);
+  if (brusselsMinutesOfDay(at) >= REVIEW_DAY_START_HOUR * 60) return ymdKey(ymd);
+  return new Date(Date.UTC(ymd.year, ymd.month - 1, ymd.day - 1)).toISOString().slice(0, 10);
+}
+
+// -----------------------------------------------------------------------------
+// Per uitbetaling (Mollie, SumUp)
 // -----------------------------------------------------------------------------
 
 export type PayoutRow = {
+  source: IncomeSourceCode;
   reference: string;
   kind: IncomeKindCode;
   amountCents: number;
   occurredAt: Date;
 };
 
-export type MolliePayout = {
+export type PayoutGroup = {
+  source: IncomeSourceCode;
   reference: string;
   firstAt: Date;
   lastAt: Date;
@@ -145,17 +167,29 @@ export type MolliePayout = {
 };
 
 /**
- * De Mollie-regels per uitbetaling. Het totaal telt elke regel, ook een
- * betaling die "telt niet mee" kreeg: het geld kwam toch op de rekening, en
- * dit bedrag moet op het uittreksel staan.
+ * De regels per uitbetaling. Het totaal telt elke regel, ook een betaling die
+ * "telt niet mee" kreeg: het geld kwam toch op de rekening, en dit bedrag moet
+ * op het uittreksel staan. Per bron, dan in de volgorde van de uitbetalingen.
  */
-export function groupMolliePayouts(rows: readonly PayoutRow[]): MolliePayout[] {
-  const payouts = new Map<string, MolliePayout>();
+export function groupPayouts(rows: readonly PayoutRow[]): PayoutGroup[] {
+  const payouts = new Map<string, PayoutGroup>();
   for (const row of rows) {
-    let payout = payouts.get(row.reference);
+    const key = `${row.source}|${row.reference}`;
+    let payout = payouts.get(key);
     if (!payout) {
-      payout = { reference: row.reference, firstAt: row.occurredAt, lastAt: row.occurredAt, count: 0, payments: 0, refunds: 0, fees: 0, reserve: 0, total: 0 };
-      payouts.set(row.reference, payout);
+      payout = {
+        source: row.source,
+        reference: row.reference,
+        firstAt: row.occurredAt,
+        lastAt: row.occurredAt,
+        count: 0,
+        payments: 0,
+        refunds: 0,
+        fees: 0,
+        reserve: 0,
+        total: 0,
+      };
+      payouts.set(key, payout);
     }
     payout.count += 1;
     payout.total += row.amountCents;
@@ -166,7 +200,26 @@ export function groupMolliePayouts(rows: readonly PayoutRow[]): MolliePayout[] {
     if (row.occurredAt < payout.firstAt) payout.firstAt = row.occurredAt;
     if (row.occurredAt > payout.lastAt) payout.lastAt = row.occurredAt;
   }
-  return [...payouts.values()].sort((a, b) => a.reference.localeCompare(b.reference));
+  const order = (source: IncomeSourceCode) => INCOME_SOURCES.indexOf(source);
+  return [...payouts.values()].sort(
+    (a, b) => order(a.source) - order(b.source) || a.lastAt.getTime() - b.lastAt.getTime() || a.reference.localeCompare(b.reference),
+  );
+}
+
+/**
+ * Of een uitbetaling klopt met de bank. Met een vinkje: afgevinkt op het
+ * bedrag van nu (`checked`), of op een ander (`changed`: een latere export
+ * veranderde de som). Zonder vinkje kan het bedrag van de provider zelf het
+ * zeggen: de overschrijving in het balansrapport van Mollie is het bedrag op
+ * het uittreksel, dus gelijk is klaar (`provider`) en anders is er een
+ * verschil om na te kijken (`differs`).
+ */
+export type PayoutState = "checked" | "provider" | "changed" | "differs" | "open";
+
+export function payoutState(total: number, checkedAmount: number | null, providerAmount: number | null): PayoutState {
+  if (checkedAmount !== null) return checkedAmount === total ? "checked" : "changed";
+  if (providerAmount !== null) return providerAmount === total ? "provider" : "differs";
+  return "open";
 }
 
 // -----------------------------------------------------------------------------
@@ -189,12 +242,25 @@ export function monthsBetween(from: string, to: string): string[] {
   return months;
 }
 
+/**
+ * Bronnen waarvan elke export één kanaal is: een SumUp-account, een
+ * Europabank-terminal. Daar zegt een regel van het ene kanaal niets over het
+ * andere, dus kijkt de controlelijst per kanaal of er iets ontbreekt. Een
+ * export van Payconiq of Mollie heeft alle kanalen samen.
+ */
+export const EXPORT_PER_CHANNEL: ReadonlySet<IncomeSourceCode> = new Set(["SUMUP", "EUROPABANK"]);
+
 export type IncomeCheck =
-  /** Een voorbije maand zonder één regel van een bron die Beheer wel oplaadt: vergeten op te laden? */
-  | { key: "coverage"; ok: boolean; missing: Array<{ source: IncomeSourceCode; month: string }> }
+  /**
+   * Een voorbije maand zonder één regel van een bron die Beheer wel oplaadt,
+   * of van een kanaal dat kort ervoor nog regels had: vergeten op te laden?
+   */
+  | { key: "coverage"; ok: boolean; missing: Array<{ source: IncomeSourceCode; month: string; channel: string | null }> }
   /** Maanden met Mollie-betalingen maar zonder kostenregel. */
   | { key: "mollieFees"; ok: boolean; months: string[] }
-  | { key: "payouts"; ok: boolean; total: number; checked: number; changed: number }
+  /** Maanden met Mollie-kosten uit twee soorten bestanden: twee keer hetzelfde geld. */
+  | { key: "mollieFeesTwice"; ok: boolean; months: string[] }
+  | { key: "payouts"; ok: boolean; total: number; checked: number; changed: number; differs: number }
   | { key: "open"; ok: boolean; count: number; cents: number }
   | { key: "accounts"; ok: boolean; count: number; cents: number }
   /** Er zijn kosten, maar er is geen kostencode gekozen. */
@@ -208,9 +274,19 @@ export type IncomeCheckInput = {
   sourcesInUse: ReadonlySet<IncomeSourceCode>;
   /** Regels per bron per maand, als `${bron}:${maand}`. */
   rowsPerSourceMonth: ReadonlyMap<string, number>;
+  /**
+   * De kanalen van een bron uit `EXPORT_PER_CHANNEL` die in de periode of de
+   * drie maanden ervoor regels hadden: die verwacht de controlelijst elke maand.
+   */
+  channelsInUse: ReadonlyArray<{ id: string; source: IncomeSourceCode; name: string }>;
+  /** Regels per kanaal per maand, als `${kanaal}:${maand}`. */
+  rowsPerChannelMonth: ReadonlyMap<string, number>;
   molliePaymentMonths: ReadonlySet<string>;
+  /** Maanden met een kostenregel van Mollie, uit het balansrapport of uit de export per uitbetaling. */
   mollieFeeMonths: ReadonlySet<string>;
-  payouts: ReadonlyArray<{ total: number; checkedAmount: number | null }>;
+  /** Maanden met kosten uit beide soorten bestanden. */
+  mollieFeeMonthsTwice: ReadonlySet<string>;
+  payouts: ReadonlyArray<{ total: number; checkedAmount: number | null; providerAmount: number | null }>;
   open: { count: number; cents: number };
   withoutAccount: { count: number; cents: number };
   hasFees: boolean;
@@ -219,21 +295,40 @@ export type IncomeCheckInput = {
 
 /** Wat Beheer best nakijkt voor een periode afgesloten wordt, in de volgorde van het werk. */
 export function computeIncomeChecks(input: IncomeCheckInput): IncomeCheck[] {
-  const missing: Array<{ source: IncomeSourceCode; month: string }> = [];
+  const missing: Array<{ source: IncomeSourceCode; month: string; channel: string | null }> = [];
+  const past = input.months.filter((month) => month < input.currentMonth);
   for (const source of INCOME_SOURCES) {
     if (!input.sourcesInUse.has(source)) continue;
-    for (const month of input.months) {
-      if (month >= input.currentMonth) continue;
-      if (!input.rowsPerSourceMonth.get(`${source}:${month}`)) missing.push({ source, month });
+    if (EXPORT_PER_CHANNEL.has(source)) {
+      for (const channel of input.channelsInUse) {
+        if (channel.source !== source) continue;
+        for (const month of past) {
+          if (!input.rowsPerChannelMonth.get(`${channel.id}:${month}`)) missing.push({ source, month, channel: channel.name });
+        }
+      }
+      continue;
+    }
+    for (const month of past) {
+      if (!input.rowsPerSourceMonth.get(`${source}:${month}`)) missing.push({ source, month, channel: null });
     }
   }
   const feeMonths = input.months.filter((month) => input.molliePaymentMonths.has(month) && !input.mollieFeeMonths.has(month));
-  const checked = input.payouts.filter((payout) => payout.checkedAmount !== null && payout.checkedAmount === payout.total).length;
-  const changed = input.payouts.filter((payout) => payout.checkedAmount !== null && payout.checkedAmount !== payout.total).length;
+  const twice = input.months.filter((month) => input.mollieFeeMonthsTwice.has(month));
+  const states = input.payouts.map((payout) => payoutState(payout.total, payout.checkedAmount, payout.providerAmount));
+  const count = (...wanted: PayoutState[]) => states.filter((state) => wanted.includes(state)).length;
+  const checked = count("checked", "provider");
   return [
     { key: "coverage", ok: missing.length === 0, missing },
     { key: "mollieFees", ok: feeMonths.length === 0, months: feeMonths },
-    { key: "payouts", ok: checked === input.payouts.length, total: input.payouts.length, checked, changed },
+    { key: "mollieFeesTwice", ok: twice.length === 0, months: twice },
+    {
+      key: "payouts",
+      ok: checked === input.payouts.length,
+      total: input.payouts.length,
+      checked,
+      changed: count("changed"),
+      differs: count("differs"),
+    },
     { key: "open", ok: input.open.count === 0, ...input.open },
     { key: "accounts", ok: input.withoutAccount.count === 0, ...input.withoutAccount },
     { key: "feeCode", ok: !input.hasFees || input.feeCodeChosen },

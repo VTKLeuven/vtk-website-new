@@ -12109,6 +12109,17 @@ had.
   printkrediet) per tekst, en die kan onthouden worden; wat iemand bij een
   sticker typt ("pintje") per sticker per dag, en dat kan niet onthouden worden.
   Onthouden staat standaard uit, zoals bij het BO.
+- **Een dag in Na te kijken loopt van 9:00 tot 9:00.** Zo deed het script van
+  de eigen poging van Beheer, en zo blijft een avond tot 4 uur één groep onder
+  de dag waarop ze begon. Enkel het groeperen: een betaling om 2 uur op 1
+  oktober telt nog altijd in oktober, want de boekhouder rekent op de
+  kalender.
+- **Een hele dag van een kanaal kan met de hand, maar enkel over wat
+  afgeleid is.** Leent een post een dag het toestel van een andere (de
+  cursusdienst met de SumUp van Theokot), dan geeft Beheer die dag één code in
+  plaats van twee regels met een standaardcode. Wat exact gekoppeld is (een
+  betaling van de site, een code in de tekst, een onthouden tekst, een kassa),
+  blijft: dat weet het beter dan de dag.
 - **Periodes zijn een reeks maanden, het boekjaar ligt niet vast.** Het
   rekenblad had augustus en september als derde kwartaal en juli apart; de site
   biedt de kalenderkwartalen als snelkeuze, en elke andere reeks kiest Beheer.
@@ -12123,9 +12134,24 @@ had.
   betaler niet over, haalt e-mailadressen uit omschrijvingen en bewaart het
   bestand niet. Daardoor hoort deze tabel niet bij de gegevensexport of de
   accountwissing.
-- **Het balansrapport van Mollie niet (nog).** Daarin staat bij een betaling
-  niet in welke uitbetaling ze zit, en dan kan de site niet per uitbetaling
-  rekenen. De site weigert het met die uitleg; de betalingenexport volstaat.
+- **Het balansrapport van Mollie naast de betalingenexport, niet in de plaats
+  ervan.** Daarin staat bij een betaling niet in welke uitbetaling ze zit, dus
+  de betalingen blijven uit de betalingenexport komen. Wat het balansrapport
+  wel heeft, neemt de site: de overschrijvingen naar de bank (het bedrag op het
+  uittreksel) en de maandfactuur met de kosten. Beheer vroeg in oktober 2026
+  om Mollie te vergelijken met wat er echt op de rekening kwam. Een kost gaat
+  mee met de eerstvolgende overschrijving en telt dus in haar maand, zoals een
+  betaling: Mollie op de maand van de uitbetaling, zoals het rekenblad.
+- **De site gelooft de overschrijving niet blind, en de eigen som ook niet.**
+  In het derde kwartaal van 2026 kwam de som per uitbetaling uit de
+  betalingenexport niet uit op de overschrijving, in beide richtingen. Gelijk
+  is in orde zonder vinkje; anders staan beide er met het verschil, en beslist
+  Beheer met het uittreksel. Een vinkje gaat voor op de overschrijving.
+- **SumUp per uitbetaling, zoals Mollie.** Elke verkoop zegt in welke
+  uitbetaling ze zat, en de som van de verkopen min hun kosten was in het
+  derde kwartaal van 2026 per uitbetaling exact wat SumUp overschreef. Een
+  verkoop blijft wel in de maand van de verkoop tellen, zoals het rekenblad:
+  enkel het afvinken gaat per uitbetaling.
 - **De boekhouder krijgt het kwartaalblad, met zijn kleuren.** Hij wil het zoals
   de Excel: kolommen per bron en per rekening, het totaalblok per rekening, de
   kleuren en de euronotatie van het tabblad "4e Kwartaal". Dezelfde redenering
@@ -12138,6 +12164,12 @@ had.
   uitbetalingen, wat niet meetelt) en rekent het kwartaalblad met formules op
   de transacties, zodat een klik op een cel toont wat ze optelt. Het bevat wat
   betalers typten en blijft dus bij Beheer.
+- **De controlelijst kijkt per account, met ruis.** Een export van SumUp of
+  Europabank is één account of terminal, dus "er zijn regels van SumUp" zegt
+  niets over de SumUp van Fakbar wanneer die van Theokot er is. Een account met
+  regels in de periode of de drie maanden ervoor verwacht ze elke maand; een
+  terminal die in de examens stillag, meldt ze ook. Liever een melding te veel
+  dan een vergeten account.
 - **Een controlelijst, geen slot.** Voor het afsluiten zegt het overzicht per
   stap of hij in orde is: een vergeten maand, ontbrekende Mollie-kosten, een
   uitbetaling die niet afgevinkt is tegen het uittreksel, iets na te kijken, een
@@ -12201,7 +12233,11 @@ had.
   haar aanvraag. In het rekenblad tikte Beheer per evenement de post, de
   periode en de code in, en het overzicht van de kassa's had geen kolom voor
   een code; zo blijft het (oktober 2026). Later aanpassen kan op de kassa zelf,
-  en elke wijziging koppelt opnieuw, buiten de afgesloten periodes.
+  en elke wijziging koppelt opnieuw, buiten de afgesloten periodes. Hangt er
+  een ticketverkoop met een code aan de kassa, dan staat die code voorgesteld:
+  wat aan de kassa binnenkomt, is meestal van hetzelfde evenement. Het blijft
+  een voorstel; hebben de ticketverkopen verschillende codes, dan vult de site
+  niets in.
 - **Een gedeeld toestel hoort bij een kassa tot de volgende kassa, een toestel
   van een post enkel tijdens haar uren.** Het rekenblad werkte niet met de uren
   van een activiteit maar met wie de sticker had, in periodes die op elkaar

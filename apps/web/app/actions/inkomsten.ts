@@ -8,6 +8,7 @@ import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { getCashRegisterConfig } from "@/lib/kassas/server";
 import { monthToDate, parseIncomeExport, parseMonth } from "@/lib/inkomsten/parse";
 import {
+  assignChannelDay,
   assignUnassignedGroup,
   importIncomeExport,
   listClosedPeriods,
@@ -26,7 +27,6 @@ export type IncomeErrorCode =
   | "TOO_MANY_FILES"
   | "EMPTY"
   | "UNKNOWN_FORMAT"
-  | "MOLLIE_BALANCE"
   | "BAD_ROW"
   | "NOT_FOUND"
   | "CODE_NOT_FOUND"
@@ -36,6 +36,7 @@ export type IncomeErrorCode =
   | "BAD_PERIOD"
   | "PERIOD_OVERLAP"
   | "BAD_DATE"
+  | "DAY_EMPTY"
   | "ACCOUNT_REQUIRED"
   | "DEVICE_NOT_FOUND";
 
@@ -207,6 +208,35 @@ export async function assignIncomeGroupAction(_prev: SaveState, formData: FormDa
   );
 }
 
+/**
+ * Een hele dag van een kanaal met de hand een code geven, of wat er die dag met
+ * de hand gezet werd terug aan de koppelregels laten (`intent=reset`).
+ */
+export async function assignIncomeDayAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const session = await requirePermission("income.manage");
+  const channelId = String(formData.get("channelId") ?? "");
+  const day = String(formData.get("day") ?? "");
+  const reset = formData.get("intent") === "reset";
+  const accountingCodeId = String(formData.get("accountingCodeId") ?? "");
+  if (!reset && !accountingCodeId) return saveError("CODE_REQUIRED");
+
+  const outcome = await assignChannelDay(channelId, day, reset ? { reset: true } : { accountingCodeId }, session.user.id);
+  if (!outcome.ok) return saveError(outcome.error === "NOT_FOUND" ? "DAY_EMPTY" : outcome.error);
+
+  await logAudit({
+    action: "update",
+    entity: "incomeTransaction",
+    target: `${outcome.channel} · ${day}`,
+    summary: reset ? `${transactions(outcome.count)} terug naar de koppelregels` : `${transactions(outcome.count)} met de hand toegewezen`,
+  });
+  revalidate();
+  return saveOk(
+    reset
+      ? `${transactions(outcome.count)} van ${outcome.channel} terug naar de koppelregels.`
+      : `${transactions(outcome.count)} van ${outcome.channel} toegewezen.`,
+  );
+}
+
 export async function resetIncomeAssignmentAction(formData: FormData): Promise<SaveState> {
   await requirePermission("income.manage");
   const id = String(formData.get("id") ?? "");
@@ -229,7 +259,7 @@ export async function rematchIncomeAction(): Promise<SaveState> {
 // -----------------------------------------------------------------------------
 
 /** Een uitbetaling afvinken tegen het uittreksel, of het vinkje weghalen. */
-export async function setMolliePayoutCheckAction(formData: FormData): Promise<SaveState> {
+export async function setPayoutCheckAction(formData: FormData): Promise<SaveState> {
   const session = await requirePermission("income.manage");
   const reference = String(formData.get("reference") ?? "").trim();
   const checked = formData.get("checked") === "1";

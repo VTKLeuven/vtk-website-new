@@ -48,13 +48,20 @@ export function checkText(
   switch (check.key) {
     case "coverage":
       return check.ok
-        ? { ok: true, text: nl ? "Elke voorbije maand heeft regels van elke bron." : "Every past month has rows from every source." }
+        ? {
+            ok: true,
+            text: nl
+              ? "Elke voorbije maand heeft regels van elke bron, en van elk SumUp-account en elke terminal."
+              : "Every past month has rows from every source, and from every SumUp account and terminal.",
+          }
         : {
             ok: false,
             text:
               (nl ? "Geen enkele regel van " : "No rows from ") +
-              check.missing.map((gap) => `${SOURCE_LABELS[gap.source]} in ${monthLabel(gap.month, nl)}`).join(", ") +
-              (nl ? ": nog niet opgeladen?" : ": not uploaded yet?"),
+              check.missing
+                .map((gap) => `${gap.channel ? `${SOURCE_LABELS[gap.source]} ${gap.channel}` : SOURCE_LABELS[gap.source]} in ${monthLabel(gap.month, nl)}`)
+                .join(", ") +
+              (nl ? ": nog niet opgeladen, of toen niet gebruikt?" : ": not uploaded yet, or not used then?"),
             href: `${base}/admin/inkomsten/opladen`,
           };
     case "mollieFees":
@@ -66,25 +73,43 @@ export function checkText(
               (nl ? "Geen Mollie-kosten in " : "No Mollie fees in ") +
               check.months.map((month) => monthLabel(month, nl)).join(", ") +
               (nl
-                ? ": laad de Mollie-export op mét de regels \"Withheld fees\" en \"rolling reserve\"."
-                : ": upload the Mollie export with the \"Withheld fees\" and \"rolling reserve\" rows."),
+                ? ": laad het balansrapport van Mollie op, of de export per uitbetaling met de regels \"Withheld fees\"."
+                : ": upload the Mollie balance report, or the export per payout with the \"Withheld fees\" rows."),
+            href: `${base}/admin/inkomsten/opladen`,
+          };
+    case "mollieFeesTwice":
+      return check.ok
+        ? { ok: true, text: nl ? "De Mollie-kosten komen per maand uit één soort bestand." : "The Mollie fees come from one kind of file per month." }
+        : {
+            ok: false,
+            text:
+              (nl ? "Mollie-kosten uit het balansrapport én uit de export per uitbetaling in " : "Mollie fees from both the balance report and the export per payout in ") +
+              check.months.map((month) => monthLabel(month, nl)).join(", ") +
+              (nl
+                ? ": dat is twee keer hetzelfde geld. Verwijder een van de twee bij de opgeladen bestanden."
+                : ": that is the same money twice. Delete one of the two under the uploaded files."),
             href: `${base}/admin/inkomsten/opladen`,
           };
     case "payouts":
-      if (check.total === 0) return { ok: true, text: nl ? "Geen Mollie-uitbetalingen in deze periode." : "No Mollie payouts in this period." };
+      if (check.total === 0) return { ok: true, text: nl ? "Geen uitbetalingen van Mollie of SumUp in deze periode." : "No Mollie or SumUp payouts in this period." };
       return check.ok
         ? {
             ok: true,
             text: nl
-              ? `${check.total === 1 ? "De Mollie-uitbetaling is" : `Alle ${check.total} Mollie-uitbetalingen zijn`} afgevinkt tegen het uittreksel.`
-              : `All ${check.total} Mollie payouts are checked against the bank statement.`,
+              ? `${check.total === 1 ? "De uitbetaling klopt" : `Alle ${check.total} uitbetalingen kloppen`} met het uittreksel of met de overschrijving van Mollie.`
+              : `All ${check.total} payouts match the bank statement or the Mollie transfer.`,
           }
         : {
             ok: false,
             text:
               (nl
-                ? `${check.checked} van de ${check.total} Mollie-uitbetalingen afgevinkt tegen het uittreksel`
-                : `${check.checked} of ${check.total} Mollie payouts checked against the bank statement`) +
+                ? `${check.checked} van de ${check.total} uitbetalingen afgevinkt of gelijk aan de overschrijving`
+                : `${check.checked} of ${check.total} payouts checked or equal to the transfer`) +
+              (check.differs
+                ? nl
+                  ? `; bij ${check.differs} verschilt de som van de site van wat Mollie overschreef`
+                  : `; for ${check.differs} the site's sum differs from what Mollie transferred`
+                : "") +
               (check.changed
                 ? nl
                   ? `; bij ${check.changed} veranderde het bedrag na het afvinken.`

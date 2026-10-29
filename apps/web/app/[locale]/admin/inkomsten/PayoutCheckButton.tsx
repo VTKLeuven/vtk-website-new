@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/toast";
 import type { SaveState } from "@/lib/saveState";
 
 /**
- * Een Mollie-uitbetaling afvinken tegen het uittreksel, of het vinkje
+ * Een uitbetaling van Mollie of SumUp afvinken tegen het uittreksel, of het vinkje
  * weghalen. Geen bevestiging: het vinkje is met één klik terug te zetten, en
  * het zegt enkel dat iemand het bedrag op het uittreksel zag.
  */

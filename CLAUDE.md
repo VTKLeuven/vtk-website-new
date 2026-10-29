@@ -445,6 +445,15 @@ the design language into the application instead of copying mockup content.
     `https://` terwijl hun eigen renderer een intern pad al correct afhandelde,
     dus een werkende bestemming was niet op te slaan.
 
+- Uitleg die te lang is voor onder een veld (wat een scherm aanneemt, welke
+  kolommen een bestand moet hebben), staat achter een "i": `InfoTip` uit
+  `apps/web/components/ui/InfoTip.tsx`. Hoveren opent, klikken zet vast (ook op
+  een telefoon). Zet hem naast een `<p>` of kop en niet erin: de uitleg heeft
+  zelf alinea's. Geen kale `title` voor zo'n uitleg: die toont geen opmaak en
+  nooit op een telefoon. Komt de uitleg uit de code (de kolommen van een
+  export), toon dan wat de code zelf gebruikt, zoals `FormatGuide` met
+  `EXPORT_COLUMNS` doet.
+
 - Uploadvelden nemen ook een gesleept bestand aan. Gebruik `useFileDrop` en
   `FileDropOverlay` uit `apps/web/components/ui/FileDrop.tsx`, zoals
   `StorageImageField`, `FileField`, `ReceiptField` en `AvatarCropField` doen;

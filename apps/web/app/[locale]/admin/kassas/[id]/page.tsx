@@ -41,7 +41,7 @@ import {
   setCashRegisterStatusAction,
   updateCashRegisterRequestAction,
 } from "@/app/actions/kassas";
-import { AcceptForm, type DeviceOption } from "../AcceptForm";
+import { AcceptForm, type CodeSuggestion, type DeviceOption } from "../AcceptForm";
 import { CodeForm } from "../CodeForm";
 import { CountForm, type TicketOption } from "../CountForm";
 import { RequestForm } from "../RequestForm";
@@ -89,6 +89,10 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
   // De code voor de online inkomsten kiest Beheer, enkel voor een kassa met toestellen.
   const hasDevices = register.wantsBancontact || register.wantsPayconiq || register.payments.length > 0;
   const codes = manage && hasDevices ? await listAccountingCodes() : [];
+  const suggestion =
+    manage && hasDevices && !register.accountingCodeId
+      ? await codeSuggestion(register.ticketEvents.map((link) => link.ticketEventId), locale)
+      : null;
   const linkedIncome =
     !requested && seesIncome && hasDevices
       ? await prisma.incomeTransaction.aggregate({
@@ -249,6 +253,7 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
             startCounts={startCounts}
             {...(await deviceOptionsFor(register, config, nl))}
             codes={codes}
+            suggestion={suggestion}
             confirmDescription={
               requesterEmail
                 ? nl
@@ -294,6 +299,7 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
             id={register.id}
             codes={codes}
             value={register.accountingCodeId}
+            suggestion={suggestion}
             errorMessages={errorMessages}
           />
           {linkedIncome ? (
@@ -470,6 +476,35 @@ async function ticketOptionsFor(
       samePost: event.ownerGroupId === register.groupId,
       incomeCents: income.get(event.id) ?? 0,
     }));
+}
+
+/**
+ * De code van de gekoppelde ticketverkopen, als voorstel voor de code van de
+ * kassa: wat er aan de kassa binnenkomt, is meestal van hetzelfde evenement.
+ * Enkel een voorstel, Beheer kiest. Hebben de ticketverkopen verschillende
+ * codes, dan staat er niets ingevuld en noemt de zin ze allemaal.
+ */
+async function codeSuggestion(ticketEventIds: string[], locale: "nl" | "en"): Promise<CodeSuggestion | null> {
+  if (ticketEventIds.length === 0) return null;
+  const nl = locale === "nl";
+  const events = await prisma.ticketEvent.findMany({
+    where: { id: { in: ticketEventIds }, accountingCodeId: { not: null } },
+    select: { titleNl: true, titleEn: true, accountingCode: { select: { id: true, code: true, name: true } } },
+  });
+  const coded = events.flatMap((event) => (event.accountingCode ? [{ title: pick(event.titleNl, event.titleEn, locale), code: event.accountingCode }] : []));
+  if (coded.length === 0) return null;
+  const ids = new Set(coded.map((event) => event.code.id));
+  const list = coded.map((event) => `${event.title} (${event.code.code} ${event.code.name})`).join(", ");
+  if (ids.size === 1) {
+    return {
+      id: coded[0].code.id,
+      note: nl ? `Voorgesteld: de code van de gekoppelde ticketverkoop, ${list}.` : `Suggested: the code of the linked ticket sale, ${list}.`,
+    };
+  }
+  return {
+    id: null,
+    note: nl ? `De gekoppelde ticketverkopen hebben verschillende codes: ${list}.` : `The linked ticket sales have different codes: ${list}.`,
+  };
 }
 
 /**

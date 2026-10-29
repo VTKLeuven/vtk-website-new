@@ -7,6 +7,7 @@ import { AccountingCodePicker } from "@/components/admin/AccountingCodePicker";
 import { SaveForm } from "@/components/ui/SaveForm";
 import type { AccountingCodeOption } from "@/lib/accounting/codes";
 import type { SaveAction } from "@/lib/saveState";
+import type { CodeSuggestion } from "./AcceptForm";
 
 /**
  * De boekhoudcode van een aanvaarde kassa, achteraf te wijzigen: wat er tijdens
@@ -19,6 +20,7 @@ export function CodeForm({
   id,
   codes,
   value,
+  suggestion,
   errorMessages,
 }: {
   locale: "nl" | "en";
@@ -26,6 +28,8 @@ export function CodeForm({
   id: string;
   codes: AccountingCodeOption[];
   value: string | null;
+  /** Een voorstel uit de gekoppelde ticketverkopen, voor een kassa zonder code. */
+  suggestion: CodeSuggestion | null;
   errorMessages: Record<string, string>;
 }) {
   const nl = locale === "nl";
@@ -52,10 +56,11 @@ export function CodeForm({
           id={`${uid}-code`}
           codes={codes}
           name="accountingCodeId"
-          defaultValue={value}
+          defaultValue={value ?? suggestion?.id ?? null}
           locale={locale}
           noneLabel={nl ? "Nog geen code" : "No code yet"}
         />
+        {!value && suggestion ? <p className="mt-1 text-xs text-vtk-muted">{suggestion.note}</p> : null}
       </div>
     </SaveForm>
   );

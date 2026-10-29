@@ -8,6 +8,7 @@ import { deleteIncomeImportAction, importIncomeAction, previewIncomeImportAction
 import { IncomeNav } from "../IncomeNav";
 import { incomeErrorMessages } from "../messages";
 import { SOURCE_LABELS } from "../shared";
+import { FormatGuide } from "./FormatGuide";
 import { UploadForm } from "./UploadForm";
 
 export default async function IncomeUploadPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -35,7 +36,8 @@ export default async function IncomeUploadPage({ params }: { params: Promise<{ l
 
       <IncomeNav base={base} nl={nl} active="opladen" openCount={openCount} />
 
-      <section className="rounded-2xl border border-vtk-blue/12 bg-white p-5">
+      <section className="space-y-4 rounded-2xl border border-vtk-blue/12 bg-white p-5">
+        <FormatGuide nl={nl} />
         <UploadForm
           locale={locale}
           previewAction={previewIncomeImportAction}

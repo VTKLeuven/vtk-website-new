@@ -16,6 +16,13 @@ import { countInputsFrom, DenominationGrid, inputsTotalCents } from "./Denominat
 export type DeviceOption = { name: string; busyWith: string | null };
 
 /**
+ * Een voorstel voor de code van de kassa, uit de gekoppelde ticketverkopen.
+ * `id` is null wanneer die verschillende codes hebben: dan staat er niets
+ * ingevuld, enkel welke codes ze hebben.
+ */
+export type CodeSuggestion = { id: string | null; note: string };
+
+/**
  * Aanvaarden, zoals Beheer het doet: de startkassa staat er al met het
  * standaardwisselgeld voor wat de post aanduidde, Beheer past het exacte aantal
  * aan, kiest het Bancontact-bakje en de Payconiq-rekening, en aanvaardt. De mail
@@ -37,6 +44,7 @@ export function AcceptForm({
   bancontact,
   payconiq,
   codes,
+  suggestion,
   confirmDescription,
   errorMessages,
 }: {
@@ -49,6 +57,7 @@ export function AcceptForm({
   bancontact: DeviceOption[] | null;
   payconiq: DeviceOption[] | null;
   codes: AccountingCodeOption[];
+  suggestion: CodeSuggestion | null;
   confirmDescription: string;
   errorMessages: Record<string, string>;
 }) {
@@ -168,6 +177,7 @@ export function AcceptForm({
             id={`${uid}-code`}
             codes={codes}
             name="accountingCodeId"
+            defaultValue={suggestion?.id ?? null}
             locale={locale}
             noneLabel={nl ? "Nog geen code" : "No code yet"}
           />
@@ -176,6 +186,7 @@ export function AcceptForm({
               ? "Wat er tijdens deze kassa op haar bakje of rekening binnenkomt, krijgt deze code in de online inkomsten."
               : "What comes in on its terminal or account during this register gets this code in the online income."}
           </p>
+          {suggestion ? <p className="mt-1 text-xs text-vtk-muted">{suggestion.note}</p> : null}
         </div>
       )}
     </SaveForm>

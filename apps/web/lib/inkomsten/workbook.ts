@@ -71,7 +71,10 @@ export type WorkbookGroup = {
 };
 
 export type WorkbookPayout = {
+  source: IncomeSourceCode;
   reference: string;
+  /** De dag van de overschrijving, als de export ze noemde. */
+  paidOn: Date | null;
   firstAt: Date;
   lastAt: Date;
   payments: number;
@@ -79,6 +82,8 @@ export type WorkbookPayout = {
   fees: number;
   reserve: number;
   total: number;
+  /** Wat de provider zegt dat hij overschreef (Mollie); null als de export het niet zegt. */
+  providerAmount: number | null;
   checked: string;
 };
 
@@ -477,13 +482,15 @@ export function payoutsSheet(model: WorkbookModel): SheetSpec {
   const data: SheetData = [
     headerRow(
       nl
-        ? ["Uitbetaling", "Eerste regel", "Laatste regel", "Betalingen", "Terugbetalingen", "Kosten", "Reserve", "Totaal", "Afgevinkt"]
-        : ["Payout", "First row", "Last row", "Payments", "Refunds", "Fees", "Reserve", "Total", "Checked"],
+        ? ["Bron", "Uitbetaling", "Overgeschreven op", "Eerste regel", "Laatste regel", "Betalingen", "Terugbetalingen", "Kosten", "Reserve", "Totaal", "Volgens de provider", "Afgevinkt"]
+        : ["Source", "Payout", "Transferred on", "First row", "Last row", "Payments", "Refunds", "Fees", "Reserve", "Total", "According to the provider", "Checked"],
     ),
   ];
   for (const payout of model.payouts) {
     data.push([
+      SOURCE_NAMES[payout.source],
       payout.reference,
+      payout.paidOn ? { value: payout.paidOn, type: Date, format: DATE } : "",
       { value: wallClock(payout.firstAt), type: Date, format: DATE },
       { value: wallClock(payout.lastAt), type: Date, format: DATE },
       euro(payout.payments),
@@ -491,13 +498,14 @@ export function payoutsSheet(model: WorkbookModel): SheetSpec {
       euro(payout.fees),
       euro(payout.reserve),
       euro(payout.total, { fontWeight: "bold" }),
+      payout.providerAmount === null ? "" : euro(payout.providerAmount),
       payout.checked,
     ]);
   }
   return {
-    sheet: nl ? "Mollie per uitbetaling" : "Mollie per payout",
+    sheet: nl ? "Per uitbetaling" : "Per payout",
     data,
-    columns: [20, 14, 14, 13, 15, 12, 12, 13, 36].map((width) => ({ width })),
+    columns: [12, 20, 16, 14, 14, 13, 15, 12, 12, 13, 18, 36].map((width) => ({ width })),
     stickyRowsCount: 1,
   };
 }

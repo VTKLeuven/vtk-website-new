@@ -9,8 +9,10 @@ import { brusselsYMD } from "@/lib/brussels";
 import { parseMonth } from "@/lib/inkomsten/parse";
 import type { OverviewLine } from "@/lib/inkomsten/overview";
 import { countUnassigned, loadIncomeOverview } from "@/lib/inkomsten/server";
-import { closeIncomePeriodAction, setMolliePayoutCheckAction } from "@/app/actions/inkomsten";
+import { closeIncomePeriodAction, setPayoutCheckAction } from "@/app/actions/inkomsten";
 import { CheckIcon, InfoIcon } from "@/components/ui/icons";
+import { InfoTip } from "@/components/ui/InfoTip";
+import { AdminDisclosure } from "@/components/admin/AdminDisclosure";
 import { IncomeNav } from "./IncomeNav";
 import { PayoutCheckButton } from "./PayoutCheckButton";
 import { incomeErrorMessages } from "./messages";
@@ -296,66 +298,124 @@ export default async function IncomeOverviewPage({
 
       {data.payouts.length > 0 ? (
         <section className="rounded-2xl border border-vtk-blue/12 bg-white p-5">
-          <h2 className="text-lg font-semibold">{nl ? "Mollie-uitbetalingen" : "Mollie payouts"}</h2>
-          <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
-            {nl
-              ? "Het totaal van elke uitbetaling hoort zo op het uittreksel te staan, met de referentie erbij. Klopt het, vink het dan af."
-              : "Each payout's total should be on the bank statement like this, with the reference next to it. If it matches, check it off."}
-          </p>
-          <div className="relative mt-3 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-vtk-blue/12 text-left text-xs uppercase tracking-wide text-vtk-muted">
-                  <th className="px-3 py-2">{nl ? "Uitbetaling" : "Payout"}</th>
-                  <th className="px-3 py-2 text-right">{nl ? "Betalingen" : "Payments"}</th>
-                  <th className="px-3 py-2 text-right">{nl ? "Terug" : "Refunds"}</th>
-                  <th className="px-3 py-2 text-right">{nl ? "Kosten" : "Fees"}</th>
-                  <th className="px-3 py-2 text-right">{nl ? "Reserve" : "Reserve"}</th>
-                  <th className="px-3 py-2 text-right">{nl ? "Totaal" : "Total"}</th>
-                  <th className="px-3 py-2">{nl ? "Uittreksel" : "Statement"}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.payouts.map((payout) => {
-                  const changed = payout.check !== null && payout.check.amountCents !== payout.total;
-                  return (
-                    <tr key={payout.reference} className="border-b border-vtk-blue/8 align-top last:border-0">
-                      <td className="px-3 py-2 whitespace-nowrap tabular-nums">
-                        {payout.reference}
-                        <span className="block text-xs text-vtk-muted">
-                          {day(payout.firstAt)} {nl ? "tot" : "to"} {day(payout.lastAt)}
+          <div className="flex items-center gap-1.5">
+            <h2 className="text-lg font-semibold">{nl ? "Per uitbetaling" : "Per payout"}</h2>
+            <InfoTip label={nl ? "Hoe de site een uitbetaling nakijkt" : "How the site checks a payout"}>
+              <p>
+                {nl
+                  ? "Het totaal is elke regel met die uitbetaling, ook wat niet meetelt: het geld kwam toch op de rekening. Zo hoort het op het uittreksel te staan, met de referentie erbij."
+                  : "The total is every row with that payout, including what does not count: the money still reached the account. That is how it should be on the bank statement, with the reference next to it."}
+              </p>
+              <p>
+                {nl
+                  ? "Mollie: het balansrapport noemt elke overschrijving naar de bank met haar bedrag. Is de som van de site gelijk, dan klopt de uitbetaling zonder vinkje; is ze anders, dan staat het verschil erbij en blijft het uittreksel het bewijs. In de exports van 2026 kwam de som per uitbetaling uit de betalingenexport niet altijd uit op de overschrijving; waarom, is nog niet duidelijk."
+                  : "Mollie: the balance report lists every transfer to the bank with its amount. If the site's sum is equal, the payout matches without a check; if not, the difference is shown and the bank statement stays the proof. In the 2026 exports the sum per payout from the payments export did not always come to the transfer; why is not clear yet."}
+              </p>
+              <p>
+                {nl
+                  ? "SumUp: elke verkoop zegt in welke uitbetaling ze zat. De som van de verkopen min hun kosten is het bedrag dat SumUp overschreef; vink het af wanneer het op het uittreksel staat."
+                  : "SumUp: every sale says which payout it was in. The sum of the sales minus their fees is what SumUp transferred; check it off when it is on the bank statement."}
+              </p>
+            </InfoTip>
+          </div>
+          <div className="mt-3 space-y-3">
+            {data.sources
+              .filter((source) => data.payouts.some((payout) => payout.source === source))
+              .map((source) => {
+                const payouts = data.payouts.filter((payout) => payout.source === source);
+                const done = payouts.filter((payout) => payout.state === "checked" || payout.state === "provider").length;
+                const differs = payouts.filter((payout) => payout.state === "differs" || payout.state === "changed").length;
+                return (
+                  <AdminDisclosure
+                    key={source}
+                    variant="row"
+                    defaultOpen={done < payouts.length}
+                    summary={
+                      <>
+                        <span className="font-medium">{SOURCE_LABELS[source]}</span>
+                        <span className="text-sm text-vtk-muted">
+                          {" · "}
+                          {nl
+                            ? `${payouts.length === 1 ? "1 uitbetaling" : `${payouts.length} uitbetalingen`}, ${done} in orde`
+                            : `${payouts.length === 1 ? "1 payout" : `${payouts.length} payouts`}, ${done} done`}
+                          {differs ? (nl ? `, ${differs} met een verschil` : `, ${differs} with a difference`) : ""}
                         </span>
-                      </td>
-                      <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{money(payout.payments)}</td>
-                      <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{money(payout.refunds)}</td>
-                      <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{money(payout.fees)}</td>
-                      <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{money(payout.reserve)}</td>
-                      <td className="px-3 py-2 text-right font-semibold whitespace-nowrap tabular-nums">{formatEuro(payout.total, locale)}</td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-start gap-2">
-                          <PayoutCheckButton
-                            reference={payout.reference}
-                            checked={payout.check !== null}
-                            action={setMolliePayoutCheckAction}
-                            locale={locale}
-                            errorMessages={errorMessages}
-                          />
-                          {payout.check ? (
-                            <span className={`text-xs ${changed ? "text-vtk-warn" : "text-vtk-muted"}`}>
-                              {changed
-                                ? nl
-                                  ? `Afgevinkt op ${formatEuro(payout.check.amountCents, locale)}, nu anders`
-                                  : `Checked at ${formatEuro(payout.check.amountCents, locale)}, now different`
-                                : `${day(payout.check.checkedAt)}${payout.check.checkedByName ? `, ${payout.check.checkedByName}` : ""}`}
-                            </span>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </>
+                    }
+                  >
+                    <div className="relative overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-vtk-blue/12 text-left text-xs uppercase tracking-wide text-vtk-muted">
+                            <th className="px-3 py-2">{nl ? "Uitbetaling" : "Payout"}</th>
+                            <th className="px-3 py-2 text-right">{nl ? "Betalingen" : "Payments"}</th>
+                            <th className="px-3 py-2 text-right">{nl ? "Terug" : "Refunds"}</th>
+                            <th className="px-3 py-2 text-right">{nl ? "Kosten" : "Fees"}</th>
+                            <th className="px-3 py-2 text-right">{nl ? "Reserve" : "Reserve"}</th>
+                            <th className="px-3 py-2 text-right">{nl ? "Totaal" : "Total"}</th>
+                            <th className="px-3 py-2">{nl ? "Uittreksel" : "Statement"}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {payouts.map((payout) => (
+                            <tr key={payout.reference} className="border-b border-vtk-blue/8 align-top last:border-0">
+                              <td className="px-3 py-2 whitespace-nowrap tabular-nums">
+                                {payout.reference}
+                                <span className="block text-xs text-vtk-muted">
+                                  {payout.paidOn
+                                    ? `${nl ? "overgeschreven" : "transferred"} ${payout.paidOn.toLocaleDateString(nl ? "nl-BE" : "en-GB", { timeZone: "UTC" })}`
+                                    : `${day(payout.firstAt)} ${nl ? "tot" : "to"} ${day(payout.lastAt)}`}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{money(payout.payments)}</td>
+                              <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{money(payout.refunds)}</td>
+                              <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{money(payout.fees)}</td>
+                              <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{money(payout.reserve)}</td>
+                              <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">
+                                <span className="font-semibold">{formatEuro(payout.total, locale)}</span>
+                                {payout.providerAmount !== null && payout.providerAmount !== payout.total ? (
+                                  <span className="block text-xs text-vtk-warn">
+                                    {nl ? "Mollie: " : "Mollie: "}
+                                    {formatEuro(payout.providerAmount, locale)}
+                                  </span>
+                                ) : null}
+                              </td>
+                              <td className="px-3 py-2">
+                                <div className="flex items-start gap-2">
+                                  <PayoutCheckButton
+                                    reference={payout.reference}
+                                    checked={payout.check !== null}
+                                    action={setPayoutCheckAction}
+                                    locale={locale}
+                                    errorMessages={errorMessages}
+                                  />
+                                  <span className={`text-xs ${payout.state === "changed" || payout.state === "differs" ? "text-vtk-warn" : "text-vtk-muted"}`}>
+                                    {payout.state === "changed" && payout.check
+                                      ? nl
+                                        ? `Afgevinkt op ${formatEuro(payout.check.amountCents, locale)}, nu anders`
+                                        : `Checked at ${formatEuro(payout.check.amountCents, locale)}, now different`
+                                      : payout.state === "checked" && payout.check
+                                        ? `${day(payout.check.checkedAt)}${payout.check.checkedByName ? `, ${payout.check.checkedByName}` : ""}`
+                                        : payout.state === "provider"
+                                          ? nl
+                                            ? "Gelijk aan de overschrijving van Mollie"
+                                            : "Equal to the Mollie transfer"
+                                          : payout.state === "differs" && payout.providerAmount !== null
+                                            ? nl
+                                              ? `${formatEuro(payout.total - payout.providerAmount, locale)} verschil met de overschrijving`
+                                              : `${formatEuro(payout.total - payout.providerAmount, locale)} off from the transfer`
+                                            : null}
+                                  </span>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </AdminDisclosure>
+                );
+              })}
           </div>
         </section>
       ) : null}

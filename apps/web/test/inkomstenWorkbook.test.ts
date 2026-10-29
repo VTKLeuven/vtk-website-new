@@ -10,7 +10,7 @@ import {
   type WorkbookModel,
   type WorkbookTransaction,
 } from "@/lib/inkomsten/workbook";
-import { computeIncomeChecks, groupMolliePayouts, monthsBetween } from "@/lib/inkomsten/overview";
+import { computeIncomeChecks, groupPayouts, monthsBetween, payoutState } from "@/lib/inkomsten/overview";
 
 // Verzonnen gegevens: geen echte namen, rekeningnummers of betaal-ID's.
 
@@ -149,19 +149,33 @@ describe("het kwartaalblad", () => {
   });
 });
 
-describe("Mollie per uitbetaling", () => {
-  it("telt per uitbetaling alles, ook wat niet meetelt", () => {
+describe("per uitbetaling", () => {
+  it("telt per uitbetaling alles, ook wat niet meetelt, per bron en in volgorde", () => {
     const at = new Date("2026-10-01T10:00:00Z");
-    const payouts = groupMolliePayouts([
-      { reference: "1.2610.02", kind: "PAYMENT", amountCents: 5500, occurredAt: at },
-      { reference: "1.2610.02", kind: "REFUND", amountCents: -1400, occurredAt: at },
-      { reference: "1.2610.02", kind: "FEE", amountCents: -185, occurredAt: at },
-      { reference: "1.2610.01", kind: "PAYMENT", amountCents: 1000, occurredAt: at },
+    const later = new Date("2026-10-02T10:00:00Z");
+    const payouts = groupPayouts([
+      { source: "SUMUP", reference: "AB PID2", kind: "PAYMENT", amountCents: 250, occurredAt: later },
+      { source: "MOLLIE", reference: "1.2610.02", kind: "PAYMENT", amountCents: 5500, occurredAt: later },
+      { source: "MOLLIE", reference: "1.2610.02", kind: "REFUND", amountCents: -1400, occurredAt: later },
+      { source: "MOLLIE", reference: "1.2610.02", kind: "FEE", amountCents: -185, occurredAt: later },
+      { source: "MOLLIE", reference: "1.2610.01", kind: "PAYMENT", amountCents: 1000, occurredAt: at },
+      { source: "SUMUP", reference: "AB PID1", kind: "PAYMENT", amountCents: 300, occurredAt: at },
+      { source: "SUMUP", reference: "AB PID1", kind: "FEE", amountCents: -5, occurredAt: at },
     ]);
-    expect(payouts.map((payout) => [payout.reference, payout.total, payout.refunds])).toEqual([
-      ["1.2610.01", 1000, 0],
-      ["1.2610.02", 3915, -1400],
+    expect(payouts.map((payout) => [payout.source, payout.reference, payout.total, payout.refunds])).toEqual([
+      ["MOLLIE", "1.2610.01", 1000, 0],
+      ["MOLLIE", "1.2610.02", 3915, -1400],
+      ["SUMUP", "AB PID1", 295, 0],
+      ["SUMUP", "AB PID2", 250, 0],
     ]);
+  });
+
+  it("neemt de overschrijving van Mollie als bewijs, maar laat een vinkje voorgaan", () => {
+    expect(payoutState(21955, null, 21955)).toBe("provider");
+    expect(payoutState(22000, null, 21955)).toBe("differs");
+    expect(payoutState(22000, 22000, 21955)).toBe("checked");
+    expect(payoutState(22000, 21000, null)).toBe("changed");
+    expect(payoutState(22000, null, null)).toBe("open");
   });
 });
 
@@ -176,12 +190,17 @@ describe("de controlelijst", () => {
       ["MOLLIE:2026-08", 75],
       ["MOLLIE:2026-09", 164],
     ]),
+    channelsInUse: [],
+    rowsPerChannelMonth: new Map<string, number>(),
     molliePaymentMonths: new Set(["2026-08", "2026-09"]),
     mollieFeeMonths: new Set(["2026-09"]),
+    mollieFeeMonthsTwice: new Set<string>(),
     payouts: [
-      { total: 1000, checkedAmount: 1000 },
-      { total: 2000, checkedAmount: 1500 },
-      { total: 3000, checkedAmount: null },
+      { total: 1000, checkedAmount: 1000, providerAmount: null },
+      { total: 2000, checkedAmount: 1500, providerAmount: null },
+      { total: 3000, checkedAmount: null, providerAmount: null },
+      { total: 4000, checkedAmount: null, providerAmount: 4000 },
+      { total: 5000, checkedAmount: null, providerAmount: 4900 },
     ],
     open: { count: 0, cents: 0 },
     withoutAccount: { count: 2, cents: 450 },
@@ -199,10 +218,34 @@ describe("de controlelijst", () => {
       ],
     });
     expect(checks.mollieFees).toMatchObject({ ok: false, months: ["2026-08"] });
-    expect(checks.payouts).toMatchObject({ ok: false, total: 3, checked: 1, changed: 1 });
+    expect(checks.payouts).toMatchObject({ ok: false, total: 5, checked: 2, changed: 1, differs: 1 });
+    expect(checks.mollieFeesTwice).toMatchObject({ ok: true });
     expect(checks.open).toMatchObject({ ok: true });
     expect(checks.accounts).toMatchObject({ ok: false, count: 2 });
     expect(checks.feeCode).toMatchObject({ ok: false });
+  });
+
+  it("kijkt per SumUp-account of per terminal, niet enkel per bron", () => {
+    const checks = computeIncomeChecks({
+      ...base,
+      months: ["2026-09"],
+      sourcesInUse: new Set(["SUMUP"] as const),
+      rowsPerSourceMonth: new Map([["SUMUP:2026-09", 851]]),
+      channelsInUse: [
+        { id: "theo", source: "SUMUP", name: "Theokot" },
+        { id: "fak", source: "SUMUP", name: "Fakbar" },
+      ],
+      rowsPerChannelMonth: new Map([["theo:2026-09", 851]]),
+    });
+    expect(checks.find((check) => check.key === "coverage")).toMatchObject({
+      ok: false,
+      missing: [{ source: "SUMUP", month: "2026-09", channel: "Fakbar" }],
+    });
+  });
+
+  it("vindt Mollie-kosten uit twee soorten bestanden in dezelfde maand", () => {
+    const checks = computeIncomeChecks({ ...base, mollieFeeMonthsTwice: new Set(["2026-09"]) });
+    expect(checks.find((check) => check.key === "mollieFeesTwice")).toMatchObject({ ok: false, months: ["2026-09"] });
   });
 
   it("meldt geen gat voor een maand die nog loopt", () => {

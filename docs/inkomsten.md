@@ -12,22 +12,27 @@ de controlelijst met de Mollie-uitbetalingen om af te vinken, het kwartaalblad
 voor de boekhouder en het controlebestand als xlsx, en afsluiten. De
 boekhoudcodes kunnen als CSV opgeladen worden in `/admin/boekhoudcodes`. Van
 fase 2 staan de kassacontrole met de lijst met afwijkingen, de code van een
-kassa en koppelregel 4.
+kassa en koppelregel 4. Van de verfijningen: het balansrapport van Mollie,
+SumUp per uitbetaling, de controlelijst per account, een dag van 9:00 tot 9:00
+in Na te kijken, een hele dag met de hand, de code van de gekoppelde
+ticketverkoop als voorstel bij een kassa, en bij het opladen per bron een "i"
+met de kolommen die de site verwacht.
 
 ## Bestanden
 
 | Bestand | Wat |
 |---|---|
-| `lib/inkomsten/parse.ts` | De exports van Payconiq, Mollie, SumUp en Europabank lezen: CSV, bedragen, datums op de Brusselse klok, Mollie-uitbetalingsmaand, kosten per betaling. Puur. |
+| `lib/inkomsten/parse.ts` | De exports van Payconiq, Mollie (betalingen en balansrapport), SumUp en Europabank lezen: de kolommen per formaat (`EXPORT_COLUMNS`), CSV, bedragen, datums op de Brusselse klok, Mollie-uitbetalingsmaand, kosten per betaling, de uitbetalingen. Puur. |
 | `lib/inkomsten/match.ts` | De koppelregels als pure functie (`matchTransaction`), de kassa die een toestel had (`kassaAt`), en de onthouden tekst (`incomeRuleText`). |
-| `lib/inkomsten/overview.ts` | Het overzicht als pure som, de rekening op een dag, Mollie per uitbetaling (`groupMolliePayouts`), de controlelijst (`computeIncomeChecks`). |
+| `lib/inkomsten/overview.ts` | Het overzicht als pure som, de rekening op een dag, de dag in Na te kijken (`reviewDay`), per uitbetaling (`groupPayouts`, `payoutState`), de controlelijst (`computeIncomeChecks`). |
 | `lib/inkomsten/workbook.ts` | Het kwartaalblad en het controlebestand als bladen voor `write-excel-file`. Puur. |
 | `lib/inkomsten/server.ts` | Database: opladen (met voorvertoning), opnieuw koppelen, Na te kijken, overzicht, uitbetalingen afvinken, het model voor de xlsx, lijsten. |
 | `lib/inkomsten/importSummary.ts` | De voorvertoning van meerdere gekozen bestanden samen (`combineImportSummaries`). Puur. |
 | `lib/inkomsten/kassa.ts` | De kassacontrole: het venster van een kassa (`kassaControlWindow`) en het ingetikte bedrag naast de import (`kassaCheck`). Puur; het optellen is `kassaImportAmounts` in `server.ts`. |
 | `app/actions/inkomsten.ts` | Server actions, allemaal achter `income.manage`. |
 | `app/[locale]/admin/kassas/` | De code van een kassa (`AcceptForm`, `CodeForm`) en de kassacontrole in het telformulier (`CountForm`); de acties in `app/actions/kassas.ts`. |
-| `app/[locale]/admin/inkomsten/` | Overzicht (met de controlelijst en de uitbetalingen), Opladen, Na te kijken, Transacties, Instellingen. |
+| `app/[locale]/admin/inkomsten/` | Overzicht (met de controlelijst en de uitbetalingen), Opladen (met `FormatGuide`, de kolommen per bron), Na te kijken (met `AssignDayForm`), Transacties, Instellingen. |
+| `components/ui/InfoTip.tsx` | De "i" met uitleg erachter: hoveren opent, klikken zet vast (ook op een telefoon). |
 | `app/api/admin/inkomsten/export/route.ts` | De twee xlsx-bestanden, voor `?van=2026-07&tot=2026-09` en `?soort=boekhouder` of `?soort=controle`. |
 | `lib/accounting/import.ts` | De lijst van boekhoudcodes als CSV lezen, en plannen wat opladen doet. Puur. |
 | `lib/csv.ts` | De CSV-lezer die beide gebruiken: scheidingsteken raden, aanhalingstekens volgens RFC 4180. |
@@ -35,12 +40,21 @@ kassa en koppelregel 4.
 
 Tabellen: `IncomeImport`, `IncomeChannel`, `IncomeChannelAccount` (de rekening
 vanaf een dag), `IncomeChannelCode` (de standaardcode vanaf een dag),
-`IncomeTransaction`, `IncomeNameRule`, `IncomePeriod`, `IncomePayoutCheck`.
+`IncomeTransaction`, `IncomeNameRule`, `IncomePeriod`, `IncomePayout` (een
+uitbetaling zoals de provider ze noemt), `IncomePayoutCheck`.
 Op de kassa: `CashRegister.accountingCodeId`, en `IncomeTransaction.cashRegisterId`
 voor de kassa die de code gaf. Instelling: `Setting` `income.config` (de
 kostencode).
 
 ## Wat de site leest
+
+De kolommen per formaat staan één keer, in `EXPORT_COLUMNS`: het herkennen
+(`recognises`) en het lezen gebruiken ze, en de "i" naast elke bron bij het
+opladen (`FormatGuide`) toont dezelfde lijst. Een kolom wordt op naam gelezen,
+hoofdletters en volgorde maken niet uit; wat niet in de lijst staat (namen,
+rekening- en kaartnummers), leest de site niet. Een bestand is van een formaat
+wanneer elke verplichte kolom er is. Voeg je een kolom toe of verander je wat
+een parser met een regel doet, pas dan ook de zinnen in `FormatGuide` aan.
 
 **Payconiq** (CSV met `;`): `id`, `date` (`dd/mm/jjjj`), `time`, `amount`,
 `status`, `type`, `description`, `reference`, `shop_name`, `bulk_id`. Enkel
@@ -60,12 +74,27 @@ tabblad van Beheer, dat er drie eigen kolommen voor zet; die worden genegeerd).
 | De rest | vervallen, geannuleerd, mislukt | overgeslagen |
 
 Een betaling telt in de **maand van haar uitbetaling**, uit de referentie
-(`17112539.2510.03` is oktober 2025), zoals het rekenblad. Zonder uitbetaling
+(`12345678.2510.03` is oktober 2025), zoals het rekenblad. Zonder uitbetaling
 telt ze nog nergens; wordt ze later opnieuw opgeladen met een uitbetaling, dan
 krijgt ze die alsnog. Alles van Payconiq telt in de maand van de betaling.
 
-Het **balansrapport** van Mollie (`Transaction type`) weigert de site met een
-uitleg: daarin staat bij een betaling niet in welke uitbetaling ze zit.
+Het **balansrapport** van Mollie (`Transaction type`, `Settlement amount`) is
+elke beweging op het Mollie-saldo (`parseMollieBalance`):
+
+| Regel | Soort |
+|---|---|
+| `transfer` | een uitbetaling (`IncomePayout`): de referentie, de dag en het bedrag dat naar de bank ging |
+| `payment` | overgeslagen (`ignored`): zonder uitbetaling, en de betalingenexport heeft ze al |
+| `invoice` | `FEE`: de maandfactuur van Mollie, en een correctie van een paar cent |
+| `rolling reserves` | `RESERVE` |
+| `refund`, `chargeback` | `REFUND` |
+
+Een kost, reserve of terugbetaling gaat van het saldo af en dus mee met de
+**eerstvolgende overschrijving** in het bestand: ze krijgt die uitbetaling en
+haar maand. De factuur van 31 augustus telt zo in september. Staat er nog geen
+overschrijving na, dan wacht ze zonder maand, zoals een betaling zonder
+uitbetaling; een later balansrapport vult ze aan. Een kost uit het
+balansrapport heeft een sleutel die met `FEE:bal:` begint (`BALANCE_KEY`).
 
 Nagekeken op het tabblad van Beheer voor het vierde kwartaal van 2025: totaal
 € 40.523,51, kosten −1.434,27, reserve −984,72, exact het kwartaalblad.
@@ -79,7 +108,7 @@ kanaal is. Ontbreekt die kolom, dan komt alles op één kanaal `SumUp`.
 | Verkoop | `Omzet` met status `Succesvol` of `Terugbetaald` | `PAYMENT`, voor het totaalbedrag |
 | Terugbetaling | `Terugbetaling` of `Terugboeking` met status `Succesvol` | `REFUND`, negatief |
 | Kosten | de kolom `Transactiekosten` van een betaling | `FEE`, één per betaling |
-| Uitbetaling | `Uitbetaling` met status `Betaald`, dezelfde ID en hetzelfde bedrag als de verkoop | overgeslagen, apart geteld (`ignored`): hetzelfde geld nog eens |
+| Uitbetaling | `Uitbetaling` met status `Betaald`, dezelfde ID en hetzelfde bedrag als de verkoop | overgeslagen, apart geteld (`ignored`): hetzelfde geld nog eens. Het `Uitbetalingsnummer` en de `Uitbetaling datum` gaan naar de verkoop en haar kosten (`payoutReference`) en naar `IncomePayout` |
 | De rest | `Mislukt`, `Geannuleerd` | overgeslagen |
 
 **Europabank** (CSV per terminal), in twee opmaken: tot maart 2026
@@ -127,6 +156,11 @@ bestanden. Eerst toont de site wat ze per bestand en samen zouden doen
   vanzelf, want de bestanden gaan na elkaar.
 - Hoogstens 250 bestanden, elk tot 10 MB en samen tot 40 MB: onder de 50 MB
   die een server action mag ontvangen (`bodySizeLimit`).
+- Een uitbetaling die er al is met dezelfde dag en hetzelfde bedrag, telt niet
+  als nieuw. SumUp zegt geen bedrag per uitbetaling; dan blijft wat er stond.
+- Komen de Mollie-kosten van een maand al uit de export per uitbetaling
+  ("Withheld fees"), dan slaat het balansrapport zijn factuur van die maand
+  over (`ignored`). Omgekeerd ziet de controlelijst het.
 
 ## Koppelregels
 
@@ -196,6 +230,20 @@ Gegroepeerd zodat één keuze veel transacties dekt (`groupKeyOf`):
   Onthouden kan hier niet; een toestel dat altijd voor dezelfde post dient,
   krijgt beter een standaardcode.
 
+Een dag loopt van 9:00 tot 9:00 de ochtend erna (`reviewDay`,
+`REVIEW_DAY_START_HOUR`), zoals in het script van de eigen poging van Beheer:
+een avond tot 4 uur is één groep, onder de dag waarop ze begon. Enkel het
+groeperen verandert; de maand van een transactie niet. De tussenlaag "Per
+groep" in het controlebestand gebruikt dezelfde groepen.
+
+**Een hele dag van een kanaal** (`assignChannelDay`, onderaan Na te kijken):
+elke betaling van dat kanaal op die dag krijgt met de hand een code, ook wat de
+standaardcode al had. Wat een exacte regel koppelde (de site, een code in de
+tekst, een onthouden tekst, een kassa), blijft. "Terug naar de regels" zet wat
+er die dag met de hand gezet werd, terug aan de koppelregels; ook wat in Na te
+kijken voor die dag gekozen werd. Zo hoeft een dag die de cursusdienst de SumUp
+van Theokot leende, geen twee regels met een standaardcode meer.
+
 ## Kanalen en rekeningen
 
 Een kanaal (`IncomeChannel`) ontstaat bij de eerste import die het noemt. Beheer
@@ -258,6 +306,12 @@ ook hoeveel transacties hun code van de kassa kregen, voor wie
 `income.manage` heeft. In de lijst met transacties en in het controlebestand
 staat de kassa bij de regel.
 
+Heeft een kassa nog geen code en hangen er ticketverkopen met een code aan
+(`CashRegisterTicketEvent`), dan staat die code voorgesteld (`codeSuggestion`
+in `[id]/page.tsx`), met de ticketverkoop erbij. Enkel een voorstel: het staat
+ingevuld, opslaan of aanvaarden doet Beheer. Hebben de ticketverkopen
+verschillende codes, dan staat er niets ingevuld en noemt de zin ze allemaal.
+
 ## Het kwartaalblad en het controlebestand
 
 Het overzicht heeft twee downloads, beide xlsx met `write-excel-file`:
@@ -272,7 +326,7 @@ Het overzicht heeft twee downloads, beide xlsx met `write-excel-file`:
 - **Het controlebestand** (`controlWorkbook`), voor Beheer: zeven tabbladen die
   de lagen van het rekenblad volgen. Kwartaalblad (hetzelfde, maar elke cel een
   `SUMIFS` op Transacties), Transacties (met de kolom Waarom, uit `reasonOf`),
-  Per groep, Mollie per uitbetaling, Na te kijken, Telt niet mee en Bestanden.
+  Per groep, Per uitbetaling, Na te kijken, Telt niet mee en Bestanden.
   Het bevat wat betalers zelf typten, dus het gaat niet naar de boekhouder.
 
 De regel van een transactie in het kwartaalblad is `quarterLineKey`, en die
@@ -285,18 +339,34 @@ geen verschil).
 `computeIncomeChecks`, op het overzicht, in de volgorde van het werk:
 
 1. elke voorbije maand van de periode heeft regels van elke bron die ooit
-   opgeladen werd (de lopende maand niet: die kan nog niet volledig zijn);
+   opgeladen werd (de lopende maand niet: die kan nog niet volledig zijn). Bij
+   SumUp en Europabank, waar een export één kanaal is (`EXPORT_PER_CHANNEL`),
+   per kanaal: elk account of elke terminal met regels in de periode of de
+   drie maanden ervoor;
 2. elke maand met Mollie-betalingen heeft ook kostenregels;
-3. elke Mollie-uitbetaling is afgevinkt tegen het uittreksel;
-4. Na te kijken staat op nul;
-5. elk kanaal heeft een rekening;
-6. er is een kostencode, als er kosten zijn.
+3. geen maand heeft Mollie-kosten uit het balansrapport én uit de export per
+   uitbetaling;
+4. elke uitbetaling van Mollie en SumUp klopt: afgevinkt tegen het uittreksel,
+   of gelijk aan de overschrijving van Mollie (`payoutState`);
+5. Na te kijken staat op nul;
+6. elk kanaal heeft een rekening;
+7. er is een kostencode, als er kosten zijn.
 
 Afvinken (`IncomePayoutCheck`) bewaart wie, wanneer en het bedrag van dat
 moment. Verandert het totaal van de uitbetaling daarna (een export met meer
 regels), dan telt ze als gewijzigd en niet meer als afgevinkt. In een
 afgesloten periode kan afvinken niet meer. Afsluiten kan met open stappen; de
 bevestiging noemt ze.
+
+**Per uitbetaling** op het overzicht: elke uitbetaling met een regel in de
+periode, met al haar regels, ook die van buiten de periode (een
+SumUp-verkoop telt in haar eigen maand, dus een uitbetaling kan over de rand
+lopen). Zonder vinkje is een uitbetaling van Mollie in orde wanneer de som van
+de site gelijk is aan de overschrijving uit het balansrapport (`provider`);
+anders staat het verschil erbij (`differs`). Een vinkje gaat voor: Beheer zag
+het uittreksel. Bij SumUp is de som van de verkopen min hun kosten het bedrag
+dat SumUp overschreef (in het derde kwartaal van 2026 per uitbetaling exact);
+daar blijft het afvinken met de hand.
 
 ## De boekhoudcodes als CSV
 
@@ -352,8 +422,22 @@ fouten), dan opladen.
   die we zagen. De site volgt Mollie (de verkoop voor haar volle bedrag, de
   terugbetaling als eigen negatieve regel), maar kijk het na bij de eerste
   echte terugbetaling.
-- **De controlelijst kijkt per bron, niet per account.** Laadt Beheer de SumUp
-  van Theokot op en vergeet die van Fakbar, dan meldt de eerste stap niets.
+- **De controlelijst kijkt per account, maar kent enkel accounts die al eens
+  iets hadden.** Een SumUp-account of terminal met regels in de periode of de
+  drie maanden ervoor, verwacht ze elke maand; een terminal die een maand niet
+  gebruikt werd (de examens), meldt ze dus ook. Een account dat nog nooit
+  opgeladen werd, kent de site niet.
+- **De som per Mollie-uitbetaling klopt niet altijd met de overschrijving.** In
+  het derde kwartaal van 2026 week de som uit de betalingenexport per
+  uitbetaling af van de overschrijving in het balansrapport, in beide
+  richtingen, ook met de factuur erbij. Waarom, is nog niet duidelijk. De site
+  zet daarom beide naast elkaar en noemt het verschil, in plaats van één van de
+  twee te geloven; het uittreksel blijft het bewijs.
+- **Mollie-kosten uit twee bestanden.** De maandfactuur in het balansrapport en
+  "Withheld fees" in de export per uitbetaling zijn dezelfde kosten. Het
+  balansrapport slaat zijn factuur over voor een maand die er al heeft;
+  komt de export per uitbetaling erna, dan meldt de controlelijst het, en moet
+  een van de twee weg.
 - **Afgesloten.** Een import voegt niets toe aan een afgesloten periode, Na te
   kijken toont er niets uit, en een import met transacties erin kan niet weg.
 - **Formules in `write-excel-file`.** Een waarde met `type: "Formula"` begint

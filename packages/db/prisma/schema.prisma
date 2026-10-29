@@ -8492,6 +8492,7 @@ model IncomeImport {
 
   importedBy   User?               @relation("IncomeImportedBy", fields: [importedById], references: [id], onDelete: SetNull)
   transactions IncomeTransaction[]
+  payouts      IncomePayout[]
 
   @@index([createdAt])
 }
@@ -8646,7 +8647,30 @@ model IncomePeriod {
   @@index([fromMonth, toMonth])
 }
 
-/// Een Mollie-uitbetaling die Beheer tegen het uittreksel afvinkte. Het bedrag
+/// Een uitbetaling zoals de provider ze noemt: een overschrijving naar de
+/// bank, met de referentie die ook op de transacties staat
+/// (`IncomeTransaction.payoutReference`). Mollie geeft het bedrag in het
+/// balansrapport ("transfer"); SumUp enkel het nummer en de dag, en daar is de
+/// som van de verkopen het bedrag. Een latere export zet de dag en het bedrag
+/// van die export.
+model IncomePayout {
+  source      IncomeSource
+  reference   String
+  /// De dag van de overschrijving.
+  paidOn      DateTime     @db.Date
+  /// Wat er volgens de provider op de bank kwam, in centen. NULL = de export
+  /// zegt het niet (SumUp).
+  amountCents Int?
+  importId    String?
+  updatedAt   DateTime     @updatedAt @db.Timestamptz(3)
+
+  import IncomeImport? @relation(fields: [importId], references: [id], onDelete: SetNull)
+
+  @@id([source, reference])
+  @@index([importId])
+}
+
+/// Een uitbetaling die Beheer tegen het uittreksel afvinkte (Mollie, SumUp). Het bedrag
 /// is dat van het moment van afvinken: verandert de som later (een export met
 /// een regel meer), dan toont de site dat het niet meer klopt.
 model IncomePayoutCheck {
