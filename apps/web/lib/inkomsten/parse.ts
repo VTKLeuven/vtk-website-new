@@ -369,7 +369,7 @@ const MOLLIE_COUNTED = new Set(["paid", "paidout", "refunded"]);
 /**
  * De betalingenexport van Mollie, met Engelse of Nederlandse koppen. Beheer
  * gebruikte er een met extra regels voor de kosten ("Withheld fees", "Invoice
- * Compensation"), de reserve ("... rolling reserve") en de terugbetalingen
+ * Compensation", "Balance correction"), de reserve ("... rolling reserve") en de terugbetalingen
  * (betaalmethode "refund"); zonder die regels kan het overzicht de kosten en
  * de reserve niet tonen, en zegt het dat. Een betaling met status "refunded"
  * telt voor haar volle bedrag, zoals in het rekenblad: de terugbetaling zelf is
@@ -400,7 +400,9 @@ function parseMollie(rows: string[][], columns: Columns): IncomeParseResult {
     const status = get(statusCol).trim().toLowerCase();
 
     let kind: IncomeKindCode;
-    if (lower.startsWith("withheld fees") || lower.startsWith("invoice compensation")) kind = "FEE";
+    // "Balance correction" (en "Reverting Balance correction") is een correctie
+    // op een factuur, zonder status; Beheer telde ze als kosten.
+    if (lower.startsWith("withheld fees") || lower.startsWith("invoice compensation") || lower.includes("balance correction")) kind = "FEE";
     else if (lower.includes("rolling reserve") || method === "rollingreserve") kind = "RESERVE";
     // Een terugbetaling of chargeback is een eigen regel zonder status, met een
     // negatief bedrag in de uitbetaling waarvan ze afging (ID `re_...`).
@@ -475,11 +477,19 @@ function balanceKind(type: string): IncomeKindCode | null {
  * uitbetaling: die komen uit de betalingenexport, dus hier slaat de site ze
  * over.
  *
- * Een kost, reserve of terugbetaling gaat van het saldo af en dus mee met de
- * eerstvolgende overschrijving: ze krijgt die uitbetaling, en daarmee haar
- * maand, zoals een betaling. Staat er in het bestand nog geen overschrijving
- * na, dan wacht ze, zoals een betaling die nog niet uitbetaald is; een later
- * balansrapport vult de uitbetaling aan.
+ * De maandfactuur en de reserve tellen in hun eigen maand, zonder
+ * uitbetaling. Mollie zet ze op de laatste seconde van de maand, na de laatste
+ * overschrijving, maar het geld ging er al die maand af: Mollie houdt de
+ * kosten en de reserve wekelijks in op elke overschrijving (in de export per
+ * uitbetaling staan ze zo, met het nummer van de factuur van die maand), en
+ * zet ze in het balansrapport nog eens als één regel per maand. Aan de
+ * volgende overschrijving gehangen, schoof de factuur een maand op, en die van
+ * de laatste maand van een kwartaal kreeg nooit een maand: een balansrapport
+ * van het volgende kwartaal begint pas de dag erna.
+ *
+ * Een terugbetaling gaat wel mee met de eerstvolgende overschrijving, zoals in
+ * de export per uitbetaling: ze krijgt die uitbetaling en haar maand. Staat er
+ * in het bestand nog geen overschrijving na, dan wacht ze.
  */
 function parseMollieBalance(rows: string[][], columns: Columns): IncomeParseResult {
   const c = indexes(columns, EXPORT_COLUMNS["mollie-balance"]);
@@ -545,14 +555,15 @@ function parseMollieBalance(rows: string[][], columns: Columns): IncomeParseResu
       seenHashes.set(base, seen + 1);
       externalKey = `${kind}:${BALANCE_KEY}:${base}:${seen}`;
     }
-    const payoutReference = nextTransfer.get(line) ?? null;
+    const ownMonth = kind !== "REFUND";
+    const payoutReference = ownMonth ? null : (nextTransfer.get(line) ?? null);
     result.push({
       source: "MOLLIE",
       kind,
       externalKey,
       providerId: kind === "REFUND" ? line.reference || null : null,
       occurredAt: line.at,
-      periodMonth: payoutMonth(payoutReference),
+      periodMonth: ownMonth ? monthKey(line.local.year, line.local.month) : payoutMonth(payoutReference),
       amountCents: line.amount,
       refundedCents: 0,
       description: cleanDescription(line.description),

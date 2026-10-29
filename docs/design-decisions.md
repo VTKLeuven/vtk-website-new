@@ -12148,14 +12148,21 @@ had.
   de betalingen blijven uit de betalingenexport komen. Wat het balansrapport
   wel heeft, neemt de site: de overschrijvingen naar de bank (het bedrag op het
   uittreksel) en de maandfactuur met de kosten. Beheer vroeg in oktober 2026
-  om Mollie te vergelijken met wat er echt op de rekening kwam. Een kost gaat
-  mee met de eerstvolgende overschrijving en telt dus in haar maand, zoals een
-  betaling: Mollie op de maand van de uitbetaling, zoals het rekenblad.
+  om Mollie te vergelijken met wat er echt op de rekening kwam. De
+  maandfactuur en de reserve tellen in hun eigen maand: Mollie hield ze die
+  maand al wekelijks in op elke uitbetaling, zoals de export per uitbetaling
+  van het rekenblad toont, en zet ze in het balansrapport enkel nog eens als
+  één regel op de laatste seconde. Een eerste versie hing ze aan de volgende
+  overschrijving; dat schoof ze een maand op, en de kosten van de laatste
+  maand van een kwartaal vielen weg.
 - **De site gelooft de overschrijving niet blind, en de eigen som ook niet.**
   In het derde kwartaal van 2026 kwam de som per uitbetaling uit de
-  betalingenexport niet uit op de overschrijving, in beide richtingen. Gelijk
-  is in orde zonder vinkje; anders staan beide er met het verschil, en beslist
-  Beheer met het uittreksel. Een vinkje gaat voor op de overschrijving.
+  betalingenexport niet uit op de overschrijving, in beide richtingen. Dat kan
+  ook niet: Mollie houdt per uitbetaling kosten en reserve in en geeft oudere
+  reserve vrij, en dat staat enkel in de export per uitbetaling. Gelijk is in
+  orde zonder vinkje; anders staan beide er met het verschil, en beslist
+  Beheer met het uittreksel. Een vinkje gaat voor op de overschrijving. Wie
+  zonder verschil wil afvinken, laadt de export per uitbetaling op.
 - **SumUp per uitbetaling, zoals Mollie.** Elke verkoop zegt in welke
   uitbetaling ze zat, en de som van de verkopen min hun kosten was in het
   derde kwartaal van 2026 per uitbetaling exact wat SumUp overschreef. Een

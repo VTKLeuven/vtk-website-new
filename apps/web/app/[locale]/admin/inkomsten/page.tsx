@@ -316,8 +316,8 @@ export default async function IncomeOverviewPage({
               </p>
               <p>
                 {nl
-                  ? "Mollie: het balansrapport noemt elke overschrijving naar de bank met haar bedrag. Is de som van de site gelijk, dan klopt de uitbetaling zonder vinkje; is ze anders, dan staat het verschil erbij en blijft het uittreksel het bewijs. In de exports van 2026 kwam de som per uitbetaling uit de betalingenexport niet altijd uit op de overschrijving; waarom, is nog niet duidelijk."
-                  : "Mollie: the balance report lists every transfer to the bank with its amount. If the site's sum is equal, the payout matches without a check; if not, the difference is shown and the bank statement stays the proof. In the 2026 exports the sum per payout from the payments export did not always come to the transfer; why is not clear yet."}
+                  ? "Mollie: het balansrapport noemt elke overschrijving naar de bank met haar bedrag. Is de som van de site gelijk, dan klopt de uitbetaling zonder vinkje; is ze anders, dan staat het verschil erbij en blijft het uittreksel het bewijs. Met de betalingenexport komt de som zelden uit: Mollie houdt per uitbetaling kosten en reserve in en geeft oudere reserve vrij, en dat staat enkel in de export per uitbetaling."
+                  : "Mollie: the balance report lists every transfer to the bank with its amount. If the site's sum is equal, the payout matches without a check; if not, the difference is shown and the bank statement stays the proof. With the payments export the sum rarely matches: Mollie withholds fees and reserve per payout and releases older reserve, and that is only in the export per payout."}
               </p>
               <p>
                 {nl

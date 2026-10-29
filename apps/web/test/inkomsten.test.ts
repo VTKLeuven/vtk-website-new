@@ -62,6 +62,7 @@ const MOLLIE_BALANCE = [
   '"2026-08-31 23:59:59",invoice,,MOL-XX-I0000.0000000001,,,"Invoice correction MOL-XX-I0000.0000000001",0.03,EUR',
   '"2026-08-31 23:59:59","rolling reserves",rollingreserve,,,,"Withheld of rolling reserve",-11.00,EUR',
   '"2026-09-30 23:59:59",invoice,,,,,"Invoiced fees",-98.75,EUR',
+  '"2026-09-02 12:00:00",refund,,re_test8,,,"Refund of tr_test7",-14.00,EUR',
 ].join("\n");
 
 const SUMUP = [
@@ -182,6 +183,23 @@ describe("Mollie", () => {
     ]);
   });
 
+  it("telt een balance correction en haar terugdraaiing als kosten, in hun eigen uitbetaling", () => {
+    // Zonder status of betaalmethode: zo staan ze in het tabblad van Beheer,
+    // die ze als kosten telde. Overgeslagen klopte het kwartaal toevallig nog,
+    // maar elke uitbetaling week 19,68 af.
+    const rows = rowsOf(
+      [
+        MOLLIE_NL.split("\n")[0],
+        ',,657000,2-11-2025 20:19:00,,EUR,"19,68",,,Balance correction for October incorrect Minimum invoice amount fee,,,,,,12345678.2511.01,',
+        ',,657000,13-11-2025 17:02:00,,EUR,"-19,68",,,Reverting Balance correction for October Minimum invoice amount fee,,,,,,12345678.2511.03,',
+      ].join("\n"),
+    );
+    expect(rows.map((row) => [row.kind, row.amountCents, row.payoutReference, row.periodMonth])).toEqual([
+      ["FEE", 1968, "12345678.2511.01", "2025-11"],
+      ["FEE", -1968, "12345678.2511.03", "2025-11"],
+    ]);
+  });
+
   it("telt een terugbetaling in de uitbetaling waarvan ze afging, met haar eigen ID", () => {
     const refund = rowsOf(MOLLIE_NL)[2];
     expect(refund.externalKey).toBe("REFUND:re_test6");
@@ -200,26 +218,32 @@ describe("Mollie", () => {
       const result = parseIncomeExport(MOLLIE_BALANCE);
       expect(result.ok && [result.format, result.source]).toEqual(["mollie-balance", "MOLLIE"]);
       if (!result.ok) return;
-      expect([result.total, result.ignored, result.skipped]).toEqual([7, 1, 0]);
+      expect([result.total, result.ignored, result.skipped]).toEqual([8, 1, 0]);
       expect(result.payouts).toEqual([
         { reference: "12345678.2609.01", paidOn: "2026-09-07", amountCents: 181335 },
         { reference: "12345678.2608.01", paidOn: "2026-08-03", amountCents: 21955 },
       ]);
     });
 
-    it("laat een kost of reserve meegaan met de eerstvolgende overschrijving, en een kost zonder erna wachten", () => {
+    it("telt de maandfactuur en de reserve in hun eigen maand, en een terugbetaling bij de eerstvolgende overschrijving", () => {
+      // De factuur van 31 augustus om 23:59:59 is augustus, niet de eerste
+      // uitbetaling van september; die van 30 september heeft geen
+      // overschrijving meer na zich in het bestand, en telt toch in september.
       expect(rowsOf(MOLLIE_BALANCE).map((row) => [row.kind, row.amountCents, row.payoutReference, row.periodMonth])).toEqual([
-        ["FEE", -4342, "12345678.2609.01", "2026-09"],
-        ["FEE", 3, "12345678.2609.01", "2026-09"],
-        ["RESERVE", -1100, "12345678.2609.01", "2026-09"],
-        ["FEE", -9875, null, null],
+        ["FEE", -4342, null, "2026-08"],
+        ["FEE", 3, null, "2026-08"],
+        ["RESERVE", -1100, null, "2026-08"],
+        ["FEE", -9875, null, "2026-09"],
+        ["REFUND", -1400, "12345678.2609.01", "2026-09"],
       ]);
     });
 
     it("geeft een kost een vaste sleutel die zegt dat ze uit het balansrapport komt", () => {
       const first = rowsOf(MOLLIE_BALANCE).map((row) => row.externalKey);
       expect(rowsOf(MOLLIE_BALANCE).map((row) => row.externalKey)).toEqual(first);
-      expect(first.every((key) => key.startsWith("FEE:bal:") || key.startsWith("RESERVE:bal:"))).toBe(true);
+      const fees = first.filter((key) => !key.startsWith("REFUND:"));
+      expect(fees.length).toBe(4);
+      expect(fees.every((key) => key.startsWith("FEE:bal:") || key.startsWith("RESERVE:bal:"))).toBe(true);
     });
 
     it("bewaart geen namen of rekeningnummers", () => {

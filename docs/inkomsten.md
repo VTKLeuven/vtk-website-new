@@ -71,7 +71,7 @@ tabblad van Beheer, dat er drie eigen kolommen voor zet; die worden genegeerd).
 |---|---|---|
 | Betaling | status `paid`, `paidout` of `refunded` | `PAYMENT`, voor het uitbetaalde bedrag |
 | Terugbetaling | betaalmethode `refund` of `chargeback`, ID `re_...` | `REFUND`, negatief |
-| Kosten | omschrijving begint met "Withheld fees" of "Invoice Compensation" | `FEE` |
+| Kosten | omschrijving begint met "Withheld fees" of "Invoice Compensation", of bevat "Balance correction" | `FEE` |
 | Reserve | omschrijving bevat "rolling reserve", of betaalmethode `rollingreserve` | `RESERVE` |
 | De rest | vervallen, geannuleerd, mislukt | overgeslagen |
 
@@ -87,16 +87,25 @@ elke beweging op het Mollie-saldo (`parseMollieBalance`):
 |---|---|
 | `transfer` | een uitbetaling (`IncomePayout`): de referentie, de dag en het bedrag dat naar de bank ging |
 | `payment` | overgeslagen (`ignored`): zonder uitbetaling, en de betalingenexport heeft ze al |
-| `invoice` | `FEE`: de maandfactuur van Mollie, en een correctie van een paar cent |
-| `rolling reserves` | `RESERVE` |
+| `invoice` | `FEE`: de maandfactuur van Mollie, en een correctie van een paar cent; in haar eigen maand |
+| `rolling reserves` | `RESERVE`, in haar eigen maand |
 | `refund`, `chargeback` | `REFUND` |
 
-Een kost, reserve of terugbetaling gaat van het saldo af en dus mee met de
-**eerstvolgende overschrijving** in het bestand: ze krijgt die uitbetaling en
-haar maand. De factuur van 31 augustus telt zo in september. Staat er nog geen
-overschrijving na, dan wacht ze zonder maand, zoals een betaling zonder
-uitbetaling; een later balansrapport vult ze aan. Een kost uit het
-balansrapport heeft een sleutel die met `FEE:bal:` begint (`BALANCE_KEY`).
+De **maandfactuur en de reserve tellen in hun eigen maand**, zonder
+uitbetaling. Mollie zet ze op de laatste seconde van de maand
+(`2026-08-31 23:59:59`), na de laatste overschrijving, maar het geld ging er
+die maand al af: Mollie houdt kosten en reserve wekelijks in op elke
+overschrijving, en de export per uitbetaling toont ze zo, met het nummer van
+de factuur van die maand ("Withheld fees MOL-NL-R2025.0001113445" van 4
+augustus tot 8 september 2025). Het balansrapport zet ze nog eens als één
+regel per maand. Een **terugbetaling** gaat wel mee met de eerstvolgende
+overschrijving in het bestand, zoals in de export per uitbetaling; staat er
+nog geen na, dan wacht ze zonder maand. Een kost uit het balansrapport heeft
+een sleutel die met `FEE:bal:` begint (`BALANCE_KEY`).
+
+Nagekeken op het balansrapport van het derde kwartaal van 2026: kosten
+−43,39 in augustus en −98,62 in september, samen −142,01, zoals de eigen
+poging van Beheer (−142,17 zonder de twee compensaties van +0,16).
 
 Nagekeken op het tabblad van Beheer voor het vierde kwartaal van 2025: totaal
 € 40.523,51, kosten −1.434,27, reserve −984,72, exact het kwartaalblad.
@@ -475,12 +484,29 @@ fouten), dan opladen.
   drie maanden ervoor, verwacht ze elke maand; een terminal die een maand niet
   gebruikt werd (de examens), meldt ze dus ook. Een account dat nog nooit
   opgeladen werd, kent de site niet.
-- **De som per Mollie-uitbetaling klopt niet altijd met de overschrijving.** In
-  het derde kwartaal van 2026 week de som uit de betalingenexport per
-  uitbetaling af van de overschrijving in het balansrapport, in beide
-  richtingen, ook met de factuur erbij. Waarom, is nog niet duidelijk. De site
-  zet daarom beide naast elkaar en noemt het verschil, in plaats van één van de
-  twee te geloven; het uittreksel blijft het bewijs.
+- **Met de betalingenexport klopt de som per Mollie-uitbetaling niet.** Een
+  overschrijving is de betalingen min de kosten die Mollie op die uitbetaling
+  inhield, min de reserve die ze inhield, plus oudere reserve die vrijkwam. Die
+  laatste drie staan per uitbetaling enkel in de export per uitbetaling; de
+  betalingenexport heeft enkel de betalingen, en het balansrapport enkel een
+  totaal per maand. In het derde kwartaal van 2026: bij 2608.02 zeven
+  Bancontact-betalingen voor € 385,00 en € 382,27 overgeschreven, € 2,73 of
+  7 × € 0,39 kosten; bij 2608.04 € 1.045,00 betaald en € 1.191,39
+  overgeschreven, oudere reserve die vrijkwam. De site zet beide naast elkaar
+  en noemt het verschil; het uittreksel blijft het bewijs. Wie zonder verschil
+  wil afvinken, laadt de export per uitbetaling op, zoals het rekenblad.
+- **De maandfactuur van Mollie staat na de laatste overschrijving.** Op de
+  laatste seconde van de maand, dus aan de volgende overschrijving gehangen
+  schoof ze een maand op, en die van de laatste maand van een kwartaal kreeg
+  nooit een maand: een balansrapport van het volgende kwartaal begint pas de
+  dag erna. Zo telde een eerste versie in het derde kwartaal van 2026 −43,39
+  aan Mollie-kosten in plaats van −142,01. Ze tellen nu in hun eigen maand.
+- **"Balance correction" heeft geen status.** In het tabblad van Beheer staan
+  twee zulke regels (+19,68 in 2511.01 en −19,68 in 2511.03, een correctie op
+  de minimumfactuur van oktober 2025 en haar terugdraaiing), zonder status of
+  betaalmethode. Overgeslagen klopte november toevallig nog, maar elke van die
+  twee uitbetalingen week 19,68 af, en een correctie die niet teruggedraaid
+  wordt, viel stil weg. Ze tellen nu als kosten, zoals Beheer ze telde.
 - **Mollie-kosten uit twee bestanden.** De maandfactuur in het balansrapport en
   "Withheld fees" in de export per uitbetaling zijn dezelfde kosten. Het
   balansrapport slaat zijn factuur over voor een maand die er al heeft;

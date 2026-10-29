@@ -27,8 +27,8 @@ const GUIDES: Guide[] = [
     format: "mollie",
     title: { nl: "Mollie, betalingen", en: "Mollie, payments" },
     what: {
-      nl: "De betalingenexport, of de export per uitbetaling (met de regels \"Withheld fees\" en \"rolling reserve\"). Engelse of Nederlandse koppen.",
-      en: "The payments export, or the export per payout (with the \"Withheld fees\" and \"rolling reserve\" rows). English or Dutch headings.",
+      nl: "De betalingenexport, of de export per uitbetaling (met de regels \"Withheld fees\", \"Balance correction\" en \"rolling reserve\"). Engelse of Nederlandse koppen. Enkel de export per uitbetaling heeft de kosten en de reserve per uitbetaling; met de betalingenexport komt de som per uitbetaling niet uit op de overschrijving.",
+      en: "The payments export, or the export per payout (with the \"Withheld fees\", \"Balance correction\" and \"rolling reserve\" rows). English or Dutch headings. Only the export per payout has the fees and reserve per payout; with the payments export the sum per payout does not come to the transfer.",
     },
     counts: {
       nl: "Telt: status paid, paidout of refunded, in de maand van de uitbetaling (de referentie zegt welke: 12345678.2608.01 is augustus 2026). Zonder uitbetaling wacht een betaling tot een latere export ze noemt.",
@@ -43,8 +43,8 @@ const GUIDES: Guide[] = [
       en: "Every movement on the Mollie balance: the transfers to the bank (transfer), the monthly invoice (invoice) and the reserve.",
     },
     counts: {
-      nl: "De betalingen erin slaat de site over: die komen uit de betalingenexport. Een kost, reserve of terugbetaling gaat mee met de eerstvolgende overschrijving en telt in haar maand. Een overschrijving is het bedrag op het uittreksel.",
-      en: "The site skips the payments in it: those come from the payments export. A fee, reserve or refund goes with the next transfer and counts in its month. A transfer is the amount on the bank statement.",
+      nl: "De betalingen erin slaat de site over: die komen uit de betalingenexport. De maandfactuur en de reserve staan op de laatste seconde van de maand en tellen in die maand; een terugbetaling gaat mee met de eerstvolgende overschrijving. Een overschrijving is het bedrag op het uittreksel.",
+      en: "The site skips the payments in it: those come from the payments export. The monthly invoice and the reserve sit on the last second of the month and count in that month; a refund goes with the next transfer. A transfer is the amount on the bank statement.",
     },
   },
   {
