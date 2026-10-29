@@ -5,10 +5,9 @@ import { brusselsYMD, parseYMD, ymdKey } from "@/lib/brussels";
  * De POC-band op de homepage: welke weergave er staat, en de tekst van de
  * verkiezingsweergave.
  *
- * Bewust een pure module zonder database en zonder React, net als
- * `lib/frontpage/heroShifts.ts`: hier zitten kringregels in (welke stap van de
- * procedure loopt er vandaag?) en die wil je kunnen testen zonder een homepage
- * te renderen.
+ * Bewust een pure module zonder database en zonder React: hier zitten
+ * kringregels in (welke stap van de procedure loopt er vandaag?) en die wil je
+ * kunnen testen zonder een homepage te renderen.
  *
  * ## Waarom er twee weergaven zijn
  *

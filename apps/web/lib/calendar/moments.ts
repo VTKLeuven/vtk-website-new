@@ -2,13 +2,11 @@
  * De losse momenten van een evenement: de gedeelde regels rond
  * `CalendarEventMoment`.
  *
- * Bewust een pure module zonder database en zonder React, net als heroWeek.ts:
- * de server rendert hiermee de eventpagina en de feeds, en de kalenderpagina in
- * de browser gebruikt dezelfde functies. Welke dagen een moment beslaat, staat
- * niet hier maar bij de twee roosters die het al berekenden
- * (`lib/calendar/heroWeek.ts` en `components/editorial/calendarGrid.ts`): die
- * rekenen elk in hun eigen dagconventie en die wilden we niet samenvoegen om er
- * een derde bij te krijgen.
+ * Bewust een pure module zonder database en zonder React: de server rendert
+ * hiermee de eventpagina en de feeds, en de kalenderpagina in de browser
+ * gebruikt dezelfde functies. Welke dagen een moment beslaat, staat niet hier
+ * maar bij het rooster dat het al berekende (`components/editorial/calendarGrid.ts`),
+ * in zijn eigen dagconventie.
  */
 
 /** Tijdzone van de kring; dezelfde als overal elders in de kalender. */
@@ -16,8 +14,7 @@ export const MOMENT_TIME_ZONE = "Europe/Brussels";
 
 /**
  * Hoe lang een nachtactiviteit mag duren om enkel bij haar startdag te horen.
- * Eén grens voor de hele kalender: het weekoverzicht in de hero en het
- * maandrooster op /kalender lezen hem allebei hier.
+ * Eén grens voor de hele kalender: het maandrooster op /kalender leest hem hier.
  */
 export const NIGHT_EVENT_MAX_MS = 12 * 60 * 60 * 1000;
 
@@ -114,9 +111,8 @@ export function hasUpcomingMoment(
 /**
  * Hoeveel dagvakjes een strip hoogstens toont voor ze afkapt op "+n".
  *
- * Zes en niet meer: de strip staat zowel op een kaart van 380 pixels als in de
- * hero naast de titel, en zes vakjes van ongeveer vijftig pixels passen daar
- * nog op één regel. Wat er niet op past, zegt het laatste vakje.
+ * Zes en niet meer: de strip staat op een kaart van 380 pixels, en zes vakjes
+ * van ongeveer vijftig pixels passen daar nog op één regel. Wat er niet op past, zegt het laatste vakje.
  */
 export const MOMENT_STRIP_MAX = 6;
 

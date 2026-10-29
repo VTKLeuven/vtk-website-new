@@ -71,7 +71,7 @@ export function Button({
   variant = 'primary',
   disabled = false,
   busy = false,
-  /** Op een donkere band keert de primaire knop om, net als op de hero. */
+  /** Op een donkere band keert de primaire knop om, net als op de site. */
   onDark = false,
 }: {
   label: string;

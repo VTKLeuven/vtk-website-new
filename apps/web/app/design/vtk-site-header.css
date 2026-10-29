@@ -5,8 +5,7 @@
 }
 
 /* Solide navy header met lichte navigatie: dezelfde donkere boekensteun als de
-   footer, in plaats van de doorschijnende paper-balk. Op de homepage-hero wordt
-   enkel de achtergrond transparant; de tekst is in beide toestanden licht. */
+   footer, in plaats van de doorschijnende paper-balk. */
 .vtk-site-header {
   color: var(--paper);
   position: sticky;
@@ -16,10 +15,6 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
-  transition:
-    background 220ms ease,
-    border-color 220ms ease,
-    color 220ms ease;
 }
 
 .vtk-site-header .utility {
@@ -176,7 +171,7 @@
    leest de uitklap als een verlenging van de header in plaats van een witte
    kaart die toevallig in de buurt zweeft. Het paneel is vrijwel dekkend: een
    zweem doorschijnendheid houdt de band met de pagina eronder, meer niet;
-   op een drukke hero-foto ging de leesbaarheid er anders aan.
+   op een drukke foto ging de leesbaarheid er anders aan.
 
    Eén set regels voor beide uitklappanelen in de header: de navigatietabs en
    het accountmenu. Ze hangen aan dezelfde rand, dus ze horen er ook hetzelfde
@@ -194,9 +189,9 @@
   border-top: 0;
   border-radius: 0 0 16px 16px;
   background: color-mix(in srgb, var(--navy) 97%, transparent);
-  /* De blur hoort bij de doorschijnendheid: zonder hem las je de hero-titel en
-     de paginakop dwars door het paneel heen, tussen de menu-items door. Nu
-     schijnt de kleur eronder nog mee, maar zijn de vormen uitgesmeerd. */
+  /* De blur hoort bij de doorschijnendheid: zonder hem las je de paginakop dwars
+     door het paneel heen, tussen de menu-items door. Nu schijnt de kleur eronder
+     nog mee, maar zijn de vormen uitgesmeerd. */
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   box-shadow: 0 26px 52px rgba(10, 15, 31, 0.45);
@@ -500,22 +495,6 @@
 
 .vtk-site-header .profile-shell[data-open]::after {
   transform: scaleX(1);
-}
-
-/* Homepage: the header sits directly on the dark hero (SiteHeaderShell sets
-   data-over-hero while the hero is in view). The text is light in both states;
-   only the bar itself goes transparent over the photo and fades back to solid
-   navy once you scroll past the hero. Desktop only: it matches the hero overlap
-   in vtk-home.css, and below 981px the header stays a solid strip above the
-   hero so the wrapping nav never covers it. */
-@media (min-width: 981px) {
-  /* De proxy kan na login de onboardinginhoud onder het homepagepad renderen.
-     Maak de header daarom alleen transparant wanneer de hero echt aanwezig is,
-     niet enkel wanneer de client-router denkt dat dit de homepage is. */
-  body:has(.home-hero) .vtk-site-header[data-over-hero='true'] {
-    background: transparent;
-    border-bottom-color: transparent;
-  }
 }
 
 /* Smal scherm: één menuknop in plaats van de tabs. De knop staat rechts naast

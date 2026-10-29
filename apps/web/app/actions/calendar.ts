@@ -47,7 +47,6 @@ const eventSchema = z.object({
   // andere, geen zin. Leeg = de standaardtekst; zie lib/calendar/eventLink.ts.
   urlLabelNl: z.string().trim().max(EVENT_LINK_LABEL_MAX).optional().nullable(),
   urlLabelEn: z.string().trim().max(EVENT_LINK_LABEL_MAX).optional().nullable(),
-  heroWeek: z.enum(["AUTO", "PINNED", "HIDDEN"]).default("AUTO"),
 });
 
 /** Eén moment zoals het formulier het meestuurt: een dag en twee uren. */
@@ -142,7 +141,6 @@ const EVENT_FIELD_LABELS: Record<string, string> = {
   imageZoomMobile: "zoom op een telefoon",
   imageRatioMobile: "zoom op een telefoon",
   publishedAt: "publicatiestatus",
-  heroWeek: "weekoverzicht op de homepage",
   moments: "momenten",
 };
 
@@ -173,7 +171,6 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     url: formData.get("url") || null,
     urlLabelNl: formData.get("urlLabelNl") || null,
     urlLabelEn: formData.get("urlLabelEn") || null,
-    heroWeek: formData.get("heroWeek") || "AUTO",
   });
   const image = readImageField(formData);
   // Waar de uitsnede rond draait. Geen validatiepad: het veld stuurt altijd een
@@ -229,11 +226,6 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
   if (!superOrAll && !hasPermission(session, "calendar.create")) {
     throw new Error("forbidden");
   }
-  // Het weekoverzicht op de homepage is een eigen permissie: wie ze niet heeft,
-  // ziet het veld niet staan en kan het ook niet meesturen. Bij een bestaand
-  // evenement blijft dan gewoon staan wat er stond, in plaats van stil terug te
-  // vallen op "automatisch".
-  const canHeroWeek = session.user.isSuperAdmin || hasPermission(session, "calendar.heroWeek");
   const userGroupIds = session.groups.map((g) => g.id);
   await assertCanManageEvent(userGroupIds, input.groupId, superOrAll);
 
@@ -264,7 +256,6 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     imageZoomMobile: mobileCrop?.zoom ?? null,
     imageRatioMobile: mobileCrop?.ratio ?? null,
     createdById: session.user.id,
-    ...(canHeroWeek ? { heroWeek: input.heroWeek } : {}),
   };
 
   // De categorieën komen als losse checkbox-waarden binnen; alles wegdoen en
@@ -694,54 +685,6 @@ export async function deleteCalendarCategoryAction(formData: FormData): Promise<
     summary: "de evenementen zelf blijven bestaan",
   });
   revalidateCalendar();
-}
-
-/**
- * Het weekoverzicht op de homepage aan- of uitzetten vanuit de evenementenlijst.
- *
- * Dezelfde keuze als het veld in het formulier (`heroWeek`), maar op de plaats
- * waar ze in de praktijk gemaakt wordt: je ziet pas dat een dag te vol staat
- * wanneer je de week naast elkaar ziet, en dan is een evenement openen, een
- * keuzelijst zoeken en opslaan drie stappen te veel.
- *
- * Aparte permissie, net als in het formulier: wie ze niet heeft, krijgt de
- * knoppen niet te zien en kan ze ook niet omzeilen door zelf te posten.
- */
-export async function setEventHeroWeekAction(
-  _prev: SaveState,
-  formData: FormData,
-): Promise<SaveState> {
-  const session = await requireSession();
-  const id = (formData.get("id") as string) || "";
-  const parsed = z.enum(["AUTO", "PINNED", "HIDDEN"]).safeParse(formData.get("heroWeek"));
-  if (!id || !parsed.success) return saveError("INVALID_INPUT");
-
-  const superOrAll =
-    session.user.isSuperAdmin || hasPermission(session, "calendar.manageAll");
-  if (!session.user.isSuperAdmin && !hasPermission(session, "calendar.heroWeek")) {
-    throw new Error("forbidden");
-  }
-  const evt = await prisma.calendarEvent.findUnique({ where: { id } });
-  if (!evt) return saveError("NOT_FOUND");
-  await assertCanManageEvent(
-    session.groups.map((g) => g.id),
-    evt.groupId,
-    superOrAll,
-  );
-  if (evt.heroWeek === parsed.data) return saveOk();
-
-  await prisma.calendarEvent.update({ where: { id }, data: { heroWeek: parsed.data } });
-  await logAudit({
-    action: "update",
-    entity: "calendarEvent",
-    entityId: id,
-    target: evt.titleNl,
-    summary: `weekoverzicht op de homepage: ${parsed.data.toLowerCase()}`,
-  });
-  // De homepage leest dit veld, en de lijst hiernaast toont de nieuwe stand.
-  revalidateCalendar();
-  revalidatePath("/admin/kalender");
-  return saveOk();
 }
 
 export async function deleteEventAction(formData: FormData): Promise<void> {

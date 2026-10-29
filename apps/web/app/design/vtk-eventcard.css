@@ -313,9 +313,8 @@
    maar vangt zelf geen klikken: een vakje is geen knop, en een klik op de kaart
    hoort gewoon het evenement te openen. Daarom geen eigen `z-index`.
 
-   Ook gebruikt in de lijstrij op /kalender (`.ag-row`) en op de homepageband, en
-   met dezelfde vorm in de hero (`.hero-week-strip` in vtk-home.css); wijzig ze
-   dus niet op één plaats. */
+   Ook gebruikt in de lijstrij op /kalender (`.ag-row`) en op de homepageband;
+   wijzig ze dus niet op één plaats. */
 .vtk-design .ev-days {
   display: flex;
   flex-wrap: wrap;

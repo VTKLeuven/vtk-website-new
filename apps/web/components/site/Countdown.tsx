@@ -6,8 +6,6 @@ import { countdownParts, type CountdownParts } from "@/lib/countdown";
 /**
  * A ticking countdown in minutes, for the `[[24urenloop]]` block on a content page.
  *
- * The 24-urenloop front page has its own clock in seconds (`UrenloopClock`).
- *
  * `initial` comes from the server so the first render here produces exactly the
  * same output and no hydration mismatch follows; after that this component
  * recomputes on its own. Without that prop the server would print one number and

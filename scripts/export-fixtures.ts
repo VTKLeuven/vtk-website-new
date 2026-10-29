@@ -51,7 +51,6 @@ import { FIXTURE_DIR } from "../packages/db/src/fixtures";
 const SETTING_ALLOWLIST = [
   "home.career",
   "home.aftermovies",
-  "home.slogans",
   "home.openingHours.theokot",
   "home.openingHours.cursusdienst",
   "media.aftermovies",

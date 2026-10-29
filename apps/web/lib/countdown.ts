@@ -1,9 +1,9 @@
 /**
  * Aftellen in dagen, uren en minuten.
  *
- * Geen seconden: de frontpage is server-gerenderd en de klok tikt clientside
- * bij; op minuten volstaat een trage timer, terwijl seconden elke seconde een
- * re-render van de hero vragen voor een cijfer waar niemand naar kijkt.
+ * Geen seconden: de pagina is server-gerenderd en de klok tikt clientside bij;
+ * op minuten volstaat een trage timer, terwijl seconden elke seconde een
+ * re-render vragen voor een cijfer waar niemand naar kijkt.
  *
  * Staat los van de client-component zodat de server dezelfde eerste waarde kan
  * berekenen: elke export van een `"use client"`-module is een client-referentie

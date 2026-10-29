@@ -19,10 +19,6 @@ const TTL_SECONDS = 60;
 /**
  * Leest de 24 urenloop-instellingen en de laatst ontvangen tussenstand in één
  * query.
- *
- * Wanneer `urenloop.config` nog nooit opgeslagen werd maar de oude `urenloop`-
- * frontpage al een `startsAt`/`endsAt` in haar `values` had staan, nemen we die
- * over als terugval zodat bestaande instellingen niet verdwijnen.
  */
 export async function readUrenloopData(): Promise<{
   config: UrenloopConfig;
@@ -33,22 +29,7 @@ export async function readUrenloopData(): Promise<{
     select: { key: true, value: true },
   });
   const byKey = new Map(rows.map((r) => [r.key, r.value]));
-  let config = parseUrenloopConfig(byKey.get(URENLOOP_CONFIG_KEY));
-
-  if (!config.startsAt && !config.endsAt) {
-    const legacy = await prisma.frontpage.findUnique({
-      where: { layout: "urenloop" },
-      select: { values: true },
-    });
-    if (legacy?.values && typeof legacy.values === "object" && !Array.isArray(legacy.values)) {
-      const legacyConfig = parseUrenloopConfig(legacy.values);
-      config = {
-        startsAt: legacyConfig.startsAt,
-        endsAt: legacyConfig.endsAt,
-        showResultsUntil: config.showResultsUntil,
-      };
-    }
-  }
+  const config = parseUrenloopConfig(byKey.get(URENLOOP_CONFIG_KEY));
 
   const stats = parseStoredUrenloopStats(byKey.get(URENLOOP_STATS_KEY));
   return { config, stats };
@@ -61,7 +42,7 @@ const cachedUrenloopData = unstable_cache(
 );
 
 /**
- * Gecachete lezing voor de publieke site (`UrenloopFrontpage` en `PageView`).
+ * Gecachete lezing voor de publieke site (`PageView`).
  * Alle velden in `UrenloopConfig` en `StoredUrenloopStats` zijn ISO-strings,
  * getallen en booleans, en overleven de JSON-serialisatie van `unstable_cache`
  * dus zonder verlies.

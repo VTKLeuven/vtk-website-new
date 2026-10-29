@@ -15,14 +15,14 @@ import "@/app/design/vtk-eventcard.css";
 import "@/app/design/vtk-news.css";
 
 /**
- * De Nieuws-band op de homepage, tussen de donkere zone en de openingsuren.
+ * De Nieuws-band bovenaan de homepage, boven de openingsuren.
  *
  * Links het uitgelichte bericht, meestal het woordje van de praeses als brief;
  * rechts de rest als de eventtegel van de kalender (`vtk-eventcard.css`), in een
  * carrousel die per tegel doorschuift. Welke berichten erin staan en welk er
  * uitgelicht wordt, beslist `lib/news/rules.ts`; dit bestand tekent enkel.
- * Zonder berichten tekent het niets, en dan sluiten de openingsuren weer aan op
- * de snelle links.
+ * Zonder berichten tekent het niets, en dan begint de homepage met de
+ * openingsuren.
  *
  * De soort van een bericht is een woord, geen kleur en geen icoon: een
  * gekleurde tegel per soort kwam nergens anders op de site terug. Zie

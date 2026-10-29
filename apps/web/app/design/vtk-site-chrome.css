@@ -576,9 +576,8 @@
 }
 
 /* Autorisatievoorbeeld (AuthorizationPreviewBanner): een zwevende balk
-   onderaan, boven al de rest. Stond ze in de flow onder de kop, dan schoof de
-   homepagehero er met haar negatieve marge overheen en was er geen uitweg meer
-   uit het voorbeeld. Terwijl ze er staat, schuiven de cookiekeuze en de
+   onderaan, boven al de rest, zodat er op elke pagina een uitweg uit het
+   voorbeeld in beeld blijft. Terwijl ze er staat, schuiven de cookiekeuze en de
    onderkant van de pagina mee omhoog, zodat ze niets afdekt. */
 .vtk-preview-bar {
   position: fixed;

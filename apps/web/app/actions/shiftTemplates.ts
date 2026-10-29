@@ -13,8 +13,7 @@ import { parseTemplateEntries } from "@/lib/shift/templates";
  * Het beheer van de shiftsjablonen: de reeks shiften die een terugkerend
  * evenement telkens nodig heeft.
  *
- * De shiftrijen komen als JSON in één verborgen veld binnen, zoals bij de
- * slogans. Elke rij heeft elf velden waarvan er drie een keuze zijn en twee een
+ * De shiftrijen komen als JSON in één verborgen veld binnen. Elke rij heeft elf velden waarvan er drie een keuze zijn en twee een
  * vinkje, en dat in genummerde formuliervelden persen levert enkel een tweede,
  * afwijkende lezing van hetzelfde op.
  *

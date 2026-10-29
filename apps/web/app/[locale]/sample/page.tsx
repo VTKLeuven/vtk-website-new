@@ -440,7 +440,7 @@ export default async function SamplePage({
           <div className="sec-head">
             <div>
               <div className="label">Home patterns</div>
-              <h2>Cards, agenda and quick links</h2>
+              <h2>Cards and agenda</h2>
             </div>
             <div className="meta">Classes from vtk-home.css</div>
           </div>
@@ -481,17 +481,6 @@ export default async function SamplePage({
             </a>
           </div>
 
-          <div className="quick mt-8 px-0">
-            <div className="quick-row">
-              {["Kalender", "Aanbod", "Fotos", "Pocs", "Praesidium", "Contact"].map((item) => (
-                <a key={item} className="ql" href="#calendar">
-                  <span className="k">Quick link</span>
-                  <span className="v">{item}</span>
-                  <span className="m">Navigation pattern</span>
-                </a>
-              ))}
-            </div>
-          </div>
         </section>
 
         <section id="calendar" className="vtk-design">

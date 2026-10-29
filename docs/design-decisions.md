@@ -34,8 +34,8 @@ De volgorde en labels zijn dus een kringkeuze, geen technische:
   slug vrij te maken. Let op: die pagina is de bij KU Leuven geregistreerde SSO
   info-URL (`apps/web/lib/sso.ts`), dus de registratie bij KU Leuven moet mee
   aangepast worden.
-- **Tweedehands en tijdsloten draaien op Cudi**, niet op deze site. De footer en de
-  homepage-quicklinks linken daarom extern naar `cudi.vtk.be`.
+- **Tweedehands en tijdsloten draaien op Cudi**, niet op deze site. De footer linkt
+  daarom extern naar `cudi.vtk.be`.
 - De **uitleendienst** (`logistiek.vtk.be`) hangt als menu-item onder Info, naast
   Kalender en Piano, en niet als twaalfde tab: elf tabs is al de grens waarop de
   header naar een menuknop overschakelt. Ze staat ook in de footerkolom Service,
@@ -2618,7 +2618,7 @@ richtingen werden in een canvas naast elkaar gelegd.
 ### De agenda blijft een maandraster
 
 Een lijst per dag (zoals /shift) en twee weken naast elkaar als agendaboek
-(zoals de week in de homepagehero) werden bekeken en afgewezen: de agenda moet
+werden bekeken en afgewezen: de agenda moet
 als een kalender blijven aanvoelen. Wat er wel veranderde:
 
 - **Geen paneel naast het raster.** Een dagpaneel rechts nam net de breedte af
@@ -2838,8 +2838,7 @@ wat het was:
 - **Zeven losse evenementen** zijn zeven URL's, zeven affiches, zeven
   interessetellers, zeven sterrenlijsten en zeven pushberichten "er staat iets
   nieuws in een categorie die je volgt" (`announcedPushAt` staat per evenement),
-  voor één ding. In het weekoverzicht van de hero vullen ze bovendien zes van de
-  tien rijen.
+  voor één ding.
 - **Eén meerdaags evenement** zegt dat het van maandag 18u tot zondag 19u
   *doorloopt*, en dat is feitelijk onjuist. Het lekt ook verder dan de
   kalenderpagina: de ICS-feed maakte er één afspraak van die een week lang in
@@ -2864,7 +2863,7 @@ zeggen enkel wannéér het doorgaat.
   doorlopende periode" en "meerdere momenten", en toont maar één van de twee: een
   formulier waarin de helft van wat je intikt stil genegeerd wordt, is erger dan
   een keuze.
-- **Waar het verschil zit.** Het weekoverzicht en het maandraster zetten het op
+- **Waar het verschil zit.** Het maandraster zet het op
   de dagen van zijn momenten (en dus niet op de dagen ertussen), telkens met het
   uur van díé dag; de balk over het rooster blijft voor wat echt doorloopt. De
   kaart en de lijstrij blijven één per evenement, met "telkens 18:00" in plaats
@@ -2873,19 +2872,15 @@ zeggen enkel wannéér het doorgaat.
 - **Eén kaart, maar wel de juiste dagen: de dagenstrip.** "telkens 20:00" zegt
   hoe laat en niet wanneer, en dat was precies de vraag die openbleef. Onder de
   titel staat daarom een strip met de dagen die de reeks **nog te gaan heeft**,
-  de eerstvolgende in het geel: op de eventkaart (/kalender en de homepageband),
-  in de lijstrij op /kalender en in het weekoverzicht van de hero. Wat er niet op
+  de eerstvolgende in het geel: op de eventkaart (/kalender en de homepageband)
+  en in de lijstrij op /kalender. Wat er niet op
   past, wordt "+3 tot wo 23 sep"; is alles voorbij, dan toont ze de laatste
   dagen zonder markering. De regels staan in `momentStrip`
-  (apps/web/lib/calendar/moments.ts), de vorm in `.ev-days` en
-  `.hero-week-strip`.
+  (apps/web/lib/calendar/moments.ts), de vorm in `.ev-days`.
   - **Enkel wat nog komt.** Een loopweek die woensdag halfweg is, moet zeggen dat
     er nog vier loopjes zijn, niet dat er twee voorbij zijn. Zo schuift de strip
     mee met de rij en met de datum op de kaart, die allebei al op het
     eerstvolgende moment staan.
-  - **Niet in de vensterweergave van de hero.** Daar staat elke dag al als eigen
-    rij; de strip zou dezelfde dagen een tweede keer zeggen. Ze verschijnt enkel
-    in de lijstvorm (een rustige week), want dan staat de reeks er maar één keer.
 - **Een kaart staat in de week van de datum die op haar pin staat.** Het raster
   op /kalender groepeerde per week op de start van de envelop, en dus bleef een
   loopweek die vrijdag begon in die week hangen; zodra die week voorbij was,
@@ -3021,8 +3016,7 @@ post binnenkort doet, wie erin zit, en welke pagina's ernaast staan.
   dezelfde hoogte en dezelfde gele onderlijn: enkel het technische patroon maakt
   plaats voor de foto onder de navy waas. Zonder foto verandert er niets.
   - **Het patroon gaat niet over de foto.** Twee tekeningen over elkaar maakten
-    het beeld rommelig in plaats van herkenbaar; de waas alleen doet het werk,
-    net als in de hero op de homepage.
+    het beeld rommelig in plaats van herkenbaar; de waas alleen doet het werk.
   - Dit wijkt af van de regel in `CLAUDE.md` dat alleen de homepage beeld in
     haar kop heeft. Bewust, en beperkt tot contentpagina's: `/tickets`, de
     categoriepagina's en `/praesidium` houden het patroon, want daar hoort geen
@@ -3188,141 +3182,6 @@ onderste helft is een ontwerpkeuze, geen toeval:
   naad en lezen als één lang vlak, dus krijgen enkel die paren het paper-gat
   terug (de regel onder `.band + .band` in `vtk-home.css`). Elke andere
   combinatie houdt de strakke naad.
-
-### De frontpage: het donkere blok bovenaan
-
-De **frontpage** is het bovenste deel van de homepage: de donkere zone met de
-titel, de knoppen, de kaart ernaast en de rij snelle links, allemaal op één foto
-(`.home-dark-zone`). De rest van de homepage staat daar los van, en wordt beheerd
-onder Admin → Homepagina. De frontpage zelf heeft één eigen scherm: Admin →
-Frontpage.
-
-**Een frontpage is een component, geen ingevuld sjabloon.** Elke frontpage in
-`apps/web/lib/frontpage/registry.ts` is een eigen ontwerp met eigen JSX en eigen
-CSS, vrij om er totaal anders uit te zien dan de andere. Dat is een bewuste
-keuze, en de tweede poging: de eerste versie was één generieke event-layout met
-velden die je invulde.
-
-- **Waarom dat niet werkte.** Een 24-urenloop-frontpage en een
-  jobfair-frontpage zijn niet dezelfde pagina met andere woorden. De ene wil een
-  aftelklok en rondetellers, de andere een muur van bedrijfslogo's. Door beide
-  door één titel/subtitel/aftelklok-schema te duwen, kreeg elk evenement dezelfde
-  vorm, en precies dat maakte de feature waardeloos.
-- **Waarom het mag.** VTK heeft een handvol evenementen per jaar die een
-  overname verdienen. Elk daarvan wordt één keer ontworpen en daarna jaarlijks
-  hergebruikt met nieuwe datums. Een component per evenement is dus goedkoop; de
-  abstractie eromheen was duurder dan het werk dat ze bespaarde.
-
-**Velden staan per frontpage, niet gedeeld.** Elke module declareert zelf welke
-velden ze aanbiedt (`fields` in het register) en het beheerscherm bouwt daar zijn
-formulier uit. Een veld toevoegen is één regel in het register; er is geen
-admin-werk aan. Zo hoeft niet elke tekstwijziging langs een deploy, zonder dat er
-opnieuw een gedeeld schema ontstaat.
-
-**De standaard is er ook een.** Ze staat in hetzelfde register met dezelfde
-soort velden, zodat "de frontpage wijzigen" overal hetzelfde betekent. Ze heeft
-geen venster en kan niet uitgezet worden: ze is wat er staat zodra geen enkele
-andere frontpage actief is.
-
-**De tweede knop van de standaard heeft per taal een eigen adres.** In het
-Nederlands is dat "Eerstejaars? Start hier" naar `/eerstejaars`, in het Engels
-"International? Start here" naar `/internationaal`: wie de site op Engels leest,
-is hier zelden een eerstejaars en meestal een uitwisselingsstudent. De labels
-stonden al per taal in het register; het adres nu ook (`secondaryUrl` en
-`secondaryUrlEn`). De Engelse knop erft het Nederlandse adres bewust **niet**,
-want dan stuurt een ingevuld NL-veld de uitwisselingsstudent alsnog naar de
-eerstejaarswerking.
-
-**Vensters, geen schakelaar.** Dezelfde reden als bij de aankondigingen: je zet
-de jobfair weken vooraf klaar, ze gaat vanzelf live en verdwijnt vanzelf. Staan
-er meerdere tegelijk klaar, dan wint de laatst gestarte; er is maar één
-frontpage. Een rij die naar een verwijderde module wijst, wordt genegeerd (de
-homepage valt terug op de standaard) en in het beheer als onbekend gemeld.
-
-### De titel van de standaard frontpage: een lijst slogans
-
-De titel in de hero is geen veld maar een **lijst** die roteert, te beheren via
-**/admin/slogans** (`Setting["home.slogans"]`). Wat er in die lijst staat, is
-kringcultuur: naast "De thuis voor ingenieurs in Leuven" ook de kreten uit het
-liedjesboek ("Glory, glory, wij zijn VTK!", "Het verstand zit aan deze kant").
-
-- **Eén tekstveld per taal, met het accent in de zin.** Het gele schuine accent
-  zet je tussen sterretjes (`Ingenieurs zijn *superieur*.`) en een enter in het
-  veld is een echte regelafbreking. Daarvoor stonden er drie velden per taal
-  (titel, accent, staart) met het accent altijd in het midden; een accent
-  vooraan, twee accenten of een kreet van één regel waren niet te schrijven,
-  terwijl de kreten die we echt gebruiken precies dat vragen.
-- **De begroeting is een gewone slogan, geen apart systeem.** Elke slogan heeft
-  een publiek (iedereen / enkel aangemelde leden / enkel bezoekers) en mag de
-  reeks *openen*. "Goeiemorgen, Jan." is dus: publiek = leden, opener = aan. Ze
-  verschijnt één keer, bij aankomst, en valt daarna uit de rotatie, want een
-  begroeting is waar wanneer je toekomt en niet elke acht seconden opnieuw.
-- **Geen kanspercentage.** De eerste versie gooide een dobbelsteen (standaard
-  50% kans op de begroeting), gevoed door de seconden van de serverklok. Dat was
-  niet te testen in het beheer, niet uit te leggen aan een redacteur, niet
-  per bezoeker (twee mensen in dezelfde seconde kregen hetzelfde) en het zou
-  bevriezen zodra de anonieme homepage ooit gecachet wordt. De regel is nu één
-  zin: **de eerste opener in de lijst die past bij het publiek en het dagdeel
-  opent de reeks.**
-- **Dagdeel in plaats van kans.** Een slogan kan beperkt worden tot ochtend,
-  middag, avond of nacht (Brusselse klok). Zo variëren de begroetingen op iets
-  dat waar is in plaats van op toeval: "Goeiemorgen", "Welkom terug",
-  "Goeieavond", "Nog laat bezig?". Het geldt voor elke slogan, niet enkel voor
-  begroetingen; zo blijft het één begrip in het beheer.
-- **De lijst kan niet leeg.** De hero heeft een titel nodig, dus de laatste
-  slogan is niet te verwijderen en opslaan met een lege lijst wordt geweigerd.
-  Anders zette de code stilletjes haar eigen zaailijst terug.
-- **De reeks staat even groot, op maat van de langste slogan.** De hero is
-  getekend voor een handvol woorden op 80px; "Studeren, fuiven, lopen: zonder
-  ons hard te forceren" loopt daar over vijf regels. Omdat de hoogte vastligt op
-  de langste slogan (anders springt de halve hero bij elke wissel), zou de hele
-  hero daarnaar groeien. Daarom zakt de tekengrootte mee met de langste regel,
-  in drie stappen, voor de hele reeks tegelijk: een titel die per slogan van
-  grootte verspringt, leest als een fout. Het beheerscherm zegt welke stap
-  actief is, zodat "korter schrijven" een zichtbare beloning heeft.
-- **De rotatie is te stoppen.** Ze pauzeert bij hover, bij focus in de hero, in
-  een verborgen tabblad en bij `prefers-reduced-motion`, en er staat een
-  pauzeknop naast het bovenschrift (WCAG 2.2.2). De `h1` draagt altijd één
-  slogan; de andere staan onzichtbaar in een stapel die enkel de hoogte bepaalt.
-- **Slogans kunnen volledig uitgeschakeld worden.** In `/admin/slogans` staat een
-  hoofdschakelaar om de slogans uit te zetten. Wanneer ze uitgeschakeld zijn,
-  toont de homepage steeds de klassieke titel over drie lijnen ("De thuis voor" /
-  *ingenieurs* / "in Leuven.") zonder rotatie of client-timers. De ingestelde
-  sloganlijst blijft bewaard voor wanneer ze later weer ingeschakeld wordt.
-- **"De thuis voor ingenieurs in Leuven" staat op 3 lijnen.** In plaats van 2
-  lijnen staat de titel nu op 3 lijnen ("De thuis voor" \n *ingenieurs* \n "in
-  Leuven."). Dit oogt voller en balanceert de hoogte van het weekoverzicht aan
-  de rechterkant van de hero.
-
-### De 24 urenloop-frontpage: het racebord
-
-De frontpage van de 24 urenloop (`UrenloopFrontpage.tsx`) is in oktober 2026
-opnieuw ontworpen, in drie rondes op een bord met de volledige homepage voor
-vier momenten: dagen ervoor, racedag, live 's nachts en de eindstand. Gekozen
-werd het **racebord**: de klok is de hero.
-
-- **Eén blok onderaan de foto.** Titel, klok, urenbalk en (tijdens en na de
-  race) de scorebordrij staan samen onderaan; het standje bovenaan de foto
-  blijft vrij. De klok volgt de titel op een vaste afstand van 40 px. Een
-  versie met de titel bovenaan en de klok los onderaan liet een strook lege
-  foto tussen beide en werd afgekeurd.
-- **De klok wisselt met de race.** Vóór de start telt ze af tot het startschot
-  (dagen, uur, min, sec), tijdens de race toont ze de tijd op de piste naast het
-  aantal ronden, na de finish het eindtotaal en de kilometers. Ze telt in
-  seconden: een reuzeklok die een minuut stilstaat, leest als kapot. Tijdens de
-  race vraagt de pagina elke minuut nieuwe cijfers op (`router.refresh()`,
-  enkel in een zichtbaar tabblad); de cache van de stand is even lang.
-- **De urenbalk vervangt de pil.** Eén vakje per uur van de race, met start en
-  finish als datum aan de uiteinden en de plaats eronder. Live, een bevroren
-  slotuur of een stand die niet meer binnenkomt, staat als markering boven het
-  lopende uur, niet als pil boven de klok.
-- **Bewust weggelaten:** het cursieve serif-accent ("the night is ours." staat
-  in hetzelfde lettertype als de titel, enkel in het geel), de knoppen (titel en
-  klok zijn samen één link naar de pagina van de 24 urenloop) en de kalender
-  (de rij snelle links houdt Kalender en Shiften één klik weg). Alle drie zijn
-  zo bekeken en teruggedraaid; zet ze niet terug.
-- Wat vóór de start bij de klok stond (losse cijfers, een subtekst), is
-  geschrapt; het enige vrije veld dat erbij kwam, is de plaats.
 
 ### Aftermovies op de homepage
 
@@ -3517,37 +3376,6 @@ nu-lijn, en daaronder de week als rij met de uren in tekst
 - **De logo's** staan als lichte versies voor navy in `public/openingsuren/`. Het
   Theokot houdt zijn rood. Van de cursusdienst staat enkel het hoofd van de kat
   erin, want de volledige tekening wordt op deze grootte een vlek.
-
-### Snelle knoppen staan op mobiel vóór de eventkaart
-
-Op een breed scherm staan de hero-tekst en de eventkaart naast elkaar, en ligt de
-rij snelle knoppen (Theokot, Cursusdienst, Tweedehands, Tijdsloten, Shiften,
-Kalender) er meteen onder: allemaal in één blik, klikbaar zonder te scrollen.
-
-Zodra de hero stapelt (**≤980px**) valt die volgorde uit elkaar. De eventkaart
-gaat dan onder de tekst staan, en de knoppen kwamen daarachter: op een scherm van
-390×844 begon de eerste knop pas op **1287px**, dus anderhalf scherm naar
-beneden, met een kaart van ruim 500px ertussen. De knoppen zijn juist het
-utilitaire deel van de homepage (waar eet ik, is de cursusdienst open), dus dat
-is precies de verkeerde volgorde voor een telefoon.
-
-- **Keuze:** onder 980px schuiven de knoppen tussen de hero-tekst en de
-  eventkaart. Onder 640px staan ze bovendien in **twee kolommen** in plaats van
-  zes onder elkaar. Resultaat op 390×844: eerste knop op **700px**, vier van de
-  zes binnen het eerste scherm, en het blok krimpt van 682px naar 311px.
-- **De eventkaart schuift dus naar beneden op mobiel.** Dat is bewust: hij blijft
-  één korte scroll ver, terwijl de knoppen de bestemming zijn waar mensen
-  meerdere keren per week naartoe gaan.
-- **Desktop verandert niet.** Alles zit in `@media (max-width: 980px)` en
-  `@media (max-width: 640px)` in `vtk-home.css`.
-- **Hoe:** `.home-dark-zone` wordt een flex-kolom en `.home-hero` krijgt
-  `display: contents`, zodat de twee hero-kinderen broers worden van de
-  quick-sectie en met `order` te herschikken zijn. Enkel de box van de hero
-  verdwijnt, niet het element, dus descendant-selectors (`.home-hero .hero-cal`)
-  en `body:has(.home-hero)` in de header-CSS blijven werken. De padding van de
-  hero verhuist wel mee naar zijn kinderen. Let op: `.quick` staat op
-  `margin: 0 auto`, en een auto-marge in de dwarsrichting zet de stretch van een
-  flex-kind uit; die marges moeten in dat blok expliciet op 0.
 
 ---
 
@@ -6262,10 +6090,9 @@ product- en niet puur technisch:
 - **Een pagina onder een categorie is canoniek `/<categorie>/<slug>`**, niet
   `/p/<slug>`, hoewel beide werken. De categorievorm is de weg die de navigatie
   aanbiedt, dus dat is de URL die gedeeld hoort te worden.
-- **Het standaard deelbeeld is het Arenbergkasteel onder een navy scrim met het
-  VTK-wordmerk** (`apps/web/app/opengraph-image.jpg`, gebouwd uit
-  `public/hero-arenberg.jpg`). Eén beeld voor de hele site; een pagina met een
-  echte eigen foto geeft die mee aan `buildMetadata()`.
+- **Er is één standaard deelbeeld** (`apps/web/app/opengraph-image.jpg`) voor de
+  hele site; een pagina met een echte eigen foto geeft die mee aan
+  `buildMetadata()`.
 
 ---
 
@@ -6861,38 +6688,6 @@ omdat de mail vaak doorgestuurd wordt naar wie meekomt.
 
 ---
 
-## Een evenement dat bijna op de homepage staat, mailt zijn post
-
-Komt een evenement in het weekoverzicht van de hero terwijl het nog een concept
-is of nog geen eigen banner heeft, dan krijgt de post die het beheert daar één
-mail over, op haar eigen adres (`onthaal@vtk.be` voor Onthaal).
-
-**Waarom.** Het weekoverzicht vult zich vanzelf: een evenement schuift erin zodra
-het binnen de komende zeven dagen valt. Precies dan is het te laat om nog rustig een affiche
-te laten maken, en een concept verschijnt helemaal nergens. Wie het evenement
-aanmaakte, kijkt op dat moment meestal al naar de volgende activiteit.
-
-- **Het venster is dat van de hero zelf** (`lib/calendar/heroWeekNotice.ts`), niet
-  "vijf dagen vooraf". Verandert de hero ooit van vorm, dan schuift deze
-  herinnering mee in plaats van er stilletjes naast te gaan lopen.
-- **Een concept telt mee, ook al staat het nergens.** Dat is het punt: het zou in
-  het overzicht staan als het gepubliceerd was.
-- **`heroWeek = HIDDEN` krijgt niets.** Iemand heeft dat evenement bewust uit het
-  weekoverzicht gehaald; "het komt bijna op de homepage" is dan onjuist.
-- **Eén mail per evenement** (`CalendarEvent.heroWeekNoticeAt`, geclaimd voor er
-  iets vertrekt, nooit teruggezet). Ontbreken de banner én de publicatie, dan is
-  dat één mail met twee punten. Wie daarna enkel de banner toevoegt, krijgt geen
-  tweede herinnering: twee mails over hetzelfde evenement lezen als spam, en dan
-  wordt ook de eerste genegeerd.
-- **Naar de post en niet naar de maker.** Een evenement is van een post, en de
-  persoon die het aanmaakte is een maand later misschien met iets anders bezig.
-  Het adres volgt de regel van de kring (post op `@vtk.be`); staat het adres als
-  lijst in de site, dan gaat dat voor (`lib/groupMail.ts`).
-- Ze vertrekt mee met de `background-worker`, elke vijf minuten, naast de
-  Theokot-no-shows en de geplande lesbezoekmails.
-
----
-
 ## Elke mail en elk eenmalig scherm heeft een voorvertoning in de admin
 
 /admin/it/flows toont de twee gates (onboarding en de jaarlijkse
@@ -7460,285 +7255,6 @@ telefoon.
 
 ---
 
-## Het weekoverzicht in de hero
-
-De homepage toont naast de titel een agenda. Dat was een lijst met de vier
-eerstvolgende evenementen; het is nu standaard een **weekoverzicht**: de komende
-dagen onder elkaar, met de dag in de marge en de evenementen ernaast. De keuze
-tussen beide staat in Admin → Website → Frontpage (veld "Agenda naast de
-titel"), zodat een periode waarin er weinig te doen is niet vastzit aan een
-rooster dat vooral leeg is.
-
-De regels staan in `apps/web/lib/calendar/heroWeek.ts` en zijn los getest
-(`apps/web/test/heroWeek.test.ts`).
-
-### Zaterdag valt weg
-
-VTK organiseert nooit iets op zaterdag, dus een zaterdagrij is een lege rij. Ze
-valt uit het venster, en het venster loopt daarvoor níet een dag verder (zie
-"De komende zeven dagen" hieronder). Staat er tóch iets op een zaterdag, dan valt
-het uit het overzicht; het blijft wel in de kalender, in de feeds en in de app
-staan. Wie op een zaterdag langskomt, ziet het venster vanaf zondag.
-
-### Een lege zondag valt ook weg
-
-Op zondag gebeurt er soms iets (de Onthaaldagen beginnen er, een weekend loopt
-erin door), maar meestal niet. Een zondag zonder evenement wordt daarom net als
-zaterdag overgeslagen. Staat er wél iets, dan staat de zondag er gewoon. Een verborgen
-evenement (`HIDDEN`) houdt de zondag niet vast.
-
-Een lege **weekdag** blijft wel staan: dat er dinsdag niets is, is ook iets om te
-weten, en het houdt de week leesbaar als week. Zondag is de uitzondering omdat
-een lege zondag het normale geval is en dus niets vertelt.
-
-De herinneringsmail voor de post (`heroWeekNotice.ts`) kent de andere
-evenementen niet; die neemt een lege zondag aan, tenzij het evenement zelf op
-zondag valt.
-
-### De komende zeven dagen, rollend, met gisteren erbij als er plaats is
-
-Een vaste week (maandag tot zondag) staat op vrijdagavond zo goed als leeg,
-terwijl er dan net het meest te beleven valt. Daarom rolt het venster mee:
-
-- Het begint **vandaag**. Wie op de homepage kijkt, kijkt in de eerste plaats
-  naar vandaag, en die dag hoort dus bovenaan te staan.
-- Het loopt **zeven kalenderdagen**, vandaag inbegrepen, en niet verder.
-  Zaterdag en een lege zondag vallen eruit, dus er staan er meestal vijf of zes.
-  Tot september 2026 telde het venster door tot er zes rijen stonden; op
-  zaterdag stond daardoor de maandag van volgende week er al in, en dat las als
-  "deze week" terwijl het dat niet was. Nu komt die maandag er pas op dinsdag bij.
-- **Gisteren** komt er enkel bij wanneer hij niets verdringt: er moet nog een
-  rij vrij zijn in het totaal van tien, en ofwel liet het weekend een dag vrij
-  (minder dan zes dagen), ofwel staat de laatste dag van het venster leeg en
-  staat die zijn plaats af. Meer dan zes dagen worden het dus nooit. Zo
-  verdwijnt een cantus van gisteren niet om middernacht van de homepage terwijl
-  de halve kring er de dag erna nog over praat, maar duwt hij ook nooit iets weg dat nog moet komen.
-- Wat gisteren begon en vandaag nog loopt, telt daar niet voor: het staat vandaag
-  al in het overzicht, en een tentoonstelling van een maand zou het venster anders
-  elke dag laten terugkijken.
-
-### Onder de vier evenementen wordt het een lijst
-
-Zes dagen met twee dingen erin leest als een kring waar niets gebeurt. Zitten er
-minder dan vier evenementen in het venster, dan toont de hero in de plaats de
-**eerstvolgende evenementen**, ook al zijn die pas over drie weken. Precies vier
-telt als genoeg om het venster te vullen. De lijst toont er standaard maximaal
-zeven: met dezelfde ademruimte als het weekoverzicht vult dat de ruimte naast de
-herotekst tot aan de onderkant van de shiften, zonder eronder te zakken. Het maximum is
-instelbaar van vier tot zeven in Admin → Website → Frontpage.
-
-De terugval kijkt niet terug: gisteren hoort bij "deze week", niet bij "wat er
-nog komt".
-
-### Hoogstens drie per dag en tien in totaal
-
-De hero staat naast de titel en mag niet met de drukte meegroeien tot een tweede
-scherm. Een dag met meer toont er drie plus "nog n die dag", met een link naar de
-kalender. Het totaal stopt op tien.
-
-**Vandaag en morgen vallen buiten de dagkap.** Dat vandaag zijn derde evenement
-afkapt terwijl er volgende week nog rijen vrij zijn, is de omgekeerde wereld: het
-overzicht gaat in de eerste plaats over vanavond en morgen. Die twee dagen
-worden dus volledig getoond; enkel het totaal van tien houdt ze tegen, want dat
-is de hoogte van het blok.
-
-**De rijen worden verdeeld in volgorde van dringendheid**: vandaag, morgen,
-overmorgen, ... en gisteren als laatste. Loopt het totaal vol, dan is het dus de
-laatste dag van het venster die rijen inlevert en "nog n die dag" krijgt, en
-nooit vandaag of morgen. Dit kwam van een homepage waarop donderdag drie
-evenementen toonde, vrijdag er één plus "nog 1 die dag", en de woensdag erna wél
-twee rijen kreeg.
-
-### Een evenement over meerdere dagen staat op elke dag
-
-De Onthaaldagen liepen van zondag tot dinsdag en stonden enkel op zondag: het
-overzicht deelde een evenement in op zijn startdag. Nu staat het op elke dag
-waarop het loopt, met dezelfde dagregels als het kalenderrooster, zodat de hero
-en /kalender nooit iets anders zeggen:
-
-- Bij een **heledagevenement** telt de einddag mee. Dat is overal in de kalender
-  zo; de ICS-feed telt er om dezelfde reden een dag bij.
-- Een **nachtactiviteit van hoogstens twaalf uur** (een cantus tot drie uur) hoort
-  enkel bij haar startdag. Anders staat ze de ochtend erna nog eens in het
-  overzicht.
-
-Vanaf de tweede rij staat er "dag 2 van 3" in plaats van het uur, een open stip
-in plaats van een volle, en geen ster. Drie gelijke rijen met drie sterren lazen
-als drie aparte evenementen. De ster staat op de eerste rij die het evenement
-echt krijgt: valt de eerste dag weg door de kap van drie, dan draagt de volgende
-dag ze. Begon het evenement al voor het venster, dan zegt ook die eerste rij welke
-dag het is.
-
-Het telt op twee manieren mee:
-
-- Voor de **drempel van vier** telt het één keer. Drie rijen Onthaaldagen maken
-  nog geen drukke week.
-- Voor de **kappen** (drie per dag, tien in totaal) telt elke rij, want die kappen
-  bewaken de hoogte van het blok. Maar ze worden **in twee rondes** verdeeld:
-  eerst krijgt elk evenement zijn eerste rij, en pas daarna vullen de herhalingen
-  aan met wat er overblijft. Anders neemt een evenement dat zes dagen duurt in
-  één keer zes van de tien rijen en verdwijnt de rest van de week van de
-  homepage. Sneuvelt er iets, dan is het dus een herhaling en nooit een evenement
-  dat nergens anders staat.
-
-**Een evenement met losse momenten staat op de dagen van zijn momenten**, niet op
-alles ertussen, en houdt op elke rij het **uur** van die dag in plaats van "dag 3
-van 7": bij een loopweek is dat uur net wat elke dag te zeggen heeft. De stip en
-de ster volgen wel dezelfde regel als hierboven, want het blijft één evenement.
-Zie "Een evenement met losse momenten (een loopweek)" bij de kalender.
-
-De homepage leest evenementen daarom op hun einde en niet op hun start: wie op
-dinsdag kijkt, moet de Onthaaldagen nog zien, ook al begonnen ze zondag. Ook de
-lijst met eerstvolgende evenementen neemt mee wat vandaag nog loopt, op de dag
-van vandaag.
-
-### Uitlichten en weglaten is een eigen recht
-
-`calendar.heroWeek` (Admin → Kalender, veld "Weekoverzicht op de homepage") laat
-toe om een evenement **voorrang** te geven op zijn dag of het **weg te laten** uit
-het overzicht. Bewust los van `calendar.manageAll`: dit gaat niet over het
-evenement maar over de homepage, en een post die haar eigen evenementen beheert,
-beslist daarmee nog niet wat er op de voorpagina staat.
-
-- **Voorrang** zet het vooraan op zijn dag en beschermt het tegen de kap van drie.
-- **Niet tonen** houdt het van de homepage, niet uit de kalender. Het is dus geen
-  zichtbaarheidsregel en geen vervanging van een concept; een interne vergadering
-  hoort in de kalender maar niet in de hero.
-
-### De ster staat in het overzicht zelf
-
-Elk evenement draagt de ster van "ik kom", dezelfde als op de eventpagina en in
-de app, in dezelfde tabel. Zonder aanmelding is het een link naar het
-aanmeldscherm in plaats van een knop die pas na het klikken vertelt dat het niet
-gaat. Het blijft wat het overal is: geen inschrijving (zie "De ster op een
-evenement is geen inschrijving").
-
-De alumnivelden (naam, afstudeerjaar) horen hier niet: daar is in de hero geen
-plaats voor, en ze zijn nergens verplicht om te kunnen aanduiden dat je komt.
-
-### Waarom er geen paneel onder staat
-
-De rechterkant van de hero is net de plek waar de foto het lichtst is (lucht en
-bomen), dus witte tekst valt er weg. Een kaart met een eigen vulling loste dat op
-maar zette een tweede scherm naast de titel. Het overzicht draagt daarom een
-breed, randloos verloop in de scrim (`.hero-week-wash`) dat naar buiten toe
-volledig oplost: dezelfde techniek als de scrim linksboven, alleen nu ook rechts.
-
-Drie alternatieven zijn bekeken en afgevallen: een zachte glasplaat onder de hele
-week (het veiligst bij eender welke foto, maar het is weer een paneel), een blok
-per dag (het dichtst bij kaartjes) en een tijdlijn met bolletjes (het mooist,
-maar het verst van de rest van de site).
-
-De waas veronderstelt wel dat de herofoto donker genoeg is, en die foto is
-instelbaar. Daarom staat de **donkerte als schuifregelaar** naast de agendakeuze
-in Admin → Website → Frontpage, van 40 tot 100 procent, standaard 88. Wie later
-een felle zomerfoto instelt, schuift ze op zonder dat er een deploy aan te pas
-komt; te ver opschuiven laat de foto onder de agenda verdwijnen, en dan is de
-lijst de betere keuze.
-
-De vorm zelf is een **vervaagde vlek** (`filter: blur`) en geen verloop of
-schaduw. Dat is twee keer misgelopen en staat daarom ook in de CSS: een radiaal
-verloop dat breder is dan zijn eigen kader wordt aan de rand afgekapt in plaats
-van uitgedoofd, zodat er een rechthoek boven de agenda verschijnt; en een
-strakke vulling met een schaduw eromheen dooft wel uit, maar leest als een
-paneel. Een vervaagde vorm heeft geen van beide problemen.
-
-### Vandaag is een gewone dag, in het geel
-
-Vandaag stond als een geel pilletje rond het dagnummer, en dat liep op twee
-manieren mis. Op een dag zonder evenementen won de regel voor een lege dag van
-die voor vandaag (even specifiek, later in de CSS), en stond er doorschijnend wit
-op geel. En de padding van het pilletje duwde de dagnaam opzij, zodat "vr" niet
-meer onder "zo" en "ma" stond.
-
-Nu ziet vandaag eruit als elke andere dag, met het nummer en de dagnaam in het
-geel: geen vlak, geen extra woord, en niets verschuift. Ook op een lege dag staat
-het cijfer op volle grootte; het kleinere, gedimde cijfer van een lege dag zou het
-geel mee dimmen. Drie alternatieven zijn bekeken en afgevallen: een pilletje rond
-nummer en dagnaam samen (leesbaar, maar op een lege dag het felste punt van het
-blok), "vandaag" in de plaats van de dagnaam (maakt die rij hoger) en een geel
-speldje in de marge (te makkelijk te missen).
-
-De dagnamen staan onder elkaar, hoe breed het nummer ook is. In Inter is een 11
-smaller dan een 16 en een lege dag heeft een kleiner cijfer; daarom staat het
-nummer rechts in een vaste breedte, met cijfers van gelijke breedte. De dagkolom
-zelf is via subgrid in elke rij even breed, zodat ook een Engelse "Wed" de
-evenementen niet opzij duwt.
-
-## Openstaande shiften onder de herotekst
-
-Onder de herotekst staan de **shiften waar nog plaats is**, hoogstens drie.
-Daarvoor stond daar niets: de tekstkolom eindigde ruim boven de agenda ernaast en
-de rest van de hoogte was lege foto.
-
-Tot september 2026 stond daaronder nog een feitenlijn (werkingsjaar, binnenkort,
-sinds). Die is weggehaald: ze zei niets wat iemand kon doen, en met haar erbij
-paste er onder de titel van drie regels maar één shift. Zet ze niet terug zonder
-te beseffen dat ze die ruimte weer van de shiften afneemt.
-
-De regel die bepaalt wat daar wel en niet hoort: **de rij snelle links eronder
-zegt waar je naartoe kan, dit blok zegt waar er nu handen tekort zijn.** Bijna
-alles wat je in die hoek zou willen zetten (Theokot, Cursusdienst, Tijdsloten,
-Kalender) staat al als bestemming in die rij; dit blok verdient zijn plaats enkel
-doordat het iets toont wat een vaste link niet kan. Zet er dus geen tweede
-menu neer.
-
-De regels staan in `apps/web/lib/frontpage/heroShifts.ts` en zijn los getest
-(`apps/web/test/heroShifts.test.ts`).
-
-### Welke shiften
-
-- **Enkel waar nog plaats is.** Dit is een oproep, geen rooster. Een volle shift
-  zegt de bezoeker niets wat hij kan doen.
-- **Niet wat je zelf al doet.** Dezelfde regel als `GET /api/shift`: je eigen
-  shift is voor jou geen vacature, en ze staat op /shift al bij je eigen shiften.
-- **Wat bezig is, blijft staan.** Gefilterd op het einde en niet op de start:
-  bij een shift die een uur geleden begon en nog een plaats vrij heeft, kan
-  iemand vandaag nog iets doen.
-- **De eerstvolgende eerst**, ook wanneer een latere shift meer plaatsen vrij
-  heeft. Wat morgen is, is dringender dan wat over drie weken is.
-- **Geel betekent binnen een dag**, net als in het weekoverzicht ernaast: daar is
-  geel "vandaag", hier "dit gaat over nu".
-
-Per rij staat de naam, wanneer ze is, hoeveel plaatsen er vrij zijn en wat ze
-opbrengt in bonnetjes. Die bonnetjes staan er bewust bij: ze maken de ruil
-meteen duidelijk, en ze staan rechts, in dezelfde kolom waar het weekoverzicht
-het uur zet.
-
-### Ook voor wie niet aangemeld is
-
-/shift vraagt een login, dus voor een bezoeker zonder account loopt elke rij uit
-op een aanmeldscherm. Het blok staat er toch, om twee redenen: de naam en het uur
-van een shift zijn geen geheim, en het is net dat publiek dat nog niet weet dat
-het kan helpen. /shift vangt het aanmelden zelf op en stuurt daarna terug.
-
-Wil je dat ooit anders, dan is het één voorwaarde in `DefaultFrontpage`: het blok
-enkel tonen wanneer `signedIn` waar is. Hou er dan rekening mee dat de hoek voor
-een bezoeker weer leeg valt.
-
-### Hoeveel er staan, hangt af van hoe hoog de titel uitvalt
-
-De titel is geen blok van vaste hoogte: `hero-slogan-sizer` maakt hem zo hoog als
-de langste slogan uit /admin/slogans, en wie daar morgen een langere kreet
-neerzet, maakt hem in één keer honderd pixels hoger. Stond er dan een vast aantal
-shiften onder, dan schoof de kolom onder de agenda uit en werd de hero hoger dan
-het scherm.
-
-Daarom delen de titel en de shiften één hoogtebudget. Groeit de titel, dan valt
-er een shift weg; nul is een geldig antwoord, en dan verdwijnt het blok. De lucht
-die overblijft, komt bóven het blok te staan, waar ze leest als ademruimte onder
-de knoppen in plaats van als een gat onderaan.
-
-De server schat die titelhoogte, want hij weet niet waar de browser afbreekt. Dat
-hoeft niet exact: de schatting kiest enkel tussen nul en drie rijen. Het budget
-ligt een tiental pixels boven de ruimte naast een heel kort weekoverzicht, zodat
-een titel van drie regels op de grootste trap nog drie shiften draagt; een
-gewoon gevuld weekoverzicht is ruim hoger dan die schatting.
-
-Eén gevolg om te kennen: het budget rekent met de breedste hero. Op een telefoon
-concurreert niets om die hoogte en zou er meer passen, maar de server rekent één
-getal uit voor alle schermen. Een lange slogan kost daar dus ook een rij.
-
 ## De ster op een evenement is geen inschrijving
 
 In de app staat bij elk evenement een ster: "ik ga hier waarschijnlijk naartoe".
@@ -7776,9 +7292,9 @@ drempel keert dat om en werkt het als aanmoediging. Een laag getal verlaat de
 server daarom niet eens: `publicInterestCounts()` geeft die rijen gewoon niet
 terug, zodat het ook niet per ongeluk ergens opduikt.
 
-De teller staat op vier plekken en overal met dezelfde drempel: de heroagenda en
-de kaarten op de homepage, het kalenderraster, de voorvertoning bij een klik, en
-de eventpagina zelf.
+De teller staat op vier plekken en overal met dezelfde drempel: de kaarten op de
+homepage, het kalenderraster, de voorvertoning bij een klik, en de eventpagina
+zelf.
 
 ### De aanbod-kaart volgt de eventkaart
 
@@ -7828,7 +7344,7 @@ voetregel te vol.
 ### De ster en het agenda-icoon op de eventkaart
 
 Sinds september 2026 draagt elke eventkaart twee icoonknoppen op de onderste
-regel: dezelfde ster als in het weekoverzicht van de hero, en een agenda-icoon
+regel: de ster van "ik kom", en een agenda-icoon
 dat het evenement in je agenda zet. Het zijn de twee dingen die iemand met een
 evenement wil doen zonder eerst de detailpagina te openen, en ze staan er samen
 omdat "ik kom" en "in mijn agenda" dezelfde beslissing zijn op twee manieren
@@ -8068,7 +7584,7 @@ de groep, niet in plaats ervan.** Staat het leeg, dan verandert er niets en blij
 de groepsnaam de organisator. Staat het ingevuld, dan vervangt die naam de
 groepsnaam overal waar een bezoeker leest van wie het evenement is: de kop en het
 infokaartje van de eventpagina, het label in de agendalijst en de voorvertoning op
-/kalender, de regel in het weekoverzicht en de agenda in de hero, en `groupName`
+/kalender, en `groupName`
 in de app-API. `lib/calendar/organiser.ts` is de enige plaats waar die keuze
 gemaakt wordt; roep die helper aan in plaats van de groepsnaam opnieuw te picken.
 
@@ -9190,7 +8706,7 @@ deze pagina", en die vraag hoefde niemand te beantwoorden.
 Waarom dit en niet de drie andere richtingen die naast elkaar bekeken zijn:
 
 - **De waas alleen hoger of anders leggen** (een hogere band met de waas onderaan
-  verankerd, zoals de hero op de homepage) toont de foto wel, maar zet de titel
+  verankerd) toont de foto wel, maar zet de titel
   nog altijd óp de foto. Bij een drukke of lichte foto blijft dat elke keer
   spannend, en dat is niet iets wat een redacteur kan zien voor ze publiceert.
 - **De band splitsen** (links navy met de titel, rechts de foto tot aan de rand)
@@ -10844,9 +10360,8 @@ dag een loopje, een filmreeks met drie avonden) is één evenement met één pag
 en één affiche. De vraag "kom je?" is er wél per dag: naar het loopje van
 woensdag komen zegt niets over dat van vrijdag.
 
-**De ster staat per dag waar de site een dag toont.** In het weekoverzicht van de
-homepage is elke rij al één moment, en op de eventpagina staat onder "Wanneer"
-de lijst van die dagen; op beide plaatsen hangt de ster aan díé dag. Voordien
+**De ster staat per dag waar de site een dag toont.** Op de eventpagina staat
+onder "Wanneer" de lijst van die dagen; daar hangt de ster aan díé dag. Voordien
 stond er één ster op de eerste rij die de reeks kreeg en een grijze plaatshouder
 op alle volgende, waardoor je je bij Loopje 3 wel kon aanduiden en bij Loopje 4,
 5 en 6 niet.
@@ -10970,9 +10485,9 @@ uren van die persoon, en de tabel onderaan enkel zijn ritten.
 heeft, en over een werkingsjaar is het verschil tussen 14u en 15u vaak ruis. Per
 4 uur past het beeld op 390px zonder te schuiven.
 
-## Nieuws tussen de hero en de openingsuren
+## Nieuws boven de openingsuren
 
-De homepage heeft een Nieuws-band tussen de snelle links en de openingsuren:
+De homepage heeft een Nieuws-band boven de openingsuren:
 links het uitgelichte bericht, rechts de rest als tegels in een carrousel.
 Beheer via Admin → Website → Nieuws (`news.manage`), waar de band ook helemaal
 uit kan. Code: `apps/web/lib/news` (regels, instelling, lezen),
@@ -11017,12 +10532,10 @@ datumpin op de foto en de soort als woord in kleine kapitalen, zoals
   opengeklapte brief verandert die maat niet, en waar de kaart boven de tegels
   staat (smal scherm), geldt ze niet.
 
-Eerder werden naast het register een raster van ticketpassen, glaskaarten op
-de herofoto en de kaarten van /tickets bekeken; het register won toen omdat het
-met en zonder foto's werkte. Het streepjesvlak lost dat nu op binnen de tegel.
-De band is lichtblauw (`--paper-2`), dus de strakke naad onder de donkere zone
-is een naad tussen donker en lichtblauw, en de openingsuren sluiten er navy op
-aan. Zonder berichten, of met de band uit, valt hij helemaal weg en staat alles
+Eerder werden naast het register een raster van ticketpassen en de kaarten
+van /tickets bekeken; het register won toen omdat het met en zonder foto's
+werkte. Het streepjesvlak lost dat nu op binnen de tegel. De band is
+lichtblauw (`--paper-2`), en de openingsuren sluiten er navy op aan. Zonder berichten, of met de band uit, valt hij helemaal weg en staat alles
 zoals voordien.
 
 **Half automatisch.** Wat iemand zelf schrijft (een mededeling, een woordje van
@@ -11318,15 +10831,12 @@ studieprofiel (`lib/calendar/audienceProfile.ts`).
 
 Tijdens een autorisatievoorbeeld blokkeert `proxy.ts` elke POST, behalve de
 stoproute. Twee dingen liepen daardoor vast. De balk met "Voorbeeld stoppen"
-stond in de flow onder de kop, en op de homepage schuift de hero onder de
-transparante kop door: die dekte de balk af en de kop verloor haar donkere
-achtergrond. En uitloggen is een server action, dus een 403 en een crashende
-pagina.
+stond in de flow onder de kop, waar ze afgedekt kon raken. En uitloggen is een
+server action, dus een 403 en een crashende pagina.
 
 - **De balk zweeft onderaan** (`.vtk-preview-bar`), op elke pagina en bij
   elke scrollpositie. De cookiekeuze en de onderkant van de pagina schuiven mee
-  omhoog. Bovenaan in de kop was ook een optie, maar dan moest de homepagehero
-  de hoogte van een balk kennen die er meestal niet is.
+  omhoog.
 - **Uitloggen loopt tijdens een voorbeeld via de stoproute** (`logout=1`): die
   wist het voorbeeld en logt daarna uit. De proxy blijft zo streng als ze was;
   er komt geen tweede uitzondering bij.
@@ -11334,7 +10844,7 @@ pagina.
 ## De site op 90% op een laptop tot 14 inch
 
 Op een MacBook Air 13" en een MacBook Pro 14" oogde de site op 100% te groot
-(de hero, de koppen, de knoppen), en na één keer Ctrl - net goed. Dat is nu de
+(de koppen, de knoppen), en na één keer Ctrl - net goed. Dat is nu de
 standaard: `zoom: 0.9` op de hele pagina (`vtk-base.css`), vanaf 15 inch blijft
 alles op 100%.
 

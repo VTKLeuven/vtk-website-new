@@ -61,8 +61,8 @@ export const RADIUS = {
 
 /**
  * De lettertypes zoals ze bij `useFonts` geladen worden. Inter draagt alles;
- * Instrument Serif bestaat enkel als cursief accent in de hero, precies zoals op
- * de site. Gebruik het niet voor gewone interfacetekst.
+ * Instrument Serif bestaat enkel als cursief accent in de kop van het
+ * beginscherm. Gebruik het niet voor gewone interfacetekst.
  */
 export const FONTS = {
   regular: 'Inter_400Regular',

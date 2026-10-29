@@ -450,8 +450,6 @@ export type AppPartner = {
 };
 
 export type AppHome = {
-  /** De foto van de hero, beheerd via de voorpagina-instellingen. */
-  heroPhotoUrl: string | null;
   openingHours: {
     theokot: AppOpeningHours;
     cursusdienst: AppOpeningHours;

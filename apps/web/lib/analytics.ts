@@ -249,7 +249,7 @@ export const OUTBOUND_EVENT = "externe-link";
 export const DOWNLOAD_EVENT = "download";
 /** Een aftermovie die afgespeeld wordt. */
 export const AFTERMOVIE_EVENT = "aftermovie";
-/** Een klik op de homepage: quicklink, aanbodkaart, hero-knop. */
+/** Een klik op de homepage, bv. op een aanbodkaart. */
 export const HOME_LINK_EVENT = "homepage-link";
 /** Een zoekopdracht die niets opleverde. */
 export const SEARCH_EMPTY_EVENT = "zoeken-zonder-resultaat";

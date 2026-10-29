@@ -42,8 +42,7 @@ export async function eventIsVisible(eventId: string): Promise<boolean> {
  * De ster in de app staat voor het evenement als geheel.
  *
  * Bij een evenement met losse momenten (een loopweek) betekent dat: alle dagen
- * tegelijk. Per dag aanduiden kan op de site, in het weekoverzicht en op de
- * eventpagina; de app kent die momenten nog niet en mag er daarom ook geen
+ * tegelijk. Per dag aanduiden kan op de eventpagina van de site; de app kent die momenten nog niet en mag er daarom ook geen
  * halve toestand van maken. Zie `CalendarEventInterest.momentStart`.
  */
 export async function setEventInterest(

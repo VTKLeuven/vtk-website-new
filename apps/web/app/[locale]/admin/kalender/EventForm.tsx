@@ -56,8 +56,6 @@ type Event = {
   categoryIds?: string[];
   /** Hangt er al een logistiek-evenement aan? Zie `UitleenEvent.calendarEventId`. */
   hasUitleenEvent?: boolean;
-  /** Voorrang of uitsluiting in het weekoverzicht op de homepage. */
-  heroWeek?: 'AUTO' | 'PINNED' | 'HIDDEN';
 };
 
 type Group = { id: string; nameNl: string; nameEn: string };
@@ -185,7 +183,6 @@ export function EventForm({
   siteDefaultImage,
   canCreateTickets = false,
   canManageCategories = false,
-  canHeroWeek = false,
 }: {
   event: Event;
   groups: Group[];
@@ -201,11 +198,6 @@ export function EventForm({
   canCreateTickets?: boolean;
   /** Geeft bij een lege keuzelijst een rechtstreekse link naar categoriebeheer. */
   canManageCategories?: boolean;
-  /**
-   * Toont de keuze voor het weekoverzicht op de homepage (`calendar.heroWeek`).
-   * Zonder die permissie staat het veld er niet, en negeert de action het ook.
-   */
-  canHeroWeek?: boolean;
 }) {
   const nl = locale === 'nl';
   const base = nl ? '' : '/en';
@@ -298,8 +290,7 @@ export function EventForm({
     event.url ||
       event.registrationNewsAt ||
       event.urlLabelNl ||
-      event.urlLabelEn ||
-      (canHeroWeek && event.heroWeek && event.heroWeek !== 'AUTO')
+      event.urlLabelEn
   );
 
   const checklistItems = [
@@ -788,17 +779,16 @@ export function EventForm({
       </Section>
 
       {/* De rest is per evenement zelden nodig: de URL-naam ontstaat vanzelf uit
-          de titel, de meeste events hebben geen externe link, en het
-          weekoverzicht staat goed op automatisch. Dicht dus, maar wel op het
-          scherm zelf en niet op een tweede tabblad. */}
+          de titel en de meeste events hebben geen externe link. Dicht dus, maar
+          wel op het scherm zelf en niet op een tweede tabblad. */}
       <details className="vtk-ef-more" open={hasMoreSettings}>
         <summary>
           <span>
             <b>{nl ? 'Meer instellingen' : 'More settings'}</b>
             <small>
               {nl
-                ? `URL-naam, externe link en knoptekst${canHeroWeek ? ', weekoverzicht op de homepage' : ''}`
-                : `URL name, external link and button text${canHeroWeek ? ', week overview on the home page' : ''}`}
+                ? 'URL-naam, externe link en knoptekst'
+                : 'URL name, external link and button text'}
             </small>
           </span>
           <span className="chev" aria-hidden>
@@ -893,24 +883,6 @@ export function EventForm({
                 : 'The event then appears as "Sign-ups" in the news band until it starts. Only for a published event with a link. If you sell VTK tickets, you do not need this: ticket sales appear in the news by themselves.'}
             </p>
           </div>
-
-          {canHeroWeek ? (
-            <div>
-              <Label htmlFor="heroWeek">
-                {nl ? 'Weekoverzicht op de homepage' : 'Week overview on the home page'}
-              </Label>
-              <Select id="heroWeek" name="heroWeek" defaultValue={event.heroWeek ?? 'AUTO'}>
-                <option value="AUTO">{nl ? 'Automatisch' : 'Automatic'}</option>
-                <option value="PINNED">{nl ? 'Voorrang geven' : 'Give priority'}</option>
-                <option value="HIDDEN">{nl ? 'Niet tonen' : 'Do not show'}</option>
-              </Select>
-              <p className="vtk-ef-hint">
-                {nl
-                  ? 'Het overzicht toont hoogstens drie evenementen per dag en tien in totaal. Voorrang zet dit evenement vooraan op zijn dag; niet tonen houdt het van de homepage zonder het uit de kalender te halen.'
-                  : 'The overview shows at most three events per day and ten in total. Priority puts this event first on its day; do not show keeps it off the home page without removing it from the calendar.'}
-              </p>
-            </div>
-          ) : null}
         </div>
       </details>
     </SaveForm>

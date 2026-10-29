@@ -14,7 +14,7 @@
 }
 
 /* The whole gallery sits on the navy media-band, so surfaces are dark glass and
-   copy is light; tokens follow the on-dark recipe from the homepage hero. */
+   copy is light; tokens follow the on-dark recipe of the navy bands. */
 .vtk-media-aftermovie-viewport {
   position: relative;
   display: grid;

@@ -2,8 +2,8 @@
  * Welke berichten er in de Nieuws-band op de homepage staan, en welk er
  * uitgelicht wordt.
  *
- * Bewust een pure module zonder database en zonder React, net als
- * `lib/calendar/heroWeek.ts`: dit zijn de regels van de kring, en die wil je
+ * Bewust een pure module zonder database en zonder React: dit zijn de regels
+ * van de kring, en die wil je
  * kunnen testen zonder een homepage te renderen. Het lezen gebeurt in
  * `load.ts`, het tekenen in `components/editorial/NewsBand.tsx`.
  *
@@ -48,7 +48,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /**
  * Zo lang staat een geopende ticketverkoop in het nieuws. Twee weken: lang
  * genoeg dat wie maar af en toe langskomt het ziet, kort genoeg dat het nieuws
- * blijft. Daarna staat het event nog op /tickets en in het weekoverzicht.
+ * blijft. Daarna staat het event nog op /tickets en in de kalender.
  */
 export const TICKETS_NEWS_DAYS = 14;
 

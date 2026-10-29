@@ -133,8 +133,8 @@ export async function interestTotal(eventId: string): Promise<number> {
 /**
  * De momenten van dit evenement die dit lid aanduidde, als ISO-startinstant.
  *
- * Een lijst van strings en geen `Date[]`: hiermee wordt in het weekoverzicht en
- * op de eventpagina per rij beslist of de ster vol staat, en die componenten
+ * Een lijst van strings en geen `Date[]`: hiermee wordt op de eventpagina per
+ * rij beslist of de ster vol staat, en die componenten
  * draaien in de browser.
  */
 export async function viewerMomentStarts(

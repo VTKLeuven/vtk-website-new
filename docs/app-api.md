@@ -90,8 +90,7 @@ een knop die er niet is.
 ### `GET /api/app/v1/vandaag`
 
 Het beginscherm van de app. Bewust een eigen route naast `/home`: die laatste is
-de voorpagina van de site in gegevensvorm (fotohero, aftermovies, career,
-partners) en blijft staan zolang er toestellen op de oudere versie van de app
+de voorpagina van de site in gegevensvorm (aftermovies, career, partners) en blijft staan zolang er toestellen op de oudere versie van de app
 zitten. `/vandaag` beantwoordt de twee vragen waarmee iemand zijn telefoon
 bovenhaalt: **wat is er open** en **wat wacht er op mij**.
 
@@ -125,7 +124,7 @@ verzenden, wanneer Expo een token als `DeviceNotRegistered` afkeurt.
 
 De homepage-inhoud, de agenda en één evenement. Alle drie bovenop de helpers die
 de site zelf gebruikt (`readOpeningHoursSetting`, `getCursusdienstHours`,
-`readBarStatus`, `resolveFrontpage`, `loadCalendarEvent`), zodat de openingsuren
+`readBarStatus`, `loadCalendarEvent`), zodat de openingsuren
 en de doelgroepfilter niet twee keer berekend worden.
 
 De kalender filtert op `end >= nu` en niet op `start`: anders verdwijnt een

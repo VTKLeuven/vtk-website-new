@@ -63,9 +63,7 @@ const RESOURCE_PERMISSIONS = {
   pages: ["pages.edit", "pages.editAll", "pages.manage", "pages.publish", "pages.delete"],
   navigation: ["header.manage", "pages.manage"],
   announcements: ["announcements.manage"],
-  // `calendar.heroWeek` staat erbij omdat wie het weekoverzicht op de homepage
-  // samenstelt precies deze lijst nodig heeft; het gaat om gepubliceerde events.
-  calendar: ["calendar.create", "calendar.manageAll", "calendar.heroWeek"],
+  calendar: ["calendar.create", "calendar.manageAll"],
   tickets: ["tickets.create", "tickets.manageAll"],
   ticket_orders: ["tickets.manageAll"],
   forms: ["forms.create", "forms.manageAll"],

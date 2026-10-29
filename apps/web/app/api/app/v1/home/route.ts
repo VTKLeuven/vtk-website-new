@@ -12,8 +12,6 @@ import {
   getDefaultEventImages,
 } from "@/lib/defaultEventImage";
 import { readBarStatus } from "@/lib/elixir/status";
-import { frontpagePhoto } from "@/lib/frontpage/registry";
-import { resolveFrontpage } from "@/lib/frontpage/resolve";
 import { getMediaContent } from "@/lib/media-content";
 import {
   entriesForService,
@@ -23,7 +21,6 @@ import {
   type OpeningHoursService,
 } from "@/lib/openingHoursSettings";
 import { getCurrentSession } from "@/lib/session";
-import { publicUrl } from "@/lib/storage";
 import { videoEmbed } from "@/lib/videoEmbed";
 import { currentWorkingYear } from "@/lib/workingYear";
 import { entryForDate, isClosedHours, isOpenAt } from "@/components/editorial/hoursUtils";
@@ -75,7 +72,7 @@ export async function GET(request: Request) {
     const locale = appLocaleFrom(url.searchParams.get("locale"));
     const now = new Date();
 
-    const [settings, session, cursusEntries, barStatus, media, frontpage, partners] =
+    const [settings, session, cursusEntries, barStatus, media, partners] =
       await Promise.all([
         prisma.setting.findMany({
           where: {
@@ -95,7 +92,6 @@ export async function GET(request: Request) {
         getCursusdienstHours(locale === "en" ? "en" : "nl"),
         readBarStatus(now),
         getMediaContent(),
-        resolveFrontpage(now),
         prisma.partner.findMany({
           where: { active: true },
           orderBy: [{ order: "asc" }, { name: "asc" }],
@@ -169,11 +165,6 @@ export async function GET(request: Request) {
     const career = map.get("home.career") as CareerSetting | undefined;
 
     const payload: AppHome = {
-      heroPhotoUrl: absoluteUrl(
-        request,
-        frontpagePhoto(frontpage.module, publicUrl(frontpage.values.photo)),
-      ),
-
       openingHours: {
         theokot: hoursFor(map, "theokot", locale, now),
         elixir: hoursFor(map, "elixir", locale, now),

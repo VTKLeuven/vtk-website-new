@@ -36,7 +36,7 @@ export const dynamic = "force-dynamic";
  * Het beginscherm van de app: **vandaag**.
  *
  * Bewust niet hetzelfde als `/home`. Die route is de voorpagina van de site in
- * gegevensvorm (fotohero, aftermovies, career, partners) en blijft staan zolang
+ * gegevensvorm (aftermovies, career, partners) en blijft staan zolang
  * er toestellen op de vorige versie van de app zitten. Deze route beantwoordt de
  * twee vragen waarmee iemand zijn telefoon bovenhaalt: **wat is er open** en
  * **wat wacht er op mij**.

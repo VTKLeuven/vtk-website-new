@@ -1399,7 +1399,7 @@
   color: var(--ink);
 }
 
-/* Op de donkere band keert de primaire knop om, net als op de hero. */
+/* Op de donkere band keert de primaire knop om. */
 .vtk-design .page-head-tools .subscribe-compact {
   flex: none;
   margin: 0;

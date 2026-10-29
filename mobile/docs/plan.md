@@ -157,7 +157,7 @@ app". Concreet:
 `--paper-2 #E6ECF5`, `--surface #FFFFFF`, `--ink #0A0F1F`, `--navy #0E1A36`,
 `--yellow #FFD23F`, `--muted #5C667F`, `--body #34405E`, `--on-dark-muted #B7C0DC`,
 `--line`). Dat bestand komt in de "Gekopieerd uit"-tabel. Verder: Inter voor alles,
-Instrument Serif enkel als cursief accent in de hero, kaarten wit met een dunne
+Instrument Serif enkel als spaarzaam cursief accent, kaarten wit met een dunne
 navy-getinte rand en 16-22px hoeken, geel enkel als accent, geen gradiënten en
 geen decoratie.
 
@@ -173,9 +173,6 @@ geen decoratie.
   lichte titel, `--on-dark-muted` ondertitel) wordt `<PageHead>` in de app en
   opent elk scherm buiten Home. Dat is precies de bestaande regel "er is één
   soort pagina-opener".
-- **De homepage houdt haar hero**: foto onder een navy scrim, zwaarst
-  linksboven, licht opschrift met het gele cursieve serif-accent. Op de site is
-  de homepage de enige met een fotohero; in de app blijft dat zo.
 - **De bandenritmiek wordt een verticale stapel.** De afwisseling navy /
   lichtblauw / papier van de homepage blijft, want ze is de reden dat de pagina
   ritme heeft; op een telefoonbreedte is elke band gewoon een sectie op volle
@@ -226,8 +223,7 @@ De eerste echt bruikbare release.
 - `GET /api/app/v1/home` — de payload van `HomeEditorial`, opgebouwd uit de
   helpers die er al zijn: `readOpeningHoursSetting` / `entriesForService` /
   `openingHoursNote`, `getCursusdienstHours`, `readBarStatus` +
-  `openingWindowPhase`, `getMediaContent` (aftermovies), `resolveFrontpage` +
-  `frontpagePhoto`, de partners, en de komende events met dezelfde
+  `openingWindowPhase`, `getMediaContent` (aftermovies), de partners, en de komende events met dezelfde
   doelgroepfilter (`viewerAudiences` + `audienceFilter`) zodat de app geen
   eerstejaarsevent toont aan wie het op de site niet ziet. Jouw POC's enkel voor
   een ingelogd lid met studierichtingen.
@@ -499,7 +495,7 @@ het anders misloopt. Tickets die in verkoop gaan, halen die drempel bewust niet.
 ### Fase 6 - De app wordt een app
 
 De aanleiding: de app was inhoudelijk compleet maar voelde als de site in een
-tabbalk. De hero, de aftermovies, career en de partners stonden vooraan, en wat
+tabbalk. De aftermovies, career en de partners stonden vooraan, en wat
 je met een telefoon in je hand doet stond eronder. Deze fase draait dat om.
 
 **De onderbalk werd Home · Kalender · Tickets · Broodjes · Meer.** Elk van die

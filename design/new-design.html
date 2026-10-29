@@ -45,78 +45,11 @@
   .btn .a{transition:transform .2s} .btn:hover .a{transform:translate(2px,-2px)}
   .btn-ghost{background:transparent; color:var(--ink); border:1px solid var(--line-2);}
 
-  /* ============ HERO ============ */
-  .hero{
-    max-width:1320px; margin:0 auto; padding:88px 36px 72px;
-    display:grid; grid-template-columns: 1.2fr 1fr; gap:64px; align-items:start;
-  }
+  /* ============ SHARED ============ */
   .eyebrow{font-size:13px; color:var(--muted); display:flex; align-items:center; gap:10px;}
   .eyebrow .dot{width:6px;height:6px;border-radius:50%; background:var(--yellow);}
-  h1{
-    font-family:'Inter',sans-serif; font-weight:600;
-    font-size: clamp(48px, 6.5vw, 92px); letter-spacing:-.035em; line-height:.98;
-    margin:18px 0 0; color:var(--ink);
-  }
-  h1 .serif{ color:var(--navy); }
-  .hero-sub{
-    max-width:46ch; margin:28px 0 0; font-size:17px; line-height:1.55; color:#34405E;
-  }
-  .hero-cta{display:flex; gap:10px; margin-top:32px;}
-  .hero-meta{
-    margin-top:56px; display:flex; gap:48px; padding-top:24px; border-top:1px solid var(--line);
-  }
   .meta .k{font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted);}
   .meta .v{font-weight:600; font-size:22px; letter-spacing:-.02em; margin-top:6px;}
-
-  /* ============ CALENDAR ============ */
-  .cal{
-    background:#fff; border:1px solid var(--line); border-radius:18px; padding:24px;
-  }
-  .cal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;}
-  .cal-head h3{margin:0; font-size:16px; font-weight:600; letter-spacing:-.01em;}
-  .cal-head .sub{font-size:12px; color:var(--muted); margin-top:2px;}
-  .cal-head .all{font-size:13px; color:var(--navy); border-bottom:1px solid var(--navy); padding-bottom:1px;}
-
-  .agenda{margin-top:22px; display:flex; flex-direction:column;}
-  .day-group{padding:14px 0; border-top:1px solid var(--line);}
-  .day-group:first-of-type{border-top:0; padding-top:0;}
-  .day-label{
-    display:flex; align-items:baseline; gap:10px; margin-bottom:8px;
-  }
-  .day-label .num{font-weight:600; font-size:20px; letter-spacing:-.02em;}
-  .day-label .dow{font-size:12px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted);}
-  .day-label .today{font-size:11px; padding:2px 8px; background:var(--yellow); color:var(--ink); border-radius:999px; font-weight:600; letter-spacing:.04em;}
-  .ev{
-    display:grid; grid-template-columns: 56px 1fr auto; gap:14px; align-items:center;
-    padding:10px 0; cursor:pointer; transition:transform .15s;
-  }
-  .ev:hover{transform:translateX(2px)}
-  .ev .t{font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums;}
-  .ev .n{font-weight:500; font-size:15px; letter-spacing:-.005em;}
-  .ev .n small{display:block; font-weight:400; color:var(--muted); font-size:12.5px; margin-top:2px;}
-  .ev .arrow{color:var(--muted); transition:color .2s, transform .2s;}
-  .ev:hover .arrow{color:var(--ink); transform:translateX(2px)}
-  .ev.featured .n{font-weight:600;}
-  .ev.featured .t{color:var(--ink);}
-  .pin{display:inline-block; width:6px;height:6px;border-radius:50%;background:var(--yellow); margin-right:6px;vertical-align:middle;}
-
-  /* ============ QUICK LINKS ROW ============ */
-  .quick{
-    max-width:1320px; margin:0 auto 0; padding:0 36px;
-  }
-  .quick-row{
-    border-top:1px solid var(--line); border-bottom:1px solid var(--line);
-    display:grid; grid-template-columns:repeat(6,1fr);
-  }
-  .ql{
-    padding:22px 18px; border-right:1px solid var(--line);
-    display:flex; flex-direction:column; gap:6px; transition:background .2s;
-  }
-  .ql:last-child{border-right:0;}
-  .ql:hover{background:rgba(255,210,63,.12)}
-  .ql .k{font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted);}
-  .ql .v{font-weight:600; font-size:16px; letter-spacing:-.01em;}
-  .ql .m{font-size:12px; color:var(--muted);}
 
   /* ============ SECTION ============ */
   .section{max-width:1320px; margin:0 auto; padding:120px 36px 0;}
@@ -211,87 +144,6 @@
     </div>
   </div>
 </header>
-
-<!-- HERO -->
-<section class="hero">
-  <div>
-    <div class="eyebrow"><span class="dot"></span> Vlaamse Technische Kring · KU Leuven</div>
-    <h1>The home for <span class="serif">engineers</span><br/>in Leuven.</h1>
-    <p class="hero-sub">Events, courses, careers and a daily broodje. Run by students, since 1920 — for everyone studying engineering &amp; engineering technology.</p>
-    <div class="hero-cta">
-      <a href="#" class="btn">Become a member <span class="a">↗</span></a>
-      <a href="#" class="btn btn-ghost">First-year? Start here</a>
-    </div>
-    <div class="hero-meta">
-      <div class="meta"><div class="k">Members</div><div class="v">2,840+</div></div>
-      <div class="meta"><div class="k">This week</div><div class="v">14 events</div></div>
-      <div class="meta"><div class="k">Since</div><div class="v">1920</div></div>
-    </div>
-  </div>
-
-  <!-- CALENDAR — quiet agenda list -->
-  <aside class="cal">
-    <div class="cal-head">
-      <div>
-        <h3>Upcoming events</h3>
-        <div class="sub">Week 21 · Tuesday 19 → Sunday 24 May</div>
-      </div>
-      <a href="#" class="all">Full calendar</a>
-    </div>
-
-    <div class="agenda">
-      <div class="day-group">
-        <div class="day-label">
-          <span class="num">19</span><span class="dow">Tuesday</span><span class="today">today</span>
-        </div>
-        <div class="ev featured">
-          <div class="t">20:00</div>
-          <div class="n"><span class="pin"></span>TD Quantum — VTK × Industria<small>Albatros · €5 presale · 1,200 going</small></div>
-          <span class="arrow">→</span>
-        </div>
-      </div>
-
-      <div class="day-group">
-        <div class="day-label"><span class="num">20</span><span class="dow">Wednesday</span></div>
-        <div class="ev">
-          <div class="t">12:30</div>
-          <div class="n">Burgie-info session, Year 2<small>Aula De Molen · broodjes included</small></div>
-          <span class="arrow">→</span>
-        </div>
-      </div>
-
-      <div class="day-group">
-        <div class="day-label"><span class="num">21</span><span class="dow">Thursday</span></div>
-        <div class="ev">
-          <div class="t">19:30</div>
-          <div class="n">Doopcantus — Wina &amp; VTK<small>Alma 2 · 4 spots left</small></div>
-          <span class="arrow">→</span>
-        </div>
-      </div>
-
-      <div class="day-group">
-        <div class="day-label"><span class="num">22</span><span class="dow">Friday</span></div>
-        <div class="ev">
-          <div class="t">18:00</div>
-          <div class="n">Galabal ticket drop + apéro<small>'t Elixir</small></div>
-          <span class="arrow">→</span>
-        </div>
-      </div>
-    </div>
-  </aside>
-</section>
-
-<!-- QUICK LINKS — single row, no bento -->
-<section class="quick">
-  <div class="quick-row">
-    <a class="ql" href="#"><span class="k">Eat</span><span class="v">Theokot</span><span class="m">Open · 11:30–14:00</span></a>
-    <a class="ql" href="#"><span class="k">Books</span><span class="v">Cursusdienst</span><span class="m">14 new this week</span></a>
-    <a class="ql" href="#"><span class="k">Second-hand</span><span class="v">Tweedehands</span><span class="m">Buy &amp; sell</span></a>
-    <a class="ql" href="#"><span class="k">Work</span><span class="v">Shiften</span><span class="m">3 shifts open</span></a>
-    <a class="ql" href="#"><span class="k">Reserve</span><span class="v">Tijdsloten</span><span class="m">Study rooms</span></a>
-    <a class="ql" href="#"><span class="k">Calendar</span><span class="v">Kalender</span><span class="m">All events</span></a>
-  </div>
-</section>
 
 <!-- AANBOD -->
 <section class="section">

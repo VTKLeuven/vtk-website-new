@@ -7,8 +7,8 @@ import { ChevronDown } from "lucide-react";
  * Een beheerkaart die dichtgeklapt begint: de kop (naam, status, een korte
  * samenvatting) staat altijd in beeld, de velden pas na een klik.
  *
- * Voor een lijst van blokken die samen meer dan een schermhoogte innemen (de
- * frontpages, de slogans): open was dat een muur van formulieren waarin je het
+ * Voor een lijst van blokken die samen meer dan een schermhoogte innemen: open
+ * was dat een muur van formulieren waarin je het
  * blok dat je zocht niet meer terugvond. Zie CLAUDE.md, "Admin".
  *
  * De inhoud wordt pas gemount wanneer de kaart voor het eerst opengaat, en blijft
@@ -34,7 +34,7 @@ export function AdminDisclosure({
   defaultOpen?: boolean;
   /**
    * `card` staat op zichzelf op de pagina; `row` is een item binnen een kaart
-   * (een slogan in de lijst), met enkel een rand: geen kaart in een kaart.
+   * (een rij in een lijst), met enkel een rand: geen kaart in een kaart.
    */
   variant?: "card" | "row";
   className?: string;

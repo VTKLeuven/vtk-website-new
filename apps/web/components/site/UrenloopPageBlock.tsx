@@ -1,6 +1,6 @@
 import type { Locale } from "@vtk/i18n";
 import { countdownParts } from "@/lib/countdown";
-import { Countdown } from "@/components/editorial/frontpage/Countdown";
+import { Countdown } from "@/components/site/Countdown";
 import type { PublicUrenloopState } from "@/lib/urenloop/stats";
 
 function formatKm(km: number, nl: boolean): string {

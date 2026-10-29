@@ -72,7 +72,6 @@ export const AUDIT_ENTITIES = {
   newsPost: { nl: "Nieuwsbericht", en: "News post", group: "home" },
   news: { nl: "Nieuws", en: "News", group: "home" },
   home: { nl: "Homepagina", en: "Homepage", group: "home" },
-  frontpage: { nl: "Frontpage", en: "Front page", group: "home" },
   urenloop: { nl: "24 urenloop", en: "24-hour run", group: "home" },
   linkPage: { nl: "Linktree", en: "Linktree", group: "home" },
   partner: { nl: "Partner", en: "Partner", group: "home" },

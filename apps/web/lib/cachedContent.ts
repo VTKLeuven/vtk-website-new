@@ -36,9 +36,6 @@ import { getMediaContent } from "@/lib/media-content";
  * velden die JSON overleven (strings, getallen, booleans, JSON-kolommen). Voeg
  * je een veld toe, controleer dan of het geen `Date` is; hoort er toch een datum
  * bij, wek ze dan expliciet weer op met `new Date(...)` na het lezen.
- *
- * Om dezelfde reden staat `resolveFrontpage` hier niet: die geeft een
- * registry-module terug en vergelijkt datums, en ze kost één kleine query.
  */
 
 /**
@@ -121,7 +118,7 @@ const cachedPartners = unstable_cache(
       where: { active: true },
       orderBy: [{ order: "asc" }, { name: "asc" }],
       take: 12,
-      // Precies de velden van `FrontpagePartner`; zie components/editorial/frontpage/context.tsx.
+      // Precies de velden die de partnerbalk op de homepage toont.
       select: { id: true, name: true, logoKey: true, url: true },
     }),
   ["site", "partners"],

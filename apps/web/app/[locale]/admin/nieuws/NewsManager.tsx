@@ -235,8 +235,8 @@ export function NewsManager({
           <h1 className="text-2xl font-semibold">{nl ? "Nieuws" : "News"}</h1>
           <p className="mt-1 text-sm text-zinc-500">
             {nl
-              ? "De band tussen de snelle links en de openingsuren op de homepage. Ticketverkoop, inschrijvingen, het Bakske, Ir.Reëel en nieuwe fotoalbums komen er vanzelf in; een mededeling of een woordje van de praeses schrijf je hier."
-              : "The band between the quick links and the opening hours on the homepage. Ticket sales, sign-ups, Het Bakske, Ir.Reëel and new photo albums appear by themselves; a notice or a word from the praeses is written here."}
+              ? "De band bovenaan de homepage, boven de openingsuren. Ticketverkoop, inschrijvingen, het Bakske, Ir.Reëel en nieuwe fotoalbums komen er vanzelf in; een mededeling of een woordje van de praeses schrijf je hier."
+              : "The band at the top of the homepage, above the opening hours. Ticket sales, sign-ups, Het Bakske, Ir.Reëel and new photo albums appear by themselves; a notice or a word from the praeses is written here."}
           </p>
         </div>
         {editing ? null : (
@@ -590,8 +590,8 @@ export function NewsManager({
             </label>
             <p className="mt-1 text-xs text-[#5c667f]">
               {nl
-                ? "Staat de band uit, of is er geen enkel bericht, dan sluiten de openingsuren weer aan op de snelle links."
-                : "When the band is off, or there is no post at all, the opening hours follow the quick links directly again."}
+                ? "Staat de band uit, of is er geen enkel bericht, dan begint de homepage met de openingsuren."
+                : "When the band is off, or there is no post at all, the homepage starts with the opening hours."}
             </p>
           </div>
 

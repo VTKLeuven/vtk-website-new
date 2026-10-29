@@ -40,17 +40,7 @@ export function TrashIcon() {
   );
 }
 
-/** Voorrang: dit evenement staat vooraan op zijn dag in het weekoverzicht. */
-export function PinIcon() {
-  return (
-    <Icon>
-      <path d="M12 17v5" />
-      <path d="M9 10.5V4h6v6.5l3 3.5H6l3-3.5Z" />
-    </Icon>
-  );
-}
-
-/** Niet tonen: wel in de kalender, niet op de homepage. */
+/** Niet tonen: bestaat wel, maar staat niet in beeld. */
 export function EyeOffIcon() {
   return (
     <Icon>
@@ -110,7 +100,7 @@ export function LinkIcon() {
 /**
  * De ster van "ik kom". Gevuld betekent aangeduid, leeg betekent niet
  * aangeduid: dat onderscheid moet in het icoon zelf zitten en niet enkel in een
- * tooltip, want in het weekoverzicht staan er zes onder elkaar.
+ * tooltip, want in een lijst staan er meerdere onder elkaar.
  */
 export function StarIcon({ filled = false }: { filled?: boolean } = {}) {
   return (

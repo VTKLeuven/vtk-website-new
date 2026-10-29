@@ -4,8 +4,8 @@ import { z } from "zod";
  * De cijfers en instellingen van de 24 urenloop op vtk.be.
  *
  * Zuivere types, validatie en regels zonder server-imports, zodat zowel de
- * API-route (`/api/24ul-app/stats`), de publieke componenten (`UrenloopFrontpage`
- * en `PageView`) als de tests dezelfde logica gebruiken.
+ * API-route (`/api/24ul-app/stats`), de publieke component (`PageView`) als de
+ * tests dezelfde logica gebruiken.
  */
 
 export const URENLOOP_CONFIG_KEY = "urenloop.config";
@@ -280,7 +280,7 @@ export type PublicUrenloopState =
     };
 
 /**
- * Wat de publieke site (`UrenloopFrontpage` en `[[24urenloop]]`) op dit moment
+ * Wat de publieke site (`[[24urenloop]]`) op dit moment
  * moet tonen, of `null` wanneer er geen editie gepland is of `showResultsUntil`
  * voorbij is.
  *

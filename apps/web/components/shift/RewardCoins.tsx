@@ -4,7 +4,7 @@ import './shift-board.css';
  * De beloning van een shift: het aantal bonnen als cijfer, met muntjes ernaast.
  *
  * Eén tekening voor de hele site: de shiftkaartjes op de homepage
- * (`FrontpageShiftBand`) en de agenda op /shift laden allebei `shift-board.css`
+ * (`HomeShiftBand`) en de agenda op /shift laden allebei `shift-board.css`
  * en gebruiken allebei dit component. Daar stonden een muntje en een
  * ticket-icoontje naast elkaar voor precies hetzelfde ding.
  *

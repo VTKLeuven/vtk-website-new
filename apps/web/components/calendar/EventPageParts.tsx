@@ -402,8 +402,8 @@ export function EventWhenBlock({
   const nl = locale === "nl";
   const base = nl ? "" : "/en";
   const title = pick(event.titleNl, event.titleEn, locale);
-  // Dezelfde handeling als de ster in het weekoverzicht, maar over één dag van
-  // de reeks; daarom dezelfde teksten met "die dag" erin.
+  // Dezelfde handeling als de ster op een eventkaart, maar over één dag van de
+  // reeks; daarom dezelfde teksten met "die dag" erin.
   const momentStarLabels = {
     mark: nl ? "Ik kom die dag" : "I am coming that day",
     marked: nl ? "Je komt die dag" : "You are coming that day",

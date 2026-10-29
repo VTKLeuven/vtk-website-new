@@ -14,7 +14,6 @@ die statistieken toestonden), uit Playwright met een gesimuleerde telefoon
 | JavaScript op de homepage (gzip) | 402 KB | 222 KB |
 | JavaScript op /kalender | 395 KB | 219 KB |
 | JavaScript op een contentpagina | 407 KB | 231 KB |
-| Hero-foto op mobiel | 1,5 MB (JPEG, CSS-achtergrond) | 287 KB (WebP, preload) |
 | Fonts die elke pagina vooraf laadt | 5 (130 KB) | 2 |
 | Prefetches per paginaweergave | 13 tot 42 | 0 tot er iemand een link aanwijst |
 | CLS op /kalender (p75 laptop, echte bezoekers) | 0,54 | de pagina rendert de eerste maand al op de server |
@@ -67,15 +66,9 @@ elke pagina. Oorzaken en oplossingen:
   `optimizePackageImports` in `next.config.ts` laat de bundler enkel laden wat
   gebruikt wordt.
 - Clientcomponenten in de gedeelde bundel die `getDictionary` riepen
-  (`PageGallery`, `FeedbackDialog`, `FrontpageShiftBand`) krijgen hun labels nu
+  (`PageGallery`, `FeedbackDialog`, `HomeShiftBand`) krijgen hun labels nu
   van de server of laden pas wanneer ze openen.
 - `Markdown` wordt in clientcomponenten via `next/dynamic` geladen.
-
-### Hero-foto via `next/image` (`HomeHeroPhoto`)
-
-Als CSS-achtergrond ontdekte de browser de foto pas na de CSS en kreeg hij het
-origineel. Nu staat er een preload in de `<head>` en komt er een WebP van de
-juiste breedte.
 
 ### Timeouts op externe fetches
 

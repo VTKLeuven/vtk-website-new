@@ -214,8 +214,8 @@ function drawClassicTicket(
   }
 
   if (artwork) {
-    // Same idea as the site's hero: a full-bleed photo under a navy scrim, so
-    // uploaded artwork and the flat-colour fallback share one text treatment.
+    // A full-bleed photo under a navy scrim, so uploaded artwork and the
+    // flat-colour fallback share one text treatment.
     drawCover(page, artwork, 0, bandBottom, width, bandHeight, design.artwork?.focalX ?? 50, design.artwork?.focalY ?? 50);
     page.drawRectangle({ x: 0, y: bandBottom, width, height: bandHeight, color: bandFill, opacity: 0.72 });
   } else {

@@ -17,10 +17,8 @@ export async function AuthorizationPreviewBanner({ locale }: { locale: Locale })
   const context = [...roleNames, ...groupNames];
 
   return (
-    // Zwevend onderaan en niet meer in de flow onder de kop. Daar schoof de
-    // homepagehero (die onder de transparante kop doorloopt) eroverheen: de
-    // balk was weg en de kop verloor haar donkere achtergrond. Vast in beeld is
-    // ze op elke pagina en bij elke scrollpositie de uitweg. Zie
+    // Zwevend onderaan en niet in de flow onder de kop: vast in beeld is ze op
+    // elke pagina en bij elke scrollpositie de uitweg. Zie
     // `.vtk-preview-bar` in vtk-site-chrome.css.
     <aside className="vtk-preview-bar" role="status">
       <div className="flex flex-wrap items-center justify-between gap-3">

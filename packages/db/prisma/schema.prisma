@@ -724,7 +724,6 @@ model User {
   createdPages             Page[]                  @relation("PageCreatedBy")
   createdAnnouncements     Announcement[]          @relation("AnnouncementCreatedBy")
   createdNewsPosts         NewsPost[]              @relation("NewsPostCreatedBy")
-  updatedFrontpages        Frontpage[]             @relation("FrontpageUpdatedBy")
   createdEvents            CalendarEvent[]         @relation("EventCreatedBy")
   dashboardTiles           DashboardTile[]
   dashboardTilePrefs       UserDashboardTilePref[]
@@ -1740,55 +1739,6 @@ model NewsShown {
   @@id([source, ref])
 }
 
-/**
- * One configurable front page: the dark block at the top of the homepage.
- * Which front pages exist is decided in code, not here. Each one is its own
- * component with its own layout, free to look nothing like the others; a
- * 24-urenloop page wants lap counts, a jobfair page wants a wall of company
- * logos, and squeezing both into one shared template only produces the same page
- * with different words. See `apps/web/lib/frontpage/registry.ts`.
- * This table only carries what an admin may change without a deploy: which front
- * page is live and when, plus the values for the fields that that particular
- * component chose to expose. Hence `values` as JSON: every front page declares
- * its own fields, so there is no shared set of columns to model. A row whose
- * `layout` is no longer in the registry is ignored.
- * One row per front page (`layout` is unique). Scheduling the same event again
- * next year is a matter of moving its window, not of making a second row.
- */
-model Frontpage {
-  id String @id @default(cuid())
-
-  /**
-   * Registry id of the component this row configures ("default", "urenloop").
-   */
-  layout String @unique
-
-  /**
-   * Field values, keyed by the field names that this layout declares. Stored as
-   * strings: an image holds a storage key, a moment holds an ISO timestamp.
-   */
-  values Json @default("{}")
-
-  /**
-   * Window in which this front page takes over. Both empty means it only shows
-   * when switched on by hand. The "default" layout ignores these: it is the
-   * fallback whenever nothing else is live.
-   */
-  startsAt DateTime?
-  endsAt   DateTime?
-  /**
-   * Off = never show, whatever the window says.
-   */
-  active   Boolean   @default(false)
-
-  updatedById String?
-  updatedBy   User?    @relation("FrontpageUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([active, startsAt, endsAt])
-}
-
 model Page {
   id                    String    @id @default(cuid())
   slug                  String    @unique
@@ -1988,18 +1938,6 @@ model CalendarEvent {
   /// nooit teruggezet: bij twijfel liever geen bericht dan twee.
   announcedPushAt DateTime? @db.Timestamptz(3)
 
-  /// Voorrang of uitsluiting in het weekoverzicht op de homepage. Zie
-  /// `HeroWeekPlacement` en apps/web/lib/calendar/heroWeek.ts; enkel te zetten
-  /// met de permissie `calendar.heroWeek`.
-  heroWeek HeroWeekPlacement @default(AUTO)
-
-  /// Wanneer de post een mail kreeg dat dit evenement in het weekoverzicht van
-  /// de homepage komt terwijl het nog een concept is of nog geen eigen banner
-  /// heeft. Zelfde afspraak als `announcedPushAt` hierboven: geclaimd voor er
-  /// iets vertrekt, en nooit teruggezet, want een tweede herinnering voor
-  /// hetzelfde evenement is spam. Zie apps/web/lib/calendar/heroWeekNotice.ts.
-  heroWeekNoticeAt DateTime? @db.Timestamptz(3)
-
   /// Wanneer iemand aanduidde dat de externe link de inschrijvingen opent. Dan
   /// staat het evenement als "Inschrijvingen" in het nieuws op de homepage, tot
   /// het begint. NULL = niet aangeduid (ook voor alles van voor deze kolom).
@@ -2027,7 +1965,6 @@ model CalendarEvent {
 
   @@index([start])
   @@index([publishedAt, announcedPushAt])
-  @@index([heroWeekNoticeAt, start])
   @@index([groupId])
   @@index([searchNl], type: Gin)
   @@index([searchEn], type: Gin)
@@ -2073,24 +2010,6 @@ model CalendarEventMoment {
 
   @@index([eventId, start])
   @@index([start])
-}
-
-/// Wat dit evenement doet in het weekoverzicht van de hero op de homepage.
-///
-/// Het overzicht kiest normaal zelf: het toont de dagen van het rollende venster
-/// en kapt af op drie events per dag en tien in totaal. Deze twee uitzonderingen
-/// bestaan omdat die keuze soms fout uitpakt. `PINNED` zet een evenement vooraan
-/// op zijn dag en beschermt het tegen die kap; `HIDDEN` houdt het volledig uit
-/// het overzicht, bijvoorbeeld een interne vergadering die wel in de kalender
-/// hoort maar niet op de homepage.
-///
-/// Dit raakt **alleen** de homepage. Een verborgen evenement blijft gewoon in de
-/// kalender, in de feeds en in de app staan; dit is geen zichtbaarheidsregel en
-/// dus ook geen vervanging van een concept.
-enum HeroWeekPlacement {
-  AUTO
-  PINNED
-  HIDDEN
 }
 
 // Doelgroep waar een categorie voor staat. Een categorie zonder `audience` is een

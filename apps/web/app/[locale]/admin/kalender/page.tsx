@@ -30,9 +30,6 @@ export default async function AdminCalendar({
 
   const canAll = session.user.isSuperAdmin || hasPermission(session, "calendar.manageAll");
   const canCreate = canAll || hasPermission(session, "calendar.create");
-  // Het weekoverzicht op de homepage is een eigen permissie; zie het veld in het
-  // formulier en `setEventHeroWeekAction`.
-  const canHeroWeek = session.user.isSuperAdmin || hasPermission(session, "calendar.heroWeek");
 
   if (!canCreate) {
     return <p>{nl ? "Geen toegang." : "No access."}</p>;
@@ -190,7 +187,6 @@ export default async function AdminCalendar({
               <th className="px-4 py-2">{nl ? "Wanneer" : "When"}</th>
               <th className="px-4 py-2">Status</th>
               <th className="px-4 py-2 text-right">{nl ? "Geïnteresseerd" : "Interested"}</th>
-              {canHeroWeek ? <th className="px-4 py-2">{nl ? "Homepage" : "Home page"}</th> : null}
               <th className="px-4 py-2"></th>
             </tr>
           </thead>
@@ -200,7 +196,6 @@ export default async function AdminCalendar({
                 key={e.id}
                 locale={locale}
                 base={base}
-                canHeroWeek={canHeroWeek}
                 event={{
                   id: e.id,
                   title: e.titleNl,
@@ -208,14 +203,13 @@ export default async function AdminCalendar({
                   published: Boolean(e.publishedAt),
                   interested: e._count.interests + e._count.guestInterests,
                   when: whenLabel(e),
-                  heroWeek: e.heroWeek,
                   commu: commuFor(e.id),
                 }}
               />
             ))}
             {events.length === 0 && (
               <tr>
-                <td colSpan={canHeroWeek ? 6 : 5} className="px-4 py-8 text-center text-zinc-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-zinc-500">
                   {showPast
                     ? nl
                       ? "Geen evenementen in het verleden"

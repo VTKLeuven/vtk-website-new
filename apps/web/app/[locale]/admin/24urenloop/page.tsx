@@ -90,8 +90,8 @@ export default async function AdminUrenloopPage({
         </h1>
         <p className="mt-1 text-sm text-zinc-500">
           {nl
-            ? "Eén plek voor het startschot, de aankomst en hoe lang de eindstand na de race op de site blijft staan. Zowel de 24 urenloop-frontpage als het blok [[24urenloop]] op een inhoudspagina lezen deze uren."
-            : "One place for the start gun, the finish, and how long final standings stay on the site after the race. Both the 24-hour run front page and the [[24urenloop]] block on a content page read these times."}
+            ? "Eén plek voor het startschot, de aankomst en hoe lang de eindstand na de race op de site blijft staan. Het blok [[24urenloop]] op een inhoudspagina leest deze uren."
+            : "One place for the start gun, the finish, and how long final standings stay on the site after the race. The [[24urenloop]] block on a content page reads these times."}
         </p>
       </div>
 

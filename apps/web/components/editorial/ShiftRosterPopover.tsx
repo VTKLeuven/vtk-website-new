@@ -3,10 +3,10 @@ import type { ShiftRosterEntry } from "@/lib/shift";
 /**
  * Wie er al op een shift staat, als popover naast de vrije plaatsen.
  *
- * Eén tekening voor de homepage: de shiftkaartjes (`FrontpageShiftBand`) en de
- * shiften in de hero (`HeroShifts`) tonen allebei deze lijst. De klassen staan
- * in `vtk-home.css`; de popover verschijnt in CSS op hover en focus van de
- * omhullende `.shift-spots-wrap`, dus dit werkt ook vanuit een servercomponent.
+ * Getoond op de shiftkaartjes van de homepage (`HomeShiftBand`). De
+ * klassen staan in `vtk-home.css`; de popover verschijnt in CSS op hover en
+ * focus van de omhullende `.shift-spots-wrap`, dus dit werkt ook vanuit een
+ * servercomponent.
  *
  * `aria-hidden`, want de trigger draagt dezelfde namen in zijn `aria-label`.
  */

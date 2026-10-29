@@ -13,7 +13,6 @@ import { umamiEvent } from '@/lib/analytics';
 import { EditorialNavLinks } from './EditorialNavLinks';
 import { LocaleSwitcher } from './LocaleSwitcher';
 import { ProfileMenu } from './ProfileMenu';
-import { SiteHeaderShell } from './SiteHeaderShell';
 import { SiteSearchForm } from './SiteSearchForm';
 
 type OpeningHoursSetting = {
@@ -85,7 +84,7 @@ export async function Header({ locale }: { locale: Locale }) {
       ];
 
   return (
-    <SiteHeaderShell>
+    <header className="vtk-site-header">
       <div className="utility">
         <div className="utility-inner">
           <Link href={`${base}/theokot`} className="flex items-center gap-1.5" {...umamiEvent("openingsuren-bekeken")}>
@@ -198,6 +197,6 @@ export async function Header({ locale }: { locale: Locale }) {
           )}
         </div>
       </div>
-    </SiteHeaderShell>
+    </header>
   );
 }

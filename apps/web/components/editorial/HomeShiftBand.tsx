@@ -63,7 +63,7 @@ function ShiftLocation({ locationText }: { locationText: string }) {
   );
 }
 
-export type FrontpageShiftItem = {
+export type HomeShiftItem = {
   id: string;
   name: string;
   startTime: Date;
@@ -108,7 +108,7 @@ function formatTimeRange(start: Date, end: Date): string {
   return `${pad(start.getHours())}:${pad(start.getMinutes())} – ${pad(end.getHours())}:${pad(end.getMinutes())}`;
 }
 
-export function FrontpageShiftBand({
+export function HomeShiftBand({
   locale,
   base,
   shifts: initialShifts,
@@ -120,7 +120,7 @@ export function FrontpageShiftBand({
 }: {
   locale: Locale;
   base: string;
-  shifts: FrontpageShiftItem[];
+  shifts: HomeShiftItem[];
   postNames: PostNames;
   signedIn: boolean;
   totalOpenSpots: number;
@@ -141,7 +141,7 @@ export function FrontpageShiftBand({
   // Als er helemaal geen shiften zijn deze week en geen gepland, verberg de band
   if (shifts.length === 0 && totalOpenSpots === 0) return null;
 
-  async function handleRegister(shift: FrontpageShiftItem) {
+  async function handleRegister(shift: HomeShiftItem) {
     setRegisteringId(shift.id);
     const ok = await registerShift(shift.id, showToast, t);
     setRegisteringId(null);

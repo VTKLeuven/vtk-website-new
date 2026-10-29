@@ -87,7 +87,7 @@
 }
 
 /* Op een laptop tot 14 inch staat de hele site op 90%, zoals na één keer
-   Ctrl - : daar oogde ze op 100% te groot (koppen, knoppen, de hero), en
+   Ctrl - : daar oogde ze op 100% te groot (koppen, knoppen), en
    uitgezoomd was ze in balans. Vanaf 15 inch blijft ze op 100%.
 
    Een fysieke schermgrootte bestaat niet in CSS; de breedte in CSS-pixels komt
@@ -1113,8 +1113,8 @@
   color: var(--ink);
 }
 
-/* Accent binnen een paginatitel: dezelfde schreefloze letter als de rest. Het
-   serif-italic accent hoort op de homepage-hero en niet in elke kop. */
+/* Accent binnen een paginatitel: dezelfde schreefloze letter als de rest, geen
+   serif-italic. */
 .vtk-page-title em,
 .vtk-design .page-head h1 em {
   color: var(--navy);
@@ -1237,7 +1237,7 @@
   font-weight: 600;
 }
 
-/* Knoppen in de donkere kop draaien om, net als op de homepage-hero. */
+/* Knoppen in de donkere kop draaien om. */
 .vtk-page-head .vtk-button-primary,
 .vtk-design .page-head .vtk-button-primary {
   background: var(--surface);
@@ -1941,20 +1941,4 @@
   .vtk-design .page-head-meta {
     text-align: left;
   }
-}
-
-
-/* De interesse-teller op de homepage: op de donkere heroagenda en op de lichte
-   kaarten van "Aankomende evenementen". Enkel zichtbaar boven de drempel uit
-   lib/calendar/interest.ts. */
-.hero-ev-going {
-  display: inline-block;
-  margin-top: 4px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--yellow);
-  color: var(--ink);
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
 }

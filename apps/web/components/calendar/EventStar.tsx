@@ -12,8 +12,8 @@ import { SAVE_IDLE } from "@/lib/saveState";
  *
  * Schrijft in dezelfde tabel als de knop op de eventpagina en de ster in de app
  * (`app/actions/eventInterest.ts`), zodat een lid overal hetzelfde antwoord
- * krijgt. Hier staat bewust enkel de ster: in het weekoverzicht en op de
- * homepagekaarten is geen plaats voor de alumnivelden, en die zijn ook nergens
+ * krijgt. Hier staat bewust enkel de ster: op de homepagekaarten is geen
+ * plaats voor de alumnivelden, en die zijn ook nergens
  * verplicht om te kunnen aanduiden dat je komt.
  *
  * De ster wisselt meteen en corrigeert zichzelf wanneer de server weigert. Een
@@ -23,8 +23,8 @@ import { SAVE_IDLE } from "@/lib/saveState";
  * Zonder aanmelding is het een link naar het aanmeldscherm en geen knop: dat is
  * eerlijker dan een ster die pas na het klikken vertelt dat het niet gaat.
  *
- * `className` bepaalt het uitzicht per plek (`hero-week-star` op de donkere
- * hero, `ev-card-action` op de witte eventkaart); het gedrag is overal hetzelfde.
+ * `className` bepaalt het uitzicht per plek (`ev-card-action` op de witte
+ * eventkaart); het gedrag is overal hetzelfde.
  */
 
 export type EventStarLabels = {

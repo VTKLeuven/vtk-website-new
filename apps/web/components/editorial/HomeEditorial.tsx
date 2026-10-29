@@ -18,10 +18,9 @@ import { getDictionary } from "@vtk/i18n";
 import { PocBand, type PocBandGroup } from "./PocBand";
 import { NewsBand } from "./NewsBand";
 import { getCachedNews, getPresaleNews } from "@/lib/news/load";
-import { HomeHeroPhoto } from "./HomeHeroPhoto";
 import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
 import { SHIFTS_BAND_SETTING, readShiftsBandSetting } from "@/lib/home/shiftBand";
-import { FrontpageShiftBand, type FrontpageShiftItem } from "./FrontpageShiftBand";
+import { HomeShiftBand, type HomeShiftItem } from "./HomeShiftBand";
 import { ROSTER_PARTICIPANT_SELECT, toRoster } from "@/lib/shift/roster";
 import { loadPostNames } from "@/lib/shift/postNames";
 import { getCursusdienstHours } from "@/lib/cursusdienstHours";
@@ -29,8 +28,6 @@ import { elixirScheduleFromSetting, openingWindowPhase } from "@/lib/elixir/open
 import { readBarStatus } from "@/lib/elixir/status";
 import { publicUrl } from "@/lib/storage";
 import { defaultEventImageFor, eventCategorySlugs } from "@/lib/defaultEventImage";
-import { splitFullName } from "@vtk/auth";
-import { readSlogansSetting, resolveSlogans } from "@/lib/slogans";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
 import { EventStar, type EventStarLabels } from "@/components/calendar/EventStar";
 import { MomentDays } from "@/components/calendar/MomentDays";
@@ -42,22 +39,10 @@ import {
   interestLabel,
   publicInterestCounts,
   viewerInterests,
-  viewerMomentStarts,
 } from "@/lib/calendar/interest";
-import {
-  FRONTPAGE_EVENT_INCLUDE,
-  frontpageEventsSince,
-  publishedTicketSlug,
-  toFrontpageEvents,
-} from "@/lib/frontpage/events";
-import { resolveFrontpage } from "@/lib/frontpage/resolve";
-import { frontpagePhoto } from "@/lib/frontpage/registry";
-import { Frontpage } from "@/components/editorial/frontpage";
-import type { FrontpageShift } from "@/components/editorial/frontpage/context";
-import { getCachedUrenloopData } from "@/lib/urenloop/server";
+import { publishedTicketSlug, TICKET_LINK_SELECT } from "@/lib/ticketing/eventPage";
 import { currentWorkingYear } from "@/lib/workingYear";
 import { AftermovieGrid, type AftermovieGridItem } from "./AftermovieGrid";
-import { entryForDate, isClosedHours } from "./hoursUtils";
 import {
   entriesForService,
   openingHoursNote,
@@ -68,13 +53,7 @@ import { OpeningHoursBand } from "./OpeningHoursBand";
 
 import "@/app/design/vtk-home.css";
 import "@/app/design/vtk-eventcard.css";
-import "@/app/design/vtk-frontpage.css";
-import {
-  HOME_LINK_EVENT,
-  OUTBOUND_EVENT,
-  outboundHost,
-  umamiEvent,
-} from "@/lib/analytics";
+import { HOME_LINK_EVENT, OUTBOUND_EVENT, umamiEvent } from "@/lib/analytics";
 import { withSource } from "@/lib/ticketing/source";
 
 type CareerSetting = {
@@ -113,7 +92,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     session,
     cursusEntries,
     barStatus,
-    frontpage,
     news,
   ] = await Promise.all([
     // Redactionele inhoud: voor elke bezoeker gelijk, dus uit de gedeelde cache
@@ -124,31 +102,31 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       "home.openingHours.cursusdienst",
       "home.openingHours.elixir",
       "home.career",
-      "home.slogans",
       POC_BAND_SETTING,
       SHIFTS_BAND_SETTING,
     ]),
     // Dezelfde doelgroepregel als /kalender: standaard staat alles erop, en enkel
     // wie op /account koos zijn kalender toe te spitsen krijgt hier minder.
     //
-    // Vanaf gisteren en niet vanaf nu: het weekoverzicht in de hero laat de dag
-    // van gisteren staan zolang daar iets was (zie lib/calendar/heroWeek.ts).
-    // Op het einde en niet op de start: anders valt een evenement over meerdere
-    // dagen weg zodra het vóór gisteren begon, terwijl het vandaag nog loopt.
-    // Alles wat de rest van deze pagina toont, filtert daar zelf weer uit. De
-    // limiet ligt hoger dan de zes van het rooster hieronder, omdat het venster
-    // van zes dagen er meer kan bevatten en de terugval de eerstvolgende vier
-    // moet kunnen vinden, ook als die pas over een maand zijn.
+    // Op het einde en niet op de start: een evenement over meerdere dagen dat
+    // eerder begon, loopt vandaag nog. De limiet ligt ruimer dan de zes kaarten
+    // hieronder, omdat een reeks waarvan elk moment al voorbij is maar waarvan
+    // de envelop nog loopt, daar nog wegvalt.
     viewerAudienceFilter().then((audiences) =>
       prisma.calendarEvent.findMany({
         where: {
-          end: { gte: frontpageEventsSince(now) },
+          end: { gte: now },
           publishedAt: { not: null },
           ...audiences,
         },
         orderBy: { start: "asc" },
-        take: 40,
-        include: FRONTPAGE_EVENT_INCLUDE,
+        take: 12,
+        include: {
+          categories: { include: { category: true } },
+          moments: { orderBy: { start: "asc" }, select: { start: true, end: true, label: true } },
+          // Voor het ticketicoon op de evenementkaart; zie `publishedTicketSlug`.
+          ticketEvents: { select: TICKET_LINK_SELECT },
+        },
       }),
     ),
     getCachedHeaderTabs(locale),
@@ -169,9 +147,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     // of één Setting-rij vlak na een herstart). De worker praat met Munisense,
     // niet deze render. Zie lib/elixir/status.ts.
     readBarStatus(now),
-    // Which front page is live, and its field values. See lib/frontpage/.
-    resolveFrontpage(now),
-    // Het nieuws tussen de snelle links en de openingsuren; ook gedeeld over
+    // Het nieuws bovenaan de pagina; ook gedeeld over
     // alle bezoekers. Faalt de lezing, dan valt enkel de band weg.
     getCachedNews(locale).catch((error) => {
       console.error("Nieuws lezen mislukt", error);
@@ -181,17 +157,12 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
 
   // Een voorverkoop staat enkel in het nieuws van wie erin mag, en hangt dus aan
   // de sessie; daarom los van het gedeelde nieuws. Zie `getPresaleNews`.
-  const [presaleNews, urenloopData] = await Promise.all([
-    news.enabled
-      ? getPresaleNews(locale, session, now).catch((error) => {
-          console.error("Voorverkoop in het nieuws lezen mislukt", error);
-          return [];
-        })
-      : [],
-    frontpage.module.id === "urenloop"
-      ? getCachedUrenloopData().catch(() => undefined)
-      : undefined,
-  ]);
+  const presaleNews = news.enabled
+    ? await getPresaleNews(locale, session, now).catch((error) => {
+        console.error("Voorverkoop in het nieuws lezen mislukt", error);
+        return [];
+      })
+    : [];
   const newsEntries = presaleNews.length > 0 ? [...news.entries, ...presaleNews] : news.entries;
 
   // Aftermovies: `media.aftermovies` is dezelfde instelling als op /media, te
@@ -211,8 +182,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     })
     .slice(0, 6);
 
-  // Wat er nog komt. De hero mag een dag terugkijken, de rest van de pagina niet:
-  // een evenement van gisteren in "Aankomende evenementen" is gewoon fout.
+  // Wat er nog komt.
   //
   // Bij een evenement met losse momenten telt niet de envelop maar het
   // eerstvolgende moment: een loopweek die maandag begon, heeft op woensdag nog
@@ -228,16 +198,14 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
 
   // "32 komen" bij een evenement waar al volk naartoe gaat. Enkel boven de
   // drempel; zie lib/calendar/interest.ts voor waarom een laag getal averechts
-  // werkt. Eén lezing voor de hero én de kaarten hieronder.
-  const eventIds = calendarEvents.map((event) => event.id);
-  const [interested, viewerInterestMap, viewerMoments, shifts, postNames] = await Promise.all([
+  // werkt.
+  const eventIds = eventCards.map((event) => event.id);
+  const [interested, viewerInterestMap, shifts, postNames] = await Promise.all([
     publicInterestCounts(eventIds),
-    // Wat de bezoeker zelf al aanduidde, voor de ster in het weekoverzicht.
-    // Zonder sessie blijft dit leeg en is de ster een link naar het aanmelden.
+    // Wat de bezoeker zelf al aanduidde, voor de ster op de kaart. Zonder
+    // sessie blijft dit leeg en is de ster een link naar het aanmelden.
     viewerInterests(eventIds, session?.user.id ?? null),
-    // En bij een reeks: welke dagen ervan. Het weekoverzicht zet de ster per dag.
-    viewerMomentStarts(eventIds, session?.user.id ?? null),
-    // De shiften onder de herotekst én voor de shiftband.
+    // De shiften voor de shiftband.
     prisma.shift.findMany({
       where: { endTime: { gte: now }, manualGrantId: null },
       orderBy: { startTime: "asc" },
@@ -265,12 +233,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     loadPostNames(locale),
   ]);
   const viewerId = session?.user.id ?? "";
-  const openShifts: FrontpageShift[] = shifts.map(({ _count, participants, ...shift }) => ({
-    ...shift,
-    takenSpots: _count.participants,
-    viewerRegistered: participants.some((p) => p.userId === viewerId),
-    roster: toRoster(participants, viewerId),
-  }));
 
   const weekEnd = addDays(now, 7);
   const weekShifts = shifts.filter((s) => s.startTime <= weekEnd);
@@ -278,7 +240,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     (acc, s) => acc + Math.max(0, s.maxParticipants - s._count.participants),
     0
   );
-  const shiftBandItems: FrontpageShiftItem[] = weekShifts
+  const shiftBandItems: HomeShiftItem[] = weekShifts
     .filter((s) => s.maxParticipants - s._count.participants > 0 || s.participants.some((p) => p.userId === viewerId))
     .slice(0, 4)
     .map(({ _count, participants, ...shift }) => ({
@@ -290,9 +252,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     }));
   const viewerInterestIds = new Set(viewerInterestMap.keys());
 
-  // Dezelfde ster als in het weekoverzicht van de hero, met dezelfde teksten:
-  // het is dezelfde handeling op dezelfde pagina, dus ze hoort niet twee namen
-  // te hebben.
   const starLabels: EventStarLabels = {
     mark: nl ? "Ik kom naar dit evenement" : "I am coming to this event",
     marked: nl ? "Je komt naar dit evenement" : "You are coming to this event",
@@ -361,30 +320,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   );
   const elixir = readOpeningHoursSetting(map.get("home.openingHours.elixir"), "elixir");
   const career = map.get("home.career") as CareerSetting | undefined;
-  const user = session?.user
-    ? {
-        name: session.user.name,
-        firstName: splitFullName(session.user.name).firstName || null,
-      }
-    : null;
-  // Op de server opgelost, met dezelfde `now` als de rest van de pagina: welke
-  // slogans bij dit publiek en dit dagdeel horen, ligt dan vast voor de HTML
-  // vertrekt en is in de browser exact hetzelfde. Zie lib/slogans.ts.
-  const slogans = resolveSlogans({
-    config: readSlogansSetting(map.get("home.slogans")),
-    locale,
-    user,
-    now,
-    fallback: frontpage.legacyHero,
-  });
 
-  // The front page carries its own background photo as a field. It goes into a
-  // custom property instead of the stylesheet so swapping it is an upload rather
-  // than a deploy. The value is an /api/media/... path or a path in public/;
-  // neither can contain a quote, because storageKeyPath percent-encodes.
-  const heroPhoto = frontpagePhoto(frontpage.module, publicUrl(frontpage.values.photo));
-
-  const curToday = cursusEntries ? entryForDate(cursusEntries, now, locale) : undefined;
   // De titel is "Openingsuren Theokot"; de band toont enkel de naam zelf.
   const serviceName = (title: string) =>
     title.replace(/^Openingsuren\s+/i, "").replace(/\s+opening hours$/i, "");
@@ -439,30 +375,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   );
 
   const aanbodTabs = tabs.filter((t) => t.slug !== "").slice(0, 6);
-  const quickLinks = [
-    { k: nl ? "Kalender" : "Calendar", v: nl ? "Kalender" : "Calendar", m: nl ? "Alle events" : "All events", href: `${base}/kalender` },
-    { k: nl ? "Werk" : "Work", v: "Shiften", m: nl ? "Help mee" : "Join a shift", href: `${base}/shift` },
-    { k: nl ? "Koop" : "Buy", v: "Tickets", m: nl ? "Voor onze events" : "For our events", href: `${base}/tickets` },
-    {
-      k: nl ? "Eten" : "Eat",
-      v: "Theokot",
-      m: nl ? "Bestel broodjes" : "Order sandwiches",
-      href: `${base}/theokot`,
-    },
-    {
-      k: nl ? "Boeken" : "Books",
-      v: nl ? "Cursusdienst" : "Course shop",
-      m: curToday && !isClosedHours(curToday.hours) ? curToday.hours : nl ? "Cursussen & tweedehands" : "Courses & second-hand",
-      href: "https://cudi.vtk.be",
-    },
-    {
-      k: nl ? "Reserveer" : "Reserve",
-      v: nl ? "Tijdsloten Cudi" : "Cudi Time Slots",
-      m: nl ? "Praktische tools" : "Practical tools",
-      href: "https://cudi.vtk.be/vtk/account/slots",
-    },
-  ];
-
   const fallbackAanbod = [
     {
       labelNl: "Sociaal",
@@ -511,63 +423,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
 
   return (
     <div className="vtk-design">
-      {/* De hero-foto en scrim lopen door tot en met de quick links; de zone
-          draagt de achtergrond zodat beide secties op hetzelfde donker zitten.
-
-          Loopt er een campagne, dan neemt haar layout de hero over; de quick
-          links eronder blijven in beide gevallen staan. Zie lib/frontpage.ts. */}
-      <div className="home-dark-zone">
-        <HomeHeroPhoto src={heroPhoto} />
-        <Frontpage
-          id={frontpage.module.id}
-          values={frontpage.values}
-          locale={locale}
-          base={base}
-          now={now}
-          upcomingEvents={toFrontpageEvents(upcomingEvents, interested, viewerInterestIds, viewerMoments)}
-          weekEvents={toFrontpageEvents(calendarEvents, interested, viewerInterestIds, viewerMoments)}
-          signedIn={session !== null}
-          openShifts={openShifts}
-          partners={partners}
-          slogans={slogans}
-          urenloop={urenloopData}
-        />
-
-        <section className="quick">
-          <div className="quick-row">
-            {quickLinks.map((item) => {
-              const body = (
-                <>
-                  <span className="k">{item.k}</span>
-                  <span className="v">{item.v}</span>
-                  <span className="m">{item.m}</span>
-                </>
-              );
-              // Welke quicklink gebruikt wordt, zegt of de volgorde hier klopt
-              // met waar mensen voor komen.
-              const tracking = item.href.startsWith("http")
-                ? umamiEvent(OUTBOUND_EVENT, {
-                    bestemming: outboundHost(item.href),
-                    vanaf: "quicklink",
-                  })
-                : umamiEvent(HOME_LINK_EVENT, { soort: "quicklink", naar: item.href });
-              return item.href.startsWith("http") ? (
-                <a key={item.k} className="ql" href={item.href} {...tracking}>
-                  {body}
-                </a>
-              ) : (
-                <Link key={item.k} className="ql" href={item.href} {...tracking}>
-                  {body}
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      </div>
-
-      {/* Tussen de donkere zone en de openingsuren: een lichtblauwe band, die
-          helemaal wegvalt zonder berichten of wanneer ze uitstaat in
-          /admin/nieuws. Zie lib/news. */}
+      {/* Boven de openingsuren: een lichtblauwe band, die helemaal wegvalt
+          zonder berichten of wanneer ze uitstaat in /admin/nieuws. Zie lib/news. */}
       {news.enabled ? (
         <NewsBand entries={newsEntries} locale={locale} base={base} now={now} />
       ) : null}
@@ -754,7 +611,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       />
 
       {shiftsBandSetting.visible && (
-        <FrontpageShiftBand
+        <HomeShiftBand
           locale={locale}
           base={base}
           shifts={shiftBandItems}

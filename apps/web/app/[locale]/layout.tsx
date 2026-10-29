@@ -34,7 +34,7 @@ export default async function LocaleLayout({
       <AuthorizationPreviewBanner locale={locale} />
       <SiteAnnouncement locale={locale} />
       {/* `flex-1` + `min-h-0` pins main to viewport height and lets children overflow;
-          that overflow painted over the footer looked like “footer in the hero”. */}
+          that overflow painted over the footer. */}
       <main className="grow" style={{ background: 'var(--paper)' }}>
         {children}
       </main>

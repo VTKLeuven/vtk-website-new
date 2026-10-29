@@ -20,8 +20,7 @@ import {
  *
  * Wat hij tekent, beslist `momentStrip` in lib/calendar/moments.ts; dat zijn de
  * regels en die staan los getest. Hoe hij eruitziet, staat in `.ev-days`
- * (vtk-eventcard.css). De hero heeft dezelfde vorm op een donkere grond
- * (`.hero-week-strip`).
+ * (vtk-eventcard.css).
  */
 export function MomentDays({
   moments,

@@ -1,5 +1,4 @@
 import { timingSafeEqual } from "node:crypto";
-import { processDueHeroWeekNotices } from "@/lib/calendar/heroWeekNoticeMailer";
 import { processDueInterestReminderMails } from "@/lib/calendar/interestReminderMailer";
 import { processDueDiscordPosts } from "@/lib/discord/posts";
 import { processDueLesbezoekScheduledMails } from "@/lib/lesbezoeken-server";
@@ -48,10 +47,9 @@ export async function POST(request: Request) {
   }
 
   const now = new Date();
-  const [theokot, lesbezoeken, kalender, mailinglijsten, kaften, palPlus, discord, interesse] = await Promise.allSettled([
+  const [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse] = await Promise.allSettled([
     processDueNoShows(now),
     processDueLesbezoekScheduledMails(now),
-    processDueHeroWeekNotices(now),
     // De stand van de mailinglijsten van vandaag, voor de grafiek in
     // /admin/mailinglijsten; zie lib/mailingListHistory.ts.
     recordMailingListCounts(now),
@@ -73,14 +71,13 @@ export async function POST(request: Request) {
   // 502 zodra een van de taken viel: de healthcheck van de worker ziet dan dat
   // er iets scheelt in plaats van stil niets te doen. De andere taken zijn wel
   // gedraaid, en alle zijn idempotent, dus de volgende ronde haalt het in.
-  const failed = [theokot, lesbezoeken, kalender, mailinglijsten, kaften, palPlus, discord, interesse].some(
+  const failed = [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse].some(
     (task) => task.status === "rejected",
   );
   if (failed) {
     console.error("[background] periodieke verwerking deels mislukt:", {
       theokot: describe(theokot),
       lesbezoeken: describe(lesbezoeken),
-      kalender: describe(kalender),
       mailinglijsten: describe(mailinglijsten),
       kaften: describe(kaften),
       palPlus: describe(palPlus),
@@ -93,7 +90,6 @@ export async function POST(request: Request) {
     {
       theokot: describe(theokot),
       lesbezoeken: describe(lesbezoeken),
-      kalender: describe(kalender),
       mailinglijsten: describe(mailinglijsten),
       kaften: describe(kaften),
       palPlus: describe(palPlus),

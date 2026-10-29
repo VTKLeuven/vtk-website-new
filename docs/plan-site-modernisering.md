@@ -223,7 +223,7 @@ Niet alles kan om, en dat is geen falen:
   de Immich-proxy. Die kunnen wel om, maar hebben `images.remotePatterns` nodig
   in `next.config.ts` (dit is de enige werkstroom die dat bestand aanraakt) en
   `sizes` die klopt, anders laadt de galerij zwaarder dan nu.
-- Zet `priority` op de hero en op niets anders.
+- Zet `priority` enkel op het grootste beeld boven de vouw.
 
 Zet `@next/next/no-img-element` aan in `eslint.config.mjs` met een gerichte
 uitzondering voor de bestanden hierboven, en zet er een korte comment bij waarom.

@@ -6,7 +6,6 @@ import {
   managedPasswordSetupMail,
   passwordResetMail,
 } from "@/lib/accountMail";
-import { heroWeekNoticeMail } from "@/lib/calendar/heroWeekNoticeMail";
 import { interestReminderMail } from "@/lib/calendar/interestReminderMail";
 import { contactMailBody } from "@/lib/contactForm";
 import type { EmailSource } from "@/lib/email";
@@ -104,8 +103,8 @@ export function mailPreviewGroups(): MailPreviewGroup[] {
     {
       id: "kalender",
       title: "Kalender",
-      description: "Berichten naar de post die een evenement beheert, en de herinnering aan wie interesse aanduidde.",
-      mails: [heroWeekNoticePreview(), interestReminderPreview()],
+      description: "De herinnering aan wie interesse aanduidde.",
+      mails: [interestReminderPreview()],
     },
     {
       id: "account",
@@ -265,36 +264,6 @@ function interestReminderPreview(): MailPreview {
       "De knop onderaan opent /uitschrijven, dat eerst een klik vraagt; de mail draagt ook List-Unsubscribe, zodat Gmail en Outlook hun eigen uitschrijfknop tonen.",
       "In het echt staat de banner van elk evenement bovenaan zijn kaart; hier niet, want de voorvertoning laadt geen bestaande foto.",
       "In de taal van het lid (User.locale), met de Engelse titel wanneer die er is.",
-    ],
-  };
-}
-
-function heroWeekNoticePreview(): MailPreview {
-  const mail = heroWeekNoticeMail({
-    title: "Voorbeeldcantus",
-    start: SAMPLE_START,
-    allDay: false,
-    location: "Theokot",
-    groupName: "Onthaal",
-    reasons: ["draft", "banner"],
-    adminUrl: "https://vtk.be/admin/kalender/voorbeeld",
-    publicUrl: null,
-    logoUrl: "https://vtk.be/vtk-logo.png",
-  });
-  return {
-    id: "hero-week-notice",
-    title: "Je evenement komt dichterbij",
-    when: "Zodra het evenement in het weekoverzicht van de homepage zou komen (zes dagen vooruit, zaterdag niet meegeteld) terwijl het nog een concept is of nog geen eigen banner heeft. Via de background-worker, elke vijf minuten.",
-    to: "De post van het evenement, op haar eigen adres (post@vtk.be)",
-    source: "calendar",
-    file: "lib/calendar/heroWeekNoticeMail.ts",
-    subject: mail.subject,
-    text: mail.text,
-    html: mail.html,
-    notes: [
-      "Eén mail per evenement: staat het nog als concept én zonder banner, dan is dat één mail met twee punten.",
-      "Een evenement dat bewust uit het weekoverzicht gehaald is (heroWeek = HIDDEN), krijgt niets.",
-      "De knop naar de eventpagina staat er enkel bij wanneer het evenement gepubliceerd is.",
     ],
   };
 }

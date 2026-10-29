@@ -18,8 +18,8 @@ import "./globals.css";
 // Elk font hier wordt standaard op élke pagina vooraf geladen, dus dit lijstje
 // kost op mobiel echt tijd. Inter is de letter van de site. De mono staat enkel
 // in kleine labels (datums, tellers) en mag laat binnenkomen, dus zonder
-// preload. Instrument Serif staat wel in de kop van de homepage, maar enkel
-// cursief (`.serif` in vtk-base.css), dus de rechte variant laden we niet.
+// preload. Instrument Serif staat enkel cursief in een paar accenten (`.serif`
+// in vtk-base.css), dus de rechte variant laden we niet.
 // Geist Sans stond hier ook, als reserve achter Inter die altijd laadt: vijf
 // fonts vooraf, samen 130 KB, waar er twee volstaan.
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"], preload: false });

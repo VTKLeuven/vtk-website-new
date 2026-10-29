@@ -22,9 +22,6 @@ export default async function EditEventPage({
   const locale: Locale = localeParam;
   const session = await requireSession();
   const canAll = session.user.isSuperAdmin || hasPermission(session, "calendar.manageAll");
-  // Het weekoverzicht op de homepage staat los van het beheer van het evenement
-  // zelf; zie packages/db/src/permissions.ts.
-  const canHeroWeek = session.user.isSuperAdmin || hasPermission(session, "calendar.heroWeek");
 
   const event = await prisma.calendarEvent.findUnique({
     where: { id },
@@ -92,7 +89,6 @@ export default async function EditEventPage({
         locale={locale}
         siteDefaultImage={siteDefaultImage}
         canManageCategories={canAll}
-        canHeroWeek={canHeroWeek}
       />
       <EventInterestsPanel
         eventId={event.id}

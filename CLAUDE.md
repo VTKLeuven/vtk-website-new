@@ -272,9 +272,9 @@ the design language into the application instead of copying mockup content.
 
 ## Visual System
 
-- Fonts: use Inter for UI and body text. Use Instrument Serif only as an italic
-  accent in the hero headline, never for dense interface copy; homepage section
-  headings are plain sans (the serif accent there was reviewed and removed), and
+- Fonts: use Inter for UI and body text. Use Instrument Serif only as a sparing
+  italic accent, never for dense interface copy; homepage section headings are
+  plain sans (the serif accent there was reviewed and removed), and
   the footer serif tagline accent was reviewed and removed too.
 - Palette: cool paper, light mode. Every colour is a CSS custom property defined
   **once** in `apps/web/app/design/vtk-base.css`; components reference the tokens,
@@ -302,41 +302,8 @@ the design language into the application instead of copying mockup content.
   controls can be pill-shaped when they are CTAs or filters.
 - Tone: prefer dense editorial utility over marketing decoration. Do not add
   gradients, decorative blobs, nested cards, or oversized explanatory text.
-- Hero (homepage): a full-bleed photo under a navy scrim (heaviest top-left,
-  behind the headline) carries light copy, a yellow italic-serif accent, and the
-  agenda beside it. The headline is not a field but a rotating list of slogans
-  from /admin/slogans (`lib/slogans.ts`); the accent sits inside the sentence as
-  `*sterretjes*`. All slogans sit in an invisible stack behind the `h1` so the
-  block keeps the height of the longest and nothing below it moves on a switch,
-  and the whole sequence shares one type size derived from that longest line. Do
-  not put the headline back in the front page fields, and do not let it rotate
-  without a pause control. See `docs/design-decisions.md`. That agenda is either the week overview (`.hero-week`, the
-  default) or the older list of upcoming events (`.hero-cal`); an editor picks
-  which in /admin/frontpage. The week overview deliberately has **no panel**: it
-  reads on a wide, borderless gradient in the scrim (`.hero-week-wash`) that
-  dissolves outward, because the photo is at its lightest exactly there. Do not
-  put a card back around it, and see `docs/design-decisions.md` for the rules
-  behind the days it shows. The foot of the text column carries the shifts that
-  still have room (`.hero-shifts`), up to three; it hangs on the bottom so the
-  column ends on the agenda's last line. The facts line that sat below it
-  (working year, coming up, since) was removed to make room for those shifts. That block is the one
-  place on the homepage for live state, never for another destination: the
-  quick-links row below already says where you can go. **How many rows it shows
-  is computed from how tall the title turns out** (`lib/frontpage/heroShifts.ts`),
-  because the slogan stack sizes itself to the longest slogan and an editor can
-  make it a hundred pixels taller without a deploy. Grow the title and a shift
-  drops; do not put a fixed number back. The dark zone (`.home-dark-zone`) stretches the photo
-  through the quick-links row, which sits on it as a dark glass panel; the zone
-  ends on a crisp seam: a short bottom-anchored vignette settles the photo edge
-  and the light-blue **Nieuws** band starts right below it (or, when there is
-  no news or it is switched off in /admin/nieuws, the openingsuren band). Both
-  an empty paper gap and a long
-  dissolve into navy were reviewed and rejected there (the gap broke the dark
-  flow; the dissolve read as murky, empty dark). The sticky header sits
-  transparently over this hero and turns solid once scrolled past it (desktop;
-  `components/site/SiteHeaderShell`).
-- Band rhythm: the hero's dark deliberately returns down the page as full-width
-  navy bands and the site-wide dark footer closes the bookend. Header, bands and
+- Band rhythm: full-width navy bands return down the page and the site-wide dark
+  footer closes the bookend. Header, bands and
   footer share the same `--navy` so the dark chrome reads as one system. The
   lower half of the page alternates navy and light-blue (`--paper-2`) bands:
   **Openingsuren** (navy) → **Aankomende evenementen** (`--paper-2`) → **POC's**
@@ -347,8 +314,8 @@ the design language into the application instead of copying mockup content.
   offer. The navy bands (openingsuren, aftermovies, career)
   carry the full-bleed `::before` navy fill plus the shared `::after` technical
   pattern, each with its own crop of `technisch-pattern.svg` so no two bands show
-  the same wallpaper. The openingsuren band follows the Nieuws band (or the
-  dark zone's crisp seam when there is no news) with a compact heading. The full-bleed bands
+  the same wallpaper. The openingsuren band follows the Nieuws band with a
+  compact heading. The full-bleed bands
   (aftermovies, evenementen, career, POC's) share a `band` class: each carries a
   top margin to separate from the paper section above it, but two consecutive
   bands butt directly against each other with a crisp navy/light-blue seam
@@ -356,8 +323,8 @@ the design language into the application instead of copying mockup content.
   bands also keep tighter internal padding than the navy ones. On a navy band,
   panels are dark glass
   (`rgba(255,255,255,.06)` fill, `.14` white border), headings go `--paper`,
-  muted text uses `--on-dark-muted`, and the primary button inverts like on the
-  hero. The **POC's** and **Shiften** bands can disappear (POC's hidden in
+  muted text uses `--on-dark-muted`, and the primary button inverts to a
+  `--surface` fill with ink text. The **POC's** and **Shiften** bands can disappear (POC's hidden in
   /admin/pocs or no representatives for this visitor; no shifts this week), and
   then two bands of the same colour meet (events + shifts, POC's +
   aftermovies, or the opening hours + the next navy band when there are no
@@ -453,9 +420,7 @@ the design language into the application instead of copying mockup content.
     wordt door leden beheerd.
 - Header: sticky, solid `--navy` bar with light nav links, compact brand mark,
   and subtle language/account controls; it pairs with the dark footer as the top
-  bookend (the old translucent paper bar was reviewed and replaced). The text is
-  light in every state; on the homepage only the background goes transparent
-  over the dark hero and fades back to solid navy on scroll.
+  bookend (the old translucent paper bar was reviewed and replaced).
   - A tab with pages under it (or extra `HeaderTabLink` items) shows a chevron
     and drops a white panel on hover and `:focus-within`; that is CSS only, so
     keep `.nav-links` free of `overflow` or the panel gets clipped.
@@ -464,14 +429,14 @@ the design language into the application instead of copying mockup content.
     reintroduce the horizontal scroller: eleven tabs in a scroll strip read as a
     mistake and hide most of the navigation.
 - Buttons: primary is dark ink/navy with paper text; secondary/ghost is bordered
-  on paper; yellow is reserved for accents and active states. Over the dark hero,
-  the primary button inverts to a `--surface` fill with ink text.
+  on paper; yellow is reserved for accents and active states. On a dark band or
+  head, the primary button inverts to a `--surface` fill with ink text.
 - Cards: `--surface` (white) panels with thin `--line` borders on the cool
   `--paper` ground, small elevation at most, and restrained hover movement. No
   flat navy/dark card fills; a featured card is marked with a yellow accent rail.
 - Footer: a dark `--navy` band on every page (light text, the same `vtk-logo.png`
   brand mark as the header rather than a separate yellow badge), the same navy as
-  the header; it bookends the dark hero, so do not lighten it per page.
+  the header; it bookends the dark header, so do not lighten it per page.
 - Page head: every non-home page opens with the same dark band
   (`.vtk-page-head` in `apps/web/app/design/vtk-base.css`): full-bleed `--navy`,
   its own crop of the technical pattern, a yellow bottom rule, light title and
@@ -642,14 +607,13 @@ the design language into the application instead of copying mockup content.
   below the panel carries its own forms. See `docs/design-decisions.md`.
 - Functional pages and modules, including Media and Logistiek, use the same
   visual system as the main website. A separate subdomain or operational flow
-  is not a reason to invent another hero, type treatment, palette, container
+  is not a reason to invent a hero, another type treatment, palette, container
   width, or card language. The one agreed exception is the container width of
   the uitleendienst, see Layout above; everything else there stays the shared
   system.
-  - Only the homepage may use a full-bleed photo hero and italic serif headline
-    accent. Every other public or functional landing page starts with the
-    canonical dark page head. Do not add a unique photo hero to Media,
-    Logistiek, Tickets, or a similar module.
+  - Every public or functional landing page starts with the canonical dark
+    page head. Do not give Media, Logistiek, Tickets, or a similar module an
+    opener of its own.
   - Do not use decorative step numbers, album counts, oversized statistics, or
     shortcut navigation as section ornaments. Show a count only where it helps
     someone make a decision, and keep it next to the control or result it
@@ -747,8 +711,8 @@ the design language into the application instead of copying mockup content.
   - **Een lijst van blokken die samen meer dan één schermhoogte inneemt, klapt
     dicht.** Gebruik `AdminDisclosure` (`apps/web/components/admin/AdminDisclosure.tsx`):
     de kop met naam, status en een korte samenvatting blijft zichtbaar, de velden
-    komen pas na een klik. Open waren de frontpages en de slogans een muur van
-    formulieren waarin je het blok dat je zocht niet meer terugvond.
+    komen pas na een klik. Open is zo'n lijst een muur van formulieren waarin je
+    het blok dat je zocht niet meer terugvindt.
     - Standaard dicht. Wat je net aanmaakt of wat nog leeg is, staat open: dat
       wil je net invullen.
     - Acties die ook dichtgeklapt nodig zijn (aan/uit, verplaatsen,

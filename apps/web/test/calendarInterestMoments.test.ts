@@ -5,7 +5,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
  * dag een loopje).
  *
  * Wat hier bewaakt wordt, is de grens tussen "ik kom naar deze reeks" en "ik kom
- * woensdag": de ster in het weekoverzicht en op de eventpagina staat per dag, de
+ * woensdag": de ster op de eventpagina staat per dag, de
  * ster op een kaart die de hele reeks toont zet ze alle samen. Gaat dat mis, dan
  * merkt niemand het aan een foutmelding maar staat er stil een markering voor de
  * verkeerde avond, of voor een avond die niet bestaat.
