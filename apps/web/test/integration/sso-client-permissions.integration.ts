@@ -9,7 +9,7 @@ import { currentWorkingYear } from '@vtk/auth';
  * het risico dat unit tests niet dekken: de drie toekenningspaden, de
  * jaargrens, en de LEADER-regel.
  */
-describe.sequential('client permissions', () => {
+describe('client permissions', () => {
   const suffix = randomUUID().slice(0, 8);
   const ids = {
     user: randomUUID(),
@@ -189,7 +189,7 @@ describe.sequential('client permissions', () => {
   });
 });
 
-describe.sequential('the access gate', () => {
+describe('the access gate', () => {
   const suffix = randomUUID().slice(0, 8);
   const ids = { granted: randomUUID(), denied: randomUUID() };
   const clientId = `gate-test-${suffix}`;

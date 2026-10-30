@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import archiver from "archiver";
+import { ZipArchive } from "archiver";
 import { Readable } from "node:stream";
 import { requirePermission, authErrorResponse } from "@/lib/session";
 import { hasLocale } from "@/lib/locale";
@@ -55,7 +55,7 @@ export async function GET(
     });
   }
 
-  const archive = archiver("zip", { zlib: { level: 6 } });
+  const archive = new ZipArchive({ zlib: { level: 6 } });
   for (const entry of careerZipEntries(recipients, locale)) {
     archive.append(entry.content, { name: entry.name });
   }

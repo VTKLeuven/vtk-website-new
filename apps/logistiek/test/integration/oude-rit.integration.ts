@@ -28,7 +28,7 @@ function unfold(ics: string): string {
   return ics.replace(/\r\n /g, '');
 }
 
-describe.sequential('een rit van voor de nieuwe velden', () => {
+describe('een rit van voor de nieuwe velden', () => {
   const ids = {
     aanvrager: randomUUID(),
     chauffeur: randomUUID(),

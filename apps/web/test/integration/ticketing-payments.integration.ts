@@ -130,7 +130,7 @@ function mollieCallback(payment: {
   );
 }
 
-describe.sequential("ticket payments", () => {
+describe("ticket payments", () => {
   const ids = {
     user: randomUUID(),
     group: randomUUID(),

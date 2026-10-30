@@ -12,7 +12,7 @@
     "server-only": "^0.0.1"
   },
   "devDependencies": {
-    "@types/node": "^20.19.43",
+    "@types/node": "^22",
     "@types/nodemailer": "^8.0.1",
     "@vtk/tsconfig": "*",
     "typescript": "^5"

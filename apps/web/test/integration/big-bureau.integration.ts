@@ -15,7 +15,7 @@ import {
  * wordt. Wat boven de limiet valt, moet dan terug vrij komen voor studenten, en
  * uitzetten mag nooit meer van de voorraad nemen dan er is.
  */
-describe.sequential("big bureau", () => {
+describe("big bureau", () => {
   const tag = randomUUID().slice(0, 8);
   // Een dag ver in de toekomst, uniek per run: `TheokotSession.date` is uniek.
   const dayNumber = 1 + (parseInt(tag.slice(0, 4), 16) % 28);

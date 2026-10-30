@@ -202,7 +202,7 @@ const profileConfig = commonConfig.extend({
 const fieldCode = z.string().regex(/^[a-z0-9_]{1,48}$/);
 
 const eventConfig = commonConfig.extend({
-  fills: z.record(z.enum(EVENT_FILL_KEYS), fieldCode).nullish(),
+  fills: z.partialRecord(z.enum(EVENT_FILL_KEYS), fieldCode).nullish(),
 });
 
 const CONFIG_SCHEMAS = {

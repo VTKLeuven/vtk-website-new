@@ -40,7 +40,7 @@ const COMPOUND_PREFIX = `${TERM}veer`;
 const LOGISTIEK_URL = "https://logistiek.test";
 process.env.LOGISTIEK_PUBLIC_URL = LOGISTIEK_URL;
 
-describe.sequential("zoeken", () => {
+describe("zoeken", () => {
   const ids = {
     tab: randomUUID(),
     group: randomUUID(),

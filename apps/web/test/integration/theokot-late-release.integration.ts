@@ -21,7 +21,7 @@ import { processSessionNoShows } from "@/lib/theokot-server";
  * hesp neemt niemand. Carl geeft enkel zijn hesp vrij en komt niets halen; Dirk
  * geeft alles vrij en niemand neemt het.
  */
-describe.sequential("laat annuleren bij het Theokot", () => {
+describe("laat annuleren bij het Theokot", () => {
   const tag = randomUUID().slice(0, 8);
   const dayNumber = 1 + (parseInt(tag.slice(0, 4), 16) % 28);
   const day = brusselsWallClock(2032, 5, dayNumber, "00:00");
