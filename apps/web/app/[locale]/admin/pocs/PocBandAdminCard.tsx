@@ -36,7 +36,7 @@ export function PocBandAdminCard({
   const [mode, setMode] = useState<PocBandMode>(setting.mode);
   const nl = locale === "nl";
 
-  const [steps, setSteps] = useState<PocBandStep[]>(
+  const steps: PocBandStep[] =
     setting.steps.length > 0
       ? setting.steps
       : [
@@ -64,8 +64,7 @@ export function PocBandAdminCard({
             from: null,
             to: null,
           },
-        ]
-  );
+        ];
 
   return (
     <div className="rounded-2xl border border-[#0e1a36]/10 bg-white p-6 shadow-sm">

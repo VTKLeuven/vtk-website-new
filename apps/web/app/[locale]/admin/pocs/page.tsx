@@ -142,7 +142,6 @@ export default async function AdminPocs({
       <PocsTable
         pocs={pocRows}
         year={year}
-        yearLabel={formatWorkingYear(year)}
         locale={nl ? "nl" : "en"}
         saveLabels={saveLabels}
         createLabels={createLabels}

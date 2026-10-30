@@ -200,7 +200,6 @@ export function EventInterestsPanel({
             </thead>
             <tbody className="divide-y divide-zinc-200 bg-white">
               {filtered.map((row) => {
-                const isGuest = row.kind === "guest";
                 const visibleLabels: string[] = [];
                 if (row.showName) visibleLabels.push(nl ? "naam" : "name");
                 if (row.showGraduationYear) visibleLabels.push(nl ? "afstudeerjaar" : "year");

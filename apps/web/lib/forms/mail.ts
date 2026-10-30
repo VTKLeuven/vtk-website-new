@@ -57,7 +57,6 @@ import {
   mailNoticeBox,
   mailParagraph,
   mailParagraphHtml,
-  mailPill,
 } from "@/lib/mailDesign";
 
 export function confirmationMail(input: {

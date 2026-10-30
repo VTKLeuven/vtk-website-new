@@ -156,7 +156,6 @@ import {
   mailHeaderRow,
   mailHeading,
   mailInfoTable,
-  mailParagraph,
   mailParagraphHtml,
 } from "@/lib/mailDesign";
 

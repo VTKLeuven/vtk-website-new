@@ -252,7 +252,6 @@ import {
   mailHeading,
   mailInfoTable,
   mailMessageBox,
-  mailParagraph,
   mailParagraphHtml,
 } from "@/lib/mailDesign";
 

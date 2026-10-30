@@ -89,7 +89,6 @@ export type SaveLabels = {
 export function PocsTable({
   pocs,
   year,
-  yearLabel,
   locale,
   saveLabels,
   createLabels,
@@ -97,7 +96,6 @@ export function PocsTable({
 }: {
   pocs: PocRow[];
   year?: number;
-  yearLabel?: string;
   locale: "nl" | "en";
   saveLabels: SaveLabels;
   createLabels: SaveLabels;

@@ -54,7 +54,6 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
-          cache: npm
 
       # Voor npm ci: een lockfile zonder de native binaries van dit platform
       # installeert "gewoon" en breekt pas veel later bij het builden.
@@ -137,12 +136,6 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with:
-          node-version: 22
-          cache: npm
-
       # Enkel bouwen wat deze commit raakt: een wijziging aan logistiek bouwt de
       # website niet, en een commit die enkel docs/ aanraakt bouwt niets. Welke
       # bestanden een app raken, leest scripts/affected-apps.mjs uit haar
@@ -185,6 +178,12 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           echo "Te bouwen: ${apps:-geen enkele app} (vergeleken met ${base:-niets})"
 
+      - name: Set up Node.js
+        if: steps.affected.outputs.apps != ''
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+
       - name: Install dependencies
         if: steps.affected.outputs.apps != ''
         run: npm ci
@@ -199,12 +198,14 @@ jobs:
         if: steps.affected.outputs.apps != ''
         run: npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
 
-      # De Turbopack-buildcache van de vorige run: die hercompileert enkel wat
-      # echt veranderd is. De sleutel bevat de sha zodat elke run haar eigen
-      # cache wegschrijft; restore-keys pakt de meest recente eerdere.
-      - name: Cache Next build cache
+      # De Turbopack-buildcache van de vorige run op main: die hercompileert enkel
+      # wat echt veranderd is. PR's lezen die cache wel in, maar schrijven zelf
+      # geen nieuwe weg: anders uploadt elke PR-commit een archief van honderden
+      # MB's en loopt de repo tegen de egress-limiet van GitHub Actions Cache aan.
+      - name: Restore Next build cache
+        id: next-cache
         if: steps.affected.outputs.apps != ''
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             apps/web/.next/cache
@@ -224,6 +225,16 @@ jobs:
           for app in "${apps[@]}"; do
             npm run build --workspace="@vtk/$app"
           done
+
+      - name: Save Next build cache
+        if: steps.affected.outputs.apps != '' && github.ref == 'refs/heads/main' && steps.next-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            apps/web/.next/cache
+            apps/logistiek/.next/cache
+            apps/fakbar/.next/cache
+          key: ${{ steps.next-cache.outputs.cache-primary-key }}
 
       # De browsertest draait tegen de website; zonder nieuwe build van de
       # website valt er niets nieuws te testen.

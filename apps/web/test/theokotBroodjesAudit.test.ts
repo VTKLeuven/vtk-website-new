@@ -106,8 +106,6 @@ import {
 } from "@/lib/theokot-server";
 
 describe("checkSessionWindows", () => {
-  const baseDay = new Date("2026-10-01T00:00:00.000Z");
-
   it("keurt geldige vensters goed", () => {
     const windows: SessionWindows = {
       orderOpenAt: new Date("2026-09-29T10:00:00.000Z"),
