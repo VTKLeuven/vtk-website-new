@@ -55,6 +55,8 @@ export default async function IncomeOverviewPage({
   const closedHere = data.closed.find((period) => period.from <= from && to <= period.to) ?? null;
   const checks = data.checks.map((check) => checkText(check, nl, locale, base));
   const openChecks = checks.filter((check) => !check.ok);
+  // Wat nog open staat bovenaan, in de volgorde van het werk; wat in orde is eronder.
+  const sortedChecks = [...openChecks, ...checks.filter((check) => check.ok)];
   const errorMessages = incomeErrorMessages(locale);
   const day = (value: Date) =>
     value.toLocaleDateString(nl ? "nl-BE" : "en-GB", { day: "numeric", month: "short", timeZone: "Europe/Brussels" });
@@ -283,7 +285,7 @@ export default async function IncomeOverviewPage({
               : "What to check before you close the period and send it to the accountant."}
           </p>
           <ul className="mt-3 space-y-2 text-sm">
-            {checks.map((check, index) => (
+            {sortedChecks.map((check, index) => (
               <li key={index} className="flex items-start gap-2">
                 <span className={`mt-0.5 shrink-0 ${check.ok ? "text-vtk-muted" : "text-vtk-warn"}`} aria-hidden>
                   {check.ok ? <CheckIcon /> : <InfoIcon />}
@@ -291,7 +293,8 @@ export default async function IncomeOverviewPage({
                 <span className={check.ok ? "text-vtk-muted" : ""}>
                   <span className="sr-only">{check.ok ? (nl ? "In orde: " : "OK: ") : nl ? "Na te kijken: " : "To check: "}</span>
                   {check.href ? (
-                    <Link href={check.href} className="underline-offset-2 hover:underline">
+                    // Wat open staat, toont zijn link: daar los je het op.
+                    <Link href={check.href} className={check.ok ? "underline-offset-2 hover:underline" : "underline underline-offset-2"}>
                       {check.text}
                     </Link>
                   ) : (
@@ -305,7 +308,7 @@ export default async function IncomeOverviewPage({
       ) : null}
 
       {data.payouts.length > 0 ? (
-        <section className="rounded-2xl border border-vtk-blue/12 bg-white p-5">
+        <section id="per-uitbetaling" className="scroll-mt-24 rounded-2xl border border-vtk-blue/12 bg-white p-5">
           <div className="flex items-center gap-1.5">
             <h2 className="text-lg font-semibold">{nl ? "Per uitbetaling" : "Per payout"}</h2>
             <InfoTip label={nl ? "Hoe de site een uitbetaling nakijkt" : "How the site checks a payout"}>

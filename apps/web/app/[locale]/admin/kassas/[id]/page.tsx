@@ -286,7 +286,8 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
       )}
 
       {manage && !requested && hasDevices && (
-        <section className="rounded-2xl border border-vtk-blue/12 bg-white p-5">
+        // Na te kijken linkt hierheen voor een kassa die nog geen code heeft.
+        <section id="online-inkomsten" className="scroll-mt-24 rounded-2xl border border-vtk-blue/12 bg-white p-5">
           <h2 className="text-base font-semibold text-vtk-ink">{nl ? "Online inkomsten" : "Online income"}</h2>
           <p className="mt-1 mb-3 max-w-2xl text-sm text-vtk-muted">
             {nl

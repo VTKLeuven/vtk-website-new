@@ -5,9 +5,10 @@
  * een kolom gelijk is aan wat er via die bron binnenkwam (bij Mollie: wat er in
  * die maanden uitbetaald werd).
  */
-import { brusselsMinutesOfDay, brusselsYMD, ymdKey } from "@/lib/brussels";
-import { codeKey } from "./match";
+import { codeKey, REVIEW_DAY_START_HOUR, reviewDay } from "./match";
 import type { IncomeKindCode, IncomeSourceCode } from "./parse";
+
+export { REVIEW_DAY_START_HOUR, reviewDay };
 
 export const INCOME_SOURCES: readonly IncomeSourceCode[] = ["PAYCONIQ", "MOLLIE", "SUMUP", "EUROPABANK"];
 
@@ -107,6 +108,13 @@ export function computeIncomeOverview(
 }
 
 /**
+ * De dag van een rekening of standaardcode die "vanaf het begin" geldt: de
+ * eerste die Beheer instelt, zonder datum. Een export kan later oudere maanden
+ * opladen, dus de vroegste transactie van nu is geen begin.
+ */
+export const CHANNEL_FROM_START = "2000-01-01";
+
+/**
  * De rekening van een kanaal op een dag: de laatste wissel op of voor die dag.
  * `accounts` met `from` als "2026-11-26".
  */
@@ -119,25 +127,6 @@ export function accountOn(
     if (account.from <= day && (!best || account.from > best.from)) best = account;
   }
   return best?.bankAccount ?? null;
-}
-
-// -----------------------------------------------------------------------------
-// Na te kijken: de dag
-// -----------------------------------------------------------------------------
-
-/**
- * Een dag in Na te kijken loopt van 9:00 tot 9:00 de volgende ochtend, zoals
- * in het script van de eigen poging van Beheer (`DAY_START_HOUR`): een avond
- * die tot 4 uur loopt, blijft zo één groep. Enkel voor het groeperen; de
- * maand waarin een transactie telt, verandert er niet door.
- */
-export const REVIEW_DAY_START_HOUR = 9;
-
-/** De dag van een transactie in Na te kijken, "2026-10-09", op de Brusselse klok. */
-export function reviewDay(at: Date): string {
-  const ymd = brusselsYMD(at);
-  if (brusselsMinutesOfDay(at) >= REVIEW_DAY_START_HOUR * 60) return ymdKey(ymd);
-  return new Date(Date.UTC(ymd.year, ymd.month - 1, ymd.day - 1)).toISOString().slice(0, 10);
 }
 
 // -----------------------------------------------------------------------------

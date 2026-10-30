@@ -12255,18 +12255,20 @@ had.
   wat aan de kassa binnenkomt, is meestal van hetzelfde evenement. Het blijft
   een voorstel; hebben de ticketverkopen verschillende codes, dan vult de site
   niets in.
-- **Een gedeeld toestel hoort bij een kassa tot de volgende kassa, een toestel
-  van een post enkel tijdens haar uren.** Het rekenblad werkte niet met de uren
-  van een activiteit maar met wie de sticker had, in periodes die op elkaar
-  aansloten: Activiteiten had Evenement 1 van 1 oktober 18:00 tot 16 oktober
-  16:59, daarna Secretaris. Wie een dag later nog betaalt, hoort bij de post
-  die de sticker toen had. Een marge rond de uren werd niet gekozen: dat is een
-  willekeurig getal, en het laat nog altijd een gat tussen twee kassa's. Op een
-  toestel van een post is het anders: daar was het voor en na de kassa van de
-  eigenaar (Caraoke tot 04:00, daarna weer de broodjesbar). Welke soort het
-  is, zegt de standaardcode: een kanaal met een standaardcode op die dag is van
-  een post. Een code in de omschrijving gaat wel voor op de kassa: die zegt
-  zelf waar de betaling bij hoort, de kassa leidt het af uit uur en toestel.
+- **Een gedeeld toestel hoort bij een kassa tijdens haar uren plus de uitloop
+  van die nacht (tot 9:00), een toestel van een post enkel tijdens haar uren.**
+  Een eerste versie liet een gedeeld toestel doorlopen tot de volgende kassa
+  met dat toestel, naar het rekenblad met "wie de sticker had". Op de echte
+  kassa's van oktober 2026 bleek dat te ruim: tussen twee kassa's in de site
+  zitten soms activiteiten die geen kassa aanvroegen (zoals Mechanix BBQ op
+  29 september na Introduction Cantus op 25 september), en die kregen dan stil
+  de code van de vorige kassa van weken eerder. Nu geldt een kassa op een
+  gedeeld toestel tijdens haar uren en tot 9:00 de ochtend na haar einde
+  (`reviewDay`, zolang er geen volgende kassa begon), zodat nachtbetalingen bij
+  de avond blijven en een latere dag zonder kassa veilig bij Na te kijken
+  verschijnt. Op een toestel van een post geldt de kassa enkel tijdens haar
+  uren; daarvoor en daarna neemt de standaardcode van de eigenaar het weer
+  over. Een code in de omschrijving gaat altijd voor op de kassa.
 - **Veel bestanden tegelijk, elk een eigen import.** Europabank laat enkel per
   dag downloaden, dus een kwartaal van één terminal is een negentigtal
   bestanden. Beheer kiest ze samen; de site toont wat ze samen en per bestand

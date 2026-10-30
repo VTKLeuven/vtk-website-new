@@ -10,7 +10,7 @@ import {
   payoutMonth,
   type ParsedIncomeRow,
 } from "@/lib/inkomsten/parse";
-import { codeAtStart, incomeRuleText, matchTransaction, nameRuleKey, type MatchContext } from "@/lib/inkomsten/match";
+import { codeAtStart, deviceAt, incomeRuleText, matchTransaction, nameRuleKey, type MatchContext } from "@/lib/inkomsten/match";
 import { accountOn, computeIncomeOverview, reviewDay, type OverviewTransaction } from "@/lib/inkomsten/overview";
 import { combineImportSummaries } from "@/lib/inkomsten/importSummary";
 import {
@@ -474,16 +474,28 @@ describe("koppelregels", () => {
     expect(on("2026-09-29T21:30:00Z").rule).toBeNull();
   });
 
-  it("geeft een betaling op een gedeeld toestel de code van de kassa die het had, tot de volgende kassa", () => {
+  it("geeft een betaling op een gedeeld toestel de code van de kassa die avond/nacht, en zet latere dagen zonder kassa bij Na te kijken", () => {
     const at = (iso: string) =>
       matchTransaction({ ...base, source: "PAYCONIQ", channelId: "kanaal-gedeeld", occurredAt: new Date(iso) }, context);
     expect(at("2026-10-01T17:00:00Z")).toMatchObject({ rule: "CASH_REGISTER", code: { code: "700100" }, cashRegisterId: "kassa-td" });
-    // Dagen later, nog voor de volgende kassa: wie nog betaalt, hoort bij wie de sticker had.
-    expect(at("2026-10-05T12:00:00Z")).toMatchObject({ rule: "CASH_REGISTER", cashRegisterId: "kassa-td" });
-    // De volgende kassa heeft nog geen code: Na te kijken, niet de kassa ervoor.
-    expect(at("2026-10-17T12:00:00Z")).toMatchObject({ rule: null, cashRegisterId: null });
+    // Later diezelfde nacht (01:30 in Brussel, voor 09:00): hoort nog bij de uitloop van die avondkassa.
+    expect(at("2026-10-01T23:30:00Z")).toMatchObject({ rule: "CASH_REGISTER", cashRegisterId: "kassa-td" });
+    // Dagen later zonder nieuwe kassa: Na te kijken, niet stilzwijgend de vorige kassa.
+    expect(at("2026-10-05T12:00:00Z")).toMatchObject({ rule: null, cashRegisterId: null });
+    // De volgende kassa heeft nog geen code: Na te kijken.
+    expect(at("2026-10-16T18:00:00Z")).toMatchObject({ rule: null, cashRegisterId: null });
     // Voor de eerste kassa hoort de sticker bij niemand.
     expect(at("2026-09-30T12:00:00Z").rule).toBeNull();
+  });
+
+  it("noemt voor Na te kijken de kassa zonder code die het toestel die dag had", () => {
+    const at = (channelId: string, iso: string) => deviceAt({ channelId, occurredAt: new Date(iso) }, context).kassa;
+    // Dezelfde kassa als regel 4: die van 16 oktober (en haar nachtuitloop), nog zonder code.
+    expect(at("kanaal-gedeeld", "2026-10-16T21:00:00Z")).toMatchObject({ id: "kassa-zonder-code", code: null });
+    expect(at("kanaal-gedeeld", "2026-10-01T23:30:00Z")?.id).toBe("kassa-td");
+    expect(at("kanaal-gedeeld", "2026-10-05T12:00:00Z")).toBeNull();
+    // Het toestel van een post: buiten de uren van de kassa geen.
+    expect(at("kanaal-post", "2026-10-03T10:00:00Z")).toBeNull();
   });
 
   it("geeft een kassa op het toestel van een post enkel tijdens haar uren voorrang", () => {
@@ -716,9 +728,22 @@ describe("de kassacontrole", () => {
       terminal,
     });
 
-    it("telt enkel de uren wanneer een andere kassa hetzelfde toestel die dag had", () => {
+    it("telt enkel de uren wanneer een andere kassa hetzelfde toestel die dag had, ook als die de dag ervoor begon", () => {
       const placed = deviceWindow(avond, "BANCONTACT", "Evenementen", [use("kassa-avond", "Evenementen"), use("kassa-middag", "Evenementen")]);
       expect(placed).toEqual({ window: { start: startsAt, end: endsAt, wholeDay: false }, sharedThatDay: true });
+      // Zoals 24UL Eetstandje (20/10 20:00 tot 21/10 19:00) en Overwinningsfeestje (21/10 22:00 tot 22/10 05:00).
+      const eetstand: DeviceUse = {
+        registerId: "kassa-24ul",
+        date: new Date("2026-10-06T00:00:00Z"),
+        startsAt: new Date("2026-10-06T18:00:00Z"),
+        endsAt: new Date("2026-10-07T17:00:00Z"),
+        method: "BANCONTACT",
+        terminal: "Evenementen",
+      };
+      expect(deviceWindow(avond, "BANCONTACT", "Evenementen", [eetstand])).toEqual({
+        window: { start: startsAt, end: endsAt, wholeDay: false },
+        sharedThatDay: true,
+      });
     });
 
     it("telt de hele dag wanneer de andere kassa een ander toestel of een andere dag had", () => {

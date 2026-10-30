@@ -6,6 +6,7 @@ import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { rematchOpenTransactions } from "@/lib/inkomsten/server";
 import {
   planAccountingCodeImport,
   parseAccountingCodesCsv,
@@ -40,6 +41,19 @@ function revalidate(): void {
   // De keuzelijsten die de codes tonen.
   revalidatePath("/admin/tickets", "layout");
   revalidatePath("/admin/leden");
+}
+
+/**
+ * Een code erbij, of een code die een ander nummer of een andere naam kreeg:
+ * de online inkomsten koppelen meteen opnieuw. Een code in de tekst van een
+ * betaling ("706200 62005") wordt zo herkend zonder dat Beheer bij Na te
+ * kijken op "Opnieuw koppelen" moet drukken, en een hernoemde code geeft haar
+ * nieuwe naam door. Wat met de hand toegewezen werd en wat in een afgesloten
+ * periode valt, blijft.
+ */
+async function rematchIncome(): Promise<void> {
+  await rematchOpenTransactions();
+  revalidatePath("/admin/inkomsten", "layout");
 }
 
 function nameValue(formData: FormData): string {
@@ -139,6 +153,7 @@ export async function createAccountingCodeAction(
     target: accountingCodeLabel({ code, name }),
     summary: parentId ? "subcode toegevoegd" : "hoofdrekening toegevoegd",
   });
+  await rematchIncome();
   revalidate();
   return saveOk();
 }
@@ -229,6 +244,7 @@ export async function updateAccountingCodeAction(
     target: accountingCodeLabel({ code, name }),
     summary: changes.length > 0 ? changes.join(", ") : "niets gewijzigd",
   });
+  if (changes.length > 0) await rematchIncome();
   revalidate();
   return saveOk();
 }
@@ -298,6 +314,8 @@ export async function reorderAccountingCodesAction(input: {
       summary: `verhuisd naar ${parent!.code}: code ${row.code} -> ${code}`,
     });
   }
+  // Enkel een verhuisde subcode krijgt een ander nummer; slepen alleen verandert niets.
+  if (arriving.length > 0) await rematchIncome();
   revalidate();
   return saveOk();
 }
@@ -416,6 +434,7 @@ export async function importAccountingCodesAction(_prev: SaveState, formData: Fo
     target: fileName,
     summary: `${plan.create.length} nieuw, ${plan.rename.length} hernoemd, ${plan.unchanged} ongewijzigd`,
   });
+  if (plan.create.length + plan.rename.length > 0) await rematchIncome();
   revalidate();
   const missing = plan.missing.length;
   const kept = missing === 0 ? "" : missing === 1 ? " 1 code staat niet in het bestand en blijft staan." : ` ${missing} codes staan niet in het bestand en blijven staan.`;

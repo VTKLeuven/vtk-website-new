@@ -156,6 +156,9 @@ Beheer kiest één of meer CSV's tegelijk, ook door ze te slepen: Europabank laa
 enkel per dag downloaden, dus een kwartaal van één terminal is een negentigtal
 bestanden. Eerst toont de site wat ze per bestand en samen zouden doen
 (`previewIncomeImportAction`, `combineImportSummaries`), dan pas slaat ze op.
+De voorvertoning toont vier getallen (nieuw, automatisch gekoppeld, na te
+kijken, al eerder opgeladen) en, als het zo is, wat in een afgesloten periode
+valt; de uitsplitsing per koppelregel staat onder "Details per koppelregel".
 
 - Elk bestand wordt een eigen `IncomeImport`, zodat er één apart weg kan.
 - Eén onleesbaar bestand houdt de hele keuze tegen: de voorvertoning noemt het
@@ -196,9 +199,10 @@ In `matchTransaction`, de eerste die past wint. Enkel voor `PAYMENT` en `REFUND`
      (de SumUp van Theokot): enkel tijdens de uren van de kassa. Daarvoor en
      daarna neemt regel 6 het weer over.
    - **Een gedeeld toestel**, een kanaal zonder standaardcode (Evenementen 2,
-     de terminal van evenementen): vanaf het begin van de kassa tot het begin
-     van de volgende kassa met dat toestel. Wat voor de eerste kassa valt,
-     koppelt deze regel niet.
+     de terminal van evenementen): tijdens de uren van de kassa plus de
+     uitloop van diezelfde avond/nacht (tot 9:00 de ochtend erna, zolang er
+     geen volgende kassa met dat toestel begon). Wat op een andere dag buiten
+     elke kassa valt, blijft voor Na te kijken.
    - Een kassa zonder uren loopt van middernacht tot middernacht van haar dag
      (`registerInterval`).
    - Een kassa zonder code koppelt niets: wat in haar venster valt, gaat door
@@ -225,8 +229,17 @@ gewijzigde standaardcode of een ander toestel bij een kanaal loopt
 `rematchOpenTransactions` opnieuw over alles wat niet met de hand gezet is,
 buiten de afgesloten periodes. Een kassa doet hetzelfde wanneer ze aanvaard,
 gewijzigd, geteld of verwijderd wordt, of een andere code krijgt
-(`rematchIncome` in `app/actions/kassas.ts`). Dat kan ook met de knop "Opnieuw
-koppelen", na een nieuwe code in het register.
+(`rematchIncome` in `app/actions/kassas.ts`), en het register van de
+boekhoudcodes wanneer er een code bijkomt, een ander nummer of een andere naam
+krijgt, of een CSV er een toevoegt of hernoemt (`rematchIncome` in
+`app/actions/accountingCodes.ts`): zo wordt "706200 62005" in de tekst van een
+betaling herkend zonder dat Beheer iets moet weten. De vergelijking in
+`rematchOpenTransactions` kijkt ook naar de naam, zodat een hernoemde code haar
+nieuwe naam doorgeeft. De knop "Opnieuw koppelen" in de kop van Na te kijken
+blijft, voor wanneer iets anders veranderde.
+
+Een code verwijderen koppelt niet opnieuw: wat haar in de tekst had, houdt ze
+tot de volgende keer dat de regels lopen.
 
 ## Na te kijken
 
@@ -255,6 +268,21 @@ er die dag met de hand gezet werd, terug aan de koppelregels; ook wat in Na te
 kijken voor die dag gekozen werd. Zo hoeft een dag die de cursusdienst de SumUp
 van Theokot leende, geen twee regels met een standaardcode meer.
 
+**Het aantal op een groep linkt naar haar rijen** in Transacties, om ze te zien
+of er een deel van aan te vinken (een sticker die 's middags en 's avonds voor
+iets anders diende). Een dag gaat met `status=na-te-kijken`, `bron`, `kanaal`
+en `dag`; dat is precies de groep. Een vaste tekst gaat met `q` op de tekst
+zoals ze getoond wordt: een andere open tekst die haar bevat ("Onthaaldagen
+VIP" naast "Onthaaldagen") komt dan mee, want een `contains` kent de
+normalisering van `incomeRuleText` niet.
+
+**Een kassa zonder code** die het toestel had toen de betalingen van een groep
+binnenkwamen, staat op de groep met een link naar haar code
+(`/admin/kassas/[id]#online-inkomsten`). `deviceAt` in `match.ts` zoekt die
+kassa op zoals regel 4 het doet, dus de hint en de koppeling kunnen niet uit
+elkaar lopen. Kiest Beheer de code, dan koppelt `setCashRegisterCodeAction`
+opnieuw en verdwijnt de groep.
+
 ## Transacties
 
 Elke regel uit de exports, 100 per pagina, nieuwste eerst. Bovenaan staat
@@ -267,7 +295,16 @@ De filter staat in de URL en `parseTransactionFilter` leest ze: `bron`,
 `gekoppeld`, `telt-niet-mee`, of de regel die de code gaf: `met-de-hand`,
 `site`, `code-in-tekst`, `onthouden-tekst`, `kassa`, `standaardcode`), `soort`
 (`betaling`, `terugbetaling`, `kosten`, `reserve`), `van`, `tot` (op de maand
-waarin een transactie telt), `code` en `q`. `pagina` hoort er niet bij.
+waarin een transactie telt), `dag`, `code` en `q`. `pagina` hoort er niet bij.
+
+- `dag` ("2026-10-09") is de dag zoals in Na te kijken, van 9:00 tot 9:00 de
+  ochtend erna, op het moment van de betaling en niet op de maand waarin ze telt.
+- `code` (`codeWhere`): een volledige code ("700100" of "700100 10002") is die
+  code en niet haar subcodes. Zo linkt een rij van het overzicht, en 700100 en
+  700100 10002 kunnen elk een eigen rij hebben; het totaal bovenaan moet dan
+  hetzelfde blijven. Elf cijfers aaneen zijn beide schrijfwijzen, een deel van
+  een nummer ("7001") is het begin van de code, en met letters ("theokot")
+  zoekt het in de naam.
 
 Een klik op een rij opent het detail, met de code zoals ze staat en de keuze om
 ze te veranderen. Vinkjes kiezen er meer; is alles op de pagina aangevinkt, dan
@@ -298,7 +335,20 @@ kan de balk onderaan "alle die aan de filter voldoen" kiezen. Alles gaat door
 Een kanaal (`IncomeChannel`) ontstaat bij de eerste import die het noemt. Beheer
 vult in de instellingen in op welke rekening het stort, vanaf welke dag
 (`IncomeChannelAccount`), en eventueel een standaardcode vanaf welke dag
-(`IncomeChannelCode`; niet bij Mollie: dat is één kanaal voor alles). Het kanaal
+(`IncomeChannelCode`; niet bij Mollie: dat is één kanaal voor alles).
+
+**De eerste rekening en de eerste standaardcode mogen zonder dag**: dan gelden
+ze vanaf het begin (`CHANNEL_FROM_START`, 2000-01-01, op het scherm "vanaf het
+begin"). Een kanaal verschijnt pas na de eerste export, dus wie er daarna
+"vandaag" invulde, liet de maanden die net opgeladen werden zonder rekening en
+bij Na te kijken. Het begin is een vaste dag en niet de vroegste transactie: een
+export van oudere maanden kan later nog komen. Een wissel vraagt wel een dag
+("Wisselt vanaf"), anders zou een vergeten datum stil de eerste regel
+vervangen.
+
+Op het scherm is elk kanaal een rij die dichtgeklapt de rekening, de
+standaardcode en het toestel van vandaag toont; een kanaal zonder rekening
+staat open. Het kanaal
 is de sticker bij Payconiq, het account bij SumUp en het terminalnummer bij
 Europabank. De rekening van een transactie is die van de laatste wissel op of
 voor haar Brusselse dag (`accountOn`); ze bepaalt de kolom in het kwartaalblad,
@@ -404,10 +454,14 @@ geen verschil).
 3. geen maand heeft Mollie-kosten uit het balansrapport én uit de export per
    uitbetaling;
 4. elke uitbetaling van Mollie en SumUp klopt: afgevinkt tegen het uittreksel,
-   of gelijk aan de overschrijving van Mollie (`payoutState`);
+   of gelijk aan de overschrijving van Mollie (`payoutState`). De stap linkt
+   naar "Per uitbetaling";
 5. Na te kijken staat op nul;
 6. elk kanaal heeft een rekening;
 7. er is een kostencode, als er kosten zijn.
+
+Op het scherm staan de open stappen bovenaan, met hun link onderlijnd; wat in
+orde is, staat er grijs onder.
 
 Afvinken (`IncomePayoutCheck`) bewaart wie, wanneer en het bedrag van dat
 moment. Verandert het totaal van de uitbetaling daarna (een export met meer
@@ -533,10 +587,10 @@ fouten), dan opladen.
 - **Een standaardcode van voor de datum.** Bij de migratie naar
   `IncomeChannelCode` kreeg een bestaande standaardcode als begin de dag van de
   eerste transactie op dat kanaal, zodat niets wat ze al koppelde, losraakte.
-- **Een gedeeld toestel blijft bij de laatste kassa.** Zonder standaardcode
-  loopt een kassa door tot de volgende kassa met dat toestel, ook weken later.
-  Dient zo'n toestel ook buiten de kassa's, dan komt dat bij de kassa ervoor.
-  Geef het dan een standaardcode: dan telt een kassa er enkel tijdens haar uren.
+- **Een gedeeld toestel stopt na de nacht van de kassa.** Zonder standaardcode
+  loopt een kassa op een gedeeld toestel hoogstens tot 9:00 de ochtend na haar
+  einde (`reviewDay`). Een evenement dagen later zonder kassa belandt zo bij
+  Na te kijken in plaats van bij de vorige kassa.
 - **Een toestel hernoemen.** Regel 4 en de kassacontrole vergelijken de naam van
   het bakje of de rekening op de kassa met die op het kanaal. Een hernoemd
   toestel in de instellingen van de kassa's verandert niets aan oude kassa's,

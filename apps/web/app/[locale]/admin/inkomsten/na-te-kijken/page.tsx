@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
 import type { Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
+import Link from "@/components/ui/Link";
 import { requirePermission } from "@/lib/session";
 import { formatEuro } from "@/lib/rekeningen/expenses";
 import { listAccountingCodes } from "@/lib/accounting/server";
-import { listIncomeChannels, listUnassignedGroups } from "@/lib/inkomsten/server";
+import { listIncomeChannels, listUnassignedGroups, type UnassignedGroup } from "@/lib/inkomsten/server";
 import { REVIEW_DAY_START_HOUR } from "@/lib/inkomsten/overview";
 import { assignIncomeDayAction, assignIncomeGroupAction, rematchIncomeAction } from "@/app/actions/inkomsten";
 import { SaveForm } from "@/components/ui/SaveForm";
@@ -37,11 +38,36 @@ export default async function IncomeReviewPage({ params }: { params: Promise<{ l
     value.toLocaleTimeString(nl ? "nl-BE" : "en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Brussels" });
   const day = (value: Date) =>
     value.toLocaleDateString(nl ? "nl-BE" : "en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Brussels" });
+  // De rijen van een groep in Transacties, om ze te zien of er een deel van aan
+  // te vinken. Een dag is daar dezelfde dag van 9:00 tot 9:00; een vaste tekst
+  // zoekt op de tekst zoals ze getoond wordt.
+  const transactionsHref = (group: UnassignedGroup) => {
+    const params = new URLSearchParams({ status: "na-te-kijken", bron: group.source.toLowerCase() });
+    if (group.channelId) params.set("kanaal", group.channelId);
+    if (group.type === "day" && group.day) params.set("dag", group.day);
+    else if (group.label) params.set("q", group.label.slice(0, 100));
+    else return null;
+    return `${base}/admin/inkomsten/transacties?${params.toString()}`;
+  };
+  const countLink = (group: UnassignedGroup) => {
+    const count = `${group.count} ${group.count === 1 ? (nl ? "transactie" : "transaction") : nl ? "transacties" : "transactions"}`;
+    const href = transactionsHref(group);
+    if (!href) return count;
+    return (
+      <Link
+        href={href}
+        title={nl ? "Bekijk ze in Transacties, en vink er een deel van aan" : "See them in Transactions, and tick part of them"}
+        className="underline underline-offset-2 hover:text-vtk-navy"
+      >
+        {count}
+      </Link>
+    );
+  };
   // De dag van een groep, "2026-10-09": een avond tot 4 uur hoort bij de dag ervoor.
   const groupDay = (value: string) =>
     new Date(`${value}T12:00:00Z`).toLocaleDateString(nl ? "nl-BE" : "en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
-  const dayTip = (
-    <InfoTip label={nl ? "Waarom een dag om 9:00 begint" : "Why a day starts at 9:00"}>
+  const dayText = (
+    <>
       <p>
         {nl
           ? `Een dag loopt hier van ${REVIEW_DAY_START_HOUR}:00 tot ${REVIEW_DAY_START_HOUR}:00 de ochtend erna, zoals in het script van de eigen poging van Beheer. Een avond die tot 4 uur loopt, blijft zo één groep, onder de dag waarop ze begon.`
@@ -52,44 +78,53 @@ export default async function IncomeReviewPage({ params }: { params: Promise<{ l
           ? "Enkel het groeperen verandert: een betaling om 2 uur op 1 oktober telt nog altijd in oktober."
           : "Only the grouping changes: a payment at 2 am on 1 October still counts in October."}
       </p>
-    </InfoTip>
+    </>
   );
+  const dayTip = <InfoTip label={nl ? "Waarom een dag om 9:00 begint" : "Why a day starts at 9:00"}>{dayText}</InfoTip>;
 
   return (
     <div className="space-y-5">
-      <header>
-        <h1 className="text-2xl font-semibold">{nl ? "Na te kijken" : "To review"}</h1>
-        {/* De "i" naast de zin en niet erin: de uitleg heeft zelf alinea's, en
-            een <p> mag geen <p> bevatten. */}
-        <div className="mt-1 flex max-w-3xl items-start gap-1">
-          <p className="text-sm text-vtk-muted">
-            {nl
-              ? "Transacties die geen koppelregel kon plaatsen. Een vaste tekst kan je onthouden; wat iemand bij een sticker intypt en een kaartbetaling bij SumUp of Europabank staan per toestel per dag. Dient een toestel altijd voor dezelfde post, geef het dan een standaardcode bij Instellingen."
-              : "Transactions no matching rule could place. A fixed text can be remembered; what someone types at a sticker and a card payment at SumUp or Europabank are grouped per device per day. If a device always serves the same post, give it a default code under Settings."}
-          </p>
-          {dayTip}
+      <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div>
+          <h1 className="text-2xl font-semibold">{nl ? "Na te kijken" : "To review"}</h1>
+          {/* De "i" naast de zin en niet erin: de uitleg heeft zelf alinea's, en
+              een <p> mag geen <p> bevatten. */}
+          <div className="mt-1 flex max-w-3xl items-start gap-1">
+            <p className="text-sm text-vtk-muted">
+              {nl
+                ? "Wat geen koppelregel kon plaatsen, per vaste tekst of per toestel per dag."
+                : "What no matching rule could place, per fixed text or per device per day."}
+            </p>
+            <InfoTip label={nl ? "Hoe Na te kijken groepeert" : "How To review groups"}>
+              <p>
+                {nl
+                  ? "Een vaste tekst (Mollie, het printkrediet) staat per tekst, en die kan je onthouden. Wat iemand bij een sticker intypt en een kaartbetaling bij SumUp of Europabank staan per toestel per dag."
+                  : "A fixed text (Mollie, print credit) is grouped per text, and can be remembered. What someone types at a sticker and a card payment at SumUp or Europabank are grouped per device per day."}
+              </p>
+              {dayText}
+              <p>
+                {nl
+                  ? "Dient een toestel altijd voor dezelfde post, geef het dan een standaardcode bij Instellingen."
+                  : "If a device always serves the same post, give it a default code under Settings."}
+              </p>
+            </InfoTip>
+          </div>
         </div>
+        {/* Een nieuwe code in het register koppelt al vanzelf opnieuw; dit is
+            voor wanneer iets anders veranderde. */}
+        <SaveForm
+          action={rematchIncomeAction}
+          submitLabel={nl ? "Opnieuw koppelen" : "Match again"}
+          submitVariant="ghost"
+          submitSize="sm"
+          savingLabel={nl ? "Bezig met koppelen..." : "Matching..."}
+          savedMessage={nl ? "Opnieuw gekoppeld." : "Matched again."}
+          fallbackErrorMessage={nl ? "Koppelen mislukt." : "Matching failed."}
+          resetOnSuccess={false}
+        />
       </header>
 
       <IncomeNav base={base} nl={nl} active="na-te-kijken" openCount={openCount} />
-
-      <SaveForm
-        action={rematchIncomeAction}
-        submitLabel={nl ? "Opnieuw koppelen" : "Match again"}
-        submitVariant="ghost"
-        submitSize="sm"
-        savingLabel={nl ? "Bezig met koppelen..." : "Matching..."}
-        savedMessage={nl ? "Opnieuw gekoppeld." : "Matched again."}
-        fallbackErrorMessage={nl ? "Koppelen mislukt." : "Matching failed."}
-        resetOnSuccess={false}
-        className="flex items-center gap-3"
-      >
-        <p className="text-sm text-vtk-muted">
-          {nl
-            ? "Na een nieuwe boekhoudcode in het register: de koppelregels lopen opnieuw over alles wat niet met de hand toegewezen is."
-            : "After adding an accounting code: the rules run again over everything not assigned by hand."}
-        </p>
-      </SaveForm>
 
       {groups.length === 0 ? (
         <p className="rounded-2xl border border-vtk-blue/12 bg-white p-5 text-sm text-vtk-muted">
@@ -123,8 +158,8 @@ export default async function IncomeReviewPage({ params }: { params: Promise<{ l
                 <p className="tabular-nums">
                   <span className="font-semibold">{formatEuro(group.totalCents, locale)}</span>
                   <span className="text-vtk-muted">
-                    {" "}
-                    · {group.count} {group.count === 1 ? (nl ? "transactie" : "transaction") : nl ? "transacties" : "transactions"}
+                    {" · "}
+                    {countLink(group)}
                   </span>
                 </p>
               </div>
@@ -139,6 +174,19 @@ export default async function IncomeReviewPage({ params }: { params: Promise<{ l
                   {group.samples.map((sample) => `"${sample}"`).join(", ")}
                 </p>
               ) : null}
+              {group.kassas.map((kassa) => (
+                <p key={kassa.id} className="mt-2 rounded-lg bg-vtk-warn-soft/60 px-3 py-1.5 text-sm">
+                  {nl ? "Toen bij de kassa " : "Then with the register "}
+                  <span className="font-medium">
+                    {kassa.activity} ({kassa.postLabel})
+                  </span>
+                  {nl ? ", die nog geen code heeft. " : ", which has no code yet. "}
+                  <Link href={`${base}/admin/kassas/${kassa.id}#online-inkomsten`} className="underline underline-offset-2">
+                    {nl ? "Kies de code van de kassa" : "Choose the register's code"}
+                  </Link>
+                  {nl ? ", dan koppelen deze betalingen vanzelf." : ", and these payments match by themselves."}
+                </p>
+              ))}
               <div className="mt-3">
                 <AssignGroupForm
                   groupKey={group.key}

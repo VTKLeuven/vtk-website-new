@@ -52,6 +52,9 @@ export function UploadForm({
   const failed = files.flatMap((file) => (file.ok ? [] : [file]));
   const several = files.length > 1;
   const totals = good.length > 0 ? combineImportSummaries(good) : null;
+  const matched = totals
+    ? totals.rules.WEBSITE + totals.rules.CODE_IN_TEXT + totals.rules.CASH_REGISTER + totals.rules.NAME_RULE + totals.rules.CHANNEL_DEFAULT
+    : 0;
 
   return (
     <SaveForm
@@ -77,8 +80,8 @@ export function UploadForm({
         chooseLabel={nl ? "Exports kiezen" : "Choose exports"}
         hint={
           nl
-            ? "Eén of meer CSV's: van Payconiq, de betalingenexport en het balansrapport van Mollie, de transacties van een SumUp-account of van een Europabank-terminal. Europabank geeft er een per dag: kies ze allemaal tegelijk. Je kan ze ook hierheen slepen."
-            : "One or more CSVs: from Payconiq, the Mollie payments export and balance report, or the transactions of a SumUp account or a Europabank terminal. Europabank gives one per day: choose them all at once. You can also drag them here."
+            ? "Eén of meer CSV's van Payconiq, Mollie, SumUp of Europabank, gerust allemaal tegelijk; slepen kan ook."
+            : "One or more CSVs from Payconiq, Mollie, SumUp or Europabank, all at once if you like; dragging works too."
         }
         onChange={onFiles}
       />
@@ -123,60 +126,73 @@ export function UploadForm({
             {totals.sources.map((source) => SOURCE_LABELS[source]).join(", ")}
             {totals.firstAt ? ` · ${day(totals.firstAt)} ${nl ? "tot" : "to"} ${day(totals.lastAt)}` : ""}
           </p>
-          <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-3">
-            <Stat label={nl ? (several ? "Regels in de bestanden" : "Regels in het bestand") : several ? "Rows in the files" : "Rows in the file"} value={number(totals.total)} />
+          {/* Vier getallen die zeggen wat er gebeurt; hoe het gekoppeld werd, staat eronder. */}
+          <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-4">
             <Stat label={nl ? "Nieuw" : "New"} value={number(totals.created)} />
-            <Stat label={nl ? "Al eerder opgeladen" : "Already uploaded"} value={number(totals.duplicates)} />
-            {totals.updated ? <Stat label={nl ? "Nu uitbetaald" : "Now paid out"} value={number(totals.updated)} /> : null}
-            {totals.payouts ? <Stat label={nl ? "Uitbetalingen, nieuw of gewijzigd" : "Payouts, new or changed"} value={number(totals.payouts)} /> : null}
-            <Stat label={nl ? "Telt niet mee (mislukt, vervallen, geweigerd)" : "Does not count (failed, expired, denied)"} value={number(totals.skipped)} />
-            {totals.ignored ? (
-              <Stat
-                label={
-                  <span className="inline-flex items-center gap-1">
-                    {nl ? "Overgeslagen: zelfde geld" : "Skipped: same money"}
-                    <InfoTip label={nl ? "Welke regels hetzelfde geld zijn" : "Which rows are the same money"}>
-                      <p>
-                        {nl
-                          ? "Regels die geen nieuwe transactie zijn, maar geld dat al uit een andere regel komt:"
-                          : "Rows that are not a new transaction, but money that already comes from another row:"}
-                      </p>
-                      <ul className="list-disc space-y-1 pl-4">
-                        <li>
-                          {nl
-                            ? "SumUp zet naast elke verkoop een regel \"Uitbetaling\" met hetzelfde bedrag. Die geeft enkel het nummer en de dag van de uitbetaling."
-                            : "SumUp puts a \"Uitbetaling\" row with the same amount next to every sale. It only gives the payout's number and day."}
-                        </li>
-                        <li>
-                          {nl
-                            ? "Het balansrapport van Mollie noemt ook de betalingen, maar zonder hun uitbetaling: die komen uit de betalingenexport."
-                            : "The Mollie balance report also lists the payments, but without their payout: those come from the payments export."}
-                        </li>
-                        <li>
-                          {nl
-                            ? "De maandfactuur van Mollie in het balansrapport, voor een maand waarvan de kosten al uit de export per uitbetaling komen (\"Withheld fees\"): dat is dezelfde kost."
-                            : "The Mollie monthly invoice in the balance report, for a month whose fees already come from the export per payout (\"Withheld fees\"): that is the same fee."}
-                        </li>
-                      </ul>
-                    </InfoTip>
-                  </span>
-                }
-                value={number(totals.ignored)}
-              />
-            ) : null}
-            {totals.locked ? <Stat label={nl ? "In een afgesloten periode" : "In a closed period"} value={number(totals.locked)} /> : null}
-            <Stat label={nl ? "Betaling van de site" : "Payment from the site"} value={number(totals.rules.WEBSITE)} />
-            <Stat label={nl ? "Code in de tekst" : "Code in the text"} value={number(totals.rules.CODE_IN_TEXT)} />
-            {totals.rules.CASH_REGISTER ? (
-              <Stat label={nl ? "Een kassa" : "A cash register"} value={number(totals.rules.CASH_REGISTER)} />
-            ) : null}
-            <Stat label={nl ? "Onthouden tekst" : "Remembered text"} value={number(totals.rules.NAME_RULE)} />
-            {totals.rules.CHANNEL_DEFAULT ? (
-              <Stat label={nl ? "Standaardcode van het kanaal" : "Default code of the channel"} value={number(totals.rules.CHANNEL_DEFAULT)} />
-            ) : null}
+            <Stat label={nl ? "Automatisch gekoppeld" : "Matched automatically"} value={number(matched)} />
             <Stat label={nl ? "Na te kijken" : "To review"} value={number(totals.rules.OPEN)} />
-            {totals.feeRows ? <Stat label={nl ? "Kosten en reserve" : "Fees and reserve"} value={number(totals.feeRows)} /> : null}
+            <Stat label={nl ? "Al eerder opgeladen" : "Already uploaded"} value={number(totals.duplicates)} />
           </dl>
+          {totals.locked ? (
+            <p className="mt-2 text-vtk-warn">
+              {nl
+                ? `${number(totals.locked)} ${totals.locked === 1 ? "regel valt" : "regels vallen"} in een afgesloten periode en ${totals.locked === 1 ? "komt" : "komen"} er niet bij.`
+                : `${number(totals.locked)} ${totals.locked === 1 ? "row falls" : "rows fall"} in a closed period and ${totals.locked === 1 ? "is" : "are"} not added.`}
+            </p>
+          ) : null}
+          <details className="mt-3">
+            <summary className="cursor-pointer text-vtk-muted">{nl ? "Details per koppelregel" : "Details per matching rule"}</summary>
+            <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-3">
+              <Stat label={nl ? (several ? "Regels in de bestanden" : "Regels in het bestand") : several ? "Rows in the files" : "Rows in the file"} value={number(totals.total)} />
+              <Stat label={nl ? "Betaling van de site" : "Payment from the site"} value={number(totals.rules.WEBSITE)} />
+              <Stat label={nl ? "Code in de tekst" : "Code in the text"} value={number(totals.rules.CODE_IN_TEXT)} />
+              {totals.rules.CASH_REGISTER ? (
+                <Stat label={nl ? "Een kassa" : "A cash register"} value={number(totals.rules.CASH_REGISTER)} />
+              ) : null}
+              <Stat label={nl ? "Onthouden tekst" : "Remembered text"} value={number(totals.rules.NAME_RULE)} />
+              {totals.rules.CHANNEL_DEFAULT ? (
+                <Stat label={nl ? "Standaardcode van het kanaal" : "Default code of the channel"} value={number(totals.rules.CHANNEL_DEFAULT)} />
+              ) : null}
+              {totals.feeRows ? <Stat label={nl ? "Kosten en reserve" : "Fees and reserve"} value={number(totals.feeRows)} /> : null}
+              {totals.updated ? <Stat label={nl ? "Nu uitbetaald" : "Now paid out"} value={number(totals.updated)} /> : null}
+              {totals.payouts ? <Stat label={nl ? "Uitbetalingen, nieuw of gewijzigd" : "Payouts, new or changed"} value={number(totals.payouts)} /> : null}
+              <Stat label={nl ? "Telt niet mee (mislukt, vervallen, geweigerd)" : "Does not count (failed, expired, denied)"} value={number(totals.skipped)} />
+              {totals.ignored ? (
+                <Stat
+                  label={
+                    <span className="inline-flex items-center gap-1">
+                      {nl ? "Overgeslagen: zelfde geld" : "Skipped: same money"}
+                      <InfoTip label={nl ? "Welke regels hetzelfde geld zijn" : "Which rows are the same money"}>
+                        <p>
+                          {nl
+                            ? "Regels die geen nieuwe transactie zijn, maar geld dat al uit een andere regel komt:"
+                            : "Rows that are not a new transaction, but money that already comes from another row:"}
+                        </p>
+                        <ul className="list-disc space-y-1 pl-4">
+                          <li>
+                            {nl
+                              ? "SumUp zet naast elke verkoop een regel \"Uitbetaling\" met hetzelfde bedrag. Die geeft enkel het nummer en de dag van de uitbetaling."
+                              : "SumUp puts a \"Uitbetaling\" row with the same amount next to every sale. It only gives the payout's number and day."}
+                          </li>
+                          <li>
+                            {nl
+                              ? "Het balansrapport van Mollie noemt ook de betalingen, maar zonder hun uitbetaling: die komen uit de betalingenexport."
+                              : "The Mollie balance report also lists the payments, but without their payout: those come from the payments export."}
+                          </li>
+                          <li>
+                            {nl
+                              ? "De maandfactuur van Mollie in het balansrapport, voor een maand waarvan de kosten al uit de export per uitbetaling komen (\"Withheld fees\"): dat is dezelfde kost."
+                              : "The Mollie monthly invoice in the balance report, for a month whose fees already come from the export per payout (\"Withheld fees\"): that is the same fee."}
+                          </li>
+                        </ul>
+                      </InfoTip>
+                    </span>
+                  }
+                  value={number(totals.ignored)}
+                />
+              ) : null}
+            </dl>
+          </details>
           {totals.newChannels.length > 0 ? (
             <p className="mt-2 text-vtk-muted">
               {nl ? (totals.newChannels.length === 1 ? "Nieuw kanaal: " : "Nieuwe kanalen: ") : totals.newChannels.length === 1 ? "New channel: " : "New channels: "}

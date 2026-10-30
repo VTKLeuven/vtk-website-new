@@ -8,7 +8,7 @@
  * De import schrijft nooit in een kassa: het ingetikte bedrag is wat Beheer
  * afleest, en een verschil is een waarschuwing. Zie docs/inkomsten.md.
  */
-import { registerInterval, timeInputValue, type PaymentMethod } from "@/lib/kassas/kassa";
+import { intervalsOverlap, registerInterval, timeInputValue, type PaymentMethod } from "@/lib/kassas/kassa";
 
 export type ControlWindow = { start: Date; end: Date; wholeDay: boolean };
 
@@ -85,7 +85,14 @@ export function kassaCheck(typedCents: number | null, amount: Pick<KassaImportAm
 export type ControlRegister = { id: string; date: Date; startsAt: Date | null; endsAt: Date | null };
 
 /** Een toestel op een kassa, zoals `CashRegisterPayment` het bewaart. */
-export type DeviceUse = { registerId: string; date: Date; method: PaymentMethod; terminal: string };
+export type DeviceUse = {
+  registerId: string;
+  date: Date;
+  startsAt?: Date | null;
+  endsAt?: Date | null;
+  method: PaymentMethod;
+  terminal: string;
+};
 
 /** Een betaling of terugbetaling op een kanaal dat een toestel is. */
 export type ControlTransaction = { channelId: string; occurredAt: Date; amountCents: number };
@@ -97,8 +104,10 @@ export function deviceKey(method: PaymentMethod, terminal: string): string {
 
 /**
  * Het venster van één toestel op één kassa. `uses` is elk toestel op elke
- * kassa van die dag; had een andere kassa hetzelfde toestel, dan telt de
- * controle enkel de uren.
+ * kassa van die dagen; raakt het interval van een andere kassa met hetzelfde
+ * toestel het dagvenster van deze kassa (ook een kassa van de dag ervoor die na
+ * middernacht doorloopt, zoals een 24-uurseetstand), dan telt de controle enkel
+ * de eigen uren.
  */
 export function deviceWindow(
   register: ControlRegister,
@@ -106,12 +115,16 @@ export function deviceWindow(
   terminal: string,
   uses: readonly DeviceUse[],
 ): { window: ControlWindow; sharedThatDay: boolean } {
+  const wholeDay = kassaControlWindow(register, false);
   const sharedThatDay = uses.some(
     (use) =>
       use.registerId !== register.id &&
-      use.date.getTime() === register.date.getTime() &&
       use.method === method &&
-      use.terminal === terminal,
+      use.terminal === terminal &&
+      intervalsOverlap(
+        wholeDay,
+        registerInterval({ date: use.date, startsAt: use.startsAt ?? null, endsAt: use.endsAt ?? null }),
+      ),
   );
   return { window: kassaControlWindow(register, sharedThatDay), sharedThatDay };
 }

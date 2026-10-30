@@ -6,7 +6,7 @@ import { requirePermission } from "@/lib/session";
 import { formatEuro } from "@/lib/rekeningen/expenses";
 import { listAccountingCodes } from "@/lib/accounting/server";
 import { dateToMonth } from "@/lib/inkomsten/parse";
-import { INCOME_SOURCES } from "@/lib/inkomsten/overview";
+import { INCOME_SOURCES, REVIEW_DAY_START_HOUR } from "@/lib/inkomsten/overview";
 import { countUnassigned, listIncomeChannels, listIncomeTransactions, TRANSACTION_PAGE } from "@/lib/inkomsten/server";
 import { KIND_PARAMS, paramGetter, parseTransactionFilter, STATE_PARAMS } from "@/lib/inkomsten/transactionFilter";
 import { changeIncomeTransactionsAction } from "@/app/actions/inkomsten";
@@ -16,7 +16,7 @@ import { KIND_LABELS, monthLabel, RULE_LABELS, SOURCE_LABELS } from "../shared";
 import { TransactionTable, type TransactionRow } from "./TransactionTable";
 
 /** De parameters die de filter vormen; `pagina` hoort er niet bij. */
-const FILTER_KEYS = ["bron", "kanaal", "status", "soort", "van", "tot", "code", "q"] as const;
+const FILTER_KEYS = ["bron", "kanaal", "status", "soort", "van", "tot", "dag", "code", "q"] as const;
 
 /** De volledige lijst, te filteren en per pagina; een cel van het overzicht linkt hiernaartoe. */
 export default async function IncomeTransactionsPage({
@@ -178,9 +178,13 @@ export default async function IncomeTransactionsPage({
           <span className="block text-xs text-vtk-muted">{nl ? "Tot en met" : "Up to"}</span>
           <input type="month" name="tot" defaultValue={filter.to ?? ""} className="rounded-lg border border-vtk-blue/15 px-2 py-1" />
         </label>
+        <label title={nl ? `Van ${REVIEW_DAY_START_HOUR}:00 tot ${REVIEW_DAY_START_HOUR}:00 de ochtend erna, zoals Na te kijken` : `From ${REVIEW_DAY_START_HOUR}:00 to ${REVIEW_DAY_START_HOUR}:00 the next morning, as in To review`}>
+          <span className="block text-xs text-vtk-muted">{nl ? "Dag" : "Day"}</span>
+          <input type="date" name="dag" defaultValue={filter.day ?? ""} className="rounded-lg border border-vtk-blue/15 px-2 py-1" />
+        </label>
         <label>
           <span className="block text-xs text-vtk-muted">{nl ? "Code" : "Code"}</span>
-          <input name="code" defaultValue={filter.code ?? ""} className="w-36 rounded-lg border border-vtk-blue/15 px-2 py-1" />
+          <input name="code" defaultValue={filter.code ?? ""} placeholder={nl ? "nummer of naam" : "number or name"} className="w-40 rounded-lg border border-vtk-blue/15 px-2 py-1" />
         </label>
         <label>
           <span className="block text-xs text-vtk-muted">{nl ? "Zoeken" : "Search"}</span>

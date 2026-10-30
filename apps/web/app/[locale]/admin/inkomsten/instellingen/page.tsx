@@ -1,11 +1,16 @@
 import { notFound } from "next/navigation";
 import type { Locale } from "@vtk/i18n";
 import { ConfirmIconButton, DeleteIconButton } from "@/components/ui/DeleteIconButton";
+import { InfoTip } from "@/components/ui/InfoTip";
+import { AdminDisclosure } from "@/components/admin/AdminDisclosure";
 import { UndoIcon } from "@/components/ui/icons";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import { listAccountingCodes } from "@/lib/accounting/server";
 import { getCashRegisterConfig } from "@/lib/kassas/server";
+import { brusselsYMD, ymdKey } from "@/lib/brussels";
+import { channelCodeOn } from "@/lib/inkomsten/match";
+import { accountOn, CHANNEL_FROM_START } from "@/lib/inkomsten/overview";
 import {
   countUnassigned,
   getIncomeConfig,
@@ -20,14 +25,13 @@ import {
   deleteIncomeChannelCodeAction,
   deleteIncomeNameRuleAction,
   reopenIncomePeriodAction,
-  saveIncomeChannelDeviceAction,
-  saveIncomeChannelLabelAction,
+  saveIncomeChannelAction,
   saveIncomeSettingsAction,
 } from "@/app/actions/inkomsten";
 import { IncomeNav } from "../IncomeNav";
 import { incomeErrorMessages } from "../messages";
 import { SOURCE_LABELS, periodLabel } from "../shared";
-import { ChannelAccountForm, ChannelCodeForm, ChannelDeviceForm, ChannelLabelForm, FeeCodeForm } from "./SettingsForms";
+import { ChannelAccountForm, ChannelBasicsForm, ChannelCodeForm, FeeCodeForm } from "./SettingsForms";
 
 /**
  * Alles over VTK zelf, ingevuld door Beheer: de kostencode, op welke rekening
@@ -55,6 +59,12 @@ export default async function IncomeSettingsPage({ params }: { params: Promise<{
   const errorMessages = incomeErrorMessages(locale);
   const common = { locale, errorMessages } as const;
   const date = (value: Date) => value.toLocaleDateString(nl ? "nl-BE" : "en-GB", { timeZone: "UTC" });
+  const day = (value: Date) => value.toISOString().slice(0, 10);
+  const today = ymdKey(brusselsYMD(new Date()));
+  // "vanaf 1/10/2026", of "vanaf het begin" voor de eerste regel zonder datum.
+  const since = (value: Date) =>
+    day(value) === CHANNEL_FROM_START ? (nl ? "vanaf het begin" : "from the start") : `${nl ? "vanaf" : "from"} ${date(value)}`;
+  const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
   // Een Payconiq-kanaal is een Payconiq-rekening, een SumUp-account of
   // Europabank-terminal een Bancontact-bakje. Een toestel dat intussen hernoemd
   // werd, blijft kiesbaar op het kanaal waar het al stond.
@@ -88,134 +98,203 @@ export default async function IncomeSettingsPage({ params }: { params: Promise<{
 
       <section className="rounded-2xl border border-vtk-blue/12 bg-white p-5">
         <h2 className="text-lg font-semibold">{nl ? "Kanalen" : "Channels"}</h2>
-        <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
-          {nl
-            ? "Elke Payconiq-QR-code, elk SumUp-account, elke Europabank-terminal en elk Mollie-profiel dat in een export voorkwam. Vul in op welke rekening het stort, vanaf welke dag: wisselt een toestel van rekening, dan voeg je een nieuwe regel toe en houdt wat ervoor binnenkwam de oude. Dient een toestel voor dezelfde post (zoals de QR-code en de SumUp van Theokot), geef het dan een standaardcode vanaf een dag: wat erop binnenkomt en geen andere regel koppelt, krijgt die code in plaats van bij Na te kijken te staan. Gebruikt een andere post het toestel een tijd, voeg dan vanaf die dag een regel zonder code toe, en vanaf de dag erna weer de code."
-            : "Every Payconiq QR code, SumUp account, Europabank terminal and Mollie profile that appeared in an export. Fill in which account it pays into, from which day: if a device changes account, add a new row and what came in before keeps the old one. If a device serves the same post (like Theokot's QR code and SumUp), give it a default code from a day: what comes in on it and no other rule matches gets that code instead of waiting under To review. If another post uses the device for a while, add a row without a code from that day, and the code again from the day after."}
-        </p>
+        {/* De "i" naast de zin en niet erin: de uitleg heeft zelf alinea's. */}
+        <div className="mt-1 flex max-w-3xl items-start gap-1">
+          <p className="text-sm text-vtk-muted">
+            {nl
+              ? "Stel per kanaal de bankrekening in, en eventueel een standaardcode of het toestel van de kassa's."
+              : "Set the bank account per channel, and a default code or the cash register device if needed."}
+          </p>
+          <InfoTip label={nl ? "Hoe rekeningen en standaardcodes werken" : "How accounts and default codes work"}>
+            <p>
+              {nl
+                ? "Elke Payconiq-QR-code, elk SumUp-account, elke Europabank-terminal en elk Mollie-profiel dat in een export voorkwam, staat hier vanzelf."
+                : "Every Payconiq QR code, SumUp account, Europabank terminal and Mollie profile that appeared in an export shows up here by itself."}
+            </p>
+            <p>
+              {nl
+                ? "De eerste rekening en de eerste standaardcode gelden vanaf het begin, ook voor wat al opgeladen werd. Wisselt een toestel later van rekening of van post, voeg dan een regel toe vanaf die dag: wat ervoor binnenkwam, houdt de oude."
+                : "The first account and the first default code apply from the start, also to what was uploaded already. If a device later changes account or post, add a row from that day: what came in before keeps the old one."}
+            </p>
+            <p>
+              {nl
+                ? "Met een standaardcode krijgt wat erop binnenkomt en geen andere regel koppelt die code, in plaats van bij Na te kijken te staan. Gebruikt een andere post het toestel een tijd, voeg dan vanaf die dag een regel zonder code toe, en vanaf de dag erna weer de code. Voor één dag kan het ook bij Na te kijken."
+                : "With a default code, what comes in on it and no other rule matches gets that code instead of waiting under To review. If another post uses the device for a while, add a row without a code from that day, and the code again from the day after. For a single day, use To review."}
+            </p>
+          </InfoTip>
+        </div>
         {channels.length === 0 ? (
           <p className="mt-3 text-sm text-vtk-muted">
             {nl ? "Nog geen kanalen: die verschijnen bij de eerste export." : "No channels yet: they appear with the first export."}
           </p>
         ) : (
-          <ul className="mt-4 divide-y divide-vtk-blue/10">
-            {channels.map((channel) => (
-              <li key={channel.id} className="space-y-2 py-4 first:pt-0 last:pb-0">
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <p className="font-medium">
-                    {channel.identifier}
-                    <span className="font-normal text-vtk-muted">
-                      {" "}
-                      · {SOURCE_LABELS[channel.source]} · {channel._count.transactions}{" "}
-                      {nl ? "transacties" : "transactions"}
-                    </span>
-                  </p>
-                  <ChannelLabelForm
-                    {...common}
-                    action={saveIncomeChannelLabelAction}
-                    channelId={channel.id}
-                    label={channel.label}
-                    placeholder={nl ? "Eigen naam (optioneel)" : "Own name (optional)"}
-                  />
-                </div>
-                <p className="text-xs font-medium uppercase tracking-wide text-vtk-muted">{nl ? "Rekening" : "Account"}</p>
-                {channel.accounts.length === 0 ? (
-                  <p className="text-sm text-vtk-warn">{nl ? "Nog geen rekening ingesteld." : "No account set yet."}</p>
-                ) : (
-                  <ul className="text-sm">
-                    {channel.accounts.map((account) => {
-                      const from = account.from.toISOString().slice(0, 10);
-                      return (
-                        <li key={from} className="flex items-center gap-3">
-                          <span className="w-32 tabular-nums text-vtk-muted">
-                            {nl ? "vanaf" : "from"} {date(account.from)}
-                          </span>
-                          <span className="tabular-nums">{account.bankAccount}</span>
-                          <DeleteIconButton
-                            action={deleteIncomeChannelAccountAction}
-                            fields={{ channelId: channel.id, from }}
-                            label={nl ? "Verwijderen" : "Delete"}
-                            srLabel={nl ? `Rekening vanaf ${date(account.from)} verwijderen` : `Delete account from ${date(account.from)}`}
-                            title={nl ? "Deze rekening verwijderen?" : "Delete this account?"}
-                            description={
-                              nl
-                                ? `Vanaf ${date(account.from)} geldt dan weer de rekening ervoor, of geen. De transacties zelf blijven; enkel het totaal per rekening in het overzicht verandert.`
-                                : `From ${date(account.from)} the account before it applies again, or none. The transactions stay; only the total per account in the overview changes.`
-                            }
-                            confirmLabel={nl ? "Verwijderen" : "Delete"}
-                            cancelLabel={nl ? "Annuleren" : "Cancel"}
-                            successMessage={nl ? "Rekening verwijderd." : "Account deleted."}
-                            errorMessages={errorMessages}
-                          />
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-                <ChannelAccountForm {...common} action={addIncomeChannelAccountAction} channelId={channel.id} />
-                {channel.source !== "MOLLIE" ? (
-                  <>
-                    <p className="pt-2 text-xs font-medium uppercase tracking-wide text-vtk-muted">
-                      {nl ? "Standaardcode" : "Default code"}
-                    </p>
-                    {channel.codes.length === 0 ? (
-                      <p className="text-sm text-vtk-muted">
-                        {nl
-                          ? "Geen: wat geen andere regel koppelt, staat bij Na te kijken."
-                          : "None: what no other rule matches waits under To review."}
-                      </p>
-                    ) : (
-                      <ul className="text-sm">
-                        {channel.codes.map((entry) => {
-                          const from = entry.from.toISOString().slice(0, 10);
-                          return (
-                            <li key={from} className="flex items-center gap-3">
-                              <span className="w-32 shrink-0 tabular-nums text-vtk-muted">
-                                {nl ? "vanaf" : "from"} {date(entry.from)}
-                              </span>
-                              {entry.accountingCode ? (
-                                <span>
-                                  <span className="tabular-nums">{entry.accountingCode.code}</span> {entry.accountingCode.name}
-                                </span>
-                              ) : (
-                                <span className="text-vtk-muted">{nl ? "geen: naar Na te kijken" : "none: to To review"}</span>
-                              )}
-                              <DeleteIconButton
-                                action={deleteIncomeChannelCodeAction}
-                                fields={{ channelId: channel.id, from }}
-                                label={nl ? "Verwijderen" : "Delete"}
-                                srLabel={nl ? `Standaardcode vanaf ${date(entry.from)} verwijderen` : `Delete default code from ${date(entry.from)}`}
-                                title={nl ? "Deze standaardcode verwijderen?" : "Delete this default code?"}
-                                description={
-                                  nl
-                                    ? `Vanaf ${date(entry.from)} geldt dan weer de standaardcode ervoor, of geen. Transacties die hun code van deze regel kregen, worden opnieuw gekoppeld; wat met de hand toegewezen werd en wat in een afgesloten periode valt, blijft.`
-                                    : `From ${date(entry.from)} the default code before it applies again, or none. Transactions that got their code from this row are matched again; manual assignments and closed periods stay.`
-                                }
-                                confirmLabel={nl ? "Verwijderen" : "Delete"}
-                                cancelLabel={nl ? "Annuleren" : "Cancel"}
-                                successMessage={nl ? "Standaardcode verwijderd." : "Default code deleted."}
-                                errorMessages={errorMessages}
+          <ul className="mt-4 space-y-2">
+            {channels.map((channel) => {
+              const account = accountOn(
+                channel.accounts.map((entry) => ({ from: day(entry.from), bankAccount: entry.bankAccount })),
+                today,
+              );
+              const code = channelCodeOn(
+                channel.codes.map((entry) => ({ from: day(entry.from), code: entry.accountingCode })),
+                today,
+              );
+              const device = channel.cashMethod && channel.cashTerminal ? `${channel.cashMethod === "PAYCONIQ" ? "Payconiq" : "Bancontact"}: ${channel.cashTerminal}` : null;
+              return (
+                <li key={channel.id}>
+                  {/* Dicht tot je er iets aan wil doen; open zolang de rekening nog ontbreekt. */}
+                  <AdminDisclosure
+                    variant="row"
+                    defaultOpen={channel.accounts.length === 0}
+                    summary={
+                      <>
+                        <span className="font-medium">{channel.label || channel.identifier}</span>
+                        <span className="text-sm text-vtk-muted">
+                          {channel.label ? ` (${channel.identifier})` : ""} · {SOURCE_LABELS[channel.source]} · {channel._count.transactions}{" "}
+                          {nl ? "transacties" : "transactions"}
+                        </span>
+                        <span className="block text-sm text-vtk-muted">
+                          {account ? (
+                            <span className="tabular-nums">{account}</span>
+                          ) : (
+                            <span className="text-vtk-warn">{nl ? "Nog geen rekening" : "No account yet"}</span>
+                          )}
+                          {channel.source !== "MOLLIE"
+                            ? code
+                              ? ` · ${nl ? "standaard" : "default"} ${code.code} ${code.name}`
+                              : ` · ${nl ? "geen standaardcode" : "no default code"}`
+                            : ""}
+                          {device ? ` · ${device}` : ""}
+                        </span>
+                      </>
+                    }
+                  >
+                    <div className="space-y-4">
+                      <ChannelBasicsForm
+                        {...common}
+                        action={saveIncomeChannelAction}
+                        channelId={channel.id}
+                        isMollie={channel.source === "MOLLIE"}
+                        label={channel.label}
+                        identifier={channel.identifier}
+                        bankAccount={channel.accounts[0]?.bankAccount ?? null}
+                        accountingCodeId={channel.codes[0]?.accountingCode?.id ?? null}
+                        codes={codes}
+                        device={channel.cashMethod && channel.cashTerminal ? `${channel.cashMethod}|${channel.cashTerminal}` : ""}
+                        deviceOptions={deviceOptions(channel)}
+                      />
+
+                      <details
+                        open={
+                          channel.accounts.length > 1 ||
+                          channel.codes.length > 1 ||
+                          channel.accounts.some((entry) => day(entry.from) !== CHANNEL_FROM_START) ||
+                          channel.codes.some((entry) => day(entry.from) !== CHANNEL_FROM_START)
+                        }
+                        className="border-t border-vtk-blue/10 pt-3 text-sm"
+                      >
+                        <summary className="cursor-pointer text-xs font-medium text-vtk-muted hover:text-vtk-ink">
+                          {nl
+                            ? "Wisselde dit kanaal vanaf een bepaalde datum van rekening of post?"
+                            : "Did this channel change account or post from a specific date?"}
+                        </summary>
+                        <div className="mt-3 space-y-3">
+                          <div className="space-y-1.5">
+                            <p className="text-xs font-medium uppercase tracking-wide text-vtk-muted">
+                              {nl ? "Rekening per startdatum" : "Account by start date"}
+                            </p>
+                            {channel.accounts.length > 0 ? (
+                              <ul className="text-sm">
+                                {channel.accounts.map((entry) => {
+                                  const from = day(entry.from);
+                                  return (
+                                    <li key={from} className="flex items-center gap-3">
+                                      <span className="w-32 tabular-nums text-vtk-muted">{since(entry.from)}</span>
+                                      <span className="tabular-nums">{entry.bankAccount}</span>
+                                      <DeleteIconButton
+                                        action={deleteIncomeChannelAccountAction}
+                                        fields={{ channelId: channel.id, from }}
+                                        label={nl ? "Verwijderen" : "Delete"}
+                                        srLabel={nl ? `Rekening ${since(entry.from)} verwijderen` : `Delete account ${since(entry.from)}`}
+                                        title={nl ? "Deze rekening verwijderen?" : "Delete this account?"}
+                                        description={
+                                          nl
+                                            ? `${capitalize(since(entry.from))} geldt dan weer de rekening ervoor, of geen. De transacties zelf blijven; enkel het totaal per rekening in het overzicht verandert.`
+                                            : `${capitalize(since(entry.from))} the account before it applies again, or none. The transactions stay; only the total per account in the overview changes.`
+                                        }
+                                        confirmLabel={nl ? "Verwijderen" : "Delete"}
+                                        cancelLabel={nl ? "Annuleren" : "Cancel"}
+                                        successMessage={nl ? "Rekening verwijderd." : "Account deleted."}
+                                        errorMessages={errorMessages}
+                                      />
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            ) : null}
+                            <ChannelAccountForm
+                              {...common}
+                              action={addIncomeChannelAccountAction}
+                              channelId={channel.id}
+                              first={false}
+                            />
+                          </div>
+
+                          {channel.source !== "MOLLIE" ? (
+                            <div className="space-y-1.5">
+                              <p className="text-xs font-medium uppercase tracking-wide text-vtk-muted">
+                                {nl ? "Standaardcode per startdatum" : "Default code by start date"}
+                              </p>
+                              {channel.codes.length > 0 ? (
+                                <ul className="text-sm">
+                                  {channel.codes.map((entry) => {
+                                    const from = day(entry.from);
+                                    return (
+                                      <li key={from} className="flex items-center gap-3">
+                                        <span className="w-32 shrink-0 tabular-nums text-vtk-muted">{since(entry.from)}</span>
+                                        {entry.accountingCode ? (
+                                          <span>
+                                            <span className="tabular-nums">{entry.accountingCode.code}</span> {entry.accountingCode.name}
+                                          </span>
+                                        ) : (
+                                          <span className="text-vtk-muted">{nl ? "geen: naar Na te kijken" : "none: to To review"}</span>
+                                        )}
+                                        <DeleteIconButton
+                                          action={deleteIncomeChannelCodeAction}
+                                          fields={{ channelId: channel.id, from }}
+                                          label={nl ? "Verwijderen" : "Delete"}
+                                          srLabel={nl ? `Standaardcode ${since(entry.from)} verwijderen` : `Delete default code ${since(entry.from)}`}
+                                          title={nl ? "Deze standaardcode verwijderen?" : "Delete this default code?"}
+                                          description={
+                                            nl
+                                              ? `${capitalize(since(entry.from))} geldt dan weer de standaardcode ervoor, of geen. Transacties die hun code van deze regel kregen, worden opnieuw gekoppeld; wat met de hand toegewezen werd en wat in een afgesloten periode valt, blijft.`
+                                              : `${capitalize(since(entry.from))} the default code before it applies again, or none. Transactions that got their code from this row are matched again; manual assignments and closed periods stay.`
+                                          }
+                                          confirmLabel={nl ? "Verwijderen" : "Delete"}
+                                          cancelLabel={nl ? "Annuleren" : "Cancel"}
+                                          successMessage={nl ? "Standaardcode verwijderd." : "Default code deleted."}
+                                          errorMessages={errorMessages}
+                                        />
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              ) : null}
+                              <ChannelCodeForm
+                                {...common}
+                                action={addIncomeChannelCodeAction}
+                                channelId={channel.id}
+                                codes={codes}
+                                first={false}
                               />
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                    <ChannelCodeForm {...common} action={addIncomeChannelCodeAction} channelId={channel.id} codes={codes} />
-                    <p className="pt-2 text-xs font-medium uppercase tracking-wide text-vtk-muted">
-                      {nl ? "Kassa's" : "Cash registers"}
-                    </p>
-                    <ChannelDeviceForm
-                      {...common}
-                      action={saveIncomeChannelDeviceAction}
-                      channelId={channel.id}
-                      value={channel.cashMethod && channel.cashTerminal ? `${channel.cashMethod}|${channel.cashTerminal}` : ""}
-                      options={deviceOptions(channel)}
-                    />
-                  </>
-                ) : null}
-              </li>
-            ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      </details>
+                    </div>
+                  </AdminDisclosure>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

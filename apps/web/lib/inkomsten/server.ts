@@ -6,6 +6,7 @@ import { brusselsWallClockMinutes, brusselsYMD, parseYMD, shiftYMD, ymdKey } fro
 import { listAccountingCodes } from "@/lib/accounting/server";
 import {
   codeKey,
+  deviceAt,
   incomeRuleLabel,
   incomeRuleText,
   matchTransaction,
@@ -563,8 +564,8 @@ export async function importIncomeExport(
 
 /**
  * Alle koppelingen die niet met de hand gezet zijn, opnieuw berekenen: na een
- * onthouden tekst, een nieuwe code in het register, een verwijderde regel, of
- * een kassa die aanvaard, gewijzigd of verwijderd werd. Een afgesloten periode
+ * onthouden tekst, een nieuwe of gewijzigde code in het register, een
+ * verwijderde regel, of een kassa die aanvaard, gewijzigd of verwijderd werd. Een afgesloten periode
  * blijft zoals ze is. Geeft het aantal wijzigingen terug.
  */
 export async function rematchOpenTransactions(): Promise<number> {
@@ -587,6 +588,7 @@ export async function rematchOpenTransactions(): Promise<number> {
       occurredAt: true,
       periodMonth: true,
       accountingCode: true,
+      accountingCodeName: true,
       rule: true,
       ticketPaymentId: true,
       membershipPaymentId: true,
@@ -624,6 +626,8 @@ export async function rematchOpenTransactions(): Promise<number> {
     const same =
       match.rule === row.rule &&
       (match.code?.code ?? null) === row.accountingCode &&
+      // Ook de naam: een hernoemde code in het register geeft haar nieuwe naam door.
+      (match.code?.name ?? null) === row.accountingCodeName &&
       match.ticketPaymentId === row.ticketPaymentId &&
       match.membershipPaymentId === row.membershipPaymentId &&
       match.uitleenPaymentId === row.uitleenPaymentId &&
@@ -680,6 +684,7 @@ export type UnassignedGroup = {
   key: string;
   type: "text" | "day";
   source: IncomeSourceCode;
+  channelId: string | null;
   channel: string;
   /** De tekst om te tonen, met hoofdletters; de groep zelf gaat op kleine letters. */
   label: string | null;
@@ -689,6 +694,11 @@ export type UnassignedGroup = {
   firstAt: Date;
   lastAt: Date;
   samples: string[];
+  /**
+   * Aanvaarde kassa's zonder code die het toestel hadden toen deze betalingen
+   * binnenkwamen: met een code had regel 4 ze gekoppeld.
+   */
+  kassas: Array<{ id: string; activity: string; postLabel: string }>;
 };
 
 type GroupRow = {
@@ -736,8 +746,10 @@ async function openRows(): Promise<Array<GroupRow & { channelName: string }>> {
 }
 
 export async function listUnassignedGroups(): Promise<UnassignedGroup[]> {
+  const [rows, channelCodes, cashRegisters] = await Promise.all([openRows(), channelCodeContext(), cashRegisterContext()]);
   const groups = new Map<string, UnassignedGroup>();
-  for (const row of await openRows()) {
+  const kassaIds = new Map<string, Set<string>>();
+  for (const row of rows) {
     const { key, type, day } = groupKeyOf(row);
     let group = groups.get(key);
     if (!group) {
@@ -745,6 +757,7 @@ export async function listUnassignedGroups(): Promise<UnassignedGroup[]> {
         key,
         type,
         source: row.source,
+        channelId: row.channelId,
         channel: row.channelName,
         label: type === "text" ? incomeRuleLabel(row.description) : null,
         day,
@@ -753,15 +766,32 @@ export async function listUnassignedGroups(): Promise<UnassignedGroup[]> {
         firstAt: row.occurredAt,
         lastAt: row.occurredAt,
         samples: [],
+        kassas: [],
       };
       groups.set(key, group);
+      kassaIds.set(key, new Set());
     }
+    // Een kassa had het toestel, maar nog geen code: dan valt de betaling door.
+    const { kassa } = deviceAt(row, { channelCodes, cashRegisters });
+    if (kassa && !kassa.code) kassaIds.get(key)!.add(kassa.id);
     group.count++;
     group.totalCents += row.amountCents;
     if (row.occurredAt < group.firstAt) group.firstAt = row.occurredAt;
     if (row.occurredAt > group.lastAt) group.lastAt = row.occurredAt;
     if (row.description && group.samples.length < 3 && !group.samples.includes(row.description)) {
       group.samples.push(row.description);
+    }
+  }
+  const ids = [...new Set([...kassaIds.values()].flatMap((set) => [...set]))];
+  if (ids.length > 0) {
+    const registers = await prisma.cashRegister.findMany({
+      where: { id: { in: ids } },
+      orderBy: [{ date: "asc" }, { startsAt: "asc" }],
+      select: { id: true, activity: true, postLabel: true },
+    });
+    for (const group of groups.values()) {
+      const own = kassaIds.get(group.key)!;
+      group.kassas = registers.filter((register) => own.has(register.id));
     }
   }
   // De grootste bedragen eerst: daar zit het meeste werk van de boekhouder.
@@ -1348,13 +1378,33 @@ async function controlAmounts(
   const linked = wanted.filter((item) => devices.has(deviceKey(item.method, item.terminal)));
   if (linked.length === 0) return wanted.map(() => null);
 
-  const days = [...new Map(linked.map((item) => [item.register.date.getTime(), item.register.date])).values()];
+  const dayMs = 86_400_000;
+  const days = [
+    ...new Map(
+      linked.flatMap((item) => {
+        const ms = item.register.date.getTime();
+        return [ms - dayMs, ms, ms + dayMs].map((t) => [t, new Date(t)] as const);
+      }),
+    ).values(),
+  ];
   const uses: DeviceUse[] = (
     await prisma.cashRegisterPayment.findMany({
-      where: { register: { date: { in: days } } },
-      select: { registerId: true, method: true, terminal: true, register: { select: { date: true } } },
+      where: { register: { status: { not: "REQUESTED" }, date: { in: days } } },
+      select: {
+        registerId: true,
+        method: true,
+        terminal: true,
+        register: { select: { date: true, startsAt: true, endsAt: true } },
+      },
     })
-  ).map((use) => ({ registerId: use.registerId, date: use.register.date, method: use.method, terminal: use.terminal }));
+  ).map((use) => ({
+    registerId: use.registerId,
+    date: use.register.date,
+    startsAt: use.register.startsAt,
+    endsAt: use.register.endsAt,
+    method: use.method,
+    terminal: use.terminal,
+  }));
 
   const placed = wanted.map((item) =>
     devices.has(deviceKey(item.method, item.terminal)) ? deviceWindow(item.register, item.method, item.terminal, uses) : null,
@@ -1469,7 +1519,7 @@ export async function listIncomeChannels() {
       cashMethod: true,
       cashTerminal: true,
       accounts: { orderBy: { from: "asc" }, select: { from: true, bankAccount: true } },
-      codes: { orderBy: { from: "asc" }, select: { from: true, accountingCode: { select: { code: true, name: true } } } },
+      codes: { orderBy: { from: "asc" }, select: { from: true, accountingCode: { select: { id: true, code: true, name: true } } } },
       _count: { select: { transactions: true } },
     },
   });

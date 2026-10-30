@@ -69,8 +69,8 @@ export function checkText(
         ? {
             ok: true,
             text: nl
-              ? "Elke voorbije maand heeft regels van elke bron, en van elk SumUp-account en elke terminal."
-              : "Every past month has rows from every source, and from every SumUp account and terminal.",
+              ? "Elke voorbije maand heeft regels van elke bron en elk toestel."
+              : "Every past month has rows from every source and device.",
           }
         : {
             ok: false,
@@ -133,6 +133,7 @@ export function checkText(
                   ? `; bij ${check.changed} veranderde het bedrag na het afvinken.`
                   : `; ${check.changed} changed after checking.`
                 : "."),
+            href: "#per-uitbetaling",
           };
     case "open":
       return check.ok

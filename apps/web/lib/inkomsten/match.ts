@@ -12,8 +12,20 @@
  *
  * Zie docs/inkomsten.md.
  */
-import { brusselsYMD, ymdKey } from "@/lib/brussels";
+import { brusselsMinutesOfDay, brusselsYMD, ymdKey } from "@/lib/brussels";
 import type { IncomeKindCode, IncomeSourceCode } from "./parse";
+
+/**
+ * Een dag in Na te kijken (en voor de uitloop van een avondkassa) loopt van
+ * 9:00 tot 9:00 de volgende ochtend op de Brusselse klok.
+ */
+export const REVIEW_DAY_START_HOUR = 9;
+
+export function reviewDay(at: Date): string {
+  const ymd = brusselsYMD(at);
+  if (brusselsMinutesOfDay(at) >= REVIEW_DAY_START_HOUR * 60) return ymdKey(ymd);
+  return new Date(Date.UTC(ymd.year, ymd.month - 1, ymd.day - 1)).toISOString().slice(0, 10);
+}
 
 export type IncomeRuleCode = "MANUAL" | "WEBSITE" | "CODE_IN_TEXT" | "NAME_RULE" | "CHANNEL_DEFAULT" | "CASH_REGISTER";
 
@@ -91,22 +103,24 @@ export function channelCodeOn(entries: readonly ChannelCodeEntry[], day: string)
 }
 
 /**
- * De kassa die het toestel had op een moment, zoals het rekenblad met "wie de
- * sticker had" werkte. Een toestel van een post (een kanaal met een
- * standaardcode op die dag: de SumUp van Theokot) hoort enkel tijdens haar uren
- * bij een kassa; daarvoor en daarna geldt de standaardcode weer. Een gedeeld
- * toestel (de stickers en de terminal van evenementen) hoort bij een kassa vanaf
- * haar begin tot het begin van de volgende kassa met dat toestel: wie een dag
- * later nog betaalt, hoort bij de post die de sticker toen nog had. Voor de
- * eerste kassa hoort het bij geen.
+ * De kassa die het toestel had op een moment. Een toestel van een post (een
+ * kanaal met een standaardcode op die dag: de SumUp van Theokot) hoort enkel
+ * tijdens haar uren bij een kassa; daarvoor en daarna geldt de standaardcode
+ * weer. Een gedeeld toestel (de stickers en de terminal van evenementen) hoort
+ * bij een kassa tijdens haar uren plus de uitloop van diezelfde avond/nacht
+ * (tot 9:00 de ochtend erna, zolang er geen volgende kassa begon). Wat op een
+ * andere dag buiten een kassa binnenkomt, gaat naar Na te kijken.
  */
 export function kassaAt(spans: readonly KassaSpan[], at: Date, postDevice: boolean): KassaSpan | null {
-  if (postDevice) return spans.find((span) => span.start <= at && at < span.end) ?? null;
+  const active = spans.find((span) => span.start <= at && at < span.end);
+  if (active || postDevice) return active ?? null;
   let latest: KassaSpan | null = null;
   for (const span of spans) {
     if (span.start <= at && (!latest || span.start > latest.start)) latest = span;
   }
-  return latest;
+  if (!latest) return null;
+  const endMoment = new Date(Math.max(latest.start.getTime(), latest.end.getTime() - 1));
+  return reviewDay(at) === reviewDay(endMoment) ? latest : null;
 }
 
 /**
@@ -160,6 +174,22 @@ function codeAlone(text: string | null, codes: ReadonlyMap<string, CodeSnapshot>
   return codes.get(codeKey(text)) ?? null;
 }
 
+/**
+ * Wat het toestel van een betaling op dat moment was: de kassa die het had
+ * (regel 4, ook een zonder code) en de standaardcode van het kanaal die dag
+ * (regel 6). Na te kijken gebruikt de kassa zonder code als hint.
+ */
+export function deviceAt(
+  input: Pick<MatchInput, "channelId" | "occurredAt">,
+  context: Pick<MatchContext, "channelCodes" | "cashRegisters">,
+): { kassa: KassaSpan | null; channelCode: CodeSnapshot | null } {
+  const entries = input.channelId ? context.channelCodes.get(input.channelId) : undefined;
+  const channelCode = entries ? channelCodeOn(entries, ymdKey(brusselsYMD(input.occurredAt))) : null;
+  const spans = input.channelId ? context.cashRegisters.get(input.channelId) : undefined;
+  const kassa = spans?.length ? kassaAt(spans, input.occurredAt, channelCode !== null) : null;
+  return { kassa, channelCode };
+}
+
 export function matchTransaction(input: MatchInput, context: MatchContext): MatchResult {
   const none: MatchResult = {
     rule: null,
@@ -193,10 +223,7 @@ export function matchTransaction(input: MatchInput, context: MatchContext): Matc
 
   // 4. Een kassa die het toestel had. Een kassa zonder code koppelt niets: wat
   // ze had, valt door naar de regels hieronder.
-  const entries = input.channelId ? context.channelCodes.get(input.channelId) : undefined;
-  const channelCode = entries ? channelCodeOn(entries, ymdKey(brusselsYMD(input.occurredAt))) : null;
-  const spans = input.channelId ? context.cashRegisters.get(input.channelId) : undefined;
-  const kassa = spans?.length ? kassaAt(spans, input.occurredAt, channelCode !== null) : null;
+  const { kassa, channelCode } = deviceAt(input, context);
   if (kassa?.code) return { ...links, rule: "CASH_REGISTER", code: kassa.code, cashRegisterId: kassa.id };
 
   // 5. Een onthouden tekst.

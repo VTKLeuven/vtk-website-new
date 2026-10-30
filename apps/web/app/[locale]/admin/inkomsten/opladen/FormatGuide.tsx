@@ -63,8 +63,8 @@ const GUIDES: Guide[] = [
     format: "europabank",
     title: { nl: "Europabank", en: "Europabank" },
     what: {
-      nl: "De transacties van één terminal, zoals het portaal ze per dag geeft. De opmaak tot maart 2026 en die erna.",
-      en: "The transactions of one terminal, as the portal gives them per day. The layout until March 2026 and the one after.",
+      nl: "De transacties van één terminal, zoals het portaal ze per dag geeft: kies de bestanden van een maand allemaal tegelijk. De opmaak tot maart 2026 en die erna.",
+      en: "The transactions of one terminal, as the portal gives them per day: choose the files of a month all at once. The layout until March 2026 and the one after.",
     },
     counts: {
       nl: "Telt: resultaat Sale of Goedgekeurd; de commissie wordt een kost. Het uur komt uit Tijd (103804 is 10:38:04).",
