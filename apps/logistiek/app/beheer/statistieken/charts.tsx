@@ -121,7 +121,17 @@ function Legend({ entries }: { entries: Array<{ color: string; label: string }> 
   );
 }
 
-function Panel({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+function Panel({
+  id,
+  title,
+  hint,
+  children,
+}: {
+  id?: string;
+  title: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     // `min-w-0`: zonder dat is de kleinste breedte van een raster-item zijn
     // inhoud, en dan groeit de kolom mee met de breedste tabel erin in plaats
@@ -129,7 +139,11 @@ function Panel({ title, hint, children }: { title: string; hint?: string; childr
     // telefoon twee keer zo breed als het venster: de tabel met alle ritten
     // (46rem) en de drukteweergave (34rem) duwden de kolom naar 778px in een
     // venster van 390.
-    <section className="min-w-0 rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-5">
+    <section
+      id={id}
+      tabIndex={id ? -1 : undefined}
+      className="min-w-0 scroll-mt-4 rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-5 outline-none"
+    >
       <h3 className="text-base font-semibold tracking-tight text-vtk-ink">{title}</h3>
       {hint ? <p className="mt-1 text-sm text-vtk-muted">{hint}</p> : null}
       <div className="mt-4">{children}</div>
@@ -187,10 +201,12 @@ const PODIUM = ['🥇', '🥈', '🥉'];
 function DriverLeaderboard({
   drivers,
   vehicles,
+  selected,
   onPickDriver,
 }: {
   drivers: DriverStat[];
   vehicles: Array<{ id: string; name: string }>;
+  selected: string | null;
   onPickDriver: (driverId: string | null) => void;
 }) {
   const [shown, setShown] = useState(10);
@@ -216,11 +232,16 @@ function DriverLeaderboard({
       <ul className="mt-3 grid gap-2">
         {top.map((driver, index) => (
           <li key={driver.id}>
+            {/* Een tweede klik laat los. De filter werkt twee panelen lager; de
+                markering hier is wat je ziet zonder te scrollen. */}
             <button
               type="button"
-              onClick={() => onPickDriver(driver.id)}
+              onClick={() => onPickDriver(selected === driver.id ? null : driver.id)}
+              aria-pressed={selected === driver.id}
               title={`Enkel de uren en de ritten van ${driver.name}`}
-              className="grid w-full grid-cols-[1.25rem_minmax(6rem,9rem)_1fr_4.5rem] items-center gap-2 rounded-lg px-1 py-0.5 text-left transition hover:bg-vtk-paper"
+              className={`grid w-full grid-cols-[1.25rem_minmax(6rem,9rem)_1fr_4.5rem] items-center gap-2 rounded-lg px-1 py-0.5 text-left transition hover:bg-vtk-paper ${
+                selected === driver.id ? 'bg-vtk-paper ring-1 ring-vtk-navy/20' : ''
+              }`}
             >
               <span aria-hidden className="text-sm tabular-nums text-vtk-muted">
                 {PODIUM[index] ?? index + 1}
@@ -730,12 +751,14 @@ function TripTable({
   rows,
   driverFilter,
   groupFilter,
+  filterLabel,
   onClearFilters,
   periodLabel,
 }: {
   rows: StatsRow[];
   driverFilter: string | null;
   groupFilter: string | null;
+  filterLabel: string | null;
   onClearFilters: () => void;
   periodLabel: string;
 }) {
@@ -849,6 +872,7 @@ function TripTable({
 
       <p className="mt-2 text-xs text-vtk-muted">
         {shown.length} van {rows.length} ritten
+        {filterLabel ? <span>, {filterLabel}</span> : null}
       </p>
 
       {/* `position: relative` op de scroller: `sr-only` is absoluut
@@ -903,6 +927,28 @@ export function TransportCharts({ stats, periodLabel }: { stats: TransportStats;
 
   const busiest = stats.perGroup[0] ?? null;
   const focusedDriver = stats.perDriver.find((driver) => driver.id === driverFilter) ?? null;
+  const focusedGroup = stats.perGroup.find((group) => group.key === groupFilter) ?? null;
+  const filterLabel = focusedDriver
+    ? `enkel die van ${focusedDriver.name}`
+    : focusedGroup
+      ? `enkel die voor ${focusedGroup.name}`
+      : null;
+
+  /**
+   * Naar de tabel met alle ritten, die vier panelen lager staat.
+   *
+   * De knop "Deze ritten in de tabel onderaan" zette enkel de filter, en die
+   * tabel staat ver buiten beeld: wie erop drukte, zag niets gebeuren en dacht
+   * dat de knop stuk was. Focus erbij, zodat ook een toetsenbord daar verder
+   * gaat.
+   */
+  const showTable = () => {
+    const table = document.getElementById('alle-ritten');
+    if (!table) return;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    table.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    table.focus({ preventScroll: true });
+  };
 
   return (
     <div className="grid gap-5">
@@ -955,6 +1001,7 @@ export function TransportCharts({ stats, periodLabel }: { stats: TransportStats;
         <DriverLeaderboard
           drivers={stats.perDriver}
           vehicles={stats.vehicles}
+          selected={driverFilter}
           onPickDriver={(id) => {
             setDriverFilter(id);
             setGroupFilter(null);
@@ -968,6 +1015,7 @@ export function TransportCharts({ stats, periodLabel }: { stats: TransportStats;
           onPickGroup={(key) => {
             setGroupFilter(key);
             setDriverFilter(null);
+            showTable();
           }}
         />
       </Panel>
@@ -1012,11 +1060,12 @@ export function TransportCharts({ stats, periodLabel }: { stats: TransportStats;
         </Panel>
       </div>
 
-      <Panel title="Alle ritten">
+      <Panel id="alle-ritten" title="Alle ritten">
         <TripTable
           rows={stats.rows}
           driverFilter={driverFilter}
           groupFilter={groupFilter}
+          filterLabel={filterLabel}
           onClearFilters={() => {
             setDriverFilter(null);
             setGroupFilter(null);

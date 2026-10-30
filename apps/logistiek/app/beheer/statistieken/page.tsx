@@ -93,7 +93,11 @@ export default async function StatistiekenPage({
         : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
     }`;
 
-  const previousYear = Math.max(currentWorkingYear() - 1, FIRST_WORKING_YEAR);
+  const thisYear = currentWorkingYear();
+  const previousYear = thisYear - 1;
+  // In het eerste werkingsjaar is er geen vorig jaar: die chip was dan een
+  // tweede "Werkingsjaar 26-27" die naar precies hetzelfde scherm leidde.
+  const periods = PERIODS.filter((option) => option.key !== 'vorigjaar' || thisYear > FIRST_WORKING_YEAR);
 
   return (
     <div className="grid gap-5">
@@ -112,7 +116,7 @@ export default async function StatistiekenPage({
               Periode
             </p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {PERIODS.map((option) => (
+              {periods.map((option) => (
                 <Link
                   key={option.key}
                   href={hrefWith({ periode: option.key === 'jaar' ? null : option.key })}
@@ -120,7 +124,7 @@ export default async function StatistiekenPage({
                   className={chip(period.key === option.key)}
                 >
                   {option.key === 'jaar'
-                    ? `Werkingsjaar ${workingYearLabel(currentWorkingYear())}`
+                    ? `Werkingsjaar ${workingYearLabel(thisYear)}`
                     : option.key === 'vorigjaar'
                       ? `Werkingsjaar ${workingYearLabel(previousYear)}`
                       : option.label}

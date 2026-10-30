@@ -467,21 +467,28 @@ export function resolvePeriod(
     const to = new Date(now.getTime() + 86_400_000);
     return { from: new Date(to.getTime() - 30 * 86_400_000), to, label: 'Laatste 30 dagen', key };
   }
-  if (key === 'vorigjaar') {
-    // Er is geen historiek van voor het eerste werkingsjaar; dan blijft het bij
-    // dat jaar in plaats van een leeg scherm met een jaartal dat niet bestaat.
-    const previous = Math.max(year - 1, FIRST_WORKING_YEAR);
+  // Er is geen historiek van voor het eerste werkingsjaar; dan is "vorig jaar"
+  // gewoon dit jaar, in plaats van een leeg scherm met een jaartal dat niet
+  // bestaat. Het scherm toont die keuze dan ook niet.
+  if (key === 'vorigjaar' && year > FIRST_WORKING_YEAR) {
+    const previous = year - 1;
     return { ...workingYearRange(previous), label: `Werkingsjaar ${workingYearLabel(previous)}`, key };
   }
-  if (key === 'aangepast' && custom.from && custom.to) {
-    return {
-      from: custom.from,
-      // Inclusief de gekozen einddag: wie "tot 30 september" kiest, bedoelt die
-      // dag erbij.
-      to: new Date(custom.to.getTime() + 86_400_000),
-      label: `${dayLabel.format(custom.from)} tot ${dayLabel.format(custom.to)}`,
-      key,
-    };
+  if (key === 'aangepast') {
+    if (custom.from && custom.to) {
+      return {
+        from: custom.from,
+        // Inclusief de gekozen einddag: wie "tot 30 september" kiest, bedoelt
+        // die dag erbij.
+        to: new Date(custom.to.getTime() + 86_400_000),
+        label: `${dayLabel.format(custom.from)} tot ${dayLabel.format(custom.to)}`,
+        key,
+      };
+    }
+    // Nog geen datums: dit werkingsjaar, maar de keuze blijft "aangepast". Wie
+    // net op die knop drukte, moet de datumvelden te zien krijgen; met de sleutel
+    // terug op "jaar" verschenen die nooit.
+    return { ...workingYearRange(year), label: `Werkingsjaar ${workingYearLabel(year)}`, key };
   }
   return { ...workingYearRange(year), label: `Werkingsjaar ${workingYearLabel(year)}`, key: 'jaar' };
 }
