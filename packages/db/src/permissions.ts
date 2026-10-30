@@ -234,6 +234,10 @@ export const PERMISSIONS = [
   // code kiezen. Kiezen mag iedereen die een event maakt; de lijst zelf
   // aanpassen is het werk van de penning. Zie docs/ticketing.md.
   { code: "accounting.manage", labelNl: "Boekhoudcodes beheren", labelEn: "Manage accounting codes", category: "accounting" },
+  // Oriëntatie online inkomsten (/admin/inkomsten): exports van Payconiq en
+  // Mollie opladen en elke betaling aan een boekhoudcode koppelen. Gewoon in de
+  // rol admin (IT en Groep 5), zoals de rekeningen en de kassa's.
+  { code: "income.manage", labelNl: "Online inkomsten uploaden en koppelen", labelEn: "Import and match online income", category: "accounting" },
 
   // Bestuursorgaan (/admin/bestuursorgaan): welke budgetten en resultaten er
   // per post langs het BO passeerden, gelezen uit de gedeelde drive. Enkel voor

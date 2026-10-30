@@ -1,11 +1,13 @@
 import Link from "@/components/ui/Link";
 
-export type KassaCaps = { request: boolean; manage: boolean };
+/** `control`: de lijst met afwijkingen, voor Beheer met `income.manage`. */
+export type KassaCaps = { request: boolean; manage: boolean; control: boolean };
 
 type Tab = { key: string; href: string; labelNl: string; labelEn: string; cap: keyof KassaCaps | "permanent" };
 
 const TABS: Tab[] = [
   { key: "overzicht", href: "", labelNl: "Overzicht", labelEn: "Overview", cap: "manage" },
+  { key: "controle", href: "/controle", labelNl: "Controle", labelEn: "Check", cap: "control" },
   // Het label komt van `permanentTabLabel`: "Kassa Theokot" voor de post zelf.
   { key: "vast", href: "/vast", labelNl: "", labelEn: "", cap: "permanent" },
   { key: "mijn", href: "/mijn", labelNl: "Mijn aanvragen", labelEn: "My requests", cap: "request" },

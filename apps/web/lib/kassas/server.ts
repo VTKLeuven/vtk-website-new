@@ -39,6 +39,11 @@ export type CashRegisterAccess = {
   canRequest: boolean;
   /** Beheer: alle kassa's, aanvaarden, status, tellen, instellingen. */
   canManage: boolean;
+  /**
+   * Beheer dat ook de online inkomsten mag zien: de kassacontrole bij het
+   * tellen en de lijst met afwijkingen (`income.manage`).
+   */
+  canCheckIncome: boolean;
   /** De posten van de gebruiker dit werkingsjaar. */
   postIds: string[];
 };
@@ -52,6 +57,7 @@ export function accessFor(session: SessionPayload): CashRegisterAccess {
     // activiteit die enkel per mail aangevraagd werd.
     canRequest: canManage || has("cashRegisters.request"),
     canManage,
+    canCheckIncome: canManage && has("income.manage"),
     postIds: session.groups.map((group) => group.id),
   };
 }

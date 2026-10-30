@@ -3,15 +3,24 @@
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { Label, Select } from "@vtk/ui";
+import { AccountingCodePicker } from "@/components/admin/AccountingCodePicker";
 import Link from "@/components/ui/Link";
 import { SaveForm } from "@/components/ui/SaveForm";
 import type { SaveAction } from "@/lib/saveState";
+import type { AccountingCodeOption } from "@/lib/accounting/codes";
 import { formatEuro } from "@/lib/rekeningen/expenses";
 import type { Counts, PaymentMethod } from "@/lib/kassas/kassa";
 import { countInputsFrom, DenominationGrid, inputsTotalCents } from "./DenominationGrid";
 
 /** Een bakje of rekening uit de instellingen, en bij wie het dan al ligt. */
 export type DeviceOption = { name: string; busyWith: string | null };
+
+/**
+ * Een voorstel voor de code van de kassa, uit de gekoppelde ticketverkopen.
+ * `id` is null wanneer die verschillende codes hebben: dan staat er niets
+ * ingevuld, enkel welke codes ze hebben.
+ */
+export type CodeSuggestion = { id: string | null; note: string };
 
 /**
  * Aanvaarden, zoals Beheer het doet: de startkassa staat er al met het
@@ -21,6 +30,10 @@ export type DeviceOption = { name: string; busyWith: string | null };
  *
  * Een toestel dat op dat moment al bij een andere activiteit ligt, staat
  * uitgegrijsd met de naam van die activiteit; de action weigert het ook.
+ *
+ * Krijgt de kassa een toestel, dan kiest Beheer ook de boekhoudcode: wat er
+ * op haar bakje of rekening binnenkomt, krijgt die code in de online
+ * inkomsten. De post kiest ze niet.
  */
 export function AcceptForm({
   locale,
@@ -30,6 +43,8 @@ export function AcceptForm({
   startCounts,
   bancontact,
   payconiq,
+  codes,
+  suggestion,
   confirmDescription,
   errorMessages,
 }: {
@@ -41,6 +56,8 @@ export function AcceptForm({
   /** `null` = de post vroeg er geen. */
   bancontact: DeviceOption[] | null;
   payconiq: DeviceOption[] | null;
+  codes: AccountingCodeOption[];
+  suggestion: CodeSuggestion | null;
   confirmDescription: string;
   errorMessages: Record<string, string>;
 }) {
@@ -150,6 +167,26 @@ export function AcceptForm({
         <div className="grid gap-4 sm:grid-cols-2">
           {bancontact && devicePicker("BANCONTACT", bancontact)}
           {payconiq && devicePicker("PAYCONIQ", payconiq)}
+        </div>
+      )}
+
+      {(bancontact || payconiq) && (
+        <div className="max-w-md">
+          <Label htmlFor={`${uid}-code`}>{nl ? "Boekhoudcode" : "Accounting code"}</Label>
+          <AccountingCodePicker
+            id={`${uid}-code`}
+            codes={codes}
+            name="accountingCodeId"
+            defaultValue={suggestion?.id ?? null}
+            locale={locale}
+            noneLabel={nl ? "Nog geen code" : "No code yet"}
+          />
+          <p className="mt-1 text-xs text-vtk-muted">
+            {nl
+              ? "Wat er tijdens deze kassa op haar bakje of rekening binnenkomt, krijgt deze code in de online inkomsten."
+              : "What comes in on its terminal or account during this register gets this code in the online income."}
+          </p>
+          {suggestion ? <p className="mt-1 text-xs text-vtk-muted">{suggestion.note}</p> : null}
         </div>
       )}
     </SaveForm>

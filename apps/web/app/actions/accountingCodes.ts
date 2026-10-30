@@ -6,6 +6,12 @@ import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { rematchOpenTransactions } from "@/lib/inkomsten/server";
+import {
+  planAccountingCodeImport,
+  parseAccountingCodesCsv,
+  type CodeImportPlan,
+} from "@/lib/accounting/import";
 import {
   accountingCodeLabel,
   MAX_ACCOUNTING_NAME,
@@ -23,13 +29,31 @@ export type AccountingCodeErrorCode =
   | "INVALID_PARENT"
   | "CODE_EXISTS"
   | "NOT_FOUND"
-  | "STALE_LIST";
+  | "STALE_LIST"
+  | "NO_FILE"
+  | "FILE_TOO_LARGE"
+  | "EMPTY"
+  | "COLUMNS"
+  | "FILE_ERRORS";
 
 function revalidate(): void {
   revalidatePath("/admin/boekhoudcodes");
   // De keuzelijsten die de codes tonen.
   revalidatePath("/admin/tickets", "layout");
   revalidatePath("/admin/leden");
+}
+
+/**
+ * Een code erbij, of een code die een ander nummer of een andere naam kreeg:
+ * de online inkomsten koppelen meteen opnieuw. Een code in de tekst van een
+ * betaling ("706200 62005") wordt zo herkend zonder dat Beheer bij Na te
+ * kijken op "Opnieuw koppelen" moet drukken, en een hernoemde code geeft haar
+ * nieuwe naam door. Wat met de hand toegewezen werd en wat in een afgesloten
+ * periode valt, blijft.
+ */
+async function rematchIncome(): Promise<void> {
+  await rematchOpenTransactions();
+  revalidatePath("/admin/inkomsten", "layout");
 }
 
 function nameValue(formData: FormData): string {
@@ -129,6 +153,7 @@ export async function createAccountingCodeAction(
     target: accountingCodeLabel({ code, name }),
     summary: parentId ? "subcode toegevoegd" : "hoofdrekening toegevoegd",
   });
+  await rematchIncome();
   revalidate();
   return saveOk();
 }
@@ -219,6 +244,7 @@ export async function updateAccountingCodeAction(
     target: accountingCodeLabel({ code, name }),
     summary: changes.length > 0 ? changes.join(", ") : "niets gewijzigd",
   });
+  if (changes.length > 0) await rematchIncome();
   revalidate();
   return saveOk();
 }
@@ -288,6 +314,8 @@ export async function reorderAccountingCodesAction(input: {
       summary: `verhuisd naar ${parent!.code}: code ${row.code} -> ${code}`,
     });
   }
+  // Enkel een verhuisde subcode krijgt een ander nummer; slepen alleen verandert niets.
+  if (arriving.length > 0) await rematchIncome();
   revalidate();
   return saveOk();
 }
@@ -321,4 +349,94 @@ export async function deleteAccountingCodeAction(formData: FormData): Promise<Sa
   });
   revalidate();
   return saveOk();
+}
+
+// -----------------------------------------------------------------------------
+// Opladen als CSV
+// -----------------------------------------------------------------------------
+
+const MAX_CODES_FILE_BYTES = 1024 * 1024;
+
+export type AccountingCodesPreviewState =
+  | { status: "idle" }
+  | { status: "preview"; plan: CodeImportPlan; fileName: string }
+  | { status: "error"; code: AccountingCodeErrorCode };
+
+async function readCodesPlan(formData: FormData): Promise<{ plan: CodeImportPlan; fileName: string } | { error: AccountingCodeErrorCode }> {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { error: "NO_FILE" };
+  if (file.size > MAX_CODES_FILE_BYTES) return { error: "FILE_TOO_LARGE" };
+  const parsed = parseAccountingCodesCsv(await file.text());
+  if (!parsed.ok) return { error: parsed.error };
+  const existing = await prisma.accountingCode.findMany({ select: { id: true, code: true, name: true, parentId: true } });
+  return { plan: planAccountingCodeImport(parsed, existing), fileName: file.name };
+}
+
+/** Lees het bestand en zeg wat opladen zou doen, zonder iets te bewaren. */
+export async function previewAccountingCodesImportAction(formData: FormData): Promise<AccountingCodesPreviewState> {
+  await requirePermission("accounting.manage");
+  const result = await readCodesPlan(formData);
+  if ("error" in result) return { status: "error", code: result.error };
+  return { status: "preview", ...result };
+}
+
+/**
+ * De lijst opladen: nieuwe codes erbij, namen bijgewerkt, en de volgorde van het
+ * bestand. Een code die niet in het bestand staat, blijft: verwijderen is een
+ * aparte, bevestigde stap, want ticketverkopen en bestellingen hangen eraan. Met
+ * een fout in het bestand laadt de site niets op.
+ */
+export async function importAccountingCodesAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  await requirePermission("accounting.manage");
+  const result = await readCodesPlan(formData);
+  if ("error" in result) return saveError(result.error);
+  const { plan, fileName } = result;
+  if (plan.errors.length > 0) {
+    const first = plan.errors[0];
+    return saveError("FILE_ERRORS", `Niets opgeladen: regel ${first.line}: ${first.message}${plan.errors.length > 1 ? ` (en nog ${plan.errors.length - 1})` : ""}.`);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const ids = new Map(
+      (await tx.accountingCode.findMany({ select: { id: true, code: true } })).map((code) => [code.code, code.id]),
+    );
+    // Zonder volledige lijst komt een nieuwe code achteraan bij haar hoofdrekening (of onderaan de hoofdrekeningen).
+    const last = new Map<string | null, number>();
+    for (const row of await tx.accountingCode.findMany({ select: { parentId: true, sortOrder: true } })) {
+      last.set(row.parentId, Math.max(last.get(row.parentId) ?? -1, row.sortOrder));
+    }
+    for (const code of plan.create) {
+      const parentId = code.parentCode ? (ids.get(code.parentCode) ?? null) : null;
+      const sortOrder = (last.get(parentId) ?? -1) + 1;
+      last.set(parentId, sortOrder);
+      const created = await tx.accountingCode.create({
+        data: { code: code.code, name: code.name, parentId, sortOrder },
+        select: { id: true },
+      });
+      ids.set(code.code, created.id);
+    }
+    for (const code of plan.rename) {
+      await tx.accountingCode.update({ where: { code: code.code }, data: { name: code.to } });
+    }
+    // Een volledige lijst bepaalt de volgorde: hoofdrekeningen onderling, subcodes per hoofdrekening.
+    const position = new Map<string, number>();
+    for (const code of plan.reorder ? plan.order : []) {
+      const parent = code.includes(" ") ? code.split(" ")[0] : "";
+      const index = position.get(parent) ?? 0;
+      position.set(parent, index + 1);
+      await tx.accountingCode.update({ where: { code }, data: { sortOrder: index } });
+    }
+  });
+
+  await logAudit({
+    action: "import",
+    entity: "accountingCode",
+    target: fileName,
+    summary: `${plan.create.length} nieuw, ${plan.rename.length} hernoemd, ${plan.unchanged} ongewijzigd`,
+  });
+  if (plan.create.length + plan.rename.length > 0) await rematchIncome();
+  revalidate();
+  const missing = plan.missing.length;
+  const kept = missing === 0 ? "" : missing === 1 ? " 1 code staat niet in het bestand en blijft staan." : ` ${missing} codes staan niet in het bestand en blijven staan.`;
+  return saveOk(`Opgeladen: ${plan.create.length} nieuw, ${plan.rename.length} hernoemd.${kept}`);
 }

@@ -11602,3 +11602,228 @@ elke ronde met het vertrekuur.
   ploeg en de plaatsen van anderen, maar staan niet meer op dat r-nummer. Laadt
   Sport daarna dezelfde export opnieuw op, dan staan ze er wel weer onder; dat is
   de prijs van geen namen bijhouden.
+
+## Online inkomsten (de opvolger van het rekenblad "Oriëntatie Online Inkomsten")
+
+Beheer maakte elk kwartaal met de hand een rekenblad voor de boekhouder: wat er
+via Payconiq en Mollie binnenkwam, onder welke code en op welke rekening. Dat
+staat nu op `/admin/inkomsten` (`lib/inkomsten`, technisch in
+`docs/inkomsten.md`).
+Fase 1 (oktober 2026): Payconiq en Mollie. Fase 1b (oktober 2026): het blad voor
+de boekhouder, het controlebestand, de controlelijst en de boekhoudcodes als CSV.
+Fase 3 (oktober 2026): SumUp en Europabank. Fase 2 (oktober 2026): de
+kassacontrole, de code van een kassa en de koppeling op de kassa die een toestel
+had.
+
+- **Rekenen zoals het rekenblad.** Mollie telt in de maand van de uitbetaling
+  (de maand in de uitbetalingsreferentie), de rest in de maand van de betaling.
+  Zo rekende Beheer al, en zo is het Mollie-totaal van een periode wat er in die
+  periode op de bank kwam. Kosten en reserve staan als eigen rij. Een betaling
+  met status "refunded" telt voor haar volle bedrag en de terugbetaling als eigen
+  regel, ook zoals in het rekenblad. Op het vierde kwartaal van 2025 komt de
+  site tot op de cent uit op het kwartaalblad. De eigen poging van Beheer
+  (augustus en september 2026) telde Mollie op de betaaldatum, met het verschil
+  als "wijziging dynamische reserve". De site bleef bij de uitbetaling
+  (oktober 2026): een betaling van eind september komt soms pas in oktober op
+  de bank, en zo klopt elk kwartaal met de uittreksels. Wat nog niet
+  uitbetaald is, toont het overzicht apart.
+- **Alles over VTK zelf is data, niets staat in de code.** Welke stickers er
+  zijn, op welke rekening ze storten en vanaf wanneer, onder welke code een
+  sticker standaard valt, welke code de kosten krijgen, welke teksten onder
+  welke code horen en welke periode afgesloten is:
+  dat vult Beheer in de site in. In de code staat enkel kennis over de
+  bestanden (kolommen, statussen, "Withheld fees"). Het rekenblad toonde
+  waarom: in één jaar wisselden de Theokot-sticker en de stickers van
+  evenementen van rekening. Een kanaal verschijnt vanzelf bij de eerste export
+  die het noemt; er is niets vooraf ingevuld.
+- **Geen kostencode als standaard.** Het rekenblad gebruikte 657000, maar die
+  code staat niet in het register (dat bevat enkel opbrengsten). Een vaste code
+  in de code zou wijzen naar iets wat de site niet kent; Beheer voegt ze toe en
+  kiest ze. Tot dan staat de kostenregel als "nog geen code gekozen". Ook de
+  uitleg bij die instelling noemt geen code.
+- **Exact koppelen gaat voor afleiden.** Een betaling via de site koppelt op
+  haar betaal-ID aan de bestelling en haar code, en een terugbetaling via de
+  terugbetaling op de site. Een code vooraan in de omschrijving telt daarna,
+  dan de kassa die het toestel had, een onthouden tekst en de standaardcode van
+  het kanaal. Wat overblijft, staat bij Na te kijken.
+- **Na te kijken groepeert op wat zinvol is.** Een vaste tekst (Mollie,
+  printkrediet) per tekst, en die kan onthouden worden; wat iemand bij een
+  sticker typt ("pintje") per sticker per dag, en dat kan niet onthouden worden.
+  Onthouden staat standaard uit, zoals bij het BO.
+- **Een dag in Na te kijken loopt van 9:00 tot 9:00.** Zo deed het script van
+  de eigen poging van Beheer, en zo blijft een avond tot 4 uur één groep onder
+  de dag waarop ze begon. Enkel het groeperen: een betaling om 2 uur op 1
+  oktober telt nog altijd in oktober, want de boekhouder rekent op de
+  kalender.
+- **Een hele dag van een kanaal kan met de hand, maar enkel over wat
+  afgeleid is.** Leent een post een dag het toestel van een andere (de
+  cursusdienst met de SumUp van Theokot), dan geeft Beheer die dag één code in
+  plaats van twee regels met een standaardcode. Wat exact gekoppeld is (een
+  betaling van de site, een code in de tekst, een onthouden tekst, een kassa),
+  blijft: dat weet het beter dan de dag.
+- **Elke code is te verbeteren, zoals een cel in het rekenblad.** In de Excel
+  tikte Beheer over een foute code heen; in Transacties opent een klik op een
+  rij de code, en vinkjes geven veel rijen samen een code, tot "alles wat aan
+  de filter voldoet". Anders dan bij een hele dag gaat dat ook over een exacte
+  koppeling: wie één rij bekijkt en de code verandert, weet dat de kassa of de
+  betaling van de site het hier mis had. De koppeling met die kassa of verkoop
+  gaat dan mee weg, zodat de kassacontrole die betaling niet meer meetelt;
+  "Terug naar de regels" legt ze opnieuw. Een onthouden tekst die zelf fout
+  is, past Beheer aan in Instellingen, niet rij per rij.
+- **Periodes zijn een reeks maanden, het boekjaar ligt niet vast.** Het
+  rekenblad had augustus en september als derde kwartaal en juli apart; de site
+  biedt de kalenderkwartalen als snelkeuze, en elke andere reeks kiest Beheer.
+- **Afgesloten is afgesloten**, zoals bij de rekeningen: een import voegt er
+  niets aan toe, toewijzen kan er niet meer, en een export met transacties erin
+  kan niet weg. Heropenen kan, met een bevestiging die zegt dat de boekhouder dan
+  een nieuwe versie nodig heeft.
+- **Elke admin ziet het** (IT en Groep 5), met een gewoon recht
+  `income.manage` in de rol admin, zoals de rekeningen en de kassa's. Een eigen
+  rol enkel voor Groep 5, zoals het BO, werd overwogen en niet gekozen.
+- **Geen persoonsgegevens.** De import neemt naam en rekeningnummer van de
+  betaler niet over, haalt e-mailadressen uit omschrijvingen en bewaart het
+  bestand niet. Daardoor hoort deze tabel niet bij de gegevensexport of de
+  accountwissing.
+- **Het balansrapport van Mollie naast de betalingenexport, niet in de plaats
+  ervan.** Daarin staat bij een betaling niet in welke uitbetaling ze zit, dus
+  de betalingen blijven uit de betalingenexport komen. Wat het balansrapport
+  wel heeft, neemt de site: de overschrijvingen naar de bank (het bedrag op het
+  uittreksel) en de maandfactuur met de kosten. Beheer vroeg in oktober 2026
+  om Mollie te vergelijken met wat er echt op de rekening kwam. De
+  maandfactuur en de reserve tellen in hun eigen maand: Mollie hield ze die
+  maand al wekelijks in op elke uitbetaling, zoals de export per uitbetaling
+  van het rekenblad toont, en zet ze in het balansrapport enkel nog eens als
+  één regel op de laatste seconde. Een eerste versie hing ze aan de volgende
+  overschrijving; dat schoof ze een maand op, en de kosten van de laatste
+  maand van een kwartaal vielen weg.
+- **De site gelooft de overschrijving niet blind, en de eigen som ook niet.**
+  In het derde kwartaal van 2026 kwam de som per uitbetaling uit de
+  betalingenexport niet uit op de overschrijving, in beide richtingen. Dat kan
+  ook niet: Mollie houdt per uitbetaling kosten en reserve in en geeft oudere
+  reserve vrij, en dat staat enkel in de export per uitbetaling. Gelijk is in
+  orde zonder vinkje; anders staan beide er met het verschil, en beslist
+  Beheer met het uittreksel. Een vinkje gaat voor op de overschrijving. Wie
+  zonder verschil wil afvinken, laadt de export per uitbetaling op.
+- **SumUp per uitbetaling, zoals Mollie.** Elke verkoop zegt in welke
+  uitbetaling ze zat, en de som van de verkopen min hun kosten was in het
+  derde kwartaal van 2026 per uitbetaling exact wat SumUp overschreef. Een
+  verkoop blijft wel in de maand van de verkoop tellen, zoals het rekenblad:
+  enkel het afvinken gaat per uitbetaling.
+- **De boekhouder krijgt het kwartaalblad, met zijn kleuren.** Hij wil het zoals
+  de Excel: kolommen per bron en per rekening, het totaalblok per rekening, de
+  kleuren en de euronotatie van het tabblad "4e Kwartaal". Dezelfde redenering
+  als bij de rekeningen, waar het blad van billsheet bewust behouden bleef. Het
+  is een xlsx, geen CSV, zodat Beheer er niets meer aan moet opmaken.
+- **Elke stap blijft controleerbaar, zoals in het rekenblad.** Dat was te
+  controleren omdat elke laag zichtbaar was: de export, het overzicht per
+  kanaal, het kwartaalblad met formules. Het controlebestand geeft die lagen
+  terug (de transacties met waarom ze hun code kregen, een tabblad per bron
+  zoals de tabbladen per export in het rekenblad, de groepen, de
+  uitbetalingen, wat niet meetelt) en rekent het kwartaalblad met formules op
+  de transacties, zodat een klik op een cel toont wat ze optelt. Het bevat wat
+  betalers typten en blijft dus bij Beheer.
+- **De controlelijst kijkt per account, met ruis.** Een export van SumUp of
+  Europabank is één account of terminal, dus "er zijn regels van SumUp" zegt
+  niets over de SumUp van Fakbar wanneer die van Theokot er is. Een account met
+  regels in de periode of de drie maanden ervoor verwacht ze elke maand; een
+  terminal die in de examens stillag, meldt ze ook. Liever een melding te veel
+  dan een vergeten account.
+- **Een controlelijst, geen slot.** Voor het afsluiten zegt het overzicht per
+  stap of hij in orde is: een vergeten maand, ontbrekende Mollie-kosten, een
+  uitbetaling die niet afgevinkt is tegen het uittreksel, iets na te kijken, een
+  kanaal zonder rekening, geen kostencode. Afsluiten kan met open stappen, want
+  Beheer weet soms waarom een stap open staat (een maand waarin er echt niets
+  via Mollie binnenkwam); de bevestiging noemt ze wel. Een afgevinkte
+  uitbetaling onthoudt haar bedrag: komt er later een regel bij, dan staat ze
+  terug open.
+- **Alles telt mee, ook wat op de eigen rekening van een post binnenkomt.** Het
+  rekenblad van 2025-2026 liet de dagelijkse werking van Theokot weg zodra haar
+  QR-code eind november 2025 naar de rekening van Theokot verhuisde. In haar
+  eigen poging van augustus en september 2026 telde Beheer de QR-codes en de
+  SumUp van Theokot en Fakbar wel mee, elk onder de code van de post. De site
+  volgt die laatste: een QR-code die altijd voor dezelfde post dient, krijgt in
+  de instellingen een standaardcode, en wat erop binnenkomt en geen andere regel
+  koppelt, telt onder die code. De rekening bepaalt enkel de kolom in het
+  kwartaalblad, dus het maakt niet meer uit wanneer een QR-code van rekening
+  wisselde. Een eerste versie liet zo'n kanaal als "eigen rekening" wegvallen.
+  Beheer bevestigde in oktober 2026 dat ook die inkomsten in het kwartaalblad
+  horen, al staan ze op een eigen rekening, en dat een toestel van een post
+  (zoals haar SumUp) normaal nooit voor iets anders dient: de standaardcode
+  dekt dus het gewone gebruik. Een kassa van een andere post op die QR-code
+  gaat tijdens haar uren voor op de standaardcode, zoals de opmerking in het
+  rekenblad het wilde.
+- **De standaardcode geldt vanaf een dag, zoals de rekening.** "Normaal nooit"
+  bleek één week: in september 2026 gebruikte de cursusdienst de SumUp van
+  Theokot (€ 41.228,86 van de € 42.466,47 die maand). Met één code zonder datum
+  kwam dat bij Theokot, en kon Beheer het niet meer per dag toewijzen. Nu zet
+  Beheer per toestel regels "vanaf deze dag deze code, of geen". Een week van
+  een andere post is een regel zonder code, en die dagen staan bij Na te
+  kijken, waar Beheer ze per dag een code geeft, zoals in de eigen poging. Een
+  einddatum per regel werd niet gekozen: de volgende regel is het einde, net
+  als bij de rekeningen, en zo kunnen twee regels elkaar niet overlappen.
+- **SumUp en Europabank rekenen zoals het rekenblad, op twee punten na.** Ze
+  tellen in de maand van de betaling, met het totaalbedrag van SumUp en het
+  originele bedrag van Europabank, en van Europabank enkel de commissie als
+  kost (geen interchange of schemakost), zoals de formules van Beheer. Anders
+  dan het rekenblad telt de site enkel SumUp-betalingen die lukten: de formule
+  van Beheer nam ook mislukte pogingen mee (€ 104,60 in het vierde kwartaal
+  van 2025). En de transactiekosten van SumUp tellen als kost; het rekenblad
+  had ze niet, omdat de SumUp van Theokot er niet in stond. Alle kosten staan
+  op één regel, onder de ene kostencode die Beheer kiest, zoals "Financiële
+  kosten" in het kwartaalblad. De terminal van evenementen krijgt geen
+  standaardcode: wat erop binnenkomt, krijgt de code van de kassa die ze had,
+  en wat buiten elke kassa valt, staat per dag bij Na te kijken.
+- **De kassacontrole vergelijkt, ze schrijft niet.** Beheer tikt bij elke kassa
+  het bedrag in dat het Bancontact-bakje of de Payconiq-rekening toont, en dat
+  blijft het bedrag van de kassa: de online inkomsten staan ernaast, met een
+  waarschuwing bij een verschil (meestal betaalde iemand op een ander
+  toestel), en "Overnemen" vult enkel een leeg veld. Zo vroeg Beheer het in
+  oktober 2026. De vergelijking telt over de uren van de kassa wanneer een
+  andere kassa dat toestel dezelfde dag had, en anders over de hele dag, zoals
+  Beheer afleest: voor en na een evenement, of het dagtotaal. Welk kanaal welk
+  toestel is, vult Beheer in; de namen van de toestellen komen uit de
+  instellingen van de kassa's, niet uit de code. Een eigen tabblad Controle
+  bij de kassa's zet elke kassa met een verschil onder elkaar, zodat Beheer na
+  het opladen van een kwartaal niet elke kassa moet openen. Wat daar staat,
+  past Beheer aan op de kassa zelf, niet in de lijst: een bedrag aanpassen
+  blijft een bewuste stap per kassa.
+- **Beheer kiest de code van een kassa, bij het aanvaarden.** Niet de post in
+  haar aanvraag. In het rekenblad tikte Beheer per evenement de post, de
+  periode en de code in, en het overzicht van de kassa's had geen kolom voor
+  een code; zo blijft het (oktober 2026). Later aanpassen kan op de kassa zelf,
+  en elke wijziging koppelt opnieuw, buiten de afgesloten periodes. Hangt er
+  een ticketverkoop met een code aan de kassa, dan staat die code voorgesteld:
+  wat aan de kassa binnenkomt, is meestal van hetzelfde evenement. Het blijft
+  een voorstel; hebben de ticketverkopen verschillende codes, dan vult de site
+  niets in.
+- **Een gedeeld toestel hoort bij een kassa tijdens haar uren plus de uitloop
+  van die nacht (tot 9:00), een toestel van een post enkel tijdens haar uren.**
+  Een eerste versie liet een gedeeld toestel doorlopen tot de volgende kassa
+  met dat toestel, naar het rekenblad met "wie de sticker had". Op de echte
+  kassa's van oktober 2026 bleek dat te ruim: tussen twee kassa's in de site
+  zitten soms activiteiten die geen kassa aanvroegen (zoals Mechanix BBQ op
+  29 september na Introduction Cantus op 25 september), en die kregen dan stil
+  de code van de vorige kassa van weken eerder. Nu geldt een kassa op een
+  gedeeld toestel tijdens haar uren en tot 9:00 de ochtend na haar einde
+  (`reviewDay`, zolang er geen volgende kassa begon), zodat nachtbetalingen bij
+  de avond blijven en een latere dag zonder kassa veilig bij Na te kijken
+  verschijnt. Op een toestel van een post geldt de kassa enkel tijdens haar
+  uren; daarvoor en daarna neemt de standaardcode van de eigenaar het weer
+  over. Een code in de omschrijving gaat altijd voor op de kassa.
+- **Veel bestanden tegelijk, elk een eigen import.** Europabank laat enkel per
+  dag downloaden, dus een kwartaal van één terminal is een negentigtal
+  bestanden. Beheer kiest ze samen; de site toont wat ze samen en per bestand
+  doen, en bewaart ze elk als eigen import, zodat een fout bestand apart weg
+  kan. Is er één bestand onleesbaar, dan gaat er niets op: een half opgeladen
+  keuze is moeilijker op te ruimen dan opnieuw kiezen.
+- **De kosten per betaling, niet per dag.** SumUp en Europabank zetten de
+  kosten op elke betaling. De site maakt er per betaling een kostenregel van,
+  met dezelfde sleutel als de betaling, zodat een export die een eerdere
+  overlapt de kosten nooit dubbel telt. Per dag optellen las korter, maar dan
+  kon een tweede, vollere export van dezelfde dag de som niet meer aanvullen.
+- **Boekhoudcodes opladen voegt toe, het verwijdert nooit.** De penning houdt de
+  lijst in een rekenblad bij, dus opladen voegt toe en hernoemt. Een code die
+  niet meer in het bestand staat, blijft, want ticketverkopen en bestellingen
+  hangen eraan; de voorvertoning toont ze en verwijderen blijft een aparte,
+  bevestigde stap. Enkel een volledige lijst bepaalt de volgorde: met een
+  bestand van twee nieuwe codes zou de rest anders door elkaar geschud worden.

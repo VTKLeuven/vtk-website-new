@@ -901,14 +901,17 @@ function notificationPreviews(): MailPreview[] {
     {
       id: "expense",
       title: "Rekening doorsturen naar de boekhouding",
-      when: "Wanneer een penningmeester in /admin/rekeningen op doorsturen klikt. Dit is een concept dat in zijn eigen mailprogramma opent.",
-      to: "De boekhouding",
+      when: "Wanneer iemand met rekeningenbeheer in /admin/rekeningen op doorsturen klikt. De site verstuurt ze zelf en zet de rekening dan op doorgestuurd.",
+      to: "Het adres van de boekhouder uit de rekeningeninstellingen, of het adres dat in het venster werd ingevuld",
       source: "expenses",
       file: "lib/rekeningen/expenses.ts",
       subject: expense.subject,
       text: expense.body,
       html: expense.html,
-      notes: ["Het blad voor de boekhouder en het bonnetje gaan als pdf mee."],
+      notes: [
+        "Het blad voor de boekhouder, met het bonnetje erin, gaat als pdf mee.",
+        "Zonder mailserver weigert het doorsturen, zodat er geen blad afgevinkt wordt dat nooit vertrok.",
+      ],
     },
   ];
 }

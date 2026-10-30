@@ -845,19 +845,24 @@ model User {
 
   adminAuditLogs AdminAuditLog[] @relation("AdminAuditActor")
 
-  urenloopDownloadEmails UrenloopDownloadEmail[] @relation("UrenloopDownloadEmailAddedBy")
-  urenloopEditionsImported UrenloopEdition[] @relation("UrenloopEditionImportedBy")
+  urenloopDownloadEmails   UrenloopDownloadEmail[] @relation("UrenloopDownloadEmailAddedBy")
+  urenloopEditionsImported UrenloopEdition[]       @relation("UrenloopEditionImportedBy")
 
   kiesploegMemberships KiesploegMember[]
 
   // Rekeningen (billsheet): ingediend, terugbetaald, ingeboekt.
-  expensesSubmitted Expense[] @relation("ExpenseSubmittedBy")
-  expensesPaid      Expense[] @relation("ExpensePaidBy")
-  expensesBooked    Expense[] @relation("ExpenseBookedBy")
-  cashRegistersRequested CashRegister[] @relation("CashRegisterRequestedBy")
-  cashRegistersAccepted  CashRegister[] @relation("CashRegisterAcceptedBy")
+  expensesSubmitted      Expense[]            @relation("ExpenseSubmittedBy")
+  expensesPaid           Expense[]            @relation("ExpensePaidBy")
+  expensesBooked         Expense[]            @relation("ExpenseBookedBy")
+  cashRegistersRequested CashRegister[]       @relation("CashRegisterRequestedBy")
+  cashRegistersAccepted  CashRegister[]       @relation("CashRegisterAcceptedBy")
   permanentCashEntries   PermanentCashEntry[] @relation("PermanentCashEntryCreatedBy")
-  expenseViews      ExpenseView[]
+  incomeImports          IncomeImport[]       @relation("IncomeImportedBy")
+  incomeAssignments      IncomeTransaction[]  @relation("IncomeAssignedBy")
+  incomeNameRules        IncomeNameRule[]     @relation("IncomeNameRuleCreatedBy")
+  incomePeriodsClosed    IncomePeriod[]       @relation("IncomePeriodClosedBy")
+  incomePayoutChecks     IncomePayoutCheck[]  @relation("IncomePayoutCheckedBy")
+  expenseViews           ExpenseView[]
 
   requestedLesbezoeken           Lesbezoek[]              @relation("LesbezoekRequester")
   createdLesbezoeken             Lesbezoek[]              @relation("LesbezoekCreatedBy")
@@ -936,10 +941,10 @@ model Group {
   /// Het kasboek van de vaste kassa (enkel Cursusdienst, Theokot, Fakbar).
   permanentCashEntries     PermanentCashEntry[]
   /// De vaste taken van deze post (/admin/wie-doet-wat).
-  tasks                    GroupTask[]                @relation("GroupTaskOwner")
+  tasks                    GroupTask[]               @relation("GroupTaskOwner")
   /// Taken van een andere post die het aanspreekpunt voor deze post zijn
   /// ("IT-contact voor Theokot").
-  tasksFor                 GroupTask[]                @relation("GroupTaskFor")
+  tasksFor                 GroupTask[]               @relation("GroupTaskFor")
 }
 
 model GroupMembership {
@@ -1188,8 +1193,9 @@ model MembershipPayment {
   createdAt          DateTime                @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime                @updatedAt @db.Timestamptz(3)
 
-  membership Membership                 @relation(fields: [membershipId], references: [id], onDelete: Cascade)
-  webhooks   MembershipPaymentWebhook[]
+  membership         Membership                 @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  webhooks           MembershipPaymentWebhook[]
+  incomeTransactions IncomeTransaction[]
 
   @@unique([provider, providerCheckoutId])
   @@unique([provider, providerPaymentId])
@@ -2252,10 +2258,15 @@ model AccountingCode {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  parent         AccountingCode?       @relation("AccountingCodeChildren", fields: [parentId], references: [id], onDelete: Cascade)
-  children       AccountingCode[]      @relation("AccountingCodeChildren")
-  ticketEvents   TicketEvent[]
-  eventTemplates TicketEventTemplate[]
+  parent          AccountingCode?       @relation("AccountingCodeChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children        AccountingCode[]      @relation("AccountingCodeChildren")
+  ticketEvents    TicketEvent[]
+  eventTemplates  TicketEventTemplate[]
+  incomeNameRules IncomeNameRule[]
+  /// De kanalen die deze code als standaardcode hebben, vanaf een dag.
+  incomeChannelCodes IncomeChannelCode[]
+  /// De kassa's die deze code kregen, voor de online inkomsten.
+  cashRegisters   CashRegister[]
 
   @@index([parentId])
 }
@@ -2743,15 +2754,16 @@ model TicketPayment {
   /// Naam van de rekeninghouder zoals Bancontact ze meldt; kan verschillen
   /// van de koper (een ouder die betaalt).
   refundAccountName  String?
-  expiresAt          DateTime?           @db.Timestamptz(3)
-  succeededAt        DateTime?           @db.Timestamptz(3)
-  failedAt           DateTime?           @db.Timestamptz(3)
-  createdAt          DateTime            @default(now()) @db.Timestamptz(3)
-  updatedAt          DateTime            @updatedAt @db.Timestamptz(3)
+  expiresAt          DateTime?              @db.Timestamptz(3)
+  succeededAt        DateTime?              @db.Timestamptz(3)
+  failedAt           DateTime?              @db.Timestamptz(3)
+  createdAt          DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime               @updatedAt @db.Timestamptz(3)
 
-  order    TicketOrder            @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  webhooks TicketPaymentWebhook[]
-  refunds  TicketRefund[]
+  order              TicketOrder            @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  webhooks           TicketPaymentWebhook[]
+  refunds            TicketRefund[]
+  incomeTransactions IncomeTransaction[]
 
   @@unique([provider, providerCheckoutId])
   @@unique([provider, providerPaymentId])
@@ -5451,9 +5463,10 @@ model UitleenPayment {
   createdAt          DateTime             @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime             @updatedAt @db.Timestamptz(3)
 
-  reservation      UitleenReservation?      @relation(fields: [reservationId], references: [id], onDelete: Restrict)
-  transportBooking UitleenTransportBooking? @relation(fields: [transportBookingId], references: [id], onDelete: Restrict)
-  webhooks         UitleenPaymentWebhook[]
+  reservation        UitleenReservation?      @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  transportBooking   UitleenTransportBooking? @relation(fields: [transportBookingId], references: [id], onDelete: Restrict)
+  webhooks           UitleenPaymentWebhook[]
+  incomeTransactions IncomeTransaction[]
 
   @@unique([provider, providerCheckoutId])
   @@unique([provider, providerPaymentId])
@@ -8223,6 +8236,11 @@ model CashRegister {
   /// Opmerking van Beheer bij het tellen. Enkel voor wie kassa's beheert.
   note String?
 
+  /// De boekhoudcode van wat er op de toestellen van deze kassa binnenkwam,
+  /// voor de online inkomsten (koppelregel 4). Beheer kiest ze bij het
+  /// aanvaarden, niet de post. NULL = nog geen: dan koppelt de kassa niets.
+  accountingCodeId String?
+
   acceptedAt         DateTime? @db.Timestamptz(3)
   acceptedById       String?
   /// Wanneer de mail met de aanvaarding vertrok. NULL bij een aanvaarding
@@ -8237,12 +8255,17 @@ model CashRegister {
   acceptedBy   User?                     @relation("CashRegisterAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
   payments     CashRegisterPayment[]
   ticketEvents CashRegisterTicketEvent[]
+  /// `SetNull`: een verwijderde code laat de kassa zonder code.
+  accountingCode     AccountingCode?     @relation(fields: [accountingCodeId], references: [id], onDelete: SetNull)
+  /// De online inkomsten die van deze kassa hun code kregen.
+  incomeTransactions IncomeTransaction[]
 
   @@index([workingYear])
   @@index([groupId])
   @@index([requestedById])
   @@index([date])
   @@index([status])
+  @@index([accountingCodeId])
 }
 
 /// Eén Bancontact-bakje of Payconiq-rekening bij een kassa, met wat erop
@@ -8326,6 +8349,256 @@ model PermanentCashEntry {
 
   @@index([groupId, date])
   @@index([createdById])
+}
+
+// -----------------------------------------------------------------------------
+// Oriëntatie online inkomsten: Beheer laadt de exports van Payconiq, Mollie,
+// SumUp en Europabank op, de site koppelt elke transactie aan een
+// boekhoudcode, en het overzicht per periode vervangt het rekenblad
+// "Oriëntatie Online Inkomsten".
+// Zie docs/inkomsten.md en docs/design-decisions.md.
+// -----------------------------------------------------------------------------
+
+enum IncomeSource {
+  PAYCONIQ
+  MOLLIE
+  SUMUP
+  EUROPABANK
+}
+
+/// Wat een regel uit een export is. Enkel een betaling of terugbetaling krijgt
+/// een boekhoudcode; kosten en reserve hebben hun eigen regel in het overzicht.
+/// Bij SumUp en Europabank staan de kosten op de betaling zelf; de import maakt
+/// er per betaling een `FEE`-regel van.
+enum IncomeKind {
+  PAYMENT
+  REFUND
+  FEE
+  RESERVE
+}
+
+/// Welke koppelregel de code gaf. NULL = nog niet gekoppeld (Na te kijken).
+/// `CHANNEL_DEFAULT`: de standaardcode van het kanaal, voor wat geen andere
+/// regel koppelde. `CASH_REGISTER`: een kassa had het toestel (regel 4).
+enum IncomeRule {
+  MANUAL
+  WEBSITE
+  CODE_IN_TEXT
+  NAME_RULE
+  CHANNEL_DEFAULT
+  CASH_REGISTER
+}
+
+/// Eén opgeladen export. Het bestand zelf wordt niet bewaard: het bevat namen
+/// en rekeningnummers van wie betaalde.
+model IncomeImport {
+  id             String       @id @default(cuid())
+  source         IncomeSource
+  fileName       String
+  /// Welk formaat de parser herkende ("payconiq", "mollie", "sumup", "europabank").
+  format         String
+  /// Regels in het bestand, nieuw bewaard, al gekend, en niet meegeteld
+  /// (vervallen of mislukt, of in een afgesloten periode).
+  rowCount       Int
+  createdCount   Int
+  duplicateCount Int
+  skippedCount   Int
+  lockedCount    Int          @default(0)
+  firstAt        DateTime?    @db.Timestamptz(3)
+  lastAt         DateTime?    @db.Timestamptz(3)
+  importedById   String?
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+
+  importedBy   User?               @relation("IncomeImportedBy", fields: [importedById], references: [id], onDelete: SetNull)
+  transactions IncomeTransaction[]
+  payouts      IncomePayout[]
+
+  @@index([createdAt])
+}
+
+/// Een sticker, terminal of profiel zoals het in de export heet. De site maakt
+/// een kanaal aan zodra een export het noemt; Beheer vult de rest in. Niets
+/// hiervan staat in de code.
+model IncomeChannel {
+  id           String       @id @default(cuid())
+  source       IncomeSource
+  /// Zoals in de export: `shop_name` bij Payconiq, "Mollie" bij Mollie, het
+  /// account bij SumUp, het terminalnummer bij Europabank.
+  identifier   String
+  /// Een eigen naam, voor het overzicht. NULL = de naam uit de export.
+  label        String?
+  /// Het toestel van de kassa's dat dit kanaal is: het Bancontact-bakje of de
+  /// Payconiq-rekening, met de naam zoals in de instellingen van de kassa's en
+  /// op `CashRegisterPayment.terminal`. NULL = niet gekoppeld. Beheer vult het
+  /// in; meerdere kanalen kunnen één toestel zijn (de twee terminals van Cudi).
+  cashMethod   CashRegisterPaymentMethod?
+  cashTerminal String?
+  createdAt    DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime     @updatedAt @db.Timestamptz(3)
+
+  accounts     IncomeChannelAccount[]
+  codes        IncomeChannelCode[]
+  transactions IncomeTransaction[]
+
+  @@unique([source, identifier])
+}
+
+/// Op welke bankrekening een kanaal stort, vanaf welke dag. Een sticker kan van
+/// rekening wisselen; wat ervoor binnenkwam, houdt de oude rekening.
+model IncomeChannelAccount {
+  channelId   String
+  from        DateTime @db.Date
+  bankAccount String
+
+  channel IncomeChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@id([channelId, from])
+}
+
+/// De standaardcode van een kanaal, vanaf welke dag: wat erop binnenkomt en
+/// geen andere regel koppelt, krijgt de code van de laatste regel op of voor
+/// die dag (de SumUp van Theokot onder de code van Theokot). Zonder code
+/// (NULL) heeft het kanaal vanaf die dag geen standaardcode en staat zo'n
+/// betaling bij Na te kijken: in september 2026 gebruikte de cursusdienst de
+/// SumUp van Theokot. Een verwijderde code laat de regel staan, zonder code.
+model IncomeChannelCode {
+  channelId        String
+  from             DateTime @db.Date
+  accountingCodeId String?
+
+  channel        IncomeChannel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  accountingCode AccountingCode? @relation(fields: [accountingCodeId], references: [id], onDelete: SetNull)
+
+  @@id([channelId, from])
+  @@index([accountingCodeId])
+}
+
+/// Eén regel uit een export.
+model IncomeTransaction {
+  id              String       @id @default(cuid())
+  source          IncomeSource
+  kind            IncomeKind
+  /// Soort plus ID van de provider ("PAYMENT:tr_..."), of een hash van de regel
+  /// als die geen ID heeft. Dezelfde export twee keer opladen telt niets dubbel.
+  externalKey     String
+  /// De ID van de provider, zoals in de export (`tr_...`, `tx...`).
+  providerId      String?
+  occurredAt      DateTime     @db.Timestamptz(3)
+  /// De maand waarin de regel in het overzicht telt (de eerste dag). Bij Mollie
+  /// die van de uitbetaling, en NULL zolang ze niet uitbetaald is; anders die
+  /// van de transactie, op de Brusselse klok.
+  periodMonth     DateTime?    @db.Date
+  amountCents     Int
+  /// Bij Mollie: wat ervan teruggestort werd. Informatief; het overzicht telt
+  /// het uitbetaalde bedrag, zoals het rekenblad.
+  refundedCents   Int          @default(0)
+  /// Zonder e-mailadressen (Uniflow zet dat van de student erin).
+  description     String?
+  reference       String?
+  bulkId          String?
+  payoutReference String?
+  channelId       String?
+  importId        String
+
+  /// De code als kopie, zoals bij `TicketOrder.accountingCode`: wat bij de
+  /// boekhouder ligt, verandert niet mee met een hernoemde code.
+  accountingCode      String?
+  accountingCodeName  String?
+  rule                IncomeRule?
+  /// Telt niet mee in het overzicht (met de hand).
+  excluded            Boolean     @default(false)
+  ticketPaymentId     String?
+  membershipPaymentId String?
+  uitleenPaymentId    String?
+  /// De kassa die het toestel had, als de code van haar komt (regel 4).
+  cashRegisterId      String?
+  assignedById        String?
+  assignedAt          DateTime?   @db.Timestamptz(3)
+  createdAt           DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime    @updatedAt @db.Timestamptz(3)
+
+  channel           IncomeChannel?     @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  import            IncomeImport       @relation(fields: [importId], references: [id], onDelete: Cascade)
+  ticketPayment     TicketPayment?     @relation(fields: [ticketPaymentId], references: [id], onDelete: SetNull)
+  membershipPayment MembershipPayment? @relation(fields: [membershipPaymentId], references: [id], onDelete: SetNull)
+  uitleenPayment    UitleenPayment?    @relation(fields: [uitleenPaymentId], references: [id], onDelete: SetNull)
+  cashRegister      CashRegister?      @relation(fields: [cashRegisterId], references: [id], onDelete: SetNull)
+  assignedBy        User?              @relation("IncomeAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@unique([source, externalKey])
+  @@index([periodMonth])
+  @@index([importId])
+  @@index([channelId])
+  @@index([rule])
+  @@index([ticketPaymentId])
+  @@index([membershipPaymentId])
+  @@index([uitleenPaymentId])
+  @@index([cashRegisterId])
+}
+
+/// "Deze tekst hoort altijd onder deze code" (koppelregel 5).
+model IncomeNameRule {
+  id               String       @id @default(cuid())
+  source           IncomeSource
+  /// De tekst zoals `incomeRuleText` ze maakt: kleine letters, zonder
+  /// ordernummer of e-mailadres.
+  text             String
+  accountingCodeId String
+  createdById      String?
+  createdAt        DateTime     @default(now()) @db.Timestamptz(3)
+
+  accountingCode AccountingCode @relation(fields: [accountingCodeId], references: [id], onDelete: Cascade)
+  createdBy      User?          @relation("IncomeNameRuleCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([source, text])
+}
+
+/// Een afgesloten periode: wat erin valt, verandert niet meer.
+model IncomePeriod {
+  id         String   @id @default(cuid())
+  fromMonth  DateTime @db.Date
+  toMonth    DateTime @db.Date
+  closedAt   DateTime @default(now()) @db.Timestamptz(3)
+  closedById String?
+
+  closedBy User? @relation("IncomePeriodClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+
+  @@index([fromMonth, toMonth])
+}
+
+/// Een uitbetaling zoals de provider ze noemt: een overschrijving naar de
+/// bank, met de referentie die ook op de transacties staat
+/// (`IncomeTransaction.payoutReference`). Mollie geeft het bedrag in het
+/// balansrapport ("transfer"); SumUp enkel het nummer en de dag, en daar is de
+/// som van de verkopen het bedrag. Een latere export zet de dag en het bedrag
+/// van die export.
+model IncomePayout {
+  source      IncomeSource
+  reference   String
+  /// De dag van de overschrijving.
+  paidOn      DateTime     @db.Date
+  /// Wat er volgens de provider op de bank kwam, in centen. NULL = de export
+  /// zegt het niet (SumUp).
+  amountCents Int?
+  importId    String?
+  updatedAt   DateTime     @updatedAt @db.Timestamptz(3)
+
+  import IncomeImport? @relation(fields: [importId], references: [id], onDelete: SetNull)
+
+  @@id([source, reference])
+  @@index([importId])
+}
+
+/// Een uitbetaling die Beheer tegen het uittreksel afvinkte (Mollie, SumUp). Het bedrag
+/// is dat van het moment van afvinken: verandert de som later (een export met
+/// een regel meer), dan toont de site dat het niet meer klopt.
+model IncomePayoutCheck {
+  payoutReference String   @id
+  amountCents     Int
+  checkedAt       DateTime @default(now()) @db.Timestamptz(3)
+  checkedById     String?
+
+  checkedBy User? @relation("IncomePayoutCheckedBy", fields: [checkedById], references: [id], onDelete: SetNull)
 }
 
 // -----------------------------------------------------------------------------

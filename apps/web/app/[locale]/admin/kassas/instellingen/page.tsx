@@ -42,7 +42,7 @@ export default async function KassaInstellingen({ params }: { params: Promise<{ 
         base={base}
         nl={nl}
         active="instellingen"
-        caps={{ request: true, manage: true }}
+        caps={{ request: true, manage: true, control: access.canCheckIncome }}
         permanentLabel={permanentTabLabel(access, locale)}
       />
 

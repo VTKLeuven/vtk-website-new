@@ -4,10 +4,12 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { Button, Input, Label, Select, Textarea } from "@vtk/ui";
 import { IconButton } from "@/components/ui/IconButton";
-import { TrashIcon } from "@/components/ui/icons";
+import { CheckIcon, TrashIcon } from "@/components/ui/icons";
+import Link from "@/components/ui/Link";
 import { SaveForm } from "@/components/ui/SaveForm";
 import type { SaveAction } from "@/lib/saveState";
 import { formatEuro } from "@/lib/rekeningen/expenses";
+import { controlSpanLabel, kassaCheck, paymentsLabel, type KassaImportAmount } from "@/lib/inkomsten/kassa";
 import {
   amountInputValue,
   computeResult,
@@ -56,6 +58,8 @@ export function CountForm({
   linkedTicketIds,
   note,
   errorMessages,
+  importAmounts = [],
+  incomeSettingsHref,
 }: {
   locale: "nl" | "en";
   action: SaveAction;
@@ -75,6 +79,12 @@ export function CountForm({
   linkedTicketIds: string[];
   note: string;
   errorMessages: Record<string, string>;
+  /**
+   * Wat de online inkomsten per toestel zagen tijdens deze kassa, enkel voor wie
+   * ze mag zien. Leeg = geen controle (geen recht, of nog geen toestel gekoppeld).
+   */
+  importAmounts?: KassaImportAmount[];
+  incomeSettingsHref?: string;
 }) {
   const nl = locale === "nl";
   const router = useRouter();
@@ -151,52 +161,79 @@ export function CountForm({
           const options = line.terminal && !names.includes(line.terminal) ? [line.terminal, ...names] : names;
           const selectId = `${uid}-${line.key}-terminal`;
           const amountId = `${uid}-${line.key}-amount`;
+          const imported = line.terminal
+            ? importAmounts.find((amount) => amount.method === method && amount.terminal === line.terminal)
+            : undefined;
           return (
-            <div key={line.key} className="flex flex-wrap items-end gap-2">
-              <input type="hidden" name="paymentMethod" value={method} />
-              <div className="w-52">
-                <Label htmlFor={selectId} className={index > 0 ? "sr-only" : undefined}>
-                  {method === "BANCONTACT" ? (nl ? "Bakje" : "Terminal") : nl ? "Rekening" : "Account"}
-                </Label>
-                <Select
-                  id={selectId}
-                  name="paymentTerminal"
-                  value={line.terminal}
-                  onChange={(event) => updateLine(line.key, { terminal: event.target.value })}
+            <div key={line.key} className="space-y-1">
+              <div className="flex flex-wrap items-end gap-2">
+                <input type="hidden" name="paymentMethod" value={method} />
+                <div className="w-52">
+                  <Label htmlFor={selectId} className={index > 0 ? "sr-only" : undefined}>
+                    {method === "BANCONTACT" ? (nl ? "Bakje" : "Terminal") : nl ? "Rekening" : "Account"}
+                  </Label>
+                  <Select
+                    id={selectId}
+                    name="paymentTerminal"
+                    value={line.terminal}
+                    onChange={(event) => updateLine(line.key, { terminal: event.target.value })}
+                  >
+                    <option value="">{nl ? "Kies..." : "Choose..."}</option>
+                    {options.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="w-36">
+                  <Label htmlFor={amountId} className={index > 0 ? "sr-only" : undefined}>
+                    {nl ? "Bedrag" : "Amount"}
+                  </Label>
+                  <Input
+                    id={amountId}
+                    name="paymentAmount"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    placeholder={nl ? "nog niet afgelezen" : "not read yet"}
+                    value={line.amount}
+                    onChange={(event) => updateLine(line.key, { amount: event.target.value })}
+                    aria-invalid={parseAmountInput(line.amount) === undefined || undefined}
+                    className="text-right tabular-nums"
+                  />
+                </div>
+                <IconButton
+                  label={nl ? "Regel weghalen" : "Remove line"}
+                  srLabel={`${nl ? "Regel weghalen" : "Remove line"}: ${label} ${line.terminal}`}
+                  tone="danger"
+                  className="mb-1"
+                  onClick={() => setLines((current) => current.filter((candidate) => candidate.key !== line.key))}
                 >
-                  <option value="">{nl ? "Kies..." : "Choose..."}</option>
-                  {options.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </Select>
+                  <TrashIcon />
+                </IconButton>
               </div>
-              <div className="w-36">
-                <Label htmlFor={amountId} className={index > 0 ? "sr-only" : undefined}>
-                  {nl ? "Bedrag" : "Amount"}
-                </Label>
-                <Input
-                  id={amountId}
-                  name="paymentAmount"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  placeholder={nl ? "nog niet afgelezen" : "not read yet"}
-                  value={line.amount}
-                  onChange={(event) => updateLine(line.key, { amount: event.target.value })}
-                  aria-invalid={parseAmountInput(line.amount) === undefined || undefined}
-                  className="text-right tabular-nums"
+              {imported ? (
+                <ImportCheckLine
+                  amount={imported}
+                  typed={line.amount}
+                  nl={nl}
+                  euro={euro}
+                  onTake={() => updateLine(line.key, { amount: amountInputValue(imported.cents) })}
                 />
-              </div>
-              <IconButton
-                label={nl ? "Regel weghalen" : "Remove line"}
-                srLabel={`${nl ? "Regel weghalen" : "Remove line"}: ${label} ${line.terminal}`}
-                tone="danger"
-                className="mb-1"
-                onClick={() => setLines((current) => current.filter((candidate) => candidate.key !== line.key))}
-              >
-                <TrashIcon />
-              </IconButton>
+              ) : line.terminal && importAmounts.length > 0 ? (
+                <p className="text-xs text-vtk-muted">
+                  {nl ? "Nog geen kanaal van de online inkomsten aan dit toestel gekoppeld" : "No online income channel linked to this device yet"}
+                  {incomeSettingsHref ? (
+                    <>
+                      {": "}
+                      <Link href={incomeSettingsHref} className="underline">
+                        {nl ? "instellingen" : "settings"}
+                      </Link>
+                    </>
+                  ) : null}
+                  .
+                </p>
+              ) : null}
             </div>
           );
         })}
@@ -378,4 +415,70 @@ export function CountForm({
       <ResultSummary result={result} locale={locale} />
     </SaveForm>
   );
+}
+
+/**
+ * Wat de online inkomsten op dit toestel zagen tijdens de kassa, naast wat
+ * ingetikt is. Een verschil is een waarschuwing: het ingetikte bedrag is wat
+ * Beheer van het toestel las, en dat blijft staan. "Overnemen" vult enkel het
+ * veld; opslaan doet de knop onderaan.
+ */
+function ImportCheckLine({
+  amount,
+  typed,
+  nl,
+  euro,
+  onTake,
+}: {
+  amount: KassaImportAmount;
+  typed: string;
+  nl: boolean;
+  euro: (cents: number) => string;
+  onTake: () => void;
+}) {
+  const parsed = parseAmountInput(typed);
+  const check = kassaCheck(typeof parsed === "number" ? parsed : null, amount);
+  const span = controlSpanLabel(amount, nl);
+  const payments = paymentsLabel(amount.count, nl);
+
+  switch (check.state) {
+    case "nothing":
+      return (
+        <p className="text-xs text-vtk-muted">
+          {nl
+            ? `Volgens de online inkomsten kwam hier ${span} niets binnen. Is de export van die dag al geüpload?`
+            : `According to the online income nothing came in here ${span}. Has the export of that day been uploaded?`}
+        </p>
+      );
+    case "empty":
+      return (
+        <p className="flex flex-wrap items-center gap-x-2 text-xs text-vtk-muted">
+          <span>
+            {nl
+              ? `Volgens de online inkomsten: ${euro(check.importCents)} (${payments}, ${span}).`
+              : `According to the online income: ${euro(check.importCents)} (${payments}, ${span}).`}
+          </span>
+          <Button type="button" variant="ghost" size="sm" onClick={onTake}>
+            {nl ? "Overnemen" : "Use this amount"}
+          </Button>
+        </p>
+      );
+    case "match":
+      return (
+        <p className="flex items-center gap-1 text-xs text-vtk-muted">
+          <span aria-hidden>
+            <CheckIcon />
+          </span>
+          {nl ? `Klopt met de online inkomsten (${payments}, ${span}).` : `Matches the online income (${payments}, ${span}).`}
+        </p>
+      );
+    case "differs":
+      return (
+        <p className="text-xs text-vtk-warn">
+          {nl
+            ? `Volgens de online inkomsten ${euro(check.importCents)} (${payments}, ${span}): er is ${euro(Math.abs(check.differenceCents))} ${check.differenceCents > 0 ? "meer" : "minder"} ingetikt. Meestal betaalde iemand op een ander toestel; het ingetikte bedrag blijft staan.`
+            : `According to the online income ${euro(check.importCents)} (${payments}, ${span}): ${euro(Math.abs(check.differenceCents))} ${check.differenceCents > 0 ? "more" : "less"} was typed. Usually someone paid on another device; the typed amount stays.`}
+        </p>
+      );
+  }
 }

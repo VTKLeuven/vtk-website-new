@@ -79,7 +79,7 @@ export default async function VasteKassas({
       base={base}
       nl={nl}
       active="vast"
-      caps={{ request: true, manage }}
+      caps={{ request: true, manage, control: access.canCheckIncome }}
       permanentLabel={permanentTabLabel(access, locale)}
     />
   );

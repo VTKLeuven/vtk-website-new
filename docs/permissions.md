@@ -490,6 +490,15 @@ een ticketevent mag maken of beheren, kiest de code in het eventformulier, en wi
 (IT en Groep 5); geef het de penning via een rol in `/admin/roles`. MCP krijgt er
 niets van, ook niet lezend.
 
+## Online inkomsten
+
+`income.manage` geeft alles op `/admin/inkomsten`: exports opladen en
+verwijderen, toewijzen, teksten onthouden, de kanalen en de kostencode instellen,
+periodes afsluiten en heropenen, en de CSV voor de boekhouder. Het zit in de
+systeemrol `admin` (IT en Groep 5), zoals de rekeningen en de kassa's; de sync
+geeft het bij de start aan admin. MCP krijgt er niets van, ook niet lezend: de
+transacties zijn het geld van de kring. Zie `docs/inkomsten.md`.
+
 ## Wie doet wat
 
 Het register van `/admin/wie-doet-wat` (keuzes in `docs/design-decisions.md`,

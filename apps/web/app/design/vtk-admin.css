@@ -85,9 +85,13 @@
 
    Een fout- of waarschuwingsregel (`text-vtk-danger`, `text-vtk-warn`) is de
    tweede uitzondering: grijs gemaakt leest "de einddatum ligt voor de
-   startdatum" als een voetnoot en niet als de reden dat de knop niet werkt. */
+   startdatum" als een voetnoot en niet als de reden dat de knop niet werkt.
+
+   De uitleg achter een "i" (`InfoTip`) is de derde: daar is de tekst de
+   inhoud zelf, geen voetnoot, en een paneel vol grijs leest als uitgeschakeld. */
 .vtk-admin-main :is(p, .text-zinc-500, .text-zinc-600, .text-zinc-700):not(
     .vtk-admin-preview *,
+    .vtk-info-tip *,
     .text-vtk-danger,
     .text-vtk-warn
   ),
