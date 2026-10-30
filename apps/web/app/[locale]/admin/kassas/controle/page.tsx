@@ -70,7 +70,7 @@ export default async function KassaControle({
     return (
       <p className="text-sm text-vtk-muted">
         {nl
-          ? "De controle legt de kassa's naast de online inkomsten. Vraag IT om het recht 'Online inkomsten opladen en koppelen' aan je rol te hangen."
+          ? "De controle legt de kassa's naast de online inkomsten. Vraag IT om het recht 'Online inkomsten uploaden en koppelen' aan je rol te hangen."
           : "The check compares the cash registers with the online income. Ask IT to add the 'Import and match online income' permission to your role."}
       </p>
     );

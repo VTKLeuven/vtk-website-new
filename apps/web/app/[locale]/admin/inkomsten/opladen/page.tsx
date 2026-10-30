@@ -26,10 +26,10 @@ export default async function IncomeUploadPage({ params }: { params: Promise<{ l
   return (
     <div className="space-y-5">
       <header>
-        <h1 className="text-2xl font-semibold">{nl ? "Online inkomsten opladen" : "Upload online income"}</h1>
+        <h1 className="text-2xl font-semibold">{nl ? "Online inkomsten uploaden" : "Upload online income"}</h1>
         <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
           {nl
-            ? "Wat al eerder opgeladen werd, telt niet dubbel: een maand twee keer opladen kan geen kwaad."
+            ? "Wat al eerder geüpload werd, telt niet dubbel: een maand twee keer uploaden kan geen kwaad."
             : "Anything uploaded before does not count twice: uploading a month twice does no harm."}
         </p>
       </header>
@@ -47,9 +47,9 @@ export default async function IncomeUploadPage({ params }: { params: Promise<{ l
       </section>
 
       <section className="rounded-2xl border border-vtk-blue/12 bg-white p-5">
-        <h2 className="text-lg font-semibold">{nl ? "Opgeladen exports" : "Uploaded exports"}</h2>
+        <h2 className="text-lg font-semibold">{nl ? "Geüploade exports" : "Uploaded exports"}</h2>
         {imports.length === 0 ? (
-          <p className="mt-2 text-sm text-vtk-muted">{nl ? "Nog niets opgeladen." : "Nothing uploaded yet."}</p>
+          <p className="mt-2 text-sm text-vtk-muted">{nl ? "Nog niets geüpload." : "Nothing uploaded yet."}</p>
         ) : (
           <div className="relative mt-3 overflow-x-auto">
             <table className="w-full text-sm">
@@ -60,7 +60,7 @@ export default async function IncomeUploadPage({ params }: { params: Promise<{ l
                   <th className="px-3 py-2">{nl ? "Periode" : "Period"}</th>
                   <th className="px-3 py-2 text-right">{nl ? "Nieuw" : "New"}</th>
                   <th className="px-3 py-2 text-right">{nl ? "Al gekend" : "Known"}</th>
-                  <th className="px-3 py-2">{nl ? "Opgeladen" : "Uploaded"}</th>
+                  <th className="px-3 py-2">{nl ? "Geüpload" : "Uploaded"}</th>
                   <th className="px-3 py-2">
                     <span className="sr-only">{nl ? "Acties" : "Actions"}</span>
                   </th>
@@ -89,7 +89,7 @@ export default async function IncomeUploadPage({ params }: { params: Promise<{ l
                         title={nl ? "Deze export verwijderen?" : "Delete this export?"}
                         description={
                           nl
-                            ? `De ${row.createdCount} transacties die deze export aanmaakte, verdwijnen${row.manualCount ? `, ook de ${row.manualCount} die met de hand een code kregen` : ""}. Onthouden teksten en de instellingen van de kanalen blijven. Laad je dezelfde export later opnieuw op, dan komen de transacties terug, zonder de toewijzingen met de hand.`
+                            ? `De ${row.createdCount} transacties die deze export aanmaakte, verdwijnen${row.manualCount ? `, ook de ${row.manualCount} die met de hand een code kregen` : ""}. Onthouden teksten en de instellingen van de kanalen blijven. Upload je dezelfde export later opnieuw, dan komen de transacties terug, zonder de toewijzingen met de hand.`
                             : `The ${row.createdCount} transactions this export created disappear${row.manualCount ? `, including the ${row.manualCount} that were assigned by hand` : ""}. Remembered texts and channel settings stay. Upload the same export again later and the transactions come back, without the manual assignments.`
                         }
                         confirmLabel={nl ? "Verwijderen" : "Delete"}

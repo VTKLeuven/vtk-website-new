@@ -113,7 +113,7 @@ export default async function IncomeSettingsPage({ params }: { params: Promise<{
             </p>
             <p>
               {nl
-                ? "De eerste rekening en de eerste standaardcode gelden vanaf het begin, ook voor wat al opgeladen werd. Wisselt een toestel later van rekening of van post, voeg dan een regel toe vanaf die dag: wat ervoor binnenkwam, houdt de oude."
+                ? "De eerste rekening en de eerste standaardcode gelden vanaf het begin, ook voor wat al geüpload werd. Wisselt een toestel later van rekening of van post, voeg dan een regel toe vanaf die dag: wat ervoor binnenkwam, houdt de oude."
                 : "The first account and the first default code apply from the start, also to what was uploaded already. If a device later changes account or post, add a row from that day: what came in before keeps the old one."}
             </p>
             <p>

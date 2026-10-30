@@ -59,11 +59,11 @@ export function UploadForm({
   return (
     <SaveForm
       action={importAction}
-      submitLabel={nl ? "Opladen" : "Upload"}
-      savingLabel={nl ? "Bezig met opladen..." : "Uploading..."}
-      savedMessage={nl ? "Opgeladen." : "Uploaded."}
+      submitLabel={nl ? "Uploaden" : "Upload"}
+      savingLabel={nl ? "Bezig met uploaden..." : "Uploading..."}
+      savedMessage={nl ? "Geüpload." : "Uploaded."}
       errorMessages={errorMessages}
-      fallbackErrorMessage={nl ? "Opladen mislukt." : "Upload failed."}
+      fallbackErrorMessage={nl ? "Uploaden mislukt." : "Upload failed."}
       submitDisabled={pending || !totals || failed.length > 0 || totals.created + totals.updated + totals.payouts === 0}
       onSuccess={() => {
         setPreview({ status: "idle" });
@@ -101,7 +101,7 @@ export function UploadForm({
             <>
               <p className="font-medium">
                 {nl
-                  ? `${failed.length} van de ${files.length} bestanden kan de site niet lezen. Laat ze weg en kies opnieuw; er is nog niets opgeladen.`
+                  ? `${failed.length} van de ${files.length} bestanden kan de site niet lezen. Laat ze weg en kies opnieuw; er is nog niets geüpload.`
                   : `The site cannot read ${failed.length} of the ${files.length} files. Leave them out and choose again; nothing has been uploaded yet.`}
               </p>
               <ul className="mt-1 space-y-0.5">
@@ -131,7 +131,7 @@ export function UploadForm({
             <Stat label={nl ? "Nieuw" : "New"} value={number(totals.created)} />
             <Stat label={nl ? "Automatisch gekoppeld" : "Matched automatically"} value={number(matched)} />
             <Stat label={nl ? "Na te kijken" : "To review"} value={number(totals.rules.OPEN)} />
-            <Stat label={nl ? "Al eerder opgeladen" : "Already uploaded"} value={number(totals.duplicates)} />
+            <Stat label={nl ? "Al eerder geüpload" : "Already uploaded"} value={number(totals.duplicates)} />
           </dl>
           {totals.locked ? (
             <p className="mt-2 text-vtk-warn">
@@ -205,7 +205,7 @@ export function UploadForm({
           {totals.mollieWithoutFees ? (
             <p className="mt-2 text-vtk-muted">
               {nl
-                ? "Een Mollie-bestand heeft geen kosten- of reserveregels. De betalingen krijgen een code, maar het Mollie-totaal zal niet kloppen met de bank tot de kosten er ook in zitten: laad ook het balansrapport op."
+                ? "Een Mollie-bestand heeft geen kosten- of reserveregels. De betalingen krijgen een code, maar het Mollie-totaal zal niet kloppen met de bank tot de kosten er ook in zitten: upload ook het balansrapport."
                 : "A Mollie file has no fee or reserve rows. The payments get a code, but the Mollie total will not match the bank until the fees are in too: upload the balance report as well."}
             </p>
           ) : null}

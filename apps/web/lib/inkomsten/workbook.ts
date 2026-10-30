@@ -675,7 +675,7 @@ export function filteredSheet(model: WorkbookModel, which: "open" | "excluded"):
 export function importsSheet(model: WorkbookModel): SheetSpec {
   const { nl } = model;
   const data: SheetData = [
-    headerRow(nl ? ["Bestand", "Bron", "Opgeladen op", "Door", "Regels in deze periode"] : ["File", "Source", "Uploaded on", "By", "Rows in this period"]),
+    headerRow(nl ? ["Bestand", "Bron", "Geüpload op", "Door", "Regels in deze periode"] : ["File", "Source", "Uploaded on", "By", "Rows in this period"]),
   ];
   for (const file of model.imports) {
     data.push([

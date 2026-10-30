@@ -12,11 +12,11 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
     NO_FILE: "Kies eerst een bestand.",
     FILE_TOO_LARGE:
       "Dat is te groot: een bestand mag tot 10 MB, een keuze samen tot 40 MB. Een export van een kwartaal is veel kleiner.",
-    TOO_MANY_FILES: "Dat zijn meer dan 250 bestanden. Laad ze in delen op, bijvoorbeeld per maand.",
+    TOO_MANY_FILES: "Dat zijn meer dan 250 bestanden. Upload ze in delen, bijvoorbeeld per maand.",
     EMPTY: "Dat bestand heeft geen regels.",
     UNKNOWN_FORMAT:
-      "Dat bestand herkent de site niet. Laad een CSV-export van Payconiq, Mollie, SumUp of Europabank op, met de kolomkoppen zoals ze uit het portaal komen; de i naast elke bron zegt welke kolommen er moeten zijn.",
-    BAD_ROW: "Een regel in dat bestand is niet te lezen (datum of bedrag). Er is niets opgeladen.",
+      "Dat bestand herkent de site niet. Upload een CSV-export van Payconiq, Mollie, SumUp of Europabank, met de kolomkoppen zoals ze uit het portaal komen; de i naast elke bron zegt welke kolommen er moeten zijn.",
+    BAD_ROW: "Een regel in dat bestand is niet te lezen (datum of bedrag). Er is niets geüpload.",
     NOT_FOUND: "Dat bestaat niet meer; ververs de pagina.",
     CODE_NOT_FOUND: "Die boekhoudcode bestaat niet meer; ververs de pagina.",
     CODE_REQUIRED: "Kies een boekhoudcode, of kies dat het niet meetelt.",

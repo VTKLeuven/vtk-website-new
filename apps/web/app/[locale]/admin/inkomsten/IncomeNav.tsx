@@ -2,7 +2,7 @@ import Link from "@/components/ui/Link";
 
 const TABS = [
   { key: "overzicht", href: "", nl: "Overzicht", en: "Overview" },
-  { key: "opladen", href: "/opladen", nl: "Opladen", en: "Upload" },
+  { key: "opladen", href: "/opladen", nl: "Uploaden", en: "Upload" },
   { key: "na-te-kijken", href: "/na-te-kijken", nl: "Na te kijken", en: "To review" },
   { key: "transacties", href: "/transacties", nl: "Transacties", en: "Transactions" },
   { key: "instellingen", href: "/instellingen", nl: "Instellingen", en: "Settings" },

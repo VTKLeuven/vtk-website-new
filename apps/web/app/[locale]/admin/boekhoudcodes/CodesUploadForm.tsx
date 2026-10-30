@@ -60,11 +60,11 @@ export function CodesUploadForm({
   return (
     <SaveForm
       action={importAction}
-      submitLabel={nl ? "Lijst opladen" : "Upload list"}
-      savingLabel={nl ? "Bezig met opladen..." : "Uploading..."}
-      savedMessage={nl ? "Opgeladen." : "Uploaded."}
+      submitLabel={nl ? "Lijst uploaden" : "Upload list"}
+      savingLabel={nl ? "Bezig met uploaden..." : "Uploading..."}
+      savedMessage={nl ? "Geüpload." : "Uploaded."}
       errorMessages={errorMessages}
-      fallbackErrorMessage={nl ? "Opladen mislukt." : "Upload failed."}
+      fallbackErrorMessage={nl ? "Uploaden mislukt." : "Upload failed."}
       submitDisabled={pending || !plan || plan.errors.length > 0 || nothingToDo}
       onSuccess={() => {
         setPreview({ status: "idle" });
@@ -111,7 +111,7 @@ export function CodesUploadForm({
           {plan.errors.length > 0 ? (
             <div className="text-vtk-danger" role="alert">
               <p className="font-medium">
-                {nl ? "Er wordt niets opgeladen tot deze regels kloppen:" : "Nothing is uploaded until these rows are right:"}
+                {nl ? "Er wordt niets geüpload tot deze regels kloppen:" : "Nothing is uploaded until these rows are right:"}
               </p>
               <ul className="mt-1 list-disc pl-5">
                 {plan.errors.slice(0, 10).map((error) => (

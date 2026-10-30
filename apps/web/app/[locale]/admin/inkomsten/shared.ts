@@ -79,7 +79,7 @@ export function checkText(
               check.missing
                 .map((gap) => `${gap.channel ? `${SOURCE_LABELS[gap.source]} ${gap.channel}` : SOURCE_LABELS[gap.source]} in ${monthLabel(gap.month, nl)}`)
                 .join(", ") +
-              (nl ? ": nog niet opgeladen, of toen niet gebruikt?" : ": not uploaded yet, or not used then?"),
+              (nl ? ": nog niet geüpload, of toen niet gebruikt?" : ": not uploaded yet, or not used then?"),
             href: `${base}/admin/inkomsten/opladen`,
           };
     case "mollieFees":
@@ -91,7 +91,7 @@ export function checkText(
               (nl ? "Geen Mollie-kosten in " : "No Mollie fees in ") +
               check.months.map((month) => monthLabel(month, nl)).join(", ") +
               (nl
-                ? ": laad het balansrapport van Mollie op, of de export per uitbetaling met de regels \"Withheld fees\"."
+                ? ": upload het balansrapport van Mollie, of de export per uitbetaling met de regels \"Withheld fees\"."
                 : ": upload the Mollie balance report, or the export per payout with the \"Withheld fees\" rows."),
             href: `${base}/admin/inkomsten/opladen`,
           };
@@ -104,7 +104,7 @@ export function checkText(
               (nl ? "Mollie-kosten uit het balansrapport én uit de export per uitbetaling in " : "Mollie fees from both the balance report and the export per payout in ") +
               check.months.map((month) => monthLabel(month, nl)).join(", ") +
               (nl
-                ? ": dat is twee keer hetzelfde geld. Verwijder een van de twee bij de opgeladen bestanden."
+                ? ": dat is twee keer hetzelfde geld. Verwijder een van de twee bij de geüploade bestanden."
                 : ": that is the same money twice. Delete one of the two under the uploaded files."),
             href: `${base}/admin/inkomsten/opladen`,
           };

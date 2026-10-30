@@ -446,7 +446,7 @@ function ImportCheckLine({
       return (
         <p className="text-xs text-vtk-muted">
           {nl
-            ? `Volgens de online inkomsten kwam hier ${span} niets binnen. Is de export van die dag al opgeladen?`
+            ? `Volgens de online inkomsten kwam hier ${span} niets binnen. Is de export van die dag al geüpload?`
             : `According to the online income nothing came in here ${span}. Has the export of that day been uploaded?`}
         </p>
       );

@@ -64,10 +64,10 @@ export default async function AdminAccountingCodes({
       <AccountingCodesEditor locale={locale} codes={codes} />
 
       <section className="rounded-2xl border border-vtk-blue/12 bg-white p-5">
-        <h2 className="text-lg font-semibold">{nl ? "De lijst opladen als CSV" : "Upload the list as CSV"}</h2>
+        <h2 className="text-lg font-semibold">{nl ? "De lijst uploaden als CSV" : "Upload the list as CSV"}</h2>
         <p className="mt-1 mb-3 max-w-3xl text-sm text-vtk-muted">
           {nl
-            ? "Staat de lijst in een rekenblad, laad dat dan op in plaats van elke code met de hand in te tikken. Nieuwe codes komen erbij en namen worden bijgewerkt; een code die niet in het bestand staat, blijft staan."
+            ? "Staat de lijst in een rekenblad, upload dat dan in plaats van elke code met de hand in te tikken. Nieuwe codes komen erbij en namen worden bijgewerkt; een code die niet in het bestand staat, blijft staan."
             : "If the list is in a spreadsheet, upload it instead of typing every code by hand. New codes are added and names updated; a code that is not in the file stays."}
         </p>
         <CodesUploadForm

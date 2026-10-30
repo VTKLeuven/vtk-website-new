@@ -180,7 +180,7 @@ export default async function IncomeOverviewPage({
           <p className="mt-4 text-sm text-vtk-muted">
             {nl ? "Nog niets in deze periode. " : "Nothing in this period yet. "}
             <Link href={`${base}/admin/inkomsten/opladen`} className="font-medium text-vtk-navy underline">
-              {nl ? "Laad een export op" : "Upload an export"}
+              {nl ? "Upload een export" : "Upload an export"}
             </Link>
             .
           </p>
