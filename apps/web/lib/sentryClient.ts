@@ -30,7 +30,6 @@ export function startSentry(): Promise<SentryModule> | null {
   started ??= import("@sentry/nextjs").then((Sentry) => {
     Sentry.init({
       dsn,
-      sendDefaultPii: false,
 
       // 100% tracing in dev, 10% in production.
       tracesSampleRate: process.env.NODE_ENV === "development" ? 1.0 : 0.1,
@@ -39,8 +38,6 @@ export function startSentry(): Promise<SentryModule> | null {
       // text masked and media blocked even after consent has been granted.
       replaysSessionSampleRate: 0.1,
       replaysOnErrorSampleRate: 1.0,
-
-      enableLogs: true,
 
       integrations: [
         Sentry.replayIntegration({

@@ -14,7 +14,7 @@ const { loadGroupingView } = await import("@/lib/forms/grouping/view");
  * verwachte aantal personen binnen is, een groepsinschrijving die voor drie
  * telt, en een laatkomer die na de indeling niet stil in een groep belandt.
  */
-describe.sequential("groepjesmaker", () => {
+describe("groepjesmaker", () => {
   const groupId = randomUUID();
   let formId = "";
   const fieldIds: Record<string, string> = {};

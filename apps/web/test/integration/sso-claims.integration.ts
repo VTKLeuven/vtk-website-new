@@ -8,7 +8,7 @@ import { currentStudyYear, currentWorkingYear } from '@vtk/auth';
  * De resolver tegen een echte database: hier zit het risico dat de unit tests
  * niet dekken (veldnamen, enum-vormen, de rollen-join).
  */
-describe.sequential('claim resolution', () => {
+describe('claim resolution', () => {
   const ids = { user: randomUUID(), group: randomUUID(), role: randomUUID() };
   const email = `claims-${ids.user}@student.kuleuven.be`;
 

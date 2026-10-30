@@ -15,7 +15,7 @@ vi.mock("@vtk/auth/server", () => ({ getSession: vi.fn(async () => null) }));
  * legt vast dat zo'n rush eindigt zoals hij hoort te eindigen: elke plaats
  * verkocht, de rest netjes "uitverkocht", en niemand met een andere fout.
  */
-describe.sequential("ticket rush", () => {
+describe("ticket rush", () => {
   const CAPACITY = 240;
   const BUYERS = 300;
   const ids = {

@@ -24,7 +24,7 @@ function vevent(ics: string, ritId: string): string | undefined {
     .find((block) => block.includes(`UID:rit-${ritId}@`));
 }
 
-describe.sequential('de agendafeed van een chauffeur', () => {
+describe('de agendafeed van een chauffeur', () => {
   const ids = {
     chauffeur: randomUUID(),
     aanvrager: randomUUID(),

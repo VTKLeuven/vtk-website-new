@@ -24,7 +24,7 @@ function vevent(ics: string, uid: string): string | undefined {
     .find((block) => block.includes(`UID:${uid}`));
 }
 
-describe.sequential('agendafeeds', () => {
+describe('agendafeeds', () => {
   const ids = {
     user: randomUUID(),
     group: randomUUID(),

@@ -19,7 +19,7 @@ vi.mock("@vtk/auth/server", () => ({ getSession: vi.fn(async () => null) }));
  * dat wat het toestel offline aanvaardt ook echt door de server aanvaard wordt,
  * en dat een tweede scan van hetzelfde ticket alsnog als dubbel terugkomt.
  */
-describe.sequential("offline scannen", () => {
+describe("offline scannen", () => {
   const ids = {
     user: randomUUID(),
     group: randomUUID(),

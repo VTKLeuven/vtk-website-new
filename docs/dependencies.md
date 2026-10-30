@@ -60,10 +60,10 @@ zijn plugins, de Expo-SDK als één set, en de action-digests in één PR per we
 
 ## Wat bewust vastgepind staat
 
-- **Node 20.** Engines, de CI-runners en de drie Dockerfiles staan erop. Een
+- **Node 22.** Engines, de CI-runners (`actions/node-versions`), `@types/node` en de drie Dockerfiles staan erop. Een
   major sprong raakt ook `setup-node` in de workflows en `ARG NODE_VERSION` in
   `infra/docker/*.Dockerfile`, dus dat is een eigen oefening. Renovate mag niet
-  verder dan `^20`.
+  verder dan `^22`.
 - **Postgres 16.** Dezelfde image staat in de CI-services, in
   `infra/compose.dev.yml` en in de deploy-stack. Een major bump laat de bestaande
   datadirectory onleesbaar achter (`pg_upgrade`), en dat merk je pas op de server.
@@ -72,8 +72,10 @@ zijn plugins, de Expo-SDK als één set, en de action-digests in één PR per we
   `docs/immich-disaster-recovery.md`. De database- en cache-image van Immich
   (`ghcr.io/immich-app/postgres`, `valkey`) staan helemaal uit: die volgen de
   compose van Immich zelf, niet Renovate.
-- **MinIO** heeft tags als `RELEASE.2025-09-07T16-13-09Z`. Die krijgen een eigen
-  `versioning`-regex, anders ziet Renovate ze niet als versies.
+- **MinIO** (`quay.io/minio/minio` en `quay.io/minio/mc`) staat uit in Renovate:
+  MinIO heeft zijn open-source repositories gearchiveerd en publiceert geen nieuwe
+  community-tags meer op `quay.io` (lookup geeft `no-result`). De gepinde images in
+  `infra/compose.dev.yml` blijven gewoon staan.
 
 ## De mobiele app
 

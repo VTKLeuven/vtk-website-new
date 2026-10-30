@@ -21,7 +21,13 @@
     "description": "Security fixes bypass the release-age wait and the PR concurrency limit, so a red audit never sits blocked behind routine dependency PRs.",
     "enabled": true,
     "minimumReleaseAge": null,
-    "labels": ["dependencies", "security"]
+    "labels": ["dependencies", "security"],
+    "packageRules": [
+      {
+        "matchPackageNames": ["better-auth", "@better-auth/*"],
+        "groupName": "better-auth"
+      }
+    ]
   },
   "lockFileMaintenance": {
     "description": "Refreshes transitive dependencies once a week. CI runs verify:lockfile before npm ci, so a refresh that drops another platform's native binaries fails the PR instead of the deploy.",
@@ -62,14 +68,17 @@
     {
       "description": "better-auth core and its plugins are released as a set.",
       "matchPackageNames": ["better-auth", "@better-auth/*"],
-      "groupName": "better-auth",
-      "vulnerabilityAlerts": {
-        "groupName": "better-auth"
-      }
+      "groupName": "better-auth"
     },
     {
       "description": "Node 22 is the whole stack: engines, the CI runners and the three Dockerfiles. Moving to a new major is a deliberate exercise, not a dependency PR. (20 went end-of-life in April 2026.)",
-      "matchPackageNames": ["node", "docker.io/library/node", "docker.io/node"],
+      "matchPackageNames": [
+        "node",
+        "actions/node-versions",
+        "@types/node",
+        "docker.io/library/node",
+        "docker.io/node"
+      ],
       "allowedVersions": "^22"
     },
     {
@@ -102,10 +111,9 @@
       "enabled": false
     },
     {
-      "description": "MinIO tags look like RELEASE.2025-09-07T16-13-09Z; without its own versioning scheme Renovate cannot compare them.",
+      "description": "MinIO archived its open-source repositories and stopped serving public tag listings on quay.io (lookup returns no-result); keep the pinned local dev images as-is.",
       "matchPackageNames": ["quay.io/minio/minio", "quay.io/minio/mc"],
-      "groupName": "minio",
-      "versioning": "regex:^RELEASE\\.(?<major>\\d{4})-(?<minor>\\d{2})-(?<patch>\\d{2})T(?<build>.+)$"
+      "enabled": false
     },
     {
       "description": "The mobile app lives outside the workspaces and needs an EAS Update after every merge, so it is never automerged. See docs/app-ontwikkelen.md.",

@@ -26,7 +26,7 @@ import {
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("@vtk/auth/server", () => ({ getSession: vi.fn(async () => null) }));
 
-describe.sequential("ticketing database invariants", () => {
+describe("ticketing database invariants", () => {
   const ids = {
     user: randomUUID(),
     group: randomUUID(),

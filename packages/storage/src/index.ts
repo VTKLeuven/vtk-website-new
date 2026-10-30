@@ -10,7 +10,7 @@ import { randomBytes } from "node:crypto";
 import { once } from "node:events";
 import { extname } from "node:path";
 import { Readable } from "node:stream";
-import archiver from "archiver";
+import { ZipArchive } from "archiver";
 
 export type S3Config = {
   endpoint: string;
@@ -307,7 +307,7 @@ export type ZipEntry = { key: string; name: string };
 // liep, en zolang laadde geen enkele afbeelding van de site. Stopt de lezer,
 // dan gaat het object dat openstaat ook dicht.
 export function streamAlbumZip(entries: ZipEntry[]): ReadableStream<Uint8Array> {
-  const archive = archiver("zip", { zlib: { level: 6 } });
+  const archive = new ZipArchive({ zlib: { level: 6 } });
   let current: Readable | undefined;
   let closed = false;
   const closing = new Promise<void>((resolve) => {

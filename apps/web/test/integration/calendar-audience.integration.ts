@@ -10,7 +10,7 @@ import { buildFeed } from "@/lib/calendar/feeds";
  * koppeltabel is makkelijk zo te schrijven dat het er goed uitziet en toch alles
  * of niets teruggeeft.
  */
-describe.sequential("kalender-doelgroepen", () => {
+describe("kalender-doelgroepen", () => {
   const ids = {
     group: randomUUID(),
     firstYearCat: randomUUID(),

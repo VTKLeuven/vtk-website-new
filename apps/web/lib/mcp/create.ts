@@ -219,52 +219,59 @@ export type McpFieldShape = {
  * `form_field.type`, en dat kost telkens een mislukte create-call.
  */
 function describeField(field: z.ZodTypeAny): McpFieldShape {
-  const def = field._def as Record<string, unknown> & { typeName?: string };
-  switch (def.typeName) {
-    case "ZodOptional":
-    case "ZodNullable":
-    case "ZodDefault":
+  const def = field.def as unknown as Record<string, unknown> & { type?: string };
+  switch (def.type) {
+    case "optional":
+    case "nullable":
+    case "default":
       return describeField(def.innerType as z.ZodTypeAny);
-    case "ZodEffects":
-      return describeField(def.schema as z.ZodTypeAny);
-    case "ZodEnum":
-      return { type: "string", enum: def.values as readonly string[] };
-    case "ZodNativeEnum":
-      return { type: "string", enum: Object.values(def.values as Record<string, unknown>) };
-    case "ZodLiteral":
-      return { type: typeof def.value, const: def.value };
-    case "ZodBoolean":
+    case "pipe":
+      return describeField(def.in as z.ZodTypeAny);
+    case "enum":
+      return { type: "string", enum: Object.values(def.entries as Record<string, unknown>) };
+    case "literal": {
+      const value = Array.isArray(def.values) ? def.values[0] : def.value;
+      return { type: typeof value, const: value };
+    }
+    case "boolean":
       return { type: "boolean" };
-    case "ZodString": {
+    case "string": {
       const shape: McpFieldShape = { type: "string" };
-      for (const check of (def.checks ?? []) as Array<Record<string, unknown>>) {
-        if (check.kind === "min") shape.minLength = check.value as number;
-        if (check.kind === "max") shape.maxLength = check.value as number;
-        if (check.kind === "regex") shape.pattern = String(check.regex);
-        if (check.kind === "email" || check.kind === "url") shape.format = check.kind;
-        if (check.kind === "datetime") shape.format = "date-time";
+      for (const rawCheck of (def.checks ?? []) as Array<{ _zod?: { def?: Record<string, unknown> } }>) {
+        const check = rawCheck._zod?.def ?? {};
+        if (check.check === "min_length") shape.minLength = check.minimum as number;
+        if (check.check === "max_length") shape.maxLength = check.maximum as number;
+        if (check.check === "string_format") {
+          if (check.format === "regex") shape.pattern = String(check.pattern);
+          if (check.format === "email" || check.format === "url") shape.format = check.format;
+          if (check.format === "datetime") shape.format = "date-time";
+        }
       }
       return shape;
     }
-    case "ZodNumber": {
+    case "number": {
       const shape: McpFieldShape = { type: "number" };
-      for (const check of (def.checks ?? []) as Array<Record<string, unknown>>) {
-        if (check.kind === "min") shape.minimum = check.value as number;
-        if (check.kind === "max") shape.maximum = check.value as number;
-        if (check.kind === "int") shape.integer = true;
+      for (const rawCheck of (def.checks ?? []) as Array<{ _zod?: { def?: Record<string, unknown> } }>) {
+        const check = rawCheck._zod?.def ?? {};
+        if (check.check === "greater_than") shape.minimum = check.value as number;
+        if (check.check === "less_than") shape.maximum = check.value as number;
+        if (check.check === "number_format" && (check.format === "safeint" || check.format === "int32")) {
+          shape.integer = true;
+        }
       }
       return shape;
     }
-    case "ZodArray": {
-      const shape: McpFieldShape = { type: "array", items: describeField(def.type as z.ZodTypeAny) };
-      const min = def.minLength as { value: number } | null;
-      const max = def.maxLength as { value: number } | null;
-      if (min) shape.minLength = min.value;
-      if (max) shape.maxLength = max.value;
+    case "array": {
+      const shape: McpFieldShape = { type: "array", items: describeField(def.element as z.ZodTypeAny) };
+      for (const rawCheck of (def.checks ?? []) as Array<{ _zod?: { def?: Record<string, unknown> } }>) {
+        const check = rawCheck._zod?.def ?? {};
+        if (check.check === "min_length") shape.minLength = check.minimum as number;
+        if (check.check === "max_length") shape.maxLength = check.maximum as number;
+      }
       return shape;
     }
-    case "ZodObject":
-    case "ZodRecord":
+    case "object":
+    case "record":
       return { type: "object" };
     default:
       return { type: "unknown" };
@@ -272,9 +279,11 @@ function describeField(field: z.ZodTypeAny): McpFieldShape {
 }
 
 function defaultValue(field: z.ZodTypeAny): unknown {
-  const def = field._def as Record<string, unknown> & { typeName?: string };
-  if (def.typeName === "ZodDefault") return (def.defaultValue as () => unknown)();
-  if (def.typeName === "ZodOptional" || def.typeName === "ZodNullable") {
+  const def = field.def as unknown as Record<string, unknown> & { type?: string };
+  if (def.type === "default") {
+    return typeof def.defaultValue === "function" ? (def.defaultValue as () => unknown)() : def.defaultValue;
+  }
+  if (def.type === "optional" || def.type === "nullable") {
     return defaultValue(def.innerType as z.ZodTypeAny);
   }
   return undefined;
@@ -282,7 +291,7 @@ function defaultValue(field: z.ZodTypeAny): unknown {
 
 export function listMcpCreateSchemas(principal: McpPrincipal) {
   return MCP_CREATE_KINDS.map((kind) => {
-    const shape = (schemas[kind] as z.AnyZodObject).shape;
+    const shape = schemas[kind].shape;
     return {
       kind,
       granted: canCreateMcpKind(principal, kind),
