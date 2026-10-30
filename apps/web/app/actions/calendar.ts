@@ -22,6 +22,8 @@ import {
 } from "@/lib/calendar/slug";
 import { EVENT_LINK_LABEL_MAX } from "@/lib/calendar/eventLink";
 import { autoPostEventToDiscord } from "@/lib/discord/posts";
+import { hasUpcomingMoment } from "@/lib/calendar/moments";
+import { HERO_EVENT_SLOTS } from "@/lib/home/heroEvents";
 
 const eventSchema = z.object({
   id: z.string().optional(),
@@ -685,6 +687,62 @@ export async function deleteCalendarCategoryAction(formData: FormData): Promise<
     summary: "de evenementen zelf blijven bestaan",
   });
   revalidateCalendar();
+}
+
+/**
+ * Licht een evenement uit bij de vier affiches in de hero, of haalt het daar weg.
+ *
+ * Enkel met `calendar.manageAll`: de hero is de plek van de hele kring, en een
+ * post die evenementen mag aanmaken, beslist niet mee wat bovenaan de site staat.
+ */
+export async function setEventHomeFeaturedAction(id: string, featured: boolean): Promise<SaveState> {
+  const session = await requireSession();
+  if (!session.user.isSuperAdmin && !hasPermission(session, "calendar.manageAll")) {
+    throw new Error("forbidden");
+  }
+  const now = new Date();
+  const moments = { select: { start: true, end: true, label: true } };
+  const event = await prisma.calendarEvent.findUnique({
+    where: { id },
+    select: { titleNl: true, publishedAt: true, start: true, homeFeaturedAt: true, moments },
+  });
+  if (!event) return saveError("NOT_FOUND");
+
+  if (featured) {
+    // Allebei staan nooit in de hero: een stille ster die niets doet, is erger
+    // dan een melding.
+    if (!event.publishedAt) return saveError("NOT_PUBLISHED");
+    if (!hasUpcomingMoment(event, now)) return saveError("ALREADY_STARTED");
+    const others = await prisma.calendarEvent.findMany({
+      where: {
+        id: { not: id },
+        homeFeaturedAt: { not: null },
+        publishedAt: { not: null },
+        end: { gte: now },
+      },
+      select: { start: true, moments },
+    });
+    if (others.filter((other) => hasUpcomingMoment(other, now)).length >= HERO_EVENT_SLOTS) {
+      return saveError("HERO_FULL");
+    }
+  }
+
+  await prisma.calendarEvent.update({
+    where: { id },
+    data: { homeFeaturedAt: featured ? (event.homeFeaturedAt ?? now) : null },
+  });
+  await logAudit({
+    action: "update",
+    entity: "calendarEvent",
+    entityId: id,
+    target: event.titleNl,
+    summary: featured ? "Uitgelicht in de hero" : "Uit de hero gehaald",
+  });
+  revalidatePath("/");
+  revalidatePath("/en");
+  revalidatePath("/admin/kalender");
+  revalidatePath("/en/admin/kalender");
+  return saveOk();
 }
 
 export async function deleteEventAction(formData: FormData): Promise<void> {

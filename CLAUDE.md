@@ -331,6 +331,15 @@ the design language into the application instead of copying mockup content.
   nodes/dimensions fade, labels rise). On mobile (<760px), leader lines hide and
   destinations appear as a hairline list below the drawing. Do not bring back the
   old photo hero, slogans, countdown clock, or live status badges.
+  - **Vier losse affiches hangen over de gele streep** (`HeroEventCards.tsx`,
+    `.g-events`): enkel de foto en de datumpin, met titel en uur zonder kaart op
+    de lichte band eronder. Zet er geen witte kaart rond: op navy tekent die een
+    rand rond elke foto. Met kaarten ligt de streep in `.g-events` en niet meer
+    onder de hero; die band is een rij van het raster, zodat de naad meeschaalt
+    met de foto. Welke vier: `lib/home/heroEvents.ts`, eerst wat uitgelicht is met
+    de ster in `/admin/kalender` (`calendar.manageAll`), daarna de eerstvolgende.
+    De band Aankomende evenementen begint na deze vier. Zie
+    `docs/design-decisions.md`.
 - Band rhythm: full-width navy bands return down the page and the site-wide dark
   footer closes the bookend. Header, bands and
   footer share the same `--navy` so the dark chrome reads as one system. The

@@ -6,7 +6,8 @@ import { requireSession } from "@/lib/session";
 import { hasPermission } from "@vtk/auth";
 import type { Locale } from "@vtk/i18n";
 import { Button, Card } from "@vtk/ui";
-import { sharedMomentTime } from "@/lib/calendar/moments";
+import { hasUpcomingMoment, nextOccurrenceAt, sharedMomentTime } from "@/lib/calendar/moments";
+import { HERO_EVENT_SLOTS, pickHeroEvents } from "@/lib/home/heroEvents";
 import { DiscordIcon } from "@/components/ui/icons";
 import { commuFormHref, getCommuRequestForm, requestsByEvent } from "@/lib/commu/requests";
 import { EventRow } from "./EventRow";
@@ -76,6 +77,18 @@ export default async function AdminCalendar({
         : commuFormHref(commuForm.slug, { evenement: eventId }),
     };
   };
+
+  // Wat er nu in de hero staat, met dezelfde regel als de homepage. Enkel voor
+  // wie het mag kiezen, en enkel bij wat nog komt.
+  const heroChooser = canAll && !showPast;
+  const heroPicks = heroChooser
+    ? pickHeroEvents(
+        events
+          .filter((event) => event.publishedAt && hasUpcomingMoment(event, now))
+          .sort((a, b) => +nextOccurrenceAt(a, now) - +nextOccurrenceAt(b, now)),
+      )
+    : [];
+  const heroFeaturedCount = heroPicks.filter((event) => event.homeFeaturedAt).length;
 
   const tag = nl ? "nl-BE" : "en-GB";
   const zone = "Europe/Brussels";
@@ -179,6 +192,42 @@ export default async function AdminCalendar({
         </FilterPill>
       </div>
 
+      {heroChooser && heroPicks.length > 0 && (
+        <section aria-labelledby="hero-events-heading">
+          <Card className="space-y-3 p-4">
+            <div>
+              <h2 id="hero-events-heading" className="text-base font-semibold">
+                {nl ? "In de hero op de homepage" : "In the hero on the homepage"}
+              </h2>
+              <p className="mt-1 text-sm text-zinc-600">
+                {nl
+                  ? `${heroFeaturedCount} van de ${HERO_EVENT_SLOTS} uitgelicht met de ster in de lijst. De andere plaatsen gaan vanzelf naar de eerstvolgende evenementen.`
+                  : `${heroFeaturedCount} of ${HERO_EVENT_SLOTS} featured with the star in the list. The other places go to the next events automatically.`}
+              </p>
+            </div>
+            <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {heroPicks.map((event) => (
+                <li key={event.id} className="min-w-0 border-t border-zinc-200 pt-2">
+                  <span className="block font-medium text-vtk-ink">{event.titleNl}</span>
+                  <span className="block text-xs tabular-nums text-zinc-500">
+                    {dayFmt.format(nextOccurrenceAt(event, now))}
+                  </span>
+                  <span className="block text-xs text-zinc-500">
+                    {event.homeFeaturedAt
+                      ? nl
+                        ? "Uitgelicht"
+                        : "Featured"
+                      : nl
+                        ? "Vanzelf"
+                        : "Automatic"}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </Card>
+        </section>
+      )}
+
       <Card className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-vtk-blue-soft text-left">
@@ -204,6 +253,7 @@ export default async function AdminCalendar({
                   interested: e._count.interests + e._count.guestInterests,
                   when: whenLabel(e),
                   commu: commuFor(e.id),
+                  heroFeatured: heroChooser ? Boolean(e.homeFeaturedAt) : null,
                 }}
               />
             ))}

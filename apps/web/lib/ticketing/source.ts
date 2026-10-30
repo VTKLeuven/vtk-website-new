@@ -186,6 +186,7 @@ type SourceInfo = { nl: string; en: string; kind: SourceKind };
 const SOURCES: Record<string, SourceInfo> = {
   "home-agenda": { nl: "Homepage: agenda bovenaan", en: "Homepage: agenda at the top", kind: "site" },
   "home-evenementen": { nl: "Homepage: aankomende evenementen", en: "Homepage: upcoming events", kind: "site" },
+  "home-hero": { nl: "Homepage: affiches in de hero", en: "Homepage: posters in the hero", kind: "site" },
   home: { nl: "Homepage (elders)", en: "Homepage (elsewhere)", kind: "site" },
   nieuws: { nl: "Nieuws", en: "News", kind: "site" },
   kalender: { nl: "Kalender", en: "Calendar", kind: "site" },

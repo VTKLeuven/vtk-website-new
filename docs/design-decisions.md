@@ -3214,6 +3214,38 @@ homepage is een ontwerpkeuze, geen toeval:
   van beide linksets is tegelijk in de DOM zichtbaar (`display: none` op de
   andere), zodat een screenreader links niet dubbel voorleest.
 
+### Evenementen in de hero: losse affiches, en wie ze kiest
+
+Sinds 30 oktober 2026 hangen vier evenementen als losse affiches over de gele
+streep van de hero. Dit was richting B op het bord
+https://claude.ai/artifact/Xo3uPbxNUGSqPb9kKuGftr, uitgewerkt op
+https://claude.ai/artifact/LcyfRnnKaK2fknXX2Kh3uN.
+
+- **Geen witte kaart.** De eerste versie had de witte evenementkaart in klein, en
+  op navy tekende dat wit een rand rond elke foto. Nu hangt enkel de foto over de
+  streep; titel en uur staan zonder kaart op de lichte band eronder. Donker glas,
+  tekst op de affiche, een doorlopende strook, leiders vanuit het logo en één
+  grote plaat zijn bekeken en niet gekozen.
+- **Wie kiest.** In `/admin/kalender` licht je met de ster in de rij een evenement
+  uit, enkel met `calendar.manageAll`: de hero is de plek van de hele kring, en
+  wie voor zijn post evenementen mag aanmaken, beslist niet mee wat bovenaan de
+  site staat. Bovenaan die lijst staat welke vier er nu in staan.
+- **Wat er getoond wordt.** Eerst wat uitgelicht is, en de overige plaatsen gaan
+  vanzelf naar de eerstvolgende evenementen, zodat de hero nooit half leeg staat
+  omdat niemand iets aanduidde. De kaarten staan altijd op datum, ook wanneer een
+  uitgelicht evenement ver vooruit ligt: de datumpins lezen als een agenda.
+- **Hoogstens vier uitgelicht, en de vijfde wordt geweigerd.** Stilletjes aanvaarden
+  en dan niet tonen zou een ster opleveren die niets doet. Een concept of een
+  evenement dat al begonnen is, kan om dezelfde reden niet uitgelicht worden. Na
+  afloop telt een uitgelicht evenement niet meer mee, dus de plaats komt vanzelf vrij.
+- **De kop zegt enkel wat klopt.** "Deze week" staat er enkel wanneer elke kaart
+  binnen de zeven dagen valt, anders "Binnenkort". De kaarten volgen de doelgroepfilter
+  van de bezoeker, net als de rest van de homepage: wie zijn kalender toespitste,
+  kan dus een andere vier zien dan de lijst in het beheer.
+- **Niets dubbel.** De band Aankomende evenementen begint na deze vier. De ster en
+  "Zet in mijn agenda" staan enkel op de kaarten in die band; een affiche in de
+  hero is als geheel één link.
+
 ### Aftermovies op de homepage
 
 - Dezelfde `media.aftermovies`-instelling als de /media-pagina, te beheren via

@@ -18,6 +18,8 @@ export type EventRowData = {
    * zolang het aanvraagformulier niet online staat.
    */
   commu?: { href: string; requested: boolean } | null;
+  /** Staat dit in de hero? Weggelaten = geen ster in deze rij. */
+  heroFeatured?: boolean | null;
 };
 
 /**
@@ -97,7 +99,13 @@ export function EventRow({
         )}
       </td>
       <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-        <EventRowActions locale={locale} id={event.id} title={event.title} commu={event.commu ?? null} />
+        <EventRowActions
+          locale={locale}
+          id={event.id}
+          title={event.title}
+          commu={event.commu ?? null}
+          heroFeatured={event.heroFeatured ?? null}
+        />
       </td>
     </tr>
   );

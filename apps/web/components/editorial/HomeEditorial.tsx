@@ -51,6 +51,8 @@ import {
 import { buildHoursBand, weekFromEntries, weekFromOpeningTimes } from "@/lib/openingHoursWeek";
 import { OpeningHoursBand } from "./OpeningHoursBand";
 import { BlueprintHero } from "./BlueprintHero";
+import type { HeroEvents } from "./HeroEventCards";
+import { allWithinWeek, pickHeroEvents, relativeDay } from "@/lib/home/heroEvents";
 
 import "@/app/design/vtk-hero.css";
 import "@/app/design/vtk-home.css";
@@ -114,23 +116,36 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     // eerder begon, loopt vandaag nog. De limiet ligt ruimer dan de zes kaarten
     // hieronder, omdat een reeks waarvan elk moment al voorbij is maar waarvan
     // de envelop nog loopt, daar nog wegvalt.
-    viewerAudienceFilter().then((audiences) =>
-      prisma.calendarEvent.findMany({
-        where: {
-          end: { gte: now },
-          publishedAt: { not: null },
-          ...audiences,
+    //
+    // De uitgelichte evenementen komen er apart bij: wat over drie weken valt, zit
+    // in een drukke periode niet tussen de eerstvolgende zestien.
+    viewerAudienceFilter().then(async (audiences) => {
+      const where = {
+        end: { gte: now },
+        publishedAt: { not: null },
+        ...audiences,
+      };
+      const include = {
+        categories: { include: { category: true } },
+        moments: {
+          orderBy: { start: "asc" as const },
+          select: { start: true, end: true, label: true },
         },
-        orderBy: { start: "asc" },
-        take: 12,
-        include: {
-          categories: { include: { category: true } },
-          moments: { orderBy: { start: "asc" }, select: { start: true, end: true, label: true } },
-          // Voor het ticketicoon op de evenementkaart; zie `publishedTicketSlug`.
-          ticketEvents: { select: TICKET_LINK_SELECT },
-        },
-      }),
-    ),
+        // Voor het ticketicoon op de evenementkaart; zie `publishedTicketSlug`.
+        ticketEvents: { select: TICKET_LINK_SELECT },
+      };
+      const [next, featured] = await Promise.all([
+        prisma.calendarEvent.findMany({ where, orderBy: { start: "asc" }, take: 16, include }),
+        prisma.calendarEvent.findMany({
+          where: { ...where, homeFeaturedAt: { not: null } },
+          orderBy: { start: "asc" },
+          take: 8,
+          include,
+        }),
+      ]);
+      const seen = new Set(next.map((event) => event.id));
+      return [...next, ...featured.filter((event) => !seen.has(event.id))];
+    }),
     getCachedHeaderTabs(locale),
     // De standaardfoto's voor evenementen zonder eigen affiche: de sitebrede en
     // die per thema. Zie lib/defaultEventImage.ts.
@@ -194,9 +209,81 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     .filter((event) => hasUpcomingMoment(event, now))
     .sort((a, b) => +nextOccurrenceAt(a, now) - +nextOccurrenceAt(b, now));
 
-  // Opkomende evenementen: 2 rijen van 3. Zijn er minder, dan krimpt het
-  // rooster gewoon mee (zie `.ev-grid`), zonder lege plaatsen op te vullen.
-  const eventCards = upcomingEvents.slice(0, 6);
+  // De vier affiches in de hero: eerst wat in /admin/kalender uitgelicht is,
+  // daarna de eerstvolgende. Zie lib/home/heroEvents.ts.
+  const heroPicks = pickHeroEvents(upcomingEvents);
+  const heroPickIds = new Set(heroPicks.map((event) => event.id));
+  const heroZone = "Europe/Brussels";
+  const heroDay = (date: Date, options: Intl.DateTimeFormatOptions) =>
+    date.toLocaleDateString(dateTag, { timeZone: heroZone, ...options });
+  const restThisWeek = upcomingEvents.filter(
+    (event) => !heroPickIds.has(event.id) && allWithinWeek([event], now),
+  ).length;
+  const heroEvents: HeroEvents = {
+    heading: allWithinWeek(heroPicks, now)
+      ? nl
+        ? "Deze week"
+        : "This week"
+      : nl
+        ? "Binnenkort"
+        : "Coming up",
+    link: {
+      label:
+        restThisWeek > 0
+          ? nl
+            ? `Nog ${restThisWeek} deze week`
+            : `${restThisWeek} more this week`
+          : nl
+            ? "Volledige kalender"
+            : "Full calendar",
+      href: `${base}/kalender`,
+    },
+    cards: heroPicks.map((event) => {
+      const start = nextOccurrenceAt(event, now);
+      const eventPhoto = publicUrl(event.imageKey);
+      const relative = relativeDay(start, now);
+      const prefix =
+        relative === "today"
+          ? nl
+            ? "Vandaag, "
+            : "Today, "
+          : relative === "tomorrow"
+            ? nl
+              ? "Morgen, "
+              : "Tomorrow, "
+            : "";
+      const time = event.allDay
+        ? nl
+          ? "hele dag"
+          : "all day"
+        : (momentsSummary(event.moments, locale, heroZone) ??
+          start.toLocaleTimeString(dateTag, { timeZone: heroZone, hour: "2-digit", minute: "2-digit" }));
+      return {
+        id: event.id,
+        href: withSource(`${base}/kalender/${event.slug}`, "home-hero"),
+        title: pick(event.titleNl, event.titleEn ?? event.titleNl, locale),
+        // Zonder eigen affiche: dezelfde standaardfoto als op de evenementkaart.
+        photo:
+          eventPhoto ??
+          defaultEventImageFor(defaultEventImages, eventCategorySlugs(event.categories)),
+        photoPosition: eventPhoto
+          ? focusPosition({ x: event.imageFocusX, y: event.imageFocusY })
+          : undefined,
+        when: prefix ? `${prefix}${time}` : time.charAt(0).toUpperCase() + time.slice(1),
+        location: event.location?.trim() || null,
+        pin: {
+          weekday: heroDay(start, { weekday: "short" }),
+          day: heroDay(start, { day: "numeric" }),
+          month: heroDay(start, { month: "short" }),
+        },
+      };
+    }),
+  };
+
+  // Opkomende evenementen: 2 rijen van 3, na wat al in de hero staat. Zijn er
+  // minder, dan krimpt het rooster gewoon mee (zie `.ev-grid`), zonder lege
+  // plaatsen op te vullen.
+  const eventCards = upcomingEvents.filter((event) => !heroPickIds.has(event.id)).slice(0, 6);
 
   // "32 komen" bij een evenement waar al volk naartoe gaat. Enkel boven de
   // drempel; zie lib/calendar/interest.ts voor waarom een laag getal averechts
@@ -426,7 +513,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   return (
     <div className="vtk-design">
       {/* Hero: de technische bouwtekening van het logo met zes wegwijzers */}
-      <BlueprintHero locale={locale} />
+      <BlueprintHero locale={locale} events={heroEvents} />
 
       {/* Onder de hero: het nieuws in een lichtblauwe band, die helemaal wegvalt
           zonder berichten of wanneer ze uitstaat in /admin/nieuws. Zie lib/news. */}

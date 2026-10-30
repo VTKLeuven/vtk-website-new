@@ -4,6 +4,7 @@ import { ArrowRightIcon } from "@/components/ui/icons";
 import { isExternalUrl, withLocaleBase } from "@/lib/href";
 import { HOME_LINK_EVENT, OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
 import type { Locale } from "@vtk/i18n";
+import { HeroEventCards, type HeroEvents } from "./HeroEventCards";
 
 /**
  * Omtrek van het VTK-logo in de hero-coördinaten (1168 x 520),
@@ -120,13 +121,19 @@ const DESTINATIONS: HeroDestination[] = [
 /**
  * G1 Wegwijzer: homepage hero als technische bouwtekening van het VTK-logo.
  * Volledige breedte navy band met CSS-geanimeerde lijntekening en wegwijzers.
+ *
+ * Zonder evenementen is dit enkel de band. Met evenementen eindigt de gele streep
+ * niet meer onder deze sectie maar in `.g-events` erna, want de affiches hangen
+ * eroverheen.
  */
-export function BlueprintHero({ locale }: { locale: Locale }) {
+export function BlueprintHero({ locale, events }: { locale: Locale; events?: HeroEvents | null }) {
   const nl = locale === "nl";
   const base = nl ? "" : "/en";
+  const hasEvents = Boolean(events && events.cards.length > 0);
 
   return (
-    <section className="vtk-blueprint-hero" aria-label="Hero">
+    <>
+    <section className={`vtk-blueprint-hero${hasEvents ? " has-events" : ""}`} aria-label="Hero">
       <h1 className="sr-only">Vlaamse Technische Kring</h1>
 
       <div className="g-box">
@@ -328,6 +335,17 @@ export function BlueprintHero({ locale }: { locale: Locale }) {
           );
         })}
       </ul>
+
+      {hasEvents && events ? (
+        <div className="g-events-head">
+          <h2>{events.heading}</h2>
+          <Link href={events.link.href}>
+            <span className="g-u">{events.link.label}</span>
+          </Link>
+        </div>
+      ) : null}
     </section>
+    {hasEvents && events ? <HeroEventCards cards={events.cards} /> : null}
+    </>
   );
 }

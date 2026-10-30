@@ -1949,6 +1949,11 @@ model CalendarEvent {
   /// het begint. NULL = niet aangeduid (ook voor alles van voor deze kolom).
   registrationNewsAt DateTime? @db.Timestamptz(3)
 
+  /// Wanneer dit evenement in /admin/kalender uitgelicht werd voor de vier
+  /// affiches in de hero van de homepage. NULL = niet uitgelicht; de site vult de
+  /// plaatsen dan zelf met de eerstvolgende evenementen. Zie lib/home/heroEvents.ts.
+  homeFeaturedAt DateTime? @db.Timestamptz(3)
+
   group          Group                        @relation(fields: [groupId], references: [id], onDelete: Cascade)
   createdBy      User?                        @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   /// De ticketverkoop(en) van dit evenement; meestal één, soms meer (zie
