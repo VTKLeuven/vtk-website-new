@@ -31,8 +31,8 @@ import {
   momentOnDay,
   toMoments,
   weekEventSpans,
-  monthGridCells,
   monthWeekDays,
+  posterGridDays,
   rollingWeeksGridCells,
   weekGridDays,
   dayRange,
@@ -266,7 +266,9 @@ export function KalenderEditorialView({
   // maandraster van zes rijen dat weer buiten het scherm valt.
   const cells = useMemo(() => rollingWeeksGridCells(cursor, AGENDA_WEEKS), [cursor]);
   // De lijstweergave blijft wel per maand werken; die heeft geen rasterhoogte.
-  const monthCells = useMemo(() => monthGridCells(year, month), [year, month]);
+  // In de maand van vandaag toont ze ook de komende twee weken, zodat ze op het
+  // einde van de maand niet leeg oogt. Zie `posterGridDays`.
+  const gridDays = useMemo(() => posterGridDays(year, month, now), [year, month, now]);
   const weekDays = useMemo(() => weekGridDays(cursor), [cursor]);
 
   const categoryName = useCallback(
@@ -303,8 +305,8 @@ export function KalenderEditorialView({
   const rangeDays = useMemo(() => {
     if (view === 'week') return weekDays;
     if (view === 'agenda') return cells.map((cell) => cell.date);
-    return monthCells.map((cell) => cell.date);
-  }, [view, weekDays, monthCells, cells]);
+    return gridDays;
+  }, [view, weekDays, gridDays, cells]);
 
   useEffect(() => {
     const { start, end } = dayRange(rangeDays);
@@ -398,18 +400,17 @@ export function KalenderEditorialView({
    * ze per week op, dus een week die over de maandgrens loopt, staat er
    * volledig in: onder "Week van 28 september" horen ook 1 en 2 oktober. De
    * zesde rij van het maandraster, die helemaal in de volgende maand ligt, valt
-   * wel weg. Zie `monthWeekDays`.
+   * wel weg, tenzij ze bij de komende twee weken hoort. Zie `posterGridDays`.
    */
-  const monthWeeks = useMemo(() => monthWeekDays(year, month), [year, month]);
   const monthOnlyEvents = useMemo(
     () =>
       monthEvents
-        .filter((e) => monthWeeks.some((date) => eventOccursOnDay(e, date)))
+        .filter((e) => gridDays.some((date) => eventOccursOnDay(e, date)))
         // Op de datum die de kaart ook draagt, en niet op de start van de
         // envelop: een reeks die vorige week begon, hoort tussen de dagen die
         // nog komen te staan. Zie `eventLeadDate`.
         .sort((a, b) => +eventLeadDate(a, now) - +eventLeadDate(b, now)),
-    [monthEvents, monthWeeks, now]
+    [monthEvents, gridDays, now]
   );
 
   /**
@@ -434,10 +435,10 @@ export function KalenderEditorialView({
   const isPastMonth = useMemo(() => {
     // Het einde van de laatste week, niet van de maand: op 1 oktober komt er in
     // de laatste week van september nog iets.
-    const lastDay = monthWeeks.at(-1)!;
+    const lastDay = gridDays.at(-1)!;
     const monthEnd = new Date(lastDay.getFullYear(), lastDay.getMonth(), lastDay.getDate(), 23, 59, 59, 999);
     return monthEnd < now;
-  }, [monthWeeks, now]);
+  }, [gridDays, now]);
 
   const pastEventsInMonth = useMemo(() => {
     return isPastMonth ? [] : monthOnlyEvents.filter((event) => isEventPast(event, now));
@@ -481,6 +482,19 @@ export function KalenderEditorialView({
     year: 'numeric',
   });
   const dateLocale = locale === 'nl' ? 'nl-BE' : 'en-GB';
+  // Loopt het raster door tot in de volgende maand om de komende twee weken te
+  // tonen, dan zegt de kop dat ook: anders staat "Oktober" boven de weken van
+  // november.
+  const gridLast = gridDays.at(-1)!;
+  const gridLabel =
+    gridDays.length === monthWeekDays(year, month).length
+      ? monthLabel
+      : gridLast.getFullYear() === year
+        ? `${cursor.toLocaleDateString(dateLocale, { month: 'long' })} - ${gridLast.toLocaleDateString(dateLocale, {
+            month: 'long',
+            year: 'numeric',
+          })}`
+        : `${monthLabel} - ${gridLast.toLocaleDateString(dateLocale, { month: 'long', year: 'numeric' })}`;
   const gridFrom = visibleCells[0]!.date;
   const gridTo = visibleCells.at(-1)!.date;
   /** "14 sep - 11 okt 2026": het venster dat het raster nu toont. */
@@ -1565,7 +1579,7 @@ export function KalenderEditorialView({
               {view === 'week'
                 ? weekLabel
                 : view === 'grid'
-                  ? monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
+                  ? gridLabel.charAt(0).toUpperCase() + gridLabel.slice(1)
                   : windowLabel}
               <small>
                 {view === 'week'

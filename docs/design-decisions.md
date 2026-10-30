@@ -2615,6 +2615,15 @@ De kalender heeft drie weergaven: het raster met affiches (de standaard), de
 agenda en de week. De agenda en de week zijn in oktober 2026 herwerkt; vijf
 richtingen werden in een canvas naast elkaar gelegd.
 
+### Het raster toont altijd de komende twee weken
+
+Het raster met affiches werkt per maand, en op het einde van een maand stond er
+daardoor bijna niets: op 30 oktober één kaart, terwijl de evenementen van begin
+november gewoon gepland waren. In de maand van vandaag loopt het raster daarom
+door tot de komende veertien dagen erin staan, in hele weken zoals de rest van
+het raster (`posterGridDays`). De kop zegt dat dan ook ("Oktober - november
+2026"). Bladeren blijft per maand; een andere maand toont enkel haar eigen weken.
+
 ### De agenda blijft een maandraster
 
 Een lijst per dag (zoals /shift) en twee weken naast elkaar als agendaboek

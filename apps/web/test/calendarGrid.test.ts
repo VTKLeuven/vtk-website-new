@@ -3,9 +3,9 @@ import {
   dayRange,
   eventLeadDate,
   eventsRequestKey,
-  monthGridCells,
   monthWeekDays,
   openingRange,
+  posterGridDays,
   eventOccursOnDay,
   isEventPast,
   isMultiDayEvent,
@@ -82,16 +82,21 @@ describe('the range the calendar opens on', () => {
     expect(openingRange(now, 'week').start).toEqual(new Date(2026, 9, 12));
   });
 
-  it('covers the whole month grid around today, like the default view fetches', () => {
-    const range = openingRange(new Date(2026, 8, 22, 20, 5));
-    const cells = monthGridCells(2026, 8);
+  it('covers the days of the poster grid around today, like the default view fetches', () => {
+    const now = new Date(2026, 8, 22, 20, 5);
+    const range = openingRange(now);
     // Het raster van september 2026 begint op maandag 31 augustus.
     expect(range.start).toEqual(new Date(2026, 7, 31));
-    expect(range).toEqual(dayRange(cells.map((cell) => cell.date)));
+    expect(range).toEqual(dayRange(posterGridDays(2026, 8, now)));
+  });
+
+  it('fetches the coming two weeks on the last days of a month', () => {
+    const { end } = openingRange(new Date(2026, 9, 30, 16, 15));
+    expect(end).toEqual(new Date(2026, 10, 15, 23, 59, 59, 999));
   });
 
   it('keys the same request the same way, and a different filter differently', () => {
-    const range = openingRange(new Date(2026, 8, 22));
+    const range = openingRange(new Date(2026, 8, 8));
     const key = eventsRequestKey(range, 'all', false);
     expect(eventsRequestKey(openingRange(new Date(2026, 8, 1)), 'all', false)).toBe(key);
     expect(eventsRequestKey(range, 'alumni', false)).not.toBe(key);
@@ -116,6 +121,40 @@ describe('the weeks of a month in the poster grid', () => {
 
   it('puts the straddling week in the next month as well', () => {
     expect(monthWeekDays(2026, 9)[0]).toEqual(new Date(2026, 8, 28));
+  });
+});
+
+describe('the coming two weeks in the poster grid', () => {
+  it('stays on the weeks of the month when those already cover the two weeks', () => {
+    expect(posterGridDays(2026, 8, new Date(2026, 8, 8, 12))).toEqual(monthWeekDays(2026, 8));
+  });
+
+  it('adds whole weeks at the end of the month', () => {
+    // Vrijdag 30 oktober 2026: twee weken verder is vrijdag 13 november, dus de
+    // weken lopen door tot en met zondag 15 november.
+    const days = posterGridDays(2026, 9, new Date(2026, 9, 30, 16, 15));
+    expect(days[0]).toEqual(new Date(2026, 8, 28));
+    expect(days.at(-1)).toEqual(new Date(2026, 10, 15));
+    expect(days).toHaveLength(49);
+    expect(days[days.length - 1]!.getDay()).toBe(0);
+    expect(new Set(days.map((day) => +day)).size).toBe(days.length);
+  });
+
+  it('crosses into the next year', () => {
+    const days = posterGridDays(2026, 11, new Date(2026, 11, 28));
+    expect(days.at(-1)).toEqual(new Date(2027, 0, 17));
+  });
+
+  it('leaves a month without today alone', () => {
+    const now = new Date(2026, 9, 30);
+    expect(posterGridDays(2026, 7, now)).toEqual(monthWeekDays(2026, 7));
+    expect(posterGridDays(2026, 11, now)).toEqual(monthWeekDays(2026, 11));
+  });
+
+  it('counts a month whose last week holds today as the month of today', () => {
+    // Zondag 1 november 2026 valt nog in de laatste week van oktober.
+    const now = new Date(2026, 10, 1);
+    expect(posterGridDays(2026, 9, now).at(-1)).toEqual(new Date(2026, 10, 15));
   });
 });
 
