@@ -17,7 +17,7 @@ x-immich-env: &immich-env
 
 services:
   postgres:
-    image: postgres:16
+    image: postgres:16@sha256:1beaa3084eee2676f20a9cd9928f0bf2c5bf674f8e49f81017912183d377c61c
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-vtk}
@@ -478,7 +478,7 @@ services:
   # weigert, in plaats van terug te vallen op anonieme toegang. `docker logout
   # ghcr.io` volstaat, want de image is publiek.
   umami-db-init:
-    image: postgres:16
+    image: postgres:16@sha256:1beaa3084eee2676f20a9cd9928f0bf2c5bf674f8e49f81017912183d377c61c
     profiles: ['umami']
     restart: 'no'
     depends_on:
