@@ -64,14 +64,12 @@ export function HeroEventCards({ cards, tempo = 1 }: { cards: HeroEventCard[]; t
             </span>
             <span className="g-event-text">
               <span className="g-event-title">{card.title}</span>
+              {/* Uur en plaats op één regel, zoals op de evenementkaart. De
+                  harde spatie houdt het bolletje bij het uur; een lange plaats
+                  loopt door op de volgende regel en wordt nooit afgekapt. */}
               <span className="g-event-meta">
                 {card.when}
-                {card.location ? (
-                  <>
-                    <br />
-                    {card.location}
-                  </>
-                ) : null}
+                {card.location ? ` · ${card.location}` : null}
               </span>
             </span>
           </Link>

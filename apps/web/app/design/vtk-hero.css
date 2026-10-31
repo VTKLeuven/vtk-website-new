@@ -358,7 +358,11 @@
   background: var(--yellow);
 }
 
+/* De 72 px rechts van het tekstblok is voor de pin, maar die steekt maar 28 px
+   onder de foto uit en deze regel staat altijd onder de titel. Ze mag dus tot
+   tegen de rand lopen, zodat uur en plaats vaker samen op één regel passen. */
 .g-event-meta {
+  margin-right: -70px;
   font-size: 13px;
   line-height: 1.38;
   color: var(--muted);
