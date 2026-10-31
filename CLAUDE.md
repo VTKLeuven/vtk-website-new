@@ -354,8 +354,8 @@ the design language into the application instead of copying mockup content.
   footer closes the bookend. Header, bands and
   footer share the same `--navy` so the dark chrome reads as one system. The
   homepage alternates navy and light-blue (`--paper-2`) bands:
-  **Hero** (navy) → **Nieuws** (`--paper-2`) → **Aankomende evenementen** (`--paper-2`) →
-  **Openingsuren** (navy) → **POC's** (navy, when shown) → **Shiften** (`--paper-2`, when shown) →
+  **Hero** (navy) → **Nieuws** (`--paper-2`) → **Openingsuren** (navy) →
+  **Aankomende evenementen** (`--paper-2`) → **POC's** (navy, when shown) → **Shiften** (`--paper-2`, when shown) →
   **Aftermovies** (navy) → **Wat we doen** (paper) → **VTK Career** (navy) →
   **Hoofdpartners** (paper). The events and the open shifts come before "Wat we
   doen" on purpose: what is coming up this week matters more than the standing
@@ -368,9 +368,10 @@ the design language into the application instead of copying mockup content.
   bands butt directly against each other with a crisp navy/light-blue seam
   (`.band + .band, .hours-strip + .band, .vtk-blueprint-hero + .band { margin-top: 0 }`)
   rather than a paper gap; the light-blue bands also keep tighter internal padding
-  than the navy ones. Between Nieuws and Evenementen, the margin-top on
-  `.events-band` preserves a restful paper gap between the two `--paper-2` bands;
-  without news, Evenementen touches the hero with a tight seam. On a navy band,
+  than the navy ones. Keep Evenementen between Openingsuren and POC's: with
+  Evenementen right under Nieuws (tried end of October 2026) two `--paper-2`
+  bands sat on top of each other and the navy opening hours touched the navy
+  POC's with nothing in between. On a navy band,
   panels are dark glass
   (`rgba(255,255,255,.06)` fill, `.14` white border), headings go `--paper`,
   muted text uses `--on-dark-muted`, and the primary button inverts to a

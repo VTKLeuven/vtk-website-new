@@ -540,6 +540,23 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         <NewsBand entries={newsEntries} locale={locale} base={base} now={now} />
       ) : null}
 
+      {/* Nieuws, openingsuren, evenementen en POC's in die volgorde: zo wisselen
+          lichtblauw en navy af en staat er tussen de navy openingsuren en de
+          navy POC's een lichtblauwe band. Zie docs/design-decisions.md. */}
+      <OpeningHoursBand
+        band={hoursBand}
+        meta={now.toLocaleString(dateTag, {
+          timeZone: "Europe/Brussels",
+          weekday: "short",
+          day: "2-digit",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        })}
+        locale={locale}
+        base={base}
+      />
+
       {eventCards.length > 0 && (
         <section className="section band events-band">
           <div className="sec-head">
@@ -697,20 +714,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           </div>
         </section>
       )}
-
-      <OpeningHoursBand
-        band={hoursBand}
-        meta={now.toLocaleString(dateTag, {
-          timeZone: "Europe/Brussels",
-          weekday: "short",
-          day: "2-digit",
-          month: "short",
-          hour: "2-digit",
-          minute: "2-digit",
-        })}
-        locale={locale}
-        base={base}
-      />
 
       <PocBand
         locale={locale}

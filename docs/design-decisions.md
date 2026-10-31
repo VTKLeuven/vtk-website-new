@@ -3170,16 +3170,19 @@ afwisselen (zie ook de styling-sectie in `CLAUDE.md`). De volgorde van de
 homepage is een ontwerpkeuze, geen toeval:
 
 - **Hero** (navy + technisch patroon + gele onderlijn) → **Nieuws** (lichtblauw, `--paper-2`) →
-  **Aankomende evenementen** (lichtblauw, `--paper-2`) → **Openingsuren** (navy) →
+  **Openingsuren** (navy) → **Aankomende evenementen** (lichtblauw, `--paper-2`) →
   **POC's** (navy, wanneer getoond) → **Shiften** (lichtblauw, wanneer aan en er
   shiften zijn) → **Aftermovies** (navy + technisch patroon) → **Wat we doen**
   (paper) → **VTK Career** (navy) → **Hoofdpartners** (paper).
-- **Waarom de evenementen direct onder het nieuws?** Sinds eind oktober 2026:
-  evenementen en nieuws staan bovenaan omdat wat er nu en deze week speelt de
-  belangrijkste reden is om de site te bezoeken. Tussen nieuws en evenementen zorgt
-  de bovenmarge van `.events-band` voor een rustig paper-gat tussen de twee
-  `--paper-2`-banden. Zonder nieuws raakt de navy hero de evenementen direct met een
-  strakke naad (`.vtk-blueprint-hero + .band { margin-top: 0 }`).
+- **Waarom de evenementen tussen de openingsuren en de POC's?** Zo wisselen
+  lichtblauw en navy af. Bij de nieuwe hero (eind oktober 2026) zijn de
+  evenementen even direct onder het nieuws gezet; dan lagen twee lichtblauwe
+  banden op elkaar en raakten de navy openingsuren de navy POC's zonder iets
+  ertussen. Op vraag van de kring staat de volgorde weer zoals hierboven. De
+  evenementen volgen op de navy openingsuren met een strakke naad
+  (`.hours-strip + .band { margin-top: 0 }`), en de POC's op de evenementen met
+  `.band + .band`. Zonder nieuws raakt de hero de openingsuren: de gele onderlijn
+  van de hero (of de lichtblauwe strook onder de affiches) scheidt de twee.
 - **Waarom de shiften vóór "Wat we doen"?** Sinds oktober 2026 op vraag van de
   kring, om dezelfde reden als de evenementen: de open shiften van deze week
   vragen iets van wie kijkt, en dat mag niet onder het vaste aanbod verdwijnen.
