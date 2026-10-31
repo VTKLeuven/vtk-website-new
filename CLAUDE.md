@@ -330,14 +330,15 @@ the design language into the application instead of copying mockup content.
   (outline draws with `stroke-dashoffset`, hatching wipes with `clip-path`,
   nodes/dimensions fade, labels rise). On mobile (<760px), leader lines hide and
   destinations appear as a hairline list below the drawing.
-  - **Welke hero er staat, kies je in /admin/home** (`lib/home/heroDesign.ts`, de
-    instelling `home.heroDesign`): de bouwtekening hierboven (`classic`, de
-    standaard zonder rij), het constructielogo uit `VTK technisch.ai`
-    (`HeroConstruction.tsx`, met opstelling, vulling, lijnen, patroon, hoverkleur
-    en snelheid) of de oude hero (`LegacyHero.tsx`, met zijn frontpages in
-    /admin/frontpage en /admin/slogans). Zijn CSS staat bewust in
-    `public/frontpage-legacy/` en niet achter een `import`: een CSS-import laadt
-    Next ook mee wanneer een ander design gekozen is. Zie
+  - **Alles over de hero staat in /admin/home, en nergens anders**
+    (`lib/home/heroDesign.ts`, de instelling `home.heroDesign`). Vijf keuzes: de
+    bouwtekening hierboven (`classic`, de standaard zonder rij), het constructielogo
+    uit `VTK technisch.ai` (`HeroConstruction.tsx`, met opstelling, vulling, lijnen,
+    patroon, hoverkleur en snelheid), en de drie hero's met een foto: oude hero, 24
+    urenloop en jobfair (`LegacyHero.tsx`). Die laatste drie hebben vaste teksten in
+    de code; breng geen apart scherm voor hun teksten of voor slogans terug. Hun CSS
+    staat bewust in `public/frontpage-legacy/` en niet achter een `import`: een
+    CSS-import laadt Next ook mee wanneer een ander design gekozen is. Zie
     `docs/design-decisions.md`.
   - **Vier losse affiches hangen over de gele streep** bij de bouwtekening en het
     constructielogo (`HeroEventCards.tsx`,

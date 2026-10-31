@@ -101,9 +101,9 @@ export function HeroWeek({
   locale: Locale;
   base: string;
   signedIn: boolean;
-  /** Donkerte van de waas in procent; in te stellen in /admin/frontpage. */
+  /** Donkerte van de waas in procent. */
   dim: number;
-  /** Maximum aantal rijen in de rustige-weeklijst; in te stellen in de admin. */
+  /** Maximum aantal rijen in de rustige-weeklijst. */
   nextEventsLimit: number;
   /** Optioneel maximum aantal dagen (bijv. 4 op de 24 urenloop-hero). */
   maxDays?: number;

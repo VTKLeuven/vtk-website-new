@@ -1,23 +1,21 @@
 /**
- * Welk design de hero van de homepage heeft, te kiezen in /admin/home.
+ * Welke hero de homepage heeft, te kiezen in /admin/home. Alles over de hero staat
+ * daar: er is geen ander scherm voor.
  *
- * `classic` is de hero van vóór deze instelling en blijft de standaard: zonder
- * rij in `Setting` verandert er niets aan de site. `construction` tekent het logo
- * met zijn echte constructielijnen (lib/home/heroConstruction.ts); de velden
- * daarna gelden enkel voor dat design, maar blijven bewaard wanneer iemand
- * terugschakelt, zodat een gekozen opstelling niet verloren gaat. `frontpage` is de
- * oude hero met zijn frontpages (standaard, 24 urenloop, jobfair, nieuw), beheerd in
- * /admin/frontpage en /admin/slogans.
+ * `classic` is de bouwtekening en blijft de standaard: zonder rij in `Setting`
+ * verandert er niets aan de site. `construction` tekent het logo met zijn echte
+ * constructielijnen (lib/home/heroConstruction.ts). `oldHero`, `urenloop` en
+ * `jobfair` zijn de fotohero's (components/editorial/LegacyHero.tsx). De velden na
+ * `design` blijven bewaard wanneer iemand wisselt, zodat een gekozen opstelling niet
+ * verloren gaat.
  */
 
 export const HERO_DESIGN_SETTING = "home.heroDesign";
 
-export const HERO_DESIGNS = ["classic", "construction", "frontpage"] as const;
-export const HERO_LAYOUTS = ["lineEnds", "inPlace", "register"] as const;
+export const HERO_DESIGNS = ["classic", "construction", "oldHero", "urenloop", "jobfair"] as const;
+export const HERO_LAYOUTS = ["lineEnds", "leaders", "register"] as const;
 export const HERO_FILLS = ["solid", "hatch", "outline"] as const;
 export const HERO_LINE_WEIGHTS = ["thin", "medium", "thick"] as const;
-/** `planned` volgt de planning in /admin/frontpage; de rest is een vaste frontpage. */
-export const HERO_FRONTPAGE_CHOICES = ["planned", "default", "urenloop", "jobfair", "nieuw"] as const;
 
 /** De kleur van de naam wanneer je over een bestemming gaat. */
 export const HERO_HOVER_COLORS = ["white", "yellow"] as const;
@@ -26,7 +24,6 @@ export type HeroDesignName = (typeof HERO_DESIGNS)[number];
 export type HeroLayout = (typeof HERO_LAYOUTS)[number];
 export type HeroFill = (typeof HERO_FILLS)[number];
 export type HeroLineWeight = (typeof HERO_LINE_WEIGHTS)[number];
-export type HeroFrontpageChoice = (typeof HERO_FRONTPAGE_CHOICES)[number];
 export type HeroHoverColor = (typeof HERO_HOVER_COLORS)[number];
 
 export type HeroDesignSetting = {
@@ -38,8 +35,6 @@ export type HeroDesignSetting = {
   lineStrength: number;
   /** Het technische patroon achter de band. */
   pattern: boolean;
-  /** Welke frontpage de oude hero toont. */
-  frontpage: HeroFrontpageChoice;
   hoverColor: HeroHoverColor;
   /** De snelheid van de animatie bij het laden, in procent van de normale. */
   animationSpeed: number;
@@ -60,10 +55,16 @@ export const DEFAULT_HERO_DESIGN: HeroDesignSetting = {
   lineWeight: "medium",
   lineStrength: 55,
   pattern: false,
-  frontpage: "planned",
   hoverColor: "white",
   animationSpeed: 100,
 };
+
+/** De drie designs met een foto, die LegacyHero rendert. */
+export type HeroPhotoDesign = Extract<HeroDesignName, "oldHero" | "urenloop" | "jobfair">;
+
+export function isHeroPhotoDesign(design: HeroDesignName): design is HeroPhotoDesign {
+  return design === "oldHero" || design === "urenloop" || design === "jobfair";
+}
 
 /** Waarmee de duur en de vertraging van de animatie vermenigvuldigd worden. */
 export function heroAnimationTempo(setting: HeroDesignSetting): number {
@@ -106,7 +107,6 @@ export function readHeroDesignSetting(value: unknown): HeroDesignSetting {
     lineWeight: oneOf(HERO_LINE_WEIGHTS, record.lineWeight) ?? DEFAULT_HERO_DESIGN.lineWeight,
     lineStrength: validStrength(record.lineStrength) ?? DEFAULT_HERO_DESIGN.lineStrength,
     pattern: typeof record.pattern === "boolean" ? record.pattern : DEFAULT_HERO_DESIGN.pattern,
-    frontpage: oneOf(HERO_FRONTPAGE_CHOICES, record.frontpage) ?? DEFAULT_HERO_DESIGN.frontpage,
     hoverColor: oneOf(HERO_HOVER_COLORS, record.hoverColor) ?? DEFAULT_HERO_DESIGN.hoverColor,
     animationSpeed: validSpeed(record.animationSpeed) ?? DEFAULT_HERO_DESIGN.animationSpeed,
   };
@@ -120,11 +120,10 @@ export function parseHeroDesignForm(formData: FormData): HeroDesignSetting | nul
   const lineWeight = oneOf(HERO_LINE_WEIGHTS, formData.get("lineWeight"));
   const lineStrength = validStrength(formData.get("lineStrength"));
   const pattern = formData.get("pattern");
-  const frontpage = oneOf(HERO_FRONTPAGE_CHOICES, formData.get("frontpage"));
   const hoverColor = oneOf(HERO_HOVER_COLORS, formData.get("hoverColor"));
   const animationSpeed = validSpeed(formData.get("animationSpeed"));
   if (!design || !layout || !fill || !lineWeight || lineStrength === null) return null;
-  if (!frontpage || !hoverColor || animationSpeed === null) return null;
+  if (!hoverColor || animationSpeed === null) return null;
   if (pattern !== "true" && pattern !== "false") return null;
   return {
     design,
@@ -133,7 +132,6 @@ export function parseHeroDesignForm(formData: FormData): HeroDesignSetting | nul
     lineWeight,
     lineStrength,
     pattern: pattern === "true",
-    frontpage,
     hoverColor,
     animationSpeed,
   };

@@ -1,144 +1,19 @@
-import type { DisplaySlogan, SloganSize } from "@/lib/slogans";
-
 /**
- * De shiften onder de herotekst: hoeveel er passen, en welke het worden.
+ * De shiften onder de herotekst: welke het worden.
  *
  * Bewust een pure module zonder database en zonder React, net als
  * `lib/calendar/heroWeek.ts`: dit is rekenwerk met kringregels erin, en dat wil
  * je kunnen testen zonder een homepage te renderen.
- *
- * ## Waarom het aantal rijen meebeweegt met de titel
- *
- * De titel is geen blok van vaste hoogte. `hero-slogan-sizer` maakt hem zo hoog
- * als de langste slogan uit /admin/slogans, en die kan van de ene dag op de
- * andere twee keer zo hoog worden; dat is precies wat er gebeurde toen de
- * slogans voor het laatst herschreven werden. Stond er dan een vast aantal
- * shiften onder, dan schoof de linkerkolom onder de agenda uit en werd de hero
- * hoger dan het scherm.
- *
- * Daarom krijgen de titel en de shiften samen één hoogtebudget: groeit de
- * titel, dan valt er een shift weg, en blijft de kolom ongeveer even hoog
- * ongeacht hoeveel regels de slogan inneemt.
- *
- * ## Waar het budget vandaan komt
- *
- * Uit de kolom ernaast. Op de breedste hero (`--max` 1240, tekstkolom 574px) is
- * het weekoverzicht met zes dagen ongeveer 645px hoog. De vaste onderdelen van
- * de linkerkolom nemen daarvan 233px: bovenschrift (19), onderregel (50),
- * knoppen (40), de kop van dit blok (24) en de tussenruimtes (16 + 24 + 26 +
- * 34). Blijft er 412px over voor de titel en de shiftrijen samen.
- *
- * Tot september 2026 stond onder de shiften nog een feitenlijn (werkingsjaar,
- * binnenkort, sinds), die samen met haar tussenruimte 96px innam. Die is
- * weggehaald om plaats te maken voor drie shiften in plaats van één.
- *
- * Het budget ligt bewust iets hóger dan die 412, en dat is een keuze: bij de
- * langste slogan van nu (drie regels op de grootste trap, 235px) passen er
- * anders twee shiften, en de vraag was er drie. Het weekoverzicht is in de
- * praktijk ook zelden zo kort als de 645px hierboven: met een paar evenementen
- * per dag loopt het eerder tegen de 750px. Bij een heel lege week kan de
- * linkerkolom daardoor een tiental pixels onder de agenda uitkomen; dat is
- * geen scherm hoger.
- *
- * De schatting van de titelhoogte hoeft niet exact te zijn: ze kiest enkel
- * tussen nul en drie rijen. Een vierde regel titel kost nog altijd een rij.
  */
 
 /** Hoogstens zoveel shiften in de hero; meer maakt van de titel een prikbord. */
 export const HERO_SHIFT_MAX_ROWS = 3;
 
 /**
- * De hoogte van één `.hero-shift-row` in `vtk-home.css`: 11px padding boven en
- * onder, een naam van 15/1.35 en een detailregel van 12.5/1.4 met 2px ertussen.
- * Verander je die stijlen, verander dan ook dit getal; dit is de enige plaats
- * waar de rekensom de opmaak moet kennen.
- */
-export const HERO_SHIFT_ROW_PX = 62;
-
-/** Wat de titel en de shiftrijen samen mogen innemen. Zie de kop van dit bestand. */
-export const HERO_SHIFT_BUDGET_PX = 424;
-
-/**
  * Een shift die binnen dit venster begint (of al bezig is) krijgt de gele stip.
  * Geel betekent hier hetzelfde als in het weekoverzicht: dit gaat over nu.
  */
 export const HERO_SHIFT_URGENT_MS = 24 * 60 * 60 * 1000;
-
-/** De tekengrootte per trap, op het plafond van de clamp in `vtk-home.css`. */
-const TITLE_SIZE_PX: Record<SloganSize, number> = { l: 80, m: 64, s: 52 };
-
-/** De `line-height` van de titel, dezelfde als in `vtk-home.css`. */
-const TITLE_LINE_RATIO = 0.98;
-
-/** De breedte van de tekstkolom op de breedste hero. */
-const TITLE_COLUMN_PX = 574;
-
-/**
- * De gemiddelde tekenbreedte van Inter 600 met -0.035em spatiëring, gemeten op
- * de hero zelf. Van 52 tot 80px blijft die verhouding vrijwel gelijk (0.473 tot
- * 0.485), dus één getal volstaat voor alle drie de trappen.
- */
-const TITLE_CHAR_EM = 0.475;
-
-/**
- * Een regel loopt nooit tot op de pixel vol: de browser breekt op een woordgrens
- * en laat dus gemiddeld een half woord liggen.
- */
-const TITLE_WRAP_SLACK = 0.95;
-
-/** Hoeveel tekens er bij deze trap op één titelregel passen. */
-export function heroTitleCharsPerLine(size: SloganSize): number {
-  const perLine = (TITLE_COLUMN_PX / (TITLE_CHAR_EM * TITLE_SIZE_PX[size])) * TITLE_WRAP_SLACK;
-  return Math.max(1, Math.floor(perLine));
-}
-
-/**
- * Hoeveel regels de hoogste slogan uit de reeks beslaat.
- *
- * Het maximum over alle slogans en niet dat van de langste zin: de stapel achter
- * de `h1` is zo hoog als de hoogste, en een slogan met twee harde regelafbrekingen
- * kan hoger zijn dan een langere zin die vanzelf afbreekt.
- */
-export function heroTitleLines(
-  items: readonly Pick<DisplaySlogan, "lines">[],
-  size: SloganSize,
-): number {
-  const perLine = heroTitleCharsPerLine(size);
-  let most = 1;
-  for (const item of items) {
-    let lines = 0;
-    for (const line of item.lines) {
-      const length = line.reduce((sum, segment) => sum + segment.text.length, 0);
-      lines += Math.max(1, Math.ceil(length / perLine));
-    }
-    most = Math.max(most, lines);
-  }
-  return most;
-}
-
-/** De geschatte hoogte van de titelstapel in pixels. */
-export function heroTitleHeight(
-  items: readonly Pick<DisplaySlogan, "lines">[],
-  size: SloganSize,
-): number {
-  return Math.round(heroTitleLines(items, size) * TITLE_SIZE_PX[size] * TITLE_LINE_RATIO);
-}
-
-/**
- * Hoeveel shiftrijen er onder deze titel passen: nul tot {@link HERO_SHIFT_MAX_ROWS}.
- *
- * Nul is een geldig antwoord. Bij een titel van vier regels op de grootste trap
- * is er domweg geen plaats meer, en dan is geen blok beter dan een blok met één
- * eenzame rij die de kolom alsnog te hoog maakt.
- */
-export function heroShiftRowCount(
-  items: readonly Pick<DisplaySlogan, "lines">[],
-  size: SloganSize,
-): number {
-  const left = HERO_SHIFT_BUDGET_PX - heroTitleHeight(items, size);
-  if (left < HERO_SHIFT_ROW_PX) return 0;
-  return Math.min(HERO_SHIFT_MAX_ROWS, Math.floor(left / HERO_SHIFT_ROW_PX));
-}
 
 /** Het minimum dat een shift moet dragen om in de hero afgewogen te kunnen worden. */
 export type HeroShiftInput = {

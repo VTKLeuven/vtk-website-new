@@ -1,6 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
 import Link from "@/components/ui/Link";
-import { pickField } from "@/lib/frontpage/fields";
 import {
   HOUR_LABEL_STEP,
   hourLabelIndexes,
@@ -62,7 +61,6 @@ function RaceBar({
   now,
   phase,
   marker,
-  place,
   nl,
 }: {
   startsAt: Date;
@@ -70,7 +68,6 @@ function RaceBar({
   now: Date;
   phase: RacePhase;
   marker: Marker | null;
-  place: string | undefined;
   nl: boolean;
 }) {
   const count = raceHourCount(startsAt, endsAt);
@@ -129,7 +126,6 @@ function RaceBar({
         ))}
         <span className="is-end">{formatMoment(endsAt, nl)}</span>
       </div>
-      {place ? <div className="fp-ul-place">{place}</div> : null}
     </div>
   );
 }
@@ -193,7 +189,7 @@ function Scoreboard({ stats, nl }: { stats: UrenloopStatsPayload; nl: boolean })
  * serif-accent, geen pil boven de klok, geen knoppen en geen kalender. Zie
  * docs/design-decisions.md, "De 24 urenloop-frontpage".
  */
-export function UrenloopFrontpage({ values, locale, base, now, urenloop }: FrontpageProps) {
+export function UrenloopFrontpage({ locale, base, now, urenloop }: FrontpageProps) {
   const nl = locale === "nl";
 
   const config = urenloop?.config ?? { startsAt: null, endsAt: null, showResultsUntil: null };
@@ -211,9 +207,9 @@ export function UrenloopFrontpage({ values, locale, base, now, urenloop }: Front
         ? "live"
         : "before";
 
-  const title = pickField(values, "title", locale) ?? (nl ? "24 urenloop," : "24-hour run,");
-  const accent = pickField(values, "accent", locale) ?? "the night is ours.";
-  const link = frontpageHref(values.primaryUrl ?? "/24-urenloop", base);
+  const title = nl ? "24 urenloop," : "24-hour run,";
+  const accent = "the night is ours.";
+  const link = frontpageHref("/24-urenloop", base);
 
   const stats = race?.stats ?? null;
   let marker: Marker | null = null;
@@ -287,7 +283,6 @@ export function UrenloopFrontpage({ values, locale, base, now, urenloop }: Front
             now={now}
             phase={phase}
             marker={marker}
-            place={values.place}
             nl={nl}
           />
         ) : null}

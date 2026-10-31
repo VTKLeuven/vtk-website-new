@@ -12,7 +12,7 @@ import type { FrontpageEvent } from "@/components/editorial/frontpage/context";
 /**
  * De evenementen die een front page krijgt, vanuit één plaats gevormd.
  *
- * De homepage en het voorbeeldscherm in /admin/frontpage renderen dezelfde
+ * De homepage en het voorbeeld in /admin/home renderen dezelfde
  * componenten en moeten dus dezelfde velden meegeven. Ze deden dat elk met hun
  * eigen `include` en hun eigen mapping, en dat is precies hoe een voorbeeld gaat
  * afwijken van de echte pagina.

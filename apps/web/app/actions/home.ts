@@ -283,11 +283,9 @@ export async function saveHomeHeroDesignAction(
     entity: "home",
     target: "Hero",
     summary:
-      value.design === "classic"
-        ? "huidig design gekozen"
-        : value.design === "frontpage"
-          ? `oude hero gekozen (${value.frontpage})`
-          : `constructielogo gekozen (${value.layout}, ${value.fill}, ${value.lineWeight}, ${value.lineStrength}%, patroon ${value.pattern ? "aan" : "uit"})`,
+      value.design === "construction"
+        ? `constructielogo (${value.layout}, ${value.fill}, ${value.lineWeight}, ${value.lineStrength}%, patroon ${value.pattern ? "aan" : "uit"})`
+        : value.design,
   });
   // De homepage leest dit uit de gedeelde cache; zonder dit duurt het tot een
   // minuut voor wie net wisselde het resultaat ziet.

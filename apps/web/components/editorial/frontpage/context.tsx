@@ -1,20 +1,12 @@
 import Link from "@/components/ui/Link";
 import type { Locale } from "@vtk/i18n";
-import type { FieldValues } from "@/lib/frontpage/fields";
 import type { HeroWeekMoment, HeroWeekPlacement } from "@/lib/calendar/heroWeek";
-import type { ResolvedSlogans } from "@/lib/slogans";
 import type { ShiftRosterEntry } from "@/lib/shift";
 import type { StoredUrenloopStats, UrenloopConfig } from "@/lib/urenloop/stats";
 
 /**
- * What every front page component receives.
- *
- * The shared data (events, partners) is fetched once by `HomeEditorial` and
- * handed down, so a front page that wants the agenda does not open its own
- * database connection, and one that does not want it costs nothing.
- *
- * `values` holds only the fields that this particular front page declared in the
- * registry, already filtered to non-empty strings.
+ * What every photo hero receives. The shared data (events, partners) is fetched
+ * once by `LegacyHero` and handed down.
  */
 export type FrontpageEvent = {
   id: string;
@@ -102,7 +94,6 @@ export type FrontpagePartner = {
 };
 
 export type FrontpageProps = {
-  values: FieldValues;
   locale: Locale;
   /** "" for Dutch, "/en" for English; prefix for internal links. */
   base: string;
@@ -119,20 +110,13 @@ export type FrontpageProps = {
   signedIn: boolean;
   /**
    * De shiften waar nog plaats is, al gefilterd en op tijd gesorteerd. De hero
-   * neemt er hoogstens de eerste paar van; hoeveel, hangt af van hoe hoog de
-   * titel uitvalt. Zie lib/frontpage/heroShifts.ts.
+   * neemt er hoogstens de eerste paar van. Zie lib/frontpage/heroShifts.ts.
    */
   openShifts: FrontpageShift[];
   partners: FrontpagePartner[];
   /**
-   * De slogans voor deze bezoeker, al opgelost op de server: welke bij haar
-   * publiek en bij dit dagdeel passen, in de volgorde waarin de hero ze toont.
-   * Enkel de standaardpagina roteert; een campagne heeft haar eigen titel.
-   */
-  slogans: ResolvedSlogans;
-  /**
    * De geplande uren en de laatst ontvangen tussenstand van de 24 urenloop.
-   * Enkel opgehaald wanneer de `urenloop`-frontpage op het scherm staat.
+   * Enkel opgehaald wanneer die hero gekozen is.
    */
   urenloop?: {
     config: UrenloopConfig;
@@ -141,7 +125,7 @@ export type FrontpageProps = {
 };
 
 /**
- * A link from a field: internal when it starts with "/" (and then it follows the
+ * A link: internal when it starts with "/" (and then it follows the
  * visitor's language), external otherwise. Returns null when either half is
  * missing, because a button without a destination is a dead button.
  */
@@ -172,8 +156,7 @@ export function frontpageHref(
  * Shared rather than repeated, because repeating it is how the front pages came
  * to disagree: two of them sent an external URL through a plain `<a>` while the
  * default handed everything to `<Link>`, which is meant for routes inside this
- * app. Now that any of these links is admin-editable, whichever component
- * someone copies next would have inherited whichever half they copied.
+ * app.
  *
  * No `target="_blank"`: the homepage's own external CTAs (the VTK Career
  * buttons) stay in the tab, and a hero button is a main route through the site,

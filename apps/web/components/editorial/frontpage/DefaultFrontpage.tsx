@@ -1,147 +1,55 @@
-import Link from "@/components/ui/Link";
-import { pick } from "@vtk/i18n";
-import { choiceValue, pickField, rangeValue } from "@/lib/frontpage/fields";
-import {
-  DEFAULT_FRONTPAGE_ID,
-  HOME_AGENDA_DIM_DEFAULT,
-  HOME_AGENDA_WEEK,
-  getFrontpageModule,
-} from "@/lib/frontpage/registry";
 import { HERO_WEEK_NEXT_LIMIT_DEFAULT } from "@/lib/calendar/heroWeek";
-import { organiserName } from "@/lib/calendar/organiser";
-import { heroShiftRowCount, pickHeroShifts } from "@/lib/frontpage/heroShifts";
+import { HERO_SHIFT_MAX_ROWS, pickHeroShifts } from "@/lib/frontpage/heroShifts";
 import { HeroWeek } from "./HeroWeek";
-import { HeroSlogan } from "./HeroSlogan";
 import { HeroShifts } from "./HeroShifts";
 import { Cta, ctaFrom, type FrontpageProps } from "./context";
-import { withSource } from "@/lib/ticketing/source";
+
+/** Hoe donker de waas achter de agenda staat, in procent. */
+const AGENDA_DIM = 88;
 
 /**
- * The regular front page: copy on the left, the agenda on the right.
- *
- * Welke agenda dat is, kiest een redacteur in /admin/frontpage: het
- * weekoverzicht (de komende zes dagen, met een ster per evenement) of de oude
- * lijst met de vier eerstvolgende events. Beide blijven bestaan omdat een
- * weekoverzicht in een rustige periode leger oogt dan een lijst, en omdat een
- * nieuwe hero die je niet kan terugzetten geen keuze is.
- *
- * Every text is a field with the wording we have always shipped as its fallback,
- * so an untouched database looks exactly like before and an admin can still
- * rewrite the headline without a deploy.
- *
- * De titel is geen veld maar een lijst slogans uit /admin/slogans, opgelost in
- * `HomeEditorial` en hier enkel nog getoond. Zie lib/slogans.ts voor de regel
- * waarmee de begroeting van een lid de reeks opent.
+ * De oude hero: tekst links, het weekoverzicht rechts, op de foto van het kasteel.
+ * De teksten staan vast in de code; er is geen scherm meer om ze te wijzigen.
  */
 export function DefaultFrontpage({
-  values,
   locale,
   base,
   now,
-  upcomingEvents,
   weekEvents,
   signedIn,
   openShifts,
-  slogans,
 }: FrontpageProps) {
   const nl = locale === "nl";
-  // De registry is de bron van de opties; zo blijft "wat staat er als er nog
-  // niets gekozen is" op één plaats staan.
-  const fields = getFrontpageModule(DEFAULT_FRONTPAGE_ID)?.fields;
-  const agendaField = fields?.agenda;
-  const agenda = agendaField ? choiceValue(values, "agenda", agendaField) : HOME_AGENDA_WEEK;
-  const dimField = fields?.agendaDim;
-  const agendaDim = dimField
-    ? rangeValue(values, "agendaDim", dimField)
-    : HOME_AGENDA_DIM_DEFAULT;
-  const nextEventsLimitField = fields?.nextEventsLimit;
-  const nextEventsLimit = nextEventsLimitField
-    ? rangeValue(values, "nextEventsLimit", nextEventsLimitField)
-    : HERO_WEEK_NEXT_LIMIT_DEFAULT;
 
-  const eyebrow = pickField(values, "eyebrow", locale) ?? "Vlaamse Technische Kring · KU Leuven";
-  const subtitle =
-    pickField(values, "subtitle", locale) ??
-    (nl
-      ? "Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920."
-      : "Events, courses, careers, sandwiches and everything that makes your day on campus more practical. Run by students, since 1920.");
-
-  const primary =
-    ctaFrom(
-      pickField(values, "primaryLabel", locale) ?? (nl ? "Ontdek wat we doen" : "Discover what we do"),
-      values.primaryUrl ?? "/info",
-      base,
-    );
+  const primary = ctaFrom(nl ? "Ontdek wat we doen" : "Discover what we do", "/info", base);
   // De tweede knop wijst elke taal naar haar eigen publiek: een Nederlandstalige
   // bezoeker is hier een eerstejaars, wie de site op Engels leest een
-  // uitwisselingsstudent. Daarom heeft ze per taal een eigen adres in
-  // /admin/frontpage, net zoals ze al een eigen tekst had. De Engelse knop erft
-  // het Nederlandse adres bewust niet: dan stuurde ze een uitwisselingsstudent
-  // alsnog naar de eerstejaarswerking.
+  // uitwisselingsstudent.
   const secondary = ctaFrom(
-    pickField(values, "secondaryLabel", locale) ??
-      (nl ? "Eerstejaars? Start hier" : "International? Start here"),
-    nl ? (values.secondaryUrl ?? "/eerstejaars") : (values.secondaryUrlEn ?? "/internationals"),
+    nl ? "Eerstejaars? Start hier" : "International? Start here",
+    nl ? "/eerstejaars" : "/internationals",
     base,
   );
 
-  const dayKey = (d: Date) =>
-    d.toLocaleDateString(nl ? "nl-BE" : "en-GB", {
-      weekday: "long",
-      day: "2-digit",
-      month: "short",
-    });
-  const monthLabel = (d: Date) => {
-    const month = d
-      .toLocaleDateString(nl ? "nl-BE" : "en-GB", { month: "short" })
-      .replace(".", "");
-    return d.getFullYear() === now.getFullYear()
-      ? month
-      : `${month} '${String(d.getFullYear()).slice(-2)}`;
-  };
-  const formatTime = (d: Date) =>
-    d.toLocaleTimeString(nl ? "nl-BE" : "en-GB", { hour: "2-digit", minute: "2-digit" });
-
-  const heroEvents = upcomingEvents.slice(0, 4);
-
-  // Hoeveel shiften er onder de titel passen, hangt af van hoe hoog die titel
-  // uitvalt: de slogans bepalen dat, en die kunnen morgen twee keer zo lang
-  // zijn. Groeit de titel, dan valt hier een rij weg in plaats van dat de kolom
-  // onder de agenda uitschiet. Zie lib/frontpage/heroShifts.ts.
-  const heroShifts = pickHeroShifts(openShifts, {
-    now,
-    limit: heroShiftRowCount(slogans.items, slogans.size),
-  });
-
-  const eventGroups = heroEvents.reduce<
-    Array<{ key: string; date: Date; events: FrontpageProps["upcomingEvents"] }>
-  >((acc, event) => {
-    const date = new Date(event.start);
-    const key = dayKey(date);
-    const found = acc.find((g) => g.key === key);
-    if (found) found.events.push(event);
-    else acc.push({ key, date, events: [event] });
-    return acc;
-  }, []);
+  const heroShifts = pickHeroShifts(openShifts, { now, limit: HERO_SHIFT_MAX_ROWS });
 
   return (
     <section className="home-hero">
       <div>
         <div className="eyebrow">
           <span className="dot" />
-          {eyebrow}
+          Vlaamse Technische Kring · KU Leuven
         </div>
-        <HeroSlogan
-          slogans={slogans.items}
-          openerCount={slogans.openerCount}
-          intervalSeconds={slogans.intervalSeconds}
-          size={slogans.size}
-          labels={{
-            pause: nl ? "Slogans pauzeren" : "Pause slogans",
-            play: nl ? "Slogans hervatten" : "Resume slogans",
-          }}
-        />
-        <p className="hero-sub">{subtitle}</p>
+        <h1 className="hero-title">
+          <span>{nl ? "De thuis voor" : "The home for"}</span>
+          <span className="serif">{nl ? "ingenieurs" : "engineers"}</span>
+          <span>{nl ? "in Leuven." : "in Leuven."}</span>
+        </h1>
+        <p className="hero-sub">
+          {nl
+            ? "Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920."
+            : "Events, courses, careers, sandwiches and everything that makes your day on campus more practical. Run by students, since 1920."}
+        </p>
         <div className="hero-cta">
           <Cta cta={primary} className="btn btn-primary arrow" />
           <Cta cta={secondary} className="btn btn-ghost" />
@@ -157,92 +65,15 @@ export function DefaultFrontpage({
         </div>
       </div>
 
-      {agenda === HOME_AGENDA_WEEK ? (
-        <HeroWeek
-          events={weekEvents}
-          now={now}
-          locale={locale}
-          base={base}
-          signedIn={signedIn}
-          dim={agendaDim}
-          nextEventsLimit={nextEventsLimit}
-        />
-      ) : (
-      <aside className="hero-cal">
-        <div className="hero-cal-head">
-          <div>
-            <h3>{nl ? "Aankomende events" : "Upcoming events"}</h3>
-            <div className="sub">
-              {heroEvents[0]
-                ? `${dayKey(new Date(heroEvents[0].start))} → ${dayKey(
-                    new Date(heroEvents[heroEvents.length - 1].start),
-                  )}`
-                : nl
-                  ? "Geen geplande events"
-                  : "No planned events"}
-            </div>
-          </div>
-          <Link href={`${base}/kalender`} className="all">
-            {nl ? "Volledige kalender" : "Full calendar"}
-          </Link>
-        </div>
-        <div className="hero-agenda">
-          {eventGroups.length === 0 ? (
-            <div className="hero-day">
-              <div className="hero-day-label">
-                <span className="num">-</span>
-                <span className="dow">{nl ? "Geen data" : "No data"}</span>
-              </div>
-            </div>
-          ) : (
-            eventGroups.map((group, groupIndex) => (
-              <div className="hero-day" key={group.key}>
-                <div className="hero-day-label">
-                  <span className="num">{String(group.date.getDate()).padStart(2, "0")}</span>
-                  <span className="mon">{monthLabel(group.date)}</span>
-                  <span className="dow">
-                    {group.date.toLocaleDateString(nl ? "nl-BE" : "en-GB", { weekday: "long" })}
-                  </span>
-                  {group.date.toDateString() === now.toDateString() ? (
-                    <span className="today">{nl ? "vandaag" : "today"}</span>
-                  ) : null}
-                </div>
-                {group.events.map((event, eventIndex) => (
-                  <Link
-                    key={event.id}
-                    href={withSource(`${base}/kalender/${event.slug}`, "home-agenda")}
-                    className={`hero-ev${groupIndex === 0 && eventIndex === 0 ? " featured" : ""}`}
-                  >
-                    <div className="t">{formatTime(new Date(event.start))}</div>
-                    <div className="n">
-                      {groupIndex === 0 && eventIndex === 0 ? <span className="pin" /> : null}
-                      {pick(event.titleNl, event.titleEn ?? event.titleNl, locale)}
-                      <small>
-                        {[event.location, organiserName(event.organiserName, event.group, locale)]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </small>
-                      {/* Enkel wanneer er al volk naartoe gaat; de drempel zit
-                          aan de serverkant, dus een laag getal komt hier niet. */}
-                      {event.interestedCount ? (
-                        <span className="hero-ev-going">
-                          {event.interestedCount} {nl ? "komen" : "going"}
-                        </span>
-                      ) : null}
-                    </div>
-                    {/* Own class: the global `.arrow` would glue a second arrow
-                        on with ::after. */}
-                    <span className="ev-go" aria-hidden="true">
-                      →
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            ))
-          )}
-        </div>
-      </aside>
-      )}
+      <HeroWeek
+        events={weekEvents}
+        now={now}
+        locale={locale}
+        base={base}
+        signedIn={signedIn}
+        dim={AGENDA_DIM}
+        nextEventsLimit={HERO_WEEK_NEXT_LIMIT_DEFAULT}
+      />
     </section>
   );
 }

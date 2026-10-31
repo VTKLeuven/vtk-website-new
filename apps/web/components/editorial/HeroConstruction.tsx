@@ -203,9 +203,9 @@ function LineEnds({ setting, nl, base }: LayoutProps) {
   );
 }
 
-/** Op de plaats van nu: dezelfde leiders, labels en maatlijn, 34 px lager. */
-const IN_PLACE_DROP = 34;
-const IN_PLACE_LEADS = [
+/** Met leiders rond het logo: zoals de bouwtekening, 34 px lager. */
+const LEADERS_DROP = 34;
+const LEADER_PATHS = [
   "M424.8 210.3 L380 174 L272 174",
   "M330 282.6 L272 282.6",
   "M330 423.4 L272 423.4",
@@ -213,7 +213,7 @@ const IN_PLACE_LEADS = [
   "M849.1 209 L872 254 L896 254",
   "M850 423.4 L896 423.4",
 ];
-const IN_PLACE_NODES: Point[] = [
+const LEADER_NODES: Point[] = [
   [424.8, 210.3],
   [330, 282.6],
   [330, 423.4],
@@ -225,7 +225,7 @@ const IN_PLACE_NODES: Point[] = [
   [850, 423.4],
 ];
 
-function InPlace({ setting, nl, base }: LayoutProps) {
+function Leaders({ setting, nl, base }: LayoutProps) {
   return (
     <div className="g-box k-box" style={cropVars(CENTRE_CROP)}>
       <Drawing place={CENTRE} viewBox="0 0 1168 520" fill={setting.fill}>
@@ -249,7 +249,7 @@ function InPlace({ setting, nl, base }: LayoutProps) {
             VLAAMSE TECHNISCHE KRING
           </text>
         </g>
-        {IN_PLACE_LEADS.map((d, index) => (
+        {LEADER_PATHS.map((d, index) => (
           <path
             key={d}
             className="g-ln lead g-lead g-draw"
@@ -258,13 +258,13 @@ function InPlace({ setting, nl, base }: LayoutProps) {
             d={d}
           />
         ))}
-        {IN_PLACE_NODES.map((point, index) => (
+        {LEADER_NODES.map((point, index) => (
           <Node key={point.join()} point={point} delay={1.2 + index * 0.05} />
         ))}
       </Drawing>
       {DESTINATIONS.map((destination, index) => {
         const { title, sub } = destinationText(destination, nl);
-        const top = Number.parseFloat(destination.topPercent) + (IN_PLACE_DROP / 520) * 100;
+        const top = Number.parseFloat(destination.topPercent) + (LEADERS_DROP / 520) * 100;
         return (
           <DestinationLink
             key={destination.key}
@@ -327,7 +327,7 @@ type LayoutProps = { setting: HeroDesignSetting; nl: boolean; base: string };
  * wanneer de schuif beweegt.
  */
 export function HeroConstruction({ setting, nl, base }: LayoutProps) {
-  if (setting.layout === "inPlace") return <InPlace setting={setting} nl={nl} base={base} />;
+  if (setting.layout === "leaders") return <Leaders setting={setting} nl={nl} base={base} />;
   if (setting.layout === "register") return <Register setting={setting} nl={nl} base={base} />;
   return <LineEnds setting={setting} nl={nl} base={base} />;
 }

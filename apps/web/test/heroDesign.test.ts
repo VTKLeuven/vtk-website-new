@@ -19,7 +19,6 @@ const VALID = {
   lineWeight: "thick",
   lineStrength: "70",
   pattern: "true",
-  frontpage: "jobfair",
   hoverColor: "yellow",
   animationSpeed: "150",
 };
@@ -36,12 +35,11 @@ describe("readHeroDesignSetting", () => {
   it("leest een geldige keuze", () => {
     const value = {
       design: "construction",
-      layout: "inPlace",
+      layout: "leaders",
       fill: "outline",
       lineWeight: "thin",
       lineStrength: 35,
       pattern: true,
-      frontpage: "urenloop",
       hoverColor: "yellow",
       animationSpeed: 75,
     };
@@ -56,8 +54,10 @@ describe("readHeroDesignSetting", () => {
 });
 
 describe("parseHeroDesignForm", () => {
-  it("kent de oude hero als derde keuze", () => {
-    expect(parseHeroDesignForm(form({ ...VALID, design: "frontpage" }))?.design).toBe("frontpage");
+  it("kent elk design", () => {
+    for (const design of ["classic", "construction", "oldHero", "urenloop", "jobfair"]) {
+      expect(parseHeroDesignForm(form({ ...VALID, design }))?.design).toBe(design);
+    }
   });
 
   it("leest het formulier", () => {
@@ -68,15 +68,14 @@ describe("parseHeroDesignForm", () => {
       lineWeight: "thick",
       lineStrength: 70,
       pattern: true,
-      frontpage: "jobfair",
-      hoverColor: "yellow",
+          hoverColor: "yellow",
       animationSpeed: 150,
     });
   });
 
   it("weigert een onbekende waarde of een sterkte buiten het bereik", () => {
     expect(parseHeroDesignForm(form({ ...VALID, design: "foto" }))).toBeNull();
-    expect(parseHeroDesignForm(form({ ...VALID, frontpage: "galabal" }))).toBeNull();
+    expect(parseHeroDesignForm(form({ ...VALID, design: "nieuw" }))).toBeNull();
     expect(parseHeroDesignForm(form({ ...VALID, layout: "randen" }))).toBeNull();
     expect(parseHeroDesignForm(form({ ...VALID, fill: "geel" }))).toBeNull();
     expect(parseHeroDesignForm(form({ ...VALID, lineStrength: "10" }))).toBeNull();

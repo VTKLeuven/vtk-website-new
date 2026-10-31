@@ -229,10 +229,10 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/scan/') ||
     pathname === '/links' ||
     pathname === '/links/' ||
-    // De frontpage-voorbeelden in /admin/frontpage. Ze staan bewust buiten
-    // `[locale]` zodat er geen sitekop en geen adminnavigatie omheen komt; ze
-    // dragen hun taal zelf in het pad (/frontpage-preview/<locale>/<layout>).
-    pathname.startsWith('/frontpage-preview/')
+    // De hero-voorbeelden in /admin/home. Ze staan bewust buiten `[locale]` zodat
+    // er geen sitekop en geen adminnavigatie omheen komt; ze dragen hun taal zelf
+    // in het pad (/hero-preview/<locale>/<design>).
+    pathname.startsWith('/hero-preview/')
   ) {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set('x-pathname', `/${DEFAULT_LOCALE}${pathname}`);

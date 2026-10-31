@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import { getDictionary, type Locale } from "@vtk/i18n";
-import { Card, Input, Label, Select, Textarea } from "@vtk/ui";
+import { Card, Input, Label, Textarea } from "@vtk/ui";
+import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import { StorageImageField } from "@/components/admin/StorageImageField";
 import {
   AANBOD_DEFAULT_BODY_EN,
@@ -249,23 +250,27 @@ export default async function AdminHome({
             <Label htmlFor="poc-band-mode">
               {locale === "nl" ? "Weergave op de homepage" : "Homepage display"}
             </Label>
-            <Select id="poc-band-mode" name="mode" defaultValue={pocSetting.mode}>
-              <option value="representatives">
-                {locale === "nl"
-                  ? "Vertegenwoordigers tonen (foto's & namen van jouw richtingen)"
-                  : "Show representatives (photos & names of your programmes)"}
-              </option>
-              <option value="elections">
-                {locale === "nl"
-                  ? "Verkiezingen tonen (paneel met oproep, deadline & procedure)"
-                  : "Show elections (panel with call, deadline & procedure)"}
-              </option>
-              <option value="hidden">
-                {locale === "nl"
-                  ? "Band uitschakelen (verborgen op de homepage)"
-                  : "Disable band (hidden on homepage)"}
-              </option>
-            </Select>
+            <ThemedSelect
+              id="poc-band-mode"
+              name="mode"
+              defaultValue={pocSetting.mode}
+              options={[
+                {
+                  value: "representatives",
+                  label:
+                    locale === "nl"
+                      ? "Vertegenwoordigers tonen (foto's & namen van jouw richtingen)"
+                      : "Show representatives (photos & names of your programmes)",
+                },
+                {
+                  value: "elections",
+                  label:
+                    locale === "nl"
+                      ? "Verkiezingen tonen (paneel met oproep, deadline & procedure)"
+                      : "Show elections (panel with call, deadline & procedure)",
+                },
+              ]}
+            />
             <p className="text-xs text-[#5c667f]">
               {locale === "nl"
                 ? "Kies 'Band uitschakelen' om de POC-band volledig te verbergen van de homepage."
@@ -408,10 +413,15 @@ export default async function AdminHome({
                       <input type="hidden" name={`id-${i}`} value={item.id ?? ""} />
                       <input type="hidden" name={`posterUrl-${i}`} value={item.posterUrl ?? ""} />
                       <input type="hidden" name={`publishedAt-${i}`} value={item.publishedAt ?? ""} />
-                      <Select name={`type-${i}`} defaultValue={item.type}>
-                        <option value="video">video</option>
-                        <option value="image">image</option>
-                      </Select>
+                      <ThemedSelect
+                        name={`type-${i}`}
+                        defaultValue={item.type}
+                        ariaLabel={locale === "nl" ? "Soort" : "Type"}
+                        options={[
+                          { value: "video", label: "video" },
+                          { value: "image", label: "image" },
+                        ]}
+                      />
                     </td>
                     <td className="pr-2 py-1"><Input name={`url-${i}`} defaultValue={item.url} /></td>
                     <td className="pr-2 py-1"><Input name={`titleNl-${i}`} defaultValue={item.titleNl ?? ""} /></td>
@@ -454,22 +464,27 @@ export default async function AdminHome({
             <Label htmlFor="shifts-band-visible">
               {locale === "nl" ? "Zichtbaarheid op de homepage" : "Homepage visibility"}
             </Label>
-            <Select
+            <ThemedSelect
               id="shifts-band-visible"
               name="visible"
               defaultValue={shiftsBand.visible ? "true" : "false"}
-            >
-              <option value="true">
-                {locale === "nl"
-                  ? "Zichtbaar (shiften tonen op homepage)"
-                  : "Visible (show shifts on homepage)"}
-              </option>
-              <option value="false">
-                {locale === "nl"
-                  ? "Band uitschakelen (verborgen op de homepage)"
-                  : "Disable band (hidden on homepage)"}
-              </option>
-            </Select>
+              options={[
+                {
+                  value: "true",
+                  label:
+                    locale === "nl"
+                      ? "Zichtbaar (shiften tonen op homepage)"
+                      : "Visible (show shifts on homepage)",
+                },
+                {
+                  value: "false",
+                  label:
+                    locale === "nl"
+                      ? "Band uitschakelen (verborgen op de homepage)"
+                      : "Disable band (hidden on homepage)",
+                },
+              ]}
+            />
             <p className="text-xs text-[#5c667f]">
               {locale === "nl"
                 ? "Kies 'Band uitschakelen' om de shiften-band volledig te verbergen van de homepage."

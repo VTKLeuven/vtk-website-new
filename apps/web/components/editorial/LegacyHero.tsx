@@ -1,8 +1,9 @@
 import Link from "@/components/ui/Link";
 import { prisma } from "@vtk/db";
 import type { Locale } from "@vtk/i18n";
-import { splitFullName } from "@vtk/auth";
-import { Frontpage } from "@/components/editorial/frontpage";
+import { DefaultFrontpage } from "@/components/editorial/frontpage/DefaultFrontpage";
+import { JobfairFrontpage } from "@/components/editorial/frontpage/JobfairFrontpage";
+import { UrenloopFrontpage } from "@/components/editorial/frontpage/UrenloopFrontpage";
 import type { FrontpageShift } from "@/components/editorial/frontpage/context";
 import { HOME_LINK_EVENT, OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
 import { viewerAudienceFilter } from "@/lib/calendar/audience";
@@ -12,27 +13,30 @@ import {
   viewerMomentStarts,
 } from "@/lib/calendar/interest";
 import { hasUpcomingMoment, nextOccurrenceAt } from "@/lib/calendar/moments";
-import { getCachedSetting, getCachedPartners } from "@/lib/cachedContent";
+import { getCachedPartners } from "@/lib/cachedContent";
 import {
   FRONTPAGE_EVENT_INCLUDE,
   frontpageEventsSince,
   toFrontpageEvents,
 } from "@/lib/frontpage/events";
-import { frontpagePhoto } from "@/lib/frontpage/registry";
-import { resolveFrontpage } from "@/lib/frontpage/resolve";
-import type { HeroFrontpageChoice } from "@/lib/home/heroDesign";
+import type { HeroPhotoDesign } from "@/lib/home/heroDesign";
 import { ROSTER_PARTICIPANT_SELECT, toRoster } from "@/lib/shift/roster";
 import { getCurrentSession } from "@/lib/session";
-import { readSlogansSetting, resolveSlogans } from "@/lib/slogans";
-import { publicUrl } from "@/lib/storage";
 import { getCachedUrenloopData } from "@/lib/urenloop/server";
 import type { getCursusdienstHours } from "@/lib/cursusdienstHours";
 import { HomeHeroPhoto } from "./HomeHeroPhoto";
 import { entryForDate, isClosedHours } from "./hoursUtils";
 
+/** De achtergrondfoto en het blok erop, per design. */
+const VARIANTS = {
+  oldHero: { photo: "/hero-arenberg.jpg", Hero: DefaultFrontpage },
+  urenloop: { photo: "/hero-24urenloop.jpg", Hero: UrenloopFrontpage },
+  jobfair: { photo: "/frontpage/jobfair.jpg", Hero: JobfairFrontpage },
+} as const;
+
 /**
- * De oude hero: de foto met een frontpage (standaard, 24 urenloop, jobfair, nieuw)
- * en daaronder de snelle links, gekozen in /admin/home.
+ * De drie hero's met een foto (oude hero, 24 urenloop, jobfair) met daaronder de
+ * snelle links, gekozen in /admin/home.
  *
  * Alles hier staat bewust apart van HomeEditorial: deze lezingen en stylesheets
  * horen enkel bij wie dit design kiest, en mogen de homepage van de andere designs
@@ -44,7 +48,9 @@ import { entryForDate, isClosedHours } from "./hoursUtils";
 export function LegacyHeroStyles() {
   return (
     <>
+      {/* eslint-disable-next-line @next/next/no-css-tags -- bewust; zie hierboven. */}
       <link rel="stylesheet" href="/frontpage-legacy/frontpage.css" precedence="default" />
+      {/* eslint-disable-next-line @next/next/no-css-tags -- bewust; zie hierboven. */}
       <link rel="stylesheet" href="/frontpage-legacy/home.css" precedence="default" />
     </>
   );
@@ -52,13 +58,13 @@ export function LegacyHeroStyles() {
 
 export async function LegacyHero({
   locale,
-  choice,
+  design,
   now,
   session,
   cursusEntries,
 }: {
   locale: Locale;
-  choice: HeroFrontpageChoice;
+  design: HeroPhotoDesign;
   now: Date;
   session: Awaited<ReturnType<typeof getCurrentSession>>;
   cursusEntries: Awaited<ReturnType<typeof getCursusdienstHours>>;
@@ -66,10 +72,10 @@ export async function LegacyHero({
   const nl = locale === "nl";
   const base = nl ? "" : "/en";
 
-  const [frontpage, partners, sloganSetting, calendarEvents, shifts] = await Promise.all([
-    resolveFrontpage(now, choice === "planned" ? undefined : choice),
+  const { photo, Hero } = VARIANTS[design];
+
+  const [partners, calendarEvents, shifts] = await Promise.all([
     getCachedPartners(),
-    getCachedSetting("home.slogans"),
     // Vanaf gisteren en niet vanaf nu: het weekoverzicht laat de dag van gisteren
     // staan zolang daar iets was (zie lib/calendar/heroWeek.ts). De limiet ligt
     // ruim, omdat de terugval de eerstvolgende vier moet kunnen vinden, ook als
@@ -116,7 +122,7 @@ export async function LegacyHero({
     publicInterestCounts(eventIds),
     viewerInterests(eventIds, viewerUserId),
     viewerMomentStarts(eventIds, viewerUserId),
-    frontpage.module.id === "urenloop"
+    design === "urenloop"
       ? getCachedUrenloopData().catch(() => undefined)
       : undefined,
   ]);
@@ -133,27 +139,6 @@ export async function LegacyHero({
     viewerRegistered: participants.some((p) => p.userId === viewerId),
     roster: toRoster(participants, viewerId),
   }));
-
-  const user = session?.user
-    ? {
-        name: session.user.name,
-        firstName: splitFullName(session.user.name).firstName || null,
-      }
-    : null;
-  // Op de server opgelost, met dezelfde `now` als de rest van de pagina: welke
-  // slogans bij dit publiek en dit dagdeel horen, ligt dan vast voor de HTML
-  // vertrekt en is in de browser exact hetzelfde. Zie lib/slogans.ts.
-  const slogans = resolveSlogans({
-    config: readSlogansSetting(sloganSetting),
-    locale,
-    user,
-    now,
-    fallback: frontpage.legacyHero,
-  });
-
-  // De foto is een veld van de frontpage: een /api/media/...-pad of een pad in
-  // public/, zodat wisselen een upload is en geen deploy.
-  const heroPhoto = frontpagePhoto(frontpage.module, publicUrl(frontpage.values.photo));
 
   const curToday = cursusEntries ? entryForDate(cursusEntries, now, locale) : undefined;
   const quickLinks = [
@@ -185,10 +170,8 @@ export async function LegacyHero({
     // de achtergrond zodat beide secties op hetzelfde donker zitten.
     <div className="home-dark-zone">
       <LegacyHeroStyles />
-      <HomeHeroPhoto src={heroPhoto} />
-      <Frontpage
-        id={frontpage.module.id}
-        values={frontpage.values}
+      <HomeHeroPhoto src={photo} />
+      <Hero
         locale={locale}
         base={base}
         now={now}
@@ -197,7 +180,6 @@ export async function LegacyHero({
         signedIn={session !== null}
         openShifts={openShifts}
         partners={partners}
-        slogans={slogans}
         urenloop={urenloopData}
       />
 

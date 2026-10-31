@@ -1,20 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  HERO_SHIFT_MAX_ROWS,
   heroShiftFreeSpots,
-  heroShiftRowCount,
-  heroTitleCharsPerLine,
-  heroTitleLines,
   isHeroShiftUrgent,
   pickHeroShifts,
   type HeroShiftInput,
 } from "@/lib/frontpage/heroShifts";
-import { parseSlogan, type SloganSize } from "@/lib/slogans";
-
-/** Een slogan zoals de hero ze krijgt: de zin, al in regels en segmenten. */
-function slogan(text: string) {
-  return { lines: parseSlogan(text) };
-}
 
 const now = new Date("2026-09-12T10:00:00Z");
 
@@ -31,76 +21,6 @@ function shift(overrides: Partial<HeroShiftInput> = {}): HeroShiftInput & { id: 
 }
 
 describe("heroShifts", () => {
-  describe("heroTitleCharsPerLine", () => {
-    it("zet meer tekens op een regel naarmate de trap kleiner is", () => {
-      const sizes: SloganSize[] = ["l", "m", "s"];
-      const [large, medium, small] = sizes.map(heroTitleCharsPerLine);
-      expect(large).toBeLessThan(medium!);
-      expect(medium!).toBeLessThan(small!);
-    });
-
-    it("komt uit op wat de hero werkelijk toont", () => {
-      // Gemeten op vtk.be: "De thuis voor ingenieurs in Leuven." breekt op de
-      // kleine trap in twee regels van 13 en 21 tekens.
-      expect(heroTitleCharsPerLine("s")).toBeGreaterThanOrEqual(21);
-      expect(heroTitleCharsPerLine("s")).toBeLessThan(25);
-    });
-  });
-
-  describe("heroTitleLines", () => {
-    it("telt de regels waarin een zin vanzelf afbreekt", () => {
-      expect(heroTitleLines([slogan("De thuis voor *ingenieurs* in Leuven.")], "s")).toBe(2);
-    });
-
-    it("telt een harde regelafbreking mee, ook bij korte regels", () => {
-      expect(heroTitleLines([slogan("Kort.\nKort.\nKort.")], "s")).toBe(3);
-    });
-
-    it("neemt de hoogste slogan en niet de eerste", () => {
-      const items = [
-        slogan("Kort."),
-        slogan("Een merkelijk langere slogan die over meerdere regels loopt."),
-      ];
-      expect(heroTitleLines(items, "s")).toBeGreaterThan(1);
-      // De stapel achter de h1 is zo hoog als de hoogste; de volgorde doet er
-      // dus niet toe.
-      expect(heroTitleLines([...items].reverse(), "s")).toBe(heroTitleLines(items, "s"));
-    });
-
-    it("negeert de sterretjes van een accent", () => {
-      expect(heroTitleLines([slogan("*Kort.*")], "s")).toBe(
-        heroTitleLines([slogan("Kort.")], "s"),
-      );
-    });
-  });
-
-  describe("heroShiftRowCount", () => {
-    it("toont er drie onder de titel die er vandaag staat", () => {
-      // Twee regels op de kleine trap: de hoogte waarmee de hero nu leeft.
-      expect(heroShiftRowCount([slogan("De thuis voor *ingenieurs* in Leuven.")], "s")).toBe(
-        HERO_SHIFT_MAX_ROWS,
-      );
-    });
-
-    it("toont er drie onder een titel van drie regels op de grootste trap", () => {
-      expect(heroShiftRowCount([slogan("Kort.\nKort.\nKort.")], "l")).toBe(HERO_SHIFT_MAX_ROWS);
-    });
-
-    it("laat een rij vallen zodra de titel groeit", () => {
-      const three = heroShiftRowCount([slogan("Kort.\nKort.\nKort.")], "l");
-      const four = heroShiftRowCount([slogan("Kort.\nKort.\nKort.\nKort.")], "l");
-      expect(four).toBeLessThan(three);
-    });
-
-    it("valt terug op geen enkel blok wanneer de titel de kolom vult", () => {
-      expect(heroShiftRowCount([slogan("Kort.\nKort.\nKort.\nKort.\nKort.")], "l")).toBe(0);
-    });
-
-    it("toont er nooit meer dan het maximum, hoe kort de titel ook is", () => {
-      expect(heroShiftRowCount([slogan("Hey.")], "s")).toBe(HERO_SHIFT_MAX_ROWS);
-    });
-  });
-
   describe("pickHeroShifts", () => {
     it("neemt de eerstvolgende, ook als een latere meer plaats heeft", () => {
       const soon = shift({ startTime: new Date("2026-09-13T18:00:00Z"), maxParticipants: 2 });

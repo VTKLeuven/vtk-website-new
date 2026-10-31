@@ -1,5 +1,4 @@
-/* De oude hero en de snelle links, sinds 31 oktober 2026 weer te kiezen in
-   /admin/home ("Oude hero"). Dit zijn de regels die b9ff2fcb uit vtk-home.css
+/* De oude hero en de snelle links, te kiezen in /admin/home. Dit zijn de regels die b9ff2fcb uit vtk-home.css
    haalde. Ze staan in public/ zodat enkel die keuze ze laadt; zie LegacyHero.tsx
    en docs/design-decisions.md. */
 
@@ -89,109 +88,14 @@
   color: var(--yellow);
 }
 
-/* De roterende slogans (zie components/editorial/frontpage/HeroSlogan.tsx).
-
-   De onzichtbare stapel en de h1 liggen in dezelfde rastercel, dus het blok is
-   altijd zo hoog als de langste slogan en de rest van de hero blijft staan
-   wanneer er gewisseld wordt. De stapel erft de typografie van de h1 hierboven
-   via de gedeelde selector, anders meet ze de verkeerde hoogte. */
-.vtk-design .home-hero .hero-slogans {
-  position: relative;
-  display: grid;
+/* De titel van de oude hero: drie regels. */
+.vtk-design .home-hero h1.hero-title {
   margin: 16px 0 0;
-  /* Eén grootte voor de hele reeks, gekozen op de langste slogan (zie
-     `sloganSizeTier`). Een kreet van vijftig tekens loopt op 80px over vijf
-     regels en trekt daarmee de hele hero uit; een titel die per slogan van
-     grootte verspringt, leest dan weer als een fout. */
   font-size: clamp(48px, 6.5vw, 80px);
 }
 
-.vtk-design .home-hero .hero-slogans[data-size="m"] {
-  font-size: clamp(40px, 5.2vw, 64px);
-}
-
-.vtk-design .home-hero .hero-slogans[data-size="s"] {
-  font-size: clamp(32px, 4.2vw, 52px);
-}
-
-.vtk-design .home-hero .hero-slogans > h1,
-.vtk-design .home-hero .hero-slogans > .hero-slogan-sizer {
-  grid-area: 1 / 1;
-  margin: 0;
-  font-size: inherit;
-}
-
-.vtk-design .home-hero .hero-slogan-sizer {
-  display: grid;
-  visibility: hidden;
-  color: var(--paper);
-  line-height: 0.98;
-  letter-spacing: -0.035em;
-  font-weight: 600;
-}
-
-.vtk-design .home-hero .hero-slogan-sizer > .hero-slogan {
-  grid-area: 1 / 1;
-}
-
-.vtk-design .home-hero .hero-slogan,
-.vtk-design .home-hero .hero-slogan-line {
+.vtk-design .home-hero h1.hero-title > span {
   display: block;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .vtk-design .home-hero h1 > .hero-slogan[data-animate="true"] {
-    animation: hero-slogan-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-}
-
-@keyframes hero-slogan-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* Rechts naast het bovenschrift: daar staat niets, dus de knop kan nooit over
-   een sloganregel vallen. Onzichtbaar tot de bezoeker de hero aanraakt of er
-   met het toetsenbord in landt; op een aanraakscherm blijft hij staan, want
-   daar bestaat hover niet. */
-.vtk-design .home-hero .hero-slogan-toggle {
-  position: absolute;
-  top: -30px;
-  right: 0;
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 1px solid rgba(250, 250, 247, 0.25);
-  border-radius: 999px;
-  background: rgba(10, 15, 31, 0.35);
-  color: rgba(250, 250, 247, 0.8);
-  opacity: 0;
-  transition: opacity 0.2s ease, border-color 0.2s ease;
-  cursor: pointer;
-}
-
-.vtk-design .home-hero .hero-slogans:hover .hero-slogan-toggle,
-.vtk-design .home-hero .hero-slogan-toggle:focus-visible,
-.vtk-design .home-hero .hero-slogan-toggle[data-stopped="true"] {
-  opacity: 1;
-}
-
-.vtk-design .home-hero .hero-slogan-toggle:hover {
-  border-color: rgba(250, 250, 247, 0.55);
-}
-
-@media (hover: none) {
-  .vtk-design .home-hero .hero-slogan-toggle {
-    opacity: 0.7;
-  }
 }
 
 .vtk-design .hero-sub {
@@ -658,7 +562,7 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Weekoverzicht in de hero: de tweede agenda, te kiezen in /admin/frontpage.
+   Weekoverzicht in de hero: de agenda naast de titel.
 
    Bewust géén kaart. De leesbaarheid komt van `.hero-week-wash`, een breed
    verloop zonder rand dat naar buiten toe volledig oplost; dat is dezelfde
@@ -693,7 +597,7 @@
   z-index: -1;
   inset: -34px -56px -48px -52px;
   border-radius: 56px;
-  /* De donkerte is instelbaar in /admin/frontpage; de waarde hier geldt zolang
+  /* De donkerte komt uit DefaultFrontpage; de waarde hier geldt zolang
      er niets ingesteld is en moet gelijk lopen met HOME_AGENDA_DIM_DEFAULT. */
   background: rgba(6, 10, 24, var(--hero-week-dim, 0.88));
   filter: blur(34px);

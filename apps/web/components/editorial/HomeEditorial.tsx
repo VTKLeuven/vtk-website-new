@@ -20,7 +20,7 @@ import { NewsBand } from "./NewsBand";
 import { getCachedNews, getPresaleNews } from "@/lib/news/load";
 import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
 import { SHIFTS_BAND_SETTING, readShiftsBandSetting } from "@/lib/home/shiftBand";
-import { HERO_DESIGN_SETTING, readHeroDesignSetting } from "@/lib/home/heroDesign";
+import { HERO_DESIGN_SETTING, isHeroPhotoDesign, readHeroDesignSetting } from "@/lib/home/heroDesign";
 import { HomeShiftBand, type HomeShiftItem } from "./HomeShiftBand";
 import { ROSTER_PARTICIPANT_SELECT, toRoster } from "@/lib/shift/roster";
 import { loadPostNames } from "@/lib/shift/postNames";
@@ -215,13 +215,12 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   // De vier affiches in de hero: eerst wat in /admin/kalender uitgelicht is,
   // daarna de eerstvolgende. Zie lib/home/heroEvents.ts.
   //
-  // De oude hero heeft zijn eigen weekoverzicht en geen affiches; dan begint de
-  // band Aankomende evenementen gewoon bij het eerstvolgende.
+  // De hero's met een foto hebben geen affiches; dan begint de band Aankomende
+  // evenementen gewoon bij het eerstvolgende.
   const heroDesign = readHeroDesignSetting(
     settings.find((setting) => setting.key === HERO_DESIGN_SETTING)?.value,
   );
-  const legacyHero = heroDesign.design === "frontpage";
-  const heroPicks = legacyHero ? [] : pickHeroEvents(upcomingEvents);
+  const heroPicks = isHeroPhotoDesign(heroDesign.design) ? [] : pickHeroEvents(upcomingEvents);
   const heroPickIds = new Set(heroPicks.map((event) => event.id));
   const heroZone = "Europe/Brussels";
   const heroDay = (date: Date, options: Intl.DateTimeFormatOptions) =>
@@ -523,10 +522,10 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   return (
     <div className="vtk-design">
       {/* Hero: de technische bouwtekening van het logo met zes wegwijzers */}
-      {legacyHero ? (
+      {isHeroPhotoDesign(heroDesign.design) ? (
         <LegacyHero
           locale={locale}
-          choice={heroDesign.frontpage}
+          design={heroDesign.design}
           now={now}
           session={session}
           cursusEntries={cursusEntries}

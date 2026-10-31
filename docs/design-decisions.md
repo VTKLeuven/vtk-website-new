@@ -3257,24 +3257,29 @@ https://claude.ai/artifact/LcyfRnnKaK2fknXX2Kh3uN.
 
 ### De hero kiezen in /admin/home
 
-Sinds 31 oktober 2026 kiest een redacteur met `home.edit` het design van de hero
-zelf, met het voorbeeld meteen erboven. Bewaren geldt voor iedereen en meteen.
+Sinds 31 oktober 2026 kiest een redacteur met `home.edit` de hero zelf, met het
+voorbeeld meteen erboven. Bewaren geldt voor iedereen en meteen. Alles over de hero
+staat op dat ene scherm: een eerste versie verspreidde het over Homepagina, Frontpage
+en Slogans, en dat las niet als één keuze.
 
 - **Bouwtekening** (de standaard). Zonder rij in `home.heroDesign` verandert er
   niets aan de site.
 - **Constructielogo.** De lijnen en cirkels zijn de echte, uit `VTK technisch.ai`
   (`lib/home/heroConstruction.ts`), niet verzonnen zoals de hulplijnen van de
-  bouwtekening. Drie opstellingen: op de lijnuiteinden, op de plaats van nu, links
-  groot met register rechts. Tot tegen de randen en de dubbele schaal stonden op het
-  bord maar zijn niet gevraagd. De arcering loopt evenwijdig aan de lange schuine
+  bouwtekening. Drie opstellingen: op de lijnuiteinden, met leiders rond het logo,
+  links groot met register rechts. De arcering loopt evenwijdig aan de lange schuine
   zijde van het logo (38,15 graden), niet op 45 graden zoals bij de bouwtekening.
-- **Oude hero.** Zijn de frontpages van voor b9ff2fcb: standaard, 24 urenloop, jobfair
-  en nieuw, vast te kiezen of volgens de planning in /admin/frontpage. Een frontpage
-  voor het galabal heeft nooit bestaan in de code.
+- **Oude hero, 24 urenloop en jobfair.** De hero's met een foto uit de tijd voor
+  b9ff2fcb. Hun teksten staan vast in de code: de slogans werden niet gebruikt, en een
+  apart beheerscherm voor drie hero's die zelden wisselen was meer dan het waard was.
+  De stijl "nieuw" kwam bewust niet mee, en een hero voor het galabal heeft nooit
+  bestaan in de code. De 24 urenloop haalt haar uren en stand uit /admin/24urenloop, de
+  jobfair haar logo's uit /admin/partners.
 - **Hoverkleur en snelheid** gelden voor de bouwtekening en het constructielogo; wit
   is wat er altijd al stond, 100% de snelheid van voordien.
 
-Wat bij de oude hero bewust niet terugkwam, omdat het los staat van hoe hij eruitziet:
+Wat bij de hero's met een foto bewust niet terugkwam, omdat het los staat van hoe ze
+eruitzien:
 
 - **De kolom `heroWeek` en de permissie `calendar.heroWeek`.** Voorrang in het
   weekoverzicht volgt nu de ster in /admin/kalender (`homeFeaturedAt`). Een evenement
@@ -3283,10 +3288,8 @@ Wat bij de oude hero bewust niet terugkwam, omdat het los staat van hoe hij erui
   achtergrond, ook wanneer die hero niet gekozen is, en zou elke post opnieuw mailen
   omdat de kolom die dat bijhield weg is.
 
-De inhoud van de oude hero kwam niet mee: de migratie van b9ff2fcb gooide de tabel
-`Frontpage` en de slogans weg. Foto's, teksten en planning vallen terug op wat in de
-code staat; de slogans komen uit de fixtures. De code staat nog in de geschiedenis
-(`git show b9ff2fcb~1:docs/design-decisions.md` voor de oude uitleg).
+De oude code en uitleg staan nog in de geschiedenis
+(`git show b9ff2fcb~1:docs/design-decisions.md`).
 
 ### Aftermovies op de homepage
 
