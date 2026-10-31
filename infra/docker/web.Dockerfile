@@ -64,6 +64,12 @@ COPY apps/web ./apps/web
 # overleeft die de build, dus een volgende deploy hercompileert enkel wat
 # echt veranderd is. De mount zit niet in de laag, dus de runner-image
 # krijgt de cache ook niet meer mee.
+# Een vaste sleutel houdt de ID's van de server actions gelijk over deploys
+# heen; zie infra/deploy.sh. Pas hier en niet hoger, zodat de lagen erboven hun
+# cache houden. Leeg: Next kiest zelf een sleutel, en elke action krijgt na de
+# deploy een andere ID. Een build-arg en geen secret-mount, omdat Next de
+# sleutel toch in .next/server zet en een secret niet meetelt voor de cache.
+ARG NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=""
 RUN --mount=type=cache,target=/repo/apps/web/.next/cache,sharing=locked \
   npm run build --workspace=@vtk/web
 

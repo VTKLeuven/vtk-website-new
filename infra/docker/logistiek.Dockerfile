@@ -62,6 +62,9 @@ COPY apps/logistiek ./apps/logistiek
 # overleeft die de build, dus een volgende deploy hercompileert enkel wat
 # echt veranderd is. De mount zit niet in de laag, dus de runner-image
 # krijgt de cache ook niet meer mee.
+# Vaste sleutel voor de ID's van de server actions; zie web.Dockerfile en
+# infra/deploy.sh.
+ARG NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=""
 RUN --mount=type=cache,target=/repo/apps/logistiek/.next/cache,sharing=locked \
   npm run build --workspace=@vtk/logistiek
 

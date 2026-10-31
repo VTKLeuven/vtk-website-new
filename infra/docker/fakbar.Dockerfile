@@ -52,6 +52,9 @@ COPY packages/mail ./packages/mail
 COPY packages/tsconfig ./packages/tsconfig
 COPY packages/ui ./packages/ui
 COPY apps/fakbar ./apps/fakbar
+# Vaste sleutel voor de ID's van de server actions; zie web.Dockerfile en
+# infra/deploy.sh.
+ARG NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=""
 RUN --mount=type=cache,target=/repo/apps/fakbar/.next/cache,sharing=locked \
   npm run build --workspace=@vtk/fakbar
 

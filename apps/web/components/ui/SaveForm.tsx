@@ -13,7 +13,8 @@ import {
 import { Button, ConfirmDialog } from "@vtk/ui";
 import { useToast } from "@/components/ui/toast";
 import { FormBusyProvider, useFormBusy } from "@/components/ui/formBusy";
-import { SAVE_IDLE, type SaveAction, type SaveState } from "@/lib/saveState";
+import { SAVE_IDLE, saveError, type SaveAction, type SaveState } from "@/lib/saveState";
+import { UNSENT_SAVE_CODES, unsentSaveMessage, unsentSaveReason } from "@/lib/unsentSave";
 
 type SecondarySubmit = {
   name: string;
@@ -141,7 +142,21 @@ export function SaveForm({
    * toast ging stil verloren. De toastprovider staat hoger en blijft.
    */
   async function actionWithToast(previous: SaveState, data: FormData): Promise<SaveState> {
-    const result = await action(previous, data);
+    let result: SaveState;
+    try {
+      result = await action(previous, data);
+    } catch (error) {
+      // Een opslag die de server nooit verwerkte (een pagina van vóór de
+      // laatste deploy, of geen verbinding) wordt een gewone rode toast, en het
+      // formulier blijft staan zoals het was. Doorgooien liet de error boundary
+      // het hele scherm vervangen, met alles wat er ingevuld was. Al de rest,
+      // ook een `redirect()` uit de action, gaat door zoals voordien.
+      const reason = unsentSaveReason(error);
+      if (!reason) throw error;
+      const english = document.documentElement.lang.toLowerCase().startsWith("en");
+      showToast({ message: unsentSaveMessage(reason, english), variant: "error", duration: 0 });
+      return saveError(UNSENT_SAVE_CODES[reason]);
+    }
     if (result.status === "success") {
       showToast({ message: result.detail ?? savedMessage, variant: "success" });
     } else if (result.status === "error") {

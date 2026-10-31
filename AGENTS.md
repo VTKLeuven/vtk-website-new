@@ -110,6 +110,13 @@ en vergelijkt met de laatste geslaagde run op main.
 - Wijzigt er iets aan de `build:`-sectie in `infra/docker-compose.yml`, dan
   ziet de CI-build dat niet (Docker op de server wel, want build-args horen bij
   zijn cache). Start dan een handmatige run van de workflow: die bouwt alles.
+- **`NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` blijft vast.** `infra/deploy.sh` zet
+  ze eenmalig in de `.env` van de server en geeft ze als build-arg aan de drie
+  apps. Zonder vaste sleutel krijgt elke server action na elke deploy een
+  andere ID, en wie dan een formulier openhad, verloor bij het opslaan alles
+  ("Failed to find Server Action" in de logs). `SaveForm` vangt dat sindsdien
+  op met een toast en laat het formulier staan (`lib/unsentSave.ts`), maar de
+  sleutel is wat het voorkomt.
 
 # Workspace root is pinned
 

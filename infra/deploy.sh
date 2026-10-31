@@ -45,6 +45,28 @@ if [ "$NFS_MODE" = required ] || grep -qE '^IMMICH_MEDIA_LOCATION=.*/mnt/immich'
   findmnt -rn -M /mnt/immich -t nfs4 >/dev/null
 fi
 
+# De sleutel achter de ID's van de server actions, voor web, logistiek en fakbar.
+#
+# `next build` haalt de ID van elke server action door een hash met deze
+# sleutel. Zonder vaste sleutel maakt het er in Docker elke build een nieuwe
+# (de cache in .next/cache telt in een container niet als blijvend), dus kreeg
+# elke action na elke deploy een andere ID. Wie dan een formulier openhad en op
+# opslaan klikte, kreeg "Failed to find Server Action" in de logs en verloor
+# wat er ingevuld stond. Met een vaste sleutel blijft een ID gelijk zolang de
+# action zelf in hetzelfde bestand onder dezelfde naam staat.
+#
+# Eén keer aangemaakt en dan in .env bewaard; de containers lezen dezelfde
+# waarde via `env_file`. Vervang ze niet zonder reden: dat zet alle open
+# formulieren nog één keer buiten spel, net als een deploy voorheen.
+key="$(sed -n 's/^NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=//p' .env 2>/dev/null | tail -n 1 | tr -d "\"'")"
+if [ -z "$key" ]; then
+  log "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY aanmaken in .env"
+  key="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
+  printf '\n# Vaste sleutel voor de server actions (web, logistiek, fakbar); zie infra/deploy.sh.\nNEXT_SERVER_ACTIONS_ENCRYPTION_KEY=%s\n' "$key" >>.env
+fi
+export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$key"
+unset key
+
 log "Compose-bestand valideren"
 "${COMPOSE[@]}" config --quiet
 

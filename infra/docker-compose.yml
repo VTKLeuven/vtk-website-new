@@ -36,6 +36,10 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/web.Dockerfile
+      args:
+        # Gezet door infra/deploy.sh (uit .env): dezelfde sleutel voor elke
+        # build, zodat een open formulier een deploy overleeft. Zie daar.
+        NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY:-}
     restart: unless-stopped
     # The root env contains app settings. The optional Immich env overlay keeps
     # face-search DB credentials synchronized with the Immich database.
@@ -104,6 +108,8 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/logistiek.Dockerfile
+      args:
+        NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY:-}
     restart: unless-stopped
     env_file:
       - ../.env
@@ -124,6 +130,8 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/fakbar.Dockerfile
+      args:
+        NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY:-}
     restart: unless-stopped
     env_file:
       - ../.env
