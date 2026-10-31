@@ -2289,10 +2289,10 @@
    -------------------------------------------------------------------------- */
 
 /* De tickets en plaatsen van een nieuw event of sjabloon (`TicketSetupEditor`).
-   Elk ticket is een kaart met gelabelde velden op twee regels: wat het is (naam,
-   wie, kleur) en wat het kost en hoeveel (prijs, ledenprijs, maximum, plaatsen).
-   De tabel die hier stond, had zeven kolommen in 900 px en moest daardoor de
-   ledenprijs onder de prijs schuiven. */
+   Elk ticket is een kaart met gelabelde velden: eerst de naam in beide talen,
+   dan wie, kleur en wat het kost en hoeveel (prijs, ledenprijs, maximum), en
+   daaronder de plaatsen en de rest. De tabel die hier stond, had zeven kolommen
+   in 900 px en moest daardoor de ledenprijs onder de prijs schuiven. */
 .ticket-setup {
   display: grid;
   gap: 14px;
@@ -2329,6 +2329,7 @@
 }
 
 .ticket-setup-fields > [data-area="name"],
+.ticket-setup-fields > [data-area="name-en"],
 .ticket-setup-fields > [data-area="audience"],
 .ticket-setup-fields > [data-area="delay"],
 .ticket-setup-fields > [data-area="pool"],
@@ -2341,7 +2342,7 @@
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
-  .ticket-setup-fields > [data-area="name"] {
+  .ticket-setup-fields > :is([data-area="name"], [data-area="name-en"]) {
     grid-column: span 3;
   }
 

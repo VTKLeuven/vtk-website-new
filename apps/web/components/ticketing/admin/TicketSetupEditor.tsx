@@ -366,13 +366,24 @@ export function TicketSetupEditor({
             <li key={row.uid} className="ticket-setup-row" data-enabled={type.enabled ? "true" : "false"}>
               <div className="ticket-setup-fields">
                 <div className="ticket-admin-field" data-area="name">
-                  <label htmlFor={field(`${row.uid}-name`)}>{nl ? "Naam" : "Name"}</label>
+                  <label htmlFor={field(`${row.uid}-name`)}>{nl ? "Naam (NL)" : "Name (NL)"}</label>
                   <input
                     id={field(`${row.uid}-name`)}
                     required={type.enabled}
                     value={type.nameNl}
                     onChange={(changed) => updateRow(row.uid, { nameNl: changed.target.value })}
-                    placeholder={nl ? "Bierticket" : "Beer ticket"}
+                    placeholder="Bierticket"
+                  />
+                </div>
+                {/* Optioneel, net als in het bewerkscherm: leeg toont de Engelse
+                    shop de Nederlandse naam. */}
+                <div className="ticket-admin-field" data-area="name-en">
+                  <label htmlFor={field(`${row.uid}-name-en`)}>{nl ? "Naam (EN)" : "Name (EN)"}</label>
+                  <input
+                    id={field(`${row.uid}-name-en`)}
+                    value={type.nameEn}
+                    onChange={(changed) => updateRow(row.uid, { nameEn: changed.target.value })}
+                    placeholder="Beer ticket"
                   />
                 </div>
                 <div className="ticket-admin-field" data-area="audience">
