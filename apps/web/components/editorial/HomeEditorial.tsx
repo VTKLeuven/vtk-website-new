@@ -20,6 +20,7 @@ import { NewsBand } from "./NewsBand";
 import { getCachedNews, getPresaleNews } from "@/lib/news/load";
 import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
 import { SHIFTS_BAND_SETTING, readShiftsBandSetting } from "@/lib/home/shiftBand";
+import { HERO_DESIGN_SETTING, readHeroDesignSetting } from "@/lib/home/heroDesign";
 import { HomeShiftBand, type HomeShiftItem } from "./HomeShiftBand";
 import { ROSTER_PARTICIPANT_SELECT, toRoster } from "@/lib/shift/roster";
 import { loadPostNames } from "@/lib/shift/postNames";
@@ -51,6 +52,7 @@ import {
 import { buildHoursBand, weekFromEntries, weekFromOpeningTimes } from "@/lib/openingHoursWeek";
 import { OpeningHoursBand } from "./OpeningHoursBand";
 import { BlueprintHero } from "./BlueprintHero";
+import { LegacyHero } from "./LegacyHero";
 import type { HeroEvents } from "./HeroEventCards";
 import { allWithinWeek, pickHeroEvents, relativeDay } from "@/lib/home/heroEvents";
 
@@ -108,6 +110,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       "home.career",
       POC_BAND_SETTING,
       SHIFTS_BAND_SETTING,
+      HERO_DESIGN_SETTING,
     ]),
     // Dezelfde doelgroepregel als /kalender: standaard staat alles erop, en enkel
     // wie op /account koos zijn kalender toe te spitsen krijgt hier minder.
@@ -211,7 +214,14 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
 
   // De vier affiches in de hero: eerst wat in /admin/kalender uitgelicht is,
   // daarna de eerstvolgende. Zie lib/home/heroEvents.ts.
-  const heroPicks = pickHeroEvents(upcomingEvents);
+  //
+  // De oude hero heeft zijn eigen weekoverzicht en geen affiches; dan begint de
+  // band Aankomende evenementen gewoon bij het eerstvolgende.
+  const heroDesign = readHeroDesignSetting(
+    settings.find((setting) => setting.key === HERO_DESIGN_SETTING)?.value,
+  );
+  const legacyHero = heroDesign.design === "frontpage";
+  const heroPicks = legacyHero ? [] : pickHeroEvents(upcomingEvents);
   const heroPickIds = new Set(heroPicks.map((event) => event.id));
   const heroZone = "Europe/Brussels";
   const heroDay = (date: Date, options: Intl.DateTimeFormatOptions) =>
@@ -513,7 +523,17 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   return (
     <div className="vtk-design">
       {/* Hero: de technische bouwtekening van het logo met zes wegwijzers */}
-      <BlueprintHero locale={locale} events={heroEvents} />
+      {legacyHero ? (
+        <LegacyHero
+          locale={locale}
+          choice={heroDesign.frontpage}
+          now={now}
+          session={session}
+          cursusEntries={cursusEntries}
+        />
+      ) : (
+        <BlueprintHero locale={locale} events={heroEvents} design={heroDesign} />
+      )}
 
       {/* Onder de hero: het nieuws in een lichtblauwe band, die helemaal wegvalt
           zonder berichten of wanneer ze uitstaat in /admin/nieuws. Zie lib/news. */}

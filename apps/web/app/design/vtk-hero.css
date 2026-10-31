@@ -405,6 +405,161 @@
   }
 }
 
+/* De hoverkleur uit /admin/home: geel kleurt ook de naam, wit enkel de streep. */
+.vtk-blueprint-hero[data-hover="yellow"] .g-lab:hover b,
+.vtk-blueprint-hero[data-hover="yellow"] .g-lab:focus-visible b,
+.vtk-blueprint-hero[data-hover="yellow"] .k-register a:hover b,
+.vtk-blueprint-hero[data-hover="yellow"] .k-register a:focus-visible b,
+.vtk-blueprint-hero[data-hover="yellow"] .g-events-head a:hover,
+.vtk-blueprint-hero[data-hover="yellow"] .g-events-head a:focus-visible {
+  color: var(--yellow);
+}
+
+/* Het nieuwe design: het logo met zijn echte constructielijnen, gekozen in
+   /admin/home. De lijnen staan in de coordinaten van het .ai-bestand binnen een
+   geschaalde groep, dus de dikte wordt door --k gedeeld. `--lwm` maakt ze op een
+   telefoon dikker, waar de hele tekening veel kleiner staat. */
+.vtk-blueprint-hero.no-pattern::after {
+  display: none;
+}
+
+.vtk-blueprint-hero .k-ln {
+  fill: none;
+  stroke: currentColor;
+  stroke-opacity: var(--lo);
+  stroke-width: calc(var(--lw) * var(--lwm, 1) / var(--k));
+  transition:
+    stroke 150ms ease,
+    stroke-opacity 150ms ease;
+}
+
+.vtk-blueprint-hero .k-out {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: calc(1.3 / var(--k));
+  stroke-linejoin: round;
+  stroke-opacity: 0.92;
+}
+
+.vtk-blueprint-hero .k-under {
+  fill: var(--navy);
+}
+
+.vtk-blueprint-hero .k-solid {
+  fill: var(--paper);
+}
+
+/* Een label onderbreekt de lijn erachter, zoals tekst op een maatlijn. */
+.vtk-blueprint-hero .g-lab.k-lab {
+  width: auto;
+  max-width: 23%;
+  padding: 3px 8px;
+  border-radius: 3px;
+  background: var(--navy);
+}
+
+/* De lijn waarop de bestemming staat, licht op wanneer je over het label gaat. */
+.vtk-blueprint-hero .g-box:has(.k-lab[data-line]:hover) .k-ln {
+  stroke-opacity: calc(var(--lo) * 0.6);
+}
+
+.vtk-blueprint-hero .g-box:has(.k-lab[data-line="kalender"]:hover) .k-ln[data-line="kalender"],
+.vtk-blueprint-hero .g-box:has(.k-lab[data-line="midden"]:hover) .k-ln[data-line="midden"],
+.vtk-blueprint-hero .g-box:has(.k-lab[data-line="basis"]:hover) .k-ln[data-line="basis"],
+.vtk-blueprint-hero .g-box:has(.k-lab[data-line="cursusdienst"]:hover) .k-ln[data-line="cursusdienst"] {
+  stroke: var(--yellow);
+  stroke-opacity: 1;
+}
+
+/* Links groot, register rechts. De tekening loopt links de band uit en stopt
+   rechts op de rand van haar kolom, anders lopen de lijnen onder de lijst door. */
+.vtk-blueprint-hero .k-register-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 36px;
+  align-items: center;
+}
+
+.vtk-blueprint-hero .g-box.k-box-register {
+  aspect-ratio: 770 / 520;
+}
+
+.vtk-blueprint-hero.has-events .g-box.k-box-register {
+  margin-bottom: 0;
+}
+
+.vtk-blueprint-hero .k-box-register > svg {
+  clip-path: inset(-34px 0 -40px -400px);
+}
+
+.vtk-blueprint-hero .k-register {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.vtk-blueprint-hero .k-register a {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16px;
+  gap: 10px;
+  align-items: center;
+  padding: 13px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--paper);
+  text-decoration: none;
+}
+
+.vtk-blueprint-hero .k-register li:first-child a {
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.vtk-blueprint-hero .k-register b {
+  display: block;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.vtk-blueprint-hero .k-register i {
+  display: block;
+  margin-top: 2px;
+  font-size: 13.5px;
+  font-style: normal;
+  color: var(--on-dark-muted);
+}
+
+.vtk-blueprint-hero .k-register svg {
+  color: var(--on-dark-muted);
+  transition:
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.vtk-blueprint-hero .k-register a:hover b,
+.vtk-blueprint-hero .k-register a:focus-visible b {
+  text-decoration: underline;
+  text-decoration-color: var(--yellow);
+  text-underline-offset: 4px;
+}
+
+.vtk-blueprint-hero .k-register a:hover svg {
+  color: var(--yellow);
+  transform: translateX(3px);
+}
+
+/* De voorvertoning in /admin/home staat in een kolom en niet tegen de schermrand. */
+.vtk-admin-preview .vtk-blueprint-hero {
+  max-width: none;
+  overflow: hidden;
+}
+
+.vtk-admin-preview .vtk-blueprint-hero::before,
+.vtk-admin-preview .vtk-blueprint-hero::after {
+  left: 0;
+  right: 0;
+}
+
 /* Lijnen die zich animeren */
 .vtk-blueprint-hero .g-draw {
   vector-effect: none;
@@ -416,32 +571,44 @@
   .vtk-blueprint-hero .g-draw {
     stroke-dasharray: 1;
     stroke-dashoffset: 1;
-    animation: draw-line 1100ms cubic-bezier(0.35, 0.6, 0.2, 1) forwards;
-    animation-delay: var(--d, 0s);
+    animation: draw-line calc(1100ms * var(--tempo, 1)) cubic-bezier(0.35, 0.6, 0.2, 1) forwards;
+    animation-delay: calc(var(--d, 0s) * var(--tempo, 1));
   }
 
   .vtk-blueprint-hero .c-out.g-draw {
-    animation-duration: 1600ms;
+    animation-duration: calc(1600ms * var(--tempo, 1));
   }
 
   .vtk-blueprint-hero .g-fade {
-    animation: fade 700ms ease both;
-    animation-delay: var(--d, 0s);
+    animation: fade calc(700ms * var(--tempo, 1)) ease both;
+    animation-delay: calc(var(--d, 0s) * var(--tempo, 1));
   }
 
   .vtk-blueprint-hero .g-wipe {
-    animation: wipe 1300ms cubic-bezier(0.5, 0.1, 0.2, 1) both;
-    animation-delay: var(--d, 0s);
+    animation: wipe calc(1300ms * var(--tempo, 1)) cubic-bezier(0.5, 0.1, 0.2, 1) both;
+    animation-delay: calc(var(--d, 0s) * var(--tempo, 1));
   }
 
   .vtk-blueprint-hero .g-lab {
-    animation: g-rise 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
-    animation-delay: var(--d, 0s);
+    animation: g-rise calc(520ms * var(--tempo, 1)) cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation-delay: calc(var(--d, 0s) * var(--tempo, 1));
   }
 
-  /* De vertraging staat per kaart inline, zodat ze na elkaar binnenkomen. */
+  .vtk-blueprint-hero .k-draw {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: draw-line calc(1000ms * var(--tempo, 1)) cubic-bezier(0.35, 0.6, 0.2, 1) forwards;
+    animation-delay: calc(var(--d, 0s) * var(--tempo, 1));
+  }
+
+  .vtk-blueprint-hero .k-out.k-draw {
+    animation-duration: calc(1500ms * var(--tempo, 1));
+  }
+
+  /* `--d` staat per kaart inline, zodat ze na elkaar binnenkomen. */
   .g-event {
-    animation: g-event-rise 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation: g-event-rise calc(520ms * var(--tempo, 1)) cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation-delay: calc(var(--d, 0s) * var(--tempo, 1));
   }
 }
 
@@ -496,6 +663,33 @@
 
   .vtk-blueprint-hero .g-events-head {
     margin-top: 18px;
+  }
+
+  .vtk-blueprint-hero.k-hero {
+    --lwm: 2;
+  }
+
+  /* De SVG is hier breder dan het kader; zonder dit schuift de hele pagina mee. */
+  .vtk-blueprint-hero .g-box.k-box {
+    aspect-ratio: var(--crop-ratio);
+    overflow: hidden;
+  }
+
+  .vtk-blueprint-hero .g-box.k-box > svg {
+    inset: auto;
+    top: var(--crop-top);
+    left: var(--crop-left);
+    width: var(--crop-width);
+    height: var(--crop-height);
+    clip-path: none;
+  }
+
+  .vtk-blueprint-hero .k-register-grid {
+    display: block;
+  }
+
+  .vtk-blueprint-hero .k-register {
+    display: none;
   }
 
   .vtk-blueprint-hero .g-lab,

@@ -150,6 +150,8 @@ export function getAdminNav(): NavEntry[] {
     // shiften en piano).
     group('website', [
       item('home', '/home', { perm: 'home.edit' }),
+      item('frontpage', '/frontpage', { perm: 'home.edit' }),
+      item('slogans', '/slogans', { perm: 'home.edit' }),
       item('openingHours', '/openingsuren', { perm: 'openingHours.manageOwn' }),
       item('announcements', '/aankondigingen', { perm: 'announcements.manage' }),
       item('news', '/nieuws', { perm: 'news.manage' }),

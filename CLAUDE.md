@@ -329,9 +329,18 @@ the design language into the application instead of copying mockup content.
   left; Cursusdienst, Shiften, Career on the right). Pure CSS keyframe animations
   (outline draws with `stroke-dashoffset`, hatching wipes with `clip-path`,
   nodes/dimensions fade, labels rise). On mobile (<760px), leader lines hide and
-  destinations appear as a hairline list below the drawing. Do not bring back the
-  old photo hero, slogans, countdown clock, or live status badges.
-  - **Vier losse affiches hangen over de gele streep** (`HeroEventCards.tsx`,
+  destinations appear as a hairline list below the drawing.
+  - **Welke hero er staat, kies je in /admin/home** (`lib/home/heroDesign.ts`, de
+    instelling `home.heroDesign`): de bouwtekening hierboven (`classic`, de
+    standaard zonder rij), het constructielogo uit `VTK technisch.ai`
+    (`HeroConstruction.tsx`, met opstelling, vulling, lijnen, patroon, hoverkleur
+    en snelheid) of de oude hero (`LegacyHero.tsx`, met zijn frontpages in
+    /admin/frontpage en /admin/slogans). Zijn CSS staat bewust in
+    `public/frontpage-legacy/` en niet achter een `import`: een CSS-import laadt
+    Next ook mee wanneer een ander design gekozen is. Zie
+    `docs/design-decisions.md`.
+  - **Vier losse affiches hangen over de gele streep** bij de bouwtekening en het
+    constructielogo (`HeroEventCards.tsx`,
     `.g-events`): enkel de foto en de datumpin, met titel en uur zonder kaart op
     de lichte band eronder. Zet er geen witte kaart rond: op navy tekent die een
     rand rond elke foto. Met kaarten ligt de streep in `.g-events` en niet meer

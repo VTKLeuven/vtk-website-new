@@ -98,6 +98,22 @@ function Svg({ children }: { children: ReactNode }) {
 
 // Icons zijn gekozen zodat je in een oogopslag de juiste tab herkent.
 const icons: Record<string, ReactNode> = {
+  // frontpage: het bovenste blok van een pagina -> venster met een gevulde kop
+  frontpage: (
+    <Svg>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M7 7h4" />
+    </Svg>
+  ),
+  // slogans: spraakwolk met tekstregels
+  slogans: (
+    <Svg>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      <path d="M8 9h8" />
+      <path d="M8 13h5" />
+    </Svg>
+  ),
   // ledenbeheer: adresboek / ledenkaart
   ledenbeheer: (
     <Svg>

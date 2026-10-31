@@ -3255,6 +3255,39 @@ https://claude.ai/artifact/LcyfRnnKaK2fknXX2Kh3uN.
   "Zet in mijn agenda" staan enkel op de kaarten in die band; een affiche in de
   hero is als geheel één link.
 
+### De hero kiezen in /admin/home
+
+Sinds 31 oktober 2026 kiest een redacteur met `home.edit` het design van de hero
+zelf, met het voorbeeld meteen erboven. Bewaren geldt voor iedereen en meteen.
+
+- **Bouwtekening** (de standaard). Zonder rij in `home.heroDesign` verandert er
+  niets aan de site.
+- **Constructielogo.** De lijnen en cirkels zijn de echte, uit `VTK technisch.ai`
+  (`lib/home/heroConstruction.ts`), niet verzonnen zoals de hulplijnen van de
+  bouwtekening. Drie opstellingen: op de lijnuiteinden, op de plaats van nu, links
+  groot met register rechts. Tot tegen de randen en de dubbele schaal stonden op het
+  bord maar zijn niet gevraagd. De arcering loopt evenwijdig aan de lange schuine
+  zijde van het logo (38,15 graden), niet op 45 graden zoals bij de bouwtekening.
+- **Oude hero.** Zijn de frontpages van voor b9ff2fcb: standaard, 24 urenloop, jobfair
+  en nieuw, vast te kiezen of volgens de planning in /admin/frontpage. Een frontpage
+  voor het galabal heeft nooit bestaan in de code.
+- **Hoverkleur en snelheid** gelden voor de bouwtekening en het constructielogo; wit
+  is wat er altijd al stond, 100% de snelheid van voordien.
+
+Wat bij de oude hero bewust niet terugkwam, omdat het los staat van hoe hij eruitziet:
+
+- **De kolom `heroWeek` en de permissie `calendar.heroWeek`.** Voorrang in het
+  weekoverzicht volgt nu de ster in /admin/kalender (`homeFeaturedAt`). Een evenement
+  uit het overzicht verbergen kan dus niet meer.
+- **De mail aan de post** dat een evenement in het weekoverzicht komt. Die liep op de
+  achtergrond, ook wanneer die hero niet gekozen is, en zou elke post opnieuw mailen
+  omdat de kolom die dat bijhield weg is.
+
+De inhoud van de oude hero kwam niet mee: de migratie van b9ff2fcb gooide de tabel
+`Frontpage` en de slogans weg. Foto's, teksten en planning vallen terug op wat in de
+code staat; de slogans komen uit de fixtures. De code staat nog in de geschiedenis
+(`git show b9ff2fcb~1:docs/design-decisions.md` voor de oude uitleg).
+
 ### Aftermovies op de homepage
 
 - Dezelfde `media.aftermovies`-instelling als de /media-pagina, te beheren via

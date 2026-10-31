@@ -1,10 +1,11 @@
 import type { CSSProperties } from "react";
 import Link from "@/components/ui/Link";
 import { ArrowRightIcon } from "@/components/ui/icons";
-import { isExternalUrl, withLocaleBase } from "@/lib/href";
-import { HOME_LINK_EVENT, OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
+import { DEFAULT_HERO_DESIGN, heroAnimationTempo, type HeroDesignSetting } from "@/lib/home/heroDesign";
 import type { Locale } from "@vtk/i18n";
+import { HeroConstruction, constructionVars } from "./HeroConstruction";
 import { HeroEventCards, type HeroEvents } from "./HeroEventCards";
+import { DESTINATIONS, DestinationLink, destinationText } from "./HeroDestinations";
 
 /**
  * Omtrek van het VTK-logo in de hero-coördinaten (1168 x 520),
@@ -37,87 +38,6 @@ const LEADS = [
   { d: "M850 389.4 L896 389.4", delay: "1.80s" },
 ];
 
-type HeroDestination = {
-  key: string;
-  side: "l" | "r";
-  topPercent: string;
-  delay: string;
-  titleNl: string;
-  titleEn: string;
-  subNl: string;
-  subEn: string;
-  href: string;
-};
-
-const DESTINATIONS: HeroDestination[] = [
-  {
-    key: "kalender",
-    side: "l",
-    topPercent: "26.92%",
-    delay: "1.50s",
-    titleNl: "Kalender",
-    titleEn: "Calendar",
-    subNl: "Alles wat er gepland staat",
-    subEn: "Everything that is planned",
-    href: "/kalender",
-  },
-  {
-    key: "tickets",
-    side: "l",
-    topPercent: "47.81%",
-    delay: "1.62s",
-    titleNl: "Tickets",
-    titleEn: "Tickets",
-    subNl: "Lopende verkopen",
-    subEn: "Sales that are open",
-    href: "/tickets",
-  },
-  {
-    key: "broodjes",
-    side: "l",
-    topPercent: "74.88%",
-    delay: "1.74s",
-    titleNl: "Broodjes",
-    titleEn: "Sandwiches",
-    subNl: "Bestellen bij de Theokot",
-    subEn: "Order at the Theokot",
-    href: "/theokot",
-  },
-  {
-    key: "cursusdienst",
-    side: "r",
-    topPercent: "20.77%",
-    delay: "1.86s",
-    titleNl: "Cursusdienst",
-    titleEn: "Course Shop",
-    subNl: "Cursussen, boeken en de printer",
-    subEn: "Courses, books and the printer",
-    href: "https://cudi.vtk.be",
-  },
-  {
-    key: "shiften",
-    side: "r",
-    topPercent: "42.31%",
-    delay: "1.98s",
-    titleNl: "Shiften",
-    titleEn: "Shifts",
-    subNl: "Help mee achter de bar",
-    subEn: "Help out behind the bar",
-    href: "/shift",
-  },
-  {
-    key: "career",
-    side: "r",
-    topPercent: "74.88%",
-    delay: "2.10s",
-    titleNl: "Career",
-    titleEn: "Career",
-    subNl: "Bedrijven, talks en de Jobfair",
-    subEn: "Companies, talks and the Job fair",
-    href: "https://career.vtk.be",
-  },
-];
-
 /**
  * G1 Wegwijzer: homepage hero als technische bouwtekening van het VTK-logo.
  * Volledige breedte navy band met CSS-geanimeerde lijntekening en wegwijzers.
@@ -126,16 +46,51 @@ const DESTINATIONS: HeroDestination[] = [
  * niet meer onder deze sectie maar in `.g-events` erna, want de affiches hangen
  * eroverheen.
  */
-export function BlueprintHero({ locale, events }: { locale: Locale; events?: HeroEvents | null }) {
+export function BlueprintHero({
+  locale,
+  events,
+  design = DEFAULT_HERO_DESIGN,
+  preview = false,
+}: {
+  locale: Locale;
+  events?: HeroEvents | null;
+  /** Gekozen in /admin/home; zonder keuze de tekening van hieronder. */
+  design?: HeroDesignSetting;
+  /** In de voorvertoning van de admin: de pagina heeft daar al een eigen `h1`. */
+  preview?: boolean;
+}) {
   const nl = locale === "nl";
   const base = nl ? "" : "/en";
   const hasEvents = Boolean(events && events.cards.length > 0);
+  const construction = design.design === "construction";
+  const tempo = heroAnimationTempo(design);
+  const className = [
+    "vtk-blueprint-hero",
+    hasEvents ? "has-events" : "",
+    construction ? "k-hero" : "",
+    construction && !design.pattern ? "no-pattern" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <>
-    <section className={`vtk-blueprint-hero${hasEvents ? " has-events" : ""}`} aria-label="Hero">
-      <h1 className="sr-only">Vlaamse Technische Kring</h1>
+    <section
+      className={className}
+      style={
+        {
+          "--tempo": tempo,
+          ...(construction ? constructionVars(design) : undefined),
+        } as CSSProperties
+      }
+      data-hover={design.hoverColor}
+      aria-label="Hero"
+    >
+      {preview ? null : <h1 className="sr-only">Vlaamse Technische Kring</h1>}
 
+      {construction ? (
+        <HeroConstruction setting={design} nl={nl} base={base} />
+      ) : (
       <div className="g-box">
         <svg viewBox="0 0 1168 520" aria-hidden="true">
           <defs>
@@ -249,88 +204,39 @@ export function BlueprintHero({ locale, events }: { locale: Locale; events?: Her
 
         {/* Labels op desktop */}
         {DESTINATIONS.map((dest) => {
-          const title = nl ? dest.titleNl : dest.titleEn;
-          const sub = nl ? dest.subNl : dest.subEn;
-          const external = isExternalUrl(dest.href);
-
-          if (external) {
-            return (
-              <a
-                key={dest.key}
-                href={dest.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`g-lab ${dest.side}`}
-                style={{ top: dest.topPercent, "--d": dest.delay } as CSSProperties}
-                {...umamiEvent(OUTBOUND_EVENT, {
-                  bestemming: outboundHost(dest.href),
-                  vanaf: "hero",
-                })}
-              >
-                <b>
-                  <span className="g-u">{title}</span>
-                  <ArrowRightIcon />
-                </b>
-                <i>{sub}</i>
-              </a>
-            );
-          }
-
+          const { title, sub } = destinationText(dest, nl);
           return (
-            <Link
+            <DestinationLink
               key={dest.key}
-              href={withLocaleBase(dest.href, base)}
+              destination={dest}
+              base={base}
               className={`g-lab ${dest.side}`}
               style={{ top: dest.topPercent, "--d": dest.delay } as CSSProperties}
-              {...umamiEvent(HOME_LINK_EVENT, { soort: "hero", naar: dest.href })}
             >
               <b>
                 <span className="g-u">{title}</span>
                 <ArrowRightIcon />
               </b>
               <i>{sub}</i>
-            </Link>
+            </DestinationLink>
           );
         })}
       </div>
+      )}
 
       {/* Mobiele lijst onder 760px */}
       <ul className="g-list">
         {DESTINATIONS.map((dest) => {
-          const title = nl ? dest.titleNl : dest.titleEn;
-          const sub = nl ? dest.subNl : dest.subEn;
-          const external = isExternalUrl(dest.href);
-
+          const { title, sub } = destinationText(dest, nl);
           return (
             <li key={dest.key}>
-              {external ? (
-                <a
-                  href={dest.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  {...umamiEvent(OUTBOUND_EVENT, {
-                    bestemming: outboundHost(dest.href),
-                    vanaf: "hero",
-                  })}
-                >
-                  <span>
-                    <b>{title}</b>
-                    <i>{sub}</i>
-                  </span>
-                  <ArrowRightIcon />
-                </a>
-              ) : (
-                <Link
-                  href={withLocaleBase(dest.href, base)}
-                  {...umamiEvent(HOME_LINK_EVENT, { soort: "hero", naar: dest.href })}
-                >
-                  <span>
-                    <b>{title}</b>
-                    <i>{sub}</i>
-                  </span>
-                  <ArrowRightIcon />
-                </Link>
-              )}
+              <DestinationLink destination={dest} base={base}>
+                <span>
+                  <b>{title}</b>
+                  <i>{sub}</i>
+                </span>
+                <ArrowRightIcon />
+              </DestinationLink>
             </li>
           );
         })}
@@ -345,7 +251,7 @@ export function BlueprintHero({ locale, events }: { locale: Locale; events?: Her
         </div>
       ) : null}
     </section>
-    {hasEvents && events ? <HeroEventCards cards={events.cards} /> : null}
+    {hasEvents && events ? <HeroEventCards cards={events.cards} tempo={tempo} /> : null}
     </>
   );
 }

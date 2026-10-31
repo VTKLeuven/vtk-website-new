@@ -1,3 +1,4 @@
+import { SiteHeaderShell } from './SiteHeaderShell';
 import Image from 'next/image';
 import Link from '@/components/ui/Link';
 import { Search } from 'lucide-react';
@@ -84,7 +85,7 @@ export async function Header({ locale }: { locale: Locale }) {
       ];
 
   return (
-    <header className="vtk-site-header">
+    <SiteHeaderShell>
       <div className="utility">
         <div className="utility-inner">
           <Link href={`${base}/theokot`} className="flex items-center gap-1.5" {...umamiEvent("openingsuren-bekeken")}>
@@ -197,6 +198,6 @@ export async function Header({ locale }: { locale: Locale }) {
           )}
         </div>
       </div>
-    </header>
+    </SiteHeaderShell>
   );
 }

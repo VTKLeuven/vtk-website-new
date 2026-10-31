@@ -724,6 +724,7 @@ model User {
   createdPages             Page[]                  @relation("PageCreatedBy")
   createdAnnouncements     Announcement[]          @relation("AnnouncementCreatedBy")
   createdNewsPosts         NewsPost[]              @relation("NewsPostCreatedBy")
+  updatedFrontpages        Frontpage[]             @relation("FrontpageUpdatedBy")
   createdEvents            CalendarEvent[]         @relation("EventCreatedBy")
   dashboardTiles           DashboardTile[]
   dashboardTilePrefs       UserDashboardTilePref[]
@@ -3245,6 +3246,32 @@ model Partner {
 // -----------------------------------------------------------------------------
 // Settings (key/value JSON, drives the editable homepage and opening hours)
 // -----------------------------------------------------------------------------
+
+/**
+ * One configurable front page of the old hero, chosen in /admin/home. Which front
+ * pages exist is decided in code (`apps/web/lib/frontpage/registry.ts`); this table
+ * only carries what an admin may change without a deploy: which one is live and
+ * when, plus the values for the fields that component exposes. A row whose `layout`
+ * is no longer in the registry is ignored.
+ */
+model Frontpage {
+  id          String    @id @default(cuid())
+  /// Registry id of the component this row configures ("default", "urenloop").
+  layout      String    @unique
+  /// Field values, keyed by the field names that this layout declares.
+  values      Json      @default("{}")
+  /// Window in which this front page takes over. The default layout ignores it.
+  startsAt    DateTime?
+  endsAt      DateTime?
+  /// Off = never show, whatever the window says.
+  active      Boolean   @default(false)
+  updatedById String?
+  updatedBy   User?     @relation("FrontpageUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([active, startsAt, endsAt])
+}
 
 model Setting {
   key       String   @id

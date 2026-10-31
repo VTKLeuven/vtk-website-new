@@ -49,6 +49,7 @@ import { FIXTURE_DIR } from "../packages/db/src/fixtures";
  * anyone adds leaks along automatically, and you find out once it is too late.
  */
 const SETTING_ALLOWLIST = [
+  "home.slogans",
   "home.career",
   "home.aftermovies",
   "home.openingHours.theokot",

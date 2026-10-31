@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { prisma } from "@vtk/db";
 import { deleteObject } from "@vtk/storage";
 import { requirePermission } from "@/lib/session";
@@ -18,6 +18,8 @@ import {
   SHIFTS_BAND_SETTING,
   type ShiftsBandSetting,
 } from "@/lib/home/shiftBand";
+import { HERO_DESIGN_SETTING, parseHeroDesignForm } from "@/lib/home/heroDesign";
+import { SITE_CONTENT_TAG } from "@/lib/cachedContent";
 
 /** Tekstveld uit het formulier: leeg betekent "terug naar de standaardzin". */
 function readOptionalText(formData: FormData, name: string): string | null {
@@ -258,6 +260,38 @@ export async function saveHomeShiftsBandAction(
     target: "Shiften-band",
     summary: visible ? "ingeschakeld" : "uitgeschakeld",
   });
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/home");
+  return saveOk();
+}
+
+/** Het design van de hero: het huidige, of het constructielogo met zijn opties. */
+export async function saveHomeHeroDesignAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requirePermission("home.edit");
+  const value = parseHeroDesignForm(formData);
+  if (!value) return saveError("INVALID_INPUT");
+  await prisma.setting.upsert({
+    where: { key: HERO_DESIGN_SETTING },
+    update: { value },
+    create: { key: HERO_DESIGN_SETTING, value },
+  });
+  await logAudit({
+    action: "update",
+    entity: "home",
+    target: "Hero",
+    summary:
+      value.design === "classic"
+        ? "huidig design gekozen"
+        : value.design === "frontpage"
+          ? `oude hero gekozen (${value.frontpage})`
+          : `constructielogo gekozen (${value.layout}, ${value.fill}, ${value.lineWeight}, ${value.lineStrength}%, patroon ${value.pattern ? "aan" : "uit"})`,
+  });
+  // De homepage leest dit uit de gedeelde cache; zonder dit duurt het tot een
+  // minuut voor wie net wisselde het resultaat ziet.
+  updateTag(SITE_CONTENT_TAG);
   revalidatePath("/", "layout");
   revalidatePath("/admin/home");
   return saveOk();

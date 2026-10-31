@@ -15,6 +15,8 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
 import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
 import { SHIFTS_BAND_SETTING, readShiftsBandSetting } from "@/lib/home/shiftBand";
+import { HERO_DESIGN_SETTING, readHeroDesignSetting } from "@/lib/home/heroDesign";
+import { HeroDesignForm } from "./HeroDesignForm";
 import {
   saveDefaultEventImageAction,
   saveHomepageCardAction,
@@ -89,6 +91,7 @@ export default async function AdminHome({
             DEFAULT_EVENT_IMAGE_SETTING,
             POC_BAND_SETTING,
             SHIFTS_BAND_SETTING,
+            HERO_DESIGN_SETTING,
           ],
         },
       },
@@ -120,6 +123,17 @@ export default async function AdminHome({
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">{locale === "nl" ? "Homepagina" : "Homepage"}</h1>
+
+      <HeroDesignForm
+        locale={locale}
+        initial={readHeroDesignSetting(map.get(HERO_DESIGN_SETTING))}
+        labels={{
+          save: dict.admin.save,
+          saving: dict.common.saving,
+          saved: dict.common.saved,
+          saveError: dict.common.saveError,
+        }}
+      />
 
       <Card className="p-5">
         <h2 className="mb-1 font-semibold">{locale === "nl" ? "Wat we doen" : "What we do"}</h2>

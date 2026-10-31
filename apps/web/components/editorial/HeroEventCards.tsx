@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import Image from "next/image";
 import Link from "@/components/ui/Link";
 import { HOME_LINK_EVENT, umamiEvent } from "@/lib/analytics";
@@ -28,7 +29,7 @@ export type HeroEvents = {
  * Geen ster en geen "Zet in mijn agenda": die horen bij de volle kaart in de band
  * Aankomende evenementen. Hier is de hele tegel één link.
  */
-export function HeroEventCards({ cards }: { cards: HeroEventCard[] }) {
+export function HeroEventCards({ cards, tempo = 1 }: { cards: HeroEventCard[]; tempo?: number }) {
   return (
     <div className="g-events">
       <div className="g-events-row">
@@ -37,7 +38,9 @@ export function HeroEventCards({ cards }: { cards: HeroEventCard[] }) {
             key={card.id}
             href={card.href}
             className="g-event"
-            style={{ animationDelay: `${(1.2 + index * 0.08).toFixed(2)}s` }}
+            style={
+              { "--d": `${(1.2 + index * 0.08).toFixed(2)}s`, "--tempo": tempo } as CSSProperties
+            }
             {...umamiEvent(HOME_LINK_EVENT, { soort: "hero-evenement", naar: card.href })}
           >
             <span className="g-event-shot">

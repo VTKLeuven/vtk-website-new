@@ -1,0 +1,136 @@
+import "server-only";
+
+import { localDateTimeToUtc } from "@/lib/ticketing/time";
+import { TICKET_LINK_SELECT } from "@/lib/ticketing/eventPage";
+import {
+  HERO_WEEK_TIME_ZONE,
+  heroWeekDayDate,
+  heroWeekDayKey,
+} from "@/lib/calendar/heroWeek";
+import type { FrontpageEvent } from "@/components/editorial/frontpage/context";
+
+/**
+ * De evenementen die een front page krijgt, vanuit één plaats gevormd.
+ *
+ * De homepage en het voorbeeldscherm in /admin/frontpage renderen dezelfde
+ * componenten en moeten dus dezelfde velden meegeven. Ze deden dat elk met hun
+ * eigen `include` en hun eigen mapping, en dat is precies hoe een voorbeeld gaat
+ * afwijken van de echte pagina.
+ */
+
+/** Wat deze module minimaal nodig heeft van een `CalendarEvent`-rij. */
+export type FrontpageEventRow = {
+  id: string;
+  slug: string;
+  start: Date;
+  end: Date;
+  allDay: boolean;
+  titleNl: string;
+  titleEn: string | null;
+  location: string | null;
+  /** De ster in /admin/kalender: voorrang in het weekoverzicht. */
+  homeFeaturedAt: Date | null;
+  /** Zie `CalendarEventMoment`; leeg voor een evenement dat gewoon doorloopt. */
+  moments: Array<{ start: Date; end: Date; label: string | null }>;
+  group: { nameNl: string; nameEn: string };
+  organiserName: string | null;
+  categories: Array<{ category: { colour: string; audience: string | null } }>;
+};
+
+/** Het `include`-blok dat bij `FrontpageEventRow` hoort. */
+export const FRONTPAGE_EVENT_INCLUDE = {
+  group: true,
+  categories: { include: { category: true } },
+  moments: { orderBy: { start: "asc" }, select: { start: true, end: true, label: true } },
+  // Voor het ticketicoon op de evenementkaart; zie `publishedTicketSlug`.
+  ticketEvents: { select: TICKET_LINK_SELECT },
+} as const;
+
+/**
+ * De slug van de ticketpagina, enkel wanneer die online staat. Dezelfde regel
+ * als de knop "Tickets kopen" op de eventpagina: een concept of een gearchiveerd
+ * ticketevent heeft geen pagina die een bezoeker kan openen. Heeft het event
+ * er meer dan één, dan de eerste; zie lib/ticketing/eventPage.ts.
+ */
+export { publishedTicketSlug } from "@/lib/ticketing/eventPage";
+
+/**
+ * Vanaf wanneer de homepage evenementen leest: middernacht gisteren, in
+ * Brusselse tijd, af te zetten tegen het **einde** van een evenement.
+ *
+ * Het weekoverzicht kan gisteren tonen wanneer daar iets stond, dus de lezing
+ * moet een dag verder terug beginnen dan "nu". Op het einde en niet op de start,
+ * want een evenement over meerdere dagen dat eerder begon, loopt vandaag nog.
+ * Wat vóór dit moment al afgelopen was, komt nergens meer op de homepage.
+ */
+export function frontpageEventsSince(now: Date): Date {
+  const yesterday = heroWeekDayDate(heroWeekDayKey(now, HERO_WEEK_TIME_ZONE));
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  return localDateTimeToUtc(`${yesterday.toISOString().slice(0, 10)}T00:00`, HERO_WEEK_TIME_ZONE);
+}
+
+/**
+ * De kleur die het evenement op de homepage draagt.
+ *
+ * Een thema (Career, Sport) gaat voor op een doelgroep: de doelgroepkleur is in
+ * de kalender de kleur van het label "Eerstejaars", niet van het evenement zelf.
+ */
+function categoryColour(row: FrontpageEventRow): string | null {
+  const theme = row.categories.find((link) => link.category.audience === null);
+  return (theme ?? row.categories[0])?.category.colour ?? null;
+}
+
+export function toFrontpageEvent(
+  row: FrontpageEventRow,
+  extras: {
+    interestedCount: number | null;
+    viewerInterested: boolean;
+    /** De dagen van een reeks die de bezoeker aanduidde; zie `FrontpageEvent`. */
+    viewerInterestedMoments?: string[];
+  },
+): FrontpageEvent {
+  return {
+    id: row.id,
+    slug: row.slug,
+    start: row.start,
+    end: row.end,
+    allDay: row.allDay,
+    moments: row.moments.map((moment) => ({
+      start: moment.start,
+      end: moment.end,
+      label: moment.label,
+    })),
+    titleNl: row.titleNl,
+    titleEn: row.titleEn,
+    location: row.location,
+    group: { nameNl: row.group.nameNl, nameEn: row.group.nameEn },
+    organiserName: row.organiserName,
+    interestedCount: extras.interestedCount,
+    categoryColour: categoryColour(row),
+    heroWeek: row.homeFeaturedAt ? "PINNED" : "AUTO",
+    viewerInterested: extras.viewerInterested,
+    viewerInterestedMoments: extras.viewerInterestedMoments ?? [],
+  };
+}
+
+/**
+ * Alle rijen omzetten, met de tellers en de eigen keuzes erbij.
+ *
+ * `interested` bevat enkel wat boven de publieke drempel zit (zie
+ * lib/calendar/interest.ts); wat er niet in staat, toont geen teller.
+ */
+export function toFrontpageEvents(
+  rows: readonly FrontpageEventRow[],
+  interested: Map<string, number>,
+  viewerInterestIds: ReadonlySet<string>,
+  /** Per evenement de aangeduide dagen; zie `viewerMomentStarts` in lib/calendar/interest.ts. */
+  viewerMoments?: ReadonlyMap<string, string[]>,
+): FrontpageEvent[] {
+  return rows.map((row) =>
+    toFrontpageEvent(row, {
+      interestedCount: interested.get(row.id) ?? null,
+      viewerInterested: viewerInterestIds.has(row.id),
+      viewerInterestedMoments: viewerMoments?.get(row.id) ?? [],
+    }),
+  );
+}
