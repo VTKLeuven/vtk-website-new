@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import { Button, Input, Label } from "@vtk/ui";
 import {
@@ -113,7 +114,8 @@ export function DoorShortcutTokens({
     form.set("label", label);
     startTransition(async () => {
       try {
-        const result = await createDoorShortcutTokenAction(form);
+        const result = await unsentGuard.run(() => createDoorShortcutTokenAction(form));
+        if (result === UNSENT) return;
         if (!result.ok) {
           const message = result.error === "invalid_label" ? t.invalidLabel : t.tooMany;
           showToast({ message, variant: "error", duration: 0 });

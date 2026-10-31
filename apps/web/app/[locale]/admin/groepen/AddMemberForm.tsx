@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useEffect, useState, useTransition } from "react";
 import { Button, Input, Select } from "@vtk/ui";
 import { useToast } from "@/components/ui/toast";
@@ -92,7 +93,8 @@ export function AddMemberForm({
 
   function submit(formData: FormData) {
     startTransition(async () => {
-      const result = await addMembershipAction(formData);
+      const result = await unsentGuard.run(() => addMembershipAction(formData));
+      if (result === UNSENT) return;
       if (result.status === "error") {
         showToast({
           message: errorMessages[result.code] ?? (nl ? "Toevoegen mislukt." : "Could not add."),

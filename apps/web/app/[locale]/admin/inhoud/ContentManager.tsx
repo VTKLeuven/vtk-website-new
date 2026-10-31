@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button, Card, ConfirmDialog } from "@vtk/ui";
@@ -164,17 +165,17 @@ export function ContentManager({
       if (from === -1 || to === -1 || from === to) return;
       const next = [...ids];
       next.splice(to, 0, next.splice(from, 1)[0]);
-      startTransition(() => void reorderHeaderTabsAction(next));
+      startTransition(() => void unsentGuard.run(() => reorderHeaderTabsAction(next)));
       return;
     }
 
     if (d.kind === "page" && d.fromTabId !== tabId) {
-      startTransition(() => void movePageToTabAction(d.id, tabId));
+      startTransition(() => void unsentGuard.run(() => movePageToTabAction(d.id, tabId)));
       return;
     }
 
     if (d.kind === "link" && d.fromTabId !== tabId) {
-      startTransition(() => void moveHeaderTabLinkToTabAction(d.id, tabId));
+      startTransition(() => void unsentGuard.run(() => moveHeaderTabLinkToTabAction(d.id, tabId)));
       return;
     }
   }
@@ -202,21 +203,21 @@ export function ContentManager({
       const [moved] = next.splice(from, 1);
       next.splice(to, 0, moved);
       startTransition(() =>
-        void reorderTabItemsAction(
+        void unsentGuard.run(() => reorderTabItemsAction(
           targetTabId,
           next.map((it) => ({ id: it.id, kind: it.kind })),
-        ),
+        )),
       );
       return;
     }
 
     if (d.kind === "page") {
-      startTransition(() => void movePageToTabAction(d.id, targetTabId));
+      startTransition(() => void unsentGuard.run(() => movePageToTabAction(d.id, targetTabId)));
       return;
     }
 
     if (d.kind === "link") {
-      startTransition(() => void moveHeaderTabLinkToTabAction(d.id, targetTabId));
+      startTransition(() => void unsentGuard.run(() => moveHeaderTabLinkToTabAction(d.id, targetTabId)));
       return;
     }
   }
@@ -349,7 +350,7 @@ export function ContentManager({
           cancelLabel={nl ? "Annuleren" : "Cancel"}
           onConfirm={() => {
             startTransition(async () => {
-              await deleteHeaderTabLinkAction(link.id);
+              if ((await unsentGuard.run(() => deleteHeaderTabLinkAction(link.id))) === UNSENT) return;
               setConfirming(false);
               if (active) close();
             });
@@ -569,7 +570,7 @@ function DefaultsNotice({ locale }: { locale: Locale }) {
       <Button
         className="mt-4"
         disabled={pending}
-        onClick={() => startTransition(() => void importDefaultHeaderTabsAction())}
+        onClick={() => startTransition(() => void unsentGuard.run(() => importDefaultHeaderTabsAction()))}
       >
         {nl ? "Standaardcategorieën importeren" : "Import default categories"}
       </Button>

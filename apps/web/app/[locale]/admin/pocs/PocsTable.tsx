@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useRef, useState, useTransition } from "react";
 import { Input, Label } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
@@ -128,11 +129,21 @@ export function PocsTable({
     dragFrom.current = null;
     setOverIndex(null);
     if (from === null || from === to) return;
+    const before = items;
     const next = [...items];
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
     setItems(next);
-    startTransition(() => void reorderPocsAction(next.map((p) => p.id)));
+    // Niet bewaard (`unsentGuard`): de oude volgorde terug. Een andere fout blijft
+    // zoals voordien los van het scherm.
+    startTransition(
+      () =>
+        void unsentGuard
+          .run(() => reorderPocsAction(next.map((p) => p.id)))
+          .then((result) => {
+            if (result === UNSENT) setItems(before);
+          }),
+    );
   }
 
   return (

@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ImagePlus, X } from "lucide-react";
@@ -89,7 +90,8 @@ export function NewAlbumDialog({
       data.set("description", description.trim());
       data.set("visible", visible ? "true" : "false");
       data.set("gallery", gallery);
-      const result = await createImmichAlbumAction(data);
+      const result = await unsentGuard.run(() => createImmichAlbumAction(data));
+      if (result === UNSENT) return;
       if (!result.ok || !result.albumId) {
         setError(
           result.error === "fakbar_upload_disabled"

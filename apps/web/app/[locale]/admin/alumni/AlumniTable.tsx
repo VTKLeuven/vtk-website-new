@@ -1,5 +1,6 @@
 "use client";
 
+import { unsentGuard } from "@/components/ui/unsentGuard";
 import { useState } from "react";
 import { Card } from "@vtk/ui";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
@@ -133,7 +134,7 @@ export function AlumniTable({
                             : "Unsubscribed through a VTK email. Only the member can undo that, on their account page."}
                         </span>
                       ) : (
-                      <form action={toggleAlumniAccountOptInAction}>
+                      <form action={unsentGuard.form(toggleAlumniAccountOptInAction)}>
                         <input type="hidden" name="id" value={account.id} />
                         <button
                           type="submit"
@@ -187,7 +188,7 @@ export function AlumniTable({
                       >
                         <PencilIcon />
                       </IconButton>
-                      <form action={toggleAlumniSubscriptionAction}>
+                      <form action={unsentGuard.form(toggleAlumniSubscriptionAction)}>
                         <input type="hidden" name="id" value={contact.id} />
                         <button
                           type="submit"

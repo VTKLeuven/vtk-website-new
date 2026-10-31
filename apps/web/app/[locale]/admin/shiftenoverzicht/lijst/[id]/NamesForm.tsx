@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import { SearchPicker, type SearchPickerOption } from "@/components/admin/SearchPicker";
 import { useToast } from "@/components/ui/toast";
@@ -157,7 +158,8 @@ function NameRow({
       data.append("nameKey", row.nameKey);
       data.set(`choice:${row.nameKey}`, next);
       if (remember) data.append("remember", row.nameKey);
-      const result = await savePraesidiumShiftNamesAction(SAVE_IDLE, data);
+      const result = await unsentGuard.run(() => savePraesidiumShiftNamesAction(SAVE_IDLE, data));
+      if (result === UNSENT) return;
       if (result.status === "error") {
         setValue(previous);
         showToast({

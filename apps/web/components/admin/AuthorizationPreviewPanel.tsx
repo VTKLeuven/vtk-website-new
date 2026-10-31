@@ -1,5 +1,6 @@
 "use client";
 
+import { unsentGuard } from "@/components/ui/unsentGuard";
 import { useMemo, useState } from "react";
 import { Button, Card } from "@vtk/ui";
 import { startAuthorizationPreview } from "@/app/actions/authorization-preview";
@@ -219,7 +220,7 @@ export function AuthorizationPreviewPanel({
       </div>
 
       <Card className="p-5">
-        <form action={startAuthorizationPreview} className="space-y-6">
+        <form action={unsentGuard.form(startAuthorizationPreview)} className="space-y-6">
           <input type="hidden" name="locale" value={locale} />
 
           <fieldset>

@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useId, useRef, useState, useTransition } from "react";
 import { Button, Input, Label, Select } from "@vtk/ui";
 import type { Locale } from "@vtk/i18n";
@@ -36,7 +37,7 @@ export function FileUploader({ pageId, locale }: { pageId: string; locale: Local
     submit.append("mimeType", data.mime);
 
     startTransition(async () => {
-      await addPageAssetAction(submit);
+      if ((await unsentGuard.run(() => addPageAssetAction(submit))) === UNSENT) return;
       setLabel("");
       if (fileInput.current) fileInput.current.value = "";
     });

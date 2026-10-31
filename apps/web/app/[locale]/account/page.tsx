@@ -1,3 +1,4 @@
+import { ActionForm } from '@/components/ui/unsentGuard';
 import type { Metadata } from 'next';
 import { staticMetadata } from '@/lib/pageMetadata';
 import Link from '@/components/ui/Link';
@@ -608,7 +609,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
                     ? 'Dit wist je login, profiel, lidmaatschappen en huidige rechten. Transacties die VTK wettelijk of voor de integriteit van de administratie moet bewaren, worden geanonimiseerd. Typ DELETE om te bevestigen.'
                     : 'This removes your login, profile, memberships and current permissions. Transactions VTK must keep for legal or administrative integrity reasons are anonymised. Type DELETE to confirm.'}
                 </p>
-                <form action={deleteMyAccountAction} className="mt-4 flex flex-wrap items-end gap-3">
+                <ActionForm action={deleteMyAccountAction} className="mt-4 flex flex-wrap items-end gap-3">
                   <div>
                     <Label htmlFor="delete-confirmation">DELETE</Label>
                     <Input id="delete-confirmation" name="confirmation" autoComplete="off" pattern="DELETE" required />
@@ -616,15 +617,15 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
                   <Button type="submit" variant="ghost">
                     {nl ? 'Mijn account verwijderen' : 'Delete my account'}
                   </Button>
-                </form>
+                </ActionForm>
               </div>
             </Card>
 
-            <form action={logoutAction}>
+            <ActionForm action={logoutAction}>
               <Button variant="ghost" type="submit">
                 {dict.auth.signOut}
               </Button>
-            </form>
+            </ActionForm>
           </section>
         }
       />

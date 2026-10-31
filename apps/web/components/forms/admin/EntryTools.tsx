@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useMemo, useState, useTransition } from "react";
 import { Download, FileArchive, FileText, UserPlus } from "lucide-react";
 import { Button } from "@vtk/ui";
@@ -260,7 +261,7 @@ export function AddEntryPanel({
   function submit() {
     setErrors({});
     startTransition(async () => {
-      const result = await addEntryOnBehalfAction({
+      const result = await unsentGuard.run(() => addEntryOnBehalfAction({
         formId,
         locale,
         submitterName: name,
@@ -268,7 +269,8 @@ export function AddEntryPanel({
         answers: Object.fromEntries(
           Object.entries(answers).filter(([fieldId]) => visible.has(fieldId))
         ),
-      });
+      }));
+      if (result === UNSENT) return;
 
       if (result.status === "invalid") {
         setErrors(result.errors);

@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import { AlertTriangle, CheckCircle2, Eye, LoaderCircle, Rocket } from "lucide-react";
 import { publishTicketEventAction } from "@/app/actions/tickets";
@@ -88,7 +89,8 @@ export function TicketPublishBar({
     form.set("locale", locale);
     startTransition(async () => {
       try {
-        const result = await publishTicketEventAction(form);
+        const result = await unsentGuard.run(() => publishTicketEventAction(form));
+        if (result === UNSENT) return;
         if (!result.ok) {
           setError(
             result.error === "FORBIDDEN"

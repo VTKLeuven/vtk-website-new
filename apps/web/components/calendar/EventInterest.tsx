@@ -1,5 +1,6 @@
 "use client";
 
+import { unsentGuard } from "@/components/ui/unsentGuard";
 import { useActionState, useState } from "react";
 import Link from "@/components/ui/Link";
 import {
@@ -97,7 +98,7 @@ export function EventInterest({
   const joined = current.kind !== "none";
 
   const [toggleState, toggleAction, togglePending] = useActionState<SaveState, FormData>(
-    async (_previous, formData) => {
+    unsentGuard.state(async (_previous: SaveState, formData: FormData) => {
       let state: SaveState;
       if (current.kind === "guest") {
         state = await removeGuestInterestAction(SAVE_IDLE, formData);
@@ -117,7 +118,7 @@ export function EventInterest({
         onChanged?.(next);
       }
       return state;
-    },
+    }),
     SAVE_IDLE,
   );
 
@@ -211,7 +212,8 @@ function AlumniAttendanceForm({
   onSaved: (viewer: JoinedViewer) => void;
 }) {
   const [state, formAction, pending] = useActionState<SaveState, FormData>(
-    async (_previous, formData) => {
+    // Naam en jaar die hier ingevuld zijn, blijven staan als het niet verstuurd raakt.
+    unsentGuard.state(async (_previous: SaveState, formData: FormData) => {
       const result = signedIn
         ? await setEventInterestAction(SAVE_IDLE, formData)
         : await setGuestInterestAction(SAVE_IDLE, formData);
@@ -219,7 +221,7 @@ function AlumniAttendanceForm({
         onSaved(viewerFromForm(signedIn ? "member" : "guest", formData));
       }
       return result;
-    },
+    }),
     SAVE_IDLE,
   );
 

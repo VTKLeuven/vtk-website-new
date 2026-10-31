@@ -1,5 +1,6 @@
 'use client';
 
+import { useUnsentGuard } from '@/components/ui/unsentGuard';
 import { useActionState, useEffect, useState } from 'react';
 import Link from '@/components/ui/Link';
 import { loginAction, type LoginState } from '@/app/actions/auth';
@@ -48,9 +49,10 @@ export function PasswordSignIn({
   };
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  const [state, formAction, pending] = useActionState<LoginState, FormData>(loginAction, undefined);
+  const unsent = useUnsentGuard();
+  const [state, formAction, pending] = useActionState<LoginState, FormData>(unsent.state(loginAction), undefined);
   const [resendState, resendAction, resendPending] = useActionState<SaveState, FormData>(
-    resendVerificationAction,
+    unsent.state(resendVerificationAction),
     SAVE_IDLE,
   );
   const [email, setEmail] = useState('');

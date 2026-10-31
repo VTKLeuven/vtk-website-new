@@ -1,5 +1,6 @@
 "use client";
 
+import { unsentGuard } from "@/components/ui/unsentGuard";
 import { useEffect, useState } from "react";
 import { Button, Input, Label, Select } from "@vtk/ui";
 import { addKiesploegMemberAction } from "./actions";
@@ -53,7 +54,7 @@ export function AddKiesploegMember({
 
   return (
     <form
-      action={addKiesploegMemberAction}
+      action={unsentGuard.form(addKiesploegMemberAction)}
       onSubmit={() => {
         setTimeout(() => {
           setSelected(null);

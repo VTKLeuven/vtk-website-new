@@ -1,3 +1,4 @@
+import { ActionForm } from '@/components/ui/unsentGuard';
 import Link from '@/components/ui/Link';
 import { notFound } from 'next/navigation';
 import { hasLocale } from '@/lib/locale';
@@ -31,7 +32,7 @@ export default async function FlowTestPage({ params }: { params: Promise<{ local
         </p>
       </div>
 
-      <form action={startFlowTestAction} className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-4">
+      <ActionForm action={startFlowTestAction} className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-4">
         <fieldset>
           <legend className="text-sm font-medium">{nl ? 'Scopes aanvragen' : 'Request scopes'}</legend>
           <div className="mt-2 space-y-1">
@@ -143,7 +144,7 @@ export default async function FlowTestPage({ params }: { params: Promise<{ local
         >
           {nl ? 'Flow starten' : 'Start flow'}
         </button>
-      </form>
+      </ActionForm>
     </div>
   );
 }

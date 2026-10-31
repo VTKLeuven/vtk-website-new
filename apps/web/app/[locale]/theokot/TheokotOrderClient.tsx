@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import Image from "next/image";
 import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import { ConfirmDialog } from "@vtk/ui";
@@ -276,10 +277,11 @@ function useDayOrder(session: OrderSession, disabled: boolean) {
       .filter(([, n]) => n > 0)
       .map(([sessionItemId, quantity]) => ({ sessionItemId, quantity }));
     startTransition(async () => {
-      const res =
-        editing && existing
-          ? await updateOrderAction(existing.orderId, lines)
-          : await placeOrderAction(session.id, lines);
+      // Niet verstuurd: de gekozen broodjes blijven staan, met de melding erboven.
+      const res = await unsentGuard.run(() =>
+        editing && existing ? updateOrderAction(existing.orderId, lines) : placeOrderAction(session.id, lines),
+      );
+      if (res === UNSENT) return;
       if (!res.ok) {
         setError(res.error);
         return;
@@ -307,7 +309,8 @@ function useDayOrder(session: OrderSession, disabled: boolean) {
   function cancel(onDone: () => void) {
     if (!existing) return;
     startTransition(async () => {
-      const res = await cancelOrderAction(existing.orderId);
+      const res = await unsentGuard.run(() => cancelOrderAction(existing.orderId));
+      if (res === UNSENT) return;
       if (!res.ok) setError(res.error);
       onDone();
     });
@@ -316,7 +319,8 @@ function useDayOrder(session: OrderSession, disabled: boolean) {
   function release(selection: Array<{ sessionItemId: string; quantity: number }>, onDone: () => void) {
     if (!existing) return;
     startTransition(async () => {
-      const res = await releaseOrderAction(existing.orderId, selection);
+      const res = await unsentGuard.run(() => releaseOrderAction(existing.orderId, selection));
+      if (res === UNSENT) return;
       setError(res.ok ? null : res.error);
       onDone();
     });
@@ -324,7 +328,8 @@ function useDayOrder(session: OrderSession, disabled: boolean) {
 
   function takeOver(sessionItemId: string, onDone: () => void) {
     startTransition(async () => {
-      const res = await takeOverSandwichAction(sessionItemId);
+      const res = await unsentGuard.run(() => takeOverSandwichAction(sessionItemId));
+      if (res === UNSENT) return;
       setError(res.ok ? null : res.error);
       onDone();
     });

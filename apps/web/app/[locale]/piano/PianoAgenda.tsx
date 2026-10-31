@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useTransition } from "react";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { useToast } from "@/components/ui/toast";
@@ -94,7 +95,8 @@ function SlotButton({
     startTransition(async () => {
       const formData = new FormData();
       formData.set("startsAt", slot.startsAt);
-      const result = await reservePianoSlotAction(SAVE_IDLE, formData);
+      const result = await unsentGuard.run(() => reservePianoSlotAction(SAVE_IDLE, formData));
+      if (result === UNSENT) return;
       if (result.status === "success") {
         showToast({ message: t.toast.reserved, variant: "success" });
         trackPianoReservation();

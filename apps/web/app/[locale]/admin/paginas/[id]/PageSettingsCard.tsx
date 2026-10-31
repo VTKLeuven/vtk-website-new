@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useId, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, ConfirmDialog } from "@vtk/ui";
@@ -119,7 +120,8 @@ export function PageSettingsCard({
 
     const losing = wouldLoseAccess;
     startTransition(async () => {
-      const res = await savePageSettingsAction(SAVE_IDLE, form);
+      const res = await unsentGuard.run(() => savePageSettingsAction(SAVE_IDLE, form));
+      if (res === UNSENT) return;
       setAskLoseAccess(false);
       if (res.status === "error") {
         showToast({
@@ -153,7 +155,8 @@ export function PageSettingsCard({
     const form = new FormData();
     form.append("id", pageId);
     startTransition(async () => {
-      const res = await deletePageAction(SAVE_IDLE, form);
+      const res = await unsentGuard.run(() => deletePageAction(SAVE_IDLE, form));
+      if (res === UNSENT) return;
       setAskDelete(false);
       if (res.status === "error") {
         showToast({

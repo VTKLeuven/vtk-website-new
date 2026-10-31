@@ -1,5 +1,6 @@
 "use client";
 
+import { useUnsentGuard } from "@/components/ui/unsentGuard";
 import { useActionState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Select } from "@vtk/ui";
@@ -42,7 +43,8 @@ export function ProvisionAccounts({
   disabled: boolean;
 }) {
   const router = useRouter();
-  const [state, formAction, pending] = useActionState(createGoogleAccountsAction, PROVISION_IDLE);
+  const unsent = useUnsentGuard();
+  const [state, formAction, pending] = useActionState(unsent.state(createGoogleAccountsAction), PROVISION_IDLE);
   const showToast = useToast();
   const lastNonce = useRef(0);
 

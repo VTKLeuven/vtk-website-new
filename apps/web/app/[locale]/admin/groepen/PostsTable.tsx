@@ -1,5 +1,6 @@
 "use client";
 
+import { unsentGuard, UNSENT } from "@/components/ui/unsentGuard";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { Input, Label, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
@@ -99,11 +100,21 @@ export function PostsTable({
     dragFrom.current = null;
     setOverIndex(null);
     if (from === null || from === to) return;
+    const before = items;
     const next = [...items];
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
     setItems(next);
-    startTransition(() => void reorderGroupsAction(next.map((p) => p.id)));
+    // Niet bewaard (`unsentGuard`): de oude volgorde terug. Een andere fout blijft
+    // zoals voordien los van het scherm.
+    startTransition(
+      () =>
+        void unsentGuard
+          .run(() => reorderGroupsAction(next.map((p) => p.id)))
+          .then((result) => {
+            if (result === UNSENT) setItems(before);
+          }),
+    );
   }
 
   return (
@@ -525,7 +536,7 @@ function GrantToggle({
 }) {
   const which = kind === "DEFAULT" ? (nl ? "elk lid" : "every member") : nl ? "enkel de lead" : "lead only";
   return (
-    <form action={setGroupRoleAction} className="justify-self-center">
+    <form action={unsentGuard.form(setGroupRoleAction)} className="justify-self-center">
       <input type="hidden" name="groupId" value={groupId} />
       <input type="hidden" name="roleId" value={role.roleId} />
       <input type="hidden" name="kind" value={kind} />

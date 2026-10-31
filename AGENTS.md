@@ -114,9 +114,9 @@ en vergelijkt met de laatste geslaagde run op main.
   ze eenmalig in de `.env` van de server en geeft ze als build-arg aan de drie
   apps. Zonder vaste sleutel krijgt elke server action na elke deploy een
   andere ID, en wie dan een formulier openhad, verloor bij het opslaan alles
-  ("Failed to find Server Action" in de logs). `SaveForm` vangt dat sindsdien
-  op met een toast en laat het formulier staan (`lib/unsentSave.ts`), maar de
-  sleutel is wat het voorkomt.
+  ("Failed to find Server Action" in de logs). Elke aanroep van een action
+  vangt dat sindsdien op met een toast en laat het formulier staan
+  (`components/ui/unsentGuard.tsx`), maar de sleutel is wat het voorkomt.
 
 # Workspace root is pinned
 

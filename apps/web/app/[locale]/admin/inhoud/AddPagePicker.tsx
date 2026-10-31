@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Button, Input, Label } from "@vtk/ui";
 import type { Locale } from "@vtk/i18n";
@@ -81,18 +82,18 @@ export function AddPagePicker({
 
   function addPage(hit: Hit) {
     startTransition(async () => {
-      await movePageToTabAction(hit.id, tabId);
+      if ((await unsentGuard.run(() => movePageToTabAction(hit.id, tabId))) === UNSENT) return;
       onClose();
     });
   }
 
   function addBuiltin(route: BuiltinRoute) {
     startTransition(async () => {
-      await addHeaderTabLinkAction(tabId, {
+      if ((await unsentGuard.run(() => addHeaderTabLinkAction(tabId, {
         labelNl: route.labelNl,
         labelEn: route.labelEn,
         url: route.path,
-      });
+      }))) === UNSENT) return;
       onClose();
     });
   }
@@ -116,11 +117,12 @@ export function AddPagePicker({
     }
 
     startTransition(async () => {
-      const res = await addHeaderTabLinkAction(tabId, {
+      const res = await unsentGuard.run(() => addHeaderTabLinkAction(tabId, {
         labelNl,
         labelEn,
         url,
-      });
+      }));
+      if (res === UNSENT) return;
       if (res.status === "error") {
         setCustomError(nl ? "Kon link niet opslaan." : "Could not save link.");
       } else {

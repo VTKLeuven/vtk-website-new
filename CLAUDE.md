@@ -90,6 +90,18 @@ het gelukt is (toast).
   - Redirect de action na het opslaan (zoals de onboarding doet), dan is die
     navigatie zelf de bevestiging en is een toast niet nodig. Let op dat
     `redirect()` via een throw werkt: hou ze buiten elke try/catch.
+  - **Elke aanroep van een server action loopt langs het vangnet**
+    (`components/ui/unsentGuard.tsx`): een opslag die de server nooit bereikt
+    (een pagina van vóór de laatste deploy, of geen verbinding) wordt een rode
+    toast, en wat er ingevuld stond, blijft staan. `SaveForm`,
+    `DeleteIconButton` en `ActionForm` doen het al; anders `unsentGuard.form`
+    voor `<form action>`, `unsentGuard.state` voor `useActionState`, en
+    `unsentGuard.run` met daarna `if (result === UNSENT) return;` voor een
+    aanroep in code. Zet bij een optimistische wijziging de vorige stand terug
+    op `UNSENT`. Een kale `<form action={serverAction}>` in een servercomponent
+    wordt `<ActionForm>`. Zonder vangnet vervangt de error boundary het hele
+    scherm, met alles wat er ingevuld was, en dat is precies wat een collega
+    tien keer overkwam.
   - **Een `redirect()` naar de pagina waar je al staat is geen feedback.** Dat
     patroon (`saveXAction` → `redirect("/admin/x")` terwijl het formulier op
     `/admin/x` staat) ziet eruit als feedback maar doet niets zichtbaars; gebruik

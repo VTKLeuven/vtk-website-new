@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@vtk/ui";
@@ -211,7 +212,7 @@ export function PublicForm({
   function send(asDraft: boolean) {
     setErrors({});
     startTransition(async () => {
-      const result = await submitFormAction({
+      const result = await unsentGuard.run(() => submitFormAction({
         formId,
         entryId,
         locale,
@@ -228,7 +229,8 @@ export function PublicForm({
         asDraft,
         isTest,
         consent: consentGiven,
-      });
+      }));
+      if (result === UNSENT) return;
 
       if (result.status === "invalid") {
         setErrors(result.errors);

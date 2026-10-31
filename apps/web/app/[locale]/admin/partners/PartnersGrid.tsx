@@ -1,5 +1,6 @@
 "use client";
 
+import { unsentGuard } from "@/components/ui/unsentGuard";
 import { imageUploadError, imageUploadSizeError } from "@/lib/imageUpload";
 
 import { useRef, useState, useTransition } from "react";
@@ -41,7 +42,7 @@ export function PartnersGrid({
   const [overIndex, setOverIndex] = useState<number | null>(null);
 
   function persistOrder(next: PartnerTile[]) {
-    startTransition(() => void reorderPartnersAction(next.map((p) => p.id)));
+    startTransition(() => void unsentGuard.run(() => reorderPartnersAction(next.map((p) => p.id))));
   }
 
   function onDrop(to: number) {

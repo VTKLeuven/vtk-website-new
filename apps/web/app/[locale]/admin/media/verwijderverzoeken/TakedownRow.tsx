@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import Link from "@/components/ui/Link";
 import { ConfirmDialog } from "@vtk/ui";
@@ -93,7 +94,8 @@ export function TakedownRow({
     const form = new FormData();
     form.append("id", request.id);
     startTransition(async () => {
-      const result = await deleteTakedownPhotoAction({ status: "idle" }, form);
+      const result = await unsentGuard.run(() => deleteTakedownPhotoAction({ status: "idle" }, form));
+      if (result === UNSENT) return;
       setConfirming(false);
       if (result.status === "error") {
         // Fout-toasts blijven staan tot de gebruiker ze wegklikt (CLAUDE.md).

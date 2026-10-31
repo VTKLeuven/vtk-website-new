@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import { Mail, Send } from "lucide-react";
 import { Button } from "@vtk/ui";
@@ -50,7 +51,8 @@ export function MailingPanel({
     startTransition(async () => {
       try {
         setPreview(await previewFormMailingAction(input));
-      } catch {
+      } catch (error) {
+        if (unsentGuard.report(error)) return;
         showToast({
           message: nl ? "Voorbeeld maken is niet gelukt." : "Building the preview failed.",
           variant: "error",
@@ -62,7 +64,8 @@ export function MailingPanel({
 
   function send() {
     startTransition(async () => {
-      const state = await sendFormMailingAction(input);
+      const state = await unsentGuard.run(() => sendFormMailingAction(input));
+      if (state === UNSENT) return;
       if (state.status === "error") {
         const messages: Record<string, string> = {
           NO_RECIPIENTS: nl

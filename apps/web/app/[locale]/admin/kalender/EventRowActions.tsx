@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import { ConfirmDialog } from "@vtk/ui";
 import type { Locale } from "@vtk/i18n";
@@ -68,7 +69,8 @@ export function EventRowActions({
 
   function toggleHero() {
     startHeroTransition(async () => {
-      const result = await setEventHomeFeaturedAction(id, !heroFeatured);
+      const result = await unsentGuard.run(() => setEventHomeFeaturedAction(id, !heroFeatured));
+      if (result === UNSENT) return;
       if (result.status === "error") {
         showToast({
           message: heroErrorMessage(result.code, nl),
@@ -94,7 +96,7 @@ export function EventRowActions({
     const form = new FormData();
     form.append("id", id);
     startTransition(async () => {
-      await deleteEventAction(form);
+      if ((await unsentGuard.run(() => deleteEventAction(form))) === UNSENT) return;
       setConfirming(false);
       showToast({
         message: nl ? "Evenement verwijderd" : "Event deleted",

@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Label } from "@vtk/ui";
@@ -31,7 +32,8 @@ export function MagazineUploadForm({ locale }: { locale: "nl" | "en" }) {
     setError(null);
     try {
       // De kaft van bladzijde 1 maakt de server (lib/magazineCover.ts).
-      const result = await saveMagazineAction(new FormData(form));
+      const result = await unsentGuard.run(() => saveMagazineAction(new FormData(form)));
+      if (result === UNSENT) return;
       if (result.ok) {
         form.reset();
         setKind("bakske");

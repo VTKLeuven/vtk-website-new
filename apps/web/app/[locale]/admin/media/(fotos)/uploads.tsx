@@ -1,5 +1,6 @@
 "use client";
 
+import { unsentGuard } from "@/components/ui/unsentGuard";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
@@ -64,6 +65,8 @@ export function UploadProvider({ locale, children }: { locale: string; children:
   const run = useCallback(
     async (job: Job, files: File[]) => {
       let failed = 0;
+      // Eén melding als het niet verstuurd raakt, niet één per foto.
+      let unsentShown = false;
       for (const file of files) {
         const data = new FormData();
         data.append("albumId", job.partId);
@@ -72,7 +75,8 @@ export function UploadProvider({ locale, children }: { locale: string; children:
         let ok = false;
         try {
           ok = (await uploadImmichAlbumAssetAction(data)).ok;
-        } catch {
+        } catch (error) {
+          if (!unsentShown && unsentGuard.report(error)) unsentShown = true;
           ok = false;
         }
         if (!ok) failed += 1;

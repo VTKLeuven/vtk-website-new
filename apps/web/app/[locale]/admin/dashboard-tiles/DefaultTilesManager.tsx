@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useRef, useState, useTransition } from "react";
 import { ConfirmDialog } from "@vtk/ui";
 import { IconButton } from "@/components/ui/IconButton";
@@ -127,37 +128,49 @@ export function DefaultTilesManager({
   }
 
   function remove(tile: SimpleTile) {
+    // De tegel verdwijnt meteen; raakt de verwijdering niet bij de server, dan
+    // komt ze terug, anders toont de lijst iets wat niet bewaard is.
+    const before = { own: ownTiles, pub: pubTiles, grp: grpSections };
     setOwnTiles((cur) => cur.filter((t) => t.id !== tile.id));
     setPubTiles((cur) => cur.filter((t) => t.id !== tile.id));
     setGrpSections((cur) =>
       cur.map((g) => ({ ...g, tiles: g.tiles.filter((t) => t.id !== tile.id) }))
     );
     startTransition(async () => {
-      await deleteDefaultTileAction(tile.id);
+      const result = await unsentGuard.run(() => deleteDefaultTileAction(tile.id));
+      if (result === UNSENT) {
+        setOwnTiles(before.own);
+        setPubTiles(before.pub);
+        setGrpSections(before.grp);
+      }
       setRemoving(null);
     });
   }
 
+  // Bij elke herschikking: de oude volgorde terug als ze niet bewaard raakt.
   function handleReorderPersonal(next: SimpleTile[]) {
+    const before = ownTiles;
     setOwnTiles(next);
     startTransition(async () => {
-      await reorderDefaultTilesAction({ scope: "USER", ids: next.map((x) => x.id) });
+      if ((await unsentGuard.run(() => reorderDefaultTilesAction({ scope: "USER", ids: next.map((x) => x.id) }))) === UNSENT) setOwnTiles(before);
     });
   }
 
   function handleReorderGlobal(next: SimpleTile[]) {
+    const before = pubTiles;
     setPubTiles(next);
     startTransition(async () => {
-      await reorderDefaultTilesAction({ scope: "GLOBAL", ids: next.map((x) => x.id) });
+      if ((await unsentGuard.run(() => reorderDefaultTilesAction({ scope: "GLOBAL", ids: next.map((x) => x.id) }))) === UNSENT) setPubTiles(before);
     });
   }
 
   function handleReorderGroup(groupId: string, next: SimpleTile[]) {
+    const before = grpSections;
     setGrpSections((cur) =>
       cur.map((g) => (g.id === groupId ? { ...g, tiles: next } : g))
     );
     startTransition(async () => {
-      await reorderDefaultTilesAction({ scope: "GROUP", groupId, ids: next.map((x) => x.id) });
+      if ((await unsentGuard.run(() => reorderDefaultTilesAction({ scope: "GROUP", groupId, ids: next.map((x) => x.id) }))) === UNSENT) setGrpSections(before);
     });
   }
 
@@ -304,12 +317,12 @@ export function DefaultTilesManager({
               }
             }
             startTransition(async () => {
-              await saveDefaultTileAction({
+              if ((await unsentGuard.run(() => saveDefaultTileAction({
                 id: editor.tile?.id,
                 scope: editor.scope,
                 groupId: editor.groupId,
                 ...data,
-              });
+              }))) === UNSENT) return;
             });
             setEditor(null);
           }}

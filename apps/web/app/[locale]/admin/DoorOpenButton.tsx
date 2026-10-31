@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useTransition } from "react";
 import { useToast } from "@/components/ui/toast";
 import { openDoorRemoteAction } from "@/app/actions/door";
@@ -43,7 +44,8 @@ export function DoorOpenButton({ locale }: { locale: "nl" | "en" }) {
   function onClick() {
     startTransition(async () => {
       try {
-        const res = await openDoorRemoteAction();
+        const res = await unsentGuard.run(() => openDoorRemoteAction());
+        if (res === UNSENT) return;
         if (res.ok) {
           showToast({ message: t.success, variant: "success" });
         } else {

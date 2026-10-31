@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { IconButton } from "@/components/ui/IconButton";
@@ -42,7 +43,8 @@ export function MagazineCoverButton({
     try {
       const data = new FormData();
       data.set("id", id);
-      const result = await setMagazineCoverAction(data);
+      const result = await unsentGuard.run(() => setMagazineCoverAction(data));
+      if (result === UNSENT) return;
       if (result.status === "success") {
         toast({ message: nl ? "Kaft gemaakt" : "Cover made", variant: "success" });
         startTransition(() => router.refresh());

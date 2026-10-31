@@ -14,7 +14,8 @@ import { Button, ConfirmDialog } from "@vtk/ui";
 import { useToast } from "@/components/ui/toast";
 import { FormBusyProvider, useFormBusy } from "@/components/ui/formBusy";
 import { SAVE_IDLE, saveError, type SaveAction, type SaveState } from "@/lib/saveState";
-import { UNSENT_SAVE_CODES, unsentSaveMessage, unsentSaveReason } from "@/lib/unsentSave";
+import { UNSENT_SAVE_CODES, unsentSaveReason } from "@/lib/unsentSave";
+import { useUnsentGuard } from "@/components/ui/unsentGuard";
 
 type SecondarySubmit = {
   name: string;
@@ -134,6 +135,7 @@ export function SaveForm({
   children?: ReactNode;
 }) {
   const showToast = useToast();
+  const unsent = useUnsentGuard();
   /**
    * De toast vertrekt zodra de action antwoordt, niet pas in een effect na het
    * hertekenen. Een formulier dat door zijn eigen succes verdwijnt (een aanvraag
@@ -152,9 +154,7 @@ export function SaveForm({
       // het hele scherm vervangen, met alles wat er ingevuld was. Al de rest,
       // ook een `redirect()` uit de action, gaat door zoals voordien.
       const reason = unsentSaveReason(error);
-      if (!reason) throw error;
-      const english = document.documentElement.lang.toLowerCase().startsWith("en");
-      showToast({ message: unsentSaveMessage(reason, english), variant: "error", duration: 0 });
+      if (!reason || !unsent.report(error)) throw error;
       return saveError(UNSENT_SAVE_CODES[reason]);
     }
     if (result.status === "success") {

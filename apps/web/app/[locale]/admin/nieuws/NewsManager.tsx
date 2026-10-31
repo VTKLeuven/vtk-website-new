@@ -1,5 +1,6 @@
 "use client";
 
+import { unsentGuard } from "@/components/ui/unsentGuard";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { Plus, X } from "lucide-react";
 import { Button, Card, Input, Label } from "@vtk/ui";
@@ -355,7 +356,7 @@ export function NewsManager({
                   </span>
                   <div className="ml-auto flex shrink-0 items-center gap-2">
                     {row.place !== "hidden" ? (
-                      <form action={setNewsFeaturedAction}>
+                      <form action={unsentGuard.form(setNewsFeaturedAction)}>
                         <input type="hidden" name="source" value={row.source} />
                         <input type="hidden" name="ref" value={row.ref} />
                         <input type="hidden" name="title" value={row.title} />
@@ -388,7 +389,7 @@ export function NewsManager({
                       </form>
                     ) : null}
                     {row.automatic ? (
-                      <form action={setNewsHiddenAction}>
+                      <form action={unsentGuard.form(setNewsHiddenAction)}>
                         <input type="hidden" name="source" value={row.source} />
                         <input type="hidden" name="ref" value={row.ref} />
                         <input type="hidden" name="title" value={row.title} />
@@ -524,7 +525,7 @@ export function NewsManager({
                   </span>
 
                   <div className="ml-auto flex shrink-0 items-center gap-2">
-                    <form action={setNewsPostActiveAction}>
+                    <form action={unsentGuard.form(setNewsPostActiveAction)}>
                       <input type="hidden" name="id" value={post.id} />
                       <input type="hidden" name="active" value={post.active ? "0" : "1"} />
                       <button

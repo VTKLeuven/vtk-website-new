@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import { ConfirmDialog } from "@vtk/ui";
 import type { Locale } from "@vtk/i18n";
@@ -28,7 +29,7 @@ export function AssetList({
     form.append("id", asset.id);
     form.append("pageId", pageId);
     startTransition(async () => {
-      await deletePageAssetAction(form);
+      if ((await unsentGuard.run(() => deletePageAssetAction(form))) === UNSENT) return;
       setConfirming(null);
     });
   }

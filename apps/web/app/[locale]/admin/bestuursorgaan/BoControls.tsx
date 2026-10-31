@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useTransition } from "react";
 import { Input, Label } from "@vtk/ui";
 import { IconButton } from "@/components/ui/IconButton";
@@ -57,7 +58,8 @@ export function RestoreFileButton({
         startTransition(async () => {
           const data = new FormData();
           data.set("docId", docId);
-          const result = await restoreBoDocumentAction(data);
+          const result = await unsentGuard.run(() => restoreBoDocumentAction(data));
+          if (result === UNSENT) return;
           if (result.status === "error") {
             showToast({
               message: errorMessages[result.code] ?? (nl ? "Niet teruggezet: er ging iets mis." : "Not restored: something went wrong."),

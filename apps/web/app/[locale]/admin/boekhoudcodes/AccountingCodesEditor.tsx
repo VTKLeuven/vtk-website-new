@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useId, useMemo, useRef, useState, useTransition, type DragEvent, type KeyboardEvent, type MouseEvent } from "react";
 import { Button, ConfirmDialog } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
@@ -448,7 +449,8 @@ export function AccountingCodesEditor({
       }),
     );
     startTransition(async () => {
-      const result = await reorderAccountingCodesAction({ parentId: move.parentId, ids: move.ids });
+      const result = await unsentGuard.run(() => reorderAccountingCodesAction({ parentId: move.parentId, ids: move.ids }));
+      if (result === UNSENT) return;
       if (result.status === "error") {
         setRows(before);
         showToast({

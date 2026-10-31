@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Button, Input, Label } from "@vtk/ui";
 import type { Locale } from "@vtk/i18n";
@@ -76,24 +77,24 @@ export function AddHeaderTabPicker({
 
   function addPageAsTab(hit: Hit) {
     startTransition(async () => {
-      await addHeaderTabDirectAction({
+      if ((await unsentGuard.run(() => addHeaderTabDirectAction({
         labelNl: hit.title,
         labelEn: hit.title,
         slug: hit.slug,
         url: `/p/${hit.slug}`,
-      });
+      }))) === UNSENT) return;
       onClose();
     });
   }
 
   function addBuiltinAsTab(route: BuiltinRoute) {
     startTransition(async () => {
-      await addHeaderTabDirectAction({
+      if ((await unsentGuard.run(() => addHeaderTabDirectAction({
         labelNl: route.labelNl,
         labelEn: route.labelEn,
         slug: route.path.replace(/^\//, ""),
         url: route.path,
-      });
+      }))) === UNSENT) return;
       onClose();
     });
   }
@@ -117,11 +118,12 @@ export function AddHeaderTabPicker({
     }
 
     startTransition(async () => {
-      const res = await addHeaderTabDirectAction({
+      const res = await unsentGuard.run(() => addHeaderTabDirectAction({
         labelNl,
         labelEn,
         url,
-      });
+      }));
+      if (res === UNSENT) return;
       if (res.status === "error") {
         setCustomError(nl ? "Kon header-item niet opslaan." : "Could not save header item.");
       } else {

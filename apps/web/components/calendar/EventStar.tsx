@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import Link from "@/components/ui/Link";
 import { setEventInterestAction } from "@/app/actions/eventInterest";
@@ -107,7 +108,8 @@ export function EventStar({
           if (momentStart) data.set("momentStart", momentStart);
           // De action leest "off" als uitzetten; al de rest is aanzetten.
           if (!next) data.set("interested", "off");
-          const result = await setEventInterestAction(SAVE_IDLE, data);
+          const result = await unsentGuard.run(() => setEventInterestAction(SAVE_IDLE, data));
+          if (result === UNSENT) return;
           if (result.status === "error") {
             setInterested(!next);
             onChanged?.(!next);

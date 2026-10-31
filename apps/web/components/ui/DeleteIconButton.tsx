@@ -5,6 +5,7 @@ import { Button, ConfirmDialog } from "@vtk/ui";
 import { IconButton, type IconTone } from "@/components/ui/IconButton";
 import { TrashIcon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
+import { useUnsentGuard } from "@/components/ui/unsentGuard";
 import type { SaveState } from "@/lib/saveState";
 
 type Common = {
@@ -45,12 +46,22 @@ function useConfirmFlow({
   const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
   const showToast = useToast();
+  const unsent = useUnsentGuard();
 
   function onConfirm() {
     const form = new FormData();
     for (const [key, value] of Object.entries(fields)) form.append(key, value);
     startTransition(async () => {
-      const result = await action(form);
+      // Een verwijdering die de server nooit bereikte, is niet gebeurd: zeg
+      // dat, in plaats van het scherm in de error boundary te laten vallen.
+      let result: void | SaveState;
+      try {
+        result = await action(form);
+      } catch (error) {
+        setConfirming(false);
+        if (unsent.report(error)) return;
+        throw error;
+      }
       setConfirming(false);
       if (result && result.status === "error") {
         // Fout-toasts blijven staan tot de gebruiker ze wegklikt.

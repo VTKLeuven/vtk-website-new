@@ -1,5 +1,6 @@
 'use client';
 
+import { UNSENT, unsentGuard } from '@/components/ui/unsentGuard';
 import { AdminNav as SharedAdminNav, type AdminNavItem, type AdminNavNode } from '@vtk/ui';
 import type { ReactNode } from 'react';
 import { toggleAdminNavPinAction } from '@/app/actions/admin-nav';
@@ -61,7 +62,8 @@ export function AdminNav({
         onToggle: async (key, pinned) => {
           let result;
           try {
-            result = await toggleAdminNavPinAction(key, pinned);
+            result = await unsentGuard.run(() => toggleAdminNavPinAction(key, pinned));
+            if (result === UNSENT) return;
           } catch (cause) {
             showToast({ message: error, variant: 'error', duration: 0 });
             throw cause;

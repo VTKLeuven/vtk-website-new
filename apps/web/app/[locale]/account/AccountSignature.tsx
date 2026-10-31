@@ -1,5 +1,6 @@
 'use client';
 
+import { UNSENT, unsentGuard } from '@/components/ui/unsentGuard';
 import { useState, useRef, useId } from 'react';
 import { Button, Input, Label, Select } from '@vtk/ui';
 import { CopyIcon, CheckIcon } from '@/components/ui/icons';
@@ -232,8 +233,9 @@ export function AccountSignature({
     formData.set('signaturePhone', phoneDisplay);
 
     setSaving(true);
-    const result = await saveSignatureProfileAction({ status: 'idle' }, formData);
+    const result = await unsentGuard.run(() => saveSignatureProfileAction({ status: 'idle' }, formData));
     setSaving(false);
+    if (result === UNSENT) return;
 
     if (result.status === 'error') {
       const messages = saveErrorMessages(locale);

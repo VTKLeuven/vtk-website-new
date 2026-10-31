@@ -1,3 +1,4 @@
+import { ActionForm } from "@/components/ui/unsentGuard";
 import type { Metadata } from "next";
 import { staticMetadata } from "@/lib/pageMetadata";
 import { CAREER_CATEGORY } from "@/lib/careerOptIn";
@@ -127,11 +128,11 @@ export default async function OnboardingPage({
         />
       </Card>
 
-      <form action={logoutAction}>
+      <ActionForm action={logoutAction}>
         <Button variant="ghost" type="submit">
           {getDictionary(locale).auth.signOut}
         </Button>
-      </form>
+      </ActionForm>
     </div>
   );
 }

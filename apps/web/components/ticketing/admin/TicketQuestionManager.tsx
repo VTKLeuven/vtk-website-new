@@ -1,5 +1,6 @@
 "use client";
 
+import { unsentGuard, UNSENT } from "@/components/ui/unsentGuard";
 import { useRef, useState, useTransition } from "react";
 import {
   archiveTicketQuestionAction,
@@ -102,6 +103,7 @@ export function TicketQuestionManager({
     dragFrom.current = null;
     setOverIndex(null);
     if (from === null || from === to) return;
+    const before = items;
     const next = [...items];
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
@@ -111,7 +113,8 @@ export function TicketQuestionManager({
       fd.set("eventId", eventId);
       fd.set("locale", locale);
       for (const q of next) fd.append("ids", q.id);
-      await reorderTicketQuestionsAction(fd);
+      // Niet bewaard: de oude volgorde terug, anders toont de lijst een andere dan de shop.
+      if ((await unsentGuard.run(() => reorderTicketQuestionsAction(fd))) === UNSENT) setItems(before);
     });
   }
 
@@ -194,7 +197,7 @@ export function TicketQuestionManager({
                       fallbackErrorMessage={nl ? "Vraag niet verwijderd." : "Question was not deleted."}
                     />
                   ) : question.active ? (
-                    <form action={archiveTicketQuestionAction}>
+                    <form action={unsentGuard.form(archiveTicketQuestionAction)}>
                       <input type="hidden" name="locale" value={locale} />
                       <input type="hidden" name="eventId" value={eventId} />
                       <input type="hidden" name="questionId" value={question.id} />
@@ -220,7 +223,7 @@ export function TicketQuestionManager({
       <details className="ticket-admin-details">
         <summary>{nl ? "Vraag toevoegen" : "Add question"}</summary>
         <div className="ticket-admin-details-body">
-          <form action={createTicketQuestionAction} className="ticket-admin-form">
+          <form action={unsentGuard.form(createTicketQuestionAction)} className="ticket-admin-form">
             <input type="hidden" name="locale" value={locale} />
             <input type="hidden" name="eventId" value={eventId} />
             {/* De action leidt de code af uit het label wanneer er geen wordt

@@ -1,5 +1,6 @@
 "use client";
 
+import { useUnsentGuard } from "@/components/ui/unsentGuard";
 import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { Button, Input, Label, Select, Textarea } from "@vtk/ui";
 import { useToast } from "@/components/ui/toast";
@@ -60,7 +61,8 @@ export function DecisionPanel({
     setAttach(template.attachContract && preview.contractReady);
   }
 
-  const [state, formAction, pending] = useActionState(decideRentalByTokenAction, SAVE_IDLE);
+  const unsent = useUnsentGuard();
+  const [state, formAction, pending] = useActionState(unsent.state(decideRentalByTokenAction), SAVE_IDLE);
   const showToast = useToast();
   const handled = useRef<number | null>(null);
   const errors = rentalAdminErrors(nl);

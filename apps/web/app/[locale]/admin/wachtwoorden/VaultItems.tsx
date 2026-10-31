@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { Fragment, useState, useTransition, type ReactNode } from "react";
 import { Button, Input, Label, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
@@ -179,7 +180,8 @@ export function VaultItems({
                             copiedLabel={t.copied}
                             srSuffix={item.name}
                             resolve={async () => {
-                              const result = await revealVaultItemAction(vaultPostId, item.id);
+                              const result = await unsentGuard.run(() => revealVaultItemAction(vaultPostId, item.id));
+                              if (result === UNSENT) return null;
                               return result.ok ? result.password : null;
                             }}
                             nl={nl}

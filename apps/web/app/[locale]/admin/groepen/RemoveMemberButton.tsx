@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import { ConfirmDialog } from "@vtk/ui";
 import { IconButton } from "@/components/ui/IconButton";
@@ -37,7 +38,7 @@ export function RemoveMemberButton({
     form.append("id", membershipId);
     form.append("userId", userId);
     startTransition(async () => {
-      await removeMembershipAction(form);
+      if ((await unsentGuard.run(() => removeMembershipAction(form))) === UNSENT) return;
       setConfirming(false);
       showToast({ message: nl ? "Lid verwijderd" : "Member removed", variant: "success" });
     });

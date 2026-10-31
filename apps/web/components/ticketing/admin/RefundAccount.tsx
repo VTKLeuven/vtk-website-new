@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import { fetchTicketRefundAccountAction } from "@/app/actions/tickets";
 import { IconButton } from "@/components/ui/IconButton";
@@ -95,7 +96,8 @@ export function RefundAccount({
           form.set("paymentId", paymentId);
           startTransition(async () => {
             try {
-              const result = await fetchTicketRefundAccountAction(form);
+              const result = await unsentGuard.run(() => fetchTicketRefundAccountAction(form));
+              if (result === UNSENT) return;
               if (result.status === "error") {
                 showToast({
                   message: errorMessages[result.code] ?? (nl ? "Rekeningnummer niet opgehaald." : "Account number not fetched."),

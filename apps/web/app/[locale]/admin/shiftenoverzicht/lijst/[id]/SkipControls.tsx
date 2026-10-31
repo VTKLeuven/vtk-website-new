@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useRef, useState, useTransition } from "react";
 import { Input } from "@vtk/ui";
 import { EyeIcon } from "@/components/ui/icons";
@@ -47,7 +48,8 @@ function useSetWeight(locale: "nl" | "en", listId: string, errorMessages: Record
       data.set("listId", listId);
       data.set("userIds", userId);
       data.set("percent", String(percent));
-      const result = await setPraesidiumShiftSkipAction(data);
+      const result = await unsentGuard.run(() => setPraesidiumShiftSkipAction(data));
+      if (result === UNSENT) return;
       if (result.status === "error") {
         showToast({
           message: errorMessages[result.code] ?? (nl ? "Niet opgeslagen: er ging iets mis." : "Not saved: something went wrong."),

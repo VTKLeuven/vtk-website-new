@@ -1,5 +1,6 @@
 'use client';
 
+import { useUnsentGuard } from '@/components/ui/unsentGuard';
 import { useActionState, useState } from 'react';
 import { registerAction } from '@/app/actions/register';
 import { SAVE_IDLE, type SaveState } from '@/lib/saveState';
@@ -37,8 +38,9 @@ export function RegisterForm({
     errorFallback: string;
   };
 }) {
+  const unsent = useUnsentGuard();
   const [state, formAction, pending] = useActionState<SaveState, FormData>(
-    registerAction,
+    unsent.state(registerAction),
     SAVE_IDLE,
   );
   const [isAlumni, setIsAlumni] = useState(false);

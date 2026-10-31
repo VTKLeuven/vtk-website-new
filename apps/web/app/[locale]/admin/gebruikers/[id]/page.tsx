@@ -1,3 +1,4 @@
+import { ActionForm } from '@/components/ui/unsentGuard';
 import { prisma } from '@vtk/db';
 import { notFound } from 'next/navigation';
 import { hasLocale } from '@/lib/locale';
@@ -276,7 +277,7 @@ export default async function EditUserPage({ params }: { params: Promise<{ local
             </li>
           )}
         </ul>
-        <form action={addMembershipFormAction} className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
+        <ActionForm action={addMembershipFormAction} className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
           <input type="hidden" name="userId" value={user.id} />
           <div className="md:col-span-2">
             <Label>Group</Label>
@@ -309,7 +310,7 @@ export default async function EditUserPage({ params }: { params: Promise<{ local
           <div>
             <Button type="submit">{locale === 'nl' ? 'Toevoegen' : 'Add'}</Button>
           </div>
-        </form>
+        </ActionForm>
       </Card>
 
       {canManageRoles && (
@@ -357,7 +358,7 @@ export default async function EditUserPage({ params }: { params: Promise<{ local
             )}
           </ul>
           {assignableRoles.length > 0 && (
-            <form action={assignUserRoleAction} className="flex flex-wrap items-end gap-3">
+            <ActionForm action={assignUserRoleAction} className="flex flex-wrap items-end gap-3">
               <input type="hidden" name="userId" value={user.id} />
               <div className="min-w-[220px] flex-1">
                 <Label>{locale === 'nl' ? 'Rol toevoegen' : 'Add role'}</Label>
@@ -373,7 +374,7 @@ export default async function EditUserPage({ params }: { params: Promise<{ local
                 </Select>
               </div>
               <Button type="submit">{locale === 'nl' ? 'Toevoegen' : 'Add'}</Button>
-            </form>
+            </ActionForm>
           )}
         </Card>
       )}

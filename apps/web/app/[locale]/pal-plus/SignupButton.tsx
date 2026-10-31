@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useTransition } from "react";
 import { leavePalPlusSessionAction, signUpPalPlusSessionAction } from "@/app/actions/palPlus";
 import { useToast } from "@/components/ui/toast";
@@ -34,7 +35,10 @@ export function SignupButton({
     const data = new FormData();
     data.set("sessionId", sessionId);
     startTransition(async () => {
-      const result = join ? await signUpPalPlusSessionAction(data) : await leavePalPlusSessionAction(data);
+      const result = await unsentGuard.run(() =>
+        join ? signUpPalPlusSessionAction(data) : leavePalPlusSessionAction(data),
+      );
+      if (result === UNSENT) return;
       if (result.status === "error") {
         showToast({
           message: copy.errors[result.code] ?? copy.fallbackError,

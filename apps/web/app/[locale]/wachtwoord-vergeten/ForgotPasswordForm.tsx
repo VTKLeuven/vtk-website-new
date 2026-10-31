@@ -1,5 +1,6 @@
 'use client';
 
+import { useUnsentGuard } from '@/components/ui/unsentGuard';
 import { useActionState } from 'react';
 import { requestPasswordResetAction } from '@/app/actions/register';
 import { SAVE_IDLE, type SaveState } from '@/lib/saveState';
@@ -22,8 +23,9 @@ export function ForgotPasswordForm({
     error: string;
   };
 }) {
+  const unsent = useUnsentGuard();
   const [state, formAction, pending] = useActionState<SaveState, FormData>(
-    requestPasswordResetAction,
+    unsent.state(requestPasswordResetAction),
     SAVE_IDLE,
   );
 

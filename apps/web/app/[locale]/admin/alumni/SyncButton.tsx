@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useTransition } from "react";
 import { Button } from "@vtk/ui";
 import { useToast } from "@/components/ui/toast";
@@ -18,7 +19,8 @@ export function AlumniSyncButton({ locale, enabled }: { locale: "nl" | "en"; ena
       disabled={pending || !enabled}
       onClick={() =>
         startTransition(async () => {
-          const state = await syncAlumniAction();
+          const state = await unsentGuard.run(() => syncAlumniAction());
+          if (state === UNSENT) return;
           if (state.status === "success") {
             showToast({
               message: nl ? "Alumnilijst gesynchroniseerd" : "Alumni list synchronised",

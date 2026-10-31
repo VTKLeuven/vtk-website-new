@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useOptimistic, useTransition } from "react";
 import { setPalPlusAttendanceAction } from "@/app/actions/palPlus";
 import { useToast } from "@/components/ui/toast";
@@ -55,7 +56,8 @@ export function AttendanceList({
     data.set("attended", value === true ? "yes" : value === false ? "no" : "");
     startTransition(async () => {
       showChoice({ userId, attended: value });
-      const result = await setPalPlusAttendanceAction(data);
+      const result = await unsentGuard.run(() => setPalPlusAttendanceAction(data));
+      if (result === UNSENT) return;
       if (result.status === "error") {
         showToast({
           message: copy.errors[result.code] ?? copy.fallbackError,

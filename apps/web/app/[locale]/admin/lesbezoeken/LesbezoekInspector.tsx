@@ -1,5 +1,6 @@
 "use client";
 
+import { unsentGuard } from "@/components/ui/unsentGuard";
 import { useMemo, useState } from "react";
 import type { MailSignature } from "@/lib/signatureProfile";
 import { splitSignature } from "@/lib/mailBodyHtml";
@@ -633,7 +634,7 @@ function ScheduledMailBanner({
 
           {canManage && (
             <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
-              <form action={cancelLesbezoekScheduledMailAction}>
+              <form action={unsentGuard.form(cancelLesbezoekScheduledMailAction)}>
                 <input type="hidden" name="id" value={mail.id} />
                 <Button
                   type="submit"
@@ -644,7 +645,7 @@ function ScheduledMailBanner({
                   {nl ? "Planning annuleren" : "Cancel schedule"}
                 </Button>
               </form>
-              <form action={sendNowLesbezoekScheduledMailAction}>
+              <form action={unsentGuard.form(sendNowLesbezoekScheduledMailAction)}>
                 <input type="hidden" name="id" value={mail.id} />
                 <Button
                   type="submit"

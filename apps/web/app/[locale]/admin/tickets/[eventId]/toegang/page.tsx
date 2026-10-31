@@ -1,3 +1,4 @@
+import { ActionForm } from "@/components/ui/unsentGuard";
 import Link from "@/components/ui/Link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
@@ -154,7 +155,7 @@ export default async function TicketAccessPage({
               </div>
             </div>
           </div>
-          <form action={addTicketUserGrantAction} className="ticket-admin-form">
+          <ActionForm action={addTicketUserGrantAction} className="ticket-admin-form">
             <input type="hidden" name="locale" value={locale} />
             <input type="hidden" name="eventId" value={eventId} />
             <PersonPicker eventId={eventId} locale={locale} inputId="grant-user-person" />
@@ -168,7 +169,7 @@ export default async function TicketAccessPage({
               <Plus aria-hidden="true" size={16} />
               {locale === "nl" ? "Toegang opslaan" : "Save access"}
             </button>
-          </form>
+          </ActionForm>
         </section>
 
         <section className="ticket-admin-section" aria-labelledby="group-access-heading">
@@ -181,7 +182,7 @@ export default async function TicketAccessPage({
               </div>
             </div>
           </div>
-          <form action={addTicketUserGrantAction} className="ticket-admin-form">
+          <ActionForm action={addTicketUserGrantAction} className="ticket-admin-form">
             <input type="hidden" name="locale" value={locale} />
             <input type="hidden" name="eventId" value={eventId} />
             <div className="ticket-admin-form-grid">
@@ -220,7 +221,7 @@ export default async function TicketAccessPage({
               <Plus aria-hidden="true" size={16} />
               {locale === "nl" ? "Groepstoegang opslaan" : "Save group access"}
             </button>
-          </form>
+          </ActionForm>
         </section>
       </div>
 
@@ -261,7 +262,7 @@ export default async function TicketAccessPage({
                         </div>
                         <div className="ticket-admin-row-actions">
                           {!grant.user.active ? <StatusBadge status="INACTIVE" locale={locale} /> : null}
-                          <form action={removeTicketUserGrantAction}>
+                          <ActionForm action={removeTicketUserGrantAction}>
                             <input type="hidden" name="locale" value={locale} />
                             <input type="hidden" name="eventId" value={eventId} />
                             <input type="hidden" name="grantId" value={grant.id} />
@@ -275,7 +276,7 @@ export default async function TicketAccessPage({
                             >
                               <Trash2 aria-hidden="true" size={16} />
                             </button>
-                          </form>
+                          </ActionForm>
                         </div>
                       </div>
                       </details>
@@ -300,7 +301,7 @@ export default async function TicketAccessPage({
                         <p className="ticket-admin-row-meta">{roleLabel(grant.role, locale)} · {grant.scope === "LEADS_ONLY" ? (locale === "nl" ? "Alleen verantwoordelijken" : "Group leads only") : (locale === "nl" ? "Alle leden" : "All members")}</p>
                         <p className="ticket-admin-row-meta">{locale === "nl" ? "Toegekend" : "Granted"} {formatDateTime(grant.createdAt, locale)}{grant.grantedBy?.name ? ` · ${grant.grantedBy.name}` : ""}</p>
                       </div>
-                      <form action={removeTicketUserGrantAction}>
+                      <ActionForm action={removeTicketUserGrantAction}>
                         <input type="hidden" name="locale" value={locale} />
                         <input type="hidden" name="eventId" value={eventId} />
                         <input type="hidden" name="grantId" value={grant.id} />
@@ -308,7 +309,7 @@ export default async function TicketAccessPage({
                         <button className="ticket-admin-icon-button" data-variant="danger" type="submit" aria-label={locale === "nl" ? "Groepstoegang intrekken" : "Revoke group access"} title={locale === "nl" ? "Groepstoegang intrekken" : "Revoke group access"}>
                           <Trash2 aria-hidden="true" size={16} />
                         </button>
-                      </form>
+                      </ActionForm>
                     </div>
                     </details>
                   </li>
@@ -345,7 +346,7 @@ export default async function TicketAccessPage({
                       </div>
                       <div className="ticket-admin-row-actions">
                         <StatusBadge status={gate.active ? "ACTIVE" : "INACTIVE"} locale={locale} />
-                        <form action={setTicketGateActiveAction}>
+                        <ActionForm action={setTicketGateActiveAction}>
                           <input type="hidden" name="locale" value={locale} />
                           <input type="hidden" name="eventId" value={eventId} />
                           <input type="hidden" name="gateId" value={gate.id} />
@@ -359,7 +360,7 @@ export default async function TicketAccessPage({
                           >
                             {gate.active ? <PowerOff aria-hidden="true" size={16} /> : <Power aria-hidden="true" size={16} />}
                           </button>
-                        </form>
+                        </ActionForm>
                       </div>
                     </div>
                   </li>
@@ -367,7 +368,7 @@ export default async function TicketAccessPage({
               </ul>
             )}
           </div>
-          <form action={createTicketGateAction} className="ticket-admin-form ticket-admin-gate-form">
+          <ActionForm action={createTicketGateAction} className="ticket-admin-form ticket-admin-gate-form">
             <h3>{locale === "nl" ? "Poort toevoegen" : "Add gate"}</h3>
             <input type="hidden" name="locale" value={locale} />
             <input type="hidden" name="eventId" value={eventId} />
@@ -383,7 +384,7 @@ export default async function TicketAccessPage({
               <Plus aria-hidden="true" size={16} />
               {locale === "nl" ? "Poort toevoegen" : "Add gate"}
             </button>
-          </form>
+          </ActionForm>
         </div>
       </section>
 
@@ -421,7 +422,7 @@ export default async function TicketAccessPage({
                   <div className="ticket-admin-row-actions">
                     <StatusBadge status={device.revokedAt ? "INACTIVE" : "ACTIVE"} locale={locale} />
                     {!device.revokedAt ? (
-                      <form action={revokeTicketScanDeviceAction}>
+                      <ActionForm action={revokeTicketScanDeviceAction}>
                         <input type="hidden" name="locale" value={locale} />
                         <input type="hidden" name="eventId" value={eventId} />
                         <input type="hidden" name="deviceId" value={device.id} />
@@ -434,7 +435,7 @@ export default async function TicketAccessPage({
                         >
                           <ShieldOff aria-hidden="true" size={16} />
                         </button>
-                      </form>
+                      </ActionForm>
                     ) : null}
                   </div>
                 </div>

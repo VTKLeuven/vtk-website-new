@@ -1,5 +1,6 @@
 'use client';
 
+import { useUnsentGuard } from '@/components/ui/unsentGuard';
 import { useActionState } from 'react';
 import Link from '@/components/ui/Link';
 import { setNewPasswordAction } from '@/app/actions/register';
@@ -24,8 +25,9 @@ export function NewPasswordForm({
     errorFallback: string;
   };
 }) {
+  const unsent = useUnsentGuard();
   const [state, formAction, pending] = useActionState<SaveState, FormData>(
-    setNewPasswordAction,
+    unsent.state(setNewPasswordAction),
     SAVE_IDLE,
   );
 

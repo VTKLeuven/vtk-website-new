@@ -1,5 +1,6 @@
 "use client";
 
+import { useUnsentGuard } from "@/components/ui/unsentGuard";
 import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Label } from "@vtk/ui";
@@ -53,8 +54,9 @@ export function BladModal({
   const [rotate, setRotate] = useState(0);
   const [recipient, setRecipient] = useState(defaultRecipient ?? "");
 
+  const unsent = useUnsentGuard();
   const [sendState, sendFormAction, sending] = useActionState(
-    sendAction ?? (async () => SAVE_IDLE),
+    unsent.state(sendAction ?? (async () => SAVE_IDLE)),
     SAVE_IDLE,
   );
   const handledSend = useRef<number | null>(null);

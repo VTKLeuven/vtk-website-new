@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import { Button, Card } from "@vtk/ui";
 import type { Locale } from "@vtk/i18n";
@@ -60,7 +61,11 @@ export function WebhookCard({ locale, webhook }: { locale: Locale; webhook: Webh
     form.append("id", webhook.id);
     form.append("enabled", String(next));
     startToggle(async () => {
-      const result = await setDiscordWebhookEnabledAction(SAVE_IDLE, form);
+      const result = await unsentGuard.run(() => setDiscordWebhookEnabledAction(SAVE_IDLE, form));
+      if (result === UNSENT) {
+        setEnabled(!next);
+        return;
+      }
       if (result.status === "error") {
         setEnabled(!next);
         showToast({
@@ -87,7 +92,8 @@ export function WebhookCard({ locale, webhook }: { locale: Locale; webhook: Webh
     const form = new FormData();
     form.append("id", webhook.id);
     startTest(async () => {
-      const result = await testDiscordWebhookAction(SAVE_IDLE, form);
+      const result = await unsentGuard.run(() => testDiscordWebhookAction(SAVE_IDLE, form));
+      if (result === UNSENT) return;
       if (result.status === "error") {
         showToast({
           message: result.detail ?? (nl ? "Het testbericht kwam niet aan." : "The test message did not arrive."),

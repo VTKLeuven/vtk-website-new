@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import Link from "@/components/ui/Link";
 import { useRef, useState, useTransition } from "react";
 import type { Locale } from "@vtk/i18n";
@@ -43,11 +44,21 @@ export function CategoryList({
     dragFrom.current = null;
     setOverIndex(null);
     if (from === null || from === to) return;
+    const before = items;
     const next = [...items];
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
     setItems(next);
-    startTransition(() => void reorderCalendarCategoriesAction(next.map((c) => c.id)));
+    // Niet bewaard (`unsentGuard`): de oude volgorde terug. Een andere fout blijft
+    // zoals voordien los van het scherm.
+    startTransition(
+      () =>
+        void unsentGuard
+          .run(() => reorderCalendarCategoriesAction(next.map((c) => c.id)))
+          .then((result) => {
+            if (result === UNSENT) setItems(before);
+          }),
+    );
   }
 
   if (items.length === 0) {

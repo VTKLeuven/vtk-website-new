@@ -1,5 +1,6 @@
 "use client";
 
+import { useUnsentGuard } from "@/components/ui/unsentGuard";
 import Link from "@/components/ui/Link";
 import {
   submitTicketEventFormAction,
@@ -307,8 +308,11 @@ export function TicketEventForm({
   // beide bepalen welke velden er verder nog gevraagd worden.
   const [calendarId, setCalendarId] = useState(event.calendarEventId ?? linkedCalendarEvent?.id ?? "");
   const [ownTimes, setOwnTimes] = useState(event.ownTimes ?? false);
+  // Het grootste formulier van de tickets: een opslag die de server niet haalt
+  // (een deploy terwijl dit openstond, of geen verbinding), laat alles staan.
+  const unsent = useUnsentGuard();
   const [state, formAction, pending] = useActionState(
-    submitTicketEventFormAction,
+    unsent.state(submitTicketEventFormAction),
     initialState
   );
 
