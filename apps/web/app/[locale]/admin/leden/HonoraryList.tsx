@@ -1,18 +1,23 @@
 import { Card } from "@vtk/ui";
-import { listHonoraryMembers } from "@/lib/membership";
+import { countHonoraryMembers, listHonoraryMembers } from "@/lib/membership";
 import { revokeHonoraryAction } from "@/app/actions/membership";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { GrantHonoraryForm } from "./GrantHonoraryForm";
+import { MemberSearch } from "./MemberSearch";
 
 /**
  * De tweede lijst op /admin/leden: de ereleden.
  *
  * Een erelid ziet ticketsoorten met doelgroep "Alleen ereleden"; voor iedereen
  * anders bestaan die niet. Anders dan het lidmaatschap hangt dit niet aan een
- * academiejaar, dus er is hier geen jaarkeuze.
+ * academiejaar, dus er is hier geen jaarkeuze. Zoeken gaat zoals bij de leden
+ * (`?zoek=`); een filter op soort is er niet, want een erelid is er maar één soort.
  */
-export async function HonoraryList({ nl }: { nl: boolean }) {
-  const rows = await listHonoraryMembers();
+export async function HonoraryList({ nl, query }: { nl: boolean; query: string }) {
+  const [rows, total] = await Promise.all([
+    listHonoraryMembers(query),
+    query ? countHonoraryMembers() : null,
+  ]);
 
   return (
     <>
@@ -32,10 +37,23 @@ export async function HonoraryList({ nl }: { nl: boolean }) {
         <div>
           <h2 className="font-medium text-vtk-ink">{nl ? "Ereleden" : "Honorary members"}</h2>
           <p className="mt-1 text-sm text-[#5c667f]">
-            {nl
-              ? `${rows.length} ${rows.length === 1 ? "erelid" : "ereleden"}.`
-              : `${rows.length} honorary ${rows.length === 1 ? "member" : "members"}.`}
+            {total !== null
+              ? nl
+                ? `${rows.length} van de ${total} ${total === 1 ? "erelid" : "ereleden"}.`
+                : `${rows.length} of ${total} honorary ${total === 1 ? "member" : "members"}.`
+              : nl
+                ? `${rows.length} ${rows.length === 1 ? "erelid" : "ereleden"}.`
+                : `${rows.length} honorary ${rows.length === 1 ? "member" : "members"}.`}
           </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <MemberSearch
+            key="ereleden"
+            initialQuery={query}
+            placeholder={nl ? "Zoek op naam, e-mail of r-nummer" : "Search by name, email or r-number"}
+            ariaLabel={nl ? "Ereleden zoeken" : "Search honorary members"}
+          />
         </div>
 
         <Card className="relative overflow-x-auto p-0">
@@ -85,7 +103,13 @@ export async function HonoraryList({ nl }: { nl: boolean }) {
               {rows.length === 0 ? (
                 <tr>
                   <td className="px-4 py-6 text-center text-[#5c667f]" colSpan={3}>
-                    {nl ? "Nog geen ereleden." : "No honorary members yet."}
+                    {query
+                      ? nl
+                        ? "Geen ereleden die passen bij deze zoekterm."
+                        : "No honorary members match this search."
+                      : nl
+                        ? "Nog geen ereleden."
+                        : "No honorary members yet."}
                   </td>
                 </tr>
               ) : null}

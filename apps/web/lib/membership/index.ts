@@ -171,12 +171,67 @@ export type MemberRow = {
  * het beheer wil net kunnen zien wie afhaakte in het betaalscherm. Standaard
  * staan ze er niet bij, want "het ledenaantal" zijn de echte leden.
  */
+/**
+ * De filter op soort lid in de URL van /admin/leden (`?soort=`), in de woorden
+ * van het ledenaantal bovenaan: gratis, betalend, toegekend. Toegekend is een
+ * eigen soort en niet "gratis": wie cash aan de toog betaalde, staat daar ook.
+ */
+export const MEMBER_KIND_FILTERS = {
+  gratis: "FACULTY",
+  betalend: "EXTERNAL",
+  toegekend: "MANUAL",
+} as const satisfies Record<string, MembershipKind>;
+
+export type MemberKindFilter = keyof typeof MEMBER_KIND_FILTERS;
+
+export function parseMemberKindFilter(value: string | null | undefined): MemberKindFilter | null {
+  return value && Object.hasOwn(MEMBER_KIND_FILTERS, value) ? (value as MemberKindFilter) : null;
+}
+
+/** Een zoekterm uit de URL, ingekort zodat een plakfout geen query van een pagina wordt. */
+export function parseMemberSearch(value: string | null | undefined): string {
+  return (value ?? "").trim().slice(0, 100);
+}
+
+/** Zoeken op naam, e-mail of r-nummer, zoals /admin/gebruikers. */
+function userSearchWhere(query: string) {
+  return {
+    OR: [
+      { name: { contains: query, mode: "insensitive" as const } },
+      { firstName: { contains: query, mode: "insensitive" as const } },
+      { lastName: { contains: query, mode: "insensitive" as const } },
+      { email: { contains: query, mode: "insensitive" as const } },
+      { rNumber: { contains: query, mode: "insensitive" as const } },
+    ],
+  };
+}
+
+export type MemberListOptions = {
+  pending?: boolean;
+  kind?: MemberKindFilter | null;
+  query?: string;
+};
+
+function memberWhere(year: number, options: MemberListOptions) {
+  return {
+    year,
+    ...(options.pending ? {} : { activatedAt: { not: null } }),
+    ...(options.kind ? { kind: MEMBER_KIND_FILTERS[options.kind] } : {}),
+    ...(options.query ? { user: userSearchWhere(options.query) } : {}),
+  };
+}
+
+/** Hoeveel rijen de ledenlijst zonder zoekterm en soort telt, voor "3 van de 412". */
+export async function countMembers(year: number, options: { pending?: boolean } = {}): Promise<number> {
+  return prisma.membership.count({ where: memberWhere(year, { pending: options.pending }) });
+}
+
 export async function listMembers(
   year: number,
-  options: { pending?: boolean } = {},
+  options: MemberListOptions = {},
 ): Promise<MemberRow[]> {
   const rows = await prisma.membership.findMany({
-    where: { year, ...(options.pending ? {} : { activatedAt: { not: null } }) },
+    where: memberWhere(year, options),
     include: {
       user: { select: { id: true, name: true, email: true, rNumber: true } },
       grantedBy: { select: { name: true } },
@@ -283,9 +338,14 @@ export type HonoraryMemberRow = {
  * Niet per academiejaar: erelid ben je tot een beheerder het intrekt. Een
  * verwijderd account valt weg, ook al zou de vlag nog staan.
  */
-export async function listHonoraryMembers(): Promise<HonoraryMemberRow[]> {
+/** Alle ereleden, zonder zoekterm, voor "2 van de 7". */
+export async function countHonoraryMembers(): Promise<number> {
+  return prisma.user.count({ where: { honoraryMember: true, deletedAt: null } });
+}
+
+export async function listHonoraryMembers(query = ""): Promise<HonoraryMemberRow[]> {
   const rows = await prisma.user.findMany({
-    where: { honoraryMember: true, deletedAt: null },
+    where: { honoraryMember: true, deletedAt: null, ...(query ? userSearchWhere(query) : {}) },
     select: { id: true, name: true, email: true, rNumber: true },
     orderBy: { name: "asc" },
   });

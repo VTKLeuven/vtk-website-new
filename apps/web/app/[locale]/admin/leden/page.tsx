@@ -6,10 +6,14 @@ import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import { currentStudyYear, formatWorkingYear } from "@/lib/workingYear";
 import {
+  countMembers,
   getMembershipConfig,
   listMembers,
   membershipTotals,
   membershipYears,
+  parseMemberKindFilter,
+  parseMemberSearch,
+  type MemberKindFilter,
 } from "@/lib/membership";
 import { formatEuro } from "@/lib/membership/config";
 import { membershipKindLabel } from "@/lib/membership/export";
@@ -19,6 +23,7 @@ import { GrantMembershipForm } from "./GrantMembershipForm";
 import { MembershipSettingsForm } from "./MembershipSettingsForm";
 import { listAccountingCodes } from "@/lib/accounting/server";
 import { HonoraryList } from "./HonoraryList";
+import { MemberSearch } from "./MemberSearch";
 
 /**
  * Ledenbeheer: wie is er dit academiejaar lid van VTK.
@@ -35,13 +40,17 @@ import { HonoraryList } from "./HonoraryList";
  * Een tweede lijst toont de ereleden (`?lijst=ereleden`): die hangen niet aan een
  * academiejaar, maar wie ze beheert, zoekt ze bij de leden en niet in een
  * vinkje op elk account apart.
+ *
+ * Beide lijsten zijn doorzoekbaar (`?zoek=`, op de server), en de leden ook te
+ * filteren op soort (`?soort=gratis|betalend|toegekend`). De Excel-export volgt
+ * dezelfde filters: wat je ziet, is wat je downloadt.
  */
 export default async function AdminLeden({
   params,
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ jaar?: string; openstaand?: string; lijst?: string }>;
+  searchParams: Promise<{ jaar?: string; openstaand?: string; lijst?: string; zoek?: string; soort?: string }>;
 }) {
   const [{ locale: localeParam }, filters] = await Promise.all([params, searchParams]);
   if (!hasLocale(localeParam)) notFound();
@@ -54,6 +63,19 @@ export default async function AdminLeden({
     filters.jaar && /^\d{4}$/.test(filters.jaar) ? Number(filters.jaar) : currentStudyYear();
   const pending = filters.openstaand === "1";
   const honorary = filters.lijst === "ereleden";
+  const query = parseMemberSearch(filters.zoek);
+  const kind = parseMemberKindFilter(filters.soort);
+  const filtered = query !== "" || kind !== null;
+
+  /** Een link binnen de ledenlijst die de huidige filters meeneemt, tenzij anders gevraagd. */
+  const listHref = (next: { jaar?: number; openstaand?: boolean; soort?: MemberKindFilter | null } = {}) => {
+    const search = new URLSearchParams({ jaar: String(next.jaar ?? year) });
+    if (next.openstaand ?? pending) search.set("openstaand", "1");
+    const soort = next.soort === undefined ? kind : next.soort;
+    if (soort) search.set("soort", soort);
+    if (query) search.set("zoek", query);
+    return `${base}/admin/leden?${search.toString()}`;
+  };
 
   const header = (
     <div className="space-y-4">
@@ -96,15 +118,16 @@ export default async function AdminLeden({
     return (
       <div className="space-y-6">
         {header}
-        <HonoraryList nl={nl} />
+        <HonoraryList nl={nl} query={query} />
       </div>
     );
   }
 
-  const [years, totals, rows, config, accountingCodes] = await Promise.all([
+  const [years, totals, rows, unfilteredCount, config, accountingCodes] = await Promise.all([
     membershipYears(),
     membershipTotals(year),
-    listMembers(year, { pending }),
+    listMembers(year, { pending, kind, query }),
+    filtered ? countMembers(year, { pending }) : null,
     getMembershipConfig(),
     listAccountingCodes(),
   ]);
@@ -116,9 +139,20 @@ export default async function AdminLeden({
     year: "numeric",
   });
 
-  const exportHref = `/api/admin/leden/export?jaar=${year}${pending ? "&openstaand=1" : ""}${
-    nl ? "" : "&taal=en"
-  }`;
+  const exportSearch = new URLSearchParams({ jaar: String(year) });
+  if (pending) exportSearch.set("openstaand", "1");
+  if (kind) exportSearch.set("soort", kind);
+  if (query) exportSearch.set("zoek", query);
+  if (!nl) exportSearch.set("taal", "en");
+  const exportHref = `/api/admin/leden/export?${exportSearch.toString()}`;
+
+  const kindChips: { key: MemberKindFilter | null; label: string }[] = [
+    { key: null, label: nl ? "Alle" : "All" },
+    { key: "gratis", label: nl ? "Gratis" : "Free" },
+    { key: "betalend", label: nl ? "Betalend" : "Paying" },
+    { key: "toegekend", label: nl ? "Toegekend" : "Granted" },
+  ];
+  const rowWord = (count: number) => (nl ? (count === 1 ? "rij" : "rijen") : count === 1 ? "row" : "rows");
 
   return (
     <div className="space-y-6">
@@ -176,7 +210,7 @@ export default async function AdminLeden({
           {years.map((entry) => (
             <Link
               key={entry}
-              href={`${base}/admin/leden?jaar=${entry}${pending ? "&openstaand=1" : ""}`}
+              href={listHref({ jaar: entry })}
               className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
                 entry === year
                   ? "border-vtk-ink bg-vtk-ink text-white"
@@ -208,14 +242,16 @@ export default async function AdminLeden({
           <div>
             <h2 className="font-medium text-vtk-ink">{nl ? "Ledenlijst" : "Member list"}</h2>
             <p className="mt-1 text-sm text-[#5c667f]">
-              {nl
-                ? `${rows.length} ${rows.length === 1 ? "rij" : "rijen"} in ${formatWorkingYear(year)}.`
-                : `${rows.length} ${rows.length === 1 ? "row" : "rows"} in ${formatWorkingYear(year)}.`}
+              {unfilteredCount !== null
+                ? nl
+                  ? `${rows.length} van de ${unfilteredCount} ${rowWord(unfilteredCount)} in ${formatWorkingYear(year)}.`
+                  : `${rows.length} of ${unfilteredCount} ${rowWord(unfilteredCount)} in ${formatWorkingYear(year)}.`
+                : `${rows.length} ${rowWord(rows.length)} in ${formatWorkingYear(year)}.`}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              href={`${base}/admin/leden?jaar=${year}${pending ? "" : "&openstaand=1"}`}
+              href={listHref({ openstaand: !pending })}
               className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
                 pending
                   ? "border-vtk-ink bg-vtk-ink text-white"
@@ -231,6 +267,34 @@ export default async function AdminLeden({
               {nl ? "Download Excel" : "Download Excel"}
             </a>
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <MemberSearch
+            key={`leden-${year}`}
+            initialQuery={query}
+            placeholder={nl ? "Zoek op naam, e-mail of r-nummer" : "Search by name, email or r-number"}
+            ariaLabel={nl ? "Leden zoeken" : "Search members"}
+          />
+          <nav aria-label={nl ? "Soort lid" : "Kind of member"} className="flex flex-wrap gap-2">
+            {kindChips.map((chip) => {
+              const active = chip.key === kind;
+              return (
+                <Link
+                  key={chip.key ?? "alle"}
+                  href={listHref({ soort: chip.key })}
+                  aria-current={active ? "page" : undefined}
+                  className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                    active
+                      ? "border-vtk-ink bg-vtk-ink text-white"
+                      : "border-vtk-blue/15 text-vtk-ink hover:bg-vtk-blue-soft/70"
+                  }`}
+                >
+                  {chip.label}
+                </Link>
+              );
+            })}
+          </nav>
         </div>
 
         <Card className="relative overflow-x-auto p-0">
@@ -304,9 +368,13 @@ export default async function AdminLeden({
               {rows.length === 0 ? (
                 <tr>
                   <td className="px-4 py-6 text-center text-[#5c667f]" colSpan={6}>
-                    {nl
-                      ? "Nog geen leden voor dit academiejaar."
-                      : "No members for this academic year yet."}
+                    {filtered
+                      ? nl
+                        ? "Geen leden die passen bij deze zoekterm of soort."
+                        : "No members match this search or kind."
+                      : nl
+                        ? "Nog geen leden voor dit academiejaar."
+                        : "No members for this academic year yet."}
                   </td>
                 </tr>
               ) : null}

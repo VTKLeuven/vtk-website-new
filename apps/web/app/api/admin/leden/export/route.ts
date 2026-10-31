@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authErrorResponse, requirePermission } from "@/lib/session";
 import { currentStudyYear } from "@/lib/workingYear";
-import { listMembers } from "@/lib/membership";
+import { listMembers, parseMemberKindFilter, parseMemberSearch } from "@/lib/membership";
 import { membersXlsx } from "@/lib/membership/export";
 
 export const runtime = "nodejs";
@@ -9,7 +9,9 @@ export const runtime = "nodejs";
 /**
  * Download van de ledenlijst als Excel-bestand. `?jaar=2026` kiest het
  * academiejaar (standaard het lopende); `?openstaand=1` neemt ook de
- * lidmaatschappen mee waarvan de betaling nog niet binnen is.
+ * lidmaatschappen mee waarvan de betaling nog niet binnen is. `?soort=` en
+ * `?zoek=` zijn dezelfde filters als op /admin/leden: wat je daar ziet, download
+ * je hier.
  */
 export async function GET(request: Request) {
   try {
@@ -24,7 +26,10 @@ export async function GET(request: Request) {
   const pending = url.searchParams.get("openstaand") === "1";
   const nl = url.searchParams.get("taal") !== "en";
 
-  const rows = await listMembers(year, { pending });
+  const kind = parseMemberKindFilter(url.searchParams.get("soort"));
+  const query = parseMemberSearch(url.searchParams.get("zoek"));
+
+  const rows = await listMembers(year, { pending, kind, query });
   const file = await membersXlsx(rows, year, nl);
 
   return new NextResponse(new Uint8Array(file), {
