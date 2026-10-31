@@ -202,7 +202,10 @@ herkenning van bestandsnamen of het uitlezen van de rekenbladen komt.
   bevat de posten en verandert na "Post wijzigen".
 - **Alles rekent op de BO-datum (`Dossier.date`)**, niet op de datum uit het
   rekenblad (`eventDate`, enkel ter info): open sinds, komt nog, tot resultaat.
-  Dat is een keuze van Groep 5; zet het niet terug op de activiteit.
+  Dat is een keuze van Groep 5; zet het niet terug op de activiteit. Eén
+  uitzondering: de herinnering "Nog te brengen resultaten" op het dashboard
+  wacht tot de activiteit voorbij is (`openResults` in `lib/bo/own.ts`). Breid
+  die uitzondering niet uit naar de status of de tellingen.
 
 # MCP-server voor agents
 

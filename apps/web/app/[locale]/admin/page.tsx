@@ -8,6 +8,7 @@ import { Card } from "@vtk/ui";
 import { mergeTiles } from "@/lib/dashboard-tiles";
 import { loadOwnBo } from "@/lib/bo/overview";
 import { openResults } from "@/lib/bo/own";
+import { brusselsYMD, ymdKey } from "@/lib/brussels";
 import { DashboardTiles } from "./DashboardTiles";
 import { DoorOpenButton } from "./DoorOpenButton";
 import { BoDueCard } from "./bestuursorgaan/BoDueCard";
@@ -93,7 +94,11 @@ export default async function AdminDashboard({
 
       {canOpenDoor && <DoorOpenButton locale={locale} />}
 
-      <BoDueCard posts={openResults(ownBo)} base={base} nl={locale === "nl"} />
+      <BoDueCard
+        posts={openResults(ownBo, ymdKey(brusselsYMD(new Date())))}
+        base={base}
+        nl={locale === "nl"}
+      />
 
       <DashboardTiles
         tiles={tiles}

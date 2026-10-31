@@ -79,9 +79,32 @@ export function ownPosts(data: ExplorerData, keys: readonly string[], groups: re
     .sort((a, b) => (order.get(a.key) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.key) ?? Number.MAX_SAFE_INTEGER));
 }
 
-/** Voor het dashboard: per post enkel de resultaten die nog moeten komen, en enkel de posten waar dat er zijn. */
-export function openResults(posts: readonly OwnPost[]): OwnPost[] {
+/**
+ * Moet de activiteit zelf nog plaatsvinden? Op de datum uit het rekenblad
+ * (`eventDate`), en vandaag telt nog als "nog bezig". Zonder datum weten we het
+ * niet, en dan geldt de BO-datum zoals overal.
+ */
+export function activityStillToCome(dossier: Pick<XDossier, "eventDate">, today: string): boolean {
+  return dossier.eventDate !== null && dossier.eventDate >= today;
+}
+
+/**
+ * Voor het dashboard: per post enkel de resultaten die nog moeten komen, en
+ * enkel de posten waar dat er zijn.
+ *
+ * Een budget passeert het BO vóór de activiteit, dus een activiteit in december
+ * stond hier al vanaf de BO van september als "open". Een resultaat kan pas na
+ * de activiteit, dus de herinnering wacht tot de dag erna. Enkel deze
+ * herinnering: status, "open sinds" en de tellingen blijven op de BO-datum (zie
+ * `Dossier.date` en docs/design-decisions.md).
+ *
+ * `today` is `yyyy-mm-dd` op de Brusselse klok.
+ */
+export function openResults(posts: readonly OwnPost[], today: string): OwnPost[] {
   return posts
-    .map((post) => ({ ...post, dossiers: post.dossiers.filter((d) => d.status === "OPEN") }))
+    .map((post) => ({
+      ...post,
+      dossiers: post.dossiers.filter((d) => d.status === "OPEN" && !activityStillToCome(d, today)),
+    }))
     .filter((post) => post.dossiers.length > 0);
 }

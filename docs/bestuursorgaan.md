@@ -217,8 +217,11 @@ O.
 budget op een BO die nog moet komen, staat als "BO op 22 okt". Enkel een
 schriftelijke goedkeuring heeft geen BO-datum ("Open · schriftelijk").
 
-De datum uit het rekenblad (`Dossier.eventDate`) staat enkel ter info in het
-detail en de tijdlijn, en ook dat enkel wanneer ze bij de BO's past (niet meer
+De datum uit het rekenblad (`Dossier.eventDate`) staat ter info in het detail
+en de tijdlijn. Daarnaast doet ze maar één ding: de herinnering "Nog te brengen
+resultaten" op het dashboard toont een open resultaat pas vanaf de dag na de
+activiteit (`openResults` in `lib/bo/own.ts`). Ook dat enkel wanneer ze bij de
+BO's past (niet meer
 dan 180 dagen voor de eerste of 400 dagen na de laatste; anders is het een oud
 sjabloon). Een jaar buiten 2000 tot 2100 laat `figures.ts` al bij het lezen
 vallen.

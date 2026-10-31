@@ -11325,6 +11325,14 @@ Hoe het werkt staat in `docs/bestuursorgaan.md`; dit zijn de keuzes erachter.
   dagen open". De BO-datum is er altijd en zegt wat Groep 5 wil weten: hoe lang
   wachten we al op dit resultaat. De datum uit het rekenblad staat nog ter info
   in het detail. Enkel een budget op een BO die nog moet komen, "komt nog".
+- **Eén uitzondering: de herinnering op het dashboard wacht op de activiteit**
+  (november 2026). "Nog te brengen resultaten" op /admin toont een open
+  resultaat pas vanaf de dag na de activiteit (de datum uit het rekenblad). Een
+  budget passeert het BO vóór de activiteit, dus een activiteit in december
+  stond er al vanaf september, terwijl er nog niets te brengen viel. Zonder
+  datum in het rekenblad blijft de herinnering zoals voordien. Status, "open
+  sinds" en alle tellingen blijven op de BO-datum; ook "Mijn budgetten" toont
+  zo'n resultaat gewoon als open (`openResults` in `lib/bo/own.ts`).
 - **Het lopende werkingsjaar en het vorige.** De resultaten van vorig jaar
   komen nog binnen in de eerste BO's van het nieuwe, en hun budgetten staan in
   de map van vorig jaar. De jaarmap zoekt de site zelf ("2026 - 2027 ..."), zodat

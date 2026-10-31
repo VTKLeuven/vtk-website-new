@@ -1029,9 +1029,39 @@ describe("wat een post zelf ziet", () => {
 
   it("zet op het dashboard enkel de open resultaten", () => {
     const own = ownGroups(["ONTHAAL", "CULTUUR", "IT"]);
-    expect(openResults(ownPosts(data, ownPostKeys(own), own, true)).map((p) => [p.name, p.dossiers.map((d) => d.activity)])).toEqual([
+    expect(openResults(ownPosts(data, ownPostKeys(own), own, true), "2026-10-15").map((p) => [p.name, p.dossiers.map((d) => d.activity)])).toEqual([
       ["Cultuur", ["Toneel", "Jeneverwandeling"]],
       ["Onthaal", ["Outdoor theokot", "Jeneverwandeling", "Cantusconvent"]],
     ]);
+  });
+
+  it("herinnert pas aan een resultaat wanneer de activiteit voorbij is", () => {
+    const dated = toExplorerData(
+      buildOverview(
+        [
+          // Budget al op het BO, activiteit pas in november.
+          doc("26-27_Budget_Onthaal_Cantusconvent", { bo: 2, eventDate: new Date(Date.UTC(2026, 10, 20)) }),
+          // Vandaag: nog bezig.
+          doc("26-27_Budget_Onthaal_Ontbijt", { bo: 3, eventDate: new Date(Date.UTC(2026, 9, 15)) }),
+          doc("26-27_Budget_Onthaal_Stadsspel", { bo: 4, eventDate: new Date(Date.UTC(2026, 9, 1)) }),
+          // Zonder datum in het rekenblad: zoals voordien, op de BO-datum.
+          doc("26-27_Budget_Onthaal_Flyers", { bo: 5 }),
+        ],
+        POSTS,
+        new Map(),
+        2026,
+        TODAY,
+      ),
+      2026,
+      TODAY,
+    );
+    const own = ownGroups(["ONTHAAL"]);
+    const posts = ownPosts(dated, ownPostKeys(own), own, true);
+    expect(openResults(posts, "2026-10-15").flatMap((p) => p.dossiers.map((d) => d.activity)).sort()).toEqual([
+      "Flyers",
+      "Stadsspel",
+    ]);
+    // Enkel de herinnering wacht: op "Mijn budgetten" staan ze alle vier open.
+    expect(posts[0].dossiers.map((d) => d.status)).toEqual(["OPEN", "OPEN", "OPEN", "OPEN"]);
   });
 });
