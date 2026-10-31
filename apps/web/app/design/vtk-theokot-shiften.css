@@ -1,0 +1,453 @@
+/* Theokot: shiftenoverzicht (/admin/theokot/shiften, `ShiftTimeline`).
+   Per dag een tijdlijn, elke shift een balk op haar uur. De kleur zegt hoe vol
+   een shift is en volgt de statuskleuren van /shift: rood (nog niemand), geel
+   (nog plaats), grijs (volzet). De tekst in de balk zegt hetzelfde, zodat de
+   kleur nooit de enige drager is. Zie docs/design-decisions.md. */
+
+.tk-sh {
+  display: grid;
+  gap: 18px;
+}
+
+.tk-sh-body {
+  display: grid;
+  gap: 18px;
+}
+
+.tk-sh-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.tk-sh-week {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.tk-sh-week-label {
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.tk-sh-today {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--line-2);
+  text-underline-offset: 4px;
+}
+
+.tk-sh-summary {
+  margin: 0;
+  font-size: 14px;
+}
+
+.tk-sh-summary strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* Een wijde tijdlijn in een zijwaartse scroller: de wrapper is het
+   positie-anker (zie de regel over `sr-only` in vtk-admin.css). */
+.tk-sh-scroll {
+  position: relative;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 12px 40px color-mix(in srgb, var(--ink) 4%, transparent);
+}
+
+.tk-sh-grid {
+  min-width: 680px;
+  padding: 4px 18px 8px;
+}
+
+.tk-sh-axis,
+.tk-sh-row {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+}
+
+.tk-sh-row {
+  border-top: 1px solid var(--line);
+}
+
+.tk-sh-axis-track {
+  position: relative;
+  height: 30px;
+}
+
+.tk-sh-hour {
+  position: absolute;
+  bottom: 6px;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Het eerste en het laatste uur niet centreren op hun lijn: het eerste viel
+   half onder de vaste dagkolom, het laatste buiten het kader. */
+.tk-sh-hour:first-child {
+  transform: none;
+}
+
+.tk-sh-hour:last-child {
+  transform: translateX(-100%);
+}
+
+/* De dag blijft staan wanneer de tijdlijn op een smal scherm zijwaarts scrolt;
+   anders weet je halverwege de middag niet meer welke rij welke dag is. */
+/* De negatieve marge trekt de kolom over de binnenmarge van het raster, zodat
+   de dag niet tegen de rand plakt; de lege hoek boven de dagen doet hetzelfde,
+   anders schuiven de uren eronder door. */
+.tk-sh-day,
+.tk-sh-axis-corner {
+  position: sticky;
+  z-index: 2;
+  left: 0;
+  margin-left: -18px;
+  background: var(--surface);
+}
+
+.tk-sh-day {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px 10px 18px;
+  line-height: 1.3;
+}
+
+.tk-sh-day-name {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+/* Vandaag: de gele lijn onder de dag, dezelfde als onder een kop. */
+.tk-sh-row[data-today] .tk-sh-day-name {
+  box-shadow: inset 0 -3px 0 var(--yellow);
+}
+
+.tk-sh-day-open {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.tk-sh-day-open[data-tone="partial"] {
+  color: var(--low-ink);
+  font-weight: 600;
+}
+
+.tk-sh-day-open[data-tone="empty"] {
+  color: var(--danger-ink);
+  font-weight: 600;
+}
+
+.tk-sh-track {
+  position: relative;
+}
+
+.tk-sh-gridline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--rule-soft);
+}
+
+.tk-sh-closed {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding-left: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.tk-sh-bar,
+.tk-sh-ghost {
+  position: absolute;
+  box-sizing: border-box;
+  border-radius: 10px;
+}
+
+.tk-sh-bar {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  overflow: hidden;
+  padding: 6px 10px;
+  border: 1px solid var(--line-2);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease;
+}
+
+.tk-sh-bar:hover {
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+.tk-sh-bar:focus-visible,
+.tk-sh-bar[aria-pressed="true"] {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+.tk-sh-bar[data-fill="partial"] {
+  border-color: color-mix(in srgb, var(--low-ink) 30%, transparent);
+  background: var(--low-bg);
+}
+
+.tk-sh-bar[data-fill="empty"] {
+  border-color: var(--danger-line);
+  background: var(--danger-bg);
+}
+
+/* Voorbij: nog leesbaar (wie kwam er), maar het vraagt geen actie meer. */
+.tk-sh-bar[data-past] {
+  opacity: 0.55;
+}
+
+.tk-sh-bar-name {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.tk-sh-bar-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tk-sh-seats {
+  display: flex;
+  gap: 3px;
+  color: var(--muted);
+}
+
+.tk-sh-bar[data-fill="partial"] .tk-sh-seats,
+.tk-sh-bar[data-fill="partial"] .tk-sh-status {
+  color: var(--low-ink);
+}
+
+.tk-sh-bar[data-fill="empty"] .tk-sh-seats,
+.tk-sh-bar[data-fill="empty"] .tk-sh-status {
+  color: var(--danger-ink);
+}
+
+.tk-sh-seat {
+  width: 9px;
+  height: 9px;
+  box-sizing: border-box;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+}
+
+.tk-sh-seat[data-taken] {
+  border-color: var(--navy);
+  background: var(--navy);
+}
+
+.tk-sh-status {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+/* Een vaste shift uit het sjabloon die er die dag niet is: het streeppatroon
+   van een ontbrekende foto, met een stippellijn. */
+.tk-sh-ghost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 56px;
+  border: 1px dashed var(--line-2);
+  background: repeating-linear-gradient(135deg, var(--paper-2) 0 6px, var(--paper) 6px 12px);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.tk-sh-now {
+  position: absolute;
+  z-index: 1;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: var(--yellow);
+  pointer-events: none;
+}
+
+.tk-sh-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.tk-sh-detail > div {
+  display: flex;
+  flex: 1 1 260px;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tk-sh-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tk-sh-detail-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.tk-sh-detail-time {
+  color: var(--body);
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-sh-badge {
+  align-self: flex-start;
+  margin-top: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tk-sh-badge[data-fill="partial"] {
+  background: var(--low-bg);
+  color: var(--low-ink);
+}
+
+.tk-sh-badge[data-fill="empty"] {
+  background: var(--danger-bg);
+  color: var(--danger-ink);
+}
+
+.tk-sh-people {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ink);
+}
+
+.tk-sh-nobody {
+  color: var(--danger-ink);
+}
+
+.tk-sh-detail-link {
+  align-self: flex-start;
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--line-2);
+  text-underline-offset: 4px;
+}
+
+.tk-sh-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.tk-sh-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.tk-sh-swatch {
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  background: var(--paper);
+}
+
+.tk-sh-swatch[data-fill="partial"] {
+  border-color: color-mix(in srgb, var(--low-ink) 30%, transparent);
+  background: var(--low-bg);
+}
+
+.tk-sh-swatch[data-fill="empty"] {
+  border-color: var(--danger-line);
+  background: var(--danger-bg);
+}
+
+.tk-sh-swatch[data-kind="ghost"] {
+  border-style: dashed;
+  background: repeating-linear-gradient(135deg, var(--paper-2) 0 3px, var(--paper) 3px 6px);
+}
+
+.tk-sh-empty {
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.tk-sh-empty p {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .tk-sh-axis,
+  .tk-sh-row {
+    grid-template-columns: 88px minmax(0, 1fr);
+  }
+
+  .tk-sh-people {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

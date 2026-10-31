@@ -134,6 +134,9 @@ export function getAdminNav(): NavEntry[] {
       item('theokotVerhuur', '/theokot/verhuur', {
         anyPerm: ['theokot.rentals.view', 'theokot.rentals.manage'],
       }),
+      // De shiften van een werkweek als tijdlijn: waar er nog shifters nodig
+      // zijn. Een eigen pagina en geen tab binnen Broodjes, op vraag van Theokot.
+      item('theokotShiften', '/theokot/shiften', { perm: 'theokot.manage' }),
     ]),
     item('vault', '/wachtwoorden', { anyPerm: ['vault.editOwn', 'vault.manage'] }),
   ];

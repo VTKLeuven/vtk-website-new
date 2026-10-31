@@ -11907,3 +11907,36 @@ had.
   hangen eraan; de voorvertoning toont ze en verwijderen blijft een aparte,
   bevestigde stap. Enkel een volledige lijst bepaalt de volgorde: met een
   bestand van twee nieuwe codes zou de rest anders door elkaar geschud worden.
+
+## Theokot: shiftenoverzicht
+
+Theokot wilde in één oogopslag zien op welke dagen en uren er nog shifters
+nodig zijn. Dat staat op `/admin/theokot/shiften` (`lib/theokotShifts.ts`,
+`ShiftTimeline.tsx`), november 2026.
+
+- **Een eigen pagina in de groep Theokot, geen tab binnen Broodjes.** Naast
+  Broodjes en Verhuur in de zijbalk, op vraag van Theokot: de shiften horen bij
+  het draaien van de zaak, niet bij het aanbod van een verkoopdag.
+- **Een tijdlijn per dag.** Vier richtingen lagen voor (een weekraster, een
+  lijst met eerst wat open staat, een agenda per dag zoals /shift, en deze
+  tijdlijn); Theokot koos de tijdlijn. Elke shift is een balk op haar uur, dus
+  een extra of een ontbrekende shift valt op zonder dat het scherm daar een
+  regel voor nodig heeft.
+- **Maandag tot vrijdag, nooit het weekend.** Theokot verkoopt niet op zaterdag
+  of zondag. In het weekend opent het scherm op de volgende week: van de week
+  die net voorbij is, valt niets meer te regelen.
+- **Wat een Theokot-shift is, zegt het sjabloon `theokot`.** De post van dat
+  sjabloon (en THEOKOT, altijd), dezelfde post waarmee een verkoopweek haar
+  shiften neerzet.
+- **Een vaste shift die er niet is, staat er gestreept.** Het vaste rooster komt
+  uit hetzelfde sjabloon (het uur van de eerste shift plus de offsets). Een vaste
+  shift telt als aanwezig zodra een shift die dag ermee overlapt, niet enkel bij
+  een gelijk uur, zodat een dag die een halfuur later opent er niet uitziet
+  alsof alles ontbreekt. Een dag zonder één shift is gewoon dicht en krijgt geen
+  strepen.
+- **Kleur en tekst zeggen hetzelfde.** Rood is nog niemand, geel nog plaats,
+  grijs volzet, en in de balk staat "2 open" of "volzet". Een afgelopen shift
+  blijft zichtbaar maar vaag, en telt niet mee in wat er nog nodig is.
+- **Het recht is `theokot.manage`**, wie de broodjes beheert. Geen apart recht:
+  de rol van Theokot draagt het al, en de afhaalbalie (`theokot.pickup`) plant
+  geen shiften.

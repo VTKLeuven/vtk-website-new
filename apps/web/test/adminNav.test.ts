@@ -56,12 +56,17 @@ describe("admin nav structure", () => {
 
     expect(nav.some((entry) => "group" in entry && entry.group === "overig")).toBe(false);
 
-    // Theokot is er twee (broodjes en verhuur, later ook de uitleendienst) en
-    // staat daarom als eigen categorie, naast Onderwijs en Communicatie.
+    // Theokot is er meer dan één (broodjes, verhuur en de shiften, later ook de
+    // uitleendienst) en staat daarom als eigen categorie, naast Onderwijs en
+    // Communicatie.
     const theokotGroup = nav.find(
       (e): e is Extract<NavEntry, { group: string }> => "group" in e && e.group === "theokot",
     );
-    expect(theokotGroup?.items.map((i) => i.key)).toEqual(["theokotBroodjes", "theokotVerhuur"]);
+    expect(theokotGroup?.items.map((i) => i.key)).toEqual([
+      "theokotBroodjes",
+      "theokotVerhuur",
+      "theokotShiften",
+    ]);
   });
 
   it("routes every internal tab to a path below /admin", () => {
