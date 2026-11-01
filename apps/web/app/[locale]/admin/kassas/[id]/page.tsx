@@ -24,6 +24,7 @@ import {
   denominationLabel,
   normaliseCounts,
   registerInterval,
+  resultSharedWithPost,
   STATUS_SLUGS,
   statusLabel,
   timeInputValue,
@@ -31,12 +32,14 @@ import {
   timeRangeShort,
   type PaymentMethod,
 } from "@/lib/kassas/kassa";
+import { SaveForm } from "@/components/ui/SaveForm";
 import { kassaImportAmounts } from "@/lib/inkomsten/server";
 import { listAccountingCodes } from "@/lib/accounting/server";
 import {
   acceptCashRegisterAction,
   deleteCashRegisterAction,
   saveCashRegisterCountAction,
+  sendCashRegisterCountedMailAction,
   setCashRegisterCodeAction,
   setCashRegisterStatusAction,
   updateCashRegisterRequestAction,
@@ -61,8 +64,17 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
   const register = await prisma.cashRegister.findUnique({
     where: { id },
     include: {
+      group: { select: { code: true, type: true } },
       requestedBy: {
-        select: { name: true, email: true, personalEmail: true, emailPreference: true, googleEmail: true },
+        select: {
+          name: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          personalEmail: true,
+          emailPreference: true,
+          googleEmail: true,
+        },
       },
       acceptedBy: { select: { name: true } },
       payments: { orderBy: { sortOrder: "asc" } },
@@ -112,7 +124,9 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
     year: "numeric",
   }).format(register.date);
   const listHref = `${base}/admin/kassas${manage ? "" : "/mijn"}`;
-  const requesterEmail = register.requestedBy ? cashRegisterMailTo(register.requestedBy) : null;
+  const requesterEmail = register.requestedBy ? cashRegisterMailTo(register.requestedBy, register.group) : null;
+  const counted = register.endCounts !== null;
+  const passesOn = !resultSharedWithPost(register.status);
   const hours = timeRangeLabel(register.startsAt, register.endsAt, nl);
   // "Bancontact (Evenementen)": het toestel dat Beheer koos, zodra het gekozen is.
   const deviceLabel = (method: PaymentMethod, label: string) => {
@@ -400,6 +414,49 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
             importAmounts={importAmounts}
             incomeSettingsHref={`${base}/admin/inkomsten/instellingen`}
           />
+        </section>
+      )}
+
+      {manage && !requested && (
+        <section className="rounded-2xl border border-vtk-blue/12 bg-white p-5">
+          <h2 className="text-base font-semibold text-vtk-ink">{nl ? "Mailen dat de kassa geteld is" : "Email that the register was counted"}</h2>
+          <p className="mt-1 mb-3 max-w-2xl text-sm text-vtk-muted">
+            {!requesterEmail
+              ? nl
+                ? "De aanvrager heeft geen account meer, dus er kan geen mail vertrekken. Laat het de post zelf weten."
+                : "The requester no longer has an account, so no email can go out. Let the post know yourself."
+              : !counted
+                ? nl
+                  ? "Kan zodra de eindkassa geteld en opgeslagen is."
+                  : "Available once the closing count is saved."
+                : register.countedMailSentAt
+                  ? nl
+                    ? `Vertrok op ${formatSubmittedOn(register.countedMailSentAt, locale)}. Opnieuw sturen kan, bijvoorbeeld na een rechtgezette telling.`
+                    : `Sent on ${formatSubmittedOn(register.countedMailSentAt, locale)}. You can send it again, for instance after correcting the count.`
+                  : nl
+                    ? `De mail gaat naar ${requesterEmail}, met het resultaat van de telling.`
+                    : `The email goes to ${requesterEmail}, with the result of the count.`}
+          </p>
+          <SaveForm
+            action={sendCashRegisterCountedMailAction}
+            submitLabel={nl ? "Mail sturen" : "Send email"}
+            savingLabel={nl ? "Bezig met sturen..." : "Sending..."}
+            savedMessage={nl ? "Mail verstuurd." : "Email sent."}
+            errorMessages={errorMessages}
+            fallbackErrorMessage={nl ? "De mail kon niet vertrekken." : "The email could not be sent."}
+            resetOnSuccess={false}
+            submitDisabled={!counted || !requesterEmail}
+            confirmSubmit={{
+              title: nl ? "Mailen dat de kassa geteld is?" : "Email that the register was counted?",
+              description: nl
+                ? `Er vertrekt meteen een mail naar ${requesterEmail}, met het resultaat zoals het nu geteld is.${passesOn ? ' De status gaat naar "doorgegeven", zodat de post het resultaat ook hier ziet.' : ""}`
+                : `An email goes to ${requesterEmail} right away, with the result as counted now.${passesOn ? ' The status moves to "passed on", so the post can see the result here too.' : ""}`,
+              confirmLabel: nl ? "Mail sturen" : "Send email",
+              cancelLabel: nl ? "Annuleren" : "Cancel",
+            }}
+          >
+            <input type="hidden" name="id" value={register.id} />
+          </SaveForm>
         </section>
       )}
 

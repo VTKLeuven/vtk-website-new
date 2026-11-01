@@ -8241,9 +8241,25 @@ de post weet wat ze komt ophalen.
 **De mail gaat naar het `@vtk.be`-adres.** Een kassa vraag je aan als lid van een
 post, en dat is werk van de kring. De mailvoorkeur in het profiel kiest tussen het
 universiteits- en het persoonlijke adres en is er voor wat de site aan iedereen
-stuurt; enkel wie geen `@vtk.be`-account heeft, krijgt de mail daar
-(`cashRegisterMailTo`). Dit kwam van Beheer: de mail van een eigen aanvraag
-kwam op het persoonlijke adres toe.
+stuurt. Dit kwam van Beheer: de mail van een eigen aanvraag kwam op het
+persoonlijke adres toe. Sinds november 2026 is dat ook zo voor wie zijn account
+niet koppelde (`cashRegisterMailTo`):
+
+- Een gekoppeld account gaat voor: dat adres bestaat zeker, en een naamgenoot
+  heeft een ander adres (`jan.peeters2`) dan wat je uit de naam zou bouwen.
+- Zonder koppeling: `voornaam.achternaam@vtk.be`, met een achternaam uit meerdere
+  delen aan elkaar (`jasper.vanelsacker@vtk.be`).
+- Staat de kassa op een werkgroep: `werkgroep.voornaam.achternaam@vtk.be`. Het gaat
+  om de post die op de kassa staat, niet om waar de aanvrager lid van is.
+- BEST krijgt altijd het voorkeursadres, ook met een gekoppeld account.
+
+**Mailen dat een kassa geteld is, is een knop.** Beheer klikt erop op de pagina van
+de kassa, zodat de post niet zelf moet gaan kijken. Niet automatisch bij het
+opslaan van de telling: die wordt vaak in stappen ingevuld en nog rechtgezet. De
+mail linkt naar de kassa, en daar ziet de post het resultaat pas vanaf
+"doorgegeven"; een kassa die nog niet zo ver staat, schuift daarom mee op. Lukt de
+mail niet, dan blijft de status staan. Opnieuw sturen mag, want een telling kan
+later nog veranderen. De opmerking van Beheer bij het tellen staat niet in de mail.
 
 **Een toestel ligt nooit op twee plaatsen tegelijk.** Daarom vraagt de aanvraag
 een begin- en einduur; een einduur dat vroeger op de klok staat dan het begin,

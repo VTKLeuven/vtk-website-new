@@ -8272,6 +8272,8 @@ model CashRegister {
   /// Wanneer de mail met de aanvaarding vertrok. NULL bij een aanvaarding
   /// zonder mail (geen mailserver, of de aanvrager heeft geen account meer).
   acceptedMailSentAt DateTime? @db.Timestamptz(3)
+  /// Wanneer Beheer het laatst mailde dat de kassa geteld is. NULL = nog niet.
+  countedMailSentAt  DateTime? @db.Timestamptz(3)
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)

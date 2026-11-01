@@ -5,6 +5,7 @@ import type { SessionPayload } from "@vtk/auth";
 import { pick } from "@vtk/i18n";
 import { getCurrentSession, requireSession } from "@/lib/session";
 import { preferredEmail } from "@/lib/brevo/contacts";
+import { normaliseNamePart, renderAddress } from "@/lib/google/addresses";
 import { formatSpentOn } from "@/lib/rekeningen/expenses";
 import { brusselsYMD } from "@/lib/brussels";
 import { withinPostWindow, type PermanentEntryKind } from "@/lib/kassas/permanent";
@@ -119,16 +120,38 @@ export function canEditRequest(access: CashRegisterAccess, register: Owned): boo
 }
 
 /**
- * Waar de mail over een kassa heen gaat: het `@vtk.be`-adres, en enkel zonder
- * dat het voorkeursadres. Een kassa vraag je aan als lid van een post, en dat is
- * werk van de kring; de mailvoorkeur in het profiel kiest tussen het
- * universiteits- en het persoonlijke adres, en is er voor wat de site aan
- * iedereen stuurt.
+ * Waar de mail over een kassa heen gaat: het `@vtk.be`-adres. Een kassa vraag je
+ * aan als lid van een post, en dat is werk van de kring; de mailvoorkeur in het
+ * profiel kiest tussen het universiteits- en het persoonlijke adres, en is er voor
+ * wat de site aan iedereen stuurt.
+ *
+ * Niet iedereen koppelde zijn account, dus zonder koppeling bouwen we het adres
+ * uit de naam: `voornaam.achternaam`, en voor een kassa van een werkgroep
+ * `werkgroep.voornaam.achternaam`. Een gekoppeld account gaat voor: dat adres
+ * bestaat zeker, en bij een naamgenoot (`jan.peeters2`) zou het gebouwde adres
+ * bij iemand anders aankomen. BEST heeft geen `@vtk.be`-adressen en krijgt altijd
+ * het voorkeursadres. Zo ook wie een naam heeft waar geen adres uit te bouwen is.
  */
 export function cashRegisterMailTo(
-  user: Parameters<typeof preferredEmail>[0] & { googleEmail: string | null },
+  user: Parameters<typeof preferredEmail>[0] & {
+    googleEmail: string | null;
+    name: string;
+    firstName: string | null;
+    lastName: string | null;
+  },
+  group: { code: string; type: string } | null,
 ): string {
-  return user.googleEmail ?? preferredEmail(user);
+  if (group?.code === "BEST") return preferredEmail(user);
+  if (user.googleEmail) return user.googleEmail;
+
+  const [firstWord = "", ...otherWords] = user.name.trim().split(/\s+/);
+  const voornaam = user.firstName?.trim() || firstWord;
+  const achternaam = user.lastName?.trim() || otherWords.join(" ");
+  if (!normaliseNamePart(voornaam) || !normaliseNamePart(achternaam)) return preferredEmail(user);
+
+  return group?.type === "WERKGROEP"
+    ? renderAddress("{post}.{voornaam}.{achternaam}", { post: group.code, voornaam, achternaam }, "vtk.be")
+    : renderAddress("{voornaam}.{achternaam}", { voornaam, achternaam }, "vtk.be");
 }
 
 // -----------------------------------------------------------------------------

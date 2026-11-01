@@ -24,7 +24,9 @@ import {
   cashRegisterMailTo,
   getCashRegisterConfig,
   requireCashRegisterAccess,
+  resultFor,
   terminalConflict,
+  ticketIncomeByEvent,
   type CashRegisterAccess,
   type TerminalChoice,
 } from "@/lib/kassas/server";
@@ -40,13 +42,14 @@ import {
   parsePick,
   PERMANENT_POST_CODES,
   registerInterval,
+  resultSharedWithPost,
   startCountsFromPicks,
   statusLabel,
   type Counts,
   type Denomination,
   type PaymentMethod,
 } from "@/lib/kassas/kassa";
-import { cashRegisterAcceptedMail } from "@/lib/kassas/mail";
+import { cashRegisterAcceptedMail, cashRegisterCountedMail } from "@/lib/kassas/mail";
 import { rematchOpenTransactions } from "@/lib/inkomsten/server";
 
 const ADMIN_PATHS = ["/admin/kassas", "/en/admin/kassas"];
@@ -413,10 +416,12 @@ export async function acceptCashRegisterAction(
     where: { id },
     include: {
       payments: { orderBy: { sortOrder: "asc" }, select: { method: true, terminal: true } },
+      group: { select: { code: true, type: true } },
       requestedBy: {
         select: {
           name: true,
           firstName: true,
+          lastName: true,
           email: true,
           personalEmail: true,
           emailPreference: true,
@@ -453,7 +458,7 @@ export async function acceptCashRegisterAction(
       contactEmail: config.contactEmail,
       url: `${siteBaseUrl()}${locale === "en" ? "/en" : ""}/admin/kassas/${register.id}`,
     });
-    const to = cashRegisterMailTo(requester);
+    const to = cashRegisterMailTo(requester, register.group);
     const result = await deliverWebsiteMail(
       { to, subject: mail.subject, text: mail.text, html: mail.html, replyTo: config.contactEmail },
       { source: "cashRegisters" },
@@ -641,6 +646,87 @@ export async function saveCashRegisterCountAction(
   await rematchIncome();
   revalidateCashRegisters(id);
   return saveOk();
+}
+
+/**
+ * De aanvrager laten weten dat de kassa geteld is. De mail linkt naar de kassa,
+ * en daar ziet de post het resultaat pas vanaf "doorgegeven": een kassa die nog
+ * niet zo ver staat, schuift daarom mee op. Lukt de mail niet, dan verandert er
+ * niets. Opnieuw sturen kan, bijvoorbeeld na een rechtgezette telling.
+ */
+export async function sendCashRegisterCountedMailAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const access = await requireManager();
+  if (!access) return saveError("FORBIDDEN");
+  const id = text(formData, "id", 60);
+  const register = await prisma.cashRegister.findUnique({
+    where: { id },
+    include: {
+      payments: { select: { method: true, amountCents: true } },
+      ticketEvents: { select: { ticketEventId: true } },
+      group: { select: { code: true, type: true } },
+      requestedBy: {
+        select: {
+          name: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          personalEmail: true,
+          emailPreference: true,
+          googleEmail: true,
+          locale: true,
+        },
+      },
+    },
+  });
+  if (!register) return saveError("NOT_FOUND");
+  if (register.status === "REQUESTED") return saveError("NOT_ACCEPTED");
+  if (register.endCounts === null) return saveError("NOT_COUNTED");
+  const requester = register.requestedBy;
+  if (!requester) return saveError("NO_REQUESTER");
+
+  const locale = requester.locale === "EN" ? "en" : "nl";
+  const income = await ticketIncomeByEvent(register.ticketEvents.map((link) => link.ticketEventId));
+  const mail = cashRegisterCountedMail({
+    locale,
+    name: requester.firstName?.trim() || requester.name,
+    activity: register.activity,
+    date: register.date,
+    postLabel: register.postLabel,
+    result: resultFor(register, income),
+    url: `${siteBaseUrl()}${locale === "en" ? "/en" : ""}/admin/kassas/${register.id}`,
+  });
+  const config = await getCashRegisterConfig();
+  const to = cashRegisterMailTo(requester, register.group);
+  const delivery = await deliverWebsiteMail(
+    { to, subject: mail.subject, text: mail.text, html: mail.html, replyTo: config.contactEmail },
+    { source: "cashRegisters" },
+  );
+  if (delivery.status === "simulated") {
+    return saveOk("Er is hier geen mailserver, dus de mail staat enkel in de serverlog. De status bleef staan.");
+  }
+  if (delivery.status !== "sent" && delivery.status !== "partial") {
+    return saveError("MAIL_FAILED", `De mail naar ${to} kon niet vertrekken. Laat het ${requester.name} zelf weten.`);
+  }
+
+  const passOn = !resultSharedWithPost(register.status);
+  await prisma.cashRegister.update({
+    where: { id },
+    data: { countedMailSentAt: new Date(), ...(passOn ? { status: "PASSED_ON" as const } : {}) },
+  });
+  await logAudit({
+    action: "update",
+    entity: "cashRegister",
+    entityId: id,
+    target: `${register.activity} (${register.postLabel})`,
+    summary: passOn
+      ? `mail "geteld" gestuurd, status ${statusLabel(register.status, true).toLowerCase()} → ${statusLabel("PASSED_ON", true).toLowerCase()}`
+      : `mail "geteld" gestuurd`,
+  });
+  revalidateCashRegisters(id);
+  return saveOk(`${requester.name} kreeg een mail op ${to}.`);
 }
 
 // -----------------------------------------------------------------------------

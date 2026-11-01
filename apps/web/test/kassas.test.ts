@@ -34,7 +34,7 @@ import {
   sameTerminal,
   visibilityWhere,
 } from "@/lib/kassas/server";
-import { cashRegisterAcceptedMail } from "@/lib/kassas/mail";
+import { cashRegisterAcceptedMail, cashRegisterCountedMail } from "@/lib/kassas/mail";
 
 const noVouchers = { shiftVouchers: null, elixirVouchers: null, shiftVoucherValueCents: 120, elixirVoucherValueCents: 120 };
 
@@ -283,14 +283,95 @@ describe("kassa's: toegang", () => {
 });
 
 describe("kassa's: adres van de mail", () => {
-  const user = { email: "r0123@kuleuven.be", personalEmail: "wannes@example.com", emailPreference: "PERSONAL" as const };
+  const user = {
+    email: "r0123@kuleuven.be",
+    personalEmail: "jasper@example.com",
+    emailPreference: "PERSONAL" as const,
+    name: "Jasper van Elsacker",
+    firstName: "Jasper",
+    lastName: "van Elsacker",
+    googleEmail: null,
+  };
+  const post = { code: "ONTHAAL", type: "PRAESIDIUM" };
+  const werkgroep = { code: "CHEMIX", type: "WERKGROEP" };
+  const best = { code: "BEST", type: "WERKGROEP" };
 
-  it("mailt naar het @vtk.be-adres, ook bij een persoonlijke voorkeur", () => {
-    expect(cashRegisterMailTo({ ...user, googleEmail: "wannes.voorbeeld@vtk.be" })).toBe("wannes.voorbeeld@vtk.be");
+  it("bouwt voornaam.achternaam, en plakt een achternaam uit meerdere delen aan elkaar", () => {
+    expect(cashRegisterMailTo(user, post)).toBe("jasper.vanelsacker@vtk.be");
   });
 
-  it("valt zonder @vtk.be-adres terug op het voorkeursadres", () => {
-    expect(cashRegisterMailTo({ ...user, googleEmail: null })).toBe("wannes@example.com");
+  it("zet er bij een werkgroep de werkgroep voor", () => {
+    expect(cashRegisterMailTo(user, werkgroep)).toBe("chemix.jasper.vanelsacker@vtk.be");
+  });
+
+  it("stuurt BEST altijd naar het voorkeursadres, ook met een gekoppeld account", () => {
+    expect(cashRegisterMailTo(user, best)).toBe("jasper@example.com");
+    expect(cashRegisterMailTo({ ...user, googleEmail: "jasper.vanelsacker@vtk.be" }, best)).toBe("jasper@example.com");
+  });
+
+  it("laat een gekoppeld account voorgaan, want een naamgenoot heeft een ander adres", () => {
+    expect(cashRegisterMailTo({ ...user, googleEmail: "jasper.vanelsacker2@vtk.be" }, post)).toBe(
+      "jasper.vanelsacker2@vtk.be",
+    );
+  });
+
+  it("haalt accenten weg en leest de volledige naam wanneer de naamvelden leeg zijn", () => {
+    expect(cashRegisterMailTo({ ...user, name: "Noël D'Hondt", firstName: null, lastName: null }, post)).toBe(
+      "noel.dhondt@vtk.be",
+    );
+  });
+
+  it("behandelt een kassa zonder post als een gewone post", () => {
+    expect(cashRegisterMailTo(user, null)).toBe("jasper.vanelsacker@vtk.be");
+  });
+
+  it("valt terug op het voorkeursadres wanneer er geen adres uit de naam te bouwen is", () => {
+    expect(cashRegisterMailTo({ ...user, name: "Jasper", firstName: null, lastName: null }, post)).toBe(
+      "jasper@example.com",
+    );
+  });
+});
+
+describe("kassa's: mail dat de kassa geteld is", () => {
+  const input = {
+    locale: "nl" as const,
+    name: "Wannes",
+    activity: "Cantus",
+    date: new Date("2026-10-08T00:00:00.000Z"),
+    postLabel: "Onthaal",
+    result: {
+      startCents: 15000,
+      endCents: 64250,
+      cashCents: 49250,
+      bancontactCents: 31075,
+      payconiqCents: 0,
+      ticketCents: 0,
+      voucherCents: 2400,
+      totalCents: 82725,
+    },
+    url: "https://vtk.be/admin/kassas/k1",
+  };
+
+  it("noemt de activiteit in het onderwerp en toont de cijfers", () => {
+    const mail = cashRegisterCountedMail(input);
+    expect(mail.subject).toBe("Je kassa voor Cantus is geteld");
+    expect(mail.text).toContain("Resultaat kassa:");
+    expect(mail.text).toContain("Bancontact:");
+    expect(mail.text).toContain("Finaal resultaat:");
+    expect(mail.text).toContain(input.url);
+    expect(mail.html).toContain(input.url);
+  });
+
+  it("geeft wat er niet was geen regel", () => {
+    const mail = cashRegisterCountedMail(input);
+    expect(mail.text).not.toContain("Payconiq");
+    expect(mail.text).not.toContain("Ticketverkoop");
+  });
+
+  it("volgt de taal van de aanvrager", () => {
+    expect(cashRegisterCountedMail({ ...input, locale: "en" }).subject).toBe(
+      "Your cash register for Cantus was counted",
+    );
   });
 });
 

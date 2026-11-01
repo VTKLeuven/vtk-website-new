@@ -34,7 +34,7 @@ import {
   type PalPlusMailSession,
 } from "@/lib/palPlusMail";
 import { expenseMailDraft } from "@/lib/rekeningen/expenses";
-import { cashRegisterAcceptedMail } from "@/lib/kassas/mail";
+import { cashRegisterAcceptedMail, cashRegisterCountedMail } from "@/lib/kassas/mail";
 import { shiftReminderMail } from "@/lib/shift/reminders";
 import { shiftReplacedMail } from "@/lib/shift/replace";
 import { newLesbezoekNotificationMail } from "@/lib/lesbezoeken-server";
@@ -142,7 +142,7 @@ export function mailPreviewGroups(): MailPreviewGroup[] {
       id: "kassas",
       title: "Kassa's",
       description: "Naar de post die een kassa aanvroeg.",
-      mails: [cashRegisterAcceptedPreview()],
+      mails: [cashRegisterAcceptedPreview(), cashRegisterCountedPreview()],
     },
     {
       id: "formulieren",
@@ -955,7 +955,7 @@ function cashRegisterAcceptedPreview(): MailPreview {
     id: "cash-register-accepted",
     title: "Je kassa is aanvaard",
     when: "Zodra iemand met kassabeheer in /admin/kassas op \"Aanvaarden en mailen\" klikt.",
-    to: "Wie de kassa aanvroeg, op het @vtk.be-adres (zonder dat op het voorkeursadres)",
+    to: "Wie de kassa aanvroeg: het gekoppelde @vtk.be-adres, anders voornaam.achternaam@vtk.be (werkgroep.voornaam.achternaam@vtk.be bij een werkgroep). Bij BEST het voorkeursadres.",
     source: "cashRegisters",
     file: "lib/kassas/mail.ts",
     subject: mail.subject,
@@ -966,6 +966,44 @@ function cashRegisterAcceptedPreview(): MailPreview {
       "De mail toont de startkassa en de toestellen zoals Beheer ze in het aanvaardformulier zette: het standaardwisselgeld voor wat de post aanduidde, met de aantallen die Beheer nog bijstelde.",
       "Een kassa van voor oktober 2026 heeft geen uren; dan valt de regel \"Uur\" weg.",
       "Heeft de aanvrager geen account meer, dan vertrekt er niets en zegt de melding in het beheer dat.",
+    ],
+  };
+}
+
+function cashRegisterCountedPreview(): MailPreview {
+  const mail = cashRegisterCountedMail({
+    locale: "nl",
+    name: "Wannes",
+    activity: "Voorbeeldcantus",
+    date: new Date("2026-10-08T00:00:00.000Z"),
+    postLabel: "Onthaal",
+    result: {
+      startCents: 15000,
+      endCents: 64250,
+      cashCents: 49250,
+      bancontactCents: 31075,
+      payconiqCents: 0,
+      ticketCents: 0,
+      voucherCents: 2400,
+      totalCents: 82725,
+    },
+    url: "https://vtk.be/admin/kassas/voorbeeld",
+  });
+  return {
+    id: "cash-register-counted",
+    title: "Je kassa is geteld",
+    when: "Zodra iemand met kassabeheer op de pagina van een getelde kassa op \"Mail sturen\" klikt. Vertrekt nooit vanzelf.",
+    to: "Wie de kassa aanvroeg, op hetzelfde adres als de mail van de aanvaarding",
+    source: "cashRegisters",
+    file: "lib/kassas/mail.ts",
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+    notes: [
+      "Staat de kassa nog voor \"doorgegeven\", dan schuift ze daarheen op: pas vanaf daar ziet de post het resultaat op de pagina waar de mail naartoe linkt.",
+      "Bancontact, Payconiq, ticketverkoop en bonnen krijgen geen regel wanneer ze nul zijn.",
+      "De opmerking van Beheer bij het tellen staat er niet in; die is enkel voor Beheer.",
+      "Opnieuw sturen kan, bijvoorbeeld na een rechtgezette telling. De mail toont dan de nieuwe cijfers.",
     ],
   };
 }
