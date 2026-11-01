@@ -20,8 +20,11 @@ const DOPL_FEEDBACK_FORM_BASE = `${DOPL_ORIGIN}/f/${DOPL_FEEDBACK_FORM_SLUG}`;
 /**
  * Wat Dopl van wie feedback geeft al kan weten: de taal van de pagina, en bij
  * een ingelogd lid zijn naam en adres. Dopl zelf is Engelstalig; enkel het
- * publieke formulier spreekt Nederlands, met `?lang=nl`. Naam en adres vullen
- * de twee contactvelden in, die het lid nog kan wijzigen (Dopl D-142).
+ * publieke formulier spreekt Nederlands, met `?lang=nl`: Dopls eigen woorden
+ * (D-142) en de velden van het formulier zelf, voor zover die in de builder van
+ * Dopl een Nederlandse versie hebben (D-143). De taal van de site beslist dus de
+ * taal van het formulier. Naam en adres vullen de twee contactvelden in, die het
+ * lid nog kan wijzigen.
  */
 export type DoplFeedbackContext = {
   locale: Locale;
