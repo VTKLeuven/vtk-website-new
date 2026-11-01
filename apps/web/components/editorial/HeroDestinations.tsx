@@ -2,16 +2,15 @@ import type { ComponentProps, ReactNode } from "react";
 import Link from "@/components/ui/Link";
 import { isExternalUrl, withLocaleBase } from "@/lib/href";
 import { HOME_LINK_EVENT, OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
+import { DEFAULT_HERO_SUBS, type HeroDestinationKey, type HeroSubs } from "@/lib/home/heroDesign";
 
 export type HeroDestination = {
-  key: string;
+  key: HeroDestinationKey;
   side: "l" | "r";
   topPercent: string;
   delay: string;
   titleNl: string;
   titleEn: string;
-  subNl: string;
-  subEn: string;
   href: string;
 };
 
@@ -23,8 +22,6 @@ export const DESTINATIONS: HeroDestination[] = [
     delay: "1.50s",
     titleNl: "Kalender",
     titleEn: "Calendar",
-    subNl: "Alles wat er gepland staat",
-    subEn: "Everything that is planned",
     href: "/kalender",
   },
   {
@@ -34,8 +31,6 @@ export const DESTINATIONS: HeroDestination[] = [
     delay: "1.62s",
     titleNl: "Tickets",
     titleEn: "Tickets",
-    subNl: "Lopende verkopen",
-    subEn: "Sales that are open",
     href: "/tickets",
   },
   {
@@ -45,8 +40,6 @@ export const DESTINATIONS: HeroDestination[] = [
     delay: "1.74s",
     titleNl: "Broodjes",
     titleEn: "Sandwiches",
-    subNl: "Bestellen bij de Theokot",
-    subEn: "Order at the Theokot",
     href: "/theokot",
   },
   {
@@ -56,8 +49,6 @@ export const DESTINATIONS: HeroDestination[] = [
     delay: "1.86s",
     titleNl: "Cursusdienst",
     titleEn: "Course Shop",
-    subNl: "Cursussen, boeken en de printer",
-    subEn: "Courses, books and the printer",
     href: "https://cudi.vtk.be",
   },
   {
@@ -67,8 +58,6 @@ export const DESTINATIONS: HeroDestination[] = [
     delay: "1.98s",
     titleNl: "Shiften",
     titleEn: "Shifts",
-    subNl: "Help mee achter de bar",
-    subEn: "Help out behind the bar",
     href: "/shift",
   },
   {
@@ -78,16 +67,16 @@ export const DESTINATIONS: HeroDestination[] = [
     delay: "2.10s",
     titleNl: "Career",
     titleEn: "Career",
-    subNl: "Bedrijven, talks en de Jobfair",
-    subEn: "Companies, talks and the Job fair",
     href: "https://career.vtk.be",
   },
 ];
 
-export function destinationText(destination: HeroDestination, nl: boolean) {
+/** Een leeg tekstje komt enkel voor in het voorbeeld terwijl iemand het veld leegmaakt. */
+export function destinationText(destination: HeroDestination, nl: boolean, subs: HeroSubs) {
+  const lang = nl ? "nl" : "en";
   return {
     title: nl ? destination.titleNl : destination.titleEn,
-    sub: nl ? destination.subNl : destination.subEn,
+    sub: subs[destination.key][lang].trim() || DEFAULT_HERO_SUBS[destination.key][lang],
   };
 }
 

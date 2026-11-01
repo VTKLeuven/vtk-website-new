@@ -3280,6 +3280,12 @@ en Slogans, en dat las niet als één keuze.
   jobfair haar logo's uit /admin/partners.
 - **Hoverkleur en snelheid** gelden voor de bouwtekening en het constructielogo; wit
   is wat er altijd al stond, 100% de snelheid van voordien.
+- **De tekstjes onder de zes bestemmingen** zijn sinds november 2026 aan te passen,
+  in beide talen, voor de bouwtekening en het constructielogo samen. De namen zelf
+  (Kalender, Tickets, ...) blijven in de code: die horen bij een vaste bestemming, en
+  een andere naam op dezelfde link zou enkel verwarren. Een leeg veld zet de
+  standaardtekst terug. Maximaal 60 tekens, zodat een tekstje op twee regels naast de
+  tekening past.
 
 Wat bij de hero's met een foto bewust niet terugkwam, omdat het los staat van hoe ze
 eruitzien:

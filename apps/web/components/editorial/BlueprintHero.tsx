@@ -204,7 +204,7 @@ export function BlueprintHero({
 
         {/* Labels op desktop */}
         {DESTINATIONS.map((dest) => {
-          const { title, sub } = destinationText(dest, nl);
+          const { title, sub } = destinationText(dest, nl, design.subs);
           return (
             <DestinationLink
               key={dest.key}
@@ -227,7 +227,7 @@ export function BlueprintHero({
       {/* Mobiele lijst onder 760px */}
       <ul className="g-list">
         {DESTINATIONS.map((dest) => {
-          const { title, sub } = destinationText(dest, nl);
+          const { title, sub } = destinationText(dest, nl, design.subs);
           return (
             <li key={dest.key}>
               <DestinationLink destination={dest} base={base}>

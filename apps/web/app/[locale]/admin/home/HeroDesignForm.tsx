@@ -1,12 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Card, Label } from "@vtk/ui";
+import { Card, Input, Label } from "@vtk/ui";
 import type { Locale } from "@vtk/i18n";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import { BlueprintHero } from "@/components/editorial/BlueprintHero";
+import { DESTINATIONS } from "@/components/editorial/HeroDestinations";
 import {
+  DEFAULT_HERO_SUBS,
+  heroSubFieldName,
+  HERO_SUB_LANGS,
+  HERO_SUB_MAX_LENGTH,
   HERO_ANIMATION_SPEED_MAX,
   HERO_ANIMATION_SPEED_MIN,
   HERO_ANIMATION_SPEED_STEP,
@@ -16,10 +21,12 @@ import {
   isHeroPhotoDesign,
   type HeroDesignName,
   type HeroDesignSetting,
+  type HeroDestinationKey,
   type HeroFill,
   type HeroHoverColor,
   type HeroLayout,
   type HeroLineWeight,
+  type HeroSubLang,
 } from "@/lib/home/heroDesign";
 import { saveErrorMessages } from "@/lib/saveMessages";
 import { saveHomeHeroDesignAction } from "@/app/actions/home";
@@ -86,6 +93,12 @@ export function HeroDesignForm({
   const replayKey = `${design.design}-${design.layout}-${design.fill}-${design.animationSpeed}`;
   const set = <K extends keyof HeroDesignSetting>(key: K, value: HeroDesignSetting[K]) =>
     setDesign((current) => ({ ...current, [key]: value }));
+  const setSub = (key: HeroDestinationKey, lang: HeroSubLang, value: string) =>
+    setDesign((current) => ({
+      ...current,
+      subs: { ...current.subs, [key]: { ...current.subs[key], [lang]: value } },
+    }));
+  const langLabel: Record<HeroSubLang, string> = { nl: "Nederlands", en: "English" };
   const construction = design.design === "construction";
   const photoHero = isHeroPhotoDesign(design.design);
 
@@ -254,6 +267,49 @@ export function HeroDesignForm({
               onChange={(event) => set("animationSpeed", Number(event.target.value))}
             />
           </div>
+        </div>
+
+        {/* Mee bewaard bij een hero met foto, zodat terugschakelen niets wist. */}
+        <div hidden={photoHero} className="space-y-2 border-t border-[var(--line)] pt-4">
+          <h3 className="text-sm font-semibold">
+            {nl ? "Tekstjes bij de bestemmingen" : "Texts under the destinations"}
+          </h3>
+          <p className="text-sm text-[#5c667f]">
+            {nl
+              ? "Het voorbeeld toont de taal van dit scherm. Een leeg veld zet de standaardtekst terug."
+              : "The preview shows the language of this screen. An empty field restores the default text."}
+          </p>
+          <div className="hidden gap-3 text-xs font-semibold text-[#5c667f] sm:grid sm:grid-cols-[110px_1fr_1fr]">
+            <span>{nl ? "Bestemming" : "Destination"}</span>
+            <span>{langLabel.nl}</span>
+            <span>{langLabel.en}</span>
+          </div>
+          {DESTINATIONS.map((destination) => {
+            const title = nl ? destination.titleNl : destination.titleEn;
+            return (
+              <div
+                key={destination.key}
+                className="grid gap-2 sm:grid-cols-[110px_1fr_1fr] sm:items-center sm:gap-3"
+              >
+                <span className="text-sm font-medium">{title}</span>
+                {HERO_SUB_LANGS.map((lang) => (
+                  <div key={lang} className="space-y-1 sm:space-y-0">
+                    <span className="block text-xs text-[#5c667f] sm:hidden" aria-hidden="true">
+                      {langLabel[lang]}
+                    </span>
+                    <Input
+                      name={heroSubFieldName(destination.key, lang)}
+                      aria-label={`${title}: ${langLabel[lang]}`}
+                      value={design.subs[destination.key][lang]}
+                      placeholder={DEFAULT_HERO_SUBS[destination.key][lang]}
+                      maxLength={HERO_SUB_MAX_LENGTH}
+                      onChange={(event) => setSub(destination.key, lang, event.target.value)}
+                    />
+                  </div>
+                ))}
+              </div>
+            );
+          })}
         </div>
       </SaveForm>
     </Card>

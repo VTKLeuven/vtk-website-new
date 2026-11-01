@@ -173,7 +173,7 @@ function LineEnds({ setting, nl, base }: LayoutProps) {
       </Drawing>
       {ends.map((entry, index) => {
         const destination = DESTINATIONS.find((candidate) => candidate.key === entry.key)!;
-        const { title, sub } = destinationText(destination, nl);
+        const { title, sub } = destinationText(destination, nl, setting.subs);
         const x = entry.point[0] + (entry.side === "l" ? -10 : 10);
         return (
           <DestinationLink
@@ -263,7 +263,7 @@ function Leaders({ setting, nl, base }: LayoutProps) {
         ))}
       </Drawing>
       {DESTINATIONS.map((destination, index) => {
-        const { title, sub } = destinationText(destination, nl);
+        const { title, sub } = destinationText(destination, nl, setting.subs);
         const top = Number.parseFloat(destination.topPercent) + (LEADERS_DROP / 520) * 100;
         return (
           <DestinationLink
@@ -300,7 +300,7 @@ function Register({ setting, nl, base }: LayoutProps) {
       </div>
       <ul className="k-register">
         {DESTINATIONS.map((destination) => {
-          const { title, sub } = destinationText(destination, nl);
+          const { title, sub } = destinationText(destination, nl, setting.subs);
           return (
             <li key={destination.key}>
               <DestinationLink destination={destination} base={base}>

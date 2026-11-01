@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_HERO_DESIGN,
+  DEFAULT_HERO_SUBS,
+  HERO_SUB_MAX_LENGTH,
+  heroSubFieldName,
   parseHeroDesignForm,
   readHeroDesignSetting,
 } from "@/lib/home/heroDesign";
@@ -42,8 +45,30 @@ describe("readHeroDesignSetting", () => {
       pattern: true,
       hoverColor: "yellow",
       animationSpeed: 75,
+      subs: {
+        ...DEFAULT_HERO_SUBS,
+        kalender: { nl: "Wat er aankomt", en: "What is coming up" },
+      },
     };
     expect(readHeroDesignSetting(value)).toEqual(value);
+  });
+
+  it("geeft een rij van voor de tekstjes de standaardteksten", () => {
+    expect(readHeroDesignSetting({ design: "classic" }).subs).toEqual(DEFAULT_HERO_SUBS);
+    expect(readHeroDesignSetting({ design: "classic", subs: "weg" }).subs).toEqual(DEFAULT_HERO_SUBS);
+    expect(readHeroDesignSetting({ design: "classic", subs: null }).subs).toEqual(DEFAULT_HERO_SUBS);
+  });
+
+  it("valt per tekstje terug, niet voor de hele lijst", () => {
+    const { subs } = readHeroDesignSetting({
+      subs: {
+        tickets: { nl: "Eigen tekst", en: "  " },
+        career: { nl: 3, en: "x".repeat(HERO_SUB_MAX_LENGTH + 1) },
+      },
+    });
+    expect(subs.tickets).toEqual({ nl: "Eigen tekst", en: DEFAULT_HERO_SUBS.tickets.en });
+    expect(subs.career).toEqual(DEFAULT_HERO_SUBS.career);
+    expect(subs.kalender).toEqual(DEFAULT_HERO_SUBS.kalender);
   });
 
   it("valt per veld terug wanneer iets niet (meer) bestaat", () => {
@@ -68,9 +93,28 @@ describe("parseHeroDesignForm", () => {
       lineWeight: "thick",
       lineStrength: 70,
       pattern: true,
-          hoverColor: "yellow",
+      hoverColor: "yellow",
       animationSpeed: 150,
+      subs: DEFAULT_HERO_SUBS,
     });
+  });
+
+  it("bewaart een tekstje zonder witruimte en zet een leeg veld terug op de standaard", () => {
+    const { subs } = parseHeroDesignForm(
+      form({
+        ...VALID,
+        [heroSubFieldName("shiften", "nl")]: "  Kom shiften  ",
+        [heroSubFieldName("shiften", "en")]: "   ",
+      }),
+    )!;
+    expect(subs.shiften).toEqual({ nl: "Kom shiften", en: DEFAULT_HERO_SUBS.shiften.en });
+  });
+
+  it("weigert een tekstje dat te lang is", () => {
+    const name = heroSubFieldName("tickets", "en");
+    const exact = "x".repeat(HERO_SUB_MAX_LENGTH);
+    expect(parseHeroDesignForm(form({ ...VALID, [name]: exact }))?.subs.tickets.en).toBe(exact);
+    expect(parseHeroDesignForm(form({ ...VALID, [name]: `${exact}x` }))).toBeNull();
   });
 
   it("weigert een onbekende waarde of een sterkte buiten het bereik", () => {
