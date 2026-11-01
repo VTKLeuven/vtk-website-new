@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { Fragment, type CSSProperties } from "react";
 import Image from "next/image";
 import Link from "@/components/ui/Link";
 import { HOME_LINK_EVENT, umamiEvent } from "@/lib/analytics";
@@ -20,6 +20,19 @@ export type HeroEvents = {
   link: { label: string; href: string };
   cards: HeroEventCard[];
 };
+
+/**
+ * "MECH/Chemical/Electrical/Energy" is voor de browser één woord. Mag de titel na
+ * elke schuine streep afbreken, dan breekt ze daar en niet midden in een woord.
+ */
+function titleWithBreaks(title: string) {
+  return title.split(/(?<=\/)/).map((part, index) => (
+    <Fragment key={index}>
+      {index > 0 ? <wbr /> : null}
+      {part}
+    </Fragment>
+  ));
+}
 
 /**
  * De evenementen in de hero: losse affiches die over de gele streep hangen, met
@@ -63,7 +76,7 @@ export function HeroEventCards({ cards, tempo = 1 }: { cards: HeroEventCard[]; t
               </span>
             </span>
             <span className="g-event-text">
-              <span className="g-event-title">{card.title}</span>
+              <span className="g-event-title">{titleWithBreaks(card.title)}</span>
               {/* Uur en plaats op één regel, zoals op de evenementkaart. De
                   harde spatie houdt het bolletje bij het uur; een lange plaats
                   loopt door op de volgende regel en wordt nooit afgekapt. */}

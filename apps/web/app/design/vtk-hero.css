@@ -296,6 +296,10 @@
 .g-event {
   grid-row: 1 / span 2;
   display: grid;
+  /* Zonder deze kolom groeit de kaart mee met het langste woord in haar titel.
+     De foto volgt die breedte, haar hoogte wordt de hoogte van de hele rij, en
+     via de 16:9 worden daarmee alle vier de foto's te breed en overlappen ze. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: subgrid;
   min-width: 0;
   color: var(--ink);
@@ -347,6 +351,7 @@
   line-height: 1.22;
   letter-spacing: -0.012em;
   text-wrap: balance;
+  overflow-wrap: anywhere;
 }
 
 .g-event-title::after {
