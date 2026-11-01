@@ -36,6 +36,7 @@ function ticket(overrides: Partial<StatsTicketInput> = {}): StatsTicketInput {
     totalCents: 1000,
     refundedCents: 0,
     memberPrice: false,
+    group: "NON_MEMBER",
     orderId: `o${seq}`,
     buyerKey: `b${seq}`,
     signedIn: true,

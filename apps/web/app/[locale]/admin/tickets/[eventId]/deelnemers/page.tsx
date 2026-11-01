@@ -26,12 +26,20 @@ import { AttendeeQr } from "@/components/ticketing/admin/AttendeeQr";
 import { AdminMetric } from "@/components/ticketing/admin/AdminMetric";
 import { StatusBadge } from "@/components/ticketing/admin/StatusBadge";
 import {
+  ATTENDEE_GROUPS,
+  attendeeGroupLabel,
+  parseAttendeeGroup,
+  type AttendeeGroup,
+} from "@/lib/ticketing/attendeeGroups";
+import { attendeeGroupsFor } from "@/lib/ticketing/attendeeAccounts";
+import {
   formatDateTime,
   formatNumber,
   type AdminLocale,
 } from "@/components/ticketing/admin/format";
 
 const TICKET_STATUSES: TicketStatus[] = ["VALID", "VOID", "REFUNDED"];
+const PAGE_SIZE = 300;
 
 function answerLabel(value: Prisma.JsonValue, locale: AdminLocale): string {
   if (value === null) return "—";
@@ -48,7 +56,7 @@ export default async function TicketAttendeesPage({
   searchParams,
 }: {
   params: Promise<{ locale: string; eventId: string }>;
-  searchParams: Promise<{ q?: string; ticketType?: string; attendance?: string }>;
+  searchParams: Promise<{ q?: string; ticketType?: string; attendance?: string; group?: string; sort?: string }>;
 }) {
   const [{ locale: localeParam, eventId }, filters] = await Promise.all([params, searchParams]);
   if (!hasLocale(localeParam)) notFound();
@@ -96,9 +104,45 @@ export default async function TicketAttendeesPage({
   }
 
   const where: Prisma.TicketOrderItemWhereInput = { AND: conditions };
-  const [attendees, issuedCount, validCount, checkedInCount, refundedCount] = await Promise.all([
+  const selectedGroup = parseAttendeeGroup(filters.group);
+  const sortByGroup = filters.sort === "group";
+
+  // Eerst enkel wat de groep bepaalt, voor alle deelnemers die aan de andere
+  // filters voldoen: of iemand praesidium, erelid of lid is, staat niet in een
+  // kolom (zie lib/ticketing/attendeeGroups.ts), dus filteren en sorteren
+  // daarop gebeurt hier en niet in de databank. Daarna de volledige rijen van
+  // de pagina die getoond wordt.
+  const candidates = await prisma.ticketOrderItem.findMany({
+    where,
+    select: {
+      id: true,
+      attendeeName: true,
+      attendeeEmail: true,
+      rNumber: true,
+      honoraryPrice: true,
+      order: { select: { buyerUserId: true, buyerName: true } },
+    },
+    orderBy: [{ attendeeName: "asc" }, { createdAt: "asc" }],
+  });
+  const candidateGroups = await attendeeGroupsFor(candidates);
+  const groupById = new Map(candidates.map((item, index) => [item.id, candidateGroups[index]]));
+  const groupCounts = new Map<AttendeeGroup, number>();
+  for (const group of candidateGroups) groupCounts.set(group, (groupCounts.get(group) ?? 0) + 1);
+  const matching = candidates.filter(
+    (item) => !selectedGroup || groupById.get(item.id) === selectedGroup,
+  );
+  // Stabiel, dus binnen een groep blijft de volgorde op naam.
+  const ordered = sortByGroup
+    ? [...matching].sort(
+        (a, b) =>
+          ATTENDEE_GROUPS.indexOf(groupById.get(a.id)!) - ATTENDEE_GROUPS.indexOf(groupById.get(b.id)!),
+      )
+    : matching;
+  const pageIds = ordered.slice(0, PAGE_SIZE).map((item) => item.id);
+
+  const [rows, issuedCount, validCount, checkedInCount, refundedCount] = await Promise.all([
     prisma.ticketOrderItem.findMany({
-      where,
+      where: { id: { in: pageIds } },
       include: {
         order: {
           select: { reference: true, buyerName: true, buyerEmail: true, status: true },
@@ -118,14 +162,14 @@ export default async function TicketAttendeesPage({
           },
         },
       },
-      orderBy: [{ attendeeName: "asc" }, { createdAt: "asc" }],
-      take: 300,
     }),
     prisma.ticket.count({ where: { eventId } }),
     prisma.ticket.count({ where: { eventId, status: "VALID" } }),
     prisma.ticket.count({ where: { eventId, status: "VALID", checkedInAt: { not: null } } }),
     prisma.ticket.count({ where: { eventId, status: "REFUNDED" } }),
   ]);
+  const rowById = new Map(rows.map((row) => [row.id, row]));
+  const attendees = pageIds.flatMap((id) => rowById.get(id) ?? []);
 
   return (
     <div className="ticket-admin-page">
@@ -196,6 +240,26 @@ export default async function TicketAttendeesPage({
               <option value="REFUNDED">{locale === "nl" ? "Terugbetaald" : "Refunded"}</option>
             </select>
           </div>
+          <div className="ticket-admin-field">
+            <label htmlFor="attendee-group">{locale === "nl" ? "Groep" : "Group"}</label>
+            <select id="attendee-group" name="group" defaultValue={selectedGroup ?? ""}>
+              <option value="">{locale === "nl" ? "Iedereen" : "Everyone"}</option>
+              {ATTENDEE_GROUPS.map((group) => (
+                <option key={group} value={group}>
+                  {attendeeGroupLabel(group, locale, true)} ({formatNumber(groupCounts.get(group) ?? 0, locale)})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="ticket-admin-field">
+            <label htmlFor="attendee-sort">{locale === "nl" ? "Sorteren" : "Sort"}</label>
+            <select id="attendee-sort" name="sort" defaultValue={sortByGroup ? "group" : ""}>
+              <option value="">{locale === "nl" ? "Op naam" : "By name"}</option>
+              <option value="group">
+                {locale === "nl" ? "Op groep, praesidium eerst" : "By group, praesidium first"}
+              </option>
+            </select>
+          </div>
           <button className="ticket-admin-button" type="submit">
             <Filter aria-hidden="true" size={15} />
             {locale === "nl" ? "Filter" : "Filter"}
@@ -204,7 +268,7 @@ export default async function TicketAttendeesPage({
         <div className="ticket-admin-section-head">
           <div>
             <h2 id="attendees-heading">{locale === "nl" ? "Deelnemerslijst" : "Attendee list"}</h2>
-            <p>{formatNumber(attendees.length, locale)} {locale === "nl" ? "resultaten" : "results"}{attendees.length === 300 ? ` · ${locale === "nl" ? "maximaal 300" : "maximum 300"}` : ""}</p>
+            <p>{formatNumber(ordered.length, locale)} {locale === "nl" ? "resultaten" : "results"}{ordered.length > PAGE_SIZE ? ` · ${locale === "nl" ? `de eerste ${PAGE_SIZE} getoond` : `first ${PAGE_SIZE} shown`}` : ""}</p>
           </div>
         </div>
         {attendees.length === 0 ? (
@@ -231,10 +295,14 @@ export default async function TicketAttendeesPage({
                   const ticket = item.ticket;
                   if (!ticket) return null;
                   const latestScan = ticket.scanLogs[0];
+                  const group = groupById.get(item.id) ?? "NON_MEMBER";
                   return (
                     <InteractiveRow key={item.id}>
                       <td data-wrap="true">
-                        <strong>{item.attendeeName}</strong>
+                        <strong>{item.attendeeName}</strong>{" "}
+                        <span className="ticket-admin-status" data-tone="neutral" data-group={group}>
+                          {attendeeGroupLabel(group, locale)}
+                        </span>
                         <div className="ticket-admin-row-meta ticket-admin-inline-meta">
                           <Mail aria-hidden="true" size={13} />
                           {item.attendeeEmail ?? item.order.buyerEmail}

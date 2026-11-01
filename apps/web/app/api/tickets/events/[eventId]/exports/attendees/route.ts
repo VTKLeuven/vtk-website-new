@@ -2,6 +2,8 @@ import type { Prisma, TicketStatus } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { createCsv, type CsvValue } from "@/lib/ticketing/csv";
 import { requireTicketEventCapability } from "@/lib/ticketing/authorization";
+import { attendeeGroupLabel, parseAttendeeGroup } from "@/lib/ticketing/attendeeGroups";
+import { attendeeGroupsFor } from "@/lib/ticketing/attendeeAccounts";
 
 const TICKET_STATUSES: TicketStatus[] = ["VALID", "VOID", "REFUNDED"];
 const MAX_EXPORT_ROWS = 50_000;
@@ -37,6 +39,7 @@ export async function GET(
       ? rawAttendance
       : "";
     const locale = search.get("locale") === "en" ? "en" : "nl";
+    const group = parseAttendeeGroup(search.get("group"));
 
     const conditions: Prisma.TicketOrderItemWhereInput[] = [
       { eventId },
@@ -76,7 +79,16 @@ export async function GET(
       prisma.ticketOrderItem.findMany({
         where: { AND: conditions },
         include: {
-          order: { select: { reference: true, buyerName: true, buyerEmail: true, status: true, createdAt: true } },
+          order: {
+            select: {
+              reference: true,
+              buyerName: true,
+              buyerEmail: true,
+              buyerUserId: true,
+              status: true,
+              createdAt: true,
+            },
+          },
           ticket: { select: { publicCode: true, status: true, checkedInAt: true } },
           answers: { select: { questionId: true, value: true } },
         },
@@ -88,11 +100,17 @@ export async function GET(
     if (items.length > MAX_EXPORT_ROWS) {
       return Response.json({ error: "EXPORT_TOO_LARGE", limit: MAX_EXPORT_ROWS }, { status: 413 });
     }
+    // Dezelfde groep als op de deelnemerslijst (lib/ticketing/attendeeGroups.ts).
+    const groups = await attendeeGroupsFor(items);
+    const exported = items
+      .map((item, index) => ({ item, group: groups[index] }))
+      .filter((row) => !group || row.group === group);
 
     const headers = [
       locale === "nl" ? "Ticketcode" : "Ticket code",
       locale === "nl" ? "Deelnemer" : "Attendee",
       locale === "nl" ? "E-mail deelnemer" : "Attendee email",
+      locale === "nl" ? "Groep" : "Group",
       locale === "nl" ? "Tickettype" : "Ticket type",
       locale === "nl" ? "Ticketstatus" : "Ticket status",
       locale === "nl" ? "Ingecheckt op" : "Checked in at",
@@ -105,12 +123,13 @@ export async function GET(
         `${locale === "nl" ? "Vraag" : "Question"}: ${locale === "en" && question.labelEn ? question.labelEn : question.labelNl} [${question.code}]`
       ),
     ];
-    const rows: CsvValue[][] = items.map((item) => {
+    const rows: CsvValue[][] = exported.map(({ item, group: itemGroup }) => {
       const answers = new Map(item.answers.map((answer) => [answer.questionId, answer.value]));
       return [
         item.ticket?.publicCode,
         item.attendeeName,
         item.attendeeEmail,
+        attendeeGroupLabel(itemGroup, locale),
         item.ticketTypeName,
         item.ticket?.status,
         item.ticket?.checkedInAt,

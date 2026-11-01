@@ -15,6 +15,8 @@
  * 23u30 opent, hoort bij die avond en niet bij de volgende UTC-dag.
  */
 
+import { ATTENDEE_GROUPS, type AttendeeGroup } from "./attendeeGroups";
+
 export type StatsEventInput = {
   id: string;
   title: string;
@@ -40,6 +42,8 @@ export type StatsTicketInput = {
   totalCents: number;
   refundedCents: number;
   memberPrice: boolean;
+  /** Wie er met dit ticket komt; zie `attendeeGroups.ts`. */
+  group: AttendeeGroup;
   orderId: string;
   /** Account-id of e-mailadres: wie hetzelfde koopt voor twee events, is één koper. */
   buyerKey: string;
@@ -167,6 +171,14 @@ export type TypeRow = {
   netCents: number | null;
 };
 
+/** Eén groep deelnemers (praesidium, ereleden, leden, niet-leden). */
+export type AttendeeGroupRow = {
+  group: AttendeeGroup;
+  sold: number;
+  share: number | null;
+  checkedIn: number;
+};
+
 export type GroupRow = {
   id: string;
   name: string;
@@ -258,6 +270,8 @@ export type TicketStats = {
   checkIns: { keys: string[]; values: number[] } | null;
   events: EventRow[];
   types: TypeRow[];
+  /** Altijd de vier groepen, in vaste volgorde, ook wanneer er een nul staat. */
+  attendeeGroups: AttendeeGroupRow[];
   groups: GroupRow[];
   sources: SourceRow[];
   accountingCodes: AccountingCodeRow[];
@@ -497,6 +511,17 @@ export function computeTicketStats(
     .map((row) => ({ ...row, share: share(row.sold, valid.length) }))
     .sort((a, b) => b.sold - a.sold);
 
+  // --- Per groep deelnemers -----------------------------------------------------
+  const attendeeGroupRows: AttendeeGroupRow[] = ATTENDEE_GROUPS.map((group) => {
+    const inGroup = valid.filter((ticket) => ticket.group === group);
+    return {
+      group,
+      sold: inGroup.length,
+      share: share(inGroup.length, valid.length),
+      checkedIn: inGroup.filter((ticket) => ticket.checkedInAt).length,
+    };
+  });
+
   // --- Per post ----------------------------------------------------------------
   const groupRows = new Map<string, GroupRow>();
   for (const row of eventRows) {
@@ -610,6 +635,7 @@ export function computeTicketStats(
     checkIns,
     events: eventRows,
     types: typeList,
+    attendeeGroups: attendeeGroupRows,
     groups: groupList,
     sources: sourceList,
     accountingCodes: accountingCodeRows(tickets, financeIds),

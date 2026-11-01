@@ -9491,6 +9491,31 @@ voor iedereen anders bestaat de prijs niet, ook niet in de paginabron.
 - De bestelregel heet "Bierticket (erelid)", zodat de mail, de pdf en de scanner
   het zonder eigen logica tonen.
 
+## Deelnemers per groep: praesidium, ereleden, leden, niet-leden
+
+Op de deelnemerslijst van een event filter en sorteer je op wie er komt, en de
+statistieken tellen dezelfde groepen ("Wie komt er"). De vraag kwam van wie
+een alumni-avond organiseerde en wilde weten hoeveel ereleden er kwamen, en van
+wie aan de deur wilde zien wie van het praesidium was.
+
+- **Eén groep per deelnemer, met voorrang**: praesidium (een post in het
+  lopende werkingsjaar), dan erelid, dan lid, dan niet-lid. Zo telt het
+  overzicht op tot het totaal, en zegt de filter hetzelfde als het getal.
+- **Het gaat om de deelnemer, niet om de koper.** Een lid dat vier tickets koopt,
+  brengt geen vier leden mee. Daarom is dit niet `memberSeat`: dat is de plaats
+  die de koper nam, en die blijft voor het plafond van de pot.
+- **Een deelnemer koppelen we aan een account** langs zijn e-mailadres (het
+  eerste ticket van een ingelogde koper draagt dat van zijn account), zijn
+  r-nummer, of zonder e-mailadres de naam van de koper. Wie we zo niet
+  terugvinden, is niet-lid: meer weten we niet. Een ticket aan de
+  ereledenprijs is altijd een erelid.
+- **Gerekend op het moment van kijken**, niet bij de aankoop: wie na 15 juli
+  geen post meer heeft, staat bij een oud event niet meer als praesidium. Een
+  overzicht van wie er nu komt, hoort te kloppen met wie het nu is.
+- De code staat in `lib/ticketing/attendeeGroups.ts` (puur) en
+  `attendeeAccounts.ts` (het opzoeken), en de CSV van de deelnemers krijgt
+  dezelfde kolom.
+
 ## Ereleden: één ticket in totaal, als vinkje per event
 
 Bovenop de ereledenprijs kan een event zeggen dat een erelid er **hoogstens één
