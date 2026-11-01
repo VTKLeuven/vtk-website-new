@@ -11199,6 +11199,36 @@ album wilde nakijken, moest in Immich zijn.
   fotobibliotheek"; de merkers (`[gallery]`, `[tab:]`) blijven een detail van de
   code. Hoe dat technisch werkt, staat in `docs/immich-gallery.md`.
 
+## Vervangbaar op een shift: een student neemt de plaats van het praesidium in
+
+Een praesidiumlid vult soms een shift in omdat ze anders leeg blijft. Schrijft er
+later toch een student in, dan had dat praesidiumlid die shift niet hoeven te
+doen. Wie zich daarom inschrijft, vinkt "Een student mag mijn plaats innemen"
+aan (`ShiftParticipant.replaceable`, ook achteraf aan of uit te zetten in het
+venster van de shift).
+
+- **Enkel voor het praesidium**, in het werkingsjaar van de shift (dezelfde
+  grens als de bonnetjes: `praesidiumYears`, kantelt op 15 juli). Voor wie
+  geen post heeft, staat het vinkje er niet, en de server negeert het.
+- **Enkel een student vervangt**, nooit een ander praesidiumlid: het doel is dat
+  de shift naar een student gaat, niet dat het praesidium onderling schuift.
+- **De student ziet het niet.** Voor hem telt die plaats als vrij (3/4 in plaats
+  van 4/4) en staat die naam niet in de lijst "Al ingeschreven". Hij schrijft
+  zich in zoals op elke shift met plaats; dat hij iemand vervangt, is niet zijn
+  zaak. Het praesidium ziet de echte bezetting.
+- **Wie er vervangen wordt: de laatst ingeschreven vervangbare.** Wie zich het
+  laatst inschreef, heeft er het minst lang op gerekend.
+- **Het praesidiumlid krijgt meteen een mail** dat het niet meer moet komen
+  (`shiftReplacedMail`, voorvertoning op /admin/it/flows). Vertrekt die mail
+  niet, dan blijft de vervanging staan; de fout gaat naar de log.
+- **Tot de start van de shift**, ook binnen de 24 uur waarin uitschrijven niet
+  meer kan: een student die er toch nog bij komt, is precies wat de optie wil.
+- **Niet op een cursusdienst-shift**: die inschrijving staat ook op cudi.vtk.be
+  en kan daar niet mee omgewisseld worden.
+- Bestaande inschrijvingen staan uit: niemand wordt vervangen zonder het zelf
+  aangeduid te hebben. De app schrijft in langs dezelfde route, dus een student
+  in de app vervangt net zo; het vinkje zelf staat (nog) enkel op de site.
+
 ## Shiftenoverzicht praesidium
 
 Oktober 2026. Naast de shiften op /shift vult het praesidium shiftenlijsten in

@@ -19,6 +19,7 @@ import {
   freeSpots,
   postLabel,
   registerShift,
+  setShiftReplaceable,
   spotsLabel,
   spotsSpoken,
   spotsVariant,
@@ -96,6 +97,11 @@ export function ShiftDialog({
   const [now] = useState(() => Date.now());
 
   const { shift, registered } = entry;
+  // "Een student mag mijn plaats innemen" (lib/shift/replace.ts). Voor een
+  // nieuwe inschrijving gaat de keuze mee met de knop; op een bestaande
+  // inschrijving bewaart het vinkje meteen.
+  const [replaceable, setReplaceable] = useState(Boolean(shift.replaceable));
+  const [savingReplaceable, setSavingReplaceable] = useState(false);
   const isFull = !registered && freeSpots(shift) <= 0;
   const locked = registered && !canUnregister(shift, now);
   const free = freeSpots(shift);
@@ -134,12 +140,26 @@ export function ShiftDialog({
     setBusy(true);
     const ok = registered
       ? await unregisterShift(shift.id, showToast, t)
-      : await registerShift(shift.id, showToast, t);
+      : await registerShift(shift.id, showToast, t, {
+          replaceable: Boolean(shift.replaceableOption) && replaceable,
+        });
     setBusy(false);
     if (ok) {
       onSuccess?.(!registered);
       onClose();
     }
+  }
+
+  async function toggleReplaceable(next: boolean) {
+    if (!registered) {
+      setReplaceable(next);
+      return;
+    }
+    setReplaceable(next);
+    setSavingReplaceable(true);
+    const ok = await setShiftReplaceable(shift.id, next, showToast, t);
+    setSavingReplaceable(false);
+    if (!ok) setReplaceable(!next);
   }
 
   const freeLabel = free === 1 ? t.spots.one : fill(t.spots.few, { n: free });
@@ -249,6 +269,21 @@ export function ShiftDialog({
                 </ul>
               )}
             </section>
+          ) : null}
+
+          {shift.replaceableOption && !signInHref ? (
+            <label className="vtk-shift-replaceable">
+              <input
+                type="checkbox"
+                checked={replaceable}
+                disabled={savingReplaceable || busy}
+                onChange={(event) => toggleReplaceable(event.target.checked)}
+              />
+              <span>
+                <strong>{t.replaceable.label}</strong>
+                <small>{t.replaceable.hint}</small>
+              </span>
+            </label>
           ) : null}
 
           {/* Instructies met gele ruitjes */}

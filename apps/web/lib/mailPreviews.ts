@@ -36,6 +36,7 @@ import {
 import { expenseMailDraft } from "@/lib/rekeningen/expenses";
 import { cashRegisterAcceptedMail } from "@/lib/kassas/mail";
 import { shiftReminderMail } from "@/lib/shift/reminders";
+import { shiftReplacedMail } from "@/lib/shift/replace";
 import { newLesbezoekNotificationMail } from "@/lib/lesbezoeken-server";
 import { newRentalNotificationMail } from "@/lib/theokotVerhuur-server";
 import { orderConfirmationMail } from "@/lib/ticketing/mail";
@@ -115,7 +116,7 @@ export function mailPreviewGroups(): MailPreviewGroup[] {
     {
       id: "shiften",
       title: "Shiften",
-      description: "Twee herinneringen per shift, elk met een eigen venster.",
+      description: "Twee herinneringen per shift, elk met een eigen venster, en de mail aan een praesidiumlid dat door een student vervangen werd.",
       mails: shiftPreviews(),
     },
     {
@@ -331,6 +332,7 @@ function shiftPreviews(): MailPreview[] {
   };
   const dayBefore = shiftReminderMail("dayBefore", { name: "Wannes", locale: "NL" }, shift);
   const soon = shiftReminderMail("soon", { name: "Wannes", locale: "NL" }, shift);
+  const replaced = shiftReplacedMail({ name: "Wannes", locale: "NL" }, shift);
   return [
     {
       id: "shift-day-before",
@@ -353,6 +355,20 @@ function shiftPreviews(): MailPreview[] {
       source: "shifts",
       file: "lib/shift/reminders.ts",
       ...soon,
+    },
+    {
+      id: "shift-replaced",
+      title: "Een student neemt je plaats in",
+      when: "Meteen, wanneer een student zich inschrijft op een volle shift waarop dit praesidiumlid aanduidde dat een student zijn plaats mocht innemen.",
+      to: "Het praesidiumlid dat vervangen werd",
+      source: "shifts",
+      file: "lib/shift/replace.ts",
+      ...replaced,
+      notes: [
+        "Vervangen wordt de laatst ingeschreven vervangbare deelnemer; een ander praesidiumlid neemt die plaats nooit in.",
+        "De student ziet niet dat hij iemand vervangt: voor hem stond die plaats als vrij.",
+        "Vertrekt de mail niet, dan blijft de vervanging staan; de fout komt in de log.",
+      ],
     },
   ];
 }

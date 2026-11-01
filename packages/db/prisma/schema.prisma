@@ -3445,6 +3445,14 @@ model ShiftParticipant {
   /// uit noodzaak (zie `PraesidiumShiftNecessity`).
   praesidiumNecessity PraesidiumShiftNecessity?
 
+  /// Een praesidiumlid dat zich inschreef "omdat het moest", mag vervangen
+  /// worden: schrijft een student (iemand zonder post in het werkingsjaar van
+  /// de shift) zich in terwijl de shift vol is, dan neemt die deze plaats in en
+  /// krijgt het praesidiumlid een mail. Voor een student telt deze plaats als
+  /// vrij, en de naam staat niet in zijn lijst. Zie `lib/shift/replace.ts` en
+  /// docs/design-decisions.md, "Vervangbaar op een shift".
+  replaceable Boolean @default(false)
+
   @@id([shiftId, userId])
 }
 

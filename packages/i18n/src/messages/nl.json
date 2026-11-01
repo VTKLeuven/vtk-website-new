@@ -757,6 +757,13 @@
     },
     "register": "Schrijf in",
     "unregister": "Uitschrijven",
+    "replaceable": {
+      "label": "Een student mag mijn plaats innemen",
+      "hint": "Schrijft er zich een student in terwijl de shift vol is, dan neemt die je plaats in. Je krijgt dan een mail en hoeft niet meer te komen.",
+      "on": "Een student mag nu je plaats innemen.",
+      "off": "Je plaats blijft van jou.",
+      "failed": "Niet opgeslagen: probeer het opnieuw."
+    },
     "isRegistered": "Ingeschreven",
     "locked": "Vast binnen 24u",
     "until": "tot {time}",

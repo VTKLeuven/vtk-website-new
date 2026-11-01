@@ -180,6 +180,13 @@ export type ShiftResponse = Shift & {
    * (`viewerReward` in `lib/shift/lists.ts`). Nul of ontbrekend: niets ingehouden.
    */
   withheldReward?: number;
+  /** Op /register: de eigen inschrijving mag door een student overgenomen worden. */
+  replaceable?: boolean;
+  /**
+   * De kijker kan aanduiden dat een student zijn plaats mag innemen: hij zit in
+   * het praesidium van het werkingsjaar van de shift (`lib/shift/replace.ts`).
+   */
+  replaceableOption?: boolean;
 };
 
 /**

@@ -4,6 +4,7 @@ import { prisma } from '@vtk/db';
 import { ROSTER_PARTICIPANT_SELECT, toRoster } from '@/lib/shift/roster';
 import { earnedShiftReward, type PraesidiumYears } from '@/lib/shift/rewards';
 import { praesidiumYears } from '@/lib/shift/voucherEligibility';
+import { canBeReplaceable, canReplace, visibleParticipants } from '@/lib/shift/replace';
 
 /*
  * De twee lijsten op /shift. Eén bron voor de API-routes (`GET /api/shift` en
@@ -48,21 +49,30 @@ export async function availableShifts(viewerId: string) {
     prisma.shift.findMany({
       where: { endTime: { gte: now }, manualGrantId: null },
       orderBy: { startTime: 'asc' },
-      include: { participants: { select: ROSTER_PARTICIPANT_SELECT } },
+      include: { participants: { select: { ...ROSTER_PARTICIPANT_SELECT, replaceable: true } } },
     }),
     praesidiumYears([viewerId]),
   ]);
 
   return shifts
-    .map(({ participants, ...shift }) => {
+    .map(({ participants: allParticipants, ...shift }) => {
+      // Een student ziet een vervangbaar praesidiumlid niet: die plaats is voor
+      // hem vrij (lib/shift/replace.ts). Wie zelf ingeschreven is, telt altijd.
+      const participants = visibleParticipants(
+        allParticipants,
+        canReplace(viewerId, shift, praesidium),
+      );
       const takenSpots = participants.length;
       return {
         ...shift,
         ...viewerReward({ userId: viewerId, ...shift }, praesidium),
         takenSpots,
         availableSpots: Math.max(0, shift.maxParticipants - takenSpots),
-        isRegistered: participants.some((p) => p.userId === viewerId),
+        isRegistered: allParticipants.some((p) => p.userId === viewerId),
         roster: toRoster(participants, viewerId),
+        // Mag deze kijker bij het inschrijven aanduiden dat een student zijn
+        // plaats mag innemen?
+        replaceableOption: canBeReplaceable(viewerId, shift, praesidium),
       };
     })
     .filter((shift) => !shift.isRegistered);
@@ -82,7 +92,9 @@ export async function registeredShifts(targetUserId: string, viewerId: string) {
         participants: { some: { userId: targetUserId } },
       },
       orderBy: { startTime: 'asc' },
-      include: { participants: { select: { ...ROSTER_PARTICIPANT_SELECT, payedOut: true } } },
+      include: {
+        participants: { select: { ...ROSTER_PARTICIPANT_SELECT, payedOut: true, replaceable: true } },
+      },
     }),
     praesidiumYears([targetUserId]),
   ]);
@@ -109,6 +121,11 @@ export async function registeredShifts(targetUserId: string, viewerId: string) {
         participants
           .find((participant) => participant.userId === targetUserId)
           ?.registeredAt.toISOString() ?? null,
+      // De eigen keuze "een student mag mijn plaats innemen", en of ze hier kan.
+      replaceable:
+        participants.find((participant) => participant.userId === targetUserId)?.replaceable ??
+        false,
+      replaceableOption: canBeReplaceable(targetUserId, shift, praesidium),
       roster: toRoster(participants, viewerId),
     };
   });

@@ -1340,6 +1340,42 @@
   color: var(--navy);
 }
 
+/* "Een student mag mijn plaats innemen": enkel voor het praesidium, als een
+   gewone keuze onder de feiten, niet als een melding. */
+.vtk-shift-replaceable {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.vtk-shift-replaceable input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: var(--navy);
+}
+
+.vtk-shift-replaceable span {
+  display: grid;
+  gap: 3px;
+}
+
+.vtk-shift-replaceable strong {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.vtk-shift-replaceable small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .vtk-shift-dialog-foot {
   display: flex;
   flex-wrap: wrap;

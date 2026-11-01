@@ -757,6 +757,13 @@
     },
     "register": "Sign up",
     "unregister": "Unregister",
+    "replaceable": {
+      "label": "A student may take my place",
+      "hint": "If a student signs up while the shift is full, they take your place. You then get an email and no longer need to come.",
+      "on": "A student may now take your place.",
+      "off": "Your place stays yours.",
+      "failed": "Not saved: please try again."
+    },
     "isRegistered": "Registered",
     "locked": "Locked within 24h",
     "until": "until {time}",
