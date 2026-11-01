@@ -45,6 +45,15 @@ export const completedShiftsThisWorkingYear = cache(async (userId: string): Prom
   return netShiftCount(done, deductedShifts(deductions));
 });
 
+/** Erelid? Request-gedeeld, net als de shiften hierboven. */
+const isHonoraryMember = cache(async (userId: string): Promise<boolean> => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { honoraryMember: true },
+  });
+  return user?.honoraryMember ?? false;
+});
+
 type PresaleEvent = PresaleConfig & {
   id: string;
   salesStartAt?: Date | string | null;
@@ -71,11 +80,15 @@ export async function presaleViewerFor(
   const countShifts = events.some(
     (event) => hasPresale(event) && event.presaleHelpers !== false,
   );
-  return {
-    groups: session.groups,
-    completedShifts: countShifts ? await completedShiftsThisWorkingYear(session.user.id) : 0,
-    hasPresaleLink,
-  };
+  // Net als de shiften: enkel opzoeken wanneer een voorverkoop er iets om geeft.
+  const checkHonorary = events.some(
+    (event) => hasPresale(event) && event.presaleHonorary !== false,
+  );
+  const [completedShifts, honorary] = await Promise.all([
+    countShifts ? completedShiftsThisWorkingYear(session.user.id) : 0,
+    checkHonorary ? isHonoraryMember(session.user.id) : false,
+  ]);
+  return { groups: session.groups, completedShifts, honorary, hasPresaleLink };
 }
 
 /**

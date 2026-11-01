@@ -52,7 +52,8 @@ export async function POST(request: Request) {
         ? 429
         : error.code === "SOLD_OUT" ||
             error.code === "FREE_TICKET_LIMIT" ||
-            error.code === "HONORARY_PRICE_USED"
+            error.code === "HONORARY_PRICE_USED" ||
+            error.code === "HONORARY_TICKET_LIMIT"
           ? 409
           : 400;
       return Response.json({ error: error.code, field: error.field }, { status });

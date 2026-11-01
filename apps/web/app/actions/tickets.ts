@@ -312,6 +312,11 @@ function presaleFromForm(formData: FormData, salesStartAt: Date | null) {
   const presaleLeadMinutes = presaleLeadMinutesValue(formData);
   const presalePraesidium = checkboxValue(formData, "presalePraesidium");
   const presaleHelpers = checkboxValue(formData, "presaleHelpers");
+  // Een formulier van voor dit vinkje stuurt het veld niet mee; dan blijft de
+  // standaard (aan) staan in plaats van stil uit te vallen.
+  const presaleHonorary = formData.has("presaleHonorary")
+    ? checkboxValue(formData, "presaleHonorary")
+    : true;
   const presaleGroupIds = [
     ...new Set(formData.getAll("presaleGroupIds").map((entry) => String(entry)).filter(Boolean)),
   ];
@@ -319,11 +324,11 @@ function presaleFromForm(formData: FormData, salesStartAt: Date | null) {
     // Een voorverkoop is een duur vóór de verkoopstart; zonder die start staat
     // de verkoop al voor iedereen open en is er niets om vroeger te zetten.
     if (!salesStartAt) throw new Error("PRESALE_NEEDS_SALES_START");
-    if (!presalePraesidium && !presaleHelpers && presaleGroupIds.length === 0) {
+    if (!presalePraesidium && !presaleHelpers && !presaleHonorary && presaleGroupIds.length === 0) {
       throw new Error("PRESALE_NEEDS_AUDIENCE");
     }
   }
-  return { presaleLeadMinutes, presalePraesidium, presaleHelpers, presaleGroupIds };
+  return { presaleLeadMinutes, presalePraesidium, presaleHelpers, presaleHonorary, presaleGroupIds };
 }
 
 function codeFrom(input: string): string {
@@ -641,7 +646,7 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
   if (salesStartAt && salesEndAt && salesEndAt <= salesStartAt) {
     throw new Error("INVALID_SALES_DATES");
   }
-  const { presaleLeadMinutes, presalePraesidium, presaleHelpers, presaleGroupIds } =
+  const { presaleLeadMinutes, presalePraesidium, presaleHelpers, presaleHonorary, presaleGroupIds } =
     presaleFromForm(formData, salesStartAt);
   const requestedSlug = slugify(value(formData, "slug") || titleNl) || `event-${randomBytes(4).toString("hex")}`;
   const slugExists = await prisma.ticketEvent.findUnique({ where: { slug: requestedSlug } });
@@ -724,6 +729,7 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
         salesStartAt,
         salesEndAt,
         maxTicketsPerOrder: boundedIntegerValue(formData, "maxTicketsPerOrder", 8, 1, 50),
+        honoraryOneTicket: checkboxValue(formData, "honoraryOneTicket"),
         cardCheckIn: checkboxValue(formData, "cardCheckIn"),
         openScanning: checkboxValue(formData, "openScanning"),
         contactEmail: emailValue(formData, "contactEmail"),
@@ -732,6 +738,7 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
         presaleLeadMinutes,
         presalePraesidium,
         presaleHelpers,
+        presaleHonorary,
         ...(templateSettings ? { settings: templateSettings } : {}),
         createdById: session.user.id,
       },
@@ -951,7 +958,7 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
   if (salesStartAt && salesEndAt && salesEndAt <= salesStartAt) {
     throw new Error("INVALID_SALES_DATES");
   }
-  const { presaleLeadMinutes, presalePraesidium, presaleHelpers, presaleGroupIds } =
+  const { presaleLeadMinutes, presalePraesidium, presaleHelpers, presaleHonorary, presaleGroupIds } =
     presaleFromForm(formData, salesStartAt);
   const locationGeo = await resolveLocationGeo(formData, event);
   const banner = await readTicketBanner(formData, event);
@@ -984,8 +991,10 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
         presaleLeadMinutes,
         presalePraesidium,
         presaleHelpers,
+        presaleHonorary,
         status,
         maxTicketsPerOrder,
+        honoraryOneTicket: checkboxValue(formData, "honoraryOneTicket"),
         cardCheckIn: checkboxValue(formData, "cardCheckIn"),
         contactEmail: emailValue(formData, "contactEmail"),
         confirmationMessageNl: limitedOptionalValue(formData, "confirmationMessageNl", 5_000),

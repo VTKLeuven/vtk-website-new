@@ -134,6 +134,12 @@ export type PublicTicketEvent = {
   /** Dit erelid heeft zijn erelidticket voor dit event al; de shop zegt dat erbij. */
   honoraryPriceUsed?: boolean;
   /**
+   * Dit event geeft een erelid hoogstens één ticket in totaal
+   * (`TicketEvent.honoraryOneTicket`), en de bezoeker is een erelid. `used`
+   * zegt of hij het al heeft. Null of afwezig voor iedereen anders.
+   */
+  honoraryOneTicket?: { used: boolean } | null;
+  /**
    * Doelgroepen (eerstejaars, alumni, ...) met een ticket dat deze uitgelogde
    * bezoeker niet ziet. Leeg voor wie ingelogd is: wie er dan niet bij hoort,
    * hoort er ook na inloggen niet bij.

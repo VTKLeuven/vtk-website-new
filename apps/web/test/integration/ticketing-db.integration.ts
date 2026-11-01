@@ -588,6 +588,65 @@ describe("ticketing database invariants", () => {
     }
   });
 
+  it("sells an honorary member one ticket in total when the event asks for it", async () => {
+    // Een eigen erelid: de test hierboven laat bestellingen van `ids.user` op
+    // dit event staan, en die zouden hier al als "heeft een ticket" tellen.
+    const honoraryUser = randomUUID();
+    await prisma.user.create({
+      data: {
+        id: honoraryUser,
+        name: "Honorary One",
+        email: `${honoraryUser}@example.test`,
+        active: true,
+        honoraryMember: true,
+      },
+    });
+    const order = (email: string, count: number) =>
+      createTicketCheckout(
+        {
+          eventId: ids.rateEvent,
+          buyerName: "Honorary One",
+          buyerEmail: email,
+          locale: "nl",
+          termsAccepted: true,
+          paymentProvider: "mock",
+          items: Array.from({ length: count }, (_, index) => ({
+            ticketTypeId: ids.rateType,
+            attendeeName: `Attendee ${index + 1}`,
+            attendeeEmail: "",
+          })),
+        },
+        `honorary-one-${email}`
+      );
+
+    vi.mocked(getSession).mockResolvedValue({
+      user: { id: honoraryUser, name: "Honorary One", email: `${honoraryUser}@example.test`, isSuperAdmin: false },
+    } as never);
+    await prisma.ticketEvent.update({ where: { id: ids.rateEvent }, data: { honoraryOneTicket: true } });
+    try {
+      // Twee in één bestelling kan niet, ook niet aan de gewone prijs.
+      await expect(order("honorary-one-pair@example.test", 2)).rejects.toMatchObject({
+        code: "HONORARY_TICKET_LIMIT",
+      });
+      await expect(order("honorary-one-first@example.test", 1)).resolves.toMatchObject({
+        orderId: expect.any(String),
+      });
+      // En een tweede bestelling ook niet: de grens loopt over de bestellingen heen.
+      await expect(order("honorary-one-second@example.test", 1)).rejects.toMatchObject({
+        code: "HONORARY_TICKET_LIMIT",
+      });
+
+      // Zonder het vinkje koopt hetzelfde erelid gewoon bij voor vrienden.
+      await prisma.ticketEvent.update({ where: { id: ids.rateEvent }, data: { honoraryOneTicket: false } });
+      await expect(order("honorary-one-friends@example.test", 2)).resolves.toMatchObject({
+        orderId: expect.any(String),
+      });
+    } finally {
+      vi.mocked(getSession).mockResolvedValue(null);
+      await prisma.ticketEvent.update({ where: { id: ids.rateEvent }, data: { honoraryOneTicket: false } });
+    }
+  });
+
   it("fulfills a Mollie webhook once and deduplicates its retry", async () => {
     const accessExpiresAt = new Date("2027-06-20T00:00:00.000Z");
     const access = createOrderAccessToken(ids.mollieOrder, accessExpiresAt);

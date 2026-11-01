@@ -36,7 +36,11 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
       startsAt: event.startsAt.toISOString(),
       endsAt: event.endsAt.toISOString(),
       ownerGroupName: event.ownerGroupName,
-      maxTicketsPerOrder: event.maxTicketsPerOrder,
+      // Wat deze koper kan nemen: een erelid op een event met
+      // `honoraryOneTicket` één, of geen wanneer het er al een heeft.
+      maxTicketsPerOrder: event.honoraryOneTicket
+        ? Math.min(event.maxTicketsPerOrder, event.honoraryOneTicket.used ? 0 : 1)
+        : event.maxTicketsPerOrder,
       currency: event.currency,
       contactEmail: event.contactEmail,
       termsUrl: event.termsUrl,

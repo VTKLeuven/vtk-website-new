@@ -113,6 +113,7 @@ function checkoutErrorMessage(
     FREE_TICKET_LIMIT: { nl: "Je hebt het maximum aantal gratis tickets voor dit event bereikt.", en: "You have reached the free-ticket limit for this event." },
     SOLD_OUT: { nl: "Deze tickets zijn net uitverkocht.", en: "These tickets have just sold out." },
     HONORARY_PRICE_USED: { nl: "Je erelidticket voor dit event heb je al. Kies de gewone prijs.", en: "You already have your honorary ticket for this event. Choose the regular price." },
+    HONORARY_TICKET_LIMIT: { nl: "Als erelid koop je voor dit event één ticket, en dat heb je al.", en: "As an honorary member you can buy one ticket for this event, and you already have it." },
     PAYMENT_UNAVAILABLE: { nl: "De betaalpagina is tijdelijk niet bereikbaar. Probeer straks opnieuw.", en: "The payment page is temporarily unavailable. Try again shortly." },
     REQUEST_BODY_TOO_LARGE: { nl: "De bestelling bevat te veel gegevens.", en: "The order contains too much data." },
     BUSY: { nl: "Het is heel druk. Je bestelling is niet doorgegaan; probeer meteen opnieuw.", en: "It is very busy. Your order did not go through; try again straight away." },
@@ -417,9 +418,14 @@ export function TicketShop({
     [event.ticketTypes],
   );
   const lines = useMemo(() => activeTypes.flatMap(ticketLinesForType), [activeTypes]);
+  // Een erelid op een event met `honoraryOneTicket` koopt één ticket in totaal,
+  // en geen meer wanneer het er al een heeft. Verder het maximum van het event.
+  const orderMax = event.honoraryOneTicket
+    ? Math.min(event.maxTicketsPerOrder, event.honoraryOneTicket.used ? 0 : 1)
+    : event.maxTicketsPerOrder;
   // Wat één bestelling hier echt kan tellen: het maximum van het event, of
   // minder wanneer de tickets elk een lager maximum hebben.
-  const limit = orderLimit(activeTypes, event.maxTicketsPerOrder);
+  const limit = orderLimit(activeTypes, orderMax);
   const selectedCount = useMemo(
     () => Object.values(quantities).reduce((sum, quantity) => sum + quantity, 0),
     [quantities],
@@ -449,7 +455,7 @@ export function TicketShop({
       line,
       lines,
       quantities,
-      maxTicketsPerOrder: event.maxTicketsPerOrder,
+      maxTicketsPerOrder: orderMax,
     });
     // Het minimum per bestelling geldt voor het type, over beide prijzen samen:
     // heeft de andere regel het al gehaald, dan mag deze per één beginnen.
@@ -572,7 +578,7 @@ export function TicketShop({
       line,
       lines,
       quantities,
-      maxTicketsPerOrder: event.maxTicketsPerOrder,
+      maxTicketsPerOrder: orderMax,
     });
     const onOtherLines = quantitiesByTicketType(lines, quantities)[type.id] - quantity;
     const belowMinimum = maximum < Math.max(1, (type.minPerOrder ?? 1) - onOtherLines);
@@ -596,7 +602,7 @@ export function TicketShop({
             label={lineLabel(line, locale)}
             quantity={quantity}
             canDecrease={quantity > 0}
-            canIncrease={!belowMinimum && quantity < maximum && selectedCount < event.maxTicketsPerOrder}
+            canIncrease={!belowMinimum && quantity < maximum && selectedCount < orderMax}
             onDecrease={() => setQuantity(line, "decrease")}
             onIncrease={() => setQuantity(line, "increase")}
             locale={locale}
@@ -844,7 +850,7 @@ export function TicketShop({
         <aside className="tshop-panel" aria-labelledby="ticket-types-heading">
           <div className="tshop-panel-head">
             <h2 id="ticket-types-heading">Tickets</h2>
-            {lines.length > 0 ? (
+            {lines.length > 0 && !event.honoraryOneTicket?.used ? (
               <small>
                 {locale === "nl"
                   ? `Max. ${limit} per bestelling`
@@ -968,7 +974,17 @@ export function TicketShop({
                 })}
               </ul>
 
-              {event.honoraryPriceUsed ? (
+              {event.honoraryOneTicket ? (
+                <p className="tshop-hint">
+                  {event.honoraryOneTicket.used
+                    ? locale === "nl"
+                      ? "Als erelid koop je voor dit event één ticket, en dat heb je al."
+                      : "As an honorary member you can buy one ticket for this event, and you already have it."
+                    : locale === "nl"
+                      ? "Als erelid koop je voor dit event één ticket."
+                      : "As an honorary member you can buy one ticket for this event."}
+                </p>
+              ) : event.honoraryPriceUsed ? (
                 <p className="tshop-hint">
                   {locale === "nl"
                     ? "Je erelidticket voor dit event heb je al."

@@ -497,6 +497,7 @@ function TemplateEditor({
               leadMinutes={template.presaleLeadMinutes}
               praesidium={template.presalePraesidium}
               helpers={template.presaleHelpers}
+              honorary={template.presaleHonorary}
               groups={[]}
               locale={locale}
             />
@@ -513,6 +514,21 @@ function TemplateEditor({
                 {nl
                   ? "Aanmelden met de studentenkaart aan de deur"
                   : "Check in with a student card at the door"}
+              </label>
+            </div>
+            <div className="ticket-admin-field" data-span="2">
+              <label className="ticket-admin-check" htmlFor={field("honorary-one")}>
+                <input type="hidden" name="honoraryOneTicket" value="false" />
+                <input
+                  id={field("honorary-one")}
+                  name="honoraryOneTicket"
+                  type="checkbox"
+                  value="true"
+                  defaultChecked={template.honoraryOneTicket}
+                />
+                {nl
+                  ? "Ereleden kopen hoogstens één ticket"
+                  : "Honorary members buy at most one ticket"}
               </label>
             </div>
             <div className="ticket-admin-field" data-span="2">

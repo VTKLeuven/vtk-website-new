@@ -97,9 +97,11 @@ type TicketEventFormValue = {
   presaleLeadMinutes?: number | null;
   presalePraesidium?: boolean;
   presaleHelpers?: boolean;
+  presaleHonorary?: boolean;
   presaleGroupIds?: readonly string[];
   status?: string;
   maxTicketsPerOrder?: number;
+  honoraryOneTicket?: boolean;
   cardCheckIn?: boolean;
   openScanning?: boolean;
   contactEmail?: string | null;
@@ -629,6 +631,7 @@ export function TicketEventForm({
             leadMinutes={event.presaleLeadMinutes}
             praesidium={event.presalePraesidium ?? true}
             helpers={event.presaleHelpers ?? true}
+            honorary={event.presaleHonorary ?? true}
             groupIds={event.presaleGroupIds}
             groups={presaleGroups}
             locale={locale}
@@ -715,6 +718,24 @@ export function TicketEventForm({
               {locale === "nl"
                 ? "Voor een cantus of een ander event waar het snel moet gaan. Het KU Leuven-nummer van de ingelogde koper komt op zijn ticket te staan; wie voor meerdere mensen bestelt, vult de rest aan op de deelnemerspagina. De QR blijft voor iedereen werken."
                 : "For a cantus or another event where the queue has to move. The KU Leuven number of the logged-in buyer is stored on their ticket; anyone ordering for several people fills in the rest on the attendees page. The QR keeps working for everyone."}
+            </span>
+          </div>
+          <div className="ticket-admin-field" data-span="2">
+            <label className="ticket-admin-check" htmlFor="ticket-honorary-one">
+              <input type="hidden" name="honoraryOneTicket" value="false" />
+              <input
+                id="ticket-honorary-one"
+                type="checkbox"
+                name="honoraryOneTicket"
+                value="true"
+                defaultChecked={event.honoraryOneTicket ?? false}
+              />
+              {nl ? "Ereleden kopen hoogstens één ticket" : "Honorary members buy at most one ticket"}
+            </label>
+            <span className="ticket-admin-help">
+              {nl
+                ? "Eén ticket per erelid voor dit event, over alle tickettypes en bestellingen heen en aan welke prijs ook. Zonder dit vinkje krijgt een erelid één ticket aan de ereledenprijs en koopt het daarnaast tickets voor anderen aan de gewone prijs."
+                : "One ticket per honorary member for this event, across all ticket types and orders and at any price. Without this, an honorary member gets one ticket at the honorary price and can buy more for others at the regular price."}
             </span>
           </div>
           {/* Enkel bij aanmaken: daarna staat deze keuze bij Toegang, naast de

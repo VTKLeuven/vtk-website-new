@@ -2122,6 +2122,7 @@ async function main() {
         salesOpensMinutesBefore: template.salesOpensMinutesBefore ?? null,
         salesClosesMinutesBefore: template.salesClosesMinutesBefore ?? null,
         maxTicketsPerOrder: template.maxTicketsPerOrder ?? 8,
+        honoraryOneTicket: template.honoraryOneTicket ?? false,
         contactEmail: template.contactEmail ?? null,
         cardCheckIn: template.cardCheckIn ?? false,
         openScanning: template.openScanning ?? true,

@@ -54,6 +54,7 @@ import { presaleViewerFor } from "./presaleViewer";
 import { hasPrivateTicketAccess } from "./privateLink";
 import { userIsMember } from "@/lib/membership";
 import { ticketViewerProfile } from "./viewerProfile";
+import { honoraryHeldTicketsWhere } from "./honorary";
 import { sanitizeSourceKey } from "./source";
 
 const answerValueSchema = z.union([
@@ -113,6 +114,7 @@ export class TicketCheckoutError extends Error {
       | "FREE_TICKET_LIMIT"
       | "SOLD_OUT"
       | "HONORARY_PRICE_USED"
+      | "HONORARY_TICKET_LIMIT"
       | "PAYMENT_UNAVAILABLE",
     public readonly field?: string
   ) {
@@ -392,6 +394,13 @@ export async function createTicketCheckout(
   // Hoogstens één erelidticket per event, ook binnen één bestelling.
   const honoraryCount = normalizedItems.filter((item) => item.honoraryPrice).length;
   if (honoraryCount > 1) throw new TicketCheckoutError("HONORARY_PRICE_USED");
+  // Staat `honoraryOneTicket` aan, dan koopt een erelid hoogstens één ticket
+  // voor dit event, aan welke prijs ook. Hangt aan het account, net als de
+  // ereledenprijs: uitgelogd is een erelid voor de shop iedereen.
+  const honoraryOneTicket = event.honoraryOneTicket && viewerProfile.honorary && session !== null;
+  if (honoraryOneTicket && normalizedItems.length > 1) {
+    throw new TicketCheckoutError("HONORARY_TICKET_LIMIT");
+  }
 
   // Enkel de eerste bestelregel draagt het r-nummer: het is dat van de koper, en
   // een r-nummer kan per event maar aan één ticket hangen.
@@ -450,17 +459,17 @@ export async function createTicketCheckout(
         // terugbetaald of vervallen erelidticket telt niet meer.
         if (honoraryCount > 0 && session) {
           const used = await tx.ticketOrderItem.count({
-            where: {
-              eventId: event.id,
-              honoraryPrice: true,
-              order: {
-                buyerUserId: session.user.id,
-                status: { in: ["PENDING_PAYMENT", "PAID", "PARTIALLY_REFUNDED"] },
-              },
-              OR: [{ ticket: null }, { ticket: { status: { not: "REFUNDED" } } }],
-            },
+            where: { ...honoraryHeldTicketsWhere(event.id, session.user.id), honoraryPrice: true },
           });
           if (used > 0) throw new TicketCheckoutError("HONORARY_PRICE_USED");
+        }
+        // Dezelfde telling voor de grens van één ticket in totaal, maar over
+        // elke bestelregel van deze koper en niet enkel die aan de ereledenprijs.
+        if (honoraryOneTicket && session) {
+          const held = await tx.ticketOrderItem.count({
+            where: honoraryHeldTicketsWhere(event.id, session.user.id),
+          });
+          if (held > 0) throw new TicketCheckoutError("HONORARY_TICKET_LIMIT");
         }
         if (totalCents === 0 && session) {
           // Bestelregels en geen tickets: een gratis bestelling krijgt haar

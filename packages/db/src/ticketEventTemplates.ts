@@ -76,12 +76,15 @@ export type BuiltinTicketTemplate = {
   salesOpensMinutesBefore?: number | null;
   salesClosesMinutesBefore?: number | null;
   maxTicketsPerOrder?: number;
+  /** Ereleden kopen hoogstens één ticket; zie `TicketEvent.honoraryOneTicket`. */
+  honoraryOneTicket?: boolean;
   contactEmail?: string;
   cardCheckIn?: boolean;
   openScanning?: boolean;
   presaleLeadMinutes?: number | null;
   presalePraesidium?: boolean;
   presaleHelpers?: boolean;
+  presaleHonorary?: boolean;
   confirmationMessageNl?: string;
   confirmationMessageEn?: string;
   capacity?: number;

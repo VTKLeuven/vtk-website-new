@@ -9491,6 +9491,32 @@ voor iedereen anders bestaat de prijs niet, ook niet in de paginabron.
 - De bestelregel heet "Bierticket (erelid)", zodat de mail, de pdf en de scanner
   het zonder eigen logica tonen.
 
+## Ereleden: één ticket in totaal, als vinkje per event
+
+Bovenop de ereledenprijs kan een event zeggen dat een erelid er **hoogstens één
+ticket in totaal** koopt (`TicketEvent.honoraryOneTicket`, het vinkje "Ereleden
+kopen hoogstens één ticket" bij de instellingen en in het sjabloon). Zonder dat
+vinkje neemt een erelid zijn ticket aan de ereledenprijs en koopt het daarnaast
+gewoon tickets voor vrienden; met het vinkje niet.
+
+- **Standaard uit**, en bestaande events en sjablonen staan uit: daar verandert
+  niets aan een lopende verkoop.
+- **Over alle tickettypes en al zijn bestellingen heen, aan welke prijs ook.**
+  Ook een type met doelgroep "Alleen ereleden" of een gewoon ticket aan de
+  ledenprijs telt mee. Het is één ticket voor het erelid zelf, niet één
+  goedkoop ticket.
+- **Dezelfde telling als bij de ereledenprijs** (`lib/ticketing/honorary.ts`):
+  een bestelling die nog op betaling wacht telt, een vervallen bestelling of een
+  terugbetaald ticket niet. Binnen hetzelfde slot op de koper, zodat twee
+  gelijktijdige bestellingen er samen geen twee krijgen.
+- **Het hangt aan het account.** Een erelid dat uitgelogd koopt, is voor de shop
+  iedereen, net zoals het dan de ereledenprijs niet ziet. De grens regelt wat
+  een erelid als erelid krijgt, geen deurbeleid.
+- De shop toont het vooraf ("Als erelid koop je voor dit event één ticket") en
+  laat niet meer kiezen dan dat; de checkout is het slot erachter
+  (`HONORARY_TICKET_LIMIT`). Voor wie geen erelid is, staat er niets over op de
+  pagina.
+
 ## De e-mailhandtekening is een recht, geen ledenfunctie
 
 De handtekeninggenerator op `/account` bouwt een mailhandtekening met het
@@ -9631,6 +9657,14 @@ vaakst achter de toog staan er dan net buiten vielen. De drempel telt enkel
 voltooide shiften van het lopende werkingsjaar, dezelfde definitie als de
 ranglijst, en reset dus mee op 15 juli. Per event uit te zetten naast het
 praesidium-vinkje (`presaleHelpers`).
+
+**En de ereleden, standaard.** Een erelid (`User.honoraryMember`) koopt mee in
+de voorverkoop, zoals de oude site dat deed: ereleden hebben bij de kring van
+oudsher voorrang op de voorinschrijving. De nieuwe site had ze daar eerst niet
+bij, en dat werd als gemis gemeld. Daarom zette de migratie het ook voor
+bestaande events aan; per event uit te zetten bij de voorverkoop
+(`presaleHonorary`). Het hangt aan het account, dus een erelid moet ingelogd
+zijn, net als een praesidiumlid.
 
 **Een tickettype volgt de voorverkoop, tenzij het echt later start.** Een eigen
 verkoopstart die op of vóór de publieke verkoopstart valt, zegt niets bovenop

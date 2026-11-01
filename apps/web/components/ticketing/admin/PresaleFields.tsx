@@ -25,6 +25,8 @@ const T = {
     praesidium: "Alle praesidiumposten",
     helpers: "Vaste medewerkers (15+ shiften dit werkingsjaar)",
     helpersShort: "vaste medewerkers",
+    honorary: "Ereleden",
+    honoraryShort: "ereleden",
     nobody: "Niemand: kies het praesidium of een groep",
     edit: "Aanpassen",
     done: "Klaar",
@@ -44,6 +46,8 @@ const T = {
     praesidium: "Every praesidium post",
     helpers: "Regular helpers (15+ shifts this working year)",
     helpersShort: "regular helpers",
+    honorary: "Honorary members",
+    honoraryShort: "honorary members",
     nobody: "Nobody: pick the praesidium or a group",
     edit: "Change",
     done: "Done",
@@ -77,6 +81,7 @@ export function PresaleFields({
   leadMinutes,
   praesidium = true,
   helpers = true,
+  honorary = true,
   groupIds = [],
   groups,
   locale,
@@ -92,6 +97,7 @@ export function PresaleFields({
   leadMinutes?: number | null;
   praesidium?: boolean;
   helpers?: boolean;
+  honorary?: boolean;
   groupIds?: readonly string[];
   /** Leeg: dan valt de keuze "extra groepen" weg in plaats van leeg te staan. */
   groups: PresaleGroupOption[];
@@ -103,6 +109,7 @@ export function PresaleFields({
   const [unit, setUnit] = useState<"hours" | "days">(initial.unit);
   const [withPraesidium, setWithPraesidium] = useState(praesidium);
   const [withHelpers, setWithHelpers] = useState(helpers);
+  const [withHonorary, setWithHonorary] = useState(honorary);
   const [selected, setSelected] = useState<string[]>([...groupIds]);
   const [open, setOpen] = useState(false);
 
@@ -135,6 +142,7 @@ export function PresaleFields({
   const parts = [
     ...(withPraesidium ? [t.praesidium] : []),
     ...(withHelpers ? [t.helpersShort] : []),
+    ...(withHonorary ? [t.honoraryShort] : []),
     ...(chosen.length > 0 ? [chosenLabel] : []),
   ];
   const audience =
@@ -194,6 +202,7 @@ export function PresaleFields({
           vakjes daarin sturen niets zelf, ze bewerken deze staat. */}
       <input type="hidden" name="presalePraesidium" value={withPraesidium ? "true" : "false"} />
       <input type="hidden" name="presaleHelpers" value={withHelpers ? "true" : "false"} />
+      <input type="hidden" name="presaleHonorary" value={withHonorary ? "true" : "false"} />
       {selected.map((id) => (
         <input key={id} type="hidden" name="presaleGroupIds" value={id} />
       ))}
@@ -232,6 +241,14 @@ export function PresaleFields({
               onChange={(event) => setWithHelpers(event.target.checked)}
             />
             {t.helpers}
+          </label>
+          <label className="ticket-admin-check">
+            <input
+              type="checkbox"
+              checked={withHonorary}
+              onChange={(event) => setWithHonorary(event.target.checked)}
+            />
+            {t.honorary}
           </label>
           {groups.length > 0 ? (
             <>

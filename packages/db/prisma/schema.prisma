@@ -2341,6 +2341,10 @@ model TicketEvent {
   // staan even vaak achter de toog als een praesidiumlid, maar zitten in geen
   // enkele post en vielen dus buiten elke voorverkoop.
   presaleHelpers        Boolean           @default(true)
+  // En de ereleden (`User.honoraryMember`): die hebben bij de kring van oudsher
+  // voorrang, zoals bij een praesidiumpost. Standaard aan, net als de twee
+  // hierboven; uit te zetten per event.
+  presaleHonorary       Boolean           @default(true)
   // Geheime sleutel voor de private voorverkooplink: wie ze heeft, koopt al
   // tijdens de voorverkoop, zonder post en zonder shiften. Bedoeld om te delen
   // met een groep die de site niet kent (de band, de sponsors, de ouders van).
@@ -2358,6 +2362,12 @@ model TicketEvent {
   status                TicketEventStatus @default(DRAFT)
   currency              String            @default("EUR")
   maxTicketsPerOrder    Int               @default(8)
+  // Een erelid koopt voor dit event hoogstens één ticket in totaal: over alle
+  // tickettypes en al zijn bestellingen heen, aan welke prijs ook. Zonder dit
+  // vinkje geldt enkel de grens op de ereledenprijs (`TicketType.honoraryPriceCents`)
+  // en koopt een erelid daarnaast tickets voor vrienden aan de gewone prijs.
+  // Zie docs/design-decisions.md, "Ereleden: één ticket in totaal".
+  honoraryOneTicket     Boolean           @default(false)
   // Aanmelden met de studentenkaart aan de deur (cantus). Staat dit aan, dan
   // koppelt de kassa het r-nummer van de ingelogde koper aan zijn ticket en kan
   // de scanner een gescande kaart tot een ticket herleiden.
@@ -3032,12 +3042,15 @@ model TicketEventTemplate {
   salesClosesMinutesBefore Int?
 
   maxTicketsPerOrder    Int     @default(8)
+  /// Zie `TicketEvent.honoraryOneTicket`.
+  honoraryOneTicket     Boolean @default(false)
   contactEmail          String?
   cardCheckIn           Boolean @default(false)
   openScanning          Boolean @default(true)
   presaleLeadMinutes    Int?
   presalePraesidium     Boolean @default(true)
   presaleHelpers        Boolean @default(true)
+  presaleHonorary       Boolean @default(true)
   confirmationMessageNl String  @default("")
   confirmationMessageEn String  @default("")
 

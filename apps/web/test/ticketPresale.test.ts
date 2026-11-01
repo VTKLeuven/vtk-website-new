@@ -40,6 +40,13 @@ describe('ticket presale', () => {
       && false);
   });
 
+  it('lets honorary members in by default, unless the event turns that off', () => {
+    const honoraryMember = { groups: [], honorary: true };
+    expect(inPresaleAudience(honoraryMember, event)).toBe(true);
+    expect(inPresaleAudience(honoraryMember, { ...event, presaleHonorary: false })).toBe(false);
+    expect(inPresaleAudience({ groups: [], honorary: false }, event)).toBe(false);
+  });
+
   it('keeps a working group out unless it was picked', () => {
     expect(inPresaleAudience(workingGroupMember, event)).toBe(false);
     expect(
