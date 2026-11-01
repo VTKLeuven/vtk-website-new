@@ -9,7 +9,7 @@
 .vtk-admin-surface-inner {
   max-width: var(--max);
   margin: 0 auto;
-  padding: 40px clamp(20px, 3vw, 36px) 80px;
+  padding: var(--admin-page-top, 40px) clamp(20px, 3vw, 36px) 80px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 32px;
@@ -23,7 +23,7 @@
 @media (min-width: 860px) {
   .vtk-admin-surface-inner {
     grid-template-columns: 220px minmax(0, 1fr);
-    gap: 48px;
+    gap: var(--admin-aside-gap, 48px);
   }
 
   /*
@@ -58,7 +58,7 @@
 .vtk-admin-main h1.text-3xl,
 .vtk-admin-main h1.text-4xl {
   color: var(--ink) !important;
-  font-size: clamp(1.8rem, 4vw, 2.6rem) !important;
+  font-size: var(--admin-h1, clamp(1.8rem, 4vw, 2.6rem)) !important;
   line-height: 1 !important;
   letter-spacing: -0.03em;
   font-weight: 600 !important;
@@ -111,7 +111,7 @@
 }
 
 .vtk-admin-main [data-vtk-ui='card'] + [data-vtk-ui='card'] {
-  margin-top: 24px;
+  margin-top: var(--admin-stack, 24px);
 }
 
 .vtk-admin-main table {
@@ -136,7 +136,7 @@
 }
 
 .vtk-admin-main thead th {
-  padding: 12px 14px;
+  padding: var(--admin-th-y, 12px) var(--admin-cell-x, 14px);
   border-bottom: 1px solid var(--line);
   color: var(--muted);
   font-size: 11px;
@@ -156,7 +156,7 @@
 }
 
 .vtk-admin-main tbody td {
-  padding: 12px 14px;
+  padding: var(--admin-cell-y, 12px) var(--admin-cell-x, 14px);
   vertical-align: top;
 }
 
@@ -170,7 +170,7 @@
 }
 
 .vtk-admin-main tbody tr.vtk-table-group th {
-  padding: 10px 14px;
+  padding: calc(var(--admin-th-y, 12px) - 2px) var(--admin-cell-x, 14px);
   font-weight: 400;
   text-align: left;
 }
@@ -265,6 +265,125 @@
 .vtk-admin-main span[class*='bg-vtk-blue/10'] {
   background: var(--paper-2) !important;
   color: var(--ink) !important;
+}
+
+/* -----------------------------------------------------------------------------
+   Compacte stand
+
+   De knop naast "Zijbalk inklappen" zet `data-density="compact"` op de omslag
+   (`AdminSurface.tsx`, onthouden in een cookie, zie `lib/adminNavCookie.ts`).
+   Ze haalt lucht weg en laat de letters staan: op een laptop staat de site al op
+   90%, en nog kleiner leest een tabel niet meer vlot. Een tabelrij met
+   icoonknoppen gaat zo van 57 naar 41px.
+
+   Enkel vanaf 860px en met een muis of trackpad; smaller en op een aanraakscherm
+   blijft alles even groot om te tikken, en de knop staat er dan ook niet.
+
+   Twee soorten regels. De maten die deze CSS zelf zet (tabel, zijbalk, de
+   ruimte rond de pagina), lezen een variabele met de gewone maat als fallback
+   (`var(--admin-cell-y, 12px)`); hier krijgen ze hun compacte waarde. Zonder
+   fallback viel de padding op 0 waar `.vtk-admin-main` zonder omslag staat
+   (de stijlgids op /sample).
+   De componenten met hun eigen Tailwind-maat (`Button`, `IconButton`, `Input`,
+   `Card` met `p-5`) worden hieronder op die klasse aangesproken: deze CSS
+   staat buiten elke laag en wint zo van de utility. Een bevestigingsdialoog en
+   een voorvertoning van een publiek scherm blijven ruim.
+   -------------------------------------------------------------------------- */
+
+@media (min-width: 860px) and (hover: hover) and (pointer: fine) {
+  .vtk-admin-surface[data-density='compact'] {
+    --admin-page-top: 20px;
+    --admin-aside-gap: 28px;
+    --admin-stack: 14px;
+    --admin-th-y: 7px;
+    --admin-cell-y: 6px;
+    --admin-cell-x: 10px;
+    --admin-h1: 1.75rem;
+
+    /* De zijbalk; `admin-nav.css` in @vtk/ui leest ze met de gewone maat als
+       fallback. */
+    --admin-nav-head-gap: 8px;
+    --admin-nav-search-y: 5px;
+    --admin-nav-search-gap: 6px;
+    --admin-nav-pad: 6px;
+    --admin-nav-gap: 2px;
+    --admin-nav-sub-gap: 1px;
+    --admin-nav-section-gap: 6px;
+    --admin-nav-y: 5px;
+    --admin-nav-x: 10px;
+    --admin-rail-btn: 34px;
+    --admin-rail-gap: 2px;
+  }
+
+  /* Knoppen: `Button` (h-10, h-8, h-12) en de links en knoppen die dezelfde
+     klassen kopieerden. 28px is het kleinste: onder de laptopzoom blijft dat
+     boven de 24px die WCAG 2.2 voor een klikdoel vraagt. */
+  .vtk-admin-surface[data-density='compact']
+    .vtk-admin-main
+    :is(a, button).inline-flex.rounded-full.h-12:not(dialog *, [role='dialog'] *, .vtk-admin-preview *) {
+    height: 36px;
+    padding-inline: 18px;
+  }
+
+  .vtk-admin-surface[data-density='compact']
+    .vtk-admin-main
+    :is(a, button).inline-flex.rounded-full.h-10:not(dialog *, [role='dialog'] *, .vtk-admin-preview *) {
+    height: 32px;
+    padding-inline: 13px;
+  }
+
+  .vtk-admin-surface[data-density='compact']
+    .vtk-admin-main
+    :is(a, button).inline-flex.rounded-full.h-9:not(dialog *, [role='dialog'] *, .vtk-admin-preview *) {
+    height: 30px;
+  }
+
+  .vtk-admin-surface[data-density='compact']
+    .vtk-admin-main
+    :is(a, button).inline-flex.rounded-full.h-8:not(dialog *, [role='dialog'] *, .vtk-admin-preview *) {
+    height: 28px;
+  }
+
+  /* Icoonknoppen in een rij (`IconButton`, `IconLink`, `DeleteIconButton`). */
+  .vtk-admin-surface[data-density='compact']
+    .vtk-admin-main
+    :is(a, button).grid.size-8.rounded-full:not(dialog *, [role='dialog'] *, .vtk-admin-preview *) {
+    width: 28px;
+    height: 28px;
+  }
+
+  /* Velden: `Input` en `Select` (py-2) en wie dat nadeed. Een tekstvak blijft
+     zoals het is: daar is de hoogte de inhoud. */
+  .vtk-admin-surface[data-density='compact']
+    .vtk-admin-main
+    :is(input, select):is(.py-2, .py-2\.5, .py-3):not(dialog *, [role='dialog'] *, .vtk-admin-preview *) {
+    padding-block: 5px;
+  }
+
+  /* Kaarten. `Card` heeft zelf geen padding; die komt van de pagina, en dat is
+     bijna altijd `p-5`. */
+  .vtk-admin-surface[data-density='compact']
+    .vtk-admin-main
+    [data-vtk-ui='card']:is(.p-5, .p-6):not(.vtk-admin-preview *) {
+    padding: 16px;
+  }
+
+  .vtk-admin-surface[data-density='compact'] .vtk-admin-main [data-vtk-ui='card'].p-4:not(.vtk-admin-preview *) {
+    padding: 12px;
+  }
+
+  /* De ruimte tussen de blokken van een pagina: de buitenste `space-y-*` van
+     bijna elk beheerscherm, en de raster van de ticketschermen. */
+  .vtk-admin-surface[data-density='compact']
+    .vtk-admin-main
+    > :is(.space-y-5, .space-y-6, .space-y-7, .space-y-8)
+    > :not(:last-child) {
+    margin-block-end: var(--admin-stack);
+  }
+
+  .vtk-admin-surface[data-density='compact'] :is(.ticket-admin-page, .ticket-admin-event) {
+    gap: var(--admin-stack);
+  }
 }
 
 /* -----------------------------------------------------------------------------

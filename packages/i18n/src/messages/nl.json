@@ -500,6 +500,7 @@
     "collapseNav": "Zijbalk inklappen",
     "expandNav": "Zijbalk uitklappen",
     "collapseNavShortcut": "[ of Ctrl+B",
+    "compactView": "Compacte weergave",
     "searchNav": "Tabs zoeken",
     "searchNavPlaceholder": "Zoek een tab of groep",
     "searchNavEmpty": "Geen tab gevonden voor",

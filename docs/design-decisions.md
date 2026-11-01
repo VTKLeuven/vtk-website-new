@@ -11161,6 +11161,39 @@ de zijbalk helemaal weg achter één knop.
   `AdminNav`, dus ook in de admin van vtk.be. Hij doet niets terwijl je typt
   (daar is Ctrl+B vet) en niets onder 860px, waar er geen rail is.
 
+## Admin: de compacte stand
+
+November 2026. Op een laptop toonde een beheertabel zoals /admin/gebruikers elf
+rijen, en de zijbalk met één groep open was langer dan het scherm. Drie
+richtingen zijn naast elkaar gelegd op een nabouw van /admin/rekeningen, met het
+aantal rijen dat in beeld bleef: alles kleiner zoomen (`zoom: 0.85`), lucht
+weghalen met een tweede reeks maten, en enkel tabellen compacter maken met een
+knop per tabel.
+
+- **Lucht weghalen won; de letters blijven staan.** De zoom gaf minder rijen in
+  beeld dan de compacte stand, en zette de tabeltekst op een laptop op 10,7px
+  (de site staat daar al op 90%). Enkel tabellen raakte de kop boven de tabel
+  niet, en die nam met titel, uitleg en filters al ruim 300px in. Gemeten op
+  /admin/gebruikers: van 11 naar 17 rijen, een rij met icoonknoppen van 57 naar
+  41px, en de hele zijbalk past weer op één scherm.
+- **Standaard verandert er niets.** Compact is een knop naast "Zijbalk
+  inklappen", per browser in een cookie (`vtk-admin-density`), om dezelfde reden
+  als het inklappen: op een groot scherm is er plaats, op een laptop niet. Per
+  account bewaren is afgewezen omdat het je dan ook op dat grote scherm volgt;
+  automatisch op schermhoogte ook, omdat er dan geen uitweg is voor wie de ruime
+  stand verkiest.
+- **Enkel vanaf 860px en met een muis of trackpad.** Op een telefoon of tablet
+  blijft alles even groot om te tikken, en de knop staat er dan ook niet.
+- **28px is het kleinste klikdoel** (icoonknoppen, kleine knoppen). Onder de
+  laptopzoom is dat 25,2px, net boven de 24px die WCAG 2.2 vraagt.
+- **Wat niet meekrimpt**: een bevestigingsdialoog (de onomkeerbare actie mag
+  ruim blijven), een voorvertoning van een publiek scherm (`.vtk-admin-preview`),
+  een tekstvak, en alles met een eigen padding die niet `p-4`, `p-5` of `p-6` op
+  een `Card` is. Dat laatste breekt niets; zo'n blok blijft gewoon ruim.
+- **De uitleendienst en de Fakbar doen (nog) niet mee.** Ze gebruiken dezelfde
+  `AdminNav`, maar zonder de prop `density` is er geen knop, en de zijbalk leest
+  zijn maten met de gewone waarde als fallback.
+
 ## Mediabeheer: twee panelen, en nooit Immich
 
 Oktober 2026. `/admin/media` was één lange pagina: bovenaan de leescijfers

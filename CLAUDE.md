@@ -740,6 +740,16 @@ the design language into the application instead of copying mockup content.
     `apps/logistiek/lib/admin-nav-cookie.ts`); bouw daar geen eigen inklapknop
     of zwevende "Tabs"-knop meer naast. De sneltoets `[` of Ctrl/Cmd+B zit in
     `AdminNav` zelf.
+  - **Er is een compacte stand, en ook die staat standaard uit.** De knop naast
+    de inklapknop zet `data-density="compact"` op `.vtk-admin-surface`
+    (`AdminSurface.tsx`, cookie `vtk-admin-density`), enkel vanaf 860px met een
+    muis of trackpad. Ze haalt lucht weg en laat de letters staan; zoom de admin
+    niet kleiner. Een vaste maat die je aan `vtk-admin.css` of `admin-nav.css`
+    toevoegt, schrijf je als `var(--admin-..., <gewone maat>)` en krijgt een
+    compacte waarde in het blok "Compacte stand"; zonder fallback valt ze op 0
+    waar `.vtk-admin-main` zonder omslag staat. Geef een kaart `p-4`, `p-5` of
+    `p-6` en gebruik `Button`, `IconButton` en `Input`, dan krimpt een nieuw
+    scherm vanzelf mee. Zie `docs/design-decisions.md`.
   - **Tabs zoeken gaat met Ctrl/Cmd+K, in elke stand van de zijbalk.** Het veld
     bovenaan de zijbalk (in de rail een icoon, smal een knop naast het menu)
     opent een `<dialog>` in `packages/ui/src/AdminNavSearch.tsx`; de rangschikking

@@ -500,6 +500,7 @@
     "collapseNav": "Collapse sidebar",
     "expandNav": "Expand sidebar",
     "collapseNavShortcut": "[ or Ctrl+B",
+    "compactView": "Compact view",
     "searchNav": "Search tabs",
     "searchNavPlaceholder": "Search for a tab or group",
     "searchNavEmpty": "No tab found for",

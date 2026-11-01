@@ -68,6 +68,20 @@ export type AdminNavCollapse = {
   };
 };
 
+/**
+ * De compacte stand is optioneel, net als inklappen: zonder deze prop is er
+ * geen knop (de uitleendienst en de Fakbar). De stand zelf leeft bij de app,
+ * want ze moet op de omslag rond de hele admin staan en niet enkel op de
+ * zijbalk; de nav toont enkel de knop. Die staat er vanaf 860px en met een muis
+ * of trackpad, net waar de maten in de CSS ook omschakelen.
+ */
+export type AdminNavDensity = {
+  compact: boolean;
+  onChange: (compact: boolean) => void;
+  /** Tooltip en `aria-label`; de toestand zit in `aria-pressed`. */
+  label: string;
+};
+
 export type AdminNavProps = {
   title: string;
   nodes: AdminNavNode[];
@@ -75,6 +89,7 @@ export type AdminNavProps = {
   pins?: AdminNavPins;
   collapse?: AdminNavCollapse;
   search?: AdminNavSearch;
+  density?: AdminNavDensity;
 };
 
 const TOP_GAP = 96;
@@ -284,7 +299,7 @@ function flatten(nodes: AdminNavNode[]): AdminNavItem[] {
   return nodes.flatMap((node) => (node.type === 'item' ? [node.item] : node.items));
 }
 
-export function AdminNav({ title, nodes, icons = {}, pins, collapse, search }: AdminNavProps) {
+export function AdminNav({ title, nodes, icons = {}, pins, collapse, search, density }: AdminNavProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(collapse?.initial ?? false);
   const stickyRef = useSmartSticky<HTMLDivElement>(collapsed);
@@ -346,17 +361,33 @@ export function AdminNav({ title, nodes, icons = {}, pins, collapse, search }: A
     <div className="vtk-admin-nav-sticky" ref={stickyRef} data-collapsed={collapse && collapsed ? 'true' : undefined}>
       <div className="vtk-admin-nav-head">
         <h2 className="vtk-admin-nav-title">{title}</h2>
-        {collapse && (
-          <button
-            type="button"
-            className="vtk-admin-nav-collapse"
-            title={withShortcut(collapse.labels.collapse, collapse.labels.shortcut)}
-            aria-label={collapse.labels.collapse}
-            aria-keyshortcuts="[ Control+B"
-            onClick={() => toggleCollapsed(true)}
-          >
-            <PanelIcon expand={false} />
-          </button>
+        {(density || collapse) && (
+          <div className="vtk-admin-nav-head-actions">
+            {density && (
+              <button
+                type="button"
+                className={`vtk-admin-nav-density${density.compact ? ' is-on' : ''}`}
+                title={density.label}
+                aria-label={density.label}
+                aria-pressed={density.compact}
+                onClick={() => density.onChange(!density.compact)}
+              >
+                <DensityIcon compact={density.compact} />
+              </button>
+            )}
+            {collapse && (
+              <button
+                type="button"
+                className="vtk-admin-nav-collapse"
+                title={withShortcut(collapse.labels.collapse, collapse.labels.shortcut)}
+                aria-label={collapse.labels.collapse}
+                aria-keyshortcuts="[ Control+B"
+                onClick={() => toggleCollapsed(true)}
+              >
+                <PanelIcon expand={false} />
+              </button>
+            )}
+          </div>
         )}
       </div>
       {search && (
@@ -384,6 +415,7 @@ export function AdminNav({ title, nodes, icons = {}, pins, collapse, search }: A
           expandTip={withShortcut(collapse.labels.expand, collapse.labels.shortcut)}
           onExpand={() => toggleCollapsed(false)}
           search={search ? { label: search.labels.open, tip: searchTip, onOpen: () => setSearchOpen(true) } : null}
+          density={density ?? null}
         />
       )}
       <div className="vtk-admin-nav-bar">
@@ -649,6 +681,7 @@ function AdminRail({
   expandTip,
   onExpand,
   search,
+  density,
 }: {
   title: string;
   nodes: AdminNavNode[];
@@ -661,6 +694,8 @@ function AdminRail({
   onExpand: () => void;
   /** Het zoekicoon onder de uitklapknop; null zonder zoeken. */
   search: { label: string; tip: string; onOpen: () => void } | null;
+  /** De knop voor de compacte stand, onder het zoekicoon; null zonder. */
+  density: AdminNavDensity | null;
 }) {
   const pathname = usePathname();
   const railRef = useRef<HTMLDivElement>(null);
@@ -723,6 +758,22 @@ function AdminRail({
             </button>
             <span className="vtk-admin-rail-tip" aria-hidden>
               {search.tip}
+            </span>
+          </div>
+        )}
+        {density && (
+          <div className="vtk-admin-rail-slot vtk-admin-rail-density">
+            <button
+              type="button"
+              className={`vtk-admin-rail-btn${density.compact ? ' is-on' : ''}`}
+              aria-label={density.label}
+              aria-pressed={density.compact}
+              onClick={() => density.onChange(!density.compact)}
+            >
+              <DensityIcon compact={density.compact} />
+            </button>
+            <span className="vtk-admin-rail-tip" aria-hidden>
+              {density.label}
             </span>
           </div>
         )}
@@ -829,6 +880,32 @@ function PanelIcon({ expand }: { expand: boolean }) {
       <rect x="3" y="3" width="18" height="18" rx="3" />
       <path d="M9 3v18" />
       <path d={expand ? 'm14 9 3 3-3 3' : 'm16 15-3-3 3-3'} />
+    </svg>
+  );
+}
+
+/**
+ * Regels tekst: drie met ruimte ertussen in de gewone stand, vier dicht op
+ * elkaar in de compacte. Zo zit de toestand in het icoon zelf en niet enkel in
+ * de tooltip.
+ */
+function DensityIcon({ compact }: { compact: boolean }) {
+  const rows = compact ? [6, 10, 14, 18] : [6, 12, 18];
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden
+    >
+      {rows.map((y) => (
+        <path key={y} d={`M4 ${y}h16`} />
+      ))}
     </svg>
   );
 }

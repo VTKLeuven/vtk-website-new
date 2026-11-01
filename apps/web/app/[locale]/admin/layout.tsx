@@ -10,8 +10,9 @@ import { canAccessAnyForm } from '@/lib/forms/authorization';
 import { canSeeCommuRequests } from '@/lib/commu/requests';
 import { isExternalUrl } from '@/lib/href';
 import { getAdminNav, type NavGuard, type NavLeaf } from '@/lib/admin-nav';
-import { ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/adminNavCookie';
+import { ADMIN_DENSITY_COOKIE, ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/adminNavCookie';
 import { AdminNav, type NavItem, type NavNode } from './AdminNav';
+import { AdminSurface } from './AdminSurface';
 
 import '@/app/design/vtk-admin.css';
 
@@ -116,10 +117,12 @@ export default async function AdminLayout({
     select: { key: true },
   });
 
-  const collapsed = (await cookies()).get(ADMIN_NAV_COLLAPSED_COOKIE)?.value === '1';
+  const cookieStore = await cookies();
+  const collapsed = cookieStore.get(ADMIN_NAV_COLLAPSED_COOKIE)?.value === '1';
+  const compact = cookieStore.get(ADMIN_DENSITY_COOKIE)?.value === 'compact';
 
   return (
-    <div className="vtk-admin-surface">
+    <AdminSurface initialCompact={compact}>
       <div className="vtk-admin-surface-inner">
         {/* Sticky/scrollgedrag staat in AdminNav (useSmartSticky) plus het
             860px-breekpunt in vtk-admin.css (niet Tailwinds md:, dat 768px is). */}
@@ -146,10 +149,11 @@ export default async function AdminLayout({
               placeholder: adminDict.searchNavPlaceholder,
               empty: adminDict.searchNavEmpty,
             }}
+            densityLabel={adminDict.compactView}
           />
         </aside>
         <section className="vtk-admin-main">{children}</section>
       </div>
-    </div>
+    </AdminSurface>
   );
 }

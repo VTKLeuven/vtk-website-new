@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { toggleAdminNavPinAction } from '@/app/actions/admin-nav';
 import { useToast } from '@/components/ui/toast';
 import { ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/adminNavCookie';
+import { useAdminDensity } from './AdminSurface';
 
 export type NavItem = AdminNavItem;
 export type NavNode = AdminNavNode;
@@ -33,6 +34,7 @@ export function AdminNav({
   collapsed,
   collapseLabels,
   searchLabels,
+  densityLabel,
 }: {
   title: string;
   nodes: NavNode[];
@@ -41,8 +43,10 @@ export function AdminNav({
   collapsed: boolean;
   collapseLabels: { collapse: string; expand: string; shortcut: string };
   searchLabels: { open: string; placeholder: string; empty: string };
+  densityLabel: string;
 }) {
   const showToast = useToast();
+  const density = useAdminDensity();
   const { error, ...labels } = pinLabels;
 
   return (
@@ -52,6 +56,7 @@ export function AdminNav({
       icons={icons}
       collapse={{ initial: collapsed, onChange: rememberCollapsed, labels: collapseLabels }}
       search={{ labels: searchLabels }}
+      density={density ? { compact: density.compact, onChange: density.setCompact, label: densityLabel } : undefined}
       pins={{
         keys: pinnedKeys,
         labels,
