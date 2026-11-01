@@ -156,3 +156,32 @@ describe("miniatuur van een videoposter", () => {
     expect(smallVideoThumbnailUrl("https://example.com/poster.jpg")).toBe("https://example.com/poster.jpg");
   });
 });
+
+describe("een enter in de markdown", () => {
+  // Statisch geïmporteerd zou de renderer `next/dynamic` meetrekken; enkel de
+  // plugin zelf is hier nodig.
+  async function render(markdown: string): Promise<string> {
+    const [{ default: ReactMarkdown }, { default: remarkGfm }, { remarkLineBreaks }, { renderToStaticMarkup }, { createElement }] =
+      await Promise.all([
+        import("react-markdown"),
+        import("remark-gfm"),
+        import("@/lib/markdownBreaks"),
+        import("react-dom/server"),
+        import("react"),
+      ]);
+    return renderToStaticMarkup(
+      createElement(ReactMarkdown, { remarkPlugins: [remarkGfm, remarkLineBreaks] }, markdown),
+    );
+  }
+
+  it("wordt een regeleinde, zoals het in het tekstvak onder elkaar staat", async () => {
+    expect(await render("🍝 Pasta\n🎲 Bordspellen\n🎮 Nintendo Switch")).toBe(
+      "<p>🍝 Pasta<br/>\n🎲 Bordspellen<br/>\n🎮 Nintendo Switch</p>",
+    );
+  });
+
+  it("laat een witregel een nieuwe alinea en code ongemoeid", async () => {
+    expect(await render("Eerste\n\nTweede")).toBe("<p>Eerste</p>\n<p>Tweede</p>");
+    expect(await render("```\na\nb\n```")).toBe("<pre><code>a\nb\n</code></pre>");
+  });
+});

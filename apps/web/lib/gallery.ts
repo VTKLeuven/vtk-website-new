@@ -98,6 +98,9 @@ function paragraphPhotos(node: Element | undefined): GalleryPhoto[] | null {
       if (child.value.trim() === "") continue;
       return null;
     }
+    // Foto's op opeenvolgende regels: een enter is een regeleinde
+    // (`lib/markdownBreaks.ts`), en dat hoort bij de galerij, niet ertussen.
+    if (child.type === "element" && child.tagName === "br") continue;
     if (child.type !== "element" || child.tagName !== "img") return null;
 
     const src = typeof child.properties?.src === "string" ? child.properties.src : "";

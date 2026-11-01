@@ -2,6 +2,7 @@ import { Children, type ReactNode } from "react";
 import type { Element } from "hast";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { remarkLineBreaks } from "@/lib/markdownBreaks";
 import { DEFAULT_LOCALE, getDictionary, type Locale } from "@vtk/i18n";
 import { galleryPhotos, imageSize, solePhoto } from "@/lib/gallery";
 import { headingId, headingText } from "@/lib/pageOutline";
@@ -52,8 +53,8 @@ export function preprocessMarkdownVideos(markdown: string): string {
  */
 function splitAroundVideos(node: Element | undefined, children: ReactNode): ReactNode[] | null {
   if (!node || !Array.isArray(node.children)) return null;
-  const isVideo = (child: Element["children"][number]) =>
-    child.type === "element" &&
+  const isVideo = (child: Element["children"][number] | undefined) =>
+    child?.type === "element" &&
     child.tagName === "img" &&
     isVideoUrl(typeof child.properties?.src === "string" ? child.properties.src : null);
   if (!node.children.some(isVideo)) return null;
@@ -71,10 +72,26 @@ function splitAroundVideos(node: Element | undefined, children: ReactNode): Reac
     if (hasContent) parts.push(<p key={`p${parts.length}`}>{text}</p>);
     text = [];
   };
+  // Een enter is een regeleinde (`lib/markdownBreaks.ts`), dus de video op de
+  // regel onder een zin heeft een `<br>` naast zich. Dat regeleinde valt weg:
+  // anders eindigt de alinea ervoor op een lege regel.
+  const isBreak = (child: Element["children"][number] | undefined) =>
+    child?.type === "element" && child.tagName === "br";
+  const isBlank = (child: Element["children"][number] | undefined) =>
+    child?.type === "text" && child.value.trim() === "";
+  // De buur van een kind, over witruimte heen: na een `<br>` volgt altijd een
+  // tekstknoop met enkel de enter erin.
+  const neighbour = (index: number, step: 1 | -1) => {
+    let at = index + step;
+    while (isBlank(node.children[at])) at += step;
+    return node.children[at];
+  };
   node.children.forEach((child, index) => {
     if (isVideo(child)) {
       flush();
       parts.push(rendered[index]);
+    } else if (isBreak(child) && (isVideo(neighbour(index, -1)) || isVideo(neighbour(index, 1)))) {
+      return;
     } else {
       text.push(rendered[index]);
     }
@@ -126,7 +143,7 @@ export function Markdown({
 
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={[remarkGfm, remarkLineBreaks]}
       components={{
         // Kopjes krijgen een anker, zodat de "Op deze pagina"-rail ernaartoe kan
         // linken. De id komt uit dezelfde helper als die rail (pageOutline).
