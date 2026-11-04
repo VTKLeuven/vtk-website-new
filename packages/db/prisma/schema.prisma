@@ -3266,6 +3266,24 @@ model Setting {
 }
 
 // -----------------------------------------------------------------------------
+// Opruiming van de bucket (apps/web/lib/storage-cleanup.ts)
+// -----------------------------------------------------------------------------
+// Een object in de bucket waar geen enkele rij in de database nog naar
+// verwijst, en sinds wanneer dat zo is. Elke nacht doorzoekt de opruiming de
+// hele database naar de key; duikt die weer op, dan verdwijnt de rij, en wie
+// 30 dagen aan één stuk hier staat, wordt uit de bucket verwijderd.
+//
+// Deze tabel draagt zelf de keys, dus de scan slaat ze over: anders zou elk
+// object zijn eigen verwijzing zijn en nooit weggaan.
+model StorageOrphan {
+  key         String   @id
+  sizeBytes   Int
+  firstSeenAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([firstSeenAt])
+}
+
+// -----------------------------------------------------------------------------
 // Admin dashboard tiles (configurable launchpad links)
 // -----------------------------------------------------------------------------
 

@@ -13,6 +13,9 @@ import type { ReactNode } from 'react';
 import { hasLocale } from '@/lib/locale';
 import { requireSession } from '@/lib/session';
 import { getStorageInsights, type LocalStorageSource } from '@/lib/storage-insights';
+import { getCleanupReport } from '@/lib/storage-cleanup';
+import { GRACE_DAYS } from '@/lib/storage-cleanup-plan';
+import Link from '@/components/ui/Link';
 
 const NUMBER = new Intl.NumberFormat('en-BE');
 const DATE_TIME = new Intl.DateTimeFormat('en-BE', {
@@ -160,7 +163,7 @@ export default async function StoragePage({ params }: { params: Promise<{ locale
   const session = await requireSession();
   if (!session.user.isSuperAdmin) notFound();
 
-  const report = await getStorageInsights();
+  const [report, cleanup] = await Promise.all([getStorageInsights(), getCleanupReport({ limit: 0 })]);
   const s3Data = report.s3.available ? report.s3.data : null;
   const s3Failure = report.s3.available ? null : report.s3.reason;
   const immichDisk = report.immich.disk.available ? report.immich.disk.data : null;
@@ -279,6 +282,28 @@ export default async function StoragePage({ params }: { params: Promise<{ locale
         ) : (
           <Unavailable title="S3 inventory unavailable" detail={storageFailureText(s3Failure!)} />
         )}
+
+        {/* Uit de database, niet uit de bucket: ook zichtbaar wanneer S3 niet te lezen is. */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium text-vtk-ink">
+              {NUMBER.format(cleanup.orphanCount)} unreferenced {cleanup.orphanCount === 1 ? 'file' : 'files'}
+              <span className="font-normal text-zinc-500"> · {formatBytes(cleanup.orphanBytes)}</span>
+            </p>
+            <p className="text-xs text-zinc-500">
+              {cleanup.settings.deleteEnabled
+                ? `Deleted after ${GRACE_DAYS} days without a reference in the database.`
+                : 'Report only: nothing is deleted until deletion is turned on.'}
+              {cleanup.lastRun ? ` Last scan ${DATE_TIME.format(new Date(cleanup.lastRun.finishedAt))}.` : ' No scan has run yet.'}
+            </p>
+          </div>
+          <Link
+            href={`/${locale}/admin/it/storage/cleanup`}
+            className="inline-flex items-center rounded-full border border-vtk-blue/20 bg-white px-4 py-2 text-sm font-medium text-vtk-ink no-underline shadow-sm hover:bg-vtk-blue/5"
+          >
+            Review cleanup
+          </Link>
+        </div>
       </section>
 
       <section className="space-y-6 rounded-2xl border border-vtk-blue/15 bg-white p-5 shadow-sm sm:p-6">

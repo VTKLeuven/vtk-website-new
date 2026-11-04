@@ -6,6 +6,7 @@ import { recordMailingListCounts } from "@/lib/mailingListHistory";
 import { processDueNoShows } from "@/lib/theokot-server";
 import { backfillMagazineCovers } from "@/lib/magazineCover";
 import { processDuePalPlusReminders } from "@/lib/palPlusNotify";
+import { runNightlyStorageCleanup } from "@/lib/storage-cleanup";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
   }
 
   const now = new Date();
-  const [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse] = await Promise.allSettled([
+  const [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse, opruiming] = await Promise.allSettled([
     processDueNoShows(now),
     processDueLesbezoekScheduledMails(now),
     // De stand van de mailinglijsten van vandaag, voor de grafiek in
@@ -66,12 +67,16 @@ export async function POST(request: Request) {
     // De herinneringsmail om 12u de dag voor een evenement waarin een lid
     // interesse aanduidde; zie lib/calendar/interestReminderMailer.ts.
     processDueInterestReminderMails(now),
+    // Eén keer per nacht de bucket opruimen: bestanden waar de database al 30
+    // dagen niet meer naar verwijst. Doet zelf niets tot het 3u is, en daarna
+    // niets meer die dag; zie lib/storage-cleanup.ts.
+    runNightlyStorageCleanup(now),
   ]);
 
   // 502 zodra een van de taken viel: de healthcheck van de worker ziet dan dat
   // er iets scheelt in plaats van stil niets te doen. De andere taken zijn wel
   // gedraaid, en alle zijn idempotent, dus de volgende ronde haalt het in.
-  const failed = [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse].some(
+  const failed = [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse, opruiming].some(
     (task) => task.status === "rejected",
   );
   if (failed) {
@@ -83,6 +88,7 @@ export async function POST(request: Request) {
       palPlus: describe(palPlus),
       discord: describe(discord),
       interesse: describe(interesse),
+      opruiming: describe(opruiming),
     });
   }
 
@@ -95,6 +101,7 @@ export async function POST(request: Request) {
       palPlus: describe(palPlus),
       discord: describe(discord),
       interesse: describe(interesse),
+      opruiming: describe(opruiming),
     },
     { status: failed ? 502 : 200, headers: { "Cache-Control": "no-store" } },
   );

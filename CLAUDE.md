@@ -219,6 +219,27 @@ herkenning van bestandsnamen of het uitlezen van de rekenbladen komt.
   wacht tot de activiteit voorbij is (`openResults` in `lib/bo/own.ts`). Breid
   die uitzondering niet uit naar de status of de tellingen.
 
+# Opruiming van de bucket
+
+Elke nacht zoekt `apps/web/lib/storage-cleanup*.ts` in elke tekst- en
+JSON-kolom van de database naar de keys van de algemene uploader (`images/`,
+`pdfs/`, `files/`, `logos/`, `tiles/`, `badges/`, `uploads/`). Een bestand dat
+30 dagen nergens vermeld staat, gaat uit de bucket zodra een superadmin dat op
+/admin/it/storage/cleanup aanzette. De kringkeuzes staan in
+`docs/design-decisions.md`, "Opruiming van de bucket".
+
+- **Bewaar een key altijd volledig** (`pdfs/<24 hex>.pdf`) of als
+  `/api/media/...`-URL, in een tekst-, JSON- of arraykolom. Een key die je uit
+  stukken samenstelt (enkel de hex in de kolom en de map in de code), in een
+  `Bytes`-kolom, of enkel buiten de database (een env-var, een constante in de
+  code), ziet de scan niet, en die verwijdert dan een bestand dat nog gebruikt
+  wordt. Dat faalt stil, en pas 30 dagen later.
+- Een nieuwe uploadmap valt er standaard buiten; zet ze pas in
+  `CLEANUP_PREFIXES` als haar bestanden geen eigenaar-rij en geen eigen
+  opruiming hebben. `bonnetjes/` komt er nooit in.
+- `StorageOrphan` draagt zelf keys en wordt dus niet doorzocht. Schrijf ook
+  geen keys in `storage.cleanup.state`: de `Setting`-tabel wordt wel doorzocht.
+
 # MCP-server voor agents
 
 `docs/mcp.md` is de referentie voor het MCP-endpoint op `/api/mcp`, waarmee een

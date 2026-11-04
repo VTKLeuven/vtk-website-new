@@ -12092,3 +12092,36 @@ nodig zijn. Dat staat op `/admin/theokot/shiften` (`lib/theokotShifts.ts`,
 - **Het recht is `theokot.manage`**, wie de broodjes beheert. Geen apart recht:
   de rol van Theokot draagt het al, en de afhaalbalie (`theokot.pickup`) plant
   geen shiften.
+
+## Opruiming van de bucket
+
+Wie in de editor een nieuwe PDF uploadt en de link naar de oude weghaalt, liet
+de oude voorgoed in de bucket staan: de algemene uploader (`/api/admin/upload`)
+maakt geen rij in de database, het bestand leeft enkel als link in een tekst.
+Over jaren worden dat duizenden bestanden die niemand nog toont. De opruiming
+staat in `apps/web/lib/storage-cleanup*.ts`, het scherm op
+`/admin/it/storage/cleanup`, november 2026.
+
+- **Niet bij het opslaan, maar elke nacht.** De oude en de nieuwe tekst
+  vergelijken en weggooien wat verdween, breekt de andere plekken waar
+  hetzelfde bestand staat (de NL- en de EN-tab, een nieuwsbericht dat naar
+  hetzelfde reglement linkt), moet in elke opslaan-actie zitten, en heeft geen
+  weg terug voor wie per ongeluk een link wist.
+- **De hele database wordt doorzocht, niet een lijst kolommen.** Elke tekst-,
+  JSON- en arraykolom van elke tabel, naar `<map>/<24 hex>`, het formaat van
+  `newStorageKey`. Een nieuwe feature met een eigen key-kolom of markdownveld
+  zit er zo vanzelf in. Ook het e-maillogboek telt mee: een afbeelding in een
+  mail die net vertrok, blijft zolang dat logboek ze bewaart.
+- **30 dagen aan één stuk zonder verwijzing**, en pas na 7 dagen beoordeeld
+  (de editor uploadt voor het opslaan). Links die mensen buiten de site deelden
+  (Discord, Instagram), breken na die termijn; daarom geen dag of een week.
+- **Eerst enkel rapporteren.** Verwijderen staat standaard uit; een superadmin
+  zet het aan op het scherm, nadat de lijst een tijd klopte. Hoogstens 500 per
+  nacht, en een scan die geen enkele verwijzing vindt, raakt niets aan.
+- **Enkel de mappen van de algemene uploader**: `images/`, `pdfs/`, `files/`,
+  `logos/`, `tiles/`, `badges/`, `uploads/`. `bonnetjes/` blijft er bewust
+  buiten, want de boekhouding heeft een bewaarplicht; `forms/`, `avatars/`,
+  `publications/`, `uitleen/`, `ticket-design/` en `theokot/contracten/` hebben
+  een eigenaar-rij en hun eigen opruiming.
+- **Verwijderd is weg.** Er is geen prullenmand in de bucket; wat terug moet,
+  moet opnieuw geüpload worden.
