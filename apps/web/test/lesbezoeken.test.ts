@@ -10,6 +10,7 @@ import {
   LESBEZOEK_COLOURS,
   LESBEZOEK_MIN_LEAD_DAYS,
   LESBEZOEK_NUDGE_LEAD_DAYS,
+  lesbezoekDateWindow,
   LESBEZOEK_STATUS_META,
   defaultTeacherLocale,
   matchPeculiarities,
@@ -113,6 +114,31 @@ describe("parseLesbezoekRequest", () => {
       now: NOW,
     });
     expect(result).toEqual({ status: "error", code: "TOO_SOON" });
+  });
+
+  it("telt de termijn in kalenderdagen, niet in uren tot het lesuur", () => {
+    // Woensdag 4 november, 15u in Brussel; de les valt woensdag 18 november om
+    // 9u. Dat is 14 kalenderdagen maar net geen 14 x 24 uur, en het formulier
+    // biedt die dag zelf aan als vroegste datum.
+    const now = new Date("2026-11-04T14:00:00.000Z");
+    const startsAt = new Date("2026-11-18T08:00:00.000Z");
+    const ok = parseLesbezoekRequest(validInput({ date: "2026-11-18", time: "09:00" }), {
+      startsAt,
+      now,
+    });
+    expect(ok.status).toBe("ok");
+
+    const tooSoon = parseLesbezoekRequest(validInput({ date: "2026-11-17", time: "18:00" }), {
+      startsAt: new Date("2026-11-17T17:00:00.000Z"),
+      now,
+    });
+    expect(tooSoon).toEqual({ status: "error", code: "TOO_SOON" });
+  });
+
+  it("rekent de dag van vandaag op de Brusselse klok", () => {
+    // 23u30 UTC op 3 november is al 4 november in Brussel.
+    const now = new Date("2026-11-03T23:30:00.000Z");
+    expect(lesbezoekDateWindow(now).earliest).toBe("2026-11-18");
   });
 
   it("weigert een aanvraag meer dan een jaar vooruit", () => {
