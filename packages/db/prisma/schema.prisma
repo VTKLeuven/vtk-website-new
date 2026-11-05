@@ -8280,6 +8280,13 @@ model CashRegister {
   /// Opmerking van Beheer bij het tellen. Enkel voor wie kassa's beheert.
   note String?
 
+  /// De kassa waarvan de eindkassa hier als startkassa doorgeschoven werd: het
+  /// cash ging zonder leegmaken naar deze activiteit. NULL = de startkassa kwam
+  /// van Beheer, of van voor november 2026, toen dat enkel in het rekenblad
+  /// kon (en dat is niet te kennen). `@unique`: één kassa ligt op één plaats.
+  /// `SetNull`: een verwijderde kassa laat deze startkassa staan.
+  startFromId String? @unique
+
   /// De boekhoudcode van wat er op de toestellen van deze kassa binnenkwam,
   /// voor de online inkomsten (koppelregel 4). Beheer kiest ze bij het
   /// aanvaarden, niet de post. NULL = nog geen: dan koppelt de kassa niets.
@@ -8299,6 +8306,9 @@ model CashRegister {
   group        Group?                    @relation(fields: [groupId], references: [id], onDelete: SetNull)
   requestedBy  User?                     @relation("CashRegisterRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
   acceptedBy   User?                     @relation("CashRegisterAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+  startFrom    CashRegister?             @relation("CashRegisterCarryOver", fields: [startFromId], references: [id], onDelete: SetNull)
+  /// De kassa die met de eindkassa van deze verderging.
+  carriedTo    CashRegister?             @relation("CashRegisterCarryOver")
   payments     CashRegisterPayment[]
   ticketEvents CashRegisterTicketEvent[]
   /// `SetNull`: een verwijderde code laat de kassa zonder code.

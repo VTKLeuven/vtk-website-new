@@ -65,6 +65,14 @@ export function denominationLabel(cents: Denomination): string {
   return cents < 100 ? `${cents} cent` : `€ ${cents / 100}`;
 }
 
+/**
+ * Zelfde stuks per coupure? Zo ziet een doorgeschoven kassa of de telling erna
+ * nog veranderde: een gelijk totaal met andere munten is een andere kassa.
+ */
+export function sameCounts(a: Counts, b: Counts): boolean {
+  return DENOMINATIONS.every((denomination) => piecesOf(a, denomination) === piecesOf(b, denomination));
+}
+
 /** De coupures met minstens één stuk, voor een mail of een samenvatting. */
 export function countsLines(counts: Counts): Array<{ denomination: Denomination; pieces: number }> {
   return DENOMINATIONS.filter((denomination) => piecesOf(counts, denomination) > 0).map(
@@ -285,6 +293,29 @@ export const PERMANENT_POST_CODES = ["CURSUSDIENST", "THEOKOT", "FAKBAR"] as con
 
 /** `?post=` voor die drie samen. */
 export const PERMANENT_POST_FILTER = "cudi-theo-fak";
+
+// -----------------------------------------------------------------------------
+// Jaarwerking
+// -----------------------------------------------------------------------------
+
+/**
+ * Een kassa voor een jaarwerking (Kanweek, Studentenwelkom, Skireis, ...) staat
+ * op geen post: zo'n activiteit is van verschillende posten samen. Ze heeft geen
+ * `groupId` en als postnaam "Jaarwerking"; welke jaarwerking het is, zegt de
+ * activiteit. `YEARLY_EVENT_CHOICE` is de waarde in de keuzelijst en in
+ * `?post=` van het overzicht.
+ */
+export const YEARLY_EVENT_CHOICE = "jaarwerking";
+export const YEARLY_EVENT_LABEL = "Jaarwerking";
+
+/**
+ * Staat de kassa op "Jaarwerking"? Op beide velden: een kassa van een post die
+ * intussen verwijderd werd, heeft ook geen `groupId` meer, maar houdt de naam
+ * van die post.
+ */
+export function isYearlyEvent(register: { groupId: string | null; postLabel: string }): boolean {
+  return register.groupId === null && register.postLabel === YEARLY_EVENT_LABEL;
+}
 
 // -----------------------------------------------------------------------------
 // Bedragen en aantallen uit een formulier

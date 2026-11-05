@@ -8324,6 +8324,41 @@ hele semester meegaat, en het blad had er een eigen tabblad voor. In het
 overzicht is dat één keuze in de postfilter, naast elke post apart. Het gaat op
 de code van de post (`PERMANENT_POST_CODES`), net als `EXPENSE_POST_SPLITS`.
 
+**Een jaarwerking is een keuze in de postlijst, geen post (november 2026).**
+Beheer vroeg "Jaarwerking" naast de posten: Kanweek, Studentenwelkom of Skireis
+zijn van verschillende posten samen. Zo'n kassa staat op geen post (`groupId`
+leeg, postnaam "Jaarwerking", `isYearlyEvent`), en welke jaarwerking het is,
+zegt de activiteit. Eén keuze en niet een per jaarwerking zoals op het BO-scherm:
+de activiteit noemt ze al, en een lijst jaarwerkingen in de code veroudert. De
+keuze staat net onder je eigen post, niet onderaan tussen de werkgroepen. Omdat
+er geen post achter zit, ziet enkel de aanvrager (en Beheer) zo'n kassa, en gaat
+de mail naar `voornaam.achternaam@vtk.be`. In het overzicht is ze een keuze in
+de postfilter.
+
+**De eindkassa schuift door naar de volgende kassa (november 2026).** Gaat het
+cash zonder leegmaken van de ene activiteit naar de volgende, dan kopieerde
+Beheer in het rekenblad de eindkassa naar de startkassa van het volgende blok.
+Op de pagina van een getelde kassa staat daarvoor "Doorschuiven naar de volgende
+kassa": kies een latere kassa die nog niet geteld is (ook een aanvraag, ook van
+een andere post), en haar startkassa wordt per munt en briefje deze eindkassa.
+
+- Het heet doorschuiven en niet doorgeven, want "doorgegeven" is al de status
+  waarin de post haar resultaat ziet.
+- Enkel het cash. De bonnen, Bancontact en Payconiq brachten op bij de eerste
+  activiteit en blijven daar; elke kassa rekent haar eigen resultaat als
+  eindkassa min startkassa, dus de tweede telt enkel wat ze zelf bijbracht.
+- De volgende kassa onthoudt van welke kassa ze kwam (`startFromId`), en één
+  kassa schuift naar één andere: naar een andere doorschuiven verhuist de
+  koppeling, en de vorige houdt haar startkassa (wat daar anders had moeten
+  staan, is niet te kennen). Waar een startkassa vandaan komt, toont enkel
+  Beheer; de kassa ervoor is vaak van een andere post.
+- Een telling die nadien rechtgezet wordt, schuift niet vanzelf mee: de telling
+  wordt in stappen ingevuld, en de startkassa van de volgende kan intussen
+  bijgesteld zijn. De kassa zegt wel wanneer de twee niet meer gelijk zijn, en
+  opnieuw doorschuiven naar dezelfde kassa mag dan ook als die al geteld is.
+- Kassa's van voor november 2026 hebben geen koppeling: wat in het rekenblad
+  doorgeschoven werd, staat nergens.
+
 ## Vaste kassa's van Cudi, Theokot en Fakbar (oktober 2026)
 
 Een kassa per activiteit past niet op die drie posten: daar is de kassa een

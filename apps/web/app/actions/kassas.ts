@@ -45,6 +45,8 @@ import {
   resultSharedWithPost,
   startCountsFromPicks,
   statusLabel,
+  YEARLY_EVENT_CHOICE,
+  YEARLY_EVENT_LABEL,
   type Counts,
   type Denomination,
   type PaymentMethod,
@@ -120,7 +122,8 @@ type RequestFields = {
   endsAt: Date;
   workingYear: number;
   activity: string;
-  groupId: string;
+  /** `null` voor een jaarwerking: die staat op geen post. */
+  groupId: string | null;
   postLabel: string;
   responsibleName: string;
   wantsBancontact: boolean;
@@ -151,17 +154,24 @@ async function readRequest(
   if (!activity || !responsibleName) return { error: "MISSING_FIELD" };
 
   const groupId = text(formData, "groupId", 60);
-  const group = groupId
-    ? await prisma.group.findUnique({
-        where: { id: groupId },
-        select: { id: true, nameNl: true, active: true },
-      })
-    : null;
-  // Een gedeactiveerde post kies je niet meer, behalve je eigen of de post waar
-  // de kassa al op stond.
-  const allowedInactive =
-    group && (access.postIds.includes(group.id) || current?.groupId === group.id);
-  if (!group || (!group.active && !allowedInactive)) return { error: "BAD_POST" };
+  let post: { groupId: string | null; postLabel: string };
+  if (groupId === YEARLY_EVENT_CHOICE) {
+    // Een jaarwerking is van verschillende posten samen en staat op geen post.
+    post = { groupId: null, postLabel: YEARLY_EVENT_LABEL };
+  } else {
+    const group = groupId
+      ? await prisma.group.findUnique({
+          where: { id: groupId },
+          select: { id: true, nameNl: true, active: true },
+        })
+      : null;
+    // Een gedeactiveerde post kies je niet meer, behalve je eigen of de post waar
+    // de kassa al op stond.
+    const allowedInactive =
+      group && (access.postIds.includes(group.id) || current?.groupId === group.id);
+    if (!group || (!group.active && !allowedInactive)) return { error: "BAD_POST" };
+    post = { groupId: group.id, postLabel: group.nameNl };
+  }
 
   // De startkassa. Een post duidt aan wat ze nodig heeft (`pick`) en krijgt het
   // standaardaantal; enkel Beheer telt ze per coupure (`count`). Bij `keep`
@@ -190,8 +200,7 @@ async function readRequest(
     endsAt: interval.end,
     workingYear: workingYearOf(date),
     activity,
-    groupId: group.id,
-    postLabel: group.nameNl,
+    ...post,
     responsibleName,
     wantsBancontact: formData.get("wantsBancontact") === "on",
     wantsPayconiq: formData.get("wantsPayconiq") === "on",
@@ -646,6 +655,90 @@ export async function saveCashRegisterCountAction(
   await rematchIncome();
   revalidateCashRegisters(id);
   return saveOk();
+}
+
+/**
+ * De eindkassa doorschuiven naar een volgende kassa: het cash gaat zonder
+ * leegmaken naar een volgende activiteit, dus de eindkassa van deze kassa wordt
+ * per munt en briefje de startkassa van die andere. Enkel het cash: de bonnen,
+ * Bancontact en Payconiq brachten hier op en blijven bij deze kassa.
+ *
+ * Opnieuw doorschuiven naar dezelfde kassa zet haar startkassa weer gelijk na
+ * een rechtgezette telling. Naar een andere kassa verhuist de koppeling; de
+ * vorige houdt haar startkassa, want wat daar anders had moeten staan, is niet
+ * te kennen.
+ */
+export async function carryOverCashRegisterAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const access = await requireManager();
+  if (!access) return saveError("FORBIDDEN");
+  const id = text(formData, "id", 60);
+  const targetId = text(formData, "targetId", 60);
+  const source = await prisma.cashRegister.findUnique({
+    where: { id },
+    select: { status: true, date: true, activity: true, postLabel: true, endCounts: true },
+  });
+  if (!source) return saveError("NOT_FOUND");
+  if (source.status === "REQUESTED") return saveError("NOT_ACCEPTED");
+  if (source.endCounts === null) return saveError("CARRY_NOT_COUNTED");
+  const target =
+    targetId && targetId !== id
+      ? await prisma.cashRegister.findUnique({
+          where: { id: targetId },
+          select: {
+            id: true,
+            date: true,
+            activity: true,
+            postLabel: true,
+            startCounts: true,
+            endCounts: true,
+            startFromId: true,
+          },
+        })
+      : null;
+  if (!target) return saveError("BAD_TARGET");
+  // Vooruit in de tijd, en niet naar een kassa die al geteld is: dan verschuift
+  // haar resultaat. Behalve als ze al van deze kassa kwam: dan is het net de
+  // bedoeling dat haar startkassa de rechtgezette telling volgt.
+  if (target.startFromId !== id) {
+    if (target.date < source.date) return saveError("BAD_TARGET");
+    if (target.endCounts !== null) return saveError("TARGET_COUNTED");
+  }
+
+  const startCounts = normaliseCounts(source.endCounts);
+  const before = countsTotalCents(normaliseCounts(target.startCounts));
+  const after = countsTotalCents(startCounts);
+  await prisma.$transaction([
+    // Eén kassa ligt op één plaats: een vorige volgende kassa laat ze los.
+    prisma.cashRegister.updateMany({
+      where: { startFromId: id, id: { not: target.id } },
+      data: { startFromId: null },
+    }),
+    prisma.cashRegister.update({
+      where: { id: target.id },
+      data: { startCounts, startFromId: id },
+    }),
+  ]);
+
+  await logAudit({
+    action: "update",
+    entity: "cashRegister",
+    entityId: target.id,
+    target: `${target.activity} (${target.postLabel})`,
+    summary: `startkassa ${formatEuro(before)} → ${formatEuro(after)}, eindkassa van ${source.activity} (${formatSpentOn(source.date)})`,
+  });
+  await logAudit({
+    action: "update",
+    entity: "cashRegister",
+    entityId: id,
+    target: `${source.activity} (${source.postLabel})`,
+    summary: `eindkassa doorgeschoven naar ${target.activity} (${formatSpentOn(target.date)})`,
+  });
+  revalidateCashRegisters(id);
+  revalidateCashRegisters(target.id);
+  return saveOk(`De startkassa van ${target.activity} staat nu op ${formatEuro(after)}.`);
 }
 
 /**

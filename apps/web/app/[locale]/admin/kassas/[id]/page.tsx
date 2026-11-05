@@ -1,11 +1,13 @@
+import type { ReactNode } from "react";
 import Link from "@/components/ui/Link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
+import { Prisma } from "@prisma/client";
 import { pick, type Locale } from "@vtk/i18n";
 import { AdminDisclosure } from "@/components/admin/AdminDisclosure";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
 import { hasLocale } from "@/lib/locale";
-import { formatEuro, formatSubmittedOn, toDateInputValue } from "@/lib/rekeningen/expenses";
+import { formatEuro, formatSpentOn, formatSubmittedOn, toDateInputValue } from "@/lib/rekeningen/expenses";
 import {
   canEditRequest,
   canSeeResult,
@@ -22,14 +24,18 @@ import {
   countsLines,
   countsTotalCents,
   denominationLabel,
+  isYearlyEvent,
   normaliseCounts,
   registerInterval,
   resultSharedWithPost,
+  sameCounts,
   STATUS_SLUGS,
   statusLabel,
   timeInputValue,
   timeRangeLabel,
   timeRangeShort,
+  YEARLY_EVENT_CHOICE,
+  type Counts,
   type PaymentMethod,
 } from "@/lib/kassas/kassa";
 import { SaveForm } from "@/components/ui/SaveForm";
@@ -37,6 +43,7 @@ import { kassaImportAmounts } from "@/lib/inkomsten/server";
 import { listAccountingCodes } from "@/lib/accounting/server";
 import {
   acceptCashRegisterAction,
+  carryOverCashRegisterAction,
   deleteCashRegisterAction,
   saveCashRegisterCountAction,
   sendCashRegisterCountedMailAction,
@@ -45,6 +52,7 @@ import {
   updateCashRegisterRequestAction,
 } from "@/app/actions/kassas";
 import { AcceptForm, type CodeSuggestion, type DeviceOption } from "../AcceptForm";
+import { CarryOverForm, type CarryOverCandidate } from "../CarryOverForm";
 import { CodeForm } from "../CodeForm";
 import { CountForm, type TicketOption } from "../CountForm";
 import { RequestForm } from "../RequestForm";
@@ -77,6 +85,8 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
         },
       },
       acceptedBy: { select: { name: true } },
+      startFrom: { select: { id: true, activity: true, date: true } },
+      carriedTo: { select: { id: true, activity: true, date: true, startCounts: true } },
       payments: { orderBy: { sortOrder: "asc" } },
       ticketEvents: { select: { ticketEventId: true } },
     },
@@ -113,6 +123,15 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
           _sum: { amountCents: true },
         })
       : null;
+  const carryOver =
+    manage && !requested
+      ? await carryOverCandidates(
+          register,
+          register.carriedTo?.id ?? null,
+          register.endCounts === null ? null : normaliseCounts(register.endCounts),
+          locale,
+        )
+      : [];
   const errorMessages = kassaErrorMessages(locale);
   const startCounts = normaliseCounts(register.startCounts);
   const startCents = countsTotalCents(startCounts);
@@ -126,6 +145,7 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
   const listHref = `${base}/admin/kassas${manage ? "" : "/mijn"}`;
   const requesterEmail = register.requestedBy ? cashRegisterMailTo(register.requestedBy, register.group) : null;
   const counted = register.endCounts !== null;
+  const endCounts = counted ? normaliseCounts(register.endCounts) : null;
   const passesOn = !resultSharedWithPost(register.status);
   const hours = timeRangeLabel(register.startsAt, register.endsAt, nl);
   // "Bancontact (Evenementen)": het toestel dat Beheer koos, zodra het gekozen is.
@@ -134,7 +154,16 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
     return names.length ? `${label} (${names.join(", ")})` : label;
   };
 
-  const facts: Array<{ label: string; value: string }> = [
+  const startLabel =
+    startCents > 0
+      ? `${formatEuro(startCents, locale)}: ${countsLines(startCounts)
+          .map((line) => `${line.pieces} × ${denominationLabel(line.denomination)}`)
+          .join(", ")}`
+      : nl
+        ? "geen wisselgeld"
+        : "no change";
+
+  const facts: Array<{ label: string; value: ReactNode }> = [
     { label: nl ? "Datum" : "Date", value: longDate },
     // Een kassa van voor er naar de uren gevraagd werd, heeft er geen; dan
     // valt de regel weg in plaats van "niet ingevuld" te tonen.
@@ -157,14 +186,23 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
     },
     {
       label: nl ? "Startkassa" : "Starting float",
+      // Waar een doorgeschoven startkassa vandaan komt, ziet enkel Beheer: de
+      // kassa ervoor is vaak van een andere post.
       value:
-        startCents > 0
-          ? `${formatEuro(startCents, locale)}: ${countsLines(startCounts)
-              .map((line) => `${line.pieces} × ${denominationLabel(line.denomination)}`)
-              .join(", ")}`
-          : nl
-            ? "geen wisselgeld"
-            : "no change",
+        manage && register.startFrom ? (
+          <>
+            {startLabel}
+            <span className="block text-vtk-muted">
+              {nl ? "De eindkassa van " : "The closing count of "}
+              <Link href={`${base}/admin/kassas/${register.startFrom.id}`} className="underline underline-offset-4">
+                {register.startFrom.activity}
+              </Link>{" "}
+              ({formatSpentOn(register.startFrom.date, locale)}){nl ? ", doorgeschoven." : ", carried over."}
+            </span>
+          </>
+        ) : (
+          startLabel
+        ),
     },
     ...(register.comment ? [{ label: nl ? "Opmerking" : "Note", value: register.comment }] : []),
     ...(register.acceptedAt
@@ -202,7 +240,7 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
         startTime: timeInputValue(register.startsAt),
         endTime: timeInputValue(register.endsAt),
         activity: register.activity,
-        groupId: register.groupId ?? "",
+        groupId: register.groupId ?? (isYearlyEvent(register) ? YEARLY_EVENT_CHOICE : ""),
         responsibleName: register.responsibleName,
         wantsBancontact: register.wantsBancontact,
         wantsPayconiq: register.wantsPayconiq,
@@ -418,6 +456,60 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
       )}
 
       {manage && !requested && (
+        <section id="doorschuiven" className="scroll-mt-24 rounded-2xl border border-vtk-blue/12 bg-white p-5">
+          <h2 className="text-base font-semibold text-vtk-ink">
+            {nl ? "Doorschuiven naar de volgende kassa" : "Carry over to the next register"}
+          </h2>
+          <p className="mt-1 mb-3 max-w-2xl text-sm text-vtk-muted">
+            {nl
+              ? "Gaat dit cash zonder leegmaken naar een volgende activiteit? Dan wordt de eindkassa hier, per munt en briefje, de startkassa van die kassa. De bonnen, Bancontact en Payconiq blijven bij deze kassa."
+              : "Does this cash go on to a next activity without being emptied? Then the closing count here, coin by coin and note by note, becomes the starting float of that register. Vouchers, Bancontact and Payconiq stay with this register."}
+            {!counted && (nl ? " Kan zodra de eindkassa geteld en opgeslagen is." : " Available once the closing count is saved.")}
+          </p>
+          {register.carriedTo && (
+            <div className="mb-3 space-y-2 text-sm text-vtk-body">
+              <p>
+                {nl ? "Doorgeschoven naar " : "Carried over to "}
+                <Link href={`${base}/admin/kassas/${register.carriedTo.id}`} className="font-medium text-vtk-ink underline underline-offset-4">
+                  {register.carriedTo.activity}
+                </Link>{" "}
+                ({formatSpentOn(register.carriedTo.date, locale)}).
+              </p>
+              {endCounts && !sameCounts(endCounts, normaliseCounts(register.carriedTo.startCounts)) && (
+                <p className="rounded-xl bg-vtk-yellow/15 px-3 py-2">
+                  {nl
+                    ? `De startkassa daar (${formatEuro(countsTotalCents(normaliseCounts(register.carriedTo.startCounts)), locale)}) is niet meer gelijk aan de eindkassa hier (${formatEuro(countsTotalCents(endCounts), locale)}), per munt en briefje. Schuif opnieuw door om ze gelijk te zetten.`
+                    : `The starting float there (${formatEuro(countsTotalCents(normaliseCounts(register.carriedTo.startCounts)), locale)}) no longer matches the closing count here (${formatEuro(countsTotalCents(endCounts), locale)}), coin by coin and note by note. Carry over again to make them match.`}
+                </p>
+              )}
+            </div>
+          )}
+          {carryOver.length > 0 ? (
+            <CarryOverForm
+              locale={locale}
+              action={carryOverCashRegisterAction}
+              id={register.id}
+              counted={counted}
+              endCents={endCounts ? countsTotalCents(endCounts) : 0}
+              candidates={carryOver}
+              currentTargetId={register.carriedTo?.id ?? null}
+              errorMessages={errorMessages}
+            />
+          ) : (
+            <p className="text-sm text-vtk-body">
+              {nl
+                ? "Er staat geen latere kassa klaar die nog niet geteld is. Vraag eerst de kassa voor de volgende activiteit aan, ook als die van een andere post is: "
+                : "There is no later register that has not been counted yet. Request the register for the next activity first, also when it belongs to another post: "}
+              <Link href={`${base}/admin/kassas/aanvragen`} className="font-medium text-vtk-ink underline underline-offset-4">
+                {nl ? "kassa aanvragen" : "request a register"}
+              </Link>
+              .
+            </p>
+          )}
+        </section>
+      )}
+
+      {manage && !requested && (
         <section className="rounded-2xl border border-vtk-blue/12 bg-white p-5">
           <h2 className="text-base font-semibold text-vtk-ink">{nl ? "Mailen dat de kassa geteld is" : "Email that the register was counted"}</h2>
           <p className="mt-1 mb-3 max-w-2xl text-sm text-vtk-muted">
@@ -494,6 +586,71 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
       )}
     </div>
   );
+}
+
+/** Meer latere kassa's dan dit in de keuzelijst helpt niemand; de eerste staan bovenaan. */
+const CARRY_OVER_LIMIT = 40;
+
+/**
+ * De kassa's waar de eindkassa naartoe kan: die van dezelfde dag of later die
+ * nog niet geteld zijn, de vroegste eerst. De kassa die er al mee verderging,
+ * staat er altijd bij, ook geteld: opnieuw doorschuiven zet haar startkassa
+ * gelijk na een rechtgezette telling.
+ */
+async function carryOverCandidates(
+  register: { id: string; date: Date },
+  currentTargetId: string | null,
+  endCounts: Counts | null,
+  locale: "nl" | "en",
+): Promise<CarryOverCandidate[]> {
+  const nl = locale === "nl";
+  const select = {
+    id: true,
+    activity: true,
+    postLabel: true,
+    date: true,
+    startsAt: true,
+    endsAt: true,
+    status: true,
+    startCounts: true,
+    endCounts: true,
+    startFromId: true,
+    startFrom: { select: { activity: true, date: true } },
+  } satisfies Prisma.CashRegisterSelect;
+  const [later, current] = await Promise.all([
+    prisma.cashRegister.findMany({
+      where: {
+        id: { notIn: [register.id, ...(currentTargetId ? [currentTargetId] : [])] },
+        date: { gte: register.date },
+        endCounts: { equals: Prisma.DbNull },
+      },
+      orderBy: [{ date: "asc" }, { startsAt: "asc" }, { createdAt: "asc" }],
+      take: CARRY_OVER_LIMIT,
+      select,
+    }),
+    currentTargetId ? prisma.cashRegister.findUnique({ where: { id: currentTargetId }, select }) : null,
+  ]);
+  const rows = current ? [current, ...later] : later;
+  return rows.map((row) => {
+    const date = formatSpentOn(row.date, locale);
+    const hours = timeRangeShort(row.startsAt, row.endsAt);
+    const fromOther =
+      row.startFrom && row.startFromId !== register.id
+        ? `${row.startFrom.activity} (${formatSpentOn(row.startFrom.date, locale)})`
+        : null;
+    return {
+      id: row.id,
+      activity: row.activity,
+      optionLabel: `${date}${hours ? ` ${hours}` : ""}: ${row.activity} (${row.postLabel}), ${statusLabel(row.status, nl).toLowerCase()}${
+        fromOther ? (nl ? `, startkassa van ${fromOther}` : `, float from ${fromOther}`) : ""
+      }`,
+      shortLabel: `${row.activity} (${date})`,
+      startCents: countsTotalCents(normaliseCounts(row.startCounts)),
+      matchesEnd: endCounts !== null && sameCounts(endCounts, normaliseCounts(row.startCounts)),
+      counted: row.endCounts !== null,
+      fromOther,
+    };
+  });
 }
 
 /**

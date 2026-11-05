@@ -18,9 +18,12 @@ import {
   DEFAULT_CASH_REGISTER_CONFIG,
   activityInterval,
   intervalsOverlap,
+  isYearlyEvent,
   parsePick,
   registerInterval,
+  sameCounts,
   startCountsFromPicks,
+  YEARLY_EVENT_LABEL,
   timeInputValue,
   timeRangeLabel,
   type Counts,
@@ -138,6 +141,22 @@ describe("kassa's: invoer", () => {
     for (const status of CASH_REGISTER_STATUSES) expect(statusFromSlug(STATUS_SLUGS[status])).toBe(status);
     expect(statusFromSlug("bestaat-niet")).toBeNull();
     expect(SETTABLE_STATUSES).not.toContain("REQUESTED");
+  });
+});
+
+describe("kassa's: doorschuiven en jaarwerking", () => {
+  it("vergelijkt een doorgeschoven kassa per coupure, niet op het totaal", () => {
+    expect(sameCounts({ "100": 3, "200": 1 }, normaliseCounts({ "200": 1, "100": 3 }))).toBe(true);
+    // Allebei € 5, maar andere munten: een andere kassa.
+    expect(sameCounts({ "500": 1 }, { "100": 5 })).toBe(false);
+    expect(sameCounts({}, normaliseCounts({ "100": 0 }))).toBe(true);
+  });
+
+  it("herkent een jaarwerking aan beide velden, niet aan een verwijderde post", () => {
+    expect(isYearlyEvent({ groupId: null, postLabel: YEARLY_EVENT_LABEL })).toBe(true);
+    // Een kassa van een post die intussen verwijderd werd: ook zonder groupId.
+    expect(isYearlyEvent({ groupId: null, postLabel: "Theokot" })).toBe(false);
+    expect(isYearlyEvent({ groupId: "g1", postLabel: YEARLY_EVENT_LABEL })).toBe(false);
   });
 });
 

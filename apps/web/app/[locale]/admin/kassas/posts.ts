@@ -3,15 +3,19 @@ import "server-only";
 import { prisma } from "@vtk/db";
 import { pick } from "@vtk/i18n";
 import type { CashRegisterAccess } from "@/lib/kassas/server";
+import { YEARLY_EVENT_CHOICE } from "@/lib/kassas/kassa";
 
 export type PostChoice = { id: string; name: string; own: boolean };
 
 /**
  * De posten in de keuzelijst van een aanvraag: je eigen posten bovenaan, dan
- * de rest. Elke actieve post is kiesbaar, zoals bij een rekening: een kassa voor
- * een activiteit die je samen met een andere post doet, staat op hun naam.
- * `currentGroupId` houdt een gedeactiveerde post kiesbaar op de kassa waar ze
- * al op stond.
+ * "Jaarwerking", dan de rest. Elke actieve post is kiesbaar, zoals bij een
+ * rekening: een kassa voor een activiteit die je samen met een andere post doet,
+ * staat op hun naam. `currentGroupId` houdt een gedeactiveerde post kiesbaar op
+ * de kassa waar ze al op stond.
+ *
+ * "Jaarwerking" staat op geen post (`YEARLY_EVENT_CHOICE`), en hoog in de lijst:
+ * tussen een dertigtal posten en werkgroepen zoek je ze anders onderaan.
  */
 export async function postChoices(
   access: CashRegisterAccess,
@@ -29,5 +33,10 @@ export async function postChoices(
     const own = access.postIds.includes(group.id);
     return { id: group.id, name: `${pick(group.nameNl, group.nameEn, locale)}${own ? suffix : ""}`, own };
   });
-  return [...choices.filter((choice) => choice.own), ...choices.filter((choice) => !choice.own)];
+  const yearly: PostChoice = {
+    id: YEARLY_EVENT_CHOICE,
+    name: locale === "nl" ? "Jaarwerking" : "Yearly event (jaarwerking)",
+    own: false,
+  };
+  return [...choices.filter((choice) => choice.own), yearly, ...choices.filter((choice) => !choice.own)];
 }

@@ -36,6 +36,9 @@ export function kassaErrorMessages(locale: Locale): Record<string, string> {
       FUTURE_DATE: "Niet opgeslagen: die datum ligt in de toekomst.",
       OUTSIDE_WINDOW: `Niet opgeslagen: een telling geef je in binnen ${POST_COUNT_WINDOW_DAYS} dagen. Voor een oudere telling mail je Beheer.`,
       MISSING_AMOUNT: "Niet opgeslagen: vul het bedrag in.",
+      CARRY_NOT_COUNTED: "Niet doorgeschoven: de eindkassa is nog niet geteld en opgeslagen.",
+      BAD_TARGET: "Niet doorgeschoven: kies een andere kassa, op dezelfde dag of later.",
+      TARGET_COUNTED: "Niet doorgeschoven: die kassa is al geteld, en haar resultaat zou mee verschuiven. Ververs de pagina.",
     };
   }
   return {
@@ -65,5 +68,8 @@ export function kassaErrorMessages(locale: Locale): Record<string, string> {
     FUTURE_DATE: "Not saved: that date is in the future.",
     OUTSIDE_WINDOW: `Not saved: enter a count within ${POST_COUNT_WINDOW_DAYS} days. For an older count, email Administration.`,
     MISSING_AMOUNT: "Not saved: fill in the amount.",
+    CARRY_NOT_COUNTED: "Not carried over: the closing count has not been saved yet.",
+    BAD_TARGET: "Not carried over: choose another register, on the same day or later.",
+    TARGET_COUNTED: "Not carried over: that register has already been counted, and its result would shift. Refresh the page.",
   };
 }

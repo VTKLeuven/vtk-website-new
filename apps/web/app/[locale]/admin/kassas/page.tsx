@@ -16,6 +16,8 @@ import {
   statusFromSlug,
   statusLabel,
   STATUS_SLUGS,
+  YEARLY_EVENT_CHOICE,
+  YEARLY_EVENT_LABEL,
   type CashRegisterStatus,
 } from "@/lib/kassas/kassa";
 import { setCashRegisterStatusAction } from "@/app/actions/kassas";
@@ -65,9 +67,13 @@ export default async function KassaOverzicht({
   const postWhere: Prisma.CashRegisterWhereInput =
     post === PERMANENT_POST_FILTER
       ? { group: { code: { in: [...PERMANENT_POST_CODES] } } }
-      : post
-        ? { groupId: post }
-        : {};
+      : post === YEARLY_EVENT_CHOICE
+        ? // Zoals `isYearlyEvent`: een kassa van een verwijderde post heeft ook
+          // geen post meer, maar een andere naam.
+          { groupId: null, postLabel: YEARLY_EVENT_LABEL }
+        : post
+          ? { groupId: post }
+          : {};
   const scope: Prisma.CashRegisterWhereInput = {
     AND: [
       year === "all" ? {} : { workingYear: year },
@@ -242,6 +248,7 @@ export default async function KassaOverzicht({
               {permanentNames.length > 0 && (
                 <option value={PERMANENT_POST_FILTER}>{permanentLabel}</option>
               )}
+              <option value={YEARLY_EVENT_CHOICE}>{nl ? "Jaarwerking" : "Yearly event (jaarwerking)"}</option>
               <optgroup label={nl ? "Eén post" : "One post"}>
                 {groups.map((group) => (
                   <option key={group.id} value={group.id}>
