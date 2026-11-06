@@ -822,10 +822,16 @@ export function requesterLabel(request: {
   group: { nameNl: string } | null;
 }): string {
   if (request.requesterType === 'INTERN') {
-    return request.group?.nameNl ?? REQUESTER_TYPE_LABELS.INTERN;
+    // Intern zonder post is wat het team voor Logistiek zelf intekent. "Interne
+    // post" zei daar niets: het is Logistiek (F6.20). Een post wordt gedeactiveerd
+    // en niet verwijderd, dus "geen groep" betekent hier niet "post is weg".
+    return request.group?.nameNl ?? LOGISTIEK_LABEL;
   }
   return request.requesterName ?? REQUESTER_TYPE_LABELS[request.requesterType];
 }
+
+/** Hoe een rit heet die Logistiek voor zichzelf plant. Eén woord, overal. */
+export const LOGISTIEK_LABEL = 'Logistiek';
 
 /**
  * "Andere...": een werkgroep met een vrije naam, in de twee formulieren waar het

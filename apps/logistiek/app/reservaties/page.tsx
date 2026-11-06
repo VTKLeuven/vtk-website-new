@@ -195,7 +195,7 @@ function PastGroup({ count, en, children }: { count: number; en: boolean; childr
 export default async function ReservatiesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ aangevraagd?: string }>;
+  searchParams: Promise<{ aangevraagd?: string; evenement?: string }>;
 }) {
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
   const t = copy[locale];
@@ -204,7 +204,7 @@ export default async function ReservatiesPage({
   }
 
   const en = locale === 'en';
-  const { aangevraagd } = await searchParams;
+  const { aangevraagd, evenement } = await searchParams;
   // Enkel echte posten delen: een werkgroepaanvraag bewaart geen groupId en
   // blijft dus persoonlijk (zie deriveMemberRequester).
   const postIds = session.groups.filter((group) => group.type === 'PRAESIDIUM').map((g) => g.id);
@@ -395,6 +395,16 @@ export default async function ReservatiesPage({
           {en
             ? 'Your request has been submitted. The Logistics team reviews it; you can follow the status below.'
             : 'Je aanvraag is ingediend. Het team van Logistiek bekijkt ze; je vindt de status hieronder.'}
+          {evenement ? (
+            <>
+              {' '}
+              {en ? 'The new event is under ' : 'Het nieuwe evenement staat onder '}
+              <a href="/evenementen" className="underline underline-offset-4">
+                {en ? 'My events' : 'Mijn evenementen'}
+              </a>
+              .
+            </>
+          ) : null}
         </p>
       ) : null}
 

@@ -32,6 +32,8 @@ export function EventPicker({
   locale,
   /** De naam die in het formulier staat; die wordt de naam van een nieuw evenement. */
   newEventName,
+  /** Staat het naamveld onder de keuzelijst in plaats van erboven? Enkel voor de tekst. */
+  nameFieldBelow = false,
 }: {
   events: SelectableEvent[];
   eventId: string;
@@ -39,6 +41,7 @@ export function EventPicker({
   onChange: (next: { eventId: string; createEvent: boolean }) => void;
   locale: LogistiekLocale;
   newEventName: string;
+  nameFieldBelow?: boolean;
 }) {
   const en = locale === 'en';
   const [search, setSearch] = useState('');
@@ -144,8 +147,8 @@ export function EventPicker({
                     ? `Called "${newEventName.trim()}". Your next request can hang under it.`
                     : `Met de naam "${newEventName.trim()}". Je volgende aanvraag kan er dan onder hangen.`
                   : en
-                    ? 'Uses the event name you fill in above.'
-                    : 'Gebruikt de naam die je hierboven invult.'}
+                    ? `Uses the event name you fill in ${nameFieldBelow ? 'below' : 'above'}.`
+                    : `Gebruikt de naam die je ${nameFieldBelow ? 'hieronder' : 'hierboven'} invult.`}
               </span>
             </span>
           </label>

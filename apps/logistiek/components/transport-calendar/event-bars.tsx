@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { placeForWeekRow } from '@/lib/month-lanes';
 
 /**
@@ -33,6 +33,16 @@ export type CalendarEventBar = {
 /** Hoogte van één balk plus de ruimte eronder. */
 const BAR_PX = 22;
 
+/**
+ * Hoeveel rijen evenementen er standaard zichtbaar zijn (F6.2).
+ *
+ * De strook zit in de kop van het rooster, en alles wat daar bijkomt, gaat af van
+ * de uren: een week met vier gelijktijdige evenementen nam ruim negentig pixels,
+ * waardoor "hele dag" niet meer in de pane paste. De rest zit achter "+N meer".
+ */
+const VISIBLE_LANES = 2;
+const MORE_PX = 18;
+
 export function EventBars({
   days,
   events,
@@ -49,11 +59,17 @@ export function EventBars({
   columns: string;
 }) {
   const parsedDays = useMemo(() => days.map((day) => new Date(day)), [days]);
-  const bars = useMemo(() => placeForWeekRow(events, parsedDays), [events, parsedDays]);
+  const allBars = useMemo(() => placeForWeekRow(events, parsedDays), [events, parsedDays]);
+  const [expanded, setExpanded] = useState(false);
 
-  if (bars.length === 0) return null;
+  if (allBars.length === 0) return null;
 
-  const lanes = bars.reduce((most, bar) => Math.max(most, bar.lane + 1), 0);
+  const totalLanes = allBars.reduce((most, bar) => Math.max(most, bar.lane + 1), 0);
+  const capped = totalLanes > VISIBLE_LANES && !expanded;
+  const lanes = capped ? VISIBLE_LANES : totalLanes;
+  const bars = capped ? allBars.filter((bar) => bar.lane < VISIBLE_LANES) : allBars;
+  const hidden = allBars.length - bars.length;
+  const canToggle = totalLanes > VISIBLE_LANES;
 
   return (
     <div className="grid gap-1 pb-1" style={{ gridTemplateColumns: columns }}>
@@ -64,9 +80,18 @@ export function EventBars({
       </span>
       <div
         className="relative"
-        style={{ gridColumn: `2 / span ${parsedDays.length}`, height: lanes * BAR_PX }}
+        style={{
+          gridColumn: `2 / span ${parsedDays.length}`,
+          height: lanes * BAR_PX + (canToggle ? MORE_PX : 0),
+        }}
       >
-        <div className="grid h-full gap-1" style={{ gridTemplateColumns: `repeat(${parsedDays.length}, minmax(0, 1fr))` }}>
+        <div
+          className="grid gap-1"
+          style={{
+            height: lanes * BAR_PX,
+            gridTemplateColumns: `repeat(${parsedDays.length}, minmax(0, 1fr))`,
+          }}
+        >
           {bars.map((bar) => {
             const label = [
               bar.name,
@@ -115,6 +140,16 @@ export function EventBars({
             );
           })}
         </div>
+        {canToggle ? (
+          <button
+            type="button"
+            onClick={() => setExpanded((current) => !current)}
+            aria-expanded={expanded}
+            className="absolute bottom-0 left-0 h-[18px] text-[11px] font-medium text-vtk-muted underline underline-offset-2 hover:text-vtk-ink"
+          >
+            {expanded ? 'Minder tonen' : `+${hidden} meer`}
+          </button>
+        ) : null}
       </div>
     </div>
   );

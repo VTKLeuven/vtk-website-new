@@ -426,8 +426,12 @@ export function TimeGrid({
     // de padding van de scroller buiten beschouwing. Met `clientHeight` bleef er
     // precies die padding aan scrollhoogte over, en dus een scrollbalk van 16
     // pixels bij "hele dag".
+    // Alles in layout-pixels. `getBoundingClientRect` geeft onder de 90%-zoom van
+    // de site (laptops, zie vtk-base.css) visuele pixels terwijl `offsetHeight`
+    // layout-pixels geeft; ze mengen liet "hele dag" 10% van de pane onbenut
+    // (F6.2). `clientHeight` is layout, mét padding, en die gaat er hier af.
     const measure = () => {
-      setPaneHeight(node.getBoundingClientRect().height - paddingOf(node));
+      setPaneHeight(node.clientHeight - paddingOf(node));
       setHeadHeight(headNode.offsetHeight);
     };
     const observer = new ResizeObserver(measure);

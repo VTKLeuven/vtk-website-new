@@ -59,6 +59,7 @@ import {
 } from '@/lib/reservation-form';
 import { buildTransportBookings, type TransportFormInput } from '@/lib/transport-form';
 import { runSerializable } from '@/lib/tx';
+import { windowMoved } from '@/lib/transport-conflicts';
 import type { ActionResult } from './uitleen';
 
 function revalidateBeheer() {
@@ -1853,6 +1854,7 @@ export async function createTransportForReservationAction(
     groupId: reservation.groupId,
     requesterName: reservation.requesterName,
     reservationId: reservation.id,
+    byTeam: true,
   });
   if (!built.ok) return { ok: false, error: built.error };
 
@@ -2297,6 +2299,7 @@ export async function adminCreateTransportAction(
     requesterType,
     groupId: input.groupId?.trim() || null,
     requesterName,
+    byTeam: true,
   });
   if (!built.ok) return { ok: false, error: built.error };
 
@@ -2370,9 +2373,20 @@ export async function adminCreateTransportAction(
       await writeAudit(tx, { transportBookingId: row.id }, {
         kind: 'STATUS_CHANGED',
         toStatus: 'APPROVED',
+        // De tekst "ingepland door Logistiek" is een sleutel: de migratie van
+        // `plannedByTeam` leest ze terug. Het staartje eronder niet.
         note: 'ingepland door Logistiek',
         actorId: session.user.id,
       });
+      // Een rit in het verleden is administratie (F6.19); dat hoort in de
+      // historiek te staan, want ze telt mee in de statistieken.
+      if ((built.bookings[index]?.startAt as Date) <= now) {
+        await writeAudit(tx, { transportBookingId: row.id }, {
+          kind: 'NOTE',
+          note: 'Ingepland met terugwerkende kracht: het startmoment lag in het verleden.',
+          actorId: session.user.id,
+        });
+      }
       const overlapNote = overlapsPerIndex.get(index);
       if (overlapNote) {
         await writeAudit(tx, { transportBookingId: row.id }, {
@@ -2576,8 +2590,14 @@ export async function adminEditTransportAction(
 
     // Enkel een goedgekeurde rit houdt een voertuig bezet; een aanvraag mag nog
     // botsen (zie "Conflicten: aanvragen mag, goedkeuren niet").
+    //
+    // Enkel wanneer het venster verschuift. Een rit die het team met opzet over
+    // een andere zette (om eerst het geheel te overzien en daarna te schuiven),
+    // moest anders bij elke opslag, ook voor een nota of een adres, "Toch
+    // verschuiven" bevestigen terwijl er niets verschuift, en schreef elke keer
+    // opnieuw een overlap-nota in de historiek (F6.26).
     let overlapNote: string | null = null;
-    if (existing.status === 'APPROVED') {
+    if (existing.status === 'APPROVED' && windowMoved(existing, { startAt, endAt })) {
       const clashes = await overlappingBookings(tx, existing.vehicleId, startAt, endAt, [bookingId]);
       if (clashes.length > 0) {
         if (!input.allowOverlap) return { error: 'OVERLAP' as const, detail: overlapLabel(clashes) };

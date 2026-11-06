@@ -68,6 +68,8 @@ export type ActionResult =
        * wordt, zoals een fout.
        */
       warning?: boolean;
+      /** Er is bij deze aanvraag een nieuw evenement aangemaakt (F6.14). */
+      eventCreated?: boolean;
     }
   | { ok: false; error: string; code?: string };
 // `ReservationFormInput` NIET her-exporteren vanuit dit `'use server'`-bestand:
@@ -125,6 +127,12 @@ async function deriveMemberRequester(
   requesterType: 'INTERN' | 'WERKGROEP' | 'EXTERN';
   groupId: string | null;
   requesterName?: string;
+  /**
+   * De groep waarvoor het lid indient, ook bij een werkgroep (waar `groupId`
+   * leeg blijft). Nodig voor "Post kiest zelf de chauffeur" (F6.10): die mag wel
+   * een werkgroep zijn.
+   */
+  memberGroupId: string | null;
 }> {
   if (session.groups.length > 0) {
     const groupId = session.groups.some((g) => g.id === chosenGroupId)
@@ -134,13 +142,15 @@ async function deriveMemberRequester(
       where: { id: groupId },
       select: { type: true, nameNl: true },
     });
-    if (!group) return { requesterType: 'EXTERN', groupId: null, requesterName: session.user.name };
-    if (group.type === 'WERKGROEP' || group.type === 'JAARWERKING') {
-      return { requesterType: 'WERKGROEP', groupId: null, requesterName: group.nameNl };
+    if (!group) {
+      return { requesterType: 'EXTERN', groupId: null, requesterName: session.user.name, memberGroupId: null };
     }
-    return { requesterType: 'INTERN', groupId, requesterName: undefined };
+    if (group.type === 'WERKGROEP' || group.type === 'JAARWERKING') {
+      return { requesterType: 'WERKGROEP', groupId: null, requesterName: group.nameNl, memberGroupId: groupId };
+    }
+    return { requesterType: 'INTERN', groupId, requesterName: undefined, memberGroupId: groupId };
   }
-  return { requesterType: 'EXTERN', groupId: null, requesterName: session.user.name };
+  return { requesterType: 'EXTERN', groupId: null, requesterName: session.user.name, memberGroupId: null };
 }
 
 /**
@@ -161,19 +171,26 @@ async function resolveEventId(
     eventStart?: string;
   },
   groupId: string | null
-): Promise<string | null> {
+): Promise<{ ok: true; eventId: string | null; created: boolean } | { ok: false; error: string }> {
   const chosen = (input.eventId ?? '').trim();
   if (chosen) {
     const found = await prisma.uitleenEvent.findUnique({
       where: { id: chosen },
       select: { id: true },
     });
-    return found?.id ?? null;
+    return { ok: true, eventId: found?.id ?? null, created: false };
   }
-  if (!input.createEvent) return null;
+  if (!input.createEvent) return { ok: true, eventId: null, created: false };
 
   const name = (input.eventName ?? '').trim();
-  if (!name) return null;
+  // Het vakje staat aan maar er is geen naam: dat gaf vroeger stil geen
+  // evenement en geen foutmelding, en las als een knop die niet werkt (F6.14).
+  if (!name) {
+    return {
+      ok: false,
+      error: 'Geef het evenement een naam, of vink "Maak hier een nieuw evenement van" uit.',
+    };
+  }
   const created = await prisma.uitleenEvent.create({
     data: {
       name: name.slice(0, 200),
@@ -184,7 +201,7 @@ async function resolveEventId(
     },
     select: { id: true },
   });
-  return created.id;
+  return { ok: true, eventId: created.id, created: true };
 }
 
 export async function createReservationAction(input: ReservationFormInput): Promise<ActionResult> {
@@ -198,12 +215,13 @@ export async function createReservationAction(input: ReservationFormInput): Prom
   );
   if (!built.ok) return built;
 
-  const eventId = await resolveEventId(session, input, built.scalars.groupId);
+  const event = await resolveEventId(session, input, built.scalars.groupId);
+  if (!event.ok) return { ok: false, error: event.error };
   const created = await prisma.uitleenReservation.create({
     data: {
       userId: session.user.id,
       ...built.scalars,
-      eventId,
+      eventId: event.eventId,
       lines: { create: built.lineCreates },
     },
     select: { id: true },
@@ -217,7 +235,11 @@ export async function createReservationAction(input: ReservationFormInput): Prom
   await notifyTeamIfUrgent('materiaal', created.id);
 
   revalidateMember();
-  return { ok: true, message: 'Aanvraag ingediend. Je vindt de status bij Mijn aanvragen.' };
+  return {
+    ok: true,
+    message: 'Aanvraag ingediend. Je vindt de status bij Mijn aanvragen.',
+    eventCreated: event.created,
+  };
 }
 
 export async function editReservationAction(
@@ -329,12 +351,13 @@ export async function createFlesserkeReservationAction(input: ReservationFormInp
   );
   if (!built.ok) return built;
 
-  const eventId = await resolveEventId(session, input, built.scalars.groupId);
+  const event = await resolveEventId(session, input, built.scalars.groupId);
+  if (!event.ok) return { ok: false, error: event.error };
   const created = await prisma.uitleenReservation.create({
     data: {
       userId: session.user.id,
       ...built.scalars,
-      eventId,
+      eventId: event.eventId,
       flesserkeLines: { create: built.flesserkeLineCreates },
     },
     select: { id: true },
@@ -344,7 +367,11 @@ export async function createFlesserkeReservationAction(input: ReservationFormInp
   await notifyTeamIfUrgent('flesserke', created.id);
 
   revalidateFlesserke();
-  return { ok: true, message: 'Flesserke-aanvraag ingediend. Je krijgt bericht zodra Logistiek beslist.' };
+  return {
+    ok: true,
+    message: 'Flesserke-aanvraag ingediend. Je krijgt bericht zodra Logistiek beslist.',
+    eventCreated: event.created,
+  };
 }
 
 export async function editFlesserkeReservationAction(
@@ -711,18 +738,25 @@ export async function createVanBookingAction(input: TransportFormInput & {
   // Dat stond hier niet, waardoor elke rit van een lid als "Interne post" zonder
   // naam in het beheer stond en de post ze onderling niet kon zien.
   const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
-  const eventId = await resolveEventId(session, { ...input, eventStart: undefined }, requester.groupId);
   const built = await buildTransportBookings(input, {
     userId: session.user.id,
-    eventId,
+    eventId: null,
     requesterType: requester.requesterType,
     groupId: requester.groupId,
     requesterName: requester.requesterName ?? null,
+    // De aanvragende post kiest standaard zelf de chauffeur (F6.10). Een extern
+    // lid heeft geen post, en bij de kar valt het in `buildTransportBookings` weg.
+    assignedGroupId: requester.memberGroupId,
   });
   if (!built.ok) return { ok: false, error: built.error };
 
+  // Het evenement pas ná de validatie van de rit: zo blijft er geen evenement
+  // achter van een aanvraag die daarna toch geweigerd werd.
+  const event = await resolveEventId(session, { ...input, eventStart: undefined }, requester.groupId);
+  if (!event.ok) return { ok: false, error: event.error };
+
   const created = await prisma.uitleenTransportBooking.createManyAndReturn({
-    data: built.bookings,
+    data: built.bookings.map((booking) => ({ ...booking, eventId: event.eventId })),
     select: { id: true },
   });
 
@@ -754,7 +788,11 @@ export async function createVanBookingAction(input: TransportFormInput & {
       : built.roundTrip
         ? 'Heen- en terugrit aangevraagd'
         : 'Rit aangevraagd';
-  return { ok: true, message: `${what}. Je vindt de status bij Mijn aanvragen.` };
+  return {
+    ok: true,
+    message: `${what}. Je vindt de status bij Mijn aanvragen.`,
+    eventCreated: event.created,
+  };
 }
 
 /**

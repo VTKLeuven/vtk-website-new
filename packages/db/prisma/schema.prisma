@@ -5072,6 +5072,15 @@ model UitleenVehicle {
   /// icoon bij zetten is een SVG erbij en hoort geen migratie te vragen.
   icon String?
 
+  /// Mogen leden dit voertuig zelf aanvragen? Uit = enkel het team plant het in
+  /// (een gehuurd busje, of een voertuig dat Logistiek zelf bestuurt). Het
+  /// voertuig blijft in de planning en op het bezettingsoverzicht staan.
+  ///
+  /// Een vlag en geen aparte lijst, en afgedwongen in de actie en niet enkel in
+  /// het formulier (F6.21): een verborgen keuze houdt niemand tegen die de actie
+  /// rechtstreeks aanroept. Bestaande voertuigen blijven aanvraagbaar.
+  requestableByMembers Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -5301,6 +5310,13 @@ model UitleenTransportBooking {
   /// één hernoemde melding van stuk. Zie docs/design-decisions.md.
   plannedByTeam Boolean @default(false)
 
+  /// Reeks waartoe deze rit hoort (F6.22): een herhaalde rit (C&G, containerpark,
+  /// BO) is een rij gewone ritten met dezelfde `seriesId`. `NULL` = geen deel van
+  /// een reeks, en dat is wat elke rit van voor november 2026 heeft: niemand kan
+  /// achteraf weten welke oude ritten bij elkaar hoorden. Geen tabel: een reeks
+  /// heeft geen eigen eigenschappen buiten wat elke rit al draagt.
+  seriesId String?
+
   // Tarief gesnapshot bij de aanvraag (en her-gesnapshot bij een voertuigwissel).
   pricingMode UitleenPricingMode
   rateCents   Int
@@ -5369,6 +5385,7 @@ model UitleenTransportBooking {
   @@index([eventId])
   @@index([reservationId])
   @@index([tripGroupId])
+  @@index([seriesId])
   // "Mijn ritten" voor een chauffeur, en de rittentelling per chauffeur in het
   // chauffeursbeheer.
   @@index([driverId, startAt])

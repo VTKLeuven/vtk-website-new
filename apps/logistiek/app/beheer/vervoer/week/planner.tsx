@@ -368,6 +368,7 @@ export function TransportPlanner({
         cargoNote: '',
         pickupAddress: '',
         destination: '',
+        adminNote: '',
       });
     },
     [showToast, vehicleOptions]

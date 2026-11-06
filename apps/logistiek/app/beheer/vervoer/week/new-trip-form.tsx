@@ -8,7 +8,7 @@ import { useToast } from '@/components/ui/toast';
 import { DriverOptions } from '../driver-select';
 import { TripEventSelect, type TripEventOption } from '@/components/trip-event-select';
 import type { DriverOption } from '@/lib/uitleen-server';
-import { OTHER_REQUESTER, type TripHandoverMode } from '@/lib/uitleen';
+import { OTHER_REQUESTER, toDatetimeLocalValue, type TripHandoverMode } from '@/lib/uitleen';
 
 /**
  * Een rit inplannen vanuit de kalender (P4).
@@ -58,6 +58,8 @@ export type NewTripValues = {
   cargoNote: string;
   pickupAddress: string;
   destination: string;
+  /** Extra info van Logistiek (F6.9); bij een rit van het team staat ze enkel bij de rit. */
+  adminNote: string;
 };
 
 export function NewTripForm({
@@ -200,6 +202,7 @@ export function NewTripForm({
         eventName: events.find((event) => event.id === values.eventId)?.name ?? '',
         pickupAddress: values.pickupAddress,
         destination: values.destination,
+        adminNote: values.adminNote,
         // Er is geen ledennota bij een rit die het team zelf inplant: er is geen
         // lid dat er een schreef.
         note: '',
@@ -246,6 +249,14 @@ export function NewTripForm({
             min={values.startAt}
           />
         </label>
+        {/* Het team mag een rit in het verleden invoeren, voor de administratie
+            (F6.19). Dat gebeurt niet per ongeluk: dit zegt wat het betekent. */}
+        {values.startAt && values.startAt < toDatetimeLocalValue(new Date()) ? (
+          <p className="rounded-lg border border-vtk-navy/15 bg-vtk-paper px-3 py-2 text-xs text-vtk-body">
+            Dit moment ligt in het verleden. De rit komt er toch in en telt mee in de statistieken; rond
+            hem daarna af.
+          </p>
+        ) : null}
       </div>
 
       <label className="grid gap-1 text-xs font-medium text-vtk-muted">
@@ -389,6 +400,17 @@ export function NewTripForm({
           type="text"
           value={values.destination}
           onChange={(event) => set('destination', event.target.value)}
+          className={inputClass}
+        />
+      </label>
+
+      <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+        Extra info van Logistiek
+        <textarea
+          rows={3}
+          value={values.adminNote}
+          onChange={(event) => set('adminNote', event.target.value)}
+          placeholder="Staat bij de rit voor de chauffeur en de post; er vertrekt geen mail"
           className={inputClass}
         />
       </label>

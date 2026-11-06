@@ -78,6 +78,11 @@ const RIT_KOLOMMEN: Record<string, Beslissing> = {
   // afleiden aan welke post een rit van vorig jaar doorgegeven zou zijn.
   // Gevolg: tripsForGroups bereikt zo'n rit enkel via zijn tweede tak.
   assignedGroupId: 'nullable',
+  // Herhaalde ritten (F6.22). `NULL` = geen deel van een reeks, en dat is wat elke
+  // rit van voor november 2026 heeft: niemand kan achteraf weten welke oude
+  // ritten bij elkaar hoorden. Gevraagd en beslist op 6 november 2026, geen
+  // backfill (migratie 20261106110000).
+  seriesId: 'nullable',
   kilometers: 'nullable',
   priceCents: 'nullable',
   paymentMode: 'nullable',

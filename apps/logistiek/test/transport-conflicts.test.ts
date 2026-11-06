@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clashingWith, conflictPartners } from '../lib/transport-conflicts';
+import { clashingWith, conflictPartners, windowMoved } from '../lib/transport-conflicts';
 
 const trip = (
   id: string,
@@ -91,5 +91,23 @@ describe('clashingWith', () => {
   it('zegt niets voor een aanvraag, zoals de kalender erna', () => {
     const moved = trip('x', 'kar', '2026-09-05T11:00:00Z', '2026-09-05T15:00:00Z', 'REQUESTED');
     expect(clashingWith(moved, others)).toEqual([]);
+  });
+});
+
+describe('windowMoved', () => {
+  const window = {
+    startAt: new Date('2026-09-05T10:00:00Z'),
+    endAt: new Date('2026-09-05T12:00:00Z'),
+  };
+
+  it('is niet verschoven wanneer het venster gelijk blijft', () => {
+    // Een nota op een bewust dubbele rit: geen botsingscontrole, dus geen "Toch
+    // verschuiven" voor iets dat niet verschuift.
+    expect(windowMoved(window, { ...window })).toBe(false);
+  });
+
+  it('ziet een ander beginuur of einduur', () => {
+    expect(windowMoved(window, { ...window, startAt: new Date('2026-09-05T10:15:00Z') })).toBe(true);
+    expect(windowMoved(window, { ...window, endAt: new Date('2026-09-05T12:15:00Z') })).toBe(true);
   });
 });

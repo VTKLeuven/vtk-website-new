@@ -4,8 +4,10 @@ import {
   billedHours,
   EXTERN_REQUESTER,
   OTHER_REQUESTER,
+  LOGISTIEK_LABEL,
   requesterChoiceOf,
   requesterFromChoice,
+  requesterLabel,
   dayPartLabel,
   describeReservationChanges,
   handoverNote,
@@ -883,5 +885,26 @@ describe('transportEventChanges', () => {
     expect(
       transportEventChanges([{ id: 'rit', eventId: 'ev-gala', eventName: 'Gala' }], galabal)
     ).toHaveLength(1);
+  });
+});
+
+describe('requesterLabel', () => {
+  it('noemt een rit van Logistiek zelf Logistiek en niet "Interne post" (F6.20)', () => {
+    expect(
+      requesterLabel({ requesterType: 'INTERN', requesterName: null, group: null })
+    ).toBe(LOGISTIEK_LABEL);
+  });
+
+  it('houdt de naam van de post wanneer er een is', () => {
+    expect(
+      requesterLabel({ requesterType: 'INTERN', requesterName: null, group: { nameNl: 'Sport' } })
+    ).toBe('Sport');
+  });
+
+  it('gebruikt de bewaarde naam bij een werkgroep of een externe', () => {
+    expect(
+      requesterLabel({ requesterType: 'WERKGROEP', requesterName: 'Alumni', group: null })
+    ).toBe('Alumni');
+    expect(requesterLabel({ requesterType: 'EXTERN', requesterName: null, group: null })).toBe('Extern');
   });
 });

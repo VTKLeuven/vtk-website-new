@@ -206,7 +206,9 @@ export function FlesserkeForm({
             : await editFlesserkeReservationAction(mode.reservationId, payload);
       if (result.ok) {
         draft.clear();
-        if (mode.kind === 'create') router.push('/reservaties?aangevraagd=1');
+        if (mode.kind === 'create') {
+          router.push(result.eventCreated ? '/reservaties?aangevraagd=1&evenement=1' : '/reservaties?aangevraagd=1');
+        }
         else {
           onCancel?.();
           router.refresh();

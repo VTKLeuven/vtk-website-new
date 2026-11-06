@@ -198,8 +198,13 @@ export function clampZoom(value: number): number {
  * Ondergrens in pixels per uur. Op een korte pagina zou "de hele dag past" op
  * 14px per uur uitkomen, en dan is een uurlijn niet meer van de volgende te
  * onderscheiden. Onder deze grens scrolt de kalender dus toch, ook op zoom 1.
+ *
+ * 18 en niet 22 (F6.2): op een laptop is de pane ruim 600px hoog, en met twee
+ * rijen evenementen in de kop bleef er minder dan 22px per uur over. De
+ * kalender scrolde dan op "hele dag" met een stuk van de nacht onderaan buiten
+ * beeld, precies wat "hele dag" moet voorkomen.
  */
-export const MIN_HOUR_PX = 22;
+export const MIN_HOUR_PX = 18;
 /** Bovengrens, zodat een misgelopen berekening geen kalender van 40 schermen maakt. */
 export const MAX_HOUR_PX = 320;
 
