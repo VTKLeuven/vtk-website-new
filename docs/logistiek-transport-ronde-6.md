@@ -40,10 +40,12 @@ Alles wordt op **390px breed** nagekeken, in licht én donker.
   oude ritten bij elkaar hoorden. Gevraagd en beslist op 6 november 2026. Zie F6.22.
 - **D3. Een wijziging bij het goedkeuren is zichtbaar voor de aanvrager én het
   team.** Geen nieuwe kolom: het komt uit de bestaande auditlog. Zie F6.11.
-- **D4. Jaarwerkingen worden werkgroepen.** In productie bestaan Duplex, Triplex,
-  Halftime, Parttime en Fulltime niet als `Group` (gemeten op 6 november 2026: 15
-  posten, 7 werkgroepen, nul jaarwerkingen). Ze worden aangemaakt als
-  `type = WERKGROEP`. Zie F6.27.
+- **D4. Jaarwerkingen zijn een eigen soort groep (`JAARWERKING`).** In productie
+  bestonden Duplex, Triplex, Halftime, Parttime en Fulltime niet als `Group`
+  (gemeten op 6 november 2026: 15 posten, 7 werkgroepen, nul jaarwerkingen). Ik
+  koos eerst `WERKGROEP`; op 7 november bouwde een collega het derde groepstype
+  `JAARWERKING` met een migratie die ze aanmaakt (`20261106150100_jaarwerkingen`).
+  Dat is de weg geworden. Zie F6.27.
 
 ## Aannames die ik maakte (zeg het als het anders moet)
 
@@ -64,7 +66,7 @@ Alles wordt op **390px breed** nagekeken, in licht én donker.
 | Fase | Inhoud | Taken | Status |
 | --- | --- | --- | --- |
 | 1 | Bugs en stille mislukkingen | F6.26, F6.14, F6.9, F6.10, F6.20, F6.19, F6.2 | ✅ af (`61990534`) |
-| 2 | Wie mag wat aanvragen en doen | F6.23, F6.24, F6.21 | ✅ af (`d8ea0fef`); F6.27 is een handeling in productie |
+| 2 | Wie mag wat aanvragen en doen | F6.27, F6.23, F6.24, F6.21 | ✅ af (F6.27 door het groepstype `JAARWERKING`) |
 | 3 | Leesbaarheid van de planning | F6.1, F6.17, F6.8, F6.7, F6.3 | ✅ af (`56fa818d`) |
 | 4 | Nota's en wijzigingen | F6.15, F6.16, F6.11, F6.12, F6.13 | ✅ af (`3e01fd7b`) |
 | 5 | Statistiek | F6.4, F6.5, F6.6 | ✅ af (`6c1d2f70`) |
@@ -74,10 +76,9 @@ Alles wordt op **390px breed** nagekeken, in licht én donker.
 
 **Wat nog openstaat, en niet aan de code ligt:**
 
-- **F6.27**: de vijf jaarwerkingen als werkgroep aanmaken in `/admin/werkgroepen` op
-  productie, met hun leden van dit werkingsjaar. Dat is data en geen release, en
-  het hoort **voor** F6.23 live te gaan: anders telt een jaarwerkinglid als externe
-  en ziet hij het materiaal niet meer.
+- **F6.27**: na de release de **leden** van dit werkingsjaar per jaarwerking zetten
+  op `/admin/jaarwerkingen`. Tot dan zit niemand in een jaarwerking en telt iedereen
+  daar nog als externe. Er worden geen groepen met de hand aangemaakt.
 - **F6.18**: de agenda voor een meet staat onderaan.
 
 ## Wat er gebouwd is, en waar het afweek van het plan
@@ -147,7 +148,7 @@ Alles wordt op **390px breed** nagekeken, in licht én donker.
 | F6.24 bijrijder voor elk praesidiumlid | Ja | Uitbreiding van een bestaand recht. |
 | F6.25 meer dan 24u in een dag | Ja | Een klok die "24:35" toont; zie de taak. |
 | F6.26 knoppen bij dubbel inplannen | Ja, bevestigd bug | Zie de taak. |
-| F6.27 jaarwerkingen ontbreken | Ja | Ze bestaan niet als groep. |
+| F6.27 jaarwerkingen ontbreken | Ja, al opgelost | Het groepstype `JAARWERKING` bestaat sinds 7 november. |
 
 ---
 
@@ -293,38 +294,28 @@ wat de scrollhoogte is. Dan kiezen: de evenementenstrook beperken (twee rijen en
 
 # Fase 2: wie mag wat aanvragen en doen
 
-### F6.27. De jaarwerkingen ontbreken in "Voor welke post of werkgroep"
-**P1 · data · 📝**
+### ✅ F6.27. De jaarwerkingen ontbreken in "Voor welke post of werkgroep"
+**P1 · data · opgelost door het groepstype `JAARWERKING`**
 
 *"Zitten deze al in het systeem? En hoe kunnen die hun bijrijders doorgeven?"*
 
-**Antwoord: nee.** Productie telt 15 posten (plus Lustrum, niet actief) en 7
-werkgroepen: BEST, Biomedix, Chemix, Existenz, Mechanix, Revue, Statix. In de code
-staan de jaarwerkingen enkel als vaste lijst in het bestuursorgaan
-(`BO_EXTRA_POSTS`), zonder leden. Gevolgen nu:
+**Antwoord op het moment van de vraag: nee.** Productie telde 15 posten (plus
+Lustrum, niet actief) en 7 werkgroepen, geen jaarwerkingen. Een jaarwerkinglid
+hoorde dus bij geen enkele groep, telde als **externe**, kwam niet in "Voor welke
+post of werkgroep", zag geen ritdetails en kon geen bijrijders doorgeven.
 
-- Een jaarwerkinglid hoort bij geen enkele groep, telt dus als **externe**
-  (`requestsAsExternal`), en komt niet in "Voor welke post of werkgroep".
-- Ze zien geen ritdetails (`canSeeTripDetails` vraagt een praesidiumpost of een
-  werkgroep).
-- Ze kunnen geen bijrijders doorgeven: dat mag de aanvrager, een collega van
-  dezelfde post, of wie `logistiek.helpers` heeft.
-- `docs/uitleendienst.md` zegt "een post, een werkgroep of een jaarwerking", wat
-  voor jaarwerkingen niet klopt. Die zin moet recht.
+**Hoe het nu opgelost is** (niet door deze ronde): `GroupType.JAARWERKING`, met een
+datamigratie die Kanweek, Halftime, Parttime, Fulltime, Duplex en Triplex aanmaakt
+en een beheerscherm op `/admin/jaarwerkingen`. In de uitleendienst vraagt een
+jaarwerking aan onder het type "werkgroep of jaarwerking", staat ze in de keuzelijsten
+en telt ze mee voor `canSeeTripDetails`. Daarmee geldt voor haar leden ook het
+antwoord op de bijrijders (F6.10 en F6.24), en zijn ze geen externen meer voor F6.23.
 
-**Plan.**
-
-1. Vijf `Group`-rijen met `type = WERKGROEP` aanmaken via `/admin/werkgroepen` (geen
-   code, wel een handeling in productie). Leden per werkingsjaar via het
-   ledenbeheer; ze verlopen op 15 juli net als alle anderen.
-2. Daarna kunnen ze aanvragen als werkgroep, staan ze in de keuzelijst van het
-   team, en geldt voor hun bijrijders het antwoord van F6.10 en F6.24.
-3. De doc-zin corrigeren en 📝 vastleggen: jaarwerkingen zijn werkgroepen.
-
-**Let op bij het aanmaken.** Een werkgroep komt ook op de publieke pagina
-`/werkgroepen`. Willen de jaarwerkingen daar niet staan, dan is dat een vlag op
-`Group` in `apps/web`, en dus een eigen taak. Staan ook Kanweek, Overtime, Skireis
-en Studentenwelkom in dit rijtje? Het bestuursorgaan telt er negen.
+**Niets handmatig op productie.** Mijn plan was de vijf als werkgroep aan te maken.
+Dat had hun migratie gebroken: ze maakt een groep enkel aan als de code nog vrij
+is (`ON CONFLICT DO NOTHING`), dus een werkgroep "DUPLEX" had de jaarwerking Duplex
+uitgesloten. Wat er na de release wél bij hoort: de **leden** van dit werkingsjaar
+per jaarwerking zetten op `/admin/jaarwerkingen`.
 
 ### F6.23. Een externe ziet het materiaal niet, enkel de melding
 **P1 · code · 📝**
@@ -344,8 +335,9 @@ voor externen: wat niet opgehaald wordt, staat ook niet in de HTML. Vervoer en
 fases open" in `design-decisions.md` krijgt de uitzondering erbij. Test met een
 pure helper die zegt of de catalogus zichtbaar is.
 
-**Afhankelijkheid: F6.27.** Zonder die eerst gaat de poort ook dicht voor de
-jaarwerkingen.
+**Afhankelijkheid: F6.27.** Zonder jaarwerkingen als groep, met hun leden erin,
+gaat de poort ook dicht voor de jaarwerkingen. De groepen komen mee met de release;
+de leden zet het beheer er daarna in.
 
 ### F6.24. Elk praesidiumlid kan bij elke rit een bijrijder toevoegen
 **P2 · code · 📝**
@@ -660,8 +652,9 @@ knop om er zelf een te maken werkt in de praktijk niet (F6.14).
 
 1. **"Logistiek als bijrijder" (F6.21)**: wat is dat precies? Een bijrijder op een
    rit lijkt me een bijrijder en geen voertuig.
-2. **Jaarwerkingen (F6.27):** alleen de vijf uit het document, of ook Kanweek,
-   Overtime, Skireis en Studentenwelkom? En mogen ze op `/werkgroepen` staan?
+2. **Jaarwerkingen (F6.27):** de migratie maakt zes aan (Kanweek, Halftime, Parttime,
+   Fulltime, Duplex, Triplex). Staan Overtime, Skireis en Studentenwelkom er ook bij?
+   Een zevende voeg je toe op `/admin/jaarwerkingen`.
 3. **F6.10 bij de bakfiets:** de keuzelijst verbergen omdat de aanvrager zelf rijdt?
 4. **F6.19:** akkoord dat een rit in het verleden gewoon goedgekeurd binnenkomt en
    daarna afgerond wordt?

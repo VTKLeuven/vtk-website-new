@@ -10616,7 +10616,8 @@ De keuzes die niet uit de code te lezen zijn:
   poort zit in `buildTransportBookings` en niet enkel in het formulier.
 - **Externen zien het materiaal niet** zolang indienen dicht is (zie "De
   uitleendienst gaat in fases open"). Jaarwerkingen bestonden in productie niet
-  als groep en telden daardoor als extern; ze worden werkgroepen.
+  als groep en telden daardoor als extern; ze zijn sindsdien een eigen soort groep
+  (zie "Jaarwerkingen als derde soort groep"), dus hun leden zijn geen externen.
 - **Elk praesidiumlid mag bij elke rit een bijrijder toevoegen, maar enkel de eigen
   toevoegingen weghalen.** De nummers van andermans ritten blijven bij de post van
   de rit. Een werkgroeplid valt hier niet onder: die regelt de bijrijders van de
