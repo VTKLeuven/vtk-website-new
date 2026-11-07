@@ -108,7 +108,12 @@ export default async function BeheerVervoerPage({
   const eventChoices = eventOptions(events);
   const activeVehicleOptions = vehicles
     .filter((v) => v.active)
-    .map((v) => ({ id: v.id, name: v.nameNl, needsVanDriver: v.needsVanDriver }));
+    .map((v) => ({
+      id: v.id,
+      name: v.nameNl,
+      needsVanDriver: v.needsVanDriver,
+      needsDriver: v.needsDriver,
+    }));
 
   const open = bookings.filter((booking) => booking.status === 'REQUESTED');
   // Heen en terug zijn twee boekingen maar één aanvraag: het team beslist er in

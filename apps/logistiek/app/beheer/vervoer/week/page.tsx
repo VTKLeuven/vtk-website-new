@@ -396,6 +396,7 @@ export default async function VervoerWeekPage({
             id: vehicle.id,
             name: vehicle.nameNl,
             needsVanDriver: vehicle.needsVanDriver,
+            needsDriver: vehicle.needsDriver,
           }))}
         groups={groups.map((group) => ({ id: group.id, name: group.nameNl }))}
         handoverNotify={settings.tripHandover.mode}

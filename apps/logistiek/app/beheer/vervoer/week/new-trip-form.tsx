@@ -74,7 +74,7 @@ export function NewTripForm({
   onRangeChange,
 }: {
   initial: NewTripValues;
-  vehicles: Array<{ id: string; name: string; needsVanDriver: boolean }>;
+  vehicles: Array<{ id: string; name: string; needsVanDriver: boolean; needsDriver?: boolean }>;
   /** De posten en werkgroepen waarvoor de rit rijdt. */
   groups: Array<{ id: string; name: string }>;
   /** Wie er een mail krijgt bij het doorgeven (F4.8b); zie de zin onder het veld. */
@@ -328,7 +328,7 @@ export function NewTripForm({
           de auto, want de kar vraagt een goedgekeurde karchauffeur en die keuze
           is niet aan de post; ze staat er dus niet in plaats van er te staan en
           te weigeren. */}
-      {!(chosenVehicle?.needsVanDriver ?? false) ? (
+      {!(chosenVehicle?.needsVanDriver ?? false) && (chosenVehicle?.needsDriver ?? true) ? (
         <label className="grid gap-1 text-xs font-medium text-vtk-muted">
           Post kiest zelf de chauffeur
           <select

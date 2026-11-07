@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SessionPayload } from '@vtk/auth';
-import { canSeeTripDetails } from '../lib/session';
+import { canSeeTripDetails, isPraesidiumMember } from '../lib/session';
 import { canReadTripNote, onTripForNotes, ownsTransportBooking } from '../lib/uitleen';
 
 /**
@@ -219,5 +219,31 @@ describe('canReadTripNote', () => {
     expect(canReadTripNote(note, collega)).toBe(true);
     expect(canReadTripNote(note, logi)).toBe(true);
     expect(canReadTripNote(note, vreemde)).toBe(false);
+  });
+});
+
+describe('isPraesidiumMember', () => {
+  const groups = (...types: Array<'PRAESIDIUM' | 'WERKGROEP'>) =>
+    ({
+      groups: types.map((type, index) => ({
+        id: `g${index}`,
+        code: `G${index}`,
+        type,
+        nameNl: 'Groep',
+        nameEn: 'Group',
+        role: 'MEMBER',
+      })),
+    }) as unknown as Pick<SessionPayload, 'groups'>;
+
+  it('herkent een praesidiumlid (F6.24: mag bij elke rit een bijrijder toevoegen)', () => {
+    expect(isPraesidiumMember(groups('PRAESIDIUM'))).toBe(true);
+    expect(isPraesidiumMember(groups('WERKGROEP', 'PRAESIDIUM'))).toBe(true);
+  });
+
+  it('laat een werkgroeplid of iemand zonder groep er niet onder vallen', () => {
+    // Een werkgroep en een jaarwerking hebben hun eigen ritten en regelen de
+    // bijrijders daarvan via hun groep, niet over alle posten heen.
+    expect(isPraesidiumMember(groups('WERKGROEP'))).toBe(false);
+    expect(isPraesidiumMember(groups())).toBe(false);
   });
 });

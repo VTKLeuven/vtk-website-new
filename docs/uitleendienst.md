@@ -139,8 +139,12 @@ beslissing af, niet de uitvoering.
 - **Leden**: elk ingelogd vtk.be-lid (`requireSession`) voor materiaal en vervoer;
    the request type is automatically derived (`deriveMemberRequester`). De
    **flesserke-tab** is zichtbaar en bruikbaar voor wie tot de interne werking
-   behoort: een post, een werkgroep of een jaarwerking
-   (`session.groups.length > 0`), server-side afgedwongen. Werkgroepen horen daar
+   behoort: een post of een werkgroep (`session.groups.length > 0`), server-side
+   afgedwongen. **Een jaarwerking (Duplex, Triplex, Halftime, Parttime,
+   Fulltime) hoort hier alleen bij als ze als werkgroep in `Group` staat.** Dat
+   was in november 2026 niet zo (productie telde 15 posten en 7 werkgroepen), en
+   dan telt een jaarwerkinglid als externe: geen aanvraag, geen ritdetails, geen
+   bijrijders. Zie `docs/logistiek-transport-ronde-6.md`, F6.27. Werkgroepen horen daar
    dus uitdrukkelijk bij; de teksten zeiden ooit "enkel praesidium" en dat is
    hersteld, want werkgroepen concludeerden daaruit dat het niets voor hen was.
    Ziet een werkgroeplid de tab toch niet, dan hangt zijn account dit werkingsjaar

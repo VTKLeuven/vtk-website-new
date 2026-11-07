@@ -21,7 +21,17 @@ import { useToast } from '@/components/ui/toast';
  * tenminste op wie hij staat te wachten.
  */
 
-export type TripHelper = { id: string; name: string; phone: string | null };
+export type TripHelper = {
+  id: string;
+  name: string;
+  phone: string | null;
+  /**
+   * Mag deze bijrijder weg? Standaard volgt dat `canEdit`. Een praesidiumlid mag
+   * bij elke rit toevoegen maar enkel de eigen toevoegingen weghalen (F6.24),
+   * dus daar staat het per bijrijder.
+   */
+  removable?: boolean;
+};
 
 export function TripHelpers({
   bookingId,
@@ -86,7 +96,7 @@ export function TripHelpers({
                   {en ? 'no number' : 'geen nummer'}
                 </span>
               )}
-              {canEdit ? (
+              {helper.removable ?? canEdit ? (
                 <ConfirmActionButton
                   label={`${en ? 'Remove' : 'Weghalen'}: ${helper.name}`}
                   confirmLabel={en ? 'Remove' : 'Weghalen'}

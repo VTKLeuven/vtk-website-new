@@ -3451,6 +3451,9 @@ export async function saveVehicleAction(_prev: SaveState, formData: FormData): P
     rateCents: pricingMode === 'FREE' ? 0 : rateCents,
     needsVanDriver: String(formData.get('needsVanDriver') ?? '') === 'on',
     needsDriver: String(formData.get('needsDriver') ?? '') === 'on',
+    // Enkel het team plant dit voertuig in wanneer het uit staat (F6.21). De poort
+    // zelf staat in `buildTransportBookings`, niet in het formulier.
+    requestableByMembers: String(formData.get('requestableByMembers') ?? '') === 'on',
     // "Geen arcering" bewaren we als null en niet als de string 'none': in de
     // databank is dat dezelfde toestand, en twee schrijfwijzen voor hetzelfde
     // lopen vroeg of laat uiteen in een query.

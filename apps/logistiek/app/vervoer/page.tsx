@@ -5,7 +5,7 @@ import { PageShell } from '@/components/page-shell';
 import { externalRequestsBlocked, getSession, requestsAsExternal } from '@/lib/session';
 import { copy, getLocale } from '@/lib/i18n';
 import { eventOptions, pricingModeLabel, formatEuro } from '@/lib/uitleen';
-import { activeVehicles, getLogistiekSettings, selectableEvents } from '@/lib/uitleen-server';
+import { getLogistiekSettings, requestableVehicles, selectableEvents } from '@/lib/uitleen-server';
 import { getPublicCopy } from '@/lib/public-copy';
 import { requesterOptions } from '@/app/materiaal/event-values';
 import { VanRequestForm } from './request-form';
@@ -22,7 +22,7 @@ export default async function VervoerPage() {
   // niet te zien, en ze worden hier dus ook niet opgehaald.
   const external = requestsAsExternal(session);
   const [vehicles, content, events, settings] = await Promise.all([
-    activeVehicles(),
+    requestableVehicles(),
     getPublicCopy(locale),
     external ? Promise.resolve([]) : selectableEvents(session.groups.map((g) => g.id)),
     getLogistiekSettings(),

@@ -26,15 +26,34 @@ export default async function MateriaalPage() {
   // zijn werking van de kring. Ze worden hier al niet opgehaald, zodat ze ook
   // niet in de HTML van de pagina belanden.
   const external = requestsAsExternal(session);
-  const [catalog, settings, content, templates, events] = await Promise.all([
+  const settings = await getLogistiekSettings();
+
+  // Zolang externen niets mogen indienen, zien ze ook de catalogus niet (F6.23).
+  // Dat keert "kijken mag" (S1) om voor het materiaal: de hele inventaris
+  // tonen aan wie er niets mee kan, is werking van de kring die niet bij een
+  // buitenstaander hoeft te belanden. De catalogus wordt dus niet eens
+  // opgehaald; wat niet opgehaald wordt, staat ook niet in de HTML. Vervoer en
+  // het bezettingsoverzicht blijven zoals ze waren.
+  if (externalRequestsBlocked(session, settings)) {
+    return (
+      <PageShell
+        title={
+          <>
+            {t.pageMaterialTitle} {t.pageMaterialAccent}
+          </>
+        }
+      >
+        <ExternClosed locale={locale} />
+      </PageShell>
+    );
+  }
+
+  const [catalog, content, templates, events] = await Promise.all([
     getCatalog(),
-    getLogistiekSettings(),
     getPublicCopy(locale),
     external ? Promise.resolve([]) : requestTemplates(),
     external ? Promise.resolve([]) : selectableEvents(session.groups.map((g) => g.id)),
   ]);
-  // S1: rondkijken in de catalogus mag, indienen nog niet.
-  const blocked = externalRequestsBlocked(session, settings);
 
   return (
     <PageShell
@@ -64,7 +83,6 @@ export default async function MateriaalPage() {
           userId={session.user.id}
           templates={templates}
           events={external ? undefined : eventOptions(events, locale)}
-          blocked={blocked ? <ExternClosed locale={locale} /> : undefined}
         />
       )}
     </PageShell>

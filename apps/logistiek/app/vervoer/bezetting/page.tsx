@@ -6,7 +6,13 @@ import { PublicWeek } from './public-week';
 import { TransportLegend } from '@/components/transport-calendar/legend';
 import type { TripBlock } from '@/components/transport-calendar/types';
 import { getLocale } from '@/lib/i18n';
-import { canEditAllHelpers, canManage, canSeeTripDetails, getSession } from '@/lib/session';
+import {
+  canEditAllHelpers,
+  canManage,
+  canSeeTripDetails,
+  getSession,
+  isPraesidiumMember,
+} from '@/lib/session';
 import {
   formatBrusselsDay,
   formatDateRange,
@@ -177,6 +183,9 @@ export default async function VervoerBezettingPage({
    * ook (`addTripHelperAction`).
    */
   const allHelpers = session ? canEditAllHelpers(session) : false;
+  // Elk praesidiumlid mag bij elke rit een bijrijder toevoegen (F6.24), maar enkel
+  // de eigen toevoegingen weghalen; de server toetst dat nog eens.
+  const addsEverywhere = session ? isPraesidiumMember(session) : false;
   const viewer = session
     ? { userId: session.user.id, groupIds: session.groups.map((group) => group.id) }
     : null;
@@ -188,7 +197,7 @@ export default async function VervoerBezettingPage({
     assignedGroupId: string | null;
   }) =>
     (booking.status === 'REQUESTED' || booking.status === 'APPROVED') &&
-    (allHelpers || (viewer !== null && ownsTransportBooking(booking, viewer)));
+    (allHelpers || addsEverywhere || (viewer !== null && ownsTransportBooking(booking, viewer)));
 
   /**
    * Is dit een rit van een post of werkgroep van de kijker (F4.15)?
@@ -280,10 +289,14 @@ export default async function VervoerBezettingPage({
       // niet bij de hele kring: bij de rit van iemand anders blijft de naam
       // staan en valt het nummer weg. Wie de bijrijders van elke rit regelt
       // (`logistiek.helpers`), houdt het nummer: die belt ze.
-      helpers:
-        own || allHelpers
-          ? booking.helpers
-          : booking.helpers.map((helper) => ({ ...helper, phone: null })),
+      // `removable`: bij een rit die niet van jou is, enkel wie je zelf toevoegde
+      // (F6.24). `addedById` zelf reist niet mee naar de browser.
+      helpers: booking.helpers.map((helper) => ({
+        id: helper.id,
+        name: helper.name,
+        phone: own || allHelpers ? helper.phone : null,
+        removable: own || allHelpers || helper.addedById === viewer?.userId,
+      })),
       helpersNote: booking.helpersNote,
       canEditHelpers: helpersEditable(booking),
       // Van het team: een nummer en een kotadres zijn van een persoon, de nota's

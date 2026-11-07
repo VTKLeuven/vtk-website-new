@@ -575,6 +575,17 @@ export async function activeVehicles() {
   });
 }
 
+/**
+ * De voertuigen die een lid zelf mag aanvragen (F6.21): actief, en niet door het
+ * team voorbehouden. Het team kiest in de planning uit `activeVehicles`.
+ */
+export async function requestableVehicles() {
+  return prisma.uitleenVehicle.findMany({
+    where: { active: true, requestableByMembers: true },
+    orderBy: { sortIndex: 'asc' },
+  });
+}
+
 export async function adminVehicles() {
   return prisma.uitleenVehicle.findMany({ orderBy: [{ active: 'desc' }, { sortIndex: 'asc' }] });
 }
@@ -1365,7 +1376,7 @@ export async function transportWeekForPraesidium(
       group: { select: { nameNl: true } },
       helpers: {
         orderBy: { createdAt: 'asc' as const },
-        select: { id: true, name: true, phone: true },
+        select: { id: true, name: true, phone: true, addedById: true },
       },
     },
     orderBy: { startAt: 'asc' },

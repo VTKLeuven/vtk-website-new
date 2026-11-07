@@ -5480,10 +5480,17 @@ naast hun bestaande Excels. Een externe student kan voorlopig niets indienen.
 - **Eén schakelaar, geen deploy** (`externalRequestsOpen` in
   `logistiek.settings`, op /beheer/instellingen). Het team beslist wanneer het
   opengaat, en dat moment valt niet samen met een release.
-- **Kijken mag, indienen niet.** De catalogus, de tarieven en het
+- **Kijken mag, indienen niet, behalve bij het materiaal.** De tarieven en het
   bezettingsoverzicht blijven zichtbaar; in de plaats van de indienknop staat het
   mailadres van Logistiek. Een externe die een leeg scherm krijgt, mailt niet en
   komt ook niet terug wanneer het wél opengaat.
+  **Uitzondering (november 2026, F6.23):** `/materiaal` en `/materiaal/[id]`
+  tonen een externe enkel de melding, geen catalogus. De hele inventaris tonen
+  aan wie er niets mee kan, is werking van de kring die niet bij een
+  buitenstaander hoeft te belanden. De catalogus wordt voor hem niet eens
+  opgehaald, zodat ze ook niet in de HTML staat, en een rechtstreekse link naar
+  een item geeft dezelfde melding. Vervoer en het bezettingsoverzicht blijven
+  zoals ze waren.
 - **De poort staat in de server action** (`externalGate` in
   `app/actions/uitleen.ts`), niet enkel in het formulier. De knop verbergen houdt
   niemand tegen die de actie rechtstreeks aanroept, en het is precies deze poort

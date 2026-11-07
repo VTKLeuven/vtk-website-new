@@ -170,6 +170,28 @@ export async function requireManage(): Promise<SessionPayload> {
 }
 
 /**
+ * Zit deze persoon dit werkingsjaar in een praesidiumpost?
+ *
+ * Een werkgroep of een jaarwerking telt hier niet mee: die hebben een eigen
+ * rit, en wie er in zit, doet de bijrijders van die rit via zijn groep.
+ */
+export function isPraesidiumMember(session: Pick<SessionPayload, 'groups'>): boolean {
+  return session.groups.some((group) => group.type === 'PRAESIDIUM');
+}
+
+/**
+ * Mag deze persoon bij élke rit een bijrijder **toevoegen** (F6.24)?
+ *
+ * Elk praesidiumlid, naast wie het al kon via `canEditAllHelpers`. Wie een
+ * andere post meerijdt, is vaak pas de dag voordien bekend en dan zit de
+ * aanvrager niet naast je. Weghalen mag niet overal: zie
+ * `removeTripHelperAction`, dat enkel de eigen toevoegingen vrijgeeft.
+ */
+export function canAddHelpersEverywhere(session: SessionPayload): boolean {
+  return canEditAllHelpers(session) || isPraesidiumMember(session);
+}
+
+/**
  * Mag deze persoon de bijrijders van élke rit aanpassen?
  *
  * Het team kan het via `logistiek.manage`. `logistiek.helpers` is hetzelfde

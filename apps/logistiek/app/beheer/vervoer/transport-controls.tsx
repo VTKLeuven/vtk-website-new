@@ -42,7 +42,7 @@ export function TransportControls({
   /** R4: enkel externen betalen; bepaalt of "Markeer als betaald" hier zin heeft. */
   requesterType: UitleenRequesterType;
   drivers: DriverOption[];
-  vehicles: Array<{ id: string; name: string; needsVanDriver: boolean }>;
+  vehicles: Array<{ id: string; name: string; needsVanDriver: boolean; needsDriver?: boolean }>;
   /** Posten en werkgroepen waaraan een autorit doorgegeven kan worden. */
   groups: Array<{ id: string; name: string }>;
   /** De post die deze rit zelf mag invullen, of null. */
@@ -61,6 +61,9 @@ export function TransportControls({
   const [kilometers, setKilometers] = useState('');
 
   const needsVanDriver = vehicles.find((v) => v.id === vehicleId)?.needsVanDriver ?? false;
+  // Een voertuig zonder chauffeur (de bakfiets: de aanvrager rijdt zelf) heeft niets om
+  // door te geven aan een post (F6.10).
+  const needsDriver = vehicles.find((v) => v.id === vehicleId)?.needsDriver ?? true;
 
   function run(
     action: () => Promise<{ ok: boolean; message?: string; error?: string; warning?: boolean }>
@@ -123,7 +126,7 @@ export function TransportControls({
             de post die iets te vervoeren heeft. Staat er dus niet bij de kar in
             plaats van er te staan en te weigeren; een keuzelijst die altijd nee
             zegt, leert mensen keuzelijsten te negeren. */}
-        {!needsVanDriver ? (
+        {!needsVanDriver && needsDriver ? (
           <label className="flex items-center gap-2 text-sm">
             <span className="text-vtk-muted">Post kiest zelf de chauffeur</span>
             <select

@@ -165,7 +165,7 @@ export function TransportPlanner({
   blocks: TripBlock[];
   trips: PlannerTrip[];
   drivers: DriverOption[];
-  vehicleOptions: Array<{ id: string; name: string; needsVanDriver: boolean }>;
+  vehicleOptions: Array<{ id: string; name: string; needsVanDriver: boolean; needsDriver?: boolean }>;
   /** Posten en werkgroepen waarvoor het team zelf een rit kan inplannen. */
   groups: Array<{ id: string; name: string }>;
   /**

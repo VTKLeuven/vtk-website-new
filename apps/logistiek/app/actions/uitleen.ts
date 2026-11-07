@@ -5,9 +5,11 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '@vtk/db';
 import { currentWorkingYear } from '@vtk/auth';
 import {
+  canAddHelpersEverywhere,
   canEditAllHelpers,
   canManage,
   externalRequestsBlocked,
+  isPraesidiumMember,
   requireSession,
 } from '@/lib/session';
 import { getLocale } from '@/lib/i18n';
@@ -1682,7 +1684,8 @@ export async function addTripHelperAction(
   const name = input.name.trim();
   if (!name) return { ok: false, error: 'Vul de naam van de bijrijder in.' };
 
-  if (!(await canEditHelpers(session, bookingId, canEditAllHelpers(session)))) {
+  // Elk praesidiumlid mag een bijrijder toevoegen aan elke rit (F6.24).
+  if (!(await canEditHelpers(session, bookingId, canAddHelpersEverywhere(session)))) {
     return { ok: false, error: 'Je kan deze rit niet aanpassen.' };
   }
 
@@ -1724,12 +1727,15 @@ export async function removeTripHelperAction(helperId: string): Promise<ActionRe
 
   const helper = await prisma.uitleenTransportHelper.findUnique({
     where: { id: helperId },
-    select: { transportBookingId: true },
+    select: { transportBookingId: true, addedById: true },
   });
   if (!helper) return { ok: false, error: 'Deze bijrijder staat er niet (meer).' };
-  if (
-    !(await canEditHelpers(session, helper.transportBookingId, canEditAllHelpers(session)))
-  ) {
+  // Een praesidiumlid mag overal toevoegen maar enkel de eigen toevoegingen weer
+  // weghalen (F6.24); de rest blijft van de aanvrager, de post en het team.
+  const mayEditAll =
+    canEditAllHelpers(session) ||
+    (isPraesidiumMember(session) && helper.addedById === session.user.id);
+  if (!(await canEditHelpers(session, helper.transportBookingId, mayEditAll))) {
     return { ok: false, error: 'Je kan deze rit niet aanpassen.' };
   }
 
