@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ChangedByTeamBadge } from '@/components/changed-by-team-badge';
 import { VanStatusBadge } from '@/components/status-badge';
 import { requireManage } from '@/lib/session';
 import { SortChipLinks, nextSortDir, type SortDir } from '@/app/beheer/sort';
@@ -26,6 +27,7 @@ import {
   driverOptions,
   selectableEvents,
   hasSucceededPayment,
+  teamEditsForTransport,
   transportAuditLogsByBooking,
   type AdminTransportBooking,
 } from '@/lib/uitleen-server';
@@ -168,6 +170,10 @@ export default async function BeheerVervoerPage({
   // Historiek van alle getoonde ritten in één query; de details staan wel
   // ingeklapt, maar worden hier server-side gerenderd.
   const auditLogs = await transportAuditLogsByBooking(bookings.map((booking) => booking.id));
+  // Welke ritten het team aanpaste t.o.v. wat gevraagd werd (F6.11).
+  const teamEdits = await teamEditsForTransport(
+    bookings.map((booking) => ({ id: booking.id, userId: booking.userId }))
+  );
 
   function paidOf(booking: AdminTransportBooking): boolean {
     return hasSucceededPayment(booking.payments) || booking.paidOfflineAt !== null;
@@ -418,6 +424,7 @@ export default async function BeheerVervoerPage({
                   </dl>
                 </div>
                 <VanStatusBadge status={booking.status} />
+                <ChangedByTeamBadge lines={teamEdits.get(booking.id)} />
               </div>
               <BookingDetails booking={booking} />
             </li>
@@ -460,6 +467,7 @@ export default async function BeheerVervoerPage({
                     </td>
                     <td className="py-2 pr-3">
                       <VanStatusBadge status={booking.status} />
+                <ChangedByTeamBadge lines={teamEdits.get(booking.id)} />
                     </td>
                   </>
                 }
@@ -603,6 +611,7 @@ export default async function BeheerVervoerPage({
                         ) : null}
                       </div>
                       <VanStatusBadge status={first.status} />
+                      <ChangedByTeamBadge lines={teamEdits.get(first.id)} />
                     </div>
                     <div className="mt-3">
                       <OpenGroupDetails group={group} />
@@ -709,6 +718,7 @@ export default async function BeheerVervoerPage({
                         </dl>
                       </div>
                       <VanStatusBadge status={booking.status} />
+                <ChangedByTeamBadge lines={teamEdits.get(booking.id)} />
                     </div>
                     <BookingDetails booking={booking}>
                       <TransportControls

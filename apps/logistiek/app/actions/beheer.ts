@@ -2879,6 +2879,12 @@ export async function changeVehicleAction(
       }
       const vehicle = await tx.uitleenVehicle.findFirst({ where: { id: vehicleId, active: true } });
       if (!vehicle) return { error: 'NO_VEHICLE' as const };
+      // Voor de historiek: wat het was, want "voertuig: Kar" zegt niet wat er
+      // veranderde, en de aanvrager leest deze regel (F6.11).
+      const before = await tx.uitleenVehicle.findUnique({
+        where: { id: booking.vehicleId },
+        select: { nameNl: true },
+      });
 
       let overlapNote: string | undefined;
       if (booking.status === 'APPROVED') {
@@ -2907,7 +2913,7 @@ export async function changeVehicleAction(
       });
       await writeAudit(tx, { transportBookingId: booking.id }, {
         kind: 'EDITED',
-        note: `voertuig: ${vehicle.nameNl}`,
+        note: `Voertuig: ${before?.nameNl ?? 'onbekend'} → ${vehicle.nameNl}`,
         actorId: session.user.id,
       });
       if (overlapNote) {

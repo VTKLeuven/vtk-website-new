@@ -1296,3 +1296,91 @@ export function vehiclesToDraw<Vehicle extends { id: string; active: boolean }>(
   const used = new Set(bookings.map((booking) => booking.vehicleId));
   return vehicles.filter((vehicle) => vehicle.active || used.has(vehicle.id));
 }
+
+/**
+ * Wat het team aan een aanvraag veranderde, als losse regels (F6.11).
+ *
+ * De bron is de historiek, niet een vergelijking met "wat er gevraagd werd": die
+ * oorspronkelijke waarden staan nergens, en de `EDITED`-regel van elke wijziging
+ * zegt al wat er van wat naar wat ging ("Uren: ... werd ...", "Voertuig: Auto →
+ * Kar"). Enkel wijzigingen van iemand anders dan de aanvrager tellen: wat het lid
+ * zelf aanpaste, is geen nieuws voor hem.
+ *
+ * Eén `EDITED`-regel bundelt meerdere wijzigingen met "; ", dus die splitsen we
+ * hier weer. Chronologisch, en hoogstens `MAX_TEAM_CHANGES`: wie elf keer
+ * schoof, wil de laatste stand lezen en geen verhaal.
+ */
+export const MAX_TEAM_CHANGES = 6;
+
+export function teamChangeLines(
+  logs: ReadonlyArray<{ kind: string; note: string | null; actorId: string | null }>,
+  requesterId: string
+): string[] {
+  const lines = logs
+    .filter((log) => log.kind === 'EDITED' && log.actorId !== requesterId && log.note)
+    .flatMap((log) => (log.note ?? '').split('; '))
+    .map((line) => line.trim())
+    .filter(Boolean);
+  // Dezelfde regel twee keer (iemand drukte twee keer op opslaan) leest als twee
+  // wijzigingen.
+  const unique = lines.filter((line, index) => lines.indexOf(line) === index);
+  return unique.slice(-MAX_TEAM_CHANGES);
+}
+
+/**
+ * Wat er voor een evenement aangevraagd is, als één regel per aanvraag (F6.13).
+ *
+ * Op "Mijn evenementen" stond enkel "2× transport". Dat telt ritten, en een heen- en
+ * terugrit is er twee voor één aanvraag; het zegt ook niet wanneer, met wat, of of
+ * Logistiek het al goedkeurde. Dus per regel de soort, het moment of de omvang, en
+ * de stand.
+ */
+export function eventRequestLines(
+  event: {
+    reservations: ReadonlyArray<{
+      status: UitleenReservationStatus;
+      lines: ReadonlyArray<{ quantity: number }>;
+      flesserkeLines: ReadonlyArray<{ quantity: number }>;
+    }>;
+    transport: ReadonlyArray<{
+      status: UitleenTransportBookingStatus;
+      startAt: Date;
+      endAt: Date;
+      tripLeg: 'HEEN' | 'TERUG' | null;
+      vehicle: { nameNl: string };
+    }>;
+  },
+  locale: LogistiekLocale
+): string[] {
+  const en = locale === 'en';
+  const pieces = (count: number) => (en ? `${count} items` : `${count} stuks`);
+  const total = (lines: ReadonlyArray<{ quantity: number }>) =>
+    lines.reduce((sum, line) => sum + line.quantity, 0);
+
+  const material = event.reservations
+    .filter((reservation) => reservation.lines.length > 0)
+    .map(
+      (reservation) =>
+        `${en ? 'Equipment' : 'Materiaal'}: ${pieces(total(reservation.lines))}, ${reservationStatusLabel(reservation.status, locale)}`
+    );
+  const drinks = event.reservations
+    .filter((reservation) => reservation.flesserkeLines.length > 0)
+    .map(
+      (reservation) =>
+        `Flesserke: ${pieces(total(reservation.flesserkeLines))}, ${reservationStatusLabel(reservation.status, locale)}`
+    );
+  const trips = event.transport.map((booking) => {
+    const leg =
+      booking.tripLeg === 'HEEN'
+        ? en
+          ? ' (outbound)'
+          : ' (heen)'
+        : booking.tripLeg === 'TERUG'
+          ? en
+            ? ' (return)'
+            : ' (terug)'
+          : '';
+    return `${en ? 'Trip' : 'Rit'}${leg}: ${formatTripWindow(booking.startAt, booking.endAt, locale)}, ${booking.vehicle.nameNl}, ${vanStatusLabel(booking.status, locale)}`;
+  });
+  return [...material, ...drinks, ...trips];
+}

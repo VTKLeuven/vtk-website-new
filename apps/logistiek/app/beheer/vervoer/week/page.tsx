@@ -40,6 +40,7 @@ import {
   eventsInRange,
   getLogistiekSettings,
   selectableEvents,
+  teamEditsForTransport,
   transportAuditLogsByBooking,
   tripNotesFor,
   transportRange,
@@ -186,6 +187,9 @@ export default async function VervoerWeekPage({
   // waar dit teamlid zelf bij hoort, want daar leest hij ook de nota's die enkel
   // voor de post bedoeld zijn: dan ís het zijn post.
   const viewer = { userId: session.user.id, groupIds: session.groups.map((group) => group.id) };
+  const teamEdits = await teamEditsForTransport(
+    bookings.map((booking) => ({ id: booking.id, userId: booking.userId }))
+  );
   const notesPerTrip = await tripNotesFor(
     bookings.map((booking) => booking.id),
     {
@@ -305,6 +309,7 @@ export default async function VervoerWeekPage({
       deleteDescription: transportDeleteDescription(legs),
       history: history.get(booking.id) ?? [],
       notes: notesPerTrip.get(booking.id) ?? [],
+      teamChanges: teamEdits.get(booking.id) ?? [],
       legs: legs
         .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
         .map((leg) => ({

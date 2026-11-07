@@ -5,11 +5,14 @@ import {
   EXTERN_REQUESTER,
   OTHER_REQUESTER,
   LOGISTIEK_LABEL,
+  MAX_TEAM_CHANGES,
   requesterChoiceOf,
   requesterFromChoice,
   requesterLabel,
+  teamChangeLines,
   dayPartLabel,
   describeReservationChanges,
+  eventRequestLines,
   handoverNote,
   mergeHandover,
   formatDateOnly,
@@ -906,5 +909,83 @@ describe('requesterLabel', () => {
       requesterLabel({ requesterType: 'WERKGROEP', requesterName: 'Alumni', group: null })
     ).toBe('Alumni');
     expect(requesterLabel({ requesterType: 'EXTERN', requesterName: null, group: null })).toBe('Extern');
+  });
+});
+
+describe('teamChangeLines', () => {
+  const edit = (note: string, actorId = 'team') => ({ kind: 'EDITED', note, actorId });
+
+  it('splitst een gebundelde wijziging in losse regels (F6.11)', () => {
+    expect(
+      teamChangeLines([edit('Uren: 18:00 tot 20:00 werd 19:00 tot 21:00; Voertuig: Auto → Kar')], 'lid')
+    ).toEqual(['Uren: 18:00 tot 20:00 werd 19:00 tot 21:00', 'Voertuig: Auto → Kar']);
+  });
+
+  it('negeert wat de aanvrager zelf wijzigde', () => {
+    expect(teamChangeLines([edit('Waarvoor: a → b', 'lid')], 'lid')).toEqual([]);
+  });
+
+  it('negeert alles wat geen wijziging is', () => {
+    expect(
+      teamChangeLines(
+        [
+          { kind: 'STATUS_CHANGED', note: 'goedgekeurd', actorId: 'team' },
+          { kind: 'NOTE', note: 'bewust ingepland over een andere rit', actorId: 'team' },
+          { kind: 'EDITED', note: null, actorId: 'team' },
+        ],
+        'lid'
+      )
+    ).toEqual([]);
+  });
+
+  it('telt dezelfde regel niet twee keer', () => {
+    expect(teamChangeLines([edit('Voertuig: Auto → Kar'), edit('Voertuig: Auto → Kar')], 'lid')).toEqual([
+      'Voertuig: Auto → Kar',
+    ]);
+  });
+
+  it('houdt de laatste wijzigingen wanneer er veel zijn', () => {
+    const logs = Array.from({ length: MAX_TEAM_CHANGES + 3 }, (_, index) => edit(`Waarvoor: ${index}`));
+    const lines = teamChangeLines(logs, 'lid');
+    expect(lines).toHaveLength(MAX_TEAM_CHANGES);
+    expect(lines.at(-1)).toBe(`Waarvoor: ${MAX_TEAM_CHANGES + 2}`);
+  });
+});
+
+describe('eventRequestLines', () => {
+  const trip = (leg: 'HEEN' | 'TERUG' | null, status: 'REQUESTED' | 'APPROVED' = 'APPROVED') => ({
+    status,
+    startAt: new Date('2026-11-14T17:00:00.000Z'),
+    endAt: new Date('2026-11-14T19:00:00.000Z'),
+    tripLeg: leg,
+    vehicle: { nameNl: 'Auto' },
+  });
+
+  it('zet elke rit op een eigen regel met voertuig en stand (F6.13)', () => {
+    const lines = eventRequestLines({ reservations: [], transport: [trip('HEEN'), trip('TERUG', 'REQUESTED')] }, 'nl');
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain('Rit (heen)');
+    expect(lines[0]).toContain('Auto');
+    expect(lines[0]).toContain('Goedgekeurd');
+    expect(lines[1]).toContain('Rit (terug)');
+  });
+
+  it('telt de stuks van materiaal en flesserke apart', () => {
+    const lines = eventRequestLines(
+      {
+        reservations: [
+          { status: 'REQUESTED', lines: [{ quantity: 10 }, { quantity: 4 }], flesserkeLines: [] },
+          { status: 'APPROVED', lines: [], flesserkeLines: [{ quantity: 6 }] },
+        ],
+        transport: [],
+      },
+      'nl'
+    );
+    expect(lines[0]).toMatch(/^Materiaal: 14 stuks/);
+    expect(lines[1]).toMatch(/^Flesserke: 6 stuks/);
+  });
+
+  it('geeft niets terug zonder aanvragen', () => {
+    expect(eventRequestLines({ reservations: [], transport: [] }, 'nl')).toEqual([]);
   });
 });

@@ -13,7 +13,12 @@ import {
   formatPriceCents,
   todayDateOnly,
 } from '@/lib/uitleen';
-import { myReservations, myVanBookings, unseenChanges } from '@/lib/uitleen-server';
+import {
+  myReservations,
+  myVanBookings,
+  teamEditsForTransport,
+  unseenChanges,
+} from '@/lib/uitleen-server';
 import { copy, getLocale } from '@/lib/i18n';
 import type { LogistiekLocale } from '@/lib/i18n-shared';
 
@@ -81,6 +86,7 @@ function ReservationOverviewRow({
   requester,
   status,
   labels,
+  extra,
 }: {
   href: string;
   subject: ReactNode;
@@ -89,6 +95,8 @@ function ReservationOverviewRow({
   requester: ReactNode;
   status: ReactNode;
   labels: { subject: string; contents: string; period: string; requester: string; status: string };
+  /** De nota's en wat Logistiek aanpaste, onder de rij (F6.11, F6.12). */
+  extra?: ReactNode;
 }) {
   return (
     <Link href={href} className="logistics-reservation-row">
@@ -112,7 +120,55 @@ function ReservationOverviewRow({
         <span>{labels.status}</span>
         {status}
       </div>
+      {extra ? <div className="logistics-reservation-extra">{extra}</div> : null}
     </Link>
+  );
+}
+
+/**
+ * De nota's en wat Logistiek aanpaste, onder een rij (F6.11, F6.12).
+ *
+ * Ze stonden enkel op de detailpagina, een klik verder. Wie de lijst opent, wil
+ * zien of Logistiek iets zei of veranderde zonder elke aanvraag te openen. Ingekort
+ * tot twee regels; de rij zelf is een link naar het geheel.
+ */
+function RowNotes({
+  memberNote,
+  adminNote,
+  changes = [],
+  en,
+}: {
+  memberNote: string | null;
+  adminNote: string | null;
+  changes?: string[];
+  en: boolean;
+}) {
+  if (!memberNote && !adminNote && changes.length === 0) return null;
+  return (
+    <>
+      {changes.length > 0 ? (
+        <div className="logistics-reservation-note logistics-reservation-note-changed">
+          <span>{en ? 'Logistics changed your request' : 'Logistiek paste je aanvraag aan'}</span>
+          <ul>
+            {changes.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {adminNote ? (
+        <div className="logistics-reservation-note">
+          <span>{en ? 'Extra info from Logistics' : 'Extra info van Logistiek'}</span>
+          <p>{adminNote}</p>
+        </div>
+      ) : null}
+      {memberNote ? (
+        <div className="logistics-reservation-note">
+          <span>{en ? 'Your note' : 'Jouw nota'}</span>
+          <p>{memberNote}</p>
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -242,6 +298,14 @@ export default async function ReservatiesPage({
     ])
   );
 
+  // Wat Logistiek aan je ritten veranderde (F6.11), enkel voor je eigen
+  // aanvragen: een rit van een collega is zijn aanvraag.
+  const teamEdits = await teamEditsForTransport(
+    vanBookings
+      .filter((booking) => booking.user.id === session.user.id)
+      .map((booking) => ({ id: booking.id, userId: booking.user.id }))
+  );
+
   // R2: lopend versus afgelopen, per sectie. "Vandaag" telt nog als lopend.
   // `todayDateOnly` geeft de Belgische wall-clock datum als UTC-middernacht,
   // dezelfde vorm als `pickupDate`/`returnDate` in de databank; dat maakt de
@@ -307,6 +371,9 @@ export default async function ReservatiesPage({
           </span>
         }
         labels={rowLabels}
+        extra={
+          <RowNotes memberNote={reservation.memberNote} adminNote={reservation.adminNote} en={en} />
+        }
       />
       <DeliveryNote reservation={reservation} en={en} locale={locale} />
     </li>
@@ -327,6 +394,9 @@ export default async function ReservatiesPage({
           </span>
         }
         labels={rowLabels}
+        extra={
+          <RowNotes memberNote={reservation.memberNote} adminNote={reservation.adminNote} en={en} />
+        }
       />
       <DeliveryNote reservation={reservation} en={en} locale={locale} />
     </li>
@@ -377,6 +447,14 @@ export default async function ReservatiesPage({
             </span>
           }
           labels={{ ...rowLabels, contents: en ? 'Destination' : 'Bestemming' }}
+          extra={
+            <RowNotes
+              memberNote={booking.memberNote}
+              adminNote={booking.adminNote}
+              changes={teamEdits.get(booking.id)}
+              en={en}
+            />
+          }
         />
       </li>
     );

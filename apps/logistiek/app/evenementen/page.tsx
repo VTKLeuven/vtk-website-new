@@ -2,9 +2,12 @@ import Link from 'next/link';
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
 import { getSession } from '@/lib/session';
-import { formatEventMoment } from '@/lib/uitleen';
-import { memberEvents, type AdminEvent } from '@/lib/uitleen-server';
+import { eventRequestLines, formatEventMoment } from '@/lib/uitleen';
+import { memberEvents } from '@/lib/uitleen-server';
 import { getLocale } from '@/lib/i18n';
+
+/** Hoeveel regels per evenement in de lijst; de rest staat op de detailpagina. */
+const SHOWN_LINES = 4;
 
 /**
  * De evenementen van je post of werkgroep (N5).
@@ -13,14 +16,11 @@ import { getLocale } from '@/lib/i18n';
  * had geen enkel scherm waar alles van één evenement samen stond: hij zag drie
  * losse aanvragen onder "Mijn reservaties" en moest zelf onthouden dat ze bij
  * elkaar hoorden.
+ *
+ * Per evenement staat elke aanvraag op een eigen regel, met moment en stand
+ * (F6.13); "2× transport" zei niet wanneer, met welk voertuig of of het al
+ * goedgekeurd was, en telde een heen- en terugrit als twee.
  */
-function countByKind(event: AdminEvent) {
-  const material = event.reservations.filter((r) => r.lines.length > 0).length;
-  const drinks = event.reservations.filter((r) => r.flesserkeLines.length > 0).length;
-  const transport = event.transport.length;
-  return { material, drinks, transport };
-}
-
 export default async function EvenementenPage() {
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
   if (!session) return <LoginGate variant="reservations" returnTo="/evenementen" />;
@@ -62,7 +62,7 @@ export default async function EvenementenPage() {
       ) : (
         <ul className="grid gap-4">
           {events.map((event) => {
-            const counts = countByKind(event);
+            const requests = eventRequestLines(event, locale);
             const moment = formatEventMoment(event, locale);
             return (
               <li key={event.id}>
@@ -92,17 +92,26 @@ export default async function EvenementenPage() {
                     <div>
                       <dt>{en ? 'Requested' : 'Aangevraagd'}</dt>
                       <dd>
-                        {counts.material + counts.drinks + counts.transport === 0
-                          ? en
-                            ? 'Nothing yet'
-                            : 'Nog niets'
-                          : [
-                              counts.material > 0 ? `${counts.material}× materiaal` : null,
-                              counts.drinks > 0 ? `${counts.drinks}× flesserke` : null,
-                              counts.transport > 0 ? `${counts.transport}× transport` : null,
-                            ]
-                              .filter(Boolean)
-                              .join(' · ')}
+                        {requests.length === 0 ? (
+                          en ? (
+                            'Nothing yet'
+                          ) : (
+                            'Nog niets'
+                          )
+                        ) : (
+                          <ul className="grid gap-0.5">
+                            {requests.slice(0, SHOWN_LINES).map((line, index) => (
+                              <li key={`${index}-${line}`}>{line}</li>
+                            ))}
+                            {requests.length > SHOWN_LINES ? (
+                              <li className="text-vtk-muted">
+                                {en
+                                  ? `and ${requests.length - SHOWN_LINES} more`
+                                  : `en ${requests.length - SHOWN_LINES} meer`}
+                              </li>
+                            ) : null}
+                          </ul>
+                        )}
                       </dd>
                     </div>
                   </dl>

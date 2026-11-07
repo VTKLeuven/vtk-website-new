@@ -17,6 +17,7 @@ import {
   formatBrusselsDay,
   formatDateRange,
   isoWeekNumber,
+  onTripForNotes,
   ownsTransportBooking,
   parseDateOnly,
   requesterLabel,
@@ -29,6 +30,7 @@ import {
 } from '@/lib/uitleen';
 import {
   activeGroups,
+  adminNotesForTrips,
   calendarVehicles,
   driverColorOverrides,
   driverOptions,
@@ -37,6 +39,7 @@ import {
   transportWeekForMembers,
   transportWeekForPraesidium,
   transportWeekPublic,
+  tripNotesFor,
 } from '@/lib/uitleen-server';
 import { filtersToQuery, parseTransportFilters } from '@/lib/transport-filters';
 import type { BezettingTrip } from './trip-card';
@@ -229,6 +232,26 @@ export default async function VervoerBezettingPage({
     [...new Set(cardBookings.map((booking) => booking.driverId).filter((id): id is string => Boolean(id)))]
   );
 
+  // De nota's (F6.16). Het team leest ze alle, een post enkel die van de ritten
+  // waar hij zelf bij hoort (aanvrager, chauffeur of de post erachter). Voor de
+  // rest van de ritten vragen we ze niet eens op: een nota die niet uit de
+  // databank komt, kan het scherm ook niet laten lekken.
+  const onTripIds = new Set(
+    viewer
+      ? cardBookings.filter((booking) => onTripForNotes(booking, viewer)).map((booking) => booking.id)
+      : []
+  );
+  const [notesPerTrip, ownAdminNotes] = await Promise.all([
+    session && cardBookings.length > 0
+      ? tripNotesFor(teamBookings ? cardBookings.map((booking) => booking.id) : [...onTripIds], {
+          userId: session.user.id,
+          onTripIds: [...onTripIds],
+          logistiek: Boolean(teamBookings),
+        })
+      : Promise.resolve(new Map()),
+    postBookings ? adminNotesForTrips([...onTripIds]) : Promise.resolve(new Map<string, string>()),
+  ]);
+
   /**
    * Wat er in het kaartje staat wanneer iemand een rit aanklikt.
    *
@@ -262,6 +285,8 @@ export default async function VervoerBezettingPage({
     memberNote: booking.memberNote,
     adminNote: booking.adminNote,
     reservationId: booking.reservationId,
+    notes: notesPerTrip.get(booking.id) ?? [],
+    canNote: true,
   })) ??
   postBookings?.map((booking) => {
     // `postBookings` bestaat enkel met een sessie, dus `viewer` staat er.
@@ -299,14 +324,17 @@ export default async function VervoerBezettingPage({
       })),
       helpersNote: booking.helpersNote,
       canEditHelpers: helpersEditable(booking),
-      // Van het team: een nummer en een kotadres zijn van een persoon, de nota's
-      // zijn het werkblad van Logistiek.
+      // Van het team: een nummer en een kotadres zijn van een persoon. De nota van
+      // het lid blijft ook weg. "Extra info van Logistiek" en de nota's staan er
+      // enkel bij een rit van je eigen post (F6.16); andermans rit krijgt niets.
       pickupAddress: null,
       helpersPhone: null,
       contactPhone: null,
       memberNote: null,
-      adminNote: null,
+      adminNote: ownAdminNotes.get(booking.id) ?? null,
       reservationId: null,
+      notes: notesPerTrip.get(booking.id) ?? [],
+      canNote: onTripIds.has(booking.id),
     };
   });
 

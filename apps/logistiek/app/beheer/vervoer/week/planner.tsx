@@ -24,6 +24,7 @@ import { TripHelpers } from '@/components/trip-helpers';
 import { TripNotes, type TripNoteView } from '@/components/trip-notes';
 import { EventLink } from '@/components/event-link';
 import type { SelectableEvent } from '@/components/event-picker';
+import { ChangedByTeamBadge } from '@/components/changed-by-team-badge';
 import { VanStatusBadge } from '@/components/status-badge';
 import type { UitleenAuditEntry, DriverOption } from '@/lib/uitleen-server';
 import { TransportControls } from '../transport-controls';
@@ -135,6 +136,8 @@ export type PlannerTrip = {
    * `tripNotesFor`.
    */
   notes: TripNoteView[];
+  /** Wat het team aan deze aanvraag veranderde (F6.11); leeg als niets. */
+  teamChanges: string[];
 };
 
 export function TransportPlanner({
@@ -575,6 +578,7 @@ export function TransportPlanner({
             <div className="grid gap-5">
               <div className="flex flex-wrap items-center gap-2">
                 <VanStatusBadge status={trip.status} />
+                <ChangedByTeamBadge lines={trip.teamChanges} />
                 <span className="rounded-full bg-vtk-paper-2 px-2.5 py-0.5 text-xs font-semibold text-vtk-navy">
                   {trip.vehicleName}
                 </span>
@@ -733,12 +737,6 @@ export function TransportPlanner({
                 canEdit={trip.status === 'REQUESTED' || trip.status === 'APPROVED'}
               />
 
-              {/* De eigen nota's (F4.20). Je leest hier wat er met Logistiek
-                  gedeeld is en wat je zelf schreef, nooit de privénota van
-                  iemand anders. Schrijven mag op elke rit: het team slaat ze
-                  hier toch al open, en een nota verandert niets aan de rit. */}
-              <TripNotes bookingId={trip.id} notes={trip.notes} canWrite />
-
               <section>
                 <h3 className="text-sm font-semibold text-vtk-ink">Rit aanpassen</h3>
                 <div className="mt-2">
@@ -749,6 +747,11 @@ export function TransportPlanner({
                     currentGroup={trip.requesterGroup}
                     reservationId={trip.reservationId}
                     locked={trip.status !== 'REQUESTED' && trip.status !== 'APPROVED'}
+                    // De eigen nota's (F4.20) staan onder "Extra info van Logistiek"
+                    // (F6.15). Je leest hier wat er met Logistiek gedeeld is en wat
+                    // je zelf schreef, nooit de privénota van iemand anders.
+                    // Schrijven mag op elke rit: een nota verandert niets aan de rit.
+                    notesSlot={<TripNotes bookingId={trip.id} notes={trip.notes} canWrite />}
                     onSaved={() => router.refresh()}
                   />
                 </div>

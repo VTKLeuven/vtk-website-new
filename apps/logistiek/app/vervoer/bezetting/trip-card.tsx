@@ -5,6 +5,7 @@ import type { UitleenTransportBookingStatus } from '@prisma/client';
 import { PhoneLink } from '@/components/phone-link';
 import { VanStatusBadge } from '@/components/status-badge';
 import { TripHelpers } from '@/components/trip-helpers';
+import { TripNotes, type TripNoteView } from '@/components/trip-notes';
 import { ToastProvider } from '@/components/ui/toast';
 import type { LogistiekLocale } from '@/lib/i18n-shared';
 
@@ -80,6 +81,13 @@ export type BezettingTrip = {
   adminNote: string | null;
   /** De materiaalaanvraag waarvan dit de levering is. */
   reservationId: string | null;
+  /**
+   * De eigen nota's bij deze rit (F4.20, F6.16), al gefilterd op wat deze persoon
+   * mag lezen. Leeg bij andermans rit: die nota's komen niet eens uit de server.
+   */
+  notes: TripNoteView[];
+  /** Mag deze persoon hier een nota schrijven? Enkel bij een rit die van hem is, of het team. */
+  canNote: boolean;
 };
 
 export function TripCard({
@@ -195,7 +203,7 @@ export function TripCard({
         ) : null}
         {trip.adminNote ? (
           <div data-span="2">
-            <dt>{en ? 'Note from the team' : 'Nota van het team'}</dt>
+            <dt>{en ? 'Extra info from Logistics' : 'Extra info van Logistiek'}</dt>
             <dd>{trip.adminNote}</dd>
           </div>
         ) : null}
@@ -228,6 +236,17 @@ export function TripCard({
               canEdit={trip.canEditHelpers}
               locale={locale}
             />
+          </ToastProvider>
+        </div>
+      ) : null}
+
+      {/* De nota's (F6.16). Onder de bijrijders en apart van "Extra info van
+          Logistiek" hierboven: dat is de boodschap van het team, dit zijn de
+          nota's van de mensen rond de rit, elk met een zichtbaarheid. */}
+      {trip.canNote || trip.notes.length > 0 ? (
+        <div className="border-t border-vtk-navy/10 pt-4">
+          <ToastProvider>
+            <TripNotes bookingId={trip.id} notes={trip.notes} canWrite={trip.canNote} locale={locale} />
           </ToastProvider>
         </div>
       ) : null}

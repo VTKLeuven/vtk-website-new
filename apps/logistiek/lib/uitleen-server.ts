@@ -15,6 +15,7 @@ import {
   NOTIFY_KINDS,
   STOCK_CONSUMING_STATUSES,
   isTripHandoverMode,
+  teamChangeLines,
   type LogistiekNotifyEmails,
   type NotifyKind,
   type TripHandoverNotify,
@@ -1019,6 +1020,56 @@ export async function adminReservation(id: string) {
       },
     },
   });
+}
+
+/**
+ * De "Extra info van Logistiek" van enkel deze ritten (F6.16).
+ *
+ * Apart van `transportWeekForPraesidium`, dat de nota's bewust niet ophaalt: wie
+ * dat doet, haalt ze voor élke rit van de week op en vertrouwt erop dat het
+ * scherm de verkeerde weglaat. Hier vraagt de oproeper enkel de ritten van de
+ * eigen post, dus er komt nooit een nota mee van een rit die niet van hem is.
+ */
+export async function adminNotesForTrips(bookingIds: string[]): Promise<Map<string, string>> {
+  const notes = new Map<string, string>();
+  if (bookingIds.length === 0) return notes;
+  const rows = await prisma.uitleenTransportBooking.findMany({
+    where: { id: { in: bookingIds }, adminNote: { not: null } },
+    select: { id: true, adminNote: true },
+  });
+  for (const row of rows) if (row.adminNote) notes.set(row.id, row.adminNote);
+  return notes;
+}
+
+/**
+ * Wat het team aan deze ritten veranderde (F6.11), per rit, als leesbare regels.
+ *
+ * Eén query voor alle ritten van een scherm. De aanvrager hoort er per rit bij
+ * (`userId`): wat hij zelf wijzigde, telt niet mee. Zie `teamChangeLines`.
+ */
+export async function teamEditsForTransport(
+  bookings: ReadonlyArray<{ id: string; userId: string }>
+): Promise<Map<string, string[]>> {
+  const result = new Map<string, string[]>();
+  if (bookings.length === 0) return result;
+
+  const logs = await prisma.uitleenAuditLog.findMany({
+    where: { transportBookingId: { in: bookings.map((booking) => booking.id) }, kind: 'EDITED' },
+    orderBy: { createdAt: 'asc' },
+    select: { transportBookingId: true, kind: true, note: true, actorId: true },
+  });
+  const perBooking = new Map<string, typeof logs>();
+  for (const log of logs) {
+    if (!log.transportBookingId) continue;
+    const list = perBooking.get(log.transportBookingId) ?? [];
+    list.push(log);
+    perBooking.set(log.transportBookingId, list);
+  }
+  for (const booking of bookings) {
+    const lines = teamChangeLines(perBooking.get(booking.id) ?? [], booking.userId);
+    if (lines.length > 0) result.set(booking.id, lines);
+  }
+  return result;
 }
 
 export type UitleenAuditEntry = {
