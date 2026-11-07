@@ -152,6 +152,19 @@ body {
   min-width: 0;
 }
 
+/* Op een breed scherm een ondergrens waarin "hele dag" ook echt de hele dag toont
+   (F6.2). 24 uur aan de minimale uurhoogte (18px, `MIN_HOUR_PX`) is 432px, plus
+   de dagkop en twee rijen evenementen: onder die hoogte scrolt de kalender op zoom
+   1, en op een laptop van 720px hoog was 68dvh daar net onder. De pagina scrolt
+   dan liever een stukje mee dan dat de nacht onderaan wegvalt. Op een telefoon
+   niet: daar past de dag toch nooit, en heeft volledig scherm een eigen
+   dagweergave. */
+@media (min-width: 860px) {
+  .tg-pane {
+    height: var(--tg-height, clamp(36rem, 68dvh, 60rem));
+  }
+}
+
 /* De maandweergave groeit met haar rijen mee; die is al compact en heeft geen
    vaste hoogte nodig. In volledig scherm neemt ze wél de volle rest. */
 .tg-pane-auto {

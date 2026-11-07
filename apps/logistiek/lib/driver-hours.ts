@@ -49,6 +49,11 @@ export type HourDriver = {
   hours: number;
   /** Vierentwintig getallen, index 0 is middernacht. */
   perHour: number[];
+  /**
+   * 168 getallen, index `dag * 24 + uur`, maandag is dag 0 (F6.4, F6.6). De som
+   * over de dagen is `perHour`.
+   */
+  heat: number[];
 };
 
 export type HourSegment = {
@@ -132,6 +137,68 @@ export function driverHourChart(drivers: HourDriver[], options: { bucket: HourBu
     });
   }
 
+  const legend = legendOf(named, rest);
+
+  return { columns, legend };
+}
+
+// ---------------------------------------------------------------------------
+// Per weekdag (F6.4)
+// ---------------------------------------------------------------------------
+
+export const WEEKDAY_SHORT = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'] as const;
+const WEEKDAY_LONG = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag'] as const;
+
+/** De uren van één chauffeur per weekdag: zeven getallen, maandag eerst. */
+export function perWeekday(heat: number[]): number[] {
+  return Array.from({ length: 7 }, (_, day) => {
+    let total = 0;
+    for (let hour = 0; hour < 24; hour += 1) total += heat[day * 24 + hour] ?? 0;
+    return total;
+  });
+}
+
+/**
+ * De gestapelde balken per weekdag, op dezelfde manier opgebouwd als per uur van
+ * de dag: een segment per chauffeur (de top), de rest samen. Dezelfde vorm als
+ * {@link driverHourChart}, zodat het scherm beide met één tekenfunctie toont.
+ */
+export function driverWeekdayChart(drivers: HourDriver[], options: { top: number }): DriverHourChart {
+  const named = drivers.slice(0, options.top);
+  const rest = drivers.slice(options.top);
+  const namedDays = named.map((driver) => ({ driver, days: perWeekday(driver.heat) }));
+  const restDays = Array.from({ length: 7 }, (_, day) =>
+    rest.reduce((total, driver) => total + perWeekday(driver.heat)[day], 0)
+  );
+
+  const columns: HourColumn[] = WEEKDAY_SHORT.map((label, day) => {
+    const segments: HourSegment[] = [];
+    for (const { driver, days } of namedDays) {
+      if (days[day] <= 0) continue;
+      segments.push({
+        key: driver.id,
+        name: driver.name,
+        color: driverColorVarFromIndex(driver.colorIndex),
+        hours: days[day],
+      });
+    }
+    if (restDays[day] > 0) {
+      segments.push({ key: REST_KEY, name: REST_NAME, color: REST_COLOR, hours: restDays[day] });
+    }
+    return {
+      key: String(day),
+      label,
+      rangeLabel: WEEKDAY_LONG[day],
+      hours: segments.reduce((total, segment) => total + segment.hours, 0),
+      segments,
+    };
+  });
+
+  return { columns, legend: legendOf(named, rest) };
+}
+
+/** De legende van een gestapelde grafiek: de top bij naam, de rest samen. */
+function legendOf(named: HourDriver[], rest: HourDriver[]): HourSegment[] {
   const legend: HourSegment[] = named
     .filter((driver) => driver.hours > 0)
     .map((driver) => ({
@@ -144,6 +211,97 @@ export function driverHourChart(drivers: HourDriver[], options: { bucket: HourBu
   if (restTotal > 0) {
     legend.push({ key: REST_KEY, name: `${REST_NAME} (${rest.length})`, color: REST_COLOR, hours: restTotal });
   }
+  return legend;
+}
 
-  return { columns, legend };
+// ---------------------------------------------------------------------------
+// Per chauffeur naast elkaar (F6.5)
+// ---------------------------------------------------------------------------
+
+export type ProfileRow = {
+  key: string;
+  name: string;
+  color: string;
+  hours: number;
+  /** Eén getal per kolom, in de volgorde van `columns`. */
+  values: number[];
+};
+
+export type DriverProfiles = {
+  columns: Array<{ key: string; label: string; rangeLabel: string }>;
+  rows: ProfileRow[];
+  /**
+   * Het hoogste getal over alle rijen. Elke rij tekent tegen deze ene maat: dat is
+   * de hele reden van deze weergave. In een gestapelde balk heeft enkel het
+   * onderste segment een gedeelde basislijn, dus enkel dat vergelijk je
+   * betrouwbaar; hier staat elke chauffeur op zijn eigen basislijn en op dezelfde
+   * schaal.
+   */
+  max: number;
+};
+
+/**
+ * Een rij per chauffeur (de top, daarna "overige"), met zijn uren per uur van de
+ * dag of per weekdag. Hetzelfde rekenwerk als de gestapelde balken, anders
+ * uitgezet.
+ */
+export function driverProfiles(
+  drivers: HourDriver[],
+  options: { by: 'hour' | 'weekday'; bucket: HourBucket; top: number }
+): DriverProfiles {
+  const { by, bucket, top } = options;
+  const named = drivers.slice(0, top);
+  const rest = drivers.slice(top);
+
+  const slots = by === 'weekday' ? 7 : 24 / bucket;
+  const columns = Array.from({ length: slots }, (_, index) => {
+    if (by === 'weekday') {
+      return { key: String(index), label: WEEKDAY_SHORT[index], rangeLabel: WEEKDAY_LONG[index] };
+    }
+    const start = index * bucket;
+    return {
+      key: String(start),
+      label: String(start).padStart(2, '0'),
+      rangeLabel: `${clock(start)} tot ${clock(start + bucket)}`,
+    };
+  });
+
+  const valuesOf = (driver: HourDriver): number[] => {
+    if (by === 'weekday') return perWeekday(driver.heat);
+    return columns.map((_, index) => {
+      let total = 0;
+      for (let hour = index * bucket; hour < index * bucket + bucket; hour += 1) total += driver.perHour[hour] ?? 0;
+      return total;
+    });
+  };
+
+  const rows: ProfileRow[] = named
+    .filter((driver) => driver.hours > 0)
+    .map((driver) => ({
+      key: driver.id,
+      name: driver.name,
+      color: driverColorVarFromIndex(driver.colorIndex),
+      hours: driver.hours,
+      values: valuesOf(driver),
+    }));
+  const restHours = rest.reduce((total, driver) => total + driver.hours, 0);
+  if (restHours > 0) {
+    const restValues = columns.map((_, index) =>
+      rest.reduce((total, driver) => total + valuesOf(driver)[index], 0)
+    );
+    rows.push({ key: REST_KEY, name: `${REST_NAME} (${rest.length})`, color: REST_COLOR, hours: restHours, values: restValues });
+  }
+
+  const max = rows.reduce((most, row) => Math.max(most, ...row.values), 0);
+  return { columns, rows, max };
+}
+
+/**
+ * De drukteweergave voor deze keuze (F6.6): het totaal, of enkel de uren van één
+ * chauffeur, als zeven rijen van vierentwintig. Zonder keuze is het wat
+ * `transportStats` al berekende.
+ */
+export function heatmapFor(total: number[][], focus: HourDriver | null): number[][] {
+  if (!focus) return total;
+  return Array.from({ length: 7 }, (_, day) => focus.heat.slice(day * 24, day * 24 + 24));
 }

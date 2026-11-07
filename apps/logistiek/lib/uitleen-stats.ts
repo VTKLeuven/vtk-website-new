@@ -141,7 +141,16 @@ export type DriverStat = {
    */
   perHour: number[];
   /**
-   * De kleur van deze chauffeur in de planning, 1 tot 24.
+   * Uren per weekdag en uur (F6.4, F6.6): 168 getallen, index `dag * 24 + uur`, met
+   * maandag als dag 0. Uit dezelfde wandeling als `perHour` en de drukteweergave,
+   * dus ze tellen precies hetzelfde: `perHour` is hiervan de som over de dagen en
+   * de weekdagen zijn de som over de uren. Eén getallenrij per chauffeur en geen
+   * `perWeekday` ernaast, want drie opgeslagen lezingen van hetzelfde lopen
+   * vroeg of laat uiteen.
+   */
+  heat: number[];
+  /**
+   * De kleur van deze chauffeur in de planning, 1 tot 40.
    *
    * Meegegeven zodat een grafiek dezelfde kleur kan gebruiken als de kalender:
    * wie daar mint is, is dat hier ook.
@@ -305,6 +314,7 @@ export async function transportStats(filters: StatsFilters): Promise<TransportSt
         hours: 0,
         perVehicle: {},
         perHour: new Array<number>(24).fill(0),
+        heat: new Array<number>(24 * 7).fill(0),
         colorIndex: driverColorIndex(booking.driverId, colors),
       };
       entry.trips += 1;
@@ -348,7 +358,10 @@ export async function transportStats(filters: StatsFilters): Promise<TransportSt
 
     eachQuarter(booking.startAt, booking.endAt, (day, hour, amount) => {
       heatmap[day][hour] += amount;
-      if (driverEntry) driverEntry.perHour[hour] += amount;
+      if (driverEntry) {
+        driverEntry.perHour[hour] += amount;
+        driverEntry.heat[day * 24 + hour] += amount;
+      }
     });
   }
 
@@ -407,6 +420,7 @@ export async function transportStats(filters: StatsFilters): Promise<TransportSt
           Object.entries(entry.perVehicle).map(([key, value]) => [key, round(value)])
         ),
         perHour: entry.perHour.map(round),
+        heat: entry.heat.map(round),
       }))
       .sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name, 'nl')),
     perGroup: [...perGroup.values()]
