@@ -2032,3 +2032,13 @@ select:focus {
     break-before: page;
   }
 }
+
+/* Een grid-item krimpt standaard niet onder de breedte van zijn inhoud
+   (`min-width: auto`): één breed onderdeel rekte zo de hele kolom op, en op een
+   telefoon liepen de kaarten op Chauffeurs, Ritten en Instellingen over de rand
+   (tot 377px op een scherm van 360). `min-width: 0` laat de kolom krimpen en de
+   inhoud binnenin wrappen. Gemeten op 320 en 360px: de overloop is weg. */
+main .grid > *,
+main [class*='logistics-form-width'] > * {
+  min-width: 0;
+}
