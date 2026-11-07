@@ -159,6 +159,23 @@
   --driver-22: #ded9cd;
   --driver-23: #d8dde6;
   --driver-24: #d6dcd8;
+  /* Middentonen (F6.7): enkel te kiezen, nooit uit de hash. */
+  --driver-25: #f59aa1;
+  --driver-26: #f2a07c;
+  --driver-27: #e1ad63;
+  --driver-28: #c2bb64;
+  --driver-29: #99c77f;
+  --driver-30: #6ccea6;
+  --driver-31: #4fcdcd;
+  --driver-32: #5ec6ec;
+  --driver-33: #87bafd;
+  --driver-34: #b0adfb;
+  --driver-35: #d2a2e8;
+  --driver-36: #ea9bc7;
+  --driver-37: #d67d5e;
+  --driver-38: #5dad70;
+  --driver-39: #639be1;
+  --driver-40: #c27cbb;
   --driver-none: #e2e6ee;
   --driver-ink: #0a0f1f; /* tekst in een blok */
   --driver-edge: rgba(14, 26, 54, 0.45); /* streepjesrand "nog geen chauffeur" */
@@ -284,6 +301,23 @@
   --driver-22: #5a5038;
   --driver-23: #2c374a;
   --driver-24: #395944;
+  /* Middentonen (F6.7), in het donker net iets lichter dan de 24 hierboven. */
+  --driver-25: #76363d;
+  --driver-26: #743b1f;
+  --driver-27: #694500;
+  --driver-28: #554f00;
+  --driver-29: #375822;
+  --driver-30: #005c41;
+  --driver-31: #005b5c;
+  --driver-32: #005672;
+  --driver-33: #284e7d;
+  --driver-34: #49457c;
+  --driver-35: #5f3d6f;
+  --driver-36: #6f3758;
+  --driver-37: #632914;
+  --driver-38: #0d4a22;
+  --driver-39: #183d6b;
+  --driver-40: #572953;
   --driver-none: #262c38;
   --driver-ink: #f2f6ff;
   --driver-edge: rgba(255, 255, 255, 0.45);

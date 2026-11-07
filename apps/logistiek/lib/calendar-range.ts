@@ -18,15 +18,34 @@ import { startOfWeek, todayDateOnly } from './uitleen';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export const CALENDAR_VIEWS = ['dag', 'week', 'maand'] as const;
+export const CALENDAR_VIEWS = ['dag', 'week', 'dagen', 'maand'] as const;
 
 export type CalendarView = (typeof CALENDAR_VIEWS)[number];
 
 export const CALENDAR_VIEW_LABELS: Record<CalendarView, string> = {
   dag: 'Dag',
   week: 'Week',
+  dagen: 'Komende dagen',
   maand: 'Maand',
 };
+
+/**
+ * "Komende x dagen" (F6.3): de eerste dag is waar je op staat (standaard
+ * vandaag), en daarnaast komen de `x - 1` volgende. Geen weekgrens: het is een
+ * kijkvenster vooruit, en een week die op woensdag begint, is wat je wil als het
+ * woensdag is.
+ */
+export const DEFAULT_DAYS_COUNT = 5;
+export const MIN_DAYS_COUNT = 2;
+/** Meer dan veertien kolommen is een tabel die niemand nog leest. */
+export const MAX_DAYS_COUNT = 14;
+
+/** Het aantal dagen uit de URL, binnen de grenzen; anders de standaard. */
+export function parseDaysCount(value: string | undefined): number {
+  const parsed = Number.parseInt(value ?? '', 10);
+  if (!Number.isFinite(parsed)) return DEFAULT_DAYS_COUNT;
+  return Math.min(MAX_DAYS_COUNT, Math.max(MIN_DAYS_COUNT, parsed));
+}
 
 /** De weergave uit de URL; alles wat geen geldige weergave is, wordt week. */
 export function parseCalendarView(value: string | undefined): CalendarView {
@@ -62,9 +81,21 @@ function startOfNextMonth(day: Date): Date {
  * rij geven waarin de ritten van die maandag onzichtbaar zijn, terwijl het team
  * juist rond de maandgrens plant. Vijf of zes rijen, naargelang de maand.
  */
-export function calendarRange(view: CalendarView, anchor: Date): CalendarRange {
+export function calendarRange(
+  view: CalendarView,
+  anchor: Date,
+  count: number = DEFAULT_DAYS_COUNT
+): CalendarRange {
   if (view === 'dag') {
     return { days: [anchor], from: anchor, to: addDays(anchor, 1) };
+  }
+  if (view === 'dagen') {
+    const length = Math.min(MAX_DAYS_COUNT, Math.max(MIN_DAYS_COUNT, Math.trunc(count)));
+    return {
+      days: Array.from({ length }, (_, index) => addDays(anchor, index)),
+      from: anchor,
+      to: addDays(anchor, length),
+    };
   }
   if (view === 'week') {
     const monday = startOfWeek(anchor);
@@ -92,8 +123,16 @@ export function calendarRange(view: CalendarView, anchor: Date): CalendarRange {
  * kalendermaand en niet per vier weken; anders zou je na twaalf keer klikken in
  * een andere maand zitten dan je verwacht.
  */
-export function shiftAnchor(view: CalendarView, anchor: Date, direction: -1 | 1): Date {
+export function shiftAnchor(
+  view: CalendarView,
+  anchor: Date,
+  direction: -1 | 1,
+  count: number = DEFAULT_DAYS_COUNT
+): Date {
   if (view === 'dag') return addDays(anchor, direction);
+  // Een hele reeks tegelijk: zo sluit het volgende venster aan op dit en blader je
+  // niet over dagen die je net zag.
+  if (view === 'dagen') return addDays(anchor, direction * count);
   if (view === 'week') return addDays(startOfWeek(anchor), direction * 7);
   const first = startOfMonth(anchor);
   return new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + direction, 1));
@@ -105,7 +144,8 @@ export function shiftAnchor(view: CalendarView, anchor: Date, direction: -1 | 1)
  */
 export function isCurrentPeriod(view: CalendarView, anchor: Date, now: Date = new Date()): boolean {
   const today = todayDateOnly(now);
-  if (view === 'dag') return anchor.getTime() === today.getTime();
+  // Bij "komende dagen" staat vandaag links, dus pas dan is dit "nu".
+  if (view === 'dag' || view === 'dagen') return anchor.getTime() === today.getTime();
   if (view === 'week') return startOfWeek(anchor).getTime() === startOfWeek(today).getTime();
   return (
     anchor.getUTCFullYear() === today.getUTCFullYear() &&

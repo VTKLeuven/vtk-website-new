@@ -427,7 +427,9 @@ export function TransportPlanner({
             ? 'Geen ritten op deze dag'
             : view === 'maand'
               ? 'Geen ritten deze maand'
-              : 'Geen ritten deze week') +
+              : view === 'dagen'
+                ? 'Geen ritten in deze dagen'
+                : 'Geen ritten deze week') +
           (hiddenNote.length > 0 ? ` met deze filters (${hiddenNote.join('; ')}).` : '.')
         }
         toolbarExtra={

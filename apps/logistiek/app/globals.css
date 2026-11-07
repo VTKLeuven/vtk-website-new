@@ -728,8 +728,11 @@ body {
   border-top-color: var(--driver-requested);
 }
 
-/* Een rit van je eigen post of werkgroep (F4.15): een gele rail langs de
-   linkerrand, dezelfde taal als een uitgelichte kaart op vtk.be.
+/* Een rit van je eigen post of werkgroep (F4.15, F6.17): een rail langs de
+   linkerrand in de nadrukkelijke kleur (navy, in het donker licht), niet meer in
+   het geel. Geel viel weg op een pastelkleur die zelf geel is (Boter, Amber) en
+   tussen een volle week; de nadrukkelijke kleur leest op elke vulling in beide
+   modi. Vier pixels in plaats van drie.
 
    Een `border-left` en geen `box-shadow`, om dezelfde reden als hierboven plus
    een eigen: de selectie in de kalender is een Tailwind-`ring`, en dat ís een
@@ -742,9 +745,16 @@ body {
    kring kijkt. Op de planning van het team zou het niets onderscheiden: daar is
    alles van jou. */
 .trip-mine {
-  border-left-width: 3px;
+  border-left-width: 4px;
   border-left-style: solid;
-  border-left-color: var(--yellow);
+  border-left-color: var(--emphasis);
+}
+
+/* "Enkel mijn post benadrukken" (F6.17, `mine-focus.tsx`): de ritten die niet van
+   jou zijn, gaan lichter. Een attribuut op `body` en een regel hier, omdat de
+   blokken in drie weergaven staan en de schakelaar in de legende. */
+body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
+  opacity: 0.4;
 }
 
 /* De rit die je aan het aanmaken bent, terwijl het formulier openstaat. Dezelfde

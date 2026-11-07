@@ -42,18 +42,26 @@ export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElem
         <path d="M6.5 18.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM17.5 18.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" />
       </>
     ),
+    // Een auto in zijaanzicht (F6.8): dak, ruiten, haakse wielkasten. De vorige
+    // was een bak met twee wielen en las niet als auto. Nagekeken op 12px, de
+    // grootte in een ritblok.
     car: (
       <>
-        <path d="M4.5 16.5v-3l1.9-4.2A2 2 0 0 1 8.2 8h7.6a2 2 0 0 1 1.8 1.3l1.9 4.2v3" />
-        <path d="M4.5 13.5h15" />
-        <path d="M8.5 18a1.6 1.6 0 1 0 0-3.2 1.6 1.6 0 0 0 0 3.2ZM15.5 18a1.6 1.6 0 1 0 0-3.2 1.6 1.6 0 0 0 0 3.2Z" />
+        <path d="M5 17H3.5a.5.5 0 0 1-.5-.5V13a1 1 0 0 1 .7-1l2.2-.7L8 8.5A1.5 1.5 0 0 1 9.1 8h5.3a1.5 1.5 0 0 1 1.1.5l2.4 2.9 1.9.5a1 1 0 0 1 .7 1v3.1a.5.5 0 0 1-.5.5H19" />
+        <path d="M9 17h6" />
+        <circle cx="7" cy="17" r="2" />
+        <circle cx="17" cy="17" r="2" />
+        <path d="M12 8.2v3.2M5.9 11.4h11.2" />
       </>
     ),
+    // Een bakfiets (F6.8): de bak vooraan op een klein wiel, een frame naar een
+    // groot achterwiel, zadel en stuur. De vorige was een fiets zonder bak.
     cargobike: (
       <>
-        <path d="M5.5 19a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM18.5 19a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
-        <path d="M3 15.5V11a1 1 0 0 1 1-1h5.5v5" />
-        <path d="m9.5 10.5 6 6M13.5 9h3" />
+        <rect x="2" y="9" width="8.5" height="5" rx="1.2" />
+        <circle cx="5" cy="18" r="2.2" />
+        <circle cx="19" cy="16.5" r="3" />
+        <path d="M5 15.8V14M10.5 12.5h3.5l5 4M14 12.5l1.4-4.6h2.4M10.5 10.5l1-4.2h2.2" />
       </>
     ),
     reservation: (

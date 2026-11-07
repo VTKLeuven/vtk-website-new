@@ -1,4 +1,5 @@
 import { vehiclePatternClass } from '@/lib/driver-colors';
+import { MineFocus } from './mine-focus';
 import type { LogistiekLocale } from '@/lib/i18n-shared';
 
 /**
@@ -54,7 +55,8 @@ const WORDS = {
     requested: 'nog te beslissen, dit moment kan vrijkomen',
     noDriver: 'nog geen chauffeur',
     mine: 'van jouw post of werkgroep',
-    conflict: 'hetzelfde voertuig staat dubbel geboekt',
+    focusMine: 'Enkel mijn post benadrukken',
+    conflict: 'hetzelfde voertuig staat dubbel geboekt, arcering blijft het voertuig',
     done: 'afgerond',
   },
   en: {
@@ -63,7 +65,8 @@ const WORDS = {
     requested: 'not decided yet, this slot may free up',
     noDriver: 'no driver yet',
     mine: 'of your post or working group',
-    conflict: 'this vehicle is double-booked',
+    focusMine: 'Highlight only my post',
+    conflict: 'this vehicle is double-booked, the hatching still shows which',
     done: 'completed',
   },
 } as const;
@@ -124,13 +127,18 @@ export function TransportLegend({
       ) : null}
 
       {showMine ? (
-        <Sample className="trip-mine" style={{ backgroundColor: 'var(--driver-none)' }}>
-          {words.mine}
-        </Sample>
+        <>
+          <Sample className="trip-mine" style={{ backgroundColor: 'var(--driver-none)' }}>
+            {words.mine}
+          </Sample>
+          <MineFocus label={words.focusMine} />
+        </>
       ) : null}
 
       {showConflict ? (
-        <Sample className="border-2 border-vtk-danger bg-vtk-danger-soft">
+        <Sample
+          className={`border-2 border-vtk-danger bg-vtk-danger-soft ${vehiclePatternClass(hatched[0]?.pattern)}`}
+        >
           {words.conflict}
         </Sample>
       ) : null}

@@ -23,7 +23,26 @@
  * De kleuren zelf staan als tokens in `app/globals.css` (`--driver-1` tot
  * `--driver-24`), zodat ze op één plek bijgesteld kunnen worden.
  */
-export const DRIVER_COLOR_COUNT = 24;
+export const AUTO_COLOR_COUNT = 24;
+
+/**
+ * Het aantal kleuren dat het team kan kiezen (F6.7): de vierentwintig van de hash
+ * en daarbovenop zestien middentonen die enkel met de hand gekozen worden.
+ *
+ * **De hash rekent met {@link AUTO_COLOR_COUNT} en nooit met dit getal.** Wie de
+ * modulus verhoogt, geeft elke chauffeur zonder gekozen kleur een andere, en
+ * "laat ieder zijn huidige kleur behouden" was precies de eis. De nieuwe kleuren
+ * zijn dus nooit een uitkomst van de hash, enkel een keuze.
+ */
+export const DRIVER_COLOR_COUNT = 40;
+
+/**
+ * De kleur die een toegevoegde chauffeur krijgt (Salie). Een vaste kleur in
+ * plaats van de hash: zo valt een nieuwe chauffeur niet toevallig samen met
+ * iemand die al een kleur heeft gekozen, en weet het team dat "Salie" nog niet
+ * bewust gekozen is.
+ */
+export const NEW_DRIVER_COLOR_INDEX = 24;
 
 /**
  * De namen van het palet, in dezelfde volgorde als de tokens.
@@ -57,6 +76,24 @@ export const DRIVER_COLOR_NAMES: readonly string[] = [
   'Klei',
   'Leisteen',
   'Salie',
+  // Middentonen (F6.7), enkel te kiezen: ze liggen een stuk donkerder dan de
+  // pastels hierboven, zodat ze er niet bijna mee samenvallen.
+  'Watermeloen',
+  'Mandarijn',
+  'Honing',
+  'Mosterd',
+  'Appel',
+  'Jade',
+  'Lagune',
+  'Oceaan',
+  'Kobalt',
+  'Viooltje',
+  'Pruim',
+  'Kers',
+  'Terracotta',
+  'Dennengroen',
+  'Inkt',
+  'Aubergine',
 ];
 
 /** De naam van kleur `index` (1-gebaseerd), of een nummer als terugval. */
@@ -82,7 +119,7 @@ function hash(value: string): number {
  */
 export type DriverColorOverrides = Readonly<Record<string, number>>;
 
-/** Ligt deze keuze binnen de tokens die `app/globals.css` kent? */
+/** Ligt deze keuze binnen de tokens die `app/design/theme.css` kent? */
 export function isDriverColorIndex(value: number | null | undefined): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= DRIVER_COLOR_COUNT;
 }
@@ -101,7 +138,7 @@ export function driverColorIndex(
   if (!driverId) return 0;
   const chosen = overrides?.[driverId];
   if (isDriverColorIndex(chosen)) return chosen;
-  return (hash(driverId) % DRIVER_COLOR_COUNT) + 1;
+  return (hash(driverId) % AUTO_COLOR_COUNT) + 1;
 }
 
 /**

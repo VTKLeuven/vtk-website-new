@@ -156,12 +156,12 @@ function DriverColorPicker({ entry }: { entry: DriverPoolEntry }) {
           role="group"
           aria-label={`Kleur voor ${entry.name}`}
         >
-          {/* Zes op een rij: dan valt het palet in vier rijen uiteen die elk bij
-              een stuk van het spectrum horen, en herken je "ergens in het groen"
-              zonder de namen te lezen. */}
+          {/* Acht op een rij: de eerste drie rijen zijn de pastels van het begin
+              (24, elk bij een stuk van het spectrum), de laatste twee de
+              middentonen die erbij kwamen (F6.7). */}
           <div
             className="grid gap-1.5"
-            style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))' }}
+            style={{ gridTemplateColumns: 'repeat(8, minmax(0, 1fr))' }}
           >
             {Array.from({ length: DRIVER_COLOR_COUNT }, (_, index) => index + 1).map((index) => (
               <button

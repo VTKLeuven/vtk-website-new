@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AUTO_COLOR_COUNT,
   DRIVER_COLOR_COUNT,
+  DRIVER_COLOR_NAMES,
+  NEW_DRIVER_COLOR_INDEX,
   driverColorIndex,
   driverColorVar,
   isDriverColorIndex,
@@ -84,5 +87,45 @@ describe('isVehiclePattern', () => {
     expect(isVehiclePattern('none')).toBe(true);
     expect(isVehiclePattern('stippen')).toBe(false);
     expect(isVehiclePattern(3)).toBe(false);
+  });
+});
+
+describe('het palet van veertig (F6.7)', () => {
+  it('houdt de automatische kleur van iedereen gelijk aan die van voor de uitbreiding', () => {
+    // Het doel was "laat ieder zijn huidige kleur behouden". Deze waarden zijn de
+    // uitkomst van de hash toen het palet 24 groot was. Verhoog je de modulus,
+    // dan faalt dit, en dan krijgt elke chauffeur zonder gekozen kleur er een
+    // andere.
+    const verwacht: Record<string, number> = {
+      user_arthur: 18,
+      user_lotte: 12,
+      ckz9x0000abcd: 1,
+      a: 23,
+      user_1: 21,
+      cm4f2k0001xyz: 1,
+      'driver-42': 5,
+    };
+    for (const [id, index] of Object.entries(verwacht)) {
+      expect(driverColorIndex(id)).toBe(index);
+    }
+    expect(AUTO_COLOR_COUNT).toBe(24);
+  });
+
+  it('geeft de hash nooit een van de nieuwe kleuren', () => {
+    for (let n = 0; n < 500; n += 1) {
+      expect(driverColorIndex(`chauffeur-${n}`)).toBeLessThanOrEqual(AUTO_COLOR_COUNT);
+    }
+  });
+
+  it('laat het team wel een van de nieuwe kleuren kiezen', () => {
+    expect(isDriverColorIndex(AUTO_COLOR_COUNT + 1)).toBe(true);
+    expect(isDriverColorIndex(DRIVER_COLOR_COUNT)).toBe(true);
+    expect(driverColorIndex('user_arthur', { user_arthur: DRIVER_COLOR_COUNT })).toBe(DRIVER_COLOR_COUNT);
+  });
+
+  it('heeft een naam voor elke kleur en een nieuwe chauffeur start op Salie', () => {
+    expect(DRIVER_COLOR_NAMES).toHaveLength(DRIVER_COLOR_COUNT);
+    expect(new Set(DRIVER_COLOR_NAMES).size).toBe(DRIVER_COLOR_COUNT);
+    expect(DRIVER_COLOR_NAMES[NEW_DRIVER_COLOR_INDEX - 1]).toBe('Salie');
   });
 });

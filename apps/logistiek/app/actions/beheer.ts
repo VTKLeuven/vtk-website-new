@@ -12,7 +12,7 @@ import {
 } from '@/lib/calendar/feed-token';
 import { logistiekBaseUrl } from '@/lib/payments';
 import { writeAudit } from '@/lib/audit';
-import { isDriverColorIndex, isVehiclePattern } from '@/lib/driver-colors';
+import { isDriverColorIndex, isVehiclePattern, NEW_DRIVER_COLOR_INDEX } from '@/lib/driver-colors';
 import { isVehicleIcon } from '@/lib/vehicle-icon';
 import { normaliseBelgianPhone } from '@/lib/vcard';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
@@ -3182,7 +3182,13 @@ async function createDriverRow(
   const existing = await prisma.uitleenDriver.count({ where: { userId } });
   if (existing > 0) return 'ALREADY_DRIVER';
 
-  await prisma.uitleenDriver.create({ data: { userId, note, addedById } });
+  // Een toegevoegde chauffeur start op Salie (F6.7) en niet op de hash: zo valt hij
+  // niet toevallig samen met iemand die zijn kleur al koos, en zie je aan Salie dat
+  // niemand er nog een koos. Wie via de post chauffeur is, heeft geen rij en houdt
+  // zijn hashkleur.
+  await prisma.uitleenDriver.create({
+    data: { userId, note, addedById, colorIndex: NEW_DRIVER_COLOR_INDEX },
+  });
   revalidateBeheer();
   return null;
 }

@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { placeForWeekRow, weekRows } from '../lib/month-lanes';
-import { calendarRange, isInMonth, parseCalendarView, shiftAnchor } from '../lib/calendar-range';
+import {
+  calendarRange,
+  DEFAULT_DAYS_COUNT,
+  isCurrentPeriod,
+  isInMonth,
+  MAX_DAYS_COUNT,
+  MIN_DAYS_COUNT,
+  parseCalendarView,
+  parseDaysCount,
+  shiftAnchor,
+} from '../lib/calendar-range';
 
 /** Date-only, zoals `todayDateOnly` ze maakt: UTC-middernacht van een Belgische dag. */
 const day = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
@@ -153,5 +163,46 @@ describe('parseCalendarView', () => {
     expect(parseCalendarView(undefined)).toBe('week');
     expect(parseCalendarView('jaar')).toBe('week');
     expect(parseCalendarView('maand')).toBe('maand');
+  });
+});
+
+describe('komende x dagen (F6.3)', () => {
+  it('begint bij het anker zelf en niet bij de maandag', () => {
+    // Een week die op woensdag begint, is wat je wil als het woensdag is: de
+    // meest linkse dag is vandaag en daarnaast komen de volgende.
+    const range = calendarRange('dagen', day('2026-11-04'), 4);
+    expect(range.days.map((d) => d.toISOString().slice(0, 10))).toEqual([
+      '2026-11-04',
+      '2026-11-05',
+      '2026-11-06',
+      '2026-11-07',
+    ]);
+    expect(range.from.toISOString()).toBe(day('2026-11-04').toISOString());
+    expect(range.to.toISOString()).toBe(day('2026-11-08').toISOString());
+  });
+
+  it('klemt het aantal tussen de grenzen', () => {
+    expect(calendarRange('dagen', day('2026-11-04'), 1).days).toHaveLength(MIN_DAYS_COUNT);
+    expect(calendarRange('dagen', day('2026-11-04'), 99).days).toHaveLength(MAX_DAYS_COUNT);
+  });
+
+  it('bladert met het aantal dagen, zodat het volgende venster aansluit', () => {
+    expect(shiftAnchor('dagen', day('2026-11-04'), 1, 5).toISOString()).toBe(day('2026-11-09').toISOString());
+    expect(shiftAnchor('dagen', day('2026-11-04'), -1, 5).toISOString()).toBe(day('2026-10-30').toISOString());
+  });
+
+  it('is "nu" zodra vandaag links staat', () => {
+    const now = new Date('2026-11-04T12:00:00.000Z');
+    expect(isCurrentPeriod('dagen', day('2026-11-04'), now)).toBe(true);
+    expect(isCurrentPeriod('dagen', day('2026-11-05'), now)).toBe(false);
+  });
+
+  it('leest het aantal uit de URL met een standaard', () => {
+    expect(parseDaysCount(undefined)).toBe(DEFAULT_DAYS_COUNT);
+    expect(parseDaysCount('abc')).toBe(DEFAULT_DAYS_COUNT);
+    expect(parseDaysCount('7')).toBe(7);
+    expect(parseDaysCount('100')).toBe(MAX_DAYS_COUNT);
+    expect(parseDaysCount('0')).toBe(MIN_DAYS_COUNT);
+    expect(parseCalendarView('dagen')).toBe('dagen');
   });
 });

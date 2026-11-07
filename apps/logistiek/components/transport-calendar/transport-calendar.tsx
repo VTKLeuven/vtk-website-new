@@ -8,6 +8,8 @@ import { vehiclePatternClass } from '@/lib/driver-colors';
 import {
   CALENDAR_VIEWS,
   CALENDAR_VIEW_LABELS,
+  MAX_DAYS_COUNT,
+  MIN_DAYS_COUNT,
   type CalendarView,
 } from '@/lib/calendar-range';
 import { LogisticsIcon } from '@/components/logistics-icon';
@@ -133,9 +135,10 @@ export function TransportCalendar({
 
   /** Dezelfde URL met een andere weergave of datum; de rest van de query blijft. */
   const hrefFor = useCallback(
-    (next: { weergave?: CalendarView; datum?: string | null }) => {
+    (next: { weergave?: CalendarView; datum?: string | null; aantal?: number }) => {
       const query = new URLSearchParams(params.toString());
       if (next.weergave) query.set('weergave', next.weergave);
+      if (next.aantal) query.set('aantal', String(next.aantal));
       if (next.datum === null) query.delete('datum');
       else if (next.datum) query.set('datum', next.datum);
       const search = query.toString();
@@ -498,7 +501,10 @@ export function TransportCalendar({
             {CALENDAR_VIEWS.map((option) => (
               <Link
                 key={option}
-                href={hrefFor({ weergave: option })}
+                // "Komende dagen" begint bij vandaag, niet bij de dag waar je net
+                // op stond: anders zie je na het wisselen een venster dat mogelijk
+                // helemaal in het verleden ligt.
+                href={hrefFor({ weergave: option, ...(option === 'dagen' ? { datum: null } : {}) })}
                 aria-current={option === view ? 'true' : undefined}
                 className={`px-3.5 py-1.5 text-sm font-medium transition ${
                   option === view
@@ -510,6 +516,29 @@ export function TransportCalendar({
               </Link>
             ))}
           </div>
+        ) : null}
+
+        {/* Hoeveel dagen "komende dagen" toont (F6.3). Een keuzelijst en geen
+            segmenten: er zijn er dertien, en je zet ze zelden om. */}
+        {views && view === 'dagen' ? (
+          <label className="flex items-center gap-1.5 text-sm text-vtk-muted">
+            <span>Dagen</span>
+            <select
+              value={days.length}
+              onChange={(event) => router.push(hrefFor({ aantal: Number(event.target.value) }))}
+              aria-label="Aantal dagen"
+              className="h-9 rounded-full border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
+            >
+              {Array.from(
+                { length: MAX_DAYS_COUNT - MIN_DAYS_COUNT + 1 },
+                (_, index) => MIN_DAYS_COUNT + index
+              ).map((count) => (
+                <option key={count} value={count}>
+                  {count}
+                </option>
+              ))}
+            </select>
+          </label>
         ) : null}
 
         {toolbarExtra}

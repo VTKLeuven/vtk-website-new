@@ -15,7 +15,8 @@ import { DEFAULT_TRIP_FIELDS, type CalendarVehicle, type TripBlock, type TripFie
  * - **De arcering is het voertuig.** Waarmee, lees je aan het patroon.
  * - **De rand en de streep zijn de staat.** Nog geen chauffeur: een grijze
  *   streepjesrand. Nog te beslissen: een streep langs de bovenrand. Conflict:
- *   een volle rode rand. Van je eigen post: een gele rail links.
+ *   een volle rode rand, mét de arcering van het voertuig erin. Van je eigen
+ *   post: een rail links.
  *
  * Een status mag dus **nooit** een tweede arcering zijn. Ze was dat wel ("nog te
  * beslissen" was een schuin streeppatroon), en naast een gearceerd voertuig was
@@ -66,7 +67,8 @@ export function blockLook({
   const awaitsDriver = showDriver && !block.driver && (vehicle?.needsDriver ?? true);
 
   const className = [
-    'overflow-hidden rounded-[8px] px-1.5 py-1 text-left text-[11px] leading-tight text-vtk-ink',
+    // `trip-block`: het haakje voor "Enkel mijn post benadrukken" (F6.17).
+    'trip-block overflow-hidden rounded-[8px] px-1.5 py-1 text-left text-[11px] leading-tight text-vtk-ink',
     // Rood en niet subtiel: een botsing mag bestaan (het team plant eerst in en
     // schuift daarna), maar enkel zolang ze niet te missen valt.
     block.conflict
@@ -76,9 +78,11 @@ export function blockLook({
           // rand betekent al iets anders: een conflict.
           'border-2 trip-no-driver'
         : 'border border-vtk-navy/15',
-    // De arcering van het voertuig (K1); bij een conflict niet, want dan is de
-    // rode vulling het enige wat je moet zien.
-    block.conflict ? '' : vehiclePatternClass(vehicle?.pattern),
+    // De arcering van het voertuig (K1), ook bij een conflict (F6.1): een botsing
+    // gaat over een voertuig, en de rode vulling zegt dát er iets mis is maar
+    // niet welk voertuig dubbel staat. De arcering is een alfa op de vulling, dus
+    // ze komt ook op de rode laag.
+    vehiclePatternClass(vehicle?.pattern),
     // Nog te beslissen: een streep langs de bovenrand, zodat je ziet dat dit
     // moment nog kan vrijkomen (T8). Afgerond: lichter, want het is geschiedenis.
     requested ? 'trip-requested' : '',
@@ -160,7 +164,9 @@ export function BlockContent({
       {fields.requester && block.subtitle ? (
         <span className="block truncate text-vtk-muted">{block.subtitle}</span>
       ) : null}
-      {fields.vehicle && vehicle ? (
+      {/* Bij een conflict altijd, ook als "Weergave" het voertuig uit heeft staan
+          (F6.1): het voertuig is de reden van de botsing. */}
+      {(fields.vehicle || block.conflict) && vehicle ? (
         <span className="flex items-center gap-1">
           <LogisticsIcon name={vehicleIconName(vehicle)} className="h-3 w-3 shrink-0" />
           <span className="truncate">{vehicle.name}</span>
