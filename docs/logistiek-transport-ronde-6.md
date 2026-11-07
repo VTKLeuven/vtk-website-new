@@ -63,19 +63,59 @@ Alles wordt op **390px breed** nagekeken, in licht én donker.
 
 | Fase | Inhoud | Taken | Status |
 | --- | --- | --- | --- |
-| 1 | Bugs en stille mislukkingen | F6.26, F6.14, F6.9, F6.10, F6.20, F6.19, F6.2 | open |
-| 2 | Wie mag wat aanvragen en doen | F6.27, F6.23, F6.24, F6.21 | open |
-| 3 | Leesbaarheid van de planning | F6.1, F6.17, F6.8, F6.7, F6.3 | open |
-| 4 | Nota's en wijzigingen | F6.15, F6.16, F6.11, F6.12, F6.13 | open |
-| 5 | Statistiek | F6.4, F6.5, F6.6, F6.25 | open (F6.25 wacht op een screenshot) |
-| 6 | Herhaalde ritten | F6.22 | open |
+| 1 | Bugs en stille mislukkingen | F6.26, F6.14, F6.9, F6.10, F6.20, F6.19, F6.2 | ✅ af (`61990534`) |
+| 2 | Wie mag wat aanvragen en doen | F6.23, F6.24, F6.21 | ✅ af (`d8ea0fef`); F6.27 is een handeling in productie |
+| 3 | Leesbaarheid van de planning | F6.1, F6.17, F6.8, F6.7, F6.3 | ✅ af (`56fa818d`) |
+| 4 | Nota's en wijzigingen | F6.15, F6.16, F6.11, F6.12, F6.13 | ✅ af (`3e01fd7b`) |
+| 5 | Statistiek | F6.4, F6.5, F6.6 | ✅ af (`6c1d2f70`); F6.25 wacht op een screenshot |
+| 6 | Herhaalde ritten | F6.22 | ✅ af (`9f4f981a`) |
 | - | Geen code, een gesprek | F6.18 | open |
 
-**Volgorde.** Fase 1 eerst: F6.26 en F6.14 zijn echte defecten, en F6.26 is precies
-wat Logistiek tegenkomt bij het dubbel inplannen. **F6.27 en F6.23 gaan samen
-live**, in die volgorde van maken: verbergen we het materiaal voor externen
-terwijl een jaarwerkinglid nog geen groep heeft, dan sluiten we het vijf
-jaarwerkingen buiten.
+**Wat nog openstaat, en niet aan de code ligt:**
+
+- **F6.27**: de vijf jaarwerkingen als werkgroep aanmaken in `/admin/werkgroepen` op
+  productie, met hun leden van dit werkingsjaar. Dat is data en geen release, en
+  het hoort **voor** F6.23 live te gaan: anders telt een jaarwerkinglid als externe
+  en ziet hij het materiaal niet meer.
+- **F6.25**: de screenshot ontbreekt.
+- **F6.18**: de agenda voor een meet staat onderaan.
+
+## Wat er gebouwd is, en waar het afweek van het plan
+
+- **F6.20** past het label aan voor elke `INTERN`-rit zonder groep en niet enkel voor
+  `plannedByTeam`: een groep wordt gedeactiveerd en niet verwijderd, dus "geen groep"
+  betekent hier Logistiek. Het geldt ook voor materiaalaanvragen in de kalender.
+- **F6.2** bleek wel degelijk de ondergrens plus de evenementenstrook, en bovendien
+  een pane die op een laptop van 720px te laag was. Gemeten: op 1280x720 scrolde
+  "hele dag" nog 9px. Nu: ondergrens 18px per uur, hoogstens twee rijen
+  evenementen (de rest achter "+N meer"), een minimumhoogte van 36rem vanaf 860px
+  breed, en een meting in layout-pixels. Nagekeken op 1440x900 en 1280x720.
+- **F6.14** was inderdaad een stille mislukking, enkel op het vervoerformulier: het
+  materiaal- en het flesserkeformulier eisten de naam al. Nu een fout op het veld,
+  een fout van de server in plaats van `null`, een tekst die zegt waar het veld
+  staat, en een zin op Mijn reservaties dat het evenement er is.
+- **F6.15** zet de nota's niet naast de extra info maar er direct onder, binnen
+  hetzelfde blok in het paneel (`notesSlot` van `TripEditForm`). Ze blijven twee
+  dingen.
+- **F6.16**: de "Extra info van Logistiek" van een rit van je post komt uit een eigen
+  query (`adminNotesForTrips`) en niet uit `transportWeekForPraesidium`, die haar
+  bewust niet ophaalt.
+- **F6.17**: de rail is nu de nadrukkelijke kleur (navy, in het donker licht), plus
+  de schakelaar "Enkel mijn post benadrukken".
+- **F6.7**: veertig kleuren, de hash blijft op vierentwintig, en de uitkomsten van
+  voor de uitbreiding staan in een test.
+- **F6.5**: "Per chauffeur" (een kleine grafiek per chauffeur op dezelfde schaal) naast
+  "Gestapeld". De heatmap chauffeur x uur is niet gebouwd.
+- **F6.6 vond een bestaande fout**: de drukteweergave tekende enkel elke derde kolom
+  (zonder `table-fixed` kregen enkel de kolommen met een uurlabel breedte), dus twee
+  van de drie uren stonden er niet. Opgelost met `table-fixed`.
+- **F6.3** staat enkel op de teamplanning; het publieke overzicht kent enkel weken.
+- **F6.22**: zie `docs/uitleendienst.md`, "Herhaalde ritten". Wijzigen blijft per
+  rit; "deze en de volgende verwijderen" bestaat.
+- **Migraties**: `20261106100000_uitleen_vehicle_requestable` (default `true`, raakt
+  geen rit) en `20261106110000_uitleen_transport_series` (nullable, bestaande ritten
+  `NULL`). `rit-kolommen.test.ts` kent `seriesId`; `oude-rit.integration.ts` haalt een
+  rit zonder reeks door `seriesPositions`.
 
 ## Kritisch nagekeken
 
