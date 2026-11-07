@@ -67,7 +67,8 @@ Alles wordt op **390px breed** nagekeken, in licht én donker.
 | 2 | Wie mag wat aanvragen en doen | F6.23, F6.24, F6.21 | ✅ af (`d8ea0fef`); F6.27 is een handeling in productie |
 | 3 | Leesbaarheid van de planning | F6.1, F6.17, F6.8, F6.7, F6.3 | ✅ af (`56fa818d`) |
 | 4 | Nota's en wijzigingen | F6.15, F6.16, F6.11, F6.12, F6.13 | ✅ af (`3e01fd7b`) |
-| 5 | Statistiek | F6.4, F6.5, F6.6 | ✅ af (`6c1d2f70`); F6.25 wacht op een screenshot |
+| 5 | Statistiek | F6.4, F6.5, F6.6 | ✅ af (`6c1d2f70`) |
+| 7 | Een klok na middernacht | F6.25 | ✅ af |
 | 6 | Herhaalde ritten | F6.22 | ✅ af (`9f4f981a`) |
 | - | Geen code, een gesprek | F6.18 | open |
 
@@ -77,7 +78,6 @@ Alles wordt op **390px breed** nagekeken, in licht én donker.
   productie, met hun leden van dit werkingsjaar. Dat is data en geen release, en
   het hoort **voor** F6.23 live te gaan: anders telt een jaarwerkinglid als externe
   en ziet hij het materiaal niet meer.
-- **F6.25**: de screenshot ontbreekt.
 - **F6.18**: de agenda voor een meet staat onderaan.
 
 ## Wat er gebouwd is, en waar het afweek van het plan
@@ -145,7 +145,7 @@ Alles wordt op **390px breed** nagekeken, in licht én donker.
 | F6.22 herhaalde rit | Ja, klein beginnen | Aanmaken en verwijderen van een reeks. |
 | F6.23 externen en materiaal | Ja (D1) | Hangt samen met F6.27. |
 | F6.24 bijrijder voor elk praesidiumlid | Ja | Uitbreiding van een bestaand recht. |
-| F6.25 meer dan 24u in een dag | **Niet te beoordelen** | De screenshot ontbreekt in het document. |
+| F6.25 meer dan 24u in een dag | Ja | Een klok die "24:35" toont; zie de taak. |
 | F6.26 knoppen bij dubbel inplannen | Ja, bevestigd bug | Zie de taak. |
 | F6.27 jaarwerkingen ontbreken | Ja | Ze bestaan niet als groep. |
 
@@ -564,16 +564,26 @@ toont ook de heatmap enkel zijn weekdag-en-uur. Samen met F6.4 geeft dat precies
 "Op welk uur, maar dan ook met weekdag erbij". Het paneel zegt "bezette uren": zonder
 chauffeur is het de som over alle voertuigen.
 
-### F6.25. "Er zit blijkbaar meer dan 24u in een dag"
-**P2 · wacht op een screenshot**
+### ✅ F6.25. "Er zit blijkbaar meer dan 24u in een dag"
+**P2 · code**
 
-Het document noemt een screenshot die in de tekst niet staat. Zonder kan ik niet
-zeggen welk scherm dit is. Een sterke verdachte: het dubbel inplannen van F6.26.
-`transportStats` telt elke goedgekeurde of afgeronde rit, dus twee ritten van
-dezelfde chauffeur over elkaar tellen allebei. Een chauffeur kan zo 30 uur op één
-dag "rijden", en dat is precies wat gebeurt wanneer het team eerst dubbel inplant
-en daarna schuift. Als het dit is, tellen de uren per chauffeur bij overlap één keer
-(de unie van de vensters), en de overlap staat apart vermeld.
+Bedoeld werd: de klok toont een uur voorbij 24:00, bijvoorbeeld "24:35".
+
+**Mijn eerste vermoeden klopte niet.** Zonder screenshot dacht ik aan dubbel
+ingeplande ritten die in de statistieken dubbel tellen. Dat is een ander punt en
+geen verklaring voor een klok die "24:35" zegt.
+
+**De oorzaak** zat in `minutesLabel` (`time-grid.tsx`), het opschrift van een
+beschikbaarheidsband: ze zette de klok pas om wanneer `hours > 24`. Dat vergelijkt
+uren in plaats van minuten, dus 24:35 is nog "24 uur" en bleef staan. Een band tot
+00:35 stond zo als "24:35" op het scherm, op het intekenscherm waar de dag van
+05:00 tot 05:00 loopt zelfs vaak.
+
+**Gedaan.** `clockLabel` in `lib/quarter-time.ts`: enkel exact 24:00 blijft staan
+(het einde van de dag), alles erna loopt weer vanaf 00:00. Getest op 24:00,
+24:01, 24:35, 24:59, 25:00 en 29:00. Alle andere plekken met een uur of een
+omzetting naar een klok zijn nagekeken (`hour % 24`, de "24"-bewaking bij
+`formatToParts`, de uurlabels van dag-, week- en telefoonweergave): die klopten al.
 
 ---
 
@@ -648,11 +658,10 @@ knop om er zelf een te maken werkt in de praktijk niet (F6.14).
 
 ## Open punten voor Maxime
 
-1. **Screenshot voor F6.25.** Het document noemt er een, de tekst niet.
-2. **"Logistiek als bijrijder" (F6.21)**: wat is dat precies? Een bijrijder op een
+1. **"Logistiek als bijrijder" (F6.21)**: wat is dat precies? Een bijrijder op een
    rit lijkt me een bijrijder en geen voertuig.
-3. **Jaarwerkingen (F6.27):** alleen de vijf uit het document, of ook Kanweek,
+2. **Jaarwerkingen (F6.27):** alleen de vijf uit het document, of ook Kanweek,
    Overtime, Skireis en Studentenwelkom? En mogen ze op `/werkgroepen` staan?
-4. **F6.10 bij de bakfiets:** de keuzelijst verbergen omdat de aanvrager zelf rijdt?
-5. **F6.19:** akkoord dat een rit in het verleden gewoon goedgekeurd binnenkomt en
+3. **F6.10 bij de bakfiets:** de keuzelijst verbergen omdat de aanvrager zelf rijdt?
+4. **F6.19:** akkoord dat een rit in het verleden gewoon goedgekeurd binnenkomt en
    daarna afgerond wordt?

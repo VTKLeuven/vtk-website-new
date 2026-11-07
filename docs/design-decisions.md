@@ -10654,6 +10654,11 @@ De keuzes die niet uit de code te lezen zijn:
   weekdag en per chauffeur naast elkaar. Een gestapelde balk heeft enkel voor het
   onderste segment een gedeelde basislijn; "Per chauffeur" zet elke chauffeur op
   dezelfde schaal.
+- **Een klok kent geen 24:35.** Een kalenderdag kan voorbij middernacht doortellen
+  (het intekenscherm loopt van 05:00 tot 05:00), maar de klok niet: enkel 24:00
+  zelf blijft staan, als einde van de dag (`clockLabel`). De omzetting
+  vergeleek uren (`> 24`) in plaats van minuten, en een band tot 00:35 stond als
+  "24:35" op het scherm.
 - **"Hele dag" toont de hele dag.** De ondergrens per uur is 18 pixels, de
   evenementenstrook heeft hoogstens twee rijen (de rest achter "+N meer"), en de
   pane heeft op een breed scherm een minimumhoogte van 36rem. De meting gebruikt

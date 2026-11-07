@@ -41,3 +41,23 @@ export function quarterOptions(current: string): readonly string[] {
   if (!current || QUARTERS.includes(current)) return QUARTERS;
   return [...QUARTERS, current].sort();
 }
+
+/**
+ * Minuten sinds het begin van de kalenderdag als klok, "08:30" (F6.25).
+ *
+ * Een kalenderdag kan voorbij middernacht doortellen (het intekenscherm loopt van
+ * 05:00 tot 05:00, zie `dayStartHour`), maar de klok niet. **Enkel 24:00 zelf
+ * blijft staan**: dat is het einde van de dag en niet het begin van de volgende,
+ * en zo leest een band tot middernacht ook. Alles erna is de ochtend erna.
+ *
+ * Dit stond op `hours > 24`, en dat vergelijkt uren in plaats van minuten: 24:35
+ * is nog "24 uur", bleef dus staan, en een band tot 00:35 stond als "24:35" op het
+ * scherm. Logistiek las dat als "er zit blijkbaar meer dan 24u in een dag".
+ */
+export function clockLabel(minutes: number): string {
+  const total = Math.round(minutes);
+  const wrapped = total > 24 * 60 ? total % (24 * 60) : total;
+  const hours = Math.floor(wrapped / 60);
+  const rest = wrapped % 60;
+  return `${String(hours).padStart(2, '0')}:${String(rest).padStart(2, '0')}`;
+}
