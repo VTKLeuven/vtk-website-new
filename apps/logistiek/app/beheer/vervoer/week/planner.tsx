@@ -39,7 +39,11 @@ import {
   type BoardNote,
 } from '@/components/transport-calendar/availability-board';
 import type { CalendarEventBar } from '@/components/transport-calendar/event-bars';
-import { adminEditTransportAction, deleteTransportAction } from '@/app/actions/beheer';
+import {
+  adminEditTransportAction,
+  deleteTransportAction,
+  deleteTripSeriesFromAction,
+} from '@/app/actions/beheer';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { useToast } from '@/components/ui/toast';
@@ -72,6 +76,19 @@ import type {
  * die altijd weigert, leert mensen op knoppen te klikken die niets doen. Zie
  * `canDeleteTransport`, `transportDeleteDescription` en docs/design-decisions.md.
  */
+/**
+ * Wat de bevestiging zegt voor een reeks (F6.22): wat er weggaat, en wat blijft.
+ * Het getal komt uit `seriesPositions`, dus het belooft niet meer dan de actie haalt.
+ */
+function seriesDeleteDescription(series: { index: number; removableFromHere: number }): string {
+  const earlier = series.index - 1;
+  const stays =
+    earlier === 0
+      ? 'Ritten die al gereden zijn of een betaling hebben blijven staan.'
+      : `${earlier === 1 ? 'De eerdere rit blijft' : `De ${earlier} eerdere ritten blijven`} staan, en ritten die al gereden zijn of een betaling hebben ook.`;
+  return `Dit verwijdert deze rit en de volgende van de reeks (samen ${series.removableFromHere}), met hun historiek en bijrijders. ${stays} Er gaat geen bericht naar iemand.`;
+}
+
 export type PlannerTrip = {
   id: string;
   purpose: string;
@@ -138,6 +155,8 @@ export type PlannerTrip = {
   notes: TripNoteView[];
   /** Wat het team aan deze aanvraag veranderde (F6.11); leeg als niets. */
   teamChanges: string[];
+  /** Waar de rit in haar reeks staat (F6.22); `null` voor een losse rit. */
+  series: { index: number; total: number; removableFromHere: number } | null;
 };
 
 export function TransportPlanner({
@@ -726,6 +745,33 @@ export function TransportPlanner({
                   </dd>
                 </div>
               </dl>
+
+              {/* Deel van een reeks (F6.22): waar deze rit staat, en de uitweg voor de
+                  rest. Enkel "vanaf hier": wat eerder reed of al gereden is, blijft. */}
+              {trip.series && trip.series.total > 1 ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-[12px] border border-vtk-navy/10 bg-vtk-paper px-3 py-2 text-sm">
+                  <span className="text-vtk-body">
+                    Deel van een reeks:{' '}
+                    <strong className="font-semibold text-vtk-ink">
+                      rit {trip.series.index} van {trip.series.total}
+                    </strong>
+                  </span>
+                  {trip.series.removableFromHere > 0 ? (
+                    <ConfirmActionButton
+                      label={`Deze en de volgende verwijderen (${trip.series.removableFromHere})`}
+                      srLabel={`Deze rit en de volgende van de reeks verwijderen: ${trip.title}`}
+                      confirmLabel="Verwijderen"
+                      variant="danger"
+                      destructive
+                      icon={<LogisticsIcon name="trash" className="h-4 w-4" />}
+                      dialogTitle="Deze en de volgende ritten verwijderen?"
+                      dialogDescription={seriesDeleteDescription(trip.series)}
+                      successMessage="Reeks verwijderd."
+                      action={() => deleteTripSeriesFromAction(trip.id)}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
 
               {/* V2: wie er meerijdt, met een nummer per persoon. Ook hier te
                   wijzigen: de chauffeur belt het team wanneer er onderweg iets

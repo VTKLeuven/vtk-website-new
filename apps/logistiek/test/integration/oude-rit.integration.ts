@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@vtk/db';
-import { tripsForDriver, tripsForGroups } from '@/lib/uitleen-server';
+import { seriesPositions, tripsForDriver, tripsForGroups } from '@/lib/uitleen-server';
 import { buildTransportFeed } from '@/lib/calendar/transport-feed';
 
 /**
@@ -256,5 +256,21 @@ describe('een rit van voor de nieuwe velden', () => {
     expect(oud.plannedByTeam).toBe(false);
     // Nooit gemeld, want de wachtrij bestond nog niet toen deze rit gemaakt werd.
     expect(oud.teamNotifiedAt).toBeNull();
+  });
+
+  /**
+   * Nullable kolom (F6.22, migratie 20261106110000). Een rit van voor de herhaalde
+   * ritten heeft `seriesId = NULL`, "geen deel van een reeks", en niemand kan
+   * achteraf weten welke oude ritten bij elkaar hoorden. Het scherm toont voor
+   * zo'n rit dus niets extra en "verwijder deze en de volgende" bestaat er niet.
+   */
+  it('hoort bij geen reeks, en krijgt dus geen reeksinfo', async () => {
+    const oud = await prisma.uitleenTransportBooking.findUniqueOrThrow({
+      where: { id: ids.oudeRit },
+      select: { id: true, seriesId: true, startAt: true },
+    });
+    expect(oud.seriesId).toBeNull();
+    const positions = await seriesPositions([oud]);
+    expect(positions.has(oud.id)).toBe(false);
   });
 });

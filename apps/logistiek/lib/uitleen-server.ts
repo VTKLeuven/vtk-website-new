@@ -1023,6 +1023,48 @@ export async function adminReservation(id: string) {
 }
 
 /**
+ * Waar een rit in haar reeks staat (F6.22): rit x van y, en hoeveel er vanaf hier
+ * nog verwijderd kunnen worden.
+ *
+ * Eén query voor alle reeksen op een scherm. `removable` telt wat
+ * `deleteTripSeriesFromAction` effectief weghaalt: niet gereden en zonder
+ * betaling, zodat de bevestiging geen getal belooft dat de actie niet haalt.
+ */
+export type SeriesPosition = { index: number; total: number; removableFromHere: number };
+
+export async function seriesPositions(
+  trips: ReadonlyArray<{ id: string; seriesId: string | null; startAt: Date }>
+): Promise<Map<string, SeriesPosition>> {
+  const result = new Map<string, SeriesPosition>();
+  const seriesIds = [...new Set(trips.map((trip) => trip.seriesId).filter((id): id is string => Boolean(id)))];
+  if (seriesIds.length === 0) return result;
+
+  const rows = await prisma.uitleenTransportBooking.findMany({
+    where: { seriesId: { in: seriesIds } },
+    orderBy: { startAt: 'asc' },
+    select: { id: true, seriesId: true, startAt: true, status: true, _count: { select: { payments: true } } },
+  });
+  const bySeries = new Map<string, typeof rows>();
+  for (const row of rows) {
+    if (!row.seriesId) continue;
+    bySeries.set(row.seriesId, [...(bySeries.get(row.seriesId) ?? []), row]);
+  }
+  for (const trip of trips) {
+    if (!trip.seriesId) continue;
+    const members = bySeries.get(trip.seriesId) ?? [];
+    result.set(trip.id, {
+      index: members.findIndex((member) => member.id === trip.id) + 1,
+      total: members.length,
+      removableFromHere: members.filter(
+        (member) =>
+          member.startAt >= trip.startAt && member.status !== 'COMPLETED' && member._count.payments === 0
+      ).length,
+    });
+  }
+  return result;
+}
+
+/**
  * De "Extra info van Logistiek" van enkel deze ritten (F6.16).
  *
  * Apart van `transportWeekForPraesidium`, dat de nota's bewust niet ophaalt: wie
@@ -1319,6 +1361,8 @@ export async function transportRange(from: Date, to: Date, filters?: TransportFi
       priceCents: true,
       paidOfflineAt: true,
       driverId: true,
+      // De reeks waartoe de rit hoort (F6.22); `null` voor een losse rit.
+      seriesId: true,
       // Twee velden voor de verwijderknop (R1): of er al geld aan hangt (dan
       // mag de rit niet weg), en of het team ze zelf tekende (dan hoeft de
       // bevestiging niet te waarschuwen voor een aanvrager zonder bericht). De

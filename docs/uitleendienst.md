@@ -48,8 +48,9 @@ zelf doet staat in `docs/logistiek-ingebruikname.md`.
 | `UitleenRequestTemplate` / `...Line` | Vaste set materiaal die het aanvraagformulier invult (M17). Beheerd door Logistiek; aanmaken gebeurt vanaf een bestaande aanvraag. |
 | `UitleenItemUnit` | Eén fysiek exemplaar met een eigen staat, optioneel per item. Bestaan er exemplaren, dan is `item.quantity` de telling van de bruikbare (actief en niet KAPOT), bijgehouden door `syncItemQuantityFromUnits`. |
 | `UitleenReservation` + `UitleenReservationLine` | Aanvraag met event-context + `requesterType` (+ `groupId`/`requesterName`), dagbereik, snapshots. Statusmachine `REQUESTED -> APPROVED/REJECTED/CANCELLED -> PICKED_UP -> RETURNED`. Per lijn: `note` (M15) en `preparedAt`/`preparedById` (klaarzetten, A7). `pickupPart`/`returnPart` zijn een afspraak tussen mensen: de voorraad rekent op hele dagen. |
-| `UitleenVehicle` | Voertuig (kar/auto/bakfiets); `pricingMode` (FREE/PER_HOUR/PER_KM/FLAT) + `rateCents`, team-configureerbaar. `pattern` = de arcering in de transportplanning, `icon` = het icoon in een ritblok (`null` = automatisch, uit de code). |
+| `UitleenVehicle` | Voertuig (kar/auto/bakfiets); `pricingMode` (FREE/PER_HOUR/PER_KM/FLAT) + `rateCents`, team-configureerbaar. `pattern` = de arcering in de transportplanning, `icon` = het icoon in een ritblok (`null` = automatisch, uit de code), `requestableByMembers` = mogen leden het zelf aanvragen (uit voor een gehuurd busje). |
 | `UitleenTransportBooking` | Rit met voertuig, tijdvenster, chauffeur, tarief-snapshot, `kilometers`/`priceCents` (nullable). `cargoNote` = wat er mee moet (ronde 3). |
+| `UitleenTransportBooking.seriesId` | De reeks waartoe een herhaalde rit hoort (F6.22). `NULL` = geen reeks. Geen tabel: zie "Herhaalde ritten" hieronder. |
 | `UitleenTransportHelper` | Bijrijder op een rit: naam + optioneel nummer, `addedById`. Vervangt `helpersNote`/`helpersPhone`, die voor bestaande ritten blijven staan. Ook achteraf te wijzigen door de aanvrager, een collega van dezelfde post, of het team. |
 | `UitleenTransportNote` | Eigen nota bij een rit (F4.20), met auteur en `visibility` (`PRIVE` / `POST` / `POST_EN_LOGISTIEK`). Naast `memberNote` en `adminNote`, die bij de rit zelf horen en er één keer op staan; hier kunnen er meer zijn, elk van iemand anders. `PRIVE` is letterlijk privé, ook voor Logistiek: de queries halen andermans privénota niet eens op. Enkel de auteur wijzigt of wist ze. |
 | `UitleenDriver` | Chauffeur die het team zelf toevoegt (uniek per `userId`, met notitie en `addedById`). Niet werkingsjaar-gescoped; verwijderen laat toegewezen ritten staan. `colorIndex` overschrijft de kleur die uit zijn id volgt. |
@@ -376,6 +377,12 @@ voedt zowel de drukteweergave per weekdag en uur als de uren per chauffeur per
 uur van de dag (F4.23). Wandel er niet een tweede keer overheen voor een derde
 grafiek; hang ze aan diezelfde `add`.
 
+**Per chauffeur staat één matrix van 168 getallen (`DriverStat.heat`, weekdag x
+uur)**, uit dezelfde wandeling als `perHour` en de drukteweergave. De uren per
+weekdag, de uren per uur van de dag en de drukteweergave van één chauffeur zijn
+daar sommen van; sla ze niet apart op (F6.4, F6.6). De weergave "Per chauffeur"
+(F6.5) en de weekdagbalken rekenen in `lib/driver-hours.ts`.
+
 **De balken per uur rekenen in de browser** (`lib/driver-hours.ts`, puur en
 getest): de keuze tussen blokken van 1, 2 of 4 uur mag geen nieuwe pagina vragen.
 Die module hangt daarom niet aan `uitleen-stats.ts`, dat `server-only` is en
@@ -389,6 +396,26 @@ Zie `docs/design-decisions.md`.
 **Elke grafiek draagt een tabelweergave.** Drie van de reekskleuren halen de
 3:1 tegen wit niet, dus kleur is hier nooit de enige uitleg. Een nieuwe grafiek
 krijgt er dus ook een.
+
+## Herhaalde ritten
+
+Een herhaling (C&G, containerpark, BO) is een rij gewone ritten met dezelfde
+`seriesId` (F6.22). `lib/recurrence.ts` rekent de data uit (puur, getest); elke
+herhaling gaat daarna door dezelfde validatie als een enkele rit
+(`buildTransportSeries` in `lib/transport-form.ts`), zodat er geen tweede regelset
+bestaat. Het intekenformulier toont via `previewTripSeriesAction` vooraf welke
+ritten botsen. In het paneel staat "rit x van y" (`seriesPositions`) en
+"deze en de volgende verwijderen" (`deleteTripSeriesFromAction`), dat gereden ritten
+en ritten met een betaling laat staan.
+
+- **De klok is die van Brussel.** De data zijn klokstrings (`YYYY-MM-DDTHH:mm`) en
+  pas `buildTransportBookings` maakt er tijdstippen van, met de offset van die
+  dag. "Plus zevenmaal 24 uur" verschuift een wekelijkse rit een uur over een
+  zomertijdwissel.
+- **Hoogstens 52 ritten per reeks**, en geen heen-en-terug in een herhaling.
+- **Bij een reeks met een doorgegeven post gaat er één bericht**, niet één per rit.
+- **Een rit van voor november 2026 heeft `seriesId = NULL`**; het scherm toont dan
+  niets extra. Zie de comment van migratie `20261106110000`.
 
 ## De dag van het intekenscherm
 

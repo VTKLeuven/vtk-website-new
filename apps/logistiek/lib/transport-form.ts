@@ -5,6 +5,7 @@ import type { Prisma, UitleenRequesterType } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { isOnQuarterHour, MAX_HELPERS, parseNotifyEmails, transportPriceCents } from './uitleen';
 import { parseBrusselsDateTime } from './reservation-form';
+import { seriesOccurrences, type RecurrenceEnd, type RecurrenceRule } from './recurrence';
 
 /**
  * De boekingen van één ritaanvraag opbouwen en valideren.
@@ -90,6 +91,10 @@ export type BuiltTransport =
       helpers: Array<{ name: string; phone: string | null }>;
       vehicleCount: number;
       roundTrip: boolean;
+      /** Alle ritten van een herhaling delen dit; `null` bij één rit (F6.22). */
+      seriesId?: string | null;
+      /** Hoeveel herhalingen het zijn, de eerste meegeteld. */
+      occurrences?: number;
     }
   | { ok: false; error: string };
 
@@ -281,5 +286,57 @@ export async function buildTransportBookings(
     helpers,
     vehicleCount: vehicles.length,
     roundTrip: Boolean(inbound),
+  };
+}
+
+/**
+ * De ritten van een herhaling (F6.22): elke herhaling gaat door dezelfde
+ * validatie als een enkele rit (`buildTransportBookings`), en ze delen een
+ * `seriesId`. Eén regelset en geen tweede kopie die uit elkaar loopt.
+ *
+ * Geen heen-en-terug in een herhaling: dat zijn twee ritten per datum die samen
+ * horen, en daar maak je beter twee reeksen van dan één die iets anders
+ * betekent dan "een rit die terugkomt".
+ */
+export async function buildTransportSeries(
+  input: TransportFormInput,
+  owner: TransportOwner,
+  repeat: { rule: RecurrenceRule; end: RecurrenceEnd }
+): Promise<BuiltTransport> {
+  if (input.returnStartAt || input.returnEndAt) {
+    return {
+      ok: false,
+      error: 'Een herhaling kan niet met een terugrit. Plan de terugrit als een eigen reeks.',
+    };
+  }
+  const windows = seriesOccurrences(
+    { startAt: input.startAt, endAt: input.endAt },
+    repeat.rule,
+    repeat.end
+  );
+  if (windows.length === 0) return { ok: false, error: 'Kies een start- en eindmoment.' };
+
+  const parts: Array<Extract<BuiltTransport, { ok: true }>> = [];
+  for (const [index, window] of windows.entries()) {
+    const built = await buildTransportBookings({ ...input, ...window }, owner);
+    if (!built.ok) {
+      return {
+        ok: false,
+        error:
+          windows.length > 1
+            ? `Rit ${index + 1} van ${windows.length} (${window.startAt.slice(0, 10)}): ${built.error}`
+            : built.error,
+      };
+    }
+    parts.push(built);
+  }
+  return {
+    ok: true,
+    bookings: parts.flatMap((part) => part.bookings),
+    helpers: parts[0].helpers,
+    vehicleCount: parts[0].vehicleCount,
+    roundTrip: false,
+    seriesId: windows.length > 1 ? randomUUID() : null,
+    occurrences: windows.length,
   };
 }

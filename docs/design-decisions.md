@@ -10587,6 +10587,79 @@ overdaad: faalt de hydratie ergens op een pagina, dan tekent React de hele boom
 opnieuw vanaf `<html>` en gooit het attribuut weg dat de server nooit
 gerenderd heeft, en dan sprong het scherm middenin het kijken terug naar licht.
 
+## Transportronde 6 (november 2026)
+
+De zesde feedbackronde van Logistiek (werkplan: `docs/logistiek-transport-ronde-6.md`).
+De keuzes die niet uit de code te lezen zijn:
+
+- **Een bewust dubbele rit is een gewone rit.** De botsingscontrole bij een
+  wijziging loopt enkel wanneer het venster verschuift (`windowMoved`). Wie
+  eerst dubbel inplant om het geheel te overzien en daarna schuift, moest bij elke
+  opslag, ook voor een nota, "Toch verschuiven" bevestigen terwijl er niets
+  verschoof, en schreef telkens een overlap-nota in de historiek.
+- **Een dubbelboeking toont nog steeds welk voertuig.** De arcering van het
+  voertuig blijft op de rode vulling staan, en het voertuig staat altijd in het
+  blok, ook als "Weergave" het uit heeft: een botsing gaat over een voertuig, en
+  de rode kleur zegt enkel dat er iets mis is.
+- **Een rit in het verleden kan enkel het team aanmaken** (`byTeam` in
+  `buildTransportBookings`), voor de administratie. Ze komt goedgekeurd binnen, de
+  historiek zegt "met terugwerkende kracht", en ze telt mee in de statistieken. Een
+  lid blijft geweigerd: die aanvraag zou nooit meer beslist worden.
+- **De aanvragende post kiest standaard zelf de chauffeur.** Op elke aanvraag via de
+  site staat `assignedGroupId` op de gekozen post of werkgroep, behalve bij de kar
+  (die vraagt een goedgekeurde karchauffeur). Bij een werkgroep is `groupId` leeg;
+  `assignedGroupId` mag wel de werkgroep zijn, en dan staat de rit ook onder
+  "Ritten van mijn post" voor haar leden. Bestaande ritten veranderen niet mee.
+  Bij een voertuig zonder chauffeur (de bakfiets) verdwijnt de keuzelijst.
+- **Een voertuig kan voorbehouden zijn aan het team** (`requestableByMembers`).
+  Een gehuurd busje staat zo in de planning maar niet in het aanvraagformulier. De
+  poort zit in `buildTransportBookings` en niet enkel in het formulier.
+- **Externen zien het materiaal niet** zolang indienen dicht is (zie "De
+  uitleendienst gaat in fases open"). Jaarwerkingen bestonden in productie niet
+  als groep en telden daardoor als extern; ze worden werkgroepen.
+- **Elk praesidiumlid mag bij elke rit een bijrijder toevoegen, maar enkel de eigen
+  toevoegingen weghalen.** De nummers van andermans ritten blijven bij de post van
+  de rit. Een werkgroeplid valt hier niet onder: die regelt de bijrijders van de
+  eigen ritten via zijn groep.
+- **De rail van "van mijn post" is de nadrukkelijke kleur, niet geel.** Geel viel
+  weg op een pastelkleur die zelf geel is. Daarnaast zet "Enkel mijn post
+  benadrukken" de andere ritten lichter; dat is een voorkeur in de browser.
+- **Het palet heeft veertig kleuren, maar de hash blijft op vierentwintig.** De
+  zestien middentonen zijn enkel te kiezen. Verhoog je de modulus van de hash,
+  dan krijgt elke chauffeur zonder gekozen kleur een andere; een test legt de
+  uitkomsten van voor de uitbreiding vast. Een toegevoegde chauffeur start op
+  Salie.
+- **Nota's en "Extra info van Logistiek" blijven twee dingen, naast elkaar.** De
+  extra info gaat mee in de mail naar de aanvrager en is de afwijzingsreden; een
+  eigen nota heeft een zichtbaarheid. Samenvoegen geeft één veld met twee
+  betekenissen. De nota's staan daarom direct onder de extra info in het paneel.
+- **Op de publieke planning leest een post enkel de nota's van de ritten waar hij
+  zelf bij hoort.** "Extra info van Logistiek" en de nota's met zichtbaarheid post
+  (of post en Logistiek) komen enkel voor de eigen ritten uit de databank. Het
+  team leest ze allemaal, de privénota's nooit.
+- **Een wijziging van Logistiek is zichtbaar voor de aanvrager én het team.** De
+  bron is de auditlog (`teamChangeLines`), geen nieuwe kolom: de aanvrager leest
+  "Logistiek paste je aanvraag aan" op zijn lijst, zijn ritpagina en bovenaan de
+  goedkeuringsmail, het team ziet een badge "Gewijzigd t.o.v. aanvraag".
+- **Een herhaalde rit is een rij gewone ritten met dezelfde `seriesId`.** Geen tabel
+  en geen regel die in de planning leeft: elke herhaling kan je openen, schuiven
+  of een chauffeur geven. Bestaande ritten hebben `NULL`, "geen reeks"; niemand kan
+  achteraf weten welke oude ritten bij elkaar hoorden. De data worden berekend op
+  Brusselse klokstrings, zodat een wekelijkse rit om 18:00 over de zomertijdwissel
+  18:00 blijft. Een maand zonder de dag (de 31ste) valt over in plaats van te
+  verspringen. De voorvertoning toont vooraf welke ritten botsen. Verwijderen kan
+  enkel "deze en de volgende", en niet wat al gereden is of een betaling heeft.
+  Een herhaling gaat niet samen met heen en terug.
+- **De drukteweergave volgt de gekozen chauffeur**, en "Op welk uur" kan ook per
+  weekdag en per chauffeur naast elkaar. Een gestapelde balk heeft enkel voor het
+  onderste segment een gedeelde basislijn; "Per chauffeur" zet elke chauffeur op
+  dezelfde schaal.
+- **"Hele dag" toont de hele dag.** De ondergrens per uur is 18 pixels, de
+  evenementenstrook heeft hoogstens twee rijen (de rest achter "+N meer"), en de
+  pane heeft op een breed scherm een minimumhoogte van 36rem. De meting gebruikt
+  enkel layout-pixels: onder het 90%-zoom van de site mengde ze visuele en
+  layout-pixels.
+
 ## Interesse per dag van een reeks
 
 Een evenement met losse momenten (`CalendarEventMoment`: een loopweek met elke

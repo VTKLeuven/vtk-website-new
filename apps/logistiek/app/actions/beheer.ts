@@ -57,7 +57,13 @@ import {
   parseBrusselsDateTime,
   type ReservationFormInput,
 } from '@/lib/reservation-form';
-import { buildTransportBookings, type TransportFormInput } from '@/lib/transport-form';
+import { buildTransportBookings, buildTransportSeries, type TransportFormInput } from '@/lib/transport-form';
+import {
+  MAX_SERIES_OCCURRENCES,
+  seriesOccurrences,
+  type RecurrenceEnd,
+  type RecurrenceRule,
+} from '@/lib/recurrence';
 import { runSerializable } from '@/lib/tx';
 import { windowMoved } from '@/lib/transport-conflicts';
 import type { ActionResult } from './uitleen';
@@ -2276,6 +2282,8 @@ export async function adminCreateTransportAction(
     assignedGroupId?: string | null;
     /** Bewust over een bestaande rit inplannen; zie `overlapAuditNote`. */
     allowOverlap?: boolean;
+    /** Herhaal deze rit (F6.22): C&G, het containerpark, de BO-rit. */
+    repeat?: { rule: RecurrenceRule; end: RecurrenceEnd };
   }
 ): Promise<ActionResult> {
   const session = await requireManage();
@@ -2293,14 +2301,17 @@ export async function adminCreateTransportAction(
     return { ok: false, error: 'Vul in voor wie deze rit rijdt, of kies een post.' };
   }
 
-  const built = await buildTransportBookings(input, {
+  const owner = {
     userId: ownerId,
     eventId: input.eventId?.trim() || null,
     requesterType,
     groupId: input.groupId?.trim() || null,
     requesterName,
     byTeam: true,
-  });
+  };
+  const built = input.repeat
+    ? await buildTransportSeries(input, owner, input.repeat)
+    : await buildTransportBookings(input, owner);
   if (!built.ok) return { ok: false, error: built.error };
 
   // Een chauffeur toewijzen mag enkel aan iemand uit de chauffeurslijst; dat is
@@ -2361,6 +2372,8 @@ export async function adminCreateTransportAction(
         plannedByTeam: true,
         driverId,
         assignedGroupId: assignedGroup?.id ?? null,
+        // Een herhaling: alle ritten delen dit (F6.22). `null` bij één rit.
+        seriesId: built.seriesId ?? null,
         decidedAt: now,
         decidedById: session.user.id,
         // Het team tekent dit zelf in en vraagt niets aan zichzelf; direct
@@ -2378,6 +2391,13 @@ export async function adminCreateTransportAction(
         note: 'ingepland door Logistiek',
         actorId: session.user.id,
       });
+      if (built.seriesId) {
+        await writeAudit(tx, { transportBookingId: row.id }, {
+          kind: 'NOTE',
+          note: `Deel van een reeks van ${built.occurrences ?? created.length} ritten`,
+          actorId: session.user.id,
+        });
+      }
       // Een rit in het verleden is administratie (F6.19); dat hoort in de
       // historiek te staan, want ze telt mee in de statistieken.
       if ((built.bookings[index]?.startAt as Date) <= now) {
@@ -2413,12 +2433,18 @@ export async function adminCreateTransportAction(
 
   revalidateBeheer();
   const overlaps = outcome.overlaps ?? [];
+  // Bij een reeks kunnen het er tientallen zijn; de eerste drie zeggen genoeg en de
+  // rest staat als rode blokken in de planning.
+  const shownOverlaps = overlaps.slice(0, 3).join('; ');
+  const moreOverlaps = overlaps.length > 3 ? ` en nog ${overlaps.length - 3}` : '';
   const base =
     overlaps.length > 0
-      ? `Ingepland, maar het voertuig staat nu dubbel geboekt: ${overlaps.join('; ')}. Verschuif een van beide.`
-      : built.roundTrip || built.vehicleCount > 1
-        ? 'Ritten ingepland.'
-        : 'Rit ingepland.';
+      ? `Ingepland, maar het voertuig staat nu dubbel geboekt: ${shownOverlaps}${moreOverlaps}. Verschuif een van beide.`
+      : built.seriesId
+        ? `Reeks van ${built.occurrences ?? 'meerdere'} ritten ingepland.`
+        : built.roundTrip || built.vehicleCount > 1
+          ? 'Ritten ingepland.'
+          : 'Rit ingepland.';
   if (!assignedGroup) return { ok: true, warning: overlaps.length > 0, message: base };
 
   // Ná de write, zoals elke mail hier, en per aangemaakte rit: zijn het er meer
@@ -2426,7 +2452,10 @@ export async function adminCreateTransportAction(
   // daarvan een chauffeur en gaat het dus over meer dan een rit.
   revalidatePath('/ritten');
   const outcomes: TripHandoverOutcome[] = [];
-  for (const id of outcome.ids ?? []) {
+  // Bij een reeks één bericht en niet één per herhaling: een post die vijftig
+  // mails krijgt voor wat één afspraak is, leest er geen enkele meer.
+  const toNotify = built.seriesId ? (outcome.ids ?? []).slice(0, 1) : (outcome.ids ?? []);
+  for (const id of toNotify) {
     outcomes.push(await notifyGroupAssignedForTrip(id));
   }
   const note = handoverNote(assignedGroup.nameNl, mergeHandover(outcomes));
@@ -2436,6 +2465,92 @@ export async function adminCreateTransportAction(
     // ze vraagt nog iets van je.
     warning: overlaps.length > 0 || note.warning,
     message: `${base} ${note.message}`,
+  };
+}
+
+/**
+ * De ritten van een herhaling vóór ze bestaan (F6.22), met welke botsen.
+ *
+ * Twaalf ritten aanmaken om er daarna twee rood te zien staan, is de fout die dit
+ * voorkomt. Het schrijft niets: dezelfde `seriesOccurrences` en dezelfde
+ * botsingscontrole als `adminCreateTransportAction`, maar enkel om te tonen.
+ */
+export async function previewTripSeriesAction(input: {
+  startAt: string;
+  endAt: string;
+  vehicleId: string;
+  repeat: { rule: RecurrenceRule; end: RecurrenceEnd };
+}): Promise<
+  | {
+      ok: true;
+      items: Array<{ startAt: string; endAt: string; clash: string | null }>;
+      /** Het maximum is bereikt: er zouden er meer geweest zijn. */
+      capped: boolean;
+    }
+  | { ok: false; error: string }
+> {
+  await requireManage();
+  if (!input.startAt || !input.endAt) {
+    return { ok: false, error: 'Kies eerst een start- en eindmoment.' };
+  }
+  const windows = seriesOccurrences(
+    { startAt: input.startAt, endAt: input.endAt },
+    input.repeat.rule,
+    input.repeat.end
+  );
+  if (windows.length === 0) return { ok: false, error: 'Kies eerst een start- en eindmoment.' };
+
+  const items: Array<{ startAt: string; endAt: string; clash: string | null }> = [];
+  for (const window of windows) {
+    const startAt = parseBrusselsDateTime(window.startAt);
+    const endAt = parseBrusselsDateTime(window.endAt);
+    if (!startAt || !endAt) return { ok: false, error: 'Vul een geldig begin- en einduur in.' };
+    const clashes = input.vehicleId
+      ? await overlappingBookings(prisma, input.vehicleId, startAt, endAt, [])
+      : [];
+    items.push({ ...window, clash: clashes.length > 0 ? overlapLabel(clashes) : null });
+  }
+  return { ok: true, items, capped: windows.length >= MAX_SERIES_OCCURRENCES };
+}
+
+/**
+ * Een rit en alle volgende van haar reeks verwijderen (F6.22).
+ *
+ * Enkel "vanaf hier", nooit de hele reeks met wat al gereden is: gereden ritten
+ * (`COMPLETED`) en ritten met een betaling blijven staan, want dat is
+ * geschiedenis en een databankregel (zie `deleteTransportAction`). De melding
+ * zegt hoeveel er bleven. Elke andere rit van de reeks, ook een eerdere die nog
+ * niet gereden is, blijft ongemoeid.
+ */
+export async function deleteTripSeriesFromAction(bookingId: string): Promise<ActionResult> {
+  await requireManage();
+
+  const booking = await prisma.uitleenTransportBooking.findUnique({
+    where: { id: bookingId },
+    select: { id: true, seriesId: true, startAt: true },
+  });
+  if (!booking) return { ok: false, error: 'Rit niet gevonden.' };
+  if (!booking.seriesId) return { ok: false, error: 'Deze rit hoort niet bij een reeks.' };
+
+  const following = await prisma.uitleenTransportBooking.findMany({
+    where: { seriesId: booking.seriesId, startAt: { gte: booking.startAt } },
+    select: { id: true, status: true, _count: { select: { payments: true } } },
+  });
+  const removable = following.filter(
+    (row) => row.status !== 'COMPLETED' && row._count.payments === 0
+  );
+  const kept = following.length - removable.length;
+
+  const { count } = await prisma.uitleenTransportBooking.deleteMany({
+    where: { id: { in: removable.map((row) => row.id) } },
+  });
+
+  revalidateBeheer();
+  return {
+    ok: true,
+    message:
+      `${count === 1 ? '1 rit' : `${count} ritten`} van de reeks verwijderd.` +
+      (kept > 0 ? ` ${kept} bleven staan omdat ze al gereden zijn of een betaling hebben.` : ''),
   };
 }
 

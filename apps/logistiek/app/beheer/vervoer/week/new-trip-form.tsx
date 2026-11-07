@@ -6,6 +6,8 @@ import { adminCreateTransportAction } from '@/app/actions/beheer';
 import { QuarterDateTime } from '@/components/quarter-datetime';
 import { useToast } from '@/components/ui/toast';
 import { DriverOptions } from '../driver-select';
+import { RepeatFields } from './repeat-fields';
+import { defaultRepeatDraft, repeatFromDraft, weekdayOfLocal, type RepeatDraft } from '@/lib/recurrence';
 import { TripEventSelect, type TripEventOption } from '@/components/trip-event-select';
 import type { DriverOption } from '@/lib/uitleen-server';
 import { OTHER_REQUESTER, toDatetimeLocalValue, type TripHandoverMode } from '@/lib/uitleen';
@@ -109,6 +111,9 @@ export function NewTripForm({
    * dat het bij de volgende tik aan de postkeuze terugspringt.
    */
   const [assignedTouched, setAssignedTouched] = useState(false);
+  /** Herhalen (F6.22). De weekdag volgt de startdag zolang het team er niet aan zat. */
+  const [repeat, setRepeat] = useState<RepeatDraft>(() => defaultRepeatDraft(initial.startAt));
+  const [weekdaysTouched, setWeekdaysTouched] = useState(false);
 
   function set<K extends keyof NewTripValues>(key: K, value: NewTripValues[K]) {
     setValues((current) => ({ ...current, [key]: value }));
@@ -166,6 +171,17 @@ export function NewTripForm({
     }));
   }
 
+  useEffect(() => {
+    if (weekdaysTouched) return;
+    const weekday = weekdayOfLocal(values.startAt);
+    if (weekday === null) return;
+    setRepeat((current) =>
+      current.weekdays.length === 1 && current.weekdays[0] === weekday
+        ? current
+        : { ...current, weekdays: [weekday] }
+    );
+  }, [values.startAt, weekdaysTouched]);
+
   // De uren terugmelden in een effect en niet in de setter: een `setState` van
   // de ouder oproepen binnen een updater draait tijdens de render van dit
   // formulier, en React klaagt daar terecht over ("Cannot update a component
@@ -203,6 +219,8 @@ export function NewTripForm({
         pickupAddress: values.pickupAddress,
         destination: values.destination,
         adminNote: values.adminNote,
+        // Een herhaling (F6.22); `undefined` wanneer het vakje uit staat.
+        repeat: repeatFromDraft(repeat) ?? undefined,
         // Er is geen ledennota bij een rit die het team zelf inplant: er is geen
         // lid dat er een schreef.
         note: '',
@@ -258,6 +276,18 @@ export function NewTripForm({
           </p>
         ) : null}
       </div>
+
+      <RepeatFields
+        draft={repeat}
+        onChange={(next) => {
+          if (next.weekdays !== repeat.weekdays) setWeekdaysTouched(true);
+          setRepeat(next);
+        }}
+        startAt={values.startAt}
+        endAt={values.endAt}
+        vehicleId={values.vehicleId}
+        inputClass={inputClass}
+      />
 
       <label className="grid gap-1 text-xs font-medium text-vtk-muted">
         Voertuig

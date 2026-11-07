@@ -40,6 +40,7 @@ import {
   eventsInRange,
   getLogistiekSettings,
   selectableEvents,
+  seriesPositions,
   teamEditsForTransport,
   transportAuditLogsByBooking,
   tripNotesFor,
@@ -190,6 +191,7 @@ export default async function VervoerWeekPage({
   const teamEdits = await teamEditsForTransport(
     bookings.map((booking) => ({ id: booking.id, userId: booking.userId }))
   );
+  const seriesPlaces = await seriesPositions(bookings);
   const notesPerTrip = await tripNotesFor(
     bookings.map((booking) => booking.id),
     {
@@ -310,6 +312,7 @@ export default async function VervoerWeekPage({
       history: history.get(booking.id) ?? [],
       notes: notesPerTrip.get(booking.id) ?? [],
       teamChanges: teamEdits.get(booking.id) ?? [],
+      series: seriesPlaces.get(booking.id) ?? null,
       legs: legs
         .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
         .map((leg) => ({
