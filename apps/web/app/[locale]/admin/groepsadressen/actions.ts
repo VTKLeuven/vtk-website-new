@@ -9,7 +9,7 @@ import { logAudit } from "@/lib/audit";
 import { type SaveState, saveError, saveOk } from "@/lib/saveState";
 import { getGoogleConfig } from "@/lib/google/config";
 import { collectLinkCandidates } from "@/lib/google/link";
-import { normaliseEmail } from "@/lib/google/members";
+import { everyGroupOfKindLabel, isGroupKind, normaliseEmail, type GroupKind } from "@/lib/google/members";
 import {
   pushMailGroupsForGroup,
   pushMailGroupsForKiesploeg,
@@ -119,7 +119,7 @@ export async function deleteMailGroupAction(formData: FormData): Promise<void> {
 
 const sourceSchema = z.object({
   mailGroupId: z.string().min(1),
-  /** `group:<id>`, `type:PRAESIDIUM`, `kiesploeg:<id>` of `kiesploegPost:<id>`. */
+  /** `group:<id>`, `type:<GroupKind>`, `kiesploeg:<id>` of `kiesploegPost:<id>`. */
   source: z.string().min(3),
   onlyLead: z.string().optional(),
 });
@@ -131,7 +131,7 @@ function parseSource(raw: string):
   const [kind, id] = raw.split(":");
   if (!id) return null;
   if (kind === "type") {
-    return id === "PRAESIDIUM" || id === "WERKGROEP" ? { kind, id } : null;
+    return isGroupKind(id) ? { kind, id } : null;
   }
   if (kind !== "group" && kind !== "kiesploeg" && kind !== "kiesploegPost") return null;
   return { kind, id };
@@ -140,7 +140,7 @@ function parseSource(raw: string):
 /** Hoe de bron heet, voor het logboek. */
 async function sourceLabel(kind: string, id: string): Promise<string | null> {
   if (kind === "type") {
-    return id === "PRAESIDIUM" ? "elke praesidiumpost" : "elke werkgroep";
+    return isGroupKind(id) ? everyGroupOfKindLabel(id, true).toLowerCase() : null;
   }
   if (kind === "group") {
     return (await prisma.group.findUnique({ where: { id }, select: { nameNl: true } }))?.nameNl ?? null;
@@ -173,8 +173,7 @@ export async function addSourceAction(_prev: SaveState, formData: FormData): Pro
 
   const columns = {
     groupId: source.kind === "group" ? source.id : null,
-    groupType:
-      source.kind === "type" ? (source.id as "PRAESIDIUM" | "WERKGROEP") : null,
+    groupType: source.kind === "type" ? (source.id as GroupKind) : null,
     kiesploegId: source.kind === "kiesploeg" ? source.id : null,
     kiesploegPostId: source.kind === "kiesploegPost" ? source.id : null,
   };
@@ -222,11 +221,7 @@ export async function removeSourceAction(formData: FormData): Promise<void> {
 
   const label =
     row.group?.nameNl ??
-    (row.groupType === "PRAESIDIUM"
-      ? "elke praesidiumpost"
-      : row.groupType === "WERKGROEP"
-        ? "elke werkgroep"
-        : null) ??
+    (row.groupType ? everyGroupOfKindLabel(row.groupType, true).toLowerCase() : null) ??
     row.kiesploeg?.formalName ??
     row.kiesploegPost?.name ??
     "bron";
@@ -253,7 +248,7 @@ export async function removeSourceAction(formData: FormData): Promise<void> {
 /** Duwt de lijsten die op deze bron staan meteen door naar Google. */
 async function pushSource(columns: {
   groupId: string | null;
-  groupType?: "PRAESIDIUM" | "WERKGROEP" | null;
+  groupType?: GroupKind | null;
   kiesploegId: string | null;
   kiesploegPostId: string | null;
 }): Promise<void> {

@@ -27,9 +27,13 @@ enum MembershipRole {
 // Soort Group. PRAESIDIUM = een praesidiumpost (op /praesidium). WERKGROEP = een
 // werkgroep (BEST, Revue, ...): dezelfde leden/rollen-machinerie, maar niet op
 // /praesidium; ze verschijnen op /werkgroepen met een eigen infotekst + website.
+// JAARWERKING = een jaarwerking (Kanweek, Halftime, ...): ook leden en rollen per
+// werkingsjaar, met een eigen beheerrecht en /admin/jaarwerkingen, maar zonder
+// publieke pagina van de site. Zie docs/design-decisions.md, "Jaarwerkingen".
 enum GroupType {
   PRAESIDIUM
   WERKGROEP
+  JAARWERKING
 }
 
 // Hoe een post (Group) een rol toekent aan haar leden.

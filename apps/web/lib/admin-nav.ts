@@ -40,6 +40,11 @@ export type NavGuard = {
   /** Werkgroepen-tab: zichtbaar voor beheerders (werkgroepen.manage) en voor leden
    *  van een werkgroep (die zien enkel hun eigen werkgroep, enkel de infotekst). */
   werkgroep?: boolean;
+  /** Jaarwerkingen-tab: zichtbaar voor beheerders (jaarwerkingen.manage) en voor
+   *  de verantwoordelijke die de leden van zijn eigen jaarwerking beheert
+   *  (jaarwerkingen.manageOwnMembers). Een gewoon lid heeft er niets te doen:
+   *  een jaarwerking heeft geen infotekst. */
+  jaarwerking?: boolean;
   /** Wie dit werkingsjaar in een post of werkgroep zit (Mijn budgetten). */
   post?: boolean;
   /** Enkel bij exacte padmatch actief markeren (voor de dashboard-landing op /admin). */
@@ -186,6 +191,8 @@ export function getAdminNav(): NavEntry[] {
       // van de grote evenementen en op /shift. Werk van de vice.
       item('praesidiumShifts', '/shiftenoverzicht', { perm: 'shift.praesidium' }),
       item('werkgroepen', '/werkgroepen', { werkgroep: true }),
+      // Kanweek, Halftime, ...: leden en rollen zoals een werkgroep, net eronder.
+      item('jaarwerkingen', '/jaarwerkingen', { jaarwerking: true }),
       item('roles', '/roles', { perm: 'roles.manage' }),
       // Alumni is een adresboek per lichting, geen opt-in mailinglijst: een
       // afgestudeerde geeft per definitie nooit meer een studiebevestiging van

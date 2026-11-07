@@ -9,6 +9,7 @@ import { canAccessAnyTicketEvent } from '@/lib/ticketing/authorization';
 import { canAccessAnyForm } from '@/lib/forms/authorization';
 import { canSeeCommuRequests } from '@/lib/commu/requests';
 import { isExternalUrl } from '@/lib/href';
+import { werkgroepenWithOwnMemberRights } from '@/lib/werkgroepMembers';
 import { getAdminNav, type NavGuard, type NavLeaf } from '@/lib/admin-nav';
 import { ADMIN_DENSITY_COOKIE, ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/adminNavCookie';
 import { AdminNav, type NavItem, type NavNode } from './AdminNav';
@@ -61,6 +62,11 @@ export default async function AdminLayout({
     (await prisma.group.count({
       where: { type: 'WERKGROEP', id: { in: session.groups.map((g) => g.id) } },
     })) > 0;
+  // Jaarwerkingen: enkel de verantwoordelijke die de leden van zijn eigen
+  // jaarwerking beheert. Vraagt pas iets op met het recht én een jaarwerking.
+  const jaarwerkingLead =
+    !session.permissions.includes('jaarwerkingen.manage') &&
+    (await werkgroepenWithOwnMemberRights(session, 'JAARWERKING')).size > 0;
 
   // Mag de huidige gebruiker deze entry zien? Superadmin ziet alles.
   const canSee = (guard: NavGuard): boolean => {
@@ -73,8 +79,11 @@ export default async function AdminLayout({
     if (guard.commuRequests) return canAccessCommuRequests;
     // Werkgroepen-tab: beheerders óf gewone werkgroepleden.
     if (guard.werkgroep) return session.permissions.includes('werkgroepen.manage') || werkgroepMember;
+    if (guard.jaarwerking) return session.permissions.includes('jaarwerkingen.manage') || jaarwerkingLead;
     // Mijn budgetten: elk lid van een post of werkgroep, voor zijn eigen post.
-    if (guard.post) return session.groups.length > 0;
+    // Een jaarwerking telt niet: het BO kent haar als eigen vak (lib/bo/posts.ts),
+    // niet als groep, dus ze had hier enkel een leeg blok.
+    if (guard.post) return session.groups.some((g) => g.type !== 'JAARWERKING');
     if (guard.anyPerm) return guard.anyPerm.some((p) => session.permissions.includes(p));
     if (guard.perm) return session.permissions.includes(guard.perm);
     return true;

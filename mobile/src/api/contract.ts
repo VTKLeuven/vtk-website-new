@@ -65,8 +65,8 @@ export type AppViewerGroup = {
   code: string;
   slug: string;
   name: string;
-  /** Praesidiumpost of werkgroep; de app toont die twee apart. */
-  type: "PRAESIDIUM" | "WERKGROEP";
+  /** Praesidiumpost, werkgroep of jaarwerking; de app toont die apart. */
+  type: "PRAESIDIUM" | "WERKGROEP" | "JAARWERKING";
   role: string;
 };
 

@@ -9,7 +9,19 @@
  * Geen `server-only`: deze module raakt niets aan wat serverbelast is.
  */
 
-export type GroupKind = "PRAESIDIUM" | "WERKGROEP";
+export const GROUP_KINDS = ["PRAESIDIUM", "WERKGROEP", "JAARWERKING"] as const;
+export type GroupKind = (typeof GROUP_KINDS)[number];
+
+export function isGroupKind(value: string | null | undefined): value is GroupKind {
+  return (GROUP_KINDS as readonly string[]).includes(value ?? "");
+}
+
+/** Hoe een bron "elke groep van dit soort" heet, op het scherm en in het logboek. */
+export function everyGroupOfKindLabel(kind: GroupKind, nl: boolean): string {
+  if (kind === "PRAESIDIUM") return nl ? "Elke praesidiumpost" : "Every praesidium post";
+  if (kind === "WERKGROEP") return nl ? "Elke werkgroep" : "Every work group";
+  return nl ? "Elke jaarwerking" : "Every yearly event";
+}
 
 export type MailGroupSourceRow = {
   /** Precies één van de vier is ingevuld; zie het schema. */
@@ -24,7 +36,7 @@ export type MailGroupSourceRow = {
 
 export type MemberUser = { id: string; name: string; googleEmail: string | null };
 
-/** Lidmaatschap van een post of werkgroep, huidig werkingsjaar. */
+/** Lidmaatschap van een post, werkgroep of jaarwerking, huidig werkingsjaar. */
 export type MembershipRow = {
   groupId: string;
   /** Nodig voor een bron die "elke praesidiumpost" zegt. */

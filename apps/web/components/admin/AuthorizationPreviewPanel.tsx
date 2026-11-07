@@ -18,7 +18,7 @@ type GroupOption = {
   id: string;
   nameNl: string;
   nameEn: string;
-  type: "PRAESIDIUM" | "WERKGROEP";
+  type: "PRAESIDIUM" | "WERKGROEP" | "JAARWERKING";
   roleGrants: Array<{
     kind: "DEFAULT" | "LEADER";
     role: { id: string; nameNl: string; nameEn: string };
@@ -62,8 +62,9 @@ export function AuthorizationPreviewPanel({
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
   const [groupChoices, setGroupChoices] = useState<Record<string, GroupChoice>>({});
 
-  const posts = groups.filter((group) => group.type !== "WERKGROEP");
+  const posts = groups.filter((group) => group.type === "PRAESIDIUM");
   const werkgroepen = groups.filter((group) => group.type === "WERKGROEP");
+  const jaarwerkingen = groups.filter((group) => group.type === "JAARWERKING");
 
   const permissionsByRole = useMemo(
     () => new Map(roles.map((role) => [role.id, role.permissions.map((entry) => entry.permission.code)])),
@@ -343,6 +344,20 @@ export function AuthorizationPreviewPanel({
                   : "Working groups behave like posts, but live on /werkgroepen instead of /praesidium."}
               </p>
               {renderGroupCards(werkgroepen)}
+            </fieldset>
+          )}
+
+          {jaarwerkingen.length > 0 && (
+            <fieldset>
+              <legend className="text-sm font-semibold text-vtk-ink">
+                {nl ? "Jaarwerkingen" : "Yearly events"}
+              </legend>
+              <p className="mb-3 mt-1 text-xs text-zinc-500">
+                {nl
+                  ? "Jaarwerkingen (Kanweek, Halftime, ...) werken net als werkgroepen, maar hebben geen publieke pagina."
+                  : "Yearly events (Kanweek, Halftime, ...) behave like working groups, but have no public page."}
+              </p>
+              {renderGroupCards(jaarwerkingen)}
             </fieldset>
           )}
 

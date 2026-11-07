@@ -7,13 +7,17 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
 import {
   saveWerkgroepAction,
+  saveJaarwerkingAction,
   saveWerkgroepInfoAction,
   reorderWerkgroepenAction,
-  setGroupRoleAction,
+  reorderJaarwerkingenAction,
+  setWerkgroepRoleAction,
+  setJaarwerkingRoleAction,
 } from "@/app/actions/users-groups";
 import { AddMemberForm } from "../groepen/AddMemberForm";
 import { RemoveMemberButton } from "../groepen/RemoveMemberButton";
 import { LEAD_LABEL_MAX, LEAD_LABEL_SUGGESTIONS } from "@/lib/werkgroepen";
+import { WERKING_KINDS, type WerkingKind } from "@/lib/groupKinds";
 import {
   Avatar,
   Chevron,
@@ -39,13 +43,13 @@ export type Member = {
 export type GrantedRole = { roleId: string; code: string; name: string; kind: "DEFAULT" | "LEADER" };
 export type RoleOption = { roleId: string; code: string; name: string };
 
-export type WerkgroepRow = {
+export type WerkingRow = {
   id: string;
   code: string;
   name: string;
   nameNl: string;
   nameEn: string;
-  /** Hoe de verantwoordelijke van deze werkgroep heet, bv. G3 of G4. */
+  /** Hoe de verantwoordelijke van deze groep heet, bv. G3 of G4. */
   leadLabel: string;
   descriptionNl: string;
   descriptionEn: string;
@@ -57,12 +61,82 @@ export type WerkgroepRow = {
   roleGrants: GrantedRole[];
   /**
    * Wat deze gebruiker met de ledenlijst van het getoonde jaar mag: alles
-   * (`werkgroepen.manage`), enkel gewone leden (`own`, de G3/G4 met
-   * `werkgroepen.manageOwnMembers`, enkel in het huidige werkingsjaar) of niets.
+   * (`werkgroepen.manage`, `jaarwerkingen.manage`), enkel gewone leden (`own`,
+   * de verantwoordelijke met `*.manageOwnMembers`, enkel in het huidige
+   * werkingsjaar) of niets.
    */
   memberEdit: "full" | "own" | "none";
   /** Voorbereide, lowercased zoekstring (naam, code, rollen, leden). */
   searchText: string;
+};
+
+/**
+ * Wat er per soort anders heet op dit scherm. De rest (leden, rollen, de
+ * titel van de verantwoordelijke) werkt voor werkgroepen en jaarwerkingen
+ * hetzelfde.
+ */
+const COPY = {
+  WERKGROEP: {
+    nl: {
+      one: "werkgroep",
+      many: "werkgroepen",
+      column: "Werkgroep",
+      create: "Nieuwe werkgroep",
+      search: "Zoek op naam, code, beschrijving of lid",
+      searchLabel: "Werkgroepen zoeken",
+      settings: "Werkgroepinstellingen",
+      active: "Actief (een inactieve werkgroep verdwijnt van /werkgroepen; de historiek blijft)",
+      leadHint: "Zo heet de verantwoordelijke van deze werkgroep, hier en op /werkgroepen. Meestal G3 of G4, maar een eigen naam kan ook.",
+    },
+    en: {
+      one: "werkgroep",
+      many: "workgroups",
+      column: "Workgroup",
+      create: "New workgroup",
+      search: "Search by name, code, description or member",
+      searchLabel: "Search workgroups",
+      settings: "Werkgroep settings",
+      active: "Active (an inactive werkgroep disappears from /werkgroepen; history is kept)",
+      leadHint: "How this werkgroep's lead is named, here and on /werkgroepen. Usually G3 or G4, but any name works.",
+    },
+  },
+  JAARWERKING: {
+    nl: {
+      one: "jaarwerking",
+      many: "jaarwerkingen",
+      column: "Jaarwerking",
+      create: "Nieuwe jaarwerking",
+      search: "Zoek op naam, code, rol of lid",
+      searchLabel: "Jaarwerkingen zoeken",
+      settings: "Instellingen van de jaarwerking",
+      active: "Actief (zet uit voor een jaarwerking die niet meer georganiseerd wordt; de historiek blijft)",
+      leadHint: "Zo heet de verantwoordelijke van deze jaarwerking in het ledenbeheer en in de rolkeuze.",
+    },
+    en: {
+      one: "yearly event",
+      many: "yearly events",
+      column: "Yearly event",
+      create: "New yearly event",
+      search: "Search by name, code, role or member",
+      searchLabel: "Search yearly events",
+      settings: "Yearly event settings",
+      active: "Active (turn off for a yearly event that is no longer organised; history is kept)",
+      leadHint: "How this yearly event's lead is named in member management and the role picker.",
+    },
+  },
+} as const;
+
+type Copy = (typeof COPY)[WerkingKind]["nl" | "en"];
+
+const ACTIONS = {
+  WERKGROEP: { save: saveWerkgroepAction, reorder: reorderWerkgroepenAction, setRole: setWerkgroepRoleAction },
+  JAARWERKING: { save: saveJaarwerkingAction, reorder: reorderJaarwerkingenAction, setRole: setJaarwerkingRoleAction },
+} as const;
+
+/** Wat het veld voorstelt; de groep mag ook iets anders intikken. */
+const LEAD_SUGGESTIONS: Record<WerkingKind, readonly string[]> = {
+  WERKGROEP: LEAD_LABEL_SUGGESTIONS,
+  JAARWERKING: ["Verantwoordelijke", ...LEAD_LABEL_SUGGESTIONS],
 };
 
 /**
@@ -71,7 +145,19 @@ export type WerkgroepRow = {
  * werkgroepinstellingen) en meerdere rijen kunnen tegelijk openstaan, dus het
  * krijgt per formulier een eigen id, en zijn voorstellenlijst ook.
  */
-function LeadLabelField({ id, value, nl }: { id: string; value: string; nl: boolean }) {
+function LeadLabelField({
+  id,
+  value,
+  nl,
+  copy,
+  suggestions,
+}: {
+  id: string;
+  value: string;
+  nl: boolean;
+  copy: Copy;
+  suggestions: readonly string[];
+}) {
   return (
     <div>
       <Label htmlFor={id}>{nl ? "Titel van de verantwoordelijke" : "Title of the lead"}</Label>
@@ -85,15 +171,11 @@ function LeadLabelField({ id, value, nl }: { id: string; value: string; nl: bool
         autoComplete="off"
       />
       <datalist id={`${id}-suggestions`}>
-        {LEAD_LABEL_SUGGESTIONS.map((suggestion) => (
+        {suggestions.map((suggestion) => (
           <option key={suggestion} value={suggestion} />
         ))}
       </datalist>
-      <p className="mt-1 text-xs text-[#5c667f]">
-        {nl
-          ? "Zo heet de verantwoordelijke van deze werkgroep, hier en op /werkgroepen. Meestal G3 of G4, maar een eigen naam kan ook."
-          : "How this werkgroep's lead is named, here and on /werkgroepen. Usually G3 or G4, but any name works."}
-      </p>
+      <p className="mt-1 text-xs text-[#5c667f]">{copy.leadHint}</p>
     </div>
   );
 }
@@ -106,8 +188,9 @@ export type SaveLabels = {
   errorMessages: Record<string, string>;
 };
 
-export function WerkgroepenTable({
-  werkgroepen,
+export function WerkingenTable({
+  kind,
+  rows: werkgroepen,
   allRoles,
   year,
   yearLabel,
@@ -115,7 +198,8 @@ export function WerkgroepenTable({
   canManage,
   saveLabels,
 }: {
-  werkgroepen: WerkgroepRow[];
+  kind: WerkingKind;
+  rows: WerkingRow[];
   allRoles: RoleOption[];
   year: number;
   yearLabel: string;
@@ -124,8 +208,10 @@ export function WerkgroepenTable({
   saveLabels: SaveLabels;
 }) {
   const nl = locale === "nl";
+  const copy = COPY[kind][locale];
+  const actions = ACTIONS[kind];
   const [prevWerkgroepen, setPrevWerkgroepen] = useState(werkgroepen);
-  const [items, setItems] = useState<WerkgroepRow[]>(werkgroepen);
+  const [items, setItems] = useState<WerkingRow[]>(werkgroepen);
   const [createOpen, setCreateOpen] = useState(false);
   const [, startTransition] = useTransition();
 
@@ -160,7 +246,7 @@ export function WerkgroepenTable({
     startTransition(
       () =>
         void unsentGuard
-          .run(() => reorderWerkgroepenAction(next.map((w) => w.id)))
+          .run(() => actions.reorder(next.map((w) => w.id)))
           .then((result) => {
             if (result === UNSENT) setItems(before);
           }),
@@ -169,17 +255,12 @@ export function WerkgroepenTable({
 
   return (
     <div className="space-y-4">
-      {/* Toolbar: zoeken + nieuwe werkgroep (enkel beheerders) */}
+      {/* Toolbar: zoeken + nieuwe groep (enkel beheerders) */}
       <div className="flex flex-wrap items-center gap-3">
-        <SearchBar
-          value={query}
-          onChange={setQuery}
-          placeholder={nl ? "Zoek op naam, code, beschrijving of lid" : "Search by name, code, description or member"}
-          ariaLabel={nl ? "Werkgroepen zoeken" : "Search workgroups"}
-        />
+        <SearchBar value={query} onChange={setQuery} placeholder={copy.search} ariaLabel={copy.searchLabel} />
         {canManage && (
           <button type="button" className="vtk-tile-btn vtk-tile-btn-primary" onClick={() => setCreateOpen(true)}>
-            {nl ? "Nieuwe werkgroep" : "New workgroup"}
+            {copy.create}
           </button>
         )}
       </div>
@@ -189,7 +270,7 @@ export function WerkgroepenTable({
           <thead>
             <tr>
               <th className="w-8" aria-hidden />
-              <SortHeader label={nl ? "Werkgroep" : "Workgroup"} active={sort?.key === "name" ? sort.dir : null} onClick={() => toggleSort("name")} />
+              <SortHeader label={copy.column} active={sort?.key === "name" ? sort.dir : null} onClick={() => toggleSort("name")} />
               <SortHeader
                 label={nl ? "Leden" : "Members"}
                 active={sort?.key === "count" ? sort.dir : null}
@@ -221,6 +302,8 @@ export function WerkgroepenTable({
                 isOpen={isOpen(werkgroep.id)}
                 onToggle={() => toggleRow(werkgroep.id)}
                 nl={nl}
+                kind={kind}
+                copy={copy}
                 allRoles={allRoles}
                 year={year}
                 yearLabel={yearLabel}
@@ -235,14 +318,20 @@ export function WerkgroepenTable({
 
       {filtered.length === 0 && (
         <p className="text-sm text-[#5c667f]">
-          {query ? (nl ? "Geen werkgroepen gevonden." : "No workgroups found.") : nl ? "Nog geen werkgroepen." : "No workgroups yet."}
+          {query
+            ? nl
+              ? `Geen ${copy.many} gevonden.`
+              : `No ${copy.many} found.`
+            : nl
+              ? `Nog geen ${copy.many}.`
+              : `No ${copy.many} yet.`}
         </p>
       )}
 
       {createOpen && (
-        <Modal title={nl ? "Nieuwe werkgroep" : "New workgroup"} onClose={() => setCreateOpen(false)}>
+        <Modal title={copy.create} onClose={() => setCreateOpen(false)}>
           <SaveForm
-            action={saveWerkgroepAction}
+            action={actions.save}
             className="grid grid-cols-1 gap-3 md:grid-cols-2 [&>button]:md:col-span-2 [&>button]:justify-self-start"
             {...saveLabels}
             onSuccess={() => setCreateOpen(false)}
@@ -250,7 +339,13 @@ export function WerkgroepenTable({
             <div><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" required /></div>
             <div><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" required /></div>
             <div><Label>{nl ? "Code" : "Code"}</Label><Input name="code" placeholder={nl ? "auto" : "auto"} /></div>
-            <LeadLabelField id="werkgroep-new-lead-label" value="G3" nl={nl} />
+            <LeadLabelField
+              id={`${kind.toLowerCase()}-new-lead-label`}
+              value={WERKING_KINDS[kind].defaultLeadLabel}
+              nl={nl}
+              copy={copy}
+              suggestions={LEAD_SUGGESTIONS[kind]}
+            />
             <input type="hidden" name="active" value="on" />
           </SaveForm>
         </Modal>
@@ -270,6 +365,8 @@ function WerkgroepRowView({
   isOpen,
   onToggle,
   nl,
+  kind,
+  copy,
   allRoles,
   year,
   yearLabel,
@@ -277,7 +374,7 @@ function WerkgroepRowView({
   canManage,
   saveLabels,
 }: {
-  werkgroep: WerkgroepRow;
+  werkgroep: WerkingRow;
   isReorderable: boolean;
   isOver: boolean;
   onDragStart: () => void;
@@ -287,6 +384,8 @@ function WerkgroepRowView({
   isOpen: boolean;
   onToggle: () => void;
   nl: boolean;
+  kind: WerkingKind;
+  copy: Copy;
   allRoles: RoleOption[];
   year: number;
   yearLabel: string;
@@ -294,7 +393,7 @@ function WerkgroepRowView({
   canManage: boolean;
   saveLabels: SaveLabels;
 }) {
-  const detailId = `werkgroep-detail-${werkgroep.id}`;
+  const detailId = `${kind.toLowerCase()}-detail-${werkgroep.id}`;
   return (
     <>
       <tr
@@ -354,6 +453,8 @@ function WerkgroepRowView({
             <WerkgroepDetail
               werkgroep={werkgroep}
               nl={nl}
+              kind={kind}
+              copy={copy}
               allRoles={allRoles}
               year={year}
               yearLabel={yearLabel}
@@ -371,6 +472,8 @@ function WerkgroepRowView({
 function WerkgroepDetail({
   werkgroep,
   nl,
+  kind,
+  copy,
   allRoles,
   year,
   yearLabel,
@@ -378,8 +481,10 @@ function WerkgroepDetail({
   canManage,
   saveLabels,
 }: {
-  werkgroep: WerkgroepRow;
+  werkgroep: WerkingRow;
   nl: boolean;
+  kind: WerkingKind;
+  copy: Copy;
   allRoles: RoleOption[];
   year: number;
   yearLabel: string;
@@ -387,54 +492,58 @@ function WerkgroepDetail({
   canManage: boolean;
   saveLabels: SaveLabels;
 }) {
+  const actions = ACTIONS[kind];
   const grants = useMemo(() => new Set(werkgroep.roleGrants.map((g) => `${g.roleId}:${g.kind}`)), [werkgroep.roleGrants]);
-  // De verantwoordelijke van een werkgroep heet zoals de werkgroep het kiest
-  // (meestal G3 of G4); dat staat in de werkgroepinstellingen.
+  // De verantwoordelijke heet zoals de groep het kiest (bij een werkgroep
+  // meestal G3 of G4); dat staat in de instellingen van de groep.
   const roleLabel = (m: Member) => (m.role === "LEAD" ? werkgroep.leadLabel : nl ? "Lid" : "Member");
 
   return (
     <div className="space-y-4 py-1">
-      {/* Infotekst + website: elk lid van de werkgroep mag dit aanpassen. */}
-      <section className="rounded-xl border border-vtk-blue/12 bg-white p-4">
-        <h4 className="mb-1 text-sm font-semibold text-vtk-ink">{nl ? "Infotekst & website" : "Info text & website"}</h4>
-        <p className="mb-3 text-xs text-[#5c667f]">
-          {nl
-            ? "Deze tekst en link verschijnen op de publieke /werkgroepen-pagina."
-            : "This text and link appear on the public /werkgroepen page."}
-        </p>
-        <SaveForm
-          action={saveWerkgroepInfoAction}
-          className="grid grid-cols-1 gap-3 md:grid-cols-2 [&>button]:md:col-span-2 [&>button]:justify-self-start"
-          {...saveLabels}
-        >
-          <input type="hidden" name="id" value={werkgroep.id} />
-          <div className="md:col-span-2">
-            <Label htmlFor={`werkgroep-${werkgroep.id}-description-nl`}>
-              {nl ? "Infotekst (NL)" : "Info text (NL)"}
-            </Label>
-            <MarkdownEditorField
-              name="descriptionNl"
-              defaultValue={werkgroep.descriptionNl}
-              locale={locale}
-              rows={8}
-              textareaId={`werkgroep-${werkgroep.id}-description-nl`}
-            />
-          </div>
-          <div className="md:col-span-2">
-            <Label htmlFor={`werkgroep-${werkgroep.id}-description-en`}>
-              {nl ? "Infotekst (EN)" : "Info text (EN)"}
-            </Label>
-            <MarkdownEditorField
-              name="descriptionEn"
-              defaultValue={werkgroep.descriptionEn}
-              locale={locale}
-              rows={8}
-              textareaId={`werkgroep-${werkgroep.id}-description-en`}
-            />
-          </div>
-          <div className="md:col-span-2"><Label>Website</Label><Input name="website" defaultValue={werkgroep.website} placeholder="https://best.vtk.be" /></div>
-        </SaveForm>
-      </section>
+      {/* Infotekst + website: elk lid van de werkgroep mag dit aanpassen. Enkel
+          voor een soort met een publieke pagina; een jaarwerking heeft er geen. */}
+      {WERKING_KINDS[kind].publicPath && (
+        <section className="rounded-xl border border-vtk-blue/12 bg-white p-4">
+          <h4 className="mb-1 text-sm font-semibold text-vtk-ink">{nl ? "Infotekst & website" : "Info text & website"}</h4>
+          <p className="mb-3 text-xs text-[#5c667f]">
+            {nl
+              ? "Deze tekst en link verschijnen op de publieke /werkgroepen-pagina."
+              : "This text and link appear on the public /werkgroepen page."}
+          </p>
+          <SaveForm
+            action={saveWerkgroepInfoAction}
+            className="grid grid-cols-1 gap-3 md:grid-cols-2 [&>button]:md:col-span-2 [&>button]:justify-self-start"
+            {...saveLabels}
+          >
+            <input type="hidden" name="id" value={werkgroep.id} />
+            <div className="md:col-span-2">
+              <Label htmlFor={`werkgroep-${werkgroep.id}-description-nl`}>
+                {nl ? "Infotekst (NL)" : "Info text (NL)"}
+              </Label>
+              <MarkdownEditorField
+                name="descriptionNl"
+                defaultValue={werkgroep.descriptionNl}
+                locale={locale}
+                rows={8}
+                textareaId={`werkgroep-${werkgroep.id}-description-nl`}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <Label htmlFor={`werkgroep-${werkgroep.id}-description-en`}>
+                {nl ? "Infotekst (EN)" : "Info text (EN)"}
+              </Label>
+              <MarkdownEditorField
+                name="descriptionEn"
+                defaultValue={werkgroep.descriptionEn}
+                locale={locale}
+                rows={8}
+                textareaId={`werkgroep-${werkgroep.id}-description-en`}
+              />
+            </div>
+            <div className="md:col-span-2"><Label>Website</Label><Input name="website" defaultValue={werkgroep.website} placeholder="https://best.vtk.be" /></div>
+          </SaveForm>
+        </section>
+      )}
 
       {/* Leden (geselecteerd werkingsjaar) */}
       <Panel
@@ -514,7 +623,7 @@ function WerkgroepDetail({
       {canManage && (
         <>
           <Panel
-            title={nl ? "Rollen die deze werkgroep toekent" : "Roles this werkgroep grants"}
+            title={nl ? `Rollen die deze ${copy.one} toekent` : `Roles this ${copy.one} grants`}
             count={werkgroep.roleGrants.length}
             canEdit
             editLabel={nl ? "Bewerken" : "Edit"}
@@ -535,6 +644,7 @@ function WerkgroepDetail({
                       groupId={werkgroep.id}
                       werkgroepName={werkgroep.name}
                       leadLabel={werkgroep.leadLabel}
+                      setRole={actions.setRole}
                       defaultOn={grants.has(`${role.roleId}:DEFAULT`)}
                       leaderOn={grants.has(`${role.roleId}:LEADER`)}
                       nl={nl}
@@ -565,30 +675,36 @@ function WerkgroepDetail({
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-[#5c667f]">{nl ? "Deze werkgroep kent geen rollen toe." : "This werkgroep grants no roles."}</p>
+                <p className="text-sm text-[#5c667f]">
+                  {nl ? `Deze ${copy.one} kent geen rollen toe.` : `This ${copy.one} grants no roles.`}
+                </p>
               )
             }
           </Panel>
 
           <details className="rounded-xl border border-vtk-blue/12 bg-white">
             <summary className="cursor-pointer px-4 py-2 text-sm font-medium text-vtk-ink">
-              {nl ? "Werkgroepinstellingen" : "Werkgroep settings"}
+              {copy.settings}
             </summary>
             <div className="space-y-4 p-4">
               <SaveForm
-                action={saveWerkgroepAction}
+                action={actions.save}
                 className="grid grid-cols-1 gap-3 md:grid-cols-2 [&>button]:md:col-span-2 [&>button]:justify-self-start"
                 {...saveLabels}
               >
                 <input type="hidden" name="id" value={werkgroep.id} />
                 <div><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" defaultValue={werkgroep.nameNl} required /></div>
                 <div><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" defaultValue={werkgroep.nameEn} required /></div>
-                <LeadLabelField id={`werkgroep-${werkgroep.id}-lead-label`} value={werkgroep.leadLabel} nl={nl} />
+                <LeadLabelField
+                  id={`${kind.toLowerCase()}-${werkgroep.id}-lead-label`}
+                  value={werkgroep.leadLabel}
+                  nl={nl}
+                  copy={copy}
+                  suggestions={LEAD_SUGGESTIONS[kind]}
+                />
                 <label className="md:col-span-2 inline-flex items-center gap-2 text-sm text-vtk-ink">
                   <input type="checkbox" name="active" defaultChecked={werkgroep.active} className="size-4 rounded border-zinc-400" />
-                  {nl
-                    ? "Actief (een inactieve werkgroep verdwijnt van /werkgroepen; de historiek blijft)"
-                    : "Active (an inactive werkgroep disappears from /werkgroepen; history is kept)"}
+                  {copy.active}
                 </label>
               </SaveForm>
             </div>
@@ -599,11 +715,14 @@ function WerkgroepDetail({
   );
 }
 
+type SetRoleAction = (formData: FormData) => Promise<void>;
+
 function RoleGrantRow({
   role,
   groupId,
   werkgroepName,
   leadLabel,
+  setRole,
   defaultOn,
   leaderOn,
   nl,
@@ -612,6 +731,7 @@ function RoleGrantRow({
   groupId: string;
   werkgroepName: string;
   leadLabel: string;
+  setRole: SetRoleAction;
   defaultOn: boolean;
   leaderOn: boolean;
   nl: boolean;
@@ -622,8 +742,8 @@ function RoleGrantRow({
         <span className="text-vtk-ink">{role.name}</span>
         <code className="rounded bg-vtk-blue-soft/60 px-1.5 py-0.5 text-[11px] text-[#5c667f]">{role.code}</code>
       </div>
-      <GrantToggle role={role} groupId={groupId} werkgroepName={werkgroepName} leadLabel={leadLabel} kind="DEFAULT" on={defaultOn} nl={nl} />
-      <GrantToggle role={role} groupId={groupId} werkgroepName={werkgroepName} leadLabel={leadLabel} kind="LEADER" on={leaderOn} nl={nl} />
+      <GrantToggle role={role} groupId={groupId} werkgroepName={werkgroepName} leadLabel={leadLabel} setRole={setRole} kind="DEFAULT" on={defaultOn} nl={nl} />
+      <GrantToggle role={role} groupId={groupId} werkgroepName={werkgroepName} leadLabel={leadLabel} setRole={setRole} kind="LEADER" on={leaderOn} nl={nl} />
     </>
   );
 }
@@ -633,6 +753,7 @@ function GrantToggle({
   groupId,
   werkgroepName,
   leadLabel,
+  setRole,
   kind,
   on,
   nl,
@@ -641,6 +762,7 @@ function GrantToggle({
   groupId: string;
   werkgroepName: string;
   leadLabel: string;
+  setRole: SetRoleAction;
   kind: "DEFAULT" | "LEADER";
   on: boolean;
   nl: boolean;
@@ -654,12 +776,12 @@ function GrantToggle({
         ? `enkel de ${leadLabel}`
         : `${leadLabel} only`;
   return (
-    <form action={unsentGuard.form(setGroupRoleAction)} className="justify-self-center">
+    <form action={unsentGuard.form(setRole)} className="justify-self-center">
       <input type="hidden" name="groupId" value={groupId} />
       <input type="hidden" name="roleId" value={role.roleId} />
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="enabled" value={on ? "0" : "1"} />
-      <ToggleDot on={on} title={`${werkgroepName} — ${role.name}: ${which}`} />
+      <ToggleDot on={on} title={`${werkgroepName}, ${role.name}: ${which}`} />
     </form>
   );
 }

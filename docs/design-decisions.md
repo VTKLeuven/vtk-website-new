@@ -12160,3 +12160,44 @@ staat in `apps/web/lib/storage-cleanup*.ts`, het scherm op
   een eigenaar-rij en hun eigen opruiming.
 - **Verwijderd is weg.** Er is geen prullenmand in de bucket; wat terug moet,
   moet opnieuw geüpload worden.
+
+## Jaarwerkingen als derde soort groep
+
+Kanweek, Halftime, Parttime, Fulltime, Duplex en Triplex hebben elk een ploeg
+per werkingsjaar en kunnen, net als een werkgroep, rollen aan hun leden
+toekennen. Ze zijn een derde soort `Group` (`type = JAARWERKING`) naast de
+praesidiumposten en de werkgroepen, beheerd op `/admin/jaarwerkingen` onder
+Ledenbeheer, november 2026. Hetzelfde scherm als de werkgroepen
+(`WerkingenAdmin`), met wat per soort verschilt in `apps/web/lib/groupKinds.ts`.
+
+- **Een eigen beheerrecht, niet dat van de werkgroepen.**
+  `jaarwerkingen.manage` en `jaarwerkingen.manageOwnMembers` volgen exact de
+  regels van hun werkgroep-tegenhanger (zie `docs/permissions.md`), maar lopen
+  er niet in over: wie werkgroepen beheert, beheert daarmee geen Kanweek. Elke
+  actie controleert dat de groep van het juiste soort is.
+- **Een eigen rol per jaarwerking** (`jaarwerking-<code>`), aan elk lid
+  toegekend, als lege container zoals bij de werkgroepen. De migratie maakte
+  de zes jaarwerkingen en hun rol eenmalig aan; daarna zijn ze GUI-beheerd.
+- **Geen publieke pagina en geen infotekst.** Er is al een contentpagina
+  "Jaarwerkingen"; de site toont de groepen nergens publiek. Daarom ziet een
+  gewoon lid van een jaarwerking het beheerscherm ook niet: er valt voor hem
+  niets te bewerken. De verantwoordelijke met `manageOwnMembers` wel.
+- **De titel van de verantwoordelijke** begint op "Verantwoordelijke" en is vrij
+  te kiezen, zoals G3 of G4 bij een werkgroep.
+- **Het BO blijft de jaarwerkingen als vak kennen** (`x:kanweek`, zie
+  "Bestuursorgaan: posten, rollen en categorieën"), niet als groep. De groepen
+  staan buiten de postherkenning en buiten "Mijn budgetten": met de groep erbij
+  zou "Kanw" voor twee doelen passen en niet meer herkend worden, en een lid
+  van Kanweek kreeg een leeg blok terwijl er wel budgetten van Kanweek zijn.
+  Het lidmaatschap koppelen aan het vak is een latere keuze van Groep 5.
+- **De kassa's houden de ene keuze "Jaarwerking"** (zie hierboven, november
+  2026). De groepen staan daar niet nog eens apart in de lijst.
+- **De koppel-je-@vtk.be-poort telt een jaarwerking niet mee.** Wie enkel in
+  Kanweek zit, krijgt geen poort die een kringaccount eist. Staat een
+  jaarwerking als bron in een groepsadres ("Elke jaarwerking" of één
+  jaarwerking), dan toont dat scherm wie nog niet gekoppeld is.
+- **Verder gedraagt een jaarwerking zich als een werkgroep**: ze staat in de
+  keuzelijsten die elke groep tonen (eigenaar van een evenement, ticketverkoop,
+  formulier, rekening), in de uitleendienst vraagt ze aan onder het type
+  "werkgroep of jaarwerking", en haar ticketverkoop komt zoals die van een post
+  vanzelf in het nieuws (enkel een werkgroep vraagt eerst de redactie).

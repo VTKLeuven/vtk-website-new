@@ -83,7 +83,7 @@ export const OAUTH_CLIENT_OWNER = 'vtk';
 export type Locale = 'NL' | 'EN';
 export type AuthGroupRole = 'MEMBER' | 'LEAD';
 /** Spiegelt `GroupType` in het schema; los getypeerd zodat @vtk/auth geen Prisma-types lekt. */
-export type AuthGroupType = 'PRAESIDIUM' | 'WERKGROEP';
+export type AuthGroupType = 'PRAESIDIUM' | 'WERKGROEP' | 'JAARWERKING';
 
 export type AuthUser = {
   id: string;
@@ -124,8 +124,8 @@ export type AuthGroup = {
   nameEn: string;
   role: AuthGroupRole;
   /**
-   * Praesidiumpost of werkgroep. De submodules tonen die twee apart (een
-   * werkgroep is geen post), en `deriveMemberRequester` in de uitleendienst
+   * Praesidiumpost, werkgroep of jaarwerking. De submodules tonen die apart
+   * (een werkgroep of jaarwerking is geen post), en `deriveMemberRequester` in de uitleendienst
    * leidde dit voordien server-side opnieuw af uit de DB terwijl de UI ze op
    * één hoop gooide.
    */

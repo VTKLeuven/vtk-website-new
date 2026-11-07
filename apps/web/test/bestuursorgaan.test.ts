@@ -225,6 +225,14 @@ describe("posten", () => {
       "Andere jaarwerking",
     ]);
   });
+
+  it("biedt een jaarwerking als groep niet nog eens aan als post", () => {
+    // Sinds /admin/jaarwerkingen bestaat Kanweek ook als `Group`. Het BO kent ze
+    // als eigen vak (`x:kanweek`); de groep hoort niet tussen de posten.
+    const kanweek = { id: "kanweek", code: "KANWEEK", slug: "kanweek", nameNl: "Kanweek", nameEn: "Kanweek", type: "JAARWERKING" };
+    const options = postOptions([...POSTS, ...WERKGROEPEN, kanweek], true);
+    expect(options.filter((o) => o.name === "Kanweek").map((o) => o.key)).toEqual(["x:kanweek"]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1015,6 +1023,11 @@ describe("wat een post zelf ziet", () => {
     expect(onthaal.stats).toMatchObject({ due: 4, done: 1, open: 3, upcoming: 1 });
     // Toneel is van Cultuur alleen en blijft weg.
     expect(onthaal.dossiers.some((d) => d.activity === "Toneel")).toBe(false);
+  });
+
+  it("geeft een jaarwerking geen leeg blok: het BO kent haar enkel als vak", () => {
+    const own = [...ownGroups(["ONTHAAL"]), { id: "kanweek", code: "KANWEEK", slug: "kanweek", nameNl: "Kanweek", nameEn: "Kanweek", type: "JAARWERKING" }];
+    expect(ownPostKeys(own)).toEqual(ownPostKeys(ownGroups(["ONTHAAL"])));
   });
 
   it("geeft wie in Groep 5 zit ook de vakken van Groep 5, maar enkel als er iets in zit", () => {

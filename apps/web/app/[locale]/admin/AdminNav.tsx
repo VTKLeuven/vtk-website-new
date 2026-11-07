@@ -414,6 +414,16 @@ const icons: Record<string, ReactNode> = {
       <path d="m2 17 10 5 10-5" />
     </Svg>
   ),
+  // jaarwerkingen: kalender met een ster (een werking die elk jaar terugkomt)
+  jaarwerkingen: (
+    <Svg>
+      <rect width="18" height="18" x="3" y="4" rx="2" />
+      <path d="M16 2v4" />
+      <path d="M8 2v4" />
+      <path d="M3 10h18" />
+      <path d="m12 12.5 1.1 2.2 2.4.3-1.75 1.7.4 2.4-2.15-1.15-2.15 1.15.4-2.4-1.75-1.7 2.4-.3Z" />
+    </Svg>
+  ),
   // roles: rechtenbundel -> schild met vinkje
   roles: (
     <Svg>

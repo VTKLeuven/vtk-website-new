@@ -40,6 +40,11 @@ export const PERMISSIONS = [
   // recht telt enkel in de werkgroep die het je verleent, enkel voor gewone
   // leden en enkel in het huidige werkingsjaar (lib/werkgroepMembers.ts).
   { code: "werkgroepen.manageOwnMembers", labelNl: "Leden van de eigen werkgroep toevoegen en verwijderen", labelEn: "Add and remove members of own werkgroep", category: "users" },
+  // Jaarwerkingen (Kanweek, Halftime, ...) naast de werkgroepen, met dezelfde
+  // twee rechten: alles beheren, of als verantwoordelijke de gewone leden van
+  // de eigen jaarwerking (lib/werkgroepMembers.ts, dezelfde grenzen).
+  { code: "jaarwerkingen.manage", labelNl: "Jaarwerkingen en hun rollen beheren", labelEn: "Manage yearly events (jaarwerkingen) and their roles", category: "users" },
+  { code: "jaarwerkingen.manageOwnMembers", labelNl: "Leden van de eigen jaarwerking toevoegen en verwijderen", labelEn: "Add and remove members of own yearly event (jaarwerking)", category: "users" },
   { code: "roles.manage", labelNl: "Rollen beheren en toewijzen", labelEn: "Manage and assign roles", category: "users" },
   // Wie doet wat (/admin/wie-doet-wat): de taakverdeling binnen de posten.
   // Lezen staat los van bewerken omdat het register er is om iemand te vinden,

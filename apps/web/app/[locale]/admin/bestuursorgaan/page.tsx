@@ -67,7 +67,10 @@ export default async function BestuursorgaanPage({
     getGoogleStatus(),
     getBoConfig(),
     getScanStatus(),
+    // Zonder jaarwerkingen: die staan als eigen vak in de keuzelijst
+    // (`BO_EXTRA_POSTS`), zie lib/bo/overview.ts.
     prisma.group.findMany({
+      where: { type: { not: "JAARWERKING" } },
       orderBy: [{ orderInPraesidium: "asc" }, { nameNl: "asc" }],
       select: { id: true, code: true, slug: true, nameNl: true, nameEn: true, type: true, active: true, orderInPraesidium: true },
     }),

@@ -33,9 +33,14 @@ const G5_KEYS = BO_EXTRA_POSTS.filter((p) => p.section === "g5").map((p) => p.ke
  * lid is. Wie in Groep 5 zit, krijgt er de vier vakken van Groep 5 bij
  * (Praeses, Vice-praeses, Secretaris, Beheer): daar dienen ze hun eigen
  * budgetten onder in.
+ *
+ * Een jaarwerking (`Group.type = JAARWERKING`) telt niet mee: het BO kent
+ * Kanweek en co. als eigen vak (`x:kanweek`, zie `BO_EXTRA_POSTS`) en nooit als
+ * groep, dus ze gaf hier enkel een leeg blok "nog niets", ook wanneer er wel
+ * budgetten van die jaarwerking zijn.
  */
-export function ownPostKeys(groups: readonly Pick<OwnGroup, "id" | "code">[]): string[] {
-  const keys = groups.map((group) => `g:${group.id}`);
+export function ownPostKeys(groups: readonly (Pick<OwnGroup, "id" | "code"> & { type?: string })[]): string[] {
+  const keys = groups.filter((group) => group.type !== "JAARWERKING").map((group) => `g:${group.id}`);
   if (groups.some((group) => group.code === "GROEP5")) keys.push(...G5_KEYS);
   return [...new Set(keys)];
 }

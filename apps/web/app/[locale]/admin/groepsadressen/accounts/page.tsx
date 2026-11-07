@@ -48,7 +48,17 @@ export default async function AdminProvisionAccounts({
     ...kiesploegen.map((k) => ({ value: `kiesploeg:${k.id}`, label: k.formalName })),
     ...groups.map((g) => ({
       value: `group:${g.id}`,
-      label: `${nl ? g.nameNl : g.nameEn}${g.type === "WERKGROEP" ? (nl ? " (werkgroep)" : " (work group)") : ""}`,
+      label: `${nl ? g.nameNl : g.nameEn}${
+        g.type === "WERKGROEP"
+          ? nl
+            ? " (werkgroep)"
+            : " (work group)"
+          : g.type === "JAARWERKING"
+            ? nl
+              ? " (jaarwerking)"
+              : " (yearly event)"
+            : ""
+      }`,
     })),
   ];
 

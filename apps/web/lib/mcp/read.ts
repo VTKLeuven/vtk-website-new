@@ -58,7 +58,7 @@ export type McpReadResource = (typeof MCP_READ_RESOURCES)[number];
 const RESOURCE_PERMISSIONS = {
   user_search: ["users.search", "users.view", "users.edit", "users.bulkImport"],
   users: ["users.view", "users.edit", "users.bulkImport"],
-  groups: ["groups.manage", "werkgroepen.manage", "roles.manage", "users.view"],
+  groups: ["groups.manage", "werkgroepen.manage", "jaarwerkingen.manage", "roles.manage", "users.view"],
   roles: ["roles.manage"],
   pages: ["pages.edit", "pages.editAll", "pages.manage", "pages.publish", "pages.delete"],
   navigation: ["header.manage", "pages.manage"],

@@ -16,6 +16,7 @@ import {
   removeMember,
 } from "./client";
 import {
+  type GroupKind,
   type KiesploegMembershipRow,
   type MembershipRow,
   desiredMembers,
@@ -72,7 +73,7 @@ type MailGroupRow = {
   allowExternalSenders: boolean;
   sources: {
     groupId: string | null;
-    groupType: "PRAESIDIUM" | "WERKGROEP" | null;
+    groupType: GroupKind | null;
     kiesploegId: string | null;
     kiesploegPostId: string | null;
     onlyLead: boolean;
@@ -238,7 +239,7 @@ function isId(value: string | null): value is string {
   return value !== null;
 }
 
-function isKind(value: "PRAESIDIUM" | "WERKGROEP" | null): value is "PRAESIDIUM" | "WERKGROEP" {
+function isKind(value: GroupKind | null): value is GroupKind {
   return value !== null;
 }
 

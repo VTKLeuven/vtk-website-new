@@ -59,6 +59,7 @@ export const AUDIT_ENTITIES = {
   post: { nl: "Post", en: "Post", group: "users" },
   postTask: { nl: "Taak van een post", en: "Post task", group: "users" },
   werkgroep: { nl: "Werkgroep", en: "Werkgroep", group: "users" },
+  jaarwerking: { nl: "Jaarwerking", en: "Yearly event", group: "users" },
   poc: { nl: "POC", en: "POC", group: "users" },
   role: { nl: "Rol", en: "Role", group: "roles" },
   rolePermission: { nl: "Rolrecht", en: "Role permission", group: "roles" },

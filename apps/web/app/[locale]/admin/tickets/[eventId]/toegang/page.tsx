@@ -188,8 +188,9 @@ export default async function TicketAccessPage({
             <div className="ticket-admin-form-grid">
               <div className="ticket-admin-field" data-span="2">
                 <label htmlFor="grant-group">{locale === "nl" ? "Groep" : "Group"}</label>
-                {/* Posten en werkgroepen apart: de standaardregel behandelt ze
-                    verschillend, dus je wil bij het toekennen zien wat je kiest. */}
+                {/* Posten, werkgroepen en jaarwerkingen apart: de standaardregel
+                    behandelt ze verschillend, dus je wil bij het toekennen zien
+                    wat je kiest. */}
                 <select id="grant-group" name="groupId" required>
                   <optgroup label={locale === "nl" ? "Praesidiumposten" : "Praesidium posts"}>
                     {groups.filter((group) => group.type === "PRAESIDIUM").map((group) => (
@@ -198,6 +199,11 @@ export default async function TicketAccessPage({
                   </optgroup>
                   <optgroup label={locale === "nl" ? "Werkgroepen" : "Working groups"}>
                     {groups.filter((group) => group.type === "WERKGROEP").map((group) => (
+                      <option key={group.id} value={group.id}>{locale === "en" ? group.nameEn : group.nameNl}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label={locale === "nl" ? "Jaarwerkingen" : "Yearly events"}>
+                    {groups.filter((group) => group.type === "JAARWERKING").map((group) => (
                       <option key={group.id} value={group.id}>{locale === "en" ? group.nameEn : group.nameNl}</option>
                     ))}
                   </optgroup>

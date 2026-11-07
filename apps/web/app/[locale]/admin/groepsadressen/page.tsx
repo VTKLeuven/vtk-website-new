@@ -6,7 +6,10 @@ import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import { getGoogleStatus } from "@/lib/google/config";
 import {
+  GROUP_KINDS,
   desiredMembers,
+  everyGroupOfKindLabel,
+  type GroupKind,
   type KiesploegMembershipRow,
   type MembershipRow,
 } from "@/lib/google/members";
@@ -108,7 +111,7 @@ export default async function AdminMailGroups({
     ...new Set(
       allSources
         .map((src) => src.groupType)
-        .filter((type): type is "PRAESIDIUM" | "WERKGROEP" => type !== null),
+        .filter((type): type is GroupKind => type !== null),
     ),
   ];
   const usesKiesploeg = allSources.some((src) => src.kiesploegId || src.kiesploegPostId);
@@ -208,11 +211,7 @@ export default async function AdminMailGroups({
     {
       label: nl ? "Alles" : "Everything",
       options: [
-        {
-          value: "type:PRAESIDIUM",
-          label: nl ? "Elke praesidiumpost" : "Every praesidium post",
-        },
-        { value: "type:WERKGROEP", label: nl ? "Elke werkgroep" : "Every work group" },
+        ...GROUP_KINDS.map((kind) => ({ value: `type:${kind}`, label: everyGroupOfKindLabel(kind, nl) })),
       ],
     },
     {
@@ -225,6 +224,12 @@ export default async function AdminMailGroups({
       label: nl ? "Werkgroepen" : "Work groups",
       options: groups
         .filter((g) => g.type === "WERKGROEP")
+        .map((g) => ({ value: `group:${g.id}`, label: nl ? g.nameNl : g.nameEn })),
+    },
+    {
+      label: nl ? "Jaarwerkingen" : "Yearly events",
+      options: groups
+        .filter((g) => g.type === "JAARWERKING")
         .map((g) => ({ value: `group:${g.id}`, label: nl ? g.nameNl : g.nameEn })),
     },
     ...kiesploegen.map((k) => ({
@@ -254,15 +259,14 @@ export default async function AdminMailGroups({
 function sourceName(
   src: {
     group: { nameNl: string; nameEn: string } | null;
-    groupType: "PRAESIDIUM" | "WERKGROEP" | null;
+    groupType: GroupKind | null;
     kiesploeg: { formalName: string } | null;
     kiesploegPost: { name: string; kiesploeg: { formalName: string } } | null;
   },
   nl: boolean,
 ): string {
   if (src.group) return nl ? src.group.nameNl : src.group.nameEn;
-  if (src.groupType === "PRAESIDIUM") return nl ? "Elke praesidiumpost" : "Every praesidium post";
-  if (src.groupType === "WERKGROEP") return nl ? "Elke werkgroep" : "Every work group";
+  if (src.groupType) return everyGroupOfKindLabel(src.groupType, nl);
   if (src.kiesploeg) return src.kiesploeg.formalName;
   if (src.kiesploegPost) {
     return `${src.kiesploegPost.name} (${src.kiesploegPost.kiesploeg.formalName})`;

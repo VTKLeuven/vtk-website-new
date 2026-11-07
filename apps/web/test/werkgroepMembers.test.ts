@@ -78,6 +78,31 @@ describe("werkgroepenWithOwnMemberRights", () => {
     expect([...allowed]).toEqual(["chemix"]);
   });
 
+  it("laat de verantwoordelijke van een jaarwerking haar leden beheren met het eigen recht", async () => {
+    findMany.mockResolvedValue([{ groupId: "kanweek", kind: "LEADER" }]);
+    const allowed = await werkgroepenWithOwnMemberRights(
+      session([group("kanweek", "LEAD", "JAARWERKING")], ["jaarwerkingen.manageOwnMembers"]),
+      "JAARWERKING",
+    );
+    expect([...allowed]).toEqual(["kanweek"]);
+    expect(findMany.mock.calls[0][0].where.role.permissions.some.permission.code).toBe("jaarwerkingen.manageOwnMembers");
+  });
+
+  it("laat het recht van een werkgroep niet overlopen naar een jaarwerking, en omgekeerd", async () => {
+    findMany.mockResolvedValue([
+      { groupId: "chemix", kind: "LEADER" },
+      { groupId: "kanweek", kind: "LEADER" },
+    ]);
+    const both = [group("chemix", "LEAD"), group("kanweek", "LEAD", "JAARWERKING")];
+    // Enkel het werkgroeprecht: Kanweek telt niet, ook niet als jaarwerking.
+    expect([...(await werkgroepenWithOwnMemberRights(session(both)))]).toEqual(["chemix"]);
+    expect((await werkgroepenWithOwnMemberRights(session(both), "JAARWERKING")).size).toBe(0);
+    // Enkel het jaarwerkingrecht: Chemix telt niet.
+    const yearly = session(both, ["jaarwerkingen.manageOwnMembers"]);
+    expect((await werkgroepenWithOwnMemberRights(yearly)).size).toBe(0);
+    expect([...(await werkgroepenWithOwnMemberRights(yearly, "JAARWERKING"))]).toEqual(["kanweek"]);
+  });
+
   it("negeert praesidiumposten en vraagt niets op zonder het recht", async () => {
     expect((await werkgroepenWithOwnMemberRights(session([group("it", "LEAD", "PRAESIDIUM")]))).size).toBe(0);
     expect((await werkgroepenWithOwnMemberRights(session([group("chemix", "LEAD")], []))).size).toBe(0);

@@ -154,7 +154,8 @@ export function canSeeTripDetails(session: SessionPayload): boolean {
     canManage(session) ||
     hasPermission(session, 'logistiek.helpers') ||
     session.groups.some(
-      (group) => group.type === 'PRAESIDIUM' || group.type === 'WERKGROEP'
+      (group) =>
+        group.type === 'PRAESIDIUM' || group.type === 'WERKGROEP' || group.type === 'JAARWERKING'
     )
   );
 }

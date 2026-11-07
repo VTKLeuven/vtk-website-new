@@ -24,7 +24,11 @@ export async function loadBoOverview(
       where: { meeting: { workingYear: { gte: year - 1, lte: year + 1 } } },
       include: { meeting: true },
     }),
+    // Zonder jaarwerkingen: die kent het BO als eigen vak (`x:kanweek`), niet als
+    // groep. Met de groep erbij zou "Kanw" voor twee doelen passen en niet meer
+    // herkend worden.
     prisma.group.findMany({
+      where: { type: { not: "JAARWERKING" } },
       select: { id: true, code: true, slug: true, nameNl: true, nameEn: true, orderInPraesidium: true, type: true },
     }),
     prisma.boPostAlias.findMany({ select: { key: true, postKeys: true } }),

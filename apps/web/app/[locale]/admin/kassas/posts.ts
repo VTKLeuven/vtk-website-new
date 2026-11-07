@@ -15,16 +15,23 @@ export type PostChoice = { id: string; name: string; own: boolean };
  * de kassa waar ze al op stond.
  *
  * "Jaarwerking" staat op geen post (`YEARLY_EVENT_CHOICE`), en hoog in de lijst:
- * tussen een dertigtal posten en werkgroepen zoek je ze anders onderaan.
+ * tussen een dertigtal posten en werkgroepen zoek je ze anders onderaan. De
+ * jaarwerkingen als groep (Kanweek, Halftime, ...) staan er daarom niet nog
+ * eens apart bij: dan waren er twee manieren om hetzelfde te kiezen.
  */
 export async function postChoices(
   access: CashRegisterAccess,
   locale: "nl" | "en",
   currentGroupId?: string | null,
 ): Promise<PostChoice[]> {
-  const keep = [...access.postIds, ...(currentGroupId ? [currentGroupId] : [])];
   const groups = await prisma.group.findMany({
-    where: { OR: [{ active: true }, { id: { in: keep } }] },
+    where: {
+      OR: [
+        { active: true, type: { not: "JAARWERKING" } },
+        { id: { in: access.postIds }, type: { not: "JAARWERKING" } },
+        ...(currentGroupId ? [{ id: currentGroupId }] : []),
+      ],
+    },
     orderBy: [{ type: "asc" }, { orderInPraesidium: "asc" }, { nameNl: "asc" }],
     select: { id: true, nameNl: true, nameEn: true },
   });

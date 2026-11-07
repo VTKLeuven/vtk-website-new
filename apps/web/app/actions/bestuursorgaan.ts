@@ -85,7 +85,7 @@ async function validPostKeys(raw: string): Promise<string[] | null> {
   const keys = [...new Set(raw.split(",").map((k) => k.trim()).filter(Boolean))];
   const groupIds = keys.filter((k) => k.startsWith("g:")).map((k) => k.slice(2));
   const found = groupIds.length
-    ? new Set((await prisma.group.findMany({ where: { id: { in: groupIds } }, select: { id: true } })).map((g) => g.id))
+    ? new Set((await prisma.group.findMany({ where: { id: { in: groupIds }, type: { not: "JAARWERKING" } }, select: { id: true } })).map((g) => g.id))
     : new Set<string>();
   const ok = keys.every((k) => EXTRA_POST_KEYS.has(k) || (k.startsWith("g:") && found.has(k.slice(2))));
   return ok ? keys : null;

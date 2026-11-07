@@ -26,11 +26,15 @@ export function requesterOptions(
   }));
 }
 
+/**
+ * Een werkgroep of jaarwerking: beide vragen aan onder het WERKGROEP-type
+ * ("werkgroep of jaarwerking"), en staan samen in hun eigen deel van de lijst.
+ */
 export function isWerkgroep(option: RequesterOption): boolean {
-  return option.type === 'WERKGROEP';
+  return option.type === 'WERKGROEP' || option.type === 'JAARWERKING';
 }
 
-/** Splitst de keuzelijst in posten en werkgroepen, met behoud van de volgorde. */
+/** Splitst de keuzelijst in posten en werkgroepen/jaarwerkingen, met behoud van de volgorde. */
 export function splitRequesterOptions(groups: RequesterOption[]): {
   posten: RequesterOption[];
   werkgroepen: RequesterOption[];

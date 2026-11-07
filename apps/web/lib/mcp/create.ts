@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { logSystemAudit, type AuditEntity } from "@/lib/audit";
 import { isEditableDestination } from "@/lib/href";
+import { WERKING_KINDS, isWerkingKind, managePermissionFor } from "@/lib/groupKinds";
 import { parseShift, ShiftValidationError } from "@/lib/shift";
 import {
   createCalendarCategory,
@@ -75,7 +76,7 @@ const CREATE_PERMISSIONS = {
   form_section: ["forms.create", "forms.manageAll"],
   form_field: ["forms.create", "forms.manageAll"],
   photo_album: ["photos.upload", "photos.manageAlbums", "media.manage"],
-  group: ["groups.manage", "werkgroepen.manage"],
+  group: ["groups.manage", "werkgroepen.manage", "jaarwerkingen.manage"],
   role: ["roles.manage"],
   dashboard_tile: ["dashboard.manage", "dashboard.manageOwn"],
   short_link: ["shortlinks.manage"],
@@ -135,7 +136,7 @@ const schemas = {
   form_section: z.object({ formId: z.string().min(1), titleNl: z.string().trim().min(1).max(200), titleEn: optionalText(200), descriptionNl: optionalText(10_000), descriptionEn: optionalText(10_000), sortOrder: z.number().int().min(0).max(999).default(0) }).strict(),
   form_field: z.object({ formId: z.string().min(1), sectionId: z.string().optional().nullable(), code, type: z.enum(["SHORT_TEXT", "LONG_TEXT", "SINGLE_CHOICE", "MULTIPLE_CHOICE", "DROPDOWN", "BOOLEAN", "EMAIL", "NUMBER", "DATE", "TIME", "PHONE", "URL", "SCALE", "FILE", "CONSENT", "PROFILE", "CALENDAR_EVENT"]), labelNl: z.string().trim().min(1).max(200), labelEn: optionalText(200), helpNl: optionalText(2_000), helpEn: optionalText(2_000), required: z.boolean().default(false), config: z.record(z.string(), z.unknown()).default({}), sortOrder: z.number().int().min(0).max(999).default(0), options: z.array(z.object({ code, labelNl: z.string().trim().min(1).max(200), labelEn: optionalText(200) }).strict()).max(100).default([]) }).strict(),
   photo_album: z.object({ slug, titleNl: z.string().trim().min(1).max(200), titleEn: optionalText(200), descriptionNl: optionalText(10_000), descriptionEn: optionalText(10_000), eventDate: isoMoment.optional().nullable() }).strict(),
-  group: z.object({ type: z.enum(["PRAESIDIUM", "WERKGROEP"]), code, slug, nameNl: z.string().trim().min(1).max(160), nameEn: z.string().trim().min(1).max(160), descriptionNl: optionalText(10_000), descriptionEn: optionalText(10_000), website: url.optional().nullable() }).strict(),
+  group: z.object({ type: z.enum(["PRAESIDIUM", "WERKGROEP", "JAARWERKING"]), code, slug, nameNl: z.string().trim().min(1).max(160), nameEn: z.string().trim().min(1).max(160), descriptionNl: optionalText(10_000), descriptionEn: optionalText(10_000), website: url.optional().nullable() }).strict(),
   role: z.object({ code: slug, nameNl: z.string().trim().min(1).max(160), nameEn: z.string().trim().min(1).max(160), descriptionNl: optionalText(2_000), descriptionEn: optionalText(2_000), color: optionalText(40), order: z.number().int().min(0).max(999).default(0) }).strict(),
   dashboard_tile: z.object({ label: z.string().trim().min(1).max(160), url, icon: z.string().trim().min(1).max(80).default("link"), color: z.string().trim().min(1).max(80).default("navy"), scope: z.enum(["GLOBAL", "GROUP"]), groupCode: code.optional(), order: z.number().int().min(0).max(999).default(0) }).strict(),
   short_link: z.object({ slug: z.string().trim().min(1).max(128).regex(/^[a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?$/), url, note: optionalText(2_000), expiresAt: isoMoment.optional().nullable() }).strict(),
@@ -448,10 +449,10 @@ export async function createMcpRecord(principal: McpPrincipal, raw: McpCreateInp
       }
       case "group": {
         const input = schemas.group.parse(data);
-        const permission = input.type === "WERKGROEP" ? "werkgroepen.manage" : "groups.manage";
+        const permission = managePermissionFor(input.type);
         if (!hasMcpPermission(principal, permission)) throw new McpInputError("FORBIDDEN", `Permissie ${permission} ontbreekt.`);
         const row = await prisma.group.create({ data: { ...input, descriptionNl: nullIfEmpty(input.descriptionNl), descriptionEn: nullIfEmpty(input.descriptionEn), website: nullIfEmpty(input.website), active: false } });
-        await audit(principal, input.type === "WERKGROEP" ? "werkgroep" : "post", row.id, row.nameNl, "inactieve groep zonder leden of rollen aangemaakt via MCP");
+        await audit(principal, isWerkingKind(input.type) ? WERKING_KINDS[input.type].auditEntity : "post", row.id, row.nameNl, "inactieve groep zonder leden of rollen aangemaakt via MCP");
         result = row; break;
       }
       case "role": {

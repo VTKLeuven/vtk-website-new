@@ -16,6 +16,7 @@ import { deleteObject } from "@vtk/storage";
 import { storeAvatar, MAX_AVATAR_BYTES } from "@/lib/avatar";
 import { LEAD_LABEL_MAX } from "@/lib/werkgroepen";
 import { canManageOwnWerkgroepMembers } from "@/lib/werkgroepMembers";
+import { WERKING_KINDS, isWerkingKind, managePermissionFor, type WerkingKind } from "@/lib/groupKinds";
 import { eraseUserData, StorageUnavailableError } from "@/lib/privacy/account";
 import { describeChanges, logAudit } from "@/lib/audit";
 import { pushMailGroupsForGroup } from "@/lib/google/sync";
@@ -453,33 +454,36 @@ const membershipSchema = z.object({
 
 // Lidmaatschappen beheren mag met users.edit (gebruikersbeheer). Verder hangt het
 // af van het soort groep: een praesidiumpost vraagt groups.manage, een werkgroep
-// vraagt werkgroepen.manage. Zo kan werkgroepbeheer los gedelegeerd worden.
-// Superadmin altijd (via hasPermission).
+// werkgroepen.manage en een jaarwerking jaarwerkingen.manage
+// (`managePermissionFor`). Zo kan het beheer van elk soort los gedelegeerd
+// worden. Superadmin altijd (via hasPermission).
 //
-// "own" is de smalle variant voor de G3/G4 van een werkgroep
-// (werkgroepen.manageOwnMembers): enkel gewone leden, enkel in het huidige
-// werkingsjaar. De beller dwingt die twee grenzen af.
+// "own" is de smalle variant voor de verantwoordelijke van een werkgroep of
+// jaarwerking (werkgroepen.manageOwnMembers, jaarwerkingen.manageOwnMembers):
+// enkel gewone leden, enkel in het huidige werkingsjaar. De beller dwingt die
+// twee grenzen af.
 async function requireMembershipManager(groupId: string): Promise<"full" | "own"> {
   const session = await requireSession();
   if (hasPermission(session, "users.edit")) return "full";
   const group = groupId
     ? await prisma.group.findUnique({ where: { id: groupId }, select: { type: true } })
     : null;
-  const needed = group?.type === "WERKGROEP" ? "werkgroepen.manage" : "groups.manage";
-  if (hasPermission(session, needed)) return "full";
-  if (group?.type === "WERKGROEP" && (await canManageOwnWerkgroepMembers(session, groupId))) {
+  if (hasPermission(session, managePermissionFor(group?.type))) return "full";
+  if (isWerkingKind(group?.type) && (await canManageOwnWerkgroepMembers(session, groupId, group.type))) {
     return "own";
   }
   throw new Error("FORBIDDEN");
 }
 
-/** Revalideert alle plekken waar een lidmaatschap zichtbaar is (post of werkgroep). */
+/** Revalideert alle plekken waar een lidmaatschap zichtbaar is (post, werkgroep, jaarwerking). */
 function revalidateMembershipSurfaces(userId?: string) {
   if (userId) revalidatePath(`/admin/gebruikers/${userId}`);
   revalidatePath("/admin/groepen");
-  revalidatePath("/admin/werkgroepen");
   revalidatePath("/praesidium");
-  revalidatePath("/werkgroepen");
+  for (const config of Object.values(WERKING_KINDS)) {
+    revalidatePath(config.adminPath);
+    if (config.publicPath) revalidatePath(config.publicPath);
+  }
 }
 
 /**
@@ -878,7 +882,7 @@ export async function reorderGroupsAction(ids: string[]): Promise<void> {
  * gewijzigd" zou hier te weinig zeggen.
  */
 async function logGroupRoleChange(
-  entity: "post" | "werkgroep",
+  entity: "post" | "werkgroep" | "jaarwerking",
   groupId: string,
   roleId: string,
   kind: "DEFAULT" | "LEADER",
@@ -926,35 +930,44 @@ export async function setGroupRoleAction(formData: FormData): Promise<void> {
   revalidatePath("/praesidium");
 }
 
-// ---- Werkgroepen ------------------------------------------------------------
-// Werkgroepen delen het Group-model met de posten, maar hebben hun eigen
-// beheerrecht (werkgroepen.manage) en een eigen publieke pagina (/werkgroepen).
-// De infotekst + website mag elk lid van de werkgroep zelf aanpassen; leden en
-// rollen blijven voorbehouden aan werkgroepen.manage.
+// ---- Werkgroepen en jaarwerkingen -------------------------------------------
+// Werkgroepen en jaarwerkingen delen het Group-model met de posten, maar hebben
+// elk hun eigen beheerrecht (werkgroepen.manage, jaarwerkingen.manage) en hun
+// eigen beheerscherm. Wat per soort verschilt, staat in `lib/groupKinds.ts`.
+// De infotekst + website van een werkgroep mag elk lid zelf aanpassen;
+// jaarwerkingen hebben geen publieke pagina en dus ook die velden niet.
+//
+// Elke actie controleert dat de groep van het juiste soort is: wie enkel
+// werkgroepen.manage heeft, hernoemt geen praesidiumpost of jaarwerking en
+// hangt er geen rollen aan.
 
-const werkgroepSchema = z.object({
+const werkingSchema = z.object({
   id: z.string().optional(),
   code: z.string().trim().optional(),
   nameNl: z.string().trim().min(1),
   nameEn: z.string().trim().min(1),
-  // Hoe de verantwoordelijke van deze werkgroep heet. Meestal de G3 of de G4,
-  // maar dat verschilt per werkgroep en sommige kiezen een eigen naam, dus het
-  // is vrije tekst. Kort gehouden: het staat als vlag op een portret.
+  // Hoe de verantwoordelijke heet. Bij een werkgroep meestal de G3 of de G4,
+  // maar dat verschilt per groep en sommige kiezen een eigen naam, dus het is
+  // vrije tekst. Kort gehouden: het staat als vlag op een portret.
   leadLabel: z.string().trim().min(1).max(LEAD_LABEL_MAX),
   active: z.coerce.boolean().default(true),
 });
 
+function revalidateWerking(kind: WerkingKind) {
+  const config = WERKING_KINDS[kind];
+  revalidatePath(config.adminPath);
+  if (config.publicPath) revalidatePath(config.publicPath);
+}
+
 /**
- * Werkgroep aanmaken of haar basisinstellingen (naam, actief) bewerken.
- * De infotekst + website lopen apart via {@link saveWerkgroepInfoAction} zodat
- * ook gewone leden die mogen aanpassen. Enkel werkgroepen.manage (of superadmin).
+ * Een werkgroep of jaarwerking aanmaken, of haar basisinstellingen (naam,
+ * titel van de verantwoordelijke, actief) bewerken. Enkel met het beheerrecht
+ * van dat soort (of superadmin).
  */
-export async function saveWerkgroepAction(
-  _prev: SaveState,
-  formData: FormData,
-): Promise<SaveState> {
-  await requirePermission("werkgroepen.manage");
-  const result = werkgroepSchema.safeParse({
+async function saveWerking(kind: WerkingKind, formData: FormData): Promise<SaveState> {
+  const config = WERKING_KINDS[kind];
+  await requirePermission(config.managePermission);
+  const result = werkingSchema.safeParse({
     id: (formData.get("id") as string) || undefined,
     code: (formData.get("code") as string) || undefined,
     nameNl: formData.get("nameNl"),
@@ -978,20 +991,21 @@ export async function saveWerkgroepAction(
   try {
     if (parsed.id) {
       const existing = await prisma.group.findUnique({ where: { id: parsed.id } });
+      if (!existing || existing.type !== kind) return saveError("INVALID_INPUT");
       await prisma.group.update({ where: { id: parsed.id }, data });
       await logAudit({
         action: "update",
-        entity: "werkgroep",
+        entity: config.auditEntity,
         entityId: parsed.id,
         target: parsed.nameNl,
-        summary: existing ? describeChanges(existing, data, GROUP_FIELD_LABELS) : null,
+        summary: describeChanges(existing, data, GROUP_FIELD_LABELS),
       });
     } else {
       const code = codeify(parsed.code || parsed.nameNl);
       const slug = slugify(parsed.nameNl);
       if (!code || !slug) return saveError("INVALID_INPUT");
       const last = await prisma.group.findFirst({
-        where: { type: "WERKGROEP" },
+        where: { type: kind },
         orderBy: { orderInPraesidium: "desc" },
         select: { orderInPraesidium: true },
       });
@@ -1000,13 +1014,13 @@ export async function saveWerkgroepAction(
           ...data,
           code,
           slug,
-          type: "WERKGROEP",
+          type: kind,
           orderInPraesidium: (last?.orderInPraesidium ?? -1) + 1,
         },
       });
       await logAudit({
         action: "create",
-        entity: "werkgroep",
+        entity: config.auditEntity,
         entityId: created.id,
         target: parsed.nameNl,
         summary: `code ${code}`,
@@ -1018,29 +1032,45 @@ export async function saveWerkgroepAction(
     throw err;
   }
 
-  revalidatePath("/admin/werkgroepen");
-  revalidatePath("/werkgroepen");
+  revalidateWerking(kind);
   return saveOk();
 }
 
-export async function reorderWerkgroepenAction(ids: string[]): Promise<void> {
-  await requirePermission("werkgroepen.manage");
+/** De infotekst + website lopen apart via {@link saveWerkgroepInfoAction}, zodat ook gewone leden die mogen aanpassen. */
+export async function saveWerkgroepAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  return saveWerking("WERKGROEP", formData);
+}
+
+export async function saveJaarwerkingAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  return saveWerking("JAARWERKING", formData);
+}
+
+async function reorderWerking(kind: WerkingKind, ids: string[]): Promise<void> {
+  const config = WERKING_KINDS[kind];
+  await requirePermission(config.managePermission);
   await prisma.$transaction(
     ids.map((id, index) =>
-      prisma.group.update({
-        where: { id },
+      prisma.group.updateMany({
+        where: { id, type: kind },
         data: { orderInPraesidium: index },
       }),
     ),
   );
   await logAudit({
     action: "reorder",
-    entity: "werkgroep",
-    target: `${ids.length} werkgroepen`,
-    summary: "volgorde van werkgroepen gewijzigd",
+    entity: config.auditEntity,
+    target: `${ids.length} ${kind === "WERKGROEP" ? "werkgroepen" : "jaarwerkingen"}`,
+    summary: `volgorde van ${kind === "WERKGROEP" ? "werkgroepen" : "jaarwerkingen"} gewijzigd`,
   });
-  revalidatePath("/admin/werkgroepen");
-  revalidatePath("/werkgroepen");
+  revalidateWerking(kind);
+}
+
+export async function reorderWerkgroepenAction(ids: string[]): Promise<void> {
+  await reorderWerking("WERKGROEP", ids);
+}
+
+export async function reorderJaarwerkingenAction(ids: string[]): Promise<void> {
+  await reorderWerking("JAARWERKING", ids);
 }
 
 const werkgroepInfoSchema = z.object({
@@ -1053,7 +1083,7 @@ const werkgroepInfoSchema = z.object({
  * Infotekst + website van een werkgroep bewerken. Toegestaan voor elk lid van
  * die werkgroep (huidig werkingsjaar) en voor werkgroepen.manage/superadmin. Een
  * lid van BEST kan dus enkel de tekst van BEST wijzigen, niet die van een andere
- * werkgroep.
+ * werkgroep. Enkel werkgroepen: een jaarwerking heeft geen publieke pagina.
  */
 export async function saveWerkgroepInfoAction(
   _prev: SaveState,
@@ -1099,31 +1129,45 @@ export async function saveWerkgroepInfoAction(
     summary: "infotekst of website bewerkt",
   });
 
-  revalidatePath("/admin/werkgroepen");
-  revalidatePath("/werkgroepen");
+  revalidateWerking("WERKGROEP");
   return saveOk();
 }
 
-/** Zoals {@link setGroupRoleAction}, maar voor werkgroepen (werkgroepen.manage). */
-export async function setWerkgroepRoleAction(formData: FormData): Promise<void> {
-  await requirePermission("werkgroepen.manage");
+/**
+ * Zoals {@link setGroupRoleAction}, maar voor een werkgroep of jaarwerking, met
+ * het beheerrecht van dat soort. De groep moet van dat soort zijn: anders hing
+ * wie enkel werkgroepen.manage heeft, via een geknutseld verzoek een rol aan
+ * een praesidiumpost.
+ */
+async function setWerkingRole(kind: WerkingKind, formData: FormData): Promise<void> {
+  const config = WERKING_KINDS[kind];
+  await requirePermission(config.managePermission);
   const groupId = formData.get("groupId") as string;
   const roleId = formData.get("roleId") as string;
-  const kind = formData.get("kind") === "LEADER" ? "LEADER" : "DEFAULT";
+  const grantKind = formData.get("kind") === "LEADER" ? "LEADER" : "DEFAULT";
   const enabled = formData.get("enabled") === "1";
   if (!groupId || !roleId) return;
+  const group = await prisma.group.findUnique({ where: { id: groupId }, select: { type: true } });
+  if (group?.type !== kind) throw new Error("FORBIDDEN");
   if (enabled) {
     await prisma.groupRole.upsert({
-      where: { groupId_roleId_kind: { groupId, roleId, kind } },
+      where: { groupId_roleId_kind: { groupId, roleId, kind: grantKind } },
       update: {},
-      create: { groupId, roleId, kind },
+      create: { groupId, roleId, kind: grantKind },
     });
   } else {
     await prisma.groupRole
-      .delete({ where: { groupId_roleId_kind: { groupId, roleId, kind } } })
+      .delete({ where: { groupId_roleId_kind: { groupId, roleId, kind: grantKind } } })
       .catch(() => null);
   }
-  await logGroupRoleChange("werkgroep", groupId, roleId, kind, enabled);
-  revalidatePath("/admin/werkgroepen");
-  revalidatePath("/werkgroepen");
+  await logGroupRoleChange(config.auditEntity, groupId, roleId, grantKind, enabled);
+  revalidateWerking(kind);
+}
+
+export async function setWerkgroepRoleAction(formData: FormData): Promise<void> {
+  await setWerkingRole("WERKGROEP", formData);
+}
+
+export async function setJaarwerkingRoleAction(formData: FormData): Promise<void> {
+  await setWerkingRole("JAARWERKING", formData);
 }

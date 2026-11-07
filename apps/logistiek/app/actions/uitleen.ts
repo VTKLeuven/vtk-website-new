@@ -111,8 +111,9 @@ async function externalGate(session: SessionLike): Promise<ActionResult | null> 
 
 /**
  * Leidt het aanvragertype automatisch af uit de gekozen groep in de login. Een
- * praesidiumpost wordt INTERN; een werkgroep behoudt het aparte WERKGROEP-type;
- * wie geen groep heeft vraagt EXTERN aan met de eigen naam.
+ * praesidiumpost wordt INTERN; een werkgroep of jaarwerking krijgt het aparte
+ * WERKGROEP-type ("werkgroep of jaarwerking" in het schema); wie geen groep
+ * heeft vraagt EXTERN aan met de eigen naam.
  *
  * `requestsAsExternal` in lib/session.ts volgt dezelfde regel, maar dan vooraf:
  * wie extern aanvraagt, krijgt de evenementen en sjablonen niet te zien.
@@ -134,7 +135,7 @@ async function deriveMemberRequester(
       select: { type: true, nameNl: true },
     });
     if (!group) return { requesterType: 'EXTERN', groupId: null, requesterName: session.user.name };
-    if (group.type === 'WERKGROEP') {
+    if (group.type === 'WERKGROEP' || group.type === 'JAARWERKING') {
       return { requesterType: 'WERKGROEP', groupId: null, requesterName: group.nameNl };
     }
     return { requesterType: 'INTERN', groupId, requesterName: undefined };
