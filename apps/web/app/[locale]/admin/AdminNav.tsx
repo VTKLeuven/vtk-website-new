@@ -246,6 +246,14 @@ const icons: Record<string, ReactNode> = {
       <path d="M6 12v5c0 1 2.5 3 6 3s6-2 6-3v-5" />
     </Svg>
   ),
+  // polls: de vragen van de RiVers -> balkjes
+  polls: (
+    <Svg>
+      <path d="M4 20V10" />
+      <path d="M12 20V4" />
+      <path d="M20 20v-7" />
+    </Svg>
+  ),
   // partners: bedrijven/sponsors -> aktetas
   partners: (
     <Svg>

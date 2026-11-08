@@ -85,6 +85,7 @@ export const AUDIT_ENTITIES = {
   calendarEvent: { nl: "Evenement", en: "Event", group: "calendar" },
   calendarCategory: { nl: "Kalendercategorie", en: "Calendar category", group: "calendar" },
   discordWebhook: { nl: "Discord-webhook", en: "Discord webhook", group: "calendar" },
+  pocPoll: { nl: "POC-peiling", en: "POC poll", group: "users" },
   ticketEvent: { nl: "Ticketevenement", en: "Ticket event", group: "tickets" },
   ticketType: { nl: "Tickettype", en: "Ticket type", group: "tickets" },
   ticketQuestion: { nl: "Ticketvraag", en: "Ticket question", group: "tickets" },

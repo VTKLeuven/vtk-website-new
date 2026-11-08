@@ -1,4 +1,5 @@
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import Link from "@/components/ui/Link";
 import { type Locale } from "@vtk/i18n";
 import { Markdown } from "@/components/ui/Markdown";
@@ -12,6 +13,15 @@ import {
   POC_BAND_DEFAULT_PHOTO,
   type PocBandSetting,
 } from "@/lib/home/pocBand";
+import { submitPocPollAction } from "@/app/actions/poc-polls";
+import { nameInitials } from "@/lib/pocPolls/core";
+import { pollPanelLabels, type PollPanelData } from "@/lib/pocPolls/copy";
+import { POLL_ANCHOR } from "@/lib/pocPolls/strip";
+
+import "@/app/design/vtk-poc-poll.css";
+
+// Enkel wie een open peiling heeft, laadt het formulier.
+const PocPollPanel = dynamic(() => import("./PocPollPanel").then((m) => m.PocPollPanel));
 
 /**
  * De POC-band op de homepage, in navy.
@@ -43,17 +53,14 @@ export type PocBandGroup = {
   name: string;
   email: string | null;
   people: PocBandPerson[];
+  /** De open peilingen van deze POC voor deze bezoeker. */
+  polls?: PollPanelData[];
+  /** Wat de RiVers na de POC vertelden. */
+  summaries?: Array<{ id: string; title: string; summary: string; voters: number }>;
 };
 
 /** De maat waarop `.poc-wall-face` staat; zie vtk-home.css. */
 const FACE_PX = 148;
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
 
 function Face({ person }: { person: PocBandPerson }) {
   return (
@@ -68,9 +75,100 @@ function Face({ person }: { person: PocBandPerson }) {
         />
       ) : (
         <span className="poc-wall-initial" aria-hidden="true">
-          {initials(person.name)}
+          {nameInitials(person.name)}
         </span>
       )}
+    </div>
+  );
+}
+
+/**
+ * De rijen van de band: links de POC, rechts de gezichten. Heeft een POC een open
+ * peiling, dan staan rechts de vragen en worden de gezichten een register in de
+ * marge. Zie docs/design-decisions.md, "POC-peilingen".
+ */
+function PocWall({ groups, locale }: { groups: PocBandGroup[]; locale: Locale }) {
+  // De strook bovenaan springt naar de eerste POC waar nog iets in te vullen is.
+  const target =
+    groups.find((group) => group.polls?.some((poll) => !poll.answered)) ??
+    groups.find((group) => group.polls?.length) ??
+    groups.find((group) => group.summaries?.length);
+  const nl = locale === "nl";
+
+  return (
+    <div className="poc-wall">
+      {groups.map((group) => {
+        const polls = group.polls ?? [];
+        return (
+          <div
+            className={
+              "poc-wall-row" +
+              (polls.length > 0 ? " has-poll" : "") +
+              (group === target ? " poc-poll-target" : "")
+            }
+            key={group.id}
+            id={group === target ? POLL_ANCHOR : undefined}
+            tabIndex={group === target ? -1 : undefined}
+          >
+            <div className="poc-wall-label">
+              <h3>{group.name}</h3>
+              {/* Studenten mailen de POC als geheel, niet één vertegenwoordiger. */}
+              {group.email ? (
+                <a className="poc-wall-mail" href={`mailto:${group.email}`}>
+                  {group.email}
+                </a>
+              ) : null}
+              {polls.length > 0 ? (
+                <ul className="poc-poll-people">
+                  {group.people.map((person) => (
+                    <li key={person.id}>
+                      <span className="poc-poll-face">
+                        <Face person={person} />
+                      </span>
+                      <span className="poc-poll-person">
+                        <b>{person.name}</b>
+                        {person.role ? <i>{person.role}</i> : null}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+            {polls.length > 0 ? (
+              <div className="poc-poll-stack">
+                {polls.map((poll) => (
+                  <PocPollPanel
+                    key={poll.id}
+                    poll={poll}
+                    labels={pollPanelLabels(locale)}
+                    action={submitPocPollAction}
+                  />
+                ))}
+              </div>
+            ) : (
+              <ul className="poc-wall-faces">
+                {group.people.map((person) => (
+                  <li key={person.id}>
+                    <Face person={person} />
+                    <p className="poc-wall-name">{person.name}</p>
+                    {person.role ? <p className="poc-wall-role">{person.role}</p> : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {group.summaries?.map((summary) => (
+              <div className="poc-poll-summary" key={summary.id}>
+                <p className="poc-poll-summary-kicker">
+                  {nl
+                    ? `Uit de peiling: ${summary.title}. ${summary.voters} studenten antwoordden.`
+                    : `From the poll: ${summary.title}. ${summary.voters} students answered.`}
+                </p>
+                <Markdown locale={locale}>{summary.summary}</Markdown>
+              </div>
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -125,9 +223,19 @@ export function PocBand({
   const nl = locale === "nl";
   const pick = (dutch: string, english: string) => (nl ? dutch : english || dutch);
 
-  if (setting.mode === "hidden") return null;
+  // Een open peiling staat er altijd: de strook bovenaan de site wijst ernaar,
+  // ook wanneer de band verborgen is of de verkiezingen toont.
+  const pollGroups = groups.filter((group) => (group.polls?.length ?? 0) > 0);
 
-  if (setting.mode === "elections") {
+  const electionsHaveText =
+    setting.mode === "elections" &&
+    Boolean(
+      pick(setting.headingNl, setting.headingEn).trim() ||
+        pick(setting.bodyNl, setting.bodyEn).trim() ||
+        pick(setting.titleNl, setting.titleEn).trim(),
+    );
+
+  if (electionsHaveText) {
     const heading = pick(setting.headingNl, setting.headingEn).trim();
     const body = pick(setting.bodyNl, setting.bodyEn).trim();
     const title = pick(setting.titleNl, setting.titleEn).trim();
@@ -135,11 +243,6 @@ export function PocBand({
     const secondaryLabel = pick(setting.secondaryLabelNl, setting.secondaryLabelEn).trim();
     const open = pocBandIsOpen(setting, now);
     const daysLeft = pocBandDaysLeft(setting.deadline, now);
-
-    // Een band zonder kop en zonder tekst is een leeg navy vlak tussen twee
-    // secties. Dan staat de instelling wel op `elections`, maar heeft nog
-    // niemand er iets in gezet.
-    if (!heading && !body && !title) return null;
 
     const meta = pick(setting.metaNl, setting.metaEn).trim();
     const photo = publicUrl(setting.imageKey) ?? POC_BAND_DEFAULT_PHOTO;
@@ -262,6 +365,8 @@ export function PocBand({
             </ol>
           ) : null}
         </div>
+
+        {pollGroups.length > 0 ? <PocWall groups={pollGroups} locale={locale} /> : null}
       </section>
     );
   }
@@ -269,7 +374,11 @@ export function PocBand({
   // Vertegenwoordigers. Zonder sessie, zonder richtingen of zonder verkozen
   // mensen valt de hele band weg: een lijst van alle POC's is hier niet wat
   // gevraagd wordt, en /pocs staat één klik verder.
-  if (groups.length === 0) return null;
+  // Een band zonder kop en zonder tekst is een leeg navy vlak tussen twee secties:
+  // dan staat de instelling wel op `elections`, maar heeft nog niemand er iets in
+  // gezet. Ook dan en bij `hidden` blijven enkel de POC's met een peiling over.
+  const shown = setting.mode === "representatives" ? groups : pollGroups;
+  if (shown.length === 0) return null;
 
   return (
     <section className="section band poc-band" aria-labelledby="poc-band-head">
@@ -283,30 +392,7 @@ export function PocBand({
         </div>
       </div>
 
-      <div className="poc-wall">
-        {groups.map((group) => (
-          <div className="poc-wall-row" key={group.id}>
-            <div className="poc-wall-label">
-              <h3>{group.name}</h3>
-              {/* Studenten mailen de POC als geheel, niet één vertegenwoordiger. */}
-              {group.email ? (
-                <a className="poc-wall-mail" href={`mailto:${group.email}`}>
-                  {group.email}
-                </a>
-              ) : null}
-            </div>
-            <ul className="poc-wall-faces">
-              {group.people.map((person) => (
-                <li key={person.id}>
-                  <Face person={person} />
-                  <p className="poc-wall-name">{person.name}</p>
-                  {person.role ? <p className="poc-wall-role">{person.role}</p> : null}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
+      <PocWall groups={shown} locale={locale} />
     </section>
   );
 }

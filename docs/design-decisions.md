@@ -12325,3 +12325,52 @@ Ledenbeheer, november 2026. Hetzelfde scherm als de werkgroepen
   formulier, rekening), in de uitleendienst vraagt ze aan onder het type
   "werkgroep of jaarwerking", en haar ticketverkoop komt zoals die van een post
   vanzelf in het nieuws (enkel een werkgroep vraagt eerst de redactie).
+
+## POC-peilingen
+
+De RiVers zetelen in de POC om de mening van de studenten te brengen, maar op de
+tweewekelijkse vergadering zitten vaak maar een paar mensen per richting. Een
+peiling laat hen de hele richting bevragen: ja of nee, een score van 1 tot 5, of
+een open vraag. Code in `apps/web/lib/pocPolls`.
+
+- **De vragen staan op de homepage, in de POC-band, en niet op een eigen pagina.**
+  Een aparte pagina bezoekt niemand. Alle vragen staan tegelijk in rijen; één vraag
+  per keer en een los formulier zijn bekeken en afgewezen.
+- **Een gele strook onder de sitekop wijst ernaar.** De band staat vier schermen
+  naar beneden, en wie enkel voor de kalender komt, scrolt daar nooit langs. Op de
+  homepage scrolt de pijl naar de vragen, op elke andere pagina brengt ze je terug
+  naar de homepage. Niet op de hero zelf: dat werkte maar op een of twee van de
+  vijf hero-ontwerpen. Niet zwevend onderaan: daar zit de aankondigingskaart al.
+- **De strook vertelt waarom je antwoord telt** ("Op 24 november zitten je RiVers
+  met je proffen rond de tafel op de POC"). Zonder gekende vergadering valt die zin terug op
+  een algemene, en de laatste twee dagen is de deadline het verhaal.
+- **Wie we niet aan een richting kunnen koppelen, krijgt de strook enkel op de
+  homepage**, met de vraag om aan te melden of een richting in te stellen. Op elke
+  pagina zou ze ook ouders en bedrijven lastigvallen.
+- **Niemand ziet een tussenstand.** Wat anderen antwoordden, kan je eigen mening
+  kleuren; daarom toont de site na het versturen enkel je bevestiging.
+- **Een antwoord is anoniem, en dat zit in de tabel.** `PocPollAnswer` heeft geen
+  userId, geen eigen id en geen tijdstempels, enkel een HMAC over de peiling en de
+  gebruiker. Daarmee telt iedereen één keer en kan je wijzigen tot de peiling
+  sluit. Wie zowel de database als `BETTER_AUTH_SECRET` heeft, kan die sleutel voor
+  een gekende gebruiker wel narekenen; de RiVers horen enkel totalen te zien.
+- **Een vraag overslaan mag.** Wie geen mening heeft, hoort geen antwoord te
+  verzinnen om verder te geraken. Minstens één antwoord is genoeg om te versturen.
+- **De RiVers stellen hun eigen peilingen op, zonder apart recht.** Wie dit
+  werkingsjaar RiVer is, krijgt de tab Peilingen voor de eigen POC; `pocs.manage`
+  ziet alle POC's. Na publiceren liggen de vragen vast, anders gaan de antwoorden
+  niet meer over dezelfde vraag.
+- **Ook de RiVers zien geen tussenstand.** Tijdens de looptijd zien ze enkel de
+  deelname. Wat ze zouden zien, kunnen ze doorvertellen of zelf overnemen.
+- **Een fase met minder dan vijf antwoorden wordt nooit apart getoond**, want in
+  zo'n kleine groep is een antwoord herleidbaar tot een persoon.
+- **Na de POC vertellen de RiVers wat er met de antwoorden gebeurde**: een
+  samenvatting staat 30 dagen bij de POC op de homepage. Wie ziet dat zijn stem
+  iets deed, antwoordt de volgende keer weer.
+- **Op Discord telt een student één keer, en enkel met een gekoppeld VTK-account.**
+  Zonder koppeling kan de site niet weten of iemand tot de richting behoort of al
+  stemde. De koppeling kost één klik extra, één keer. Een ingebouwde Discord-poll
+  kan niet: daar is de tussenstand zichtbaar.
+- **Een open peiling gaat voor de stand van de band.** Staat de band in
+  `/admin/pocs` verborgen of op de verkiezingen, dan blijven de POC's met een open
+  peiling er toch staan: anders wijst de strook naar niets.

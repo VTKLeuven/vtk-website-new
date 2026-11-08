@@ -9,6 +9,8 @@ import {
 } from "@/lib/defaultEventImage";
 import { getVisibleHeaderTabsForNav, type NavHeaderTab } from "@/lib/headerTabs";
 import { getMediaContent } from "@/lib/media-content";
+import type { OpenPocPoll, PocPollSummary } from "@/lib/pocPolls/core";
+import { currentWorkingYear } from "@/lib/workingYear";
 
 /**
  * De gedeelde, onpersoonlijke lezingen van de publieke site.
@@ -186,4 +188,105 @@ const cachedAnnouncement = unstable_cache(
  */
 export function getCachedAnnouncement() {
   return cachedAnnouncement();
+}
+
+const cachedOpenPocPolls = unstable_cache(
+  async (): Promise<OpenPocPoll[]> => {
+    const year = currentWorkingYear();
+    const polls = await prisma.pocPoll.findMany({
+      // Enkel een POC met RiVers dit jaar: de band toont geen POC zonder mensen,
+      // en dan zou de strook naar niets wijzen.
+      where: {
+        publishedAt: { not: null },
+        closesAt: { gt: new Date() },
+        poc: { representatives: { some: { year, user: { deletedAt: null } } } },
+      },
+      orderBy: { closesAt: "asc" },
+      select: {
+        id: true,
+        pocId: true,
+        titleNl: true,
+        titleEn: true,
+        meetingDate: true,
+        opensAt: true,
+        closesAt: true,
+        studyYears: true,
+        poc: {
+          select: {
+            studyProgrammes: true,
+            representatives: {
+              where: { year, user: { deletedAt: null } },
+              orderBy: { order: "asc" },
+              take: 3,
+              select: { user: { select: { name: true, avatarKey: true } } },
+            },
+          },
+        },
+        questions: {
+          orderBy: { order: "asc" },
+          select: {
+            id: true,
+            kind: true,
+            textNl: true,
+            textEn: true,
+            lowLabelNl: true,
+            lowLabelEn: true,
+            highLabelNl: true,
+            highLabelEn: true,
+          },
+        },
+      },
+    });
+    return polls.map(({ poc, meetingDate, opensAt, closesAt, ...poll }) => ({
+      ...poll,
+      meetingDate: meetingDate ? meetingDate.toISOString().slice(0, 10) : null,
+      opensAt: opensAt.toISOString(),
+      closesAt: closesAt.toISOString(),
+      programmes: poc.studyProgrammes,
+      faces: poc.representatives.map((rep) => ({ name: rep.user.name, avatarKey: rep.user.avatarKey })),
+    }));
+  },
+  ["poc", "open-polls"],
+  { revalidate: TTL_SECONDS, tags: [SITE_CONTENT_TAG] },
+);
+
+/** De peilingen die nog niet gesloten zijn; `pollIsOpen` kijkt na of ze al open zijn. */
+export function getCachedOpenPocPolls(): Promise<OpenPocPoll[]> {
+  return cachedOpenPocPolls();
+}
+
+/** Zo lang blijft een samenvatting in de POC-band staan. */
+const POLL_SUMMARY_DAYS = 30;
+
+const cachedPocPollSummaries = unstable_cache(
+  async (): Promise<PocPollSummary[]> => {
+    const since = new Date(Date.now() - POLL_SUMMARY_DAYS * 24 * 60 * 60 * 1000);
+    const polls = await prisma.pocPoll.findMany({
+      where: { summaryPublishedAt: { gte: since }, summaryNl: { not: null } },
+      orderBy: { summaryPublishedAt: "desc" },
+      select: {
+        id: true,
+        pocId: true,
+        titleNl: true,
+        titleEn: true,
+        summaryNl: true,
+        questions: { select: { answers: { distinct: ["voterKey"], select: { voterKey: true } } } },
+      },
+    });
+    return polls.map((poll) => ({
+      id: poll.id,
+      pocId: poll.pocId,
+      titleNl: poll.titleNl,
+      titleEn: poll.titleEn,
+      summary: poll.summaryNl ?? "",
+      voters: new Set(poll.questions.flatMap((q) => q.answers.map((a) => a.voterKey))).size,
+    }));
+  },
+  ["poc", "poll-summaries"],
+  { revalidate: TTL_SECONDS, tags: [SITE_CONTENT_TAG] },
+);
+
+/** De samenvattingen die de RiVers de laatste weken publiceerden. */
+export function getCachedPocPollSummaries(): Promise<PocPollSummary[]> {
+  return cachedPocPollSummaries();
 }

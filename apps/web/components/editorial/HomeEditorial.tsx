@@ -16,6 +16,9 @@ import { getCurrentSession } from "@/lib/session";
 import { addDays } from "date-fns";
 import { getDictionary } from "@vtk/i18n";
 import { PocBand, type PocBandGroup } from "./PocBand";
+import { getCachedPocPollSummaries } from "@/lib/cachedContent";
+import { getViewerPocPolls, getViewerProgrammes } from "@/lib/pocPolls/read";
+import { pollPanelData } from "@/lib/pocPolls/copy";
 import { NewsBand } from "./NewsBand";
 import { getCachedNews, getPresaleNews } from "@/lib/news/load";
 import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
@@ -373,14 +376,10 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   // De richtingen komen uit de database en niet uit de sessie: `AuthUser` draagt
   // ze niet, en ze daar bij zetten zou elke sessie-payload zwaarder maken voor
   // één sectie op één pagina. Deze lezing gebeurt enkel voor wie ingelogd is.
-  const myProgrammes = session
-    ? (
-        await prisma.user.findUnique({
-          where: { id: session.user.id },
-          select: { studyProgrammes: true },
-        })
-      )?.studyProgrammes ?? []
-    : [];
+  const myProgrammes = session ? await getViewerProgrammes(session.user.id) : [];
+  const [myPolls, pollSummaries] = session
+    ? await Promise.all([getViewerPocPolls(session.user.id), getCachedPocPollSummaries()])
+    : [[], []];
 
   const myPocs =
     myProgrammes.length > 0
@@ -408,6 +407,17 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       avatarUrl: publicUrl(rep.user.avatarKey),
       role: pick(rep.roleNl ?? "", rep.roleEn ?? rep.roleNl ?? "", locale) || null,
     })),
+    polls: myPolls
+      .filter((poll) => poll.pocId === poc.id)
+      .map((poll) => pollPanelData(poll, locale, now)),
+    summaries: pollSummaries
+      .filter((summary) => summary.pocId === poc.id)
+      .map((summary) => ({
+        id: summary.id,
+        title: pick(summary.titleNl, summary.titleEn ?? "", locale),
+        summary: summary.summary,
+        voters: summary.voters,
+      })),
   }));
 
   const dict = getDictionary(locale);

@@ -612,3 +612,135 @@ body:has(.vtk-preview-bar) .vtk-cookie-consent-positioner {
     bottom: calc(12px + 128px);
   }
 }
+
+/* De gele strook onder de sitekop: je RiVers vragen je mening (PocPollStrip).
+   Hier en niet in vtk-poc-poll.css, want ze hangt in de layout. */
+.vtk-poll-strip {
+  background: var(--yellow);
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.vtk-poll-strip-inner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 0 clamp(8px, 2vw, 24px) 0 clamp(20px, 3vw, 36px);
+}
+
+.vtk-poll-strip-link {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 14px;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 56px;
+  padding: 8px 0;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.vtk-poll-strip-link:focus-visible,
+.vtk-poll-strip-hide:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.vtk-poll-strip-faces {
+  display: flex;
+  flex: none;
+  padding-left: 4px;
+}
+
+.vtk-poll-strip-face {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  width: 32px;
+  height: 32px;
+  margin-left: -4px;
+  border-radius: 10px;
+  background: var(--navy);
+  box-shadow: 0 0 0 2px var(--yellow);
+  color: var(--paper);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.vtk-poll-strip-face img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vtk-poll-strip-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.vtk-poll-strip-text strong {
+  font-weight: 700;
+}
+
+.vtk-poll-strip-action {
+  flex: none;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.vtk-poll-strip-arrow {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--navy);
+  color: var(--yellow);
+  transition: transform 140ms ease;
+}
+
+.vtk-poll-strip-link:hover .vtk-poll-strip-arrow {
+  transform: scale(1.08);
+}
+
+.vtk-poll-strip-hide {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.vtk-poll-strip-hide:hover {
+  background: rgba(10, 15, 31, 0.08);
+}
+
+@media (max-width: 640px) {
+  .vtk-poll-strip-faces,
+  .vtk-poll-strip-action {
+    display: none;
+  }
+
+  .vtk-poll-strip-text {
+    font-size: 14.5px;
+  }
+
+  .vtk-poll-strip-link {
+    padding: 12px 0;
+  }
+}

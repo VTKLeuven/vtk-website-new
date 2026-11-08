@@ -175,7 +175,9 @@
   text-align: left;
 }
 
-.vtk-admin-main :is(input:not([type='checkbox']):not([type='radio']), select, textarea) {
+/* `.poc-poll` staat als voorvertoning op een navy vlak (/admin/it/flows) en
+   brengt zijn eigen velden en knop mee. */
+.vtk-admin-main :is(input:not([type='checkbox']):not([type='radio']), select, textarea):not(.poc-poll *) {
   border-radius: 12px !important;
   border-color: var(--line-2) !important;
   background: var(--paper) !important;
@@ -183,7 +185,7 @@
   box-shadow: none !important;
 }
 
-.vtk-admin-main :is(input, select, textarea):focus {
+.vtk-admin-main :is(input, select, textarea):focus:not(.poc-poll *) {
   outline: none !important;
   border-color: var(--ink) !important;
   box-shadow: 0 0 0 3px rgba(14, 26, 54, 0.08) !important;
@@ -199,13 +201,13 @@
 }
 
 .vtk-admin-main button.bg-vtk-blue,
-.vtk-admin-main button.bg-vtk-ink {
+.vtk-admin-main button.bg-vtk-ink:not(.poc-poll *) {
   background: var(--ink) !important;
   color: var(--paper) !important;
 }
 
 .vtk-admin-main button.bg-vtk-blue:hover:not(:disabled),
-.vtk-admin-main button.bg-vtk-ink:hover:not(:disabled) {
+.vtk-admin-main button.bg-vtk-ink:hover:not(:disabled):not(.poc-poll *) {
   background: var(--navy) !important;
 }
 

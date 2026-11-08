@@ -34,9 +34,27 @@ import { UnsubscribePanel } from "@/components/profile/UnsubscribePanel";
 import { DiscordMessagePreview } from "@/components/admin/DiscordMessagePreview";
 import { discordEventMessage, DISCORD_AVATAR_PATH } from "@/lib/discord/eventMessage";
 import { siteUrl } from "@/lib/seo";
+import { discordBotConfigured } from "@/lib/discord/bot";
 import { RunnerYearPanel } from "@/components/urenloop/RunnerStats";
 import { sampleRunnerStats } from "@/lib/urenloop/laps";
 import { getRunnerStats } from "@/lib/urenloop/runnerStats";
+import { PocPollPanel } from "@/components/editorial/PocPollPanel";
+import { PocPollStripBar } from "@/components/site/PocPollStripBar";
+import { pollPanelData, pollPanelLabels, pollStripCopy } from "@/lib/pocPolls/copy";
+import { getViewerPocPolls } from "@/lib/pocPolls/read";
+import { samplePocPoll } from "@/lib/pocPolls/sample";
+import { DiscordLinkForm } from "@/components/profile/DiscordLinkForm";
+import { discordLinkLabels } from "@/lib/discord/linkCopy";
+import {
+  pollChannelMessage,
+  pollClosedChannelMessage,
+  pollDoneMessage,
+  pollLinkAccountMessage,
+  pollStepMessage,
+  type DiscordPollView,
+  type PollBotMessage,
+} from "@/lib/discord/pollMessages";
+import "@/app/design/vtk-poc-poll.css";
 import { FlowPreview } from "./FlowPreview";
 import { MailPreviewList } from "./MailPreviewList";
 
@@ -227,6 +245,81 @@ export default async function AdminFlowPreview({
   // De Discord-post met verzonnen gegevens, door dezelfde functie als een echte
   // post. Een vast moment, zodat "over 2 weken" niet elke dag verschuift.
   const discordWebhooks = await prisma.discordWebhook.count();
+
+  // De strook en de vragen van een POC-peiling, met dezelfde teksten als op de
+  // site. De strook staat hier naast elkaar in elke situatie.
+  const pollNow = new Date();
+  const pollSample = samplePocPoll(pollNow);
+  const myOpenPolls = await getViewerPocPolls(session.user.id);
+  const pollDiscordView: DiscordPollView = {
+    id: "voorbeeld",
+    title: pollSample.titleNl,
+    pocName: "Computerwetenschappen",
+    closesAt: new Date(pollSample.closesAt),
+    meetingDate: pollSample.meetingDate,
+    siteOrigin: siteUrl(),
+    questions: pollSample.questions.map((question) => ({
+      id: question.id,
+      kind: question.kind,
+      text: question.textNl,
+      low: null,
+      high: null,
+    })),
+  };
+  const asPollPreview = (message: PollBotMessage) => ({
+    ...message,
+    username: "VTK Peilingen",
+    avatar_url: DISCORD_AVATAR_PATH,
+  });
+  const pollDiscordMessages = [
+    { label: nl ? "In het kanaal" : "In the channel", ephemeral: false, message: pollChannelMessage(pollDiscordView) },
+    { label: nl ? "Vraag per vraag" : "Question by question", ephemeral: true, message: pollStepMessage(pollDiscordView, 1, undefined) },
+    { label: nl ? "Klaar" : "Done", ephemeral: true, message: pollDoneMessage() },
+    { label: nl ? "Eerste keer: koppelen" : "First time: linking", ephemeral: true, message: pollLinkAccountMessage(`${siteUrl()}/koppel-discord`) },
+    { label: nl ? "Na de deadline" : "After the deadline", ephemeral: false, message: pollClosedChannelMessage(pollDiscordView, 84, { summaryPublished: false, meetingAhead: true }) },
+  ];
+  const pollFaces = [
+    { initials: "LJ", avatarUrl: null },
+    { initials: "AP", avatarUrl: null },
+    { initials: "NE", avatarUrl: null },
+  ];
+  const pollStrips = [
+    {
+      label: nl ? "Op de homepage" : "On the homepage",
+      place: "home" as const,
+      jump: true,
+      faces: pollFaces,
+      copy: pollStripCopy("poll", { locale, questionCount: 4, meetingDate: pollSample.meetingDate, closesAt: pollSample.closesAt, now: pollNow }),
+    },
+    {
+      label: nl ? "Op een andere pagina" : "On another page",
+      place: "away" as const,
+      jump: true,
+      faces: pollFaces,
+      copy: pollStripCopy("poll", { locale, questionCount: 4, meetingDate: pollSample.meetingDate, closesAt: pollSample.closesAt, now: pollNow }),
+    },
+    {
+      label: nl ? "De laatste dagen" : "The last days",
+      place: "home" as const,
+      jump: true,
+      faces: pollFaces,
+      copy: pollStripCopy("poll", { locale, questionCount: 4, meetingDate: pollSample.meetingDate, closesAt: new Date(pollNow.getTime() + 24 * 60 * 60 * 1000).toISOString(), now: pollNow }),
+    },
+    {
+      label: nl ? "Niet aangemeld, enkel op de homepage" : "Signed out, homepage only",
+      place: "home" as const,
+      jump: false,
+      faces: [],
+      copy: pollStripCopy("signIn", { locale, now: pollNow }),
+    },
+    {
+      label: nl ? "Aangemeld zonder richting, enkel op de homepage" : "Signed in without a programme, homepage only",
+      place: "home" as const,
+      jump: false,
+      faces: [],
+      copy: pollStripCopy("noProgramme", { locale, now: pollNow }),
+    },
+  ];
   const origin = siteUrl();
   const discordSample = discordEventMessage(
     {
@@ -659,6 +752,132 @@ export default async function AdminFlowPreview({
       >
         <div className="vtk-admin-preview">
           <RunnerYearPanel stats={sampleRunnerStats()} locale={locale} />
+        </div>
+      </FlowPreview>
+
+      <FlowPreview
+        title={nl ? "POC-peiling: de strook en de vragen" : "POC poll: the strip and the questions"}
+        when={
+          nl
+            ? "Zolang de RiVers van je richting een peiling open hebben staan en je ze nog niet invulde."
+            : "While the student reps of your programme have a poll open and you have not answered it."
+        }
+        openLabel={nl ? "Toon de strook en de vragen" : "Show the strip and the questions"}
+        closeLabel={nl ? "Verberg de strook en de vragen" : "Hide the strip and the questions"}
+        rules={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Wanneer" : "When"}</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li>
+                {nl
+                  ? "De strook staat op elke pagina, behalve in het beheer en tijdens aanmelden, onboarding of afrekenen."
+                  : "The strip is on every page, except in the admin and while signing in, onboarding or checking out."}
+              </li>
+              <li>
+                {nl
+                  ? "Invullen haalt ze meteen weg; wegklikken onthoudt een cookie per peiling."
+                  : "Answering removes it at once; dismissing is remembered in a cookie per poll."}
+              </li>
+              <li>
+                {nl
+                  ? "Hieronder een verzonnen peiling. Versturen bewaart niets."
+                  : "Below is an invented poll. Sending saves nothing."}
+              </li>
+            </ul>
+          </>
+        }
+        yourState={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Jouw account" : "Your account"}</p>
+            <dl className="mt-2 space-y-1">
+              <div className="flex justify-between gap-4">
+                <dt>{nl ? "Richtingen" : "Programmes"}</dt>
+                <dd className="text-right">{user.studyProgrammes.length}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt>{nl ? "Open peilingen voor jou" : "Open polls for you"}</dt>
+                <dd className="text-right">{myOpenPolls.length}</dd>
+              </div>
+            </dl>
+          </>
+        }
+      >
+        <div className="space-y-6">
+          <div className="space-y-3">
+            {pollStrips.map((strip) => (
+              <div key={strip.label}>
+                <p className="mb-1 text-sm text-[#5c667f]">{strip.label}</p>
+                <PocPollStripBar
+                  pollId={pollSample.id}
+                  scope="site"
+                  href="#"
+                  jump={strip.jump}
+                  copy={strip.copy}
+                  faces={strip.faces}
+                  hideLabel={nl ? "Verbergen" : "Hide"}
+                  previewPlace={strip.place}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="rounded-2xl p-5" style={{ background: "var(--navy)" }}>
+            <PocPollPanel
+              poll={pollPanelData(pollSample, locale, pollNow)}
+              labels={pollPanelLabels(locale)}
+              action={previewNoopAction}
+            />
+          </div>
+        </div>
+      </FlowPreview>
+
+      <FlowPreview
+        title={nl ? "POC-peiling op Discord" : "POC poll on Discord"}
+        when={
+          nl
+            ? "Wanneer een RiVer een peiling publiceert met een Discord-kanaal, en wanneer iemand op een knop drukt."
+            : "When a student rep publishes a poll with a Discord channel, and when someone presses a button."
+        }
+        openLabel={nl ? "Toon de berichten" : "Show the messages"}
+        closeLabel={nl ? "Verberg de berichten" : "Hide the messages"}
+        rules={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Wanneer" : "When"}</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li>
+                {nl
+                  ? "Eén ja/nee-vraag of score staat met knoppen in het kanaal; al de rest start met één knop en loopt vraag per vraag."
+                  : "A single yes/no or score question has buttons in the channel; everything else starts with one button and runs question by question."}
+              </li>
+              <li>
+                {nl
+                  ? "Wie nog niet koppelde, krijgt eerst de link naar de site."
+                  : "Anyone who has not linked yet first gets the link to the site."}
+              </li>
+            </ul>
+          </>
+        }
+        yourState={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Koppeling" : "Connection"}</p>
+            <p className="mt-2">
+              {discordBotConfigured()
+                ? nl ? "De Discord-bot is ingesteld." : "The Discord bot is configured."
+                : nl ? "De Discord-bot is nog niet ingesteld." : "The Discord bot is not configured yet."}
+            </p>
+          </>
+        }
+      >
+        <div className="space-y-5">
+          {pollDiscordMessages.map((item) => (
+            <div key={item.label}>
+              <p className="mb-1 text-sm text-[#5c667f]">{item.label}</p>
+              <DiscordMessagePreview message={asPollPreview(item.message)} now={pollNow} ephemeral={item.ephemeral} />
+            </div>
+          ))}
+          <div>
+            <p className="mb-1 text-sm text-[#5c667f]">{nl ? "Koppelen op de site" : "Linking on the site"}</p>
+            <DiscordLinkForm token="voorbeeld" labels={discordLinkLabels(nl, "voorbeeld_student")} action={previewNoopAction} />
+          </div>
         </div>
       </FlowPreview>
 

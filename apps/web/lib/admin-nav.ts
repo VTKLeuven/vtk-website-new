@@ -47,6 +47,8 @@ export type NavGuard = {
   jaarwerking?: boolean;
   /** Wie dit werkingsjaar in een post of werkgroep zit (Mijn budgetten). */
   post?: boolean;
+  /** Peilingen: de RiVers van dit werkingsjaar, en wie `pocs.manage` heeft. */
+  pocRep?: boolean;
   /** Enkel bij exacte padmatch actief markeren (voor de dashboard-landing op /admin). */
   exact?: boolean;
 };
@@ -228,6 +230,7 @@ export function getAdminNav(): NavEntry[] {
     // lesbezoeken en PAL+ lopen via dezelfde post.
     group('onderwijs', [
       item('pocs', '/pocs', { perm: 'pocs.manage' }),
+      item('polls', '/peilingen', { pocRep: true }),
       item('bureau', '/bureau', { perm: 'bureau.manage' }),
       item('lesbezoeken', '/lesbezoeken', {
         anyPerm: ['lesbezoeken.view', 'lesbezoeken.manage'],

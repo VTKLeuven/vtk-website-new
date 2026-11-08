@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { processDueInterestReminderMails } from "@/lib/calendar/interestReminderMailer";
 import { processDueDiscordPosts } from "@/lib/discord/posts";
+import { closeExpiredPollsOnDiscord } from "@/lib/discord/pollPosts";
 import { processDueLesbezoekScheduledMails } from "@/lib/lesbezoeken-server";
 import { recordMailingListCounts } from "@/lib/mailingListHistory";
 import { processDueNoShows } from "@/lib/theokot-server";
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
   }
 
   const now = new Date();
-  const [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse, opruiming] = await Promise.allSettled([
+  const [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse, opruiming, peilingen] = await Promise.allSettled([
     processDueNoShows(now),
     processDueLesbezoekScheduledMails(now),
     // De stand van de mailinglijsten van vandaag, voor de grafiek in
@@ -71,12 +72,14 @@ export async function POST(request: Request) {
     // dagen niet meer naar verwijst. Doet zelf niets tot het 3u is, en daarna
     // niets meer die dag; zie lib/storage-cleanup.ts.
     runNightlyStorageCleanup(now),
+    // POC-peilingen voorbij hun deadline: de knoppen op Discord gaan uit.
+    closeExpiredPollsOnDiscord(now),
   ]);
 
   // 502 zodra een van de taken viel: de healthcheck van de worker ziet dan dat
   // er iets scheelt in plaats van stil niets te doen. De andere taken zijn wel
   // gedraaid, en alle zijn idempotent, dus de volgende ronde haalt het in.
-  const failed = [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse, opruiming].some(
+  const failed = [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse, opruiming, peilingen].some(
     (task) => task.status === "rejected",
   );
   if (failed) {
@@ -89,6 +92,7 @@ export async function POST(request: Request) {
       discord: describe(discord),
       interesse: describe(interesse),
       opruiming: describe(opruiming),
+      peilingen: describe(peilingen),
     });
   }
 
@@ -102,6 +106,7 @@ export async function POST(request: Request) {
       discord: describe(discord),
       interesse: describe(interesse),
       opruiming: describe(opruiming),
+      peilingen: describe(peilingen),
     },
     { status: failed ? 502 : 200, headers: { "Cache-Control": "no-store" } },
   );

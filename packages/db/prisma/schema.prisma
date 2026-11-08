@@ -638,6 +638,10 @@ model User {
   isStudent               Boolean             @default(true)
   studyYears              StudyYear[]         @default([])
   studyProgrammes         StudyProgramme[]    @default([])
+  /// Het Discord-account dat dit lid zelf koppelde om peilingen op Discord te
+  /// beantwoorden. Zie docs/poc-peilingen.md.
+  discordId               String?             @unique
+  discordUsername         String?
   // Lid dat niet aan de faculteit Ingenieurswetenschappen studeert. Bewust geen
   // `StudyProgramme`-waarde: het is geen richting, en als enum-waarde zou het
   // overal opduiken waar richtingen opgelijst worden (o.a. de career-export).
@@ -3249,6 +3253,7 @@ model Poc {
   studyProgrammes StudyProgramme[] @default([])
 
   representatives PocRepresentative[]
+  polls           PocPoll[]
 }
 
 model PocRepresentative {
@@ -3266,6 +3271,104 @@ model PocRepresentative {
   @@unique([pocId, userId, year])
   @@index([pocId])
   @@index([year])
+}
+
+// -----------------------------------------------------------------------------
+// POC-peilingen: de RiVers vragen de studenten van hun richting om hun mening.
+// Beantwoorden gebeurt in de POC-band op de homepage. De kringkeuzes staan in
+// docs/design-decisions.md, "POC-peilingen".
+// -----------------------------------------------------------------------------
+
+enum PocPollQuestionKind {
+  YES_NO
+  SCORE
+  OPEN
+}
+
+model PocPoll {
+  id    String @id @default(cuid())
+  pocId String
+
+  titleNl String
+  titleEn String?
+
+  /// De vergadering waarvoor de RiVers dit verzamelen. Optioneel; de strook
+  /// bovenaan de site vertelt ermee waarom je antwoord telt.
+  meetingDate DateTime? @db.Date
+  /// Leeg: een concept, dat enkel de RiVers zien. Publiceren opent de peiling
+  /// meteen; vanaf dan liggen de vragen vast.
+  publishedAt DateTime? @db.Timestamptz(3)
+  opensAt     DateTime  @db.Timestamptz(3)
+  closesAt    DateTime  @db.Timestamptz(3)
+  /// De fases waarvoor de peiling is. Leeg: alle fases van de richting.
+  studyYears  StudyYear[] @default([])
+
+  /// Het kanaal en het bericht op Discord. `discordClosedAt` zegt dat de knoppen
+  /// na de deadline uitgezet zijn, `discordError` waarom posten mislukte.
+  discordChannelId String?
+  discordMessageId String?
+  discordClosedAt  DateTime? @db.Timestamptz(3)
+  discordError     String?
+
+  /// Wat de RiVers na de POC aan de studenten vertellen, in Markdown.
+  summaryNl          String?
+  summaryPublishedAt DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  poc       Poc               @relation(fields: [pocId], references: [id], onDelete: Cascade)
+  questions PocPollQuestion[]
+
+  @@index([pocId])
+  @@index([closesAt])
+}
+
+model PocPollQuestion {
+  id     String              @id @default(cuid())
+  pollId String
+  order  Int                 @default(0)
+  kind   PocPollQuestionKind
+  textNl String
+  textEn String?
+
+  /// Wat 1 en 5 betekenen bij een score. Leeg: oneens en eens.
+  lowLabelNl  String?
+  lowLabelEn  String?
+  highLabelNl String?
+  highLabelEn String?
+
+  poll    PocPoll         @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  answers PocPollAnswer[]
+
+  @@index([pollId])
+}
+
+/// Eén antwoord van één student, zonder dat de rij zegt van wie.
+///
+/// `voterKey` is een HMAC over de peiling en de gebruiker (`lib/pocPolls/voterKey.ts`):
+/// de site herkent er je eigen antwoord mee, zodat je het kan wijzigen en één keer
+/// telt, maar uit de rij zelf is geen persoon af te leiden. Daarom ook geen eigen
+/// id (een cuid bevat een tijdstip) en geen tijdstempels: die zouden een antwoord
+/// aan de toegangslogs kunnen koppelen. Voeg ze niet toe.
+model PocPollAnswer {
+  questionId String
+  voterKey   String
+  /// `YES_NO`: 1 of 0. `SCORE`: 1 tot en met 5. `OPEN`: leeg.
+  value      Int?
+  /// Enkel bij `OPEN`.
+  text       String?
+  /// De fases van de student op het moment van antwoorden, voor de deelname per
+  /// fase. Een fase met minder dan vijf antwoorden wordt nooit apart getoond.
+  studyYears StudyYear[] @default([])
+  /// Door de RiVers: open antwoord markeren voor de POC, of verbergen.
+  starred    Boolean     @default(false)
+  hidden     Boolean     @default(false)
+
+  question PocPollQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@id([questionId, voterKey])
+  @@index([voterKey])
 }
 
 // -----------------------------------------------------------------------------

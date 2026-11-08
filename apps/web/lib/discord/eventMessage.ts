@@ -75,6 +75,7 @@ export type DiscordEventPost = {
 };
 
 export type DiscordEmbed = {
+  author?: { name: string };
   title?: string;
   url?: string;
   description?: string;

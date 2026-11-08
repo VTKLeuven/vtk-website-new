@@ -219,6 +219,19 @@ herkenning van bestandsnamen of het uitlezen van de rekenbladen komt.
   wacht tot de activiteit voorbij is (`openResults` in `lib/bo/own.ts`). Breid
   die uitzondering niet uit naar de status of de tellingen.
 
+# POC-peilingen
+
+`docs/poc-peilingen.md` is de referentie: hoe de RiVers de studenten van hun
+richting bevragen op de homepage en op Discord, en hoe je de Discord-applicatie
+instelt. Lees het voor je aan `apps/web/lib/pocPolls` of de knoppen in
+`apps/web/lib/discord/poll*` komt. De kringkeuzes staan in
+`docs/design-decisions.md`.
+
+- **`PocPollAnswer` blijft anoniem.** Geen `userId`, geen eigen id en geen
+  tijdstempels: die laatste twee zijn aan de toegangslogs te koppelen.
+- **Toon niemand een tussenstand**, ook de RiVers niet, en toon een fase met
+  minder dan vijf antwoorden nooit apart.
+
 # Opruiming van de bucket
 
 Elke nacht zoekt `apps/web/lib/storage-cleanup*.ts` in elke tekst- en

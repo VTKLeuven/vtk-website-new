@@ -10,6 +10,7 @@ import { canAccessAnyForm } from '@/lib/forms/authorization';
 import { canSeeCommuRequests } from '@/lib/commu/requests';
 import { isExternalUrl } from '@/lib/href';
 import { werkgroepenWithOwnMemberRights } from '@/lib/werkgroepMembers';
+import { currentWorkingYear } from '@/lib/workingYear';
 import { getAdminNav, type NavGuard, type NavLeaf } from '@/lib/admin-nav';
 import { ADMIN_DENSITY_COOKIE, ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/adminNavCookie';
 import { AdminNav, type NavItem, type NavNode } from './AdminNav';
@@ -68,6 +69,13 @@ export default async function AdminLayout({
     !session.permissions.includes('jaarwerkingen.manage') &&
     (await werkgroepenWithOwnMemberRights(session, 'JAARWERKING')).size > 0;
 
+  // RiVers van dit werkingsjaar krijgen de tab Peilingen, zonder apart recht.
+  const pocRep =
+    !session.permissions.includes('pocs.manage') &&
+    (await prisma.pocRepresentative.count({
+      where: { userId: session.user.id, year: currentWorkingYear() },
+    })) > 0;
+
   // Mag de huidige gebruiker deze entry zien? Superadmin ziet alles.
   const canSee = (guard: NavGuard): boolean => {
     if (session.user.isSuperAdmin) return true;
@@ -84,6 +92,7 @@ export default async function AdminLayout({
     // Een jaarwerking telt niet: het BO kent haar als eigen vak (lib/bo/posts.ts),
     // niet als groep, dus ze had hier enkel een leeg blok.
     if (guard.post) return session.groups.some((g) => g.type !== 'JAARWERKING');
+    if (guard.pocRep) return session.permissions.includes('pocs.manage') || pocRep;
     if (guard.anyPerm) return guard.anyPerm.some((p) => session.permissions.includes(p));
     if (guard.perm) return session.permissions.includes(guard.perm);
     return true;
