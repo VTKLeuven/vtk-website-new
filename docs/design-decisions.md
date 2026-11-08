@@ -3860,24 +3860,61 @@ ze staan naast elkaar op twee assen die je tegelijk kan lezen.
   (een handmatige update, een ooit verkleind palet) valt terug op de hash in
   plaats van een token te vragen dat niet bestaat, want een blok zonder vulling
   ziet eruit als een blok zonder chauffeur.
-- **Een palet van vierentwintig, geen vrij kleurenwiel.** Het waren er acht in
+- **Een palet van veertig, met daarnaast drie schuiven (zie "Eigen kleur met
+  schuiven" hieronder).** Het waren er acht in
   een rijtje, en dat was te weinig zodra er meer dan acht mensen rijden: dan
   deelden twee chauffeurs een kleur op precies de week waarin het druk was. Nu
   staan ze als raster van zes bij vier in het kiesscherm, in de volgorde van het
   spectrum (blauw, groen, geel, oranje, rood, roze, paars, neutraal), elk met een
   naam als tooltip; "Kleur 17" zegt niets.
 
-  Een **vrije** kleurkiezer blijft er bewust niet: de tekst in een blok is donker
-  en de arcering van het voertuig ligt eroverheen, dus een vulling moet licht
-  blijven. Met een kleurenwiel staat er binnen de maand een donkerblauw tussen
-  waarop niemand het uur nog leest. Alle vierentwintig tinten in
-  `apps/logistiek/app/globals.css` zijn daarop gekozen.
+  Een **volledig vrije** kleurkiezer blijft er bewust niet: de tekst in een blok
+  heeft één kleur en de arcering van het voertuig ligt eroverheen, dus een vulling
+  moet binnen een bereik blijven. Met een kleurenwiel met vrije helderheid staat
+  er binnen de maand een donkerblauw tussen waarop niemand het uur nog leest. Alle
+  tinten van het palet in `apps/logistiek/app/design/theme.css` zijn daarop
+  gekozen, en de schuiven hieronder houden dezelfde grens aan.
 
   **Ingeklapt tot één knop.** Vierentwintig bolletjes bij elke chauffeur maakten
   van een lijst van tien mensen een muur van tweehonderdveertig stippen, en je
   kijkt naar hoogstens één ervan. De knop toont de kleur die deze chauffeur nu
   heeft, met haar naam; het palet klapt eronder open en sluit met Escape of door
   ernaast te klikken.
+- **Eigen kleur met schuiven (drie: tint, levendigheid, kracht).** Het palet van
+  veertig was nog altijd te beperkt voor wie een kleur wil die er niet tussen
+  staat, en "oneindig veel opties" is dan het antwoord op de vraag. Onder het
+  palet staat een ingeklapte knop "Eigen kleur" met drie schuiven en een voorbeeld
+  van een rit.
+  - **Tint en levendigheid zijn vrij, de kracht niet.** De tint (0 tot 359 graden)
+    en de levendigheid (grijs tot zo levendig als hier mag) lopen over het hele
+    bereik. De kracht, de derde schuif, kiest enkel tussen "zacht" en "krachtig",
+    en dat bereik is het stuk waarin de tekst in het blok 4.5:1 haalt. Een vrije
+    helderheid was precies de val waar het palet van vierentwintig voor gekozen
+    werd.
+  - **Er staan drie getallen in de databank, geen kleur.** `UitleenDriver.customColor`
+    bewaart `tint,levendigheid,kracht` (bv. `210,60,35`), en de echte helderheid
+    komt uit `--driver-l0` en `--driver-l1` in `theme.css`, per modus (`customColorCss`
+    in `lib/driver-colors.ts`). Zo wordt dezelfde keuze in het donker vanzelf een
+    donkere vulling met lichte tekst, zonder dat iemand ze opnieuw opslaat. Een hex
+    kon dat niet: dat is één vaste kleur.
+  - **`oklch` en geen `hsl`.** Bij `hsl` is geel bij dezelfde "lightness" veel
+    lichter dan blauw, dus de kracht-schuif zou bij elke tint iets anders doen en
+    de leesbaarheid zou per tint anders uitvallen. Bij `oklch` is één grens genoeg.
+  - **De grens wordt nagerekend.** `test/driver-colors.test.ts` leest de tokens uit
+    `theme.css` en zoekt de slechtste combinatie van tint, levendigheid en kracht
+    met de strengste arcering erover, in beide modi. Schuift iemand `--driver-l1`
+    op, dan faalt die test; dat is de bedoeling.
+  - **Een paletkleur en een eigen kleur sluiten elkaar uit.** Een nummer kiezen
+    (of "Standaard") zet `customColor` op `null`, en een eigen kleur zet
+    `colorIndex` op `null`. Anders bleef er na "Standaard" een eigen kleur staan
+    die de hash bleef overschrijven. Een tekst in de databank die geen kleur is,
+    valt terug op palet of hash (`parseCustomColor`), net als een onzinnige
+    `colorIndex`.
+  - **Bestaande chauffeurs veranderen niet.** De kolom is nullable en `NULL` is
+    "geen eigen kleur"; er is geen backfill.
+  - **De schuiven bewaren niets per pixel.** Een knop "Eigen kleur toepassen" slaat
+    op; een schuif die bij elke beweging opslaat is honderd server actions voor
+    één kleur.
 - **Een postlid krijgt pas een `UitleenDriver`-rij zodra iemand er iets aan
   instelt**, net zoals bij `canDriveVan`. De rij is de plek voor wat het team
   handmatig bijhoudt; het lidmaatschap zelf blijft uit de post komen.
@@ -10601,7 +10638,9 @@ hetzelfde soort vlak onder.
 **De chauffeurskleuren hebben een tweede reeks.** De vierentwintig tinten waren
 bewust licht met donkere tekst; in het donker zijn dat vierentwintig felle
 vlakken op bijna zwart. Er is dus een donkere reeks met dezelfde tinten in
-dezelfde huisvolgorde, en `--driver-ink` keert mee. De arcering per voertuig en
+dezelfde huisvolgorde, en `--driver-ink` keert mee. Een eigen kleur met schuiven
+doet hetzelfde met drie tokens (`--driver-l0`, `--driver-l1`, `--driver-c-max`)
+in plaats van veertig. De arcering per voertuig en
 het streeppatroon voor "nog te beslissen" gaan van donkere naar lichte alfa,
 anders verdwijnen ze in hun eigen blok. De helderheid wisselt licht per buur
 (0,23 en 0,29), want vierentwintig kleuren enkel op tint uit elkaar houden lukt

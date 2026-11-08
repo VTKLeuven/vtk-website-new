@@ -9,6 +9,7 @@ import type {
   UitleenTransportNoteVisibility,
 } from '@prisma/client';
 import { currentWorkingYear } from '@vtk/auth';
+import { parseCustomColor, type CustomDriverColor, type DriverColorChoice } from './driver-colors';
 import { resolveDriverPhones, type DriverPhone, type DriverPhoneSource } from './driver-phones';
 import {
   DEFAULT_LAST_MINUTE_DAYS,
@@ -1559,6 +1560,11 @@ export type DriverOption = {
    */
   colorIndex: number | null;
   /**
+   * Een eigen kleur uit de schuiven, of `null`. Wint van `colorIndex`; de actie
+   * zet er altijd één van de twee op `null`.
+   */
+  customColor: CustomDriverColor | null;
+  /**
    * Het nummer waarop deze chauffeur bereikbaar is, of `null`. Zie
    * {@link driverPhones}: vastgelegd door het team, anders het gsm-nummer van
    * zijn profiel, anders het laatste nummer dat hij zelf bij een aanvraag opgaf.
@@ -1722,12 +1728,20 @@ export async function feedTokensForUser(userId: string) {
  * wel de kleuren maar mag de chauffeurslijst zelf niet ophalen: dat zou namen
  * meebrengen die daar niet horen.
  */
-export async function driverColorOverrides(): Promise<Record<string, number>> {
+export async function driverColorOverrides(): Promise<Record<string, DriverColorChoice>> {
   const rows = await prisma.uitleenDriver.findMany({
-    where: { colorIndex: { not: null } },
-    select: { userId: true, colorIndex: true },
+    where: { OR: [{ colorIndex: { not: null } }, { customColor: { not: null } }] },
+    select: { userId: true, colorIndex: true, customColor: true },
   });
-  return Object.fromEntries(rows.map((row) => [row.userId, row.colorIndex as number]));
+  const overrides: Record<string, DriverColorChoice> = {};
+  for (const row of rows) {
+    // Een eigen kleur wint. Is de tekst geen kleur (een handmatige update), dan
+    // geldt het palet, en zonder palet de hash.
+    const custom = parseCustomColor(row.customColor);
+    if (custom) overrides[row.userId] = custom;
+    else if (row.colorIndex !== null) overrides[row.userId] = row.colorIndex;
+  }
+  return overrides;
 }
 
 /**
@@ -1743,6 +1757,7 @@ export async function driverOptions(): Promise<DriverOption[]> {
       select: {
         canDriveVan: true,
         colorIndex: true,
+        customColor: true,
         phone: true,
         user: { select: { id: true, name: true } },
       },
@@ -1770,6 +1785,7 @@ export async function driverOptions(): Promise<DriverOption[]> {
       source: 'POST',
       canDriveVan: row?.canDriveVan ?? false,
       colorIndex: row?.colorIndex ?? null,
+      customColor: parseCustomColor(row?.customColor),
       // `row.phone` niet meer apart: dat is de bron TEAM en die wint al binnen
       // `driverPhones` zelf.
       phone: phones.get(member.id)?.number ?? null,
@@ -1783,6 +1799,7 @@ export async function driverOptions(): Promise<DriverOption[]> {
       source: 'EXTRA',
       canDriveVan: row.canDriveVan,
       colorIndex: row.colorIndex,
+      customColor: parseCustomColor(row.customColor),
       phone: phones.get(row.user.id)?.number ?? null,
     });
   }
@@ -1877,6 +1894,7 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
         note: true,
         canDriveVan: true,
         colorIndex: true,
+        customColor: true,
         phone: true,
         user: { select: { id: true, name: true, email: true, active: true } },
       },
@@ -1928,6 +1946,7 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
       note: row?.note ?? null,
       canDriveVan: row?.canDriveVan ?? false,
       colorIndex: row?.colorIndex ?? null,
+      customColor: parseCustomColor(row?.customColor),
       inactive: false,
       phone: phones.get(member.id)?.number ?? null,
       phoneSource: phones.get(member.id)?.source ?? null,
@@ -1943,6 +1962,7 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
       note: row.note,
       canDriveVan: row.canDriveVan,
       colorIndex: row.colorIndex,
+      customColor: parseCustomColor(row.customColor),
       inactive: !row.user.active,
       phone: phones.get(row.user.id)?.number ?? null,
       phoneSource: phones.get(row.user.id)?.source ?? null,

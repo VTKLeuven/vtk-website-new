@@ -5234,8 +5234,8 @@ model UitleenDriver {
   // vlag zet; tot dan gelden ze als autochauffeur.
   canDriveVan Boolean @default(false)
 
-  /// De kleur van deze chauffeur in de transportplanning, 1 tot 8
-  /// (`--driver-1` .. `--driver-8` in app/globals.css).
+  /// De kleur van deze chauffeur in de transportplanning, 1 tot 40
+  /// (`--driver-1` .. `--driver-40` in app/design/theme.css).
   ///
   /// `null` = de kleur die uit zijn id volgt (`driverColorIndex` in
   /// lib/driver-colors.ts). Die hash blijft de standaard: het doel is
@@ -5247,6 +5247,16 @@ model UitleenDriver {
   /// Een lid van de post Logistiek zonder rij in deze tabel krijgt er een zodra
   /// iemand zijn kleur zet, net zoals `canDriveVan` dat al doet.
   colorIndex Int?
+
+  /// Een eigen kleur uit de drie schuiven in /beheer/chauffeurs, als
+  /// `tint,levendigheid,kracht` (bv. `210,60,35`); zie `CustomDriverColor` in
+  /// lib/driver-colors.ts.
+  ///
+  /// Wint van `colorIndex`, maar de actie zet er altijd één van de twee op
+  /// `null`, dus in de praktijk staat er hooguit één. `null` = geen eigen kleur.
+  /// Een tekst die er niet als kleur uitziet, wordt genegeerd (`parseCustomColor`)
+  /// en laat de paletkleur of de hash gelden.
+  customColor String?
 
   /// Het nummer waarop deze chauffeur bereikbaar is onderweg.
   ///

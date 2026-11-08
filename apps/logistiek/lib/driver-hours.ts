@@ -1,4 +1,3 @@
-import { driverColorVarFromIndex } from './driver-colors';
 
 /**
  * Uren per chauffeur per uur van de dag (F4.23).
@@ -14,10 +13,12 @@ import { driverColorVarFromIndex } from './driver-colors';
  * getallen in, getallen uit.
  *
  * **De kleur is de kleur van de kalender.** Een chauffeur heeft in de planning
- * al een kleur (`driverColorIndex`), en die hier hergebruiken betekent dat wie
+ * al een kleur (`driverColorVar`), en die hier hergebruiken betekent dat wie
  * daar mint is, dat hier ook is. Dat twee chauffeurs op dezelfde kleur kunnen
  * vallen, is in de kalender al zo en wordt daar rechtgezet met
- * `UitleenDriver.colorIndex`; één palet betekent dat je dat één keer doet.
+ * `UitleenDriver.colorIndex` of een eigen kleur; één bron betekent dat je dat
+ * één keer doet. De kleur komt hier als CSS-waarde binnen en niet als nummer,
+ * want een eigen kleur heeft geen nummer.
  */
 export const HOUR_BUCKETS = [1, 2, 4] as const;
 
@@ -43,8 +44,8 @@ const REST_COLOR = 'var(--chart-rest)';
 export type HourDriver = {
   id: string;
   name: string;
-  /** 1 tot 24, zoals in de planning; 0 bestaat hier niet. */
-  colorIndex: number;
+  /** De kleur uit de planning, als CSS-waarde (`driverColorVar`). */
+  color: string;
   /** De uren van deze chauffeur over de hele periode. */
   hours: number;
   /** Vierentwintig getallen, index 0 is middernacht. */
@@ -120,7 +121,7 @@ export function driverHourChart(drivers: HourDriver[], options: { bucket: HourBu
       segments.push({
         key: driver.id,
         name: driver.name,
-        color: driverColorVarFromIndex(driver.colorIndex),
+        color: driver.color,
         hours: value,
       });
     }
@@ -178,7 +179,7 @@ export function driverWeekdayChart(drivers: HourDriver[], options: { top: number
       segments.push({
         key: driver.id,
         name: driver.name,
-        color: driverColorVarFromIndex(driver.colorIndex),
+        color: driver.color,
         hours: days[day],
       });
     }
@@ -204,7 +205,7 @@ function legendOf(named: HourDriver[], rest: HourDriver[]): HourSegment[] {
     .map((driver) => ({
       key: driver.id,
       name: driver.name,
-      color: driverColorVarFromIndex(driver.colorIndex),
+      color: driver.color,
       hours: driver.hours,
     }));
   const restTotal = rest.reduce((total, driver) => total + driver.hours, 0);
@@ -280,7 +281,7 @@ export function driverProfiles(
     .map((driver) => ({
       key: driver.id,
       name: driver.name,
-      color: driverColorVarFromIndex(driver.colorIndex),
+      color: driver.color,
       hours: driver.hours,
       values: valuesOf(driver),
     }));

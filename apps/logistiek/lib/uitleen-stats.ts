@@ -3,7 +3,7 @@ import 'server-only';
 import { prisma } from '@vtk/db';
 import { currentWorkingYear, FIRST_WORKING_YEAR } from '@vtk/auth';
 import type { Prisma } from '@prisma/client';
-import { driverColorIndex } from './driver-colors';
+import { driverColorVar } from './driver-colors';
 import { driverColorOverrides } from './uitleen-server';
 import { tripTitle } from './uitleen';
 
@@ -150,12 +150,14 @@ export type DriverStat = {
    */
   heat: number[];
   /**
-   * De kleur van deze chauffeur in de planning, 1 tot 40.
+   * De kleur van deze chauffeur in de planning, als CSS-waarde (een paletkleur
+   * of een eigen kleur).
    *
    * Meegegeven zodat een grafiek dezelfde kleur kan gebruiken als de kalender:
-   * wie daar mint is, is dat hier ook.
+   * wie daar mint is, is dat hier ook. Een CSS-waarde en geen paletnummer, want
+   * een eigen kleur heeft geen nummer.
    */
-  colorIndex: number;
+  color: string;
 };
 
 export type GroupStat = {
@@ -315,7 +317,7 @@ export async function transportStats(filters: StatsFilters): Promise<TransportSt
         perVehicle: {},
         perHour: new Array<number>(24).fill(0),
         heat: new Array<number>(24 * 7).fill(0),
-        colorIndex: driverColorIndex(booking.driverId, colors),
+        color: driverColorVar(booking.driverId, colors),
       };
       entry.trips += 1;
       entry.hours += duration;

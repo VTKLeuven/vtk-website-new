@@ -12,7 +12,13 @@ import {
 } from '@/lib/calendar/feed-token';
 import { logistiekBaseUrl } from '@/lib/payments';
 import { writeAudit } from '@/lib/audit';
-import { isDriverColorIndex, isVehiclePattern, NEW_DRIVER_COLOR_INDEX } from '@/lib/driver-colors';
+import {
+  isCustomDriverColor,
+  isDriverColorIndex,
+  isVehiclePattern,
+  NEW_DRIVER_COLOR_INDEX,
+  serializeCustomColor,
+} from '@/lib/driver-colors';
 import { isVehicleIcon } from '@/lib/vehicle-icon';
 import { normaliseBelgianPhone } from '@/lib/vcard';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
@@ -3499,6 +3505,11 @@ export async function setDriverVanAction(
  * niet "geen kleur", want een blok zonder vulling is niet te onderscheiden van
  * een blok zonder chauffeur.
  *
+ * Een paletkleur en een eigen kleur sluiten elkaar uit: wie een nummer kiest,
+ * wist de eigen kleur, en `setDriverCustomColorAction` doet het omgekeerde.
+ * Anders blijft er na "Standaard" een eigen kleur in de rij staan die de hash
+ * blijft overschrijven.
+ *
  * Upsert, zoals `setDriverVanAction`: een lid van de post Logistiek heeft pas een
  * rij zodra iemand er iets aan instelt.
  */
@@ -3520,7 +3531,7 @@ export async function setDriverColorAction(
 
   await prisma.uitleenDriver.upsert({
     where: { userId },
-    update: { colorIndex },
+    update: { colorIndex, customColor: null },
     create: { userId, colorIndex },
   });
 
@@ -3528,6 +3539,46 @@ export async function setDriverColorAction(
   // Ook het publieke bezettingsoverzicht draagt deze kleuren.
   revalidatePath('/vervoer/bezetting');
   return { ok: true, message: colorIndex === null ? 'Terug op de standaardkleur.' : 'Kleur opgeslagen.' };
+}
+
+/**
+ * Een eigen kleur voor een chauffeur, uit de drie schuiven (tint, levendigheid,
+ * kracht; zie `CustomDriverColor`).
+ *
+ * De server controleert de bereiken zelf: de schuiven kunnen niets anders geven,
+ * maar een aanroep hoeft niet via de schuiven te komen, en een kleur buiten het
+ * bereik is er een waarop de tekst in het blok niet meer leesbaar is. De
+ * helderheid zelf wordt hier niet bewaard maar volgt uit de modus (`theme.css`),
+ * dus een waarde die klopt, kan het scherm nooit onleesbaar maken.
+ */
+export async function setDriverCustomColorAction(
+  userId: string,
+  color: { hue: number; chroma: number; tone: number }
+): Promise<ActionResult> {
+  await requireManage();
+
+  if (!isCustomDriverColor(color)) {
+    return { ok: false, error: 'Die kleur kan niet: de schuiven staan buiten hun bereik.' };
+  }
+
+  const user = await prisma.user.findFirst({
+    where: { id: userId, deletedAt: null },
+    select: { id: true },
+  });
+  if (!user) return { ok: false, error: 'Dit lid bestaat niet (meer) op vtk.be.' };
+
+  // Alleen de drie velden uit `color`, niet het object zelf: een aanroep kan er
+  // meer in stoppen dan de schuiven kennen.
+  const customColor = serializeCustomColor({ hue: color.hue, chroma: color.chroma, tone: color.tone });
+  await prisma.uitleenDriver.upsert({
+    where: { userId },
+    update: { customColor, colorIndex: null },
+    create: { userId, customColor },
+  });
+
+  revalidateBeheer();
+  revalidatePath('/vervoer/bezetting');
+  return { ok: true, message: 'Eigen kleur opgeslagen.' };
 }
 
 /**

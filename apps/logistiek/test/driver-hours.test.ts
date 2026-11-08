@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { driverColorVarFromIndex } from '@/lib/driver-colors';
 import {
   driverHourChart,
   driverProfiles,
@@ -27,7 +28,7 @@ function driver(
   return {
     id,
     name,
-    colorIndex,
+    color: driverColorVarFromIndex(colorIndex),
     hours: perHour.reduce((total, value) => total + value, 0),
     perHour,
     heat,

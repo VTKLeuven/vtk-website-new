@@ -7,14 +7,21 @@ import {
   saveDriverNoteAction,
   saveDriverPhoneAction,
   setDriverColorAction,
+  setDriverCustomColorAction,
   setDriverVanAction,
 } from '@/app/actions/beheer';
 import {
+  CUSTOM_COLOR_NAME,
+  CUSTOM_COLOR_START,
   DRIVER_COLOR_COUNT,
+  customColorCss,
   driverColorIndex,
   driverColorName,
   driverColorVar,
+  serializeCustomColor,
+  type CustomDriverColor,
 } from '@/lib/driver-colors';
+import { CustomColorSliders } from './custom-color-sliders';
 import { useToast } from '@/components/ui/toast';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { LogisticsIcon } from '@/components/logistics-icon';
@@ -67,10 +74,13 @@ function removeDescription(entry: DriverPoolEntry): string {
  * rijden; dan deelden twee chauffeurs een kleur op precies de week waarin het
  * druk was.
  *
- * **Een palet en geen vrije kleurkiezer.** De tekst in een blok is donker, dus
- * een vulling moet licht blijven; met een vrij kleurenwiel staat er binnen de
- * maand een donkerblauw tussen waarop niemand het uur nog leest. Alle
- * vierentwintig tinten hier zijn daarop gekozen.
+ * **Een palet, en daarnaast drie schuiven voor wie iets anders wil.** De tekst
+ * in een blok heeft één kleur, dus een vulling moet binnen een bereik blijven
+ * waar die tekst leesbaar is; een kleurenwiel met vrije helderheid levert binnen
+ * de maand een donkerblauw op waarop niemand het uur nog leest. De schuiven
+ * (tint, levendigheid, kracht) laten dus alle tinten en alle verzadigingen toe,
+ * maar de kracht kiest enkel binnen dat bereik, en per lichte of donkere modus.
+ * Zie `customColorCss`.
  *
  * **Ingeklapt tot één knop.** Vierentwintig bolletjes bij elke chauffeur maakten
  * van een lijst van tien mensen een muur van tweehonderdveertig stippen, en je
@@ -87,13 +97,32 @@ function DriverColorPicker({ entry }: { entry: DriverPoolEntry }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const active = entry.colorIndex;
+  const saved = entry.customColor;
   const fallback = driverColorIndex(entry.id);
   const shown = active ?? fallback;
+  // Geen paletkleur en geen eigen kleur: de kleur uit zijn id.
+  const usesDefault = active === null && saved === null;
+  const [showCustom, setShowCustom] = useState(saved !== null);
+  const [draft, setDraft] = useState<CustomDriverColor>(saved ?? CUSTOM_COLOR_START);
+  // Wat er nu staat en wat de schuiven tonen, vergeleken op de opgeslagen tekst.
+  const draftIsSaved = saved !== null && serializeCustomColor(saved) === serializeCustomColor(draft);
 
   function choose(colorIndex: number | null) {
     setOpen(false);
     startTransition(async () => {
       const result = await setDriverColorAction(entry.id, colorIndex);
+      if (result.ok) {
+        showToast({ message: result.message ?? 'Opgeslagen.', variant: 'success' });
+      } else {
+        showToast({ message: result.error, variant: 'error', duration: 0 });
+      }
+    });
+  }
+
+  function applyCustom() {
+    setOpen(false);
+    startTransition(async () => {
+      const result = await setDriverCustomColorAction(entry.id, draft);
       if (result.ok) {
         showToast({ message: result.message ?? 'Opgeslagen.', variant: 'success' });
       } else {
@@ -139,10 +168,10 @@ function DriverColorPicker({ entry }: { entry: DriverPoolEntry }) {
         <span
           aria-hidden
           className="h-4 w-4 rounded-full border border-vtk-navy/20"
-          style={{ backgroundColor: `var(--driver-${shown})` }}
+          style={{ backgroundColor: saved ? customColorCss(saved) : `var(--driver-${shown})` }}
         />
-        {driverColorName(shown)}
-        {active === null ? <span className="text-vtk-muted">(standaard)</span> : null}
+        {saved ? CUSTOM_COLOR_NAME : driverColorName(shown)}
+        {usesDefault ? <span className="text-vtk-muted">(standaard)</span> : null}
         <LogisticsIcon
           name="chevron"
           className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`}
@@ -152,7 +181,7 @@ function DriverColorPicker({ entry }: { entry: DriverPoolEntry }) {
 
       {open ? (
         <div
-          className="absolute left-0 top-full z-30 mt-1.5 w-fit rounded-[14px] border border-vtk-navy/15 bg-vtk-surface p-2.5 shadow-lg"
+          className="absolute left-0 top-full z-30 mt-1.5 w-[min(18rem,calc(100vw-2.5rem))] rounded-[14px] border border-vtk-navy/15 bg-vtk-surface p-2.5 shadow-lg"
           role="group"
           aria-label={`Kleur voor ${entry.name}`}
         >
@@ -160,7 +189,7 @@ function DriverColorPicker({ entry }: { entry: DriverPoolEntry }) {
               (24, elk bij een stuk van het spectrum), de laatste twee de
               middentonen die erbij kwamen (F6.7). */}
           <div
-            className="grid gap-1.5"
+            className="grid justify-items-center gap-1.5"
             style={{ gridTemplateColumns: 'repeat(8, minmax(0, 1fr))' }}
           >
             {Array.from({ length: DRIVER_COLOR_COUNT }, (_, index) => index + 1).map((index) => (
@@ -184,14 +213,54 @@ function DriverColorPicker({ entry }: { entry: DriverPoolEntry }) {
               </button>
             ))}
           </div>
+
+          {/* Eigen kleur: ingeklapt tot één knop, want de schuiven zijn bijna
+              driemaal de hoogte van het palet en de meeste chauffeurs krijgen
+              een paletkleur. Staat er al een eigen kleur, dan staat hij open. */}
           <button
             type="button"
-            disabled={pending || active === null}
+            onClick={() => setShowCustom((value) => !value)}
+            aria-expanded={showCustom}
+            className={`mt-2 inline-flex w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+              saved
+                ? 'border-vtk-navy bg-vtk-navy/5 text-vtk-ink'
+                : 'border-vtk-navy/20 text-vtk-muted hover:border-vtk-navy/50'
+            }`}
+          >
+            <span
+              aria-hidden
+              className="h-3 w-3 rounded-full border border-vtk-navy/20"
+              style={{ backgroundColor: customColorCss(draft) }}
+            />
+            {CUSTOM_COLOR_NAME}
+            <LogisticsIcon
+              name="chevron"
+              className={`ml-auto h-3 w-3 transition-transform ${showCustom ? 'rotate-180' : ''}`}
+            />
+            <span className="sr-only">maken met schuiven voor {entry.name}</span>
+          </button>
+          {showCustom ? (
+            <div className="mt-2.5 grid gap-3 rounded-[10px] border border-vtk-navy/10 p-2.5">
+              <CustomColorSliders value={draft} onChange={setDraft} disabled={pending} />
+              <button
+                type="button"
+                disabled={pending || draftIsSaved}
+                onClick={applyCustom}
+                className="inline-flex h-8 items-center justify-center rounded-full bg-vtk-navy px-3 text-xs font-semibold text-vtk-on-emphasis transition hover:opacity-90 disabled:opacity-40"
+              >
+                {draftIsSaved ? 'Deze kleur staat erop' : 'Eigen kleur toepassen'}
+              </button>
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            disabled={pending || usesDefault}
             onClick={() => choose(null)}
-            aria-pressed={active === null}
+            aria-pressed={usesDefault}
             title="Terug op de standaardkleur"
             className={`mt-2 inline-flex w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition disabled:opacity-50 ${
-              active === null
+              usesDefault
                 ? 'border-vtk-navy bg-vtk-navy/5 text-vtk-ink'
                 : 'border-vtk-navy/20 text-vtk-muted hover:border-vtk-navy/50'
             }`}

@@ -389,9 +389,11 @@ Die module hangt daarom niet aan `uitleen-stats.ts`, dat `server-only` is en
 Prisma meetrekt. `charts.tsx` is `'use client'` en mag er enkel types uit halen.
 
 **De kleur van een chauffeur komt uit `lib/driver-colors.ts`**, dezelfde als in
-de kalender, via `colorIndex` op elke `DriverStat`. Twee chauffeurs kunnen op
-dezelfde kleur vallen; het scherm noemt dat en wijst naar `/beheer/chauffeurs`.
-Zie `docs/design-decisions.md`.
+de kalender, via `color` (een CSS-waarde, `driverColorVar`) op elke `DriverStat`.
+Een CSS-waarde en geen paletnummer, want een chauffeur kan ook een eigen kleur
+met schuiven hebben (`UitleenDriver.customColor`), en die heeft geen nummer.
+Twee chauffeurs kunnen op dezelfde kleur vallen; het scherm noemt dat en wijst
+naar `/beheer/chauffeurs`. Zie `docs/design-decisions.md`.
 
 **Elke grafiek draagt een tabelweergave.** Drie van de reekskleuren halen de
 3:1 tegen wit niet, dus kleur is hier nooit de enige uitleg. Een nieuwe grafiek

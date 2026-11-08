@@ -18,10 +18,13 @@
  * vaste hash geeft dezelfde persoon altijd dezelfde kleur zonder dat iemand
  * kleuren moet gaan zitten kiezen. Maar twee chauffeurs die toevallig op bijna
  * dezelfde tint uitkomen, moet het team kunnen rechtzetten; daarom kan
- * `UitleenDriver.colorIndex` de hash overschrijven.
+ * `UitleenDriver.colorIndex` de hash overschrijven. Wie ook buiten het palet iets
+ * zoekt, stelt een {@link CustomDriverColor} in met drie schuiven
+ * (`UitleenDriver.customColor`).
  *
- * De kleuren zelf staan als tokens in `app/globals.css` (`--driver-1` tot
- * `--driver-24`), zodat ze op één plek bijgesteld kunnen worden.
+ * De kleuren zelf staan als tokens in `app/design/theme.css` (`--driver-1` tot
+ * `--driver-40`, en de grenzen van de schuiven), zodat ze op één plek bijgesteld
+ * kunnen worden.
  */
 export const AUTO_COLOR_COUNT = 24;
 
@@ -114,10 +117,94 @@ function hash(value: string): number {
 }
 
 /**
+ * Een eigen kleur, gekozen met schuiven in plaats van uit het palet. Drie
+ * hele getallen, en geen hex: een hex is één vaste kleur, terwijl dit in de
+ * lichte en de donkere modus een andere vulling moet worden met dezelfde tint.
+ *
+ * - `hue`: de tint, 0 tot en met 359 graden op het kleurenwiel.
+ * - `chroma`: hoe levendig, 0 (grijs) tot en met 100 (zo levendig als hier mag).
+ * - `tone`: hoe krachtig, 0 (zacht, het dichtst bij het vlak eronder) tot en met
+ *   100 (krachtig, de diepste vulling waar de tekst nog leesbaar op blijft).
+ *
+ * **Geen vrije helderheid.** De tekst in een blok heeft één kleur en de arcering
+ * van het voertuig ligt eroverheen, dus een vulling mag niet verder van het vlak
+ * af dan waar die tekst nog 4.5:1 haalt. De schuiven kiezen binnen dat bereik
+ * (`--driver-l0` tot `--driver-l1` in `app/design/theme.css`, per modus) en
+ * `test/driver-colors.test.ts` rekent het na over het hele kleurenwiel.
+ */
+export type CustomDriverColor = {
+  hue: number;
+  chroma: number;
+  tone: number;
+};
+
+/** Waar de schuiven staan wanneer iemand een eigen kleur begint te maken. */
+export const CUSTOM_COLOR_START: CustomDriverColor = { hue: 200, chroma: 55, tone: 35 };
+
+export const CUSTOM_COLOR_NAME = 'Eigen kleur';
+
+function inRange(value: unknown, min: number, max: number): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max;
+}
+
+/** Ligt dit binnen wat de schuiven kunnen opleveren? Hele getallen, binnen het bereik. */
+export function isCustomDriverColor(value: unknown): value is CustomDriverColor {
+  if (typeof value !== 'object' || value === null) return false;
+  const color = value as Record<string, unknown>;
+  return inRange(color.hue, 0, 359) && inRange(color.chroma, 0, 100) && inRange(color.tone, 0, 100);
+}
+
+/**
+ * De tekst in `UitleenDriver.customColor`: `tint,levendigheid,kracht`, bv.
+ * `210,60,35`. Eén kolom in plaats van drie, want de drie horen samen: een rij
+ * met een tint maar zonder kracht zou een halve kleur zijn.
+ */
+export function serializeCustomColor(color: CustomDriverColor): string {
+  return `${color.hue},${color.chroma},${color.tone}`;
+}
+
+/**
+ * Leest `UitleenDriver.customColor` terug. `null` voor alles wat geen kleur is:
+ * een lege kolom, een handmatige update, een tekst uit een toekomstige versie.
+ * Dan geldt de paletkleur of de hash, net zoals bij een onzinnige `colorIndex`;
+ * een blok zonder vulling ziet eruit als een blok zonder chauffeur.
+ */
+export function parseCustomColor(value: string | null | undefined): CustomDriverColor | null {
+  if (!value) return null;
+  const parts = value.split(',');
+  if (parts.length !== 3 || parts.some((part) => !/^\d{1,3}$/.test(part))) return null;
+  const [hue, chroma, tone] = parts.map(Number);
+  const color = { hue, chroma, tone };
+  return isCustomDriverColor(color) ? color : null;
+}
+
+/**
+ * De CSS-kleur van een eigen kleur.
+ *
+ * `oklch` omdat gelijke stappen daar ook gelijk lijken: bij `hsl` is geel bij
+ * dezelfde "lightness" veel lichter dan blauw en liggen de schuiven scheef.
+ * De helderheid en het maximum aan levendigheid komen uit tokens, per modus, en
+ * de kleur rekent dus mee wanneer de modus wisselt, zonder dat iemand opnieuw
+ * iets opslaat. Ook in een SVG-`fill` en in `color-mix` bruikbaar.
+ */
+export function customColorCss(color: CustomDriverColor): string {
+  const tone = color.tone / 100;
+  const chroma = color.chroma / 100;
+  const lightness = `calc(var(--driver-l0) + (var(--driver-l1) - var(--driver-l0)) * ${tone})`;
+  return `oklch(${lightness} calc(var(--driver-c-max) * ${chroma}) ${color.hue})`;
+}
+
+/**
+ * De keuze van het team voor één chauffeur: een nummer uit het palet, of een
+ * eigen kleur. Nooit beide; zie `setDriverColorAction`.
+ */
+export type DriverColorChoice = number | CustomDriverColor;
+
+/**
  * Kleuren die het team zelf gezet heeft, op chauffeur-id. Wat er niet in staat,
  * valt terug op de hash.
  */
-export type DriverColorOverrides = Readonly<Record<string, number>>;
+export type DriverColorOverrides = Readonly<Record<string, DriverColorChoice>>;
 
 /** Ligt deze keuze binnen de tokens die `app/design/theme.css` kent? */
 export function isDriverColorIndex(value: number | null | undefined): value is number {
@@ -127,9 +214,13 @@ export function isDriverColorIndex(value: number | null | undefined): value is n
 /**
  * 1 tot en met {@link DRIVER_COLOR_COUNT}; 0 wanneer er geen chauffeur is.
  *
- * Een ingestelde kleur wint; een onzinnige waarde in de databank (een
+ * Een ingestelde paletkleur wint; een onzinnige waarde in de databank (een
  * handmatige update, een oude rij na het verkleinen van het palet) valt terug op
  * de hash in plaats van een kleur te vragen die niet bestaat.
+ *
+ * **Een eigen kleur heeft geen nummer.** Heeft de chauffeur er een, dan geeft
+ * dit toch de hash terug, en dat is dus niet wat er op het scherm staat. Wie de
+ * kleur zelf nodig heeft, vraagt {@link driverColorVar}.
  */
 export function driverColorIndex(
   driverId: string | null | undefined,
@@ -137,7 +228,7 @@ export function driverColorIndex(
 ): number {
   if (!driverId) return 0;
   const chosen = overrides?.[driverId];
-  if (isDriverColorIndex(chosen)) return chosen;
+  if (typeof chosen === 'number' && isDriverColorIndex(chosen)) return chosen;
   return (hash(driverId) % AUTO_COLOR_COUNT) + 1;
 }
 
@@ -153,11 +244,18 @@ export function driverColorVarFromIndex(index: number): string {
   return index === 0 ? 'var(--driver-none)' : `var(--driver-${index})`;
 }
 
-/** De CSS-variabele voor deze chauffeur, of de neutrale kleur zonder chauffeur. */
+/**
+ * De CSS-kleur voor deze chauffeur: zijn eigen kleur, anders zijn paletkleur,
+ * anders de hash; de neutrale kleur zonder chauffeur.
+ */
 export function driverColorVar(
   driverId: string | null | undefined,
   overrides?: DriverColorOverrides
 ): string {
+  if (driverId) {
+    const chosen = overrides?.[driverId];
+    if (isCustomDriverColor(chosen)) return customColorCss(chosen);
+  }
   return driverColorVarFromIndex(driverColorIndex(driverId, overrides));
 }
 

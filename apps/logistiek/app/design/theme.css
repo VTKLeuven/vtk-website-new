@@ -177,6 +177,15 @@
   --driver-39: #639be1;
   --driver-40: #c27cbb;
   --driver-none: #e2e6ee;
+  /* De grenzen van de schuiven bij een eigen kleur (`customColorCss` in
+     lib/driver-colors.ts). `l0` is de zachtste vulling, `l1` de krachtigste;
+     `c-max` is hoe levendig 100% mag zijn. Lager dan 0.70 bij `l1` (donkerder)
+     zakt de tekst onder 4.5:1 met de arcering eroverheen, en `test/driver-colors.test.ts`
+     rekent dat na over het hele kleurenwiel; pas ze dus nooit zonder die test
+     aan. In de donkere modus staan ze omgekeerd: zacht is daar het donkerst. */
+  --driver-l0: 0.94;
+  --driver-l1: 0.7;
+  --driver-c-max: 0.13;
   --driver-ink: #0a0f1f; /* tekst in een blok */
   --driver-edge: rgba(14, 26, 54, 0.45); /* streepjesrand "nog geen chauffeur" */
   --driver-pattern: rgba(14, 26, 54, 0.13); /* arcering per voertuig */
@@ -319,6 +328,9 @@
   --driver-39: #183d6b;
   --driver-40: #572953;
   --driver-none: #262c38;
+  --driver-l0: 0.26;
+  --driver-l1: 0.36;
+  --driver-c-max: 0.11;
   --driver-ink: #f2f6ff;
   --driver-edge: rgba(255, 255, 255, 0.45);
   --driver-pattern: rgba(255, 255, 255, 0.16);
@@ -366,6 +378,10 @@
     --danger-fill: #ffffff;
     --warn-fill: #ffffff;
     --driver-ink: #000000;
+    /* Een eigen kleur drukt licht af, net als de zwarte tekst erop verwacht. */
+    --driver-l0: 0.94;
+    --driver-l1: 0.7;
+    --driver-c-max: 0.13;
     /* De statusstreep blijft ook op papier zichtbaar; ze zegt of een moment nog
        kan vrijkomen, en dat is precies wat er op een afgedrukte week toe doet. */
     --driver-requested: #000000;
