@@ -9468,6 +9468,48 @@ model BoDocument {
 /// Hoe een post in de bestandsnamen heet wanneer de site dat niet zelf
 /// herkent: "WERKGROEPEN" is Overige, "Biomedix" een werkgroep. Eén keer
 /// gekoppeld, geldt het voor elk bestand met die schrijfwijze, ook de volgende.
+enum BoBudgetStatus {
+  /// Een post is het aan het opstellen.
+  DRAFT
+  /// Ingediend voor een BO: de GM kijkt het na, de post wijzigt niets meer
+  /// tot ze het terug in opmaak zet.
+  SUBMITTED
+}
+
+/// Een budget dat een post op de site opstelt, in plaats van een rekenblad in
+/// de map Budgetten van de gedeelde drive. De site rekent alles zelf uit
+/// (`lib/bo/budget/calc.ts`); zie docs/bestuursorgaan.md ("Budgetten op de
+/// site"). Drive blijft bestaan voor wie er nog in werkt.
+model BoBudget {
+  id           String         @id @default(cuid())
+  workingYear  Int
+  /// De post: `g:<groupId>` of een vak uit `lib/bo/posts.ts` (`x:vice`). Geen
+  /// vreemde sleutel, zoals bij `BoPostAlias`: een vak is geen `Group`.
+  postKey      String
+  title        String
+  /// Het sjabloon waarmee de post begon (`lib/bo/budget/types.ts`).
+  template     String
+  status       BoBudgetStatus @default(DRAFT)
+  /// De datum van het BO waarvoor de post het indient.
+  targetDate   DateTime?      @db.Date
+  /// Parameters, secties en regels (`BudgetContent`). Geen sommen of
+  /// totalen: die rekent de site uit de regels.
+  content      Json
+  /// Afgeleid uit `content` bij elke bewaring, voor de lijsten. Een kost is
+  /// negatief in `totalCents`, zoals in het blad.
+  incomeCents  Int            @default(0)
+  expenseCents Int            @default(0)
+  totalCents   Int            @default(0)
+  submittedAt  DateTime?      @db.Timestamptz(3)
+  /// Wie het aanmaakte. Geen relatie: het logboek (`AdminAuditLog`) houdt bij
+  /// wie wat wijzigde, en een budget hoort bij een post, niet bij een persoon.
+  createdById  String?
+  createdAt    DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime       @updatedAt @db.Timestamptz(3)
+
+  @@index([workingYear, postKey])
+}
+
 model BoPostAlias {
   /// De schrijfwijze, genormaliseerd met `normalizeKey`.
   key       String   @id

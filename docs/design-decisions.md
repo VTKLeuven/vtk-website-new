@@ -11869,6 +11869,70 @@ https://claude.ai/artifact/VpxcbRLcNKHuuaxpYKnejB
   krijgt de verkenner. Wisselen meldt zich niet met een toast: de weergave
   wisselt zichtbaar, en enkel een mislukte bewaring krijgt een melding.
 
+## Bestuursorgaan: budgetten op de site
+
+Op een BO gaat veel tijd naar controles die een machine kan doen: werken de
+links, kloppen de prijzen, is de BTW juist toegepast, kloppen de sommen, komen
+de percentages op 100 %. In november 2026 bekeken we BO 12 (13 budgetten, 3
+resultaten) op een bord met hoe dat op de site zou gaan
+(https://claude.ai/artifact/Ug2f5LKzJ4ALofmuuCBSBv), en daarna is de eerste
+stap gebouwd. Hoe het werkt staat in `docs/bestuursorgaan.md` ("Budgetten op de
+site").
+
+- **Een proef naast Drive, geen vervanging** (november 2026, op vraag van IT:
+  "we zijn nog niet zeker of we gaan overstappen"). "Drive blijft de bron"
+  hierboven geldt nog: het BO, de verkenner, de lijst, "Mijn budgetten" en het
+  dashboard lezen enkel de BO-map. Een post die de proef doet, stelt haar budget
+  op de site op en downloadt het als rekenblad voor de map Budgetten; de scan
+  leest dat zoals elk blad. Zo kan de kring proberen zonder dat er een tweede
+  plek ontstaat waar het BO moet gaan kijken.
+- **Groep 5 kiest wie meedoet.** Groep 5 zelf altijd, een andere post pas als ze
+  aangevinkt is bij de instellingen. Wie niet meedoet, ziet niets nieuws: een
+  knop "Nieuw budget" voor elke post zou zeggen dat dit de nieuwe werkwijze is.
+- **Een rekenblad zonder formules, geen formulier.** Naam, aantal en prijs typ
+  je in de cel, met Enter naar de volgende regel; wat de site rekent, staat
+  zonder vlak en is niet te typen. Bron, BTW, Flesserke en opmerking staan in
+  een paneel achter het potlood. Het bord toonde ook gestructureerde regels die
+  openklappen; die vroegen een klik per regel om iets te typen, en dat is
+  precies wat een post in Sheets niet hoeft.
+- **De kop scrolt mee, zoals het evenementenformulier**: naam, totaal, verschil
+  met de begroting, "Bewaard om ..." en de download. Bewaren gebeurt vanzelf,
+  een halve seconde na elke wijziging, zoals in Sheets.
+- **BTW per regel: incl. of excl., en het tarief van het product.** Niemand
+  typt nog een BTW-formule. De site rekent excl. × (1 + tarief van de post),
+  zoals Bedrijvenrelaties (`=1.85/1.06`), IT (`=(119/1.21)*1.105`) en Cultuur
+  (`=SUM(...)*1.21`) het met de hand deden. Enkel die drie tarieven zijn
+  gekend; de andere vult Beheer in, en tot dan telt elke prijs zoals ingetypt.
+  Open: geldt 21 % van Cultuur ook op een product met 6 %?
+- **Percentages per verdeling, niet over alles samen.** Een rest-regel (water
+  op een cantus) en een mix (Mimosa) zijn eigen begrippen. Zo klopt Live
+  Cantus met 89,25 %, FIESTA I met 200 % en PeMe met 114 %.
+- **Live prijzen bij Collect&Go, op vraag.** De site leest de productpagina
+  zoals een browser, met een eerlijke user-agent, en vergelijkt met de regel.
+  Er is geen openbare prijs-API (de productsearch van colruyt.be vraagt een
+  sleutel) en Colruyt weert bots; lukt het niet, dan zegt de editor dat en
+  bevestigt de post de prijs met datum. Bewust op vraag en niet elke nacht voor
+  elk budget: een paar pagina's wanneer een post erom vraagt, valt niet op, een
+  nachtelijke ronde over alles wel. Groep 5 kan het uitzetten.
+- **Een bron per regel, niet enkel een link.** Ruim een derde van de regels in
+  BO 12 had geen link, vaak terecht (huur, offerte, servicekost). Daarom kiest
+  elke regel een soort bron: webshop, Collect&Go, offerte, Flesserke of vaste
+  afspraak met reden, of de prijs van de zaal.
+- **Locaties, BTW per post en de Collect&Go-servicekost staan één keer**, bij
+  de instellingen van Groep 5, in plaats van in elk blad. In de code staat geen
+  tarief, geen zaal en geen prijs als standaard, behalve de servicekost (6,95)
+  en de sangria zonder prijs van de zaal (1,95), allebei aan te passen.
+- **Flesserke telt mee als kost**, zoals Heverlicht het deed, met een
+  schakelaar bij de instellingen. Open: hoort dat zo?
+- **Een budget op de site staat onder de tabel van "Mijn budgetten"**, in een
+  eigen blok "Op de site (proef)". Bovenaan blijft wat in Drive staat, met de
+  uitleg van voordien; in die tabel is de stand altijd een van vier woorden.
+- **Nog niet gebouwd**: de wachtrij voor de GM, de BO-modus, het resultaat naast
+  het budget, de begroting uit één bron, en de site-budgetten in de verkenner.
+  Klein of groot bleek in BO 12 niet aan het bedrag te hangen (Live Cantus
+  −1.167 was klein, Poolavond −144 groot), maar aan of er iets te bespreken
+  viel; dat beslist de GM.
+
 ## Nieuwe evenementen in Discord
 
 Op /admin/kalender/discord hangt de kring Discord-webhooks aan de kalender. Een

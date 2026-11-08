@@ -100,13 +100,22 @@ export default async function BestuursorgaanPage({
   return (
     <div className="space-y-7">
       <div className="space-y-4">
-        <div>
-          <h1 className="text-2xl font-semibold">{nl ? "Budgetten & Resultaten" : "Budgets & Results"}</h1>
-          <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
-            {nl
-              ? "Welke budgetten en resultaten er per post langs het BO passeerden, met de bedragen uit de rekenbladen. Gelezen uit de map Bestuursorgaan op de gedeelde drive; wat daar verandert, staat hier binnen het halfuur."
-              : "Which budgets and results each post took to the board meeting, with the amounts from the spreadsheets. Read from the Bestuursorgaan folder on the shared drive; changes there show up here within half an hour."}
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold">{nl ? "Budgetten & Resultaten" : "Budgets & Results"}</h1>
+            <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
+              {nl
+                ? "Welke budgetten en resultaten er per post langs het BO passeerden, met de bedragen uit de rekenbladen. Gelezen uit de map Bestuursorgaan op de gedeelde drive; wat daar verandert, staat hier binnen het halfuur."
+                : "Which budgets and results each post took to the board meeting, with the amounts from the spreadsheets. Read from the Bestuursorgaan folder on the shared drive; changes there show up here within half an hour."}
+            </p>
+          </div>
+          {/* BTW per post, Collect&Go en de locaties voor budgetten op de site. */}
+          <Link
+            href={`${base}/admin/bestuursorgaan/instellingen`}
+            className="inline-flex h-10 items-center justify-center rounded-full border border-vtk-blue/20 px-4 text-sm font-medium text-vtk-ink hover:bg-vtk-blue-soft"
+          >
+            {nl ? "Instellingen voor budgetten" : "Budget settings"}
+          </Link>
         </div>
         {tabs.length > 1 && (
           <div className="flex flex-wrap items-center gap-1.5" aria-label={nl ? "Werkingsjaar" : "Working year"}>

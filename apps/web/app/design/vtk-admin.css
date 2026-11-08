@@ -177,7 +177,9 @@
 
 /* `.poc-poll` staat als voorvertoning op een navy vlak (/admin/it/flows) en
    brengt zijn eigen velden en knop mee. */
-.vtk-admin-main :is(input:not([type='checkbox']):not([type='radio']), select, textarea):not(.poc-poll *) {
+/* De cellen van een budget (`components/bo-budget`) zien eruit als een rekenblad:
+   zonder kader tot je erover gaat. */
+.vtk-admin-main :is(input:not([type='checkbox']):not([type='radio']), select, textarea):not(.poc-poll *):not(.vtk-bud-bare) {
   border-radius: 12px !important;
   border-color: var(--line-2) !important;
   background: var(--paper) !important;
@@ -185,7 +187,7 @@
   box-shadow: none !important;
 }
 
-.vtk-admin-main :is(input, select, textarea):focus:not(.poc-poll *) {
+.vtk-admin-main :is(input, select, textarea):focus:not(.poc-poll *):not(.vtk-bud-bare) {
   outline: none !important;
   border-color: var(--ink) !important;
   box-shadow: 0 0 0 3px rgba(14, 26, 54, 0.08) !important;
@@ -301,6 +303,10 @@
     --admin-cell-y: 6px;
     --admin-cell-x: 10px;
     --admin-h1: 1.75rem;
+    /* Budgetten op de site (`.vtk-bud-*`). */
+    --admin-bud-card-y: 14px;
+    --admin-bud-card-x: 16px;
+    --admin-bud-cell-y: 1px;
 
     /* De zijbalk; `admin-nav.css` in @vtk/ui leest ze met de gewone maat als
        fallback. */
@@ -5238,5 +5244,1443 @@ a.vtk-shortcut-tile:hover {
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Budgetten op de site (`components/bo-budget`, /admin/bestuursorgaan/mijn)
+
+   Een budget is een werkblad: secties als tabellen waarin je meteen typt, de
+   cellen zonder kader tot je erover gaat, en grijs wat de site rekent. Bovenaan
+   een meescrollende kop zoals het evenementenformulier (`.vtk-ef-head`): wat je
+   bewerkt, of het bewaard is, het totaal en indienen. Alles onder `.vtk-bud`.
+   -------------------------------------------------------------------------- */
+
+.vtk-bud {
+  display: flex;
+  flex-direction: column;
+  gap: var(--admin-stack, 20px);
+}
+
+.vtk-bud-narrow {
+  max-width: 760px;
+}
+
+.vtk-bud-back,
+.vtk-bud-crumbs a {
+  align-self: flex-start;
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.vtk-bud-back:hover,
+.vtk-bud-crumbs a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.vtk-bud-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* De kop */
+.vtk-bud-top {
+  position: sticky;
+  top: var(--vtk-header-height, 73px);
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px 24px;
+  margin-bottom: calc(-1 * var(--admin-stack, 20px) + 8px);
+  padding: 14px 0 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.vtk-bud-top-text {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.vtk-bud-title {
+  display: block;
+  width: 100%;
+  margin: 2px 0 0 -7px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: clamp(1.45rem, 2.4vw, 1.9rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.vtk-bud-title:hover:not(:disabled) {
+  border-color: var(--line);
+}
+
+.vtk-bud-title:focus {
+  outline: none;
+  border-color: var(--ink);
+  background: var(--surface);
+}
+
+.vtk-bud-top-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+}
+
+.vtk-bud-top-figs {
+  display: flex;
+  gap: 20px;
+  margin: 0;
+}
+
+.vtk-bud-top-figs dt,
+.vtk-bud-facts dt,
+.vtk-bud-ov-total dt {
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vtk-bud-top-figs dd {
+  margin: 1px 0 0;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.vtk-bud .neg {
+  color: var(--danger-ink);
+}
+
+.vtk-bud .pos {
+  color: var(--ok-ink);
+}
+
+.vtk-bud-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.vtk-bud-save::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok-ink);
+}
+
+.vtk-bud-save[data-kind='dirty']::before,
+.vtk-bud-save[data-kind='saving']::before {
+  background: var(--line-2);
+}
+
+.vtk-bud-save[data-kind='error']::before,
+.vtk-bud-save[data-kind='conflict']::before {
+  background: var(--danger-ink);
+}
+
+.vtk-bud-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 32px;
+  margin: 0;
+}
+
+.vtk-bud-facts dd {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  margin: 3px 0 0;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.vtk-bud-date {
+  width: auto !important;
+  height: 34px;
+  padding: 0 10px;
+}
+
+.vtk-bud-open {
+  padding: 4px 11px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--danger-bg);
+  color: var(--danger-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vtk-bud-open:hover {
+  text-decoration: underline;
+}
+
+.vtk-bud-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 20px;
+  padding: 14px 18px;
+  border: 1px solid color-mix(in srgb, var(--ok-ink) 25%, transparent);
+  border-radius: 16px;
+  background: var(--ok-bg);
+  color: var(--ink);
+  font-size: 14px;
+}
+
+/* Kaarten en velden */
+.vtk-bud-card {
+  min-width: 0;
+  padding: var(--admin-bud-card-y, 20px) var(--admin-bud-card-x, 22px);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.vtk-bud-h2 {
+  margin: 0 0 12px;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.vtk-bud-colhead {
+  margin: 18px 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vtk-bud-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--admin-stack, 20px);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.vtk-bud-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px 18px;
+}
+
+.vtk-bud-field {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.vtk-bud-field.wide {
+  grid-column: 1 / -1;
+}
+
+.vtk-bud-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vtk-bud-input {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 14px;
+}
+
+textarea.vtk-bud-input {
+  padding: 9px 12px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.vtk-bud-input.num,
+.vtk-bud-cell.num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.vtk-bud-hint {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.vtk-bud-static {
+  display: flex;
+  align-items: center;
+  min-height: 38px;
+  color: var(--ink);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-bud-fine {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.vtk-bud-explain {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--body);
+  font-size: 13.5px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-bud-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ink);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.vtk-bud-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--navy);
+}
+
+.vtk-bud-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--navy);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--yellow);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.vtk-bud-link:hover {
+  text-decoration-color: var(--navy);
+}
+
+.vtk-bud-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.vtk-bud-inline > .vtk-bud-input {
+  flex: 1 1 200px;
+  width: auto;
+}
+
+.vtk-bud-iconlink {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line-2);
+  border-radius: 50%;
+  color: var(--ink);
+}
+
+.vtk-bud-iconlink svg,
+.vtk-bud-add svg,
+.vtk-bud-goto svg {
+  width: 14px;
+  height: 14px;
+}
+
+.vtk-bud-muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Overzicht */
+.vtk-bud-ov-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 32px;
+}
+
+.vtk-bud-ov-cols .vtk-bud-colhead {
+  margin-top: 0;
+}
+
+.vtk-bud-ov-list {
+  margin: 0;
+}
+
+.vtk-bud-ov-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--rule-soft);
+  font-size: 14px;
+}
+
+.vtk-bud-ov-list dt a {
+  color: var(--body);
+  text-decoration: none;
+}
+
+.vtk-bud-ov-list dt a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.vtk-bud-ov-list dd {
+  margin: 0;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-bud-ov-list > .sum {
+  border-bottom: 0;
+  font-weight: 650;
+}
+
+.vtk-bud-ov-total {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 24px;
+  margin: 14px 0 0;
+  padding-top: 14px;
+  border-top: 2px solid var(--ink);
+}
+
+.vtk-bud-ov-total dd {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.vtk-bud-begroting {
+  max-width: 170px;
+  font-size: 18px !important;
+  font-weight: 600;
+}
+
+/* Controles */
+.vtk-bud-checks {
+  box-shadow: inset 3px 0 0 var(--ok-ink);
+}
+
+.vtk-bud-checks:has([data-level='block']) {
+  box-shadow: inset 3px 0 0 var(--danger-ink);
+}
+
+.vtk-bud-checklist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vtk-bud-checklist li {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding: 9px 0 9px 18px;
+  border-top: 1px solid var(--rule-soft);
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.vtk-bud-checklist li:first-child {
+  border-top: 0;
+}
+
+.vtk-bud-checklist li::before {
+  content: "";
+  position: absolute;
+  top: 16px;
+  left: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger-ink);
+}
+
+.vtk-bud-checklist[data-level='review'] li::before {
+  background: var(--yellow);
+  box-shadow: inset 0 0 0 1px var(--low-ink);
+}
+
+.vtk-bud-checklist li > span {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.vtk-bud-goto {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--navy);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.vtk-bud-goto:hover {
+  text-decoration: underline;
+}
+
+/* Prijzen bij Collect&Go */
+.vtk-bud-prices-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 20px;
+}
+
+.vtk-bud-prices-row .vtk-bud-h2 {
+  margin-bottom: 4px;
+}
+
+.vtk-bud-prices-row .vtk-bud-fine {
+  margin: 0;
+  max-width: 62ch;
+}
+
+.vtk-bud-cgcheck {
+  display: grid;
+  gap: 6px;
+}
+
+.vtk-bud-cgcheck[data-status='changed'],
+.vtk-bud-cgcheck[data-status='failed'] {
+  background: var(--low-bg);
+}
+
+.vtk-bud-cgcheck[data-status='notfound'] {
+  background: var(--danger-bg);
+}
+
+.vtk-bud-cgcheck[data-status='ok'] {
+  background: var(--ok-bg);
+}
+
+/* De primaire actie in de kop: een link die eruitziet als de knop ernaast. */
+.vtk-bud-primary {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--surface) !important;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.vtk-bud-primary:hover {
+  background: var(--navy);
+}
+
+.vtk-bud-tobo {
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  max-width: 520px;
+  color: var(--body) !important;
+  font-size: 13.5px !important;
+}
+
+/* Activiteit */
+.vtk-bud-vat {
+  display: grid;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.vtk-bud-vat p {
+  margin: 0;
+}
+
+.vtk-bud-alloc {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+
+.vtk-bud-alloc-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 220px) 96px auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Secties */
+.vtk-bud-sec {
+  padding: 0;
+  overflow: hidden;
+}
+
+.vtk-bud-sec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px var(--admin-bud-card-x, 22px) 10px calc(var(--admin-bud-card-x, 22px) - 7px);
+}
+
+.vtk-bud-sec-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 12px;
+  min-width: 0;
+}
+
+.vtk-bud-sec-name {
+  min-width: 0;
+  max-width: 100%;
+  padding: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  field-sizing: content;
+}
+
+.vtk-bud-sec-name:hover:not(:disabled) {
+  border-color: var(--line);
+}
+
+.vtk-bud-sec-name:focus {
+  outline: none;
+  border-color: var(--ink);
+  background: var(--paper);
+}
+
+.vtk-bud-sec-type {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vtk-bud-sec-right {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+}
+
+.vtk-bud-sec-amount {
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-bud-sec-opts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 24px;
+  padding: 0 var(--admin-bud-card-x, 22px) 12px;
+  color: var(--body);
+  font-size: 13.5px;
+}
+
+.vtk-bud-sec-opts label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.vtk-bud-mini {
+  width: 64px !important;
+  min-height: 32px;
+  padding: 0 8px !important;
+  font: inherit;
+  font-size: 14px;
+}
+
+.vtk-bud-split {
+  padding: 0 var(--admin-bud-card-x, 22px) 14px;
+}
+
+.vtk-bud-split-bar {
+  display: flex;
+  gap: 2px;
+  height: 26px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--paper-2);
+}
+
+.vtk-bud-split[data-ok='0'] .vtk-bud-split-bar {
+  outline: 2px solid var(--danger-ink);
+  outline-offset: 1px;
+}
+
+.vtk-bud-split-bar span {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0 9px;
+  overflow: hidden;
+  background: var(--navy);
+  color: var(--paper);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vtk-bud-split-bar span[data-alt] {
+  background: color-mix(in srgb, var(--navy) 72%, var(--surface));
+}
+
+.vtk-bud-split-bar span[data-rest] {
+  background: repeating-linear-gradient(135deg, var(--paper-2) 0 5px, var(--surface) 5px 10px);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  color: var(--muted);
+}
+
+.vtk-bud-split-bar span[data-gap] {
+  background: repeating-linear-gradient(135deg, var(--danger-bg) 0 5px, var(--surface) 5px 10px);
+}
+
+.vtk-bud-split-text {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+
+.vtk-bud-empty {
+  margin: 0;
+  padding: 4px var(--admin-bud-card-x, 22px) 16px;
+  font-size: 14px;
+}
+
+.vtk-bud-sec-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px calc(var(--admin-bud-card-x, 22px) - 8px);
+  border-top: 1px solid var(--rule-soft);
+}
+
+.vtk-bud-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 13px;
+  border: 1px dashed var(--line-2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vtk-bud-add:hover {
+  border-style: solid;
+  background: var(--paper);
+}
+
+.vtk-bud-addsec {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.vtk-bud-addsec > span {
+  margin-right: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.vtk-bud-danger-zone {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+/* De tabel: een rekenblad zonder rasterlijnen */
+.vtk-bud-tablewrap {
+  position: relative;
+  overflow-x: auto;
+  border-top: 1px solid var(--line);
+}
+
+.vtk-admin-main .vtk-bud-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.vtk-admin-main .vtk-bud-table thead th {
+  padding: 7px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  box-shadow: none;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.vtk-admin-main .vtk-bud-table thead th.num {
+  text-align: right;
+}
+
+.vtk-admin-main .vtk-bud-table tbody tr {
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.vtk-admin-main .vtk-bud-table tbody tr:last-child {
+  border-bottom: 0;
+}
+
+.vtk-admin-main .vtk-bud-table tbody tr:hover {
+  background: color-mix(in srgb, var(--paper) 45%, var(--surface));
+}
+
+.vtk-admin-main .vtk-bud-table tbody td {
+  padding: var(--admin-bud-cell-y, 4px) 4px;
+  vertical-align: middle;
+}
+
+.vtk-bud-table th:first-child,
+.vtk-bud-table td:first-child {
+  padding-left: calc(var(--admin-bud-card-x, 22px) - 9px) !important;
+}
+
+.vtk-bud-table .num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.vtk-bud-col-name {
+  min-width: 190px;
+}
+
+.vtk-bud-col-act {
+  width: 1%;
+  padding-right: calc(var(--admin-bud-card-x, 22px) - 10px) !important;
+  white-space: nowrap;
+}
+
+/* Een cel waarin je typt, heeft een licht vlak; wat de site rekent, niet. Zo zie
+   je zonder te klikken wat van jou is en wat volgt. */
+.vtk-bud-cell {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--paper) 80%, var(--surface));
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+
+.vtk-bud-cell::placeholder {
+  color: color-mix(in srgb, var(--muted) 70%, transparent);
+}
+
+td.num > .vtk-bud-cell {
+  width: 88px;
+}
+
+.vtk-bud-cell:hover:not(:disabled) {
+  border-color: var(--line-2);
+  background: var(--surface);
+}
+
+.vtk-bud-cell:disabled {
+  background: transparent;
+  opacity: 1;
+}
+
+.vtk-bud-cell:focus {
+  outline: none;
+  border-color: var(--ink);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(14, 26, 54, 0.08);
+}
+
+select.vtk-bud-cell {
+  width: auto;
+  padding-right: 24px;
+}
+
+.vtk-bud-calc {
+  display: inline-block;
+  padding: 0 9px;
+  color: var(--body);
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-bud-from {
+  text-decoration: underline dotted var(--line-2);
+  text-underline-offset: 4px;
+  cursor: help;
+}
+
+.vtk-bud-unit {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.vtk-bud-amount {
+  padding-right: 10px !important;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.vtk-bud-table tr[data-kind='rest'] td,
+.vtk-bud-table tr[data-kind='forfait'] td.vtk-bud-muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.vtk-bud-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vtk-bud-dot {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+}
+
+button.vtk-bud-dot {
+  cursor: pointer;
+}
+
+.vtk-bud-dot[data-level='block'] {
+  background: var(--danger-ink);
+}
+
+.vtk-bud-dot[data-level='review'] {
+  background: var(--yellow);
+  box-shadow: inset 0 0 0 1px var(--low-ink);
+}
+
+/* Het paneel met alles over één regel */
+.vtk-bud-panel-root {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+}
+
+.vtk-bud-panel-bg {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 15, 31, 0.32);
+}
+
+.vtk-bud-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(480px, 100%);
+  padding-top: env(safe-area-inset-top, 0px);
+  background: var(--surface);
+  box-shadow: -16px 0 40px rgba(10, 15, 31, 0.18);
+}
+
+.vtk-bud-panel-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: start;
+  gap: 14px;
+  padding: 18px 20px 14px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.vtk-bud-panel-kicker {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vtk-bud-panel-head h2 {
+  margin: 3px 0 0;
+  color: var(--ink);
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.vtk-bud-panel-amount {
+  display: grid;
+  justify-items: end;
+}
+
+.vtk-bud-panel-amount span {
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vtk-bud-panel-amount b {
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: 19px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-bud-panel-close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line-2);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.vtk-bud-panel-close svg {
+  width: 16px;
+  height: 16px;
+}
+
+.vtk-bud-panel-checks {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 12px 22px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+  list-style: none;
+  font-size: 13.5px;
+}
+
+.vtk-bud-panel-checks li {
+  position: relative;
+  padding-left: 16px;
+  color: var(--ink);
+}
+
+.vtk-bud-panel-checks li::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger-ink);
+}
+
+.vtk-bud-panel-checks li[data-level='review']::before {
+  background: var(--yellow);
+  box-shadow: inset 0 0 0 1px var(--low-ink);
+}
+
+.vtk-bud-panel-body {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 14px 16px;
+  min-width: 0;
+  margin: 0;
+  padding: 18px 22px 22px;
+  overflow-y: auto;
+  border: 0;
+}
+
+.vtk-bud-panel-body > .vtk-bud-explain,
+.vtk-bud-panel-body > .vtk-bud-link,
+.vtk-bud-subhead {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.vtk-bud-panel-body > .vtk-bud-explain {
+  justify-self: stretch;
+}
+
+.vtk-bud-subhead {
+  width: 100%;
+  margin: 6px 0 -4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule-soft);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.vtk-bud-panel-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 22px calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+}
+
+.vtk-bud-panel-foot > :last-child {
+  margin-left: auto;
+}
+
+.vtk-admin-main .vtk-bud-danger,
+.vtk-bud-danger {
+  color: var(--danger-ink) !important;
+}
+
+.vtk-bud-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  justify-self: start;
+}
+
+.vtk-bud-seg button {
+  padding: 6px 13px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vtk-bud-seg button[aria-checked='true'] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(14, 26, 54, 0.16);
+}
+
+/* Nieuw budget */
+.vtk-bud-newform {
+  display: grid;
+  gap: 20px;
+}
+
+.vtk-bud-templates {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.vtk-bud-templates legend {
+  margin-bottom: 8px;
+  padding: 0;
+}
+
+.vtk-bud-template {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.vtk-bud-template input {
+  margin-top: 3px;
+  accent-color: var(--navy);
+}
+
+.vtk-bud-template > span {
+  display: grid;
+  gap: 3px;
+  color: var(--body);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.vtk-bud-template b {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.vtk-bud-template[data-on] {
+  border-color: var(--ink);
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+.vtk-bud-formbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Instellingen */
+.vtk-bud-vatgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 0 32px;
+}
+
+.vtk-bud-vatgroup .vtk-bud-colhead {
+  margin-top: 14px;
+}
+
+.vtk-bud-pilot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--body);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.vtk-bud-pilot input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--navy);
+}
+
+.vtk-bud-vatrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 140px;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--rule-soft);
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.vtk-bud-vatrow > span {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.vtk-bud-vatrow .vtk-bud-input {
+  min-height: 34px;
+}
+
+/* De bewaarknop van een lang instellingenformulier blijft in beeld. */
+.vtk-bud-savebar {
+  position: sticky;
+  bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: fit-content;
+  margin-left: auto;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 10px 30px rgba(10, 15, 31, 0.12);
+}
+
+.vtk-bud-loctable td.num > .vtk-bud-cell {
+  width: 82px;
+}
+
+/* Op een telefoon wordt elke regel een blok: de naam bovenaan, en elke kolomkop
+   een label boven zijn waarde, in plaats van een tabel die zijwaarts scrolt en
+   het bedrag uit beeld schuift. */
+@media (max-width: 640px) {
+  .vtk-bud-tablewrap {
+    overflow-x: visible;
+  }
+
+  .vtk-admin-main .vtk-bud-table thead {
+    display: none;
+  }
+
+  .vtk-admin-main .vtk-bud-table,
+  .vtk-admin-main .vtk-bud-table tbody {
+    display: block;
+  }
+
+  .vtk-admin-main .vtk-bud-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px 10px;
+    padding: 12px 14px;
+  }
+
+  .vtk-admin-main .vtk-bud-table tbody td {
+    display: block;
+    min-width: 0;
+    padding: 0 !important;
+  }
+
+  .vtk-admin-main .vtk-bud-table td.vtk-bud-col-name {
+    grid-column: 1 / span 2;
+    min-width: 0;
+  }
+
+  .vtk-admin-main .vtk-bud-table td.vtk-bud-col-act {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+    width: auto;
+  }
+
+  .vtk-admin-main .vtk-bud-table td.vtk-bud-span {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+
+  .vtk-admin-main .vtk-bud-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 3px;
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-align: left;
+    text-transform: uppercase;
+  }
+
+  .vtk-admin-main .vtk-bud-table td.num > .vtk-bud-cell,
+  .vtk-admin-main .vtk-bud-table td > select.vtk-bud-cell {
+    width: 100%;
+  }
+
+  .vtk-admin-main .vtk-bud-table .vtk-bud-calc {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    min-height: 34px;
+  }
+
+  .vtk-admin-main .vtk-bud-table td.vtk-bud-amount {
+    display: grid;
+    align-content: start;
+    justify-items: end;
+  }
+
+  .vtk-admin-main .vtk-bud-table td.vtk-bud-amount::before {
+    justify-self: start;
+  }
+
+  .vtk-admin-main .vtk-bud-table td.vtk-bud-amount {
+    line-height: 34px;
+  }
+
+  .vtk-bud-sec-head {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 720px) {
+  .vtk-bud-top {
+    position: static;
+  }
+
+  .vtk-bud-ov-cols,
+  .vtk-bud-templates,
+  .vtk-bud-panel-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .vtk-bud-ov-total {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .vtk-bud-ov-total > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .vtk-bud-alloc-row {
+    grid-template-columns: minmax(0, 1fr) 80px auto;
+  }
+
+  .vtk-bud-alloc-row > .vtk-bud-link {
+    grid-column: 1 / -1;
+    justify-self: start;
   }
 }

@@ -360,3 +360,124 @@ Wie wat ziet:
 
 Het dashboard leest hiervoor het hele overzicht van het jaar
 (`loadOwnBo`), maar enkel voor wie in een post zit.
+
+---
+
+## Budgetten op de site (proef)
+
+**Een proef naast Drive, geen vervanging.** Het BO werkt met de rekenbladen in
+de map Bestuursorgaan, en alles hierboven (de verkenner, de lijst, "Mijn
+budgetten", het dashboardblok) leest enkel die map. Daarnaast kan een post een
+budget op de site opstellen, het als rekenblad downloaden en dat in de map
+Budgetten van een BO zetten, zoals elk ander blad. Zo blijft Drive de bron tot
+er beslist is om over te stappen. Het waarom staat in `docs/design-decisions.md`
+("Bestuursorgaan: budgetten op de site").
+
+**Wie.** Groep 5 kan het altijd; een andere post pas wanneer Groep 5 ze aanvinkt
+bij "Instellingen voor budgetten" (`/admin/bestuursorgaan/instellingen`,
+`BudgetSettings.pilotPostKeys`, `siteBudgetPostKeys` in `server.ts`). Wie niet
+meedoet, ziet op "Mijn budgetten" niets nieuws. Een budget dat al bestaat, blijft
+voor de leden van zijn post te openen.
+
+| Bestand | Inhoud |
+| ------- | ------ |
+| `apps/web/lib/bo/budget/types.ts` | Het document van een budget (`BudgetContent`) en de instellingen |
+| `apps/web/lib/bo/budget/calc.ts` | Rekenen: BTW, verdelingen, eenheden, inkomsten, overzicht (puur) |
+| `apps/web/lib/bo/budget/checks.ts` | Wat nog na te kijken is, en wat de GM bekijkt (puur) |
+| `apps/web/lib/bo/budget/prices.ts` | Welke regels een Collect&Go-product hebben, en wat het antwoord betekent (puur) |
+| `apps/web/lib/bo/budget/sheet.ts` | Het budget als rekenblad voor Drive, in de vorm van het sjabloon van de penning |
+| `apps/web/lib/bo/budget/schema.ts` | Wat de server aanvaardt (zod) |
+| `apps/web/lib/bo/budget/templates.ts` | De sjablonen Standaard en Cantus |
+| `apps/web/lib/bo/budget/server.ts` | Wie mag wat, de instellingen (`Setting` `bestuursorgaan.budgets`) |
+| `apps/web/lib/collectgo/` | Een productlink herkennen en de prijs van de productpagina lezen |
+| `apps/web/app/actions/boBudgets.ts` | Aanmaken, bewaren, prijzen nakijken, verwijderen, instellingen |
+| `apps/web/app/api/admin/bestuursorgaan/budget/[id]/route.ts` | De download voor Drive |
+| `apps/web/components/bo-budget/` | De editor, het paneel per regel, het formulier en de instellingen |
+| `apps/web/test/boBudget.test.ts` | Live Cantus, IT Nieuw Materiaal en PeMe van BO 12, Collect&Go, de download |
+
+**Het model.** Een `BoBudget` hoort bij één post (`postKey`, zoals overal in
+`lib/bo`) en één werkingsjaar, en draagt zijn inhoud als één JSON-document:
+parameters, info, begroting, verdeling per organisatie en secties. Een sectie
+is vast (aantal × prijs), variabel (per deelnemer, met een verdeling) of
+inkomsten. Er staat geen som in: `totalCents` en co. worden bij elke bewaring
+uit de regels gerekend, enkel voor de lijsten.
+
+**BTW.** Elke regel zegt of de prijs incl. of excl. BTW is, en bij incl. het
+tarief van het product (6 of 21 %). Telt: excl. × (1 + tarief van de post). Het
+tarief van de post vult Beheer in bij de instellingen; zolang dat leeg is, telt
+elke prijs zoals ingetypt, zoals in de bladen. Een budget kan een ander tarief
+nemen, met verplichte reden.
+
+**Verdelingen.** Een variabele sectie kan haar regels samen 100 % laten
+verdelen. Een rest-regel krijgt wat overblijft (water op een cantus), en een
+regel kan het percentage van een andere delen (Fruitsap met Cava is één
+Mimosa). De controle loopt per sectie, niet over alles samen: zo gaven Live
+Cantus (89,25 %), FIESTA I (200 %) en PeMe (114 %) in de bladen vals alarm.
+
+**Bewaren.** De editor bewaart een halve seconde na elke wijziging
+(`saveBoBudgetAction`), en zegt "Bewaard om ..." in de kop. Twee bewerkers
+tegelijk: de server bewaart enkel als `updatedAt` nog klopt, anders een rode
+toast met de vraag om te herladen.
+
+**Naar het BO: download voor Drive.** De knop in de kop geeft
+`26-27_Budget_<post>_<activiteit>.xlsx` (`sheet.ts`): bovenaan het blok
+Overzicht met de kolommen Budget en Resultaat, rechts Info met Datum, Locatie en
+Verdeling, en daaronder de secties met hun regels. Enkel waarden, geen
+formules: een xlsx die niet door Sheets of Excel opende, heeft geen berekende
+waarden, en dan zou de scan "openen" tonen. `test/boBudget.test.ts` leest het
+blad terug met `figuresFromSheet` en vindt dezelfde bedragen als de editor.
+Indienen op de site (`submitBoBudgetAction`) bestaat, maar staat niet in de
+editor zolang het BO met Drive werkt.
+
+**Prijzen bij Collect&Go, live.** "Prijzen nakijken" in de editor (of "Nu
+nakijken" per regel) vraagt voor elke regel met een link naar één product de
+productpagina op bij collectandgo.be en leest de prijs uit de JSON-LD
+(`lib/collectgo/product.ts`). Een product herkent de site aan het nummer achter
+`#pdp_` (de zoeklinks uit de bladen), aan `productId=`, of aan een pagina
+`/nl/assortiment/<product>`. Wat er terugkomt, staat in `lastCheck` van de regel:
+
+- klopt: de prijs is dezelfde als in de regel (een prijs excl. wordt eerst
+  omgerekend naar de winkelprijs);
+- gewijzigd: de nieuwe prijs en het effect op het totaal, bij de controles en
+  in het paneel, met "overnemen";
+- niet gevonden: het product staat niet meer online (het sangria-product uit
+  Live Cantus);
+- geen antwoord: geblokkeerd of een time-out; dan bevestigt een mens de prijs
+  ("Prijs klopt, vandaag nagekeken").
+
+De productnaam staat erbij, zodat je ziet of de link wel het juiste product is.
+Drie pagina's tegelijk, hoogstens 60 per keer, en een gevonden pagina onthoudt
+de server een halfuur. Groep 5 zet het uit bij de instellingen
+(`collectGoLive`) als Colruyt het niet wil.
+
+### Wat nog niet gebouwd is
+
+- De wachtrij voor de GM, de BO-modus om te projecteren en het resultaat naast
+  het budget.
+- Site-budgetten in het register van `/admin/bestuursorgaan`: daar staat een
+  budget pas wanneer het gedownloade blad in de BO-map staat.
+- De begroting van het werkingsjaar uit één bron.
+- Prijzen nakijken gebeurt enkel op vraag, niet 's nachts, en enkel voor
+  Collect&Go (niet voor andere webshops).
+- De sjablonen Fakfeestje en Meerdelig, en een eigen formule per regel.
+
+### Vallen
+
+- **Colruyt weert bots en blokkeert IP-adressen van datacenters.** Getest vanop
+  een gewone verbinding: het werkt met een eerlijke user-agent ("VTK-budgetten"),
+  terwijl `node` als user-agent geweigerd wordt (HTTP 456). Of het werkt vanop de
+  server bij Hetzner, is niet getest; zo niet, dan zegt de editor bij elke regel
+  "geen antwoord" en bevestigt de post de prijs. Zet geen browser-user-agent in
+  de plaats om dat te omzeilen.
+- **De site volgt nooit zomaar een link.** De actie herkent eerst een product op
+  collectandgo.be en bouwt zelf de URL; zo kan niemand de server een willekeurig
+  adres laten opvragen.
+- **Een cel in de tabel is een `input` met `.vtk-bud-bare`.** `vtk-admin.css`
+  geeft elk veld in de admin een kader en een achtergrond met `!important`; die
+  regel slaat `.vtk-bud-bare` over. Een nieuwe cel zonder die klasse krijgt
+  het kader van een formulierveld midden in het rekenblad.
+- **Een getal typ je met een komma.** `NumberField` houdt bij wat je typt tot
+  je het veld verlaat; zonder dat werd "80," meteen "80" en kon je geen
+  decimaal meer typen.
+- **Een sectie mag niet "Inkomsten" of "Totaal" heten in het blad voor Drive**:
+  dat zijn de labels waarop de scan zoekt. `sheet.ts` zet er "(regels)" achter.

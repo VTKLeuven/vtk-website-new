@@ -154,6 +154,7 @@ export const AUDIT_ENTITIES = {
   boSettings: { nl: "Instelling Bestuursorgaan", en: "Board meeting setting", group: "bestuursorgaan" },
   boPostAlias: { nl: "Postnaam in BO-bestanden", en: "Post name in board files", group: "bestuursorgaan" },
   boDocument: { nl: "Budget of resultaat", en: "Budget or result", group: "bestuursorgaan" },
+  boBudget: { nl: "Budget op de site", en: "Budget on the site", group: "bestuursorgaan" },
   vaultItem: { nl: "Kluiswachtwoord", en: "Vault password", group: "vault" },
   mailGroup: { nl: "Groepsadres", en: "Group address", group: "google" },
   kiesploeg: { nl: "Kiesploeg", en: "Kiesploeg", group: "google" },
