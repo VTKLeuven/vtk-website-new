@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
 import { publicUrl } from "@/lib/storage";
+import { eventAsOfNow, MOMENT_SELECT } from "@/lib/calendar/moments";
 import { markdownToPlainText } from "@/lib/markdown";
 import { getMediaContent } from "@/lib/media-content";
 import { ensureMagazineCover } from "@/lib/magazineCover";
@@ -230,6 +231,7 @@ export async function collectNews(
             location: true,
             start: true,
             imageKey: true,
+            moments: { orderBy: { start: "asc" }, select: MOMENT_SELECT },
             publishedAt: true,
             registrationNewsAt: true,
           },
@@ -293,6 +295,7 @@ export async function collectNews(
     if (!signupInNews(event, now)) continue;
     const date = signupNewsDate(event)!;
     const day = newsDay(event.start, locale);
+    const shown = eventAsOfNow(event, now);
     entries.push({
       key: `signup:${event.id}`,
       source: "signup",
@@ -302,15 +305,15 @@ export async function collectNews(
       featured: false,
       title: pick(event.titleNl, event.titleEn, locale),
       line: nl
-        ? `Inschrijven kan tot ${day}${event.location ? `, ${event.location}` : ""}`
-        : `Sign up before ${day}${event.location ? `, ${event.location}` : ""}`,
+        ? `Inschrijven kan tot ${day}${shown.location ? `, ${shown.location}` : ""}`
+        : `Sign up before ${day}${shown.location ? `, ${shown.location}` : ""}`,
       body: null,
       href: withSource(`/kalender/${event.slug}`, "nieuws"),
       ctaLabel: pick(event.urlLabelNl ?? "", event.urlLabelEn, locale) || (nl ? "Inschrijven" : "Sign up"),
       ctaHref: event.url,
-      imageUrl: publicUrl(event.imageKey),
+      imageUrl: publicUrl(shown.imageKey),
       author: null,
-      place: event.location,
+      place: shown.location,
     });
   }
 

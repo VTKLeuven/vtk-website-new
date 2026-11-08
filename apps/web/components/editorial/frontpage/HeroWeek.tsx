@@ -8,7 +8,7 @@ import {
 } from "@/lib/calendar/heroWeek";
 import { EventStar, type EventStarLabels } from "@/components/calendar/EventStar";
 import { organiserName } from "@/lib/calendar/organiser";
-import { momentDayParts, momentStrip, momentStripRest } from "@/lib/calendar/moments";
+import { eventForMoment, momentDayParts, momentStrip, momentStripRest } from "@/lib/calendar/moments";
 import type { FrontpageEvent } from "./context";
 import { withSource } from "@/lib/ticketing/source";
 
@@ -192,7 +192,7 @@ export function HeroWeek({
                     const meta = [
                       // De eigen naam van dít moment ("Nachtloop"), als die er is.
                       entry.moment?.label || null,
-                      event.location,
+                      eventForMoment(event, entry.moment).location,
                       organiserName(event.organiserName, event.group, locale),
                       // Enkel boven de publieke drempel; zie lib/calendar/interest.ts.
                       event.interestedCount

@@ -3,7 +3,13 @@ import { pick, type Locale } from "@vtk/i18n";
 import { Markdown } from "@/components/ui/Markdown";
 import { MapPinIcon, UsersIcon } from "@/components/ui/icons";
 import { organiserName } from "@/lib/calendar/organiser";
-import { EVENT_MOMENTS_VISIBLE, momentsSummary } from "@/lib/calendar/moments";
+import {
+  EVENT_MOMENTS_VISIBLE,
+  eventAsOfNow,
+  momentDescription,
+  momentsSummary,
+  upcomingMoment,
+} from "@/lib/calendar/moments";
 import { publicUrl } from "@/lib/storage";
 import { defaultEventImageFor, eventCategorySlugs } from "@/lib/defaultEventImage";
 import { loadCalendarEvent, loadDefaultEventImages } from "@/lib/pageQueries";
@@ -140,6 +146,9 @@ export function EventHead({ event, locale }: { event: CalendarEventPageData; loc
   // moet meteen zien dat het evenement voor eerstejaars of internationals is.
   const audiences = event.categories.map((c) => c.category).filter((c) => c.audience !== null);
   const themes = event.categories.map((c) => c.category).filter((c) => c.audience === null);
+  // Bij een reeks de startplaats van de eerstvolgende keer; wie de locatie leest,
+  // wil weten waar hij nu moet zijn.
+  const { location } = eventAsOfNow(event, new Date());
 
   return (
     <header className="vtk-page-head vtk-event-head">
@@ -188,11 +197,61 @@ export function EventHead({ event, locale }: { event: CalendarEventPageData; loc
           <span>{locale === "nl" ? "Locatie" : "Location"}</span>
           <b>
             <MapPinIcon />
-            {event.location ?? (locale === "nl" ? "Nog te bevestigen" : "To be confirmed")}
+            {location ?? (locale === "nl" ? "Nog te bevestigen" : "To be confirmed")}
           </b>
         </div>
       </div>
     </header>
+  );
+}
+
+/**
+ * Wat er speciaal is aan de eerstvolgende keer, boven de tekst die altijd geldt:
+ * een andere startplaats, de uitleg bij dit ene loopje.
+ *
+ * Staat er enkel wanneer dat moment zelf iets te zeggen heeft. Een eigen naam
+ * alleen is daar niet genoeg voor: die staat al in de lijst ernaast, en een reeks
+ * zonder eigen tekst hoort er precies zo uit te zien als voordien.
+ */
+function NextMoment({
+  event,
+  locale,
+  now,
+}: {
+  event: CalendarEventPageData;
+  locale: Locale;
+  now: Date;
+}) {
+  const next = upcomingMoment(event.moments, now);
+  if (!next) return null;
+  const text = momentDescription(next, locale);
+  if (!text && !next.location?.trim()) return null;
+
+  const nl = locale === "nl";
+  const heading = nl ? "Volgende keer" : "Next up";
+  const { location } = eventAsOfNow(event, now);
+  return (
+    <section className="vtk-event-about vtk-event-next">
+      <h2>{next.label ? `${heading}: ${next.label}` : heading}</h2>
+      <dl className="spec">
+        <dt>{nl ? "Wanneer" : "When"}</dt>
+        <dd>
+          {dayLabel(next.start, locale, "short")}, {clockLabel(next.start, locale)} -{" "}
+          {clockLabel(next.end, locale)}
+        </dd>
+        {location ? (
+          <>
+            <dt>{nl ? "Waar" : "Where"}</dt>
+            <dd>{location}</dd>
+          </>
+        ) : null}
+      </dl>
+      {text ? (
+        <div className="prose-vtk vtk-event-description">
+          <Markdown locale={locale}>{text}</Markdown>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -209,8 +268,13 @@ export async function EventPhotoAndAbout({
   /** Hoe breed de foto in de layout staat; de ticketkolom is smaller. */
   sizes: string;
 }) {
+  const now = new Date();
   const description = pick(event.descriptionNl ?? "", event.descriptionEn ?? "", locale);
-  const eventPhoto = publicUrl(event.imageKey);
+  // De affiche van de eerstvolgende keer wanneer die er een heeft; zodra dat moment
+  // voorbij is, staat de volgende klaar.
+  const shown = eventAsOfNow(event, now);
+  const ownPoster = shown.imageKey !== event.imageKey;
+  const eventPhoto = publicUrl(shown.imageKey);
   // Zonder eigen affiche: de standaardbanner van het thema (Cantus, Career, ...)
   // en anders de sitebrede foto. Zie lib/defaultEventImage.ts.
   const imageSrc =
@@ -226,9 +290,11 @@ export async function EventPhotoAndAbout({
         src={imageSrc}
         sizes={sizes}
         quality={90}
-        focus={eventPhoto ? { x: event.imageFocusX, y: event.imageFocusY } : null}
+        focus={eventPhoto ? { x: shown.imageFocusX, y: shown.imageFocusY } : null}
+        // Een eigen affiche volgt op een telefoon gewoon haar focuspunt: de
+        // telefoonuitsnede van het evenement is voor een andere foto gekozen.
         mobile={
-          eventPhoto
+          eventPhoto && !ownPoster
             ? mobileCropFrom(
                 event.imageFocusMobileX,
                 event.imageFocusMobileY,
@@ -238,6 +304,8 @@ export async function EventPhotoAndAbout({
             : null
         }
       />
+
+      <NextMoment event={event} locale={locale} now={now} />
 
       <section className="vtk-event-about">
         <h2>{locale === "nl" ? "Over dit event" : "About this event"}</h2>
@@ -402,6 +470,7 @@ export function EventWhenBlock({
   const nl = locale === "nl";
   const base = nl ? "" : "/en";
   const title = pick(event.titleNl, event.titleEn, locale);
+  const next = upcomingMoment(event.moments, new Date());
   // Dezelfde handeling als de ster op een eventkaart, maar over één dag van de
   // reeks; daarom dezelfde teksten met "die dag" erin.
   const momentStarLabels = {
@@ -444,6 +513,12 @@ export function EventWhenBlock({
       >
         {event.moments.map((moment, index) => {
           const momentIso = moment.start.toISOString();
+          // De locatie enkel wanneer ze afwijkt: zes keer dezelfde plaats onder
+          // elkaar zegt niets wat de kop niet al zegt.
+          const place = moment.location?.trim();
+          const ownPlace = place && place !== event.location?.trim() ? place : null;
+          // De tekst van de eerstvolgende keer staat al links, boven de omschrijving.
+          const moreText = moment === next ? "" : momentDescription(moment, locale);
           const momentTitle = moment.label
             ? `${title} (${moment.label})`
             : `${title}, ${dayLabel(moment.start, locale, "short")}`;
@@ -471,6 +546,20 @@ export function EventWhenBlock({
                   met spatiëring, waardoor "Loopje 1" als een rubriek las in
                   plaats van als de naam van die avond. */}
               {moment.label ? <span className="name">{moment.label}</span> : null}
+              {ownPlace ? (
+                <span className="place">
+                  <MapPinIcon />
+                  {ownPlace}
+                </span>
+              ) : null}
+              {moreText ? (
+                <details className="vtk-event-moment-more">
+                  <summary>{nl ? "Meer info" : "More info"}</summary>
+                  <div className="prose-vtk">
+                    <Markdown locale={locale}>{moreText}</Markdown>
+                  </div>
+                </details>
+              ) : null}
             </li>
           );
         })}

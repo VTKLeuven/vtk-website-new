@@ -15,19 +15,21 @@ export type ImageFieldValue =
   | { kind: "clear" }
   | { kind: "invalid" };
 
+/**
+ * Mag deze key in een afbeeldingsveld staan? Afbeeldingen komen uit `images/`
+ * (foto's), `badges/` (stickers) of `theokot/` (seed/standaard); alles daarbuiten
+ * (bonnetjes, ...) hoort niet publiek getoond te worden.
+ */
+export function isImageFieldKey(key: string): boolean {
+  return key.startsWith("images/") || key.startsWith("badges/") || key.startsWith("theokot/");
+}
+
 export function readImageField(formData: FormData, name = "imageKey"): ImageFieldValue {
   const raw = formData.get(name);
   const cleared = formData.get(`${name}__cleared`) === "1";
 
   if (typeof raw === "string" && raw) {
-    // Afbeeldingen komen uit `images/` (foto's), `badges/` (stickers) of `theokot/` (seed/standaard).
-    if (
-      !raw.startsWith("images/") &&
-      !raw.startsWith("badges/") &&
-      !raw.startsWith("theokot/")
-    ) {
-      return { kind: "invalid" };
-    }
+    if (!isImageFieldKey(raw)) return { kind: "invalid" };
     return { kind: "set", key: raw };
   }
 

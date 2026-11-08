@@ -34,7 +34,13 @@ import { EventStar, type EventStarLabels } from "@/components/calendar/EventStar
 import { MomentDays } from "@/components/calendar/MomentDays";
 import { CalendarPlusIcon, TicketIcon } from "@/components/ui/icons";
 import { focusPosition } from "@/lib/imageFocus";
-import { hasUpcomingMoment, momentsSummary, nextOccurrenceAt } from "@/lib/calendar/moments";
+import {
+  eventAsOfNow,
+  hasUpcomingMoment,
+  MOMENT_SELECT,
+  momentsSummary,
+  nextOccurrenceAt,
+} from "@/lib/calendar/moments";
 import { viewerAudienceFilter } from "@/lib/calendar/audience";
 import {
   interestLabel,
@@ -132,7 +138,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         categories: { include: { category: true } },
         moments: {
           orderBy: { start: "asc" as const },
-          select: { start: true, end: true, label: true },
+          select: MOMENT_SELECT,
         },
         // Voor het ticketicoon op de evenementkaart; zie `publishedTicketSlug`.
         ticketEvents: { select: TICKET_LINK_SELECT },
@@ -249,7 +255,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     },
     cards: heroPicks.map((event) => {
       const start = nextOccurrenceAt(event, now);
-      const eventPhoto = publicUrl(event.imageKey);
+      const shown = eventAsOfNow(event, now);
+      const eventPhoto = publicUrl(shown.imageKey);
       const relative = relativeDay(start, now);
       const prefix =
         relative === "today"
@@ -276,10 +283,10 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           eventPhoto ??
           defaultEventImageFor(defaultEventImages, eventCategorySlugs(event.categories)),
         photoPosition: eventPhoto
-          ? focusPosition({ x: event.imageFocusX, y: event.imageFocusY })
+          ? focusPosition({ x: shown.imageFocusX, y: shown.imageFocusY })
           : undefined,
         when: prefix ? `${prefix}${time}` : time.charAt(0).toUpperCase() + time.slice(1),
-        location: event.location?.trim() || null,
+        location: shown.location?.trim() || null,
         pin: {
           weekday: heroDay(start, { weekday: "short" }),
           day: heroDay(start, { day: "numeric" }),
@@ -571,7 +578,10 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
               // De eerstvolgende keer dat er iets is; bij een gewoon evenement
               // gewoon zijn start.
               const start = nextOccurrenceAt(event, now);
-              const eventPhoto = publicUrl(event.imageKey);
+              // De affiche en de locatie van de eerstvolgende keer, net als de
+              // datum op de pin.
+              const shown = eventAsOfNow(event, now);
+              const eventPhoto = publicUrl(shown.imageKey);
               // Zonder eigen affiche: de standaardbanner van het thema, en
               // anders de sitebrede foto.
               const photo =
@@ -579,7 +589,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                 defaultEventImageFor(defaultEventImages, eventCategorySlugs(event.categories));
               const title = pick(event.titleNl, event.titleEn ?? event.titleNl, locale);
               const going = interestLabel(interested.get(event.id), locale);
-              const location = event.location?.trim() || null;
+              const location = shown.location?.trim() || null;
               const categories = event.categories.map((link) => link.category);
               const theme = categories.find((category) => category.audience === null) ?? null;
               const audiences = categories.filter((category) => category.audience !== null);
@@ -606,8 +616,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                         eventPhoto
                           ? {
                               objectPosition: focusPosition({
-                                x: event.imageFocusX,
-                                y: event.imageFocusY,
+                                x: shown.imageFocusX,
+                                y: shown.imageFocusY,
                               }),
                             }
                           : undefined

@@ -136,6 +136,13 @@
   background: var(--yellow);
 }
 
+/* De eerstvolgende keer, boven "Over dit event". Dezelfde kop als die sectie
+   (de klasse `.vtk-event-about` staat er ook op); enkel de feitenrij is eigen. */
+.vtk-event-next .spec {
+  margin: 0 0 14px;
+  font-size: 13px;
+}
+
 .vtk-event-about > p {
   margin: 0;
   color: var(--body);
@@ -263,6 +270,42 @@
   grid-column: 1 / -1;
   color: var(--muted);
   font-size: 12.5px;
+}
+
+/* Enkel wanneer dit moment ergens anders doorgaat dan de rest. */
+.vtk-event-moment .place {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.vtk-event-moment .place svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+}
+
+/* De eigen tekst van een latere keer. `<details>`, dus zonder JavaScript bruikbaar
+   en zonder dat de rij een eigen client component moet worden. */
+.vtk-event-moment-more {
+  grid-column: 1 / -1;
+  font-size: 13px;
+}
+
+.vtk-event-moment-more summary {
+  width: fit-content;
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vtk-event-moment-more .prose-vtk {
+  margin-top: 6px;
+  font-size: 13px;
 }
 
 .vtk-event-moment-star {

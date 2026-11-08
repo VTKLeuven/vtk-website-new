@@ -4,6 +4,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { pick, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { eventLinkLabel } from "@/lib/calendar/eventLink";
+import { eventAsOfNow } from "@/lib/calendar/moments";
 import { publicUrl } from "@/lib/storage";
 import { defaultEventImageFor, eventCategorySlugs } from "@/lib/defaultEventImage";
 import { eventMetadata } from "@/lib/pageMetadata";
@@ -53,8 +54,10 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const event = await loadCalendarEvent(slugOrId);
   if (!event) return {};
 
+  // Dezelfde affiche als op de pagina: een link in een groepsgesprek toont zo de
+  // eerstvolgende keer.
   const image =
-    publicUrl(event.imageKey) ??
+    publicUrl(eventAsOfNow(event, new Date()).imageKey) ??
     defaultEventImageFor(await loadDefaultEventImages(), eventCategorySlugs(event.categories));
   return eventMetadata(event, locale, `/kalender/${event.slug}`, image);
 }

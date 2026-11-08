@@ -1996,9 +1996,10 @@ model CalendarEvent {
 /// de kalenderpagina: de ICS-feed maakt er één afspraak van die een week lang in
 /// ieders agenda staat, en het maandraster tekent er een balk over alle dagen van.
 ///
-/// Het evenement blijft dus één record met één URL, één affiche, één beschrijving,
-/// één ster, één ticketshop en één formulier; de momenten zeggen enkel wannéér het
-/// doorgaat.
+/// Het evenement blijft dus één record met één URL, één ster, één ticketshop en
+/// één formulier. De affiche, de beschrijving en de locatie van het evenement
+/// gelden voor elk moment, tenzij een moment er zelf een heeft: zie de velden
+/// hieronder.
 ///
 /// **`CalendarEvent.start` en `.end` blijven de envelop**: de start van het eerste
 /// moment en het einde van het laatste, door de save-action bijgehouden. Alles wat
@@ -2020,6 +2021,28 @@ model CalendarEventMoment {
   /// Een korte eigen naam voor dit ene moment ("Ploegenloop", "Nachtloop").
   /// Leeg = het moment draagt gewoon de titel van het evenement.
   label String?
+
+  /// Wat alleen voor dit moment geldt: een andere startplaats, een eigen tekst,
+  /// een eigen affiche. Alles is optioneel, en leeg betekent dat het moment de
+  /// waarde van het evenement volgt (`eventForMoment` in lib/calendar/moments.ts).
+  ///
+  /// De eigen tekst staat **naast** de beschrijving van het evenement en vervangt
+  /// ze niet: wat altijd geldt, hoeft zo niet per week overgetikt te worden. Wat
+  /// een bezoeker ziet, is de affiche en de locatie van het eerstvolgende moment;
+  /// is de reeks voorbij, dan weer die van het evenement.
+  ///
+  /// Geen eigen telefoonuitsnede: een telefoon volgt hier het focuspunt.
+  ///
+  /// **Elk veld hier moet ook door het formulier**, want de save-action gooit de
+  /// momenten weg en maakt ze opnieuw aan. `test/calendarMomentForm.test.ts` faalt
+  /// zodra een kolom die weg niet aflegt.
+  location      String?
+  descriptionNl String?
+  descriptionEn String?
+  imageKey      String?
+  /// 0..1, zoals `CalendarEvent.imageFocusX/Y`.
+  imageFocusX   Float   @default(0.5)
+  imageFocusY   Float   @default(0.5)
 
   event CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
 

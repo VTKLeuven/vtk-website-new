@@ -7,6 +7,7 @@ import {
   heroWeekDayDate,
   heroWeekDayKey,
 } from "@/lib/calendar/heroWeek";
+import { MOMENT_SELECT } from "@/lib/calendar/moments";
 import type { FrontpageEvent } from "@/components/editorial/frontpage/context";
 
 /**
@@ -31,7 +32,7 @@ export type FrontpageEventRow = {
   /** De ster in /admin/kalender: voorrang in het weekoverzicht. */
   homeFeaturedAt: Date | null;
   /** Zie `CalendarEventMoment`; leeg voor een evenement dat gewoon doorloopt. */
-  moments: Array<{ start: Date; end: Date; label: string | null }>;
+  moments: Array<{ start: Date; end: Date; label: string | null; location: string | null }>;
   group: { nameNl: string; nameEn: string };
   organiserName: string | null;
   categories: Array<{ category: { colour: string; audience: string | null } }>;
@@ -41,7 +42,7 @@ export type FrontpageEventRow = {
 export const FRONTPAGE_EVENT_INCLUDE = {
   group: true,
   categories: { include: { category: true } },
-  moments: { orderBy: { start: "asc" }, select: { start: true, end: true, label: true } },
+  moments: { orderBy: { start: "asc" }, select: MOMENT_SELECT },
   // Voor het ticketicoon op de evenementkaart; zie `publishedTicketSlug`.
   ticketEvents: { select: TICKET_LINK_SELECT },
 } as const;
@@ -99,6 +100,7 @@ export function toFrontpageEvent(
       start: moment.start,
       end: moment.end,
       label: moment.label,
+      location: moment.location,
     })),
     titleNl: row.titleNl,
     titleEn: row.titleEn,

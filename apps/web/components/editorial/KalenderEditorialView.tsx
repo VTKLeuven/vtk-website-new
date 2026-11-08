@@ -64,7 +64,7 @@ export type CalendarApiEvent = {
    * met elke dag een loopje). Leeg = het evenement loopt van `start` tot `end`
    * door. `start` en `end` blijven in beide gevallen de envelop eromheen.
    */
-  moments: Array<{ start: string; end: string; label: string | null }>;
+  moments: Array<{ start: string; end: string; label: string | null; location: string | null }>;
   extendedProps: {
     groupCode: string;
     groupSlug: string;
@@ -1172,6 +1172,9 @@ export function KalenderEditorialView({
     const top = (block.from - timelineFrom) * TIMELINE_HOUR_PX + 1;
     const height = Math.max(26, (Math.min(block.to, timelineTo) - block.from) * TIMELINE_HOUR_PX - 3);
     const time = `${clock(block.start)} ${locale === 'nl' ? 'tot' : 'to'} ${clock(block.end)}`;
+    // Dit blok is één moment: de locatie van díé keer, niet die van de eerstvolgende.
+    const blockStart = block.start.getTime();
+    const location = e.moments.find((m) => Date.parse(m.start) === blockStart)?.location ?? e.location;
     return (
       <a
         key={`${e.id}-${block.start.toISOString()}`}
@@ -1188,12 +1191,12 @@ export function KalenderEditorialView({
             '--cat': cat?.colour,
           } as React.CSSProperties
         }
-        title={`${title} · ${time}${e.location ? ` · ${e.location}` : ''}`}
+        title={`${title} · ${time}${location ? ` · ${location}` : ''}`}
         onClick={(clicked) => openPreview(clicked, e)}
       >
         <span className="kal-tl-time">{time}</span>
         <b>{title}</b>
-        {height >= 74 && e.location ? <small>{e.location}</small> : null}
+        {height >= 74 && location ? <small>{location}</small> : null}
         {height >= 96
           ? audienceCategories(e).map((a) => (
               <span key={a.slug} className="kal-tl-aud" style={{ '--cat': a.colour } as React.CSSProperties}>

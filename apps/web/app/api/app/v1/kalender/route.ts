@@ -13,6 +13,7 @@ import { followedCategorySlugs, interestedEventIds } from "@/lib/app-api/interes
 import { absoluteMediaUrl } from "@/lib/app-api/media";
 import { appErrorResponse, appJson } from "@/lib/app-api/respond";
 import { organiserName } from "@/lib/calendar/organiser";
+import { eventAsOfNow, MOMENT_SELECT } from "@/lib/calendar/moments";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -102,6 +103,7 @@ export async function GET(request: Request) {
         take: MAX_EVENTS,
         include: {
           group: { select: { slug: true, nameNl: true, nameEn: true } },
+          moments: { orderBy: { start: "asc" }, select: MOMENT_SELECT },
           ticketEvents: { select: TICKET_LINK_SELECT },
           categories: {
             select: {
@@ -124,6 +126,7 @@ export async function GET(request: Request) {
       publicInterestCounts(events.map((event) => event.id)),
     ]);
 
+    const now = new Date();
     const payload: AppCalendar = {
       filteredByAudience,
       followedCategories: followed,
@@ -133,7 +136,11 @@ export async function GET(request: Request) {
         colour: category.colour,
         audience: category.audience,
       })),
-      events: events.map((event) => ({
+      // De app kent geen losse momenten, dus de server vult in wat er voor de
+      // eerstvolgende keer geldt.
+      events: events.map((row) => {
+        const event = eventAsOfNow(row, now);
+        return {
         id: event.id,
         title: pick(event.titleNl, event.titleEn, locale) ?? event.titleNl,
         start: event.start.toISOString(),
@@ -152,7 +159,8 @@ export async function GET(request: Request) {
         interested: interested.has(event.id),
         interestedCount: publicCounts.get(event.id) ?? null,
         ticketSlug: publishedTicketSlug(event.ticketEvents),
-      })),
+        };
+      }),
     };
 
     return appJson(request, payload);

@@ -1,4 +1,4 @@
-import { pick } from "@vtk/i18n";
+import { pick, type Locale } from "@vtk/i18n";
 
 import { prisma } from "@vtk/db";
 import { publishedTicketSlug } from "@/lib/ticketing/eventPage";
@@ -21,6 +21,7 @@ import { absoluteMediaUrl, absoluteUrl } from "@/lib/app-api/media";
 import { appErrorResponse, appJson, appNotFound } from "@/lib/app-api/respond";
 import { organiserName } from "@/lib/calendar/organiser";
 import { eventLinkLabel } from "@/lib/calendar/eventLink";
+import { eventAsOfNow, momentDescription, upcomingMoment } from "@/lib/calendar/moments";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,8 +57,12 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     // opent de helft van de lijst op een grijs vlak. De resolver geeft al een
     // pad terug (soms een bestand uit `public/`), dus dat gaat langs
     // `absoluteUrl` en niet langs de media-helper.
+    const now = new Date();
+    // De app kent geen losse momenten. Daarom vult de server hier in wat er voor de
+    // eerstvolgende keer geldt, en hoeft de app er niets van te weten.
+    const shown = eventAsOfNow(event, now);
     const imageUrl =
-      absoluteMediaUrl(request, event.imageKey) ??
+      absoluteMediaUrl(request, shown.imageKey) ??
       absoluteUrl(
         request,
         defaultEventImageFor(await getDefaultEventImages(), eventCategorySlugs(event.categories)),
@@ -79,7 +84,6 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       isAlumniEvent ? attendeeList(event.id) : Promise.resolve([]),
     ]);
 
-    const now = new Date();
     const formOpen =
       event.form?.status === "PUBLISHED" &&
       (!event.form.opensAt || event.form.opensAt <= now) &&
@@ -91,7 +95,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       start: event.start.toISOString(),
       end: event.end.toISOString(),
       allDay: event.allDay,
-      location: event.location,
+      location: shown.location,
       imageUrl,
       groupName: organiserName(event.organiserName, event.group, locale),
       groupSlug: event.group.slug,
@@ -101,7 +105,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         colour: category.colour,
         audience: category.audience,
       })),
-      description: pick(event.descriptionNl, event.descriptionEn, locale) || null,
+      description: appDescription(event, locale, now),
       url: event.url,
       urlLabel: event.url ? eventLinkLabel(event, locale) : null,
       ticketSlug: publishedTicketSlug(event.ticketEvents),
@@ -116,6 +120,31 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   } catch (error) {
     return appErrorResponse(request, error);
   }
+}
+
+/**
+ * De omschrijving voor de app: wat er eigen is aan de eerstvolgende keer, en
+ * daaronder de tekst die altijd geldt. Dezelfde volgorde als op de eventpagina.
+ */
+function appDescription(
+  event: NonNullable<Awaited<ReturnType<typeof loadCalendarEvent>>>,
+  locale: Locale,
+  now: Date,
+): string | null {
+  const general = pick(event.descriptionNl, event.descriptionEn, locale) || null;
+  const next = upcomingMoment(event.moments, now);
+  const own = next ? momentDescription(next, locale) : "";
+  if (!next || !own) return general;
+
+  const nl = locale === "nl";
+  const day = next.start.toLocaleDateString(nl ? "nl-BE" : "en-GB", {
+    timeZone: "Europe/Brussels",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  const heading = `${nl ? "Volgende keer" : "Next up"}${next.label ? `: ${next.label}` : ""} (${day})`;
+  return [`**${heading}**`, own, general].filter(Boolean).join("\n\n");
 }
 
 export function OPTIONS(request: Request) {

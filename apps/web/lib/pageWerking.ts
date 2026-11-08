@@ -4,6 +4,7 @@ import { cache } from "react";
 import { prisma } from "@vtk/db";
 import { currentWorkingYear } from "@/lib/workingYear";
 import { viewerAudienceFilter } from "@/lib/calendar/audience";
+import { eventForMoment, MOMENT_SELECT, upcomingMoment } from "@/lib/calendar/moments";
 import { categoryTiles, type CategoryTile } from "@/lib/categoryTiles";
 
 /**
@@ -122,7 +123,7 @@ export type WerkingEvent = {
  */
 export const loadWerkingEvents = cache(async (groupId: string): Promise<WerkingEvent[]> => {
   const audience = await viewerAudienceFilter();
-  return prisma.calendarEvent.findMany({
+  const rows = await prisma.calendarEvent.findMany({
     where: {
       groupId,
       publishedAt: { not: null },
@@ -142,11 +143,15 @@ export const loadWerkingEvents = cache(async (groupId: string): Promise<WerkingE
       imageKey: true,
       imageFocusX: true,
       imageFocusY: true,
+      moments: { orderBy: { start: "asc" }, select: MOMENT_SELECT },
       // Enkel de slug: het evenement zonder eigen affiche krijgt hiermee de
       // standaardbanner van zijn thema. Zie lib/defaultEventImage.ts.
       categories: { select: { category: { select: { slug: true } } } },
     },
   });
+  // Dezelfde affiche en locatie als op de kaart elders: die van de eerstvolgende keer.
+  const now = new Date();
+  return rows.map(({ moments, ...event }) => eventForMoment(event, upcomingMoment(moments, now)));
 });
 
 /**

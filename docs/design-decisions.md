@@ -2856,9 +2856,10 @@ wat het was:
   de eerste dag.
 
 Daarom is er een derde vorm: **één evenement met meerdere momenten**
-(`CalendarEventMoment`). Het evenement blijft één record met één URL, één
-affiche, één beschrijving, één ster, één ticketshop en één formulier; de momenten
-zeggen enkel wannéér het doorgaat.
+(`CalendarEventMoment`). Het evenement blijft één record met één URL, één ster,
+één ticketshop en één formulier; de momenten zeggen wannéér het doorgaat, en waar
+nodig wat er die keer anders is (zie "Eigen locatie, tekst en affiche per moment"
+hieronder).
 
 - **`CalendarEvent.start` en `.end` blijven de envelop** eromheen: de start van
   het eerste moment en het einde van het laatste, door de save-action
@@ -2915,6 +2916,43 @@ kalender leest, en levert momenten op zonder eigen rij, terwijl de ster, de
 tellers, de tickets en de formulieren allemaal aan een id hangen. Een opsomming
 van momenten is voor een kring die zoiets een paar keer per jaar doet het
 eerlijkere model, en een editor kan een reeks dagen in één klik klaarzetten.
+
+### Eigen locatie, tekst en affiche per moment
+
+De wekelijkse loopjes van Sport draaiden op één evenement met een moment per week,
+en dan botst "één affiche, één beschrijving": de startplaats verschilt per loopje,
+het ene loopje is een Pinguino Run en het andere niet. Een moment kan daarom een
+eigen locatie, tekst en affiche hebben. Alles is optioneel en leeg volgt het
+evenement (`eventForMoment` in lib/calendar/moments.ts, de enige plek met die
+regel).
+
+- **De eigen tekst staat naast de beschrijving en vervangt ze niet.** Wat altijd
+  geldt (WhatsApp-groep, wie welkom is) staat in de beschrijving van het
+  evenement en hoeft zo niet per week overgetikt te worden. Op de eventpagina komt
+  een blok "Volgende keer" boven "Over dit event".
+- **De site toont de eerstvolgende keer, en wisselt vanzelf.** Zodra een moment
+  afgelopen is, staan de affiche en de locatie van het volgende klaar
+  (`upcomingMoment`), overal waar het evenement als één geheel staat: de
+  eventpagina, de kaarten op /kalender en de homepage, de post-pagina's, het
+  nieuws, het linkvoorbeeld en de app. Geen cron nodig; die pagina's renderen per
+  request. Is de reeks voorbij, dan weer die van het evenement: de pagina gaat dan
+  over de reeks en niet over haar laatste avond.
+- **Wat over één keer gaat, neemt die keer** en niet de eerstvolgende: een afspraak
+  in de agenda-feed, een blok in de week, de herinneringsmail en de push.
+- **Een naam alleen maakt geen "Volgende keer".** Het blok verschijnt enkel met een
+  eigen tekst of locatie; de naam staat al in de lijst ernaast, en een reeks zonder
+  eigen tekst hoort eruit te zien zoals voordien.
+- **De app kent geen momenten en hoeft dat niet.** De API vult locatie, affiche en
+  omschrijving al voor de eerstvolgende keer in, dus dit vroeg geen app-update.
+- **Discord krijgt wel de affiche van het evenement.** Die post vertrekt één keer
+  bij het aankondigen en kan dus niet meewisselen.
+- **Geen eigen URL, ster-teller of telefoonuitsnede per moment.** Een link naar het
+  evenement toont vanzelf de eerstvolgende keer, en dat is wat iemand wil die hem
+  in een groepsgesprek krijgt. Een telefoon volgt het focuspunt van de eigen affiche.
+- **Een nieuw veld op een moment moet door het formulier.** De save-action gooit de
+  momenten weg en maakt ze opnieuw aan, dus wat niet heen en terug gaat, is stil
+  weg. `test/calendarMomentForm.test.ts` leest de DMMF en faalt zodra een kolom die
+  weg niet aflegt.
 
 ### Twee weergaven: Agenda en Lijst
 

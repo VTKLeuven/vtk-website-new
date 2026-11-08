@@ -23,6 +23,7 @@ import {
 import { EVENT_LINK_LABEL_MAX } from "@/lib/calendar/eventLink";
 import { autoPostEventToDiscord } from "@/lib/discord/posts";
 import { hasUpcomingMoment } from "@/lib/calendar/moments";
+import { parseMomentsField } from "@/lib/calendar/momentForm";
 import { HERO_EVENT_SLOTS } from "@/lib/home/heroEvents";
 
 const eventSchema = z.object({
@@ -40,7 +41,7 @@ const eventSchema = z.object({
   // is. Leeg = de groep; zie lib/calendar/organiser.ts.
   organiserName: z.string().trim().max(120).optional().nullable(),
   // Leeg wanneer het evenement met losse momenten werkt: dan komen start en
-  // einde uit die momenten. Zie `readMoments` hieronder.
+  // einde uit die momenten. Zie `parseMomentsField`.
   start: z.string().optional(),
   end: z.string().optional(),
   allDay: z.coerce.boolean().default(false),
@@ -50,73 +51,6 @@ const eventSchema = z.object({
   urlLabelNl: z.string().trim().max(EVENT_LINK_LABEL_MAX).optional().nullable(),
   urlLabelEn: z.string().trim().max(EVENT_LINK_LABEL_MAX).optional().nullable(),
 });
-
-/** Eén moment zoals het formulier het meestuurt: een dag en twee uren. */
-const momentSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  start: z.string().regex(/^\d{2}:\d{2}$/),
-  end: z.string().regex(/^\d{2}:\d{2}$/),
-  label: z.string().trim().max(80).optional().default(""),
-});
-
-/**
- * Hoeveel momenten één evenement mag dragen. Een loopweek heeft er zeven en een
- * kerstmarkt een stuk of tien; honderd is geen evenement meer maar een reeks die
- * in de kalender zelf thuishoort.
- */
-const MAX_MOMENTS = 60;
-
-/**
- * De losse momenten uit het formulier, in volgorde.
- *
- * `null` = het formulier stuurde er geen mee, dus het evenement werkt met één
- * doorlopende periode. Een lege lijst is wél een fout: dan stond het formulier in
- * de momentenmodus zonder dat er iets ingevuld was, en stil terugvallen op de
- * start en het einde van daarnet zou iets anders opslaan dan wat er op het scherm
- * stond.
- *
- * Een einduur dat niet later is dan het beginuur betekent de nacht erna: een
- * nachtloop van 22u tot 2u hoort bij de avond waarop hij vertrekt, en dat is ook
- * hoe de kalender hem indeelt.
- */
-function readMoments(
-  formData: FormData,
-): { start: Date; end: Date; label: string | null }[] | null | "invalid" {
-  const raw = formData.get("moments");
-  if (typeof raw !== "string") return null;
-
-  let parsedJson: unknown;
-  try {
-    parsedJson = JSON.parse(raw);
-  } catch {
-    return "invalid";
-  }
-  const parsed = z.array(momentSchema).max(MAX_MOMENTS).safeParse(parsedJson);
-  if (!parsed.success) return "invalid";
-
-  const moments: { start: Date; end: Date; label: string | null }[] = [];
-  for (const row of parsed.data) {
-    try {
-      const start = localDateTimeToUtc(`${row.date}T${row.start}`);
-      const endDay = row.end > row.start ? row.date : nextDay(row.date);
-      moments.push({
-        start,
-        end: localDateTimeToUtc(`${endDay}T${row.end}`),
-        label: row.label || null,
-      });
-    } catch {
-      return "invalid";
-    }
-  }
-  return moments.sort((a, b) => a.start.getTime() - b.start.getTime());
-}
-
-/** De dag na deze, als "YYYY-MM-DD". Kalenderdagen, dus via UTC gerekend. */
-function nextDay(date: string): string {
-  const next = new Date(`${date}T12:00:00Z`);
-  next.setUTCDate(next.getUTCDate() + 1);
-  return next.toISOString().slice(0, 10);
-}
 
 /** Velden die in het logboek bij naam genoemd worden bij een bewerking. */
 const EVENT_FIELD_LABELS: Record<string, string> = {
@@ -145,6 +79,25 @@ const EVENT_FIELD_LABELS: Record<string, string> = {
   publishedAt: "publicatiestatus",
   moments: "momenten",
 };
+
+/**
+ * Haalt de afbeeldingen uit de bucket die nergens meer gebruikt worden. Mislukt
+ * dat, dan is dat geen opslaanfout: de nachtelijke opruiming pikt ze later op.
+ */
+async function deleteImages(
+  before: readonly (string | null)[],
+  kept: readonly (string | null)[],
+): Promise<void> {
+  const stillUsed = new Set(kept);
+  for (const key of new Set(before)) {
+    if (!key || stillUsed.has(key)) continue;
+    try {
+      await deleteObject(key);
+    } catch {
+      /* ignore */
+    }
+  }
+}
 
 async function assertCanManageEvent(userGroups: string[], groupId: string, superOrAll: boolean) {
   if (superOrAll) return;
@@ -190,7 +143,7 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
   // E1: hangt er een logistiek-evenement aan dit evenement?
   const needsLogistics = formData.get("needsLogistics") === "on";
 
-  const moments = readMoments(formData);
+  const moments = parseMomentsField(formData.get("moments"));
   if (moments === "invalid") return saveError("INVALID_MOMENT");
   if (moments !== null && moments.length === 0) return saveError("NO_MOMENTS");
 
@@ -278,7 +231,10 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
   let created: { id: string } | null = null;
 
   if (input.id) {
-    const existing = await prisma.calendarEvent.findUnique({ where: { id: input.id } });
+    const existing = await prisma.calendarEvent.findUnique({
+      where: { id: input.id },
+      include: { moments: { select: { imageKey: true } } },
+    });
     if (!existing) return saveError("INVALID_INPUT");
     await assertCanManageEvent(userGroupIds, existing.groupId, superOrAll);
     const imageKey = resolveImageKey(image, existing.imageKey);
@@ -354,15 +310,12 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
         EVENT_FIELD_LABELS,
       ),
     });
-    // De vervangen (of gewiste) afbeelding opruimen, zodat losse objecten niet
-    // in de bucket blijven staan. Mislukt dat, dan is dat geen opslaanfout.
-    if (existing.imageKey && existing.imageKey !== imageKey) {
-      try {
-        await deleteObject(existing.imageKey);
-      } catch {
-        /* ignore */
-      }
-    }
+    // De vervangen (of gewiste) afbeeldingen opruimen, zodat losse objecten niet
+    // in de bucket blijven staan: die van het evenement en die van zijn momenten.
+    await deleteImages(
+      [existing.imageKey, ...existing.moments.map((moment) => moment.imageKey)],
+      [imageKey, ...(moments ?? []).map((moment) => moment.imageKey)],
+    );
   } else {
     // Niets ingetikt betekent "leid af uit de titel"; dan mag de teller stil
     // bijspringen bij een tweede editie in hetzelfde jaar. Wel zelf ingetikt en
@@ -749,7 +702,10 @@ export async function deleteEventAction(formData: FormData): Promise<void> {
   const session = await requireSession();
   const id = formData.get("id") as string;
   if (!id) return;
-  const evt = await prisma.calendarEvent.findUnique({ where: { id } });
+  const evt = await prisma.calendarEvent.findUnique({
+    where: { id },
+    include: { moments: { select: { imageKey: true } } },
+  });
   if (!evt) return;
   const superOrAll =
     session.user.isSuperAdmin || hasPermission(session, "calendar.manageAll");
@@ -765,13 +721,7 @@ export async function deleteEventAction(formData: FormData): Promise<void> {
     entityId: id,
     target: evt.titleNl,
   });
-  if (evt.imageKey) {
-    try {
-      await deleteObject(evt.imageKey);
-    } catch {
-      /* ignore */
-    }
-  }
+  await deleteImages([evt.imageKey, ...evt.moments.map((moment) => moment.imageKey)], []);
   revalidatePath("/kalender");
   // Geen redirect: de lijst ververst ter plaatse, zodat de gekozen filter
   // (aankomend/verleden) blijft staan.
