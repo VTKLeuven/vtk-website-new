@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ExternalLink, Eye, EyeOff, ImagePlus, Play, Plus, Star, Trash2, X } from "lucide-react";
+import { Check, Download, ExternalLink, Eye, EyeOff, ImagePlus, Play, Plus, Star, Trash2, X } from "lucide-react";
 import { ConfirmDialog } from "@vtk/ui";
 import { AdminDisclosure } from "@/components/admin/AdminDisclosure";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
-import { IconButton } from "@/components/ui/IconButton";
+import { IconAnchor, IconButton } from "@/components/ui/IconButton";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { useToast } from "@/components/ui/toast";
 import {
@@ -22,7 +22,7 @@ import {
   trashAlbumAction,
   trashPhotosAction,
 } from "@/app/actions/media-albums";
-import { PHOTO_PAGE_SIZE, TRASH_DAYS, adminThumbnailUrl } from "@/lib/media-admin-shared";
+import { PHOTO_PAGE_SIZE, TRASH_DAYS, adminThumbnailUrl, albumZipUrl, photoDownloadUrl } from "@/lib/media-admin-shared";
 import { SAVE_IDLE, type SaveAction } from "@/lib/saveState";
 import { albumErrorMessages } from "../../messages";
 import { useUploads } from "../../uploads";
@@ -84,6 +84,7 @@ export function AlbumManager({
   );
 
   const onSite = parts.reduce((sum, item) => sum + item.photos.filter((photo) => !photo.hidden).length, 0);
+  const hiddenTotal = parts.reduce((sum, item) => sum + item.photos.filter((photo) => photo.hidden).length, 0);
   const hiddenHere = part.photos.filter((photo) => photo.hidden).length;
   // Zonder verborgen foto's verdwijnt de filter; bleef hij op "Verborgen" staan,
   // dan zat je vast op een leeg raster zonder knop om terug te gaan.
@@ -304,6 +305,35 @@ export function AlbumManager({
         </span>
       </div>
 
+      {onSite + hiddenTotal > 0 ? (
+        <div className="media-switch-row is-card media-album-download">
+          <span>
+            <b>{nl ? "Album downloaden" : "Download album"}</b>
+            <small>
+              {nl
+                ? `Alle ${photoCount(onSite + hiddenTotal)} in originele kwaliteit als zip${hasTabs ? ", met een map per tab" : ""}${hiddenTotal > 0 ? ", ook de verborgen foto's" : ""}. Werkt ook voor een verborgen album.`
+                : `All ${photoCount(onSite + hiddenTotal)} in original quality as a zip${hasTabs ? ", with a folder per tab" : ""}${hiddenTotal > 0 ? ", hidden photos included" : ""}. Works for a hidden album too.`}
+            </small>
+          </span>
+          <a
+            className="ticket-admin-button"
+            href={albumZipUrl(album.id)}
+            download
+            onClick={() =>
+              showToast({
+                message: nl
+                  ? "Download gestart. Een groot album kan even duren voor de browser het bestand toont."
+                  : "Download started. A large album can take a moment before the browser shows the file.",
+                variant: "info",
+              })
+            }
+          >
+            <Download aria-hidden="true" size={15} />
+            {nl ? "Zip downloaden" : "Download zip"}
+          </a>
+        </div>
+      ) : null}
+
       <div className="media-tabs" role="group" aria-label="Tabs">
         <span className="media-tabs-label">Tabs</span>
         {hasTabs ? (
@@ -522,6 +552,15 @@ export function AlbumManager({
                   >
                     {photo.hidden ? <Eye aria-hidden="true" size={15} /> : <EyeOff aria-hidden="true" size={15} />}
                   </IconButton>
+                  <IconAnchor
+                    className="media-photo-action"
+                    href={photoDownloadUrl(album.id, photo.id)}
+                    download
+                    label={photo.video ? (nl ? "Video downloaden" : "Download video") : nl ? "Foto downloaden" : "Download photo"}
+                    srLabel={`${photo.video ? (nl ? "Video downloaden" : "Download video") : nl ? "Foto downloaden" : "Download photo"}: ${name}`}
+                  >
+                    <Download aria-hidden="true" size={15} />
+                  </IconAnchor>
                   {partIndex === 0 && !photo.hidden && !photo.video && !isCover ? (
                     <IconButton
                       className="media-photo-action"

@@ -166,6 +166,15 @@ export async function uploadImmichAsset({
   return immichJson<{ id?: string; status?: string }>('/assets', { method: 'POST', body: form });
 }
 
+/**
+ * De gegevens van één asset: naam en soort. Nodig voor een verborgen foto, die
+ * in geen album meer zit en dus niet in een albumlijst staat; haar rij in de
+ * databank bewaart geen naam.
+ */
+export async function getImmichAsset(assetId: string): Promise<ImmichAsset> {
+  return immichJson<ImmichAsset>(`/assets/${encodeURIComponent(assetId)}`);
+}
+
 export async function downloadImmichOriginal(assetId: string): Promise<Response> {
   const response = await immichRequest(`/assets/${encodeURIComponent(assetId)}/original`, {
     headers: { Accept: '*/*' },

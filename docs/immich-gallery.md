@@ -97,6 +97,55 @@ in Immich, maar heeft geen publieke URL meer: die hangt aan de gedeelde link van
 een *album*. De rij in `GalleryDetachedPhoto` houdt bij waar ze vandaan kwam;
 daarmee toont het beheer haar gedimd in haar eigen album en zet "Tonen" haar terug.
 
+### Een album of een foto downloaden
+
+Twee routes onder `/api/admin/immich-gallery/albums/<albumId>/`, achter
+`media.manage` of `photos.manageAlbums` (Communicatie heeft het eerste). Beide
+geven het **origineel**, en beide lezen het album uit `loadLibraryAlbum`, net als
+het scherm.
+
+- **`download`: het hele album als zip.** Elke tab in een eigen map zodra er meer
+  dan één is, en ook een album dat van de site staat (`[gallery-uit]`), en ook de
+  verborgen foto's. Wat in de prullenmand ligt, bestaat er niet meer. De
+  naamgeving staat apart in
+  `lib/media-album-zip.ts` (pure functies, getest): twee foto's met dezelfde naam
+  worden `IMG_0001 (2).jpg`, en een naam die enkel uit punten bestaat of een pad
+  bevat kan niet uit zijn map ontsnappen.
+- **`photos/<assetId>/download`: één foto of video**, via het icoon op de tegel.
+  De foto moet bij dit album horen, ook een verborgen foto. Dat is bewust: de
+  thumbnailroute neemt elk Immich-id aan, maar een origineel geven we niet voor
+  alles wat in Immich staat (de fakbargalerij, een tijdelijke selfie van de
+  gezichtszoeker). Dat kost een albumlezing per klik, dus de download begint met
+  een kleine vertraging. De publieke route (`/api/immich-gallery/albums/<slug>/photos/...`)
+  blijft enkel voor wat op de site staat.
+
+Waar je op moet letten:
+
+- **Een verborgen foto kent haar eigen naam niet.** De verberg-actie bewaart geen
+  bestandsnaam in `GalleryDetachedPhoto`, en `loadLibraryAlbum` zet haar altijd
+  op `video: false`. Zonder extra stap heette ze in de zip `foto-0007.jpg`, en
+  kreeg een verborgen video een `.jpg`-extensie. `withHiddenPhotoDetails`
+  (`lib/media-hidden-photos.ts`) vraagt daarom vóór het streamen per verborgen
+  foto `GET /assets/<id>` aan Immich, acht tegelijk. Weet Immich het niet, dan
+  blijft het nummer staan en zegt het openen van het origineel wat er mis is.
+  Zichtbare foto's worden niet nagevraagd.
+- **De zip wordt gestreamd, een origineel per keer** (`streamZip` in
+  `@vtk/storage`, dezelfde functie als de zip van de oude albums). Een album is
+  snel enkele gigabytes en past niet in het geheugen; alles tegelijk openen zou
+  bovendien elke verbinding met Immich bezetten. Zonder compressie, want
+  foto's en video's krimpen niet. Boven 4 GB wordt het archief vanzelf Zip64;
+  gecontroleerd met een archief van 4,7 GB (`unzip -t` en Python `zipfile`).
+- **Er is geen voortgangsbalk.** Streamen betekent dat de lengte vooraf niet
+  bekend is. Het scherm zegt dat een groot album even kan duren.
+- **Een mislukt origineel breekt de hele download af** (na een tweede poging),
+  in plaats van een zip te leveren waar stilletjes foto's ontbreken. De browser
+  meldt een mislukte download en de fout staat in de log.
+- **Het is een gewone `<a download>`**, geen `fetch`: de browser schrijft het
+  bestand zelf weg. Een foutantwoord (404, 502) toont Chrome als mislukte
+  download; het kan dus geen toast worden.
+- **Niet in het adminlogboek**: dat slaat leesacties en exports bewust over
+  (zie `lib/audit.ts`).
+
 ### De prullenmand
 
 Verwijderen in het beheer is nooit meteen definitief, en terugzetten gebeurt in

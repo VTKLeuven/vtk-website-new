@@ -11451,6 +11451,21 @@ album wilde nakijken, moest in Immich zijn.
 - **Het woord Immich staat nergens in het beheer.** Foutmeldingen spreken van "de
   fotobibliotheek"; de merkers (`[gallery]`, `[tab:]`) blijven een detail van de
   code. Hoe dat technisch werkt, staat in `docs/immich-gallery.md`.
+- **Downloaden (november 2026): een album als zip en elke foto apart.**
+  Communicatie haalt de foto's van een evenement op voor een partner of een
+  nieuwsbrief, en moest daarvoor bij Immich zijn. Drie keuzes:
+  - **Een verborgen album kan wel gedownload worden.** "Verborgen" betekent hier
+    enkel dat het niet op vtk.be staat, bijvoorbeeld omdat het nog nagekeken
+    wordt; juist dan wil Communicatie ermee werken.
+  - **Verborgen foto's zitten wel in de zip.** Communicatie wil het hele album
+    kunnen doorgeven, en een zip waar je moet uitzoeken wat ontbreekt, helpt
+    niemand. Het eerste ontwerp liet ze weg, omdat een foto vaak verborgen wordt
+    na een verwijderverzoek en een zip de site verlaat; dat is op uitdrukkelijke
+    vraag omgekeerd. Wie een foto om die reden verborg, moet dus weten dat ze met
+    een zip mee kan gaan. Een verborgen foto staat achter de zichtbare van haar
+    tab.
+  - **Altijd het origineel, nooit een verkleinde versie.** Wie een nieuwsbrief of
+    affiche maakt, wil de volle resolutie.
 
 ## Vervangbaar op een shift: een student neemt de plaats van het praesidium in
 

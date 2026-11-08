@@ -41,6 +41,7 @@ export {
   deleteImmichAssets,
   downloadImmichOriginal,
   galleryStatus,
+  getImmichAsset,
   getImmichAssetThumbnail,
   immichJson,
   immichRequest,

@@ -299,15 +299,23 @@ export async function getObjectStorageInventory(): Promise<ObjectStorageInventor
 
 export type ZipEntry = { key: string; name: string };
 
-// Stream a ZIP archive built from a list of S3 objects. Returns a web-stream
-// suitable for a Next.js Route Handler Response.
+// Stream a ZIP archive built from a list of entries. Returns a web-stream
+// suitable for a Next.js Route Handler Response. `open` levert de inhoud van
+// één entry; waar die vandaan komt (S3, Immich) is niet de zorg van deze functie.
 //
-// Elk object gaat pas open wanneer het vorige in het archief zit. Alles meteen
+// Elke entry gaat pas open wanneer de vorige in het archief zit. Alles meteen
 // openen hield de hele pool van vijftig S3-sockets bezet zolang de download
 // liep, en zolang laadde geen enkele afbeelding van de site. Stopt de lezer,
-// dan gaat het object dat openstaat ook dicht.
-export function streamAlbumZip(entries: ZipEntry[]): ReadableStream<Uint8Array> {
-  const archive = new ZipArchive({ zlib: { level: 6 } });
+// dan gaat de entry die openstaat ook dicht.
+//
+// `store` schrijft zonder compressie: voor foto's en video's, die niet meer
+// krimpen, kost zlib enkel processortijd.
+export function streamZip<T extends { name: string }>(
+  entries: readonly T[],
+  open: (entry: T) => Promise<Readable>,
+  { store = false }: { store?: boolean } = {},
+): ReadableStream<Uint8Array> {
+  const archive = new ZipArchive(store ? { store: true } : { zlib: { level: 6 } });
   let current: Readable | undefined;
   let closed = false;
   const closing = new Promise<void>((resolve) => {
@@ -322,8 +330,7 @@ export function streamAlbumZip(entries: ZipEntry[]): ReadableStream<Uint8Array> 
     try {
       for (const entry of entries) {
         if (closed) return;
-        const { stream } = await getObjectStream(entry.key);
-        current = stream as Readable;
+        current = await open(entry);
         if (closed) {
           current.destroy();
           return;
@@ -341,4 +348,9 @@ export function streamAlbumZip(entries: ZipEntry[]): ReadableStream<Uint8Array> 
   })();
 
   return Readable.toWeb(archive) as unknown as ReadableStream<Uint8Array>;
+}
+
+// Stream a ZIP archive built from a list of S3 objects.
+export function streamAlbumZip(entries: ZipEntry[]): ReadableStream<Uint8Array> {
+  return streamZip(entries, async (entry) => (await getObjectStream(entry.key)).stream as Readable);
 }

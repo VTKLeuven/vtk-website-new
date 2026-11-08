@@ -416,6 +416,20 @@
   background: var(--surface);
 }
 
+/* Album downloaden: tekst links, knop rechts, en onder elkaar op een smal scherm. */
+.media-album-download {
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.media-album-download > span {
+  flex: 1 1 280px;
+}
+
+.media-album-download .ticket-admin-button {
+  flex: none;
+}
+
 .media-switch-row b {
   display: block;
   font-size: 14px;

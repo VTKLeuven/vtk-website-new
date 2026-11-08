@@ -39,6 +39,7 @@ export {
   deleteImmichAlbum,
   deleteImmichAssets,
   downloadImmichOriginal,
+  getImmichAsset,
   getImmichAssetThumbnail,
   immichWebUrl,
   listImmichAlbumAssets,
