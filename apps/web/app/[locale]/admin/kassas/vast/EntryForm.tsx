@@ -7,7 +7,7 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import type { SaveAction } from "@/lib/saveState";
 import { formatEuro } from "@/lib/rekeningen/expenses";
 import { parseCountInput, type Counts } from "@/lib/kassas/kassa";
-import type { PermanentEntryKind } from "@/lib/kassas/permanent";
+import { entersCashPerPiece, type PermanentEntryKind } from "@/lib/kassas/permanent";
 import { countInputsFrom, DenominationGrid, inputsTotalCents } from "../DenominationGrid";
 
 export type EntryFormValues = {
@@ -17,9 +17,9 @@ export type EntryFormValues = {
   kind: PermanentEntryKind;
   /** "YYYY-MM-DD". */
   date: string;
-  /** Bedrag bij meegeven en teruggeven, zoals in het veld ("125,50"). */
+  /** Opgeslagen bedrag zonder coupures, zoals in het veld ("125,50"). */
   cash: string;
-  /** Stuks per coupure bij een telling; `null` = nog niets ingevuld. */
+  /** Stuks per coupure; `null` = geen coupures. */
   counts: Counts | null;
   shiftVouchers: string;
   elixirVouchers: string;
@@ -28,8 +28,8 @@ export type EntryFormValues = {
 };
 
 /**
- * Eén regel van een vaste kassa: meegeven, terugkrijgen of tellen. Een telling
- * gaat per coupure, met hetzelfde raster als de gewone kassa's, en rekent het
+ * Eén regel van een vaste kassa: meegeven, terugkrijgen of tellen. Alle drie
+ * gaan per coupure, met hetzelfde raster als de gewone kassa's, en rekenen het
  * totaal mee terwijl je typt; zo zie je een tikfout aan een vreemd bedrag.
  */
 export function EntryForm({
@@ -65,9 +65,12 @@ export function EntryForm({
   const isEdit = Boolean(values.id);
   const isCount = values.kind === "COUNT";
   const isReturn = values.kind === "RETURNED";
+  const perPiece = entersCashPerPiece(values.kind, values.counts, values.cash);
   const euro = (cents: number) => formatEuro(cents, locale);
 
-  const [coins, setCoins] = useState(() => countInputsFrom(values.counts));
+  // Bij meegeven en teruggeven is een leeg veld gewoon nul stuks; bij een
+  // telling toont een opgeslagen regel haar nullen.
+  const [coins, setCoins] = useState(() => countInputsFrom(values.counts, !isCount));
   const [shift, setShift] = useState(values.shiftVouchers);
   const [elixir, setElixir] = useState(values.elixirVouchers);
   const [closes, setCloses] = useState(values.closesRegister);
@@ -84,6 +87,22 @@ export function EntryForm({
     HANDED_OUT: nl ? "Meegegeven opgeslagen." : "Handed out saved.",
     RETURNED: nl ? "Teruggegeven opgeslagen." : "Returned saved.",
     COUNT: nl ? "Telling opgeslagen." : "Count saved.",
+  }[values.kind];
+  const piecesHint = {
+    HANDED_OUT: nl
+      ? "Hoeveel stuks van elke munt en elk briefje Beheer meegeeft. Wat er niet bij zit, laat je leeg."
+      : "How many of each coin and note Administration hands out. Leave empty what is not included.",
+    RETURNED: nl
+      ? "Hoeveel stuks van elke munt en elk briefje er terugkwamen. Wat niet terugkwam, laat je leeg."
+      : "How many of each coin and note came back. Leave empty what did not.",
+    COUNT: nl
+      ? "Hoeveel stuks van elke munt en elk briefje er in de kassa zitten. Vul 0 in voor wat er niet in zit."
+      : "How many of each coin and note are in the register. Enter 0 for what is not in it.",
+  }[values.kind];
+  const totalLabel = {
+    HANDED_OUT: nl ? "Meegegeven" : "Handed out",
+    RETURNED: nl ? "Teruggekregen" : "Received",
+    COUNT: nl ? "In de kassa" : "In the register",
   }[values.kind];
 
   return (
@@ -135,7 +154,7 @@ export function EntryForm({
             defaultValue={values.date}
           />
         </div>
-        {!isCount && (
+        {!perPiece && (
           <div className="w-44">
             <Label htmlFor={`${uid}-cash`}>{nl ? "Bedrag cash" : "Cash amount"}</Label>
             <Input
@@ -151,7 +170,15 @@ export function EntryForm({
         )}
       </div>
 
-      {isCount && (
+      {!perPiece && (
+        <p className="text-xs text-vtk-muted">
+          {nl
+            ? "Deze regel werd ingegeven voor er per munt en briefje bijgehouden werd, en houdt daarom één bedrag."
+            : "This line was entered before coins and notes were kept separately, so it keeps a single amount."}
+        </p>
+      )}
+
+      {perPiece && (
         <section>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h3 className="text-sm font-semibold text-vtk-ink">{nl ? "Munten en briefjes" : "Coins and notes"}</h3>
@@ -159,11 +186,7 @@ export function EntryForm({
               {nl ? "Cash" : "Cash"} <strong className="tabular-nums text-vtk-ink">{euro(cashCents)}</strong>
             </span>
           </div>
-          <p className="mb-3 mt-1 text-xs text-vtk-muted">
-            {nl
-              ? "Hoeveel stuks van elke munt en elk briefje er in de kassa zitten. Vul 0 in voor wat er niet in zit."
-              : "How many of each coin and note are in the register. Enter 0 for what is not in it."}
-          </p>
+          <p className="mb-3 mt-1 text-xs text-vtk-muted">{piecesHint}</p>
           <DenominationGrid
             locale={locale}
             prefix="c_"
@@ -225,8 +248,8 @@ export function EntryForm({
             </strong>{" "}
             {closes
               ? nl
-                ? `Daarna staat de kassa van ${postName} op € 0, en loopt de winst van dit kwartaal tot deze dag. Vul dus het volledige bedrag in, met de bonnen erbij.`
-                : `The ${postName} register then stands at € 0, and this quarter's profit runs until this day. So enter the full amount, vouchers included.`
+                ? `Daarna staat de kassa van ${postName} op € 0, en loopt de winst van dit kwartaal tot deze dag. Vul dus alles in wat terugkwam, met de bonnen erbij.`
+                : `The ${postName} register then stands at € 0, and this quarter's profit runs until this day. So enter everything that came back, vouchers included.`
               : nl
                 ? "Bijvoorbeeld op het einde van het werkingsjaar."
                 : "For example at the end of the working year."}
@@ -257,9 +280,9 @@ export function EntryForm({
         />
       </div>
 
-      {isCount && (
+      {perPiece && (
         <p className="border-t border-vtk-blue/10 pt-4 text-sm text-vtk-body">
-          {nl ? "In de kassa" : "In the register"}{" "}
+          {totalLabel}{" "}
           <strong className="text-base tabular-nums text-vtk-ink">{euro(cashCents + voucherCents)}</strong>
           {vouchers > 0 && (
             <span className="text-vtk-muted">

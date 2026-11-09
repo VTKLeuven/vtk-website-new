@@ -18,6 +18,16 @@ export function isPermanentEntryKind(value: unknown): value is PermanentEntryKin
   return typeof value === "string" && (PERMANENT_ENTRY_KINDS as readonly string[]).includes(value);
 }
 
+/**
+ * Gaat het cash van deze regel per munt en briefje? Ja, behalve bij meegeven of
+ * teruggeven van voor november 2026: zo'n regel heeft enkel een bedrag (`counts`
+ * NULL, `cash` ingevuld) en houdt haar bedragveld, want welke munten het waren
+ * is niet meer te kennen en een leeg raster zou het bedrag op nul zetten.
+ */
+export function entersCashPerPiece(kind: PermanentEntryKind, counts: object | null, cash: string): boolean {
+  return kind === "COUNT" || counts !== null || cash === "";
+}
+
 /** Wat de berekening van een regel nodig heeft, zoals het uit de database komt. */
 export type PermanentEntry = {
   id: string;

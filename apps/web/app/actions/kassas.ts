@@ -925,15 +925,17 @@ export async function savePermanentEntryAction(_prev: SaveState, formData: FormD
 
   let cashCents: number;
   let counts: Counts | null = null;
-  if (kind === "COUNT") {
-    const read = readCounts(formData, "c_");
-    if (read === "BAD_COUNT") return saveError("BAD_COUNT");
-    // Alles leeg is geen lege kassa maar een vergeten telling; een lege kassa
-    // tel je met een 0.
-    if (read === null) return saveError("EMPTY_COUNT");
+  const read = readCounts(formData, "c_");
+  if (read === "BAD_COUNT") return saveError("BAD_COUNT");
+  // Alles leeg is geen lege kassa maar een vergeten telling; een lege kassa
+  // tel je met een 0. Bij een teruggave mag het wel: die kan enkel bonnen zijn.
+  if (kind === "COUNT" && read === null) return saveError("EMPTY_COUNT");
+  if (read) {
     counts = read;
     cashCents = countsTotalCents(read);
   } else {
+    // Een regel van voor er per coupure ingegeven werd: dat formulier stuurt
+    // geen raster maar één bedrag.
     const amount = parseAmountInput(text(formData, "cash", 20));
     if (amount === undefined) return saveError("BAD_AMOUNT");
     cashCents = amount ?? 0;

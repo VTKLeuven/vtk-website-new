@@ -392,8 +392,8 @@ export default async function VasteKassas({
           <p className="p-6 text-sm text-vtk-muted">
             {manage
               ? nl
-                ? `Het kasboek van ${postName} is nog leeg. Begin met de startkassa: Meegeven, met het bedrag dat Beheer meegaf.`
-                : `The ${postName} ledger is still empty. Start with the starting float: Hand out, with the amount Administration gave.`
+                ? `Het kasboek van ${postName} is nog leeg. Begin met de startkassa: Meegeven, met de munten en briefjes die Beheer meegaf.`
+                : `The ${postName} ledger is still empty. Start with the starting float: Hand out, with the coins and notes Administration gave.`
               : nl
                 ? "Er staat nog niets in het kasboek. Zodra Beheer de startkassa ingeeft of jullie tellen, staat het hier."
                 : "Nothing in the ledger yet. Once Administration enters the starting float or you count, it shows here."}

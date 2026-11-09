@@ -8493,6 +8493,15 @@ einde van het jaar helemaal terug, dan geeft Beheer het hele bedrag in als
 teruggegeven en vinkt aan dat de kassa volledig terugkwam. Daarna staat ze op
 nul, en het volgende jaar begint van daar, niet van de laatste telling.
 
+**Wat meegaat en terugkomt, gaat per munt en briefje (november 2026).** Beheer wil
+bijhouden welke munten en briefjes er meegegeven en teruggebracht worden, niet
+enkel hoeveel, dus "Meegeven" en "Terugkrijgen" hebben hetzelfde raster als een
+telling en het bedrag is de som daarvan. Een leeg veld is hier gewoon nul stuks.
+Bij terugkrijgen mag het hele raster leeg blijven: een afgifte kan enkel uit bonnen
+bestaan. Een regel van daarvoor heeft geen coupures (`counts` NULL) en houdt bij
+het aanpassen haar bedragveld: welke munten het waren is niet meer te kennen, en
+een leeg raster zou haar bedrag op nul zetten.
+
 **Op dezelfde dag geldt de volgorde van ingeven.** Een regel heeft een datum en
 geen uur; telt de post 's ochtends en geeft ze 's middags geld af, dan hoort de
 afgifte bij de volgende periode zolang ze na de telling ingegeven werd.

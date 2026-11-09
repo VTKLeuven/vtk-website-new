@@ -51,7 +51,8 @@ export default async function VasteKassaRegel({ params }: { params: Promise<{ lo
     RETURNED: nl ? `Teruggegeven op ${date}` : `Returned on ${date}`,
     COUNT: nl ? `Telling van ${date}` : `Count of ${date}`,
   }[entry.kind];
-  const counts = entry.kind === "COUNT" ? normaliseCounts(entry.counts) : null;
+  // NULL bij een regel die enkel een bedrag heeft.
+  const counts = entry.counts ? normaliseCounts(entry.counts) : null;
 
   const facts: Array<{ label: string; value: string }> = [
     { label: "Post", value: postName },
@@ -138,7 +139,7 @@ export default async function VasteKassaRegel({ params }: { params: Promise<{ lo
                 groupId: entry.groupId,
                 kind: entry.kind,
                 date: toDateInputValue(entry.date),
-                cash: entry.kind === "COUNT" ? "" : amountInputValue(entry.cashCents),
+                cash: entry.kind === "COUNT" || entry.cashCents === 0 ? "" : amountInputValue(entry.cashCents),
                 counts,
                 shiftVouchers: entry.shiftVouchers ? String(entry.shiftVouchers) : "",
                 elixirVouchers: entry.elixirVouchers ? String(entry.elixirVouchers) : "",

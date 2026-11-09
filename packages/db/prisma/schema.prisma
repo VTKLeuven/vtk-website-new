@@ -8544,9 +8544,11 @@ model PermanentCashEntry {
   /// dezelfde dag geldt de volgorde van ingeven (`createdAt`).
   date    DateTime               @db.Date
 
-  /// Cash in centen. Bij een telling de som van `counts`, gezet door de action.
+  /// Cash in centen. Staan er `counts`, dan de som daarvan, gezet door de action.
   cashCents Int
-  /// Stuks per coupure, zoals `CashRegister.endCounts`. Enkel bij een telling.
+  /// Stuks per coupure, zoals `CashRegister.endCounts`: bij een telling, en bij
+  /// meegeven en teruggeven vanaf november 2026. NULL bij een oudere regel, die
+  /// enkel `cashCents` heeft.
   counts    Json?
 
   /// Bonnen in de kassa (telling) of mee afgegeven aan Beheer (teruggegeven).
