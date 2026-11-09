@@ -2683,6 +2683,10 @@ a.vtk-shortcut-tile:hover {
   width: 190px;
 }
 
+.vtk-codes-table th.vtk-codes-col-total {
+  width: 116px;
+}
+
 .vtk-codes-table th.vtk-codes-col-actions {
   width: 46px;
 }
@@ -2782,6 +2786,22 @@ a.vtk-shortcut-tile:hover {
 .vtk-codes-usage {
   color: var(--muted);
   font-size: 12.5px;
+}
+
+.vtk-admin-main .vtk-codes-table .vtk-codes-total {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.vtk-admin-main .vtk-codes-table td.vtk-codes-total {
+  color: var(--ink);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-admin-main .vtk-codes-table tr.vtk-codes-unlisted-head {
+  background: var(--paper-2);
+  font-weight: 600;
 }
 
 /* Op een smal scherm valt de kolom weg en komt het gebruik onder de naam. */
@@ -2940,7 +2960,8 @@ a.vtk-shortcut-tile:hover {
 }
 
 @media (max-width: 639px) {
-  .vtk-codes-table .vtk-codes-usage {
+  .vtk-codes-table .vtk-codes-usage,
+  .vtk-admin-main .vtk-codes-table .vtk-codes-total {
     display: none;
   }
 

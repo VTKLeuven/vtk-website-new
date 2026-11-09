@@ -26,6 +26,8 @@ import {
   type AccountingCodeGroup,
   type AccountingCodeRow,
 } from "@/lib/accounting/codes";
+import { groupTicketCents, type UnlistedTicketTotal } from "@/lib/accounting/ticketTotals";
+import { formatMoney } from "@/lib/ticketing/money";
 
 export type AccountingCodeUsageRow = AccountingCodeRow & {
   /** Ticketverkopen die deze code nu gekozen hebben. */
@@ -34,6 +36,8 @@ export type AccountingCodeUsageRow = AccountingCodeRow & {
   templates: number;
   /** Gaat deze code mee met het lidgeld? */
   membership: boolean;
+  /** Netto via de ticketverkoop onder precies deze code; `null`: nog niets verkocht. */
+  ticketCents: number | null;
 };
 
 type Locale = "nl" | "en";
@@ -81,6 +85,12 @@ function copy(locale: Locale) {
     subCode: nl ? "Subcode" : "Sub code",
     name: nl ? "Naam" : "Name",
     usage: nl ? "Gebruikt door" : "Used by",
+    ticketSales: nl ? "Ticketverkoop" : "Ticket sales",
+    ticketSalesHint: nl
+      ? "Ticketverkoop is wat er netto binnenkwam, na terugbetalingen, onder de code die gold op het moment van bestellen. Een hoofdrekening telt haar subcodes mee."
+      : "Ticket sales is the net amount received, after refunds, under the code that applied when the order was placed. A main account includes its sub codes.",
+    unlistedHeading: nl ? "Verkocht buiten deze lijst" : "Sold outside this list",
+    noCode: nl ? "Zonder boekhoudcode" : "Without an accounting code",
     actions: nl ? "Acties" : "Actions",
     move: nl ? "Verplaatsen" : "Move",
     moveHint: nl
@@ -296,7 +306,7 @@ function EditRow({
   const nl = locale === "nl";
   return (
     <tr className="vtk-codes-form-row" data-sub={row.parentId ? "true" : undefined}>
-      <td colSpan={5}>
+      <td colSpan={6}>
         <div className="vtk-codes-form">
           <SaveForm
             action={updateAccountingCodeAction}
@@ -359,7 +369,7 @@ function NewRow({
   const t = copy(locale);
   return (
     <tr className="vtk-codes-form-row" data-sub={parentId ? "true" : undefined} data-new="true">
-      <td colSpan={5}>
+      <td colSpan={6}>
         <div className="vtk-codes-form">
           <SaveForm
             action={createAccountingCodeAction}
@@ -400,12 +410,19 @@ function NewRow({
 export function AccountingCodesEditor({
   locale,
   codes,
+  unlisted,
 }: {
   locale: Locale;
   codes: AccountingCodeUsageRow[];
+  /** Verkocht onder een code die niet (meer) in de lijst staat, of zonder code. */
+  unlisted: UnlistedTicketTotal[];
 }) {
   const t = copy(locale);
   const nl = locale === "nl";
+  const money = (cents: number | null) => (cents === null ? "" : formatMoney(cents, "EUR", locale));
+  // Op een smal scherm valt de kolom weg en staat het bedrag onder de naam.
+  const inlineUsage = (usage: string, cents: number | null) =>
+    [usage, cents === null ? "" : `${t.ticketSales}: ${money(cents)}`].filter(Boolean).join(", ");
   const showToast = useToast();
   const [, startTransition] = useTransition();
 
@@ -672,6 +689,7 @@ export function AccountingCodesEditor({
               <th className="vtk-codes-col-code">{t.code}</th>
               <th>{t.name}</th>
               <th className="vtk-codes-col-usage vtk-codes-usage">{t.usage}</th>
+              <th className="vtk-codes-col-total vtk-codes-total">{t.ticketSales}</th>
               <th className="vtk-codes-col-actions">
                 <span className="sr-only">{t.actions}</span>
               </th>
@@ -685,13 +703,13 @@ export function AccountingCodesEditor({
           {rows.length === 0 ? (
             <tbody>
               <tr className="vtk-codes-empty">
-                <td colSpan={5}>{t.empty}</td>
+                <td colSpan={6}>{t.empty}</td>
               </tr>
             </tbody>
           ) : visible.length === 0 ? (
             <tbody>
               <tr className="vtk-codes-empty">
-                <td colSpan={5}>{t.noResults(query.trim())}</td>
+                <td colSpan={6}>{t.noResults(query.trim())}</td>
               </tr>
             </tbody>
           ) : null}
@@ -701,6 +719,9 @@ export function AccountingCodesEditor({
               drop?.kind === "main" && drop.groupId === main.id ? drop.place : undefined;
             const allChildren = rows.filter((row) => row.parentId === main.id);
             const mainUsage = usageLabel(main, locale);
+            // Over alle subcodes, ook die de zoekterm nu verbergt.
+            const mainCents = groupTicketCents([main.ticketCents, ...allChildren.map((child) => child.ticketCents)]);
+            const mainInline = inlineUsage(mainUsage, mainCents);
             return (
               <tbody
                 key={main.id}
@@ -738,9 +759,10 @@ export function AccountingCodesEditor({
                       >
                         {main.name}
                       </button>
-                      {mainUsage ? <span className="vtk-codes-usage-inline">{mainUsage}</span> : null}
+                      {mainInline ? <span className="vtk-codes-usage-inline">{mainInline}</span> : null}
                     </td>
                     <td className="vtk-codes-usage">{mainUsage}</td>
+                    <td className="vtk-codes-total">{money(mainCents)}</td>
                     <td className="vtk-codes-actions">
                       <IconButton
                         label={t.addSub}
@@ -769,6 +791,7 @@ export function AccountingCodesEditor({
                     );
                   }
                   const childUsage = usageLabel(child, locale);
+                  const childInline = inlineUsage(childUsage, child.ticketCents);
                   return (
                     <tr
                       key={child.id}
@@ -793,11 +816,12 @@ export function AccountingCodesEditor({
                         >
                           {child.name}
                         </button>
-                        {childUsage ? (
-                          <span className="vtk-codes-usage-inline">{childUsage}</span>
+                        {childInline ? (
+                          <span className="vtk-codes-usage-inline">{childInline}</span>
                         ) : null}
                       </td>
                       <td className="vtk-codes-usage">{childUsage}</td>
+                      <td className="vtk-codes-total">{money(child.ticketCents)}</td>
                       <td className="vtk-codes-actions" />
                     </tr>
                   );
@@ -813,8 +837,30 @@ export function AccountingCodesEditor({
               </tbody>
             );
           })}
+          {!searching && unlisted.length > 0 ? (
+            <tbody className="vtk-codes-group">
+              <tr className="vtk-codes-unlisted-head">
+                <td />
+                <td colSpan={5}>{t.unlistedHeading}</td>
+              </tr>
+              {unlisted.map((row) => (
+                <tr key={row.code ?? "none"}>
+                  <td />
+                  <td className="vtk-codes-code">{row.code ?? ""}</td>
+                  <td className="vtk-codes-name">
+                    {row.code === null ? t.noCode : row.name}
+                    <span className="vtk-codes-usage-inline">{money(row.netCents)}</span>
+                  </td>
+                  <td className="vtk-codes-usage" />
+                  <td className="vtk-codes-total">{money(row.netCents)}</td>
+                  <td />
+                </tr>
+              ))}
+            </tbody>
+          ) : null}
         </table>
       </div>
+      <p className="vtk-codes-hint">{t.ticketSalesHint}</p>
 
       <ConfirmDialog
         open={confirmMove !== null}

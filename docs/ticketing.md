@@ -371,6 +371,13 @@ payout per code without looking up orders. The list lives in
 answered (see below). The kring choices behind it are in
 `docs/design-decisions.md` ("Boekhoudcodes in de betaalinfo").
 
+`/admin/boekhoudcodes` also shows the net ticket revenue per code, summed from the
+copy on the order (`lib/accounting/ticketTotals.ts`). The statuses and the net
+formula are those of the revenue per event, so a refund lowers the total as soon
+as it has succeeded. A main account includes its sub codes. Orders under a code
+that is no longer in the list, or without a code, get their own block under the
+list instead of dropping out of the sum.
+
 | Concern | Location |
 | --- | --- |
 | Table, sub codes (parent code, space, five digits), list order | `AccountingCode` in `schema.prisma` |

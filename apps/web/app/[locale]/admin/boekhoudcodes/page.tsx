@@ -6,15 +6,16 @@ import { requirePermission } from "@/lib/session";
 import { orderAccountingCodes } from "@/lib/accounting/codes";
 import { getMembershipConfig } from "@/lib/membership";
 import { membershipAccountingCode } from "@/lib/accounting/server";
+import { ticketTotalsPerCode } from "@/lib/accounting/ticketTotals";
 import { AccountingCodesEditor, type AccountingCodeUsageRow } from "./AccountingCodesEditor";
 import { CodesUploadForm } from "./CodesUploadForm";
 import { importAccountingCodesAction, previewAccountingCodesImportAction } from "@/app/actions/accountingCodes";
 
 /**
  * De lijst waaruit een ticketverkoop en het lidmaatschap hun boekhoudcode
- * kiezen. Enkel de lijst: welke code een verkoop gebruikt, staat in het
- * eventformulier, en hoeveel er onder een code verkocht is in de
- * ticketstatistieken (per boekhoudcode).
+ * kiezen, met per code wat er via de ticketverkoop binnenkwam. Welke code een
+ * verkoop gebruikt, staat in het eventformulier; de uitsplitsing per event en
+ * betaalwijze in de ticketstatistieken.
  */
 export default async function AdminAccountingCodes({
   params,
@@ -27,7 +28,7 @@ export default async function AdminAccountingCodes({
   const nl = locale === "nl";
   await requirePermission("accounting.manage");
 
-  const [rows, membershipConfig] = await Promise.all([
+  const [rows, membershipConfig, orderSums] = await Promise.all([
     prisma.accountingCode.findMany({
       select: {
         id: true,
@@ -39,8 +40,25 @@ export default async function AdminAccountingCodes({
       },
     }),
     getMembershipConfig(),
+    // Dezelfde bestellingen als de omzet per event: betaald, ook als er later
+    // iets terugbetaald werd.
+    prisma.ticketOrder.groupBy({
+      by: ["accountingCode", "accountingCodeName"],
+      where: { status: { in: ["PAID", "PARTIALLY_REFUNDED", "REFUNDED"] } },
+      _sum: { totalCents: true, refundedCents: true },
+    }),
   ]);
   const membershipCode = await membershipAccountingCode(membershipConfig.accountingCodeId);
+
+  const totals = ticketTotalsPerCode(
+    rows,
+    orderSums.map((sum) => ({
+      accountingCode: sum.accountingCode,
+      accountingCodeName: sum.accountingCodeName,
+      totalCents: sum._sum.totalCents ?? 0,
+      refundedCents: sum._sum.refundedCents ?? 0,
+    })),
+  );
 
   const countsById = new Map(rows.map((row) => [row.id, row._count]));
   const codes: AccountingCodeUsageRow[] = orderAccountingCodes(rows).map((row) => ({
@@ -48,6 +66,7 @@ export default async function AdminAccountingCodes({
     ticketEvents: countsById.get(row.id)?.ticketEvents ?? 0,
     templates: countsById.get(row.id)?.eventTemplates ?? 0,
     membership: membershipCode?.code === row.code,
+    ticketCents: totals.byId.get(row.id) ?? null,
   }));
 
   return (
@@ -61,7 +80,7 @@ export default async function AdminAccountingCodes({
         </p>
       </header>
 
-      <AccountingCodesEditor locale={locale} codes={codes} />
+      <AccountingCodesEditor locale={locale} codes={codes} unlisted={totals.unlisted} />
 
       <section className="rounded-2xl border border-vtk-blue/12 bg-white p-5">
         <h2 className="text-lg font-semibold">{nl ? "De lijst uploaden als CSV" : "Upload the list as CSV"}</h2>
