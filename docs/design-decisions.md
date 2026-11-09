@@ -11120,6 +11120,11 @@ en bestanden: `docs/ticketing.md`, "Boekhoudcodes".
   van de penning, hier om onze fout. Bleef de oude schrijfwijze staan, dan
   telden de statistieken dezelfde rekening twee keer, en voor Onthaal en
   Bedrijvenrelaties een code die in de boekhouding niet bestaat.
+- **Bij elke code staat wat er via de ticketverkoop binnenkwam.** Netto na
+  terugbetalingen, op dezelfde bestellingen als de omzet per event, over alle jaren
+  samen. Een hoofdrekening telt haar subcodes mee. Wat onder een oude code of zonder
+  code verkocht is, staat in een eigen blok onder de lijst, zodat de som blijft
+  kloppen met wat er echt binnenkwam.
 - **Het beheer is een register zoals het rekenblad van de penning.** Elke
   hoofdrekening een kop, haar subcodes ingesprongen eronder, één regel per code,
   een zoekveld bovenaan, en een klik op een rij bewerkt ze ter plaatse. De
@@ -12489,6 +12494,15 @@ een open vraag. Code in `apps/web/lib/pocPolls`.
   Zonder koppeling kan de site niet weten of iemand tot de richting behoort of al
   stemde. De koppeling kost één klik extra, één keer. Een ingebouwde Discord-poll
   kan niet: daar is de tussenstand zichtbaar.
+- **Op Discord krijgt elke POC een rol en een eigen kanaal.** Studenten koppelen hun
+  account onder één publiek bericht, en de bot geeft hen de rol van hun POC. Zo zien
+  ze enkel de peilingen van hun eigen richting. Eén kanaal voor alles kan niet:
+  Discord kent geen zichtbaarheid per bericht. Privéberichten van de bot zijn bekeken
+  en afgewezen. De RiVers kiezen daarom geen kanaal meer; ze kiezen enkel of de
+  peiling ook op Discord komt.
+- **De rol volgt het account, ook de jaarlijkse bevestiging.** Wie sinds 21 september
+  de studie niet bevestigde, verliest de rol en krijgt ze terug na het bevestigen.
+  Anders stemt iemand die de site niet meer opent nog jaren met de richting van toen.
 - **Een open peiling gaat voor de stand van de band.** Staat de band in
   `/admin/pocs` verborgen of op de verkiezingen, dan blijven de POC's met een open
   peiling er toch staan: anders wijst de strook naar niets.

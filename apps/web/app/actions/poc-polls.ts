@@ -111,7 +111,6 @@ export async function savePocPollAction(_previous: SaveState, formData: FormData
       meetingDate: text(formData, "meetingDate"),
       questions: text(formData, "questions"),
       studyYears: formData.getAll("studyYears").filter((year): year is string => typeof year === "string"),
-      discordChannelId: text(formData, "discordChannelId"),
     },
     { publish, now },
   );
@@ -128,17 +127,16 @@ export async function savePocPollAction(_previous: SaveState, formData: FormData
   }
   if (!pocId || !managesPoc(scope, pocId)) return saveError("POLL_FORBIDDEN");
 
-  if (publish) {
-    const poc = await prisma.poc.findUnique({ where: { id: pocId }, select: { studyProgrammes: true } });
-    if (!poc || poc.studyProgrammes.length === 0) return saveError("POLL_POC_NO_PROGRAMME");
-  }
+  const poc = await prisma.poc.findUnique({ where: { id: pocId }, select: { studyProgrammes: true, discordChannelId: true } });
+  if (publish && (!poc || poc.studyProgrammes.length === 0)) return saveError("POLL_POC_NO_PROGRAMME");
 
   const fields = {
     titleNl: draft.title,
     closesAt: draft.closesAt,
     meetingDate: draft.meetingDate,
     studyYears: draft.studyYears.filter((year): year is StudyYear => STUDY_YEARS.includes(year as StudyYear)),
-    discordChannelId: discordBotConfigured() ? draft.discordChannelId : null,
+    // Altijd het kanaal van de POC zelf: dat zien enkel haar studenten.
+    discordChannelId: discordBotConfigured() && formData.has("postToDiscord") ? (poc?.discordChannelId ?? null) : null,
     ...(publish ? { publishedAt: now, opensAt: now } : {}),
   };
 

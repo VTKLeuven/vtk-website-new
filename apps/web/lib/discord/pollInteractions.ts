@@ -1,12 +1,18 @@
 import "server-only";
 
+import { after } from "next/server";
 import { prisma } from "@vtk/db";
 import { parsePollAnswers, pollFieldName, pollIsForViewer, pollIsOpen } from "@/lib/pocPolls/core";
 import { pollVoterKey } from "@/lib/pocPolls/voterKey";
 import { savePollAnswer } from "@/lib/pocPolls/write";
 import { siteUrl } from "@/lib/seo";
 import { createDiscordLinkToken } from "./linkToken";
+import { accessiblePocNames, loadRolePocs, repairDiscordRoles, roleAccount, ROLE_ACCOUNT_SELECT } from "./pocAccess";
 import {
+  DISCORD_LINK_PANEL_ID,
+  discordAccessMessage,
+  discordConfirmStudyMessage,
+  discordNoPocMessage,
   parsePollCustomId,
   pollAnswerLabel,
   pollBrokenNotice,
@@ -35,7 +41,7 @@ import { DISCORD_POLL_SELECT, discordPollView } from "./pollPosts";
 export type DiscordInteraction = {
   type: number;
   data?: { custom_id?: unknown; components?: unknown };
-  member?: { user?: { id?: unknown; username?: unknown } };
+  member?: { user?: { id?: unknown; username?: unknown }; roles?: unknown };
   user?: { id?: unknown; username?: unknown };
 };
 
@@ -63,7 +69,40 @@ async function stepOrDone(view: DiscordPollView, index: number, userId: string):
   return pollStepMessage(view, index, answers.get(view.questions[index].id));
 }
 
+/**
+ * De knop onder het vaste koppelbericht. Antwoorden gaat voor: de rollen veranderen
+ * pas na het antwoord, want dat zijn verzoeken die Discords drie seconden kunnen
+ * opeten.
+ */
+async function handleLinkPanel(interaction: DiscordInteraction): Promise<DiscordInteractionResponse> {
+  const actor = interaction.member?.user ?? interaction.user;
+  if (typeof actor?.id !== "string") return reply(pollBrokenNotice());
+
+  const origin = siteUrl();
+  const now = new Date();
+  const [pocs, account] = await Promise.all([
+    loadRolePocs(),
+    prisma.user.findUnique({ where: { discordId: actor.id }, select: ROLE_ACCOUNT_SELECT }),
+  ]);
+
+  if (!account || !account.active || account.deletedAt) {
+    const username = typeof actor.username === "string" ? actor.username : "";
+    const token = createDiscordLinkToken(actor.id, username, now);
+    return reply(pollLinkAccountMessage(`${origin}/koppel-discord?token=${token}`));
+  }
+
+  const roles = interaction.member?.roles;
+  const memberRoleIds = Array.isArray(roles) ? roles.filter((role): role is string => typeof role === "string") : [];
+  after(() => repairDiscordRoles({ account, memberRoleIds, pocs, now }));
+
+  if (!roleAccount(account, now).confirmed) return reply(discordConfirmStudyMessage(`${origin}/studie-bevestigen`));
+  const names = accessiblePocNames(pocs, account, now);
+  return reply(names.length > 0 ? discordAccessMessage(names) : discordNoPocMessage(`${origin}/account#profile`));
+}
+
 export async function handlePollInteraction(interaction: DiscordInteraction): Promise<DiscordInteractionResponse> {
+  if (interaction.data?.custom_id === DISCORD_LINK_PANEL_ID) return handleLinkPanel(interaction);
+
   const parsed = parsePollCustomId(interaction.data?.custom_id);
   const actor = interaction.member?.user ?? interaction.user;
   if (!parsed || typeof actor?.id !== "string") return reply(pollBrokenNotice());

@@ -7,6 +7,7 @@ import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { describeChanges, logAudit } from "@/lib/audit";
+import { placeLinkPanel } from "@/lib/discord/pocAccess";
 import { STUDY_PROGRAMMES } from "@/lib/profile";
 import { deleteObject } from "@vtk/storage";
 import { currentWorkingYear } from "@/lib/workingYear";
@@ -31,6 +32,9 @@ function isUniqueViolation(err: unknown, field: string): boolean {
 
 // ---- POCs -------------------------------------------------------------------
 
+/** Een id van Discord: enkel cijfers, en dus nooit iets om in een pad te plakken. */
+const DISCORD_ID = /^\d{5,25}$/;
+
 const pocSchema = z.object({
   id: z.string().optional(),
   slug: z.string().min(1).regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/),
@@ -41,7 +45,19 @@ const pocSchema = z.object({
   // De aangevinkte richtingen. Onbekende waarden weren we hier: het formulier
   // stuurt enkel `StudyProgramme`-codes, dus iets anders is geknoei.
   studyProgrammes: z.array(z.enum(STUDY_PROGRAMMES)).default([]),
+  discordRoleId: z.string().regex(DISCORD_ID).nullable().optional(),
+  discordChannelId: z.string().regex(DISCORD_ID).nullable().optional(),
 });
+
+/** Zonder bot staan de keuzelijsten er niet; dan blijft wat er was gewoon staan. */
+function discordFields(formData: FormData) {
+  return formData.has("discordRoleId")
+    ? {
+        discordRoleId: formData.get("discordRoleId") || null,
+        discordChannelId: formData.get("discordChannelId") || null,
+      }
+    : {};
+}
 
 export async function savePocAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requirePermission("pocs.manage");
@@ -52,6 +68,7 @@ export async function savePocAction(_prev: SaveState, formData: FormData): Promi
     nameEn: formData.get("nameEn") || null,
     email: formData.get("email") || null,
     studyProgrammes: formData.getAll("studyProgrammes"),
+    ...discordFields(formData),
   });
   if (!parsed.success) return saveError("INVALID_INPUT");
 
@@ -71,6 +88,8 @@ export async function savePocAction(_prev: SaveState, formData: FormData): Promi
               nameEn: "Engelse naam",
               email: "e-mailadres",
               studyProgrammes: "richtingen",
+              discordRoleId: "Discord-rol",
+              discordChannelId: "Discord-kanaal",
             })
           : null,
       });
@@ -96,6 +115,20 @@ export async function savePocAction(_prev: SaveState, formData: FormData): Promi
   // De homepage toont de POC's van je eigen richtingen; een gewijzigde
   // richting of naam hoort daar meteen door te komen.
   revalidatePath("/", "layout");
+  return saveOk();
+}
+
+/** Het publieke bericht met de koppelknop, in het gekozen kanaal. */
+export async function placeDiscordLinkPanelAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  await requirePermission("pocs.manage");
+  const channelId = formData.get("channelId");
+  if (typeof channelId !== "string" || !DISCORD_ID.test(channelId)) return saveError("INVALID_INPUT");
+
+  const result = await placeLinkPanel(channelId);
+  if (!result.ok) return saveError("DISCORD_LINK_PANEL", result.message);
+
+  await logAudit({ action: "update", entity: "poc", target: "Discord-koppelbericht", summary: "geplaatst" });
+  revalidatePath("/admin/pocs");
   return saveOk();
 }
 

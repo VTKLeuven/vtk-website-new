@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "@vtk/db";
 import { deleteObject } from "@vtk/storage";
+import { removeDiscordRoles } from "@/lib/discord/pocAccess";
 
 /**
  * A data-subject export deliberately excludes credentials, session tokens,
@@ -19,6 +20,7 @@ export async function exportUserData(userId: string) {
       rNumberFromKul: true,
       discordId: true,
       discordUsername: true,
+      discordRoleIds: true,
       firwStudent: true,
       firwStudentChangedAt: true,
       emailVerified: true,
@@ -342,7 +344,7 @@ async function removeObject(key: string): Promise<void> {
 export async function eraseUserData(userId: string) {
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { email: true, name: true, avatarKey: true, rNumber: true },
+    select: { email: true, name: true, avatarKey: true, rNumber: true, discordId: true, discordRoleIds: true },
   });
   const tombstone = randomUUID();
   const deletedEmail = `deleted+${tombstone}@vtk.invalid`;
@@ -522,6 +524,7 @@ export async function eraseUserData(userId: string) {
           rNumberFromKul: false,
           discordId: null,
           discordUsername: null,
+          discordRoleIds: { set: [] },
           firwStudent: false,
           firwStudentChangedAt: null,
           emailVerified: false,
@@ -587,4 +590,8 @@ export async function eraseUserData(userId: string) {
       maxWait: 15_000,
     },
   );
+
+  // Na de transactie: Discord mag het wissen niet tegenhouden. De koppeling is
+  // dan al weg, dus dit is de enige kans om de POC-rollen weg te halen.
+  if (user.discordId) await removeDiscordRoles(user.discordId, user.discordRoleIds);
 }

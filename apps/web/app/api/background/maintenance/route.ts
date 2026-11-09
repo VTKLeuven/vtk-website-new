@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { processDueInterestReminderMails } from "@/lib/calendar/interestReminderMailer";
 import { processDueDiscordPosts } from "@/lib/discord/posts";
 import { closeExpiredPollsOnDiscord } from "@/lib/discord/pollPosts";
+import { syncPocDiscordRoles } from "@/lib/discord/pocAccess";
 import { processDueLesbezoekScheduledMails } from "@/lib/lesbezoeken-server";
 import { recordMailingListCounts } from "@/lib/mailingListHistory";
 import { processDueNoShows } from "@/lib/theokot-server";
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
   }
 
   const now = new Date();
-  const [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse, opruiming, peilingen] = await Promise.allSettled([
+  const [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse, opruiming, peilingen, pocRollen] = await Promise.allSettled([
     processDueNoShows(now),
     processDueLesbezoekScheduledMails(now),
     // De stand van de mailinglijsten van vandaag, voor de grafiek in
@@ -74,12 +75,15 @@ export async function POST(request: Request) {
     runNightlyStorageCleanup(now),
     // POC-peilingen voorbij hun deadline: de knoppen op Discord gaan uit.
     closeExpiredPollsOnDiscord(now),
+    // De POC-rollen op Discord lopen mee met richting en studiebevestiging; zie
+    // lib/discord/pocAccess.ts.
+    syncPocDiscordRoles(now),
   ]);
 
   // 502 zodra een van de taken viel: de healthcheck van de worker ziet dan dat
   // er iets scheelt in plaats van stil niets te doen. De andere taken zijn wel
   // gedraaid, en alle zijn idempotent, dus de volgende ronde haalt het in.
-  const failed = [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse, opruiming, peilingen].some(
+  const failed = [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse, opruiming, peilingen, pocRollen].some(
     (task) => task.status === "rejected",
   );
   if (failed) {
@@ -93,6 +97,7 @@ export async function POST(request: Request) {
       interesse: describe(interesse),
       opruiming: describe(opruiming),
       peilingen: describe(peilingen),
+      pocRollen: describe(pocRollen),
     });
   }
 
@@ -107,6 +112,7 @@ export async function POST(request: Request) {
       interesse: describe(interesse),
       opruiming: describe(opruiming),
       peilingen: describe(peilingen),
+      pocRollen: describe(pocRollen),
     },
     { status: failed ? 502 : 200, headers: { "Cache-Control": "no-store" } },
   );

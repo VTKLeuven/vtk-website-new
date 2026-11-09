@@ -642,6 +642,9 @@ model User {
   /// beantwoorden. Zie docs/poc-peilingen.md.
   discordId               String?             @unique
   discordUsername         String?
+  /// De POC-rollen die de site dit account op Discord gaf. Zo ziet de worker
+  /// zonder Discord te bevragen bij wie er iets moet veranderen.
+  discordRoleIds          String[]            @default([])
   // Lid dat niet aan de faculteit Ingenieurswetenschappen studeert. Bewust geen
   // `StudyProgramme`-waarde: het is geen richting, en als enum-waarde zou het
   // overal opduiken waar richtingen opgelijst worden (o.a. de career-export).
@@ -3251,6 +3254,12 @@ model Poc {
   // zodat de homepage de POC's van jouw richtingen kan tonen. Meerdere richtingen
   // per POC kan: één POC bedient soms verschillende opleidingen.
   studyProgrammes StudyProgramme[] @default([])
+
+  /// De rol op de studentendiscord die de studenten van deze POC krijgen, en het
+  /// kanaal waar enkel die rol in kan en waar de peilingen verschijnen. Zie
+  /// docs/poc-peilingen.md.
+  discordRoleId    String?
+  discordChannelId String?
 
   representatives PocRepresentative[]
   polls           PocPoll[]

@@ -46,6 +46,10 @@ import { samplePocPoll } from "@/lib/pocPolls/sample";
 import { DiscordLinkForm } from "@/components/profile/DiscordLinkForm";
 import { discordLinkLabels } from "@/lib/discord/linkCopy";
 import {
+  discordAccessMessage,
+  discordConfirmStudyMessage,
+  discordLinkPanelMessage,
+  discordNoPocMessage,
   pollChannelMessage,
   pollClosedChannelMessage,
   pollDoneMessage,
@@ -272,6 +276,10 @@ export default async function AdminFlowPreview({
     avatar_url: DISCORD_AVATAR_PATH,
   });
   const pollDiscordMessages = [
+    { label: nl ? "Koppelbericht in het publieke kanaal" : "Link message in the public channel", ephemeral: false, message: discordLinkPanelMessage() },
+    { label: nl ? "Na een klik: al gekoppeld" : "After a click: already linked", ephemeral: true, message: discordAccessMessage(["Computerwetenschappen"]) },
+    { label: nl ? "Na een klik: geen richting met een kanaal" : "After a click: no programme with a channel", ephemeral: true, message: discordNoPocMessage(`${siteUrl()}/account#profile`) },
+    { label: nl ? "Na een klik: studie niet bevestigd" : "After a click: study not confirmed", ephemeral: true, message: discordConfirmStudyMessage(`${siteUrl()}/studie-bevestigen`) },
     { label: nl ? "In het kanaal" : "In the channel", ephemeral: false, message: pollChannelMessage(pollDiscordView) },
     { label: nl ? "Vraag per vraag" : "Question by question", ephemeral: true, message: pollStepMessage(pollDiscordView, 1, undefined) },
     { label: nl ? "Klaar" : "Done", ephemeral: true, message: pollDoneMessage() },

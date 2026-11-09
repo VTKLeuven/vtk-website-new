@@ -3,6 +3,7 @@
 import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useRef, useState, useTransition } from "react";
 import { Input, Label } from "@vtk/ui";
+import { SearchPicker } from "@/components/admin/SearchPicker";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteButton, DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { CheckboxChip } from "@/components/profile/StudyFieldset";
@@ -13,6 +14,7 @@ import {
   reorderPocsAction,
 } from "@/app/actions/pocs-partners";
 import { AddRepresentativeForm } from "./AddRepresentativeForm";
+import type { DiscordOption } from "./PocDiscordCard";
 import { Avatar, Chevron, Modal, Panel, SearchBar, SortHeader, useTableControls } from "../admin-table";
 
 // ---- Data shapes ------------------------------------------------------------
@@ -34,9 +36,14 @@ export type PocRow = {
   email: string;
   order: number;
   studyProgrammes: string[];
+  discordRoleId: string;
+  discordChannelId: string;
   reps: Rep[];
   searchText: string;
 };
+
+/** `null`: de Discord-bot is niet ingesteld of niet bereikbaar. */
+type DiscordOptions = { roles: DiscordOption[]; channels: DiscordOption[] } | null;
 
 /** Richting-waarde uit `StudyProgramme` met haar vertaalde label. */
 export type ProgrammeOption = { value: string; label: string };
@@ -94,6 +101,7 @@ export function PocsTable({
   saveLabels,
   createLabels,
   programmeOptions,
+  discord,
 }: {
   pocs: PocRow[];
   year?: number;
@@ -101,6 +109,7 @@ export function PocsTable({
   saveLabels: SaveLabels;
   createLabels: SaveLabels;
   programmeOptions: ProgrammeOption[];
+  discord: DiscordOptions;
 }) {
   const nl = locale === "nl";
   const [prevPocs, setPrevPocs] = useState(pocs);
@@ -207,6 +216,7 @@ export function PocsTable({
                 locale={locale}
                 saveLabels={saveLabels}
                 programmeOptions={programmeOptions}
+                discord={discord}
               />
             ))}
           </tbody>
@@ -256,6 +266,7 @@ function PocRowView({
   locale,
   saveLabels,
   programmeOptions,
+  discord,
 }: {
   poc: PocRow;
   year?: number;
@@ -271,6 +282,7 @@ function PocRowView({
   locale: "nl" | "en";
   saveLabels: SaveLabels;
   programmeOptions: ProgrammeOption[];
+  discord: DiscordOptions;
 }) {
   const detailId = `poc-detail-${poc.id}`;
   return (
@@ -331,6 +343,7 @@ function PocRowView({
               locale={locale}
               saveLabels={saveLabels}
               programmeOptions={programmeOptions}
+              discord={discord}
             />
           </td>
         </tr>
@@ -346,6 +359,7 @@ function PocDetail({
   locale,
   saveLabels,
   programmeOptions,
+  discord,
 }: {
   poc: PocRow;
   year?: number;
@@ -353,6 +367,7 @@ function PocDetail({
   locale: "nl" | "en";
   saveLabels: SaveLabels;
   programmeOptions: ProgrammeOption[];
+  discord: DiscordOptions;
 }) {
   return (
     <div className="space-y-4 py-1">
@@ -435,6 +450,44 @@ function PocDetail({
               <Label>{nl ? "E-mailadres van de POC" : "POC email address"}</Label>
               <Input name="email" type="email" defaultValue={poc.email} placeholder="wtk-poc@vtk.be" autoComplete="off" />
             </div>
+            {/* Boven de richtingen: de tabel staat in een scroller, en de open lijst
+                heeft ruimte onder zich nodig om niet in die scroller te vallen. */}
+            {discord ? (
+              <>
+                <div className="md:col-span-3">
+                  <Label htmlFor={`poc-role-${poc.id}`}>{nl ? "Discord-rol" : "Discord role"}</Label>
+                  <SearchPicker
+                    id={`poc-role-${poc.id}`}
+                    name="discordRoleId"
+                    options={[
+                      { value: "", label: nl ? "Geen rol" : "No role", muted: true },
+                      ...discord.roles.map((role) => ({ value: role.id, label: role.name })),
+                    ]}
+                    defaultValue={poc.discordRoleId}
+                    placeholder={nl ? "Geen rol" : "No role"}
+                    searchPlaceholder={nl ? "Zoek een rol" : "Search a role"}
+                    ariaLabel={nl ? "Discord-rol" : "Discord role"}
+                    emptyText={(query) => (nl ? `Geen rol gevonden voor "${query}".` : `No role found for "${query}".`)}
+                  />
+                </div>
+                <div className="md:col-span-3">
+                  <Label htmlFor={`poc-channel-${poc.id}`}>{nl ? "Discord-kanaal voor peilingen" : "Discord channel for polls"}</Label>
+                  <SearchPicker
+                    id={`poc-channel-${poc.id}`}
+                    name="discordChannelId"
+                    options={[
+                      { value: "", label: nl ? "Geen kanaal" : "No channel", muted: true },
+                      ...discord.channels.map((channel) => ({ value: channel.id, label: `#${channel.name}` })),
+                    ]}
+                    defaultValue={poc.discordChannelId}
+                    placeholder={nl ? "Geen kanaal" : "No channel"}
+                    searchPlaceholder={nl ? "Zoek een kanaal" : "Search a channel"}
+                    ariaLabel={nl ? "Discord-kanaal voor peilingen" : "Discord channel for polls"}
+                    emptyText={(query) => (nl ? `Geen kanaal gevonden voor "${query}".` : `No channel found for "${query}".`)}
+                  />
+                </div>
+              </>
+            ) : null}
             <div className="md:col-span-6">
               <ProgrammesField options={programmeOptions} selected={poc.studyProgrammes} nl={nl} />
             </div>

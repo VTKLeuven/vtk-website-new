@@ -26,7 +26,6 @@ export type PollDraft = {
   meetingDate: Date | null;
   questions: PollDraftQuestion[];
   studyYears: string[];
-  discordChannelId: string | null;
 };
 
 export type ParsedPollDraft = { ok: true; draft: PollDraft } | { ok: false; code: string };
@@ -82,7 +81,6 @@ export function parsePollDraft(
     meetingDate: string;
     questions: string;
     studyYears: string[];
-    discordChannelId: string;
   },
   options: { publish: boolean; now: Date },
 ): ParsedPollDraft {
@@ -119,7 +117,6 @@ export function parsePollDraft(
       meetingDate,
       questions,
       studyYears: input.studyYears,
-      discordChannelId: input.discordChannelId.trim() || null,
     },
   };
 }

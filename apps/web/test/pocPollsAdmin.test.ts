@@ -1,7 +1,11 @@
 import { generateKeyPairSync, sign } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { createDiscordLinkToken, readDiscordLinkToken } from "@/lib/discord/linkToken";
+import { desiredPocRoleIds, managedRoleIds, roleChanges } from "@/lib/discord/pocRoles";
 import {
+  DISCORD_LINK_PANEL_ID,
+  discordAccessMessage,
+  discordLinkPanelMessage,
   parsePollCustomId,
   pollChannelMessage,
   pollClosedChannelMessage,
@@ -23,7 +27,6 @@ const draftInput = {
   meetingDate: "2026-11-24",
   questions: JSON.stringify([{ kind: "YES_NO", text: "Vraag?", low: "", high: "" }]),
   studyYears: [],
-  discordChannelId: "",
 };
 
 describe("parsePollDraft", () => {
@@ -105,6 +108,42 @@ describe("anonieme sleutels", () => {
   });
 });
 
+describe("POC-rollen op Discord", () => {
+  const pocs = [
+    { discordRoleId: "cw", studyProgrammes: ["COMPUTER_SCIENCE"] },
+    { discordRoleId: "ba", studyProgrammes: ["COMMON_BACHELOR", "COMPUTER_SCIENCE"] },
+    { discordRoleId: null, studyProgrammes: ["COMPUTER_SCIENCE"] },
+    { discordRoleId: "wtk", studyProgrammes: ["MECHANICAL"] },
+  ];
+  const account = { live: true, confirmed: true, programmes: ["COMPUTER_SCIENCE"] };
+
+  it("geeft de rollen van de POC's van je richting, en een POC zonder rol telt niet", () => {
+    expect(desiredPocRoleIds(pocs, account)).toEqual(["cw", "ba"]);
+  });
+
+  it("geeft niets zonder bevestigde studie of aan een inactief account", () => {
+    expect(desiredPocRoleIds(pocs, { ...account, confirmed: false })).toEqual([]);
+    expect(desiredPocRoleIds(pocs, { ...account, live: false })).toEqual([]);
+  });
+
+  it("twee POC's met dezelfde rol geven die rol één keer", () => {
+    const shared = [
+      { discordRoleId: "x", studyProgrammes: ["CIVIL"] },
+      { discordRoleId: "x", studyProgrammes: ["CIVIL"] },
+    ];
+    expect(desiredPocRoleIds(shared, { ...account, programmes: ["CIVIL"] })).toEqual(["x"]);
+  });
+
+  it("verandert enkel wat verschilt", () => {
+    expect(roleChanges(["cw", "oud"], ["cw", "ba"])).toEqual({ add: ["ba"], remove: ["oud"] });
+    expect(roleChanges(["cw"], ["cw"])).toEqual({ add: [], remove: [] });
+  });
+
+  it("blijft van de andere rollen van een lid af", () => {
+    expect(managedRoleIds(["moderator", "cw", "oud"], pocs, ["oud"])).toEqual(["cw", "oud"]);
+  });
+});
+
 describe("discord", () => {
   const view: DiscordPollView = {
     id: "cmw89jayw0000s05nmey0dewl",
@@ -166,6 +205,18 @@ describe("discord", () => {
     expect(closed.embeds?.[0].description).toContain("84 studenten");
     const withSummary = allowed(pollClosedChannelMessage(single, 1, { summaryPublished: true, meetingAhead: false })) as Array<{ label: string }>;
     expect(withSummary[0].label).toBe("Bekijk de samenvatting");
+  });
+
+  it("het koppelbericht is publiek, pingt niemand en is geen knop van een peiling", () => {
+    const panel = discordLinkPanelMessage();
+    expect(panel.flags).toBeUndefined();
+    expect(panel.allowed_mentions.parse).toEqual([]);
+    expect(allowed(panel)).toEqual([expect.objectContaining({ custom_id: DISCORD_LINK_PANEL_ID })]);
+    expect(parsePollCustomId(DISCORD_LINK_PANEL_ID)).toBeNull();
+  });
+
+  it("wat je na het koppelen ziet, is enkel voor wie klikte", () => {
+    expect(discordAccessMessage(["Computerwetenschappen"]).flags).toBe(64);
   });
 
   it("controleert de handtekening echt", () => {

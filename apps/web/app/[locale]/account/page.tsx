@@ -476,8 +476,8 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
                 <h2 className="text-lg font-semibold">Discord</h2>
                 <p className="mt-1 text-sm text-vtk-muted">
                   {nl
-                    ? `Gekoppeld als ${discordAccount.discordUsername ?? 'Discord-gebruiker'}, om peilingen op Discord te beantwoorden.`
-                    : `Linked as ${discordAccount.discordUsername ?? 'Discord user'}, to answer polls on Discord.`}
+                    ? `Gekoppeld als ${discordAccount.discordUsername ?? 'Discord-gebruiker'}, voor het kanaal van je POC en de peilingen op Discord.`
+                    : `Linked as ${discordAccount.discordUsername ?? 'Discord user'}, for the channel of your POC and the polls on Discord.`}
                 </p>
                 <div className="mt-3">
                   <DeleteButton
@@ -486,8 +486,8 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
                     title={nl ? 'Discord ontkoppelen?' : 'Unlink Discord?'}
                     description={
                       nl
-                        ? 'Je kan peilingen op Discord pas weer beantwoorden nadat je opnieuw koppelt. Wat je al antwoordde, blijft meetellen.'
-                        : 'You can only answer polls on Discord again after linking once more. What you already answered still counts.'
+                        ? 'Je verliest de toegang tot het kanaal van je POC en kan peilingen op Discord pas weer beantwoorden nadat je opnieuw koppelt. Wat je al antwoordde, blijft meetellen.'
+                        : 'You lose access to the channel of your POC and can only answer polls on Discord again after linking once more. What you already answered still counts.'
                     }
                     confirmLabel={nl ? 'Ontkoppelen' : 'Unlink'}
                     cancelLabel={nl ? 'Annuleren' : 'Cancel'}

@@ -9,8 +9,11 @@ import { saveErrorMessages } from "@/lib/saveMessages";
 import { STUDY_PROGRAMMES } from "@/lib/profile";
 import { formatWorkingYear, parseWorkingYear, workingYearTabs } from "@/lib/workingYear";
 import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
+import { discordGuildConfigured, listDiscordChannels, listDiscordRoles } from "@/lib/discord/bot";
+import { discordAccessStatus } from "@/lib/discord/pocAccess";
 import { PocsTable, type PocRow } from "./PocsTable";
 import { PocBandAdminCard } from "./PocBandAdminCard";
+import { PocDiscordCard } from "./PocDiscordCard";
 
 export default async function AdminPocs({
   params,
@@ -32,7 +35,7 @@ export default async function AdminPocs({
 
   // Enkel de POC's + hun vertegenwoordigers van het geselecteerde werkingsjaar;
   // de user-picker zoekt server-side (/api/users/search).
-  const [pocs, distinctYears, pocBandSettingRow] = await Promise.all([
+  const [pocs, distinctYears, pocBandSettingRow, discordRoles, discordChannels, discordStatus] = await Promise.all([
     prisma.poc.findMany({
       orderBy: { order: "asc" },
       include: {
@@ -50,9 +53,14 @@ export default async function AdminPocs({
     prisma.setting.findUnique({
       where: { key: POC_BAND_SETTING },
     }),
+    listDiscordRoles(),
+    listDiscordChannels(),
+    discordGuildConfigured() ? discordAccessStatus() : null,
   ]);
 
   const pocBandSetting = readPocBandSetting(pocBandSettingRow?.value);
+  // Beide lijsten of geen: een halve lijst zou bij opslaan de andere waarde wissen.
+  const discord = discordRoles && discordChannels ? { roles: discordRoles, channels: discordChannels } : null;
 
   const tabs = workingYearTabs(distinctYears.map((r) => r.year));
 
@@ -79,6 +87,8 @@ export default async function AdminPocs({
       email: poc.email ?? "",
       order: poc.order,
       studyProgrammes: poc.studyProgrammes,
+      discordRoleId: poc.discordRoleId ?? "",
+      discordChannelId: poc.discordChannelId ?? "",
       reps,
       searchText,
     };
@@ -118,6 +128,10 @@ export default async function AdminPocs({
 
       <PocBandAdminCard setting={pocBandSetting} locale={locale} />
 
+      {discord && discordStatus ? (
+        <PocDiscordCard locale={nl ? "nl" : "en"} status={discordStatus} channels={discord.channels} />
+      ) : null}
+
       {/* Werkingsjaar-tabjes */}
       <div className="flex flex-wrap gap-2">
         {tabs.map((y) => {
@@ -146,6 +160,7 @@ export default async function AdminPocs({
         saveLabels={saveLabels}
         createLabels={createLabels}
         programmeOptions={programmeOptions}
+        discord={discord}
       />
     </div>
   );

@@ -33,7 +33,7 @@ export default async function NieuwePeiling({ params }: { params: Promise<{ loca
           closesAt: defaultPollCloseInput(),
           meetingDate: "",
           studyYears: [],
-          discordChannelId: "",
+          postToDiscord: true,
           questions: [{ kind: "YES_NO", text: "", low: "", high: "" }],
         }}
         {...data}

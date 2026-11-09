@@ -11,26 +11,24 @@ export async function loadBuilderData(scope: string[] | "all", locale: Locale) {
   const pocRows = await prisma.poc.findMany({
     where: scope === "all" ? {} : { id: { in: scope } },
     orderBy: { order: "asc" },
-    select: { id: true, nameNl: true, studyProgrammes: true },
+    select: { id: true, nameNl: true, studyProgrammes: true, discordChannelId: true },
   });
-  const [pocs, channels] = await Promise.all([
-    Promise.all(
-      pocRows.map(async (poc): Promise<PollBuilderPoc> => {
-        const population = await pollPopulation(poc.studyProgrammes, []);
-        return {
-          id: poc.id,
-          name: poc.nameNl.replace(/^POC\s+/i, ""),
-          hasProgramme: poc.studyProgrammes.length > 0,
-          reach: population.total,
-          perYear: population.perYear,
-        };
-      }),
-    ),
-    listDiscordChannels(),
-  ]);
+  const channels = await listDiscordChannels();
+  const pocs = await Promise.all(
+    pocRows.map(async (poc): Promise<PollBuilderPoc> => {
+      const population = await pollPopulation(poc.studyProgrammes, []);
+      return {
+        id: poc.id,
+        name: poc.nameNl.replace(/^POC\s+/i, ""),
+        hasProgramme: poc.studyProgrammes.length > 0,
+        reach: population.total,
+        perYear: population.perYear,
+        discordChannelName: channels?.find((channel) => channel.id === poc.discordChannelId)?.name ?? null,
+      };
+    }),
+  );
   return {
     pocs,
-    channels,
     phases: STUDY_YEARS.map((key) => ({ key, label: pollPhaseLabel(key, locale) })),
     panelLabels: pollPanelLabels(locale),
   };

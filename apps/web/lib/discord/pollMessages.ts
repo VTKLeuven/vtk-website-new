@@ -244,6 +244,47 @@ export function pollLinkAccountMessage(url: string): PollBotMessage {
   });
 }
 
+/** De knop onder het vaste koppelbericht; geen `|`, dus geen knop van een peiling. */
+export const DISCORD_LINK_PANEL_ID = "vtk-koppel";
+
+/** Het publieke bericht waarmee studenten hun account koppelen. */
+export function discordLinkPanelMessage(): PollBotMessage {
+  return base({
+    embeds: [
+      {
+        title: "Peilingen van je RiVers",
+        description:
+          "Koppel je Discord-account aan je VTK-account. Daarna krijg je toegang tot het kanaal van je POC, waar je RiVers je mening vragen. Je antwoorden blijven anoniem.\n\nAl gekoppeld en zie je je kanaal niet? Druk gewoon nog eens op de knop.",
+        color: DISCORD_EMBED_COLOUR,
+      },
+    ],
+    components: [
+      { type: 1, components: [{ type: 2, style: PRIMARY, label: "Koppel mijn account", custom_id: DISCORD_LINK_PANEL_ID }] },
+    ],
+  });
+}
+
+export function discordAccessMessage(pocNames: readonly string[]): PollBotMessage {
+  const names = pocNames.map((name) => `**${name}**`).join(", ");
+  return ephemeral({
+    content: `Je bent gekoppeld en hebt toegang tot het kanaal van POC ${names}.`,
+  });
+}
+
+export function discordNoPocMessage(accountUrl: string): PollBotMessage {
+  return ephemeral({
+    content: "Je bent gekoppeld, maar op je VTK-account staat geen richting met een POC-kanaal.",
+    components: [{ type: 1, components: [{ type: 2, style: LINK, label: "Richting nakijken", url: accountUrl }] }],
+  });
+}
+
+export function discordConfirmStudyMessage(url: string): PollBotMessage {
+  return ephemeral({
+    content: "Je bent gekoppeld, maar je studie is dit academiejaar nog niet bevestigd. Daarna krijg je toegang tot het kanaal van je POC.",
+    components: [{ type: 1, components: [{ type: 2, style: LINK, label: "Studie bevestigen", url }] }],
+  });
+}
+
 export function pollNotForYouMessage(pocName: string, accountUrl: string): PollBotMessage {
   return ephemeral({
     content: `Deze peiling is voor studenten ${pocName}. Op je VTK-account staat een andere richting of fase.`,

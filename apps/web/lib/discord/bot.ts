@@ -52,9 +52,46 @@ export function deleteChannelMessage(channelId: string, messageId: string) {
   return request<void>("DELETE", `/channels/${channelId}/messages/${messageId}`);
 }
 
-/** De tekstkanalen van de studentendiscord, om er eentje te kiezen in het opstelscherm. */
+function guild(): string | null {
+  return process.env.DISCORD_GUILD_ID?.trim() || null;
+}
+
+export function discordGuildConfigured(): boolean {
+  return Boolean(guild()) && discordBotConfigured();
+}
+
+function memberRoleRequest(method: "PUT" | "DELETE", discordId: string, roleId: string) {
+  const guildId = guild();
+  if (!guildId) return Promise.resolve<BotResult<void>>({ ok: false, status: null, message: "DISCORD_GUILD_ID ontbreekt." });
+  return request<void>(method, `/guilds/${guildId}/members/${discordId}/roles/${roleId}`);
+}
+
+export function addMemberRole(discordId: string, roleId: string) {
+  return memberRoleRequest("PUT", discordId, roleId);
+}
+
+export function removeMemberRole(discordId: string, roleId: string) {
+  return memberRoleRequest("DELETE", discordId, roleId);
+}
+
+/** De rollen die de bot kan uitdelen: geen @everyone en geen rol van een andere bot. */
+export async function listDiscordRoles(): Promise<Array<{ id: string; name: string }> | null> {
+  const guildId = guild();
+  if (!guildId || !discordBotConfigured()) return null;
+  const result = await request<Array<{ id: string; name: string; managed: boolean; position: number }>>(
+    "GET",
+    `/guilds/${guildId}/roles`,
+  );
+  if (!result.ok) return null;
+  return result.data
+    .filter((role) => role.id !== guildId && !role.managed)
+    .sort((a, b) => b.position - a.position)
+    .map(({ id, name }) => ({ id, name }));
+}
+
+/** De tekstkanalen van de studentendiscord, om er eentje te kiezen in het beheer. */
 export async function listDiscordChannels(): Promise<Array<{ id: string; name: string }> | null> {
-  const guildId = process.env.DISCORD_GUILD_ID?.trim();
+  const guildId = guild();
   if (!guildId || !discordBotConfigured()) return null;
   const result = await request<Array<{ id: string; name: string; type: number; position: number }>>(
     "GET",

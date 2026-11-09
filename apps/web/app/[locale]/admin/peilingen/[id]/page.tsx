@@ -110,7 +110,7 @@ export default async function PeilingDetail({
             closesAt: toBrusselsInput(poll.closesAt),
             meetingDate: poll.meetingDate ? poll.meetingDate.toISOString().slice(0, 10) : "",
             studyYears: poll.studyYears,
-            discordChannelId: poll.discordChannelId ?? "",
+            postToDiscord: Boolean(poll.discordChannelId),
             questions: poll.questions.map((question) => ({
               kind: question.kind,
               text: question.textNl,
