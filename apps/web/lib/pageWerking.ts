@@ -120,6 +120,11 @@ export type WerkingEvent = {
  * bezig is, is precies wat iemand op deze pagina zoekt. De doelgroepfilter is
  * dezelfde als op de homepage en de kalender, zodat wie zijn agenda toespitst
  * hier niet plots alles terugkrijgt.
+ *
+ * Een reeks (een wekelijks loopje met momenten) staat op de kaart met de datum
+ * van de eerstvolgende keer, niet met `CalendarEvent.start`: dat is de envelop
+ * en dus de dag waarop de reeks ooit begon. Om dezelfde reden sorteren we pas na
+ * het ophalen, op die eerstvolgende keer; daarom halen we er meer op dan we tonen.
  */
 export const loadWerkingEvents = cache(async (groupId: string): Promise<WerkingEvent[]> => {
   const audience = await viewerAudienceFilter();
@@ -131,7 +136,7 @@ export const loadWerkingEvents = cache(async (groupId: string): Promise<WerkingE
       ...audience,
     },
     orderBy: { start: "asc" },
-    take: MAX_EVENTS,
+    take: MAX_EVENTS * 4,
     select: {
       id: true,
       slug: true,
@@ -149,9 +154,17 @@ export const loadWerkingEvents = cache(async (groupId: string): Promise<WerkingE
       categories: { select: { category: { select: { slug: true } } } },
     },
   });
-  // Dezelfde affiche en locatie als op de kaart elders: die van de eerstvolgende keer.
+  // Dezelfde datum, affiche en locatie als op de kaart elders: die van de
+  // eerstvolgende keer. Een reeks waarvan elk moment voorbij is, valt weg.
   const now = new Date();
-  return rows.map(({ moments, ...event }) => eventForMoment(event, upcomingMoment(moments, now)));
+  return rows
+    .flatMap(({ moments, ...event }) => {
+      if (moments.length === 0) return [event];
+      const next = upcomingMoment(moments, now);
+      return next ? [{ ...eventForMoment(event, next), start: next.start }] : [];
+    })
+    .sort((a, b) => +a.start - +b.start)
+    .slice(0, MAX_EVENTS);
 });
 
 /**
