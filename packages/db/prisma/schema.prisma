@@ -3555,6 +3555,19 @@ model Shift {
   manualGrantId String?
   manualGrant   ManualShiftGrant? @relation(fields: [manualGrantId], references: [id], onDelete: Cascade)
 
+  /// De Theokot-verkoopdag waarvoor deze shift aangemaakt is ("Week aanmaken").
+  ///
+  /// Zonder deze koppeling raadde de code welke shiften bij een dag horen ("een
+  /// shift met post THEOKOT op die dag"), en dan hield één losse opkuisshift de
+  /// drie gewone shiften tegen. Nu weet een dag precies welke shiften de zijne zijn:
+  /// aanvullen zet er nooit een tweede reeks bij, en verwijderen neemt enkel die mee.
+  ///
+  /// `SetNull` en geen `Cascade`: een voorbije dag wissen (`purgeFinishedSession`)
+  /// mag de shift met haar inschrijvingen en bonnetjes niet meenemen. Een dag die
+  /// niet doorgaat, verwijdert haar shiften zelf, na een vraag in de popup.
+  theokotSessionId String?
+  theokotSession   TheokotSession? @relation(fields: [theokotSessionId], references: [id], onDelete: SetNull)
+
   /// Wanneer deze shift voor het laatst gewijzigd is.
   ///
   /// Bestaat voor de agendafeed. Die vult `LAST-MODIFIED` en `SEQUENCE` van een
@@ -3567,6 +3580,7 @@ model Shift {
 
   @@unique([sourceSystem, sourceId])
   @@index([manualGrantId])
+  @@index([theokotSessionId])
 }
 
 model ShiftParticipant {
@@ -4063,6 +4077,8 @@ model TheokotSession {
 
   items  TheokotSessionItem[]
   orders TheokotOrder[]
+  /// De shiften die "Week aanmaken" voor deze dag zette; zie `Shift.theokotSessionId`.
+  shifts Shift[]
 
   @@index([date])
   @@index([processedAt, isOpen, pickupEnd])

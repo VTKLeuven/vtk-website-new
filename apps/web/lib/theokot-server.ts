@@ -611,10 +611,20 @@ function itemsLabel(lines: Array<{ quantity: number; name: string }>): string {
  *
  * De mails vertrekken na het wissen en houden het niet tegen: de dag is dan al
  * weg, en een adres dat het begeeft hoort de rest niet mee te sleuren.
+ *
+ * `removeShifts` neemt de shiften mee die "Week aanmaken" voor deze dag zette
+ * (`Shift.theokotSessionId`), in dezelfde transactie als de dag. Wie erop
+ * ingeschreven stond, krijgt geen mail: zo gaat ook een shift verwijderen in
+ * /admin/shiften, en de popup zegt het vooraf. Zonder die keuze blijven de
+ * shiften op /shift staan, los van de dag.
  */
 export async function removeSession(
   sessionId: string,
-): Promise<{ ok: true; orders: number } | { ok: false; code: 'SESSION_NOT_FOUND' | 'SESSION_HAS_PICKUPS' }> {
+  options: { removeShifts?: boolean } = {},
+): Promise<
+  | { ok: true; orders: number; shifts: number }
+  | { ok: false; code: 'SESSION_NOT_FOUND' | 'SESSION_HAS_PICKUPS' }
+> {
   const session = await prisma.theokotSession.findUnique({
     where: { id: sessionId },
     include: {
@@ -654,8 +664,18 @@ export async function removeSession(
       ),
     }));
 
-  // De bestellingen en het aanbod hangen met onDelete: Cascade aan de sessie.
-  await prisma.theokotSession.delete({ where: { id: sessionId } });
+  // De bestellingen en het aanbod hangen met onDelete: Cascade aan de sessie; de
+  // shiften met SetNull, dus die gaan enkel mee wanneer erom gevraagd is.
+  let shifts = 0;
+  if (options.removeShifts) {
+    shifts = await prisma.$transaction(async (tx) => {
+      const { count } = await tx.shift.deleteMany({ where: { theokotSessionId: sessionId } });
+      await tx.theokotSession.delete({ where: { id: sessionId } });
+      return count;
+    });
+  } else {
+    await prisma.theokotSession.delete({ where: { id: sessionId } });
+  }
 
   for (const row of notify) {
     await sendOrderCancelled(row.user, {
@@ -668,7 +688,7 @@ export async function removeSession(
     });
   }
 
-  return { ok: true, orders: notify.length };
+  return { ok: true, orders: notify.length, shifts };
 }
 
 /**

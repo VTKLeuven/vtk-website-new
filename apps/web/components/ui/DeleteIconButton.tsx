@@ -33,6 +33,22 @@ type Common = {
    */
   errorMessages?: Record<string, string>;
   errorFallback?: string;
+  /**
+   * Eén keuze in de dialoog zelf, als vinkje onder de beschrijving. Aangevinkt
+   * gaat `name=on` mee naar de action, net als een checkbox in een formulier.
+   * Voor een verwijdering die iets mee kan nemen waar de gebruiker over moet
+   * kunnen beslissen (een verkoopdag en haar shiften).
+   */
+  option?: ConfirmOption;
+};
+
+export type ConfirmOption = {
+  name: string;
+  label: string;
+  /** Een regel uitleg onder het vinkje, bv. wat er gebeurt als je het uitvinkt. */
+  hint?: string;
+  /** Standaard uit. */
+  defaultChecked?: boolean;
 };
 
 /** Bevestigen, uitvoeren en melden; gedeeld door alle varianten. */
@@ -42,8 +58,10 @@ function useConfirmFlow({
   successMessage,
   errorMessages,
   errorFallback,
-}: Pick<Common, "action" | "fields" | "successMessage" | "errorMessages" | "errorFallback">) {
+  option,
+}: Pick<Common, "action" | "fields" | "successMessage" | "errorMessages" | "errorFallback" | "option">) {
   const [confirming, setConfirming] = useState(false);
+  const [checked, setChecked] = useState(option?.defaultChecked ?? false);
   const [pending, startTransition] = useTransition();
   const showToast = useToast();
   const unsent = useUnsentGuard();
@@ -51,6 +69,7 @@ function useConfirmFlow({
   function onConfirm() {
     const form = new FormData();
     for (const [key, value] of Object.entries(fields)) form.append(key, value);
+    if (option && checked) form.append(option.name, "on");
     startTransition(async () => {
       // Een verwijdering die de server nooit bereikte, is niet gebeurd: zeg
       // dat, in plaats van het scherm in de error boundary te laten vallen.
@@ -80,7 +99,23 @@ function useConfirmFlow({
     });
   }
 
-  return { confirming, setConfirming, pending, onConfirm };
+  // Elke keer dat de dialoog opengaat, staat het vinkje terug op zijn standaard:
+  // een keuze van een vorige, geannuleerde poging hoort niet stil mee te gaan.
+  function open() {
+    setChecked(option?.defaultChecked ?? false);
+    setConfirming(true);
+  }
+
+  const dialog = {
+    open: confirming,
+    pending,
+    onConfirm,
+    onCancel: () => setConfirming(false),
+    checked,
+    onCheckedChange: setChecked,
+  };
+
+  return { open, dialog };
 }
 
 /**
@@ -103,13 +138,13 @@ export function ConfirmIconButton({
   tone = "neutral",
   ...common
 }: Common & { label: string; srLabel?: string; icon: ReactNode; tone?: IconTone }) {
-  const { confirming, setConfirming, pending, onConfirm } = useConfirmFlow(common);
+  const { open, dialog } = useConfirmFlow(common);
   return (
     <>
-      <IconButton label={label} srLabel={srLabel} tone={tone} onClick={() => setConfirming(true)}>
+      <IconButton label={label} srLabel={srLabel} tone={tone} onClick={open}>
         {icon}
       </IconButton>
-      <Dialog {...common} open={confirming} pending={pending} onConfirm={onConfirm} onCancel={() => setConfirming(false)} />
+      <Dialog {...common} {...dialog} />
     </>
   );
 }
@@ -119,13 +154,13 @@ export function ConfirmIconButton({
  * ("POC verwijderen") die geen compacte rij-actie zijn.
  */
 export function DeleteButton({ children, ...common }: Common & { children: ReactNode }) {
-  const { confirming, setConfirming, pending, onConfirm } = useConfirmFlow(common);
+  const { open, dialog } = useConfirmFlow(common);
   return (
     <>
-      <Button variant="ghost" size="sm" type="button" onClick={() => setConfirming(true)}>
+      <Button variant="ghost" size="sm" type="button" onClick={open}>
         {children}
       </Button>
-      <Dialog {...common} open={confirming} pending={pending} onConfirm={onConfirm} onCancel={() => setConfirming(false)} />
+      <Dialog {...common} {...dialog} />
     </>
   );
 }
@@ -141,13 +176,13 @@ export function ConfirmTextButton({
   children,
   ...common
 }: Common & { className: string; ariaLabel?: string; children: ReactNode }) {
-  const { confirming, setConfirming, pending, onConfirm } = useConfirmFlow(common);
+  const { open, dialog } = useConfirmFlow(common);
   return (
     <>
-      <button type="button" className={className} aria-label={ariaLabel} onClick={() => setConfirming(true)}>
+      <button type="button" className={className} aria-label={ariaLabel} onClick={open}>
         {children}
       </button>
-      <Dialog {...common} open={confirming} pending={pending} onConfirm={onConfirm} onCancel={() => setConfirming(false)} />
+      <Dialog {...common} {...dialog} />
     </>
   );
 }
@@ -157,21 +192,47 @@ function Dialog({
   description,
   confirmLabel,
   cancelLabel,
+  option,
   open,
   pending,
   onConfirm,
   onCancel,
+  checked,
+  onCheckedChange,
 }: Omit<Common, "action" | "fields" | "successMessage" | "errorMessages" | "errorFallback"> & {
   open: boolean;
   pending: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
 }) {
   return (
     <ConfirmDialog
       open={open}
       title={title}
-      description={description}
+      description={
+        option ? (
+          <>
+            <p>{description}</p>
+            <label className="mt-3 flex items-start gap-2 text-vtk-ink">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={checked}
+                disabled={pending}
+                onChange={(event) => onCheckedChange(event.target.checked)}
+              />
+              <span>
+                {option.label}
+                {option.hint ? <span className="mt-0.5 block text-xs text-vtk-muted">{option.hint}</span> : null}
+              </span>
+            </label>
+          </>
+        ) : (
+          description
+        )
+      }
       confirmLabel={confirmLabel}
       cancelLabel={cancelLabel}
       pending={pending}

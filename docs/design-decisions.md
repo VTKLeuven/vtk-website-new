@@ -206,19 +206,37 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   op het bord), is in migratie `20260928100000_theokot_reprice_open_orders`
   rechtgezet.
 - **Een verkoopdag aanmaken zet meteen de shiften van die dag neer.** Wie de week
-  online zet, vinkt de dagen aan; voor elke dag die daadwerkelijk nieuw is, komen
-  ook de drie Theokot-shiften (smeren, middag, namiddag) op `/shift` te staan. Dat
-  was vroeger een tweede, losse handeling in het shiftscherm, en precies dát werd
-  vergeten: een verkoopdag zonder shifters is een dag waarop niemand de balie doet
-  terwijl de broodjes wel besteld zijn.
-  - **De uren volgen het afhaaluur van die dag**, niet een vast uur: zet je een dag
-    later open, dan schuiven de shiften mee. De reeks zelf (welke shiften, hoe lang,
-    hoeveel plaatsen, hoeveel bonnetjes) komt uit hetzelfde sjabloon als het scherm
-    "Shiften uit sjabloon", zodat een aangepaste Theokot-shift op beide plaatsen
-    tegelijk verandert.
-  - **Een dag waar al een Theokot-shift op staat, blijft ongemoeid.** Anders krijgt
-    wie de shiften al met de hand zette een tweede reeks bovenop de eerste, en
-    schrijven leden zich in op de verkeerde helft.
+  online zet, vinkt de dagen aan; elke dag krijgt ook de Theokot-shiften (smeren,
+  middag, namiddag) op `/shift`. Dat was vroeger een tweede, losse handeling in het
+  shiftscherm, en precies dát werd vergeten: een verkoopdag zonder shifters is een
+  dag waarop niemand de balie doet terwijl de broodjes wel besteld zijn.
+  - **De uren komen uit het sjabloon, niet uit het afhaaluur** (november 2026). De
+    shiften staan op het startuur van het sjabloon "Theokot opening" plus de offset
+    van elke shift; dezelfde rekensom die het sjabloonbeheer en de Theokot-tijdlijn
+    maken. Vroeger rekende de verkoopweek vanaf het afhaaluur (12:00) terwijl die
+    twee schermen vanaf het startuur (10:30) rekenden: elke automatische shift
+    stond anderhalf uur te laat, en het startuur in het sjabloon aanpassen haalde
+    niets uit, want de verkoopweek negeerde het. Wie de uren wil veranderen, doet
+    dat dus in het sjabloon, en het formulier "Nieuwe verkoopweek" toont ze vooraf.
+    Een week met een later afhaaluur verschuift de shiften bewust niet: één uur
+    waar alles vanaf rekent, is belangrijker dan een week die zichzelf bijstuurt.
+  - **Een shift weet bij welke verkoopdag ze hoort** (`Shift.theokotSessionId`).
+    Vroeger raadde de code "een shift met post THEOKOT op die dag", waardoor één
+    losse opkuisshift de drie gewone shiften tegenhield. De koppeling is `SetNull`:
+    een voorbije dag wissen laat de shifthistoriek en de bonnetjes staan.
+  - **Een dag met gekoppelde shiften krijgt nooit een tweede reeks.** Anders
+    schrijven leden zich in op de verkeerde helft. Een bestaande dag **zonder**
+    shiften kan wel aangevuld worden: opnieuw "Week aanmaken" voor die week.
+  - **Een gewone nieuwe week vraagt niets; staat er al iets, dan wel.** Is er in de
+    gekozen week al een verkoopdag of een Theokot-shift, dan vraagt een popup per
+    dag wat er gebeurt: nieuw, aanvullen, of ongemoeid. Een dag met met de hand
+    gezette Theokot-shiften staat daar standaard uitgevinkt, zodat er geen tweede
+    reeks bovenop komt zonder dat iemand dat koos.
+  - **Een verkoopdag verwijderen neemt haar shiften mee, na een vinkje.** De
+    verwijderpopup zegt hoeveel shiften en inschrijvingen er zijn; het vinkje staat
+    standaard aan. Wie ingeschreven was, krijgt geen mail, net zoals bij een shift
+    verwijderen in /admin/shiften. Met de hand gezette Theokot-shiften blijven
+    altijd staan; enkel de gekoppelde gaan mee.
   - **Wie de week aanmaakt heeft geen `shift.edit` nodig.** De shiften zijn hier een
     gevolg van het openzetten van een verkoopdag, geen aparte bevoegdheid; een extra
     recht eisen zou betekenen dat Theokot de week niet meer alleen online kan zetten.
@@ -12380,6 +12398,12 @@ nodig zijn. Dat staat op `/admin/theokot/shiften` (`lib/theokotShifts.ts`,
 - **Kleur en tekst zeggen hetzelfde.** Rood is nog niemand, geel nog plaats,
   grijs volzet, en in de balk staat "2 open" of "volzet". Een afgelopen shift
   blijft zichtbaar maar vaag, en telt niet mee in wat er nog nodig is.
+- **In de balk staat de naam zonder het evenement** ("Broodjes smeren", niet
+  "Broodjes smeren - Theokot"): op een pagina die enkel Theokot toont, zegt dat
+  achtervoegsel niets en kost het de regel die de balk niet heeft. De volledige
+  naam blijft in de tooltip en in het paneel eronder. De balk is hoog genoeg voor
+  twee regels plus de plaatsenrij; daarvoor kromp de naam en stond de tweede regel
+  er half afgeknipt.
 - **Het recht is `theokot.manage`**, wie de broodjes beheert. Geen apart recht:
   de rol van Theokot draagt het al, en de afhaalbalie (`theokot.pickup`) plant
   geen shiften.

@@ -7,7 +7,10 @@ import type { TheokotTimeline, TimelineBar, TimelineDay } from "@/lib/theokotShi
 export type DayLabel = { short: string; long: string };
 
 /** Hoogte van één balk en de ruimte rond en tussen de rijen, in px. */
-const BAR_HEIGHT = 56;
+// Twee regels naam plus de plaatsenrij, met de padding van de balk erbij. Op 56
+// kromp de naam om de rij eronder te laten passen, en stond de tweede regel er
+// half afgeknipt ("Theokot" zonder onderkant).
+const BAR_HEIGHT = 68;
 const LANE_GAP = 6;
 const TRACK_PADDING = 10;
 
@@ -100,6 +103,7 @@ export function ShiftTimeline({
                       className="tk-sh-ghost"
                       style={{
                         top: TRACK_PADDING,
+                        height: BAR_HEIGHT,
                         left: `calc(${ghost.left}% + 2px)`,
                         width: `calc(${ghost.width}% - 4px)`,
                       }}
@@ -130,7 +134,7 @@ export function ShiftTimeline({
                         width: `calc(${bar.width}% - 4px)`,
                       }}
                     >
-                      <span className="tk-sh-bar-name">{bar.name}</span>
+                      <span className="tk-sh-bar-name">{bar.shortName}</span>
                       <span className="tk-sh-bar-meta">
                         {bar.max <= MAX_SEAT_DOTS ? (
                           <span className="tk-sh-seats" aria-hidden="true">

@@ -8,6 +8,9 @@
  * gebeurt in `lib/shift/templateStore.ts`.
  */
 
+import { brusselsTimeOnDay } from '@/lib/brussels';
+import type { ShiftInput } from '@/lib/shift';
+
 export { THEOKOT_TEMPLATE_SLUG } from '@vtk/db/shiftTemplates';
 
 /** Eén shift binnen een sjabloon, zoals het scherm ze leest. */
@@ -158,6 +161,71 @@ export function templateClockAt(timeOfDay: string, offsetMinutes: number, nl: bo
   const clock = `${pad(Math.floor(inDay / 60))}:${pad(inDay % 60)}`;
   if (day === 0) return clock;
   return `${clock} (${day > 0 ? `+${day}` : day} ${nl ? 'dag' : 'day'})`;
+}
+
+// -----------------------------------------------------------------------------
+// Een sjabloon op één dag neerzetten
+// -----------------------------------------------------------------------------
+
+/**
+ * De shiften van een sjabloon op één kalenderdag, klaar om aangemaakt te worden.
+ *
+ * Het anker is het startuur van het sjabloon (`templateTimeOfDay`), hetzelfde uur
+ * waarmee het beheerscherm de klokuren toont en waarmee de Theokot-tijdlijn haar
+ * vaste rooster tekent. Dat moet één en hetzelfde punt zijn: een verkoopweek
+ * rekende vroeger vanaf het afhaaluur, waardoor elke Theokot-shift anderhalf uur
+ * later stond dan het sjabloon zei, en het startuur aanpassen niets uithaalde.
+ *
+ * Het optellen gebeurt in echte minuten. Dat mag hier: de zomertijd verspringt om
+ * 03:00 en geen enkele dagshift raakt dat uur.
+ */
+export function templateShiftsForDay(
+  template: Pick<ShiftTemplate, 'eventName' | 'location' | 'post' | 'timeOfDay' | 'shifts'>,
+  day: Date,
+): ShiftInput[] {
+  const anchor = brusselsTimeOnDay(day, templateTimeOfDay(template));
+
+  return template.shifts
+    // Een shift die in het sjabloon standaard uitgevinkt staat, hoort ook hier
+    // niet bij de gewone dag: iemand moet ze bewust aanzetten.
+    .filter((entry) => entry.enabled)
+    .map((entry) => {
+      const startTime = new Date(anchor.getTime() + entry.startOffsetMinutes * 60_000);
+      return {
+        name: composeName(template.eventName, entry.name),
+        startTime,
+        endTime: new Date(startTime.getTime() + entry.durationMinutes * 60_000),
+        location: entry.location ?? template.location,
+        description: entry.description,
+        maxParticipants: entry.maxParticipants,
+        reward: entry.reward,
+        post: entry.ownPost ? entry.post : template.post,
+        openToInternationals: entry.openToInternationals,
+        instructions: entry.instructions,
+      };
+    });
+}
+
+/** Eén shift van een sjabloon als klokuren, om vooraf te tonen wat er komt. */
+export type TemplateShiftPlanRow = { name: string; start: string; end: string };
+
+/**
+ * De shiften die een sjabloon op een dag neerzet, als "10:30" tot "12:30". Zelfde
+ * anker als {@link templateShiftsForDay}, zodat wat je vooraf ziet ook is wat er
+ * komt.
+ */
+export function templateShiftPlan(
+  template: Pick<ShiftTemplate, 'timeOfDay' | 'shifts'>,
+  nl: boolean,
+): TemplateShiftPlanRow[] {
+  const timeOfDay = templateTimeOfDay(template);
+  return template.shifts
+    .filter((entry) => entry.enabled)
+    .map((entry) => ({
+      name: entry.name,
+      start: templateClockAt(timeOfDay, entry.startOffsetMinutes, nl),
+      end: templateClockAt(timeOfDay, entry.startOffsetMinutes + entry.durationMinutes, nl),
+    }));
 }
 
 // -----------------------------------------------------------------------------

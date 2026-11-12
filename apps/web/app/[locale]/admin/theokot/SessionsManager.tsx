@@ -18,6 +18,9 @@ import {
   updateWeekItemsAction,
 } from "@/app/actions/theokot";
 import { OfferingRows, type OfferingRow } from "./OfferingRows";
+import { parseYMD } from "@/lib/brussels";
+import type { TemplateShiftPlanRow } from "@/lib/shift/templates";
+import { weekShiftPreview, type WeekShiftDay } from "@/lib/theokotShifts";
 
 /** Waar een verkoopdag staat; de tabel toont het als een woord met een kleur. */
 export type AdminSessionStatus = "upcoming" | "ordering" | "pickup" | "past" | "off";
@@ -51,6 +54,10 @@ export type AdminSession = {
   pickedUpCount: number;
   /** De afhaal van deze dag is voorbij, dus sluiten heeft geen zin meer. */
   closed: boolean;
+  /** Shiften die "Week aanmaken" voor deze dag zette (`Shift.theokotSessionId`). */
+  shiftCount: number;
+  /** Inschrijvingen op die shiften: de verwijderpopup zegt wie er mee verdwijnt. */
+  shiftSignups: number;
   items: OfferingRow[];
   orders: AdminOrder[];
 };
@@ -95,12 +102,20 @@ export function SessionsManager({
   nextMonday,
   defaultProducts,
   defaultHours,
+  shiftPlan,
+  otherShiftsByDay,
+  canEditShiftTemplates,
 }: {
   nl: boolean;
   sessions: AdminSession[];
   nextMonday: string;
   defaultProducts: OfferingRow[];
   defaultHours: DefaultHours;
+  /** De shiften uit het Theokot-sjabloon als klokuren; leeg = geen sjabloon. */
+  shiftPlan: TemplateShiftPlanRow[];
+  /** Theokot-shiften die niet door een verkoopweek gezet zijn, per `yyyy-mm-dd`. */
+  otherShiftsByDay: Record<string, number>;
+  canEditShiftTemplates: boolean;
 }) {
   const base = nl ? "" : "/en";
   // Eén bewerktaak tegelijk: een nieuwe week, het aanbod van een week, of één
@@ -143,6 +158,10 @@ export function SessionsManager({
           nextMonday={nextMonday}
           defaultProducts={defaultProducts}
           defaultHours={defaultHours}
+          sessions={sessions}
+          shiftPlan={shiftPlan}
+          otherShiftsByDay={otherShiftsByDay}
+          canEditShiftTemplates={canEditShiftTemplates}
           onDone={() => setOpen(null)}
         />
       )}
@@ -171,19 +190,129 @@ export function SessionsManager({
   );
 }
 
+/** "Ma 16 nov" voor een `yyyy-mm-dd`, zonder tijdzone-verrassingen. */
+function dayLabel(key: string, nl: boolean): string {
+  const ymd = parseYMD(key);
+  if (!ymd) return key;
+  const text = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
+    timeZone: "UTC",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  })
+    .format(new Date(Date.UTC(ymd.year, ymd.month - 1, ymd.day, 12)))
+    .replace(/\./g, "");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** Wat er met de shiften van één dag gebeurt, in één zin onder de datum. */
+function shiftDayStatus(day: WeekShiftDay, nl: boolean): string {
+  const others = (n: number) =>
+    nl
+      ? `Er ${n === 1 ? "staat" : "staan"} al ${n} andere Theokot-shift${n === 1 ? "" : "en"} op; aangevinkt komt de reeks erbij.`
+      : `There ${n === 1 ? "is" : "are"} already ${n} other Theokot shift${n === 1 ? "" : "s"}; checked, the set is added on top.`;
+  if (!day.exists) {
+    return day.otherShifts > 0
+      ? `${nl ? "Nieuwe verkoopdag." : "New sale day."} ${others(day.otherShifts)}`
+      : nl
+        ? "Nieuwe verkoopdag, met shiften."
+        : "New sale day, with shifts.";
+  }
+  if (!day.canAdd) {
+    return nl
+      ? `Bestaat al, met ${day.linkedShifts} shift${day.linkedShifts === 1 ? "" : "en"}. Blijft ongemoeid.`
+      : `Already exists, with ${day.linkedShifts} shift${day.linkedShifts === 1 ? "" : "s"}. Left as is.`;
+  }
+  if (day.otherShifts > 0) {
+    return `${nl ? "Bestaat al, zonder eigen shiften." : "Already exists, without its own shifts."} ${others(day.otherShifts)}`;
+  }
+  return nl
+    ? "Bestaat al, maar zonder shiften: die worden aangevuld. Aanbod en uren blijven zoals ze zijn."
+    : "Already exists, but without shifts: they are added. Offering and hours stay as they are.";
+}
+
 function CreateWeek({
   nl,
   nextMonday,
   defaultProducts,
   defaultHours,
+  sessions,
+  shiftPlan,
+  otherShiftsByDay,
+  canEditShiftTemplates,
   onDone,
 }: {
   nl: boolean;
   nextMonday: string;
   defaultProducts: OfferingRow[];
   defaultHours: DefaultHours;
+  sessions: AdminSession[];
+  shiftPlan: TemplateShiftPlanRow[];
+  otherShiftsByDay: Record<string, number>;
+  canEditShiftTemplates: boolean;
   onDone: () => void;
 }) {
+  const base = nl ? "" : "/en";
+  // Gecontroleerd, zodat de popup weet over welke dagen het gaat.
+  const [weekStart, setWeekStart] = useState(nextMonday);
+  const [days, setDays] = useState<number[]>(() => DAYS.filter((d) => d.v <= 4).map((d) => d.v));
+
+  // Valt er in deze week al iets (een bestaande dag, of al Theokot-shiften), dan
+  // vraagt het formulier eerst wat er met de shiften moet gebeuren. Een volledig
+  // nieuwe week maak je gewoon aan.
+  // Zonder aangevinkte dag neemt de server maandag tot vrijdag; hier dus ook.
+  const start = parseYMD(weekStart);
+  const offsets = days.length > 0 ? days : [0, 1, 2, 3, 4];
+  const preview = start
+    ? weekShiftPreview({ start, offsets, sessions, otherShiftsByDay })
+    : { days: [], needsConfirm: false };
+
+  const planLabel = shiftPlan.map((row) => `${row.name} ${row.start}\u2013${row.end}`).join(", ");
+
+  const confirmSubmit = preview.needsConfirm
+    ? {
+        title: nl ? "Wat met de shiften van deze week?" : "What about this week's shifts?",
+        description: (
+          <div className="space-y-3">
+            <p>
+              {nl
+                ? `In deze week staat al iets. Aangevinkte dagen krijgen de Theokot-shiften uit het sjabloon${planLabel ? `: ${planLabel}` : ""}. Bestaande dagen houden hun aanbod en uren.`
+                : `Something is already planned this week. Checked days get the Theokot shifts from the template${planLabel ? `: ${planLabel}` : ""}. Existing days keep their offering and hours.`}
+            </p>
+            <ul className="space-y-2">
+              {preview.days.map((day) => (
+                <li key={day.key}>
+                  {day.canAdd ? (
+                    <label className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        name="shiftDays"
+                        value={day.offset}
+                        defaultChecked={day.defaultChecked}
+                        className="mt-0.5"
+                      />
+                      <span>
+                        <span className="font-medium text-vtk-ink">{dayLabel(day.key, nl)}</span>
+                        <span className="block text-xs">{shiftDayStatus(day, nl)}</span>
+                      </span>
+                    </label>
+                  ) : (
+                    <div className="pl-[21px]">
+                      <span className="font-medium text-vtk-ink">{dayLabel(day.key, nl)}</span>
+                      <span className="block text-xs">{shiftDayStatus(day, nl)}</span>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ),
+        confirmLabel: nl ? "Week aanmaken" : "Create week",
+        cancelLabel: nl ? "Annuleren" : "Cancel",
+        destructive: false,
+      }
+    : null;
+
   return (
     <Card className="p-5">
       <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
@@ -194,8 +323,32 @@ function CreateWeek({
       </div>
       <p className="mb-4 text-sm text-[#5c667f]">
         {nl
-          ? "Uren en aanbod gelden voor de hele week; nadien kan je per dag of per week bijsturen. Dagen die al bestaan, worden overgeslagen. Elke nieuwe dag krijgt meteen zijn Theokot-shiften (smeren, middag, namiddag)."
-          : "Hours and offering apply to the whole week; you can adjust per day or per week afterwards. Existing days are skipped. Every new day gets its Theokot shifts (spreading, midday, afternoon) right away."}
+          ? "Uren en aanbod gelden voor de hele week; nadien kan je per dag of per week bijsturen. Dagen die al bestaan, houden hun aanbod en uren. Staat er in de week al iets, dan vraagt de site eerst wat er met de shiften moet gebeuren."
+          : "Hours and offering apply to the whole week; you can adjust per day or per week afterwards. Existing days keep their offering and hours. If something is already planned that week, you are asked what to do with the shifts first."}
+      </p>
+      <p className="mb-4 text-sm text-[#5c667f]">
+        {shiftPlan.length > 0 ? (
+          <>
+            {nl ? "Elke dag krijgt deze Theokot-shiften: " : "Every day gets these Theokot shifts: "}
+            <span className="text-vtk-ink">{planLabel}</span>.{" "}
+            {canEditShiftTemplates ? (
+              <Link
+                href={`${base}/admin/shiften/sjablonen/beheer`}
+                className="underline underline-offset-2 hover:text-vtk-ink"
+              >
+                {nl ? "Uren aanpassen in het sjabloon" : "Change the hours in the template"}
+              </Link>
+            ) : nl ? (
+              "De uren komen uit het shiftsjabloon \u201cTheokot opening\u201d."
+            ) : (
+              "The hours come from the \u201cTheokot opening\u201d shift template."
+            )}
+          </>
+        ) : nl ? (
+          "Er is geen Theokot-shiftsjabloon, dus er komen geen shiften bij."
+        ) : (
+          "There is no Theokot shift template, so no shifts are added."
+        )}
       </p>
       <SaveForm
         action={createWeekSessionsAction}
@@ -205,6 +358,7 @@ function CreateWeek({
         savedMessage={nl ? "Verkoopweek aangemaakt" : "Sale week created"}
         resetOnSuccess={false}
         onSuccess={onDone}
+        confirmSubmit={confirmSubmit}
         errorMessages={
           nl
             ? {
@@ -228,14 +382,30 @@ function CreateWeek({
         <div className="flex flex-wrap items-end gap-4">
           <div>
             <Label>{nl ? "Maandag van de week" : "Monday of the week"}</Label>
-            <Input type="date" name="weekStart" defaultValue={nextMonday} required />
+            <Input
+              type="date"
+              name="weekStart"
+              value={weekStart}
+              onChange={(event) => setWeekStart(event.target.value)}
+              required
+            />
           </div>
           <div>
             <Label>{nl ? "Dagen" : "Days"}</Label>
             <div className="flex flex-wrap gap-2 pt-1">
               {DAYS.map((d) => (
                 <label key={d.v} className="inline-flex items-center gap-1 text-sm">
-                  <input type="checkbox" name="days" value={d.v} defaultChecked={d.v <= 4} />
+                  <input
+                    type="checkbox"
+                    name="days"
+                    value={d.v}
+                    checked={days.includes(d.v)}
+                    onChange={(event) =>
+                      setDays((current) =>
+                        event.target.checked ? [...current, d.v] : current.filter((v) => v !== d.v),
+                      )
+                    }
+                  />
                   {nl ? d.nl : d.en}
                 </label>
               ))}
@@ -261,6 +431,16 @@ function CreateWeek({
             <Input type="time" name="orderOpenTime" defaultValue={defaultHours.orderOpenTime} />
           </div>
         </div>
+
+        {/* De server leest de shiftkeuze uit `shiftDays`. Zonder popup krijgt elke
+            gekozen dag haar shiften; met popup komen de vinkjes uit de dialoog,
+            die binnen dit formulier staat. */}
+        <input type="hidden" name="shiftChoice" value="1" />
+        {preview.needsConfirm
+          ? null
+          : preview.days
+              .filter((day) => day.defaultChecked)
+              .map((day) => <input key={day.key} type="hidden" name="shiftDays" value={day.offset} />)}
 
         <div className="rounded-xl border border-vtk-blue/10 p-3">
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
@@ -578,6 +758,26 @@ function SessionEditor({ nl, session }: { nl: boolean; session: AdminSession }) 
               nl
                 ? `${session.dateLabel} verdwijnt met haar aanbod en haar ${session.orderCount} bestelling(en). Iedereen die besteld had, krijgt een mail dat die dag niet doorgaat. Gaat de dag wel door en ben je gewoon klaar met verkopen, gebruik dan "Afhaalronde afsluiten".`
                 : `${session.dateLabel} disappears with its offering and its ${session.orderCount} order(s). Everyone who ordered gets an email that the day is not happening. If the day did happen and you are simply done selling, use "End pickup round" instead.`
+            }
+            // Enkel de shiften die een verkoopweek voor deze dag zette; met de
+            // hand gezette Theokot-shiften blijven altijd staan.
+            option={
+              session.shiftCount > 0
+                ? {
+                    name: "removeShifts",
+                    defaultChecked: true,
+                    label: nl
+                      ? `Ook de ${session.shiftCount} Theokot-shift${session.shiftCount === 1 ? "" : "en"} van die dag verwijderen`
+                      : `Also remove the ${session.shiftCount} Theokot shift${session.shiftCount === 1 ? "" : "s"} of that day`,
+                    hint: nl
+                      ? session.shiftSignups > 0
+                        ? `Er ${session.shiftSignups === 1 ? "staat 1 inschrijving" : `staan ${session.shiftSignups} inschrijvingen`} op; die verdwijnen mee, zonder mail. Uitgevinkt blijven de shiften op /shift staan.`
+                        : "Er staat nog niemand op ingeschreven. Uitgevinkt blijven de shiften op /shift staan."
+                      : session.shiftSignups > 0
+                        ? `${session.shiftSignups} sign-up${session.shiftSignups === 1 ? "" : "s"} disappear with them, without an email. Unchecked, the shifts stay on /shift.`
+                        : "Nobody has signed up yet. Unchecked, the shifts stay on /shift."
+                  }
+                : undefined
             }
             confirmLabel={nl ? "Verwijderen" : "Remove"}
             cancelLabel={nl ? "Annuleren" : "Cancel"}

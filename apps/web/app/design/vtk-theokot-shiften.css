@@ -227,8 +227,13 @@
   opacity: 0.55;
 }
 
+/* `flex: none`: de naam mag niet krimpen om de plaatsenrij te laten passen. Dan
+   knipt `overflow: hidden` midden in een regel en staat er een halve tweede
+   regel. Te lang voor twee regels wordt netjes afgebroken; de volledige naam staat
+   in de tooltip en in het paneel onder de tijdlijn. */
 .tk-sh-bar-name {
   display: -webkit-box;
+  flex: none;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -285,7 +290,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 56px;
   border: 1px dashed var(--line-2);
   background: repeating-linear-gradient(135deg, var(--paper-2) 0 6px, var(--paper) 6px 12px);
   font-size: 12.5px;

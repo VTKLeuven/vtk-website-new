@@ -234,6 +234,7 @@ export function HomeShiftBand({
                 sourceSystem: null,
                 sourceId: null,
                 manualGrantId: null,
+                theokotSessionId: null,
                 ...shift,
                 roster: shift.roster,
               },

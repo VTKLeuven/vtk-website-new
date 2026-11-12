@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { logAudit } from "@/lib/audit";
 import type { ShiftInput } from "@/lib/shift";
@@ -14,8 +15,27 @@ import type { ShiftInput } from "@/lib/shift";
  * De invoer is al door {@link parseShift} gegaan; deze functie valideert niet
  * opnieuw.
  */
-export async function createShift(data: ShiftInput, options: { audit?: boolean } = {}) {
-  const shift = await prisma.shift.create({ data });
+export async function createShift(
+  data: ShiftInput,
+  options: {
+    audit?: boolean;
+    /**
+     * Een transactie om in te schrijven, zodat een Theokot-verkoopdag en haar
+     * shiften samen slagen of samen falen. Weglaten = de gewone client.
+     */
+    db?: Prisma.TransactionClient;
+    /**
+     * De verkoopdag waarvoor deze shift aangemaakt wordt. Bewust een optie en geen
+     * veld van `ShiftInput`: dat type komt ook uit een request body, en een
+     * koppeling aan een verkoopdag zet enkel "Week aanmaken".
+     */
+    theokotSessionId?: string;
+  } = {},
+) {
+  const db = options.db ?? prisma;
+  const shift = await db.shift.create({
+    data: options.theokotSessionId ? { ...data, theokotSessionId: options.theokotSessionId } : data,
+  });
 
   // Uit wanneer de aanroeper zelf één regel schrijft over de hele reeks: vijftien
   // losse regels voor één klik op "week aanmaken" verzuipen het logboek.

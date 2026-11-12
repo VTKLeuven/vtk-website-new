@@ -7,6 +7,8 @@ import { formatEuro } from "@/lib/theokot";
 import { getTheokotConfig } from "@/lib/theokot-server";
 import { usageForSessionItems } from "@/lib/meetings-server";
 import { brusselsWallClock, brusselsYMD, shiftYMD } from "@/lib/brussels";
+import { templateShiftPlan, THEOKOT_TEMPLATE_SLUG } from "@/lib/shift/templates";
+import { getShiftTemplate, theokotPostFilter, theokotShiftPosts } from "@/lib/shift/templateStore";
 import { TheokotAdminNav } from "./TheokotAdminNav";
 import { SessionsManager, type AdminSession } from "./SessionsManager";
 import type { OfferingRow } from "./OfferingRows";
@@ -51,7 +53,7 @@ export default async function AdminTheokot({ params }: { params: Promise<{ local
   // berekening trok er na het aftrekken van een etmaal nog een dag af).
   const yesterday = shiftYMD(brusselsYMD(new Date()), -1);
   const from = brusselsWallClock(yesterday.year, yesterday.month, yesterday.day, "00:00");
-  const [sessions, config, products] = await Promise.all([
+  const [sessions, config, products, shiftTemplate] = await Promise.all([
     prisma.theokotSession.findMany({
       where: { date: { gte: from } },
       orderBy: { date: "asc" },
@@ -76,11 +78,15 @@ export default async function AdminTheokot({ params }: { params: Promise<{ local
             voucherRedemption: { select: { id: true } },
           },
         },
-        _count: { select: { orders: true } },
+        // De shiften die "Week aanmaken" voor deze dag zette, met hun
+        // inschrijvingen: de verwijderpopup zegt wie er mee verdwijnt.
+        shifts: { select: { _count: { select: { participants: true } } } },
+        _count: { select: { orders: true, shifts: true } },
       },
     }),
     getTheokotConfig(),
     prisma.theokotProduct.findMany({ where: { active: true }, orderBy: { order: "asc" } }),
+    getShiftTemplate(THEOKOT_TEMPLATE_SLUG),
   ]);
 
   // Hoeveel er van elk broodje al weg is. De aanbod-editor heeft dat nodig om
@@ -89,6 +95,24 @@ export default async function AdminTheokot({ params }: { params: Promise<{ local
   // voorraad.
   const itemIds = sessions.flatMap((s) => s.items.map((i) => i.id));
   const ordered = await usageForSessionItems(itemIds);
+
+  // Theokot-shiften die niet door een verkoopweek gezet zijn (met de hand, of een
+  // opkuis), per dag. "Week aanmaken" vinkt zo'n dag standaard uit, zodat er geen
+  // tweede reeks bovenop komt.
+  const otherShifts = await prisma.shift.findMany({
+    where: {
+      OR: theokotPostFilter(theokotShiftPosts(shiftTemplate)),
+      startTime: { gte: from },
+      theokotSessionId: null,
+      manualGrantId: null,
+    },
+    select: { startTime: true },
+  });
+  const otherShiftsByDay: Record<string, number> = {};
+  for (const shift of otherShifts) {
+    const key = ymd(shift.startTime);
+    otherShiftsByDay[key] = (otherShiftsByDay[key] ?? 0) + 1;
+  }
 
   // In de taal van de pagina: dit stond in het Engels ("Monday 28 September")
   // op een Nederlandstalig scherm.
@@ -140,6 +164,8 @@ export default async function AdminTheokot({ params }: { params: Promise<{ local
     orderOpenAt: ymdhm(s.orderOpenAt),
     processed: s.processedAt !== null,
     orderCount: s._count.orders,
+    shiftCount: s._count.shifts,
+    shiftSignups: s.shifts.reduce((sum, shift) => sum + shift._count.participants, 0),
     // Wat de dag onverwijderbaar maakt: opgehaalde bestellingen en bestellingen
     // waarop al bonnetjes afgeboekt zijn. Allebei zijn ze echt gebeurd.
     pickedUpCount: s.orders.filter(
@@ -219,6 +245,9 @@ export default async function AdminTheokot({ params }: { params: Promise<{ local
         nextMonday={nextMonday}
         defaultProducts={defaultProducts}
         defaultHours={defaultHours}
+        shiftPlan={shiftTemplate ? templateShiftPlan(shiftTemplate, nl) : []}
+        otherShiftsByDay={otherShiftsByDay}
+        canEditShiftTemplates={has("shift.templates")}
       />
     </div>
   );

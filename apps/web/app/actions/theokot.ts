@@ -56,7 +56,8 @@ import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { logAudit } from "@/lib/audit";
 import { createShift } from "@/lib/shift/server";
-import { theokotShiftsForDay, theokotShiftPost } from "@/lib/shift/templateStore";
+import { getShiftTemplate, theokotPostFilter, theokotShiftPosts } from "@/lib/shift/templateStore";
+import { templateShiftsForDay, THEOKOT_TEMPLATE_SLUG } from "@/lib/shift/templates";
 import { shiftYMD } from "@/lib/brussels";
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
@@ -204,7 +205,13 @@ function parseOfferingRows(
  * een lijst van dag-offsets (0=ma … 6=zo). De uren (`pickupStart/End`,
  * `orderCloseTime`, `orderOpenTime`) en het aanbod komen uit het formulier;
  * ontbreekt het aanbod, dan valt het terug op de actieve catalogus. Bestaande
- * dagen (zelfde datum) worden overgeslagen; nadien kan je alles per dag aanpassen.
+ * dagen (zelfde datum) behouden hun aanbod en uren; nadien kan je alles per dag
+ * aanpassen.
+ *
+ * Elke dag in `shiftDays` krijgt de shiften uit het Theokot-sjabloon, gekoppeld
+ * aan die verkoopdag. Dat geldt ook voor een bestaande dag die er nog geen heeft:
+ * zo vul je een dag aan waarvan de shiften ontbraken of verwijderd werden. Een dag
+ * met gekoppelde shiften krijgt nooit een tweede reeks.
  */
 export async function createWeekSessionsAction(
   _prev: SaveState,
@@ -282,75 +289,114 @@ export async function createWeekSessionsAction(
 
   // Eén keer opgezocht i.p.v. per dag: het sjabloon verandert niet halverwege
   // een week, en dit staat in de lus die de hele week aanmaakt.
-  const shiftPost = await theokotShiftPost();
+  const template = await getShiftTemplate(THEOKOT_TEMPLATE_SLUG);
+  const shiftPosts = theokotShiftPosts(template);
+
+  // Welke dagen hun Theokot-shiften krijgen. Het formulier stuurt `shiftChoice`
+  // mee, met in `shiftDays` de dagen die aangevinkt bleven: in de popup wanneer er
+  // in die week al iets stond, en anders gewoon elke gekozen dag. Zonder
+  // `shiftChoice` komt het verzoek van een pagina die nog van vóór die popup
+  // openstond; dan geldt de oude regel: enkel een nieuwe dag, en niet wanneer er
+  // al een Theokot-shift op staat.
+  const shiftDays = formData.has("shiftChoice")
+    ? new Set(formData.getAll("shiftDays").map((d) => Number(d)))
+    : null;
+
   let createdDays = 0;
+  let filledDays = 0;
   let createdShifts = 0;
   let skippedDays = 0;
   for (const offset of days) {
     const dayMidnight = dayMidnightFor(offset);
-    const existing = await prisma.theokotSession.findUnique({ where: { date: dayMidnight } });
-    if (existing) {
+    const existing = await prisma.theokotSession.findUnique({
+      where: { date: dayMidnight },
+      select: { id: true, _count: { select: { shifts: true } } },
+    });
+
+    let wantsShifts: boolean;
+    if (shiftDays) {
+      wantsShifts = shiftDays.has(offset);
+    } else if (existing) {
+      wantsShifts = false;
+    } else {
+      const nextDay = shiftYMD(brusselsYMD(dayMidnight), 1);
+      const staffed = await prisma.shift.findFirst({
+        where: {
+          OR: theokotPostFilter(shiftPosts),
+          startTime: {
+            gte: dayMidnight,
+            lt: brusselsTimeOnDay(new Date(Date.UTC(nextDay.year, nextDay.month - 1, nextDay.day, 12)), "00:00"),
+          },
+        },
+        select: { id: true },
+      });
+      wantsShifts = !staffed;
+    }
+
+    // Een dag die al bestaat en geen shiften (meer) nodig heeft, blijft zoals ze is.
+    if (existing && (!wantsShifts || existing._count.shifts > 0)) {
       skippedDays += 1;
       continue;
     }
 
-    await prisma.theokotSession.create({
-      data: {
-        date: dayMidnight,
-        isOpen: true,
-        ...windowsFor(dayMidnight),
-        createdById: session.user.id,
-        items: {
-          create: offering.map((it) => ({
-            nameNl: it.nameNl,
-            nameEn: it.nameEn,
-            priceCents: it.priceCents,
-            quantity: it.quantity,
-            isWeeklySpecial: it.isWeeklySpecial,
-            ingredientsNl: it.ingredientsNl,
-            ingredientsEn: it.ingredientsEn,
-            imageKey: it.imageKey,
-            badgeImageKey: it.badgeImageKey,
-            order: it.order,
-          })),
-        },
-      },
+    // De uren komen uit het sjabloon, niet uit het afhaaluur: zie
+    // `templateShiftsForDay`. Een verkoopdag en haar shiften slagen samen of
+    // falen samen; een halve reeks valt niet meer aan te vullen zonder te raden
+    // welke shift er ontbreekt.
+    const shifts = wantsShifts && template ? templateShiftsForDay(template, dayMidnight) : [];
+    const result = await prisma.$transaction(async (tx) => {
+      let sessionId: string;
+      if (existing) {
+        sessionId = existing.id;
+        // De dag vastzetten en opnieuw tellen: twee keer op de knop mag geen
+        // tweede reeks op dezelfde dag geven.
+        await tx.$executeRaw`SELECT 1 FROM "TheokotSession" WHERE "id" = ${sessionId} FOR UPDATE`;
+        if ((await tx.shift.count({ where: { theokotSessionId: sessionId } })) > 0) return { shifts: 0 };
+      } else {
+        const created = await tx.theokotSession.create({
+          data: {
+            date: dayMidnight,
+            isOpen: true,
+            ...windowsFor(dayMidnight),
+            createdById: session.user.id,
+            items: {
+              create: offering.map((it) => ({
+                nameNl: it.nameNl,
+                nameEn: it.nameEn,
+                priceCents: it.priceCents,
+                quantity: it.quantity,
+                isWeeklySpecial: it.isWeeklySpecial,
+                ingredientsNl: it.ingredientsNl,
+                ingredientsEn: it.ingredientsEn,
+                imageKey: it.imageKey,
+                badgeImageKey: it.badgeImageKey,
+                order: it.order,
+              })),
+            },
+          },
+          select: { id: true },
+        });
+        sessionId = created.id;
+      }
+      for (const shift of shifts) {
+        // Zonder eigen logregel: hieronder staat er één voor de hele week.
+        await createShift(shift, { audit: false, db: tx, theokotSessionId: sessionId });
+      }
+      return { shifts: shifts.length };
     });
+    createdShifts += result.shifts;
+
+    if (existing) {
+      if (result.shifts > 0) filledDays += 1;
+      else skippedDays += 1;
+      continue;
+    }
 
     // Reservaties voor een grocomeet of bureau op deze dag zijn weken geleden
     // uit de catalogus gekozen. Nu het aanbod van die dag bestaat, koppelen we
     // ze eraan; wat er niet op staat, wordt ongeldig en de persoon krijgt een mail.
     await syncMeetingsOnDay(dayMidnight);
     createdDays += 1;
-
-    // Een verkoopdag moet ook bemand worden: smeren, middag en namiddag. Die
-    // shiften apart moeten aanmaken werd stelselmatig vergeten, en een
-    // verkoopdag zonder shifters is een dag waarop niemand de balie doet.
-    // De uren volgen het afhaaluur van déze dag, niet het vaste uur uit het
-    // sjabloon.
-    //
-    // Staat er al een Theokot-shift op die dag, dan blijft die met rust: iemand
-    // heeft ze dan met de hand of via het sjabloonscherm gezet, en er twee
-    // reeksen bovenop elkaar leggen kost inschrijvingen.
-    const nextDay = shiftYMD(brusselsYMD(dayMidnight), 1);
-    const alreadyStaffed = await prisma.shift.findFirst({
-      where: {
-        post: shiftPost,
-        startTime: {
-          gte: dayMidnight,
-          lt: brusselsTimeOnDay(new Date(Date.UTC(nextDay.year, nextDay.month - 1, nextDay.day, 12)), "00:00"),
-        },
-      },
-      select: { id: true },
-    });
-
-    if (!alreadyStaffed) {
-      for (const shift of await theokotShiftsForDay(dayMidnight, pickupStart)) {
-        // Zonder eigen logregel: hieronder staat er één voor de hele week.
-        await createShift(shift, { audit: false });
-        createdShifts += 1;
-      }
-    }
   }
 
   await logAudit({
@@ -359,23 +405,25 @@ export async function createWeekSessionsAction(
     target: `Verkoopweek van ${formatDay(weekStart)}`,
     summary:
       `${createdDays} nieuwe verkoopdag(en) met ${offering.length} broodje(s); ` +
-      `${createdShifts} shift(en) aangemaakt; ${skippedDays} bestaande dag(en) overgeslagen`,
+      `${createdShifts} shift(en) aangemaakt; ${filledDays} bestaande dag(en) aangevuld; ` +
+      `${skippedDays} bestaande dag(en) ongewijzigd`,
   });
 
   revalidateTheokot();
 
   // Zeg wat er gebeurd is: opnieuw op "Week aanmaken" duwen met een ander aanbod
-  // slaat elke bestaande dag over, en zonder deze zin ziet dat eruit als een
+  // laat elke bestaande dag ongemoeid, en zonder deze zin ziet dat eruit als een
   // geslaagde wijziging.
-  return saveOk(
-    [
-      `${createdDays} verkoopdag(en) aangemaakt`,
-      createdShifts > 0 ? `${createdShifts} shift(en) erbij` : null,
-      skippedDays > 0 ? `${skippedDays} dag(en) bestonden al en bleven ongewijzigd` : null,
-    ]
-      .filter(Boolean)
-      .join(", ") + ".",
-  );
+  const parts = [
+    createdDays > 0 ? `${createdDays} verkoopdag(en) aangemaakt` : null,
+    createdShifts > 0 ? `${createdShifts} shift(en) erbij` : null,
+    filledDays > 0 ? `${filledDays} bestaande dag(en) aangevuld met shiften` : null,
+    skippedDays > 0 ? `${skippedDays} bestaande dag(en) ongewijzigd` : null,
+  ].filter(Boolean);
+  if (createdDays === 0 && filledDays === 0) {
+    return saveOk("Niets gewijzigd: elke gekozen dag bestond al en kreeg geen shiften bij.");
+  }
+  return saveOk(parts.join(", ") + ".");
 }
 
 // -----------------------------------------------------------------------------
@@ -759,7 +807,9 @@ export async function removeSessionAction(formData: FormData): Promise<void> {
   const existing = await prisma.theokotSession.findUnique({ where: { id } });
   if (!existing) return;
 
-  const result = await removeSession(id);
+  // Het vinkje in de verwijderpopup: de shiften die "Week aanmaken" voor deze
+  // dag zette, gaan mee. Uitgevinkt blijven ze op /shift staan.
+  const result = await removeSession(id, { removeShifts: formData.get("removeShifts") === "on" });
   if (!result.ok) {
     // De knop staat er niet wanneer er al opgehaald is; komt dit toch voor, dan
     // is het geen invoerfout maar een scherm dat achterloopt.
@@ -775,7 +825,9 @@ export async function removeSessionAction(formData: FormData): Promise<void> {
     entity: "theokotSession",
     entityId: id,
     target: sessionLabel(existing.date),
-    summary: `verkoopdag verwijderd; ${result.orders} bestelling(en) geannuleerd en verwittigd`,
+    summary:
+      `verkoopdag verwijderd; ${result.orders} bestelling(en) geannuleerd en verwittigd; ` +
+      `${result.shifts} shift(en) mee verwijderd`,
   });
 
   // De vergaderingen van die dag vallen terug op de catalogus nu het aanbod van

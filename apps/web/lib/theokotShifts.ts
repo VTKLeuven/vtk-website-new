@@ -16,6 +16,8 @@ export const THEOKOT_WEEKDAYS = 5;
 export type TheokotShiftInput = {
   id: string;
   name: string;
+  /** Wat er in de balk zelf staat; weglaten = `name`. Zie `shortShiftName`. */
+  shortName?: string;
   startTime: Date;
   endTime: Date;
   maxParticipants: number;
@@ -31,6 +33,8 @@ export type ShiftFill = 'full' | 'partial' | 'empty';
 export type TimelineBar = {
   id: string;
   name: string;
+  /** De naam in de balk, zonder het evenement erachter. */
+  shortName: string;
   /** "HH:mm" op de Brusselse klok. */
   start: string;
   end: string;
@@ -193,6 +197,7 @@ export function buildTheokotTimeline({
       return {
         id: item.shift.id,
         name: item.shift.name,
+        shortName: item.shift.shortName ?? item.shift.name,
         start: hhmm(item.startMinutes),
         end: hhmm(item.endMinutes),
         left: pct(item.startMinutes),
@@ -254,4 +259,84 @@ export function defaultSelectedShift(timeline: TheokotTimeline): string | null {
     bars[0]?.id ??
     null
   );
+}
+
+/**
+ * De naam van een shift zonder het evenement erachter: "Broodjes smeren" i.p.v.
+ * "Broodjes smeren - Theokot". Op een pagina die enkel Theokot toont, zegt dat
+ * achtervoegsel niets en kost het net de regel die de balk niet heeft.
+ */
+export function shortShiftName(name: string, eventName: string): string {
+  const suffix = ` - ${eventName.trim()}`;
+  if (eventName.trim() === '' || !name.endsWith(suffix) || name.length === suffix.length) return name;
+  return name.slice(0, -suffix.length);
+}
+
+// -----------------------------------------------------------------------------
+// "Week aanmaken": wat er met de shiften van elke gekozen dag gebeurt
+// -----------------------------------------------------------------------------
+
+export type WeekShiftDay = {
+  /** Dag-offset t.o.v. de gekozen startdag, zoals het formulier ze verstuurt. */
+  offset: number;
+  /** `yyyy-mm-dd`. */
+  key: string;
+  /** Bestaat de verkoopdag al? */
+  exists: boolean;
+  /** Shiften die een verkoopweek eerder voor deze dag zette. */
+  linkedShifts: number;
+  /** Andere Theokot-shiften op die dag: met de hand gezet, of een opkuis. */
+  otherShifts: number;
+  /** Kan deze dag (nog) shiften krijgen? Niet wanneer ze er al gekoppelde heeft. */
+  canAdd: boolean;
+  /**
+   * Staat het vinkje standaard aan? Uit wanneer er al andere Theokot-shiften op
+   * die dag staan: dan heeft iemand de dag al bemand, en een tweede reeks erbovenop
+   * laat leden zich op de verkeerde helft inschrijven.
+   */
+  defaultChecked: boolean;
+};
+
+/**
+ * Per gekozen dag van een verkoopweek: bestaat ze al, heeft ze al shiften, en
+ * krijgt ze er standaard bij. `needsConfirm` zegt of het formulier eerst moet
+ * vragen wat er moet gebeuren: enkel wanneer er in die week al iets staat. Een
+ * volledig nieuwe week maak je gewoon aan, zoals vroeger.
+ *
+ * De offsets tellen vanaf de ingevulde startdag, net zoals de server ze leest.
+ */
+export function weekShiftPreview({
+  start,
+  offsets,
+  sessions,
+  otherShiftsByDay,
+}: {
+  start: YMD;
+  offsets: number[];
+  sessions: { dateValue: string; shiftCount: number }[];
+  otherShiftsByDay: Record<string, number>;
+}): { days: WeekShiftDay[]; needsConfirm: boolean } {
+  const byKey = new Map(sessions.map((session) => [session.dateValue, session]));
+  const days = [...offsets]
+    .sort((a, b) => a - b)
+    .map((offset): WeekShiftDay => {
+      const key = ymdKey(shiftYMD(start, offset));
+      const session = byKey.get(key);
+      const linkedShifts = session?.shiftCount ?? 0;
+      const otherShifts = otherShiftsByDay[key] ?? 0;
+      const canAdd = linkedShifts === 0;
+      return {
+        offset,
+        key,
+        exists: session !== undefined,
+        linkedShifts,
+        otherShifts,
+        canAdd,
+        defaultChecked: canAdd && otherShifts === 0,
+      };
+    });
+  return {
+    days,
+    needsConfirm: days.some((day) => day.exists || day.otherShifts > 0),
+  };
 }

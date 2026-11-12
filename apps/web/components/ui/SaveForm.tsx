@@ -81,6 +81,11 @@ export function SaveForm({
     description: ReactNode;
     confirmLabel: string;
     cancelLabel: string;
+    /**
+     * Rode bevestigknop (standaard). Uit voor een vraag die niets weggooit maar
+     * een keuze laat maken, zoals welke dagen van een verkoopweek shiften krijgen.
+     */
+    destructive?: boolean;
   } | null;
   savingLabel: string;
   savedMessage: string;
@@ -300,6 +305,7 @@ export function SaveForm({
       description={confirmSubmit.description}
       confirmLabel={confirmSubmit.confirmLabel}
       cancelLabel={confirmSubmit.cancelLabel}
+      destructive={confirmSubmit.destructive}
       pending={pending}
       onConfirm={submitPlain}
       onCancel={() => setConfirmingSubmit(false)}

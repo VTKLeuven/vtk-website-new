@@ -10,12 +10,13 @@ import { requirePermission } from "@/lib/session";
 import { brusselsWallClock, isoWeekKey, parseYMD, shiftYMD, ymdKey, type YMD } from "@/lib/brussels";
 import { canEditShifts } from "@/lib/shift/authorization";
 import { THEOKOT_TEMPLATE_SLUG } from "@/lib/shift/templates";
-import { getShiftTemplate } from "@/lib/shift/templateStore";
+import { getShiftTemplate, theokotPostFilter, theokotShiftPosts } from "@/lib/shift/templateStore";
 import {
   buildTheokotTimeline,
   defaultSelectedShift,
   defaultTheokotWeek,
   mondayOf,
+  shortShiftName,
   weekdaysOf,
   type TheokotSlot,
 } from "@/lib/theokotShifts";
@@ -56,14 +57,9 @@ export default async function TheokotShiftsPage({
   const saturday = shiftYMD(monday, 5);
 
   // Welke post een Theokot-shift draagt, zegt het sjabloon waarmee een
-  // verkoopweek haar shiften neerzet. THEOKOT blijft er altijd bij, zodat een
-  // sjabloon zonder post de pagina niet laat vollopen met elke shift zonder post.
+  // verkoopweek haar shiften neerzet; zie `theokotShiftPosts`.
   const template = await getShiftTemplate(THEOKOT_TEMPLATE_SLUG);
-  const posts = new Set<string>(["THEOKOT"]);
-  if (template?.post) posts.add(template.post);
-  for (const entry of template?.shifts ?? []) {
-    if (entry.ownPost && entry.post) posts.add(entry.post);
-  }
+  const posts = theokotShiftPosts(template);
 
   // Het vaste rooster, om te tonen welke gewone shift er een dag niet is.
   const anchor = /^(\d{2}):(\d{2})$/.exec(template?.timeOfDay ?? "");
@@ -78,7 +74,7 @@ export default async function TheokotShiftsPage({
 
   const shifts = await prisma.shift.findMany({
     where: {
-      OR: [...posts].map((post) => ({ post: { equals: post, mode: "insensitive" as const } })),
+      OR: theokotPostFilter(posts),
       // Maandag 00:00 tot zaterdag 00:00 op de Brusselse klok: het weekend
       // hoort er nooit bij.
       startTime: {
@@ -106,6 +102,7 @@ export default async function TheokotShiftsPage({
     shifts: shifts.map((shift) => ({
       id: shift.id,
       name: shift.name,
+      shortName: shortShiftName(shift.name, template?.eventName ?? ""),
       startTime: shift.startTime,
       endTime: shift.endTime,
       maxParticipants: shift.maxParticipants,
