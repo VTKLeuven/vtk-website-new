@@ -30,8 +30,8 @@ import { resolvePostKeys } from '@/lib/bo/posts';
 import { downloadSpreadsheet } from '@/lib/google/client';
 import { getGoogleConfig } from '@/lib/google/config';
 import type { Lookup } from '@/lib/bo/budget/prices';
-import { lookupShopProduct } from '@/lib/priceCheck/fetch';
-import { parseShopUrl } from '@/lib/priceCheck/shops';
+import { lookupShopProduct, priceBrowserStatus } from '@/lib/priceCheck/fetch';
+import { parseShopUrl, shopOfUrl, SHOPS } from '@/lib/priceCheck/shops';
 import { templateContent } from '@/lib/bo/budget/templates';
 import { BUDGET_TEMPLATES, type BudgetContent, type BudgetTemplate } from '@/lib/bo/budget/types';
 
@@ -548,4 +548,51 @@ export async function importMeetingFromDriveAction(input: { meetingId: string })
   revalidatePath('/[locale]/admin/bestuursorgaan/mappen', 'page');
   if (t.created + t.replaced + t.kept === 0) return saveError('NOTHING_IMPORTED', importSummary(t));
   return saveOk(importSummary(t));
+}
+
+export type PriceTestResult =
+  | { ok: false; code: 'UNKNOWN_SHOP' | 'NO_PRICE_ONLINE' | 'NOT_A_PRODUCT'; shop?: string }
+  | {
+      ok: true;
+      shop: string;
+      via: 'fetch' | 'browser';
+      /** De prijsbrowser: niet ingesteld, draait niet, of antwoordt. */
+      browser: 'off' | 'down' | 'up';
+      basis: 'incl' | 'excl';
+      ms: number;
+      lookup:
+        | { status: 'found'; name: string; price: number }
+        | { status: 'notfound' }
+        | { status: 'failed'; reason: string };
+    };
+
+/**
+ * Eén productlink proberen, los van een budget: herkent de site de winkel, en
+ * krijgt ze er nu een prijs? Voor de instellingen, om na een deploy of een
+ * wijziging aan de prijsbrowser te zien of het werkt. Vraagt de winkel echt
+ * op (niet uit het geheugen) en bewaart niets. Enkel Groep 5.
+ */
+export async function testPriceLookupAction(input: { url: string }): Promise<PriceTestResult> {
+  await requirePermission('bestuursorgaan.manage');
+  const url = String(input?.url ?? '')
+    .trim()
+    .slice(0, 2000);
+  const shopId = shopOfUrl(url);
+  if (!shopId) return { ok: false, code: 'UNKNOWN_SHOP' };
+  const shop = SHOPS[shopId].name;
+  if (!SHOPS[shopId].live) return { ok: false, code: 'NO_PRICE_ONLINE', shop };
+  const ref = parseShopUrl(url);
+  if (!ref) return { ok: false, code: 'NOT_A_PRODUCT', shop };
+  const started = Date.now();
+  const [lookup, browser] = await Promise.all([lookupShopProduct(ref, true), priceBrowserStatus()]);
+  return {
+    ok: true,
+    shop,
+    via: ref.via,
+    browser,
+    basis: ref.basis,
+    ms: Date.now() - started,
+    lookup:
+      lookup.status === 'found' ? { status: 'found', name: lookup.product.name, price: lookup.product.price } : lookup,
+  };
 }

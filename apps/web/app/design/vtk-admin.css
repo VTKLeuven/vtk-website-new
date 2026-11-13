@@ -7631,3 +7631,55 @@ button.vtk-bud-dot {
 .vtk-fold-import {
   max-width: 760px;
 }
+
+/* De prijscontrole testen bij de instellingen (`PriceCheckTest.tsx`). */
+.vtk-admin-main .vtk-bud-pricetest-state {
+  margin: 0 0 10px;
+  padding-left: 16px;
+  color: var(--body) !important;
+  font-size: 13.5px;
+  background: radial-gradient(circle at 4px 0.7em, var(--muted) 4px, transparent 4.5px) no-repeat;
+}
+
+.vtk-admin-main .vtk-bud-pricetest-state[data-state='up'] {
+  background-image: radial-gradient(circle at 4px 0.7em, var(--ok-ink) 4px, transparent 4.5px);
+}
+
+.vtk-admin-main .vtk-bud-pricetest-state[data-state='down'] {
+  background-image: radial-gradient(circle at 4px 0.7em, var(--danger-ink) 4px, transparent 4.5px);
+}
+
+.vtk-bud-pricetest {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vtk-bud-pricetest li {
+  display: grid;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 13.5px;
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-bud-pricetest li[data-tone='ok'] {
+  box-shadow: inset 3px 0 0 var(--ok-ink);
+}
+
+.vtk-bud-pricetest li[data-tone='bad'] {
+  box-shadow: inset 3px 0 0 var(--danger-ink);
+}
+
+.vtk-bud-pricetest a {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

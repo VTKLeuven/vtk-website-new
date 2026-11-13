@@ -69,10 +69,30 @@ async function lookupInBrowser(ref: ShopRef): Promise<ShopLookup> {
     : { status: 'failed', reason: `HTTP ${answer.status}` };
 }
 
-export async function lookupShopProduct(ref: ShopRef): Promise<ShopLookup> {
+/**
+ * Staat de prijsbrowser aan, en antwoordt hij? Voor de test bij de instellingen:
+ * zo zie je het verschil tussen "niet ingesteld", "draait niet" en "de winkel
+ * weigert".
+ */
+export async function priceBrowserStatus(): Promise<'off' | 'down' | 'up'> {
+  const base = process.env.PRICE_BROWSER_URL?.trim();
+  if (!base || !process.env.PRICE_BROWSER_SECRET?.trim()) return 'off';
+  try {
+    const res = await fetch(`${base.replace(/\/$/, '')}/health`, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(4000),
+    });
+    return res.ok ? 'up' : 'down';
+  } catch {
+    return 'down';
+  }
+}
+
+/** `fresh` slaat het geheugen van een halfuur over: een test wil de winkel zelf horen. */
+export async function lookupShopProduct(ref: ShopRef, fresh = false): Promise<ShopLookup> {
   const key = ref.page;
   const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < TTL_MS) return hit.lookup;
+  if (!fresh && hit && Date.now() - hit.at < TTL_MS) return hit.lookup;
 
   let lookup: ShopLookup;
   try {

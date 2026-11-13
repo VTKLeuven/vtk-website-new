@@ -623,6 +623,13 @@ Aanzetten op een server:
 3. Deploy. De eerste start haalt het Playwright-image (ruim 2 GB) en installeert
    `playwright` in een volume; daarna staat de dienst in `docker ps` op healthy.
 
+**Testen zonder budget.** Onderaan "Instellingen voor budgetten" staat
+"Prijscontrole testen" (`PriceCheckTest.tsx`, `testPriceLookupAction`): plak een
+productlink en de site vraagt de winkel meteen op, niet uit het geheugen van
+een halfuur, en bewaart niets. Het blok zegt ook of de prijsbrowser niet
+ingesteld is, niet antwoordt of draait, zodat je na een deploy het verschil
+ziet tussen "de container draait niet" en "de winkel weigert".
+
 Zonder die twee stappen verandert er niets: de editor zegt bij die winkels
 "deze winkel laat enkel browsers toe en de prijsbrowser staat niet aan".
 

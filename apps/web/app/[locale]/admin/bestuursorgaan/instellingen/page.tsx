@@ -7,6 +7,8 @@ import { requirePermission } from '@/lib/session';
 import { postOptions } from '@/lib/bo/posts';
 import { getBegroting, getBudgetSettings } from '@/lib/bo/budget/server';
 import { BegrotingUpload } from '@/components/bo-budget/BegrotingUpload';
+import { PriceCheckTest } from '@/components/bo-budget/PriceCheckTest';
+import { priceBrowserStatus } from '@/lib/priceCheck/fetch';
 import { BudgetSettingsForm } from '@/components/bo-budget/BudgetSettingsForm';
 
 /*
@@ -23,7 +25,7 @@ export default async function BudgetSettingsPage({ params }: { params: Promise<{
   const base = nl ? '' : '/en';
   await requirePermission('bestuursorgaan.manage');
 
-  const [groups, settings, begroting] = await Promise.all([
+  const [groups, settings, begroting, browser] = await Promise.all([
     prisma.group.findMany({
       where: { type: { not: 'JAARWERKING' } },
       orderBy: [{ orderInPraesidium: 'asc' }, { nameNl: 'asc' }],
@@ -40,6 +42,7 @@ export default async function BudgetSettingsPage({ params }: { params: Promise<{
     }),
     getBudgetSettings(),
     getBegroting(),
+    priceBrowserStatus(),
   ]);
   const posts = postOptions(groups, nl).map((p) => ({ key: p.key, name: p.name, group: p.group }));
 
@@ -69,6 +72,7 @@ export default async function BudgetSettingsPage({ params }: { params: Promise<{
         locale={locale}
       />
       <BudgetSettingsForm settings={settings} posts={posts} locale={locale} />
+      <PriceCheckTest browser={browser} locale={locale} />
     </div>
   );
 }
