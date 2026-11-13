@@ -11021,6 +11021,14 @@ een album, een Bakske), het recentste eerst (`compareNewsTiles` in
 `lib/news/rules.ts`). Een tijdlijn van oud naar nieuw werd niet gekozen: dan
 opent de band met het oudste album.
 
+**Het Bakske staat altijd als eerste tegel.** Op zijn pin viel het nieuwste
+nummer achter elke ticketverkoop en inschrijving, en stond het met drie of meer
+verkopen buiten beeld tot de carrousel er eens langs schoof. Het blad van de
+kring hoort meteen naast het uitgelichte bericht, dus `composeNews` zet het
+nieuwste Bakske vooraan en laat de rest de volgorde van hun pin houden. Enkel
+het Bakske: Ir.Reëel en de andere berichten volgen gewoon hun pin. Is het
+Bakske zelf uitgelicht, dan verandert er niets aan de tegels.
+
 **Er is geen maximum aantal berichten.** Er was een instelling van 3 tot 8, en
 wat erbuiten viel, stond in het beheer als "Band vol". Maar de tegels staan in
 een carrousel die schuift, dus er is geen plaats die volloopt; het maximum liet

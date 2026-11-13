@@ -303,7 +303,10 @@ export function compareNewsTiles(now: Date) {
  *
  * Uitgelicht is het bericht dat de redactie aanduidde, anders het nieuwste
  * woordje van de praeses, anders gewoon het nieuwste bericht. De tegels volgen
- * {@link compareNewsTiles}.
+ * {@link compareNewsTiles}, met één uitzondering: het nieuwste Bakske staat
+ * altijd als eerste tegel, meteen na het uitgelichte bericht. Op zijn pin (een
+ * datum die voorbij is) kwam het anders achter elke ticketverkoop, en dus
+ * buiten beeld tot de carrousel er eens langs schoof.
  */
 export function composeNews<T extends NewsComposable>(
   entries: readonly T[],
@@ -315,9 +318,11 @@ export function composeNews<T extends NewsComposable>(
     newest.find((entry) => entry.featured) ??
     newest.find((entry) => entry.source === "praeses") ??
     newest[0]!;
+  const rest = newest.filter((entry) => entry !== featured).sort(compareNewsTiles(now));
+  const bakske = newest.find((entry) => entry !== featured && entry.source === "bakske");
   return {
     featured,
-    rest: newest.filter((entry) => entry !== featured).sort(compareNewsTiles(now)),
+    rest: bakske ? [bakske, ...rest.filter((entry) => entry !== bakske)] : rest,
   };
 }
 
