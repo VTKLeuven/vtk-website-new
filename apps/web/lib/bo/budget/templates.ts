@@ -115,6 +115,100 @@ export function templateContent(template: BudgetTemplate, nl: boolean): BudgetCo
       { persons: 0, guests: 0, memberShare: 0, honoraryShare: 0 }
     );
   }
+  if (template === 'fakfeestje') {
+    // Het blad "Budget Fakfeestje": wat een promo kost tegenover de gewone
+    // verkoop, de inkleding en de dj's. De prijzen van de Fakbar staan niet in
+    // de code: de post typt per promo "=verkoopprijs - promoprijs/1,21".
+    return base(
+      [
+        {
+          id: newId(),
+          name: nl ? "Drankpromo's" : 'Drink promos',
+          type: 'fixed',
+          rows: [
+            cost({
+              name: '',
+              qty: 0,
+              price: 0,
+              basis: 'excl',
+              productVat: 0.21,
+              source: {
+                type: 'afspraak',
+                note: nl
+                  ? 'Verlies per consumptie: de gewone verkoopprijs excl. min de promoprijs excl. (typ "=1,05-0,75/1,21")'
+                  : 'Loss per drink: the normal selling price excl. minus the promo price excl.',
+              },
+            }),
+          ],
+        },
+        { id: newId(), name: nl ? 'Inkleding' : 'Decoration', type: 'fixed', rows: [] },
+        { id: newId(), name: "DJ's", type: 'fixed', rows: [] },
+        {
+          id: newId(),
+          name: nl ? 'Tappersdrank en huur' : 'Bar staff drinks and rent',
+          type: 'fixed',
+          rows: [],
+        },
+      ],
+      { persons: 0 }
+    );
+  }
+  if (template === 'sectornight') {
+    // Het blad van Bedrijvenrelaties: bedrijven betalen een deelnameprijs, en
+    // de catering rekent op studenten plus vertegenwoordigers.
+    const bedrijven = newId();
+    return {
+      ...base(
+        [
+          {
+            id: newId(),
+            name: nl ? 'Deelname bedrijven' : 'Company fees',
+            type: 'income',
+            rows: [
+              income({
+                name: nl ? 'Bedrijven' : 'Companies',
+                count: { type: 'manual', qty: 0 },
+                price: { type: 'manual', value: 0 },
+                fx: {
+                  qty: nl ? '=[Aantal bedrijven]' : '=[Companies]',
+                  price: nl ? '=[Prijs deelname bedrijf]' : '=[Fee per company]',
+                },
+              }),
+            ],
+          },
+          { id: newId(), name: nl ? 'Vaste kosten' : 'Fixed costs', type: 'fixed', rows: [] },
+          {
+            id: newId(),
+            name: nl ? 'Catering' : 'Catering',
+            type: 'variable',
+            distribute: false,
+            perPerson: 1,
+            base: 0,
+            fx: {
+              base: nl
+                ? '=Deelnemers+[Aantal bedrijven]*[Vertegenwoordigers per bedrijf]'
+                : '=Participants+[Companies]*[Representatives per company]',
+            },
+            rows: [],
+          },
+        ],
+        { persons: 0 }
+      ),
+      params: {
+        persons: 0,
+        extra: [
+          { id: bedrijven, name: nl ? 'Aantal bedrijven' : 'Companies', value: 0, kind: 'number' },
+          {
+            id: newId(),
+            name: nl ? 'Vertegenwoordigers per bedrijf' : 'Representatives per company',
+            value: 2,
+            kind: 'number',
+          },
+          { id: newId(), name: nl ? 'Prijs deelname bedrijf' : 'Fee per company', value: 0, kind: 'money' },
+        ],
+      },
+    };
+  }
   return base(
     [
       // Niet "Inkomsten": dat is in het blad de regel met de som eronder.

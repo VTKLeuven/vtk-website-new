@@ -6705,3 +6705,929 @@ button.vtk-bud-dot {
     justify-self: start;
   }
 }
+
+/* --------------------------------------------------------------------------
+   Budgetten op de site: maken en nakijken, delen, potjes en resultaten
+
+   Twee weergaven van hetzelfde budget. "Maken" is het werkblad hierboven.
+   "Nakijken" (`.vtk-rev`, `BudgetReview.tsx`) is één dicht blad zonder één
+   invoerveld: per regel hoeveel, tegen welke prijs, waar die prijs vandaan
+   komt en of ze nagekeken is. Alles wat in de editor achter het potlood zit,
+   staat daar gewoon in de rij.
+   -------------------------------------------------------------------------- */
+
+.vtk-bud-views {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.vtk-bud-views button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.vtk-bud-views button[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.vtk-bud-views-count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 11.5px;
+  font-weight: 650;
+  line-height: 18px;
+  text-align: center;
+}
+
+.vtk-bud-views-count[data-level='block'] {
+  background: var(--danger-ink);
+  color: #fff;
+}
+
+.vtk-bud-ghost {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.vtk-bud-ghost:hover {
+  background: var(--surface);
+}
+
+/* Een cel met een berekening erachter: een gele hoek, zoals een notitie in een blad. */
+.vtk-bud [data-fx] {
+  background-image: linear-gradient(225deg, var(--yellow) 0 6px, transparent 6px);
+  background-repeat: no-repeat;
+}
+
+.vtk-bud-code {
+  display: inline-block;
+  margin: 0 3px 3px 0;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--paper-2);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 12.5px;
+}
+
+.vtk-bud-params {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.vtk-bud-param {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) 96px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  max-width: 620px;
+}
+
+.vtk-bud-params .vtk-bud-add {
+  justify-self: start;
+}
+
+/* Overzicht: het resultaat naast het budget */
+.vtk-bud-ov-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+.vtk-bud-ov-head .vtk-bud-h2 {
+  margin: 0;
+}
+
+.vtk-bud-ov-toggle {
+  margin-left: auto;
+}
+
+.vtk-bud-ov-legend {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.vtk-bud-ov-res {
+  display: inline-block;
+  min-width: 84px;
+  margin-left: 12px;
+  color: var(--navy);
+  font-weight: 650;
+  text-align: right;
+}
+
+.vtk-bud-ov-legend .vtk-bud-ov-res {
+  min-width: 0;
+  margin-left: 8px;
+}
+
+.vtk-bud-result {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--paper-2);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-bud-result .vtk-bud-ov-total {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.vtk-bud-result .vtk-bud-field {
+  display: block;
+  margin-top: 12px;
+}
+
+.vtk-bud-sec-res {
+  display: block;
+  color: var(--navy);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: right;
+}
+
+.vtk-bud-table td.vtk-bud-col-res > .vtk-bud-cell {
+  background: color-mix(in srgb, var(--yellow) 14%, var(--surface));
+}
+
+.vtk-bud-begr {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.vtk-bud-begr-row {
+  display: grid;
+  grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
+  gap: 8px;
+  max-width: 720px;
+}
+
+.vtk-bud-pot {
+  margin-top: 14px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.vtk-bud-ov-list dd .neg,
+.vtk-rev .neg {
+  color: var(--danger-ink);
+}
+
+.vtk-bud-ov-list dd .pos,
+.vtk-rev .pos {
+  color: var(--ok-ink);
+}
+
+/* Delen */
+.vtk-bud-share-root {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.vtk-bud-share {
+  position: relative;
+  width: min(560px, 100%);
+  max-height: calc(100 * var(--vtk-dvh, 1dvh) - 32px);
+  overflow: auto;
+  padding: 22px;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 24px 60px rgba(10, 15, 31, 0.28);
+}
+
+.vtk-bud-share-row {
+  display: grid;
+  gap: 8px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+
+.vtk-bud-share-row h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.vtk-bud-share-row .vtk-bud-fine {
+  margin: 0;
+}
+
+.vtk-bud-share-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.vtk-bud-shared {
+  width: 100%;
+  max-width: var(--max);
+  margin-inline: auto;
+  padding: 20px clamp(20px, 3vw, 36px) 56px;
+}
+
+/* ------------------------------------------------------------- Nakijken */
+
+.vtk-rev {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  color: var(--body);
+  font-size: 13.5px;
+}
+
+.vtk-rev-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 28px;
+  padding: 16px 20px;
+  border-radius: 16px;
+  background: var(--navy);
+  color: var(--paper);
+}
+
+.vtk-admin-main .vtk-rev-head h2 {
+  margin: 0;
+  color: var(--paper);
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.vtk-admin-main .vtk-rev-kicker {
+  margin: 0 0 2px;
+  color: var(--yellow) !important;
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vtk-rev-figs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 26px;
+  margin: 0;
+}
+
+.vtk-rev-figs dt {
+  color: var(--on-dark-muted);
+  font-size: 11.5px;
+}
+
+.vtk-rev-figs dd {
+  margin: 0;
+  color: var(--paper);
+  font-size: 16px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-rev-figs .total dd {
+  font-size: 20px;
+}
+
+.vtk-rev-figs dd.res {
+  color: var(--yellow);
+  font-size: 13.5px;
+}
+
+.vtk-rev-figs dd .neg,
+.vtk-rev-figs dd.neg {
+  color: #ffb4ab;
+}
+
+.vtk-rev-figs dd .pos {
+  color: #9be3b4;
+}
+
+.vtk-rev-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  margin: 0;
+  padding: 0 4px;
+}
+
+.vtk-rev-facts > div {
+  display: flex;
+  gap: 6px;
+}
+
+.vtk-rev-facts dt {
+  color: var(--muted);
+}
+
+.vtk-rev-facts dd {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 550;
+}
+
+.vtk-admin-main .vtk-rev-line,
+.vtk-admin-main .vtk-rev-concept,
+.vtk-admin-main .vtk-rev-clean {
+  margin: 0;
+  padding: 0 4px;
+  color: var(--body) !important;
+}
+
+.vtk-rev-concept {
+  max-width: 90ch;
+  white-space: pre-line;
+}
+
+.vtk-admin-main .vtk-rev-clean {
+  color: var(--ok-ink) !important;
+}
+
+.vtk-rev-checks,
+.vtk-rev-pot,
+.vtk-rev-sec {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.vtk-rev-checks {
+  padding: 12px 16px;
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-rev-checks h3,
+.vtk-rev-pot h3,
+.vtk-rev-sec-head h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 14.5px;
+  font-weight: 650;
+}
+
+.vtk-rev-checks h3 span,
+.vtk-rev-sec-head h3 span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.vtk-rev-checks ul {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vtk-rev-checks li {
+  position: relative;
+  padding-left: 16px;
+  color: var(--ink);
+}
+
+.vtk-rev-checks li::before {
+  content: '';
+  position: absolute;
+  top: 0.5em;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--yellow);
+  box-shadow: inset 0 0 0 1px var(--low-ink);
+}
+
+.vtk-rev-checks li[data-level='block']::before {
+  background: var(--danger-ink);
+  box-shadow: none;
+}
+
+.vtk-rev-pot h3 {
+  padding: 12px 16px 6px;
+}
+
+.vtk-rev-sec-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.vtk-rev-sec-sum {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-rev-sec-sum b {
+  color: var(--ink);
+  font-size: 14.5px;
+}
+
+.vtk-rev-wrap {
+  position: relative;
+  overflow-x: auto;
+}
+
+.vtk-admin-main .vtk-rev-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.vtk-admin-main .vtk-rev-table th {
+  padding: 6px 10px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 550;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.vtk-admin-main .vtk-rev-table td {
+  padding: 5px 10px;
+  border-top: 1px solid var(--rule-soft);
+  color: var(--ink);
+  vertical-align: top;
+}
+
+.vtk-rev-table th:first-child,
+.vtk-rev-table td:first-child {
+  padding-left: 16px;
+}
+
+.vtk-rev-table th:last-child,
+.vtk-rev-table td:last-child {
+  padding-right: 16px;
+}
+
+.vtk-rev-table .num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.vtk-rev-name {
+  min-width: 180px;
+  font-weight: 550;
+}
+
+.vtk-rev-calc {
+  color: var(--body) !important;
+}
+
+.vtk-rev-amount {
+  font-weight: 650;
+}
+
+.vtk-rev-sub {
+  display: block;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 400;
+  white-space: normal;
+}
+
+.vtk-rev-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--body);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.vtk-rev-muted {
+  color: var(--muted);
+}
+
+.vtk-rev-empty {
+  margin: 0;
+  padding: 10px 16px;
+}
+
+.vtk-rev-flag {
+  color: var(--danger-ink);
+  font-weight: 600;
+}
+
+.vtk-rev-source,
+.vtk-rev-note {
+  min-width: 200px;
+  max-width: 340px;
+  color: var(--body) !important;
+}
+
+.vtk-rev-src {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+}
+
+.vtk-rev-src a,
+.vtk-rev-pot a {
+  color: var(--navy);
+  font-weight: 550;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.vtk-rev-status {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.vtk-rev-status[data-status='ok'],
+.vtk-rev-status[data-status='confirmed'] {
+  color: var(--ok-ink);
+}
+
+.vtk-rev-status[data-status='changed'],
+.vtk-rev-status[data-status='notfound'],
+.vtk-rev-status[data-status='nolink'] {
+  color: var(--danger-ink);
+  font-weight: 600;
+}
+
+.vtk-rev-table tr[data-level='block'] td:first-child {
+  box-shadow: inset 3px 0 0 var(--danger-ink);
+}
+
+.vtk-rev-table tr[data-level='review'] td:first-child {
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-rev-table tr.self td {
+  background: var(--paper-2);
+}
+
+.vtk-admin-main .vtk-rev-table tfoot td {
+  border-top: 1px solid var(--line-2);
+  font-weight: 650;
+}
+
+@media print {
+  .vtk-bud-top {
+    position: static;
+  }
+
+  .vtk-bud-views,
+  .vtk-bud-ghost,
+  .vtk-bud-primary,
+  .vtk-bud-save {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------- Mappen per BO */
+
+.vtk-fold-crumbs {
+  display: flex;
+  gap: 6px;
+  min-height: 18px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.vtk-fold-crumbs a {
+  color: var(--muted);
+}
+
+.vtk-fold-search {
+  flex: 0 1 320px;
+}
+
+.vtk-admin-main .vtk-fold-search input {
+  width: 100%;
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.vtk-fold-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vtk-fold-tile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.vtk-fold-tile:hover {
+  border-color: var(--line-2);
+  box-shadow: 0 2px 10px rgba(14, 26, 54, 0.07);
+}
+
+.vtk-fold-tile:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.vtk-fold-tileicon {
+  flex: none;
+  width: 38px;
+  height: 38px;
+}
+
+.vtk-fold-icon {
+  fill: var(--paper-2);
+  stroke: var(--navy);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+
+.vtk-fold-tile[data-upcoming] .vtk-fold-icon,
+.vtk-fold-icon[data-open] {
+  fill: var(--yellow);
+}
+
+.vtk-fold-tiletext {
+  display: grid;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+.vtk-fold-tiletext b {
+  color: var(--ink);
+  font-size: 14.5px;
+  font-weight: 650;
+}
+
+.vtk-fold-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.vtk-fold-sub small {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.vtk-fold-subicon {
+  width: 22px;
+  height: 22px;
+}
+
+.vtk-fold-list {
+  position: relative;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.vtk-admin-main .vtk-fold-list table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.vtk-admin-main .vtk-fold-list th {
+  padding: 8px 14px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 550;
+  text-align: left;
+}
+
+.vtk-admin-main .vtk-fold-list td {
+  padding: 7px 14px;
+  border-top: 1px solid var(--rule-soft);
+  color: var(--body);
+}
+
+.vtk-fold-list tbody tr:hover td {
+  background: var(--paper);
+}
+
+.vtk-fold-list .num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.vtk-fold-name {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--ink);
+  font-weight: 550;
+  text-decoration: none;
+}
+
+.vtk-fold-name:hover span {
+  text-decoration: underline;
+}
+
+.vtk-fold-name small {
+  display: block;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 400;
+}
+
+.vtk-fold-file {
+  flex: none;
+  margin-top: 1px;
+  fill: none;
+  stroke: #188038;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.vtk-fold-file[data-source='site'] {
+  stroke: var(--navy);
+}
+
+.vtk-admin-main .vtk-fold-empty {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px dashed var(--line-2);
+  border-radius: 14px;
+}
+
+.vtk-fold-drive {
+  color: var(--navy);
+  font-size: 13.5px;
+  font-weight: 550;
+}
+
+@media (max-width: 720px) {
+  .vtk-bud-param,
+  .vtk-bud-begr-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .vtk-rev-figs {
+    gap: 8px 18px;
+  }
+}
+
+/* Smal: elke regel van een nakijktabel of een map wordt een kaartje met het
+   kolomhoofd als label per waarde, in plaats van een tabel die opzij schuift. */
+@media (max-width: 720px) {
+  .vtk-rev-head {
+    padding: 14px 16px;
+  }
+
+  .vtk-rev-figs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .vtk-admin-main .vtk-rev-table:not(.vtk-rev-pottable) thead,
+  .vtk-admin-main .vtk-fold-list thead {
+    display: none;
+  }
+
+  .vtk-admin-main .vtk-rev-table:not(.vtk-rev-pottable),
+  .vtk-admin-main .vtk-rev-table:not(.vtk-rev-pottable) tbody,
+  .vtk-admin-main .vtk-fold-list table,
+  .vtk-admin-main .vtk-fold-list tbody {
+    display: block;
+  }
+
+  .vtk-admin-main .vtk-rev-table:not(.vtk-rev-pottable) tr,
+  .vtk-admin-main .vtk-fold-list tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2px 14px;
+    padding: 9px 14px;
+    border-top: 1px solid var(--rule-soft);
+  }
+
+  .vtk-admin-main .vtk-rev-table:not(.vtk-rev-pottable) td,
+  .vtk-admin-main .vtk-fold-list td {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+    max-width: none;
+    padding: 1px 0;
+    border: 0;
+    text-align: right;
+    white-space: normal;
+  }
+
+  .vtk-admin-main .vtk-rev-table td::before,
+  .vtk-admin-main .vtk-fold-list td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 11.5px;
+    font-weight: 400;
+    text-align: left;
+  }
+
+  .vtk-admin-main .vtk-rev-table:not(.vtk-rev-pottable) td:first-child,
+  .vtk-admin-main .vtk-rev-table td.vtk-rev-source,
+  .vtk-admin-main .vtk-rev-table td.vtk-rev-note,
+  .vtk-admin-main .vtk-fold-list td:first-child {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  .vtk-admin-main .vtk-rev-table td:empty {
+    display: none;
+  }
+
+  .vtk-rev-table .vtk-rev-sub {
+    display: inline;
+    margin-left: 6px;
+  }
+
+  .vtk-rev-pot {
+    overflow-x: auto;
+  }
+}
+
+.vtk-admin-main .vtk-bud-source {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--paper-2);
+  color: var(--body) !important;
+  font-size: 13.5px;
+  box-shadow: inset 3px 0 0 var(--navy);
+}
+
+.vtk-fold-import {
+  max-width: 760px;
+}

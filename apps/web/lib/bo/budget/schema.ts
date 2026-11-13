@@ -12,6 +12,7 @@ const share = z.number().finite().min(0).max(10);
 const count = z.number().finite().min(0).max(1_000_000);
 const text = (max: number) => z.string().max(max);
 const id = z.string().min(1).max(40);
+const formula = z.string().max(300);
 
 const source = z.object({
   type: z.enum(SOURCE_TYPES),
@@ -55,9 +56,13 @@ const costRow = z.object({
       price: money.optional(),
       name: text(300).optional(),
       reason: text(300).optional(),
+      basis: z.enum(['incl', 'excl']).optional(),
+      shop: text(40).optional(),
     })
     .nullable()
     .optional(),
+  fx: z.partialRecord(z.enum(['qty', 'pct', 'perPerson', 'perUnit', 'price']), formula).optional(),
+  result: money.nullable().optional(),
 });
 
 const incomeRow = z.object({
@@ -74,6 +79,8 @@ const incomeRow = z.object({
     z.object({ type: z.literal('drinks'), sectionId: id, main: money, rest: money }),
   ]),
   note: text(1000).optional(),
+  fx: z.partialRecord(z.enum(['qty', 'price']), formula).optional(),
+  result: money.nullable().optional(),
 });
 
 const section = z.discriminatedUnion('type', [
@@ -85,6 +92,8 @@ const section = z.discriminatedUnion('type', [
     share: share.optional(),
     perPerson: count.optional(),
     distribute: z.boolean().optional(),
+    base: count.nullable().optional(),
+    fx: z.partialRecord(z.enum(['share', 'perPerson', 'base']), formula).optional(),
     rows: z.array(costRow).max(200),
   }),
 ]);
@@ -96,15 +105,46 @@ export const budgetContentSchema = z.object({
     guests: count.optional(),
     memberShare: share.optional(),
     honoraryShare: share.optional(),
+    extra: z
+      .array(
+        z.object({
+          id,
+          name: text(80),
+          value: money,
+          kind: z.enum(['number', 'percent', 'money']).optional(),
+          fx: formula.optional(),
+        })
+      )
+      .max(40)
+      .optional(),
   }),
   info: z.object({ date: text(40), location: text(120), concept: text(2000) }),
   begroting: money.nullable(),
+  begrotingRef: z
+    .object({ sheet: text(80), key: text(300), label: text(300) })
+    .nullable()
+    .optional(),
+  potPart: z.boolean().optional(),
   vat: z.object({ rate: z.number().min(0).max(1), reason: text(500) }).nullable(),
   allocation: z
     .array(z.object({ org: text(80), share }))
     .min(1)
     .max(10),
   sections: z.array(section).max(30),
+  result: z
+    .object({ on: z.boolean(), note: text(2000).optional() })
+    .nullable()
+    .optional(),
+  source: z
+    .object({
+      kind: z.enum(['drive', 'upload']),
+      name: text(300),
+      id: text(200).optional(),
+      mode: z.enum(['regels', 'overzicht']),
+      sheetTotal: money.nullable(),
+    })
+    .nullable()
+    .optional(),
 });
 
 export function parseBudgetContent(value: unknown): BudgetContent | null {
@@ -139,3 +179,11 @@ export function parseBudgetSettings(value: unknown): BudgetSettings | null {
   const parsed = budgetSettingsSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
 }
+
+const begrotingLine = z.object({ key: text(300), group: text(200), name: text(200), amount: money });
+
+export const begrotingSchema = z.object({
+  fileName: text(200),
+  uploadedAt: z.string().max(40),
+  sheets: z.array(z.object({ name: text(80), lines: z.array(begrotingLine).max(2000) })).max(80),
+});

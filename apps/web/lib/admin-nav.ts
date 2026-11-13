@@ -131,6 +131,8 @@ export function getAdminNav(): NavEntry[] {
       // Hetzelfde voor de eigen post, voor elk lid van een post of werkgroep:
       // welke resultaten nog naar het BO moeten.
       item('bestuursorgaanOwn', '/bestuursorgaan/mijn', { post: true }),
+      // Alles per BO in een map, zoals in Drive: de eigen post, of alles voor Groep 5.
+      item('bestuursorgaanFolders', '/bestuursorgaan/mappen', { post: true }),
     ]),
     // Theokot doet twee dingen die weinig met elkaar te maken hebben: broodjes
     // verkopen en de zaal verhuren. Later komt de uitleendienst erbij. Daarom

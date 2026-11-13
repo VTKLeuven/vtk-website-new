@@ -12016,6 +12016,63 @@ site").
   −1.167 was klein, Poolavond −144 groot), maar aan of er iets te bespreken
   viel; dat beslist de GM.
 
+### Budgetten op de site: tweede ronde (november 2026)
+
+Na de eerste stap zijn alle 209 bladen van 26-27 naast de site gelegd; de
+telling staat in `docs/bestuursorgaan.md` ("Wat de 209 bladen van 26-27
+vroegen").
+
+- **Maken en nakijken zijn twee weergaven, geen twee schermen.** Wie een budget
+  opstelt, heeft cellen, knoppen en panelen nodig; wie het nakijkt (de GM, het
+  BO, een andere kring) wil alles op één blad zien en niets kunnen aanraken. Eén
+  schakelaar in de kop, dezelfde URL, en `?weergave=nakijken` voor wie van
+  buitenaf komt. In Nakijken staat per regel de som uitgeschreven en de bron met
+  de stand van de prijscontrole: dat is precies wat op het BO nu mondeling
+  gevraagd wordt.
+- **Berekeningen in een cel, maar geen rekenblad.** 67 bladen hadden een losse
+  som in een cel en 96 verwezen naar een eigen parameter; zonder dat moest een
+  post buiten de site rekenen en zag niemand nog waar "0,6975" vandaan kwam.
+  Verwijzen naar een andere regel en ALS() kunnen bewust niet: daar gingen de
+  bladen stuk (een som die een rij mist, een percentage dat over twee secties
+  heen telt), en dat was de reden om van de bladen weg te willen.
+- **Een leeg resultaat is "nog niet ingevuld", geen nul.** Zo is een
+  tussentijds resultaat gewoon een resultaat dat nog niet af is, en zegt de site
+  hoeveel regels nog ontbreken in plaats van een te goed totaal te tonen.
+- **Een potje is een lijn uit de begroting, geen eigen ding.** Twee budgetten
+  die dezelfde lijn kiezen, horen samen; er is niets om aan te maken of te
+  beheren. De begroting komt uit het rekenblad van Beheer, opgeladen bij de
+  instellingen: geen lijn en geen bedrag in de code. Een budget houdt het
+  bedrag dat het overnam, ook wanneer de begroting later vervangen wordt.
+- **Een deellink is een geheim in de URL, zonder account.** De vraag kwam van
+  twee kanten: een kring waarmee samengewerkt wordt en die niet in de admin
+  kan, en de slides van het BO. Twee links, bekijken en aanpassen, elk
+  intrekbaar; een link geeft toegang tot één budget en tot niets anders, en
+  verwijderen of delen blijft bij de post. Geen inlog voor de andere kring:
+  dat vroeg een account per persoon voor iets wat één avond duurt.
+- **Mappen per BO, zoals Drive.** De verkenner en de lijst groeperen op post
+  en stand; wie een budget zoekt, weet meestal op welke BO het passeerde. De
+  mappen tonen de bladen uit Drive en de budgetten op de site door elkaar, met
+  erbij waar een bestand staat. Een post ziet enkel haar eigen bestanden: de
+  regel "een post ziet enkel haar eigen budgetten" geldt hier ook.
+- **Prijzen: automatisch bij de vijf meest gebruikte winkels, ook waar dat
+  een echte browser vraagt.** bol.com, Partywinkel en Action weigeren alles wat
+  geen browser is. De kring wilde geen tussenstap voor wie een budget maakt
+  (geen extensie, geen klik per product), dus opent een Chromium in een eigen
+  container die pagina's, op vraag en traag (`docs/bestuursorgaan.md`, "De
+  prijsbrowser"). De grens: een gewone browser die een openbare productpagina
+  laadt, niets dat een captcha oplost of zich voordoet als iets anders. Colruyt
+  toont geen prijs zonder gekozen winkel; daar blijft Collect&Go de bron.
+  Helloprint en Drukzo geven de prijs excl. BTW, en zo neemt de site ze over.
+
+- **Bestaande rekenbladen overnemen, als uitkomst en niet als berekening.**
+  Om te beslissen of de kring wil overstappen, moet ze de site zien met wat al
+  passeerde. Een blad komt binnen met dezelfde regels en hetzelfde totaal, maar
+  een variabele regel is op de site het aantal eenheden tegen de prijs: de
+  formule naspelen zou bij de helft van de bladen een ander bedrag geven dan wat
+  het BO goedkeurde, en dan vertrouwt niemand de import. Waar de regels niet op
+  het totaal uitkomen, neemt de site enkel het overzicht en zegt ze dat. Een
+  import raakt nooit een budget dat op de site zelf opgesteld is.
+
 ## Nieuwe evenementen in Discord
 
 Op /admin/kalender/discord hangt de kring Discord-webhooks aan de kalender. Een

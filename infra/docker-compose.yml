@@ -48,6 +48,8 @@ services:
       - path: ./immich/.env.example
       - path: ./immich/.env
         required: false
+      - path: ./price-browser/.env
+        required: false
     depends_on:
       postgres:
         condition: service_healthy
@@ -77,6 +79,10 @@ services:
       # The website talks to Immich over the private Compose network.
       GALLERY_IMMICH_API_URL: http://immich-server:2283/api
       GALLERY_DATABASE_HOST: immich-database
+      # De prijsbrowser op het interne netwerk (zie de service `price-browser`).
+      # Het geheim komt uit infra/price-browser/.env; zonder dat bestand vraagt
+      # de site er niets aan.
+      PRICE_BROWSER_URL: http://price-browser:8787
       # Object storage (Hetzner S3) is configured at runtime via Admin -> IT and
       # stored in the database. S3_* values from ../.env are only a fallback.
     volumes:
@@ -771,6 +777,57 @@ services:
       retries: 1
       start_period: 60s
 
+  # De prijsbrowser: een echte Chromium die productpagina's opent voor de
+  # budgetten op de site (bol.com, Partywinkel, Action). Die winkels weigeren
+  # alles wat geen browser is, dus een gewone aanvraag vanuit `web` krijgt
+  # HTTP 403. Zie infra/price-browser/server.cjs en docs/bestuursorgaan.md.
+  #
+  # Achter een profiel, zoals umami: het image is ruim 2 GB en er draait een
+  # browser, dus dat kiest de server bewust (`COMPOSE_PROFILES=price-browser`
+  # in infra/.env) samen met een geheim in infra/price-browser/.env. Zonder
+  # beide zegt de editor bij die winkels "geen antwoord" en verandert er niets.
+  #
+  # Geen `build:` en geen poort naar buiten: het officiële Playwright-image,
+  # met het script uit de repo erin gemount, enkel bereikbaar voor `web` op het
+  # interne netwerk. `playwright` zelf komt bij de eerste start van npm (dezelfde
+  # versie als het image, in een volume), zodat de lockfile van de repo en de
+  # drie app-builds er niets van merken. Chromium draait met een venster op een
+  # virtueel scherm (xvfb-run): headless houdt Cloudflare (Action) het tegen.
+  price-browser:
+    logging: *app-logging
+    profiles: ['price-browser']
+    image: mcr.microsoft.com/playwright:v1.64.1-noble
+    restart: unless-stopped
+    init: true
+    ipc: host
+    env_file:
+      - path: ./price-browser/.env
+        required: false
+    environment:
+      PORT: '8787'
+      NODE_PATH: /opt/price-browser/node_modules
+    volumes:
+      - ./price-browser/server.cjs:/srv/server.cjs:ro
+      - price-browser-modules:/opt/price-browser
+    working_dir: /opt/price-browser
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        test -d node_modules/playwright || npm install --no-save --no-audit --no-fund playwright@1.64.1
+        exec xvfb-run -a node /srv/server.cjs
+    # Een browser met een paar tabbladen; meer dan dit is een lek, geen werk.
+    mem_limit: 1500m
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8787/health',{signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
+      interval: 60s
+      timeout: 6s
+      retries: 3
+      start_period: 120s
+
 # KU Leuvens IdP is vanaf de productieserver enkel via IPv6 bereikbaar.
 # Docker kent voor een IPv6-enabled custom bridge automatisch een ULA-subnet
 # toe en NAT dat via de IPv6-route van de host.
@@ -783,3 +840,4 @@ volumes:
   immich-model-cache:
   vaultwarden-data:
   web-image-cache:
+  price-browser-modules:

@@ -384,16 +384,24 @@ voor de leden van zijn post te openen.
 | `apps/web/lib/bo/budget/types.ts` | Het document van een budget (`BudgetContent`) en de instellingen |
 | `apps/web/lib/bo/budget/calc.ts` | Rekenen: BTW, verdelingen, eenheden, inkomsten, overzicht (puur) |
 | `apps/web/lib/bo/budget/checks.ts` | Wat nog na te kijken is, en wat de GM bekijkt (puur) |
-| `apps/web/lib/bo/budget/prices.ts` | Welke regels een Collect&Go-product hebben, en wat het antwoord betekent (puur) |
+| `apps/web/lib/bo/budget/formula.ts` | Een berekening in een getalveld ("=2,79/4") en de eigen parameters (puur) |
+| `apps/web/lib/bo/budget/begroting.ts` | De begroting van het werkingsjaar uit het rekenblad van Beheer lezen (puur) |
+| `apps/web/lib/bo/budget/pot.ts` | Een potje: meer budgetten op één lijn van de begroting (puur) |
+| `apps/web/lib/bo/budget/importSheet.ts`, `importStore.ts` | Een rekenblad van het BO omzetten naar een budget op de site, en het bewaren |
+| `apps/web/lib/bo/budget/prices.ts` | Welke regels een product bij een webshop hebben, en wat het antwoord betekent (puur) |
+| `apps/web/lib/priceCheck/` | De webshops: een productlink herkennen, de pagina ophalen, de prijs lezen |
 | `apps/web/lib/bo/budget/sheet.ts` | Het budget als rekenblad voor Drive, in de vorm van het sjabloon van de penning |
 | `apps/web/lib/bo/budget/schema.ts` | Wat de server aanvaardt (zod) |
-| `apps/web/lib/bo/budget/templates.ts` | De sjablonen Standaard en Cantus |
-| `apps/web/lib/bo/budget/server.ts` | Wie mag wat, de instellingen (`Setting` `bestuursorgaan.budgets`) |
-| `apps/web/lib/collectgo/` | Een productlink herkennen en de prijs van de productpagina lezen |
+| `apps/web/lib/bo/budget/templates.ts` | De sjablonen Standaard, Cantus, Fakfeestje en Sector Night |
+| `apps/web/lib/bo/budget/server.ts` | Wie mag wat (lid of deellink), de instellingen, de begroting, de potjes |
+| `apps/web/lib/collectgo/product.ts` | Collect&Go: het product uit een link en uit de JSON-LD van de pagina |
 | `apps/web/app/actions/boBudgets.ts` | Aanmaken, bewaren, prijzen nakijken, verwijderen, instellingen |
 | `apps/web/app/api/admin/bestuursorgaan/budget/[id]/route.ts` | De download voor Drive |
-| `apps/web/components/bo-budget/` | De editor, het paneel per regel, het formulier en de instellingen |
+| `apps/web/components/bo-budget/` | De editor (Maken), `BudgetReview` (Nakijken), `ShareDialog`, het paneel per regel, de instellingen |
+| `apps/web/app/[locale]/admin/bestuursorgaan/mappen/` | Per BO een map, zoals in Drive |
+| `apps/web/app/[locale]/budget/[token]/` | Een budget achter een deellink, buiten de admin |
 | `apps/web/test/boBudget.test.ts` | Live Cantus, IT Nieuw Materiaal en PeMe van BO 12, Collect&Go, de download |
+| `apps/web/test/boBudgetFormulas.test.ts` | Berekeningen, parameters, resultaat, potjes, de begroting, de webshops |
 
 **Het model.** Een `BoBudget` hoort bij één post (`postKey`, zoals overal in
 `lib/bo`) en één werkingsjaar, en draagt zijn inhoud als één JSON-document:
@@ -450,19 +458,244 @@ Drie pagina's tegelijk, hoogstens 60 per keer, en een gevonden pagina onthoudt
 de server een halfuur. Groep 5 zet het uit bij de instellingen
 (`collectGoLive`) als Colruyt het niet wil.
 
+### Maken en nakijken: twee weergaven van hetzelfde budget
+
+De kop van de editor heeft een schakelaar. **Maken** is het werkblad: cellen om
+in te typen, het paneel achter het potlood, de knoppen. **Nakijken**
+(`BudgetReview.tsx`) is hetzelfde budget zonder één invoerveld: bovenaan de
+bedragen, daaronder de aandachtspunten, en per sectie één dichte tabel met per
+regel de som ("30 % × 150 p × 2 ÷ 24 = 4 bak ×"), de prijs met incl. of excl.,
+het bedrag, het resultaat en de bron met de stand van de prijscontrole. Wat in
+Maken achter het potlood zit, staat daar gewoon in de rij. `?weergave=nakijken`
+opent een budget meteen zo; de mappen per BO en de deellink om te bekijken
+gebruiken dat.
+
+### Berekeningen en eigen parameters
+
+Elk getalveld neemt ook een berekening aan, zoals een cel: `=2,79/4`,
+`=5+1+2+2+7`, `=[Aantal bedrijven]*2+8`, `=omhoog(45/6)`. Het veld toont het
+antwoord en een gele hoek; klik erin en de berekening staat er weer. Onder
+"Deelnemers" voegt een post eigen parameters toe (aantal, % of €), zoals het
+blok Parameters bovenaan het blad.
+
+- De berekening staat in `fx` naast het veld (`row.fx.qty`), het antwoord in
+  het veld zelf. `applyFormulas` rekent alles opnieuw uit bij elke wijziging in
+  de editor én bij elke bewaring op de server; `calc.ts`, de controles en de
+  download lezen enkel de getallen.
+- Kan: getallen (komma of punt), + − × ÷, haakjes, `%`, parameters op naam
+  (`[Aantal bedrijven]` of `aantal_bedrijven`), `Deelnemers`, en `omhoog`,
+  `omlaag`, `afronden`, `min`, `max` (ook als ROUNDUP, ROUNDDOWN, ROUND). Kan
+  bewust niet: verwijzen naar een andere regel, en ALS().
+- Een berekening die niet uitkomt (een parameter die weg is, delen door nul)
+  is een punt dat het indienen tegenhoudt, met de reden.
+- Een variabele sectie rekent standaard op de deelnemers; "% van ... personen"
+  geeft haar een eigen aantal (`section.base`), ook als berekening.
+
+### Resultaat naast het budget
+
+"Resultaat invullen" in het overzicht zet `content.result.on`. Elke regel
+krijgt dan een kolom Resultaat (`row.result`, wat ze echt kostte of opbracht),
+het overzicht toont budget en resultaat naast elkaar met het verschil, en de
+download heet `26-27_Resultaat_<post>_<activiteit>.xlsx` met de kolom
+Resultaat gevuld, zodat de scan het als resultaat leest. Een leeg veld is "nog
+niet ingevuld", niet nul: de site telt hoeveel regels nog ontbreken, en een
+tussentijds resultaat is dus gewoon een resultaat dat nog niet af is.
+
+### De begroting en potjes
+
+Groep 5 laadt bij de instellingen het rekenblad van de begroting op
+(`uploadBegrotingAction`). `begroting.ts` leest per post-tabblad de lijnen
+(kopje, naam, totaal) en bewaart enkel die in `Setting`
+`bestuursorgaan.begroting`; in de code staat geen lijn en geen bedrag. In het
+overzicht van een budget kiest de post de lijn; de site neemt het bedrag over
+(het blijft aan te passen) en onthoudt de lijn in `content.begrotingRef`.
+
+Twee budgetten met dezelfde lijn zijn een **potje** (`pot.ts`, `loadPot`):
+materiaal dat door het jaar gekocht wordt, met telkens een budget en een
+(tussentijds) resultaat. De editor en de nakijkweergave tonen dan de andere
+budgetten op de lijn met hun resultaat, en "verschil met begroting" vergelijkt
+het potje als geheel (`CalcContext.pot`). Wie nog geen resultaat heeft, telt in
+het resultaat van het potje mee met zijn budget.
+
+### Delen met een link
+
+"Delen" in de kop maakt twee soorten link (`BoBudget.viewToken` en
+`editToken`, `/budget/<token>`): een om te **bekijken** (de nakijkweergave,
+voor in de slides van het BO) en een om **aan te passen** (de editor, voor een
+kring waarmee samengewerkt wordt en die niet in de admin kan). Geen account
+nodig; de link is de toegang.
+
+- Elke action en de download vragen `budgetAccess(budget, token)`: lid van de
+  post, of een geldige link. Een link geeft toegang tot dat ene budget, niet
+  tot de lijst, de instellingen, de begroting of de links zelf.
+- Verwijderen, links maken en intrekken kan enkel een lid (`requireSession`).
+- Een nieuwe link maakt de oude ongeldig; intrekken zet de kolom op NULL.
+  Een onbekende of ingetrokken link is een 404.
+- De pagina staat op `noindex` en `referrer: no-referrer`: de regels linken
+  naar webshops, en die hoeven de link niet te krijgen.
+
+### Mappen per BO
+
+`/admin/bestuursorgaan/mappen`: elke BO van het werkingsjaar als een map, met
+daarin Budgetten en Resultaten. Een rij is een rekenblad uit Drive (opent in
+Drive) of een budget op de site (opent in Nakijken), en bovenaan zoekt één
+veld over alle mappen. Groep 5 ziet alles; een post enkel haar eigen
+bestanden, op de server gefilterd op `postKeys` zoals `lib/bo/own.ts`. Een
+budget op de site staat in de map van de BO met dezelfde datum als "Voor het
+BO van", anders in een map op die datum of in "Nog geen BO gekozen".
+
+### Rekenbladen overnemen
+
+Wat al met een rekenblad langs het BO passeerde, kan alsnog op de site komen,
+zodat de kring de site met echte cijfers beoordeelt. Enkel Groep 5, op
+`/admin/bestuursorgaan/mappen`:
+
+- **Uit Drive**: open de map van een BO en klik "Bladen van deze BO op de site
+  zetten" (`importMeetingFromDriveAction`). De site downloadt wat de scan in
+  die map vond (`downloadSpreadsheet`, dezelfde koppeling en dezelfde scope), met
+  de post, de activiteit en budget-of-resultaat zoals het register ze al kent.
+  In Drive verandert niets.
+- **Opladen**: onderaan dezelfde pagina, een of meer `.xlsx` tegelijk
+  (`importBudgetFilesAction`). De post en de activiteit komen uit de
+  bestandsnaam (`parseDocumentName`, met de aliassen van Groep 5), anders uit
+  A1 en C1 van het blad. Voor een server zonder Drive-koppeling, of om lokaal
+  te proberen.
+
+`importSheet.ts` leest het blad zoals de scan (de laatst berekende waarde van
+elke cel) en maakt van elke regel een regel: naam, aantal, prijs, het resultaat
+en de link uit "Opmerking/link" (de xlsx-lezer geeft daarvoor nu ook de
+hyperlinks van een cel terug). Wat er bewust niet gebeurt, is de berekening
+naspelen: een variabele regel komt binnen als haar uitkomst (zoveel eenheden
+tegen die prijs). Zo klopt elk bedrag met wat het BO goedkeurde.
+
+- **Het totaal moet kloppen met het blad, tot op de cent.** Komen de regels er
+  niet op uit (het blad Fakfeestje, meer tabbladen, een eigen indeling), dan
+  neemt de lezer het blok Overzicht: één regel per post. `content.source.mode`
+  zegt welke van de twee, en de editor en de nakijkweergave tonen het.
+- **Eén activiteit van een post is één budget.** Het resultaatblad vervangt het
+  budgetblad van dezelfde activiteit (het bevat beide kolommen), niet omgekeerd.
+- **Een import overschrijft nooit wat op de site opgesteld is**: enkel een
+  budget dat zelf uit een rekenblad kwam (`content.source`), wordt vervangen.
+  Opnieuw overnemen is dus veilig, en gooit wel weg wat iemand intussen in zo'n
+  overgenomen budget wijzigde.
+- Een overgenomen budget staat in opmaak (sjabloon "Uit een rekenblad"), in de
+  map van zijn BO, en is te wijzigen, te delen en na te kijken zoals elk ander.
+  De controles zeggen wat het blad niet had: een regel zonder bron, een prijs
+  zonder incl. of excl.
+- **De bladen zelf komen nooit in de repo.** `test/boBudgetImport.test.ts`
+  bouwt een blad na met verzonnen cijfers. Tegen de 209 bladen van 26-27 is de
+  lezer lokaal gedraaid: 155 regel per regel, 53 met het overzicht, 1 zonder
+  blok Overzicht (geen budgetblad), en elk overgenomen totaal klopte.
+
+### Prijzen bij de webshops
+
+`lib/priceCheck/shops.ts` herkent een link naar één product en zegt hoe de
+prijs opgehaald wordt (`via`). Getest in november 2026:
+
+| Winkel | Bladen (van 209) | Hoe | Stand |
+| ------ | ---------------- | --- | ----- |
+| collectandgo.be | 90 | gewone aanvraag, JSON-LD | werkt |
+| bol.com | 35 | prijsbrowser, JSON-LD | werkt |
+| partywinkel.be | 30 | prijsbrowser, JSON-LD en `og:price:amount` (de gekozen variant) | werkt |
+| helloprint.com, drukzo.be | 14 en 4 | gewone aanvraag, JSON-LD, prijs van de gekozen configuratie, **excl. BTW** | werkt (505,99 excl. = 612,25 incl. op de pagina) |
+| action.com | 7 | prijsbrowser, JSON-LD | werkt |
+| colruyt.be | 9 | geen prijs zonder gekozen winkel, ook niet in een browser | herkend, niet nagekeken; het paneel zegt het en verwijst naar Collect&Go |
+
+Waar een winkel niet antwoordt, zegt de regel dat met de reden, en bevestigt
+een mens de prijs met datum. Een prijs excl. (Helloprint) vergelijkt en neemt
+de site over als excl. (`PriceCheck.basis`).
+
+### De prijsbrowser
+
+bol.com (HTTP 403), Partywinkel (429) en Action (een Cloudflare-wachtpagina)
+weigeren alles wat geen browser is, wat de user-agent ook zegt. Voor die drie
+vraagt `lib/priceCheck/fetch.ts` de pagina aan de **prijsbrowser**
+(`infra/price-browser/server.cjs`): een echte Chromium in een eigen container,
+die de pagina opent zoals een bezoeker en enkel de JSON-LD-blokken en de
+prijs-metatag teruggeeft. Gemeten in die container: bol.com, Partywinkel en
+Action elk onder de twee seconden per product.
+
+Aanzetten op een server:
+
+1. `cp infra/price-browser/.env.example infra/price-browser/.env` en vul
+   `PRICE_BROWSER_SECRET` in (`openssl rand -hex 24`).
+2. Zet `price-browser` bij `COMPOSE_PROFILES` in `infra/.env`.
+3. Deploy. De eerste start haalt het Playwright-image (ruim 2 GB) en installeert
+   `playwright` in een volume; daarna staat de dienst in `docker ps` op healthy.
+
+Zonder die twee stappen verandert er niets: de editor zegt bij die winkels
+"deze winkel laat enkel browsers toe en de prijsbrowser staat niet aan".
+
+Waarom zo:
+
+- **Een eigen container, geen Chromium in de website.** Een browser die
+  vreemde pagina's laadt, hoort niet in het proces dat de sessies en de
+  databank heeft. De container krijgt enkel zijn eigen `.env` (het geheim),
+  niet de root-`.env`, en heeft geen poort naar buiten.
+- **Geen open proxy.** De dienst vraagt het gedeelde geheim, opent enkel
+  https-pagina's van `bol.com`, `partywinkel.be` en `action.com`
+  (`PRICE_BROWSER_HOSTS`), breekt een navigatie naar elders af en geeft geen
+  HTML terug. De site bouwde het adres zelf op uit de herkende link.
+- **Met een venster op een virtueel scherm (`xvfb-run`).** Headless Chromium
+  houdt Cloudflare tegen; met een venster komt Action door. Een wachtpagina
+  zit de browser uit, hoogstens twintig seconden. Er wordt geen captcha
+  opgelost en geen vingerafdruk vervalst: lukt het zo niet, dan is het
+  antwoord "geen antwoord".
+- **Rustig.** Enkel wanneer iemand op "Prijzen nakijken" klikt, hoogstens twee
+  pagina's tegelijk, zonder afbeeldingen, en een gevonden prijs blijft een
+  halfuur onthouden. Niet 's nachts en niet voor elk budget.
+- **Geen `build:` in compose.** Het officiële Playwright-image met het script
+  erin gemount; zo blijven `infra/deploy.sh` (drie builds), de lockfile en
+  `scripts/affected-apps.mjs` wat ze waren. Wijzigt `server.cjs`, herstart dan
+  de container (`docker compose restart price-browser`); een bump van de
+  Playwright-versie doe je op de twee plaatsen in de service én leeg je het
+  volume `price-browser-modules`.
+
+### Wat de 209 bladen van 26-27 vroegen
+
+In november 2026 zijn alle bladen uit de BO-mappen van het jaar (BO 0 tot 13
+en de schriftelijke goedkeuringen: 165 budgetten, 44 resultaten) naast het
+model gelegd.
+
+| Wat een blad doet | Bladen | Op de site |
+| ----------------- | ------ | ---------- |
+| Vaste kosten (aantal × prijs), variabel met verdeling of per persoon | bijna alle | kon al |
+| Een parameter buiten "aantal personen" (bedrijven, percentages, prijzen) | 96 | eigen parameters en berekeningen |
+| Een losse som in een cel (`=2.79/4`, `=97.47*1.21`) | 67 | berekeningen; de BTW-sommen via incl./excl. |
+| Het resultaat ingevuld | 41 | resultaat per regel |
+| Het blad Fakfeestje (drankpromo's, inkleding, dj's) | 19 | sjabloon Fakfeestje |
+| Sector Night en co. van Bedrijvenrelaties | 14 | sjabloon Sector Night |
+| Meer dan één organisatie in de verdeling | 9 | kon al |
+| Cantus met het tabblad Locaties | 7 | kon al (sjabloon Cantus) |
+| Meer tabbladen die naar elkaar verwijzen (Praesidiumweekend, 30 jaar 't ElixIr, VTK-reis) | 9 | niet: zie hieronder |
+| Een regel die naar een andere regel verwijst (winst per consumptie = verkoopprijs min kost van een regel hoger) | 32 | niet rechtstreeks: de waarde als parameter, of de som in de cel |
+
 ### Wat nog niet gebouwd is
 
-- De wachtrij voor de GM, de BO-modus om te projecteren en het resultaat naast
-  het budget.
-- Site-budgetten in het register van `/admin/bestuursorgaan`: daar staat een
-  budget pas wanneer het gedownloade blad in de BO-map staat.
-- De begroting van het werkingsjaar uit één bron.
-- Prijzen nakijken gebeurt enkel op vraag, niet 's nachts, en enkel voor
-  Collect&Go (niet voor andere webshops).
-- De sjablonen Fakfeestje en Meerdelig, en een eigen formule per regel.
+- De wachtrij voor de GM en de BO-modus om te projecteren.
+- Een budget uit meer delen (een tabblad per dag of per maaltijd) en een regel
+  die naar een andere regel verwijst. Vandaag: een sectie per deel, en een
+  gedeelde waarde als parameter.
+- De prijslijst van de Fakbar (Standaardaanbod) voor de drankpromo's: de post
+  typt de verkoopprijs in de berekening.
+- De som van de begroting per post uit de site: de begroting wordt opgeladen,
+  niet op de site opgesteld.
+- Prijzen nakijken gebeurt enkel op vraag, niet 's nachts.
+- Een deellink verloopt niet vanzelf; intrekken doet de post.
 
 ### Vallen
 
+- **De prijsbrowser is getest vanop een gewone verbinding en in de container
+  op een laptop, niet vanop de server bij Hetzner.** Een winkel kan het IP van
+  een datacenter weigeren, ook voor een echte browser. Dan zegt elke regel van
+  die winkel "de winkel hield ook de prijsbrowser tegen". `PRICE_BROWSER_PROXY`
+  laat de browser langs een proxy gaan; zet daar enkel een proxy die daarvoor
+  bedoeld is. De relay voor de studentenkaarten loopt over een IP van de KU
+  Leuven: die hiervoor gebruiken is een beslissing van de kring samen met wie
+  die relay beheert, en staat bewust nergens als standaard.
+- **De winkels kunnen hun beveiliging aanscherpen.** Wat vandaag doorkomt,
+  kan morgen een wachtpagina blijven. De site valt dan vanzelf terug op "geen
+  antwoord" en een mens die bevestigt; er breekt niets.
 - **Colruyt weert bots en blokkeert IP-adressen van datacenters.** Getest vanop
   een gewone verbinding: het werkt met een eerlijke user-agent ("VTK-budgetten"),
   terwijl `node` als user-agent geweigerd wordt (HTTP 456). Of het werkt vanop de

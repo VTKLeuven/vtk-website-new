@@ -1,4 +1,4 @@
-import { inflateRawSync } from "node:zlib";
+import { inflateRawSync } from 'node:zlib';
 
 /*
  * Een kleine xlsx-lezer, voor de shiftenlijsten van het praesidium. Ook de
@@ -20,10 +20,10 @@ import { inflateRawSync } from "node:zlib";
  */
 
 export type CellValue =
-  | { kind: "text"; text: string }
-  | { kind: "number"; value: number }
-  | { kind: "date"; value: Date }
-  | { kind: "bool"; value: boolean };
+  | { kind: 'text'; text: string }
+  | { kind: 'number'; value: number }
+  | { kind: 'date'; value: Date }
+  | { kind: 'bool'; value: boolean };
 
 export type Cell = {
   row: number;
@@ -43,6 +43,12 @@ export type Sheet = {
   merges: MergeRange[];
   maxRow: number;
   maxCol: number;
+  /**
+   * De link achter een cel, op `cellKey(row, col)`: een hyperlink op de cel of
+   * een `HYPERLINK("...")`-formule. Enkel http(s). Voor de bronnen in een
+   * budgetblad (`lib/bo/budget/importSheet.ts`).
+   */
+  links: Map<number, string>;
 };
 
 export type Workbook = { sheets: Sheet[] };
@@ -67,7 +73,7 @@ export function parseRef(ref: string): { row: number; col: number } | null {
 
 /** `(12, 28)` -> `"AB12"`. */
 export function formatRef(row: number, col: number): string {
-  let letters = "";
+  let letters = '';
   let n = col;
   while (n > 0) {
     const rem = (n - 1) % 26;
@@ -79,17 +85,17 @@ export function formatRef(row: number, col: number): string {
 
 /** Leesbare tekst van een cel, zoals een mens ze in de spreadsheet ziet. */
 export function cellText(cell: Cell | undefined): string {
-  if (!cell) return "";
+  if (!cell) return '';
   const v = cell.value;
   switch (v.kind) {
-    case "text":
+    case 'text':
       return v.text;
-    case "number":
+    case 'number':
       return Number.isInteger(v.value) ? String(v.value) : String(v.value);
-    case "date":
+    case 'date':
       return v.value.toISOString().slice(0, 10);
-    case "bool":
-      return v.value ? "TRUE" : "FALSE";
+    case 'bool':
+      return v.value ? 'TRUE' : 'FALSE';
   }
 }
 
@@ -99,7 +105,7 @@ export function cellText(cell: Cell | undefined): string {
 
 function readZip(buffer: Buffer): Map<string, () => Buffer> {
   const minEocd = 22;
-  if (buffer.length < minEocd) throw new XlsxError("NOT_ZIP");
+  if (buffer.length < minEocd) throw new XlsxError('NOT_ZIP');
   let eocd = -1;
   const searchStart = Math.max(0, buffer.length - 65_557);
   for (let i = buffer.length - minEocd; i >= searchStart; i -= 1) {
@@ -108,14 +114,14 @@ function readZip(buffer: Buffer): Map<string, () => Buffer> {
       break;
     }
   }
-  if (eocd < 0) throw new XlsxError("NOT_ZIP");
+  if (eocd < 0) throw new XlsxError('NOT_ZIP');
   const total = buffer.readUInt16LE(eocd + 10);
   let offset = buffer.readUInt32LE(eocd + 16);
 
   const entries = new Map<string, () => Buffer>();
   for (let i = 0; i < total; i += 1) {
     if (offset + 46 > buffer.length || buffer.readUInt32LE(offset) !== 0x02014b50) {
-      throw new XlsxError("NOT_ZIP");
+      throw new XlsxError('NOT_ZIP');
     }
     const method = buffer.readUInt16LE(offset + 10);
     const compressedSize = buffer.readUInt32LE(offset + 20);
@@ -123,18 +129,18 @@ function readZip(buffer: Buffer): Map<string, () => Buffer> {
     const extraLength = buffer.readUInt16LE(offset + 30);
     const commentLength = buffer.readUInt16LE(offset + 32);
     const localOffset = buffer.readUInt32LE(offset + 42);
-    const name = buffer.toString("utf8", offset + 46, offset + 46 + nameLength);
+    const name = buffer.toString('utf8', offset + 46, offset + 46 + nameLength);
     offset += 46 + nameLength + extraLength + commentLength;
 
     entries.set(name, () => {
-      if (buffer.readUInt32LE(localOffset) !== 0x04034b50) throw new XlsxError("NOT_ZIP");
+      if (buffer.readUInt32LE(localOffset) !== 0x04034b50) throw new XlsxError('NOT_ZIP');
       const localName = buffer.readUInt16LE(localOffset + 26);
       const localExtra = buffer.readUInt16LE(localOffset + 28);
       const start = localOffset + 30 + localName + localExtra;
       const data = buffer.subarray(start, start + compressedSize);
       if (method === 0) return data;
       if (method === 8) return inflateRawSync(data, { maxOutputLength: MAX_ENTRY_BYTES });
-      throw new XlsxError("UNSUPPORTED_COMPRESSION");
+      throw new XlsxError('UNSUPPORTED_COMPRESSION');
     });
   }
   return entries;
@@ -148,20 +154,18 @@ function readZip(buffer: Buffer): Map<string, () => Buffer> {
 function decodeXml(text: string): string {
   return text.replace(/&(#x[0-9a-fA-F]+|#\d+|lt|gt|amp|quot|apos);/g, (_, code: string) => {
     switch (code) {
-      case "lt":
-        return "<";
-      case "gt":
-        return ">";
-      case "amp":
-        return "&";
-      case "quot":
+      case 'lt':
+        return '<';
+      case 'gt':
+        return '>';
+      case 'amp':
+        return '&';
+      case 'quot':
         return '"';
-      case "apos":
+      case 'apos':
         return "'";
       default:
-        return String.fromCodePoint(
-          code.startsWith("#x") ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10),
-        );
+        return String.fromCodePoint(code.startsWith('#x') ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10));
     }
   });
 }
@@ -174,8 +178,8 @@ function attrs(tag: string): Record<string, string> {
 
 /** Alle `<t>`-stukken binnen een stuk XML aan elkaar, zonder fonetische hulp. */
 function runText(xml: string): string {
-  const cleaned = xml.replace(/<rPh\b[\s\S]*?<\/rPh>/g, "");
-  let out = "";
+  const cleaned = xml.replace(/<rPh\b[\s\S]*?<\/rPh>/g, '');
+  let out = '';
   for (const match of cleaned.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)) out += decodeXml(match[1]);
   return out;
 }
@@ -190,29 +194,45 @@ const BUILTIN_DATE_FORMATS = new Set([14, 15, 16, 17, 18, 19, 20, 21, 22, 45, 46
 
 function isDateFormat(code: string): boolean {
   // Tekst tussen aanhalingstekens en blokken als [Red] of [$-413] tellen niet.
-  const bare = code.replace(/"[^"]*"/g, "").replace(/\[[^\]]*\]/g, "");
+  const bare = code.replace(/"[^"]*"/g, '').replace(/\[[^\]]*\]/g, '');
   return /[dmyhs]/i.test(bare) && !/^[#0.,%\s]+$/.test(bare);
 }
 
 /** De twaalf themakleuren in de volgorde die Excel met `theme="n"` aanspreekt. */
 function themeColors(xml: string | null): string[] {
   if (!xml) return [];
-  const scheme = /<a:clrScheme\b[\s\S]*?<\/a:clrScheme>/.exec(xml)?.[0] ?? "";
+  const scheme = /<a:clrScheme\b[\s\S]*?<\/a:clrScheme>/.exec(xml)?.[0] ?? '';
   const byName = new Map<string, string>();
-  for (const match of scheme.matchAll(/<a:(\w+)>\s*<a:(?:srgbClr val="([0-9A-Fa-f]{6})"|sysClr[^>]*lastClr="([0-9A-Fa-f]{6})")/g)) {
+  for (const match of scheme.matchAll(
+    /<a:(\w+)>\s*<a:(?:srgbClr val="([0-9A-Fa-f]{6})"|sysClr[^>]*lastClr="([0-9A-Fa-f]{6})")/g
+  )) {
     byName.set(match[1], (match[2] ?? match[3]).toUpperCase());
   }
   // Excel wisselt de eerste twee paren om: thema 0 is lt1, thema 1 is dk1.
-  return ["lt1", "dk1", "lt2", "dk2", "accent1", "accent2", "accent3", "accent4", "accent5", "accent6", "hlink", "folHlink"].map(
-    (name) => byName.get(name) ?? "",
-  );
+  return [
+    'lt1',
+    'dk1',
+    'lt2',
+    'dk2',
+    'accent1',
+    'accent2',
+    'accent3',
+    'accent4',
+    'accent5',
+    'accent6',
+    'hlink',
+    'folHlink',
+  ].map((name) => byName.get(name) ?? '');
 }
 
 function applyTint(hex: string, tint: number): string {
   if (!tint) return hex;
   const channels = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
   const tinted = channels.map((c) => Math.round(tint > 0 ? c + (255 - c) * tint : c * (1 + tint)));
-  return tinted.map((c) => Math.max(0, Math.min(255, c)).toString(16).padStart(2, "0")).join("").toUpperCase();
+  return tinted
+    .map((c) => Math.max(0, Math.min(255, c)).toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase();
 }
 
 function colorOf(tag: string | undefined, theme: string[]): string | null {
@@ -220,7 +240,7 @@ function colorOf(tag: string | undefined, theme: string[]): string | null {
   const a = attrs(tag);
   if (a.rgb && /^[0-9A-Fa-f]{8}$/.test(a.rgb)) {
     // ARGB; een volledig doorzichtige kleur is geen vulling.
-    if (a.rgb.slice(0, 2) === "00" && a.rgb.slice(2) === "000000") return null;
+    if (a.rgb.slice(0, 2) === '00' && a.rgb.slice(2) === '000000') return null;
     return a.rgb.slice(2).toUpperCase();
   }
   if (a.rgb && /^[0-9A-Fa-f]{6}$/.test(a.rgb)) return a.rgb.toUpperCase();
@@ -237,23 +257,23 @@ function readStyles(xml: string | null, theme: string[]): Style[] {
   const numFmts = new Map<number, string>();
   for (const match of xml.matchAll(/<numFmt\b([^>]*)\/?>/g)) {
     const a = attrs(match[1]);
-    numFmts.set(Number(a.numFmtId), a.formatCode ?? "");
+    numFmts.set(Number(a.numFmtId), a.formatCode ?? '');
   }
 
-  const fillsXml = /<fills\b[^>]*>([\s\S]*?)<\/fills>/.exec(xml)?.[1] ?? "";
+  const fillsXml = /<fills\b[^>]*>([\s\S]*?)<\/fills>/.exec(xml)?.[1] ?? '';
   const fills: (string | null)[] = [];
   for (const match of fillsXml.matchAll(/<fill\b[^>]*?(?:\/>|>([\s\S]*?)<\/fill>)/g)) {
-    const body = match[1] ?? "";
+    const body = match[1] ?? '';
     const pattern = /<patternFill\b([^>]*)/.exec(body);
     const patternType = pattern ? attrs(pattern[1]).patternType : undefined;
-    if (!pattern || !patternType || patternType === "none") {
+    if (!pattern || !patternType || patternType === 'none') {
       fills.push(null);
       continue;
     }
     fills.push(colorOf(/<fgColor\b[^>]*\/?>/.exec(body)?.[0], theme));
   }
 
-  const xfsXml = /<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/.exec(xml)?.[1] ?? "";
+  const xfsXml = /<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/.exec(xml)?.[1] ?? '';
   const styles: Style[] = [];
   for (const match of xfsXml.matchAll(/<xf\b([^>]*?)(?:\/>|>[\s\S]*?<\/xf>)/g)) {
     const a = attrs(match[1]);
@@ -277,8 +297,8 @@ function serialToDate(serial: number): Date {
 }
 
 function resolveTarget(target: string): string {
-  const clean = target.replace(/^\/+/, "");
-  return clean.startsWith("xl/") ? clean : `xl/${clean}`;
+  const clean = target.replace(/^\/+/, '');
+  return clean.startsWith('xl/') ? clean : `xl/${clean}`;
 }
 
 function readSheet(
@@ -287,46 +307,53 @@ function readSheet(
   xml: string,
   sharedStrings: string[],
   styles: Style[],
+  relsXml: string | null = null
 ): Sheet {
   const cells = new Map<number, Cell>();
+  const links = new Map<number, string>();
+  const http = (url: string | undefined) => (url && /^https?:\/\//i.test(url.trim()) ? url.trim() : null);
   let maxRow = 0;
   let maxCol = 0;
-  const data = /<sheetData\b[^>]*>([\s\S]*?)<\/sheetData>/.exec(xml)?.[1] ?? "";
+  const data = /<sheetData\b[^>]*>([\s\S]*?)<\/sheetData>/.exec(xml)?.[1] ?? '';
 
   for (const match of data.matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
     const a = attrs(match[1]);
     const ref = a.r ? parseRef(a.r) : null;
     if (!ref) continue;
-    const body = match[2] ?? "";
+    const body = match[2] ?? '';
     const style = styles[Number(a.s ?? 0)];
     const fill = style?.fill ?? null;
     const raw = /<v>([\s\S]*?)<\/v>/.exec(body)?.[1];
+    // Sheets exporteert een link soms als formule in plaats van als hyperlink op de cel.
+    const formula = /<f\b[^>]*>([\s\S]*?)<\/f>/.exec(body)?.[1];
+    const formulaLink = formula ? http(/HYPERLINK\(\s*"([^"]+)"/i.exec(decodeXml(formula))?.[1]) : null;
+    if (formulaLink) links.set(cellKey(ref.row, ref.col), formulaLink);
 
     let value: CellValue | null = null;
     switch (a.t) {
-      case "s": {
+      case 's': {
         const text = raw !== undefined ? sharedStrings[Number(raw)] : undefined;
-        if (text !== undefined && text !== "") value = { kind: "text", text };
+        if (text !== undefined && text !== '') value = { kind: 'text', text };
         break;
       }
-      case "inlineStr": {
-        const text = runText(/<is>([\s\S]*?)<\/is>/.exec(body)?.[1] ?? "");
-        if (text !== "") value = { kind: "text", text };
+      case 'inlineStr': {
+        const text = runText(/<is>([\s\S]*?)<\/is>/.exec(body)?.[1] ?? '');
+        if (text !== '') value = { kind: 'text', text };
         break;
       }
-      case "str":
-        if (raw !== undefined && raw !== "") value = { kind: "text", text: decodeXml(raw) };
+      case 'str':
+        if (raw !== undefined && raw !== '') value = { kind: 'text', text: decodeXml(raw) };
         break;
-      case "b":
-        if (raw !== undefined) value = { kind: "bool", value: raw === "1" };
+      case 'b':
+        if (raw !== undefined) value = { kind: 'bool', value: raw === '1' };
         break;
-      case "e":
+      case 'e':
         break;
       default:
-        if (raw !== undefined && raw !== "") {
+        if (raw !== undefined && raw !== '') {
           const n = Number(raw);
           if (Number.isFinite(n)) {
-            value = style?.isDate ? { kind: "date", value: serialToDate(n) } : { kind: "number", value: n };
+            value = style?.isDate ? { kind: 'date', value: serialToDate(n) } : { kind: 'number', value: n };
           }
         }
     }
@@ -335,7 +362,7 @@ function readSheet(
     cells.set(cellKey(ref.row, ref.col), {
       row: ref.row,
       col: ref.col,
-      value: value ?? { kind: "text", text: "" },
+      value: value ?? { kind: 'text', text: '' },
       fill,
     });
     if (ref.row > maxRow) maxRow = ref.row;
@@ -349,7 +376,21 @@ function readSheet(
     if (from && to) merges.push({ r1: from.row, c1: from.col, r2: to.row, c2: to.col });
   }
 
-  return { name, hidden, cells, merges, maxRow, maxCol };
+  if (relsXml) {
+    const targets = new Map<string, string>();
+    for (const match of relsXml.matchAll(/<Relationship\b([^>]*)\/?>/g)) {
+      const a = attrs(match[1]);
+      if (a.Id && a.Target) targets.set(a.Id, decodeXml(a.Target));
+    }
+    for (const match of xml.matchAll(/<hyperlink\b([^>]*)\/?>/g)) {
+      const a = attrs(match[1]);
+      const from = a.ref ? parseRef(a.ref.split(':')[0]) : null;
+      const url = http(targets.get(a['r:id'] ?? ''));
+      if (from && url) links.set(cellKey(from.row, from.col), url);
+    }
+  }
+
+  return { name, hidden, cells, merges, maxRow, maxCol, links };
 }
 
 /**
@@ -360,35 +401,39 @@ export function readWorkbook(buffer: Buffer): Workbook {
   const zip = readZip(buffer);
   const read = (path: string): string | null => {
     const entry = zip.get(path);
-    return entry ? entry().toString("utf8") : null;
+    return entry ? entry().toString('utf8') : null;
   };
 
-  const workbookXml = read("xl/workbook.xml");
-  if (!workbookXml) throw new XlsxError("NOT_XLSX");
-  const relsXml = read("xl/_rels/workbook.xml.rels") ?? "";
+  const workbookXml = read('xl/workbook.xml');
+  if (!workbookXml) throw new XlsxError('NOT_XLSX');
+  const relsXml = read('xl/_rels/workbook.xml.rels') ?? '';
   const targets = new Map<string, string>();
   for (const match of relsXml.matchAll(/<Relationship\b([^>]*)\/?>/g)) {
     const a = attrs(match[1]);
     if (a.Id && a.Target) targets.set(a.Id, resolveTarget(a.Target));
   }
 
-  const sharedXml = read("xl/sharedStrings.xml") ?? "";
+  const sharedXml = read('xl/sharedStrings.xml') ?? '';
   const sharedStrings: string[] = [];
   for (const match of sharedXml.matchAll(/<si\b[^>]*?(?:\/>|>([\s\S]*?)<\/si>)/g)) {
-    sharedStrings.push(runText(match[1] ?? ""));
+    sharedStrings.push(runText(match[1] ?? ''));
   }
 
-  const theme = themeColors(read("xl/theme/theme1.xml"));
-  const styles = readStyles(read("xl/styles.xml"), theme);
+  const theme = themeColors(read('xl/theme/theme1.xml'));
+  const styles = readStyles(read('xl/styles.xml'), theme);
 
   const sheets: Sheet[] = [];
   for (const match of workbookXml.matchAll(/<sheet\b([^>]*)\/?>/g)) {
     const a = attrs(match[1]);
-    const target = targets.get(a["r:id"] ?? "");
+    const target = targets.get(a['r:id'] ?? '');
     const xml = target ? read(target) : null;
     if (!xml) continue;
-    sheets.push(readSheet(a.name ?? "", a.state === "hidden" || a.state === "veryHidden", xml, sharedStrings, styles));
+    // De links van een tabblad staan in haar eigen rels-bestand ernaast.
+    const rels = target ? read(target.replace(/([^/]+)$/, '_rels/$1.rels')) : null;
+    sheets.push(
+      readSheet(a.name ?? '', a.state === 'hidden' || a.state === 'veryHidden', xml, sharedStrings, styles, rels)
+    );
   }
-  if (sheets.length === 0) throw new XlsxError("NOT_XLSX");
+  if (sheets.length === 0) throw new XlsxError('NOT_XLSX');
   return { sheets };
 }

@@ -5,7 +5,8 @@ import Link from '@/components/ui/Link';
 import { hasLocale } from '@/lib/locale';
 import { requirePermission } from '@/lib/session';
 import { postOptions } from '@/lib/bo/posts';
-import { getBudgetSettings } from '@/lib/bo/budget/server';
+import { getBegroting, getBudgetSettings } from '@/lib/bo/budget/server';
+import { BegrotingUpload } from '@/components/bo-budget/BegrotingUpload';
 import { BudgetSettingsForm } from '@/components/bo-budget/BudgetSettingsForm';
 
 /*
@@ -22,7 +23,7 @@ export default async function BudgetSettingsPage({ params }: { params: Promise<{
   const base = nl ? '' : '/en';
   await requirePermission('bestuursorgaan.manage');
 
-  const [groups, settings] = await Promise.all([
+  const [groups, settings, begroting] = await Promise.all([
     prisma.group.findMany({
       where: { type: { not: 'JAARWERKING' } },
       orderBy: [{ orderInPraesidium: 'asc' }, { nameNl: 'asc' }],
@@ -38,6 +39,7 @@ export default async function BudgetSettingsPage({ params }: { params: Promise<{
       },
     }),
     getBudgetSettings(),
+    getBegroting(),
   ]);
   const posts = postOptions(groups, nl).map((p) => ({ key: p.key, name: p.name, group: p.group }));
 
@@ -54,6 +56,18 @@ export default async function BudgetSettingsPage({ params }: { params: Promise<{
             : 'What every budget sheet repeats today, is set here once. A change applies at once to every draft budget.'}
         </p>
       </header>
+      <BegrotingUpload
+        current={
+          begroting
+            ? {
+                fileName: begroting.fileName,
+                uploadedAt: begroting.uploadedAt,
+                sheets: begroting.sheets.map((sheet) => ({ name: sheet.name, lines: sheet.lines.length })),
+              }
+            : null
+        }
+        locale={locale}
+      />
       <BudgetSettingsForm settings={settings} posts={posts} locale={locale} />
     </div>
   );

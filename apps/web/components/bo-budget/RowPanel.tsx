@@ -24,8 +24,8 @@ import {
   type IncomeSection,
   type SourceType,
 } from '@/lib/bo/budget/types';
-import { parseCollectGoUrl } from '@/lib/collectgo/product';
-import { shopPriceOf } from '@/lib/bo/budget/prices';
+import { parseShopUrl, shopOfUrl, SHOPS } from '@/lib/priceCheck/shops';
+import { rowPriceIn } from '@/lib/bo/budget/prices';
 import type { EditorApi } from './editorApi';
 import { money, percent, plain, todayIso, shortDate } from './format';
 import { NumberField } from './NumberField';
@@ -107,40 +107,53 @@ function when(iso: string, nl: boolean) {
   });
 }
 
-/** Wat collectandgo.be zei over deze regel, met wat je ermee kan. */
-function CollectGoCheck({ api, row }: { api: EditorApi; row: CostRow }) {
+/** Wat de webshop zei over deze regel, met wat je ermee kan. */
+function ShopCheck({ api, row }: { api: EditorApi; row: CostRow }) {
   const { nl } = api;
   const url = row.source?.url?.trim() ?? '';
-  const checkable = !!url && !!parseCollectGoUrl(url);
+  const shopId = shopOfUrl(url);
+  const shop = shopId ? SHOPS[shopId] : null;
+  const name = shop?.name ?? (row.source?.type === 'collectgo' ? 'Collect&Go' : nl ? 'de webshop' : 'the shop');
+  const checkable = !!url && !!parseShopUrl(url);
   const busy = api.checkingRows?.includes(row.id) ?? false;
   const check = row.lastCheck;
+  const excl = check?.basis === 'excl' ? (nl ? ' excl. BTW' : ' excl. VAT') : '';
+  const was = rowPriceIn(row, check?.basis ?? 'incl');
   let text: string;
   if (!url)
     text = nl
-      ? 'Plak de link van het product; dan kan de site de prijs bij Collect&Go nakijken.'
-      : 'Paste the product link so the site can check the price.';
+      ? 'Plak de link van het product. Bij Collect&Go, bol.com, Partywinkel, Helloprint, Drukzo en Action kijkt de site de prijs zelf na.'
+      : 'Paste the product link. For Collect&Go, bol.com, Partywinkel, Helloprint, Drukzo and Action the site checks the price itself.';
+  else if (!shop)
+    text = nl
+      ? 'Deze winkel kent de site niet, dus de prijs kijkt een mens na. Bevestig hieronder wanneer je dat deed.'
+      : 'The site does not know this shop, so someone checks the price by hand. Confirm below when you did.';
+  else if (!shop.live)
+    text = nl
+      ? `${name} toont geen prijs zonder gekozen winkel, dus de site kan ze niet nakijken. Plak de link van hetzelfde product op collectandgo.be (dezelfde prijzen): die kijkt de site wel na.`
+      : `${name} shows no price without a chosen store, so it cannot be checked. The same product on collectandgo.be can.`;
   else if (!checkable)
     text = nl
-      ? 'Deze link wijst niet naar één product, dus de site kan de prijs niet nakijken. Open het product op collectandgo.be en kopieer die link; een zoeklink met #pdp_ erin werkt ook.'
-      : 'This link does not point to one product, so the price cannot be checked. Open the product and copy that link.';
-  else if (busy) text = nl ? 'Bezig met nakijken bij Collect&Go…' : 'Checking at Collect&Go…';
-  else if (!check) text = nl ? 'Nog niet nagekeken bij Collect&Go.' : 'Not checked at Collect&Go yet.';
+      ? `Deze link wijst niet naar één product bij ${name}, dus de site kan de prijs niet nakijken. Open het product en kopieer die link${shopId === 'collectgo' ? '; een zoeklink met #pdp_ erin werkt ook' : ''}.`
+      : `This link does not point to one product at ${name}, so the price cannot be checked. Open the product and copy that link.`;
+  else if (busy) text = nl ? `Bezig met nakijken bij ${name}…` : `Checking at ${name}…`;
+  else if (!check) text = nl ? `Nog niet nagekeken bij ${name}.` : `Not checked at ${name} yet.`;
   else if (check.status === 'ok')
     text = nl
-      ? `Klopt: ${money(check.price ?? 0)} voor "${check.name}" op collectandgo.be (${when(check.at, nl)}).`
-      : `Correct: ${money(check.price ?? 0, false)} for "${check.name}" (${when(check.at, nl)}).`;
+      ? `Klopt: ${money(check.price ?? 0)}${excl} voor "${check.name}" bij ${name} (${when(check.at, nl)}).`
+      : `Correct: ${money(check.price ?? 0, false)}${excl} for "${check.name}" (${when(check.at, nl)}).`;
   else if (check.status === 'changed')
     text = nl
-      ? `Collect&Go vraagt nu ${money(check.price ?? 0)} voor "${check.name}", de regel rekent met ${money(shopPriceOf(row))} (${when(check.at, nl)}).`
-      : `Collect&Go now asks ${money(check.price ?? 0, false)} for "${check.name}"; the row uses ${money(shopPriceOf(row), false)}.`;
+      ? `${name} vraagt nu ${money(check.price ?? 0)}${excl} voor "${check.name}", de regel rekent met ${money(was)} (${when(check.at, nl)}).`
+      : `${name} now asks ${money(check.price ?? 0, false)}${excl} for "${check.name}"; the row uses ${money(was, false)}.`;
   else if (check.status === 'notfound')
     text = nl
-      ? `Dit product staat niet (meer) op Collect&Go (${when(check.at, nl)}). Zoek het opnieuw en plak de link van het product.`
-      : 'This product is no longer on Collect&Go. Find it again and paste the product link.';
+      ? `Dit product staat niet (meer) bij ${name} (${when(check.at, nl)}). Zoek het opnieuw en plak de link van het product.`
+      : `This product is no longer at ${name}. Find it again and paste the product link.`;
   else
     text = nl
-      ? `Collect&Go gaf geen prijs (${check.reason ?? 'geen antwoord'}, ${when(check.at, nl)}). Kijk de prijs na op de site en bevestig ze hieronder.`
-      : `Collect&Go gave no price (${check.reason ?? 'no answer'}). Check it on the site and confirm below.`;
+      ? `${name} gaf geen prijs (${check.reason ?? 'geen antwoord'}, ${when(check.at, nl)}). Open de link, kijk de prijs na en bevestig ze hieronder.`
+      : `${name} gave no price (${check.reason ?? 'no answer'}). Open the link, check it and confirm below.`;
 
   return (
     <div
@@ -598,7 +611,9 @@ function CostRowFields({ api, section, row }: { api: EditorApi; section: CostSec
                   />
                 </Field>
               )}
-              {row.source?.type === 'collectgo' && <CollectGoCheck api={api} row={row} />}
+              {(row.source?.type === 'collectgo' || row.source?.type === 'webshop') && (
+                <ShopCheck api={api} row={row} />
+              )}
               {(row.source?.type === 'webshop' || row.source?.type === 'collectgo') && (
                 <Field label={nl ? 'Prijs bevestigd' : 'Price confirmed'} wide>
                   <div className="vtk-bud-inline">

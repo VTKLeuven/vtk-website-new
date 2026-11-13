@@ -62,6 +62,12 @@ export default async function MijnBudgettenPage({ params }: { params: Promise<{ 
               {nl ? "Alle posten" : "All posts"}
             </Link>
           )}
+          <Link
+            href={`${base}/admin/bestuursorgaan/mappen`}
+            className="inline-flex h-10 items-center justify-center rounded-full border border-vtk-blue/20 px-4 text-sm font-medium text-vtk-ink hover:bg-vtk-blue-soft"
+          >
+            {nl ? "Mappen per BO" : "Folders per meeting"}
+          </Link>
           {canStart && (
             <Link
               href={`${base}/admin/bestuursorgaan/mijn/nieuw`}

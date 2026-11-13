@@ -532,6 +532,13 @@ const icons: Record<string, ReactNode> = {
       <path d="m9 13.5 2 2 4-4" />
     </Svg>
   ),
+  // bestuursorgaanFolders: een open map (Mappen per BO)
+  bestuursorgaanFolders: (
+    <Svg>
+      <path d="M3 8V6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v1" />
+      <path d="M3.5 19 5.6 11a1.5 1.5 0 0 1 1.45-1.1H20.5a1 1 0 0 1 .97 1.25L19.6 18a1.5 1.5 0 0 1-1.45 1.1H3.5A.5.5 0 0 1 3 18.6V8" />
+    </Svg>
+  ),
   // bestuursorgaanOwn: dezelfde map, met de post erin (Mijn budgetten)
   bestuursorgaanOwn: (
     <Svg>

@@ -9531,6 +9531,12 @@ model BoBudget {
   /// Wie het aanmaakte. Geen relatie: het logboek (`AdminAuditLog`) houdt bij
   /// wie wat wijzigde, en een budget hoort bij een post, niet bij een persoon.
   createdById  String?
+  /// Deellinks (`/budget/<token>`): wie de link heeft, ziet het budget
+  /// (`viewToken`) of mag het aanpassen (`editToken`), zonder account. Voor
+  /// een kring waarmee samengewerkt wordt en voor de slides van het BO. Null
+  /// = geen link; een nieuwe waarde trekt de oude in.
+  viewToken    String?        @unique
+  editToken    String?        @unique
   createdAt    DateTime       @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime       @updatedAt @db.Timestamptz(3)
 

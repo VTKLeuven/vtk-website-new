@@ -1,6 +1,9 @@
 import {
   costSections,
   distributionOf,
+  hasResult,
+  missingResults,
+  resultOverviewOf,
   locationOf,
   locationValue,
   overviewOf,
@@ -9,7 +12,8 @@ import {
   unitsOf,
   type CalcContext,
 } from './calc';
-import { isUncheckableCollectGo, openCheck, shopPriceOf } from './prices';
+import { applyFormulas } from './formula';
+import { isUncheckableShopLink, openCheck, rowPriceIn, shopName } from './prices';
 import type { BudgetContent } from './types';
 
 /*
@@ -54,6 +58,17 @@ function pct(x: number): string {
 export function checksOf(content: BudgetContent, ctx: CalcContext, nl: boolean): Check[] {
   const out: Check[] = [];
   const add = (check: Check) => out.push(check);
+
+  // Berekeningen die niet uit te rekenen zijn: op een kopie, de controles wijzigen niets.
+  for (const error of applyFormulas(structuredClone(content))) {
+    add({
+      level: 'block',
+      rowId: error.rowId,
+      sectionId: error.sectionId,
+      field: error.paramId ? 'persons' : undefined,
+      text: nl ? `Berekening klopt niet. ${error.text}` : `A calculation does not work. ${error.text}`,
+    });
+  }
 
   // Verdelingen
   for (const section of costSections(content)) {
@@ -226,14 +241,17 @@ export function checksOf(content: BudgetContent, ctx: CalcContext, nl: boolean):
       const check = openCheck(row);
       if (check?.status === 'changed' && check.price != null) {
         const units = section.type === 'variable' ? unitsOf(content, section, row) : (row.qty ?? 0);
-        const effect = units * (check.price - shopPriceOf(row));
+        const was = rowPriceIn(row, check.basis ?? 'incl');
+        const effect = units * (check.price - was);
+        const shop = shopName(check.shop ?? 'collectgo');
+        const excl = check.basis === 'excl' ? (nl ? ' excl. BTW' : ' excl. VAT') : '';
         add({
           level: 'review',
           rowId: row.id,
           sectionId: section.id,
           text: nl
-            ? `${name}: Collect&Go vraagt nu ${eur(check.price)} in plaats van ${eur(shopPriceOf(row))} (ongeveer ${effect > 0 ? '+' : ''}${eur(effect)} op het totaal).`
-            : `${name}: Collect&Go now asks ${eur(check.price)} instead of ${eur(shopPriceOf(row))}.`,
+            ? `${name}: ${shop} vraagt nu ${eur(check.price)}${excl} in plaats van ${eur(was)} (ongeveer ${effect > 0 ? '+' : ''}${eur(effect)} op het totaal).`
+            : `${name}: ${shop} now asks ${eur(check.price)}${excl} instead of ${eur(was)}.`,
         });
       } else if (check?.status === 'notfound') {
         add({
@@ -241,8 +259,8 @@ export function checksOf(content: BudgetContent, ctx: CalcContext, nl: boolean):
           rowId: row.id,
           sectionId: section.id,
           text: nl
-            ? `${name}: dit product staat niet (meer) op Collect&Go. Kies een ander product.`
-            : `${name}: this product is no longer on Collect&Go. Choose another one.`,
+            ? `${name}: dit product staat niet (meer) bij ${shopName(check.shop ?? 'collectgo')}. Kies een ander product.`
+            : `${name}: this product is no longer at ${shopName(check.shop ?? 'collectgo')}. Choose another one.`,
         });
       } else if (check?.status === 'failed') {
         add({
@@ -250,10 +268,10 @@ export function checksOf(content: BudgetContent, ctx: CalcContext, nl: boolean):
           rowId: row.id,
           sectionId: section.id,
           text: nl
-            ? `${name}: Collect&Go gaf geen prijs (${check.reason ?? 'geen antwoord'}). Kijk ze na op de site en bevestig.`
-            : `${name}: Collect&Go gave no price. Check it on the site and confirm.`,
+            ? `${name}: ${shopName(check.shop ?? 'collectgo')} gaf geen prijs (${check.reason ?? 'geen antwoord'}). Open de link, kijk de prijs na en bevestig.`
+            : `${name}: ${shopName(check.shop ?? 'collectgo')} gave no price. Open the link, check it and confirm.`,
         });
-      } else if (isUncheckableCollectGo(row)) {
+      } else if (isUncheckableShopLink(row)) {
         add({
           level: 'review',
           rowId: row.id,
@@ -320,13 +338,40 @@ export function checksOf(content: BudgetContent, ctx: CalcContext, nl: boolean):
       text: nl ? 'Vul het bedrag uit de begroting in.' : 'Fill in the amount from the yearly budget.',
     });
   } else if (overview.diff != null && overview.diff < -0.004) {
+    const pot = ctx.pot && ctx.pot.count > 0 ? ctx.pot : null;
     add({
       level: 'review',
       field: 'begroting',
-      text: nl
-        ? `${eur(-overview.diff)} slechter dan de begroting (${eur(content.begroting)}).`
-        : `${eur(-overview.diff)} worse than the yearly budget (${eur(content.begroting)}).`,
+      text: pot
+        ? nl
+          ? `Samen met ${pot.count === 1 ? 'het andere budget' : `de ${pot.count} andere budgetten`} op deze lijn (${eur(pot.others)}) gaat het potje ${eur(-overview.diff)} over de begroting (${eur(content.begroting)}).`
+          : `Together with the other budgets on this line (${eur(pot.others)}) the pot exceeds the yearly budget (${eur(content.begroting)}) by ${eur(-overview.diff)}.`
+        : nl
+          ? `${eur(-overview.diff)} slechter dan de begroting (${eur(content.begroting)}).`
+          : `${eur(-overview.diff)} worse than the yearly budget (${eur(content.begroting)}).`,
     });
+  }
+
+  // Resultaat
+  if (hasResult(content)) {
+    const missing = missingResults(content, ctx);
+    if (missing > 0) {
+      add({
+        level: 'info',
+        text: nl
+          ? `${missing} ${missing === 1 ? 'regel heeft' : 'regels hebben'} nog geen resultaat. Vul 0 in als er niets uitgegeven of ontvangen is.`
+          : `${missing} ${missing === 1 ? 'row has' : 'rows have'} no result yet. Enter 0 if nothing was spent or received.`,
+      });
+    }
+    const result = resultOverviewOf(content, ctx);
+    if (missing === 0 && result.diffBudget < -0.004) {
+      add({
+        level: 'review',
+        text: nl
+          ? `Het resultaat is ${eur(-result.diffBudget)} slechter dan het budget (${eur(overview.total)}).${content.result?.note?.trim() ? '' : ' Zeg bij de toelichting waarom.'}`
+          : `The result is ${eur(-result.diffBudget)} worse than the budget (${eur(overview.total)}).`,
+      });
+    }
   }
 
   if (ctx.settings.vatByPost[ctx.postKey] == null && !content.vat) {

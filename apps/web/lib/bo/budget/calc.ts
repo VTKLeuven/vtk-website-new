@@ -27,6 +27,11 @@ export type CalcContext = {
   /** De sleutel van de post, voor het tarief. */
   postKey: string;
   settings: BudgetSettings;
+  /**
+   * De andere budgetten op dezelfde begrotingslijn (`pot.ts`): hun totalen
+   * samen. Met een potje vergelijkt het overzicht de som met de begroting.
+   */
+  pot?: { others: number; othersResult: number; count: number } | null;
 };
 
 export function isIncome(section: Section): section is Extract<Section, { type: 'income' }> {
@@ -181,9 +186,14 @@ export function perPersonOf(section: CostSection, row: CostRow): number {
   return row.perPerson ?? section.perPerson ?? 1;
 }
 
+/** Voor hoeveel personen een variabele sectie rekent: haar eigen aantal, of de deelnemers. */
+export function baseOf(content: BudgetContent, section: CostSection): number {
+  return section.base ?? (content.params.persons || 0);
+}
+
 /** Hoeveel er gedronken of gegeten wordt, voor de afronding. */
 export function consumptionOf(content: BudgetContent, section: CostSection, row: CostRow): number {
-  return (section.share ?? 1) * rowPct(section, row) * (content.params.persons || 0) * perPersonOf(section, row);
+  return (section.share ?? 1) * rowPct(section, row) * baseOf(content, section) * perPersonOf(section, row);
 }
 
 /** Hoeveel eenheden de regel koopt: altijd naar boven afgerond, zoals ROUNDUP in het blad. */
@@ -293,10 +303,71 @@ export function overviewOf(content: BudgetContent, ctx: CalcContext): Overview {
   const expense = lines.filter((l) => l.side === 'out').reduce((s, l) => s + l.amount, 0);
   const total = income - expense;
   const begroting = content.begroting;
-  return { lines, income, expense, total, begroting, diff: begroting == null ? null : total - begroting };
+  // Een potje: wat de andere budgetten op dezelfde lijn al namen, telt mee.
+  const others = ctx.pot?.others ?? 0;
+  return { lines, income, expense, total, begroting, diff: begroting == null ? null : total + others - begroting };
 }
 
 /** Een bedrag in centen, zoals de lijst het bewaart: de helft weg van nul, zoals Sheets. */
 export function toCents(amount: number): number {
   return Math.sign(amount) * Math.round(Math.abs(amount) * 100 + 1e-7);
+}
+
+/* ---------------------------------------------------------- Resultaat */
+
+export function hasResult(content: BudgetContent): boolean {
+  return !!content.result?.on;
+}
+
+/** Wat een sectie echt opbracht of kostte: de som van de ingevulde resultaten. */
+export function sectionResult(section: Section): number {
+  return section.rows.reduce((sum, row) => sum + (row.result ?? 0), 0);
+}
+
+/** Hoeveel regels met een bedrag nog geen resultaat hebben. */
+export function missingResults(content: BudgetContent, ctx: CalcContext): number {
+  let missing = 0;
+  for (const section of content.sections) {
+    for (const row of section.rows) {
+      if (row.result != null) continue;
+      const amount =
+        section.type === 'income'
+          ? incomeAmount(content, row as IncomeRow)
+          : costAmount(content, ctx, section, row as CostRow);
+      if (Math.abs(amount) > 0.004) missing += 1;
+    }
+  }
+  return missing;
+}
+
+export type ResultOverview = {
+  lines: OverviewLine[];
+  income: number;
+  expense: number;
+  total: number;
+  /** Resultaat min budget: positief is beter dan gebudgetteerd. */
+  diffBudget: number;
+  /** Resultaat min begroting. */
+  diffBegroting: number | null;
+};
+
+export function resultOverviewOf(content: BudgetContent, ctx: CalcContext): ResultOverview {
+  const lines: OverviewLine[] = content.sections.map((section) => ({
+    id: section.id,
+    name: section.name,
+    side: section.type === 'income' ? 'in' : 'out',
+    amount: sectionResult(section),
+  }));
+  const income = lines.filter((l) => l.side === 'in').reduce((s, l) => s + l.amount, 0);
+  const expense = lines.filter((l) => l.side === 'out').reduce((s, l) => s + l.amount, 0);
+  const total = income - expense;
+  const budget = overviewOf(content, ctx).total;
+  return {
+    lines,
+    income,
+    expense,
+    total,
+    diffBudget: total - budget,
+    diffBegroting: content.begroting == null ? null : total + (ctx.pot?.othersResult ?? 0) - content.begroting,
+  };
 }

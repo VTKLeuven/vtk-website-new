@@ -6,7 +6,13 @@ import { hasPermission, type SessionPayload } from '@vtk/auth';
 import { currentWorkingYear } from '@/lib/workingYear';
 import { ownPostKeys } from '../own';
 import { postName } from '../posts';
-import { parseBudgetContent, parseBudgetSettings } from './schema';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { getCurrentSession } from '@/lib/session';
+import { applyFormulas } from './formula';
+import { hasResult, overviewOf, resultOverviewOf, type CalcContext } from './calc';
+import type { Begroting } from './begroting';
+import { potKey, potOf, type Pot, type PotMember } from './pot';
+import { begrotingSchema, parseBudgetContent, parseBudgetSettings } from './schema';
 import { DEFAULT_SETTINGS, type BudgetContent, type BudgetSettings } from './types';
 
 /*
@@ -84,6 +90,8 @@ export type BudgetRecord = {
   submittedAt: string | null;
   /** De versie die de editor terugstuurt, om twee gelijktijdige bewerkers te vangen. */
   version: string;
+  viewToken: string | null;
+  editToken: string | null;
 };
 
 function toRecord(row: {
@@ -98,6 +106,8 @@ function toRecord(row: {
   totalCents: number;
   submittedAt: Date | null;
   updatedAt: Date;
+  viewToken: string | null;
+  editToken: string | null;
 }): BudgetRecord | null {
   const content = parseBudgetContent(row.content);
   if (!content) return null;
@@ -113,6 +123,8 @@ function toRecord(row: {
     totalCents: row.totalCents,
     submittedAt: row.submittedAt?.toISOString() ?? null,
     version: row.updatedAt.toISOString(),
+    viewToken: row.viewToken,
+    editToken: row.editToken,
   };
 }
 
@@ -148,4 +160,151 @@ export async function listBudgets(postKeys: readonly string[]): Promise<BudgetLi
     totalCents: r.totalCents,
     updatedAt: r.updatedAt.toISOString(),
   }));
+}
+
+/* ------------------------------------------------------------ Deellinks */
+
+/*
+ * Een deellink is een geheim in de URL (`/budget/<token>`): wie hem heeft, ziet
+ * het budget of mag het aanpassen, zonder account. Bedoeld voor een kring
+ * waarmee samengewerkt wordt en voor de slides van het BO. Een link geeft
+ * toegang tot dat ene budget en tot niets anders: niet tot de lijst, niet tot
+ * de instellingen, en verwijderen of de links beheren kan enkel een lid.
+ */
+
+export const SHARE_TOKEN = /^[A-Za-z0-9_-]{32,64}$/;
+
+export function newShareToken(): string {
+  return randomBytes(24).toString('base64url');
+}
+
+function sameToken(a: string | null, b: string): boolean {
+  if (!a) return false;
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
+export type BudgetAccess = { level: 'edit' | 'view'; via: 'member' | 'link' };
+
+/** Het budget achter een deellink, en wat de link toelaat. */
+export async function loadBudgetByToken(
+  token: string
+): Promise<{ budget: BudgetRecord; level: 'edit' | 'view' } | null> {
+  if (!SHARE_TOKEN.test(token)) return null;
+  const row = await prisma.boBudget.findFirst({ where: { OR: [{ viewToken: token }, { editToken: token }] } });
+  const budget = row ? toRecord(row) : null;
+  if (!budget) return null;
+  return { budget, level: sameToken(budget.editToken, token) ? 'edit' : 'view' };
+}
+
+/**
+ * Wat deze aanvraag met het budget mag: als lid van de post (of Groep 5), of
+ * met een deellink. Elke server action vraagt dit opnieuw; een action is een
+ * gewoon POST-adres.
+ */
+export async function budgetAccess(
+  budget: { postKey: string; viewToken: string | null; editToken: string | null },
+  token?: string | null
+): Promise<BudgetAccess | null> {
+  if (token) {
+    if (!SHARE_TOKEN.test(token)) return null;
+    if (sameToken(budget.editToken, token)) return { level: 'edit', via: 'link' };
+    if (sameToken(budget.viewToken, token)) return { level: 'view', via: 'link' };
+    return null;
+  }
+  const session = await getCurrentSession();
+  if (session && canEditBudget(session, budget.postKey)) return { level: 'edit', via: 'member' };
+  return null;
+}
+
+/* ------------------------------------------------------------ Begroting */
+
+export const BEGROTING_KEY = 'bestuursorgaan.begroting';
+
+export async function getBegroting(): Promise<Begroting | null> {
+  const row = await prisma.setting.findUnique({ where: { key: BEGROTING_KEY } });
+  const parsed = begrotingSchema.safeParse(row?.value);
+  return parsed.success ? parsed.data : null;
+}
+
+export async function saveBegroting(begroting: Begroting): Promise<void> {
+  const value = begroting as unknown as Prisma.InputJsonValue;
+  await prisma.setting.upsert({
+    where: { key: BEGROTING_KEY },
+    create: { key: BEGROTING_KEY, value },
+    update: { value },
+  });
+}
+
+/* --------------------------------------------------------------- Potjes */
+
+/** De budgetten van dit werkingsjaar op dezelfde begrotingslijn als dit budget. */
+export async function loadPot(budget: BudgetRecord, settings: BudgetSettings): Promise<Pot | null> {
+  const key = potKey(budget.content.begrotingRef);
+  if (!key) return null;
+  const rows = await prisma.boBudget.findMany({
+    where: {
+      workingYear: budget.workingYear,
+      content: { path: ['begrotingRef', 'key'], equals: budget.content.begrotingRef!.key },
+    },
+  });
+  const members: PotMember[] = [];
+  for (const row of rows) {
+    const record = toRecord(row);
+    if (!record || potKey(record.content.begrotingRef) !== key) continue;
+    const ctx: CalcContext = { postKey: record.postKey, settings };
+    members.push({
+      id: record.id,
+      title: record.title,
+      postKey: record.postKey,
+      status: record.status,
+      targetDate: record.targetDate,
+      total: overviewOf(record.content, ctx).total,
+      result: hasResult(record.content) ? resultOverviewOf(record.content, ctx).total : null,
+    });
+  }
+  return potOf(members, budget.id);
+}
+
+/** Het budget zoals het bewaard wordt: elke berekening uitgerekend, zodat de getallen kloppen met de formules. */
+export function normalizeContent(content: BudgetContent): BudgetContent {
+  applyFormulas(content);
+  return content;
+}
+
+/* ---------------------------------------------------------------- Mappen */
+
+export type FolderBudget = BudgetListItem & { hasResult: boolean; resultCents: number | null };
+
+/** Alle budgetten op de site van dit werkingsjaar (Groep 5), of enkel die van de eigen posten. */
+export async function listFolderBudgets(
+  postKeys: readonly string[] | 'all',
+  settings: BudgetSettings
+): Promise<FolderBudget[]> {
+  if (postKeys !== 'all' && postKeys.length === 0) return [];
+  const rows = await prisma.boBudget.findMany({
+    where: { workingYear: currentWorkingYear(), ...(postKeys === 'all' ? {} : { postKey: { in: [...postKeys] } }) },
+    orderBy: { title: 'asc' },
+  });
+  return rows.flatMap((row) => {
+    const record = toRecord(row);
+    if (!record) return [];
+    const result = hasResult(record.content)
+      ? resultOverviewOf(record.content, { postKey: record.postKey, settings }).total
+      : null;
+    return [
+      {
+        id: record.id,
+        postKey: record.postKey,
+        title: record.title,
+        status: record.status,
+        targetDate: record.targetDate,
+        totalCents: record.totalCents,
+        updatedAt: row.updatedAt.toISOString(),
+        hasResult: result != null,
+        resultCents: result == null ? null : Math.round(result * 100),
+      },
+    ];
+  });
 }

@@ -3,11 +3,13 @@ import { normalizeKey } from '../names';
 import {
   costAmount,
   distributionOf,
+  hasResult,
   incomeAmount,
   incomeCount,
   incomePrice,
   overviewOf,
   priceOf,
+  resultOverviewOf,
   rowPct,
   toCents,
   unitsOf,
@@ -91,7 +93,7 @@ export type BudgetSheetMeta = { title: string; postName: string; year: string; m
 
 export function budgetSheet(content: BudgetContent, ctx: CalcContext, meta: BudgetSheetMeta) {
   const { nl } = meta;
-  const W = 11;
+  const W = 12;
   const o = overviewOf(content, ctx);
   const data: SheetData = [];
 
@@ -131,16 +133,35 @@ export function budgetSheet(content: BudgetContent, ctx: CalcContext, meta: Budg
     [text(nl ? 'Organisatie' : 'Organisation', bold), text(nl ? 'Verdeling' : 'Split', bold)],
     ...content.allocation.map((a) => [text(a.org), { value: a.share, type: Number, format: PCT } as CellObject]),
   ];
+  const res = hasResult(content) ? resultOverviewOf(content, ctx) : null;
+  const resLine = (id: string) => res?.lines.find((l) => l.id === id)?.amount ?? 0;
+  const resHead = res ? [text('Resultaat', head)] : [];
+  const resCell = (r: { result?: number | null }) => (res ? [r.result == null ? null : euro(r.result)] : []);
   const overview: Array<Array<Cell | undefined>> = [
     [text(nl ? 'Overzicht' : 'Overview', head), null, text('Budget', head), text(nl ? 'Resultaat' : 'Resultaat', head)],
-    ...o.lines.filter((l) => l.side === 'in').map((l) => [text(sectionLabel(l.name, nl)), null, euro(l.amount)]),
-    [text(nl ? 'Inkomsten' : 'Inkomsten', bold), null, euro(o.income, bold)],
-    ...o.lines.filter((l) => l.side === 'out').map((l) => [text(sectionLabel(l.name, nl)), null, euro(l.amount)]),
-    [text(nl ? 'Uitgaven' : 'Uitgaven', bold), null, euro(o.expense, bold)],
+    ...o.lines
+      .filter((l) => l.side === 'in')
+      .map((l) => [text(sectionLabel(l.name, nl)), null, euro(l.amount), res ? euro(resLine(l.id)) : null]),
+    [text(nl ? 'Inkomsten' : 'Inkomsten', bold), null, euro(o.income, bold), res ? euro(res.income, bold) : null],
+    ...o.lines
+      .filter((l) => l.side === 'out')
+      .map((l) => [text(sectionLabel(l.name, nl)), null, euro(l.amount), res ? euro(resLine(l.id)) : null]),
+    [text(nl ? 'Uitgaven' : 'Uitgaven', bold), null, euro(o.expense, bold), res ? euro(res.expense, bold) : null],
     [],
-    [text(nl ? 'Totaal' : 'Totaal', bold), null, euro(o.total, bold)],
-    [text(nl ? 'Begroting' : 'Begroting'), null, o.begroting == null ? null : euro(o.begroting)],
-    [text(nl ? 'Verschil met begroting' : 'Verschil met begroting'), null, o.diff == null ? null : euro(o.diff)],
+    [text(nl ? 'Totaal' : 'Totaal', bold), null, euro(o.total, bold), res ? euro(res.total, bold) : null],
+    [
+      text(nl ? 'Begroting' : 'Begroting'),
+      null,
+      o.begroting == null ? null : euro(o.begroting),
+      res && o.begroting != null ? euro(o.begroting) : null,
+    ],
+    [
+      text(nl ? 'Verschil met begroting' : 'Verschil met begroting'),
+      null,
+      o.diff == null ? null : euro(o.diff),
+      res && res.diffBegroting != null ? euro(res.diffBegroting) : null,
+    ],
+    ...(res ? [[text('Verschil met budget'), null, null, euro(res.diffBudget)]] : []),
   ];
   for (let i = 0; i < Math.max(info.length, overview.length); i += 1) {
     const left = overview[i] ?? [];
@@ -161,6 +182,7 @@ export function budgetSheet(content: BudgetContent, ctx: CalcContext, meta: Budg
             text(nl ? 'Prijs' : 'Price', head),
             text(nl ? 'Bedrag' : 'Amount', head),
             text(nl ? 'Opmerking' : 'Note', head),
+            ...resHead,
           ],
           W
         )
@@ -175,6 +197,7 @@ export function budgetSheet(content: BudgetContent, ctx: CalcContext, meta: Budg
               euro(incomePrice(content, r)),
               euro(incomeAmount(content, r)),
               text(r.note ?? ''),
+              ...resCell(r),
             ],
             W
           )
@@ -195,6 +218,7 @@ export function budgetSheet(content: BudgetContent, ctx: CalcContext, meta: Budg
             text(nl ? 'Bedrag' : 'Amount', head),
             text(nl ? 'Bron' : 'Source', head),
             text(nl ? 'Opmerking' : 'Note', head),
+            ...resHead,
           ],
           W
         )
@@ -211,6 +235,7 @@ export function budgetSheet(content: BudgetContent, ctx: CalcContext, meta: Budg
               euro(costAmount(content, ctx, s, r)),
               text(sourceText(content, r, nl)),
               text(r.note ?? ''),
+              ...resCell(r),
             ],
             W
           )
@@ -233,6 +258,7 @@ export function budgetSheet(content: BudgetContent, ctx: CalcContext, meta: Budg
           text(nl ? 'Bedrag' : 'Amount', head),
           text(nl ? 'Bron' : 'Source', head),
           text(nl ? 'Opmerking' : 'Note', head),
+          ...resHead,
         ],
         W
       )
@@ -258,6 +284,7 @@ export function budgetSheet(content: BudgetContent, ctx: CalcContext, meta: Budg
                 : sourceText(content, r, nl)
             ),
             text(r.note ?? ''),
+            ...resCell(r),
           ],
           W
         )
@@ -281,17 +308,18 @@ export function budgetSheet(content: BudgetContent, ctx: CalcContext, meta: Budg
         { width: 12 },
         { width: 40 },
         { width: 30 },
+        { width: 14 },
       ],
     },
   ];
 }
 
 /** "26-27_Budget_Activiteiten_Live Cantus.xlsx", zoals de scan een budget herkent. */
-export function budgetFileName(year: string, postName: string, title: string): string {
+export function budgetFileName(year: string, postName: string, title: string, result = false): string {
   const clean = (s: string) =>
     s
       .replace(/[\\/:*?"<>|_]+/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-  return `${year}_Budget_${clean(postName)}_${clean(title) || 'Budget'}.xlsx`;
+  return `${year}_${result ? 'Resultaat' : 'Budget'}_${clean(postName)}_${clean(title) || 'Budget'}.xlsx`;
 }

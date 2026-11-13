@@ -25,6 +25,16 @@ const TEMPLATES = {
       name: 'Cantus',
       text: 'Zaal, vaten en sangria uit de locatie, drank als verdeling met water als rest, en inkom per doelgroep: leden, niet-leden, ereleden en genodigden.',
     },
+    {
+      id: 'fakfeestje',
+      name: 'Fakfeestje',
+      text: "Drankpromo's (wat een promo kost tegenover de gewone verkoop), inkleding, dj's, tappersdrank en huur, zoals het blad van de Fakbar.",
+    },
+    {
+      id: 'sectornight',
+      name: 'Sector Night',
+      text: 'Bedrijven betalen een deelnameprijs; de catering rekent op studenten plus vertegenwoordigers. Met de parameters Aantal bedrijven en Prijs deelname.',
+    },
   ],
   en: [
     {
@@ -36,6 +46,16 @@ const TEMPLATES = {
       id: 'cantus',
       name: 'Cantus',
       text: 'Venue, kegs and sangria from the venue list, drinks as a split with water as the rest, and entrance per audience.',
+    },
+    {
+      id: 'fakfeestje',
+      name: 'Fak party',
+      text: 'Drink promos (what a promo costs against normal sales), decoration, DJs, bar staff drinks and rent.',
+    },
+    {
+      id: 'sectornight',
+      name: 'Sector Night',
+      text: 'Companies pay a fee; catering counts students plus representatives.',
     },
   ],
 };

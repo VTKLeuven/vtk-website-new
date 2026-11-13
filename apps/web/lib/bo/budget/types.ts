@@ -12,7 +12,7 @@
  * enkel de totalen die de lijst toont, gaan als centen naar de databank.
  */
 
-export const BUDGET_TEMPLATES = ['standaard', 'cantus'] as const;
+export const BUDGET_TEMPLATES = ['standaard', 'cantus', 'fakfeestje', 'sectornight'] as const;
 export type BudgetTemplate = (typeof BUDGET_TEMPLATES)[number];
 
 /** Is de ingetypte prijs incl. of excl. BTW? */
@@ -87,8 +87,12 @@ export type CostRow = {
   note?: string;
   /** De Collect&Go-servicekost: één regel per bestelling, de prijs komt uit de instellingen. */
   service?: boolean;
-  /** De laatste keer dat de site de prijs bij Collect&Go opvroeg. */
+  /** De laatste keer dat de site de prijs bij de webshop opvroeg. */
   lastCheck?: PriceCheck | null;
+  /** Een berekening per veld ("=2,79/4"); het antwoord staat in het veld zelf (`formula.ts`). */
+  fx?: Partial<Record<'qty' | 'pct' | 'perPerson' | 'perUnit' | 'price', string>>;
+  /** Resultaat: wat deze regel echt kostte. Null of afwezig = nog niet ingevuld. */
+  result?: number | null;
 };
 
 /**
@@ -100,8 +104,12 @@ export type PriceCheck = {
   /** ISO-tijdstip van de controle. */
   at: string;
   status: 'ok' | 'changed' | 'notfound' | 'failed';
-  /** De prijs op de site, incl. BTW. */
+  /** De prijs op de site, incl. BTW (bij een drukker excl., zie `basis`). */
   price?: number;
+  /** Is die prijs incl. of excl. BTW? Afwezig = incl., zoals een winkelprijs. */
+  basis?: VatBasis;
+  /** Welke webshop antwoordde (`lib/priceCheck/shops.ts`). */
+  shop?: string;
   /** De naam op de site, om te zien of de link het juiste product is. */
   name?: string;
   reason?: string;
@@ -133,6 +141,10 @@ export type IncomeRow = {
   count: IncomeCount;
   price: IncomePrice;
   note?: string;
+  /** Een berekening voor het aantal of de prijs, enkel bij een ingetypte waarde. */
+  fx?: Partial<Record<'qty' | 'price', string>>;
+  /** Resultaat: wat er echt binnenkwam. */
+  result?: number | null;
 };
 
 export type CostSection = {
@@ -145,6 +157,13 @@ export type CostSection = {
   perPerson?: number;
   /** Variabel: verdelen de regels samen 100 %? Zo niet, telt elke regel voor iedereen (eten). */
   distribute?: boolean;
+  /**
+   * Variabel: voor hoeveel personen deze sectie rekent, als dat niet alle
+   * deelnemers zijn (enkel het praesidium eet mee, twee vertegenwoordigers
+   * per bedrijf). Null of afwezig = de deelnemers van het budget.
+   */
+  base?: number | null;
+  fx?: Partial<Record<'share' | 'perPerson' | 'base', string>>;
   rows: CostRow[];
 };
 
@@ -166,6 +185,21 @@ export type BudgetParams = {
   memberShare?: number;
   /** Cantus: aandeel ereleden, 0 tot 1. */
   honoraryShare?: number;
+  /**
+   * Eigen parameters, zoals het blok Parameters bovenaan het blad: "Aantal
+   * bedrijven", "Percentage cola", "Prijs inkom". Een berekening verwijst
+   * ernaar met de naam tussen haken.
+   */
+  extra?: BudgetParam[];
+};
+
+export type BudgetParam = {
+  id: string;
+  name: string;
+  value: number;
+  /** Hoe het getal getoond wordt; een percentage staat als 0 tot 1. */
+  kind?: 'number' | 'percent' | 'money';
+  fx?: string;
 };
 
 export type BudgetContent = {
@@ -174,10 +208,39 @@ export type BudgetContent = {
   info: { date: string; location: string; concept: string };
   /** Het bedrag uit de begroting van het werkingsjaar; positief is winst. */
   begroting: number | null;
+  /**
+   * De lijn uit de begroting waar dit budget op zit (`begroting.ts`). Twee
+   * budgetten met dezelfde lijn delen een potje (`pot.ts`).
+   */
+  begrotingRef?: { sheet: string; key: string; label: string } | null;
+  /**
+   * Dit budget neemt maar een deel van de lijn: er komen nog budgetten op
+   * (materiaal dat door het jaar gekocht wordt). Dan is "minder dan de
+   * begroting" geen nieuws en vergelijkt de site het potje als geheel.
+   */
+  potPart?: boolean;
   /** Een ander tarief dan dat van de post, met reden. */
   vat: { rate: number; reason: string } | null;
   allocation: { org: string; share: number }[];
   sections: Section[];
+  /**
+   * Het resultaat van de activiteit, naast het budget. Zodra dit aan staat,
+   * toont de editor de kolom Resultaat en heet de download "Resultaat".
+   */
+  result?: { on: boolean; note?: string } | null;
+  /**
+   * Overgenomen uit een rekenblad van het BO (`importSheet.ts`): welk bestand,
+   * en of de regels overgenomen zijn of enkel het overzicht. Afwezig bij een
+   * budget dat op de site opgesteld is.
+   */
+  source?: {
+    kind: 'drive' | 'upload';
+    name: string;
+    id?: string;
+    mode: 'regels' | 'overzicht';
+    /** Het totaal van het blad bij het overnemen, om later te zien of iemand het budget wijzigde. */
+    sheetTotal: number | null;
+  } | null;
 };
 
 export type BudgetLocation = {
@@ -210,7 +273,7 @@ export type BudgetSettings = {
    * werking, geen vervanging (zie docs/design-decisions.md).
    */
   pilotPostKeys: string[];
-  /** Vraagt de site prijzen op bij collectandgo.be? Uit als Colruyt het niet wil. */
+  /** Vraagt de site prijzen op bij de webshops? Uit als een winkel het niet wil. */
   collectGoLive: boolean;
 };
 

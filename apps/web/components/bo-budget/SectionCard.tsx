@@ -15,8 +15,10 @@ import {
   restShare,
   rowPct,
   sectionAmount,
+  sectionResult,
   unitsOf,
 } from '@/lib/bo/budget/calc';
+import { setFx } from '@/lib/bo/budget/formula';
 import type { CostRow, CostSection, IncomeRow, IncomeSection, Section } from '@/lib/bo/budget/types';
 import type { EditorApi } from './editorApi';
 import { money, percent, plain } from './format';
@@ -105,10 +107,35 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
       const row = s.rows.find((r) => r.id === rowId);
       if (row) change(row);
     });
+  /** Een cel die ook een berekening aanneemt ("=2,79/4"). */
+  const fx = (row: CostRow, key: 'qty' | 'pct' | 'perPerson' | 'perUnit' | 'price') => ({
+    formula: row.fx?.[key],
+    onFormula: (formula: string | null) => update(row.id, (r) => setFx(r, key, formula)),
+  });
+  const resultCell = (row: CostRow) =>
+    api.resultOn ? (
+      <td className="num vtk-bud-col-res" data-label={nl ? 'Resultaat' : 'Result'}>
+        <NumberField
+          className="vtk-bud-bare vtk-bud-cell num"
+          value={row.result ?? null}
+          decimals={2}
+          allowEmpty
+          placeholder="–"
+          data-col="result"
+          aria-label={nl ? `Resultaat van ${row.name || 'deze regel'}` : `Result of ${row.name || 'this row'}`}
+          onValue={(v) => update(row.id, (r) => (r.result = v))}
+        />
+      </td>
+    ) : null;
 
   return (
     <div className="vtk-bud-tablewrap">
-      <table className="vtk-bud-table" ref={tableRef} onKeyDown={onEnterMovesDown}>
+      <table
+        className="vtk-bud-table"
+        ref={tableRef}
+        onKeyDown={onEnterMovesDown}
+        data-result={api.resultOn ? '1' : undefined}
+      >
         <thead>
           <tr>
             <th className="vtk-bud-col-name">{nl ? 'Omschrijving' : 'Description'}</th>
@@ -124,6 +151,7 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
             )}
             <th className="num">{nl ? 'Prijs' : 'Price'}</th>
             <th className="num">{nl ? 'Bedrag' : 'Amount'}</th>
+            {api.resultOn && <th className="num vtk-bud-col-res">{nl ? 'Resultaat' : 'Result'}</th>}
             <th className="vtk-bud-col-act">
               <span className="sr-only">{nl ? 'Status en details' : 'Status and details'}</span>
             </th>
@@ -171,6 +199,7 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
                       ? `de rest: ${percent(rowPct(section, row))}, geen aankoop`
                       : `the rest: ${percent(rowPct(section, row), false)}, nothing bought`}
                   </td>
+                  {api.resultOn && <td />}
                   {actions}
                 </tr>
               );
@@ -192,6 +221,7 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
                       onValue={(v) => update(row.id, (r) => r.forfait && (r.forfait.amount = v ?? 0))}
                     />
                   </td>
+                  {resultCell(row)}
                   {actions}
                 </tr>
               );
@@ -218,6 +248,7 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
                             value={row.pct ?? 0}
                             percent
                             data-col="pct"
+                            {...fx(row, 'pct')}
                             aria-label={nl ? 'Deel van de verdeling, in procent' : 'Share of the split, in percent'}
                             onValue={(v) => update(row.id, (r) => (r.pct = v ?? 0))}
                           />
@@ -231,6 +262,7 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
                         allowEmpty
                         placeholder={plain(section.perPerson ?? 1, nl)}
                         data-col="perPerson"
+                        {...fx(row, 'perPerson')}
                         aria-label={nl ? 'Hoeveel per persoon' : 'How much per person'}
                         onValue={(v) => update(row.id, (r) => (v == null ? delete r.perPerson : (r.perPerson = v)))}
                       />
@@ -240,6 +272,7 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
                         className="vtk-bud-bare vtk-bud-cell num"
                         value={row.perUnit}
                         data-col="perUnit"
+                        {...fx(row, 'perUnit')}
                         aria-label={nl ? 'Hoeveel in één eenheid' : 'How much in one unit'}
                         onValue={(v) => update(row.id, (r) => (r.perUnit = v ?? 0))}
                       />
@@ -260,6 +293,7 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
                       className="vtk-bud-bare vtk-bud-cell num"
                       value={row.qty ?? 0}
                       data-col="qty"
+                      {...fx(row, 'qty')}
                       aria-label={
                         row.service ? (nl ? 'Aantal bestellingen' : 'Number of orders') : nl ? 'Aantal' : 'Quantity'
                       }
@@ -289,6 +323,7 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
                       value={row.override ?? row.price ?? 0}
                       decimals={2}
                       data-col="price"
+                      {...fx(row, 'price')}
                       aria-label={nl ? 'Prijs' : 'Price'}
                       onValue={(v) =>
                         update(row.id, (r) => {
@@ -302,6 +337,7 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
                 <td className="num vtk-bud-amount" data-label={nl ? 'Bedrag' : 'Amount'}>
                   {money(amount, nl)}
                 </td>
+                {resultCell(row)}
                 {actions}
               </tr>
             );
@@ -338,6 +374,7 @@ function IncomeTable({ api, section }: { api: EditorApi; section: IncomeSection 
             <th className="num">{nl ? 'Aantal' : 'Qty'}</th>
             <th className="num">{nl ? 'Prijs' : 'Price'}</th>
             <th className="num">{nl ? 'Bedrag' : 'Amount'}</th>
+            {api.resultOn && <th className="num vtk-bud-col-res">{nl ? 'Resultaat' : 'Result'}</th>}
             <th className="vtk-bud-col-act">
               <span className="sr-only">{nl ? 'Details' : 'Details'}</span>
             </th>
@@ -366,6 +403,8 @@ function IncomeTable({ api, section }: { api: EditorApi; section: IncomeSection 
                       className="vtk-bud-bare vtk-bud-cell num"
                       value={row.count.qty}
                       data-col="qty"
+                      formula={row.fx?.qty}
+                      onFormula={(f) => update(row.id, (r) => setFx(r, 'qty', f))}
                       aria-label={nl ? 'Aantal' : 'Quantity'}
                       onValue={(v) => update(row.id, (r) => r.count.type === 'manual' && (r.count.qty = v ?? 0))}
                     />
@@ -387,6 +426,8 @@ function IncomeTable({ api, section }: { api: EditorApi; section: IncomeSection 
                       value={row.price.value}
                       decimals={2}
                       data-col="price"
+                      formula={row.fx?.price}
+                      onFormula={(f) => update(row.id, (r) => setFx(r, 'price', f))}
                       aria-label={nl ? 'Prijs' : 'Price'}
                       onValue={(v) => update(row.id, (r) => r.price.type === 'manual' && (r.price.value = v ?? 0))}
                     />
@@ -406,6 +447,22 @@ function IncomeTable({ api, section }: { api: EditorApi; section: IncomeSection 
                 <td className="num vtk-bud-amount" data-label={nl ? 'Bedrag' : 'Amount'}>
                   {money(incomeAmount(content, row), nl)}
                 </td>
+                {api.resultOn && (
+                  <td className="num vtk-bud-col-res" data-label={nl ? 'Resultaat' : 'Result'}>
+                    <NumberField
+                      className="vtk-bud-bare vtk-bud-cell num"
+                      value={row.result ?? null}
+                      decimals={2}
+                      allowEmpty
+                      placeholder="–"
+                      data-col="result"
+                      aria-label={
+                        nl ? `Resultaat van ${row.name || 'deze regel'}` : `Result of ${row.name || 'this row'}`
+                      }
+                      onValue={(v) => update(row.id, (r) => (r.result = v))}
+                    />
+                  </td>
+                )}
                 <td className="vtk-bud-col-act">
                   <span className="vtk-bud-act">
                     <span className="vtk-bud-dot" aria-hidden="true" />
@@ -515,7 +572,14 @@ export function SectionCard({ api, section, onDelete }: { api: EditorApi; sectio
           <span className="vtk-bud-sec-type">{TYPE_LABEL[nl ? 'nl' : 'en'][section.type]}</span>
         </div>
         <div className="vtk-bud-sec-right">
-          <span className="vtk-bud-sec-amount">{money(amount, nl)}</span>
+          <span className="vtk-bud-sec-amount">
+            {money(amount, nl)}
+            {api.resultOn && (
+              <span className="vtk-bud-sec-res" title={nl ? 'Resultaat' : 'Result'}>
+                {nl ? 'resultaat' : 'result'} {money(sectionResult(section), nl)}
+              </span>
+            )}
+          </span>
           {!readOnly && (
             <IconButton
               label={nl ? 'Sectie verwijderen' : 'Delete section'}
@@ -539,7 +603,30 @@ export function SectionCard({ api, section, onDelete }: { api: EditorApi; sectio
               aria-label={nl ? 'Deel van de deelnemers, in procent' : 'Share of the participants, in percent'}
               onValue={(v) => setCost((s) => (s.share = v ?? 1))}
             />
-            <span>{nl ? `% van de ${persons} deelnemers` : `% of the ${persons} participants`}</span>
+            <span>{nl ? '% van' : '% of'}</span>
+            <NumberField
+              className="vtk-bud-mini num"
+              value={section.base ?? null}
+              allowEmpty
+              placeholder={String(persons)}
+              formula={section.fx?.base}
+              onFormula={(f) => setCost((s) => setFx(s, 'base', f))}
+              aria-label={
+                nl
+                  ? 'Voor hoeveel personen deze sectie rekent; leeg is alle deelnemers'
+                  : 'How many people this section counts; empty means all participants'
+              }
+              onValue={(v) => setCost((s) => (v == null ? delete s.base : (s.base = v)))}
+            />
+            <span>
+              {section.base == null
+                ? nl
+                  ? 'personen (alle deelnemers)'
+                  : 'people (all participants)'
+                : nl
+                  ? `personen, in plaats van de ${persons} deelnemers`
+                  : `people, instead of the ${persons} participants`}
+            </span>
           </label>
           <label>
             <NumberField

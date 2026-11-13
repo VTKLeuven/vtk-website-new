@@ -19,11 +19,13 @@ export type EditorApi = {
   clearFocusRow: () => void;
   addRow: (sectionId: string, kind?: 'row' | 'forfait' | 'rest') => void;
   locationNames: string[];
-  /** Mag de site prijzen opvragen bij collectandgo.be (instellingen, en niet ingediend)? */
+  /** Mag de site prijzen opvragen bij de webshops (instellingen, en niet ingediend)? */
   liveCollectGo: boolean;
   /** De regels waarvan de prijs nu opgevraagd wordt, of null. */
   checkingRows: string[] | null;
   checkPrices: (rowIds?: string[]) => void;
-  /** De prijs die Collect&Go gaf, overnemen in de regel. */
+  /** Staat het resultaat aan? Dan tonen de tabellen de kolom Resultaat. */
+  resultOn: boolean;
+  /** De prijs die de webshop gaf, overnemen in de regel. */
   acceptPrice: (rowId: string) => void;
 };

@@ -73,7 +73,8 @@ export function parseProductPage(html: string): ProductInfo | null {
   const blocks = html.matchAll(/<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi);
   for (const [, block] of blocks) {
     if (!/"@type"\s*:\s*"Product"/.test(block)) continue;
-    const name = /"name"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(block)?.[1];
+    // Zonder het merk: bij een drukker staat "brand": { "name": "HelloPrint" } vóór de naam van het product.
+    const name = /"name"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(block.replace(/"brand"\s*:\s*\{[^{}]*\}/g, ''))?.[1];
     const price = /"price"\s*:\s*"?(\d+(?:[.,]\d+)?)"?/.exec(block)?.[1];
     if (!name || !price) continue;
     const value = Number(price.replace(',', '.'));
