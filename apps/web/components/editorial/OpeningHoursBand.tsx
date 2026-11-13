@@ -38,8 +38,14 @@ const LOGOS: Record<string, { src: string; width: number; height: number }> = {
 
 const CUDI_SLOTS_URL = "https://cudi.vtk.be/vtk/account/slots";
 
-/** Zo dicht bij "nu" (in procent van de as) wijkt een uur op de as voor het nu-label. */
-const NOW_CLEARANCE = 4.5;
+/**
+ * Zo dicht bij "nu" (in procent van de as) wijkt een uur op de as voor het
+ * nu-label. Een label als "10:00" is zo'n 40px breed; de lange tijdlijn zonder
+ * kader is ruim 800px, een kolom van de week in strepen hoogstens 470px (en op
+ * een telefoon ongeveer 330px), dus daar moet een uur veel verder wijken.
+ */
+const NOW_CLEARANCE_PLAIN = 6;
+const NOW_CLEARANCE_STRIPS = 16;
 
 function position(left: number, width?: number): CSSProperties {
   return {
@@ -188,7 +194,7 @@ function PlainBar({ bar }: { bar: TimelineBar }) {
 
 function PlainLayout({ band, base, nl }: { band: HoursBand; base: string; nl: boolean }) {
   const now = band.now;
-  const ticks = band.ticks.filter((tick) => !now || Math.abs(tick.left - now.left) > NOW_CLEARANCE);
+  const ticks = band.ticks.filter((tick) => !now || Math.abs(tick.left - now.left) > NOW_CLEARANCE_PLAIN);
   return (
     <div
       className="hours-plain"
@@ -240,7 +246,7 @@ function PlainLayout({ band, base, nl }: { band: HoursBand; base: string; nl: bo
               {service.unavailable ? (
                 <span className="hours-plain-empty">{service.status.label}</span>
               ) : service.bars.length === 0 ? (
-                <span className="hours-plain-empty">{nl ? "Vandaag dicht" : "Closed today"}</span>
+                <span className="hours-plain-empty">{nl ? "Vandaag gesloten" : "Closed today"}</span>
               ) : (
                 service.bars.map((bar, index) => <PlainBar key={index} bar={bar} />)
               )}
@@ -275,7 +281,7 @@ function PlainLayout({ band, base, nl }: { band: HoursBand; base: string; nl: bo
                       ))
                     ) : (
                       <span className="hours-plain-time" data-closed>
-                        {nl ? "dicht" : "closed"}
+                        {nl ? "gesloten" : "closed"}
                       </span>
                     )}
                   </li>
@@ -322,7 +328,7 @@ function StripsLayout({ band, base, nl }: { band: HoursBand; base: string; nl: b
   const now = band.now;
   // Om de vier uur een uur op de as, en niet vlak naast het uur van nu.
   const ticks = band.ticks.filter(
-    (tick, index) => index % 2 === 0 && (!now || Math.abs(tick.left - now.left) > NOW_CLEARANCE * 2),
+    (tick, index) => index % 2 === 0 && (!now || Math.abs(tick.left - now.left) > NOW_CLEARANCE_STRIPS),
   );
   return (
     <div className="hours-strips" style={{ "--hours-span": band.hours } as CSSProperties}>
@@ -338,7 +344,7 @@ function StripsLayout({ band, base, nl }: { band: HoursBand; base: string; nl: b
                     <span className="hours-strips-day">{row.short.toLowerCase()}</span>
                     <div className="hours-strips-lane">
                       {row.bars.length === 0 ? (
-                        <span className="hours-strips-closed">{nl ? "dicht" : "closed"}</span>
+                        <span className="hours-strips-closed">{nl ? "gesloten" : "closed"}</span>
                       ) : (
                         row.bars.map((bar, index) => <StripBar key={index} bar={bar} />)
                       )}

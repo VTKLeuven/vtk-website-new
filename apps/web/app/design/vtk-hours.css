@@ -428,10 +428,12 @@
   min-width: 0;
 }
 
+/* Onder de as wat lucht voor de knop en de opmerking: anders lazen die als
+   nog een rij van de grafiek. */
 .vtk-design .hours-strips-chart {
   display: grid;
   gap: 7px;
-  margin-top: 8px;
+  margin: 8px 0 14px;
 }
 
 .vtk-design .hours-strips-line,
@@ -475,7 +477,7 @@
 .vtk-design .hours-strips-bar {
   container: hours-strip-bar / inline-size;
   position: absolute;
-  z-index: 1;
+  z-index: 2;
   top: 5px;
   bottom: 5px;
   left: var(--l);
@@ -568,6 +570,7 @@
 
 .vtk-design .hours-strips-closed {
   position: absolute;
+  z-index: 0;
   top: 50%;
   left: 0;
   transform: translateY(-50%);
@@ -578,10 +581,11 @@
 }
 
 /* Achter de balken: in het venster dat nu loopt, is de balk zelf al geel, en de
-   lijn liep anders door de uren erin. Erboven en eronder steekt ze uit. */
+   lijn liep anders door de uren erin. Erboven en eronder steekt ze uit. Wel
+   boven "gesloten", waarvan de navy achtergrond ze anders afdekte. */
 .vtk-design .hours-strips-now {
   position: absolute;
-  z-index: 0;
+  z-index: 1;
   top: -5px;
   bottom: -5px;
   left: var(--l);

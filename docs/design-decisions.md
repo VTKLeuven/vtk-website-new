@@ -3570,11 +3570,11 @@ wijzerplaat, week in strepen) koos de kring er twee, met een keuze in /admin/hom
 - **Zonder kader (`plain`).** Dezelfde opbouw als voorheen (vandaag als tijdlijn,
   de week als tekst eronder), zonder paneel: elke dienst een rij op de band met
   een haarlijn ertussen, vandaag als dunne lijn met de vensters erop, één nu-lijn
-  door alle diensten, "dicht" in plaats van een streepje en vandaag geel
+  door alle diensten, "gesloten" in plaats van een streepje en vandaag geel
   onderlijnd.
 - **In beide geen statusbolletje.** Open staat in het wit, dicht gedempt met enkel
   het uur in het wit ("Opent vandaag om **10:30**"), "Mogelijk nog open" in het
-  geel.
+  geel. Een dag zonder uren heet "gesloten", zoals de statuszin, en niet "dicht".
 - **De wijzerplaat** (een klok van 24 uur per dienst) viel af: een venster van een
   uur, zoals de cursusdienst, is op een ring een kort boogje.
 
