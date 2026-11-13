@@ -39,7 +39,7 @@ import {
 } from '@/lib/bo/budget/prices';
 import { allCostRows } from '@/lib/bo/budget/calc';
 import { newId } from '@/lib/bo/budget/templates';
-import { lookupShopProduct, priceBrowserStatus } from '@/lib/priceCheck/fetch';
+import { lookupShopProduct, priceBrowserStatus, routeOf } from '@/lib/priceCheck/fetch';
 import { parseShopUrl, shopOfUrl, SHOPS } from '@/lib/priceCheck/shops';
 import { templateContent } from '@/lib/bo/budget/templates';
 import {
@@ -710,7 +710,7 @@ export async function testPriceLookupAction(input: { url: string }): Promise<Pri
   return {
     ok: true,
     shop,
-    via: ref.via,
+    via: routeOf(ref),
     browser,
     basis: ref.basis,
     ms: Date.now() - started,

@@ -31,7 +31,7 @@ const { chromium } = require('playwright');
 const PORT = Number(process.env.PORT || 8787);
 const SECRET = process.env.PRICE_BROWSER_SECRET || '';
 const PROXY = process.env.PRICE_BROWSER_PROXY || '';
-const ALLOWED = (process.env.PRICE_BROWSER_HOSTS || 'bol.com,partywinkel.be,action.com,colruyt.be')
+const ALLOWED = (process.env.PRICE_BROWSER_HOSTS || 'bol.com,partywinkel.be,action.com,colruyt.be,collectandgo.be')
   .split(',')
   .map((h) => h.trim().toLowerCase())
   .filter(Boolean);

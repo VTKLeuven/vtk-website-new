@@ -38,6 +38,20 @@ const pending = new Map<string, Promise<ShopLookup>>();
 
 export type LookupOptions = { fresh?: boolean; colruytPostcode?: string };
 
+function priceBrowserConfigured(): boolean {
+  return !!process.env.PRICE_BROWSER_URL?.trim() && !!process.env.PRICE_BROWSER_SECRET?.trim();
+}
+
+/**
+ * Langs waar de site deze winkel echt opvraagt. Collect&Go antwoordt een gewone
+ * aanvraag, maar weigert het IP van de server (HTTP 456); staat de prijsbrowser
+ * aan, dan gaat Collect&Go daarlangs, en zo ook langs zijn `PRICE_BROWSER_PROXY`.
+ */
+export function routeOf(ref: ShopRef): ShopRef['via'] {
+  if (ref.shop === 'collectgo' && priceBrowserConfigured()) return 'browser';
+  return ref.via;
+}
+
 async function lookupInBrowser(ref: ShopRef, options: LookupOptions): Promise<ShopLookup> {
   const base = process.env.PRICE_BROWSER_URL?.trim();
   const secret = process.env.PRICE_BROWSER_SECRET?.trim();
@@ -125,7 +139,7 @@ export async function lookupShopProduct(ref: ShopRef, options: LookupOptions = {
 async function fetchShopProduct(ref: ShopRef, options: LookupOptions): Promise<ShopLookup> {
   let lookup: ShopLookup;
   try {
-    if (ref.via === 'browser') return await lookupInBrowser(ref, options);
+    if (routeOf(ref) === 'browser') return await lookupInBrowser(ref, options);
     const res = await fetch(ref.page, {
       headers: {
         'User-Agent': USER_AGENT,

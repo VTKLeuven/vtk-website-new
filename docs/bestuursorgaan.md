@@ -638,7 +638,7 @@ prijs opgehaald wordt (`via`). Getest in november 2026:
 
 | Winkel | Bladen (van 209) | Hoe | Stand |
 | ------ | ---------------- | --- | ----- |
-| collectandgo.be | 90 | gewone aanvraag, JSON-LD | werkt |
+| collectandgo.be | 90 | gewone aanvraag, JSON-LD; langs de prijsbrowser zodra die aan staat (`routeOf` in `lib/priceCheck/fetch.ts`), want Collect&Go weigert het IP van de server met HTTP 456 | werkt vanop een gewone verbinding; vanop de server enkel met `PRICE_BROWSER_PROXY` |
 | bol.com | 35 | prijsbrowser, JSON-LD | werkt |
 | partywinkel.be | 30 | prijsbrowser, JSON-LD en `og:price:amount` (de gekozen variant) | werkt |
 | helloprint.com, drukzo.be | 14 en 4 | gewone aanvraag, JSON-LD, prijs van de gekozen configuratie, **excl. BTW** | werkt (505,99 excl. = 612,25 incl. op de pagina) |
