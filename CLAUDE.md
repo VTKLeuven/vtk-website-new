@@ -447,9 +447,14 @@ the design language into the application instead of copying mockup content.
   word from the praeses opens with the author's square portrait. See
   `docs/design-decisions.md`.
 - Opening hours (`components/editorial/OpeningHoursBand.tsx`,
-  `lib/openingHoursWeek.ts`): per service, today as a timeline with a yellow
-  now-line, and the week as a row of exact times underneath (Sunday first). Do
-  not go back to one card per service with a list of days: it hid what is open
+  `lib/openingHoursWeek.ts`, `app/design/vtk-hours.css`): today on a time axis
+  with a yellow now-line, and the week (Sunday first). Two layouts, chosen in
+  /admin/home (`home.hoursLayout`): **week in strepen** (default, per service a
+  column with the week as thin rows on one axis, today the thickest row) and
+  **zonder kader** (per service a row, today as a thin line, the week as text,
+  one now-line through all services). Neither has a glass panel, status dots,
+  yellow caps or pill-shaped bars: together those read as a template. Do not
+  go back to one card per service with a list of days: it hid what is open
   now and could not show a second window on a day. Read hours with
   `parseHoursWindows`, never with `parseHoursRange` (first window only), and
   compute "now" on the Brussels clock, not with `getHours()`. An evening without

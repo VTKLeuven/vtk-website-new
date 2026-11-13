@@ -357,6 +357,13 @@ export type HoursServiceInput = {
 
 export type HoursCell = { day: number; short: string; full: string; today: boolean; lines: string[] };
 
+/**
+ * Eén dag van de week als tijdlijn, voor de weergave "week in strepen" (zie
+ * `lib/home/hoursLayout.ts`). Enkel de rij van vandaag kent "nu": op een andere
+ * dag licht geen venster op en loopt geen avond.
+ */
+export type HoursRow = { day: number; short: string; full: string; today: boolean; bars: TimelineBar[] };
+
 export type HoursBandService = {
   key: string;
   name: string;
@@ -366,6 +373,8 @@ export type HoursBandService = {
   unavailable: boolean;
   bars: TimelineBar[];
   cells: HoursCell[];
+  /** Dezelfde dagen als `cells`, met hun vensters als balken op de gedeelde as. */
+  rows: HoursRow[];
 };
 
 export type HoursBand = {
@@ -374,12 +383,18 @@ export type HoursBand = {
   ticks: Array<{ left: number; label: string; minor: boolean }>;
   now: { left: number; label: string } | null;
   dayLabel: string;
+  /** De dag van de tijdlijn ("vrijdag"), en of het de nacht na die dag is. */
+  dayName: string;
+  overnight: boolean;
   /** Het weekend: de cursusdienst toont dan de uren van volgende week. */
   nextWeek: boolean;
   /** Kolommen van het weekrooster: zondag eerst, zie docs/design-decisions.md. */
   columns: number;
   services: HoursBandService[];
 };
+
+/** Een dag die niet vandaag is: geen "nu", dus niets licht op en geen avond loopt. */
+const QUIET_MOMENT: TimelineMoment = { day: -1, overnight: false, position: -1, visible: false };
 
 export function buildHoursBand(inputs: ReadonlyArray<HoursServiceInput>, now: Date, locale: Locale): HoursBand {
   const nl = locale === "nl";
@@ -407,6 +422,7 @@ export function buildHoursBand(inputs: ReadonlyArray<HoursServiceInput>, now: Da
         unavailable: true,
         bars: [],
         cells: [],
+        rows: [],
       };
     }
     const week = input.week;
@@ -425,6 +441,16 @@ export function buildHoursBand(inputs: ReadonlyArray<HoursServiceInput>, now: Da
         today: day === moment.day,
         lines: week[day].map((window) => windowLabel(window, locale)),
       })),
+      rows: days.map((day) => {
+        const today = day === moment.day;
+        return {
+          day,
+          short: (nl ? DAY_SHORT_NL : DAY_SHORT_EN)[day],
+          full: (nl ? DAY_NAMES_NL : DAY_NAMES_EN)[day],
+          today,
+          bars: timelineBars(week[day], axis, today ? moment : QUIET_MOMENT, today ? status.state : "closed", locale),
+        };
+      }),
     };
   });
 
@@ -440,6 +466,8 @@ export function buildHoursBand(inputs: ReadonlyArray<HoursServiceInput>, now: Da
     ticks,
     now: moment.visible ? { left: pct(moment.position), label: formatMinutes(clock.minutes) } : null,
     dayLabel,
+    dayName,
+    overnight: moment.overnight,
     nextWeek: clock.weekday >= 5,
     columns: days.length,
     services,

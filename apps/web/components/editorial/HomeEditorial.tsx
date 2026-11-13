@@ -23,6 +23,7 @@ import { NewsBand } from "./NewsBand";
 import { getCachedNews, getPresaleNews } from "@/lib/news/load";
 import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
 import { SHIFTS_BAND_SETTING, readShiftsBandSetting } from "@/lib/home/shiftBand";
+import { HOURS_LAYOUT_SETTING, readHoursLayoutSetting } from "@/lib/home/hoursLayout";
 import { HERO_DESIGN_SETTING, isHeroPhotoDesign, readHeroDesignSetting } from "@/lib/home/heroDesign";
 import { HomeShiftBand, type HomeShiftItem } from "./HomeShiftBand";
 import { ROSTER_PARTICIPANT_SELECT, toRoster } from "@/lib/shift/roster";
@@ -120,6 +121,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       POC_BAND_SETTING,
       SHIFTS_BAND_SETTING,
       HERO_DESIGN_SETTING,
+      HOURS_LAYOUT_SETTING,
     ]),
     // Dezelfde doelgroepregel als /kalender: standaard staat alles erop, en enkel
     // wie op /account koos zijn kalender toe te spitsen krijgt hier minder.
@@ -428,6 +430,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   const map = new Map(settings.map((s) => [s.key, s.value as unknown]));
   const pocSetting = readPocBandSetting(map.get(POC_BAND_SETTING));
   const shiftsBandSetting = readShiftsBandSetting(map.get(SHIFTS_BAND_SETTING));
+  const hoursLayout = readHoursLayoutSetting(map.get(HOURS_LAYOUT_SETTING)).layout;
   const theokot = readOpeningHoursSetting(map.get("home.openingHours.theokot"), "theokot");
   const cursusdienst = readOpeningHoursSetting(
     map.get("home.openingHours.cursusdienst"),
@@ -572,6 +575,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         })}
         locale={locale}
         base={base}
+        layout={hoursLayout}
       />
 
       {eventCards.length > 0 && (

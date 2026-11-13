@@ -3550,6 +3550,34 @@ nu-lijn, en daaronder de week als rij met de uren in tekst
   Theokot houdt zijn rood. Van de cursusdienst staat enkel het hoofd van de kat
   erin, want de volledige tekening wordt op deze grootte een vlek.
 
+### Openingsuren: twee weergaven, week in strepen als standaard
+
+De werking hierboven bleef, maar de vorm las als een sjabloon: een glazen paneel
+met een kader, gele kapitalen boven de as, gekleurde bolletjes voor de status,
+balken als pillen en de week in gevulde vakjes. Op een bord (november 2026) met de
+band zoals hij was en drie richtingen die de werking houden (zonder kader,
+wijzerplaat, week in strepen) koos de kring er twee, met een keuze in /admin/home
+(`home.hoursLayout`, `lib/home/hoursLayout.ts`). De opmaak staat in
+`app/design/vtk-hours.css`.
+
+- **Week in strepen (`strips`, de standaard).** Per dienst een kolom met de week
+  als dunne rijen op dezelfde tijdas; vandaag is de dikste rij en draagt de gele
+  nu-lijn. De uren staan in de balk, of ernaast als die te smal is (een container
+  query op de balk). Je ziet in één oogopslag dat Theokot vrijdag vroeger sluit en
+  dat 't ElixIr enkel 's avonds draait, en de band is veel korter. De week staat
+  voor een schermlezer ook als tekst. Smaller dan 980px staan de diensten onder
+  elkaar.
+- **Zonder kader (`plain`).** Dezelfde opbouw als voorheen (vandaag als tijdlijn,
+  de week als tekst eronder), zonder paneel: elke dienst een rij op de band met
+  een haarlijn ertussen, vandaag als dunne lijn met de vensters erop, één nu-lijn
+  door alle diensten, "dicht" in plaats van een streepje en vandaag geel
+  onderlijnd.
+- **In beide geen statusbolletje.** Open staat in het wit, dicht gedempt met enkel
+  het uur in het wit ("Opent vandaag om **10:30**"), "Mogelijk nog open" in het
+  geel.
+- **De wijzerplaat** (een klok van 24 uur per dienst) viel af: een venster van een
+  uur, zoals de cursusdienst, is op een ring een kort boogje.
+
 ---
 
 ## Uitleendienst (logistiek.vtk.be)

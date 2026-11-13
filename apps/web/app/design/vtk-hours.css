@@ -1,0 +1,631 @@
+/* ==========================================================================
+   Openingsuren op de homepage (components/editorial/OpeningHoursBand.tsx)
+
+   Twee weergaven, te kiezen in /admin/home (lib/home/hoursLayout.ts):
+   - week in strepen (`.hours-strips`, de standaard): per dienst een kolom met
+     de week als dunne rijen op dezelfde tijdas, vandaag de dikste rij;
+   - zonder kader (`.hours-plain`): per dienst een rij op de band, vandaag als
+     dunne lijn met de vensters erop, de week als tekst eronder.
+
+   Bewust zonder glazen paneel, statusbolletjes, gele kapitalen en balken als
+   pillen: samen lazen die als een sjabloon. De band zelf (navy, patroon, kop)
+   staat in vtk-home.css onder `.hours-strip`. Zie docs/design-decisions.md.
+
+   De tijdlijn rekent in procenten van een gedeelde as (`--l`, `--w`, `--now`,
+   uitgerekend in lib/openingHoursWeek.ts); `--hours-span` is het aantal uren
+   op die as, voor de rasterlijnen.
+   ========================================================================== */
+
+.vtk-design .hours-strip .hours-week-label[data-next] {
+  color: var(--yellow);
+}
+
+/* ---------- Gedeeld: de kop van een dienst ---------- */
+
+.vtk-design .hours-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.vtk-design .hours-logo {
+  display: block;
+  flex: none;
+  width: auto;
+  height: var(--logo-h);
+}
+
+.vtk-design .hours-head-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.vtk-design .hours-name {
+  margin: 0;
+  color: var(--paper);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+
+.vtk-design .hours-sub {
+  margin: 0;
+  color: var(--on-dark-muted);
+  font-size: 13.5px;
+  line-height: 1.35;
+}
+
+/* Een zin zonder bolletje ervoor: open staat in het wit, dicht gedempt met
+   enkel het uur in het wit, "mogelijk nog open" in het geel. */
+.vtk-design .hours-status {
+  margin: 0;
+  color: var(--paper);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.vtk-design .hours-status em {
+  font-style: normal;
+}
+
+.vtk-design .hours-status[data-state="closed"],
+.vtk-design .hours-status[data-state="unavailable"] {
+  color: var(--on-dark-muted);
+  font-weight: 500;
+}
+
+.vtk-design .hours-status[data-state="closed"] em {
+  color: var(--paper);
+  font-weight: 600;
+}
+
+.vtk-design .hours-status[data-state="maybe"] {
+  color: var(--yellow);
+}
+
+.vtk-design .hours-hint {
+  margin: 0;
+  color: var(--on-dark-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.vtk-design .hours-cta {
+  color: var(--paper);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--yellow);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+}
+
+.vtk-design .hours-cta:hover {
+  color: var(--yellow);
+}
+
+/* Het begin van een venster in plaats van het hele venster, wanneer het
+   volgende er te dicht op volgt (`crowded`). */
+.vtk-design .hours-short {
+  display: none;
+}
+
+/* ==========================================================================
+   Zonder kader
+   ========================================================================== */
+
+.vtk-design .hours-plain {
+  --lc: 280px;
+  --gap: 40px;
+  position: relative;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-design .hours-plain-axis {
+  display: grid;
+  grid-template-columns: var(--lc) minmax(0, 1fr);
+  column-gap: var(--gap);
+  align-items: end;
+  height: 22px;
+  margin-bottom: 10px;
+}
+
+.vtk-design .hours-plain-day,
+.vtk-design .hours-plain-mday {
+  margin: 0;
+  color: var(--on-dark-muted);
+  font-size: 14px;
+}
+
+.vtk-design .hours-plain-day b,
+.vtk-design .hours-plain-mday b {
+  color: var(--paper);
+  font-weight: 600;
+}
+
+.vtk-design .hours-plain-ticks {
+  position: relative;
+  height: 22px;
+}
+
+.vtk-design .hours-plain-tick,
+.vtk-design .hours-plain-nowlabel {
+  position: absolute;
+  bottom: 0;
+  left: var(--l);
+  transform: translateX(-50%);
+  color: var(--on-dark-muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.vtk-design .hours-plain-nowlabel {
+  color: var(--yellow);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Eén nu-lijn door alle diensten, vanaf de as tot onder de laatste rij. */
+.vtk-design .hours-plain-nowline {
+  position: absolute;
+  z-index: 1;
+  top: 36px;
+  bottom: 24px;
+  left: calc(var(--lc) + var(--gap) + (100% - var(--lc) - var(--gap)) * var(--now));
+  width: 1.5px;
+  margin-left: -0.75px;
+  background: var(--yellow);
+  pointer-events: none;
+}
+
+.vtk-design .hours-plain-row {
+  display: grid;
+  grid-template-columns: var(--lc) minmax(0, 1fr);
+  column-gap: var(--gap);
+  padding: 26px 0 30px;
+  border-top: 1px solid rgba(255, 255, 255, 0.13);
+}
+
+.vtk-design .hours-plain-id {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.vtk-design .hours-plain-id .hours-head {
+  margin-bottom: 2px;
+}
+
+.vtk-design .hours-plain-days {
+  min-width: 0;
+}
+
+/* Een dunne lijn met een streepje per uur; de vensters liggen erop. */
+.vtk-design .hours-plain-track {
+  position: relative;
+  height: 44px;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.22) 1px, transparent 1px);
+  background-size: calc(100% / var(--hours-span)) 7px;
+  background-repeat: repeat-x;
+  background-position: 0 27px;
+}
+
+.vtk-design .hours-plain-track::before {
+  content: "";
+  position: absolute;
+  top: 30px;
+  right: 0;
+  left: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.vtk-design .hours-plain-bar {
+  position: absolute;
+  top: 25px;
+  left: var(--l);
+  width: var(--w);
+  height: 11px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--paper) 86%, transparent);
+}
+
+.vtk-design .hours-plain-bar[data-active] {
+  background: var(--yellow);
+}
+
+/* Een avond zonder sluitingsuur loopt in streepjes uit: open, maar niet gekend
+   tot wanneer. Geel zolang ze nu loopt. */
+.vtk-design .hours-plain-bar[data-kind="tail"] {
+  top: 29px;
+  height: 3px;
+  border-radius: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--paper) 60%, transparent) 0 6px,
+    transparent 6px 11px
+  );
+}
+
+.vtk-design .hours-plain-bar[data-kind="tail"][data-tail="open"],
+.vtk-design .hours-plain-bar[data-kind="tail"][data-tail="maybe"] {
+  background: repeating-linear-gradient(90deg, var(--yellow) 0 6px, transparent 6px 11px);
+}
+
+.vtk-design .hours-plain-label {
+  position: absolute;
+  top: 0;
+  left: var(--l);
+  color: var(--paper);
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.vtk-design .hours-plain-label[data-active] {
+  color: var(--yellow);
+}
+
+.vtk-design .hours-plain-empty {
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: var(--on-dark-muted);
+  font-size: 13.5px;
+}
+
+.vtk-design .hours-plain-mday,
+.vtk-design .hours-plain-mnow,
+.vtk-design .hours-plain-mticks {
+  display: none;
+}
+
+.vtk-design .hours-plain-week {
+  display: grid;
+  grid-template-columns: repeat(var(--hours-cols), minmax(0, 1fr));
+  gap: 0 12px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vtk-design .hours-plain-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  color: color-mix(in srgb, var(--paper) 90%, transparent);
+  font-size: 14.5px;
+}
+
+.vtk-design .hours-plain-cell-day {
+  color: var(--on-dark-muted);
+  font-size: 13px;
+}
+
+.vtk-design .hours-plain-time {
+  white-space: nowrap;
+}
+
+.vtk-design .hours-plain-time[data-closed] {
+  color: color-mix(in srgb, var(--on-dark-muted) 60%, transparent);
+}
+
+.vtk-design .hours-plain-cell[data-today] .hours-plain-cell-day {
+  color: var(--yellow);
+  font-weight: 600;
+}
+
+/* Vandaag geel onderlijnd in plaats van een gevuld vak. */
+.vtk-design .hours-plain-cell[data-today] .hours-plain-time {
+  color: var(--paper);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--yellow);
+}
+
+/* Smaller dan een laptop: de dienst boven haar tijdlijn, met per dienst een
+   eigen as en een eigen nu-streepje. Een gedeelde kolom liet de tijdlijn hier
+   te smal om een uur op te lezen. */
+@media (max-width: 980px) {
+  .vtk-design .hours-plain {
+    --lc: 0px;
+    --gap: 0px;
+  }
+
+  .vtk-design .hours-plain-axis,
+  .vtk-design .hours-plain-nowline {
+    display: none;
+  }
+
+  .vtk-design .hours-plain-row {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 18px;
+  }
+
+  .vtk-design .hours-plain-mday {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 13px;
+  }
+
+  .vtk-design .hours-plain-mday b {
+    color: var(--yellow);
+  }
+
+  .vtk-design .hours-plain-mnow {
+    display: block;
+    position: absolute;
+    top: 20px;
+    left: var(--l);
+    width: 1.5px;
+    height: 21px;
+    margin-left: -0.75px;
+    background: var(--yellow);
+  }
+
+  .vtk-design .hours-plain-mticks {
+    display: block;
+    position: relative;
+    height: 16px;
+    margin-top: 2px;
+  }
+
+  .vtk-design .hours-plain-mticks span {
+    position: absolute;
+    left: var(--l);
+    transform: translateX(-50%);
+    color: var(--on-dark-muted);
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 600px) {
+  /* Zes kolommen van 50px laten "12:30–14:00" niet toe; drie wel. */
+  .vtk-design .hours-plain-week {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px 12px;
+  }
+
+  .vtk-design .hours-plain-cell {
+    font-size: 13.5px;
+  }
+
+  .vtk-design .hours-plain-label {
+    font-size: 12px;
+  }
+
+  .vtk-design .hours-plain-label[data-crowded] .hours-full {
+    display: none;
+  }
+
+  .vtk-design .hours-plain-label[data-crowded] .hours-short {
+    display: inline;
+  }
+}
+
+/* ==========================================================================
+   Week in strepen
+   ========================================================================== */
+
+.vtk-design .hours-strips {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 44px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-design .hours-strips-svc {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.vtk-design .hours-strips-chart {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.vtk-design .hours-strips-line,
+.vtk-design .hours-strips-axis {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.vtk-design .hours-strips-day {
+  color: var(--on-dark-muted);
+  font-size: 12.5px;
+}
+
+.vtk-design .hours-strips-line[data-today] .hours-strips-day {
+  color: var(--yellow);
+  font-weight: 600;
+}
+
+.vtk-design .hours-strips-lane {
+  position: relative;
+  height: 22px;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: calc(100% / var(--hours-span)) 100%;
+}
+
+.vtk-design .hours-strips-line[data-today] .hours-strips-lane {
+  height: 30px;
+}
+
+.vtk-design .hours-strips-lane::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.vtk-design .hours-strips-bar {
+  container: hours-strip-bar / inline-size;
+  position: absolute;
+  z-index: 1;
+  top: 5px;
+  bottom: 5px;
+  left: var(--l);
+  width: var(--w);
+  display: flex;
+  align-items: center;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--paper) 50%, transparent);
+}
+
+.vtk-design .hours-strips-line[data-today] .hours-strips-bar {
+  top: 3px;
+  bottom: 3px;
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+}
+
+.vtk-design .hours-strips-line[data-today] .hours-strips-bar[data-active] {
+  background: var(--yellow);
+}
+
+.vtk-design .hours-strips-bar[data-kind="tail"],
+.vtk-design .hours-strips-line[data-today] .hours-strips-bar[data-kind="tail"] {
+  border-radius: 0 2px 2px 0;
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--paper) 35%, transparent) 0 2px,
+    transparent 2px 7px
+  );
+}
+
+.vtk-design .hours-strips-line[data-today] .hours-strips-bar[data-tail="open"],
+.vtk-design .hours-strips-line[data-today] .hours-strips-bar[data-tail="maybe"] {
+  background: repeating-linear-gradient(135deg, var(--yellow) 0 2px, transparent 2px 7px);
+}
+
+.vtk-design .hours-strips-in {
+  overflow: hidden;
+  padding-left: 6px;
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.vtk-design .hours-strips-line[data-today] .hours-strips-in {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.vtk-design .hours-strips-tag {
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 6px);
+  transform: translateY(-50%);
+  color: var(--on-dark-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.vtk-design .hours-strips-bar[data-side="before"] .hours-strips-tag {
+  right: calc(100% + 6px);
+  left: auto;
+}
+
+.vtk-design .hours-strips-line[data-today] .hours-strips-tag {
+  color: var(--paper);
+  font-size: 13px;
+}
+
+/* Te smal voor zijn uren: die staan dan naast de balk, of na een venster dat
+   kort voor het volgende stopt enkel het begin. */
+@container hours-strip-bar (max-width: 84px) {
+  .vtk-design .hours-strips-in {
+    display: none;
+  }
+
+  .vtk-design .hours-strips-tag {
+    display: block;
+  }
+}
+
+.vtk-design .hours-strips-bar[data-crowded] .hours-full {
+  display: none;
+}
+
+.vtk-design .hours-strips-bar[data-crowded] .hours-short {
+  display: inline;
+}
+
+.vtk-design .hours-strips-closed {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  padding-right: 6px;
+  background: var(--navy);
+  color: color-mix(in srgb, var(--on-dark-muted) 60%, transparent);
+  font-size: 12px;
+}
+
+/* Achter de balken: in het venster dat nu loopt, is de balk zelf al geel, en de
+   lijn liep anders door de uren erin. Erboven en eronder steekt ze uit. */
+.vtk-design .hours-strips-now {
+  position: absolute;
+  z-index: 0;
+  top: -5px;
+  bottom: -5px;
+  left: var(--l);
+  width: 2px;
+  margin-left: -1px;
+  background: var(--yellow);
+}
+
+.vtk-design .hours-strips-axis > div {
+  position: relative;
+  height: 16px;
+}
+
+.vtk-design .hours-strips-axis > div > span {
+  position: absolute;
+  left: var(--l);
+  transform: translateX(-50%);
+  color: var(--on-dark-muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.vtk-design .hours-strips-axis > div > .hours-strips-nowlabel {
+  color: var(--yellow);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.vtk-design .hours-strips-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.vtk-design .hours-strips-actions:empty {
+  display: none;
+}
+
+/* Drie kolommen hebben elk minstens 300px nodig om een uur te lezen; smaller
+   staan de diensten onder elkaar, met de grafiek over de volle breedte. */
+@media (max-width: 980px) {
+  .vtk-design .hours-strips {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 40px;
+  }
+}

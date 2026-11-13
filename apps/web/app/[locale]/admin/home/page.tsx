@@ -17,6 +17,7 @@ import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/
 import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
 import { SHIFTS_BAND_SETTING, readShiftsBandSetting } from "@/lib/home/shiftBand";
 import { HERO_DESIGN_SETTING, readHeroDesignSetting } from "@/lib/home/heroDesign";
+import { HOURS_LAYOUT_SETTING, readHoursLayoutSetting } from "@/lib/home/hoursLayout";
 import { HeroDesignForm } from "./HeroDesignForm";
 import {
   saveDefaultEventImageAction,
@@ -25,6 +26,7 @@ import {
   saveAftermoviesAction,
   saveHomePocBandAction,
   saveHomeShiftsBandAction,
+  saveHomeHoursLayoutAction,
 } from "@/app/actions/home";
 
 type Career = { titleNl: string; titleEn: string; bodyNl: string; bodyEn: string; ctaLabelNl?: string; ctaLabelEn?: string; ctaUrl?: string };
@@ -93,6 +95,7 @@ export default async function AdminHome({
             POC_BAND_SETTING,
             SHIFTS_BAND_SETTING,
             HERO_DESIGN_SETTING,
+            HOURS_LAYOUT_SETTING,
           ],
         },
       },
@@ -120,6 +123,7 @@ export default async function AdminHome({
     (map.get(DEFAULT_EVENT_IMAGE_SETTING) as { imageKey?: string | null } | undefined)?.imageKey ?? null;
   const pocSetting = readPocBandSetting(map.get(POC_BAND_SETTING));
   const shiftsBand = readShiftsBandSetting(map.get(SHIFTS_BAND_SETTING));
+  const hoursLayout = readHoursLayoutSetting(map.get(HOURS_LAYOUT_SETTING));
 
   return (
     <div className="space-y-6">
@@ -135,6 +139,58 @@ export default async function AdminHome({
           saveError: dict.common.saveError,
         }}
       />
+
+      <Card className="p-5">
+        <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+          <div>
+            <h2 className="font-semibold">{locale === "nl" ? "Openingsuren" : "Opening hours"}</h2>
+            <p className="text-sm text-[#5c667f]">
+              {locale === "nl"
+                ? "Hoe de band met de openingsuren eruitziet. Beide tonen vandaag op een tijdas en de uren van de week; de uren zelf pas je aan onder Openingsuren."
+                : "How the opening hours band looks. Both show today on a time axis and the hours of the week; the hours themselves are edited under Opening hours."}
+            </p>
+          </div>
+          <Link
+            href={`${base}/admin/openingsuren`}
+            className="shrink-0 self-start whitespace-nowrap text-xs text-vtk-blue hover:underline sm:self-auto"
+          >
+            {locale === "nl" ? "Naar de openingsuren" : "Go to opening hours"} →
+          </Link>
+        </div>
+        <SaveForm
+          action={saveHomeHoursLayoutAction}
+          className="space-y-4"
+          submitLabel={dict.admin.save}
+          savingLabel={dict.common.saving}
+          savedMessage={dict.common.saved}
+          fallbackErrorMessage={dict.common.saveError}
+        >
+          <div className="max-w-md space-y-1.5">
+            <Label htmlFor="hours-layout">{locale === "nl" ? "Weergave" : "Layout"}</Label>
+            <ThemedSelect
+              id="hours-layout"
+              name="layout"
+              defaultValue={hoursLayout.layout}
+              options={[
+                {
+                  value: "strips",
+                  label:
+                    locale === "nl"
+                      ? "Week in strepen (standaard): per dienst een kolom met de week als grafiek"
+                      : "Week in stripes (default): one column per service with the week as a chart",
+                },
+                {
+                  value: "plain",
+                  label:
+                    locale === "nl"
+                      ? "Zonder kader: per dienst een rij, de week als tekst"
+                      : "Without a frame: one row per service, the week as text",
+                },
+              ]}
+            />
+          </div>
+        </SaveForm>
+      </Card>
 
       <Card className="p-5">
         <h2 className="mb-1 font-semibold">{locale === "nl" ? "Wat we doen" : "What we do"}</h2>

@@ -19,6 +19,7 @@ import {
   type ShiftsBandSetting,
 } from "@/lib/home/shiftBand";
 import { HERO_DESIGN_SETTING, parseHeroDesignForm } from "@/lib/home/heroDesign";
+import { HOURS_LAYOUT_SETTING, isHoursLayout, type HoursLayoutSetting } from "@/lib/home/hoursLayout";
 import { SITE_CONTENT_TAG } from "@/lib/cachedContent";
 
 /** Tekstveld uit het formulier: leeg betekent "terug naar de standaardzin". */
@@ -260,6 +261,33 @@ export async function saveHomeShiftsBandAction(
     target: "Shiften-band",
     summary: visible ? "ingeschakeld" : "uitgeschakeld",
   });
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/home");
+  return saveOk();
+}
+
+/** Hoe de openingsurenband eruitziet: week in strepen of zonder kader. */
+export async function saveHomeHoursLayoutAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requirePermission("home.edit");
+  const layout = formData.get("layout");
+  if (!isHoursLayout(layout)) return saveError("INVALID_INPUT");
+  const value: HoursLayoutSetting = { layout };
+  await prisma.setting.upsert({
+    where: { key: HOURS_LAYOUT_SETTING },
+    update: { value },
+    create: { key: HOURS_LAYOUT_SETTING, value },
+  });
+  await logAudit({
+    action: "update",
+    entity: "home",
+    target: "Openingsuren",
+    summary: layout === "strips" ? "week in strepen" : "zonder kader",
+  });
+  // De homepage leest dit uit de gedeelde cache, zoals de hero.
+  updateTag(SITE_CONTENT_TAG);
   revalidatePath("/", "layout");
   revalidatePath("/admin/home");
   return saveOk();
