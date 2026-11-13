@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "@/components/ui/Link";
 import type { CSSProperties, ReactNode } from "react";
 import type { Locale } from "@vtk/i18n";
@@ -124,6 +125,46 @@ export function pinParts(date: string, locale: Locale) {
     day: part({ day: "numeric" }),
     month: part({ month: "short" }),
   };
+}
+
+/**
+ * Hoe breed een nieuwsbeeld op het scherm moet zijn, voor `sizes`. Het beeld
+ * vult zijn vak met `object-fit: cover`, dus een vak dat hoger is dan 16:9 (een
+ * tegel die meegroeit met een lange titel of met het uitgelichte bericht) vraagt
+ * een breder beeld dan het vak zelf. De maten komen uit een meting van de
+ * homepage van 360 tot 1920 px breed, met wat marge: kleiner en een foto oogt
+ * zachter dan voorheen. Zie docs/performance.md.
+ */
+const FEATURED_SIZES = "(max-width: 1023px) 100vw, 400px";
+const TILE_SIZES = "(max-width: 760px) 105vw, (max-width: 1023px) 60vw, 520px";
+
+/**
+ * Een foto in een nieuwsvak. Uploads uit de eigen media-routes gaan langs
+ * next/image, zodat een telefoon geen origineel van 2500 px binnenhaalt voor
+ * een tegel van 300; dat waren samen meer dan een megabyte op de homepage. Een
+ * albumcover komt van Immich Public Proxy, een andere host die next/image niet
+ * mag ophalen (zie `next.config.ts`), en blijft een gewone `<img>`; Immich
+ * levert daar al een thumbnail op maat.
+ */
+function NewsPhoto({
+  src,
+  position,
+  sizes,
+  eager = false,
+}: {
+  src: string;
+  position?: string;
+  sizes: string;
+  eager?: boolean;
+}) {
+  const style = position ? { objectPosition: position } : undefined;
+  if (src.startsWith("/api/media/")) {
+    return <Image src={src} alt="" fill sizes={sizes} loading={eager ? "eager" : "lazy"} style={style} />;
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt="" loading={eager ? undefined : "lazy"} style={style} />
+  );
 }
 
 /** De gele datumpin van de eventtegel, hangend over de onderrand van de foto. */
@@ -264,9 +305,7 @@ function FeaturedPost({
     <article className={`news-feat${entry.imageUrl ? "" : " is-plain"}`}>
       {entry.imageUrl ? (
         <div className="news-feat-media">
-          {/* Posters en albumcovers komen uit de eigen media-routes. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={entry.imageUrl} alt="" style={{ objectPosition: entry.imagePosition }} />
+          <NewsPhoto src={entry.imageUrl} position={entry.imagePosition} sizes={FEATURED_SIZES} eager />
           <CardPin date={entry.shownDate ?? entry.date} locale={locale} />
         </div>
       ) : null}
@@ -334,9 +373,7 @@ function NewsTile({
     <article className="ev-card news-tile">
       <div className={`ev-card-shot${entry.imageUrl ? "" : " is-blank"}`}>
         {entry.imageUrl ? (
-          // Posters en albumcovers komen uit de eigen media-routes.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={entry.imageUrl} alt="" loading="lazy" style={{ objectPosition: entry.imagePosition }} />
+          <NewsPhoto src={entry.imageUrl} position={entry.imagePosition} sizes={TILE_SIZES} />
         ) : null}
         <CardPin date={entry.shownDate ?? entry.date} locale={locale} />
       </div>

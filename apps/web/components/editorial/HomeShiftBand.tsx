@@ -36,7 +36,8 @@ function ShiftLocation({ locationText }: { locationText: string }) {
     const check = () => {
       setIsOverflowing(el.scrollWidth > el.clientWidth);
     };
-    check();
+    // De observer meet de eerste keer zelf, na de layout; meteen meten dwong
+    // een synchrone layout af tijdens de hydration.
     const ro = new ResizeObserver(check);
     ro.observe(el);
     return () => ro.disconnect();

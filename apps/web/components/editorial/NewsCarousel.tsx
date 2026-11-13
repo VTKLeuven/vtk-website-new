@@ -60,7 +60,9 @@ export function NewsCarousel({
     const el = track.current;
     if (!el) return;
     const measure = () => setScrollable(el.scrollWidth > el.clientWidth + 2);
-    measure();
+    // Geen meting meteen hier: een ResizeObserver meldt zich na `observe` toch
+    // één keer, en dan na de layout van de browser. Hier meten dwong een
+    // synchrone layout af tijdens de hydration (Lighthouse: "Forced reflow").
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();
@@ -79,7 +81,7 @@ export function NewsCarousel({
         beside ? `${Math.round(featured.offsetHeight * TILE_HEIGHT_RATIO)}px` : "0px",
       );
     };
-    measure();
+    // Zoals hierboven: de observer meet de eerste keer zelf, na de layout.
     const observer = new ResizeObserver(measure);
     observer.observe(featured);
     observer.observe(el);

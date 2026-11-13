@@ -64,17 +64,27 @@ export function BlueprintHero({
   const hasEvents = Boolean(events && events.cards.length > 0);
   const construction = design.design === "construction";
   const tempo = heroAnimationTempo(design);
+  const showsPattern = !(construction && !design.pattern);
   const className = [
     "vtk-blueprint-hero",
     hasEvents ? "has-events" : "",
     construction ? "k-hero" : "",
-    construction && !design.pattern ? "no-pattern" : "",
+    showsPattern ? "" : "no-pattern",
   ]
     .filter(Boolean)
     .join(" ");
 
   return (
     <>
+    {/* Het patroon over de band is het grootste vlak boven de vouw, dus de LCP
+        van de homepage. Als CSS-achtergrond vond de browser het pas na de
+        stylesheets; deze <link> hijst React naar de <head>, zodat het samen met
+        de CSS binnenkomt. Geen `preload()` uit react-dom: vanuit een server
+        component komt die enkel in de RSC-data terecht en niet in de <head>.
+        Zie docs/performance.md. */}
+    {showsPattern && !preview ? (
+      <link rel="preload" as="image" href="/technisch-pattern.svg" fetchPriority="high" />
+    ) : null}
     <section
       className={className}
       style={

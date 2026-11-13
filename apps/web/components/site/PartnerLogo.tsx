@@ -29,7 +29,17 @@ export function PartnerLogo({
     // De upload schaalt ze enkel tot binnen 600x200 (`fit: inside`), dus elke
     // verhouding komt voor en elke width/height die we hier zouden invullen is
     // een gok. SVG-logo's laat next/image sowieso ongewijzigd door.
+    //
+    // `lazy`: de logo's staan onderaan de pagina. Zonder lazy vroeg de browser
+    // ze meteen op, samen met wat de homepage voor haar eerste beeld nodig heeft.
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={name} className={className} onError={() => setFailedSrc(src)} />
+    <img
+      src={src}
+      alt={name}
+      className={className}
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailedSrc(src)}
+    />
   );
 }

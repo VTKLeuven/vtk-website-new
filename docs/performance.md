@@ -77,6 +77,48 @@ cudi.vtk.be hield zo de homepage vast, een hangende Immich /media. Elke externe
 aanroep heeft nu een timeout; bij Immich enkel tot de headers binnen zijn,
 zodat een groot origineel mag doorstromen.
 
+### PageSpeed op de homepage (november 2026)
+
+PageSpeed Insights gaf desktop 100 en mobiel 87, met een LCP van 3,9 s op een
+gesimuleerde telefoon. Echte bezoekers (CrUX) haalden de Core Web Vitals wel.
+Het LCP-element is niet een foto maar het technische patroon over de hero
+(`technisch-pattern.svg`, de `::after` van `.vtk-blueprint-hero`): het grootste
+vlak boven de vouw. Lighthouse rekent bij een gesimuleerde LCP alles mee wat
+vóór die paint gevraagd werd, dus elke grote download vroeg op de pagina telt,
+ook als die onderaan staat.
+
+- **Het patroon staat als preload in de `<head>`** (`BlueprintHero.tsx`), met
+  `fetchPriority="high"`. Als CSS-achtergrond vond de browser het pas nadat de
+  stylesheets binnen waren.
+- **De foto's in de nieuwsband gaan langs next/image** (`NewsPhoto` in
+  `NewsBand.tsx`). Het waren originelen tot 2560 px breed voor tegels van 300
+  px: samen 1,2 MB, waarvan de uitgelichte foto (300 KB) meteen geladen werd.
+  `sizes` houdt rekening met `object-fit: cover` in een vak dat hoger is dan
+  16:9; op de live site gemeten verschilt het beeld met de nieuwe breedtes niet
+  zichtbaar van het origineel. Albumcovers van Immich blijven een `<img>`.
+- **Partnerlogo's laden lazy** (`PartnerLogo.tsx`): ze staan onderaan en werden
+  anders samen met de hero opgevraagd.
+- **De munt van de shiftband maskeert `vtk-logo-mask.png`** (256 px, 4 KB) in
+  plaats van het volle `vtk-logo.png` (31 KB), voor een munt van hoogstens 34 px.
+- **Geen meting meer meteen in een effect vóór een `ResizeObserver`**
+  (`NewsCarousel`, `HomeShiftBand`): de observer meet de eerste keer toch zelf,
+  na de layout. Meten in het effect dwong tijdens de hydration een synchrone
+  layout af ("Forced reflow").
+
+Bewust niet gedaan, omdat het iets zichtbaars verandert of meer kost dan het
+oplevert:
+
+- **"Legacy JavaScript" (13 KB)** is de `polyfill-module` die Next zelf in elke
+  app zet (`Array.prototype.at`, `Object.hasOwn`, ...). Daar is geen instelling
+  voor; een `browserslist` verandert er niets aan.
+- **"Render-blocking requests"**: de vijftien stylesheets inlinen kan met
+  `experimental.inlineCss`, maar dan downloadt elke volle paginalading de CSS
+  opnieuw, en de meeste bezoekers komen terug. De CSS staat ook dubbel in de
+  HTML (`<style>` en RSC-data).
+- **"Non-composited animations"** zijn de `stroke-dashoffset`-lijnen van de
+  bouwtekening. Die tekenen zich net zo; een andere techniek is een ander design.
+- **Afmetingen op partnerlogo's**: die kennen we niet, zie `PartnerLogo.tsx`.
+
 ---
 
 ## Wat nog op de server moet gebeuren
@@ -153,6 +195,13 @@ logconfig in compose ze bij de volgende deploy opnieuw zou maken:
   Geef de eerste data mee van de server.
 - **`next/link` rechtstreeks importeren** zet de viewport-prefetch terug. Gebruik
   `@/components/ui/Link`.
+- **`preload()` uit `react-dom` in een server component komt niet in de
+  `<head>`.** De hint belandt enkel in de RSC-data, en de browser leest die pas
+  bij de hydration. Zet een `<link rel="preload">` in de JSX; React 19 hijst die
+  naar de `<head>`. Controleer het in de HTML van een productiebuild.
+- **Een upload als kale `<img>` laadt het origineel.** Een foto van 2500 px voor
+  een tegel van 300 px: gebruik next/image met `sizes` voor alles onder
+  `/api/media/`.
 - **Meten doe je op een productiebuild**, niet op `next dev`: dev splitst de
   bundels anders. `npx next build && npx next start -p 3005`, en tel de scripts
   in de HTML.
