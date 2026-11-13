@@ -7683,3 +7683,7 @@ button.vtk-bud-dot {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.vtk-bud-postcode {
+  max-width: 110px;
+}

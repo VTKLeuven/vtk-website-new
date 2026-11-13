@@ -283,7 +283,9 @@ export async function checkPricesAction(input: {
   const found = new Map<string, Lookup>();
   for (let i = 0; i < pages.length; i += 3) {
     const batch = pages.slice(i, i + 3);
-    const lookups = await Promise.all(batch.map(([, ref]) => lookupShopProduct(ref)));
+    const lookups = await Promise.all(
+      batch.map(([, ref]) => lookupShopProduct(ref, { colruytPostcode: settings.colruytPostcode }))
+    );
     batch.forEach(([page, ref], j) => {
       const lookup = lookups[j];
       found.set(
@@ -574,6 +576,7 @@ export type PriceTestResult =
  */
 export async function testPriceLookupAction(input: { url: string }): Promise<PriceTestResult> {
   await requirePermission('bestuursorgaan.manage');
+  const settings = await getBudgetSettings();
   const url = String(input?.url ?? '')
     .trim()
     .slice(0, 2000);
@@ -584,7 +587,10 @@ export async function testPriceLookupAction(input: { url: string }): Promise<Pri
   const ref = parseShopUrl(url);
   if (!ref) return { ok: false, code: 'NOT_A_PRODUCT', shop };
   const started = Date.now();
-  const [lookup, browser] = await Promise.all([lookupShopProduct(ref, true), priceBrowserStatus()]);
+  const [lookup, browser] = await Promise.all([
+    lookupShopProduct(ref, { fresh: true, colruytPostcode: settings.colruytPostcode }),
+    priceBrowserStatus(),
+  ]);
   return {
     ok: true,
     shop,

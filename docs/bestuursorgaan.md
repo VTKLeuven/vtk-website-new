@@ -599,7 +599,7 @@ prijs opgehaald wordt (`via`). Getest in november 2026:
 | partywinkel.be | 30 | prijsbrowser, JSON-LD en `og:price:amount` (de gekozen variant) | werkt |
 | helloprint.com, drukzo.be | 14 en 4 | gewone aanvraag, JSON-LD, prijs van de gekozen configuratie, **excl. BTW** | werkt (505,99 excl. = 612,25 incl. op de pagina) |
 | action.com | 7 | prijsbrowser, JSON-LD | werkt |
-| colruyt.be | 9 | geen prijs zonder gekozen winkel, ook niet in een browser | herkend, niet nagekeken; het paneel zegt het en verwijst naar Collect&Go |
+| colruyt.be | 9 | prijsbrowser: het product op zijn nummer, met de prijs van de winkel bij de ingestelde postcode | werkt (zes producten uit de bladen in vier seconden) |
 
 Waar een winkel niet antwoordt, zegt de regel dat met de reden, en bevestigt
 een mens de prijs met datum. Een prijs excl. (Helloprint) vergelijkt en neemt
@@ -614,6 +614,16 @@ vraagt `lib/priceCheck/fetch.ts` de pagina aan de **prijsbrowser**
 die de pagina opent zoals een bezoeker en enkel de JSON-LD-blokken en de
 prijs-metatag teruggeeft. Gemeten in die container: bol.com, Partywinkel en
 Action elk onder de twee seconden per product.
+
+**Colruyt gaat anders.** colruyt.be toont een prijs pas voor een gekozen
+winkel. Groep 5 vult bij de instellingen de postcode van de Colruyt in
+(`BudgetSettings.colruytPostcode`; in de code staat er geen). De prijsbrowser
+houdt één Colruyt-pagina open, zoekt de winkel bij die postcode (de winkel
+zelf, niet het afhaalpunt) en vraagt per product één lichte aanvraag aan de
+API die de pagina zelf gebruikt, op het nummer uit de link. Geen pagina per
+product: wie er twintig na elkaar opent, houdt de botbeveiliging van Colruyt
+tegen (HTTP 456), en dat was ook wat er bij de eerste poging gebeurde. Zonder
+postcode zegt de regel dat; een postcode zonder Colruyt-winkel ook.
 
 Aanzetten op een server:
 
@@ -640,7 +650,7 @@ Waarom zo:
   databank heeft. De container krijgt enkel zijn eigen `.env` (het geheim),
   niet de root-`.env`, en heeft geen poort naar buiten.
 - **Geen open proxy.** De dienst vraagt het gedeelde geheim, opent enkel
-  https-pagina's van `bol.com`, `partywinkel.be` en `action.com`
+  https-pagina's van `bol.com`, `partywinkel.be`, `action.com` en `colruyt.be`
   (`PRICE_BROWSER_HOSTS`), breekt een navigatie naar elders af en geeft geen
   HTML terug. De site bouwde het adres zelf op uit de herkende link.
 - **Met een venster op een virtueel scherm (`xvfb-run`).** Headless Chromium

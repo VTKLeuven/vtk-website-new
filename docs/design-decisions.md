@@ -12061,7 +12061,8 @@ vroegen").
   container die pagina's, op vraag en traag (`docs/bestuursorgaan.md`, "De
   prijsbrowser"). De grens: een gewone browser die een openbare productpagina
   laadt, niets dat een captcha oplost of zich voordoet als iets anders. Colruyt
-  toont geen prijs zonder gekozen winkel; daar blijft Collect&Go de bron.
+  heeft een prijs per winkel: Groep 5 stelt de postcode in van de winkel waar
+  de kring koopt, zodat de prijs die van die winkel is en niet een gemiddelde.
   Helloprint en Drukzo geven de prijs excl. BTW, en zo neemt de site ze over.
 
 - **Bestaande rekenbladen overnemen, als uitkomst en niet als berekening.**

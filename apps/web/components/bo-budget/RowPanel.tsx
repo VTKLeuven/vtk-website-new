@@ -122,16 +122,12 @@ function ShopCheck({ api, row }: { api: EditorApi; row: CostRow }) {
   let text: string;
   if (!url)
     text = nl
-      ? 'Plak de link van het product. Bij Collect&Go, bol.com, Partywinkel, Helloprint, Drukzo en Action kijkt de site de prijs zelf na.'
+      ? 'Plak de link van het product. Bij Collect&Go, Colruyt, bol.com, Partywinkel, Helloprint, Drukzo en Action kijkt de site de prijs zelf na.'
       : 'Paste the product link. For Collect&Go, bol.com, Partywinkel, Helloprint, Drukzo and Action the site checks the price itself.';
   else if (!shop)
     text = nl
       ? 'Deze winkel kent de site niet, dus de prijs kijkt een mens na. Bevestig hieronder wanneer je dat deed.'
       : 'The site does not know this shop, so someone checks the price by hand. Confirm below when you did.';
-  else if (!shop.live)
-    text = nl
-      ? `${name} toont geen prijs zonder gekozen winkel, dus de site kan ze niet nakijken. Plak de link van hetzelfde product op collectandgo.be (dezelfde prijzen): die kijkt de site wel na.`
-      : `${name} shows no price without a chosen store, so it cannot be checked. The same product on collectandgo.be can.`;
   else if (!checkable)
     text = nl
       ? `Deze link wijst niet naar één product bij ${name}, dus de site kan de prijs niet nakijken. Open het product en kopieer die link${shopId === 'collectgo' ? '; een zoeklink met #pdp_ erin werkt ook' : ''}.`

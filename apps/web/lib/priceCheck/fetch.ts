@@ -32,7 +32,9 @@ const TTL_MS = 30 * 60 * 1000;
 const MAX_BYTES = 4_000_000;
 const cache = new Map<string, { at: number; lookup: ShopLookup }>();
 
-async function lookupInBrowser(ref: ShopRef): Promise<ShopLookup> {
+export type LookupOptions = { fresh?: boolean; colruytPostcode?: string };
+
+async function lookupInBrowser(ref: ShopRef, options: LookupOptions): Promise<ShopLookup> {
   const base = process.env.PRICE_BROWSER_URL?.trim();
   const secret = process.env.PRICE_BROWSER_SECRET?.trim();
   if (!base || !secret)
@@ -40,7 +42,7 @@ async function lookupInBrowser(ref: ShopRef): Promise<ShopLookup> {
   const res = await fetch(`${base.replace(/\/$/, '')}/lookup`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-price-browser-secret': secret },
-    body: JSON.stringify({ url: ref.page }),
+    body: JSON.stringify({ url: ref.page, postcode: ref.shop === 'colruyt' ? (options.colruytPostcode ?? '') : '' }),
     cache: 'no-store',
     signal: AbortSignal.timeout(45_000),
   });
@@ -57,6 +59,15 @@ async function lookupInBrowser(ref: ShopRef): Promise<ShopLookup> {
   if (shopOfUrl(answer.finalUrl) !== ref.shop) return { status: 'failed', reason: 'doorverwezen naar een andere site' };
   const product = parseBrowserAnswer(ref, answer);
   if (product) return { status: 'found', product };
+  if (ref.shop === 'colruyt' && answer.status === 200)
+    return {
+      status: 'failed',
+      reason: !options.colruytPostcode
+        ? 'Colruyt geeft een prijs per winkel en bij de instellingen staat nog geen postcode'
+        : answer.store
+          ? `${answer.store} gaf geen prijs voor dit product`
+          : `bij postcode ${options.colruytPostcode} vond de site geen Colruyt-winkel`,
+    };
   if (answer.status === 404 || answer.status === 410) return { status: 'notfound' };
   if (
     answer.status === 403 ||
@@ -89,15 +100,16 @@ export async function priceBrowserStatus(): Promise<'off' | 'down' | 'up'> {
 }
 
 /** `fresh` slaat het geheugen van een halfuur over: een test wil de winkel zelf horen. */
-export async function lookupShopProduct(ref: ShopRef, fresh = false): Promise<ShopLookup> {
-  const key = ref.page;
+export async function lookupShopProduct(ref: ShopRef, options: LookupOptions = {}): Promise<ShopLookup> {
+  const fresh = !!options.fresh;
+  const key = ref.shop === 'colruyt' ? `${ref.page}#${options.colruytPostcode ?? ''}` : ref.page;
   const hit = cache.get(key);
   if (!fresh && hit && Date.now() - hit.at < TTL_MS) return hit.lookup;
 
   let lookup: ShopLookup;
   try {
     if (ref.via === 'browser') {
-      lookup = await lookupInBrowser(ref);
+      lookup = await lookupInBrowser(ref, options);
       if (lookup.status !== 'failed') cache.set(key, { at: Date.now(), lookup });
       return lookup;
     }

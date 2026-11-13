@@ -39,7 +39,7 @@ export function PriceCheckTest({ browser, locale }: { browser: 'off' | 'down' | 
       ? 'De prijsbrowser is ingesteld maar antwoordt niet. Kijk of de container price-browser draait (docker ps) en of het profiel aan staat.'
       : 'The price browser is configured but does not answer. Check the price-browser container.',
     off: nl
-      ? 'De prijsbrowser staat niet aan op deze server, dus bol.com, Partywinkel en Action geven "geen antwoord". Zie docs/bestuursorgaan.md, "De prijsbrowser".'
+      ? 'De prijsbrowser staat niet aan op deze server, dus bol.com, Partywinkel, Action en Colruyt geven "geen antwoord". Zie docs/bestuursorgaan.md, "De prijsbrowser".'
       : 'The price browser is not switched on, so bol.com, Partywinkel and Action give no answer.',
   }[browser];
 
@@ -102,7 +102,7 @@ export function PriceCheckTest({ browser, locale }: { browser: 'off' | 'down' | 
       </h2>
       <p className="vtk-bud-fine">
         {nl
-          ? 'Plak de link van een product bij Collect&Go, bol.com, Partywinkel, Helloprint, Drukzo of Action. De site vraagt de winkel nu op, zoals "Prijzen nakijken" in een budget dat doet, en bewaart niets.'
+          ? 'Plak de link van een product bij Collect&Go, Colruyt, bol.com, Partywinkel, Helloprint, Drukzo of Action. De site vraagt de winkel nu op, zoals "Prijzen nakijken" in een budget dat doet, en bewaart niets.'
           : 'Paste a product link from one of the shops. The site asks the shop now, as "Check prices" does in a budget, and stores nothing.'}
       </p>
       <p className="vtk-bud-pricetest-state" data-state={browser}>

@@ -205,12 +205,28 @@ export function BudgetSettingsForm({
             checked={value.collectGoLive}
             onChange={(e) => set((d) => (d.collectGoLive = e.target.checked))}
           />
-          <span>{nl ? 'Prijzen live nakijken op collectandgo.be' : 'Check prices live on collectandgo.be'}</span>
+          <span>{nl ? 'Prijzen live nakijken bij de webshops' : 'Check prices live at the web shops'}</span>
         </label>
         <p className="vtk-bud-fine">
           {nl
-            ? 'De site leest dan de productpagina, zoals een browser, voor elke regel met een link naar één product. Colruyt weert bots; lukt het niet, dan zegt de editor dat en bevestigt de post de prijs zelf.'
+            ? 'De site leest dan de productpagina, zoals een browser, voor elke regel met een link naar één product (Collect&Go, bol.com, Partywinkel, Helloprint, Drukzo, Action, Colruyt). Lukt het niet, dan zegt de editor dat en bevestigt de post de prijs zelf.'
             : 'The site then reads the product page, like a browser, for every row linking to one product. If it fails, the editor says so and the post confirms the price.'}
+        </p>
+        <label className="vtk-bud-field">
+          <span className="vtk-bud-label">{nl ? 'Postcode van de Colruyt' : 'Postcode of the Colruyt store'}</span>
+          <input
+            className="vtk-bud-input vtk-bud-postcode"
+            value={value.colruytPostcode}
+            inputMode="numeric"
+            maxLength={4}
+            placeholder="0000"
+            onChange={(e) => set((d) => (d.colruytPostcode = e.target.value.replace(/\D/g, '').slice(0, 4)))}
+          />
+        </label>
+        <p className="vtk-bud-fine">
+          {nl
+            ? 'Colruyt heeft een prijs per winkel. De site neemt de Colruyt-winkel in deze postcode voor elke link naar colruyt.be; zonder postcode kijkt ze die links niet na.'
+            : 'Colruyt has a price per store. The site uses the Colruyt store in this postcode; without one it does not check those links.'}
         </p>
       </section>
 

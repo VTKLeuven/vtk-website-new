@@ -214,9 +214,13 @@ describe('prijzen bij de webshops', () => {
     expect(parseShopUrl('https://www.action.com/nl-be/p/3208221/euromunten/')).toMatchObject({ shop: 'action' });
     // Een categorie heeft een vanaf-prijs, geen prijs van wat de post bestelt.
     expect(parseShopUrl('https://www.helloprint.com/nl-be/posters')).toBeNull();
-    // Colruyt toont geen prijs zonder winkel: herkend, niet nagekeken.
+    // Colruyt geeft een prijs per winkel: langs de prijsbrowser, met de postcode uit de instellingen.
     expect(shopOfUrl('https://www.colruyt.be/nl/producten/38672')).toBe('colruyt');
-    expect(parseShopUrl('https://www.colruyt.be/nl/producten/38672')).toBeNull();
+    expect(parseShopUrl('https://www.colruyt.be/nl/producten/everyday-doekjes-38672?x=1')).toMatchObject({
+      via: 'browser',
+      page: 'https://www.colruyt.be/nl/producten/38672',
+    });
+    expect(parseShopUrl('https://www.colruyt.be/nl/producten')).toBeNull();
     // De host telt, niet wat er verder in het adres staat.
     expect(parseShopUrl('https://evil.example/www.bol.com/be/nl/p/x/9300000038335239/')).toBeNull();
     expect(parseShopUrl('https://bol.com.evil.example/be/nl/p/x/9300000038335239/')).toBeNull();

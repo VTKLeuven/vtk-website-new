@@ -173,6 +173,10 @@ export const budgetSettingsSchema = z.object({
   // Ontbreekt in instellingen van voor de proef: dan doet niemand buiten Groep 5 mee.
   pilotPostKeys: z.array(z.string().max(60)).max(200).default([]),
   collectGoLive: z.boolean().default(true),
+  colruytPostcode: z
+    .string()
+    .regex(/^(\d{4})?$/)
+    .default(''),
 });
 
 export function parseBudgetSettings(value: unknown): BudgetSettings | null {

@@ -20,9 +20,10 @@ import { parseCollectGoUrl, parseProductPage, productPageUrl, isCollectGoPage } 
  *   echte Chromium in een eigen container. Staat die niet aan
  *   (`PRICE_BROWSER_URL` leeg), dan zegt de regel "geen antwoord" en bevestigt
  *   een mens de prijs;
- * - colruyt.be toont geen prijs zonder gekozen winkel, ook niet in een
- *   browser: herkend, niet nagekeken. Hetzelfde product op collectandgo.be
- *   kan wel.
+ * - colruyt.be toont een prijs pas voor een gekozen winkel. De prijsbrowser
+ *   zoekt de winkel bij de postcode die Groep 5 instelde
+ *   (`BudgetSettings.colruytPostcode`) en vraagt de prijs voor die winkel;
+ *   zonder postcode is er geen prijs.
  *
  * Puur, zodat het getest kan worden; het ophalen staat in `fetch.ts`.
  */
@@ -34,7 +35,7 @@ export const SHOPS = {
   helloprint: { name: 'Helloprint', hosts: ['helloprint.com', 'helloprint.be'], live: true },
   drukzo: { name: 'Drukzo', hosts: ['drukzo.be', 'drukzo.nl'], live: true },
   action: { name: 'Action', hosts: ['action.com'], live: true },
-  colruyt: { name: 'Colruyt', hosts: ['colruyt.be'], live: false },
+  colruyt: { name: 'Colruyt', hosts: ['colruyt.be'], live: true },
 } as const;
 
 export type ShopId = keyof typeof SHOPS;
@@ -126,8 +127,13 @@ export function parseShopUrl(input: string | null | undefined): ShopRef | null {
       const slug = SLUG.test(parts[i + 2] ?? '') ? `${parts[i + 2]}/` : '';
       return { shop, page: `https://www.action.com/nl-be/p/${id}/${slug}`, via: 'browser', basis: 'incl' };
     }
-    case 'colruyt':
-      return null;
+    case 'colruyt': {
+      // /nl/producten/38672, of met de naam ervoor: /nl/producten/everyday-doekjes-38672
+      const i = parts.indexOf('producten');
+      const id = /(\d{2,9})$/.exec(parts[i + 1] ?? '')?.[1];
+      if (i < 0 || !id || parts.length > i + 2) return null;
+      return { shop, page: `https://www.colruyt.be/nl/producten/${id}`, via: 'browser', basis: 'incl' };
+    }
   }
 }
 
@@ -138,7 +144,15 @@ export function parseShopResponse(_ref: ShopRef, body: string): ShopProduct | nu
 }
 
 /** Wat de prijsbrowser teruggaf: de JSON-LD-blokken van de pagina en de prijs uit de metatags. */
-export type BrowserAnswer = { status: number; finalUrl: string; title: string; ld: string[]; price: string | null };
+export type BrowserAnswer = {
+  status: number;
+  finalUrl: string;
+  title: string;
+  ld: string[];
+  price: string | null;
+  /** Colruyt: de winkel waarvoor de prijs geldt, of null als er bij de postcode geen is. */
+  store?: string | null;
+};
 
 /** "€4,30", "4.30" of "1.215,50" als getal. */
 function metaPrice(text: string | null): number | null {

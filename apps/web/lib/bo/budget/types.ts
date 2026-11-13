@@ -275,6 +275,11 @@ export type BudgetSettings = {
   pilotPostKeys: string[];
   /** Vraagt de site prijzen op bij de webshops? Uit als een winkel het niet wil. */
   collectGoLive: boolean;
+  /**
+   * De postcode van de Colruyt waar de kring koopt. Colruyt geeft een prijs per
+   * winkel; zonder postcode kijkt de site een link naar colruyt.be niet na.
+   */
+  colruytPostcode: string;
 };
 
 export const DEFAULT_SETTINGS: BudgetSettings = {
@@ -285,4 +290,5 @@ export const DEFAULT_SETTINGS: BudgetSettings = {
   locations: [],
   pilotPostKeys: [],
   collectGoLive: true,
+  colruytPostcode: '',
 };

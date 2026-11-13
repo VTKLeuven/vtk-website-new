@@ -1019,7 +1019,7 @@ export function BudgetEditor({
                     </h2>
                     <p className="vtk-bud-fine">
                       {nl
-                        ? `${checkable} van ${rows.length} ${rows.length === 1 ? 'regel wijst' : 'regels wijzen'} naar een product dat de site zelf kan nakijken (Collect&Go, bol.com, Partywinkel, Helloprint, Drukzo, Action). ${last ? `Laatst nagekeken op ${stamp(last)}.` : 'Nog niet nagekeken.'}`
+                        ? `${checkable} van ${rows.length} ${rows.length === 1 ? 'regel wijst' : 'regels wijzen'} naar een product dat de site zelf kan nakijken (Collect&Go, Colruyt, bol.com, Partywinkel, Helloprint, Drukzo, Action). ${last ? `Laatst nagekeken op ${stamp(last)}.` : 'Nog niet nagekeken.'}`
                         : `${checkable} of ${rows.length} rows point to a product the site can check itself. ${last ? `Last checked ${stamp(last)}.` : 'Not checked yet.'}`}
                       {byHand > 0 &&
                         (nl
