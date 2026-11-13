@@ -192,4 +192,36 @@ describe('een rekenblad overnemen', () => {
     const loose = await workbook({ A1: 'Zomaar een lijstje', A2: 12 });
     expect(importBudgetWorkbook(loose, { fileName: 'b.xlsx', kind: 'upload' })).toEqual({ error: 'NO_OVERVIEW' });
   });
+
+  it('leest het totaal onder "Uitgaven", ook als een kostenpost zelf "Totaal" heet', async () => {
+    // Zoals IT Nieuw Materiaal (BO 7): de site las de post van +234,15 als het
+    // totaal, en het budget stond er met een winst in plaats van een kost.
+    const buffer = await workbook({
+      ...HEAD,
+      A9: 'Inkomsten',
+      C9: 0,
+      A10: 'Totaal',
+      C10: 234.15,
+      A16: 'Uitgaven',
+      C16: 234.15,
+      A18: 'Totaal',
+      C18: -234.15,
+      A24: 'Vaste kosten/Keuzekost',
+      A25: 'Totaal',
+      B25: 'Naam',
+      E25: 'Aantal',
+      F25: 'Prijs per stuk',
+      J25: 'Totaal',
+      B26: 'Kabel',
+      E26: 1,
+      F26: 234.15,
+      J26: 234.15,
+    });
+    const imported = importBudgetWorkbook(buffer, { fileName: '26-27_Budget_IT_Kabel.xlsx', kind: 'upload' });
+    if ('error' in imported) throw new Error(imported.error);
+    expect(imported.sheetTotalCents).toBe(-23415);
+    const overview = overviewOf(imported.content, ctx);
+    expect(overview.expense).toBeCloseTo(234.15, 2);
+    expect(overview.total).toBeCloseTo(-234.15, 2);
+  });
 });

@@ -29,11 +29,12 @@ export default async function MijnBudgettenPage({ params }: { params: Promise<{ 
   const posts = await loadOwnBo(session.groups, nl);
   const year = formatWorkingYear(currentWorkingYear());
   // Budgetten op de site: een proef naast de rekenbladen in Drive, die blijven
-  // de bron. Wie een budget heeft, ziet het; starten kan enkel Groep 5 en wie
-  // Groep 5 aanvinkte (zie `siteBudgetPostKeys`).
-  const budgetKeys = ownBudgetPostKeys(session);
-  const [siteBudgets, budgetPostNames, budgetSettings] = await Promise.all([listBudgets(budgetKeys), postNames(budgetKeys, nl), getBudgetSettings()]);
-  const canStart = siteBudgetPostKeys(session, budgetSettings).length > 0;
+  // de bron. Enkel Groep 5 en de posten die ze aanvinkte, zien er iets van, ook
+  // van een budget dat Groep 5 voor hun post uit een rekenblad overnam.
+  const budgetSettings = await getBudgetSettings();
+  const budgetKeys = canManage ? ownBudgetPostKeys(session) : siteBudgetPostKeys(session, budgetSettings);
+  const [siteBudgets, budgetPostNames] = await Promise.all([listBudgets(budgetKeys), postNames(budgetKeys, nl)]);
+  const canStart = budgetKeys.length > 0;
 
   return (
     <div className="space-y-6">
@@ -66,7 +67,7 @@ export default async function MijnBudgettenPage({ params }: { params: Promise<{ 
             href={`${base}/admin/bestuursorgaan/mappen`}
             className="inline-flex h-10 items-center justify-center rounded-full border border-vtk-blue/20 px-4 text-sm font-medium text-vtk-ink hover:bg-vtk-blue-soft"
           >
-            {nl ? "Mappen per BO" : "Folders per meeting"}
+            {nl ? "Bestuursorgaan" : "Board meetings"}
           </Link>
           {canStart && (
             <Link

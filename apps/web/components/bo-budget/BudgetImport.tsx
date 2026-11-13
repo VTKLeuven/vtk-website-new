@@ -20,10 +20,7 @@ import { importBudgetFilesAction, importMeetingFromDriveAction } from '@/app/act
 export function BudgetUpload({ locale, defaultDate }: { locale: 'nl' | 'en'; defaultDate?: string | null }) {
   const nl = locale === 'nl';
   return (
-    <section className="vtk-bud-card vtk-fold-import" aria-labelledby="bud-import-h">
-      <h2 id="bud-import-h" className="vtk-bud-h2">
-        {nl ? 'Rekenbladen opladen' : 'Upload spreadsheets'}
-      </h2>
+    <section aria-label={nl ? 'Rekenbladen opladen' : 'Upload spreadsheets'}>
       <p className="vtk-bud-fine">
         {nl
           ? 'Kies de bladen uit de map Budgetten of Resultaten van een BO (.xlsx; uit Sheets: Bestand > Downloaden). De post en de activiteit leest de site uit de bestandsnaam (26-27_Budget_<post>_<activiteit>). Elk blad wordt een budget op de site met dezelfde regels en hetzelfde totaal; een resultaatblad vult het resultaat van hetzelfde budget in.'

@@ -376,8 +376,11 @@ er beslist is om over te stappen. Het waarom staat in `docs/design-decisions.md`
 **Wie.** Groep 5 kan het altijd; een andere post pas wanneer Groep 5 ze aanvinkt
 bij "Instellingen voor budgetten" (`/admin/bestuursorgaan/instellingen`,
 `BudgetSettings.pilotPostKeys`, `siteBudgetPostKeys` in `server.ts`). Wie niet
-meedoet, ziet op "Mijn budgetten" niets nieuws. Een budget dat al bestaat, blijft
-voor de leden van zijn post te openen.
+meedoet, ziet van de site niets: geen lijst op "Mijn budgetten", geen rij in de
+mappen, geen budgetpagina en geen download, ook niet van een budget dat Groep 5
+voor haar post uit een rekenblad overnam (`canEditBudget` kijkt naar de
+proeflijst, niet enkel naar het lidmaatschap). Dat was eerst anders: een post
+die niet aangevinkt was, zag haar overgenomen bladen toch.
 
 | Bestand | Inhoud |
 | ------- | ------ |
@@ -437,38 +440,71 @@ blad terug met `figuresFromSheet` en vindt dezelfde bedragen als de editor.
 Indienen op de site (`submitBoBudgetAction`) bestaat, maar staat niet in de
 editor zolang het BO met Drive werkt.
 
-**Prijzen bij Collect&Go, live.** "Prijzen nakijken" in de editor (of "Nu
-nakijken" per regel) vraagt voor elke regel met een link naar één product de
-productpagina op bij collectandgo.be en leest de prijs uit de JSON-LD
-(`lib/collectgo/product.ts`). Een product herkent de site aan het nummer achter
-`#pdp_` (de zoeklinks uit de bladen), aan `productId=`, of aan een pagina
-`/nl/assortiment/<product>`. Wat er terugkomt, staat in `lastCheck` van de regel:
+**Prijzen nakijken gebeurt vanzelf.** Er is geen knop "Prijzen nakijken" meer.
+Wie een budget opent, in Maken, in Nakijken of via een deellink, laat de site de
+regels met een link naar één product bij een gekende winkel nakijken
+(`refreshPricesAction`):
 
-- klopt: de prijs is dezelfde als in de regel (een prijs excl. wordt eerst
-  omgerekend naar de winkelprijs);
-- gewijzigd: de nieuwe prijs en het effect op het totaal, bij de controles en
-  in het paneel, met "overnemen";
-- niet gevonden: het product staat niet meer online (het sangria-product uit
-  Live Cantus);
-- geen antwoord: geblokkeerd of een time-out; dan bevestigt een mens de prijs
-  ("Prijs klopt, vandaag nagekeken").
+- hoogstens één ronde per vier uur per budget (`BudgetContent.pricesAt`,
+  `rowsToCheck`), en de server onthoudt elk product vier uur en voegt
+  gelijktijdige aanvragen samen (`lib/priceCheck/fetch.ts`). Honderd mensen die
+  samen een budget openen, zijn voor de winkel één bezoek per product;
+- een nieuwe of gewijzigde link gaat meteen mee, zonder op de ronde te wachten;
+- **niet meer eens het budget vastligt**: ingediend, of de datum van "Voor het
+  BO van" is voorbij (`pricesStillChecked`). Er bestaat geen aparte
+  goedkeuring op de site, dus dit is wat "goedgekeurd" hier betekent;
+- de uitkomst komt in het budget zonder `updatedAt` te wijzigen, zodat een
+  editor die openstaat gewoon blijft bewaren.
 
-De productnaam staat erbij, zodat je ziet of de link wel het juiste product is.
-Drie pagina's tegelijk, hoogstens 60 per keer, en een gevonden pagina onthoudt
-de server een halfuur. Groep 5 zet het uit bij de instellingen
-(`collectGoLive`) als Colruyt het niet wil.
+Wat er terugkomt, staat in `lastCheck` van de regel: klopt, gewijzigd (met
+"overnemen"), niet gevonden, of geen antwoord. De uitkomst wordt bij het tonen
+opnieuw berekend tegen de prijs in de regel (`liveCheck`): wie de prijs aanpast
+naar die van de winkel, ziet meteen "klopt". "Nu nakijken" in het paneel van
+een regel vraagt de winkel vers op. Groep 5 zet alles uit bij de instellingen
+(`collectGoLive`).
+
+**Zelf nagekeken.** Voor een link naar een winkel die de site niet kent (een
+frituur, een verhuurder) en voor een regel zonder link zegt een mens dat hij de
+prijs nakeek: de knop "Zelf nagekeken" bij de regel in Nakijken, of in het
+paneel in Maken. De regel toont daarna door wie en wanneer (`checkedBy`,
+`checkedAt`). De naam komt van de server (`stampConfirmations`), niet van de
+browser; via een deellink is dat "iemand met de deellink". Een bevestiging
+vervalt wanneer de prijs of de link wijzigt, en wanneer de winkel later een
+ander antwoord geeft dan toen (`PriceCheck.since`). De site zet `checkedAt`
+nooit zelf.
+
+**Vaste prijzen.** De huur van een zaal, een vat, licht en geluid: daar bestaat
+geen offerte per activiteit voor, en "geen bron" stond er dus in elk budget.
+Groep 5 houdt bij de instellingen een lijst "Vaste prijzen" bij (omschrijving,
+prijs, optioneel een locatie), of zet er een bij vanuit het paneel van een regel
+("onthouden als vaste prijs"). Een regel zonder bron met die omschrijving en die
+prijs heeft daarmee een bron (`lib/bo/budget/fixed.ts`); met een locatie geldt
+de prijs enkel daar, en valt een regel met een ander bedrag op zonder iets tegen
+te houden. Herkennen gebeurt bij het tonen: de regel zelf verandert niet.
 
 ### Maken en nakijken: twee weergaven van hetzelfde budget
 
 De kop van de editor heeft een schakelaar. **Maken** is het werkblad: cellen om
 in te typen, het paneel achter het potlood, de knoppen. **Nakijken**
-(`BudgetReview.tsx`) is hetzelfde budget zonder één invoerveld: bovenaan de
-bedragen, daaronder de aandachtspunten, en per sectie één dichte tabel met per
-regel de som ("30 % × 150 p × 2 ÷ 24 = 4 bak ×"), de prijs met incl. of excl.,
-het bedrag, het resultaat en de bron met de stand van de prijscontrole. Wat in
-Maken achter het potlood zit, staat daar gewoon in de rij. `?weergave=nakijken`
-opent een budget meteen zo; de mappen per BO en de deellink om te bekijken
-gebruiken dat.
+(`BudgetReview.tsx`) is hetzelfde budget op één blad: bovenaan de bedragen, en
+per sectie één dichte tabel met per regel de som ("30 % × 150 p × 2 ÷ 24 = 4
+bak ×"), de prijs met incl. of excl., het bedrag, het resultaat en de bron met
+de stand van de prijscontrole. Wat in Maken achter het potlood zit, staat daar
+gewoon in de rij. Er is geen lijst "Aandachtspunten" meer: wat aan een regel
+scheelt, staat bij die regel (een bolletje voor de naam, de stand bij de bron).
+Wie mag wijzigen, kan in Nakijken twee dingen: op een prijs klikken om ze te
+verbeteren, en "Zelf nagekeken" aanduiden. `?weergave=nakijken` opent een budget
+meteen zo; de mappen en de deellink om te bekijken gebruiken dat.
+
+In beide weergaven staat **het totaal van een sectie onder haar regels**, in de
+kolom van de bedragen, en is **elk negatief bedrag een min in het rood**
+(`Money.tsx`): een kost staat er als wat ze met het totaal doet. In Maken staat
+**de link van een regel in de tabel**: plakken volstaat, de site herkent zelf of
+het Collect&Go of een andere webshop is.
+
+**Secties zijn vrij.** Zoveel als je wil (hoogstens dertig), met een naam naar
+keuze, en met de pijlen te verplaatsen. De soort bepaalt enkel hoe de regels
+rekenen: kosten (aantal × prijs), kosten per persoon, of inkomsten.
 
 ### Berekeningen en eigen parameters
 
@@ -534,12 +570,20 @@ nodig; de link is de toegang.
 - De pagina staat op `noindex` en `referrer: no-referrer`: de regels linken
   naar webshops, en die hoeven de link niet te krijgen.
 
-### Mappen per BO
+### Mappen per BO ("Bestuursorgaan" in de zijbalk)
 
-`/admin/bestuursorgaan/mappen`: elke BO van het werkingsjaar als een map, met
-daarin Budgetten en Resultaten. Een rij is een rekenblad uit Drive (opent in
-Drive) of een budget op de site (opent in Nakijken), en bovenaan zoekt één
-veld over alle mappen. Groep 5 ziet alles; een post enkel haar eigen
+`/admin/bestuursorgaan/mappen` heet in de zijbalk **Bestuursorgaan**; het
+overzicht per post op `/admin/bestuursorgaan` heet **Resultatenoverzicht**. De
+instellingen voor budgetten hangen onder Bestuursorgaan (de knop bovenaan), niet
+meer onder het overzicht. De URL's zijn niet gewijzigd.
+
+Elke BO van het werkingsjaar is een rij in een lijst, met daarin Budgetten en
+Resultaten. Een rij is een rekenblad uit Drive (opent in Drive) of een budget op
+de site (opent in Nakijken). **Een activiteit die in Drive én op de site staat,
+is één rij** (zelfde post, zelfde naam) die naar de site leidt, met het blad in
+Drive als tweede link; staan er in een map beide soorten, dan is ze gesplitst in
+"Op de site" en "Enkel in Drive". "Rekenbladen opladen" is een dichtgeklapt blok
+onderaan. Bovenaan zoekt één veld over alle mappen. Groep 5 ziet alles; een post enkel haar eigen
 bestanden, op de server gefilterd op `postKeys` zoals `lib/bo/own.ts`. Een
 budget op de site staat in de map van de BO met dezelfde datum als "Voor het
 BO van", anders in een map op die datum of in "Nog geen BO gekozen".
@@ -601,8 +645,8 @@ prijs opgehaald wordt (`via`). Getest in november 2026:
 | action.com | 7 | prijsbrowser, JSON-LD | werkt |
 | colruyt.be | 9 | prijsbrowser: het product op zijn nummer, met de prijs van de winkel bij de ingestelde postcode | werkt (zes producten uit de bladen in vier seconden) |
 
-Waar een winkel niet antwoordt, zegt de regel dat met de reden, en bevestigt
-een mens de prijs met datum. Een prijs excl. (Helloprint) vergelijkt en neemt
+Waar een winkel niet antwoordt, zegt de regel dat met de reden, en duidt een
+mens aan dat hij de prijs zelf nakeek. Een prijs excl. (Helloprint) vergelijkt en neemt
 de site over als excl. (`PriceCheck.basis`).
 
 ### De prijsbrowser
@@ -636,7 +680,7 @@ Aanzetten op een server:
 **Testen zonder budget.** Onderaan "Instellingen voor budgetten" staat
 "Prijscontrole testen" (`PriceCheckTest.tsx`, `testPriceLookupAction`): plak een
 productlink en de site vraagt de winkel meteen op, niet uit het geheugen van
-een halfuur, en bewaart niets. Het blok zegt ook of de prijsbrowser niet
+vier uur, en bewaart niets. Het blok zegt ook of de prijsbrowser niet
 ingesteld is, niet antwoordt of draait, zodat je na een deploy het verschil
 ziet tussen "de container draait niet" en "de winkel weigert".
 
@@ -658,9 +702,10 @@ Waarom zo:
   zit de browser uit, hoogstens twintig seconden. Er wordt geen captcha
   opgelost en geen vingerafdruk vervalst: lukt het zo niet, dan is het
   antwoord "geen antwoord".
-- **Rustig.** Enkel wanneer iemand op "Prijzen nakijken" klikt, hoogstens twee
-  pagina's tegelijk, zonder afbeeldingen, en een gevonden prijs blijft een
-  halfuur onthouden. Niet 's nachts en niet voor elk budget.
+- **Rustig.** Enkel wanneer iemand een budget opent dat nog niet vastligt,
+  hoogstens één ronde per vier uur per budget, hoogstens twee pagina's
+  tegelijk, zonder afbeeldingen, en een gevonden prijs blijft vier uur
+  onthouden. Niet 's nachts en niet voor budgetten die niemand opent.
 - **Geen `build:` in compose.** Het officiële Playwright-image met het script
   erin gemount; zo blijven `infra/deploy.sh` (drie builds), de lockfile en
   `scripts/affected-apps.mjs` wat ze waren. Wijzigt `server.cjs`, herstart dan
@@ -697,10 +742,19 @@ model gelegd.
   typt de verkoopprijs in de berekening.
 - De som van de begroting per post uit de site: de begroting wordt opgeladen,
   niet op de site opgesteld.
-- Prijzen nakijken gebeurt enkel op vraag, niet 's nachts.
+- Prijzen nakijken gebeurt wanneer iemand een budget opent, niet 's nachts.
+- Een echte goedkeuring door het BO: een budget ligt vast eens het ingediend is
+  of de BO-datum voorbij is.
 - Een deellink verloopt niet vanzelf; intrekken doet de post.
 
 ### Vallen
+
+- **Een post die zelf "Totaal" heet.** IT Nieuw Materiaal (BO 7) had boven
+  "Uitgaven" een kostenpost met die naam; `figuresFromSheet` las die +234,15 als
+  het totaal van het blad, en het budget stond in het overzicht én na de import
+  met een winst in plaats van een kost. Staat er een rij "Uitgaven", dan is het
+  totaal de eerste "Totaal" daarna (`lib/bo/figures.ts`). Voor wat al gescand of
+  overgenomen was: opnieuw scannen, en het blad opnieuw overnemen.
 
 - **De prijsbrowser is getest vanop een gewone verbinding en in de container
   op een laptop, niet vanop de server bij Hetzner.** Een winkel kan het IP van

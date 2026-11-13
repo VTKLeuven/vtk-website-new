@@ -695,7 +695,7 @@ describe('Collect&Go: links en productpagina', () => {
     wijn.lastCheck = { at: '2026-11-08T22:00:00Z', status: 'changed', price: 4.19, name: 'Wijn wit' };
     const ctx: CalcContext = { postKey: 'g:onthaal', settings: settings() };
     expect(checksOf(content, ctx, true).find((c) => c.rowId === 'wijn')?.text).toContain('4,19');
-    acceptCheckedPrice(wijn, '2026-11-08');
+    acceptCheckedPrice(wijn);
     expect(wijn.price).toBe(4.19);
     expect(checksOf(content, ctx, true).some((c) => c.rowId === 'wijn')).toBe(false);
   });

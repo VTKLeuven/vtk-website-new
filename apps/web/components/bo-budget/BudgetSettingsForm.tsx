@@ -7,6 +7,7 @@ import { PlusIcon, TrashIcon } from '@/components/ui/icons';
 import { SaveForm } from '@/components/ui/SaveForm';
 import { saveBudgetSettingsAction } from '@/app/actions/boBudgets';
 import { POST_VAT_RATES, type BudgetLocation, type BudgetSettings } from '@/lib/bo/budget/types';
+import { newId } from '@/lib/bo/budget/templates';
 import { percent } from './format';
 import { NumberField } from './NumberField';
 
@@ -51,6 +52,7 @@ export function BudgetSettingsForm({
   const nl = locale === 'nl';
   const [value, setValue] = useState<BudgetSettings>(settings);
   const [removing, setRemoving] = useState<number | null>(null);
+  const [removingFixed, setRemovingFixed] = useState<number | null>(null);
   const set = (change: (draft: BudgetSettings) => void) =>
     setValue((prev) => {
       const next = structuredClone(prev);
@@ -72,8 +74,8 @@ export function BudgetSettingsForm({
       fallbackErrorMessage={nl ? 'Bewaren lukte niet. Probeer het opnieuw.' : 'Saving failed. Try again.'}
       errorMessages={{
         INVALID_SETTINGS: nl
-          ? 'Een locatie heeft geen naam, of een bedrag is ongeldig.'
-          : 'A venue has no name, or an amount is invalid.',
+          ? 'Een locatie of een vaste prijs heeft geen naam, of een bedrag is ongeldig.'
+          : 'A venue or a fixed price has no name, or an amount is invalid.',
         DUPLICATE_LOCATION: nl ? 'Twee locaties hebben dezelfde naam.' : 'Two venues have the same name.',
       }}
       className="space-y-6"
@@ -321,6 +323,124 @@ export function BudgetSettingsForm({
           <PlusIcon /> {nl ? 'Locatie' : 'Venue'}
         </button>
       </section>
+
+      <section className="vtk-bud-card" aria-labelledby="set-fixed">
+        <h2 id="set-fixed" className="vtk-bud-h2">
+          {nl ? 'Vaste prijzen' : 'Fixed prices'}
+        </h2>
+        <p className="vtk-bud-fine">
+          {nl
+            ? 'Prijzen die vastliggen en waar geen link of offerte per activiteit voor bestaat: de huur van een zaal, een vat, licht en geluid. Een regel zonder bron met deze omschrijving en deze prijs vraagt in geen enkel budget nog "waar komt de prijs vandaan?". Met een locatie geldt de prijs enkel daar, en valt een regel met een andere prijs op. Vanuit een budget zet je er een bij met "Vaste prijs" naast de regel.'
+            : 'Prices that are fixed and have no link or quote per activity. A row without a source with this description and this price no longer asks where the price comes from.'}
+        </p>
+        {value.fixedPrices.length === 0 ? (
+          <p className="vtk-bud-empty">{nl ? 'Nog geen vaste prijzen.' : 'No fixed prices yet.'}</p>
+        ) : (
+          <div className="vtk-bud-tablewrap">
+            <table className="vtk-bud-table vtk-bud-loctable">
+              <thead>
+                <tr>
+                  <th className="vtk-bud-col-name">{nl ? 'Omschrijving' : 'Description'}</th>
+                  <th className="num">{nl ? 'Prijs' : 'Price'}</th>
+                  <th>{nl ? 'Locatie' : 'Venue'}</th>
+                  <th>{nl ? 'Opmerking' : 'Note'}</th>
+                  <th className="vtk-bud-col-act">
+                    <span className="sr-only">{nl ? 'Acties' : 'Actions'}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {value.fixedPrices.map((f, i) => (
+                  <tr key={f.id}>
+                    <td className="vtk-bud-col-name">
+                      <input
+                        className="vtk-bud-bare vtk-bud-cell"
+                        value={f.name}
+                        aria-label={nl ? 'Omschrijving' : 'Description'}
+                        placeholder={nl ? 'Zoals de regel heet' : 'As the row is called'}
+                        onChange={(e) => set((d) => (d.fixedPrices[i].name = e.target.value))}
+                      />
+                    </td>
+                    <td className="num" data-label={nl ? 'Prijs' : 'Price'}>
+                      <NumberField
+                        className="vtk-bud-bare vtk-bud-cell num"
+                        value={f.price}
+                        decimals={2}
+                        aria-label={nl ? `Prijs van ${f.name}` : `Price of ${f.name}`}
+                        onValue={(v) => set((d) => (d.fixedPrices[i].price = v ?? 0))}
+                      />
+                    </td>
+                    <td data-label={nl ? 'Locatie' : 'Venue'}>
+                      <input
+                        className="vtk-bud-bare vtk-bud-cell"
+                        value={f.location}
+                        list="set-fixed-locations"
+                        aria-label={nl ? `Locatie van ${f.name}` : `Venue of ${f.name}`}
+                        placeholder={nl ? 'Overal' : 'Everywhere'}
+                        onChange={(e) => set((d) => (d.fixedPrices[i].location = e.target.value))}
+                      />
+                    </td>
+                    <td data-label={nl ? 'Opmerking' : 'Note'}>
+                      <input
+                        className="vtk-bud-bare vtk-bud-cell"
+                        value={f.note}
+                        aria-label={nl ? `Opmerking bij ${f.name}` : `Note for ${f.name}`}
+                        onChange={(e) => set((d) => (d.fixedPrices[i].note = e.target.value))}
+                      />
+                    </td>
+                    <td className="vtk-bud-col-act">
+                      <IconButton
+                        label={nl ? 'Vaste prijs verwijderen' : 'Delete fixed price'}
+                        srLabel={`${nl ? 'Vaste prijs verwijderen' : 'Delete fixed price'}: ${f.name}`}
+                        tone="danger"
+                        onClick={() => setRemovingFixed(i)}
+                      >
+                        <TrashIcon />
+                      </IconButton>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <datalist id="set-fixed-locations">
+              {value.locations.map((l) => (
+                <option key={l.name} value={l.name} />
+              ))}
+            </datalist>
+          </div>
+        )}
+        <button
+          type="button"
+          className="vtk-bud-add"
+          onClick={() =>
+            set((d) => void d.fixedPrices.push({ id: newId(), name: '', price: 0, location: '', note: '' }))
+          }
+        >
+          <PlusIcon /> {nl ? 'Vaste prijs' : 'Fixed price'}
+        </button>
+      </section>
+
+      <ConfirmDialog
+        open={removingFixed !== null}
+        title={
+          nl
+            ? `Vaste prijs "${removingFixed !== null ? value.fixedPrices[removingFixed]?.name || 'zonder naam' : ''}" verwijderen?`
+            : 'Delete this fixed price?'
+        }
+        description={
+          nl
+            ? 'De prijs verdwijnt uit de lijst zodra je de instellingen bewaart. Regels in budgetten die erop steunden, vragen daarna opnieuw waar hun prijs vandaan komt; de regels en hun bedragen zelf veranderen niet.'
+            : 'The price leaves the list once you save. Rows that relied on it ask for a source again; the rows themselves do not change.'
+        }
+        confirmLabel={nl ? 'Vaste prijs verwijderen' : 'Delete fixed price'}
+        cancelLabel={nl ? 'Annuleren' : 'Cancel'}
+        onCancel={() => setRemovingFixed(null)}
+        onConfirm={() => {
+          const i = removingFixed;
+          setRemovingFixed(null);
+          if (i !== null) set((d) => void d.fixedPrices.splice(i, 1));
+        }}
+      />
 
       <ConfirmDialog
         open={removing !== null}

@@ -4,6 +4,7 @@ import type { Locale } from '@vtk/i18n';
 import { hasLocale } from '@/lib/locale';
 import { BudgetEditor } from '@/components/bo-budget/BudgetEditor';
 import { BudgetReview } from '@/components/bo-budget/BudgetReview';
+import { PriceRefresh } from '@/components/bo-budget/PriceRefresh';
 import { checksOf } from '@/lib/bo/budget/checks';
 import { getBudgetSettings, loadBudgetByToken, loadPot, postNames } from '@/lib/bo/budget/server';
 
@@ -69,6 +70,7 @@ export default async function SharedBudgetPage({ params }: { params: Promise<{ l
           />
         ) : (
           <div className="vtk-bud">
+            <PriceRefresh id={budget.id} token={token} />
             <p className="vtk-bud-fine">
               {nl
                 ? `Gedeeld budget van ${postName} (Vlaamse Technische Kring). Je kijkt mee; wijzigen kan hier niet.`

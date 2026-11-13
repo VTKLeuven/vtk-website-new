@@ -5724,14 +5724,7 @@ textarea.vtk-bud-input {
   font-weight: 600;
 }
 
-/* Controles */
-.vtk-bud-checks {
-  box-shadow: inset 3px 0 0 var(--ok-ink);
-}
-
-.vtk-bud-checks:has([data-level='block']) {
-  box-shadow: inset 3px 0 0 var(--danger-ink);
-}
+/* Controles: geen gekleurde rand links; de kop en de bolletjes zeggen het al. */
 
 .vtk-bud-checklist {
   margin: 0;
@@ -6855,9 +6848,9 @@ button.vtk-bud-dot {
 .vtk-bud-result {
   margin-top: 14px;
   padding: 14px 16px;
+  border: 1px solid var(--line);
   border-radius: 14px;
-  background: var(--paper-2);
-  box-shadow: inset 3px 0 0 var(--yellow);
+  background: color-mix(in srgb, var(--yellow) 9%, var(--surface));
 }
 
 .vtk-bud-result .vtk-bud-ov-total {
@@ -7082,7 +7075,6 @@ button.vtk-bud-dot {
   color: var(--ok-ink) !important;
 }
 
-.vtk-rev-checks,
 .vtk-rev-pot,
 .vtk-rev-sec {
   border: 1px solid var(--line);
@@ -7090,12 +7082,6 @@ button.vtk-bud-dot {
   background: var(--surface);
 }
 
-.vtk-rev-checks {
-  padding: 12px 16px;
-  box-shadow: inset 3px 0 0 var(--yellow);
-}
-
-.vtk-rev-checks h3,
 .vtk-rev-pot h3,
 .vtk-rev-sec-head h3 {
   display: flex;
@@ -7107,42 +7093,10 @@ button.vtk-bud-dot {
   font-weight: 650;
 }
 
-.vtk-rev-checks h3 span,
 .vtk-rev-sec-head h3 span {
   color: var(--muted);
   font-size: 12px;
   font-weight: 500;
-}
-
-.vtk-rev-checks ul {
-  display: grid;
-  gap: 4px;
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.vtk-rev-checks li {
-  position: relative;
-  padding-left: 16px;
-  color: var(--ink);
-}
-
-.vtk-rev-checks li::before {
-  content: '';
-  position: absolute;
-  top: 0.5em;
-  left: 0;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--yellow);
-  box-shadow: inset 0 0 0 1px var(--low-ink);
-}
-
-.vtk-rev-checks li[data-level='block']::before {
-  background: var(--danger-ink);
-  box-shadow: none;
 }
 
 .vtk-rev-pot h3 {
@@ -7299,12 +7253,108 @@ button.vtk-bud-dot {
   font-weight: 600;
 }
 
-.vtk-rev-table tr[data-level='block'] td:first-child {
-  box-shadow: inset 3px 0 0 var(--danger-ink);
+/* Wat aan een regel scheelt: een bolletje voor de naam (de uitleg in de
+   tooltip) en de stand bij de bron. Geen gekleurde rand langs de rij. */
+.vtk-rev-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--yellow);
+  box-shadow: inset 0 0 0 1px var(--low-ink);
+  vertical-align: 1px;
+  cursor: help;
 }
 
-.vtk-rev-table tr[data-level='review'] td:first-child {
-  box-shadow: inset 3px 0 0 var(--yellow);
+.vtk-rev-dot[data-level='block'] {
+  background: var(--danger-ink);
+  box-shadow: none;
+}
+
+.vtk-admin-main .vtk-rev-secnote {
+  margin: 0;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--rule-soft);
+  color: var(--body) !important;
+  font-size: 12.5px;
+}
+
+.vtk-admin-main .vtk-rev-secnote[data-level='block'] {
+  color: var(--danger-ink) !important;
+}
+
+.vtk-admin-main .vtk-rev-table tfoot td {
+  border-top: 1px solid var(--line-2);
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.vtk-rev-btn {
+  padding: 1px 9px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.vtk-rev-btn:hover {
+  border-color: var(--ink);
+}
+
+.vtk-rev-btn[data-primary] {
+  border-color: var(--ink);
+}
+
+.vtk-rev-confirmed {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  color: var(--ok-ink);
+  font-size: 12px;
+}
+
+.vtk-rev-price {
+  margin: -2px -7px;
+  padding: 1px 6px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: text;
+}
+
+.vtk-rev-price:hover,
+.vtk-rev-price:focus-visible {
+  border-color: var(--line-2);
+  background: var(--paper);
+  outline: none;
+}
+
+.vtk-admin-main .vtk-rev-priceinput {
+  width: 84px;
+  height: 24px;
+  margin: -2px -7px;
+  padding: 0 6px;
+  border: 1px solid var(--ink);
+  border-radius: 7px;
+  background: var(--surface);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+@media print {
+  .vtk-rev-btn {
+    display: none;
+  }
 }
 
 .vtk-rev-table tr.self td {
@@ -7356,44 +7406,111 @@ button.vtk-bud-dot {
   background: var(--surface);
 }
 
-.vtk-fold-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 12px;
+/* De mappen onder elkaar, zoals de lijstweergave van Drive: een rij per BO met
+   de datum en de aantallen in vaste kolommen. */
+.vtk-fold-rows {
   margin: 0;
   padding: 0;
-  list-style: none;
-}
-
-.vtk-fold-tile {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--surface);
-  color: var(--ink);
+  list-style: none;
+}
+
+.vtk-fold-rows > li + li {
+  border-top: 1px solid var(--rule-soft);
+}
+
+.vtk-fold-row {
+  display: grid;
+  grid-template-columns: 26px minmax(120px, 1.4fr) minmax(150px, 1fr) 110px 110px;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 16px;
+  color: var(--body);
+  font-size: 13.5px;
   text-decoration: none;
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
 }
 
-.vtk-fold-tile:hover {
-  border-color: var(--line-2);
-  box-shadow: 0 2px 10px rgba(14, 26, 54, 0.07);
+.vtk-fold-row:hover {
+  background: var(--paper);
 }
 
-.vtk-fold-tile:focus-visible {
+.vtk-fold-row:focus-visible {
   outline: 2px solid var(--ink);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
-.vtk-fold-tileicon {
-  flex: none;
-  width: 38px;
-  height: 38px;
+.vtk-fold-row b {
+  color: var(--ink);
+  font-size: 14.5px;
+  font-weight: 650;
+}
+
+.vtk-fold-rowicon {
+  width: 26px;
+  height: 26px;
+}
+
+.vtk-fold-rowcount {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.vtk-fold-row[data-upcoming] .vtk-fold-icon {
+  fill: var(--yellow);
+}
+
+@media (max-width: 640px) {
+  .vtk-fold-row {
+    grid-template-columns: 26px minmax(0, 1fr) auto;
+    gap: 2px 12px;
+  }
+
+  .vtk-fold-rowicon {
+    grid-row: span 2;
+  }
+
+  .vtk-fold-rowdate {
+    grid-column: 2;
+  }
+
+  .vtk-fold-rowcount {
+    grid-column: 3;
+    font-size: 12.5px;
+  }
+
+  .vtk-fold-row > .vtk-fold-rowcount:nth-of-type(3) {
+    grid-row: 1;
+  }
+}
+
+.vtk-admin-main .vtk-fold-part {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.vtk-fold-part small {
+  font-weight: 400;
+}
+
+.vtk-fold-where {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.vtk-fold-where a {
+  color: var(--navy);
+  font-size: 12.5px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
 }
 
 .vtk-fold-icon {
@@ -7403,23 +7520,8 @@ button.vtk-bud-dot {
   stroke-linejoin: round;
 }
 
-.vtk-fold-tile[data-upcoming] .vtk-fold-icon,
 .vtk-fold-icon[data-open] {
   fill: var(--yellow);
-}
-
-.vtk-fold-tiletext {
-  display: grid;
-  min-width: 0;
-  color: var(--muted);
-  font-size: 12.5px;
-  line-height: 1.35;
-}
-
-.vtk-fold-tiletext b {
-  color: var(--ink);
-  font-size: 14.5px;
-  font-weight: 650;
 }
 
 .vtk-fold-sub {
@@ -7511,7 +7613,8 @@ button.vtk-bud-dot {
   stroke-linejoin: round;
 }
 
-.vtk-fold-file[data-source='site'] {
+.vtk-fold-file[data-source='site'],
+.vtk-fold-file[data-source='both'] {
   stroke: var(--navy);
 }
 
@@ -7620,16 +7723,15 @@ button.vtk-bud-dot {
 
 .vtk-admin-main .vtk-bud-source {
   margin: 0;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: var(--paper-2);
+  padding: 0 2px;
+  max-width: 100ch;
   color: var(--body) !important;
   font-size: 13.5px;
-  box-shadow: inset 3px 0 0 var(--navy);
 }
 
 .vtk-fold-import {
   max-width: 760px;
+  margin-top: 28px;
 }
 
 /* De prijscontrole testen bij de instellingen (`PriceCheckTest.tsx`). */
@@ -7665,15 +7767,14 @@ button.vtk-bud-dot {
   background: var(--paper);
   color: var(--ink);
   font-size: 13.5px;
-  box-shadow: inset 3px 0 0 var(--yellow);
 }
 
 .vtk-bud-pricetest li[data-tone='ok'] {
-  box-shadow: inset 3px 0 0 var(--ok-ink);
+  background: var(--ok-bg);
 }
 
 .vtk-bud-pricetest li[data-tone='bad'] {
-  box-shadow: inset 3px 0 0 var(--danger-ink);
+  background: var(--danger-bg);
 }
 
 .vtk-bud-pricetest a {
@@ -7686,4 +7787,101 @@ button.vtk-bud-dot {
 
 .vtk-bud-postcode {
   max-width: 110px;
+}
+
+/* Negatief is altijd een min en rood: een kost, een verlies, minder dan begroot
+   (`components/bo-budget/Money.tsx`). */
+.vtk-bud .neg,
+.vtk-bud-shared .neg {
+  color: var(--danger-ink);
+}
+
+.vtk-bud .pos,
+.vtk-bud-shared .pos {
+  color: var(--ok-ink);
+}
+
+.vtk-bud .vtk-rev-figs dd .neg {
+  color: #ffb4ab;
+}
+
+.vtk-bud .vtk-rev-figs dd .pos {
+  color: #9be3b4;
+}
+
+/* Het totaal van een sectie staat onder haar regels, in de kolom van de bedragen. */
+.vtk-admin-main .vtk-bud-table tfoot td {
+  padding: 9px 4px;
+  border-top: 1px solid var(--line-2);
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 650;
+}
+
+/* De link van een regel, in de tabel zelf. */
+.vtk-bud-col-link {
+  min-width: 150px;
+}
+
+.vtk-bud-linkcell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vtk-bud-linkcell .vtk-bud-cell {
+  flex: 1;
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+}
+
+.vtk-bud-srcword {
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--body);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.vtk-bud-srcword:hover {
+  text-decoration: underline;
+}
+
+/* Met de link erbij: de kleine getallen (deel, per persoon, per eenheid, aantal) hoeven geen 88px. */
+.vtk-bud-table td.num > .vtk-bud-cell[data-col='pct'],
+.vtk-bud-table td.num > .vtk-bud-cell[data-col='perPerson'],
+.vtk-bud-table td.num > .vtk-bud-cell[data-col='perUnit'],
+.vtk-bud-table td.num > .vtk-bud-cell[data-col='qty'] {
+  width: 64px;
+}
+
+@media (max-width: 640px) {
+  .vtk-admin-main .vtk-bud-table tfoot,
+  .vtk-admin-main .vtk-rev-table:not(.vtk-rev-pottable) tfoot {
+    display: block;
+  }
+
+  .vtk-admin-main .vtk-bud-table tfoot tr {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 4px 12px;
+    padding: 10px 14px;
+  }
+
+  .vtk-admin-main .vtk-bud-table tfoot td {
+    padding: 0 !important;
+    border: 0;
+  }
+
+  .vtk-admin-main .vtk-bud-table tfoot td:empty {
+    display: none;
+  }
+
+  .vtk-admin-main .vtk-bud-table td.vtk-bud-col-link {
+    grid-column: 1 / -1;
+  }
 }

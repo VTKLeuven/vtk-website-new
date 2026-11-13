@@ -12,8 +12,9 @@ import {
   unitsOf,
   type CalcContext,
 } from './calc';
+import { fixedPriceOf } from './fixed';
 import { applyFormulas } from './formula';
-import { isUncheckableShopLink, openCheck, rowPriceIn, shopName } from './prices';
+import { isUncheckableShopLink, needsHandCheck, openCheck, rowPriceIn, shopName } from './prices';
 import type { BudgetContent } from './types';
 
 /*
@@ -168,13 +169,28 @@ export function checksOf(content: BudgetContent, ctx: CalcContext, nl: boolean):
         continue;
       }
       const source = row.source;
-      if (!source) {
-        add({
-          level: 'block',
-          rowId: row.id,
-          sectionId: section.id,
-          text: nl ? `${name}: waar komt de prijs vandaan?` : `${name}: where does the price come from?`,
-        });
+      const fixed = fixedPriceOf(content, ctx, row);
+      if (!source && fixed) {
+        // Een vaste prijs bij deze locatie die Beheer intussen aanpaste, of die de post anders intypte.
+        if (!fixed.exact && !row.checkedAt)
+          add({
+            level: 'review',
+            rowId: row.id,
+            sectionId: section.id,
+            text: nl
+              ? `${name}: ${eur(priceOf(content, ctx, row))} in plaats van de vaste prijs van ${eur(fixed.price)} (${fixed.name}).`
+              : `${name}: ${eur(priceOf(content, ctx, row))} instead of the fixed price of ${eur(fixed.price)} (${fixed.name}).`,
+          });
+      } else if (!source) {
+        // Iemand die de prijs zelf nakeek en bevestigde, is ook een bron. Een
+        // overgenomen blad passeerde al zo langs het BO: dat houdt niets tegen.
+        if (!row.checkedAt)
+          add({
+            level: content.source ? 'review' : 'block',
+            rowId: row.id,
+            sectionId: section.id,
+            text: nl ? `${name}: waar komt de prijs vandaan?` : `${name}: where does the price come from?`,
+          });
       } else if ((source.type === 'webshop' || source.type === 'collectgo') && !source.url?.trim()) {
         add({
           level: 'block',
@@ -271,7 +287,7 @@ export function checksOf(content: BudgetContent, ctx: CalcContext, nl: boolean):
             ? `${name}: ${shopName(check.shop ?? 'collectgo')} gaf geen prijs (${check.reason ?? 'geen antwoord'}). Open de link, kijk de prijs na en bevestig.`
             : `${name}: ${shopName(check.shop ?? 'collectgo')} gave no price. Open the link, check it and confirm.`,
         });
-      } else if (isUncheckableShopLink(row)) {
+      } else if (isUncheckableShopLink(row) && !row.checkedAt) {
         add({
           level: 'review',
           rowId: row.id,
@@ -279,6 +295,15 @@ export function checksOf(content: BudgetContent, ctx: CalcContext, nl: boolean):
           text: nl
             ? `${name}: de link wijst niet naar één product, dus de site kan de prijs niet nakijken. Open het product en kopieer die link.`
             : `${name}: the link does not point to one product, so the price cannot be checked. Open the product and copy that link.`,
+        });
+      } else if (needsHandCheck(row)) {
+        add({
+          level: 'review',
+          rowId: row.id,
+          sectionId: section.id,
+          text: nl
+            ? `${name}: deze winkel kan de site niet zelf nakijken. Open de link, kijk de prijs na en duid aan dat je het deed.`
+            : `${name}: the site cannot check this shop itself. Open the link, check the price and mark it as checked.`,
         });
       }
       if (row.flesserke && row.flesserke > unitsOf(content, section, row)) {

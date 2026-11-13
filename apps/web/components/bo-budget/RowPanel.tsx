@@ -11,6 +11,7 @@ import {
   locationOf,
   locationValue,
   orderUnits,
+  priceOf,
   restShare,
   unitAmount,
   unitsOf,
@@ -25,9 +26,10 @@ import {
   type SourceType,
 } from '@/lib/bo/budget/types';
 import { parseShopUrl, shopOfUrl, SHOPS } from '@/lib/priceCheck/shops';
-import { rowPriceIn } from '@/lib/bo/budget/prices';
+import { fixedPriceOf } from '@/lib/bo/budget/fixed';
+import { clearConfirmation, liveCheck, rowPriceIn } from '@/lib/bo/budget/prices';
 import type { EditorApi } from './editorApi';
-import { money, percent, plain, todayIso, shortDate } from './format';
+import { money, percent, plain, shortDate } from './format';
 import { NumberField } from './NumberField';
 
 /*
@@ -116,7 +118,7 @@ function ShopCheck({ api, row }: { api: EditorApi; row: CostRow }) {
   const name = shop?.name ?? (row.source?.type === 'collectgo' ? 'Collect&Go' : nl ? 'de webshop' : 'the shop');
   const checkable = !!url && !!parseShopUrl(url);
   const busy = api.checkingRows?.includes(row.id) ?? false;
-  const check = row.lastCheck;
+  const check = liveCheck(row);
   const excl = check?.basis === 'excl' ? (nl ? ' excl. BTW' : ' excl. VAT') : '';
   const was = rowPriceIn(row, check?.basis ?? 'incl');
   let text: string;
@@ -126,14 +128,17 @@ function ShopCheck({ api, row }: { api: EditorApi; row: CostRow }) {
       : 'Paste the product link. For Collect&Go, bol.com, Partywinkel, Helloprint, Drukzo and Action the site checks the price itself.';
   else if (!shop)
     text = nl
-      ? 'Deze winkel kent de site niet, dus de prijs kijkt een mens na. Bevestig hieronder wanneer je dat deed.'
-      : 'The site does not know this shop, so someone checks the price by hand. Confirm below when you did.';
+      ? 'Deze winkel kan de site niet zelf nakijken. Open de link, kijk de prijs na en duid hieronder aan dat je het deed.'
+      : 'The site cannot check this shop itself. Open the link, check the price and mark it below.';
   else if (!checkable)
     text = nl
       ? `Deze link wijst niet naar één product bij ${name}, dus de site kan de prijs niet nakijken. Open het product en kopieer die link${shopId === 'collectgo' ? '; een zoeklink met #pdp_ erin werkt ook' : ''}.`
       : `This link does not point to one product at ${name}, so the price cannot be checked. Open the product and copy that link.`;
   else if (busy) text = nl ? `Bezig met nakijken bij ${name}…` : `Checking at ${name}…`;
-  else if (!check) text = nl ? `Nog niet nagekeken bij ${name}.` : `Not checked at ${name} yet.`;
+  else if (!check)
+    text = nl
+      ? `De site kijkt de prijs bij ${name} vanzelf na, zo meteen en daarna om de vier uur.`
+      : `The site checks the price at ${name} automatically.`;
   else if (check.status === 'ok')
     text = nl
       ? `Klopt: ${money(check.price ?? 0)}${excl} voor "${check.name}" bij ${name} (${when(check.at, nl)}).`
@@ -191,6 +196,7 @@ function CostRowFields({ api, section, row }: { api: EditorApi; section: CostSec
   const locValue = fromLocation && row.source?.field ? locationValue(content, ctx, row.source.field) : null;
   const units = unitsOf(content, section, row);
   const partners = section.rows.filter((r) => r.id !== row.id && !r.rest && !r.mixOf);
+  const fixed = fixedPriceOf(content, ctx, row);
 
   if (row.rest) {
     return (
@@ -443,7 +449,15 @@ function CostRowFields({ api, section, row }: { api: EditorApi; section: CostSec
                 className="vtk-bud-input num"
                 value={fromLocation ? row.override : (row.price ?? 0)}
                 decimals={2}
-                onValue={(v) => update((r) => (fromLocation ? (r.override = v ?? 0) : (r.price = v ?? 0)))}
+                onValue={(v) =>
+                  update((r) => {
+                    const before = fromLocation ? r.override : r.price;
+                    if (fromLocation) r.override = v ?? 0;
+                    else r.price = v ?? 0;
+                    // Een bevestiging gold voor de vorige prijs.
+                    if ((v ?? 0) !== (before ?? 0)) clearConfirmation(r);
+                  })
+                }
               />
             </Field>
           )}
@@ -561,7 +575,15 @@ function CostRowFields({ api, section, row }: { api: EditorApi; section: CostSec
                       value={row.source.url ?? ''}
                       placeholder="https://"
                       inputMode="url"
-                      onChange={(e) => update((r) => r.source && (r.source.url = e.target.value))}
+                      onChange={(e) =>
+                        update((r) => {
+                          if (!r.source) return;
+                          r.source.url = e.target.value;
+                          // Een andere link is een ander product.
+                          delete r.lastCheck;
+                          clearConfirmation(r);
+                        })
+                      }
                     />
                     {row.source.url?.startsWith('http') && (
                       <a
@@ -610,21 +632,68 @@ function CostRowFields({ api, section, row }: { api: EditorApi; section: CostSec
               {(row.source?.type === 'collectgo' || row.source?.type === 'webshop') && (
                 <ShopCheck api={api} row={row} />
               )}
-              {(row.source?.type === 'webshop' || row.source?.type === 'collectgo') && (
-                <Field label={nl ? 'Prijs bevestigd' : 'Price confirmed'} wide>
+              {!row.source && fixed && (
+                <div className="vtk-bud-explain">
+                  {fixed.exact
+                    ? nl
+                      ? `Dit is een vaste prijs (${fixed.name}${fixed.note ? `, ${fixed.note}` : ''}): daar hoeft geen bron bij.`
+                      : `This is a fixed price (${fixed.name}); it needs no source.`
+                    : nl
+                      ? `De vaste prijs voor ${fixed.name} is ${money(fixed.price)}. Deze regel rekent met een ander bedrag.`
+                      : `The fixed price for ${fixed.name} is ${money(fixed.price, false)}. This row uses another amount.`}
+                </div>
+              )}
+              {!(fixed?.exact && !row.source) && (
+                <Field
+                  label={nl ? 'Zelf nagekeken' : 'Checked by hand'}
+                  hint={
+                    nl
+                      ? 'Voor een prijs die de site niet zelf kan nakijken: een winkel die ze niet kent, of een prijs zonder link. Wijzigt de prijs of de link, dan vervalt dit.'
+                      : 'For a price the site cannot check itself. It lapses when the price or the link changes.'
+                  }
+                  wide
+                >
                   <div className="vtk-bud-inline">
                     <span className="vtk-bud-static">
-                      {row.checkedAt ? shortDate(row.checkedAt, nl) : nl ? 'Nog niet' : 'Not yet'}
+                      {row.checkedAt
+                        ? nl
+                          ? `Door ${row.checkedBy || 'iemand'} op ${row.checkedAt.length > 10 ? when(row.checkedAt, nl) : shortDate(row.checkedAt, nl)}`
+                          : `By ${row.checkedBy || 'someone'} on ${row.checkedAt.length > 10 ? when(row.checkedAt, nl) : shortDate(row.checkedAt, nl)}`
+                        : nl
+                          ? 'Nog niet'
+                          : 'Not yet'}
                     </span>
                     <button
                       type="button"
                       className="vtk-bud-link"
-                      onClick={() => update((r) => (r.checkedAt = todayIso()))}
+                      onClick={() => api.confirmPrice(row.id, !row.checkedAt)}
                     >
-                      {nl ? 'Prijs klopt, vandaag nagekeken' : 'Price is correct, checked today'}
+                      {row.checkedAt
+                        ? nl
+                          ? 'Intrekken'
+                          : 'Undo'
+                        : nl
+                          ? 'Ik keek de prijs na, ze klopt'
+                          : 'I checked the price, it is correct'}
                     </button>
                   </div>
                 </Field>
+              )}
+              {!row.source && !fixed?.exact && api.rememberFixed && row.name.trim() && (
+                <div className="vtk-bud-explain">
+                  <span>
+                    {nl
+                      ? `Ligt deze prijs vast (huur, een vat, licht en geluid)? Onthoud ze, dan vraagt geen enkel budget er nog een bron voor${content.info.location.trim() ? `; ze geldt dan voor ${content.info.location.trim()}` : ''}.`
+                      : 'Is this price fixed? Remember it and no budget asks for a source again.'}
+                  </span>
+                  <span className="vtk-bud-inline">
+                    <button type="button" className="vtk-bud-link" onClick={() => api.rememberFixed?.(row.id)}>
+                      {nl
+                        ? `${money(priceOf(content, ctx, row))} onthouden als vaste prijs`
+                        : 'Remember as a fixed price'}
+                    </button>
+                  </span>
+                </div>
               )}
             </>
           )}

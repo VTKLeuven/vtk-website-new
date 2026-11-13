@@ -44,9 +44,10 @@ const costRow = z.object({
   flesserke: count.nullable().optional(),
   checkedAt: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .regex(/^\d{4}-\d{2}-\d{2}(T[\d:.]{5,12}Z)?$/)
     .nullable()
     .optional(),
+  checkedBy: text(120).nullable().optional(),
   note: text(1000).optional(),
   service: z.boolean().optional(),
   lastCheck: z
@@ -58,6 +59,7 @@ const costRow = z.object({
       reason: text(300).optional(),
       basis: z.enum(['incl', 'excl']).optional(),
       shop: text(40).optional(),
+      since: z.string().max(40).optional(),
     })
     .nullable()
     .optional(),
@@ -125,6 +127,7 @@ export const budgetContentSchema = z.object({
     .nullable()
     .optional(),
   potPart: z.boolean().optional(),
+  pricesAt: z.string().max(40).nullable().optional(),
   vat: z.object({ rate: z.number().min(0).max(1), reason: text(500) }).nullable(),
   allocation: z
     .array(z.object({ org: text(80), share }))
@@ -170,6 +173,10 @@ export const budgetSettingsSchema = z.object({
   flesserkeCounts: z.boolean(),
   sangriaFallback: money,
   locations: z.array(location).max(100),
+  fixedPrices: z
+    .array(z.object({ id, name: text(120).min(1), price: money, location: text(80), note: text(300) }))
+    .max(300)
+    .default([]),
   // Ontbreekt in instellingen van voor de proef: dan doet niemand buiten Groep 5 mee.
   pilotPostKeys: z.array(z.string().max(60)).max(200).default([]),
   collectGoLive: z.boolean().default(true),

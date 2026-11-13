@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@vtk/db';
 import { logAudit } from '@/lib/audit';
-import { requirePermission, requireSession } from '@/lib/session';
+import { getCurrentSession, requirePermission, requireSession } from '@/lib/session';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
 import { currentWorkingYear } from '@/lib/workingYear';
 import { overviewOf, toCents } from '@/lib/bo/budget/calc';
@@ -29,11 +29,26 @@ import { parseDocumentName } from '@/lib/bo/names';
 import { resolvePostKeys } from '@/lib/bo/posts';
 import { downloadSpreadsheet } from '@/lib/google/client';
 import { getGoogleConfig } from '@/lib/google/config';
-import type { Lookup } from '@/lib/bo/budget/prices';
+import {
+  applyCheck,
+  checkFromLookup,
+  pricesStillChecked,
+  rowsToCheck,
+  stampConfirmations,
+  type Lookup,
+} from '@/lib/bo/budget/prices';
+import { allCostRows } from '@/lib/bo/budget/calc';
+import { newId } from '@/lib/bo/budget/templates';
 import { lookupShopProduct, priceBrowserStatus } from '@/lib/priceCheck/fetch';
 import { parseShopUrl, shopOfUrl, SHOPS } from '@/lib/priceCheck/shops';
 import { templateContent } from '@/lib/bo/budget/templates';
-import { BUDGET_TEMPLATES, type BudgetContent, type BudgetTemplate } from '@/lib/bo/budget/types';
+import {
+  BUDGET_TEMPLATES,
+  type BudgetContent,
+  type BudgetSettings,
+  type BudgetTemplate,
+  type PriceCheck,
+} from '@/lib/bo/budget/types';
 
 /*
  * Acties voor budgetten op de site. Elke actie kijkt opnieuw na of de
@@ -132,6 +147,9 @@ export async function saveBoBudgetAction(input: {
   if (!parsed) return saveError('INVALID_CONTENT');
   // Elke berekening opnieuw uitgerekend: wat bewaard wordt, klopt met de formules.
   const content = normalizeContent(parsed);
+  // Wie een prijs met de hand bevestigde, zegt de server en niet de browser.
+  const who = access.via === 'link' ? 'iemand met de deellink' : ((await getCurrentSession())?.user.name ?? 'onbekend');
+  stampConfirmations(parseBudgetContent(budget.content), content, who);
 
   const settings = await getBudgetSettings();
   // Enkel bewaren als niemand er intussen aan kwam: de voorwaarde op updatedAt
@@ -161,7 +179,7 @@ export async function submitBoBudgetAction(input: {
   const nl = input.locale !== 'en';
   const budget = await prisma.boBudget.findUnique({ where: { id: input.id } });
   if (!budget) return saveError('NOT_FOUND');
-  if (!canEditBudget(session, budget.postKey)) return saveError('NOT_YOUR_POST');
+  if (!canEditBudget(session, budget.postKey, await getBudgetSettings())) return saveError('NOT_YOUR_POST');
   if (budget.status !== 'DRAFT') return saveError('ALREADY_SUBMITTED');
   if (budget.updatedAt.toISOString() !== input.version) return saveError('CHANGED_ELSEWHERE');
   if (!budget.targetDate) return saveError('TARGET_REQUIRED');
@@ -191,7 +209,7 @@ export async function reopenBoBudgetAction(input: { id: string }): Promise<Budge
   const session = await requireSession();
   const budget = await prisma.boBudget.findUnique({ where: { id: input.id } });
   if (!budget) return saveError('NOT_FOUND');
-  if (!canEditBudget(session, budget.postKey)) return saveError('NOT_YOUR_POST');
+  if (!canEditBudget(session, budget.postKey, await getBudgetSettings())) return saveError('NOT_YOUR_POST');
   const updated = await prisma.boBudget.update({
     where: { id: budget.id },
     data: { status: 'DRAFT', submittedAt: null },
@@ -217,7 +235,7 @@ export async function deleteBoBudgetAction(formData: FormData): Promise<SaveStat
   const nl = formData.get('locale') !== 'en';
   const budget = await prisma.boBudget.findUnique({ where: { id } });
   if (!budget) return saveError('NOT_FOUND');
-  if (!canEditBudget(session, budget.postKey)) return saveError('NOT_YOUR_POST');
+  if (!canEditBudget(session, budget.postKey, await getBudgetSettings())) return saveError('NOT_YOUR_POST');
   await prisma.boBudget.delete({ where: { id } });
   await logAudit({ action: 'delete', entity: 'boBudget', entityId: id, target: budget.title });
   revalidateBudgets();
@@ -256,35 +274,26 @@ export type PriceCheckResponse =
   { ok: true; results: { rowId: string; lookup: Lookup }[] } | { ok: false; code: string };
 
 /**
- * De prijzen opvragen bij de webshops (`lib/priceCheck/shops.ts`) voor de
- * regels die de editor meestuurt. Haalt enkel productpagina's van de gekende
- * winkels op (de link wordt eerst herkend, nooit zomaar gevolgd), hoogstens 60
- * per keer en drie tegelijk. Verandert niets aan het budget: de editor zet de
- * uitkomst in de regels en bewaart dan zoals bij elke wijziging.
+ * De productpagina's van de gekende winkels opvragen (de link wordt eerst
+ * herkend, nooit zomaar gevolgd), hoogstens 60 per keer en drie tegelijk. Elke
+ * pagina één keer, ook als twee regels hetzelfde product hebben; wat de site
+ * de voorbije vier uur al vroeg, komt uit haar geheugen (`lib/priceCheck/fetch.ts`).
  */
-export async function checkPricesAction(input: {
-  id: string;
-  rows: { rowId: string; url: string }[];
-  token?: string | null;
-}): Promise<PriceCheckResponse> {
-  const budget = await prisma.boBudget.findUnique({ where: { id: String(input.id) } });
-  if (!budget) return { ok: false, code: 'NOT_FOUND' };
-  const access = await budgetAccess(budget, input.token);
-  if (access?.level !== 'edit') return { ok: false, code: 'NOT_YOUR_POST' };
-  const settings = await getBudgetSettings();
-  if (!settings.collectGoLive) return { ok: false, code: 'DISABLED' };
-
-  const wanted = (Array.isArray(input.rows) ? input.rows : []).slice(0, 60).flatMap((row) => {
+async function lookupRows(
+  rows: { rowId: string; url: string }[],
+  settings: BudgetSettings,
+  fresh = false
+): Promise<{ rowId: string; lookup: Lookup }[]> {
+  const wanted = rows.slice(0, 60).flatMap((row) => {
     const ref = parseShopUrl(String(row?.url ?? ''));
     return ref ? [{ rowId: String(row.rowId).slice(0, 40), ref, page: ref.page }] : [];
   });
-  // Elke pagina één keer, ook als twee regels hetzelfde product hebben.
   const pages = [...new Map(wanted.map((w) => [w.page, w.ref])).entries()];
   const found = new Map<string, Lookup>();
   for (let i = 0; i < pages.length; i += 3) {
     const batch = pages.slice(i, i + 3);
     const lookups = await Promise.all(
-      batch.map(([, ref]) => lookupShopProduct(ref, { colruytPostcode: settings.colruytPostcode }))
+      batch.map(([, ref]) => lookupShopProduct(ref, { fresh, colruytPostcode: settings.colruytPostcode }))
     );
     batch.forEach(([page, ref], j) => {
       const lookup = lookups[j];
@@ -294,7 +303,114 @@ export async function checkPricesAction(input: {
       );
     });
   }
-  return { ok: true, results: wanted.map((w) => ({ rowId: w.rowId, lookup: found.get(w.page)! })) };
+  return wanted.map((w) => ({ rowId: w.rowId, lookup: found.get(w.page)! }));
+}
+
+/**
+ * De prijs van de regels die de editor meestuurt nu opvragen: na een nieuwe
+ * link, of met "Nu nakijken" bij een regel (dan vers bij de winkel, niet uit
+ * het geheugen). Verandert niets aan het budget: de editor zet de uitkomst in
+ * de regels en bewaart dan zoals bij elke wijziging.
+ */
+export async function checkPricesAction(input: {
+  id: string;
+  rows: { rowId: string; url: string }[];
+  token?: string | null;
+  fresh?: boolean;
+}): Promise<PriceCheckResponse> {
+  const budget = await prisma.boBudget.findUnique({ where: { id: String(input.id) } });
+  if (!budget) return { ok: false, code: 'NOT_FOUND' };
+  const access = await budgetAccess(budget, input.token);
+  if (access?.level !== 'edit') return { ok: false, code: 'NOT_YOUR_POST' };
+  const settings = await getBudgetSettings();
+  if (!settings.collectGoLive) return { ok: false, code: 'DISABLED' };
+  const rows = Array.isArray(input.rows) ? input.rows : [];
+  // Vers bij de winkel enkel voor één regel: een hele lijst hoeft dat niet.
+  return { ok: true, results: await lookupRows(rows, settings, !!input.fresh && rows.length === 1) };
+}
+
+export type PriceRefreshResponse =
+  { ok: true; at: string | null; checks: Record<string, PriceCheck> } | { ok: false; code: 'NOT_FOUND' | 'DISABLED' };
+
+/**
+ * De prijzen van een budget vanzelf nakijken wanneer iemand het opent, ook wie
+ * enkel meekijkt. Hoogstens één ronde per vier uur per budget, en de winkel
+ * hoort elk product hoogstens één keer per vier uur, hoeveel mensen er ook
+ * tegelijk kijken. Na het BO waarvoor het budget was (of eens ingediend) niet
+ * meer: dan ligt het vast.
+ *
+ * De uitkomst komt in het budget zelf, zonder `updatedAt` te wijzigen: een
+ * editor die openstaat, blijft gewoon bewaren.
+ */
+export async function refreshPricesAction(input: { id: string; token?: string | null }): Promise<PriceRefreshResponse> {
+  const budget = await prisma.boBudget.findUnique({ where: { id: String(input.id) } });
+  if (!budget || !(await budgetAccess(budget, input.token))) return { ok: false, code: 'NOT_FOUND' };
+  const settings = await getBudgetSettings();
+  if (!settings.collectGoLive) return { ok: false, code: 'DISABLED' };
+  const content = parseBudgetContent(budget.content);
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Brussels' }).format(new Date());
+  const open = pricesStillChecked(
+    { status: budget.status, targetDate: budget.targetDate?.toISOString().slice(0, 10) ?? null },
+    today
+  );
+  if (!content || !open) return { ok: true, at: null, checks: {} };
+  const rows = rowsToCheck(content, Date.now());
+  if (rows.length === 0) return { ok: true, at: null, checks: {} };
+
+  const results = await lookupRows(rows, settings);
+  const at = new Date().toISOString();
+  const checks: Record<string, PriceCheck> = {};
+  for (const row of allCostRows(content)) {
+    const hit = results.find((r) => r.rowId === row.id);
+    if (!hit) continue;
+    applyCheck(row, checkFromLookup(row, hit.lookup, at));
+    if (row.lastCheck) checks[row.id] = row.lastCheck;
+  }
+  // Een volledige ronde zet de klok; een losse nieuwe regel niet.
+  if (rows.length === rowsToCheck({ ...content, pricesAt: null }, Date.now()).length) content.pricesAt = at;
+  // Enkel als niemand intussen bewaarde: anders zet de editor van die persoon de uitkomst er zelf in.
+  await prisma.boBudget.updateMany({
+    where: { id: budget.id, updatedAt: budget.updatedAt },
+    data: { content: content as unknown as Prisma.InputJsonValue, updatedAt: budget.updatedAt },
+  });
+  return { ok: true, at: content.pricesAt ?? null, checks };
+}
+
+/**
+ * Een vaste prijs onthouden vanuit een budget: de huur van een zaal, een vat.
+ * Daarna vraagt geen enkel budget er nog een bron voor. Enkel Groep 5.
+ */
+export async function rememberFixedPriceAction(input: {
+  name: string;
+  price: number;
+  location: string;
+}): Promise<SaveState> {
+  await requirePermission('bestuursorgaan.manage');
+  const name = String(input?.name ?? '')
+    .trim()
+    .slice(0, 120);
+  const price = Number(input?.price);
+  const location = String(input?.location ?? '')
+    .trim()
+    .slice(0, 80);
+  if (!name || !Number.isFinite(price) || Math.abs(price) > 10_000_000) return saveError('INVALID_SETTINGS');
+  const settings = await getBudgetSettings();
+  const same = (f: { name: string; location: string }) =>
+    f.name.trim().toLowerCase() === name.toLowerCase() && f.location.trim().toLowerCase() === location.toLowerCase();
+  if (settings.fixedPrices.length >= 300 && !settings.fixedPrices.some(same)) return saveError('TOO_MANY');
+  await saveBudgetSettings({
+    ...settings,
+    fixedPrices: [...settings.fixedPrices.filter((f) => !same(f)), { id: newId(), name, price, location, note: '' }],
+  });
+  await logAudit({
+    action: 'update',
+    entity: 'boSettings',
+    target: 'Vaste prijzen',
+    summary: `${name}${location ? ` (${location})` : ''}: ${price.toFixed(2)}`,
+  });
+  revalidateBudgets();
+  revalidatePath('/[locale]/admin/bestuursorgaan/instellingen', 'page');
+  return saveOk();
 }
 
 export type ShareLinks = { viewToken: string | null; editToken: string | null };
@@ -313,7 +429,7 @@ export async function setBudgetShareAction(input: {
   const session = await requireSession();
   const budget = await prisma.boBudget.findUnique({ where: { id: String(input.id) } });
   if (!budget) return saveError('NOT_FOUND');
-  if (!canEditBudget(session, budget.postKey)) return saveError('NOT_YOUR_POST');
+  if (!canEditBudget(session, budget.postKey, await getBudgetSettings())) return saveError('NOT_YOUR_POST');
   const kind = input.kind === 'edit' ? 'edit' : 'view';
   const token = input.on ? newShareToken() : null;
   // `updatedAt` blijft wat het was: de editor die openstaat, mag blijven bewaren.

@@ -49,20 +49,21 @@ export function canManageBudgets(session: SessionPayload): boolean {
   return hasPermission(session, 'bestuursorgaan.manage');
 }
 
-export function canEditBudget(session: SessionPayload, postKey: string): boolean {
-  return canManageBudgets(session) || ownBudgetPostKeys(session).includes(postKey);
-}
-
 /**
- * De posten waarvoor dit lid een nieuw budget op de site mag starten. Het is
- * een proef naast de rekenbladen in Drive: Groep 5 mag het voor haar eigen
- * posten, andere posten pas wanneer Groep 5 ze aanvinkt bij de instellingen.
- * Een budget dat al bestaat, blijft voor de post te openen (`canEditBudget`).
+ * De posten waarvan dit lid de budgetten op de site ziet en wijzigt. Het is
+ * een proef naast de rekenbladen in Drive: Groep 5 ziet alles, een andere post
+ * pas wanneer Groep 5 ze aanvinkt bij de instellingen. Voor een post die niet
+ * meedoet, bestaat er op de site niets: geen lijst, geen budget dat Groep 5
+ * voor haar uit een rekenblad overnam, geen download.
  */
 export function siteBudgetPostKeys(session: SessionPayload, settings: BudgetSettings): string[] {
   const own = ownBudgetPostKeys(session);
   if (canManageBudgets(session)) return own;
   return own.filter((key) => settings.pilotPostKeys.includes(key));
+}
+
+export function canEditBudget(session: SessionPayload, postKey: string, settings: BudgetSettings): boolean {
+  return canManageBudgets(session) || siteBudgetPostKeys(session, settings).includes(postKey);
 }
 
 /** De naam van een post zoals een lid ze kent, ook voor een vak van Groep 5. */
@@ -214,7 +215,8 @@ export async function budgetAccess(
     return null;
   }
   const session = await getCurrentSession();
-  if (session && canEditBudget(session, budget.postKey)) return { level: 'edit', via: 'member' };
+  if (session && canEditBudget(session, budget.postKey, await getBudgetSettings()))
+    return { level: 'edit', via: 'member' };
   return null;
 }
 

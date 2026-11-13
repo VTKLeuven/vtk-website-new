@@ -36,10 +36,10 @@ export default async function BudgetPage({
   const base = nl ? '' : '/en';
   const session = await requireSession(`${base}/inloggen?next=${base}/admin/bestuursorgaan/mijn/${id}`);
 
-  const budget = await loadBudget(id);
-  if (!budget || !canEditBudget(session, budget.postKey)) notFound();
-  const [settings, names, begroting, { weergave }] = await Promise.all([
-    getBudgetSettings(),
+  const [budget, settings] = await Promise.all([loadBudget(id), getBudgetSettings()]);
+  // Ook de eigen post ziet het pas als ze meedoet aan de proef (`canEditBudget`).
+  if (!budget || !canEditBudget(session, budget.postKey, settings)) notFound();
+  const [names, begroting, { weergave }] = await Promise.all([
     postNames([budget.postKey], nl),
     getBegroting(),
     searchParams,
@@ -67,6 +67,8 @@ export default async function BudgetPage({
       pot={pot}
       begroting={begroting ? { sheets: begroting.sheets, suggested: sheetForPost(begroting, postName) } : null}
       share={{ viewToken: budget.viewToken, editToken: budget.editToken, origin: siteUrl().replace(/\/$/, '') }}
+      viewerName={session.user.name}
+      canManage={canManageBudgets(session)}
       initialView={weergave === 'nakijken' ? 'nakijken' : 'maken'}
     />
   );

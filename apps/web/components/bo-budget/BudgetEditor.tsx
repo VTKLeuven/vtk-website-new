@@ -10,14 +10,18 @@ import { UNSENT, unsentGuard } from '@/components/ui/unsentGuard';
 import {
   checkPricesAction,
   deleteBoBudgetAction,
+  refreshPricesAction,
+  rememberFixedPriceAction,
   reopenBoBudgetAction,
   saveBoBudgetAction,
 } from '@/app/actions/boBudgets';
 import {
   allCostRows,
   audienceCount,
+  findCostRow,
   hasResult,
   overviewOf,
+  priceOf,
   resultOverviewOf,
   type CalcContext,
 } from '@/lib/bo/budget/calc';
@@ -27,10 +31,11 @@ import type { BegrotingSheet } from '@/lib/bo/budget/begroting';
 import type { Pot } from '@/lib/bo/budget/pot';
 import {
   acceptCheckedPrice,
+  applyCheck,
   checkableRows,
   checkFromLookup,
-  isUncheckableShopLink,
-  shopRows,
+  clearConfirmation,
+  confirmRow,
 } from '@/lib/bo/budget/prices';
 import { newId } from '@/lib/bo/budget/templates';
 import {
@@ -42,7 +47,8 @@ import {
   type Section,
 } from '@/lib/bo/budget/types';
 import type { EditorApi } from './editorApi';
-import { money, percent, shortDate, signedMoney, todayIso } from './format';
+import { money, percent, shortDate, todayIso } from './format';
+import { Money } from './Money';
 import { NumberField } from './NumberField';
 import { BudgetReview } from './BudgetReview';
 import { RowPanel } from './RowPanel';
@@ -99,6 +105,16 @@ function errorText(code: string, nl: boolean): string {
   return pair ? pair[nl ? 0 : 1] : nl ? 'Bewaren lukte niet. Probeer het opnieuw.' : 'Saving failed. Try again.';
 }
 
+function stamp(iso: string, nl: boolean) {
+  return new Date(iso).toLocaleString(nl ? 'nl-BE' : 'en-GB', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Europe/Brussels',
+  });
+}
+
 function time(d: Date | undefined, nl: boolean) {
   return d ? d.toLocaleTimeString(nl ? 'nl-BE' : 'en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
 }
@@ -115,6 +131,8 @@ export function BudgetEditor({
   begroting = null,
   share = null,
   initialView = 'maken',
+  viewerName = '',
+  canManage = false,
 }: {
   budget: EditorBudget;
   postName: string;
@@ -132,6 +150,10 @@ export function BudgetEditor({
   /** De deellinks van dit budget; null voor wie ze niet mag beheren. */
   share?: { viewToken: string | null; editToken: string | null; origin: string } | null;
   initialView?: 'maken' | 'nakijken';
+  /** Wie een prijs met de hand bevestigt; de server zet de echte naam bij het bewaren. */
+  viewerName?: string;
+  /** Groep 5: mag een vaste prijs onthouden vanuit een budget. */
+  canManage?: boolean;
 }) {
   const nl = locale === 'nl';
   const showToast = useToast();
@@ -143,7 +165,6 @@ export function BudgetEditor({
   const [panel, setPanel] = useState<string | null>(null);
   const [focusRowId, setFocusRowId] = useState<string | null>(null);
   const [checking, setChecking] = useState<string[] | null>(null);
-  const [priceSummary, setPriceSummary] = useState<string | null>(null);
   const readOnly = status !== 'DRAFT';
   const [view, setView] = useState<'maken' | 'nakijken'>(initialView);
   const [sharing, setSharing] = useState(false);
@@ -311,14 +332,53 @@ export function BudgetEditor({
     locationNames: settings.locations.map((l) => l.name),
     liveCollectGo: settings.collectGoLive && !readOnly,
     checkingRows: checking,
-    checkPrices: (rowIds?: string[]) => void checkPrices(rowIds),
+    checkPrices: (rowIds?: string[]) => void checkPrices(rowIds, true),
     resultOn,
     acceptPrice: (rowId: string) =>
       mutate((d) => {
         for (const s of d.sections)
-          if (s.type !== 'income') for (const r of s.rows) if (r.id === rowId) acceptCheckedPrice(r, todayIso());
+          if (s.type !== 'income') for (const r of s.rows) if (r.id === rowId) acceptCheckedPrice(r);
       }),
+    confirmPrice: (rowId: string, on: boolean) =>
+      mutate((d) => {
+        const found = findCostRow(d, rowId);
+        if (!found) return;
+        if (on) confirmRow(found.row, viewerName || (nl ? 'iemand met de deellink' : 'someone with the link'));
+        else clearConfirmation(found.row);
+      }),
+    rememberFixed: canManage && !token ? (rowId: string) => void rememberFixed(rowId) : null,
   };
+
+  /** Groep 5 onthoudt de prijs van deze regel als vaste prijs: geen enkel budget vraagt er nog een bron voor. */
+  async function rememberFixed(rowId: string) {
+    const found = findCostRow(content, rowId);
+    if (!found || !found.row.name.trim()) return;
+    const price = priceOf(content, ctx, found.row);
+    const result = await unsentGuard.run(() =>
+      rememberFixedPriceAction({ name: found.row.name, price, location: content.info.location.trim() })
+    );
+    if (result === UNSENT) return;
+    if (result.status === 'success')
+      showToast({
+        message: nl
+          ? `"${found.row.name}" staat bij de vaste prijzen${content.info.location.trim() ? ` van ${content.info.location.trim()}` : ''}. Geen budget vraagt er nog een bron voor.`
+          : `"${found.row.name}" is now a fixed price.`,
+        variant: 'success',
+      });
+    else if (result.status === 'error')
+      showToast({
+        message:
+          result.code === 'TOO_MANY'
+            ? nl
+              ? 'Er staan al 300 vaste prijzen. Ruim eerst op bij de instellingen.'
+              : 'There are already 300 fixed prices.'
+            : nl
+              ? 'De vaste prijs bewaren lukte niet. Heeft de regel een naam en een geldige prijs?'
+              : 'Saving the fixed price failed.',
+        variant: 'error',
+        duration: 0,
+      });
+  }
 
   function goTo(check: Check) {
     if (check.rowId) {
@@ -346,68 +406,109 @@ export function BudgetEditor({
     if (ok) link.click();
   }
 
-  /** Vraagt de prijzen op bij de webshops en zet het antwoord in de regels. */
-  async function checkPrices(rowIds?: string[]) {
+  /**
+   * Vraagt de prijs van regels op bij de webshop en zet het antwoord erin.
+   * Vanzelf na een nieuwe of gewijzigde link (stil), of met "Nu nakijken" bij
+   * een regel (dan vers bij de winkel, met een melding).
+   */
+  async function checkPrices(rowIds?: string[], manual = false) {
     const rows = checkableRows(content).filter((r) => !rowIds || rowIds.includes(r.rowId));
     if (rows.length === 0) return;
     setChecking(rows.map((r) => r.rowId));
-    const result = await unsentGuard.run(() => checkPricesAction({ id: budget.id, rows, token }));
+    const result = await unsentGuard.run(() => checkPricesAction({ id: budget.id, rows, token, fresh: manual }));
     setChecking(null);
     if (result === UNSENT) return;
     if (!result.ok) {
-      showToast({
-        message:
-          result.code === 'DISABLED'
-            ? nl
-              ? 'Prijzen live nakijken staat uit bij de instellingen.'
-              : 'Live price checks are switched off in the settings.'
-            : errorText(result.code, nl),
-        variant: 'error',
-        duration: 0,
-      });
+      if (manual)
+        showToast({
+          message:
+            result.code === 'DISABLED'
+              ? nl
+                ? 'Prijzen nakijken staat uit bij de instellingen.'
+                : 'Price checks are switched off in the settings.'
+              : errorText(result.code, nl),
+          variant: 'error',
+          duration: 0,
+        });
       return;
     }
     const at = new Date().toISOString();
-    // Eerst uitrekenen, dan pas in het budget zetten: de update van React loopt
-    // pas bij de volgende render, en de samenvatting hieronder heeft ze nu nodig.
     const checks = new Map<string, PriceCheck>();
     for (const r of allCostRows(content)) {
       const hit = result.results.find((x) => x.rowId === r.id);
       if (hit) checks.set(r.id, checkFromLookup(r, hit.lookup, at));
     }
-    const counts = { ok: 0, changed: 0, notfound: 0, failed: 0 };
-    for (const c of checks.values()) counts[c.status] += 1;
     mutate((d) => {
-      for (const s of d.sections) {
-        if (s.type === 'income') continue;
-        for (const r of s.rows) {
-          const check = checks.get(r.id);
-          if (!check) continue;
-          r.lastCheck = check;
-          if (check.status === 'ok') r.checkedAt = at.slice(0, 10);
-        }
+      for (const r of allCostRows(d)) {
+        const check = checks.get(r.id);
+        if (check) applyCheck(r, check);
       }
     });
-    const parts = [
-      counts.ok ? (nl ? `${counts.ok} ${counts.ok === 1 ? 'klopt' : 'kloppen'}` : `${counts.ok} correct`) : null,
-      counts.changed
-        ? nl
-          ? `${counts.changed} ${counts.changed === 1 ? 'is gewijzigd' : 'zijn gewijzigd'}`
-          : `${counts.changed} changed`
-        : null,
-      counts.notfound ? (nl ? `${counts.notfound} niet meer te vinden` : `${counts.notfound} not found`) : null,
-      counts.failed ? (nl ? `${counts.failed} zonder antwoord` : `${counts.failed} without an answer`) : null,
-    ].filter(Boolean);
-    const summary = nl ? `${parts.join(', ')}.` : `${parts.join(', ')}.`;
-    setPriceSummary(summary);
-    const trouble = counts.changed + counts.notfound + counts.failed;
+    if (!manual) return;
+    const check = [...checks.values()][0];
+    if (!check) return;
     showToast({
-      message: nl
-        ? `Prijzen nagekeken: ${summary}${trouble ? ' Ze staan bij de controles.' : ''}`
-        : `Prices checked: ${summary}`,
-      variant: counts.failed && !counts.ok && !counts.changed ? 'warning' : 'success',
+      message:
+        check.status === 'ok'
+          ? nl
+            ? 'De prijs klopt.'
+            : 'The price is correct.'
+          : check.status === 'changed'
+            ? nl
+              ? 'De winkel vraagt een andere prijs. Je ziet ze bij de regel.'
+              : 'The shop asks a different price.'
+            : check.status === 'notfound'
+              ? nl
+                ? 'Dit product staat niet meer bij de winkel.'
+                : 'This product is no longer at the shop.'
+              : nl
+                ? `De winkel gaf geen prijs (${check.reason ?? 'geen antwoord'}).`
+                : 'The shop gave no price.',
+      variant: check.status === 'ok' ? 'success' : 'warning',
     });
   }
+
+  // De prijzen vanzelf nakijken bij het openen, in beide weergaven. De server
+  // houdt de klok bij (hoogstens om de vier uur per budget, en nooit meer eens
+  // het budget langs het BO ging); wat ze antwoordt, staat al in de databank,
+  // dus dit maakt de editor niet "gewijzigd".
+  const refreshed = useRef(false);
+  useEffect(() => {
+    if (refreshed.current) return;
+    refreshed.current = true;
+    void (async () => {
+      const result = await refreshPricesAction({ id: budget.id, token }).catch(() => null);
+      if (!result || !result.ok || Object.keys(result.checks).length === 0) return;
+      setContent((prev) => {
+        const next = structuredClone(prev);
+        for (const r of allCostRows(next)) if (result.checks[r.id]) r.lastCheck = result.checks[r.id];
+        if (result.at) next.pricesAt = result.at;
+        return next;
+      });
+    })();
+  }, [budget.id, token]);
+
+  // Een regel met een nieuwe of gewijzigde link naar een gekende winkel: meteen
+  // nakijken, zonder knop. Elke link één poging; de rest volgt de ronde van vier uur.
+  const tried = useRef(new Set<string>());
+  const pendingKey =
+    readOnly || !settings.collectGoLive
+      ? ''
+      : checkableRows(content)
+          .filter((r) => !allCostRows(content).find((x) => x.id === r.rowId)?.lastCheck)
+          .map((r) => `${r.rowId}|${r.url}`)
+          .filter((k) => !tried.current.has(k))
+          .join('\n');
+  useEffect(() => {
+    if (!pendingKey || checking) return;
+    const timer = window.setTimeout(() => {
+      const keys = pendingKey.split('\n');
+      keys.forEach((k) => tried.current.add(k));
+      void checkPrices(keys.map((k) => k.split('|')[0]));
+    }, 1200);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingKey, checking]);
 
   async function reopen() {
     const result = await unsentGuard.run(() => reopenBoBudgetAction({ id: budget.id }));
@@ -425,36 +526,26 @@ export function BudgetEditor({
       showToast({ message: errorText(result.code, nl), variant: 'error', duration: 0 });
   }
 
+  /**
+   * Een sectie erbij, onderaan, met een lege naam die meteen de focus krijgt:
+   * de post kiest zelf hoe ze heet (Drank, Decoratie, Sponsoring) en hoeveel er
+   * zijn. De soort bepaalt enkel hoe de regels rekenen.
+   */
   function addSection(type: Section['type']) {
     const id = newId();
     mutate((draft) => {
-      const name =
-        type === 'income'
-          ? nl
-            ? 'Inkomsten'
-            : 'Income'
-          : type === 'fixed'
-            ? nl
-              ? 'Vaste kosten'
-              : 'Fixed costs'
-            : nl
-              ? 'Variabele kosten'
-              : 'Variable costs';
       const section: Section =
         type === 'income'
-          ? { id, name, type, rows: [] }
+          ? { id, name: '', type, rows: [] }
           : type === 'variable'
-            ? { id, name, type, distribute: true, perPerson: 1, rows: [] }
-            : { id, name, type, rows: [] };
-      if (type === 'income') {
-        const firstCost = draft.sections.findIndex((s) => s.type !== 'income');
-        draft.sections.splice(firstCost < 0 ? draft.sections.length : firstCost, 0, section);
-      } else draft.sections.push(section);
+            ? { id, name: '', type, distribute: false, perPerson: 1, rows: [] }
+            : { id, name: '', type, rows: [] };
+      draft.sections.push(section);
     });
     window.setTimeout(() => {
       const el = document.querySelector<HTMLInputElement>(`#bud-sec-${id} .vtk-bud-sec-name`);
       el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      el?.select();
+      el?.focus({ preventScroll: true });
     }, 50);
   }
 
@@ -528,12 +619,14 @@ export function BudgetEditor({
           <dl className="vtk-bud-top-figs">
             <div>
               <dt>{nl ? 'Totaal' : 'Total'}</dt>
-              <dd className={overview.total < -0.004 ? 'neg' : ''}>{money(overview.total, nl)}</dd>
+              <dd className={overview.total < -0.004 ? 'neg' : ''}>
+                <Money value={overview.total} nl={nl} />
+              </dd>
             </div>
             <div>
               <dt>{nl ? 'Tegenover begroting' : 'Against plan'}</dt>
               <dd className={overview.diff == null ? '' : overview.diff < -0.004 ? 'neg' : 'pos'}>
-                {overview.diff == null ? '–' : signedMoney(overview.diff, nl)}
+                <Money signed value={overview.diff} nl={nl} />
               </dd>
             </div>
           </dl>
@@ -610,6 +703,28 @@ export function BudgetEditor({
           pot={pot}
           locale={locale}
           potHref={token ? undefined : (id) => `${locale === 'en' ? '/en' : ''}/admin/bestuursorgaan/mijn/${id}`}
+          actions={
+            readOnly
+              ? undefined
+              : {
+                  confirm: api.confirmPrice,
+                  accept: api.acceptPrice,
+                  setPrice: (rowId, value) =>
+                    mutate((d) => {
+                      const found = findCostRow(d, rowId);
+                      if (!found) return;
+                      const r = found.row;
+                      if (r.source?.type === 'locatie') r.override = value;
+                      else r.price = value;
+                      if (r.fx?.price) {
+                        delete r.fx.price;
+                        if (Object.keys(r.fx).length === 0) delete r.fx;
+                      }
+                      // Een bevestiging gold voor de vorige prijs.
+                      clearConfirmation(r);
+                    }),
+                }
+          }
         />
       ) : (
         <>
@@ -668,6 +783,38 @@ export function BudgetEditor({
                 </span>
               </dd>
             </div>
+            {checkableRows(content).length > 0 && (
+              <div>
+                <dt>{nl ? 'Prijzen bij de webshops' : 'Prices at the web shops'}</dt>
+                <dd className="vtk-bud-tobo">
+                  <span>
+                    {!settings.collectGoLive
+                      ? nl
+                        ? 'Nakijken staat uit bij de instellingen.'
+                        : 'Checks are switched off in the settings.'
+                      : checking
+                        ? nl
+                          ? `Bezig met ${checking.length} ${checking.length === 1 ? 'prijs' : 'prijzen'}…`
+                          : 'Checking…'
+                        : readOnly
+                          ? nl
+                            ? 'Liggen vast sinds het indienen.'
+                            : 'Fixed since it was submitted.'
+                          : targetDate && targetDate < todayIso()
+                            ? nl
+                              ? 'Liggen vast: het BO waarvoor dit budget was, is voorbij.'
+                              : 'Fixed: the board meeting this budget was for has passed.'
+                            : content.pricesAt
+                              ? nl
+                                ? `Vanzelf nagekeken, laatst op ${stamp(content.pricesAt, nl)}. Dat gebeurt om de vier uur, tot het BO.`
+                                : `Checked automatically, last on ${stamp(content.pricesAt, nl)}.`
+                              : nl
+                                ? 'De site kijkt ze vanzelf na, om de vier uur tot het BO.'
+                                : 'The site checks them automatically, every four hours.'}
+                  </span>
+                </dd>
+              </div>
+            )}
           </dl>
 
           {content.source && (
@@ -734,10 +881,10 @@ export function BudgetEditor({
                         <a href={`#bud-sec-${l.id}`}>{l.name || '…'}</a>
                       </dt>
                       <dd>
-                        {money(l.amount, nl)}
+                        <Money value={l.amount} nl={nl} />
                         {resultOverview && (
                           <span className="vtk-bud-ov-res">
-                            {money(resultOverview.lines.find((x) => x.id === l.id)?.amount ?? 0, nl)}
+                            <Money value={resultOverview.lines.find((x) => x.id === l.id)?.amount ?? 0} nl={nl} />
                           </span>
                         )}
                       </dd>
@@ -746,8 +893,8 @@ export function BudgetEditor({
                   <div className="sum">
                     <dt>{nl ? 'Inkomsten' : 'Income'}</dt>
                     <dd>
-                      {money(overview.income, nl)}
-                      {resultOverview && <span className="vtk-bud-ov-res">{money(resultOverview.income, nl)}</span>}
+                      <Money value={overview.income} nl={nl} />
+                      {resultOverview && <Money className="vtk-bud-ov-res" value={resultOverview.income} nl={nl} />}
                     </dd>
                   </div>
                 </dl>
@@ -762,10 +909,10 @@ export function BudgetEditor({
                         <a href={`#bud-sec-${l.id}`}>{l.name || '…'}</a>
                       </dt>
                       <dd>
-                        {money(l.amount, nl)}
+                        <Money cost value={l.amount} nl={nl} />
                         {resultOverview && (
                           <span className="vtk-bud-ov-res">
-                            {money(resultOverview.lines.find((x) => x.id === l.id)?.amount ?? 0, nl)}
+                            <Money cost value={resultOverview.lines.find((x) => x.id === l.id)?.amount ?? 0} nl={nl} />
                           </span>
                         )}
                       </dd>
@@ -774,8 +921,10 @@ export function BudgetEditor({
                   <div className="sum">
                     <dt>{nl ? 'Uitgaven' : 'Expenses'}</dt>
                     <dd>
-                      {money(overview.expense, nl)}
-                      {resultOverview && <span className="vtk-bud-ov-res">{money(resultOverview.expense, nl)}</span>}
+                      <Money cost value={overview.expense} nl={nl} />
+                      {resultOverview && (
+                        <Money className="vtk-bud-ov-res" cost value={resultOverview.expense} nl={nl} />
+                      )}
                     </dd>
                   </div>
                 </dl>
@@ -784,7 +933,9 @@ export function BudgetEditor({
             <dl className="vtk-bud-ov-total">
               <div>
                 <dt>{nl ? 'Totaal' : 'Total'}</dt>
-                <dd className={overview.total < -0.004 ? 'neg' : ''}>{money(overview.total, nl)}</dd>
+                <dd className={overview.total < -0.004 ? 'neg' : ''}>
+                  <Money value={overview.total} nl={nl} />
+                </dd>
               </div>
               <div id="bud-field-begroting">
                 <dt>
@@ -806,7 +957,7 @@ export function BudgetEditor({
               <div>
                 <dt>{nl ? 'Verschil met begroting' : 'Difference with plan'}</dt>
                 <dd className={overview.diff == null ? '' : overview.diff < -0.004 ? 'neg' : 'pos'}>
-                  {signedMoney(overview.diff, nl)}
+                  <Money signed value={overview.diff} nl={nl} />
                 </dd>
               </div>
             </dl>
@@ -861,25 +1012,25 @@ export function BudgetEditor({
                         {m.targetDate && <span className="vtk-bud-muted"> · BO {shortDate(m.targetDate, nl)}</span>}
                       </dt>
                       <dd>
-                        {money(m.total, nl)}
-                        {m.result != null && <span className="vtk-bud-ov-res">{money(m.result, nl)}</span>}
+                        <Money value={m.total} nl={nl} />
+                        {m.result != null && <Money className="vtk-bud-ov-res" value={m.result} nl={nl} />}
                       </dd>
                     </div>
                   ))}
                   <div>
                     <dt>{nl ? 'Dit budget' : 'This budget'}</dt>
                     <dd>
-                      {money(overview.total, nl)}
-                      {resultOverview && <span className="vtk-bud-ov-res">{money(resultOverview.total, nl)}</span>}
+                      <Money value={overview.total} nl={nl} />
+                      {resultOverview && <Money className="vtk-bud-ov-res" value={resultOverview.total} nl={nl} />}
                     </dd>
                   </div>
                   <div className="sum">
                     <dt>{nl ? 'Samen, tegenover de begroting' : 'Together, against the yearly budget'}</dt>
                     <dd>
-                      {money(overview.total + pot.othersTotal, nl)}
+                      <Money value={overview.total + pot.othersTotal} nl={nl} />
                       <span className={overview.diff == null ? '' : overview.diff < -0.004 ? 'neg' : 'pos'}>
                         {' '}
-                        ({signedMoney(overview.diff, nl)})
+                        (<Money signed value={overview.diff} nl={nl} />)
                       </span>
                     </dd>
                   </div>
@@ -891,12 +1042,14 @@ export function BudgetEditor({
                 <dl className="vtk-bud-ov-total">
                   <div>
                     <dt>{nl ? 'Resultaat' : 'Result'}</dt>
-                    <dd className={resultOverview.total < -0.004 ? 'neg' : ''}>{money(resultOverview.total, nl)}</dd>
+                    <dd className={resultOverview.total < -0.004 ? 'neg' : ''}>
+                      <Money value={resultOverview.total} nl={nl} />
+                    </dd>
                   </div>
                   <div>
                     <dt>{nl ? 'Verschil met budget' : 'Difference with budget'}</dt>
                     <dd className={resultOverview.diffBudget < -0.004 ? 'neg' : 'pos'}>
-                      {signedMoney(resultOverview.diffBudget, nl)}
+                      <Money signed value={resultOverview.diffBudget} nl={nl} />
                     </dd>
                   </div>
                   <div>
@@ -910,7 +1063,7 @@ export function BudgetEditor({
                             : 'pos'
                       }
                     >
-                      {signedMoney(resultOverview.diffBegroting, nl)}
+                      <Money signed value={resultOverview.diffBegroting} nl={nl} />
                     </dd>
                   </div>
                 </dl>
@@ -989,64 +1142,6 @@ export function BudgetEditor({
               ))}
             </section>
           )}
-
-          {/* Prijzen bij de webshops: live opgevraagd op de productpagina. */}
-          {(() => {
-            const rows = shopRows(content);
-            if (rows.length === 0) return null;
-            const checkable = checkableRows(content).length;
-            const loose = rows.filter(isUncheckableShopLink).length;
-            const byHand = rows.length - checkable;
-            const last = rows
-              .map((r) => r.lastCheck?.at)
-              .filter(Boolean)
-              .sort()
-              .at(-1);
-            const stamp = (iso: string) =>
-              new Date(iso).toLocaleString(nl ? 'nl-BE' : 'en-GB', {
-                day: 'numeric',
-                month: 'short',
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZone: 'Europe/Brussels',
-              });
-            return (
-              <section className="vtk-bud-card vtk-bud-prices" aria-labelledby="bud-prices">
-                <div className="vtk-bud-prices-row">
-                  <div>
-                    <h2 id="bud-prices" className="vtk-bud-h2">
-                      {nl ? 'Prijzen bij de webshops' : 'Prices at the web shops'}
-                    </h2>
-                    <p className="vtk-bud-fine">
-                      {nl
-                        ? `${checkable} van ${rows.length} ${rows.length === 1 ? 'regel wijst' : 'regels wijzen'} naar een product dat de site zelf kan nakijken (Collect&Go, Colruyt, bol.com, Partywinkel, Helloprint, Drukzo, Action). ${last ? `Laatst nagekeken op ${stamp(last)}.` : 'Nog niet nagekeken.'}`
-                        : `${checkable} of ${rows.length} rows point to a product the site can check itself. ${last ? `Last checked ${stamp(last)}.` : 'Not checked yet.'}`}
-                      {byHand > 0 &&
-                        (nl
-                          ? ` ${byHand} ${byHand === 1 ? 'kijkt' : 'kijken'} een mens na${loose > 0 ? ` (${loose} met een link die niet naar één product wijst)` : ''}.`
-                          : ` ${byHand} are checked by hand.`)}
-                      {priceSummary && ` ${nl ? 'Net nagekeken:' : 'Just checked:'} ${priceSummary}`}
-                      {!settings.collectGoLive &&
-                        (nl
-                          ? ' Live nakijken staat uit bij de instellingen.'
-                          : ' Live checks are switched off in the settings.')}
-                    </p>
-                  </div>
-                  {settings.collectGoLive && !readOnly && checkable > 0 && (
-                    <Button size="sm" variant="ghost" onClick={() => void checkPrices()} disabled={checking !== null}>
-                      {checking
-                        ? nl
-                          ? `Bezig met ${checking.length} ${checking.length === 1 ? 'prijs' : 'prijzen'}…`
-                          : 'Checking…'
-                        : nl
-                          ? 'Prijzen nakijken'
-                          : 'Check prices'}
-                    </Button>
-                  )}
-                </div>
-              </section>
-            );
-          })()}
 
           <fieldset className="vtk-bud-fieldset" disabled={readOnly}>
             {/* Activiteit */}
@@ -1348,23 +1443,38 @@ export function BudgetEditor({
               </div>
             </section>
 
-            {content.sections.map((section) => (
+            {content.sections.map((section, index) => (
               <SectionCard
                 key={section.id}
                 api={api}
                 section={section}
                 onDelete={() => mutate((d) => void (d.sections = d.sections.filter((s) => s.id !== section.id)))}
+                onMove={(by) =>
+                  mutate((d) => {
+                    const from = d.sections.findIndex((s) => s.id === section.id);
+                    const to = from + by;
+                    if (from < 0 || to < 0 || to >= d.sections.length) return;
+                    const [moved] = d.sections.splice(from, 1);
+                    d.sections.splice(to, 0, moved);
+                  })
+                }
+                first={index === 0}
+                last={index === content.sections.length - 1}
               />
             ))}
 
             {!readOnly && (
               <div className="vtk-bud-addsec">
-                <span>{nl ? 'Sectie toevoegen:' : 'Add a section:'}</span>
+                <span>
+                  {nl
+                    ? 'Sectie toevoegen, zoveel als je wil en met een naam naar keuze:'
+                    : 'Add a section, as many as you like, named as you like:'}
+                </span>
                 <button type="button" className="vtk-bud-add" onClick={() => addSection('fixed')}>
-                  <PlusIcon /> {nl ? 'Vaste kosten' : 'Fixed costs'}
+                  <PlusIcon /> {nl ? 'Kosten (aantal × prijs)' : 'Costs (quantity × price)'}
                 </button>
                 <button type="button" className="vtk-bud-add" onClick={() => addSection('variable')}>
-                  <PlusIcon /> {nl ? 'Variabele kosten' : 'Variable costs'}
+                  <PlusIcon /> {nl ? 'Kosten per persoon' : 'Costs per person'}
                 </button>
                 <button type="button" className="vtk-bud-add" onClick={() => addSection('income')}>
                   <PlusIcon /> {nl ? 'Inkomsten' : 'Income'}

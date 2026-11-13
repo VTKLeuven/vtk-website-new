@@ -179,6 +179,21 @@ export function figuresFromSheet(sheet: Sheet): Figures | null {
     // De eerste "Totaal" telt; verder naar onder staan totalen van kostenposten.
     if (key && !lines.has(key)) lines.set(key, row);
   }
+  // Tenzij een post zelf "Totaal" heet: IT Nieuw Materiaal (BO 7, 26-27) had
+  // boven "Uitgaven" een kostenpost met die naam, en de site las die +234,15
+  // als het totaal van het blad in plaats van de -234,15 eronder. Staat er een
+  // rij "Uitgaven", dan is het totaal de eerste "Totaal" daarna; staat er
+  // daarna geen, dan blijft de eerste gelden.
+  const expenseRow = lines.get("uitgaven");
+  const earlyTotal = lines.get("totaal");
+  if (expenseRow !== undefined && earlyTotal !== undefined && earlyTotal < expenseRow) {
+    for (let row = expenseRow + 1; row <= overview.row + OVERVIEW_DEPTH; row += 1) {
+      if (label(sheet, row, overview.labelCol) === "totaal") {
+        lines.set("totaal", row);
+        break;
+      }
+    }
+  }
   // De posten zelf: alles boven "Inkomsten" is een inkomst, alles tussen
   // "Inkomsten" en "Uitgaven" een kost. Een regel van het sjabloon die nul
   // bleef (de lege "Drinken" onder Inkom) laten we weg.
@@ -192,7 +207,8 @@ export function figuresFromSheet(sheet: Sheet): Figures | null {
       side = "out";
       continue;
     }
-    if (key === "uitgaven" || key === "totaal") break;
+    // Een "Totaal" boven "Uitgaven" is een post die zo heet, niet het einde.
+    if (key === "uitgaven" || (key === "totaal" && row === lines.get("totaal"))) break;
     const budgetCents = cents(at(sheet, row, overview.budgetCol));
     const resultCents = cents(at(sheet, row, overview.resultCol));
     if (!budgetCents && !resultCents) continue;

@@ -48,8 +48,8 @@ export default async function BudgetSettingsPage({ params }: { params: Promise<{
 
   return (
     <div className="vtk-bud">
-      <Link href={`${base}/admin/bestuursorgaan`} className="vtk-bud-back">
-        ← {nl ? 'Budgetten & Resultaten' : 'Budgets & Results'}
+      <Link href={`${base}/admin/bestuursorgaan/mappen`} className="vtk-bud-back">
+        ← {nl ? 'Bestuursorgaan' : 'Board meetings'}
       </Link>
       <header>
         <h1 className="text-2xl font-semibold">{nl ? 'Instellingen voor budgetten' : 'Budget settings'}</h1>

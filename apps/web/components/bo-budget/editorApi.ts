@@ -28,4 +28,8 @@ export type EditorApi = {
   resultOn: boolean;
   /** De prijs die de webshop gaf, overnemen in de regel. */
   acceptPrice: (rowId: string) => void;
+  /** Iemand keek de prijs zelf na (of trekt dat in). De server zet de echte naam bij het bewaren. */
+  confirmPrice: (rowId: string, on: boolean) => void;
+  /** Groep 5: deze prijs onthouden als vaste prijs, voor elk budget. Null voor wie dat niet mag. */
+  rememberFixed: ((rowId: string) => void) | null;
 };

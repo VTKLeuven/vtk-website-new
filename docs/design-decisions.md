@@ -11772,7 +11772,9 @@ Hoe het werkt staat in `docs/bestuursorgaan.md`; dit zijn de keuzes erachter.
 Na de eerste week met echte bestanden (oktober 2026) bleek "een post" voor het
 BO ruimer dan een `Group`. Wat Groep 5 vroeg, en waarom het zo gebouwd is:
 
-- **Het scherm heet "Budgetten & Resultaten"**, in de zijbalk en als titel.
+- **Het scherm heette "Budgetten & Resultaten"**, in de zijbalk en als titel;
+  sinds november 2026 heet het "Resultatenoverzicht", en is "Bestuursorgaan"
+  de naam van de mappen per BO (zie "Bestuursorgaan: budgetten op de site").
   "Bestuursorgaan" is de vergadering, niet wat je er komt zoeken. De URL
   (`/admin/bestuursorgaan`), het recht en de rol blijven: een label wijzigen is
   geen reden om bladwijzers en rechten te breken.
@@ -12064,6 +12066,43 @@ vroegen").
   heeft een prijs per winkel: Groep 5 stelt de postcode in van de winkel waar
   de kring koopt, zodat de prijs die van die winkel is en niet een gemiddelde.
   Helloprint en Drukzo geven de prijs excl. BTW, en zo neemt de site ze over.
+
+- **Na de eerste dag met echte bladen (13 november 2026) vroeg Groep 5 dit:**
+  - *Geen lijst "Aandachtspunten" in Nakijken.* Ze herhaalde wat al bij de regel
+    stond, en met overgenomen bladen was ze langer dan het budget.
+  - *Vaste prijzen.* De huur en de drank van een zaal zijn elk jaar dezelfde,
+    zonder offerte per activiteit. "Geen bron" bij elk budget is dan lawaai, en
+    wie lawaai ziet, leest de echte vragen niet meer. Groep 5 houdt een lijst
+    bij; een regel met die omschrijving en die prijs vraagt geen bron.
+  - *Prijzen vanzelf, om de vier uur, tot het budget vastligt.* Een knop die
+    enkel in Maken stond, drukte wie nakijkt nooit in. Vier uur is de afweging
+    tussen een verse prijs op het BO en een winkel die niet bestookt wordt;
+    honderd kijkers tegelijk zijn één aanvraag. Na het BO verandert een budget
+    niet meer, dus ook zijn prijzen niet.
+  - *Zelf nagekeken, met naam en uur.* Een link naar een frituur kan de site
+    niet lezen. Dan zegt een mens dat hij keek, en staat erbij wie en wanneer:
+    zonder naam is "nagekeken" een vinkje dat niemand hoeft te verantwoorden.
+    De naam komt van de server.
+  - *Het totaal onder de regels*, zoals in het blad: boven de regels moest je
+    geloven dat ze ertoe optellen.
+  - *Negatief is een min in het rood.* Uitgaven stonden als een positief getal
+    onder een kop "Uitgaven", en in een tabel zonder die kop las een kost als
+    een inkomst.
+  - *De link in de tabel.* Het potlood openen voor elke link was de traagste
+    stap van een budget overtypen.
+  - *Vrije secties.* De soorten (kosten, kosten per persoon, inkomsten) zeggen
+    hoe er gerekend wordt, niet hoe een budget ingedeeld moet zijn.
+  - *Geen gekleurde rand links van een blok.* Dat patroon staat elders op de
+    site als accent op een uitgelichte kaart; hier stond het op elk bericht, en
+    las het als een sjabloon. In de budgetten is het weg.
+  - *Namen.* "Mappen per BO" werd "Bestuursorgaan" en "Budgetten & Resultaten"
+    werd "Resultatenoverzicht"; de instellingen voor budgetten hangen onder
+    Bestuursorgaan. De URL's en het recht blijven.
+  - *Eén rij per activiteit in een map.* Na "Bladen van deze BO op de site
+    zetten" stond alles dubbel: het blad in Drive en het budget op de site. Nu
+    is dat één rij met twee links.
+  - *De proef is dicht.* Een post die niet aangevinkt is, ziet niets van de
+    site, ook niet wat Groep 5 voor haar overnam.
 
 - **Bestaande rekenbladen overnemen, als uitkomst en niet als berekening.**
   Om te beslissen of de kring wil overstappen, moet ze de site zien met wat al

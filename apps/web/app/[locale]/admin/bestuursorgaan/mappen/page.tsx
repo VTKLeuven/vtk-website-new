@@ -8,18 +8,21 @@ import { currentWorkingYear, formatWorkingYear } from '@/lib/workingYear';
 import { loadBoOverview } from '@/lib/bo/overview';
 import { toExplorerData, type XDoc, type XDossier } from '@/lib/bo/explorer';
 import { ownPostKeys } from '@/lib/bo/own';
-import { getBudgetSettings, listFolderBudgets, postNames } from '@/lib/bo/budget/server';
+import { getBudgetSettings, listFolderBudgets, postNames, siteBudgetPostKeys } from '@/lib/bo/budget/server';
+import { AdminDisclosure } from '@/components/admin/AdminDisclosure';
 import { BudgetUpload, DriveImportButton } from '@/components/bo-budget/BudgetImport';
 import { money, shortDate } from '@/components/bo-budget/format';
 
 /*
- * /admin/bestuursorgaan/mappen: per BO een map, zoals in Drive. Wie een budget
+ * /admin/bestuursorgaan/mappen ("Bestuursorgaan" in de zijbalk): per BO een map, zoals in Drive. Wie een budget
  * of resultaat zoekt, weet meestal op welke BO het passeerde, en zoekt dan
  * dáár, niet per post of per stand.
  *
  * In een map staan de rekenbladen uit de BO-map in Drive (gelezen door de
  * scan, de site schrijft daar niets) én de budgetten die op de site opgesteld
- * zijn voor die BO. Groep 5 ziet alles; een post ziet enkel wat van haar is.
+ * zijn voor die BO. Groep 5 ziet alles; een post ziet enkel wat van haar is,
+ * en van de site enkel iets als ze meedoet aan de proef (`siteBudgetPostKeys`).
+ * Een activiteit die in Drive én op de site staat, is één rij met twee links.
  * Dat wordt hier op de server gefilterd: de pagina krijgt nooit het hele jaar
  * mee voor wie het niet mag zien (zie `lib/bo/own.ts`).
  */
@@ -32,7 +35,10 @@ type FileRow = {
   cents: number | null;
   href: string;
   external: boolean;
-  source: 'drive' | 'site';
+  /** `both`: het rekenblad uit Drive is ook op de site gezet. */
+  source: 'drive' | 'site' | 'both';
+  /** Het blad in Drive, wanneer de rij zelf naar de site leidt. */
+  driveHref?: string;
   note?: string;
 };
 
@@ -60,7 +66,7 @@ function FolderIcon({ open = false }: { open?: boolean }) {
   );
 }
 
-function FileIcon({ source }: { source: 'drive' | 'site' }) {
+function FileIcon({ source }: { source: 'drive' | 'site' | 'both' }) {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" className="vtk-fold-file" data-source={source}>
       <path d="M6 3h8l5 5v11.5A1.5 1.5 0 0 1 17.5 21h-11A1.5 1.5 0 0 1 5 19.5v-15A1.5 1.5 0 0 1 6.5 3Z" />
@@ -90,14 +96,21 @@ export default async function BoFoldersPage({
   const year = currentWorkingYear();
   const [{ overview }, settings] = await Promise.all([loadBoOverview(year, nl), getBudgetSettings()]);
   const data = toExplorerData(overview, year, new Date());
-  const siteBudgets = await listFolderBudgets(all ? 'all' : ownKeys, settings);
+  const siteBudgets = await listFolderBudgets(all ? 'all' : siteBudgetPostKeys(session, settings), settings);
   const names = await postNames([...new Set(siteBudgets.map((b) => b.postKey))], nl);
+  const siteHref = (id: string) => `${base}/admin/bestuursorgaan/mijn/${id}?weergave=nakijken`;
+  // Een budget op de site hoort bij het blad van dezelfde post en dezelfde activiteit.
+  const siteKey = (postKey: string, title: string) => `${postKey}|${title.trim().toLowerCase()}`;
+  const siteByKey = new Map(siteBudgets.map((b) => [siteKey(b.postKey, b.title), b]));
+  const matched = new Set<string>();
 
   // Enkel wat deze bezoeker mag zien: alles voor Groep 5, anders de eigen posten.
   const visible = (d: XDossier) => all || d.postKeys.some((k) => ownKeys.includes(k));
   const byMeeting = new Map<string, FileRow[]>();
   const push = (id: string, row: FileRow) => byMeeting.set(id, [...(byMeeting.get(id) ?? []), row]);
   for (const dossier of data.dossiers.filter(visible)) {
+    const site = dossier.postKeys.map((k) => siteByKey.get(siteKey(k, dossier.activity))).find(Boolean);
+    if (site) matched.add(site.id);
     const add = (doc: XDoc, kind: 'budget' | 'result') =>
       push(doc.meetingId, {
         key: `${doc.id}-${kind}`,
@@ -105,9 +118,10 @@ export default async function BoFoldersPage({
         post: dossier.postName,
         kind,
         cents: doc.totalCents,
-        href: doc.webUrl,
-        external: true,
-        source: 'drive',
+        href: site ? siteHref(site.id) : doc.webUrl,
+        external: !site,
+        source: site ? 'both' : 'drive',
+        driveHref: site ? doc.webUrl : undefined,
         note: doc.name,
       });
     dossier.budgets.forEach((doc) => add(doc, 'budget'));
@@ -127,13 +141,15 @@ export default async function BoFoldersPage({
   // Budgetten op de site: in de map van de BO waarvoor ze zijn, anders een eigen map.
   const loose: FileRow[] = [];
   for (const b of siteBudgets) {
+    // Staat al bij haar blad uit Drive: geen tweede rij.
+    if (matched.has(b.id)) continue;
     const row: FileRow = {
       key: `site-${b.id}`,
       name: b.title,
       post: names.get(b.postKey) ?? b.postKey,
       kind: b.hasResult ? 'result' : 'budget',
       cents: b.hasResult ? b.resultCents : b.totalCents,
-      href: `${base}/admin/bestuursorgaan/mijn/${b.id}?weergave=nakijken`,
+      href: siteHref(b.id),
       external: false,
       source: 'site',
       note: b.status === 'SUBMITTED' ? (nl ? 'ingediend' : 'submitted') : nl ? 'in opmaak' : 'draft',
@@ -215,8 +231,18 @@ export default async function BoFoldersPage({
                 {file.cents == null ? '–' : `€ ${money(file.cents / 100, nl)}`}
               </td>
               <td data-label={nl ? 'Staat in' : 'Lives in'}>
-                <span className="vtk-bo-pill" data-tone={file.source === 'site' ? 'ok' : undefined}>
-                  {file.source === 'site' ? (nl ? 'Site' : 'Site') : 'Drive'}
+                <span className="vtk-fold-where">
+                  {file.source !== 'drive' && (
+                    <span className="vtk-bo-pill" data-tone="ok">
+                      Site
+                    </span>
+                  )}
+                  {file.source === 'drive' && <span className="vtk-bo-pill">Drive</span>}
+                  {file.driveHref && (
+                    <a href={file.driveHref} target="_blank" rel="noreferrer">
+                      {nl ? 'blad in Drive ↗' : 'sheet in Drive ↗'}
+                    </a>
+                  )}
                 </span>
               </td>
             </tr>
@@ -231,7 +257,7 @@ export default async function BoFoldersPage({
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <nav className="vtk-fold-crumbs" aria-label={nl ? 'Kruimelpad' : 'Breadcrumb'}>
-            {open || needle ? <Link href={here}>{nl ? 'Mappen per BO' : 'Folders per meeting'}</Link> : null}
+            {open || needle ? <Link href={here}>{nl ? 'Bestuursorgaan' : 'Board meetings'}</Link> : null}
             {open && <span aria-hidden="true">›</span>}
           </nav>
           <h1 className="text-2xl font-semibold">
@@ -242,8 +268,8 @@ export default async function BoFoldersPage({
                   ? `Zoeken: "${query.trim()}"`
                   : `Search: "${query.trim()}"`
                 : nl
-                  ? 'Mappen per BO'
-                  : 'Folders per meeting'}
+                  ? 'Bestuursorgaan'
+                  : 'Board meetings'}
           </h1>
           <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
             {open
@@ -257,15 +283,26 @@ export default async function BoFoldersPage({
                 : `Every board meeting of ${formatWorkingYear(year)} as a folder, with the budgets and results that passed${all ? '' : ' of your own post'}.`}
           </p>
         </div>
-        <form action={here} method="get" className="vtk-fold-search" role="search">
-          <input
-            type="search"
-            name="q"
-            defaultValue={query}
-            placeholder={nl ? 'Zoek een activiteit of post' : 'Search an activity or post'}
-            aria-label={nl ? 'Zoek in alle mappen' : 'Search all folders'}
-          />
-        </form>
+        <div className="flex items-center gap-2">
+          <form action={here} method="get" className="vtk-fold-search" role="search">
+            <input
+              type="search"
+              name="q"
+              defaultValue={query}
+              placeholder={nl ? 'Zoek een activiteit of post' : 'Search an activity or post'}
+              aria-label={nl ? 'Zoek in alle mappen' : 'Search all folders'}
+            />
+          </form>
+          {/* BTW per post, vaste prijzen, de proef en de begroting: alles over budgetten op de site. */}
+          {all && (
+            <Link
+              href={`${base}/admin/bestuursorgaan/instellingen`}
+              className="inline-flex h-10 items-center justify-center rounded-full border border-vtk-blue/20 px-4 text-sm font-medium text-vtk-ink hover:bg-vtk-blue-soft"
+            >
+              {nl ? 'Instellingen' : 'Settings'}
+            </Link>
+          )}
+        </div>
       </header>
 
       {needle ? (
@@ -295,6 +332,8 @@ export default async function BoFoldersPage({
             const rows = open.files
               .filter((f) => f.kind === kind)
               .sort((a, b) => a.post.localeCompare(b.post) || a.name.localeCompare(b.name));
+            const onSite = rows.filter((f) => f.source !== 'drive');
+            const driveOnly = rows.filter((f) => f.source === 'drive');
             return (
               <section key={kind} className="space-y-2" aria-label={kind}>
                 <h2 className="vtk-fold-sub">
@@ -314,6 +353,17 @@ export default async function BoFoldersPage({
                         ? 'Geen resultaten in deze map.'
                         : 'No results in this folder.'}
                   </p>
+                ) : onSite.length > 0 && driveOnly.length > 0 ? (
+                  <>
+                    <h3 className="vtk-fold-part">
+                      {nl ? 'Op de site' : 'On the site'} <small>{onSite.length}</small>
+                    </h3>
+                    {fileTable(onSite.map((file) => ({ file })))}
+                    <h3 className="vtk-fold-part">
+                      {nl ? 'Enkel in Drive' : 'In Drive only'} <small>{driveOnly.length}</small>
+                    </h3>
+                    {fileTable(driveOnly.map((file) => ({ file })))}
+                  </>
                 ) : (
                   fileTable(rows.map((file) => ({ file })))
                 )}
@@ -328,7 +378,7 @@ export default async function BoFoldersPage({
             : 'Nothing of your post has passed the board meeting yet this working year.'}
         </p>
       ) : (
-        <ul className="vtk-fold-grid">
+        <ul className="vtk-fold-rows">
           {folders.map((f) => {
             const budgets = f.files.filter((x) => x.kind === 'budget').length;
             const results = f.files.length - budgets;
@@ -336,23 +386,33 @@ export default async function BoFoldersPage({
               <li key={f.id}>
                 <Link
                   href={`${here}?map=${encodeURIComponent(f.id)}`}
-                  className="vtk-fold-tile"
+                  className="vtk-fold-row"
                   data-upcoming={f.upcoming ? '1' : undefined}
                 >
-                  <span className="vtk-fold-tileicon">
+                  <span className="vtk-fold-rowicon">
                     <FolderIcon />
                   </span>
-                  <span className="vtk-fold-tiletext">
-                    <b>{f.label}</b>
-                    <span>
-                      {f.date ? shortDate(f.date, nl) : nl ? 'zonder datum' : 'no date'}
-                      {f.upcoming ? (nl ? ' · komt nog' : ' · upcoming') : ''}
-                    </span>
-                    <span>
-                      {nl
-                        ? `${budgets} ${budgets === 1 ? 'budget' : 'budgetten'}, ${results} ${results === 1 ? 'resultaat' : 'resultaten'}`
-                        : `${budgets} budgets, ${results} results`}
-                    </span>
+                  <b>{f.label}</b>
+                  <span className="vtk-fold-rowdate">
+                    {/* Een map zonder naam in Drive heet al naar haar datum: die niet twee keer. */}
+                    {!f.date
+                      ? nl
+                        ? 'zonder datum'
+                        : 'no date'
+                      : f.label.includes(shortDate(f.date, nl))
+                        ? ''
+                        : shortDate(f.date, nl)}
+                    {f.upcoming ? (nl ? ' komt nog' : ' upcoming') : ''}
+                  </span>
+                  <span className="vtk-fold-rowcount">
+                    {nl
+                      ? `${budgets} ${budgets === 1 ? 'budget' : 'budgetten'}`
+                      : `${budgets} ${budgets === 1 ? 'budget' : 'budgets'}`}
+                  </span>
+                  <span className="vtk-fold-rowcount">
+                    {nl
+                      ? `${results} ${results === 1 ? 'resultaat' : 'resultaten'}`
+                      : `${results} ${results === 1 ? 'result' : 'results'}`}
                   </span>
                 </Link>
               </li>
@@ -361,7 +421,25 @@ export default async function BoFoldersPage({
         </ul>
       )}
       {/* Groep 5: wat al met een rekenblad passeerde, alsnog op de site zetten. */}
-      {all && !needle && <BudgetUpload locale={locale} defaultDate={open?.date ?? null} />}
+      {all && !needle && (
+        <AdminDisclosure
+          className="vtk-fold-import"
+          summary={
+            <span className="block">
+              <span className="block text-sm font-semibold text-vtk-ink">
+                {nl ? 'Rekenbladen opladen' : 'Upload spreadsheets'}
+              </span>
+              <span className="block text-xs text-vtk-muted">
+                {nl
+                  ? 'Budgetten of resultaten die al met een rekenblad passeerden, alsnog op de site zetten.'
+                  : 'Put budgets or results that passed as a spreadsheet on the site.'}
+              </span>
+            </span>
+          }
+        >
+          <BudgetUpload locale={locale} defaultDate={open?.date ?? null} />
+        </AdminDisclosure>
+      )}
     </div>
   );
 }

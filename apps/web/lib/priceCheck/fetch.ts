@@ -11,9 +11,10 @@ import {
 } from './shops';
 
 /*
- * Een productpagina van een webshop ophalen. Rustig: wat de site net vroeg,
- * onthoudt ze een halfuur, zodat drie klikken op "Prijzen nakijken" niet drie
- * keer dezelfde pagina's opvragen. Met een eerlijke user-agent: een winkel die
+ * Een productpagina van een webshop ophalen. Rustig: wat de site vroeg,
+ * onthoudt ze vier uur, en twee aanvragen voor dezelfde pagina op hetzelfde
+ * moment worden er één. Honderd mensen die samen een budget openen, zijn voor
+ * de winkel dus één bezoek per product per vier uur. Met een eerlijke user-agent: een winkel die
  * geen automatische aanvragen wil, mag dat zeggen, en dan bevestigt een mens
  * de prijs in de editor.
  *
@@ -28,9 +29,12 @@ export type ShopLookup =
   { status: 'found'; product: ShopProduct } | { status: 'notfound' } | { status: 'failed'; reason: string };
 
 const USER_AGENT = 'Mozilla/5.0 (compatible; VTK-budgetten/1.0; +https://vtk.be)';
-const TTL_MS = 30 * 60 * 1000;
+const TTL_MS = 4 * 60 * 60 * 1000;
+// Een winkel die niet antwoordde, krijgt tien minuten rust voor de volgende poging.
+const FAILED_TTL_MS = 10 * 60 * 1000;
 const MAX_BYTES = 4_000_000;
 const cache = new Map<string, { at: number; lookup: ShopLookup }>();
+const pending = new Map<string, Promise<ShopLookup>>();
 
 export type LookupOptions = { fresh?: boolean; colruytPostcode?: string };
 
@@ -99,20 +103,29 @@ export async function priceBrowserStatus(): Promise<'off' | 'down' | 'up'> {
   }
 }
 
-/** `fresh` slaat het geheugen van een halfuur over: een test wil de winkel zelf horen. */
+/** `fresh` slaat het geheugen van vier uur over: een test wil de winkel zelf horen. */
 export async function lookupShopProduct(ref: ShopRef, options: LookupOptions = {}): Promise<ShopLookup> {
-  const fresh = !!options.fresh;
   const key = ref.shop === 'colruyt' ? `${ref.page}#${options.colruytPostcode ?? ''}` : ref.page;
   const hit = cache.get(key);
-  if (!fresh && hit && Date.now() - hit.at < TTL_MS) return hit.lookup;
+  if (!options.fresh && hit && Date.now() - hit.at < (hit.lookup.status === 'failed' ? FAILED_TTL_MS : TTL_MS))
+    return hit.lookup;
+  const running = pending.get(key);
+  if (running) return running;
+  const job = fetchShopProduct(ref, options)
+    .then((lookup) => {
+      cache.set(key, { at: Date.now(), lookup });
+      if (cache.size > 5000) cache.delete(cache.keys().next().value!);
+      return lookup;
+    })
+    .finally(() => pending.delete(key));
+  pending.set(key, job);
+  return job;
+}
 
+async function fetchShopProduct(ref: ShopRef, options: LookupOptions): Promise<ShopLookup> {
   let lookup: ShopLookup;
   try {
-    if (ref.via === 'browser') {
-      lookup = await lookupInBrowser(ref, options);
-      if (lookup.status !== 'failed') cache.set(key, { at: Date.now(), lookup });
-      return lookup;
-    }
+    if (ref.via === 'browser') return await lookupInBrowser(ref, options);
     const res = await fetch(ref.page, {
       headers: {
         'User-Agent': USER_AGENT,
@@ -138,9 +151,7 @@ export async function lookupShopProduct(ref: ShopRef, options: LookupOptions = {
     }
   } catch (err) {
     const timeout = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError');
-    lookup = { status: 'failed', reason: timeout ? 'geen antwoord binnen 12 seconden' : 'geen verbinding' };
+    lookup = { status: 'failed', reason: timeout ? 'geen antwoord op tijd' : 'geen verbinding' };
   }
-  // Een mislukte poging onthouden we niet: de volgende klik probeert opnieuw.
-  if (lookup.status !== 'failed') cache.set(key, { at: Date.now(), lookup });
   return lookup;
 }

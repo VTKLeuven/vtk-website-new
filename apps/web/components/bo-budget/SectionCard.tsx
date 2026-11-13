@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { ConfirmDialog } from '@vtk/ui';
 import { IconButton } from '@/components/ui/IconButton';
-import { PencilIcon, PlusIcon, TrashIcon } from '@/components/ui/icons';
+import { ArrowDownIcon, ArrowUpIcon, ExternalLinkIcon, PencilIcon, PlusIcon, TrashIcon } from '@/components/ui/icons';
 import {
   costAmount,
   distributionOf,
@@ -19,9 +19,12 @@ import {
   unitsOf,
 } from '@/lib/bo/budget/calc';
 import { setFx } from '@/lib/bo/budget/formula';
+import { clearConfirmation } from '@/lib/bo/budget/prices';
+import { shopOfUrl } from '@/lib/priceCheck/shops';
 import type { CostRow, CostSection, IncomeRow, IncomeSection, Section } from '@/lib/bo/budget/types';
 import type { EditorApi } from './editorApi';
 import { money, percent, plain } from './format';
+import { Money } from './Money';
 import { NumberField } from './NumberField';
 
 /*
@@ -33,8 +36,14 @@ import { NumberField } from './NumberField';
  */
 
 const TYPE_LABEL = {
-  nl: { fixed: 'Vaste kosten', variable: 'Variabele kosten', income: 'Inkomsten' },
-  en: { fixed: 'Fixed costs', variable: 'Variable costs', income: 'Income' },
+  nl: { fixed: 'Kosten', variable: 'Kosten per persoon', income: 'Inkomsten' },
+  en: { fixed: 'Costs', variable: 'Costs per person', income: 'Income' },
+};
+
+const SOURCE_WORD: Record<string, [string, string]> = {
+  flesserke: ['Flesserke', 'Flesserke'],
+  afspraak: ['Vaste afspraak', 'Fixed agreement'],
+  locatie: ['Prijs van de locatie', "Venue's price"],
 };
 
 function StatusDot({ api, rowId, name }: { api: EditorApi; rowId: string; name: string }) {
@@ -112,6 +121,67 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
     formula: row.fx?.[key],
     onFormula: (formula: string | null) => update(row.id, (r) => setFx(r, key, formula)),
   });
+  /**
+   * De link van de regel, meteen in de tabel: plakken volstaat, de site
+   * herkent zelf of het Collect&Go of een andere webshop is. Een bron zonder
+   * link (afspraak, Flesserke, de locatie) staat er als woord; die kies je in
+   * het paneel achter het potlood.
+   */
+  const linkCell = (row: CostRow) => {
+    const type = row.source?.type;
+    const word = type ? SOURCE_WORD[type] : undefined;
+    if (word)
+      return (
+        <td className="vtk-bud-col-link" data-label={nl ? 'Bron' : 'Source'}>
+          <button type="button" className="vtk-bud-srcword" onClick={(e) => api.openRow(row.id, e.currentTarget)}>
+            {word[nl ? 0 : 1]}
+          </button>
+        </td>
+      );
+    const url = row.source?.url ?? '';
+    return (
+      <td className="vtk-bud-col-link" data-label="Link">
+        <span className="vtk-bud-linkcell">
+          <input
+            className="vtk-bud-bare vtk-bud-cell"
+            value={url}
+            data-col="link"
+            inputMode="url"
+            placeholder={type === 'offerte' ? (nl ? 'Link naar de offerte' : 'Link to the quote') : 'https://'}
+            aria-label={nl ? `Link van ${row.name || 'deze regel'}` : `Link of ${row.name || 'this row'}`}
+            onChange={(e) =>
+              update(row.id, (r) => {
+                const value = e.target.value.trim();
+                if (r.source?.type === 'offerte') r.source.url = value;
+                else if (!value) r.source = null;
+                else
+                  r.source = {
+                    ...(r.source ?? {}),
+                    type: shopOfUrl(value) === 'collectgo' ? 'collectgo' : 'webshop',
+                    url: value,
+                  };
+                // Een andere link is een ander product: het vorige antwoord van de winkel geldt niet meer.
+                delete r.lastCheck;
+                clearConfirmation(r);
+              })
+            }
+          />
+          {/^https?:\/\//i.test(url) && (
+            <a
+              className="vtk-bud-iconlink"
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              title={nl ? 'Link openen' : 'Open link'}
+              aria-label={nl ? `Link openen: ${row.name}` : `Open link: ${row.name}`}
+            >
+              <ExternalLinkIcon />
+            </a>
+          )}
+        </span>
+      </td>
+    );
+  };
   const resultCell = (row: CostRow) =>
     api.resultOn ? (
       <td className="num vtk-bud-col-res" data-label={nl ? 'Resultaat' : 'Result'}>
@@ -152,6 +222,7 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
             <th className="num">{nl ? 'Prijs' : 'Price'}</th>
             <th className="num">{nl ? 'Bedrag' : 'Amount'}</th>
             {api.resultOn && <th className="num vtk-bud-col-res">{nl ? 'Resultaat' : 'Result'}</th>}
+            <th className="vtk-bud-col-link">{nl ? 'Link of bron' : 'Link or source'}</th>
             <th className="vtk-bud-col-act">
               <span className="sr-only">{nl ? 'Status en details' : 'Status and details'}</span>
             </th>
@@ -200,6 +271,7 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
                       : `the rest: ${percent(rowPct(section, row), false)}, nothing bought`}
                   </td>
                   {api.resultOn && <td />}
+                  <td className="vtk-bud-col-link" />
                   {actions}
                 </tr>
               );
@@ -222,6 +294,7 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
                     />
                   </td>
                   {resultCell(row)}
+                  <td className="vtk-bud-col-link" />
                   {actions}
                 </tr>
               );
@@ -327,22 +400,43 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
                       aria-label={nl ? 'Prijs' : 'Price'}
                       onValue={(v) =>
                         update(row.id, (r) => {
+                          const before = r.override ?? r.price ?? 0;
                           if (r.override != null) r.override = v ?? 0;
                           else r.price = v ?? 0;
+                          // Een bevestiging gold voor de vorige prijs.
+                          if ((v ?? 0) !== before) clearConfirmation(r);
                         })
                       }
                     />
                   )}
                 </td>
                 <td className="num vtk-bud-amount" data-label={nl ? 'Bedrag' : 'Amount'}>
-                  {money(amount, nl)}
+                  <Money cost value={amount} nl={nl} />
                 </td>
                 {resultCell(row)}
+                {row.service ? <td className="vtk-bud-col-link" /> : linkCell(row)}
                 {actions}
               </tr>
             );
           })}
         </tbody>
+        {/* Het totaal onder de regels, in de kolom van de bedragen: je ziet dat ze ertoe optellen. */}
+        <tfoot>
+          <tr>
+            <td colSpan={variable ? (distribute ? 6 : 5) : 3}>
+              {nl ? `Totaal ${section.name}` : `Total ${section.name}`}
+            </td>
+            <td className="num vtk-bud-amount" data-label={nl ? 'Totaal' : 'Total'}>
+              <Money cost value={sectionAmount(content, ctx, section)} nl={nl} />
+            </td>
+            {api.resultOn && (
+              <td className="num vtk-bud-col-res vtk-bud-amount" data-label={nl ? 'Resultaat' : 'Result'}>
+                <Money cost value={sectionResult(section)} nl={nl} />
+              </td>
+            )}
+            <td colSpan={2} />
+          </tr>
+        </tfoot>
       </table>
     </div>
   );
@@ -445,7 +539,7 @@ function IncomeTable({ api, section }: { api: EditorApi; section: IncomeSection 
                   )}
                 </td>
                 <td className="num vtk-bud-amount" data-label={nl ? 'Bedrag' : 'Amount'}>
-                  {money(incomeAmount(content, row), nl)}
+                  <Money value={incomeAmount(content, row)} nl={nl} />
                 </td>
                 {api.resultOn && (
                   <td className="num vtk-bud-col-res" data-label={nl ? 'Resultaat' : 'Result'}>
@@ -480,6 +574,20 @@ function IncomeTable({ api, section }: { api: EditorApi; section: IncomeSection 
             );
           })}
         </tbody>
+        <tfoot>
+          <tr>
+            <td colSpan={3}>{nl ? `Totaal ${section.name}` : `Total ${section.name}`}</td>
+            <td className="num vtk-bud-amount" data-label={nl ? 'Totaal' : 'Total'}>
+              <Money value={section.rows.reduce((sum, row) => sum + incomeAmount(content, row), 0)} nl={nl} />
+            </td>
+            {api.resultOn && (
+              <td className="num vtk-bud-col-res vtk-bud-amount" data-label={nl ? 'Resultaat' : 'Result'}>
+                <Money value={sectionResult(section)} nl={nl} />
+              </td>
+            )}
+            <td />
+          </tr>
+        </tfoot>
       </table>
     </div>
   );
@@ -541,7 +649,22 @@ function DistributionBar({ api, section }: { api: EditorApi; section: CostSectio
 
 /* ------------------------------------------------------------------- Kaart */
 
-export function SectionCard({ api, section, onDelete }: { api: EditorApi; section: Section; onDelete: () => void }) {
+export function SectionCard({
+  api,
+  section,
+  onDelete,
+  onMove,
+  first = false,
+  last = false,
+}: {
+  api: EditorApi;
+  section: Section;
+  onDelete: () => void;
+  /** De sectie een plaats naar boven (-1) of naar beneden (1). */
+  onMove?: (by: -1 | 1) => void;
+  first?: boolean;
+  last?: boolean;
+}) {
   const { nl, content, ctx, readOnly } = api;
   const [confirming, setConfirming] = useState(false);
   const amount = sectionAmount(content, ctx, section);
@@ -566,20 +689,38 @@ export function SectionCard({ api, section, onDelete }: { api: EditorApi; sectio
             className="vtk-bud-bare vtk-bud-sec-name"
             value={section.name}
             aria-label={nl ? 'Naam van de sectie' : 'Section name'}
-            placeholder={nl ? 'Naam van de sectie' : 'Section name'}
+            placeholder={nl ? 'Naam, bv. Drank of Decoratie' : 'Name, e.g. Drinks'}
             onChange={(e) => rename(e.target.value)}
           />
           <span className="vtk-bud-sec-type">{TYPE_LABEL[nl ? 'nl' : 'en'][section.type]}</span>
         </div>
         <div className="vtk-bud-sec-right">
-          <span className="vtk-bud-sec-amount">
-            {money(amount, nl)}
-            {api.resultOn && (
-              <span className="vtk-bud-sec-res" title={nl ? 'Resultaat' : 'Result'}>
-                {nl ? 'resultaat' : 'result'} {money(sectionResult(section), nl)}
-              </span>
-            )}
-          </span>
+          {/* Zonder regels is er geen tabel, en dus geen totaal eronder. */}
+          {section.rows.length === 0 && (
+            <span className="vtk-bud-sec-amount">
+              <Money cost={section.type !== 'income'} value={amount} nl={nl} />
+            </span>
+          )}
+          {!readOnly && onMove && (
+            <>
+              <IconButton
+                label={nl ? 'Sectie naar boven' : 'Move section up'}
+                srLabel={`${nl ? 'Naar boven' : 'Move up'}: ${section.name}`}
+                disabled={first}
+                onClick={() => onMove(-1)}
+              >
+                <ArrowUpIcon />
+              </IconButton>
+              <IconButton
+                label={nl ? 'Sectie naar beneden' : 'Move section down'}
+                srLabel={`${nl ? 'Naar beneden' : 'Move down'}: ${section.name}`}
+                disabled={last}
+                onClick={() => onMove(1)}
+              >
+                <ArrowDownIcon />
+              </IconButton>
+            </>
+          )}
           {!readOnly && (
             <IconButton
               label={nl ? 'Sectie verwijderen' : 'Delete section'}

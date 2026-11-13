@@ -82,8 +82,14 @@ export type CostRow = {
   forfait?: { amount: number; reason: string } | null;
   /** Hoeveel eenheden uit de voorraad van Flesserke komen. */
   flesserke?: number | null;
-  /** Wanneer iemand de prijs laatst nakeek (yyyy-mm-dd). */
+  /**
+   * Wanneer iemand de prijs zelf nakeek en bevestigde: een tijdstip (ISO), of
+   * bij oudere budgetten enkel de dag (yyyy-mm-dd). De site zet dit nooit
+   * zelf: wat zij bij een winkel nakeek, staat in `lastCheck`.
+   */
   checkedAt?: string | null;
+  /** Wie bevestigde. De server vult de naam in bij het bewaren (`stampConfirmations`). */
+  checkedBy?: string | null;
   note?: string;
   /** De Collect&Go-servicekost: één regel per bestelling, de prijs komt uit de instellingen. */
   service?: boolean;
@@ -113,6 +119,12 @@ export type PriceCheck = {
   /** De naam op de site, om te zien of de link het juiste product is. */
   name?: string;
   reason?: string;
+  /**
+   * Sinds wanneer de winkel dit antwoord geeft. Een nieuwe controle met
+   * dezelfde uitkomst houdt dit tijdstip, zodat een prijs die iemand met de
+   * hand bevestigde niet om de vier uur opnieuw als "gewijzigd" opduikt.
+   */
+  since?: string;
 };
 
 export const AUDIENCES = ['leden', 'nietleden', 'ereleden', 'genodigden'] as const;
@@ -219,6 +231,8 @@ export type BudgetContent = {
    * begroting" geen nieuws en vergelijkt de site het potje als geheel.
    */
   potPart?: boolean;
+  /** Wanneer de site de prijzen bij de webshops laatst zelf nakeek (ISO). */
+  pricesAt?: string | null;
   /** Een ander tarief dan dat van de post, met reden. */
   vat: { rate: number; reason: string } | null;
   allocation: { org: string; share: number }[];
@@ -256,6 +270,20 @@ export type BudgetLocation = {
   note: string;
 };
 
+/**
+ * Een prijs die vastligt en in elk budget terugkomt zonder link of offerte:
+ * de huur van een zaal, een vat, licht en geluid. Een regel zonder bron met
+ * die omschrijving en die prijs heeft daarmee een bron (`fixed.ts`).
+ */
+export type FixedPrice = {
+  id: string;
+  name: string;
+  price: number;
+  /** Enkel op deze locatie; leeg = overal. */
+  location: string;
+  note: string;
+};
+
 /** Wat Beheer instelt (`Setting` "bestuursorgaan.budgets"). */
 export type BudgetSettings = {
   /** Het BTW-tarief per post (`g:<groupId>` of een vak); ontbreekt = nog in te vullen. */
@@ -267,6 +295,8 @@ export type BudgetSettings = {
   /** Zonder sangriaprijs bij de zaal rekent het cantusblad met de Collect&Go-sangria. */
   sangriaFallback: number;
   locations: BudgetLocation[];
+  /** Vaste prijzen die geen bron per budget vragen. */
+  fixedPrices: FixedPrice[];
   /**
    * De posten die budgetten op de site mogen proberen. Groep 5 mag het altijd.
    * Het BO werkt nog met de rekenbladen in Drive; dit is een proef naast die
@@ -288,6 +318,7 @@ export const DEFAULT_SETTINGS: BudgetSettings = {
   flesserkeCounts: true,
   sangriaFallback: 1.95,
   locations: [],
+  fixedPrices: [],
   pilotPostKeys: [],
   collectGoLive: true,
   colruytPostcode: '',

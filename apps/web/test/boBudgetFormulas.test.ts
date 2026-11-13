@@ -5,7 +5,20 @@ import { overviewOf, resultOverviewOf, sectionAmount, type CalcContext } from '@
 import { checksOf } from '@/lib/bo/budget/checks';
 import { applyFormulas, evalFormula } from '@/lib/bo/budget/formula';
 import { potOf, type PotMember } from '@/lib/bo/budget/pot';
-import { acceptCheckedPrice, checkableRows, checkFromLookup, isUncheckableShopLink } from '@/lib/bo/budget/prices';
+import {
+  acceptCheckedPrice,
+  applyCheck,
+  checkableRows,
+  checkFromLookup,
+  confirmRow,
+  isUncheckableShopLink,
+  openCheck,
+  pricesStillChecked,
+  PRICE_TTL_MS,
+  rowsToCheck,
+  stampConfirmations,
+} from '@/lib/bo/budget/prices';
+import { fixedPriceOf } from '@/lib/bo/budget/fixed';
 import { budgetContentSchema } from '@/lib/bo/budget/schema';
 import { budgetFileName } from '@/lib/bo/budget/sheet';
 import { newId, templateContent } from '@/lib/bo/budget/templates';
@@ -263,8 +276,10 @@ describe('prijzen bij de webshops', () => {
     const changed = checkFromLookup({ ...row, price: 580 }, found, '2026-11-13T10:00:00Z');
     expect(changed).toMatchObject({ status: 'changed', price: 505.99, basis: 'excl', shop: 'helloprint' });
     const accepted: CostRow = { ...row, price: 580, fx: { price: '=1160/2' }, lastCheck: changed };
-    acceptCheckedPrice(accepted, '2026-11-13');
-    expect(accepted).toMatchObject({ price: 505.99, basis: 'excl', checkedAt: '2026-11-13' });
+    acceptCheckedPrice(accepted);
+    expect(accepted).toMatchObject({ price: 505.99, basis: 'excl' });
+    // De site zet zelf nooit een bevestiging: die is van een mens.
+    expect(accepted.checkedAt).toBeUndefined();
     expect(accepted.fx).toBeUndefined();
 
     const content = templateContent('standaard', true);
@@ -284,5 +299,110 @@ describe('prijzen bij de webshops', () => {
     expect(isUncheckableShopLink(rows[1])).toBe(true);
     // Een winkel die de site niet kent, is geen fout in de link.
     expect(isUncheckableShopLink(rows[2])).toBe(false);
+  });
+});
+
+describe('prijzen vanzelf nakijken, en met de hand bevestigen', () => {
+  const shopRow = (extra: Partial<CostRow> = {}): CostRow => ({
+    id: 'r1',
+    name: 'Stickers',
+    qty: 1,
+    price: 7.99,
+    basis: 'incl',
+    source: { type: 'webshop', url: 'https://www.bol.com/be/nl/p/stickers/9300000038335239/' },
+    ...extra,
+  });
+  const withRow = (row: CostRow) => {
+    const content = templateContent('standaard', true);
+    const section = content.sections.find((s) => s.type === 'fixed') as CostSection;
+    section.rows = [row];
+    return content;
+  };
+
+  it('kijkt om de vier uur alles na, en daartussen enkel wat nog geen antwoord kreeg', () => {
+    const now = Date.parse('2026-11-13T12:00:00Z');
+    const content = withRow(shopRow());
+    expect(rowsToCheck(content, now)).toHaveLength(1);
+    content.pricesAt = new Date(now - 60_000).toISOString();
+    const row = (content.sections.find((s) => s.type === 'fixed') as CostSection).rows[0];
+    row.lastCheck = { at: content.pricesAt, status: 'ok', price: 7.99 };
+    expect(rowsToCheck(content, now)).toHaveLength(0);
+    // Een nieuwe link wist het antwoord: die regel gaat meteen mee.
+    delete row.lastCheck;
+    expect(rowsToCheck(content, now)).toHaveLength(1);
+    row.lastCheck = { at: content.pricesAt, status: 'ok', price: 7.99 };
+    expect(rowsToCheck(content, now + PRICE_TTL_MS)).toHaveLength(1);
+  });
+
+  it('kijkt niet meer na eens het budget ingediend is of het BO voorbij is', () => {
+    expect(pricesStillChecked({ status: 'DRAFT', targetDate: null }, '2026-11-13')).toBe(true);
+    expect(pricesStillChecked({ status: 'DRAFT', targetDate: '2026-11-13' }, '2026-11-13')).toBe(true);
+    expect(pricesStillChecked({ status: 'DRAFT', targetDate: '2026-11-08' }, '2026-11-13')).toBe(false);
+    expect(pricesStillChecked({ status: 'SUBMITTED', targetDate: '2026-11-20' }, '2026-11-13')).toBe(false);
+  });
+
+  it('vraagt een bevestigde prijs niet om de vier uur opnieuw', () => {
+    const row = shopRow();
+    applyCheck(row, { at: '2026-11-13T08:00:00.000Z', status: 'changed', price: 8.49 });
+    expect(openCheck(row)?.status).toBe('changed');
+    confirmRow(row, 'Jarne', '2026-11-13T09:00:00.000Z');
+    expect(openCheck(row)).toBeNull();
+    // Dezelfde uitkomst vier uur later: de bevestiging blijft gelden.
+    applyCheck(row, { at: '2026-11-13T12:00:00.000Z', status: 'changed', price: 8.49 });
+    expect(openCheck(row)).toBeNull();
+    // Een nieuwe prijs bij de winkel: opnieuw na te kijken.
+    applyCheck(row, { at: '2026-11-13T16:00:00.000Z', status: 'changed', price: 8.99 });
+    expect(openCheck(row)?.price).toBe(8.99);
+    // Wie de prijs aanpast naar die van de winkel, ziet meteen dat het klopt.
+    row.price = 8.99;
+    expect(openCheck(row)).toBeNull();
+  });
+
+  it('laat een winkel die even niet antwoordt een recente prijs niet uitwissen', () => {
+    const row = shopRow();
+    applyCheck(row, { at: '2026-11-13T08:00:00.000Z', status: 'ok', price: 7.99 });
+    applyCheck(row, { at: '2026-11-13T12:00:00.000Z', status: 'failed', reason: 'geen antwoord' });
+    expect(row.lastCheck).toMatchObject({ status: 'ok', price: 7.99 });
+  });
+
+  it('laat de server zeggen wie bevestigde, niet de browser', () => {
+    const before = withRow(shopRow({ checkedAt: '2026-11-12T10:00:00.000Z', checkedBy: 'Lotte' }));
+    const kept = structuredClone(before);
+    (kept.sections.find((s) => s.type === 'fixed') as CostSection).rows[0].checkedBy = 'Iemand anders';
+    stampConfirmations(before, kept, 'Jarne');
+    expect((kept.sections.find((s) => s.type === 'fixed') as CostSection).rows[0].checkedBy).toBe('Lotte');
+
+    const fresh = structuredClone(before);
+    const row = (fresh.sections.find((s) => s.type === 'fixed') as CostSection).rows[0];
+    row.checkedAt = '2026-11-13T10:00:00.000Z';
+    row.checkedBy = 'De praeses';
+    stampConfirmations(before, fresh, 'Jarne');
+    expect(row.checkedBy).toBe('Jarne');
+  });
+
+  it('vraagt geen bron voor een vaste prijs, en ook niet na een bevestiging', () => {
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      fixedPrices: [{ id: 'f1', name: 'Huur zaal', price: 350, location: 'Waaiberg', note: 'vast tarief' }],
+    };
+    const local: CalcContext = { postKey: 'g:test', settings };
+    const content = withRow({ id: 'r1', name: 'Huur zaal Waaiberg', qty: 1, price: 350, basis: 'excl', source: null });
+    content.info.location = 'Waaiberg';
+    const row = (content.sections.find((s) => s.type === 'fixed') as CostSection).rows[0];
+    expect(fixedPriceOf(content, local, row)).toMatchObject({ exact: true, name: 'Huur zaal' });
+    expect(checksOf(content, local, true).some((c) => c.rowId === 'r1' && /vandaan/.test(c.text))).toBe(false);
+
+    // Een andere prijs dan de vaste valt op, maar houdt niets tegen.
+    row.price = 400;
+    const off = checksOf(content, local, true).find((c) => c.rowId === 'r1');
+    expect(off).toMatchObject({ level: 'review' });
+    expect(off?.text).toContain('350,00');
+
+    // Op een andere locatie geldt de vaste prijs niet: daar is het weer een regel zonder bron.
+    content.info.location = 'Elders';
+    expect(fixedPriceOf(content, local, row)).toBeNull();
+    expect(checksOf(content, local, true).find((c) => c.rowId === 'r1')?.level).toBe('block');
+    confirmRow(row, 'Jarne');
+    expect(checksOf(content, local, true).some((c) => c.rowId === 'r1' && /vandaan/.test(c.text))).toBe(false);
   });
 });
