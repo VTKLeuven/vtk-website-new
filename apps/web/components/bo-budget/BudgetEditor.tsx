@@ -8,9 +8,7 @@ import { ArrowRightIcon, PlusIcon } from '@/components/ui/icons';
 import { useToast } from '@/components/ui/toast';
 import { UNSENT, unsentGuard } from '@/components/ui/unsentGuard';
 import {
-  checkPricesAction,
   deleteBoBudgetAction,
-  refreshPricesAction,
   rememberFixedPriceAction,
   reopenBoBudgetAction,
   saveBoBudgetAction,
@@ -47,6 +45,7 @@ import {
   type Section,
 } from '@/lib/bo/budget/types';
 import type { EditorApi } from './editorApi';
+import { checkRowPrices, refreshPrices } from './priceApi';
 import { money, percent, shortDate, todayIso } from './format';
 import { Money } from './Money';
 import { NumberField } from './NumberField';
@@ -415,9 +414,8 @@ export function BudgetEditor({
     const rows = checkableRows(content).filter((r) => !rowIds || rowIds.includes(r.rowId));
     if (rows.length === 0) return;
     setChecking(rows.map((r) => r.rowId));
-    const result = await unsentGuard.run(() => checkPricesAction({ id: budget.id, rows, token, fresh: manual }));
+    const result = await checkRowPrices(budget.id, rows, token, manual);
     setChecking(null);
-    if (result === UNSENT) return;
     if (!result.ok) {
       if (manual)
         showToast({
@@ -426,7 +424,11 @@ export function BudgetEditor({
               ? nl
                 ? 'Prijzen nakijken staat uit bij de instellingen.'
                 : 'Price checks are switched off in the settings.'
-              : errorText(result.code, nl),
+              : result.code === 'UNSENT'
+                ? nl
+                  ? 'De site kon de winkel nu niet vragen: geen verbinding met de server.'
+                  : 'Could not reach the server to ask the shop.'
+                : errorText(result.code, nl),
           variant: 'error',
           duration: 0,
         });
@@ -470,15 +472,19 @@ export function BudgetEditor({
 
   // De prijzen vanzelf nakijken bij het openen, in beide weergaven. De server
   // houdt de klok bij (hoogstens om de vier uur per budget, en nooit meer eens
-  // het budget langs het BO ging); wat ze antwoordt, staat al in de databank,
-  // dus dit maakt de editor niet "gewijzigd".
+  // het budget langs het BO ging; de budgetten van het eerstvolgende BO kijkt
+  // ze ook zonder bezoek na); wat ze antwoordt, staat al in de databank, dus
+  // dit maakt de editor niet "gewijzigd". Langs een route handler en niet als
+  // server action, zodat het bewaren er niet op wacht.
   const refreshed = useRef(false);
+  const [refreshing, setRefreshing] = useState(true);
   useEffect(() => {
     if (refreshed.current) return;
     refreshed.current = true;
     void (async () => {
-      const result = await refreshPricesAction({ id: budget.id, token }).catch(() => null);
-      if (!result || !result.ok || Object.keys(result.checks).length === 0) return;
+      const result = await refreshPrices(budget.id, token);
+      setRefreshing(false);
+      if (!result.ok || Object.keys(result.checks).length === 0) return;
       setContent((prev) => {
         const next = structuredClone(prev);
         for (const r of allCostRows(next)) if (result.checks[r.id]) r.lastCheck = result.checks[r.id];
@@ -491,8 +497,9 @@ export function BudgetEditor({
   // Een regel met een nieuwe of gewijzigde link naar een gekende winkel: meteen
   // nakijken, zonder knop. Elke link één poging; de rest volgt de ronde van vier uur.
   const tried = useRef(new Set<string>());
+  // Pas na de ronde bij het openen: die vraagt dezelfde regels al.
   const pendingKey =
-    readOnly || !settings.collectGoLive
+    readOnly || !settings.collectGoLive || refreshing
       ? ''
       : checkableRows(content)
           .filter((r) => !allCostRows(content).find((x) => x.id === r.rowId)?.lastCheck)

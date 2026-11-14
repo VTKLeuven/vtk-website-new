@@ -1,5 +1,5 @@
 import { parseShopUrl, shopOfUrl, SHOPS, type ShopId } from '@/lib/priceCheck/shops';
-import { costSections } from './calc';
+import { allCostRows, costSections } from './calc';
 import type { BudgetContent, CostRow, PriceCheck, VatBasis } from './types';
 
 /** Hoe lang een prijs van een winkel geldt voor de site ze opnieuw vraagt. */
@@ -8,7 +8,7 @@ export const PRICE_TTL_MS = 4 * 60 * 60 * 1000;
 /*
  * Prijzen bij een webshop nakijken: welke regels in aanmerking komen, en wat
  * het antwoord van de winkel betekent voor een regel. Puur; het ophalen
- * gebeurt op de server (`checkPricesAction`). Welke winkels, staat in
+ * gebeurt op de server (`priceRound.ts`). Welke winkels, staat in
  * `lib/priceCheck/shops.ts`.
  */
 
@@ -204,4 +204,24 @@ export function rowsToCheck(content: BudgetContent, now: number): CheckableRow[]
       .map((r) => [r.id, r])
   );
   return rows.filter((r) => !byId.get(r.rowId)?.lastCheck);
+}
+
+/**
+ * Wat de prijsronde intussen in de databank zette, overhouden wanneer een
+ * editor bewaart die het nog niet had. De ronde loopt op de server (om de vier
+ * uur, ook zonder dat iemand kijkt) en wijzigt `updatedAt` niet; een editor die
+ * openstond, stuurt daarna het hele budget terug, met de oude controles erin.
+ * Per regel wint de jongste controle, zolang de link dezelfde bleef: wie een
+ * andere link plakte, wil geen antwoord over het vorige product.
+ */
+export function keepNewerChecks(stored: BudgetContent | null, next: BudgetContent): void {
+  if (!stored) return;
+  const before = new Map(allCostRows(stored).map((r) => [r.id, r]));
+  for (const row of allCostRows(next)) {
+    const was = before.get(row.id);
+    const check = was?.lastCheck;
+    if (!check || (was.source?.url ?? '') !== (row.source?.url ?? '')) continue;
+    if (!row.lastCheck || Date.parse(check.at) > Date.parse(row.lastCheck.at)) row.lastCheck = check;
+  }
+  if (stored.pricesAt && (!next.pricesAt || stored.pricesAt > next.pricesAt)) next.pricesAt = stored.pricesAt;
 }

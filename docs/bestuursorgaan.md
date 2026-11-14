@@ -441,9 +441,24 @@ Indienen op de site (`submitBoBudgetAction`) bestaat, maar staat niet in de
 editor zolang het BO met Drive werkt.
 
 **Prijzen nakijken gebeurt vanzelf.** Er is geen knop "Prijzen nakijken" meer.
-Wie een budget opent, in Maken, in Nakijken of via een deellink, laat de site de
-regels met een link naar één product bij een gekende winkel nakijken
-(`refreshPricesAction`):
+De regels met een link naar één product bij een gekende winkel worden nagekeken
+(`lib/bo/budget/priceRound.ts`):
+
+- **om de vier uur door de server**, voor de budgetten van het eerstvolgende BO
+  (niet ingediend, BO-datum van vandaag tot en met de datum van de eerstvolgende
+  BO-map in Drive), ook als niemand ze opent. Dat loopt in de
+  `background-worker` (`refreshDueBudgetPrices` in
+  `/api/background/maintenance`), die elke vijf minuten langskomt; per budget
+  beslist `rowsToCheck` of het al tijd is. De worker wacht hoogstens twintig
+  seconden op de ronde, en er loopt er nooit meer dan één tegelijk;
+- **wanneer iemand een budget opent**, in Maken, in Nakijken of via een
+  deellink, voor elk budget dat nog niet vastligt (`refreshBudgetPrices` via
+  `POST /api/bo/budgets/[id]/prices`). Een nieuwe link in de editor gaat langs
+  dezelfde route, met `rows`.
+
+Dat zijn **route handlers en geen server actions**: Next stuurt server actions
+vanuit de browser één voor één, dus een ronde van een halve minuut hield elke
+bewaring van de editor zolang tegen. Verder:
 
 - hoogstens één ronde per vier uur per budget (`BudgetContent.pricesAt`,
   `rowsToCheck`), en de server onthoudt elk product vier uur en voegt
@@ -454,7 +469,10 @@ regels met een link naar één product bij een gekende winkel nakijken
   BO van" is voorbij (`pricesStillChecked`). Er bestaat geen aparte
   goedkeuring op de site, dus dit is wat "goedgekeurd" hier betekent;
 - de uitkomst komt in het budget zonder `updatedAt` te wijzigen, zodat een
-  editor die openstaat gewoon blijft bewaren.
+  editor die openstaat gewoon blijft bewaren. Bewaarde iemand tijdens de ronde,
+  dan leest de ronde het budget opnieuw en zet ze de antwoorden in die versie;
+  bewaart een editor die de ronde nog niet had, dan houdt de server de jongste
+  controle per regel (`keepNewerChecks`), zolang de link dezelfde bleef.
 
 Wat er terugkomt, staat in `lastCheck` van de regel: klopt, gewijzigd (met
 "overnemen"), niet gevonden, of geen antwoord. De uitkomst wordt bij het tonen
@@ -488,8 +506,14 @@ De kop van de editor heeft een schakelaar. **Maken** is het werkblad: cellen om
 in te typen, het paneel achter het potlood, de knoppen. **Nakijken**
 (`BudgetReview.tsx`) is hetzelfde budget op één blad: bovenaan de bedragen, en
 per sectie één dichte tabel met per regel de som ("30 % × 150 p × 2 ÷ 24 = 4
-bak ×"), de prijs met incl. of excl., het bedrag, het resultaat en de bron met
-de stand van de prijscontrole. Wat in Maken achter het potlood zit, staat daar
+bak ×"), de prijs met incl. of excl., het bedrag, het resultaat, de bron en de
+controle. **Bron** is enkel waar de prijs vandaan komt (de winkel als link, een
+offerte, een vaste prijs). **Controle** is een icoon met de uitleg als tooltip
+(klopt, loopt, zelf nagekeken door wie en wanneer, geen bron), met enkel voor
+wat aandacht vraagt een kort woord ("winkel: 36,49", "geen antwoord").
+"Zelf nagekeken" en "Intrekken" zijn icoonknoppen die bij hover of focus
+verschijnen, op een smal scherm altijd; de prijs van de winkel overnemen staat
+er meteen. Wat in Maken achter het potlood zit, staat daar
 gewoon in de rij. Er is geen lijst "Aandachtspunten" meer: wat aan een regel
 scheelt, staat bij die regel (een bolletje voor de naam, de stand bij de bron).
 Wie mag wijzigen, kan in Nakijken twee dingen: op een prijs klikken om ze te
@@ -638,7 +662,7 @@ prijs opgehaald wordt (`via`). Getest in november 2026:
 
 | Winkel | Bladen (van 209) | Hoe | Stand |
 | ------ | ---------------- | --- | ----- |
-| collectandgo.be | 90 | gewone aanvraag, JSON-LD; langs de prijsbrowser zodra die aan staat (`routeOf` in `lib/priceCheck/fetch.ts`), want Collect&Go weigert het IP van de server met HTTP 456 | werkt vanop een gewone verbinding; vanop de server enkel met `PRICE_BROWSER_PROXY` |
+| collectandgo.be | 90 | gewone aanvraag, JSON-LD; langs de prijsbrowser zodra die aan staat (`routeOf` in `lib/priceCheck/fetch.ts`), want Collect&Go weigert het IP van de server met HTTP 456. Daar één open pagina die de productpagina's zelf ophaalt (zie "De prijsbrowser") | werkt vanop een gewone verbinding; vanop de server enkel met `PRICE_BROWSER_PROXY` |
 | bol.com | 35 | prijsbrowser, JSON-LD | werkt |
 | partywinkel.be | 30 | prijsbrowser, JSON-LD en `og:price:amount` (de gekozen variant) | werkt |
 | helloprint.com, drukzo.be | 14 en 4 | gewone aanvraag, JSON-LD, prijs van de gekozen configuratie, **excl. BTW** | werkt (505,99 excl. = 612,25 incl. op de pagina) |
@@ -668,6 +692,18 @@ API die de pagina zelf gebruikt, op het nummer uit de link. Geen pagina per
 product: wie er twintig na elkaar opent, houdt de botbeveiliging van Colruyt
 tegen (HTTP 456), en dat was ook wat er bij de eerste poging gebeurde. Zonder
 postcode zegt de regel dat; een postcode zonder Colruyt-winkel ook.
+
+**Collect&Go gaat ook zo.** Eerst opende de prijsbrowser per product een
+volledige pagina, twee tegelijk: vijf tot vijftien seconden per product, dus
+een budget met twintig dranken stond minuten te wachten, en de rest van de
+editor wachtte mee. Nu houdt de prijsbrowser één Collect&Go-pagina open en haalt
+die pagina de productpagina's zelf op (`fetch` vanuit de pagina, met haar
+cookies), vier tegelijk, zonder ze te tekenen; gemeten een kwart tot driekwart
+seconde per product. Stuurt de botbeveiliging van Colruyt ("Colruyt | AntiBot")
+een wachtpagina, dan opent één product een volledige pagina die ze uitzit; de
+andere wachten daarop en proberen één keer opnieuw. Komt ook die pagina niet
+door, dan antwoordt de prijsbrowser tien minuten lang meteen "tegengehouden" in
+plaats van elk product een halve minuut te laten wachten.
 
 Aanzetten op een server:
 
@@ -702,10 +738,11 @@ Waarom zo:
   zit de browser uit, hoogstens twintig seconden. Er wordt geen captcha
   opgelost en geen vingerafdruk vervalst: lukt het zo niet, dan is het
   antwoord "geen antwoord".
-- **Rustig.** Enkel wanneer iemand een budget opent dat nog niet vastligt,
-  hoogstens één ronde per vier uur per budget, hoogstens twee pagina's
-  tegelijk, zonder afbeeldingen, en een gevonden prijs blijft vier uur
-  onthouden. Niet 's nachts en niet voor budgetten die niemand opent.
+- **Rustig.** Voor de budgetten van het eerstvolgende BO en wanneer iemand
+  een budget opent dat nog niet vastligt, hoogstens één ronde per vier uur per
+  budget, hoogstens twee volledige pagina's en vier lichte aanvragen tegelijk,
+  zonder afbeeldingen, en een gevonden prijs blijft vier uur onthouden. Niet
+  voor budgetten van een later BO die niemand opent.
 - **Geen `build:` in compose.** Het officiële Playwright-image met het script
   erin gemount; zo blijven `infra/deploy.sh` (drie builds), de lockfile en
   `scripts/affected-apps.mjs` wat ze waren. Wijzigt `server.cjs`, herstart dan
@@ -742,7 +779,7 @@ model gelegd.
   typt de verkoopprijs in de berekening.
 - De som van de begroting per post uit de site: de begroting wordt opgeladen,
   niet op de site opgesteld.
-- Prijzen nakijken gebeurt wanneer iemand een budget opent, niet 's nachts.
+- Prijzen nakijken zonder bezoek gebeurt enkel voor het eerstvolgende BO.
 - Een echte goedkeuring door het BO: een budget ligt vast eens het ingediend is
   of de BO-datum voorbij is.
 - Een deellink verloopt niet vanzelf; intrekken doet de post.
@@ -773,6 +810,13 @@ model gelegd.
   server bij Hetzner, is niet getest; zo niet, dan zegt de editor bij elke regel
   "geen antwoord" en bevestigt de post de prijs. Zet geen browser-user-agent in
   de plaats om dat te omzeilen.
+- **Geen prijzen van derden.** colruyt-prijzen.nasaj.be (en de repo's
+  `colruyt-products-scraper` en `colruyt-price-history` erachter) zijn in
+  november 2026 bekeken: de prijzen op die site stonden stil sinds maart 2024,
+  en de scraper gebruikt dezelfde API van Colruyt (met de sleutel uit een
+  browsersessie) als de prijsbrowser al doet, voor één vaste winkel. Er valt
+  dus niets bij te halen, en een budget hangt dan niet af van iemands
+  hobbyproject.
 - **De site volgt nooit zomaar een link.** De actie herkent eerst een product op
   collectandgo.be en bouwt zelf de URL; zo kan niemand de server een willekeurig
   adres laten opvragen.

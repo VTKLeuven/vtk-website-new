@@ -12,6 +12,7 @@ import {
   checkFromLookup,
   confirmRow,
   isUncheckableShopLink,
+  keepNewerChecks,
   openCheck,
   pricesStillChecked,
   PRICE_TTL_MS,
@@ -356,6 +357,34 @@ describe('prijzen vanzelf nakijken, en met de hand bevestigen', () => {
     // Wie de prijs aanpast naar die van de winkel, ziet meteen dat het klopt.
     row.price = 8.99;
     expect(openCheck(row)).toBeNull();
+  });
+
+  it('houdt wat de prijsronde intussen vond, wanneer een open editor bewaart', () => {
+    const stored = withRow(shopRow({ lastCheck: { at: '2026-11-14T12:00:00.000Z', status: 'ok', price: 7.99 } }));
+    stored.pricesAt = '2026-11-14T12:00:00.000Z';
+    // De editor stond al open voor de ronde: zonder antwoord, en met een andere naam.
+    const next = withRow(shopRow({ name: 'Stickers groot' }));
+    keepNewerChecks(stored, next);
+    const row = (next.sections.find((s) => s.type === 'fixed') as CostSection).rows[0];
+    expect(row.lastCheck).toMatchObject({ status: 'ok', price: 7.99 });
+    expect(row.name).toBe('Stickers groot');
+    expect(next.pricesAt).toBe('2026-11-14T12:00:00.000Z');
+  });
+
+  it('geeft een nieuwe link geen antwoord over het vorige product', () => {
+    const stored = withRow(shopRow({ lastCheck: { at: '2026-11-14T12:00:00.000Z', status: 'ok', price: 7.99 } }));
+    const next = withRow(
+      shopRow({ source: { type: 'webshop', url: 'https://www.bol.com/be/nl/p/andere/9300000038335240/' } })
+    );
+    keepNewerChecks(stored, next);
+    expect((next.sections.find((s) => s.type === 'fixed') as CostSection).rows[0].lastCheck).toBeUndefined();
+  });
+
+  it('laat een jonger antwoord uit de editor staan', () => {
+    const stored = withRow(shopRow({ lastCheck: { at: '2026-11-14T08:00:00.000Z', status: 'ok', price: 7.99 } }));
+    const next = withRow(shopRow({ lastCheck: { at: '2026-11-14T12:00:00.000Z', status: 'changed', price: 8.49 } }));
+    keepNewerChecks(stored, next);
+    expect((next.sections.find((s) => s.type === 'fixed') as CostSection).rows[0].lastCheck?.price).toBe(8.49);
   });
 
   it('laat een winkel die even niet antwoordt een recente prijs niet uitwissen', () => {

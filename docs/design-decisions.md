@@ -12079,6 +12079,21 @@ vroegen").
     tussen een verse prijs op het BO en een winkel die niet bestookt wordt;
     honderd kijkers tegelijk zijn één aanvraag. Na het BO verandert een budget
     niet meer, dus ook zijn prijzen niet.
+  - *Bron en controle als twee kolommen, de controle als icoon (14 november
+    2026).* De kolom "Bron en controle" zette per regel een link met pijltje,
+    een zin en een omkaderde knop naast elkaar, en las als een muur van
+    "Collect&Go ↗ wordt vanzelf nagekeken [Zelf nagekeken]". Vier richtingen
+    zijn bekeken (icoon, twee kolommen met een woord, enkel wat scheelt, per
+    winkel gegroepeerd); gekozen is het icoon, met de uitleg in de tooltip,
+    zoals de rij-acties elders in de admin. Wat aandacht vraagt, blijft een
+    zichtbaar woord.
+  - *De budgetten van het eerstvolgende BO ook zonder bezoek (14 november
+    2026).* Wachten tot iemand een budget opent, betekende dat de GM een budget
+    opende waarvan de helft nog "wordt vanzelf nagekeken" zei. De server kijkt
+    dus om de vier uur de niet-ingediende budgetten na met een BO-datum tot en
+    met het eerstvolgende BO in Drive. Budgetten voor een later BO wachten nog
+    op een bezoek: die zijn nog in opbouw, en hun prijs is tegen het BO toch
+    weer vier uur oud.
   - *Zelf nagekeken, met naam en uur.* Een link naar een frituur kan de site
     niet lezen. Dan zegt een mens dat hij keek, en staat erbij wie en wanneer:
     zonder naam is "nagekeken" een vinkje dat niemand hoeft te verantwoorden.

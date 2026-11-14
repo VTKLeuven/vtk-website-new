@@ -9,6 +9,7 @@ import { processDueNoShows } from "@/lib/theokot-server";
 import { backfillMagazineCovers } from "@/lib/magazineCover";
 import { processDuePalPlusReminders } from "@/lib/palPlusNotify";
 import { runNightlyStorageCleanup } from "@/lib/storage-cleanup";
+import { refreshDueBudgetPrices } from "@/lib/bo/budget/priceRound";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
   }
 
   const now = new Date();
-  const [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse, opruiming, peilingen, pocRollen] = await Promise.allSettled([
+  const [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse, opruiming, peilingen, pocRollen, budgetprijzen] = await Promise.allSettled([
     processDueNoShows(now),
     processDueLesbezoekScheduledMails(now),
     // De stand van de mailinglijsten van vandaag, voor de grafiek in
@@ -78,12 +79,16 @@ export async function POST(request: Request) {
     // De POC-rollen op Discord lopen mee met richting en studiebevestiging; zie
     // lib/discord/pocAccess.ts.
     syncPocDiscordRoles(now),
+    // De prijzen bij de webshops in de budgetten van het eerstvolgende BO, om
+    // de vier uur per budget, ook als niemand het opent; zie
+    // lib/bo/budget/priceRound.ts.
+    refreshDueBudgetPrices(now),
   ]);
 
   // 502 zodra een van de taken viel: de healthcheck van de worker ziet dan dat
   // er iets scheelt in plaats van stil niets te doen. De andere taken zijn wel
   // gedraaid, en alle zijn idempotent, dus de volgende ronde haalt het in.
-  const failed = [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse, opruiming, peilingen, pocRollen].some(
+  const failed = [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse, opruiming, peilingen, pocRollen, budgetprijzen].some(
     (task) => task.status === "rejected",
   );
   if (failed) {
@@ -98,6 +103,7 @@ export async function POST(request: Request) {
       opruiming: describe(opruiming),
       peilingen: describe(peilingen),
       pocRollen: describe(pocRollen),
+      budgetprijzen: describe(budgetprijzen),
     });
   }
 
@@ -113,6 +119,7 @@ export async function POST(request: Request) {
       opruiming: describe(opruiming),
       peilingen: describe(peilingen),
       pocRollen: describe(pocRollen),
+      budgetprijzen: describe(budgetprijzen),
     },
     { status: failed ? 502 : 200, headers: { "Cache-Control": "no-store" } },
   );

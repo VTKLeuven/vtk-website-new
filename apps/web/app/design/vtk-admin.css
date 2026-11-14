@@ -7169,6 +7169,10 @@ button.vtk-bud-dot {
   white-space: nowrap;
 }
 
+.vtk-admin-main .vtk-rev-table th.num {
+  text-align: right;
+}
+
 .vtk-rev-name {
   min-width: 180px;
   font-weight: 550;
@@ -7217,9 +7221,86 @@ button.vtk-bud-dot {
 
 .vtk-rev-source,
 .vtk-rev-note {
-  min-width: 200px;
-  max-width: 340px;
+  min-width: 120px;
+  max-width: 300px;
   color: var(--body) !important;
+}
+
+.vtk-rev-who {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* Controle: een icoon met de uitleg als tooltip, een kort woord enkel voor wat
+   aandacht vraagt, en de rij-acties die pas bij hover of focus verschijnen. */
+.vtk-rev-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.vtk-rev-state {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  color: var(--muted);
+  cursor: help;
+}
+
+.vtk-rev-state[data-tone='ok'] {
+  color: var(--ok-ink);
+}
+
+.vtk-rev-state[data-tone='bad'],
+.vtk-rev-word[data-tone='bad'] {
+  color: var(--danger-ink);
+}
+
+.vtk-rev-state[data-tone='low'],
+.vtk-rev-word[data-tone='low'] {
+  color: var(--low-ink);
+}
+
+.vtk-rev-word {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.vtk-rev-table .vtk-rev-ico {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+}
+
+.vtk-rev-table .vtk-rev-ico svg {
+  width: 14px;
+  height: 14px;
+}
+
+.vtk-rev-hover {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.vtk-rev-table tr:hover .vtk-rev-hover,
+.vtk-rev-table tr:focus-within .vtk-rev-hover {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .vtk-rev-hover {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vtk-rev-hover {
+    transition: none;
+  }
 }
 
 .vtk-rev-src {
@@ -7236,21 +7317,18 @@ button.vtk-bud-dot {
   text-underline-offset: 2px;
 }
 
-.vtk-rev-status {
-  color: var(--muted);
-  font-size: 12px;
+.vtk-rev-src a {
+  font-weight: 500;
+  text-decoration-color: var(--line-2);
 }
 
-.vtk-rev-status[data-status='ok'],
-.vtk-rev-status[data-status='confirmed'] {
-  color: var(--ok-ink);
+.vtk-rev-src a:hover {
+  text-decoration-color: currentColor;
 }
 
-.vtk-rev-status[data-status='changed'],
-.vtk-rev-status[data-status='notfound'],
-.vtk-rev-status[data-status='nolink'] {
-  color: var(--danger-ink);
-  font-weight: 600;
+.vtk-admin-main .vtk-rev-table td.vtk-rev-control {
+  padding-top: 3px;
+  padding-bottom: 3px;
 }
 
 /* Wat aan een regel scheelt: een bolletje voor de naam (de uitleg in de
@@ -7290,35 +7368,6 @@ button.vtk-bud-dot {
   font-weight: 650;
 }
 
-.vtk-rev-btn {
-  padding: 1px 9px;
-  border: 1px solid var(--line-2);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--ink);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 550;
-  cursor: pointer;
-}
-
-.vtk-rev-btn:hover {
-  border-color: var(--ink);
-}
-
-.vtk-rev-btn[data-primary] {
-  border-color: var(--ink);
-}
-
-.vtk-rev-confirmed {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 2px 8px;
-  color: var(--ok-ink);
-  font-size: 12px;
-}
-
 .vtk-rev-price {
   margin: -2px -7px;
   padding: 1px 6px;
@@ -7352,7 +7401,7 @@ button.vtk-bud-dot {
 }
 
 @media print {
-  .vtk-rev-btn {
+  .vtk-rev-ico {
     display: none;
   }
 }
@@ -7709,6 +7758,17 @@ button.vtk-bud-dot {
 
   .vtk-admin-main .vtk-rev-table td:empty {
     display: none;
+  }
+
+  /* Controle over de volle breedte, met de knoppen altijd zichtbaar: op een
+     smal scherm is er geen hover. */
+  .vtk-admin-main .vtk-rev-table td.vtk-rev-control {
+    grid-column: 1 / -1;
+    align-items: center;
+  }
+
+  .vtk-rev-hover {
+    opacity: 1;
   }
 
   .vtk-rev-table .vtk-rev-sub {

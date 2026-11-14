@@ -29,15 +29,7 @@ import { parseDocumentName } from '@/lib/bo/names';
 import { resolvePostKeys } from '@/lib/bo/posts';
 import { downloadSpreadsheet } from '@/lib/google/client';
 import { getGoogleConfig } from '@/lib/google/config';
-import {
-  applyCheck,
-  checkFromLookup,
-  pricesStillChecked,
-  rowsToCheck,
-  stampConfirmations,
-  type Lookup,
-} from '@/lib/bo/budget/prices';
-import { allCostRows } from '@/lib/bo/budget/calc';
+import { keepNewerChecks, stampConfirmations } from '@/lib/bo/budget/prices';
 import { newId } from '@/lib/bo/budget/templates';
 import { lookupShopProduct, priceBrowserStatus, routeOf } from '@/lib/priceCheck/fetch';
 import { parseShopUrl, shopOfUrl, SHOPS } from '@/lib/priceCheck/shops';
@@ -45,9 +37,7 @@ import { templateContent } from '@/lib/bo/budget/templates';
 import {
   BUDGET_TEMPLATES,
   type BudgetContent,
-  type BudgetSettings,
   type BudgetTemplate,
-  type PriceCheck,
 } from '@/lib/bo/budget/types';
 
 /*
@@ -149,7 +139,10 @@ export async function saveBoBudgetAction(input: {
   const content = normalizeContent(parsed);
   // Wie een prijs met de hand bevestigde, zegt de server en niet de browser.
   const who = access.via === 'link' ? 'iemand met de deellink' : ((await getCurrentSession())?.user.name ?? 'onbekend');
-  stampConfirmations(parseBudgetContent(budget.content), content, who);
+  const stored = parseBudgetContent(budget.content);
+  stampConfirmations(stored, content, who);
+  // Wat de prijsronde intussen vond, gaat niet verloren omdat deze editor het nog niet had.
+  keepNewerChecks(stored, content);
 
   const settings = await getBudgetSettings();
   // Enkel bewaren als niemand er intussen aan kwam: de voorwaarde op updatedAt
@@ -270,111 +263,11 @@ export async function saveBudgetSettingsAction(_prev: SaveState, formData: FormD
   return saveOk();
 }
 
-export type PriceCheckResponse =
-  { ok: true; results: { rowId: string; lookup: Lookup }[] } | { ok: false; code: string };
-
-/**
- * De productpagina's van de gekende winkels opvragen (de link wordt eerst
- * herkend, nooit zomaar gevolgd), hoogstens 60 per keer en drie tegelijk. Elke
- * pagina één keer, ook als twee regels hetzelfde product hebben; wat de site
- * de voorbije vier uur al vroeg, komt uit haar geheugen (`lib/priceCheck/fetch.ts`).
+/*
+ * Prijzen nakijken staat niet meer hier: een server action wacht in de browser
+ * op de vorige, dus een ronde van een halve minuut hield elke bewaring tegen.
+ * Zie `lib/bo/budget/priceRound.ts` en `/api/bo/budgets/[id]/prices`.
  */
-async function lookupRows(
-  rows: { rowId: string; url: string }[],
-  settings: BudgetSettings,
-  fresh = false
-): Promise<{ rowId: string; lookup: Lookup }[]> {
-  const wanted = rows.slice(0, 60).flatMap((row) => {
-    const ref = parseShopUrl(String(row?.url ?? ''));
-    return ref ? [{ rowId: String(row.rowId).slice(0, 40), ref, page: ref.page }] : [];
-  });
-  const pages = [...new Map(wanted.map((w) => [w.page, w.ref])).entries()];
-  const found = new Map<string, Lookup>();
-  for (let i = 0; i < pages.length; i += 3) {
-    const batch = pages.slice(i, i + 3);
-    const lookups = await Promise.all(
-      batch.map(([, ref]) => lookupShopProduct(ref, { fresh, colruytPostcode: settings.colruytPostcode }))
-    );
-    batch.forEach(([page, ref], j) => {
-      const lookup = lookups[j];
-      found.set(
-        page,
-        lookup.status === 'found' ? { ...lookup, basis: ref.basis, shop: ref.shop } : { ...lookup, shop: ref.shop }
-      );
-    });
-  }
-  return wanted.map((w) => ({ rowId: w.rowId, lookup: found.get(w.page)! }));
-}
-
-/**
- * De prijs van de regels die de editor meestuurt nu opvragen: na een nieuwe
- * link, of met "Nu nakijken" bij een regel (dan vers bij de winkel, niet uit
- * het geheugen). Verandert niets aan het budget: de editor zet de uitkomst in
- * de regels en bewaart dan zoals bij elke wijziging.
- */
-export async function checkPricesAction(input: {
-  id: string;
-  rows: { rowId: string; url: string }[];
-  token?: string | null;
-  fresh?: boolean;
-}): Promise<PriceCheckResponse> {
-  const budget = await prisma.boBudget.findUnique({ where: { id: String(input.id) } });
-  if (!budget) return { ok: false, code: 'NOT_FOUND' };
-  const access = await budgetAccess(budget, input.token);
-  if (access?.level !== 'edit') return { ok: false, code: 'NOT_YOUR_POST' };
-  const settings = await getBudgetSettings();
-  if (!settings.collectGoLive) return { ok: false, code: 'DISABLED' };
-  const rows = Array.isArray(input.rows) ? input.rows : [];
-  // Vers bij de winkel enkel voor één regel: een hele lijst hoeft dat niet.
-  return { ok: true, results: await lookupRows(rows, settings, !!input.fresh && rows.length === 1) };
-}
-
-export type PriceRefreshResponse =
-  { ok: true; at: string | null; checks: Record<string, PriceCheck> } | { ok: false; code: 'NOT_FOUND' | 'DISABLED' };
-
-/**
- * De prijzen van een budget vanzelf nakijken wanneer iemand het opent, ook wie
- * enkel meekijkt. Hoogstens één ronde per vier uur per budget, en de winkel
- * hoort elk product hoogstens één keer per vier uur, hoeveel mensen er ook
- * tegelijk kijken. Na het BO waarvoor het budget was (of eens ingediend) niet
- * meer: dan ligt het vast.
- *
- * De uitkomst komt in het budget zelf, zonder `updatedAt` te wijzigen: een
- * editor die openstaat, blijft gewoon bewaren.
- */
-export async function refreshPricesAction(input: { id: string; token?: string | null }): Promise<PriceRefreshResponse> {
-  const budget = await prisma.boBudget.findUnique({ where: { id: String(input.id) } });
-  if (!budget || !(await budgetAccess(budget, input.token))) return { ok: false, code: 'NOT_FOUND' };
-  const settings = await getBudgetSettings();
-  if (!settings.collectGoLive) return { ok: false, code: 'DISABLED' };
-  const content = parseBudgetContent(budget.content);
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Brussels' }).format(new Date());
-  const open = pricesStillChecked(
-    { status: budget.status, targetDate: budget.targetDate?.toISOString().slice(0, 10) ?? null },
-    today
-  );
-  if (!content || !open) return { ok: true, at: null, checks: {} };
-  const rows = rowsToCheck(content, Date.now());
-  if (rows.length === 0) return { ok: true, at: null, checks: {} };
-
-  const results = await lookupRows(rows, settings);
-  const at = new Date().toISOString();
-  const checks: Record<string, PriceCheck> = {};
-  for (const row of allCostRows(content)) {
-    const hit = results.find((r) => r.rowId === row.id);
-    if (!hit) continue;
-    applyCheck(row, checkFromLookup(row, hit.lookup, at));
-    if (row.lastCheck) checks[row.id] = row.lastCheck;
-  }
-  // Een volledige ronde zet de klok; een losse nieuwe regel niet.
-  if (rows.length === rowsToCheck({ ...content, pricesAt: null }, Date.now()).length) content.pricesAt = at;
-  // Enkel als niemand intussen bewaarde: anders zet de editor van die persoon de uitkomst er zelf in.
-  await prisma.boBudget.updateMany({
-    where: { id: budget.id, updatedAt: budget.updatedAt },
-    data: { content: content as unknown as Prisma.InputJsonValue, updatedAt: budget.updatedAt },
-  });
-  return { ok: true, at: content.pricesAt ?? null, checks };
-}
 
 /**
  * Een vaste prijs onthouden vanuit een budget: de huur van een zaal, een vat.

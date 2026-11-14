@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { refreshPricesAction } from '@/app/actions/boBudgets';
+import { refreshPrices } from './priceApi';
 
 /**
  * Kijkt de prijzen van een budget vanzelf na voor wie enkel meekijkt (de
@@ -16,11 +16,9 @@ export function PriceRefresh({ id, token }: { id: string; token: string }) {
   useEffect(() => {
     if (done.current) return;
     done.current = true;
-    void refreshPricesAction({ id, token })
-      .then((result) => {
-        if (result.ok && Object.keys(result.checks).length > 0) router.refresh();
-      })
-      .catch(() => undefined);
+    void refreshPrices(id, token).then((result) => {
+      if (result.ok && Object.keys(result.checks).length > 0) router.refresh();
+    });
   }, [id, token, router]);
   return null;
 }

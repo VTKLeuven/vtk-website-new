@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactElement } from 'react';
 import {
   audienceCount,
   baseOf,
@@ -32,6 +32,18 @@ import { shopOfUrl, SHOPS } from '@/lib/priceCheck/shops';
 import { money, percent, plain, shortDate } from './format';
 import { Money } from './Money';
 import { NumberField } from './NumberField';
+import { IconButton } from '@/components/ui/IconButton';
+import {
+  AlertIcon,
+  CheckIcon,
+  CheckSquareIcon,
+  ClockIcon,
+  InfoIcon,
+  LinkOffIcon,
+  TakeOverIcon,
+  UndoIcon,
+  UserCheckIcon,
+} from '@/components/ui/icons';
 
 /*
  * Een budget om na te kijken: alles wat de GM of het BO moet zien op één
@@ -70,65 +82,245 @@ function checkedWhen(iso: string, nl: boolean): string {
   });
 }
 
+type ControlState =
+  | 'ok'
+  | 'fixed'
+  | 'confirmed'
+  | 'waiting'
+  | 'changed'
+  | 'notfound'
+  | 'failed'
+  | 'byhand'
+  | 'nolink'
+  | 'nosource'
+  | 'offfixed';
+
+/** De stand van de prijs van een regel, voor de kolom Controle. */
+type Control = {
+  state: ControlState;
+  /** De uitleg in de tooltip: wat, wanneer en door wie. */
+  tip: string;
+  /** Een kort woord naast het icoon, enkel voor wat aandacht vraagt. */
+  word?: string;
+  /** Mag iemand zeggen dat hij de prijs zelf nakeek? De site kon ze niet bevestigen. */
+  offer: boolean;
+  /** De prijs die de winkel nu vraagt, om over te nemen. */
+  shopPrice?: number;
+};
+
+const TONE: Record<ControlState, 'ok' | 'muted' | 'bad' | 'low'> = {
+  ok: 'ok',
+  fixed: 'ok',
+  confirmed: 'ok',
+  waiting: 'muted',
+  byhand: 'muted',
+  changed: 'bad',
+  notfound: 'bad',
+  nolink: 'bad',
+  nosource: 'bad',
+  offfixed: 'bad',
+  failed: 'low',
+};
+
+const ICON: Record<ControlState, () => ReactElement> = {
+  ok: CheckIcon,
+  fixed: CheckIcon,
+  confirmed: UserCheckIcon,
+  waiting: ClockIcon,
+  byhand: InfoIcon,
+  changed: AlertIcon,
+  notfound: AlertIcon,
+  failed: AlertIcon,
+  offfixed: AlertIcon,
+  nolink: LinkOffIcon,
+  nosource: LinkOffIcon,
+};
+
+function confirmedTip(row: CostRow, nl: boolean): string {
+  const who = row.checkedBy || (nl ? 'iemand' : 'someone');
+  return nl
+    ? `Zelf nagekeken door ${who} op ${checkedWhen(row.checkedAt ?? '', nl)}`
+    : `Checked by ${who} on ${checkedWhen(row.checkedAt ?? '', nl)}`;
+}
+
 /**
- * Wie de prijs zelf nakeek en wanneer, of de knop om dat te zeggen. Voor een
- * link naar een winkel die de site niet kent (een frituur, een verhuurder) en
- * voor een regel zonder bron is dit de controle.
+ * Hoe het staat met de prijs van een regel. Null voor een regel zonder prijs om
+ * na te kijken (een forfait, de rest, de prijs van de zaal).
  */
-function Confirmation({
+function controlOf(content: BudgetContent, ctx: CalcContext, row: CostRow, nl: boolean): Control | null {
+  if (row.rest || row.service || row.forfait) return null;
+  const confirmed: Control | null = row.checkedAt
+    ? { state: 'confirmed', tip: confirmedTip(row, nl), offer: false }
+    : null;
+  const s = row.source;
+  if (!s) {
+    if (confirmed) return confirmed;
+    const fixed = fixedPriceOf(content, ctx, row);
+    if (fixed?.exact)
+      return {
+        state: 'fixed',
+        tip: nl ? 'Vaste prijs uit de instellingen' : 'Fixed price from the settings',
+        offer: false,
+      };
+    if (fixed)
+      return {
+        state: 'offfixed',
+        word: nl ? `vast is ${money(fixed.price)}` : `fixed is ${money(fixed.price, false)}`,
+        tip: nl ? 'Deze prijs wijkt af van de vaste prijs' : 'This price differs from the fixed price',
+        offer: true,
+      };
+    return {
+      state: 'nosource',
+      tip: nl ? 'Geen bron: geen link, offerte of vaste prijs' : 'No source: no link, quote or fixed price',
+      offer: true,
+    };
+  }
+  if (s.type === 'locatie') return null;
+  if (s.type !== 'webshop' && s.type !== 'collectgo') return confirmed;
+
+  const url = s.url?.trim();
+  const isLink = !!url && /^https?:\/\//i.test(url);
+  const shopId = shopOfUrl(url);
+  const label = shopId ? SHOPS[shopId].name : s.type === 'collectgo' ? 'Collect&Go' : hostLabel(url);
+  const open = openCheck(row);
+  const live = liveCheck(row);
+  if (open?.status === 'changed') {
+    const excl = open.basis === 'excl' ? ' excl.' : '';
+    const price = open.price ?? 0;
+    return {
+      state: 'changed',
+      word: nl ? `winkel: ${money(price)}${excl}` : `shop: ${money(price, false)}${excl}`,
+      tip: nl ? `${shopName(open.shop)} vraagt nu ${money(price)}${excl}` : `The shop now asks ${money(price, false)}`,
+      offer: true,
+      shopPrice: open.price ?? undefined,
+    };
+  }
+  if (open?.status === 'notfound')
+    return {
+      state: 'notfound',
+      word: nl ? 'niet meer te vinden' : 'not found',
+      tip: nl ? `Het product staat niet meer bij ${label}` : `The product is no longer at ${label}`,
+      offer: true,
+    };
+  if (open?.status === 'failed')
+    return {
+      state: 'failed',
+      word: nl ? 'geen antwoord' : 'no answer',
+      tip: nl
+        ? `Geen antwoord van ${label}${open.reason ? ` (${open.reason})` : ''}. De site probeert het over vier uur opnieuw.`
+        : `No answer from ${label}. The site tries again in four hours.`,
+      offer: true,
+    };
+  if (live?.status === 'ok')
+    return {
+      state: 'ok',
+      tip: nl
+        ? `Prijs klopt bij ${label}, nagekeken ${checkedWhen(live.at, nl)}`
+        : `Price correct at ${label}, checked ${checkedWhen(live.at, nl)}`,
+      offer: false,
+    };
+  if (confirmed) return confirmed;
+  if (!isLink)
+    return {
+      state: 'nolink',
+      word: nl ? 'geen link' : 'no link',
+      tip: nl ? 'Geen link naar het product' : 'No link to the product',
+      offer: true,
+    };
+  if (shopId && SHOPS[shopId].live)
+    return {
+      state: 'waiting',
+      tip: nl
+        ? 'Wordt vanzelf nagekeken, om de vier uur tot het BO'
+        : 'Checked automatically every four hours until the meeting',
+      offer: true,
+    };
+  return {
+    state: 'byhand',
+    tip: nl
+      ? 'De site kan deze winkel niet zelf nakijken: kijk de prijs zelf na'
+      : 'The site cannot check this shop: check the price yourself',
+    offer: true,
+  };
+}
+
+/**
+ * De kolom Controle: een icoon met de uitleg in de tooltip, en enkel voor wat
+ * aandacht vraagt een kort woord. "Zelf nagekeken" en "Intrekken" zijn
+ * rij-acties en verschijnen bij hover of focus (op een aanraakscherm altijd);
+ * de prijs van de winkel overnemen staat er meteen, want die vraagt iets.
+ */
+function ControlCell({
+  control,
   row,
   nl,
   actions,
-  offer,
 }: {
+  control: Control;
   row: CostRow;
   nl: boolean;
   actions?: ReviewActions;
-  /** Toon de knop: de site kon deze prijs niet zelf bevestigen. */
-  offer: boolean;
 }) {
-  if (row.checkedAt)
-    return (
-      <span className="vtk-rev-confirmed">
-        <span>
-          {nl ? 'Nagekeken door ' : 'Checked by '}
-          <b>{row.checkedBy || (nl ? 'iemand' : 'someone')}</b>
-          {nl ? ' op ' : ' on '}
-          {checkedWhen(row.checkedAt, nl)}
-        </span>
-        {actions && (
-          <button type="button" className="vtk-rev-btn" onClick={() => actions.confirm(row.id, false)}>
-            {nl ? 'Intrekken' : 'Undo'}
-          </button>
-        )}
-      </span>
-    );
-  if (!actions || !offer) return null;
+  const Icon = ICON[control.state];
+  const tone = TONE[control.state];
+  const name = row.name || '…';
   return (
-    <button
-      type="button"
-      className="vtk-rev-btn"
-      data-primary
-      aria-label={nl ? `Prijs zelf nagekeken: ${row.name}` : `Price checked by hand: ${row.name}`}
-      onClick={() => actions.confirm(row.id, true)}
-    >
-      {nl ? 'Zelf nagekeken' : 'Checked by hand'}
-    </button>
+    <span className="vtk-rev-check">
+      {control.word && (
+        <span className="vtk-rev-word" data-tone={tone}>
+          {control.word}
+        </span>
+      )}
+      {actions && control.shopPrice != null && (
+        <IconButton
+          className="vtk-rev-ico"
+          label={nl ? `${money(control.shopPrice)} overnemen` : `Use ${money(control.shopPrice, false)}`}
+          srLabel={
+            nl ? `Prijs van de winkel overnemen: ${name}, ${money(control.shopPrice)}` : `Use the shop price: ${name}`
+          }
+          onClick={() => actions.accept(row.id)}
+        >
+          <TakeOverIcon />
+        </IconButton>
+      )}
+      {actions && control.offer && (
+        <IconButton
+          className="vtk-rev-ico vtk-rev-hover"
+          label={nl ? 'Zelf nagekeken' : 'Checked by hand'}
+          srLabel={nl ? `Prijs zelf nagekeken: ${name}` : `Price checked by hand: ${name}`}
+          onClick={() => actions.confirm(row.id, true)}
+        >
+          <CheckSquareIcon />
+        </IconButton>
+      )}
+      {actions && control.state === 'confirmed' && (
+        <IconButton
+          className="vtk-rev-ico vtk-rev-hover"
+          label={nl ? 'Zelf nagekeken intrekken' : 'Undo checked by hand'}
+          srLabel={nl ? `Zelf nagekeken intrekken: ${name}` : `Undo checked by hand: ${name}`}
+          onClick={() => actions.confirm(row.id, false)}
+        >
+          <UndoIcon />
+        </IconButton>
+      )}
+      <span className="vtk-rev-state" data-tone={tone} role="img" title={control.tip} aria-label={control.tip}>
+        <Icon />
+      </span>
+    </span>
   );
 }
 
+/** De kolom Bron: waar de prijs vandaan komt, zonder de stand (die staat in Controle). */
 function SourceCell({
   content,
   ctx,
   row,
   nl,
-  actions,
 }: {
   content: BudgetContent;
   ctx: CalcContext;
   row: CostRow;
   nl: boolean;
-  actions?: ReviewActions;
 }) {
   if (row.rest) return <span className="vtk-rev-muted">{nl ? 'geen aankoop' : 'nothing bought'}</span>;
   if (row.service) return <span>{nl ? 'Collect&Go-servicekost' : 'Collect&Go service cost'}</span>;
@@ -142,27 +334,16 @@ function SourceCell({
   const s = row.source;
   if (!s) {
     const fixed = fixedPriceOf(content, ctx, row);
-    return (
-      <span className="vtk-rev-src">
-        {fixed ? (
-          <span>
-            <b>{nl ? 'Vaste prijs' : 'Fixed price'}</b>
-            {normalizeName(fixed.name) !== normalizeName(row.name) ? `: ${fixed.name}` : ''}
-            {fixed.note ? ` (${fixed.note})` : ''}
-            {!fixed.exact && (
-              <span className="vtk-rev-status" data-status="changed">
-                {nl ? ` vast is ${money(fixed.price)}` : ` fixed is ${money(fixed.price, false)}`}
-              </span>
-            )}
-          </span>
-        ) : row.checkedAt ? (
-          <span className="vtk-rev-muted">{nl ? 'Zonder link' : 'No link'}</span>
-        ) : (
-          <span className="vtk-rev-flag">{nl ? 'geen bron' : 'no source'}</span>
-        )}
-        <Confirmation row={row} nl={nl} actions={actions} offer={!fixed?.exact} />
-      </span>
-    );
+    if (fixed)
+      return (
+        <span>
+          <b>{nl ? 'Vaste prijs' : 'Fixed price'}</b>
+          {normalizeName(fixed.name) !== normalizeName(row.name) ? `: ${fixed.name}` : ''}
+          {fixed.note ? ` (${fixed.note})` : ''}
+        </span>
+      );
+    if (row.checkedAt) return <span className="vtk-rev-muted">{nl ? 'Zonder link' : 'No link'}</span>;
+    return <span className="vtk-rev-flag">{nl ? 'geen bron' : 'no source'}</span>;
   }
   if (s.type === 'locatie') {
     const location = locationOf(content, ctx);
@@ -177,64 +358,20 @@ function SourceCell({
   }
   const url = s.url?.trim();
   const isLink = !!url && /^https?:\/\//i.test(url);
+  const who = row.checkedAt && row.checkedBy ? <span className="vtk-rev-who"> · {row.checkedBy}</span> : null;
   if (s.type === 'webshop' || s.type === 'collectgo') {
     const shopId = shopOfUrl(url);
     const label = shopId ? SHOPS[shopId].name : s.type === 'collectgo' ? 'Collect&Go' : hostLabel(url);
-    const open = openCheck(row);
-    const live = liveCheck(row);
-    const status = open
-      ? open.status
-      : live?.status === 'ok'
-        ? 'ok'
-        : row.checkedAt
-          ? 'confirmed'
-          : !isLink
-            ? 'nolink'
-            : shopId && SHOPS[shopId].live
-              ? 'unchecked'
-              : 'byhand';
-    const excl = open?.basis === 'excl' ? (nl ? ' excl.' : ' excl.') : '';
-    const statusText: Record<string, string> = nl
-      ? {
-          ok: `prijs klopt, nagekeken ${checkedWhen(live?.at ?? '', nl)}`,
-          confirmed: '',
-          changed: `${shopName(open?.shop)} vraagt nu ${money(open?.price ?? 0)}${excl}`,
-          notfound: 'product niet meer te vinden',
-          failed: 'geen antwoord van de winkel',
-          unchecked: 'wordt vanzelf nagekeken',
-          byhand: 'kan de site niet zelf nakijken',
-          nolink: 'geen link',
-        }
-      : {
-          ok: `price correct, checked ${checkedWhen(live?.at ?? '', nl)}`,
-          confirmed: '',
-          changed: `now ${money(open?.price ?? 0, false)}${excl}`,
-          notfound: 'product not found',
-          failed: 'no answer from the shop',
-          unchecked: 'is checked automatically',
-          byhand: 'cannot be checked by the site',
-          nolink: 'no link',
-        };
     return (
       <span className="vtk-rev-src">
         {isLink ? (
-          <a href={url} target="_blank" rel="noreferrer">
-            {label} ↗
+          <a href={url} target="_blank" rel="noreferrer" title={nl ? `Openen bij ${label}` : `Open at ${label}`}>
+            {label}
           </a>
         ) : (
           <span>{label}</span>
         )}
-        {statusText[status] && (
-          <span className="vtk-rev-status" data-status={status}>
-            {statusText[status]}
-          </span>
-        )}
-        {actions && open?.status === 'changed' && open.price != null && (
-          <button type="button" className="vtk-rev-btn" onClick={() => actions.accept(row.id)}>
-            {nl ? `${money(open.price)} overnemen` : `Use ${money(open.price, false)}`}
-          </button>
-        )}
-        <Confirmation row={row} nl={nl} actions={actions} offer={status !== 'ok'} />
+        {who}
       </span>
     );
   }
@@ -253,13 +390,13 @@ function SourceCell({
       <span>
         <b>{kind}</b>
         {s.note ? `: ${s.note}` : ''}
+        {who}
       </span>
       {isLink && (
         <a href={url} target="_blank" rel="noreferrer">
-          {nl ? 'openen' : 'open'} ↗
+          {nl ? 'openen' : 'open'}
         </a>
       )}
-      <Confirmation row={row} nl={nl} actions={actions} offer={false} />
     </span>
   );
 }
@@ -392,7 +529,8 @@ function SectionTable({
                 <th className="num">{nl ? 'Budget' : 'Budget'}</th>
                 {result && <th className="num">{nl ? 'Resultaat' : 'Result'}</th>}
                 {result && <th className="num">{nl ? 'Verschil' : 'Diff.'}</th>}
-                <th>{income ? (nl ? 'Opmerking' : 'Note') : nl ? 'Bron en controle' : 'Source and check'}</th>
+                <th>{income ? (nl ? 'Opmerking' : 'Note') : nl ? 'Bron' : 'Source'}</th>
+                {!income && <th className="num">{nl ? 'Controle' : 'Check'}</th>}
               </tr>
             </thead>
             <tbody>
@@ -438,6 +576,7 @@ function SectionTable({
                     ? 'review'
                     : undefined;
                 const vat = vatNote(content, ctx, row, nl);
+                const control = controlOf(content, ctx, row, nl);
                 return (
                   <tr key={row.id}>
                     <td className="vtk-rev-name">
@@ -486,7 +625,10 @@ function SectionTable({
                       </td>
                     )}
                     <td className="vtk-rev-source" data-label={nl ? 'Bron' : 'Source'}>
-                      <SourceCell content={content} ctx={ctx} row={row} nl={nl} actions={actions} />
+                      <SourceCell content={content} ctx={ctx} row={row} nl={nl} />
+                    </td>
+                    <td className="num vtk-rev-control" data-label={nl ? 'Controle' : 'Check'}>
+                      {control && <ControlCell control={control} row={row} nl={nl} actions={actions} />}
                     </td>
                   </tr>
                 );
@@ -510,6 +652,7 @@ function SectionTable({
                   </td>
                 )}
                 <td />
+                {!income && <td />}
               </tr>
             </tfoot>
           </table>

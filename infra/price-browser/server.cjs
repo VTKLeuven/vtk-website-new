@@ -15,10 +15,10 @@
  *   `apps/web/lib/priceCheck/shops.ts`, die de link al herkende en het adres
  *   zelf opbouwde), en breekt een navigatie naar elders af;
  * - geeft geen HTML terug, enkel de JSON-LD-blokken en de prijs-metatags;
- * - laadt geen afbeeldingen, video of lettertypes, en doet hoogstens twee
- *   pagina's tegelijk. De site vraagt een pagina hoogstens eens per halfuur
- *   (`lib/priceCheck/fetch.ts`), en enkel wanneer iemand op "Prijzen nakijken"
- *   klikt.
+ * - laadt geen afbeeldingen, video of lettertypes, en opent hoogstens twee
+ *   pagina's tegelijk. Colruyt en Collect&Go krijgen geen pagina per product
+ *   maar één open pagina met lichte aanvragen erin (zie verderop). De site
+ *   vraagt een product hoogstens eens per vier uur (`lib/priceCheck/fetch.ts`).
  *
  * CommonJS, zodat NODE_PATH werkt: `playwright` staat naast het script
  * geïnstalleerd, niet in de repo (zie de service in infra/docker-compose.yml).
@@ -36,8 +36,10 @@ const ALLOWED = (process.env.PRICE_BROWSER_HOSTS || 'bol.com,partywinkel.be,acti
   .map((h) => h.trim().toLowerCase())
   .filter(Boolean);
 const MAX_PARALLEL = 2;
+// Lichte aanvragen vanuit een open pagina (Colruyt, Collect&Go): geen nieuw tabblad, dus meer tegelijk.
+const MAX_LIGHT = 4;
 const NAV_TIMEOUT = 25_000;
-const CHALLENGE = /even geduld|just a moment|un instant|checking your browser/i;
+const CHALLENGE = /even geduld|just a moment|un instant|checking your browser|antibot/i;
 
 function allowedHost(hostname) {
   const host = hostname.toLowerCase().replace(/^www\./, '');
@@ -86,18 +88,23 @@ async function context() {
   return contextPromise;
 }
 
-let running = 0;
-const waiting = [];
-async function withSlot(job) {
-  if (running >= MAX_PARALLEL) await new Promise((resolve) => waiting.push(resolve));
-  running += 1;
-  try {
-    return await job();
-  } finally {
-    running -= 1;
-    waiting.shift()?.();
-  }
+function limiter(max) {
+  const queue = [];
+  const state = { running: 0 };
+  state.run = async (job) => {
+    if (state.running >= max) await new Promise((resolve) => queue.push(resolve));
+    state.running += 1;
+    try {
+      return await job();
+    } finally {
+      state.running -= 1;
+      queue.shift()?.();
+    }
+  };
+  return state;
 }
+const pages = limiter(MAX_PARALLEL);
+const light = limiter(MAX_LIGHT);
 
 /*
  * Colruyt toont een prijs pas voor een gekozen winkel, en haalt ze dan op bij
@@ -214,8 +221,133 @@ async function lookupColruyt(url, postcode) {
   }
 }
 
+/*
+ * Collect&Go weigert het IP van de server voor een gewone aanvraag (HTTP 456),
+ * en een pagina per product openen duurde vijf tot vijftien seconden per
+ * product, twee tegelijk: een budget met twintig dranken stond minuten te
+ * wachten. Zoals bij Colruyt blijft er dus één Collect&Go-pagina open, en
+ * vraagt die pagina de productpagina's zelf op (`fetch` vanuit de pagina, met
+ * haar cookies), zonder ze te tekenen of hun scripts te draaien. Wat terugkomt,
+ * is enkel de JSON-LD, zoals bij elke andere winkel. Gemeten op een gewone
+ * verbinding: een kwart tot driekwart seconde per product, tegen twee tot
+ * vijftien seconden voor een volledige pagina.
+ *
+ * De botbeveiliging van Colruyt ("Colruyt | AntiBot") stuurt af en toe een
+ * wachtpagina met een script in plaats van het product. Een `fetch` voert dat
+ * script niet uit; dan opent de prijsbrowser dat ene product als gewone pagina,
+ * die de wachtpagina uitzit zoals een bezoeker (`lookupPage`). De cookie die
+ * daarbij komt, geldt voor de hele context, dus de volgende producten gaan weer
+ * langs de snelle weg.
+ */
+const COLLECTGO_HOME = 'https://www.collectandgo.be/';
+const ANTIBOT = /antibot/i;
+let collectGoSession = null;
+let collectGoOpening = null;
+
+function openCollectGo() {
+  collectGoOpening ??= openCollectGoNow().finally(() => {
+    collectGoOpening = null;
+  });
+  return collectGoOpening;
+}
+
+async function openCollectGoNow() {
+  const now = Date.now();
+  if (collectGoSession?.failed && now - collectGoSession.at < 60_000) return collectGoSession;
+  if (
+    collectGoSession &&
+    !collectGoSession.failed &&
+    now - collectGoSession.at < COLRUYT_SESSION_MS &&
+    !collectGoSession.page.isClosed()
+  )
+    return collectGoSession;
+  if (collectGoSession?.page) await collectGoSession.page.close().catch(() => {});
+  collectGoSession = null;
+  const page = await (await context()).newPage();
+  const response = await page
+    .goto(COLLECTGO_HOME, { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT })
+    .catch(() => null);
+  if (ANTIBOT.test(await page.title().catch(() => '')))
+    await page.waitForFunction(() => !/antibot/i.test(document.title), null, { timeout: 20_000 }).catch(() => {});
+  const ready = !ANTIBOT.test(await page.title().catch(() => '')) && allowedHost(new URL(page.url()).hostname);
+  if (!ready || !response || response.status() >= 500) {
+    await page.close().catch(() => {});
+    // Een minuut niet opnieuw proberen: anders opent elk product de startpagina opnieuw.
+    collectGoSession = { failed: true, at: now };
+    return collectGoSession;
+  }
+  collectGoSession = { page, at: now };
+  return collectGoSession;
+}
+
+async function fetchInSession(session, url) {
+  try {
+    return await session.page.evaluate(async (target) => {
+      const res = await fetch(target, { credentials: 'include', headers: { accept: 'text/html' } });
+      const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+      return {
+        status: res.status,
+        finalUrl: res.url,
+        title: doc.title || '',
+        ld: [...doc.querySelectorAll('script[type="application/ld+json"]')]
+          .map((s) => s.textContent || '')
+          .filter((t) => t.length < 200_000)
+          .slice(0, 12),
+      };
+    }, url);
+  } catch (err) {
+    session.at = 0;
+    throw err;
+  }
+}
+
+const blocked = (found) =>
+  ANTIBOT.test(found.title || '') || [403, 405, 429, 456].includes(found.status) || found.ok === false;
+const BLOCKED_ANSWER = (url) => ({ ok: true, status: 456, finalUrl: url, title: 'Colruyt | AntiBot', ld: [], price: null });
+// Eén product tegelijk zit de wachtpagina uit; de andere wachten daarop en proberen dan opnieuw.
+let collectGoPassing = null;
+// Kwam ook de volledige pagina niet door, dan tien minuten niet opnieuw proberen:
+// elk product zou anders een halve minuut op dezelfde wachtpagina zitten.
+let collectGoBlockedUntil = 0;
+const COLLECTGO_PAUSE_MS = 10 * 60 * 1000;
+
+async function lookupCollectGo(url) {
+  if (Date.now() < collectGoBlockedUntil) return BLOCKED_ANSWER(url);
+  const session = await openCollectGo();
+  if (!session.failed) {
+    const found = await fetchInSession(session, url);
+    if (!blocked(found)) return { ok: true, price: null, ...found };
+  }
+  // Tegengehouden, of geen open pagina: één product als volledige pagina, zoals een bezoeker.
+  if (!collectGoPassing) {
+    collectGoPassing = pages.run(() => lookupPage(url)).finally(() => {
+      collectGoPassing = null;
+    });
+    const own = await collectGoPassing.catch(() => ({ ok: false, error: 'TIMEOUT' }));
+    if (blocked(own)) {
+      collectGoBlockedUntil = Date.now() + COLLECTGO_PAUSE_MS;
+      return own.ok === false ? own : BLOCKED_ANSWER(url);
+    }
+    // Die pagina kwam door, dus de context heeft nu de cookie: de volgende opent de startpagina opnieuw.
+    if (collectGoSession?.failed) collectGoSession = null;
+    return own;
+  }
+  await collectGoPassing.catch(() => {});
+  if (Date.now() < collectGoBlockedUntil) return BLOCKED_ANSWER(url);
+  const retry = await openCollectGo();
+  const again = retry.failed ? null : await fetchInSession(retry, url);
+  // Nog altijd tegengehouden: geen tweede pagina; de site zegt "geen antwoord" en probeert later opnieuw.
+  if (!again || blocked(again)) return BLOCKED_ANSWER(url);
+  return { ok: true, price: null, ...again };
+}
+
 async function lookup(url, options) {
-  if (/(^|\.)colruyt\.be$/i.test(new URL(url).hostname)) return lookupColruyt(url, options.postcode);
+  if (/(^|\.)colruyt\.be$/i.test(new URL(url).hostname)) return light.run(() => lookupColruyt(url, options.postcode));
+  if (/(^|\.)collectandgo\.be$/i.test(new URL(url).hostname)) return light.run(() => lookupCollectGo(url));
+  return pages.run(() => lookupPage(url));
+}
+
+async function lookupPage(url) {
   const ctx = await context();
   const page = await ctx.newPage();
   try {
@@ -274,7 +406,8 @@ function send(res, code, body) {
 
 http
   .createServer((req, res) => {
-    if (req.method === 'GET' && req.url === '/health') return send(res, 200, { ok: true, running });
+    if (req.method === 'GET' && req.url === '/health')
+      return send(res, 200, { ok: true, running: pages.running + light.running });
     if (req.method !== 'POST' || req.url !== '/lookup') return send(res, 404, { ok: false, error: 'NOT_FOUND' });
     if (!sameSecret(req.headers['x-price-browser-secret'])) return send(res, 401, { ok: false, error: 'UNAUTHORIZED' });
     let raw = '';
@@ -294,7 +427,7 @@ http
       }
       if (url.protocol !== 'https:' || !allowedHost(url.hostname))
         return send(res, 400, { ok: false, error: 'HOST_NOT_ALLOWED' });
-      withSlot(() => lookup(url.toString(), options))
+      lookup(url.toString(), options)
         .then((result) => send(res, 200, result))
         .catch((err) => {
           const timeout = /Timeout/i.test(String(err && err.name)) || /Timeout/i.test(String(err && err.message));
