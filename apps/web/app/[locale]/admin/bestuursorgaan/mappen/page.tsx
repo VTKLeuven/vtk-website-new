@@ -98,7 +98,7 @@ export default async function BoFoldersPage({
   const data = toExplorerData(overview, year, new Date());
   const siteBudgets = await listFolderBudgets(all ? 'all' : siteBudgetPostKeys(session, settings), settings);
   const names = await postNames([...new Set(siteBudgets.map((b) => b.postKey))], nl);
-  const siteHref = (id: string) => `${base}/admin/bestuursorgaan/mijn/${id}?weergave=nakijken`;
+  const siteHref = (id: string) => `${base}/admin/bestuursorgaan/mijn/${id}`;
   // Een budget op de site hoort bij het blad van dezelfde post en dezelfde activiteit.
   const siteKey = (postKey: string, title: string) => `${postKey}|${title.trim().toLowerCase()}`;
   const siteByKey = new Map(siteBudgets.map((b) => [siteKey(b.postKey, b.title), b]));

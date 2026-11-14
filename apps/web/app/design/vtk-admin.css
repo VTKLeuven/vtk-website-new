@@ -5222,7 +5222,6 @@ a.vtk-shortcut-tile:hover {
   }
 }
 
-
 /* ---------------------------------------------------------------------------
    Bestanden zonder verwijzing (/admin/it/storage/cleanup)
    Smal scherm: elke rij een blok, met de kolomkop als label per waarde. In de
@@ -5369,9 +5368,7 @@ a.vtk-shortcut-tile:hover {
   margin: 0;
 }
 
-.vtk-bud-top-figs dt,
-.vtk-bud-facts dt,
-.vtk-bud-ov-total dt {
+.vtk-bud-top-figs dt {
   color: var(--muted);
   font-size: 10.5px;
   font-weight: 700;
@@ -5421,22 +5418,6 @@ a.vtk-shortcut-tile:hover {
 .vtk-bud-save[data-kind='error']::before,
 .vtk-bud-save[data-kind='conflict']::before {
   background: var(--danger-ink);
-}
-
-.vtk-bud-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 32px;
-  margin: 0;
-}
-
-.vtk-bud-facts dd {
-  display: flex;
-  align-items: center;
-  min-height: 34px;
-  margin: 3px 0 0;
-  color: var(--ink);
-  font-size: 14px;
 }
 
 .vtk-bud-date {
@@ -5644,8 +5625,7 @@ textarea.vtk-bud-input {
 }
 
 .vtk-bud-iconlink svg,
-.vtk-bud-add svg,
-.vtk-bud-goto svg {
+.vtk-bud-add svg {
   width: 14px;
   height: 14px;
 }
@@ -5656,67 +5636,6 @@ textarea.vtk-bud-input {
 }
 
 /* Overzicht */
-.vtk-bud-ov-cols {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 32px;
-}
-
-.vtk-bud-ov-cols .vtk-bud-colhead {
-  margin-top: 0;
-}
-
-.vtk-bud-ov-list {
-  margin: 0;
-}
-
-.vtk-bud-ov-list > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--rule-soft);
-  font-size: 14px;
-}
-
-.vtk-bud-ov-list dt a {
-  color: var(--body);
-  text-decoration: none;
-}
-
-.vtk-bud-ov-list dt a:hover {
-  color: var(--ink);
-  text-decoration: underline;
-}
-
-.vtk-bud-ov-list dd {
-  margin: 0;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-
-.vtk-bud-ov-list > .sum {
-  border-bottom: 0;
-  font-weight: 650;
-}
-
-.vtk-bud-ov-total {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px 24px;
-  margin: 14px 0 0;
-  padding-top: 14px;
-  border-top: 2px solid var(--ink);
-}
-
-.vtk-bud-ov-total dd {
-  margin: 4px 0 0;
-  color: var(--ink);
-  font-size: 22px;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
-}
 
 .vtk-bud-begroting {
   max-width: 170px;
@@ -5726,86 +5645,7 @@ textarea.vtk-bud-input {
 
 /* Controles: geen gekleurde rand links; de kop en de bolletjes zeggen het al. */
 
-.vtk-bud-checklist {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.vtk-bud-checklist li {
-  position: relative;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4px 16px;
-  padding: 9px 0 9px 18px;
-  border-top: 1px solid var(--rule-soft);
-  color: var(--ink);
-  font-size: 14px;
-}
-
-.vtk-bud-checklist li:first-child {
-  border-top: 0;
-}
-
-.vtk-bud-checklist li::before {
-  content: "";
-  position: absolute;
-  top: 16px;
-  left: 2px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--danger-ink);
-}
-
-.vtk-bud-checklist[data-level='review'] li::before {
-  background: var(--yellow);
-  box-shadow: inset 0 0 0 1px var(--low-ink);
-}
-
-.vtk-bud-checklist li > span {
-  flex: 1 1 320px;
-  min-width: 0;
-}
-
-.vtk-bud-goto {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--navy);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.vtk-bud-goto:hover {
-  text-decoration: underline;
-}
-
 /* Prijzen bij Collect&Go */
-.vtk-bud-prices-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px 20px;
-}
-
-.vtk-bud-prices-row .vtk-bud-h2 {
-  margin-bottom: 4px;
-}
-
-.vtk-bud-prices-row .vtk-bud-fine {
-  margin: 0;
-  max-width: 62ch;
-}
 
 .vtk-bud-cgcheck {
   display: grid;
@@ -5844,37 +5684,7 @@ textarea.vtk-bud-input {
   background: var(--navy);
 }
 
-.vtk-bud-tobo {
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  max-width: 520px;
-  color: var(--body) !important;
-  font-size: 13.5px !important;
-}
-
 /* Activiteit */
-.vtk-bud-vat {
-  display: grid;
-  gap: 10px;
-  font-size: 14px;
-}
-
-.vtk-bud-vat p {
-  margin: 0;
-}
-
-.vtk-bud-alloc {
-  display: grid;
-  justify-items: start;
-  gap: 8px;
-}
-
-.vtk-bud-alloc-row {
-  display: grid;
-  grid-template-columns: minmax(120px, 220px) 96px auto auto;
-  align-items: center;
-  gap: 8px;
-}
 
 /* Secties */
 .vtk-bud-sec {
@@ -6130,7 +5940,17 @@ textarea.vtk-bud-input {
 }
 
 .vtk-bud-col-name {
-  min-width: 190px;
+  min-width: 170px;
+}
+
+/* Het bolletje van wat aan een regel scheelt, voor de naam: de kolom Controle
+   zegt hoe het met de prijs staat, het bolletje al de rest (de uitleg in de
+   tooltip, een klik opent de regel). */
+.vtk-bud-namecell {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: -4px;
 }
 
 .vtk-bud-col-act {
@@ -6672,87 +6492,478 @@ button.vtk-bud-dot {
     position: static;
   }
 
-  .vtk-bud-ov-cols,
   .vtk-bud-templates,
   .vtk-bud-panel-body {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .vtk-bud-ov-total {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .vtk-bud-ov-total > div {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-  }
-
-  .vtk-bud-alloc-row {
-    grid-template-columns: minmax(0, 1fr) 80px auto;
-  }
-
-  .vtk-bud-alloc-row > .vtk-bud-link {
-    grid-column: 1 / -1;
-    justify-self: start;
-  }
 }
 
 /* --------------------------------------------------------------------------
-   Budgetten op de site: maken en nakijken, delen, potjes en resultaten
+   Budgetten op de site: één blad voor maken en nakijken, delen, potjes
 
-   Twee weergaven van hetzelfde budget. "Maken" is het werkblad hierboven.
-   "Nakijken" (`.vtk-rev`, `BudgetReview.tsx`) is één dicht blad zonder één
-   invoerveld: per regel hoeveel, tegen welke prijs, waar die prijs vandaan
-   komt en of ze nagekeken is. Alles wat in de editor achter het potlood zit,
-   staat daar gewoon in de rij.
+   Er is één weergave (`BudgetEditor`, `BudgetTop`, `SectionCard`), opgebouwd
+   zoals het rekenblad: bovenaan het Overzicht en de Parameters naast elkaar
+   (`.vtk-bud-sheettop`), daaronder de prijzen bij de webshops
+   (`.vtk-bud-prices`), dan de secties. Per regel staat naast de cellen waar
+   de prijs vandaan komt (Bron) en hoe het ermee staat (Controle, de klassen
+   `.vtk-rev-*` van `ControlCell`). Wat niet mag wijzigen, staat er als tekst.
    -------------------------------------------------------------------------- */
 
-.vtk-bud-views {
-  display: inline-flex;
-  padding: 3px;
+.vtk-bud-sheettop {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.vtk-bud-card.vtk-bud-ovcard,
+.vtk-bud-card.vtk-bud-pmcard,
+.vtk-bud-card.vtk-bud-potcard {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* De kop van een kaart en van een sectie: een lichtblauwe strook, zoals de
+   blauwe koppen van het blad maar in de kleuren van de site. */
+.vtk-bud-cardhead,
+.vtk-bud-sec > .vtk-bud-sec-head {
+  background: var(--paper-2);
+}
+
+.vtk-bud-cardhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 14px;
+  padding: 11px var(--admin-bud-card-x, 22px) 10px;
+}
+
+.vtk-admin-main .vtk-bud-cardhead h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+}
+
+.vtk-bud-cardhead .vtk-bud-check,
+.vtk-bud-cardhead .vtk-bud-muted {
+  font-size: 13px;
+}
+
+.vtk-bud-sec-head + .vtk-bud-sec-opts {
+  padding-top: 12px;
+}
+
+/* Het overzicht: elke sectie met haar bedrag, de sommen, en de begroting. */
+.vtk-admin-main .vtk-bud-ov {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-admin-main .vtk-bud-ov th {
+  padding: 9px 10px 4px;
+  color: var(--body);
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.vtk-admin-main .vtk-bud-ov td {
+  padding: 5px 10px;
+  color: var(--ink);
+  vertical-align: top;
+}
+
+.vtk-bud-ov th:first-child,
+.vtk-bud-ov td:first-child {
+  padding-left: var(--admin-bud-card-x, 22px);
+}
+
+.vtk-bud-ov th:last-child,
+.vtk-bud-ov td:last-child {
+  padding-right: var(--admin-bud-card-x, 22px);
+}
+
+.vtk-admin-main .vtk-bud-ov .num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.vtk-bud-ov td a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.vtk-bud-ov td a:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--line-2);
+  text-underline-offset: 3px;
+}
+
+.vtk-admin-main .vtk-bud-ov tr.sum td {
+  padding-bottom: 9px;
+  border-top: 1px solid var(--line-2);
+  font-weight: 650;
+}
+
+.vtk-admin-main .vtk-bud-ov tr.tot td {
+  padding-top: 9px;
+  border-top: 2px solid var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.vtk-admin-main .vtk-bud-ov tr.soft td {
+  color: var(--body);
+}
+
+.vtk-admin-main .vtk-bud-ov tr.soft td:first-child {
+  color: var(--muted);
+}
+
+.vtk-bud-ov tbody tr:last-child td {
+  padding-bottom: 12px;
+}
+
+.vtk-admin-main .vtk-bud-ov tr.soft td > .vtk-bud-cell {
+  width: 116px;
+  height: 28px;
+  margin: -3px -8px -3px 0;
+  text-align: right;
+}
+
+.vtk-bud-ov-issue {
+  margin-left: 7px;
+  color: var(--danger-ink);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.vtk-bud-ov-miss {
+  display: block;
+  color: var(--low-ink);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.vtk-bud-cardfoot {
+  display: grid;
+  gap: 8px;
+  padding: 0 var(--admin-bud-card-x, 22px) 14px;
+}
+
+.vtk-bud-cardfoot:empty {
+  display: none;
+}
+
+/* Een controle onder het veld waar ze over gaat, in plaats van een lijst. */
+.vtk-admin-main p.vtk-bud-fieldnote {
+  margin: 4px 0 0;
+  color: var(--body) !important;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.vtk-admin-main p.vtk-bud-fieldnote[data-level='block'],
+.vtk-admin-main p.vtk-bud-secnote[data-level='block'] {
+  color: var(--danger-ink) !important;
+}
+
+.vtk-admin-main p.vtk-bud-fieldnote[data-level='review'],
+.vtk-admin-main p.vtk-bud-secnote[data-level='review'] {
+  color: var(--low-ink) !important;
+}
+
+.vtk-admin-main p.vtk-bud-secnote {
+  margin: 0;
+  padding: 8px var(--admin-bud-card-x, 22px);
+  border-bottom: 1px solid var(--rule-soft);
+  color: var(--body) !important;
+  font-size: 12.5px;
+}
+
+/* De parameters: label links, waarde of cel rechts, met haarlijnen ertussen. */
+.vtk-bud-pm {
+  display: grid;
+  padding: 2px var(--admin-bud-card-x, 22px) 16px;
+}
+
+.vtk-bud-pm > .vtk-bud-colhead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 2px;
+}
+
+.vtk-bud-prow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 36px;
+  padding: 2px 0;
+  border-top: 1px solid var(--rule-soft);
+  font-size: 14px;
+}
+
+.vtk-bud-pm > .vtk-bud-colhead + .vtk-bud-prow,
+.vtk-bud-pm > .vtk-bud-colhead + div > .vtk-bud-prow:first-child {
+  border-top: 0;
+}
+
+.vtk-bud-prow > label,
+.vtk-bud-prow > span {
+  flex: 0 1 auto;
+  color: var(--body);
+}
+
+.vtk-bud-prow > div {
+  display: flex;
+  flex: 0 1 62%;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 0;
+}
+
+.vtk-bud-prow > div b {
+  color: var(--ink);
+  font-weight: 600;
+  text-align: right;
+}
+
+.vtk-bud-prow .vtk-bud-cell {
+  height: 30px;
+}
+
+.vtk-bud-prow input.vtk-bud-cell {
+  text-align: right;
+}
+
+.vtk-bud-prow .vtk-bud-cell.num {
+  width: 104px;
+}
+
+.vtk-bud-prow-param > input.vtk-bud-cell {
+  flex: 1 1 40%;
+  text-align: left;
+}
+
+.vtk-bud-prow select.vtk-bud-kind {
+  flex: none;
+  width: 98px;
+  padding-right: 4px;
+}
+
+.vtk-bud-pm .vtk-bud-check {
+  margin: 6px 0 2px;
+  font-size: 13px;
+}
+
+.vtk-bud-pm .vtk-bud-add,
+.vtk-bud-pm .vtk-bud-link {
+  justify-self: start;
+  margin-top: 4px;
+}
+
+.vtk-bud-concept {
+  display: grid;
+  gap: 4px;
+  max-width: 100ch;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.vtk-bud-concept textarea.vtk-bud-cell {
+  height: auto;
+  padding: 6px 8px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+/* De prijzen bij de webshops: de stand, geteld met de iconen van Controle, en de knop. */
+.vtk-bud-prices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 20px;
+  padding: 12px var(--admin-bud-card-x, 22px);
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 16px;
   background: var(--surface);
 }
 
-.vtk-bud-views button {
+.vtk-bud-prices-text {
+  display: grid;
+  flex: 1 1 420px;
+  gap: 4px;
+  min-width: 0;
+}
+
+.vtk-admin-main .vtk-bud-prices h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14.5px;
+  font-weight: 650;
+}
+
+.vtk-admin-main .vtk-bud-prices p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.vtk-bud-prices-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 2px 0 0;
+  padding: 0;
+  color: var(--body);
+  font-size: 13px;
+  list-style: none;
+}
+
+.vtk-bud-prices-counts li {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 26px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
+  gap: 5px;
+}
+
+.vtk-bud-prices-counts svg {
+  width: 15px;
+  height: 15px;
   color: var(--muted);
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 500;
-  cursor: pointer;
 }
 
-.vtk-bud-views button[aria-pressed='true'] {
-  background: var(--ink);
-  color: var(--surface);
+.vtk-bud-prices-counts li[data-tone='ok'] svg {
+  color: var(--ok-ink);
 }
 
-.vtk-bud-views-count {
-  min-width: 18px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: var(--yellow);
-  color: var(--ink);
+.vtk-bud-prices-counts li[data-tone='bad'] svg {
+  color: var(--danger-ink);
+}
+
+.vtk-bud-prices-counts li[data-tone='low'] svg {
+  color: var(--low-ink);
+}
+
+.vtk-bud-prices-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.vtk-bud-open[data-level='review'] {
+  background: var(--low-bg);
+  color: var(--low-ink);
+}
+
+/* In de tabel: wat onder een cel staat (BTW onder de prijs, de opmerking onder
+   de naam), de bron als link naar de winkel, en de kolom Controle. */
+.vtk-bud-sub {
+  display: block;
+  margin-top: 1px;
+  padding: 0 8px;
+  color: var(--muted);
   font-size: 11.5px;
-  font-weight: 650;
-  line-height: 18px;
-  text-align: center;
+  font-weight: 400;
+  line-height: 1.3;
+  white-space: normal;
 }
 
-.vtk-bud-views-count[data-level='block'] {
-  background: var(--danger-ink);
-  color: #fff;
+.vtk-bud-who {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.vtk-bud-flag {
+  color: var(--danger-ink);
+  font-weight: 550;
+}
+
+.vtk-bud-srclink {
+  overflow: hidden;
+  padding: 0 0 0 8px;
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--line-2);
+  text-overflow: ellipsis;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+
+.vtk-bud-srclink:hover {
+  text-decoration-color: currentColor;
+}
+
+.vtk-bud-table .vtk-bud-relink {
+  width: 24px;
+  height: 24px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.vtk-bud-table .vtk-bud-relink svg {
+  width: 13px;
+  height: 13px;
+}
+
+.vtk-bud-table tr:hover .vtk-bud-relink,
+.vtk-bud-table tr:focus-within .vtk-bud-relink {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .vtk-bud-table .vtk-bud-relink {
+    opacity: 1;
+  }
+}
+
+.vtk-bud-cell[data-danger]::placeholder {
+  color: var(--danger-ink);
+  opacity: 0.85;
+}
+
+.vtk-admin-main .vtk-bud-table td.vtk-bud-col-ctl {
+  padding-top: 5px;
+  white-space: nowrap;
+}
+
+/* In de tabel staat het woord ("winkel: 7,29", "geen antwoord") onder de
+   iconen, zodat de kolom niet breder wordt dan drie knoppen. */
+.vtk-bud-col-ctl .vtk-rev-check {
+  flex-wrap: wrap;
+  gap: 0 4px;
+  max-width: 100px;
+  margin-left: auto;
+}
+
+.vtk-bud-col-ctl .vtk-rev-word {
+  flex-basis: 100%;
+  order: 2;
+  font-size: 11.5px;
+  line-height: 1.3;
+  text-align: right;
+  white-space: normal;
+}
+
+@media (max-width: 860px) {
+  .vtk-bud-sheettop {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .vtk-bud-ghost {
@@ -6791,118 +7002,10 @@ button.vtk-bud-dot {
   font-size: 12.5px;
 }
 
-.vtk-bud-params {
-  display: grid;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.vtk-bud-param {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) 96px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  max-width: 620px;
-}
-
-.vtk-bud-params .vtk-bud-add {
-  justify-self: start;
-}
-
 /* Overzicht: het resultaat naast het budget */
-.vtk-bud-ov-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px 16px;
-  margin-bottom: 12px;
-}
-
-.vtk-bud-ov-head .vtk-bud-h2 {
-  margin: 0;
-}
-
-.vtk-bud-ov-toggle {
-  margin-left: auto;
-}
-
-.vtk-bud-ov-legend {
-  color: var(--muted);
-  font-size: 12.5px;
-}
-
-.vtk-bud-ov-res {
-  display: inline-block;
-  min-width: 84px;
-  margin-left: 12px;
-  color: var(--navy);
-  font-weight: 650;
-  text-align: right;
-}
-
-.vtk-bud-ov-legend .vtk-bud-ov-res {
-  min-width: 0;
-  margin-left: 8px;
-}
-
-.vtk-bud-result {
-  margin-top: 14px;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--yellow) 9%, var(--surface));
-}
-
-.vtk-bud-result .vtk-bud-ov-total {
-  margin-top: 0;
-  padding-top: 0;
-  border-top: 0;
-}
-
-.vtk-bud-result .vtk-bud-field {
-  display: block;
-  margin-top: 12px;
-}
-
-.vtk-bud-sec-res {
-  display: block;
-  color: var(--navy);
-  font-size: 12.5px;
-  font-weight: 500;
-  text-align: right;
-}
 
 .vtk-bud-table td.vtk-bud-col-res > .vtk-bud-cell {
   background: color-mix(in srgb, var(--yellow) 14%, var(--surface));
-}
-
-.vtk-bud-begr {
-  display: grid;
-  gap: 6px;
-  margin-top: 14px;
-}
-
-.vtk-bud-begr-row {
-  display: grid;
-  grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
-  gap: 8px;
-  max-width: 720px;
-}
-
-.vtk-bud-pot {
-  margin-top: 14px;
-  padding-top: 4px;
-  border-top: 1px solid var(--line);
-}
-
-.vtk-bud-ov-list dd .neg,
-.vtk-rev .neg {
-  color: var(--danger-ink);
-}
-
-.vtk-bud-ov-list dd .pos,
-.vtk-rev .pos {
-  color: var(--ok-ink);
 }
 
 /* Delen */
@@ -6960,277 +7063,6 @@ button.vtk-bud-dot {
 
 /* ------------------------------------------------------------- Nakijken */
 
-.vtk-rev {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 14px;
-  color: var(--body);
-  font-size: 13.5px;
-}
-
-.vtk-rev-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px 28px;
-  padding: 16px 20px;
-  border-radius: 16px;
-  background: var(--navy);
-  color: var(--paper);
-}
-
-.vtk-admin-main .vtk-rev-head h2 {
-  margin: 0;
-  color: var(--paper);
-  font-size: 22px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
-}
-
-.vtk-admin-main .vtk-rev-kicker {
-  margin: 0 0 2px;
-  color: var(--yellow) !important;
-  font-size: 11.5px;
-  font-weight: 650;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.vtk-rev-figs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 26px;
-  margin: 0;
-}
-
-.vtk-rev-figs dt {
-  color: var(--on-dark-muted);
-  font-size: 11.5px;
-}
-
-.vtk-rev-figs dd {
-  margin: 0;
-  color: var(--paper);
-  font-size: 16px;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-}
-
-.vtk-rev-figs .total dd {
-  font-size: 20px;
-}
-
-.vtk-rev-figs dd.res {
-  color: var(--yellow);
-  font-size: 13.5px;
-}
-
-.vtk-rev-figs dd .neg,
-.vtk-rev-figs dd.neg {
-  color: #ffb4ab;
-}
-
-.vtk-rev-figs dd .pos {
-  color: #9be3b4;
-}
-
-.vtk-rev-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 22px;
-  margin: 0;
-  padding: 0 4px;
-}
-
-.vtk-rev-facts > div {
-  display: flex;
-  gap: 6px;
-}
-
-.vtk-rev-facts dt {
-  color: var(--muted);
-}
-
-.vtk-rev-facts dd {
-  margin: 0;
-  color: var(--ink);
-  font-weight: 550;
-}
-
-.vtk-admin-main .vtk-rev-line,
-.vtk-admin-main .vtk-rev-concept,
-.vtk-admin-main .vtk-rev-clean {
-  margin: 0;
-  padding: 0 4px;
-  color: var(--body) !important;
-}
-
-.vtk-rev-concept {
-  max-width: 90ch;
-  white-space: pre-line;
-}
-
-.vtk-admin-main .vtk-rev-clean {
-  color: var(--ok-ink) !important;
-}
-
-.vtk-rev-pot,
-.vtk-rev-sec {
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface);
-}
-
-.vtk-rev-pot h3,
-.vtk-rev-sec-head h3 {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin: 0;
-  color: var(--ink);
-  font-size: 14.5px;
-  font-weight: 650;
-}
-
-.vtk-rev-sec-head h3 span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.vtk-rev-pot h3 {
-  padding: 12px 16px 6px;
-}
-
-.vtk-rev-sec-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--line);
-}
-
-.vtk-rev-sec-sum {
-  display: flex;
-  align-items: baseline;
-  gap: 14px;
-  color: var(--muted);
-  font-size: 12.5px;
-  font-variant-numeric: tabular-nums;
-}
-
-.vtk-rev-sec-sum b {
-  color: var(--ink);
-  font-size: 14.5px;
-}
-
-.vtk-rev-wrap {
-  position: relative;
-  overflow-x: auto;
-}
-
-.vtk-admin-main .vtk-rev-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.vtk-admin-main .vtk-rev-table th {
-  padding: 6px 10px;
-  color: var(--muted);
-  font-size: 11.5px;
-  font-weight: 550;
-  text-align: left;
-  white-space: nowrap;
-}
-
-.vtk-admin-main .vtk-rev-table td {
-  padding: 5px 10px;
-  border-top: 1px solid var(--rule-soft);
-  color: var(--ink);
-  vertical-align: top;
-}
-
-.vtk-rev-table th:first-child,
-.vtk-rev-table td:first-child {
-  padding-left: 16px;
-}
-
-.vtk-rev-table th:last-child,
-.vtk-rev-table td:last-child {
-  padding-right: 16px;
-}
-
-.vtk-rev-table .num {
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.vtk-admin-main .vtk-rev-table th.num {
-  text-align: right;
-}
-
-.vtk-rev-name {
-  min-width: 180px;
-  font-weight: 550;
-}
-
-.vtk-rev-calc {
-  color: var(--body) !important;
-}
-
-.vtk-rev-amount {
-  font-weight: 650;
-}
-
-.vtk-rev-sub {
-  display: block;
-  color: var(--muted);
-  font-size: 11.5px;
-  font-weight: 400;
-  white-space: normal;
-}
-
-.vtk-rev-tag {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--paper-2);
-  color: var(--body);
-  font-size: 11px;
-  font-weight: 500;
-}
-
-.vtk-rev-muted {
-  color: var(--muted);
-}
-
-.vtk-rev-empty {
-  margin: 0;
-  padding: 10px 16px;
-}
-
-.vtk-rev-flag {
-  color: var(--danger-ink);
-  font-weight: 600;
-}
-
-.vtk-rev-source,
-.vtk-rev-note {
-  min-width: 120px;
-  max-width: 300px;
-  color: var(--body) !important;
-}
-
-.vtk-rev-who {
-  color: var(--muted);
-  font-weight: 400;
-}
-
 /* Controle: een icoon met de uitleg als tooltip, een kort woord enkel voor wat
    aandacht vraagt, en de rij-acties die pas bij hover of focus verschijnen. */
 .vtk-rev-check {
@@ -7270,13 +7102,13 @@ button.vtk-bud-dot {
   font-weight: 600;
 }
 
-.vtk-rev-table .vtk-rev-ico {
+.vtk-bud-table .vtk-rev-ico {
   width: 22px;
   height: 22px;
   border-radius: 7px;
 }
 
-.vtk-rev-table .vtk-rev-ico svg {
+.vtk-bud-table .vtk-rev-ico svg {
   width: 14px;
   height: 14px;
 }
@@ -7286,8 +7118,8 @@ button.vtk-bud-dot {
   transition: opacity 0.12s;
 }
 
-.vtk-rev-table tr:hover .vtk-rev-hover,
-.vtk-rev-table tr:focus-within .vtk-rev-hover {
+.vtk-bud-table tr:hover .vtk-rev-hover,
+.vtk-bud-table tr:focus-within .vtk-rev-hover {
   opacity: 1;
 }
 
@@ -7303,102 +7135,8 @@ button.vtk-bud-dot {
   }
 }
 
-.vtk-rev-src {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 10px;
-}
-
-.vtk-rev-src a,
-.vtk-rev-pot a {
-  color: var(--navy);
-  font-weight: 550;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.vtk-rev-src a {
-  font-weight: 500;
-  text-decoration-color: var(--line-2);
-}
-
-.vtk-rev-src a:hover {
-  text-decoration-color: currentColor;
-}
-
-.vtk-admin-main .vtk-rev-table td.vtk-rev-control {
-  padding-top: 3px;
-  padding-bottom: 3px;
-}
-
 /* Wat aan een regel scheelt: een bolletje voor de naam (de uitleg in de
    tooltip) en de stand bij de bron. Geen gekleurde rand langs de rij. */
-.vtk-rev-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-right: 7px;
-  border-radius: 50%;
-  background: var(--yellow);
-  box-shadow: inset 0 0 0 1px var(--low-ink);
-  vertical-align: 1px;
-  cursor: help;
-}
-
-.vtk-rev-dot[data-level='block'] {
-  background: var(--danger-ink);
-  box-shadow: none;
-}
-
-.vtk-admin-main .vtk-rev-secnote {
-  margin: 0;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--rule-soft);
-  color: var(--body) !important;
-  font-size: 12.5px;
-}
-
-.vtk-admin-main .vtk-rev-secnote[data-level='block'] {
-  color: var(--danger-ink) !important;
-}
-
-.vtk-admin-main .vtk-rev-table tfoot td {
-  border-top: 1px solid var(--line-2);
-  color: var(--ink);
-  font-weight: 650;
-}
-
-.vtk-rev-price {
-  margin: -2px -7px;
-  padding: 1px 6px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-variant-numeric: tabular-nums;
-  cursor: text;
-}
-
-.vtk-rev-price:hover,
-.vtk-rev-price:focus-visible {
-  border-color: var(--line-2);
-  background: var(--paper);
-  outline: none;
-}
-
-.vtk-admin-main .vtk-rev-priceinput {
-  width: 84px;
-  height: 24px;
-  margin: -2px -7px;
-  padding: 0 6px;
-  border: 1px solid var(--ink);
-  border-radius: 7px;
-  background: var(--surface);
-  font: inherit;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
 
 @media print {
   .vtk-rev-ico {
@@ -7406,21 +7144,11 @@ button.vtk-bud-dot {
   }
 }
 
-.vtk-rev-table tr.self td {
-  background: var(--paper-2);
-}
-
-.vtk-admin-main .vtk-rev-table tfoot td {
-  border-top: 1px solid var(--line-2);
-  font-weight: 650;
-}
-
 @media print {
   .vtk-bud-top {
     position: static;
   }
 
-  .vtk-bud-views,
   .vtk-bud-ghost,
   .vtk-bud-primary,
   .vtk-bud-save {
@@ -7680,43 +7408,18 @@ button.vtk-bud-dot {
   font-weight: 550;
 }
 
+/* Smal: elke regel van een map wordt een kaartje met het kolomhoofd als label
+   per waarde, in plaats van een tabel die opzij schuift. */
 @media (max-width: 720px) {
-  .vtk-bud-param,
-  .vtk-bud-begr-row {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .vtk-rev-figs {
-    gap: 8px 18px;
-  }
-}
-
-/* Smal: elke regel van een nakijktabel of een map wordt een kaartje met het
-   kolomhoofd als label per waarde, in plaats van een tabel die opzij schuift. */
-@media (max-width: 720px) {
-  .vtk-rev-head {
-    padding: 14px 16px;
-  }
-
-  .vtk-rev-figs {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    width: 100%;
-  }
-
-  .vtk-admin-main .vtk-rev-table:not(.vtk-rev-pottable) thead,
   .vtk-admin-main .vtk-fold-list thead {
     display: none;
   }
 
-  .vtk-admin-main .vtk-rev-table:not(.vtk-rev-pottable),
-  .vtk-admin-main .vtk-rev-table:not(.vtk-rev-pottable) tbody,
   .vtk-admin-main .vtk-fold-list table,
   .vtk-admin-main .vtk-fold-list tbody {
     display: block;
   }
 
-  .vtk-admin-main .vtk-rev-table:not(.vtk-rev-pottable) tr,
   .vtk-admin-main .vtk-fold-list tr {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -7725,7 +7428,6 @@ button.vtk-bud-dot {
     border-top: 1px solid var(--rule-soft);
   }
 
-  .vtk-admin-main .vtk-rev-table:not(.vtk-rev-pottable) td,
   .vtk-admin-main .vtk-fold-list td {
     display: flex;
     justify-content: space-between;
@@ -7738,7 +7440,6 @@ button.vtk-bud-dot {
     white-space: normal;
   }
 
-  .vtk-admin-main .vtk-rev-table td::before,
   .vtk-admin-main .vtk-fold-list td::before {
     content: attr(data-label);
     color: var(--muted);
@@ -7747,38 +7448,19 @@ button.vtk-bud-dot {
     text-align: left;
   }
 
-  .vtk-admin-main .vtk-rev-table:not(.vtk-rev-pottable) td:first-child,
-  .vtk-admin-main .vtk-rev-table td.vtk-rev-source,
-  .vtk-admin-main .vtk-rev-table td.vtk-rev-note,
   .vtk-admin-main .vtk-fold-list td:first-child {
     grid-column: 1 / -1;
     justify-content: flex-start;
     text-align: left;
   }
 
-  .vtk-admin-main .vtk-rev-table td:empty {
-    display: none;
-  }
-
   /* Controle over de volle breedte, met de knoppen altijd zichtbaar: op een
      smal scherm is er geen hover. */
-  .vtk-admin-main .vtk-rev-table td.vtk-rev-control {
-    grid-column: 1 / -1;
-    align-items: center;
-  }
 
   .vtk-rev-hover {
     opacity: 1;
   }
 
-  .vtk-rev-table .vtk-rev-sub {
-    display: inline;
-    margin-left: 6px;
-  }
-
-  .vtk-rev-pot {
-    overflow-x: auto;
-  }
 }
 
 .vtk-admin-main .vtk-bud-source {
@@ -7861,14 +7543,6 @@ button.vtk-bud-dot {
   color: var(--ok-ink);
 }
 
-.vtk-bud .vtk-rev-figs dd .neg {
-  color: #ffb4ab;
-}
-
-.vtk-bud .vtk-rev-figs dd .pos {
-  color: #9be3b4;
-}
-
 /* Het totaal van een sectie staat onder haar regels, in de kolom van de bedragen. */
 .vtk-admin-main .vtk-bud-table tfoot td {
   padding: 9px 4px;
@@ -7880,13 +7554,28 @@ button.vtk-bud-dot {
 
 /* De link van een regel, in de tabel zelf. */
 .vtk-bud-col-link {
-  min-width: 150px;
+  min-width: 120px;
+  max-width: 190px;
 }
 
 .vtk-bud-linkcell {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: 0 4px;
+}
+
+.vtk-bud-col-link .vtk-bud-who {
+  display: block;
+  flex-basis: 100%;
+  overflow: hidden;
+  padding-left: 8px;
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+}
+
+.vtk-bud-srcword .vtk-bud-who {
+  padding-left: 0;
 }
 
 .vtk-bud-linkcell .vtk-bud-cell {
@@ -7919,8 +7608,7 @@ button.vtk-bud-dot {
 }
 
 @media (max-width: 640px) {
-  .vtk-admin-main .vtk-bud-table tfoot,
-  .vtk-admin-main .vtk-rev-table:not(.vtk-rev-pottable) tfoot {
+  .vtk-admin-main .vtk-bud-table tfoot {
     display: block;
   }
 

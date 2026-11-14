@@ -1,6 +1,7 @@
 import type { CalcContext } from '@/lib/bo/budget/calc';
 import type { Check } from '@/lib/bo/budget/checks';
 import type { BudgetContent } from '@/lib/bo/budget/types';
+import type { ControlActions } from './ControlCell';
 
 /** Wat de onderdelen van de editor van het budget weten en mogen doen. */
 export type EditorApi = {
@@ -14,6 +15,10 @@ export type EditorApi = {
   openRow: (rowId: string, opener?: HTMLElement | null) => void;
   /** De controles per regel, voor het bolletje in de tabel. */
   checksByRow: Map<string, Check[]>;
+  /** Alle controles, ook die van een sectie (een verdeling, een naam). */
+  checks: Check[];
+  /** Zelf nagekeken en de prijs van de winkel overnemen; null zolang niets mag wijzigen. */
+  controlActions: ControlActions | null;
   /** Een regel die net toegevoegd werd en de focus moet krijgen. */
   focusRowId: string | null;
   clearFocusRow: () => void;

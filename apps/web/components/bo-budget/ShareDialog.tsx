@@ -79,8 +79,8 @@ export function ShareDialog({
       token: links.viewToken,
       title: nl ? 'Link om te bekijken' : 'Link to view',
       text: nl
-        ? 'Opent de nakijkweergave, zonder inloggen en zonder iets te kunnen wijzigen. Voor in de slides van het BO.'
-        : 'Opens the review view, without logging in and without being able to change anything.',
+        ? 'Opent het budget zonder inloggen en zonder iets te kunnen wijzigen. Voor in de slides van het BO.'
+        : 'Opens the budget without logging in and without being able to change anything.',
     },
     {
       kind: 'edit',

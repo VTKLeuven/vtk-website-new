@@ -3,9 +3,18 @@ import 'server-only';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@vtk/db';
 import { lookupShopProduct } from '@/lib/priceCheck/fetch';
+import { prunePriceLog, type PriceLogContext } from '@/lib/priceCheck/log';
 import { parseShopUrl } from '@/lib/priceCheck/shops';
 import { allCostRows } from './calc';
-import { applyCheck, checkFromLookup, pricesStillChecked, rowsToCheck, type CheckableRow, type Lookup } from './prices';
+import {
+  applyCheck,
+  checkableRows,
+  checkFromLookup,
+  pricesStillChecked,
+  rowsToCheck,
+  type CheckableRow,
+  type Lookup,
+} from './prices';
 import { parseBudgetContent } from './schema';
 import { getBudgetSettings } from './server';
 import type { BudgetSettings, PriceCheck } from './types';
@@ -34,7 +43,12 @@ export type RowLookup = { rowId: string; url: string; lookup: Lookup };
  * als twee regels hetzelfde product hebben. Wat de site de voorbije vier uur al
  * vroeg, komt uit haar geheugen (`lib/priceCheck/fetch.ts`).
  */
-export async function lookupRows(rows: CheckableRow[], settings: BudgetSettings, fresh = false): Promise<RowLookup[]> {
+export async function lookupRows(
+  rows: CheckableRow[],
+  settings: BudgetSettings,
+  fresh = false,
+  log?: PriceLogContext
+): Promise<RowLookup[]> {
   const wanted = rows.slice(0, MAX_ROWS).flatMap((row) => {
     const ref = parseShopUrl(String(row?.url ?? ''));
     return ref ? [{ rowId: String(row.rowId).slice(0, 40), url: String(row.url), ref }] : [];
@@ -46,7 +60,7 @@ export async function lookupRows(rows: CheckableRow[], settings: BudgetSettings,
   async function worker() {
     while (next < pages.length) {
       const ref = pages[next++];
-      const lookup = await lookupShopProduct(ref, { fresh, colruytPostcode: settings.colruytPostcode });
+      const lookup = await lookupShopProduct(ref, { fresh, colruytPostcode: settings.colruytPostcode, log });
       found.set(
         ref.page,
         lookup.status === 'found' ? { ...lookup, basis: ref.basis, shop: ref.shop } : { ...lookup, shop: ref.shop }
@@ -63,7 +77,22 @@ function brusselsToday(now = new Date()): string {
 
 export type RefreshOutcome =
   | { ok: true; at: string | null; checks: Record<string, PriceCheck> }
-  | { ok: false; code: 'NOT_FOUND' | 'DISABLED' };
+  | { ok: false; code: 'NOT_FOUND' | 'DISABLED' | 'FIXED' | 'TOO_SOON'; retryInSeconds?: number };
+
+/**
+ * Hoe snel na elkaar iemand "Prijzen opnieuw ophalen" mag drukken voor één
+ * budget. Die knop vraagt elke winkel vers, buiten het geheugen van vier uur om;
+ * tien kliks na elkaar zijn voor de winkel tien bezoeken per product.
+ */
+export const FORCE_COOLDOWN_MS = 2 * 60 * 1000;
+const lastForced = new Map<string, number>();
+
+export type RefreshOptions = {
+  /** Waarom: de worker (`ronde`), iemand opent het budget (`openen`), of de knop. */
+  trigger: 'ronde' | 'openen' | 'knop';
+  settings?: BudgetSettings;
+  now?: Date;
+};
 
 /**
  * Eén ronde voor één budget: enkel wat `rowsToCheck` zegt (alles na vier uur,
@@ -72,13 +101,15 @@ export type RefreshOutcome =
  * wijzigen, zodat een editor die openstaat gewoon blijft bewaren; bewaarde
  * iemand intussen, dan leest dit het budget opnieuw en zet het de antwoorden
  * in die versie, op de regels waarvan de link niet veranderde.
+ *
+ * De knop "Prijzen opnieuw ophalen" (`trigger: 'knop'`) slaat de klok over:
+ * alle nakijkbare regels, vers bij de winkel en niet uit het geheugen, en een
+ * duidelijke weigering (`FIXED`) voor een budget dat al vastligt.
  */
-export async function refreshBudgetPrices(
-  id: string,
-  settings?: BudgetSettings,
-  now = new Date()
-): Promise<RefreshOutcome> {
-  const config = settings ?? (await getBudgetSettings());
+export async function refreshBudgetPrices(id: string, options: RefreshOptions): Promise<RefreshOutcome> {
+  const now = options.now ?? new Date();
+  const force = options.trigger === 'knop';
+  const config = options.settings ?? (await getBudgetSettings());
   if (!config.collectGoLive) return { ok: false, code: 'DISABLED' };
   const budget = await prisma.boBudget.findUnique({ where: { id } });
   if (!budget) return { ok: false, code: 'NOT_FOUND' };
@@ -87,13 +118,25 @@ export async function refreshBudgetPrices(
     { status: budget.status, targetDate: budget.targetDate?.toISOString().slice(0, 10) ?? null },
     brusselsToday(now)
   );
+  if (force && !open) return { ok: false, code: 'FIXED' };
   if (!content || !open) return { ok: true, at: null, checks: {} };
-  const rows = rowsToCheck(content, now.getTime());
+  if (force) {
+    const wait = (lastForced.get(id) ?? 0) + FORCE_COOLDOWN_MS - now.getTime();
+    if (wait > 0) return { ok: false, code: 'TOO_SOON', retryInSeconds: Math.ceil(wait / 1000) };
+    lastForced.set(id, now.getTime());
+    if (lastForced.size > 2000) lastForced.delete(lastForced.keys().next().value!);
+  }
+  // De knop vraagt alles opnieuw; anders enkel wat `rowsToCheck` zegt.
+  const rows = force ? checkableRows(content) : rowsToCheck(content, now.getTime());
   if (rows.length === 0) return { ok: true, at: null, checks: {} };
   // Een volledige ronde zet de klok; een losse nieuwe regel niet.
-  const fullRound = rows.length === rowsToCheck({ ...content, pricesAt: null }, now.getTime()).length;
+  const fullRound = force || rows.length === rowsToCheck({ ...content, pricesAt: null }, now.getTime()).length;
 
-  const results = await lookupRows(rows, config);
+  const results = await lookupRows(rows, config, force, {
+    trigger: options.trigger,
+    budgetId: budget.id,
+    budgetName: budget.title,
+  });
   const at = new Date().toISOString();
 
   let current = budget;
@@ -148,6 +191,7 @@ let running: Promise<unknown> | null = null;
 export async function refreshDueBudgetPrices(now = new Date()) {
   if (running) return { skipped: 'already running' as const };
   const job = (async () => {
+    await prunePriceLog(now);
     const settings = await getBudgetSettings();
     if (!settings.collectGoLive) return { skipped: 'disabled' };
     const meeting = await nextMeetingDate(now);
@@ -165,7 +209,7 @@ export async function refreshDueBudgetPrices(now = new Date()) {
     for (const budget of budgets) {
       const content = parseBudgetContent(budget.content);
       if (!content || rowsToCheck(content, now.getTime()).length === 0) continue;
-      const outcome = await refreshBudgetPrices(budget.id, settings, now);
+      const outcome = await refreshBudgetPrices(budget.id, { trigger: 'ronde', settings, now });
       if (outcome.ok) {
         checked += 1;
         rows += Object.keys(outcome.checks).length;
@@ -180,6 +224,8 @@ export async function refreshDueBudgetPrices(now = new Date()) {
     });
   // De worker wacht hoogstens twintig seconden: een lange ronde loopt verder,
   // en de andere taken van de worker schuiven er niet door op.
-  const later = new Promise<{ running: true }>((resolve) => setTimeout(() => resolve({ running: true }), 20_000).unref());
+  const later = new Promise<{ running: true }>((resolve) =>
+    setTimeout(() => resolve({ running: true }), 20_000).unref()
+  );
   return Promise.race([job, later]);
 }

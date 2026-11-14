@@ -12128,6 +12128,46 @@ vroegen").
   het totaal uitkomen, neemt de site enkel het overzicht en zegt ze dat. Een
   import raakt nooit een budget dat op de site zelf opgesteld is.
 
+### Budgetten op de site: één blad, zoals het rekenblad (14 november 2026)
+
+De nakijkweergave vond de gebruiker onoverzichtelijk, en het rekenblad van
+voordien duidelijker: bovenaan een Overzicht met per sectie Budget en Resultaat,
+ernaast de Parameters, en daaronder elke sectie als band met een totaalrij.
+Vier richtingen zijn bekeken op een bord
+(https://claude.ai/artifact/XUsYV9fGnVGKJr9NRt2Q66): A overzicht en parameters
+bovenaan, B één doorlopende afrekening, C een overzicht dat openklapt, D het
+rekenblad met raster. Gekozen is A.
+
+- **Maken en Nakijken zijn één blad.** De schakelaar is weg, en
+  `?weergave=nakijken` ook. Wie maakt, ziet bij elke regel meteen de bron en de
+  controle; wie nakijkt, kan een prijs verbeteren in dezelfde cel. Twee
+  weergaven van hetzelfde budget betekende dat een post nooit zag wat de GM zag.
+  Wie niet mag wijzigen, krijgt hetzelfde blad met tekst in plaats van cellen.
+  Dit vervangt "Maken en nakijken zijn twee weergaven" hierboven.
+- **Overzicht en Parameters naast elkaar, bovenaan.** Zoals het blad: eerst waar
+  het geld heen gaat (elke sectie, de sommen, de begroting), dan waarmee
+  gerekend wordt. Het navy blok met de bedragen is weg: een donkere kaart in een
+  lichte admin, en het herhaalde wat in de kop stond. Het totaal staat in de
+  meescrollende kop pas wanneer het overzicht uit beeld is.
+- **Geen sectie "Nog na te kijken voor het BO"** (expliciet gevraagd). Wat
+  scheelt, staat bij de regel, onder de sectie of onder het veld; het overzicht
+  telt per sectie "N open", en de kop zegt hoeveel er in totaal openstaan met
+  een klik naar het eerste.
+- **De knop "Prijzen opnieuw ophalen" is terug**, naast het vanzelf nakijken om
+  de vier uur. Wie een prijs net aanpaste bij de winkel of een budget voor het
+  BO nog eens wil nakijken, wil niet wachten. De knop vraagt elke winkel vers,
+  dus hoogstens om de twee minuten per budget: tien kliks na elkaar zijn anders
+  tien bezoeken per product. Niet meer eens het budget vastligt, zoals de ronde.
+- **De stand van de prijzen staat apart boven de secties**, geteld met dezelfde
+  iconen als de kolom Controle, met wanneer de laatste ronde liep en vanaf
+  wanneer de volgende kan. Zo zie je zonder door de regels te scrollen of er
+  iets gewijzigd is of een winkel niet antwoordde.
+- **Een logboek van elke prijscontrole** (/admin/bestuursorgaan/prijzen, enkel
+  Groep 5, zestig dagen). Zonder logboek was "geen antwoord" bij een regel niet
+  na te gaan: lag het aan de winkel, aan de prijsbrowser, of liep de ronde niet?
+  Ook een antwoord uit het geheugen staat erin, met de reden waarom de site
+  vroeg. De link staat bij de instellingen en in het blok van elk budget.
+
 ## Nieuwe evenementen in Discord
 
 Op /admin/kalender/discord hangt de kring Discord-webhooks aan de kalender. Een

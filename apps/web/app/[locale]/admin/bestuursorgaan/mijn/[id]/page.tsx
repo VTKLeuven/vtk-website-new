@@ -16,19 +16,13 @@ import {
 } from '@/lib/bo/budget/server';
 
 /*
- * /admin/bestuursorgaan/mijn/<id>: één budget op de site, om op te stellen
- * (Maken) of na te kijken (`?weergave=nakijken`, zo openen de mappen per BO
- * het). Wie in de post zit of in Groep 5, opent het; voor de rest bestaat het
- * niet. Wie geen lid is, komt binnen met een deellink (`/budget/<token>`).
+ * /admin/bestuursorgaan/mijn/<id>: één budget op de site, om op te stellen en
+ * na te kijken op hetzelfde blad. Wie in de post zit of in Groep 5, opent het;
+ * voor de rest bestaat het niet. Wie geen lid is, komt binnen met een deellink
+ * (`/budget/<token>`).
  */
 
-export default async function BudgetPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ locale: string; id: string }>;
-  searchParams: Promise<{ weergave?: string }>;
-}) {
+export default async function BudgetPage({ params }: { params: Promise<{ locale: string; id: string }> }) {
   const { locale: localeParam, id } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
@@ -39,11 +33,7 @@ export default async function BudgetPage({
   const [budget, settings] = await Promise.all([loadBudget(id), getBudgetSettings()]);
   // Ook de eigen post ziet het pas als ze meedoet aan de proef (`canEditBudget`).
   if (!budget || !canEditBudget(session, budget.postKey, settings)) notFound();
-  const [names, begroting, { weergave }] = await Promise.all([
-    postNames([budget.postKey], nl),
-    getBegroting(),
-    searchParams,
-  ]);
+  const [names, begroting] = await Promise.all([postNames([budget.postKey], nl), getBegroting()]);
   const pot = await loadPot(budget, settings);
   const postName = names.get(budget.postKey) ?? budget.postKey;
 
@@ -69,7 +59,7 @@ export default async function BudgetPage({
       share={{ viewToken: budget.viewToken, editToken: budget.editToken, origin: siteUrl().replace(/\/$/, '') }}
       viewerName={session.user.name}
       canManage={canManageBudgets(session)}
-      initialView={weergave === 'nakijken' ? 'nakijken' : 'maken'}
+      logHref={canManageBudgets(session) ? `${base}/admin/bestuursorgaan/prijzen?budget=${budget.id}` : null}
     />
   );
 }

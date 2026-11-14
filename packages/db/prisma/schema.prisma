@@ -9543,6 +9543,47 @@ model BoBudget {
   @@index([workingYear, postKey])
 }
 
+/// Elke keer dat de site een prijs bij een webshop opvroeg voor een budget op de
+/// site, of bij de test op de instellingen (`lib/priceCheck/log.ts`). Voor
+/// /admin/bestuursorgaan/prijzen: wanneer liep de ronde, welke winkel weigert,
+/// waarom kreeg een regel "geen antwoord". Ook een antwoord uit het geheugen
+/// van vier uur staat erin (`cached`), zodat je ziet waarom een ronde niets
+/// nieuws vroeg. Na zestig dagen weg.
+model BoPriceCheckLog {
+  id         String   @id @default(cuid())
+  at         DateTime @default(now()) @db.Timestamptz(3)
+  /// Waarom de site vroeg: ronde (de worker om de vier uur), openen, nieuwe
+  /// link, nakijken (een regel vers), knop (alles vers), test.
+  trigger    String
+  /// Geen vreemde sleutel: een verwijderd budget laat zijn log niet vallen.
+  budgetId   String?
+  /// De naam van het budget op het moment van de controle.
+  budgetName String?
+  /// `ShopId` uit `lib/priceCheck/shops.ts`.
+  shop       String
+  /// De pagina die de site opvroeg (opgebouwd uit het herkende product).
+  url        String
+  /// fetch of browser (de prijsbrowser).
+  via        String
+  /// found, notfound of failed.
+  status     String
+  price      Float?
+  /// Is `price` incl. of excl. BTW?
+  basis      String?
+  /// De productnaam op de site van de winkel.
+  product    String?
+  /// Waarom er geen antwoord was.
+  reason     String?
+  /// Hoe lang de winkel (of de prijsbrowser) erover deed; 0 uit het geheugen.
+  durationMs Int      @default(0)
+  /// Uit het geheugen van vier uur, zonder de winkel te vragen.
+  cached     Boolean  @default(false)
+
+  @@index([at])
+  @@index([budgetId, at])
+  @@index([shop, at])
+}
+
 model BoPostAlias {
   /// De schrijfwijze, genormaliseerd met `normalizeKey`.
   key       String   @id

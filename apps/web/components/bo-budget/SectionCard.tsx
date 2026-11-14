@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { ConfirmDialog } from '@vtk/ui';
 import { IconButton } from '@/components/ui/IconButton';
-import { ArrowDownIcon, ArrowUpIcon, ExternalLinkIcon, PencilIcon, PlusIcon, TrashIcon } from '@/components/ui/icons';
+import { ArrowDownIcon, ArrowUpIcon, LinkIcon, PencilIcon, PlusIcon, TrashIcon } from '@/components/ui/icons';
 import {
+  basisOf,
   costAmount,
   distributionOf,
   incomeAmount,
@@ -12,16 +13,20 @@ import {
   incomePrice,
   locationOf,
   priceOf,
+  rateOf,
   restShare,
   rowPct,
   sectionAmount,
   sectionResult,
   unitsOf,
 } from '@/lib/bo/budget/calc';
-import { setFx } from '@/lib/bo/budget/formula';
+import { controlOf, shopLabel } from '@/lib/bo/budget/control';
+import { fixedPriceOf } from '@/lib/bo/budget/fixed';
+import { normalizeName, setFx } from '@/lib/bo/budget/formula';
 import { clearConfirmation } from '@/lib/bo/budget/prices';
 import { shopOfUrl } from '@/lib/priceCheck/shops';
 import type { CostRow, CostSection, IncomeRow, IncomeSection, Section } from '@/lib/bo/budget/types';
+import { ControlCell } from './ControlCell';
 import type { EditorApi } from './editorApi';
 import { money, percent, plain } from './format';
 import { Money } from './Money';
@@ -30,9 +35,13 @@ import { NumberField } from './NumberField';
 /*
  * Eén sectie van het budget als tabel om in te typen, zoals een blad: naam,
  * aantal en prijs staan meteen in de cel, het bedrag rekent de site. Enter
- * springt naar dezelfde kolom op de volgende regel. Bron, BTW, Flesserke en
- * opmerking staan in het paneel achter het potlood: die hoeven niet bij elke
- * regel in beeld.
+ * springt naar dezelfde kolom op de volgende regel.
+ *
+ * Dezelfde tabel is ook wat wie nakijkt ziet (er is geen aparte weergave
+ * meer): per regel waar de prijs vandaan komt (Bron) en hoe het met die prijs
+ * staat (Controle), met zelf nagekeken en de prijs van de winkel overnemen
+ * als rij-acties. Kiezen van een andere soort bron, de BTW, Flesserke en de
+ * opmerking staan in het paneel achter het potlood.
  */
 
 const TYPE_LABEL = {
@@ -42,9 +51,107 @@ const TYPE_LABEL = {
 
 const SOURCE_WORD: Record<string, [string, string]> = {
   flesserke: ['Flesserke', 'Flesserke'],
-  afspraak: ['Vaste afspraak', 'Fixed agreement'],
+  afspraak: ['Afspraak', 'Agreed'],
   locatie: ['Prijs van de locatie', "Venue's price"],
 };
+
+/** "incl. 21 %", "excl." of "incl. of excl.?" onder de prijs, zodra de post een tarief heeft. */
+function vatNote(api: EditorApi, row: CostRow): string {
+  const { content, ctx, nl } = api;
+  if (row.forfait || row.rest || row.service || rateOf(content, ctx) === null) return '';
+  const { basis, productVat } = basisOf(content, ctx, row);
+  if (!basis) return nl ? 'incl. of excl.?' : 'incl. or excl.?';
+  return basis === 'incl' ? `incl. ${percent(productVat, nl)}` : 'excl.';
+}
+
+/**
+ * De link van een regel in de tabel. Leeg is het een cel om in te plakken (de
+ * site herkent zelf of het Collect&Go of een andere webshop is); met een link
+ * staat de naam van de winkel er, als link naar het product, met ernaast een
+ * knop om de link te wijzigen.
+ */
+function LinkField({
+  api,
+  row,
+  onUrl,
+  placeholder,
+  danger = false,
+}: {
+  api: EditorApi;
+  row: CostRow;
+  onUrl: (value: string) => void;
+  placeholder: string;
+  danger?: boolean;
+}) {
+  const { nl, readOnly } = api;
+  const [editing, setEditing] = useState(false);
+  const url = row.source?.url ?? '';
+  const isLink = /^https?:\/\//i.test(url.trim());
+  const offerte = row.source?.type === 'offerte';
+  const who =
+    row.checkedAt && row.checkedBy ? (
+      <span className="vtk-bud-who">{nl ? `door ${row.checkedBy}` : `by ${row.checkedBy}`}</span>
+    ) : null;
+  if (isLink && !editing) {
+    const label = offerte ? (nl ? 'Offerte' : 'Quote') : shopLabel(row);
+    return (
+      <span className="vtk-bud-linkcell">
+        <a
+          className="vtk-bud-srclink"
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          title={nl ? `Openen bij ${label}` : `Open at ${label}`}
+        >
+          {label}
+          {offerte && row.source?.note ? `: ${row.source.note}` : ''}
+        </a>
+        {who}
+        {!readOnly && (
+          <IconButton
+            className="vtk-bud-relink"
+            label={nl ? 'Link wijzigen' : 'Change link'}
+            srLabel={nl ? `Link wijzigen: ${row.name || 'deze regel'}` : `Change link: ${row.name || 'this row'}`}
+            onClick={() => setEditing(true)}
+          >
+            <LinkIcon />
+          </IconButton>
+        )}
+      </span>
+    );
+  }
+  if (readOnly) {
+    return offerte ? (
+      <span>
+        <b>{nl ? 'Offerte' : 'Quote'}</b>
+        {row.source?.note ? `: ${row.source.note}` : ''}
+        {who}
+      </span>
+    ) : (
+      <span className={danger ? 'vtk-bud-flag' : 'vtk-bud-muted'}>{placeholder}</span>
+    );
+  }
+  return (
+    <span className="vtk-bud-linkcell">
+      <input
+        className="vtk-bud-bare vtk-bud-cell"
+        data-danger={danger ? '1' : undefined}
+        value={url}
+        data-col="link"
+        inputMode="url"
+        autoFocus={editing}
+        placeholder={placeholder}
+        aria-label={nl ? `Link van ${row.name || 'deze regel'}` : `Link of ${row.name || 'this row'}`}
+        onChange={(e) => onUrl(e.target.value)}
+        onBlur={() => setEditing(false)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') e.currentTarget.blur();
+        }}
+      />
+      {offerte && row.source?.note && <span className="vtk-bud-sub">{row.source.note}</span>}
+    </span>
+  );
+}
 
 function StatusDot({ api, rowId, name }: { api: EditorApi; rowId: string; name: string }) {
   const checks = api.checksByRow.get(rowId) ?? [];
@@ -121,64 +228,111 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
     formula: row.fx?.[key],
     onFormula: (formula: string | null) => update(row.id, (r) => setFx(r, key, formula)),
   });
-  /**
-   * De link van de regel, meteen in de tabel: plakken volstaat, de site
-   * herkent zelf of het Collect&Go of een andere webshop is. Een bron zonder
-   * link (afspraak, Flesserke, de locatie) staat er als woord; die kies je in
-   * het paneel achter het potlood.
-   */
+  /** Bron: waar de prijs vandaan komt. Een link plak je hier; een andere soort bron kies je achter het potlood. */
   const linkCell = (row: CostRow) => {
     const type = row.source?.type;
     const word = type ? SOURCE_WORD[type] : undefined;
-    if (word)
+    const label = nl ? 'Bron' : 'Source';
+    if (row.service)
       return (
-        <td className="vtk-bud-col-link" data-label={nl ? 'Bron' : 'Source'}>
+        <td className="vtk-bud-col-link vtk-bud-muted" data-label={label}>
+          {nl ? 'Collect&Go-servicekost' : 'Collect&Go service cost'}
+        </td>
+      );
+    if (row.forfait)
+      return (
+        <td className="vtk-bud-col-link" data-label={label}>
           <button type="button" className="vtk-bud-srcword" onClick={(e) => api.openRow(row.id, e.currentTarget)}>
-            {word[nl ? 0 : 1]}
+            <b>{nl ? 'Forfait' : 'Lump sum'}</b>
+            {row.forfait.reason ? `: ${row.forfait.reason}` : ''}
           </button>
         </td>
       );
-    const url = row.source?.url ?? '';
+    if (word) {
+      const location = type === 'locatie' ? locationOf(content, ctx) : null;
+      return (
+        <td className="vtk-bud-col-link" data-label={label}>
+          <button type="button" className="vtk-bud-srcword" onClick={(e) => api.openRow(row.id, e.currentTarget)}>
+            <b>
+              {type === 'locatie' && location ? `${nl ? 'Prijs van' : 'Price of'} ${location.name}` : word[nl ? 0 : 1]}
+            </b>
+            {row.source?.note ? `: ${row.source.note}` : ''}
+            {row.checkedAt && row.checkedBy ? (
+              <span className="vtk-bud-who">{nl ? `door ${row.checkedBy}` : `by ${row.checkedBy}`}</span>
+            ) : null}
+          </button>
+        </td>
+      );
+    }
+    // Een offerte zonder link: het woord, en de link plak je achter het potlood.
+    if (type === 'offerte' && !row.source?.url?.trim())
+      return (
+        <td className="vtk-bud-col-link" data-label={label}>
+          <button type="button" className="vtk-bud-srcword" onClick={(e) => api.openRow(row.id, e.currentTarget)}>
+            <b>{nl ? 'Offerte' : 'Quote'}</b>
+            {row.source?.note ? `: ${row.source.note}` : ''}
+          </button>
+        </td>
+      );
+    if (!row.source) {
+      const fixed = fixedPriceOf(content, ctx, row);
+      if (fixed)
+        return (
+          <td className="vtk-bud-col-link" data-label={label}>
+            <button type="button" className="vtk-bud-srcword" onClick={(e) => api.openRow(row.id, e.currentTarget)}>
+              <b>{nl ? 'Vaste prijs' : 'Fixed price'}</b>
+              {normalizeName(fixed.name) !== normalizeName(row.name) ? `: ${fixed.name}` : ''}
+            </button>
+          </td>
+        );
+    }
+    const noSource = !row.source && !row.checkedAt;
     return (
-      <td className="vtk-bud-col-link" data-label="Link">
-        <span className="vtk-bud-linkcell">
-          <input
-            className="vtk-bud-bare vtk-bud-cell"
-            value={url}
-            data-col="link"
-            inputMode="url"
-            placeholder={type === 'offerte' ? (nl ? 'Link naar de offerte' : 'Link to the quote') : 'https://'}
-            aria-label={nl ? `Link van ${row.name || 'deze regel'}` : `Link of ${row.name || 'this row'}`}
-            onChange={(e) =>
-              update(row.id, (r) => {
-                const value = e.target.value.trim();
-                if (r.source?.type === 'offerte') r.source.url = value;
-                else if (!value) r.source = null;
-                else
-                  r.source = {
-                    ...(r.source ?? {}),
-                    type: shopOfUrl(value) === 'collectgo' ? 'collectgo' : 'webshop',
-                    url: value,
-                  };
-                // Een andere link is een ander product: het vorige antwoord van de winkel geldt niet meer.
-                delete r.lastCheck;
-                clearConfirmation(r);
-              })
-            }
-          />
-          {/^https?:\/\//i.test(url) && (
-            <a
-              className="vtk-bud-iconlink"
-              href={url}
-              target="_blank"
-              rel="noreferrer"
-              title={nl ? 'Link openen' : 'Open link'}
-              aria-label={nl ? `Link openen: ${row.name}` : `Open link: ${row.name}`}
-            >
-              <ExternalLinkIcon />
-            </a>
-          )}
-        </span>
+      <td className="vtk-bud-col-link" data-label={label}>
+        <LinkField
+          api={api}
+          row={row}
+          danger={noSource}
+          placeholder={
+            type === 'offerte'
+              ? nl
+                ? 'Link naar de offerte'
+                : 'Link to the quote'
+              : noSource
+                ? nl
+                  ? 'geen bron: plak een link'
+                  : 'no source: paste a link'
+                : row.checkedAt
+                  ? nl
+                    ? 'zonder link'
+                    : 'no link'
+                  : 'https://'
+          }
+          onUrl={(input) =>
+            update(row.id, (r) => {
+              const value = input.trim();
+              if (r.source?.type === 'offerte') r.source.url = value;
+              else if (!value) r.source = null;
+              else
+                r.source = {
+                  ...(r.source ?? {}),
+                  type: shopOfUrl(value) === 'collectgo' ? 'collectgo' : 'webshop',
+                  url: value,
+                };
+              // Een andere link is een ander product: het vorige antwoord van de winkel geldt niet meer.
+              delete r.lastCheck;
+              clearConfirmation(r);
+            })
+          }
+        />
+      </td>
+    );
+  };
+  const controlCell = (row: CostRow) => {
+    const control = controlOf(content, ctx, row, nl);
+    return (
+      <td className="num vtk-bud-col-ctl" data-label={nl ? 'Controle' : 'Check'}>
+        {control && <ControlCell control={control} row={row} nl={nl} actions={api.controlActions ?? undefined} />}
       </td>
     );
   };
@@ -222,7 +376,8 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
             <th className="num">{nl ? 'Prijs' : 'Price'}</th>
             <th className="num">{nl ? 'Bedrag' : 'Amount'}</th>
             {api.resultOn && <th className="num vtk-bud-col-res">{nl ? 'Resultaat' : 'Result'}</th>}
-            <th className="vtk-bud-col-link">{nl ? 'Link of bron' : 'Link or source'}</th>
+            <th className="vtk-bud-col-link">{nl ? 'Bron' : 'Source'}</th>
+            <th className="num vtk-bud-col-ctl">{nl ? 'Controle' : 'Check'}</th>
             <th className="vtk-bud-col-act">
               <span className="sr-only">{nl ? 'Status en details' : 'Status and details'}</span>
             </th>
@@ -233,23 +388,34 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
             const amount = costAmount(content, ctx, section, row);
             const fromLocation = row.source?.type === 'locatie' && row.override == null;
             const partner = row.mixOf ? section.rows.find((r) => r.id === row.mixOf) : null;
+            const sub = [
+              row.flesserke
+                ? nl
+                  ? `${plain(row.flesserke, nl)} uit Flesserke`
+                  : `${plain(row.flesserke, nl)} from Flesserke`
+                : '',
+              row.note?.trim() ?? '',
+            ].filter(Boolean);
             const name = (
               <td className="vtk-bud-col-name">
-                <input
-                  className="vtk-bud-bare vtk-bud-cell"
-                  value={row.name}
-                  data-col="name"
-                  data-row={row.id}
-                  aria-label={nl ? 'Omschrijving' : 'Description'}
-                  placeholder={nl ? 'Wat koop je?' : 'What are you buying?'}
-                  onChange={(e) => update(row.id, (r) => (r.name = e.target.value))}
-                />
+                <span className="vtk-bud-namecell">
+                  <StatusDot api={api} rowId={row.id} name={row.name} />
+                  <input
+                    className="vtk-bud-bare vtk-bud-cell"
+                    value={row.name}
+                    data-col="name"
+                    data-row={row.id}
+                    aria-label={nl ? 'Omschrijving' : 'Description'}
+                    placeholder={nl ? 'Wat koop je?' : 'What are you buying?'}
+                    onChange={(e) => update(row.id, (r) => (r.name = e.target.value))}
+                  />
+                </span>
+                {sub.length > 0 && <span className="vtk-bud-sub">{sub.join(' · ')}</span>}
               </td>
             );
             const actions = (
               <td className="vtk-bud-col-act">
                 <span className="vtk-bud-act">
-                  <StatusDot api={api} rowId={row.id} name={row.name} />
                   <IconButton
                     label={nl ? 'Bron, BTW en meer' : 'Source, VAT and more'}
                     srLabel={`${nl ? 'Details' : 'Details'}: ${row.name || (nl ? 'regel' : 'row')}`}
@@ -272,6 +438,7 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
                   </td>
                   {api.resultOn && <td />}
                   <td className="vtk-bud-col-link" />
+                  <td className="vtk-bud-col-ctl" />
                   {actions}
                 </tr>
               );
@@ -294,7 +461,8 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
                     />
                   </td>
                   {resultCell(row)}
-                  <td className="vtk-bud-col-link" />
+                  {linkCell(row)}
+                  {controlCell(row)}
                   {actions}
                 </tr>
               );
@@ -409,12 +577,14 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
                       }
                     />
                   )}
+                  {vatNote(api, row) && <span className="vtk-bud-sub">{vatNote(api, row)}</span>}
                 </td>
                 <td className="num vtk-bud-amount" data-label={nl ? 'Bedrag' : 'Amount'}>
                   <Money cost value={amount} nl={nl} />
                 </td>
                 {resultCell(row)}
-                {row.service ? <td className="vtk-bud-col-link" /> : linkCell(row)}
+                {linkCell(row)}
+                {controlCell(row)}
                 {actions}
               </tr>
             );
@@ -434,7 +604,7 @@ function CostTable({ api, section }: { api: EditorApi; section: CostSection }) {
                 <Money cost value={sectionResult(section)} nl={nl} />
               </td>
             )}
-            <td colSpan={2} />
+            <td colSpan={3} />
           </tr>
         </tfoot>
       </table>
@@ -559,7 +729,6 @@ function IncomeTable({ api, section }: { api: EditorApi; section: IncomeSection 
                 )}
                 <td className="vtk-bud-col-act">
                   <span className="vtk-bud-act">
-                    <span className="vtk-bud-dot" aria-hidden="true" />
                     <IconButton
                       label={nl ? 'Aantal, prijs en meer' : 'Quantity, price and more'}
                       srLabel={`${nl ? 'Details' : 'Details'}: ${row.name || (nl ? 'regel' : 'row')}`}
@@ -791,6 +960,20 @@ export function SectionCard({
         </div>
       )}
       {variable && section.distribute && <DistributionBar api={api} section={section} />}
+      {/* Wat aan de sectie zelf scheelt (een naam die niets zegt). De verdeling zegt het al in haar balk. */}
+      {api.checks
+        .filter(
+          (c) =>
+            c.sectionId === section.id &&
+            !c.rowId &&
+            c.level !== 'info' &&
+            !(variable && section.distribute && c.text.startsWith(`${section.name}:`))
+        )
+        .map((c, i) => (
+          <p key={i} className="vtk-bud-secnote" data-level={c.level}>
+            {c.text}
+          </p>
+        ))}
 
       {section.rows.length === 0 ? (
         <p className="vtk-bud-empty">

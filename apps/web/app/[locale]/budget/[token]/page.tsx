@@ -3,17 +3,14 @@ import { notFound } from 'next/navigation';
 import type { Locale } from '@vtk/i18n';
 import { hasLocale } from '@/lib/locale';
 import { BudgetEditor } from '@/components/bo-budget/BudgetEditor';
-import { BudgetReview } from '@/components/bo-budget/BudgetReview';
-import { PriceRefresh } from '@/components/bo-budget/PriceRefresh';
-import { checksOf } from '@/lib/bo/budget/checks';
 import { getBudgetSettings, loadBudgetByToken, loadPot, postNames } from '@/lib/bo/budget/server';
 
 import '@/app/design/vtk-admin.css';
 
 /*
  * /budget/<token>: een budget achter een deellink, buiten de admin. De link is
- * de toegang: wie hem heeft, ziet dit ene budget (de nakijkweergave) of mag
- * het aanpassen (de editor), zonder account. Voor een kring waarmee
+ * de toegang: wie hem heeft, ziet dit ene budget of mag het aanpassen, op
+ * hetzelfde blad als in de admin, zonder account. Voor een kring waarmee
  * samengewerkt wordt en voor de slides van het BO. Een ingetrokken of
  * onbekende link is een 404, zonder te zeggen welke van de twee.
  *
@@ -39,55 +36,36 @@ export default async function SharedBudgetPage({ params }: { params: Promise<{ l
   const [settings, names] = await Promise.all([getBudgetSettings(), postNames([budget.postKey], nl)]);
   const pot = await loadPot(budget, settings);
   const postName = names.get(budget.postKey) ?? budget.postKey;
-  const ctx = {
-    postKey: budget.postKey,
-    settings,
-    pot: pot ? { others: pot.othersTotal, othersResult: pot.othersResult, count: pot.others.length } : null,
-  };
-
   return (
     <div className="vtk-bud-shared">
       <section className="vtk-admin-main">
-        {level === 'edit' ? (
-          <BudgetEditor
-            budget={{
-              id: budget.id,
-              version: budget.version,
-              title: budget.title,
-              template: budget.template,
-              status: budget.status,
-              targetDate: budget.targetDate,
-              postKey: budget.postKey,
-              content: budget.content,
-            }}
-            postName={postName}
-            settings={settings}
-            locale={locale}
-            backHref={null}
-            settingsHref={null}
-            token={token}
-            pot={pot}
-          />
-        ) : (
-          <div className="vtk-bud">
-            <PriceRefresh id={budget.id} token={token} />
-            <p className="vtk-bud-fine">
-              {nl
-                ? `Gedeeld budget van ${postName} (Vlaamse Technische Kring). Je kijkt mee; wijzigen kan hier niet.`
-                : `Shared budget of ${postName} (Vlaamse Technische Kring). View only.`}
-            </p>
-            <BudgetReview
-              title={budget.title}
-              postName={postName}
-              targetDate={budget.targetDate}
-              content={budget.content}
-              ctx={ctx}
-              checks={checksOf(budget.content, ctx, nl)}
-              pot={pot}
-              locale={locale}
-            />
-          </div>
+        {level === 'view' && (
+          <p className="vtk-bud-fine">
+            {nl
+              ? `Gedeeld budget van ${postName} (Vlaamse Technische Kring). Je kijkt mee; wijzigen kan hier niet.`
+              : `Shared budget of ${postName} (Vlaamse Technische Kring). View only.`}
+          </p>
         )}
+        <BudgetEditor
+          budget={{
+            id: budget.id,
+            version: budget.version,
+            title: budget.title,
+            template: budget.template,
+            status: budget.status,
+            targetDate: budget.targetDate,
+            postKey: budget.postKey,
+            content: budget.content,
+          }}
+          postName={postName}
+          settings={settings}
+          locale={locale}
+          backHref={null}
+          settingsHref={null}
+          token={token}
+          pot={pot}
+          viewOnly={level !== 'edit'}
+        />
       </section>
     </div>
   );

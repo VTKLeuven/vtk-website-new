@@ -400,7 +400,7 @@ die niet aangevinkt was, zag haar overgenomen bladen toch.
 | `apps/web/lib/collectgo/product.ts` | Collect&Go: het product uit een link en uit de JSON-LD van de pagina |
 | `apps/web/app/actions/boBudgets.ts` | Aanmaken, bewaren, prijzen nakijken, verwijderen, instellingen |
 | `apps/web/app/api/admin/bestuursorgaan/budget/[id]/route.ts` | De download voor Drive |
-| `apps/web/components/bo-budget/` | De editor (Maken), `BudgetReview` (Nakijken), `ShareDialog`, het paneel per regel, de instellingen |
+| `apps/web/components/bo-budget/` | Het blad (`BudgetEditor`, `BudgetTop`, `SectionCard`, `ControlCell`), `ShareDialog`, het paneel per regel, de instellingen |
 | `apps/web/app/[locale]/admin/bestuursorgaan/mappen/` | Per BO een map, zoals in Drive |
 | `apps/web/app/[locale]/budget/[token]/` | Een budget achter een deellink, buiten de admin |
 | `apps/web/test/boBudget.test.ts` | Live Cantus, IT Nieuw Materiaal en PeMe van BO 12, Collect&Go, de download |
@@ -440,8 +440,8 @@ blad terug met `figuresFromSheet` en vindt dezelfde bedragen als de editor.
 Indienen op de site (`submitBoBudgetAction`) bestaat, maar staat niet in de
 editor zolang het BO met Drive werkt.
 
-**Prijzen nakijken gebeurt vanzelf.** Er is geen knop "Prijzen nakijken" meer.
-De regels met een link naar één product bij een gekende winkel worden nagekeken
+**Prijzen nakijken gebeurt vanzelf, en kan ook met de knop.** De regels met een
+link naar één product bij een gekende winkel worden nagekeken
 (`lib/bo/budget/priceRound.ts`):
 
 - **om de vier uur door de server**, voor de budgetten van het eerstvolgende BO
@@ -451,10 +451,15 @@ De regels met een link naar één product bij een gekende winkel worden nagekeke
   `/api/background/maintenance`), die elke vijf minuten langskomt; per budget
   beslist `rowsToCheck` of het al tijd is. De worker wacht hoogstens twintig
   seconden op de ronde, en er loopt er nooit meer dan één tegelijk;
-- **wanneer iemand een budget opent**, in Maken, in Nakijken of via een
-  deellink, voor elk budget dat nog niet vastligt (`refreshBudgetPrices` via
+- **wanneer iemand een budget opent**, ook via een deellink, voor elk budget
+  dat nog niet vastligt (`refreshBudgetPrices` via
   `POST /api/bo/budgets/[id]/prices`). Een nieuwe link in de editor gaat langs
-  dezelfde route, met `rows`.
+  dezelfde route, met `rows`;
+- **met "Prijzen opnieuw ophalen"** in het blok "Prijzen bij de webshops", voor
+  wie mag wijzigen (`force`). Die vraagt elke nakijkbare regel vers bij de
+  winkel, buiten het geheugen van vier uur om, en bewaart zoals de ronde.
+  Hoogstens om de twee minuten per budget (`FORCE_COOLDOWN_MS`, in het geheugen
+  van het proces); een budget dat vastligt, weigert met `FIXED`.
 
 Dat zijn **route handlers en geen server actions**: Next stuurt server actions
 vanuit de browser één voor één, dus een ronde van een halve minuut hield elke
@@ -481,10 +486,28 @@ naar die van de winkel, ziet meteen "klopt". "Nu nakijken" in het paneel van
 een regel vraagt de winkel vers op. Groep 5 zet alles uit bij de instellingen
 (`collectGoLive`).
 
+**Het blok "Prijzen bij de webshops"** boven de secties telt de regels met een
+winkel als bron per stand, met dezelfde iconen als de kolom Controle
+(`priceSummary` in `lib/bo/budget/control.ts`), en zegt wanneer de laatste
+volledige ronde liep (`pricesAt`) en vanaf wanneer de volgende kan. Daar staat
+de knop, en voor Groep 5 een link naar het logboek van dit budget.
+
+**Het logboek** (`/admin/bestuursorgaan/prijzen`, `BoPriceCheckLog`,
+`lib/priceCheck/log.ts`) houdt elke opvraging bij een winkel bij: wanneer,
+waarom (ronde, openen, nieuwe link, één regel nakijken, de knop, de test bij de
+instellingen), voor welk budget, welke winkel en pagina, langs de prijsbrowser
+of niet, de uitkomst met prijs of reden, en hoe lang het duurde. Een antwoord
+uit het geheugen van vier uur staat er ook in (`cached`), zodat je ziet waarom
+een ronde niets nieuws vroeg; wie meelift op een aanvraag die al loopt, logt
+niet. Bovenaan de pagina staat hoe het nu staat (nakijken aan, de prijsbrowser,
+de laatste ronde van de worker, het eerstvolgende BO) en per winkel de laatste
+24 uur. Enkel Groep 5 (`bestuursorgaan.manage`). Na zestig dagen weg
+(`prunePriceLog`, vanuit de ronde van de worker en bij het openen van de pagina).
+
 **Zelf nagekeken.** Voor een link naar een winkel die de site niet kent (een
 frituur, een verhuurder) en voor een regel zonder link zegt een mens dat hij de
-prijs nakeek: de knop "Zelf nagekeken" bij de regel in Nakijken, of in het
-paneel in Maken. De regel toont daarna door wie en wanneer (`checkedBy`,
+prijs nakeek: de knop "Zelf nagekeken" in de kolom Controle, of in het paneel
+van de regel. De regel toont daarna door wie en wanneer (`checkedBy`,
 `checkedAt`). De naam komt van de server (`stampConfirmations`), niet van de
 browser; via een deellink is dat "iemand met de deellink". Een bevestiging
 vervalt wanneer de prijs of de link wijzigt, en wanneer de winkel later een
@@ -500,31 +523,36 @@ prijs heeft daarmee een bron (`lib/bo/budget/fixed.ts`); met een locatie geldt
 de prijs enkel daar, en valt een regel met een ander bedrag op zonder iets tegen
 te houden. Herkennen gebeurt bij het tonen: de regel zelf verandert niet.
 
-### Maken en nakijken: twee weergaven van hetzelfde budget
+### Eén blad voor maken en nakijken
 
-De kop van de editor heeft een schakelaar. **Maken** is het werkblad: cellen om
-in te typen, het paneel achter het potlood, de knoppen. **Nakijken**
-(`BudgetReview.tsx`) is hetzelfde budget op één blad: bovenaan de bedragen, en
-per sectie één dichte tabel met per regel de som ("30 % × 150 p × 2 ÷ 24 = 4
-bak ×"), de prijs met incl. of excl., het bedrag, het resultaat, de bron en de
-controle. **Bron** is enkel waar de prijs vandaan komt (de winkel als link, een
-offerte, een vaste prijs). **Controle** is een icoon met de uitleg als tooltip
-(klopt, loopt, zelf nagekeken door wie en wanneer, geen bron), met enkel voor
-wat aandacht vraagt een kort woord ("winkel: 36,49", "geen antwoord").
-"Zelf nagekeken" en "Intrekken" zijn icoonknoppen die bij hover of focus
-verschijnen, op een smal scherm altijd; de prijs van de winkel overnemen staat
-er meteen. Wat in Maken achter het potlood zit, staat daar
-gewoon in de rij. Er is geen lijst "Aandachtspunten" meer: wat aan een regel
-scheelt, staat bij die regel (een bolletje voor de naam, de stand bij de bron).
-Wie mag wijzigen, kan in Nakijken twee dingen: op een prijs klikken om ze te
-verbeteren, en "Zelf nagekeken" aanduiden. `?weergave=nakijken` opent een budget
-meteen zo; de mappen en de deellink om te bekijken gebruiken dat.
+Er is één weergave (`BudgetEditor.tsx`, `BudgetTop.tsx`, `SectionCard.tsx`),
+opgebouwd zoals het rekenblad: bovenaan **het Overzicht en de Parameters naast
+elkaar**. Het overzicht toont elke sectie met haar bedrag (een link naar de
+sectie, met "N open" als er iets scheelt), Inkomsten, Uitgaven, Totaal,
+Begroting (in te typen) en het verschil; met het resultaat aan een tweede kolom
+Resultaat, "N nog leeg" per sectie en het verschil met het budget. De
+parameters groeperen de activiteit (BO, datum, locatie, lijn in de begroting),
+waarmee gerekend wordt (deelnemers, eigen parameters) en BTW en verdeling.
+Daaronder het concept, het blok "Prijzen bij de webshops" en de secties.
 
-In beide weergaven staat **het totaal van een sectie onder haar regels**, in de
-kolom van de bedragen, en is **elk negatief bedrag een min in het rood**
-(`Money.tsx`): een kost staat er als wat ze met het totaal doet. In Maken staat
-**de link van een regel in de tabel**: plakken volstaat, de site herkent zelf of
-het Collect&Go of een andere webshop is.
+Per regel staan naast de cellen om in te typen **Bron** (waar de prijs vandaan
+komt: de winkel als link naar het product, een offerte, een vaste prijs,
+Flesserke; leeg is een cel om een link in te plakken) en **Controle** (een
+icoon met de uitleg als tooltip: klopt, loopt, zelf nagekeken door wie en
+wanneer, geen bron; enkel voor wat aandacht vraagt een kort woord onder de
+iconen, zoals "winkel: 36,49" of "geen antwoord"). "Zelf nagekeken" en
+"Intrekken" verschijnen bij hover of focus, op een smal scherm altijd; de prijs
+van de winkel overnemen staat er meteen. Een bolletje voor de naam zegt dat er
+aan de regel iets anders scheelt (tooltip, klik opent de regel).
+
+Er is **geen lijst met aandachtspunten**: wat scheelt, staat bij de regel, onder
+de kop van de sectie (een naam die niets zegt) of onder het veld in de
+parameters en het overzicht. De kop zegt hoeveel punten er openstaan, met een
+klik naar het eerste. Het totaal staat in de meescrollende kop pas wanneer het
+overzicht uit beeld is.
+
+Wie niet mag wijzigen (een ingediend budget, de deellink om te bekijken), ziet
+hetzelfde blad met tekst in plaats van cellen (`viewOnly`, `readOnly`).
 
 **Secties zijn vrij.** Zoveel als je wil (hoogstens dertig), met een naam naar
 keuze, en met de pijlen te verplaatsen. De soort bepaalt enkel hoe de regels
@@ -572,7 +600,7 @@ overzicht van een budget kiest de post de lijn; de site neemt het bedrag over
 
 Twee budgetten met dezelfde lijn zijn een **potje** (`pot.ts`, `loadPot`):
 materiaal dat door het jaar gekocht wordt, met telkens een budget en een
-(tussentijds) resultaat. De editor en de nakijkweergave tonen dan de andere
+(tussentijds) resultaat. Het blad toont dan de andere
 budgetten op de lijn met hun resultaat, en "verschil met begroting" vergelijkt
 het potje als geheel (`CalcContext.pot`). Wie nog geen resultaat heeft, telt in
 het resultaat van het potje mee met zijn budget.
@@ -580,8 +608,8 @@ het resultaat van het potje mee met zijn budget.
 ### Delen met een link
 
 "Delen" in de kop maakt twee soorten link (`BoBudget.viewToken` en
-`editToken`, `/budget/<token>`): een om te **bekijken** (de nakijkweergave,
-voor in de slides van het BO) en een om **aan te passen** (de editor, voor een
+`editToken`, `/budget/<token>`): een om te **bekijken** (hetzelfde blad zonder
+cellen, voor in de slides van het BO) en een om **aan te passen** (de editor, voor een
 kring waarmee samengewerkt wordt en die niet in de admin kan). Geen account
 nodig; de link is de toegang.
 
@@ -603,7 +631,7 @@ meer onder het overzicht. De URL's zijn niet gewijzigd.
 
 Elke BO van het werkingsjaar is een rij in een lijst, met daarin Budgetten en
 Resultaten. Een rij is een rekenblad uit Drive (opent in Drive) of een budget op
-de site (opent in Nakijken). **Een activiteit die in Drive én op de site staat,
+de site (opent het blad). **Een activiteit die in Drive én op de site staat,
 is één rij** (zelfde post, zelfde naam) die naar de site leidt, met het blad in
 Drive als tweede link; staan er in een map beide soorten, dan is ze gesplitst in
 "Op de site" en "Enkel in Drive". "Rekenbladen opladen" is een dichtgeklapt blok
@@ -639,7 +667,7 @@ tegen die prijs). Zo klopt elk bedrag met wat het BO goedkeurde.
 - **Het totaal moet kloppen met het blad, tot op de cent.** Komen de regels er
   niet op uit (het blad Fakfeestje, meer tabbladen, een eigen indeling), dan
   neemt de lezer het blok Overzicht: één regel per post. `content.source.mode`
-  zegt welke van de twee, en de editor en de nakijkweergave tonen het.
+  zegt welke van de twee, en het blad toont het.
 - **Eén activiteit van een post is één budget.** Het resultaatblad vervangt het
   budgetblad van dezelfde activiteit (het bevat beide kolommen), niet omgekeerd.
 - **Een import overschrijft nooit wat op de site opgesteld is**: enkel een

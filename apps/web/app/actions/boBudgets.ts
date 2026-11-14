@@ -597,7 +597,7 @@ export async function testPriceLookupAction(input: { url: string }): Promise<Pri
   if (!ref) return { ok: false, code: 'NOT_A_PRODUCT', shop };
   const started = Date.now();
   const [lookup, browser] = await Promise.all([
-    lookupShopProduct(ref, { fresh: true, colruytPostcode: settings.colruytPostcode }),
+    lookupShopProduct(ref, { fresh: true, colruytPostcode: settings.colruytPostcode, log: { trigger: 'test' } }),
     priceBrowserStatus(),
   ]);
   return {

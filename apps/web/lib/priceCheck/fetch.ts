@@ -9,6 +9,7 @@ import {
   type ShopProduct,
   type ShopRef,
 } from './shops';
+import { logLookup, type PriceLogContext } from './log';
 
 /*
  * Een productpagina van een webshop ophalen. Rustig: wat de site vroeg,
@@ -36,7 +37,12 @@ const MAX_BYTES = 4_000_000;
 const cache = new Map<string, { at: number; lookup: ShopLookup }>();
 const pending = new Map<string, Promise<ShopLookup>>();
 
-export type LookupOptions = { fresh?: boolean; colruytPostcode?: string };
+export type LookupOptions = {
+  fresh?: boolean;
+  colruytPostcode?: string;
+  /** Waarom de site vraagt, voor het logboek (`log.ts`). Zonder context: geen log. */
+  log?: PriceLogContext;
+};
 
 function priceBrowserConfigured(): boolean {
   return !!process.env.PRICE_BROWSER_URL?.trim() && !!process.env.PRICE_BROWSER_SECRET?.trim();
@@ -121,14 +127,19 @@ export async function priceBrowserStatus(): Promise<'off' | 'down' | 'up'> {
 export async function lookupShopProduct(ref: ShopRef, options: LookupOptions = {}): Promise<ShopLookup> {
   const key = ref.shop === 'colruyt' ? `${ref.page}#${options.colruytPostcode ?? ''}` : ref.page;
   const hit = cache.get(key);
-  if (!options.fresh && hit && Date.now() - hit.at < (hit.lookup.status === 'failed' ? FAILED_TTL_MS : TTL_MS))
+  if (!options.fresh && hit && Date.now() - hit.at < (hit.lookup.status === 'failed' ? FAILED_TTL_MS : TTL_MS)) {
+    if (options.log) logLookup(options.log, ref, routeOf(ref), hit.lookup, 0, true);
     return hit.lookup;
+  }
+  // Wie meelift op een aanvraag die al loopt, logt niet: die aanvraag logt zelf.
   const running = pending.get(key);
   if (running) return running;
+  const started = Date.now();
   const job = fetchShopProduct(ref, options)
     .then((lookup) => {
       cache.set(key, { at: Date.now(), lookup });
       if (cache.size > 5000) cache.delete(cache.keys().next().value!);
+      if (options.log) logLookup(options.log, ref, routeOf(ref), lookup, Date.now() - started, false);
       return lookup;
     })
     .finally(() => pending.delete(key));

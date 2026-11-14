@@ -35,7 +35,7 @@ import {
  * de regels (het blad Fakfeestje, een budget over meer tabbladen, een eigen
  * indeling), dan valt de lezer terug op het blok Overzicht: één regel per
  * kostenpost, met het bedrag van het blad. Welke van de twee het werd, staat
- * in `content.source.mode`, en de nakijkweergave zegt het.
+ * in `content.source.mode`, en het blad zegt het.
  *
  * Puur op een buffer: de bladen zelf komen nooit in de repo, de test bouwt er
  * een na.

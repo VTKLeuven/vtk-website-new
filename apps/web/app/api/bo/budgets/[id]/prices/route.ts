@@ -17,12 +17,15 @@ export const dynamic = 'force-dynamic';
  * - Zonder `rows`: de ronde van het budget (`refreshBudgetPrices`), voor
  *   iedereen die het budget mag zien. De server houdt zelf de klok bij, dus dit
  *   doet meestal niets.
+ * - Met `force`: "Prijzen opnieuw ophalen", alle regels vers bij de winkel,
+ *   voor wie mag wijzigen, hoogstens om de twee minuten per budget. Bewaart
+ *   zoals de ronde.
  * - Met `rows`: enkel die regels opvragen (een nieuwe link, of "Nu nakijken"),
  *   voor wie mag wijzigen. Bewaart niets: de editor zet het antwoord in de
  *   regels en bewaart zoals bij elke wijziging.
  */
 
-type Body = { token?: unknown; rows?: unknown; fresh?: unknown };
+type Body = { token?: unknown; rows?: unknown; fresh?: unknown; force?: unknown };
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   // Enkel JSON: een formulier van een andere site kan dit zo niet aanroepen zonder CORS-voorcontrole.
@@ -34,13 +37,19 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
   const budget = await prisma.boBudget.findUnique({
     where: { id: String(id) },
-    select: { id: true, postKey: true, viewToken: true, editToken: true },
+    select: { id: true, title: true, postKey: true, viewToken: true, editToken: true },
   });
   const access = budget ? await budgetAccess(budget, token) : null;
   if (!budget || !access) return Response.json({ ok: false, code: 'NOT_FOUND' }, { status: 404 });
 
+  if (body.force === true) {
+    if (access.level !== 'edit') return Response.json({ ok: false, code: 'NOT_YOUR_POST' }, { status: 403 });
+    const outcome = await refreshBudgetPrices(budget.id, { trigger: 'knop' });
+    return Response.json(outcome, { headers: { 'Cache-Control': 'no-store' } });
+  }
+
   if (!Array.isArray(body.rows)) {
-    const outcome = await refreshBudgetPrices(budget.id);
+    const outcome = await refreshBudgetPrices(budget.id, { trigger: 'openen' });
     return Response.json(outcome, { headers: { 'Cache-Control': 'no-store' } });
   }
 
@@ -52,7 +61,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     .map((r) => ({ rowId: String(r.rowId ?? ''), url: String(r.url ?? '') }))
     .filter((r) => r.rowId && r.url);
   // Vers bij de winkel enkel voor één regel: een hele lijst hoeft dat niet.
-  const results = await lookupRows(rows, settings, body.fresh === true && rows.length === 1);
+  const fresh = body.fresh === true && rows.length === 1;
+  const results = await lookupRows(rows, settings, fresh, {
+    trigger: fresh ? 'nakijken' : 'nieuwe link',
+    budgetId: budget.id,
+    budgetName: budget.title,
+  });
   return Response.json(
     { ok: true, results: results.map(({ rowId, lookup }) => ({ rowId, lookup })) },
     { headers: { 'Cache-Control': 'no-store' } }

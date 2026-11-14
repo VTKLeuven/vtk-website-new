@@ -73,6 +73,11 @@ export default async function BudgetSettingsPage({ params }: { params: Promise<{
       />
       <BudgetSettingsForm settings={settings} posts={posts} locale={locale} />
       <PriceCheckTest browser={browser} locale={locale} />
+      <p className="text-sm">
+        <Link href={`${base}/admin/bestuursorgaan/prijzen`} className="vtk-bud-link">
+          {nl ? 'Logboek van alle prijscontroles' : 'Log of all price checks'}
+        </Link>
+      </p>
     </div>
   );
 }
