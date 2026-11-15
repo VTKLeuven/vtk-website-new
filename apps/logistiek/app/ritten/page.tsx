@@ -378,7 +378,6 @@ export default async function RittenPage() {
           {t.pageTripsAccent}
         </>
       }
-      intro={t.pageTripsLead}
       /* V1: laten weten wanneer je kan rijden. In de kop en niet als paneel
          tussen de ritten: het is de enige actie op dit scherm en de rest is
          lezen, en als paneel las het als een mededeling die je wegscrolt. */

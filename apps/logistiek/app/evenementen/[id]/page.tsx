@@ -52,10 +52,7 @@ export default async function EvenementDetailPage({
         </Link>
       }
       title={event.name}
-      intro={
-        [moment, event.location].filter(Boolean).join(' · ') ||
-        (en ? 'Fill in when and where below.' : 'Vul hieronder in wanneer en waar.')
-      }
+      intro={[moment, event.location].filter(Boolean).join(' · ') || undefined}
     >
       <div className="grid gap-6">
         <MemberEventForm

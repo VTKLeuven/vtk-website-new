@@ -38,7 +38,6 @@ export default async function VervoerPage() {
           {t.pageVanTitle} {t.pageVanAccent}
         </>
       }
-      intro={content.pageVanLead}
     >
       <div className="logistics-form-width grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         {blocked ? (

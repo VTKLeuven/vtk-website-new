@@ -39,11 +39,6 @@ export default async function EvenementenPage() {
           <em>{en ? 'events' : 'evenementen'}</em>
         </>
       }
-      intro={
-        en
-          ? 'Everything your group requested for one event, on one screen.'
-          : 'Alles wat je post of werkgroep voor één evenement aanvroeg, op één scherm.'
-      }
     >
       {events.length === 0 ? (
         <p className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6 text-sm text-vtk-muted">

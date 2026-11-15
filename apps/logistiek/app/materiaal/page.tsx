@@ -62,7 +62,6 @@ export default async function MateriaalPage() {
           {t.pageMaterialTitle} {t.pageMaterialAccent}
         </>
       }
-      intro={content.pageMaterialLead}
     >
       {catalog.length === 0 ? (
         <p className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-7 text-vtk-body">

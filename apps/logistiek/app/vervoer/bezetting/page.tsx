@@ -413,19 +413,6 @@ export default async function VervoerBezettingPage({
   return (
     <PageShell
       title={en ? 'When is a vehicle free?' : 'Wanneer is een voertuig vrij?'}
-      intro={
-        team || praesidium
-          ? en
-            ? 'The same planning Logistics works from, without the decision buttons. Click a trip to see the post, the reason, the driver and the rest.'
-            : 'Dezelfde planning als waar Logistiek mee werkt, zonder de beslisknoppen. Klik een rit aan voor de post, de reden, de chauffeur en de rest.'
-          : session
-            ? en
-              ? 'The same planning Logistics works from, without the decision buttons.'
-              : 'Dezelfde planning als waar Logistiek mee werkt, zonder de beslisknoppen.'
-            : en
-              ? 'Vehicle, day and time only. Log in to request a trip; who is driving and what for is not shown here.'
-              : 'Enkel voertuig, dag en uur. Log in om een rit aan te vragen; wie rijdt en waarvoor staat hier niet bij.'
-      }
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>

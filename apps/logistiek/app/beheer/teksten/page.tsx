@@ -22,9 +22,8 @@ const SECTIONS: Array<{
   },
   {
     title: 'Homepage',
-    description: 'Uitleg in de hero, de drie kaarten en het stappenoverzicht.',
+    description: 'De drie kaarten en het stappenoverzicht.',
     fields: [
-      { key: 'homeLead', label: 'Intro', rows: 2 },
       { key: 'homeMaterialLead', label: 'Kaart Materiaal', rows: 2 },
       { key: 'homeVanLead', label: 'Kaart Camionette', rows: 2 },
       { key: 'homeReservationsLead', label: 'Kaart Mijn aanvragen', rows: 2 },
@@ -37,17 +36,15 @@ const SECTIONS: Array<{
   },
   {
     title: 'Materiaal',
-    description: 'Uitleg boven en naast de materiaalcatalogus.',
+    description: 'Uitleg naast de materiaalcatalogus.',
     fields: [
-      { key: 'pageMaterialLead', label: 'Intro catalogus', rows: 3 },
       { key: 'materialPaymentNote', label: 'Uitleg betaling en waarborg', rows: 3 },
     ],
   },
   {
     title: 'Camionette',
-    description: 'Uitleg boven het formulier en in het blok Praktische informatie.',
+    description: 'Uitleg in het blok Praktische informatie.',
     fields: [
-      { key: 'pageVanLead', label: 'Intro aanvraag', rows: 3 },
       { key: 'vanDriverInfo', label: 'Chauffeur en helpers', rows: 2 },
       { key: 'vanTimingInfo', label: 'Aanvraagtermijn', rows: 2 },
       { key: 'vanPaymentInfo', label: 'Goedkeuring en betaling', rows: 2 },
