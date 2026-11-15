@@ -14,6 +14,8 @@ import { discordAccessStatus } from "@/lib/discord/pocAccess";
 import { PocsTable, type PocRow } from "./PocsTable";
 import { PocBandAdminCard } from "./PocBandAdminCard";
 import { PocDiscordCard } from "./PocDiscordCard";
+import { PocMailCard } from "./PocMailCard";
+import { currentWorkingYear } from "@vtk/auth";
 
 export default async function AdminPocs({
   params,
@@ -28,7 +30,7 @@ export default async function AdminPocs({
   const locale: Locale = localeParam;
   const nl = locale === "nl";
   const base = nl ? "" : "/en";
-  await requirePermission("pocs.manage");
+  const session = await requirePermission("pocs.manage");
   const dict = getDictionary(locale);
 
   const year = parseWorkingYear(jaar);
@@ -57,6 +59,15 @@ export default async function AdminPocs({
     listDiscordChannels(),
     discordGuildConfigured() ? discordAccessStatus() : null,
   ]);
+
+  // Welke POC een groepsadres heeft dat haar vertegenwoordigers volgt.
+  const pocLists = await prisma.mailGroupSource.findMany({
+    where: { pocId: { not: null } },
+    select: { pocId: true, mailGroupId: true, mailGroup: { select: { email: true } } },
+  });
+  const listByPoc = new Map(
+    pocLists.map((s) => [s.pocId as string, { id: s.mailGroupId, email: s.mailGroup.email }]),
+  );
 
   const pocBandSetting = readPocBandSetting(pocBandSettingRow?.value);
   // Beide lijsten of geen: een halve lijst zou bij opslaan de andere waarde wissen.
@@ -152,6 +163,21 @@ export default async function AdminPocs({
           );
         })}
       </div>
+
+      <PocMailCard
+        nl={nl}
+        year={year}
+        canCreateLists={session.user.isSuperAdmin || session.permissions.includes("mailgroups.manage")}
+        groupsBase={`${base}/admin/groepsadressen`}
+        rows={pocs.map((poc) => ({
+          id: poc.id,
+          name: nl ? poc.nameNl : (poc.nameEn ?? poc.nameNl),
+          email: poc.email,
+          mailYear: poc.mailYear ?? currentWorkingYear(),
+          repsInYear: poc.representatives.length,
+          linkedList: listByPoc.get(poc.id) ?? null,
+        }))}
+      />
 
       <PocsTable
         pocs={pocRows}

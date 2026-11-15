@@ -3,7 +3,7 @@ import "server-only";
 import { prisma } from "@vtk/db";
 import { logAudit } from "@/lib/audit";
 import type { GoogleConfig } from "./config";
-import { GoogleError, addAlias, createUser, listGroups, listUsers } from "./client";
+import { GoogleError, addAlias, addSendAs, createUser, listGroups, listUsers } from "./client";
 import { generatePassword, proposeAddress } from "./addresses";
 
 /**
@@ -25,15 +25,24 @@ export type ProvisionTarget = {
   firstName: string | null;
   lastName: string | null;
   googleEmail: string | null;
+  /** Het kiesploegadres dat al op het account staat, of `null`. */
+  aliasEmail?: string | null;
 };
 
 export type PlanRow = {
   userId: string;
   name: string;
-  /** Voorgesteld primair adres, of leeg wanneer er niets voor te stellen valt. */
+  /** Voorgesteld primair adres, of het bestaande account bij `mode: "alias"`. */
   email: string;
   /** Voorgestelde kiesploegalias, of `null` buiten een kiesploeg. */
   alias: string | null;
+  /**
+   * `create`: nieuw account (met alias in een kiesploeg). `alias`: het lid heeft
+   * al een account (bv. een praesidiumlid dat in de kiesploeg stapt) en krijgt
+   * er enkel het kiesploegadres bij. Een tweede account voor dezelfde persoon
+   * zou zijn mail over twee mailboxen verdelen.
+   */
+  mode: "create" | "alias";
   /** Waarom deze rij niet aangemaakt kan worden; `null` = klaar om aan te maken. */
   blocked: string | null;
 };
@@ -49,7 +58,7 @@ export type KiesploegTemplates = {
  * groepsadressen. Een gebruiker en een groep kunnen niet hetzelfde adres
  * dragen, dus die laatste horen erbij.
  */
-async function takenAddresses(cfg: GoogleConfig): Promise<Set<string>> {
+export async function takenAddresses(cfg: GoogleConfig): Promise<Set<string>> {
   const [users, groups] = await Promise.all([listUsers(cfg), listGroups(cfg)]);
   const taken = new Set<string>();
   for (const user of users) {
@@ -69,13 +78,14 @@ export async function planAccounts(
   const rows: PlanRow[] = [];
 
   for (const target of input.targets) {
-    if (target.googleEmail) {
+    if (target.googleEmail && (!input.kiesploeg || target.aliasEmail)) {
       rows.push({
         userId: target.userId,
         name: target.name,
         email: target.googleEmail,
-        alias: null,
-        blocked: "heeft al een gekoppeld account",
+        alias: target.aliasEmail ?? null,
+        mode: "alias",
+        blocked: input.kiesploeg ? "heeft al een account en een kiesploegadres" : "heeft al een gekoppeld account",
       });
       continue;
     }
@@ -83,8 +93,9 @@ export async function planAccounts(
       rows.push({
         userId: target.userId,
         name: target.name,
-        email: "",
+        email: target.googleEmail ?? "",
         alias: null,
+        mode: target.googleEmail ? "alias" : "create",
         blocked: "voor- of achternaam ontbreekt in het profiel",
       });
       continue;
@@ -95,6 +106,22 @@ export async function planAccounts(
       achternaam: target.lastName,
       code: input.kiesploeg?.code,
     };
+
+    // Bestaand account in een kiesploeg: enkel het kiesploegadres erbij.
+    if (target.googleEmail && input.kiesploeg) {
+      const alias = proposeAddress(input.kiesploeg.aliasTemplate, vars, cfg.domain, taken);
+      taken.add(alias);
+      rows.push({
+        userId: target.userId,
+        name: target.name,
+        email: target.googleEmail,
+        alias,
+        mode: "alias",
+        blocked: null,
+      });
+      continue;
+    }
+
     const email = proposeAddress(accountTemplate, vars, cfg.domain, taken);
     // Meteen bezet verklaren: twee naamgenoten in dezelfde ronde mogen niet
     // allebei hetzelfde adres voorgesteld krijgen.
@@ -106,7 +133,7 @@ export async function planAccounts(
       taken.add(alias);
     }
 
-    rows.push({ userId: target.userId, name: target.name, email, alias, blocked: null });
+    rows.push({ userId: target.userId, name: target.name, email, alias, mode: "create", blocked: null });
   }
 
   return rows;
@@ -131,12 +158,67 @@ export type CreatedAccount = {
  */
 export async function createAccounts(
   cfg: GoogleConfig,
-  rows: { userId: string; email: string; alias: string | null }[],
-  options: { orgUnitPath?: string } = {},
+  rows: { userId: string; email: string; alias: string | null; mode: "create" | "alias" }[],
+  options: {
+    orgUnitPath?: string;
+    /** Bewaart het effectieve kiesploegadres op het lidmaatschap. */
+    kiesploegId?: string;
+    /** Wie vanaf het kiesploegadres mag mailen: krijgt het als afzender. */
+    aliasSenders?: ReadonlySet<string>;
+  } = {},
 ): Promise<CreatedAccount[]> {
   const out: CreatedAccount[] = [];
 
+  const rememberAlias = async (userId: string, alias: string) => {
+    if (!options.kiesploegId) return;
+    await prisma.kiesploegMember.updateMany({
+      where: { kiesploegId: options.kiesploegId, userId },
+      data: { aliasEmail: alias.toLowerCase(), aliasRemovedAt: null },
+    });
+  };
+
   for (const row of rows) {
+    if (row.mode === "alias") {
+      const user = await prisma.user.findUnique({
+        where: { id: row.userId },
+        select: { id: true, name: true, googleEmail: true },
+      });
+      if (!user?.googleEmail || !row.alias) {
+        out.push({ userId: row.userId, name: user?.name ?? row.userId, email: row.email, password: null, error: "geen account om een adres aan toe te voegen" });
+        continue;
+      }
+      try {
+        await addAlias(cfg, user.googleEmail, row.alias);
+        await rememberAlias(user.id, row.alias);
+        let error: string | null = null;
+        if (options.aliasSenders?.has(user.id)) {
+          try {
+            await addSendAs(cfg, user.googleEmail, row.alias);
+          } catch (err) {
+            error = `adres toegevoegd, afzender mislukt: ${describe(err)}`;
+          }
+        }
+        await logAudit({
+          action: "update",
+          entity: "user",
+          entityId: user.id,
+          target: user.name,
+          summary: `kiesploegadres ${row.alias} toegevoegd aan ${user.googleEmail}`,
+        });
+        out.push({ userId: user.id, name: user.name, email: row.alias, password: null, error });
+      } catch (err) {
+        const conflict = err instanceof GoogleError && err.status === 409;
+        out.push({
+          userId: user.id,
+          name: user.name,
+          email: row.alias,
+          password: null,
+          error: conflict ? "dat adres is al bezet in Google; ververs het voorstel" : describe(err),
+        });
+      }
+      continue;
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: row.userId },
       select: { id: true, name: true, firstName: true, lastName: true, googleUserId: true },
@@ -163,6 +245,7 @@ export async function createAccounts(
       if (row.alias) {
         try {
           await addAlias(cfg, created.primaryEmail, row.alias);
+          await rememberAlias(user.id, row.alias);
         } catch (err) {
           // De alias is comfort, het account is de zaak. Meld het en ga door.
           out.push({

@@ -378,6 +378,12 @@ export async function eraseUserData(userId: string) {
       await tx.groupMembership.deleteMany({ where: { userId } });
       await tx.userRole.deleteMany({ where: { userId } });
       await tx.pocRepresentative.deleteMany({ where: { userId } });
+      // Google Workspace: rechtstreeks in een groepsadres, in een kiesploeg, en
+      // de aanvragen en koppelingen van werkgroepaccounts. Het account in Google
+      // zelf blijft: dat is van de kring, niet van deze rij.
+      await tx.mailGroupExtra.deleteMany({ where: { userId } });
+      await tx.kiesploegMember.deleteMany({ where: { userId } });
+      await tx.werkgroepAccount.deleteMany({ where: { userId } });
       await tx.userDashboardTilePref.deleteMany({ where: { userId } });
       await tx.dashboardTile.deleteMany({ where: { userId } });
       await tx.shiftParticipant.deleteMany({ where: { userId } });

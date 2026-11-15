@@ -224,6 +224,10 @@ export type GoogleGroup = {
   email: string;
   name: string;
   description?: string;
+  /** Aantal directe leden, als string zoals Google het teruggeeft. */
+  directMembersCount?: string;
+  /** Andere adressen van dezelfde groep. */
+  aliases?: string[];
 };
 
 export async function getGroup(cfg: GoogleConfig, key: string): Promise<GoogleGroup | null> {
@@ -336,6 +340,9 @@ export type GoogleGroupSettings = {
   allowExternalMembers?: string;
   whoCanJoin?: string;
   whoCanViewGroup?: string;
+  whoCanContactOwner?: string;
+  whoCanViewMembership?: string;
+  whoCanModerateMembers?: string;
   messageModerationLevel?: string;
 };
 
@@ -445,6 +452,28 @@ export async function moveUser(
   await request(cfg, "PUT", `${DIRECTORY}/users/${encodeURIComponent(key)}`, { orgUnitPath });
 }
 
+/**
+ * Schorst een account of heft de schorsing op. Een geschorst account kan niet
+ * aanmelden en ontvangt geen mail meer, maar het adres en de mailbox blijven
+ * bestaan; dat is waarom we schorsen en nooit verwijderen.
+ */
+export async function setUserSuspended(
+  cfg: GoogleConfig,
+  key: string,
+  suspended: boolean,
+): Promise<void> {
+  await request(cfg, "PUT", `${DIRECTORY}/users/${encodeURIComponent(key)}`, { suspended });
+}
+
+/** Haalt een alias van een account. Een alias die er al niet meer is, is goed. */
+export async function removeAlias(cfg: GoogleConfig, key: string, alias: string): Promise<void> {
+  await request(
+    cfg,
+    "DELETE",
+    `${DIRECTORY}/users/${encodeURIComponent(key)}/aliases/${encodeURIComponent(alias)}`,
+  );
+}
+
 export async function addAlias(cfg: GoogleConfig, key: string, alias: string): Promise<void> {
   try {
     await request(cfg, "POST", `${DIRECTORY}/users/${encodeURIComponent(key)}/aliases`, {
@@ -517,6 +546,34 @@ export async function ensureDefaultSendAs(
     "PATCH",
     `${GMAIL}/${encodeURIComponent(email)}/settings/sendAs/${encodeURIComponent(alias)}`,
     { isDefault: true },
+    asUser(email),
+  );
+}
+
+/**
+ * Zet een alias als bijkomend afzenderadres, zonder er de standaard van te
+ * maken. Voor wie al een volwaardig account heeft en daarnaast vanaf zijn
+ * kiesploegadres moet kunnen mailen.
+ */
+export async function addSendAs(cfg: GoogleConfig, email: string, alias: string): Promise<void> {
+  const existing = await listSendAs(cfg, email);
+  if (existing.some((s) => s.sendAsEmail.toLowerCase() === alias.toLowerCase())) return;
+  await request(
+    cfg,
+    "POST",
+    `${GMAIL}/${encodeURIComponent(email)}/settings/sendAs`,
+    { sendAsEmail: alias, treatAsAlias: true },
+    asUser(email),
+  );
+}
+
+/** Haalt een afzenderadres weg in Gmail (na het wegnemen van de alias). */
+export async function deleteSendAs(cfg: GoogleConfig, email: string, alias: string): Promise<void> {
+  await request(
+    cfg,
+    "DELETE",
+    `${GMAIL}/${encodeURIComponent(email)}/settings/sendAs/${encodeURIComponent(alias)}`,
+    undefined,
     asUser(email),
   );
 }

@@ -12,6 +12,7 @@ export type ProvisionRow = {
   name: string;
   email: string;
   alias: string | null;
+  mode: "create" | "alias";
   blocked: string | null;
 };
 
@@ -55,7 +56,8 @@ export function ProvisionAccounts({
         plan: (label: string) => `Voorstel voor ${label}`,
         member: "Lid",
         address: "Adres",
-        alias: "Alias",
+        alias: "Kiesploegadres",
+        aliasOnly: "bestaand account: enkel het kiesploegadres erbij",
         create: "Geselecteerde accounts aanmaken",
         creating: "Bezig met aanmaken...",
         nothing: "Niemand die een account nodig heeft.",
@@ -65,7 +67,8 @@ export function ProvisionAccounts({
           "Deze wachtwoorden staan nergens bewaard en zijn na het verlaten van dit scherm weg. Geef ze door; bij de eerste aanmelding moet het lid zelf een nieuw wachtwoord kiezen.",
         error: "Fout",
         restrictedNote:
-          "Kiesploegaccounts komen meteen in de beperkte organisatie-eenheid terecht, met de alias als afzender en met doorsturen aan waar een adres ingevuld is.",
+          "Nieuwe kiesploegaccounts kunnen enkel ontvangen; wie in het kiesploegscherm mag mailen, kan dat enkel vanaf zijn kiesploegadres. Wie al een account heeft (bv. een praesidiumlid), krijgt geen tweede account maar enkel het kiesploegadres erbij.",
+        noPassword: "geen nieuw wachtwoord: bestaand account",
       }
     : {
         source: "For whom",
@@ -73,7 +76,8 @@ export function ProvisionAccounts({
         plan: (label: string) => `Proposal for ${label}`,
         member: "Member",
         address: "Address",
-        alias: "Alias",
+        alias: "Kiesploeg address",
+        aliasOnly: "existing account: only the kiesploeg address is added",
         create: "Create selected accounts",
         creating: "Creating...",
         nothing: "Nobody needs an account.",
@@ -83,7 +87,8 @@ export function ProvisionAccounts({
           "These passwords are stored nowhere and are gone once you leave this screen. Pass them on; the member has to pick a new one at first sign-in.",
         error: "Error",
         restrictedNote:
-          "Kiesploeg accounts land in the restricted organisational unit right away, with the alias as sender and forwarding on where an address is filled in.",
+          "New kiesploeg accounts can only receive; whoever may send (set in the kiesploeg screen) can do so only from their kiesploeg address. Someone who already has an account (a praesidium member, say) gets no second account, only the kiesploeg address.",
+        noPassword: "no new password: existing account",
       };
 
   useEffect(() => {
@@ -166,9 +171,11 @@ export function ProvisionAccounts({
                       <td className="px-4 py-3 font-medium text-vtk-ink">{row.name}</td>
                       <td className="px-4 py-3 text-zinc-600">
                         {row.email || "-"}
-                        {row.blocked && (
+                        {row.blocked ? (
                           <span className="block text-xs text-amber-700">{row.blocked}</span>
-                        )}
+                        ) : row.mode === "alias" ? (
+                          <span className="block text-xs text-zinc-500">{t.aliasOnly}</span>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3 text-zinc-600">{row.alias ?? "-"}</td>
                     </tr>
@@ -209,6 +216,8 @@ export function ProvisionAccounts({
                         <code className="rounded bg-vtk-blue-soft/60 px-2 py-1">
                           {account.password}
                         </code>
+                      ) : !account.error ? (
+                        <span className="text-xs text-zinc-500">{t.noPassword}</span>
                       ) : (
                         <span className="text-xs text-red-700">
                           {t.error}: {account.error}

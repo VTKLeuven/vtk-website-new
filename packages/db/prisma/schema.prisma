@@ -482,10 +482,19 @@ enum StudyProgramme {
 /// Wat een `@vtk.be`-account mag. Afgeleid uit de posten en de kiesploeg, met
 /// een override per persoon; zie docs/design-decisions.md, "Google Workspace".
 enum GoogleAccountState {
-  /// Kiesploeglid: mailbox stuurt door, verzenden gebeurt via de kiesploegalias.
+  /// Kiesploeglid dat enkel ontvangt: geen enkel uitgaand bericht, de mailbox
+  /// mag doorsturen.
   RESTRICTED
+  /// Kiesploeglid dat mag mailen, maar enkel vanaf zijn kiesploegadres (de
+  /// alias). Een eigen organisatie-eenheid met een routing-regel die het
+  /// primaire adres weigert.
+  ALIAS_SENDER
   /// Volwaardig: eigen mailbox, mag mailen vanaf het eigen adres.
   FULL
+  /// Geschorst door de sync: een kiesploeglid dat op 15 juli van het jaar
+  /// waarin de ploeg aantreedt geen post kreeg. Zie
+  /// docs/design-decisions.md, "Na de verkiezing".
+  SUSPENDED
 }
 
 /// Functie van een lid dat zichzelf als academisch personeel aanduidt. `null`
@@ -860,6 +869,13 @@ model User {
   urenloopEditionsImported UrenloopEdition[]       @relation("UrenloopEditionImportedBy")
 
   kiesploegMemberships KiesploegMember[]
+  /// Extra accounts van een werkgroep (statix.voornaam.naam@vtk.be), naast het
+  /// persoonlijke account in `googleEmail`.
+  werkgroepAccounts          WerkgroepAccount[] @relation("WerkgroepAccountUser")
+  werkgroepAccountsRequested WerkgroepAccount[] @relation("WerkgroepAccountRequestedBy")
+  werkgroepAccountsDecided   WerkgroepAccount[] @relation("WerkgroepAccountDecidedBy")
+  /// Rechtstreeks in een groepsadres gezet, zonder post (statix.pr@vtk.be).
+  mailGroupMemberships       MailGroupExtra[]
 
   // Rekeningen (billsheet): ingediend, terugbetaald, ingeboekt.
   expensesSubmitted      Expense[]            @relation("ExpenseSubmittedBy")
@@ -917,6 +933,11 @@ model Group {
   // "Verantwoordelijke" houden.
   leadLabel         String         @default("G3")
   website           String?
+  /// Voorvoegsel van de eigen adressen van een werkgroep, bv. "statix": de
+  /// accounts heten dan statix.voornaam.achternaam@vtk.be en de lijsten die de
+  /// werkgroep zelf aanmaakt beginnen met "statix.". Leeg = de werkgroep kan
+  /// geen eigen lijsten of accounts aanvragen. Enkel IT vult dit in.
+  mailPrefix        String?        @unique
   // Een gedeactiveerde post verdwijnt uit de nieuwe-shift-keuzes en het
   // postenbeheer voor nieuwe jaren, maar de historiek (memberships per jaar)
   // blijft bewaard i.p.v. de post te verwijderen.
@@ -947,6 +968,11 @@ model Group {
   ticketTemplates          TicketEventTemplate[]
   uitleenEventsGroup       UitleenEvent[]
   mailGroupSources         MailGroupSource[]
+  /// Groepsadressen die deze werkgroep zelf beheert (statix.pr@vtk.be).
+  ownedMailGroups          MailGroup[]               @relation("MailGroupOwner")
+  /// Hoofdgroepen waarvan de jaargroepen uit deze post komen.
+  yearlyMailGroups         MailGroup[]               @relation("MailGroupYearlyPost")
+  werkgroepAccounts        WerkgroepAccount[]
   expenses                 Expense[]
   cashRegisters            CashRegister[]
   /// Het kasboek van de vaste kassa (enkel Cursusdienst, Theokot, Fakbar).
@@ -1323,6 +1349,34 @@ model MailGroup {
   /// Aantal leden dat de laatste geslaagde sync in Google zette.
   lastMemberCount Int       @default(0)
 
+  /// De werkgroep die deze lijst zelf mag beheren (leden erbij en eraf), naast
+  /// wie `mailgroups.manage` heeft. Een lid van die werkgroep krijgt in deze
+  /// lijst zijn werkgroepadres in plaats van zijn persoonlijke.
+  ownerGroupId String?
+  ownerGroup   Group?  @relation("MailGroupOwner", fields: [ownerGroupId], references: [id], onDelete: SetNull)
+
+  /// Jaargroep (activiteiten_2627@vtk.be): de bronnen tellen voor dit vaste
+  /// werkingsjaar in plaats van het huidige. Een jaargroep van een voorbij jaar
+  /// wordt niet meer aangeraakt: ze is het archief van die ploeg.
+  year     Int?
+  /// De hoofdgroep waarin deze jaargroep als lid hangt, zolang `year` het
+  /// huidige werkingsjaar is.
+  parentId String?
+  parent   MailGroup?  @relation("MailGroupYearly", fields: [parentId], references: [id], onDelete: SetNull)
+  children MailGroup[] @relation("MailGroupYearly")
+
+  /// Op een hoofdgroep: het adres van de jaargroepen, met {jj} (2627) of
+  /// {jaar} (2026), bv. "activiteiten_{jj}". De sync maakt de jaargroep van
+  /// het huidige werkingsjaar aan (en die van volgend jaar zodra daar iemand
+  /// in de post staat) en hangt op 15 juli de nieuwe in de plaats van de oude.
+  yearlyTemplate String?
+  /// De post waarvan de leden in de jaargroepen komen.
+  yearlyGroupId  String?
+  yearlyGroup    Group?  @relation("MailGroupYearlyPost", fields: [yearlyGroupId], references: [id], onDelete: SetNull)
+
+  /// Overgenomen uit Google in plaats van hier aangemaakt. Enkel ter info.
+  importedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1330,6 +1384,8 @@ model MailGroup {
   extras  MailGroupExtra[]
 
   @@index([enabled])
+  @@index([ownerGroupId])
+  @@index([parentId])
 }
 
 /// Een post of werkgroep waarvan de leden van dit werkingsjaar in de lijst
@@ -1353,10 +1409,15 @@ model MailGroupSource {
   groupType       GroupType?
   kiesploegId     String?
   kiesploegPostId String?
+  /// De vertegenwoordigers van een POC, van het jaar in `Poc.mailYear`. Dat jaar
+  /// verandert enkel met de knop "verkozen", niet wanneer iemand vooraf voor
+  /// volgend jaar ingevoerd wordt.
+  pocId           String?
   /// Enkel de verantwoordelijke (`role = LEAD`) i.p.v. elk lid.
   onlyLead        Boolean    @default(false)
 
   mailGroup     MailGroup      @relation(fields: [mailGroupId], references: [id], onDelete: Cascade)
+  poc           Poc?           @relation(fields: [pocId], references: [id], onDelete: Cascade)
   group         Group?         @relation(fields: [groupId], references: [id], onDelete: Cascade)
   kiesploeg     Kiesploeg?     @relation(fields: [kiesploegId], references: [id], onDelete: Cascade)
   kiesploegPost KiesploegPost? @relation(fields: [kiesploegPostId], references: [id], onDelete: Cascade)
@@ -1365,9 +1426,11 @@ model MailGroupSource {
   @@unique([mailGroupId, groupType, onlyLead])
   @@unique([mailGroupId, kiesploegId, onlyLead])
   @@unique([mailGroupId, kiesploegPostId, onlyLead])
+  @@unique([mailGroupId, pocId, onlyLead])
   @@index([groupId])
   @@index([kiesploegId])
   @@index([kiesploegPostId])
+  @@index([pocId])
 }
 
 // -----------------------------------------------------------------------------
@@ -1398,8 +1461,13 @@ model Kiesploeg {
   /// Sjablonen voor de adressen, met {code}, {voornaam}, {achternaam} en {post}.
   /// Sjablonen en geen code, want de conventie verschilt nu al per ploeg.
   accountTemplate String @default("{voornaam}.{achternaam}")
-  aliasTemplate   String @default("kiesploeg{code}.{voornaam}.{achternaam}")
-  listTemplate    String @default("{post}.{code}")
+  aliasTemplate   String @default("{voornaam}.{achternaam}.kiesploeg{code}")
+  listTemplate    String @default("{code}.{post}")
+
+  /// Wanneer de sync de ploeg na 15 juli van haar werkingsjaar afhandelde:
+  /// aliassen weg, wie een post heeft volwaardig, wie geen post kreeg
+  /// geschorst. Leeg zolang dat nog moet gebeuren.
+  transitionedAt DateTime?
 
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -1439,11 +1507,20 @@ model KiesploegMember {
   /// de g5 bekend.
   postId        String?
   role          MembershipRole @default(MEMBER)
-  /// Override: dit lid mag nu al mailen vanaf zijn eigen adres (de
-  /// marketingmensen). Wint van de afgeleide staat.
-  mailboxActive Boolean        @default(false)
+  /// Dit lid mag mailen, maar enkel vanaf zijn kiesploegadres. Vanaf zijn
+  /// primaire adres mailt geen enkel kiesploeglid voor de ploeg aantreedt; wie
+  /// dit niet heeft, ontvangt enkel.
+  sendFromAlias Boolean        @default(false)
   /// Waar de mail naartoe gaat zolang de mailbox niet actief is.
   forwardTo     String?
+  /// Het kiesploegadres zoals het effectief op het account gezet werd (een
+  /// naamgenoot kan een cijfer krijgen). Leeg = nog geen alias.
+  aliasEmail    String?
+  /// Wanneer de sync de alias weghaalde (na 15 juli van het werkingsjaar).
+  aliasRemovedAt DateTime?
+  /// Een beheerder hief de schorsing op: de sync schorst dit account niet
+  /// opnieuw, ook al heeft het lid geen post.
+  keepAccount   Boolean        @default(false)
   createdAt     DateTime       @default(now())
 
   kiesploeg Kiesploeg      @relation(fields: [kiesploegId], references: [id], onDelete: Cascade)
@@ -1467,15 +1544,62 @@ enum MailGroupExtraKind {
 model MailGroupExtra {
   id          String             @id @default(cuid())
   mailGroupId String
-  /// Kleine letters; een vrij adres, dus niet noodzakelijk van een lid.
-  email       String
+  /// Precies één van de twee is ingevuld. Een vrij adres (kleine letters, ook
+  /// een andere groep zoals groep5@vtk.be), of een lid van de site: dan volgt
+  /// het adres zijn gekoppelde account, en verandert het mee wanneer dat
+  /// account verandert.
+  email       String?
+  userId      String?
   kind        MailGroupExtraKind @default(INCLUDE)
   note        String?
   createdAt   DateTime           @default(now())
 
   mailGroup MailGroup @relation(fields: [mailGroupId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([mailGroupId, email])
+  @@unique([mailGroupId, userId])
+  @@index([userId])
+}
+
+enum WerkgroepAccountStatus {
+  /// Aangevraagd door de werkgroep, wacht op IT of de vice.
+  REQUESTED
+  REJECTED
+  /// Aangemaakt in Google.
+  ACTIVE
+  SUSPENDED
+}
+
+/// Een extra account van een werkgroep (statix.voornaam.achternaam@vtk.be),
+/// naast het persoonlijke account van het lid. De werkgroep vraagt het aan,
+/// iemand met `googleAccounts.manage` keurt het goed en dan pas maakt de site
+/// het aan. Zie docs/design-decisions.md, "Werkgroepen beheren hun eigen
+/// adressen".
+model WerkgroepAccount {
+  id            String                 @id @default(cuid())
+  userId        String
+  groupId       String
+  /// Het adres, berekend uit `Group.mailPrefix` bij de aanvraag en opnieuw
+  /// bij de goedkeuring.
+  email         String                 @unique
+  googleUserId  String?                @unique
+  status        WerkgroepAccountStatus @default(REQUESTED)
+  requestedById String?
+  requestedAt   DateTime               @default(now())
+  decidedById   String?
+  decidedAt     DateTime?
+  /// Waarom een aanvraag geweigerd werd; de werkgroep ziet dit.
+  rejectReason  String?
+
+  user        User  @relation("WerkgroepAccountUser", fields: [userId], references: [id], onDelete: Cascade)
+  group       Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  requestedBy User? @relation("WerkgroepAccountRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  decidedBy   User? @relation("WerkgroepAccountDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@unique([userId, groupId])
+  @@index([groupId])
+  @@index([status])
 }
 
 model Permission {
@@ -3261,8 +3385,15 @@ model Poc {
   discordRoleId    String?
   discordChannelId String?
 
+  /// Het werkingsjaar waarvan de vertegenwoordigers in het groepsadres van de
+  /// POC staan. Verandert enkel met de knop "verkozen" in /admin/pocs: wie je
+  /// vooraf voor volgend jaar invoert, komt pas in de lijst wanneer de
+  /// verkiezing achter de rug is. Leeg = het huidige werkingsjaar.
+  mailYear        Int?
+
   representatives PocRepresentative[]
   polls           PocPoll[]
+  mailGroupSources MailGroupSource[]
 }
 
 model PocRepresentative {

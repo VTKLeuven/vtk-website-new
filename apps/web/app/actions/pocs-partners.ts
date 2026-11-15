@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
@@ -8,6 +9,7 @@ import { requirePermission } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { describeChanges, logAudit } from "@/lib/audit";
 import { placeLinkPanel } from "@/lib/discord/pocAccess";
+import { pushMailGroupsForPoc } from "@/lib/google/sync";
 import { STUDY_PROGRAMMES } from "@/lib/profile";
 import { deleteObject } from "@vtk/storage";
 import { currentWorkingYear } from "@/lib/workingYear";
@@ -206,6 +208,9 @@ export async function addPocRepresentativeAction(formData: FormData): Promise<vo
     target: poc.nameNl ?? parsed.pocId,
     summary: `${user.name} toegevoegd als vertegenwoordiger`,
   });
+  // Enkel van belang wanneer dit het jaar is dat het groepsadres volgt; anders
+  // vindt de push niets te veranderen.
+  after(() => pushMailGroupsForPoc(parsed.pocId));
   revalidatePath("/pocs");
   revalidatePath("/admin/pocs");
   revalidatePath("/", "layout");
@@ -226,6 +231,7 @@ export async function removePocRepresentativeAction(formData: FormData): Promise
       target: rep.poc.nameNl,
       summary: `${rep.user.name} verwijderd als vertegenwoordiger`,
     });
+    after(() => pushMailGroupsForPoc(rep.pocId));
   }
   revalidatePath("/pocs");
   revalidatePath("/admin/pocs");

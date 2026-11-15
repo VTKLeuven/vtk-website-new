@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   desiredMembers,
   normaliseEmail,
+  memberAddress,
   type KiesploegMembershipRow,
+  type MemberUser,
   type MembershipRow,
 } from "@/lib/google/members";
 
@@ -12,6 +14,8 @@ import {
  * zonder Google.
  */
 
+const YEAR = 2026;
+
 function member(
   groupId: string,
   name: string,
@@ -19,7 +23,7 @@ function member(
   role: "MEMBER" | "LEAD" = "MEMBER",
   groupType: "PRAESIDIUM" | "WERKGROEP" = "PRAESIDIUM",
 ): MembershipRow {
-  return { groupId, groupType, role, user: { id: `u-${name}`, name, googleEmail } };
+  return { groupId, groupType, role, year: YEAR, user: { id: `u-${name}`, name, googleEmail } };
 }
 
 const jan = member("activiteiten", "Jan", "jan.peeters@vtk.be");
@@ -29,6 +33,7 @@ const bob = member("groep5", "Bob", "bob.mertens@vtk.be");
 describe("desiredMembers", () => {
   it("neemt de leden van elke bronpost", () => {
     const result = desiredMembers({
+      year: YEAR,
       sources: [
         { groupId: "activiteiten", onlyLead: false },
         { groupId: "groep5", onlyLead: false },
@@ -46,6 +51,7 @@ describe("desiredMembers", () => {
 
   it("laat een post buiten de lijst wanneer ze geen bron is", () => {
     const result = desiredMembers({
+      year: YEAR,
       sources: [{ groupId: "activiteiten", onlyLead: false }],
       memberships: [jan, bob],
       extras: [],
@@ -55,6 +61,7 @@ describe("desiredMembers", () => {
 
   it("neemt bij onlyLead enkel de verantwoordelijke", () => {
     const result = desiredMembers({
+      year: YEAR,
       sources: [{ groupId: "activiteiten", onlyLead: true }],
       memberships: [jan, ann],
       extras: [],
@@ -64,6 +71,7 @@ describe("desiredMembers", () => {
 
   it("laat de ruimste bron winnen wanneer een post twee keer staat", () => {
     const result = desiredMembers({
+      year: YEAR,
       sources: [
         { groupId: "activiteiten", onlyLead: true },
         { groupId: "activiteiten", onlyLead: false },
@@ -76,6 +84,7 @@ describe("desiredMembers", () => {
 
   it("meldt leden zonder gekoppeld adres in plaats van ze stil over te slaan", () => {
     const result = desiredMembers({
+      year: YEAR,
       sources: [{ groupId: "activiteiten", onlyLead: false }],
       memberships: [jan, member("activiteiten", "Zoe", null)],
       extras: [],
@@ -86,6 +95,7 @@ describe("desiredMembers", () => {
 
   it("voegt losse adressen toe, ook van buiten het domein", () => {
     const result = desiredMembers({
+      year: YEAR,
       sources: [{ groupId: "activiteiten", onlyLead: false }],
       memberships: [jan],
       extras: [{ email: "oudlid@gmail.com", kind: "INCLUDE" }],
@@ -95,6 +105,7 @@ describe("desiredMembers", () => {
 
   it("laat een uitsluiting winnen van de post en van een los adres", () => {
     const result = desiredMembers({
+      year: YEAR,
       sources: [{ groupId: "activiteiten", onlyLead: false }],
       memberships: [jan, ann],
       extras: [
@@ -108,6 +119,7 @@ describe("desiredMembers", () => {
 
   it("ontdubbelt iemand die in twee bronposten zit", () => {
     const result = desiredMembers({
+      year: YEAR,
       sources: [
         { groupId: "activiteiten", onlyLead: false },
         { groupId: "groep5", onlyLead: false },
@@ -123,6 +135,7 @@ describe("desiredMembers", () => {
     // tellen niet mee, dus de lijst loopt leeg tot het nieuwe praesidium
     // ingevoerd is. De sync hoort dat gewoon door te zetten.
     const result = desiredMembers({
+      year: YEAR,
       sources: [{ groupId: "activiteiten", onlyLead: false }],
       memberships: [],
       extras: [],
@@ -159,6 +172,7 @@ describe("desiredMembers met een kiesploeg", () => {
 
   it("neemt de hele ploeg bij een kiesploegbron", () => {
     const result = desiredMembers({
+      year: YEAR,
       sources: [{ kiesploegId: "kp", onlyLead: false }],
       memberships: [],
       kiesploegMemberships: [marketing, g5, zonderPost],
@@ -169,6 +183,7 @@ describe("desiredMembers met een kiesploeg", () => {
 
   it("neemt bij een postbron enkel die post", () => {
     const result = desiredMembers({
+      year: YEAR,
       sources: [{ kiesploegPostId: "post-marketing", onlyLead: false }],
       memberships: [],
       kiesploegMemberships: [marketing, g5, zonderPost],
@@ -181,6 +196,7 @@ describe("desiredMembers met een kiesploeg", () => {
     // Zo maakt `createKiesploegListsAction` de lijsten: de post plus de g5, als
     // twee zichtbare rijen en niet als verstopte regel in de sync.
     const result = desiredMembers({
+      year: YEAR,
       sources: [
         { kiesploegPostId: "post-marketing", onlyLead: false },
         { kiesploegPostId: "post-g5", onlyLead: false },
@@ -194,6 +210,7 @@ describe("desiredMembers met een kiesploeg", () => {
 
   it("laat een lid zonder post buiten de postlijsten", () => {
     const result = desiredMembers({
+      year: YEAR,
       sources: [{ kiesploegPostId: "post-marketing", onlyLead: false }],
       memberships: [],
       kiesploegMemberships: [zonderPost],
@@ -204,6 +221,7 @@ describe("desiredMembers met een kiesploeg", () => {
 
   it("combineert een gewone post met een kiesploegpost", () => {
     const result = desiredMembers({
+      year: YEAR,
       sources: [
         { groupId: "activiteiten", onlyLead: false },
         { kiesploegPostId: "post-marketing", onlyLead: false },
@@ -223,6 +241,7 @@ describe("desiredMembers met een brontype", () => {
     // Dit is wat praesidium@vtk.be nodig heeft, en meteen ook de sleutel tot de
     // gedeelde drive: één regel die blijft kloppen als er een post bijkomt.
     const result = desiredMembers({
+      year: YEAR,
       sources: [{ groupType: "PRAESIDIUM", onlyLead: false }],
       memberships: [jan, bob, revue],
       extras: [],
@@ -232,6 +251,7 @@ describe("desiredMembers met een brontype", () => {
 
   it("neemt bij onlyLead enkel de verantwoordelijken van elke post", () => {
     const result = desiredMembers({
+      year: YEAR,
       sources: [{ groupType: "PRAESIDIUM", onlyLead: true }],
       memberships: [jan, ann],
       extras: [],
@@ -241,10 +261,136 @@ describe("desiredMembers met een brontype", () => {
 
   it("houdt werkgroepen en posten uit elkaar", () => {
     const result = desiredMembers({
+      year: YEAR,
       sources: [{ groupType: "WERKGROEP", onlyLead: false }],
       memberships: [jan, revue],
       extras: [],
     });
     expect(result.emails).toEqual(["rik@vtk.be"]);
+  });
+});
+
+describe("desiredMembers met een jaar", () => {
+  it("telt enkel de lidmaatschappen van het jaar van de lijst", () => {
+    // Een jaargroep (activiteiten_2627) volgt haar eigen jaar. Wie voor volgend
+    // jaar al ingevoerd is, hoort er nog niet in.
+    const next = { ...member("activiteiten", "Nina", "nina@vtk.be"), year: YEAR + 1 };
+    const result = desiredMembers({
+      year: YEAR,
+      sources: [{ groupId: "activiteiten", onlyLead: false }],
+      memberships: [jan, next],
+      extras: [],
+    });
+    expect(result.emails).toEqual(["jan.peeters@vtk.be"]);
+  });
+
+  it("hangt de jaargroep van het lopende jaar in de hoofdgroep", () => {
+    const result = desiredMembers({
+      year: YEAR,
+      sources: [],
+      memberships: [],
+      childEmails: ["Activiteiten_2627@vtk.be"],
+      extras: [
+        { email: "groep5@vtk.be", kind: "INCLUDE" },
+        { email: "actitablet@vtk.be", kind: "INCLUDE" },
+      ],
+    });
+    expect(result.emails).toEqual([
+      "actitablet@vtk.be",
+      "activiteiten_2627@vtk.be",
+      "groep5@vtk.be",
+    ]);
+  });
+});
+
+describe("desiredMembers met een POC", () => {
+  const student: MemberUser = {
+    id: "u-sara",
+    name: "Sara",
+    googleEmail: null,
+    siteEmail: "sara@student.kuleuven.be",
+  };
+  const vtk: MemberUser = { id: "u-tom", name: "Tom", googleEmail: "tom@vtk.be" };
+
+  it("neemt de vertegenwoordigers van het verkozen jaar, niet van een vooraf ingevoerd jaar", () => {
+    const result = desiredMembers({
+      year: YEAR,
+      sources: [{ pocId: "ene", onlyLead: false }],
+      memberships: [],
+      pocRepresentatives: [
+        { pocId: "ene", year: YEAR, user: vtk },
+        { pocId: "ene", year: YEAR + 1, user: student },
+      ],
+      pocYears: { ene: YEAR },
+      extras: [],
+    });
+    expect(result.emails).toEqual(["tom@vtk.be"]);
+  });
+
+  it("valt voor een student zonder @vtk.be-account terug op het adres van de site", () => {
+    const result = desiredMembers({
+      year: YEAR,
+      sources: [{ pocId: "ene", onlyLead: false }],
+      memberships: [],
+      pocRepresentatives: [{ pocId: "ene", year: YEAR + 1, user: student }],
+      pocYears: { ene: YEAR + 1 },
+      extras: [],
+    });
+    expect(result.emails).toEqual(["sara@student.kuleuven.be"]);
+    expect(result.unlinked).toEqual([]);
+  });
+});
+
+describe("desiredMembers met een werkgroep", () => {
+  const statix = "statix";
+  const lien: MemberUser = {
+    id: "u-lien",
+    name: "Lien",
+    googleEmail: "lien.peeters@vtk.be",
+    werkgroepEmails: { [statix]: "statix.lien.peeters@vtk.be" },
+  };
+
+  it("geeft in een lijst van de werkgroep het werkgroepadres", () => {
+    const result = desiredMembers({
+      year: YEAR,
+      sources: [],
+      memberships: [],
+      ownerGroupId: statix,
+      extras: [{ user: lien, kind: "INCLUDE" }],
+    });
+    expect(result.emails).toEqual(["statix.lien.peeters@vtk.be"]);
+  });
+
+  it("geeft elders het persoonlijke adres", () => {
+    expect(memberAddress(lien, null)).toBe("lien.peeters@vtk.be");
+    expect(memberAddress(lien, "revue")).toBe("lien.peeters@vtk.be");
+  });
+
+  it("valt zonder persoonlijk account terug op het werkgroepadres", () => {
+    const enkelStatix: MemberUser = { ...lien, googleEmail: null };
+    expect(memberAddress(enkelStatix, null)).toBe("statix.lien.peeters@vtk.be");
+  });
+
+  it("toont een los lid zonder account als ongekoppeld", () => {
+    const zonder: MemberUser = { id: "u-x", name: "Xavier", googleEmail: null };
+    const result = desiredMembers({
+      year: YEAR,
+      sources: [],
+      memberships: [],
+      ownerGroupId: statix,
+      extras: [{ user: zonder, kind: "INCLUDE" }],
+    });
+    expect(result.emails).toEqual([]);
+    expect(result.unlinked).toEqual([{ id: "u-x", name: "Xavier" }]);
+  });
+
+  it("laat een uitgesloten lid ook met zijn werkgroepadres buiten de lijst", () => {
+    const result = desiredMembers({
+      year: YEAR,
+      sources: [{ groupId: statix, onlyLead: false }],
+      memberships: [{ groupId: statix, groupType: "WERKGROEP", role: "MEMBER", year: YEAR, user: lien }],
+      extras: [{ user: lien, kind: "EXCLUDE" }],
+    });
+    expect(result.emails).toEqual([]);
   });
 });

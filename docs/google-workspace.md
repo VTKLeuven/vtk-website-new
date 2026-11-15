@@ -54,8 +54,12 @@ huidige werkingsjaar, dus de 15-juli-wissel heeft geen eigen cron nodig.
 | `apps/web/lib/google/config.ts`                  | `Setting`-sleutel `google.config`, geheimen versleuteld                  |
 | `apps/web/lib/google/client.ts`                  | Directory API, Groups Settings API, Gmail-instellingen, de scopes        |
 | `apps/web/lib/google/members.ts`                 | **De regel**: wie hoort er in een groepsadres (puur, getest)             |
-| `apps/web/lib/google/sync.ts`                    | `reconcileGoogle()` en de push per post/kiesploeg                        |
-| `apps/web/lib/google/accountState.ts`            | Beperkt versus volwaardig, en de upgrade-only-regel                      |
+| `apps/web/lib/google/desired.ts`                 | De rijen voor die regel ophalen; gedeeld door sync en beheerschermen     |
+| `apps/web/lib/google/sync.ts`                    | `reconcileGoogle()`, jaargroepen, standaardinstellingen, 15 juli         |
+| `apps/web/lib/google/accountState.ts`            | De vier accountstaten en wat de sync zelf mag (`transitionAllowed`)      |
+| `apps/web/lib/google/access.ts`                  | Wie welke lijst mag beheren (IT, of een werkgroep haar eigen lijsten)    |
+| `apps/web/lib/google/import.ts`                  | Een bestaande Google-groep overnemen                                     |
+| `apps/web/lib/google/werkgroepAccounts.ts`       | Accounts van werkgroepen aanvragen, goedkeuren, weigeren                 |
 | `apps/web/lib/google/addresses.ts`               | Adressjablonen, normalisatie, botsingen, wachtwoord                      |
 | `apps/web/lib/google/provision.ts`               | Accounts plannen en aanmaken                                             |
 | `apps/web/lib/google/linking.ts` + `link.ts`     | Naamvoorstellen voor het koppelscherm                                    |
@@ -66,10 +70,14 @@ huidige werkingsjaar, dus de 15-juli-wissel heeft geen eigen cron nodig.
 
 | Route                                | Wat                                                            | Recht                    |
 | ------------------------------------ | -------------------------------------------------------------- | ------------------------ |
-| `/admin/groepsadressen`              | Lijsten opbouwen, bronnen, losse adressen, nu synchroniseren   | `mailgroups.manage`      |
+| `/admin/groepsadressen`              | Overzicht van alle lijsten, filter per soort, nu synchroniseren | `mailgroups.manage`, of een werkgroep (haar eigen lijsten) |
+| `/admin/groepsadressen/<id>`         | Eén lijst: wie erin zit, bronnen, losse leden, jaargroepen      | idem                     |
+| `/admin/groepsadressen/overnemen`    | Bestaande Google-groepen overnemen                             | `mailgroups.manage`      |
+| `/admin/groepsadressen/aanvragen`    | Accounts van werkgroepen aanvragen en goedkeuren; voorvoegsels | werkgroep / `googleAccounts.manage` / `mailgroups.manage` |
 | `/admin/groepsadressen/koppelingen`  | Bestaande `@vtk.be`-accounts aan leden hangen                  | `mailgroups.manage`      |
 | `/admin/groepsadressen/accounts`     | Accounts aanmaken (voorbeeld eerst)                            | `googleAccounts.manage`  |
-| `/admin/kiesploeg`                   | Kiesploeg, haar posten, leden en adressjablonen                | `kiesploeg.manage`       |
+| `/admin/kiesploeg`                   | Kiesploeg, haar posten, leden, adressjablonen, 15 juli vooraf  | `kiesploeg.manage`       |
+| `/admin/pocs`                        | POC-lijsten aanmaken en "verkozen" per werkingsjaar            | `pocs.manage`            |
 | `/admin/it`                          | Service-account, OAuth-client, organisatie-eenheden            | superadmin               |
 | `/koppel-vtk-account`                | Wat een lid zelf doet                                          | ingelogd                 |
 
@@ -143,14 +151,24 @@ primaire adres altijd in "Verzenden als". De enige afdwinging is een
 routing-regel, en daar is geen publieke API voor.
 
 Daarom hangt die regel aan een **organisatie-eenheid** en verplaatst de sync
-mensen in en uit die OU.
+mensen in en uit die OU. Er zijn er twee, want een kiesploeglid ontvangt enkel,
+of mailt enkel vanaf zijn kiesploegadres:
 
-1. **Directory → Organisatie-eenheden**: maak `/Kiesploeg/Beperkt` aan (de naam
-   mag anders, je vult hem straks in bij Admin > IT).
-2. **Apps → Google Workspace → Gmail → Routing**: voeg een regel toe op die OU,
-   voor **uitgaande** berichten, met als actie **Reject message**. Beperk ze tot
-   afzenders in die OU en laat de kiesploegalias door. Test ze met één account
-   voor je de hele ploeg erin zet.
+1. **Directory → Organisatie-eenheden**: maak `/Kiesploeg/Ontvangen` en
+   `/Kiesploeg/Verzenden` aan (de namen mogen anders, je vult ze straks in bij
+   Admin > IT).
+2. **Apps → Google Workspace → Gmail → Routing**, op `/Kiesploeg/Ontvangen`: een
+   regel voor **uitgaande** berichten met als actie **Reject message**. Wie hier
+   zit, verstuurt niets.
+3. Zelfde plek, op `/Kiesploeg/Verzenden`: een regel voor **uitgaande**
+   berichten, **Reject message**, maar enkel voor de envelopafzenders die het
+   primaire adres zijn. Het primaire adres heeft twee delen
+   (`voornaam.naam@vtk.be`), het kiesploegadres drie
+   (`voornaam.naam.kiesploegepsilon@vtk.be`), dus het patroon
+   `^[a-z0-9]+\.[a-z0-9]+@vtk\.be$` vangt het eerste en laat het tweede door.
+   Gmail gebruikt RE2: een lookahead werkt niet.
+4. Test beide regels met één account voor je de hele ploeg erin zet: verstuur
+   vanaf het primaire adres en vanaf de alias, en kijk wat er terugkomt.
 3. Wil je dat kiesploegaccounts ook geen Gmail-interface krijgen, zet dan de
    Gmail-service uit voor die OU. Let op: dan **bouncet** inkomende mail in
    plaats van door te sturen. Wij gaan ervan uit dat Gmail aan staat en dat de
@@ -182,7 +200,8 @@ de koppelpagina zegt dat IT dat nog moet afwerken.
 | Admin to impersonate      | het account uit stap 3, bv. `it@vtk.be`                            |
 | Service account           | `client_email` uit het JSON-bestand                                |
 | Full org unit             | `/` (of de OU waar volwaardige accounts thuishoren)                |
-| Restricted org unit       | `/Kiesploeg/Beperkt` uit stap 4                                    |
+| Restricted org unit       | `/Kiesploeg/Ontvangen` uit stap 4                                  |
+| Alias sender org unit     | `/Kiesploeg/Verzenden` uit stap 4                                  |
 | OAuth client ID + secret  | uit stap 5                                                         |
 | Private key               | de `private_key` uit het JSON-bestand                              |
 | Koppeling verplichten     | **laat dit uit** tot de accounts bestaan; zie hieronder            |
@@ -245,6 +264,80 @@ server-side en neemt niet over wat de browser terugstuurt.
 
 Wat overblijft lost zichzelf op: nieuwe accounts worden door de site aangemaakt
 (dan klopt de koppeling per constructie) en leden koppelen zichzelf via de gate.
+
+### De bestaande groepen overnemen
+
+`/admin/groepsadressen/overnemen` leest alle groepen van het domein en toont
+die de site nog niet kent. Vink aan wat de site voortaan moet beheren.
+
+- **Er verandert niets in Google.** Wie er nu als gewoon lid in staat, komt mee
+  als los lid: een lid van de site wanneer het adres zijn gekoppelde account is,
+  anders een vrij adres met de notitie "overgenomen uit Google". Een geneste
+  groep (`groep5@vtk.be`) wordt zo een vrij adres, en blijft dus gewoon lid.
+- Eigenaars en beheerders komen niet mee; de sync raakt ze nooit aan.
+- Een groep die enkel intern bereikbaar was, blijft dat
+  (`allowExternalSenders` volgt de huidige instelling). De andere
+  toegangsinstellingen worden die van VTK (zie "Standaardinstellingen").
+- Daarna per lijst: zet de juiste bron (de post, de POC, de werkgroep), kijk de
+  berekende ledenlijst na, en klik "overgenomen adressen wissen".
+
+Begin met een handvol lijsten en kijk na wat er in Google gebeurde.
+
+### Standaardinstellingen van een groep
+
+Elke beheerde groep krijgt bij elke sync dezelfde toegangsinstellingen
+(`wantedGroupSettings` in `lib/google/sync.ts`, vastgezet in
+`test/googleGroupSettings.test.ts`): iedereen mag de eigenaars contacteren en
+posten, enkel leden zien de gesprekken en de ledenlijst, enkel eigenaars en
+beheerders beheren de leden, externe leden mogen. Het vinkje "mail van buiten
+toelaten" zet posten op enkel de organisatie. Wie bij één lijst iets anders wil,
+zet "de site beheert dit adres" uit; anders zet de volgende sync het terug.
+
+### Jaargroepen (`activiteiten_2627@vtk.be`)
+
+Open `activiteiten@vtk.be`, vul bij **Jaargroepen** `activiteiten_{jj}` en de
+post Activiteiten in. Vanaf dan:
+
+- maakt de sync `activiteiten_2627@vtk.be` met de leden van Activiteiten
+  2026-27, en `activiteiten_2728` zodra iemand in de post van 2027-28 staat;
+- hangt de jaargroep van het lopende jaar in `activiteiten@vtk.be`, en op 15 juli
+  de nieuwe in de plaats van de oude;
+- wordt een jaargroep van een voorbij jaar archief: niemand erbij, niemand eruit.
+
+Was `activiteiten_2526` al overgenomen, dan wordt ze gekoppeld en archief, en
+verdwijnen de jaargroepen die als los adres in de hoofdgroep stonden (de sync
+hangt er nu zelf de juiste in). Groep 5 en de tablet blijven losse adressen.
+
+### POC-lijsten
+
+`/admin/pocs` → **Groepsadressen aanmaken of koppelen** maakt per POC met een
+adres een lijst met de POC als bron, of zet de POC als bron op de overgenomen
+lijst. Een POC-lijst volgt de vertegenwoordigers van `Poc.mailYear`; leeg is het
+huidige werkingsjaar. Na de verkiezing: kies het tabje van het nieuwe jaar en
+klik **verkozen: lijsten overzetten** (of per POC het vinkje). Wie je vooraf
+voor dat jaar invoerde, kwam er tot dan niet in.
+
+Een vertegenwoordiger zonder `@vtk.be`-account komt met het adres waarmee hij op
+de site staat in de lijst; dat is meestal zijn studentenadres.
+
+### Werkgroepen die hun eigen adressen beheren
+
+1. IT vult bij `/admin/groepsadressen/aanvragen` → **Voorvoegsels** het
+   voorvoegsel van de werkgroep in (`statix`).
+2. Wie in die werkgroep haar leden mag beheren
+   (`werkgroepen.manageOwnMembers`, de grant op de werkgroep zelf) ziet vanaf
+   dan de tab Groepsadressen met enkel de lijsten waarvan de werkgroep
+   eigenaar is, kan een nieuwe `statix.<iets>@vtk.be` maken, leden van de
+   werkgroep in en uit zijn lijsten zetten, en accounts aanvragen.
+3. Een overgenomen `statix.*`-lijst geef je de werkgroep als eigenaar bij de
+   instellingen van die lijst.
+4. Aanvragen staan bij `/admin/groepsadressen/aanvragen` voor wie
+   `googleAccounts.manage` heeft (IT, de vice). Goedkeuren maakt het account
+   meteen aan, in de volwaardige OU; het wachtwoord staat één keer op het scherm.
+
+Een werkgroepaccount is een tweede account naast het persoonlijke. In de lijsten
+van de werkgroep komt het werkgroepadres, elders het persoonlijke (zie
+`memberAddress` in `lib/google/members.ts`).
 
 ### Een eerste groepsadres
 
@@ -309,57 +402,51 @@ drive-toegang.
 
 **1. De ploeg start, enkel de g5 is bekend**
 
-- `/admin/kiesploeg` → nieuwe kiesploeg: code `2027`, werkingsjaar `2027`,
-  formele naam "Kiesploeg Delta". De informele naam mag leeg blijven; de
-  adressen hangen aan de code.
+- `/admin/kiesploeg` → nieuwe kiesploeg: code `epsilon`, werkingsjaar `2027`,
+  formele naam "Kiesploeg Epsilon". De sjablonen staan standaard op
+  `voornaam.naam@vtk.be` (account), `voornaam.naam.kiesploegepsilon@vtk.be`
+  (kiesploegadres) en `epsilon.<post>@vtk.be` (lijsten).
 - Voeg de posten toe die al bestaan, minstens de **g5** (vink "dit is de g5"
-  aan) en **beheer**.
-- Voeg de g5-leden toe, nog zonder post als de verdeling er niet is.
-- **Accounts aanmaken** → kies de kiesploeg. Je ziet per persoon het
-  voorgestelde adres (`voornaam.achternaam@vtk.be`) en de alias
-  (`kiesploeg2027.voornaam.achternaam@vtk.be`). Vink aan, maak aan, **noteer de
-  wachtwoorden meteen**: ze staan er één keer en nergens anders.
-- **Standaardlijsten aanmaken** zet `g5.2027@vtk.be` en `beheer.2027@vtk.be`
-  klaar (volgens het lijstsjabloon `{post}.{code}`), telkens met die post en de
-  g5 als bron.
-
-  Wil je voor die twee de omgekeerde volgorde (`2027.g5@vtk.be`), dan is er één
-  sjabloon per ploeg en dus één vorm voor álle lijsten. Kies dan `{code}.{post}`,
-  of maak die twee adressen met de hand aan bij Groepsadressen met de
-  kiesploegpost als bron; het resultaat is hetzelfde.
+  aan) en **beheer**, en de g5-leden.
+- Zet bij wie mag mailen **Mailen: vanaf kiesploegadres**. Vanaf het primaire
+  adres mailt geen enkel kiesploeglid; de rest ontvangt enkel.
+- **Accounts aanmaken** → kies de kiesploeg. Wie nog geen account heeft, krijgt
+  `voornaam.naam@vtk.be` met het kiesploegadres erop. **Wie al een account heeft
+  (een praesidiumlid dat in de ploeg stapt), krijgt geen tweede account**, enkel
+  het kiesploegadres erbij, en als afzender wanneer hij mag mailen. Noteer de
+  wachtwoorden meteen: ze staan er één keer.
+- **Standaardlijsten aanmaken** zet `epsilon.g5@vtk.be` en
+  `epsilon.beheer@vtk.be` klaar, telkens met die post en de g5 als bron.
 
 **2. De volledige ploeg komt erbij**
 
 - Leden toevoegen, post nog leeg waar die niet bekend is.
-- Vul per lid het **doorstuuradres** in: zolang hun mailbox beperkt is, gaat de
+- Vul eventueel een **doorstuuradres** in: zolang ze geen post hebben, gaat de
   mail daarheen.
-- Wie nu al moet kunnen mailen (marketing) krijgt het vinkje **"mag nu al
-  mailen"**. Dat wint van de afgeleide staat.
-- Accounts aanmaken zoals bij stap 1. Nieuwe accounts komen meteen in de
-  beperkte OU terecht.
+- Accounts aanmaken zoals bij stap 1. Nieuwe accounts komen in
+  `/Kiesploeg/Ontvangen`; wie mag mailen, verhuist naar `/Kiesploeg/Verzenden`.
 
 **3. Mensen vallen af of komen erbij**
 
 Lidmaatschap aanpassen; de reconcile zet Google recht binnen de vijf minuten.
-Iemand verwijderen haalt hem uit de lijsten maar **sluit zijn account niet af**;
-dat is een bewuste beslissing die nog openstaat.
 
 **4. Verkozen: de postverdeling voor volgend jaar**
 
 - Voer de praesidiumverdeling in bij `/admin/groepen` met het **volgende
-  werkingsjaar**. De jaarbalk toont dat jaar pas zodra er een lidmaatschap in
-  staat, dus zet er de eerste keer `?jaar=2027` achter in de adresbalk; daarna
-  staat het tabje er gewoon.
-- Op 15 juli kantelt `currentWorkingYear()`. De eerstvolgende reconcile zet de
-  nieuwe mensen in `activiteiten@vtk.be` en gezelschap, verplaatst hun account
-  naar de volwaardige OU, zet het doorsturen uit en geeft hun verzendrecht.
+  werkingsjaar** (de eerste keer met `?jaar=2027` in de adresbalk).
+- Het kiesploegscherm toont vanaf dan **Op 15 juli**: wie volwaardig wordt en
+  wie geschorst wordt. Kijk dat een week vooraf na.
+- Op 15 juli kantelt `currentWorkingYear()`. De eerstvolgende reconcile:
+  - maakt wie een post heeft volwaardig (eigen mailbox, doorsturen uit);
+  - schorst wie geen post kreeg, enkel een account dat de kiesploeg maakte, en
+    enkel wanneer er een postverdeling voor dat jaar ingevoerd is;
+  - haalt het kiesploegadres weg bij iedereen van de ploeg
+    (`KiesploegMember.aliasRemovedAt`, daarna `Kiesploeg.transitionedAt`).
+- Een geschorst account zet je terug open met **Account terug openzetten** in
+  het kiesploegscherm; de sync schorst het daarna niet opnieuw. Krijgt iemand
+  later toch een post, dan maakt de sync hem vanzelf volwaardig.
 - Het vertrekkende praesidium verliest zijn plaats in de lijsten, maar **niet**
-  zijn mailbox: automatisch degraderen doet de sync nooit.
-
-Zet de ploeg daarna op **inactief** in het kiesploegscherm. Haar lijsten blijven
-bestaan; enkel de accountstaat wordt niet meer uit die ploeg afgeleid.
-
----
+  zijn mailbox: een volwaardig account degradeert de sync nooit.
 
 ## Vallen waar we in gelopen zijn (of die op je liggen te wachten)
 
@@ -391,6 +478,15 @@ bestaan; enkel de accountstaat wordt niet meer uit die ploeg afgeleid.
   VTK-account" stelt zeven dagen uit (`GOOGLE_LINK_DEFER_MS` in `proxy.ts`) en
   zet `User.googleLinkDeferredAt`, wat meteen de lijst is van wie op een account
   wacht.
+- **Zonder postverdeling schorst de sync niemand.** Staat er op 16 juli nog
+  geen enkel lidmaatschap in een praesidiumpost van het nieuwe jaar, dan houdt
+  `postsEnteredFor` de schorsingen tegen. Dat is een vangnet, geen planning:
+  één ingevoerde post volstaat om het los te laten, dus voer de verdeling
+  volledig in voor 15 juli.
+- **Overnemen kopieert, de bron vervangt.** Zet je een bron op een overgenomen
+  lijst zonder de overgenomen adressen te wissen, dan staat iedereen er twee
+  keer om dezelfde reden in, en blijft een oud-lid erin staan dat de bron al
+  liet vallen. Wis ze pas nadat de berekende lijst klopt.
 - **Een naamgenoot krijgt `jan.peeters2@vtk.be`.** Kijk het voorbeeldscherm na
   voor je aanmaakt; een adres is achteraf lastig te veranderen.
 
@@ -402,12 +498,13 @@ bestaan; enkel de accountstaat wordt niet meer uit die ploeg afgeleid.
   hebben, en die beheren we al; wie er lid van is, automatiseren we dus niet.
   De Drive-scope wordt enkel gebruikt om de map van het Bestuursorgaan te
   lezen (`docs/bestuursorgaan.md`), en nooit om te schrijven.
-- **Geen accounts afsluiten of verwijderen.** Wat er gebeurt met de mailbox en
-  de Drive-bestanden van iemand die de kring verlaat, is een kringkeuze die nog
-  niet gemaakt is. Tot dan degradeert en suspendeert de sync niemand.
+- **Geen accounts verwijderen.** Schorsen doet de sync enkel bij een
+  kiesploeglid zonder post na 15 juli. Wat er gebeurt met de mailbox van iemand
+  die de kring verlaat, is een kringkeuze die nog niet gemaakt is.
 - **Geen beheer van groepen die we niet kennen.** Een Google-groep zonder
-  `MailGroup`-rij wordt niet gelezen en niet aangeraakt, zodat IT lijsten met de
-  hand kan blijven onderhouden.
+  `MailGroup`-rij wordt niet aangeraakt; enkel het overnemenscherm leest de
+  lijst. Wie een groep met de hand wil blijven onderhouden, neemt ze niet over
+  (of zet "de site beheert dit adres" uit).
 - **Geen groepen verwijderen.** Aan een groepsadres hangt het archief, en het
   staat op affiches en in mailhandtekeningen.
 - **Geen routing- of complianceregels via de API.** Die bestaan niet publiek;

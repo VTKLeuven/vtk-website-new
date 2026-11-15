@@ -25,15 +25,15 @@ export function parseSourceKey(raw: string): ProvisionSource | null {
 }
 
 export type TargetRow = PlanRow & {
-  /** Enkel bij een kiesploeg: dit lid mag nu al mailen. */
-  mailboxActive: boolean;
+  /** Enkel bij een kiesploeg: dit lid mag mailen vanaf zijn kiesploegadres. */
+  sendFromAlias: boolean;
   forwardTo: string | null;
 };
 
 export type TargetPlan = {
   label: string;
   /** Ingevuld wanneer de bron een kiesploeg is; stuurt alias en OU. */
-  kiesploeg: { code: string } | null;
+  kiesploeg: { id: string; code: string; workingYear: number } | null;
   rows: TargetRow[];
 };
 
@@ -78,22 +78,25 @@ export async function collectTargets(
     return {
       label: group.nameNl,
       kiesploeg: null,
-      rows: rows.map((row) => ({ ...row, mailboxActive: true, forwardTo: null })),
+      rows: rows.map((row) => ({ ...row, sendFromAlias: false, forwardTo: null })),
     };
   }
 
   const kiesploeg = await prisma.kiesploeg.findUnique({
     where: { id: source.id },
     select: {
+      id: true,
       code: true,
+      workingYear: true,
       formalName: true,
       accountTemplate: true,
       aliasTemplate: true,
       members: {
         where: { user: { active: true, deletedAt: null } },
         select: {
-          mailboxActive: true,
+          sendFromAlias: true,
           forwardTo: true,
+          aliasEmail: true,
           user: {
             select: { id: true, name: true, firstName: true, lastName: true, googleEmail: true },
           },
@@ -111,6 +114,7 @@ export async function collectTargets(
       firstName: m.user.firstName,
       lastName: m.user.lastName,
       googleEmail: m.user.googleEmail,
+      aliasEmail: m.aliasEmail,
     })),
     kiesploeg: {
       code: kiesploeg.code,
@@ -122,10 +126,10 @@ export async function collectTargets(
   const byUser = new Map(kiesploeg.members.map((m) => [m.user.id, m]));
   return {
     label: kiesploeg.formalName,
-    kiesploeg: { code: kiesploeg.code },
+    kiesploeg: { id: kiesploeg.id, code: kiesploeg.code, workingYear: kiesploeg.workingYear },
     rows: rows.map((row) => ({
       ...row,
-      mailboxActive: byUser.get(row.userId)?.mailboxActive ?? false,
+      sendFromAlias: byUser.get(row.userId)?.sendFromAlias ?? false,
       forwardTo: byUser.get(row.userId)?.forwardTo ?? null,
     })),
   };

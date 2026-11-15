@@ -2395,14 +2395,101 @@ Hetzelfde geldt voor "haal mij van die lijst": wie niet meer in een bronpost van
 dit jaar zit, verdwijnt bij de eerstvolgende reconcile. Enkel een handmatige
 extra vraagt een handeling, en dat is één rij verwijderen.
 
+### Alle groepen vanuit de site, niet enkel de nieuwe
+
+De Admin console is voor het dagelijkse werk onhandig: geen zicht op waarom
+iemand in een lijst zit, geen manier om een werkgroep haar eigen lijsten te
+laten beheren, en elk jaar dezelfde handelingen. Daarom beheert de site **elke**
+groep van de kring, ook de bestaande (`statix.*`, de POC-lijsten, de
+jaargroepen), en niet enkel de lijsten die ze zelf aanmaakte.
+
+**Overnemen kopieert en verandert niets in Google.** Wie er als gewoon lid in
+stond, komt mee als los lid (een lid van de site wanneer het adres zijn
+gekoppelde account is, anders een vrij adres). De eerste sync vindt dus exact
+wat er stond. Pas daarna zet iemand de bron (de post, de POC) en wist hij de
+overgenomen adressen, met een bevestiging die zegt wie er blijft. Zo kan een
+overname nooit in één klik een lijst leegmaken.
+
+**De standaardinstellingen van VTK gelden voor elke beheerde groep**
+(Toegangsinstellingen in de Admin console): iedereen mag de eigenaars
+contacteren en posten, enkel leden zien de gesprekken en de ledenlijst, enkel
+eigenaars en beheerders beheren de leden, externe leden mogen. De sync zet ze bij
+elke ronde, niet enkel bij het aanmaken, zodat een groep die iemand met de hand
+anders zette, terugkomt. Een groep die bewust anders moet, beheert de site niet
+(het vinkje "de site beheert dit adres"). Enkel "wie mag posten" heeft een eigen
+vinkje, omdat een interne lijst daar echt van afwijkt; bij het overnemen volgt
+het de huidige instelling.
+
+### Jaargroepen: activiteiten_2627 in activiteiten@vtk.be
+
+VTK maakt elk jaar per post een jaargroep (`activiteiten_2627@vtk.be`) met de
+leden van dat jaar, en hangt die in de hoofdgroep (`activiteiten@vtk.be`), naast
+Groep 5 en de tablet. Die structuur blijft, en de site neemt het jaarlijkse werk
+over: een hoofdgroep krijgt een sjabloon (`activiteiten_{jj}`) en een post, en
+de sync maakt de jaargroep van het lopende jaar, die van volgend jaar zodra daar
+iemand in de post staat, en wisselt op 15 juli de jaargroep in de hoofdgroep.
+
+- **Behouden in plaats van platslaan** (de hoofdgroep rechtstreeks de post laten
+  volgen was het alternatief): oude jaargroepen zijn het archief van die ploeg,
+  er kan Drive-toegang aan hangen, en wie het adres van vorig jaar nog gebruikt,
+  bereikt nog altijd die ploeg.
+- **Een jaargroep van een voorbij jaar raakt de sync niet meer aan**
+  (`isArchivedYear`). Zou ze de post van dat jaar blijven volgen, dan liep ze
+  leeg of veranderde ze, want de site houdt oude jaren minder volledig bij dan
+  wat er in Google staat.
+- De jaargroep van volgend jaar hangt nog niet in de hoofdgroep: wie al voor
+  volgend jaar ingevoerd is, krijgt de mail van de post pas op 15 juli.
+
+### POC-lijsten volgen de verkiezing, niet de invoer
+
+Een POC-lijst (`ene-poc@vtk.be`) hangt aan de POC zoals de site die al
+bijhoudt, en bevat de vertegenwoordigers van **één werkingsjaar**
+(`Poc.mailYear`). Dat jaar verschuift enkel met de knop "verkozen" op
+`/admin/pocs`, per POC of voor alle POC's met vertegenwoordigers in dat jaar.
+
+Niet op 15 juli zoals de posten: de vertegenwoordigers van een nieuw jaar worden
+vaak vooraf ingevoerd, en de lijst mag pas wisselen wanneer ze effectief
+verkozen zijn. Tot dan krijgt de vorige ploeg de mail.
+
+Een vertegenwoordiger is meestal een student zonder `@vtk.be`-account. Voor een
+POC-bron valt de lijst daarom terug op het adres waarmee hij op de site staat,
+waar een postenlijst iemand zonder koppeling bewust weglaat. Dat is geen
+privéadres dat iemand ongevraagd in een interne lijst zet: het is het adres
+waarop een POC-vertegenwoordiger zijn POC-mail verwacht.
+
+### Werkgroepen beheren hun eigen adressen
+
+Statix (en elke werkgroep met een eigen domein aan lijsten) mailde elk jaar een
+lijst namen naar IT om `statix.voornaam.naam@vtk.be`-accounts te maken en mensen
+in `statix.pr` of `statix.info` te zetten. Dat doet de werkgroep nu zelf:
+
+- **IT geeft de werkgroep een voorvoegsel** (`Group.mailPrefix`). Pas dan kan
+  ze iets: lijsten maken die met dat voorvoegsel beginnen, haar eigen lijsten
+  (`MailGroup.ownerGroupId`) beheren, en accounts aanvragen. Zonder voorvoegsel
+  zou ze een adres kunnen kiezen dat op een post lijkt.
+- **Wie dat binnen de werkgroep mag, is wie haar leden mag beheren**
+  (`werkgroepen.manageOwnMembers`, met dezelfde regel als in
+  `lib/werkgroepMembers.ts`). Geen nieuw recht: wie de ploeg samenstelt, beslist
+  ook wie in welke lijst zit.
+- **Een werkgroep zet enkel haar eigen leden van dit werkingsjaar in een lijst**,
+  plus vrije adressen. Bronnen als posten, kiesploegen en POC's blijven IT.
+- **Accounts worden aangevraagd, niet aangemaakt.** IT of de vice
+  (`googleAccounts.manage`) keurt goed, en dan maakt de site het account meteen.
+  Een account kost een licentie en is een adres van de kring; dat beslist niet
+  de werkgroep alleen.
+- **Een werkgroepaccount is een tweede account** (`WerkgroepAccount`), naast het
+  persoonlijke op `User`. In een lijst van de werkgroep komt het werkgroepadres,
+  elders het persoonlijke (`memberAddress`); wie enkel een werkgroepaccount
+  heeft, krijgt dat overal.
+
 ### Wat de sync nooit doet
 
 Drie grenzen, om dezelfde reden als bij de kluis: een bug in een sync die alles
 mag, wist dingen die niemand kan terughalen.
 
 - **Enkel gekoppelde groepen.** Een Google-groep zonder `MailGroup`-rij wordt
-  niet gelezen en niet aangeraakt. IT kan dus lijsten met de hand blijven
-  beheren zonder dat wij ze leegmaken.
+  niet aangeraakt; enkel het overnemenscherm leest de lijst van groepen. IT kan
+  dus lijsten met de hand blijven beheren zonder dat wij ze leegmaken.
 - **Enkel gewone leden.** `OWNER` en `MANAGER` van een groep blijven staan, ook
   als ze niet in onze berekening zitten. Daar zit het botaccount tussen, en een
   sync die zichzelf uit de groep gooit kan nadien niets meer rechtzetten.
@@ -2545,6 +2632,11 @@ samengeplakt, en bij een botsing een cijfer erachter.
 
 #### De standaardlijsten worden in één klik aangemaakt
 
+De standaardvormen volgen sinds november 2026 wat VTK effectief gebruikt:
+`epsilon.g5@vtk.be` (`{code}.{post}`) en
+`voornaam.naam.kiesploegepsilon@vtk.be` (`{voornaam}.{achternaam}.kiesploeg{code}`),
+met de naam van de ploeg als code. Bestaande ploegen houden hun eigen sjablonen.
+
 De knop "standaardlijsten aanmaken" maakt per kiesploegpost een groepsadres uit
 het lijstsjabloon, met **twee zichtbare bronrijen**: die post en de g5 van de
 ploeg. Dat de g5 in elke lijst zit, staat dus in de bronnenlijst en niet als
@@ -2554,18 +2646,65 @@ adressen worden overgeslagen, zodat de knop twee keer indrukken niets breekt.
 #### De accountstaat is afgeleid, met een override
 
 Net als het groepslidmaatschap wordt de staat van een account **berekend** en
-niet als losse knoppen bijgehouden:
+niet als losse knoppen bijgehouden (`desiredAccountState`):
 
-- **beperkt**: zit enkel in een kiesploeg. Geen verzendrecht vanaf het primaire
-  adres, mailbox stuurt door, de kiesploeg-alias is de standaardafzender.
-- **volwaardig**: zit in een post of werkgroep van het huidige werkingsjaar.
-- **override per persoon**: wint van allebei, voor de marketingmensen uit stap 2.
+- **enkel ontvangen** (`RESTRICTED`): zit enkel in een kiesploeg. Geen enkel
+  uitgaand bericht; de mailbox mag doorsturen.
+- **mailen vanaf het kiesploegadres** (`ALIAS_SENDER`): een kiesploeglid dat de
+  ploeg aanduidt (het vinkje per lid). Vanaf het primaire adres mailt **geen
+  enkel** kiesploeglid voor de ploeg aantreedt: dat adres wordt pas na 15 juli
+  van hen, en enkel als ze een post krijgen.
+- **volwaardig** (`FULL`): zit in een post of werkgroep van het huidige
+  werkingsjaar.
+- **geschorst** (`SUSPENDED`): zie "Na de verkiezing" hieronder.
 
-**Een afgeleide staat mag automatisch upgraden, nooit automatisch degraderen.**
-Zonder die regel verliest op 15 juli het hele vertrekkende praesidium in één
-reconcile zijn mailbox en zijn verzendrecht, want hun memberships van vorig jaar
-tellen dan niet meer mee. Afsluiten, suspenderen en verzendrecht intrekken zijn
-expliciete handelingen.
+Dat zijn er twee voor de kiesploeg en niet één met een override "mag mailen",
+omdat VTK het zo vroeg: de paar mensen die voor de ploeg mailen, doen dat als
+ploeg, vanaf `voornaam.naam.kiesploegepsilon@vtk.be`, en de rest leest enkel
+mee. Elke staat heeft zijn eigen organisatie-eenheid met een eigen
+routing-regel.
+
+**Een afgeleide staat mag automatisch upgraden, nooit automatisch degraderen**
+(`transitionAllowed`). Zonder die regel verliest op 15 juli het hele vertrekkende
+praesidium in één reconcile zijn mailbox en zijn verzendrecht, want hun
+memberships van vorig jaar tellen dan niet meer mee. Een volwaardig account
+wordt dus nooit vanzelf beperkt of geschorst; een account waarvan de site de
+staat nooit zette, ook niet.
+
+#### Een praesidiumlid in de kiesploeg krijgt geen tweede account
+
+Wie al `voornaam.naam@vtk.be` heeft (de huidige g5 die de nieuwe ploeg trekt),
+krijgt bij "accounts aanmaken" enkel het kiesploegadres erbij als alias, en als
+afzender wanneer hij mag mailen. Een tweede account zou zijn mail over twee
+mailboxen verdelen, en op 15 juli zou het nieuwe precies het adres zijn dat hij
+al had. Zijn staat blijft volwaardig: die degradeert de sync niet.
+
+#### Na de verkiezing
+
+Wie verkozen wordt, zit daarom nog niet in het praesidium: het gebeurt dat
+iemand in de kiesploeg zat, verkozen werd, en toch geen post kreeg. Daarom
+beslist niet de verkiezing maar **de postverdeling van het nieuwe werkingsjaar**,
+en gebeurt alles op 15 juli, wanneer `currentWorkingYear()` kantelt:
+
+- **Het kiesploegadres verdwijnt bij iedereen van de ploeg**
+  (`transitionKiesploegen`). Op 15 juli en niet bij de verkiezing: tot dan is
+  het het adres waarmee de ploeg als ploeg mailt. Mail naar dat adres bouncet
+  daarna; dat is gekozen, het adres hoorde bij de campagne.
+- **Wie een post heeft, wordt volwaardig**: eigen mailbox, mailen vanaf het eigen
+  adres, doorsturen uit.
+- **Wie geen post kreeg, wordt geschorst**, niet verwijderd. Een geschorst
+  account kan niet aanmelden en kost op termijn geen licentie, maar het adres
+  blijft gereserveerd en het account kan terug open. Verwijderen is onomkeerbaar
+  en het adres komt dan niet meteen vrij.
+
+Twee vangnetten, omdat dit het enige is wat de sync uit zichzelf afsluit:
+
+- **Zonder postverdeling schorst de sync niemand** (`postsEnteredFor`). Anders
+  schorst de eerste ronde na 15 juli de hele ploeg wanneer niemand de posten op
+  tijd invulde. Het kiesploegscherm toont vooraf wie er geschorst zou worden.
+- **Een schorsing opheffen is een knop**, en daarna schorst de sync dat account
+  niet opnieuw (`KiesploegMember.keepAccount`). Krijgt iemand later toch een
+  post, dan maakt de sync hem vanzelf volwaardig.
 
 ### Wat handmatig in de Admin console blijft
 
@@ -2623,9 +2762,8 @@ avond werk voor niets.
 - Wat er gebeurt met het account van iemand die de kring verlaat, en na hoeveel
   tijd (mail en Drive-bestanden hangen eraan). Tot dat beslist is, degradeert de
   sync niemand automatisch en suspendt ze niemand.
-- Of de kiesploegalias blijft staan als ontvangend adres nadat de ploeg
-  aantreedt. Nu blijft hij staan: hij verwijderen zou mail doen bouncen die naar
-  een adres uit die periode gestuurd wordt.
+- (Beslist in november 2026: de kiesploegalias verdwijnt op 15 juli, zie "Na
+  de verkiezing".)
 
 ## Kalender: de agenda en de week
 

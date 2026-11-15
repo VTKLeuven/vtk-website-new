@@ -1,39 +1,45 @@
 "use server";
 
 import { after } from "next/server";
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@vtk/db";
+import { currentWorkingYear } from "@vtk/auth";
 import { requirePermission } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { type SaveState, saveError, saveOk } from "@/lib/saveState";
-import { getGoogleConfig } from "@/lib/google/config";
+import { getGoogleConfig, getGoogleStatus } from "@/lib/google/config";
 import { collectLinkCandidates } from "@/lib/google/link";
+import { mailGroupAccess, requireMailGroupEditor } from "@/lib/google/access";
+import { normaliseNamePart, renderAddress, yearVars } from "@/lib/google/addresses";
 import { everyGroupOfKindLabel, isGroupKind, normaliseEmail, type GroupKind } from "@/lib/google/members";
-import {
-  pushMailGroupsForGroup,
-  pushMailGroupsForKiesploeg,
-  reconcileGoogle,
-} from "@/lib/google/sync";
+import { pushMailGroup, reconcileGoogle } from "@/lib/google/sync";
+import { IMPORTED_NOTE, type ImportOutcome, importGoogleGroup } from "@/lib/google/import";
 
 /**
  * Server actions van de groepsadressen (Google Workspace).
  *
- * Twee dingen die overal terugkomen:
+ * Drie dingen die overal terugkomen:
  *
  * - **Verwachte fouten komen terug, ze worden niet gegooid** (zie CLAUDE.md).
  *   Een adres dat al bestaat of een onbereikbaar Google hoort een rode toast te
  *   geven, geen error boundary.
- * - **Een wijziging aan de regel duwt niet meteen naar Google.** De reconcile
- *   doet dat binnen de vijf minuten, en de knop "Nu synchroniseren" doet het
- *   onmiddellijk. Enkel een gewijzigde bron duwt wel, want dan verandert
- *   effectief wie er in de lijst zit.
+ * - **Wie mag wat** staat in `lib/google/access.ts`: `mailgroups.manage` alles,
+ *   een werkgroep enkel de leden van haar eigen lijsten.
+ * - **Een wijziging aan wie erin zit, duwt meteen naar Google** (in `after()`,
+ *   zodat niemand op Google wacht). De reconcile haalt een hapering in.
  */
 
 const ADMIN = "/admin/groepsadressen";
 
 function fields(formData: FormData) {
   return Object.fromEntries(formData.entries()) as Record<string, string>;
+}
+
+function revalidate(mailGroupId?: string) {
+  revalidatePath(ADMIN);
+  if (mailGroupId) revalidatePath(`${ADMIN}/${mailGroupId}`);
 }
 
 const emailSchema = z
@@ -43,56 +49,151 @@ const emailSchema = z
   .max(200)
   .regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, "geen geldig adres");
 
-const groupSchema = z.object({
-  id: z.string().optional(),
-  email: emailSchema,
+/**
+ * Gooit enkel bij een onbekende lijst of een sessie zonder recht: dat is geen
+ * invoerfout maar een knop die er niet had mogen staan.
+ */
+async function editor(mailGroupId: string) {
+  return requireMailGroupEditor(mailGroupId);
+}
+
+// -----------------------------------------------------------------------------
+// Een groepsadres aanmaken, instellen, loskoppelen
+// -----------------------------------------------------------------------------
+
+const createSchema = z.object({
+  email: z.string().trim().optional(),
+  localPart: z.string().trim().max(60).optional(),
+  ownerGroupId: z.string().optional(),
   name: z.string().trim().min(1).max(120),
   description: z.string().trim().max(500).optional(),
   allowExternalSenders: z.string().optional(),
+  locale: z.string().optional(),
 });
 
+export async function createMailGroupAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const access = await mailGroupAccess();
+  const parsed = createSchema.safeParse(fields(formData));
+  if (!parsed.success) return saveError("INVALID_INPUT");
+  const input = parsed.data;
+  const ownerGroupId = input.ownerGroupId || null;
+
+  if (!access.manageAll && (!ownerGroupId || !access.werkgroepIds.has(ownerGroupId))) {
+    throw new Error("FORBIDDEN");
+  }
+
+  const owner = ownerGroupId
+    ? await prisma.group.findUnique({
+        where: { id: ownerGroupId },
+        select: { mailPrefix: true, type: true },
+      })
+    : null;
+  if (ownerGroupId && !owner) return saveError("INVALID_INPUT");
+
+  let email: string;
+  if (!access.manageAll) {
+    // Een werkgroep kiest enkel wat er na haar voorvoegsel komt.
+    const domain = (await getGoogleStatus()).domain ?? "vtk.be";
+    const local = (input.localPart ?? "")
+      .toLowerCase()
+      .split(".")
+      .map(normaliseNamePart)
+      .filter(Boolean)
+      .join(".");
+    if (!local || !owner?.mailPrefix) return saveError("INVALID_EMAIL");
+    email = `${owner.mailPrefix}.${local}@${domain}`;
+  } else {
+    const parsedEmail = emailSchema.safeParse(input.email ?? "");
+    if (!parsedEmail.success) return saveError("INVALID_EMAIL");
+    email = normaliseEmail(parsedEmail.data);
+  }
+
+  const clash = await prisma.mailGroup.findUnique({ where: { email }, select: { id: true } });
+  if (clash) return saveError("DUPLICATE_EMAIL");
+
+  const created = await prisma.mailGroup.create({
+    data: {
+      email,
+      name: input.name,
+      description: input.description || null,
+      allowExternalSenders: input.allowExternalSenders === "on",
+      ownerGroupId,
+    },
+    select: { id: true },
+  });
+  await logAudit({
+    action: "create",
+    entity: "mailGroup",
+    entityId: created.id,
+    target: email,
+    summary: "groepsadres toegevoegd",
+  });
+
+  revalidate();
+  // De detailpagina openen is zelf de bevestiging; buiten elke try/catch.
+  redirect(`${input.locale === "en" ? "/en" : ""}${ADMIN}/${created.id}`);
+}
+
+const settingsSchema = z.object({
+  id: z.string().min(1),
+  email: z.string().trim().optional(),
+  name: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(500).optional(),
+  allowExternalSenders: z.string().optional(),
+  ownerGroupId: z.string().optional(),
+  enabled: z.string().optional(),
+});
+
+/**
+ * Naam en omschrijving mag de werkgroep zelf aanpassen. Het adres, wie het
+ * beheert en of de site het nog beheert, enkel `mailgroups.manage`: een
+ * werkgroep die haar adres hernoemt, neemt het adres op affiches mee.
+ */
 export async function saveMailGroupAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  await requirePermission("mailgroups.manage");
-  const parsed = groupSchema.safeParse(fields(formData));
+  const parsed = settingsSchema.safeParse(fields(formData));
   if (!parsed.success) return saveError("INVALID_INPUT");
   const input = parsed.data;
-  const email = normaliseEmail(input.email);
+  const { access, mailGroup } = await editor(input.id);
 
-  const data = {
-    email,
-    name: input.name,
-    description: input.description || null,
+  const data: {
+    name: string;
+    description: string | null;
+    email?: string;
+    allowExternalSenders?: boolean;
+    ownerGroupId?: string | null;
+    enabled?: boolean;
+  } = { name: input.name, description: input.description || null };
+
+  if (access.manageAll) {
+    const parsedEmail = emailSchema.safeParse(input.email ?? "");
+    if (!parsedEmail.success) return saveError("INVALID_EMAIL");
+    const email = normaliseEmail(parsedEmail.data);
+    const clash = await prisma.mailGroup.findUnique({ where: { email }, select: { id: true } });
+    if (clash && clash.id !== input.id) return saveError("DUPLICATE_EMAIL");
+    data.email = email;
     // Een checkbox stuurt niets mee wanneer ze uit staat.
-    allowExternalSenders: input.allowExternalSenders === "on",
-  };
-
-  const clash = await prisma.mailGroup.findUnique({ where: { email }, select: { id: true } });
-  if (clash && clash.id !== input.id) return saveError("DUPLICATE_EMAIL");
-
-  if (input.id) {
-    await prisma.mailGroup.update({ where: { id: input.id }, data });
-    await logAudit({
-      action: "update",
-      entity: "mailGroup",
-      entityId: input.id,
-      target: email,
-      summary: "groepsadres bijgewerkt",
-    });
-  } else {
-    const created = await prisma.mailGroup.create({ data });
-    await logAudit({
-      action: "create",
-      entity: "mailGroup",
-      entityId: created.id,
-      target: email,
-      summary: "groepsadres toegevoegd",
-    });
+    data.allowExternalSenders = input.allowExternalSenders === "on";
+    data.ownerGroupId = input.ownerGroupId || null;
+    data.enabled = input.enabled === "on";
   }
 
-  revalidatePath(ADMIN);
+  await prisma.mailGroup.update({ where: { id: input.id }, data });
+  await logAudit({
+    action: "update",
+    entity: "mailGroup",
+    entityId: input.id,
+    target: data.email ?? mailGroup.email,
+    summary: "groepsadres bijgewerkt",
+  });
+
+  revalidate(input.id);
+  after(() => pushMailGroup(input.id));
   return saveOk();
 }
 
@@ -114,36 +215,46 @@ export async function deleteMailGroupAction(formData: FormData): Promise<void> {
     target: row.email,
     summary: "koppeling verwijderd; de groep in Google blijft bestaan",
   });
-  revalidatePath(ADMIN);
+  revalidate();
+  const locale = formData.get("locale");
+  redirect(`${locale === "en" ? "/en" : ""}${ADMIN}`);
 }
+
+// -----------------------------------------------------------------------------
+// Bronnen
+// -----------------------------------------------------------------------------
 
 const sourceSchema = z.object({
   mailGroupId: z.string().min(1),
-  /** `group:<id>`, `type:<GroupKind>`, `kiesploeg:<id>` of `kiesploegPost:<id>`. */
+  /** `group:<id>`, `type:<GroupKind>`, `kiesploeg:<id>`, `kiesploegPost:<id>` of `poc:<id>`. */
   source: z.string().min(3),
   onlyLead: z.string().optional(),
 });
 
+type SourceKind = "group" | "type" | "kiesploeg" | "kiesploegPost" | "poc";
+
 /** Splitst de gecombineerde keuzelijst in het juiste kolomveld. */
-function parseSource(raw: string):
-  | { kind: "group" | "type" | "kiesploeg" | "kiesploegPost"; id: string }
-  | null {
+function parseSource(raw: string): { kind: SourceKind; id: string } | null {
   const [kind, id] = raw.split(":");
   if (!id) return null;
-  if (kind === "type") {
-    return isGroupKind(id) ? { kind, id } : null;
+  if (kind === "type") return isGroupKind(id) ? { kind, id } : null;
+  if (kind !== "group" && kind !== "kiesploeg" && kind !== "kiesploegPost" && kind !== "poc") {
+    return null;
   }
-  if (kind !== "group" && kind !== "kiesploeg" && kind !== "kiesploegPost") return null;
   return { kind, id };
 }
 
 /** Hoe de bron heet, voor het logboek. */
-async function sourceLabel(kind: string, id: string): Promise<string | null> {
+async function sourceLabel(kind: SourceKind, id: string): Promise<string | null> {
   if (kind === "type") {
     return isGroupKind(id) ? everyGroupOfKindLabel(id, true).toLowerCase() : null;
   }
   if (kind === "group") {
     return (await prisma.group.findUnique({ where: { id }, select: { nameNl: true } }))?.nameNl ?? null;
+  }
+  if (kind === "poc") {
+    const row = await prisma.poc.findUnique({ where: { id }, select: { nameNl: true } });
+    return row ? `POC ${row.nameNl}` : null;
   }
   if (kind === "kiesploeg") {
     const row = await prisma.kiesploeg.findUnique({ where: { id }, select: { formalName: true } });
@@ -156,26 +267,32 @@ async function sourceLabel(kind: string, id: string): Promise<string | null> {
   return row ? `${row.name} (${row.kiesploeg.formalName})` : null;
 }
 
+/**
+ * Een bron toevoegen. Een werkgroep mag enkel haar eigen werkgroep als bron
+ * zetten ("iedereen van Statix"); posten, kiesploegen en POC's zijn voor
+ * `mailgroups.manage`.
+ */
 export async function addSourceAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
-  await requirePermission("mailgroups.manage");
   const parsed = sourceSchema.safeParse(fields(formData));
   if (!parsed.success) return saveError("INVALID_INPUT");
   const { mailGroupId } = parsed.data;
+  const { access, mailGroup } = await editor(mailGroupId);
   const onlyLead = parsed.data.onlyLead === "on";
   const source = parseSource(parsed.data.source);
   if (!source) return saveError("INVALID_INPUT");
+  if (!access.manageAll && !(source.kind === "group" && source.id === mailGroup.ownerGroupId)) {
+    throw new Error("FORBIDDEN");
+  }
 
-  const [mailGroup, label] = await Promise.all([
-    prisma.mailGroup.findUnique({ where: { id: mailGroupId }, select: { email: true } }),
-    sourceLabel(source.kind, source.id),
-  ]);
-  if (!mailGroup || !label) return saveError("INVALID_INPUT");
+  const label = await sourceLabel(source.kind, source.id);
+  if (!label) return saveError("INVALID_INPUT");
 
   const columns = {
     groupId: source.kind === "group" ? source.id : null,
     groupType: source.kind === "type" ? (source.id as GroupKind) : null,
     kiesploegId: source.kind === "kiesploeg" ? source.id : null,
     kiesploegPostId: source.kind === "kiesploegPost" ? source.id : null,
+    pocId: source.kind === "poc" ? source.id : null,
   };
 
   const existing = await prisma.mailGroupSource.findFirst({
@@ -193,13 +310,12 @@ export async function addSourceAction(_prev: SaveState, formData: FormData): Pro
     summary: `bron toegevoegd: ${label}${onlyLead ? " (enkel de verantwoordelijke)" : ""}`,
   });
 
-  revalidatePath(ADMIN);
-  after(() => pushSource(columns));
+  revalidate(mailGroupId);
+  after(() => pushMailGroup(mailGroupId));
   return saveOk();
 }
 
 export async function removeSourceAction(formData: FormData): Promise<void> {
-  await requirePermission("mailgroups.manage");
   const id = (formData.get("id") as string) ?? "";
   if (!id) return;
 
@@ -208,22 +324,23 @@ export async function removeSourceAction(formData: FormData): Promise<void> {
     select: {
       groupId: true,
       groupType: true,
-      kiesploegId: true,
-      kiesploegPostId: true,
       mailGroupId: true,
-      mailGroup: { select: { email: true } },
       group: { select: { nameNl: true } },
       kiesploeg: { select: { formalName: true } },
       kiesploegPost: { select: { name: true } },
+      poc: { select: { nameNl: true } },
     },
   });
   if (!row) return;
+  const { access, mailGroup } = await editor(row.mailGroupId);
+  if (!access.manageAll && row.groupId !== mailGroup.ownerGroupId) throw new Error("FORBIDDEN");
 
   const label =
     row.group?.nameNl ??
     (row.groupType ? everyGroupOfKindLabel(row.groupType, true).toLowerCase() : null) ??
     row.kiesploeg?.formalName ??
     row.kiesploegPost?.name ??
+    (row.poc ? `POC ${row.poc.nameNl}` : null) ??
     "bron";
 
   await prisma.mailGroupSource.delete({ where: { id } });
@@ -231,47 +348,16 @@ export async function removeSourceAction(formData: FormData): Promise<void> {
     action: "update",
     entity: "mailGroup",
     entityId: row.mailGroupId,
-    target: row.mailGroup.email,
+    target: mailGroup.email,
     summary: `bron verwijderd: ${label}`,
   });
-  revalidatePath(ADMIN);
-  after(() =>
-    pushSource({
-      groupId: row.groupId,
-      groupType: row.groupType,
-      kiesploegId: row.kiesploegId,
-      kiesploegPostId: row.kiesploegPostId,
-    }),
-  );
+  revalidate(row.mailGroupId);
+  after(() => pushMailGroup(row.mailGroupId));
 }
 
-/** Duwt de lijsten die op deze bron staan meteen door naar Google. */
-async function pushSource(columns: {
-  groupId: string | null;
-  groupType?: GroupKind | null;
-  kiesploegId: string | null;
-  kiesploegPostId: string | null;
-}): Promise<void> {
-  if (columns.groupId) return pushMailGroupsForGroup(columns.groupId);
-  if (columns.groupType) {
-    // Eén willekeurige groep van dat soort volstaat: `pushMailGroupsForGroup`
-    // neemt de lijsten met dat brontype mee.
-    const any = await prisma.group.findFirst({
-      where: { type: columns.groupType, active: true },
-      select: { id: true },
-    });
-    if (any) return pushMailGroupsForGroup(any.id);
-    return;
-  }
-  if (columns.kiesploegId) return pushMailGroupsForKiesploeg(columns.kiesploegId);
-  if (columns.kiesploegPostId) {
-    const post = await prisma.kiesploegPost.findUnique({
-      where: { id: columns.kiesploegPostId },
-      select: { kiesploegId: true },
-    });
-    if (post) return pushMailGroupsForKiesploeg(post.kiesploegId);
-  }
-}
+// -----------------------------------------------------------------------------
+// Losse leden: een lid van de site of een vrij adres
+// -----------------------------------------------------------------------------
 
 const extraSchema = z.object({
   mailGroupId: z.string().min(1),
@@ -281,17 +367,11 @@ const extraSchema = z.object({
 });
 
 export async function addExtraAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
-  await requirePermission("mailgroups.manage");
   const parsed = extraSchema.safeParse(fields(formData));
   if (!parsed.success) return saveError("INVALID_EMAIL");
   const { mailGroupId, kind } = parsed.data;
+  const { mailGroup } = await editor(mailGroupId);
   const email = normaliseEmail(parsed.data.email);
-
-  const mailGroup = await prisma.mailGroup.findUnique({
-    where: { id: mailGroupId },
-    select: { email: true },
-  });
-  if (!mailGroup) return saveError("INVALID_INPUT");
 
   const existing = await prisma.mailGroupExtra.findUnique({
     where: { mailGroupId_email: { mailGroupId, email } },
@@ -310,30 +390,223 @@ export async function addExtraAction(_prev: SaveState, formData: FormData): Prom
     summary: `${kind === "INCLUDE" ? "extra adres" : "uitsluiting"} toegevoegd: ${email}`,
   });
 
-  revalidatePath(ADMIN);
+  revalidate(mailGroupId);
+  after(() => pushMailGroup(mailGroupId));
+  return saveOk();
+}
+
+const userMemberSchema = z.object({
+  mailGroupId: z.string().min(1),
+  userId: z.string().min(1),
+  kind: z.enum(["INCLUDE", "EXCLUDE"]).default("INCLUDE"),
+});
+
+/**
+ * Zet een lid van de site in de lijst. Het adres volgt dan zijn account: in
+ * een lijst van zijn werkgroep zijn werkgroepadres, anders zijn persoonlijke.
+ *
+ * Een werkgroep kiest enkel uit haar eigen leden van dit werkingsjaar; een vrij
+ * adres kan ze nog altijd als los adres toevoegen.
+ */
+export async function addUserMemberAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const parsed = userMemberSchema.safeParse(fields(formData));
+  if (!parsed.success) return saveError("INVALID_INPUT");
+  const { mailGroupId, userId, kind } = parsed.data;
+  const { access, mailGroup } = await editor(mailGroupId);
+
+  if (!access.manageAll) {
+    const isMember = await prisma.groupMembership.count({
+      where: { userId, groupId: mailGroup.ownerGroupId ?? "", year: currentWorkingYear() },
+    });
+    if (!isMember) return saveError("NOT_IN_WERKGROEP");
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+  if (!user) return saveError("INVALID_INPUT");
+
+  const existing = await prisma.mailGroupExtra.findUnique({
+    where: { mailGroupId_userId: { mailGroupId, userId } },
+    select: { id: true },
+  });
+  if (existing) return saveError("DUPLICATE_MEMBER");
+
+  await prisma.mailGroupExtra.create({ data: { mailGroupId, userId, kind } });
+  await logAudit({
+    action: "update",
+    entity: "mailGroup",
+    entityId: mailGroupId,
+    target: mailGroup.email,
+    summary: `${kind === "INCLUDE" ? "lid toegevoegd" : "lid uitgesloten"}: ${user.name}`,
+  });
+
+  revalidate(mailGroupId);
+  after(() => pushMailGroup(mailGroupId));
   return saveOk();
 }
 
 export async function removeExtraAction(formData: FormData): Promise<void> {
-  await requirePermission("mailgroups.manage");
   const id = (formData.get("id") as string) ?? "";
   if (!id) return;
 
   const row = await prisma.mailGroupExtra.findUnique({
     where: { id },
-    select: { email: true, mailGroupId: true, mailGroup: { select: { email: true } } },
+    select: { email: true, mailGroupId: true, user: { select: { name: true } } },
   });
   if (!row) return;
+  const { mailGroup } = await editor(row.mailGroupId);
 
   await prisma.mailGroupExtra.delete({ where: { id } });
   await logAudit({
     action: "update",
     entity: "mailGroup",
     entityId: row.mailGroupId,
-    target: row.mailGroup.email,
-    summary: `adres losgekoppeld: ${row.email}`,
+    target: mailGroup.email,
+    summary: `uit de lijst gehaald: ${row.user?.name ?? row.email}`,
   });
-  revalidatePath(ADMIN);
+  revalidate(row.mailGroupId);
+  after(() => pushMailGroup(row.mailGroupId));
+}
+
+/**
+ * Wist de losse adressen die bij het overnemen uit Google meekwamen, nadat de
+ * lijst een bron kreeg die hetzelfde doet. Bewust een aparte, bevestigde stap:
+ * overnemen kopieert wat er in Google stond, en pas wie de bron nakeek, weet
+ * dat die adressen dubbel zijn.
+ */
+export async function clearImportedExtrasAction(formData: FormData): Promise<void> {
+  await requirePermission("mailgroups.manage");
+  const mailGroupId = (formData.get("mailGroupId") as string) ?? "";
+  const mailGroup = await prisma.mailGroup.findUnique({
+    where: { id: mailGroupId },
+    select: { email: true },
+  });
+  if (!mailGroup) return;
+  const { count } = await prisma.mailGroupExtra.deleteMany({
+    where: { mailGroupId, kind: "INCLUDE", note: IMPORTED_NOTE, userId: null },
+  });
+  await logAudit({
+    action: "update",
+    entity: "mailGroup",
+    entityId: mailGroupId,
+    target: mailGroup.email,
+    summary: `${count} overgenomen adressen gewist`,
+  });
+  revalidate(mailGroupId);
+  after(() => pushMailGroup(mailGroupId));
+}
+
+
+// -----------------------------------------------------------------------------
+// Jaargroepen
+// -----------------------------------------------------------------------------
+
+const yearlySchema = z.object({
+  mailGroupId: z.string().min(1),
+  yearlyTemplate: z.string().trim().max(80).optional(),
+  yearlyGroupId: z.string().optional(),
+});
+
+/**
+ * Stelt de jaargroepen van een hoofdgroep in (activiteiten_{jj} uit post
+ * Activiteiten).
+ *
+ * Wat er al stond, wordt opgeruimd en niet verdubbeld: een overgenomen
+ * jaargroep (activiteiten_2526) krijgt deze groep als ouder en haar jaar, zodat
+ * ze archief wordt; en de jaargroepen die als los adres in de hoofdgroep
+ * stonden, verdwijnen daar, want de sync hangt vanaf nu zelf de juiste erin.
+ */
+export async function saveYearlyAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  await requirePermission("mailgroups.manage");
+  const parsed = yearlySchema.safeParse(fields(formData));
+  if (!parsed.success) return saveError("INVALID_INPUT");
+  const { mailGroupId } = parsed.data;
+  const template = parsed.data.yearlyTemplate?.toLowerCase() || null;
+  const groupId = parsed.data.yearlyGroupId || null;
+  if (Boolean(template) !== Boolean(groupId)) return saveError("YEARLY_INCOMPLETE");
+  if (template && !/\{(jj|jaar)\}/.test(template)) return saveError("YEARLY_NO_YEAR");
+  if (template && template.includes("@")) return saveError("YEARLY_NO_DOMAIN");
+
+  const mailGroup = await prisma.mailGroup.findUnique({
+    where: { id: mailGroupId },
+    select: { email: true, year: true },
+  });
+  if (!mailGroup) return saveError("INVALID_INPUT");
+  if (mailGroup.year !== null) return saveError("YEARLY_ON_YEARLY");
+
+  await prisma.mailGroup.update({
+    where: { id: mailGroupId },
+    data: { yearlyTemplate: template, yearlyGroupId: groupId },
+  });
+
+  let linked = 0;
+  if (template) {
+    const domain = (await getGoogleStatus()).domain ?? "vtk.be";
+    const current = currentWorkingYear();
+    // Tien jaar terug volstaat ruim voor wat er nog in Google staat.
+    for (let y = current - 10; y <= current + 1; y += 1) {
+      const email = renderAddress(template, yearVars(y), domain);
+      await prisma.mailGroupExtra.deleteMany({
+        where: { mailGroupId, email, kind: "INCLUDE" },
+      });
+      const existing = await prisma.mailGroup.findUnique({
+        where: { email },
+        select: { id: true },
+      });
+      if (existing && existing.id !== mailGroupId) {
+        await prisma.mailGroup.update({
+          where: { id: existing.id },
+          data: { parentId: mailGroupId, year: y },
+        });
+        linked += 1;
+      }
+    }
+  }
+
+  await logAudit({
+    action: "update",
+    entity: "mailGroup",
+    entityId: mailGroupId,
+    target: mailGroup.email,
+    summary: template
+      ? `jaargroepen ingesteld: ${template} (${linked} bestaande jaargroepen gekoppeld)`
+      : "jaargroepen uitgezet",
+  });
+
+  revalidate(mailGroupId);
+  return saveOk();
+}
+
+// -----------------------------------------------------------------------------
+// Overnemen uit Google
+// -----------------------------------------------------------------------------
+
+export type ImportState =
+  | { status: "idle" }
+  | { status: "error"; code: string; nonce: number }
+  | { status: "done"; results: ImportOutcome[]; nonce: number };
+
+/**
+ * Neemt de aangevinkte Google-groepen over. Zie `lib/google/import.ts`: er
+ * verandert niets in Google, de huidige leden komen mee als losse leden.
+ */
+export async function importGroupsAction(
+  _prev: ImportState,
+  formData: FormData,
+): Promise<ImportState> {
+  await requirePermission("mailgroups.manage");
+  const emails = [...new Set(formData.getAll("email").map(String).filter(Boolean))];
+  if (emails.length === 0) return { status: "error", code: "NOTHING_SELECTED", nonce: Date.now() };
+  const cfg = await getGoogleConfig();
+  if (!cfg) return { status: "error", code: "NOT_CONFIGURED", nonce: Date.now() };
+
+  const results: ImportOutcome[] = [];
+  for (const email of emails) results.push(await importGoogleGroup(cfg, email));
+
+  revalidatePath(ADMIN, "layout");
+  return { status: "done", results, nonce: Date.now() };
 }
 
 export async function syncMailGroupsAction(): Promise<SaveState> {
@@ -347,7 +620,7 @@ export async function syncMailGroupsAction(): Promise<SaveState> {
     target: "Groepsadressen",
     summary: `${result.groups} lijsten, ${result.added} toegevoegd, ${result.removed} verwijderd, ${result.accountsChanged} accounts aangepast`,
   });
-  revalidatePath(ADMIN);
+  revalidatePath(ADMIN, "layout");
   if (result.failed > 0) return saveError("SYNC_PARTIAL");
   return saveOk();
 }

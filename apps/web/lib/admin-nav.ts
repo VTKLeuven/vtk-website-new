@@ -49,6 +49,9 @@ export type NavGuard = {
   post?: boolean;
   /** Peilingen: de RiVers van dit werkingsjaar, en wie `pocs.manage` heeft. */
   pocRep?: boolean;
+  /** Groepsadressen: `mailgroups.manage`, `googleAccounts.manage`, of een werkgroep
+   *  die haar eigen adressen beheert (zie lib/google/access.ts). */
+  mailGroups?: boolean;
   /** Enkel bij exacte padmatch actief markeren (voor de dashboard-landing op /admin). */
   exact?: boolean;
 };
@@ -214,7 +217,7 @@ export function getAdminNav(): NavEntry[] {
       // naar studenten (export + Brevo), en de eigen adressen van de kring
       // (activiteiten@vtk.be) die de posten van dit werkingsjaar volgen.
       item('mailinglists', '/mailinglijsten', { perm: 'mailinglists.export' }),
-      item('mailGroups', '/groepsadressen', { perm: 'mailgroups.manage' }),
+      item('mailGroups', '/groepsadressen', { mailGroups: true }),
       item('appPush', '/app-push', { perm: 'app.push' }),
       // De linkpagina hangt in de bio van de sociale media: dat is het werk van
       // communicatie, niet van wie de website onderhoudt.

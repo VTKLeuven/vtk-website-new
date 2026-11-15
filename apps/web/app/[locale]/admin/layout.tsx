@@ -12,6 +12,7 @@ import { isExternalUrl } from '@/lib/href';
 import { werkgroepenWithOwnMemberRights } from '@/lib/werkgroepMembers';
 import { currentWorkingYear } from '@/lib/workingYear';
 import { getAdminNav, type NavGuard, type NavLeaf } from '@/lib/admin-nav';
+import { canSeeMailGroups, mailGroupAccess } from '@/lib/google/access';
 import { ADMIN_DENSITY_COOKIE, ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/adminNavCookie';
 import { AdminNav, type NavItem, type NavNode } from './AdminNav';
 import { AdminSurface } from './AdminSurface';
@@ -76,6 +77,14 @@ export default async function AdminLayout({
       where: { userId: session.user.id, year: currentWorkingYear() },
     })) > 0;
 
+  // Groepsadressen: wie ze beheert of accounts goedkeurt, en een werkgroep die
+  // haar eigen adressen beheert. Dat laatste vraagt pas iets op met het recht.
+  const mailGroupsVisible =
+    session.permissions.includes('mailgroups.manage') ||
+    session.permissions.includes('googleAccounts.manage') ||
+    (session.permissions.includes('werkgroepen.manageOwnMembers') &&
+      canSeeMailGroups(await mailGroupAccess(session)));
+
   // Mag de huidige gebruiker deze entry zien? Superadmin ziet alles.
   const canSee = (guard: NavGuard): boolean => {
     if (session.user.isSuperAdmin) return true;
@@ -93,6 +102,7 @@ export default async function AdminLayout({
     // niet als groep, dus ze had hier enkel een leeg blok.
     if (guard.post) return session.groups.some((g) => g.type !== 'JAARWERKING');
     if (guard.pocRep) return session.permissions.includes('pocs.manage') || pocRep;
+    if (guard.mailGroups) return mailGroupsVisible;
     if (guard.anyPerm) return guard.anyPerm.some((p) => session.permissions.includes(p));
     if (guard.perm) return session.permissions.includes(guard.perm);
     return true;

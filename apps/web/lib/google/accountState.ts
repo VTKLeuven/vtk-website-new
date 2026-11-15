@@ -9,6 +9,7 @@ import {
   ensureDefaultSendAs,
   moveUser,
   resetDefaultSendAs,
+  setUserSuspended,
 } from "./client";
 
 /**
@@ -19,13 +20,27 @@ import {
  * er één plek is waar staat wanneer iemand mag mailen.
  */
 
-export type AccountState = "RESTRICTED" | "FULL";
+export type AccountState = "RESTRICTED" | "ALIAS_SENDER" | "FULL" | "SUSPENDED";
 
 export type StateInput = {
   /** Zit dit lid dit werkingsjaar in een post of werkgroep? */
   hasCurrentPost: boolean;
-  /** Lidmaatschap van een kiesploeg, of `null`. */
-  kiesploeg: { mailboxActive: boolean } | null;
+  /** Lidmaatschap van een actieve kiesploeg, of `null`. */
+  kiesploeg: {
+    /** Mag mailen, maar enkel vanaf het kiesploegadres. */
+    sendFromAlias: boolean;
+    /** Is 15 juli van het werkingsjaar van de ploeg voorbij? */
+    tookOffice: boolean;
+    /** Een beheerder hief de schorsing bewust op. */
+    keepAccount: boolean;
+  } | null;
+  /**
+   * Mag de sync iemand schorsen? Enkel wanneer de postverdeling van het nieuwe
+   * werkingsjaar effectief ingevoerd is. Zonder die voorwaarde schorst de
+   * eerste reconcile na 15 juli de hele ploeg wanneer niemand de posten op tijd
+   * invulde.
+   */
+  suspensionAllowed: boolean;
 };
 
 /**
@@ -36,8 +51,33 @@ export type StateInput = {
  */
 export function desiredAccountState(input: StateInput): AccountState | null {
   if (input.hasCurrentPost) return "FULL";
-  if (input.kiesploeg) return input.kiesploeg.mailboxActive ? "FULL" : "RESTRICTED";
-  return null;
+  const kiesploeg = input.kiesploeg;
+  if (!kiesploeg) return null;
+  if (!kiesploeg.tookOffice) return kiesploeg.sendFromAlias ? "ALIAS_SENDER" : "RESTRICTED";
+  // De ploeg trad aan en dit lid kreeg geen post: verkozen maar niet in het
+  // praesidium. Zie docs/design-decisions.md, "Na de verkiezing".
+  if (kiesploeg.keepAccount || !input.suspensionAllowed) return null;
+  return "SUSPENDED";
+}
+
+/**
+ * Mag de sync van `current` naar `desired` gaan zonder dat een mens erom vroeg?
+ *
+ * **Automatisch upgraden mag, automatisch degraderen niet.** Zonder die regel
+ * verliest op 15 juli het hele vertrekkende praesidium in één reconcile zijn
+ * mailbox en zijn verzendrecht, want hun memberships van vorig jaar tellen dan
+ * niet meer mee. Een volwaardig account wordt dus nooit vanzelf beperkt of
+ * geschorst.
+ *
+ * Schorsen mag enkel bij een account dat de kiesploeg maakte (beperkt of
+ * afzender vanaf de alias). Een account waarvan we de staat nooit zetten
+ * (`null`), raken we ook niet aan: dat is van iemand anders.
+ */
+export function transitionAllowed(current: AccountState | null, desired: AccountState): boolean {
+  if (current === desired) return false;
+  if (current === "FULL") return false;
+  if (desired === "SUSPENDED") return current === "RESTRICTED" || current === "ALIAS_SENDER";
+  return true;
 }
 
 export type ApplyInput = {
@@ -46,9 +86,9 @@ export type ApplyInput = {
   googleEmail: string;
   /** Huidige, laatst toegepaste staat; `null` als er nog niets toegepast is. */
   current: AccountState | null;
-  /** Kiesploegalias die de standaardafzender wordt in de beperkte staat. */
+  /** Kiesploegalias die de standaardafzender wordt bij ALIAS_SENDER. */
   alias?: string | null;
-  /** Waar de mail naartoe gaat in de beperkte staat. */
+  /** Waar de mail naartoe gaat zolang het lid niet volwaardig is. */
   forwardTo?: string | null;
 };
 
@@ -61,36 +101,46 @@ export type ApplyOutcome = {
 /**
  * Zet de staat van één account in Google.
  *
- * **Automatisch upgraden mag, automatisch degraderen niet.** Zonder die regel
- * verliest op 15 juli het hele vertrekkende praesidium in één reconcile zijn
- * mailbox en zijn verzendrecht, want hun memberships van vorig jaar tellen dan
- * niet meer mee. Een beheerder die de override uitzet, doet dat wél bewust en
- * geeft `allowDowngrade` mee.
+ * Wat mag zonder dat iemand erom vroeg, staat in {@link transitionAllowed}. Een
+ * beheerder die bewust degradeert of een schorsing opheft, geeft `force` mee.
  */
 export async function applyAccountState(
   cfg: GoogleConfig,
   input: ApplyInput,
   desired: AccountState,
-  { allowDowngrade = false }: { allowDowngrade?: boolean } = {},
+  { force = false }: { force?: boolean } = {},
 ): Promise<ApplyOutcome> {
   if (input.current === desired) return { changed: false, warnings: [] };
-  if (input.current === "FULL" && desired === "RESTRICTED" && !allowDowngrade) {
+  if (!force && !transitionAllowed(input.current, desired)) {
     return { changed: false, warnings: [] };
   }
 
   const warnings: string[] = [];
 
-  if (desired === "RESTRICTED") {
-    if (cfg.restrictedOrgUnit) {
-      await moveUser(cfg, input.googleEmail, cfg.restrictedOrgUnit);
+  // Een geschorst account eerst terug openzetten; anders lukken de Gmail-stappen
+  // hieronder niet.
+  if (input.current === "SUSPENDED" && desired !== "SUSPENDED") {
+    await setUserSuspended(cfg, input.googleEmail, false);
+  }
+
+  if (desired === "SUSPENDED") {
+    await setUserSuspended(cfg, input.googleEmail, true);
+  } else if (desired === "RESTRICTED" || desired === "ALIAS_SENDER") {
+    const orgUnit = desired === "RESTRICTED" ? cfg.restrictedOrgUnit : cfg.aliasSenderOrgUnit;
+    if (orgUnit) {
+      await moveUser(cfg, input.googleEmail, orgUnit);
     } else {
       // Zonder OU is er geen plek waar de routing-regel hangt, dus is er ook
       // niets dat het verzenden tegenhoudt. Dat hoort zichtbaar te zijn.
-      warnings.push("geen beperkte organisatie-eenheid ingesteld; verzenden is niet geblokkeerd");
+      warnings.push(
+        desired === "RESTRICTED"
+          ? "geen organisatie-eenheid voor kiesploegleden die enkel ontvangen; verzenden is niet geblokkeerd"
+          : "geen organisatie-eenheid voor kiesploegafzenders; het account bleef staan waar het stond",
+      );
     }
     // De Gmail-stappen mogen falen zonder de verhuizing ongedaan te maken: die
     // eerste is de afdwinging, deze twee zijn het comfort.
-    if (input.alias) {
+    if (desired === "ALIAS_SENDER" && input.alias) {
       try {
         await ensureDefaultSendAs(cfg, input.googleEmail, input.alias);
       } catch (err) {
@@ -101,9 +151,7 @@ export async function applyAccountState(
       try {
         const { pending } = await enableForwarding(cfg, input.googleEmail, input.forwardTo);
         if (pending) {
-          warnings.push(
-            `doorsturen wacht op de bevestigingsmail bij ${input.forwardTo}`,
-          );
+          warnings.push(`doorsturen wacht op de bevestigingsmail bij ${input.forwardTo}`);
         }
       } catch (err) {
         warnings.push(`doorsturen niet ingesteld: ${message(err)}`);
@@ -132,14 +180,18 @@ export async function applyAccountState(
     entity: "user",
     entityId: input.userId,
     target: input.name,
-    summary:
-      desired === "FULL"
-        ? `Google-account volwaardig gemaakt (${input.googleEmail})`
-        : `Google-account beperkt (${input.googleEmail})`,
+    summary: `${STATE_SUMMARY[desired]} (${input.googleEmail})`,
   });
 
   return { changed: true, warnings };
 }
+
+const STATE_SUMMARY: Record<AccountState, string> = {
+  FULL: "Google-account volwaardig gemaakt",
+  RESTRICTED: "Google-account beperkt: enkel ontvangen",
+  ALIAS_SENDER: "Google-account beperkt: mailen enkel vanaf het kiesploegadres",
+  SUSPENDED: "Google-account geschorst: geen post na de verkiezing",
+};
 
 function message(err: unknown): string {
   return err instanceof Error ? err.message : String(err);

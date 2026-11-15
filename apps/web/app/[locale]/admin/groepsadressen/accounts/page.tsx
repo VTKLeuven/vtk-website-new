@@ -79,6 +79,7 @@ export default async function AdminProvisionAccounts({
       name: row.name,
       email: row.email,
       alias: row.alias,
+      mode: row.mode,
       blocked: row.blocked,
     })) ?? [];
 

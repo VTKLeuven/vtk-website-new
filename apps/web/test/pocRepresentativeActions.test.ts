@@ -8,9 +8,13 @@ const mocks = vi.hoisted(() => ({
   userFindFirst: vi.fn(),
   pocRepresentativeUpsert: vi.fn(),
   pocRepresentativeDelete: vi.fn(),
+  after: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
+// De push naar Google loopt na de response; hier enkel nagaan dat ze gepland wordt.
+vi.mock("next/server", () => ({ after: mocks.after }));
+vi.mock("@/lib/google/sync", () => ({ pushMailGroupsForPoc: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: mocks.logAudit }));
 vi.mock("@/lib/session", () => ({
   requirePermission: mocks.requirePermission,

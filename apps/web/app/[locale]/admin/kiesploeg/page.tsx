@@ -40,6 +40,7 @@ export default async function AdminKiesploeg({
         accountTemplate: true,
         aliasTemplate: true,
         listTemplate: true,
+        transitionedAt: true,
         posts: {
           orderBy: { order: "asc" },
           select: { id: true, code: true, name: true, isG5: true },
@@ -50,8 +51,11 @@ export default async function AdminKiesploeg({
             id: true,
             postId: true,
             role: true,
-            mailboxActive: true,
+            sendFromAlias: true,
             forwardTo: true,
+            aliasEmail: true,
+            aliasRemovedAt: true,
+            keepAccount: true,
             user: {
               select: {
                 id: true,
@@ -70,6 +74,32 @@ export default async function AdminKiesploeg({
   ]);
 
   const domain = status.domain ?? "vtk.be";
+  const year = currentWorkingYear();
+
+  // Wie een post heeft in het werkingsjaar van elke ploeg: dat beslist op 15
+  // juli tussen volwaardig en geschorst.
+  const years = [...new Set(kiesploegen.map((k) => k.workingYear))];
+  const memberIds = [...new Set(kiesploegen.flatMap((k) => k.members.map((m) => m.user.id)))];
+  const [postRows, praesidiumYears] = await Promise.all([
+    memberIds.length
+      ? prisma.groupMembership.findMany({
+          where: { year: { in: years }, userId: { in: memberIds } },
+          select: { userId: true, year: true },
+        })
+      : [],
+    prisma.groupMembership.groupBy({
+      by: ["year"],
+      where: { year: { in: years }, group: { type: "PRAESIDIUM" } },
+      _count: { _all: true },
+    }),
+  ]);
+  const hasPost = new Set(postRows.map((r) => `${r.userId}:${r.year}`));
+  const postsEntered = new Set(praesidiumYears.map((r) => r.year));
+  const dateFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 
   const rows: KiesploegRow[] = kiesploegen.map((k) => ({
     id: k.id,
@@ -82,7 +112,10 @@ export default async function AdminKiesploeg({
     listTemplate: k.listTemplate,
     active: k.active,
     /** Nog niet aangetreden of net aangetreden: dan staat het blok open. */
-    current: k.workingYear >= currentWorkingYear(),
+    current: k.workingYear >= year,
+    tookOffice: k.workingYear <= year,
+    transitionedLabel: k.transitionedAt ? dateFmt.format(k.transitionedAt) : null,
+    postsEntered: postsEntered.has(k.workingYear),
     posts: k.posts.map((p) => ({
       id: p.id,
       code: p.code,
@@ -98,10 +131,14 @@ export default async function AdminKiesploeg({
       name: m.user.name,
       postId: m.postId,
       role: m.role,
-      mailboxActive: m.mailboxActive,
+      sendFromAlias: m.sendFromAlias,
       forwardTo: m.forwardTo,
       googleEmail: m.user.googleEmail,
       accountState: m.user.googleAccountState,
+      aliasEmail: m.aliasEmail,
+      aliasRemoved: Boolean(m.aliasRemovedAt),
+      hasPostInYear: hasPost.has(`${m.user.id}:${k.workingYear}`),
+      keepAccount: m.keepAccount,
       // Voorbeeld van de alias; het echte adres wordt pas bij het aanmaken
       // vastgelegd (en kan een cijfer krijgen bij naamgenoten).
       aliasPreview:

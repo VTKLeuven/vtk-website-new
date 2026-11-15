@@ -51,20 +51,24 @@ export async function createGoogleAccountsAction(
 
   const rows = plan.rows
     .filter((row) => row.blocked === null && selected.has(row.userId))
-    .map((row) => ({ userId: row.userId, email: row.email, alias: row.alias }));
+    .map((row) => ({ userId: row.userId, email: row.email, alias: row.alias, mode: row.mode }));
   if (rows.length === 0) return { status: "error", code: "NOTHING_SELECTED", nonce: Date.now() };
 
   const created = await createAccounts(cfg, rows, {
     // Een kiesploegaccount komt meteen in de beperkte OU terecht; daar hangt de
-    // routing-regel die het verzenden vanaf het primaire adres tegenhoudt.
+    // routing-regel die het verzenden vanaf het primaire adres tegenhoudt. Wie
+    // mag mailen vanaf zijn kiesploegadres, verhuist de staat hieronder meteen.
     orgUnitPath:
       plan.kiesploeg && cfg.restrictedOrgUnit ? cfg.restrictedOrgUnit : cfg.fullOrgUnit,
+    kiesploegId: plan.kiesploeg?.id,
+    aliasSenders: new Set(plan.rows.filter((row) => row.sendFromAlias).map((row) => row.userId)),
   });
 
   // De staat meteen zetten in plaats van op de reconcile te wachten: wie net
   // een account kreeg, hoort niet vijf minuten lang te kunnen mailen.
   const year = currentWorkingYear();
   for (const account of created) {
+    // Enkel een nieuw account; een bestaand account houdt zijn staat.
     if (account.error || !account.password) continue;
     const member = plan.rows.find((row) => row.userId === account.userId);
     const hasPost =
@@ -77,7 +81,15 @@ export async function createGoogleAccountsAction(
     const desired =
       desiredAccountState({
         hasCurrentPost: hasPost,
-        kiesploeg: plan.kiesploeg ? { mailboxActive: member?.mailboxActive ?? false } : null,
+        kiesploeg: plan.kiesploeg
+          ? {
+              sendFromAlias: member?.sendFromAlias ?? false,
+              tookOffice: plan.kiesploeg.workingYear <= year,
+              keepAccount: false,
+            }
+          : null,
+        // Een account dat we net aanmaken, schorsen we niet meteen.
+        suspensionAllowed: false,
       }) ?? "FULL";
     try {
       await applyAccountState(
@@ -86,7 +98,7 @@ export async function createGoogleAccountsAction(
           userId: account.userId,
           name: account.name,
           googleEmail: account.email,
-          current: null,
+          current: plan.kiesploeg && cfg.restrictedOrgUnit ? "RESTRICTED" : null,
           alias: member?.alias ?? null,
           forwardTo: member?.forwardTo ?? null,
         },
@@ -101,7 +113,7 @@ export async function createGoogleAccountsAction(
     action: "create",
     entity: "user",
     target: "Google-accounts",
-    summary: `${created.filter((c) => !c.error).length} accounts aangemaakt`,
+    summary: `${created.filter((c) => !c.error && c.password).length} accounts aangemaakt, ${created.filter((c) => !c.error && !c.password).length} kiesploegadressen toegevoegd`,
   });
 
   revalidatePath("/admin/groepsadressen/accounts");

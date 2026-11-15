@@ -11,6 +11,7 @@ import { getGoogleConfig } from "@/lib/google/config";
 import { renderAddress } from "@/lib/google/addresses";
 import { normaliseEmail } from "@/lib/google/members";
 import { pushMailGroupsForKiesploeg } from "@/lib/google/sync";
+import { applyAccountState } from "@/lib/google/accountState";
 
 /**
  * Server actions van de kiesploeg.
@@ -225,7 +226,7 @@ const updateMemberSchema = z.object({
   id: z.string().min(1),
   postId: z.string().optional(),
   role: z.enum(["MEMBER", "LEAD"]).optional(),
-  mailboxActive: z.string().optional(),
+  sendFromAlias: z.string().optional(),
   forwardTo: z.string().trim().max(200).optional(),
 });
 
@@ -260,7 +261,7 @@ export async function saveKiesploegMemberAction(
     data: {
       postId: parsed.data.postId || null,
       role: parsed.data.role ?? "MEMBER",
-      mailboxActive: parsed.data.mailboxActive === "on",
+      sendFromAlias: parsed.data.sendFromAlias === "on",
       forwardTo,
     },
   });
@@ -275,6 +276,55 @@ export async function saveKiesploegMemberAction(
   revalidatePath(ADMIN);
   revalidatePath(ADDRESSES);
   after(() => pushMailGroupsForKiesploeg(row.kiesploegId));
+  return saveOk();
+}
+
+/**
+ * Heft de schorsing op van een kiesploeglid dat geen post kreeg.
+ *
+ * Een bewuste handeling, dus met `force`: de sync zou dit nooit vanzelf doen.
+ * `keepAccount` zorgt dat de volgende ronde het niet opnieuw schorst. Vraagt
+ * ook `googleAccounts.manage`: een account openzetten is accountbeheer, niet
+ * enkel de ploeg opvolgen.
+ */
+export async function restoreKiesploegAccountAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requirePermission("kiesploeg.manage");
+  await requirePermission("googleAccounts.manage");
+  const id = (formData.get("id") as string) ?? "";
+  const member = await prisma.kiesploegMember.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      user: { select: { id: true, name: true, googleEmail: true, googleAccountState: true } },
+    },
+  });
+  if (!member) return saveError("INVALID_INPUT");
+  if (!member.user.googleEmail) return saveError("NO_ACCOUNT");
+
+  const cfg = await getGoogleConfig();
+  if (!cfg) return saveError("NOT_CONFIGURED");
+
+  await prisma.kiesploegMember.update({ where: { id }, data: { keepAccount: true } });
+  try {
+    await applyAccountState(
+      cfg,
+      {
+        userId: member.user.id,
+        name: member.user.name,
+        googleEmail: member.user.googleEmail,
+        current: member.user.googleAccountState,
+      },
+      "FULL",
+      { force: true },
+    );
+  } catch {
+    return saveError("GOOGLE_UNREACHABLE");
+  }
+
+  revalidatePath(ADMIN);
   return saveOk();
 }
 
