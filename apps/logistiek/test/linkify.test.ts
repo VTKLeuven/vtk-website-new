@@ -68,6 +68,30 @@ describe('describeLink', () => {
     expect(describeLink('/beheer/aanvragen/abc', 'en').label).toBe('Request');
   });
 
+  it('noemt een bestand bij zijn naam als die kort is, anders bij zijn soort', () => {
+    expect(describeLink('https://vtk.be/files/materiaallijst.pdf')).toEqual({ kind: 'file', label: 'materiaallijst.pdf' });
+    expect(describeLink('https://vtk.be/files/Materiaallijst%20Winterbar.pdf').label).toBe('Materiaallijst Winterbar.pdf');
+    expect(
+      describeLink('https://cdn.example.com/u/2026/11/materiaallijst-winterbar-ladeuzeplein-definitief.pdf?dl=1').label
+    ).toBe('PDF');
+    expect(describeLink('https://example.com/lijst.xlsx').kind).toBe('file');
+  });
+
+  it('noemt OneDrive en Dropbox bij hun naam', () => {
+    expect(describeLink('https://kuleuven-my.sharepoint.com/:x:/g/personal/abc/EaBcD?e=xyz').label).toBe('OneDrive');
+    expect(describeLink('https://1drv.ms/x/s!AbCdEf').label).toBe('OneDrive');
+    expect(describeLink('https://www.dropbox.com/scl/fi/abc/lijst?rlkey=x').label).toBe('Dropbox');
+  });
+
+  it('houdt een lang domein kort', () => {
+    expect(describeLink('https://heel-lang-subdomein-van-iets.voorbeeld.be/a/b/c').label).toBe('voorbeeld.be');
+  });
+
+  it('toont nooit een lang adres, ook geen lang pad op deze site', () => {
+    const long = describeLink('/beheer/vervoer/week?vanaf=2026-11-16&voertuig=kar&chauffeur=abc');
+    expect(long.label.length).toBeLessThanOrEqual(28);
+  });
+
   it('toont van een ander adres enkel de site', () => {
     expect(describeLink('https://www.colruyt.be/nl/producten/123')).toEqual({ kind: 'web', label: 'colruyt.be' });
   });

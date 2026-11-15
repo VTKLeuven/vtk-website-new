@@ -10,11 +10,12 @@ import { describeLink, linkify, type LinkKind } from '@/lib/linkify';
  * Een extern adres opent in een nieuw tabblad; een pad op deze site blijft in
  * hetzelfde venster, want dat is gewoon navigeren binnen Logistiek.
  *
- * **Een link staat er als knopje met wat het is, niet als adres.** In de lading
- * staat zo goed als altijd een Google Sheet, en dat adres voluit vulde op een
- * telefoon drie regels met `docs.google.com/spreadsheets/d/…`. Nu staat er
- * "Google Sheet", met het groene raster van Sheets ervoor zodat je het
- * herkent. Het volledige adres staat in de tooltip (`describeLink`).
+ * **Een link staat er als knopje met wat het is, nooit als lang adres.** In de
+ * lading staat bijna altijd een materiaallijst (een Google Sheet, een Doc, een
+ * pdf), en dat adres voluit vulde op een telefoon drie regels. Nu staat er
+ * "Google Sheet", "materiaallijst.pdf" of "OneDrive"; een Google Sheet krijgt
+ * het groene raster van Sheets zodat je hem herkent. Het volledige adres staat
+ * in de tooltip. Welk label bij welk adres hoort: `describeLink`.
  */
 export function LinkedText({ text, locale = 'nl' }: { text: string; locale?: 'nl' | 'en' }) {
   return (
@@ -59,7 +60,7 @@ function KindIcon({ kind }: { kind: LinkKind }) {
     );
   }
   if (kind === 'request') return <LogisticsIcon name="request" className="h-4 w-4 shrink-0" strokeWidth={2} />;
-  if (kind === 'doc' || kind === 'slides' || kind === 'form' || kind === 'drive') {
+  if (kind === 'doc' || kind === 'slides' || kind === 'form' || kind === 'drive' || kind === 'file') {
     return <LogisticsIcon name="text" className="h-4 w-4 shrink-0" strokeWidth={2} />;
   }
   return null;

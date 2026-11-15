@@ -350,15 +350,24 @@ function aliceTrips(): DemoTrip[] {
 }
 
 /**
- * In het echt plakt Logistiek bijna altijd de link naar een Google Sheet met de
- * materiaallijst in de lading. Hier ook, met een verzonnen sheet: de link opent
- * niets, maar zo zie je hoe hij op het scherm staat.
+ * In het echt plakt Logistiek bijna altijd een link naar de materiaallijst in
+ * de lading: meestal een Google Sheet, soms een Doc, een pdf of een OneDrive.
+ * Hier ook, met verzonnen adressen: de links openen niets, maar zo zie je hoe
+ * elke soort op het scherm staat.
  */
 function cargoWithSheet(trip: DemoTrip): string | null {
   if (!trip.cargo) return null;
   if (trip.n % 5 === 0) return trip.cargo;
-  const sheet = `https://docs.google.com/spreadsheets/d/1Demo${trip.n}RittenMateriaallijstVtkLogistiek2026/edit#gid=${trip.n * 1000}`;
-  return `${trip.cargo}. Materiaallijst: ${sheet}`;
+  const id = `1Demo${trip.n}RittenMateriaallijstVtkLogistiek2026`;
+  const links = [
+    `https://docs.google.com/spreadsheets/d/${id}/edit#gid=${trip.n * 1000}`,
+    `https://docs.google.com/document/d/${id}/edit?usp=sharing`,
+    `https://www.vtk.be/files/uploads/2026/11/materiaallijst-${trip.n}-logistiek-vtk-definitieve-versie.pdf`,
+    `https://docs.google.com/spreadsheets/d/${id}/edit#gid=0`,
+    `https://kuleuven-my.sharepoint.com/:x:/g/personal/logistiek_vtk_be/E${id}?e=AbC123`,
+    `https://www.vtk.be/files/materiaallijst.pdf`,
+  ];
+  return `${trip.cargo}. Materiaallijst: ${links[trip.n % links.length]}`;
 }
 
 async function clear(prisma: PrismaClient): Promise<void> {
