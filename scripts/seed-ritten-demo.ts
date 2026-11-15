@@ -9,13 +9,18 @@
  *   npm run db:demo:ritten -- --reset   # enkel opruimen
  *
  * Bekijken: start logistiek (`npm run dev -w @vtk/logistiek`, poort 3100) met
- * `LOGISTIEK_TEST_LOGIN=open` in de `.env`, ga naar /test-login en kies
- * "Carol (test post)". Zij zit in Sport en staat in de chauffeurslijst. De
- * datums hangen aan vandaag: draai het script opnieuw om ze te verversen.
+ * `LOGISTIEK_TEST_LOGIN=open` in de `.env`, ga naar /test-login en kies:
+ *
+ * - "Carol (test post)": zit in Sport en rijdt af en toe. Ze ziet haar eigen
+ *   ritten, die van Sport, en een rit die Sport nog zelf moet invullen.
+ * - "Alice (test logistiek)": zit in Logistiek en rijdt elke week meerdere
+ *   ritten met de kar voor andere posten. Zo ziet een drukke chauffeur het.
+ *
+ * De datums hangen aan vandaag: draai het script opnieuw om ze te verversen.
  *
  * Wat dit script aanmaakt, herkent het aan het id (`demo-ritten-...`) en aan het
- * domein `@ritten.demo`. Carol zelf (`test-user-post`) blijft staan; enkel haar
- * plaats in de chauffeurslijst komt van hier en gaat mee weg bij `--reset`.
+ * domein `@ritten.demo`. Carol en Alice zelf (`test-user-*`) blijven staan; enkel
+ * een plaats in de chauffeurslijst die van hier komt, gaat mee weg bij `--reset`.
  *
  * Weigert te draaien tegen iets anders dan een lokale database.
  */
@@ -28,6 +33,7 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 const PREFIX = "demo-ritten";
 const DOMAIN = "@ritten.demo";
 const CAROL = "test-user-post";
+const ALICE = "test-user-logistiek";
 
 function assertLocalDatabase(): void {
   const raw = process.env.DATABASE_URL;
@@ -60,7 +66,30 @@ const PEOPLE = [
   { slug: "elias", name: "Elias Maes", group: "CULTUUR", driver: false },
   { slug: "hanne", name: "Hanne Wouters", group: "IT", driver: false },
   { slug: "noor", name: "Noor Vandamme", group: "CULTUUR", driver: false },
+  { slug: "ruben", name: "Ruben Claes", group: "FAKBAR", driver: false },
+  { slug: "sara", name: "Sara De Smet", group: "ACTIVITEITEN", driver: false },
+  { slug: "tom", name: "Tom Wuyts", group: "INTERNATIONAAL", driver: false },
+  { slug: "ines", name: "Ines Mertens", group: "CURSUSDIENST", driver: false },
+  { slug: "emma", name: "Emma Jacobs", group: "BEDRIJVENRELATIES", driver: false },
+  { slug: "lars", name: "Lars Goossens", group: "ONTHAAL", driver: false },
 ] as const;
+
+/** Het nummer van elke contactpersoon, zodat de belknop iets doet. */
+const PHONES: Record<Person, string> = {
+  lotte: "+32 470 12 34 56",
+  arne: "+32 478 90 12 34",
+  elias: "+32 485 21 09 77",
+  hanne: "+32 476 30 44 12",
+  noor: "+32 494 18 72 30",
+  ruben: "+32 471 82 40 19",
+  sara: "+32 486 55 07 31",
+  tom: "+32 475 14 63 88",
+  ines: "+32 492 70 21 45",
+  emma: "+32 477 39 52 06",
+  lars: "+32 483 61 17 92",
+};
+
+type Driver = "carol" | "alice" | Person;
 
 type Person = (typeof PEOPLE)[number]["slug"];
 
@@ -75,8 +104,8 @@ type DemoTrip = {
   group: string;
   requester: Person;
   contactPhone?: string;
-  /** `carol`, iemand van hierboven, of niemand. */
-  driver: "carol" | Person | null;
+  /** `carol`, `alice`, iemand van hierboven, of niemand. */
+  driver: Driver | null;
   /** Doorgegeven aan deze post om zelf een chauffeur te kiezen. */
   assignedGroup?: string;
   eventName?: string;
@@ -86,7 +115,7 @@ type DemoTrip = {
   adminNote?: string;
   memberNote?: string;
   helpers?: Array<{ name: string; phone?: string }>;
-  notes?: Array<{ author: "carol" | Person; text: string; visibility: UitleenTransportNoteVisibility }>;
+  notes?: Array<{ author: Driver; text: string; visibility: UitleenTransportNoteVisibility }>;
   completed?: boolean;
 };
 
@@ -186,6 +215,137 @@ function trips(): DemoTrip[] {
       purpose: "Verhuis van het praesidiumlokaal", group: "CULTUUR", requester: "noor",
       driver: "carol", pickup: KELDER, destination: MAGAZIJN,
     },
+    ...aliceTrips(),
+  ];
+}
+
+const FAKBAR = "Fakbar 't Elixir, Tiensestraat 1, 3000 Leuven";
+const ACCO = "Drukkerij Acco, Tiensestraat 134, 3000 Leuven";
+const CURSUSDIENST = "Cursusdienst VTK, Kasteelpark Arenberg 1, 3001 Heverlee";
+const LADEUZE = "Ladeuzeplein, 3000 Leuven";
+const BRABANTHAL = "Brabanthal, Brabantlaan 1, 3010 Kessel-Lo";
+const PDS = "Aula Pieter De Somer, Deberiotstraat 24, 3000 Leuven";
+
+/**
+ * Alice rijdt voor iedereen: elke week drie tot vijf ritten met de kar, voor
+ * andere posten, met af en toe twee op één dag (heen en terug rond een
+ * activiteit) en een rit tot na middernacht.
+ */
+function aliceTrips(): DemoTrip[] {
+  const kar = { vehicle: "kar" as const, driver: "alice" as const };
+  const fakbar = (n: number, day: number, completed = false): DemoTrip => ({
+    ...kar, n, start: at(day, 9), end: at(day, 11), completed,
+    purpose: "Vaten ophalen voor de Fakbar", group: "FAKBAR", requester: "ruben",
+    pickup: HAACHT, destination: FAKBAR, cargo: "20 vaten pils en 4 bakken frisdrank",
+    adminNote: "Neem het leeggoed van vorige week mee naar Haacht; het staat naast de koelcel.",
+  });
+  return [
+    // Deze week en volgende week.
+    fakbar(101, 1),
+    {
+      ...kar, n: 102, start: at(2, 13), end: at(2, 15),
+      purpose: "Cursussen van de drukkerij naar de cursusdienst", group: "CURSUSDIENST", requester: "ines",
+      pickup: ACCO, destination: CURSUSDIENST, cargo: "40 dozen cursussen",
+      memberNote: "Aan de achterkant van de drukkerij laden, de voordeur is te smal voor de dozen.",
+    },
+    {
+      ...kar, n: 103, start: at(3, 16, 30), end: at(3, 18, 30), eventName: "Winterbar",
+      purpose: "Podium en tap naar het Ladeuzeplein", group: "ACTIVITEITEN", requester: "sara",
+      pickup: MAGAZIJN, destination: LADEUZE, cargo: "6 podiumelementen, 1 tapinstallatie en 2 partytenten",
+      helpers: [{ name: "Wout Peeters", phone: "+32 479 22 81 03" }, { name: "Julie Maes", phone: "+32 470 66 14 29" }],
+      notes: [{ author: "sara", text: "We staan klaar vanaf 16:15 aan de loods.", visibility: "POST_EN_LOGISTIEK" }],
+    },
+    {
+      ...kar, n: 104, start: at(3, 23, 30), end: at(4, 1), eventName: "Winterbar",
+      purpose: "Podium en tap terug naar de loods", group: "ACTIVITEITEN", requester: "sara",
+      pickup: LADEUZE, destination: MAGAZIJN, cargo: "6 podiumelementen, 1 tapinstallatie en 2 partytenten",
+      helpers: [{ name: "Wout Peeters", phone: "+32 479 22 81 03" }],
+      adminNote: "De loods sluit om 01:30. Sleutel terug in de sleutelkluis, code 2580.",
+    },
+    {
+      ...kar, n: 105, start: at(5, 8, 30), end: at(5, 10), eventName: "Welkomstweekend",
+      purpose: "Bagage naar het welkomstweekend", group: "INTERNATIONAAL", requester: "tom",
+      pickup: "Studentenhuis Groot Begijnhof, Schapenstraat 34, 3000 Leuven",
+      destination: "Jeugdherberg De Blauwput, Martelarenlaan 11A, 3010 Kessel-Lo",
+      cargo: "Bagage van 30 uitwisselingsstudenten",
+    },
+    {
+      ...kar, n: 106, start: at(6, 14), end: at(6, 16),
+      purpose: "Kraampje naar de Sintactie", group: "ONTHAAL", requester: "lars",
+      pickup: MAGAZIJN, destination: LADEUZE, cargo: "1 kraam, 2 tafels en een doos snoep",
+    },
+    // Week daarna.
+    {
+      ...kar, n: 107, start: at(8, 10), end: at(8, 12), eventName: "Jobbeurs",
+      purpose: "Standen naar de jobbeurs", group: "BEDRIJVENRELATIES", requester: "emma",
+      pickup: MAGAZIJN, destination: BRABANTHAL, cargo: "12 standwanden, 20 statafels en kabelhaspels",
+      adminNote: "Laden aan poort C. Meld je bij de stand van VTK, daar ligt je parkeerkaart.",
+      helpers: [{ name: "Kobe Hermans", phone: "+32 474 08 31 66" }, { name: "Lina Aerts" }],
+    },
+    fakbar(108, 9),
+    {
+      ...kar, n: 109, start: at(11, 19), end: at(11, 21), eventName: "Sportgala",
+      purpose: "Geluid en licht naar het sportgala", group: "SPORT", requester: "lotte",
+      pickup: MAGAZIJN, destination: SALONS, cargo: "Geluidsinstallatie, 2 lichtbruggen en 8 kabelkisten",
+    },
+    {
+      ...kar, n: 110, start: at(12, 22, 30), end: at(13, 1), eventName: "Jobbeurs",
+      purpose: "Standen terug van de jobbeurs", group: "BEDRIJVENRELATIES", requester: "emma",
+      pickup: BRABANTHAL, destination: MAGAZIJN, cargo: "12 standwanden, 20 statafels en kabelhaspels",
+    },
+    // Twee en drie weken verder.
+    {
+      ...kar, n: 111, start: at(15, 9), end: at(15, 10, 30),
+      purpose: "Cursussen tweede semester", group: "CURSUSDIENST", requester: "ines",
+      pickup: ACCO, destination: CURSUSDIENST, cargo: "65 dozen cursussen",
+    },
+    {
+      ...kar, n: 112, start: at(16, 18), end: at(16, 20), eventName: "Revue",
+      purpose: "Decor naar de revue", group: "CULTUUR", requester: "noor",
+      pickup: MAGAZIJN, destination: PDS, cargo: "Decorstukken en 4 kostuumrekken",
+      memberNote: "De decorstukken zijn breed; de kar moet tot aan de zij-ingang.",
+    },
+    {
+      ...kar, n: 113, start: at(18, 14), end: at(18, 17), eventName: "Kerstmarkt",
+      purpose: "Kerstmarktkramen opbouwen", group: "ONTHAAL", requester: "lars",
+      pickup: MAGAZIJN, destination: LADEUZE, cargo: "4 kramen en verlichting",
+    },
+    fakbar(114, 22),
+    {
+      ...kar, n: 115, start: at(24, 13), end: at(24, 15), eventName: "Kerstmarkt",
+      purpose: "Kerstmarktkramen terug naar de loods", group: "ONTHAAL", requester: "lars",
+      pickup: LADEUZE, destination: MAGAZIJN, cargo: "4 kramen en verlichting",
+    },
+    // Gereden.
+    {
+      ...kar, n: 130, start: at(-1, 20), end: at(-1, 23, 30), completed: true, eventName: "Sportcantus",
+      purpose: "Vaten naar de sportcantus", group: "SPORT", requester: "lotte",
+      pickup: HAACHT, destination: KELDER,
+    },
+    fakbar(131, -3, true),
+    {
+      ...kar, n: 132, start: at(-5, 14), end: at(-5, 16), completed: true,
+      purpose: "Cursussen van de drukkerij naar de cursusdienst", group: "CURSUSDIENST", requester: "ines",
+      pickup: ACCO, destination: CURSUSDIENST,
+      notes: [{ author: "alice", text: "Twee dozen beschadigd bij het laden; gemeld aan Ines.", visibility: "POST_EN_LOGISTIEK" }],
+    },
+    fakbar(133, -6, true),
+    {
+      ...kar, n: 134, start: at(-9, 17), end: at(-9, 19), completed: true, eventName: "Filmavond",
+      purpose: "Scherm en projector naar de filmavond", group: "CULTUUR", requester: "elias",
+      pickup: MAGAZIJN, destination: PDS,
+    },
+    {
+      ...kar, n: 135, start: at(-12, 8), end: at(-12, 10), completed: true,
+      purpose: "Matrassen naar het onthaalkamp", group: "ONTHAAL", requester: "lars",
+      pickup: MAGAZIJN, destination: "Jeugdherberg De Blauwput, Martelarenlaan 11A, 3010 Kessel-Lo",
+    },
+    fakbar(136, -13, true),
+    {
+      ...kar, n: 137, start: at(-19, 21), end: at(-18, 0, 30), completed: true, eventName: "Halloween-TD",
+      purpose: "Leeggoed terug na de Halloween-TD", group: "ACTIVITEITEN", requester: "sara",
+      pickup: ALMA, destination: HAACHT,
+    },
   ];
 }
 
@@ -208,11 +368,12 @@ async function main(): Promise<void> {
     }
 
     const year = currentWorkingYear();
+    const codes = [...new Set([...PEOPLE.map((person) => person.group), "LOGISTIEK"])];
     const groups = new Map(
-      (await prisma.group.findMany({ where: { code: { in: ["SPORT", "CULTUUR", "IT"] } }, select: { id: true, code: true } }))
+      (await prisma.group.findMany({ where: { code: { in: codes } }, select: { id: true, code: true } }))
         .map((group) => [group.code, group.id])
     );
-    for (const code of ["SPORT", "CULTUUR", "IT"]) {
+    for (const code of codes) {
       if (!groups.has(code)) throw new Error(`Post ${code} bestaat niet. Draai eerst de seed (make db).`);
     }
     const vehicles = new Map(
@@ -239,6 +400,23 @@ async function main(): Promise<void> {
       create: { id: `${PREFIX}-driver-carol`, userId: CAROL, canDriveVan: true },
     });
 
+    // Alice net zo: Logistiek, en karchauffeur.
+    await prisma.user.upsert({
+      where: { id: ALICE },
+      update: {},
+      create: { id: ALICE, email: "logistiek@test.vtk.be", name: "Alice (test logistiek)", active: true },
+    });
+    await prisma.groupMembership.upsert({
+      where: { userId_groupId_year: { userId: ALICE, groupId: groups.get("LOGISTIEK")!, year } },
+      update: {},
+      create: { userId: ALICE, groupId: groups.get("LOGISTIEK")!, year, role: "LEAD" },
+    });
+    await prisma.uitleenDriver.upsert({
+      where: { userId: ALICE },
+      update: { canDriveVan: true },
+      create: { id: `${PREFIX}-driver-alice`, userId: ALICE, canDriveVan: true },
+    });
+
     for (const person of PEOPLE) {
       await prisma.user.create({
         data: { id: userId(person.slug), email: `${person.slug}${DOMAIN}`, name: person.name, active: true },
@@ -253,7 +431,7 @@ async function main(): Promise<void> {
       }
     }
 
-    const who = (person: "carol" | Person) => (person === "carol" ? CAROL : userId(person));
+    const who = (person: Driver) => (person === "carol" ? CAROL : person === "alice" ? ALICE : userId(person));
     for (const trip of trips()) {
       const vehicle = vehicles.get(trip.vehicle);
       if (!vehicle) throw new Error(`Voertuig ${trip.vehicle} bestaat niet. Draai eerst de seed (make db).`);
@@ -272,7 +450,7 @@ async function main(): Promise<void> {
           cargoNote: trip.cargo ?? null,
           pickupAddress: trip.pickup ?? null,
           destination: trip.destination ?? null,
-          contactPhone: trip.contactPhone ?? null,
+          contactPhone: trip.contactPhone ?? (trip.completed ? null : PHONES[trip.requester]),
           driverId: trip.driver ? who(trip.driver) : null,
           assignedGroupId: trip.assignedGroup ? groups.get(trip.assignedGroup)! : null,
           pricingMode: vehicle.pricingMode,
@@ -293,7 +471,9 @@ async function main(): Promise<void> {
       });
     }
 
-    console.log(`Klaar: ${trips().length} ritten. Log in op /test-login als "Carol (test post)" en open /ritten.`);
+    console.log(
+      `Klaar: ${trips().length} ritten. Log in op /test-login als "Carol (test post)" of "Alice (test logistiek)" en open /ritten.`
+    );
   } finally {
     await prisma.$disconnect();
   }
