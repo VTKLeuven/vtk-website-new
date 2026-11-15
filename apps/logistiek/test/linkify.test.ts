@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasLink, linkify } from '@/lib/linkify';
+import { describeLink, hasLink, linkify } from '@/lib/linkify';
 
 describe('linkify', () => {
   it('laat tekst zonder adres met rust', () => {
@@ -45,5 +45,34 @@ describe('linkify', () => {
   it('herkent meerdere adressen na elkaar', () => {
     const chunks = linkify('https://a.be/1 en https://b.be/2');
     expect(chunks.filter((chunk) => chunk.kind === 'link')).toHaveLength(2);
+  });
+});
+
+describe('describeLink', () => {
+  it('noemt een Google Sheet gewoon een Google Sheet', () => {
+    expect(describeLink('https://docs.google.com/spreadsheets/d/1AbCdEf/edit#gid=0')).toEqual({
+      kind: 'sheet',
+      label: 'Google Sheet',
+    });
+  });
+
+  it('herkent de andere bestanden van Google', () => {
+    expect(describeLink('https://docs.google.com/document/d/1x/edit').kind).toBe('doc');
+    expect(describeLink('https://docs.google.com/presentation/d/1x/edit').kind).toBe('slides');
+    expect(describeLink('https://forms.gle/abc').kind).toBe('form');
+    expect(describeLink('https://drive.google.com/file/d/1x/view').kind).toBe('drive');
+  });
+
+  it('noemt de materiaallijst van een aanvraag een aanvraag', () => {
+    expect(describeLink('/beheer/aanvragen/abc')).toEqual({ kind: 'request', label: 'Aanvraag' });
+    expect(describeLink('/beheer/aanvragen/abc', 'en').label).toBe('Request');
+  });
+
+  it('toont van een ander adres enkel de site', () => {
+    expect(describeLink('https://www.colruyt.be/nl/producten/123')).toEqual({ kind: 'web', label: 'colruyt.be' });
+  });
+
+  it('laat een ander pad op deze site staan zoals het is', () => {
+    expect(describeLink('/beheer/vervoer')).toEqual({ kind: 'page', label: '/beheer/vervoer' });
   });
 });

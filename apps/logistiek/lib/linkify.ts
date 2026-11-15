@@ -48,3 +48,44 @@ export function linkify(text: string): TextChunk[] {
 export function hasLink(text: string): boolean {
   return linkify(text).some((chunk) => chunk.kind === 'link');
 }
+
+/**
+ * Wat een link is, in een paar woorden, voor het knopje dat `LinkedText` er
+ * van maakt.
+ *
+ * In de lading staat zo goed als altijd de link naar een Google Sheet met de
+ * materiaallijst. Voluit is dat honderd tekens `docs.google.com/spreadsheets/d/…`
+ * die op een telefoon drie regels vullen en niets zeggen: wat je wil weten, is
+ * dat het de sheet is, en dat je er met één tik in zit. Het adres zelf staat nog
+ * in de tooltip.
+ *
+ * Herkent enkel wat aan het adres te zien is. De titel van de sheet kennen we
+ * niet zonder hem op te halen, en dat doen we hier niet.
+ */
+export type LinkKind = 'sheet' | 'doc' | 'slides' | 'form' | 'drive' | 'request' | 'page' | 'web';
+
+export function describeLink(href: string, locale: 'nl' | 'en' = 'nl'): { kind: LinkKind; label: string } {
+  const en = locale === 'en';
+  if (href.startsWith('/')) {
+    // De materiaallijst van een aanvraag (`materialListNote`).
+    if (/^\/beheer\/aanvragen\/[^/?#]+/.test(href)) return { kind: 'request', label: en ? 'Request' : 'Aanvraag' };
+    return { kind: 'page', label: href };
+  }
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    return { kind: 'web', label: href };
+  }
+  const host = url.hostname.replace(/^www\./, '');
+  const path = url.pathname;
+  if (host === 'docs.google.com' || host === 'sheets.google.com') {
+    if (host === 'sheets.google.com' || path.startsWith('/spreadsheets')) return { kind: 'sheet', label: 'Google Sheet' };
+    if (path.startsWith('/document')) return { kind: 'doc', label: 'Google Doc' };
+    if (path.startsWith('/presentation')) return { kind: 'slides', label: 'Google Slides' };
+    if (path.startsWith('/forms')) return { kind: 'form', label: 'Google Form' };
+  }
+  if (host === 'forms.gle') return { kind: 'form', label: 'Google Form' };
+  if (host === 'drive.google.com') return { kind: 'drive', label: 'Google Drive' };
+  return { kind: 'web', label: host };
+}

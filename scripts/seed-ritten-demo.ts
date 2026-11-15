@@ -349,6 +349,18 @@ function aliceTrips(): DemoTrip[] {
   ];
 }
 
+/**
+ * In het echt plakt Logistiek bijna altijd de link naar een Google Sheet met de
+ * materiaallijst in de lading. Hier ook, met een verzonnen sheet: de link opent
+ * niets, maar zo zie je hoe hij op het scherm staat.
+ */
+function cargoWithSheet(trip: DemoTrip): string | null {
+  if (!trip.cargo) return null;
+  if (trip.n % 5 === 0) return trip.cargo;
+  const sheet = `https://docs.google.com/spreadsheets/d/1Demo${trip.n}RittenMateriaallijstVtkLogistiek2026/edit#gid=${trip.n * 1000}`;
+  return `${trip.cargo}. Materiaallijst: ${sheet}`;
+}
+
 async function clear(prisma: PrismaClient): Promise<void> {
   // Nota's en bijrijders gaan mee via onDelete: Cascade.
   await prisma.uitleenTransportBooking.deleteMany({ where: { id: { startsWith: `${PREFIX}-` } } });
@@ -447,7 +459,7 @@ async function main(): Promise<void> {
           endAt: trip.end,
           purpose: trip.purpose,
           eventName: trip.eventName ?? null,
-          cargoNote: trip.cargo ?? null,
+          cargoNote: cargoWithSheet(trip),
           pickupAddress: trip.pickup ?? null,
           destination: trip.destination ?? null,
           contactPhone: trip.contactPhone ?? (trip.completed ? null : PHONES[trip.requester]),

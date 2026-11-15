@@ -462,7 +462,7 @@ function TripItem({
                       </span>
                       <span>
                         <span className="sr-only">{en ? 'Cargo: ' : 'Lading: '}</span>
-                        <LinkedText text={trip.cargoNote} />
+                        <LinkedText text={trip.cargoNote} locale={locale} />
                       </span>
                     </p>
                   ) : null}
@@ -524,7 +524,7 @@ function TripItem({
                     {en ? 'Logistics' : 'Logistiek'}
                   </span>
                   <span>
-                    <LinkedText text={trip.adminNote} />
+                    <LinkedText text={trip.adminNote} locale={locale} />
                   </span>
                 </div>
               ) : null}
@@ -535,7 +535,7 @@ function TripItem({
                     <span className="trips-bubble-meta">
                       {trip.contact.name}, {en ? 'requester' : 'aanvrager'}
                     </span>
-                    <LinkedText text={trip.memberNote} />
+                    <LinkedText text={trip.memberNote} locale={locale} />
                   </div>
                 </div>
               ) : null}

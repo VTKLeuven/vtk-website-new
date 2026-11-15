@@ -222,7 +222,7 @@ export function TripNotes({
                       </span>
                       {note.mine ? noteActions(note, 'trips-text-button') : null}
                     </span>
-                    <LinkedText text={note.text} />
+                    <LinkedText text={note.text} locale={locale} />
                   </div>
                 </li>
               )
@@ -274,7 +274,7 @@ export function TripNotes({
                     : null}
                 </p>
                 <p className="mt-1 whitespace-pre-wrap">
-                  <LinkedText text={note.text} />
+                  <LinkedText text={note.text} locale={locale} />
                 </p>
               </li>
             )

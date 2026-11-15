@@ -73,6 +73,10 @@
   --maps: #1a73e8;
   --maps-hover: #1765cc;
   --on-maps: #ffffff;
+  /* Het groen van Google Sheets, op het icoon van een sheet-link in de lading
+     (`components/linked-text.tsx`). Enkel daar. */
+  --sheets: #188038;
+  --on-sheets: #ffffff;
 
   /* --- Statuskleuren ---------------------------------------------------- */
   /* Drie per status: de tekstkleur, het zachte vlak eronder en de rand. Eén hex
@@ -247,6 +251,8 @@
   --maps: #8ab4f8;
   --maps-hover: #aecbfa;
   --on-maps: #0a0f1f;
+  --sheets: #81c995;
+  --on-sheets: #0a0f1f;
 
   /* --- Statuskleuren ---------------------------------------------------- */
   --danger: #ff9d9d;

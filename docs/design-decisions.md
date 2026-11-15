@@ -6037,6 +6037,12 @@ website (`app/ritten/trips-agenda.tsx`).
   een zoekopdracht opent ze wel, want dan zoek je net dat.
 - **In de regel staat enkel de naam van een adres**, het stuk voor de eerste
   komma ("Brouwerij Haacht"). Het volledige adres staat in het opengeklapte deel.
+- **Een link in de lading of een nota is een knopje met wat het is**, niet het
+  adres. In de lading staat zo goed als altijd een Google Sheet met de
+  materiaallijst, en die url voluit vulde op een telefoon drie regels. Nu staat er
+  "Google Sheet" met het groene raster van Sheets (`--sheets`), het adres in de
+  tooltip (`describeLink` in `lib/linkify.ts`). Dat geldt overal waar
+  `LinkedText` staat, ook in het beheer.
 - **De mensen dragen de kleur uit het chauffeurspalet.** Een chauffeur heeft er
   dezelfde kleur als in de planning; wie geen chauffeur is, krijgt er een uit zijn
   naam. Jij bent altijd geel.
