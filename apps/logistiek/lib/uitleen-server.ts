@@ -2244,7 +2244,7 @@ export async function groupMemberOptions(groupId: string) {
 
 const driverTripInclude = {
   user: { select: { name: true, email: true } },
-  vehicle: { select: { nameNl: true, nameEn: true, needsVanDriver: true } },
+  vehicle: { select: { code: true, icon: true, nameNl: true, nameEn: true, needsVanDriver: true, needsDriver: true } },
   group: { select: { nameNl: true, nameEn: true } },
   assignedGroup: { select: { id: true, nameNl: true, nameEn: true } },
   driver: { select: { id: true, name: true } },

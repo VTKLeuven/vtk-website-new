@@ -5982,16 +5982,17 @@ de streep zijn de **staat**. Die drie assen mogen elkaars taal niet lenen.
 
 ### Een rit van je post staat op "Mijn ritten", ook als jij hem rijdt
 
-`/ritten` heeft twee lijsten, en die beantwoorden twee verschillende vragen:
-**"Komende ritten"** is *wat moet ik doen*, **"Ritten van mijn post"** is *wat
-staat er bij ons open*. Een rit kan in allebei thuishoren.
+`/ritten` beantwoordt twee vragen: *wat moet ik doen* en *wat staat er bij ons
+open*. Een rit kan op allebei het antwoord zijn. Dat waren eerst twee lijsten
+("Komende ritten" en "Ritten van mijn post"); sinds november 2026 is het één
+agenda met een filter, zie "Mijn ritten als agenda" hieronder.
 
-- **Kies je jezelf als chauffeur van een rit van je post, dan blijft hij ook in
-  de postlijst staan.** Hij verdween daar, omdat dezelfde rit twee keer op één
-  scherm als twee ritten leest. In de praktijk was het omgekeerde erger: de
-  andere postleden zagen de rit verdwijnen zodra er iemand op stond, en wisten
-  dus niet meer of er al iemand reed. De kaart draagt daarom het merkteken
-  **"Jij rijdt"**; dat is wat het verschil tussen de twee lijsten leesbaar houdt.
+- **Kies je jezelf als chauffeur van een rit van je post, dan blijft hij bij de
+  post staan.** Hij verdween eerst uit de postlijst, omdat dezelfde rit twee keer
+  op één scherm als twee ritten leest. In de praktijk was het omgekeerde erger:
+  de andere postleden zagen de rit verdwijnen zodra er iemand op stond, en
+  wisten dus niet meer of er al iemand reed. In de ene lijst staat zo'n rit nu
+  één keer, met "Jij rijdt" bij de chauffeur, en hij valt onder beide filters.
 - **Een goedgekeurde rit die je post zelf aanvroeg, staat er ook zonder
   chauffeur.** Dat is net de rit waar een post iets mee moet. Hij verscheen pas
   zodra Logistiek er iemand op zette of hem uitdrukkelijk doorgaf, en dat is de
@@ -6005,6 +6006,40 @@ staat er bij ons open*. Een rit kan in allebei thuishoren.
   collega van dezelfde post dat al toe; ze stonden er enkel te lezen, dus moest
   een post naar het bezettingsoverzicht voor iets wat op haar eigen ritlijst
   hoort.
+
+### "Mijn ritten" als agenda
+
+`/ritten` was een kaart per rit, met alles open: adressen met een kaartlink,
+contactpersoon met mail en nummer, bijrijders, nota's. Op een telefoon was dat
+een halve meter per rit, en met een drukke week vond een chauffeur de rit van
+morgen niet meer terug. Het is nu een agenda per week, zoals `/shift` op de
+website (`app/ritten/trips-agenda.tsx`).
+
+- **Elke rit is één regel die openklapt.** De regel zegt wanneer, wat, voor wie,
+  van waar naar waar en wie rijdt; adressen voluit, nummers en nota's staan één
+  tik verder. Alles staat dicht bij het laden, ook op een groot scherm: een eerste
+  rit die pas in de browser openspringt, doet de pagina verspringen. Een link met
+  `?rit=<id>` opent die ene rit.
+- **Minder woorden, niet minder informatie.** Het uur, het voertuig, de route en
+  de chauffeur dragen een icoon, een bolletje of een kleur in plaats van een
+  label ervoor (open bolletje is vertrek, geel is bestemming). Een nummer staat
+  achter een belknop en een e-mailadres achter een mailknop, met het nummer in de
+  tooltip: wie het nodig heeft, wil bellen en niet overtypen.
+- **Eén knop naar de kaart.** "Route in Google Maps", in de kleur van Google Maps
+  (`--maps` in `theme.css`), opent de route van laadadres naar bestemming. De
+  "kaart"-link achter elk adres is weg: naast de route zei die niets meer.
+- **Eigen ritten en die van je post in één lijst, met een filter** (Alles, Ik rij,
+  de naam van je post). Twee lijsten zetten de rit die je zelf voor je post rijdt
+  twee keer op het scherm. De rit die aan je post doorgegeven is en nog niemand
+  heeft, is de enige taak hier; die staat daarom als gele melding bovenaan, met
+  een knop die de rit opent, en kan dus niet achter een filter verdwijnen.
+- **Gereden ritten staan dicht, per maand.** Ze zijn er om iets terug te vinden;
+  een zoekopdracht opent ze wel, want dan zoek je net dat.
+- **In de regel staat enkel de naam van een adres**, het stuk voor de eerste
+  komma ("Brouwerij Haacht"). Het volledige adres staat in het opengeklapte deel.
+- **De mensen dragen de kleur uit het chauffeurspalet.** Een chauffeur heeft er
+  dezelfde kleur als in de planning; wie geen chauffeur is, krijgt er een uit zijn
+  naam. Jij bent altijd geel.
 
 ### Een rit doorgeven aan een post mailt standaard niemand
 

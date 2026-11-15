@@ -68,6 +68,12 @@
   --yellow-dark: #edbd22;
   --on-yellow: #0a0f1f; /* tekst op geel, in beide modi donker */
 
+  /* De knop "Route in Google Maps" op /ritten draagt de kleur van Google Maps,
+     zodat je ze herkent als de knop die de kaart-app opent. Enkel daar. */
+  --maps: #1a73e8;
+  --maps-hover: #1765cc;
+  --on-maps: #ffffff;
+
   /* --- Statuskleuren ---------------------------------------------------- */
   /* Drie per status: de tekstkleur, het zachte vlak eronder en de rand. Eén hex
      met een alfa volstaat niet: rood op 10% over wit is roze, over bijna zwart
@@ -236,6 +242,11 @@
   --yellow: #ffd23f;
   --yellow-dark: #edbd22;
   --on-yellow: #0a0f1f;
+
+  /* Het lichtere blauw dat Google Maps zelf in het donker gebruikt. */
+  --maps: #8ab4f8;
+  --maps-hover: #aecbfa;
+  --on-maps: #0a0f1f;
 
   /* --- Statuskleuren ---------------------------------------------------- */
   --danger: #ff9d9d;

@@ -2,12 +2,21 @@ import Link from 'next/link';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
-import { LinkedText } from '@/components/linked-text';
-import { PhoneLink } from '@/components/phone-link';
+import { FeedTokens } from '@/components/feed-tokens';
+import { ToastProvider } from '@/components/ui/toast';
+import { driverColorVar } from '@/lib/driver-colors';
 import { copy, getLocale } from '@/lib/i18n';
+import type { LogistiekLocale } from '@/lib/i18n-shared';
 import { canManage, getSession } from '@/lib/session';
-import { formatTripWindow, onTripForNotes } from '@/lib/uitleen';
 import {
+  formatBrusselsTime,
+  isoWeekNumber,
+  onTripForNotes,
+  startOfWeek,
+  toBrusselsDateValue,
+} from '@/lib/uitleen';
+import {
+  driverColorOverrides,
   driverPhones,
   feedTokensForUser,
   groupMemberOptions,
@@ -18,364 +27,280 @@ import {
   tripsForGroups,
   type DriverTrip,
 } from '@/lib/uitleen-server';
-import { GroupDriverPicker } from './group-driver-picker';
-import { TripHelpers } from '@/components/trip-helpers';
-import { TripNotes, type TripNoteView } from '@/components/trip-notes';
-import { FeedTokens } from '@/components/feed-tokens';
-import { ToastProvider } from '@/components/ui/toast';
-import type { LogistiekLocale } from '@/lib/i18n-shared';
+import { vehicleIconName } from '@/lib/vehicle-icon';
+import type { TripMonth, TripView, TripWeek } from './trip-view';
+import { TripsAgenda } from './trips-agenda';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Zonder de punt die `nl-BE` achter een afgekorte dag of maand zet. */
+function short(text: string): string {
+  return text.replace(/\./g, '');
+}
+
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 /**
- * Een adres met een link naar de kaart erachter. Een chauffeur die vertrekt,
- * wil navigeren en niet overtypen; het adres zelf blijft staan zoals het
- * ingevuld is, want dat is wat je aan de telefoon voorleest.
+ * De woorden rond een datum, in Belgische tijd. Eén plek, zodat de tegel, de
+ * week en de maand dezelfde afkortingen gebruiken.
+ */
+function dateWords(locale: LogistiekLocale) {
+  const tag = locale === 'en' ? 'en-GB' : 'nl-BE';
+  const brussels = { timeZone: 'Europe/Brussels' } as const;
+  const weekday = new Intl.DateTimeFormat(tag, { ...brussels, weekday: 'short' });
+  const day = new Intl.DateTimeFormat(tag, { ...brussels, day: 'numeric' });
+  const long = new Intl.DateTimeFormat(tag, { ...brussels, weekday: 'long', day: 'numeric', month: 'long' });
+  const month = new Intl.DateTimeFormat(tag, { ...brussels, month: 'long', year: 'numeric' });
+  // Een week is een date-only op UTC-middernacht (`startOfWeek`): die lees je in UTC.
+  const rangeDay = new Intl.DateTimeFormat(tag, { timeZone: 'UTC', day: 'numeric' });
+  const rangeDayMonth = new Intl.DateTimeFormat(tag, { timeZone: 'UTC', day: 'numeric', month: 'short' });
+
+  return {
+    weekday: (date: Date) => short(weekday.format(date)),
+    day: (date: Date) => day.format(date),
+    long: (date: Date) => long.format(date),
+    month: (date: Date) => capitalize(month.format(date)),
+    /** "16–22 nov", of "30 nov – 6 dec" over een maandgrens. */
+    weekRange(monday: Date) {
+      const sunday = new Date(monday.getTime() + 6 * DAY_MS);
+      return monday.getUTCMonth() === sunday.getUTCMonth()
+        ? `${rangeDay.format(monday)}–${short(rangeDayMonth.format(sunday))}`
+        : `${short(rangeDayMonth.format(monday))} – ${short(rangeDayMonth.format(sunday))}`;
+    },
+  };
+}
+
+/** Het eerste stuk van een adres, voor in de rij: "Brouwerij Haacht". */
+function firstPart(address: string | null): string {
+  return address ? address.split(',')[0].trim() : '';
+}
+
+/**
+ * "Mijn ritten": de ritten die jij rijdt en die van je post, als één agenda per
+ * week. Bewust zonder prijzen of betaalstatus: dat is een zaak tussen de
+ * aanvrager en Logistiek. Wie geen chauffeur is en geen rit op zijn post heeft,
+ * komt hier op een lege pagina en niet op een foutmelding.
  *
- * `geo:`-achtige diepe links bestaan wel maar werken per toestel anders; een
- * gewone maps-zoekopdracht opent op elk toestel de kaart-app die daar de
- * standaard is.
+ * Elke rit is één regel die openklapt; zie `trips-agenda.tsx` en
+ * docs/design-decisions.md ("Mijn ritten als agenda").
  */
-function MapLink({ address, en }: { address: string; en: boolean }) {
-  return (
-    <>
-      {address}{' '}
-      <a
-        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}
-        target="_blank"
-        rel="noreferrer noopener"
-        className="whitespace-nowrap text-xs font-normal text-vtk-navy underline decoration-vtk-yellow underline-offset-2"
-      >
-        {en ? 'map' : 'kaart'}
-      </a>
-    </>
-  );
-}
-
-function TripCard({
-  trip,
-  locale,
-  past,
-  driverPhone,
-  groupMembers,
-  youDrive = false,
-  canEditHelpers = false,
-  notes = [],
-}: {
-  trip: DriverTrip;
-  locale: LogistiekLocale;
-  past: boolean;
-  /** Het nummer van wie rijdt; enkel op een rit van je post, niet op je eigen. */
-  driverPhone?: string | null;
-  /**
-   * De leden van de post waaraan deze rit doorgegeven is die ook chauffeur zijn.
-   * Aanwezig betekent: jij mag hier de chauffeur kiezen. Leeg is een echt
-   * antwoord en geen fout; zie `groupMemberOptions`.
-   */
-  groupMembers?: Array<{ id: string; name: string }>;
-  /**
-   * Jij rijdt deze rit zelf (F4.19). Dezelfde rit staat dan ook bovenaan onder
-   * "Komende ritten", en zonder dit merkteken leest dat als twee ritten.
-   */
-  youDrive?: boolean;
-  /** Bijrijders toevoegen en weghalen vanaf deze kaart (F4.8a). */
-  canEditHelpers?: boolean;
-  /** De eigen nota's bij deze rit, al gefilterd op wat je mag lezen (F4.20). */
-  notes?: TripNoteView[];
-}) {
-  const en = locale === 'en';
-  const vehicle = en ? trip.vehicle.nameEn : trip.vehicle.nameNl;
-  const requesterGroup = trip.group ? (en ? trip.group.nameEn : trip.group.nameNl) : null;
-
-  return (
-    <li
-      className={`rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-5 ${past ? 'opacity-75' : ''}`}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-vtk-paper-2 px-2.5 py-0.5 text-xs font-semibold text-vtk-navy">
-              {vehicle}
-            </span>
-            <span className="font-medium text-vtk-ink">{trip.purpose}</span>
-          </p>
-          <p className="mt-1 text-sm text-vtk-muted">
-            {formatTripWindow(trip.startAt, trip.endAt, locale)}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* "Jij rijdt": deze rit staat ook in je eigen lijst hierboven, en dat
-              is de bedoeling. Zonder dit merkteken leest dezelfde rit twee keer
-              op één scherm als twee ritten. */}
-          {youDrive ? (
-            <span className="rounded-full bg-vtk-yellow px-2.5 py-0.5 text-xs font-semibold text-vtk-on-yellow">
-              {en ? 'You drive' : 'Jij rijdt'}
-            </span>
-          ) : null}
-          {trip.status === 'COMPLETED' ? (
-            <span className="rounded-full bg-vtk-navy/8 px-2.5 py-0.5 text-xs font-semibold text-vtk-navy">
-              {en ? 'Completed' : 'Afgerond'}
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      {/* Op een telefoon staat dit raster in één kolom, en dan is de afstand
-          tussen twee rijen het enige wat een label nog aan zijn waarde bindt:
-          met één gap stonden "Laadadres" en "Brouwerij Haacht" even ver uit
-          elkaar als twee losse feiten (F4.14). De rij-afstand is daarom groter
-          dan de regelafstand binnen een rij, en de kolomafstand telt enkel mee
-          vanaf `sm`, waar er echt twee kolommen zijn. */}
-      <dl className="mt-4 grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
-        {trip.pickupAddress ? (
-          <div>
-            <dt className="text-vtk-muted">{en ? 'Loading address' : 'Laadadres'}</dt>
-            <dd className="font-medium text-vtk-ink">
-              <MapLink address={trip.pickupAddress} en={en} />
-            </dd>
-          </div>
-        ) : null}
-        {trip.destination ? (
-          <div>
-            <dt className="text-vtk-muted">{en ? 'Destination' : 'Bestemming'}</dt>
-            <dd className="font-medium text-vtk-ink">
-              <MapLink address={trip.destination} en={en} />
-            </dd>
-          </div>
-        ) : null}
-        {/* Wat er mee moet. Stond hier niet, terwijl het net het antwoord is op
-            "waarom sta ik hier met de auto in plaats van met de kar". De link
-            naar de materiaallijst die Logistiek erin plakt, is aanklikbaar. */}
-        {trip.cargoNote ? (
-          <div className="sm:col-span-2">
-            <dt className="text-vtk-muted">{en ? 'Cargo' : 'Lading'}</dt>
-            <dd className="font-medium text-vtk-ink">
-              <LinkedText text={trip.cargoNote} />
-            </dd>
-          </div>
-        ) : null}
-        <div>
-          <dt className="text-vtk-muted">{en ? 'Contact' : 'Contactpersoon'}</dt>
-          <dd className="font-medium text-vtk-ink">
-            {trip.user.name}
-            {requesterGroup ? ` · ${requesterGroup}` : ''}
-            <br />
-            <a href={`mailto:${trip.user.email}`} className="font-normal text-vtk-navy underline underline-offset-4">
-              {trip.user.email}
-            </a>
-            {trip.contactPhone ? (
-              <>
-                <br />
-                <span className="font-normal">
-                  <PhoneLink number={trip.contactPhone} />
-                </span>
-              </>
-            ) : null}
-          </dd>
-        </div>
-        {trip.eventName ? (
-          <div>
-            <dt className="text-vtk-muted">{en ? 'Event' : 'Evenement'}</dt>
-            <dd className="font-medium text-vtk-ink">{trip.eventName}</dd>
-          </div>
-        ) : null}
-        {/* Enkel op een rit van je post: op je eigen rit ben jij de chauffeur,
-            en je eigen nummer opzoeken op een scherm is geen hulp. */}
-        {trip.driver && driverPhone !== undefined ? (
-          <div>
-            <dt className="text-vtk-muted">{en ? 'Driver' : 'Chauffeur'}</dt>
-            <dd className="font-medium text-vtk-ink">
-              {trip.driver.name}
-              {driverPhone ? (
-                <>
-                  {' · '}
-                  <span className="font-normal">
-                    <PhoneLink number={driverPhone} />
-                  </span>
-                </>
-              ) : null}
-            </dd>
-          </div>
-        ) : null}
-        {/* Enkel de lijst wanneer je ze niet mag wijzigen; anders staat het hele
-            blok onder het raster, zoals op het bezettingsoverzicht. */}
-        {!canEditHelpers && trip.helpers.length > 0 ? (
-          <div className="sm:col-span-2">
-            <dt className="text-vtk-muted">{en ? 'Passengers' : 'Bijrijders'}</dt>
-            <dd className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-medium text-vtk-ink">
-              {trip.helpers.map((helper) => (
-                <span key={helper.id} className="inline-flex items-center gap-1.5">
-                  {helper.name}
-                  {helper.phone ? <PhoneLink number={helper.phone} /> : null}
-                </span>
-              ))}
-            </dd>
-          </div>
-        ) : null}
-        {!canEditHelpers && (trip.helpersNote || trip.helpersPhone) ? (
-          <div className="sm:col-span-2">
-            <dt className="text-vtk-muted">{en ? 'Helpers' : 'Bijrijders'}</dt>
-            <dd className="font-medium text-vtk-ink">
-              {trip.helpersNote}
-              {trip.helpersPhone ? (
-                <span className="font-normal">
-                  {trip.helpersNote ? ' · ' : ''}
-                  <PhoneLink number={trip.helpersPhone} />
-                </span>
-              ) : null}
-            </dd>
-          </div>
-        ) : null}
-      </dl>
-
-      {/* De bijrijders bijwerken vanaf deze kaart (F4.8a). De serverkant kon dit
-          al (`addTripHelperAction` laat een collega van dezelfde post toe); hier
-          stonden ze enkel te lezen, zodat een post naar het bezettingsoverzicht
-          moest voor iets wat op haar eigen ritlijst hoort. Onder het raster en
-          niet erin: het is het enige blok waar je iets wijzigt, en een veld met
-          een knop tussen twee feiten leest als een feit. */}
-      {canEditHelpers ? (
-        <div className="mt-4 border-t border-vtk-navy/10 pt-4">
-          <TripHelpers
-            bookingId={trip.id}
-            helpers={trip.helpers}
-            /* De vrije tekst van vóór V2, met het nummer dat er los naast stond:
-               samen één regel, want TripHelpers kent enkel die ene. */
-            legacyNote={[trip.helpersNote, trip.helpersPhone].filter(Boolean).join(' · ') || null}
-            canEdit
-            locale={locale}
-          />
-        </div>
-      ) : null}
-
-      {/* De boodschap van Logistiek is geen voetnoot: daar staat de code van de
-          poort in, of bij wie de sleutel ligt. Ze krijgt daarom de gele
-          accentrand die op de site een uitgelicht paneel markeert, terwijl de
-          nota van de aanvrager gewoon een nota blijft. */}
-      {trip.adminNote ? (
-        <p className="mt-4 rounded-lg bg-vtk-paper px-4 py-3 text-sm text-vtk-body shadow-[inset_3px_0_0_var(--yellow)]">
-          <span className="font-medium text-vtk-ink">{en ? 'Note from Logistics:' : 'Nota van Logistiek:'}</span>{' '}
-          <LinkedText text={trip.adminNote} />
-        </p>
-      ) : null}
-      {trip.memberNote ? (
-        <p className="mt-2 rounded-lg bg-vtk-paper px-4 py-3 text-sm text-vtk-body">
-          <span className="font-medium text-vtk-ink">
-            {en ? 'Note from the requester:' : 'Nota van de aanvrager:'}
-          </span>{' '}
-          <LinkedText text={trip.memberNote} />
-        </p>
-      ) : null}
-
-      {/* De eigen nota's (F4.20). Onder de nota van Logistiek en die van de
-          aanvrager, want het is dezelfde soort informatie; maar in een eigen
-          blok met een rand erboven, omdat dit het enige is waar je zelf iets aan
-          toevoegt. Wie de rit op dit scherm ziet, hoort er ook bij, dus mag hij
-          schrijven; de actie toetst dat nog eens. */}
-      <div className="mt-4 border-t border-vtk-navy/10 pt-4">
-        <TripNotes bookingId={trip.id} notes={notes} canWrite locale={locale} />
-      </div>
-
-      {/* Doorgegeven aan jouw post: dan duid je hier zelf iemand aan. Onderaan
-          de kaart en niet bovenaan: eerst weten wat de rit is, dan pas kiezen
-          wie hem doet. */}
-      {groupMembers && !past && trip.assignedGroup ? (
-        <GroupDriverPicker
-          bookingId={trip.id}
-          driverId={trip.driverId}
-          members={groupMembers}
-          groupName={en ? trip.assignedGroup.nameEn : trip.assignedGroup.nameNl}
-        />
-      ) : null}
-    </li>
-  );
-}
-
-/**
- * "Mijn ritten": wat een chauffeur van zijn eigen ritten ziet. Bewust enkel de
- * ritten die aan deze persoon toegewezen zijn, en zonder prijzen of
- * betaalstatus: dat is een zaak tussen de aanvrager en Logistiek. Wie geen
- * chauffeur is, komt hier op een lege pagina en niet op een foutmelding.
- */
-export default async function RittenPage() {
-  const [session, locale] = await Promise.all([getSession(), getLocale()]);
+export default async function RittenPage({ searchParams }: { searchParams: Promise<{ rit?: string }> }) {
+  const [session, locale, params] = await Promise.all([getSession(), getLocale(), searchParams]);
   const t = copy[locale];
   if (!session) {
     return <LoginGate variant="trips" returnTo="/ritten" />;
   }
   const en = locale === 'en';
-
+  const userId = session.user.id;
   const myGroupIds = session.groups.map((group) => group.id);
 
   const [trips, groupTrips, driver, vanDriver, feedTokens] = await Promise.all([
-    tripsForDriver(session.user.id),
+    tripsForDriver(userId),
     // Wat je post aanvroeg, wat je medepostleden rijden, en wat er nog een
-    // chauffeur mist omdat Logistiek de rit aan jouw post doorgaf. Ook de rit
-    // die je zelf rijdt voor je post: die staat dan in allebei de lijsten (D3).
+    // chauffeur mist omdat Logistiek de rit aan jouw post doorgaf.
     tripsForGroups(myGroupIds),
-    isDriver(session.user.id),
-    isVanDriver(session.user.id),
-    feedTokensForUser(session.user.id),
-  ]);
-
-  // Enkel voor de ritten van je post: het nummer van wie rijdt, en de leden van
-  // de post die de rit mag invullen. Twee queries op precies wat op het scherm
-  // komt, en niets wanneer er geen postritten zijn.
-  const assignedGroupIds = [
-    ...new Set(
-      groupTrips
-        .map((trip) => trip.assignedGroup?.id)
-        .filter((id): id is string => Boolean(id) && myGroupIds.includes(id as string))
-    ),
-  ];
-  // De eigen nota's bij alles wat op dit scherm komt (F4.20). Eén query voor de
-  // hele pagina: elke kaart heeft ze nodig, en per kaart vragen is per kaart een
-  // rondje naar de databank. Elke rit hier is er een waar je zelf bij hoort (je
-  // rijdt hem, of hij is van je post), dus `onTripIds` is gewoon de hele lijst;
-  // `onTripForNotes` staat er toch bij, zodat de regel op één plaats ligt en
-  // niet op de aanname dat deze query dat altijd zal blijven garanderen.
-  const shownTrips = [...trips, ...groupTrips];
-  const viewer = { userId: session.user.id, groupIds: myGroupIds };
-  const [groupDriverPhones, membersPerGroup, notesPerTrip] = await Promise.all([
-    driverPhones(groupTrips.map((trip) => trip.driverId).filter((id): id is string => Boolean(id))),
-    Promise.all(
-      assignedGroupIds.map(async (groupId) => [groupId, await groupMemberOptions(groupId)] as const)
-    ).then((entries) => new Map(entries)),
-    tripNotesFor([...new Set(shownTrips.map((trip) => trip.id))], {
-      userId: session.user.id,
-      onTripIds: shownTrips.filter((trip) => onTripForNotes(trip, viewer)).map((trip) => trip.id),
-      logistiek: canManage(session),
-    }),
+    isDriver(userId),
+    isVanDriver(userId),
+    feedTokensForUser(userId),
   ]);
 
   // Grens tussen komend en voorbij: het einde van de rit, niet de start. Een rit
   // die vandaag bezig is, hoort nog bovenaan te staan.
   const now = new Date();
-  const upcoming = trips.filter((trip) => trip.endAt >= now);
-  const past = trips.filter((trip) => trip.endAt < now).reverse();
+  const postIds = new Set(groupTrips.map((trip) => trip.id));
+  // Je eigen ritten en die van je post in één lijst: een rit die je zelf rijdt
+  // voor je post staat er nu één keer, met beide merktekens.
+  const byId = new Map<string, DriverTrip>();
+  for (const trip of [...trips, ...groupTrips]) byId.set(trip.id, trip);
+  const upcoming = [...byId.values()]
+    .filter((trip) => trip.endAt >= now)
+    .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
   // Van je post tonen we enkel wat er nog aankomt: wie er vorige maand reed, is
   // historiek van Logistiek en niet iets waar een post iets mee doet.
-  const groupUpcoming = groupTrips.filter((trip) => trip.endAt >= now);
+  const past = trips.filter((trip) => trip.endAt < now).sort((a, b) => b.startAt.getTime() - a.startAt.getTime());
+  const shown = [...upcoming, ...past];
+
+  const assignedGroupIds = [
+    ...new Set(
+      upcoming
+        .map((trip) => trip.assignedGroup?.id)
+        .filter((id): id is string => Boolean(id) && myGroupIds.includes(id as string))
+    ),
+  ];
+  const otherDriverIds = [
+    ...new Set(
+      shown.map((trip) => trip.driverId).filter((id): id is string => Boolean(id) && id !== userId)
+    ),
+  ];
+  const viewer = { userId, groupIds: myGroupIds };
+  const [phones, membersPerGroup, notesPerTrip, colors] = await Promise.all([
+    driverPhones(otherDriverIds),
+    Promise.all(
+      assignedGroupIds.map(async (groupId) => [groupId, await groupMemberOptions(groupId)] as const)
+    ).then((entries) => new Map(entries)),
+    // De eigen nota's bij alles op dit scherm (F4.20), in één query.
+    tripNotesFor(
+      shown.map((trip) => trip.id),
+      {
+        userId,
+        onTripIds: shown.filter((trip) => onTripForNotes(trip, viewer)).map((trip) => trip.id),
+        logistiek: canManage(session),
+      }
+    ),
+    // Dezelfde kleur als in de planning, zodat een chauffeur er overal hetzelfde
+    // uitziet. Enkel nodig wanneer iemand anders dan jij rijdt.
+    otherDriverIds.length > 0 ? driverColorOverrides() : Promise.resolve({}),
+  ]);
+
+  const words = dateWords(locale);
+  const today = toBrusselsDateValue(now);
+  const thisMonday = startOfWeek(now);
+
+  function view(trip: DriverTrip, isPast: boolean): TripView {
+    const requesterGroup = trip.group ? (en ? trip.group.nameEn : trip.group.nameNl) : null;
+    const requester = requesterGroup ?? trip.requesterName ?? null;
+    const sameDay = toBrusselsDateValue(trip.startAt) === toBrusselsDateValue(trip.endAt);
+    const assignedToMe =
+      !isPast && trip.assignedGroup && myGroupIds.includes(trip.assignedGroup.id) ? trip.assignedGroup : null;
+    const driverView: TripView['driver'] =
+      trip.driverId === userId
+        ? { kind: 'me' }
+        : trip.driver
+          ? {
+              kind: 'other',
+              name: trip.driver.name,
+              phone: phones.get(trip.driver.id)?.number ?? null,
+              color: driverColorVar(trip.driver.id, colors),
+            }
+          : trip.vehicle.needsDriver
+            ? { kind: 'none' }
+            : { kind: 'notNeeded' };
+    const post = postIds.has(trip.id);
+    const dayLong = words.long(trip.startAt);
+
+    return {
+      id: trip.id,
+      weekKey: '',
+      dayShort: words.weekday(trip.startAt),
+      dayNumber: words.day(trip.startAt),
+      dayLong,
+      today: !isPast && (toBrusselsDateValue(trip.startAt) === today || trip.startAt <= now),
+      hours: `${formatBrusselsTime(trip.startAt, locale)}–${formatBrusselsTime(trip.endAt, locale)}`,
+      hoursUntil: sameDay
+        ? null
+        : `${en ? 'until' : 'tot'} ${words.weekday(trip.endAt)} ${words.day(trip.endAt)}`,
+      vehicleName: en ? trip.vehicle.nameEn : trip.vehicle.nameNl,
+      vehicleIcon: vehicleIconName(trip.vehicle),
+      purpose: trip.purpose,
+      requester,
+      eventName: trip.eventName,
+      pickup: trip.pickupAddress,
+      destination: trip.destination,
+      cargoNote: trip.cargoNote,
+      adminNote: trip.adminNote,
+      memberNote: trip.memberNote,
+      contact: {
+        name: trip.user.name,
+        role: `${en ? 'Contact' : 'Contactpersoon'}${requester ? `, ${requester}` : ''}`,
+        email: trip.user.email,
+        phone: trip.contactPhone,
+      },
+      driver: driverView,
+      helpers: trip.helpers,
+      helpersLegacy: [trip.helpersNote, trip.helpersPhone].filter(Boolean).join(' · ') || null,
+      // Dezelfde regel als `canEditHelpers` op de server: je eigen post, of een
+      // rit die aan je post doorgegeven is. Een gereden rit niet meer.
+      canEditHelpers: post && !isPast && trip.status === 'APPROVED',
+      notes: notesPerTrip.get(trip.id) ?? [],
+      mine: trip.driverId === userId,
+      post,
+      picker: assignedToMe
+        ? {
+            groupName: en ? assignedToMe.nameEn : assignedToMe.nameNl,
+            driverId: trip.driverId,
+            members: membersPerGroup.get(assignedToMe.id) ?? [],
+          }
+        : null,
+      completed: trip.status === 'COMPLETED',
+      searchText: [
+        trip.purpose,
+        requester,
+        trip.eventName,
+        trip.pickupAddress,
+        trip.destination,
+        trip.user.name,
+        trip.driver?.name,
+        trip.cargoNote,
+        en ? trip.vehicle.nameEn : trip.vehicle.nameNl,
+        dayLong,
+        ...trip.helpers.map((helper) => helper.name),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase(),
+    };
+  }
+
+  // Per week, zoals op /shift: "Deze week", "Volgende week", dan het nummer. Een
+  // rit die vorige week begon en nog loopt, hoort bij deze week.
+  const weeks: TripWeek[] = [];
+  for (const trip of upcoming) {
+    const start = startOfWeek(trip.startAt);
+    const monday = start < thisMonday ? thisMonday : start;
+    const key = monday.toISOString().slice(0, 10);
+    let week = weeks.find((entry) => entry.key === key);
+    if (!week) {
+      const offset = Math.round((monday.getTime() - thisMonday.getTime()) / (7 * DAY_MS));
+      week = {
+        key,
+        label:
+          offset === 0
+            ? en
+              ? 'This week'
+              : 'Deze week'
+            : offset === 1
+              ? en
+                ? 'Next week'
+                : 'Volgende week'
+              : `Week ${isoWeekNumber(monday)}`,
+        range: words.weekRange(monday),
+        trips: [],
+      };
+      weeks.push(week);
+    }
+    week.trips.push({ ...view(trip, false), weekKey: key });
+  }
+
+  const months: TripMonth[] = [];
+  for (const trip of past) {
+    const key = toBrusselsDateValue(trip.startAt).slice(0, 7);
+    let month = months.find((entry) => entry.key === key);
+    if (!month) {
+      month = { key, label: words.month(trip.startAt), trips: [] };
+      months.push(month);
+    }
+    month.trips.push(view(trip, true));
+  }
+
   const groupNames = [
     ...new Set(
-      groupUpcoming.map((trip) =>
-        trip.assignedGroup
-          ? en
-            ? trip.assignedGroup.nameEn
-            : trip.assignedGroup.nameNl
-          : trip.group
-            ? en
-              ? trip.group.nameEn
-              : trip.group.nameNl
-            : ''
-      )
+      upcoming
+        .filter((trip) => postIds.has(trip.id))
+        .map((trip) => {
+          const group = trip.assignedGroup && myGroupIds.includes(trip.assignedGroup.id) ? trip.assignedGroup : trip.group;
+          return group ? (en ? group.nameEn : group.nameNl) : '';
+        })
+        .filter(Boolean)
     ),
-  ].filter(Boolean);
+  ];
 
   return (
     <PageShell
       title={
         <>
-          {t.pageTripsTitle}{' '}
-          {t.pageTripsAccent}
+          {t.pageTripsTitle} {t.pageTripsAccent}
         </>
       }
       /* V1: laten weten wanneer je kan rijden. In de kop en niet als paneel
@@ -401,100 +326,27 @@ export default async function RittenPage() {
       ) : null}
 
       {/* De ledenkant heeft geen ToastProvider in de layout (die staat enkel
-          rond /beheer). Sinds elke ritkaart nota's draagt, hangt hij hier rond
-          het hele scherm in plaats van rond twee blokken: twee providers tekenen
+          rond /beheer). Hij hangt rond het hele scherm: twee providers tekenen
           twee meldingsstapels, elk in hun eigen hoek. */}
       <ToastProvider>
         <div className="grid gap-8">
-          <section>
-            <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
-              {en ? 'Upcoming trips' : 'Komende ritten'} ({upcoming.length})
-            </h2>
-            {upcoming.length === 0 ? (
-              <p className="mt-3 text-sm text-vtk-muted">
-                {driver
+          {driver || upcoming.length > 0 || past.length > 0 ? (
+            <TripsAgenda
+              weeks={weeks}
+              months={months}
+              locale={locale}
+              postLabel={groupNames.length === 1 ? groupNames[0] : en ? 'My post' : 'Mijn post'}
+              emptyText={
+                driver
                   ? en
                     ? 'Nothing yet. Logistics usually assigns a driver in the week before the trip.'
                     : 'Nog niets. Logistiek wijst een chauffeur meestal pas de week voor de rit toe.'
                   : en
                     ? 'Nothing planned.'
-                    : 'Niets gepland.'}
-              </p>
-            ) : (
-              <ul className="mt-4 grid gap-4">
-                {upcoming.map((trip) => (
-                  <TripCard
-                    key={trip.id}
-                    trip={trip}
-                    locale={locale}
-                    past={false}
-                    notes={notesPerTrip.get(trip.id) ?? []}
-                  />
-                ))}
-              </ul>
-            )}
-          </section>
-
-          {/* De ritten van je post. Een tweede sectie en geen tweede tabblad: het
-              zijn er meestal een handvol, en een tabblad verstopt precies de rit
-              die nog een chauffeur zoekt. Valt helemaal weg wanneer er niets is;
-              een lege sectie met een uitleg erbij zou op elk scherm staan van
-              iedereen die bij een post zit. */}
-          {groupUpcoming.length > 0 ? (
-            <section>
-                <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
-                  {en ? 'Trips of my post' : 'Ritten van mijn post'}
-                  {groupNames.length > 0 ? ` (${groupNames.join(', ')})` : ''}
-                </h2>
-                <p className="mt-1 text-sm text-vtk-muted">
-                  {en
-                    ? 'What your fellow members are driving, and the trips Logistics handed to your post to fill in yourselves.'
-                    : 'Wat je medeleden rijden, en de ritten die Logistiek aan je post doorgaf om zelf in te vullen.'}
-                </p>
-                <ul className="mt-4 grid gap-4">
-                  {groupUpcoming.map((trip) => (
-                    <TripCard
-                      key={trip.id}
-                      trip={trip}
-                      locale={locale}
-                      past={false}
-                      driverPhone={
-                        trip.driverId ? (groupDriverPhones.get(trip.driverId)?.number ?? null) : null
-                      }
-                      groupMembers={
-                        trip.assignedGroup && myGroupIds.includes(trip.assignedGroup.id)
-                          ? (membersPerGroup.get(trip.assignedGroup.id) ?? [])
-                          : undefined
-                      }
-                      youDrive={trip.driverId === session.user.id}
-                      /* Dezelfde regel als `canEditHelpers` op de server: je eigen
-                         post, of een rit die aan je post doorgegeven is. Een
-                         gereden of geannuleerde rit niet meer; die is historiek. */
-                      canEditHelpers={trip.status === 'APPROVED'}
-                      notes={notesPerTrip.get(trip.id) ?? []}
-                    />
-                  ))}
-                </ul>
-            </section>
-          ) : null}
-
-          {past.length > 0 ? (
-            <section>
-              <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
-                {en ? 'Past trips' : 'Gereden ritten'} ({past.length})
-              </h2>
-              <ul className="mt-4 grid gap-4">
-                {past.map((trip) => (
-                  <TripCard
-                    key={trip.id}
-                    trip={trip}
-                    locale={locale}
-                    past
-                    notes={notesPerTrip.get(trip.id) ?? []}
-                  />
-                ))}
-              </ul>
-            </section>
+                    : 'Niets gepland.'
+              }
+              initialOpen={params.rit && byId.has(params.rit) ? params.rit : null}
+            />
           ) : null}
 
           {/* Je ritten in je eigen agenda (A1). Enkel voor wie chauffeur is. */}

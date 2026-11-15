@@ -26,7 +26,14 @@ export type IconName =
   | 'basket'
   | 'bottle'
   | 'trash'
-  | 'chart';
+  | 'chart'
+  | 'clock'
+  | 'phone'
+  | 'mail'
+  | 'note'
+  | 'people'
+  | 'alert'
+  | 'search';
 
 export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElement> & { name: IconName }) {
   const paths = {
@@ -216,6 +223,37 @@ export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElem
       <>
         <path d="M10 3h4v3.2c0 .6.2 1.1.6 1.6l1.2 1.4c.4.5.7 1.1.7 1.8v8a2 2 0 0 1-2 2H9.5a2 2 0 0 1-2-2v-8c0-.7.2-1.3.7-1.8l1.2-1.4c.4-.5.6-1 .6-1.6Z" />
         <path d="M7.5 13.5h9" />
+      </>
+    ),
+    // De iconen van "Mijn ritten": uur, bellen, mailen, nota's, bijrijders,
+    // een nota van Logistiek en zoeken.
+    clock: (
+      <>
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M12 7.5V12l3 2" />
+      </>
+    ),
+    phone: (
+      <path d="M5 4h3.5l1.5 4-2 1.3a10 10 0 0 0 6.7 6.7l1.3-2 4 1.5V19a1.5 1.5 0 0 1-1.5 1.5A15.5 15.5 0 0 1 3.5 5.5 1.5 1.5 0 0 1 5 4Z" />
+    ),
+    mail: (
+      <>
+        <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
+        <path d="m4 7 8 6 8-6" />
+      </>
+    ),
+    note: <path d="M4 5h16v11H9l-5 4V5Z" />,
+    people: (
+      <>
+        <circle cx="9" cy="8" r="3.5" />
+        <path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.7 3.1 2.4 3.5 5.2" />
+      </>
+    ),
+    alert: <path d="M12 5v9M12 18.5h.01" />,
+    search: (
+      <>
+        <circle cx="11" cy="11" r="6.5" />
+        <path d="m16 16 4.5 4.5" />
       </>
     ),
   } satisfies Record<IconName, ReactNode>;

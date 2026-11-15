@@ -6,6 +6,7 @@ import { addTripNoteAction, editTripNoteAction, removeTripNoteAction } from '@/a
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { LinkedText } from '@/components/linked-text';
 import { LogisticsIcon } from '@/components/logistics-icon';
+import { Avatar } from '@/components/person-avatar';
 import { useToast } from '@/components/ui/toast';
 import { TRIP_NOTE_VISIBILITIES } from '@/lib/uitleen';
 import type { UitleenTransportNoteVisibility } from '@prisma/client';
@@ -73,13 +74,21 @@ export function TripNotes({
   notes,
   canWrite,
   locale = 'nl',
+  variant = 'list',
 }: {
   bookingId: string;
   /** Al gefilterd op wat deze persoon mag lezen; zie `tripNotesFor`. */
   notes: TripNoteView[];
   canWrite: boolean;
   locale?: 'nl' | 'en';
+  /**
+   * `thread`: als ballonnen met een rondje per auteur, onder de nota van
+   * Logistiek op "Mijn ritten" (`app/ritten/ritten.css`). Zonder eigen kop en
+   * zonder lege-staat-zin: dat blok heeft er al een.
+   */
+  variant?: 'list' | 'thread';
 }) {
+  const thread = variant === 'thread';
   const en = locale === 'en';
   const showToast = useToast();
   const [pending, startTransition] = useTransition();
@@ -169,6 +178,67 @@ export function TripNotes({
     </div>
   );
 
+  function noteActions(note: TripNoteView, buttonClass: string) {
+    return (
+      <>
+        <button type="button" onClick={() => open(note)} className={buttonClass}>
+          {en ? 'Edit' : 'Wijzigen'}
+        </button>
+        <ConfirmActionButton
+          label={`${en ? 'Remove note' : 'Nota weghalen'}`}
+          confirmLabel={en ? 'Remove' : 'Weghalen'}
+          icon={<LogisticsIcon name="close" className="h-3.5 w-3.5" />}
+          action={removeTripNoteAction.bind(null, note.id)}
+          successMessage={en ? 'Removed.' : 'Nota weggehaald.'}
+          destructive
+          dialogTitle={en ? 'Remove note?' : 'Nota weghalen?'}
+          dialogDescription={
+            en
+              ? 'Your note disappears from this trip. The trip itself does not change.'
+              : 'Je nota verdwijnt van deze rit. Aan de rit zelf verandert er niets.'
+          }
+        />
+      </>
+    );
+  }
+
+  if (thread) {
+    return (
+      <>
+        {notes.length > 0 ? (
+          <ul className="trips-thread">
+            {notes.map((note) =>
+              editing === note.id ? (
+                <li key={note.id}>{form}</li>
+              ) : (
+                <li key={note.id} className="trips-bubble">
+                  {note.mine ? <Avatar me en={en} size="small" /> : <Avatar name={note.authorName} size="small" />}
+                  <div className="trips-bubble-text">
+                    <span className="trips-bubble-meta">
+                      {note.mine ? (en ? 'You' : 'Jij') : note.authorName}
+                      <span className="trips-visibility" title={en ? 'Who may read this' : 'Wie dit mag lezen'}>
+                        <LogisticsIcon name="show" className="h-3 w-3" strokeWidth={2.2} />
+                        {en ? CHIPS[note.visibility].en : CHIPS[note.visibility].nl}
+                      </span>
+                      {note.mine ? noteActions(note, 'trips-text-button') : null}
+                    </span>
+                    <LinkedText text={note.text} />
+                  </div>
+                </li>
+              )
+            )}
+          </ul>
+        ) : null}
+        {editing === 'nieuw' ? form : null}
+        {canWrite && editing === null ? (
+          <button type="button" onClick={() => open(null)} className="trips-add">
+            {en ? '+ Note' : '+ Nota'}
+          </button>
+        ) : null}
+      </>
+    );
+  }
+
   return (
     <div className="grid gap-2">
       <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">{en ? 'Notes' : "Nota's"}</p>
@@ -199,31 +269,9 @@ export function TripNotes({
                   <span className="rounded-full bg-vtk-navy/8 px-2 py-0.5 text-[10px] font-semibold text-vtk-navy">
                     {en ? CHIPS[note.visibility].en : CHIPS[note.visibility].nl}
                   </span>
-                  {note.mine ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => open(note)}
-                        className="text-xs font-medium text-vtk-muted underline underline-offset-4"
-                      >
-                        {en ? 'Edit' : 'Wijzigen'}
-                      </button>
-                      <ConfirmActionButton
-                        label={`${en ? 'Remove note' : 'Nota weghalen'}`}
-                        confirmLabel={en ? 'Remove' : 'Weghalen'}
-                        icon={<LogisticsIcon name="close" className="h-3.5 w-3.5" />}
-                        action={removeTripNoteAction.bind(null, note.id)}
-                        successMessage={en ? 'Removed.' : 'Nota weggehaald.'}
-                        destructive
-                        dialogTitle={en ? 'Remove note?' : 'Nota weghalen?'}
-                        dialogDescription={
-                          en
-                            ? 'Your note disappears from this trip. The trip itself does not change.'
-                            : 'Je nota verdwijnt van deze rit. Aan de rit zelf verandert er niets.'
-                        }
-                      />
-                    </>
-                  ) : null}
+                  {note.mine
+                    ? noteActions(note, 'text-xs font-medium text-vtk-muted underline underline-offset-4')
+                    : null}
                 </p>
                 <p className="mt-1 whitespace-pre-wrap">
                   <LinkedText text={note.text} />
