@@ -8,6 +8,7 @@ import { publicUrl } from "@/lib/storage";
 import { formatWorkingYear, parseWorkingYear, workingYearTabs } from "@/lib/workingYear";
 import { groupErrorMessages } from "./messages";
 import { PostsTable, type PostRow, type RoleOption } from "./PostsTable";
+import { sortRolesByName } from "@/lib/roleOrder";
 
 export default async function AdminGroups({
   params,
@@ -35,13 +36,13 @@ export default async function AdminGroups({
         memberships: { where: { year }, include: { user: true } },
       },
     }),
-    prisma.role.findMany({ orderBy: [{ order: "asc" }, { nameNl: "asc" }], select: { id: true, code: true, nameNl: true, nameEn: true } }),
+    prisma.role.findMany({ select: { id: true, code: true, nameNl: true, nameEn: true } }),
     prisma.groupMembership.findMany({ where: { group: { type: "PRAESIDIUM" } }, distinct: ["year"], select: { year: true } }),
   ]);
 
   const tabs = workingYearTabs(distinctYears.map((r) => r.year));
 
-  const allRoles: RoleOption[] = roles.map((r) => ({ roleId: r.id, code: r.code, name: nl ? r.nameNl : r.nameEn }));
+  const allRoles: RoleOption[] = sortRolesByName(roles, locale).map((r) => ({ roleId: r.id, code: r.code, name: nl ? r.nameNl : r.nameEn }));
 
   const postRows: PostRow[] = groups.map((group) => {
     const members = [...group.memberships]

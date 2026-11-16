@@ -10,6 +10,7 @@ import {
   type PageNode,
   type RoleOption,
 } from "../inhoud/ContentManager";
+import { sortRolesByName } from "@/lib/roleOrder";
 
 /**
  * Beheer van de navigatiestructuur en headercategorieën: welke categorieën in
@@ -61,10 +62,10 @@ export default async function AdminHeaderPage({
       },
       orderBy: [{ order: "asc" }, { titleNl: "asc" }],
     }),
-    prisma.role.findMany({ orderBy: [{ order: "asc" }, { nameNl: "asc" }] }),
+    prisma.role.findMany(),
   ]);
 
-  const roleOptions: RoleOption[] = roles.map((r) => ({
+  const roleOptions: RoleOption[] = sortRolesByName(roles, locale).map((r) => ({
     id: r.id,
     name: locale === "nl" ? r.nameNl : r.nameEn,
   }));

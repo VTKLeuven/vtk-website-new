@@ -229,7 +229,7 @@ export async function adminRead(principal: McpPrincipal, raw: McpAdminReadInput)
     case "roles": {
       const items = await prisma.role.findMany({
         where: { ...idWhere(input.id), ...(contains ? { OR: [{ code: contains }, { nameNl: contains }, { nameEn: contains }] } : {}) },
-        take, skip, orderBy: [{ order: "asc" }, { nameNl: "asc" }],
+        take, skip, orderBy: { nameNl: "asc" },
         select: {
           id: true, code: true, nameNl: true, nameEn: true, descriptionNl: true,
           descriptionEn: true, color: true, order: true, system: true,

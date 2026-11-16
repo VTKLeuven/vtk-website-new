@@ -9,6 +9,7 @@ import { publicUrl } from "@/lib/storage";
 import { currentWorkingYear, formatWorkingYear } from "@/lib/workingYear";
 import { roleErrorMessages } from "./messages";
 import { RolesTable, type RoleRow, type Perm, type Post, type ClientPerm } from "./RolesTable";
+import { sortRolesByName } from "@/lib/roleOrder";
 
 export default async function AdminRoles({
   params,
@@ -26,7 +27,6 @@ export default async function AdminRoles({
 
   const [roles, permissions, posts, clientPermissions] = await Promise.all([
     prisma.role.findMany({
-      orderBy: [{ order: "asc" }, { nameNl: "asc" }],
       include: {
         permissions: true,
         // Permissies van externe applicaties die deze rol toekent (SSO).
@@ -71,7 +71,7 @@ export default async function AdminRoles({
 
   const allPosts: Post[] = posts.map((p) => ({ groupId: p.id, code: p.code, name: nl ? p.nameNl : p.nameEn }));
 
-  const roleRows: RoleRow[] = roles.map((role) => {
+  const roleRows: RoleRow[] = sortRolesByName(roles, locale).map((role) => {
     const directHolders = role.users.map((u) => ({
       userId: u.userId,
       name: u.user.name,

@@ -110,25 +110,6 @@ export async function saveRoleAction(_prev: SaveState, formData: FormData): Prom
   return saveOk();
 }
 
-export async function reorderRolesAction(ids: string[]): Promise<void> {
-  await requirePermission("roles.manage");
-  await prisma.$transaction(
-    ids.map((id, index) =>
-      prisma.role.update({
-        where: { id },
-        data: { order: index },
-      })
-    )
-  );
-  await logAudit({
-    action: "reorder",
-    entity: "role",
-    target: `${ids.length} rollen`,
-    summary: "volgorde van rollen gewijzigd",
-  });
-  revalidatePath("/admin/roles");
-}
-
 export async function deleteRoleAction(formData: FormData): Promise<void> {
   await requirePermission("roles.manage");
   const id = formData.get("id") as string;

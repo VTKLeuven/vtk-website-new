@@ -2,6 +2,7 @@ import { ActionForm } from '@/components/ui/unsentGuard';
 import { prisma } from '@vtk/db';
 import { notFound } from 'next/navigation';
 import { hasLocale } from '@/lib/locale';
+import { sortRolesByName } from '@/lib/roleOrder';
 import { requirePermission } from '@/lib/session';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import { nameParts } from '@vtk/auth';
@@ -47,13 +48,13 @@ export default async function EditUserPage({ params }: { params: Promise<{ local
       },
     }),
     prisma.group.findMany({ orderBy: { orderInPraesidium: 'asc' } }),
-    canManageRoles ? prisma.role.findMany({ orderBy: [{ order: 'asc' }, { nameNl: 'asc' }] }) : Promise.resolve([]),
+    canManageRoles ? prisma.role.findMany() : Promise.resolve([]),
   ]);
   if (!user) notFound();
 
   // Rollen die dit lid dit jaar nog niet heeft, om in de dropdown aan te bieden.
   const assignedRoleIds = new Set(user.roles.map((ur) => ur.roleId));
-  const assignableRoles = allRoles.filter((r) => !assignedRoleIds.has(r.id));
+  const assignableRoles = sortRolesByName(allRoles, locale).filter((r) => !assignedRoleIds.has(r.id));
 
   // Leden van voor de eerste onboarding hebben nog geen aparte voor-/achternaam;
   // dan tonen we een split van de weergavenaam als startwaarde.

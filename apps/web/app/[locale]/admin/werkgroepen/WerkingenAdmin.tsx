@@ -10,6 +10,7 @@ import { werkgroepenWithOwnMemberRights } from "@/lib/werkgroepMembers";
 import { WERKING_KINDS, type WerkingKind } from "@/lib/groupKinds";
 import { werkgroepErrorMessages } from "./messages";
 import { WerkingenTable, type WerkingRow, type RoleOption } from "./WerkingenTable";
+import { sortRolesByName } from "@/lib/roleOrder";
 
 /**
  * Het beheerscherm van de werkgroepen (/admin/werkgroepen) en van de
@@ -52,7 +53,6 @@ export async function WerkingenAdmin({ kind, locale, jaar }: { kind: WerkingKind
       },
     }),
     prisma.role.findMany({
-      orderBy: [{ order: "asc" }, { nameNl: "asc" }],
       select: { id: true, code: true, nameNl: true, nameEn: true },
     }),
     prisma.groupMembership.findMany({
@@ -70,7 +70,7 @@ export async function WerkingenAdmin({ kind, locale, jaar }: { kind: WerkingKind
   if (!canManage && visible.length === 0) notFound();
 
   const tabs = workingYearTabs(distinctYears.map((r) => r.year));
-  const allRoles: RoleOption[] = roles.map((r) => ({ roleId: r.id, code: r.code, name: nl ? r.nameNl : r.nameEn }));
+  const allRoles: RoleOption[] = sortRolesByName(roles, locale).map((r) => ({ roleId: r.id, code: r.code, name: nl ? r.nameNl : r.nameEn }));
 
   const rows: WerkingRow[] = visible.map((group) => {
     const members = [...group.memberships]

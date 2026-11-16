@@ -12,6 +12,7 @@ import { tiptapToMarkdown } from "@/lib/tiptap-to-markdown";
 import { publicUrl } from "@/lib/storage";
 import { publicRequestHost } from "@/lib/requestHost";
 import { PageContentEditor } from "./PageContentEditor";
+import { sortRolesByName } from "@/lib/roleOrder";
 
 /**
  * De inhoudseditor van één pagina: markdown (NL + optioneel EN) met voorbeeld,
@@ -49,7 +50,7 @@ export default async function AdminPageEditor({
         },
       },
     }),
-    prisma.role.findMany({ orderBy: [{ order: "asc" }, { nameNl: "asc" }] }),
+    prisma.role.findMany(),
   ]);
   if (!page) notFound();
   if (!canEditPageContent(session, page)) throw new Error("FORBIDDEN");
@@ -132,7 +133,7 @@ export default async function AdminPageEditor({
       initialNl={initialNl}
       initialEn={initialEn}
       convertedFromLegacy={legacy}
-      roles={roles.map((r) => ({ id: r.id, name: locale === "nl" ? r.nameNl : r.nameEn }))}
+      roles={sortRolesByName(roles, locale).map((r) => ({ id: r.id, name: locale === "nl" ? r.nameNl : r.nameEn }))}
       myRoleIds={session.roleIds}
       canEditAll={session.user.isSuperAdmin || hasPermission(session, "pages.editAll")}
       canDelete={hasPermission(session, "pages.delete")}
