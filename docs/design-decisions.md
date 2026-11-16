@@ -2538,6 +2538,29 @@ klikt dat cijfer open tot de lijst met per adres de status.
 - "Loskoppelen" blijft bestaan naast verwijderen: dat haalt enkel de regel hier
   weg en laat de groep in Google staan.
 
+### Nakijken, één voor één
+
+Zevenhonderd groepen nakijken in een tabel is omslachtig: telkens openen,
+terugkeren, de volgende zoeken. De nakijkmodus (`/admin/groepsadressen/nakijken`)
+toont de groepen van de huidige filter één voor één, met wie erin zit en de
+status per adres, en drie knoppen: **Houden** (H), **Weg ermee** (V) en
+**Overslaan** (S); met de pijltjes ga je vooruit en terug.
+
+- **Een beslissing wordt bewaard** (`MailGroup.reviewDecision`), zodat je kan
+  stoppen en later verdergaan: de nakijkmodus begint bij de eerste groep die nog
+  niet nagekeken is. Het overzicht toont "op weg" of "houden" bij de groep.
+- **"Weg" verwijdert nog niets.** De groep komt op de lijst "Te verwijderen"
+  (ook een filter op het overzicht), en die bevestig je in één keer, met
+  dezelfde bevestiging als de bulkverwijdering. Een vergissing tijdens het
+  doorklikken is zo nog terug te draaien met "Beslissing wissen".
+- **De filter van het overzicht gaat mee**: wie "Niemand meer actief" of één
+  categorie aanklikt en dan "Eén voor één nakijken", ziet precies die groepen,
+  in dezelfde volgorde (`lib/google/overview.ts` is de gedeelde lijst).
+- Tijdens het nakijken kan je de groep meteen in een categorie zetten; een
+  geneste groep klik je open zoals in het venster op het overzicht.
+- Geen regel in het adminlogboek per beslissing (zevenhonderd regels zeggen
+  niets); de verwijdering zelf staat er wel in, met wie erin zat.
+
 ### Categorieën: ordening, geen regel
 
 Zevenhonderd adressen in één alfabetische lijst zijn niet te overzien. Een

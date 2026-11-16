@@ -10,12 +10,10 @@ import { useToast } from "@/components/ui/toast";
 import { UNSENT, useUnsentGuard } from "@/components/ui/unsentGuard";
 import type { SaveState } from "@/lib/saveState";
 import { MAX_DELETE_PER_CLICK } from "@/lib/google/kinds";
-import { STATUS_TONE_CLASS, statusLabel } from "@/lib/google/activityLabels";
+import { GroupMembers } from "./GroupMembers";
 import {
-  type MemberPeek,
   assignCategoryAction,
   deleteFromGoogleAction,
-  mailGroupMembersAction,
 } from "./bulkActions";
 
 export type MailGroupRow = {
@@ -38,6 +36,8 @@ export type MailGroupRow = {
   unknown: number;
   /** De groep heet naar dit of volgend werkingsjaar (`sport_2627`). */
   thisYear: boolean;
+  /** Uit de nakijkmodus. */
+  decision: "KEEP" | "DELETE" | null;
   lastSync: string;
   notInGoogle: boolean;
   lastError: string | null;
@@ -290,6 +290,10 @@ export function MailGroupTable({
             {row.owner && <> · {row.owner}</>}
             {row.archived && <> · {nl ? "archief" : "archive"}</>}
             {!row.enabled && <> · {nl ? "niet beheerd" : "not managed"}</>}
+            {row.decision === "DELETE" && (
+              <span className="text-red-700"> · {nl ? "op weg" : "marked to remove"}</span>
+            )}
+            {row.decision === "KEEP" && <> · {nl ? "houden" : "keep"}</>}
           </span>
         </td>
         <td className="px-4 py-3 align-top text-zinc-600">{row.summary || "-"}</td>
@@ -602,7 +606,7 @@ function ActivityCell({ nl, row }: { nl: boolean; row: MailGroupRow }) {
   );
 }
 
-/** Wie er in één groep zit, met per adres of het nog actief is. */
+/** Wie er in één groep zit, in een venster boven het overzicht. */
 function MembersPeek({
   nl,
   base,
@@ -614,119 +618,39 @@ function MembersPeek({
   row: MailGroupRow;
   onClose: () => void;
 }) {
-  // Een geneste groep klikt open in hetzelfde venster; de stapel is het pad
-  // terug (24urenloop > sport > sport_2627).
-  const [stack, setStack] = useState<{ id: string; email: string }[]>([{ id: row.id, email: row.email }]);
-  const current = stack[stack.length - 1];
-  const [loaded, setLoaded] = useState<{ id: string; members: MemberPeek[] | null; failed: boolean } | null>(null);
-  const members = loaded?.id === current.id ? loaded.members : null;
-  const failed = loaded?.id === current.id && loaded.failed;
-  const unsent = useUnsentGuard();
-
-  useEffect(() => {
-    let cancelled = false;
-    unsent
-      .run(() => mailGroupMembersAction(current.id))
-      .then((result) => {
-        if (cancelled) return;
-        if (result === UNSENT || result === null) setLoaded({ id: current.id, members: null, failed: true });
-        else setLoaded({ id: current.id, members: result, failed: false });
-      })
-      .catch(() => !cancelled && setLoaded({ id: current.id, members: null, failed: true }));
-    return () => {
-      cancelled = true;
-    };
-  }, [current.id, unsent]);
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const activeCount = members?.filter((m) => m.active).length ?? 0;
-
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-900/40 p-4"
       role="dialog"
       aria-modal="true"
-      aria-label={current.email}
+      aria-label={row.email}
       onClick={onClose}
     >
       <div
         className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl border border-vtk-blue/15 bg-vtk-surface-elevated shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="border-b border-vtk-blue/10 px-5 py-4">
-          {stack.length > 1 && (
-            <nav className="mb-1 flex flex-wrap items-center gap-1 text-xs text-zinc-500" aria-label={nl ? "Pad" : "Path"}>
-              {stack.slice(0, -1).map((g, i) => (
-                <span key={g.id} className="inline-flex items-center gap-1">
-                  <button type="button" className="vtk-link" onClick={() => setStack(stack.slice(0, i + 1))}>
-                    {g.email}
-                  </button>
-                  <span aria-hidden="true">›</span>
-                </span>
-              ))}
-            </nav>
+        <GroupMembers
+          nl={nl}
+          rootId={row.id}
+          rootEmail={row.email}
+          footer={(current) => (
+            <div className="flex items-center justify-end gap-3 border-t border-vtk-blue/10 px-5 py-3">
+              <Link href={`${base}/${current.id}`} className="vtk-link text-sm">
+                {nl ? "Groepsadres openen" : "Open group address"}
+              </Link>
+              <Button type="button" size="sm" variant="ghost" onClick={onClose}>
+                {nl ? "Sluiten" : "Close"}
+              </Button>
+            </div>
           )}
-          <h2 className="break-all font-semibold text-vtk-ink">{current.email}</h2>
-          <p className="mt-1 text-sm text-zinc-500">
-            {members === null
-              ? nl
-                ? "Een post dit werkingsjaar, of hun studie dit academiejaar bevestigd, telt als actief."
-                : "A post this working year, or their studies confirmed this academic year, counts as active."
-              : nl
-                ? `${activeCount} van ${members.length} nog actief: een post dit werkingsjaar, hun studie dit academiejaar bevestigd, of een groep waarin iemand actief is.`
-                : `${activeCount} of ${members.length} still active: a post this working year, their studies confirmed this academic year, or a group with someone active in it.`}
-          </p>
-        </div>
-        <div className="min-h-0 flex-1 overflow-auto px-5 py-3">
-          {failed ? (
-            <p className="text-sm text-red-700">
-              {nl ? "De leden konden niet geladen worden. Probeer het opnieuw." : "Could not load the members. Try again."}
-            </p>
-          ) : members === null ? (
-            <p className="text-sm text-zinc-500">{nl ? "Bezig met laden..." : "Loading..."}</p>
-          ) : members.length === 0 ? (
-            <p className="text-sm text-zinc-500">{nl ? "Niemand." : "Nobody."}</p>
-          ) : (
-            <ul className="divide-y divide-vtk-blue/5">
-              {members.map((m) => {
-                const l = statusLabel(m, nl);
-                return (
-                  <li key={m.email} className="flex items-start justify-between gap-3 py-2">
-                    <span className="min-w-0 text-sm">
-                      {m.groupId ? (
-                        <button
-                          type="button"
-                          className="vtk-link block break-all text-left"
-                          onClick={() => setStack([...stack, { id: m.groupId!, email: m.email }])}
-                          aria-label={nl ? `Wie zit er in ${m.email}` : `Who is in ${m.email}`}
-                        >
-                          {m.email}
-                        </button>
-                      ) : (
-                        <span className="block break-all text-vtk-ink">{m.email}</span>
-                      )}
-                      {m.name && <span className="block text-xs text-zinc-500">{m.name}</span>}
-                    </span>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${STATUS_TONE_CLASS[l.tone]}`}>{l.text}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-        <div className="flex items-center justify-end gap-3 border-t border-vtk-blue/10 px-5 py-3">
-          <Link href={`${base}/${current.id}`} className="vtk-link text-sm">
-            {nl ? "Groepsadres openen" : "Open group address"}
-          </Link>
-          <Button type="button" size="sm" variant="ghost" onClick={onClose}>
-            {nl ? "Sluiten" : "Close"}
-          </Button>
-        </div>
+        />
       </div>
     </div>
   );

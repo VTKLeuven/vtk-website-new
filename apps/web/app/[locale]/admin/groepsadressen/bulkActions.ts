@@ -230,7 +230,7 @@ export async function deleteOneFromGoogleAction(formData: FormData): Promise<Sav
 
 async function deleteGroups(
   ids: string[],
-): Promise<{ code: string } | { deleted: number; problems: string[] }> {
+): Promise<{ code: string } | { deleted: number; deletedIds: string[]; problems: string[] }> {
   const cfg = await getGoogleConfig();
   if (!cfg) return { code: "NOT_CONFIGURED" };
 
@@ -247,6 +247,7 @@ async function deleteGroups(
   const todo = rows.filter((r) => !recreated.includes(r));
 
   const failed: string[] = [];
+  const deletedIds: string[] = [];
   let deleted = 0;
   await pool(todo, 4, async (row) => {
     const members = currentAddresses(row, ctx);
@@ -261,6 +262,7 @@ async function deleteGroups(
       prisma.mailGroup.delete({ where: { id: row.id } }),
     ]);
     deleted++;
+    deletedIds.push(row.id);
     const listed = members.slice(0, LOGGED_MEMBERS).join(", ");
     const rest = members.length - LOGGED_MEMBERS;
     await logAudit({
@@ -274,6 +276,7 @@ async function deleteGroups(
 
   return {
     deleted,
+    deletedIds,
     problems: [
       ...failed.map((f) => `niet gelukt: ${f}`),
       ...recreated.map(
@@ -324,4 +327,59 @@ export async function mailGroupMembersAction(id: string): Promise<MemberPeek[] |
     groupId: groupId.get(email) ?? null,
     ...toStatusView(status),
   }));
+}
+
+// -----------------------------------------------------------------------------
+// Nakijkmodus
+// -----------------------------------------------------------------------------
+
+/**
+ * Houden, weg, of de beslissing wissen. "Weg" verwijdert nog niets: de groep
+ * komt op de lijst "Te verwijderen", die iemand daarna in één keer bevestigt.
+ * Geen regel in het adminlogboek per klik (zevenhonderd regels zeggen niets);
+ * de verwijdering zelf staat er wel in.
+ */
+export async function reviewMailGroupAction(
+  id: string,
+  decision: "KEEP" | "DELETE" | null,
+): Promise<SaveState> {
+  await requirePermission("mailgroups.manage");
+  if (decision !== null && decision !== "KEEP" && decision !== "DELETE") return saveError("INVALID_INPUT");
+  const result = await prisma.mailGroup.updateMany({
+    where: { id },
+    data: { reviewDecision: decision, reviewedAt: decision ? new Date() : null },
+  });
+  if (result.count === 0) return saveError("NOT_FOUND");
+  revalidatePath(ADMIN);
+  return saveOk();
+}
+
+export type ReviewDeleteResult =
+  | { status: "error"; code: string }
+  | { status: "done"; deletedIds: string[]; message: string; problems: boolean };
+
+/**
+ * Verwijdert wat in de nakijkmodus op "weg" staat. Geeft terug welke groepen
+ * echt weg zijn, zodat de nakijkmodus enkel die uit haar lijst haalt; wat
+ * mislukte, blijft op "weg" staan voor een volgende keer.
+ */
+export async function deleteReviewedAction(ids: string[]): Promise<ReviewDeleteResult> {
+  await requirePermission("mailgroups.manage");
+  const unique = [...new Set(ids.filter(Boolean))].slice(0, MAX_DELETE_PER_CLICK);
+  if (unique.length === 0) return { status: "error", code: "NOTHING_SELECTED" };
+  // Enkel wat echt op "weg" staat: een id uit een verouderd scherm verwijdert niets.
+  const marked = await prisma.mailGroup.findMany({
+    where: { id: { in: unique }, reviewDecision: "DELETE" },
+    select: { id: true },
+  });
+  const outcome = await deleteGroups(marked.map((m) => m.id));
+  if ("code" in outcome) return { status: "error", code: outcome.code };
+  revalidate();
+  const { deleted, deletedIds, problems } = outcome;
+  return {
+    status: "done",
+    deletedIds,
+    problems: problems.length > 0,
+    message: `${deleted} ${deleted === 1 ? "groep" : "groepen"} verwijderd uit Google.${problems.length ? ` ${problems.join("; ")}.` : ""}`,
+  };
 }

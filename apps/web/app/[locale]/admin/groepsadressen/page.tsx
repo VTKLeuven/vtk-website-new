@@ -1,28 +1,17 @@
 import { notFound } from "next/navigation";
 import Link from "@/components/ui/Link";
 import { prisma } from "@vtk/db";
-import type { Prisma } from "@prisma/client";
-import { currentWorkingYear } from "@vtk/auth";
 import type { Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { getGoogleStatus } from "@/lib/google/config";
 import { canSeeMailGroups, mailGroupAccess } from "@/lib/google/access";
+import { MAIL_GROUP_KINDS, type MailGroupKind, mailGroupKindLabel } from "@/lib/google/kinds";
 import {
-  MAIL_GROUP_SELECT,
-  type MailGroupForSync,
-  desiredFor,
-  isArchivedYear,
-  loadDesiredContext,
-} from "@/lib/google/desired";
-import {
-  MAIL_GROUP_KINDS,
-  type MailGroupKind,
-  isMailGroupKind,
-  mailGroupKind,
-  mailGroupKindLabel,
-} from "@/lib/google/kinds";
-import { SOURCE_NAME_SELECT, sourceName } from "@/lib/google/labels";
-import { loadMailGroupActivity } from "@/lib/google/activityData";
+  isEmptyRow,
+  isInactiveRow,
+  loadMailGroupOverview,
+  overviewQuery,
+} from "@/lib/google/overview";
 import { formatWorkingYear } from "@/lib/workingYear";
 import { MailGroupsToolbar } from "./MailGroupsToolbar";
 import { type CategoryNode, MailGroupCategories } from "./MailGroupCategories";
@@ -65,27 +54,8 @@ export default async function AdminMailGroups({
   const access = await mailGroupAccess();
   if (!canSeeMailGroups(access)) throw new Error("FORBIDDEN");
 
-  const year = currentWorkingYear();
-  const where: Prisma.MailGroupWhereInput = access.manageAll
-    ? {}
-    : { ownerGroupId: { in: [...access.werkgroepIds] } };
-
-  const [mailGroups, status, pendingRequests, werkgroepen, categoryRows] = await Promise.all([
-    prisma.mailGroup.findMany({
-      where,
-      orderBy: { email: "asc" },
-      select: {
-        ...MAIL_GROUP_SELECT,
-        lastSyncAt: true,
-        lastError: true,
-        lastMemberCount: true,
-        ownerGroup: { select: { nameNl: true, nameEn: true } },
-        categoryId: true,
-        sources: {
-          select: { ...MAIL_GROUP_SELECT.sources.select, ...SOURCE_NAME_SELECT },
-        },
-      },
-    }),
+  const [overview, status, pendingRequests, werkgroepen] = await Promise.all([
+    loadMailGroupOverview({ access, nl, search: filters }),
     getGoogleStatus(),
     access.approveAccounts
       ? prisma.werkgroepAccount.count({ where: { status: "REQUESTED" } })
@@ -97,97 +67,17 @@ export default async function AdminMailGroups({
       select: { id: true, nameNl: true, nameEn: true, mailPrefix: true },
       orderBy: { nameNl: "asc" },
     }),
-    access.manageAll
-      ? prisma.mailGroupCategory.findMany({
-          select: { id: true, name: true, parentId: true },
-          orderBy: { name: "asc" },
-        })
-      : Promise.resolve([]),
   ]);
+  const { rows, base0, visible, categoryRows, categoryLabel, topOf } = overview;
+  const { kind, showArchive, q, categoryFilter, cleanup } = overview.filter;
 
-  const ctx = await loadDesiredContext(mailGroups as unknown as MailGroupForSync[], year);
-  const activity = await loadMailGroupActivity(mailGroups as unknown as MailGroupForSync[], ctx);
-
-  // Categorieën: hoofdcategorie met haar subcategorieën, alfabetisch.
-  const categoryById = new Map(categoryRows.map((c) => [c.id, c]));
-  const categoryLabel = (id: string | null): string | null => {
-    const c = id ? categoryById.get(id) : undefined;
-    if (!c) return null;
-    const parent = c.parentId ? categoryById.get(c.parentId) : undefined;
-    return parent ? `${parent.name} › ${c.name}` : c.name;
-  };
-  const topOf = (id: string | null): string | null => {
-    const c = id ? categoryById.get(id) : undefined;
-    return c ? (c.parentId ?? c.id) : null;
-  };
-
-  const rows = mailGroups.map((g) => {
-    const kind = mailGroupKind({
-      ...g,
-      sources: g.sources.map((s) => ({ ...s, groupKind: s.group?.type ?? null })),
-    });
-    const archived = isArchivedYear(g, year);
-    const computed = archived ? null : desiredFor(g as unknown as MailGroupForSync, ctx);
-    return {
-      id: g.id,
-      email: g.email,
-      name: g.name,
-      kind,
-      archived,
-      enabled: g.enabled,
-      memberCount: computed ? computed.emails.length : g.lastMemberCount,
-      unlinked: computed?.unlinked.length ?? 0,
-      summary: [
-        ...g.sources.map((s) => sourceName(s, nl)),
-        ...(g.extras.length
-          ? [nl ? `${g.extras.length} los` : `${g.extras.length} loose`]
-          : []),
-        ...(g.children.some((c) => c.year === year)
-          ? [nl ? "jaargroep van dit jaar" : "this year's group"]
-          : []),
-      ].join(", "),
-      owner: g.ownerGroup ? (nl ? g.ownerGroup.nameNl : g.ownerGroup.nameEn) : null,
-      year: g.year,
-      lastSyncAt: g.lastSyncAt,
-      lastError: g.lastError,
-      existsInGoogle: Boolean(g.googleId),
-      categoryId: g.categoryId,
-      activity: activity.get(g.id)?.activity ?? { total: 0, active: 0, unknown: 0, lastYear: null, thisYear: false },
-    };
-  });
-
-  const kind: MailGroupKind | null = isMailGroupKind(filters.soort) ? filters.soort : null;
-  const showArchive = filters.archief === "1";
-  const q = normalizeSearchText((filters.q ?? "").trim());
-  // `geen` = zonder categorie; een hoofdcategorie toont ook haar subcategorieën.
-  const categoryFilter =
-    filters.categorie === "geen" || (filters.categorie && categoryById.has(filters.categorie))
-      ? filters.categorie
-      : null;
-  const cleanup = filters.opruimen === "inactief" || filters.opruimen === "leeg" ? filters.opruimen : null;
-  const isEmpty = (row: (typeof rows)[number]) => row.memberCount === 0;
-  const isInactive = (row: (typeof rows)[number]) =>
-    row.memberCount > 0 && row.activity.active === 0 && !row.activity.thisYear;
-  const inCategory = (row: (typeof rows)[number]) =>
-    !categoryFilter ||
-    (categoryFilter === "geen"
-      ? !row.categoryId
-      : row.categoryId === categoryFilter || topOf(row.categoryId) === categoryFilter);
-
-  const base0 = rows.filter((row) => showArchive || !row.archived);
-  const visible = base0.filter(
-    (row) =>
-      (!kind || row.kind === kind) &&
-      inCategory(row) &&
-      (!cleanup || (cleanup === "leeg" ? isEmpty(row) : isInactive(row))) &&
-      (!q ||
-        normalizeSearchText(`${row.email} ${row.name} ${row.summary} ${categoryLabel(row.categoryId) ?? ""}`).includes(q)),
-  );
   const counts = new Map<MailGroupKind, number>();
   for (const row of base0) counts.set(row.kind, (counts.get(row.kind) ?? 0) + 1);
   const archivedCount = rows.filter((row) => row.archived).length;
-  const inactiveCount = base0.filter(isInactive).length;
-  const emptyCount = base0.filter(isEmpty).length;
+  const inactiveCount = base0.filter(isInactiveRow).length;
+  const emptyCount = base0.filter(isEmptyRow).length;
+  const toDeleteCount = base0.filter((row) => row.reviewDecision === "DELETE").length;
+  const toReviewCount = visible.filter((row) => !row.reviewDecision).length;
 
   // Per categorie: wat er rechtstreeks in zit, en voor een hoofdcategorie ook
   // wat in haar subcategorieën zit (dat toont de chip).
@@ -208,20 +98,8 @@ export default async function AdminMailGroups({
   const openTop = categoryFilter && categoryFilter !== "geen" ? topOf(categoryFilter) : null;
   const openNode = tree.find((c) => c.id === openTop) ?? null;
 
-  const href = (patch: Record<string, string | null>) => {
-    const params = new URLSearchParams();
-    const next = {
-      categorie: categoryFilter,
-      soort: kind,
-      opruimen: cleanup,
-      q: filters.q ?? null,
-      archief: showArchive ? "1" : null,
-      ...patch,
-    };
-    for (const [key, value] of Object.entries(next)) if (value) params.set(key, value);
-    const query = params.toString();
-    return `${base}${query ? `?${query}` : ""}`;
-  };
+  const href = (patch: Record<string, string | null>) =>
+    `${base}${overviewQuery(overview.filter, filters.q, patch)}`;
 
   const dateFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
     day: "2-digit",
@@ -235,6 +113,7 @@ export default async function AdminMailGroups({
     categoryId: row.categoryId,
     unknown: row.activity.unknown,
     thisYear: row.activity.thisYear,
+    decision: row.reviewDecision,
     email: row.email,
     name: row.name,
     category: categoryLabel(row.categoryId),
@@ -364,6 +243,15 @@ export default async function AdminMailGroups({
                 {nl ? "Leeg" : "Empty"} <span className="tabular-nums">{emptyCount}</span>
               </FilterChip>
             )}
+            {toDeleteCount > 0 && (
+              <FilterChip
+                href={href({ opruimen: cleanup === "verwijderen" ? null : "verwijderen" })}
+                active={cleanup === "verwijderen"}
+                small
+              >
+                {nl ? "Te verwijderen" : "To delete"} <span className="tabular-nums">{toDeleteCount}</span>
+              </FilterChip>
+            )}
             {archivedCount > 0 && (
               <Link href={href({ archief: showArchive ? null : "1" })} className="vtk-link ml-1 text-sm">
                 {showArchive
@@ -390,6 +278,28 @@ export default async function AdminMailGroups({
               />
             </form>
           </div>
+          {visible.length > 0 && (
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              <Link
+                href={`${base}/nakijken${overviewQuery(overview.filter, filters.q)}`}
+                className="inline-flex h-9 items-center rounded-full bg-vtk-ink px-4 text-sm font-medium text-vtk-surface hover:opacity-90"
+              >
+                {nl ? "Eén voor één nakijken" : "Review one by one"}
+              </Link>
+              <span className="text-sm text-zinc-500">
+                {nl
+                  ? `${toReviewCount} van de ${visible.length} adressen in deze lijst nog niet nagekeken`
+                  : `${toReviewCount} of the ${visible.length} addresses in this list not reviewed yet`}
+              </span>
+            </div>
+          )}
+          {cleanup === "verwijderen" && (
+            <p className="max-w-3xl text-sm text-zinc-500">
+              {nl
+                ? "Wat je in de nakijkmodus op \"weg\" zette. Er is nog niets verwijderd: vink alles aan en kies \"Verwijderen uit Google\"."
+                : "What you marked \"remove\" in review mode. Nothing has been deleted yet: select all and choose \"Delete from Google\"."}
+            </p>
+          )}
           {cleanup === "inactief" && (
             <p className="max-w-3xl text-sm text-zinc-500">
               {nl
@@ -436,11 +346,6 @@ export default async function AdminMailGroups({
       />
     </div>
   );
-}
-
-/** Zonder accenten en hoofdletters; `admin-table` is een clientmodule. */
-function normalizeSearchText(value: string): string {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
 function FilterChip({

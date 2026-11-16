@@ -1382,6 +1382,12 @@ model MailGroup {
   categoryId String?
   category   MailGroupCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
+  /// Uit de nakijkmodus op /admin/groepsadressen/nakijken: houden of weg.
+  /// Leeg = nog niet nagekeken. "Weg" verwijdert nog niets; dat gebeurt pas
+  /// wanneer iemand de lijst van te verwijderen groepen bevestigt.
+  reviewDecision MailGroupReview?
+  reviewedAt     DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1392,6 +1398,11 @@ model MailGroup {
   @@index([ownerGroupId])
   @@index([parentId])
   @@index([categoryId])
+}
+
+enum MailGroupReview {
+  KEEP
+  DELETE
 }
 
 /// Een map voor groepsadressen in het overzicht, met hoogstens één niveau

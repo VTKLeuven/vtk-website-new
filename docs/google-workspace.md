@@ -307,6 +307,11 @@ op de site en het adres als los lid in andere lijsten ook. Wie erin zat, staat
 per groep in het adminlogboek. De jaargroep van dit jaar van een hoofdgroep met
 een sjabloon wordt overgeslagen: die maakt de sync gewoon opnieuw.
 
+Groep per groep gaat sneller met **Eén voor één nakijken** (onder de filters):
+dezelfde lijst, telkens één groep met wie erin zit, en Houden (H), Weg ermee (V)
+of Overslaan (S). De beslissingen blijven bewaard; "weg" zet een groep op de
+lijst **Te verwijderen**, die je daarna in één keer verwijdert.
+
 Ordenen gaat met **categorieën** (Praesidium › Activiteiten): maak ze bij
 "Categorieën", vink groepen aan en kies "In categorie zetten".
 
