@@ -2493,10 +2493,79 @@ mag, wist dingen die niemand kan terughalen.
 - **Enkel gewone leden.** `OWNER` en `MANAGER` van een groep blijven staan, ook
   als ze niet in onze berekening zitten. Daar zit het botaccount tussen, en een
   sync die zichzelf uit de groep gooit kan nadien niets meer rechtzetten.
-- **Nooit een groep verwijderen.** Verdwijnt de bron (post opgeheven), dan
+- **Nooit zelf een groep verwijderen.** Verdwijnt de bron (post opgeheven), dan
   laten we de groep staan en beheren we ze niet meer. Aan een groepsadres hangt
   het archief van de conversaties, en het adres staat op affiches, in
-  mailhandtekeningen en op de site van een bedrijf.
+  mailhandtekeningen en op de site van een bedrijf. Verwijderen gebeurt enkel
+  door iemand met `mailgroups.manage`, op het overzicht; zie "Opruimen" hieronder.
+
+### Opruimen: een mens verwijdert, met de leden ernaast
+
+Na het overnemen stonden er ruim zevenhonderd groepen op de site, waarvan een
+groot deel van lang geleden (`activiteiten_1112`, `cantus_1617`). Wie wil weten
+of zo'n groep weg mag, wil weten of er nog iemand in zit die nu bij de kring
+hoort. Daarom toont het overzicht per groep **hoeveel leden nog actief zijn**, en
+klikt dat cijfer open tot de lijst met per adres de status.
+
+- **Actief** is een post, werkgroep of jaarwerking dit werkingsjaar, een lopende
+  kiesploeg, of een studie die dit academiejaar bevestigd is (dezelfde grens als
+  de mailinglijsten). Een andere groep van de kring telt als actief wanneer ze
+  zelf rechtstreeks actieve leden heeft. Bewust **niet** wanneer iemand laatst in
+  Google aanmeldde: een oud-praesidiumlid dat zijn mailbox nog gebruikt, is geen
+  reden om `cantus_1617` te houden. De regel staat in `lib/google/activity.ts`.
+- Bij nul actief toont de rij **het jongste jaar** waarin nog iemand actief was
+  ("laatst 17-18"), of "niemand gekend" wanneer de site geen enkel adres kent.
+  Dat jaar zegt meer dan de naam van de groep.
+- **Verwijderen haalt de groep in Google weg**, met haar aliassen en het archief
+  van haar berichten, en daarna de regel op de site en het adres als los lid in
+  andere lijsten (anders probeert de sync elke vijf minuten een groep toe te
+  voegen die niet meer bestaat). Wie erin zat, staat per groep in het
+  adminlogboek. Terugzetten kan niet vanuit de site, en dat zegt de bevestiging.
+- **In bulk**, tot 200 per klik: zoeken (`activiteiten_`), alles in de filter
+  aanvinken, verwijderen. De bevestiging noemt de adressen, telt de leden en
+  waarschuwt wanneer er een groep met nog actieve leden tussen zit.
+- **Eén uitzondering:** de jaargroep van dit of volgend werkingsjaar van een
+  hoofdgroep met een sjabloon. Die maakt de sync bij de volgende ronde opnieuw
+  aan, dus die slaat de verwijdering over en zegt waarom.
+- "Loskoppelen" blijft bestaan naast verwijderen: dat haalt enkel de regel hier
+  weg en laat de groep in Google staan.
+
+### Categorieën: ordening, geen regel
+
+Zevenhonderd adressen in één alfabetische lijst zijn niet te overzien. Een
+groepsadres kan in één categorie staan, met hoogstens één niveau
+subcategorieën (Praesidium › Activiteiten). Dieper maakt van de filterrij een
+boom die niemand overziet.
+
+- De categorieën zijn chips boven de lijst; een hoofdcategorie toont haar
+  subcategorieën als tweede rij, en "Zonder categorie" vangt de rest.
+- **Toewijzen gebeurt in bulk**: aanvinken (of alles in de filter) en "In
+  categorie zetten". Per groep kan het ook bij Instellingen.
+- Een categorie zegt niets over wie erin zit: de sync leest ze niet. Weghalen
+  laat de adressen staan, zonder categorie; de subcategorieën gaan mee.
+- Alfabetisch, zonder handmatige volgorde, zoals de rollen.
+- De automatische soorten (posten, jaargroepen, POC's) blijven als kleine chips
+  naast de opruimfilters. "Met de hand" is weg: dat was elke overgenomen groep
+  en zei dus niets.
+
+### Eén groepsadres in tabbladen
+
+De detailpagina was vijf secties onder elkaar, en bij een overgenomen lijst
+stond elk adres twee keer (bij "Wie erin zit" en bij "Losse leden"). Vier
+richtingen zijn op een bord vergeleken (tabbladen, één lijst met de regels
+erboven, regel en resultaat naast elkaar, dichtgeklapte kaarten); gekozen zijn
+de **tabbladen**: Leden, Bronnen, Jaargroepen en Instellingen.
+
+- **Leden is één tabel**: elk adres één keer, met waarom het erin zit (via een
+  bron, los, jaargroep, uitgesloten) en of het nog actief is, plus de knop om
+  een los lid of een uitsluiting weg te halen. Toevoegen staat bovenaan die
+  tabel, met een keuze tussen een lid van de site en een mailadres.
+- Bovenaan de pagina een zin die de groep samenvat ("9 leden, waarvan 2 nog
+  actief. Geen bronnen, enkel 9 losse adressen.").
+- Het tabblad staat in de URL (`?tab=instellingen`). Loskoppelen en
+  verwijderen staan onderaan Instellingen.
+- Keuzes uit een lange lijst (bron, post, categorie) zijn een zoekbare
+  keuzelijst (`SearchPicker`), geen keuzelijst van de browser.
 
 ### Deze adressen ontvangen mail van buiten
 

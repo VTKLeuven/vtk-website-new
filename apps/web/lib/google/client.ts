@@ -251,6 +251,30 @@ export async function updateGroup(
   await request(cfg, "PUT", `${DIRECTORY}/groups/${encodeURIComponent(key)}`, input);
 }
 
+/**
+ * Verwijdert een groep in Google, met haar aliassen en het archief van haar
+ * berichten. Een groep die er al niet meer is, geeft `false` en geen fout:
+ * dat is de toestand die we wilden.
+ *
+ * Enkel aangeroepen vanuit een expliciete keuze van een beheerder op
+ * /admin/groepsadressen, nooit door de sync. Zie docs/design-decisions.md.
+ */
+export async function deleteGroup(cfg: GoogleConfig, key: string): Promise<boolean> {
+  const res = await authorizedFetch(
+    cfg,
+    "DELETE",
+    `${DIRECTORY}/groups/${encodeURIComponent(key)}`,
+    undefined,
+    {},
+  );
+  if (res.status === 404) return false;
+  if (!res.ok) {
+    const parsed = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+    throw new GoogleError(parsed?.error?.message ?? `${res.status} ${res.statusText}`, res.status, parsed);
+  }
+  return true;
+}
+
 /** Alle groepen van het domein, voor het koppelscherm. */
 export async function listGroups(cfg: GoogleConfig): Promise<GoogleGroup[]> {
   const out: GoogleGroup[] = [];

@@ -59,6 +59,7 @@ huidige werkingsjaar, dus de 15-juli-wissel heeft geen eigen cron nodig.
 | `apps/web/lib/google/accountState.ts`            | De vier accountstaten en wat de sync zelf mag (`transitionAllowed`)      |
 | `apps/web/lib/google/access.ts`                  | Wie welke lijst mag beheren (IT, of een werkgroep haar eigen lijsten)    |
 | `apps/web/lib/google/import.ts`                  | Een bestaande Google-groep overnemen                                     |
+| `apps/web/lib/google/activity.ts`                | Wie in een lijst nog actief is (puur, getest); `activityData.ts` haalt de rijen |
 | `apps/web/lib/google/werkgroepAccounts.ts`       | Accounts van werkgroepen aanvragen, goedkeuren, weigeren                 |
 | `apps/web/lib/google/addresses.ts`               | Adressjablonen, normalisatie, botsingen, wachtwoord                      |
 | `apps/web/lib/google/provision.ts`               | Accounts plannen en aanmaken                                             |
@@ -70,8 +71,8 @@ huidige werkingsjaar, dus de 15-juli-wissel heeft geen eigen cron nodig.
 
 | Route                                | Wat                                                            | Recht                    |
 | ------------------------------------ | -------------------------------------------------------------- | ------------------------ |
-| `/admin/groepsadressen`              | Overzicht van alle lijsten, filter per soort, nu synchroniseren | `mailgroups.manage`, of een werkgroep (haar eigen lijsten) |
-| `/admin/groepsadressen/<id>`         | Eén lijst: wie erin zit, bronnen, losse leden, jaargroepen      | idem                     |
+| `/admin/groepsadressen`              | Overzicht, categorieën, wie nog actief is, in bulk ordenen of verwijderen, nu synchroniseren | `mailgroups.manage`, of een werkgroep (haar eigen lijsten) |
+| `/admin/groepsadressen/<id>`         | Eén lijst in tabbladen: leden, bronnen, jaargroepen, instellingen | idem                   |
 | `/admin/groepsadressen/overnemen`    | Bestaande Google-groepen overnemen                             | `mailgroups.manage`      |
 | `/admin/groepsadressen/aanvragen`    | Accounts van werkgroepen aanvragen en goedkeuren; voorvoegsels | werkgroep / `googleAccounts.manage` / `mailgroups.manage` |
 | `/admin/groepsadressen/koppelingen`  | Bestaande `@vtk.be`-accounts aan leden hangen                  | `mailgroups.manage`      |
@@ -282,6 +283,25 @@ die de site nog niet kent. Vink aan wat de site voortaan moet beheren.
   berekende ledenlijst na, en klik "overgenomen adressen wissen".
 
 Begin met een handvol lijsten en kijk na wat er in Google gebeurde.
+
+### Opruimen
+
+Het overzicht toont per groep hoeveel leden nog actief zijn: een post dit
+werkingsjaar, een lopende kiesploeg of een studie die dit academiejaar
+bevestigd is. Een klik op dat cijfer toont wie erin zit, met per adres de status.
+
+1. Filter op **Niemand meer actief** of **Leeg**, of zoek (`activiteiten_`).
+2. Vink aan wat weg mag; het vinkje in de kop neemt alles in de filter.
+3. **Verwijderen uit Google**, tot 200 per keer. De bevestiging noemt wat weggaat
+   en waarschuwt bij een groep met nog actieve leden.
+
+Wat er gebeurt: de groep verdwijnt in Google (met aliassen en archief), de regel
+op de site en het adres als los lid in andere lijsten ook. Wie erin zat, staat
+per groep in het adminlogboek. De jaargroep van dit jaar van een hoofdgroep met
+een sjabloon wordt overgeslagen: die maakt de sync gewoon opnieuw.
+
+Ordenen gaat met **categorieën** (Praesidium › Activiteiten): maak ze bij
+"Categorieën", vink groepen aan en kies "In categorie zetten".
 
 ### Standaardinstellingen van een groep
 
@@ -505,7 +525,8 @@ Lidmaatschap aanpassen; de reconcile zet Google recht binnen de vijf minuten.
   `MailGroup`-rij wordt niet aangeraakt; enkel het overnemenscherm leest de
   lijst. Wie een groep met de hand wil blijven onderhouden, neemt ze niet over
   (of zet "de site beheert dit adres" uit).
-- **Geen groepen verwijderen.** Aan een groepsadres hangt het archief, en het
-  staat op affiches en in mailhandtekeningen.
+- **De sync verwijdert nooit een groep.** Aan een groepsadres hangt het
+  archief, en het staat op affiches en in mailhandtekeningen. Verwijderen doet
+  enkel een mens, op het overzicht (zie "Opruimen" hierboven).
 - **Geen routing- of complianceregels via de API.** Die bestaan niet publiek;
   daarom de OU-constructie uit stap 4.

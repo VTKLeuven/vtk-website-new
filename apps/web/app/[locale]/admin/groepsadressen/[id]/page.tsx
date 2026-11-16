@@ -17,7 +17,9 @@ import { GROUP_KINDS, everyGroupOfKindLabel, memberAddress, normaliseEmail } fro
 import { renderAddress, yearVars } from "@/lib/google/addresses";
 import { IMPORTED_NOTE } from "@/lib/google/import";
 import { SOURCE_NAME_SELECT, sourceName } from "@/lib/google/labels";
-import { MailGroupDetail, type SourceOptionGroup } from "./MailGroupDetail";
+import { loadMailGroupActivity } from "@/lib/google/activityData";
+import { toStatusView } from "@/lib/google/activityLabels";
+import { MailGroupDetail, type MemberRow, type SourceOptionGroup } from "./MailGroupDetail";
 
 /**
  * Eén groepsadres: wie erin zit en waarom, de bronnen, de losse leden, de
@@ -29,10 +31,12 @@ import { MailGroupDetail, type SourceOptionGroup } from "./MailGroupDetail";
  */
 export default async function MailGroupPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
-  const { locale: localeParam, id } = await params;
+  const [{ locale: localeParam, id }, { tab }] = await Promise.all([params, searchParams]);
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const nl = locale === "nl";
@@ -46,6 +50,8 @@ export default async function MailGroupPage({
       lastSyncAt: true,
       lastError: true,
       importedAt: true,
+      categoryId: true,
+      category: { select: { name: true, parent: { select: { name: true } } } },
       ownerGroup: { select: { id: true, nameNl: true, nameEn: true, mailPrefix: true } },
       parent: { select: { id: true, email: true } },
       yearlyGroup: { select: { nameNl: true, nameEn: true } },
@@ -78,6 +84,7 @@ export default async function MailGroupPage({
   const syncRow = row as unknown as MailGroupForSync;
   const ctx = await loadDesiredContext([syncRow], year);
   const computed = desiredFor(syncRow, ctx);
+  const activity = (await loadMailGroupActivity([syncRow], ctx)).get(row.id);
 
   // Wie bij welk adres hoort, om de berekende lijst met namen te tonen.
   const names = new Map<string, string>();
@@ -100,7 +107,7 @@ export default async function MailGroupPage({
   }
   for (const child of row.children) names.set(child.email, nl ? "jaargroep" : "yearly group");
 
-  const [groups, kiesploegen, pocs, werkgroepen, ownMembers] = await Promise.all([
+  const [groups, kiesploegen, pocs, werkgroepen, ownMembers, categories] = await Promise.all([
     access.manageAll
       ? prisma.group.findMany({
           where: { active: true },
@@ -135,6 +142,12 @@ export default async function MailGroupPage({
           where: { groupId: row.ownerGroupId, year, user: { active: true, deletedAt: null } },
           select: { user: { select: { id: true, name: true } } },
           orderBy: { user: { name: "asc" } },
+        })
+      : [],
+    access.manageAll
+      ? prisma.mailGroupCategory.findMany({
+          select: { id: true, name: true, parentId: true },
+          orderBy: { name: "asc" },
         })
       : [],
   ]);
@@ -191,6 +204,80 @@ export default async function MailGroupPage({
     minute: "2-digit",
   });
 
+  // Eén rij per adres in de lijst, met waarom het erin zit; daarna de regels
+  // die geen adres opleveren (uitsluitingen, leden zonder account).
+  const extraAddress = (e: (typeof row.extras)[number]): string | null =>
+    e.user
+      ? memberAddress(
+          {
+            id: e.user.id,
+            name: e.user.name,
+            googleEmail: e.user.googleEmail,
+            werkgroepEmails: Object.fromEntries(e.user.werkgroepAccounts.map((a) => [a.groupId, a.email])),
+          },
+          ownerId,
+        )
+      : e.email
+        ? normaliseEmail(e.email)
+        : null;
+  const includeByAddress = new Map<string, (typeof row.extras)[number]>();
+  for (const e of row.extras) {
+    const address = extraAddress(e);
+    if (e.kind === "INCLUDE" && address) includeByAddress.set(address, e);
+  }
+  const childEmails = new Set(row.children.map((c) => c.email));
+  const memberRows: MemberRow[] = (activity?.members ?? []).map(({ email, status }) => {
+    const extra = includeByAddress.get(email);
+    return {
+      key: `m:${email}`,
+      address: email,
+      name: ("name" in status ? status.name : null) ?? names.get(email) ?? null,
+      via: extra ? "loose" : childEmails.has(email) ? "yearly" : "source",
+      extraId: extra?.id ?? null,
+      note: extra?.note && extra.note !== IMPORTED_NOTE ? extra.note : null,
+      status: toStatusView(status),
+    };
+  });
+  for (const e of row.extras) {
+    const address = extraAddress(e);
+    if (e.kind === "EXCLUDE") {
+      memberRows.push({
+        key: `x:${e.id}`,
+        address,
+        name: e.user?.name ?? null,
+        via: "excluded",
+        extraId: e.id,
+        note: e.note && e.note !== IMPORTED_NOTE ? e.note : null,
+        status: null,
+      });
+    } else if (!address) {
+      memberRows.push({
+        key: `x:${e.id}`,
+        address: null,
+        name: e.user?.name ?? null,
+        via: "loose",
+        extraId: e.id,
+        note: e.note && e.note !== IMPORTED_NOTE ? e.note : null,
+        status: null,
+      });
+    }
+  }
+
+  const categoryById = new Map(categories.map((c) => [c.id, c]));
+  const categoryOptions = categories
+    .filter((c) => !c.parentId)
+    .flatMap((c) => [
+      { value: c.id, label: c.name, group: nl ? "Categorieën" : "Categories" },
+      ...categories
+        .filter((s) => s.parentId === c.id)
+        .map((s) => ({ value: s.id, label: s.name, hint: categoryById.get(c.id)?.name, group: c.name })),
+    ]);
+  const categoryName = row.category
+    ? row.category.parent
+      ? `${row.category.parent.name} › ${row.category.name}`
+      : row.category.name
+    : null;
+
   const importedLeft = row.extras.filter(
     (e) => e.note === IMPORTED_NOTE && e.kind === "INCLUDE" && !e.user,
   ).length;
@@ -204,6 +291,7 @@ export default async function MailGroupPage({
         <h1 className="mt-1 text-xl font-semibold text-vtk-ink">{row.email}</h1>
         <p className="mt-1 text-sm text-zinc-500">
           {row.name}
+          {categoryName && <> · {categoryName}</>}
           {row.description && <> · {row.description}</>}
         </p>
         <p className="mt-1 text-xs text-zinc-500">
@@ -247,6 +335,7 @@ export default async function MailGroupPage({
       <MailGroupDetail
         nl={nl}
         locale={locale}
+        initialTab={tab}
         manageAll={access.manageAll}
         archived={archived}
         group={{
@@ -257,17 +346,13 @@ export default async function MailGroupPage({
           enabled: row.enabled,
           allowExternalSenders: row.allowExternalSenders,
           ownerGroupId: row.ownerGroupId,
+          categoryId: row.categoryId,
           isYearly: row.year !== null,
-          // Jaargroepen horen bij een postenlijst, niet bij een lijst van een
-          // werkgroep, een POC of een kiesploeg.
-          canHaveYearly:
-            row.year === null &&
-            !row.ownerGroupId &&
-            row.sources.every((s) => !s.pocId && !s.kiesploegId && !s.kiesploegPostId),
           yearlyTemplate: row.yearlyTemplate,
           yearlyGroupId: row.yearlyGroupId,
         }}
-        members={computed.emails.map((email) => ({ email, name: names.get(email) ?? null }))}
+        members={memberRows}
+        activeCount={activity?.activity.active ?? 0}
         unlinked={computed.unlinked.map((u) => u.name)}
         sources={row.sources.map((s) => ({
           id: s.id,
@@ -276,26 +361,6 @@ export default async function MailGroupPage({
           removable: access.manageAll || s.groupId === ownerId,
         }))}
         sourceOptions={sourceOptions}
-        extras={row.extras.map((e) => ({
-          id: e.id,
-          label: e.user ? e.user.name : (e.email ?? "?"),
-          address: e.user
-            ? memberAddress(
-                {
-                  id: e.user.id,
-                  name: e.user.name,
-                  googleEmail: e.user.googleEmail,
-                  werkgroepEmails: Object.fromEntries(
-                    e.user.werkgroepAccounts.map((a) => [a.groupId, a.email]),
-                  ),
-                },
-                ownerId,
-              )
-            : null,
-          isUser: Boolean(e.user),
-          kind: e.kind,
-          note: e.note,
-        }))}
         importedLeft={importedLeft}
         ownMembers={ownMembers.map((m) => ({ id: m.user.id, name: m.user.name }))}
         werkgroepen={werkgroepen.map((w) => ({
@@ -306,6 +371,16 @@ export default async function MailGroupPage({
         praesidiumPosts={groups
           .filter((x) => x.type === "PRAESIDIUM")
           .map((x) => ({ id: x.id, name: g(x) }))}
+        categoryOptions={categoryOptions}
+        showYearly={
+          access.manageAll &&
+          (Boolean(row.yearlyTemplate) ||
+            // Jaargroepen horen bij een postenlijst, niet bij een lijst van een
+            // werkgroep, een POC of een kiesploeg.
+            (row.year === null &&
+              !row.ownerGroupId &&
+              row.sources.every((s) => !s.pocId && !s.kiesploegId && !s.kiesploegPostId)))
+        }
         yearlyPreview={
           row.yearlyTemplate
             ? renderAddress(row.yearlyTemplate, yearVars(year), domain)

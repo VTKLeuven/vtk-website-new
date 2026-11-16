@@ -145,6 +145,7 @@ const settingsSchema = z.object({
   allowExternalSenders: z.string().optional(),
   ownerGroupId: z.string().optional(),
   enabled: z.string().optional(),
+  categoryId: z.string().optional(),
 });
 
 /**
@@ -168,6 +169,7 @@ export async function saveMailGroupAction(
     allowExternalSenders?: boolean;
     ownerGroupId?: string | null;
     enabled?: boolean;
+    categoryId?: string | null;
   } = { name: input.name, description: input.description || null };
 
   if (access.manageAll) {
@@ -181,6 +183,15 @@ export async function saveMailGroupAction(
     data.allowExternalSenders = input.allowExternalSenders === "on";
     data.ownerGroupId = input.ownerGroupId || null;
     data.enabled = input.enabled === "on";
+    // Enkel wanneer het formulier het veld meestuurt: een ouder formulier zonder
+    // categorie mag een gekozen categorie niet stil wissen.
+    if (input.categoryId !== undefined) {
+      const categoryId = input.categoryId || null;
+      if (categoryId && !(await prisma.mailGroupCategory.findUnique({ where: { id: categoryId }, select: { id: true } }))) {
+        return saveError("INVALID_INPUT");
+      }
+      data.categoryId = categoryId;
+    }
   }
 
   await prisma.mailGroup.update({ where: { id: input.id }, data });

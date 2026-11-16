@@ -157,6 +157,7 @@ export const AUDIT_ENTITIES = {
   boBudget: { nl: "Budget op de site", en: "Budget on the site", group: "bestuursorgaan" },
   vaultItem: { nl: "Kluiswachtwoord", en: "Vault password", group: "vault" },
   mailGroup: { nl: "Groepsadres", en: "Group address", group: "google" },
+  mailGroupCategory: { nl: "Categorie van groepsadressen", en: "Group address category", group: "google" },
   kiesploeg: { nl: "Kiesploeg", en: "Kiesploeg", group: "google" },
   werkgroepAccount: { nl: "Werkgroepaccount", en: "Work group account", group: "google" },
   vaultPost: { nl: "Kluiskoppeling", en: "Vault link", group: "vault" },

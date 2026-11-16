@@ -59,3 +59,10 @@ export function mailGroupKindLabel(kind: MailGroupKind, nl: boolean): string {
   };
   return labels[kind][nl ? 0 : 1];
 }
+
+/**
+ * Hoeveel groepen één klik op /admin/groepsadressen uit Google mag verwijderen.
+ * Een aanroep naar Google per groep; met meer wacht de knop langer dan een
+ * proxy een request openhoudt.
+ */
+export const MAX_DELETE_PER_CLICK = 200;

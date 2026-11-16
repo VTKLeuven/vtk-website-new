@@ -1377,6 +1377,11 @@ model MailGroup {
   /// Overgenomen uit Google in plaats van hier aangemaakt. Enkel ter info.
   importedAt DateTime?
 
+  /// Enkel voor het overzicht op /admin/groepsadressen ("Praesidium ›
+  /// Activiteiten"). Zegt niets over wie erin zit en de sync leest het niet.
+  categoryId String?
+  category   MailGroupCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1385,6 +1390,26 @@ model MailGroup {
 
   @@index([enabled])
   @@index([ownerGroupId])
+  @@index([parentId])
+  @@index([categoryId])
+}
+
+/// Een map voor groepsadressen in het overzicht, met hoogstens één niveau
+/// subcategorieën (Praesidium › Activiteiten). Puur ordening: een categorie
+/// verwijderen laat de adressen staan, zonder categorie. Alfabetisch, zonder
+/// handmatige volgorde. Zie docs/design-decisions.md.
+model MailGroupCategory {
+  id       String              @id @default(cuid())
+  name     String
+  parentId String?
+  parent   MailGroupCategory?  @relation("MailGroupCategoryTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children MailGroupCategory[] @relation("MailGroupCategoryTree")
+
+  mailGroups MailGroup[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([parentId, name])
   @@index([parentId])
 }
 

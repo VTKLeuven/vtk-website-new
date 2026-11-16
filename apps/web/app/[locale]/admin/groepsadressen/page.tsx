@@ -5,7 +5,6 @@ import type { Prisma } from "@prisma/client";
 import { currentWorkingYear } from "@vtk/auth";
 import type { Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
-import { LinkedRow } from "@/components/ui/LinkedRow";
 import { getGoogleStatus } from "@/lib/google/config";
 import { canSeeMailGroups, mailGroupAccess } from "@/lib/google/access";
 import {
@@ -23,7 +22,11 @@ import {
   mailGroupKindLabel,
 } from "@/lib/google/kinds";
 import { SOURCE_NAME_SELECT, sourceName } from "@/lib/google/labels";
+import { loadMailGroupActivity } from "@/lib/google/activityData";
+import { formatWorkingYear } from "@/lib/workingYear";
 import { MailGroupsToolbar } from "./MailGroupsToolbar";
+import { type CategoryNode, MailGroupCategories } from "./MailGroupCategories";
+import { type MailGroupRow, MailGroupTable } from "./MailGroupTable";
 import { NewMailGroup } from "./NewMailGroup";
 
 /**
@@ -45,7 +48,13 @@ export default async function AdminMailGroups({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ soort?: string; q?: string; archief?: string }>;
+  searchParams: Promise<{
+    soort?: string;
+    q?: string;
+    archief?: string;
+    categorie?: string;
+    opruimen?: string;
+  }>;
 }) {
   const [{ locale: localeParam }, filters] = await Promise.all([params, searchParams]);
   if (!hasLocale(localeParam)) notFound();
@@ -61,7 +70,7 @@ export default async function AdminMailGroups({
     ? {}
     : { ownerGroupId: { in: [...access.werkgroepIds] } };
 
-  const [mailGroups, status, pendingRequests, werkgroepen] = await Promise.all([
+  const [mailGroups, status, pendingRequests, werkgroepen, categoryRows] = await Promise.all([
     prisma.mailGroup.findMany({
       where,
       orderBy: { email: "asc" },
@@ -71,6 +80,7 @@ export default async function AdminMailGroups({
         lastError: true,
         lastMemberCount: true,
         ownerGroup: { select: { nameNl: true, nameEn: true } },
+        categoryId: true,
         sources: {
           select: { ...MAIL_GROUP_SELECT.sources.select, ...SOURCE_NAME_SELECT },
         },
@@ -87,9 +97,29 @@ export default async function AdminMailGroups({
       select: { id: true, nameNl: true, nameEn: true, mailPrefix: true },
       orderBy: { nameNl: "asc" },
     }),
+    access.manageAll
+      ? prisma.mailGroupCategory.findMany({
+          select: { id: true, name: true, parentId: true },
+          orderBy: { name: "asc" },
+        })
+      : Promise.resolve([]),
   ]);
 
   const ctx = await loadDesiredContext(mailGroups as unknown as MailGroupForSync[], year);
+  const activity = await loadMailGroupActivity(mailGroups as unknown as MailGroupForSync[], ctx);
+
+  // Categorieën: hoofdcategorie met haar subcategorieën, alfabetisch.
+  const categoryById = new Map(categoryRows.map((c) => [c.id, c]));
+  const categoryLabel = (id: string | null): string | null => {
+    const c = id ? categoryById.get(id) : undefined;
+    if (!c) return null;
+    const parent = c.parentId ? categoryById.get(c.parentId) : undefined;
+    return parent ? `${parent.name} › ${c.name}` : c.name;
+  };
+  const topOf = (id: string | null): string | null => {
+    const c = id ? categoryById.get(id) : undefined;
+    return c ? (c.parentId ?? c.id) : null;
+  };
 
   const rows = mailGroups.map((g) => {
     const kind = mailGroupKind({
@@ -121,28 +151,72 @@ export default async function AdminMailGroups({
       lastSyncAt: g.lastSyncAt,
       lastError: g.lastError,
       existsInGoogle: Boolean(g.googleId),
+      categoryId: g.categoryId,
+      activity: activity.get(g.id)?.activity ?? { total: 0, active: 0, lastYear: null },
     };
   });
 
   const kind: MailGroupKind | null = isMailGroupKind(filters.soort) ? filters.soort : null;
   const showArchive = filters.archief === "1";
   const q = normalizeSearchText((filters.q ?? "").trim());
-  const visible = rows.filter(
+  // `geen` = zonder categorie; een hoofdcategorie toont ook haar subcategorieën.
+  const categoryFilter =
+    filters.categorie === "geen" || (filters.categorie && categoryById.has(filters.categorie))
+      ? filters.categorie
+      : null;
+  const cleanup = filters.opruimen === "inactief" || filters.opruimen === "leeg" ? filters.opruimen : null;
+  const isEmpty = (row: (typeof rows)[number]) => row.memberCount === 0;
+  const isInactive = (row: (typeof rows)[number]) => row.memberCount > 0 && row.activity.active === 0;
+  const inCategory = (row: (typeof rows)[number]) =>
+    !categoryFilter ||
+    (categoryFilter === "geen"
+      ? !row.categoryId
+      : row.categoryId === categoryFilter || topOf(row.categoryId) === categoryFilter);
+
+  const base0 = rows.filter((row) => showArchive || !row.archived);
+  const visible = base0.filter(
     (row) =>
       (!kind || row.kind === kind) &&
-      (showArchive || !row.archived) &&
-      (!q || normalizeSearchText(`${row.email} ${row.name} ${row.summary}`).includes(q)),
+      inCategory(row) &&
+      (!cleanup || (cleanup === "leeg" ? isEmpty(row) : isInactive(row))) &&
+      (!q ||
+        normalizeSearchText(`${row.email} ${row.name} ${row.summary} ${categoryLabel(row.categoryId) ?? ""}`).includes(q)),
   );
   const counts = new Map<MailGroupKind, number>();
-  for (const row of rows) {
-    if (!showArchive && row.archived) continue;
-    counts.set(row.kind, (counts.get(row.kind) ?? 0) + 1);
-  }
+  for (const row of base0) counts.set(row.kind, (counts.get(row.kind) ?? 0) + 1);
   const archivedCount = rows.filter((row) => row.archived).length;
+  const inactiveCount = base0.filter(isInactive).length;
+  const emptyCount = base0.filter(isEmpty).length;
+
+  // Per categorie: wat er rechtstreeks in zit, en voor een hoofdcategorie ook
+  // wat in haar subcategorieën zit (dat toont de chip).
+  const direct = new Map<string, number>();
+  for (const row of base0) if (row.categoryId) direct.set(row.categoryId, (direct.get(row.categoryId) ?? 0) + 1);
+  const tree: CategoryNode[] = categoryRows
+    .filter((c) => !c.parentId)
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      count: direct.get(c.id) ?? 0,
+      children: categoryRows
+        .filter((s) => s.parentId === c.id)
+        .map((s) => ({ id: s.id, name: s.name, count: direct.get(s.id) ?? 0 })),
+    }));
+  const withChildren = (c: CategoryNode) => c.count + c.children.reduce((n, s) => n + s.count, 0);
+  const uncategorised = base0.filter((row) => !row.categoryId).length;
+  const openTop = categoryFilter && categoryFilter !== "geen" ? topOf(categoryFilter) : null;
+  const openNode = tree.find((c) => c.id === openTop) ?? null;
 
   const href = (patch: Record<string, string | null>) => {
     const params = new URLSearchParams();
-    const next = { soort: kind, q: filters.q ?? null, archief: showArchive ? "1" : null, ...patch };
+    const next = {
+      categorie: categoryFilter,
+      soort: kind,
+      opruimen: cleanup,
+      q: filters.q ?? null,
+      archief: showArchive ? "1" : null,
+      ...patch,
+    };
     for (const [key, value] of Object.entries(next)) if (value) params.set(key, value);
     const query = params.toString();
     return `${base}${query ? `?${query}` : ""}`;
@@ -154,6 +228,27 @@ export default async function AdminMailGroups({
     hour: "2-digit",
     minute: "2-digit",
   });
+
+  const tableRows: MailGroupRow[] = visible.map((row) => ({
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    category: categoryLabel(row.categoryId),
+    summary: row.summary,
+    owner: row.owner,
+    archived: row.archived,
+    enabled: row.enabled,
+    memberCount: row.memberCount,
+    unlinked: row.unlinked,
+    active: row.activity.active,
+    lastYear:
+      row.activity.active === 0 && row.activity.lastYear !== null
+        ? formatWorkingYear(row.activity.lastYear)
+        : null,
+    lastSync: row.lastSyncAt ? dateFmt.format(row.lastSyncAt) : nl ? "nog niet" : "not yet",
+    notInGoogle: !row.existsInGoogle,
+    lastError: row.lastError,
+  }));
 
   const ownPrefixes = werkgroepen
     .filter((g) => g.mailPrefix)
@@ -192,40 +287,94 @@ export default async function AdminMailGroups({
         canRequestAccounts={ownPrefixes.length > 0}
       />
 
+      {access.manageAll && <MailGroupCategories nl={nl} categories={tree} />}
+
       {access.manageAll && (
-        <nav className="flex flex-wrap items-center gap-2" aria-label={nl ? "Soort" : "Kind"}>
-          <FilterChip href={href({ soort: null })} active={!kind}>
-            {nl ? "Alle" : "All"} <span className="tabular-nums">{rows.filter((r) => showArchive || !r.archived).length}</span>
-          </FilterChip>
-          {MAIL_GROUP_KINDS.filter((k) => counts.get(k)).map((k) => (
-            <FilterChip key={k} href={href({ soort: k })} active={kind === k}>
-              {mailGroupKindLabel(k, nl)} <span className="tabular-nums">{counts.get(k)}</span>
+        <div className="space-y-2">
+          <nav className="flex flex-wrap items-center gap-2" aria-label={nl ? "Categorie" : "Category"}>
+            <FilterChip href={href({ categorie: null })} active={!categoryFilter}>
+              {nl ? "Alle" : "All"} <span className="tabular-nums">{base0.length}</span>
             </FilterChip>
-          ))}
-          {archivedCount > 0 && (
-            <Link href={href({ archief: showArchive ? null : "1" })} className="vtk-link ml-2 text-sm">
-              {showArchive
-                ? nl
-                  ? "Archief verbergen"
-                  : "Hide archive"
-                : nl
-                  ? `Archief tonen (${archivedCount})`
-                  : `Show archive (${archivedCount})`}
-            </Link>
+            {tree.map((c) => (
+              <FilterChip key={c.id} href={href({ categorie: c.id })} active={openTop === c.id}>
+                {c.name} <span className="tabular-nums">{withChildren(c)}</span>
+              </FilterChip>
+            ))}
+            {tree.length > 0 && (
+              <FilterChip href={href({ categorie: "geen" })} active={categoryFilter === "geen"}>
+                {nl ? "Zonder categorie" : "No category"} <span className="tabular-nums">{uncategorised}</span>
+              </FilterChip>
+            )}
+          </nav>
+          {openNode && openNode.children.length > 0 && (
+            <nav
+              className="flex flex-wrap items-center gap-2 border-l-2 border-vtk-yellow pl-3"
+              aria-label={nl ? `Subcategorie van ${openNode.name}` : `Subcategory of ${openNode.name}`}
+            >
+              <FilterChip href={href({ categorie: openNode.id })} active={categoryFilter === openNode.id} small>
+                {nl ? `Alles in ${openNode.name}` : `All of ${openNode.name}`}
+              </FilterChip>
+              {openNode.children.map((sub) => (
+                <FilterChip key={sub.id} href={href({ categorie: sub.id })} active={categoryFilter === sub.id} small>
+                  {sub.name} <span className="tabular-nums">{sub.count}</span>
+                </FilterChip>
+              ))}
+            </nav>
           )}
-          <form action={base} className="ml-auto">
-            {kind && <input type="hidden" name="soort" value={kind} />}
-            {showArchive && <input type="hidden" name="archief" value="1" />}
-            <input
-              type="search"
-              name="q"
-              defaultValue={filters.q ?? ""}
-              placeholder={nl ? "Zoek een adres" : "Search an address"}
-              aria-label={nl ? "Zoek een adres" : "Search an address"}
-              className="h-9 w-56 rounded-full border border-vtk-blue/15 bg-white px-4 text-sm"
-            />
-          </form>
-        </nav>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            {MAIL_GROUP_KINDS.filter((k) => k !== "overig" && counts.get(k)).map((k) => (
+              <FilterChip key={k} href={href({ soort: kind === k ? null : k })} active={kind === k} small>
+                {mailGroupKindLabel(k, nl)} <span className="tabular-nums">{counts.get(k)}</span>
+              </FilterChip>
+            ))}
+            {inactiveCount > 0 && (
+              <FilterChip
+                href={href({ opruimen: cleanup === "inactief" ? null : "inactief" })}
+                active={cleanup === "inactief"}
+                small
+              >
+                {nl ? "Niemand meer actief" : "Nobody active"} <span className="tabular-nums">{inactiveCount}</span>
+              </FilterChip>
+            )}
+            {emptyCount > 0 && (
+              <FilterChip href={href({ opruimen: cleanup === "leeg" ? null : "leeg" })} active={cleanup === "leeg"} small>
+                {nl ? "Leeg" : "Empty"} <span className="tabular-nums">{emptyCount}</span>
+              </FilterChip>
+            )}
+            {archivedCount > 0 && (
+              <Link href={href({ archief: showArchive ? null : "1" })} className="vtk-link ml-1 text-sm">
+                {showArchive
+                  ? nl
+                    ? "Archief verbergen"
+                    : "Hide archive"
+                  : nl
+                    ? `Archief tonen (${archivedCount})`
+                    : `Show archive (${archivedCount})`}
+              </Link>
+            )}
+            <form action={base} className="ml-auto">
+              {categoryFilter && <input type="hidden" name="categorie" value={categoryFilter} />}
+              {kind && <input type="hidden" name="soort" value={kind} />}
+              {cleanup && <input type="hidden" name="opruimen" value={cleanup} />}
+              {showArchive && <input type="hidden" name="archief" value="1" />}
+              <input
+                type="search"
+                name="q"
+                defaultValue={filters.q ?? ""}
+                placeholder={nl ? "Zoek, bv. activiteiten_" : "Search, e.g. activiteiten_"}
+                aria-label={nl ? "Zoek een adres" : "Search an address"}
+                className="h-9 w-56 rounded-full border border-vtk-blue/15 bg-white px-4 text-sm"
+              />
+            </form>
+          </div>
+          {cleanup === "inactief" && (
+            <p className="max-w-3xl text-sm text-zinc-500">
+              {nl
+                ? "Groepen waarin niemand nog actief is: geen post of werkgroep dit werkingsjaar, geen studie bevestigd dit academiejaar, en geen groep met actieve leden. Klik op \"niemand\" om te zien wie erin zit; vink aan wat weg mag."
+                : "Groups where nobody is active anymore: no post or work group this working year, no studies confirmed this academic year, and no group with active members. Click \"nobody\" to see who is in it; select what can go."}
+            </p>
+          )}
+        </div>
       )}
 
       {visible.length === 0 ? (
@@ -239,55 +388,16 @@ export default async function AdminMailGroups({
               : "No addresses for this filter."}
         </p>
       ) : (
-        <div className="relative overflow-x-auto rounded-2xl border border-vtk-blue/15 bg-white">
-          <table className="w-full min-w-[44rem] text-sm">
-            <thead className="border-b border-vtk-blue/10 text-left text-xs uppercase tracking-wide text-zinc-500">
-              <tr>
-                <th className="px-4 py-3 font-medium">{nl ? "Adres" : "Address"}</th>
-                <th className="px-4 py-3 font-medium">{nl ? "Wie erin zit" : "Who is in it"}</th>
-                <th className="px-4 py-3 text-right font-medium">{nl ? "Leden" : "Members"}</th>
-                <th className="px-4 py-3 font-medium">{nl ? "Laatste sync" : "Last sync"}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((row) => (
-                <LinkedRow
-                  key={row.id}
-                  href={`${base}/${row.id}`}
-                  className="cursor-pointer border-b border-vtk-blue/5 last:border-0 hover:bg-vtk-blue-soft/30"
-                >
-                  <td className="px-4 py-3 align-top">
-                    <Link href={`${base}/${row.id}`} className="font-medium text-vtk-ink">
-                      {row.email}
-                    </Link>
-                    <span className="block text-xs text-zinc-500">
-                      {row.name}
-                      {row.owner && <> · {row.owner}</>}
-                      {row.archived && <> · {nl ? "archief" : "archive"}</>}
-                      {!row.enabled && <> · {nl ? "niet beheerd" : "not managed"}</>}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 align-top text-zinc-600">{row.summary || "-"}</td>
-                  <td className="px-4 py-3 text-right align-top tabular-nums">
-                    {row.memberCount}
-                    {row.unlinked > 0 && (
-                      <span className="block text-xs text-amber-700">
-                        {nl ? `${row.unlinked} zonder adres` : `${row.unlinked} without address`}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 align-top text-xs text-zinc-500">
-                    {row.lastSyncAt ? dateFmt.format(row.lastSyncAt) : nl ? "nog niet" : "not yet"}
-                    {!row.existsInGoogle && !row.archived && (
-                      <span className="block">{nl ? "nog niet in Google" : "not in Google yet"}</span>
-                    )}
-                    {row.lastError && <span className="block text-red-700">{row.lastError}</span>}
-                  </td>
-                </LinkedRow>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <MailGroupTable
+          nl={nl}
+          base={base}
+          manageAll={access.manageAll}
+          rows={tableRows}
+          categoryOptions={tree.flatMap((c) => [
+            { value: c.id, label: c.name, group: nl ? "Categorieën" : "Categories" },
+            ...c.children.map((sub) => ({ value: sub.id, label: sub.name, hint: c.name, group: c.name })),
+          ])}
+        />
       )}
 
       <NewMailGroup
@@ -308,10 +418,12 @@ function normalizeSearchText(value: string): string {
 function FilterChip({
   href,
   active,
+  small = false,
   children,
 }: {
   href: string;
   active: boolean;
+  small?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -319,7 +431,8 @@ function FilterChip({
       href={href}
       aria-current={active ? "page" : undefined}
       className={[
-        "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-sm",
+        "inline-flex items-center gap-1.5 rounded-full border text-sm",
+        small ? "h-7 px-2.5 text-[13px]" : "h-8 px-3",
         active
           ? "border-vtk-ink bg-vtk-ink text-vtk-surface"
           : "border-vtk-blue/15 bg-white text-vtk-ink hover:border-vtk-blue/30",
