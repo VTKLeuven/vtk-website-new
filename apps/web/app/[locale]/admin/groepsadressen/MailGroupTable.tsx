@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { Fragment, useEffect, useState, useTransition } from "react";
+import { ChevronDown } from "lucide-react";
 import Link from "@/components/ui/Link";
 import { Button, ConfirmDialog } from "@vtk/ui";
 import { LinkedRow } from "@/components/ui/LinkedRow";
@@ -19,6 +20,7 @@ import {
 
 export type MailGroupRow = {
   id: string;
+  categoryId: string | null;
   email: string;
   name: string;
   category: string | null;
@@ -32,12 +34,27 @@ export type MailGroupRow = {
   active: number;
   /** Het jongste jaar waarin nog iemand actief was, als "22-23"; enkel bij nul actief. */
   lastYear: string | null;
+  /** Adressen die de site niet kent (geen lid, geen groep van de kring). */
+  unknown: number;
+  /** De groep heet naar dit of volgend werkingsjaar (`sport_2627`). */
+  thisYear: boolean;
   lastSync: string;
   notInGoogle: boolean;
   lastError: string | null;
 };
 
 const NO_CATEGORY = "__none__";
+
+/**
+ * Een categorie als uitklapbaar blok in de tabel ("Alle" zonder filter), met
+ * haar subcategorieën eronder. `rowIds` zijn de rijen rechtstreeks erin.
+ */
+export type TableSection = {
+  key: string;
+  label: string;
+  rowIds: string[];
+  children: { key: string; label: string; rowIds: string[] }[];
+};
 
 /**
  * Het overzicht van de groepsadressen. Wie `mailgroups.manage` heeft, vinkt
@@ -49,12 +66,18 @@ export function MailGroupTable({
   base,
   manageAll,
   rows,
+  sections,
+  sectionsOpen,
   categoryOptions,
 }: {
   nl: boolean;
   base: string;
   manageAll: boolean;
   rows: MailGroupRow[];
+  /** `null`: één platte lijst (een categorie gekozen). */
+  sections: TableSection[] | null;
+  /** Open bij een zoekterm of filter: dan wil je zien wat er gevonden is. */
+  sectionsOpen: boolean;
   categoryOptions: SearchPickerOption[];
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -70,13 +93,68 @@ export function MailGroupTable({
   const chosen = rows.filter((r) => selected.has(r.id));
 
   const allChecked = rows.length > 0 && chosen.length === rows.length;
-  const toggle = (id: string) =>
+  const byId = new Map(rows.map((r) => [r.id, r]));
+
+  const [openSections, setOpenSections] = useState<Set<string>>(() =>
+    sectionsOpen && sections ? new Set(sections.flatMap((s) => [s.key, ...s.children.map((c) => c.key)])) : new Set(),
+  );
+  const toggleSection = (key: string) =>
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  // De rijen in de volgorde waarin ze op het scherm staan; enkel wat open is.
+  // Daarop werkt shift-klik: alles tussen de vorige klik en deze.
+  const ordered: string[] = sections
+    ? sections.flatMap((s) =>
+        openSections.has(s.key)
+          ? [...s.rowIds, ...s.children.flatMap((c) => (openSections.has(c.key) ? c.rowIds : []))]
+          : [],
+      )
+    : rows.map((r) => r.id);
+  const [anchor, setAnchor] = useState<string | null>(null);
+
+  /** Klik op een vinkje of met Ctrl/Cmd op een rij: één rij; met shift: een reeks. */
+  function pick(id: string, event: { shiftKey: boolean }) {
+    const from = anchor ? ordered.indexOf(anchor) : -1;
+    const to = ordered.indexOf(id);
+    if (event.shiftKey && from >= 0 && to >= 0) {
+      const [a, b] = from < to ? [from, to] : [to, from];
+      const range = ordered.slice(a, b + 1);
+      // Zoals in een bestandsbeheerder: de reeks krijgt de stand van het anker.
+      const on = selected.has(anchor as string);
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const r of range) {
+          if (on) next.add(r);
+          else next.delete(r);
+        }
+        return next;
+      });
+      return;
+    }
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+    setAnchor(id);
+  }
+
+  function setMany(ids: string[], on: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (on) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }
 
   function report(result: SaveState, fallback: string) {
     if (result.status === "error") {
@@ -173,6 +251,69 @@ export function MailGroupTable({
     </div>
   );
 
+  function renderRow(row: MailGroupRow, depth: number) {
+    return (
+      <LinkedRow
+        key={row.id}
+        href={`${base}/${row.id}`}
+        onModifierClick={manageAll ? (event) => pick(row.id, event) : undefined}
+        className={[
+          "cursor-pointer border-b border-vtk-blue/5 last:border-0 hover:bg-vtk-blue-soft/30",
+          selected.has(row.id) ? "bg-vtk-blue-soft/40" : "",
+        ].join(" ")}
+      >
+        {manageAll && (
+          <td
+            className="px-4 py-3 align-top"
+            data-row-action
+            onClick={(event) => pick(row.id, event)}
+          >
+            <input
+              type="checkbox"
+              checked={selected.has(row.id)}
+              onChange={() => {}}
+              onClick={(event) => {
+                event.stopPropagation();
+                pick(row.id, event);
+              }}
+              aria-label={nl ? `Aanvinken: ${row.email}` : `Select: ${row.email}`}
+            />
+          </td>
+        )}
+        <td className="px-4 py-3 align-top" style={depth ? { paddingLeft: `${16 + depth * 14}px` } : undefined}>
+          <Link href={`${base}/${row.id}`} className="font-medium text-vtk-ink">
+            {row.email}
+          </Link>
+          <span className="block text-xs text-zinc-500">
+            {row.name !== row.email.split("@")[0] && <>{row.name} · </>}
+            {!sections && (row.category ?? (nl ? "zonder categorie" : "no category"))}
+            {row.owner && <> · {row.owner}</>}
+            {row.archived && <> · {nl ? "archief" : "archive"}</>}
+            {!row.enabled && <> · {nl ? "niet beheerd" : "not managed"}</>}
+          </span>
+        </td>
+        <td className="px-4 py-3 align-top text-zinc-600">{row.summary || "-"}</td>
+        <td className="px-4 py-3 align-top" data-row-action>
+          <button
+            type="button"
+            className="text-left"
+            onClick={() => setPeek(row)}
+            aria-label={nl ? `Wie zit er in ${row.email}` : `Who is in ${row.email}`}
+          >
+            <ActivityCell nl={nl} row={row} />
+          </button>
+        </td>
+        <td className="px-4 py-3 align-top text-xs text-zinc-500">
+          {row.lastSync}
+          {row.notInGoogle && !row.archived && (
+            <span className="block">{nl ? "nog niet in Google" : "not in Google yet"}</span>
+          )}
+          {row.lastError && <span className="block text-red-700">{row.lastError}</span>}
+        </td>
+      </LinkedRow>
+    );
+  }
+
   return (
     <>
       <div className="relative overflow-x-auto rounded-2xl border border-vtk-blue/15 bg-white">
@@ -197,60 +338,51 @@ export function MailGroupTable({
               <th className="px-4 py-3 font-medium">{nl ? "Laatste sync" : "Last sync"}</th>
             </tr>
           </thead>
-          <tbody>
-            {rows.map((row) => (
-              <LinkedRow
-                key={row.id}
-                href={`${base}/${row.id}`}
-                className={[
-                  "cursor-pointer border-b border-vtk-blue/5 last:border-0 hover:bg-vtk-blue-soft/30",
-                  selected.has(row.id) ? "bg-vtk-blue-soft/40" : "",
-                ].join(" ")}
-              >
-                {manageAll && (
-                  <td className="px-4 py-3 align-top" data-row-action onClick={() => toggle(row.id)}>
-                    <input
-                      type="checkbox"
-                      checked={selected.has(row.id)}
-                      onChange={() => toggle(row.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      aria-label={nl ? `Aanvinken: ${row.email}` : `Select: ${row.email}`}
-                    />
-                  </td>
-                )}
-                <td className="px-4 py-3 align-top">
-                  <Link href={`${base}/${row.id}`} className="font-medium text-vtk-ink">
-                    {row.email}
-                  </Link>
-                  <span className="block text-xs text-zinc-500">
-                    {row.name !== row.email.split("@")[0] && <>{row.name} · </>}
-                    {row.category ?? (nl ? "zonder categorie" : "no category")}
-                    {row.owner && <> · {row.owner}</>}
-                    {row.archived && <> · {nl ? "archief" : "archive"}</>}
-                    {!row.enabled && <> · {nl ? "niet beheerd" : "not managed"}</>}
-                  </span>
-                </td>
-                <td className="px-4 py-3 align-top text-zinc-600">{row.summary || "-"}</td>
-                <td className="px-4 py-3 align-top" data-row-action>
-                  <button
-                    type="button"
-                    className="text-left"
-                    onClick={() => setPeek(row)}
-                    aria-label={nl ? `Wie zit er in ${row.email}` : `Who is in ${row.email}`}
-                  >
-                    <ActivityCell nl={nl} row={row} />
-                  </button>
-                </td>
-                <td className="px-4 py-3 align-top text-xs text-zinc-500">
-                  {row.lastSync}
-                  {row.notInGoogle && !row.archived && (
-                    <span className="block">{nl ? "nog niet in Google" : "not in Google yet"}</span>
+          {sections ? (
+            sections.map((section) => {
+              const allIds = [...section.rowIds, ...section.children.flatMap((c) => c.rowIds)];
+              return (
+                <tbody key={section.key}>
+                  <SectionRow
+                    nl={nl}
+                    manageAll={manageAll}
+                    label={section.label}
+                    ids={allIds}
+                    rows={byId}
+                    depth={0}
+                    open={openSections.has(section.key)}
+                    selected={selected}
+                    onToggle={() => toggleSection(section.key)}
+                    onSelectAll={setMany}
+                  />
+                  {openSections.has(section.key) && (
+                    <>
+                      {section.rowIds.map((id) => renderRow(byId.get(id)!, 1))}
+                      {section.children.map((child) => (
+                        <Fragment key={child.key}>
+                          <SectionRow
+                            nl={nl}
+                            manageAll={manageAll}
+                            label={child.label}
+                            ids={child.rowIds}
+                            rows={byId}
+                            depth={1}
+                            open={openSections.has(child.key)}
+                            selected={selected}
+                            onToggle={() => toggleSection(child.key)}
+                            onSelectAll={setMany}
+                          />
+                          {openSections.has(child.key) && child.rowIds.map((id) => renderRow(byId.get(id)!, 2))}
+                        </Fragment>
+                      ))}
+                    </>
                   )}
-                  {row.lastError && <span className="block text-red-700">{row.lastError}</span>}
-                </td>
-              </LinkedRow>
-            ))}
-          </tbody>
+                </tbody>
+              );
+            })
+          ) : (
+            <tbody>{rows.map((row) => renderRow(row, 0))}</tbody>
+          )}
         </table>
       </div>
 
@@ -332,11 +464,105 @@ export function MailGroupTable({
   );
 }
 
+/** De kop van een categorie in de tabel: klik klapt open, het vinkje neemt alles erin. */
+function SectionRow({
+  nl,
+  manageAll,
+  label,
+  ids,
+  rows,
+  depth,
+  open,
+  selected,
+  onToggle,
+  onSelectAll,
+}: {
+  nl: boolean;
+  manageAll: boolean;
+  label: string;
+  ids: string[];
+  rows: Map<string, MailGroupRow>;
+  depth: number;
+  open: boolean;
+  selected: Set<string>;
+  onToggle: () => void;
+  onSelectAll: (ids: string[], on: boolean) => void;
+}) {
+  const inactive = ids.filter((id) => {
+    const row = rows.get(id);
+    return row && row.memberCount > 0 && row.active === 0 && !row.thisYear;
+  }).length;
+  const picked = ids.filter((id) => selected.has(id)).length;
+  const all = ids.length > 0 && picked === ids.length;
+  return (
+    <tr
+      className={[
+        "cursor-pointer border-b border-vtk-blue/10 hover:bg-vtk-blue-soft/40",
+        depth === 0 ? "bg-vtk-blue-soft/30" : "bg-vtk-blue-soft/10",
+      ].join(" ")}
+      onClick={(event) => {
+        if ((event.target as Element).closest("input")) return;
+        onToggle();
+      }}
+    >
+      {manageAll && (
+        <td className="px-4 py-2.5">
+          <input
+            type="checkbox"
+            checked={all}
+            ref={(el) => {
+              if (el) el.indeterminate = picked > 0 && !all;
+            }}
+            onChange={() => onSelectAll(ids, !all)}
+            aria-label={nl ? `Alles in ${label} aanvinken (${ids.length})` : `Select all in ${label} (${ids.length})`}
+          />
+        </td>
+      )}
+      <td colSpan={4} className="px-4 py-2.5" style={depth ? { paddingLeft: `${16 + depth * 14}px` } : undefined}>
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggle();
+          }}
+          className="flex w-full items-center gap-2 text-left"
+        >
+          <ChevronDown
+            aria-hidden="true"
+            size={16}
+            className={`shrink-0 text-zinc-500 transition-transform ${open ? "" : "-rotate-90"}`}
+          />
+          <span className={depth === 0 ? "font-semibold text-vtk-ink" : "font-medium text-vtk-ink"}>{label}</span>
+          <span className="text-sm tabular-nums text-zinc-500">{ids.length}</span>
+          {inactive > 0 && (
+            <span className="ml-auto text-xs text-amber-800">
+              {nl ? `${inactive} zonder actieve leden` : `${inactive} without active members`}
+            </span>
+          )}
+        </button>
+      </td>
+    </tr>
+  );
+}
+
 function ActivityCell({ nl, row }: { nl: boolean; row: MailGroupRow }) {
   // Enkel de eerste regel krijgt de stippellijn: dat is het klikbare deel.
   const link = "underline decoration-dotted decoration-zinc-400 underline-offset-4";
   if (row.memberCount === 0) {
     return <span className={`text-sm text-amber-800 ${link}`}>{nl ? "leeg" : "empty"}</span>;
+  }
+  if (row.active === 0 && row.thisYear) {
+    return (
+      <span className="block text-sm">
+        <span className={link}>
+          <span className="text-vtk-ink">{nl ? "groep van dit jaar" : "this year's group"}</span>
+        </span>
+        <span className="block text-xs text-zinc-500">
+          {nl ? `${row.memberCount} leden, geen gekend` : `${row.memberCount} members, none known`}
+        </span>
+      </span>
+    );
   }
   if (row.active === 0) {
     return (
@@ -346,7 +572,17 @@ function ActivityCell({ nl, row }: { nl: boolean; row: MailGroupRow }) {
           <span className="text-zinc-500"> {nl ? `van ${row.memberCount}` : `of ${row.memberCount}`}</span>
         </span>
         <span className="block text-xs text-zinc-500">
-          {row.lastYear ? (nl ? `laatst ${row.lastYear}` : `last ${row.lastYear}`) : nl ? "niemand gekend" : "nobody known"}
+          {row.lastYear
+            ? nl
+              ? `laatst ${row.lastYear}`
+              : `last ${row.lastYear}`
+            : row.unknown > 0
+              ? nl
+                ? `${row.unknown} ${row.unknown === 1 ? "adres" : "adressen"} onbekend`
+                : `${row.unknown} unknown ${row.unknown === 1 ? "address" : "addresses"}`
+              : nl
+                ? "niemand gekend"
+                : "nobody known"}
         </span>
       </span>
     );
@@ -378,24 +614,29 @@ function MembersPeek({
   row: MailGroupRow;
   onClose: () => void;
 }) {
-  const [members, setMembers] = useState<MemberPeek[] | null>(null);
-  const [failed, setFailed] = useState(false);
+  // Een geneste groep klikt open in hetzelfde venster; de stapel is het pad
+  // terug (24urenloop > sport > sport_2627).
+  const [stack, setStack] = useState<{ id: string; email: string }[]>([{ id: row.id, email: row.email }]);
+  const current = stack[stack.length - 1];
+  const [loaded, setLoaded] = useState<{ id: string; members: MemberPeek[] | null; failed: boolean } | null>(null);
+  const members = loaded?.id === current.id ? loaded.members : null;
+  const failed = loaded?.id === current.id && loaded.failed;
   const unsent = useUnsentGuard();
 
   useEffect(() => {
     let cancelled = false;
     unsent
-      .run(() => mailGroupMembersAction(row.id))
+      .run(() => mailGroupMembersAction(current.id))
       .then((result) => {
         if (cancelled) return;
-        if (result === UNSENT || result === null) setFailed(true);
-        else setMembers(result);
+        if (result === UNSENT || result === null) setLoaded({ id: current.id, members: null, failed: true });
+        else setLoaded({ id: current.id, members: result, failed: false });
       })
-      .catch(() => !cancelled && setFailed(true));
+      .catch(() => !cancelled && setLoaded({ id: current.id, members: null, failed: true }));
     return () => {
       cancelled = true;
     };
-  }, [row.id, unsent]);
+  }, [current.id, unsent]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -403,12 +644,14 @@ function MembersPeek({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  const activeCount = members?.filter((m) => m.active).length ?? 0;
+
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-900/40 p-4"
       role="dialog"
       aria-modal="true"
-      aria-label={row.email}
+      aria-label={current.email}
       onClick={onClose}
     >
       <div
@@ -416,11 +659,27 @@ function MembersPeek({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-vtk-blue/10 px-5 py-4">
-          <h2 className="font-semibold text-vtk-ink">{row.email}</h2>
+          {stack.length > 1 && (
+            <nav className="mb-1 flex flex-wrap items-center gap-1 text-xs text-zinc-500" aria-label={nl ? "Pad" : "Path"}>
+              {stack.slice(0, -1).map((g, i) => (
+                <span key={g.id} className="inline-flex items-center gap-1">
+                  <button type="button" className="vtk-link" onClick={() => setStack(stack.slice(0, i + 1))}>
+                    {g.email}
+                  </button>
+                  <span aria-hidden="true">›</span>
+                </span>
+              ))}
+            </nav>
+          )}
+          <h2 className="break-all font-semibold text-vtk-ink">{current.email}</h2>
           <p className="mt-1 text-sm text-zinc-500">
-            {nl
-              ? `${row.active} van ${row.memberCount} nog actief: een post dit werkingsjaar, of hun studie dit academiejaar bevestigd.`
-              : `${row.active} of ${row.memberCount} still active: a post this working year, or their studies confirmed this academic year.`}
+            {members === null
+              ? nl
+                ? "Een post dit werkingsjaar, of hun studie dit academiejaar bevestigd, telt als actief."
+                : "A post this working year, or their studies confirmed this academic year, counts as active."
+              : nl
+                ? `${activeCount} van ${members.length} nog actief: een post dit werkingsjaar, hun studie dit academiejaar bevestigd, of een groep waarin iemand actief is.`
+                : `${activeCount} of ${members.length} still active: a post this working year, their studies confirmed this academic year, or a group with someone active in it.`}
           </p>
         </div>
         <div className="min-h-0 flex-1 overflow-auto px-5 py-3">
@@ -439,7 +698,18 @@ function MembersPeek({
                 return (
                   <li key={m.email} className="flex items-start justify-between gap-3 py-2">
                     <span className="min-w-0 text-sm">
-                      <span className="block break-all text-vtk-ink">{m.email}</span>
+                      {m.groupId ? (
+                        <button
+                          type="button"
+                          className="vtk-link block break-all text-left"
+                          onClick={() => setStack([...stack, { id: m.groupId!, email: m.email }])}
+                          aria-label={nl ? `Wie zit er in ${m.email}` : `Who is in ${m.email}`}
+                        >
+                          {m.email}
+                        </button>
+                      ) : (
+                        <span className="block break-all text-vtk-ink">{m.email}</span>
+                      )}
                       {m.name && <span className="block text-xs text-zinc-500">{m.name}</span>}
                     </span>
                     <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${STATUS_TONE_CLASS[l.tone]}`}>{l.text}</span>
@@ -450,7 +720,7 @@ function MembersPeek({
           )}
         </div>
         <div className="flex items-center justify-end gap-3 border-t border-vtk-blue/10 px-5 py-3">
-          <Link href={`${base}/${row.id}`} className="vtk-link text-sm">
+          <Link href={`${base}/${current.id}`} className="vtk-link text-sm">
             {nl ? "Groepsadres openen" : "Open group address"}
           </Link>
           <Button type="button" size="sm" variant="ghost" onClick={onClose}>

@@ -259,7 +259,9 @@ aanmaken is iets anders dan een lijst bijwerken.
 ### Bestaande accounts koppelen
 
 `/admin/groepsadressen/koppelingen` leest de directory en stelt koppelingen voor
-op naam. Enkel **eenduidige** overeenkomsten worden voorgesteld; naamgenoten
+op naam. Daaronder staan de leden met een post die nog geen gekoppeld account
+hebben, elk met de vrije accounts in een zoekbare lijst; de vrije accounts zonder
+lid (meestal oud-leden) staan dichtgeklapt, met een zoekveld. Enkel **eenduidige** overeenkomsten worden voorgesteld; naamgenoten
 staan apart met een keuzelijst. "Alle voorstellen koppelen" herberekent
 server-side en neemt niet over wat de browser terugstuurt.
 
@@ -287,11 +289,16 @@ Begin met een handvol lijsten en kijk na wat er in Google gebeurde.
 ### Opruimen
 
 Het overzicht toont per groep hoeveel leden nog actief zijn: een post dit
-werkingsjaar, een lopende kiesploeg of een studie die dit academiejaar
-bevestigd is. Een klik op dat cijfer toont wie erin zit, met per adres de status.
+werkingsjaar, een lopende kiesploeg, een studie die dit academiejaar bevestigd
+is, of een groep van de kring waarin (hoe diep ook) iemand actief is. Een groep
+die naar dit werkingsjaar heet (`sport_2627`) telt altijd. Een klik op dat
+cijfer toont wie erin zit, met per adres de status; een geneste groep klik je
+daar verder open.
 
 1. Filter op **Niemand meer actief** of **Leeg**, of zoek (`activiteiten_`).
-2. Vink aan wat weg mag; het vinkje in de kop neemt alles in de filter.
+2. Vink aan wat weg mag; het vinkje in de kop neemt alles in de filter, dat van
+   een categorieblok alles in dat blok. Shift-klik neemt een reeks, Ctrl- of
+   Cmd-klik op een rij vinkt aan in plaats van te openen.
 3. **Verwijderen uit Google**, tot 200 per keer. De bevestiging noemt wat weggaat
    en waarschuwt bij een groep met nog actieve leden.
 

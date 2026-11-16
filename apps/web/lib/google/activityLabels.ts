@@ -11,14 +11,17 @@ import type { MemberStatus } from "./activity";
 export type MemberStatusView = {
   kind: MemberStatus["kind"];
   lastYear: number | null;
-  /** Bij een geneste groep: heeft die zelf actieve leden? Anders: is dit lid actief? */
+  /** Bij een geneste groep: zit er (hoe diep ook) iemand actief in? Anders: is dit lid actief? */
   active: boolean;
+  /** Een geneste groep die naar dit werkingsjaar heet (`sport_2627`). */
+  thisYear: boolean;
 };
 
 export function toStatusView(status: MemberStatus): MemberStatusView {
   return {
     kind: status.kind,
-    lastYear: status.kind === "former" ? status.lastYear : null,
+    lastYear: status.kind === "former" || status.kind === "group" ? status.lastYear : null,
+    thisYear: status.kind === "group" && status.thisYear,
     active:
       status.kind === "group" ? status.active : status.kind === "post" || status.kind === "student",
   };
@@ -51,9 +54,18 @@ export function statusLabel(s: MemberStatusView, nl: boolean): { text: string; t
         tone: "muted",
       };
     case "group":
-      return s.active
-        ? { text: nl ? "groep met actieve leden" : "group with active members", tone: "ok" }
-        : { text: nl ? "groep zonder actieve leden" : "group without active members", tone: "muted" };
+      if (s.thisYear) return { text: nl ? "groep van dit werkingsjaar" : "group of this working year", tone: "ok" };
+      if (s.active) return { text: nl ? "groep met actieve leden" : "group with active members", tone: "ok" };
+      return {
+        text: s.lastYear
+          ? nl
+            ? `groep, laatst actief ${shortYear(s.lastYear)}`
+            : `group, last active ${shortYear(s.lastYear)}`
+          : nl
+            ? "groep zonder actieve leden"
+            : "group without active members",
+        tone: "muted",
+      };
     default:
       return { text: nl ? "onbekend adres" : "unknown address", tone: "warn" };
   }

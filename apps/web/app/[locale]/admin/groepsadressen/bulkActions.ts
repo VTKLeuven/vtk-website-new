@@ -296,7 +296,12 @@ async function pool<T>(items: T[], size: number, run: (item: T) => Promise<void>
 // Wie erin zit, zonder de pagina te verlaten
 // -----------------------------------------------------------------------------
 
-export type MemberPeek = MemberStatusView & { email: string; name: string | null };
+export type MemberPeek = MemberStatusView & {
+  email: string;
+  name: string | null;
+  /** Bij een groep van de kring: haar id, om erin door te klikken. */
+  groupId: string | null;
+};
 
 export async function mailGroupMembersAction(id: string): Promise<MemberPeek[] | null> {
   await requirePermission("mailgroups.manage");
@@ -307,9 +312,16 @@ export async function mailGroupMembersAction(id: string): Promise<MemberPeek[] |
   if (!row) return null;
   const ctx = await loadDesiredContext([row]);
   const activity = (await loadMailGroupActivity([row], ctx)).get(row.id);
-  return (activity?.members ?? []).map(({ email, status }) => ({
+  const members = activity?.members ?? [];
+  const groupEmails = members.filter((m) => m.status.kind === "group").map((m) => m.email);
+  const groups = groupEmails.length
+    ? await prisma.mailGroup.findMany({ where: { email: { in: groupEmails } }, select: { id: true, email: true } })
+    : [];
+  const groupId = new Map(groups.map((g) => [g.email, g.id]));
+  return members.map(({ email, status }) => ({
     email,
     name: "name" in status ? status.name : null,
+    groupId: groupId.get(email) ?? null,
     ...toStatusView(status),
   }));
 }

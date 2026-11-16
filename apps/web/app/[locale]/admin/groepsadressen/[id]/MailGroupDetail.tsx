@@ -40,6 +40,8 @@ export type MemberRow = {
   key: string;
   /** `null` bij een lid van de site zonder `@vtk.be`-account. */
   address: string | null;
+  /** Een andere groep van de site: haar id, om erheen te klikken. */
+  groupId: string | null;
   name: string | null;
   via: "source" | "loose" | "yearly" | "excluded";
   /** De rij in `MailGroupExtra`, om ze te kunnen weghalen. */
@@ -219,6 +221,7 @@ export function MailGroupDetail({
             members={members}
             unlinked={unlinked}
             hasSources={sources.length > 0}
+            base={base}
             importedLeft={importedLeft}
             ownMembers={ownMembers}
             domain={domain}
@@ -488,6 +491,7 @@ function MembersTab({
   members,
   unlinked,
   hasSources,
+  base,
   importedLeft,
   ownMembers,
   domain,
@@ -502,6 +506,7 @@ function MembersTab({
   members: MemberRow[];
   unlinked: string[];
   hasSources: boolean;
+  base: string;
   importedLeft: number;
   ownMembers: { id: string; name: string }[];
   domain: string;
@@ -663,7 +668,15 @@ function MembersTab({
                   return (
                     <tr key={m.key} className="border-b border-vtk-blue/5 last:border-0">
                       <td className="px-4 py-2 align-top">
-                        <span className="block break-all text-vtk-ink">{m.address ?? <em className="not-italic text-zinc-500">{t.noAccount}</em>}</span>
+                        {m.groupId && m.address ? (
+                          <Link href={`${base}/${m.groupId}`} className="vtk-link block break-all">
+                            {m.address}
+                          </Link>
+                        ) : (
+                          <span className="block break-all text-vtk-ink">
+                            {m.address ?? <em className="not-italic text-zinc-500">{t.noAccount}</em>}
+                          </span>
+                        )}
                         {m.name && <span className="block text-xs text-zinc-500">{m.name}</span>}
                         {m.note && <span className="block text-xs text-zinc-500">{m.note}</span>}
                       </td>

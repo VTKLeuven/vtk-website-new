@@ -226,11 +226,19 @@ export default async function MailGroupPage({
     if (e.kind === "INCLUDE" && address) includeByAddress.set(address, e);
   }
   const childEmails = new Set(row.children.map((c) => c.email));
+  const nestedEmails = (activity?.members ?? []).filter((m) => m.status.kind === "group").map((m) => m.email);
+  const nestedIds = new Map(
+    (nestedEmails.length
+      ? await prisma.mailGroup.findMany({ where: { email: { in: nestedEmails } }, select: { id: true, email: true } })
+      : []
+    ).map((g) => [g.email, g.id]),
+  );
   const memberRows: MemberRow[] = (activity?.members ?? []).map(({ email, status }) => {
     const extra = includeByAddress.get(email);
     return {
       key: `m:${email}`,
       address: email,
+      groupId: nestedIds.get(email) ?? null,
       name: ("name" in status ? status.name : null) ?? names.get(email) ?? null,
       via: extra ? "loose" : childEmails.has(email) ? "yearly" : "source",
       extraId: extra?.id ?? null,
@@ -244,6 +252,7 @@ export default async function MailGroupPage({
       memberRows.push({
         key: `x:${e.id}`,
         address,
+        groupId: null,
         name: e.user?.name ?? null,
         via: "excluded",
         extraId: e.id,
@@ -254,6 +263,7 @@ export default async function MailGroupPage({
       memberRows.push({
         key: `x:${e.id}`,
         address: null,
+        groupId: null,
         name: e.user?.name ?? null,
         via: "loose",
         extraId: e.id,
@@ -263,14 +273,14 @@ export default async function MailGroupPage({
     }
   }
 
-  const categoryById = new Map(categories.map((c) => [c.id, c]));
   const categoryOptions = categories
     .filter((c) => !c.parentId)
     .flatMap((c) => [
-      { value: c.id, label: c.name, group: nl ? "Categorieën" : "Categories" },
+      // Per hoofdcategorie één kop, met de hoofdcategorie zelf bovenaan.
+      { value: c.id, label: c.name, hint: nl ? "hoofdcategorie" : "main category", group: c.name },
       ...categories
         .filter((s) => s.parentId === c.id)
-        .map((s) => ({ value: s.id, label: s.name, hint: categoryById.get(c.id)?.name, group: c.name })),
+        .map((s) => ({ value: s.id, label: s.name, group: c.name })),
     ]);
   const categoryName = row.category
     ? row.category.parent

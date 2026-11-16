@@ -93,6 +93,11 @@ export function SearchPicker({
   const [internal, setInternal] = useState(defaultValue);
   const value = controlledValue ?? internal;
   const [open, setOpen] = useState(autoOpen);
+  // Boven de knop openen wanneer eronder geen plaats is: een kiezer in een balk
+  // onderaan het scherm (de bulkbalk op /admin/groepsadressen) viel anders
+  // buiten beeld. `getBoundingClientRect` en `innerHeight` zijn allebei
+  // zichtbare pixels, dus de zoom van 90% doet hier niets.
+  const [placement, setPlacement] = useState<"bottom" | "top">("bottom");
   const [query, setQuery] = useState("");
   const [highlighted, setHighlighted] = useState(() =>
     autoOpen ? Math.max(0, options.findIndex((option) => option.value === value)) : 0,
@@ -147,6 +152,11 @@ export function SearchPicker({
     setQuery("");
     const current = options.findIndex((option) => option.value === value);
     setHighlighted(current >= 0 ? current : 0);
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (rect) {
+      const below = window.innerHeight - rect.bottom;
+      setPlacement(below < 320 && rect.top > below ? "top" : "bottom");
+    }
     setOpen(true);
     requestAnimationFrame(() => {
       searchRef.current?.focus();
@@ -234,7 +244,7 @@ export function SearchPicker({
       </button>
 
       {open ? (
-        <div className="vtk-code-picker-popover">
+        <div className="vtk-code-picker-popover" data-placement={placement}>
           <div className="vtk-code-picker-search">
             <Search aria-hidden="true" size={16} />
             <input

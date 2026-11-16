@@ -26,7 +26,7 @@ import { loadMailGroupActivity } from "@/lib/google/activityData";
 import { formatWorkingYear } from "@/lib/workingYear";
 import { MailGroupsToolbar } from "./MailGroupsToolbar";
 import { type CategoryNode, MailGroupCategories } from "./MailGroupCategories";
-import { type MailGroupRow, MailGroupTable } from "./MailGroupTable";
+import { type MailGroupRow, MailGroupTable, type TableSection } from "./MailGroupTable";
 import { NewMailGroup } from "./NewMailGroup";
 
 /**
@@ -152,7 +152,7 @@ export default async function AdminMailGroups({
       lastError: g.lastError,
       existsInGoogle: Boolean(g.googleId),
       categoryId: g.categoryId,
-      activity: activity.get(g.id)?.activity ?? { total: 0, active: 0, lastYear: null },
+      activity: activity.get(g.id)?.activity ?? { total: 0, active: 0, unknown: 0, lastYear: null, thisYear: false },
     };
   });
 
@@ -166,7 +166,8 @@ export default async function AdminMailGroups({
       : null;
   const cleanup = filters.opruimen === "inactief" || filters.opruimen === "leeg" ? filters.opruimen : null;
   const isEmpty = (row: (typeof rows)[number]) => row.memberCount === 0;
-  const isInactive = (row: (typeof rows)[number]) => row.memberCount > 0 && row.activity.active === 0;
+  const isInactive = (row: (typeof rows)[number]) =>
+    row.memberCount > 0 && row.activity.active === 0 && !row.activity.thisYear;
   const inCategory = (row: (typeof rows)[number]) =>
     !categoryFilter ||
     (categoryFilter === "geen"
@@ -231,6 +232,9 @@ export default async function AdminMailGroups({
 
   const tableRows: MailGroupRow[] = visible.map((row) => ({
     id: row.id,
+    categoryId: row.categoryId,
+    unknown: row.activity.unknown,
+    thisYear: row.activity.thisYear,
     email: row.email,
     name: row.name,
     category: categoryLabel(row.categoryId),
@@ -249,6 +253,25 @@ export default async function AdminMailGroups({
     notInGoogle: !row.existsInGoogle,
     lastError: row.lastError,
   }));
+
+  // Zonder gekozen categorie: per categorie een blok dat dichtklapt, met de
+  // subcategorieën eronder en "Zonder categorie" als laatste. Lege blokken vallen weg.
+  const idsIn = (categoryId: string | null) =>
+    tableRows.filter((r) => r.categoryId === categoryId).map((r) => r.id);
+  const sections: TableSection[] | null =
+    access.manageAll && !categoryFilter && tree.length > 0
+      ? [
+          ...tree.map((c) => ({
+            key: c.id,
+            label: c.name,
+            rowIds: idsIn(c.id),
+            children: c.children
+              .map((sub) => ({ key: sub.id, label: sub.name, rowIds: idsIn(sub.id) }))
+              .filter((sub) => sub.rowIds.length > 0),
+          })),
+          { key: "geen", label: nl ? "Zonder categorie" : "No category", rowIds: idsIn(null), children: [] },
+        ].filter((s) => s.rowIds.length > 0 || s.children.length > 0)
+      : null;
 
   const ownPrefixes = werkgroepen
     .filter((g) => g.mailPrefix)
@@ -389,13 +412,18 @@ export default async function AdminMailGroups({
         </p>
       ) : (
         <MailGroupTable
+          // Een andere filter is een nieuwe lijst: selectie en open blokken beginnen opnieuw.
+          key={`${categoryFilter}|${kind}|${cleanup}|${filters.q ?? ""}|${showArchive}`}
+          sections={sections}
+          sectionsOpen={Boolean(kind || cleanup || q)}
           nl={nl}
           base={base}
           manageAll={access.manageAll}
           rows={tableRows}
           categoryOptions={tree.flatMap((c) => [
-            { value: c.id, label: c.name, group: nl ? "Categorieën" : "Categories" },
-            ...c.children.map((sub) => ({ value: sub.id, label: sub.name, hint: c.name, group: c.name })),
+            // Per hoofdcategorie één kop, met de hoofdcategorie zelf bovenaan.
+            { value: c.id, label: c.name, hint: nl ? "hoofdcategorie" : "main category", group: c.name },
+            ...c.children.map((sub) => ({ value: sub.id, label: sub.name, group: c.name })),
           ])}
         />
       )}

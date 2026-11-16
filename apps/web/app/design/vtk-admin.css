@@ -2416,6 +2416,12 @@ a.vtk-shortcut-tile:hover {
   box-shadow: 0 14px 32px color-mix(in srgb, var(--ink) 14%, transparent);
 }
 
+/* Geen plaats onder de knop: boven openen (zie `placement` in SearchPicker). */
+.vtk-code-picker-popover[data-placement='top'] {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
 .vtk-code-picker-search {
   display: flex;
   align-items: center;

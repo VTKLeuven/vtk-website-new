@@ -125,19 +125,23 @@ export async function loadMailGroupActivity(
     email: row.email,
     emails: currentAddresses(row, ctx),
   }));
-  const ownEmails = new Set(rows.map((r) => r.email));
-  const others = [...new Set(own.flatMap((g) => g.emails))].filter((e) => !ownEmails.has(e));
-  const nestedRows = others.length
-    ? ((await prisma.mailGroup.findMany({
-        where: { email: { in: others } },
-        select: MAIL_GROUP_SELECT,
-      })) as unknown as MailGroupForSync[])
-    : [];
-  const nestedCtx = nestedRows.length ? await loadDesiredContext(nestedRows, ctx.year) : ctx;
-  const groups = [
-    ...own,
-    ...nestedRows.map((r) => ({ id: r.id, email: r.email, emails: currentAddresses(r, nestedCtx) })),
-  ];
+  // Geneste groepen over alle niveaus: 24urenloop bevat sport, dat sport_2627
+  // bevat. Per niveau één query, met een grens tegen een kring.
+  const groups = [...own];
+  const known = new Set(rows.map((r) => r.email));
+  let frontier = [...new Set(own.flatMap((g) => g.emails))].filter((e) => !known.has(e));
+  for (let depth = 0; depth < 8 && frontier.length > 0; depth++) {
+    const nestedRows = (await prisma.mailGroup.findMany({
+      where: { email: { in: frontier } },
+      select: MAIL_GROUP_SELECT,
+    })) as unknown as MailGroupForSync[];
+    if (nestedRows.length === 0) break;
+    const nestedCtx = await loadDesiredContext(nestedRows, ctx.year);
+    const added = nestedRows.map((r) => ({ id: r.id, email: r.email, emails: currentAddresses(r, nestedCtx) }));
+    for (const g of added) known.add(g.email);
+    groups.push(...added);
+    frontier = [...new Set(added.flatMap((g) => g.emails))].filter((e) => !known.has(e));
+  }
 
   const people = await loadActivityPeople(groups.flatMap((g) => g.emails));
   const classified = classifyGroups(groups, people, activityYears());

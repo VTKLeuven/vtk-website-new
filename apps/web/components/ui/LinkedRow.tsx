@@ -26,10 +26,17 @@ const INTERACTIVE =
 export function LinkedRow({
   href,
   className,
+  onModifierClick,
   children,
 }: {
   href: string;
   className?: string;
+  /**
+   * Voor een tabel waarin je rijen aanvinkt: shift-, Ctrl- of Cmd-klik op de rij
+   * selecteert (zoals in een bestandsbeheerder) in plaats van te navigeren of
+   * een tabblad te openen. Ook een klik op de link in de rij.
+   */
+  onModifierClick?: (event: MouseEvent<HTMLTableRowElement>) => void;
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -39,6 +46,15 @@ export function LinkedRow({
     // React laat een klik uit een portaal (een modal die de rij opent) ook langs
     // de rij bubbelen; enkel wat echt in de rij staat, telt.
     if (!event.currentTarget.contains(target)) return;
+    if (
+      onModifierClick &&
+      (event.shiftKey || event.metaKey || event.ctrlKey) &&
+      !target.closest("input, button, select, textarea, [data-row-action]")
+    ) {
+      event.preventDefault();
+      onModifierClick(event);
+      return;
+    }
     if (target.closest(INTERACTIVE)) return;
     // Wie tekst selecteert, wil kopiëren en niet wegnavigeren.
     if (window.getSelection()?.toString()) return;
@@ -50,7 +66,12 @@ export function LinkedRow({
   }
 
   return (
-    <tr className={className} onClick={onClick}>
+    <tr
+      className={className}
+      onClick={onClick}
+      // Shift-klik selecteert anders de tekst van alle rijen ertussen.
+      onMouseDown={onModifierClick ? (event) => event.shiftKey && event.preventDefault() : undefined}
+    >
       {children}
     </tr>
   );

@@ -2509,8 +2509,16 @@ klikt dat cijfer open tot de lijst met per adres de status.
 
 - **Actief** is een post, werkgroep of jaarwerking dit werkingsjaar, een lopende
   kiesploeg, of een studie die dit academiejaar bevestigd is (dezelfde grens als
-  de mailinglijsten). Een andere groep van de kring telt als actief wanneer ze
-  zelf rechtstreeks actieve leden heeft. Bewust **niet** wanneer iemand laatst in
+  de mailinglijsten). Een andere groep van de kring telt als actief wanneer er,
+  **hoe diep ook**, iemand actief in zit: `24urenloop` bevat `sport`, dat
+  `sport_2627` bevat, en daar zit de ploeg. Eén niveau diep (de eerste versie)
+  toonde `24urenloop` als "niemand", en dat was misleidend.
+- **Een groep die naar dit of volgend werkingsjaar heet** (`sport_2627`,
+  `activiteiten_2728`) is per definitie van de huidige ploeg, ook wanneer haar
+  leden nog geen gekoppeld account hebben. Ze valt nooit onder "Niemand meer
+  actief"; het overzicht zegt "groep van dit jaar".
+- In het venster met de leden klik je een geneste groep open, met het pad
+  erboven: zo zie je waarom een groep actief telt. Bewust **niet** wanneer iemand laatst in
   Google aanmeldde: een oud-praesidiumlid dat zijn mailbox nog gebruikt, is geen
   reden om `cantus_1617` te houden. De regel staat in `lib/google/activity.ts`.
 - Bij nul actief toont de rij **het jongste jaar** waarin nog iemand actief was
@@ -2539,6 +2547,13 @@ boom die niemand overziet.
 
 - De categorieën zijn chips boven de lijst; een hoofdcategorie toont haar
   subcategorieën als tweede rij, en "Zonder categorie" vangt de rest.
+- **Onder "Alle" is de lijst per categorie gegroepeerd**, in blokken die
+  standaard dicht staan, met de subcategorieën als blokken erin en "Zonder
+  categorie" als laatste. Het vinkje van een blok neemt alles erin. Bij een
+  zoekterm of een filter staan de blokken open: dan wil je zien wat gevonden is.
+- **Aanvinken werkt zoals in een bestandsbeheerder**: shift-klik neemt alles
+  tussen de vorige klik en deze (op het vinkje of op de rij), Ctrl- of Cmd-klik
+  op de rij vinkt aan in plaats van te openen.
 - **Toewijzen gebeurt in bulk**: aanvinken (of alles in de filter) en "In
   categorie zetten". Per groep kan het ook bij Instellingen.
 - Een categorie zegt niets over wie erin zit: de sync leest ze niet. Weghalen
@@ -2566,6 +2581,17 @@ de **tabbladen**: Leden, Bronnen, Jaargroepen en Instellingen.
   verwijderen staan onderaan Instellingen.
 - Keuzes uit een lange lijst (bron, post, categorie) zijn een zoekbare
   keuzelijst (`SearchPicker`), geen keuzelijst van de browser.
+
+### Accounts koppelen begint bij de mensen
+
+Het koppelscherm toonde elk vrij `@vtk.be`-account (ruim zevenhonderd, meestal
+oud-leden) met naast elk een keuzelijst van leden. Wat er toe doet, is de
+andere richting: **wie een post heeft en nog niet gekoppeld is**, want die valt
+uit elke lijst. Dat zijn er tientallen, en die staan nu bovenaan, elk met de
+vrije accounts in een zoekbare lijst en een link naar "Accounts aanmaken" voor
+wie er nog geen heeft. De accounts zonder lid en de al gekoppelde staan
+dichtgeklapt eronder; die eerste lijst toont enkel wat bij de zoekterm past, en
+hoogstens vijftig.
 
 ### Deze adressen ontvangen mail van buiten
 
