@@ -35,6 +35,7 @@ import { fileURLToPath } from "node:url";
 import { PrismaClient } from "@prisma/client";
 import { GROUP_SEEDS, WERKGROEP_SEEDS, HEADER_TABS } from "../src/groups";
 import { ADMIN_EXCLUDED_PERMISSIONS, PERMISSIONS } from "../src/permissions";
+import { envSaysProduction, markDatabaseAsProduction } from "../src/productionGuard";
 
 const prisma = new PrismaClient();
 
@@ -263,8 +264,24 @@ async function syncBuildings() {
   note(`gebouwen gesynct: ${buildings.length} gebouwen, ${rooms} lokalen${created ? ` (${created} nieuw)` : ""}`);
 }
 
+/**
+ * Zet op productie de markering waarop de seed weigert, zodat die ook weigert
+ * wanneer iemand ze van buiten de container tegen deze database draait. Zie
+ * packages/db/src/productionGuard.ts. Haalt de markering nooit weg.
+ */
+async function markProduction() {
+  if (!envSaysProduction()) return;
+  if (dryRun) {
+    console.log("Productie: markering instance.environment zou gecontroleerd worden.");
+    return;
+  }
+  if (await markDatabaseAsProduction(prisma)) note("database gemarkeerd als productie (instance.environment)");
+}
+
 async function main() {
   if (dryRun) console.log("Dry run: er wordt niets geschreven.\n");
+
+  await markProduction();
 
   await syncPermissions();
   await syncAdminRolePermissions();

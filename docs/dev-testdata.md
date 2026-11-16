@@ -132,6 +132,48 @@ photos.dev.vtk.be {
 
 Daarna `sudo systemctl reload caddy`; Caddy haalt het certificaat zelf op.
 
+## Nooit op productie
+
+De seed maakt de prototype-accounts aan (`<post>@vtk.prototype`, wachtwoord
+`prototype` uit de repo), zet ze in de posten van het werkingsjaar, en voegt
+verzonnen shiften, kalenderevents en een demoformulier toe. Op vtk.be stonden
+die mensen zo op /praesidium en kon iedereen als "praeses" aanmelden. Dat
+gebeurde meer dan eens, omdat het commando hierboven op liv precies hetzelfde
+doet als op elise.
+
+Daarom weigert `seed.ts` op productie (`packages/db/src/productionGuard.ts`),
+zonder vlag om het toch te doen. Productie herkent hij aan:
+
+- de env: `BETTER_AUTH_URL` of `VTK_MAIN_URL` wijst naar vtk.be;
+- de database: de rij `instance.environment` in `Setting` zegt `production`.
+  `prisma/sync.ts` schrijft die bij elke start op productie, zodat de seed ook
+  weigert wanneer iemand hem van een laptop tegen de productiedatabase draait.
+
+Een kopie van de productiedatabase op dev of lokaal neemt die markering mee, en
+dan weigert de seed daar ook; dat is de bedoeling, want daar staan dan echte
+leden in. Wil je er toch testdata op, verwijder die ene rij dan bewust.
+
+Wat iemand op productie van de seed leek nodig te hebben (nieuwe permissies, de
+rechten van de rol admin, de gebouwen), doet `sync.ts` al bij elke start.
+
+### Opruimen wat er toch staat
+
+`packages/db/prisma/remove-seed-data.ts` haalt de testdata van de seed en van
+de demoscripts weer weg, enkel op hun markeringen (`@vtk.prototype`,
+`seed-shift-*`, de events uit `seed-calendar-events.ts` die niemand aanmaakte,
+het demoformulier). Zonder `--apply` toont het enkel wat weg zou gaan:
+
+```bash
+docker compose -f infra/docker-compose.yml exec web sh -lc \
+  "cd /app && npx tsx packages/db/prisma/remove-seed-data.ts"
+docker compose -f infra/docker-compose.yml exec web sh -lc \
+  "cd /app && npx tsx packages/db/prisma/remove-seed-data.ts --apply"
+```
+
+Pagina's, POC's, partners, posten, rollen en het Theokot-aanbod uit de seed
+laat het staan: die kunnen op productie echt zijn. Het script noemt ze, kijk ze
+zelf na in de admin.
+
 ## Waarom dit niet automatisch bij een deploy gebeurt
 
 De web-container draait bij het starten haar migraties, maar de seed enkel

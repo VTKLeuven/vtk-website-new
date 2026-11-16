@@ -244,7 +244,8 @@ bewust niet in mee: dat is wachten op een mens, geen storing.
 ```
 npm run db:migrate        # lokaal
 # op de server draait `prisma migrate deploy` bij elke start
-npm run db:seed           # zet de nieuwe permissies in de registry
+# de nieuwe permissies zet prisma/sync.ts bij elke start; lokaal: npm run db:seed
+# (de seed weigert op productie, zie docs/dev-testdata.md)
 ```
 
 Ken daarna in `/admin/roles` de rechten toe: `mailgroups.manage` aan wie de
