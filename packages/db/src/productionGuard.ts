@@ -38,7 +38,9 @@ function hostOf(raw: string | undefined): string | null {
 }
 
 /** Zegt de env van dit proces dat we op productie draaien? */
-export function envSaysProduction(env: NodeJS.ProcessEnv = process.env): boolean {
+export function envSaysProduction(
+  env: { readonly [key: string]: string | undefined } = process.env,
+): boolean {
   return [env.BETTER_AUTH_URL, env.VTK_MAIN_URL].some((value) => {
     const host = hostOf(value);
     return host !== null && PRODUCTION_HOSTS.has(host);
