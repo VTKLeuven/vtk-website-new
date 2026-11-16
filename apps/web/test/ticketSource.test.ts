@@ -4,6 +4,7 @@ import {
   sanitizeSourceKey,
   sourceFromLanding,
   sourceQuery,
+  taggedLanding,
   withSource,
 } from "@/lib/ticketing/source";
 
@@ -68,5 +69,16 @@ describe("ticket source", () => {
     expect(describeSource(null, "nl").kind).toBe("unknown");
     expect(describeSource("direct", "nl").kind).toBe("direct");
     expect(describeSource("flyer-agora", "nl")).toEqual({ label: "flyer-agora", kind: "extern" });
+  });
+});
+
+describe("taggedLanding", () => {
+  it("leest de herkomst uit de link, al op de server", () => {
+    expect(taggedLanding({ via: "Mail", c: ["week-3", "x"] })).toEqual({ source: "mail", campaign: "week-3" });
+  });
+
+  it("is null zonder herkomst in de link, zodat de browser de referrer nog kan lezen", () => {
+    expect(taggedLanding({})).toBeNull();
+    expect(taggedLanding({ bureau: "abc" })).toBeNull();
   });
 });

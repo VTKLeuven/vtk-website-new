@@ -5,8 +5,9 @@ import type { MeetingKind } from "@prisma/client";
 import { Button, Card, Input, Label, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
+import { BureauLinkButton } from "./BureauLinkButton";
 import { IconButton } from "@/components/ui/IconButton";
-import { CheckIcon, CopyIcon } from "@/components/ui/icons";
+import { CheckIcon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
 import { formatEuro } from "@/lib/theokot";
 import {
@@ -121,7 +122,9 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {meeting.shareUrl && <CopyLinkButton nl={nl} url={meeting.shareUrl} />}
+          {meeting.shareUrl && (
+            <BureauLinkButton nl={nl} url={meeting.shareUrl} dateLabel={meeting.dateLabel} />
+          )}
           <DeleteIconButton
             action={deleteMeetingAction}
             fields={{ meetingId: meeting.id }}
@@ -130,8 +133,8 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
             title={nl ? "Vergadering verwijderen" : "Delete meeting"}
             description={
               (nl
-                ? `De vergadering van ${meeting.dateLabel} verdwijnt, samen met ${meeting.reservations.length} inschrijving(en) en hun opmerkingen. De broodjes komen terug vrij voor studenten. Dit kan niet ongedaan gemaakt worden.`
-                : `The meeting of ${meeting.dateLabel} will be removed, together with ${meeting.reservations.length} registration(s) and their comments. The sandwiches become available to students again. This cannot be undone.`) +
+                ? `De vergadering van ${meeting.dateLabel} verdwijnt, samen met ${meeting.reservations.length} inschrijving(en) en hun opmerkingen${meeting.kind === "BUREAU" ? " en de genoteerde reclamemomenten" : ""}. De broodjes komen terug vrij voor studenten. Dit kan niet ongedaan gemaakt worden.`
+                : `The meeting of ${meeting.dateLabel} will be removed, together with ${meeting.reservations.length} registration(s) and their comments${meeting.kind === "BUREAU" ? " and the logged promotion moments" : ""}. The sandwiches become available to students again. This cannot be undone.`) +
               (meeting.theokotOrders.length > 0
                 ? nl
                   ? ` De ${meeting.theokotOrders.length} bestelling(en) die grocos zelf bij Theokot plaatsten, blijven bestaan maar gaan niet meer in de doos: die halen ze dan zelf af aan de balie en betalen ze daar.`
@@ -580,24 +583,3 @@ function PaidToggle({
   );
 }
 
-/** De deelbare link van een bureau kopiëren. */
-function CopyLinkButton({ nl, url }: { nl: boolean; url: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <IconButton
-      label={copied ? (nl ? "Gekopieerd" : "Copied") : nl ? "Link kopiëren" : "Copy link"}
-      srLabel={nl ? "Link naar het bestelformulier kopiëren" : "Copy the link to the order form"}
-      onClick={() => {
-        navigator.clipboard?.writeText(url).then(
-          () => {
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-          },
-          () => setCopied(false),
-        );
-      }}
-    >
-      {copied ? <CheckIcon /> : <CopyIcon />}
-    </IconButton>
-  );
-}

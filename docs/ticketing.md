@@ -581,6 +581,11 @@ navigatie binnen de site).
   doorstuurt de herkomst niet meegeeft. Geen cookie en geen storage.
 - De checkout schoont de waarde opnieuw op (`sanitizeSourceKey`) en weigert
   nooit een bestelling om een rare herkomst.
+- Het VTK Bureau gebruikt hetzelfde systeem voor zijn inschrijvingen
+  (`MeetingReservation.source`), met een eigen tab Statistieken op
+  `/admin/bureau`. Zie "Statistieken van het VTK Bureau" in
+  `docs/design-decisions.md`. Verander je hier een sleutel of `SOURCES`, dan
+  verandert die ook daar.
 
 ### Kleur per tickettype
 

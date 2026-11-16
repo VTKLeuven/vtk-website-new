@@ -964,6 +964,73 @@ hoeveel bestellingen eraan hangen.
 
 ---
 
+## Statistieken van het VTK Bureau
+
+Onderwijs wil zien wat een mail, een story of een affiche doet voor de
+inschrijvingen van een bureau. De tab Statistieken op `/admin/bureau`
+(`app/[locale]/admin/bureau/statistieken`, rekenwerk in `lib/meetingStats.ts`)
+toont drie blokken: één bureau (de inschrijvingen per dag, het totaal door de
+tijd en het logboek van reclamemomenten), de herkomst van dat bureau, en het
+jaar met een staaf per bureau en nieuw tegenover terugkerend. Bewust niet meer:
+geen richting of studiejaar, geen Umami-cijfers, niets voor de grocomeet en
+geen herkomst per persoon in "Wie komt".
+
+- **De herkomst hangt aan de inschrijving en wordt maar één keer gezet.**
+  `MeetingReservation.source` en `sourceCampaign` volgen het systeem van de
+  tickets (`?via=` en `?c=`, `lib/ticketing/source.ts`). Ze gaan enkel in de
+  `create` van de upsert: wie later zijn broodje wijzigt via een andere link,
+  verandert niet langs waar hij eerst binnenkwam.
+- **"Niet gemeten" is iets anders dan "rechtstreeks".** Een inschrijving van
+  voor de meting heeft `source = null` en staat apart. Een nieuwe inschrijving
+  zonder herkomst in het formulier (iemand die instuurt voor de browser de
+  herkomst las) wordt `direct`, zodat `null` voorbehouden blijft voor wat er
+  echt niet gemeten werd.
+- **Er telt wie nu ingeschreven is.** Annuleren wist de rij, dus wie zich
+  uitschreef, telt nergens mee, en wie annuleert en opnieuw inschrijft via een
+  andere link, krijgt de nieuwe herkomst. Geen soft delete in deze versie. Enkel
+  `ACTIVE` rijen tellen, zodat het aantal gelijk is aan "Ingeschreven" op de tab
+  Beheer.
+- **Het totaal loopt per uur**, niet per dag: het effect van een mail zit in de
+  uren erna. Staat een bureau langer dan een week open, dan per drie uur, en
+  na drie weken per zes uur, zodat de lijn en haar tabel leesbaar blijven
+  (`cumulativeCurve`). De sleutels zijn UTC-tijdstippen, getoond op de
+  Brusselse klok, want bij de overgang naar wintertijd komt 02:00 twee keer
+  voor.
+- **Reclamemomenten vult Onderwijs zelf in** (`MeetingPromotion`): wanneer een
+  mail vertrok of een story online kwam, optioneel met het kanaal en de naam
+  van de link. De site kan die momenten niet weten, want ze gebeuren buiten de
+  site, en de eerste inschrijving via een link is maar een benadering: die
+  komt altijd later, en een mail die niets opleverde, heeft er geen. Ze staan
+  als genummerde gestippelde lijn op het totaal, met de nummers ook in de lijst
+  eronder, in de tooltip en in de tabel (een label in de grafiek zelf schuift
+  over de lijn). Een aankondiging van voor het openen rekt de as naar achter
+  op; een moment na nu krijgt geen lijn en geen nummer. De staven per dag
+  volgen dezelfde as, zodat beide grafieken op dezelfde dag beginnen. Een
+  moment ligt ten vroegste 60 dagen voor het bureau (of voor het openen) en
+  ten laatste op de dag zelf: een verkeerd jaartal zou de as anders maanden
+  oprekken, dus de action weigert het (`DATE_OUT_OF_RANGE`). Het kanaal mag
+  ook een eigen naam zijn ("Iets anders..."), zoals in de linkbouwer.
+- **Eén kleur per kanaal over de hele tab.** De reeksen (de grootste drie
+  kanalen, Andere, niet gemeten) komen uit het hele jaar en gelden ook voor
+  de grafiek van één bureau. Per bureau gerangschikt kreeg mail daar een
+  andere kleur dan in het jaaroverzicht.
+- **Terugkerend** = stond dit werkingsjaar (vanaf 15 juli, `Meeting.year`) al
+  ingeschreven op een eerder bureau. Het eerste bureau van het jaar heeft dus
+  enkel nieuwe mensen.
+- **"Rechtstreeks" ligt te hoog, en dat is gekend.** Wie uitgelogd binnenkomt,
+  gaat langs de login; `?via=` reist mee (`landingQuery`), maar de referrer
+  niet, dus wie zonder link met kanaal kwam, komt terug als `direct`. Het
+  antwoord daarop is de linkbouwer (het linkicoon bij een bureau op de tab
+  Beheer, dezelfde sleutels als bij de tickets via `useSourceLink`), niet meer
+  code. Ook de vaste link `/bureau-inschrijving` geeft `?via=` en `?c=` door.
+  De linkbouwer van een bureau opent op "Geen kanaal (gewone link)": wie
+  meteen kopieert, deelt geen kanaal dat hij niet koos (bij de tickets stond
+  Facebook voorgeselecteerd, en dat bleef zo).
+- **De herkomst staat al in de HTML.** De bureaupagina leest `?via=` en `?c=`
+  op de server (`taggedLanding`) en zet ze in het formulier, want
+  `useLandingSource` is in de eerste render nog leeg. Wie instuurt voor de
+  pagina klaar is met laden, telt zo toch onder zijn link.
+
 ## Lesbezoeken
 
 Een lesbezoek is een aankondiging van een paar minuten bij het begin (of einde) van een

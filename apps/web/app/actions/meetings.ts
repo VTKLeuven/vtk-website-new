@@ -8,6 +8,7 @@ import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { logAudit } from "@/lib/audit";
 import { brusselsTimeOnDay, ymdKey } from "@/lib/brussels";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
+import { sanitizeSourceKey } from "@/lib/ticketing/source";
 import {
   bureauStockFor,
   chooseBureauSupply,
@@ -634,6 +635,18 @@ export async function saveMeetingReservationAction(
   const drinkName = String(formData.get("drink") ?? "").trim();
   const comment =
     meeting.kind === "BUREAU" ? String(formData.get("comment") ?? "").trim() || null : null;
+  // Herkomst van een bureau-inschrijving, enkel voor een nieuwe rij (zie de
+  // `create` hieronder). Opnieuw gesaniteerd: een hidden field is aan te
+  // passen. Leeg wordt "direct" en geen `null`: `null` is voorbehouden voor
+  // inschrijvingen van voor de meting, en wie instuurt voor de browser de
+  // herkomst las, is wel gemeten.
+  const origin =
+    meeting.kind === "BUREAU"
+      ? {
+          source: sanitizeSourceKey(formData.get("source")) ?? "direct",
+          sourceCampaign: sanitizeSourceKey(formData.get("sourceCampaign")),
+        }
+      : {};
 
   const drinks = await getMeetingDrinks();
   if (drinkName && !drinks.items.includes(drinkName)) return saveError("UNKNOWN_DRINK");
@@ -706,10 +719,12 @@ export async function saveMeetingReservationAction(
         invalidatedReason: null,
       };
 
+      // De herkomst gaat enkel in `create`: wie later zijn broodje wijzigt via
+      // een andere link, overschrijft niet langs waar hij eerst binnenkwam.
       await tx.meetingReservation.upsert({
         where: { meetingId_userId: { meetingId, userId } },
         update: data,
-        create: { ...data, meetingId, userId },
+        create: { ...data, ...origin, meetingId, userId },
       });
       if (bigBureau) await rebalanceMeetingSupply(tx, meetingId);
     });
@@ -744,4 +759,79 @@ export async function cancelMeetingReservationAction(formData: FormData): Promis
     await prisma.meetingReservation.deleteMany({ where: { meetingId, userId: session.user.id } });
   }
   revalidateMeeting(meeting.kind, meeting.slug);
+}
+
+const PROMOTION_LABEL_MAX = 120;
+/**
+ * Zo ver voor het bureau mag een reclamemoment liggen. Een bureau opent een
+ * paar weken op voorhand; een moment dat verder ligt, is bijna altijd een
+ * verkeerd jaartal, en dat zou de lijn op de tab Statistieken maanden naar
+ * achter oprekken.
+ */
+const PROMOTION_MAX_DAYS_BEFORE = 60;
+
+/** De keuze "Iets anders..." in het logboek; dan telt `sourceCustom`. */
+const OTHER_PROMOTION_SOURCE = "__other";
+
+function revalidateBureauStats() {
+  revalidatePath("/admin/bureau/statistieken");
+  revalidatePath("/en/admin/bureau/statistieken");
+}
+
+/**
+ * Een reclamemoment noteren bij een bureau: wanneer een mail vertrok of een
+ * story online kwam. Verschijnt als markering op de cumulatieve lijn van
+ * /admin/bureau/statistieken. Het kanaal en de naam zijn optioneel en worden
+ * opgeschoond zoals de herkomst van een inschrijving, zodat ze naast elkaar
+ * te leggen zijn.
+ */
+export async function addMeetingPromotionAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const meetingId = String(formData.get("meetingId") ?? "");
+  const meeting = await prisma.meeting.findUnique({ where: { id: meetingId } });
+  if (!meeting || meeting.kind !== "BUREAU") return saveError("NOT_FOUND");
+  const session = await requireMeetingManager(meeting.kind);
+
+  const at = parseLocalDateTime(String(formData.get("at") ?? ""));
+  if (!at) return saveError("INVALID_DATE");
+  const earliest = new Date(
+    Math.min(meeting.startsAt.getTime(), meeting.opensAt?.getTime() ?? Infinity) -
+      PROMOTION_MAX_DAYS_BEFORE * 86_400_000,
+  );
+  // Ten laatste op de dag van het bureau: wat erna komt, verandert niets meer.
+  const latest = new Date(meeting.startsAt.getTime() + 86_400_000);
+  if (at < earliest || at > latest) return saveError("DATE_OUT_OF_RANGE");
+  const label = String(formData.get("label") ?? "").trim();
+  if (!label) return saveError("LABEL_REQUIRED");
+  if (label.length > PROMOTION_LABEL_MAX) return saveError("LABEL_TOO_LONG");
+
+  await prisma.meetingPromotion.create({
+    data: {
+      meetingId,
+      at,
+      label,
+      source:
+        formData.get("source") === OTHER_PROMOTION_SOURCE
+          ? sanitizeSourceKey(formData.get("sourceCustom"))
+          : sanitizeSourceKey(formData.get("source")),
+      sourceCampaign: sanitizeSourceKey(formData.get("sourceCampaign")),
+      createdById: session.user.id,
+    },
+  });
+  revalidateBureauStats();
+  return saveOk();
+}
+
+/** Een genoteerd reclamemoment weghalen; de inschrijvingen blijven staan. */
+export async function deleteMeetingPromotionAction(formData: FormData): Promise<SaveState> {
+  const id = String(formData.get("promotionId") ?? "");
+  const promotion = await prisma.meetingPromotion.findUnique({
+    where: { id },
+    include: { meeting: { select: { kind: true } } },
+  });
+  if (!promotion) return saveError("NOT_FOUND");
+  await requireMeetingManager(promotion.meeting.kind);
+
+  await prisma.meetingPromotion.delete({ where: { id } });
+  revalidateBureauStats();
+  return saveOk();
 }
