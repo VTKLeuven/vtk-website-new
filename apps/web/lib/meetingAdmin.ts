@@ -10,7 +10,7 @@ import { prisma } from "@vtk/db";
 import type { MeetingKind, TheokotOrderStatus } from "@prisma/client";
 import { pick, type Locale } from "@vtk/i18n";
 
-import type { MeetingAdminView } from "@/components/meetings/MeetingAdminCard";
+import type { MeetingAdminView } from "@/components/meetings/MeetingDetail";
 import type { PlannedDay } from "@/components/meetings/MeetingPlanner";
 import { brusselsTimeOnDay, brusselsYMD, ymdKey } from "./brussels";
 import {
@@ -50,16 +50,21 @@ export type MeetingAdminData = {
   hasPlan: boolean;
 };
 
+/**
+ * De momenten van één semester, of met `meetingId` enkel dat ene moment (de
+ * pagina van een vergadering). Een `meetingId` van een ander soort moment geeft
+ * een lege lijst, zodat het bureau geen grocomeet opent en omgekeerd.
+ */
 export async function loadMeetingAdmin(
   kind: MeetingKind,
-  options: { locale: Locale; workingYear: number; semester: Semester },
+  options: { locale: Locale; workingYear: number; semester: Semester; meetingId?: string },
 ): Promise<MeetingAdminData> {
-  const { locale, workingYear, semester } = options;
+  const { locale, workingYear, semester, meetingId } = options;
   const nl = locale === "nl";
 
   const [meetings, plan] = await Promise.all([
     prisma.meeting.findMany({
-      where: { kind, year: workingYear, semester },
+      where: meetingId ? { kind, id: meetingId } : { kind, year: workingYear, semester },
       orderBy: { startsAt: "asc" },
       include: {
         options: { orderBy: { order: "asc" } },
@@ -130,19 +135,22 @@ export async function loadMeetingAdmin(
       }),
     }));
 
-    const theokotOrders = meeting.theokotOrders.map((order) => ({
-      id: order.id,
-      name: order.user.name,
-      items: [...order.lines]
+    const theokotOrders = meeting.theokotOrders.map((order) => {
+      const lines = [...order.lines]
         .sort((a, b) => a.sessionItem.order - b.sessionItem.order)
-        .map(
-          (line) =>
-            `${line.quantity}× ${pick(line.sessionItem.nameNl, line.sessionItem.nameEn, locale) ?? line.sessionItem.nameNl}`,
-        )
-        .join(", "),
-      totalCents: order.totalCents,
-      paid: order.grocomeetPaidAt !== null,
-    }));
+        .map((line) => ({
+          name: pick(line.sessionItem.nameNl, line.sessionItem.nameEn, locale) ?? line.sessionItem.nameNl,
+          quantity: line.quantity,
+        }));
+      return {
+        id: order.id,
+        name: order.user.name,
+        items: lines.map((line) => `${line.quantity}× ${line.name}`).join(", "),
+        lines,
+        totalCents: order.totalCents,
+        paid: order.grocomeetPaidAt !== null,
+      };
+    });
     const money = [...reservations, ...theokotOrders];
 
     // Wat Onderwijs zelf bij de externe zaak moet bestellen, per broodje.
@@ -171,6 +179,7 @@ export async function loadMeetingAdmin(
       externalItems: [...externalItems.entries()]
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
+      past: meeting.startsAt.getTime() < now.getTime(),
       // Na de deadline werkt Theokot misschien al met de turflijst.
       deadlinePassed: now >= meetingCloseAt(meeting, session ?? null),
       options: meeting.options.map((option) => ({

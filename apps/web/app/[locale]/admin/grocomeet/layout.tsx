@@ -2,16 +2,18 @@ import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import { currentWorkingYear, formatWorkingYear } from "@/lib/workingYear";
-import { GrocomeetAdminNav } from "./GrocomeetAdminNav";
+import { ModuleAdminShell } from "@/components/admin/ModuleAdminShell";
+import { meetingAdminTabs } from "@/components/meetings/MeetingAdminPages";
 
 import "@/app/design/vtk-basic.css";
 
 /**
  * Beheer van de grocomeets (`grocomeet.manage`: admin en de verantwoordelijke
- * van Theokot), in vier tabbladen: de vergaderingen zelf (kalender en
- * bestellingen), wie nog wat verschuldigd is, het overzicht voor de
- * herbegroting, en de drankjes. Dit was één lange pagina; het bureau van
- * Onderwijs draait op dezelfde code onder /admin/bureau.
+ * van Theokot), in tabbladen zoals Tickets: de vergaderingen (een lijst, en per
+ * vergadering wat er uitgedeeld moet worden), de planning (kalender en losse
+ * vergaderingen), wie nog wat verschuldigd is, het overzicht voor de
+ * herbegroting, en de drankjes. Het bureau van Onderwijs draait op dezelfde
+ * code onder /admin/bureau; zie components/meetings/MeetingAdminPages.tsx.
  */
 export default async function AdminGrocomeetLayout({
   children,
@@ -26,10 +28,12 @@ export default async function AdminGrocomeetLayout({
   const nl = locale === "nl";
 
   return (
-    <div className="space-y-5">
-      <h1 className="text-2xl font-semibold">Grocomeet · {formatWorkingYear(currentWorkingYear())}</h1>
-      <GrocomeetAdminNav nl={nl} />
+    <ModuleAdminShell
+      title={`Grocomeet · ${formatWorkingYear(currentWorkingYear())}`}
+      navLabel="Grocomeet"
+      tabs={meetingAdminTabs("GROCOMEET", nl)}
+    >
       {children}
-    </div>
+    </ModuleAdminShell>
   );
 }

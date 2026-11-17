@@ -115,8 +115,8 @@ function revalidateTheokot() {
   // Een gewijzigd aanbod verandert wat een vergadering nog kan bestellen.
   revalidatePath("/grocomeet");
   revalidatePath("/en/grocomeet");
-  revalidatePath("/admin/grocomeet");
-  revalidatePath("/admin/bureau");
+  revalidatePath("/[locale]/admin/grocomeet", "layout");
+  revalidatePath("/[locale]/admin/bureau", "layout");
   revalidatePath("/admin/theokot/turflijst");
   revalidatePath("/admin/theokot/afhalen");
   revalidatePath("/en/admin/theokot/afhalen");

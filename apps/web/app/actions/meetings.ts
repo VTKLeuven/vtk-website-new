@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@vtk/db";
 import type { MeetingKind } from "@prisma/client";
 import { requirePermission, requireSession } from "@/lib/session";
@@ -49,9 +50,15 @@ function adminPath(kind: MeetingKind): string {
   return kind === "GROCOMEET" ? "/admin/grocomeet" : "/admin/bureau";
 }
 
+/** Het beheer van dit soort moment, met "layout" ook elk tabblad en de pagina van elke vergadering. */
+function revalidateAdmin(kind: MeetingKind) {
+  revalidatePath(adminPath(kind));
+  revalidatePath(`/[locale]${adminPath(kind)}`, "layout");
+}
+
 /** Vernieuwt de schermen die op dit moment steunen, in beide talen. */
 function revalidateMeeting(kind: MeetingKind, slug?: string) {
-  revalidatePath(adminPath(kind));
+  revalidateAdmin(kind);
   if (kind === "GROCOMEET") {
     revalidatePath("/grocomeet");
     revalidatePath("/en/grocomeet");
@@ -432,6 +439,12 @@ export async function deleteMeetingAction(formData: FormData): Promise<void> {
     summary: "het moment en alle reservaties erop zijn weg",
   });
   revalidateMeeting(meeting.kind, meeting.slug);
+
+  // Vanop de pagina van de vergadering zelf: die bestaat nu niet meer, dus terug
+  // naar de lijst. Enkel een pad binnen het eigen beheer, geen open redirect.
+  const redirectTo = String(formData.get("redirectTo") ?? "");
+  const listPath = adminPath(meeting.kind);
+  if (redirectTo === listPath || redirectTo === `/en${listPath}`) redirect(redirectTo);
 }
 
 /**
@@ -529,8 +542,8 @@ export async function saveMeetingDrinksAction(
     summary: `${items.length} drank(en) aan ${(priceCents / 100).toFixed(2)} euro`,
   });
 
-  revalidatePath(adminPath("GROCOMEET"));
-  revalidatePath(adminPath("BUREAU"));
+  revalidateAdmin("GROCOMEET");
+  revalidateAdmin("BUREAU");
   revalidateMeeting(kind);
   return saveOk();
 }
@@ -564,7 +577,7 @@ export async function toggleReservationPaidAction(formData: FormData): Promise<v
     summary: reservation.paidAt ? "afgevinkt als niet betaald" : "afgevinkt als betaald",
   });
 
-  revalidatePath(adminPath(reservation.meeting.kind));
+  revalidateAdmin(reservation.meeting.kind);
 }
 
 /**
@@ -595,7 +608,7 @@ export async function toggleGrocomeetOrderPaidAction(formData: FormData): Promis
       : "Theokot-bestelling voor de grocomeet afgevinkt als betaald",
   });
 
-  revalidatePath(adminPath("GROCOMEET"));
+  revalidateAdmin("GROCOMEET");
 }
 
 // -----------------------------------------------------------------------------
