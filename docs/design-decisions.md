@@ -13487,3 +13487,36 @@ November 2026, na een week werken met de tabbladen.
   dezelfde NL/EN-schakelaar als het evenementformulier. Leeg toont het
   Nederlands; elke shift van daarvoor blijft dus wat ze was
   (`lib/shift/localize.ts`).
+
+## Weekmail van de kalender
+
+Elke zaterdagavond krijgt wie de mailinglijst Evenementen aan heeft een
+overzicht van de week die komt (`lib/calendar/weekOverview*.ts`). Uit drie
+ontwerpen (een agenda per dag, één uitgelicht evenement met de rest als lijst,
+een raster van affiches) is het uitgelichte gekozen: een week heeft meestal één
+activiteit waar mensen een ticket voor moeten kopen, en die hoort de knop
+bovenaan te krijgen.
+
+- **Zaterdag vanaf 19u**, over maandag tot en met zondag. Zaterdagavond is een
+  moment waarop mensen hun week nog plannen. Lag de worker plat, dan vertrekt ze
+  zondag nog, maar nooit meer zodra de week begonnen is.
+- **Een lege week geeft geen mail.** Een mail die zegt dat er niets is, leert
+  mensen deze mail niet te openen.
+- **Bovenaan staat wat met de ster in /admin/kalender uitgelicht is**, dezelfde
+  ster als de affiches in de hero. Zonder ster het eerste evenement met tickets
+  of een inschrijving, en anders het eerste van de week. Zo kiest niemand elke
+  week met de hand, en staat er nooit een lege kop.
+- **Wat in die week begint, één keer per evenement.** Een reeks met momenten
+  staat op haar eerste moment in de week, met "Nog 2 keer deze week". Wat vóór
+  maandag begon, staat er niet in: wie het wou, zag het vorige week.
+- **Alle evenementen, ook die van Feest, Sport of Career.** De lijst Evenementen
+  is de algemene lijst; wie ook Feest aan heeft, krijgt de cantus dus in beide.
+  Wie op /account de doelgroepfilter aanzette, krijgt enkel wat hij op de
+  kalender ziet, en geen mail wanneer daarvan niets overblijft.
+- **Niet vergeten**: een publieke ticketverkoop die opent, of een inschrijving
+  bij een evenement die sluit, tussen het versturen en het einde van de week.
+  Ook wanneer het evenement zelf later valt: dat is net wat iemand mist.
+- Eén rij per lid per week in `CalendarWeekMail` is de claim, zoals bij de
+  andere kalendermails, zodat geen lid er twee krijgt wanneer de website op meer
+  dan één container draait. De worker verstuurt in rondes van 300 leden om de
+  vijf minuten.

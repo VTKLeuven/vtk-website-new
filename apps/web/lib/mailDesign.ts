@@ -61,8 +61,21 @@ export function escapeHtml(value: string): string {
  * de kaart is een tabel, want dat is het enige wat elke mailclient op dezelfde
  * manier tekent.
  */
-export function mailDocument(input: { lang: "nl" | "en"; title: string; rows: string }): string {
-  return `<!doctype html><html lang="${input.lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(input.title)}</title></head><body style="margin:0;padding:0;background:${MAIL_COLOR.paper};color:${MAIL_COLOR.ink};font-family:${MAIL_FONT}"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;background:${MAIL_COLOR.paper}"><tr><td align="center" style="padding:32px 16px">${MSO_OPEN}<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;max-width:600px;background:${MAIL_COLOR.surface};border:1px solid ${MAIL_COLOR.line};border-radius:18px;overflow:hidden">${input.rows}</table>${MSO_CLOSE}</td></tr></table></body></html>`;
+export function mailDocument(input: {
+  lang: "nl" | "en";
+  title: string;
+  rows: string;
+  /**
+   * De regel die een inbox naast het onderwerp toont. Zonder deze regel neemt
+   * de client de eerste tekst van de mail, en dat is hier het woord in de kop.
+   */
+  preheader?: string;
+}): string {
+  // De opvulling na de regel houdt de rest van de mail uit dat voorbeeld.
+  const preheader = input.preheader
+    ? `<div style="display:none;max-height:0;max-width:0;overflow:hidden;opacity:0;mso-hide:all;font-size:1px;line-height:1px;color:${MAIL_COLOR.paper}">${escapeHtml(input.preheader)}${"&zwnj;&nbsp;".repeat(60)}</div>`
+    : "";
+  return `<!doctype html><html lang="${input.lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(input.title)}</title></head><body style="margin:0;padding:0;background:${MAIL_COLOR.paper};color:${MAIL_COLOR.ink};font-family:${MAIL_FONT}">${preheader}<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;background:${MAIL_COLOR.paper}"><tr><td align="center" style="padding:32px 16px">${MSO_OPEN}<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;max-width:600px;background:${MAIL_COLOR.surface};border:1px solid ${MAIL_COLOR.line};border-radius:18px;overflow:hidden">${input.rows}</table>${MSO_CLOSE}</td></tr></table></body></html>`;
 }
 
 /**
@@ -94,8 +107,9 @@ export function mailHeaderRow(input: { kicker: string; logoUrl?: string }): stri
  * doet. Loopt de kop over twee regels, dan is de streep zo breed als de langste
  * regel, en dat is precies de bedoeling.
  */
-export function mailHeading(text: string, size = 26): string {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse"><tr><td style="padding:0"><h1 style="margin:0;font-family:${MAIL_FONT};font-size:${size}px;font-weight:650;line-height:1.2;letter-spacing:-.02em;color:${MAIL_COLOR.ink}">${escapeHtml(text)}</h1><div style="height:4px;margin-top:8px;border-radius:2px;background:${MAIL_COLOR.yellow};font-size:0;line-height:0">&nbsp;</div></td></tr></table>`;
+export function mailHeading(text: string, size = 26, level: 1 | 2 = 1): string {
+  const tag = level === 2 ? "h2" : "h1";
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse"><tr><td style="padding:0"><${tag} style="margin:0;font-family:${MAIL_FONT};font-size:${size}px;font-weight:650;line-height:1.2;letter-spacing:-.02em;color:${MAIL_COLOR.ink}">${escapeHtml(text)}</${tag}><div style="height:4px;margin-top:8px;border-radius:2px;background:${MAIL_COLOR.yellow};font-size:0;line-height:0">&nbsp;</div></td></tr></table>`;
 }
 
 /** De centrale inhoudsrij met de standaard padding van 28px/30px. */

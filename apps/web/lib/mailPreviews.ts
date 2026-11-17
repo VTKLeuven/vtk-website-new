@@ -8,6 +8,8 @@ import {
 } from "@/lib/accountMail";
 import { interestReminderMail } from "@/lib/calendar/interestReminderMail";
 import { signupOpenedMail } from "@/lib/calendar/signupOpenedMail";
+import { WEEK_OVERVIEW_SEND_HOUR } from "@/lib/calendar/weekOverview";
+import { weekOverviewMail, type WeekOverviewMailEvent } from "@/lib/calendar/weekOverviewMail";
 import { contactMailBody } from "@/lib/contactForm";
 import type { EmailSource } from "@/lib/email";
 import { confirmationMail, notificationMail } from "@/lib/forms/mail";
@@ -105,8 +107,8 @@ export function mailPreviewGroups(): MailPreviewGroup[] {
     {
       id: "kalender",
       title: "Kalender",
-      description: "De mails aan wie interesse aanduidde: wanneer de verkoop of de inschrijvingen opengaan, en de dag ervoor.",
-      mails: [signupOpenedPreview(), signupOpenedPresalePreview(), interestReminderPreview()],
+      description: "De mails aan wie interesse aanduidde (wanneer de verkoop of de inschrijvingen opengaan, en de dag ervoor) en de weekmail aan de lijst Evenementen.",
+      mails: [signupOpenedPreview(), signupOpenedPresalePreview(), interestReminderPreview(), weekOverviewPreview()],
     },
     {
       id: "account",
@@ -353,6 +355,91 @@ function interestReminderPreview(): MailPreview {
       "De knop onderaan opent /uitschrijven, dat eerst een klik vraagt; de mail draagt ook List-Unsubscribe, zodat Gmail en Outlook hun eigen uitschrijfknop tonen.",
       "In het echt staat de banner van elk evenement bovenaan zijn kaart; hier niet, want de voorvertoning laadt geen bestaande foto.",
       "In de taal van het lid (User.locale), met de Engelse titel wanneer die er is.",
+    ],
+  };
+}
+
+function weekOverviewPreview(): MailPreview {
+  // Een week van maandag 23 tot zondag 29 november 2026.
+  const at = (iso: string) => new Date(iso);
+  const sample = (event: Partial<WeekOverviewMailEvent> & Pick<WeekOverviewMailEvent, "title" | "start" | "end">): WeekOverviewMailEvent => ({
+    allDay: false,
+    momentLabel: null,
+    location: null,
+    organiser: "Activiteiten",
+    imageUrl: null,
+    eventUrl: "https://vtk.be/kalender/voorbeeld-2026",
+    link: null,
+    moreThisWeek: 0,
+    excerpt: null,
+    ...event,
+  });
+  const mail = weekOverviewMail({
+    locale: "nl",
+    weekStart: at("2026-11-23T00:00:00+01:00"),
+    featured: sample({
+      title: "Voorbeeld-TD",
+      start: at("2026-11-26T22:00:00+01:00"),
+      end: at("2026-11-27T04:00:00+01:00"),
+      location: "Recup, Leuven",
+      organiser: "Feest",
+      eventUrl: "https://vtk.be/kalender/voorbeeld-td-2026",
+      link: { label: "Tickets kopen", url: "https://vtk.be/tickets/voorbeeld-td" },
+      excerpt: "De laatste TD voor de blok. Drie dj's, de hele nacht, en de eerste tweehonderd binnen krijgen een jeton.",
+    }),
+    others: [
+      sample({
+        title: "Voorbeeldlezing",
+        start: at("2026-11-23T12:30:00+01:00"),
+        end: at("2026-11-23T13:30:00+01:00"),
+        location: "Campus Arenberg, aula 200C",
+        organiser: "Career",
+      }),
+      sample({
+        title: "Voorbeeldcantus",
+        start: at("2026-11-24T20:00:00+01:00"),
+        end: at("2026-11-25T01:00:00+01:00"),
+        location: "Theokot",
+        organiser: "Cantus",
+        link: { label: "Tickets kopen", url: "https://vtk.be/tickets/voorbeeldcantus" },
+      }),
+      sample({
+        title: "Voorbeeldloopweek",
+        momentLabel: "Ochtendloop",
+        start: at("2026-11-25T07:30:00+01:00"),
+        end: at("2026-11-25T08:30:00+01:00"),
+        location: "Sportkot",
+        organiser: "Sport",
+        moreThisWeek: 2,
+      }),
+    ],
+    reminders: [
+      { kind: "ticketSale", at: at("2026-11-25T12:00:00+01:00"), title: "Voorbeeldgalabal", url: "https://vtk.be/tickets/voorbeeldgalabal" },
+      { kind: "formCloses", at: at("2026-11-27T23:59:00+01:00"), title: "Inschrijving voorbeeldreis", url: "https://vtk.be/formulieren/voorbeeldreis" },
+    ],
+    calendarUrl: "https://vtk.be/kalender",
+    unsubscribeUrl: "https://vtk.be/uitschrijven?t=voorbeeld",
+    accountUrl: "https://vtk.be/account",
+    logoUrl: "https://vtk.be/vtk-logo.png",
+  });
+  return {
+    id: "week-overview",
+    title: "Weekmail: deze week bij VTK",
+    when: `Elke zaterdag vanaf ${WEEK_OVERVIEW_SEND_HOUR}u Brusselse tijd, over de week van maandag tot en met zondag die komt. Lag de worker plat, dan nog op zondag, nooit meer zodra de week begonnen is. Via de background-worker, elke vijf minuten, in rondes van 300 leden.`,
+    to: "Elk actief lid met de mailinglijst Evenementen aan, op zijn voorkeursadres",
+    source: "calendar",
+    file: "lib/calendar/weekOverviewMail.ts",
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+    notes: [
+      "Een week zonder gepubliceerde evenementen geeft geen mail.",
+      "Bovenaan staat wat met de ster in /admin/kalender uitgelicht is; anders het eerste evenement met tickets of een inschrijving, en anders het eerste van de week.",
+      "Een evenement met momenten staat één keer, op het eerste moment van de week, met hoe vaak het nog terugkomt.",
+      "Wie de doelgroepfilter op /account aanzette, krijgt enkel wat hij op de kalender ziet; blijft er niets over, dan geen mail.",
+      "Niet vergeten: een publieke ticketverkoop die opent of een inschrijving bij een evenement die sluit, tussen het versturen en het einde van de week.",
+      "In het echt staat de affiche van het uitgelichte evenement over de hele breedte en heeft elk evenement in de lijst een kleine foto; hier niet, want de voorvertoning laadt geen bestaande foto.",
+      "In de taal van het lid (User.locale). Draagt List-Unsubscribe, zodat Gmail en Outlook hun eigen uitschrijfknop tonen.",
     ],
   };
 }

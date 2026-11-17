@@ -789,6 +789,7 @@ model User {
   viewPreferences         UserViewPreference[]
   calendarInterests       CalendarEventInterest[]     @relation("CalendarInterestUser")
   calendarSignupMails     CalendarEventSignupMail[]   @relation("CalendarSignupMailUser")
+  calendarWeekMails       CalendarWeekMail[]          @relation("CalendarWeekMailUser")
   calendarCategoryFollows CalendarCategoryFollow[]    @relation("CalendarFollowUser")
   shiftRewardRedemptions  ShiftRewardRedemption[]     @relation("ShiftRewardRedemptionUser")
   shiftRewardsProcessed   ShiftRewardRedemption[]     @relation("ShiftRewardRedemptionProcessedBy")
@@ -8341,6 +8342,28 @@ model CalendarEventSignupMail {
 
   @@unique([userId, eventId, source])
   @@index([eventId])
+}
+
+/// De weekmail van de kalender: zaterdagavond het overzicht van de week die
+/// komt, aan wie de mailinglijst Evenementen aan heeft. Eén rij per lid per
+/// week.
+///
+/// De rij is de claim, zoals bij `CalendarEventSignupMail`: eerst aanmaken (de
+/// unieke sleutel houdt een tweede container tegen), dan versturen, en bij een
+/// mislukte verzending weer weg. Zie apps/web/lib/calendar/weekOverview.ts.
+model CalendarWeekMail {
+  id     String   @id @default(cuid())
+  userId String
+  /// De maandag van de week waarover de mail ging, als Brusselse datum
+  /// ("2026-11-23"). Een tekst en geen tijdstip, zodat het omschakelen naar
+  /// winteruur de sleutel niet verschuift.
+  week   String
+  sentAt DateTime @default(now()) @db.Timestamptz(3)
+
+  user User @relation("CalendarWeekMailUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, week])
+  @@index([week])
 }
 
 /// "Ik kom naar dit alumni-evenement", aangeduid door iemand zonder account.
