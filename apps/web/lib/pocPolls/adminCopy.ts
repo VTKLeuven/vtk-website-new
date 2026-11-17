@@ -16,6 +16,7 @@ export function pollAdminErrors(nl: boolean): Record<string, string> {
         POLL_POC_NO_PROGRAMME: "Niet gepubliceerd: deze POC hangt nog aan geen richting. Vraag VTK Onderwijs dat in te stellen.",
         POLL_STILL_OPEN: "Niet gepubliceerd: de peiling staat nog open.",
         POLL_SUMMARY_LONG: "Niet gepubliceerd: de samenvatting is te lang.",
+        POLL_CHANNEL: "Niet opgeslagen: dat Discord-kanaal bestaat niet (meer) op de server. Kies een ander kanaal.",
       }
     : {
         POLL_TITLE: "Not saved: give the poll a title of at most 120 characters.",
@@ -32,5 +33,6 @@ export function pollAdminErrors(nl: boolean): Record<string, string> {
         POLL_POC_NO_PROGRAMME: "Not published: this POC is not linked to a programme yet. Ask VTK Onderwijs to set that up.",
         POLL_STILL_OPEN: "Not published: the poll is still open.",
         POLL_SUMMARY_LONG: "Not published: the summary is too long.",
+        POLL_CHANNEL: "Not saved: that Discord channel does not exist (anymore) on the server. Choose another channel.",
       };
 }

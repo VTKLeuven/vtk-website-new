@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "@/components/ui/Link";
 import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";
@@ -9,11 +10,11 @@ import { saveErrorMessages } from "@/lib/saveMessages";
 import { STUDY_PROGRAMMES } from "@/lib/profile";
 import { formatWorkingYear, parseWorkingYear, workingYearTabs } from "@/lib/workingYear";
 import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
-import { discordGuildConfigured, listDiscordChannels, listDiscordRoles } from "@/lib/discord/bot";
+import { discordGuildConfigured, listDiscordChannels } from "@/lib/discord/bot";
 import { discordAccessStatus } from "@/lib/discord/pocAccess";
 import { PocsTable, type PocRow } from "./PocsTable";
 import { PocBandAdminCard } from "./PocBandAdminCard";
-import { PocDiscordCard } from "./PocDiscordCard";
+import { PocDiscordCard, PocDiscordCardPending } from "./PocDiscordCard";
 import { PocMailCard } from "./PocMailCard";
 import { currentWorkingYear } from "@vtk/auth";
 
@@ -37,10 +38,15 @@ export default async function AdminPocs({
 
   // Enkel de POC's + hun vertegenwoordigers van het geselecteerde werkingsjaar;
   // de user-picker zoekt server-side (/api/users/search).
-  const [pocs, distinctYears, pocBandSettingRow, discordRoles, discordChannels, discordStatus] = await Promise.all([
+  //
+  // Niets van Discord hier: dat zijn aanroepen over het net, en ze hielden het
+  // laden van de hele pagina op. De rollen komen pas wanneer je een POC
+  // openklapt, de kaart met het koppelbericht in haar eigen Suspense.
+  const [pocs, distinctYears, pocBandSettingRow] = await Promise.all([
     prisma.poc.findMany({
       orderBy: { order: "asc" },
       include: {
+        discordRoles: { select: { roleId: true, studyYears: true } },
         representatives: {
           where: { year },
           orderBy: { order: "asc" },
@@ -55,9 +61,6 @@ export default async function AdminPocs({
     prisma.setting.findUnique({
       where: { key: POC_BAND_SETTING },
     }),
-    listDiscordRoles(),
-    listDiscordChannels(),
-    discordGuildConfigured() ? discordAccessStatus() : null,
   ]);
 
   // Welke POC een groepsadres heeft dat haar vertegenwoordigers volgt.
@@ -70,8 +73,7 @@ export default async function AdminPocs({
   );
 
   const pocBandSetting = readPocBandSetting(pocBandSettingRow?.value);
-  // Beide lijsten of geen: een halve lijst zou bij opslaan de andere waarde wissen.
-  const discord = discordRoles && discordChannels ? { roles: discordRoles, channels: discordChannels } : null;
+  const discordEnabled = discordGuildConfigured();
 
   const tabs = workingYearTabs(distinctYears.map((r) => r.year));
 
@@ -98,8 +100,7 @@ export default async function AdminPocs({
       email: poc.email ?? "",
       order: poc.order,
       studyProgrammes: poc.studyProgrammes,
-      discordRoleId: poc.discordRoleId ?? "",
-      discordChannelId: poc.discordChannelId ?? "",
+      discordRoles: poc.discordRoles,
       reps,
       searchText,
     };
@@ -139,8 +140,10 @@ export default async function AdminPocs({
 
       <PocBandAdminCard setting={pocBandSetting} locale={locale} />
 
-      {discord && discordStatus ? (
-        <PocDiscordCard locale={nl ? "nl" : "en"} status={discordStatus} channels={discord.channels} />
+      {discordEnabled ? (
+        <Suspense fallback={<PocDiscordCardPending nl={nl} />}>
+          <PocDiscordSection nl={nl} />
+        </Suspense>
       ) : null}
 
       {/* Werkingsjaar-tabjes */}
@@ -186,8 +189,19 @@ export default async function AdminPocs({
         saveLabels={saveLabels}
         createLabels={createLabels}
         programmeOptions={programmeOptions}
-        discord={discord}
+        discordEnabled={discordEnabled}
       />
     </div>
   );
+}
+
+/**
+ * Het koppelbericht en hoe de rollen ervoor staan. Twee aanroepen naar Discord en
+ * een telling over alle gekoppelde accounts: in een eigen Suspense, zodat de rest
+ * van de pagina er niet op wacht.
+ */
+async function PocDiscordSection({ nl }: { nl: boolean }) {
+  const [channels, status] = await Promise.all([listDiscordChannels(), discordAccessStatus()]);
+  if (!channels) return null;
+  return <PocDiscordCard locale={nl ? "nl" : "en"} status={status} channels={channels} />;
 }

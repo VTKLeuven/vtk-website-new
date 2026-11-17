@@ -282,6 +282,11 @@ export default async function AdminFlowPreview({
     { label: nl ? "Na een klik: geen richting met een kanaal" : "After a click: no programme with a channel", ephemeral: true, message: discordNoPocMessage(`${siteUrl()}/account#profile`) },
     { label: nl ? "Na een klik: studie niet bevestigd" : "After a click: study not confirmed", ephemeral: true, message: discordConfirmStudyMessage(`${siteUrl()}/studie-bevestigen`) },
     { label: nl ? "In het kanaal" : "In the channel", ephemeral: false, message: pollChannelMessage(pollDiscordView) },
+    {
+      label: nl ? "In het kanaal, algemene peiling van VTK Onderwijs" : "In the channel, general poll by VTK Onderwijs",
+      ephemeral: false,
+      message: pollChannelMessage({ ...pollDiscordView, pocName: null }),
+    },
     { label: nl ? "Vraag per vraag" : "Question by question", ephemeral: true, message: pollStepMessage(pollDiscordView, 1, undefined) },
     { label: nl ? "Klaar" : "Done", ephemeral: true, message: pollDoneMessage() },
     { label: nl ? "Eerste keer: koppelen" : "First time: linking", ephemeral: true, message: pollLinkAccountMessage(`${siteUrl()}/koppel-discord`) },
@@ -313,6 +318,13 @@ export default async function AdminFlowPreview({
       jump: true,
       faces: pollFaces,
       copy: pollStripCopy("poll", { locale, questionCount: 4, meetingDate: pollSample.meetingDate, closesAt: new Date(pollNow.getTime() + 24 * 60 * 60 * 1000).toISOString(), now: pollNow }),
+    },
+    {
+      label: nl ? "Algemene peiling van VTK Onderwijs" : "General poll by VTK Onderwijs",
+      place: "away" as const,
+      jump: true,
+      faces: [],
+      copy: pollStripCopy("poll", { locale, questionCount: 4, meetingDate: null, closesAt: pollSample.closesAt, now: pollNow, general: true }),
     },
     {
       label: nl ? "Niet aangemeld, enkel op de homepage" : "Signed out, homepage only",

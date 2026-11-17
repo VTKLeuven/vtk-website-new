@@ -6,15 +6,18 @@ import { currentStudyYear } from "@/lib/workingYear";
 
 export const STUDY_YEARS: StudyYear[] = ["BACHELOR_1", "BACHELOR_2", "BACHELOR_3", "MASTER_1", "MASTER_2"];
 
-/** Hoeveel studenten een peiling kan bereiken, in totaal en per fase. */
+/**
+ * Hoeveel studenten een peiling kan bereiken, in totaal en per fase. `null`: een
+ * algemene peiling, voor iedereen met een richting.
+ */
 export async function pollPopulation(
-  programmes: StudyProgramme[],
+  programmes: StudyProgramme[] | null,
   studyYears: StudyYear[],
 ): Promise<{ total: number; perYear: Record<string, number> }> {
-  if (programmes.length === 0) return { total: 0, perYear: {} };
+  if (programmes && programmes.length === 0) return { total: 0, perYear: {} };
   const base = {
     ...OUR_STUDENTS,
-    studyProgrammes: { hasSome: programmes },
+    studyProgrammes: programmes ? { hasSome: programmes } : { isEmpty: false },
     studyConfirmedYear: { gte: currentStudyYear() },
   };
   const years = studyYears.length > 0 ? studyYears : STUDY_YEARS;

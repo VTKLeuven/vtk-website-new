@@ -7,7 +7,9 @@ Discord. De kringkeuzes staan in `docs/design-decisions.md`, "POC-peilingen".
 
 1. Een RiVer stelt een peiling op in `/admin/peilingen`: 1 tot 5 vragen (ja of nee,
    score van 1 tot 5, open), een deadline, optioneel de datum van de POC, de fases
-   en of ze ook in het Discord-kanaal van de POC komt.
+   en in welk Discord-kanaal ze ook komt (of niet op Discord). VTK Onderwijs
+   (`pocs.manage`) kan er ook een maken voor alle richtingen samen, onder "Alle
+   richtingen (VTK Onderwijs)" in de keuzelijst.
 2. Publiceren opent de peiling meteen. De vragen liggen dan vast.
 3. Studenten met een richting van die POC zien een gele strook bovenaan elke pagina
    (`PocPollStrip`). De vragen staan in de POC-band op de homepage, op het anker
@@ -36,12 +38,16 @@ staan de peilingen gewoon enkel op de website.
    `https://vtk.be/api/discord/interactions`. Discord test die meteen; een fout hier
    betekent bijna altijd dat `DISCORD_PUBLIC_KEY` niet klopt of nog niet gedeployed is.
 
-Per POC komt er een rol en een kanaal op de server:
+Per POC komen er rollen en een kanaal op de server:
 
-1. Maak een rol, bv. `POC Computerwetenschappen`.
-2. Maak een kanaal waarin `@everyone` View Channel niet heeft en die rol en de bot
+1. Maak een rol, bv. `POC Computerwetenschappen`, of gebruik de jaarrollen die er al
+   zijn (`1ste bachelor`, `2de bachelor`, ...).
+2. Maak een kanaal waarin `@everyone` View Channel niet heeft en die rollen en de bot
    wel. Dat zet Discord zelf, niet de site.
-3. Kies de rol en het kanaal in `/admin/pocs`, onder POC-instellingen.
+3. Kies de rollen in `/admin/pocs`, onder POC-instellingen, en per rol eventueel de
+   fases. De lijst met rollen komt pas van Discord wanneer je een POC openklapt.
+4. Het kanaal kies je bij elke peiling zelf, in `/admin/peilingen`. Het scherm stelt
+   het kanaal van de vorige peiling van die POC voor.
 
 Zet tot slot in `/admin/pocs` het koppelbericht in een publiek kanaal. Daar staat de
 knop waarmee studenten hun account koppelen.
@@ -55,14 +61,19 @@ scherm van de peiling, met een knop om opnieuw te posten.
   het kanaal. Daarom krijgt elke POC een eigen kanaal, en bepaalt de rol wie erin kan.
 - Wie op de knop onder het koppelbericht drukt, krijgt een link naar `/koppel-discord`.
   Discord zegt welk account klikte, de aanmelding op de site wie dat is. Daarna geeft
-  de bot de rol van elke POC waarvan de richting op het account staat. Ontkoppelen kan
-  op `/account` en haalt de rollen weer weg.
+  de bot de rollen van elke POC waarvan de richting op het account staat, en van een
+  rol met fases enkel als de fase ook klopt. Ontkoppelen kan op `/account` en haalt
+  de rollen weer weg.
+- De site neemt enkel af wat ze zelf gaf (`User.discordRoleIds`). Studenten kunnen
+  dezelfde jaarrollen ook zelf kiezen; die blijven staan, ook wanneer ze aan een POC
+  hangen.
 - De rol volgt het account. De worker (`/api/background/maintenance`) vergelijkt elke
   vijf minuten wat er hoort te staan (`lib/discord/pocRoles.ts`) met wat de site al
   uitdeelde (`User.discordRoleIds`). Een andere richting, een nieuwe rol in
   `/admin/pocs` of het begin van een academiejaar loopt dus vanzelf mee. Wie de studie
   niet bevestigde, verliest de rol tot dat wel gebeurd is.
-- Publiceert een RiVer een peiling, dan komt ze in het kanaal van de POC. Eén ja/nee-vraag
+- Publiceert een RiVer een peiling, dan komt ze in het gekozen kanaal. Een algemene
+  peiling van VTK Onderwijs hoort in een kanaal dat alle gekoppelde studenten zien. Eén ja/nee-vraag
   of score staat met knoppen in het kanaal. Al de rest start met één knop en loopt vraag
   per vraag in berichten die enkel de klikker ziet. Een open vraag opent een pop-up.
 - Bij elke klik kijkt de site opnieuw na of de peiling voor dit account is, want een

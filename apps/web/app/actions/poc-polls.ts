@@ -6,10 +6,10 @@ import type { StudyYear } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { logAudit } from "@/lib/audit";
 import { SITE_CONTENT_TAG } from "@/lib/cachedContent";
-import { discordBotConfigured } from "@/lib/discord/bot";
+import { discordBotConfigured, listDiscordChannels } from "@/lib/discord/bot";
 import { postPollToDiscord, refreshPollDiscordMessage, removePollDiscordMessage } from "@/lib/discord/pollPosts";
 import { managedPocIds, managesPoc } from "@/lib/pocPolls/access";
-import { parsePollAnswers, pollIsForViewer, pollIsOpen } from "@/lib/pocPolls/core";
+import { GENERAL_POLL, parsePollAnswers, pollIsForViewer, pollIsOpen } from "@/lib/pocPolls/core";
 import { parseBrusselsInput, parsePollDraft } from "@/lib/pocPolls/draft";
 import { STUDY_YEARS } from "@/lib/pocPolls/population";
 import { getViewerStudy } from "@/lib/pocPolls/read";
@@ -59,7 +59,7 @@ export async function submitPocPollAction(_previous: SaveState, formData: FormDa
   if (!poll?.publishedAt || !pollIsOpen(poll, new Date())) return saveError("POLL_CLOSED");
 
   const study = await getViewerStudy(session.user.id);
-  if (!pollIsForViewer({ programmes: poll.poc.studyProgrammes, studyYears: poll.studyYears }, study)) {
+  if (!pollIsForViewer({ programmes: poll.poc?.studyProgrammes ?? null, studyYears: poll.studyYears }, study)) {
     return saveError("POLL_NOT_YOURS");
   }
 
@@ -118,25 +118,42 @@ export async function savePocPollAction(_previous: SaveState, formData: FormData
   const { draft } = parsed;
 
   const id = text(formData, "id");
-  let pocId = text(formData, "pocId");
+  // `GENERAL_POLL` is een algemene peiling van VTK Onderwijs: geen POC.
+  const pocField = text(formData, "pocId");
+  let pocId: string | null = pocField === GENERAL_POLL ? null : pocField;
   if (id) {
     const existing = await managedPoll(id);
     if (!existing) return saveError("POLL_FORBIDDEN");
     if (existing.publishedAt) return saveError("POLL_LOCKED");
     pocId = existing.pocId;
+  } else if (!pocField) {
+    return saveError("POLL_FORBIDDEN");
   }
-  if (!pocId || !managesPoc(scope, pocId)) return saveError("POLL_FORBIDDEN");
+  if (!managesPoc(scope, pocId)) return saveError("POLL_FORBIDDEN");
 
-  const poc = await prisma.poc.findUnique({ where: { id: pocId }, select: { studyProgrammes: true, discordChannelId: true } });
-  if (publish && (!poc || poc.studyProgrammes.length === 0)) return saveError("POLL_POC_NO_PROGRAMME");
+  if (pocId !== null) {
+    const poc = await prisma.poc.findUnique({ where: { id: pocId }, select: { studyProgrammes: true } });
+    if (!poc) return saveError("POLL_FORBIDDEN");
+    if (publish && poc.studyProgrammes.length === 0) return saveError("POLL_POC_NO_PROGRAMME");
+  }
+
+  // Het kanaal kiest wie de peiling opstelt. Een kanaal dat de bot niet kent,
+  // weigeren we hier al, en niet pas bij het posten na publiceren.
+  const channelField = text(formData, "discordChannelId").trim();
+  let discordChannelId: string | null = null;
+  if (channelField && discordBotConfigured()) {
+    if (!/^\d{5,25}$/.test(channelField)) return saveError("POLL_CHANNEL");
+    const channels = await listDiscordChannels();
+    if (channels && !channels.some((channel) => channel.id === channelField)) return saveError("POLL_CHANNEL");
+    discordChannelId = channelField;
+  }
 
   const fields = {
     titleNl: draft.title,
     closesAt: draft.closesAt,
     meetingDate: draft.meetingDate,
     studyYears: draft.studyYears.filter((year): year is StudyYear => STUDY_YEARS.includes(year as StudyYear)),
-    // Altijd het kanaal van de POC zelf: dat zien enkel haar studenten.
-    discordChannelId: discordBotConfigured() && formData.has("postToDiscord") ? (poc?.discordChannelId ?? null) : null,
+    discordChannelId,
     ...(publish ? { publishedAt: now, opensAt: now } : {}),
   };
 

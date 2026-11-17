@@ -86,6 +86,15 @@ describe("pollIsForViewer", () => {
     expect(pollIsForViewer(masters, { programmes: ["COMPUTER_SCIENCE"], years: ["MASTER_1"] })).toBe(true);
     expect(pollIsForViewer(masters, { programmes: ["COMPUTER_SCIENCE"], years: ["BACHELOR_2"] })).toBe(false);
   });
+
+  it("een algemene peiling is voor iedereen met een richting, binnen de gekozen fases", () => {
+    const general = { programmes: null, studyYears: [] as string[] };
+    expect(pollIsForViewer(general, { programmes: ["ENERGY"], years: [] })).toBe(true);
+    expect(pollIsForViewer(general, { programmes: [], years: ["BACHELOR_1"] })).toBe(false);
+    const firstYears = { programmes: null, studyYears: ["BACHELOR_1"] };
+    expect(pollIsForViewer(firstYears, { programmes: ["COMMON_BACHELOR"], years: ["BACHELOR_1"] })).toBe(true);
+    expect(pollIsForViewer(firstYears, { programmes: ["COMPUTER_SCIENCE"], years: ["MASTER_2"] })).toBe(false);
+  });
 });
 
 describe("pollStatus", () => {
@@ -192,6 +201,18 @@ describe("de teksten", () => {
     expect(pollStripCopy("poll", { locale: "nl", questionCount: 4, meetingDate: "2026-11-24", closesAt, now: sunday }).text).toBe(
       "Vandaag verzamelen je RiVers de laatste meningen voor de POC.",
     );
+  });
+
+  it("noemt VTK Onderwijs bij een algemene peiling, niet je RiVers", () => {
+    const copy = pollStripCopy("poll", { locale: "nl", questionCount: 2, meetingDate: null, closesAt, now, general: true });
+    expect(copy.text).toBe("VTK Onderwijs vraagt de mening van alle richtingen.");
+    const saturday = new Date("2026-11-21T12:00:00.000Z");
+    expect(pollStripCopy("poll", { locale: "nl", questionCount: 2, meetingDate: null, closesAt, now: saturday, general: true }).text).toBe(
+      "Nog tot zondag verzamelt VTK Onderwijs meningen van alle richtingen.",
+    );
+    const panel = pollPanelText({ locale: "nl", meetingDate: null, closesAt, now, general: true });
+    expect(panel.anonymous).toContain("VTK Onderwijs ziet enkel totalen");
+    expect(`${panel.lead} ${panel.thanks}`).not.toContain("RiVers");
   });
 
   it("rekent de deadline op de Brusselse klok", () => {

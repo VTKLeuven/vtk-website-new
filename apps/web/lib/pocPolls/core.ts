@@ -8,6 +8,13 @@
 /** Dezelfde waarden als de enum `PocPollQuestionKind` in Prisma. */
 export type PollQuestionKind = "YES_NO" | "SCORE" | "OPEN";
 
+/**
+ * De waarde van de POC-keuze voor een algemene peiling van VTK Onderwijs: een
+ * peiling zonder POC, voor de studenten van alle richtingen. In de database is
+ * dat `pocId = null`; dit is enkel wat het formulier verstuurt.
+ */
+export const GENERAL_POLL = "algemeen";
+
 /** Ruim genoeg voor een alinea, en past in een pop-up op Discord. */
 export const MAX_OPEN_ANSWER_LENGTH = 2000;
 
@@ -38,14 +45,16 @@ export type OpenPocPollQuestion = {
  */
 export type OpenPocPoll = {
   id: string;
-  pocId: string;
+  /** `null`: een algemene peiling van VTK Onderwijs. */
+  pocId: string | null;
   titleNl: string;
   titleEn: string | null;
   /** `yyyy-mm-dd`, of null wanneer de RiVers geen vergadering opgaven. */
   meetingDate: string | null;
   opensAt: string;
   closesAt: string;
-  programmes: string[];
+  /** `null`: alle richtingen (een algemene peiling). */
+  programmes: string[] | null;
   /** Leeg: alle fases van de richting. */
   studyYears: string[];
   /** De eerste drie RiVers, voor de gezichten in de strook. */
@@ -56,7 +65,7 @@ export type OpenPocPoll = {
 /** Wat de RiVers na de POC vertellen, zoals de gedeelde cache het bewaart. */
 export type PocPollSummary = {
   id: string;
-  pocId: string;
+  pocId: string | null;
   titleNl: string;
   titleEn: string | null;
   summary: string;
@@ -86,12 +95,18 @@ export function pollIsOpen(
   return new Date(poll.opensAt) <= now && now < new Date(poll.closesAt);
 }
 
-/** Een peiling is voor wie een richting met haar POC deelt en in een gekozen fase zit. */
+/**
+ * Een peiling is voor wie een richting met haar POC deelt en in een gekozen fase
+ * zit. Een algemene peiling (`programmes: null`) is voor wie een richting heeft.
+ */
 export function pollIsForViewer(
-  poll: { programmes: readonly string[]; studyYears: readonly string[] },
+  poll: { programmes: readonly string[] | null; studyYears: readonly string[] },
   viewer: { programmes: readonly string[]; years: readonly string[] },
 ): boolean {
-  if (!poll.programmes.some((programme) => viewer.programmes.includes(programme))) return false;
+  const reaches = poll.programmes
+    ? poll.programmes.some((programme) => viewer.programmes.includes(programme))
+    : viewer.programmes.length > 0;
+  if (!reaches) return false;
   return poll.studyYears.length === 0 || poll.studyYears.some((year) => viewer.years.includes(year));
 }
 

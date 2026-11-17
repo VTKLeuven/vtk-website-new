@@ -195,11 +195,12 @@ const cachedOpenPocPolls = unstable_cache(
     const year = currentWorkingYear();
     const polls = await prisma.pocPoll.findMany({
       // Enkel een POC met RiVers dit jaar: de band toont geen POC zonder mensen,
-      // en dan zou de strook naar niets wijzen.
+      // en dan zou de strook naar niets wijzen. Een algemene peiling van VTK
+      // Onderwijs heeft geen POC en staat in de band onder haar eigen naam.
       where: {
         publishedAt: { not: null },
         closesAt: { gt: new Date() },
-        poc: { representatives: { some: { year, user: { deletedAt: null } } } },
+        OR: [{ pocId: null }, { poc: { representatives: { some: { year, user: { deletedAt: null } } } } }],
       },
       orderBy: { closesAt: "asc" },
       select: {
@@ -242,8 +243,8 @@ const cachedOpenPocPolls = unstable_cache(
       meetingDate: meetingDate ? meetingDate.toISOString().slice(0, 10) : null,
       opensAt: opensAt.toISOString(),
       closesAt: closesAt.toISOString(),
-      programmes: poc.studyProgrammes,
-      faces: poc.representatives.map((rep) => ({ name: rep.user.name, avatarKey: rep.user.avatarKey })),
+      programmes: poc ? poc.studyProgrammes : null,
+      faces: poc ? poc.representatives.map((rep) => ({ name: rep.user.name, avatarKey: rep.user.avatarKey })) : [],
     }));
   },
   ["poc", "open-polls"],

@@ -47,8 +47,12 @@ export default async function AdminPeilingen({ params }: { params: Promise<{ loc
           <h1 className="text-2xl font-semibold">{nl ? "Peilingen" : "Polls"}</h1>
           <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
             {nl
-              ? "Vraag de studenten van je richting wat ze vinden, zodat je op de POC meer kan brengen dan je eigen mening."
-              : "Ask the students of your programme what they think, so you can bring more to the POC than your own opinion."}
+              ? scope === "all"
+                ? "Vraag de studenten van een richting, of van alle richtingen samen, wat ze vinden. Een algemene peiling en een van een POC lopen naast elkaar."
+                : "Vraag de studenten van je richting wat ze vinden, zodat je op de POC meer kan brengen dan je eigen mening."
+              : scope === "all"
+                ? "Ask the students of one programme, or of all programmes together, what they think. A general poll and a POC poll run side by side."
+                : "Ask the students of your programme what they think, so you can bring more to the POC than your own opinion."}
           </p>
         </div>
         <Link
@@ -88,7 +92,9 @@ export default async function AdminPeilingen({ params }: { params: Promise<{ loc
                     <td className="px-4 py-3 font-medium">
                       <Link href={href}>{poll.titleNl}</Link>
                     </td>
-                    <td className="px-4 py-3">{poll.poc.nameNl.replace(/^POC\s+/i, "")}</td>
+                    <td className="px-4 py-3">
+                      {poll.poc ? poll.poc.nameNl.replace(/^POC\s+/i, "") : nl ? "Alle richtingen" : "All programmes"}
+                    </td>
                     <td className="px-4 py-3">
                       <PollStatusPill status={pollStatus(poll, now)} nl={nl} />
                     </td>

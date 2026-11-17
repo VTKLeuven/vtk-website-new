@@ -17,13 +17,16 @@ import { saveOk } from "@/lib/saveState";
 type BuilderQuestion = { key: number; kind: PollQuestionKind; text: string; low: string; high: string };
 
 export type PollBuilderPoc = {
+  /** `GENERAL_POLL` voor een algemene peiling van VTK Onderwijs. */
   id: string;
   name: string;
+  /** Een peiling voor alle richtingen, zonder POC. */
+  general: boolean;
   hasProgramme: boolean;
   reach: number;
   perYear: Record<string, number>;
-  /** `null`: geen kanaal ingesteld in /admin/pocs, of Discord is niet bereikbaar. */
-  discordChannelName: string | null;
+  /** Het kanaal van de vorige peiling, als startwaarde. */
+  defaultChannelId: string | null;
 };
 
 export type PollBuilderInitial = {
@@ -33,7 +36,8 @@ export type PollBuilderInitial = {
   closesAt: string;
   meetingDate: string;
   studyYears: string[];
-  postToDiscord: boolean;
+  /** Leeg: enkel op de website. */
+  channelId: string;
   questions: Array<Omit<BuilderQuestion, "key">>;
 };
 
@@ -50,12 +54,15 @@ export function PollBuilder({
   locale,
   initial,
   pocs,
+  channels,
   phases,
   panelLabels,
 }: {
   locale: "nl" | "en";
   initial: PollBuilderInitial;
   pocs: PollBuilderPoc[];
+  /** `null`: de Discord-bot is niet ingesteld of Discord antwoordde niet. */
+  channels: Array<{ id: string; name: string }> | null;
   phases: Array<{ key: string; label: string }>;
   panelLabels: PollPanelLabels;
 }) {
@@ -69,10 +76,18 @@ export function PollBuilder({
   const [meetingDate, setMeetingDate] = useState(initial.meetingDate);
   const [pocId, setPocId] = useState(initial.pocId);
   const [showPreview, setShowPreview] = useState(false);
-  const [postToDiscord, setPostToDiscord] = useState(initial.postToDiscord);
+  const [channelId, setChannelId] = useState(initial.channelId);
 
   const poc = pocs.find((candidate) => candidate.id === pocId) ?? pocs[0];
-  const goesToDiscord = postToDiscord && Boolean(poc?.discordChannelName);
+  const general = Boolean(poc?.general);
+  const channelName = channels?.find((channel) => channel.id === channelId)?.name ?? null;
+  const audience = general ? (nl ? "alle richtingen" : "all programmes") : (poc?.name ?? (nl ? "je POC" : "your POC"));
+
+  // Een andere POC brengt het kanaal van haar vorige peiling mee.
+  function choosePoc(id: string) {
+    setPocId(id);
+    setChannelId(pocs.find((candidate) => candidate.id === id)?.defaultChannelId ?? "");
+  }
 
   function update(key: number, patch: Partial<BuilderQuestion>) {
     setQuestions((current) => current.map((question) => (question.key === key ? { ...question, ...patch } : question)));
@@ -102,6 +117,7 @@ export function PollBuilder({
       meetingDate: meetingDate || null,
       closesAt: (closesDate ?? new Date()).toISOString(),
       now: new Date(),
+      general,
     }),
     answered: false,
     questions: questions
@@ -129,8 +145,8 @@ export function PollBuilder({
       confirmSubmit={{
         title: nl ? "Deze peiling publiceren?" : "Publish this poll?",
         description: nl
-          ? `De peiling gaat meteen open voor de studenten van ${poc?.name ?? "je POC"}${goesToDiscord ? ` en verschijnt in #${poc?.discordChannelName} op Discord` : ""}. Daarna liggen de vragen vast, zodat alle antwoorden over dezelfde vraag gaan.`
-          : `The poll opens immediately for the students of ${poc?.name ?? "your POC"}${goesToDiscord ? ` and appears in #${poc?.discordChannelName} on Discord` : ""}. After that the questions are locked, so all answers are about the same question.`,
+          ? `De peiling gaat meteen open voor de studenten van ${audience}${channelName ? ` en verschijnt in #${channelName} op Discord` : ""}. Daarna liggen de vragen vast, zodat alle antwoorden over dezelfde vraag gaan.`
+          : `The poll opens immediately for the students of ${audience}${channelName ? ` and appears in #${channelName} on Discord` : ""}. After that the questions are locked, so all answers are about the same question.`,
         confirmLabel: nl ? "Publiceren" : "Publish",
         cancelLabel: nl ? "Annuleren" : "Cancel",
       }}
@@ -164,13 +180,13 @@ export function PollBuilder({
         <h2 className="text-base font-semibold">{nl ? "Over deze peiling" : "About this poll"}</h2>
         {pocs.length > 1 && !initial.id ? (
           <div>
-            <Label htmlFor="poll-poc">POC</Label>
+            <Label htmlFor="poll-poc">{nl ? "Van welke POC" : "From which POC"}</Label>
             <SearchPicker
               id="poll-poc"
               name="pocId"
               options={pocs.map((candidate) => ({ value: candidate.id, label: candidate.name }))}
               value={pocId}
-              onChange={setPocId}
+              onChange={choosePoc}
               placeholder={nl ? "Kies een POC" : "Choose a POC"}
               searchPlaceholder={nl ? "Zoek een POC" : "Search a POC"}
               ariaLabel="POC"
@@ -190,7 +206,15 @@ export function PollBuilder({
             <Input id="poll-closes" name="closesAt" type="datetime-local" required value={closesAt} onChange={(event) => setClosesAt(event.target.value)} />
           </div>
           <div>
-            <Label htmlFor="poll-meeting">{nl ? "Besproken op de POC van, optioneel" : "Discussed at the POC of, optional"}</Label>
+            <Label htmlFor="poll-meeting">
+              {general
+                ? nl
+                  ? "Besproken op de vergadering van, optioneel"
+                  : "Discussed at the meeting of, optional"
+                : nl
+                  ? "Besproken op de POC van, optioneel"
+                  : "Discussed at the POC of, optional"}
+            </Label>
             <Input id="poll-meeting" name="meetingDate" type="date" value={meetingDate} onChange={(event) => setMeetingDate(event.target.value)} />
           </div>
         </div>
@@ -270,7 +294,11 @@ export function PollBuilder({
         <Card className="space-y-3 p-5">
           <h2 className="text-base font-semibold">{nl ? "Voor wie" : "For whom"}</h2>
           <p className="text-sm text-vtk-body">
-            {poc?.hasProgramme
+            {general
+              ? nl
+                ? `${poc?.reach ?? 0} studenten van alle richtingen. Een peiling van een POC die tegelijk loopt, blijft gewoon staan: studenten zien ze allebei.`
+                : `${poc?.reach ?? 0} students of all programmes. A POC poll running at the same time stays as it is: students see both.`
+              : poc?.hasProgramme
               ? nl
                 ? `${poc.reach} studenten van ${poc.name}.`
                 : `${poc.reach} students of ${poc.name}.`
@@ -290,7 +318,13 @@ export function PollBuilder({
               ))}
             </div>
             <p className="mt-2 text-sm text-vtk-muted">
-              {nl ? "Niets aangevinkt: de hele richting." : "Nothing ticked: the whole programme."}
+              {general
+                ? nl
+                  ? "Niets aangevinkt: alle fases. Bv. enkel 1e bachelor voor de eerstejaars."
+                  : "Nothing ticked: all phases. E.g. only 1st bachelor for first-year students."
+                : nl
+                  ? "Niets aangevinkt: de hele richting."
+                  : "Nothing ticked: the whole programme."}
             </p>
           </fieldset>
         </Card>
@@ -298,30 +332,46 @@ export function PollBuilder({
         <Card className="space-y-3 p-5">
           <h2 className="text-base font-semibold">{nl ? "Waar verschijnt ze" : "Where it appears"}</h2>
           <p className="text-sm text-vtk-body">
-            {nl
-              ? "Op de website: bovenaan elke pagina en bij je POC op de homepage, enkel voor studenten van je richting."
-              : "On the website: at the top of every page and at your POC on the homepage, only for students of your programme."}
+            {general
+              ? nl
+                ? "Op de website: bovenaan elke pagina en onder VTK Onderwijs in de POC-band op de homepage, voor alle studenten met een richting."
+                : "On the website: at the top of every page and under VTK Onderwijs in the POC band on the homepage, for all students with a programme."
+              : nl
+                ? "Op de website: bovenaan elke pagina en bij je POC op de homepage, enkel voor studenten van je richting."
+                : "On the website: at the top of every page and at your POC on the homepage, only for students of your programme."}
           </p>
-          {poc?.discordChannelName ? (
-            <label className="flex cursor-pointer items-start gap-2 text-sm text-vtk-body">
-              <input
-                type="checkbox"
-                name="postToDiscord"
-                className="mt-0.5"
-                checked={postToDiscord}
-                onChange={(event) => setPostToDiscord(event.target.checked)}
+          {channels ? (
+            <div>
+              <Label htmlFor="poll-channel">{nl ? "Ook op Discord, in" : "Also on Discord, in"}</Label>
+              <SearchPicker
+                id="poll-channel"
+                name="discordChannelId"
+                options={[
+                  { value: "", label: nl ? "Niet op Discord" : "Not on Discord", muted: true },
+                  ...channels.map((channel) => ({ value: channel.id, label: `#${channel.name}` })),
+                ]}
+                value={channelId}
+                onChange={setChannelId}
+                placeholder={nl ? "Niet op Discord" : "Not on Discord"}
+                searchPlaceholder={nl ? "Zoek een kanaal" : "Search a channel"}
+                ariaLabel={nl ? "Discord-kanaal" : "Discord channel"}
+                emptyText={(query) => (nl ? `Geen kanaal gevonden voor "${query}".` : `No channel found for "${query}".`)}
               />
-              <span>
-                {nl
-                  ? `Ook op Discord, in #${poc.discordChannelName}. Dat kanaal zien enkel studenten van deze POC die hun account koppelden.`
-                  : `Also on Discord, in #${poc.discordChannelName}. Only students of this POC who linked their account can see that channel.`}
-              </span>
-            </label>
+              <p className="mt-2 text-sm text-vtk-muted">
+                {general
+                  ? nl
+                    ? "Kies een kanaal dat alle gekoppelde studenten zien. Wie er niet bij hoort, kan op Discord toch niet antwoorden: de site kijkt bij elke klik de richting en fase na."
+                    : "Choose a channel all linked students can see. Anyone outside the audience still cannot answer on Discord: the site checks programme and phase on every click."
+                  : nl
+                    ? "Kies het kanaal van je POC, dat enkel haar studenten zien. Wie er niet bij hoort, kan op Discord toch niet antwoorden: de site kijkt bij elke klik de richting en fase na."
+                    : "Choose your POC's channel, which only its students can see. Anyone outside the audience still cannot answer on Discord: the site checks programme and phase on every click."}
+              </p>
+            </div>
           ) : (
             <p className="text-sm text-vtk-muted">
               {nl
-                ? "Deze POC heeft nog geen Discord-kanaal; de peiling komt enkel op de website. Vraag VTK Onderwijs dat in te stellen in /admin/pocs."
-                : "This POC has no Discord channel yet; the poll only appears on the website. Ask VTK Onderwijs to set that up in /admin/pocs."}
+                ? "Discord is niet ingesteld of antwoordde niet; de peiling komt enkel op de website."
+                : "Discord is not set up or did not answer; the poll only appears on the website."}
             </p>
           )}
         </Card>

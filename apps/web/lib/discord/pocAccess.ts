@@ -39,15 +39,16 @@ export const ROLE_ACCOUNT_SELECT = {
   isStudent: true,
   studyConfirmedYear: true,
   studyProgrammes: true,
+  studyYears: true,
 } satisfies Prisma.UserSelect;
 
 type LinkedAccount = Prisma.UserGetPayload<{ select: typeof ROLE_ACCOUNT_SELECT }>;
 
 export function loadRolePocs() {
   return prisma.poc.findMany({
-    where: { discordRoleId: { not: null } },
+    where: { discordRoles: { some: {} } },
     orderBy: { order: "asc" },
-    select: { nameNl: true, discordRoleId: true, studyProgrammes: true },
+    select: { nameNl: true, studyProgrammes: true, discordRoles: { select: { roleId: true, studyYears: true } } },
   });
 }
 
@@ -58,6 +59,7 @@ export function roleAccount(account: LinkedAccount, now: Date): RoleAccount {
     live: account.active && !account.deletedAt,
     confirmed: !needsStudyConfirmation(account, now),
     programmes: account.studyProgrammes,
+    years: account.studyYears,
   };
 }
 
@@ -172,7 +174,7 @@ export async function repairDiscordRoles(input: {
   const { account, memberRoleIds, pocs, now } = input;
   if (!account.discordId || !discordGuildConfigured()) return;
   const desired = desiredPocRoleIds(pocs, roleAccount(account, now));
-  const changes = roleChanges(managedRoleIds(memberRoleIds, pocs, account.discordRoleIds), desired);
+  const changes = roleChanges(managedRoleIds(memberRoleIds, account.discordRoleIds), desired);
   const result = await applyRoleChanges(account.discordId, changes);
   if (result.ok) await storeRoles(account.id, desired);
 }

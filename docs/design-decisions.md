@@ -13176,12 +13176,29 @@ een open vraag. Code in `apps/web/lib/pocPolls`.
   Zonder koppeling kan de site niet weten of iemand tot de richting behoort of al
   stemde. De koppeling kost één klik extra, één keer. Een ingebouwde Discord-poll
   kan niet: daar is de tussenstand zichtbaar.
-- **Op Discord krijgt elke POC een rol en een eigen kanaal.** Studenten koppelen hun
-  account onder één publiek bericht, en de bot geeft hen de rol van hun POC. Zo zien
-  ze enkel de peilingen van hun eigen richting. Eén kanaal voor alles kan niet:
+- **Op Discord krijgt elke POC rollen en een eigen kanaal.** Studenten koppelen hun
+  account onder één publiek bericht, en de bot geeft hen de rollen van hun POC. Zo
+  zien ze enkel de peilingen van hun eigen richting. Eén kanaal voor alles kan niet:
   Discord kent geen zichtbaarheid per bericht. Privéberichten van de bot zijn bekeken
-  en afgewezen. De RiVers kiezen daarom geen kanaal meer; ze kiezen enkel of de
-  peiling ook op Discord komt.
+  en afgewezen.
+- **Het kanaal kies je bij de peiling, niet bij de POC** (november 2026). Het stond
+  eerst in /admin/pocs, onder de POC-instellingen, en dat vond Onderwijs onlogisch:
+  wie een peiling opstelt, wil daar zien en kiezen waar ze komt. Het scherm stelt het
+  kanaal van de vorige peiling van dezelfde POC voor. Een verkeerd gekozen kanaal
+  toont de peiling aan meer mensen, maar laat hen niet antwoorden: de site kijkt bij
+  elke klik richting en fase na.
+- **Een POC kan meerdere rollen hebben, elk eventueel voor bepaalde fases.** De BPOC
+  hangt aan "1ste bachelor", "2de bachelor" en "3de bachelor"; een eerstejaars krijgt
+  enkel de eerste. Een rol zonder fase krijgt iedereen van de POC.
+- **De site neemt enkel een rol af die ze zelf gaf.** Studenten kiezen die jaarrollen
+  ook zelf op Discord. Wat de site gaf, staat in `User.discordRoleIds`; een rol die
+  een lid al had of zelf koos, blijft van de site af, ook na een klik op het
+  koppelbericht.
+- **VTK Onderwijs kan een peiling voor alle richtingen maken** (`pocId` leeg, enkel
+  met `pocs.manage`), eventueel beperkt tot fases zoals de eerstejaars of de
+  laatstejaars. Ze staat naast de peiling van een POC en niet in de plaats ervan: in
+  de POC-band een eigen rij "VTK Onderwijs" onder de POC's, en in de strook de
+  eerste peiling die je nog niet invulde. Wie beide heeft, ziet ze dus allebei.
 - **De rol volgt het account, ook de jaarlijkse bevestiging.** Wie sinds 21 september
   de studie niet bevestigde, verliest de rol en krijgt ze terug na het bevestigen.
   Anders stemt iemand die de site niet meer opent nog jaren met de richting van toen.

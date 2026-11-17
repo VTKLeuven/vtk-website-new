@@ -17,7 +17,7 @@ import { hasLocale } from "@/lib/locale";
 import { managedPocIds, managesPoc } from "@/lib/pocPolls/access";
 import { pollAdminErrors } from "@/lib/pocPolls/adminCopy";
 import { pollPhaseLabel } from "@/lib/pocPolls/copy";
-import { pollStatus, POLL_YES } from "@/lib/pocPolls/core";
+import { GENERAL_POLL, pollStatus, POLL_YES } from "@/lib/pocPolls/core";
 import { toBrusselsInput } from "@/lib/pocPolls/draft";
 import { pollPopulation } from "@/lib/pocPolls/population";
 import {
@@ -105,12 +105,12 @@ export default async function PeilingDetail({
           locale={locale}
           initial={{
             id: poll.id,
-            pocId: poll.pocId,
+            pocId: poll.pocId ?? GENERAL_POLL,
             title: poll.titleNl,
             closesAt: toBrusselsInput(poll.closesAt),
             meetingDate: poll.meetingDate ? poll.meetingDate.toISOString().slice(0, 10) : "",
             studyYears: poll.studyYears,
-            postToDiscord: Boolean(poll.discordChannelId),
+            channelId: poll.discordChannelId ?? "",
             questions: poll.questions.map((question) => ({
               kind: question.kind,
               text: question.textNl,
@@ -127,7 +127,8 @@ export default async function PeilingDetail({
   const allRows = poll.questions.flatMap((question) =>
     question.answers.map((answer) => ({ ...answer, questionId: question.id })),
   );
-  const population = await pollPopulation(poll.poc.studyProgrammes, poll.studyYears);
+  const population = await pollPopulation(poll.poc?.studyProgrammes ?? null, poll.studyYears);
+  const pocLabel = poll.poc ? poll.poc.nameNl.replace(/^POC\s+/i, "") : nl ? "Alle richtingen" : "All programmes";
   const turnout = computeTurnout(allRows, population);
   const closed = status === "CLOSED";
 
@@ -169,7 +170,7 @@ export default async function PeilingDetail({
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-[18rem] flex-1">
           <p className="text-sm text-vtk-muted">
-            <Link href={`${base}/admin/peilingen`}>{nl ? "Peilingen" : "Polls"}</Link> · {poll.poc.nameNl.replace(/^POC\s+/i, "")}
+            <Link href={`${base}/admin/peilingen`}>{nl ? "Peilingen" : "Polls"}</Link> · {pocLabel}
           </p>
           <h1 className="mt-1 text-2xl font-semibold">{poll.titleNl}</h1>
           <p className="mt-2 flex flex-wrap items-center gap-2.5 text-sm text-vtk-muted">
@@ -274,7 +275,15 @@ export default async function PeilingDetail({
                 <Input id="closes" name="closesAt" type="datetime-local" required defaultValue={toBrusselsInput(poll.closesAt)} />
               </div>
               <div>
-                <Label htmlFor="meeting">{nl ? "Besproken op de POC van, optioneel" : "Discussed at the POC of, optional"}</Label>
+                <Label htmlFor="meeting">
+                  {poll.poc
+                    ? nl
+                      ? "Besproken op de POC van, optioneel"
+                      : "Discussed at the POC of, optional"
+                    : nl
+                      ? "Besproken op de vergadering van, optioneel"
+                      : "Discussed at the meeting of, optional"}
+                </Label>
                 <Input id="meeting" name="meetingDate" type="date" defaultValue={poll.meetingDate ? poll.meetingDate.toISOString().slice(0, 10) : ""} />
               </div>
             </div>
@@ -370,8 +379,8 @@ export default async function PeilingDetail({
             <h2 className="text-base font-semibold">{nl ? "Samenvatting voor studenten" : "Summary for students"}</h2>
             <p className="mb-3 mt-1 text-sm text-vtk-muted">
               {nl
-                ? "Na de POC: vertel wat er met de antwoorden gebeurde. Dit staat 30 dagen bij je POC op de homepage. Leegmaken haalt het weer weg."
-                : "After the POC: tell what happened with the answers. This stays at your POC on the homepage for 30 days. Emptying it removes it again."}
+                ? `Achteraf: vertel wat er met de antwoorden gebeurde. Dit staat 30 dagen ${poll.poc ? "bij je POC" : "onder VTK Onderwijs"} op de homepage. Leegmaken haalt het weer weg.`
+                : `Afterwards: tell what happened with the answers. This stays ${poll.poc ? "at your POC" : "under VTK Onderwijs"} on the homepage for 30 days. Emptying it removes it again.`}
             </p>
             <SaveForm
               action={publishPocPollSummaryAction}

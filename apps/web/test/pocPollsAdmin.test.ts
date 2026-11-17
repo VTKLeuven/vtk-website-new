@@ -109,16 +109,30 @@ describe("anonieme sleutels", () => {
 });
 
 describe("POC-rollen op Discord", () => {
+  const role = (roleId: string, studyYears: string[] = []) => ({ roleId, studyYears });
   const pocs = [
-    { discordRoleId: "cw", studyProgrammes: ["COMPUTER_SCIENCE"] },
-    { discordRoleId: "ba", studyProgrammes: ["COMMON_BACHELOR", "COMPUTER_SCIENCE"] },
-    { discordRoleId: null, studyProgrammes: ["COMPUTER_SCIENCE"] },
-    { discordRoleId: "wtk", studyProgrammes: ["MECHANICAL"] },
+    { studyProgrammes: ["COMPUTER_SCIENCE"], discordRoles: [role("cw")] },
+    { studyProgrammes: ["COMMON_BACHELOR", "COMPUTER_SCIENCE"], discordRoles: [role("ba")] },
+    { studyProgrammes: ["COMPUTER_SCIENCE"], discordRoles: [] },
+    { studyProgrammes: ["MECHANICAL"], discordRoles: [role("wtk")] },
   ];
-  const account = { live: true, confirmed: true, programmes: ["COMPUTER_SCIENCE"] };
+  const account = { live: true, confirmed: true, programmes: ["COMPUTER_SCIENCE"], years: ["BACHELOR_2"] };
 
   it("geeft de rollen van de POC's van je richting, en een POC zonder rol telt niet", () => {
     expect(desiredPocRoleIds(pocs, account)).toEqual(["cw", "ba"]);
+  });
+
+  it("geeft een rol met fases enkel aan wie in zo'n fase zit", () => {
+    const bpoc = [
+      {
+        studyProgrammes: ["COMMON_BACHELOR"],
+        discordRoles: [role("ba1", ["BACHELOR_1"]), role("ba2", ["BACHELOR_2"]), role("ba3", ["BACHELOR_3"]), role("bpoc")],
+      },
+    ];
+    const student = { ...account, programmes: ["COMMON_BACHELOR"] };
+    expect(desiredPocRoleIds(bpoc, { ...student, years: ["BACHELOR_1"] })).toEqual(["ba1", "bpoc"]);
+    expect(desiredPocRoleIds(bpoc, { ...student, years: ["BACHELOR_2", "BACHELOR_3"] })).toEqual(["ba2", "ba3", "bpoc"]);
+    expect(desiredPocRoleIds(bpoc, { ...student, years: [] })).toEqual(["bpoc"]);
   });
 
   it("geeft niets zonder bevestigde studie of aan een inactief account", () => {
@@ -128,8 +142,8 @@ describe("POC-rollen op Discord", () => {
 
   it("twee POC's met dezelfde rol geven die rol één keer", () => {
     const shared = [
-      { discordRoleId: "x", studyProgrammes: ["CIVIL"] },
-      { discordRoleId: "x", studyProgrammes: ["CIVIL"] },
+      { studyProgrammes: ["CIVIL"], discordRoles: [role("x")] },
+      { studyProgrammes: ["CIVIL"], discordRoles: [role("x")] },
     ];
     expect(desiredPocRoleIds(shared, { ...account, programmes: ["CIVIL"] })).toEqual(["x"]);
   });
@@ -139,8 +153,8 @@ describe("POC-rollen op Discord", () => {
     expect(roleChanges(["cw"], ["cw"])).toEqual({ add: [], remove: [] });
   });
 
-  it("blijft van de andere rollen van een lid af", () => {
-    expect(managedRoleIds(["moderator", "cw", "oud"], pocs, ["oud"])).toEqual(["cw", "oud"]);
+  it("gaat enkel over wat de site zelf gaf, niet over een rol die het lid zelf koos", () => {
+    expect(managedRoleIds(["moderator", "cw", "oud"], ["oud"])).toEqual(["oud"]);
   });
 });
 
@@ -167,6 +181,13 @@ describe("discord", () => {
     expect(parsePollCustomId(pollCustomId(view.id, "s"))).toEqual({ pollId: view.id, action: "s", index: 0, value: null });
     expect(parsePollCustomId("iets anders")).toBeNull();
     expect(parsePollCustomId(undefined)).toBeNull();
+  });
+
+  it("een algemene peiling komt van VTK Onderwijs", () => {
+    const message = pollChannelMessage({ ...view, pocName: null }) as { embeds: Array<{ author: { name: string }; description: string }> };
+    expect(message.embeds[0].author.name).toBe("VTK Onderwijs");
+    expect(message.embeds[0].description).toContain("van VTK Onderwijs");
+    expect(message.embeds[0].description).not.toContain("RiVers");
   });
 
   it("één vraag met knoppen in het kanaal, de rest met een startknop", () => {

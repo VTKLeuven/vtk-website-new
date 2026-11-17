@@ -34,7 +34,7 @@ export function discordPollView(poll: DiscordPollRow, siteOrigin: string = siteU
   return {
     id: poll.id,
     title: poll.titleNl,
-    pocName: poll.poc.nameNl.replace(/^POC\s+/i, ""),
+    pocName: poll.poc ? poll.poc.nameNl.replace(/^POC\s+/i, "") : null,
     closesAt: poll.closesAt,
     meetingDate: poll.meetingDate ? poll.meetingDate.toISOString().slice(0, 10) : null,
     siteOrigin,

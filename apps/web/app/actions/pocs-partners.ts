@@ -3,11 +3,12 @@
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { Prisma } from "@prisma/client";
+import { Prisma, type StudyYear } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { describeChanges, logAudit } from "@/lib/audit";
+import { listDiscordRoles } from "@/lib/discord/bot";
 import { placeLinkPanel } from "@/lib/discord/pocAccess";
 import { pushMailGroupsForPoc } from "@/lib/google/sync";
 import { STUDY_PROGRAMMES } from "@/lib/profile";
@@ -47,18 +48,48 @@ const pocSchema = z.object({
   // De aangevinkte richtingen. Onbekende waarden weren we hier: het formulier
   // stuurt enkel `StudyProgramme`-codes, dus iets anders is geknoei.
   studyProgrammes: z.array(z.enum(STUDY_PROGRAMMES)).default([]),
-  discordRoleId: z.string().regex(DISCORD_ID).nullable().optional(),
-  discordChannelId: z.string().regex(DISCORD_ID).nullable().optional(),
 });
 
-/** Zonder bot staan de keuzelijsten er niet; dan blijft wat er was gewoon staan. */
-function discordFields(formData: FormData) {
-  return formData.has("discordRoleId")
-    ? {
-        discordRoleId: formData.get("discordRoleId") || null,
-        discordChannelId: formData.get("discordChannelId") || null,
-      }
-    : {};
+const STUDY_YEARS = ["BACHELOR_1", "BACHELOR_2", "BACHELOR_3", "MASTER_1", "MASTER_2"] as const;
+
+const discordRolesSchema = z
+  .array(z.object({ roleId: z.string().regex(DISCORD_ID), studyYears: z.array(z.enum(STUDY_YEARS)).default([]) }))
+  .max(25);
+
+/**
+ * De Discord-rollen uit het formulier. Zonder bot of wanneer de lijst niet
+ * geladen raakte, staat het veld er niet; dan blijft wat er was gewoon staan.
+ * Dezelfde rol twee keer valt samen, met de fases van beide.
+ */
+function discordRolesField(formData: FormData): { roleId: string; studyYears: StudyYear[] }[] | null | "invalid" {
+  const raw = formData.get("discordRoles");
+  if (typeof raw !== "string") return null;
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    return "invalid";
+  }
+  const parsed = discordRolesSchema.safeParse(value);
+  if (!parsed.success) return "invalid";
+  const merged = new Map<string, Set<StudyYear>>();
+  for (const role of parsed.data) {
+    const years = merged.get(role.roleId) ?? new Set<StudyYear>();
+    for (const year of role.studyYears) years.add(year);
+    merged.set(role.roleId, years);
+  }
+  // Een rol voor alle fases en dezelfde rol voor één fase is gewoon voor iedereen.
+  return [...merged].map(([roleId, years]) => ({
+    roleId,
+    studyYears: parsed.data.some((role) => role.roleId === roleId && role.studyYears.length === 0) ? [] : [...years],
+  }));
+}
+
+function rolesSummary(roles: { roleId: string; studyYears: readonly string[] }[]): string {
+  return roles
+    .map((role) => `${role.roleId}${role.studyYears.length > 0 ? ` (${[...role.studyYears].sort().join(", ")})` : ""}`)
+    .sort()
+    .join("; ");
 }
 
 export async function savePocAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
@@ -70,30 +101,46 @@ export async function savePocAction(_prev: SaveState, formData: FormData): Promi
     nameEn: formData.get("nameEn") || null,
     email: formData.get("email") || null,
     studyProgrammes: formData.getAll("studyProgrammes"),
-    ...discordFields(formData),
   });
   if (!parsed.success) return saveError("INVALID_INPUT");
+  const discordRoles = discordRolesField(formData);
+  if (discordRoles === "invalid") return saveError("INVALID_INPUT");
 
   try {
     if (parsed.data.id) {
-      const existing = await prisma.poc.findUnique({ where: { id: parsed.data.id } });
-      await prisma.poc.update({ where: { id: parsed.data.id }, data: parsed.data });
+      const pocId = parsed.data.id;
+      const existing = await prisma.poc.findUnique({
+        where: { id: pocId },
+        include: { discordRoles: { select: { roleId: true, studyYears: true } } },
+      });
+      await prisma.$transaction([
+        prisma.poc.update({ where: { id: pocId }, data: parsed.data }),
+        ...(discordRoles
+          ? [
+              prisma.pocDiscordRole.deleteMany({ where: { pocId } }),
+              prisma.pocDiscordRole.createMany({ data: discordRoles.map((role) => ({ ...role, pocId })) }),
+            ]
+          : []),
+      ]);
+      const changes = existing
+        ? describeChanges(existing, parsed.data, {
+            slug: "slug",
+            nameNl: "naam",
+            nameEn: "Engelse naam",
+            email: "e-mailadres",
+            studyProgrammes: "richtingen",
+          })
+        : null;
+      const rolesChanged =
+        existing && discordRoles && rolesSummary(existing.discordRoles) !== rolesSummary(discordRoles)
+          ? `Discord-rollen: ${rolesSummary(discordRoles) || "geen"}`
+          : null;
       await logAudit({
         action: "update",
         entity: "poc",
-        entityId: parsed.data.id,
+        entityId: pocId,
         target: parsed.data.nameNl,
-        summary: existing
-          ? describeChanges(existing, parsed.data, {
-              slug: "slug",
-              nameNl: "naam",
-              nameEn: "Engelse naam",
-              email: "e-mailadres",
-              studyProgrammes: "richtingen",
-              discordRoleId: "Discord-rol",
-              discordChannelId: "Discord-kanaal",
-            })
-          : null,
+        summary: [changes, rolesChanged].filter(Boolean).join("; ") || null,
       });
     } else {
       const last = await prisma.poc.findFirst({ orderBy: { order: "desc" }, select: { order: true } });
@@ -118,6 +165,16 @@ export async function savePocAction(_prev: SaveState, formData: FormData): Promi
   // richting of naam hoort daar meteen door te komen.
   revalidatePath("/", "layout");
   return saveOk();
+}
+
+/**
+ * De rollen van de studentendiscord, pas wanneer iemand een POC openklapt. Dat
+ * is een aanroep naar Discord, en die hoort het laden van /admin/pocs niet op te
+ * houden. `null`: de bot is niet ingesteld of Discord antwoordde niet.
+ */
+export async function loadDiscordRolesAction(): Promise<Array<{ id: string; name: string }> | null> {
+  await requirePermission("pocs.manage");
+  return listDiscordRoles();
 }
 
 /** Het publieke bericht met de koppelknop, in het gekozen kanaal. */

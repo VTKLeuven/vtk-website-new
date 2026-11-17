@@ -45,7 +45,8 @@ export type DiscordPollQuestion = {
 export type DiscordPollView = {
   id: string;
   title: string;
-  pocName: string;
+  /** `null`: een algemene peiling van VTK Onderwijs, voor alle richtingen. */
+  pocName: string | null;
   closesAt: Date;
   /** `yyyy-mm-dd`. */
   meetingDate: string | null;
@@ -120,8 +121,15 @@ export function pollAnswersInChannel(view: DiscordPollView): boolean {
   return view.questions.length === 1 && view.questions[0].kind !== "OPEN";
 }
 
+/** Wie de peiling stelt, bovenaan elk bericht. */
+function pollAuthor(view: DiscordPollView): { name: string } {
+  return { name: view.pocName ? `POC ${view.pocName}` : "VTK Onderwijs" };
+}
+
 export function pollChannelMessage(view: DiscordPollView): PollBotMessage {
-  const anonymous = "Anoniem: je RiVers zien enkel totalen en niemand ziet een tussenstand.";
+  const anonymous = view.pocName
+    ? "Anoniem: je RiVers zien enkel totalen en niemand ziet een tussenstand."
+    : "Anoniem: VTK Onderwijs ziet enkel totalen en niemand ziet een tussenstand.";
   const openUntil = { name: "Open tot", value: stamp(view.closesAt), inline: true };
 
   if (pollAnswersInChannel(view)) {
@@ -129,7 +137,7 @@ export function pollChannelMessage(view: DiscordPollView): PollBotMessage {
     return base({
       embeds: [
         {
-          author: { name: `POC ${view.pocName}` },
+          author: pollAuthor(view),
           title: question.text,
           description: question.kind === "SCORE" ? `${legend(question)}\n${anonymous}` : `Stem met de knoppen. ${anonymous}`,
           color: DISCORD_EMBED_COLOUR,
@@ -152,13 +160,20 @@ export function pollChannelMessage(view: DiscordPollView): PollBotMessage {
 
   const count = view.questions.length;
   const what = count === 1 ? "Eén korte vraag" : `${count} korte vragen`;
-  const forMeeting = view.meetingDate ? ` voor de POC van ${meetingLabel(view.meetingDate)}` : " voor de POC";
+  const forMeeting = view.pocName
+    ? view.meetingDate
+      ? ` voor de POC van ${meetingLabel(view.meetingDate)}`
+      : " voor de POC"
+    : view.meetingDate
+      ? ` voor de vergadering van ${meetingLabel(view.meetingDate)}`
+      : ", voor de studenten van alle richtingen";
+  const from = view.pocName ? "van je RiVers" : "van VTK Onderwijs";
   return base({
     embeds: [
       {
-        author: { name: `POC ${view.pocName}` },
+        author: pollAuthor(view),
         title: view.title,
-        description: `${what} van je RiVers${forMeeting}. Duurt ongeveer een minuut.`,
+        description: `${what} ${from}${forMeeting}. Duurt ongeveer een minuut.`,
         color: DISCORD_EMBED_COLOUR,
         fields: [openUntil, { name: "Anoniem", value: "Enkel totalen, geen tussenstand", inline: true }],
       },
@@ -285,9 +300,11 @@ export function discordConfirmStudyMessage(url: string): PollBotMessage {
   });
 }
 
-export function pollNotForYouMessage(pocName: string, accountUrl: string): PollBotMessage {
+export function pollNotForYouMessage(pocName: string | null, accountUrl: string): PollBotMessage {
   return ephemeral({
-    content: `Deze peiling is voor studenten ${pocName}. Op je VTK-account staat een andere richting of fase.`,
+    content: pocName
+      ? `Deze peiling is voor studenten ${pocName}. Op je VTK-account staat een andere richting of fase.`
+      : "Deze peiling is voor studenten in een andere fase, of op je VTK-account staat nog geen richting.",
     components: [{ type: 1, components: [{ type: 2, style: LINK, label: "Richting nakijken", url: accountUrl }] }],
   });
 }
@@ -356,13 +373,13 @@ export function pollClosedChannelMessage(
   const next = options.summaryPublished
     ? " De samenvatting staat op de site."
     : options.meetingAhead && view.meetingDate
-      ? ` De samenvatting volgt na de POC van ${meetingLabel(view.meetingDate)}.`
+      ? ` De samenvatting volgt na de ${view.pocName ? "POC" : "vergadering"} van ${meetingLabel(view.meetingDate)}.`
       : "";
   const single = pollAnswersInChannel(view);
   return base({
     embeds: [
       {
-        author: { name: `POC ${view.pocName}` },
+        author: pollAuthor(view),
         title: single ? view.questions[0].text : view.title,
         description: `Afgesloten. ${who}.${next}`,
         color: 0x4e5058,

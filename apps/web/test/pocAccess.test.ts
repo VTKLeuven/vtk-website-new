@@ -37,6 +37,7 @@ function account(over: Record<string, unknown> = {}) {
     isStudent: true,
     studyConfirmedYear: confirmedYear,
     studyProgrammes: ["COMPUTER_SCIENCE"],
+    studyYears: ["BACHELOR_2"],
     ...over,
   };
 }
@@ -60,8 +61,8 @@ beforeEach(() => {
     }),
   );
   mocks.pocs.mockResolvedValue([
-    { nameNl: "POC Computerwetenschappen", discordRoleId: "cw", studyProgrammes: ["COMPUTER_SCIENCE"] },
-    { nameNl: "POC Werktuigkunde", discordRoleId: "wtk", studyProgrammes: ["MECHANICAL"] },
+    { nameNl: "POC Computerwetenschappen", studyProgrammes: ["COMPUTER_SCIENCE"], discordRoles: [{ roleId: "cw", studyYears: [] }] },
+    { nameNl: "POC Werktuigkunde", studyProgrammes: ["MECHANICAL"], discordRoles: [{ roleId: "wtk", studyYears: [] }] },
   ]);
 });
 
@@ -167,6 +168,15 @@ describe("de knop onder het koppelbericht", () => {
     expect(content(response)).toContain("**Computerwetenschappen**");
     await (mocks.after.mock.calls[0][0] as () => Promise<void>)();
     expect(calls).toEqual(["PUT /guilds/guild/members/d1/roles/cw"]);
+  });
+
+  it("neemt een rol die het lid zelf koos niet af", async () => {
+    mocks.account.mockResolvedValue(account({ discordRoleIds: ["cw"] }));
+
+    await click(["cw", "wtk"]);
+    await (mocks.after.mock.calls[0][0] as () => Promise<void>)();
+
+    expect(calls).toEqual([]);
   });
 
   it("zegt het wanneer de studie nog bevestigd moet worden", async () => {

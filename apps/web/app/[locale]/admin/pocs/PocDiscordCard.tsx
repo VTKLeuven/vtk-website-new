@@ -35,8 +35,8 @@ export function PocDiscordCard({
       <h2 className="text-base font-semibold">Discord</h2>
       <p className="text-sm text-vtk-body">
         {nl
-          ? "Studenten koppelen hun account met de knop onder het koppelbericht. Daarna geeft de bot hen de rol van hun POC, en die volgt de richting op hun account. De rol en het kanaal per POC stel je in onder POC-instellingen."
-          : "Students link their account with the button under the link message. The bot then gives them the role of their POC, which follows the programme on their account. Set the role and channel per POC under POC settings."}
+          ? "Studenten koppelen hun account met de knop onder het koppelbericht. Daarna geeft de bot hen de rollen van hun POC, en die volgen de richting en de fase op hun account. De rollen per POC stel je in onder POC-instellingen; het kanaal kies je per peiling."
+          : "Students link their account with the button under the link message. The bot then gives them the roles of their POC, which follow the programme and phase on their account. Set the roles per POC under POC settings; the channel is chosen per poll."}
       </p>
       <p className="text-sm tabular-nums text-vtk-muted">
         {linked}
@@ -72,6 +72,16 @@ export function PocDiscordCard({
           />
         </div>
       </SaveForm>
+    </Card>
+  );
+}
+
+/** Zolang Discord nog niet geantwoord heeft: de kaart staat al, zonder te verspringen. */
+export function PocDiscordCardPending({ nl }: { nl: boolean }) {
+  return (
+    <Card className="space-y-3 p-5">
+      <h2 className="text-base font-semibold">Discord</h2>
+      <p className="text-sm text-vtk-muted">{nl ? "Bezig met ophalen bij Discord..." : "Fetching from Discord..."}</p>
     </Card>
   );
 }

@@ -53,7 +53,8 @@ export type PocBandGroup = {
   name: string;
   email: string | null;
   people: PocBandPerson[];
-  /** De open peilingen van deze POC voor deze bezoeker. */
+  /** De open peilingen van deze POC voor deze bezoeker. Een rij zonder mensen is
+   * die van VTK Onderwijs, met de algemene peilingen. */
   polls?: PollPanelData[];
   /** Wat de RiVers na de POC vertelden. */
   summaries?: Array<{ id: string; title: string; summary: string; voters: number }>;
@@ -118,7 +119,7 @@ function PocWall({ groups, locale }: { groups: PocBandGroup[]; locale: Locale })
                   {group.email}
                 </a>
               ) : null}
-              {polls.length > 0 ? (
+              {polls.length > 0 && group.people.length > 0 ? (
                 <ul className="poc-poll-people">
                   {group.people.map((person) => (
                     <li key={person.id}>
@@ -145,7 +146,7 @@ function PocWall({ groups, locale }: { groups: PocBandGroup[]; locale: Locale })
                   />
                 ))}
               </div>
-            ) : (
+            ) : group.people.length === 0 ? null : (
               <ul className="poc-wall-faces">
                 {group.people.map((person) => (
                   <li key={person.id}>

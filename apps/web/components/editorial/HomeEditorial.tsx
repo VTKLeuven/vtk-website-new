@@ -399,6 +399,33 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       : [];
   // Een POC zonder vertegenwoordigers levert een lege kaart op; die tonen we niet.
   const pocsWithPeople = myPocs.filter((poc) => poc.representatives.length > 0);
+  const summariesFor = (pocId: string | null) =>
+    pollSummaries
+      .filter((summary) => summary.pocId === pocId)
+      .map((summary) => ({
+        id: summary.id,
+        title: pick(summary.titleNl, summary.titleEn ?? "", locale),
+        summary: summary.summary,
+        voters: summary.voters,
+      }));
+  // Een algemene peiling van VTK Onderwijs hangt aan geen POC en staat als eigen
+  // rij onder de POC's, zodat een peiling van je RiVers en die van Onderwijs
+  // allebei zichtbaar zijn. Zonder peiling of samenvatting valt de rij weg.
+  const generalPolls = myPolls.filter((poll) => poll.pocId === null).map((poll) => pollPanelData(poll, locale, now));
+  const generalSummaries = myProgrammes.length > 0 ? summariesFor(null) : [];
+  const generalGroup: PocBandGroup[] =
+    generalPolls.length > 0 || generalSummaries.length > 0
+      ? [
+          {
+            id: "vtk-onderwijs",
+            name: "VTK Onderwijs",
+            email: null,
+            people: [],
+            polls: generalPolls,
+            summaries: generalSummaries,
+          },
+        ]
+      : [];
   const pocGroups: PocBandGroup[] = pocsWithPeople.map((poc) => ({
     id: poc.id,
     name: pick(poc.nameNl, poc.nameEn ?? poc.nameNl, locale),
@@ -412,15 +439,9 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     polls: myPolls
       .filter((poll) => poll.pocId === poc.id)
       .map((poll) => pollPanelData(poll, locale, now)),
-    summaries: pollSummaries
-      .filter((summary) => summary.pocId === poc.id)
-      .map((summary) => ({
-        id: summary.id,
-        title: pick(summary.titleNl, summary.titleEn ?? "", locale),
-        summary: summary.summary,
-        voters: summary.voters,
-      })),
+    summaries: summariesFor(poc.id),
   }));
+  pocGroups.push(...generalGroup);
 
   const dict = getDictionary(locale);
   const myProgrammeNames = myProgrammes.map(

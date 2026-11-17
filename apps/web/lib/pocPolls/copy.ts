@@ -57,8 +57,9 @@ function pollCopy(input: {
   meetingDate: string | null;
   closesAt: string;
   now: Date;
+  general: boolean;
 }): PollStripCopy {
-  const { locale, questionCount, meetingDate, closesAt, now } = input;
+  const { locale, questionCount, meetingDate, closesAt, now, general } = input;
   const nl = locale === "nl";
   const closes = new Date(closesAt);
   const today = brusselsYMD(now);
@@ -79,6 +80,20 @@ function pollCopy(input: {
       timeZone: BRUSSELS,
     });
     const lastDay = closesKey === ymdKey(today);
+    if (general) {
+      return {
+        text: nl
+          ? lastDay
+            ? "Vandaag verzamelt VTK Onderwijs de laatste meningen van alle richtingen."
+            : `Nog tot ${weekday} verzamelt VTK Onderwijs meningen van alle richtingen.`
+          : lastDay
+            ? "Today is the last day VTK Onderwijs collects opinions from all programmes."
+            : `Until ${weekday} VTK Onderwijs is collecting opinions from all programmes.`,
+        strong: nl ? "Doe je mee?" : "Will you join in?",
+        action,
+        actionAway,
+      };
+    }
     return {
       text: nl
         ? lastDay
@@ -99,6 +114,16 @@ function pollCopy(input: {
       month: "long",
       timeZone: BRUSSELS,
     });
+    if (general) {
+      return {
+        text: nl
+          ? `Op ${date} neemt VTK Onderwijs de mening van alle richtingen mee naar de vergadering.`
+          : `On ${date} VTK Onderwijs brings the opinion of all programmes to the meeting.`,
+        strong: nl ? "Er staan een paar vraagjes voor je klaar." : "A few questions are waiting for you.",
+        action,
+        actionAway,
+      };
+    }
     return {
       text: nl
         ? `Op ${date} zitten je RiVers met je proffen rond de tafel op de POC.`
@@ -109,6 +134,16 @@ function pollCopy(input: {
     };
   }
 
+  if (general) {
+    return {
+      text: nl
+        ? "VTK Onderwijs vraagt de mening van alle richtingen."
+        : "VTK Onderwijs wants the opinion of all programmes.",
+      strong: nl ? "Er staan een paar vraagjes voor je klaar." : "A few questions are waiting for you.",
+      action,
+      actionAway,
+    };
+  }
   return {
     text: nl
       ? "Je RiVers vragen je mening voor de POC."
@@ -127,6 +162,8 @@ export function pollStripCopy(
     meetingDate?: string | null;
     closesAt?: string;
     now: Date;
+    /** Een algemene peiling van VTK Onderwijs in plaats van een van je RiVers. */
+    general?: boolean;
   },
 ): PollStripCopy {
   const { locale, now } = input;
@@ -162,17 +199,19 @@ export function pollStripCopy(
     meetingDate: input.meetingDate ?? null,
     closesAt: input.closesAt ?? now.toISOString(),
     now,
+    general: input.general ?? false,
   });
 }
 
-/** De drie regels rond de vragen van één peiling. */
+/** De regels rond de vragen van één peiling. */
 export function pollPanelText(input: {
   locale: Locale;
   meetingDate: string | null;
   closesAt: string;
   now: Date;
-}): { openUntil: string; lead: string; thanks: string } {
-  const { locale, meetingDate, closesAt, now } = input;
+  general?: boolean;
+}): { openUntil: string; lead: string; thanks: string; anonymous: string } {
+  const { locale, meetingDate, closesAt, now, general = false } = input;
   const nl = locale === "nl";
   const closes = new Date(closesAt).toLocaleDateString(localeTag(locale), {
     weekday: "short",
@@ -181,6 +220,43 @@ export function pollPanelText(input: {
     timeZone: BRUSSELS,
   });
   const openUntil = nl ? `Open tot ${closes}` : `Open until ${closes}`;
+
+  if (general) {
+    const anonymous = nl
+      ? "Anoniem. VTK Onderwijs ziet enkel totalen en niemand ziet een tussenstand."
+      : "Anonymous. VTK Onderwijs only sees totals and nobody sees interim results.";
+    const thanks = nl
+      ? "Je ziet bewust geen tussenstand. VTK Onderwijs ziet enkel de totalen van alle richtingen."
+      : "You deliberately see no interim results. VTK Onderwijs only sees the totals of all programmes.";
+    if (meetingIsAhead(meetingDate, now)) {
+      const long = noonOf(meetingDate).toLocaleDateString(localeTag(locale), {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        timeZone: BRUSSELS,
+      });
+      return {
+        openUntil,
+        lead: nl
+          ? `Op ${long} neemt VTK Onderwijs dit mee naar de vergadering, voor alle richtingen samen.`
+          : `On ${long} VTK Onderwijs brings this to the meeting, for all programmes together.`,
+        thanks,
+        anonymous,
+      };
+    }
+    return {
+      openUntil,
+      lead: nl
+        ? "VTK Onderwijs vraagt dit aan de studenten van alle richtingen."
+        : "VTK Onderwijs asks this of the students of all programmes.",
+      thanks,
+      anonymous,
+    };
+  }
+
+  const anonymous = nl
+    ? "Anoniem. Je RiVers zien enkel totalen en niemand ziet een tussenstand."
+    : "Anonymous. Your student reps only see totals and nobody sees interim results.";
 
   if (meetingIsAhead(meetingDate, now)) {
     const noon = noonOf(meetingDate);
@@ -203,6 +279,7 @@ export function pollPanelText(input: {
       thanks: nl
         ? `Je ziet bewust geen tussenstand. Op ${short} nemen je RiVers de totalen mee naar je proffen.`
         : `You deliberately see no interim results. On ${short} your student reps bring the totals to your professors.`,
+      anonymous,
     };
   }
 
@@ -214,6 +291,7 @@ export function pollPanelText(input: {
     thanks: nl
       ? "Je ziet bewust geen tussenstand. Je RiVers nemen de totalen mee naar de POC."
       : "You deliberately see no interim results. Your student reps bring the totals to the POC.",
+    anonymous,
   };
 }
 
@@ -224,6 +302,8 @@ export type PollPanelData = {
   openUntil: string;
   lead: string;
   thanks: string;
+  /** Wie de totalen ziet, onder de verstuurknop. */
+  anonymous: string;
   answered: boolean;
   questions: Array<{
     id: string;
@@ -239,7 +319,7 @@ export function pollPanelData(poll: ViewerPocPoll, locale: Locale, now: Date): P
   return {
     id: poll.id,
     title: inLocale(poll.titleNl, poll.titleEn, locale),
-    ...pollPanelText({ locale, meetingDate: poll.meetingDate, closesAt: poll.closesAt, now }),
+    ...pollPanelText({ locale, meetingDate: poll.meetingDate, closesAt: poll.closesAt, now, general: poll.pocId === null }),
     answered: poll.answered,
     questions: poll.questions.map((question) => ({
       id: question.id,
@@ -257,7 +337,6 @@ export type PollPanelLabels = {
   no: string;
   optional: string;
   placeholder: string;
-  anonymous: string;
   defaultLow: string;
   defaultHigh: string;
   submit: string;
@@ -276,7 +355,6 @@ export function pollPanelLabels(locale: Locale): PollPanelLabels {
         no: "Nee",
         optional: "Optioneel",
         placeholder: "Typ hier je antwoord",
-        anonymous: "Anoniem. Je RiVers zien enkel totalen en niemand ziet een tussenstand.",
         defaultLow: "Oneens",
         defaultHigh: "Eens",
         submit: "Verstuur mijn antwoorden",
@@ -299,7 +377,6 @@ export function pollPanelLabels(locale: Locale): PollPanelLabels {
         no: "No",
         optional: "Optional",
         placeholder: "Type your answer here",
-        anonymous: "Anonymous. Your student reps only see totals and nobody sees interim results.",
         defaultLow: "Disagree",
         defaultHigh: "Agree",
         submit: "Send my answers",

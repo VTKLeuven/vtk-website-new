@@ -3426,21 +3426,37 @@ model Poc {
   // per POC kan: één POC bedient soms verschillende opleidingen.
   studyProgrammes StudyProgramme[] @default([])
 
-  /// De rol op de studentendiscord die de studenten van deze POC krijgen, en het
-  /// kanaal waar enkel die rol in kan en waar de peilingen verschijnen. Zie
-  /// docs/poc-peilingen.md.
-  discordRoleId    String?
+  /// De rollen op de studentendiscord die de studenten van deze POC krijgen,
+  /// eventueel per fase. Zie docs/poc-peilingen.md.
+  discordRoles     PocDiscordRole[]
+  /// Het kanaal dat vroeger in /admin/pocs stond. Het kanaal kies je nu per
+  /// peiling; dit is enkel nog de startwaarde zolang de POC er geen postte.
   discordChannelId String?
 
   /// Het werkingsjaar waarvan de vertegenwoordigers in het groepsadres van de
   /// POC staan. Verandert enkel met de knop "verkozen" in /admin/pocs: wie je
   /// vooraf voor volgend jaar invoert, komt pas in de lijst wanneer de
   /// verkiezing achter de rug is. Leeg = het huidige werkingsjaar.
-  mailYear        Int?
+  mailYear Int?
 
-  representatives PocRepresentative[]
-  polls           PocPoll[]
+  representatives  PocRepresentative[]
+  polls            PocPoll[]
   mailGroupSources MailGroupSource[]
+}
+
+/// Een rol op de studentendiscord die de bot geeft aan de studenten van een POC.
+/// Met fases krijgt enkel wie in een van die fases zit de rol (bv. "1ste
+/// bachelor" bij de BPOC); zonder fases iedereen van de POC. Studenten kunnen
+/// dezelfde rol ook zelf kiezen op Discord: de site neemt enkel af wat ze zelf
+/// gaf (`User.discordRoleIds`).
+model PocDiscordRole {
+  pocId      String
+  roleId     String
+  studyYears StudyYear[] @default([])
+
+  poc Poc @relation(fields: [pocId], references: [id], onDelete: Cascade)
+
+  @@id([pocId, roleId])
 }
 
 model PocRepresentative {
@@ -3473,24 +3489,27 @@ enum PocPollQuestionKind {
 }
 
 model PocPoll {
-  id    String @id @default(cuid())
-  pocId String
+  id    String  @id @default(cuid())
+  /// Leeg: een algemene peiling van VTK Onderwijs, voor de studenten van alle
+  /// richtingen. Enkel wie `pocs.manage` heeft, maakt die.
+  pocId String?
 
   titleNl String
   titleEn String?
 
   /// De vergadering waarvoor de RiVers dit verzamelen. Optioneel; de strook
   /// bovenaan de site vertelt ermee waarom je antwoord telt.
-  meetingDate DateTime? @db.Date
+  meetingDate DateTime?   @db.Date
   /// Leeg: een concept, dat enkel de RiVers zien. Publiceren opent de peiling
   /// meteen; vanaf dan liggen de vragen vast.
-  publishedAt DateTime? @db.Timestamptz(3)
-  opensAt     DateTime  @db.Timestamptz(3)
-  closesAt    DateTime  @db.Timestamptz(3)
+  publishedAt DateTime?   @db.Timestamptz(3)
+  opensAt     DateTime    @db.Timestamptz(3)
+  closesAt    DateTime    @db.Timestamptz(3)
   /// De fases waarvoor de peiling is. Leeg: alle fases van de richting.
   studyYears  StudyYear[] @default([])
 
-  /// Het kanaal en het bericht op Discord. `discordClosedAt` zegt dat de knoppen
+  /// Het kanaal en het bericht op Discord. Het kanaal kiest wie de peiling
+  /// opstelt; leeg is enkel op de website. `discordClosedAt` zegt dat de knoppen
   /// na de deadline uitgezet zijn, `discordError` waarom posten mislukte.
   discordChannelId String?
   discordMessageId String?
@@ -3504,7 +3523,7 @@ model PocPoll {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  poc       Poc               @relation(fields: [pocId], references: [id], onDelete: Cascade)
+  poc       Poc?              @relation(fields: [pocId], references: [id], onDelete: Cascade)
   questions PocPollQuestion[]
 
   @@index([pocId])

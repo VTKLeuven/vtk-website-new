@@ -127,7 +127,7 @@ export async function handlePollInteraction(interaction: DiscordInteraction): Pr
   }
 
   const eligible = pollIsForViewer(
-    { programmes: poll.poc.studyProgrammes, studyYears: poll.studyYears },
+    { programmes: poll.poc?.studyProgrammes ?? null, studyYears: poll.studyYears },
     { programmes: account.studyProgrammes, years: account.studyYears },
   );
   const view = discordPollView(poll, origin);

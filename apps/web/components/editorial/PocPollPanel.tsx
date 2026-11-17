@@ -122,7 +122,7 @@ export function PocPollPanel({
           <div className="poc-poll-foot">
             <p>
               <LockIcon />
-              {labels.anonymous}
+              {poll.anonymous}
             </p>
             {submitButton}
             {confirmDialog}

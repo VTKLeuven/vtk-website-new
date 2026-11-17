@@ -59,6 +59,7 @@ export async function PocPollStrip({ locale }: { locale: Locale }) {
           meetingDate: poll.meetingDate,
           closesAt: poll.closesAt,
           now,
+          general: poll.pocId === null,
         })}
         faces={poll.faces.map((face) => ({
           initials: nameInitials(face.name),
