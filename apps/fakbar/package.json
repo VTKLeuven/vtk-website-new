@@ -14,7 +14,7 @@
     "@vtk/db": "*",
     "@vtk/gallery": "*",
     "@vtk/ui": "*",
-    "next": "16.4.3",
+    "next": "16.4.5",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "qrcode": "^1.5.4"
