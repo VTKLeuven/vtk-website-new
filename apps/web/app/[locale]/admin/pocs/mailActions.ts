@@ -63,7 +63,7 @@ export async function createPocListsAction(): Promise<SaveState> {
     target: "POC's",
     summary: `${created} POC-adressen aangemaakt, ${linked} bestaande gekoppeld`,
   });
-  revalidatePath("/admin/pocs");
+  revalidatePath("/[locale]/admin/pocs", "layout");
   revalidatePath("/admin/groepsadressen");
   for (const poc of pocs) after(() => pushMailGroupsForPoc(poc.id));
   return saveOk();
@@ -93,7 +93,7 @@ export async function markPocsElectedAction(formData: FormData): Promise<SaveSta
     target: pocId ? pocs[0].nameNl : "POC's",
     summary: `verkozen: groepsadres volgt de vertegenwoordigers van ${year}-${year + 1}${pocId ? "" : ` (${pocs.length} POC's)`}`,
   });
-  revalidatePath("/admin/pocs");
+  revalidatePath("/[locale]/admin/pocs", "layout");
   revalidatePath("/admin/groepsadressen");
   for (const poc of pocs) after(() => pushMailGroupsForPoc(poc.id));
   return saveOk();

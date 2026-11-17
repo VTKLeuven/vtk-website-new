@@ -160,7 +160,7 @@ export async function savePocAction(_prev: SaveState, formData: FormData): Promi
   }
 
   revalidatePath("/pocs");
-  revalidatePath("/admin/pocs");
+  revalidatePath("/[locale]/admin/pocs", "layout");
   // De homepage toont de POC's van je eigen richtingen; een gewijzigde
   // richting of naam hoort daar meteen door te komen.
   revalidatePath("/", "layout");
@@ -187,7 +187,7 @@ export async function placeDiscordLinkPanelAction(_prev: SaveState, formData: Fo
   if (!result.ok) return saveError("DISCORD_LINK_PANEL", result.message);
 
   await logAudit({ action: "update", entity: "poc", target: "Discord-koppelbericht", summary: "geplaatst" });
-  revalidatePath("/admin/pocs");
+  revalidatePath("/[locale]/admin/pocs", "layout");
   return saveOk();
 }
 
@@ -203,7 +203,7 @@ export async function reorderPocsAction(ids: string[]): Promise<void> {
     summary: "volgorde van POC's gewijzigd",
   });
   revalidatePath("/pocs");
-  revalidatePath("/admin/pocs");
+  revalidatePath("/[locale]/admin/pocs", "layout");
   revalidatePath("/", "layout");
 }
 
@@ -216,7 +216,7 @@ export async function deletePocAction(formData: FormData): Promise<void> {
   }
   revalidatePath("/pocs");
   // Geen redirect: de lijst staat op deze pagina en ververst ter plaatse.
-  revalidatePath("/admin/pocs");
+  revalidatePath("/[locale]/admin/pocs", "layout");
   revalidatePath("/", "layout");
 }
 
@@ -269,7 +269,7 @@ export async function addPocRepresentativeAction(formData: FormData): Promise<vo
   // vindt de push niets te veranderen.
   after(() => pushMailGroupsForPoc(parsed.pocId));
   revalidatePath("/pocs");
-  revalidatePath("/admin/pocs");
+  revalidatePath("/[locale]/admin/pocs", "layout");
   revalidatePath("/", "layout");
 }
 
@@ -291,7 +291,7 @@ export async function removePocRepresentativeAction(formData: FormData): Promise
     after(() => pushMailGroupsForPoc(rep.pocId));
   }
   revalidatePath("/pocs");
-  revalidatePath("/admin/pocs");
+  revalidatePath("/[locale]/admin/pocs", "layout");
   revalidatePath("/", "layout");
 }
 
@@ -496,7 +496,7 @@ export async function savePocBandAction(_prev: SaveState, formData: FormData): P
   });
 
   revalidatePath("/", "layout");
-  revalidatePath("/admin/pocs");
+  revalidatePath("/[locale]/admin/pocs", "layout");
   revalidatePath("/pocs");
   return saveOk();
 }
