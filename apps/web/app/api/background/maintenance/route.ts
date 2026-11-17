@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { processDueInterestReminderMails } from "@/lib/calendar/interestReminderMailer";
+import { processDueSignupOpenedMails } from "@/lib/calendar/signupOpenedMailer";
 import { processDueDiscordPosts } from "@/lib/discord/posts";
 import { closeExpiredPollsOnDiscord } from "@/lib/discord/pollPosts";
 import { syncPocDiscordRoles } from "@/lib/discord/pocAccess";
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
   }
 
   const now = new Date();
-  const [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse, opruiming, peilingen, pocRollen, budgetprijzen] = await Promise.allSettled([
+  const [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse, inschrijvingen, opruiming, peilingen, pocRollen, budgetprijzen] = await Promise.allSettled([
     processDueNoShows(now),
     processDueLesbezoekScheduledMails(now),
     // De stand van de mailinglijsten van vandaag, voor de grafiek in
@@ -70,6 +71,10 @@ export async function POST(request: Request) {
     // De herinneringsmail om 12u de dag voor een evenement waarin een lid
     // interesse aanduidde; zie lib/calendar/interestReminderMailer.ts.
     processDueInterestReminderMails(now),
+    // De mail aan wie interesse aanduidde zodra de ticketverkoop (of voor wie
+    // erin zit, de voorverkoop) of de inschrijvingen opengaan; zie
+    // lib/calendar/signupOpenedMailer.ts.
+    processDueSignupOpenedMails(now),
     // Eén keer per nacht de bucket opruimen: bestanden waar de database al 30
     // dagen niet meer naar verwijst. Doet zelf niets tot het 3u is, en daarna
     // niets meer die dag; zie lib/storage-cleanup.ts.
@@ -88,7 +93,7 @@ export async function POST(request: Request) {
   // 502 zodra een van de taken viel: de healthcheck van de worker ziet dan dat
   // er iets scheelt in plaats van stil niets te doen. De andere taken zijn wel
   // gedraaid, en alle zijn idempotent, dus de volgende ronde haalt het in.
-  const failed = [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse, opruiming, peilingen, pocRollen, budgetprijzen].some(
+  const failed = [theokot, lesbezoeken, mailinglijsten, kaften, palPlus, discord, interesse, inschrijvingen, opruiming, peilingen, pocRollen, budgetprijzen].some(
     (task) => task.status === "rejected",
   );
   if (failed) {
@@ -100,6 +105,7 @@ export async function POST(request: Request) {
       palPlus: describe(palPlus),
       discord: describe(discord),
       interesse: describe(interesse),
+      inschrijvingen: describe(inschrijvingen),
       opruiming: describe(opruiming),
       peilingen: describe(peilingen),
       pocRollen: describe(pocRollen),
@@ -116,6 +122,7 @@ export async function POST(request: Request) {
       palPlus: describe(palPlus),
       discord: describe(discord),
       interesse: describe(interesse),
+      inschrijvingen: describe(inschrijvingen),
       opruiming: describe(opruiming),
       peilingen: describe(peilingen),
       pocRollen: describe(pocRollen),

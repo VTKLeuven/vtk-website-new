@@ -439,6 +439,9 @@ export async function eraseUserData(userId: string) {
       // alumni-evenement staat er mogelijk een naam van hem publiek op de site.
       // Een tombstone hoort daar niet meer in te staan.
       await tx.calendarEventInterest.deleteMany({ where: { userId } });
+      // En de sporen van de mails over die interesses: welke evenementen iemand
+      // volgde, hoort niet aan een tombstone te blijven hangen.
+      await tx.calendarEventSignupMail.deleteMany({ where: { userId } });
       // De bevestigingen dragen een momentopname van studiejaar en richting; aan
       // een tombstone hoort die niet meer te hangen. De tellingen van die rondes
       // zakken daardoor met één, en dat is de prijs van een echte verwijdering.

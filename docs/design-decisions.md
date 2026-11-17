@@ -7982,6 +7982,25 @@ waar de rest van de site zich vragen bij stelt; wie geen erelid is, ziet gewoon
 het gewone aanbod. `createTicketCheckout` weigert zo'n type ook serverside, met
 dezelfde fout als bij een onbestaand type.
 
+**Een erelid is ook lid van de kring**, in elk academiejaar dat hij erelid is
+(november 2026, op vraag van wie de ereleden bijhoudt: ereleden kregen geen
+ledenprijs en geen ticket "alleen leden"). Dat staat in `userIsMember` als derde
+weg naast `firwStudent` en een geactiveerd lidmaatschap, en geldt dus overal
+waar de site naar het lidmaatschap kijkt: de ledenprijs, ledentickets, de
+ledenplaatsen en "lid" op de deelnemerslijst.
+
+- **Afgeleid, geen `Membership`-rij bij het toekennen.** Een erelid is erelid
+  tot een beheerder het intrekt; een rij voor één academiejaar zou op
+  14 september vervallen terwijl de vlag blijft staan, en dan stond hetzelfde
+  probleem er het jaar nadien opnieuw.
+- **Geen aanbod om lid te worden.** `membershipOffer` geeft een erelid niets
+  (`already`), zodat /account, /lidmaatschap en de studiebevestiging hem niet
+  vragen te betalen voor wat hij al heeft. Die schermen zeggen "Je bent erelid
+  van VTK, dus je telt als lid".
+- **De ledenlijst op /admin/leden toont enkel rijen**, zoals een student van de
+  faculteit die de vraag oversloeg er ook niet in staat. De ereleden hebben
+  daar hun eigen lijst.
+
 ### Een tickettype kiest zijn kopers, en dat blijft aanpasbaar
 
 Elk tickettype draagt wie het mag kopen: **leden en niet-leden**, **alleen
@@ -9769,6 +9788,24 @@ niet opdagen, of er is een andere reden (oktober 2026). Het is dezelfde tabel
 - **Gelogd, ook na het intrekken.** Afnemen en intrekken komen allebei in het
   adminlogboek (`shiftManual`), met de reden. Wie een afname intrekt, haalt ze
   uit de tellingen, maar het logboek houdt bij dat ze er was.
+
+## Een nieuwe ticketverkoop staat standaard op je eigen post
+
+November 2026. De "Verantwoordelijke groep" bij een nieuwe verkoop
+(`/admin/tickets/new`) stond op de eerste post in de praesidiumvolgorde. Wie
+alles beheert, maakte zo ongemerkt verkopen aan voor een post die er niets mee
+te maken had, en die post kreeg dan de rol Eventbeheerder (de leads van de
+verantwoordelijke groep krijgen `MANAGER` bij het aanmaken).
+
+- **Standaard je eigen post** van dit werkingsjaar, eerst een praesidiumpost en
+  anders een werkgroep of jaarwerking, zolang je er een verkoop voor mag
+  aanmaken.
+- **Een gekoppeld kalenderevent en een sjabloon gaan voor.** Die zeggen allebei
+  uitdrukkelijk van wie de verkoop is. Mag je niet aanmaken voor de groep van
+  het sjabloon, dan valt de keuze terug op je eigen post en niet op de eerste
+  optie van de lijst.
+- De keuze blijft een gewone lijst: wie voor een andere post aanmaakt, kiest die
+  zelf.
 
 ## Ticketsjablonen: een cantus is elke keer dezelfde verkoop op een andere dag
 
@@ -12530,6 +12567,44 @@ heeft in zijn account, krijgt de dag ervoor om **12u** een mail. Regels in
   `/api/mail/uitschrijven`, en een scanner post niet. Uitschrijven gaat meteen
   naar Brevo, net als het vinkje op /account, en `/uitschrijven` staat open
   tijdens de onboarding- en studiebevestigingsgate.
+
+## Een mail wanneer de ticketverkoop of de inschrijvingen opengaan
+
+November 2026. Wie interesse aanduidt in een evenement, wil weten wanneer hij
+een ticket kan kopen of zich kan inschrijven, en niet pas de dag ervoor horen
+dat het uitverkocht is. Regels in `apps/web/lib/calendar/signupOpened.ts`, de
+verzender in `signupOpenedMailer.ts` (achtergrondworker, elke vijf minuten), de
+mail in `signupOpenedMail.ts`, voorvertoning op /admin/it/flows.
+
+- **Dezelfde schakelaar als de herinnering**: de mailinglijst Evenementen, en
+  een uitschrijving via een mail geldt ook hier. Interesse alleen is geen
+  toestemming voor mail.
+- **Drie manieren om binnen te geraken**, elk één keer per lid: een
+  ticketverkoop van VTK bij het evenement, het formulier bij het evenement, en
+  de externe link, maar die laatste enkel met "deze link opent de inschrijvingen"
+  aangevinkt (`registrationNewsAt`, hetzelfde vinkje als het nieuws op de
+  homepage). Een link zonder dat vinkje is meestal een Facebook-event, en dan
+  gaat er niets open. Een externe link toevoegen zonder vinkje stuurt dus geen
+  mail.
+- **Elke ticketverkoop apart.** De tweede wave van Galabal is een eigen
+  bericht; wie interesse had, wil ook die weten.
+- **Wie in de voorverkoop zit, krijgt de mail bij de start van de
+  voorverkoop**, en bij de publieke start geen tweede. Dezelfde regel als de
+  shop (`inPresaleAudience`): praesidiumposten, ereleden, vaste medewerkers en
+  de groepen die de beheerder erbij zette, elk volgens de vinkjes van die
+  verkoop. De private voorverkooplink telt niet: die hangt aan een cookie in een
+  browser, niet aan een account; wie zo binnen mag, krijgt de mail bij de
+  publieke start.
+- **Enkel wie al interesse had voor het openging.** Wie pas daarna op de ster
+  klikt, zag de knop al staan.
+- **Gemist is gemist na 24 uur**, of zodra het evenement begint of de verkoop
+  sluit. Lag de worker even plat, dan vertrekt de mail nog; een verkoop die al
+  dagen loopt, levert na een deploy geen golf mails op.
+- **Eén mail per lid per ronde**, met alles wat voor hem openging. Welke mails
+  vertrokken, staat in `CalendarEventSignupMail`: de rij is ook de claim, zodat
+  twee containers niet allebei versturen.
+- **Een alumnus zonder account** (`CalendarEventGuestInterest`) krijgt deze mail
+  niet: die gaf geen toestemming om gemaild te worden.
 
 ## Commu-aanvraag
 

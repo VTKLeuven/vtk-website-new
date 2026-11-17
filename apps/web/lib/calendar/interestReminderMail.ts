@@ -102,7 +102,7 @@ function copy(locale: "nl" | "en") {
 }
 
 /** "20:00 tot 03:00", "Hele dag", of een einde op een andere dag voluit. */
-function timeRange(event: InterestReminderMailEvent, locale: "nl" | "en", timeZone: string): string {
+export function timeRange(event: InterestReminderMailEvent, locale: "nl" | "en", timeZone: string): string {
   const t = copy(locale);
   if (event.allDay) return t.allDay;
   const tag = locale === "en" ? "en-GB" : "nl-BE";
@@ -123,17 +123,33 @@ function timeRange(event: InterestReminderMailEvent, locale: "nl" | "en", timeZo
   return `${start} ${t.until} ${end}`;
 }
 
-function eventCard(event: InterestReminderMailEvent, locale: "nl" | "en", timeZone: string): string {
+/**
+ * Eén evenement als kaart: banner, datumblok, wat/wanneer/waar en de knoppen.
+ * Gedeeld met de mail "de ticketverkoop is open" (`signupOpenedMail.ts`), die
+ * de ticketknop vooraan zet en er een regel over de voorverkoop bij schrijft.
+ */
+export function interestEventCard(
+  event: InterestReminderMailEvent,
+  locale: "nl" | "en",
+  timeZone: string,
+  options: { linkFirst?: boolean; note?: string | null } = {},
+): string {
   const t = copy(locale);
   const title = event.momentLabel ? `${event.title}: ${event.momentLabel}` : event.title;
-  const facts = [timeRange(event, locale, timeZone), event.location?.trim()].filter(Boolean) as string[];
+  const facts = [timeRange(event, locale, timeZone), event.location?.trim(), options.note?.trim()].filter(
+    Boolean,
+  ) as string[];
   const banner = event.imageUrl
     ? `<tr><td colspan="2" style="padding:0;font-size:0;line-height:0"><a href="${escapeHtml(event.eventUrl)}"><img src="${escapeHtml(event.imageUrl)}" width="600" alt="${escapeHtml(title)}" style="display:block;width:100%;max-width:600px;height:auto;border:0"></a></td></tr>`
     : "";
-  const buttons = [
-    mailButton(event.eventUrl, t.view),
-    ...(event.link ? [mailButton(event.link.url, event.link.label, "secondary")] : []),
-  ].join(" ");
+  const buttons = (
+    options.linkFirst && event.link
+      ? [mailButton(event.link.url, event.link.label), mailButton(event.eventUrl, t.view, "secondary")]
+      : [
+          mailButton(event.eventUrl, t.view),
+          ...(event.link ? [mailButton(event.link.url, event.link.label, "secondary")] : []),
+        ]
+  ).join(" ");
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;margin:20px 0 0;border:1px solid ${COLOR.line};border-radius:18px;overflow:hidden">${banner}<tr>${mailDateStub(
     { date: event.start, timeZone, locale },
   )}<td valign="middle" style="padding:18px 20px;font-family:${FONT}"><div style="font-size:12px;font-weight:600;color:${COLOR.muted}">${escapeHtml(
@@ -186,7 +202,7 @@ export function interestReminderMail(input: InterestReminderMailInput): Interest
       events.length === 1 ? `${t.tomorrow}: ${firstTitle}` : t.headingMany,
     )}<p style="margin:18px 0 0;font-family:${FONT};font-size:15.5px;line-height:1.6;color:${COLOR.body}">${escapeHtml(
       intro,
-    )}</p>${events.map((event) => eventCard(event, input.locale, timeZone)).join("")}</td></tr>${mailFooterRowHtml(footer)}`,
+    )}</p>${events.map((event) => interestEventCard(event, input.locale, timeZone)).join("")}</td></tr>${mailFooterRowHtml(footer)}`,
   });
 
   return { subject, text: textLines.join("\n"), html };

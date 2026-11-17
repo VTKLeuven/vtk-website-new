@@ -787,6 +787,7 @@ model User {
   /// De weergave die iemand koos op een beheerscherm met meer dan één weergave.
   viewPreferences         UserViewPreference[]
   calendarInterests       CalendarEventInterest[]     @relation("CalendarInterestUser")
+  calendarSignupMails     CalendarEventSignupMail[]   @relation("CalendarSignupMailUser")
   calendarCategoryFollows CalendarCategoryFollow[]    @relation("CalendarFollowUser")
   shiftRewardRedemptions  ShiftRewardRedemption[]     @relation("ShiftRewardRedemptionUser")
   shiftRewardsProcessed   ShiftRewardRedemption[]     @relation("ShiftRewardRedemptionProcessedBy")
@@ -2144,6 +2145,7 @@ model CalendarEvent {
   uitleenEvent   UitleenEvent?
   categories     CalendarEventCategory[]
   interests      CalendarEventInterest[]
+  signupMails    CalendarEventSignupMail[]
   guestInterests CalendarEventGuestInterest[]
   /// De losse momenten van dit evenement, wanneer het er meer dan één heeft. Leeg
   /// = het evenement loopt gewoon van `start` tot `end` door. Zie
@@ -8193,6 +8195,39 @@ model CalendarEventInterest {
   @@index([eventId])
   @@index([remindedAt])
   @@index([mailRemindedAt])
+}
+
+/// "De ticketverkoop of de inschrijvingen zijn open": de mail aan wie interesse
+/// aanduidde in een evenement, één keer per manier om binnen te geraken.
+///
+/// Een eigen tabel en geen kolom op `CalendarEventInterest`, om twee redenen.
+/// Een lid heeft bij een reeks momenten meer dan één interesserij voor
+/// hetzelfde evenement, en hoort toch maar één mail te krijgen. En een
+/// evenement kan meer dan één ticketverkoop hebben (de waves van Galabal): elke
+/// verkoop die opengaat, is een eigen bericht.
+///
+/// De rij is de claim: eerst aanmaken (de unieke sleutel houdt een tweede
+/// container tegen), dan versturen, en bij een mislukte verzending weer weg.
+/// Zie apps/web/lib/calendar/signupOpened.ts en docs/design-decisions.md.
+model CalendarEventSignupMail {
+  id      String  @id @default(cuid())
+  userId  String
+  eventId String
+  /// Wat er openging: `ticket:<TicketEvent.id>`, `form` (het formulier bij het
+  /// evenement) of `link` (de externe link met "deze link opent de
+  /// inschrijvingen" aangevinkt).
+  source  String
+  /// Of de mail over de voorverkoop ging. Enkel ter info: de sleutel is
+  /// dezelfde, zodat wie in de voorverkoop een mail kreeg, er bij de publieke
+  /// start geen tweede krijgt.
+  presale Boolean @default(false)
+  sentAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  user  User          @relation("CalendarSignupMailUser", fields: [userId], references: [id], onDelete: Cascade)
+  event CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId, source])
+  @@index([eventId])
 }
 
 /// "Ik kom naar dit alumni-evenement", aangeduid door iemand zonder account.

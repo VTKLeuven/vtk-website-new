@@ -7,6 +7,7 @@ import {
   passwordResetMail,
 } from "@/lib/accountMail";
 import { interestReminderMail } from "@/lib/calendar/interestReminderMail";
+import { signupOpenedMail } from "@/lib/calendar/signupOpenedMail";
 import { contactMailBody } from "@/lib/contactForm";
 import type { EmailSource } from "@/lib/email";
 import { confirmationMail, notificationMail } from "@/lib/forms/mail";
@@ -104,8 +105,8 @@ export function mailPreviewGroups(): MailPreviewGroup[] {
     {
       id: "kalender",
       title: "Kalender",
-      description: "De herinnering aan wie interesse aanduidde.",
-      mails: [interestReminderPreview()],
+      description: "De mails aan wie interesse aanduidde: wanneer de verkoop of de inschrijvingen opengaan, en de dag ervoor.",
+      mails: [signupOpenedPreview(), signupOpenedPresalePreview(), interestReminderPreview()],
     },
     {
       id: "account",
@@ -210,6 +211,93 @@ function ticketOrderPreview(): MailPreview {
     notes: [
       "De poster van het gekoppelde kalender-event staat er in het echt bovenaan; hier staat ze niet, want de voorvertoning laadt geen bestaande foto.",
       "De pdf met de tickets en de Apple Wallet-passen gaan als bijlage mee; de tekst noemt enkel wat er echt bij zit.",
+    ],
+  };
+}
+
+const SIGNUP_OPENED_NOTES = [
+  "Drie manieren om binnen te geraken, elk één keer per lid: een ticketverkoop van VTK bij het evenement (elke verkoop apart, dus de tweede wave is een eigen mail), het formulier bij het evenement, en de externe link wanneer \"deze link opent de inschrijvingen\" aangevinkt staat.",
+  "Enkel voor wie al interesse had voor het openging, en tot 24 uur erna; nooit meer zodra het evenement begint of de verkoop sluit.",
+  "Gaat er in dezelfde ronde meer open voor hetzelfde lid, dan staat het in één mail.",
+  "De private voorverkooplink telt niet mee: die hangt aan een browser, niet aan een account. Wie zo binnen mag, krijgt de mail bij de publieke start.",
+  "In het echt staat de banner van het evenement bovenaan de kaart; hier niet, want de voorvertoning laadt geen bestaande foto.",
+];
+
+function signupOpenedPreview(): MailPreview {
+  const mail = signupOpenedMail({
+    locale: "nl",
+    firstName: "Voorbeeldlid",
+    events: [
+      {
+        kind: "tickets",
+        presalePublicStart: null,
+        title: "Voorbeeldcantus",
+        start: SAMPLE_START,
+        end: new Date(SAMPLE_START.getTime() + 4 * 60 * 60 * 1000),
+        allDay: false,
+        momentLabel: null,
+        location: "Theokot",
+        organiser: "Onthaal",
+        imageUrl: null,
+        eventUrl: "https://vtk.be/kalender/voorbeeldcantus-2026",
+        link: { label: "Tickets kopen", url: "https://vtk.be/tickets/voorbeeldcantus" },
+      },
+    ],
+    unsubscribeUrl: "https://vtk.be/uitschrijven?t=voorbeeld",
+    accountUrl: "https://vtk.be/account",
+    logoUrl: "https://vtk.be/vtk-logo.png",
+  });
+  return {
+    id: "signup-opened",
+    title: "De ticketverkoop of de inschrijvingen zijn open",
+    when: "Zodra de ticketverkoop, het formulier of de inschrijflink van een evenement opengaat waarin het lid interesse aanduidde. Via de background-worker, elke vijf minuten.",
+    to: "Het lid, op zijn voorkeursadres, enkel wanneer de mailinglijst Evenementen aan staat in zijn account",
+    source: "calendar",
+    file: "lib/calendar/signupOpenedMail.ts",
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+    notes: SIGNUP_OPENED_NOTES,
+  };
+}
+
+function signupOpenedPresalePreview(): MailPreview {
+  const mail = signupOpenedMail({
+    locale: "nl",
+    firstName: "Voorbeeldlid",
+    events: [
+      {
+        kind: "tickets",
+        presalePublicStart: new Date(SAMPLE_START.getTime() - 9 * 24 * 60 * 60 * 1000),
+        title: "Voorbeeldgala",
+        start: SAMPLE_START,
+        end: new Date(SAMPLE_START.getTime() + 8 * 60 * 60 * 1000),
+        allDay: false,
+        momentLabel: null,
+        location: "Voorbeeldzaal",
+        organiser: "Galabal",
+        imageUrl: null,
+        eventUrl: "https://vtk.be/kalender/voorbeeldgala-2026",
+        link: { label: "Tickets kopen", url: "https://vtk.be/tickets/voorbeeldgala" },
+      },
+    ],
+    unsubscribeUrl: "https://vtk.be/uitschrijven?t=voorbeeld",
+    accountUrl: "https://vtk.be/account",
+    logoUrl: "https://vtk.be/vtk-logo.png",
+  });
+  return {
+    id: "signup-opened-presale",
+    title: "Je voorverkoop is begonnen",
+    when: "Bij de start van de voorverkoop, voor wie interesse aanduidde en erin mag: een praesidiumpost, een erelid, een vaste medewerker of een groep die de beheerder erbij zette. Dezelfde regel als de shop.",
+    to: "Het lid, op zijn voorkeursadres, enkel wanneer de mailinglijst Evenementen aan staat in zijn account",
+    source: "calendar",
+    file: "lib/calendar/signupOpenedMail.ts",
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+    notes: [
+      "Wie deze mail kreeg, krijgt er bij de publieke start geen tweede over dezelfde verkoop.",
+      ...SIGNUP_OPENED_NOTES,
     ],
   };
 }
