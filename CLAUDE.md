@@ -772,7 +772,16 @@ the design language into the application instead of copying mockup content.
       delen, `preserveParams={["jaar"]}` wanneer een filter mee moet naar elk
       tabblad, en `variant="sub"` voor een tweede rij binnen een tabblad (IT ›
       Mails & schermen). Een route-groep geeft twee mappen één kop zonder hun
-      adres te veranderen (`theokot/(broodjes)`, `(navigatie)`).
+      adres te veranderen (`theokot/(broodjes)`, `(leden)` voor Leden en
+      Alumni, `(posten)`). `isolated` op een tabblad wanneer dezelfde parameter
+      daar iets anders betekent (`jaar` bij Alumni is een lichting).
+    - **Een tabblad staat niet nog eens als item in de zijbalk.** Moet het
+      vindbaar blijven met Ctrl/Cmd+K of als pin, zet het dan als `hidden` in
+      `lib/admin-nav.ts` (zoals de tabbladen van IT).
+    - Eén uitzondering op "elk tabblad een route": een formulier dat in één
+      keer opslaat, zoals een evenement (`kalender/EventForm.tsx`). Daar zijn
+      de tabbladen knoppen in het formulier, en een verplicht veld op een
+      verborgen tabblad opent dat tabblad.
     - Een oude `?tab=`-link stuurt door naar het nieuwe tabblad.
     - De kop zet bewust niet `.ticket-admin` op de pagina: die maakt de kleur
       van elke link `inherit`, en dan staat de tekst van een donkere knop-link

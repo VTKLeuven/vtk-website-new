@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { CalendarDays, Clock, ExternalLink, Film, LayoutGrid, PanelsTopLeft, Rows3 } from "lucide-react";
+import { Clock, ExternalLink, Film, LayoutGrid, PanelsTopLeft, Rows3 } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import { ModuleAdminShell, type ModuleTab } from "@/components/admin/ModuleAdminShell";
@@ -9,8 +9,9 @@ const ICON = { "aria-hidden": true, size: 15, strokeWidth: 1.8 } as const;
 /**
  * De homepage (`home.edit`) in tabbladen zoals Tickets, in de volgorde van de
  * pagina zelf: de hero, de openingsuren, wat we doen, de banden die kunnen
- * wegvallen (POC's, shiften), Career en de aftermovies, en de standaardfoto
- * van een evenement. Dat waren elf kaarten onder elkaar.
+ * wegvallen (POC's, shiften), Career en de aftermovies. Dat waren elf kaarten
+ * onder elkaar. De standaardfoto van een evenement staat sinds november 2026
+ * onder Kalender › Standaardbanner.
  */
 export default async function AdminHomeLayout({
   children,
@@ -31,7 +32,6 @@ export default async function AdminHomeLayout({
     { href: `${base}/aanbod`, label: nl ? "Wat we doen" : "What we do", icon: <LayoutGrid {...ICON} />, segments: ["aanbod"] },
     { href: `${base}/banden`, label: nl ? "Banden" : "Bands", icon: <Rows3 {...ICON} />, segments: ["banden"] },
     { href: `${base}/career`, label: "Career & media", icon: <Film {...ICON} />, segments: ["career"] },
-    { href: `${base}/evenementen`, label: nl ? "Evenementen" : "Events", icon: <CalendarDays {...ICON} />, segments: ["evenementen"] },
   ];
 
   const viewLabel = nl ? "De homepage openen" : "Open the homepage";

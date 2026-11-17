@@ -4,7 +4,8 @@ import { currentWorkingYear } from "@vtk/auth";
 import type { Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { mailGroupAccess } from "@/lib/google/access";
-import { getGoogleStatus } from "@/lib/google/config";
+import { getGoogleConfig, getGoogleStatus } from "@/lib/google/config";
+import { existingGoogleAddresses, expectedWerkgroepAddress } from "@/lib/google/werkgroepAccounts";
 import { AdminDisclosure } from "@/components/admin/AdminDisclosure";
 import { DecideRequests } from "./DecideRequests";
 import { RequestAccounts } from "./RequestAccounts";
@@ -74,6 +75,7 @@ export default async function WerkgroepAccountRequests({
                 firstName: true,
                 lastName: true,
                 werkgroepAccounts: { select: { groupId: true, status: true, email: true, rejectReason: true } },
+                werkgroepAccountSkips: { select: { groupId: true } },
               },
             },
           },
@@ -88,6 +90,13 @@ export default async function WerkgroepAccountRequests({
         })
       : [],
   ]);
+
+  // Wat er al in Google staat: een werkgroepaccount dat met de hand aangemaakt
+  // werd, kent de site niet, en dan stond het lid er als "geen account".
+  const domain = status.domain ?? "vtk.be";
+  const inGoogle = ownGroups.some((g) => g.memberships.length > 0)
+    ? await existingGoogleAddresses(await getGoogleConfig())
+    : null;
 
   return (
     <div className="space-y-8">
@@ -136,8 +145,10 @@ export default async function WerkgroepAccountRequests({
           <RequestAccounts
             nl={nl}
             groupId={g.id}
+            canLink={access.approveAccounts && inGoogle !== null}
             rows={g.memberships.map(({ user }) => {
               const account = user.werkgroepAccounts.find((a) => a.groupId === g.id) ?? null;
+              const expected = g.mailPrefix ? expectedWerkgroepAddress(g.mailPrefix, user, domain) : null;
               return {
                 userId: user.id,
                 name: user.name,
@@ -145,6 +156,8 @@ export default async function WerkgroepAccountRequests({
                 status: account?.status ?? null,
                 email: account?.email ?? null,
                 rejectReason: account?.rejectReason ?? null,
+                notNeeded: user.werkgroepAccountSkips.some((skip) => skip.groupId === g.id),
+                existingEmail: !account && expected && inGoogle?.has(expected) ? expected : null,
               };
             })}
           />

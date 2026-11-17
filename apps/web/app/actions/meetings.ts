@@ -655,6 +655,59 @@ export async function toggleGrocomeetOrderPaidAction(formData: FormData): Promis
   revalidateAdmin("GROCOMEET");
 }
 
+/**
+ * Vinkt alles af wat iemand nog openstaan heeft over het werkingsjaar: zijn
+ * broodjes en drankjes van elke grocomeet, en wat hij bij Theokot bestelde voor
+ * in de doos. Een groco betaalt zijn schuld in één keer, niet per vergadering;
+ * per vergadering afvinken (op de vergadering zelf) blijft voor wie dat wil.
+ *
+ * Dezelfde rijen als `loadGrocomeetDebts`: enkel wat geld kost en nog niet
+ * betaald is.
+ */
+export async function settleGrocomeetDebtAction(formData: FormData): Promise<SaveState> {
+  const session = await requireMeetingManager("GROCOMEET");
+  const userId = String(formData.get("userId") ?? "");
+  if (!userId) return saveError("NOT_FOUND");
+  const year = currentWorkingYear();
+  const now = new Date();
+
+  const [reservations, orders, user] = await Promise.all([
+    prisma.meetingReservation.updateMany({
+      where: {
+        userId,
+        status: "ACTIVE",
+        paidAt: null,
+        meeting: { kind: "GROCOMEET", year },
+        OR: [{ itemNameNl: { not: null } }, { drinkName: { not: null } }],
+      },
+      data: { paidAt: now, paidById: session.user.id },
+    }),
+    prisma.theokotOrder.updateMany({
+      where: {
+        userId,
+        status: { in: ["RESERVED", "PICKED_UP"] },
+        grocomeetPaidAt: null,
+        grocomeet: { kind: "GROCOMEET", year },
+      },
+      data: { grocomeetPaidAt: now },
+    }),
+    prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+  ]);
+
+  const count = reservations.count + orders.count;
+  if (count > 0) {
+    await logAudit({
+      action: "update",
+      entity: "meetingReservation",
+      target: user?.name ?? userId,
+      summary: `volledige grocomeet-schuld afgevinkt als betaald (${count} ${count === 1 ? "bestelling" : "bestellingen"})`,
+    });
+  }
+
+  revalidateAdmin("GROCOMEET");
+  return saveOk();
+}
+
 // -----------------------------------------------------------------------------
 // Reserveren
 // -----------------------------------------------------------------------------

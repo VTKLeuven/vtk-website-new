@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import type { Locale } from "@vtk/i18n";
 import { Button, Card, Input, Label } from "@vtk/ui";
 import { useToast } from "@/components/ui/toast";
+import { InfoTip } from "@/components/ui/InfoTip";
+import { RewardCoins } from "@/components/shift/RewardCoins";
 import { formatVoucherCount, formatVouchers, wholeVouchers } from "@/lib/shift/rewards";
 import type { RewardRow } from "./ShiftAdmin";
 import { YearPicker } from "./YearPicker";
@@ -141,17 +143,6 @@ export function ShiftRewards({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/35 p-4 text-sm text-vtk-body">
-        <h2 className="font-semibold text-vtk-ink">
-          {nl ? "Bonnetjessaldo lezen" : "Understanding the voucher balance"}
-        </h2>
-        <p className="mt-1 leading-6">
-          {nl
-            ? "Het grote getal is het aantal bonnetjes. De kleinere regel toont over hoeveel shiften dat saldo verdeeld is. Een gedeeltelijk uitbetaalde shift kan daarom zowel bij openstaand als bij toegekend meetellen. Je kent enkel hele bonnetjes toe: een broodje aan de afhaalbalie kost per half bonnetje, en zo'n half bestaat niet op papier. Het blijft openstaan tot de student het aan de balie gebruikt."
-            : "The large number is the voucher count. The smaller line shows how many shifts make up that balance. A partially paid shift can therefore appear in both outstanding and awarded totals. You only award whole vouchers: a sandwich at the pickup counter costs half vouchers, and such a half does not exist on paper. It stays outstanding until the student uses it at the counter."}
-        </p>
-      </div>
-
       <div className="flex flex-wrap items-end gap-3">
         <YearPicker locale={locale} year={year} years={years} />
         <div>
@@ -162,6 +153,23 @@ export function ShiftRewards({
             placeholder={nl ? "Naam of e-mail..." : "Name or email..."}
             className="w-56"
           />
+        </div>
+        {/* De uitleg stond als blok boven de tabel; ze is voor wie het één keer
+            wil weten, niet voor elke keer dat je bonnetjes toekent. */}
+        <div className="flex items-center gap-1.5 pb-2 text-sm text-vtk-muted">
+          {nl ? "Hoe lees je het saldo?" : "How to read the balance"}
+          <InfoTip label={nl ? "Bonnetjessaldo lezen" : "Understanding the voucher balance"}>
+            <p>
+              {nl
+                ? "Het getal is het aantal bonnetjes; ernaast staat over hoeveel shiften dat saldo verdeeld is. Een gedeeltelijk uitbetaalde shift kan daarom zowel bij openstaand als bij toegekend meetellen."
+                : "The number is the voucher count; next to it is how many shifts make up that balance. A partially paid shift can therefore appear in both outstanding and awarded totals."}
+            </p>
+            <p>
+              {nl
+                ? "Je kent enkel hele bonnetjes toe: een broodje aan de afhaalbalie kost per half bonnetje, en zo'n half bestaat niet op papier. Het blijft openstaan tot de student het aan de balie gebruikt."
+                : "You only award whole vouchers: a sandwich at the pickup counter costs half vouchers, and such a half does not exist on paper. It stays outstanding until the student uses it at the counter."}
+            </p>
+          </InfoTip>
         </div>
       </div>
 
@@ -176,12 +184,11 @@ export function ShiftRewards({
                 {nl ? "Naam" : "Name"}
                 {arrow("name")}
               </th>
-              <th className="px-4 py-2">Email</th>
               <th
                 className="cursor-pointer px-4 py-2"
                 onClick={() => toggleSort("outstanding")}
               >
-                {nl ? "Openstaande bonnetjes" : "Outstanding vouchers"}
+                {nl ? "Openstaand" : "Outstanding"}
                 {arrow("outstanding")}
               </th>
               <th
@@ -206,14 +213,21 @@ export function ShiftRewards({
 
               return (
                 <tr key={row.userId} className="border-t border-vtk-navy/10">
-                  <td className="px-4 py-3 font-medium">{row.name}</td>
-                  <td className="px-4 py-3 text-vtk-muted">{row.email}</td>
-                  <td className="px-4 py-3">
-                    <strong className="block text-base text-vtk-ink">
-                      {formatVoucherCount(row.outstandingBonnetjes, lang)}
-                    </strong>
-                    <span className="block text-xs text-vtk-muted">
-                      {sourceSummary(nl, "balance", row.outstandingShiftCount, row.outstandingPalCount)}
+                  {/* Geen aparte kolom voor het adres: zoeken vindt het nog, en de tooltip toont het. */}
+                  <td className="px-4 py-2 font-medium" title={row.email}>
+                    {row.name}
+                  </td>
+                  <td className="px-4 py-2">
+                    <span className="flex items-center gap-2 whitespace-nowrap">
+                      <RewardCoins
+                        amount={row.outstandingBonnetjes}
+                        display={formatVouchers(row.outstandingBonnetjes, lang)}
+                        label={formatVoucherCount(row.outstandingBonnetjes, lang)}
+                        size="sm"
+                      />
+                      <span className="text-xs text-vtk-muted">
+                        {sourceSummary(nl, "balance", row.outstandingShiftCount, row.outstandingPalCount)}
+                      </span>
                     </span>
                     {halfLeft > 0 ? (
                       <span className="block text-xs text-vtk-muted">
@@ -223,16 +237,21 @@ export function ShiftRewards({
                       </span>
                     ) : null}
                   </td>
-                  <td className="px-4 py-3">
-                    <strong className="block text-base text-vtk-ink">
-                      {formatVoucherCount(row.paidBonnetjes, lang)}
-                    </strong>
-                    <span className="text-xs text-vtk-muted">
-                      {sourceSummary(nl, "awarded", row.paidShiftCount, row.paidPalCount)}
+                  <td className="px-4 py-2">
+                    <span className="flex items-center gap-2 whitespace-nowrap">
+                      <RewardCoins
+                        amount={row.paidBonnetjes}
+                        display={formatVouchers(row.paidBonnetjes, lang)}
+                        label={formatVoucherCount(row.paidBonnetjes, lang)}
+                        size="sm"
+                      />
+                      <span className="text-xs text-vtk-muted">
+                        {sourceSummary(nl, "awarded", row.paidShiftCount, row.paidPalCount)}
+                      </span>
                     </span>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex min-w-[250px] items-center justify-end gap-2">
+                  <td className="px-4 py-2">
+                    <div className="flex items-center justify-end gap-2">
                       <label className="sr-only" htmlFor={`reward-${row.userId}`}>
                         {nl
                           ? `Aantal bonnetjes voor ${row.name}`
@@ -251,7 +270,7 @@ export function ShiftRewards({
                             [row.userId]: event.target.value,
                           }))
                         }
-                        className="w-20"
+                        className="!w-20"
                         disabled={busyId !== null || payable === 0}
                       />
                       <span className="whitespace-nowrap text-xs text-vtk-muted">
@@ -279,7 +298,7 @@ export function ShiftRewards({
             {rows.length === 0 && (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={4}
                   className="px-4 py-8 text-center text-vtk-muted"
                 >
                   {nl
@@ -303,6 +322,6 @@ export function ShiftRewards({
 function sourceSummary(nl: boolean, kind: "balance" | "awarded", shifts: number, pal: number): string {
   const shiftPart = nl ? `${shifts} ${shifts === 1 ? "shift" : "shiften"}` : `${shifts} ${shifts === 1 ? "shift" : "shifts"}`;
   const palPart = pal > 0 ? (nl ? ` en ${pal} PAL+-${pal === 1 ? "sessie" : "sessies"}` : ` and ${pal} PAL+ ${pal === 1 ? "session" : "sessions"}`) : "";
-  if (kind === "balance") return nl ? `saldo uit ${shiftPart}${palPart}` : `balance from ${shiftPart}${palPart}`;
-  return nl ? `toegekend over ${shiftPart}${palPart}` : `awarded across ${shiftPart}${palPart}`;
+  if (kind === "balance") return nl ? `uit ${shiftPart}${palPart}` : `from ${shiftPart}${palPart}`;
+  return nl ? `over ${shiftPart}${palPart}` : `across ${shiftPart}${palPart}`;
 }

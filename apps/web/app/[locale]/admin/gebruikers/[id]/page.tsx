@@ -45,6 +45,11 @@ export default async function EditUserPage({ params }: { params: Promise<{ local
         memberships: { include: { group: true } },
         roles: { where: { year }, include: { role: true } },
         accounts: { where: { providerId: 'credential' }, select: { id: true } },
+        // De richtingen per academiejaar, zoals het lid ze bevestigde.
+        studyConfirmations: {
+          orderBy: { year: 'desc' },
+          select: { year: true, studyYears: true, studyProgrammes: true, confirmedAt: true },
+        },
       },
     }),
     prisma.group.findMany({ orderBy: { orderInPraesidium: 'asc' } }),
@@ -80,6 +85,35 @@ export default async function EditUserPage({ params }: { params: Promise<{ local
         ? 'Het privéadres is bewaard, maar de mail kon niet worden verstuurd.'
         : 'The private address was saved, but the email could not be sent.',
   };
+
+  const nl = locale === 'nl';
+  const formatAddress = (a: {
+    street: string | null;
+    houseNumber: string | null;
+    bus: string | null;
+    postalCode: string | null;
+    city: string | null;
+  }) => {
+    const line1 = [a.street, a.houseNumber].filter(Boolean).join(' ') + (a.bus ? ` ${nl ? 'bus' : 'box'} ${a.bus}` : '');
+    const line2 = [a.postalCode, a.city].filter(Boolean).join(' ');
+    return [line1.trim(), line2].filter(Boolean).join(', ') || null;
+  };
+  const kotAddress = formatAddress(user);
+  const homeAddress = formatAddress({
+    street: user.homeStreet,
+    houseNumber: user.homeHouseNumber,
+    bus: user.homeBus,
+    postalCode: user.homePostalCode,
+    city: user.homeCity,
+  });
+  const studyLabel = (years: string[], programmes: string[]) => ({
+    years: years.map((y) => dict.onboarding.years[y as keyof typeof dict.onboarding.years] ?? y).join(', '),
+    programmes: programmes
+      .map((p) => dict.onboarding.programmes[p as keyof typeof dict.onboarding.programmes] ?? p)
+      .join(', '),
+  });
+  const currentStudy = studyLabel(user.studyYears, user.studyProgrammes);
+  const notFilled = nl ? 'Niet ingevuld' : 'Not filled in';
 
   return (
     <div className="space-y-6">
@@ -156,6 +190,71 @@ export default async function EditUserPage({ params }: { params: Promise<{ local
             </p>
           ) : null}
         </SaveForm>
+      </Card>
+
+      {/* Wat het lid zelf invulde in de onboarding, de studiebevestiging en op
+          /account. Enkel ter info: het lid past dit zelf aan. */}
+      <Card className="p-5 space-y-4">
+        <h2 className="font-semibold">{nl ? 'Adressen en studie' : 'Addresses and studies'}</h2>
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm md:grid-cols-2">
+          <div>
+            <dt className="text-xs font-medium uppercase tracking-wide text-[#5c667f]">{nl ? 'Kotadres' : 'Student address'}</dt>
+            <dd className="mt-0.5 text-vtk-ink">
+              {user.noKot ? (nl ? 'Geen kot' : 'No student room') : (kotAddress ?? <span className="text-[#5c667f]">{notFilled}</span>)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium uppercase tracking-wide text-[#5c667f]">{nl ? 'Thuisadres' : 'Home address'}</dt>
+            <dd className="mt-0.5 text-vtk-ink">{homeAddress ?? <span className="text-[#5c667f]">{notFilled}</span>}</dd>
+          </div>
+        </dl>
+
+        <div>
+          <h3 className="text-sm font-medium text-vtk-ink">{nl ? 'Studierichtingen per academiejaar' : 'Study programmes per academic year'}</h3>
+          <div className="relative mt-2 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-vtk-blue/10 text-left text-xs uppercase tracking-wide text-[#5c667f]">
+                  <th className="py-2 pr-4 font-medium">{nl ? 'Academiejaar' : 'Academic year'}</th>
+                  <th className="py-2 pr-4 font-medium">{nl ? 'Studiejaar' : 'Year of study'}</th>
+                  <th className="py-2 font-medium">{nl ? 'Richtingen' : 'Programmes'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {/* Het profiel zoals het nu staat; een bevestiging van dit jaar staat eronder apart. */}
+                <tr className="border-b border-vtk-blue/10">
+                  <td className="py-2 pr-4 text-[#5c667f]">{nl ? 'Nu op het profiel' : 'Current profile'}</td>
+                  <td className="py-2 pr-4">{currentStudy.years || '—'}</td>
+                  <td className="py-2">
+                    {currentStudy.programmes || '—'}
+                    {user.notAtFaculty ? (
+                      <span className="block text-xs text-[#5c667f]">{nl ? 'Studeert niet aan de faculteit' : 'Not studying at the faculty'}</span>
+                    ) : null}
+                  </td>
+                </tr>
+                {user.studyConfirmations.map((row) => {
+                  const label = studyLabel(row.studyYears, row.studyProgrammes);
+                  return (
+                    <tr key={row.year} className="border-b border-vtk-blue/10 last:border-0">
+                      <td className="py-2 pr-4 tabular-nums">{formatWorkingYear(row.year)}</td>
+                      <td className="py-2 pr-4">{label.years || '—'}</td>
+                      <td className="py-2">{label.programmes || '—'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-xs text-[#5c667f]">
+            {user.studyConfirmations.length === 0
+              ? nl
+                ? 'Nog geen bevestigde studie bewaard. De historiek per jaar bestaat sinds 22 september 2026; daarvoor bleef enkel het huidige profiel.'
+                : 'No confirmed studies stored yet. The history per year exists since 22 September 2026; before that only the current profile was kept.'
+              : nl
+                ? 'Per jaar zoals bevestigd in de onboarding of de jaarlijkse studiebevestiging. De historiek bestaat sinds 22 september 2026.'
+                : 'Per year as confirmed in the onboarding or the yearly study confirmation. The history exists since 22 September 2026.'}
+          </p>
+        </div>
       </Card>
 
       <Card className="p-5 space-y-4">

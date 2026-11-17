@@ -6,6 +6,8 @@ import { IconButton } from "@/components/ui/IconButton";
 import { TrashIcon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
 import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
+import { RewardCoins } from "@/components/shift/RewardCoins";
+import { LangTabs, type Lang } from "../kalender/LangTabs";
 import { utcToLocalDateTime } from "@/lib/ticketing/time";
 import type { AdminParticipant, AdminShift } from "./ShiftAdmin";
 
@@ -67,6 +69,12 @@ export function ShiftEditModal({
     shift?.openToInternationals ?? false,
   );
   const [instructions, setInstructions] = useState(shift?.instructions ?? "");
+  // Engels is optioneel: leeg = de Nederlandse tekst op /en/shift. Eén
+  // schakelaar voor de drie velden, zoals in het evenementformulier.
+  const [lang, setLang] = useState<Lang>("nl");
+  const [nameEn, setNameEn] = useState(shift?.nameEn ?? "");
+  const [descriptionEn, setDescriptionEn] = useState(shift?.descriptionEn ?? "");
+  const [instructionsEn, setInstructionsEn] = useState(shift?.instructionsEn ?? "");
   const [participants, setParticipants] = useState<AdminParticipant[]>(shift?.participants ?? []);
   const [addSearch, setAddSearch] = useState("");
   const [results, setResults] = useState<SearchUser[]>([]);
@@ -143,6 +151,9 @@ export function ShiftEditModal({
       post: post === "" ? null : post,
       openToInternationals,
       instructions: instructions.trim() === "" ? null : instructions,
+      nameEn: nameEn.trim() === "" ? null : nameEn,
+      descriptionEn: descriptionEn.trim() === "" ? null : descriptionEn,
+      instructionsEn: instructionsEn.trim() === "" ? null : instructionsEn,
     };
 
     try {
@@ -201,8 +212,22 @@ export function ShiftEditModal({
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <Label>{nl ? "Naam" : "Name"}</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
+            <div className="vtk-ef-field-head">
+              <Label htmlFor={`shift-name-${lang}`}>
+                {nl ? "Naam" : "Name"} ({lang.toUpperCase()})
+              </Label>
+              <LangTabs value={lang} onChange={setLang} nl={nl} />
+            </div>
+            {lang === "nl" ? (
+              <Input id="shift-name-nl" value={name} onChange={(e) => setName(e.target.value)} />
+            ) : (
+              <Input
+                id="shift-name-en"
+                value={nameEn}
+                onChange={(e) => setNameEn(e.target.value)}
+                placeholder={name || undefined}
+              />
+            )}
           </div>
           <div>
             <Label>{nl ? "Start" : "Start"}</Label>
@@ -242,16 +267,48 @@ export function ShiftEditModal({
             />
           </div>
           <div>
-            <Label>{nl ? "Beloning" : "Reward"}</Label>
-            <Input type="number" min={0} value={reward} onChange={(e) => setReward(e.target.value)} />
+            <Label htmlFor="shift-reward">{nl ? "Beloning" : "Reward"}</Label>
+            {/* Dezelfde muntjes als op /shift: zo is het meteen duidelijk dat dit getal bonnetjes zijn. */}
+            <div className="flex items-center gap-2">
+              <Input
+                id="shift-reward"
+                type="number"
+                min={0}
+                value={reward}
+                onChange={(e) => setReward(e.target.value)}
+              />
+              <RewardCoins
+                amount={Number(reward) || 0}
+                label={nl ? "bonnetjes" : "vouchers"}
+                display=""
+              />
+            </div>
           </div>
           <div className="sm:col-span-2">
-            <Label>{nl ? "Beschrijving" : "Description"}</Label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+            <div className="vtk-ef-field-head">
+              <Label htmlFor={`shift-description-${lang}`}>
+                {nl ? "Beschrijving" : "Description"} ({lang.toUpperCase()})
+              </Label>
+              <LangTabs value={lang} onChange={setLang} nl={nl} />
+            </div>
+            {lang === "nl" ? (
+              <Textarea id="shift-description-nl" value={description} onChange={(e) => setDescription(e.target.value)} />
+            ) : (
+              <Textarea
+                id="shift-description-en"
+                value={descriptionEn}
+                onChange={(e) => setDescriptionEn(e.target.value)}
+                placeholder={description || undefined}
+              />
+            )}
             <p className="mt-1 text-xs text-vtk-muted">
-              {nl
-                ? "Eén korte regel; staat bovenaan het detailvenster op de shiftpagina."
-                : "One short line; shown at the top of the detail dialog on the shift page."}
+              {lang === "en"
+                ? nl
+                  ? "Optioneel. Leeg laten toont op de Engelse shiftpagina de Nederlandse tekst."
+                  : "Optional. Leaving it empty shows the Dutch text on the English shift page."
+                : nl
+                  ? "Eén korte regel; staat bovenaan het detailvenster op de shiftpagina."
+                  : "One short line; shown at the top of the detail dialog on the shift page."}
             </p>
           </div>
 
@@ -277,18 +334,40 @@ export function ShiftEditModal({
           </div>
 
           <div className="sm:col-span-2">
-            <Label>{nl ? "Uitleg: wat houdt de shift in?" : "Explanation: what does the shift involve?"}</Label>
-            <MarkdownEditor
-              locale={locale}
-              value={instructions}
-              onChange={setInstructions}
-              rows={8}
-              allowImages={false}
-            />
+            <div className="vtk-ef-field-head">
+              <Label>
+                {nl ? "Uitleg: wat houdt de shift in?" : "Explanation: what does the shift involve?"} (
+                {lang.toUpperCase()})
+              </Label>
+              <LangTabs value={lang} onChange={setLang} nl={nl} />
+            </div>
+            {/* Beide editors blijven gemonteerd; enkel de zichtbare telt. */}
+            <div className={lang === "nl" ? undefined : "hidden"}>
+              <MarkdownEditor
+                locale={locale}
+                value={instructions}
+                onChange={setInstructions}
+                rows={8}
+                allowImages={false}
+              />
+            </div>
+            <div className={lang === "en" ? undefined : "hidden"}>
+              <MarkdownEditor
+                locale={locale}
+                value={instructionsEn}
+                onChange={setInstructionsEn}
+                rows={8}
+                allowImages={false}
+              />
+            </div>
             <p className="mt-1 text-xs text-vtk-muted">
-              {nl
-                ? "Optioneel: wat moet je doen, waar meld je je, wat mag je verwachten. Leeg laten verbergt dit blok op de shiftpagina."
-                : "Optional: what to do, where to report, what to expect. Leaving it empty hides this block on the shift page."}
+              {lang === "en"
+                ? nl
+                  ? "Optioneel. Leeg laten toont op de Engelse shiftpagina de Nederlandse uitleg."
+                  : "Optional. Leaving it empty shows the Dutch explanation on the English shift page."
+                : nl
+                  ? "Optioneel: wat moet je doen, waar meld je je, wat mag je verwachten. Leeg laten verbergt dit blok op de shiftpagina."
+                  : "Optional: what to do, where to report, what to expect. Leaving it empty hides this block on the shift page."}
             </p>
           </div>
         </div>

@@ -1,10 +1,7 @@
-import { notFound } from "next/navigation";
-import { hasLocale } from "@/lib/locale";
-import { HomeAdminPage } from "../HomeAdminPage";
+import { redirect } from "next/navigation";
 
-/** Tabblad Evenementen: de foto van een evenement zonder eigen foto. */
+/** De standaardfoto van een evenement staat nu onder Kalender › Standaardbanner. */
 export default async function AdminHomeEvents({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  if (!hasLocale(locale)) notFound();
-  return <HomeAdminPage locale={locale} section="evenementen" />;
+  redirect(`${locale === "en" ? "/en" : ""}/admin/kalender/standaardbanner`);
 }

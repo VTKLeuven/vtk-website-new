@@ -1,4 +1,5 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { hasPermission } from "@vtk/auth";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { getS3Status, getSentryStatus } from "@/lib/runtimeConfig";
@@ -23,9 +24,16 @@ export default async function AdminIT({
   const { locale: localeParam } = await params;
   if (!hasLocale(localeParam)) notFound();
 
-  // IT tab is superadmin-only (same gate as in the admin-nav filter).
+  // The configuration itself is superadmin-only. The IT item in the sidebar is
+  // also shown to whoever may open one of the other tabs (audit log, 24UL app):
+  // send them to the first tab they can see instead of a 404.
   const session = await requireSession();
-  if (!session.user.isSuperAdmin) notFound();
+  if (!session.user.isSuperAdmin) {
+    const base = `${localeParam === "nl" ? "" : "/en"}/admin/it`;
+    if (hasPermission(session, "audit.view")) redirect(`${base}/logboek`);
+    if (hasPermission(session, "urenloopApp.manage")) redirect(`${base}/24ul-app`);
+    notFound();
+  }
 
   const [s3Status, sentryStatus, doorStatus, vaultStatus, googleStatus] = await Promise.all([
     getS3Status(),

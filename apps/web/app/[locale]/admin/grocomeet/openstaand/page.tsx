@@ -5,6 +5,9 @@ import { Card } from "@vtk/ui";
 import { currentWorkingYear, formatWorkingYear } from "@/lib/workingYear";
 import { formatEuro } from "@/lib/theokot";
 import { loadGrocomeetDebts } from "@/lib/meetingAdmin";
+import { ConfirmIconButton } from "@/components/ui/DeleteIconButton";
+import { CheckIcon } from "@/components/ui/icons";
+import { settleGrocomeetDebtAction } from "@/app/actions/meetings";
 
 /** Tabblad Openstaand: wie nog wat verschuldigd is over het werkingsjaar. */
 export default async function AdminGrocomeetDebtsPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -22,8 +25,8 @@ export default async function AdminGrocomeetDebtsPage({ params }: { params: Prom
       <h2 className="mb-1 text-lg font-semibold">{nl ? "Openstaand" : "Outstanding"}</h2>
       <p className="mb-4 text-sm text-[#5c667f]">
         {nl
-          ? `Per persoon over ${formatWorkingYear(workingYear)}, met wat grocos zelf bij Theokot bestelden voor in de doos. Afvinken doe je bij de vergadering zelf (tabblad Vergaderingen), zodat je ziet welke bestelling betaald werd.`
-          : `Per person over ${formatWorkingYear(workingYear)}, including what grocos ordered at Theokot themselves for the box. Tick off at the meeting itself (Meetings tab), so you can see which order was paid.`}
+          ? `Per persoon over ${formatWorkingYear(workingYear)}, met wat grocos zelf bij Theokot bestelden voor in de doos. Betaalt iemand alles in één keer, vink dan zijn volledige schuld hier af; per bestelling afvinken kan bij de vergadering zelf (tabblad Vergaderingen).`
+          : `Per person over ${formatWorkingYear(workingYear)}, including what grocos ordered at Theokot themselves for the box. If someone pays everything at once, tick off their whole debt here; ticking off per order is done at the meeting itself (Meetings tab).`}
       </p>
       {debts.length === 0 ? (
         <p className="text-sm text-[#5c667f]">{nl ? "Nog geen bestellingen." : "No orders yet."}</p>
@@ -36,7 +39,10 @@ export default async function AdminGrocomeetDebtsPage({ params }: { params: Prom
                 <th className="py-1 pr-3 text-right">{nl ? "Bestellingen" : "Orders"}</th>
                 <th className="py-1 pr-3 text-right">{nl ? "Totaal" : "Total"}</th>
                 <th className="py-1 pr-3 text-right">{nl ? "Betaald" : "Paid"}</th>
-                <th className="py-1 text-right">{nl ? "Openstaand" : "Outstanding"}</th>
+                <th className="py-1 pr-3 text-right">{nl ? "Openstaand" : "Outstanding"}</th>
+                <th className="py-1">
+                  <span className="sr-only">{nl ? "Acties" : "Actions"}</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -46,14 +52,35 @@ export default async function AdminGrocomeetDebtsPage({ params }: { params: Prom
                   <td className="py-1.5 pr-3 text-right tabular-nums">{row.orders}</td>
                   <td className="py-1.5 pr-3 text-right tabular-nums">{formatEuro(row.totalCents)}</td>
                   <td className="py-1.5 pr-3 text-right tabular-nums text-[#5c667f]">{formatEuro(row.paidCents)}</td>
-                  <td className="py-1.5 text-right font-semibold tabular-nums">{formatEuro(row.openCents)}</td>
+                  <td className="py-1.5 pr-3 text-right font-semibold tabular-nums">{formatEuro(row.openCents)}</td>
+                  <td className="py-1 text-right">
+                    {row.openCents > 0 ? (
+                      <ConfirmIconButton
+                        label={nl ? "Alles betaald" : "Paid in full"}
+                        srLabel={`${nl ? "Alles betaald" : "Paid in full"}: ${row.name}`}
+                        icon={<CheckIcon />}
+                        action={settleGrocomeetDebtAction}
+                        fields={{ userId: row.userId }}
+                        title={nl ? `${row.name} heeft alles betaald?` : `${row.name} paid in full?`}
+                        description={
+                          nl
+                            ? `Elke onbetaalde bestelling van ${row.name} over ${formatWorkingYear(workingYear)} wordt afgevinkt als betaald, samen ${formatEuro(row.openCents)}, over alle grocomeets heen. Per vergadering kan je een bestelling nadien nog terug op niet betaald zetten.`
+                            : `Every unpaid order of ${row.name} over ${formatWorkingYear(workingYear)} is ticked off as paid, ${formatEuro(row.openCents)} in total, across all grocomeets. You can still set a single order back to unpaid at its meeting.`
+                        }
+                        confirmLabel={nl ? "Alles afvinken" : "Tick off everything"}
+                        cancelLabel={nl ? "Annuleren" : "Cancel"}
+                        successMessage={nl ? `Schuld van ${row.name} afgevinkt` : `Debt of ${row.name} ticked off`}
+                      />
+                    ) : null}
+                  </td>
                 </tr>
               ))}
               <tr className="border-t-2 border-vtk-blue/20">
                 <td className="py-1.5 pr-3 font-semibold" colSpan={4}>
                   {nl ? "Totaal openstaand" : "Total outstanding"}
                 </td>
-                <td className="py-1.5 text-right font-semibold tabular-nums">{formatEuro(openTotal)}</td>
+                <td className="py-1.5 pr-3 text-right font-semibold tabular-nums">{formatEuro(openTotal)}</td>
+                <td />
               </tr>
             </tbody>
           </table>

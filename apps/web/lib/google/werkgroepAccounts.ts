@@ -4,8 +4,8 @@ import { prisma } from "@vtk/db";
 import { currentWorkingYear } from "@vtk/auth";
 import { logAudit } from "@/lib/audit";
 import type { GoogleConfig } from "./config";
-import { GoogleError, createUser } from "./client";
-import { generatePassword, proposeAddress } from "./addresses";
+import { GoogleError, createUser, getUser, listUsersLite } from "./client";
+import { generatePassword, proposeAddress, renderAddress } from "./addresses";
 import { takenAddresses } from "./provision";
 
 /**
@@ -116,6 +116,8 @@ export async function requestWerkgroepAccounts(input: {
         rejectReason: null,
       },
     });
+    // Wie toch een account aanvraagt, had het dus wel nodig.
+    await prisma.werkgroepAccountSkip.deleteMany({ where: { userId: user.id, groupId: input.groupId } });
     requested += 1;
     await logAudit({
       action: "create",
@@ -233,4 +235,159 @@ export async function rejectWerkgroepAccount(id: string, reason: string, decided
     summary: `aanvraag geweigerd: ${row.email}${reason ? ` (${reason})` : ""}`,
   });
   return true;
+}
+
+/** Het adres dat een lid in deze werkgroep zou krijgen, zonder rekening te houden met naamgenoten. */
+export function expectedWerkgroepAddress(
+  prefix: string,
+  user: { firstName: string | null; lastName: string | null },
+  domain: string,
+): string | null {
+  if (!user.firstName?.trim() || !user.lastName?.trim()) return null;
+  return renderAddress(
+    WERKGROEP_ACCOUNT_TEMPLATE,
+    { prefix, voornaam: user.firstName, achternaam: user.lastName },
+    domain,
+  ).toLowerCase();
+}
+
+/**
+ * Alle adressen die nu in Google bestaan, om een werkgroepaccount te herkennen
+ * dat er al was voor de site het aanmaakte (met de hand in de Admin console).
+ * Null wanneer Google niet bereikbaar is: dan toont de pagina gewoon wat ze
+ * zelf weet, in plaats van te falen.
+ */
+export async function existingGoogleAddresses(cfg: GoogleConfig | null): Promise<Map<string, string> | null> {
+  if (!cfg) return null;
+  try {
+    const users = await listUsersLite(cfg);
+    return new Map(users.map((user) => [user.primaryEmail.toLowerCase(), user.id]));
+  } catch {
+    return null;
+  }
+}
+
+/** Duidt leden aan die geen werkgroepaccount nodig hebben, of zet dat terug. */
+export async function setWerkgroepAccountSkip(input: {
+  groupId: string;
+  userIds: string[];
+  skip: boolean;
+  markedById: string;
+}): Promise<number> {
+  const group = await prisma.group.findUnique({ where: { id: input.groupId }, select: { nameNl: true } });
+  if (!group) return 0;
+  // Enkel leden van dit werkingsjaar, zoals bij het aanvragen.
+  const members = await prisma.groupMembership.findMany({
+    where: { groupId: input.groupId, year: currentWorkingYear(), userId: { in: input.userIds } },
+    select: { user: { select: { id: true, name: true } } },
+  });
+  let changed = 0;
+  for (const { user } of members) {
+    if (input.skip) {
+      await prisma.werkgroepAccountSkip.upsert({
+        where: { userId_groupId: { userId: user.id, groupId: input.groupId } },
+        create: { userId: user.id, groupId: input.groupId, markedById: input.markedById },
+        update: {},
+      });
+    } else {
+      await prisma.werkgroepAccountSkip.deleteMany({ where: { userId: user.id, groupId: input.groupId } });
+    }
+    changed += 1;
+    await logAudit({
+      action: "update",
+      entity: "werkgroepAccount",
+      target: user.name,
+      summary: input.skip
+        ? `geen werkgroepaccount nodig (${group.nameNl})`
+        : `werkgroepaccount toch nodig (${group.nameNl})`,
+    });
+  }
+  return changed;
+}
+
+export type LinkOutcome = { linked: string[]; missing: string[] };
+
+/**
+ * Koppelt leden aan het werkgroepaccount dat al in Google bestaat op het adres
+ * dat de site zou voorstellen. Geen account aanmaken, geen wachtwoord: het
+ * account was er al. Daarna krijgt het lid dat adres in de lijsten van de
+ * werkgroep, net als na een goedkeuring.
+ */
+export async function linkExistingWerkgroepAccounts(
+  cfg: GoogleConfig,
+  input: { groupId: string; userIds: string[]; decidedById: string },
+): Promise<LinkOutcome> {
+  const group = await prisma.group.findUnique({
+    where: { id: input.groupId },
+    select: { nameNl: true, mailPrefix: true },
+  });
+  if (!group?.mailPrefix) return { linked: [], missing: [] };
+  const members = await prisma.groupMembership.findMany({
+    where: { groupId: input.groupId, year: currentWorkingYear(), userId: { in: input.userIds } },
+    select: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          firstName: true,
+          lastName: true,
+          werkgroepAccounts: { where: { groupId: input.groupId }, select: { status: true } },
+        },
+      },
+    },
+  });
+  const outcome: LinkOutcome = { linked: [], missing: [] };
+  for (const { user } of members) {
+    const current = user.werkgroepAccounts[0];
+    if (current && current.status !== "REJECTED") continue;
+    const email = expectedWerkgroepAddress(group.mailPrefix, user, cfg.domain);
+    const found = email ? await getUser(cfg, email) : null;
+    // Google geeft ook een account terug op een alias; dan is het iemands ander
+    // adres (bv. zijn persoonlijke account) en geen werkgroepaccount.
+    const google = found && found.primaryEmail.toLowerCase() === email ? found : null;
+    if (!email || !google) {
+      outcome.missing.push(user.name);
+      continue;
+    }
+    // Het adres is uniek; hangt het al aan iemand anders, dan koppelen we niets.
+    const taken = await prisma.werkgroepAccount.findFirst({
+      where: { OR: [{ email }, { googleUserId: google.id }], NOT: { userId: user.id, groupId: input.groupId } },
+      select: { id: true },
+    });
+    if (taken) {
+      outcome.missing.push(user.name);
+      continue;
+    }
+    const now = new Date();
+    await prisma.werkgroepAccount.upsert({
+      where: { userId_groupId: { userId: user.id, groupId: input.groupId } },
+      create: {
+        userId: user.id,
+        groupId: input.groupId,
+        email,
+        googleUserId: google.id,
+        status: google.suspended ? "SUSPENDED" : "ACTIVE",
+        requestedById: input.decidedById,
+        decidedById: input.decidedById,
+        decidedAt: now,
+      },
+      update: {
+        email,
+        googleUserId: google.id,
+        status: google.suspended ? "SUSPENDED" : "ACTIVE",
+        decidedById: input.decidedById,
+        decidedAt: now,
+        rejectReason: null,
+      },
+    });
+    await prisma.werkgroepAccountSkip.deleteMany({ where: { userId: user.id, groupId: input.groupId } });
+    outcome.linked.push(user.name);
+    await logAudit({
+      action: "update",
+      entity: "werkgroepAccount",
+      target: user.name,
+      summary: `bestaand account gekoppeld: ${email} (${group.nameNl})`,
+    });
+  }
+  return outcome;
 }

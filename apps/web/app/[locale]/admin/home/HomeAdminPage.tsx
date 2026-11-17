@@ -11,14 +11,12 @@ import {
   AANBOD_PHOTOS,
 } from "@/lib/aanbodCards";
 import { SaveForm } from "@/components/ui/SaveForm";
-import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
 import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
 import { SHIFTS_BAND_SETTING, readShiftsBandSetting } from "@/lib/home/shiftBand";
 import { HERO_DESIGN_SETTING, readHeroDesignSetting } from "@/lib/home/heroDesign";
 import { HOURS_LAYOUT_SETTING, readHoursLayoutSetting } from "@/lib/home/hoursLayout";
 import { HeroDesignForm } from "./HeroDesignForm";
 import {
-  saveDefaultEventImageAction,
   saveHomepageCardAction,
   saveCareerAction,
   saveAftermoviesAction,
@@ -70,7 +68,7 @@ function readAftermoviesSetting(value: unknown): Aftermovies | null {
 }
 
 /** De tabbladen van /admin/home; elk is een eigen route (zie de layout). */
-export type HomeSection = "hero" | "openingsuren" | "aanbod" | "banden" | "career" | "evenementen";
+export type HomeSection = "hero" | "openingsuren" | "aanbod" | "banden" | "career";
 
 /**
  * Het beheer van de homepage, per tabblad enkel de blokken van dat tabblad.
@@ -90,7 +88,6 @@ export async function HomeAdminPage({ locale, section }: { locale: Locale; secti
             "home.career",
             "media.aftermovies",
             "home.aftermovies",
-            DEFAULT_EVENT_IMAGE_SETTING,
             POC_BAND_SETTING,
             SHIFTS_BAND_SETTING,
             HERO_DESIGN_SETTING,
@@ -118,8 +115,6 @@ export async function HomeAdminPage({ locale, section }: { locale: Locale; secti
   const after = readAftermoviesSetting(map.get("media.aftermovies"))
     ?? readAftermoviesSetting(map.get("home.aftermovies"))
     ?? { titleNl: "", titleEn: "", items: [] };
-  const defaultEventImageKey =
-    (map.get(DEFAULT_EVENT_IMAGE_SETTING) as { imageKey?: string | null } | undefined)?.imageKey ?? null;
   const pocSetting = readPocBandSetting(map.get(POC_BAND_SETTING));
   const shiftsBand = readShiftsBandSetting(map.get(SHIFTS_BAND_SETTING));
   const hoursLayout = readHoursLayoutSetting(map.get(HOURS_LAYOUT_SETTING));
@@ -141,22 +136,37 @@ export async function HomeAdminPage({ locale, section }: { locale: Locale; secti
       )}
 
       {section === "openingsuren" && (
-      <Card className="p-5">
-        <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+      <Card className="p-5" style={{ boxShadow: "inset 3px 0 0 var(--yellow)" }}>
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
           <div>
-            <h2 className="font-semibold">{locale === "nl" ? "Openingsuren" : "Opening hours"}</h2>
-            <p className="text-sm text-[#5c667f]">
+            <h2 className="font-semibold">
+              {locale === "nl" ? "De uren zelf stel je hier niet in" : "The hours themselves are not set here"}
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm text-[#5c667f]">
               {locale === "nl"
-                ? "Hoe de band met de openingsuren eruitziet. Beide tonen vandaag op een tijdas en de uren van de week; de uren zelf pas je aan onder Openingsuren."
-                : "How the opening hours band looks. Both show today on a time axis and the hours of the week; the hours themselves are edited under Opening hours."}
+                ? "Wanneer Theokot, de Fakbar en de andere diensten open zijn, pas je aan onder Website › Openingsuren. Op dit tabblad kies je enkel hoe de band op de homepage eruitziet."
+                : "When Theokot, the Fakbar and the other services are open is edited under Website › Opening hours. This tab only sets how the band on the homepage looks."}
             </p>
           </div>
           <Link
             href={`${base}/admin/openingsuren`}
-            className="shrink-0 self-start whitespace-nowrap text-xs text-vtk-blue hover:underline sm:self-auto"
+            className="inline-flex shrink-0 items-center justify-center rounded-full bg-vtk-ink px-4 py-2 text-sm font-medium text-white hover:bg-vtk-navy"
           >
-            {locale === "nl" ? "Naar de openingsuren" : "Go to opening hours"} →
+            {locale === "nl" ? "Naar Openingsuren" : "Go to Opening hours"}
           </Link>
+        </div>
+      </Card>
+      )}
+
+      {section === "openingsuren" && (
+      <Card className="p-5">
+        <div className="mb-3">
+          <h2 className="font-semibold">{locale === "nl" ? "Weergave op de homepage" : "Layout on the homepage"}</h2>
+          <p className="text-sm text-[#5c667f]">
+            {locale === "nl"
+              ? "Beide tonen vandaag op een tijdas en de uren van de week."
+              : "Both show today on a time axis and the hours of the week."}
+          </p>
         </div>
         <SaveForm
           action={saveHomeHoursLayoutAction}
@@ -342,39 +352,6 @@ export async function HomeAdminPage({ locale, section }: { locale: Locale; secti
       </Card>
       )}
 
-      {section === "evenementen" && (
-      <Card className="p-5">
-        <h2 className="mb-1 font-semibold">
-          {locale === "nl" ? "Standaardfoto evenementen" : "Default event photo"}
-        </h2>
-        <p className="mb-4 text-sm text-[#5c667f]">
-          {locale === "nl"
-            ? "Deze foto verschijnt op de homepage en op eventpagina's van evenementen zonder eigen cover."
-            : "This photo appears on the homepage and on event pages for events without their own cover."}
-        </p>
-        <SaveForm
-          action={saveDefaultEventImageAction}
-          submitLabel={dict.admin.save}
-          savingLabel={dict.common.saving}
-          savedMessage={dict.common.saved}
-          fallbackErrorMessage={dict.common.saveError}
-        >
-          <StorageImageField
-            defaultKey={defaultEventImageKey}
-            locale={locale}
-            label={locale === "nl" ? "Standaardfoto" : "Default photo"}
-            fallbackUrl={BUILTIN_DEFAULT_EVENT_IMAGE}
-            srContext={locale === "nl" ? "Standaardfoto evenementen" : "Default event photo"}
-            helpText={
-              locale === "nl"
-                ? "Zonder upload gebruiken evenementen de meegeleverde foto uit de preview."
-                : "Without an upload, events use the bundled photo shown here."
-            }
-          />
-        </SaveForm>
-      </Card>
-      )}
-
       {section === "openingsuren" && (
       <Card className="p-5">
         <h2 className="font-semibold mb-1">
@@ -398,33 +375,6 @@ export async function HomeAdminPage({ locale, section }: { locale: Locale; secti
               </a>
               , where they also generate shifts and time slots. They appear on the
               homepage automatically; edit the note in the central Opening hours tab.
-            </>
-          )}
-        </p>
-      </Card>
-      )}
-
-      {section === "openingsuren" && (
-      <Card className="p-5">
-        <h2 className="font-semibold mb-1">
-          {locale === "nl" ? "Openingsuren" : "Opening hours"} – Theokot
-        </h2>
-        <p className="text-sm text-[#5c667f]">
-          {locale === "nl" ? (
-            <>
-              De Theokot-openingsuren beheer je onder{" "}
-              <Link href={`${base}/admin/openingsuren`} className="underline">
-                Openingsuren
-              </Link>
-              . Ze verschijnen automatisch op de startpagina.
-            </>
-          ) : (
-            <>
-              Manage the Theokot opening hours under{" "}
-              <Link href={`${base}/admin/openingsuren`} className="underline">
-                Opening hours
-              </Link>
-              . They appear on the homepage automatically.
             </>
           )}
         </p>

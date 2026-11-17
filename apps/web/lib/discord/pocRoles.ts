@@ -68,3 +68,41 @@ export function roleChanges(
 export function managedRoleIds(memberRoleIds: readonly string[], storedRoleIds: readonly string[]): string[] {
   return memberRoleIds.filter((roleId) => storedRoleIds.includes(roleId));
 }
+
+/** Een POC zoals `explainNoPoc` ze nodig heeft: ook zonder rol. */
+export type ExplainPoc = RolePoc & { name: string };
+
+/**
+ * Waarom een bevestigd account geen enkele POC-rol krijgt, per richting op het
+ * account. "Geen richting met een POC-kanaal" zei niet wat er ontbrak: er is geen
+ * POC voor die richting, de POC heeft (nog) geen Discord-rol, of die rol is voor
+ * andere fases. Wie op de knop drukt, moet weten of hij zelf iets kan doen.
+ */
+export type NoPocReason =
+  | { kind: "noProgramme" }
+  | { kind: "noPoc"; programme: string }
+  | { kind: "noRole"; poc: string }
+  | { kind: "otherYears"; poc: string; years: string[] };
+
+export function explainNoPoc(pocs: readonly ExplainPoc[], account: RoleAccount): NoPocReason[] {
+  if (account.programmes.length === 0) return [{ kind: "noProgramme" }];
+  const reasons: NoPocReason[] = [];
+  const seen = new Set<string>();
+  for (const programme of account.programmes) {
+    const matching = pocs.filter((poc) => poc.studyProgrammes.includes(programme));
+    if (matching.length === 0) {
+      reasons.push({ kind: "noPoc", programme });
+      continue;
+    }
+    for (const poc of matching) {
+      if (seen.has(poc.name)) continue;
+      seen.add(poc.name);
+      if (poc.discordRoles.length === 0) {
+        reasons.push({ kind: "noRole", poc: poc.name });
+      } else if (!poc.discordRoles.some((role) => roleFits(role, account))) {
+        reasons.push({ kind: "otherYears", poc: poc.name, years: [...new Set(poc.discordRoles.flatMap((r) => r.studyYears))] });
+      }
+    }
+  }
+  return reasons;
+}

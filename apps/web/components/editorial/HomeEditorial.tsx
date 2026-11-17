@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "@/components/ui/Link";
+import { localizeShift } from "@/lib/shift/localize";
 import type { CSSProperties } from "react";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
@@ -330,6 +331,9 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         location: true,
         description: true,
         instructions: true,
+        nameEn: true,
+        descriptionEn: true,
+        instructionsEn: true,
         maxParticipants: true,
         reward: true,
         post: true,
@@ -354,7 +358,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     .filter((s) => s.maxParticipants - s._count.participants > 0 || s.participants.some((p) => p.userId === viewerId))
     .slice(0, 4)
     .map(({ _count, participants, ...shift }) => ({
-      ...shift,
+      ...localizeShift(shift, locale),
       takenSpots: _count.participants,
       availableSpots: Math.max(0, shift.maxParticipants - _count.participants),
       viewerRegistered: participants.some((p) => p.userId === viewerId),

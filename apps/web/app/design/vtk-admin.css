@@ -1369,6 +1369,7 @@ a.vtk-shortcut-tile:hover {
   min-width: 0;
 }
 
+.vtk-ef-head h1,
 .vtk-ef-head h2 {
   margin: 3px 0 0;
   font-size: clamp(1.4rem, 2.4vw, 1.9rem);
@@ -1376,6 +1377,59 @@ a.vtk-shortcut-tile:hover {
   letter-spacing: -0.03em;
   font-weight: 600;
   color: var(--ink);
+}
+
+/* De tabbladen van een evenement, in de meescrollende kop: dezelfde pillen als
+   bij een ticketevent (.ticket-admin-tabs), maar knoppen in plaats van links,
+   want het is één formulier dat in één keer opslaat. */
+.vtk-ef-tabs {
+  flex-basis: 100%;
+  margin-top: 4px;
+  padding-bottom: 0;
+}
+
+.ticket-admin-tabs button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 13px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(10, 15, 31, 0.72);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ticket-admin-tabs button:hover,
+.ticket-admin-tabs button.is-active {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.ticket-admin-tabs button.is-active {
+  font-weight: 600;
+}
+
+.ticket-admin-tabs button:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 2px;
+}
+
+.vtk-ef-shell,
+.vtk-ef-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vtk-ef-panel[hidden] {
+  display: none;
 }
 
 .vtk-ef-crumbs {

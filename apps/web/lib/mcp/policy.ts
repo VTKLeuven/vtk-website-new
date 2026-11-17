@@ -158,10 +158,6 @@ export const MCP_PERMISSION_POLICY = {
   "income.manage": { reads: [], creates: [], blocked: ["read, import or match online income"] },
   "audit.view": { reads: ["audit_log"], creates: [], blocked: [] },
   "urenloopApp.manage": { reads: ["urenloop_app"], creates: [], blocked: ["grant download access, issue codes or revoke devices"] },
-  // Websitefeedback is vrije tekst van leden over de site, soms anoniem
-  // gemeld. Wie anoniem meldde, deed dat tegenover de kring en niet tegenover
-  // een agent; niets ervan gaat door dit endpoint, ook niet lezend.
-  "feedback.manage": { reads: [], creates: [], blocked: ["read or handle website feedback"] },
 } as const satisfies Record<Permission, McpPermissionPolicy>;
 
 export function parseConfiguredPermissions(raw: string | undefined): {

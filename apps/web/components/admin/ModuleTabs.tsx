@@ -21,6 +21,12 @@ export type ModuleTab = {
    * waarvan het segment de id zelf is en niet op voorhand te kennen.
    */
   fallback?: boolean;
+  /**
+   * Neemt niet deel aan `preserveParams`: er reist niets naartoe en niets van
+   * weg. Voor een tabblad waar dezelfde parameter iets anders betekent, zoals
+   * `jaar` bij Alumni (een lichting) naast Leden (een academiejaar).
+   */
+  isolated?: boolean;
 };
 
 /**
@@ -58,11 +64,11 @@ export function ModuleTabNav({
     const value = searchParams.get(name);
     if (value) carried.set(name, value);
   }
-  const query = carried.size > 0 ? `?${carried.toString()}` : "";
   const current =
     tabs.find((tab) => tab.segments.includes(full)) ??
     tabs.find((tab) => tab.segments.includes(first)) ??
     tabs.find((tab) => tab.fallback);
+  const query = carried.size > 0 && !current?.isolated ? `?${carried.toString()}` : "";
   return (
     <nav className={variant === "sub" ? "ticket-admin-subnav" : "ticket-admin-tabs"} aria-label={label}>
       {tabs.map((tab) => {
@@ -70,7 +76,7 @@ export function ModuleTabNav({
         return (
           <Link
             key={tab.href}
-            href={`${tab.href}${query}`}
+            href={`${tab.href}${tab.isolated ? "" : query}`}
             className={active ? "is-active" : undefined}
             aria-current={active ? "page" : undefined}
           >

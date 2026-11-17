@@ -236,6 +236,10 @@ export function HomeShiftBand({
                 sourceId: null,
                 manualGrantId: null,
                 theokotSessionId: null,
+                // Al in de taal van de pagina (`localizeShift` op de server).
+                nameEn: null,
+                descriptionEn: null,
+                instructionsEn: null,
                 ...shift,
                 roster: shift.roster,
               },

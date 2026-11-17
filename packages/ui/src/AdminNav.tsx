@@ -20,6 +20,13 @@ export type AdminNavItem = {
   href: string;
   label: string;
   exact?: boolean;
+  /**
+   * Staat niet in de lijst, maar is wel te vinden met zoeken en blijft staan
+   * als pin. Voor een scherm dat als tabblad onder een ander item hangt (de
+   * tabbladen van IT): zo vindt Ctrl/Cmd+K "Adminlogboek" nog, en verdwijnt een
+   * bestaande pin niet omdat het item uit de zijbalk ging.
+   */
+  hidden?: boolean;
 };
 
 export type AdminNavNode =
@@ -299,14 +306,28 @@ function flatten(nodes: AdminNavNode[]): AdminNavItem[] {
   return nodes.flatMap((node) => (node.type === 'item' ? [node.item] : node.items));
 }
 
-export function AdminNav({ title, nodes, icons = {}, pins, collapse, search, density }: AdminNavProps) {
+/** De nodes zoals ze in de lijst staan: zonder `hidden`, en zonder groep die dan leeg is. */
+function listedNodes(nodes: AdminNavNode[]): AdminNavNode[] {
+  return nodes.flatMap((node): AdminNavNode[] => {
+    if (node.type === 'item') return node.item.hidden ? [] : [node];
+    const items = node.items.filter((item) => !item.hidden);
+    return items.length > 0 ? [{ ...node, items }] : [];
+  });
+}
+
+export function AdminNav({ title, nodes: allNodes, icons = {}, pins, collapse, search, density }: AdminNavProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(collapse?.initial ?? false);
   const stickyRef = useSmartSticky<HTMLDivElement>(collapsed);
   const panelId = useId();
   const [open, setOpen] = useState(false);
+  // De lijst toont enkel wat niet `hidden` is; daar licht het item op waaronder
+  // het scherm hangt (IT op /admin/it/logboek). Pins en zoeken kennen elk item,
+  // en daar licht het scherm zelf op.
+  const nodes = listedNodes(allNodes);
   const activeHref = activeHrefFor(nodes, pathname);
-  const current = activeLabel(nodes, activeHref, title);
+  const exactHref = activeHrefFor(allNodes, pathname);
+  const current = activeLabel(allNodes, exactHref, title);
 
   const [searchOpen, setSearchOpen] = useState(false);
   const shortcutLabel = useSearchShortcutLabel();
@@ -408,8 +429,10 @@ export function AdminNav({ title, nodes, icons = {}, pins, collapse, search, den
         <AdminRail
           title={title}
           nodes={nodes}
+          allNodes={allNodes}
           icons={icons}
           activeHref={activeHref}
+          exactHref={exactHref}
           pinnedKeys={pinCtx?.state.keys ?? []}
           expandLabel={collapse.labels.expand}
           expandTip={withShortcut(collapse.labels.expand, collapse.labels.shortcut)}
@@ -445,7 +468,7 @@ export function AdminNav({ title, nodes, icons = {}, pins, collapse, search, den
       </div>
       <nav id={panelId} className={`vtk-admin-nav${open ? ' is-open' : ''}`} aria-label={title}>
         {pinCtx && (
-          <PinnedSection nodes={nodes} activeHref={activeHref} icons={icons} pins={pinCtx.pins} state={pinCtx.state} />
+          <PinnedSection nodes={allNodes} activeHref={exactHref} icons={icons} pins={pinCtx.pins} state={pinCtx.state} />
         )}
         {nodes.map((node) =>
           node.type === 'item' ? (
@@ -471,9 +494,9 @@ export function AdminNav({ title, nodes, icons = {}, pins, collapse, search, den
         <AdminNavSearchDialog
           open={searchOpen}
           onClose={() => setSearchOpen(false)}
-          nodes={nodes}
+          nodes={allNodes}
           icons={icons}
-          activeHref={activeHref}
+          activeHref={exactHref}
           labels={search.labels}
         />
       )}
@@ -674,8 +697,10 @@ function NavGroup({
 function AdminRail({
   title,
   nodes,
+  allNodes,
   icons,
   activeHref,
+  exactHref,
   pinnedKeys,
   expandLabel,
   expandTip,
@@ -685,8 +710,12 @@ function AdminRail({
 }: {
   title: string;
   nodes: AdminNavNode[];
+  /** Ook de `hidden` items, om een pin op te zoeken. */
+  allNodes: AdminNavNode[];
   icons: Record<string, ReactNode>;
   activeHref: string | null;
+  /** Het actieve item onder álle items, voor de pins. */
+  exactHref: string | null;
   pinnedKeys: string[];
   expandLabel: string;
   /** De tooltip: het label, met de sneltoets erachter wanneer de app die geeft. */
@@ -724,7 +753,7 @@ function AdminRail({
     };
   }, [flyout]);
 
-  const byKey = new Map(flatten(nodes).map((item) => [item.key, item]));
+  const byKey = new Map(flatten(allNodes).map((item) => [item.key, item]));
   const pinned = pinnedKeys.map((key) => byKey.get(key)).filter((item): item is AdminNavItem => !!item);
 
   return (
@@ -779,7 +808,7 @@ function AdminRail({
         )}
         <span className="vtk-admin-rail-sep" aria-hidden />
         {pinned.map((item) => (
-          <RailLink key={`pin-${item.key}`} item={item} icons={icons} active={isActive(activeHref, item)} pinned />
+          <RailLink key={`pin-${item.key}`} item={item} icons={icons} active={isActive(exactHref, item)} pinned />
         ))}
         {pinned.length > 0 && <span className="vtk-admin-rail-sep" aria-hidden />}
         {nodes.map((node) => {

@@ -26,6 +26,9 @@ export type AdminShift = {
   post: string | null;
   openToInternationals: boolean;
   instructions: string | null;
+  nameEn: string | null;
+  descriptionEn: string | null;
+  instructionsEn: string | null;
   participants: AdminParticipant[];
 };
 export type RankingRow = { userId: string; name: string; post: string; count: number };

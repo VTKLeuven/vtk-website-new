@@ -285,7 +285,7 @@ export async function FlowsAdminPage({
   const pollDiscordMessages = [
     { label: nl ? "Koppelbericht in het publieke kanaal" : "Link message in the public channel", ephemeral: false, message: discordLinkPanelMessage() },
     { label: nl ? "Na een klik: al gekoppeld" : "After a click: already linked", ephemeral: true, message: discordAccessMessage(["Computerwetenschappen"]) },
-    { label: nl ? "Na een klik: geen richting met een kanaal" : "After a click: no programme with a channel", ephemeral: true, message: discordNoPocMessage(`${siteUrl()}/account#profile`) },
+    { label: nl ? "Na een klik: geen richting met een kanaal" : "After a click: no programme with a channel", ephemeral: true, message: discordNoPocMessage(`${siteUrl()}/account#profile`, ["POC Energie heeft nog geen kanaal op Discord. Vraag het aan je RiVers of aan VTK Onderwijs."]) },
     { label: nl ? "Na een klik: studie niet bevestigd" : "After a click: study not confirmed", ephemeral: true, message: discordConfirmStudyMessage(`${siteUrl()}/studie-bevestigen`) },
     { label: nl ? "In het kanaal" : "In the channel", ephemeral: false, message: pollChannelMessage(pollDiscordView) },
     {

@@ -138,6 +138,9 @@ const SHIFT_FIELD_KEYS = [
   'post',
   'openToInternationals',
   'instructions',
+  'nameEn',
+  'descriptionEn',
+  'instructionsEn',
 ];
 
 const isStringArray = (value: unknown): value is string[] =>

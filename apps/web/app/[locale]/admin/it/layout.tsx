@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { hasPermission } from "@vtk/auth";
-import { Eye, HardDrive, Inbox, MessageSquareText, MonitorSmartphone, ScrollText, Settings2, Smartphone } from "lucide-react";
+import { Eye, HardDrive, Inbox, MonitorSmartphone, ScrollText, Settings2, Smartphone } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { getCurrentSession } from "@/lib/session";
 import { ModuleAdminShell, type ModuleTab } from "@/components/admin/ModuleAdminShell";
@@ -10,8 +10,12 @@ const ICON = { "aria-hidden": true, size: 15, strokeWidth: 1.8 } as const;
 /**
  * Alles onder /admin/it in tabbladen zoals Tickets. Elk tabblad volgt zijn
  * eigen recht, zoals in de zijbalk: de meeste zijn voor superadmins, het
- * adminlogboek voor `audit.view`, de 24UL-app voor `urenloopApp.manage` en de
- * feedback voor `feedback.manage`. Elke pagina controleert dat zelf nog eens.
+ * adminlogboek voor `audit.view` en de 24UL-app voor `urenloopApp.manage`.
+ * Elke pagina controleert dat zelf nog eens.
+ *
+ * In de zijbalk is dit één item, IT (naast Deur, Kluisbeheer en SSO & apps):
+ * de tabbladen hieronder staan daar als verborgen items, zodat zoeken en een
+ * pin ze nog vinden (zie `hidden` in lib/admin-nav.ts).
  *
  * Een autorisatievoorbeeld zet `isSuperAdmin` op false: dan vallen de
  * superadmin-tabbladen weg, net zoals de pagina's zelf dan een 404 geven.
@@ -50,9 +54,6 @@ export default async function AdminItLayout({
   }
   if (can("urenloopApp.manage")) {
     tabs.push({ href: `${base}/24ul-app`, label: "24UL App Download", icon: <Smartphone {...ICON} />, segments: ["24ul-app"] });
-  }
-  if (can("feedback.manage")) {
-    tabs.push({ href: `${base}/feedback`, label: "Feedback", icon: <MessageSquareText {...ICON} />, segments: ["feedback"] });
   }
 
   return (

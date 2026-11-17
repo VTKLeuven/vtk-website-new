@@ -98,7 +98,9 @@ export async function saveDefaultEventImageAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  await requirePermission("home.edit");
+  // Een instelling van de kalender (/admin/kalender/standaardbanner), net als
+  // de banners per categorie: wie alle evenementen beheert.
+  await requirePermission("calendar.manageAll");
   const image = readImageField(formData);
   if (image.kind === "invalid") return saveError("INVALID_INPUT");
 
@@ -132,7 +134,7 @@ export async function saveDefaultEventImageAction(
 
   // Elke eventpagina en de homepage kunnen deze foto tonen.
   revalidatePath("/", "layout");
-  revalidatePath("/admin/home");
+  revalidatePath("/[locale]/admin/kalender/standaardbanner", "page");
   return saveOk();
 }
 

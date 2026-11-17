@@ -425,7 +425,7 @@
     "calendar": "Kalender",
     "users": "Gebruikers",
     "leden": "Leden",
-    "groups": "Posten",
+    "groups": "Posten & werkgroepen",
     "tasks": "Wie doet wat",
     "praesidiumShifts": "Shiftenoverzicht",
     "werkgroepen": "Werkgroepen",
@@ -470,6 +470,7 @@
     "vault": "Wachtwoorden",
     "vaultAdmin": "Kluisbeheer",
     "it": "IT",
+    "itModule": "IT",
     "itConfig": "Configuratie",
     "storage": "Storage",
     "authorizationPreview": "Autorisatievoorbeeld",
@@ -508,7 +509,6 @@
     "searchNavPlaceholder": "Zoek een tab of groep",
     "searchNavEmpty": "Geen tab gevonden voor",
     "takedowns": "Verwijderverzoeken",
-    "feedback": "Feedback Website",
     "urenloop": "24 urenloop"
   },
   "confirmStudy": {

@@ -646,6 +646,13 @@ const icons: Record<string, ReactNode> = {
       <line x1="12" y1="19" x2="20" y2="19" />
     </Svg>
   ),
+  // itModule: het ene item onder IT met de technische tabbladen (terminal, als de groep)
+  itModule: (
+    <Svg>
+      <polyline points="4 17 10 11 4 5" />
+      <line x1="12" y1="19" x2="20" y2="19" />
+    </Svg>
+  ),
   // itConfig: schuifregelaars, de instellingen zelf
   itConfig: (
     <Svg>
@@ -698,14 +705,6 @@ const icons: Record<string, ReactNode> = {
       <path d="m10.7 12.3 8.5-8.5" />
       <path d="m17 6 2.5 2.5" />
       <path d="m14.5 8.5 2.5 2.5" />
-    </Svg>
-  ),
-  // feedback: tekstballon met een uitroepteken; wat leden over de site melden
-  feedback: (
-    <Svg>
-      <path d="M21 14a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2Z" />
-      <path d="M12 7v4" />
-      <path d="M12 13.5h.01" />
     </Svg>
   ),
   // door: deur met klink

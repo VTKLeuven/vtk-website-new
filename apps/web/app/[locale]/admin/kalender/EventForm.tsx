@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import '@/app/design/vtk-ticket-admin.css';
+import { useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react';
+import { ArrowLeft, CalendarClock, FileText, ImageIcon, Link2, Settings2, Tags } from 'lucide-react';
 import Link from '@/components/ui/Link';
 import { Card, Input, Label, Select } from '@vtk/ui';
 import { saveEventAction } from '@/app/actions/calendar';
@@ -146,6 +148,17 @@ function Section({ title, note, children }: { title: string; note?: ReactNode; c
   );
 }
 
+/** Een tabblad naast de instellingen, met iets dat niet in het formulier hoort (de geïnteresseerden, de tickets). */
+export type EventExtraTab = { key: string; label: string; icon: ReactNode; content: ReactNode };
+
+const TAB_ICON = { 'aria-hidden': true, size: 15, strokeWidth: 1.8 } as const;
+
+function subscribeHash(onChange: () => void) {
+  window.addEventListener('hashchange', onChange);
+  return () => window.removeEventListener('hashchange', onChange);
+}
+const readHash = () => window.location.hash.slice(1);
+
 export function EventForm({
   event,
   groups,
@@ -154,6 +167,7 @@ export function EventForm({
   siteDefaultImage,
   canCreateTickets = false,
   canManageCategories = false,
+  extraTabs = [],
 }: {
   event: Event;
   groups: Group[];
@@ -169,6 +183,11 @@ export function EventForm({
   canCreateTickets?: boolean;
   /** Geeft bij een lege keuzelijst een rechtstreekse link naar categoriebeheer. */
   canManageCategories?: boolean;
+  /**
+   * Tabbladen achter de instellingen, buiten het formulier (een eigen formulier
+   * mag niet in dit formulier staan). Daar staat de opslagknop niet bij.
+   */
+  extraTabs?: EventExtraTab[];
 }) {
   const nl = locale === 'nl';
   const base = nl ? '' : '/en';
@@ -182,6 +201,58 @@ export function EventForm({
    * taal tikte niet verdwijnt bij het wisselen en gewoon mee opgeslagen wordt.
    */
   const [activeLang, setActiveLang] = useState<Lang>('nl');
+
+  /**
+   * De tabbladen, zoals bij een ticketevent. Eén formulier dat in één keer
+   * opslaat, dus geen route per tabblad: alle velden blijven gemonteerd (een
+   * verborgen tabblad stuurt zijn waarden gewoon mee), en enkel het zichtbare
+   * telt. Het tabblad staat in de hash, zodat herladen op hetzelfde blijft.
+   */
+  const formTabs = [
+    { key: 'algemeen', label: nl ? 'Algemeen' : 'General', icon: <Settings2 {...TAB_ICON} /> },
+    { key: 'wanneer', label: nl ? 'Wanneer' : 'When', icon: <CalendarClock {...TAB_ICON} /> },
+    { key: 'beschrijving', label: nl ? 'Beschrijving' : 'Description', icon: <FileText {...TAB_ICON} /> },
+    { key: 'affiche', label: nl ? 'Affiche' : 'Poster', icon: <ImageIcon {...TAB_ICON} /> },
+    { key: 'doelgroep', label: nl ? 'Doelgroep' : 'Audience', icon: <Tags {...TAB_ICON} /> },
+    { key: 'link', label: 'Link', icon: <Link2 {...TAB_ICON} /> },
+  ];
+  const allTabs = [...formTabs, ...extraTabs];
+  // De hash bij het openen (na de hydratatie; de server kent ze niet), tot er
+  // een tabblad aangeklikt wordt.
+  const hash = useSyncExternalStore(subscribeHash, readHash, () => '');
+  const [picked, setPicked] = useState<string | null>(null);
+  const tab = picked ?? (allTabs.some((t) => t.key === hash) ? hash : 'algemeen');
+  const extraActive = extraTabs.some((t) => t.key === tab);
+  const openTab = (key: string) => {
+    setPicked(key);
+    window.history.replaceState(null, '', `#${key}`);
+  };
+  /**
+   * Een verplicht veld op een verborgen tabblad: de browser kan er niet naar
+   * wijzen, en dan gebeurt er bij Opslaan niets zichtbaars. Open dat tabblad en
+   * toon de melding daar.
+   */
+  const firstInvalidAt = useRef(0);
+  const onInvalid = (e: FormEvent) => {
+    // Bij opslaan krijgt elk ongeldig veld een `invalid`, in de volgorde van het
+    // formulier. Enkel het eerste telt, anders springt het tabblad heen en weer.
+    if (e.timeStamp - firstInvalidAt.current < 50) return;
+    firstInvalidAt.current = e.timeStamp;
+    const field = e.target as HTMLInputElement;
+    const panel = field.closest<HTMLElement>('[data-ef-tab]');
+    const key = panel?.dataset.efTab;
+    if (key && key !== tab) {
+      openTab(key);
+      window.setTimeout(() => field.reportValidity(), 0);
+    }
+  };
+  const panel = (key: string) => ({
+    role: 'tabpanel' as const,
+    id: `ef-panel-${key}`,
+    'aria-labelledby': `ef-tab-${key}`,
+    'data-ef-tab': key,
+    hidden: tab !== key,
+  });
   // Wie er als organisator getoond wordt. Gecontroleerd, zodat een snelkeuze
   // (VTK Alumni) het veld kan invullen zonder dat iemand de naam moet tikken.
   const [organiser, setOrganiser] = useState(event.organiserName ?? '');
@@ -253,16 +324,6 @@ export function EventForm({
   const hasImage = Boolean(event.imageKey);
   const hasCategories = (event.categoryIds?.length ?? 0) > 0;
 
-  // Staat er iets in "Meer instellingen" dat van de standaard afwijkt, dan gaat
-  // die sectie open: een externe link die dicht staat, is een link die niemand
-  // ziet staan tot hij verkeerd blijkt. De URL-naam telt niet mee; elk bestaand
-  // evenement heeft er een.
-  const hasMoreSettings = Boolean(
-    event.url ||
-      event.registrationNewsAt ||
-      event.urlLabelNl ||
-      event.urlLabelEn
-  );
 
   const checklistItems = [
     {
@@ -323,6 +384,7 @@ export function EventForm({
   const allReady = checklistItems.every((item) => item.done);
 
   return (
+    <div className="vtk-ef-shell" onInvalidCapture={onInvalid}>
     <SaveForm
       action={saveEventAction}
       className="vtk-ef"
@@ -358,26 +420,17 @@ export function EventForm({
         <>
           <div className="vtk-ef-head">
             <div className="vtk-ef-head-text">
-              <nav className="vtk-ef-crumbs" aria-label={nl ? 'Kruimelpad' : 'Breadcrumb'}>
-                <Link href={`${base}/admin/kalender`}>{nl ? 'Kalender' : 'Calendar'}</Link>
-                <span aria-hidden>›</span>
-                <span>
-                  {isNew
-                    ? nl
-                      ? 'Nieuw evenement'
-                      : 'New event'
-                    : nl
-                      ? 'Bewerken'
-                      : 'Edit'}
-                </span>
-              </nav>
-              <h2>
+              <Link className="ticket-admin-back" href={`${base}/admin/kalender`}>
+                <ArrowLeft aria-hidden="true" size={14} />
+                {nl ? 'Alle evenementen' : 'All events'}
+              </Link>
+              <h1>
                 {isNew
                   ? nl
                     ? 'Nieuw evenement'
                     : 'New event'
                   : (event.titleNl ?? '')}
-              </h2>
+              </h1>
             </div>
             <div className="vtk-ef-head-actions">
               <span className={`vtk-ef-pill ${isPublished ? 'is-live' : 'is-draft'}`}>
@@ -409,9 +462,31 @@ export function EventForm({
                   <ExternalLinkIcon />
                 </a>
               ) : null}
-              {submitButton}
-              {secondaryButtons}
+              {/* De tickets en de geïnteresseerden hebben hun eigen knoppen. */}
+              {extraActive ? null : (
+                <>
+                  {submitButton}
+                  {secondaryButtons}
+                </>
+              )}
             </div>
+            <nav className="ticket-admin-tabs vtk-ef-tabs" role="tablist" aria-label={nl ? 'Evenement' : 'Event'}>
+              {allTabs.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  id={`ef-tab-${t.key}`}
+                  aria-selected={tab === t.key}
+                  aria-controls={`ef-panel-${t.key}`}
+                  className={tab === t.key ? 'is-active' : undefined}
+                  onClick={() => openTab(t.key)}
+                >
+                  {t.icon}
+                  {t.label}
+                </button>
+              ))}
+            </nav>
           </div>
           <p className="vtk-ef-state">
             {isPublished
@@ -432,6 +507,7 @@ export function EventForm({
     >
       {event.id ? <input type="hidden" name="id" value={event.id} /> : null}
 
+      <div {...panel('algemeen')} className="vtk-ef-panel">
       {event.id ? (
         <div className={`vtk-ef-todo ${allReady ? 'is-done' : ''}`}>
           <h2>
@@ -556,7 +632,9 @@ export function EventForm({
           </div>
         </div>
       </Section>
+      </div>
 
+      <div {...panel('wanneer')} className="vtk-ef-panel">
       <Section
         title={nl ? 'Wanneer en waar' : 'When and where'}
         note={
@@ -611,7 +689,9 @@ export function EventForm({
           </label>
         </div>
       </Section>
+      </div>
 
+      <div {...panel('beschrijving')} className="vtk-ef-panel">
       <Section
         title={nl ? 'Beschrijving' : 'Description'}
         note={
@@ -651,7 +731,9 @@ export function EventForm({
           />
         </div>
       </Section>
+      </div>
 
+      <div {...panel('affiche')} className="vtk-ef-panel">
       <Section
         title={nl ? 'Affiche' : 'Poster'}
         note={
@@ -680,7 +762,9 @@ export function EventForm({
           }
         />
       </Section>
+      </div>
 
+      <div {...panel('doelgroep')} className="vtk-ef-panel">
       {/* Twee assen, bewust apart gezet. De doelgroep bepaalt wie het event
           vanzelf in zijn kalender krijgt; het thema is enkel een filter en een
           kleur. Ze staan in dezelfde koppeltabel, vandaar dezelfde `name`. */}
@@ -748,26 +832,16 @@ export function EventForm({
           </div>
         </div>
       </Section>
+      </div>
 
-      {/* De rest is per evenement zelden nodig: de URL-naam ontstaat vanzelf uit
-          de titel en de meeste events hebben geen externe link. Dicht dus, maar
-          wel op het scherm zelf en niet op een tweede tabblad. */}
-      <details className="vtk-ef-more" open={hasMoreSettings}>
-        <summary>
-          <span>
-            <b>{nl ? 'Meer instellingen' : 'More settings'}</b>
-            <small>
-              {nl
-                ? 'URL-naam, externe link en knoptekst'
-                : 'URL name, external link and button text'}
-            </small>
-          </span>
-          <span className="chev" aria-hidden>
-            ⌄
-          </span>
-        </summary>
-
-        <div className="vtk-ef-more-body">
+      <div {...panel('link')} className="vtk-ef-panel">
+      {/* Per evenement zelden nodig: de URL-naam ontstaat vanzelf uit de titel
+          en de meeste events hebben geen externe link. */}
+      <Section
+        title={nl ? 'Link en URL-naam' : 'Link and URL name'}
+        note={nl ? 'Het adres van de eventpagina, en een knop naar een andere site.' : 'The address of the event page, and a button to another site.'}
+      >
+        <div className="space-y-5">
           <div>
             <Label htmlFor="event-slug">{nl ? 'URL-naam' : 'URL name'}</Label>
             <div className="flex items-center gap-2">
@@ -855,7 +929,14 @@ export function EventForm({
             </p>
           </div>
         </div>
-      </details>
+      </Section>
+      </div>
     </SaveForm>
+    {extraTabs.map((t) => (
+      <div key={t.key} {...panel(t.key)} className="vtk-ef-panel">
+        {t.content}
+      </div>
+    ))}
+    </div>
   );
 }

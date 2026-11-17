@@ -425,7 +425,7 @@
     "calendar": "Calendar",
     "users": "Users",
     "leden": "Members",
-    "groups": "Posts",
+    "groups": "Posts & working groups",
     "tasks": "Who does what",
     "praesidiumShifts": "Shift overview",
     "werkgroepen": "Werkgroepen",
@@ -470,6 +470,7 @@
     "vault": "Passwords",
     "vaultAdmin": "Vault management",
     "it": "IT",
+    "itModule": "IT",
     "itConfig": "Configuration",
     "storage": "Storage",
     "authorizationPreview": "Authorization preview",
@@ -508,7 +509,6 @@
     "searchNavPlaceholder": "Search for a tab or group",
     "searchNavEmpty": "No tab found for",
     "takedowns": "Takedown requests",
-    "feedback": "Website feedback",
     "urenloop": "24-hour run"
   },
   "confirmStudy": {

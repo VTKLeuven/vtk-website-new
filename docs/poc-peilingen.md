@@ -66,6 +66,10 @@ scherm van de peiling, met een knop om opnieuw te posten.
   de bot de rollen van elke POC waarvan de richting op het account staat, en van een
   rol met fases enkel als de fase ook klopt. Ontkoppelen kan op `/account` en haalt
   de rollen weer weg.
+- Krijgt een gekoppeld lid geen enkel kanaal, dan zegt de bot per richting waarom
+  (`explainNoPoc` in `lib/discord/pocRoles.ts`): er is geen POC voor die richting,
+  de POC heeft nog geen Discord-rol, of de rol is voor andere fases. "Geen richting
+  met een POC-kanaal" alleen liet een lid met een richting op zijn account raden.
 - De site neemt enkel af wat ze zelf gaf (`User.discordRoleIds`). Studenten kunnen
   dezelfde jaarrollen ook zelf kiezen; die blijven staan, ook wanneer ze aan een POC
   hangen.

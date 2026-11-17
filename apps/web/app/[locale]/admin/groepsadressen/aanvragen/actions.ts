@@ -13,8 +13,10 @@ import { pushMailGroupsForGroup } from "@/lib/google/sync";
 import {
   type ApproveOutcome,
   approveWerkgroepAccount,
+  linkExistingWerkgroepAccounts,
   rejectWerkgroepAccount,
   requestWerkgroepAccounts,
+  setWerkgroepAccountSkip,
 } from "@/lib/google/werkgroepAccounts";
 
 /**
@@ -30,6 +32,36 @@ export async function requestAccountsAction(_prev: SaveState, formData: FormData
   if (!access.manageAll && !access.werkgroepIds.has(groupId)) throw new Error("FORBIDDEN");
   const userIds = formData.getAll("userId").map(String).filter(Boolean);
   if (userIds.length === 0) return saveError("NOTHING_SELECTED");
+
+  // Dezelfde vinkjes, drie knoppen: aanvragen, niet nodig, of koppelen aan een
+  // account dat al in Google bestaat.
+  const intent = String(formData.get("intent") ?? "request");
+  if (intent === "skip" || intent === "unskip") {
+    const changed = await setWerkgroepAccountSkip({
+      groupId,
+      userIds,
+      skip: intent === "skip",
+      markedById: access.session.user.id,
+    });
+    revalidatePath(PATH);
+    return changed > 0 ? saveOk() : saveError("NOTHING_CHANGED");
+  }
+  if (intent === "link") {
+    // Koppelen zet een account actief, net als goedkeuren: enkel IT of de vice.
+    if (!access.approveAccounts) throw new Error("FORBIDDEN");
+    const cfg = await getGoogleConfig();
+    if (!cfg) return saveError("NOT_CONFIGURED");
+    const outcome = await linkExistingWerkgroepAccounts(cfg, {
+      groupId,
+      userIds,
+      decidedById: access.session.user.id,
+    });
+    revalidatePath(PATH);
+    revalidatePath("/admin/groepsadressen", "layout");
+    if (outcome.linked.length > 0) after(() => pushMailGroupsForGroup(groupId));
+    if (outcome.linked.length === 0) return saveError("NOTHING_LINKED");
+    return saveOk();
+  }
 
   const domain = (await getGoogleStatus()).domain ?? "vtk.be";
   const outcome = await requestWerkgroepAccounts({

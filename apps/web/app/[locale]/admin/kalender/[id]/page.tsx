@@ -1,4 +1,5 @@
 import { prisma } from "@vtk/db";
+import { Star, Ticket } from "lucide-react";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
@@ -77,45 +78,56 @@ export default async function EditEventPage({
 
   const base = locale === "nl" ? "" : "/en";
 
-  // Geen <h1> hier: de titel van het evenement staat in de meescrollende kop
-  // van het formulier, samen met de status en de opslagknoppen.
+  // Geen <h1> hier: de kop van het formulier draagt de titel, de status, de
+  // opslagknoppen en de tabbladen, zoals bij een ticketevent.
+  const canCreateTickets = await canCreateTicketEventForGroup(
+    session.user.id,
+    event.groupId,
+    session.user.isSuperAdmin,
+  );
+  const ticketsLabel = event.ticketEvents.length > 0 ? `Tickets (${event.ticketEvents.length})` : "Tickets";
   return (
-    <div className="space-y-4">
-      <EventForm
-        event={{
-          ...event,
-          categoryIds: event.categories.map((c) => c.categoryId),
-          hasUitleenEvent: event.uitleenEvent !== null,
-        }}
-        groups={groups}
-        categories={categories}
-        locale={locale}
-        siteDefaultImage={siteDefaultImage}
-        canManageCategories={canAll}
-      />
-      <EventInterestsPanel
-        eventId={event.id}
-        rows={interests}
-        locale={locale}
-        base={base}
-      />
-      <EventTicketsPanel
-        eventId={event.id}
-        ticketEvents={event.ticketEvents.map((ticketEvent) => ({
-          id: ticketEvent.id,
-          slug: ticketEvent.slug,
-          status: ticketEvent.status,
-          onEventPage: ticketEvent.onEventPage,
-          label: ticketEvent.labelNl,
-          ticketsSold: ticketEvent._count.tickets,
-        }))}
-        canCreateTickets={await canCreateTicketEventForGroup(
-          session.user.id,
-          event.groupId,
-          session.user.isSuperAdmin,
-        )}
-        locale={locale}
-      />
-    </div>
+    <EventForm
+      event={{
+        ...event,
+        categoryIds: event.categories.map((c) => c.categoryId),
+        hasUitleenEvent: event.uitleenEvent !== null,
+      }}
+      groups={groups}
+      categories={categories}
+      locale={locale}
+      siteDefaultImage={siteDefaultImage}
+      canManageCategories={canAll}
+      extraTabs={[
+        {
+          key: "geinteresseerden",
+          label: `${locale === "nl" ? "Interesse" : "Interest"} (${interests.length})`,
+          icon: <Star aria-hidden size={15} strokeWidth={1.8} />,
+          content: (
+            <EventInterestsPanel eventId={event.id} rows={interests} locale={locale} base={base} />
+          ),
+        },
+        {
+          key: "tickets",
+          label: ticketsLabel,
+          icon: <Ticket aria-hidden size={15} strokeWidth={1.8} />,
+          content: (
+            <EventTicketsPanel
+              eventId={event.id}
+              ticketEvents={event.ticketEvents.map((ticketEvent) => ({
+                id: ticketEvent.id,
+                slug: ticketEvent.slug,
+                status: ticketEvent.status,
+                onEventPage: ticketEvent.onEventPage,
+                label: ticketEvent.labelNl,
+                ticketsSold: ticketEvent._count.tickets,
+              }))}
+              canCreateTickets={canCreateTickets}
+              locale={locale}
+            />
+          ),
+        },
+      ]}
+    />
   );
 }

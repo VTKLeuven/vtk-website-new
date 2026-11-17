@@ -875,6 +875,7 @@ model User {
   /// Extra accounts van een werkgroep (statix.voornaam.naam@vtk.be), naast het
   /// persoonlijke account in `googleEmail`.
   werkgroepAccounts          WerkgroepAccount[] @relation("WerkgroepAccountUser")
+  werkgroepAccountSkips WerkgroepAccountSkip[]
   werkgroepAccountsRequested WerkgroepAccount[] @relation("WerkgroepAccountRequestedBy")
   werkgroepAccountsDecided   WerkgroepAccount[] @relation("WerkgroepAccountDecidedBy")
   /// Rechtstreeks in een groepsadres gezet, zonder post (statix.pr@vtk.be).
@@ -978,6 +979,7 @@ model Group {
   /// Hoofdgroepen waarvan de jaargroepen uit deze post komen.
   yearlyMailGroups         MailGroup[]               @relation("MailGroupYearlyPost")
   werkgroepAccounts        WerkgroepAccount[]
+  werkgroepAccountSkips WerkgroepAccountSkip[]
   expenses                 Expense[]
   cashRegisters            CashRegister[]
   /// Het kasboek van de vaste kassa (enkel Cursusdienst, Theokot, Fakbar).
@@ -1660,6 +1662,30 @@ model WerkgroepAccount {
   @@unique([userId, groupId])
   @@index([groupId])
   @@index([status])
+}
+
+/// Een lid van een werkgroep dat geen werkgroepaccount nodig heeft, aangeduid
+/// door de werkgroep of IT op /admin/groepsadressen/aanvragen. Zonder dit stond
+/// elk lid zonder aanvraag als "geen account", ook wie er al een had in Google
+/// van voor de site of het gewoon niet nodig heeft, en las de lijst als werk dat
+/// nog moest gebeuren.
+///
+/// Per lid en werkgroep, niet per werkingsjaar: wie het dit jaar niet nodig
+/// heeft, staat volgend jaar niet opnieuw als werk. Een aanvraag haalt de
+/// markering weg. Een eigen tabel en geen status op `WerkgroepAccount`: die rij
+/// draagt een uniek adres, en "niet nodig" heeft er geen.
+model WerkgroepAccountSkip {
+  id         String   @id @default(cuid())
+  userId     String
+  groupId    String
+  markedById String?
+  markedAt   DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+  @@index([groupId])
 }
 
 model Permission {
@@ -3747,6 +3773,13 @@ model Shift {
   // Langere uitleg (Markdown) over wat de shift concreet inhoudt, los van de
   // korte `description`. Leeg (NULL of "") = de frontend toont het blok niet.
   instructions String?
+
+  // De Engelse versie van naam, beschrijving en uitleg, voor /en/shift en de
+  // app in het Engels. Optioneel: leeg (NULL) = de Nederlandse tekst, zoals bij
+  // elke shift van voor november 2026 (`localizeShift` in lib/shift/localize.ts).
+  nameEn         String?
+  descriptionEn  String?
+  instructionsEn String?
 
   // Postcode (Group.code) waarvoor deze shift telt; los tekstveld i.p.v. een
   // relatie, zodat een oude postcode behouden blijft ook als de post later

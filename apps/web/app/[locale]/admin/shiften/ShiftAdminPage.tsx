@@ -169,6 +169,9 @@ export async function ShiftAdminPage({
     post: s.post,
     openToInternationals: s.openToInternationals,
     instructions: s.instructions,
+    nameEn: s.nameEn,
+    descriptionEn: s.descriptionEn,
+    instructionsEn: s.instructionsEn,
     participants: s.participants.map((p) => ({
       userId: p.userId,
       name: p.user.name,

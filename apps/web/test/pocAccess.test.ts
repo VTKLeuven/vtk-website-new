@@ -188,6 +188,7 @@ describe("de knop onder het koppelbericht", () => {
   it("zegt het wanneer geen enkele POC bij de richting past", async () => {
     mocks.account.mockResolvedValue(account({ studyProgrammes: ["ARCHITECTURE"] }));
 
-    expect(content(await click())).toContain("geen richting met een POC-kanaal");
+    // Niet enkel "geen kanaal": de bot zegt welke richting geen POC heeft.
+    expect(content(await click())).toContain("Er is geen POC voor Architectuur.");
   });
 });

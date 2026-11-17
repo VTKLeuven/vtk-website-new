@@ -2,7 +2,8 @@ import { prisma } from "@vtk/db";
 
 import { corsPreflight } from "@/lib/cors";
 import { requireSession } from "@/lib/session";
-import type { AppShift, AppShifts } from "@/lib/app-api/contract";
+import { appLocaleFrom, type AppShift, type AppShifts } from "@/lib/app-api/contract";
+import { localizeShift } from "@/lib/shift/localize";
 import { appErrorResponse, appJson } from "@/lib/app-api/respond";
 import { earnedShiftReward } from "@/lib/shift/rewards";
 import { praesidiumYears } from "@/lib/shift/voucherEligibility";
@@ -40,6 +41,9 @@ export async function GET(request: Request) {
   try {
     const session = await requireSession();
     const now = new Date();
+    // Zoals de andere routes van de app: `?locale=en` geeft de Engelse naam en
+    // uitleg van een shift waar die ingevuld zijn.
+    const locale = appLocaleFrom(new URL(request.url).searchParams.get("locale"));
 
     const [shifts, praesidium] = await Promise.all([
       prisma.shift.findMany({
@@ -55,7 +59,8 @@ export async function GET(request: Request) {
     const mine: AppShift[] = [];
     const available: AppShift[] = [];
 
-    for (const shift of shifts) {
+    for (const raw of shifts) {
+      const shift = localizeShift(raw, locale);
       const own = shift.participants.find((participant) => participant.userId === session.user.id);
       const taken = shift.participants.length;
 

@@ -9,10 +9,10 @@ import { canAccessAnyTicketEvent } from '@/lib/ticketing/authorization';
 import { canAccessAnyForm } from '@/lib/forms/authorization';
 import { canSeeCommuRequests } from '@/lib/commu/requests';
 import { isExternalUrl } from '@/lib/href';
-import { werkgroepenWithOwnMemberRights } from '@/lib/werkgroepMembers';
 import { getAdminNav, type NavGuard, type NavLeaf } from '@/lib/admin-nav';
 import { canSeeMailGroups, mailGroupAccess } from '@/lib/google/access';
 import { representedPocIds } from '@/lib/pocPolls/access';
+import { postenAccess } from '@/lib/postenAccess';
 import { ADMIN_DENSITY_COOKIE, ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/adminNavCookie';
 import { AdminNav, type NavItem, type NavNode } from './AdminNav';
 import { AdminSurface } from './AdminSurface';
@@ -57,19 +57,6 @@ export default async function AdminLayout({
   const canAccessForms = session.user.isSuperAdmin || (await canAccessAnyForm());
   const canAccessCommuRequests = await canSeeCommuRequests();
 
-  // Is de gebruiker lid van minstens één werkgroep (huidig werkingsjaar)? Zij
-  // krijgen de Werkgroepen-tab om enkel hun eigen infotekst te bewerken.
-  const werkgroepMember =
-    session.groups.length > 0 &&
-    (await prisma.group.count({
-      where: { type: 'WERKGROEP', id: { in: session.groups.map((g) => g.id) } },
-    })) > 0;
-  // Jaarwerkingen: enkel de verantwoordelijke die de leden van zijn eigen
-  // jaarwerking beheert. Vraagt pas iets op met het recht én een jaarwerking.
-  const jaarwerkingLead =
-    !session.permissions.includes('jaarwerkingen.manage') &&
-    (await werkgroepenWithOwnMemberRights(session, 'JAARWERKING')).size > 0;
-
   // RiVers van dit werkingsjaar krijgen de tab Peilingen, zonder apart recht.
   const pocRep =
     !session.permissions.includes('pocs.manage') && (await representedPocIds(session.user.id)).length > 0;
@@ -82,6 +69,10 @@ export default async function AdminLayout({
     (session.permissions.includes('werkgroepen.manageOwnMembers') &&
       canSeeMailGroups(await mailGroupAccess(session)));
 
+  // Posten & werkgroepen: één item voor vier tabbladen met elk hun eigen recht.
+  const posten = await postenAccess(session);
+  const postenVisible = posten.posts || posten.werkgroepen || posten.jaarwerkingen || posten.kiesploeg;
+
   // Mag de huidige gebruiker deze entry zien? Superadmin ziet alles.
   const canSee = (guard: NavGuard): boolean => {
     if (session.user.isSuperAdmin) return true;
@@ -92,14 +83,15 @@ export default async function AdminLayout({
     if (guard.forms) return canAccessForms;
     if (guard.commuRequests) return canAccessCommuRequests;
     // Werkgroepen-tab: beheerders óf gewone werkgroepleden.
-    if (guard.werkgroep) return session.permissions.includes('werkgroepen.manage') || werkgroepMember;
-    if (guard.jaarwerking) return session.permissions.includes('jaarwerkingen.manage') || jaarwerkingLead;
+    if (guard.werkgroep) return posten.werkgroepen;
+    if (guard.jaarwerking) return posten.jaarwerkingen;
     // Mijn budgetten: elk lid van een post of werkgroep, voor zijn eigen post.
     // Een jaarwerking telt niet: het BO kent haar als eigen vak (lib/bo/posts.ts),
     // niet als groep, dus ze had hier enkel een leeg blok.
     if (guard.post) return session.groups.some((g) => g.type !== 'JAARWERKING');
     if (guard.pocRep) return session.permissions.includes('pocs.manage') || pocRep;
     if (guard.mailGroups) return mailGroupsVisible;
+    if (guard.posten) return postenVisible;
     if (guard.anyPerm) return guard.anyPerm.some((p) => session.permissions.includes(p));
     if (guard.perm) return session.permissions.includes(guard.perm);
     return true;
@@ -110,6 +102,7 @@ export default async function AdminLayout({
     href: isExternalUrl(leaf.href) ? leaf.href : `${base}/admin${leaf.href}`,
     label: adminDict[leaf.key],
     exact: leaf.exact,
+    hidden: leaf.hidden,
   });
 
   // Bouw de zichtbare nav. De volgorde staat vast in admin-nav.ts, ook
@@ -124,8 +117,12 @@ export default async function AdminLayout({
       // Een groep waarvan je maar één item mag zien, is een klik om niets: toon
       // dat item dan gewoon als los item. Behalve bij een groep die bewust
       // groeit (Apps): die blijft staan, zodat het item niet van plaats wisselt.
-      if (items.length === 1 && !entry.keepSingle) {
-        nodes.push({ type: 'item', item: items[0] });
+      // Verborgen items tellen niet mee: die staan niet in de lijst. Ze gaan
+      // wel mee in de nodes, voor het zoeken en de pins.
+      const listed = items.filter((i) => !i.hidden);
+      if (listed.length === 1 && !entry.keepSingle) {
+        nodes.push({ type: 'item', item: listed[0] });
+        for (const hidden of items.filter((i) => i.hidden)) nodes.push({ type: 'item', item: hidden });
       } else if (items.length > 0) {
         nodes.push({ type: 'group', key: entry.group, label: adminDict[entry.group], items });
       }

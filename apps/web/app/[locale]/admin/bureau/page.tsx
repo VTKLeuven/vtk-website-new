@@ -9,11 +9,11 @@ export default async function AdminBureauPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ semester?: string }>;
+  searchParams: Promise<{ semester?: string; verleden?: string }>;
 }) {
   const { locale } = await params;
   if (!hasLocale(locale)) notFound();
   await requirePermission("bureau.manage");
-  const { semester } = await searchParams;
-  return <MeetingListPage kind="BUREAU" locale={locale} semester={semesterFromParam(semester)} />;
+  const { semester, verleden } = await searchParams;
+  return <MeetingListPage kind="BUREAU" locale={locale} semester={semesterFromParam(semester)} showPast={verleden === "1"} />;
 }

@@ -7,7 +7,7 @@ import { pollVoterKey } from "@/lib/pocPolls/voterKey";
 import { savePollAnswer } from "@/lib/pocPolls/write";
 import { siteUrl } from "@/lib/seo";
 import { createDiscordLinkToken } from "./linkToken";
-import { accessiblePocNames, loadRolePocs, repairDiscordRoles, roleAccount, ROLE_ACCOUNT_SELECT } from "./pocAccess";
+import { accessiblePocNames, loadRolePocs, noPocReasons, repairDiscordRoles, roleAccount, ROLE_ACCOUNT_SELECT } from "./pocAccess";
 import {
   DISCORD_LINK_PANEL_ID,
   discordAccessMessage,
@@ -97,7 +97,8 @@ async function handleLinkPanel(interaction: DiscordInteraction): Promise<Discord
 
   if (!roleAccount(account, now).confirmed) return reply(discordConfirmStudyMessage(`${origin}/studie-bevestigen`));
   const names = accessiblePocNames(pocs, account, now);
-  return reply(names.length > 0 ? discordAccessMessage(names) : discordNoPocMessage(`${origin}/account#profile`));
+  if (names.length > 0) return reply(discordAccessMessage(names));
+  return reply(discordNoPocMessage(`${origin}/account#profile`, await noPocReasons(account, now)));
 }
 
 export async function handlePollInteraction(interaction: DiscordInteraction): Promise<DiscordInteractionResponse> {

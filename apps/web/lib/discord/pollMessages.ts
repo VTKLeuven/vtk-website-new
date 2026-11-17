@@ -286,9 +286,14 @@ export function discordAccessMessage(pocNames: readonly string[]): PollBotMessag
   });
 }
 
-export function discordNoPocMessage(accountUrl: string): PollBotMessage {
+/**
+ * Gekoppeld, maar geen enkel POC-kanaal. `reasons` zegt per richting waarom
+ * (zie `explainNoPoc`), al in zinnen; zonder redenen blijft de algemene zin staan.
+ */
+export function discordNoPocMessage(accountUrl: string, reasons: readonly string[] = []): PollBotMessage {
+  const why = reasons.length > 0 ? `\n${reasons.map((reason) => `- ${reason}`).join("\n")}` : "";
   return ephemeral({
-    content: "Je bent gekoppeld, maar op je VTK-account staat geen richting met een POC-kanaal.",
+    content: `Je bent gekoppeld, maar je krijgt nog geen POC-kanaal.${why || "\nOp je VTK-account staat geen richting met een POC-kanaal."}`,
     components: [{ type: 1, components: [{ type: 2, style: LINK, label: "Richting nakijken", url: accountUrl }] }],
   });
 }

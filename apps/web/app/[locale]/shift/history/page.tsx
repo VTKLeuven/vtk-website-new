@@ -56,7 +56,7 @@ export default async function ShiftHistoryPage({
       where: { userId, shift: { endTime: { lt: new Date() } } },
       select: {
         shift: {
-          select: { id: true, name: true, startTime: true, endTime: true, location: true, post: true, reward: true },
+          select: { id: true, name: true, nameEn: true, startTime: true, endTime: true, location: true, post: true, reward: true },
         },
       },
     }),
@@ -69,7 +69,11 @@ export default async function ShiftHistoryPage({
   const currentYear = currentWorkingYear();
   const years = buildShiftHistory({
     userId,
-    shifts: participations.map((p) => p.shift),
+    // In het Engels de Engelse naam waar die er is (`localizeShift` doet enkel naam, beschrijving en uitleg).
+    shifts: participations.map(({ shift: { nameEn, ...shift } }) => ({
+      ...shift,
+      name: locale === 'en' && nameEn?.trim() ? nameEn : shift.name,
+    })),
     deductions,
     praesidium,
     currentYear,

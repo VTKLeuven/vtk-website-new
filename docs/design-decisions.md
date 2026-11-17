@@ -9607,9 +9607,10 @@ een fout in de inhoud, iets aan het ontwerp of een idee.
 werk bijhoudt, bij de intake van het project Website (het publieke formulier
 `website-feedback-nieuwe-website`). Voordien bewaarde de site de meldingen zelf
 en las IT ze op `/admin/it/feedback`; dat was een tweede werklijst naast die in
-Dopl, en wat daar binnenkwam, moest iemand overtypen. Dat beheerscherm blijft
-bestaan voor de meldingen die er nog liggen, tot ze afgehandeld zijn; er komt
-niets meer bij. De upload `feedback` voor screenshots is weg: Dopl neemt zelf
+Dopl, en wat daar binnenkwam, moest iemand overtypen. Dat beheerscherm en het
+recht `feedback.manage` zijn in november 2026 weggehaald: alles loopt nu via
+Dopl. De tabel `WebsiteFeedback` blijft staan met wat er nog in zat (de
+bewaartermijn koppelt de melders na een jaar los), maar geen scherm leest ze nog. De upload `feedback` voor screenshots is weg: Dopl neemt zelf
 bijlagen aan, en een uploadsoort die elk lid mag gebruiken zonder dat er nog
 een formulier bij hoort, is enkel een open opslagplaats.
 
@@ -13396,7 +13397,7 @@ shiftenoverzicht, alumni, de mailinglijsten, rekeningen, kassa's, de online
 inkomsten, het bestuursorgaan (resultatenoverzicht, mijn budgetten met de
 budgetten op de site, de BO-mappen), Theokot (broodjes en verhuur), IT
 (configuratie, storage, logboeken, autorisatievoorbeeld, mails en schermen,
-de 24UL-app, feedback) en de deur. Een nieuw beheerscherm begint dus met een
+de 24UL-app) en de deur. Een nieuw beheerscherm begint dus met een
 `layout.tsx` op `ModuleAdminShell`, ook wanneer het voorlopig maar één tabblad
 heeft: dan toont de kop enkel de titel, en het tweede tabblad past er later
 zonder ombouw bij. De regels staan in CLAUDE.md onder "Admin".
@@ -13413,3 +13414,65 @@ zonder ombouw bij. De regels staan in CLAUDE.md onder "Admin".
   iets doet ("Nieuw evenement", "Rekening indienen") blijft een knop.
 - **Een dienst per tabblad** bij de openingsuren: elke post ziet enkel haar
   eigen dienst, en wie er maar één heeft, krijgt geen tabbalk.
+
+### Tweede ronde: wat er dubbel stond, en wat te veel plaats nam
+
+November 2026, na een week werken met de tabbladen.
+
+- **Een tabblad staat niet nog eens in de zijbalk.** IT is in de zijbalk vier
+  items: Deur, Kluisbeheer, SSO & apps en IT. Configuratie, storage, de twee
+  logboeken, het autorisatievoorbeeld, mails & schermen en de 24UL-app zijn
+  tabbladen onder IT, en stonden er ook nog als losse items naast. Hetzelfde
+  voor Verwijderverzoeken (een tabblad van Media) en Alumni (nu een tabblad van
+  Leden). Zo'n tabblad blijft wel een **verborgen item** (`hidden` in
+  `lib/admin-nav.ts`): Ctrl/Cmd+K vindt "Adminlogboek" nog, en wie het al had
+  vastgepind, houdt zijn pin. Een item dat niet in de lijst staat maar wel
+  zoekbaar is, is goedkoper dan een pin die stil verdwijnt.
+- **Wie enkel een tabblad van IT mag zien** (`audit.view`,
+  `urenloopApp.manage`), krijgt het item IT ook, en `/admin/it` stuurt hem naar
+  dat tabblad: de configuratie zelf blijft voor superadmins.
+- **Posten, werkgroepen, jaarwerkingen en de kiesploeg zijn één module**
+  ("Posten & werkgroepen", route-groep `(posten)`), met elk tabblad op zijn
+  eigen recht (`lib/postenAccess.ts`). Het zijn vier lijsten van wie in welke
+  ploeg zit; vier items in de zijbalk lieten dat lijken op vier soorten werk.
+  Het item houdt de key `groups`, zodat een pin blijft staan, en wie geen
+  posten beheert, komt via `/admin/groepen` op zijn eerste tabblad.
+- **Iemand lid maken staat op het tabblad Leden**, boven de ledenlijst, zoals
+  iemand erelid maken op het tabblad Ereleden staat. Een eigen tabblad "Lid
+  maken" naast Ereleden was ongelijk: bij het ene tabblad kon je iemand
+  toevoegen, bij het andere moest je eerst naar een derde.
+- **Header en Pagina's zijn terug twee modules.** Samen onder "Header &
+  pagina's" stonden ze twee keer: als twee items in de zijbalk en als twee
+  tabbladen onder één kop. Elk heeft zijn eigen recht, dus twee items en twee
+  koppen; de tekst bij de pagina's linkt naar de header.
+- **De standaardbanner van een evenement hoort bij de kalender**
+  (`/admin/kalender/standaardbanner`, `calendar.manageAll`), naast de banners
+  per categorie, en niet bij de homepage: ze geldt op elke eventpagina.
+- **Een evenement bewerken ziet eruit als een ticketevent**: een eigen kop met
+  "Alle evenementen", de titel, de status en de opslagknoppen, en daaronder
+  tabbladen (Algemeen, Wanneer, Beschrijving, Affiche, Doelgroep, Link, en bij
+  een bestaand evenement Interesse en Tickets). Daarom staan `[id]` en `new`
+  buiten de route-groep `(overzicht)` van de kalender. **Dit zijn knoppen in
+  één formulier en geen routes**, anders dan bij elke module: het evenement
+  slaat in één keer op, en een route per tabblad zou het in zes formulieren
+  knippen die elk apart bewaren. Alle velden blijven gemonteerd; een verplicht
+  veld op een verborgen tabblad opent dat tabblad bij het opslaan. Het
+  tabblad staat in de hash.
+- **Bovenaan de evenementenlijst staat één regel**, geen drie blokken: de
+  filter, "Nieuw evenement" en welke evenementen in de hero staan. De uitleg
+  over de hero zit achter een "i".
+- **Grocomeet en Bureau tonen enkel wat nog komt**, met "Toon voorbije (n)".
+  Wie het tabblad opent, zoekt de volgende vergadering.
+- **Een grocoschuld los je in één keer af** (Openstaand, het vinkje per
+  persoon): een groco betaalt alles samen, niet per grocomeet. Per bestelling
+  afvinken kan nog op de vergadering zelf.
+- **Een werkgroepaccount kan "niet nodig" zijn** (`WerkgroepAccountSkip`), per
+  lid en werkgroep en niet per jaar. De lijst op Aanvragen las anders als werk
+  dat nog moest gebeuren, terwijl bijna iedereen er al een had. Bestaat het
+  adres dat de site zou voorstellen al in Google, dan staat het lid als
+  "bestaat al in Google" in plaats van "geen account", en kan IT of de vice
+  het koppelen zonder een nieuw account te maken.
+- **Een shift heeft een Engelse naam, beschrijving en uitleg**, optioneel, met
+  dezelfde NL/EN-schakelaar als het evenementformulier. Leeg toont het
+  Nederlands; elke shift van daarvoor blijft dus wat ze was
+  (`lib/shift/localize.ts`).

@@ -52,8 +52,16 @@ export type NavGuard = {
   /** Groepsadressen: `mailgroups.manage`, `googleAccounts.manage`, of een werkgroep
    *  die haar eigen adressen beheert (zie lib/google/access.ts). */
   mailGroups?: boolean;
+  /** Posten & werkgroepen: wie minstens één van de vier tabbladen mag zien (lib/postenAccess.ts). */
+  posten?: boolean;
   /** Enkel bij exacte padmatch actief markeren (voor de dashboard-landing op /admin). */
   exact?: boolean;
+  /**
+   * Een tabblad van een module die zelf al een item heeft (de tabbladen van IT,
+   * Alumni onder Leden). Staat niet in de lijst, maar zoeken vindt het en een
+   * pin erop blijft werken. Zie `hidden` in packages/ui/src/AdminNav.tsx.
+   */
+  hidden?: boolean;
 };
 
 export type NavLeaf = { key: string; href: string } & NavGuard;
@@ -192,25 +200,28 @@ export function getAdminNav(): NavEntry[] {
     ]),
     group('ledenbeheer', [
       item('users', '/gebruikers', { perm: 'users.view' }),
-      // Leden van de kring dit academiejaar. Boven Posten omdat het de bredere
-      // groep is: elk praesidiumlid is lid, lang niet elk lid heeft een post.
-      item('leden', '/leden', { perm: 'leden.manage' }),
-      item('groups', '/groepen', { perm: 'groups.manage' }),
+      // Leden van de kring dit academiejaar, met de ereleden en de alumni als
+      // tabbladen. Boven Posten omdat het de bredere groep is: elk
+      // praesidiumlid is lid, lang niet elk lid heeft een post. Wie enkel de
+      // alumni beheert, komt via /admin/leden op dat tabblad terecht.
+      item('leden', '/leden', { anyPerm: ['leden.manage', 'alumni.manage'] }),
+      // Alumni is een adresboek per lichting, geen opt-in mailinglijst: een
+      // afgestudeerde geeft per definitie nooit meer een studiebevestiging van
+      // dit werkingsjaar. Daarom bij Leden en niet bij Communicatie.
+      item('alumni', '/alumni', { perm: 'alumni.manage', hidden: true }),
+      // Posten, werkgroepen, jaarwerkingen en de kiesploeg: één module met vier
+      // tabbladen. De key blijft `groups`, zodat een bestaande pin blijft staan.
+      item('groups', '/groepen', { posten: true }),
+      item('werkgroepen', '/werkgroepen', { werkgroep: true, hidden: true }),
+      item('jaarwerkingen', '/jaarwerkingen', { jaarwerking: true, hidden: true }),
+      item('kiesploeg', '/kiesploeg', { perm: 'kiesploeg.manage', hidden: true }),
       // Direct onder Posten: dezelfde posten, maar gelezen als "bij wie moet ik
       // zijn voor X". Zichtbaar voor elk praesidiumlid, niet enkel voor beheer.
       item('tasks', '/wie-doet-wat', { anyPerm: ['tasks.view', 'tasks.manageOwn', 'tasks.manage'] }),
       // Ook over het praesidium zelf: wie hoeveel shiften opnam op de lijsten
       // van de grote evenementen en op /shift. Werk van de vice.
       item('praesidiumShifts', '/shiftenoverzicht', { perm: 'shift.praesidium' }),
-      item('werkgroepen', '/werkgroepen', { werkgroep: true }),
-      // Kanweek, Halftime, ...: leden en rollen zoals een werkgroep, net eronder.
-      item('jaarwerkingen', '/jaarwerkingen', { jaarwerking: true }),
       item('roles', '/roles', { perm: 'roles.manage' }),
-      // Alumni is een adresboek per lichting, geen opt-in mailinglijst: een
-      // afgestudeerde geeft per definitie nooit meer een studiebevestiging van
-      // dit werkingsjaar. Daarom hier en niet bij Communicatie.
-      item('alumni', '/alumni', { perm: 'alumni.manage' }),
-      item('kiesploeg', '/kiesploeg', { perm: 'kiesploeg.manage' }),
     ]),
     // Alles wat de kring naar buiten stuurt, en het beeld dat ze publiceert.
     group('communicatie', [
@@ -227,10 +238,10 @@ export function getAdminNav(): NavEntry[] {
       // Fotoalbums hebben één ingang: /admin/media. Daar staat de Immich-galerij,
       // en dat is de enige bron die de publieke mediapagina leest.
       item('media', '/media', { anyPerm: ['media.manage', 'photos.manageAlbums'] }),
-      // Verzoeken om een foto uit de galerij te halen. Naast Media, want dat is
-      // waar de albums beheerd worden; alleen `media.manage`, want dit is de
+      // Verzoeken om een foto uit de galerij te halen: een tabblad van Media,
+      // dus niet nog eens in de lijst. Alleen `media.manage`, want dit is de
       // enige tab die foto's echt weggooit.
-      item('takedowns', '/media/verwijderverzoeken', { perm: 'media.manage' }),
+      item('takedowns', '/media/verwijderverzoeken', { perm: 'media.manage', hidden: true }),
     ]),
     // Wat VTK Onderwijs beheert hangt samen: de POC's zijn de studenten die de
     // opleiding vertegenwoordigen, het bureau is hun vergadering, en de
@@ -251,26 +262,30 @@ export function getAdminNav(): NavEntry[] {
     // ---------------------------------------------------------------------------
     ...loose,
 
+    // IT is vier items: de deur, de kluis en SSO hebben elk een eigen
+    // beheerder, en de rest (configuratie, storage, de logboeken, het
+    // autorisatievoorbeeld, mails & schermen, de 24UL-app) zijn tabbladen onder
+    // het item IT. Die tabbladen staan hier als `hidden`: zoeken vindt ze nog,
+    // en een pin erop (het adminlogboek) blijft staan.
     group('it', [
-      // `exact`, anders licht Configuratie (/admin/it) ook op wanneer je op de
-      // onderliggende /admin/it/preview staat.
-      item('itConfig', '/it', { superAdminOnly: true, exact: true }),
-      item('storage', '/it/storage', { superAdminOnly: true }),
-      item('vaultAdmin', '/wachtwoorden/beheer', { perm: 'vault.manage' }),
-      item('auditLog', '/it/logboek', { perm: 'audit.view' }),
-      item('emailLog', '/it/email-logboek', { superAdminOnly: true }),
       item('door', '/deur', { perm: 'door.manage' }),
+      item('vaultAdmin', '/wachtwoorden/beheer', { perm: 'vault.manage' }),
       item('sso', '/sso', { perm: 'oauth.client.edit' }),
-      item('authorizationPreview', '/it/preview', { superAdminOnly: true }),
+      // Wie geen superadmin is maar wel een van de tabbladen mag zien, wordt
+      // door /admin/it naar dat tabblad gestuurd.
+      item('itModule', '/it', { anyPerm: ['audit.view', 'urenloopApp.manage'] }),
+      // `exact`, anders zou Configuratie (/admin/it) ook oplichten in de pins
+      // en het zoeken wanneer je op een ander tabblad van IT staat.
+      item('itConfig', '/it', { superAdminOnly: true, exact: true, hidden: true }),
+      item('storage', '/it/storage', { superAdminOnly: true, hidden: true }),
+      item('auditLog', '/it/logboek', { perm: 'audit.view', hidden: true }),
+      item('emailLog', '/it/email-logboek', { superAdminOnly: true, hidden: true }),
+      item('authorizationPreview', '/it/preview', { superAdminOnly: true, hidden: true }),
       // Alles wat je op de site zelf niet te zien krijgt: de onboarding en de
       // jaarlijkse bevestiging (die zie je maar één keer) en elke mail die de
-      // site opstelt. Zonder deze pagina is er geen manier om te controleren of
-      // ze nog kloppen.
-      item('flowPreview', '/it/flows', { superAdminOnly: true }),
-      item('urenloopApp', '/it/24ul-app', { perm: 'urenloopApp.manage' }),
-      // Wat leden over de site zelf melden. Onder IT en niet onder Website: het
-      // is een werklijst voor wie de site onderhoudt, geen redactiescherm.
-      item('feedback', '/it/feedback', { perm: 'feedback.manage' }),
+      // site opstelt.
+      item('flowPreview', '/it/flows', { superAdminOnly: true, hidden: true }),
+      item('urenloopApp', '/it/24ul-app', { perm: 'urenloopApp.manage', hidden: true }),
     ]),
   ];
 }

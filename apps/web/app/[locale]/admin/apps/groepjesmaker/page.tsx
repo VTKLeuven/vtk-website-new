@@ -1,4 +1,5 @@
 import Link from "@/components/ui/Link";
+import { LinkedRow } from "@/components/ui/LinkedRow";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { ChevronRight, Plus, Shuffle } from "lucide-react";
@@ -148,7 +149,13 @@ export default async function GroupMakerOverview({
               </thead>
               <tbody>
                 {withGrouping.map((form) => (
-                  <tr key={form.id} className="ticket-admin-linked-row">
+                  // De rij zag er klikbaar uit (cursor) maar enkel de titel was een
+                  // link; een klik ernaast deed niets. LinkedRow, zoals bij Forms.
+                  <LinkedRow
+                    key={form.id}
+                    className="ticket-admin-linked-row"
+                    href={`${base}/admin/apps/groepjesmaker/${form.id}`}
+                  >
                     <td data-wrap="true">
                       <Link
                         className="ticket-admin-row-link"
@@ -186,7 +193,7 @@ export default async function GroupMakerOverview({
                         size={18}
                       />
                     </td>
-                  </tr>
+                  </LinkedRow>
                 ))}
               </tbody>
             </table>

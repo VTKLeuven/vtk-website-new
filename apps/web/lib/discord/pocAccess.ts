@@ -13,7 +13,15 @@ import {
   type BotResult,
 } from "./bot";
 import { discordLinkPanelMessage } from "./pollMessages";
-import { desiredPocRoleIds, managedRoleIds, pocsForAccount, roleChanges, type RoleAccount } from "./pocRoles";
+import { getDictionary } from "@vtk/i18n";
+import {
+  desiredPocRoleIds,
+  explainNoPoc,
+  managedRoleIds,
+  pocsForAccount,
+  roleChanges,
+  type RoleAccount,
+} from "./pocRoles";
 
 /**
  * Wie welk POC-kanaal ziet op Discord: de bot geeft de rol van de POC aan wie zijn
@@ -66,6 +74,40 @@ export function roleAccount(account: LinkedAccount, now: Date): RoleAccount {
 /** De namen van de POC's die dit account mag zien, zoals op Discord getoond. */
 export function accessiblePocNames(pocs: Pocs, account: LinkedAccount, now: Date): string[] {
   return pocsForAccount(pocs, roleAccount(account, now)).map((poc) => poc.nameNl.replace(/^POC\s+/i, ""));
+}
+
+/**
+ * Waarom dit account geen POC-kanaal krijgt, in zinnen voor Discord (dat is
+ * Nederlandstalig, zoals de andere berichten van de bot). Leest ook de POC's
+ * zonder rol: net die zijn vaak de reden.
+ */
+export async function noPocReasons(account: LinkedAccount, now: Date): Promise<string[]> {
+  const pocs = await prisma.poc.findMany({
+    orderBy: { order: "asc" },
+    select: { nameNl: true, studyProgrammes: true, discordRoles: { select: { roleId: true, studyYears: true } } },
+  });
+  const words = getDictionary("nl").onboarding;
+  const programme = (code: string) => words.programmes[code as keyof typeof words.programmes] ?? code;
+  const year = (code: string) => words.years[code as keyof typeof words.years] ?? code;
+  const pocName = (name: string) => `POC ${name.replace(/^POC\s+/i, "")}`;
+  const mine = account.studyYears.map(year).join(", ");
+  return explainNoPoc(
+    pocs.map((poc) => ({ ...poc, name: poc.nameNl })),
+    roleAccount(account, now),
+  ).map((reason) => {
+    switch (reason.kind) {
+      case "noProgramme":
+        return "Op je VTK-account staat geen richting.";
+      case "noPoc":
+        return `Er is geen POC voor ${programme(reason.programme)}.`;
+      case "noRole":
+        return `${pocName(reason.poc)} heeft nog geen kanaal op Discord. Vraag het aan je RiVers of aan VTK Onderwijs.`;
+      case "otherYears":
+        return `Het kanaal van ${pocName(reason.poc)} is voor ${reason.years.map(year).join(", ")}${
+          mine ? `, en op je account staat ${mine}` : ""
+        }.`;
+    }
+  });
 }
 
 type Applied = { ok: true } | { ok: false; status: number | null; message: string };

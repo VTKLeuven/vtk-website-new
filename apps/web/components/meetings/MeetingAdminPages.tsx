@@ -82,20 +82,51 @@ export async function MeetingListPage({
   kind,
   locale,
   semester,
+  showPast = false,
 }: {
   kind: MeetingKind;
   locale: Locale;
   semester: Semester;
+  /**
+   * Ook de vergaderingen die al voorbij zijn. Standaard niet: wie dit tabblad
+   * opent, zoekt de volgende, en die stond onder een rij voorbije.
+   */
+  showPast?: boolean;
 }) {
   const nl = locale === "nl";
   const base = meetingAdminBase(kind, nl);
-  const { meetings } = await loadMeetingAdmin(kind, { locale, workingYear: currentWorkingYear(), semester });
+  const { meetings: all } = await loadMeetingAdmin(kind, { locale, workingYear: currentWorkingYear(), semester });
+  const pastCount = all.filter((meeting) => meeting.past).length;
+  const meetings = showPast ? all : all.filter((meeting) => !meeting.past);
   const showPaid = kind === "GROCOMEET";
+  const toggleHref = `${base}?semester=${semester}${showPast ? "" : "&verleden=1"}`;
 
   return (
     <div className="space-y-5">
-      <SemesterTabs nl={nl} base={base} semester={semester} />
-      {meetings.length === 0 ? (
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SemesterTabs nl={nl} base={base} semester={semester} />
+        {pastCount > 0 ? (
+          <Link
+            href={toggleHref}
+            className="rounded-full border border-vtk-blue/15 px-3 py-1.5 text-sm text-vtk-ink transition-colors hover:bg-vtk-blue-soft/70"
+          >
+            {showPast
+              ? nl
+                ? `Verberg voorbije (${pastCount})`
+                : `Hide past (${pastCount})`
+              : nl
+                ? `Toon voorbije (${pastCount})`
+                : `Show past (${pastCount})`}
+          </Link>
+        ) : null}
+      </div>
+      {meetings.length === 0 && pastCount > 0 ? (
+        <div className="vtk-basic-empty">
+          {nl
+            ? `Alle ${nouns(kind, nl).plural} van semester ${semester} zijn voorbij.`
+            : `All ${nouns(kind, nl).plural} of semester ${semester} are in the past.`}
+        </div>
+      ) : meetings.length === 0 ? (
         <div className="vtk-basic-empty">
           {nl
             ? `Nog geen ${nouns(kind, nl).plural} in semester ${semester}. Zet ze in de kalender op het tabblad `
