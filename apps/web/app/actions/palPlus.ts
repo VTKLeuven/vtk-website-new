@@ -61,11 +61,14 @@ const PUBLIC_PATHS = ["/pal-plus", "/en/pal-plus"];
 /** De beheerlijst moet mee verversen, anders blijft staan wat je net wijzigde. */
 function revalidatePalPlusAdmin() {
   for (const path of ADMIN_PATHS) revalidatePath(path);
+  // Met "layout" ook elk tabblad eronder (Sessies, Tutors, ...), en de tellers in de tabbladen.
+  revalidatePath("/[locale]/admin/pal-plus", "layout");
 }
 
 /** Een aanvraag staat op de publieke pagina én in het werkbakje van Onderwijs. */
 function revalidatePalPlusEverywhere() {
-  for (const path of [...PUBLIC_PATHS, ...ADMIN_PATHS]) revalidatePath(path);
+  for (const path of PUBLIC_PATHS) revalidatePath(path);
+  revalidatePalPlusAdmin();
 }
 
 const ACTIVE_STATUSES = PAL_PLUS_ACTIVE_STATUSES;
