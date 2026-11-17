@@ -278,16 +278,21 @@ every member of the post gets the role):
 | `medewerker` | none (fill in the GUI) | - |
 | `theokot` | `theokot.manage`, `theokot.pickup` | Theokot |
 | `grocomeet-deelnemer` | `grocomeet.reserve` | **LEADER** of every post, plus Groep 5 (DEFAULT) |
-| `grocomeet-beheer` | `grocomeet.manage`, `grocomeet.reserve` | Groep 5 |
+| `grocomeet-beheer` | `grocomeet.manage`, `grocomeet.reserve` | **LEADER** of Theokot (Groep 5 and IT have it through `admin`) |
 | `bureau` | `bureau.manage` | Onderwijs |
 | `pal-plus` | `pal.manage` | Onderwijs |
 | `post-<code>` (one per post) | none, except: `post-fakbar` also carries `openingHours.manageOwn`, `fakbar.manage` | its own post |
 
-`grocomeet-deelnemer` is the one seeded role granted with **`LEADER`** instead of `DEFAULT`: the
+`grocomeet-deelnemer` and `grocomeet-beheer` are the seeded roles granted with **`LEADER`** instead of `DEFAULT`: the
 grocomeet is a meeting of the people responsible for a post, not of every post member. Group 5 gets
 it as `DEFAULT` because all five of them attend. Whoever holds it sees the "Broodje grocomeet" entry
 in the profile menu; that entry is gated on the permission, not on a hard-coded "is lead of a
 praesidium post" check, so the board can add someone (a co-responsible) without a code change.
+
+`grocomeet.manage` (planning, who owes what, the overview for the budget) is for `admin` and the lead
+of Theokot only, who supplies the sandwiches. It must not sit in a role every post lead gets: on the
+production site it once did (a GUI role `groco` carried it), and then every post lead could see the
+debts of every other groco. A role that every groco gets carries `grocomeet.reserve`, not `.manage`.
 
 `grocomeet.reserve` does one more thing: a Theokot order placed by a holder on a day with a
 grocomeet goes into the GM box instead of the counter (`TheokotOrder.grocomeetId`, see "Een groco

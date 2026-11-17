@@ -748,7 +748,7 @@ identiek; enkel het publiek en de beheerder verschillen.
 | Ingang | tabje in het profielmenu (`/grocomeet`) | gedeelde link per bureau (`/bureau/<slug>`) |
 | Opent | meteen; grocos bestellen weken vooruit | instelbaar per bureau (`opensAt`) |
 | Geld | per persoon bijgehouden en af te vinken | enkel totalen, Onderwijs betaalt |
-| Beheer | Groep 5 (`grocomeet.manage`) | Onderwijs (`bureau.manage`) |
+| Beheer | Groep 5, IT en de verantwoordelijke van Theokot (`grocomeet.manage`) | Onderwijs (`bureau.manage`) |
 
 ### Waarom dit geen formulier uit de formulierenmodule is
 
@@ -941,6 +941,32 @@ deadline per vergadering: twee deadlines voor hetzelfde broodje is één te veel
   toont per persoon het totaal, het betaalde en het openstaande bedrag over het werkingsjaar.
 - Bij het **bureau** betaalt de student niets: daar staan enkel totalen per bureau, per
   werkingsjaar en over alle bureaus heen, voor de boekhouding van Onderwijs.
+
+### Overzicht van de GM voor de herbegroting
+
+Groep 5 heeft voor de herbegroting nodig wat er op de grocomeets al gegeten en gedronken
+is. Daarvoor heeft `/admin/grocomeet` het tabblad Overzicht, met een Excel-download
+(`/api/admin/grocomeet/export`). De optelling staat in `lib/grocomeetSummary.ts`.
+
+- **Het totaal staat vooraan**, op het scherm en als eerste blad van de Excel: dat is het
+  getal dat de herbegroting vraagt. De tabellen eronder verklaren het.
+- **Het beheer is vier tabbladen** (Vergaderingen, Openstaand, Overzicht, Drankjes), elk
+  met een eigen adres. Het was één lange pagina waarin het overzicht onder de kalender en
+  alle vergaderingen verdween.
+
+- **Het formulier en de GM-doos staan apart**, met een totaal erbij. Wat een groco die dag
+  zelf bij Theokot bestelde, gaat wel mee in de doos, maar het is een andere post: wie
+  begroot, moet kunnen kiezen welke van de twee erin hoort.
+- **Enkel wat al geweest is**: een vergadering telt vanaf haar beginuur. De
+  bestellingen voor een GM van volgende week staan er nog niet in. Het scherm zegt hoeveel
+  er nog komen.
+- **Een ongeldige inschrijving telt niet**, want daar stond geen broodje tegenover. Een
+  inschrijving zonder bestelling telt wel als aanwezige, maar zonder bedrag. Uit de GM-doos
+  telt hetzelfde als in het geldoverzicht: open of afgegeven, geen annulering en geen
+  no-show.
+- **Het lopende werkingsjaar**, per semester en samen. Vorige jaren zijn niet gevraagd.
+- Een product wordt **op naam** samengeteld (`offeringNameKey`), net als bij het koppelen
+  aan een verkoopdag: hetzelfde broodje heeft op elke dag een ander id.
 
 ### Plannen per semester
 
