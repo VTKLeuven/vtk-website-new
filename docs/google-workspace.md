@@ -123,11 +123,12 @@ zie "Het Drive-account voor het Bestuursorgaan" hieronder.
    https://www.googleapis.com/auth/apps.groups.settings,
    https://www.googleapis.com/auth/gmail.settings.basic,
    https://www.googleapis.com/auth/gmail.settings.sharing,
-   https://www.googleapis.com/auth/drive.readonly
+   https://www.googleapis.com/auth/drive.readonly,
+   https://www.googleapis.com/auth/admin.reports.audit.readonly
    ```
 
    Ze staan ook in `apps/web/lib/google/client.ts` (`GOOGLE_SCOPES`,
-   `GMAIL_SCOPES` en `DRIVE_SCOPES`); dat is de bron van waarheid als er ooit één
+   `GMAIL_SCOPES`, `DRIVE_SCOPES` en `REPORTS_SCOPES`); dat is de bron van waarheid als er ooit één
    bijkomt.
 
    **Ontbreekt er één, dan faalt élke aanroep** met `unauthorized_client`. Dat
@@ -330,10 +331,13 @@ OU's zelf niet lezen (dat vraagt een extra scope), dus de keuzes zijn de OU's
 waar nu al iemand in staat plus die uit de instellingen: een nieuwe, lege OU
 vul je één keer in de Admin console.
 
-**Terugzetten uit het logboek**, op dezelfde pagina: kopieer in de Admin
-console (Rapportage → Audit en onderzoek → Logboekgebeurtenissen beheerder,
-gebeurtenis "Organisatie-eenheid gebruiker gewijzigd") de rijen of een
-CSV-export, plak ze, kijk na en zet terug. Een account gaat enkel terug als het
+**Terugzetten uit het logboek**, op dezelfde pagina: kies een periode en klik
+"Uit Google lezen". De site leest de verhuizingen (`MOVE_USER_TO_ORG_UNIT`) zelf
+uit het logboek van de Admin console, standaard enkel die van haar eigen
+beheerdersaccount, en toont per account waar het stond en waar het nu staat.
+Daarvoor is de scope `admin.reports.audit.readonly` nodig in de delegatie
+(stap 2); ontbreekt ze, dan zegt het scherm hoe je ze toevoegt en loopt de rest
+gewoon door. Een account gaat enkel terug als het
 nog staat waar die verhuizing het zette. Gebouwd na 16 november 2026, toen de
 sync tientallen accounts naar `/` verhuisde (zie "Vallen").
 

@@ -94,6 +94,7 @@ export default async function OrgUnitsPage({ params }: { params: Promise<{ local
 
       {cfg && (
         <AdminDisclosure
+          defaultOpen
           summary={
             <span>
               <span className="font-semibold text-vtk-ink">
@@ -101,13 +102,14 @@ export default async function OrgUnitsPage({ params }: { params: Promise<{ local
               </span>
               <span className="block text-sm text-zinc-500">
                 {nl
-                  ? "Plak de regels \"x@vtk.be is verplaatst van /Praesidium naar /\" uit het logboek van de Admin console; de site zet die accounts terug waar ze stonden."
-                  : "Paste the lines \"x@vtk.be was moved from /Praesidium to /\" from the Admin console log; the site puts those accounts back where they were."}
+                  ? "De site leest de verhuizingen in een periode uit het logboek van de Admin console en zet die accounts terug waar ze stonden."
+                  : "The site reads the moves in a period from the Admin console log and puts those accounts back where they were."}
               </span>
             </span>
           }
         >
-          <OuRestore nl={nl} />
+          {/* Standaard de middag van 16 november 2026, toen de sync accounts naar "/" zette. */}
+          <OuRestore nl={nl} defaultSince="2026-11-16T14:30" />
         </AdminDisclosure>
       )}
 

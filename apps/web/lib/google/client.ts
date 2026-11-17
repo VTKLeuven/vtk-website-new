@@ -70,6 +70,14 @@ export const GMAIL_SCOPES = [
  */
 export const DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.readonly";
 
+/**
+ * Scope om het logboek van de Admin console te lezen, voor het terugzetten van
+ * organisatie-eenheden (/admin/groepsadressen/organisatie-eenheden). Een eigen
+ * tokenaanvraag, net als Drive: staat de scope niet in de delegatie, dan faalt
+ * enkel dat scherm en niet de groepssync.
+ */
+export const REPORTS_SCOPES = "https://www.googleapis.com/auth/admin.reports.audit.readonly";
+
 export class GoogleError extends Error {
   constructor(
     message: string,
@@ -760,4 +768,75 @@ export async function downloadSpreadsheet(
     throw new GoogleError(parsed?.error?.message ?? `${res.status} ${res.statusText}`, res.status, parsed);
   }
   return Buffer.from(await res.arrayBuffer());
+}
+
+// -----------------------------------------------------------------------------
+// Logboek van de Admin console (Reports API, enkel lezen)
+// -----------------------------------------------------------------------------
+
+const REPORTS = "https://admin.googleapis.com/admin/reports/v1";
+
+export type OrgUnitMoveEvent = {
+  email: string;
+  /** De OU waar het account stond (`ORG_UNIT_NAME`). */
+  from: string;
+  /** De OU waarheen het verplaatst werd (`NEW_VALUE`). */
+  to: string;
+  at: string;
+  /** Wie het deed: het beheerdersaccount van de site of een mens. */
+  actor: string | null;
+};
+
+/**
+ * Elke verhuizing van een account naar een andere organisatie-eenheid in de
+ * periode, uit het logboek van de Admin console (`MOVE_USER_TO_ORG_UNIT`, de
+ * regel "x is verplaatst van /A naar /B").
+ */
+export async function listOrgUnitMoves(
+  cfg: GoogleConfig,
+  startTime: Date,
+  endTime: Date,
+): Promise<OrgUnitMoveEvent[]> {
+  type Activity = {
+    id?: { time?: string };
+    actor?: { email?: string };
+    events?: { name?: string; parameters?: { name?: string; value?: string }[] }[];
+  };
+  const out: OrgUnitMoveEvent[] = [];
+  let pageToken: string | undefined;
+  do {
+    const params = new URLSearchParams({
+      eventName: "MOVE_USER_TO_ORG_UNIT",
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+      maxResults: "1000",
+    });
+    if (pageToken) params.set("pageToken", pageToken);
+    const page = await request<{ items?: Activity[]; nextPageToken?: string }>(
+      cfg,
+      "GET",
+      `${REPORTS}/activity/users/all/applications/admin?${params.toString()}`,
+      undefined,
+      { scope: REPORTS_SCOPES },
+    );
+    for (const item of page?.items ?? []) {
+      for (const event of item.events ?? []) {
+        if (event.name !== "MOVE_USER_TO_ORG_UNIT") continue;
+        const value = (name: string) => event.parameters?.find((p) => p.name === name)?.value ?? null;
+        const email = value("USER_EMAIL");
+        const from = value("ORG_UNIT_NAME");
+        const to = value("NEW_VALUE");
+        if (!email || !from || !to) continue;
+        out.push({
+          email: email.toLowerCase(),
+          from,
+          to,
+          at: item.id?.time ?? "",
+          actor: item.actor?.email?.toLowerCase() ?? null,
+        });
+      }
+    }
+    pageToken = page?.nextPageToken;
+  } while (pageToken);
+  return out;
 }

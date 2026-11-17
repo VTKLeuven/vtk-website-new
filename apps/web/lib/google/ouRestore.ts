@@ -5,8 +5,10 @@
  * Op 16 november 2026 verhuisde de sync tientallen accounts uit /Praesidium,
  * /Statix, /Oude Zakken enz. naar "/" (zie docs/google-workspace.md, "Vallen").
  * De site wist niet waar ze stonden; het logboek wel: "x@vtk.be is verplaatst
- * van /Praesidium naar /". Dit leest die regels, zoals ze uit de tabel gekopieerd
- * of als CSV geëxporteerd worden.
+ * van /Praesidium naar /". Het scherm leest die verhuizingen rechtstreeks uit
+ * Google (`listOrgUnitMoves`); `planOuRestore` maakt er per account één plan
+ * van. `parseOuMoves` leest dezelfde regels uit tekst (een CSV-export), voor
+ * wie de scope niet wil geven.
  *
  * Geen `server-only`: puur, zie `test/googleOuRestore.test.ts`.
  */
