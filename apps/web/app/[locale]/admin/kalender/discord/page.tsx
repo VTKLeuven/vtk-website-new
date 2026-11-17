@@ -187,10 +187,7 @@ export default async function AdminDiscordWebhooks({
   return (
     <div className="space-y-6">
       <div>
-        <Link href={`${base}/admin/kalender`} className="text-sm text-vtk-muted hover:underline">
-          ← {nl ? "Evenementen" : "Events"}
-        </Link>
-        <h1 className="mt-1 text-2xl font-semibold text-vtk-ink">Discord webhooks</h1>
+        <h2 className="mt-1 text-lg font-semibold text-vtk-ink">Discord webhooks</h2>
         <p className="mt-1 max-w-2xl text-sm text-vtk-muted">
           {nl
             ? "Evenementen met een banner verschijnen vanzelf in deze kanalen, als VTK Kalender met het schild: twee weken voor ze beginnen, of meteen wanneer ze later gepubliceerd worden. Elk evenement komt hoogstens één keer in een kanaal: een latere wijziging aan titel, banner of beschrijving post niets opnieuw."

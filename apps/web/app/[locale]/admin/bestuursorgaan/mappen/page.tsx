@@ -260,7 +260,7 @@ export default async function BoFoldersPage({
             {open || needle ? <Link href={here}>{nl ? 'Bestuursorgaan' : 'Board meetings'}</Link> : null}
             {open && <span aria-hidden="true">›</span>}
           </nav>
-          <h1 className="text-2xl font-semibold">
+          <h2 className="text-lg font-semibold">
             {open
               ? open.label
               : needle
@@ -270,7 +270,7 @@ export default async function BoFoldersPage({
                 : nl
                   ? 'Bestuursorgaan'
                   : 'Board meetings'}
-          </h1>
+          </h2>
           <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
             {open
               ? open.date

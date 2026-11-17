@@ -448,7 +448,6 @@ export function ContentManager({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <div className="min-w-0 flex-1 basis-64">
-          <h1 className="text-2xl font-semibold">{nl ? "Header" : "Header"}</h1>
           <p className="mt-1 text-sm text-[#5c667f]">
             {nl
               ? "Beheer de categorieën, menu-items en hun foto's op de categoriepagina. Sleep om de volgorde te wijzigen of een item naar een andere categorie te verplaatsen. De inhoud zelf bewerk je onder Pagina's."

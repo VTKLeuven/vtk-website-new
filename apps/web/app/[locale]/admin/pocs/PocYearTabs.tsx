@@ -9,8 +9,6 @@ import { formatWorkingYear, workingYearTabs } from "@/lib/workingYear";
 export async function PocYearTabs({ year, href }: { year: number; href: (year: number) => string }) {
   const distinctYears = await prisma.pocRepresentative.findMany({ distinct: ["year"], select: { year: true } });
   const tabs = workingYearTabs(distinctYears.map((row) => row.year));
-  // `!text-white`: in een module met tabbladen zet `.ticket-admin a` de kleur van
-  // elke link op `inherit`, en dan stond het actieve label donker op donker.
   return (
     <div className="flex flex-wrap gap-2">
       {tabs.map((y) => {
@@ -23,7 +21,7 @@ export async function PocYearTabs({ year, href }: { year: number; href: (year: n
             className={
               "rounded-full border px-4 py-1.5 text-sm font-medium transition " +
               (active
-                ? "border-vtk-ink bg-vtk-ink !text-white"
+                ? "border-vtk-ink bg-vtk-ink text-white"
                 : "border-vtk-blue/20 bg-white text-vtk-ink hover:bg-vtk-blue-soft/50")
             }
           >

@@ -1369,7 +1369,7 @@ a.vtk-shortcut-tile:hover {
   min-width: 0;
 }
 
-.vtk-ef-head h1 {
+.vtk-ef-head h2 {
   margin: 3px 0 0;
   font-size: clamp(1.4rem, 2.4vw, 1.9rem);
   line-height: 1.05;

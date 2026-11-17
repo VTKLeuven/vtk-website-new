@@ -21,6 +21,7 @@ export function ModuleAdminShell({
   actions,
   navLabel,
   tabs,
+  preserveParams,
   children,
 }: {
   title: ReactNode;
@@ -28,12 +29,18 @@ export function ModuleAdminShell({
   actions?: ReactNode;
   navLabel: string;
   tabs: ModuleTab[];
+  /** Zie `ModuleTabNav`: queryparameters die meereizen naar elk tabblad. */
+  preserveParams?: string[];
   children: ReactNode;
 }) {
   return (
-    <div className="ticket-admin">
+    // Bewust zonder `.ticket-admin`: die zet de kleur van elke link op `inherit`,
+    // en dan stond de tekst van een donkere knop-link donker op donker. De kop en
+    // de tabbladen zelf hangen niet aan die klasse.
+    <div className="vtk-module-admin">
       <div className="ticket-admin-event">
-        <header className="ticket-admin-event-head">
+        {/* Niet op papier: een afdruk (de turflijst van Theokot) begint met wat er te lezen valt. */}
+        <header className="ticket-admin-event-head print:hidden">
           <div className="ticket-admin-event-title">
             <div>
               <h1>{title}</h1>
@@ -41,7 +48,8 @@ export function ModuleAdminShell({
             </div>
             {actions ? <div className="ticket-admin-event-actions">{actions}</div> : null}
           </div>
-          <ModuleTabNav label={navLabel} tabs={tabs} />
+          {/* Eén tabblad is geen keuze: wie maar één onderdeel mag zien, krijgt enkel de kop. */}
+          {tabs.length > 1 ? <ModuleTabNav label={navLabel} tabs={tabs} preserveParams={preserveParams} /> : null}
         </header>
         {children}
       </div>

@@ -38,7 +38,6 @@ export default async function AdminIT({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Configuration</h1>
         <p className="mt-1 text-sm text-zinc-500">
           Technical configuration and tools for administrators. Sensitive keys are stored
           encrypted and never shown again after saving.

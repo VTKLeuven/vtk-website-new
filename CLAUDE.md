@@ -750,6 +750,34 @@ the design language into the application instead of copying mockup content.
 - Admin: keep pages operationally dense. Forms, tables, and upload/editor
   surfaces should use the same palette and rounded panels without becoming
   decorative.
+  - **Een beheerscherm werkt in het thema van Tickets: een kop met tabbladen.**
+    Elke module (en elk nieuw beheerscherm) zet zijn `layout.tsx` op
+    `ModuleAdminShell` (`apps/web/components/admin/ModuleAdminShell.tsx`):
+    titel, eventueel een korte uitleg en icoonknoppen rechts, daaronder de
+    pillen met een icoon (`.ticket-admin-tabs`), en elk tabblad een eigen route.
+    Dat geldt voor nieuwe schermen net zo goed als voor de bestaande; bouw geen
+    eigen `<h1>` met een rij pillen eronder, geen `?tab=`-tabs en geen tabs in
+    een clientcomponent.
+    - Het werk van elke dag is het eerste tabblad; instellingen en lijsten die je
+      een keer per semester aanraakt, staan achteraan. Een lange pagina met
+      kaarten onder elkaar splits je in tabbladen per taak.
+    - Elk tabblad volgt een recht: de layout toont enkel wat je mag openen, de
+      pagina controleert het zelf nog eens. Eén zichtbaar tabblad toont geen
+      tabbalk.
+    - Een pagina onder zo'n kop heeft geen eigen `<h1>`: de module heeft de
+      titel, een sectie heet een `<h2>`. Herhaalt een kop enkel de naam van het
+      tabblad, laat hem dan weg.
+    - `fallback` voor een detailroute (`[id]`), een pad als
+      `"sjablonen/beheer"` wanneer twee tabbladen hetzelfde eerste segment
+      delen, `preserveParams={["jaar"]}` wanneer een filter mee moet naar elk
+      tabblad, en `variant="sub"` voor een tweede rij binnen een tabblad (IT ›
+      Mails & schermen). Een route-groep geeft twee mappen één kop zonder hun
+      adres te veranderen (`theokot/(broodjes)`, `(navigatie)`).
+    - Een oude `?tab=`-link stuurt door naar het nieuwe tabblad.
+    - De kop zet bewust niet `.ticket-admin` op de pagina: die maakt de kleur
+      van elke link `inherit`, en dan staat de tekst van een donkere knop-link
+      donker op donker.
+    Zie `docs/design-decisions.md`, "Beheermodules in tabbladen".
   - Alle beheeromgevingen gebruiken `AdminNav` uit `@vtk/ui`: op desktop een
     compacte, gegroepeerde zijbalk en op smalle schermen één uitklapknop die het
     huidige onderdeel benoemt. Bouw voor Logistiek of een volgende module geen

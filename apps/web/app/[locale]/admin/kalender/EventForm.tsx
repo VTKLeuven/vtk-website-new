@@ -371,13 +371,13 @@ export function EventForm({
                       : 'Edit'}
                 </span>
               </nav>
-              <h1>
+              <h2>
                 {isNew
                   ? nl
                     ? 'Nieuw evenement'
                     : 'New event'
                   : (event.titleNl ?? '')}
-              </h1>
+              </h2>
             </div>
             <div className="vtk-ef-head-actions">
               <span className={`vtk-ef-pill ${isPublished ? 'is-live' : 'is-draft'}`}>

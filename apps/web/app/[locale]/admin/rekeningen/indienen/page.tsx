@@ -13,7 +13,6 @@ import {
   postOptionValue,
   toDateInputValue,
 } from "@/lib/rekeningen/expenses";
-import { RekeningenNav } from "../RekeningenNav";
 import { ExpenseForm } from "../ExpenseForm";
 import { expenseErrorMessages } from "../messages";
 
@@ -88,24 +87,13 @@ export default async function RekeningIndienen({
   return (
     <div className="space-y-5">
       <header>
-        <h1 className="text-2xl font-semibold">{nl ? "Rekening indienen" : "Submit an expense"}</h1>
+        <h2 className="text-lg font-semibold">{nl ? "Rekening indienen" : "Submit an expense"}</h2>
         <p className="mt-1 max-w-5xl text-sm text-[#5c667f]">
           {nl
             ? "Kocht je iets voor VTK? Vul het blad in en voeg het bonnetje toe. Betaalde je met je eigen kaart, dan stort Beheer het terug op het rekeningnummer dat je hier invult."
             : "Bought something for VTK? Fill in the sheet and add the receipt. If you paid with your own card, Administration refunds it to the account number you enter here."}
         </p>
       </header>
-
-      <RekeningenNav
-        base={base}
-        nl={nl}
-        active="indienen"
-        caps={{
-          submit: access.canSubmit,
-          overview: access.canSeeOverview,
-          settings: access.canManageAll,
-        }}
-      />
 
       {guidelines.trim() && (
         <div className="prose-vtk max-w-none rounded-2xl border border-vtk-blue/12 bg-white p-5 text-sm shadow-[inset_3px_0_0_var(--yellow)]">

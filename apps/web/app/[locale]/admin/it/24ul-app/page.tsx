@@ -51,7 +51,6 @@ export default async function AdminUrenloopApp({
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold">24UL App Download</h1>
         <p className="mt-1 text-sm text-zinc-500">
           Who may download the 24urenloop desktop app. The repository is private, so this
           list is the only way in: an address here can request a one-time code by mail and

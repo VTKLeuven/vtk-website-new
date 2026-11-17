@@ -13,7 +13,6 @@ import {
   getExpenseConfig,
 } from "@/lib/rekeningen/server";
 import { formatEuro, formatIban } from "@/lib/rekeningen/expenses";
-import { RekeningenNav } from "../RekeningenNav";
 import { ExpenseWorkbench } from "../ExpenseWorkbench";
 import { expenseErrorMessages } from "../messages";
 import { expenseInclude, toDetail, toRow } from "../rows";
@@ -108,7 +107,7 @@ export default async function MijnRekeningen({
     <div className="space-y-5">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">{nl ? "Mijn rekeningen" : "My expenses"}</h1>
+          <h2 className="text-lg font-semibold">{nl ? "Mijn rekeningen" : "My expenses"}</h2>
           <p className="mt-1 max-w-5xl text-sm text-[#5c667f]">
             {openCount > 0
               ? nl
@@ -126,17 +125,6 @@ export default async function MijnRekeningen({
           {nl ? "Rekening indienen" : "Submit an expense"}
         </Link>
       </header>
-
-      <RekeningenNav
-        base={base}
-        nl={nl}
-        active="mijn"
-        caps={{
-          submit: access.canSubmit,
-          overview: access.canSeeOverview,
-          settings: access.canManageAll,
-        }}
-      />
 
       <ExpenseWorkbench
         locale={locale}

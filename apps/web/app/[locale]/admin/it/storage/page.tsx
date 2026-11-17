@@ -179,7 +179,6 @@ export default async function StoragePage({ params }: { params: Promise<{ locale
     <div className="space-y-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Storage</h1>
           <p className="mt-2 max-w-3xl text-sm text-zinc-500">
             Aggregate storage use across object storage, Immich and the local application server. No individual
             files or object keys are shown.

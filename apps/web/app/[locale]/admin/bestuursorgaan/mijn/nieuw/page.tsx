@@ -30,7 +30,7 @@ export default async function NewBudgetPage({ params }: { params: Promise<{ loca
         ← {nl ? 'Mijn budgetten' : 'My budgets'}
       </Link>
       <header>
-        <h1 className="text-2xl font-semibold">{nl ? 'Budget op de site' : 'Budget on the site'}</h1>
+        <h2 className="text-lg font-semibold">{nl ? 'Budget op de site' : 'Budget on the site'}</h2>
         <p className="mt-2 max-w-2xl text-sm">
           {nl
             ? 'Een proef naast de rekenbladen in Drive. Je vult de regels in, de site rekent de sommen en de BTW en zegt wat nog ontbreekt. Daarna download je het als rekenblad en zet je het in de map Budgetten van de BO, zoals voordien.'

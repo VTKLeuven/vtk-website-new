@@ -141,7 +141,6 @@ export default async function AdminWebsiteFeedbackPage({
   return (
     <div className="vtk-admin-page">
       <header className="vtk-admin-page-head">
-        <h1>{nl ? "Feedback Website" : "Website feedback"}</h1>
         <p>
           {nl ? (
             <>

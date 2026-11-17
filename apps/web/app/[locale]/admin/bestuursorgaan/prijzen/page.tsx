@@ -161,7 +161,7 @@ export default async function PriceLogPage({
         ← {nl ? 'Instellingen voor budgetten' : 'Budget settings'}
       </Link>
       <header>
-        <h1 className="text-2xl font-semibold">{nl ? 'Prijscontroles' : 'Price checks'}</h1>
+        <h2 className="text-lg font-semibold">{nl ? 'Prijscontroles' : 'Price checks'}</h2>
         <p className="mt-1 max-w-3xl text-sm">
           {nl
             ? `Elke keer dat de site een prijs bij een webshop opvroeg voor een budget, ook wat uit het geheugen van vier uur kwam. De regels blijven ${PRICE_LOG_DAYS} dagen staan.`

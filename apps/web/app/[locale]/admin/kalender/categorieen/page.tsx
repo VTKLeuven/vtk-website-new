@@ -45,9 +45,9 @@ export default async function AdminCalendarCategories({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">
+        <h2 className="text-lg font-semibold">
           {nl ? "Kalendercategorieën" : "Calendar categories"}
-        </h1>
+        </h2>
         <p className="mt-1 max-w-2xl text-sm text-vtk-blue-muted">
           {nl
             ? "Beheer hier twee aparte indelingen voor evenementen: wat voor evenement het is en voor wie het bedoeld is. Elke indeling krijgt een eigen kalenderpagina en agenda-feed."

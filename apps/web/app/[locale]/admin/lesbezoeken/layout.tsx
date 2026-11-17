@@ -71,6 +71,7 @@ export default async function AdminLesbezoekenLayout({
       title={nl ? "Lesbezoeken" : "Classroom visits"}
       navLabel={nl ? "Lesbezoeken" : "Classroom visits"}
       tabs={tabs}
+      preserveParams={["jaar"]}
       actions={
         <a className="ticket-admin-icon-button" href={`${nl ? "" : "/en"}/api/admin/lesbezoeken/ics`} aria-label={icsLabel} title={icsLabel}>
           <Download aria-hidden="true" size={17} />

@@ -52,7 +52,7 @@ export default async function BudgetSettingsPage({ params }: { params: Promise<{
         ← {nl ? 'Bestuursorgaan' : 'Board meetings'}
       </Link>
       <header>
-        <h1 className="text-2xl font-semibold">{nl ? 'Instellingen voor budgetten' : 'Budget settings'}</h1>
+        <h2 className="text-lg font-semibold">{nl ? 'Instellingen voor budgetten' : 'Budget settings'}</h2>
         <p className="mt-2 max-w-2xl text-sm">
           {nl
             ? 'Wat vandaag in elk budgetblad opnieuw staat, staat hier één keer. Een wijziging werkt meteen door in elk budget dat op de site opgesteld wordt.'

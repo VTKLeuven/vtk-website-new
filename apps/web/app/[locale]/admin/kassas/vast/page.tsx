@@ -6,14 +6,7 @@ import { LinkedRow } from "@/components/ui/LinkedRow";
 import { hasLocale } from "@/lib/locale";
 import { formatWorkingYear } from "@/lib/workingYear";
 import { formatDayMonth, formatEuro, formatSpentOn, toDateInputValue } from "@/lib/rekeningen/expenses";
-import {
-  brusselsToday,
-  canEditPermanentEntry,
-  cashRegisterAccess,
-  getCashRegisterConfig,
-  permanentPostsFor,
-  permanentTabLabel,
-} from "@/lib/kassas/server";
+import { brusselsToday, canEditPermanentEntry, cashRegisterAccess, getCashRegisterConfig, permanentPostsFor } from "@/lib/kassas/server";
 import {
   daysBetween,
   entryValueCents,
@@ -36,7 +29,6 @@ import {
   type PermanentEntryKind,
 } from "@/lib/kassas/permanent";
 import { savePermanentEntryAction } from "@/app/actions/kassas";
-import { KassaNav } from "../KassaNav";
 import { kassaErrorMessages } from "../messages";
 import { EntryForm } from "./EntryForm";
 import { ManagerActions } from "./ManagerActions";
@@ -74,18 +66,8 @@ export default async function VasteKassas({
   }
   const manage = access.canManage;
   const posts = await permanentPostsFor(access);
-  const nav = (
-    <KassaNav
-      base={base}
-      nl={nl}
-      active="vast"
-      caps={{ request: true, manage, control: access.canCheckIncome }}
-      permanentLabel={permanentTabLabel(access, locale)}
-    />
-  );
   const heading = (
     <header>
-      <h1 className="text-2xl font-semibold">{nl ? "Kassa's" : "Cash registers"}</h1>
       <p className="mt-1 max-w-5xl text-sm text-vtk-muted">
         {manage
           ? nl
@@ -102,7 +84,6 @@ export default async function VasteKassas({
     return (
       <div className="space-y-5">
         {heading}
-        {nav}
         <p className="rounded-2xl border border-vtk-blue/12 bg-white p-5 text-sm text-vtk-body">
           {nl
             ? "Enkel Cursusdienst, Theokot en Fakbar hebben een vaste kassa. Heeft je post een kassa nodig voor een activiteit, vraag ze dan aan bij Kassa aanvragen."
@@ -287,7 +268,6 @@ export default async function VasteKassas({
   return (
     <div className="space-y-5">
       {heading}
-      {nav}
 
       {posts.length > 1 && (
         <nav className="flex flex-wrap items-center gap-2" aria-label="Post">

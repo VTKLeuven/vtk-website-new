@@ -103,7 +103,7 @@ export default async function EmailLogDetailPage({
         </Link>
         <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="break-words text-2xl font-semibold text-vtk-ink">{row.subject}</h1>
+            <h2 className="break-words text-lg font-semibold text-vtk-ink">{row.subject}</h2>
             <p className="mt-1 text-sm text-[#5c667f]">{dateFmt.format(row.completedAt)}</p>
           </div>
           <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${status.className}`}>

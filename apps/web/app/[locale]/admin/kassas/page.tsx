@@ -8,7 +8,7 @@ import { LinkedRow } from "@/components/ui/LinkedRow";
 import { hasLocale } from "@/lib/locale";
 import { currentWorkingYear, formatWorkingYear, workingYearTabs } from "@/lib/workingYear";
 import { formatEuro } from "@/lib/rekeningen/expenses";
-import { cashRegisterAccess, permanentTabLabel } from "@/lib/kassas/server";
+import { cashRegisterAccess } from "@/lib/kassas/server";
 import {
   CASH_REGISTER_STATUSES,
   PERMANENT_POST_CODES,
@@ -21,7 +21,6 @@ import {
   type CashRegisterStatus,
 } from "@/lib/kassas/kassa";
 import { setCashRegisterStatusAction } from "@/app/actions/kassas";
-import { KassaNav } from "./KassaNav";
 import { StatusSelect } from "./StatusSelect";
 import { kassaErrorMessages } from "./messages";
 import { listInclude, toListRows } from "./rows";
@@ -150,7 +149,6 @@ export default async function KassaOverzicht({
     <div className="space-y-5">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">{nl ? "Kassa's" : "Cash registers"}</h1>
           <p className="mt-1 max-w-5xl text-sm text-vtk-muted">
             {nl
               ? "Elke kassa die een post aanvroeg, van de aanvraag tot het kasboek. Aanvaard een aanvraag om de aanvrager te mailen, en tel de kassa na de activiteit in het detail."
@@ -164,14 +162,6 @@ export default async function KassaOverzicht({
           {nl ? "Kassa aanvragen" : "Request a register"}
         </Link>
       </header>
-
-      <KassaNav
-        base={base}
-        nl={nl}
-        active="overzicht"
-        caps={{ request: access.canRequest, manage: true, control: access.canCheckIncome }}
-        permanentLabel={permanentTabLabel(access, locale)}
-      />
 
       <nav className="flex flex-wrap items-center gap-2" aria-label={nl ? "Werkingsjaar" : "Working year"}>
         <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">

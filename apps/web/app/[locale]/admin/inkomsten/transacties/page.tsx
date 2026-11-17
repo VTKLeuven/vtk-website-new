@@ -7,10 +7,9 @@ import { formatEuro } from "@/lib/rekeningen/expenses";
 import { listAccountingCodes } from "@/lib/accounting/server";
 import { dateToMonth } from "@/lib/inkomsten/parse";
 import { INCOME_SOURCES, REVIEW_DAY_START_HOUR } from "@/lib/inkomsten/overview";
-import { countUnassigned, listIncomeChannels, listIncomeTransactions, TRANSACTION_PAGE } from "@/lib/inkomsten/server";
+import { listIncomeChannels, listIncomeTransactions, TRANSACTION_PAGE } from "@/lib/inkomsten/server";
 import { KIND_PARAMS, paramGetter, parseTransactionFilter, STATE_PARAMS } from "@/lib/inkomsten/transactionFilter";
 import { changeIncomeTransactionsAction } from "@/app/actions/inkomsten";
-import { IncomeNav } from "../IncomeNav";
 import { incomeErrorMessages } from "../messages";
 import { KIND_LABELS, monthLabel, RULE_LABELS, SOURCE_LABELS } from "../shared";
 import { TransactionTable, type TransactionRow } from "./TransactionTable";
@@ -47,9 +46,8 @@ export default async function IncomeTransactionsPage({
     return `${base}/admin/inkomsten/transacties${search ? `?${search}` : ""}`;
   };
 
-  const [{ rows, total, totalCents, assignable }, openCount, codes, channels] = await Promise.all([
+  const [{ rows, total, totalCents, assignable }, codes, channels] = await Promise.all([
     listIncomeTransactions(filter, page),
-    countUnassigned(),
     listAccountingCodes(),
     listIncomeChannels(),
   ]);
@@ -101,15 +99,13 @@ export default async function IncomeTransactionsPage({
   return (
     <div className="space-y-5">
       <header>
-        <h1 className="text-2xl font-semibold">{nl ? "Transacties" : "Transactions"}</h1>
+        <h2 className="text-lg font-semibold">{nl ? "Transacties" : "Transactions"}</h2>
         <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
           {nl
             ? "Elke regel uit de geüploade exports, met de code en de regel die ze gaf. Klik op een rij om de code te veranderen, of vink er meer aan om ze samen een code te geven. De periode is die van het overzicht: bij Mollie de maand van de uitbetaling."
             : "Every row from the uploaded exports, with the code and the rule that gave it. Click a row to change its code, or tick several to give them a code together. The period is the one of the overview: for Mollie the month of the payout."}
         </p>
       </header>
-
-      <IncomeNav base={base} nl={nl} active="transacties" openCount={openCount} />
 
       <form className="flex flex-wrap items-end gap-3 text-sm" action={`${base}/admin/inkomsten/transacties`}>
         <label>

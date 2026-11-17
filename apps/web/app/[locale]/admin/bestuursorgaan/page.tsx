@@ -102,7 +102,6 @@ export default async function BestuursorgaanPage({
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold">{nl ? "Resultatenoverzicht" : "Results overview"}</h1>
             <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
               {nl
                 ? "Welke budgetten en resultaten er per post langs het BO passeerden, met de bedragen uit de rekenbladen. Gelezen uit de map Bestuursorgaan op de gedeelde drive; wat daar verandert, staat hier binnen het halfuur."

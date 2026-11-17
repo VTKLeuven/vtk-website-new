@@ -45,6 +45,7 @@ export default async function AdminPocsLayout({
       }
       navLabel={nl ? "POC's" : "POCs"}
       tabs={tabs}
+      preserveParams={["jaar"]}
     >
       {children}
     </ModuleAdminShell>

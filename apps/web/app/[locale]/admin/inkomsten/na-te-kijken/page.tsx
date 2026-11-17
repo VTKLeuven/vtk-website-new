@@ -11,7 +11,6 @@ import { assignIncomeDayAction, assignIncomeGroupAction, rematchIncomeAction } f
 import { SaveForm } from "@/components/ui/SaveForm";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { AdminDisclosure } from "@/components/admin/AdminDisclosure";
-import { IncomeNav } from "../IncomeNav";
 import { incomeErrorMessages } from "../messages";
 import { SOURCE_LABELS } from "../shared";
 import { AssignDayForm } from "./AssignDayForm";
@@ -32,7 +31,6 @@ export default async function IncomeReviewPage({ params }: { params: Promise<{ l
   await requirePermission("income.manage");
 
   const [groups, codes, channels] = await Promise.all([listUnassignedGroups(), listAccountingCodes(), listIncomeChannels()]);
-  const openCount = groups.reduce((sum, group) => sum + group.count, 0);
   const errorMessages = incomeErrorMessages(locale);
   const time = (value: Date) =>
     value.toLocaleTimeString(nl ? "nl-BE" : "en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Brussels" });
@@ -86,7 +84,7 @@ export default async function IncomeReviewPage({ params }: { params: Promise<{ l
     <div className="space-y-5">
       <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div>
-          <h1 className="text-2xl font-semibold">{nl ? "Na te kijken" : "To review"}</h1>
+          <h2 className="text-lg font-semibold">{nl ? "Na te kijken" : "To review"}</h2>
           {/* De "i" naast de zin en niet erin: de uitleg heeft zelf alinea's, en
               een <p> mag geen <p> bevatten. */}
           <div className="mt-1 flex max-w-3xl items-start gap-1">
@@ -123,8 +121,6 @@ export default async function IncomeReviewPage({ params }: { params: Promise<{ l
           resetOnSuccess={false}
         />
       </header>
-
-      <IncomeNav base={base} nl={nl} active="na-te-kijken" openCount={openCount} />
 
       {groups.length === 0 ? (
         <p className="rounded-2xl border border-vtk-blue/12 bg-white p-5 text-sm text-vtk-muted">

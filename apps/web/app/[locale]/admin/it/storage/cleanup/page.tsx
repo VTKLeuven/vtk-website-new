@@ -76,7 +76,7 @@ export default async function StorageCleanupPage({ params }: { params: Promise<{
         <Link href={`/${locale}/admin/it/storage`} className="text-sm font-medium text-[#5c667f] hover:text-vtk-ink">
           &larr; Storage
         </Link>
-        <h1 className="mt-1 text-2xl font-semibold">File cleanup</h1>
+        <h2 className="mt-1 text-lg font-semibold">File cleanup</h2>
         <div className="mt-2 flex max-w-3xl items-start gap-2">
           <p className="text-sm text-zinc-500">
             Files from the general uploader that no row in the database mentions any more. Each night the whole

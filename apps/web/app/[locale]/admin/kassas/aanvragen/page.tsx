@@ -1,9 +1,8 @@
 import { notFound } from "next/navigation";
 import type { Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
-import { cashRegisterAccess, getCashRegisterConfig, permanentTabLabel } from "@/lib/kassas/server";
+import { cashRegisterAccess, getCashRegisterConfig } from "@/lib/kassas/server";
 import { requestCashRegisterAction } from "@/app/actions/kassas";
-import { KassaNav } from "../KassaNav";
 import { RequestForm } from "../RequestForm";
 import { kassaErrorMessages } from "../messages";
 import { postChoices } from "../posts";
@@ -32,21 +31,13 @@ export default async function KassaAanvragen({ params }: { params: Promise<{ loc
   return (
     <div className="space-y-5">
       <header>
-        <h1 className="text-2xl font-semibold">{nl ? "Kassa aanvragen" : "Request a cash register"}</h1>
+        <h2 className="text-lg font-semibold">{nl ? "Kassa aanvragen" : "Request a cash register"}</h2>
         <p className="mt-1 max-w-5xl text-sm text-vtk-muted">
           {nl
             ? `Heb je voor een activiteit een kassa met wisselgeld nodig, of een Bancontact- of Payconiq-toestel? Vraag het hier aan. Beheer krijgt je aanvraag te zien en mailt je zodra ze aanvaard is; het ophalen spreek je daarna zelf af met de financieel beheerders of via ${config.contactEmail}.`
             : `Need a cash register with change for an activity, or a Bancontact or Payconiq device? Request it here. Administration sees your request and emails you once it is accepted; you then arrange the pick-up with the financial managers or via ${config.contactEmail}.`}
         </p>
       </header>
-
-      <KassaNav
-        base={base}
-        nl={nl}
-        active="aanvragen"
-        caps={{ request: true, manage: access.canManage, control: access.canCheckIncome }}
-        permanentLabel={permanentTabLabel(access, locale)}
-      />
 
       <div className="rounded-2xl border border-vtk-blue/12 bg-white p-5">
         <RequestForm

@@ -264,7 +264,7 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
           {manage ? (nl ? "Alle kassa's" : "All cash registers") : nl ? "Mijn aanvragen" : "My requests"}
         </Link>
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold">{register.activity}</h1>
+          <h2 className="text-lg font-semibold">{register.activity}</h2>
           <span
             data-status={STATUS_SLUGS[register.status]}
             className="vtk-kassa-status inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"

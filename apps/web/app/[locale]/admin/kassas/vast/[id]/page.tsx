@@ -103,7 +103,7 @@ export default async function VasteKassaRegel({ params }: { params: Promise<{ lo
         <Link href={listHref} className="text-sm text-vtk-muted underline underline-offset-4">
           {nl ? `Kasboek van ${postName}` : `${postName} ledger`}
         </Link>
-        <h1 className="text-2xl font-semibold">{title}</h1>
+        <h2 className="text-lg font-semibold">{title}</h2>
       </header>
 
       <section className="rounded-2xl border border-vtk-blue/12 bg-white p-5">

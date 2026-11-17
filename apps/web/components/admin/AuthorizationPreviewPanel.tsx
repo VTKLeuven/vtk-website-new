@@ -222,11 +222,7 @@ export function AuthorizationPreviewPanel({
   return (
     <section className="space-y-3">
       <div>
-        {/* Deze panel vult een eigen pagina (/admin/it/preview), dus dit is de
-            paginakop en geen sectiekop. */}
-        <h1 className="text-2xl font-semibold">
-          {nl ? "Autorisatievoorbeeld" : "Authorization preview"}
-        </h1>
+        {/* De titel staat in de kop van IT (het tabblad Autorisatievoorbeeld). */}
         <p className="mt-1 text-sm text-zinc-500">
           {nl
             ? "Bekijk de frontend en admin alsof je deze rollen en posten hebt. Je echte identiteit blijft behouden; er wordt nooit een ander account geopend. De voorbeeldmodus is volledig alleen-lezen en stopt automatisch na twee uur."

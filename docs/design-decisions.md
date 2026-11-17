@@ -13303,3 +13303,28 @@ bookmarken, en laadt enkel wat het toont.
   in de layout voor het lopende werkingsjaar. Elke action van die module
   vernieuwt de hele layout (`revalidatePath("/[locale]/admin/...", "layout")`),
   anders blijft de teller staan.
+
+**Dit is de standaard voor elk beheerscherm (november 2026).** Na de eerste
+vijf modules volgden de homepage, openingsuren, nieuws, de header en de
+pagina's, shiften, piano, de 24 urenloop, de kalender, leden, het
+shiftenoverzicht, alumni, de mailinglijsten, rekeningen, kassa's, de online
+inkomsten, het bestuursorgaan (resultatenoverzicht, mijn budgetten met de
+budgetten op de site, de BO-mappen), Theokot (broodjes en verhuur), IT
+(configuratie, storage, logboeken, autorisatievoorbeeld, mails en schermen,
+de 24UL-app, feedback) en de deur. Een nieuw beheerscherm begint dus met een
+`layout.tsx` op `ModuleAdminShell`, ook wanneer het voorlopig maar één tabblad
+heeft: dan toont de kop enkel de titel, en het tweede tabblad past er later
+zonder ombouw bij. De regels staan in CLAUDE.md onder "Admin".
+
+- **Tabbladen in de pagina zelf zijn verdwenen.** Leden en Ereleden
+  (`?lijst=`), de tabs van Shiften in een clientcomponent, de `?tab=` van
+  Lesbezoeken, PAL+ en de verhuur, en de eigen navs van Rekeningen, Kassa's,
+  Online inkomsten en Theokot: allemaal één kop. Een verzamelbak
+  ("Instellingen" met zes kaarten bij de verhuur, "Organisaties & mails" bij
+  de lesbezoeken) werd een tabblad per taak.
+- **Wat vroeger een link of knop naast de titel was, is een tabblad** wanneer
+  het een eigen scherm is (de categorieën en Discord-webhooks van de kalender,
+  de bijnamen en de shiften op /shift in het shiftenoverzicht). Een knop die
+  iets doet ("Nieuw evenement", "Rekening indienen") blijft een knop.
+- **Een dienst per tabblad** bij de openingsuren: elke post ziet enkel haar
+  eigen dienst, en wie er maar één heeft, krijgt geen tabbalk.

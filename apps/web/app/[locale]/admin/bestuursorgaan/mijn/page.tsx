@@ -40,7 +40,6 @@ export default async function MijnBudgettenPage({ params }: { params: Promise<{ 
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">{nl ? "Mijn budgetten" : "My budgets"}</h1>
           <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
             {nl
               ? "De budgetten en resultaten van je post die dit werkingsjaar langs het BO passeerden, gelezen uit de map Bestuursorgaan op de gedeelde drive. Een resultaat staat open vanaf de BO waarop het budget passeerde. Breng het naar een volgende BO zoals een budget: het rekenblad met Resultaat in de naam "
