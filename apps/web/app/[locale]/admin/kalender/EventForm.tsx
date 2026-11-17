@@ -4,7 +4,7 @@ import '@/app/design/vtk-ticket-admin.css';
 import { useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, CalendarClock, FileText, ImageIcon, Link2, Settings2, Tags } from 'lucide-react';
 import Link from '@/components/ui/Link';
-import { Card, Input, Label, Select } from '@vtk/ui';
+import { Card, Input, Label } from '@vtk/ui';
 import { saveEventAction } from '@/app/actions/calendar';
 import { DEFAULT_EVENT_LINK_LABEL, EVENT_LINK_LABEL_MAX } from '@/lib/calendar/eventLink';
 import { MarkdownEditorField } from '@/components/editor/MarkdownEditor';
@@ -13,6 +13,7 @@ import { ExternalLinkIcon } from '@/components/ui/icons';
 import { saveErrorMessages } from '@/lib/saveMessages';
 import { mobileCropFrom, toImageFocus } from '@/lib/imageFocus';
 import { ORGANISER_PRESETS } from '@/lib/calendar/organiser';
+import { SearchPicker } from '@/components/admin/SearchPicker';
 import { EventImageField } from './EventImageField';
 import { LangTabs, type Lang } from './LangTabs';
 import { EventWhenField, type MomentValue } from './EventWhenField';
@@ -580,16 +581,17 @@ export function EventForm({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <Label htmlFor="event-group">{nl ? 'Groep' : 'Group'}</Label>
-              <Select id="event-group" name="groupId" defaultValue={event.groupId ?? ''} required>
-                <option value="" disabled>
-                  {nl ? 'Kies een groep' : 'Choose a group'}
-                </option>
-                {groups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {nl ? g.nameNl : g.nameEn}
-                  </option>
-                ))}
-              </Select>
+              <SearchPicker
+                id="event-group"
+                name="groupId"
+                defaultValue={event.groupId ?? ''}
+                required
+                options={groups.map((g) => ({ value: g.id, label: nl ? g.nameNl : g.nameEn }))}
+                placeholder={nl ? 'Kies een groep' : 'Choose a group'}
+                searchPlaceholder={nl ? 'Zoek een groep' : 'Search a group'}
+                ariaLabel={nl ? 'Groep' : 'Group'}
+                emptyText={(query) => (nl ? `Geen groep gevonden voor "${query}".` : `No group found for "${query}".`)}
+              />
               <p className="vtk-ef-hint">
                 {nl ? 'Bepaalt wie het mag bewerken.' : 'Decides who may edit it.'}
               </p>

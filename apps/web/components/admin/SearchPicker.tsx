@@ -62,6 +62,7 @@ export function SearchPicker({
   ariaLabel,
   emptyText,
   disabled = false,
+  required = false,
   attention = false,
   autoOpen = false,
 }: {
@@ -78,6 +79,12 @@ export function SearchPicker({
   /** Melding als niets past; krijgt de zoekterm. */
   emptyText: (query: string) => string;
   disabled?: boolean;
+  /**
+   * Verplicht, zoals bij een native select: het verborgen veld (enkel met
+   * `name`) draagt `required`, zodat de browser bij Opslaan onder de kiezer
+   * meldt dat er nog niets gekozen is.
+   */
+  required?: boolean;
   /** Vraagt aandacht (een open keuze): een gele rand op de knop. */
   attention?: boolean;
   /**
@@ -211,7 +218,14 @@ export function SearchPicker({
     >
       {name ? (
         <span className="vtk-code-picker-value">
-          <input name={name} value={value} onChange={() => {}} tabIndex={-1} aria-hidden="true" />
+          <input
+            name={name}
+            value={value}
+            onChange={() => {}}
+            required={required}
+            tabIndex={-1}
+            aria-hidden="true"
+          />
         </span>
       ) : null}
       <button
