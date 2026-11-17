@@ -4,7 +4,8 @@ import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { prisma } from "@vtk/db";
+import { prisma, searchUsers } from "@vtk/db";
+import { cachedDirectory } from "@/lib/google/directoryCache";
 import { currentWorkingYear } from "@vtk/auth";
 import { requirePermission } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
@@ -777,4 +778,115 @@ export async function unlinkGoogleAccountAction(formData: FormData): Promise<voi
 
   revalidatePath(ADMIN);
   revalidatePath(`${ADMIN}/koppelingen`);
+}
+
+// -----------------------------------------------------------------------------
+// Eén zoekveld voor leden van de site en accounts van Google Workspace
+// -----------------------------------------------------------------------------
+
+export type MemberCandidate =
+  | {
+      source: "site";
+      userId: string;
+      name: string;
+      /** Het adres waarmee het lid op de site staat. */
+      siteEmail: string;
+      /** Het gekoppelde @vtk.be-account; dat komt in de lijst. `null` = geen. */
+      vtk: string | null;
+    }
+  | { source: "gw"; email: string; name: string | null; suspended: boolean }
+  | { source: "address"; email: string };
+
+function fold(value: string): string {
+  return value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+/**
+ * Zoekt tegelijk in de leden van de site en in de accounts van het domein. Een
+ * account dat aan een lid gekoppeld is, komt één keer terug, als lid: kies je
+ * dat, dan volgt het adres zijn account. Een getypt mailadres dat nergens bij
+ * past, kan je als vrij adres toevoegen.
+ */
+export async function searchMemberCandidatesAction(
+  mailGroupId: string,
+  query: string,
+): Promise<MemberCandidate[]> {
+  const { access } = await editor(mailGroupId);
+  if (!access.manageAll) return [];
+  const q = query.trim().slice(0, 100);
+  if (q.length < 2) return [];
+  const words = fold(q).split(/\s+/).filter(Boolean);
+
+  const cfg = await getGoogleConfig();
+  const [siteHits, directory] = await Promise.all([
+    searchUsers(q, { limit: 8, db: prisma }),
+    cfg ? cachedDirectory(cfg).catch(() => []) : Promise.resolve([]),
+  ]);
+  const gwHits = directory
+    .filter((u) => words.every((w) => fold(`${u.primaryEmail} ${u.name?.fullName ?? ""}`).includes(w)))
+    .slice(0, 12);
+
+  // Welke van die accounts hangen aan een lid? Die tonen we als lid.
+  const linkedUsers = await prisma.user.findMany({
+    where: {
+      deletedAt: null,
+      OR: [
+        { id: { in: siteHits.map((u) => u.id) } },
+        { googleEmail: { in: gwHits.map((u) => u.primaryEmail.toLowerCase()) } },
+      ],
+    },
+    select: { id: true, name: true, email: true, googleEmail: true },
+  });
+  const userById = new Map(linkedUsers.map((u) => [u.id, u]));
+  const userByVtk = new Map(linkedUsers.filter((u) => u.googleEmail).map((u) => [u.googleEmail as string, u]));
+
+  const out: MemberCandidate[] = [];
+  const seenUsers = new Set<string>();
+  for (const hit of siteHits) {
+    const user = userById.get(hit.id);
+    if (!user || seenUsers.has(user.id)) continue;
+    seenUsers.add(user.id);
+    out.push({ source: "site", userId: user.id, name: user.name, siteEmail: user.email, vtk: user.googleEmail });
+  }
+  for (const account of gwHits) {
+    const email = account.primaryEmail.toLowerCase();
+    const user = userByVtk.get(email);
+    if (user) {
+      if (seenUsers.has(user.id)) continue;
+      seenUsers.add(user.id);
+      out.push({ source: "site", userId: user.id, name: user.name, siteEmail: user.email, vtk: user.googleEmail });
+      continue;
+    }
+    out.push({ source: "gw", email, name: account.name?.fullName ?? null, suspended: Boolean(account.suspended) });
+  }
+  const typed = q.toLowerCase();
+  if (emailSchema.safeParse(typed).success && !out.some((c) => ("email" in c && c.email === typed) || (c.source === "site" && c.vtk === typed))) {
+    out.push({ source: "address", email: typed });
+  }
+  return out;
+}
+
+/**
+ * Voegt toe wat in het gecombineerde zoekveld gekozen werd: een lid van de site
+ * (`site:<id>`), een account van Google Workspace of een vrij adres
+ * (`gw:<adres>`, `address:<adres>`). Hetzelfde als de twee losse acties.
+ */
+export async function addMemberAction(prev: SaveState, formData: FormData): Promise<SaveState> {
+  const choice = String(formData.get("choice") ?? "");
+  const [source, ...rest] = choice.split(":");
+  const value = rest.join(":");
+  if (!value) return saveError("NOTHING_CHOSEN");
+  const forward = new FormData();
+  forward.set("mailGroupId", String(formData.get("mailGroupId") ?? ""));
+  forward.set("kind", String(formData.get("kind") ?? "INCLUDE"));
+  if (source === "site") {
+    forward.set("userId", value);
+    return addUserMemberAction(prev, forward);
+  }
+  if (source === "gw" || source === "address") {
+    forward.set("email", value);
+    forward.set("note", source === "gw" ? "account van Google Workspace" : "");
+    return addExtraAction(prev, forward);
+  }
+  return saveError("INVALID_INPUT");
 }

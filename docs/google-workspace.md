@@ -341,6 +341,18 @@ gewoon door. Een account gaat enkel terug als het
 nog staat waar die verhuizing het zette. Gebouwd na 16 november 2026, toen de
 sync tientallen accounts naar `/` verhuisde (zie "Vallen").
 
+### Een lid toevoegen: één zoekveld
+
+In het tabblad Leden zoekt "Lid, account of adres" tegelijk in de leden van de
+site en in de accounts van Google Workspace (vijf minuten gecachet,
+`lib/google/directoryCache.ts`). Rechts op elke rij staat **SITE**, **GW** of
+**ADRES**. Een lid van de site komt in de lijst met zijn gekoppelde
+`@vtk.be`-adres; heeft het er geen (enkel een privéadres op de site), dan zegt de
+rij dat, en kies je de GW-rij met zijn `@vtk.be`-account. Een account dat al aan
+een lid hangt, staat één keer, als lid. Een getypt adres dat nergens bij past,
+voeg je toe als vrij adres. Een werkgroep die haar eigen lijsten beheert, kiest
+nog altijd enkel uit haar eigen leden.
+
 ### Wijzigingen in de Admin console
 
 Een lid toevoegen of verwijderen in de Admin console mag: de volgende ronde

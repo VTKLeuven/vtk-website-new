@@ -13,8 +13,10 @@ import {
   statusLabel,
 } from "@/lib/google/activityLabels";
 import { UserSearchField } from "../UserSearchField";
+import { MemberPicker } from "./MemberPicker";
 import {
   addExtraAction,
+  addMemberAction,
   addSourceAction,
   addUserMemberAction,
   clearImportedExtrasAction,
@@ -65,6 +67,7 @@ const ERRORS_NL: Record<string, string> = {
   YEARLY_NO_DOMAIN: "Niet opgeslagen: geef enkel het stuk voor de @, bv. activiteiten_{jj}.",
   YEARLY_ON_YEARLY: "Een jaargroep kan zelf geen jaargroepen hebben.",
   NOT_CONFIGURED: "Google Workspace is nog niet ingesteld (Admin > IT); er is niets verwijderd.",
+  NOTHING_CHOSEN: "Niet toegevoegd: kies eerst een lid, account of adres uit de lijst.",
 };
 const ERRORS_EN: Record<string, string> = {
   DUPLICATE_EMAIL: "Not saved: that address is already in it or already exists.",
@@ -78,6 +81,7 @@ const ERRORS_EN: Record<string, string> = {
   YEARLY_NO_DOMAIN: "Not saved: only give the part before the @, e.g. activiteiten_{jj}.",
   YEARLY_ON_YEARLY: "A yearly group cannot have yearly groups itself.",
   NOT_CONFIGURED: "Google Workspace is not set up yet (Admin > IT); nothing was deleted.",
+  NOTHING_CHOSEN: "Not added: first pick a member, account or address from the list.",
 };
 
 /**
@@ -569,7 +573,25 @@ function MembersTab({
       )}
 
       <div className="relative overflow-hidden rounded-2xl border border-vtk-blue/15 bg-white">
-        {!archived && (
+        {!archived && manageAll && (
+          <SaveForm
+            action={addMemberAction}
+            submitLabel={t.add}
+            savingLabel={t.adding}
+            savedMessage={t.added}
+            errorMessages={errorMessages}
+            fallbackErrorMessage={t.addFailed}
+            className="flex flex-wrap items-end gap-3 border-b border-vtk-blue/10 bg-vtk-blue-soft/30 px-4 py-3"
+          >
+            <input type="hidden" name="mailGroupId" value={group.id} />
+            <MemberPicker nl={nl} mailGroupId={group.id} label={t.memberOrAccount} />
+            <div className="w-32">
+              <Label>{t.kind}</Label>
+              <ThemedSelect name="kind" defaultValue="INCLUDE" options={kindOptions} ariaLabel={t.kind} />
+            </div>
+          </SaveForm>
+        )}
+        {!archived && !manageAll && (
           <div className="flex flex-wrap items-end gap-3 border-b border-vtk-blue/10 bg-vtk-blue-soft/30 px-4 py-3">
             <div className="inline-flex rounded-full border border-vtk-blue/15 bg-white p-0.5" role="group" aria-label={t.addWhat}>
               {(["lid", "adres"] as const).map((k) => (
@@ -774,6 +796,7 @@ function NL(email: string) {
     goToSources: "Naar Bronnen",
     addWhat: "Wat voeg je toe?",
     member: "Lid van de site",
+    memberOrAccount: "Lid, account of adres",
     address: "Mailadres",
     pickMember: "Kies een lid",
     searchMember: "Zoek op naam",
@@ -901,6 +924,7 @@ function EN(email: string): Texts {
     goToSources: "Go to Sources",
     addWhat: "What are you adding?",
     member: "Site member",
+    memberOrAccount: "Member, account or address",
     address: "Email address",
     pickMember: "Pick a member",
     searchMember: "Search by name",
