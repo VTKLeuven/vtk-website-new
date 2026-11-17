@@ -1,5 +1,6 @@
 import { prisma } from "@vtk/db";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { isPocOnly } from "@/lib/pocPolls/access";
 import { hasPermission } from "@vtk/auth";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
@@ -15,6 +16,7 @@ export default async function AdminDashboardTiles({
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const session = await requireSession();
+  if (await isPocOnly(session)) redirect(`${locale === "nl" ? "" : "/en"}/admin/peilingen`);
   const canManageGlobal = session.user.isSuperAdmin || hasPermission(session, "dashboard.manage");
   const canManageGroups = session.user.isSuperAdmin || hasPermission(session, "dashboard.manageOwn");
   const ownGroupIds = session.groups.map((group) => group.id);

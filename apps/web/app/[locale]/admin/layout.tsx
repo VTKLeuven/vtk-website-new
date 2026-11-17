@@ -11,7 +11,7 @@ import { canSeeCommuRequests } from '@/lib/commu/requests';
 import { isExternalUrl } from '@/lib/href';
 import { getAdminNav, type NavGuard, type NavLeaf } from '@/lib/admin-nav';
 import { canSeeMailGroups, mailGroupAccess } from '@/lib/google/access';
-import { representedPocIds } from '@/lib/pocPolls/access';
+import { isPocOnly, representedPocIds } from '@/lib/pocPolls/access';
 import { postenAccess } from '@/lib/postenAccess';
 import { ADMIN_DENSITY_COOKIE, ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/adminNavCookie';
 import { AdminNav, type NavItem, type NavNode } from './AdminNav';
@@ -60,6 +60,9 @@ export default async function AdminLayout({
   // RiVers van dit werkingsjaar krijgen de tab Peilingen, zonder apart recht.
   const pocRep =
     !session.permissions.includes('pocs.manage') && (await representedPocIds(session.user.id)).length > 0;
+  // Een RiVer zonder post of werkgroep komt enkel voor de peilingen: geen
+  // dashboard en geen uitleendienst in de zijbalk.
+  const pocOnly = await isPocOnly(session);
 
   // Groepsadressen: wie ze beheert of accounts goedkeurt, en een werkgroep die
   // haar eigen adressen beheert. Dat laatste vraagt pas iets op met het recht.
@@ -77,6 +80,7 @@ export default async function AdminLayout({
   const canSee = (guard: NavGuard): boolean => {
     if (session.user.isSuperAdmin) return true;
     if (guard.superAdminOnly) return false;
+    if (guard.notForPocOnly && pocOnly) return false;
     // Ticketing-tab hangt af van ticket-toegang (eigen grant of globale perm),
     // niet van de gewone admin-permissies. canAccessTickets dekt superadmins al.
     if (guard.ticketing) return canAccessTickets;

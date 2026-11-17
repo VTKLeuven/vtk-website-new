@@ -1,6 +1,7 @@
 import { prisma } from "@vtk/db";
 import { hasLocale } from "@/lib/locale";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { isPocOnly } from "@/lib/pocPolls/access";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { requireSession } from "@/lib/session";
 import { hasPermission } from "@vtk/auth";
@@ -24,6 +25,9 @@ export default async function AdminDashboard({
   const session = await requireSession();
   const dict = getDictionary(locale);
   const base = locale === "nl" ? "" : "/en";
+  // Een RiVer zonder post of werkgroep komt enkel voor de peilingen; het
+  // dashboard (tegels, deur, budgetten) is er voor de kring.
+  if (await isPocOnly(session)) redirect(`${base}/admin/peilingen`);
 
   const groupIds = session.groups.map((g) => g.id);
   const userId = session.user.id;

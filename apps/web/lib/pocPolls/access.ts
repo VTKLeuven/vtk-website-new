@@ -33,6 +33,20 @@ export async function representedPocIds(userId: string): Promise<string[]> {
   return rows.map((row) => row.pocId);
 }
 
+/**
+ * Komt deze gebruiker enkel voor de peilingen in het beheer: RiVer van een POC
+ * dit werkingsjaar, maar geen superadmin, geen `pocs.manage` en in geen enkele
+ * post, werkgroep of jaarwerking. Die ziet het dashboard en de uitleendienst
+ * niet; `/admin` stuurt hem door naar de peilingen.
+ */
+export async function isPocOnly(
+  session: Session & { user: { id: string; isSuperAdmin: boolean }; groups: unknown[] },
+): Promise<boolean> {
+  if (session.user.isSuperAdmin || session.groups.length > 0) return false;
+  if (hasPermission(session, "pocs.manage")) return false;
+  return (await representedPocIds(session.user.id)).length > 0;
+}
+
 /** Een algemene peiling (`pocId = null`) is enkel voor wie `pocs.manage` heeft. */
 export function managesPoc(scope: string[] | "all", pocId: string | null): boolean {
   return scope === "all" || (pocId !== null && scope.includes(pocId));

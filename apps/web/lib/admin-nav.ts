@@ -49,6 +49,12 @@ export type NavGuard = {
   post?: boolean;
   /** Peilingen: de RiVers van dit werkingsjaar, en wie `pocs.manage` heeft. */
   pocRep?: boolean;
+  /**
+   * Niet voor wie enkel voor de peilingen in het beheer komt: een RiVer zonder
+   * post of werkgroep (`isPocOnly` in lib/pocPolls/access.ts). Het dashboard en
+   * de uitleendienst zijn er voor de kring, niet voor de studenten van een POC.
+   */
+  notForPocOnly?: boolean;
   /** Groepsadressen: `mailgroups.manage`, `googleAccounts.manage`, of een werkgroep
    *  die haar eigen adressen beheert (zie lib/google/access.ts). */
   mailGroups?: boolean;
@@ -118,7 +124,7 @@ export function getAdminNav(): NavEntry[] {
       keepSingle: true,
     }),
     item('grocomeet', '/grocomeet', { perm: 'grocomeet.manage' }),
-    ...(logistics ? [item('logistics', logistics)] : []),
+    ...(logistics ? [item('logistics', logistics, { notForPocOnly: true })] : []),
     // Beheer: alles wat met het geld van de kring te maken heeft, onder één
     // groep in plaats van vier losse tabs. Wie maar één ervan mag zien (een
     // praesidiumlid dat enkel een rekening indient), krijgt dat ene item
@@ -170,8 +176,8 @@ export function getAdminNav(): NavEntry[] {
     // Het dashboard is een groep omdat de tegels erop door elke post aangepast
     // kunnen worden; dat scherm hoort bij het dashboard, niet bij IT.
     group('dashboard', [
-      item('dashboardOverview', '', { exact: true }),
-      item('dashboardTiles', '/dashboard-tiles'),
+      item('dashboardOverview', '', { exact: true, notForPocOnly: true }),
+      item('dashboardTiles', '/dashboard-tiles', { notForPocOnly: true }),
     ]),
     // Alles wat een bezoeker op de site ziet, plus de dingen die je daar
     // publiceert zonder dat er per se een evenement aan hangt (formulieren,
