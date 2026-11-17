@@ -51,7 +51,11 @@ export default async function AdminGrocomeetPage({
               ? "De kalender van dit semester staat nog niet vast. Duid aan op welke dagen er een grocomeet is; het voorstel hieronder volgt het gewone ritme."
               : "This semester's calendar is not set yet. Mark the days with a grocomeet; the suggestion below follows the usual rhythm."}
         </p>
+        {/* Een eigen `key` per semester: de planner bewaart zijn selectie in
+            state, en die bleef bij het wisselen van tab staan. Opslaan zette
+            dan de dagen van het andere semester er een tweede keer in. */}
         <MeetingPlanner
+          key={`${workingYear}-${semester}`}
           nl={nl}
           kind="GROCOMEET"
           year={workingYear}

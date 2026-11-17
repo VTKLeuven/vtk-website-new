@@ -157,11 +157,15 @@ export function MeetingPlanner({
         nl
           ? {
               INVALID_TIME: "Geef bij elke dag een geldig uur op (bv. 12:45).",
+              DAY_OUTSIDE_SEMESTER:
+                "Er zat een dag van een ander semester in de selectie. Laad de pagina opnieuw en duid de dagen opnieuw aan.",
               KEPT_WITH_RESERVATIONS:
                 "Opgeslagen. Dagen waarvoor al besteld is, bleven staan; verwijder die apart bij het moment zelf.",
             }
           : {
               INVALID_TIME: "Enter a valid time for every day (e.g. 12:45).",
+              DAY_OUTSIDE_SEMESTER:
+                "The selection contained a day from another semester. Reload the page and mark the days again.",
               KEPT_WITH_RESERVATIONS:
                 "Saved. Days with existing orders were kept; remove those separately at the meeting itself.",
             }

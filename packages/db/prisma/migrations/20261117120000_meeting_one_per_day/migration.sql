@@ -1,8 +1,10 @@
 -- Eén vergadering per soort per dag (de Brusselse kalenderdag): een bureau en
 -- een grocomeet mogen dezelfde dag vallen, twee bureaus niet. Op productie
--- stond elk bureau van het eerste semester 2026-27 dubbel, waarschijnlijk
--- doordat de semesterplanning twee keer tegelijk werd opgeslagen; niets hield
--- dat tegen. De code ging er al van uit dat er per dag één is (de koppeling
+-- stond elk bureau van het eerste semester 2026-27 dubbel: op 6 september zette
+-- de planning van semester 2 de zeven dagen van semester 1 er een tweede keer
+-- in (slug `-2`, `semester` 2, geen inschrijvingen). De planner hield na het
+-- wisselen van semestertab de dagen van het vorige semester vast, onzichtbaar
+-- omdat ze buiten de getoonde maanden vielen, en niets hield dat tegen. De code ging er al van uit dat er per dag één is (de koppeling
 -- van Theokot-bestellingen aan "de" grocomeet van die dag).
 --
 -- Wat er met bestaande rijen gebeurt:

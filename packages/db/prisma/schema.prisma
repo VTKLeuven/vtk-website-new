@@ -4507,8 +4507,9 @@ model Meeting {
   /// Reclamemomenten (mail, story) die Onderwijs zelf noteerde.
   promotions    MeetingPromotion[]
 
-  /// Op productie stond elk bureau dubbel (twee keer tegelijk gepland). Een
-  /// tweede op dezelfde dag faalt nu met P2002; zie `DAY_TAKEN`.
+  /// Op productie stond elk bureau dubbel (semester 1 nog eens ingepland onder
+  /// semester 2). Een tweede op dezelfde dag faalt nu met P2002; zie
+  /// `DAY_TAKEN`.
   @@unique([kind, day])
   @@index([kind, startsAt])
   @@index([year, semester, kind])

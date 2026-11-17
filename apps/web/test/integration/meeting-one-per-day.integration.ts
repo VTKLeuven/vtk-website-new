@@ -14,8 +14,9 @@ const { createMeetingAction, planMeetingsAction } = await import("@/app/actions/
 
 /**
  * Eén bureau en één grocomeet per dag (`@@unique([kind, day])`). Op productie
- * stond elk bureau van een semester dubbel: de planning was twee keer tegelijk
- * opgeslagen, en beide aanvragen zagen nog geen bestaande dagen.
+ * stond elk bureau van semester 1 dubbel: de planner hield na het wisselen van
+ * semestertab de dagen van semester 1 vast, en opslaan zette ze er onder
+ * semester 2 een tweede keer in. Twee opslagen tegelijk zijn de andere weg.
  */
 describe("één vergadering per soort per dag", () => {
   const tag = randomUUID().slice(0, 8);
@@ -57,6 +58,16 @@ describe("één vergadering per soort per dag", () => {
     expect(results.map((result) => result.status)).toEqual(["success", "success"]);
     const meetings = await meetingsOfYear();
     expect(meetings.map((meeting) => meeting.slug)).toEqual(days.map((day) => `bureau-${day}`));
+  });
+
+  it("weigert dagen van een ander semester, zoals de dubbels op productie", async () => {
+    // Op productie zette de planning van semester 2 de dagen van semester 1 er
+    // een tweede keer in: de planner hield ze na het wisselen van tab vast.
+    const data = planForm();
+    data.set("semester", "2");
+    const before = await meetingsOfYear();
+    expect(await planMeetingsAction(SAVE_IDLE, data)).toMatchObject({ status: "error", code: "DAY_OUTSIDE_SEMESTER" });
+    expect(await meetingsOfYear()).toHaveLength(before.length);
   });
 
   it("een tweede bureau op dezelfde dag toevoegen zegt dat de dag bezet is", async () => {

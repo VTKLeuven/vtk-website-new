@@ -17,6 +17,7 @@ import {
   meetingWindowState,
   parseDayValue,
   semesterForDate,
+  semesterMonths,
   type Semester,
 } from "@/lib/meetings";
 import { currentWorkingYear } from "@/lib/workingYear";
@@ -86,7 +87,8 @@ function parseSemester(value: FormDataEntryValue | null): Semester | null {
 /**
  * Er staat al een vergadering van deze soort op die dag (`@@unique([kind, day])`
  * op `Meeting`). Eén bureau en één grocomeet per dag: op productie stond elk
- * bureau dubbel nadat de planning twee keer tegelijk was opgeslagen. Een botsing
+ * bureau dubbel nadat de planning van semester 2 de dagen van semester 1 er een
+ * tweede keer in had gezet (zie `planMeetingsAction`). Een botsing
  * op de slug is iets anders en gooit gewoon door.
  */
 async function isDayTaken(error: unknown, kind: MeetingKind, startsAt: Date): Promise<boolean> {
@@ -178,11 +180,21 @@ export async function planMeetingsAction(_prev: SaveState, formData: FormData): 
   const opensDaysBefore =
     kind === "BUREAU" && Number.isInteger(opensDaysRaw) && opensDaysRaw > 0 ? opensDaysRaw : null;
 
+  // Enkel dagen uit de maanden van dit semester. Zo kwamen de dubbele bureaus
+  // van 2026-27 op productie: de planner hield na het wisselen van semestertab
+  // de dagen van semester 1 vast (onzichtbaar, want buiten de getoonde
+  // maanden), en opslaan zette ze een tweede keer in onder semester 2.
+  const allowedMonths = new Set(semesterMonths(year, semester).map((m) => `${m.year}-${m.month}`));
+
   const dayCount = Number(formData.get("dayCount")) || 0;
   const days: Array<{ day: Date; time: string; location: string | null }> = [];
   for (let i = 0; i < dayCount; i += 1) {
-    const day = parseDayValue(String(formData.get(`day-${i}-date`) ?? ""));
+    const raw = String(formData.get(`day-${i}-date`) ?? "");
+    const day = parseDayValue(raw);
     if (!day) continue;
+    if (!allowedMonths.has(`${Number(raw.slice(0, 4))}-${Number(raw.slice(5, 7))}`)) {
+      return saveError("DAY_OUTSIDE_SEMESTER");
+    }
     const time = String(formData.get(`day-${i}-time`) ?? "");
     if (!HHMM.test(time)) return saveError("INVALID_TIME");
     days.push({
@@ -232,8 +244,8 @@ export async function planMeetingsAction(_prev: SaveState, formData: FormData): 
         },
       });
     } catch (error) {
-      // Die dag bestaat al: een tweede opslag die tegelijk liep, of dezelfde dag
-      // in een ander semester. Laten staan; er is er maar één per dag.
+      // Die dag bestaat al, bv. door een tweede opslag die tegelijk liep. Laten
+      // staan; er is er maar één per dag.
       if (await isDayTaken(error, kind, startsAt)) continue;
       throw error;
     }
