@@ -377,9 +377,9 @@ async function main() {
   }
   await grantRoleToGroup("GROEP5", grocomeetRole.id, "DEFAULT");
 
-  // De planning en het geldoverzicht van de GM horen bij Groep 5; Groep 5 heeft
-  // via de admin-rol al alle rechten, dus dit is enkel de expliciete rol voor wie
-  // ze later los wil toekennen (bv. de penningmeester van een werkgroep).
+  // De planning en het geldoverzicht van de GM horen bij de rol admin (Groep 5 en
+  // IT, via `sync.ts`) en bij de verantwoordelijke van Theokot, die de broodjes
+  // levert. Niet bij elke groco: die reserveren enkel (`grocomeet-deelnemer`).
   const grocomeetManageRole = await upsertRole(
     "grocomeet-beheer",
     "Grocomeet-beheer",
@@ -389,7 +389,7 @@ async function main() {
     "Plan grocomeets and keep track of who owes what.",
   );
   await setRolePermissions(grocomeetManageRole.id, ["grocomeet.manage", "grocomeet.reserve"]);
-  await grantRoleToGroup("GROEP5", grocomeetManageRole.id, "DEFAULT");
+  await grantRoleToGroup("THEOKOT", grocomeetManageRole.id, "LEADER");
 
   // bureau: de tweewekelijkse onderwijsvergadering, beheerd door Onderwijs.
   const bureauRole = await upsertRole(

@@ -38,7 +38,7 @@ import {
 // -----------------------------------------------------------------------------
 
 /**
- * Wie dit soort moment mag beheren. De GM hoort bij Groep 5 en het Bureau bij
+ * Wie dit soort moment mag beheren. De GM hoort bij admin en Theokot en het Bureau bij
  * Onderwijs; ze zien elkaars schermen dus niet, ook al draaien ze op dezelfde code.
  */
 async function requireMeetingManager(kind: MeetingKind) {

@@ -21,6 +21,7 @@ import {
   type Semester,
 } from "./meetings";
 import { siteUrl } from "./seo";
+import { summarizeGrocomeets, type GrocomeetSummary } from "./grocomeetSummary";
 
 function hhmm(date: Date): string {
   return new Intl.DateTimeFormat("en-GB", {
@@ -336,4 +337,76 @@ export async function loadBureauTotals(
     yearCents: perMeeting.reduce((total, row) => total + row.totalCents, 0),
     allTimeCents: (allTimeItems._sum.itemPriceCents ?? 0) + (allTimeDrinks._sum.drinkPriceCents ?? 0),
   };
+}
+
+/**
+ * Alles wat de grocomeets van een werkingsjaar al kostten, voor de herbegroting:
+ * het formulier en de GM-doos apart. Zie `lib/grocomeetSummary.ts` voor wat er
+ * meetelt.
+ */
+export async function loadGrocomeetSummary(
+  workingYear: number,
+  locale: Locale,
+  now: Date = new Date(),
+): Promise<GrocomeetSummary> {
+  const meetings = await prisma.meeting.findMany({
+    where: { kind: "GROCOMEET", year: workingYear },
+    orderBy: { startsAt: "asc" },
+    select: {
+      id: true,
+      startsAt: true,
+      semester: true,
+      reservations: {
+        select: {
+          status: true,
+          itemNameNl: true,
+          itemNameEn: true,
+          itemPriceCents: true,
+          drinkName: true,
+          drinkPriceCents: true,
+          external: true,
+        },
+      },
+      theokotOrders: {
+        where: { status: { in: GROCOMEET_ORDER_STATUSES } },
+        select: {
+          status: true,
+          lines: {
+            select: {
+              quantity: true,
+              unitPriceCents: true,
+              sessionItem: { select: { nameNl: true, nameEn: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return summarizeGrocomeets(
+    meetings.map((meeting) => ({
+      id: meeting.id,
+      startsAt: meeting.startsAt,
+      semester: meeting.semester,
+      reservations: meeting.reservations.map((reservation) => ({
+        status: reservation.status,
+        itemName: reservation.itemNameNl
+          ? pick(reservation.itemNameNl, reservation.itemNameEn, locale) ?? reservation.itemNameNl
+          : null,
+        itemPriceCents: reservation.itemPriceCents,
+        drinkName: reservation.drinkName,
+        drinkPriceCents: reservation.drinkPriceCents,
+        external: reservation.external,
+      })),
+      boxOrders: meeting.theokotOrders.map((order) => ({
+        status: order.status,
+        lines: order.lines.map((line) => ({
+          name: pick(line.sessionItem.nameNl, line.sessionItem.nameEn, locale) ?? line.sessionItem.nameNl,
+          quantity: line.quantity,
+          unitPriceCents: line.unitPriceCents,
+        })),
+      })),
+    })),
+    now,
+  );
 }
