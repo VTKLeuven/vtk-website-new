@@ -13,6 +13,7 @@ import { MeetingPlanner } from "@/components/meetings/MeetingPlanner";
 import { MeetingDrinksCard } from "@/components/meetings/MeetingDrinksCard";
 import { NewMeetingCard } from "@/components/meetings/NewMeetingCard";
 import { SemesterTabs } from "@/components/meetings/SemesterTabs";
+import { BureauTabs } from "@/components/meetings/BureauTabs";
 
 import "@/app/design/vtk-basic.css";
 
@@ -50,6 +51,8 @@ export default async function AdminBureauPage({
   return (
     <div className="space-y-5">
       <h1 className="text-2xl font-semibold">VTK Bureau · {formatWorkingYear(workingYear)}</h1>
+
+      <BureauTabs nl={nl} current="beheer" />
 
       <SemesterTabs nl={nl} base={`${nl ? "" : "/en"}/admin/bureau`} semester={semester} />
 

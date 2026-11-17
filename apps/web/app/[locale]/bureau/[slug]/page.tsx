@@ -8,6 +8,7 @@ import { PleaseLogin } from "@/components/site/pleaseLogin";
 import { getMeetingDrinks } from "@/lib/meetings-server";
 import { buildMeetingCard } from "@/lib/meetingView";
 import { MeetingReservationCard } from "@/components/meetings/MeetingReservationCard";
+import { landingQuery, taggedLanding } from "@/lib/ticketing/source";
 
 import "@/app/design/vtk-basic.css";
 import "@/app/design/vtk-forms.css";
@@ -23,8 +24,10 @@ export const metadata: Metadata = { robots: { index: false, follow: false } };
  */
 export default async function BureauPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { locale: localeParam, slug } = await params;
   if (!hasLocale(localeParam)) notFound();
@@ -38,9 +41,15 @@ export default async function BureauPage({
   });
   if (!meeting || meeting.kind !== "BUREAU") notFound();
 
+  const query = await searchParams;
   const session = await getCurrentSession();
   if (!session) {
-    return <PleaseLogin locale={locale} nextPath={`${base}/bureau/${slug}`} className="vtk-page-shell" />;
+    // De herkomst reist mee langs de login; anders komt elke uitgelogde
+    // bezoeker uit de mail terug als "direct".
+    const via = landingQuery(query);
+    return (
+      <PleaseLogin locale={locale} nextPath={`${base}/bureau/${slug}${via}`} className="vtk-page-shell" />
+    );
   }
 
   const [reservation, drinks] = await Promise.all([
@@ -67,7 +76,7 @@ export default async function BureauPage({
 
       <div className="vtk-page-shell">
         <div className="vtk-basic-stack">
-          <MeetingReservationCard nl={nl} meeting={card} />
+          <MeetingReservationCard nl={nl} meeting={card} serverLanding={taggedLanding(query)} />
         </div>
       </div>
     </div>

@@ -772,6 +772,7 @@ model User {
   meetingReservations       MeetingReservation[]       @relation("MeetingReservationUser")
   meetingPaymentsProcessed  MeetingReservation[]       @relation("MeetingReservationPaidBy")
   meetingPlans              MeetingPlan[]              @relation("MeetingPlanBy")
+  meetingPromotions         MeetingPromotion[]         @relation("MeetingPromotionCreatedBy")
   theokotOrders             TheokotOrder[]             @relation("TheokotOrderUser")
   theokotPickedUp           TheokotOrder[]             @relation("TheokotPickedUpBy")
   theokotVoucherRedemptions TheokotVoucherRedemption[] @relation("TheokotVoucherUser")
@@ -4468,12 +4469,39 @@ model Meeting {
   reservations  MeetingReservation[]
   /// Wat grocos die dag zelf bij Theokot bestelden (enkel bij een GM).
   theokotOrders TheokotOrder[]
+  /// Reclamemomenten (mail, story) die Onderwijs zelf noteerde.
+  promotions    MeetingPromotion[]
 
   @@index([kind, startsAt])
   @@index([year, semester, kind])
 }
 
 /// Eén keuze uit het eigen aanbod van een moment (enkel bij `useTheokot=false`).
+/// Een reclamemoment voor een bureau: wanneer Onderwijs een mail stuurde of
+/// een story postte. Zelf ingevuld in /admin/bureau/statistieken, want die
+/// momenten gebeuren buiten de site. Verschijnt als verticale markering op de
+/// cumulatieve lijn, zodat je ziet wat erna gebeurde.
+model MeetingPromotion {
+  id             String   @id @default(cuid())
+  meetingId      String
+  /// Wanneer de mail vertrok of de post online kwam.
+  at             DateTime @db.Timestamptz(3)
+  /// Vrije omschrijving: "Mail naar bureau", "Story Instagram".
+  label          String
+  /// Optioneel het kanaal en de naam van de link die erbij hoorde
+  /// (`?via=mail&c=week-3`), om het moment naast de herkomst te leggen.
+  source         String?
+  sourceCampaign String?
+
+  createdById String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  meeting   Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("MeetingPromotionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([meetingId, at])
+}
+
 model MeetingOption {
   id         String  @id @default(cuid())
   meetingId  String
@@ -4526,6 +4554,15 @@ model MeetingReservation {
 
   /// Opmerking bij een bureau (onderwijsfeedback vooraf).
   comment String?
+
+  /// Langs welk kanaal de eerste inschrijving binnenkwam (`?via=mail`), zoals
+  /// `TicketOrder.source`. Enkel gezet bij het aanmaken van de rij: een
+  /// wijziging via een andere link laat ze staan. `null` = inschrijving van
+  /// voor die meting, op het scherm "niet gemeten" en nooit "rechtstreeks".
+  /// Zie `lib/ticketing/source.ts` en docs/design-decisions.md.
+  source         String?
+  /// `?c=` uit dezelfde link, om twee posts op hetzelfde kanaal te scheiden.
+  sourceCampaign String?
 
   /// Ongeldig gemaakt omdat het gekozen broodje die dag niet bestaat. De persoon
   /// kreeg er een mail over en ziet het op de reservatiepagina.

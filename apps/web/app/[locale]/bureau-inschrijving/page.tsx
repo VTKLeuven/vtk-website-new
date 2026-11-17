@@ -3,6 +3,7 @@ import Link from "@/components/ui/Link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { hasLocale } from "@/lib/locale";
+import { landingQuery } from "@/lib/ticketing/source";
 import type { Locale } from "@vtk/i18n";
 
 import "@/app/design/vtk-basic.css";
@@ -16,8 +17,10 @@ export const dynamic = "force-dynamic";
  */
 export default async function BureauRegistrationRedirectPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { locale: localeParam } = await params;
   if (!hasLocale(localeParam)) notFound();
@@ -36,7 +39,8 @@ export default async function BureauRegistrationRedirectPage({
   });
 
   if (nextBureau) {
-    redirect(`${base}/bureau/${nextBureau.slug}`);
+    // Geef `?via=` en `?c=` door: de vaste link staat in de mail van Onderwijs.
+    redirect(`${base}/bureau/${nextBureau.slug}${landingQuery(await searchParams)}`);
   }
 
   return (

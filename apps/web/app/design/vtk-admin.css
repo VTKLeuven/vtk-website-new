@@ -1846,6 +1846,29 @@ a.vtk-shortcut-tile:hover {
   stroke-width: 2;
 }
 
+/* Een gebeurtenis op de as (een verstuurde mail op /admin/bureau/statistieken):
+   een gestippelde lijn met een genummerd bolletje bovenaan. Het nummer verwijst
+   naar de lijst onder de grafiek, want een label in de grafiek zelf schuift
+   over de lijn en over een tweede gebeurtenis. */
+.vtk-chart-marker {
+  stroke: var(--navy);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  opacity: 0.55;
+  shape-rendering: crispEdges;
+}
+
+.vtk-chart-marker-badge {
+  fill: var(--navy);
+}
+
+.vtk-chart-marker-number {
+  fill: var(--paper);
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 .vtk-chart-tooltip {
   position: absolute;
   top: 0;
