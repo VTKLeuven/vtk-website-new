@@ -1,13 +1,16 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Card } from "@vtk/ui";
 import { prisma } from "@vtk/db";
 import type { Locale } from "@vtk/i18n";
 import Link from "@/components/ui/Link";
 import { LinkedRow } from "@/components/ui/LinkedRow";
+import { discordGuildConfigured, listDiscordChannels } from "@/lib/discord/bot";
 import { hasLocale } from "@/lib/locale";
 import { managedPocIds } from "@/lib/pocPolls/access";
 import { pollStatus } from "@/lib/pocPolls/core";
 import { requireSession } from "@/lib/session";
+import { PocChannelsCard } from "./PocChannelsCard";
 import { PollStatusPill, pollDateLabel } from "./PollStatusPill";
 
 /**
@@ -107,6 +110,28 @@ export default async function AdminPeilingen({ params }: { params: Promise<{ loc
           </table>
         </Card>
       )}
+
+      {scope === "all" && discordGuildConfigured() ? (
+        <Suspense fallback={null}>
+          <PocChannelsSection nl={nl} />
+        </Suspense>
+      ) : null}
     </div>
+  );
+}
+
+/** De lijst met kanalen komt van Discord; de peilingen erboven wachten daar niet op. */
+async function PocChannelsSection({ nl }: { nl: boolean }) {
+  const [channels, pocs] = await Promise.all([
+    listDiscordChannels(),
+    prisma.poc.findMany({ orderBy: { order: "asc" }, select: { id: true, nameNl: true, discordChannelId: true } }),
+  ]);
+  if (!channels) return null;
+  return (
+    <PocChannelsCard
+      nl={nl}
+      channels={channels}
+      pocs={pocs.map((poc) => ({ id: poc.id, name: poc.nameNl.replace(/^POC\s+/i, ""), channelId: poc.discordChannelId ?? "" }))}
+    />
   );
 }

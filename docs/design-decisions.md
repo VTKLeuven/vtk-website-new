@@ -13224,12 +13224,12 @@ een open vraag. Code in `apps/web/lib/pocPolls`.
   zien ze enkel de peilingen van hun eigen richting. Eén kanaal voor alles kan niet:
   Discord kent geen zichtbaarheid per bericht. Privéberichten van de bot zijn bekeken
   en afgewezen.
-- **Het kanaal kies je bij de peiling, niet bij de POC** (november 2026). Het stond
-  eerst in /admin/pocs, onder de POC-instellingen, en dat vond Onderwijs onlogisch:
-  wie een peiling opstelt, wil daar zien en kiezen waar ze komt. Het scherm stelt het
-  kanaal van de vorige peiling van dezelfde POC voor. Een verkeerd gekozen kanaal
-  toont de peiling aan meer mensen, maar laat hen niet antwoorden: de site kijkt bij
-  elke klik richting en fase na.
+- **Het kanaal hoort bij de POC, en staat ingesteld op /admin/peilingen** (november
+  2026). Het stond eerst in /admin/pocs, onder de POC-instellingen; Onderwijs zoekt
+  het bij de peilingen, dus daar staat nu de lijst "Discord-kanalen per POC". Een
+  RiVer kiest geen kanaal: zijn peiling komt in dat van zijn POC, of niet op
+  Discord. Enkel VTK Onderwijs (`pocs.manage`) kan bij een peiling een ander kanaal
+  kiezen. De site dwingt dat af in de action, niet enkel in het formulier.
 - **Een POC kan meerdere rollen hebben, elk eventueel voor bepaalde fases.** De BPOC
   hangt aan "1ste bachelor", "2de bachelor" en "3de bachelor"; een eerstejaars krijgt
   enkel de eerste. Een rol zonder fase krijgt iedereen van de POC.

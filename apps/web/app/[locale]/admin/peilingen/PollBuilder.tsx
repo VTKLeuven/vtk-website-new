@@ -25,7 +25,7 @@ export type PollBuilderPoc = {
   hasProgramme: boolean;
   reach: number;
   perYear: Record<string, number>;
-  /** Het kanaal van de vorige peiling, als startwaarde. */
+  /** Het kanaal van de POC (of van de vorige algemene peiling). `null`: geen. */
   defaultChannelId: string | null;
 };
 
@@ -55,6 +55,7 @@ export function PollBuilder({
   initial,
   pocs,
   channels,
+  canChooseChannel,
   phases,
   panelLabels,
 }: {
@@ -63,6 +64,8 @@ export function PollBuilder({
   pocs: PollBuilderPoc[];
   /** `null`: de Discord-bot is niet ingesteld of Discord antwoordde niet. */
   channels: Array<{ id: string; name: string }> | null;
+  /** VTK Onderwijs: mag een ander kanaal kiezen dan dat van de POC. */
+  canChooseChannel: boolean;
   phases: Array<{ key: string; label: string }>;
   panelLabels: PollPanelLabels;
 }) {
@@ -77,13 +80,17 @@ export function PollBuilder({
   const [pocId, setPocId] = useState(initial.pocId);
   const [showPreview, setShowPreview] = useState(false);
   const [channelId, setChannelId] = useState(initial.channelId);
+  const [postToDiscord, setPostToDiscord] = useState(initial.channelId !== "");
 
   const poc = pocs.find((candidate) => candidate.id === pocId) ?? pocs[0];
   const general = Boolean(poc?.general);
-  const channelName = channels?.find((channel) => channel.id === channelId)?.name ?? null;
+  const nameOf = (id: string | null | undefined) => channels?.find((channel) => channel.id === id)?.name ?? null;
+  const pocChannelName = nameOf(poc?.defaultChannelId);
+  // Een RiVer post enkel in het kanaal van de POC; VTK Onderwijs kiest zelf.
+  const channelName = canChooseChannel ? nameOf(channelId) : postToDiscord ? pocChannelName : null;
   const audience = general ? (nl ? "alle richtingen" : "all programmes") : (poc?.name ?? (nl ? "je POC" : "your POC"));
 
-  // Een andere POC brengt het kanaal van haar vorige peiling mee.
+  // Een andere POC brengt haar eigen kanaal mee.
   function choosePoc(id: string) {
     setPocId(id);
     setChannelId(pocs.find((candidate) => candidate.id === id)?.defaultChannelId ?? "");
@@ -340,7 +347,7 @@ export function PollBuilder({
                 ? "Op de website: bovenaan elke pagina en bij je POC op de homepage, enkel voor studenten van je richting."
                 : "On the website: at the top of every page and at your POC on the homepage, only for students of your programme."}
           </p>
-          {channels ? (
+          {channels && canChooseChannel ? (
             <div>
               <Label htmlFor="poll-channel">{nl ? "Ook op Discord, in" : "Also on Discord, in"}</Label>
               <SearchPicker
@@ -360,13 +367,38 @@ export function PollBuilder({
               <p className="mt-2 text-sm text-vtk-muted">
                 {general
                   ? nl
-                    ? "Kies een kanaal dat alle gekoppelde studenten zien. Wie er niet bij hoort, kan op Discord toch niet antwoorden: de site kijkt bij elke klik de richting en fase na."
-                    : "Choose a channel all linked students can see. Anyone outside the audience still cannot answer on Discord: the site checks programme and phase on every click."
-                  : nl
-                    ? "Kies het kanaal van je POC, dat enkel haar studenten zien. Wie er niet bij hoort, kan op Discord toch niet antwoorden: de site kijkt bij elke klik de richting en fase na."
-                    : "Choose your POC's channel, which only its students can see. Anyone outside the audience still cannot answer on Discord: the site checks programme and phase on every click."}
+                    ? "Kies een kanaal dat alle gekoppelde studenten zien."
+                    : "Choose a channel all linked students can see."
+                  : pocChannelName
+                    ? nl
+                      ? `Standaard #${pocChannelName}, het kanaal van deze POC. Enkel VTK Onderwijs kan hiervan afwijken; een RiVer post altijd daar.`
+                      : `By default #${pocChannelName}, this POC's channel. Only VTK Onderwijs can deviate from it; a student rep always posts there.`
+                    : nl
+                      ? "Deze POC heeft nog geen kanaal. Stel het in onderaan Peilingen, onder Discord-kanalen per POC."
+                      : "This POC has no channel yet. Set it at the bottom of Polls, under Discord channels per POC."}
               </p>
             </div>
+          ) : channels && pocChannelName ? (
+            <label className="flex cursor-pointer items-start gap-2 text-sm text-vtk-body">
+              <input
+                type="checkbox"
+                name="postToDiscord"
+                className="mt-0.5"
+                checked={postToDiscord}
+                onChange={(event) => setPostToDiscord(event.target.checked)}
+              />
+              <span>
+                {nl
+                  ? `Ook op Discord, in #${pocChannelName}. Dat kanaal zien enkel studenten van deze POC die hun account koppelden.`
+                  : `Also on Discord, in #${pocChannelName}. Only students of this POC who linked their account can see that channel.`}
+              </span>
+            </label>
+          ) : channels ? (
+            <p className="text-sm text-vtk-muted">
+              {nl
+                ? "Deze POC heeft nog geen Discord-kanaal; de peiling komt enkel op de website. Vraag VTK Onderwijs dat in te stellen bij Peilingen."
+                : "This POC has no Discord channel yet; the poll only appears on the website. Ask VTK Onderwijs to set that up under Polls."}
+            </p>
           ) : (
             <p className="text-sm text-vtk-muted">
               {nl

@@ -3440,8 +3440,9 @@ model Poc {
   /// De rollen op de studentendiscord die de studenten van deze POC krijgen,
   /// eventueel per fase. Zie docs/poc-peilingen.md.
   discordRoles     PocDiscordRole[]
-  /// Het kanaal dat vroeger in /admin/pocs stond. Het kanaal kies je nu per
-  /// peiling; dit is enkel nog de startwaarde zolang de POC er geen postte.
+  /// Het kanaal waar de peilingen van deze POC komen, en waar enkel haar rollen
+  /// in kunnen. VTK Onderwijs stelt het in op /admin/peilingen; een RiVer post
+  /// altijd hier, enkel `pocs.manage` kan per peiling afwijken.
   discordChannelId String?
 
   /// Het werkingsjaar waarvan de vertegenwoordigers in het groepsadres van de
@@ -3519,8 +3520,8 @@ model PocPoll {
   /// De fases waarvoor de peiling is. Leeg: alle fases van de richting.
   studyYears  StudyYear[] @default([])
 
-  /// Het kanaal en het bericht op Discord. Het kanaal kiest wie de peiling
-  /// opstelt; leeg is enkel op de website. `discordClosedAt` zegt dat de knoppen
+  /// Het kanaal en het bericht op Discord. Bij een POC-peiling het kanaal van
+  /// de POC, tenzij VTK Onderwijs een ander koos; leeg is enkel op de website. `discordClosedAt` zegt dat de knoppen
   /// na de deadline uitgezet zijn, `discordError` waarom posten mislukte.
   discordChannelId String?
   discordMessageId String?

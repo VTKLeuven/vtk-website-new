@@ -10,9 +10,10 @@ import type { PollBuilderPoc } from "./PollBuilder";
 /**
  * Wat het opstelscherm nodig heeft, voor een nieuwe peiling en voor een concept.
  *
- * Het Discord-kanaal kies je per peiling. Als startwaarde neemt het scherm het
- * kanaal van de laatste peiling van dezelfde POC (of van de laatste algemene
- * peiling), en anders het kanaal dat vroeger in /admin/pocs stond.
+ * Een peiling van een POC komt in het kanaal van die POC (ingesteld door VTK
+ * Onderwijs onderaan /admin/peilingen). Enkel wie `pocs.manage` heeft, kan een
+ * ander kanaal kiezen; een algemene peiling start van het kanaal van de vorige
+ * algemene peiling.
  */
 export async function loadBuilderData(scope: string[] | "all", locale: Locale) {
   const [pocRows, channels, lastChannels] = await Promise.all([
@@ -23,9 +24,9 @@ export async function loadBuilderData(scope: string[] | "all", locale: Locale) {
     }),
     listDiscordChannels(),
     prisma.pocPoll.findMany({
-      where: { discordChannelId: { not: null }, ...(scope === "all" ? {} : { pocId: { in: scope } }) },
+      where: { discordChannelId: { not: null }, pocId: null },
       orderBy: { createdAt: "desc" },
-      distinct: ["pocId"],
+      take: 1,
       select: { pocId: true, discordChannelId: true },
     }),
   ]);
@@ -45,7 +46,7 @@ export async function loadBuilderData(scope: string[] | "all", locale: Locale) {
         hasProgramme: poc.studyProgrammes.length > 0,
         reach: population.total,
         perYear: population.perYear,
-        defaultChannelId: known(lastFor(poc.id)) ?? known(poc.discordChannelId),
+        defaultChannelId: known(poc.discordChannelId),
       };
     }),
   );
@@ -67,6 +68,8 @@ export async function loadBuilderData(scope: string[] | "all", locale: Locale) {
   return {
     pocs,
     channels,
+    /** Enkel VTK Onderwijs wijkt af van het kanaal van de POC. */
+    canChooseChannel: scope === "all",
     phases: STUDY_YEARS.map((key) => ({ key, label: pollPhaseLabel(key, locale) })),
     panelLabels: pollPanelLabels(locale),
   };

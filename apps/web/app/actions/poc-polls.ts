@@ -131,16 +131,20 @@ export async function savePocPollAction(_previous: SaveState, formData: FormData
   }
   if (!managesPoc(scope, pocId)) return saveError("POLL_FORBIDDEN");
 
+  let pocChannelId: string | null = null;
   if (pocId !== null) {
-    const poc = await prisma.poc.findUnique({ where: { id: pocId }, select: { studyProgrammes: true } });
+    const poc = await prisma.poc.findUnique({ where: { id: pocId }, select: { studyProgrammes: true, discordChannelId: true } });
     if (!poc) return saveError("POLL_FORBIDDEN");
     if (publish && poc.studyProgrammes.length === 0) return saveError("POLL_POC_NO_PROGRAMME");
+    pocChannelId = poc.discordChannelId;
   }
 
-  // Het kanaal kiest wie de peiling opstelt. Een kanaal dat de bot niet kent,
-  // weigeren we hier al, en niet pas bij het posten na publiceren.
-  const channelField = text(formData, "discordChannelId").trim();
-  let discordChannelId: string | null = null;
+  // Een RiVer post enkel in het kanaal van de eigen POC: aan of uit, geen keuze.
+  // Enkel VTK Onderwijs (`pocs.manage`) kiest een ander kanaal; een kanaal dat de
+  // bot niet kent, weigeren we dan hier al, en niet pas bij het posten.
+  const channelField = scope === "all" ? text(formData, "discordChannelId").trim() : "";
+  let discordChannelId: string | null =
+    scope !== "all" && discordBotConfigured() && formData.has("postToDiscord") ? pocChannelId : null;
   if (channelField && discordBotConfigured()) {
     if (!/^\d{5,25}$/.test(channelField)) return saveError("POLL_CHANNEL");
     const channels = await listDiscordChannels();
@@ -191,6 +195,44 @@ export async function savePocPollAction(_previous: SaveState, formData: FormData
   // Een nieuw concept krijgt zijn eigen adres: een tweede klik op bewaren maakt
   // anders een duplicaat. Na publiceren is het opstelscherm er niet meer.
   if (publish || !id) redirect(`${adminBase(formData)}/${pollId}`);
+  return saveOk();
+}
+
+/**
+ * Welk Discord-kanaal bij welke POC hoort: daar komen de peilingen van haar
+ * RiVers. Enkel VTK Onderwijs (`pocs.manage`) stelt dit in. Een veld dat niet
+ * meekwam (Discord antwoordde niet), laat de POC zoals ze was.
+ */
+export async function savePocPollChannelsAction(_previous: SaveState, formData: FormData): Promise<SaveState> {
+  const scope = await manageScope();
+  if (scope !== "all") return saveError("POLL_FORBIDDEN");
+  const channels = await listDiscordChannels();
+  if (!channels) return saveError("POLL_DISCORD_DOWN");
+
+  const pocs = await prisma.poc.findMany({ select: { id: true, nameNl: true, discordChannelId: true } });
+  const changes: Array<{ id: string; name: string; channelId: string | null }> = [];
+  for (const poc of pocs) {
+    const field = formData.get(`channel_${poc.id}`);
+    if (typeof field !== "string") continue;
+    const channelId = field.trim() || null;
+    if (channelId && !channels.some((channel) => channel.id === channelId)) return saveError("POLL_CHANNEL");
+    if (channelId !== poc.discordChannelId) changes.push({ id: poc.id, name: poc.nameNl, channelId });
+  }
+
+  await prisma.$transaction(
+    changes.map((change) => prisma.poc.update({ where: { id: change.id }, data: { discordChannelId: change.channelId } })),
+  );
+  if (changes.length > 0) {
+    const label = (channelId: string | null) =>
+      channelId ? `#${channels.find((channel) => channel.id === channelId)?.name ?? channelId}` : "geen";
+    await logAudit({
+      action: "update",
+      entity: "poc",
+      target: "Discord-kanalen van de peilingen",
+      summary: changes.map((change) => `${change.name}: ${label(change.channelId)}`).join("; "),
+    });
+  }
+  revalidatePath("/[locale]/admin/peilingen", "layout");
   return saveOk();
 }
 
