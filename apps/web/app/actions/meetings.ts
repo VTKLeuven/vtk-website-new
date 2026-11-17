@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@vtk/db";
-import type { MeetingKind } from "@prisma/client";
+import { Prisma, type MeetingKind } from "@prisma/client";
 import { requirePermission, requireSession } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { logAudit } from "@/lib/audit";
@@ -81,6 +81,23 @@ function parseKind(value: FormDataEntryValue | null): MeetingKind | null {
 function parseSemester(value: FormDataEntryValue | null): Semester | null {
   const n = Number(value);
   return n === 1 || n === 2 ? (n as Semester) : null;
+}
+
+/**
+ * Er staat al een vergadering van deze soort op die dag (`@@unique([kind, day])`
+ * op `Meeting`). Eén bureau en één grocomeet per dag: op productie stond elk
+ * bureau dubbel nadat de planning twee keer tegelijk was opgeslagen. Een botsing
+ * op de slug is iets anders en gooit gewoon door.
+ */
+async function isDayTaken(error: unknown, kind: MeetingKind, startsAt: Date): Promise<boolean> {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") return false;
+  const target = error.meta?.target;
+  if (Array.isArray(target) ? target.includes("day") : String(target ?? "").includes("day")) return true;
+  // Twee aanvragen tegelijk kiezen dezelfde slug (`bureau-2026-10-01`) en botsen
+  // daarop voor ze aan de dag toekomen. Staat die dag er nu, dan is het dezelfde
+  // situatie.
+  const day = new Date(`${ymdKey(dayParts(startsAt))}T00:00:00Z`);
+  return (await prisma.meeting.count({ where: { kind, day } })) > 0;
 }
 
 /** "YYYY-MM-DDTHH:mm" uit een datetime-local, als Brussel-wandkloktijd. */
@@ -200,18 +217,26 @@ export async function planMeetingsAction(_prev: SaveState, formData: FormData): 
       continue;
     }
 
-    const created = await prisma.meeting.create({
-      data: {
-        kind,
-        year,
-        semester,
-        slug: await uniqueSlug(kind, startsAt),
-        startsAt,
-        location: entry.location,
-        opensAt: opensDaysBefore ? new Date(startsAt.getTime() - opensDaysBefore * 86400000) : null,
-        createdById: session.user.id,
-      },
-    });
+    let created;
+    try {
+      created = await prisma.meeting.create({
+        data: {
+          kind,
+          year,
+          semester,
+          slug: await uniqueSlug(kind, startsAt),
+          startsAt,
+          location: entry.location,
+          opensAt: opensDaysBefore ? new Date(startsAt.getTime() - opensDaysBefore * 86400000) : null,
+          createdById: session.user.id,
+        },
+      });
+    } catch (error) {
+      // Die dag bestaat al: een tweede opslag die tegelijk liep, of dezelfde dag
+      // in een ander semester. Laten staan; er is er maar één per dag.
+      if (await isDayTaken(error, kind, startsAt)) continue;
+      throw error;
+    }
     // Een GM die er pas bijkomt terwijl er die dag al besteld is.
     await linkGrocomeetOrders(created);
   }
@@ -265,17 +290,23 @@ export async function createMeetingAction(_prev: SaveState, formData: FormData):
   const location = String(formData.get("location") ?? "").trim() || null;
   const year = Number(formData.get("year"));
 
-  const created = await prisma.meeting.create({
-    data: {
-      kind,
-      year: Number.isInteger(year) ? year : currentWorkingYear(startsAt),
-      semester: semesterForDate(startsAt),
-      slug: await uniqueSlug(kind, startsAt),
-      startsAt,
-      location,
-      createdById: session.user.id,
-    },
-  });
+  let created;
+  try {
+    created = await prisma.meeting.create({
+      data: {
+        kind,
+        year: Number.isInteger(year) ? year : currentWorkingYear(startsAt),
+        semester: semesterForDate(startsAt),
+        slug: await uniqueSlug(kind, startsAt),
+        startsAt,
+        location,
+        createdById: session.user.id,
+      },
+    });
+  } catch (error) {
+    if (await isDayTaken(error, kind, startsAt)) return saveError("DAY_TAKEN");
+    throw error;
+  }
 
   await logAudit({
     action: "create",
@@ -356,6 +387,7 @@ export async function saveMeetingAction(_prev: SaveState, formData: FormData): P
     });
   } catch (error) {
     if (error instanceof ExternalLeftError) return saveError("EXTERNAL_LEFT");
+    if (await isDayTaken(error, meeting.kind, startsAt)) return saveError("DAY_TAKEN");
     throw error;
   }
 

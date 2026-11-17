@@ -32,6 +32,8 @@ export type StatsMeeting = {
   id: string;
   startsAt: Date;
   opensAt: Date | null;
+  /** Enkel voor het label in de keuzelijst; de rekenkant gebruikt het niet. */
+  location?: string | null;
   reservations: StatsReservation[];
 };
 

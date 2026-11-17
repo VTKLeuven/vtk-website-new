@@ -750,6 +750,19 @@ identiek; enkel het publiek en de beheerder verschillen.
 | Geld | per persoon bijgehouden en af te vinken | enkel totalen, Onderwijs betaalt |
 | Beheer | Groep 5, IT en de verantwoordelijke van Theokot (`grocomeet.manage`) | Onderwijs (`bureau.manage`) |
 
+**Eén bureau en één grocomeet per dag.** Een bureau en een grocomeet mogen
+dezelfde dag vallen, twee bureaus niet: er is maar één bureau per donderdag, en
+een tweede met dezelfde dag verdeelt de inschrijvingen over twee links. De
+database dwingt het af (`@@unique([kind, day])`, met `day` door een trigger uit
+`startsAt`), zodat ook een dubbele klik of twee tabbladen het niet omzeilen. In
+november 2026 stond op productie elk bureau van het eerste semester dubbel,
+waarschijnlijk doordat de semesterplanning twee keer tegelijk was opgeslagen. De
+migratie `20261117120000_meeting_one_per_day` voegde ze samen in de oudste (die
+met de gewone link zonder `-2`); wie op beide stond, hield zijn laatste keuze met
+de herkomst van zijn eerste inschrijving. Een tweede op dezelfde dag toevoegen
+of een bestaande ernaar verplaatsen geeft nu `DAY_TAKEN`; de planning slaat een
+dag die al bestaat stil over.
+
 ### Waarom dit geen formulier uit de formulierenmodule is
 
 Het lijkt een form met twee keuzevragen, maar de bestelling moet dingen doen die een

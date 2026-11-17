@@ -511,7 +511,11 @@ export async function createMcpRecord(principal: McpPrincipal, raw: McpCreateInp
       case "meeting": {
         const input = schemas.meeting.parse(data); const needed = input.kind === "GROCOMEET" ? "grocomeet.manage" : "bureau.manage";
         if (!hasMcpPermission(principal, needed)) throw new McpInputError("FORBIDDEN", `Permissie ${needed} ontbreekt.`);
-        const row = await prisma.meeting.create({ data: { ...input, startsAt: new Date(input.startsAt), opensAt: input.opensAt ? new Date(input.opensAt) : null, location: nullIfEmpty(input.location), noteNl: nullIfEmpty(input.noteNl), noteEn: nullIfEmpty(input.noteEn) } });
+        // Eén per soort per dag (`@@unique([kind, day])`): zeg het in plaats van een ruwe P2002.
+        const row = await prisma.meeting.create({ data: { ...input, startsAt: new Date(input.startsAt), opensAt: input.opensAt ? new Date(input.opensAt) : null, location: nullIfEmpty(input.location), noteNl: nullIfEmpty(input.noteNl), noteEn: nullIfEmpty(input.noteEn) } }).catch((error: unknown) => {
+          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002" && JSON.stringify(error.meta?.target ?? "").includes("day")) throw new McpInputError("DAY_TAKEN", "Op die dag staat er al een vergadering van deze soort.");
+          throw error;
+        });
         await audit(principal, "meeting", row.id, row.slug, `${row.kind.toLowerCase()} aangemaakt via MCP`);
         result = row; break;
       }
