@@ -337,6 +337,15 @@ CSV-export, plak ze, kijk na en zet terug. Een account gaat enkel terug als het
 nog staat waar die verhuizing het zette. Gebouwd na 16 november 2026, toen de
 sync tientallen accounts naar `/` verhuisde (zie "Vallen").
 
+### Wijzigingen in de Admin console
+
+Een lid toevoegen of verwijderen in de Admin console mag: de volgende ronde
+neemt het over. Een toegevoegd lid komt als los lid op de site ("toegevoegd in
+Google"), een verwijderd lid gaat ook op de site uit de lijst (een uitsluiting
+als het er via een post in zat). Zie `docs/design-decisions.md`, "Een wijziging
+in Google wordt overgenomen". De toegangsinstellingen (wie mag posten) zet de
+sync wel terug; die stel je op de site in.
+
 ### Standaardinstellingen van een groep
 
 Elke beheerde groep krijgt bij elke sync dezelfde toegangsinstellingen

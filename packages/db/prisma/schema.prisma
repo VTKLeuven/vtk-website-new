@@ -1349,6 +1349,14 @@ model MailGroup {
   /// Aantal leden dat de laatste geslaagde sync in Google zette.
   lastMemberCount Int       @default(0)
 
+  /// Wie de site na de laatste geslaagde ronde in Google zette (gewone leden).
+  /// Een verschil met wat er nu in Google staat, is een wijziging van een mens
+  /// in de Admin console: die neemt de site over in plaats van ze terug te
+  /// draaien. Zie `lib/google/twoWay.ts`.
+  syncedMembers  String[]  @default([])
+  /// Leeg = er is nog geen onthouden lijst; dan haalt de sync niemand weg.
+  syncBaselineAt DateTime?
+
   /// De werkgroep die deze lijst zelf mag beheren (leden erbij en eraf), naast
   /// wie `mailgroups.manage` heeft. Een lid van die werkgroep krijgt in deze
   /// lijst zijn werkgroepadres in plaats van zijn persoonlijke.

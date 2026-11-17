@@ -2384,6 +2384,27 @@ verstopte regel in de code: de volgende IT'er moet het kunnen zien en wijzigen
 zonder de code te lezen. Het aanmaakscherm zet die rij vanzelf klaar wanneer je
 een lijst uit een post maakt.
 
+### Een wijziging in Google wordt overgenomen, niet teruggedraaid
+
+Eerst was de site de enige bron: wie in de Admin console een lid toevoegde,
+zag het binnen de vijf minuten weer verdwijnen ("die bot reverteert al mijn
+changes", wgalumni@vtk.be, 17 november 2026). Mensen blijven de Admin console
+gebruiken, dus nu werkt de sync in twee richtingen (`lib/google/twoWay.ts`):
+
+- De site onthoudt na elke ronde wie ze in Google zette
+  (`MailGroup.syncedMembers`). Een verschil met wat er nu staat, is een mens.
+- **Toegevoegd in Google** wordt een los lid op de site, met de notitie
+  "toegevoegd in Google". Een uitsluiting voor dat adres valt weg.
+- **Verwijderd in Google**: een los lid verdwijnt ook op de site; wie er via
+  een bron (een post) in zit, krijgt een uitsluiting "verwijderd in Google".
+- Wat op de site veranderde, gaat zoals altijd naar Google.
+- Zonder onthouden lijst (de eerste ronde na de migratie, een nieuwe groep)
+  neemt de site over wat extra in Google staat en haalt ze niemand weg.
+- Eigenaars en beheerders blijven buiten de sync, zoals voorheen.
+
+Het blijft een regel: een in Google toegevoegd lid staat er als los lid, niet
+als bron. Wie wil dat een lijst een post volgt, zet de post als bron op de site.
+
 ### De 15-juli-wissel kost geen cron
 
 Precies zoals bij de wachtwoordkluis: omdat `GroupMembership` per werkingsjaar

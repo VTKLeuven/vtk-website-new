@@ -17,7 +17,8 @@ import {
   removeAlias,
   removeMember,
 } from "./client";
-import { normaliseEmail } from "./members";
+import { memberAddress, normaliseEmail } from "./members";
+import { planTwoWay } from "./twoWay";
 import { type AccountState, applyAccountState, desiredAccountState } from "./accountState";
 import { renderAddress, yearVars } from "./addresses";
 import {
@@ -68,8 +69,8 @@ export type ReconcileOutcome =
       accountWarnings: string[];
     };
 
-type MailGroupRow = MailGroupForSync;
-const SELECT = MAIL_GROUP_SELECT;
+type MailGroupRow = MailGroupForSync & { syncedMembers: string[]; syncBaselineAt: Date | null };
+const SELECT = { ...MAIL_GROUP_SELECT, syncedMembers: true, syncBaselineAt: true } as const;
 
 /**
  * Zorgt dat de groep in Google bestaat en geeft de sleutel terug waarmee we
@@ -150,6 +151,101 @@ async function ensureSettings(cfg: GoogleConfig, row: MailGroupRow): Promise<voi
   await patchGroupSettings(cfg, row.email, wanted);
 }
 
+/** De notitie op een los lid dat in Google toegevoegd en door de site overgenomen werd. */
+export const ADDED_IN_GOOGLE_NOTE = "toegevoegd in Google";
+/** De notitie op een uitsluiting voor iemand die in Google verwijderd werd. */
+export const REMOVED_IN_GOOGLE_NOTE = "verwijderd in Google";
+
+/**
+ * Zet in de regel op de site wat iemand in Google veranderde, en geeft de
+ * nieuwe ledenlijst terug.
+ *
+ * - Toegevoegd in Google: een los lid (het account van een lid van de site als
+ *   het adres zijn gekoppelde account is, anders het vrije adres).
+ * - Verwijderd in Google: een los lid verdwijnt; wie er dan nog via een bron
+ *   in zit (een post), krijgt een uitsluiting, anders zet de sync hem terug.
+ */
+async function adoptGoogleChanges(
+  row: MailGroupRow,
+  ctx: DesiredContext,
+  takeOver: string[],
+  dropped: string[],
+) {
+  const reload = async () =>
+    (await prisma.mailGroup.findUniqueOrThrow({ where: { id: row.id }, select: SELECT })) as unknown as MailGroupRow;
+  const addressOf = (extra: MailGroupRow["extras"][number]) =>
+    extra.email
+      ? normaliseEmail(extra.email)
+      : extra.user
+        ? memberAddress(
+            {
+              id: extra.user.id,
+              name: extra.user.name,
+              googleEmail: extra.user.googleEmail,
+              werkgroepEmails: Object.fromEntries(extra.user.werkgroepAccounts.map((a) => [a.groupId, a.email])),
+            },
+            row.ownerGroupId,
+          )
+        : null;
+
+  if (dropped.length > 0) {
+    const current = await prisma.mailGroupExtra.findMany({
+      where: { mailGroupId: row.id, kind: "INCLUDE" },
+      select: { id: true, email: true, user: { select: MAIL_GROUP_SELECT.extras.select.user.select } },
+    });
+    const loose = current.filter((e) => {
+      const address = addressOf({ ...e, kind: "INCLUDE" } as MailGroupRow["extras"][number]);
+      return address !== null && dropped.includes(address);
+    });
+    if (loose.length) await prisma.mailGroupExtra.deleteMany({ where: { id: { in: loose.map((e) => e.id) } } });
+    // Zit iemand er nog altijd in (via een post), dan een uitsluiting.
+    const still = desiredFor(await reload(), ctx).emails.filter((e) => dropped.includes(e));
+    if (still.length) {
+      const users = await prisma.user.findMany({
+        where: { googleEmail: { in: still }, deletedAt: null },
+        select: { id: true, googleEmail: true },
+      });
+      const userBy = new Map(users.map((u) => [u.googleEmail as string, u.id]));
+      await prisma.mailGroupExtra.createMany({
+        data: still.map((email) =>
+          userBy.has(email)
+            ? { mailGroupId: row.id, userId: userBy.get(email), kind: "EXCLUDE" as const, note: REMOVED_IN_GOOGLE_NOTE }
+            : { mailGroupId: row.id, email, kind: "EXCLUDE" as const, note: REMOVED_IN_GOOGLE_NOTE },
+        ),
+        skipDuplicates: true,
+      });
+    }
+  }
+
+  if (takeOver.length > 0) {
+    // Een lid van de site herkennen we enkel op zijn gekoppelde account, zoals
+    // bij het overnemen (lib/google/import.ts); nooit op naam.
+    const users = await prisma.user.findMany({
+      where: { googleEmail: { in: takeOver }, deletedAt: null },
+      select: { id: true, googleEmail: true },
+    });
+    const userBy = new Map(users.map((u) => [u.googleEmail as string, u.id]));
+    // Een uitsluiting voor hetzelfde adres valt weg: iemand zette hem net bewust terug.
+    await prisma.mailGroupExtra.deleteMany({
+      where: {
+        mailGroupId: row.id,
+        kind: "EXCLUDE",
+        OR: [{ email: { in: takeOver } }, { userId: { in: users.map((u) => u.id) } }],
+      },
+    });
+    await prisma.mailGroupExtra.createMany({
+      data: takeOver.map((email) =>
+        userBy.has(email)
+          ? { mailGroupId: row.id, userId: userBy.get(email), kind: "INCLUDE" as const, note: ADDED_IN_GOOGLE_NOTE }
+          : { mailGroupId: row.id, email, kind: "INCLUDE" as const, note: ADDED_IN_GOOGLE_NOTE },
+      ),
+      skipDuplicates: true,
+    });
+  }
+
+  return desiredFor(await reload(), ctx);
+}
+
 type Counters = { added: number; removed: number; unlinked: number; failed: number };
 
 async function syncOne(
@@ -164,11 +260,25 @@ async function syncOne(
     const key = await ensureGroup(cfg, row);
     await ensureSettings(cfg, row);
 
-    const desired = desiredFor(row, ctx);
-    counters.unlinked += desired.unlinked.length;
-
+    let desired = desiredFor(row, ctx);
     const remote = await listMembers(cfg, key);
     const remoteByEmail = new Map(remote.map((m) => [normaliseEmail(m.email), m]));
+    const isPlainMember = (email: string) => remoteByEmail.get(email)?.role === "MEMBER";
+
+    // Tweerichtingsverkeer: wat een mens in de Admin console veranderde sinds
+    // de vorige ronde, neemt de site over in plaats van het terug te draaien.
+    // Eigenaars en beheerders blijven buiten beschouwing, zoals altijd.
+    const plan = planTwoWay({
+      desired: desired.emails,
+      remote: [...remoteByEmail.keys()],
+      baseline: row.syncBaselineAt ? row.syncedMembers : null,
+    });
+    const takeOver = plan.takeOver.filter(isPlainMember);
+    const dropped = plan.dropped;
+    if (takeOver.length > 0 || dropped.length > 0) {
+      desired = await adoptGoogleChanges(row, ctx, takeOver, dropped);
+    }
+    counters.unlinked += desired.unlinked.length;
     const wanted = new Set(desired.emails);
 
     let added = 0;
@@ -187,6 +297,21 @@ async function syncOne(
       removed += 1;
     }
 
+    if (takeOver.length > 0 || dropped.length > 0) {
+      await logAudit({
+        action: "sync",
+        entity: "mailGroup",
+        entityId: row.id,
+        target: row.email,
+        summary: [
+          takeOver.length ? `in Google toegevoegd, overgenomen als los lid: ${takeOver.join(", ")}` : null,
+          dropped.length ? `in Google verwijderd, ook hier uit de lijst: ${dropped.join(", ")}` : null,
+        ]
+          .filter(Boolean)
+          .join("; "),
+      });
+    }
+
     counters.added += added;
     counters.removed += removed;
 
@@ -196,6 +321,10 @@ async function syncOne(
         lastSyncAt: new Date(),
         lastError: null,
         lastMemberCount: desired.emails.length,
+        // Wie er nu in Google staat (gewone leden die wij zetten): de lijst
+        // waartegen de volgende ronde een wijziging in Google herkent.
+        syncedMembers: desired.emails,
+        syncBaselineAt: new Date(),
       },
     });
 
