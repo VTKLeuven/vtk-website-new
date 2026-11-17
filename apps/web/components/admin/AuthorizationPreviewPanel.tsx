@@ -27,6 +27,8 @@ type GroupOption = {
 
 type GroupChoice = { selected: boolean; lead: boolean };
 
+type PocOption = { id: string; name: string };
+
 /** Permissiecodes gegroepeerd per categorie, in de volgorde van de registry. */
 function groupByCategory(
   codes: string[],
@@ -51,16 +53,19 @@ export function AuthorizationPreviewPanel({
   locale,
   roles,
   groups,
+  pocs,
 }: {
   locale: "nl" | "en";
   roles: RoleOption[];
   groups: GroupOption[];
+  pocs: PocOption[];
 }) {
   const nl = locale === "nl";
   const info = useMemo(() => permissionInfoByCode(locale), [locale]);
 
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
   const [groupChoices, setGroupChoices] = useState<Record<string, GroupChoice>>({});
+  const [selectedPocs, setSelectedPocs] = useState<Set<string>>(new Set());
 
   const posts = groups.filter((group) => group.type === "PRAESIDIUM");
   const werkgroepen = groups.filter((group) => group.type === "WERKGROEP");
@@ -99,6 +104,15 @@ export function AuthorizationPreviewPanel({
 
   function toggleRole(id: string) {
     setSelectedRoles((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function togglePoc(id: string) {
+    setSelectedPocs((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -361,18 +375,69 @@ export function AuthorizationPreviewPanel({
             </fieldset>
           )}
 
+          {/* RiVer zijn is geen rol of post maar een rij in PocRepresentative.
+              Het geeft geen rechten, wel de peilingen van die POC
+              (lib/pocPolls/access.ts). */}
+          {pocs.length > 0 && (
+            <fieldset>
+              <legend className="text-sm font-semibold text-vtk-ink">
+                {nl ? "RiVer van een POC" : "Student rep of a POC"}
+              </legend>
+              <p className="mb-3 mt-1 text-xs text-zinc-500">
+                {nl
+                  ? "Een RiVer heeft geen rol of recht, maar krijgt de tab Peilingen voor de peilingen van zijn eigen POC."
+                  : "A student rep has no role or permission, but gets the Polls tab for the polls of their own POC."}
+              </p>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {pocs.map((poc) => {
+                  const checked = selectedPocs.has(poc.id);
+                  return (
+                    <label
+                      key={poc.id}
+                      className={
+                        "flex items-center gap-3 rounded-xl border p-3 text-sm font-medium text-vtk-ink transition " +
+                        (checked
+                          ? "border-vtk-blue/35 bg-white shadow-sm"
+                          : "border-vtk-blue/10 bg-vtk-blue-soft/25")
+                      }
+                    >
+                      <input
+                        className="shrink-0"
+                        type="checkbox"
+                        name="pocId"
+                        value={poc.id}
+                        checked={checked}
+                        onChange={() => togglePoc(poc.id)}
+                      />
+                      {poc.name}
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          )}
+
           {/* Uitkomst van de selectie: anders moet je zelf optellen wat je
               rollen en posten samen opleveren. */}
           <div className="rounded-xl border border-vtk-blue/15 bg-vtk-blue-soft/30 p-4">
             <h2 className="text-sm font-semibold text-vtk-ink">
               {nl ? "Wat dit voorbeeld je geeft" : "What this preview gives you"}
             </h2>
-            {effective.roleIds.size === 0 ? (
+            {selectedPocs.size > 0 && (
               <p className="mt-1 text-xs text-[#5c667f]">
                 {nl
-                  ? "Nog niets geselecteerd: je ziet de site zoals een lid zonder rollen of posten."
-                  : "Nothing selected yet: you will see the site as a member without roles or posts."}
+                  ? `RiVer van ${pocs.filter((poc) => selectedPocs.has(poc.id)).map((poc) => poc.name).join(", ")}: de tab Peilingen, voor die ${selectedPocs.size === 1 ? "POC" : "POC's"}.`
+                  : `Student rep of ${pocs.filter((poc) => selectedPocs.has(poc.id)).map((poc) => poc.name).join(", ")}: the Polls tab, for ${selectedPocs.size === 1 ? "that POC" : "those POCs"}.`}
               </p>
+            )}
+            {effective.roleIds.size === 0 ? (
+              selectedPocs.size > 0 ? null : (
+                <p className="mt-1 text-xs text-[#5c667f]">
+                  {nl
+                    ? "Nog niets geselecteerd: je ziet de site zoals een lid zonder rollen of posten."
+                    : "Nothing selected yet: you will see the site as a member without roles or posts."}
+                </p>
+              )
             ) : (
               <>
                 <p className="mt-1 text-xs text-[#5c667f]">

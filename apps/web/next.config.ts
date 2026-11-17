@@ -26,6 +26,10 @@ const nextConfig: NextConfig = {
   // production build (Next 16 stores them separately in .next/dev/types).
   typescript: {
     tsconfigPath: process.env.NODE_ENV === "production" ? "tsconfig.build.json" : "tsconfig.json",
+    // Enkel in de Docker-build (infra/docker/*.Dockerfile): daar zou de typecheck
+    // dubbel gebeuren, want de job "Types and lint" doet ze al en een deploy
+    // schakelt pas om als die groen is. Lokaal en in CI blijft ze aan.
+    ignoreBuildErrors: process.env.VTK_SKIP_BUILD_TYPECHECK === "1",
   },
   // Een dev-server die je over het netwerk opent (LAN, Tailscale, tunnel) moet
   // hier staan. Anders weigert Next de HMR-websocket en hydrateert de pagina

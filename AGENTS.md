@@ -110,6 +110,26 @@ en vergelijkt met de laatste geslaagde run op main.
 - Wijzigt er iets aan de `build:`-sectie in `infra/docker-compose.yml`, dan
   ziet de CI-build dat niet (Docker op de server wel, want build-args horen bij
   zijn cache). Start dan een handmatige run van de workflow: die bouwt alles.
+- **Op dev bouwt de server al terwijl de checks lopen.** De job "Build on dev
+  server" draait `infra/deploy.sh <sha> auto build` meteen bij de push; de job
+  "Deploy to dev (elise)" draait `... switch` pas wanneer "Types and lint",
+  "Unit and integration tests" en de productiebuild groen zijn. Tot dan blijven
+  de oude containers draaien. Prod roept het script zonder fase aan en doet
+  alles in één keer. Hernoem je een van die checks, pas dan ook de controle in
+  `deploy-prod.yml` aan: die zoekt ze op naam.
+- **De Docker-build typecheckt niet** (`VTK_SKIP_BUILD_TYPECHECK=1`, gelezen in
+  elke `next.config.ts`): dat doet "Types and lint" al, en zonder die check
+  schakelt geen deploy om. Lokaal en in de CI-build blijft de typecheck aan.
+- **In de runner-stage komt `node_modules` als eerste laag, uit `deps`**, met de
+  Prisma-client (`node_modules/.prisma`, uit de stage `prisma`) als eigen kleine
+  laag erbovenop. Zet ze niet terug na `.next`: dan maakt elke codewijziging
+  heel `node_modules` opnieuw aan, en exporteerde elke deploy per app 50 tot 90
+  seconden aan lagen.
+- **Een wijziging aan een `package.json` herbouwt `node_modules`**, ook als
+  enkel `scripts` verandert: de deps-stage kopieert de `package.json` van de
+  root, van de app en van elke package vóór `npm install`. Een vlag die enkel CI
+  nodig heeft (zoals `--cache` voor eslint in "Types and lint"), zet je daarom
+  in de workflow en niet in een script.
 - **`NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` blijft vast.** `infra/deploy.sh` zet
   ze eenmalig in de `.env` van de server en geeft ze als build-arg aan de drie
   apps. Zonder vaste sleutel krijgt elke server action na elke deploy een

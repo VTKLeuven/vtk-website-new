@@ -35,8 +35,8 @@ export function PocDiscordCard({
       <h2 className="text-base font-semibold">Discord</h2>
       <p className="text-sm text-vtk-body">
         {nl
-          ? "Studenten koppelen hun account met de knop onder het koppelbericht. Daarna geeft de bot hen de rollen van hun POC, en die volgen de richting en de fase op hun account. De rollen per POC stel je in onder POC-instellingen; het kanaal kies je per peiling."
-          : "Students link their account with the button under the link message. The bot then gives them the roles of their POC, which follow the programme and phase on their account. Set the roles per POC under POC settings; the channel is chosen per poll."}
+          ? "Studenten koppelen hun account met de knop onder het koppelbericht. Daarna geeft de bot hen de rollen van hun POC, en die volgen de richting en de fase op hun account. De rollen per POC stel je in onder POC-instellingen, het kanaal per POC bij Peilingen."
+          : "Students link their account with the button under the link message. The bot then gives them the roles of their POC, which follow the programme and phase on their account. Set the roles per POC under POC settings, the channel per POC under Polls."}
       </p>
       <p className="text-sm tabular-nums text-vtk-muted">
         {linked}

@@ -522,7 +522,7 @@ function RequestDetail({
           {courses.length === 0 ? (
             <p className="text-sm text-vtk-muted">
               {nl ? "De vakkenlijst is nog leeg. " : "The course list is still empty. "}
-              <Link href={`${base}/admin/pal-plus?tab=vakken`} className="underline underline-offset-2">
+              <Link href={`${base}/admin/pal-plus/vakken`} className="underline underline-offset-2">
                 {nl ? "Vakken toevoegen" : "Add courses"}
               </Link>
             </p>

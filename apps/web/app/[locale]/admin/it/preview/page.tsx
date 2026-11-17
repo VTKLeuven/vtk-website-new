@@ -19,7 +19,7 @@ export default async function AdminAuthorizationPreview({
   const session = await requireSession();
   if (!session.user.isSuperAdmin) notFound();
 
-  const [roles, groups] = await Promise.all([
+  const [roles, groups, pocs] = await Promise.all([
     prisma.role.findMany({
       select: {
         id: true,
@@ -44,6 +44,7 @@ export default async function AdminAuthorizationPreview({
         },
       },
     }),
+    prisma.poc.findMany({ orderBy: { order: "asc" }, select: { id: true, nameNl: true, nameEn: true } }),
   ]);
 
   return (
@@ -51,6 +52,10 @@ export default async function AdminAuthorizationPreview({
       locale={localeParam === "en" ? "en" : "nl"}
       roles={sortRolesByName(roles, localeParam)}
       groups={groups}
+      pocs={pocs.map((poc) => ({
+        id: poc.id,
+        name: (localeParam === "en" ? (poc.nameEn ?? poc.nameNl) : poc.nameNl).replace(/^POC\s+/i, ""),
+      }))}
     />
   );
 }

@@ -11,6 +11,8 @@ export function SemesterTabs({
   base: string;
   semester: Semester;
 }) {
+  // `!text-white`: in een module met tabbladen zet `.ticket-admin a` de kleur van
+  // elke link op `inherit`, en dan stond het actieve label donker op donker.
   return (
     <nav className="flex flex-wrap gap-2" aria-label={nl ? "Semester" : "Semester"}>
       {([1, 2] as const).map((value) => (
@@ -20,7 +22,7 @@ export function SemesterTabs({
           aria-current={value === semester ? "page" : undefined}
           className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
             value === semester
-              ? "border-vtk-ink bg-vtk-ink text-white"
+              ? "border-vtk-ink bg-vtk-ink !text-white"
               : "border-vtk-blue/15 text-vtk-ink hover:bg-vtk-blue-soft/60"
           }`}
         >

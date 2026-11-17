@@ -20,7 +20,6 @@ import {
 } from '@/lib/meetingStats';
 import { loadBureauStatsMeetings } from '@/lib/meetingStatsLoad';
 import { DailyChart, type ChartSeries } from '@/components/admin/DailyChart';
-import { BureauTabs } from '@/components/meetings/BureauTabs';
 import { BureauPromotionLog, type PromotionView } from '@/components/meetings/BureauPromotionLog';
 import { brusselsYMD, ymdKey } from '@/lib/brussels';
 
@@ -190,10 +189,6 @@ export default async function AdminBureauStatsPage({
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-semibold">VTK Bureau · {formatWorkingYear(workingYear)}</h1>
-
-      <BureauTabs nl={nl} current="statistieken" />
-
       <p className="text-sm text-[#5c667f]">
         {nl
           ? 'Langs welk kanaal de inschrijvingen binnenkwamen. Een link maak je bij een bureau op de tab Beheer, met het linkicoon. Wie zich uitschreef, telt niet mee.'

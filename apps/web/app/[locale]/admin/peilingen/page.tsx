@@ -4,10 +4,12 @@ import { prisma } from "@vtk/db";
 import type { Locale } from "@vtk/i18n";
 import Link from "@/components/ui/Link";
 import { LinkedRow } from "@/components/ui/LinkedRow";
+import { discordGuildConfigured } from "@/lib/discord/bot";
 import { hasLocale } from "@/lib/locale";
 import { managedPocIds } from "@/lib/pocPolls/access";
 import { pollStatus } from "@/lib/pocPolls/core";
-import { requireSession } from "@/lib/session";
+import { getAuthorizationPreview, requireSession } from "@/lib/session";
+import { PocChannelsCard } from "./PocChannelsCard";
 import { PollStatusPill, pollDateLabel } from "./PollStatusPill";
 
 /**
@@ -25,7 +27,13 @@ export default async function AdminPeilingen({ params }: { params: Promise<{ loc
   const scope = await managedPocIds(session);
   if (scope !== "all" && scope.length === 0) notFound();
 
-  const polls = await prisma.pocPoll.findMany({
+  // De POC's voor de kaart met Discord-kanalen; de kanalen zelf vraagt die kaart
+  // pas op wanneer ze opengeklapt wordt (zie PocChannelsCard).
+  const pocsQuery =
+    scope === "all" && discordGuildConfigured()
+      ? prisma.poc.findMany({ orderBy: { order: "asc" }, select: { id: true, nameNl: true, discordChannelId: true } })
+      : Promise.resolve([]);
+  const pollsQuery = prisma.pocPoll.findMany({
     where: scope === "all" ? {} : { pocId: { in: scope } },
     orderBy: [{ closesAt: "desc" }],
     select: {
@@ -38,6 +46,7 @@ export default async function AdminPeilingen({ params }: { params: Promise<{ loc
       questions: { select: { answers: { distinct: ["voterKey"], select: { voterKey: true } } } },
     },
   });
+  const [polls, pocs] = await Promise.all([pollsQuery, pocsQuery]);
   const now = new Date();
 
   return (
@@ -107,6 +116,14 @@ export default async function AdminPeilingen({ params }: { params: Promise<{ loc
           </table>
         </Card>
       )}
+
+      {scope === "all" && discordGuildConfigured() ? (
+        <PocChannelsCard
+          nl={nl}
+          preview={(await getAuthorizationPreview()) !== null}
+          pocs={pocs.map((poc) => ({ id: poc.id, name: poc.nameNl.replace(/^POC\s+/i, ""), channelId: poc.discordChannelId ?? "" }))}
+        />
+      ) : null}
     </div>
   );
 }

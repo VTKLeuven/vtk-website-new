@@ -21,6 +21,8 @@ export type AuthorizationPreview = {
     nameEn: string;
     role: AuthGroupRole;
   }>;
+  /** De POC's waarvan je in dit voorbeeld RiVer bent, dit werkingsjaar. */
+  pocs: Array<{ id: string; nameNl: string; nameEn: string }>;
 };
 
 type RoleRecord = {
@@ -42,7 +44,7 @@ export async function resolveAuthorizationPreview(
   if (!actualSession.user.isSuperAdmin || selection.actorId !== actualSession.user.id) return null;
 
   const selectedGroupRole = new Map(selection.groups.map((group) => [group.id, group.role]));
-  const [directRoles, groups] = await Promise.all([
+  const [directRoles, groups, pocs] = await Promise.all([
     prisma.role.findMany({
       where: { id: { in: selection.roleIds } },
       select: {
@@ -75,6 +77,11 @@ export async function resolveAuthorizationPreview(
           },
         },
       },
+    }),
+    prisma.poc.findMany({
+      where: { id: { in: selection.pocIds } },
+      orderBy: { order: "asc" },
+      select: { id: true, nameNl: true, nameEn: true },
     }),
   ]);
 
@@ -123,6 +130,7 @@ export async function resolveAuthorizationPreview(
         nameEn: group.nameEn,
         role: selectedGroupRole.get(group.id) ?? "MEMBER",
       })),
+      pocs: pocs.map((poc) => ({ id: poc.id, nameNl: poc.nameNl, nameEn: poc.nameEn ?? poc.nameNl })),
     },
   };
 }

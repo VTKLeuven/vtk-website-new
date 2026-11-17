@@ -56,6 +56,8 @@ const PUBLIC_PATH = "/[locale]/lesbezoeken";
 /** De beheerlijst moet mee verversen, anders blijft staan wat je net wijzigde. */
 function revalidateLesbezoeken() {
   for (const path of ADMIN_PATHS) revalidatePath(path);
+  // Met "layout" ook elk tabblad eronder (Verwerkt, Kalender, Organisaties, ...).
+  revalidatePath("/[locale]/admin/lesbezoeken", "layout");
 }
 
 /** Wandklok naar instant; `null` wanneer datum of uur niet kloppen. */

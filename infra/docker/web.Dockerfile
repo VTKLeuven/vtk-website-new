@@ -31,6 +31,15 @@ RUN --mount=type=cache,target=/root/.npm,sharing=locked \
   npm install --no-audit --no-fund \
   && node infra/docker/install-alpine-optional-natives.cjs
 
+# De Prisma-client in een eigen stage, los van de build. Ze hangt enkel af van
+# de dependencies en het schema, dus een commit die enkel code raakt, laat ze
+# gecached. De runner neemt ze als eigen kleine laag over de vaste node_modules
+# heen (zie onderaan): een schemawijziging exporteert dan 56 MB in plaats van
+# heel node_modules.
+FROM deps AS prisma
+COPY packages/db/prisma ./packages/db/prisma
+RUN npx --yes prisma generate --schema packages/db/prisma/schema.prisma
+
 FROM node:${NODE_VERSION}-alpine AS builder
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /repo
@@ -40,16 +49,14 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # en dan valt `next build` in de TypeScript-stap om met "heap out of memory".
 # Vast op 4 GB: wat liv altijd al kreeg, maar nu overal hetzelfde.
 ENV NODE_OPTIONS=--max-old-space-size=4096
+# Geen typecheck in `next build`: de job "Types and lint" doet die al, en een
+# deploy schakelt pas om wanneer die groen is (zie .github/workflows). Hier
+# kostte ze per app een halve tot een hele minuut op de server.
+ENV VTK_SKIP_BUILD_TYPECHECK=1
 
-COPY --from=deps /repo/node_modules ./node_modules
+COPY --from=prisma /repo/node_modules ./node_modules
 COPY --from=deps /repo/packages ./packages
-# De Prisma-client hangt enkel van het schema af, dus die genereren we vóór de
-# broncode binnenkomt: zo blijft deze laag gecached zolang het schema niet
-# wijzigt, in plaats van bij elke commit opnieuw te draaien. De client landt in
-# node_modules, en node_modules zit niet in de buildcontext, dus de COPY's
-# hieronder overschrijven ze niet.
-COPY packages/db/prisma ./packages/db/prisma
-RUN npx --yes prisma generate --schema packages/db/prisma/schema.prisma
+# De Prisma-client zit al in node_modules, uit de stage `prisma` hierboven.
 # Enkel wat deze build leest, en niet `COPY . .`. Met heel de repo veranderde
 # deze laag bij elke commit (een regel in docs/ volstond), en bouwde elke deploy
 # alle drie de apps opnieuw. Nu is een app waaraan niets veranderde een
@@ -79,7 +86,12 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV TZ=Europe/Brussels
-
+# node_modules eerst, en uit `deps` en niet uit `builder`: die laag verandert
+# enkel met de lockfile. Stond ze na .next, dan maakte elke codewijziging ze
+# opnieuw aan, en exporteerde elke deploy per app heel node_modules (50 tot 90
+# seconden "exporting layers"). De Prisma-client komt erbovenop als eigen laag.
+COPY --from=deps /repo/node_modules ./node_modules
+COPY --from=prisma /repo/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /repo/apps/web/.next ./apps/web/.next
 COPY --from=builder /repo/apps/web/public ./apps/web/public
 COPY --from=builder /repo/apps/web/next.config.ts ./apps/web/next.config.ts
@@ -94,7 +106,6 @@ COPY --from=builder /repo/apps/web/lib ./apps/web/lib
 COPY --from=builder /repo/apps/web/package.json ./apps/web/package.json
 COPY --from=builder /repo/packages ./packages
 COPY --from=builder /repo/package.json ./package.json
-COPY --from=builder /repo/node_modules ./node_modules
 
 WORKDIR /app/apps/web
 EXPOSE 3000
