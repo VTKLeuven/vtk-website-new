@@ -91,6 +91,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
         rNumber: true,
         rNumberFromKul: true,
         firwStudent: true,
+        honoraryMember: true,
         avatarKey: true,
         noKot: true,
         street: true,
@@ -279,6 +280,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
                 locale={locale}
                 year={currentStudyYear(now)}
                 firwStudent={profile.firwStudent}
+                honoraryMember={profile.honoraryMember}
                 membership={membership}
                 canJoin={
                   membershipOffer(profile, membership, membershipConfig).kind !== 'none'

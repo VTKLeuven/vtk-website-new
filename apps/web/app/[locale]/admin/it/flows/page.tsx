@@ -142,6 +142,7 @@ export default async function AdminFlowPreview({
       studyProgrammes: true,
       isStudent: true,
       firwStudent: true,
+      honoraryMember: true,
       notAtFaculty: true,
       notStudying: true,
       academicStaffRole: true,

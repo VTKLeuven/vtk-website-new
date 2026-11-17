@@ -61,7 +61,7 @@ export async function attendeeGroupsFor(items: AttendeeGroupItem[]): Promise<Att
     rNumber: user.rNumber,
     praesidium: user.memberships.length > 0,
     honorary: user.honoraryMember,
-    member: user.firwStudent || membershipIsActive(user.vtkMemberships[0] ?? null),
+    member: user.firwStudent || user.honoraryMember || membershipIsActive(user.vtkMemberships[0] ?? null),
   }));
   const index = indexAttendeeAccounts(accounts);
   return items.map((item) => attendeeGroup(item, attendeeAccount(item, index)));

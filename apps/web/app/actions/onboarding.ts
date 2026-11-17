@@ -534,7 +534,7 @@ async function recordMembershipFromForm(
   const [user, existing, config] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { firwStudent: true },
+      select: { firwStudent: true, honoraryMember: true },
     }),
     getMembership(userId, year),
     getMembershipConfig(),

@@ -16,13 +16,15 @@ export type MembershipOffer =
 /**
  * Gratis voor een student van de faculteit Ingenieurswetenschappen, betalend
  * voor de rest, en niets voor wie dit academiejaar al een lidmaatschap heeft.
+ * Een erelid is al lid (zie `userIsMember`) en krijgt dus ook niets: anders
+ * vraagt het scherm hem te betalen voor wat hij al heeft.
  */
 export function membershipOffer(
-  user: { firwStudent: boolean },
+  user: { firwStudent: boolean; honoraryMember: boolean },
   membership: { id: string } | null,
   config: MembershipConfig,
 ): MembershipOffer {
-  if (membership) return { kind: "none", reason: "already" };
+  if (membership || user.honoraryMember) return { kind: "none", reason: "already" };
   if (user.firwStudent) {
     return config.facultyOpen
       ? { kind: "faculty", priceCents: 0 }

@@ -49,7 +49,7 @@ export default async function MembershipPage({
   const [user, membership, config] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: session.user.id },
-      select: { firwStudent: true },
+      select: { firwStudent: true, honoraryMember: true },
     }),
     getMembership(session.user.id, year),
     getMembershipConfig(),
@@ -60,7 +60,9 @@ export default async function MembershipPage({
     locale === "en" ? "en" : "nl",
   );
   const active = membership?.activatedAt != null;
-  const pending = membership != null && membership.activatedAt == null;
+  // Een erelid is lid zonder rij (zie `userIsMember`); een betaling die nog
+  // openstaat, hoeft hij dus niet meer af te ronden.
+  const pending = membership != null && membership.activatedAt == null && !user.honoraryMember;
   // Wie de vraag bij de studiebevestiging liet staan, kan hier alsnog. Het
   // aanbod wordt op dezelfde manier bepaald als daar, en de action rekent het
   // serverside nog eens na.
@@ -70,7 +72,9 @@ export default async function MembershipPage({
     ? membership.kind === "FACULTY"
       ? t.statusActiveFaculty.replace("{year}", yearLabel)
       : t.statusActive.replace("{year}", yearLabel)
-    : pending
+    : user.honoraryMember
+      ? t.statusHonorary
+      : pending
       ? t.statusPending.replace("{year}", yearLabel).replace("{price}", price)
       : user.firwStudent
         ? t.statusFirw

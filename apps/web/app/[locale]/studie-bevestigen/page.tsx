@@ -73,6 +73,7 @@ export default async function ConfirmStudyPage({
       studyProgrammes: true,
       isStudent: true,
       firwStudent: true,
+      honoraryMember: true,
       notAtFaculty: true,
       notStudying: true,
       academicStaffRole: true,

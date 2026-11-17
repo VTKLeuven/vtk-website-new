@@ -17,12 +17,15 @@ export function AccountMembership({
   locale,
   year,
   firwStudent,
+  honoraryMember,
   membership,
   canJoin,
 }: {
   locale: Locale;
   year: number;
   firwStudent: boolean;
+  /** Erelid: telt als lid zonder rij (zie `userIsMember`). */
+  honoraryMember: boolean;
   membership: { kind: string; priceCents: number; activatedAt: Date | null } | null;
   /** Staat er nog een weg naar een lidmaatschap open voor dit lid? */
   canJoin: boolean;
@@ -31,13 +34,15 @@ export function AccountMembership({
   const prefix = locale === "en" ? "/en" : "";
   const yearLabel = formatWorkingYear(year);
   const active = membership?.activatedAt != null;
-  const pending = membership != null && membership.activatedAt == null;
+  const pending = membership != null && membership.activatedAt == null && !honoraryMember;
 
   const status = active
     ? membership.kind === "FACULTY"
       ? t.statusActiveFaculty.replace("{year}", yearLabel)
       : t.statusActive.replace("{year}", yearLabel)
-    : pending
+    : honoraryMember
+      ? t.statusHonorary
+      : pending
       ? t.statusPending
           .replace("{year}", yearLabel)
           .replace("{price}", formatEuro(membership.priceCents, locale === "en" ? "en" : "nl"))

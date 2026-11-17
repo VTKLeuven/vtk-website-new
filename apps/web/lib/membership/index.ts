@@ -60,13 +60,19 @@ export function membershipIsActive(membership: Pick<Membership, "activatedAt"> |
 /**
  * Wie voor de kring als lid telt.
  *
- * Twee wegen, en dat is bewust. Een student van de faculteit is lid zodra KU
+ * Drie wegen, en dat is bewust. Een student van de faculteit is lid zodra KU
  * Leuven dat bevestigt (`User.firwStudent`, uit `eduPersonOrgUnitDN`): die
  * bevestiging is sterker dan een vinkje, en zonder die tak zou het halve
  * publiek van de kring buiten staan tot iedereen het formulier ooit eens
  * invulde. Daarnaast telt een geactiveerd lidmaatschap van dit academiejaar,
  * en daar maakt het niet uit of het gratis, betaald of door een beheerder
  * toegekend is.
+ *
+ * En een erelid (`User.honoraryMember`) is lid in elk academiejaar dat hij
+ * erelid is. Bewust afgeleid en geen `Membership`-rij bij het toekennen: het
+ * erelidmaatschap hangt niet aan een academiejaar, dus een rij voor dat ene
+ * jaar zou op 14 september vervallen terwijl de persoon erelid blijft. Zie
+ * docs/design-decisions.md, "Ereleden".
  *
  * Een DB-lezing, want `SessionPayload` draagt permissies en posten, geen
  * ledenstatus; dat uitbreiden zou elke sessielezing op de hele site duurder
@@ -78,13 +84,16 @@ export async function userIsMember(
 ): Promise<boolean> {
   if (!userId) return false;
   const [user, membership] = await Promise.all([
-    prisma.user.findUnique({ where: { id: userId }, select: { firwStudent: true } }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { firwStudent: true, honoraryMember: true },
+    }),
     prisma.membership.findUnique({
       where: { userId_year: { userId, year } },
       select: { activatedAt: true },
     }),
   ]);
-  return (user?.firwStudent ?? false) || membershipIsActive(membership);
+  return (user?.firwStudent ?? false) || (user?.honoraryMember ?? false) || membershipIsActive(membership);
 }
 
 // Het aanbod zelf is pure logica en staat in `offer.ts`, zodat het

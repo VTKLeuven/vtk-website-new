@@ -55,6 +55,7 @@ export default async function OnboardingPage({
       rNumber: true,
       rNumberFromKul: true,
       firwStudent: true,
+      honoraryMember: true,
       avatarKey: true,
       noKot: true,
       street: true,

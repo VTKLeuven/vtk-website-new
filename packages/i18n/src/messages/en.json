@@ -1524,6 +1524,7 @@
     "statusPending": "Your membership for {year} is ready once you have paid {price}.",
     "statusNone": "You are not a member yet this academic year.",
     "statusFirw": "You study at the Faculty of Engineering Science, so you count as a member of VTK.",
+    "statusHonorary": "You are an honorary member of VTK, so you count as a member.",
     "pay": "Pay {price}",
     "payAgain": "Try the payment again",
     "paymentReturned": "Thank you. As soon as the payment is confirmed your membership shows up here. That usually takes a few seconds.",

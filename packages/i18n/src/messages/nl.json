@@ -1524,6 +1524,7 @@
     "statusPending": "Je lidmaatschap voor {year} staat klaar zodra je {price} betaald hebt.",
     "statusNone": "Je bent dit academiejaar nog geen lid.",
     "statusFirw": "Je studeert aan de faculteit Ingenieurswetenschappen, dus je telt als lid van VTK.",
+    "statusHonorary": "Je bent erelid van VTK, dus je telt als lid.",
     "pay": "Betaal {price}",
     "payAgain": "Betaling opnieuw proberen",
     "paymentReturned": "Bedankt. Zodra de betaling bevestigd is, staat je lidmaatschap hier. Dat duurt meestal een paar seconden.",
