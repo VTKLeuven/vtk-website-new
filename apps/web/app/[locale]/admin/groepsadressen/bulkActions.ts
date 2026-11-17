@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -10,6 +11,7 @@ import { logAudit } from "@/lib/audit";
 import { type SaveState, saveError, saveOk } from "@/lib/saveState";
 import { getGoogleConfig } from "@/lib/google/config";
 import { deleteGroup } from "@/lib/google/client";
+import { pushMailGroup } from "@/lib/google/sync";
 import {
   MAIL_GROUP_SELECT,
   type MailGroupForSync,
@@ -170,6 +172,37 @@ export async function assignCategoryAction(formData: FormData): Promise<SaveStat
     categoryId
       ? `${result.count} ${result.count === 1 ? "adres" : "adressen"} in ${label} gezet.`
       : `${result.count} ${result.count === 1 ? "adres" : "adressen"} zonder categorie gezet.`,
+  );
+}
+
+/**
+ * Wie mag naar de aangevinkte groepen mailen: iedereen, of enkel adressen van
+ * het domein. De sync zet het in Google (`wantedGroupSettings`); de eerste
+ * vijftig duwen we meteen, de rest volgt binnen de vijf minuten.
+ */
+export async function setExternalSendersAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("mailgroups.manage");
+  const ids = [...new Set(formData.getAll("id").map(String).filter(Boolean))];
+  if (ids.length === 0) return saveError("NOTHING_SELECTED");
+  const allow = formData.get("allow") === "1";
+  const result = await prisma.mailGroup.updateMany({
+    where: { id: { in: ids } },
+    data: { allowExternalSenders: allow },
+  });
+  await logAudit({
+    action: "update",
+    entity: "mailGroup",
+    target: allow ? "Mail van buiten toegelaten" : "Enkel mail van vtk.be",
+    summary: `${result.count} groepsadressen: ${allow ? "iedereen mag mailen" : "enkel adressen van het domein mogen mailen"}`,
+  });
+  revalidate();
+  after(async () => {
+    for (const id of ids.slice(0, 50)) await pushMailGroup(id).catch(() => {});
+  });
+  return saveOk(
+    allow
+      ? `${result.count} ${result.count === 1 ? "adres" : "adressen"}: iedereen mag mailen.`
+      : `${result.count} ${result.count === 1 ? "adres" : "adressen"}: enkel mail van vtk.be.`,
   );
 }
 

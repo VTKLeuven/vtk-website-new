@@ -14,6 +14,7 @@ import { GroupMembers } from "./GroupMembers";
 import {
   assignCategoryAction,
   deleteFromGoogleAction,
+  setExternalSendersAction,
 } from "./bulkActions";
 
 export type MailGroupRow = {
@@ -38,6 +39,8 @@ export type MailGroupRow = {
   thisYear: boolean;
   /** Uit de nakijkmodus. */
   decision: "KEEP" | "DELETE" | null;
+  /** Enkel adressen van vtk.be mogen naar deze groep mailen. */
+  internalOnly: boolean;
   lastSync: string;
   notInGoogle: boolean;
   lastError: string | null;
@@ -195,6 +198,17 @@ export function MailGroupTable({
     });
   }
 
+  function setExternal(allow: boolean) {
+    const form = new FormData();
+    for (const row of chosen) form.append("id", row.id);
+    form.append("allow", allow ? "1" : "0");
+    startTransition(async () => {
+      const result = await unsent.run(() => setExternalSendersAction(form));
+      if (result === UNSENT) return;
+      report(result, nl ? "Opslaan is mislukt." : "Saving failed.");
+    });
+  }
+
   function remove() {
     const form = new FormData();
     for (const row of chosen) form.append("id", row.id);
@@ -294,6 +308,7 @@ export function MailGroupTable({
               <span className="text-red-700"> · {nl ? "op weg" : "marked to remove"}</span>
             )}
             {row.decision === "KEEP" && <> · {nl ? "houden" : "keep"}</>}
+            {row.internalOnly && <> · {nl ? "enkel vtk.be" : "vtk.be only"}</>}
           </span>
         </td>
         <td className="px-4 py-3 align-top text-zinc-600">{row.summary || "-"}</td>
@@ -416,6 +431,15 @@ export function MailGroupTable({
             </div>
             <Button type="button" size="sm" variant="ghost" disabled={!category || pending} onClick={assign}>
               {nl ? "In categorie zetten" : "Put in category"}
+            </Button>
+          </div>
+          <div className="flex items-center gap-1.5" role="group" aria-label={nl ? "Wie mag mailen" : "Who may send"}>
+            <span className="text-sm text-zinc-600">{nl ? "Wie mag mailen:" : "Who may send:"}</span>
+            <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setExternal(true)}>
+              {nl ? "Iedereen" : "Anyone"}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setExternal(false)}>
+              {nl ? "Enkel vtk.be" : "vtk.be only"}
             </Button>
           </div>
           <Button

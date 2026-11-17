@@ -67,6 +67,11 @@ export function MailGroupsToolbar({
           {nl ? "Accounts aanmaken" : "Create accounts"}
         </Link>
       )}
+      {approveAccounts && (
+        <Link href={`${base}/organisatie-eenheden`} className="vtk-link text-sm">
+          {nl ? "Organisatie-eenheden" : "Organisational units"}
+        </Link>
+      )}
       {manageAll && (
         <Link href={`${base}/koppelingen`} className="vtk-link text-sm">
           {nl ? "Accounts koppelen" : "Link accounts"}

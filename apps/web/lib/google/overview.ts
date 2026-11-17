@@ -51,6 +51,8 @@ export type OverviewRow = {
   existsInGoogle: boolean;
   categoryId: string | null;
   reviewDecision: "KEEP" | "DELETE" | null;
+  /** Uit: enkel adressen van het domein mogen naar de groep mailen. */
+  allowExternalSenders: boolean;
   activity: GroupActivity;
 };
 
@@ -153,6 +155,7 @@ export async function loadMailGroupOverview({
       existsInGoogle: Boolean(g.googleId),
       categoryId: g.categoryId,
       reviewDecision: g.reviewDecision,
+      allowExternalSenders: g.allowExternalSenders,
       activity: activity.get(g.id)?.activity ?? NO_ACTIVITY,
     };
   });

@@ -114,6 +114,7 @@ export default async function AdminMailGroups({
     unknown: row.activity.unknown,
     thisYear: row.activity.thisYear,
     decision: row.reviewDecision,
+    internalOnly: !row.allowExternalSenders,
     email: row.email,
     name: row.name,
     category: categoryLabel(row.categoryId),

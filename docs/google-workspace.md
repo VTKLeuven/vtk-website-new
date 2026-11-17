@@ -77,6 +77,7 @@ huidige werkingsjaar, dus de 15-juli-wissel heeft geen eigen cron nodig.
 | `/admin/groepsadressen/aanvragen`    | Accounts van werkgroepen aanvragen en goedkeuren; voorvoegsels | werkgroep / `googleAccounts.manage` / `mailgroups.manage` |
 | `/admin/groepsadressen/koppelingen`  | Bestaande `@vtk.be`-accounts aan leden hangen                  | `mailgroups.manage`      |
 | `/admin/groepsadressen/accounts`     | Accounts aanmaken (voorbeeld eerst)                            | `googleAccounts.manage`  |
+| `/admin/groepsadressen/organisatie-eenheden` | Accounts per OU, in bulk verplaatsen; terugzetten uit het logboek | `googleAccounts.manage` |
 | `/admin/kiesploeg`                   | Kiesploeg, haar posten, leden, adressjablonen, 15 juli vooraf  | `kiesploeg.manage`       |
 | `/admin/pocs`                        | POC-lijsten aanmaken en "verkozen" per werkingsjaar            | `pocs.manage`            |
 | `/admin/it`                          | Service-account, OAuth-client, organisatie-eenheden            | superadmin               |
@@ -312,8 +313,29 @@ dezelfde lijst, telkens één groep met wie erin zit, en Houden (H), Weg ermee (
 of Overslaan (S). De beslissingen blijven bewaard; "weg" zet een groep op de
 lijst **Te verwijderen**, die je daarna in één keer verwijdert.
 
+Wie naar een groep mag mailen (iedereen, of enkel `@vtk.be`) zet je per groep
+bij Instellingen, of voor de aangevinkte groepen in de balk onderaan ("Wie mag
+mailen"). Het overzicht toont "enkel vtk.be" bij een groep die enkel intern
+bereikbaar is.
+
 Ordenen gaat met **categorieën** (Praesidium › Activiteiten): maak ze bij
 "Categorieën", vink groepen aan en kies "In categorie zetten".
+
+### Organisatie-eenheden
+
+`/admin/groepsadressen/organisatie-eenheden` toont elk `@vtk.be`-account met
+zijn OU, het gekoppelde lid en zijn post. Vink accounts aan (shift en
+Ctrl/Cmd werken) en verplaats ze naar een andere OU. De site mag de lijst van
+OU's zelf niet lezen (dat vraagt een extra scope), dus de keuzes zijn de OU's
+waar nu al iemand in staat plus die uit de instellingen: een nieuwe, lege OU
+vul je één keer in de Admin console.
+
+**Terugzetten uit het logboek**, op dezelfde pagina: kopieer in de Admin
+console (Rapportage → Audit en onderzoek → Logboekgebeurtenissen beheerder,
+gebeurtenis "Organisatie-eenheid gebruiker gewijzigd") de rijen of een
+CSV-export, plak ze, kijk na en zet terug. Een account gaat enkel terug als het
+nog staat waar die verhuizing het zette. Gebouwd na 16 november 2026, toen de
+sync tientallen accounts naar `/` verhuisde (zie "Vallen").
 
 ### Standaardinstellingen van een groep
 
