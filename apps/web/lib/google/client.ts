@@ -442,6 +442,36 @@ export async function listUsers(cfg: GoogleConfig): Promise<GoogleUser[]> {
 }
 
 
+/**
+ * Elk account, maar enkel wat een overzicht nodig heeft: adres, naam, OU en of
+ * het geschorst is. Met `fields` en 500 per pagina in plaats van 200 met alles
+ * erbij; dat maakt van een tiental zware aanroepen er een paar lichte, en dat
+ * merk je op /admin/groepsadressen/organisatie-eenheden bij elke keer laden.
+ * Geen aliassen: wie die nodig heeft, gebruikt `listUsers`.
+ */
+export async function listUsersLite(cfg: GoogleConfig): Promise<GoogleUser[]> {
+  const out: GoogleUser[] = [];
+  let pageToken: string | undefined;
+  do {
+    const params = new URLSearchParams({
+      domain: cfg.domain,
+      maxResults: "500",
+      orderBy: "email",
+      projection: "basic",
+      fields: "nextPageToken,users(id,primaryEmail,name/fullName,suspended,orgUnitPath)",
+    });
+    if (pageToken) params.set("pageToken", pageToken);
+    const page = await request<{ users?: GoogleUser[]; nextPageToken?: string }>(
+      cfg,
+      "GET",
+      `${DIRECTORY}/users?${params.toString()}`,
+    );
+    out.push(...(page?.users ?? []));
+    pageToken = page?.nextPageToken;
+  } while (pageToken);
+  return out;
+}
+
 export async function getUser(cfg: GoogleConfig, key: string): Promise<GoogleUser | null> {
   return request<GoogleUser>(cfg, "GET", `${DIRECTORY}/users/${encodeURIComponent(key)}`);
 }

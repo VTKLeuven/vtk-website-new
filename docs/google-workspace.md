@@ -71,7 +71,8 @@ huidige werkingsjaar, dus de 15-juli-wissel heeft geen eigen cron nodig.
 
 | Route                                | Wat                                                            | Recht                    |
 | ------------------------------------ | -------------------------------------------------------------- | ------------------------ |
-| `/admin/groepsadressen`              | Overzicht, categorieën, wie nog actief is, in bulk ordenen of verwijderen, nu synchroniseren | `mailgroups.manage`, of een werkgroep (haar eigen lijsten) |
+| `/admin/groepsadressen`              | Overzicht, categorieën, in bulk ordenen of verwijderen, nu synchroniseren (icoon) | `mailgroups.manage`, of een werkgroep (haar eigen lijsten) |
+| `/admin/groepsadressen/nieuw`        | Nieuw groepsadres, meteen met bronnen, losse leden en categorie | idem                    |
 | `/admin/groepsadressen/<id>`         | Eén lijst in tabbladen: leden, bronnen, jaargroepen, instellingen | idem                   |
 | `/admin/groepsadressen/overnemen`    | Bestaande Google-groepen overnemen                             | `mailgroups.manage`      |
 | `/admin/groepsadressen/aanvragen`    | Accounts van werkgroepen aanvragen en goedkeuren; voorvoegsels | werkgroep / `googleAccounts.manage` / `mailgroups.manage` |
@@ -288,16 +289,26 @@ die de site nog niet kent. Vink aan wat de site voortaan moet beheren.
 
 Begin met een handvol lijsten en kijk na wat er in Google gebeurde.
 
+In de zijbalk heet dit geheel **Google Admin**, een eigen item en niet meer
+onder Communicatie. De routes hieronder zijn tabbladen van één layout
+(`app/[locale]/admin/groepsadressen/layout.tsx`, `GoogleAdminTabs.tsx`); een
+adres, de nakijkmodus en een nieuw adres vallen onder het tabblad
+Groepsadressen. Een nieuw scherm erbij wordt een tabblad daar, geen link boven
+het overzicht.
+
 ### Opruimen
 
-Het overzicht toont per groep hoeveel leden nog actief zijn: een post dit
-werkingsjaar, een lopende kiesploeg, een studie die dit academiejaar bevestigd
-is, of een groep van de kring waarin (hoe diep ook) iemand actief is. Een groep
-die naar dit werkingsjaar heet (`sport_2627`) telt altijd. Een klik op dat
-cijfer toont wie erin zit, met per adres de status; een geneste groep klik je
-daar verder open.
+Een klik op "wie erin zit" toont de leden met per adres de status (een post
+dit werkingsjaar, een lopende kiesploeg, een studie die dit academiejaar
+bevestigd is); een geneste groep klik je daar verder open. Het overzicht zelf
+toont sinds 17 november 2026 geen kolom "nog actief" meer: na het grote
+nakijken bleven vooral alumnilijsten over, waarin niemand "gekend" is en die
+toch blijven. De berekening (`lib/google/activity.ts`) draait nog voor de
+nakijkmodus, het venster met de leden en de waarschuwing bij verwijderen.
 
-1. Filter op **Niemand meer actief** of **Leeg**, of zoek (`activiteiten_`).
+1. Filter op **Leeg** of zoek (`activiteiten_`, Cmd/Ctrl+F zet de cursor in het
+   zoekveld). De zoekterm en de open categorieën staan in de URL: wie een adres
+   opent en terugkeert, vindt de lijst zoals hij ze achterliet.
 2. Vink aan wat weg mag; het vinkje in de kop neemt alles in de filter, dat van
    een categorieblok alles in dat blok. Shift-klik neemt een reeks, Ctrl- of
    Cmd-klik op een rij vinkt aan in plaats van te openen.
@@ -309,7 +320,8 @@ op de site en het adres als los lid in andere lijsten ook. Wie erin zat, staat
 per groep in het adminlogboek. De jaargroep van dit jaar van een hoofdgroep met
 een sjabloon wordt overgeslagen: die maakt de sync gewoon opnieuw.
 
-Groep per groep gaat sneller met **Eén voor één nakijken** (onder de filters):
+Groep per groep gaat sneller met **Eén voor één nakijken** (het lijstjesicoon
+naast het zoekveld; `?opruimen=inactief` filtert daar nog op "niemand meer actief"):
 dezelfde lijst, telkens één groep met wie erin zit, en Houden (H), Weg ermee (V)
 of Overslaan (S). De beslissingen blijven bewaard; "weg" zet een groep op de
 lijst **Te verwijderen**, die je daarna in één keer verwijdert.
@@ -420,16 +432,16 @@ van de werkgroep komt het werkgroepadres, elders het persoonlijke (zie
 
 ### Een eerste groepsadres
 
-1. `/admin/groepsadressen` → **Nieuw groepsadres**: `activiteiten@vtk.be`, naam
-   "Activiteiten", "mail van buiten toelaten" aan.
-2. Open het adres en voeg de bronnen toe: post **Activiteiten** en post **Groep
-   5**. Dat g5 overal in zit, staat dus als zichtbare rij; wie het anders wil,
-   haalt de rij weg.
-3. Het scherm toont meteen hoeveel leden die regel oplevert, en wie er nog geen
-   `@vtk.be`-adres heeft. Dat berekenen we zelf, los van Google, zodat je het
-   ziet vóór de eerste sync.
-4. **Nu synchroniseren.** Bestaat de groep al in Google, dan wordt ze
-   hergebruikt op het adres; anders aangemaakt.
+1. `/admin/groepsadressen` → **Nieuw groepsadres** (rechtsboven):
+   `activiteiten@vtk.be`, naam "Activiteiten", als bronnen post **Activiteiten**
+   en post **Groep 5**, "mail van buiten toelaten" aan. Losse leden en een
+   categorie kunnen in hetzelfde formulier. Dat g5 overal in zit, staat dus als
+   zichtbare rij; wie het anders wil, haalt de rij weg.
+2. Het adres opent meteen en toont hoeveel leden die regel oplevert, en wie er
+   nog geen `@vtk.be`-adres heeft. Dat berekenen we zelf, los van Google.
+3. Met bronnen of leden duwt de site de groep meteen naar Google; anders doet
+   de volgende ronde het (of het icoon "Nu synchroniseren" naast het zoekveld).
+   Bestaat de groep al in Google, dan wordt ze hergebruikt op het adres.
 
 Begin met één adres en kijk in Google na wat er gebeurde voor je de rest
 aanmaakt.

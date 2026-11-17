@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import Link from "@/components/ui/Link";
 import { prisma } from "@vtk/db";
 import { currentWorkingYear } from "@vtk/auth";
 import type { Locale } from "@vtk/i18n";
@@ -28,7 +27,6 @@ export default async function WerkgroepAccountRequests({
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const nl = locale === "nl";
-  const base = `${nl ? "" : "/en"}/admin/groepsadressen`;
 
   const access = await mailGroupAccess();
   if (!access.manageAll && !access.approveAccounts && access.werkgroepIds.size === 0) {
@@ -94,12 +92,9 @@ export default async function WerkgroepAccountRequests({
   return (
     <div className="space-y-8">
       <div>
-        <Link href={base} className="vtk-link text-sm">
-          {nl ? "Groepsadressen" : "Group addresses"}
-        </Link>
-        <h1 className="mt-1 text-xl font-semibold text-vtk-ink">
+        <h2 className="text-lg font-semibold text-vtk-ink">
           {nl ? "Accounts van werkgroepen" : "Work group accounts"}
-        </h1>
+        </h2>
         <p className="mt-1 max-w-3xl text-sm text-zinc-500">
           {nl
             ? "Een werkgroep vraagt hier zelf een account aan voor haar leden (statix.voornaam.naam@vtk.be). IT of de vice keurt goed, en dan maakt de site het account meteen aan. Het is een tweede account naast het persoonlijke: in de lijsten van de werkgroep komt dit adres, elders het persoonlijke."

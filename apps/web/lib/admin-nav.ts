@@ -150,6 +150,11 @@ export function getAdminNav(): NavEntry[] {
       // zijn. Een eigen pagina en geen tab binnen Broodjes, op vraag van Theokot.
       item('theokotShiften', '/theokot/shiften', { perm: 'theokot.manage' }),
     ]),
+    // Google Admin: de groepsadressen, de @vtk.be-accounts en hun
+    // organisatie-eenheden, met tabbladen in de pagina zelf. Stond onder
+    // Communicatie als "Groepsadressen", maar de accounts en OU's zijn het werk
+    // van IT en de vice, niet van communicatie.
+    item('mailGroups', '/groepsadressen', { mailGroups: true }),
     item('vault', '/wachtwoorden', { anyPerm: ['vault.editOwn', 'vault.manage'] }),
   ];
 
@@ -212,12 +217,9 @@ export function getAdminNav(): NavEntry[] {
       // Bovenaan: dit is het werk dat binnenkomt. Elke post ziet het item om
       // zijn evenementen aan te vragen; commu ziet er alle aanvragen.
       item('commuRequests', '/commu-aanvragen', { commuRequests: true }),
-      // Twee dingen die allebei "mailinglijst" heten en bewust naast elkaar
-      // staan zodat wie het ene zoekt het andere ziet: de opt-in nieuwsbrieven
-      // naar studenten (export + Brevo), en de eigen adressen van de kring
-      // (activiteiten@vtk.be) die de posten van dit werkingsjaar volgen.
+      // De opt-in nieuwsbrieven naar studenten (export + Brevo). De eigen
+      // adressen van de kring (activiteiten@vtk.be) staan onder Google Admin.
       item('mailinglists', '/mailinglijsten', { perm: 'mailinglists.export' }),
-      item('mailGroups', '/groepsadressen', { mailGroups: true }),
       item('appPush', '/app-push', { perm: 'app.push' }),
       // De linkpagina hangt in de bio van de sociale media: dat is het werk van
       // communicatie, niet van wie de website onderhoudt.

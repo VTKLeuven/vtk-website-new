@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 import { Input, Label } from "@vtk/ui";
-import { type MemberCandidate, searchMemberCandidatesAction } from "../actions";
+import { type MemberCandidate, searchMemberCandidatesAction, searchNewMemberCandidatesAction } from "../actions";
 
 const SOURCE_LABEL: Record<MemberCandidate["source"], string> = { site: "SITE", gw: "GW", address: "ADRES" };
 const SOURCE_TONE: Record<MemberCandidate["source"], string> = {
@@ -15,6 +15,15 @@ export function candidateValue(c: MemberCandidate): string {
   return c.source === "site" ? `site:${c.userId}` : `${c.source}:${c.email}`;
 }
 
+/** Het label rechts op een rij: SITE, GW of ADRES. */
+export function CandidateBadge({ source }: { source: MemberCandidate["source"] }) {
+  return (
+    <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide ${SOURCE_TONE[source]}`}>
+      {SOURCE_LABEL[source]}
+    </span>
+  );
+}
+
 /**
  * Eén zoekveld voor een lid van de site, een account van Google Workspace of
  * een vrij mailadres. Rechts op elke rij staat waar ze vandaan komt (SITE, GW,
@@ -23,8 +32,21 @@ export function candidateValue(c: MemberCandidate): string {
  * je dan de GW-rij.
  *
  * De keuze gaat mee als `choice` (`site:<id>`, `gw:<adres>`, `address:<adres>`).
+ * Met `onPick` (op "Nieuw groepsadres", waar er nog geen lijst is) gaat een
+ * keuze naar de ouder en is het veld meteen weer leeg voor de volgende.
  */
-export function MemberPicker({ nl, mailGroupId, label }: { nl: boolean; mailGroupId: string; label: string }) {
+export function MemberPicker({
+  nl,
+  mailGroupId,
+  label,
+  onPick,
+}: {
+  nl: boolean;
+  /** Zonder: zoeken voor een lijst die nog niet bestaat. */
+  mailGroupId?: string;
+  label: string;
+  onPick?: (candidate: MemberCandidate) => void;
+}) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<MemberCandidate[]>([]);
   const [chosen, setChosen] = useState<MemberCandidate | null>(null);
@@ -39,7 +61,9 @@ export function MemberPicker({ nl, mailGroupId, label }: { nl: boolean; mailGrou
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
-        const found = await searchMemberCandidatesAction(mailGroupId, q);
+        const found = mailGroupId
+          ? await searchMemberCandidatesAction(mailGroupId, q)
+          : await searchNewMemberCandidatesAction(q);
         if (!cancelled) {
           setResults(found);
           setOpen(true);
@@ -83,12 +107,12 @@ export function MemberPicker({ nl, mailGroupId, label }: { nl: boolean; mailGrou
   return (
     <div className="relative w-80 max-w-full">
       <Label htmlFor={`${listId}-input`}>{label}</Label>
-      {chosen && <input type="hidden" name="choice" value={candidateValue(chosen)} />}
+      {chosen && !onPick && <input type="hidden" name="choice" value={candidateValue(chosen)} />}
       <Input
         id={`${listId}-input`}
         value={query}
         autoComplete="off"
-        required
+        required={!onPick}
         role="combobox"
         aria-expanded={open}
         aria-controls={listId}
@@ -99,7 +123,20 @@ export function MemberPicker({ nl, mailGroupId, label }: { nl: boolean; mailGrou
           setResults([]);
         }}
         onFocus={() => results.length > 0 && !chosen && setOpen(true)}
-        onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") setOpen(false);
+          // Enter in een veld van een groter formulier zou het hele formulier
+          // versturen; hier neemt het de eerste rij.
+          if (e.key === "Enter" && onPick) {
+            e.preventDefault();
+            if (results[0]) {
+              onPick(results[0]);
+              setQuery("");
+              setResults([]);
+              setOpen(false);
+            }
+          }
+        }}
       />
       {chosen && (
         <span className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500">
@@ -128,9 +165,15 @@ export function MemberPicker({ nl, mailGroupId, label }: { nl: boolean; mailGrou
                     type="button"
                     className="flex w-full items-start gap-3 px-3 py-2 text-left hover:bg-vtk-blue-soft/50"
                     onClick={() => {
+                      setOpen(false);
+                      if (onPick) {
+                        onPick(c);
+                        setQuery("");
+                        setResults([]);
+                        return;
+                      }
                       setChosen(c);
                       setQuery(c.source === "site" ? c.name : c.email);
-                      setOpen(false);
                     }}
                   >
                     <span className="min-w-0 flex-1">

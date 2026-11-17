@@ -69,9 +69,20 @@ const createSchema = z.object({
   name: z.string().trim().min(1).max(120),
   description: z.string().trim().max(500).optional(),
   allowExternalSenders: z.string().optional(),
+  categoryId: z.string().optional(),
   locale: z.string().optional(),
 });
 
+/**
+ * Een nieuw groepsadres, meteen met categorie, bronnen en leden: wie een adres
+ * maakt, weet meestal al wie erin moet, en hoefde het vroeger eerst leeg aan te
+ * maken om dat daarna op de detailpagina te doen.
+ *
+ * Bronnen komen als `source` (`group:<id>`, eventueel met `|lead` voor enkel
+ * de verantwoordelijke), leden als `member` (`site:<id>`, `gw:<adres>`,
+ * `address:<adres>`, zoals het gecombineerde zoekveld). Beide enkel voor
+ * `mailgroups.manage`; een werkgroep zet haar leden er daarna in.
+ */
 export async function createMailGroupAction(
   _prev: SaveState,
   formData: FormData,
@@ -115,6 +126,49 @@ export async function createMailGroupAction(
   const clash = await prisma.mailGroup.findUnique({ where: { email }, select: { id: true } });
   if (clash) return saveError("DUPLICATE_EMAIL");
 
+  // Wat er meteen in moet; enkel voor wie alles beheert.
+  const sources: { kind: SourceKind; id: string; onlyLead: boolean }[] = [];
+  const members: { userId?: string; email?: string; note?: string }[] = [];
+  let categoryId: string | null = null;
+  if (access.manageAll) {
+    if (input.categoryId) {
+      const category = await prisma.mailGroupCategory.findUnique({ where: { id: input.categoryId }, select: { id: true } });
+      if (!category) return saveError("INVALID_INPUT");
+      categoryId = category.id;
+    }
+    for (const raw of formData.getAll("source").map(String)) {
+      const [key, flag] = raw.split("|");
+      const source = parseSource(key);
+      if (!source || !(await sourceLabel(source.kind, source.id))) return saveError("INVALID_INPUT");
+      const onlyLead = flag === "lead";
+      if (!sources.some((x) => x.kind === source.kind && x.id === source.id && x.onlyLead === onlyLead)) {
+        sources.push({ ...source, onlyLead });
+      }
+    }
+    const seen = new Set<string>();
+    for (const raw of formData.getAll("member").map(String)) {
+      const [kind, ...rest] = raw.split(":");
+      const value = rest.join(":");
+      if (seen.has(raw) || !value) continue;
+      seen.add(raw);
+      if (kind === "site") {
+        const user = await prisma.user.findUnique({ where: { id: value }, select: { id: true } });
+        if (!user) return saveError("INVALID_INPUT");
+        members.push({ userId: user.id });
+      } else if (kind === "gw" || kind === "address") {
+        const parsedMember = emailSchema.safeParse(value);
+        if (!parsedMember.success) return saveError("INVALID_EMAIL");
+        if (members.some((m) => m.email === normaliseEmail(parsedMember.data))) continue;
+        members.push({
+          email: normaliseEmail(parsedMember.data),
+          note: kind === "gw" ? "account van Google Workspace" : undefined,
+        });
+      } else {
+        return saveError("INVALID_INPUT");
+      }
+    }
+  }
+
   const created = await prisma.mailGroup.create({
     data: {
       email,
@@ -122,6 +176,25 @@ export async function createMailGroupAction(
       description: input.description || null,
       allowExternalSenders: input.allowExternalSenders === "on",
       ownerGroupId,
+      categoryId,
+      sources: {
+        create: sources.map((source) => ({
+          onlyLead: source.onlyLead,
+          groupId: source.kind === "group" ? source.id : null,
+          groupType: source.kind === "type" ? (source.id as GroupKind) : null,
+          kiesploegId: source.kind === "kiesploeg" ? source.id : null,
+          kiesploegPostId: source.kind === "kiesploegPost" ? source.id : null,
+          pocId: source.kind === "poc" ? source.id : null,
+        })),
+      },
+      extras: {
+        create: members.map((m) => ({
+          kind: "INCLUDE" as const,
+          userId: m.userId ?? null,
+          email: m.email ?? null,
+          note: m.note ?? null,
+        })),
+      },
     },
     select: { id: true },
   });
@@ -130,10 +203,14 @@ export async function createMailGroupAction(
     entity: "mailGroup",
     entityId: created.id,
     target: email,
-    summary: "groepsadres toegevoegd",
+    summary:
+      sources.length || members.length
+        ? `groepsadres toegevoegd, met ${sources.length} ${sources.length === 1 ? "bron" : "bronnen"} en ${members.length} ${members.length === 1 ? "lid" : "leden"}`
+        : "groepsadres toegevoegd",
   });
 
   revalidate();
+  if (sources.length || members.length) after(() => pushMailGroup(created.id));
   // De detailpagina openen is zelf de bevestiging; buiten elke try/catch.
   redirect(`${input.locale === "en" ? "/en" : ""}${ADMIN}/${created.id}`);
 }
@@ -813,6 +890,17 @@ export async function searchMemberCandidatesAction(
 ): Promise<MemberCandidate[]> {
   const { access } = await editor(mailGroupId);
   if (!access.manageAll) return [];
+  return findMemberCandidates(query);
+}
+
+/** Hetzelfde zoekveld op "Nieuw groepsadres", voor er een lijst is. */
+export async function searchNewMemberCandidatesAction(query: string): Promise<MemberCandidate[]> {
+  const access = await mailGroupAccess();
+  if (!access.manageAll) return [];
+  return findMemberCandidates(query);
+}
+
+async function findMemberCandidates(query: string): Promise<MemberCandidate[]> {
   const q = query.trim().slice(0, 100);
   if (q.length < 2) return [];
   const words = fold(q).split(/\s+/).filter(Boolean);

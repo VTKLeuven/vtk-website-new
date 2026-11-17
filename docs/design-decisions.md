@@ -2525,8 +2525,10 @@ mag, wist dingen die niemand kan terughalen.
 Na het overnemen stonden er ruim zevenhonderd groepen op de site, waarvan een
 groot deel van lang geleden (`activiteiten_1112`, `cantus_1617`). Wie wil weten
 of zo'n groep weg mag, wil weten of er nog iemand in zit die nu bij de kring
-hoort. Daarom toont het overzicht per groep **hoeveel leden nog actief zijn**, en
-klikt dat cijfer open tot de lijst met per adres de status.
+hoort. Daarom toonde het overzicht per groep **hoeveel leden nog actief zijn**, en
+klikte dat cijfer open tot de lijst met per adres de status. Na het grote
+nakijken is die kolom weg (zie "Google Admin: één item, tabbladen erin"); de
+regel hieronder geldt nog voor de nakijkmodus en het venster met de leden.
 
 - **Actief** is een post, werkgroep of jaarwerking dit werkingsjaar, een lopende
   kiesploeg, of een studie die dit academiejaar bevestigd is (dezelfde grens als
@@ -2582,6 +2584,42 @@ status per adres, en drie knoppen: **Houden** (H), **Weg ermee** (V) en
 - Geen regel in het adminlogboek per beslissing (zevenhonderd regels zeggen
   niets); de verwijdering zelf staat er wel in, met wie erin zat.
 
+### Google Admin: één item, tabbladen erin
+
+De groepsadressen hadden boven hun overzicht een rij links (Overnemen uit
+Google, Accountaanvragen, Accounts aanmaken, Organisatie-eenheden, Accounts
+koppelen), elk naar een losse pagina met "Terug naar groepsadressen", en een
+grote knop "Nu synchroniseren" die bijna nooit nodig is. Op vraag van de
+beheerder (november 2026) is het een eigen item in de zijbalk, **Google
+Admin**, met tabbladen zoals Media en Tickets.
+
+- **Wat zelden gebruikt wordt, is een icoon naast het zoekveld**: "Nu
+  synchroniseren" (de sync draait toch elke vijf minuten) en "Eén voor één
+  nakijken" (een keer per jaar). "Nieuw groepsadres" werd net prominenter,
+  rechtsboven, want dat stond in een dichtgeklapt blok onderaan.
+- **Een nieuw adres krijgt meteen zijn bronnen, losse leden en categorie**, in
+  één formulier (`/nieuw`). Eerst een lege groep maken en dan op de detailpagina
+  vullen, was twee keer hetzelfde werk. Een werkgroep krijgt enkel het adres;
+  haar leden zet ze er op de volgende pagina in.
+- **Geen categoriechips meer boven de lijst**: de lijst is onder "Alle" al per
+  categorie gegroepeerd in blokken die dichtklappen, en twee manieren om
+  hetzelfde te kiezen was er een te veel. `?categorie=` werkt nog (de
+  nakijkmodus gebruikt het).
+- **Zoeken gebeurt in de browser, met Cmd/Ctrl+F**, en de zoekterm en de open
+  blokken staan in de URL (`?q=`, `?open=`, met `history.replaceState`). Wie een
+  adres opende en terugkeerde, begon anders met alles dicht en een leeg
+  zoekveld. De link "Groepsadressen" op een adres gaat naar dezelfde lijst
+  (`overviewMemory.ts`). Een tweede Cmd+F in het veld opent de zoekbalk van de
+  browser, zodat het gewone gedrag bereikbaar blijft.
+- **Geen kolom "nog actief" en geen "x zonder actieve leden" meer.** Dat was
+  het werktuig voor het grote nakijken; daarna bleven vooral alumnilijsten over
+  waarin niemand "gekend" is, en die horen te blijven. Het venster met wie erin
+  zit (een klik op "wie erin zit") toont de status per adres nog wel.
+- **Organisatie-eenheden** kiest de OU in een zoekbare keuzelijst in plaats van
+  een rij chips, leest enkel de velden die het scherm toont (`listUsersLite`)
+  in een eigen `Suspense`, en toont 100 rijen per keer. Het terugzetten uit het
+  logboek staat onderaan en dicht: dat was één keer nodig.
+
 ### Categorieën: ordening, geen regel
 
 Zevenhonderd adressen in één alfabetische lijst zijn niet te overzien. Een
@@ -2589,8 +2627,8 @@ groepsadres kan in één categorie staan, met hoogstens één niveau
 subcategorieën (Praesidium › Activiteiten). Dieper maakt van de filterrij een
 boom die niemand overziet.
 
-- De categorieën zijn chips boven de lijst; een hoofdcategorie toont haar
-  subcategorieën als tweede rij, en "Zonder categorie" vangt de rest.
+- De categorieën waren eerst chips boven de lijst; die zijn weg sinds de
+  blokken hieronder er zijn (zie "Google Admin: één item, tabbladen erin").
 - **Onder "Alle" is de lijst per categorie gegroepeerd**, in blokken die
   standaard dicht staan, met de subcategorieën als blokken erin en "Zonder
   categorie" als laatste. Het vinkje van een blok neemt alles erin. Bij een
@@ -8898,8 +8936,12 @@ twee mag zien, krijgt dat ene item vanzelf als los item terug.
 - *Forms en Shiften* staan bij Website, niet bij Evenementen. Ze hangen niet
   altijd aan een evenement; een formulier of een shift kan evengoed op zichzelf
   staan.
-- *Media* staat bij Communicatie, samen met de mailinglijsten, de groepsadressen
-  en de app-pushberichten. Dat is wat de kring naar buiten brengt.
+- *Media* staat bij Communicatie, samen met de mailinglijsten en de
+  app-pushberichten. Dat is wat de kring naar buiten brengt. De groepsadressen
+  stonden er ook, maar zijn sinds november 2026 een eigen item, **Google Admin**:
+  met de accounts, hun organisatie-eenheden en de koppelingen erbij is het meer
+  het werk van IT en de vice dan van communicatie. Zie "Google Admin: één item,
+  tabbladen erin".
   *App-pushberichten* stond onder IT, maar wie een pushbericht stuurt doet
   communicatie, geen systeembeheer.
 - *Dashboard* is een groep met Overzicht en Dashboardtegels. Die tegels kan elke

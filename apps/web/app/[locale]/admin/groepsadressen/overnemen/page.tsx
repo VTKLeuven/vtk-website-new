@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import Link from "@/components/ui/Link";
 import { prisma } from "@vtk/db";
 import type { Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
@@ -25,7 +24,6 @@ export default async function ImportMailGroups({
   const locale: Locale = localeParam;
   const nl = locale === "nl";
   await requirePermission("mailgroups.manage");
-  const base = `${nl ? "" : "/en"}/admin/groepsadressen`;
 
   const cfg = await getGoogleConfig();
   let groups: GoogleGroup[] = [];
@@ -53,12 +51,9 @@ export default async function ImportMailGroups({
   return (
     <div className="space-y-6">
       <div>
-        <Link href={base} className="vtk-link text-sm">
-          {nl ? "Groepsadressen" : "Group addresses"}
-        </Link>
-        <h1 className="mt-1 text-xl font-semibold text-vtk-ink">
+        <h2 className="text-lg font-semibold text-vtk-ink">
           {nl ? "Overnemen uit Google" : "Take over from Google"}
-        </h1>
+        </h2>
         <p className="mt-1 max-w-3xl text-sm text-zinc-500">
           {nl
             ? "De groepen die nu enkel in de Admin console beheerd worden. Overnemen verandert niets in Google: wie er nu als lid in staat, komt mee als los lid (een lid van de site wanneer het zijn gekoppeld account is). Daarna kan je per adres de post, de POC of de werkgroep als bron zetten en de overgenomen adressen wissen. Eigenaars en beheerders van de groep blijven staan en worden nooit aangeraakt."

@@ -7,7 +7,8 @@ import { requirePermission } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { getGoogleConfig } from "@/lib/google/config";
 import { applyAccountState, desiredAccountState } from "@/lib/google/accountState";
-import { type CreatedAccount, createAccounts } from "@/lib/google/provision";
+import { createAccounts } from "@/lib/google/provision";
+import type { ProvisionState } from "./state";
 import { collectTargets, parseSourceKey } from "./targets";
 
 /**
@@ -16,13 +17,6 @@ import { collectTargets, parseSourceKey } from "./targets";
  * De uitkomst is meer dan "gelukt": er komen wachtwoorden uit die je één keer
  * te zien krijgt. Daarom een eigen state en geen `SaveForm`.
  */
-
-export type ProvisionState =
-  | { status: "idle" }
-  | { status: "error"; code: string; nonce: number }
-  | { status: "done"; created: CreatedAccount[]; nonce: number };
-
-export const PROVISION_IDLE: ProvisionState = { status: "idle" };
 
 export async function createGoogleAccountsAction(
   _prev: ProvisionState,

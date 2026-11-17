@@ -1,11 +1,15 @@
 "use client";
 
-import { Fragment, useEffect, useState, useTransition } from "react";
-import { ChevronDown } from "lucide-react";
+import { Fragment, useEffect, useRef, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ChevronDown, RefreshCw, Search } from "lucide-react";
 import Link from "@/components/ui/Link";
 import { Button, ConfirmDialog } from "@vtk/ui";
 import { LinkedRow } from "@/components/ui/LinkedRow";
+import { IconButton, IconLink } from "@/components/ui/IconButton";
+import { ListCheckIcon } from "@/components/ui/icons";
 import { SearchPicker, type SearchPickerOption } from "@/components/admin/SearchPicker";
+import { useFindShortcut } from "@/components/admin/useFindShortcut";
 import { useToast } from "@/components/ui/toast";
 import { UNSENT, useUnsentGuard } from "@/components/ui/unsentGuard";
 import type { SaveState } from "@/lib/saveState";
@@ -16,6 +20,8 @@ import {
   deleteFromGoogleAction,
   setExternalSendersAction,
 } from "./bulkActions";
+import { syncMailGroupsAction } from "./actions";
+import { rememberOverview } from "./overviewMemory";
 
 export type MailGroupRow = {
   id: string;
@@ -28,15 +34,8 @@ export type MailGroupRow = {
   archived: boolean;
   enabled: boolean;
   memberCount: number;
-  unlinked: number;
-  /** Leden die nu een post hebben of hun studie dit jaar bevestigden. */
+  /** Leden die nu een post hebben of hun studie dit jaar bevestigden; enkel voor de waarschuwing bij verwijderen. */
   active: number;
-  /** Het jongste jaar waarin nog iemand actief was, als "22-23"; enkel bij nul actief. */
-  lastYear: string | null;
-  /** Adressen die de site niet kent (geen lid, geen groep van de kring). */
-  unknown: number;
-  /** De groep heet naar dit of volgend werkingsjaar (`sport_2627`). */
-  thisYear: boolean;
   /** Uit de nakijkmodus. */
   decision: "KEEP" | "DELETE" | null;
   /** Enkel adressen van vtk.be mogen naar deze groep mailen. */
@@ -44,7 +43,14 @@ export type MailGroupRow = {
   lastSync: string;
   notInGoogle: boolean;
   lastError: string | null;
+  /** Adres, naam, wie erin zit en categorie, zonder accenten en hoofdletters. */
+  search: string;
 };
+
+/** Zonder accenten en hoofdletters; dezelfde vouw als `normalizeSearchText`. */
+function fold(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
 
 const NO_CATEGORY = "__none__";
 
@@ -62,7 +68,12 @@ export type TableSection = {
 /**
  * Het overzicht van de groepsadressen. Wie `mailgroups.manage` heeft, vinkt
  * aan en zet in bulk in een categorie of verwijdert uit Google; een klik op
- * "nog actief" toont wie erin zit zonder de lijst te verlaten.
+ * "wie erin zit" toont de leden zonder de lijst te verlaten.
+ *
+ * **Zoeken en open categorieën staan in de URL** (`?q=`, `?open=`), bijgewerkt
+ * met `history.replaceState` zonder de server te vragen. Wie een adres opent en
+ * terugkeert, vindt de lijst dus zoals hij ze achterliet; in een state alleen
+ * begon je na elke klik weer met alles dicht en een leeg zoekveld.
  */
 export function MailGroupTable({
   nl,
@@ -72,6 +83,7 @@ export function MailGroupTable({
   sections,
   sectionsOpen,
   categoryOptions,
+  canSync,
 }: {
   nl: boolean;
   base: string;
@@ -82,7 +94,14 @@ export function MailGroupTable({
   /** Open bij een zoekterm of filter: dan wil je zien wat er gevonden is. */
   sectionsOpen: boolean;
   categoryOptions: SearchPickerOption[];
+  /** Mag "Nu synchroniseren" (enkel `mailgroups.manage`). */
+  canSync: boolean;
 }) {
+  const params = useSearchParams();
+  const router = useRouter();
+  const [query, setQuery] = useState(() => params.get("q") ?? "");
+  const searchRef = useRef<HTMLInputElement>(null);
+  useFindShortcut(searchRef);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [category, setCategory] = useState("");
   const [confirming, setConfirming] = useState(false);
@@ -91,33 +110,69 @@ export function MailGroupTable({
   const showToast = useToast();
   const unsent = useUnsentGuard();
 
-  // Enkel wat nu in beeld staat, telt: een vinkje op een rij die door een
-  // andere filter of een verwijdering verdween, verwijdert niets dat je niet ziet.
-  const chosen = rows.filter((r) => selected.has(r.id));
+  /** Zet één parameter in de URL zonder naar de server te gaan. */
+  function writeUrl(key: string, value: string | null) {
+    const next = new URLSearchParams(window.location.search);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    const qs = next.toString();
+    const url = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
+    window.history.replaceState(null, "", url);
+    rememberOverview(url);
+  }
 
-  const allChecked = rows.length > 0 && chosen.length === rows.length;
+  // Ook de lijst zoals ze geladen werd (een filter gekozen, nog niets getypt).
+  useEffect(() => {
+    rememberOverview(`${window.location.pathname}${window.location.search}`);
+  }, []);
+
+  // Zoeken gebeurt in de browser: alle rijen van de filter staan al op de pagina.
+  const words = fold(query).split(/\s+/).filter(Boolean);
+  const searching = words.length > 0;
+  const shown = searching ? rows.filter((r) => words.every((w) => r.search.includes(w))) : rows;
+  const shownIds = new Set(shown.map((r) => r.id));
+  const visibleSections = sections
+    ?.map((s) => ({
+      ...s,
+      rowIds: s.rowIds.filter((id) => shownIds.has(id)),
+      children: s.children
+        .map((c) => ({ ...c, rowIds: c.rowIds.filter((id) => shownIds.has(id)) }))
+        .filter((c) => c.rowIds.length > 0),
+    }))
+    .filter((s) => s.rowIds.length > 0 || s.children.length > 0) ?? null;
+
+  // Enkel wat nu in beeld staat, telt: een vinkje op een rij die door een
+  // andere filter, een zoekterm of een verwijdering verdween, verwijdert niets
+  // dat je niet ziet.
+  const chosen = shown.filter((r) => selected.has(r.id));
+
+  const allChecked = shown.length > 0 && chosen.length === shown.length;
   const byId = new Map(rows.map((r) => [r.id, r]));
 
-  const [openSections, setOpenSections] = useState<Set<string>>(() =>
-    sectionsOpen && sections ? new Set(sections.flatMap((s) => [s.key, ...s.children.map((c) => c.key)])) : new Set(),
-  );
-  const toggleSection = (key: string) =>
-    setOpenSections((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+  const [openSections, setOpenSections] = useState<Set<string>>(() => {
+    const fromUrl = params.get("open");
+    if (fromUrl) return new Set(fromUrl.split(",").filter(Boolean));
+    return sectionsOpen && sections
+      ? new Set(sections.flatMap((s) => [s.key, ...s.children.map((c) => c.key)]))
+      : new Set();
+  });
+  // Met een zoekterm staat alles open waar iets gevonden is.
+  const isOpen = (key: string) => searching || openSections.has(key);
+  const toggleSection = (key: string) => {
+    const next = new Set(openSections);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setOpenSections(next);
+    writeUrl("open", [...next].join(",") || null);
+  };
 
   // De rijen in de volgorde waarin ze op het scherm staan; enkel wat open is.
   // Daarop werkt shift-klik: alles tussen de vorige klik en deze.
-  const ordered: string[] = sections
-    ? sections.flatMap((s) =>
-        openSections.has(s.key)
-          ? [...s.rowIds, ...s.children.flatMap((c) => (openSections.has(c.key) ? c.rowIds : []))]
-          : [],
+  const ordered: string[] = visibleSections
+    ? visibleSections.flatMap((s) =>
+        isOpen(s.key) ? [...s.rowIds, ...s.children.flatMap((c) => (isOpen(c.key) ? c.rowIds : []))] : [],
       )
-    : rows.map((r) => r.id);
+    : shown.map((r) => r.id);
   const [anchor, setAnchor] = useState<string | null>(null);
 
   /** Klik op een vinkje of met Ctrl/Cmd op een rij: één rij; met shift: een reeks. */
@@ -221,6 +276,39 @@ export function MailGroupTable({
     });
   }
 
+  function sync() {
+    startTransition(async () => {
+      const result = await unsent.run(() => syncMailGroupsAction());
+      if (result === UNSENT) return;
+      if (result.status === "error") {
+        const messages: Record<string, string> = nl
+          ? {
+              NOT_CONFIGURED: "Google Workspace is nog niet ingesteld; vul eerst de configuratie in bij Admin > IT.",
+              SYNC_PARTIAL: "Niet alles is gelukt. Kijk de foutmelding per adres na; de volgende ronde probeert het opnieuw.",
+            }
+          : {
+              NOT_CONFIGURED: "Google Workspace is not set up yet; fill in the configuration under Admin > IT first.",
+              SYNC_PARTIAL: "Not everything succeeded. Check the error per address; the next round will try again.",
+            };
+        showToast({
+          message: messages[result.code] ?? (nl ? "Synchroniseren is mislukt." : "Synchronisation failed."),
+          variant: "error",
+          duration: 0,
+        });
+        return;
+      }
+      showToast({ message: nl ? "Synchronisatie afgerond." : "Synchronisation finished.", variant: "success" });
+      router.refresh();
+    });
+  }
+
+  // De nakijkmodus krijgt dezelfde filter en zoekterm mee, zonder de open blokken.
+  const reviewParams = new URLSearchParams(params.toString());
+  reviewParams.delete("open");
+  if (query.trim()) reviewParams.set("q", query.trim());
+  else reviewParams.delete("q");
+  const reviewHref = `${base}/nakijken${reviewParams.toString() ? `?${reviewParams}` : ""}`;
+
   const totalMembers = chosen.reduce((n, r) => n + r.memberCount, 0);
   const stillActive = chosen.filter((r) => r.active > 0);
   const preview = chosen.slice(0, 8);
@@ -300,7 +388,7 @@ export function MailGroupTable({
           </Link>
           <span className="block text-xs text-zinc-500">
             {row.name !== row.email.split("@")[0] && <>{row.name} · </>}
-            {!sections && (row.category ?? (nl ? "zonder categorie" : "no category"))}
+            {!visibleSections && (row.category ?? (nl ? "zonder categorie" : "no category"))}
             {row.owner && <> · {row.owner}</>}
             {row.archived && <> · {nl ? "archief" : "archive"}</>}
             {!row.enabled && <> · {nl ? "niet beheerd" : "not managed"}</>}
@@ -311,15 +399,18 @@ export function MailGroupTable({
             {row.internalOnly && <> · {nl ? "enkel vtk.be" : "vtk.be only"}</>}
           </span>
         </td>
-        <td className="px-4 py-3 align-top text-zinc-600">{row.summary || "-"}</td>
         <td className="px-4 py-3 align-top" data-row-action>
           <button
             type="button"
-            className="text-left"
+            className="text-left text-zinc-600 underline decoration-dotted decoration-zinc-400 underline-offset-4 hover:text-vtk-ink"
             onClick={() => setPeek(row)}
             aria-label={nl ? `Wie zit er in ${row.email}` : `Who is in ${row.email}`}
           >
-            <ActivityCell nl={nl} row={row} />
+            {row.memberCount === 0 ? (
+              <span className="text-amber-800">{nl ? "leeg" : "empty"}</span>
+            ) : (
+              row.summary || (nl ? `${row.memberCount} leden` : `${row.memberCount} members`)
+            )}
           </button>
         </td>
         <td className="px-4 py-3 align-top text-xs text-zinc-500">
@@ -335,6 +426,51 @@ export function MailGroupTable({
 
   return (
     <>
+      <div className="mb-3 flex items-center gap-2">
+        <label className="relative min-w-0 flex-1 sm:max-w-sm">
+          <span className="sr-only">{nl ? "Zoek een adres" : "Search an address"}</span>
+          <Search
+            aria-hidden="true"
+            size={15}
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400"
+          />
+          <input
+            ref={searchRef}
+            type="search"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              writeUrl("q", e.target.value.trim() || null);
+            }}
+            placeholder={nl ? "Zoek, bv. activiteiten_" : "Search, e.g. activiteiten_"}
+            className="h-9 w-full rounded-full border border-vtk-blue/15 bg-white pl-9 pr-14 text-sm"
+          />
+          <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded bg-vtk-blue-soft/70 px-1.5 text-[11px] text-zinc-500">
+            ⌘F
+          </kbd>
+        </label>
+        {searching && (
+          <span className="text-sm tabular-nums text-zinc-500">
+            {nl ? `${shown.length} gevonden` : `${shown.length} found`}
+          </span>
+        )}
+        {manageAll && (
+          <div className="ml-auto flex items-center gap-1.5">
+            <IconLink href={reviewHref} label={nl ? "Eén voor één nakijken" : "Review one by one"}>
+              <ListCheckIcon />
+            </IconLink>
+            {canSync && (
+              <IconButton
+                label={pending ? (nl ? "Bezig met synchroniseren..." : "Synchronising...") : nl ? "Nu synchroniseren" : "Synchronise now"}
+                onClick={sync}
+                disabled={pending}
+              >
+                <RefreshCw aria-hidden="true" size={15} className={pending ? "animate-spin" : undefined} />
+              </IconButton>
+            )}
+          </div>
+        )}
+      </div>
       <div className="relative overflow-x-auto rounded-2xl border border-vtk-blue/15 bg-white">
         <table className="w-full min-w-[48rem] text-sm">
           <thead className="border-b border-vtk-blue/10 text-left text-xs uppercase tracking-wide text-zinc-500">
@@ -345,20 +481,33 @@ export function MailGroupTable({
                     type="checkbox"
                     checked={allChecked}
                     aria-label={
-                      nl ? `Alle ${rows.length} adressen in deze lijst aanvinken` : `Select all ${rows.length} addresses in this list`
+                      nl ? `Alle ${shown.length} adressen in deze lijst aanvinken` : `Select all ${shown.length} addresses in this list`
                     }
-                    onChange={() => setSelected(allChecked ? new Set() : new Set(rows.map((r) => r.id)))}
+                    onChange={() => setSelected(allChecked ? new Set() : new Set(shown.map((r) => r.id)))}
                   />
                 </th>
               )}
               <th className="px-4 py-3 font-medium">{nl ? "Adres" : "Address"}</th>
               <th className="px-4 py-3 font-medium">{nl ? "Wie erin zit" : "Who is in it"}</th>
-              <th className="px-4 py-3 font-medium">{nl ? "Nog actief" : "Still active"}</th>
               <th className="px-4 py-3 font-medium">{nl ? "Laatste sync" : "Last sync"}</th>
             </tr>
           </thead>
-          {sections ? (
-            sections.map((section) => {
+          {shown.length === 0 ? (
+            <tbody>
+              <tr>
+                <td colSpan={manageAll ? 4 : 3} className="px-4 py-4 text-sm text-zinc-500">
+                  {rows.length === 0
+                    ? nl
+                      ? "Geen adressen voor deze filter."
+                      : "No addresses for this filter."
+                    : nl
+                      ? `Niets gevonden voor "${query.trim()}".`
+                      : `Nothing found for "${query.trim()}".`}
+                </td>
+              </tr>
+            </tbody>
+          ) : visibleSections ? (
+            visibleSections.map((section) => {
               const allIds = [...section.rowIds, ...section.children.flatMap((c) => c.rowIds)];
               return (
                 <tbody key={section.key}>
@@ -367,14 +516,13 @@ export function MailGroupTable({
                     manageAll={manageAll}
                     label={section.label}
                     ids={allIds}
-                    rows={byId}
                     depth={0}
-                    open={openSections.has(section.key)}
+                    open={isOpen(section.key)}
                     selected={selected}
                     onToggle={() => toggleSection(section.key)}
                     onSelectAll={setMany}
                   />
-                  {openSections.has(section.key) && (
+                  {isOpen(section.key) && (
                     <>
                       {section.rowIds.map((id) => renderRow(byId.get(id)!, 1))}
                       {section.children.map((child) => (
@@ -384,14 +532,13 @@ export function MailGroupTable({
                             manageAll={manageAll}
                             label={child.label}
                             ids={child.rowIds}
-                            rows={byId}
-                            depth={1}
-                            open={openSections.has(child.key)}
+                                    depth={1}
+                            open={isOpen(child.key)}
                             selected={selected}
                             onToggle={() => toggleSection(child.key)}
                             onSelectAll={setMany}
                           />
-                          {openSections.has(child.key) && child.rowIds.map((id) => renderRow(byId.get(id)!, 2))}
+                          {isOpen(child.key) && child.rowIds.map((id) => renderRow(byId.get(id)!, 2))}
                         </Fragment>
                       ))}
                     </>
@@ -400,7 +547,7 @@ export function MailGroupTable({
               );
             })
           ) : (
-            <tbody>{rows.map((row) => renderRow(row, 0))}</tbody>
+            <tbody>{shown.map((row) => renderRow(row, 0))}</tbody>
           )}
         </table>
       </div>
@@ -498,7 +645,6 @@ function SectionRow({
   manageAll,
   label,
   ids,
-  rows,
   depth,
   open,
   selected,
@@ -509,17 +655,12 @@ function SectionRow({
   manageAll: boolean;
   label: string;
   ids: string[];
-  rows: Map<string, MailGroupRow>;
   depth: number;
   open: boolean;
   selected: Set<string>;
   onToggle: () => void;
   onSelectAll: (ids: string[], on: boolean) => void;
 }) {
-  const inactive = ids.filter((id) => {
-    const row = rows.get(id);
-    return row && row.memberCount > 0 && row.active === 0 && !row.thisYear;
-  }).length;
   const picked = ids.filter((id) => selected.has(id)).length;
   const all = ids.length > 0 && picked === ids.length;
   return (
@@ -546,7 +687,7 @@ function SectionRow({
           />
         </td>
       )}
-      <td colSpan={4} className="px-4 py-2.5" style={depth ? { paddingLeft: `${16 + depth * 14}px` } : undefined}>
+      <td colSpan={3} className="px-4 py-2.5" style={depth ? { paddingLeft: `${16 + depth * 14}px` } : undefined}>
         <button
           type="button"
           aria-expanded={open}
@@ -563,70 +704,9 @@ function SectionRow({
           />
           <span className={depth === 0 ? "font-semibold text-vtk-ink" : "font-medium text-vtk-ink"}>{label}</span>
           <span className="text-sm tabular-nums text-zinc-500">{ids.length}</span>
-          {inactive > 0 && (
-            <span className="ml-auto text-xs text-amber-800">
-              {nl ? `${inactive} zonder actieve leden` : `${inactive} without active members`}
-            </span>
-          )}
         </button>
       </td>
     </tr>
-  );
-}
-
-function ActivityCell({ nl, row }: { nl: boolean; row: MailGroupRow }) {
-  // Enkel de eerste regel krijgt de stippellijn: dat is het klikbare deel.
-  const link = "underline decoration-dotted decoration-zinc-400 underline-offset-4";
-  if (row.memberCount === 0) {
-    return <span className={`text-sm text-amber-800 ${link}`}>{nl ? "leeg" : "empty"}</span>;
-  }
-  if (row.active === 0 && row.thisYear) {
-    return (
-      <span className="block text-sm">
-        <span className={link}>
-          <span className="text-vtk-ink">{nl ? "groep van dit jaar" : "this year's group"}</span>
-        </span>
-        <span className="block text-xs text-zinc-500">
-          {nl ? `${row.memberCount} leden, geen gekend` : `${row.memberCount} members, none known`}
-        </span>
-      </span>
-    );
-  }
-  if (row.active === 0) {
-    return (
-      <span className="block text-sm">
-        <span className={link}>
-          <span className="text-amber-800">{nl ? "niemand" : "nobody"}</span>
-          <span className="text-zinc-500"> {nl ? `van ${row.memberCount}` : `of ${row.memberCount}`}</span>
-        </span>
-        <span className="block text-xs text-zinc-500">
-          {row.lastYear
-            ? nl
-              ? `laatst ${row.lastYear}`
-              : `last ${row.lastYear}`
-            : row.unknown > 0
-              ? nl
-                ? `${row.unknown} ${row.unknown === 1 ? "adres" : "adressen"} onbekend`
-                : `${row.unknown} unknown ${row.unknown === 1 ? "address" : "addresses"}`
-              : nl
-                ? "niemand gekend"
-                : "nobody known"}
-        </span>
-      </span>
-    );
-  }
-  return (
-    <span className="block text-sm tabular-nums">
-      <span className={link}>
-        <span className="text-vtk-ink">{row.active}</span>
-        <span className="text-zinc-500"> {nl ? `van ${row.memberCount}` : `of ${row.memberCount}`}</span>
-      </span>
-      {row.unlinked > 0 && (
-        <span className="block text-xs text-amber-700">
-          {nl ? `${row.unlinked} zonder adres` : `${row.unlinked} without address`}
-        </span>
-      )}
-    </span>
   );
 }
 

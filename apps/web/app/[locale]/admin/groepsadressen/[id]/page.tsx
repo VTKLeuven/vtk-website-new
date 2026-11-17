@@ -13,13 +13,15 @@ import {
   isArchivedYear,
   loadDesiredContext,
 } from "@/lib/google/desired";
-import { GROUP_KINDS, everyGroupOfKindLabel, memberAddress, normaliseEmail } from "@/lib/google/members";
+import { memberAddress, normaliseEmail } from "@/lib/google/members";
 import { renderAddress, yearVars } from "@/lib/google/addresses";
 import { IMPORTED_NOTE } from "@/lib/google/import";
 import { SOURCE_NAME_SELECT, sourceName } from "@/lib/google/labels";
 import { loadMailGroupActivity } from "@/lib/google/activityData";
 import { toStatusView } from "@/lib/google/activityLabels";
-import { MailGroupDetail, type MemberRow, type SourceOptionGroup } from "./MailGroupDetail";
+import { loadCategoryOptions, loadSourceOptions, type SourceOptionGroup } from "@/lib/google/mailGroupOptions";
+import { MailGroupDetail, type MemberRow } from "./MailGroupDetail";
+import { OverviewBackLink } from "../OverviewBackLink";
 
 /**
  * Eén groepsadres: wie erin zit en waarom, de bronnen, de losse leden, de
@@ -107,27 +109,13 @@ export default async function MailGroupPage({
   }
   for (const child of row.children) names.set(child.email, nl ? "jaargroep" : "yearly group");
 
-  const [groups, kiesploegen, pocs, werkgroepen, ownMembers, categories] = await Promise.all([
+  const [groups, werkgroepen, ownMembers, categoryOptions] = await Promise.all([
     access.manageAll
       ? prisma.group.findMany({
           where: { active: true },
           select: { id: true, nameNl: true, nameEn: true, type: true },
           orderBy: { nameNl: "asc" },
         })
-      : [],
-    access.manageAll
-      ? prisma.kiesploeg.findMany({
-          where: { active: true },
-          select: {
-            id: true,
-            formalName: true,
-            posts: { select: { id: true, name: true }, orderBy: { order: "asc" } },
-          },
-          orderBy: { workingYear: "desc" },
-        })
-      : [],
-    access.manageAll
-      ? prisma.poc.findMany({ select: { id: true, nameNl: true, nameEn: true }, orderBy: { order: "asc" } })
       : [],
     access.manageAll
       ? prisma.group.findMany({
@@ -144,48 +132,12 @@ export default async function MailGroupPage({
           orderBy: { user: { name: "asc" } },
         })
       : [],
-    access.manageAll
-      ? prisma.mailGroupCategory.findMany({
-          select: { id: true, name: true, parentId: true },
-          orderBy: { name: "asc" },
-        })
-      : [],
+    access.manageAll ? loadCategoryOptions(nl) : [],
   ]);
 
   const g = (x: { nameNl: string; nameEn: string }) => (nl ? x.nameNl : x.nameEn);
   const sourceOptions: SourceOptionGroup[] = access.manageAll
-    ? [
-        {
-          label: nl ? "Alles" : "Everything",
-          options: GROUP_KINDS.map((kind) => ({
-            value: `type:${kind}`,
-            label: everyGroupOfKindLabel(kind, nl),
-          })),
-        },
-        {
-          label: nl ? "Posten" : "Posts",
-          options: groups.filter((x) => x.type === "PRAESIDIUM").map((x) => ({ value: `group:${x.id}`, label: g(x) })),
-        },
-        {
-          label: nl ? "Werkgroepen" : "Work groups",
-          options: groups.filter((x) => x.type === "WERKGROEP").map((x) => ({ value: `group:${x.id}`, label: g(x) })),
-        },
-        {
-          label: nl ? "Jaarwerkingen" : "Yearly events",
-          options: groups.filter((x) => x.type === "JAARWERKING").map((x) => ({ value: `group:${x.id}`, label: g(x) })),
-        },
-        {
-          label: nl ? "POC's (verkozen vertegenwoordigers)" : "POCs (elected representatives)",
-          options: pocs.map((p) => ({ value: `poc:${p.id}`, label: nl ? p.nameNl : (p.nameEn ?? p.nameNl) })),
-        },
-        ...kiesploegen.map((k) => ({
-          label: k.formalName,
-          options: [
-            { value: `kiesploeg:${k.id}`, label: nl ? "Volledige kiesploeg" : "Whole kiesploeg" },
-            ...k.posts.map((post) => ({ value: `kiesploegPost:${post.id}`, label: post.name })),
-          ],
-        })),
-      ].filter((group) => group.options.length > 0)
+    ? await loadSourceOptions(nl)
     : row.ownerGroup
       ? [
           {
@@ -273,15 +225,6 @@ export default async function MailGroupPage({
     }
   }
 
-  const categoryOptions = categories
-    .filter((c) => !c.parentId)
-    .flatMap((c) => [
-      // Per hoofdcategorie één kop, met de hoofdcategorie zelf bovenaan.
-      { value: c.id, label: c.name, hint: nl ? "hoofdcategorie" : "main category", group: c.name },
-      ...categories
-        .filter((s) => s.parentId === c.id)
-        .map((s) => ({ value: s.id, label: s.name, group: c.name })),
-    ]);
   const categoryName = row.category
     ? row.category.parent
       ? `${row.category.parent.name} › ${row.category.name}`
@@ -295,10 +238,8 @@ export default async function MailGroupPage({
   return (
     <div className="space-y-6">
       <div>
-        <Link href={base} className="vtk-link text-sm">
-          {nl ? "Groepsadressen" : "Group addresses"}
-        </Link>
-        <h1 className="mt-1 text-xl font-semibold text-vtk-ink">{row.email}</h1>
+        <OverviewBackLink base={base} label={nl ? "Groepsadressen" : "Group addresses"} />
+        <h2 className="text-lg font-semibold text-vtk-ink">{row.email}</h2>
         <p className="mt-1 text-sm text-zinc-500">
           {row.name}
           {categoryName && <> · {categoryName}</>}

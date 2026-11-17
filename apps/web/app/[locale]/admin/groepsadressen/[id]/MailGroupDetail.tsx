@@ -28,10 +28,8 @@ import {
 } from "../actions";
 import { deleteOneFromGoogleAction } from "../bulkActions";
 
-export type SourceOptionGroup = {
-  label: string;
-  options: { value: string; label: string }[];
-};
+import type { SourceOptionGroup } from "@/lib/google/mailGroupOptions";
+export type { SourceOptionGroup };
 
 /**
  * Eén rij in het tabblad Leden: wie er nu in zit, plus de losse regels die

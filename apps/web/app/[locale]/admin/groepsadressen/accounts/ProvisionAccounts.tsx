@@ -3,9 +3,11 @@
 import { useUnsentGuard } from "@/components/ui/unsentGuard";
 import { useActionState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Select } from "@vtk/ui";
+import { Button } from "@vtk/ui";
+import { SearchPicker } from "@/components/admin/SearchPicker";
 import { useToast } from "@/components/ui/toast";
-import { PROVISION_IDLE, createGoogleAccountsAction } from "./actions";
+import { createGoogleAccountsAction } from "./actions";
+import { PROVISION_IDLE } from "./state";
 
 export type ProvisionRow = {
   userId: string;
@@ -116,22 +118,20 @@ export function ProvisionAccounts({
 
   return (
     <div className="space-y-6">
-      <div className="w-80">
+      <div className="w-80 max-w-full">
         <label className="mb-1 block text-sm font-medium text-vtk-ink" htmlFor="provision-source">
           {t.source}
         </label>
-        <Select
+        <SearchPicker
           id="provision-source"
+          options={sources}
           value={selectedSource}
-          onChange={(e) => router.push(`${basePath}?bron=${encodeURIComponent(e.target.value)}`)}
-        >
-          <option value="">{t.choose}</option>
-          {sources.map((source) => (
-            <option key={source.value} value={source.value}>
-              {source.label}
-            </option>
-          ))}
-        </Select>
+          onChange={(value) => router.push(value ? `${basePath}?bron=${encodeURIComponent(value)}` : basePath)}
+          placeholder={t.choose}
+          searchPlaceholder={nl ? "Zoek, bv. Cultuur" : "Search, e.g. Cultuur"}
+          ariaLabel={t.source}
+          emptyText={(q) => (nl ? `Geen post of kiesploeg "${q}".` : `No post or kiesploeg "${q}".`)}
+        />
       </div>
 
       {planLabel && (

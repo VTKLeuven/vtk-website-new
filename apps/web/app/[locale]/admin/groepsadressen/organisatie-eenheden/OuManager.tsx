@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Search } from "lucide-react";
 import { Button, ConfirmDialog } from "@vtk/ui";
 import { SearchPicker } from "@/components/admin/SearchPicker";
+import { useFindShortcut } from "@/components/admin/useFindShortcut";
 import { useToast } from "@/components/ui/toast";
 import { UNSENT, useUnsentGuard } from "@/components/ui/unsentGuard";
 import { moveAccountsAction } from "./actions";
@@ -20,6 +22,8 @@ export type OuAccount = {
 };
 
 const ALL = "__all__";
+/** Zoveel rijen per keer: een tabel van duizend rijen maakt het scherm traag. */
+const PAGE = 100;
 
 /** Zonder accenten en hoofdletters. */
 function fold(value: string): string {
@@ -29,6 +33,10 @@ function fold(value: string): string {
 /**
  * Accounts per organisatie-eenheid, aanvinken (shift en Ctrl/Cmd zoals op het
  * overzicht van de groepsadressen) en in één keer verplaatsen.
+ *
+ * De OU kies je in een keuzelijst met zoekveld (een rij chips liep over drie
+ * regels), en de tabel toont er 100 tegelijk; "Alle aanvinken" neemt wel alles
+ * wat de filter oplevert, ook wat nog niet getoond is.
  */
 export function OuManager({
   nl,
@@ -44,6 +52,9 @@ export function OuManager({
 }) {
   const [ou, setOu] = useState(ALL);
   const [query, setQuery] = useState("");
+  const [limit, setLimit] = useState(PAGE);
+  const searchRef = useRef<HTMLInputElement>(null);
+  useFindShortcut(searchRef);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [anchor, setAnchor] = useState<string | null>(null);
   const [target, setTarget] = useState("");
@@ -68,6 +79,7 @@ export function OuManager({
     );
   }, [accounts, ou, query]);
   const ordered = visible.map((a) => a.email);
+  const rendered = visible.slice(0, limit);
   const chosen = visible.filter((a) => selected.has(a.email));
   const allChecked = visible.length > 0 && chosen.length === visible.length;
 
@@ -138,39 +150,52 @@ export function OuManager({
     });
   }
 
-  const chip = (value: string, label: string, n: number) => (
-    <button
-      key={value}
-      type="button"
-      aria-pressed={ou === value}
-      onClick={() => {
-        setOu(value);
-        setSelected(new Set());
-      }}
-      className={[
-        "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-sm",
-        ou === value
-          ? "border-vtk-ink bg-vtk-ink text-vtk-surface"
-          : "border-vtk-blue/15 bg-white text-vtk-ink hover:border-vtk-blue/30",
-      ].join(" ")}
-    >
-      {label} <span className="tabular-nums">{n}</span>
-    </button>
-  );
-
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        {chip(ALL, nl ? "Alle" : "All", accounts.length)}
-        {orgUnits.filter((o) => counts.get(o)).map((o) => chip(o, o, counts.get(o) ?? 0))}
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={nl ? "Zoek op adres, naam of post" : "Search address, name or post"}
-          aria-label={nl ? "Zoek een account" : "Search an account"}
-          className="ml-auto h-9 w-64 rounded-full border border-vtk-blue/15 bg-white px-4 text-sm"
-        />
+        <div className="w-64 max-w-full">
+          <SearchPicker
+            options={[
+              { value: ALL, label: nl ? "Alle organisatie-eenheden" : "All organisational units", hint: String(accounts.length) },
+              ...orgUnits.filter((o) => counts.get(o)).map((o) => ({ value: o, label: o, hint: String(counts.get(o)) })),
+            ]}
+            value={ou}
+            onChange={(value) => {
+              setOu(value || ALL);
+              setSelected(new Set());
+              setLimit(PAGE);
+            }}
+            placeholder={nl ? "Alle organisatie-eenheden" : "All organisational units"}
+            searchPlaceholder={nl ? "Zoek, bv. Praesidium" : "Search, e.g. Praesidium"}
+            ariaLabel={nl ? "Organisatie-eenheid" : "Organisational unit"}
+            emptyText={(q) => (nl ? `Geen OU "${q}".` : `No OU "${q}".`)}
+          />
+        </div>
+        <label className="relative min-w-0 flex-1 sm:max-w-sm">
+          <span className="sr-only">{nl ? "Zoek een account" : "Search an account"}</span>
+          <Search
+            aria-hidden="true"
+            size={15}
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400"
+          />
+          <input
+            ref={searchRef}
+            type="search"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setLimit(PAGE);
+            }}
+            placeholder={nl ? "Zoek op adres, naam of post" : "Search address, name or post"}
+            className="h-9 w-full rounded-full border border-vtk-blue/15 bg-white pl-9 pr-14 text-sm"
+          />
+          <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded bg-vtk-blue-soft/70 px-1.5 text-[11px] text-zinc-500">
+            ⌘F
+          </kbd>
+        </label>
+        <span className="ml-auto text-sm tabular-nums text-zinc-500">
+          {nl ? `${visible.length} accounts` : `${visible.length} accounts`}
+        </span>
       </div>
 
       <div className="relative overflow-x-auto rounded-2xl border border-vtk-blue/15 bg-white">
@@ -191,7 +216,7 @@ export function OuManager({
             </tr>
           </thead>
           <tbody>
-            {visible.map((a) => (
+            {rendered.map((a) => (
               <tr
                 key={a.email}
                 className={[
@@ -229,6 +254,18 @@ export function OuManager({
             ))}
           </tbody>
         </table>
+        {visible.length > rendered.length && (
+          <div className="flex items-center justify-center gap-3 border-t border-vtk-blue/10 px-4 py-3 text-sm">
+            <span className="text-zinc-500">
+              {nl
+                ? `${rendered.length} van ${visible.length} getoond`
+                : `${rendered.length} of ${visible.length} shown`}
+            </span>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setLimit((n) => n + PAGE * 2)}>
+              {nl ? "Toon er meer" : "Show more"}
+            </Button>
+          </div>
+        )}
         {visible.length === 0 && (
           <p className="px-4 py-4 text-sm text-zinc-500">{nl ? "Geen accounts voor deze filter." : "No accounts for this filter."}</p>
         )}

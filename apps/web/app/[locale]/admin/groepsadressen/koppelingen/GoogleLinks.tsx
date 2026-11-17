@@ -45,7 +45,6 @@ export function GoogleLinks({
     ? {
         title: "Accounts koppelen",
         intro: `Welk ${domain}-account hoort bij welk lid. Zonder koppeling weet de synchronisatie geen adres en valt iemand uit elke lijst.`,
-        back: "Terug naar groepsadressen",
         suggestions: "Voorstellen",
         suggestionsHelp:
           "Eenduidige naamovereenkomsten: precies één lid en precies één account.",
@@ -86,7 +85,6 @@ export function GoogleLinks({
     : {
         title: "Link accounts",
         intro: `Which ${domain} account belongs to which member. Without a link the synchronisation has no address and someone drops out of every list.`,
-        back: "Back to group addresses",
         suggestions: "Suggestions",
         suggestionsHelp: "Unambiguous name matches: exactly one member and exactly one account.",
         linkAll: "Link all suggestions",
@@ -153,11 +151,8 @@ export function GoogleLinks({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-vtk-ink">{t.title}</h1>
+        <h2 className="text-lg font-semibold text-vtk-ink">{t.title}</h2>
         <p className="mt-1 max-w-3xl text-sm text-zinc-500">{t.intro}</p>
-        <Link href={backHref} className="vtk-link mt-2 inline-block text-sm">
-          {t.back}
-        </Link>
       </div>
 
       {error && (

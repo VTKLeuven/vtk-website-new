@@ -220,7 +220,7 @@ export function ReviewMode({
         <Link href={backHref} className="vtk-link text-sm">
           {nl ? "Groepsadressen" : "Group addresses"}
         </Link>
-        <h1 className="mt-1 text-xl font-semibold text-vtk-ink">{nl ? "Nakijken" : "Review"}</h1>
+        <h2 className="text-lg font-semibold text-vtk-ink">{nl ? "Nakijken" : "Review"}</h2>
         <p className="mt-1 text-sm text-zinc-500">
           {filterLabel ? `${filterLabel} · ` : nl ? "Alle groepsadressen · " : "All group addresses · "}
           {nl
