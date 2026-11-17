@@ -45,6 +45,7 @@ export function TicketEventCreate({
   bannerCategories = [],
   accountingCodes,
   baseEvent,
+  defaultOwnerGroupId,
   canManageTemplates,
   locale,
 }: {
@@ -62,6 +63,12 @@ export function TicketEventCreate({
   accountingCodes: AccountingCodeOption[];
   /** Wat het formulier zonder sjabloon al meekreeg (een gekoppeld kalenderevent). */
   baseEvent?: { ownerGroupId?: string; slug?: string };
+  /**
+   * De eigen post van wie aanmaakt, wanneer die bij de keuzes staat. Komt na
+   * het gekoppelde kalenderevent en het sjabloon: die zeggen allebei
+   * uitdrukkelijk van wie de verkoop is.
+   */
+  defaultOwnerGroupId?: string;
   canManageTemplates: boolean;
   locale: AdminLocale;
 }) {
@@ -103,10 +110,17 @@ export function TicketEventCreate({
     }
   })();
 
+  // De eerste die ook echt bij de keuzes staat: een sjabloon van een post
+  // waarvoor jij niet mag aanmaken, valt zo terug op je eigen post in plaats van
+  // op de eerste optie van de lijst.
+  const ownerGroupId = [baseEvent?.ownerGroupId, template?.ownerGroupId, defaultOwnerGroupId].find(
+    (id): id is string => Boolean(id) && groups.some((group) => group.id === id),
+  );
+
   const prefill = template
     ? {
         ...baseEvent,
-        ownerGroupId: baseEvent?.ownerGroupId ?? template.ownerGroupId ?? undefined,
+        ownerGroupId,
         accountingCodeId: template.accountingCodeId,
         titleNl: template.titleNl,
         titleEn: template.titleEn,
@@ -135,7 +149,7 @@ export function TicketEventCreate({
         salesStartAt: schedule?.salesStartAt ?? undefined,
         salesEndAt: schedule?.salesEndAt ?? undefined,
       }
-    : baseEvent;
+    : { ...baseEvent, ownerGroupId };
 
   const base = ticketBase(locale);
 
