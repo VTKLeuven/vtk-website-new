@@ -18,23 +18,28 @@ export async function startAuthorizationPreview(formData: FormData): Promise<voi
   const locale = formData.get("locale") === "en" ? "en" : "nl";
   const roleIds = [...new Set(formData.getAll("roleId").filter((id): id is string => typeof id === "string"))];
   const groupIds = [...new Set(formData.getAll("groupId").filter((id): id is string => typeof id === "string"))];
-  if (roleIds.length > 50 || groupIds.length > 50) throw new Error("INVALID_INPUT");
+  const pocIds = [...new Set(formData.getAll("pocId").filter((id): id is string => typeof id === "string"))];
+  if (roleIds.length > 50 || groupIds.length > 50 || pocIds.length > 50) throw new Error("INVALID_INPUT");
 
   const groups: AuthorizationPreviewSelection["groups"] = groupIds.map((id) => ({
     id,
     role: formData.get(`groupRole:${id}`) === "LEAD" ? "LEAD" : "MEMBER",
   }));
 
-  const [roleCount, groupCount] = await Promise.all([
+  const [roleCount, groupCount, pocCount] = await Promise.all([
     prisma.role.count({ where: { id: { in: roleIds } } }),
     prisma.group.count({ where: { id: { in: groupIds }, active: true } }),
+    prisma.poc.count({ where: { id: { in: pocIds } } }),
   ]);
-  if (roleCount !== roleIds.length || groupCount !== groupIds.length) throw new Error("INVALID_INPUT");
+  if (roleCount !== roleIds.length || groupCount !== groupIds.length || pocCount !== pocIds.length) {
+    throw new Error("INVALID_INPUT");
+  }
 
   const value = encodeAuthorizationPreview({
     actorId: session.user.id,
     roleIds,
     groups,
+    pocIds,
   });
   // Browsers generally cap one cookie at 4096 bytes. Leave room for the name
   // and attributes instead of silently starting a preview that cannot persist.

@@ -47,7 +47,9 @@ Per POC komen er rollen en een kanaal op de server:
 3. Kies de rollen in `/admin/pocs`, onder POC-instellingen, en per rol eventueel de
    fases. De lijst met rollen komt pas van Discord wanneer je een POC openklapt.
 4. Kies het kanaal per POC onderaan `/admin/peilingen`, onder "Discord-kanalen per
-   POC". Daar komen de peilingen van de RiVers van die POC.
+   POC". Daar komen de peilingen van de RiVers van die POC. Die kaart staat dicht,
+   en de lijst met kanalen komt pas van Discord wanneer je ze openklapt: Discord
+   antwoordt soms traag, en de lijst met peilingen hoort daar niet op te wachten.
 
 Zet tot slot in `/admin/pocs` het koppelbericht in een publiek kanaal. Daar staat de
 knop waarmee studenten hun account koppelen.

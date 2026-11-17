@@ -199,6 +199,20 @@ export async function savePocPollAction(_previous: SaveState, formData: FormData
 }
 
 /**
+ * De kanalen van de Discord-server, voor de kaart "Discord-kanalen per POC".
+ * Die vraagt ze pas op wanneer ze opengeklapt wordt: Discord antwoordt soms
+ * traag, en /admin/peilingen hoort daar niet op te wachten.
+ */
+export async function listPocPollChannelsAction(): Promise<
+  { ok: true; channels: Array<{ id: string; name: string }> } | { ok: false; code: "POLL_FORBIDDEN" | "POLL_DISCORD_DOWN" }
+> {
+  const scope = await manageScope();
+  if (scope !== "all") return { ok: false, code: "POLL_FORBIDDEN" };
+  const channels = await listDiscordChannels();
+  return channels ? { ok: true, channels } : { ok: false, code: "POLL_DISCORD_DOWN" };
+}
+
+/**
  * Welk Discord-kanaal bij welke POC hoort: daar komen de peilingen van haar
  * RiVers. Enkel VTK Onderwijs (`pocs.manage`) stelt dit in. Een veld dat niet
  * meekwam (Discord antwoordde niet), laat de POC zoals ze was.

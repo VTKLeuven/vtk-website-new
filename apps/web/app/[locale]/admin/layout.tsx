@@ -10,9 +10,9 @@ import { canAccessAnyForm } from '@/lib/forms/authorization';
 import { canSeeCommuRequests } from '@/lib/commu/requests';
 import { isExternalUrl } from '@/lib/href';
 import { werkgroepenWithOwnMemberRights } from '@/lib/werkgroepMembers';
-import { currentWorkingYear } from '@/lib/workingYear';
 import { getAdminNav, type NavGuard, type NavLeaf } from '@/lib/admin-nav';
 import { canSeeMailGroups, mailGroupAccess } from '@/lib/google/access';
+import { representedPocIds } from '@/lib/pocPolls/access';
 import { ADMIN_DENSITY_COOKIE, ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/adminNavCookie';
 import { AdminNav, type NavItem, type NavNode } from './AdminNav';
 import { AdminSurface } from './AdminSurface';
@@ -72,10 +72,7 @@ export default async function AdminLayout({
 
   // RiVers van dit werkingsjaar krijgen de tab Peilingen, zonder apart recht.
   const pocRep =
-    !session.permissions.includes('pocs.manage') &&
-    (await prisma.pocRepresentative.count({
-      where: { userId: session.user.id, year: currentWorkingYear() },
-    })) > 0;
+    !session.permissions.includes('pocs.manage') && (await representedPocIds(session.user.id)).length > 0;
 
   // Groepsadressen: wie ze beheert of accounts goedkeurt, en een werkgroep die
   // haar eigen adressen beheert. Dat laatste vraagt pas iets op met het recht.

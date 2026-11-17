@@ -7,6 +7,12 @@ export type AuthorizationPreviewSelection = {
   actorId: string;
   roleIds: string[];
   groups: Array<{ id: string; role: AuthGroupRole }>;
+  /**
+   * De POC's waarvan je in het voorbeeld RiVer bent. Een RiVer is geen rol of
+   * post maar een rij in `PocRepresentative`; zie `representedPocIds`. Ontbreekt
+   * in een cookie van voor deze optie, en is dan leeg.
+   */
+  pocIds: string[];
 };
 
 export function encodeAuthorizationPreview(selection: AuthorizationPreviewSelection): string {
@@ -25,6 +31,9 @@ export function decodeAuthorizationPreview(value: string | undefined): Authoriza
     if (!Array.isArray(raw.roleIds) || !Array.isArray(raw.groups)) return null;
     if (raw.roleIds.length > MAX_SELECTIONS || raw.groups.length > MAX_SELECTIONS) return null;
     if (!raw.roleIds.every((id) => typeof id === "string" && id.length > 0)) return null;
+    const pocIds = raw.pocIds ?? [];
+    if (!Array.isArray(pocIds) || pocIds.length > MAX_SELECTIONS) return null;
+    if (!pocIds.every((id) => typeof id === "string" && id.length > 0)) return null;
 
     const groups: AuthorizationPreviewSelection["groups"] = [];
     for (const entry of raw.groups) {
@@ -44,6 +53,7 @@ export function decodeAuthorizationPreview(value: string | undefined): Authoriza
       actorId: raw.actorId,
       roleIds: [...new Set(raw.roleIds as string[])],
       groups: [...new Map(groups.map((group) => [group.id, group])).values()],
+      pocIds: [...new Set(pocIds as string[])],
     };
   } catch {
     return null;

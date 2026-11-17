@@ -114,13 +114,18 @@ describe('authorization preview', () => {
         { id: 'group-a', role: 'MEMBER' },
         { id: 'group-a', role: 'LEAD' },
       ],
+      pocIds: ['poc-a', 'poc-a'],
     });
 
     expect(decodeAuthorizationPreview(encoded)).toEqual({
       actorId: 'admin',
       roleIds: ['role-a'],
       groups: [{ id: 'group-a', role: 'LEAD' }],
+      pocIds: ['poc-a'],
     });
+    // Een cookie van voor de RiVer-optie blijft geldig, zonder POC's.
+    const legacy = Buffer.from(JSON.stringify({ actorId: 'admin', roleIds: [], groups: [] }), 'utf8').toString('base64url');
+    expect(decodeAuthorizationPreview(legacy)?.pocIds).toEqual([]);
     expect(decodeAuthorizationPreview('not-json')).toBeNull();
   });
 

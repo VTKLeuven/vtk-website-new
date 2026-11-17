@@ -14,7 +14,8 @@ export async function AuthorizationPreviewBanner({ locale }: { locale: Locale })
     const name = nl ? group.nameNl : group.nameEn;
     return group.role === "LEAD" ? `${name} (${nl ? "verantwoordelijke" : "lead"})` : name;
   });
-  const context = [...roleNames, ...groupNames];
+  const pocNames = preview.pocs.map((poc) => `${nl ? "RiVer" : "Student rep"} ${(nl ? poc.nameNl : poc.nameEn).replace(/^POC\s+/i, "")}`);
+  const context = [...roleNames, ...groupNames, ...pocNames];
 
   return (
     // Zwevend onderaan en niet in de flow onder de kop: vast in beeld is ze op

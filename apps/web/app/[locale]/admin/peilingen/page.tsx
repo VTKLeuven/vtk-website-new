@@ -1,15 +1,14 @@
-import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Card } from "@vtk/ui";
 import { prisma } from "@vtk/db";
 import type { Locale } from "@vtk/i18n";
 import Link from "@/components/ui/Link";
 import { LinkedRow } from "@/components/ui/LinkedRow";
-import { discordGuildConfigured, listDiscordChannels } from "@/lib/discord/bot";
+import { discordGuildConfigured } from "@/lib/discord/bot";
 import { hasLocale } from "@/lib/locale";
 import { managedPocIds } from "@/lib/pocPolls/access";
 import { pollStatus } from "@/lib/pocPolls/core";
-import { requireSession } from "@/lib/session";
+import { getAuthorizationPreview, requireSession } from "@/lib/session";
 import { PocChannelsCard } from "./PocChannelsCard";
 import { PollStatusPill, pollDateLabel } from "./PollStatusPill";
 
@@ -28,7 +27,13 @@ export default async function AdminPeilingen({ params }: { params: Promise<{ loc
   const scope = await managedPocIds(session);
   if (scope !== "all" && scope.length === 0) notFound();
 
-  const polls = await prisma.pocPoll.findMany({
+  // De POC's voor de kaart met Discord-kanalen; de kanalen zelf vraagt die kaart
+  // pas op wanneer ze opengeklapt wordt (zie PocChannelsCard).
+  const pocsQuery =
+    scope === "all" && discordGuildConfigured()
+      ? prisma.poc.findMany({ orderBy: { order: "asc" }, select: { id: true, nameNl: true, discordChannelId: true } })
+      : Promise.resolve([]);
+  const pollsQuery = prisma.pocPoll.findMany({
     where: scope === "all" ? {} : { pocId: { in: scope } },
     orderBy: [{ closesAt: "desc" }],
     select: {
@@ -41,6 +46,7 @@ export default async function AdminPeilingen({ params }: { params: Promise<{ loc
       questions: { select: { answers: { distinct: ["voterKey"], select: { voterKey: true } } } },
     },
   });
+  const [polls, pocs] = await Promise.all([pollsQuery, pocsQuery]);
   const now = new Date();
 
   return (
@@ -112,26 +118,12 @@ export default async function AdminPeilingen({ params }: { params: Promise<{ loc
       )}
 
       {scope === "all" && discordGuildConfigured() ? (
-        <Suspense fallback={null}>
-          <PocChannelsSection nl={nl} />
-        </Suspense>
+        <PocChannelsCard
+          nl={nl}
+          preview={(await getAuthorizationPreview()) !== null}
+          pocs={pocs.map((poc) => ({ id: poc.id, name: poc.nameNl.replace(/^POC\s+/i, ""), channelId: poc.discordChannelId ?? "" }))}
+        />
       ) : null}
     </div>
-  );
-}
-
-/** De lijst met kanalen komt van Discord; de peilingen erboven wachten daar niet op. */
-async function PocChannelsSection({ nl }: { nl: boolean }) {
-  const [channels, pocs] = await Promise.all([
-    listDiscordChannels(),
-    prisma.poc.findMany({ orderBy: { order: "asc" }, select: { id: true, nameNl: true, discordChannelId: true } }),
-  ]);
-  if (!channels) return null;
-  return (
-    <PocChannelsCard
-      nl={nl}
-      channels={channels}
-      pocs={pocs.map((poc) => ({ id: poc.id, name: poc.nameNl.replace(/^POC\s+/i, ""), channelId: poc.discordChannelId ?? "" }))}
-    />
   );
 }
