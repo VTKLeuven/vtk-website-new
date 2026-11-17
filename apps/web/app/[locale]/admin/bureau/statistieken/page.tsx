@@ -16,6 +16,7 @@ import {
   sourceRows,
   yearOverview,
   type Series,
+  type StatsMeeting,
 } from '@/lib/meetingStats';
 import { loadBureauStatsMeetings } from '@/lib/meetingStatsLoad';
 import { DailyChart, type ChartSeries } from '@/components/admin/DailyChart';
@@ -58,6 +59,22 @@ export default async function AdminBureauStatsPage({
     day: 'numeric',
     month: 'long',
   });
+  const timeLabel = new Intl.DateTimeFormat('nl-BE', {
+    timeZone: 'Europe/Brussels',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  });
+  // Met uur, plaats en aantal: twee bureaus op dezelfde dag waren anders twee
+  // keer dezelfde regel in de keuzelijst.
+  const pickLabel = (meeting: StatsMeeting) =>
+    [
+      `${dateLabel.format(meeting.startsAt)}, ${timeLabel.format(meeting.startsAt)}`,
+      meeting.location,
+      `${meeting.reservations.length} ${nl ? 'ingeschreven' : 'registered'}`,
+    ]
+      .filter(Boolean)
+      .join(' · ');
   const dateTime = new Intl.DateTimeFormat(nl ? 'nl-BE' : 'en-GB', {
     timeZone: 'Europe/Brussels',
     weekday: 'short',
@@ -197,10 +214,10 @@ export default async function AdminBureauStatsPage({
               <form method="get" className="flex flex-wrap items-end gap-2">
                 <div>
                   <Label htmlFor="bureau-stats-pick">{nl ? 'Bureau' : 'Bureau'}</Label>
-                  <Select id="bureau-stats-pick" name="bureau" defaultValue={selected?.id} className="w-64">
+                  <Select id="bureau-stats-pick" name="bureau" defaultValue={selected?.id} className="w-80">
                     {meetings.map((meeting) => (
                       <option key={meeting.id} value={meeting.id}>
-                        {dateLabel.format(meeting.startsAt)}
+                        {pickLabel(meeting)}
                       </option>
                     ))}
                   </Select>

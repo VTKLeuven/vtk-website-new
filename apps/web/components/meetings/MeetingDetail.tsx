@@ -313,6 +313,7 @@ export function MeetingDetail({
                 ? {
                     INVALID_DATE: "Geef een geldig moment op.",
                     NOT_FOUND: "Deze vergadering bestaat niet meer.",
+                    DAY_TAKEN: "Op die dag staat er al een andere. Er kan er maar één per dag zijn.",
                     INVALID_LIMIT: "Geef bij big bureau op hoeveel broodjes Theokot levert (0 of meer).",
                     EXTERNAL_LEFT:
                       "Big bureau staat nog aan: Theokot heeft niet genoeg voorraad meer om de extern bestelde broodjes over te nemen, ook niet met de bureauvoorraad. Zet het aantal voor Theokot hoger, of vraag Theokot eerst om meer broodjes.",
@@ -320,6 +321,7 @@ export function MeetingDetail({
                 : {
                     INVALID_DATE: "Enter a valid moment.",
                     NOT_FOUND: "This meeting no longer exists.",
+                    DAY_TAKEN: "There is already another one on that day. There can only be one per day.",
                     INVALID_LIMIT: "Enter how many sandwiches Theokot provides for a big bureau (0 or more).",
                     EXTERNAL_LEFT:
                       "Big bureau is still on: Theokot no longer has enough stock to take over the externally ordered sandwiches, not even with the bureau stock. Raise the number for Theokot, or ask Theokot for more sandwiches first.",

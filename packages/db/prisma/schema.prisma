@@ -4470,6 +4470,11 @@ model Meeting {
   slug     String      @unique
 
   startsAt DateTime  @db.Timestamptz(3)
+  /// De Brusselse kalenderdag van `startsAt`. Een trigger
+  /// (`meeting_set_day`) vult het bij elke schrijfactie; de code zet het
+  /// nooit zelf. Bestaat enkel voor de regel hieronder: één bureau en één
+  /// grocomeet per dag.
+  day      DateTime  @default(dbgenerated("CURRENT_DATE")) @db.Date
   location String?
   /// Vanaf wanneer studenten dit bureau kunnen invullen. Leeg = meteen open.
   /// Een GM staat altijd open: de grocos bestellen weken op voorhand.
@@ -4503,6 +4508,10 @@ model Meeting {
   /// Reclamemomenten (mail, story) die Onderwijs zelf noteerde.
   promotions    MeetingPromotion[]
 
+  /// Op productie stond elk bureau dubbel (semester 1 nog eens ingepland onder
+  /// semester 2). Een tweede op dezelfde dag faalt nu met P2002; zie
+  /// `DAY_TAKEN`.
+  @@unique([kind, day])
   @@index([kind, startsAt])
   @@index([year, semester, kind])
 }

@@ -36,7 +36,15 @@ export function NewMeetingCard({
         savingLabel={nl ? "Bezig..." : "Adding..."}
         savedMessage={nl ? "Vergadering toegevoegd" : "Meeting added"}
         errorMessages={
-          nl ? { INVALID_DATE: "Geef een geldig moment op." } : { INVALID_DATE: "Enter a valid moment." }
+          nl
+            ? {
+                INVALID_DATE: "Geef een geldig moment op.",
+                DAY_TAKEN: "Op die dag staat er al een. Pas die aan in plaats van een tweede toe te voegen.",
+              }
+            : {
+                INVALID_DATE: "Enter a valid moment.",
+                DAY_TAKEN: "There is already one on that day. Edit it instead of adding a second one.",
+              }
         }
         fallbackErrorMessage={nl ? "Toevoegen mislukt." : "Adding failed."}
       >

@@ -191,7 +191,11 @@ export async function MeetingPlanningPage({
                 ? "De kalender van dit semester staat nog niet vast. Duid aan wanneer de bureaus doorgaan; het voorstel staat op de even weken en je wisselt met één klik naar de oneven weken."
                 : "This semester's calendar is not set yet. Mark when the bureaus take place; the suggestion uses the even weeks and one click switches to the odd ones."}
         </p>
+        {/* Een eigen `key` per semester: de planner bewaart zijn selectie in
+            state, en die bleef bij het wisselen van tab staan. Opslaan zette
+            dan de dagen van het andere semester er een tweede keer in. */}
         <MeetingPlanner
+          key={`${workingYear}-${semester}`}
           nl={nl}
           kind={kind}
           year={workingYear}
