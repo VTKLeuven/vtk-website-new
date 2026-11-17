@@ -41,7 +41,7 @@ export const MCP_PERMISSION_POLICY = {
   "forms.create": { reads: ["forms"], creates: ["app_create:form", "app_create:form_section", "app_create:form_field"], blocked: ["publish forms or submit entries"] },
   "forms.manageAll": { reads: ["forms", "form_entries"], creates: ["app_create:form", "app_create:form_section", "app_create:form_field"], blocked: ["publish forms, submit entries or send mail"] },
   "photos.upload": { reads: ["photos"], creates: ["app_create:photo_album"], blocked: ["upload assets or publish albums"] },
-  "photos.manageAlbums": { reads: ["photos"], creates: ["app_create:photo_album"], blocked: ["modify, publish or delete albums"] },
+  "photos.manageAlbums": { reads: ["photos"], creates: ["app_create:photo_album"], blocked: ["modify, publish or delete albums", "create, change or revoke private album links"] },
   "users.search": { reads: ["user_search"], creates: [], blocked: ["create or modify accounts"] },
   "users.view": { reads: ["users"], creates: [], blocked: ["create or modify accounts"] },
   "users.edit": { reads: ["users"], creates: [], blocked: ["create, modify or deactivate accounts"] },
@@ -75,7 +75,7 @@ export const MCP_PERMISSION_POLICY = {
   // MCP mag het onder geen enkele voorwaarde.
   "app.push": { reads: [], creates: [], blocked: ["send push notifications"] },
   "openingHours.manageOwn": { reads: ["editorial_settings"], creates: [], blocked: ["overwrite opening hours"] },
-  "media.manage": { reads: ["editorial_settings", "photos"], creates: ["app_create:photo_album"], blocked: ["upload or overwrite media settings"] },
+  "media.manage": { reads: ["editorial_settings", "photos"], creates: ["app_create:photo_album"], blocked: ["upload or overwrite media settings", "create, change or revoke private album links"] },
   "dashboard.manage": { reads: ["dashboard"], creates: ["app_create:dashboard_tile"], blocked: ["update or delete dashboard tiles"] },
   "dashboard.manageOwn": { reads: ["dashboard"], creates: ["app_create:dashboard_tile(GROUP)"], blocked: ["update or delete dashboard tiles"] },
   "shortlinks.manage": { reads: ["shortlinks"], creates: ["app_create:short_link"], blocked: ["enable, update or delete short links"] },

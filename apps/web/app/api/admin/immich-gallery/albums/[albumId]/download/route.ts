@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { Readable } from "node:stream";
-import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { streamZip } from "@vtk/storage";
 import { contentDisposition } from "@/lib/contentDisposition";
-import { downloadImmichOriginal, immichGalleryStatus } from "@/lib/immich-gallery";
+import { immichGalleryStatus } from "@/lib/immich-gallery";
 import { loadLibraryAlbum } from "@/lib/media-admin";
-import { albumZipEntries, albumZipFilename, type AlbumZipEntry } from "@/lib/media-album-zip";
+import { albumZipEntries, albumZipFilename } from "@/lib/media-album-zip";
 import { withHiddenPhotoDetails } from "@/lib/media-hidden-photos";
+import { openZipOriginal } from "@/lib/media-zip-originals";
 import { authErrorResponse, requireAnyPermission } from "@/lib/session";
 
 /**
@@ -30,23 +29,6 @@ import { authErrorResponse, requireAnyPermission } from "@/lib/session";
  */
 export const dynamic = "force-dynamic";
 
-/** Een Immich die even hapert (NFS, ML bezig) krijgt één tweede kans per bestand. */
-async function openOriginal(entry: AlbumZipEntry): Promise<Readable> {
-  let failure: unknown;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      const response = await downloadImmichOriginal(entry.assetId);
-      if (!response.body) throw new Error("Immich gaf geen inhoud terug.");
-      return Readable.fromWeb(response.body as unknown as NodeReadableStream);
-    } catch (error) {
-      failure = error;
-      if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 500));
-    }
-  }
-  console.error("Media library: album zip stopped, original could not be opened", entry.assetId, failure);
-  throw failure;
-}
-
 export async function GET(
   _request: Request,
   context: { params: Promise<{ albumId: string }> },
@@ -69,7 +51,7 @@ export async function GET(
       return NextResponse.json({ error: "Dit album bevat geen foto's.", code: "album_empty" }, { status: 404 });
     }
 
-    return new Response(streamZip(entries, openOriginal, { store: true }) as unknown as BodyInit, {
+    return new Response(streamZip(entries, openZipOriginal, { store: true }) as unknown as BodyInit, {
       headers: {
         "content-type": "application/zip",
         "content-disposition": contentDisposition("attachment", albumZipFilename(loaded.album.title)),

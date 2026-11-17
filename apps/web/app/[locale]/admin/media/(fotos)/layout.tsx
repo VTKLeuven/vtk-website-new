@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { fakbarUploadEnabled } from "@/lib/fakbar-gallery";
 import { countTrash, loadLibraryAlbums, purgeExpiredGalleryTrash } from "@/lib/media-admin";
+import { sharedAlbumIds } from "@/lib/media-share";
 import { requireAnyPermission } from "@/lib/session";
 import { currentWorkingYear } from "@/lib/workingYear";
 import type { AdminAlbum } from "@/lib/immich-gallery";
@@ -31,7 +32,11 @@ export default async function PhotoLibraryLayout({
     console.error("Media library: albums could not be loaded", cause);
     error = true;
   }
-  const [trashCount, fakbarEnabled] = await Promise.all([countTrash(), fakbarUploadEnabled()]);
+  const [trashCount, fakbarEnabled, shared] = await Promise.all([
+    countTrash(),
+    fakbarUploadEnabled(),
+    sharedAlbumIds(),
+  ]);
 
   // Wat langer dan 30 dagen in de prullenmand ligt, opruimen. Na het antwoord:
   // wie het beheer opent, wacht daar niet op.
@@ -46,6 +51,7 @@ export default async function PhotoLibraryLayout({
     coverAssetId: album.coverAssetId,
     tabCount: album.parts.length > 1 ? album.parts.length : 0,
     workingYear: album.date ? currentWorkingYear(new Date(album.date)) : null,
+    shared: shared.has(album.id),
   }));
 
   return (

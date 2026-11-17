@@ -24,6 +24,10 @@ export function albumErrorMessages(locale: Locale): Record<string, string> {
         COVER_OTHER_TAB: "Geen cover gezet: de cover moet een foto uit de eerste tab zijn.",
         TRASH_MISSING: "Niet teruggezet: dit staat niet meer in de prullenmand.",
         TRASH_EXPIRED: "Niet teruggezet: dit lag langer dan 30 dagen in de prullenmand en is definitief weg.",
+        LABEL_REQUIRED: "Niet opgeslagen: zeg bij Voor wie? voor wie de link is, zodat je hem later terugvindt.",
+        GROUP_REQUIRED: "Niet opgeslagen: kies de werkgroep die de link mag openen.",
+        GROUP_MISSING: "Niet opgeslagen: die werkgroep bestaat niet meer. Herlaad de pagina en kies opnieuw.",
+        LINK_MISSING: "Niet gelukt: deze link bestaat niet meer. Herlaad de pagina.",
         INVALID_INPUT: "Niet opgeslagen: kijk de ingevulde velden na.",
       }
     : {
@@ -43,6 +47,10 @@ export function albumErrorMessages(locale: Locale): Record<string, string> {
         COVER_OTHER_TAB: "No cover set: the cover has to be a photo from the first tab.",
         TRASH_MISSING: "Not restored: this is no longer in the trash.",
         TRASH_EXPIRED: "Not restored: this was in the trash for more than 30 days and is gone for good.",
+        LABEL_REQUIRED: "Not saved: say who the link is for, so you can find it again later.",
+        GROUP_REQUIRED: "Not saved: choose the working group that may open the link.",
+        GROUP_MISSING: "Not saved: that working group no longer exists. Reload the page and choose again.",
+        LINK_MISSING: "Failed: this link no longer exists. Reload the page.",
         INVALID_INPUT: "Not saved: please check the fields you entered.",
       };
 }

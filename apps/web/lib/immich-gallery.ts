@@ -37,6 +37,7 @@ export type {
 
 export {
   deleteImmichAlbum,
+  deleteImmichAlbumSharedLinks,
   deleteImmichAssets,
   downloadImmichOriginal,
   getImmichAsset,

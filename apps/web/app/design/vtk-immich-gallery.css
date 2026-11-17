@@ -1105,3 +1105,94 @@
     opacity: 0.55;
   }
 }
+
+/* ------------------------------------------------------------------------
+   Privélink naar een album (/media/gedeeld/<token>): de regel boven de foto's
+   en de kaart die in hun plaats staat wanneer de link niet zomaar opengaat.
+   Zie docs/immich-gallery.md, "Een album delen met een link".
+   ------------------------------------------------------------------------ */
+
+/* Een uitgelichte kaart in een licht vlak: wit met de gele rail, geen navy blok. */
+.vtk-shared-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+  margin-bottom: clamp(20px, 3vw, 32px);
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-shared-notice p {
+  flex: 1 1 320px;
+  min-width: 0;
+  margin: 0;
+  color: var(--body);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.vtk-shared-notice b {
+  color: var(--ink);
+}
+
+.vtk-shared-notice .btn {
+  flex: none;
+}
+
+.vtk-shared-gate {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: clamp(22px, 4vw, 32px);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+.vtk-shared-gate-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 4px;
+  border-radius: 12px;
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.vtk-shared-gate-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.vtk-shared-gate-kicker {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.vtk-shared-gate h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+.vtk-shared-gate p {
+  margin: 0;
+  color: var(--body);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.vtk-shared-gate .btn {
+  margin-top: 10px;
+}

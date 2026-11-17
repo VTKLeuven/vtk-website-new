@@ -23,9 +23,11 @@ import {
   trashPhotosAction,
 } from "@/app/actions/media-albums";
 import { PHOTO_PAGE_SIZE, TRASH_DAYS, adminThumbnailUrl, albumZipUrl, photoDownloadUrl } from "@/lib/media-admin-shared";
+import type { ShareLinkRow } from "@/lib/media-share";
 import { SAVE_IDLE, type SaveAction } from "@/lib/saveState";
 import { albumErrorMessages } from "../../messages";
 import { useUploads } from "../../uploads";
+import { AlbumShareLinks } from "./AlbumShareLinks";
 
 type Photo = { id: string; filename: string; hidden: boolean; video: boolean };
 type Part = { id: string; name: string; photos: Photo[] };
@@ -43,6 +45,9 @@ export function AlbumManager({
   album,
   parts,
   publicPath,
+  shareLinks,
+  werkgroepen,
+  now,
 }: {
   locale: string;
   album: {
@@ -56,6 +61,11 @@ export function AlbumManager({
   };
   parts: Part[];
   publicPath: string | null;
+  /** De privélinks naar dit album; zie `AlbumShareLinks`. */
+  shareLinks: ShareLinkRow[];
+  werkgroepen: Array<{ id: string; name: string }>;
+  /** Het moment waarop de server tekende, voor "nog 6 dagen" en "verlopen". */
+  now: string;
 }) {
   const nl = locale === "nl";
   const base = `${nl ? "" : "/en"}/admin/media`;
@@ -85,6 +95,9 @@ export function AlbumManager({
 
   const onSite = parts.reduce((sum, item) => sum + item.photos.filter((photo) => !photo.hidden).length, 0);
   const hiddenTotal = parts.reduce((sum, item) => sum + item.photos.filter((photo) => photo.hidden).length, 0);
+  // Verborgen is niet onzichtbaar zolang er een link werkt; de uitleg bij de
+  // schakelaar zegt dat, anders denkt wie verbergt dat niemand het nog ziet.
+  const workingLinks = shareLinks.filter((link) => new Date(link.expiresAt) > new Date(now)).length;
   const hiddenHere = part.photos.filter((photo) => photo.hidden).length;
   // Zonder verborgen foto's verdwijnt de filter; bleef hij op "Verborgen" staan,
   // dan zat je vast op een leeg raster zonder knop om terug te gaan.
@@ -295,15 +308,30 @@ export function AlbumManager({
           <b>{album.hidden ? (nl ? "Verborgen" : "Hidden") : nl ? "Op vtk.be" : "On vtk.be"}</b>
           <small>
             {album.hidden
-              ? nl
-                ? "Enkel zichtbaar in dit beheer. Zet het aan om het op de mediapagina te tonen."
-                : "Only visible in this admin. Switch it on to show it on the media page."
+              ? workingLinks > 0
+                ? nl
+                  ? "Enkel zichtbaar in dit beheer en voor wie een link heeft. Zet het aan om het op de mediapagina te tonen."
+                  : "Only visible in this admin and to whoever has a link. Switch it on to show it on the media page."
+                : nl
+                  ? "Enkel zichtbaar in dit beheer. Zet het aan om het op de mediapagina te tonen."
+                  : "Only visible in this admin. Switch it on to show it on the media page."
               : nl
                 ? "Iedereen ziet dit album op de mediapagina."
                 : "Everyone sees this album on the media page."}
           </small>
         </span>
       </div>
+
+      <AlbumShareLinks
+        locale={locale}
+        albumId={album.id}
+        albumTitle={album.title}
+        visibleCount={onSite}
+        hiddenCount={hiddenTotal}
+        links={shareLinks}
+        werkgroepen={werkgroepen}
+        now={now}
+      />
 
       {onSite + hiddenTotal > 0 ? (
         <div className="media-switch-row is-card media-album-download">

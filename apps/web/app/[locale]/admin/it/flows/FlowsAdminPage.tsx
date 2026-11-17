@@ -59,6 +59,7 @@ import {
   type PollBotMessage,
 } from "@/lib/discord/pollMessages";
 import "@/app/design/vtk-poc-poll.css";
+import { SharedAlbumGateCard } from "@/components/media/SharedAlbumGate";
 import { FlowPreview } from "./FlowPreview";
 import { MailPreviewList } from "./MailPreviewList";
 
@@ -914,6 +915,58 @@ export async function FlowsAdminPage({
             <p className="mb-1 text-sm text-[#5c667f]">{nl ? "Koppelen op de site" : "Linking on the site"}</p>
             <DiscordLinkForm token="voorbeeld" labels={discordLinkLabels(nl, "voorbeeld_student")} action={previewNoopAction} />
           </div>
+        </div>
+      </FlowPreview>
+      )}
+
+      {section === "schermen" && (
+      <FlowPreview
+        title={nl ? "Privélink naar een album: wanneer ze niet zomaar opengaat" : "Private album link: when it does not just open"}
+        when={
+          nl
+            ? "Verschijnt op /media/gedeeld/<token> in de plaats van de foto's: zonder sessie bij een link voor het praesidium of een werkgroep, ingelogd maar niet in die groep, of wanneer de link verlopen of ingetrokken is."
+            : "Appears on /media/gedeeld/<token> instead of the photos: without a session on a link for the praesidium or a working group, logged in but not in that group, or when the link expired or was revoked."
+        }
+        openLabel={nl ? "Toon de schermen" : "Show the screens"}
+        closeLabel={nl ? "Verberg de schermen" : "Hide the screens"}
+        rules={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Regels" : "Rules"}</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4">
+              <li>
+                {nl
+                  ? "Lidmaatschap telt in het werkingsjaar van vandaag, bij elk bezoek opnieuw (lib/media-share.ts). Geen link loopt voorbij 15 juli."
+                  : "Membership counts in today's working year, again on every visit (lib/media-share.ts). No link runs past 15 July."}
+              </li>
+              <li>
+                {nl
+                  ? "Geen scherm noemt de titel van het album of de groep. Verlopen, ingetrokken en nooit gemaakt geven hetzelfde scherm."
+                  : "No screen names the album title or the group. Expired, revoked and never created give the same screen."}
+              </li>
+              <li>
+                {nl
+                  ? "Na het inloggen gaat de ontvanger terug naar dezelfde link (?next=)."
+                  : "After logging in the recipient returns to the same link (?next=)."}
+              </li>
+            </ul>
+          </>
+        }
+        yourState={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Waar" : "Where"}</p>
+            <p className="mt-2">
+              {nl
+                ? "Links maak je in /admin/media, in het album zelf, bij Delen met een link."
+                : "Links are created in /admin/media, in the album itself, under Share with a link."}
+            </p>
+          </>
+        }
+      >
+        <div className="grid gap-6 lg:grid-cols-2">
+          <SharedAlbumGateCard kind="login" locale={locale} loginHref={`${nl ? "" : "/en"}/inloggen`} />
+          <SharedAlbumGateCard kind="forbidden" locale={locale} />
+          <SharedAlbumGateCard kind="gone" locale={locale} />
+          <SharedAlbumGateCard kind="unavailable" locale={locale} />
         </div>
       </FlowPreview>
       )}

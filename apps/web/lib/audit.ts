@@ -79,6 +79,7 @@ export const AUDIT_ENTITIES = {
   shortLink: { nl: "Verkorte link", en: "Short link", group: "shortlinks" },
   media: { nl: "Mediapagina", en: "Media page", group: "media" },
   photoAlbum: { nl: "Fotoalbum", en: "Photo album", group: "media" },
+  photoAlbumShareLink: { nl: "Privélink naar een album", en: "Private album link", group: "media" },
   dashboardTile: { nl: "Dashboardtegel", en: "Dashboard tile", group: "dashboard" },
 
   // Evenementen

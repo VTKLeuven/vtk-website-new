@@ -21,10 +21,13 @@ export function AlbumTabViewer({
   albumSlug,
   subAlbums,
   labels,
+  allowDownload = true,
 }: {
-  albumSlug: string;
+  /** Zonder slug (een privélink naar een verborgen album) geen meldknop; zie `AlbumViewer`. */
+  albumSlug?: string;
   subAlbums: SubAlbumData[];
   labels: Labels;
+  allowDownload?: boolean;
 }) {
   const searchParams = useSearchParams();
   const subParam = searchParams.get("sub");
@@ -76,6 +79,7 @@ export function AlbumTabViewer({
         albumSlug={albumSlug}
         photos={activeSub.photos}
         labels={labels}
+        allowDownload={allowDownload}
       />
     </div>
   );

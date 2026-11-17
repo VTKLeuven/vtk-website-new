@@ -12061,6 +12061,48 @@ album wilde nakijken, moest in Immich zijn.
     tab.
   - **Altijd het origineel, nooit een verkleinde versie.** Wie een nieuwsbrief of
     affiche maakt, wil de volle resolutie.
+- **Privélinks (november 2026): een album delen zonder het op de site te zetten.**
+  Communicatie kon een album enkel tonen door het publiek te maken. Nu kan het
+  vanuit het album een link maken naar `/media/gedeeld/<token>`; de techniek
+  staat in `docs/immich-gallery.md`, "Een album delen met een link". De keuzes:
+  - **Drie soorten link, op vraag van IT:** iedereen met de link, met de link
+    enkel het praesidium, of met de link enkel één werkgroep, gekozen in een
+    keuzelijst. Een post of een jaarwerking als groep kan (nog) niet: niet
+    gevraagd, en het is later dezelfde keuzelijst met meer groepen.
+  - **Een eigen link op vtk.be, geen gedeelde link van Immich.** Enkel zo kan een
+    link vragen dat iemand inlogt, zie je hoe vaak hij geopend is, en staat er
+    geen sleutel in de foto-URL's die het album op de fotoproxy opent.
+  - **Standaard een maand, en nooit voorbij 15 juli.** Een vergeten link verloopt
+    vanzelf. Op 15 juli wisselt het werkingsjaar, en daarmee wie er in het
+    praesidium of een werkgroep zit en wie er in Communicatie zit; wie daarna
+    nog moet kijken, krijgt een nieuwe link van de nieuwe ploeg. Er is geen
+    link zonder einddatum.
+  - **Downloaden staat standaard aan.** Meestal is dat net de bedoeling: een
+    partner of een fotograaf wil de foto's hebben. Uit is enkel bekijken, en het
+    venster zegt eerlijk dat een schermafbeelding dat niet tegenhoudt.
+  - **Verborgen foto's gaan nooit mee**, ook niet in de zip van een link. Dat is
+    het omgekeerde van de zip in het beheer, en bewust: die zip blijft bij
+    Communicatie, een link gaat naar buiten, en een foto wordt vaak verborgen na
+    een verwijderverzoek. Wie ze toch moet doorgeven, gebruikt de zip.
+  - **Geen eigen recht.** Wie een album als zip kan downloaden, kan het nu al
+    doorsturen; een link is daar de veiligere vorm van. Dus `media.manage` of
+    `photos.manageAlbums`, zoals de rest van het albumbeheer.
+  - **Een telling, geen lijst van wie keek.** Ook bij een link voor het
+    praesidium, waar de site weet wie er inlogt, staat enkel hoe vaak en wanneer
+    laatst. Wie er keek, is een vraag die niemand moet kunnen beantwoorden.
+  - **Geen wachtwoord en geen mail vanaf de site** in deze versie. Een wachtwoord
+    in hetzelfde bericht als de link beschermt niets extra, en praesidium of
+    werkgroep dekt het interne geval. Een link gaat nu via WhatsApp of mail; een
+    mail vanaf de site vraagt een sjabloon en een voorvertoning op
+    /admin/it/flows, en komt er pas als iemand erom vraagt.
+  - **Intrekken staat in het venster van de link, niet in de rij.** Een klik op de
+    rij opent de link; het icoon in de rij kopieert hem, want dat doe je het vaakst.
+    Intrekken is de enige onomkeerbare actie, en de bevestiging zegt wat er weg is
+    (de URL) en wat blijft (het album, de andere links).
+  - **Verbergen sluit ook de oude publieke link van Immich**, en dat hoort hierbij:
+    met privélinks ernaast moet "Verborgen" in het beheer kloppen. Voordien was
+    een verborgen album via de fotoproxy nog te openen voor wie ooit een
+    foto-URL had.
 
 ## Vervangbaar op een shift: een student neemt de plaats van het praesidium in
 

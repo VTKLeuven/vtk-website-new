@@ -26,6 +26,7 @@ import { logAudit } from "@/lib/audit";
 import {
   addImmichAssetsToAlbum,
   createImmichGalleryAlbum,
+  deleteImmichAlbumSharedLinks,
   deleteImmichAssets,
   galleryAlbumMarker,
   galleryHiddenAlbumMarker,
@@ -92,7 +93,14 @@ function tabNameOf(album: AdminAlbum, partId: string): string | null {
   return album.parts.length > 1 ? partOf(album, partId)?.name ?? null : null;
 }
 
-/** Zet de galerijmerker op elk deel van het album aan of uit. */
+/**
+ * Zet de galerijmerker op elk deel van het album aan of uit.
+ *
+ * Verbergen haalt ook de gedeelde link van Immich weg. De sleutel daarvan staat
+ * in elke foto-URL die de site ooit toonde, en op de fotoproxy opent hij het hele
+ * album, ook nadat het van de site is. Terugzetten maakt geen link: dat doet de
+ * momentopname zelf, met een nieuwe sleutel. Ook de prullenmand loopt hierlangs.
+ */
 async function setPartsVisible(partIds: string[], visible: boolean): Promise<void> {
   const marker = galleryAlbumMarker();
   const hidden = galleryHiddenAlbumMarker();
@@ -103,6 +111,7 @@ async function setPartsVisible(partIds: string[], visible: boolean): Promise<voi
       ? swapMarker(current.description, hidden, marker)
       : swapMarker(current.description, marker, hidden);
     if (next !== current.description) await updateImmichAlbum(id, { description: next });
+    if (!visible) await deleteImmichAlbumSharedLinks(id);
   }
 }
 

@@ -802,6 +802,7 @@ model User {
   galleryPhotosDetached GalleryDetachedPhoto[] @relation("GalleryPhotoDetacher")
   galleryPhotosTrashed  GalleryTrashedPhoto[]  @relation("GalleryPhotoTrasher")
   galleryAlbumsTrashed  GalleryTrashedAlbum[]  @relation("GalleryAlbumTrasher")
+  galleryShareLinks     GalleryShareLink[]     @relation("GalleryShareLinkCreator")
 
   websiteFeedback        WebsiteFeedback[] @relation("WebsiteFeedbackAuthor")
   websiteFeedbackHandled WebsiteFeedback[] @relation("WebsiteFeedbackHandler")
@@ -986,6 +987,8 @@ model Group {
   /// Taken van een andere post die het aanspreekpunt voor deze post zijn
   /// ("IT-contact voor Theokot").
   tasksFor                 GroupTask[]               @relation("GroupTaskFor")
+  /// Privélinks naar een album die enkel de leden van deze werkgroep openen.
+  galleryShareLinks        GalleryShareLink[]
 }
 
 model GroupMembership {
@@ -9484,6 +9487,61 @@ model GalleryTrashedAlbum {
   trashedBy User? @relation("GalleryAlbumTrasher", fields: [trashedById], references: [id], onDelete: SetNull)
 
   @@index([gallery, trashedAt])
+}
+
+/// Wie er met een privélink van een album binnen mag. Zie
+/// `docs/immich-gallery.md`, "Een album delen met een link".
+enum GalleryShareAudience {
+  /// Iedereen met de link, ook zonder account.
+  LINK
+  /// Inloggen, en dit werkingsjaar een post van het praesidium hebben.
+  PRAESIDIUM
+  /// Inloggen, en dit werkingsjaar lid zijn van de werkgroep in `groupId`.
+  GROUP
+}
+
+/// Een privélink naar een album van vtk.be. Wie hem heeft, ziet het album op
+/// /media/gedeeld/<token>, ook wanneer het niet op de site staat; hij toont
+/// enkel de zichtbare foto's. Draagt een geheim: nooit in de fixtures en nooit
+/// in een MCP-leesresource.
+model GalleryShareLink {
+  id      String               @id @default(cuid())
+  gallery PhotoTakedownGallery
+
+  /// Het hoofdalbum in Immich; zijn tabs horen er vanzelf bij.
+  albumId String
+  /// Voor wie, enkel voor het beheer ("Praesidium 2026-2027").
+  label   String
+
+  /// sha256 van het token, om op te zoeken. Het token zelf staat nergens leesbaar.
+  tokenHash   String @unique
+  /// Het token, versleuteld met `encryptSecret`, om de link later opnieuw te
+  /// kopiëren. De link van een album is van het team, niet van één persoon.
+  tokenSecret String
+
+  audience      GalleryShareAudience @default(LINK)
+  /// Enkel bij GROUP: de werkgroep. Een CHECK in de migratie eist hem daar en
+  /// verbiedt hem elders; verdwijnt de werkgroep, dan gaan haar links mee.
+  groupId       String?
+  allowDownload Boolean              @default(true)
+  /// Nooit voorbij 15 juli: dan wisselt het werkingsjaar, en met hem wie er in
+  /// het praesidium of een werkgroep zit.
+  expiresAt     DateTime             @db.Timestamptz(3)
+
+  /// Een telling, geen lijst van wie er keek.
+  openCount    Int       @default(0)
+  lastOpenedAt DateTime? @db.Timestamptz(3)
+
+  createdById String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  group     Group? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  /// `SetNull`: wie de link maakte, mag de kring verlaten zonder de link mee te nemen.
+  createdBy User?  @relation("GalleryShareLinkCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([gallery, albumId])
+  @@index([groupId])
 }
 
 /// Waarover de feedback gaat. Vier categorieën plus een restcategorie: meer

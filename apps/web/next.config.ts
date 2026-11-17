@@ -208,6 +208,30 @@ const nextConfig: NextConfig = {
           { key: "Cache-Control", value: "private, no-store, max-age=0" },
         ],
       })),
+      // Een privélink naar een album: het token staat in de URL, net als bij een
+      // ticketbestelling. Geen referrer naar een externe link op de pagina, niet
+      // in een gedeelde cache, en niet in een zoekmachine.
+      ...[
+        "/media/gedeeld/:path*",
+        "/nl/media/gedeeld/:path*",
+        "/en/media/gedeeld/:path*",
+      ].map((source) => ({
+        source,
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "Cache-Control", value: "private, no-store, max-age=0" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        ],
+      })),
+      // De foto's en de zip van zo'n link zetten zelf hun cache; hier enkel wat
+      // voor elk antwoord geldt.
+      {
+        source: "/api/immich-gallery/gedeeld/:path*",
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        ],
+      },
     ];
   },
 };

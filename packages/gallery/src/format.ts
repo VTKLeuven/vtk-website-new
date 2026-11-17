@@ -39,6 +39,13 @@ export function slugify(value: string): string {
 }
 
 /**
+ * Mappen naast `/media/[albumSlug]` op de site. Een album dat zo zou heten,
+ * krijgt meteen `-2`: anders wint de map en is het album onbereikbaar.
+ * `gedeeld` draagt de privélinks (`/media/gedeeld/<token>`).
+ */
+const RESERVED_SLUGS = new Set(['gedeeld']);
+
+/**
  * Twee albums met dezelfde naam mogen niet dezelfde slug krijgen; de tweede
  * wordt `-2`. De teller leeft per momentopname, zodat de slug van een album
  * niet verschuift zolang de albums ervoor niet veranderen.
@@ -48,7 +55,7 @@ export function createSlugAllocator(): (title: string) => string {
 
   return (title: string) => {
     const base = slugify(title);
-    const count = counts.get(base) || 0;
+    const count = counts.get(base) ?? (RESERVED_SLUGS.has(base) ? 1 : 0);
     counts.set(base, count + 1);
     return count === 0 ? base : `${base}-${count + 1}`;
   };

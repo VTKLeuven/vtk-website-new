@@ -38,6 +38,7 @@ export {
   GalleryError,
   addImmichAssetsToAlbum,
   deleteImmichAlbum,
+  deleteImmichAlbumSharedLinks,
   deleteImmichAssets,
   downloadImmichOriginal,
   galleryStatus,
@@ -57,8 +58,12 @@ export {
 } from './immich';
 
 export {
+  assetDimensions,
+  dateValue,
   downloadFilenameFromResponse,
+  fileTitle,
   parseAlbumMarkers,
+  photoDate,
   sanitizeFilename,
   setMarker,
   slugify,

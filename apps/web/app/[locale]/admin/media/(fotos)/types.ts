@@ -13,4 +13,6 @@ export type LibraryRow = {
   tabCount: number;
   /** Het werkingsjaar (startjaar) van de datum, om de lijst in te delen. */
   workingYear: number | null;
+  /** Heeft het album minstens één privélink die nog werkt? */
+  shared: boolean;
 };

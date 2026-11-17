@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { hasLocale } from "@/lib/locale";
 import { loadLibraryAlbum } from "@/lib/media-admin";
+import { listShareLinks, listShareWerkgroepen } from "@/lib/media-share";
 import { requireAnyPermission } from "@/lib/session";
 import { AlbumManager } from "./AlbumManager";
 
@@ -58,6 +59,11 @@ export default async function PhotoAlbumPage({
   }
 
   const { album, parts, publicPath } = loaded;
+  const now = new Date();
+  const [shareLinks, werkgroepen] = await Promise.all([
+    listShareLinks(album.id, locale, now),
+    listShareWerkgroepen(locale),
+  ]);
   return (
     <AlbumManager
       // Een ander album is een nieuw scherm: selectie, tab en filter beginnen opnieuw.
@@ -74,6 +80,9 @@ export default async function PhotoAlbumPage({
       }}
       parts={parts}
       publicPath={publicPath ? `${locale === "nl" ? "" : "/en"}${publicPath}` : null}
+      shareLinks={shareLinks}
+      werkgroepen={werkgroepen}
+      now={now.toISOString()}
     />
   );
 }

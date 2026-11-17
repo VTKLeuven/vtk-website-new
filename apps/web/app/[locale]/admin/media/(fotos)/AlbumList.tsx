@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSelectedLayoutSegments } from "next/navigation";
-import { EyeOff, Plus, Trash2 } from "lucide-react";
+import { EyeOff, Link2, Plus, Trash2 } from "lucide-react";
 import Link from "@/components/ui/Link";
 import { adminThumbnailUrl } from "@/lib/media-admin-shared";
 import { useUploads } from "./uploads";
 import type { LibraryRow } from "./types";
 
-type Filter = "all" | "on" | "off";
+type Filter = "all" | "on" | "off" | "shared";
 
 /**
  * De lijst van alle albums, links naast het open album.
@@ -48,11 +48,16 @@ export function AlbumList({
   const numberFormat = useMemo(() => new Intl.NumberFormat(nl ? "nl-BE" : "en-GB"), [nl]);
 
   const hiddenCount = rows.filter((row) => row.hidden).length;
+  const sharedCount = rows.filter((row) => row.shared).length;
+  // Zonder gedeelde albums verdwijnt de filter; bleef hij aan staan, dan zat je
+  // vast op een lege lijst zonder chip om terug te gaan.
+  const showing = filter === "shared" && sharedCount === 0 ? "all" : filter;
   const groups = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const shown = rows.filter((row) => {
-      if (filter === "on" && row.hidden) return false;
-      if (filter === "off" && !row.hidden) return false;
+      if (showing === "on" && row.hidden) return false;
+      if (showing === "off" && !row.hidden) return false;
+      if (showing === "shared" && !row.shared) return false;
       return !needle || row.title.toLowerCase().includes(needle);
     });
     const out: Array<{ key: string; label: string; rows: LibraryRow[] }> = [];
@@ -65,7 +70,7 @@ export function AlbumList({
       else out.push({ key, label, rows: [row] });
     }
     return out;
-  }, [rows, query, filter, nl]);
+  }, [rows, query, showing, nl]);
 
   // Het open album in beeld houden, maar enkel binnen de lijst: een
   // `scrollIntoView` zou ook de pagina zelf verschuiven.
@@ -83,6 +88,11 @@ export function AlbumList({
     { value: "all", label: nl ? "Alle" : "All", count: rows.length },
     { value: "on", label: nl ? "Op de site" : "On the site", count: rows.length - hiddenCount },
     { value: "off", label: nl ? "Verborgen" : "Hidden", count: hiddenCount },
+    // Welke albums een werkende privélink hebben: aan het einde van het
+    // werkingsjaar kijkt de nieuwe ploeg hier na wat er nog openstaat.
+    ...(sharedCount > 0
+      ? [{ value: "shared" as const, label: nl ? "Gedeeld" : "Shared", count: sharedCount }]
+      : []),
   ];
 
   return (
@@ -106,9 +116,10 @@ export function AlbumList({
               key={item.value}
               type="button"
               className="media-chip"
-              aria-pressed={filter === item.value}
+              aria-pressed={showing === item.value}
               onClick={() => setFilter(item.value)}
             >
+              {item.value === "shared" ? <Link2 aria-hidden="true" size={13} /> : null}
               {item.label}
               <span className="num">{item.count}</span>
             </button>
@@ -172,13 +183,25 @@ export function AlbumList({
                                   .join(" · ")}
                           </span>
                         </span>
-                        {row.hidden ? (
-                          <EyeOff
-                            className="media-album-row-flag"
-                            role="img"
-                            aria-label={nl ? "Verborgen" : "Hidden"}
-                            size={15}
-                          />
+                        {row.hidden || row.shared ? (
+                          <span className="media-album-row-flags">
+                            {row.shared ? (
+                              <Link2
+                                className="media-album-row-flag is-shared"
+                                role="img"
+                                aria-label={nl ? "Gedeeld met een link" : "Shared with a link"}
+                                size={15}
+                              />
+                            ) : null}
+                            {row.hidden ? (
+                              <EyeOff
+                                className="media-album-row-flag"
+                                role="img"
+                                aria-label={nl ? "Verborgen" : "Hidden"}
+                                size={15}
+                              />
+                            ) : null}
+                          </span>
                         ) : null}
                       </Link>
                     </li>

@@ -208,6 +208,9 @@ export async function purgeExpiredGalleryTrash(now = new Date()): Promise<void> 
         await deleteImmichAlbum(id).catch(() => null);
       }
       await prisma.galleryDetachedPhoto.deleteMany({ where: { albumId: { in: row.partIds } } });
+      // De privélinks naar het album werkten al niet meer zolang het in de
+      // prullenmand lag; nu het weg is, hebben ze geen album meer om naar te wijzen.
+      await prisma.galleryShareLink.deleteMany({ where: { gallery: "MAIN", albumId: row.albumId } });
       await prisma.galleryTrashedAlbum.delete({ where: { id: row.id } });
       await logAudit({
         action: "delete",

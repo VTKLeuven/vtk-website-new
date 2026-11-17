@@ -100,6 +100,34 @@ Twee keer draaien levert geen tweede set op: het script onthoudt in de setting
 `theokot.demo.broodjes` wat het aanmaakte en gooit precies dat weg voor het
 opnieuw begint. Verkoopdagen die je zelf aanmaakte, blijven staan.
 
+## 2c. Privélinks naar een album
+
+`scripts/seed-media-share-demo.ts` zet alles klaar om de privélinks uit
+[immich-gallery.md](immich-gallery.md) ("Een album delen met een link") te
+proberen: een verborgen album "Praesidiumweekend 2026" met de tabs Zaterdag en
+Zondag (en twee verborgen foto's), vier links en een demostudent.
+
+```bash
+GALLERY_IMMICH_API_URL=http://localhost:2283/api GALLERY_IMMICH_API_KEY=<sleutel> \
+  npm run db:demo:delen
+npm run db:demo:delen -- --reset   # enkel opruimen
+```
+
+Het draait **enkel tegen een lokale databank** en heeft een werkende Immich nodig
+(zie hieronder); de foto's komen uit `infra/immich/seed/photos`. De URL's van de
+links verschijnen in de terminal. Twee keer draaien levert geen tweede set op:
+de setting `media.demo.delen` onthoudt wat het script maakte.
+
+| Link | Waarvoor |
+| --- | --- |
+| Praesidium 2026-2027 | Enkel het praesidium, tot 15 juli. Zonder sessie zie je het inlogscherm, als `student.delen@vtk.prototype` "niet met jou gedeeld", als `it@vtk.prototype` de foto's. |
+| Fotograaf (nakijken) | Iedereen met de link, een week, downloaden uit: geen knoppen om te downloaden, en de route weigert het origineel. |
+| Werkgroep Revue | Enkel werkgroep Revue. De demostudent zit erin, `it@vtk.prototype` niet. |
+| Kookploeg | Verlopen: het scherm "werkt niet meer", en gedimd in het beheer. |
+
+De demostudent is `student.delen@vtk.prototype` met wachtwoord `prototype`: geen
+post, wel lid van Revue in het lopende werkingsjaar.
+
 ## 3. Immich: albums en foto's
 
 Dev heeft een eigen Immich (`infra-immich-server-1`, poort 2283 op localhost).
