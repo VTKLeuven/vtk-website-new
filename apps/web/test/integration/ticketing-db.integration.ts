@@ -569,9 +569,12 @@ describe("ticketing database invariants", () => {
         include: { items: { orderBy: { unitPriceCents: "asc" } } },
       });
       expect(order.totalCents).toBe(140);
+      // Een erelid telt als lid van de kring (`userIsMember`): zijn gewone
+      // ticket neemt dan een ledenplaats, zoals bij elk lid op een type zonder
+      // ledenprijs (`isMemberSeat`).
       expect(order.items.map((item) => [item.ticketTypeName, item.unitPriceCents, item.honoraryPrice, item.memberSeat])).toEqual([
         ["Limiettest (erelid)", 40, true, true],
-        ["Limiettest", 100, false, false],
+        ["Limiettest", 100, false, true],
       ]);
 
       // Eén per erelid per event, ook onder de oude naam van een shop die nog openstond.
