@@ -44,14 +44,14 @@ Per POC komen er rollen en een kanaal op de server:
    zijn (`1ste bachelor`, `2de bachelor`, ...).
 2. Maak een kanaal waarin `@everyone` View Channel niet heeft en die rollen en de bot
    wel. Dat zet Discord zelf, niet de site.
-3. Kies de rollen in `/admin/pocs`, onder POC-instellingen, en per rol eventueel de
+3. Kies de rollen in `/admin/pocs` (tabblad POC's), onder POC-instellingen, en per rol eventueel de
    fases. De lijst met rollen komt pas van Discord wanneer je een POC openklapt.
 4. Kies het kanaal per POC onderaan `/admin/peilingen`, onder "Discord-kanalen per
    POC". Daar komen de peilingen van de RiVers van die POC. Die kaart staat dicht,
    en de lijst met kanalen komt pas van Discord wanneer je ze openklapt: Discord
    antwoordt soms traag, en de lijst met peilingen hoort daar niet op te wachten.
 
-Zet tot slot in `/admin/pocs` het koppelbericht in een publiek kanaal. Daar staat de
+Zet tot slot in `/admin/pocs/discord` (tabblad Discord) het koppelbericht in een publiek kanaal. Daar staat de
 knop waarmee studenten hun account koppelen.
 
 Een kanaal waar de bot niet in mag, geeft na het publiceren een foutmelding op het

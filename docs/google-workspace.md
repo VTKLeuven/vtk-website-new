@@ -406,7 +406,7 @@ hangt er nu zelf de juiste in). Groep 5 en de tablet blijven losse adressen.
 
 ### POC-lijsten
 
-`/admin/pocs` → **Groepsadressen aanmaken of koppelen** maakt per POC met een
+`/admin/pocs/mail` (tabblad Groepsadressen) → **Groepsadressen aanmaken of koppelen** maakt per POC met een
 adres een lijst met de POC als bron, of zet de POC als bron op de overgenomen
 lijst. Een POC-lijst volgt de vertegenwoordigers van `Poc.mailYear`; leeg is het
 huidige werkingsjaar. Na de verkiezing: kies het tabje van het nieuwe jaar en

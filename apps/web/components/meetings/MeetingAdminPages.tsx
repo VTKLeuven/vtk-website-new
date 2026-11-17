@@ -126,10 +126,10 @@ export async function MeetingListPage({
                     href={href}
                     className={`cursor-pointer border-b border-vtk-blue/10 last:border-0 hover:bg-vtk-blue-soft/40 ${meeting.past ? "text-[#5c667f]" : ""}`}
                   >
-                    <td className="px-4 py-3 font-medium capitalize">
+                    <td className="px-4 py-3 font-medium first-letter:uppercase">
                       <Link href={href}>{meeting.dateLabel}</Link>
                       {meeting.location && (
-                        <span className="block text-xs font-normal normal-case text-[#5c667f]">{meeting.location}</span>
+                        <span className="block text-xs font-normal text-[#5c667f]">{meeting.location}</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums">{meeting.reservations.length}</td>

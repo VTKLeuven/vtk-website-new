@@ -131,7 +131,7 @@ export function MeetingDetail({
               <ArrowLeft aria-hidden="true" size={14} />
               {nl ? "Alle vergaderingen" : "All meetings"}
             </Link>
-            <h2 className="text-lg font-semibold capitalize text-vtk-ink">{meeting.dateLabel}</h2>
+            <h2 className="text-lg font-semibold text-vtk-ink first-letter:uppercase">{meeting.dateLabel}</h2>
             <p className="text-sm text-[#5c667f]">
               {meeting.reservations.length} {nl ? "ingeschreven" : "registered"} ·{" "}
               {meeting.orderCount} {nl ? "met bestelling" : "with an order"} ·{" "}
@@ -207,7 +207,7 @@ export function MeetingDetail({
         {handout.items.length === 0 && handout.drinks.length === 0 ? (
           <p className="text-sm text-[#5c667f]">{nl ? "Nog niets besteld." : "Nothing ordered yet."}</p>
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2">
+          <div className="grid items-start gap-6 sm:grid-cols-2">
             <CountTable
               nl={nl}
               heading={nl ? "Broodjes" : "Sandwiches"}

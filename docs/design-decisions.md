@@ -13248,3 +13248,40 @@ een open vraag. Code in `apps/web/lib/pocPolls`.
 - **Een open peiling gaat voor de stand van de band.** Staat de band in
   `/admin/pocs` verborgen of op de verkiezingen, dan blijven de POC's met een open
   peiling er toch staan: anders wijst de strook naar niets.
+
+## Beheermodules in tabbladen
+
+November 2026. Grocomeet, VTK Bureau, POC's, Lesbezoeken en PAL+ waren elk
+één lange pagina met kaarten onder elkaar, of tabbladen als `?tab=`-pillen
+onder een losse titel. Ze krijgen nu dezelfde kop als Tickets en Media:
+`ModuleAdminShell` (`apps/web/components/admin/ModuleAdminShell.tsx`), met de
+pillen van `.ticket-admin-tabs`, een icoon per tabblad, en elk tabblad een
+eigen route onder de layout van de module. Een tabblad is zo te delen en te
+bookmarken, en laadt enkel wat het toont.
+
+- **Eén component voor de kop**, niet nog vijf kopieën van `MediaAdminNav`.
+  Media, de formulieren en een ticketevent hebben hun eigen nav nog; zet een
+  nieuwe module op `ModuleAdminShell`.
+- **Het werk van elke week is het eerste tabblad.** Bij Grocomeet en het
+  Bureau is dat Vergaderingen, niet de kalender: de kalender en een losse
+  vergadering toevoegen delen het tabblad Planning, omdat je die een keer per
+  semester gebruikt. Bij POC's staan de POC's met hun vertegenwoordigers eerst,
+  en de groepsadressen, de homepageband en Discord elk apart.
+- **Een vergadering heeft een eigen pagina** (`.../vergadering/<id>`), vanuit
+  een tabel met een rij per vergadering. Vroeger stond elke vergadering als
+  kaart onder elkaar met de bestellingen achter een uitklapper; met tien per
+  semester vond je die van deze week niet terug. Bovenaan die pagina staat
+  **Uit te delen**: hoeveel van elk broodje en elk drankje er mee moet, over
+  alle inschrijvingen samen en bij een GM met wat grocos zelf bij Theokot
+  bestelden. Daaronder **Per persoon**, standaard alfabetisch in twee kolommen
+  zodat de hele groep bij het uitdelen op één scherm past, en met één klik de
+  tabel met bedragen en afvinken.
+- **De "Organisaties & mails" van Lesbezoeken zijn drie tabbladen**:
+  Organisaties, Bijzonderheden en Mails. Drie kaarten onder één naam lieten je
+  zoeken naar wat je kwam aanpassen.
+- **Een oude `?tab=`-link stuurt door** naar het nieuwe tabblad (Lesbezoeken,
+  PAL+), zodat een bladwijzer blijft werken.
+- **Een teller staat in de naam van het tabblad** ("Aanvragen (3)"), berekend
+  in de layout voor het lopende werkingsjaar. Elke action van die module
+  vernieuwt de hele layout (`revalidatePath("/[locale]/admin/...", "layout")`),
+  anders blijft de teller staan.

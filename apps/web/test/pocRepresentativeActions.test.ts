@@ -94,6 +94,7 @@ describe("addPocRepresentativeAction", () => {
     });
 
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/pocs");
-    expect(mocks.revalidatePath).toHaveBeenCalledWith("/admin/pocs");
+    // De hele layout van het beheer, zodat elk tabblad onder /admin/pocs meekomt.
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/[locale]/admin/pocs", "layout");
   });
 });
