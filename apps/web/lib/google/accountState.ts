@@ -7,6 +7,7 @@ import {
   disableForwarding,
   enableForwarding,
   ensureDefaultSendAs,
+  getUser,
   moveUser,
   resetDefaultSendAs,
   setUserSuspended,
@@ -78,6 +79,31 @@ export function transitionAllowed(current: AccountState | null, desired: Account
   if (current === "FULL") return false;
   if (desired === "SUSPENDED") return current === "RESTRICTED" || current === "ALIAS_SENDER";
   return true;
+}
+
+/**
+ * Staat het account in een organisatie-eenheid die de site gebruikt om te
+ * beperken (enkel ontvangen, of enkel mailen vanaf het kiesploegadres)? Enkel
+ * dan haalt "volwaardig maken" het eruit. Een account in een eigen OU van de
+ * kring (/Praesidium, /Statix) blijft daar.
+ */
+export function isInLimitingOrgUnit(
+  orgUnitPath: string | null | undefined,
+  ous: { restrictedOrgUnit: string | null; aliasSenderOrgUnit: string | null },
+): boolean {
+  if (!orgUnitPath) return false;
+  return [ous.restrictedOrgUnit, ous.aliasSenderOrgUnit].some(
+    (ou) => Boolean(ou) && ou !== "/" && (orgUnitPath === ou || orgUnitPath.startsWith(`${ou}/`)),
+  );
+}
+
+/**
+ * Zette de site zelf het doorsturen en de standaardafzender? Enkel bij een
+ * account dat ze beperkte (kiesploeg). Bij een account waarvan de staat nog
+ * leeg was, zijn die instellingen van de persoon zelf en blijven ze staan.
+ */
+export function setBySite(current: AccountState | null): boolean {
+  return current === "RESTRICTED" || current === "ALIAS_SENDER" || current === "SUSPENDED";
 }
 
 export type ApplyInput = {
@@ -158,16 +184,27 @@ export async function applyAccountState(
       }
     }
   } else {
-    await moveUser(cfg, input.googleEmail, cfg.fullOrgUnit);
-    try {
-      await resetDefaultSendAs(cfg, input.googleEmail);
-    } catch (err) {
-      warnings.push(`standaardafzender niet teruggezet: ${message(err)}`);
+    // Volwaardig maken is iets terugdraaien wat de site zelf deed, niet het
+    // account naar een vaste plek zetten. Vroeger ging elk account dat FULL
+    // werd naar `fullOrgUnit` ("/"), ook bij de eerste keer dat de sync het
+    // zag: na het koppelen verhuisde zo iedereen uit /Praesidium, /Statix en
+    // /Oude Zakken naar /, en ging zijn eigen doorsturen uit. Zie
+    // docs/google-workspace.md, "Vallen".
+    const account = await getUser(cfg, input.googleEmail);
+    if (account && isInLimitingOrgUnit(account.orgUnitPath, cfg)) {
+      await moveUser(cfg, input.googleEmail, cfg.fullOrgUnit);
     }
-    try {
-      await disableForwarding(cfg, input.googleEmail);
-    } catch (err) {
-      warnings.push(`doorsturen niet uitgezet: ${message(err)}`);
+    if (setBySite(input.current)) {
+      try {
+        await resetDefaultSendAs(cfg, input.googleEmail);
+      } catch (err) {
+        warnings.push(`standaardafzender niet teruggezet: ${message(err)}`);
+      }
+      try {
+        await disableForwarding(cfg, input.googleEmail);
+      } catch (err) {
+        warnings.push(`doorsturen niet uitgezet: ${message(err)}`);
+      }
     }
   }
 

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { desiredAccountState, transitionAllowed } from "@/lib/google/accountState";
+import {
+  desiredAccountState,
+  isInLimitingOrgUnit,
+  setBySite,
+  transitionAllowed,
+} from "@/lib/google/accountState";
 
 /**
  * De regel die bepaalt wanneer iemand mag mailen. De tegenhanger daarvan, "een
@@ -110,5 +115,36 @@ describe("transitionAllowed", () => {
   it("wisselt vrij tussen enkel ontvangen en mailen vanaf het kiesploegadres", () => {
     expect(transitionAllowed("RESTRICTED", "ALIAS_SENDER")).toBe(true);
     expect(transitionAllowed("ALIAS_SENDER", "RESTRICTED")).toBe(true);
+  });
+});
+
+describe("volwaardig maken raakt enkel aan wat de site zelf zette", () => {
+  const ous = { restrictedOrgUnit: "/Kiesploeg/Ontvangen", aliasSenderOrgUnit: "/Kiesploeg/Verzenden" };
+
+  it("haalt een account uit de OU van de kiesploeg", () => {
+    expect(isInLimitingOrgUnit("/Kiesploeg/Ontvangen", ous)).toBe(true);
+    expect(isInLimitingOrgUnit("/Kiesploeg/Verzenden", ous)).toBe(true);
+    expect(isInLimitingOrgUnit("/Kiesploeg/Ontvangen/Gamma", ous)).toBe(true);
+  });
+
+  it("laat een account in een eigen OU van de kring staan", () => {
+    // Zo verhuisden op 16 november 2026 tientallen accounts naar "/".
+    expect(isInLimitingOrgUnit("/Praesidium", ous)).toBe(false);
+    expect(isInLimitingOrgUnit("/Statix", ous)).toBe(false);
+    expect(isInLimitingOrgUnit("/Oude Zakken", ous)).toBe(false);
+    expect(isInLimitingOrgUnit("/", ous)).toBe(false);
+    expect(isInLimitingOrgUnit("/Kiesploegen-archief", ous)).toBe(false);
+  });
+
+  it("doet niets zonder ingestelde OU's", () => {
+    expect(isInLimitingOrgUnit("/Kiesploeg/Ontvangen", { restrictedOrgUnit: null, aliasSenderOrgUnit: null })).toBe(false);
+  });
+
+  it("zet doorsturen en afzender enkel terug wanneer de site ze zette", () => {
+    expect(setBySite(null)).toBe(false);
+    expect(setBySite("FULL")).toBe(false);
+    expect(setBySite("RESTRICTED")).toBe(true);
+    expect(setBySite("ALIAS_SENDER")).toBe(true);
+    expect(setBySite("SUSPENDED")).toBe(true);
   });
 });

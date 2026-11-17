@@ -519,6 +519,15 @@ Lidmaatschap aanpassen; de reconcile zet Google recht binnen de vijf minuten.
   lijst zonder de overgenomen adressen te wissen, dan staat iedereen er twee
   keer om dezelfde reden in, en blijft een oud-lid erin staan dat de bron al
   liet vallen. Wis ze pas nadat de berekende lijst klopt.
+- **Volwaardig maken verhuist enkel uit de kiesploeg-OU's.** Tot 17 november
+  2026 zette de sync elk account dat volwaardig werd in de "full" OU (`/`),
+  ook de eerste keer dat ze het zag. Na het koppelen van de bestaande accounts
+  verhuisde zo iedereen met een post uit /Praesidium, /Statix en /Oude Zakken
+  naar /, en zette de sync bij hen het doorsturen uit en de standaardafzender
+  terug. Nu haalt ze een account enkel uit de OU voor enkel ontvangen of voor
+  mailen vanaf het kiesploegadres, en raakt ze doorsturen en afzender enkel aan
+  bij een account dat ze zelf beperkte (`isInLimitingOrgUnit` en `setBySite` in
+  `lib/google/accountState.ts`). Een eigen OU van de kring is van de kring.
 - **Een naamgenoot krijgt `jan.peeters2@vtk.be`.** Kijk het voorbeeldscherm na
   voor je aanmaakt; een adres is achteraf lastig te veranderen.
 
