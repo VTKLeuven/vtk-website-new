@@ -105,7 +105,13 @@ export async function loadMailGroupOverview({
     }),
     access.manageAll
       ? prisma.mailGroupCategory.findMany({
-          select: { id: true, name: true, parentId: true },
+          select: {
+            id: true,
+            name: true,
+            parentId: true,
+            ownerGroupId: true,
+            ownerGroup: { select: { nameNl: true, nameEn: true } },
+          },
           orderBy: { name: "asc" },
         })
       : Promise.resolve([]),

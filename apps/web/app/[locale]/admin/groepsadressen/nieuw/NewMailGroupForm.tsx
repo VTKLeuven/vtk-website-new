@@ -7,6 +7,7 @@ import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import { IconButton } from "@/components/ui/IconButton";
 import { CloseIcon } from "@/components/ui/icons";
 import { SearchPicker, type SearchPickerOption } from "@/components/admin/SearchPicker";
+import type { CategoryOption } from "@/lib/google/mailGroupOptions";
 import type { MemberCandidate } from "../actions";
 import { createMailGroupAction } from "../actions";
 import { CandidateBadge, MemberPicker, candidateValue } from "../[id]/MemberPicker";
@@ -35,7 +36,7 @@ export function NewMailGroupForm({
   manageAll: boolean;
   werkgroepen: Werkgroep[];
   sourceOptions: SearchPickerOption[];
-  categoryOptions: SearchPickerOption[];
+  categoryOptions: CategoryOption[];
 }) {
   const [ownerId, setOwnerId] = useState(manageAll ? "" : (werkgroepen[0]?.id ?? ""));
   const owner = werkgroepen.find((w) => w.id === ownerId) ?? null;
@@ -188,6 +189,14 @@ export function NewMailGroupForm({
               <Label>{nl ? "Categorie" : "Category"}</Label>
               <SearchPicker
                 name="categoryId"
+                onChange={(value) => {
+                  // Een categorie van een werkgroep stelt die werkgroep voor,
+                  // zolang er nog geen gekozen is.
+                  const categoryOwner = categoryOptions.find((c) => c.value === value)?.ownerId;
+                  if (!ownerId && categoryOwner && werkgroepen.some((w) => w.id === categoryOwner)) {
+                    setOwnerId(categoryOwner);
+                  }
+                }}
                 options={[{ value: "", label: nl ? "Zonder categorie" : "No category", muted: true }, ...categoryOptions]}
                 placeholder={nl ? "Zonder categorie" : "No category"}
                 searchPlaceholder={nl ? "Zoek een categorie" : "Search a category"}

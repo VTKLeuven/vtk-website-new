@@ -2733,6 +2733,23 @@ boom die niemand overziet.
   categorie zetten". Per groep kan het ook bij Instellingen.
 - Een categorie zegt niets over wie erin zit: de sync leest ze niet. Weghalen
   laat de adressen staan, zonder categorie; de subcategorieën gaan mee.
+- **Een categorie kan bij een werkgroep horen** (Werkgroepen › Biomedix), in
+  te stellen met het potlood bij "Categorieën". Werkgroepen › Biomedix had 28
+  adressen, en "Beheerd door werkgroep" adres per adres invullen was voor 78
+  adressen een middag werk. Het is **geen overerving** die de sync of de
+  rechten lezen: opslaan zet de werkgroep als `MailGroup.ownerGroupId` op de
+  adressen, zodat elke bestaande check op `ownerGroupId` blijft kloppen.
+  - Ze komt op elk adres rechtstreeks in de categorie zonder werkgroep, of met
+    nog de vorige werkgroep van de categorie. **Een adres met een andere
+    werkgroep houdt die**: dat is een bewuste uitzondering, en de melding zegt
+    hoeveel er zo zijn. Een werkgroep weghalen haalt ze dus ook enkel weg waar
+    de categorie ze gezet had.
+  - Een adres dat later in de categorie komt (in bulk, bij Instellingen of bij
+    een nieuw adres) en nog geen werkgroep heeft, krijgt ze erbij. In bulk
+    neemt verplaatsen niemand het beheer af: een adres met een werkgroep houdt
+    de zijne. In een formulier wordt ze enkel voorgesteld, zodat "Geen" kiezen
+    mogelijk blijft.
+  - Een subcategorie kiest zelf; die van de hoofdcategorie loopt niet door.
 - Alfabetisch, zonder handmatige volgorde, zoals de rollen.
 - De automatische soorten (posten, jaargroepen, POC's) blijven als kleine chips
   naast de opruimfilters. "Met de hand" is weg: dat was elke overgenomen groep

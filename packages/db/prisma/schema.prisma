@@ -972,6 +972,8 @@ model Group {
   mailGroupSources         MailGroupSource[]
   /// Groepsadressen die deze werkgroep zelf beheert (statix.pr@vtk.be).
   ownedMailGroups          MailGroup[]               @relation("MailGroupOwner")
+  /// Categorieën van groepsadressen die bij deze werkgroep horen.
+  ownedMailGroupCategories MailGroupCategory[]       @relation("MailGroupCategoryOwner")
   /// Hoofdgroepen waarvan de jaargroepen uit deze post komen.
   yearlyMailGroups         MailGroup[]               @relation("MailGroupYearlyPost")
   werkgroepAccounts        WerkgroepAccount[]
@@ -1416,7 +1418,7 @@ enum MailGroupReview {
 }
 
 /// Een map voor groepsadressen in het overzicht, met hoogstens één niveau
-/// subcategorieën (Praesidium › Activiteiten). Puur ordening: een categorie
+/// subcategorieën (Praesidium › Activiteiten). Ordening: een categorie
 /// verwijderen laat de adressen staan, zonder categorie. Alfabetisch, zonder
 /// handmatige volgorde. Zie docs/design-decisions.md.
 model MailGroupCategory {
@@ -1426,12 +1428,21 @@ model MailGroupCategory {
   parent   MailGroupCategory?  @relation("MailGroupCategoryTree", fields: [parentId], references: [id], onDelete: Cascade)
   children MailGroupCategory[] @relation("MailGroupCategoryTree")
 
+  /// De werkgroep waartoe deze categorie hoort (Werkgroepen › Biomedix). Geen
+  /// overerving die de sync leest: opslaan zet ze als `MailGroup.ownerGroupId`
+  /// op de adressen in de categorie die nog geen werkgroep hadden of nog de
+  /// vorige van de categorie, en een adres dat in de categorie komt zonder
+  /// werkgroep, krijgt ze erbij. Een adres met een andere werkgroep houdt die.
+  ownerGroupId String?
+  ownerGroup   Group?  @relation("MailGroupCategoryOwner", fields: [ownerGroupId], references: [id], onDelete: SetNull)
+
   mailGroups MailGroup[]
 
   createdAt DateTime @default(now())
 
   @@unique([parentId, name])
   @@index([parentId])
+  @@index([ownerGroupId])
 }
 
 /// Een post of werkgroep waarvan de leden van dit werkingsjaar in de lijst

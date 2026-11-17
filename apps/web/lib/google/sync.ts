@@ -739,6 +739,12 @@ export async function pushMailGroup(mailGroupId: string): Promise<void> {
   await pushFor({ id: mailGroupId });
 }
 
+/** Idem, voor een handvol lijsten tegelijk (na een wijziging aan hun werkgroep). */
+export async function pushMailGroups(mailGroupIds: string[]): Promise<void> {
+  if (mailGroupIds.length === 0) return;
+  await pushFor({ id: { in: mailGroupIds } });
+}
+
 async function pushFor(where: Prisma.MailGroupWhereInput): Promise<void> {
   try {
     const cfg = await getGoogleConfig();

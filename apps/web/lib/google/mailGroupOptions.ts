@@ -14,7 +14,8 @@ export type SourceOptionGroup = {
   options: { value: string; label: string }[];
 };
 
-export type CategoryOption = { value: string; label: string; hint?: string; group: string };
+/** `ownerId`: de werkgroep van de categorie, die het formulier dan voorstelt. */
+export type CategoryOption = { value: string; label: string; hint?: string; group: string; ownerId?: string | null };
 
 export async function loadSourceOptions(nl: boolean): Promise<SourceOptionGroup[]> {
   const [groups, kiesploegen, pocs] = await Promise.all([
@@ -70,13 +71,15 @@ export async function loadSourceOptions(nl: boolean): Promise<SourceOptionGroup[
 /** Per hoofdcategorie één kop, met de hoofdcategorie zelf bovenaan. */
 export async function loadCategoryOptions(nl: boolean): Promise<CategoryOption[]> {
   const categories = await prisma.mailGroupCategory.findMany({
-    select: { id: true, name: true, parentId: true },
+    select: { id: true, name: true, parentId: true, ownerGroupId: true },
     orderBy: { name: "asc" },
   });
   return categories
     .filter((c) => !c.parentId)
     .flatMap((c) => [
-      { value: c.id, label: c.name, hint: nl ? "hoofdcategorie" : "main category", group: c.name },
-      ...categories.filter((s) => s.parentId === c.id).map((s) => ({ value: s.id, label: s.name, group: c.name })),
+      { value: c.id, label: c.name, hint: nl ? "hoofdcategorie" : "main category", group: c.name, ownerId: c.ownerGroupId },
+      ...categories
+        .filter((s) => s.parentId === c.id)
+        .map((s) => ({ value: s.id, label: s.name, group: c.name, ownerId: s.ownerGroupId })),
     ]);
 }

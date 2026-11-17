@@ -11,7 +11,7 @@ import { logAudit } from "@/lib/audit";
 import { type SaveState, saveError, saveOk } from "@/lib/saveState";
 import { getGoogleConfig } from "@/lib/google/config";
 import { deleteGroup } from "@/lib/google/client";
-import { pushMailGroup } from "@/lib/google/sync";
+import { pushMailGroup, pushMailGroups } from "@/lib/google/sync";
 import {
   MAIL_GROUP_SELECT,
   type MailGroupForSync,
@@ -68,8 +68,11 @@ export async function createCategoryAction(
   });
   if (clash) return saveError("DUPLICATE_CATEGORY");
 
+  const owner = await categoryOwner(formData);
+  if (owner === undefined) return saveError("INVALID_OWNER");
+
   const created = await prisma.mailGroupCategory.create({
-    data: { name: name.data, parentId },
+    data: { name: name.data, parentId, ownerGroupId: owner?.id ?? null },
     select: { id: true },
   });
   await logAudit({
@@ -77,22 +80,31 @@ export async function createCategoryAction(
     entity: "mailGroupCategory",
     entityId: created.id,
     target: name.data,
+    summary: owner ? `categorie van werkgroep ${owner.nameNl}` : null,
   });
   revalidate();
   return saveOk();
 }
 
-export async function renameCategoryAction(
+/**
+ * Naam en werkgroep van een categorie. Een werkgroep kiezen is wat het scherm
+ * bespaart: ze komt op elk adres in de categorie dat nog geen werkgroep had of
+ * nog de vorige van de categorie, in plaats van adres per adres. Een adres dat
+ * bewust bij een andere werkgroep staat, houdt die; de melding zegt hoeveel.
+ * Enkel de adressen rechtstreeks in de categorie: een subcategorie kiest zelf.
+ */
+export async function saveCategoryAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
   await requirePermission("mailgroups.manage");
+  const nl = formData.get("locale") !== "en";
   const id = String(formData.get("id") ?? "");
   const name = nameSchema.safeParse(formData.get("name") ?? "");
   if (!name.success) return saveError("INVALID_NAME");
   const row = await prisma.mailGroupCategory.findUnique({
     where: { id },
-    select: { name: true, parentId: true },
+    select: { name: true, parentId: true, ownerGroupId: true },
   });
   if (!row) return saveError("INVALID_INPUT");
   const clash = await prisma.mailGroupCategory.findFirst({
@@ -100,17 +112,88 @@ export async function renameCategoryAction(
     select: { id: true },
   });
   if (clash) return saveError("DUPLICATE_CATEGORY");
+  const owner = await categoryOwner(formData);
+  if (owner === undefined) return saveError("INVALID_OWNER");
+  const ownerGroupId = owner?.id ?? null;
+  const ownerChanged = ownerGroupId !== row.ownerGroupId;
 
-  await prisma.mailGroupCategory.update({ where: { id }, data: { name: name.data } });
+  // Wie volgt de categorie: zonder werkgroep, of nog met de vorige van de
+  // categorie. Een werkgroep weghalen haalt ze dus ook enkel weg waar de
+  // categorie ze gezet had.
+  const { changed, kept } = await prisma.$transaction(async (tx) => {
+    await tx.mailGroupCategory.update({ where: { id }, data: { name: name.data, ownerGroupId } });
+    if (!ownerChanged) return { changed: [] as string[], kept: 0 };
+    const previous = row.ownerGroupId ? [{ ownerGroupId: row.ownerGroupId }] : [];
+    const changed = (
+      await tx.mailGroup.findMany({
+        where: { categoryId: id, OR: ownerGroupId ? [{ ownerGroupId: null }, ...previous] : previous },
+        select: { id: true },
+      })
+    ).map((g) => g.id);
+    if (changed.length) {
+      await tx.mailGroup.updateMany({ where: { id: { in: changed } }, data: { ownerGroupId } });
+    }
+    const kept = ownerGroupId
+      ? await tx.mailGroup.count({
+          where: { categoryId: id, AND: [{ ownerGroupId: { not: null } }, { ownerGroupId: { not: ownerGroupId } }] },
+        })
+      : 0;
+    return { changed, kept };
+  });
+
+  const summary = [
+    row.name === name.data ? null : `hernoemd van ${row.name}`,
+    ownerChanged
+      ? `werkgroep ${owner ? owner.nameNl : "weggehaald"}; ${changed.length} groepsadressen aangepast${kept ? `, ${kept} houden een andere werkgroep` : ""}`
+      : null,
+  ].filter(Boolean);
   await logAudit({
     action: "update",
     entity: "mailGroupCategory",
     entityId: id,
     target: name.data,
-    summary: row.name === name.data ? null : `hernoemd van ${row.name}`,
+    summary: summary.length ? summary.join("; ") : null,
   });
   revalidate();
-  return saveOk();
+  // De werkgroep bepaalt welk adres haar leden in de lijst krijgen (hun
+  // werkgroepadres), dus de groepen in Google veranderen mee.
+  if (changed.length) after(() => pushMailGroups(changed));
+
+  if (!ownerChanged) return saveOk();
+  const n = changed.length;
+  const ownerName = owner ? (nl ? owner.nameNl : owner.nameEn) : null;
+  const keptText = kept
+    ? nl
+      ? ` ${kept} ${kept === 1 ? "adres houdt zijn" : "adressen houden hun"} eigen werkgroep.`
+      : ` ${kept} ${kept === 1 ? "address keeps its" : "addresses keep their"} own work group.`
+    : "";
+  if (nl) {
+    return saveOk(
+      ownerName
+        ? `Opgeslagen. ${n} ${n === 1 ? "adres wordt" : "adressen worden"} nu beheerd door ${ownerName}.${keptText}`
+        : `Opgeslagen. ${n} ${n === 1 ? "adres heeft" : "adressen hebben"} geen werkgroep meer.`,
+    );
+  }
+  return saveOk(
+    ownerName
+      ? `Saved. ${n} ${n === 1 ? "address is" : "addresses are"} now managed by ${ownerName}.${keptText}`
+      : `Saved. ${n} ${n === 1 ? "address has" : "addresses have"} no work group any more.`,
+  );
+}
+
+/**
+ * De werkgroep uit het formulier: `null` voor geen, `undefined` wanneer het
+ * geen bestaande werkgroep is. Enkel een werkgroep: een post beheert haar
+ * adressen via de bronnen, niet als eigenaar.
+ */
+async function categoryOwner(formData: FormData) {
+  const ownerGroupId = String(formData.get("ownerGroupId") ?? "");
+  if (!ownerGroupId) return null;
+  const group = await prisma.group.findUnique({
+    where: { id: ownerGroupId },
+    select: { id: true, type: true, nameNl: true, nameEn: true },
+  });
+  return group?.type === "WERKGROEP" ? group : undefined;
 }
 
 /**
@@ -148,30 +231,46 @@ export async function assignCategoryAction(formData: FormData): Promise<SaveStat
   const categoryId = String(formData.get("categoryId") ?? "") || null;
 
   let label = "zonder categorie";
+  let owner: { id: string; nameNl: string } | null = null;
   if (categoryId) {
     const category = await prisma.mailGroupCategory.findUnique({
       where: { id: categoryId },
-      select: { name: true, parent: { select: { name: true } } },
+      select: { name: true, parent: { select: { name: true } }, ownerGroup: { select: { id: true, nameNl: true } } },
     });
     if (!category) return saveError("INVALID_INPUT");
     label = category.parent ? `${category.parent.name} › ${category.name}` : category.name;
+    owner = category.ownerGroup;
   }
 
-  const result = await prisma.mailGroup.updateMany({
-    where: { id: { in: ids } },
-    data: { categoryId },
+  // Hoort de categorie bij een werkgroep, dan krijgt een adres zonder werkgroep
+  // die erbij. Een adres met een werkgroep houdt de zijne: verplaatsen neemt
+  // niemand het beheer af.
+  const { count, owned } = await prisma.$transaction(async (tx) => {
+    const owned = owner
+      ? (await tx.mailGroup.findMany({ where: { id: { in: ids }, ownerGroupId: null }, select: { id: true } })).map(
+          (g) => g.id,
+        )
+      : [];
+    const { count } = await tx.mailGroup.updateMany({ where: { id: { in: ids } }, data: { categoryId } });
+    if (owner && owned.length) {
+      await tx.mailGroup.updateMany({ where: { id: { in: owned } }, data: { ownerGroupId: owner.id } });
+    }
+    return { count, owned };
   });
   await logAudit({
     action: "update",
     entity: "mailGroup",
     target: label,
-    summary: `${result.count} groepsadressen in ${label} gezet`,
+    summary: `${count} groepsadressen in ${label} gezet${owner && owned.length ? `, waarvan ${owned.length} nu beheerd door ${owner.nameNl}` : ""}`,
   });
   revalidate();
+  if (owned.length) after(() => pushMailGroups(owned));
+  const ownedText =
+    owner && owned.length ? ` ${owned.length} daarvan ${owned.length === 1 ? "wordt" : "worden"} nu beheerd door ${owner.nameNl}.` : "";
   return saveOk(
     categoryId
-      ? `${result.count} ${result.count === 1 ? "adres" : "adressen"} in ${label} gezet.`
-      : `${result.count} ${result.count === 1 ? "adres" : "adressen"} zonder categorie gezet.`,
+      ? `${count} ${count === 1 ? "adres" : "adressen"} in ${label} gezet.${ownedText}`
+      : `${count} ${count === 1 ? "adres" : "adressen"} zonder categorie gezet.`,
   );
 }
 

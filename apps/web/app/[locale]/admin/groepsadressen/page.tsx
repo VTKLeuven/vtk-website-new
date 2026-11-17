@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { Plus } from "lucide-react";
+import { prisma } from "@vtk/db";
 import Link from "@/components/ui/Link";
 import type { Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
@@ -50,9 +51,16 @@ export default async function AdminMailGroups({
   // De zoekterm filtert in de browser (`MailGroupTable`), niet hier: zo blijft
   // ze staan wanneer je een adres opent en terugkeert, zonder elke letter een
   // volledige render van zevenhonderd groepen.
-  const [overview, status] = await Promise.all([
+  const [overview, status, werkgroepen] = await Promise.all([
     loadMailGroupOverview({ access, nl, search: { ...filters, q: undefined } }),
     getGoogleStatus(),
+    access.manageAll
+      ? prisma.group.findMany({
+          where: { type: "WERKGROEP", active: true },
+          select: { id: true, nameNl: true, nameEn: true, mailPrefix: true },
+          orderBy: { nameNl: "asc" },
+        })
+      : [],
   ]);
   const { rows, base0, visible, categoryRows, categoryLabel } = overview;
   const { kind, showArchive, categoryFilter, cleanup } = overview.filter;
@@ -71,10 +79,18 @@ export default async function AdminMailGroups({
     .map((c) => ({
       id: c.id,
       name: c.name,
+      ownerId: c.ownerGroupId,
+      ownerName: c.ownerGroup ? (nl ? c.ownerGroup.nameNl : c.ownerGroup.nameEn) : null,
       count: direct.get(c.id) ?? 0,
       children: categoryRows
         .filter((s) => s.parentId === c.id)
-        .map((s) => ({ id: s.id, name: s.name, count: direct.get(s.id) ?? 0 })),
+        .map((s) => ({
+          id: s.id,
+          name: s.name,
+          ownerId: s.ownerGroupId,
+          ownerName: s.ownerGroup ? (nl ? s.ownerGroup.nameNl : s.ownerGroup.nameEn) : null,
+          count: direct.get(s.id) ?? 0,
+        })),
     }));
   const dateFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
     day: "2-digit",
@@ -216,7 +232,17 @@ export default async function AdminMailGroups({
         <p className="text-sm text-zinc-500">{nl ? "Nog geen groepsadressen." : "No group addresses yet."}</p>
       )}
 
-      {access.manageAll && <MailGroupCategories nl={nl} categories={tree} />}
+      {access.manageAll && (
+        <MailGroupCategories
+          nl={nl}
+          categories={tree}
+          werkgroepen={werkgroepen.map((w) => ({
+            id: w.id,
+            name: nl ? w.nameNl : w.nameEn,
+            prefix: w.mailPrefix,
+          }))}
+        />
+      )}
     </div>
   );
 }

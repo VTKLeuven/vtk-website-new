@@ -6,7 +6,7 @@ import { Input, Label } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteButton, DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { ThemedSelect } from "@/components/ui/ThemedSelect";
-import { SearchPicker, type SearchPickerOption } from "@/components/admin/SearchPicker";
+import { SearchPicker } from "@/components/admin/SearchPicker";
 import {
   type MemberStatusView,
   STATUS_TONE_CLASS,
@@ -28,7 +28,7 @@ import {
 } from "../actions";
 import { deleteOneFromGoogleAction } from "../bulkActions";
 
-import type { SourceOptionGroup } from "@/lib/google/mailGroupOptions";
+import type { CategoryOption, SourceOptionGroup } from "@/lib/google/mailGroupOptions";
 export type { SourceOptionGroup };
 
 /**
@@ -137,7 +137,7 @@ export function MailGroupDetail({
   ownMembers: { id: string; name: string }[];
   werkgroepen: { id: string; name: string; prefix: string | null }[];
   praesidiumPosts: { id: string; name: string }[];
-  categoryOptions: SearchPickerOption[];
+  categoryOptions: CategoryOption[];
   showYearly: boolean;
   yearlyPreview: string | null;
   yearlyGroups: { id: string; email: string; year: number | null; current: boolean; members: number }[];
@@ -157,6 +157,8 @@ export function MailGroupDetail({
   // Het tabblad staat in de URL (`?tab=instellingen`), zodat een link daar
   // opent en herladen na een opslag niet naar Leden springt. De server geeft
   // de beginstand mee; wisselen raakt de server niet.
+  // De werkgroep volgt een gekozen categorie zolang er nog geen werkgroep staat.
+  const [ownerId, setOwnerId] = useState(group.ownerGroupId ?? "");
   const [tab, setTab] = useState<Tab>(tabs.some((x) => x.key === initialTab) ? (initialTab as Tab) : "leden");
   const choose = (next: Tab) => {
     setTab(next);
@@ -395,6 +397,12 @@ export function MailGroupDetail({
                     <SearchPicker
                       name="categoryId"
                       defaultValue={group.categoryId ?? ""}
+                      onChange={(value) => {
+                        const categoryOwner = categoryOptions.find((c) => c.value === value)?.ownerId;
+                        if (!ownerId && categoryOwner && werkgroepen.some((w) => w.id === categoryOwner)) {
+                          setOwnerId(categoryOwner);
+                        }
+                      }}
                       options={[{ value: "", label: t.noCategory, muted: true }, ...categoryOptions]}
                       placeholder={t.noCategory}
                       searchPlaceholder={t.searchCategory}
@@ -409,7 +417,8 @@ export function MailGroupDetail({
                     <Label>{t.owner}</Label>
                     <ThemedSelect
                       name="ownerGroupId"
-                      defaultValue={group.ownerGroupId ?? ""}
+                      value={ownerId}
+                      onChange={setOwnerId}
                       ariaLabel={t.owner}
                       options={[
                         { value: "", label: t.noOwner },
@@ -869,7 +878,7 @@ function NL(email: string) {
     noCategory: "Zonder categorie",
     searchCategory: "Zoek een categorie",
     noCategoryMatch: (q: string) => `Geen categorie "${q}". Maak ze aan op het overzicht.`,
-    categoryHelp: "Enkel voor het overzicht; zegt niets over wie erin zit.",
+    categoryHelp: "Voor het overzicht; zegt niets over wie erin zit. Hoort de categorie bij een werkgroep, dan komt die hiernaast.",
     owner: "Beheerd door werkgroep",
     noOwner: "Geen (enkel IT)",
     ownerHelp: "Die werkgroep zet dan zelf leden in en uit. Haar leden krijgen in deze lijst hun werkgroepadres.",
@@ -996,7 +1005,7 @@ function EN(email: string): Texts {
     noCategory: "No category",
     searchCategory: "Search a category",
     noCategoryMatch: (q: string) => `No category "${q}". Create it on the overview.`,
-    categoryHelp: "Only for the overview; says nothing about who is in it.",
+    categoryHelp: "For the overview; says nothing about who is in it. If the category belongs to a work group, it is filled in next to it.",
     owner: "Managed by work group",
     noOwner: "None (IT only)",
     ownerHelp: "That work group then adds and removes members itself. Its members get their work group address in this list.",

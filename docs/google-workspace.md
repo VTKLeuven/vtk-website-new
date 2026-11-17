@@ -333,7 +333,11 @@ mailen"). Het overzicht toont "enkel vtk.be" bij een groep die enkel intern
 bereikbaar is.
 
 Ordenen gaat met **categorieën** (Praesidium › Activiteiten): maak ze bij
-"Categorieën", vink groepen aan en kies "In categorie zetten".
+"Categorieën", vink groepen aan en kies "In categorie zetten". Hoort een
+categorie bij een werkgroep (Werkgroepen › Biomedix), kies die dan met het
+potlood bij de categorie: ze komt op elk adres erin zonder werkgroep, en op wat
+er later in komt. Een adres met een andere werkgroep houdt die. Zie
+`docs/design-decisions.md`, "Categorieën: ordening, geen regel".
 
 ### Organisatie-eenheden
 
