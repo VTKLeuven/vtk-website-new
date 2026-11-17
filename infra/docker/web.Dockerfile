@@ -106,8 +106,10 @@ ENTRYPOINT ["/sbin/tini", "--"]
 # actually usable after a deploy. It creates no users, roles or groups.
 # The seed does NOT run on every start: it only runs when RUN_SEED=true, so a
 # redeploy never re-asserts seeded/admin-managed content (header tabs, pages,
-# partners, ...) over edits made in /admin. For a fresh DB, run it once (README
-# "First-time database init") or set RUN_SEED=true for a single start. Keep both
+# partners, ...) over edits made in /admin. For a fresh dev DB, run it once
+# (README "First-time database init") or set RUN_SEED=true for a single start.
+# On production the seed always refuses (packages/db/src/productionGuard.ts);
+# that refusal must not keep the site down, hence the `|| echo`. Keep both
 # scripts in a subshell: `cd /app` must not leak into `next start`, which needs
 # cwd = /app/apps/web to find .next.
-CMD ["/bin/sh", "-c", "npx prisma migrate deploy --schema=/app/packages/db/prisma/schema.prisma && (cd /app && npx tsx packages/db/prisma/sync.ts) && if [ \"$RUN_SEED\" = \"true\" ]; then (cd /app && npx tsx packages/db/prisma/seed.ts); else echo 'Skipping seed (set RUN_SEED=true to run it)'; fi && exec node /app/node_modules/next/dist/bin/next start -p 3000"]
+CMD ["/bin/sh", "-c", "npx prisma migrate deploy --schema=/app/packages/db/prisma/schema.prisma && (cd /app && npx tsx packages/db/prisma/sync.ts) && if [ \"$RUN_SEED\" = \"true\" ]; then (cd /app && npx tsx packages/db/prisma/seed.ts) || echo 'Seed failed or refused (see above); starting anyway'; else echo 'Skipping seed (set RUN_SEED=true to run it)'; fi && exec node /app/node_modules/next/dist/bin/next start -p 3000"]

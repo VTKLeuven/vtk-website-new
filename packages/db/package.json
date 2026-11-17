@@ -11,7 +11,8 @@
     "./permissions": "./src/permissions.ts",
     "./shiftTemplates": "./src/shiftTemplates.ts",
     "./ticketEventTemplates": "./src/ticketEventTemplates.ts",
-    "./slug": "./src/slug.ts"
+    "./slug": "./src/slug.ts",
+    "./productionGuard": "./src/productionGuard.ts"
   },
   "scripts": {
     "generate": "dotenv -e ../../.env -- prisma generate",
@@ -20,6 +21,7 @@
     "migrate:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
     "seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
     "sync": "dotenv -e ../../.env -- tsx prisma/sync.ts",
+    "unseed": "dotenv -e ../../.env -- tsx prisma/remove-seed-data.ts",
     "sync:check": "dotenv -e ../../.env -- tsx prisma/sync.ts --dry-run",
     "db:setup": "npm run migrate:deploy && npm run seed",
     "db:reset": "dotenv -e ../../.env -- prisma migrate reset --force",
