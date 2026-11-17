@@ -41,6 +41,7 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
+          cache: npm
 
       # Voor npm ci: een lockfile zonder de native binaries van dit platform
       # installeert "gewoon" en breekt pas veel later bij het builden.
@@ -54,6 +55,25 @@ jobs:
         run: |
           cp .env.example .env
           npm run db:generate
+
+      # tsc (incremental, uit packages/tsconfig/base.json) en eslint (--cache
+      # hieronder) onthouden wat ze al nagekeken hadden. Koud duren ze elk
+      # rond de 45 s, warm een paar seconden. Beide vergelijken op inhoud en niet
+      # op mtime, dus een verse checkout breekt de cache niet. De sleutel draagt
+      # de commit, zodat elke geslaagde run een nieuwe cache bewaart; terugvallen
+      # doet hij enkel op een cache met dezelfde lockfile, want de cache van
+      # eslint ziet een andere versie van een plugin niet. De vlaggen van eslint
+      # staan hier en niet in het lint-script: een wijziging aan een package.json
+      # maakt in elke Docker-build de npm install-laag ongeldig.
+      - name: Restore tsc and eslint caches
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            apps/*/tsconfig.build.tsbuildinfo
+            apps/web/.eslintcache
+          key: types-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            types-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
 
       # tsc is single-threaded en de runner heeft vier kernen, dus de drie apps
       # en eslint draaien naast elkaar: dat halveert deze stap. De typegen van
@@ -72,7 +92,7 @@ jobs:
             ) > "/tmp/check-types-$app.log" 2>&1 &
             jobs+=("$!:types-$app")
           done
-          npm run lint --workspace=@vtk/web > /tmp/check-lint.log 2>&1 &
+          npm run lint --workspace=@vtk/web -- --cache --cache-strategy content > /tmp/check-lint.log 2>&1 &
           jobs+=("$!:lint")
 
           failed=()
@@ -115,6 +135,7 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -209,6 +230,7 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
+          cache: npm
 
       - name: Install dependencies
         if: steps.affected.outputs.apps != ''

@@ -125,6 +125,11 @@ en vergelijkt met de laatste geslaagde run op main.
   laag erbovenop. Zet ze niet terug na `.next`: dan maakt elke codewijziging
   heel `node_modules` opnieuw aan, en exporteerde elke deploy per app 50 tot 90
   seconden aan lagen.
+- **Een wijziging aan een `package.json` herbouwt `node_modules`**, ook als
+  enkel `scripts` verandert: de deps-stage kopieert de `package.json` van de
+  root, van de app en van elke package vóór `npm install`. Een vlag die enkel CI
+  nodig heeft (zoals `--cache` voor eslint in "Types and lint"), zet je daarom
+  in de workflow en niet in een script.
 - **`NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` blijft vast.** `infra/deploy.sh` zet
   ze eenmalig in de `.env` van de server en geeft ze als build-arg aan de drie
   apps. Zonder vaste sleutel krijgt elke server action na elke deploy een
