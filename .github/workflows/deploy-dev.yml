@@ -28,24 +28,11 @@ env:
   NEXT_TELEMETRY_DISABLED: '1'
 
 jobs:
-  checks:
-    name: Types, lint and tests
+  # Types/lint en de tests zijn twee jobs op twee runners, en niet meer één job
+  # na elkaar: de deploy wacht op de traagste, en dat is nu types/lint alleen.
+  types:
+    name: Types and lint
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: vtk
-          POSTGRES_PASSWORD: vtk
-          POSTGRES_DB: vtk_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U vtk -d vtk_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -68,14 +55,13 @@ jobs:
           cp .env.example .env
           npm run db:generate
 
-      - name: Run unit tests
-        run: |
-          npm run test --workspace=@vtk/web
-          npm run test --workspace=@vtk/logistiek
-
       # tsc is single-threaded en de runner heeft vier kernen, dus de drie apps
       # en eslint draaien naast elkaar: dat halveert deze stap. De typegen van
       # een app moet wel vóór haar eigen tsc blijven, vandaar de subshells.
+      #
+      # Dit is ook de typecheck van de deploy: de Docker-build op de server slaat
+      # ze over (VTK_SKIP_BUILD_TYPECHECK), en de deploy schakelt pas om wanneer
+      # deze job groen is.
       - name: Validate types and lint
         run: |
           jobs=()
@@ -102,6 +88,46 @@ jobs:
             echo "::error::Mislukt: ${failed[*]}"
             exit 1
           fi
+
+  tests:
+    name: Unit and integration tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: vtk
+          POSTGRES_PASSWORD: vtk
+          POSTGRES_DB: vtk_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vtk -d vtk_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare Prisma client
+        run: |
+          cp .env.example .env
+          npm run db:generate
+
+      - name: Run unit tests
+        run: |
+          npm run test --workspace=@vtk/web
+          npm run test --workspace=@vtk/logistiek
 
       - name: Apply migrations and run database integration tests
         run: |
@@ -260,18 +286,23 @@ jobs:
         if: contains(format(' {0} ', steps.affected.outputs.apps), ' web ')
         run: npm run test:e2e:tickets --workspace=@vtk/web
 
-  deploy:
-    name: Deploy to dev (elise)
-    # Alleen deployen bij een push naar main of handmatige workflow_dispatch; nooit bij pull_request.
+  # Bouwen op de server begint meteen bij de push, naast de checks, en niet pas
+  # erna: dat was zes minuten wachten na vier minuten checks. Omschakelen gebeurt
+  # pas in `deploy` hieronder, wanneer alle checks groen zijn; tot dan blijven de
+  # oude containers draaien. Faalt een check, dan staan er nieuwe images op de
+  # server die nooit uitgerold worden; de volgende push bouwt erover.
+  #
+  # Twee runs na elkaar lopen niet door elkaar: de concurrency-groep bovenaan
+  # laat op main één run tegelijk toe, dus de build van de volgende commit kan
+  # de repo niet resetten terwijl deze nog omschakelt.
+  server-build:
+    name: Build on dev server
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    needs: [checks, build]
     runs-on: ubuntu-latest
-    environment:
-      name: dev
-      url: https://dev.vtk.be
+    # Geen `environment`: dat is `deploy` hieronder; anders telt GitHub elke push
+    # als twee deploys. De SSH-secrets staan op reponiveau.
 
     steps:
-      # Enkel nodig om infra/deploy.sh mee te hebben; de runner bouwt niets.
       - name: Checkout deploy script
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -294,23 +325,56 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.DEV_SSH_KEY || secrets.SSH_KEY }}
 
-      # De deploylogica staat in infra/deploy.sh en wordt daarheen gepipet, zodat
-      # ze in git leeft in plaats van als quoted string in deze workflow. `auto`
-      # betekent: controleer de NFS-opslag enkel wanneer .env ze gebruikt.
-      - name: Deploy through SSH
+      # `ServerAliveInterval`: tijdens het bouwen staat deze sessie minutenlang
+      # stil (de drie builds schrijven naar een logbestand op de server), en
+      # een stille TCP-verbinding wordt onderweg afgeschoten. Dat is precies
+      # hoe run 34767614290 sneuvelde: "client_loop: send disconnect: Broken
+      # pipe", 4,5 minuten na de laatste regel. De client stuurt nu elke 30
+      # seconden een teken van leven en houdt het 20 keer vol, dus een echt
+      # dode verbinding valt na tien minuten alsnog op.
+      - name: Build images through SSH
         env:
           SSH_USER: ${{ secrets.DEV_SSH_USER || secrets.SSH_USER || 'it' }}
           SSH_HOST: ${{ secrets.DEV_SSH_HOST }}
           GIT_SHA: ${{ github.sha }}
         run: |
-          # `ServerAliveInterval`: tijdens het bouwen staat deze sessie minutenlang
-          # stil (de drie builds schrijven naar een logbestand op de server), en
-          # een stille TCP-verbinding wordt onderweg afgeschoten. Dat is precies
-          # hoe run 34767614290 sneuvelde: "client_loop: send disconnect: Broken
-          # pipe", 4,5 minuten na de laatste regel. De client stuurt nu elke 30
-          # seconden een teken van leven en houdt het 20 keer vol, dus een echt
-          # dode verbinding valt na tien minuten alsnog op.
           ssh -o StrictHostKeyChecking=no -o BatchMode=yes \
             -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
             "$SSH_USER@$SSH_HOST" \
-            bash -s -- "$GIT_SHA" auto < infra/deploy.sh
+            bash -s -- "$GIT_SHA" auto build < infra/deploy.sh
+
+  deploy:
+    name: Deploy to dev (elise)
+    # Alleen deployen bij een push naar main of handmatige workflow_dispatch; nooit bij pull_request.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: [types, tests, build, server-build]
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: https://dev.vtk.be
+
+    steps:
+      # Enkel nodig om infra/deploy.sh mee te hebben; de runner bouwt niets.
+      - name: Checkout deploy script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          sparse-checkout: infra/deploy.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555 # v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.DEV_SSH_KEY || secrets.SSH_KEY }}
+
+      # Enkel omschakelen naar wat `server-build` voor deze commit bouwde; het
+      # script weigert wanneer de images op de server van een andere commit zijn.
+      - name: Switch containers through SSH
+        env:
+          SSH_USER: ${{ secrets.DEV_SSH_USER || secrets.SSH_USER || 'it' }}
+          SSH_HOST: ${{ secrets.DEV_SSH_HOST }}
+          GIT_SHA: ${{ github.sha }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -o BatchMode=yes \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
+            "$SSH_USER@$SSH_HOST" \
+            bash -s -- "$GIT_SHA" auto switch < infra/deploy.sh
