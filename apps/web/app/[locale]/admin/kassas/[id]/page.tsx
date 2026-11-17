@@ -32,6 +32,7 @@ import {
   STATUS_SLUGS,
   statusLabel,
   timeInputValue,
+  lastDayOf,
   timeRangeLabel,
   timeRangeShort,
   YEARLY_EVENT_CHOICE,
@@ -227,6 +228,7 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
       : []),
   ];
 
+  const lastDay = lastDayOf(register.startsAt, register.endsAt);
   const requestForm = editable ? (
     <RequestForm
       locale={locale}
@@ -237,6 +239,7 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
       values={{
         id: register.id,
         date: toDateInputValue(register.date),
+        endDate: lastDay ? toDateInputValue(lastDay) : "",
         startTime: timeInputValue(register.startsAt),
         endTime: timeInputValue(register.endsAt),
         activity: register.activity,

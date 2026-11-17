@@ -145,16 +145,62 @@ const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
  * klok. Een einduur dat vroeger op de klok staat dan het begin, valt de dag
  * erna: 22:00 tot 03:00 is een nacht, geen activiteit die achteruit loopt.
  *
- * `null` bij een uur dat niet bestaat of twee gelijke uren.
+ * Met `endDate` (een `@db.Date`, zoals `date`) loopt de activiteit over
+ * meerdere dagen, zoals de onthaaldagen: het begin valt op `date`, het einde op
+ * `endDate`, en dan wordt er niets meer naar de dag erna geschoven. Dezelfde
+ * dag als `date` is gewoon een activiteit van één dag.
+ *
+ * `null` bij een uur dat niet bestaat, twee gelijke uren, of een einde dat niet
+ * na het begin valt.
  */
-export function activityInterval(date: Date, startTime: string, endTime: string): Interval | null {
-  if (!TIME_PATTERN.test(startTime) || !TIME_PATTERN.test(endTime) || startTime === endTime) return null;
+export function activityInterval(
+  date: Date,
+  startTime: string,
+  endTime: string,
+  endDate?: Date | null,
+): Interval | null {
+  if (!TIME_PATTERN.test(startTime) || !TIME_PATTERN.test(endTime)) return null;
   const day = calendarDay(date);
+  const start = brusselsWallClock(day.year, day.month, day.day, startTime);
+  if (endDate && endDate.getTime() !== date.getTime()) {
+    const last = calendarDay(endDate);
+    const end = brusselsWallClock(last.year, last.month, last.day, endTime);
+    return end > start ? { start, end } : null;
+  }
+  if (startTime === endTime) return null;
   const endDay = endTime < startTime ? shiftYMD(day, 1) : day;
-  return {
-    start: brusselsWallClock(day.year, day.month, day.day, startTime),
-    end: brusselsWallClock(endDay.year, endDay.month, endDay.day, endTime),
-  };
+  return { start, end: brusselsWallClock(endDay.year, endDay.month, endDay.day, endTime) };
+}
+
+/**
+ * De laatste dag van een activiteit over meerdere dagen, als `@db.Date`
+ * (middernacht UTC), voor het datumveld bij het aanpassen. `null` voor een
+ * activiteit van één dag, ook als ze over middernacht loopt: 22:00 tot 03:00
+ * vul je in met één datum.
+ */
+export function lastDayOf(startsAt: Date | null, endsAt: Date | null): Date | null {
+  if (!spansDays(startsAt, endsAt)) return null;
+  const last = brusselsYMD(endsAt!);
+  return new Date(Date.UTC(last.year, last.month - 1, last.day));
+}
+
+/**
+ * Loopt dit over meerdere dagen, en niet enkel over één middernacht? Een einde
+ * de dag erna dat vroeger op de klok staat dan het begin, is een nacht.
+ */
+function spansDays(startsAt: Date | null, endsAt: Date | null): boolean {
+  if (!startsAt || !endsAt) return false;
+  const first = brusselsYMD(startsAt);
+  const last = brusselsYMD(endsAt);
+  if (ymdKey(first) === ymdKey(last)) return false;
+  if (ymdKey(shiftYMD(first, 1)) !== ymdKey(last)) return true;
+  return brusselsMinutesOfDay(endsAt) >= brusselsMinutesOfDay(startsAt);
+}
+
+/** "24/10", de laatste dag in een urenlabel. */
+function dayMonth(at: Date): string {
+  const day = brusselsYMD(at);
+  return `${String(day.day).padStart(2, "0")}/${String(day.month).padStart(2, "0")}`;
 }
 
 /** `date` is een `@db.Date`: middernacht UTC van de kalenderdag. */
@@ -193,19 +239,27 @@ export function timeInputValue(at: Date | null): string {
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 }
 
-/** "20:00 tot 23:00", en "22:00 tot 03:00 (de dag erna)" over middernacht. */
+/**
+ * "20:00 tot 23:00", "22:00 tot 03:00 (de dag erna)" over middernacht, en
+ * "10:00 tot 24/10 18:00" over meerdere dagen.
+ */
 export function timeRangeLabel(startsAt: Date | null, endsAt: Date | null, nl: boolean): string | null {
   if (!startsAt || !endsAt) return null;
+  const to = nl ? "tot" : "to";
+  if (spansDays(startsAt, endsAt)) {
+    return `${timeInputValue(startsAt)} ${to} ${dayMonth(endsAt)} ${timeInputValue(endsAt)}`;
+  }
   const nextDay = ymdKey(brusselsYMD(startsAt)) !== ymdKey(brusselsYMD(endsAt));
-  return `${timeInputValue(startsAt)} ${nl ? "tot" : "to"} ${timeInputValue(endsAt)}${
+  return `${timeInputValue(startsAt)} ${to} ${timeInputValue(endsAt)}${
     nextDay ? (nl ? " (de dag erna)" : " (the next day)") : ""
   }`;
 }
 
-/** "20:00-23:00" voor een smalle kolom. */
+/** "20:00-23:00" voor een smalle kolom, "10:00-24/10 18:00" over meerdere dagen. */
 export function timeRangeShort(startsAt: Date | null, endsAt: Date | null): string | null {
   if (!startsAt || !endsAt) return null;
-  return `${timeInputValue(startsAt)}-${timeInputValue(endsAt)}`;
+  const end = spansDays(startsAt, endsAt) ? `${dayMonth(endsAt)} ${timeInputValue(endsAt)}` : timeInputValue(endsAt);
+  return `${timeInputValue(startsAt)}-${end}`;
 }
 
 // -----------------------------------------------------------------------------

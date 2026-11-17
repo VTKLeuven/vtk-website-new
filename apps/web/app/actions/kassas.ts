@@ -146,7 +146,13 @@ async function readRequest(
   const startTime = text(formData, "startTime", 5);
   const endTime = text(formData, "endTime", 5);
   if (!startTime || !endTime) return { error: "MISSING_TIME" };
-  const interval = activityInterval(date, startTime, endTime);
+  // Enkel bij een activiteit over meerdere dagen (de onthaaldagen): dan staat
+  // het einduur op deze laatste dag in plaats van op `date`.
+  const endDateText = text(formData, "endDate", 10);
+  const endDate = endDateText ? parseDateInput(endDateText) : null;
+  if (endDateText && !endDate) return { error: "BAD_DATE" };
+  if (endDate && endDate < date) return { error: "BAD_END_DATE" };
+  const interval = activityInterval(date, startTime, endTime, endDate);
   if (!interval) return { error: "BAD_TIME" };
 
   const activity = text(formData, "activity", 120);

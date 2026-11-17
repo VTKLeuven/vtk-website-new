@@ -12,8 +12,9 @@ export function kassaErrorMessages(locale: Locale): Record<string, string> {
     return {
       ...shared,
       BAD_DATE: "Niet opgeslagen: die datum bestaat niet.",
+      BAD_END_DATE: "Niet opgeslagen: de laatste dag valt voor de eerste dag van de activiteit.",
       MISSING_TIME: "Niet opgeslagen: vul het begin- en einduur van de activiteit in.",
-      BAD_TIME: "Niet opgeslagen: begin- en einduur moeten een uur zijn, en mogen niet gelijk zijn.",
+      BAD_TIME: "Niet opgeslagen: begin- en einduur moeten een uur zijn, en het einde moet na het begin vallen.",
       MISSING_TERMINAL:
         "Niet aanvaard: kies een Bancontact-bakje of Payconiq-rekening voor wat de post vroeg. Heeft ze er toch geen nodig, vink het dan uit in de aanvraag.",
       MISSING_FIELD: "Niet opgeslagen: vul de activiteit en de verantwoordelijke in.",
@@ -44,8 +45,9 @@ export function kassaErrorMessages(locale: Locale): Record<string, string> {
   return {
     ...shared,
     BAD_DATE: "Not saved: that date does not exist.",
+    BAD_END_DATE: "Not saved: the last day is before the first day of the activity.",
     MISSING_TIME: "Not saved: fill in the start and end time of the activity.",
-    BAD_TIME: "Not saved: start and end must be a time of day, and cannot be the same.",
+    BAD_TIME: "Not saved: start and end must be a time of day, and the end must come after the start.",
     MISSING_TERMINAL:
       "Not accepted: choose a Bancontact terminal or Payconiq account for what the post asked for. If they do not need one after all, untick it in the request.",
     MISSING_FIELD: "Not saved: fill in the activity and the person responsible.",

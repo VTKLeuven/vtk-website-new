@@ -8905,6 +8905,17 @@ uitlening. Een kassa van voor de uren gevraagd werden, heeft er geen en houdt ha
 toestellen de hele dag bezet: welk deel van de dag het was, is niet te kennen, en
 een fail-safe die bij twijfel doorlaat, is er geen.
 
+**Een kassa kan over meerdere dagen lopen (november 2026).** Voor de
+onthaaldagen houdt een post één kassa een hele week bij zich; daarvoor moest er
+per dag een aanvraag komen. Het vinkje "Over meerdere dagen" vraagt een eerste en
+een laatste dag: het beginuur geldt op de eerste dag, het einduur op de laatste,
+en de toestellen blijven die hele tijd bezet, ook 's nachts. Het is één kassa
+met één telling, niet één per dag. `CashRegister.date` blijft de eerste dag
+(werkingsjaar, sortering); de laatste dag zit in `endsAt`, zodat er geen kolom
+bij moest en bestaande kassa's niets veranderen. Een einde de dag erna dat
+vroeger op de klok staat dan het begin, leest het scherm als een nacht en niet
+als twee dagen.
+
 **De statussen zijn die van het rekenblad, met de hand gezet.** Te maken,
 gemaakt, meegegeven, teruggebracht, geteld, doorgegeven, kasboek. Anders dan bij
 de rekeningen is de status hier wel een kolom: het zijn handelingen in de echte

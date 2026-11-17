@@ -21,6 +21,11 @@ import { FloatPicker } from "./FloatPicker";
 export type RequestFormValues = {
   id?: string;
   date: string;
+  /**
+   * Laatste dag ("2026-09-25") bij een activiteit over meerdere dagen, zoals
+   * de onthaaldagen; leeg of weg bij één dag, ook als die over middernacht loopt.
+   */
+  endDate?: string;
   /** "20:00"; leeg bij een kassa van voor er naar de uren gevraagd werd. */
   startTime: string;
   endTime: string;
@@ -82,6 +87,7 @@ export function RequestForm({
     ),
   );
   const [start, setStart] = useState(() => countInputsFrom(values.startCounts, true));
+  const [multiDay, setMultiDay] = useState(Boolean(values.endDate));
   const total =
     floatMode === "count"
       ? inputsTotalCents(start)
@@ -107,8 +113,27 @@ export function RequestForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <Label htmlFor="date">{nl ? "Datum van de activiteit" : "Date of the activity"}</Label>
-          <Input id="date" name="date" type="date" required defaultValue={values.date} />
+          {multiDay ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="date">{nl ? "Eerste dag" : "First day"}</Label>
+                <Input id="date" name="date" type="date" required defaultValue={values.date} />
+              </div>
+              <div>
+                <Label htmlFor="endDate">{nl ? "Laatste dag" : "Last day"}</Label>
+                <Input id="endDate" name="endDate" type="date" required defaultValue={values.endDate} />
+              </div>
+            </div>
+          ) : (
+            <>
+              <Label htmlFor="date">{nl ? "Datum van de activiteit" : "Date of the activity"}</Label>
+              <Input id="date" name="date" type="date" required defaultValue={values.date} />
+            </>
+          )}
+          <label className="mt-2 inline-flex items-center gap-2 text-sm text-vtk-body">
+            <input type="checkbox" checked={multiDay} onChange={(event) => setMultiDay(event.target.checked)} />
+            {nl ? "Over meerdere dagen, bv. de onthaaldagen" : "Over several days, e.g. the welcome days"}
+          </label>
         </div>
         <div>
           <div className="grid grid-cols-2 gap-3">
@@ -122,9 +147,13 @@ export function RequestForm({
             </div>
           </div>
           <p className="mt-1 text-xs text-vtk-muted">
-            {nl
-              ? "Loopt het over middernacht, vul dan gewoon het uur van de nacht in, bv. 22:00 tot 03:00."
-              : "Past midnight? Just enter the time at night, e.g. 22:00 to 03:00."}
+            {multiDay
+              ? nl
+                ? "Het beginuur op de eerste dag en het einduur op de laatste dag. Zo lang blijven de toestellen voor jou gereserveerd."
+                : "The start time on the first day and the end time on the last day. The devices stay reserved for you that whole time."
+              : nl
+                ? "Loopt het over middernacht, vul dan gewoon het uur van de nacht in, bv. 22:00 tot 03:00."
+                : "Past midnight? Just enter the time at night, e.g. 22:00 to 03:00."}
           </p>
         </div>
         <div>
