@@ -789,6 +789,7 @@ model User {
   viewPreferences         UserViewPreference[]
   calendarInterests       CalendarEventInterest[]     @relation("CalendarInterestUser")
   calendarSignupMails     CalendarEventSignupMail[]   @relation("CalendarSignupMailUser")
+  calendarWeekMails       CalendarWeekMail[]          @relation("CalendarWeekMailUser")
   calendarCategoryFollows CalendarCategoryFollow[]    @relation("CalendarFollowUser")
   shiftRewardRedemptions  ShiftRewardRedemption[]     @relation("ShiftRewardRedemptionUser")
   shiftRewardsProcessed   ShiftRewardRedemption[]     @relation("ShiftRewardRedemptionProcessedBy")
@@ -8343,6 +8344,28 @@ model CalendarEventSignupMail {
   @@index([eventId])
 }
 
+/// De weekmail van de kalender: zaterdagavond het overzicht van de week die
+/// komt, aan wie de mailinglijst Evenementen aan heeft. Eén rij per lid per
+/// week.
+///
+/// De rij is de claim, zoals bij `CalendarEventSignupMail`: eerst aanmaken (de
+/// unieke sleutel houdt een tweede container tegen), dan versturen, en bij een
+/// mislukte verzending weer weg. Zie apps/web/lib/calendar/weekOverview.ts.
+model CalendarWeekMail {
+  id     String   @id @default(cuid())
+  userId String
+  /// De maandag van de week waarover de mail ging, als Brusselse datum
+  /// ("2026-11-23"). Een tekst en geen tijdstip, zodat het omschakelen naar
+  /// winteruur de sleutel niet verschuift.
+  week   String
+  sentAt DateTime @default(now()) @db.Timestamptz(3)
+
+  user User @relation("CalendarWeekMailUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, week])
+  @@index([week])
+}
+
 /// "Ik kom naar dit alumni-evenement", aangeduid door iemand zonder account.
 ///
 /// Bestaat enkel voor **alumni-evenementen**. Een afgestudeerde van 2004 heeft
@@ -9845,6 +9868,9 @@ model BoDocument {
   /// De `driveModifiedAt` waarvoor de bedragen gelezen werden. Gelijk aan de
   /// huidige: het bestand hoeft niet opnieuw gedownload te worden.
   figuresReadFor     DateTime? @db.Timestamptz(3)
+  /// `FIGURES_VERSION` uit `lib/bo/figures.ts` waarmee de bedragen gelezen
+  /// werden. Lager dan de huidige: opnieuw lezen, ook al wijzigde het blad niet.
+  figuresVersion     Int       @default(0)
 
   /// Een resultaat dat Groep 5 met de hand bij een budget zette, omdat de
   /// namen te ver uiteenlopen om vanzelf te koppelen.
@@ -9859,6 +9885,13 @@ model BoDocument {
   /// versie, een kopie, iets wat er niet hoort. In Drive verandert er niets, en
   /// de scan zet het niet terug. Null = telt mee.
   hiddenAt       DateTime? @db.Timestamptz(3)
+  /// Telt wel mee in het overzicht (budget, resultaat, percentage), maar niet
+  /// in de stand tegenover de begroting: een activiteit die de stad betaalt,
+  /// of waarvan het blad nog maar half is. Groep 5 zet het terug zodra het
+  /// klopt. Null = telt mee in de begroting.
+  begrotingExcludedAt     DateTime? @db.Timestamptz(3)
+  /// Waarom, zodat wie de lijst later nakijkt weet wat er nog moet gebeuren.
+  begrotingExcludedReason String?
 
   firstSeenAt  DateTime  @default(now()) @db.Timestamptz(3)
   lastSeenAt   DateTime  @db.Timestamptz(3)

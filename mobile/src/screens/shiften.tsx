@@ -1,22 +1,35 @@
-
-import { Globe, MapPin, Users } from 'lucide-react-native';
-import { useState } from 'react';
-import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ChevronDown, Globe } from 'lucide-react-native';
+import { useMemo, useState } from 'react';
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { ApiError } from '../api/client';
 import type { AppShift } from '../api/contract';
-import { fetchShifts, registerForShift, unregisterFromShift } from '../api/endpoints';
+import {
+  fetchShifts,
+  registerForShift,
+  setShiftReplaceable,
+  unregisterFromShift,
+} from '../api/endpoints';
 import { messageFor, useResource } from '../api/useResource';
+import { DatePin } from '../components/DatePin';
 import { PageHead } from '../components/PageHead';
 import { Prose } from '../components/Prose';
-import { Button, Card, Empty, ErrorState, Loading, SectionTitle, StaleNotice } from '../components/ui';
-import { formatDay, formatTimeRange } from '../format';
+import { Button, Card, Empty, ErrorState, Loading, StaleNotice, WeekHead } from '../components/ui';
+import { formatDay, formatTime } from '../format';
+import { dayKeyOf, todayKey } from '../monthGrid';
 import { useApp } from '../state/app';
 import { useTabRouter } from '../navigation';
-import { COLORS, SPACING, TYPE } from '../theme/tokens';
+import { COLORS, FONTS, RADIUS, SPACING, TYPE } from '../theme/tokens';
+import { groupByWeek } from '../weeks';
 
 /**
- * Shiften: waar je op staat, en waar je nog op kan.
+ * Shiften: de agenda van /shift.
+ *
+ * Alles onder elkaar, per week een kop en per dag een kaart met de gele
+ * datumpin; de shiften zijn rijen met het uur, de naam, de plaats en een teller
+ * (1/3), en een knop om in te schrijven. Tik een rij aan voor de uitleg, de keuze
+ * om je plaats af te staan en uitschrijven. Je eigen shiften staan ertussen, met
+ * de gele rail, zoals op de site; een aparte lijst erboven herhaalde ze enkel.
  *
  * Alle regels staan op de server. Of je nog kan uitschrijven is een veld dat de
  * API meestuurt (`canUnregister`) en geen berekening hier: de 24-uursgrens en de
@@ -27,17 +40,24 @@ export default function ShiftenScreen() {
   const router = useTabRouter();
   const { locale, viewer } = useApp();
   const resource = useResource('shiften', () => fetchShifts(locale), locale);
+  const weeks = useMemo(() => {
+    const all = [...(resource.data?.mine ?? []), ...(resource.data?.available ?? [])].sort((a, b) =>
+      a.start.localeCompare(b.start),
+    );
+    return groupByWeek(all, (shift) => shift.start, locale).map((week) => ({
+      ...week,
+      days: groupByDay(week.items),
+    }));
+  }, [resource.data, locale]);
 
   if (!viewer) {
     return (
       <>
-        <PageHead title="Shiften" subtitle="Help mee en verdien wat" />
+        <PageHead title="Shiften" subtitle="Help mee en verdien bonnetjes" />
         <ScrollView contentContainerStyle={styles.content} style={styles.root}>
           <Card>
             <Text style={styles.title}>Log eerst in</Text>
-            <Text style={styles.body}>
-              Inschrijven op een shift hangt aan je account.
-            </Text>
+            <Text style={styles.body}>Inschrijven op een shift hangt aan je account.</Text>
             <Button label="Inloggen" onPress={() => router.push('/inloggen')} />
           </Card>
         </ScrollView>
@@ -52,59 +72,80 @@ export default function ShiftenScreen() {
     );
   }
 
-  const { mine, available } = resource.data;
-
   return (
     <>
-      <PageHead title="Shiften" subtitle="Help mee en verdien wat" />
+      <PageHead title="Shiften" subtitle="Help mee en verdien bonnetjes" />
       <ScrollView
         style={styles.root}
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl
-            refreshing={resource.refreshing}
-            onRefresh={() => void resource.refresh()}
-          />
+          <RefreshControl refreshing={resource.refreshing} onRefresh={() => void resource.refresh()} />
         }
       >
         {resource.stale ? <StaleNotice onRetry={() => void resource.refresh()} /> : null}
 
-        {mine.length > 0 ? (
-          <>
-            <SectionTitle>Jouw shiften</SectionTitle>
-            {mine.map((shift) => (
-              <ShiftCard
-                key={shift.id}
-                shift={shift}
-                locale={locale}
-                onChanged={() => void resource.refresh()}
-              />
-            ))}
-          </>
-        ) : null}
-
-        <SectionTitle>Nog vrij</SectionTitle>
-        {available.length === 0 ? (
+        {weeks.length === 0 ? (
           <Empty
-            title="Geen vrije shiften"
+            title="Geen shiften"
             hint="Er staat nu niets open. Nieuwe shiften verschijnen hier zodra ze ingepland zijn."
           />
-        ) : (
-          available.map((shift) => (
-            <ShiftCard
-              key={shift.id}
-              shift={shift}
-              locale={locale}
-              onChanged={() => void resource.refresh()}
-            />
-          ))
-        )}
+        ) : null}
+
+        {weeks.map((week) => (
+          <View key={week.key} style={styles.week}>
+            <WeekHead name={week.name} range={week.range} />
+            {week.days.map((day) => (
+              <View key={day.key} style={styles.day}>
+                <View style={styles.dayHead}>
+                  <DatePin iso={day.shifts[0].start} locale={locale} size="sm" month={false} />
+                  <View style={styles.flex}>
+                    <Text style={styles.dayName}>{dayName(day.key, day.shifts[0].start, locale)}</Text>
+                    <Text style={styles.hint}>
+                      {day.shifts.length === 1 ? '1 shift' : `${day.shifts.length} shiften`}
+                      {day.shifts.some((shift) => shift.registered) ? ', jij staat erop' : ''}
+                    </Text>
+                  </View>
+                </View>
+                {day.shifts.map((shift) => (
+                  <ShiftRow
+                    key={shift.id}
+                    shift={shift}
+                    locale={locale}
+                    onChanged={() => void resource.refresh()}
+                  />
+                ))}
+              </View>
+            ))}
+          </View>
+        ))}
       </ScrollView>
     </>
   );
 }
 
-function ShiftCard({
+function groupByDay(shifts: AppShift[]): { key: string; shifts: AppShift[] }[] {
+  const days = new Map<string, AppShift[]>();
+  for (const shift of shifts) {
+    const key = dayKeyOf(shift.start);
+    days.set(key, [...(days.get(key) ?? []), shift]);
+  }
+  return [...days.entries()].map(([key, items]) => ({ key, shifts: items }));
+}
+
+/** "Vandaag", "Morgen", anders de weekdag. */
+function dayName(key: string, iso: string, locale: 'nl' | 'en'): string {
+  const today = todayKey();
+  const tomorrow = todayKey(new Date(Date.now() + 24 * 60 * 60 * 1000));
+  if (key === today) return locale === 'en' ? 'Today' : 'Vandaag';
+  if (key === tomorrow) return locale === 'en' ? 'Tomorrow' : 'Morgen';
+  const name = new Date(iso).toLocaleDateString(locale === 'en' ? 'en-GB' : 'nl-BE', {
+    timeZone: 'Europe/Brussels',
+    weekday: 'long',
+  });
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+function ShiftRow({
   shift,
   locale,
   onChanged,
@@ -115,12 +156,16 @@ function ShiftCard({
 }) {
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
+  // Voor het inschrijven: mag een student deze plaats later innemen? Op een
+  // shift waar je al op staat, is het de opgeslagen keuze.
+  const [replaceable, setReplaceable] = useState(shift.replaceable ?? false);
 
   const act = async (kind: 'register' | 'unregister') => {
     setBusy(true);
     try {
-      if (kind === 'register') await registerForShift(shift.id);
-      else await unregisterFromShift(shift.id);
+      if (kind === 'register') {
+        await registerForShift(shift.id, { replaceable: shift.replaceableOption && replaceable });
+      } else await unregisterFromShift(shift.id);
       onChanged();
     } catch (error) {
       Alert.alert(
@@ -146,66 +191,114 @@ function ShiftCard({
     );
   };
 
-  const free = shift.maxParticipants - shift.takenSpots;
+  /**
+   * Achteraf omzetten: meteen tonen, en bij een fout terugzetten en het zeggen.
+   * Er is geen apart opslaan; de schakelaar ís de keuze.
+   */
+  const toggleReplaceable = async (next: boolean) => {
+    setReplaceable(next);
+    try {
+      await setShiftReplaceable(shift.id, next);
+      onChanged();
+    } catch (error) {
+      setReplaceable(!next);
+      Alert.alert('Niet opgeslagen', shiftErrorText(error));
+    }
+  };
+
+  const full = shift.takenSpots >= shift.maxParticipants;
 
   return (
-    <Card featured={shift.registered}>
-      <Text style={styles.shiftName}>{shift.name}</Text>
-
-      <View style={styles.facts}>
-        <Text style={styles.factDay}>{formatDay(shift.start, locale)}</Text>
-        <Text style={styles.fact}>{formatTimeRange(shift.start, shift.end, locale)}</Text>
-      </View>
-
-      <View style={styles.factRow}>
-        <MapPin color={COLORS.muted} size={15} />
-        <Text style={styles.fact}>{shift.location}</Text>
-      </View>
-      <View style={styles.factRow}>
-        <Users color={COLORS.muted} size={15} />
-        <Text style={styles.fact}>
-          {shift.takenSpots} van {shift.maxParticipants}
-          {free > 0 ? `, nog ${free} vrij` : ', volzet'}
+    <View style={[styles.shift, shift.registered && styles.mine]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={`${shift.name}, ${formatTime(shift.start, locale)}`}
+        onPress={() => setOpen(!open)}
+        style={({ pressed }) => [styles.shiftRow, pressed && styles.pressed]}
+      >
+        <Text style={styles.time}>
+          {formatTime(shift.start, locale)}
+          {'\n'}
+          <Text style={styles.timeEnd}>{formatTime(shift.end, locale)}</Text>
         </Text>
-      </View>
-      {shift.openToInternationals ? (
-        <View style={styles.factRow}>
-          <Globe color={COLORS.muted} size={15} />
-          <Text style={styles.fact}>Ook zonder Nederlands</Text>
+        <View style={styles.flex}>
+          <Text style={styles.shiftName} numberOfLines={1}>
+            {shift.name}
+          </Text>
+          <Text style={styles.hint} numberOfLines={1}>
+            {shift.location}{'  '}
+            <Text style={styles.count}>
+              {shift.takenSpots}/{shift.maxParticipants}
+            </Text>
+          </Text>
+        </View>
+        {shift.registered ? (
+          <View style={styles.tag}>
+            <Text style={styles.tagText}>Ingeschreven</Text>
+          </View>
+        ) : shift.canRegister ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Inschrijven voor ${shift.name}`}
+            disabled={busy}
+            onPress={() => void act('register')}
+            hitSlop={6}
+            style={({ pressed }) => [styles.go, (busy || pressed) && styles.pressed]}
+          >
+            <Text style={styles.goText}>Schrijf in</Text>
+          </Pressable>
+        ) : (
+          <Text style={styles.hint}>{full ? 'Volzet' : 'Gesloten'}</Text>
+        )}
+        <ChevronDown color={COLORS.muted} size={15} style={open ? styles.chevronOpen : undefined} />
+      </Pressable>
+
+      {open ? (
+        <View style={styles.details}>
+          {shift.openToInternationals ? (
+            <View style={styles.factRow}>
+              <Globe color={COLORS.muted} size={14} />
+              <Text style={styles.hint}>Ook zonder Nederlands</Text>
+            </View>
+          ) : null}
+          {shift.description ? <Text style={styles.body}>{shift.description}</Text> : null}
+          {shift.instructions ? <Prose>{shift.instructions}</Prose> : null}
+
+          {shift.replaceableOption && (shift.registered || shift.canRegister) ? (
+            <View style={styles.switchRow}>
+              <View style={styles.flex}>
+                <Text style={styles.switchLabel}>Een student mag mijn plaats innemen</Text>
+                <Text style={styles.hint}>
+                  Schrijft er zich een student in terwijl de shift vol is, dan neemt die je plaats
+                  in. Je krijgt dan een mail en hoeft niet meer te komen.
+                </Text>
+              </View>
+              <Switch
+                value={replaceable}
+                onValueChange={(next) =>
+                  shift.registered ? void toggleReplaceable(next) : setReplaceable(next)
+                }
+                trackColor={{ true: COLORS.yellow, false: COLORS.line2 }}
+                thumbColor={COLORS.surface}
+                accessibilityLabel="Een student mag mijn plaats innemen"
+              />
+            </View>
+          ) : null}
+
+          {shift.registered ? (
+            shift.canUnregister ? (
+              <Button label="Uitschrijven" variant="ghost" busy={busy} onPress={confirmUnregister} />
+            ) : (
+              <Text style={styles.hint}>
+                Uitschrijven kan niet meer: de shift begint binnen het etmaal. Kan je echt niet,
+                laat het dan weten aan de verantwoordelijke.
+              </Text>
+            )
+          ) : null}
         </View>
       ) : null}
-
-      {shift.description ? <Text style={styles.body}>{shift.description}</Text> : null}
-
-      {shift.instructions ? (
-        <>
-          <Button
-            label={open ? 'Minder uitleg' : 'Wat houdt dit in?'}
-            variant="ghost"
-            onPress={() => setOpen(!open)}
-          />
-          {open ? <Prose>{shift.instructions}</Prose> : null}
-        </>
-      ) : null}
-
-      {shift.registered ? (
-        shift.canUnregister ? (
-          <Button label="Uitschrijven" variant="ghost" busy={busy} onPress={confirmUnregister} />
-        ) : (
-          <Text style={styles.hint}>
-            Uitschrijven kan niet meer: de shift begint binnen het etmaal. Kan je echt niet, laat
-            het dan weten aan de verantwoordelijke.
-          </Text>
-        )
-      ) : (
-        <Button
-          label="Inschrijven"
-          busy={busy}
-          disabled={!shift.canRegister}
-          onPress={() => void act('register')}
-        />
-      )}
-    </Card>
+    </View>
   );
 }
 
@@ -225,6 +318,9 @@ function shiftErrorText(error: unknown): string {
   if (text.includes('full')) return 'Deze shift is intussen volzet.';
   if (text.includes('started')) return 'Deze shift is al begonnen.';
   if (text.includes('already registered')) return 'Je stond hier al op ingeschreven.';
+  if (text.includes('only praesidium')) return 'Enkel een praesidiumlid kan vervangen worden.';
+  if (text.includes('not registered')) return 'Je staat niet (meer) op deze shift.';
+  if (text.includes('closed')) return 'Deze shift is al begonnen.';
   if (error.status === 409) {
     return 'Uitschrijven kan niet meer: de shift begint binnen het etmaal.';
   }
@@ -234,13 +330,71 @@ function shiftErrorText(error: unknown): string {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.paper },
-  content: { padding: SPACING.lg, gap: SPACING.md, paddingBottom: SPACING.xxl },
+  content: { padding: SPACING.xl - 4, gap: SPACING.lg, paddingBottom: SPACING.xxl },
+  flex: { flex: 1 },
   title: { ...TYPE.cardTitle, color: COLORS.ink },
   body: { ...TYPE.body, color: COLORS.body },
   hint: { ...TYPE.small, color: COLORS.muted },
-  shiftName: { ...TYPE.sectionTitle, color: COLORS.ink },
-  facts: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, alignItems: 'baseline' },
-  factDay: { ...TYPE.body, fontFamily: TYPE.cardTitle.fontFamily, color: COLORS.ink },
+  pressed: { opacity: 0.7 },
+
+  week: { gap: SPACING.sm },
+  day: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    overflow: 'hidden',
+  },
+  dayHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.line,
+  },
+  dayName: { fontFamily: FONTS.semibold, fontSize: 15, color: COLORS.ink },
+
+  shift: { borderBottomWidth: 1, borderBottomColor: COLORS.line },
+  // Je eigen shift: de gele rail van de site.
+  mine: { borderLeftWidth: 3, borderLeftColor: COLORS.yellow },
+  shiftRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 10,
+  },
+  time: {
+    width: 46,
+    fontFamily: FONTS.semibold,
+    fontSize: 13.5,
+    lineHeight: 17,
+    color: COLORS.ink,
+    fontVariant: ['tabular-nums'],
+  },
+  timeEnd: { fontFamily: FONTS.regular, color: COLORS.muted },
+  shiftName: { fontFamily: FONTS.semibold, fontSize: 15, lineHeight: 20, color: COLORS.ink },
+  count: { fontVariant: ['tabular-nums'], color: COLORS.body },
+  go: {
+    backgroundColor: COLORS.ink,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  goText: { fontFamily: FONTS.semibold, fontSize: 13, color: COLORS.paper },
+  tag: {
+    backgroundColor: COLORS.paper2,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  tagText: { fontFamily: FONTS.semibold, fontSize: 12, color: COLORS.ink },
+  chevronOpen: { transform: [{ rotate: '180deg' }] },
+
+  details: { paddingHorizontal: SPACING.md, paddingBottom: SPACING.md, gap: SPACING.sm },
   factRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  fact: { ...TYPE.small, color: COLORS.muted, flex: 1 },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
+  switchLabel: { fontFamily: FONTS.semibold, fontSize: 14, color: COLORS.ink },
 });

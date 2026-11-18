@@ -65,6 +65,7 @@ export async function loadBoOverview(
     postKeysOverride: row.postKeys ?? [],
     budgetWaiver: row.budgetWaiver,
     hidden: row.hiddenAt !== null,
+    begrotingExcluded: row.begrotingExcludedAt ? { reason: row.begrotingExcludedReason } : null,
     driveFileId: row.driveFileId,
   }));
 

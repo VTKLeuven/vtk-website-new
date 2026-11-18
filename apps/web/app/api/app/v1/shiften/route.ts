@@ -7,6 +7,7 @@ import { localizeShift } from "@/lib/shift/localize";
 import { appErrorResponse, appJson } from "@/lib/app-api/respond";
 import { earnedShiftReward } from "@/lib/shift/rewards";
 import { praesidiumYears } from "@/lib/shift/voucherEligibility";
+import { canBeReplaceable, canReplace, visibleParticipants } from "@/lib/shift/replace";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,7 +51,7 @@ export async function GET(request: Request) {
         where: { endTime: { gte: now }, manualGrantId: null },
         orderBy: { startTime: "asc" },
         include: {
-          participants: { select: { userId: true, registeredAt: true } },
+          participants: { select: { userId: true, registeredAt: true, replaceable: true } },
         },
       }),
       praesidiumYears([session.user.id]),
@@ -62,7 +63,12 @@ export async function GET(request: Request) {
     for (const raw of shifts) {
       const shift = localizeShift(raw, locale);
       const own = shift.participants.find((participant) => participant.userId === session.user.id);
-      const taken = shift.participants.length;
+      // Zoals op /shift: wie een vervangbaar praesidiumlid kan vervangen, ziet
+      // die plaats als vrij, en de inschrijving neemt ze dan over
+      // (`lib/shift/replace.ts`). Wie zelf ingeschreven is, telt altijd mee.
+      const taken = own
+        ? shift.participants.length
+        : visibleParticipants(shift.participants, canReplace(session.user.id, shift, praesidium)).length;
 
       const startsWithinLock = shift.startTime.getTime() - now.getTime() < UNREGISTER_LOCK_MS;
       const withinGrace = own
@@ -86,6 +92,8 @@ export async function GET(request: Request) {
         registered: Boolean(own),
         canUnregister: Boolean(own) && (!startsWithinLock || withinGrace),
         canRegister: !own && taken < shift.maxParticipants && shift.startTime > now,
+        replaceableOption: canBeReplaceable(session.user.id, shift, praesidium),
+        replaceable: own?.replaceable ?? false,
       };
 
       if (own) mine.push(dto);

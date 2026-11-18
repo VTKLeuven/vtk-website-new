@@ -3,7 +3,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { findDossier, SECTIONS, type ExplorerData, type Stats, type XDossier, type XMeeting, type XPost } from "@/lib/bo/explorer";
-import { dossierNotes, Files, HideDossierButton, Lines, linesOf, PostLinks, StatusNote, statusNote, StatusPill, Tiles, Timeline, useFormat, type Fmt, type Locale, type Sheet } from "./BoParts";
+import { BegrotingExcludedNote, dossierNotes, Files, HideDossierButton, Lines, linesOf, PostLinks, StatusNote, statusNote, StatusPill, Tiles, Timeline, useFormat, type Fmt, type Locale, type Sheet } from "./BoParts";
 import { ChangePosts, type PostChoice } from "./BoReview";
 
 /*
@@ -560,6 +560,7 @@ function DossierDetail({
           {note}
         </p>
       ))}
+      <BegrotingExcludedNote dossier={d} nl={nl} errorMessages={errorMessages} />
       <div className="vtk-bo-tabs" role="group" aria-label={nl ? "Onderdeel" : "Section"}>
         {(
           [

@@ -2,7 +2,7 @@ import { pick } from "@vtk/i18n";
 
 import { corsPreflight } from "@/lib/cors";
 import { requireSession } from "@/lib/session";
-import { canCancel, canOrderNow } from "@/lib/theokot";
+import { canCancel, canOrderNow, inTakeoverWindow } from "@/lib/theokot";
 import { loadOrderableSessions, remainingFor } from "@/lib/theokot-orders";
 import { appLocaleFrom, type AppTheokot, type AppTheokotWindow } from "@/lib/app-api/contract";
 import { absoluteMediaUrl } from "@/lib/app-api/media";
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     const locale = appLocaleFrom(new URL(request.url).searchParams.get("locale"));
     const now = new Date();
 
-    const { config, ban, sessions, used, message } = await loadOrderableSessions(
+    const { config, ban, sessions, used, released, message } = await loadOrderableSessions(
       session.user.id,
       now,
     );
@@ -40,9 +40,12 @@ export async function GET(request: Request) {
       ban: ban ? { until: ban.endsAt.toISOString() } : null,
       sessions: sessions.map((sess) => {
         // Na de deadline helemaal vrijgegeven: er staat niets meer op je naam, dus
-        // de app toont geen reservatie. Vrijgeven en overnemen kan enkel op de
-        // website; de app kent die broodjes niet.
+        // de app toont geen reservatie. Wil je er toch een terug, dan staat het
+        // bij de vrijgekomen broodjes, zoals voor iedereen (`released`).
         const existing = sess.orders[0]?.lines.length ? sess.orders[0] : undefined;
+        // Na de deadline en tot het einde van de afhaal: laat annuleren geeft je
+        // broodjes vrij, en wat anderen vrijgaven kan je overnemen.
+        const takeover = inTakeoverWindow(sess, now);
         // "Broodje van de week" is het aanbod-item dat zo gemarkeerd staat; de
         // naam ervan is wat het die week concreet is.
         const special = sess.items.find((item) => item.isWeeklySpecial);
@@ -58,6 +61,7 @@ export async function GET(request: Request) {
           orderCloseAt: sess.orderCloseAt.toISOString(),
           window,
           canOrder: canOrderNow(sess, now),
+          canTakeOver: takeover,
           weeklySpecialName: special
             ? (pick(special.nameNl, special.nameEn, locale) ?? special.nameNl)
             : null,
@@ -66,6 +70,7 @@ export async function GET(request: Request) {
             name: pick(item.nameNl, item.nameEn, locale) ?? item.nameNl,
             priceCents: item.priceCents,
             remaining: remainingFor(item, used),
+            released: takeover ? (released.get(item.id) ?? 0) : 0,
             isWeeklySpecial: item.isWeeklySpecial,
             imageUrl: absoluteMediaUrl(request, item.imageKey),
             // Beide talen leeg = geen ingrediënten, en dan toont de app er ook
@@ -78,7 +83,15 @@ export async function GET(request: Request) {
                 status: existing.status,
                 totalCents: existing.totalCents,
                 canCancel: existing.status === "RESERVED" && canCancel(sess, now),
+                // Dezelfde regels als op /theokot: aanpassen volgt het
+                // bestelvenster, vrijgeven het overnamevenster, en de doos van
+                // een grocomeet ligt niet aan de balie.
+                canEdit: existing.status === "RESERVED" && canOrderNow(sess, now),
+                canRelease:
+                  existing.status === "RESERVED" && existing.grocomeetId === null && takeover,
+                releasedCount: existing.releases.reduce((sum, release) => sum + release.quantity, 0),
                 lines: existing.lines.map((line) => ({
+                  sessionItemId: line.sessionItemId,
                   name:
                     pick(line.sessionItem.nameNl, line.sessionItem.nameEn, locale) ??
                     line.sessionItem.nameNl,

@@ -90,7 +90,8 @@ een post zelf ziet" onderaan.
 4. **De bedragen**, enkel bij een Google Sheet of een xlsx. Een Sheet wordt als
    xlsx geëxporteerd, zodat één lezer (`lib/praesidiumShifts/xlsx.ts`) beide
    leest, met de laatst berekende waarde van elke formule. Een ongewijzigd
-   bestand (zelfde `modifiedTime`) wordt niet opnieuw gedownload.
+   bestand (zelfde `modifiedTime`), gelezen door de huidige versie van de lezer
+   (`FIGURES_VERSION`), wordt niet opnieuw gedownload.
 
 De BO van een bestand is **de map in de hoofdboom waarlangs het gevonden werd**,
 niet de map waar het echt staat: de map van een werkgroep heet `BO 7 - 4/10`
@@ -273,6 +274,20 @@ haar posten werkgroepen zijn). Een vak voor uitzonderingen (Groep 5 als
 geheel, Andere jaarwerking, Overige: `PostOption.catchAll`) staat er enkel
 wanneer er iets in zit.
 
+Per post en bij de totalen staat ook **de stand tegenover de begroting**
+(`Dossier.begrotingDevCents`, `Stats.begrotingDev`): per activiteit met een BO
+die al voorbij is, het resultaat (of zolang dat er niet is het budget) min de
+regel Begroting, opgeteld. Plus is beter dan begroot. Een blad zonder regel
+Begroting telt niet mee; `Stats.begrotingCounted` zegt over hoeveel het gaat.
+Een activiteit die Groep 5 met "Niet meetellen" en dan "Enkel niet in de
+begroting" markeerde (`BoDocument.begrotingExcludedAt`, met een reden), telt
+ook niet mee in het bedrag, maar wel in budgetten, resultaten en percentage.
+Ze staat onder Instellingen ("Niet in de begroting") en onder het overzicht
+("Buiten de begroting"); één gemarkeerd bestand volstaat voor de hele
+activiteit, zodat een resultaat dat later binnenkomt de markering volgt.
+Waarom zo: `docs/design-decisions.md`, "Bestuursorgaan: de stand tegenover de
+begroting".
+
 ---
 
 ## Vallen waar we in gelopen zijn (of die op je liggen te wachten)
@@ -293,6 +308,13 @@ wanneer er iets in zit.
   "openen" in plaats van een bedrag; de bedragen komen terug zodra iemand het in
   Sheets of Excel opent en bewaart, want dan wijzigt het en leest de scan het
   opnieuw.
+- **Een fix aan de lezer bereikt een blad dat niet meer wijzigt niet vanzelf.**
+  De scan downloadt enkel opnieuw wat in Drive wijzigde. De fix voor een
+  kostenpost die "Totaal" heet (IT Nieuw Materiaal, 26-27) stond zo een week
+  in de code terwijl het scherm nog +233 toonde in plaats van -233, en IT
+  daardoor +748 tegenover de begroting. Verhoog daarom `FIGURES_VERSION` in
+  `lib/bo/figures.ts` bij elke wijziging die een bedrag anders leest; de
+  volgende scan leest dan elk blad opnieuw (`BoDocument.figuresVersion`).
 - **De bedragen zijn netto.** Totaal is inkomsten min uitgaven, dus een kost is
   negatief. "Stand" is resultaat min budget: positief is beter dan gepland.
 - **Eén onmogelijke waarde hield de hele scan tegen.** Een cel "5/3/20026" werd
@@ -326,6 +348,14 @@ wanneer er iets in zit.
   `Resultaat`, dus stond er een resultaat op BO 3 en "geen budget". Vandaar
   `BoDocument.linkName`. "Niet meetellen" werkt nog altijd per bestand: bij
   zo'n blad verdwijnen budget en resultaat samen, en de bevestiging zegt dat.
+- **Soms staat de juiste naam enkel op de snelkoppeling.** Post en activiteit
+  komen uit de naam van het blad (die is het laatst rechtgezet), maar een post
+  die een kopie van het sjabloon maakt, hernoemt soms enkel de snelkoppeling in
+  de BO-map. `26-27_Budget_Cursusdienst_shiftersvoorzieningen teldagen` (BO 3)
+  werd niet herkend terwijl de snelkoppeling juist heette, en het scherm toont
+  de naam van de snelkoppeling, dus niemand zag waarom. Noemt het blad
+  geen post die de site kent en de snelkoppeling wel, dan wint de snelkoppeling
+  (`namesOf` in `lib/bo/dossiers.ts`).
 - **Een fout in de scan breekt de groepssync niet.** De worker roept beide in
   dezelfde ronde aan, maar de statuscode volgt enkel de groepssync; een fout in
   de BO-scan staat op `/admin/bestuursorgaan`.

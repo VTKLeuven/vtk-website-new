@@ -7,7 +7,9 @@ import type { PostOption } from "./posts";
  * budgetten er al op een BO passeerden, hoeveel resultaten er binnen zijn en
  * het percentage, met bovenaan de totalen voor VTK en voor de werkgroepen. Zo
  * hield Groep 5 het vroeger bij in een rekenblad, en elke week gaat er een
- * schermafbeelding van op een slide. Puur, zodat het getest kan worden.
+ * schermafbeelding van op een slide. Sinds november 2026 ook hoe elke post
+ * ervoor staat tegenover de begroting, om sneller te kunnen bijsturen. Puur,
+ * zodat het getest kan worden.
  */
 
 export type SummaryRow = {
@@ -19,6 +21,14 @@ export type SummaryRow = {
   done: number;
   missing: number;
   pct: number | null;
+  /**
+   * Hoe de post ervoor staat tegenover de begroting (`Stats.begrotingDev`):
+   * positief is beter dan begroot. Null wanneer geen enkel blad een begroting
+   * had.
+   */
+  begroting: number | null;
+  /** Over hoeveel van `due` dat bedrag gaat. */
+  begrotingCounted: number;
 };
 
 export type SummarySection = { section: PostSection; rows: SummaryRow[] };
@@ -30,6 +40,11 @@ export type Summary = {
   werkgroepen: Stats;
   /** De laatste BO die al plaatsvond, als "BO 9". */
   lastMeeting: string | null;
+  /**
+   * Wat Groep 5 bewust buiten de stand tegenover de begroting zette, zodat de
+   * slide zegt waarom het getal die activiteiten niet bevat.
+   */
+  outOfPlan: { key: string; activity: string; postName: string; reason: string | null }[];
 };
 
 const ORDER: PostSection[] = ["g5", "post", "werkgroep", "jaarwerking", "extra", "unknown"];
@@ -38,7 +53,16 @@ export function buildSummary(data: ExplorerData, options: readonly PostOption[])
   const blocks = new Map(data.posts.map((p) => [p.key, p]));
   const row = (key: string, name: string): SummaryRow => {
     const s = blocks.get(key)?.stats;
-    return { key, name, due: s?.due ?? 0, done: s?.done ?? 0, missing: (s?.due ?? 0) - (s?.done ?? 0), pct: s?.pct ?? null };
+    return {
+      key,
+      name,
+      due: s?.due ?? 0,
+      done: s?.done ?? 0,
+      missing: (s?.due ?? 0) - (s?.done ?? 0),
+      pct: s?.pct ?? null,
+      begroting: s?.begrotingCounted ? s.begrotingDev : null,
+      begrotingCounted: s?.begrotingCounted ?? 0,
+    };
   };
 
   // Elke post en elk vak, ook zonder budget: wie niets indiende, hoort ook op
@@ -71,5 +95,8 @@ export function buildSummary(data: ExplorerData, options: readonly PostOption[])
     vtk: statsOf(data.dossiers.filter((d) => !isWerkgroep(d))),
     werkgroepen: statsOf(data.dossiers.filter(isWerkgroep)),
     lastMeeting: past[0]?.label ?? null,
+    outOfPlan: data.dossiers
+      .filter((d) => d.begrotingExcluded && (d.status === "DONE" || d.status === "OPEN"))
+      .map((d) => ({ key: d.key, activity: d.activity, postName: d.postName, reason: d.begrotingExcluded?.reason ?? null })),
   };
 }

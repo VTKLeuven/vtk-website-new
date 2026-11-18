@@ -22,6 +22,7 @@ import { appErrorResponse, appJson, appNotFound } from "@/lib/app-api/respond";
 import { organiserName } from "@/lib/calendar/organiser";
 import { eventLinkLabel } from "@/lib/calendar/eventLink";
 import { eventAsOfNow, momentDescription, upcomingMoment } from "@/lib/calendar/moments";
+import { appMoments } from "@/lib/app-api/moments";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -109,6 +110,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       url: event.url,
       urlLabel: event.url ? eventLinkLabel(event, locale) : null,
       ticketSlug: publishedTicketSlug(event.ticketEvents),
+      moments: appMoments(event.moments),
       formSlug: formOpen ? (event.form?.slug ?? null) : null,
       interested: interest > 0,
       interestedCount: total >= INTEREST_PUBLIC_THRESHOLD ? total : null,

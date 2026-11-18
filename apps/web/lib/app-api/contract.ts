@@ -198,12 +198,19 @@ export type AppTheokotItem = {
   priceCents: number;
   /** Wat er nu nog van is, met de gereserveerde stukken er al af. */
   remaining: number;
+  /**
+   * Na de deadline vrijgegeven en nu over te nemen, ook wat je zelf vrijgaf.
+   * Enkel betekenisvol wanneer `AppTheokotSession.canTakeOver` waar is.
+   */
+  released?: number;
   isWeeklySpecial: boolean;
   imageUrl: string | null;
   ingredients: string | null;
 };
 
 export type AppTheokotOrderLine = {
+  /** Het aanbod-item van die dag; nodig om de bestelling aan te passen of deels vrij te geven. */
+  sessionItemId?: string;
   name: string;
   quantity: number;
   unitPriceCents: number;
@@ -214,6 +221,19 @@ export type AppTheokotOrder = {
   status: string;
   totalCents: number;
   canCancel: boolean;
+  /**
+   * Aanpassen kan zolang annuleren kan: binnen het bestelvenster, niet in de
+   * doos van een grocomeet. Zelfde voorwaarden als `updateOrder` op de server.
+   */
+  canEdit?: boolean;
+  /**
+   * Na de deadline en voor het einde van de afhaal: wat je annuleert, wordt
+   * vrijgegeven voor overname (`releaseOrder`). Blijft het liggen, dan telt het
+   * als no-show.
+   */
+  canRelease?: boolean;
+  /** Hoeveel broodjes van deze bestelling vrijgegeven zijn en nog niet overgenomen. */
+  releasedCount?: number;
   lines: AppTheokotOrderLine[];
 };
 
@@ -227,6 +247,8 @@ export type AppTheokotSession = {
   orderCloseAt: string;
   window: AppTheokotWindow;
   canOrder: boolean;
+  /** Na de deadline, voor het einde van de afhaal: vrijgegeven broodjes overnemen kan. */
+  canTakeOver?: boolean;
   weeklySpecialName: string | null;
   items: AppTheokotItem[];
   /** Jouw bestelling voor deze dag, of `null`. Eén per dag. */
@@ -252,14 +274,32 @@ export type AppTheokotOrderInput = {
   lines: { sessionItemId: string; quantity: number }[];
 };
 
+/** Een bestaande reservatie aanpassen (`PATCH /theokot/order`). Nul broodjes is annuleren. */
+export type AppTheokotUpdateInput = {
+  orderId: string;
+  lines: { sessionItemId: string; quantity: number }[];
+};
+
+/**
+ * Na de deadline vrijgeven (`POST /theokot/vrijgeven`). Zonder `lines` gaat
+ * alles vrij; met `lines` enkel die aantallen, zodat wie één van twee broodjes
+ * niet meer wil, het andere houdt.
+ */
+export type AppTheokotReleaseInput = {
+  orderId: string;
+  lines?: { sessionItemId: string; quantity: number }[];
+};
+
+/** Eén vrijgegeven broodje overnemen (`POST /theokot/overnemen`). */
+export type AppTheokotTakeoverInput = { sessionItemId: string };
+
 /**
  * De weigeringen die de app zelf een zin bij maakt. Komt uit
  * `TheokotOrderErrorCode` in `lib/theokot-orders.ts`; die lijst is het origineel.
- * Enkel wat bestellen en annuleren voor de deadline kan geven, staat hier: laat
- * annuleren en overnemen (`TAKEOVER_CLOSED`, `RELEASE_NOT_POSSIBLE`,
- * `NOTHING_RELEASED`, `TAKEOVER_UNAVAILABLE`) bestaan enkel op de website, dus
- * de app krijgt die codes nooit. Voegt de app die wegen toe, zet ze dan hier.
- * `INVALID_ORDER` komt van de lijncontrole en draagt de details mee in `fields`.
+ * Ook laat annuleren en overnemen (`TAKEOVER_CLOSED`, `RELEASE_NOT_POSSIBLE`,
+ * `NOTHING_RELEASED`, `TAKEOVER_UNAVAILABLE`) lopen sinds november 2026 via de
+ * app. `INVALID_ORDER` komt van de lijncontrole en draagt de details mee in
+ * `fields`.
  */
 export type AppTheokotErrorCode =
   | "BANNED"
@@ -269,6 +309,10 @@ export type AppTheokotErrorCode =
   | "ORDER_NOT_FOUND"
   | "NOT_CANCELABLE"
   | "CANCEL_DEADLINE_PASSED"
+  | "TAKEOVER_CLOSED"
+  | "RELEASE_NOT_POSSIBLE"
+  | "NOTHING_RELEASED"
+  | "TAKEOVER_UNAVAILABLE"
   | "INVALID_ORDER";
 
 // -----------------------------------------------------------------------------
@@ -321,6 +365,26 @@ export type AppCalendarEvent = {
   interestedCount: number | null;
   /** Er staan tickets voor te koop; de app kan dan meteen doorsturen. */
   ticketSlug: string | null;
+  /**
+   * De losse momenten van een evenement dat over meerdere dagen loopt (een
+   * loopweek, drie filmavonden), oplopend. Leeg of afwezig: een gewoon evenement
+   * van `start` tot `end`. Bij een reeks zijn `start` en `end` de envelop, van
+   * het eerste tot het laatste moment; de app zet een reeks op de dag van het
+   * eerstvolgende moment, zoals de kalender op de site.
+   *
+   * Optioneel omdat een oudere server het veld niet meestuurt.
+   */
+  moments?: AppEventMoment[];
+};
+
+/** Eén moment uit een reeks. Locatie leeg: die van het evenement. */
+export type AppEventMoment = {
+  /** ISO. */
+  start: string;
+  end: string;
+  /** Een eigen naam voor dit ene moment ("Nachtloop"), of `null`. */
+  label: string | null;
+  location: string | null;
 };
 
 /**
@@ -515,6 +579,12 @@ export type AppTicketEvent = {
   /** De laagste prijs die nu te koop staat, in cent. `null` bij geen enkel type. */
   fromPriceCents: number | null;
   /**
+   * De banner zoals op /tickets: een eigen foto, de themabanner of de affiche
+   * van het gekoppelde evenement. Absolute URL, of `null` zonder banner.
+   * Optioneel voor een oudere server.
+   */
+  imageUrl?: string | null;
+  /**
    * Er staan enkel ledentickets open en je bent niet ingelogd. De app toont dan
    * een loginknop in plaats van een lege lijst.
    */
@@ -524,7 +594,13 @@ export type AppTicketEvent = {
 export type AppTicketEventDetail = AppTicketEvent & {
   /** Markdown. */
   description: string;
+  /** Wat deze koper in één bestelling kan nemen; nul wanneer een erelid zijn ene ticket al heeft. */
   maxTicketsPerOrder: number;
+  /**
+   * Een erelid op een event met "één ticket per erelid": `used` zegt of het dat
+   * ticket al heeft. `null` voor iedereen anders. Optioneel voor een oudere server.
+   */
+  honoraryOneTicket?: { used: boolean } | null;
   currency: string;
   contactEmail: string | null;
   /** Pad naar de verkoopvoorwaarden op de site. */
@@ -789,6 +865,14 @@ export type AppShift = {
   canUnregister: boolean;
   /** Vol, of al begonnen: dan kan je niet meer inschrijven. */
   canRegister: boolean;
+  /**
+   * Mag je bij deze shift aanduiden dat een student je plaats mag innemen? Enkel
+   * voor het praesidium van het werkingsjaar van de shift, en niet op een shift
+   * van de cursusdienst (`canBeReplaceable` op de server).
+   */
+  replaceableOption?: boolean;
+  /** Je eigen keuze daarvoor, op een shift waarop je ingeschreven staat. */
+  replaceable?: boolean;
 };
 
 export type AppShifts = {
@@ -799,6 +883,75 @@ export type AppShifts = {
 
 /** Waarom een inschrijving geweigerd werd. Codes van `/api/shift/register`. */
 export type AppShiftErrorCode = "FULL" | "STARTED" | "OVERLAP" | "NOT_FOUND" | "ALREADY";
+
+// -----------------------------------------------------------------------------
+// Peilingen van de RiVers
+// -----------------------------------------------------------------------------
+
+/**
+ * Eén vraag uit een peiling. `low` en `high` zijn de woorden bij 1 en 5 van een
+ * score, of `null`.
+ */
+export type AppPollQuestion = {
+  id: string;
+  kind: "YES_NO" | "SCORE" | "OPEN";
+  text: string;
+  low: string | null;
+  high: string | null;
+};
+
+/**
+ * Een open peiling voor de richting en fase van deze student, met wat die er
+ * zelf al op antwoordde. De zinnen komen al vertaald van de server
+ * (`lib/pocPolls/copy.ts`), net als op de homepage.
+ *
+ * **Anoniem**: de server bewaart geen gebruiker bij een antwoord, enkel een
+ * sleutel per student per peiling. De app toont geen tussenstand.
+ */
+export type AppPoll = {
+  id: string;
+  title: string;
+  /** De POC die het vraagt, of "VTK Onderwijs" voor een algemene peiling. */
+  askedBy: string;
+  openUntil: string;
+  lead: string;
+  thanks: string;
+  anonymous: string;
+  /** ISO. */
+  closesAt: string;
+  answered: boolean;
+  questions: AppPollQuestion[];
+  /** Per vraag-id het eigen antwoord: 1/0 bij ja-nee, 1-5 bij een score, tekst bij open. */
+  answers: Record<string, { value: number | null; text: string | null }>;
+};
+
+export type AppPolls = {
+  polls: AppPoll[];
+  /**
+   * Waarom er geen peiling staat voor wie er een zou verwachten: zonder richting
+   * in het profiel weet de server niet welke POC jou vraagt.
+   */
+  missingProgramme: boolean;
+};
+
+/**
+ * Antwoorden insturen. Per vraag-id een string zoals het formulier op de site
+ * ze stuurt: "1"/"0" bij ja-nee, "1".."5" bij een score, de tekst bij open. Een
+ * vraag die ontbreekt of leeg is, is overgeslagen. Opnieuw insturen vervangt
+ * alles.
+ */
+export type AppPollAnswerInput = {
+  pollId: string;
+  answers: Record<string, string>;
+};
+
+/** Waarom een antwoord geweigerd werd. Codes van `submitPollAnswers`. */
+export type AppPollErrorCode =
+  | "POLL_CLOSED"
+  | "POLL_NOT_YOURS"
+  | "POLL_INVALID"
+  | "POLL_TOO_LONG"
+  | "POLL_EMPTY";
 
 // -----------------------------------------------------------------------------
 // Groepen: werkgroepen, POC's en het bureau
@@ -897,7 +1050,15 @@ export type AppServiceStatus = {
   unavailable: boolean;
   entries: AppOpeningHoursEntry[];
   note: string;
+  /**
+   * De vensters van vandaag in minuten sinds middernacht in Brussel, voor de
+   * tijdlijn. `end` kan voorbij 1440 lopen (over middernacht); `null` is een avond
+   * zonder vast sluitingsuur, zoals 't ElixIr. Optioneel voor een oudere server.
+   */
+  today?: AppHoursWindow[];
 };
+
+export type AppHoursWindow = { start: number; end: number | null };
 
 /**
  * Eén ding dat op jou wacht. De app tekent ze als kaarten onder "Voor jou", op
@@ -911,7 +1072,8 @@ export type AppTodayTask = {
     | "theokot-order"
     | "ticket"
     | "shift"
-    | "piano";
+    | "piano"
+    | "poll";
   title: string;
   detail: string | null;
   /** Een route in de app (`/broodjes`), nooit een URL. */

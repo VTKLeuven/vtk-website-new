@@ -54,6 +54,7 @@ export const TAB_ROUTES = {
     'piano',
     'broodjes',
     'bestellen',
+    'peilingen',
   ],
   kalender: ['evenement/[id]', 'ticket/[slug]', 'mijn-tickets', 'meldingen'],
   studeren: ['studiegroep/[id]', 'studiegroep/nieuw', 'lokalen'],
@@ -67,6 +68,7 @@ export const TAB_ROUTES = {
     'praesidium',
     'werkgroepen',
     'pocs',
+    'peilingen',
     'piano',
     'shiften',
     'profiel',
@@ -183,11 +185,18 @@ export function useTabRouter() {
         ? resolveTabHref(target, tab)
         : { ...target, pathname: resolveTabHref(target.pathname, tab) };
 
+    /**
+     * `withAnchor`: komt het scherm in een stack die nog niet bestaat, dan ligt
+     * het tabscherm eronder (`unstable_settings.anchor` in elke tablayout).
+     * Zonder dat bouwt expo-router 58 een stack met enkel het doelscherm, en dan
+     * verliet "terug" de tab in plaats van naar het tabscherm te gaan.
+     */
+    const options = { withAnchor: true } as const;
     return {
       ...router,
-      push: (target: TabTarget) => router.push(resolve(target) as never),
-      replace: (target: TabTarget) => router.replace(resolve(target) as never),
-      navigate: (target: TabTarget) => router.navigate(resolve(target) as never),
+      push: (target: TabTarget) => router.push(resolve(target) as never, options),
+      replace: (target: TabTarget) => router.replace(resolve(target) as never, options),
+      navigate: (target: TabTarget) => router.navigate(resolve(target) as never, options),
     };
   }, [router, tab]);
 }

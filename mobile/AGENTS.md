@@ -1,9 +1,9 @@
 # Expo HAS CHANGED
 
-Read the exact versioned docs at https://docs.expo.dev/versions/v54.0.0/ before writing any code.
+Read the exact versioned docs at https://docs.expo.dev/versions/v58.0.0/ before writing any code.
 
 (Dit blok wordt door `expo start` herschreven en kan dan naar een andere versie
-wijzen dan waar deze app op staat. Wij zitten op SDK 54; zie onderaan waarom.)
+wijzen dan waar deze app op staat. Wij zitten op SDK 58; zie onderaan waarom.)
 
 # VTK (Expo)
 
@@ -44,8 +44,8 @@ bewaren van een foto wel gewoon testen. Op een APK moet de module in de build
 zelf zitten; wie een oudere APK heeft, krijgt daar een rood scherm.
 
 **Voeg je een native dependency toe, bouw dan voor je publiceert.**
-`runtimeVersion` staat op `"exposdk:54.0.0"`, dezelfde waarde voor élke SDK
-54-build, dus een update wordt ook aangeboden aan een oudere APK die de module
+`runtimeVersion` staat op `"exposdk:58.0.0"`, dezelfde waarde voor élke SDK
+58-build, dus een update wordt ook aangeboden aan een oudere APK die de module
 niet heeft; `requireNativeModule` gooit dan op het scherm waar die import hangt.
 Bouw eerst, verspreid de APK, en vraag om de vorige te vervangen.
 
@@ -76,10 +76,17 @@ bekijken. Push is de bestaande uitzondering: die werkt in Expo Go niet.
 7. **Nederlands in de interface**, Engelse vakterminologie waar dat natuurlijker
    is. **Geen em-dashes**, ook niet in code, comments of commits.
 8. **Het ontwerp komt van de site.** De tokens in `src/theme/tokens.ts` zijn de
-   enige plek met kleuren; verzin er geen. Witte kaarten op papier, dunne randen,
-   geel enkel als accent, geen gradienten en geen kaart in een kaart. De donkere
-   `PageHead` opent elk scherm, precies zoals `.vtk-page-head` dat op de site doet;
-   Home tekent dezelfde kop zelf omdat ze buiten de scroll staat.
+   enige plek met kleuren; verzin er geen. Geel enkel als accent, geen gradienten
+   en geen kaart in een kaart. De donkere `PageHead` opent elk scherm, precies
+   zoals `.vtk-page-head` dat op de site doet: navy met het technische patroon
+   (`PatternBand`) en een gele onderlijn van 5 px; tabbladen staan als pillen in
+   die kop. Sinds november 2026 leent elk scherm een patroon van de site in plaats
+   van een eigen app-vorm: de eventtegel met de gele datumpin (`EventTile`),
+   koppen met de gele lijn eronder (`SectionHeading`), registers met haarlijnen in
+   plaats van een witte kaart per regel, de agenda per week (`WeekHead`). Zoek bij
+   een nieuw scherm eerst het overeenkomende scherm op de site en neem dat over.
+   Praesidium hield bewust zijn eigen vorm; de muur van gezichten van de site werd
+   op een telefoon niet beter.
 9. **Home is vandaag, Meer is waar alles staat.** Home beantwoordt twee vragen:
    wat is er open, en wat wacht er op mij. De CMS-boom, de mensen, de piano en je
    profiel staan onder Meer. Zet een snelkoppeling niet op allebei; anders komt de
@@ -137,9 +144,9 @@ bekijken. Push is de bestaande uitzondering: die werkt in Expo Go niet.
   achterlopen en een pushbericht van vorige week draagt nog het oude pad; dat mag
   niet op een leeg scherm eindigen. Ook deze worden gemaakt.
 - `app/(tabs)/_layout.tsx` is wél met de hand geschreven: **Home, Kalender,
-  Studeren, Tickets, Meer**, met hun iconen. Tickets heeft twee segmenten (Kopen/Mijne); zie
-  `src/components/Segmented.tsx` voor waarom dat geen tabs zijn. Broodjes staat als
-  snelkoppeling op Home.
+  Studeren, Tickets, Meer**, met hun iconen. Tickets heeft twee tabbladen (Kopen/Mijne) als
+  pillen in de kop (`tabs` op `PageHead`), net als Broodjes (Bestellen/Afhalen).
+  Broodjes staat als snelkoppeling op Home.
 - `app/_layout.tsx` draagt enkel nog de tabs plus drie modals (inloggen, de
   onboardingpoort, de serverinstelling). Die liggen bewust wél over de balk: een
   modal die de navigatie eronder laat staan, is geen modal.
@@ -208,13 +215,15 @@ vergelijkt de eerste rij byte voor byte wanneer beide repo's naast elkaar staan.
 | `src/theme/tokens.ts` | `apps/web/app/design/vtk-base.css` (`:root`) |
 | `src/api/client.ts` | `vtk-scanner-app/src/api/client.ts` |
 
-## Expo SDK 57, gelijk met de andere twee apps
+## Expo SDK 58
 
-Bewust gelijk aan **vtk-scanner-app** en **vtk-floorplan-app**: één toolchain voor
-de drie VTK-apps, en die is al door de EAS-bouwproblemen heen (de `react-dom`-pin,
-het wegvallen van `@react-native-cookies/cookies`, `platforms: ["ios","android"]`
-voor `eas update`). Upgraden is prima, maar doe het dan voor alle drie tegelijk en
-als een eigen taak, niet en passant.
+Tot september 2026 bewust gelijk aan **vtk-scanner-app** en **vtk-floorplan-app**:
+één toolchain voor de drie VTK-apps, en die is al door de EAS-bouwproblemen heen
+(de `react-dom`-pin, het wegvallen van `@react-native-cookies/cookies`,
+`platforms: ["ios","android"]` voor `eas update`). In november 2026 ging deze app
+alleen naar SDK 58, omdat Expo Go in de stores enkel nog SDK 58 opent. Trek de
+andere twee mee wanneer daar iets aan gebeurt; upgraden blijft een eigen taak,
+niet en passant.
 
 **Die keuze is niet vrijblijvend.** Expo Go in de App Store draait enkel de
 nieuwste SDK, en zonder Apple Developer-account is Expo Go de enige weg naar een
@@ -238,3 +247,20 @@ Wat er bij de sprong van 54 naar 57 uit de weg moest, voor de volgende keer:
 - `eslint-config-expo` zet de React Compiler-regels aan. Zie `eslint.config.js`
   voor welke aan staan en waarom `immutability` uit moet zolang we Reanimated
   gebruiken.
+
+En bij de sprong van 57 naar 58 (React Native 0.88, React 19.3):
+
+- **`expo-calendar` en `expo-media-library` gooien een fout bij de oude
+  functies** wanneer je ze uit het hoofdpakket haalt (`getCalendarsAsync`,
+  `saveToLibraryAsync`, ...): die staan nu onder `expo-calendar/legacy` en
+  `expo-media-library/legacy`. De typecheck ziet het niet, want de stubs hebben
+  dezelfde types; `import/namespace` in eslint wel. Een import uit het hoofdpakket
+  geeft dus pas op het toestel een fout, op de knop "In agenda" of "Bewaren".
+- `ListEmptyComponent` van een `FlatList` aanvaardt geen `null` meer; geef
+  `undefined`.
+- `npx expo install --fix` liep vast op een peer-conflict rond het optionele
+  `@expo/ui`. De verwachte versies met de hand in `package.json` zetten en de
+  lockfile opnieuw oplossen (`rm -rf node_modules package-lock.json && npm install`)
+  werkte wel.
+- `react-native-gesture-handler` ging naar 3 en `react-native-webview` naar 14; de
+  app gebruikt de eerste niet rechtstreeks en de tweede enkel in `WebFlow`.

@@ -3630,6 +3630,22 @@ a.vtk-shortcut-tile:hover {
   font-size: 14px;
 }
 
+/* Hoe het ervoor staat tegenover de begroting, onder de telling. */
+.vtk-bo-sum-kpi .b {
+  grid-column: 1 / -1;
+  color: var(--body);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-bo-sum-kpi .b .vtk-bo-devtext {
+  font-size: 14px;
+}
+
+.vtk-bo-sum-kpi .b .of {
+  color: var(--muted);
+}
+
 /* De percentages in de kleuren van het oude rekenblad. */
 .vtk-bo-sum-pct {
   display: inline-block;
@@ -3731,6 +3747,37 @@ a.vtk-shortcut-tile:hover {
   text-align: right;
 }
 
+.vtk-admin-main .vtk-bo-sum-table .begr {
+  width: 84px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* In twee kolommen naast elkaar is er voor de naam van de post te weinig over
+   met de volle koppen; dan de korte, zoals op een telefoon. */
+@container bo-sum (min-width: 721px) {
+  .vtk-admin-main .vtk-bo-sum-table .num {
+    width: 34px;
+  }
+
+  .vtk-admin-main .vtk-bo-sum-table .pct {
+    width: 52px;
+  }
+
+  .vtk-admin-main .vtk-bo-sum-table .begr {
+    width: 76px;
+  }
+
+  .vtk-bo-sum-table thead .long {
+    display: none;
+  }
+
+  .vtk-bo-sum-table thead .short {
+    display: inline;
+  }
+}
+
 .vtk-bo-sum-table tr[data-empty] th,
 .vtk-bo-sum-table tr[data-empty] td,
 .vtk-bo-sum-table .none {
@@ -3759,11 +3806,21 @@ a.vtk-shortcut-tile:hover {
 
 @container bo-sum (max-width: 420px) {
   .vtk-admin-main .vtk-bo-sum-table .num {
-    width: 40px;
+    width: 34px;
   }
 
   .vtk-admin-main .vtk-bo-sum-table .pct {
-    width: 54px;
+    width: 46px;
+  }
+
+  .vtk-admin-main .vtk-bo-sum-table .begr {
+    width: 62px;
+  }
+
+  /* Missend is budgetten min resultaten: op een telefoon wijkt die kolom,
+     anders blijft er voor de naam van de post geen plaats over. */
+  .vtk-admin-main .vtk-bo-sum-table .mis {
+    display: none;
   }
 
   .vtk-admin-main .vtk-bo-sum-table :is(th, td) {
@@ -4226,6 +4283,41 @@ a.vtk-shortcut-tile:hover {
 
 .vtk-admin-main .vtk-bo-note {
   color: var(--body) !important;
+}
+
+/* De twee manieren van "Niet meetellen" in de dialoog: een radioknop met een
+   regel uitleg, het gekozen vak met de gele streep zoals een notitie. */
+.vtk-bo-choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.vtk-bo-choice[data-checked] {
+  background: var(--paper);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-bo-choice input[type='radio'] {
+  margin-top: 3px;
+}
+
+.vtk-bo-choice .t {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.vtk-bo-choice .h {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12.5px;
 }
 
 .vtk-bo-tabs {

@@ -223,8 +223,8 @@ export function pollPanelText(input: {
 
   if (general) {
     const anonymous = nl
-      ? "Anoniem. VTK Onderwijs ziet enkel totalen en niemand ziet een tussenstand."
-      : "Anonymous. VTK Onderwijs only sees totals and nobody sees interim results.";
+      ? "Anoniem. VTK Onderwijs ziet enkel totalen, nooit wie wat antwoordde."
+      : "Anonymous. VTK Onderwijs only sees totals, never who answered what.";
     const thanks = nl
       ? "Je ziet bewust geen tussenstand. VTK Onderwijs ziet enkel de totalen van alle richtingen."
       : "You deliberately see no interim results. VTK Onderwijs only sees the totals of all programmes.";
@@ -255,8 +255,8 @@ export function pollPanelText(input: {
   }
 
   const anonymous = nl
-    ? "Anoniem. Je RiVers zien enkel totalen en niemand ziet een tussenstand."
-    : "Anonymous. Your student reps only see totals and nobody sees interim results.";
+    ? "Anoniem. Je RiVers zien enkel totalen, nooit wie wat antwoordde."
+    : "Anonymous. Your student reps only see totals, never who answered what.";
 
   if (meetingIsAhead(meetingDate, now)) {
     const noon = noonOf(meetingDate);

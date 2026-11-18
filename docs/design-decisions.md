@@ -12519,6 +12519,46 @@ allebei): allebei.
   Secretaris, Beheer), maar enkel wanneer er iets in zit. Jaarwerkingen en
   Overige hebben geen leden en staan bij niemand.
 
+## Bestuursorgaan: de stand tegenover de begroting
+
+In november 2026 vroeg Groep 5 om op "Resultaten per post" ook te zien hoe goed
+het jaar loopt tegenover de begroting, om sneller te kunnen bijsturen. Elk blad
+heeft een regel Begroting; het getal is per activiteit het resultaat min die
+regel, of zolang er geen resultaat is het budget min die regel, opgeteld per
+post en bovenaan voor Totaal, VTK en Werkgroepen. Plus is beter dan begroot.
+
+- **Het resultaat wint van het budget**: dat is het meest accuraat. Een budget
+  telt pas mee zodra zijn BO voorbij is (of het schriftelijk goedgekeurd werd),
+  dezelfde activiteiten als de kolom Budgetten; een budget voor een BO die nog
+  moet komen, is nog niet goedgekeurd.
+- **Een blad zonder regel Begroting telt niet mee**, en het scherm zegt over
+  hoeveel van de budgetten het getal gaat ("22 van 27"). Een lege regel als 0
+  lezen zou elk zo'n budget volledig als afwijking tellen.
+- **Elke activiteit telt apart, ook bij een potje.** Een potje (meer uitgaven op
+  één begrotingslijn) hoort in één blad; een post die het over vier bladen
+  verdeelt met telkens de hele begroting erin, doet het verkeerd, en dat
+  corrigeert het overzicht niet.
+- **Komt een potje terug met dezelfde naam, dan telt enkel het meest recente
+  blad.** Een potje als IT Nieuw Materiaal (begroting -500) kan na zijn
+  resultaat opnieuw een budget krijgen. Dat blad is dezelfde activiteit en
+  draagt de stand van het hele potje, dus tellen we het niet naast het oude
+  resultaat. Zodra de BO van dat nieuwe budget voorbij is, staat de activiteit
+  weer open, wacht ze op een eigen resultaat, en rekent "open sinds" vanaf die
+  BO; het oude resultaat blijft bij de bestanden staan. Een nieuw budget voor
+  een BO die nog moet komen, verandert niets, net zoals elders.
+- Op een telefoon wijkt de kolom Missend (budgetten min resultaten), zodat de
+  naam van de post plaats houdt.
+- **Een activiteit kan buiten de begroting staan en toch meetellen.** Sommige
+  budgetten horen niet in de stand: Studentenwelkom betaalt de stad, en een
+  blad dat nog maar half is (de cultuurreis) trekt het getal scheef. "Niet
+  meetellen" vraagt daarom hoe: "Enkel niet in de begroting" (met een reden)
+  houdt de activiteit in budgetten, resultaten en percentage, maar laat ze
+  weg uit het bedrag; "Helemaal niet meetellen" is het oude gedrag voor een
+  kopie of een oude versie. De eerste keuze staat bovenaan, omdat ze het
+  minst wegneemt. Welke er buiten staan, staat onder Instellingen en onder
+  "Resultaten per post", met de reden; terugzetten kan daar en in het detail,
+  zodra het blad klopt.
+
 ## Bestuursorgaan: de verkenner
 
 Op een bord met het register en vijf richtingen (een lijst met formulieren zoals
@@ -13357,10 +13397,15 @@ een open vraag. Code in `apps/web/lib/pocPolls`.
   werkingsjaar RiVer is, krijgt de tab Peilingen voor de eigen POC; `pocs.manage`
   ziet alle POC's. Na publiceren liggen de vragen vast, anders gaan de antwoorden
   niet meer over dezelfde vraag.
-- **Ook de RiVers zien geen tussenstand.** Tijdens de looptijd zien ze enkel de
-  deelname. Wat ze zouden zien, kunnen ze doorvertellen of zelf overnemen.
-- **Een fase met minder dan vijf antwoorden wordt nooit apart getoond**, want in
-  zo'n kleine groep is een antwoord herleidbaar tot een persoon.
+- **De RiVers zien de cijfers live, ook tijdens de looptijd, en per fase hoe klein
+  die ook is** (november 2026). Eerst zagen ze tijdens de looptijd enkel de
+  deelname, en werd een fase met minder dan vijf antwoorden nooit apart getoond.
+  Dat vond VTK Onderwijs onlogisch: wie een peiling uitzet, wil zien hoe ze loopt.
+  De prijs is bewust aanvaard: bij een handvol antwoorden, of wie na elk nieuw
+  antwoord herlaadt, kan een RiVer een antwoord tot een persoon herleiden. De
+  studenten zelf zien nog steeds geen tussenstand, en de tekst bij de peiling
+  belooft enkel nog dat niemand ziet wie wat antwoordde. Open antwoorden markeren
+  kan pas na de deadline: tot dan kan een student zijn antwoord nog wijzigen.
 - **Na de POC vertellen de RiVers wat er met de antwoorden gebeurde**: een
   samenvatting staat 30 dagen bij de POC op de homepage. Wie ziet dat zijn stem
   iets deed, antwoordt de volgende keer weer.
@@ -13521,3 +13566,36 @@ November 2026, na een week werken met de tabbladen.
   dezelfde NL/EN-schakelaar als het evenementformulier. Leeg toont het
   Nederlands; elke shift van daarvoor blijft dus wat ze was
   (`lib/shift/localize.ts`).
+
+## Weekmail van de kalender
+
+Elke zaterdagavond krijgt wie de mailinglijst Evenementen aan heeft een
+overzicht van de week die komt (`lib/calendar/weekOverview*.ts`). Uit drie
+ontwerpen (een agenda per dag, één uitgelicht evenement met de rest als lijst,
+een raster van affiches) is het uitgelichte gekozen: een week heeft meestal één
+activiteit waar mensen een ticket voor moeten kopen, en die hoort de knop
+bovenaan te krijgen.
+
+- **Zaterdag vanaf 19u**, over maandag tot en met zondag. Zaterdagavond is een
+  moment waarop mensen hun week nog plannen. Lag de worker plat, dan vertrekt ze
+  zondag nog, maar nooit meer zodra de week begonnen is.
+- **Een lege week geeft geen mail.** Een mail die zegt dat er niets is, leert
+  mensen deze mail niet te openen.
+- **Bovenaan staat wat met de ster in /admin/kalender uitgelicht is**, dezelfde
+  ster als de affiches in de hero. Zonder ster het eerste evenement met tickets
+  of een inschrijving, en anders het eerste van de week. Zo kiest niemand elke
+  week met de hand, en staat er nooit een lege kop.
+- **Wat in die week begint, één keer per evenement.** Een reeks met momenten
+  staat op haar eerste moment in de week, met "Nog 2 keer deze week". Wat vóór
+  maandag begon, staat er niet in: wie het wou, zag het vorige week.
+- **Alle evenementen, ook die van Feest, Sport of Career.** De lijst Evenementen
+  is de algemene lijst; wie ook Feest aan heeft, krijgt de cantus dus in beide.
+  Wie op /account de doelgroepfilter aanzette, krijgt enkel wat hij op de
+  kalender ziet, en geen mail wanneer daarvan niets overblijft.
+- **Niet vergeten**: een publieke ticketverkoop die opent, of een inschrijving
+  bij een evenement die sluit, tussen het versturen en het einde van de week.
+  Ook wanneer het evenement zelf later valt: dat is net wat iemand mist.
+- Eén rij per lid per week in `CalendarWeekMail` is de claim, zoals bij de
+  andere kalendermails, zodat geen lid er twee krijgt wanneer de website op meer
+  dan één container draait. De worker verstuurt in rondes van 300 leden om de
+  vijf minuten.

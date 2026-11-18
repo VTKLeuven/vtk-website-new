@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import * as WebBrowser from 'expo-web-browser';
 import { useMemo } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
-import Markdown from 'react-native-markdown-display';
+import Markdown, { MarkdownIt } from 'react-native-markdown-display';
 
 import { baseUrl } from '../api/client';
 import { COLORS, FONTS, RADIUS, SPACING, TYPE } from '../theme/tokens';
@@ -25,7 +25,14 @@ import { COLORS, FONTS, RADIUS, SPACING, TYPE } from '../theme/tokens';
  * is uit 2018 en leunt op `Image.propTypes`, dat React Native al jaren niet meer
  * heeft. Vandaag valt dat stil terug op niets, maar het is een pad dat we niet
  * willen betreden; `expo-image` doet het werk beter en cachet bovendien.
+ *
+ * **Een enkele enter is een regeleinde**, zoals op de site sinds november 2026
+ * (`lib/markdownBreaks.ts` daar): wat een redacteur in de editor onder elkaar
+ * typte, staat ook hier onder elkaar. Een witregel blijft een nieuwe alinea.
  */
+/** Eén parser voor heel de app, met `breaks` aan; zie hierboven. */
+const markdownIt = MarkdownIt({ typographer: true, breaks: true });
+
 export function Prose({ children }: { children: string }) {
   const { width } = useWindowDimensions();
 
@@ -64,7 +71,12 @@ export function Prose({ children }: { children: string }) {
   );
 
   return (
-    <Markdown style={markdownStyles} rules={rules} onLinkPress={onLinkPress}>
+    <Markdown
+      style={markdownStyles}
+      rules={rules}
+      onLinkPress={onLinkPress}
+      markdownit={markdownIt}
+    >
       {children}
     </Markdown>
   );
@@ -151,9 +163,18 @@ const markdownStyles = StyleSheet.create({
   hr: { backgroundColor: COLORS.line, height: 1, marginVertical: SPACING.lg },
 
   // Een brede tabel mag scrollen in zijn eigen kader, niet de pagina meesleuren.
-  table: { borderWidth: 1, borderColor: COLORS.line, borderRadius: RADIUS.sm, marginBottom: SPACING.md },
-  th: { padding: SPACING.sm, fontFamily: FONTS.semibold, color: COLORS.ink },
-  td: { padding: SPACING.sm },
+  // Een witte kaart met dunne randen en linkse koppen, zoals de tabellen op de site.
+  table: {
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: RADIUS.sm,
+    marginBottom: SPACING.md,
+    backgroundColor: COLORS.surface,
+  },
+  thead: { backgroundColor: COLORS.paper2 },
+  tr: { borderBottomWidth: 1, borderColor: COLORS.line, flexDirection: 'row' },
+  th: { flex: 1, padding: SPACING.sm, fontFamily: FONTS.semibold, color: COLORS.ink, textAlign: 'left' },
+  td: { flex: 1, padding: SPACING.sm },
 
   image: { borderRadius: RADIUS.sm, marginBottom: SPACING.md },
 });

@@ -1,4 +1,5 @@
 import { unstable_isUnrecognizedActionError } from "next/navigation";
+import { AUTHORIZATION_PREVIEW_READ_ONLY } from "@/lib/authorization-preview-constants";
 
 /**
  * Een opslag die de server nooit verwerkte, en waarom.
@@ -8,6 +9,10 @@ import { unstable_isUnrecognizedActionError } from "next/navigation";
  *   formulier openhoudt terwijl er gedeployd wordt, botst hierop.
  * - `offline`: het verzoek vertrok nooit (geen wifi, een laptop die net uit
  *   slaap komt). `fetch` faalt dan met een `TypeError`.
+ * - `preview`: een superadmin bekijkt de site als iemand anders, en die
+ *   voorvertoning is bewust alleen-lezen: de proxy houdt elke schrijfactie
+ *   tegen (`proxy.ts`). Zonder deze herkenning werd een klik op opslaan in de
+ *   voorvertoning het foutscherm.
  *
  * Beide zijn geen fout van de server, en in beide gevallen moet wat iemand
  * invulde blijven staan. Zonder deze herkenning gooide `SaveForm` de fout door
@@ -15,10 +20,11 @@ import { unstable_isUnrecognizedActionError } from "next/navigation";
  * Een fout die de server wél gooide, gaat nog altijd naar de error boundary en
  * de monitoring (zie CLAUDE.md, "Opslaan meldt altijd zijn uitkomst").
  */
-export type UnsentReason = "stale" | "offline";
+export type UnsentReason = "stale" | "offline" | "preview";
 
 export function unsentSaveReason(error: unknown): UnsentReason | null {
   if (unstable_isUnrecognizedActionError(error)) return "stale";
+  if (error instanceof Error && error.message === AUTHORIZATION_PREVIEW_READ_ONLY) return "preview";
   // Chrome zegt "Failed to fetch", Firefox "NetworkError when attempting to
   // fetch resource", Safari "Load failed".
   if (error instanceof TypeError && /fetch|network|load failed/i.test(error.message)) return "offline";
@@ -29,6 +35,7 @@ export function unsentSaveReason(error: unknown): UnsentReason | null {
 export const UNSENT_SAVE_CODES: Record<UnsentReason, string> = {
   stale: "PAGE_OUTDATED",
   offline: "OFFLINE",
+  preview: "AUTHORIZATION_PREVIEW_READ_ONLY",
 };
 
 /**
@@ -41,6 +48,11 @@ export function unsentSaveMessage(reason: UnsentReason, english: boolean): strin
     return english
       ? "Not saved: the site was updated while this page was open. What you entered is still here: copy any text you want to keep, reload the page and paste it back."
       : "Niet opgeslagen: de site werd bijgewerkt terwijl deze pagina openstond. Wat je invulde staat er nog: kopieer de tekst die je wil houden, herlaad de pagina en plak hem terug.";
+  }
+  if (reason === "preview") {
+    return english
+      ? "Not saved: you are viewing the site as someone else, and that preview never saves anything. Stop the preview to do this for real."
+      : "Niet opgeslagen: je bekijkt de site als iemand anders, en die voorvertoning slaat niets op. Stop de voorvertoning om dit echt te doen.";
   }
   return english
     ? "Not saved: no connection to the server. What you entered is still here; try again once you are back online."

@@ -102,7 +102,11 @@ function copy(locale: "nl" | "en") {
 }
 
 /** "20:00 tot 03:00", "Hele dag", of een einde op een andere dag voluit. */
-export function timeRange(event: InterestReminderMailEvent, locale: "nl" | "en", timeZone: string): string {
+export function timeRange(
+  event: Pick<InterestReminderMailEvent, "allDay" | "start" | "end">,
+  locale: "nl" | "en",
+  timeZone: string,
+): string {
   const t = copy(locale);
   if (event.allDay) return t.allDay;
   const tag = locale === "en" ? "en-GB" : "nl-BE";

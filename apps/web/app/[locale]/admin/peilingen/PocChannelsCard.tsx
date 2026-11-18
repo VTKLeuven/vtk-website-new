@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@vtk/ui";
+import Link from "@/components/ui/Link";
 import { AdminDisclosure } from "@/components/admin/AdminDisclosure";
 import { SearchPicker } from "@/components/admin/SearchPicker";
 import { SaveForm } from "@/components/ui/SaveForm";
@@ -9,7 +10,7 @@ import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { listPocPollChannelsAction, savePocPollChannelsAction } from "@/app/actions/poc-polls";
 import { pollAdminErrors } from "@/lib/pocPolls/adminCopy";
 
-type Poc = { id: string; name: string; channelId: string };
+type Poc = { id: string; name: string; channelId: string; hasRole: boolean };
 type Channel = { id: string; name: string };
 
 /**
@@ -20,9 +21,25 @@ type Channel = { id: string; name: string };
  * kaart openklapt: Discord antwoordt soms traag, en de lijst met peilingen
  * erboven hoort daar niet op te wachten. `AdminDisclosure` mount de inhoud pas
  * bij de eerste klik, dus de vraag aan Discord vertrekt ook pas dan.
+ *
+ * Het kanaal zegt enkel waar de peilingen komen. Wie het kanaal ziet, bepaalt de
+ * rol van de POC, en die staat bij POC's. Een kanaal zonder rol is voor geen
+ * enkele student open; daarom staat dat hier naast het kanaal, en niet enkel in
+ * het antwoord van de bot aan een student die op de knop drukt.
  */
-export function PocChannelsCard({ nl, pocs, preview }: { nl: boolean; pocs: Poc[]; preview: boolean }) {
+export function PocChannelsCard({
+  nl,
+  pocs,
+  preview,
+  rolesHref,
+}: {
+  nl: boolean;
+  pocs: Poc[];
+  preview: boolean;
+  rolesHref: string;
+}) {
   const linked = pocs.filter((poc) => poc.channelId).length;
+  const closed = pocs.filter((poc) => poc.channelId && !poc.hasRole).map((poc) => poc.name);
   return (
     <AdminDisclosure
       summary={
@@ -33,6 +50,13 @@ export function PocChannelsCard({ nl, pocs, preview }: { nl: boolean; pocs: Poc[
               ? `${linked} van ${pocs.length} POC's hebben een kanaal. Een peiling van een RiVer komt altijd in het kanaal van zijn POC; enkel VTK Onderwijs kan bij een peiling een ander kanaal kiezen.`
               : `${linked} of ${pocs.length} POCs have a channel. A poll by a student rep always goes to their POC's channel; only VTK Onderwijs can pick another channel for a poll.`}
           </span>
+          {closed.length > 0 ? (
+            <span className="mt-1 block max-w-3xl text-sm text-vtk-danger">
+              {nl
+                ? `Zonder Discord-rol, dus voor geen enkele student open: ${closed.join(", ")}.`
+                : `No Discord role, so closed to every student: ${closed.join(", ")}.`}
+            </span>
+          ) : null}
         </>
       }
     >
@@ -45,13 +69,13 @@ export function PocChannelsCard({ nl, pocs, preview }: { nl: boolean; pocs: Poc[
             : "The channels are not fetched in an authorization preview: the preview is read-only."}
         </div>
       ) : (
-        <PocChannelsForm nl={nl} pocs={pocs} />
+        <PocChannelsForm nl={nl} pocs={pocs} rolesHref={rolesHref} />
       )}
     </AdminDisclosure>
   );
 }
 
-function PocChannelsForm({ nl, pocs }: { nl: boolean; pocs: Poc[] }) {
+function PocChannelsForm({ nl, pocs, rolesHref }: { nl: boolean; pocs: Poc[]; rolesHref: string }) {
   const [channels, setChannels] = useState<Channel[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   // Elke klik op "Opnieuw proberen" verhoogt dit, en dat start het effect opnieuw.
@@ -114,7 +138,8 @@ function PocChannelsForm({ nl, pocs }: { nl: boolean; pocs: Poc[] }) {
         <thead>
           <tr className="text-left text-xs text-vtk-muted">
             <th scope="col" className="pb-1.5 pr-3 font-medium">POC</th>
-            <th scope="col" className="pb-1.5 font-medium">{nl ? "Kanaal" : "Channel"}</th>
+            <th scope="col" className="pb-1.5 pr-3 font-medium">{nl ? "Kanaal" : "Channel"}</th>
+            <th scope="col" className="pb-1.5 font-medium">{nl ? "Wie het ziet" : "Who sees it"}</th>
           </tr>
         </thead>
         <tbody>
@@ -134,6 +159,15 @@ function PocChannelsForm({ nl, pocs }: { nl: boolean; pocs: Poc[] }) {
                   ariaLabel={nl ? `Discord-kanaal van ${poc.name}` : `Discord channel of ${poc.name}`}
                   emptyText={(query) => (nl ? `Geen kanaal gevonden voor "${query}".` : `No channel found for "${query}".`)}
                 />
+              </td>
+              <td className="py-2 pl-3 align-middle">
+                {poc.hasRole ? (
+                  <span className="text-vtk-muted">{nl ? "Wie de rol van de POC heeft" : "Holders of the POC role"}</span>
+                ) : (
+                  <Link href={rolesHref} className="font-medium text-vtk-danger underline underline-offset-2">
+                    {nl ? "Niemand: kies een rol bij POC's" : "Nobody: pick a role under POCs"}
+                  </Link>
+                )}
               </td>
             </tr>
           ))}

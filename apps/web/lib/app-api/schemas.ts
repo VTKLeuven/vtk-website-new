@@ -53,6 +53,38 @@ export const appTheokotOrderSchema = z.object({
 
 export const appTheokotCancelSchema = z.object({ orderId: z.string().min(1).max(64) });
 
+const theokotLinesSchema = z
+  .array(
+    z.object({
+      sessionItemId: z.string().min(1).max(64),
+      quantity: z.number().int().min(0).max(99),
+    }),
+  )
+  .max(50);
+
+/** Een reservatie aanpassen; de regels staan in `updateOrder`. */
+export const appTheokotUpdateSchema = z.object({
+  orderId: z.string().min(1).max(64),
+  lines: theokotLinesSchema.min(1),
+});
+
+/** Na de deadline vrijgeven; zonder `lines` alles. De regels staan in `releaseOrder`. */
+export const appTheokotReleaseSchema = z.object({
+  orderId: z.string().min(1).max(64),
+  lines: theokotLinesSchema.optional(),
+});
+
+export const appTheokotTakeoverSchema = z.object({ sessionItemId: z.string().min(1).max(64) });
+
+/**
+ * Antwoorden op een peiling. Ruwe grenzen; welke waarde bij welke vraag mag,
+ * beslist `parsePollAnswers`, net als voor het formulier op de site.
+ */
+export const appPollAnswerSchema = z.object({
+  pollId: z.string().min(1).max(64),
+  answers: z.record(z.string().min(1).max(64), z.string().max(4000)),
+});
+
 // -----------------------------------------------------------------------------
 // Samen blokken
 // -----------------------------------------------------------------------------

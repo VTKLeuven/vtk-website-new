@@ -74,7 +74,9 @@ export const FONTS = {
 
 export const TYPE = {
   /** De titel in een donkere paginakop. */
-  pageTitle: { fontFamily: FONTS.bold, fontSize: 28, lineHeight: 34 },
+  pageTitle: { fontFamily: FONTS.semibold, fontSize: 32, lineHeight: 34, letterSpacing: -0.9 },
+  /** Een kop met de gele lijn eronder (`SectionHeading`), zoals een h2 op de site. */
+  heading: { fontFamily: FONTS.semibold, fontSize: 20, lineHeight: 24, letterSpacing: -0.4 },
   sectionTitle: { fontFamily: FONTS.semibold, fontSize: 20, lineHeight: 26 },
   cardTitle: { fontFamily: FONTS.semibold, fontSize: 16, lineHeight: 22 },
   body: { fontFamily: FONTS.regular, fontSize: 15, lineHeight: 22 },

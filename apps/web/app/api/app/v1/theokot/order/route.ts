@@ -1,9 +1,13 @@
 import { corsPreflight } from "@/lib/cors";
 import { requireSession } from "@/lib/session";
-import { TheokotValidationError } from "@/lib/theokot";
-import { cancelOrder, placeOrder, TheokotOrderError } from "@/lib/theokot-orders";
-import { appTheokotCancelSchema, appTheokotOrderSchema } from "@/lib/app-api/schemas";
-import { appError, appErrorResponse, appJson, readAppJson } from "@/lib/app-api/respond";
+import { cancelOrder, placeOrder, updateOrder } from "@/lib/theokot-orders";
+import {
+  appTheokotCancelSchema,
+  appTheokotOrderSchema,
+  appTheokotUpdateSchema,
+} from "@/lib/app-api/schemas";
+import { appErrorResponse, appJson, readAppJson } from "@/lib/app-api/respond";
+import { orderErrorResponse } from "@/lib/app-api/theokotErrors";
 
 export const runtime = "nodejs";
 
@@ -17,19 +21,6 @@ export const runtime = "nodejs";
  * Nederlandse zin maakt de app zelf, want die kent de taal van de gebruiker.
  */
 
-function orderErrorResponse(request: Request, error: unknown): Response | null {
-  if (error instanceof TheokotOrderError) {
-    return appError(request, error.code, error.code === "BANNED" ? 403 : 409, {
-      message: error.bannedUntil ? `Geschorst tot ${error.bannedUntil.toISOString()}` : undefined,
-    });
-  }
-  if (error instanceof TheokotValidationError) {
-    // De details zijn de zinnen uit `validateOrderLines`. Ze komen mee zodat de
-    // app kan zeggen wát er scheelt in plaats van enkel dat er iets scheelt.
-    return appError(request, "INVALID_ORDER", 422, { fields: { lines: error.details } });
-  }
-  return null;
-}
 
 export async function POST(request: Request) {
   try {
@@ -38,6 +29,22 @@ export async function POST(request: Request) {
 
     const order = await placeOrder(session.user.id, input.sessionId, input.lines);
     return appJson(request, order, 201);
+  } catch (error) {
+    return orderErrorResponse(request, error) ?? appErrorResponse(request, error);
+  }
+}
+
+/**
+ * Een reservatie aanpassen zolang het bestelvenster open is: dezelfde
+ * `updateOrder` als op /theokot, met de eigen reservatie als vrije voorraad.
+ */
+export async function PATCH(request: Request) {
+  try {
+    const session = await requireSession();
+    const { orderId, lines } = appTheokotUpdateSchema.parse(await readAppJson(request));
+
+    const order = await updateOrder(session.user.id, orderId, lines);
+    return appJson(request, order);
   } catch (error) {
     return orderErrorResponse(request, error) ?? appErrorResponse(request, error);
   }
@@ -65,5 +72,5 @@ export async function DELETE(request: Request) {
 }
 
 export function OPTIONS(request: Request) {
-  return corsPreflight(request, "POST, DELETE, OPTIONS");
+  return corsPreflight(request, "POST, PATCH, DELETE, OPTIONS");
 }

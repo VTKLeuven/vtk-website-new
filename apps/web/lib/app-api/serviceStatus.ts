@@ -13,10 +13,9 @@ import {
 import {
   DUTCH_FULL_DAYS,
   entryForDate,
-  isClosedHours,
   mondayFirstWeekdayIndex,
-  parseHoursRange,
 } from "@/components/editorial/hoursUtils";
+import { parseHoursWindows, type HoursWindow } from "@/lib/openingHoursWeek";
 import type { AppLocale, AppServiceStatus } from "./contract";
 
 /**
@@ -60,29 +59,22 @@ function dayLabel(entry: OpeningHoursEntry, locale: AppLocale): string {
 }
 
 /**
- * Wanneer een dag opengaat, en tot hoe laat als dat vaststaat.
+ * De vensters van een dag, als minuten sinds middernacht.
  *
- * Twee vormen komen in de databank voor, en het verschil is geen slordigheid:
+ * Drie vormen komen in de databank voor, en het verschil is geen slordigheid:
  *
- * - **Een bereik** (`12:00 - 14:00`) bij het Theokot en de cursusdienst. Die
- *   sluiten op een uur.
+ * - **Een bereik** (`12:00 - 14:00`) bij het Theokot.
+ * - **Twee bereiken** (`12:30 – 14:00, 18:00 – 19:00`) bij de cursusdienst, die
+ *   's middags en 's avonds opengaat.
  * - **Eén tijdstip** (`22:00`) bij 't ElixIr. Een fakbar opent om tien uur en
- *   sluit wanneer ze sluit; er staat met opzet geen einduur.
+ *   sluit wanneer ze sluit; er staat met opzet geen einduur (`end: null`).
  *
- * `parseHoursRange` uit `hoursUtils` kent enkel het eerste en geeft `null` voor
- * het tweede. Dat las hier als "gesloten", en dus stond 't ElixIr de hele week
- * dicht op het beginscherm. Vandaar deze laag erbovenop; de site zelf toont de
- * ruwe string en had er daarom nooit last van.
+ * `parseHoursWindows` is dezelfde lezer als de band op de homepage. Vroeger
+ * stond hier `parseHoursRange`, dat enkel het eerste venster kent: dan stond de
+ * cursusdienst 's avonds als gesloten terwijl ze open was.
  */
-function parseDayHours(hours: string): { startMin: number; endMin: number | null } | null {
-  if (isClosedHours(hours)) return null;
-
-  const range = parseHoursRange(hours);
-  if (range) return { startMin: range.startMin, endMin: range.endMin };
-
-  const single = hours.replace(/\s+/g, " ").trim().match(/(\d{1,2})[:.](\d{2})/);
-  if (!single) return null;
-  return { startMin: Number(single[1]) * 60 + Number(single[2]), endMin: null };
+function dayWindows(hours: string | undefined): HoursWindow[] {
+  return hours ? parseHoursWindows(hours) : [];
 }
 
 /**
@@ -106,16 +98,18 @@ function nextOpening(
         ? candidate.dayEn === en || candidate.dayEn.toLowerCase().includes(en.slice(0, 3).toLowerCase())
         : candidate.dayNl === nl || candidate.dayNl.toLowerCase().includes(nl.slice(0, 3).toLowerCase()),
     );
-    const range = entry ? parseDayHours(entry.hours) : null;
-    if (!entry || !range) continue;
-    // Vandaag telt enkel nog mee wanneer de opening nog moet komen.
-    if (offset === 0 && range.startMin <= brusselsMinutesOfDay(now)) continue;
+    if (!entry) continue;
+    // Vandaag telt enkel een venster dat nog moet komen; zo zegt de cursusdienst
+    // na de middag "opent 18:00" en niet "morgen".
+    const minutes = brusselsMinutesOfDay(now);
+    const next = dayWindows(entry.hours).find((window) => offset > 0 || window.start > minutes);
+    if (!next) continue;
 
     if (offset === 0) {
-      return { label: locale === "en" ? `opens ${formatMinutes(range.startMin)}` : `opent ${formatMinutes(range.startMin)}`, sameDay: true };
+      return { label: locale === "en" ? `opens ${formatMinutes(next.start)}` : `opent ${formatMinutes(next.start)}`, sameDay: true };
     }
     const day = dayLabel(entry, locale).slice(0, locale === "en" ? 3 : 2).toLowerCase();
-    return { label: `${day} ${formatMinutes(range.startMin)}`, sameDay: false };
+    return { label: `${day} ${formatMinutes(next.start)}`, sameDay: false };
   }
 
   return null;
@@ -163,12 +157,21 @@ export function serviceStatus(
   }
 
   const entries = liveEntries ?? entriesForService(parsed, service, locale);
-  const today = entryForDate(entries, new Date(brusselsDayAnchor(now)), locale);
-  const range = today ? parseDayHours(today.hours) : null;
-  const minutes = brusselsMinutesOfDay(now);
-  const scheduledOpen = Boolean(
-    range && minutes >= range.startMin && (range.endMin === null || minutes <= range.endMin),
+  const anchor = brusselsDayAnchor(now);
+  const todayWindows = dayWindows(entryForDate(entries, new Date(anchor), locale)?.hours);
+  const yesterdayWindows = dayWindows(
+    entryForDate(entries, new Date(anchor - 24 * 60 * 60 * 1000), locale)?.hours,
   );
+  const minutes = brusselsMinutesOfDay(now);
+  // Het venster waarin "nu" valt: een van vandaag, of een van gisteren dat over
+  // middernacht loopt. Een avond zonder einduur geldt tot middernacht; wat de
+  // fakbar daarna doet, zegt de meting.
+  const running =
+    todayWindows.find(
+      (window) => minutes >= window.start && (window.end === null || minutes < window.end),
+    ) ??
+    yesterdayWindows.find((window) => window.end !== null && window.end > 24 * 60 && minutes + 24 * 60 < window.end);
+  const scheduledOpen = Boolean(running);
 
   // De meting wint van het rooster, maar enkel wanneer ze vers is; de aanroeper
   // geeft `null` door zodra ze dat niet meer is. Een verouderde "open" is erger
@@ -177,8 +180,8 @@ export function serviceStatus(
   const live = measuredOpen !== null && measuredOpen !== undefined;
 
   let detail: string;
-  if (openNow && scheduledOpen && range && range.endMin !== null) {
-    detail = locale === "en" ? `until ${formatMinutes(range.endMin)}` : `tot ${formatMinutes(range.endMin)}`;
+  if (openNow && running && running.end !== null) {
+    detail = locale === "en" ? `until ${formatMinutes(running.end)}` : `tot ${formatMinutes(running.end)}`;
   } else if (openNow) {
     // Twee gevallen komen hier samen uit, en geen van beide kent een sluitingsuur:
     // een dag zonder einduur (de fakbar), en live open buiten het rooster. In het
@@ -199,5 +202,6 @@ export function serviceStatus(
     unavailable: false,
     entries: entries.map((entry) => ({ day: dayLabel(entry, locale), hours: entry.hours })),
     note,
+    today: todayWindows.map((window) => ({ start: window.start, end: window.end })),
   };
 }

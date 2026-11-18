@@ -62,6 +62,17 @@ import { COLORS } from '${up}src/theme/tokens';
  * hier opent komt erbovenop, en teruggaan komt daardoor altijd uit waar je
  * vandaan kwam. Zie src/navigation.ts voor het geheel.
  */
+
+/**
+ * Het tabscherm ligt altijd onderaan, ook wanneer je hier binnenkomt via een
+ * adres dieper in de stack (een pushbericht, een oud adres, een knop vanuit een
+ * stack die expo-router nog niet kende). Sinds expo-router 58 bouwt een sprong
+ * naar \`/meer/pocs\` anders een stack met enkel POC's erin: Meer opende dan
+ * telkens op POC's, en terug verliet de tab. Werkt samen met \`withAnchor\` in
+ * \`useTabRouter\`.
+ */
+export const unstable_settings = { anchor: 'index' };
+
 export default function ${NAMES[tab]}StackLayout() {
   return (
     <Stack
@@ -144,14 +155,14 @@ import { Redirect, useLocalSearchParams } from 'expo-router';
 
 export default function OudAdres() {
   const { ${params.join(', ')} } = useLocalSearchParams<{ ${params.map((p) => `${p}: string`).join('; ')} }>();
-  return <Redirect href={\`${target.replace(/\[(\w+)\]/g, '${$1}')}\`} />;
+  return <Redirect href={\`${target.replace(/\[(\w+)\]/g, '${$1}')}\`} withAnchor />;
 }
 `
     : `${GENERATED}
 import { Redirect } from 'expo-router';
 
 export default function OudAdres() {
-  return <Redirect href="${target}" />;
+  return <Redirect href="${target}" withAnchor />;
 }
 `;
   write(join(root, 'app/(oud)', `${screen}.tsx`), body);

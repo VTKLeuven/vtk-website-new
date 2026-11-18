@@ -186,11 +186,72 @@ export function StaleNotice({ onRetry }: { onRetry: () => void }) {
   );
 }
 
+/**
+ * Een kop met de gele lijn eronder, zo breed als de kop zelf: de behandeling van
+ * een h2 op de site (`.prose-vtk h2::after`, de titel van een eventtegel, "Over
+ * dit event"). Een lijn over de hele breedte leest als een scheiding tussen twee
+ * delen, niet als een lijn onder een titel.
+ */
+export function SectionHeading({
+  children,
+  right,
+}: {
+  children: string;
+  /** Een link of actie rechts op dezelfde hoogte, zoals "Kalender ->". */
+  right?: React.ReactNode;
+}) {
+  return (
+    <View style={styles.headingRow}>
+      <View style={styles.heading}>
+        <Text style={styles.headingText}>{children}</Text>
+      </View>
+      {right ?? null}
+    </View>
+  );
+}
+
+/**
+ * De kop van een week in een agenda, zoals op /shift: een haarlijn erboven, de
+ * naam ("Deze week") en het bereik ernaast.
+ */
+export function WeekHead({ name, range }: { name: string; range: string }) {
+  return (
+    <View style={styles.week}>
+      <Text style={styles.weekName}>{name}</Text>
+      <Text style={styles.weekRange}>{range}</Text>
+    </View>
+  );
+}
+
 export function SectionTitle({ children }: { children: string }) {
   return <Text style={styles.sectionTitle}>{children}</Text>;
 }
 
 const styles = StyleSheet.create({
+  headingRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: SPACING.md,
+  },
+  heading: {
+    alignSelf: 'flex-start',
+    paddingBottom: 6,
+    borderBottomWidth: 3,
+    borderBottomColor: COLORS.yellow,
+  },
+  headingText: { ...TYPE.heading, color: COLORS.ink },
+  week: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: SPACING.sm,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.line2,
+  },
+  weekName: { ...TYPE.cardTitle, fontSize: 17, color: COLORS.ink },
+  weekRange: { ...TYPE.small, color: COLORS.muted },
   card: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.md,
