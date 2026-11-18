@@ -300,7 +300,9 @@ een oudere app zou er anders een lege afhaalkaart van maken.
 
 De ticketverkoop, uit dezelfde `listPublishedTicketEvents` /
 `getPublishedTicketEventBySlug` als de webshop. De lijst draagt geen tickettypes;
-die zijn pas op het detailscherm nodig.
+die zijn pas op het detailscherm nodig. `imageUrl` is de banner zoals op /tickets
+(`lib/ticketing/poster.ts`): een eigen foto, de themabanner of de affiche van
+het gekoppelde evenement.
 
 **Afrekenen heeft geen eigen app-route.** De app post rechtstreeks naar het
 bestaande `POST /api/tickets/checkout` en opent de `checkoutUrl` die daaruit komt

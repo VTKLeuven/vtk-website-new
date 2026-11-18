@@ -1,21 +1,22 @@
 
-import { Bell, CalendarDays, List, Star } from 'lucide-react-native';
+import { Bell } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { fetchCalendar, setEventInterest } from '../api/endpoints';
 import { messageFor, useResource } from '../api/useResource';
-import { EventRow } from '../components/EventRow';
+import { EventTile } from '../components/EventTile';
 import { MonthView } from '../components/MonthView';
 import { PageHead } from '../components/PageHead';
-import { Empty, ErrorState, Loading, StaleNotice } from '../components/ui';
+import { Empty, ErrorState, Loading, StaleNotice, WeekHead } from '../components/ui';
 import { formatDay } from '../format';
 import { anchorOf, dayKeyOf, gridRange, todayKey, type MonthAnchor } from '../monthGrid';
 import { displayStart, eventDayKeys } from '../moments';
 import { getPref, setPref } from '../storage';
 import { useApp } from '../state/app';
 import { useTabRouter } from '../navigation';
-import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
+import { COLORS, FONTS, RADIUS, SPACING, TYPE } from '../theme/tokens';
+import { groupByWeek } from '../weeks';
 
 type Weergave = 'lijst' | 'maand';
 
@@ -25,7 +26,10 @@ const VIEW_KEY = 'kalender-weergave';
 const MINE = '__mijn__';
 
 /**
- * De kalender, in twee weergaven.
+ * De kalender, in twee weergaven, in de vorm van /kalender op de site: de
+ * eventtegel met de gele datumpin, per week een kop, en de thema's als chips.
+ * De tegels zijn lager dan op de site (`compact`), zodat er meer onder elkaar
+ * past op een telefoon.
  *
  * **Lijst** is wat je meestal wil: wat komt er nu. **Maand** is wat je wil
  * wanneer je een datum in gedachten hebt ("wanneer was die cantus ook weer") of
@@ -39,8 +43,8 @@ const MINE = '__mijn__';
  * maandweergave precies het zichtbare rooster, inclusief het verleden. Anders zou
  * bladeren naar vorige maand een leeg rooster geven.
  *
- * **De ster is geen inschrijving.** Ze zet een evenement in jouw lijst (de chip
- * "Mijn lijst") en hangt er de herinnering van de dag ervoor aan. Wat ze niet
+ * **De ster is geen inschrijving.** Ze zet een evenement in jouw lijst (het
+ * tabblad "Mijn lijst" in de kop) en hangt er de herinnering van de dag ervoor aan. Wat ze niet
  * doet: een plaats reserveren, een ticket kopen of iemand laten weten dat je
  * komt. Dat onderscheid is de reden dat ze naast de rij staat en niet de rij zelf
  * is.
@@ -116,6 +120,8 @@ export default function KalenderScreen() {
     [events, selectedDay],
   );
 
+  const weeks = useMemo(() => groupByWeek(events, (event) => displayStart(event), locale), [events, locale]);
+
   if (resource.loading) return <Loading label="Kalender ophalen" />;
   if (!resource.data) {
     return (
@@ -124,16 +130,30 @@ export default function KalenderScreen() {
   }
 
   const { categories, filteredByAudience } = resource.data;
+  // "Mijn lijst" staat als derde tabblad in de kop: het is een andere lijst, geen
+  // thema om op te filteren.
+  const headTab: 'lijst' | 'maand' | 'mijn' = mine ? 'mijn' : view;
 
   return (
-    <>
-      <PageHead
-        title="Kalender"
-        subtitle="Alles wat er te doen is"
-        back={false}
-        right={
-          <View style={styles.headActions}>
-            {viewer ? (
+    <View style={styles.root}>
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={resource.refreshing}
+            tintColor={COLORS.onDark}
+            onRefresh={() => void resource.refresh()}
+          />
+        }
+      >
+        <View style={styles.overscroll} />
+        <PageHead
+          title="Kalender"
+          subtitle="Alles wat er bij VTK te doen is"
+          back={false}
+          right={
+            viewer ? (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Meldingen instellen"
@@ -142,161 +162,146 @@ export default function KalenderScreen() {
               >
                 <Bell color={COLORS.yellow} size={20} />
               </Pressable>
-            ) : null}
-            <View style={styles.toggle}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: view === 'lijst' }}
-              accessibilityLabel="Lijstweergave"
-              onPress={() => setView('lijst')}
-              style={[styles.toggleButton, view === 'lijst' && styles.toggleActive]}
-            >
-              <List color={view === 'lijst' ? COLORS.ink : COLORS.onDarkMuted} size={17} />
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: view === 'maand' }}
-              accessibilityLabel="Maandweergave"
-              onPress={() => setView('maand')}
-              style={[styles.toggleButton, view === 'maand' && styles.toggleActive]}
-            >
-              <CalendarDays
-                color={view === 'maand' ? COLORS.ink : COLORS.onDarkMuted}
-                size={17}
-              />
-            </Pressable>
-            </View>
-          </View>
-        }
-      />
+            ) : undefined
+          }
+          tabs={{
+            value: headTab,
+            onChange: (next) => {
+              if (next === 'mijn') {
+                setView('lijst');
+                setCategory(MINE);
+              } else {
+                setView(next);
+                if (mine) setCategory(null);
+              }
+            },
+            options: [
+              { value: 'lijst', label: 'Agenda' },
+              { value: 'maand', label: 'Maand' },
+              ...(viewer ? [{ value: 'mijn' as const, label: 'Mijn lijst' }] : []),
+            ],
+          }}
+        />
 
-      {categories.length > 0 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chips}
-          style={styles.chipBar}
-        >
-          <Chip label="Alles" active={category === null} onPress={() => setCategory(null)} />
-          {viewer ? (
-            <Chip
-              label="Mijn lijst"
-              icon={<Star color={mine ? COLORS.ink : COLORS.body} size={13} fill={mine ? COLORS.ink : 'transparent'} />}
-              active={mine}
-              onPress={() => setCategory(mine ? null : MINE)}
-            />
-          ) : null}
-          {categories.map((item) => (
-            <Chip
-              key={item.slug}
-              label={item.name}
-              active={category === item.slug}
-              onPress={() => setCategory(category === item.slug ? null : item.slug)}
-            />
-          ))}
-        </ScrollView>
-      ) : null}
-
-      {resource.stale ? <StaleNotice onRetry={() => void resource.refresh()} /> : null}
-
-      <ScrollView
-        style={styles.root}
-        contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl
-            refreshing={resource.refreshing}
-            onRefresh={() => void resource.refresh()}
-          />
-        }
-      >
-        {view === 'maand' ? (
-          <>
-            <MonthView
-              anchor={anchor}
-              onAnchorChange={(next) => {
-                setAnchor(next);
-                setSelectedDay(null);
-              }}
-              events={events}
-              locale={locale}
-              selected={selectedDay}
-              onSelect={setSelectedDay}
-            />
-
-            {selectedDay ? (
-              <>
-                <Text style={styles.dayTitle}>
-                  {formatDay(`${selectedDay}T12:00:00.000Z`, locale)}
-                </Text>
-                {dayEvents.length === 0 ? (
-                  <Text style={styles.hint}>Niets gepland op deze dag.</Text>
-                ) : (
-                  dayEvents.map(({ event, at }) => (
-                    <EventRow
-                      key={event.id}
-                      event={event}
-                      at={at}
-                      locale={locale}
-                      onPress={() => router.push(`/evenement/${event.id}`)}
-                      onToggleInterest={
-                        viewer ? (next) => toggleInterest(event.id, next) : undefined
-                      }
-                    />
-                  ))
-                )}
-              </>
-            ) : (
-              <Text style={styles.hint}>
-                Tik een dag aan om te zien wat er die dag te doen is.
-              </Text>
-            )}
-          </>
-        ) : events.length === 0 ? (
-          <Empty
-            title="Niets gevonden"
-            hint={
-              mine
-                ? 'Je hebt nog niets aangeduid. Tik het sterretje bij een evenement en het komt hier te staan.'
-                : category
-                  ? 'Er staat niets in deze categorie. Zet de filter op Alles om de rest te zien.'
-                  : 'Er staat nog niets gepland.'
-            }
-            action={category ? { label: 'Toon alles', onPress: () => setCategory(null) } : undefined}
-          />
-        ) : (
-          <>
-            {events.map((event) => (
-              <EventRow
-                key={event.id}
-                event={event}
-                locale={locale}
-                onPress={() => router.push(`/evenement/${event.id}`)}
-                onToggleInterest={viewer ? (next) => toggleInterest(event.id, next) : undefined}
+        {categories.length > 0 && !mine ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chips}
+          >
+            <Chip label="Alles" active={category === null} onPress={() => setCategory(null)} />
+            {categories.map((item) => (
+              <Chip
+                key={item.slug}
+                label={item.name}
+                colour={item.colour}
+                active={category === item.slug}
+                onPress={() => setCategory(category === item.slug ? null : item.slug)}
               />
             ))}
-            {viewer && filteredByAudience ? (
-              <Text style={styles.footer}>
-                Je ziet de evenementen die bij jouw studiejaar horen. Activiteiten voor een andere
-                doelgroep staan er niet tussen.
-              </Text>
-            ) : null}
-          </>
-        )}
+          </ScrollView>
+        ) : null}
+
+        {resource.stale ? <StaleNotice onRetry={() => void resource.refresh()} /> : null}
+
+        <View style={styles.content}>
+          {view === 'maand' && !mine ? (
+            <>
+              <MonthView
+                anchor={anchor}
+                onAnchorChange={(next) => {
+                  setAnchor(next);
+                  setSelectedDay(null);
+                }}
+                events={events}
+                locale={locale}
+                selected={selectedDay}
+                onSelect={setSelectedDay}
+              />
+
+              {selectedDay ? (
+                <>
+                  <Text style={styles.dayTitle}>
+                    {formatDay(`${selectedDay}T12:00:00.000Z`, locale)}
+                  </Text>
+                  {dayEvents.length === 0 ? (
+                    <Text style={styles.hint}>Niets gepland op deze dag.</Text>
+                  ) : (
+                    dayEvents.map(({ event, at }) => (
+                      <EventTile
+                        key={event.id}
+                        event={event}
+                        at={at}
+                        locale={locale}
+                        compact
+                        onPress={() => router.push(`/evenement/${event.id}`)}
+                        onToggleInterest={
+                          viewer ? (next) => toggleInterest(event.id, next) : undefined
+                        }
+                      />
+                    ))
+                  )}
+                </>
+              ) : (
+                <Text style={styles.hint}>
+                  Tik een dag aan om te zien wat er die dag te doen is.
+                </Text>
+              )}
+            </>
+          ) : events.length === 0 ? (
+            <Empty
+              title="Niets gevonden"
+              hint={
+                mine
+                  ? 'Je hebt nog niets aangeduid. Tik het sterretje bij een evenement en het komt hier te staan.'
+                  : category
+                    ? 'Er staat niets in deze categorie. Zet de filter op Alles om de rest te zien.'
+                    : 'Er staat nog niets gepland.'
+              }
+              action={category && !mine ? { label: 'Toon alles', onPress: () => setCategory(null) } : undefined}
+            />
+          ) : (
+            <>
+              {weeks.map((week) => (
+                <View key={week.key} style={styles.week}>
+                  <WeekHead name={week.name} range={week.range} />
+                  {week.items.map((event) => (
+                    <EventTile
+                      key={event.id}
+                      event={event}
+                      locale={locale}
+                      compact
+                      onPress={() => router.push(`/evenement/${event.id}`)}
+                      onToggleInterest={viewer ? (next) => toggleInterest(event.id, next) : undefined}
+                    />
+                  ))}
+                </View>
+              ))}
+              {viewer && filteredByAudience ? (
+                <Text style={styles.footer}>
+                  Je ziet de evenementen die bij jouw studiejaar horen. Activiteiten voor een andere
+                  doelgroep staan er niet tussen.
+                </Text>
+              ) : null}
+            </>
+          )}
+        </View>
       </ScrollView>
-    </>
+    </View>
   );
 }
 
+/** Een themafilter zoals de chips van /tickets: wit, met de kleur als stip, actief in inkt. */
 function Chip({
   label,
   active,
   onPress,
-  icon,
+  colour,
 }: {
   label: string;
   active: boolean;
   onPress: () => void;
-  icon?: React.ReactNode;
+  colour?: string | null;
 }) {
   return (
     <Pressable
@@ -306,7 +311,7 @@ function Chip({
       onPress={onPress}
       style={[styles.chip, active && styles.chipActive]}
     >
-      {icon}
+      {colour ? <View style={[styles.chipDot, { backgroundColor: colour }]} /> : null}
       <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{label}</Text>
     </Pressable>
   );
@@ -314,42 +319,35 @@ function Chip({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.paper },
-  content: { padding: SPACING.lg, gap: SPACING.md, paddingBottom: SPACING.xxl },
-
-  // De schakelaar staat in de donkere paginakop, dus de inactieve kant gebruikt
-  // de gedempte kleur voor een donkere band.
-  headActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
-  toggle: {
-    flexDirection: 'row',
-    gap: 2,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    borderRadius: RADIUS.pill,
-    padding: 2,
+  scrollContent: { paddingBottom: SPACING.xxl },
+  // Vangt het omlaag trekken op iOS op: daar verschijnt dan navy in plaats van papier.
+  overscroll: {
+    position: 'absolute',
+    top: -1000,
+    left: 0,
+    right: 0,
+    height: 1000,
+    backgroundColor: COLORS.navy,
   },
-  toggleButton: { paddingHorizontal: SPACING.md, paddingVertical: 6, borderRadius: RADIUS.pill },
-  toggleActive: { backgroundColor: COLORS.yellow },
+  content: { paddingHorizontal: SPACING.xl - 4, paddingTop: SPACING.sm, gap: SPACING.md },
+  week: { gap: SPACING.md, marginTop: SPACING.sm },
 
-  chipBar: {
-    flexGrow: 0,
-    backgroundColor: COLORS.paper,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.line,
-  },
-  chips: { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, gap: SPACING.sm },
+  chips: { paddingHorizontal: SPACING.xl - 4, paddingTop: SPACING.lg, paddingBottom: SPACING.xs, gap: SPACING.sm },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
     borderColor: COLORS.line2,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
     backgroundColor: COLORS.surface,
   },
-  chipActive: { backgroundColor: COLORS.yellow, borderColor: COLORS.yellow },
-  chipLabel: { ...TYPE.small, color: COLORS.body },
-  chipLabelActive: { color: COLORS.ink, fontFamily: TYPE.cardTitle.fontFamily },
+  chipActive: { backgroundColor: COLORS.ink, borderColor: COLORS.ink },
+  chipDot: { width: 7, height: 7, borderRadius: 4 },
+  chipLabel: { ...TYPE.small, fontFamily: FONTS.medium, color: COLORS.body },
+  chipLabelActive: { color: COLORS.paper },
 
   dayTitle: { ...TYPE.sectionTitle, color: COLORS.ink, marginTop: SPACING.sm },
   hint: { ...TYPE.small, color: COLORS.muted },

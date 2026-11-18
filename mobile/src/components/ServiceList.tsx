@@ -1,43 +1,47 @@
-import { useMemo, useState } from 'react';
 import { ChevronDown } from 'lucide-react-native';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { AppHoursWindow, AppServiceStatus } from '../api/contract';
-import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
+import { COLORS, FONTS, SPACING, TYPE } from '../theme/tokens';
 
 /**
  * Theokot, cursusdienst en 't ElixIr: open of niet, en tot hoe laat.
  *
- * Dit is de vraag die het vaakst gesteld wordt en daarom staat ze bovenaan Home,
- * boven de vouw. De site zet drie weekroosters naast elkaar; op een telefoon is
- * dat drie keer zeven regels waar je doorheen moet lezen voor je weet of je nu
- * kan gaan. Hier staat het antwoord vooraan en het rooster erachter: tik een
- * dienst aan en de week klapt open.
+ * De openingsuren "zonder kader" van de homepage, op de navy band van de kop van
+ * Home: per dienst een regel met de naam en een statuszin, vandaag als dunne lijn
+ * op één gedeelde tijdas, en één gele nu-lijn door alle diensten. Geen glazen
+ * paneel, geen statusbolletjes, geen kapitalen: op de site lazen die samen als een
+ * sjabloon en zijn ze weggehaald. Een avond zonder sluitingsuur loopt twee uur vol
+ * en daarna gearceerd, want een einduur verzinnen mag niet. Tik een dienst aan en
+ * de week klapt open.
  *
- * **Het rekenwerk gebeurt op de server** (`lib/app-api/serviceStatus.ts`). De
- * openingsuren staan in wandkloktijd van Brussel, en een telefoon staat niet
- * noodzakelijk op die tijdzone; het hier nog eens uitrekenen zou betekenen dat de
- * app op reis andere uren toont dan de site.
- *
- * Naam, toestand en uur staan als drie kolommen naast elkaar en niet als één zin
- * met puntjes ertussen. Dat is de regel over gelabelde kolommen uit CLAUDE.md.
- *
- * **Vandaag als dunne lijn, met één gele nu-lijn door alle diensten**, zoals de
- * openingsuren "zonder kader" op de homepage van de site. Geen statusbolletjes:
- * die werden daar bewust weggehaald. Een avond zonder sluitingsuur loopt vol tot
- * twee uur na de opening en vervaagt daarna, want een einduur verzinnen mag niet.
- * Een oudere server stuurt de vensters niet mee; dan valt de lijn weg.
+ * **Het rekenwerk gebeurt op de server** (`lib/app-api/serviceStatus.ts`), op de
+ * klok van Brussel. Een oudere server stuurt `today` niet mee; dan valt de lijn
+ * weg en blijft de statuszin staan.
  */
 export function ServiceList({ services }: { services: AppServiceStatus[] }) {
   const [open, setOpen] = useState<string | null>(null);
   const axis = useMemo(() => timelineAxis(services), [services]);
   const nowMinutes = brusselsMinutes(new Date());
-  const nowLeft = axis ? pct(nowMinutes, axis) : null;
   const showNow = axis !== null && nowMinutes >= axis.start && nowMinutes <= axis.end;
 
   return (
-    <View style={styles.list}>
-      {services.map((service, index) => {
+    <View>
+      {axis ? (
+        <View style={styles.axisRow}>
+          <View style={styles.nameCol} />
+          <View style={styles.axis}>
+            {axisLabels(axis).map((label) => (
+              <Text key={label.text} style={[styles.axisLabel, { left: `${label.left}%` }]}>
+                {label.text}
+              </Text>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {services.map((service) => {
         const expanded = open === service.key;
         const hasSchedule = service.entries.length > 0;
 
@@ -46,53 +50,39 @@ export function ServiceList({ services }: { services: AppServiceStatus[] }) {
             <Pressable
               accessibilityRole={hasSchedule ? 'button' : 'text'}
               accessibilityState={hasSchedule ? { expanded } : undefined}
-              accessibilityLabel={`${service.name}, ${service.openNow ? 'open' : 'gesloten'}, ${service.detail}`}
+              accessibilityLabel={`${service.name}, ${statusLine(service)}`}
               disabled={!hasSchedule}
               onPress={() => setOpen(expanded ? null : service.key)}
-              style={({ pressed }) => [
-                styles.row,
-                index > 0 && styles.divided,
-                pressed && hasSchedule && styles.pressed,
-              ]}
+              style={({ pressed }) => [styles.row, pressed && hasSchedule && styles.pressed]}
             >
-              <Text style={styles.name} numberOfLines={1}>
-                {service.name}
-              </Text>
-
-              {service.unavailable ? (
-                <Text style={styles.unavailable} numberOfLines={1}>
-                  {service.detail}
+              <View style={styles.nameCol}>
+                <Text style={styles.name} numberOfLines={1}>
+                  {service.name}
                 </Text>
+                <Text style={[styles.status, service.openNow && styles.statusOpen]} numberOfLines={1}>
+                  {statusLine(service)}
+                </Text>
+              </View>
+
+              {axis && service.today && !service.unavailable ? (
+                <View style={styles.track}>
+                  {service.today.map((window, index) => (
+                    <WindowBar key={index} window={window} axis={axis} open={service.openNow} now={nowMinutes} />
+                  ))}
+                  {showNow ? <View style={[styles.nowLine, { left: `${pct(nowMinutes, axis)}%` }]} /> : null}
+                </View>
               ) : (
-                <>
-                  <Text style={service.openNow ? styles.openText : styles.shutText}>
-                    {service.openNow ? 'Open' : 'Gesloten'}
-                  </Text>
-                  <Text style={styles.detail} numberOfLines={1}>
-                    {service.detail}
-                  </Text>
-                </>
+                <View style={styles.trackEmpty} />
               )}
 
               {hasSchedule ? (
                 <ChevronDown
-                  color={COLORS.muted}
-                  size={15}
+                  color={COLORS.onDarkMuted}
+                  size={14}
                   style={expanded ? styles.chevronOpen : undefined}
                 />
               ) : null}
             </Pressable>
-
-            {axis && service.today && !service.unavailable ? (
-              <View style={styles.track} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-                {service.today.map((window, windowIndex) => (
-                  <WindowBar key={windowIndex} window={window} axis={axis} />
-                ))}
-                {showNow && nowLeft !== null ? (
-                  <View style={[styles.nowLine, { left: `${nowLeft}%` }]} />
-                ) : null}
-              </View>
-            ) : null}
 
             {expanded ? (
               <View style={styles.schedule}>
@@ -108,9 +98,7 @@ export function ServiceList({ services }: { services: AppServiceStatus[] }) {
                 ))}
                 {service.note ? <Text style={styles.note}>{service.note}</Text> : null}
                 {service.live ? (
-                  <Text style={styles.note}>
-                    De toestand hierboven is live gemeten en kan van het rooster afwijken.
-                  </Text>
+                  <Text style={styles.note}>Live gemeten; dat kan van het rooster afwijken.</Text>
                 ) : null}
               </View>
             ) : null}
@@ -121,9 +109,21 @@ export function ServiceList({ services }: { services: AppServiceStatus[] }) {
   );
 }
 
+/** "Open tot 14:00", "Opent 18:00", "Opent do 12:00": de regel van de server, als zin. */
+function statusLine(service: AppServiceStatus): string {
+  const detail = service.detail.trim();
+  if (service.unavailable) return detail;
+  if (service.openNow) {
+    return detail.startsWith('tot') ? `Open ${detail}` : 'Nu open';
+  }
+  if (detail === 'gesloten') return 'Gesloten';
+  if (detail.startsWith('opent')) return `O${detail.slice(1)}`;
+  return `Opent ${detail}`;
+}
+
 type Axis = { start: number; end: number };
 
-/** Hoe lang het vaste stuk van een avond zonder sluitingsuur is, en de vervaagde staart erna. */
+/** Hoe lang het vaste stuk van een avond zonder sluitingsuur is, en de arcering erna. */
 const OPEN_END_SOLID = 2 * 60;
 const OPEN_END_TAIL = 5 * 60;
 
@@ -132,15 +132,23 @@ const OPEN_END_TAIL = 5 * 60;
  * 9:00 tot 19:00, zoals op de site; een avond zonder einde trekt ze verder.
  */
 function timelineAxis(services: AppServiceStatus[]): Axis | null {
-  const windows = services.flatMap((service) => service.today ?? []);
   if (!services.some((service) => service.today)) return null;
   let start = 9 * 60;
   let end = 19 * 60;
-  for (const window of windows) {
+  for (const window of services.flatMap((service) => service.today ?? [])) {
     start = Math.min(start, Math.floor(window.start / 60) * 60);
     end = Math.max(end, Math.ceil((window.end ?? window.start + OPEN_END_TAIL) / 60) * 60);
   }
   return { start, end: Math.min(end, start + 24 * 60) };
+}
+
+function axisLabels(axis: Axis): { text: string; left: number }[] {
+  const labels: { text: string; left: number }[] = [];
+  const step = axis.end - axis.start > 12 * 60 ? 4 * 60 : 3 * 60;
+  for (let minutes = Math.ceil(axis.start / step) * step; minutes <= axis.end; minutes += step) {
+    labels.push({ text: String((minutes / 60) % 24), left: pct(minutes, axis) });
+  }
+  return labels;
 }
 
 function pct(minutes: number, axis: Axis): number {
@@ -161,71 +169,88 @@ function brusselsMinutes(now: Date): number {
   return hour * 60 + minute;
 }
 
-function WindowBar({ window, axis }: { window: AppHoursWindow; axis: Axis }) {
+function WindowBar({
+  window,
+  axis,
+  open,
+  now,
+}: {
+  window: AppHoursWindow;
+  axis: Axis;
+  open: boolean;
+  now: number;
+}) {
   const left = pct(window.start, axis);
+  // Het venster waarin "nu" valt en dat open is, licht geel op.
+  const running = open && now >= window.start && (window.end === null || now < window.end);
   if (window.end !== null) {
-    return <View style={[styles.bar, { left: `${left}%`, width: `${pct(window.end, axis) - left}%` }]} />;
+    return (
+      <View
+        style={[styles.bar, running && styles.barOn, { left: `${left}%`, width: `${pct(window.end, axis) - left}%` }]}
+      />
+    );
   }
   const solidEnd = pct(window.start + OPEN_END_SOLID, axis);
   return (
     <>
-      <View style={[styles.bar, { left: `${left}%`, width: `${solidEnd - left}%` }]} />
+      <View style={[styles.bar, running && styles.barOn, { left: `${left}%`, width: `${solidEnd - left}%` }]} />
       <View style={[styles.bar, styles.tail, { left: `${solidEnd}%`, width: `${100 - solidEnd}%` }]} />
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  list: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.line,
-    overflow: 'hidden',
+  axisRow: { flexDirection: 'row', gap: SPACING.md, marginBottom: 4, paddingRight: 26 },
+  axis: { flex: 1, height: 14 },
+  axisLabel: {
+    position: 'absolute',
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    color: COLORS.onDarkMuted,
+    fontVariant: ['tabular-nums'],
+    marginLeft: -4,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
+    gap: SPACING.md,
+    paddingVertical: 9,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.12)',
   },
-  divided: { borderTopWidth: 1, borderTopColor: COLORS.line },
-  pressed: { backgroundColor: COLORS.paper2 },
-  name: { ...TYPE.body, fontFamily: TYPE.cardTitle.fontFamily, color: COLORS.ink, flex: 1 },
-  // De tijdlijn van vandaag: een haarlijn met de vensters erop in navy.
+  pressed: { opacity: 0.7 },
+  nameCol: { width: 112 },
+  name: { fontFamily: FONTS.semibold, fontSize: 14, lineHeight: 18, color: COLORS.onDark },
+  status: { fontFamily: FONTS.regular, fontSize: 12, lineHeight: 16, color: COLORS.onDarkMuted },
+  statusOpen: { color: COLORS.yellow },
   track: {
-    height: 4,
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
-    marginTop: -SPACING.xs,
-    backgroundColor: COLORS.paper2,
-    borderRadius: 2,
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  bar: { position: 'absolute', top: 0, bottom: 0, backgroundColor: COLORS.navy, borderRadius: 2 },
-  tail: { opacity: 0.25 },
+  trackEmpty: { flex: 1 },
+  bar: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    borderRadius: 3,
+    backgroundColor: 'rgba(239,242,248,0.55)',
+  },
+  barOn: { backgroundColor: COLORS.yellow },
+  tail: { backgroundColor: 'rgba(239,242,248,0.18)' },
   nowLine: {
     position: 'absolute',
-    top: -4,
-    bottom: -4,
+    top: -9,
+    bottom: -9,
     width: 2,
     marginLeft: -1,
-    backgroundColor: COLORS.yellowDeep,
+    backgroundColor: COLORS.yellow,
   },
-  openText: { ...TYPE.small, fontFamily: TYPE.cardTitle.fontFamily, color: COLORS.ink },
-  shutText: { ...TYPE.small, color: COLORS.muted },
-  detail: { ...TYPE.small, color: COLORS.muted, minWidth: 74, textAlign: 'right' },
-  unavailable: { ...TYPE.small, color: COLORS.muted, flexShrink: 1, textAlign: 'right' },
   chevronOpen: { transform: [{ rotate: '180deg' }] },
-
-  schedule: {
-    backgroundColor: COLORS.paper2,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    gap: 3,
-  },
+  schedule: { paddingLeft: 112 + SPACING.md, paddingBottom: SPACING.md, gap: 3 },
   scheduleRow: { flexDirection: 'row', justifyContent: 'space-between', gap: SPACING.md },
-  scheduleDay: { ...TYPE.small, color: COLORS.muted, flex: 1 },
-  scheduleHours: { ...TYPE.small, color: COLORS.body },
-  note: { ...TYPE.small, color: COLORS.muted, marginTop: SPACING.sm },
+  scheduleDay: { ...TYPE.small, color: COLORS.onDarkMuted, flex: 1 },
+  scheduleHours: { ...TYPE.small, color: COLORS.onDark },
+  note: { ...TYPE.small, color: COLORS.onDarkMuted, marginTop: SPACING.xs },
 });

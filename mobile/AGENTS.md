@@ -76,10 +76,17 @@ bekijken. Push is de bestaande uitzondering: die werkt in Expo Go niet.
 7. **Nederlands in de interface**, Engelse vakterminologie waar dat natuurlijker
    is. **Geen em-dashes**, ook niet in code, comments of commits.
 8. **Het ontwerp komt van de site.** De tokens in `src/theme/tokens.ts` zijn de
-   enige plek met kleuren; verzin er geen. Witte kaarten op papier, dunne randen,
-   geel enkel als accent, geen gradienten en geen kaart in een kaart. De donkere
-   `PageHead` opent elk scherm, precies zoals `.vtk-page-head` dat op de site doet;
-   Home tekent dezelfde kop zelf omdat ze buiten de scroll staat.
+   enige plek met kleuren; verzin er geen. Geel enkel als accent, geen gradienten
+   en geen kaart in een kaart. De donkere `PageHead` opent elk scherm, precies
+   zoals `.vtk-page-head` dat op de site doet: navy met het technische patroon
+   (`PatternBand`) en een gele onderlijn van 5 px; tabbladen staan als pillen in
+   die kop. Sinds november 2026 leent elk scherm een patroon van de site in plaats
+   van een eigen app-vorm: de eventtegel met de gele datumpin (`EventTile`),
+   koppen met de gele lijn eronder (`SectionHeading`), registers met haarlijnen in
+   plaats van een witte kaart per regel, de agenda per week (`WeekHead`). Zoek bij
+   een nieuw scherm eerst het overeenkomende scherm op de site en neem dat over.
+   Praesidium hield bewust zijn eigen vorm; de muur van gezichten van de site werd
+   op een telefoon niet beter.
 9. **Home is vandaag, Meer is waar alles staat.** Home beantwoordt twee vragen:
    wat is er open, en wat wacht er op mij. De CMS-boom, de mensen, de piano en je
    profiel staan onder Meer. Zet een snelkoppeling niet op allebei; anders komt de
@@ -137,9 +144,9 @@ bekijken. Push is de bestaande uitzondering: die werkt in Expo Go niet.
   achterlopen en een pushbericht van vorige week draagt nog het oude pad; dat mag
   niet op een leeg scherm eindigen. Ook deze worden gemaakt.
 - `app/(tabs)/_layout.tsx` is wél met de hand geschreven: **Home, Kalender,
-  Studeren, Tickets, Meer**, met hun iconen. Tickets heeft twee segmenten (Kopen/Mijne); zie
-  `src/components/Segmented.tsx` voor waarom dat geen tabs zijn. Broodjes staat als
-  snelkoppeling op Home.
+  Studeren, Tickets, Meer**, met hun iconen. Tickets heeft twee tabbladen (Kopen/Mijne) als
+  pillen in de kop (`tabs` op `PageHead`), net als Broodjes (Bestellen/Afhalen).
+  Broodjes staat als snelkoppeling op Home.
 - `app/_layout.tsx` draagt enkel nog de tabs plus drie modals (inloggen, de
   onboardingpoort, de serverinstelling). Die liggen bewust wél over de balk: een
   modal die de navigatie eronder laat staan, is geen modal.

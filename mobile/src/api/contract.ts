@@ -579,6 +579,12 @@ export type AppTicketEvent = {
   /** De laagste prijs die nu te koop staat, in cent. `null` bij geen enkel type. */
   fromPriceCents: number | null;
   /**
+   * De banner zoals op /tickets: een eigen foto, de themabanner of de affiche
+   * van het gekoppelde evenement. Absolute URL, of `null` zonder banner.
+   * Optioneel voor een oudere server.
+   */
+  imageUrl?: string | null;
+  /**
    * Er staan enkel ledentickets open en je bent niet ingelogd. De app toont dan
    * een loginknop in plaats van een lege lijst.
    */

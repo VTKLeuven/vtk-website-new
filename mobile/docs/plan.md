@@ -607,3 +607,30 @@ De site liep twee maanden voor op de app. Wat de app raakte, is bijgewerkt:
   vandaag met een gele nu-lijn, zonder statusbolletjes, zoals op de homepage.
 - **Markdown**: een enkele enter is een regeleinde, en tabellen staan in een
   witte kaart.
+
+### Fase 8 - Het ontwerp van de site (18 november 2026)
+
+De app zag er niet uit als de site. Per scherm is een patroon van de site
+overgenomen (ontwerpbord: https://claude.ai/artifact/Nn9fxsQCeMZcZ35hQ4XwY8):
+
+- **Overal**: de paginakop met het technische patroon en de gele onderlijn van
+  5 px (`PageHead`, `PatternBand`), tabbladen als pillen in die kop, koppen met
+  de gele lijn eronder (`SectionHeading`), registers met haarlijnen in plaats van
+  een witte kaart per regel.
+- **Home** (voorstel A): de openingsuren als tijdlijn in de navy kop, "Voor jou"
+  als register, de evenementen als eventtegels op een lichtblauwe band, "Snel
+  naar" als de kaarten van "Wat we doen" met een foto.
+- **Kalender**: de eventtegel van /kalender (`EventTile`, lager dan op de site),
+  per week een kop, de thema's als chips, "Mijn lijst" als tabblad.
+- **Evenement**: zoals de eventpagina van de site: kop, affiche als plaat zonder
+  waas, de feiten als gelabelde rijen, "Over dit event".
+- **Tickets**: kaarten met de banner (nieuw veld `imageUrl` in de API), de
+  datumpin en de prijs.
+- **Broodjes**: zoals /theokot: één dag tegelijk via datumpinnen, het broodje van
+  de week uitgelicht, het aanbod als register, het totaal vast onderaan.
+- **Shiften**: de agenda van /shift: per week een kop, per dag een kaart, de
+  shiften als compacte rijen die openklappen.
+- **Meer**: je profiel als donker glas in de kop, de links als het register in de
+  marge van de site, de onderdelen als de tegels van een categoriepagina.
+- **Praesidium** bleef zoals het was: de muur van gezichten was op een telefoon
+  geen verbetering.
