@@ -72,7 +72,9 @@ acties zijn daarom verwijderd.
 - `photos.manageAlbums` blijft de permissie voor fotoalbums: ze geeft nu toegang
   tot het albumgedeelte van `/admin/media`. `media.manage` blijft over voor
   magazines en promovideo's, zodat Communicatie en de fotografen apart bediend
-  kunnen worden.
+  kunnen worden. Sinds november 2026 zijn er twee lichtere rechten naast:
+  `photos.upload` en `photos.createAlbums`; zie "Rechten op de fotoalbums" onder
+  "Mediabeheer".
 - De homepage-instelling **"Uitgelichte albums"** is mee verdwenen. Ze schreef
   `home.featuredAlbums` weg met vrij getypte slugs, maar de homepage toonde die
   albums nergens. Wil je later toch uitgelichte albums op de homepage, bouw dan
@@ -12115,6 +12117,38 @@ album wilde nakijken, moest in Immich zijn.
     met privélinks ernaast moet "Verborgen" in het beheer kloppen. Voordien was
     een verborgen album via de fotoproxy nog te openen voor wie ooit een
     foto-URL had.
+- **Rechten op de fotoalbums (november 2026): drie trappen.** Tot dan gaf elk
+  recht op albums alles, ook publiceren en weggooien, en `photos.upload` (in de
+  basisrol van het praesidium) gaf eigenlijk niets in het mediabeheer. Nu, in
+  `lib/media-album-access.ts`:
+  - **`photos.upload`: foto's toevoegen aan een album dat er al is.** Het tabblad
+    Foto's opent, de dropzone werkt, en dat is het. Geen nieuw album, geen
+    titel of cover, geen foto verbergen, niets downloaden of delen. Een upload in
+    een album dat op de site staat, staat meteen online: dat is de bedoeling (wie
+    op de activiteit fotografeerde, vult het album aan), en daarom controleert de
+    server dat het album bij vtk.be hoort en niet in de prullenmand ligt.
+  - **`photos.createAlbums`: ook een album aanmaken, maar niet publiceren of
+    verwijderen.** Een nieuw album begint altijd verborgen, wat het formulier ook
+    meestuurt. Zolang het verborgen is, is het een kladversie en mag deze trap de
+    titel, de beschrijving, de cover en de tabs nog wijzigen; eens het op de site
+    staat (openbaar of privé), niet meer, want elke wijziging is dan een
+    publicatie. Een tab toevoegen mag wel bij elk album: dat is een album
+    aanmaken, en de tab krijgt de stand van zijn album.
+  - **`photos.manageAlbums` en `media.manage`: alles**, ook de stand kiezen, foto's
+    verbergen, privélinks, downloaden en de prullenmand.
+  - Er is geen eigenaar per album: wie albums aanmaakt, mag elke kladversie
+    bewerken, niet enkel de eigen. Een eigenaar bijhouden vraagt een tabel naast
+    Immich, en daar was (nog) geen vraag naar.
+- **Een derde stand: privé (`[gallery-private]`).** Naast "op vtk.be" en
+  "verborgen" kan een album gepubliceerd zijn zonder in het overzicht te staan:
+  niet op /media, niet in de zoekfunctie, niet in de nieuwsband en niet in de
+  app, en `noindex` voor zoekmachines, maar wie het adres `/media/<slug>` heeft,
+  ziet de foto's zonder in te loggen. Dat is iets anders dan een privélink: die
+  werkt ook voor een verborgen album, verloopt, kan inloggen vragen en telt hoe
+  vaak hij geopend is. Privé is voor een album dat gewoon niet in de etalage
+  hoort (een bedankavond voor de helpers), niet voor iets dat geheim moet
+  blijven: het adres volgt uit de titel en is dus te raden. Wie dat niet wil,
+  verbergt het album en maakt een privélink.
 
 ## Vervangbaar op een shift: een student neemt de plaats van het praesidium in
 

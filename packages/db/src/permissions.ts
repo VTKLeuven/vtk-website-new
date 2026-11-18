@@ -24,9 +24,15 @@ export const PERMISSIONS = [
   { code: "forms.create", labelNl: "Formulieren aanmaken voor eigen groep", labelEn: "Create forms for own group", category: "forms" },
   { code: "forms.manageAll", labelNl: "Alle formulieren beheren", labelEn: "Manage all forms", category: "forms" },
 
-  // Photos
-  { code: "photos.upload", labelNl: "Foto's uploaden", labelEn: "Upload photos", category: "photos" },
-  { code: "photos.manageAlbums", labelNl: "Albums beheren", labelEn: "Manage albums", category: "photos" },
+  // Photos. Drie trappen in /admin/media, elk met wat de vorige kan erbij
+  // (lib/media-album-access.ts): `upload` vult een bestaand album aan,
+  // `createAlbums` maakt een nieuw album dat verborgen begint en mag het
+  // bewerken zolang het verborgen is, `manageAlbums` publiceert en verwijdert.
+  // `photos.upload` opent ook de algemene uploadroute (afbeeldingen voor
+  // pagina's en evenementen), zoals vroeger.
+  { code: "photos.upload", labelNl: "Foto's uploaden naar bestaande albums", labelEn: "Upload photos to existing albums", category: "photos" },
+  { code: "photos.createAlbums", labelNl: "Albums aanmaken (zonder publiceren of verwijderen)", labelEn: "Create albums (without publishing or deleting)", category: "photos" },
+  { code: "photos.manageAlbums", labelNl: "Albums beheren, publiceren en verwijderen", labelEn: "Manage, publish and delete albums", category: "photos" },
 
   // Users & groups
   { code: "users.search", labelNl: "Gebruikers opzoeken (user-pickers)", labelEn: "Search users (user pickers)", category: "users" },

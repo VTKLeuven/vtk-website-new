@@ -9,6 +9,8 @@ export function albumErrorMessages(locale: Locale): Record<string, string> {
   return locale === "nl"
     ? {
         ALBUM_MISSING: "Niet gelukt: dit album bestaat niet meer. Herlaad de pagina.",
+        ALBUM_PUBLISHED:
+          "Niet opgeslagen: dit album staat op de site. Enkel wie albums beheert, kan het nog wijzigen; foto's toevoegen kan wel.",
         PHOTO_MISSING: "Niet gelukt: die foto's staan niet meer bij de verborgen foto's.",
         IMMICH_UNREACHABLE: "Niet gelukt: de fotobibliotheek is niet bereikbaar. Probeer straks opnieuw.",
         TAB_NAME_REQUIRED: "Niet opgeslagen: geef de tab een naam.",
@@ -32,6 +34,8 @@ export function albumErrorMessages(locale: Locale): Record<string, string> {
       }
     : {
         ALBUM_MISSING: "Failed: this album no longer exists. Reload the page.",
+        ALBUM_PUBLISHED:
+          "Not saved: this album is on the site. Only album managers can still change it; adding photos does work.",
         PHOTO_MISSING: "Failed: those photos are no longer among the hidden photos.",
         IMMICH_UNREACHABLE: "Failed: the photo library is unreachable. Try again later.",
         TAB_NAME_REQUIRED: "Not saved: give the tab a name.",

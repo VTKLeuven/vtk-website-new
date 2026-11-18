@@ -7,6 +7,7 @@ import {
 } from "@/lib/immich-gallery";
 import { loadLibraryAlbum } from "@/lib/media-admin";
 import { authErrorResponse, requireAnyPermission } from "@/lib/session";
+import { ALBUM_MANAGE_PERMISSIONS } from "@/lib/media-album-access";
 
 /**
  * Het origineel van één foto of video uit een album, vanuit het mediabeheer.
@@ -29,7 +30,7 @@ export async function GET(
   context: { params: Promise<{ albumId: string; assetId: string }> },
 ) {
   try {
-    await requireAnyPermission(["media.manage", "photos.manageAlbums"]);
+    await requireAnyPermission([...ALBUM_MANAGE_PERMISSIONS]);
   } catch (error) {
     return authErrorResponse(error);
   }

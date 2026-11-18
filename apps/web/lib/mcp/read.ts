@@ -68,7 +68,7 @@ const RESOURCE_PERMISSIONS = {
   ticket_orders: ["tickets.manageAll"],
   forms: ["forms.create", "forms.manageAll"],
   form_entries: ["forms.manageAll"],
-  photos: ["photos.upload", "photos.manageAlbums", "media.manage"],
+  photos: ["photos.upload", "photos.createAlbums", "photos.manageAlbums", "media.manage"],
   pocs: ["pocs.manage"],
   partners: ["partners.manage"],
   editorial_settings: ["home.edit", "openingHours.manageOwn", "media.manage"],

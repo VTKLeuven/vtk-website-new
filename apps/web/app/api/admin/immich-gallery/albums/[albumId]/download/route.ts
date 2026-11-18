@@ -7,6 +7,7 @@ import { albumZipEntries, albumZipFilename } from "@/lib/media-album-zip";
 import { withHiddenPhotoDetails } from "@/lib/media-hidden-photos";
 import { openZipOriginal } from "@/lib/media-zip-originals";
 import { authErrorResponse, requireAnyPermission } from "@/lib/session";
+import { ALBUM_MANAGE_PERMISSIONS } from "@/lib/media-album-access";
 
 /**
  * Het hele album als zip, in de originele kwaliteit: alle tabs, en ook een
@@ -34,7 +35,7 @@ export async function GET(
   context: { params: Promise<{ albumId: string }> },
 ) {
   try {
-    await requireAnyPermission(["media.manage", "photos.manageAlbums"]);
+    await requireAnyPermission([...ALBUM_MANAGE_PERMISSIONS]);
   } catch (error) {
     return authErrorResponse(error);
   }

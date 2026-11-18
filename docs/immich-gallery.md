@@ -79,6 +79,52 @@ achter de mediarechten). Een album in het beheer heeft als adres het Immich-id
 van zijn hoofdalbum, niet de slug: die verandert mee met de titel, en een
 verborgen album heeft er geen.
 
+### De drie standen van een album
+
+Een album van vtk.be draagt precies één van drie merkers, op elk deel (het
+hoofdalbum en zijn tabs):
+
+| Merker | Stand | Overzicht (/media, zoeken, nieuws, app) | Eigen adres `/media/<slug>` | Gedeelde link in Immich |
+| --- | --- | --- | --- | --- |
+| `[gallery]` | op vtk.be | ja | ja | ja |
+| `[gallery-private]` | privé | nee | ja, met `noindex` | ja |
+| `[gallery-uit]` | verborgen | nee | nee (404) | weggehaald |
+
+De fakbar heeft dezelfde drie: `[fakbar]`, `[fakbar-private]`, `[fakbar-uit]`.
+Geen enkele botst met de gewone merker: `"[gallery-private]"` bevat `"[gallery]"`
+niet. `albumVisibility` (`packages/gallery/src/config.ts`) leest de stand; draagt
+een album er toch twee, dan wint de meest openbare. Wisselen gebeurt met
+`replaceVisibilityMarker`, die alle drie weghaalt en er één terugzet.
+
+**Een privé album zit gewoon in de momentopname**, met zijn gedeelde link en zijn
+foto-URL's; enkel `listAlbums()` laat het weg (`unlisted` op het album). Het
+beheer vraagt `listAlbums({ includeUnlisted: true })` om ook van een privé album
+de slug te kennen. In `listAdminAlbums` telt privé als zichtbaar, zodat de slugs
+in dezelfde volgorde vallen als in de momentopname. Een album met tabs neemt de
+stand van zijn hoofdalbum over.
+
+De prullenmand onthoudt de stand (`GalleryTrashedAlbum.wasHidden` en
+`wasPrivate`): terugzetten maakt van een privé album geen openbaar album.
+
+### Wie wat mag
+
+`lib/media-album-access.ts`, drie trappen, elk met alles van de vorige:
+
+| Recht | Mag |
+| --- | --- |
+| `photos.upload` | het tabblad Foto's openen en foto's toevoegen aan een bestaand album van vtk.be |
+| `photos.createAlbums` | ook een album aanmaken (altijd verborgen), een tab toevoegen, en een **verborgen** album bewerken: titel, beschrijving, cover, tabs hernoemen of loskoppelen, foto's tussen tabs verplaatsen |
+| `photos.manageAlbums`, `media.manage` | alles: de stand kiezen, foto's verbergen of tonen, privélinks, downloaden, de prullenmand |
+
+Magazines, aftermovies, verwijderverzoeken en de schakelaar voor de
+fakbargalerij blijven enkel `media.manage`. Elke actie controleert het recht zelf
+nog eens; het scherm verbergt enkel wat je niet mag. Een upload controleert
+bovendien dat het album bij vtk.be hoort en niet in de prullenmand ligt
+(`albumVisibilityOf`, zonder de foto's op te halen): het album-id komt uit de
+browser, en zonder die controle kon wie mag uploaden in elk album van Immich
+schrijven. Naar de fakbargalerij uploaden kan enkel wie albums mag aanmaken,
+want dat gaat altijd via een nieuw album.
+
 ### Een album van de site halen
 
 `[gallery]` wisselen voor **`[gallery-uit]`** haalt het album van de mediapagina
@@ -109,7 +155,8 @@ daarmee toont het beheer haar gedimd in haar eigen album en zet "Tonen" haar ter
 ### Een album of een foto downloaden
 
 Twee routes onder `/api/admin/immich-gallery/albums/<albumId>/`, achter
-`media.manage` of `photos.manageAlbums` (Communicatie heeft het eerste). Beide
+`media.manage` of `photos.manageAlbums` (Communicatie heeft het eerste), niet
+achter `photos.upload` of `photos.createAlbums`. Beide
 geven het **origineel**, en beide lezen het album uit `loadLibraryAlbum`, net als
 het scherm.
 

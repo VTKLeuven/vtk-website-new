@@ -14,8 +14,15 @@ import {
   type MediaPublicationKind,
 } from "@/lib/media-content";
 import {
+  ALBUM_CREATE_PERMISSIONS,
+  ALBUM_MANAGE_PERMISSIONS,
+  ALBUM_UPLOAD_PERMISSIONS,
+  albumRights,
+} from "@/lib/media-album-access";
+import {
   addImmichAssetsToAlbum,
   createImmichGalleryAlbum,
+  galleryAlbumVisibilityOf,
   getImmichGalleryAlbum,
   getManageableGalleryAlbum,
   refreshImmichGallerySnapshot,
@@ -268,18 +275,42 @@ export async function savePromoVideosAction(
 }
 
 /**
- * Wie een fotoalbum mag aanmaken en vullen.
- *
- * De albumsectie van /admin/media staat open voor `photos.manageAlbums`, maar
- * deze acties eisten enkel `media.manage`: wie het eerste recht had, zag de
- * uploader en kreeg een throw bij het opslaan.
+ * Mag deze upload naar dit Immich-album? Het id komt uit de browser, en wie
+ * enkel `photos.upload` heeft, mocht anders in elk album van Immich schrijven:
+ * dat van de fakbar, een album dat in de prullenmand ligt, of een album dat
+ * helemaal niet bij de site hoort. Een album van vtk.be moet dus een van onze
+ * merkers dragen en niet in de prullenmand liggen; een fakbaralbum enkel voor
+ * wie albums mag aanmaken, want enkel die komt er via het nieuwe-albumvenster.
  */
-const ALBUM_PERMISSIONS = ["media.manage", "photos.manageAlbums"] as const;
+async function canUploadInto(
+  albumId: string,
+  target: GalleryTarget | null,
+  canCreate: boolean,
+): Promise<boolean> {
+  if (target === "fakbar") {
+    return canCreate && (await fakbarGallery.albumVisibilityOf(albumId).catch(() => null)) !== null;
+  }
+  if (target !== "main") return false;
+  const [visibility, trashed] = await Promise.all([
+    galleryAlbumVisibilityOf(albumId).catch(() => null),
+    prisma.galleryTrashedAlbum.findFirst({
+      where: { OR: [{ albumId }, { partIds: { has: albumId } }] },
+      select: { id: true },
+    }),
+  ]);
+  return visibility !== null && !trashed;
+}
 
+/**
+ * Een nieuw album. Wie enkel albums mag aanmaken (`photos.createAlbums`), krijgt
+ * het altijd verborgen, wat het formulier ook meestuurt: op de site zetten is
+ * publiceren, en dat blijft bij wie albums beheert.
+ */
 export async function createImmichAlbumAction(
   formData: FormData
 ): Promise<{ ok: boolean; albumId?: string; error?: string }> {
-  await requireAnyPermission([...ALBUM_PERMISSIONS]);
+  const session = await requireAnyPermission([...ALBUM_CREATE_PERMISSIONS]);
+  const rights = albumRights(session);
   const title = readField(formData, "title");
   let description = readField(formData, "description", 1000);
   const parentSlug = readField(formData, "parentSlug", 100);
@@ -300,7 +331,7 @@ export async function createImmichAlbumAction(
   if (!target) return { ok: false, error: "fakbar_upload_disabled" };
   // "Eerst nakijken": het album krijgt meteen de uit-merker en staat pas op de
   // site wanneer iemand het in het beheer aanzet. Standaard staat het er meteen.
-  const hidden = formData.get("visible") === "false";
+  const hidden = !rights.manage || formData.get("visible") === "false";
   try {
     const album =
       target === "fakbar"
@@ -343,11 +374,15 @@ export async function createImmichAlbumAction(
 export async function uploadImmichAlbumAssetAction(
   formData: FormData
 ): Promise<{ ok: boolean; assetId?: string; error?: string }> {
-  await requireAnyPermission([...ALBUM_PERMISSIONS]);
+  const session = await requireAnyPermission([...ALBUM_UPLOAD_PERMISSIONS]);
   const albumId = readField(formData, "albumId", 100);
   const file = formData.get("file");
   if (!albumId || !(file instanceof File) || file.size === 0) {
     return { ok: false, error: "missing" };
+  }
+  const target = await readGalleryTarget(formData);
+  if (!(await canUploadInto(albumId, target, albumRights(session).create))) {
+    return { ok: false, error: "album_not_allowed" };
   }
   if (file.size > MAX_IMAGE_BYTES) return { ok: false, error: "too_large" };
   if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
@@ -379,7 +414,9 @@ export async function uploadImmichAlbumAssetAction(
 export async function setImmichAlbumCoverAction(
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
-  await requireAnyPermission([...ALBUM_PERMISSIONS]);
+  // Geen scherm roept dit nog aan (de cover zet je met `setAlbumCoverAction`);
+  // daarom enkel voor wie albums beheert, in plaats van de kladregel te herhalen.
+  await requireAnyPermission([...ALBUM_MANAGE_PERMISSIONS]);
   const albumId = readField(formData, "albumId", 100);
   const assetId = readField(formData, "assetId", 100);
   if (!albumId || !assetId) return { ok: false, error: "missing" };
@@ -400,7 +437,7 @@ export async function setImmichAlbumCoverAction(
 }
 
 export async function finalizeImmichAlbumAction(formData?: FormData): Promise<void> {
-  await requireAnyPermission([...ALBUM_PERMISSIONS]);
+  await requireAnyPermission([...ALBUM_UPLOAD_PERMISSIONS]);
   // Ververst de momentopname van de galerij waarin net geüpload is. De andere
   // met rust laten scheelt een volledige Immich-uitlezing per upload.
   if (formData?.get("gallery") === "fakbar") {

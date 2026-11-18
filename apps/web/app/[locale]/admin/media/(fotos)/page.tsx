@@ -6,18 +6,19 @@ import { hasLocale } from "@/lib/locale";
 import { requireAnyPermission } from "@/lib/session";
 import { FakbarUploadToggle } from "../FakbarUploadToggle";
 import { EmptyLibrary } from "./EmptyLibrary";
+import { ALBUM_UPLOAD_PERMISSIONS, albumRights } from "@/lib/media-album-access";
 
 export default async function PhotoLibraryHome({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   if (!hasLocale(locale)) notFound();
-  const session = await requireAnyPermission(["media.manage", "photos.manageAlbums"]);
+  const session = await requireAnyPermission([...ALBUM_UPLOAD_PERMISSIONS]);
   const nl = locale === "nl";
   const canManageMedia = hasPermission(session, "media.manage");
   const fakbarEnabled = canManageMedia ? await fakbarUploadEnabled() : false;
 
   return (
     <>
-      <EmptyLibrary locale={locale} />
+      <EmptyLibrary locale={locale} canCreate={albumRights(session).create} />
       {/* Een instelling die je eens per jaar aanraakt: dicht, en enkel voor wie ze
           mag wijzigen. Ze stond bovenaan de albumsectie en duwde de uploader
           voor iedereen een scherm naar beneden. */}

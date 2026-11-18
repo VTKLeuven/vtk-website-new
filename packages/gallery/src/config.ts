@@ -76,6 +76,60 @@ export function hiddenMarker(id: GalleryId): string {
   return marker.endsWith(']') ? `${marker.slice(0, -1)}-uit]` : `${marker}-uit`;
 }
 
+/**
+ * De merker van een album dat **gepubliceerd** is maar niet in het overzicht
+ * staat: `[gallery]` wordt `[gallery-private]`.
+ *
+ * Zo'n album zit in de momentopname, heeft een gedeelde link en opent op
+ * `/media/<slug>` voor wie dat adres heeft, maar `listAlbums()` laat het weg:
+ * niet op /media, niet in de zoekfunctie, niet in de app. Ook hier geen botsing:
+ * `'[gallery-private]'.includes('[gallery]')` is `false`.
+ *
+ * Dit is iets anders dan een privélink (`GalleryShareLink`): die werkt ook voor
+ * een verborgen album, kan verlopen en kan inloggen vragen. Een privé album is
+ * gewoon openbaar voor wie het adres kent.
+ */
+export function privateMarker(id: GalleryId): string {
+  const marker = galleryMarker(id);
+  return marker.endsWith(']') ? `${marker.slice(0, -1)}-private]` : `${marker}-private`;
+}
+
+/**
+ * De drie standen van een album binnen zijn galerij.
+ *
+ * - `public`: `[gallery]`, in het overzicht en op zijn eigen adres.
+ * - `private`: `[gallery-private]`, enkel op zijn eigen adres.
+ * - `hidden`: `[gallery-uit]`, nergens op de site, enkel in het beheer.
+ */
+export type AlbumVisibility = 'public' | 'private' | 'hidden';
+
+export const ALBUM_VISIBILITIES: readonly AlbumVisibility[] = ['public', 'private', 'hidden'] as const;
+
+/** De merker die bij een stand hoort. */
+export function visibilityMarker(id: GalleryId, visibility: AlbumVisibility): string {
+  if (visibility === 'public') return galleryMarker(id);
+  if (visibility === 'private') return privateMarker(id);
+  return hiddenMarker(id);
+}
+
+/**
+ * De stand van een album volgens zijn beschrijving, of `null` wanneer het niet
+ * bij deze galerij hoort.
+ *
+ * Draagt een album er toevallig twee, dan wint de meest openbare: zo deed de
+ * site het al met `[gallery]` naast `[gallery-uit]`, en het beheer zet bij de
+ * volgende wijziging toch maar één merker terug.
+ */
+export function albumVisibility(id: GalleryId, description: string | null | undefined): AlbumVisibility | null {
+  const raw = String(description || '');
+  const own = galleryMarker(id);
+  if (!own) return null;
+  if (raw.includes(own)) return 'public';
+  if (raw.includes(privateMarker(id))) return 'private';
+  if (raw.includes(hiddenMarker(id))) return 'hidden';
+  return null;
+}
+
 /** De merkers van alle andere galerijen, voor de uitsluiting hierboven. */
 export function foreignMarkers(id: GalleryId): string[] {
   return GALLERY_IDS.filter((other) => other !== id)

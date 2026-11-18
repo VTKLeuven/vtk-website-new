@@ -1487,3 +1487,55 @@
 .media-album-row-flag.is-shared {
   color: var(--ink);
 }
+
+/* ------------------------------------------------------------------------
+   Rechten: wat een uploader of albummaker ziet in plaats van een bewerkveld
+   (lib/media-album-access.ts)
+   ------------------------------------------------------------------------ */
+
+/* De lege toestand voor wie enkel uploadt: dezelfde vorm, maar geen doel. */
+.media-dropzone.is-static {
+  cursor: default;
+}
+
+.media-dropzone.is-static:hover {
+  border-color: color-mix(in oklab, var(--navy) 30%, transparent);
+  background: color-mix(in oklab, var(--paper-2) 35%, var(--surface));
+}
+
+/* De titel van een album dat je niet mag bewerken: zoals het veld, zonder rand. */
+.media-album-static h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.media-album-static p {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+}
+
+/* De stand van het album: uitleg links, de drie keuzes rechts. */
+.media-visibility {
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.media-visibility > span:first-child {
+  flex: 1 1 280px;
+}
+
+.media-visibility .media-chip:disabled {
+  cursor: default;
+}
+
+.media-dialog-note {
+  margin: 0;
+  font-size: 13px;
+}
+
+.media-dialog-note b {
+  color: var(--ink);
+}

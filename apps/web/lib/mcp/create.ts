@@ -75,7 +75,7 @@ const CREATE_PERMISSIONS = {
   form: ["forms.create", "forms.manageAll"],
   form_section: ["forms.create", "forms.manageAll"],
   form_field: ["forms.create", "forms.manageAll"],
-  photo_album: ["photos.upload", "photos.manageAlbums", "media.manage"],
+  photo_album: ["photos.upload", "photos.createAlbums", "photos.manageAlbums", "media.manage"],
   group: ["groups.manage", "werkgroepen.manage", "jaarwerkingen.manage"],
   role: ["roles.manage"],
   dashboard_tile: ["dashboard.manage", "dashboard.manageOwn"],

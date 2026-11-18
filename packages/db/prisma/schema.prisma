@@ -9513,6 +9513,10 @@ model GalleryTrashedAlbum {
   photoCount Int
   /// Stond het album al van de site? Dan blijft het na terugzetten verborgen.
   wasHidden  Boolean
+  /// Was het privé (`[gallery-private]`)? Dan wordt het na terugzetten weer privé
+  /// en geen openbaar album in het overzicht. Rijen van voor deze kolom: false,
+  /// en dat klopt, want privé bestond toen nog niet.
+  wasPrivate Boolean @default(false)
 
   trashedById String?
   trashedAt   DateTime @default(now()) @db.Timestamptz(3)

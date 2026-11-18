@@ -20,8 +20,7 @@ import { createShareToken, hashShareToken } from "@/lib/media-share-token";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { encryptSecret } from "@/lib/secrets";
 import { requireAnyPermission } from "@/lib/session";
-
-const ALBUM_PERMISSIONS = ["media.manage", "photos.manageAlbums"] as const;
+import { ALBUM_MANAGE_PERMISSIONS } from "@/lib/media-album-access";
 
 const AUDIENCE_SUMMARY: Record<GalleryShareAudience, string> = {
   LINK: "iedereen met de link",
@@ -58,7 +57,7 @@ function refresh(): void {
 }
 
 export async function createShareLinkAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
-  const session = await requireAnyPermission([...ALBUM_PERMISSIONS]);
+  const session = await requireAnyPermission([...ALBUM_MANAGE_PERMISSIONS]);
 
   const albumId = readField(formData, "albumId", 100);
   const label = readField(formData, "label", SHARE_LABEL_MAX);
@@ -112,7 +111,7 @@ export async function createShareLinkAction(_prev: SaveState, formData: FormData
  * zodat een verlopen link met dezelfde URL weer werkt.
  */
 export async function updateShareLinkAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
-  await requireAnyPermission([...ALBUM_PERMISSIONS]);
+  await requireAnyPermission([...ALBUM_MANAGE_PERMISSIONS]);
 
   const id = readField(formData, "id", 100);
   const label = readField(formData, "label", SHARE_LABEL_MAX);
@@ -149,7 +148,7 @@ export async function updateShareLinkAction(_prev: SaveState, formData: FormData
 
 /** Intrekken is verwijderen: de URL werkt meteen niet meer, het album blijft staan. */
 export async function revokeShareLinkAction(formData: FormData): Promise<SaveState> {
-  await requireAnyPermission([...ALBUM_PERMISSIONS]);
+  await requireAnyPermission([...ALBUM_MANAGE_PERMISSIONS]);
 
   const id = readField(formData, "id", 100);
   const link = id

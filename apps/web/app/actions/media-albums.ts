@@ -21,6 +21,12 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@vtk/db";
 import { requireAnyPermission } from "@/lib/session";
+import {
+  ALBUM_CREATE_PERMISSIONS,
+  ALBUM_MANAGE_PERMISSIONS,
+  albumRights,
+  canEditAlbum,
+} from "@/lib/media-album-access";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { logAudit } from "@/lib/audit";
 import {
@@ -30,6 +36,7 @@ import {
   deleteImmichAssets,
   galleryAlbumMarker,
   galleryHiddenAlbumMarker,
+  galleryPrivateAlbumMarker,
   getManageableGalleryAlbum,
   listAdminGalleryAlbums,
   refreshImmichGallerySnapshot,
@@ -38,20 +45,20 @@ import {
   setImmichAlbumCover,
   succeededAssetIds,
   setMarker,
-  swapMarker,
+  replaceVisibilityMarker,
   updateImmichAlbum,
   type AdminAlbum,
+  type AlbumVisibility,
 } from "@/lib/immich-gallery";
 import { trashCutoff } from "@/lib/media-admin-shared";
 
 /**
- * Wie een album mag beheren.
- *
- * De albumsectie van /admin/media staat open voor `photos.manageAlbums`, maar de
- * acties eisten `media.manage`: wie enkel het eerste recht had, zag de uploader
- * en kreeg een throw bij het opslaan. Beide rechten geven hier toegang.
+ * Wie wat mag, staat in `lib/media-album-access.ts`. Kort: de stand kiezen,
+ * foto's verbergen en alles met de prullenmand is voor wie albums beheert
+ * (`ALBUM_MANAGE_PERMISSIONS`). Titel, beschrijving, cover en tabs mag ook wie
+ * albums aanmaakt, maar enkel zolang het album verborgen is (`canEditAlbum`):
+ * daarna staat het op de site en is elke wijziging een publicatie.
  */
-const ALBUM_PERMISSIONS = ["media.manage", "photos.manageAlbums"] as const;
 
 function readField(formData: FormData, name: string, max = 200): string {
   const raw = formData.get(name);
@@ -84,6 +91,27 @@ async function loadAlbum(albumId: string): Promise<AdminAlbum | null> {
   return albums?.find((album) => album.id === albumId) ?? null;
 }
 
+/** Het album waar een tab bij hoort, op het id van de tab (of van het album zelf). */
+async function loadAlbumOfPart(partId: string): Promise<AdminAlbum | null> {
+  if (!partId) return null;
+  const albums = await listAdminGalleryAlbums().catch(() => null);
+  return albums?.find((album) => album.parts.some((part) => part.id === partId)) ?? null;
+}
+
+/**
+ * Voor een actie die een album bewerkt zonder het te publiceren: de sessie, en
+ * of ze dit album mag wijzigen. Een beheerder altijd, wie albums aanmaakt
+ * enkel een verborgen album. `null` wanneer het album niet (meer) bestaat.
+ */
+async function requireEditable(
+  album: AdminAlbum | null,
+): Promise<{ ok: true; album: AdminAlbum } | { ok: false; state: SaveState }> {
+  const session = await requireAnyPermission([...ALBUM_CREATE_PERMISSIONS]);
+  if (!album) return { ok: false, state: saveError("ALBUM_MISSING") };
+  if (!canEditAlbum(albumRights(session), album)) return { ok: false, state: saveError("ALBUM_PUBLISHED") };
+  return { ok: true, album };
+}
+
 function partOf(album: AdminAlbum, partId: string) {
   return album.parts.find((part) => part.id === partId) ?? null;
 }
@@ -94,26 +122,40 @@ function tabNameOf(album: AdminAlbum, partId: string): string | null {
 }
 
 /**
- * Zet de galerijmerker op elk deel van het album aan of uit.
+ * Zet de galerijmerker op elk deel van het album: `[gallery]` (openbaar),
+ * `[gallery-private]` (enkel via het adres) of `[gallery-uit]` (verborgen).
  *
  * Verbergen haalt ook de gedeelde link van Immich weg. De sleutel daarvan staat
  * in elke foto-URL die de site ooit toonde, en op de fotoproxy opent hij het hele
  * album, ook nadat het van de site is. Terugzetten maakt geen link: dat doet de
  * momentopname zelf, met een nieuwe sleutel. Ook de prullenmand loopt hierlangs.
+ *
+ * Tussen openbaar en privé blijft de link wel staan: een privé album staat nog
+ * op de site, op zijn eigen adres, en zijn foto's lopen via die link.
  */
-async function setPartsVisible(partIds: string[], visible: boolean): Promise<void> {
-  const marker = galleryAlbumMarker();
-  const hidden = galleryHiddenAlbumMarker();
+async function setPartsVisibility(partIds: string[], visibility: AlbumVisibility): Promise<void> {
+  const markers = [galleryAlbumMarker(), galleryPrivateAlbumMarker(), galleryHiddenAlbumMarker()];
+  const to =
+    visibility === "public" ? markers[0] : visibility === "private" ? markers[1] : markers[2];
   for (const id of partIds) {
     const current = await getManageableGalleryAlbum(id);
     if (!current) continue;
-    const next = visible
-      ? swapMarker(current.description, hidden, marker)
-      : swapMarker(current.description, marker, hidden);
+    const next = replaceVisibilityMarker(current.description, markers, to);
     if (next !== current.description) await updateImmichAlbum(id, { description: next });
-    if (!visible) await deleteImmichAlbumSharedLinks(id);
+    if (visibility === "hidden") await deleteImmichAlbumSharedLinks(id);
   }
 }
+
+function readVisibility(formData: FormData): AlbumVisibility | null {
+  const raw = formData.get("visibility");
+  return raw === "public" || raw === "private" || raw === "hidden" ? raw : null;
+}
+
+const VISIBILITY_SUMMARY: Record<AlbumVisibility, string> = {
+  public: "fotoalbum op de site gezet",
+  private: "fotoalbum privé gezet: enkel nog via zijn adres",
+  hidden: "fotoalbum van de site gehaald",
+};
 
 // -----------------------------------------------------------------------------
 // Het album zelf
@@ -123,13 +165,13 @@ export async function saveAlbumDetailsAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  await requireAnyPermission([...ALBUM_PERMISSIONS]);
-
   const albumId = readField(formData, "albumId", 100);
   const title = readField(formData, "title");
   const description = readField(formData, "description", 1000);
   if (!albumId || !title) return saveError("INVALID_INPUT");
 
+  const access = await requireEditable(await loadAlbum(albumId));
+  if (!access.ok) return access.state;
   const current = await getManageableGalleryAlbum(albumId);
   if (!current) return saveError("ALBUM_MISSING");
 
@@ -158,23 +200,25 @@ export async function saveAlbumDetailsAction(
 }
 
 /**
- * Op de site zetten en eraf halen: `[gallery]` wisselt met `[gallery-uit]`, op
- * **elk** deel van het album. Enkel het hoofdalbum omzetten liet de tabs als
- * losse albums op de site staan, want hun `[parent:]` wees dan naar niets.
+ * De stand van het album kiezen: openbaar, privé of verborgen, op **elk** deel
+ * van het album. Enkel het hoofdalbum omzetten liet de tabs als losse albums op
+ * de site staan, want hun `[parent:]` wees dan naar niets. Dit is publiceren,
+ * dus enkel voor wie albums beheert.
  */
 export async function setAlbumVisibilityAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  await requireAnyPermission([...ALBUM_PERMISSIONS]);
+  await requireAnyPermission([...ALBUM_MANAGE_PERMISSIONS]);
 
   const albumId = readField(formData, "albumId", 100);
-  const visible = formData.get("visible") === "true";
+  const visibility = readVisibility(formData);
+  if (!visibility) return saveError("INVALID_INPUT");
   const album = await loadAlbum(albumId);
   if (!album) return saveError("ALBUM_MISSING");
 
   try {
-    await setPartsVisible(album.parts.map((part) => part.id), visible);
+    await setPartsVisibility(album.parts.map((part) => part.id), visibility);
   } catch (error) {
     console.error("Immich album visibility update failed", error);
     return saveError("IMMICH_UNREACHABLE");
@@ -185,7 +229,7 @@ export async function setAlbumVisibilityAction(
     entity: "photoAlbum",
     entityId: album.id,
     target: album.title,
-    summary: visible ? "fotoalbum op de site gezet" : "fotoalbum van de site gehaald",
+    summary: VISIBILITY_SUMMARY[visibility],
   });
   await refreshGallery();
   return saveOk();
@@ -195,11 +239,11 @@ export async function setAlbumCoverAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  await requireAnyPermission([...ALBUM_PERMISSIONS]);
-
   const albumId = readField(formData, "albumId", 100);
   const assetId = readField(formData, "assetId", 100);
   if (!albumId || !assetId) return saveError("INVALID_INPUT");
+  const access = await requireEditable(await loadAlbum(albumId));
+  if (!access.ok) return access.state;
 
   try {
     await setImmichAlbumCover(albumId, assetId);
@@ -235,14 +279,14 @@ export async function trashAlbumAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  const session = await requireAnyPermission([...ALBUM_PERMISSIONS]);
+  const session = await requireAnyPermission([...ALBUM_MANAGE_PERMISSIONS]);
 
   const album = await loadAlbum(readField(formData, "albumId", 100));
   if (!album) return saveError("ALBUM_MISSING");
   const partIds = album.parts.map((part) => part.id);
 
   try {
-    await setPartsVisible(partIds, false);
+    await setPartsVisibility(partIds, "hidden");
   } catch (error) {
     console.error("Immich album trash failed", error);
     return saveError("IMMICH_UNREACHABLE");
@@ -257,6 +301,7 @@ export async function trashAlbumAction(
       title: album.title,
       photoCount: album.photoCount,
       wasHidden: album.hidden,
+      wasPrivate: album.visibility === "private",
       trashedById: session.user.id,
     },
     update: { partIds, title: album.title, photoCount: album.photoCount, trashedAt: new Date() },
@@ -277,7 +322,7 @@ export async function restoreAlbumAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  await requireAnyPermission([...ALBUM_PERMISSIONS]);
+  await requireAnyPermission([...ALBUM_MANAGE_PERMISSIONS]);
 
   const albumId = readField(formData, "albumId", 100);
   const row = await prisma.galleryTrashedAlbum.findUnique({ where: { albumId } });
@@ -285,8 +330,9 @@ export async function restoreAlbumAction(
   if (row.trashedAt < trashCutoff(new Date())) return saveError("TRASH_EXPIRED");
 
   try {
-    // Stond het al van de site voor het weggegooid werd, dan blijft het dat.
-    if (!row.wasHidden) await setPartsVisible(row.partIds, true);
+    // Terug in de stand van voor de prullenmand: verborgen blijft verborgen,
+    // privé wordt geen openbaar album in het overzicht.
+    if (!row.wasHidden) await setPartsVisibility(row.partIds, row.wasPrivate ? "private" : "public");
   } catch (error) {
     console.error("Immich album restore failed", error);
     return saveError("IMMICH_UNREACHABLE");
@@ -317,7 +363,9 @@ export async function addAlbumTabAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  await requireAnyPermission([...ALBUM_PERMISSIONS]);
+  // Een tab toevoegen is een album aanmaken: mag ook bij een album dat al op de
+  // site staat, en de tab krijgt dan de stand van dat album.
+  const session = await requireAnyPermission([...ALBUM_CREATE_PERMISSIONS]);
 
   const name = readField(formData, "tabName", 50);
   if (!name) return saveError("TAB_NAME_REQUIRED");
@@ -336,10 +384,12 @@ export async function addAlbumTabAction(
     await createImmichGalleryAlbum({
       title: `${album.title}: ${name}`,
       description: `[parent: ${album.slug}] [tab: ${name}]`,
-      hidden: album.hidden,
+      visibility: album.visibility,
     });
 
-    if (parentTabName && !album.hasOwnTabName) {
+    // De naam van de bestaande tab is een wijziging aan het album zelf: enkel
+    // wie het mag bewerken. Anders komt de tab er gewoon bij.
+    if (parentTabName && !album.hasOwnTabName && canEditAlbum(albumRights(session), album)) {
       const raw = (await getManageableGalleryAlbum(album.id))?.description ?? "";
       await updateImmichAlbum(album.id, { description: setMarker(raw, "tab", parentTabName) });
     }
@@ -363,11 +413,11 @@ export async function renameAlbumTabAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  await requireAnyPermission([...ALBUM_PERMISSIONS]);
-
   const partId = readField(formData, "partId", 100);
   const name = readField(formData, "tabName", 50);
   if (!partId || !name) return saveError("TAB_NAME_REQUIRED");
+  const access = await requireEditable(await loadAlbumOfPart(partId));
+  if (!access.ok) return access.state;
 
   try {
     const raw = (await getManageableGalleryAlbum(partId))?.description;
@@ -394,10 +444,12 @@ export async function renameAlbumTabAction(
  * zelfstandig album wordt. De foto's blijven waar ze zijn.
  */
 export async function detachAlbumTabAction(formData: FormData): Promise<void> {
-  await requireAnyPermission([...ALBUM_PERMISSIONS]);
-
   const partId = readField(formData, "partId", 100);
   if (!partId) return;
+  // Geen SaveState hier (`DeleteIconButton`); het scherm toont de knop enkel aan
+  // wie het album mag bewerken, dus een weigering is geen verwachte invoerfout.
+  const access = await requireEditable(await loadAlbumOfPart(partId));
+  if (!access.ok) throw new Error("FORBIDDEN");
 
   const raw = (await getManageableGalleryAlbum(partId))?.description ?? "";
   const next = setMarker(setMarker(raw, "parent", null), "tab", null);
@@ -427,16 +479,15 @@ export async function movePhotosToTabAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  await requireAnyPermission([...ALBUM_PERMISSIONS]);
-
   const fromId = readField(formData, "fromPartId", 100);
   const toId = readField(formData, "toPartId", 100);
   const assetIds = readIds(formData);
   if (!fromId || !toId || assetIds.length === 0) return saveError("INVALID_INPUT");
   if (fromId === toId) return saveError("SAME_TAB");
 
-  const album = await loadAlbum(readField(formData, "albumId", 100));
-  if (!album) return saveError("ALBUM_MISSING");
+  const access = await requireEditable(await loadAlbum(readField(formData, "albumId", 100)));
+  if (!access.ok) return access.state;
+  const album = access.album;
   // Verplaatsen mag enkel binnen dit album; anders is dit een manier om foto's
   // naar willekeurige Immich-albums te schuiven.
   if (!partOf(album, fromId) || !partOf(album, toId)) return saveError("INVALID_INPUT");
@@ -490,7 +541,7 @@ export async function hidePhotosAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  const session = await requireAnyPermission([...ALBUM_PERMISSIONS]);
+  const session = await requireAnyPermission([...ALBUM_MANAGE_PERMISSIONS]);
 
   const partId = readField(formData, "partId", 100);
   const assetIds = readIds(formData);
@@ -545,7 +596,7 @@ export async function showPhotosAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  await requireAnyPermission([...ALBUM_PERMISSIONS]);
+  await requireAnyPermission([...ALBUM_MANAGE_PERMISSIONS]);
 
   const assetIds = readIds(formData);
   if (assetIds.length === 0) return saveError("INVALID_INPUT");
@@ -590,7 +641,7 @@ export async function trashPhotosAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  const session = await requireAnyPermission([...ALBUM_PERMISSIONS]);
+  const session = await requireAnyPermission([...ALBUM_MANAGE_PERMISSIONS]);
 
   const partId = readField(formData, "partId", 100);
   const assetIds = readIds(formData);
@@ -655,7 +706,7 @@ export async function restorePhotosAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  await requireAnyPermission([...ALBUM_PERMISSIONS]);
+  await requireAnyPermission([...ALBUM_MANAGE_PERMISSIONS]);
 
   const assetIds = readIds(formData);
   if (assetIds.length === 0) return saveError("INVALID_INPUT");

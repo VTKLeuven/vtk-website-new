@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSelectedLayoutSegments } from "next/navigation";
-import { EyeOff, Link2, Plus, Trash2 } from "lucide-react";
+import { EyeOff, Link2, Lock, Plus, Trash2 } from "lucide-react";
 import Link from "@/components/ui/Link";
 import { adminThumbnailUrl } from "@/lib/media-admin-shared";
 import { useUploads } from "./uploads";
 import type { LibraryRow } from "./types";
 
-type Filter = "all" | "on" | "off" | "shared";
+type Filter = "all" | "on" | "private" | "off" | "shared";
 
 /**
  * De lijst van alle albums, links naast het open album.
@@ -24,12 +24,16 @@ export function AlbumList({
   error,
   trashCount,
   onNewAlbum,
+  showTrash,
 }: {
   locale: string;
   rows: LibraryRow[];
   error: boolean;
   trashCount: number;
-  onNewAlbum: () => void;
+  /** `null` voor wie geen albums mag aanmaken: dan geen knop "Nieuw album". */
+  onNewAlbum: (() => void) | null;
+  /** De prullenmand is voor wie albums beheert. */
+  showTrash: boolean;
 }) {
   const nl = locale === "nl";
   const base = `${nl ? "" : "/en"}/admin/media`;
@@ -47,16 +51,19 @@ export function AlbumList({
   );
   const numberFormat = useMemo(() => new Intl.NumberFormat(nl ? "nl-BE" : "en-GB"), [nl]);
 
-  const hiddenCount = rows.filter((row) => row.hidden).length;
+  const hiddenCount = rows.filter((row) => row.visibility === "hidden").length;
+  const privateCount = rows.filter((row) => row.visibility === "private").length;
   const sharedCount = rows.filter((row) => row.shared).length;
-  // Zonder gedeelde albums verdwijnt de filter; bleef hij aan staan, dan zat je
-  // vast op een lege lijst zonder chip om terug te gaan.
-  const showing = filter === "shared" && sharedCount === 0 ? "all" : filter;
+  // Zonder gedeelde of privé albums verdwijnt die filter; bleef hij aan staan,
+  // dan zat je vast op een lege lijst zonder chip om terug te gaan.
+  const showing =
+    (filter === "shared" && sharedCount === 0) || (filter === "private" && privateCount === 0) ? "all" : filter;
   const groups = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const shown = rows.filter((row) => {
-      if (showing === "on" && row.hidden) return false;
-      if (showing === "off" && !row.hidden) return false;
+      if (showing === "on" && row.visibility !== "public") return false;
+      if (showing === "private" && row.visibility !== "private") return false;
+      if (showing === "off" && row.visibility !== "hidden") return false;
       if (showing === "shared" && !row.shared) return false;
       return !needle || row.title.toLowerCase().includes(needle);
     });
@@ -86,7 +93,10 @@ export function AlbumList({
 
   const filters: Array<{ value: Filter; label: string; count: number }> = [
     { value: "all", label: nl ? "Alle" : "All", count: rows.length },
-    { value: "on", label: nl ? "Op de site" : "On the site", count: rows.length - hiddenCount },
+    { value: "on", label: nl ? "Op de site" : "On the site", count: rows.length - hiddenCount - privateCount },
+    ...(privateCount > 0
+      ? [{ value: "private" as const, label: nl ? "Privé" : "Private", count: privateCount }]
+      : []),
     { value: "off", label: nl ? "Verborgen" : "Hidden", count: hiddenCount },
     // Welke albums een werkende privélink hebben: aan het einde van het
     // werkingsjaar kijkt de nieuwe ploeg hier na wat er nog openstaat.
@@ -98,10 +108,12 @@ export function AlbumList({
   return (
     <aside className="media-library-list" aria-label={nl ? "Albums" : "Albums"}>
       <div className="media-library-list-head">
-        <button type="button" className="ticket-admin-button" data-variant="primary" onClick={onNewAlbum}>
-          <Plus aria-hidden="true" size={15} />
-          {nl ? "Nieuw album" : "New album"}
-        </button>
+        {onNewAlbum ? (
+          <button type="button" className="ticket-admin-button" data-variant="primary" onClick={onNewAlbum}>
+            <Plus aria-hidden="true" size={15} />
+            {nl ? "Nieuw album" : "New album"}
+          </button>
+        ) : null}
         <input
           type="search"
           className="ticket-admin-search"
@@ -137,9 +149,13 @@ export function AlbumList({
         ) : groups.length === 0 ? (
           <p className="media-library-note">
             {rows.length === 0
-              ? nl
-                ? "Nog geen albums. Begin met Nieuw album."
-                : "No albums yet. Start with New album."
+              ? onNewAlbum
+                ? nl
+                  ? "Nog geen albums. Begin met Nieuw album."
+                  : "No albums yet. Start with New album."
+                : nl
+                  ? "Nog geen albums om foto's aan toe te voegen."
+                  : "No albums to add photos to yet."
               : nl
                 ? "Geen albums die hierbij passen."
                 : "No albums match."}
@@ -183,13 +199,21 @@ export function AlbumList({
                                   .join(" · ")}
                           </span>
                         </span>
-                        {row.hidden || row.shared ? (
+                        {row.visibility !== "public" || row.shared ? (
                           <span className="media-album-row-flags">
                             {row.shared ? (
                               <Link2
                                 className="media-album-row-flag is-shared"
                                 role="img"
                                 aria-label={nl ? "Gedeeld met een link" : "Shared with a link"}
+                                size={15}
+                              />
+                            ) : null}
+                            {row.visibility === "private" ? (
+                              <Lock
+                                className="media-album-row-flag"
+                                role="img"
+                                aria-label={nl ? "Privé: enkel via zijn adres" : "Private: only through its address"}
                                 size={15}
                               />
                             ) : null}
@@ -213,15 +237,17 @@ export function AlbumList({
         )}
       </div>
 
-      <Link
-        href={`${base}/prullenmand`}
-        className="media-library-trash"
-        aria-current={inTrash ? "page" : undefined}
-      >
-        <Trash2 aria-hidden="true" size={15} />
-        {nl ? "Prullenmand" : "Trash"}
-        <span className="num">{trashCount}</span>
-      </Link>
+      {showTrash ? (
+        <Link
+          href={`${base}/prullenmand`}
+          className="media-library-trash"
+          aria-current={inTrash ? "page" : undefined}
+        >
+          <Trash2 aria-hidden="true" size={15} />
+          {nl ? "Prullenmand" : "Trash"}
+          <span className="num">{trashCount}</span>
+        </Link>
+      ) : null}
     </aside>
   );
 }

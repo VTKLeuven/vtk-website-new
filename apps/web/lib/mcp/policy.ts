@@ -41,6 +41,7 @@ export const MCP_PERMISSION_POLICY = {
   "forms.create": { reads: ["forms"], creates: ["app_create:form", "app_create:form_section", "app_create:form_field"], blocked: ["publish forms or submit entries"] },
   "forms.manageAll": { reads: ["forms", "form_entries"], creates: ["app_create:form", "app_create:form_section", "app_create:form_field"], blocked: ["publish forms, submit entries or send mail"] },
   "photos.upload": { reads: ["photos"], creates: ["app_create:photo_album"], blocked: ["upload assets or publish albums"] },
+  "photos.createAlbums": { reads: ["photos"], creates: ["app_create:photo_album"], blocked: ["upload assets, publish or delete albums"] },
   "photos.manageAlbums": { reads: ["photos"], creates: ["app_create:photo_album"], blocked: ["modify, publish or delete albums", "create, change or revoke private album links"] },
   "users.search": { reads: ["user_search"], creates: [], blocked: ["create or modify accounts"] },
   "users.view": { reads: ["users"], creates: [], blocked: ["create or modify accounts"] },

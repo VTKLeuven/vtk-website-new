@@ -243,7 +243,7 @@ export function getAdminNav(): NavEntry[] {
       item('linkPage', '/linkpagina', { perm: 'home.edit' }),
       // Fotoalbums hebben één ingang: /admin/media. Daar staat de Immich-galerij,
       // en dat is de enige bron die de publieke mediapagina leest.
-      item('media', '/media', { anyPerm: ['media.manage', 'photos.manageAlbums'] }),
+      item('media', '/media', { anyPerm: ['media.manage', 'photos.manageAlbums', 'photos.createAlbums', 'photos.upload'] }),
       // Verzoeken om een foto uit de galerij te halen: een tabblad van Media,
       // dus niet nog eens in de lijst. Alleen `media.manage`, want dit is de
       // enige tab die foto's echt weggooit.

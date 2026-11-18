@@ -5,6 +5,7 @@ import { loadLibraryAlbum } from "@/lib/media-admin";
 import { listShareLinks, listShareWerkgroepen } from "@/lib/media-share";
 import { requireAnyPermission } from "@/lib/session";
 import { AlbumManager } from "./AlbumManager";
+import { ALBUM_UPLOAD_PERMISSIONS, albumRights } from "@/lib/media-album-access";
 
 /**
  * Eén album, rechts naast de lijst. Het adres draagt het Immich-id van het
@@ -20,7 +21,8 @@ export default async function PhotoAlbumPage({
 }) {
   const { locale, albumId: raw } = await params;
   if (!hasLocale(locale)) notFound();
-  await requireAnyPermission(["media.manage", "photos.manageAlbums"]);
+  const session = await requireAnyPermission([...ALBUM_UPLOAD_PERMISSIONS]);
+  const rights = albumRights(session);
   const albumId = decodeURIComponent(raw);
 
   const loaded = await loadLibraryAlbum(albumId).catch((cause) => {
@@ -60,10 +62,10 @@ export default async function PhotoAlbumPage({
 
   const { album, parts, publicPath } = loaded;
   const now = new Date();
-  const [shareLinks, werkgroepen] = await Promise.all([
-    listShareLinks(album.id, locale, now),
-    listShareWerkgroepen(locale),
-  ]);
+  // Privélinks zijn voor wie albums beheert; de anderen krijgen ze niet mee.
+  const [shareLinks, werkgroepen] = rights.manage
+    ? await Promise.all([listShareLinks(album.id, locale, now), listShareWerkgroepen(locale)])
+    : [[], []];
   return (
     <AlbumManager
       // Een ander album is een nieuw scherm: selectie, tab en filter beginnen opnieuw.
@@ -74,6 +76,7 @@ export default async function PhotoAlbumPage({
         title: album.title,
         description: album.description,
         date: album.date,
+        visibility: album.visibility,
         hidden: album.hidden,
         coverAssetId: album.coverAssetId,
         hasOwnTabName: album.hasOwnTabName,
@@ -83,6 +86,7 @@ export default async function PhotoAlbumPage({
       shareLinks={shareLinks}
       werkgroepen={werkgroepen}
       now={now.toISOString()}
+      rights={rights}
     />
   );
 }

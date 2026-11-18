@@ -1,4 +1,14 @@
-import { foreignMarkers, galleryMarker, hiddenMarker, immichConfig, type GalleryId } from './config';
+import {
+  albumVisibility,
+  foreignMarkers,
+  galleryMarker,
+  hiddenMarker,
+  immichConfig,
+  privateMarker,
+  visibilityMarker,
+  type AlbumVisibility,
+  type GalleryId,
+} from './config';
 import {
   GalleryError,
   addImmichAssetsToAlbum,
@@ -40,6 +50,7 @@ export type GalleryClient = {
   id: GalleryId;
   marker: () => string;
   hiddenMarker: () => string;
+  privateMarker: () => string;
   /**
    * Alle albums van deze galerij recht uit Immich, ook die van de site gehaald
    * zijn. Loopt niet via de momentopname; zie `ManageableAlbum`.
@@ -47,7 +58,18 @@ export type GalleryClient = {
   listManageableAlbums: () => Promise<ManageableAlbum[]>;
   /** Eén album uit die lijst, op Immich-id. */
   getManageableAlbum: (albumId: string) => Promise<ManageableAlbum | null>;
-  listAlbums: () => Promise<{ generatedAt: string; albums: GalleryAlbumSummary[] }>;
+  /**
+   * De stand van één Immich-album in deze galerij, of `null` wanneer het er niet
+   * bij hoort (een ander galerij, dubbelzinnig, onbestaand). Zonder de foto's op
+   * te halen: dit loopt bij elke upload, om te weten of het album van ons is.
+   */
+  albumVisibilityOf: (albumId: string) => Promise<AlbumVisibility | null>;
+  /**
+   * Het overzicht van de site. Een privé album (`[gallery-private]`) staat er
+   * niet in, tenzij `includeUnlisted`: dat is enkel voor het beheer, dat de slug
+   * van zo'n album wil kennen.
+   */
+  listAlbums: (options?: { includeUnlisted?: boolean }) => Promise<{ generatedAt: string; albums: GalleryAlbumSummary[] }>;
   getAlbum: (slug: string) => Promise<GalleryAlbum | null>;
   getDownloadTarget: (slug: string, assetId: string) => Promise<DownloadTarget>;
   /** Albums die de merker van meer dan één galerij dragen; zie config.ts. */
@@ -58,8 +80,17 @@ export type GalleryClient = {
    * zoals op de site. Loopt niet via de momentopname; zie `AdminAlbum`.
    */
   listAdminAlbums: () => Promise<AdminAlbum[]>;
-  /** `hidden`: meteen met de uit-merker, dus niet op de site tot iemand het aanzet. */
-  createAlbum: (input: { title: string; description?: string; hidden?: boolean }) => Promise<{ id: string }>;
+  /**
+   * `hidden`: meteen met de uit-merker, dus niet op de site tot iemand het aanzet.
+   * `visibility` wint van `hidden`; een nieuwe tab neemt zo de stand van zijn
+   * album over, ook privé.
+   */
+  createAlbum: (input: {
+    title: string;
+    description?: string;
+    hidden?: boolean;
+    visibility?: AlbumVisibility;
+  }) => Promise<{ id: string }>;
   addAssets: (albumId: string, assetIds: string[]) => Promise<ImmichBulkIdResult[]>;
 };
 
@@ -150,12 +181,14 @@ export function createGalleryClient({
     shareKey,
     markers,
     publicProxyUrl,
+    unlisted,
   }: {
     album: ImmichAlbumSummary;
     slug: string;
     shareKey: string;
     markers: string[];
     publicProxyUrl: string;
+    unlisted: boolean;
   }): GalleryAlbum {
     const description = stripMarkers(album.description || '', markers);
     const sortedAssets = [...(album.assets || [])]
@@ -201,6 +234,9 @@ export function createGalleryClient({
       photos,
       shareUrl: `${publicProxyUrl}/share/${encodeURIComponent(shareKey)}`,
       updatedAt: album.updatedAt || null,
+      // Een album met tabs neemt de stand van zijn hoofdalbum over: `groupAlbums`
+      // bouwt het samengestelde album met `...parentEntry.album`.
+      ...(unlisted ? { unlisted: true } : {}),
     };
   }
 
@@ -208,12 +244,15 @@ export function createGalleryClient({
     const config = immichConfig();
     const ownMarker = galleryMarker(id);
     const otherMarkers = foreignMarkers(id);
-    const allMarkers = [ownMarker, ...otherMarkers];
+    const allMarkers = [ownMarker, privateMarker(id), hiddenMarker(id), ...otherMarkers];
 
     const summaries = await immichJson<ImmichAlbumSummary[]>('/albums');
 
     const ambiguous: AmbiguousAlbum[] = [];
     const wanted: ImmichAlbumSummary[] = [];
+    // Privé albums horen in de momentopname (ze hebben een adres en foto-URL's),
+    // maar niet in het overzicht; `listAlbums` filtert ze daar weg.
+    const unlistedIds = new Set<string>();
 
     // De merker staat al in de albumlijst, dus we filteren voor we de foto's
     // ophalen. Anders haalt elke galerij ook de volledige inhoud binnen van de
@@ -223,7 +262,8 @@ export function createGalleryClient({
       // Een lege merker zou elk album opeisen; dat mag nooit, want dan slorpt
       // deze galerij ook die van de andere op.
       if (!ownMarker) continue;
-      if (!description.includes(ownMarker)) continue;
+      const visibility = albumVisibility(id, description);
+      if (visibility !== 'public' && visibility !== 'private') continue;
 
       const foreign = otherMarkers.filter((marker) => description.includes(marker));
       if (foreign.length > 0) {
@@ -235,6 +275,7 @@ export function createGalleryClient({
         continue;
       }
       wanted.push(album);
+      if (visibility === 'private') unlistedIds.add(album.id);
     }
 
     const settled = await Promise.allSettled(wanted.map((album) => getFullAlbum(album.id)));
@@ -289,6 +330,7 @@ export function createGalleryClient({
         shareKey: sharedLink.key,
         markers: allMarkers,
         publicProxyUrl: config.publicProxyUrl,
+        unlisted: unlistedIds.has(album.id),
       });
 
       mappedEntries.push({
@@ -349,26 +391,43 @@ export function createGalleryClient({
     return inflight;
   }
 
-  function toManageableAlbum(album: ImmichAlbumSummary, ownMarker: string, offMarker: string): ManageableAlbum {
+  function toManageableAlbum(album: ImmichAlbumSummary): ManageableAlbum {
     const description = String(album.description || '');
     const markers = parseAlbumMarkers(description, album.albumName || '');
+    const visibility = albumVisibility(id, description);
 
     return {
       id: album.id,
       title: album.albumName || 'Naamloos album',
       description,
-      publicDescription: stripMarkers(description, [ownMarker, offMarker, ...foreignMarkers(id)]),
+      publicDescription: stripMarkers(description, [
+        galleryMarker(id),
+        privateMarker(id),
+        hiddenMarker(id),
+        ...foreignMarkers(id),
+      ]),
       photoCount: Number(album.assetCount || 0),
-      hidden: description.includes(offMarker) && !description.includes(ownMarker),
+      visibility,
+      hidden: visibility === 'hidden',
       parent: markers.parent,
       tab: markers.tab,
     };
+  }
+
+  /** Hoort een album met deze beschrijving bij deze galerij, en zo ja, hoe? */
+  function ownVisibility(description: string): AlbumVisibility | null {
+    const visibility = albumVisibility(id, description);
+    if (!visibility) return null;
+    // Dubbelzinnig (twee galerijmerkers): hoort nergens, zie `listAmbiguousAlbums`.
+    if (foreignMarkers(id).some((marker) => description.includes(marker))) return null;
+    return visibility;
   }
 
   return {
     id,
     marker: () => galleryMarker(id),
     hiddenMarker: () => hiddenMarker(id),
+    privateMarker: () => privateMarker(id),
 
     /**
      * Eén `GET /albums`, geen assets en geen gedeelde links: dit voedt een
@@ -376,22 +435,16 @@ export function createGalleryClient({
      * anders is een album dat van de site is, nergens meer terug te vinden.
      */
     async listManageableAlbums() {
-      const ownMarker = galleryMarker(id);
-      const offMarker = hiddenMarker(id);
-      if (!ownMarker) return [];
+      if (!galleryMarker(id)) return [];
 
       const summaries = await immichJson<ImmichAlbumSummary[]>('/albums');
       const rows: ManageableAlbum[] = [];
 
       for (const album of summaries || []) {
-        const description = String(album.description || '');
-        const own = description.includes(ownMarker);
-        const off = description.includes(offMarker);
-        if (!own && !off) continue;
         // Een dubbelzinnig album (twee galerijmerkers) hoort nergens; het staat
         // al apart in `listAmbiguousAlbums`.
-        if (own && foreignMarkers(id).some((marker) => description.includes(marker))) continue;
-        rows.push(toManageableAlbum(album, ownMarker, offMarker));
+        if (!ownVisibility(String(album.description || ''))) continue;
+        rows.push(toManageableAlbum(album));
       }
 
       return rows;
@@ -400,12 +453,24 @@ export function createGalleryClient({
     async getManageableAlbum(albumId: string) {
       const album = await immichJson<ImmichAlbumSummary>(`/albums/${encodeURIComponent(albumId)}`).catch(() => null);
       if (!album?.id) return null;
-      return toManageableAlbum(album, galleryMarker(id), hiddenMarker(id));
+      return toManageableAlbum(album);
     },
 
-    async listAlbums() {
+    async albumVisibilityOf(albumId: string) {
+      if (!albumId || !galleryMarker(id)) return null;
+      const album = await immichJson<ImmichAlbumSummary>(
+        `/albums/${encodeURIComponent(albumId)}?withoutAssets=true`,
+      ).catch(() => null);
+      if (!album?.id) return null;
+      return ownVisibility(String(album.description || ''));
+    },
+
+    async listAlbums(options) {
       const snapshot = await getSnapshot();
-      return { generatedAt: snapshot.generatedAt, albums: snapshot.summaries };
+      const albums = options?.includeUnlisted
+        ? snapshot.summaries
+        : snapshot.summaries.filter((album) => !album.unlisted);
+      return { generatedAt: snapshot.generatedAt, albums };
     },
 
     async getAlbum(slug: string) {
@@ -451,20 +516,19 @@ export function createGalleryClient({
      */
     async listAdminAlbums() {
       const ownMarker = galleryMarker(id);
-      const offMarker = hiddenMarker(id);
       if (!ownMarker) return [];
 
       const summaries = await immichJson<ImmichAlbumSummary[]>('/albums');
+      // "Zichtbaar" is hier alles wat in de momentopname zit, dus ook privé:
+      // de slugs moeten in dezelfde volgorde vallen als op de site.
       const visible: ImmichAlbumSummary[] = [];
       const hidden: ImmichAlbumSummary[] = [];
+      const visibilityById = new Map<string, AlbumVisibility>();
       for (const album of summaries || []) {
-        const description = String(album.description || '');
-        const own = description.includes(ownMarker);
-        const off = !own && description.includes(offMarker);
-        if (!own && !off) continue;
-        // Dubbelzinnig (twee galerijmerkers): hoort nergens, zie `listAmbiguousAlbums`.
-        if (foreignMarkers(id).some((marker) => description.includes(marker))) continue;
-        (own ? visible : hidden).push(album);
+        const visibility = ownVisibility(String(album.description || ''));
+        if (!visibility) continue;
+        visibilityById.set(album.id, visibility);
+        (visibility === 'hidden' ? hidden : visible).push(album);
       }
       const newestFirst = (left: ImmichAlbumSummary, right: ImmichAlbumSummary) =>
         dateValue(right.startDate) - dateValue(left.startDate);
@@ -473,7 +537,7 @@ export function createGalleryClient({
 
       const hiddenIds = new Set(hidden.map((album) => album.id));
       const allocateSlug = createSlugAllocator();
-      const markers = [ownMarker, offMarker, ...foreignMarkers(id)];
+      const markers = [ownMarker, privateMarker(id), hiddenMarker(id), ...foreignMarkers(id)];
       const own = new Map<string, { cover: string | null; hasTab: boolean }>();
 
       const entries: MappedAlbumEntry[] = [...visible, ...hidden].map((album) => {
@@ -512,6 +576,7 @@ export function createGalleryClient({
             description: album.description,
             date: album.date,
             photoCount: album.photoCount,
+            visibility: visibilityById.get(album.id) ?? 'hidden',
             hidden: hiddenIds.has(album.id),
             coverAssetId: own.get(album.id)?.cover ?? null,
             parts: tabs
@@ -533,9 +598,9 @@ export function createGalleryClient({
      * upload vanuit de fakbar-app niet per ongeluk op vtk.be belanden: de
      * merker komt van de client, niet van het formulier.
      */
-    async createAlbum({ title, description, hidden = false }) {
+    async createAlbum({ title, description, hidden = false, visibility }) {
       const publicDescription = (description || '').trim();
-      const marker = hidden ? hiddenMarker(id) : galleryMarker(id);
+      const marker = visibilityMarker(id, visibility ?? (hidden ? 'hidden' : 'public'));
       const fullDescription = publicDescription ? `${publicDescription}\n\n${marker}` : marker;
 
       const album = await immichJson<{ id: string }>('/albums', {

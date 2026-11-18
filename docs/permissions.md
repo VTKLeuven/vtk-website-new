@@ -264,6 +264,14 @@ would only mean handing out two roles to the same person. Its device endpoint
 the DB, unlike the door secret); see `docs/design-decisions.md` ("Fakscanner") and
 `scripts/fakscanner.py`.
 
+**Photo albums** (`/admin/media`, Foto's) have three tiers, each including the
+previous one (`apps/web/lib/media-album-access.ts`): `photos.upload` adds photos
+to an existing album, `photos.createAlbums` also creates albums (always hidden)
+and edits an album while it is still hidden, `photos.manageAlbums` (and
+`media.manage`) publishes, hides, shares, downloads and deletes. Publishing means
+choosing between public, private (`[gallery-private]`, only on its own address)
+and hidden; see `docs/immich-gallery.md`, "Wie wat mag".
+
 ## Seeded baseline
 
 `packages/db/prisma/seed.ts` seeds the role set and wires posts to them (all grants `DEFAULT`, so

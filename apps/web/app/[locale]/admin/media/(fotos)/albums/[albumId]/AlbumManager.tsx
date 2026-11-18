@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Download, ExternalLink, Eye, EyeOff, ImagePlus, Play, Plus, Star, Trash2, X } from "lucide-react";
+import { Check, Download, ExternalLink, Eye, EyeOff, ImagePlus, Lock, Play, Plus, Star, Trash2, X } from "lucide-react";
+import type { AlbumVisibility } from "@vtk/gallery";
 import { ConfirmDialog } from "@vtk/ui";
 import { AdminDisclosure } from "@/components/admin/AdminDisclosure";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
@@ -23,6 +24,7 @@ import {
   trashPhotosAction,
 } from "@/app/actions/media-albums";
 import { PHOTO_PAGE_SIZE, TRASH_DAYS, adminThumbnailUrl, albumZipUrl, photoDownloadUrl } from "@/lib/media-admin-shared";
+import { canEditAlbum, type AlbumRights } from "@/lib/media-album-access-shared";
 import type { ShareLinkRow } from "@/lib/media-share";
 import { SAVE_IDLE, type SaveAction } from "@/lib/saveState";
 import { albumErrorMessages } from "../../messages";
@@ -39,6 +41,12 @@ type Part = { id: string; name: string; photos: Photo[] };
  * selectie kan, staat in één balk onderaan. Verbergen en de cover zetten kan
  * ook rechtstreeks op de foto, want dat doe je meestal met één tegelijk.
  * Verborgen foto's blijven hier staan, gedimd: van de site, niet uit het beheer.
+ *
+ * Wat er van dit alles op het scherm staat, hangt af van `rights`
+ * (`lib/media-album-access.ts`): een uploader ziet enkel de foto's en de
+ * dropzone, wie albums aanmaakt bewerkt daarnaast een album dat nog verborgen
+ * is, en enkel wie albums beheert kiest de stand, verbergt, deelt, downloadt en
+ * gooit weg. De server controleert elk van die acties zelf nog eens.
  */
 export function AlbumManager({
   locale,
@@ -48,6 +56,7 @@ export function AlbumManager({
   shareLinks,
   werkgroepen,
   now,
+  rights,
 }: {
   locale: string;
   album: {
@@ -55,6 +64,7 @@ export function AlbumManager({
     title: string;
     description: string;
     date: string | null;
+    visibility: AlbumVisibility;
     hidden: boolean;
     coverAssetId: string | null;
     hasOwnTabName: boolean;
@@ -66,6 +76,7 @@ export function AlbumManager({
   werkgroepen: Array<{ id: string; name: string }>;
   /** Het moment waarop de server tekende, voor "nog 6 dagen" en "verlopen". */
   now: string;
+  rights: AlbumRights;
 }) {
   const nl = locale === "nl";
   const base = `${nl ? "" : "/en"}/admin/media`;
@@ -86,6 +97,10 @@ export function AlbumManager({
 
   const part = parts[Math.min(partIndex, parts.length - 1)];
   const hasTabs = parts.length > 1;
+  // Titel, cover en tabs: een beheerder altijd, wie albums aanmaakt zolang het
+  // album verborgen is. Selecteren heeft enkel zin als er iets mee te doen valt.
+  const canEdit = canEditAlbum(rights, album);
+  const canSelect = rights.manage || (canEdit && hasTabs);
   const job = jobs.find((item) => item.albumId === album.id);
   const numberFormat = useMemo(() => new Intl.NumberFormat(nl ? "nl-BE" : "en-GB"), [nl]);
   const dateFormat = useMemo(
@@ -225,6 +240,7 @@ export function AlbumManager({
           <span className="media-album-cover is-blank" aria-hidden="true" />
         )}
         <div className="media-album-head-main">
+          {canEdit ? (
           <SaveForm
             action={saveAlbumDetailsAction}
             submitLabel={nl ? "Opslaan" : "Save"}
@@ -265,6 +281,12 @@ export function AlbumManager({
               placeholder={nl ? "Beschrijving (optioneel)" : "Description (optional)"}
             />
           </SaveForm>
+          ) : (
+            <div className="media-album-static">
+              <h2>{album.title}</h2>
+              {album.description ? <p>{album.description}</p> : null}
+            </div>
+          )}
           <p className="media-album-meta num">
             {[album.date ? dateFormat.format(new Date(album.date)) : null, photoCount(onSite)]
               .filter(Boolean)
@@ -282,46 +304,61 @@ export function AlbumManager({
         </div>
       </header>
 
-      <div className="media-switch-row is-card">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={!album.hidden}
-          className="media-switch"
-          disabled={pending}
-          aria-labelledby="media-album-visibility"
-          onClick={() =>
-            run(
-              setAlbumVisibilityAction,
-              { albumId: album.id, visible: album.hidden ? "true" : "false" },
-              album.hidden
-                ? nl
-                  ? `${album.title} staat op vtk.be.`
-                  : `${album.title} is on vtk.be.`
-                : nl
-                  ? `${album.title} staat niet meer op vtk.be.`
-                  : `${album.title} is no longer on vtk.be.`,
-            )
-          }
-        />
+      <div className="media-switch-row is-card media-visibility">
         <span id="media-album-visibility">
-          <b>{album.hidden ? (nl ? "Verborgen" : "Hidden") : nl ? "Op vtk.be" : "On vtk.be"}</b>
+          <b>{VISIBILITY_LABEL[album.visibility][nl ? "nl" : "en"]}</b>
           <small>
-            {album.hidden
-              ? workingLinks > 0
-                ? nl
-                  ? "Enkel zichtbaar in dit beheer en voor wie een link heeft. Zet het aan om het op de mediapagina te tonen."
-                  : "Only visible in this admin and to whoever has a link. Switch it on to show it on the media page."
-                : nl
-                  ? "Enkel zichtbaar in dit beheer. Zet het aan om het op de mediapagina te tonen."
-                  : "Only visible in this admin. Switch it on to show it on the media page."
-              : nl
+            {album.visibility === "public"
+              ? nl
                 ? "Iedereen ziet dit album op de mediapagina."
-                : "Everyone sees this album on the media page."}
+                : "Everyone sees this album on the media page."
+              : album.visibility === "private"
+                ? nl
+                  ? "Gepubliceerd, maar niet op de mediapagina, in de zoekfunctie of in de app. Wie het adres heeft, ziet de foto's."
+                  : "Published, but not on the media page, in search or in the app. Whoever has the address sees the photos."
+                : workingLinks > 0
+                  ? nl
+                    ? "Enkel zichtbaar in dit beheer en voor wie een privélink heeft."
+                    : "Only visible in this admin and to whoever has a private link."
+                  : nl
+                    ? "Enkel zichtbaar in dit beheer."
+                    : "Only visible in this admin."}
+            {!rights.manage
+              ? nl
+                ? " Op de site zetten of eraf halen doet iemand die albums beheert."
+                : " Someone who manages albums puts it on or takes it off the site."
+              : null}
           </small>
         </span>
+        {rights.manage ? (
+          <span className="media-chips" role="group" aria-labelledby="media-album-visibility">
+            {VISIBILITIES.map((value) => (
+              <button
+                key={value}
+                type="button"
+                className="media-chip"
+                aria-pressed={album.visibility === value}
+                disabled={pending || album.visibility === value}
+                title={VISIBILITY_HINT[value][nl ? "nl" : "en"]}
+                onClick={() =>
+                  run(
+                    setAlbumVisibilityAction,
+                    { albumId: album.id, visibility: value },
+                    nl
+                      ? `${album.title}: ${VISIBILITY_DONE[value].nl}`
+                      : `${album.title}: ${VISIBILITY_DONE[value].en}`,
+                  )
+                }
+              >
+                {VISIBILITY_ICON[value]}
+                {VISIBILITY_LABEL[value][nl ? "nl" : "en"]}
+              </button>
+            ))}
+          </span>
+        ) : null}
       </div>
 
+      {rights.manage ? (
       <AlbumShareLinks
         locale={locale}
         albumId={album.id}
@@ -332,8 +369,9 @@ export function AlbumManager({
         werkgroepen={werkgroepen}
         now={now}
       />
+      ) : null}
 
-      {onSite + hiddenTotal > 0 ? (
+      {rights.manage && onSite + hiddenTotal > 0 ? (
         <div className="media-switch-row is-card media-album-download">
           <span>
             <b>{nl ? "Album downloaden" : "Download album"}</b>
@@ -382,13 +420,15 @@ export function AlbumManager({
             {nl ? "Geen; alle foto's staan samen." : "None; all photos are together."}
           </span>
         )}
-        <button type="button" className="media-chip" aria-expanded={addingTab} onClick={() => setAddingTab((value) => !value)}>
-          <Plus aria-hidden="true" size={14} />
-          {nl ? "Tab toevoegen" : "Add tab"}
-        </button>
+        {rights.create ? (
+          <button type="button" className="media-chip" aria-expanded={addingTab} onClick={() => setAddingTab((value) => !value)}>
+            <Plus aria-hidden="true" size={14} />
+            {nl ? "Tab toevoegen" : "Add tab"}
+          </button>
+        ) : null}
       </div>
 
-      {addingTab ? (
+      {addingTab && rights.create ? (
         <SaveForm
           action={addAlbumTabAction}
           submitLabel={nl ? "Tab toevoegen" : "Add tab"}
@@ -404,7 +444,7 @@ export function AlbumManager({
             <span>{nl ? "Naam van de nieuwe tab" : "Name of the new tab"}</span>
             <input name="tabName" placeholder="Photobooth" maxLength={50} required />
           </label>
-          {!album.hasOwnTabName ? (
+          {!album.hasOwnTabName && canEdit ? (
             <label className="ticket-admin-field">
               <span>{nl ? "Naam voor de huidige foto's" : "Name for the current photos"}</span>
               <input name="parentTabName" placeholder={nl ? "Zaal" : "Hall"} maxLength={50} />
@@ -416,7 +456,7 @@ export function AlbumManager({
         </SaveForm>
       ) : null}
 
-      {hasTabs ? (
+      {hasTabs && canEdit ? (
         <AdminDisclosure
           variant="row"
           className="media-tab-manage"
@@ -560,8 +600,9 @@ export function AlbumManager({
                 <button
                   type="button"
                   className="media-photo-hit"
-                  aria-pressed={isSelected}
+                  aria-pressed={canSelect ? isSelected : undefined}
                   aria-label={photo.hidden ? `${name}, ${nl ? "verborgen" : "hidden"}` : name}
+                  disabled={!canSelect}
                   onClick={(event) => toggle(index, event.shiftKey)}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -570,7 +611,9 @@ export function AlbumManager({
                     <Check size={13} strokeWidth={3} />
                   </span>
                 </button>
+                {rights.manage || canEdit ? (
                 <span className="media-photo-actions">
+                  {rights.manage ? (
                   <IconButton
                     className="media-photo-action"
                     label={photo.hidden ? (nl ? "Tonen op vtk.be" : "Show on vtk.be") : nl ? "Verbergen op vtk.be" : "Hide on vtk.be"}
@@ -580,6 +623,8 @@ export function AlbumManager({
                   >
                     {photo.hidden ? <Eye aria-hidden="true" size={15} /> : <EyeOff aria-hidden="true" size={15} />}
                   </IconButton>
+                  ) : null}
+                  {rights.manage ? (
                   <IconAnchor
                     className="media-photo-action"
                     href={photoDownloadUrl(album.id, photo.id)}
@@ -589,7 +634,8 @@ export function AlbumManager({
                   >
                     <Download aria-hidden="true" size={15} />
                   </IconAnchor>
-                  {partIndex === 0 && !photo.hidden && !photo.video && !isCover ? (
+                  ) : null}
+                  {canEdit && partIndex === 0 && !photo.hidden && !photo.video && !isCover ? (
                     <IconButton
                       className="media-photo-action"
                       label={nl ? "Als cover gebruiken" : "Use as cover"}
@@ -607,6 +653,7 @@ export function AlbumManager({
                     </IconButton>
                   ) : null}
                 </span>
+                ) : null}
                 {isCover ? (
                   <span className="media-photo-badge is-cover">Cover</span>
                 ) : photo.hidden ? (
@@ -634,6 +681,7 @@ export function AlbumManager({
         </button>
       ) : null}
 
+      {rights.manage ? (
       <div className="media-danger">
         <p>
           <b>{nl ? "Album naar de prullenmand" : "Move album to the trash"}</b>
@@ -646,25 +694,26 @@ export function AlbumManager({
           {nl ? "Naar de prullenmand" : "Move to trash"}
         </button>
       </div>
+      ) : null}
 
-      {selected.size > 0 ? (
+      {canSelect && selected.size > 0 ? (
         <div className="media-selection-bar" role="toolbar" aria-label={nl ? "Selectie" : "Selection"}>
           <b className="num">
             {selected.size} {nl ? "geselecteerd" : "selected"}
           </b>
-          {pickedVisible.length > 0 ? (
+          {rights.manage && pickedVisible.length > 0 ? (
             <button type="button" disabled={pending} onClick={() => hide(pickedVisible)}>
               <EyeOff aria-hidden="true" size={15} />
               {nl ? "Verbergen" : "Hide"}
             </button>
           ) : null}
-          {pickedHidden.length > 0 ? (
+          {rights.manage && pickedHidden.length > 0 ? (
             <button type="button" disabled={pending} onClick={() => show(pickedHidden)}>
               <Eye aria-hidden="true" size={15} />
               {nl ? "Tonen" : "Show"}
             </button>
           ) : null}
-          {hasTabs && pickedVisible.length > 0 ? (
+          {canEdit && hasTabs && pickedVisible.length > 0 ? (
             <select
               value=""
               disabled={pending}
@@ -691,10 +740,12 @@ export function AlbumManager({
                 ))}
             </select>
           ) : null}
-          <button type="button" className="is-danger" disabled={pending} onClick={() => setConfirm("photos")}>
-            <Trash2 aria-hidden="true" size={15} />
-            {nl ? "Verwijderen" : "Delete"}
-          </button>
+          {rights.manage ? (
+            <button type="button" className="is-danger" disabled={pending} onClick={() => setConfirm("photos")}>
+              <Trash2 aria-hidden="true" size={15} />
+              {nl ? "Verwijderen" : "Delete"}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => setSelected(new Set())}
@@ -772,3 +823,29 @@ export function AlbumManager({
     </div>
   );
 }
+
+const VISIBILITIES: readonly AlbumVisibility[] = ["public", "private", "hidden"];
+
+const VISIBILITY_LABEL: Record<AlbumVisibility, { nl: string; en: string }> = {
+  public: { nl: "Op vtk.be", en: "On vtk.be" },
+  private: { nl: "Privé", en: "Private" },
+  hidden: { nl: "Verborgen", en: "Hidden" },
+};
+
+const VISIBILITY_HINT: Record<AlbumVisibility, { nl: string; en: string }> = {
+  public: { nl: "Op de mediapagina, voor iedereen", en: "On the media page, for everyone" },
+  private: { nl: "Enkel wie het adres van het album heeft", en: "Only whoever has the address of the album" },
+  hidden: { nl: "Nergens op de site, enkel in dit beheer", en: "Nowhere on the site, only in this admin" },
+};
+
+const VISIBILITY_DONE: Record<AlbumVisibility, { nl: string; en: string }> = {
+  public: { nl: "staat op de mediapagina.", en: "is on the media page." },
+  private: { nl: "is privé: enkel nog te zien via zijn adres.", en: "is private: only visible through its address." },
+  hidden: { nl: "staat niet meer op vtk.be.", en: "is no longer on vtk.be." },
+};
+
+const VISIBILITY_ICON: Record<AlbumVisibility, ReactNode> = {
+  public: <Eye aria-hidden="true" size={13} />,
+  private: <Lock aria-hidden="true" size={13} />,
+  hidden: <EyeOff aria-hidden="true" size={13} />,
+};

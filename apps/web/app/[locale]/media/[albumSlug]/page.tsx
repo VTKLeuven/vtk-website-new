@@ -62,6 +62,9 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     type: "article",
     publishedTime: album.date,
     modifiedTime: album.updatedAt,
+    // Privé (`[gallery-private]`): wie het adres heeft, ziet het album, maar een
+    // zoekmachine hoort het niet te vinden. Het staat ook niet op /media.
+    noIndex: album.unlisted === true,
   });
 }
 

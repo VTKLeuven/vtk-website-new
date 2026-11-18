@@ -180,6 +180,35 @@ export function swapMarker(description: string | null | undefined, from: string,
   return tidyDescription(raw.trim() ? `${raw.trim()}\n\n${to}` : to);
 }
 
+/**
+ * Zet de galerijmerker van een album op `to` en haalt elke andere stand weg.
+ *
+ * `swapMarker` volstond zolang er twee standen waren. Met drie kan een album van
+ * elke stand naar elke andere, en mag er na afloop maar één merker staan: een
+ * album met `[gallery]` naast `[gallery-private]` staat gewoon in het overzicht.
+ * De nieuwe merker komt op de plaats van de eerste die er stond, zodat de rest
+ * van de beschrijving niet verschuift; stond er geen, dan komt ze achteraan.
+ */
+export function replaceVisibilityMarker(
+  description: string | null | undefined,
+  markers: readonly string[],
+  to: string,
+): string {
+  const raw = String(description || '');
+  const present = markers
+    .filter((marker) => marker && raw.includes(marker))
+    .map((marker) => ({ marker, at: raw.indexOf(marker) }))
+    .sort((left, right) => left.at - right.at);
+  if (present.length === 0) return tidyDescription(raw.trim() ? `${raw.trim()}\n\n${to}` : to);
+
+  const placeholder = '\u0000';
+  let next = raw.slice(0, present[0].at) + placeholder + raw.slice(present[0].at + present[0].marker.length);
+  for (const marker of markers) {
+    if (marker) next = next.split(marker).join('');
+  }
+  return tidyDescription(next.replace(placeholder, to));
+}
+
 export function stripMarkers(description: string | null | undefined, markers: string[]): string {
   let raw = String(description || '');
   for (const marker of markers) {
