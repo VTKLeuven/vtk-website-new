@@ -9878,6 +9878,13 @@ model BoDocument {
   /// versie, een kopie, iets wat er niet hoort. In Drive verandert er niets, en
   /// de scan zet het niet terug. Null = telt mee.
   hiddenAt       DateTime? @db.Timestamptz(3)
+  /// Telt wel mee in het overzicht (budget, resultaat, percentage), maar niet
+  /// in de stand tegenover de begroting: een activiteit die de stad betaalt,
+  /// of waarvan het blad nog maar half is. Groep 5 zet het terug zodra het
+  /// klopt. Null = telt mee in de begroting.
+  begrotingExcludedAt     DateTime? @db.Timestamptz(3)
+  /// Waarom, zodat wie de lijst later nakijkt weet wat er nog moet gebeuren.
+  begrotingExcludedReason String?
 
   firstSeenAt  DateTime  @default(now()) @db.Timestamptz(3)
   lastSeenAt   DateTime  @db.Timestamptz(3)

@@ -278,6 +278,12 @@ Per post en bij de totalen staat ook **de stand tegenover de begroting**
 die al voorbij is, het resultaat (of zolang dat er niet is het budget) min de
 regel Begroting, opgeteld. Plus is beter dan begroot. Een blad zonder regel
 Begroting telt niet mee; `Stats.begrotingCounted` zegt over hoeveel het gaat.
+Een activiteit die Groep 5 met "Niet meetellen" en dan "Enkel niet in de
+begroting" markeerde (`BoDocument.begrotingExcludedAt`, met een reden), telt
+ook niet mee in het bedrag, maar wel in budgetten, resultaten en percentage.
+Ze staat onder Instellingen ("Niet in de begroting") en onder het overzicht
+("Buiten de begroting"); één gemarkeerd bestand volstaat voor de hele
+activiteit, zodat een resultaat dat later binnenkomt de markering volgt.
 Waarom zo: `docs/design-decisions.md`, "Bestuursorgaan: de stand tegenover de
 begroting".
 

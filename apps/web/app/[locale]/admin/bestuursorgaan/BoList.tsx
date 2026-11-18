@@ -14,7 +14,7 @@ import {
   type ListFilter,
   type ListGroup,
 } from "@/lib/bo/list";
-import { boRange, dossierNotes, Files, HideDossierButton, Lines, linesOf, PostLinks, Progress, Stand, sumLines, Timeline, useFormat, type Fmt, type Locale, type Sheet } from "./BoParts";
+import { BegrotingExcludedNote, boRange, dossierNotes, Files, HideDossierButton, Lines, linesOf, PostLinks, Progress, Stand, sumLines, Timeline, useFormat, type Fmt, type Locale, type Sheet } from "./BoParts";
 import { ChangePosts, type PostChoice } from "./BoReview";
 
 /*
@@ -752,6 +752,7 @@ function DossierForm({
               {note}
             </p>
           ))}
+          <BegrotingExcludedNote dossier={d} nl={nl} errorMessages={errorMessages} />
           <div className="vtk-bo-l-fields">
             <Field label={d.postKeys.length > 1 ? (nl ? "Posten" : "Posts") : "Post"}>
               <span className="flex flex-wrap items-center gap-x-3 gap-y-1">

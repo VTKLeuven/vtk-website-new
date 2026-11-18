@@ -7,7 +7,12 @@ import { IconButton } from "@/components/ui/IconButton";
 import { EyeIcon } from "@/components/ui/icons";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { useToast } from "@/components/ui/toast";
-import { restoreBoDocumentAction, saveBoSettingsAction, scanBestuursorgaanAction } from "@/app/actions/bestuursorgaan";
+import {
+  includeBoBegrotingAction,
+  restoreBoDocumentAction,
+  saveBoSettingsAction,
+  scanBestuursorgaanAction,
+} from "@/app/actions/bestuursorgaan";
 
 type Locale = "nl" | "en";
 
@@ -69,6 +74,55 @@ export function RestoreFileButton({
             return;
           }
           showToast({ message: nl ? `"${name}" telt weer mee.` : `"${name}" counts again.`, variant: "success" });
+        })
+      }
+    >
+      <EyeIcon />
+    </IconButton>
+  );
+}
+
+/**
+ * Een activiteit weer laten meetellen in de stand tegenover de begroting.
+ * Zonder bevestiging, net als hierboven: "Niet meetellen" zet het zo terug.
+ */
+export function RestoreBegrotingButton({
+  docIds,
+  activity,
+  locale,
+  errorMessages,
+}: {
+  docIds: string[];
+  activity: string;
+  locale: Locale;
+  errorMessages: Record<string, string>;
+}) {
+  const nl = locale === "nl";
+  const [pending, startTransition] = useTransition();
+  const showToast = useToast();
+  return (
+    <IconButton
+      label={nl ? "Weer meetellen in de begroting" : "Count towards the plan again"}
+      srLabel={nl ? `Weer meetellen in de begroting: ${activity}` : `Count towards the plan again: ${activity}`}
+      disabled={pending}
+      onClick={() =>
+        startTransition(async () => {
+          const data = new FormData();
+          data.set("docIds", docIds.join(","));
+          const result = await unsentGuard.run(() => includeBoBegrotingAction(data));
+          if (result === UNSENT) return;
+          if (result.status === "error") {
+            showToast({
+              message: errorMessages[result.code] ?? (nl ? "Niet teruggezet: er ging iets mis." : "Not restored: something went wrong."),
+              variant: "error",
+              duration: 0,
+            });
+            return;
+          }
+          showToast({
+            message: nl ? `"${activity}" telt weer mee in de begroting.` : `"${activity}" counts towards the plan again.`,
+            variant: "success",
+          });
         })
       }
     >

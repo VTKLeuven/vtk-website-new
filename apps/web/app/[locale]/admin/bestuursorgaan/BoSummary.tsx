@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { Stats } from "@/lib/bo/dossiers";
 import { SECTIONS } from "@/lib/bo/explorer";
 import type { Summary, SummaryRow } from "@/lib/bo/summary";
@@ -47,8 +48,8 @@ function Begroting({ cents, counted, due, nl }: { cents: number | null; counted:
   const title =
     counted < due
       ? nl
-        ? `Over ${counted} van ${due} budgetten; de andere hebben geen regel Begroting in hun blad`
-        : `Over ${counted} of ${due} budgets; the others have no Begroting line in their sheet`
+        ? `Over ${counted} van ${due} budgetten; de andere hebben geen regel Begroting in hun blad, of staan bewust buiten de begroting`
+        : `Over ${counted} of ${due} budgets; the others have no Begroting line in their sheet, or were left out on purpose`
       : undefined;
   return (
     <span className="vtk-bo-devtext" data-tone={begrotingTone(cents)} title={title}>
@@ -160,6 +161,18 @@ export function BoSummary({ summary, year, nl }: { summary: Summary; year: strin
           );
         })}
       </div>
+      {summary.outOfPlan.length > 0 && (
+        <p className="vtk-bo-sum-foot">
+          <b>{nl ? "Buiten de begroting: " : "Left out of the plan: "}</b>
+          {summary.outOfPlan.map((o, i) => (
+            <Fragment key={o.key}>
+              {i > 0 && "; "}
+              {o.activity} ({[o.postName, o.reason].filter(Boolean).join(", ")})
+            </Fragment>
+          ))}
+          .
+        </p>
+      )}
       <p className="vtk-bo-sum-foot">
         {nl
           ? "Budgetten: op een BO die al plaatsvond, of schriftelijk goedgekeurd. Percentage: daarvan met een resultaat. Rood onder 50%, oranje onder 100%, groen wanneer alles binnen is; een streepje: nog geen budget gepasseerd. Begroting: per budget het resultaat (of, zolang dat er niet is, het budget) min de regel Begroting in het blad, opgeteld; plus is beter dan begroot. Een blad zonder begroting telt niet mee."

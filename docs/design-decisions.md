@@ -12506,6 +12506,16 @@ post en bovenaan voor Totaal, VTK en Werkgroepen. Plus is beter dan begroot.
   corrigeert het overzicht niet.
 - Op een telefoon wijkt de kolom Missend (budgetten min resultaten), zodat de
   naam van de post plaats houdt.
+- **Een activiteit kan buiten de begroting staan en toch meetellen.** Sommige
+  budgetten horen niet in de stand: Studentenwelkom betaalt de stad, en een
+  blad dat nog maar half is (de cultuurreis) trekt het getal scheef. "Niet
+  meetellen" vraagt daarom hoe: "Enkel niet in de begroting" (met een reden)
+  houdt de activiteit in budgetten, resultaten en percentage, maar laat ze
+  weg uit het bedrag; "Helemaal niet meetellen" is het oude gedrag voor een
+  kopie of een oude versie. De eerste keuze staat bovenaan, omdat ze het
+  minst wegneemt. Welke er buiten staan, staat onder Instellingen en onder
+  "Resultaten per post", met de reden; terugzetten kan daar en in het detail,
+  zodra het blad klopt.
 
 ## Bestuursorgaan: de verkenner
 

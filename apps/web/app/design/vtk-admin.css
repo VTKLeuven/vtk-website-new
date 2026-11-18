@@ -4285,6 +4285,41 @@ a.vtk-shortcut-tile:hover {
   color: var(--body) !important;
 }
 
+/* De twee manieren van "Niet meetellen" in de dialoog: een radioknop met een
+   regel uitleg, het gekozen vak met de gele streep zoals een notitie. */
+.vtk-bo-choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.vtk-bo-choice[data-checked] {
+  background: var(--paper);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-bo-choice input[type='radio'] {
+  margin-top: 3px;
+}
+
+.vtk-bo-choice .t {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.vtk-bo-choice .h {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
 .vtk-bo-tabs {
   display: flex;
   flex-wrap: wrap;

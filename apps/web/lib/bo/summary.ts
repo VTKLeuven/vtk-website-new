@@ -40,6 +40,11 @@ export type Summary = {
   werkgroepen: Stats;
   /** De laatste BO die al plaatsvond, als "BO 9". */
   lastMeeting: string | null;
+  /**
+   * Wat Groep 5 bewust buiten de stand tegenover de begroting zette, zodat de
+   * slide zegt waarom het getal die activiteiten niet bevat.
+   */
+  outOfPlan: { key: string; activity: string; postName: string; reason: string | null }[];
 };
 
 const ORDER: PostSection[] = ["g5", "post", "werkgroep", "jaarwerking", "extra", "unknown"];
@@ -90,5 +95,8 @@ export function buildSummary(data: ExplorerData, options: readonly PostOption[])
     vtk: statsOf(data.dossiers.filter((d) => !isWerkgroep(d))),
     werkgroepen: statsOf(data.dossiers.filter(isWerkgroep)),
     lastMeeting: past[0]?.label ?? null,
+    outOfPlan: data.dossiers
+      .filter((d) => d.begrotingExcluded && (d.status === "DONE" || d.status === "OPEN"))
+      .map((d) => ({ key: d.key, activity: d.activity, postName: d.postName, reason: d.begrotingExcluded?.reason ?? null })),
   };
 }

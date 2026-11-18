@@ -57,6 +57,11 @@ export type DocInput = {
   postKeysOverride?: readonly string[];
   /** Groep 5 zette het uit het overzicht ("Niet meetellen"); telt nergens mee. */
   hidden?: boolean;
+  /**
+   * Telt mee in het overzicht, maar niet in de stand tegenover de begroting
+   * (`BoDocument.begrotingExcludedAt`), met de reden die Groep 5 opgaf.
+   */
+  begrotingExcluded?: { reason: string | null } | null;
   /** Hetzelfde bestand in twee BO-mappen (een snelkoppeling) is één bestand. */
   driveFileId?: string;
   /** Een resultaat zonder budget op het BO: "grocomeet" of "geen". */
@@ -153,6 +158,12 @@ export type Dossier = {
    * één blad, dus elke activiteit telt apart (zie docs/design-decisions.md).
    */
   begrotingDevCents: number | null;
+  /**
+   * Groep 5 haalde de activiteit uit de stand tegenover de begroting (de stad
+   * betaalt, het blad is nog maar half). Ze telt wel mee in het overzicht.
+   * Gezet wanneer één van haar bestanden zo gemarkeerd is.
+   */
+  begrotingExcluded: { reason: string | null } | null;
   vtkSharePercent: number | null;
   /** Dagen tussen de BO van het budget en die van het resultaat. */
   lagDays: number | null;
@@ -194,6 +205,8 @@ export type Stats = {
    */
   begrotingDev: number;
   begrotingCounted: number;
+  /** Bewust buiten de begroting gezet ("Niet in de begrotingsstand"). */
+  begrotingExcluded: number;
   oldest: { key: string; activity: string; days: number } | null;
 };
 
@@ -297,7 +310,7 @@ const sum = (values: (number | null)[]) => values.reduce<number>((total, v) => t
 /** Wat `statsOf` van een dossier nodig heeft; ook de JSON-vorm voor de browser past. */
 export type StatsInput = Pick<
   Dossier,
-  "key" | "activity" | "status" | "budgetCents" | "allocationCents" | "resultCents" | "devCents" | "begrotingDevCents" | "lagDays" | "overdueDays" | "overAllocation"
+  "key" | "activity" | "status" | "budgetCents" | "allocationCents" | "resultCents" | "devCents" | "begrotingDevCents" | "begrotingExcluded" | "lagDays" | "overdueDays" | "overAllocation"
 > & { budgets: readonly unknown[]; results: readonly unknown[] };
 
 /** De cijfers van een rij dossiers: een post, het hele jaar, of een groep in de lijst. */
@@ -325,8 +338,9 @@ export function statsOf(dossiers: readonly StatsInput[]): Stats {
     worse: done.filter((d) => (d.devCents ?? 0) < 0).length,
     avgLagDays: lags.length ? Math.round(lags.reduce((a, b) => a + b, 0) / lags.length) : null,
     overAllocation: dossiers.filter((d) => d.overAllocation).length,
-    begrotingDev: sum(due.map((d) => d.begrotingDevCents)),
-    begrotingCounted: due.filter((d) => d.begrotingDevCents !== null).length,
+    begrotingDev: sum(due.filter((d) => !d.begrotingExcluded).map((d) => d.begrotingDevCents)),
+    begrotingCounted: due.filter((d) => !d.begrotingExcluded && d.begrotingDevCents !== null).length,
+    begrotingExcluded: due.filter((d) => d.begrotingExcluded).length,
     oldest: oldest ? { key: oldest.key, activity: oldest.activity, days: oldest.overdueDays ?? 0 } : null,
   };
 }
@@ -582,6 +596,7 @@ export function buildOverview(
         lagDays: resultDate && date && budgetItems.length > 0 ? Math.max(0, days(date, resultDate)) : null,
         overdueDays: status === "OPEN" && date ? Math.max(0, days(date, today)) : null,
         begrotingDevCents: allocationCents !== null && standCents !== null ? standCents - allocationCents : null,
+        begrotingExcluded: items.find((c) => c.doc.begrotingExcluded)?.doc.begrotingExcluded ?? null,
         overAllocation: budgetCents !== null && allocationCents !== null && budgetCents < allocationCents,
         lines,
         lastSeen: dates.length > 0 ? new Date(Math.max(...dates)) : null,

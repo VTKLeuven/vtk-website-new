@@ -1050,6 +1050,42 @@ describe("het overzicht per post (voor de slide)", () => {
     expect(plan.total).toMatchObject({ due: 4, begrotingDev: -8000, begrotingCounted: 3 });
     expect(plan.vtk).toMatchObject({ begrotingDev: -10000 });
     expect(plan.werkgroepen).toMatchObject({ begrotingDev: 2000 });
+    expect(plan.outOfPlan).toEqual([]);
+  });
+
+  it("laat een activiteit buiten de begroting wel meetellen in het overzicht", () => {
+    const today = new Date(Date.UTC(2026, 8, 20));
+    const withPlan = toExplorerData(
+      buildOverview(
+        [
+          doc("26-27_Budget_IT_Router", { bo: 5, budgetTotalCents: -95000, allocationCents: -100000 }),
+          // De stad betaalt: het budget staat op het resultaat, het resultaat
+          // (een ander bestand) volgt de markering van het budget.
+          doc("26-27_Budget_IT_Welkom", {
+            bo: 5,
+            budgetTotalCents: -7146793,
+            allocationCents: -7500000,
+            begrotingExcluded: { reason: "betaald door de stad" },
+          }),
+          doc("26-27_Resultaat_IT_Welkom", { bo: 9, resultTotalCents: -7000000, allocationCents: -7500000 }),
+        ],
+        posts,
+        new Map(),
+        2026,
+        today,
+        true,
+        meetings,
+      ),
+      2026,
+      today,
+    );
+    const welkom = withPlan.dossiers.find((d) => d.activity === "Welkom")!;
+    expect(welkom).toMatchObject({ status: "DONE", begrotingExcluded: { reason: "betaald door de stad" } });
+    const plan = buildSummary(withPlan, postOptions(posts, true));
+    const it = plan.sections.flatMap((s) => s.rows).find((r) => r.name === "IT")!;
+    expect(it).toMatchObject({ due: 2, done: 1, begroting: 5000, begrotingCounted: 1 });
+    expect(plan.total).toMatchObject({ begrotingDev: 5000, begrotingCounted: 1, begrotingExcluded: 1 });
+    expect(plan.outOfPlan).toEqual([{ key: welkom.key, activity: "Welkom", postName: "IT", reason: "betaald door de stad" }]);
   });
 });
 

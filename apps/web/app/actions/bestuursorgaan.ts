@@ -265,6 +265,60 @@ export async function hideBoDocumentAction(formData: FormData): Promise<SaveStat
   return saveOk();
 }
 
+/**
+ * "Niet in de begrotingsstand": de activiteit telt mee in het overzicht
+ * (budget, resultaat, percentage), maar niet in de stand tegenover de
+ * begroting. Voor een activiteit die de stad betaalt, of een blad dat nog maar
+ * half is. Terugzetten kan in het detail en onder Instellingen.
+ */
+export async function excludeBoBegrotingAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("bestuursorgaan.manage");
+  const ids = field(formData, "docIds").split(",").filter(Boolean);
+  const reason = field(formData, "reason").slice(0, 300) || null;
+  const docs = await prisma.boDocument.findMany({ where: { id: { in: ids } }, select: { id: true, driveFileId: true, name: true } });
+  if (docs.length === 0) return saveError("DOCUMENT_NOT_FOUND");
+  await prisma.boDocument.updateMany({
+    where: { driveFileId: { in: docs.map((d) => d.driveFileId) } },
+    data: { begrotingExcludedAt: new Date(), begrotingExcludedReason: reason },
+  });
+  for (const doc of docs) {
+    await logAudit({
+      action: "update",
+      entity: "boDocument",
+      entityId: doc.id,
+      target: doc.name,
+      summary: reason
+        ? `Telt niet meer mee in de stand tegenover de begroting: ${reason}`
+        : "Telt niet meer mee in de stand tegenover de begroting",
+    });
+  }
+  revalidateBo();
+  return saveOk();
+}
+
+/** Weer meetellen in de begroting: alle bestanden van de activiteit, of één. */
+export async function includeBoBegrotingAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("bestuursorgaan.manage");
+  const ids = field(formData, "docIds").split(",").filter(Boolean);
+  const docs = await prisma.boDocument.findMany({ where: { id: { in: ids } }, select: { id: true, driveFileId: true, name: true } });
+  if (docs.length === 0) return saveError("DOCUMENT_NOT_FOUND");
+  await prisma.boDocument.updateMany({
+    where: { driveFileId: { in: docs.map((d) => d.driveFileId) } },
+    data: { begrotingExcludedAt: null, begrotingExcludedReason: null },
+  });
+  for (const doc of docs) {
+    await logAudit({
+      action: "update",
+      entity: "boDocument",
+      entityId: doc.id,
+      target: doc.name,
+      summary: "Telt weer mee in de stand tegenover de begroting",
+    });
+  }
+  revalidateBo();
+  return saveOk();
+}
+
 export async function restoreBoDocumentAction(formData: FormData): Promise<SaveState> {
   await requirePermission("bestuursorgaan.manage");
   const doc = await prisma.boDocument.findUnique({ where: { id: field(formData, "docId") }, select: { id: true, driveFileId: true, name: true } });
