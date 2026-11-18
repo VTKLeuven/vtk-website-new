@@ -1,5 +1,5 @@
 import type { BoLine } from "./figures";
-import { normalizeKey, parseDocumentName, type BoKind, type MeetingKind } from "./names";
+import { normalizeKey, parseDocumentName, type BoKind, type MeetingKind, type ParsedDocumentName } from "./names";
 import { BO_EXTRA_POSTS, postName, resolvePostKeys, splitPost, type PostAliases, type PostCandidate } from "./posts";
 
 /*
@@ -146,6 +146,13 @@ export type Dossier = {
   allocationCents: number | null;
   /** Resultaat min budget; positief is beter dan gepland. */
   devCents: number | null;
+  /**
+   * Hoe de activiteit ervoor staat tegenover de begroting: het resultaat (of,
+   * zolang dat er niet is, het budget) min de regel Begroting. Positief is
+   * beter dan begroot. Null zonder begroting in het blad. Een potje staat in
+   * één blad, dus elke activiteit telt apart (zie docs/design-decisions.md).
+   */
+  begrotingDevCents: number | null;
   vtkSharePercent: number | null;
   /** Dagen tussen de BO van het budget en die van het resultaat. */
   lagDays: number | null;
@@ -180,6 +187,13 @@ export type Stats = {
   worse: number;
   avgLagDays: number | null;
   overAllocation: number;
+  /**
+   * De som van `begrotingDevCents` over de activiteiten met een BO die al
+   * voorbij is (`due`), en over hoeveel daarvan: een blad zonder begroting
+   * telt niet mee.
+   */
+  begrotingDev: number;
+  begrotingCounted: number;
   oldest: { key: string; activity: string; days: number } | null;
 };
 
@@ -283,7 +297,7 @@ const sum = (values: (number | null)[]) => values.reduce<number>((total, v) => t
 /** Wat `statsOf` van een dossier nodig heeft; ook de JSON-vorm voor de browser past. */
 export type StatsInput = Pick<
   Dossier,
-  "key" | "activity" | "status" | "budgetCents" | "allocationCents" | "resultCents" | "devCents" | "lagDays" | "overdueDays" | "overAllocation"
+  "key" | "activity" | "status" | "budgetCents" | "allocationCents" | "resultCents" | "devCents" | "begrotingDevCents" | "lagDays" | "overdueDays" | "overAllocation"
 > & { budgets: readonly unknown[]; results: readonly unknown[] };
 
 /** De cijfers van een rij dossiers: een post, het hele jaar, of een groep in de lijst. */
@@ -311,6 +325,8 @@ export function statsOf(dossiers: readonly StatsInput[]): Stats {
     worse: done.filter((d) => (d.devCents ?? 0) < 0).length,
     avgLagDays: lags.length ? Math.round(lags.reduce((a, b) => a + b, 0) / lags.length) : null,
     overAllocation: dossiers.filter((d) => d.overAllocation).length,
+    begrotingDev: sum(due.map((d) => d.begrotingDevCents)),
+    begrotingCounted: due.filter((d) => d.begrotingDevCents !== null).length,
     oldest: oldest ? { key: oldest.key, activity: oldest.activity, days: oldest.overdueDays ?? 0 } : null,
   };
 }
@@ -324,6 +340,27 @@ export function statsOf(dossiers: readonly StatsInput[]): Stats {
  */
 export function kindAt(doc: Pick<DocInput, "name" | "linkName" | "folderKind">): BoKind | null {
   return parseDocumentName(doc.linkName ?? "").kind ?? parseDocumentName(doc.name).kind ?? doc.folderKind;
+}
+
+/**
+ * Uit welke naam post en activiteit komen. Eerst de naam van het blad: die is
+ * het laatst rechtgezet. Maar een snelkoppeling krijgt bij het aanmaken haar
+ * eigen naam, en wie een blad maakt als kopie van een sjabloon, zet de juiste
+ * naam soms enkel op de snelkoppeling in de BO-map ("Kopie van Budget
+ * sjabloon" achter "26-27_Budget_Cursusdienst_..."). Zegt het blad geen post
+ * die de site kent en de snelkoppeling wel, dan wint de snelkoppeling.
+ */
+function namesOf(
+  doc: Pick<DocInput, "name" | "linkName">,
+  posts: readonly PostCandidate[],
+  aliases: PostAliases,
+): ParsedDocumentName {
+  const own = parseDocumentName(doc.name);
+  if (!doc.linkName) return own;
+  const known = (p: ParsedDocumentName) => Boolean(p.post && splitPost(p.post, p.activity, posts, aliases).postKeys.length > 0);
+  if (known(own)) return own;
+  const link = parseDocumentName(doc.linkName);
+  return known(link) ? link : own;
 }
 
 const SECTION_ORDER: Record<PostSection, number> = { g5: 0, post: 1, werkgroep: 2, jaarwerking: 3, extra: 4, unknown: 5 };
@@ -369,7 +406,7 @@ export function buildOverview(
   const sameAs = new Map<string, string>();
   for (const doc of ordered) {
     if (doc.hidden) continue;
-    const parsed = parseDocumentName(doc.name);
+    const parsed = namesOf(doc, posts, aliases);
     const kind = kinds.get(doc.id) ?? null;
     const label = meetingLabel(doc.meeting, nl);
     const override = (doc.postKeysOverride ?? []).filter(Boolean);
@@ -516,6 +553,8 @@ export function buildOverview(
     const budgetCents = lastBudget?.doc.budgetTotalCents ?? null;
     const resultCents = lastResult?.doc.resultTotalCents ?? null;
     const allocationCents = lastBudget?.doc.allocationCents ?? lastResult?.doc.allocationCents ?? null;
+    // Het resultaat is het meest accuraat; zolang het er niet is, het budget.
+    const standCents = (status === "DONE" ? resultCents : null) ?? budgetCents;
     const resultDate = lastResult?.view.meetingDate ?? null;
     const resultLines = lastResult?.doc.lines ?? [];
     const lines = resultLines.length > 0 ? resultLines : (lastBudget?.doc.lines ?? []);
@@ -542,6 +581,7 @@ export function buildOverview(
         vtkSharePercent: (lastResult ?? lastBudget)?.doc.vtkSharePercent ?? null,
         lagDays: resultDate && date && budgetItems.length > 0 ? Math.max(0, days(date, resultDate)) : null,
         overdueDays: status === "OPEN" && date ? Math.max(0, days(date, today)) : null,
+        begrotingDevCents: allocationCents !== null && standCents !== null ? standCents - allocationCents : null,
         overAllocation: budgetCents !== null && allocationCents !== null && budgetCents < allocationCents,
         lines,
         lastSeen: dates.length > 0 ? new Date(Math.max(...dates)) : null,

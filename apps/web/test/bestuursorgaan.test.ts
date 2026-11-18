@@ -608,6 +608,39 @@ describe("budgetten en resultaten samenleggen", () => {
     expect(overview.totals).toMatchObject({ budgets: 1, results: 1 });
   });
 
+  it("haalt de post uit de snelkoppeling wanneer het blad zelf er geen noemt", () => {
+    // Cursusdienst in BO 3 (26-27): de snelkoppeling in de BO-map heet zoals het
+    // hoort, het blad zelf is een kopie van het sjabloon.
+    const overview = buildOverview(
+      [
+        doc("Kopie van Budget sjabloon", {
+          bo: 3,
+          folderKind: "BUDGET",
+          linkName: "26-27_Budget_Cursusdienst_shiftersvoorzieningen teldagen",
+          budgetTotalCents: -12000,
+        }),
+      ],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    expect(overview.unknownPosts).toEqual([]);
+    expect(overview.posts.map((p) => p.key)).toEqual(["g:curs"]);
+    expect(overview.posts[0].dossiers[0]).toMatchObject({ activity: "shiftersvoorzieningen teldagen", budgetCents: -12000 });
+  });
+
+  it("houdt de post uit het blad wanneer de site die kent", () => {
+    const overview = buildOverview(
+      [stadsspel({ bo: 3, folderKind: "BUDGET", linkName: "26-27_Budget_Cursusdienst_Stadsspel" })],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    expect(overview.posts.map((p) => p.key)).toEqual(["g:onth"]);
+  });
+
   it("volgt de map wanneer de oude naam nergens meer staat", () => {
     // Een werkgroep hangt haar map in de BO-map: geen snelkoppeling per blad,
     // en voor de scan de nieuwe naam liest, is er ook nog geen.
@@ -982,6 +1015,41 @@ describe("het overzicht per post (voor de slide)", () => {
     expect(summary.vtk).toMatchObject({ due: 3, done: 1 });
     expect(summary.werkgroepen).toMatchObject({ due: 1, done: 0, pct: 0 });
     expect(summary.lastMeeting).toBe("BO 40");
+  });
+
+  it("telt per post hoe ze ervoor staat tegenover de begroting", () => {
+    const withPlan = toExplorerData(
+      buildOverview(
+        [
+          // Resultaat binnen: dat telt, niet het budget. -900 tegen -1000: +100.
+          doc("26-27_Budget_IT_Router", { bo: 5, budgetTotalCents: -95000, allocationCents: -100000 }),
+          doc("26-27_Resultaat_IT_Router", { bo: 9, resultTotalCents: -90000, allocationCents: -100000 }),
+          // Nog geen resultaat: het budget. -1200 tegen -1000: -200.
+          doc("26-27_Budget_IT_Server", { bo: 9, budgetTotalCents: -120000, allocationCents: -100000 }),
+          // Geen regel Begroting: telt niet mee.
+          doc("26-27_Budget_IT_Kabels", { bo: 9, budgetTotalCents: -5000 }),
+          // Een BO die nog moet komen: nog niet goedgekeurd, telt niet mee.
+          doc("26-27_Budget_IT_Scherm", { bo: 30, year: 2026, budgetTotalCents: -1000, allocationCents: -50000 }),
+          doc("26-27_Budget_Statix_Talks", { bo: 9, budgetTotalCents: 2000, allocationCents: 0 }),
+        ],
+        posts,
+        new Map(),
+        2026,
+        new Date(Date.UTC(2026, 8, 20)),
+        true,
+        meetings,
+      ),
+      2026,
+      new Date(Date.UTC(2026, 8, 20)),
+    );
+    const plan = buildSummary(withPlan, postOptions(posts, true));
+    const row = (name: string) => plan.sections.flatMap((s) => s.rows).find((r) => r.name === name)!;
+    expect(row("IT")).toMatchObject({ due: 3, begroting: -10000, begrotingCounted: 2 });
+    expect(row("Statix")).toMatchObject({ begroting: 2000, begrotingCounted: 1 });
+    expect(row("Sport")).toMatchObject({ begroting: null, begrotingCounted: 0 });
+    expect(plan.total).toMatchObject({ due: 4, begrotingDev: -8000, begrotingCounted: 3 });
+    expect(plan.vtk).toMatchObject({ begrotingDev: -10000 });
+    expect(plan.werkgroepen).toMatchObject({ begrotingDev: 2000 });
   });
 });
 

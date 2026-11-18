@@ -19,10 +19,48 @@ export function tone(pct: number | null): "down" | "low" | "ok" | undefined {
 
 const pctText = (pct: number | null) => (pct === null ? "–" : `${Math.round(pct * 100)}%`);
 
-/** Een kolomkop, met een korte vorm voor een smal scherm (`vtk-admin.css`). */
-function Head({ long, short }: { long: string; short: string }) {
+/**
+ * Een bedrag tegenover de begroting, in hele euro: "+€ 1.234" of "−€ 320". Het
+ * teken blijft met een woordverbinder aan het bedrag, zodat het niet alleen op
+ * een regel belandt.
+ */
+function begrotingText(cents: number, nl: boolean): string {
+  const euros = Math.round(cents / 100);
+  const amount = `€ ${Math.abs(euros).toLocaleString(nl ? "nl-BE" : "en-GB")}`;
+  return euros > 0 ? `+\u2060${amount}` : euros < 0 ? `−\u2060${amount}` : amount;
+}
+
+function begrotingTone(cents: number): "up" | "down" | undefined {
+  const euros = Math.round(cents / 100);
+  return euros > 0 ? "up" : euros < 0 ? "down" : undefined;
+}
+
+/** Hoe een post ervoor staat tegenover de begroting, of een streepje zonder begroting. */
+function Begroting({ cents, counted, due, nl }: { cents: number | null; counted: number; due: number; nl: boolean }) {
+  if (cents === null) {
+    return (
+      <span className="none" title={nl ? "Geen blad met een begroting" : "No sheet with a budget line"}>
+        –
+      </span>
+    );
+  }
+  const title =
+    counted < due
+      ? nl
+        ? `Over ${counted} van ${due} budgetten; de andere hebben geen regel Begroting in hun blad`
+        : `Over ${counted} of ${due} budgets; the others have no Begroting line in their sheet`
+      : undefined;
   return (
-    <th scope="col" className="num" title={long}>
+    <span className="vtk-bo-devtext" data-tone={begrotingTone(cents)} title={title}>
+      {begrotingText(cents, nl)}
+    </span>
+  );
+}
+
+/** Een kolomkop, met een korte vorm voor een smal scherm (`vtk-admin.css`). */
+function Head({ long, short, className = "num" }: { long: string; short: string; className?: string }) {
+  return (
+    <th scope="col" className={className} title={long}>
       <span className="long">{long}</span>
       <span className="short" aria-hidden="true">
         {short}
@@ -50,6 +88,16 @@ export function BoSummary({ summary, year, nl }: { summary: Summary; year: strin
       <span className="vtk-bo-sum-pct" data-tone={tone(s.pct)}>
         {pctText(s.pct)}
       </span>
+      <span className="b">
+        {nl ? "t.o.v. begroting" : "vs. annual plan"}{" "}
+        <Begroting cents={s.begrotingCounted ? s.begrotingDev : null} counted={s.begrotingCounted} due={s.due} nl={nl} />
+        {s.begrotingCounted > 0 && s.begrotingCounted < s.due && (
+          <span className="of">
+            {" "}
+            {nl ? `(${s.begrotingCounted} van ${s.due})` : `(${s.begrotingCounted} of ${s.due})`}
+          </span>
+        )}
+      </span>
     </div>
   );
   const line = (r: SummaryRow) => (
@@ -57,7 +105,7 @@ export function BoSummary({ summary, year, nl }: { summary: Summary; year: strin
       <th scope="row">{r.name}</th>
       <td className="num">{r.due}</td>
       <td className="num">{r.done}</td>
-      <td className="num">{r.due ? r.missing : ""}</td>
+      <td className="num mis">{r.due ? r.missing : ""}</td>
       <td className="pct">
         {r.due === 0 ? (
           <span className="none" title={nl ? "Nog geen budget gepasseerd" : "No budget passed yet"}>
@@ -68,6 +116,9 @@ export function BoSummary({ summary, year, nl }: { summary: Summary; year: strin
             {pctText(r.pct)}
           </span>
         )}
+      </td>
+      <td className="begr">
+        {r.due === 0 ? "" : <Begroting cents={r.begroting} counted={r.begrotingCounted} due={r.due} nl={nl} />}
       </td>
     </tr>
   );
@@ -97,8 +148,11 @@ export function BoSummary({ summary, year, nl }: { summary: Summary; year: strin
                   <th scope="col">Post</th>
                   <Head long={nl ? "Budgetten" : "Budgets"} short={nl ? "Budg." : "Budg."} />
                   <Head long={nl ? "Resultaten" : "Results"} short={nl ? "Res." : "Res."} />
-                  <Head long={nl ? "Missend" : "Missing"} short={nl ? "Mis." : "Miss."} />
+                  <Head long={nl ? "Missend" : "Missing"} short={nl ? "Mis." : "Miss."} className="num mis" />
                   <th scope="col" className="pct">%</th>
+                  <th scope="col" className="begr" title={nl ? "Stand tegenover de begroting" : "Standing against the annual budget"}>
+                    {nl ? "Begroting" : "vs. plan"}
+                  </th>
                 </tr>
               </thead>
               <tbody>{rows.map(line)}</tbody>
@@ -108,8 +162,8 @@ export function BoSummary({ summary, year, nl }: { summary: Summary; year: strin
       </div>
       <p className="vtk-bo-sum-foot">
         {nl
-          ? "Budgetten: op een BO die al plaatsvond, of schriftelijk goedgekeurd. Percentage: daarvan met een resultaat. Rood onder 50%, oranje onder 100%, groen wanneer alles binnen is; een streepje: nog geen budget gepasseerd."
-          : "Budgets: at a meeting that already took place, or approved in writing. Percentage: of those, with a result. Red below 50%, orange below 100%, green when everything is in; a dash: no budget passed yet."}
+          ? "Budgetten: op een BO die al plaatsvond, of schriftelijk goedgekeurd. Percentage: daarvan met een resultaat. Rood onder 50%, oranje onder 100%, groen wanneer alles binnen is; een streepje: nog geen budget gepasseerd. Begroting: per budget het resultaat (of, zolang dat er niet is, het budget) min de regel Begroting in het blad, opgeteld; plus is beter dan begroot. Een blad zonder begroting telt niet mee."
+          : "Budgets: at a meeting that already took place, or approved in writing. Percentage: of those, with a result. Red below 50%, orange below 100%, green when everything is in; a dash: no budget passed yet. vs. plan: per budget the result (or, until there is one, the budget) minus the Begroting line in the sheet, summed; plus is better than planned. A sheet without a Begroting line is left out."}
       </p>
     </section>
   );

@@ -12485,6 +12485,28 @@ allebei): allebei.
   Secretaris, Beheer), maar enkel wanneer er iets in zit. Jaarwerkingen en
   Overige hebben geen leden en staan bij niemand.
 
+## Bestuursorgaan: de stand tegenover de begroting
+
+In november 2026 vroeg Groep 5 om op "Resultaten per post" ook te zien hoe goed
+het jaar loopt tegenover de begroting, om sneller te kunnen bijsturen. Elk blad
+heeft een regel Begroting; het getal is per activiteit het resultaat min die
+regel, of zolang er geen resultaat is het budget min die regel, opgeteld per
+post en bovenaan voor Totaal, VTK en Werkgroepen. Plus is beter dan begroot.
+
+- **Het resultaat wint van het budget**: dat is het meest accuraat. Een budget
+  telt pas mee zodra zijn BO voorbij is (of het schriftelijk goedgekeurd werd),
+  dezelfde activiteiten als de kolom Budgetten; een budget voor een BO die nog
+  moet komen, is nog niet goedgekeurd.
+- **Een blad zonder regel Begroting telt niet mee**, en het scherm zegt over
+  hoeveel van de budgetten het getal gaat ("22 van 27"). Een lege regel als 0
+  lezen zou elk zo'n budget volledig als afwijking tellen.
+- **Elke activiteit telt apart, ook bij een potje.** Een potje (meer uitgaven op
+  één begrotingslijn) hoort in één blad; een post die het over vier bladen
+  verdeelt met telkens de hele begroting erin, doet het verkeerd, en dat
+  corrigeert het overzicht niet.
+- Op een telefoon wijkt de kolom Missend (budgetten min resultaten), zodat de
+  naam van de post plaats houdt.
+
 ## Bestuursorgaan: de verkenner
 
 Op een bord met het register en vijf richtingen (een lijst met formulieren zoals

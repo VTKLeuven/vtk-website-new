@@ -273,6 +273,14 @@ haar posten werkgroepen zijn). Een vak voor uitzonderingen (Groep 5 als
 geheel, Andere jaarwerking, Overige: `PostOption.catchAll`) staat er enkel
 wanneer er iets in zit.
 
+Per post en bij de totalen staat ook **de stand tegenover de begroting**
+(`Dossier.begrotingDevCents`, `Stats.begrotingDev`): per activiteit met een BO
+die al voorbij is, het resultaat (of zolang dat er niet is het budget) min de
+regel Begroting, opgeteld. Plus is beter dan begroot. Een blad zonder regel
+Begroting telt niet mee; `Stats.begrotingCounted` zegt over hoeveel het gaat.
+Waarom zo: `docs/design-decisions.md`, "Bestuursorgaan: de stand tegenover de
+begroting".
+
 ---
 
 ## Vallen waar we in gelopen zijn (of die op je liggen te wachten)
@@ -326,6 +334,14 @@ wanneer er iets in zit.
   `Resultaat`, dus stond er een resultaat op BO 3 en "geen budget". Vandaar
   `BoDocument.linkName`. "Niet meetellen" werkt nog altijd per bestand: bij
   zo'n blad verdwijnen budget en resultaat samen, en de bevestiging zegt dat.
+- **Soms staat de juiste naam enkel op de snelkoppeling.** Post en activiteit
+  komen uit de naam van het blad (die is het laatst rechtgezet), maar een post
+  die een kopie van het sjabloon maakt, hernoemt soms enkel de snelkoppeling in
+  de BO-map. `26-27_Budget_Cursusdienst_shiftersvoorzieningen teldagen` (BO 3)
+  werd niet herkend terwijl de snelkoppeling juist heette, en het scherm toont
+  de naam van de snelkoppeling, dus niemand zag waarom. Noemt het blad
+  geen post die de site kent en de snelkoppeling wel, dan wint de snelkoppeling
+  (`namesOf` in `lib/bo/dossiers.ts`).
 - **Een fout in de scan breekt de groepssync niet.** De worker roept beide in
   dezelfde ronde aan, maar de statuscode volgt enkel de groepssync; een fout in
   de BO-scan staat op `/admin/bestuursorgaan`.

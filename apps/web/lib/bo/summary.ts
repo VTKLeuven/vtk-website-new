@@ -7,7 +7,9 @@ import type { PostOption } from "./posts";
  * budgetten er al op een BO passeerden, hoeveel resultaten er binnen zijn en
  * het percentage, met bovenaan de totalen voor VTK en voor de werkgroepen. Zo
  * hield Groep 5 het vroeger bij in een rekenblad, en elke week gaat er een
- * schermafbeelding van op een slide. Puur, zodat het getest kan worden.
+ * schermafbeelding van op een slide. Sinds november 2026 ook hoe elke post
+ * ervoor staat tegenover de begroting, om sneller te kunnen bijsturen. Puur,
+ * zodat het getest kan worden.
  */
 
 export type SummaryRow = {
@@ -19,6 +21,14 @@ export type SummaryRow = {
   done: number;
   missing: number;
   pct: number | null;
+  /**
+   * Hoe de post ervoor staat tegenover de begroting (`Stats.begrotingDev`):
+   * positief is beter dan begroot. Null wanneer geen enkel blad een begroting
+   * had.
+   */
+  begroting: number | null;
+  /** Over hoeveel van `due` dat bedrag gaat. */
+  begrotingCounted: number;
 };
 
 export type SummarySection = { section: PostSection; rows: SummaryRow[] };
@@ -38,7 +48,16 @@ export function buildSummary(data: ExplorerData, options: readonly PostOption[])
   const blocks = new Map(data.posts.map((p) => [p.key, p]));
   const row = (key: string, name: string): SummaryRow => {
     const s = blocks.get(key)?.stats;
-    return { key, name, due: s?.due ?? 0, done: s?.done ?? 0, missing: (s?.due ?? 0) - (s?.done ?? 0), pct: s?.pct ?? null };
+    return {
+      key,
+      name,
+      due: s?.due ?? 0,
+      done: s?.done ?? 0,
+      missing: (s?.due ?? 0) - (s?.done ?? 0),
+      pct: s?.pct ?? null,
+      begroting: s?.begrotingCounted ? s.begrotingDev : null,
+      begrotingCounted: s?.begrotingCounted ?? 0,
+    };
   };
 
   // Elke post en elk vak, ook zonder budget: wie niets indiende, hoort ook op
