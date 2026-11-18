@@ -13,8 +13,9 @@ import { messageFor, useResource } from '../../api/useResource';
 import { Prose } from '../../components/Prose';
 import { Button, Card, ErrorState, Loading } from '../../components/ui';
 import { addEventToDeviceCalendar, addResultMessage } from '../../deviceCalendar';
-import { formatEventWhen } from '../../format';
+import { formatDayShort, formatEventWhen, formatTimeRange } from '../../format';
 import { markdownToPlainText } from '../../markdown';
+import { leadMoment } from '../../moments';
 import { useApp } from '../../state/app';
 import { useTabRouter } from '../../navigation';
 import { COLORS, RADIUS, SPACING, TYPE } from '../../theme/tokens';
@@ -47,12 +48,16 @@ import { COLORS, RADIUS, SPACING, TYPE } from '../../theme/tokens';
  * kan enkel op de site: in de app ben je per definitie ingelogd, en dan is de
  * ster de juiste knop.
  */
+/** Zoveel dagen van een reeks staan er meteen; zeven past een loopweek, zoals op de site. */
+const MOMENTS_VISIBLE = 7;
+
 export default function EventScreen() {
   const router = useTabRouter();
   const insets = useSafeAreaInsets();
   const { locale, viewer } = useApp();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [addingToCalendar, setAddingToCalendar] = useState(false);
+  const [allDays, setAllDays] = useState(false);
 
   const resource = useResource(
     `evenement:${id}`,
@@ -68,6 +73,14 @@ export default function EventScreen() {
   }
 
   const event = resource.data;
+  // Een reeks (een loopweek, drie filmavonden): de dagen die nog komen, zoals het
+  // paneel op de eventpagina van de site. Wat voorbij is, telt niet meer mee.
+  const now = new Date();
+  const moments = event.moments ?? [];
+  const upcomingMoments = moments.filter((moment) => new Date(moment.end) >= now);
+  const series = moments.length >= 2;
+  const shownMoments = allDays ? upcomingMoments : upcomingMoments.slice(0, MOMENTS_VISIBLE);
+  const next = leadMoment(event, now);
 
   const toggleInterest = () => {
     void setEventInterest(event.id, !event.interested)
@@ -78,12 +91,14 @@ export default function EventScreen() {
   const addToCalendar = async () => {
     setAddingToCalendar(true);
     try {
+      // Bij een reeks de eerstvolgende keer: een blok van een hele week in je
+      // agenda zegt niets over wanneer je er moet zijn.
       const result = await addEventToDeviceCalendar({
-        title: event.title,
-        start: event.start,
-        end: event.end,
+        title: next?.label ? `${event.title}: ${next.label}` : event.title,
+        start: next?.start ?? event.start,
+        end: next?.end ?? event.end,
         allDay: event.allDay,
-        location: event.location,
+        location: next?.location ?? event.location,
         notes: event.description ? markdownToPlainText(event.description).slice(0, 600) : null,
       });
       if (result.ok) {
@@ -122,9 +137,43 @@ export default function EventScreen() {
         <Card>
           <View style={styles.fact}>
             <CalendarDays color={COLORS.muted} size={18} />
-            <Text style={styles.factText}>
-              {formatEventWhen(event.start, event.end, event.allDay, locale)}
-            </Text>
+            {series && upcomingMoments.length > 0 ? (
+              <View style={styles.moments}>
+                {shownMoments.map((moment, index) => (
+                  <View key={moment.start} style={styles.momentRow}>
+                    <Text style={[styles.momentDay, index === 0 && styles.momentNext]}>
+                      {formatDayShort(moment.start, locale)}
+                    </Text>
+                    <View style={styles.momentText}>
+                      <Text style={styles.momentTime}>
+                        {event.allDay ? '' : formatTimeRange(moment.start, moment.end, locale)}
+                        {moment.label ? `${event.allDay ? '' : ', '}${moment.label}` : ''}
+                      </Text>
+                      {moment.location ? (
+                        <Text style={styles.momentPlace}>{moment.location}</Text>
+                      ) : null}
+                    </View>
+                  </View>
+                ))}
+                {upcomingMoments.length > MOMENTS_VISIBLE ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setAllDays(!allDays)}
+                    hitSlop={8}
+                  >
+                    <Text style={styles.momentsToggle}>
+                      {allDays
+                        ? 'Minder dagen'
+                        : `Toon alle ${upcomingMoments.length} dagen`}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : (
+              <Text style={styles.factText}>
+                {formatEventWhen(event.start, event.end, event.allDay, locale)}
+              </Text>
+            )}
           </View>
           {event.location ? (
             <View style={styles.fact}>
@@ -305,4 +354,13 @@ const styles = StyleSheet.create({
   attendeeName: { ...TYPE.body, color: COLORS.ink, flex: 1 },
   attendeeAnon: { color: COLORS.muted, fontStyle: 'italic' },
   attendeeMeta: { ...TYPE.small, color: COLORS.muted },
+  moments: { flex: 1, gap: SPACING.sm },
+  momentRow: { flexDirection: 'row', gap: SPACING.md, alignItems: 'flex-start' },
+  momentDay: { ...TYPE.body, color: COLORS.body, width: 92 },
+  // De eerstvolgende keer in het vet, zoals het gele vakje in de strip op de site.
+  momentNext: { fontFamily: TYPE.cardTitle.fontFamily, color: COLORS.ink },
+  momentText: { flex: 1 },
+  momentTime: { ...TYPE.body, color: COLORS.ink },
+  momentPlace: { ...TYPE.small, color: COLORS.muted },
+  momentsToggle: { ...TYPE.small, color: COLORS.navy, textDecorationLine: 'underline' },
 });

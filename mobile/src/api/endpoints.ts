@@ -15,6 +15,8 @@ import type {
   AppPassHolder,
   AppPiano,
   AppPoc,
+  AppPollAnswerInput,
+  AppPolls,
   AppPraesidium,
   AppProfile,
   AppRooms,
@@ -27,6 +29,8 @@ import type {
   AppStudyStopResult,
   AppTheokot,
   AppTheokotOrderInput,
+  AppTheokotReleaseInput,
+  AppTheokotUpdateInput,
   AppTicketEvent,
   AppTicketEventDetail,
   AppTicketScanResult,
@@ -84,6 +88,25 @@ export function placeTheokotOrder(
 
 export function cancelTheokotOrder(orderId: string): Promise<{ ok: true }> {
   return apiFetch(appApi('/theokot/order'), { method: 'DELETE', body: { orderId } });
+}
+
+/** Een reservatie aanpassen zolang het bestelvenster open is. */
+export function updateTheokotOrder(
+  input: AppTheokotUpdateInput,
+): Promise<{ orderId: string; totalCents: number }> {
+  return apiFetch(appApi('/theokot/order'), { method: 'PATCH', body: input });
+}
+
+/** Na de deadline: broodjes vrijgeven voor overname. Zonder `lines` alles. */
+export function releaseTheokotOrder(input: AppTheokotReleaseInput): Promise<{ ok: true }> {
+  return apiFetch(appApi('/theokot/vrijgeven'), { method: 'POST', body: input });
+}
+
+/** Eén vrijgegeven broodje overnemen. */
+export function takeOverTheokotSandwich(
+  sessionItemId: string,
+): Promise<{ orderId: string; totalCents: number }> {
+  return apiFetch(appApi('/theokot/overnemen'), { method: 'POST', body: { sessionItemId } });
 }
 
 // ── Tickets ─────────────────────────────────────────────────────────────────
@@ -177,12 +200,40 @@ export function fetchShifts(locale: AppLocale): Promise<AppShifts> {
  * overdoen zou betekenen dat een uitschrijving in de app op cudi kan blijven
  * staan.
  */
-export function registerForShift(shiftId: string): Promise<unknown> {
-  return apiFetch(`/api/shift/register?id=${encodeURIComponent(shiftId)}`, { method: 'POST' });
+/**
+ * `replaceable`: enkel voor een praesidiumlid (`AppShift.replaceableOption`).
+ * Een student mag dan deze plaats innemen wanneer de shift vol staat.
+ */
+export function registerForShift(
+  shiftId: string,
+  options: { replaceable?: boolean } = {},
+): Promise<unknown> {
+  const extra = options.replaceable ? '&replaceable=1' : '';
+  return apiFetch(`/api/shift/register?id=${encodeURIComponent(shiftId)}${extra}`, {
+    method: 'POST',
+  });
+}
+
+/** Achteraf aanzetten of uitzetten of een student je plaats mag innemen. */
+export function setShiftReplaceable(shiftId: string, replaceable: boolean): Promise<unknown> {
+  return apiFetch(`/api/shift/register?id=${encodeURIComponent(shiftId)}`, {
+    method: 'PATCH',
+    body: { replaceable },
+  });
 }
 
 export function unregisterFromShift(shiftId: string): Promise<unknown> {
   return apiFetch(`/api/shift/register?id=${encodeURIComponent(shiftId)}`, { method: 'DELETE' });
+}
+
+// ── Peilingen ───────────────────────────────────────────────────────────────
+
+export function fetchPolls(locale: AppLocale): Promise<AppPolls> {
+  return apiFetch<AppPolls>(appApi('/peilingen', { locale }));
+}
+
+export function answerPoll(input: AppPollAnswerInput): Promise<{ ok: true }> {
+  return apiFetch(appApi('/peilingen'), { method: 'POST', body: input });
 }
 
 // ── Groepen ─────────────────────────────────────────────────────────────────
@@ -219,7 +270,7 @@ export function cancelPianoSlot(id: string): Promise<{ ok: true }> {
  * nog op de vorige versie van de app zitten.
  */
 export function fetchToday(locale: AppLocale): Promise<AppToday> {
-  return apiFetch<AppToday>(appApi('/vandaag', { locale }));
+  return apiFetch<AppToday>(appApi('/vandaag', { locale, peilingen: '1' }));
 }
 
 // ── Interesse en gevolgde categorieën ───────────────────────────────────────

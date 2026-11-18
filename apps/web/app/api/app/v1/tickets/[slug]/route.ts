@@ -41,6 +41,7 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
       maxTicketsPerOrder: event.honoraryOneTicket
         ? Math.min(event.maxTicketsPerOrder, event.honoraryOneTicket.used ? 0 : 1)
         : event.maxTicketsPerOrder,
+      honoraryOneTicket: event.honoraryOneTicket ? { used: event.honoraryOneTicket.used } : null,
       currency: event.currency,
       contactEmail: event.contactEmail,
       termsUrl: event.termsUrl,

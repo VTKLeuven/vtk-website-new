@@ -1,6 +1,7 @@
 import {
   CalendarCheck,
   ChevronRight,
+  MessageSquareText,
   Music,
   Sandwich,
   TicketCheck,
@@ -32,6 +33,7 @@ const ICONS: Record<AppTodayTask['kind'], React.ComponentType<{ color: string; s
   ticket: TicketCheck,
   shift: Wrench,
   piano: Music,
+  poll: MessageSquareText,
 };
 
 export function TaskCard({ task }: { task: AppTodayTask }) {

@@ -179,3 +179,42 @@ describe("een dag zonder sluitingsuur", () => {
     expect(status.detail).toBe("zo 22:00");
   });
 });
+
+/**
+ * De cursusdienst gaat 's middags en 's avonds open. `parseHoursRange` las enkel
+ * het eerste venster, waardoor ze elke avond als gesloten op het beginscherm van
+ * de app stond.
+ */
+describe("twee vensters op een dag", () => {
+  const twice = {
+    key: "cursusdienst" as const,
+    service: "cursusdienst" as const,
+    setting: null,
+    liveEntries: setting.entries.map((entry) => ({
+      ...entry,
+      hours: entry.hours === "Gesloten" ? entry.hours : "12:30 - 14:00, 18:00 - 19:00",
+    })),
+  };
+
+  it("is 's avonds open tot het einde van het tweede venster", () => {
+    // Dinsdag 18:30 in Brussel.
+    const status = serviceStatus(twice, "nl", new Date("2026-09-15T16:30:00.000Z"));
+    expect(status.openNow).toBe(true);
+    expect(status.detail).toBe("tot 19:00");
+  });
+
+  it("zegt tussen de twee vensters wanneer het weer opengaat", () => {
+    // Dinsdag 15:00 in Brussel.
+    const status = serviceStatus(twice, "nl", new Date("2026-09-15T13:00:00.000Z"));
+    expect(status.openNow).toBe(false);
+    expect(status.detail).toBe("opent 18:00");
+  });
+
+  it("stuurt de vensters van vandaag mee voor de tijdlijn", () => {
+    const status = serviceStatus(twice, "nl", new Date("2026-09-15T13:00:00.000Z"));
+    expect(status.today).toEqual([
+      { start: 12 * 60 + 30, end: 14 * 60 },
+      { start: 18 * 60, end: 19 * 60 },
+    ]);
+  });
+});

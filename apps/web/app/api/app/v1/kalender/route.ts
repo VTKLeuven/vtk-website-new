@@ -14,6 +14,7 @@ import { absoluteMediaUrl } from "@/lib/app-api/media";
 import { appErrorResponse, appJson } from "@/lib/app-api/respond";
 import { organiserName } from "@/lib/calendar/organiser";
 import { eventAsOfNow, MOMENT_SELECT } from "@/lib/calendar/moments";
+import { appMoments } from "@/lib/app-api/moments";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -159,6 +160,7 @@ export async function GET(request: Request) {
         interested: interested.has(event.id),
         interestedCount: publicCounts.get(event.id) ?? null,
         ticketSlug: publishedTicketSlug(event.ticketEvents),
+        moments: appMoments(row.moments),
         };
       }),
     };

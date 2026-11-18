@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { AppCalendarEvent, AppLocale } from '../api/contract';
 import { formatDayShort, formatTime } from '../format';
+import { displayStart, momentsSummary } from '../moments';
 import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
 
 /**
@@ -28,31 +29,40 @@ import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
  * beslist over de drempel (zie `lib/calendar/interest.ts` op de site), zodat de
  * app en de website hetzelfde tonen en een lage teller nergens opduikt. Een
  * oudere serverversie stuurt het veld niet mee; dan blijft het weg.
+ *
+ * **Een reeks staat op haar eerstvolgende moment**, zoals op de kalender van de
+ * site, met onder de titel hoeveel keer ze nog loopt. `at` zet de rij op een
+ * ander moment, voor de dag die in het maandrooster aangetikt is.
  */
 export function EventRow({
   event,
   locale,
   onPress,
   onToggleInterest,
+  at,
 }: {
   event: AppCalendarEvent;
   locale: AppLocale;
+  /** Het moment waarop deze rij staat; standaard het eerstvolgende. */
+  at?: string;
   onPress: () => void;
   /** Weglaten en de ster verdwijnt; zo blijft de rij bruikbaar zonder login. */
   onToggleInterest?: (next: boolean) => void;
 }) {
   const category = event.categories[0];
+  const start = at ?? displayStart(event);
+  const series = momentsSummary(event, locale);
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${event.title}, ${formatDayShort(event.start, locale)}`}
+      accessibilityLabel={`${event.title}, ${formatDayShort(start, locale)}`}
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
       <View style={styles.when}>
-        <Text style={styles.day}>{formatDayShort(event.start, locale)}</Text>
-        {!event.allDay ? <Text style={styles.time}>{formatTime(event.start, locale)}</Text> : null}
+        <Text style={styles.day}>{formatDayShort(start, locale)}</Text>
+        {!event.allDay ? <Text style={styles.time}>{formatTime(start, locale)}</Text> : null}
       </View>
 
       {event.imageUrl ? (
@@ -68,6 +78,11 @@ export function EventRow({
         <Text style={styles.group} numberOfLines={1}>
           {event.groupName}
         </Text>
+        {series ? (
+          <Text style={styles.series} numberOfLines={1}>
+            {series}
+          </Text>
+        ) : null}
         {event.location ? (
           <View style={styles.locationRow}>
             <MapPin color={COLORS.muted} size={13} />
@@ -143,6 +158,7 @@ const styles = StyleSheet.create({
   text: { flex: 1, gap: 3 },
   title: { ...TYPE.cardTitle, color: COLORS.ink },
   group: { ...TYPE.small, color: COLORS.muted },
+  series: { ...TYPE.small, color: COLORS.body },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   location: { ...TYPE.small, color: COLORS.muted, flex: 1 },
   tags: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 4, marginTop: 2 },

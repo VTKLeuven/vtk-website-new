@@ -202,6 +202,16 @@ function Shop({
           </Card>
         ) : null}
 
+        {event.honoraryOneTicket ? (
+          <Card featured>
+            <Text style={styles.body}>
+              {event.honoraryOneTicket.used
+                ? 'Als erelid koop je voor dit event één ticket, en dat heb je al.'
+                : 'Als erelid koop je voor dit event één ticket.'}
+            </Text>
+          </Card>
+        ) : null}
+
         {event.ticketTypes.length === 0 ? (
           <Empty
             title="Geen tickets beschikbaar"
@@ -232,7 +242,7 @@ function Shop({
                   value={quantity}
                   max={max}
                   label={type.name}
-                  disabled={type.available === 0}
+                  disabled={type.available === 0 || event.maxTicketsPerOrder === 0}
                   onChange={(next) =>
                     setQuantities((current) => ({ ...current, [type.id]: next }))
                   }
@@ -358,6 +368,14 @@ function checkoutErrorText(error: unknown): string {
       return 'Je hebt al een bestelling lopen. Rond die eerst af of wacht tot ze vervalt.';
     case 'FREE_TICKET_LIMIT':
       return 'Je hebt het maximum aan gratis tickets bereikt.';
+    case 'HONORARY_PRICE_USED':
+      return 'Je erelidticket voor dit event heb je al. Kies de gewone prijs.';
+    case 'HONORARY_TICKET_LIMIT':
+      return 'Als erelid koop je voor dit event één ticket, en dat heb je al.';
+    case 'MEMBERSHIP_REQUIRED':
+      return 'Dit ticket is enkel voor leden van VTK.';
+    case 'INVALID_TICKET_TYPE':
+      return 'Een gekozen tickettype is niet meer beschikbaar.';
     case 'INVALID_QUANTITY':
       return 'Dat aantal kan niet voor dit tickettype.';
     case 'INVALID_ANSWER':

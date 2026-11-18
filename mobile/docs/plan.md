@@ -582,3 +582,28 @@ via `/push/maintenance` (claim gezet, tweede beurt doet niets).
 - **De fakbar-QR verloopt niet.** Dat is met opzet: hij hangt maanden aan een
   muur. Wat hem buiten de bar waardeloos maakt, staat in
   `docs/design-decisions.md` en zit niet in het token.
+
+### Fase 7 - Bijgehaald met de site (20 september tot 18 november 2026)
+
+De site liep twee maanden voor op de app. Wat de app raakte, is bijgewerkt:
+
+- **Kalender**: evenementen met losse momenten (een loopweek) staan op hun
+  eerstvolgende moment, met "Nog 4 keer, telkens 18:00" onder de titel, een stip
+  op elke dag in het maandrooster en de dagen op de eventpagina. "In agenda" zet
+  de eerstvolgende keer in je agenda, niet de hele reeks. Home toont een reeks
+  die al loopt.
+- **Shiften**: per week een kop zoals op /shift. Een student ziet de plaats van
+  een vervangbaar praesidiumlid als vrij; een praesidiumlid kan aanduiden dat een
+  student zijn plaats mag innemen.
+- **Broodjes**: een reservatie aanpassen, na de deadline vrijgeven in plaats van
+  annuleren, en vrijgekomen broodjes overnemen. De voorraad staat er enkel nog
+  wanneer ze laag is.
+- **Tickets**: een erelid op een event met één ticket per erelid krijgt dat te
+  horen, en de nieuwe weigeringen van de checkout hebben een zin.
+- **Peilingen**: de vragen van je RiVers beantwoorden, vanuit een taak op Home of
+  onder Meer.
+- **Openingsuren**: de cursusdienst 's avonds staat niet meer als gesloten (de
+  API las enkel het eerste venster), en elke dienst heeft een dunne tijdlijn van
+  vandaag met een gele nu-lijn, zonder statusbolletjes, zoals op de homepage.
+- **Markdown**: een enkele enter is een regeleinde, en tabellen staan in een
+  witte kaart.

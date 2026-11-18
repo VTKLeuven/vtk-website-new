@@ -11,6 +11,7 @@ import { PageHead } from '../components/PageHead';
 import { Empty, ErrorState, Loading, StaleNotice } from '../components/ui';
 import { formatDay } from '../format';
 import { anchorOf, dayKeyOf, gridRange, todayKey, type MonthAnchor } from '../monthGrid';
+import { displayStart, eventDayKeys } from '../moments';
 import { getPref, setPref } from '../storage';
 import { useApp } from '../state/app';
 import { useTabRouter } from '../navigation';
@@ -91,10 +92,27 @@ export default function KalenderScreen() {
       .then(() => resource.refresh());
   };
 
-  const events = useMemo(() => resource.data?.events ?? [], [resource.data]);
+  // Een reeks die al loopt, staat op haar eerstvolgende moment; de server sorteert
+  // op de start van de reeks, dus hier opnieuw.
+  const events = useMemo(
+    () =>
+      [...(resource.data?.events ?? [])].sort((a, b) =>
+        displayStart(a).localeCompare(displayStart(b)),
+      ),
+    [resource.data],
+  );
 
   const dayEvents = useMemo(
-    () => (selectedDay ? events.filter((event) => dayKeyOf(event.start) === selectedDay) : []),
+    () =>
+      selectedDay
+        ? events
+            .filter((event) => eventDayKeys(event).includes(selectedDay))
+            .map((event) => ({
+              event,
+              // Bij een reeks het moment van die dag, niet het eerstvolgende.
+              at: event.moments?.find((moment) => dayKeyOf(moment.start) === selectedDay)?.start,
+            }))
+        : [],
     [events, selectedDay],
   );
 
@@ -213,10 +231,11 @@ export default function KalenderScreen() {
                 {dayEvents.length === 0 ? (
                   <Text style={styles.hint}>Niets gepland op deze dag.</Text>
                 ) : (
-                  dayEvents.map((event) => (
+                  dayEvents.map(({ event, at }) => (
                     <EventRow
                       key={event.id}
                       event={event}
+                      at={at}
                       locale={locale}
                       onPress={() => router.push(`/evenement/${event.id}`)}
                       onToggleInterest={

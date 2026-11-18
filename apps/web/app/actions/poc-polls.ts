@@ -9,12 +9,11 @@ import { SITE_CONTENT_TAG } from "@/lib/cachedContent";
 import { discordBotConfigured, listDiscordChannels } from "@/lib/discord/bot";
 import { postPollToDiscord, refreshPollDiscordMessage, removePollDiscordMessage } from "@/lib/discord/pollPosts";
 import { managedPocIds, managesPoc } from "@/lib/pocPolls/access";
-import { GENERAL_POLL, parsePollAnswers, pollIsForViewer, pollIsOpen } from "@/lib/pocPolls/core";
+import { GENERAL_POLL, pollIsOpen } from "@/lib/pocPolls/core";
 import { parseBrusselsInput, parsePollDraft } from "@/lib/pocPolls/draft";
 import { STUDY_YEARS } from "@/lib/pocPolls/population";
-import { getViewerStudy } from "@/lib/pocPolls/read";
 import { pollAnswerRef } from "@/lib/pocPolls/voterKey";
-import { replacePollAnswers } from "@/lib/pocPolls/write";
+import { submitPollAnswers } from "@/lib/pocPolls/submit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { getCurrentSession, requireSession } from "@/lib/session";
 
@@ -44,30 +43,8 @@ export async function submitPocPollAction(_previous: SaveState, formData: FormDa
   const session = await getCurrentSession();
   if (!session) return saveError("POLL_SIGN_IN");
 
-  const pollId = text(formData, "pollId");
-  const poll = await prisma.pocPoll.findUnique({
-    where: { id: pollId },
-    select: {
-      publishedAt: true,
-      opensAt: true,
-      closesAt: true,
-      studyYears: true,
-      poc: { select: { studyProgrammes: true } },
-      questions: { select: { id: true, kind: true } },
-    },
-  });
-  if (!poll?.publishedAt || !pollIsOpen(poll, new Date())) return saveError("POLL_CLOSED");
-
-  const study = await getViewerStudy(session.user.id);
-  if (!pollIsForViewer({ programmes: poll.poc?.studyProgrammes ?? null, studyYears: poll.studyYears }, study)) {
-    return saveError("POLL_NOT_YOURS");
-  }
-
-  const parsed = parsePollAnswers(poll.questions, (name) => formData.get(name));
-  if (!parsed.ok) return saveError(parsed.code);
-  if (parsed.answers.length === 0) return saveError("POLL_EMPTY");
-
-  await replacePollAnswers({ pollId, userId: session.user.id, years: study.years, answers: parsed.answers });
+  const code = await submitPollAnswers(session.user.id, text(formData, "pollId"), (name) => formData.get(name));
+  if (code) return saveError(code);
 
   // De layout mee: de strook bovenaan hoort meteen te verdwijnen.
   revalidatePath("/", "layout");

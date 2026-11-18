@@ -9,6 +9,7 @@ import {
   ExternalLink,
   GraduationCap,
   Images,
+  MessageSquareText,
   Music,
   QrCode,
   Search,
@@ -168,6 +169,14 @@ export default function MeerScreen() {
             label="POC's"
             onPress={() => router.push('/pocs')}
           />
+          {viewer ? (
+            <Row
+              icon={<MessageSquareText color={COLORS.navy} size={19} />}
+              label="Peilingen"
+              hint="Je RiVers vragen je mening voor de POC"
+              onPress={() => router.push('/peilingen')}
+            />
+          ) : null}
         </Group>
 
         {viewer ? (

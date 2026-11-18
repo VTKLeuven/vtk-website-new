@@ -7,7 +7,14 @@ import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react
 
 import { ApiError } from '../api/client';
 import type { AppLocale, AppTheokot, AppTheokotSession } from '../api/contract';
-import { cancelTheokotOrder, fetchTheokot, placeTheokotOrder } from '../api/endpoints';
+import {
+  cancelTheokotOrder,
+  fetchTheokot,
+  placeTheokotOrder,
+  releaseTheokotOrder,
+  takeOverTheokotSandwich,
+  updateTheokotOrder,
+} from '../api/endpoints';
 import { messageFor, useResource } from '../api/useResource';
 import { PageHead } from '../components/PageHead';
 import { PassCode } from '../components/PassCode';
@@ -21,6 +28,9 @@ import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
 import { useTabParam } from '../useTabParam';
 
 type Tab = 'bestellen' | 'afhalen';
+
+/** Onder dit aantal zegt de voorraad iets; daarboven staat ze er niet, zoals op /theokot. */
+const LOW_STOCK = 5;
 
 /**
  * Broodjes: bestellen en afhalen.
@@ -293,6 +303,17 @@ function SessionCard({
 }) {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
+  // Een bestaande reservatie aanpassen: dezelfde stappers, met je eigen broodjes
+  // al ingevuld en als vrije voorraad meegeteld (`updateOrder` op de server).
+  const [editing, setEditing] = useState(false);
+  const order = session.order;
+  const own = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const line of order?.lines ?? []) {
+      if (line.sessionItemId) map[line.sessionItemId] = (map[line.sessionItemId] ?? 0) + line.quantity;
+    }
+    return map;
+  }, [order]);
 
   const totals = useMemo(() => {
     let items = 0;
@@ -313,17 +334,20 @@ function SessionCard({
 
   const submit = async () => {
     setBusy(true);
+    const lines = session.items
+      .map((item) => ({ sessionItemId: item.id, quantity: quantities[item.id] ?? 0 }))
+      .filter((line) => line.quantity > 0);
     try {
-      await placeTheokotOrder({
-        sessionId: session.id,
-        lines: session.items
-          .map((item) => ({ sessionItemId: item.id, quantity: quantities[item.id] ?? 0 }))
-          .filter((line) => line.quantity > 0),
-      });
+      if (editing && order) {
+        await updateTheokotOrder({ orderId: order.orderId, lines });
+        setEditing(false);
+      } else {
+        await placeTheokotOrder({ sessionId: session.id, lines });
+      }
       setQuantities({});
       onChanged();
     } catch (error) {
-      Alert.alert('Bestellen lukte niet', orderErrorText(error));
+      Alert.alert(editing ? 'Aanpassen lukte niet' : 'Bestellen lukte niet', orderErrorText(error));
       // Ook bij een fout opnieuw ophalen: "uitverkocht" en "al besteld" betekenen
       // allebei dat dit scherm achterloopt op de werkelijkheid.
       onChanged();
@@ -332,7 +356,72 @@ function SessionCard({
     }
   };
 
-  const order = session.order;
+  const startEditing = () => {
+    setQuantities(own);
+    setEditing(true);
+  };
+
+  /**
+   * Na de deadline worden de broodjes al gemaakt: annuleren wordt vrijgeven. Een
+   * ander kan ze dan overnemen; wat bij het einde van de afhaal nog vrij staat,
+   * telt als no-show. Dezelfde uitleg als in de bevestiging op /theokot.
+   */
+  const release = () => {
+    if (!order) return;
+    const pickupEnd = formatTimeRange(session.pickupStart, session.pickupEnd, locale).split(' - ')[1];
+    Alert.alert(
+      'Vrijgeven voor overname',
+      `De deadline is verstreken en je broodjes worden al gemaakt. Wat je nu annuleert, wordt vrijgegeven voor overname. Neemt iemand anders het over, dan vervalt het zonder gevolgen. Blijft het om ${pickupEnd} over, dan telt dit als een no-show.`,
+      [
+        { text: 'Behouden', style: 'cancel' },
+        {
+          text: 'Vrijgeven',
+          style: 'destructive',
+          onPress: async () => {
+            setBusy(true);
+            try {
+              await releaseTheokotOrder({ orderId: order.orderId });
+              onChanged();
+            } catch (error) {
+              Alert.alert('Vrijgeven lukte niet', orderErrorText(error));
+              onChanged();
+            } finally {
+              setBusy(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const takeOver = (item: AppTheokotSession['items'][number]) => {
+    const pickupEnd = formatTimeRange(session.pickupStart, session.pickupEnd, locale).split(' - ')[1];
+    Alert.alert(
+      'Broodje overnemen?',
+      `Je neemt 1x ${item.name} over voor ${formatEuro(item.priceCents)}. Je haalt het af en betaalt aan de balie, tot ${pickupEnd}. Haal je het niet op, dan telt dat als een no-show.`,
+      [
+        { text: 'Toch niet', style: 'cancel' },
+        {
+          text: 'Overnemen',
+          onPress: async () => {
+            setBusy(true);
+            try {
+              await takeOverTheokotSandwich(item.id);
+              onChanged();
+            } catch (error) {
+              Alert.alert('Overnemen lukte niet', orderErrorText(error));
+              onChanged();
+            } finally {
+              setBusy(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const offered = session.canTakeOver ? session.items.filter((item) => (item.released ?? 0) > 0) : [];
+  const ownCount = order?.lines.reduce((sum, line) => sum + line.quantity, 0) ?? 0;
 
   const cancel = () => {
     if (!order) return;
@@ -390,8 +479,31 @@ function SessionCard({
             <Text style={styles.title}>{formatEuro(order.totalCents)}</Text>
           </View>
           <Text style={styles.hint}>Je betaalt bij het afhalen.</Text>
+          {order.releasedCount ? (
+            <Text style={styles.hint}>
+              {order.releasedCount === 1
+                ? '1 broodje van deze bestelling staat vrij voor overname en is niet meer van jou.'
+                : `${order.releasedCount} broodjes van deze bestelling staan vrij voor overname en zijn niet meer van jou.`}{' '}
+              Wat bij het einde van de afhaal niet overgenomen is, telt als no-show.
+            </Text>
+          ) : null}
           {order.canCancel ? (
-            <Button label="Bestelling annuleren" variant="ghost" busy={busy} onPress={cancel} />
+            <>
+              {order.canEdit && !editing ? (
+                <Button label="Bestelling aanpassen" variant="ghost" busy={busy} onPress={startEditing} />
+              ) : null}
+              {!editing ? (
+                <Button label="Bestelling annuleren" variant="ghost" busy={busy} onPress={cancel} />
+              ) : null}
+            </>
+          ) : order.canRelease && order.lines.length > 0 ? (
+            <>
+              <Text style={styles.hint}>
+                De deadline is voorbij en je broodjes worden al gemaakt. Kan je toch niet komen,
+                geef ze dan vrij: een ander kan ze overnemen.
+              </Text>
+              <Button label="Annuleren en vrijgeven" variant="ghost" busy={busy} onPress={release} />
+            </>
           ) : (
             <Text style={styles.hint}>
               De annulatiedeadline is voorbij. Kom je bestelling zeker afhalen: drie keer niet
@@ -399,15 +511,19 @@ function SessionCard({
             </Text>
           )}
         </View>
-      ) : session.window === 'UPCOMING' ? (
+      ) : null}
+
+      {order && !editing ? null : session.window === 'UPCOMING' ? (
         <Text style={styles.hint}>Bestellen opent {formatDay(session.orderOpenAt, locale)}.</Text>
       ) : session.window === 'CLOSED' ? (
-        <Text style={styles.hint}>Bestellen is gesloten voor deze dag.</Text>
+        offered.length === 0 ? <Text style={styles.hint}>Bestellen is gesloten voor deze dag.</Text> : null
       ) : (
         <>
           <View style={styles.items}>
             {session.items.map((item) => {
               const quantity = quantities[item.id] ?? 0;
+              // Bij aanpassen telt je eigen reservatie als vrije voorraad.
+              const available = item.remaining + (editing ? (own[item.id] ?? 0) : 0);
               // De bovengrens per item is de strengste van drie: wat er nog is,
               // wat er nog in de bestelling past, en bij een broodje van de week
               // ook die aparte limiet.
@@ -415,7 +531,7 @@ function SessionCard({
               const roomForSpecial = item.isWeeklySpecial
                 ? maxWeeklySpecial - totals.specials + quantity
                 : Number.POSITIVE_INFINITY;
-              const max = Math.max(0, Math.min(item.remaining, roomInOrder, roomForSpecial));
+              const max = Math.max(0, Math.min(available, roomInOrder, roomForSpecial));
 
               return (
                 <View key={item.id} style={styles.item}>
@@ -431,14 +547,18 @@ function SessionCard({
                     ) : null}
                     <Text style={styles.itemMeta}>
                       {formatEuro(item.priceCents)}
-                      {item.remaining === 0 ? '   uitverkocht' : `   nog ${item.remaining}`}
+                      {available === 0
+                        ? '   uitverkocht'
+                        : available <= LOW_STOCK
+                          ? `   nog ${available}`
+                          : ''}
                     </Text>
                   </View>
                   <Stepper
                     value={quantity}
                     max={max}
                     label={item.name}
-                    disabled={banned || item.remaining === 0}
+                    disabled={banned || available === 0}
                     onChange={(next) => setQuantity(item.id, next)}
                   />
                 </View>
@@ -453,14 +573,69 @@ function SessionCard({
                 : `${totals.items} van ${maxItems}   ${formatEuro(totals.cents)}`}
             </Text>
             <Button
-              label="Bestellen"
+              label={editing ? 'Wijziging bewaren' : 'Bestellen'}
               busy={busy}
               disabled={banned || totals.items === 0}
               onPress={() => void submit()}
             />
+            {editing ? (
+              <Button
+                label="Niet aanpassen"
+                variant="ghost"
+                onPress={() => {
+                  setEditing(false);
+                  setQuantities({});
+                }}
+              />
+            ) : null}
+            {editing && totals.items === 0 ? (
+              <Text style={styles.hint}>Wil je niets meer, annuleer dan je bestelling.</Text>
+            ) : null}
           </View>
         </>
       )}
+
+      {offered.length > 0 && !banned ? (
+        <View style={styles.takeover}>
+          <Text style={styles.kicker}>VRIJGEKOMEN BROODJES</Text>
+          <Text style={styles.hint}>
+            Na de deadline geannuleerd en al gemaakt. Neem je een broodje over, dan haal je het af
+            en betaal je aan de balie.
+          </Text>
+          {offered.map((item) => {
+            const full =
+              ownCount + 1 > maxItems ||
+              (item.isWeeklySpecial &&
+                (order?.lines ?? []).reduce(
+                  (sum, line) =>
+                    sum +
+                    (session.items.find((candidate) => candidate.id === line.sessionItemId)
+                      ?.isWeeklySpecial
+                      ? line.quantity
+                      : 0),
+                  0,
+                ) +
+                  1 >
+                  maxWeeklySpecial);
+            return (
+              <View key={item.id} style={styles.item}>
+                <View style={styles.itemText}>
+                  <Text style={styles.itemName}>{item.name}</Text>
+                  <Text style={styles.itemMeta}>
+                    {formatEuro(item.priceCents)}   {item.released} vrij
+                  </Text>
+                </View>
+                <Button
+                  label="Overnemen"
+                  busy={busy}
+                  disabled={full}
+                  onPress={() => takeOver(item)}
+                />
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
     </Card>
   );
 }
@@ -491,6 +666,14 @@ function orderErrorText(error: unknown): string {
       return 'Deze bestelling kan niet meer geannuleerd worden.';
     case 'CANCEL_DEADLINE_PASSED':
       return 'De annulatiedeadline is voorbij.';
+    case 'TAKEOVER_CLOSED':
+      return 'De afhaal is voorbij: vrijgeven of overnemen kan niet meer.';
+    case 'RELEASE_NOT_POSSIBLE':
+      return 'Deze bestelling kan niet vrijgegeven worden. Een bestelling in de doos van een grocomeet ligt niet aan de balie.';
+    case 'NOTHING_RELEASED':
+      return 'Er is niets vrijgegeven om over te nemen.';
+    case 'TAKEOVER_UNAVAILABLE':
+      return 'Dit broodje is intussen al overgenomen.';
     case 'INVALID_ORDER':
       return 'Er is intussen iets veranderd aan het aanbod. Het scherm is bijgewerkt; probeer opnieuw.';
     default:
@@ -518,6 +701,12 @@ const styles = StyleSheet.create({
   itemName: { ...TYPE.body, fontFamily: TYPE.cardTitle.fontFamily, color: COLORS.ink },
   itemMeta: { ...TYPE.small, color: COLORS.muted },
 
+  takeover: {
+    borderTopWidth: 1,
+    borderTopColor: COLORS.line,
+    paddingTop: SPACING.lg,
+    gap: SPACING.md,
+  },
   summary: {
     borderTopWidth: 1,
     borderTopColor: COLORS.line,

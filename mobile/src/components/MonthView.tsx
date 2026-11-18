@@ -4,7 +4,6 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { AppCalendarEvent, AppLocale } from '../api/contract';
 import {
-  dayKeyOf,
   monthGrid,
   monthLabel,
   shiftMonth,
@@ -12,6 +11,7 @@ import {
   weekdayLabels,
   type MonthAnchor,
 } from '../monthGrid';
+import { eventDayKeys } from '../moments';
 import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
 
 /** Hoogstens zoveel stipjes per dag; daarboven wordt het een vlek. */
@@ -52,14 +52,16 @@ export function MonthView({
   /**
    * De categoriekleuren per dag. Een evenement over meerdere dagen zetten we op
    * zijn startdag: het rooster zegt wanneer iets begint, niet hoe lang het duurt.
+   * Een reeks met losse momenten (een loopweek) staat op elke dag met een moment.
    */
   const byDay = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const event of events) {
-      const key = dayKeyOf(event.start);
-      const colours = map.get(key) ?? [];
-      colours.push(event.categories[0]?.colour ?? COLORS.navy);
-      map.set(key, colours);
+      for (const key of eventDayKeys(event)) {
+        const colours = map.get(key) ?? [];
+        colours.push(event.categories[0]?.colour ?? COLORS.navy);
+        map.set(key, colours);
+      }
     }
     return map;
   }, [events]);
