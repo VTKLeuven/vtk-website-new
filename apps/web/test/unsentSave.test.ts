@@ -15,6 +15,11 @@ describe('unsentSaveReason', () => {
     expect(unsentSaveReason(new TypeError('Load failed'))).toBe('offline');
   });
 
+  it('recognises a save blocked by the read-only authorization preview', () => {
+    expect(unsentSaveReason(new Error('AUTHORIZATION_PREVIEW_READ_ONLY'))).toBe('preview');
+    expect(unsentSaveMessage('preview', false)).toMatch(/voorvertoning/);
+  });
+
   it('leaves every other error to the error boundary', () => {
     expect(unsentSaveReason(new Error('boom'))).toBeNull();
     expect(unsentSaveReason(new TypeError("Cannot read properties of undefined (reading 'x')"))).toBeNull();

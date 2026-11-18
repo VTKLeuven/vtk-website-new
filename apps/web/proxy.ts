@@ -4,6 +4,7 @@ import { googleLinkGateEnabled } from '@/lib/google/config';
 import { getGateUser, getSession } from '@vtk/auth/server';
 import {
   AUTHORIZATION_PREVIEW_COOKIE,
+  AUTHORIZATION_PREVIEW_READ_ONLY,
   blocksAuthorizationPreviewMutation,
 } from '@/lib/authorization-preview-constants';
 
@@ -177,8 +178,19 @@ export async function proxy(request: NextRequest) {
     pathname,
   );
   if (previewMutation && (await getSession(request.headers))?.user.isSuperAdmin) {
+    // Een server action krijgt platte tekst: Next maakt van een `text/plain`
+    // met een foutstatus een `Error` met die tekst, en het vangnet
+    // (`lib/unsentSave.ts`) maakt daar een rode toast van en laat het formulier
+    // staan. Met JSON gooide Next een algemene fout en verving de error
+    // boundary het scherm. Het content-type moet exact `text/plain` zijn.
+    if (request.headers.has('next-action')) {
+      return new NextResponse(AUTHORIZATION_PREVIEW_READ_ONLY, {
+        status: 403,
+        headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'private, no-store' },
+      });
+    }
     return NextResponse.json(
-      { error: 'AUTHORIZATION_PREVIEW_READ_ONLY' },
+      { error: AUTHORIZATION_PREVIEW_READ_ONLY },
       { status: 403, headers: { 'Cache-Control': 'private, no-store' } },
     );
   }
