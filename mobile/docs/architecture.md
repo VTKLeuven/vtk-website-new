@@ -108,9 +108,9 @@ lucht, native modules niet.
 
 ## `runtimeVersion`: `exposdk`, en waarom niet fingerprint
 
-`app.json` zet `runtimeVersion` op `"exposdk:57.0.0"`. Een update en een client
-horen bij elkaar wanneer die waarde gelijk is, en `exposdk:57.0.0` is de waarde
-van **Expo Go** voor SDK 57.
+`app.json` zet `runtimeVersion` op `"exposdk:58.0.0"`. Een update en een client
+horen bij elkaar wanneer die waarde gelijk is, en `exposdk:58.0.0` is de waarde
+van **Expo Go** voor SDK 58.
 
 Dat is geen detail maar de hele iOS-kant. Er is geen Apple Developer-account, dus
 er bestaat geen iOS-build en die is er ook nooit geweest. De enige manier waarop
@@ -126,7 +126,7 @@ Expo Go verstuurt sinds SDK 53 geen pushberichten meer. Voeg je een module toe d
 niet in Expo Go zit, dan valt die weg weg, en dan is dit hele stuk aan herziening
 toe.
 
-**De prijs is echt.** Deze waarde is dezelfde voor élke SDK 57-build, dus EAS kan
+**De prijs is echt.** Deze waarde is dezelfde voor élke SDK 58-build, dus EAS kan
 een oude APK niet van een nieuwe onderscheiden en biedt elke update aan iedereen
 aan. Krijgt een APK zonder `expo-camera` JavaScript dat `expo-camera` importeert,
 dan gooit `requireNativeModule` op het moment dat dat scherm laadt: een rood
@@ -143,7 +143,8 @@ versie van een app niet installeren, en de uitweg die Expo daarvoor heeft
 (`eas go`, een eigen Expo Go op TestFlight) vraagt net het Apple
 Developer-account dat er niet is. Zet Expo een nieuwe SDK in de store, dan
 kunnen de iPhone-testers de app dus niet meer openen tot wij mee zijn. Dat is
-in september 2026 gebeurd met SDK 57, en het gebeurt opnieuw bij SDK 58.
+in september 2026 gebeurd met SDK 57 en in november 2026 met SDK 58, en het
+gebeurt bij elke volgende SDK opnieuw.
 
 Een SDK-sprong **verlegt bovendien deze `runtimeVersion`**, en dat is precies het
 geval waarin de policy hierboven stil faalt in de andere richting: een APK van de

@@ -61,6 +61,9 @@ export async function enablePush(): Promise<boolean> {
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
       name: 'VTK',
+      // De enum bestaat (`NotificationChannelManager.types`), maar sinds SDK 58
+      // herkent `import/namespace` het patroon waarmee ze gebouwd wordt niet meer.
+      // eslint-disable-next-line import/namespace
       importance: Notifications.AndroidImportance.DEFAULT,
       lightColor: '#FFD23F',
     });
