@@ -161,6 +161,7 @@ function Pager({
             width={width}
             height={height}
             active={position === index}
+            zoomed={zoomed && position === index}
             onZoomChange={setZoomed}
           />
         )}
@@ -198,12 +199,15 @@ function ZoomablePhoto({
   width,
   height,
   active,
+  zoomed,
   onZoomChange,
 }: {
   photo: AppPhoto;
   width: number;
   height: number;
   active: boolean;
+  /** Staat deze foto ingezoomd; dan pas mag slepen meedoen. */
+  zoomed: boolean;
   onZoomChange: (zoomed: boolean) => void;
 }) {
   const scale = useSharedValue(1);
@@ -212,7 +216,6 @@ function ZoomablePhoto({
   const y = useSharedValue(0);
   const savedX = useSharedValue(0);
   const savedY = useSharedValue(0);
-
   const reset = useCallback(() => {
     scale.value = withTiming(1);
     savedScale.value = 1;
@@ -249,7 +252,14 @@ function ZoomablePhoto({
       }
     });
 
+  /**
+   * Slepen staat **enkel aan wanneer de foto ingezoomd is**. Een actieve
+   * `Pan` neemt elke horizontale veeg over, ook als hij daarna niets doet, en
+   * dan kwam de lijst eronder nooit aan bod: je kon niet naar de volgende foto
+   * vegen. Op ware grootte is vegen bladeren, ingezoomd is het rondkijken.
+   */
   const pan = Gesture.Pan()
+    .enabled(zoomed)
     .averageTouches(true)
     .onUpdate((event) => {
       // Slepen heeft enkel zin wanneer er meer foto is dan er past.
