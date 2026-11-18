@@ -86,6 +86,29 @@ export function formatEuro(cents: number): string {
   return `€${(cents / 100).toFixed(2).replace('.', ',')}`;
 }
 
+/**
+ * "5 nov." of "5 nov. 2025", voor onder een album. Het jaar enkel wanneer het
+ * niet vanzelf spreekt: in de lijst per jaar staat het al in de kop erboven.
+ */
+export function formatShortDate(iso: string, locale: AppLocale, withYear: boolean): string {
+  return new Intl.DateTimeFormat(tag(locale), {
+    timeZone: TZ,
+    day: 'numeric',
+    month: 'short',
+    ...(withYear ? { year: 'numeric' } : {}),
+  }).format(new Date(iso));
+}
+
+/** "15 september 2026" */
+export function formatLongDate(iso: string, locale: AppLocale): string {
+  return new Intl.DateTimeFormat(tag(locale), {
+    timeZone: TZ,
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(iso));
+}
+
 /** "15 september", voor een ban of een deadline. */
 export function formatDate(iso: string, locale: AppLocale): string {
   return new Intl.DateTimeFormat(tag(locale), {

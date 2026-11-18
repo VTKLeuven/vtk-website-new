@@ -765,6 +765,12 @@ export type AppAlbum = {
   date: string | null;
   photoCount: number;
   coverUrl: string | null;
+  /**
+   * Dezelfde cover in schermmaat, voor de grote tegel bovenaan een lijst. De
+   * thumbnail is 250 px breed en wordt wazig over de volle breedte van een
+   * telefoon. Optioneel: een server van voor november 2026 stuurt hem niet.
+   */
+  coverPreviewUrl?: string | null;
 };
 
 export type AppPhoto = {
@@ -799,9 +805,18 @@ export type AppPublication = {
   id: string;
   title: string;
   kind: "bakske" | "ir-reeel";
+  /** Bladzijde 1 als JPEG, of `null` voor een editie zonder kaft. */
   coverUrl: string | null;
   /** De PDF. Absolute URL. */
   url: string | null;
+  /**
+   * Enkel het nummer ("Week 6 / Semester 2"), zonder de naam van het blad, die
+   * in `title` vooraan staat. Optioneel, zoals `publishedAt`: een oudere server
+   * stuurt geen van beide, en dan toont de app `title`.
+   */
+  issue?: string | null;
+  /** ISO-datum. De lijst komt al nieuwste eerst binnen. */
+  publishedAt?: string | null;
 };
 
 export type AppMedia = {

@@ -1,11 +1,9 @@
-import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
 import { Check, Download, Share2 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Pressable,
   StyleSheet,
   View,
@@ -14,24 +12,29 @@ import {
 
 import { fetchAlbum } from '../../api/endpoints';
 import { messageFor, useResource } from '../../api/useResource';
+import { photoCount } from '../../components/AlbumCard';
 import { PageHead } from '../../components/PageHead';
+import { PhotoMosaic } from '../../components/PhotoMosaic';
 import { PhotoViewer } from '../../components/PhotoViewer';
 import { Empty, ErrorState, Loading } from '../../components/ui';
-import { formatDate } from '../../format';
+import { formatLongDate } from '../../format';
 import { savePhotoToLibrary, sharePhoto, type SaveOutcome } from '../../savePhoto';
 import { useApp } from '../../state/app';
 import { COLORS, SPACING } from '../../theme/tokens';
 
-/** Kolommen in het raster. Drie is wat op een telefoon nog herkenbaar blijft. */
-const COLUMNS = 3;
-
 /**
  * Eén fotoalbum.
  *
- * Het raster toont thumbnails; tikken opent de viewer, waarin je veegt en knijpt
- * (zie `components/PhotoViewer.tsx`). Het origineel wordt enkel opgehaald wanneer
- * iemand het bewaart of deelt: dat zijn bestanden van tien megabyte en meer, en
- * een album dat die allemaal inlaadt, laadt niet.
+ * Het raster is een mozaïek (`components/PhotoMosaic.tsx`); tikken opent de
+ * viewer, waarin je veegt en knijpt (zie `components/PhotoViewer.tsx`). Het
+ * origineel wordt enkel opgehaald wanneer iemand het bewaart of deelt: dat zijn
+ * bestanden van tien megabyte en meer, en een album dat die allemaal inlaadt,
+ * laadt niet.
+ *
+ * **Een album met delen krijgt tabs in de kop**, zoals op de site
+ * (`AlbumTabViewer`): vanaf twee delen, elk met zijn aantal foto's. De viewer
+ * bladert dan binnen het deel dat openstaat. Een server die geen `subAlbums`
+ * stuurt, of één deel, toont gewoon alle foto's.
  */
 export default function AlbumScreen() {
   const { locale } = useApp();
@@ -42,6 +45,7 @@ export default function AlbumScreen() {
   // Kort vinkje na het bewaren. Een melding wegklikken voor elke foto die je
   // bewaart, is meer werk dan het bewaren zelf.
   const [justSaved, setJustSaved] = useState(false);
+  const [part, setPart] = useState<string | null>(null);
 
   const resource = useResource(`album:${slug}`, () => fetchAlbum(locale, slug), `${locale}:${slug}`);
 
@@ -59,7 +63,10 @@ export default function AlbumScreen() {
   }
 
   const album = resource.data;
-  const open = openIndex === null ? null : album.photos[openIndex];
+  const parts = album.subAlbums && album.subAlbums.length > 1 ? album.subAlbums : null;
+  const activePart = parts ? (parts.find((sub) => sub.id === part) ?? parts[0]) : null;
+  const photos = activePart ? activePart.photos : album.photos;
+  const open = openIndex === null ? null : photos[openIndex];
 
   /**
    * Bewaren of delen van de foto die openstaat.
@@ -93,51 +100,42 @@ export default function AlbumScreen() {
     }
   };
 
-  const gap = 2;
-  const size = (width - gap * (COLUMNS - 1)) / COLUMNS;
-
   return (
     <>
       <PageHead
         title={album.title}
         subtitle={[
-          `${album.photoCount} foto${album.photoCount === 1 ? '' : "'s"}`,
-          album.date ? formatDate(album.date, locale) : null,
+          photoCount(album.photoCount, locale),
+          album.date ? formatLongDate(album.date, locale) : null,
         ]
           .filter(Boolean)
-          .join('   ')}
-      />
-
-      <FlatList
-        data={album.photos}
-        keyExtractor={(photo) => photo.id}
-        numColumns={COLUMNS}
-        style={styles.root}
-        contentContainerStyle={styles.grid}
-        renderItem={({ item, index }) => (
-          <Pressable
-            accessibilityRole="imagebutton"
-            accessibilityLabel={`Foto ${index + 1} van ${album.photoCount}`}
-            onPress={() => changeIndex(index)}
-          >
-            <Image
-              source={{ uri: item.thumbUrl }}
-              style={{ width: size, height: size, marginRight: gap, marginBottom: gap }}
-              contentFit="cover"
-              // Een grijs vlak in plaats van niets terwijl de foto binnenkomt;
-              // zonder dat springt het hele raster bij elk beeld.
-              transition={150}
-              recyclingKey={item.id}
-            />
-          </Pressable>
-        )}
-        ListEmptyComponent={
-          <Empty title="Leeg album" hint="Er staan nog geen foto's in dit album." />
+          .join(' · ')}
+        tabs={
+          parts && activePart
+            ? {
+                scroll: true,
+                value: activePart.id,
+                onChange: (next) => {
+                  setPart(next);
+                  setOpenIndex(null);
+                },
+                options: parts.map((sub) => ({ value: sub.id, label: sub.title, count: sub.photoCount })),
+              }
+            : undefined
         }
       />
 
+      <PhotoMosaic
+        // Een ander deel begint bovenaan, niet halverwege het vorige.
+        key={activePart?.id ?? 'alles'}
+        photos={photos}
+        width={width}
+        onOpen={changeIndex}
+        empty={<Empty title="Leeg album" hint="Er staan nog geen foto's in dit album." />}
+      />
+
       <PhotoViewer
-        photos={album.photos}
+        photos={photos}
         index={openIndex}
         onIndexChange={changeIndex}
         onClose={() => setOpenIndex(null)}
@@ -192,8 +190,6 @@ export default function AlbumScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.paper },
-  grid: { paddingBottom: SPACING.xxl },
   actions: { flexDirection: 'row', gap: SPACING.sm },
   button: {
     width: 40,

@@ -1,48 +1,45 @@
+import { Search, X } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import {
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  SectionList,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
 
 import type { AppAlbum } from '../api/contract';
 import { fetchMedia } from '../api/endpoints';
 import { messageFor, useResource } from '../api/useResource';
-import { AlbumCard } from '../components/AlbumCard';
+import { AlbumFeature, AlbumTile } from '../components/AlbumCard';
 import { PageHead } from '../components/PageHead';
 import { SearchField } from '../components/SearchField';
 import { Empty, ErrorState, Loading, StaleNotice } from '../components/ui';
 import { useApp } from '../state/app';
-import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
+import { COLORS, DARK_GLASS, FONTS, SPACING, TYPE } from '../theme/tokens';
 
-/** Kolommen in het raster. Twee, want een cover moet herkenbaar blijven. */
-const COLUMNS = 2;
+/** Een rij in de lijst: het album dat een jaar opent, of twee naast elkaar. */
+type Row = { kind: 'feature'; album: AppAlbum } | { kind: 'pair'; albums: AppAlbum[] };
+
+const ALL = 'alle';
 
 /**
  * Alle fotoalbums.
  *
- * Sinds het archief van de oude site erin zit zijn het er meer dan tweehonderd,
- * en dat is te veel om zomaar te tonen. Vandaar drie dingen tegelijk: een
- * zoekveld op titel, een jaarfilter, en koppen per jaar terwijl je scrollt.
+ * Sinds het archief van de oude site erin zit zijn het er meer dan tweehonderd.
+ * Per jaar een groot jaartal met de gele lijn, het eerste album van dat jaar
+ * breed als evenementtegel en de rest in twee kolommen. De jaren staan als
+ * pillen in de kop, zoeken achter het vergrootglas ernaast: zo staat er tussen
+ * de kop en de covers niets meer.
  *
- * **Waarom een `SectionList` en geen `ScrollView`.** Het media-scherm was er een,
- * en die monteert elke tegel die erin staat. Bij tweehonderd covers is dat
- * tweehonderd `expo-image`-instanties bij het openen. Een `SectionList` tekent
- * enkel wat in beeld komt.
+ * **Waarom een `SectionList` en geen `ScrollView`.** Die laatste monteert elke
+ * tegel; bij tweehonderd covers zijn dat tweehonderd `expo-image`-instanties bij
+ * het openen. Een `SectionList` tekent enkel wat in beeld komt.
  *
  * Filteren gebeurt hier en niet op de server: de lijst zit al volledig in het
- * antwoord van `/media`, en met dezelfde cachesleutel als het media-scherm staat
+ * antwoord van `/media`, en met dezelfde cachesleutel als het mediascherm staat
  * ze er meteen zonder een tweede verzoek.
  */
 export default function AlbumsScreen() {
   const { locale } = useApp();
   const resource = useResource('media', () => fetchMedia(locale), locale);
   const [query, setQuery] = useState('');
-  const [year, setYear] = useState<string | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [year, setYear] = useState<string>(ALL);
 
   const albums = useMemo(() => resource.data?.albums ?? [], [resource.data]);
 
@@ -56,30 +53,36 @@ export default function AlbumsScreen() {
     return [...seen].sort((left, right) => Number(right) - Number(left));
   }, [albums]);
 
+  const term = query.trim().toLowerCase();
+
   const sections = useMemo(() => {
-    const term = query.trim().toLowerCase();
     const matching = albums.filter((album) => {
-      if (year !== null && yearOf(album) !== year) return false;
+      if (year !== ALL && yearOf(album) !== year) return false;
       if (!term) return true;
       return album.title.toLowerCase().includes(term);
     });
 
     // De albums komen al aflopend op datum binnen, dus de groepen ontstaan in de
     // juiste volgorde en hoeven niet opnieuw gesorteerd te worden.
-    const groups: { title: string; data: AppAlbum[][] }[] = [];
+    const groups: { title: string; data: Row[] }[] = [];
     for (const album of matching) {
       const label = yearOf(album) ?? 'Zonder datum';
       let group = groups[groups.length - 1];
       if (!group || group.title !== label) {
         group = { title: label, data: [] };
         groups.push(group);
+        // Wie zoekt, wil treffers vergelijken; dan geen grote tegel bovenaan.
+        if (!term) {
+          group.data.push({ kind: 'feature', album });
+          continue;
+        }
       }
       const row = group.data[group.data.length - 1];
-      if (row && row.length < COLUMNS) row.push(album);
-      else group.data.push([album]);
+      if (row?.kind === 'pair' && row.albums.length < 2) row.albums.push(album);
+      else group.data.push({ kind: 'pair', albums: [album] });
     }
     return groups;
-  }, [albums, query, year]);
+  }, [albums, term, year]);
 
   if (resource.loading) return <Loading label="Albums ophalen" />;
   if (!resource.data) {
@@ -88,53 +91,74 @@ export default function AlbumsScreen() {
     );
   }
 
-  const total = sections.reduce((sum, group) => sum + group.data.flat().length, 0);
-  const filtered = query.trim().length > 0 || year !== null;
+  const found = sections.reduce(
+    (sum, group) =>
+      sum + group.data.reduce((rows, row) => rows + (row.kind === 'feature' ? 1 : row.albums.length), 0),
+    0,
+  );
+
+  const toggleSearch = () => {
+    if (searching) setQuery('');
+    setSearching(!searching);
+  };
 
   return (
     <>
       <PageHead
-        title="Alle albums"
-        subtitle={`${albums.length} album${albums.length === 1 ? '' : 's'}`}
+        title="Albums"
+        backLabel="Media"
+        right={
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={searching ? 'Zoeken sluiten' : 'Zoek een album'}
+            onPress={toggleSearch}
+            hitSlop={8}
+            style={({ pressed }) => [styles.searchButton, pressed && styles.pressed]}
+          >
+            {searching ? (
+              <X color={COLORS.onDark} size={18} />
+            ) : (
+              <Search color={COLORS.onDark} size={18} />
+            )}
+          </Pressable>
+        }
+        tabs={
+          years.length > 1
+            ? {
+                scroll: true,
+                value: year,
+                onChange: setYear,
+                options: [{ value: ALL, label: 'Alle' }, ...years.map((label) => ({ value: label, label }))],
+              }
+            : undefined
+        }
       />
 
-      <SearchField
-        value={query}
-        onChange={setQuery}
-        placeholder="Zoek een album"
-        label="Zoek een album op titel"
-      />
-
-      {years.length > 1 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chips}
-        >
-          <Chip label="Alle" active={year === null} onPress={() => setYear(null)} />
-          {years.map((label) => (
-            <Chip
-              key={label}
-              label={label}
-              active={year === label}
-              onPress={() => setYear(year === label ? null : label)}
-            />
-          ))}
-        </ScrollView>
+      {searching ? (
+        <SearchField
+          value={query}
+          onChange={setQuery}
+          placeholder="Zoek een album"
+          label="Zoek een album op titel"
+          autoFocus
+        />
       ) : null}
 
       <SectionList
         sections={sections}
-        keyExtractor={(row) => row.map((album) => album.slug).join('+')}
+        keyExtractor={(row) =>
+          row.kind === 'feature' ? row.album.slug : row.albums.map((album) => album.slug).join('+')
+        }
         style={styles.root}
         contentContainerStyle={styles.list}
         stickySectionHeadersEnabled
         // Krap gehouden: tweehonderd covers hoeven niet allemaal in het geheugen
         // te staan om te kunnen scrollen.
-        initialNumToRender={6}
-        maxToRenderPerBatch={8}
+        initialNumToRender={5}
+        maxToRenderPerBatch={6}
         windowSize={7}
         removeClippedSubviews
+        keyboardDismissMode="on-drag"
         refreshControl={
           <RefreshControl
             refreshing={resource.refreshing}
@@ -144,35 +168,39 @@ export default function AlbumsScreen() {
         ListHeaderComponent={
           <>
             {resource.stale ? <StaleNotice onRetry={() => void resource.refresh()} /> : null}
-            {filtered ? (
+            {term ? (
               <Text style={styles.count}>
-                {total} van {albums.length} albums
+                {found} van {albums.length} albums
               </Text>
             ) : null}
           </>
         }
         renderSectionHeader={({ section }) => (
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
+            <View style={styles.rule}>
+              <Text style={styles.year}>{section.title}</Text>
+            </View>
           </View>
         )}
-        renderItem={({ item: row }) => (
-          <View style={styles.row}>
-            {row.map((album) => (
-              <AlbumCard key={album.slug} album={album} style={styles.card} />
-            ))}
-            {/* Een halve rij mag niet uitrekken tot de volle breedte. */}
-            {row.length < COLUMNS ? <View style={styles.card} /> : null}
-          </View>
-        )}
+        renderItem={({ item: row }) =>
+          row.kind === 'feature' ? (
+            <View style={styles.featureRow}>
+              <AlbumFeature album={row.album} />
+            </View>
+          ) : (
+            <View style={styles.row}>
+              {row.albums.map((album) => (
+                <AlbumTile key={album.slug} album={album} withYear={false} style={styles.cell} />
+              ))}
+              {/* Een halve rij mag niet uitrekken tot de volle breedte. */}
+              {row.albums.length < 2 ? <View style={styles.cell} /> : null}
+            </View>
+          )
+        }
         ListEmptyComponent={
           <Empty
             title="Niets gevonden"
-            hint={
-              filtered
-                ? 'Geen album met die titel in dat jaar. Probeer een ander woord of zet het jaar op Alle.'
-                : 'Er staan nu geen albums online.'
-            }
+            hint={term || year !== ALL ? 'Probeer een ander woord of een ander jaar.' : undefined}
           />
         }
       />
@@ -187,48 +215,36 @@ function yearOf(album: AppAlbum): string | null {
   return Number.isFinite(year) ? String(year) : null;
 }
 
-function Chip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      accessibilityLabel={label === 'Alle' ? 'Alle jaren' : `Enkel ${label}`}
-      onPress={onPress}
-      style={({ pressed }) => [styles.chip, active && styles.chipActive, pressed && styles.pressed]}
-    >
-      <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.paper },
-  chips: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, gap: SPACING.sm },
-  chip: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.pill,
+  pressed: { opacity: 0.7 },
+  // Dark glass, zoals elk bedieningselement op een navy band.
+  searchButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: DARK_GLASS.background,
     borderWidth: 1,
-    borderColor: COLORS.line2,
-    backgroundColor: COLORS.surface,
+    borderColor: DARK_GLASS.border,
   },
-  // Geel is het accent van de site en markeert hier wat aanstaat.
-  chipActive: { backgroundColor: COLORS.yellow, borderColor: COLORS.yellowDeep },
-  chipLabel: { ...TYPE.small, color: COLORS.body },
-  chipLabelActive: { color: COLORS.ink },
-  pressed: { opacity: 0.8 },
-  list: { padding: SPACING.lg, paddingBottom: SPACING.xxl },
-  count: { ...TYPE.small, color: COLORS.muted, marginBottom: SPACING.sm },
-  sectionHeader: { backgroundColor: COLORS.paper, paddingTop: SPACING.md, paddingBottom: SPACING.sm },
-  sectionTitle: { ...TYPE.cardTitle, color: COLORS.ink },
-  row: { flexDirection: 'row', gap: SPACING.md, marginBottom: SPACING.md },
-  card: { flex: 1 },
+  list: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.xxl },
+  count: { ...TYPE.small, color: COLORS.muted, marginTop: SPACING.md },
+  sectionHeader: {
+    backgroundColor: COLORS.paper,
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.md + 2,
+  },
+  rule: {
+    alignSelf: 'flex-start',
+    paddingBottom: 6,
+    borderBottomWidth: 3,
+    borderBottomColor: COLORS.yellow,
+  },
+  year: { fontFamily: FONTS.semibold, fontSize: 28, lineHeight: 32, letterSpacing: -0.8, color: COLORS.ink },
+  // Ruimte onder de tegel voor de pin die over de foto hangt.
+  featureRow: { marginBottom: SPACING.xl },
+  row: { flexDirection: 'row', gap: SPACING.md, marginBottom: SPACING.xl - 4 },
+  cell: { flex: 1 },
 });

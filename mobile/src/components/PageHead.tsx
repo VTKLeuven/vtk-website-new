@@ -1,12 +1,21 @@
 import { useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, FONTS, RADIUS, SPACING, TYPE } from '../theme/tokens';
 import { PatternBand } from './PatternBand';
 
-export type HeadTab<T extends string> = { value: T; label: string; badge?: number };
+export type HeadTab<T extends string> = {
+  value: T;
+  label: string;
+  badge?: number;
+  /**
+   * Een gedempt getal achter het label, zoals het aantal foto's in een deel van
+   * een album. Geen `badge`: die is geel en vraagt aandacht, dit is enkel info.
+   */
+  count?: number;
+};
 
 /**
  * De donkere paginakop, `.vtk-page-head` uit `apps/web/app/design/vtk-base.css`.
@@ -20,7 +29,9 @@ export type HeadTab<T extends string> = { value: T; label: string; badge?: numbe
  *
  * **Tabbladen horen in de kop** (`tabs`), als de pillen van de site: een volle
  * lichte pil voor wat open staat, een omlijnde voor de rest. Ze vervangen de gele
- * schuifschakelaar die vroeger onder de kop stond.
+ * schuifschakelaar die vroeger onder de kop stond. Met `scroll` lopen ze op één
+ * regel door tot over de rand, voor een lange rij zoals de jaartallen van de
+ * albums; anders breken ze af naar een volgende regel.
  *
  * **De terugknop hoort hier en nergens anders.** De schermen draaien met
  * `headerShown: false`, dus er is geen systeemkop die er een tekent. Zonder deze
@@ -47,7 +58,7 @@ export function PageHead<T extends string = string>({
   back?: boolean;
   /** Wat er naast het pijltje staat; standaard "Terug". */
   backLabel?: string;
-  tabs?: { options: HeadTab<T>[]; value: T; onChange: (next: T) => void };
+  tabs?: { options: HeadTab<T>[]; value: T; onChange: (next: T) => void; scroll?: boolean };
   /** Extra inhoud onderaan de kop, nog op de navy band. */
   children?: React.ReactNode;
 }) {
@@ -84,35 +95,68 @@ export function PageHead<T extends string = string>({
       </View>
 
       {tabs ? (
-        <View style={styles.tabs}>
-          {tabs.options.map((option) => {
-            const active = option.value === tabs.value;
-            return (
-              <Pressable
+        tabs.scroll ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.tabsScroll}
+            contentContainerStyle={styles.tabsScrollContent}
+          >
+            {tabs.options.map((option) => (
+              <TabPill
                 key={option.value}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
+                option={option}
+                active={option.value === tabs.value}
                 onPress={() => tabs.onChange(option.value)}
-                style={({ pressed }) => [
-                  styles.tab,
-                  active && styles.tabActive,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{option.label}</Text>
-                {option.badge ? (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{option.badge}</Text>
-                  </View>
-                ) : null}
-              </Pressable>
-            );
-          })}
-        </View>
+              />
+            ))}
+          </ScrollView>
+        ) : (
+          <View style={styles.tabs}>
+            {tabs.options.map((option) => (
+              <TabPill
+                key={option.value}
+                option={option}
+                active={option.value === tabs.value}
+                onPress={() => tabs.onChange(option.value)}
+              />
+            ))}
+          </View>
+        )
       ) : null}
 
       {children}
     </View>
+  );
+}
+
+function TabPill<T extends string>({
+  option,
+  active,
+  onPress,
+}: {
+  option: HeadTab<T>;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityState={{ selected: active }}
+      accessibilityLabel={option.count === undefined ? option.label : `${option.label}, ${option.count}`}
+      onPress={onPress}
+      style={({ pressed }) => [styles.tab, active && styles.tabActive, pressed && styles.pressed]}
+    >
+      <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{option.label}</Text>
+      {option.count !== undefined ? (
+        <Text style={[styles.tabCount, active && styles.tabCountActive]}>{option.count}</Text>
+      ) : null}
+      {option.badge ? (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{option.badge}</Text>
+        </View>
+      ) : null}
+    </Pressable>
   );
 }
 
@@ -157,6 +201,9 @@ const styles = StyleSheet.create({
   title: { ...TYPE.pageTitle, color: COLORS.onDark },
   subtitle: { ...TYPE.body, color: COLORS.onDarkMuted },
   tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: SPACING.lg },
+  // Tot tegen de rand van het scherm, zodat de laatste pil zichtbaar doorloopt.
+  tabsScroll: { marginTop: SPACING.lg, marginRight: -(SPACING.xl - 4) },
+  tabsScrollContent: { gap: 6, paddingRight: SPACING.xl - 4 },
   tab: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -170,6 +217,8 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: COLORS.onDark, borderColor: COLORS.onDark },
   tabLabel: { fontFamily: FONTS.semibold, fontSize: 13, color: COLORS.onDark },
   tabLabelActive: { color: COLORS.ink },
+  tabCount: { fontFamily: FONTS.medium, fontSize: 13, color: 'rgba(239,242,248,0.6)' },
+  tabCountActive: { color: COLORS.muted },
   badge: {
     minWidth: 18,
     paddingHorizontal: 5,

@@ -359,6 +359,17 @@ mobiele data is dat een galerij die niet laadt.
 Valt Immich weg, dan blijft de albumlijst leeg en gaan de aftermovies en
 magazines gewoon door; die staan er los van.
 
+- Een album draagt naast `coverUrl` (de thumbnail van 250 px) ook
+  `coverPreviewUrl`, dezelfde cover in schermmaat. De app gebruikt die enkel
+  voor de grote tegel bovenaan een lijst; over de volle breedte van een
+  telefoon wordt de thumbnail wazig.
+- De magazines komen **nieuwste eerst**, met hun kaft (`coverUrl`, bladzijde 1
+  uit `coverKey`), het nummer apart (`issue`) en `publishedAt`. De app zet het
+  eerste nummer van elk blad vooraan op de plank. `title` blijft de naam plus
+  het nummer, voor een app van voor november 2026.
+- `/media/[slug]` stuurt de delen van een album mee (`subAlbums`); vanaf twee
+  delen toont de app ze als tabs, zoals de site.
+
 ### `GET /api/app/v1/praesidium`
 
 Het praesidium per werkingsjaar. De jarenlijst komt uit de data zelf en niet uit
