@@ -48,7 +48,8 @@ export default function RootLayout() {
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const path = response.notification.request.content.data?.path;
       if (typeof path === 'string' && path.startsWith('/')) {
-        router.push(path as never);
+        // Met het tabscherm eronder, zodat terug niet uit de tab valt.
+        router.push(path as never, { withAnchor: true });
       }
     });
     return () => subscription.remove();
