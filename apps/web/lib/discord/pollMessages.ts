@@ -128,8 +128,8 @@ function pollAuthor(view: DiscordPollView): { name: string } {
 
 export function pollChannelMessage(view: DiscordPollView): PollBotMessage {
   const anonymous = view.pocName
-    ? "Anoniem: je RiVers zien enkel totalen en niemand ziet een tussenstand."
-    : "Anoniem: VTK Onderwijs ziet enkel totalen en niemand ziet een tussenstand.";
+    ? "Anoniem: je RiVers zien enkel totalen, nooit wie wat antwoordde."
+    : "Anoniem: VTK Onderwijs ziet enkel totalen, nooit wie wat antwoordde.";
   const openUntil = { name: "Open tot", value: stamp(view.closesAt), inline: true };
 
   if (pollAnswersInChannel(view)) {
@@ -175,7 +175,7 @@ export function pollChannelMessage(view: DiscordPollView): PollBotMessage {
         title: view.title,
         description: `${what} ${from}${forMeeting}. Duurt ongeveer een minuut.`,
         color: DISCORD_EMBED_COLOUR,
-        fields: [openUntil, { name: "Anoniem", value: "Enkel totalen, geen tussenstand", inline: true }],
+        fields: [openUntil, { name: "Anoniem", value: "Enkel totalen, niet wie wat antwoordde", inline: true }],
       },
     ],
     components: [

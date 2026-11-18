@@ -69,13 +69,13 @@ describe("parsePollDraft", () => {
 describe("resultaten", () => {
   const row = (voterKey: string, value: number, studyYears: string[]): ResultRow => ({ questionId: "q", voterKey, value, text: null, studyYears });
 
-  it("telt een student één keer en verbergt kleine groepen", () => {
+  it("telt een student één keer, per fase", () => {
     const rows = [row("a", 1, ["MASTER_1"]), row("a", 2, ["MASTER_1"]), row("b", 1, ["BACHELOR_2"])];
     const turnout = computeTurnout(rows, { total: 10, perYear: { MASTER_1: 5, BACHELOR_2: 5, BACHELOR_3: 0 } });
     expect(turnout.answered).toBe(2);
     expect(turnout.share).toBe(20);
     expect(turnout.phases.map((phase) => phase.year)).toEqual(["MASTER_1", "BACHELOR_2"]);
-    expect(turnout.phases.every((phase) => phase.tooFew)).toBe(true);
+    expect(turnout.phases.map((phase) => phase.answered)).toEqual([1, 1]);
   });
 
   it("rekent aandelen en het gemiddelde", () => {

@@ -22,7 +22,6 @@ import { toBrusselsInput } from "@/lib/pocPolls/draft";
 import { pollPopulation } from "@/lib/pocPolls/population";
 import {
   computeTurnout,
-  MIN_GROUP_SIZE,
   pollResultsText,
   questionResult,
   rowsForPhase,
@@ -132,8 +131,7 @@ export default async function PeilingDetail({
   const turnout = computeTurnout(allRows, population);
   const closed = status === "CLOSED";
 
-  const selectable = turnout.phases.filter((phase) => !phase.tooFew);
-  const activePhase = fase && selectable.some((phase) => phase.year === fase) ? fase : null;
+  const activePhase = fase && turnout.phases.some((phase) => phase.year === fase) ? fase : null;
   const errors = pollAdminErrors(nl);
   const fallbackError = nl ? "Niet opgeslagen: er ging iets mis." : "Not saved: something went wrong.";
 
@@ -182,7 +180,7 @@ export default async function PeilingDetail({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {closed ? <CopyForPocButton text={copyText} nl={nl} /> : null}
+          <CopyForPocButton text={copyText} nl={nl} />
           <DeleteButton
             action={deletePocPollAction}
             fields={{ id: poll.id, locale }}
@@ -202,8 +200,12 @@ export default async function PeilingDetail({
 
       <p className="text-sm text-vtk-body">
         {nl
-          ? "Zolang een peiling open staat, zie je hier enkel de deelname. De cijfers verschijnen na de deadline. Wie wat antwoordde, zie je nooit."
-          : "While a poll is open you only see the turnout here. The figures appear after the deadline. You never see who answered what."}
+          ? closed
+            ? "Wie wat antwoordde, zie je nooit."
+            : "De cijfers lopen live mee zolang de peiling open staat; studenten kunnen hun antwoord tot de deadline nog wijzigen. Wie wat antwoordde, zie je nooit."
+          : closed
+            ? "You never see who answered what."
+            : "The figures update live while the poll is open; students can still change their answer until the deadline. You never see who answered what."}
       </p>
 
       {poll.discordChannelId && discordBotConfigured() && !poll.discordMessageId ? (
@@ -291,30 +293,20 @@ export default async function PeilingDetail({
         </Card>
       ) : null}
 
-      {closed ? (
-        <>
+      {/* De cijfers staan er ook tijdens de looptijd en per fase, hoe klein ook:
+          een keuze van VTK Onderwijs, zie docs/design-decisions.md, "POC-peilingen". */}
+      <>
           <div className="space-y-2">
             <div role="group" aria-label={nl ? "Toon per fase" : "Show per phase"} className="flex flex-wrap gap-1.5">
               <Link href={phaseHref(null)} aria-current={activePhase === null ? "true" : undefined} className={`${chip} ${activePhase === null ? "border-vtk-yellow bg-vtk-yellow font-semibold" : "border-vtk-blue/20 font-medium"}`}>
                 {nl ? "Alle fasen" : "All phases"}
               </Link>
-              {turnout.phases.map((phase) =>
-                phase.tooFew ? (
-                  <span key={phase.year} className={`${chip} border-dashed border-vtk-blue/20 font-medium text-vtk-muted`}>
-                    {pollPhaseLabel(phase.year, locale)}, {nl ? "te weinig" : "too few"}
-                  </span>
-                ) : (
-                  <Link key={phase.year} href={phaseHref(phase.year)} aria-current={activePhase === phase.year ? "true" : undefined} className={`${chip} ${activePhase === phase.year ? "border-vtk-yellow bg-vtk-yellow font-semibold" : "border-vtk-blue/20 font-medium"}`}>
-                    {pollPhaseLabel(phase.year, locale)}
-                  </Link>
-                ),
-              )}
+              {turnout.phases.map((phase) => (
+                <Link key={phase.year} href={phaseHref(phase.year)} aria-current={activePhase === phase.year ? "true" : undefined} className={`${chip} ${activePhase === phase.year ? "border-vtk-yellow bg-vtk-yellow font-semibold" : "border-vtk-blue/20 font-medium"}`}>
+                  {pollPhaseLabel(phase.year, locale)}
+                </Link>
+              ))}
             </div>
-            <p className="text-[13px] text-vtk-muted">
-              {nl
-                ? `Een groep met minder dan ${MIN_GROUP_SIZE} antwoorden tonen we niet apart, anders wordt ze herkenbaar.`
-                : `A group with fewer than ${MIN_GROUP_SIZE} answers is not shown separately, or it becomes identifiable.`}
-            </p>
           </div>
 
           {results.map(({ question, rows, result }) => (
@@ -344,7 +336,11 @@ export default async function PeilingDetail({
                     .map(({ row, ref }) => (
                       <div key={ref} className="flex items-center gap-3 border-t border-vtk-blue/10 py-2">
                         <div className={`min-w-0 flex-1 text-[15px] leading-snug ${row.hidden ? "text-vtk-muted line-through" : "text-vtk-ink"}`}>{row.text}</div>
-                        <OpenAnswerActions pollId={poll.id} questionId={question.id} answerRef={ref} starred={row.starred} hidden={row.hidden} text={row.text ?? ""} nl={nl} />
+                        {/* Markeren pas na de deadline: tot dan kan de student zijn
+                            antwoord nog wijzigen, en dan hoort de ster er niet meer bij. */}
+                        {closed ? (
+                          <OpenAnswerActions pollId={poll.id} questionId={question.id} answerRef={ref} starred={row.starred} hidden={row.hidden} text={row.text ?? ""} nl={nl} />
+                        ) : null}
                       </div>
                     ))}
                 </div>
@@ -375,6 +371,7 @@ export default async function PeilingDetail({
             </Card>
           ))}
 
+          {closed ? (
           <Card className="p-5">
             <h2 className="text-base font-semibold">{nl ? "Samenvatting voor studenten" : "Summary for students"}</h2>
             <p className="mb-3 mt-1 text-sm text-vtk-muted">
@@ -396,8 +393,8 @@ export default async function PeilingDetail({
               <MarkdownEditorField name="summary" defaultValue={poll.summaryNl} locale={locale} allowImages={false} rows={6} maxLength={4000} />
             </SaveForm>
           </Card>
-        </>
-      ) : null}
+          ) : null}
+      </>
     </div>
   );
 }

@@ -2,12 +2,10 @@ import type { PollQuestionKind } from "./core";
 import { POLL_NO, POLL_SCORES, POLL_YES } from "./core";
 
 /**
- * De resultaten van een peiling, puur uit de antwoorden gerekend.
- *
- * Een fase met minder dan {@link MIN_GROUP_SIZE} antwoorden wordt nooit apart
- * getoond: in een groep van drie is een antwoord herleidbaar tot een persoon.
+ * De resultaten van een peiling, puur uit de antwoorden gerekend. Ze staan er
+ * ook tijdens de looptijd en per fase, hoe klein ook: zie docs/design-decisions.md,
+ * "POC-peilingen".
  */
-export const MIN_GROUP_SIZE = 5;
 
 export type ResultRow = {
   questionId: string;
@@ -22,7 +20,6 @@ export type PhaseTurnout = {
   answered: number;
   population: number;
   share: number;
-  tooFew: boolean;
 };
 
 export type PollTurnout = {
@@ -56,7 +53,7 @@ export function computeTurnout(
     .filter(([, count]) => count > 0)
     .map(([year, count]) => {
       const answered = all.filter((years) => years.includes(year)).length;
-      return { year, answered, population: count, share: share(answered, count), tooFew: answered < MIN_GROUP_SIZE };
+      return { year, answered, population: count, share: share(answered, count) };
     });
   return { answered: all.length, population: population.total, share: share(all.length, population.total), phases };
 }

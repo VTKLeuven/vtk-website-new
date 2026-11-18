@@ -14,8 +14,9 @@ Discord. De kringkeuzes staan in `docs/design-decisions.md`, "POC-peilingen".
 3. Studenten met een richting van die POC zien een gele strook bovenaan elke pagina
    (`PocPollStrip`). De vragen staan in de POC-band op de homepage, op het anker
    `#peiling`.
-4. Tijdens de looptijd zien de RiVers enkel de deelname. Na de deadline verschijnen
-   de cijfers, per fase te filteren.
+4. De RiVers zien de cijfers live, ook tijdens de looptijd, per fase te filteren.
+   Open antwoorden markeren of verbergen en de samenvatting kan pas na de
+   deadline: tot dan kan een student zijn antwoord nog wijzigen.
 5. Na de POC publiceren de RiVers een samenvatting, die 30 dagen bij de POC staat.
 
 ## Discord instellen

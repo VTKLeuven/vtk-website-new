@@ -13355,10 +13355,15 @@ een open vraag. Code in `apps/web/lib/pocPolls`.
   werkingsjaar RiVer is, krijgt de tab Peilingen voor de eigen POC; `pocs.manage`
   ziet alle POC's. Na publiceren liggen de vragen vast, anders gaan de antwoorden
   niet meer over dezelfde vraag.
-- **Ook de RiVers zien geen tussenstand.** Tijdens de looptijd zien ze enkel de
-  deelname. Wat ze zouden zien, kunnen ze doorvertellen of zelf overnemen.
-- **Een fase met minder dan vijf antwoorden wordt nooit apart getoond**, want in
-  zo'n kleine groep is een antwoord herleidbaar tot een persoon.
+- **De RiVers zien de cijfers live, ook tijdens de looptijd, en per fase hoe klein
+  die ook is** (november 2026). Eerst zagen ze tijdens de looptijd enkel de
+  deelname, en werd een fase met minder dan vijf antwoorden nooit apart getoond.
+  Dat vond VTK Onderwijs onlogisch: wie een peiling uitzet, wil zien hoe ze loopt.
+  De prijs is bewust aanvaard: bij een handvol antwoorden, of wie na elk nieuw
+  antwoord herlaadt, kan een RiVer een antwoord tot een persoon herleiden. De
+  studenten zelf zien nog steeds geen tussenstand, en de tekst bij de peiling
+  belooft enkel nog dat niemand ziet wie wat antwoordde. Open antwoorden markeren
+  kan pas na de deadline: tot dan kan een student zijn antwoord nog wijzigen.
 - **Na de POC vertellen de RiVers wat er met de antwoorden gebeurde**: een
   samenvatting staat 30 dagen bij de POC op de homepage. Wie ziet dat zijn stem
   iets deed, antwoordt de volgende keer weer.

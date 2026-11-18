@@ -229,8 +229,10 @@ instelt. Lees het voor je aan `apps/web/lib/pocPolls` of de knoppen in
 
 - **`PocPollAnswer` blijft anoniem.** Geen `userId`, geen eigen id en geen
   tijdstempels: die laatste twee zijn aan de toegangslogs te koppelen.
-- **Toon niemand een tussenstand**, ook de RiVers niet, en toon een fase met
-  minder dan vijf antwoorden nooit apart.
+- **De studenten zien geen tussenstand; de RiVers zien de cijfers live en per
+  fase**, hoe klein die ook is. Dat laatste is een bewuste keuze van VTK
+  Onderwijs (zie `docs/design-decisions.md`); zet er geen drempel of wachttijd
+  terug zonder het te vragen.
 
 # Opruiming van de bucket
 
