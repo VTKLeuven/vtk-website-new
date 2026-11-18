@@ -15,7 +15,7 @@ import { currentWorkingYear } from "@/lib/workingYear";
 import { deleteObject } from "@vtk/storage";
 import { storeAvatar, MAX_AVATAR_BYTES } from "@/lib/avatar";
 import { LEAD_LABEL_MAX } from "@/lib/werkgroepen";
-import { canManageOwnWerkgroepMembers } from "@/lib/werkgroepMembers";
+import { canManageOwnWerkgroepMembers, werkgroepenWithInfoRights } from "@/lib/werkgroepMembers";
 import { WERKING_KINDS, isWerkingKind, managePermissionFor, type WerkingKind } from "@/lib/groupKinds";
 import { eraseUserData, StorageUnavailableError } from "@/lib/privacy/account";
 import { describeChanges, logAudit } from "@/lib/audit";
@@ -1080,10 +1080,12 @@ const werkgroepInfoSchema = z.object({
 });
 
 /**
- * Infotekst + website van een werkgroep bewerken. Toegestaan voor elk lid van
- * die werkgroep (huidig werkingsjaar) en voor werkgroepen.manage/superadmin. Een
- * lid van BEST kan dus enkel de tekst van BEST wijzigen, niet die van een andere
- * werkgroep. Enkel werkgroepen: een jaarwerking heeft geen publieke pagina.
+ * Infotekst + website van een werkgroep bewerken. Toegestaan voor
+ * werkgroepen.manage/superadmin en voor wie `werkgroepen.editOwnInfo` via díe
+ * werkgroep krijgt (in productie de G3/G4, zie lib/werkgroepMembers.ts). Een
+ * gewoon lid mag het niet meer: dat stond de tekst op de site open voor
+ * iedereen in de werkgroep. Enkel werkgroepen: een jaarwerking heeft geen
+ * publieke pagina.
  */
 export async function saveWerkgroepInfoAction(
   _prev: SaveState,
@@ -1096,9 +1098,8 @@ export async function saveWerkgroepInfoAction(
     : null;
   if (!group || group.type !== "WERKGROEP") return saveError("INVALID_INPUT");
 
-  const isMember = session.groups.some((g) => g.id === id);
   const canManage = session.user.isSuperAdmin || hasPermission(session, "werkgroepen.manage");
-  if (!isMember && !canManage) return saveError("FORBIDDEN");
+  if (!canManage && !(await werkgroepenWithInfoRights(session)).has(id)) return saveError("FORBIDDEN");
 
   const result = werkgroepInfoSchema.safeParse({
     descriptionNl: (formData.get("descriptionNl") as string) || null,

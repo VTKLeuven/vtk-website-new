@@ -45,7 +45,7 @@ export type NavGuard = {
    *  (jaarwerkingen.manageOwnMembers). Een gewoon lid heeft er niets te doen:
    *  een jaarwerking heeft geen infotekst. */
   jaarwerking?: boolean;
-  /** Wie dit werkingsjaar in een post of werkgroep zit (Mijn budgetten). */
+  /** Wie dit werkingsjaar in een post zit of een werkgroep trekt (Mijn budgetten, `countsForBo`). */
   post?: boolean;
   /** Peilingen: de RiVers van dit werkingsjaar, en wie `pocs.manage` heeft. */
   pocRep?: boolean;
@@ -145,8 +145,8 @@ export function getAdminNav(): NavEntry[] {
       // De budgetten en resultaten die langs het Bestuursorgaan passeerden.
       // Enkel Groep 5 (de rol admin draagt dit recht niet).
       item('bestuursorgaan', '/bestuursorgaan', { perm: 'bestuursorgaan.manage' }),
-      // Hetzelfde voor de eigen post, voor elk lid van een post of werkgroep:
-      // welke resultaten nog naar het BO moeten.
+      // Hetzelfde voor de eigen post, voor elk lid van een post en de G3/G4 van
+      // een werkgroep: welke resultaten nog naar het BO moeten.
       item('bestuursorgaanOwn', '/bestuursorgaan/mijn', { post: true }),
       // Alles per BO in een map, zoals in Drive: de eigen post, of alles voor Groep 5.
       item('bestuursorgaanFolders', '/bestuursorgaan/mappen', { post: true }),

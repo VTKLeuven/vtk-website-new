@@ -13,6 +13,7 @@ import { getAdminNav, type NavGuard, type NavLeaf } from '@/lib/admin-nav';
 import { canSeeMailGroups, mailGroupAccess } from '@/lib/google/access';
 import { isPocOnly, representedPocIds } from '@/lib/pocPolls/access';
 import { postenAccess } from '@/lib/postenAccess';
+import { countsForBo } from '@/lib/bo/own';
 import { ADMIN_DENSITY_COOKIE, ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/adminNavCookie';
 import { AdminNav, type NavItem, type NavNode } from './AdminNav';
 import { AdminSurface } from './AdminSurface';
@@ -89,10 +90,10 @@ export default async function AdminLayout({
     // Werkgroepen-tab: beheerders óf gewone werkgroepleden.
     if (guard.werkgroep) return posten.werkgroepen;
     if (guard.jaarwerking) return posten.jaarwerkingen;
-    // Mijn budgetten: elk lid van een post of werkgroep, voor zijn eigen post.
-    // Een jaarwerking telt niet: het BO kent haar als eigen vak (lib/bo/posts.ts),
-    // niet als groep, dus ze had hier enkel een leeg blok.
-    if (guard.post) return session.groups.some((g) => g.type !== 'JAARWERKING');
+    // Mijn budgetten: elk lid van een post en de G3/G4 van een werkgroep, voor
+    // zijn eigen post. Een gewoon werkgroeplid en een jaarwerking tellen niet
+    // (zie `countsForBo` in lib/bo/own.ts).
+    if (guard.post) return session.groups.some(countsForBo);
     if (guard.pocRep) return session.permissions.includes('pocs.manage') || pocRep;
     if (guard.mailGroups) return mailGroupsVisible;
     if (guard.posten) return postenVisible;

@@ -4,7 +4,9 @@ import type { AuthGroup, SessionPayload } from "@vtk/auth";
 const findMany = vi.fn();
 vi.mock("@vtk/db", () => ({ prisma: { groupRole: { findMany } } }));
 
-const { werkgroepenWithOwnMemberRights, grantReachesMember } = await import("@/lib/werkgroepMembers");
+const { werkgroepenWithOwnMemberRights, werkgroepenWithInfoRights, grantReachesMember } = await import(
+  "@/lib/werkgroepMembers"
+);
 
 function group(id: string, role: AuthGroup["role"], type: AuthGroup["type"] = "WERKGROEP"): AuthGroup {
   return { id, code: id.toUpperCase(), slug: id, nameNl: id, nameEn: id, role, type };
@@ -106,6 +108,36 @@ describe("werkgroepenWithOwnMemberRights", () => {
   it("negeert praesidiumposten en vraagt niets op zonder het recht", async () => {
     expect((await werkgroepenWithOwnMemberRights(session([group("it", "LEAD", "PRAESIDIUM")]))).size).toBe(0);
     expect((await werkgroepenWithOwnMemberRights(session([group("chemix", "LEAD")], []))).size).toBe(0);
+    expect(findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("werkgroepenWithInfoRights", () => {
+  const info = ["werkgroepen.editOwnInfo"];
+
+  it("laat de G3 de infotekst van zijn werkgroep aanpassen", async () => {
+    findMany.mockResolvedValue([{ groupId: "chemix", kind: "LEADER" }]);
+    const allowed = await werkgroepenWithInfoRights(session([group("chemix", "LEAD")], info));
+    expect([...allowed]).toEqual(["chemix"]);
+    expect(findMany.mock.calls[0][0].where.role.permissions.some.permission.code).toBe("werkgroepen.editOwnInfo");
+  });
+
+  it("geeft een gewoon lid de tekst op de site niet", async () => {
+    // Zo staat het in productie: het recht hangt aan de G3/G4 (LEADER-grant).
+    findMany.mockResolvedValue([{ groupId: "chemix", kind: "LEADER" }]);
+    const allowed = await werkgroepenWithInfoRights(session([group("chemix", "MEMBER")], info));
+    expect(allowed.size).toBe(0);
+  });
+
+  it("geeft lidmaatschap alleen niets, zonder het recht in de sessie", async () => {
+    const allowed = await werkgroepenWithInfoRights(session([group("chemix", "LEAD")], []));
+    expect(allowed.size).toBe(0);
+    expect(findMany).not.toHaveBeenCalled();
+  });
+
+  it("telt het ledenrecht niet als recht op de tekst", async () => {
+    const allowed = await werkgroepenWithInfoRights(session([group("chemix", "LEAD")]));
+    expect(allowed.size).toBe(0);
     expect(findMany).not.toHaveBeenCalled();
   });
 });

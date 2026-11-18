@@ -15,7 +15,7 @@ import { postOptions, resolvePost, resolvePostKeys, splitPost } from "@/lib/bo/p
 import { findDossier, toExplorerData } from "@/lib/bo/explorer";
 import { groupByMeeting, groupDossiers, matchesFilters } from "@/lib/bo/list";
 import { buildSummary } from "@/lib/bo/summary";
-import { openResults, ownPostKeys, ownPosts } from "@/lib/bo/own";
+import { countsForBo, openResults, ownPostKeys, ownPosts } from "@/lib/bo/own";
 
 /*
  * Het overzicht van het Bestuursorgaan. De namen hieronder komen letterlijk uit
@@ -1184,6 +1184,16 @@ describe("wat een post zelf ziet", () => {
   it("geeft een jaarwerking geen leeg blok: het BO kent haar enkel als vak", () => {
     const own = [...ownGroups(["ONTHAAL"]), { id: "kanweek", code: "KANWEEK", slug: "kanweek", nameNl: "Kanweek", nameEn: "Kanweek", type: "JAARWERKING" }];
     expect(ownPostKeys(own)).toEqual(ownPostKeys(ownGroups(["ONTHAAL"])));
+  });
+
+  it("toont een werkgroep enkel aan haar G3/G4, niet aan een gewoon lid", () => {
+    const werkgroep = (role: "LEAD" | "MEMBER") => ({ id: "statix", code: "STATIX", type: "WERKGROEP", role });
+    expect(ownPostKeys([werkgroep("LEAD")])).toEqual(["g:statix"]);
+    expect(ownPostKeys([werkgroep("MEMBER")])).toEqual([]);
+    // Een praesidiumpost blijft voor elk lid, ook wie er geen verantwoordelijke is.
+    expect(ownPostKeys([{ id: "onthaal", code: "ONTHAAL", type: "PRAESIDIUM", role: "MEMBER" }])).toEqual(["g:onthaal"]);
+    expect(countsForBo({ type: "WERKGROEP", role: "MEMBER" })).toBe(false);
+    expect(countsForBo({ type: "JAARWERKING", role: "LEAD" })).toBe(false);
   });
 
   it("geeft wie in Groep 5 zit ook de vakken van Groep 5, maar enkel als er iets in zit", () => {

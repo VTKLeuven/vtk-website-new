@@ -66,6 +66,12 @@ export type WerkingRow = {
    * werkingsjaar) of niets.
    */
   memberEdit: "full" | "own" | "none";
+  /**
+   * Mag deze gebruiker de infotekst en website aanpassen: het beheerrecht, of
+   * `werkgroepen.editOwnInfo` via deze werkgroep. Altijd `false` bij een
+   * jaarwerking, die heeft geen publieke pagina.
+   */
+  infoEdit: boolean;
   /** Voorbereide, lowercased zoekstring (naam, code, rollen, leden). */
   searchText: string;
 };
@@ -500,9 +506,9 @@ function WerkgroepDetail({
 
   return (
     <div className="space-y-4 py-1">
-      {/* Infotekst + website: elk lid van de werkgroep mag dit aanpassen. Enkel
-          voor een soort met een publieke pagina; een jaarwerking heeft er geen. */}
-      {WERKING_KINDS[kind].publicPath && (
+      {/* Infotekst + website: het beheerrecht of `werkgroepen.editOwnInfo` via
+          deze werkgroep (de G3/G4). Een jaarwerking heeft geen publieke pagina. */}
+      {werkgroep.infoEdit && (
         <section className="rounded-xl border border-vtk-blue/12 bg-white p-4">
           <h4 className="mb-1 text-sm font-semibold text-vtk-ink">{nl ? "Infotekst & website" : "Info text & website"}</h4>
           <p className="mb-3 text-xs text-[#5c667f]">

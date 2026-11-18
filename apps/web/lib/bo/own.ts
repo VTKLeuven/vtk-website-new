@@ -9,9 +9,9 @@ import { BO_EXTRA_POSTS, postName, type PostCandidate } from "./posts";
  *
  * Het volledige overzicht blijft van Groep 5 (`bestuursorgaan.manage`). Dit
  * volgt het lidmaatschap van dit werkingsjaar, zonder apart recht: wie in een
- * post of werkgroep zit, ziet wat die post langs het BO bracht, en niets van
- * een andere post. Zie docs/design-decisions.md ("Bestuursorgaan: de post
- * ziet haar eigen budgetten").
+ * post zit of een werkgroep trekt (`countsForBo`), ziet wat die post langs het
+ * BO bracht, en niets van een andere post. Zie docs/design-decisions.md
+ * ("Bestuursorgaan: de post ziet haar eigen budgetten").
  *
  * Puur, zodat de regels getest kunnen worden; de sessie en het overzicht komen
  * binnen.
@@ -28,19 +28,39 @@ export type OwnPost = {
 
 const G5_KEYS = BO_EXTRA_POSTS.filter((p) => p.section === "g5").map((p) => p.key);
 
+/** Wat `ownPostKeys` en de zijbalk van een lidmaatschap moeten weten. */
+export type BoMembership = Pick<OwnGroup, "id" | "code"> & { type?: string; role?: string };
+
 /**
- * De posten van één lid: elke post en werkgroep waarvan hij dit werkingsjaar
- * lid is. Wie in Groep 5 zit, krijgt er de vier vakken van Groep 5 bij
- * (Praeses, Vice-praeses, Secretaris, Beheer): daar dienen ze hun eigen
- * budgetten onder in.
+ * Telt dit lidmaatschap mee voor het BO (Mijn budgetten, de BO-mappen, het
+ * blok op het dashboard)?
  *
- * Een jaarwerking (`Group.type = JAARWERKING`) telt niet mee: het BO kent
- * Kanweek en co. als eigen vak (`x:kanweek`, zie `BO_EXTRA_POSTS`) en nooit als
- * groep, dus ze gaf hier enkel een leeg blok "nog niets", ook wanneer er wel
- * budgetten van die jaarwerking zijn.
+ * - Een praesidiumpost: elk lid, zonder recht. Het zijn de eigen rekenbladen
+ *   van de post, die ze al in haar eigen map in Drive ziet.
+ * - Een werkgroep: enkel de verantwoordelijke (de G3/G4,
+ *   `GroupMembership.role = LEAD`). Die brengt de budgetten van de werkgroep
+ *   naar het BO; een gewoon lid van een werkgroep heeft er niets te zoeken.
+ * - Een jaarwerking nooit: het BO kent Kanweek en co. als eigen vak
+ *   (`x:kanweek`, zie `BO_EXTRA_POSTS`) en nooit als groep, dus ze gaf hier
+ *   enkel een leeg blok "nog niets".
+ *
+ * Een lidmaatschap zonder `type` telt als post.
  */
-export function ownPostKeys(groups: readonly (Pick<OwnGroup, "id" | "code"> & { type?: string })[]): string[] {
-  const keys = groups.filter((group) => group.type !== "JAARWERKING").map((group) => `g:${group.id}`);
+export function countsForBo(group: Pick<BoMembership, "type" | "role">): boolean {
+  if (group.type === "JAARWERKING") return false;
+  if (group.type === "WERKGROEP") return group.role === "LEAD";
+  return true;
+}
+
+/**
+ * De posten van één lid: elke post waarvan hij dit werkingsjaar lid is, en
+ * elke werkgroep waarvan hij verantwoordelijke is (zie `countsForBo`). Wie in
+ * Groep 5 zit, krijgt er de vier vakken van Groep 5 bij (Praeses,
+ * Vice-praeses, Secretaris, Beheer): daar dienen ze hun eigen budgetten onder
+ * in.
+ */
+export function ownPostKeys(groups: readonly BoMembership[]): string[] {
+  const keys = groups.filter(countsForBo).map((group) => `g:${group.id}`);
   if (groups.some((group) => group.code === "GROEP5")) keys.push(...G5_KEYS);
   return [...new Set(keys)];
 }

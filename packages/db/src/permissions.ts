@@ -46,6 +46,10 @@ export const PERMISSIONS = [
   // recht telt enkel in de werkgroep die het je verleent, enkel voor gewone
   // leden en enkel in het huidige werkingsjaar (lib/werkgroepMembers.ts).
   { code: "werkgroepen.manageOwnMembers", labelNl: "Leden van de eigen werkgroep toevoegen en verwijderen", labelEn: "Add and remove members of own werkgroep", category: "users" },
+  // De infotekst en website op /werkgroepen. Stond open voor elk lid van de
+  // werkgroep; nu enkel voor wie een rol met dit recht via die werkgroep krijgt
+  // (in productie de G3/G4, via de LEADER-grant). Zelfde regel als hierboven.
+  { code: "werkgroepen.editOwnInfo", labelNl: "Infotekst en website van de eigen werkgroep aanpassen", labelEn: "Edit info text and website of own werkgroep", category: "users" },
   // Jaarwerkingen (Kanweek, Halftime, ...) naast de werkgroepen, met dezelfde
   // twee rechten: alles beheren, of als verantwoordelijke de gewone leden van
   // de eigen jaarwerking (lib/werkgroepMembers.ts, dezelfde grenzen).

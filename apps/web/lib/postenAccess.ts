@@ -1,7 +1,6 @@
 import "server-only";
-import { prisma } from "@vtk/db";
 import { hasPermission, type SessionPayload } from "@vtk/auth";
-import { werkgroepenWithOwnMemberRights } from "@/lib/werkgroepMembers";
+import { werkgroepenWithInfoRights, werkgroepenWithOwnMemberRights } from "@/lib/werkgroepMembers";
 
 /**
  * Welke tabbladen van "Posten & werkgroepen" iemand mag openen. Eén bron voor de
@@ -10,8 +9,10 @@ import { werkgroepenWithOwnMemberRights } from "@/lib/werkgroepMembers";
  * recht daarnaast nog eens.
  *
  * - Posten: `groups.manage`.
- * - Werkgroepen: `werkgroepen.manage`, of lid van een werkgroep (die bewerkt
- *   enkel de infotekst van zijn eigen werkgroep).
+ * - Werkgroepen: `werkgroepen.manage`, of wie via zijn werkgroep de infotekst
+ *   (`werkgroepen.editOwnInfo`) of de gewone leden
+ *   (`werkgroepen.manageOwnMembers`) van die werkgroep beheert: in productie de
+ *   G3/G4. Een gewoon lid heeft er niets te doen en ziet het tabblad niet.
  * - Jaarwerkingen: `jaarwerkingen.manage`, of de verantwoordelijke die de leden
  *   van zijn eigen jaarwerking beheert. Een gewoon lid heeft er niets te doen.
  * - Kiesploeg: `kiesploeg.manage`.
@@ -29,10 +30,8 @@ export async function postenAccess(session: SessionPayload | null | undefined): 
 
   const werkgroepen =
     hasPermission(session, "werkgroepen.manage") ||
-    (session.groups.length > 0 &&
-      (await prisma.group.count({
-        where: { type: "WERKGROEP", id: { in: session.groups.map((g) => g.id) } },
-      })) > 0);
+    (await werkgroepenWithInfoRights(session)).size > 0 ||
+    (await werkgroepenWithOwnMemberRights(session, "WERKGROEP")).size > 0;
   const jaarwerkingen =
     hasPermission(session, "jaarwerkingen.manage") ||
     (await werkgroepenWithOwnMemberRights(session, "JAARWERKING")).size > 0;

@@ -46,7 +46,30 @@ export async function werkgroepenWithOwnMemberRights(
   session: SessionPayload,
   kind: WerkingKind = "WERKGROEP",
 ): Promise<Set<string>> {
-  const permission = WERKING_KINDS[kind].ownMembersPermission;
+  return werkgroepenGrantingPermission(session, kind, WERKING_KINDS[kind].ownMembersPermission);
+}
+
+/**
+ * Het recht op de infotekst en website (`werkgroepen.editOwnInfo`), met
+ * dezelfde regel: enkel de werkgroep die het verleent. Stond vroeger open voor
+ * elk lid; in productie hangt het nu aan de G3/G4 (LEADER-grant).
+ */
+export const OWN_INFO_PERMISSION = "werkgroepen.editOwnInfo" satisfies Permission;
+
+export async function werkgroepenWithInfoRights(session: SessionPayload): Promise<Set<string>> {
+  return werkgroepenGrantingPermission(session, "WERKGROEP", OWN_INFO_PERMISSION);
+}
+
+/**
+ * De groepen van dit soort waarvan het lidmaatschap van deze sessie een rol
+ * met `permission` binnenhaalt. Superadmins en houders van het brede
+ * beheerrecht vallen hier niet onder; dat beslist de beller.
+ */
+async function werkgroepenGrantingPermission(
+  session: SessionPayload,
+  kind: WerkingKind,
+  permission: Permission,
+): Promise<Set<string>> {
   const own = session.groups.filter((group) => group.type === kind);
   if (own.length === 0 || !session.permissions.includes(permission)) return new Set();
 

@@ -3,6 +3,7 @@ import { hasPermission } from "@vtk/auth";
 import { BadgeEuro, FolderOpen, LayoutList, Settings2, Wallet } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { getCurrentSession } from "@/lib/session";
+import { countsForBo } from "@/lib/bo/own";
 import { ModuleAdminShell, type ModuleTab } from "@/components/admin/ModuleAdminShell";
 
 const ICON = { "aria-hidden": true, size: 15, strokeWidth: 1.8 } as const;
@@ -28,8 +29,9 @@ export default async function AdminBestuursorgaanLayout({
   const base = `${nl ? "" : "/en"}/admin/bestuursorgaan`;
   const session = await getCurrentSession();
   const manage = Boolean(session && hasPermission(session, "bestuursorgaan.manage"));
-  // Dezelfde regel als de zijbalk (`guard.post` in de admin-layout).
-  const post = Boolean(session?.groups.some((group) => group.type !== "JAARWERKING"));
+  // Dezelfde regel als de zijbalk (`guard.post` in de admin-layout): een post,
+  // of de G3/G4 van een werkgroep.
+  const post = Boolean(session?.groups.some(countsForBo));
 
   const tabs: ModuleTab[] = [];
   if (manage) {

@@ -225,7 +225,7 @@ table whose rows expand into per-category editors, with create/import in modals.
 | --- | --- | --- |
 | `/admin/roles` (`RolesTable`) | `roles.manage` | Row = role + effective holder count. Expands to: direct holders, posts that grant it (edit needs `groups.manage`), permissions. |
 | `/admin/groepen` (`PostsTable`) | `groups.manage` | Per working-year tabs. Row = post + member count. Expands to: members, roles this post grants (DEFAULT/LEADER), post settings (incl. `active`). Posts are deactivated, never hard-deleted. Filtered to `Group.type = PRAESIDIUM`. |
-| `/admin/werkgroepen` (`WerkingenTable`) | `werkgroepen.manage` **or** werkgroep member | Werkgroepen = `Group` with `type = WERKGROEP`. Managers see all and manage members/roles/settings like posts; a plain member sees only their own werkgroep(s) and may edit just the info text + website (`saveWerkgroepInfoAction`, scoped to their own membership). With `werkgroepen.manageOwnMembers` (see "Werkgroepleden door de G3/G4") a member also adds and removes the plain members of this working year. Public page: `/werkgroepen`. |
+| `/admin/werkgroepen` (`WerkingenTable`) | `werkgroepen.manage` **or** `werkgroepen.editOwnInfo` / `werkgroepen.manageOwnMembers` through the werkgroep | Werkgroepen = `Group` with `type = WERKGROEP`. Managers see all and manage members/roles/settings like posts. Without that, you see only the werkgroep(s) whose grant gives you one of the two own-rights (in production the G3/G4, via the LEADER grant): `werkgroepen.editOwnInfo` for the info text + website (`saveWerkgroepInfoAction`), `werkgroepen.manageOwnMembers` for the plain members of this working year (see "Werkgroepleden door de G3/G4"). A plain member has neither and does not see the tab. Public page: `/werkgroepen`. |
 | `/admin/peilingen` | `pocs.manage` **of** RiVer dit werkingsjaar | POC-peilingen opstellen en de resultaten bekijken. Een RiVer (`PocRepresentative` van het huidige werkingsjaar) ziet enkel de eigen POC, zonder apart recht; `pocs.manage` ziet alles. Scope in `lib/pocPolls/access.ts`; vraag RiVer-zijn altijd aan `representedPocIds`, die in het autorisatievoorbeeld de daar aangevinkte POC's teruggeeft. Een RiVer zonder post, werkgroep of jaarwerking (`isPocOnly`) ziet in de zijbalk enkel de peilingen: geen dashboard en geen uitleendienst (`notForPocOnly` in `lib/admin-nav.ts`), en `/admin` stuurt hem door naar `/admin/peilingen`. |
 | `/admin/jaarwerkingen` (`WerkingenTable`) | `jaarwerkingen.manage` **or** `jaarwerkingen.manageOwnMembers` through the jaarwerking | Jaarwerkingen = `Group` with `type = JAARWERKING` (Kanweek, Halftime, ...). Same screen and rules as werkgroepen (`WerkingenAdmin`, `lib/groupKinds.ts`), with its own permissions that do not carry over to werkgroepen or back. No info text and no public page, so a plain member does not see the tab; the lead with `jaarwerkingen.manageOwnMembers` manages the plain members of this working year. |
 | `/admin/gebruikers` | `users.view` (edit needs `users.edit`) | **Server-driven** table (URL `?q&sort&dir&page`, `count` + `findMany` with `take`/`skip`, no memberships join), built to scale to tens of thousands of users. Editing opens `/admin/gebruikers/[id]`. |
@@ -489,6 +489,15 @@ Wat het recht toelaat (`lib/werkgroepMembers.ts`, de grenzen in
   in plaats van een stille degradatie.
 - **Enkel het huidige werkingsjaar.** De ploeg van volgend jaar zet IT klaar.
 
+**De infotekst en website op `/werkgroepen`** volgen dezelfde regel met een eigen
+recht, `werkgroepen.editOwnInfo` (`werkgroepenWithInfoRights`). Tot november 2026
+mocht elk lid van de werkgroep ze aanpassen, zonder recht, en dus stond de tekst
+op de site open voor iedere student in een werkgroep. De migratie
+`20261118170000_werkgroep_info_permission` gaf het recht aan elke rol die al
+`werkgroepen.manageOwnMembers` had, zodat de G3/G4 het niet verloor. Het is een
+apart recht en niet een deel van `manageOwnMembers`, zodat een werkgroep de tekst
+aan iemand kan geven die de leden niet beheert.
+
 **Opzetten:** vink in `/admin/roles` `werkgroepen.manageOwnMembers` aan bij de rol
 die als **verantwoordelijke** (LEADER-grant) aan de werkgroepen hangt (in
 productie `werkgroepen-g3-g4`), plus `users.search`: zonder dat laatste geeft het
@@ -497,7 +506,15 @@ zoekveld een 403, en het formulier zegt dan welk recht ontbreekt.
 **Bonnetjes van werkgroepleden** hebben geen eigen recht nodig: `expenses.submit`
 is precies "indienen en enkel je eigen rekeningen zien", en de postkeuze bij het
 indienen bevat de werkgroepen al. Vink het aan bij de rol die als DEFAULT aan elke
-werkgroep hangt (in productie `werkgroepen`).
+werkgroep hangt (in productie `werkgroepen`). Zet op die rol niets anders: alles
+wat ze draagt, krijgt elk gewoon lid. `cashRegisters.request` (de tab Kassa's)
+en `expenses.managePost` / `expenses.reimbursePost` (alle rekeningen van de
+werkgroep) horen bij de G3/G4-rol op de LEADER-grant.
+
+**Mijn budgetten en Bestuursorgaan** volgen voor een werkgroep geen recht maar
+het lidmaatschap als verantwoordelijke: enkel de G3/G4 (`role = LEAD`) ziet de
+budgetten van de werkgroep, een gewoon lid niet (`countsForBo` in
+`lib/bo/own.ts`). Een praesidiumpost blijft voor elk lid.
 
 ## Boekhoudcodes
 

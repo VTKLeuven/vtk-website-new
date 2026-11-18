@@ -6,7 +6,7 @@ import { hasPermission } from "@vtk/auth";
 import type { Locale } from "@vtk/i18n";
 import { publicUrl } from "@/lib/storage";
 import { currentWorkingYear, formatWorkingYear, parseWorkingYear, workingYearTabs } from "@/lib/workingYear";
-import { werkgroepenWithOwnMemberRights } from "@/lib/werkgroepMembers";
+import { werkgroepenWithInfoRights, werkgroepenWithOwnMemberRights } from "@/lib/werkgroepMembers";
 import { WERKING_KINDS, type WerkingKind } from "@/lib/groupKinds";
 import { werkgroepErrorMessages } from "./messages";
 import { WerkingenTable, type WerkingRow, type RoleOption } from "./WerkingenTable";
@@ -25,10 +25,12 @@ import { sortRolesByName } from "@/lib/roleOrder";
  * - de verantwoordelijke met het recht op de eigen leden
  *   (`*.manageOwnMembers`) beheert daarbovenop de gewone leden van dit
  *   werkingsjaar, enkel van de eigen groep;
- * - een gewoon werkgroeplid ziet enkel de eigen werkgroep(en) en past daar de
- *   infotekst en website aan. Een jaarwerking heeft die velden niet, dus een
- *   gewoon lid van een jaarwerking heeft hier niets te doen en ziet het scherm
- *   niet.
+ * - wie `werkgroepen.editOwnInfo` via zijn werkgroep krijgt (in productie de
+ *   G3/G4), past de infotekst en website van die werkgroep aan. Een
+ *   jaarwerking heeft die velden niet.
+ *
+ * Een gewoon lid zonder een van die rechten heeft hier niets te doen en ziet
+ * het scherm niet: de tekst op /werkgroepen stond vroeger open voor elk lid.
  */
 export async function WerkingenAdmin({ kind, locale, jaar }: { kind: WerkingKind; locale: Locale; jaar?: string }) {
   const nl = locale === "nl";
@@ -37,11 +39,12 @@ export async function WerkingenAdmin({ kind, locale, jaar }: { kind: WerkingKind
 
   const session = await requireSession();
   const canManage = hasPermission(session, config.managePermission);
-  const myGroupIds = new Set(session.groups.map((g) => g.id));
 
   const year = parseWorkingYear(jaar);
   const isCurrentYear = year === currentWorkingYear();
   const ownMemberGroupIds = canManage ? new Set<string>() : await werkgroepenWithOwnMemberRights(session, kind);
+  const infoGroupIds =
+    canManage || !config.publicPath ? new Set<string>() : await werkgroepenWithInfoRights(session);
 
   const [groups, roles, distinctYears] = await Promise.all([
     prisma.group.findMany({
@@ -62,11 +65,11 @@ export async function WerkingenAdmin({ kind, locale, jaar }: { kind: WerkingKind
     }),
   ]);
 
-  // Een werkgroeplid ziet zijn eigen werkgroepen (voor de infotekst); bij een
-  // jaarwerking enkel de verantwoordelijke die haar leden beheert.
+  // Zonder beheerrecht enkel de groepen waarvan je de infotekst of de gewone
+  // leden beheert; een gewoon lid ziet niets.
   const visible = canManage
     ? groups
-    : groups.filter((g) => (config.publicPath ? myGroupIds.has(g.id) : ownMemberGroupIds.has(g.id)));
+    : groups.filter((g) => ownMemberGroupIds.has(g.id) || infoGroupIds.has(g.id));
   if (!canManage && visible.length === 0) notFound();
 
   const tabs = workingYearTabs(distinctYears.map((r) => r.year));
@@ -117,6 +120,7 @@ export async function WerkingenAdmin({ kind, locale, jaar }: { kind: WerkingKind
       members,
       roleGrants,
       memberEdit: canManage ? "full" : isCurrentYear && ownMemberGroupIds.has(group.id) ? "own" : "none",
+      infoEdit: Boolean(config.publicPath) && (canManage || infoGroupIds.has(group.id)),
       searchText,
     };
   });
@@ -130,19 +134,24 @@ export async function WerkingenAdmin({ kind, locale, jaar }: { kind: WerkingKind
   };
 
   const ownMembers = ownMemberGroupIds.size > 0;
+  const ownInfo = infoGroupIds.size > 0;
   const intro =
     kind === "WERKGROEP"
       ? canManage
         ? nl
           ? "Werkgroepen werken zoals posten: ze verlenen rollen aan hun leden. Lidmaatschappen gelden per werkingsjaar en resetten op 15 juli. Elke werkgroep verschijnt op /werkgroepen met haar eigen infotekst en website."
           : "Werkgroepen work like posts: they grant roles to their members. Memberships apply per working year and reset on 15 July. Each werkgroep appears on /werkgroepen with its own info text and website."
-        : ownMembers
+        : ownMembers && ownInfo
           ? nl
             ? "Hier pas je de infotekst en website van je eigen werkgroep aan en beheer je de leden van dit werkingsjaar. De tekst en website verschijnen op de publieke /werkgroepen-pagina."
             : "Here you edit the info text and website of your own werkgroep and manage its members for this working year. The text and website appear on the public /werkgroepen page."
-          : nl
-            ? "Hier pas je de infotekst en website van je eigen werkgroep aan. Die verschijnen op de publieke /werkgroepen-pagina."
-            : "Here you edit the info text and website of your own werkgroep. They appear on the public /werkgroepen page."
+          : ownMembers
+            ? nl
+              ? "Hier beheer je de leden van je eigen werkgroep voor dit werkingsjaar."
+              : "Here you manage the members of your own werkgroep for this working year."
+            : nl
+              ? "Hier pas je de infotekst en website van je eigen werkgroep aan. Die verschijnen op de publieke /werkgroepen-pagina."
+              : "Here you edit the info text and website of your own werkgroep. They appear on the public /werkgroepen page."
       : canManage
         ? nl
           ? "Jaarwerkingen werken zoals werkgroepen: ze verlenen rollen aan hun leden. Lidmaatschappen gelden per werkingsjaar en resetten op 15 juli."

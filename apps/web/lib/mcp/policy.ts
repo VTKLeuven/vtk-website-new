@@ -50,6 +50,7 @@ export const MCP_PERMISSION_POLICY = {
   "groups.manage": { reads: ["groups"], creates: ["app_create:group(PRAESIDIUM)"], blocked: ["modify memberships or grants"] },
   "werkgroepen.manage": { reads: ["groups"], creates: ["app_create:group(WERKGROEP)"], blocked: ["modify memberships or grants"] },
   "werkgroepen.manageOwnMembers": { reads: [], creates: [], blocked: ["modify memberships"] },
+  "werkgroepen.editOwnInfo": { reads: [], creates: [], blocked: ["edit werkgroep info text"] },
   "jaarwerkingen.manage": { reads: ["groups"], creates: ["app_create:group(JAARWERKING)"], blocked: ["modify memberships or grants"] },
   "jaarwerkingen.manageOwnMembers": { reads: [], creates: [], blocked: ["modify memberships"] },
   "roles.manage": { reads: ["roles"], creates: ["app_create:role"], blocked: ["assign roles or permissions"] },

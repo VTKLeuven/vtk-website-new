@@ -2383,11 +2383,17 @@ terug (`apps/web/lib/brevo/unsubscribe.ts`).
   naam en de rollen.
 - **Wie mag wat.** Leden en rollen beheren vraagt het aparte recht
   `werkgroepen.manage` (los van `groups.manage`, zodat het delegeerbaar is). De
-  **infotekst + website** mag daarnaast **elk lid van díe werkgroep** zelf
-  aanpassen (huidig werkingsjaar), maar enkel van de eigen werkgroep: de
-  admin-tab toont een gewoon lid enkel zijn eigen werkgroep(en) en enkel het
-  infotekst-formulier; `saveWerkgroepInfoAction` checkt het lidmaatschap
-  server-side. Beheerders (met het recht of superadmin) zien en beheren alles.
+  **infotekst + website** past de G3/G4 van díe werkgroep aan, met
+  `werkgroepen.editOwnInfo` via de LEADER-grant; enkel van de eigen werkgroep,
+  en `saveWerkgroepInfoAction` toetst dat server-side. Beheerders (met het recht
+  of superadmin) zien en beheren alles.
+- **Een gewoon werkgroeplid heeft in het beheer bijna niets te doen** (november
+  2026). Eerst mocht elk lid de infotekst aanpassen en zag het Mijn budgetten en
+  de BO-mappen van zijn werkgroep, en de rol die als DEFAULT aan elke werkgroep
+  hing, gaf ook Kassa's. Dat was te ruim: een werkgroep telt tientallen leden,
+  en de tekst op de site, de budgetten en de kassa's zijn het werk van de
+  G3/G4. Een gewoon lid dient enkel nog zijn eigen rekeningen in
+  (`expenses.submit`); de rest gaat via de G3/G4. Zie `docs/permissions.md`.
 - **De G3/G4 beheert zijn gewone leden zelf, de verantwoordelijken niet.**
   Met `werkgroepen.manageOwnMembers` voegt de verantwoordelijke van een
   werkgroep leden toe en verwijdert hij ze, enkel voor het huidige werkingsjaar
@@ -12509,8 +12515,11 @@ allebei): allebei.
   activiteit met haar BO's, budget, resultaat en stand, in dezelfde tabel en
   dezelfde vier woorden als de lijst van Groep 5. Een post en Groep 5 lezen
   over één activiteit dus hetzelfde.
-- **Het lidmaatschap beslist, geen recht.** Wie dit werkingsjaar in een post of
-  werkgroep zit, ziet die post; niets van een andere. Een recht zou betekenen
+- **Het lidmaatschap beslist, geen recht.** Wie dit werkingsjaar in een post
+  zit, ziet die post; niets van een andere. Bij een werkgroep enkel de G3/G4
+  (`role = LEAD`, `countsForBo` in `lib/bo/own.ts`): sinds november 2026 zag een
+  gewoon lid de budgetten van zijn werkgroep niet meer, omdat de G3/G4 ze naar
+  het BO brengt en de werkgroep tientallen leden telt. Een recht zou betekenen
   dat iemand het aan elke post moet hangen, en een post die het niet kreeg,
   ziet dan niet wat ze nog moet brengen. Het zijn haar eigen rekenbladen: ze
   staan al in haar eigen map in Drive. Het overzicht van alle posten blijft

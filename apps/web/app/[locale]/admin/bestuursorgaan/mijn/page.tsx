@@ -12,9 +12,10 @@ import { BoOwn } from "../BoOwn";
 
 /*
  * /admin/bestuursorgaan/mijn ("Mijn budgetten"): wat de eigen post langs het
- * BO bracht, en welke resultaten nog moeten komen. Elk lid van een post of
- * werkgroep ziet dit voor zijn eigen posten, zonder apart recht; het volledige
- * overzicht van alle posten blijft voor Groep 5. Zie `lib/bo/own.ts`.
+ * BO bracht, en welke resultaten nog moeten komen. Elk lid van een post en de
+ * G3/G4 van een werkgroep ziet dit voor zijn eigen posten, zonder apart recht;
+ * het volledige overzicht van alle posten blijft voor Groep 5. Zie
+ * `lib/bo/own.ts`.
  */
 
 export default async function MijnBudgettenPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -83,8 +84,8 @@ export default async function MijnBudgettenPage({ params }: { params: Promise<{ 
       {posts.length === 0 ? (
         <p className="rounded-[18px] border border-vtk-blue/10 bg-vtk-surface-elevated p-5 text-sm text-vtk-muted">
           {nl
-            ? "Je zit dit werkingsjaar in geen post of werkgroep, dus er zijn geen budgetten om te tonen."
-            : "You are not in a post or working group this working year, so there are no budgets to show."}
+            ? "Je zit dit werkingsjaar in geen post en bent geen G3/G4 van een werkgroep, dus er zijn geen budgetten om te tonen."
+            : "You are not in a post or leading a working group this working year, so there are no budgets to show."}
         </p>
       ) : (
         <BoOwn posts={posts} locale={locale} />
