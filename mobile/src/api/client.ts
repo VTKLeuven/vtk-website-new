@@ -80,6 +80,21 @@ export function defaultBaseUrl(): string {
 }
 
 /**
+ * Een beeld-URL uit de API, altijd als volledig adres.
+ *
+ * De server hoort die al absoluut te maken (`absoluteUrl` in
+ * `lib/app-api/media.ts`), maar niet elk veld deed dat: de poster van een
+ * aftermovie kwam binnen als `/api/video-thumbnail?id=...`, en daar kan
+ * `expo-image` niets mee, dus het vlak bleef leeg zonder foutmelding. Een
+ * relatief pad hoort bij de site waar de app mee praat.
+ */
+export function mediaUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  return `${baseUrl()}${value.startsWith('/') ? value : `/${value}`}`;
+}
+
+/**
  * Lokaal testen tegen een cloudflared-tunnel, zonder rebuild.
  *
  * Gooit de leescache weg: die hoort bij één site, en inhoud van de ene server op

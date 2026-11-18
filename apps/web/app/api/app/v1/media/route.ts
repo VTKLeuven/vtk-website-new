@@ -53,7 +53,9 @@ export async function GET(request: Request) {
               id: video.id,
               title: pick(video.titleNl, video.titleEn ?? video.titleNl, locale),
               externalUrl: embed.externalUrl,
-              posterUrl: embed.posterUrl ?? null,
+              // `videoEmbed` geeft een pad op onze eigen proxy terug
+              // (`/api/video-thumbnail`); de app heeft een volledig adres nodig.
+              posterUrl: absoluteUrl(request, embed.posterUrl ?? null),
             },
           ];
         }),

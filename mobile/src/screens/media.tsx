@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 
 import type { AppAftermovie, AppPublication } from '../api/contract';
+import { mediaUrl } from '../api/client';
 import { fetchMedia } from '../api/endpoints';
 import { messageFor, useResource } from '../api/useResource';
 import { AlbumFeature, AlbumTile } from '../components/AlbumCard';
@@ -174,10 +175,11 @@ function Aftermovies({ movies }: { movies: AppAftermovie[] }) {
             <View style={styles.poster}>
               {item.posterUrl ? (
                 <Image
-                  source={{ uri: item.posterUrl }}
+                  source={{ uri: mediaUrl(item.posterUrl) as string }}
                   style={StyleSheet.absoluteFill}
                   contentFit="cover"
                   transition={200}
+                  cachePolicy="memory-disk"
                 />
               ) : null}
               <View style={styles.play}>
@@ -274,12 +276,14 @@ function MagazineCover({
     <View style={[styles.paper, style]}>
       {publication.coverUrl ? (
         <Image
-          source={{ uri: publication.coverUrl }}
+          source={{ uri: mediaUrl(publication.coverUrl) as string }}
           style={styles.coverImage}
           contentFit="cover"
           contentPosition="top"
           transition={200}
           recyclingKey={publication.id}
+          // Een kaft verandert nooit; eens binnen hoeft ze niet opnieuw.
+          cachePolicy="memory-disk"
         />
       ) : (
         <View style={[styles.blank, compact && styles.blankCompact]}>
