@@ -3,7 +3,7 @@ import "server-only";
 import { prisma } from "@vtk/db";
 // Rechtstreeks uit @prisma/client, niet via @vtk/db: dat package exporteert
 // bewust enkel `prisma` (zie AGENTS.md).
-import type { TicketEventStatus, TicketGrantRole } from "@prisma/client";
+import type { Prisma, TicketEventStatus, TicketGrantRole } from "@prisma/client";
 import { currentWorkingYear, hasPermission, type SessionPayload } from "@vtk/auth";
 import { getAuthorizationPreview, requireSession } from "@/lib/session";
 import { hasLivePermission } from "@/lib/livePermissions";
@@ -235,6 +235,31 @@ export async function requireTicketEventCapability(
  */
 export async function listScannableTicketEvents() {
   const session = await requireSession();
+  return prisma.ticketEvent.findMany({
+    where: await scannableTicketEventsWhere(session),
+    orderBy: { startsAt: "asc" },
+    select: { id: true, titleNl: true, titleEn: true, startsAt: true, location: true },
+  });
+}
+
+/**
+ * Of deze gebruiker nu iets te scannen heeft: de scanknop in de app.
+ *
+ * Dezelfde regel en hetzelfde venster als de lijst hierboven, zodat de knop er
+ * precies staat wanneer die lijst niet leeg is. Een gewone student ziet hem dus
+ * niet, tot een organisator hem uitnodigt; dan wel, tot twaalf uur na dat event.
+ */
+export async function hasScannableTicketEvent(session: SessionPayload): Promise<boolean> {
+  const event = await prisma.ticketEvent.findFirst({
+    where: await scannableTicketEventsWhere(session),
+    select: { id: true },
+  });
+  return event !== null;
+}
+
+async function scannableTicketEventsWhere(
+  session: SessionPayload,
+): Promise<Prisma.TicketEventWhereInput> {
   const now = new Date();
   const hidden: TicketEventStatus[] = ["DRAFT", "CANCELLED", "ARCHIVED"];
   const window = {
@@ -244,13 +269,7 @@ export async function listScannableTicketEvents() {
     status: { notIn: hidden },
   };
 
-  if (hasPermission(session, "tickets.manageAll")) {
-    return prisma.ticketEvent.findMany({
-      where: window,
-      orderBy: { startsAt: "asc" },
-      select: { id: true, titleNl: true, titleEn: true, startsAt: true, location: true },
-    });
-  }
+  if (hasPermission(session, "tickets.manageAll")) return window;
 
   const preview = await getAuthorizationPreview();
   const allGroupIds = session.groups.map((group) => group.id);
@@ -261,32 +280,28 @@ export async function listScannableTicketEvents() {
   const scanRoles: TicketGrantRole[] = ["OWNER", "MANAGER", "SCANNER"];
   const openScanning = openScanningWhere(session);
 
-  return prisma.ticketEvent.findMany({
-    where: {
-      ...window,
-      OR: [
-        // De standaardregel; `null` betekent niets toevoegen, want een lege
-        // voorwaarde zou hier net alles doorlaten.
-        ...(openScanning ? [openScanning] : []),
-        ...(preview
-          ? []
-          : [{ userGrants: { some: { userId: session.user.id, role: { in: scanRoles } } } }]),
-        {
-          groupGrants: {
-            some: {
-              role: { in: scanRoles },
-              OR: [
-                { scope: "ALL_MEMBERS" as const, groupId: { in: allGroupIds } },
-                { scope: "LEADS_ONLY" as const, groupId: { in: leadGroupIds } },
-              ],
-            },
+  return {
+    ...window,
+    OR: [
+      // De standaardregel; `null` betekent niets toevoegen, want een lege
+      // voorwaarde zou hier net alles doorlaten.
+      ...(openScanning ? [openScanning] : []),
+      ...(preview
+        ? []
+        : [{ userGrants: { some: { userId: session.user.id, role: { in: scanRoles } } } }]),
+      {
+        groupGrants: {
+          some: {
+            role: { in: scanRoles },
+            OR: [
+              { scope: "ALL_MEMBERS" as const, groupId: { in: allGroupIds } },
+              { scope: "LEADS_ONLY" as const, groupId: { in: leadGroupIds } },
+            ],
           },
         },
-      ],
-    },
-    orderBy: { startsAt: "asc" },
-    select: { id: true, titleNl: true, titleEn: true, startsAt: true, location: true },
-  });
+      },
+    ],
+  };
 }
 
 /**

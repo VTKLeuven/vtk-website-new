@@ -140,6 +140,11 @@ Expliciet, zodat het niet later alsnog binnensluipt:
   > installeren. `vtk-scanner-app` blijft wat ze is (offline manifest,
   > schrijfwachtrij, donker scherm, aan een deur in een kelder); wat hier
   > bijkwam is de lichte versie voor één avond met het netwerk dat er is.
+  >
+  > **Bijgesteld in november 2026.** Die lichte versie is vervangen door de
+  > volledige scanner, en vtk-scanner-app is opgegaan in deze app. Eén app is
+  > makkelijker uit te leggen aan wie komt helpen, en de scanknop staat er enkel
+  > voor wie iets te scannen heeft. Zie `docs/scanner.md`.
 - **geen offline-wachtrij.** De scanner heeft SQLite en een flush-lus omdat een
   deur in een kelder staat. Hier volstaat een leescache op schijf: laatst
   opgehaalde inhoud tonen met een "niet vernieuwd"-melding. Iets bestellen of
@@ -571,12 +576,16 @@ via `/push/maintenance` (claim gezet, tweede beurt doet niets).
 | 2026-08-25 | `Samen blokken` | Studietijd meten, blokgroepen met een code, de skyline. |
 | 2026-08-25 | `App: elke tab een eigen stack, zodat terugvegen werkt` | Schermen naar `src/screens/`, routes gemaakt uit `TAB_ROUTES`, `useTabRouter`, `routes:check`, oude adressen in `app/(oud)`. |
 | 2026-08-25 | `App: elke tab draagt nu alles wat je er kan openen` | Studeren opgenomen in dezelfde stackopsplitsing (zesde tab, `studiegroep/*`); `routes:check` loopt sindsdien elke tab af en eist dat wat een scherm opent ook in diezelfde tab bestaat. |
+| 2026-11-18 | `feat(app): de scanner aan de deur zit in de app` | De volledige scanner van vtk-scanner-app (offline, wachtrij, namen, kaartlezer, scannerspaneel) als volledig scherm, Aan de deur als keuzescherm, `scanTickets` volgt echte scanrechten. Drie native modules erbij, dus een nieuwe APK. |
 
 **Drie afwijkingen van het oorspronkelijke plan.**
 
 - **A7 zei "geen scanner".** De app scant nu wel. De reden staat bij A7 zelf: een
-  shifter die één avond komt bijspringen, installeert geen tweede app.
-  `vtk-scanner-app` blijft bestaan en blijft de zware versie.
+  shifter die één avond komt bijspringen, installeert geen tweede app. In
+  november 2026 ging dat een stap verder: de volledige scanner van
+  vtk-scanner-app (offline manifest, wachtrij, namenlijst, kaartlezer,
+  scannerspaneel) zit nu in de app, enkel zichtbaar voor wie iets te scannen
+  heeft, en die repo staat als archief. Zie `docs/scanner.md`.
 - **De aftermovies en de partners blijven op de site** en komen niet elders in de
   app terug. Ze zijn er om een voorpagina te vullen, en dat doet Home niet meer.
 - **De fakbar-QR verloopt niet.** Dat is met opzet: hij hangt maanden aan een

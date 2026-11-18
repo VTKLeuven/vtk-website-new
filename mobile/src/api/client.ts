@@ -28,8 +28,8 @@ import { APP_ERROR, type AppErrorBody } from './contract';
  * Loopt het ooit tóch mis, dan zet `EXPO_PUBLIC_USE_RN_FETCH=1` de oude `fetch`
  * terug.
  *
- * Zelfde bestand als in vtk-scanner-app, op de app-API-paden na. Bewust een
- * kopie: twee losse repo's delen hier geen pakket voor.
+ * De scanner aan de deur (`src/api/scanner.ts`) gebruikt deze laag ook; dit
+ * bestand begon als kopie van die van de vroegere vtk-scanner-app.
  */
 
 const BASE_URL_KEY = 'base-url';

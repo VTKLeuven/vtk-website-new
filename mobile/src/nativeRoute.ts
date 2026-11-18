@@ -29,7 +29,7 @@ const NATIVE_ROUTES: Record<string, string> = {
   '/fotos': '/media',
   // De webscanner. Wie de app heeft, hoort niet in een browser te belanden voor
   // iets waar hier een scherm voor bestaat.
-  '/scan': '/scannen',
+  '/scan': '/deur',
 };
 
 /**

@@ -7917,6 +7917,38 @@ of de koper hangen.
 deelnemer in, met zijn naam in het scanlogboek. Dat is geen testmodus en het
 paneel zegt dat er ook bij; terugdraaien doe je in de scanner zelf.
 
+### De scanner zit in de VTK-app, enkel voor wie iets te scannen heeft
+
+Tot november 2026 was de native scanner een aparte app (vtk-scanner-app), naast
+een lichte scanner in de VTK-app. Nu zit de volledige scanner in de VTK-app, met
+het offline manifest, de wachtrij, de namenlijst, de kaartlezer en het
+scannerspaneel. Eén app is makkelijker uit te leggen aan wie komt helpen: een
+shifter die één avond aan de deur staat, installeert geen tweede app.
+
+**Enkel wie iets te scannen heeft, ziet hem.** De scanknop in Tickets en de regel
+Aan de deur onder Meer volgen `abilities.scanTickets`, en dat is precies "is
+de lijst van events die je mag scannen niet leeg". Een gewone student ziet de
+scanner dus niet. Daarvoor zijn geen nieuwe rechten nodig, want wie mag scannen
+stond al vast (de standaardregel en de toekenningen hierboven).
+
+**Een gewone student die komt shiften, komt erbij met de uitnodigings-QR.** Die
+scant hij onder Meer, Code scannen; dat scherm staat voor iedereen open, want ook
+de fakbar-QR wordt daar gescand. Vanaf dan ziet hij de scanner en dat ene event,
+tot twaalf uur na afloop. Wie als scanner toegevoegd werd, krijgt op de dag zelf
+ook een taak op Home ("Aan de deur: ..."); een praesidiumlid dat enkel door de
+standaardregel kan scannen niet, anders kreeg het elke avond een kaart voor een
+deur waar het niet staat.
+
+**Bewust niet:** een shift koppelen aan een ticketevent, zodat wie zich voor die
+shift inschrijft vanzelf scanrechten krijgt. Dat was een voorstel, maar inschrijven
+op een shift staat open voor elke student, en scanrechten tonen de namen van alle
+deelnemers. De uitnodigings-QR legt die beslissing bij wie aan de deur staat.
+
+**Het manifest blijft niet liggen.** Het draagt de naam van elke deelnemer en
+staat nu op veel meer telefoons dan de scanners van vroeger. De app wist het na
+twee dagen en bij het uitloggen; de wachtrij met nog niet verstuurde scans blijft
+wel staan. Zie `mobile/docs/scanner.md`.
+
 ---
 
 ## Wanneer de app een pushbericht stuurt

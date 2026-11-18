@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getCurrentSession } from "@/lib/session";
+import { hasScannableTicketEvent } from "@/lib/ticketing/authorization";
 import type { AppAbilities } from "./contract";
 
 /**
@@ -14,8 +15,11 @@ import type { AppAbilities } from "./contract";
  * Scannen staat er bewust **niet** in als "heeft de permissie `tickets.manageAll`":
  * de standaardregel (`TicketEvent.openScanning`) geeft elk praesidiumlid
  * scanrechten, en een losse `SCANNER`-grant doet hetzelfde voor wie komt
- * bijspringen. Of er echt iets te scannen valt, hangt dus aan de events zelf en
- * niet aan een permissie; `/api/app/v1/scan/events` geeft die lijst.
+ * bijspringen. Of er echt iets te scannen valt, hangt dus aan de events zelf, en
+ * `scanTickets` volgt precies de lijst van `/api/app/v1/scan/events`: is die
+ * leeg, dan is er geen knop. Een gewone student ziet de scanner aan de deur dus
+ * niet. Wie komt shiften, scant onder Meer de uitnodigings-QR; de app haalt dit
+ * daarna opnieuw op en dan staat de knop er wel.
  */
 export async function appAbilities(): Promise<AppAbilities | null> {
   const session = await getCurrentSession();
@@ -25,10 +29,7 @@ export async function appAbilities(): Promise<AppAbilities | null> {
     session.user.isSuperAdmin || session.permissions.includes(permission as never);
 
   return {
-    // Wie in een post zit, kan door de standaardregel sowieso iets scannen; wie
-    // dat niet is, kan een uitnodiging krijgen en dan alsnog. De knop mag dus
-    // voor elk ingelogd lid bestaan, want een lege lijst legt zichzelf uit.
-    scanTickets: true,
+    scanTickets: await hasScannableTicketEvent(session),
     acceptVouchers: has("shift.rewardRedeem"),
     theokotPickup: has("theokot.pickup"),
   };

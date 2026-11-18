@@ -5,8 +5,9 @@
  * vtk-website-new. **Wijzigt daar een kleur, dan wijzigt ze hier mee**; dit
  * bestand staat daarom in de "Gekopieerd uit"-tabel in AGENTS.md.
  *
- * De site is bewust light mode ("cool paper"). De scanner-app is dark, en dat is
- * de uitzondering: die staat in het donker aan een deur. Deze app volgt de site.
+ * De site is bewust light mode ("cool paper"), en deze app volgt de site. Eén
+ * scherm is de uitzondering: de scanner aan de deur (`SCANNER` onderaan), die in
+ * het donker op armlengte gebruikt wordt.
  */
 
 export const COLORS = {
@@ -84,3 +85,64 @@ export const TYPE = {
   /** Bovenschriftje in kapitalen, zoals `.vtk-page-kicker`. */
   kicker: { fontFamily: FONTS.semibold, fontSize: 11, letterSpacing: 1.2 },
 } as const;
+
+/**
+ * Het scherm aan de deur (`src/screens/scan/[eventId].tsx`) en zijn panelen.
+ *
+ * Het enige donkere scherm van de app, en dat is geen stijlkeuze: de scanner
+ * staat aan een deur, in het donker, op armlengte, en een wit scherm verblindt
+ * wie erop kijkt en wie ervoor staat. Het palet is dat van de webscanner, uit
+ * `apps/web/app/design/vtk-tickets.css` (`.scanner-*`); **wijzigt daar een
+ * kleur, dan wijzigt ze hier mee**. Eén accent (het VTK-geel) en vier
+ * oordeelkleuren.
+ */
+export const SCANNER = {
+  shell: '#111318',
+  header: '#171a20',
+  field: '#20242b',
+  videoWell: '#090a0d',
+  line: 'rgba(255,255,255,.10)',
+  scrim: 'rgba(0,0,0,.55)',
+
+  text: '#f7f7f4',
+  textMuted: '#a7adba',
+  accent: '#ffd23f',
+  accentInk: '#111318',
+
+  accepted: '#0d784c',
+  duplicate: '#a66800',
+  reversed: '#304c8c',
+  rejected: '#ab1f39',
+
+  onlineBg: 'rgba(39,190,125,.13)',
+  onlineInk: '#6be0a7',
+  offlineBg: 'rgba(239,81,100,.15)',
+  offlineInk: '#ff8493',
+  // Bewust niet alarmrood: offline scannen is een werkende toestand, geen fout.
+  offlineBanner: '#74520d',
+  conflictBanner: '#5c1524',
+
+  countAccepted: '#63d59c',
+  countDuplicate: '#ffd23f',
+  countRejected: '#ff788b',
+  countReversed: '#a9c4ff',
+} as const;
+
+/**
+ * Het palet van `TicketType.color`, uit `apps/web/app/design/vtk-ticket-colors.css`
+ * met de keys uit `apps/web/lib/ticketing/ticketColors.ts`. Bij een aanvaard ticket vult deze
+ * kleur het hele camerabeeld, zodat een tapper van drie meter ziet welk ticket
+ * het is.
+ */
+export const TICKET_COLORS = {
+  navy: '#0e1a36',
+  blue: '#17558f',
+  amber: '#96590a',
+  violet: '#5b3699',
+  green: '#16663f',
+  rose: '#a32259',
+  slate: '#4a5468',
+} as const;
+
+/** Minimale aanraakoppervlakte aan de deur; dit wordt met handschoenen aan bediend. */
+export const HIT_TARGET = 48;

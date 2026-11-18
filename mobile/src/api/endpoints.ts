@@ -33,7 +33,6 @@ import type {
   AppTheokotUpdateInput,
   AppTicketEvent,
   AppTicketEventDetail,
-  AppTicketScanResult,
   AppToday,
   AppVoucherRedeemInput,
   AppVoucherRedeemResult,
@@ -321,27 +320,6 @@ export function fetchScanEvents(locale: AppLocale): Promise<AppScanEvent[]> {
 
 export function redeemScannerInvite(code: string): Promise<AppScannerInviteResult> {
   return apiFetch(appApi('/scan/uitnodiging'), { method: 'POST', body: { code } });
-}
-
-/**
- * Een ticket scannen gaat naar de bestaande route van de webscanner en niet naar
- * `/app/v1`. Dezelfde reden als bij afrekenen en bij inschrijven op een shift:
- * die route draagt de hele beoordeling (geldig, al gescand, verkeerd evenement,
- * terugbetaald) plus het scanlogboek, en een wrapper zou daar niets doen dan
- * doorgeven of, erger, de helft vergeten.
- *
- * `clientScanId` maakt de aanroep idempotent: dezelfde id twee keer sturen geeft
- * hetzelfde antwoord in plaats van een tweede scan. Dat is precies wat je wil
- * wanneer het netwerk aan een deur wegvalt en de app opnieuw probeert.
- */
-export function scanTicket(
-  eventId: string,
-  input: { credential: string; clientScanId: string; deviceId: string; clientScannedAt: string },
-): Promise<AppTicketScanResult> {
-  return apiFetch(`/api/tickets/events/${encodeURIComponent(eventId)}/scan`, {
-    method: 'POST',
-    body: input,
-  });
 }
 
 // ── Fakbar ──────────────────────────────────────────────────────────────────

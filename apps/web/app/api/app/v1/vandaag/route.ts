@@ -267,7 +267,7 @@ async function tasksFor(
     });
   }
 
-  const [theokotOrders, openSessions, tickets, shifts, piano, polls] = await Promise.all([
+  const [theokotOrders, openSessions, tickets, shifts, doors, piano, polls] = await Promise.all([
     prisma.theokotOrder.findMany({
       where: {
         userId,
@@ -318,6 +318,26 @@ async function tasksFor(
       },
       orderBy: { shift: { startTime: "asc" } },
     }),
+    // De deur waar je vandaag staat. Enkel een expliciete `SCANNER`-toekenning,
+    // dus wie via de uitnodigings-QR of het scannerspaneel toegevoegd werd: een
+    // praesidiumlid kan door de standaardregel bijna elk event scannen, en die
+    // kreeg anders elke avond een kaart voor een deur waar hij niet staat.
+    prisma.ticketEventUserGrant.findMany({
+      where: {
+        userId,
+        role: "SCANNER",
+        event: {
+          endsAt: { gte: now },
+          startsAt: { lte: horizon },
+          archivedAt: null,
+          status: { notIn: ["DRAFT", "CANCELLED", "ARCHIVED"] },
+        },
+      },
+      select: {
+        event: { select: { id: true, titleNl: true, startsAt: true, location: true } },
+      },
+      orderBy: { event: { startsAt: "asc" } },
+    }),
     prisma.pianoReservation.findMany({
       where: { userId, startsAt: { gte: now, lte: horizon } },
       orderBy: { startsAt: "asc" },
@@ -366,6 +386,20 @@ async function tasksFor(
       actionLabel: null,
       highlight: shift.shift.startTime <= new Date(now.getTime() + 2 * 60 * 60 * 1000),
       at: shift.shift.startTime.toISOString(),
+    });
+  }
+
+  for (const door of doors) {
+    tasks.push({
+      kind: "scan",
+      title: `Aan de deur: ${door.event.titleNl}`,
+      detail: door.event.location
+        ? `${timeFormat.format(door.event.startsAt)}, ${door.event.location}`
+        : timeFormat.format(door.event.startsAt),
+      path: `/scan/${door.event.id}`,
+      actionLabel: "Scannen",
+      highlight: door.event.startsAt <= new Date(now.getTime() + 2 * 60 * 60 * 1000),
+      at: door.event.startsAt.toISOString(),
     });
   }
 

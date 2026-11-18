@@ -69,6 +69,10 @@ export default function MeerScreen() {
     { label: "Foto's", onPress: () => router.push('/media') },
     { label: 'Piano', onPress: () => router.push('/piano') },
     ...(viewer ? [{ label: 'Code scannen', onPress: () => router.push('/scannen') }] : []),
+    // Enkel voor wie iets te scannen heeft; de rest heeft hier niets aan.
+    ...(bootstrap?.abilities?.scanTickets
+      ? [{ label: 'Aan de deur', onPress: () => router.push('/deur') }]
+      : []),
   ];
   const mensen: Link[] = [
     { label: 'Praesidium', onPress: () => router.push('/praesidium') },

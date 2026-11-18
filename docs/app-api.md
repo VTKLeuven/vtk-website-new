@@ -6,8 +6,10 @@ alles wat er voor de app aan deze site toegevoegd is (endpoints, migraties,
 rechten, wat er nog moet gebeuren), zie [`app-toevoegingen.md`](./app-toevoegingen.md).
 Het plan van de app zelf staat in `mobile/docs/plan.md`.
 
-Niet te verwarren met de scanner: `vtk-scanner-app` praat met `/api/tickets/...`
-en staat hier los van.
+De scanner aan de deur zit sinds november 2026 in de app (`mobile/docs/scanner.md`),
+maar praat voor het scannen zelf met `/api/tickets/...`, de routes van de
+webscanner, en niet met deze boom. Enkel de lijst van events en het inwisselen van
+een uitnodiging staan hier.
 
 ## Waarom een eigen boom
 
@@ -87,6 +89,11 @@ beveiliging** (elke route controleert het daarna nog eens zelf); zonder dit zou 
 app knoppen tonen die bij de helft "geen toegang" antwoorden, en dat is erger dan
 een knop die er niet is.
 
+`scanTickets` volgt precies `/scan/events`: is die lijst leeg, dan is het `false`
+(`hasScannableTicketEvent` in `lib/ticketing/authorization.ts`, met hetzelfde
+filter als de lijst). Een gewone student ziet de scanner aan de deur dus niet,
+tot hij een uitnodiging inwisselt; de app haalt de bootstrap daarna opnieuw op.
+
 ### `GET /api/app/v1/vandaag`
 
 Het beginscherm van de app. Bewust een eigen route naast `/home`: die laatste is
@@ -114,6 +121,11 @@ bovenhaalt: **wat is er open** en **wat wacht er op mij**.
   Een peiling van je RiVers waarop je nog niet antwoordde, is ook een taak
   (`kind: "poll"`), maar enkel met `?peilingen=1`: een oudere app kent het scherm
   `/peilingen` niet en zou een kaart krijgen die nergens heen leidt.
+  Wie als scanner toegevoegd is (een `SCANNER`-toekenning op zijn naam) op een
+  event dat binnen 24 uur begint of al loopt, krijgt `kind: "scan"` met het pad
+  `/scan/<id>`. Bewust niet voor de standaardregel: dan kreeg elk praesidiumlid
+  elke avond een kaart voor een deur waar hij niet staat. Dat pad bestaat ook in
+  een oudere app, en een onbekende `kind` krijgt daar het standaardicoon.
 - `vouchers`: het openstaande bonnetjessaldo, of `null` zonder login.
 - `upcomingEvents`: ook een reeks die al loopt (een loopweek die maandag begon),
   op de plaats van haar eerstvolgende moment.
@@ -245,9 +257,11 @@ van een telefoon. Eén soort code die overal werkt is makkelijker uit te leggen 
 wie hem aan de deur moet tonen, en er is maar één plek waar een grant ontstaat.
 De app mag ook de volledige URL doorsturen; dat is wat een camera leest.
 
-**Scannen zelf loopt niet langs `/app/v1`.** De app post naar
-`/api/tickets/events/[eventId]/scan`, want die route draagt de hele beoordeling
-(geldig, al gescand, verkeerd evenement, terugbetaald) plus het scanlogboek.
+**Scannen zelf loopt niet langs `/app/v1`.** De scanner in de app gebruikt de
+routes van de webscanner (`scanner/bootstrap`, `scan`, `scan/batch`, `scan/card`,
+`scan/reverse` en het scannerspaneel), want die dragen de hele beoordeling
+(geldig, al gescand, verkeerd evenement, terugbetaald) plus het scanlogboek. Zie
+`mobile/docs/scanner.md`.
 
 ### `POST /api/app/v1/fakbar/checkin`
 

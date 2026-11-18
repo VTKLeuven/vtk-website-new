@@ -4,6 +4,7 @@ import {
   MessageSquareText,
   Music,
   Sandwich,
+  ScanLine,
   TicketCheck,
   TriangleAlert,
   Wrench,
@@ -34,6 +35,7 @@ const ICONS: Record<AppTodayTask['kind'], React.ComponentType<{ color: string; s
   shift: Wrench,
   piano: Music,
   poll: MessageSquareText,
+  scan: ScanLine,
 };
 
 export function TaskCard({ task }: { task: AppTodayTask }) {

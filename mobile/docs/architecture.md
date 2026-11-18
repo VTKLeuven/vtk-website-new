@@ -74,10 +74,13 @@ overgangsschermen per tab, geen vierde categorie.
 - **een leescache**: de laatste uitkomst per scherm, zodat de app niet als een
   leeg vak opent op een trage verbinding.
 
-Er staat **geen wachtrij** in, anders dan bij vtk-scanner-app. Die scanner staat
-aan een deur in een kelder en moet offline door kunnen; deze app niet. Iets
-bestellen of kopen vraagt netwerk, en dat is eerlijker dan een bestelling die
-"gelukt" lijkt en pas uren later ergens aankomt.
+Er staat **geen wachtrij** in. Iets bestellen of kopen vraagt netwerk, en dat is
+eerlijker dan een bestelling die "gelukt" lijkt en pas uren later ergens aankomt.
+
+De enige uitzondering is de **scanner aan de deur**: die staat in een kelder of
+een tent en moet offline door kunnen scannen. Zijn manifest en wachtrij staan in
+een eigen databank (`src/scanner/storage.ts`), los van de leescache, zodat die
+leegmaken nooit een scan meeneemt. Zie `docs/scanner.md`.
 
 Wat uit de cache komt, wordt ook zo getoond (`StaleNotice`). Verzwijgen dat je
 oude inhoud toont is erger dan een leeg scherm: iemand plant er zijn avond mee.

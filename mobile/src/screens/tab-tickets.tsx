@@ -48,9 +48,10 @@ type Tab = 'kopen' | 'mijne';
  * je aan elke deur. Wie niet ingelogd is, ziet wel de verkoop, want zijn eigen
  * tickets zijn dan enkel een aanmeldscherm.
  *
- * De scanknop staat er ook, maar enkel voor wie mag scannen. Zo hoeft een shifter
- * die komt bijspringen niets te installeren: hij scant de uitnodigings-QR die een
- * praesidiumlid toont en kan meteen aan de deur staan.
+ * De scanknop staat er ook, maar enkel voor wie iets te scannen heeft
+ * (`abilities.scanTickets`): een gewone student ziet hem niet. Wie komt shiften,
+ * scant onder Meer de uitnodigings-QR die de organisator toont, en heeft vanaf
+ * dan deze knop en dat event onder Aan de deur.
  */
 export default function TicketsScreen() {
   const router = useTabRouter();
@@ -89,8 +90,8 @@ export default function TicketsScreen() {
           bootstrap?.abilities?.scanTickets ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Tickets scannen"
-              onPress={() => router.push('/scannen')}
+              accessibilityLabel="Tickets scannen aan de deur"
+              onPress={() => router.push('/deur')}
               hitSlop={10}
             >
               <ScanLine color={COLORS.yellow} size={22} />

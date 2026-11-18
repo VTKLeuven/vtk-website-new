@@ -167,7 +167,8 @@ heb je een echte build nodig.
 niet installeren, en Expo's uitweg daarvoor (`eas go`, een eigen Expo Go op
 TestFlight) vraagt net het Developer-account dat er niet is. Publiceert Expo een
 nieuwe SDK, dan kan geen enkele iPhone-tester de app nog openen tot wij mee zijn.
-Upgrade dan meteen, en in één beurt met vtk-scanner-app en vtk-floorplan-app:
+Upgrade dan meteen, en in één beurt met vtk-floorplan-app (de scanner zit sinds
+november 2026 in deze app):
 `npx expo install expo@^<versie> --fix` per SDK, één versie tegelijk, en daarna
 `npx expo-doctor@latest` en `npm run app:check`.
 

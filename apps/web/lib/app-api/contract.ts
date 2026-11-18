@@ -1088,7 +1088,11 @@ export type AppTodayTask = {
     | "ticket"
     | "shift"
     | "piano"
-    | "poll";
+    | "poll"
+    // Je staat vandaag aan de deur: een expliciete `SCANNER`-toekenning op een
+    // event dat binnenkort begint of al loopt. Een oudere app kent dit niet en
+    // tekent dan het standaardicoon; het pad (`/scan/<id>`) bestaat daar ook.
+    | "scan";
   title: string;
   detail: string | null;
   /** Een route in de app (`/broodjes`), nooit een URL. */

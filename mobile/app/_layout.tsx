@@ -15,13 +15,13 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppProvider } from '../src/state/app';
-import { COLORS } from '../src/theme/tokens';
+import { COLORS, SCANNER } from '../src/theme/tokens';
 
 void SplashScreen.preventAutoHideAsync();
 
 /**
- * De wortel. Elke route staat hier expliciet in de `<Stack>`, zoals in
- * vtk-scanner-app; zo is in één blik te zien welke schermen er zijn.
+ * De wortel. Elke route staat hier expliciet in de `<Stack>`; zo is in één blik
+ * te zien welke schermen er zijn.
  */
 export default function RootLayout() {
   const router = useRouter();
@@ -77,11 +77,22 @@ export default function RootLayout() {
                 enkel door, zodat een ouder pushbericht of een link van buitenaf
                 nog steeds op het juiste scherm uitkomt. Zie src/navigation.ts. */}
             <Stack.Screen name="(oud)" />
-            {/* Enkel deze drie liggen bewust óver de tabbalk: het zijn modals, en
-                een modal die de navigatie eronder laat staan is geen modal. */}
+            {/* Enkel deze liggen bewust óver de tabbalk: het zijn modals, en een
+                modal die de navigatie eronder laat staan is geen modal. */}
             <Stack.Screen name="inloggen" options={{ presentation: 'modal' }} />
             <Stack.Screen name="poort" options={{ presentation: 'modal' }} />
             <Stack.Screen name="instellingen" options={{ presentation: 'modal' }} />
+            {/* De scanner aan de deur: het hele scherm, en niet weg te vegen. Een
+                veeg naar beneden terwijl er een rij voor je staat, mag de camera
+                niet sluiten; dat doet het kruis bovenaan. */}
+            <Stack.Screen
+              name="scan/[eventId]"
+              options={{
+                presentation: 'fullScreenModal',
+                gestureEnabled: false,
+                contentStyle: { backgroundColor: SCANNER.shell },
+              }}
+            />
           </Stack>
         </AppProvider>
       </SafeAreaProvider>

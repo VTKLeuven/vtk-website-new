@@ -45,7 +45,7 @@ export const TAB_ROUTES = {
     'mijn-tickets',
     'bonnetjes',
     'scannen',
-    'scan/[eventId]',
+    'deur',
     'meldingen',
     'shiften',
     'media',
@@ -58,7 +58,7 @@ export const TAB_ROUTES = {
   ],
   kalender: ['evenement/[id]', 'ticket/[slug]', 'mijn-tickets', 'meldingen'],
   studeren: ['studiegroep/[id]', 'studiegroep/nieuw', 'lokalen'],
-  tickets: ['ticket/[slug]', 'mijn-tickets', 'scannen', 'scan/[eventId]'],
+  tickets: ['ticket/[slug]', 'mijn-tickets', 'scannen', 'deur'],
   meer: [
     'zoeken',
     'lokalen',
@@ -75,7 +75,7 @@ export const TAB_ROUTES = {
     'bonnetjes',
     'meldingen',
     'scannen',
-    'scan/[eventId]',
+    'deur',
     'categorie/[slug]',
     'pagina/[slug]',
     'evenement/[id]',
@@ -138,9 +138,9 @@ function tabFor(segments: string[], current: TabName): TabName | null {
  * Zet een adres om naar het adres binnen de juiste tab.
  *
  * Wat er **niet** verandert: de modals aan de wortel (`/inloggen`,
- * `/instellingen`, `/poort`) en een adres dat al een tab noemt. Die eerste horen
- * bewust buiten de tabs: ze schuiven over de app heen in plaats van erin, en
- * teruggaan is ze wegvegen naar beneden.
+ * `/instellingen`, `/poort`, en de scanner op `/scan/<id>`) en een adres dat al
+ * een tab noemt. Die eerste horen bewust buiten de tabs: ze schuiven over de app
+ * heen in plaats van erin.
  */
 export function resolveTabHref(path: string, current: TabName): string {
   if (!path.startsWith('/')) return path;
