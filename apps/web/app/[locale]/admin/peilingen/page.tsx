@@ -31,7 +31,10 @@ export default async function AdminPeilingen({ params }: { params: Promise<{ loc
   // pas op wanneer ze opengeklapt wordt (zie PocChannelsCard).
   const pocsQuery =
     scope === "all" && discordGuildConfigured()
-      ? prisma.poc.findMany({ orderBy: { order: "asc" }, select: { id: true, nameNl: true, discordChannelId: true } })
+      ? prisma.poc.findMany({
+          orderBy: { order: "asc" },
+          select: { id: true, nameNl: true, discordChannelId: true, _count: { select: { discordRoles: true } } },
+        })
       : Promise.resolve([]);
   const pollsQuery = prisma.pocPoll.findMany({
     where: scope === "all" ? {} : { pocId: { in: scope } },
@@ -121,7 +124,13 @@ export default async function AdminPeilingen({ params }: { params: Promise<{ loc
         <PocChannelsCard
           nl={nl}
           preview={(await getAuthorizationPreview()) !== null}
-          pocs={pocs.map((poc) => ({ id: poc.id, name: poc.nameNl.replace(/^POC\s+/i, ""), channelId: poc.discordChannelId ?? "" }))}
+          rolesHref={`${base}/admin/pocs`}
+          pocs={pocs.map((poc) => ({
+            id: poc.id,
+            name: poc.nameNl.replace(/^POC\s+/i, ""),
+            channelId: poc.discordChannelId ?? "",
+            hasRole: poc._count.discordRoles > 0,
+          }))}
         />
       ) : null}
     </div>

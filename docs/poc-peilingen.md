@@ -116,6 +116,11 @@ richting en RiVers. Na hoogstens een minuut verschijnt ze, door de gedeelde cach
 - **De worker ziet niet wie de server verliet en terugkwam.** Volgens `discordRoleIds`
   heeft dat lid de rol nog. Daarom herstelt een klik op het koppelbericht de rollen op
   basis van wat Discord meestuurt.
+- **Een kanaal kiezen geeft nog niemand toegang.** Het kanaal (bij Peilingen) zegt
+  enkel waar de peilingen komen; wie erin mag, bepaalt de rol (bij POC's). Een POC met
+  een kanaal en zonder rol stond er ingesteld uit, terwijl de bot elke student "nog
+  geen kanaal" antwoordde. De kaart bij Peilingen toont daarom per POC of er een rol
+  is, en de bot zegt in dat geval dat de rol ontbreekt.
 - **Rollen geven dat mislukt, staat op `/admin/pocs`.** Bijna altijd staat de rol van
   de bot onder een POC-rol, of ontbreekt Manage Roles.
 - **De open peilingen staan een minuut in de gedeelde cache** (`getCachedOpenPocPolls`).
