@@ -156,6 +156,8 @@ export type Dossier = {
    * zolang dat er niet is, het budget) min de regel Begroting. Positief is
    * beter dan begroot. Null zonder begroting in het blad. Een potje staat in
    * één blad, dus elke activiteit telt apart (zie docs/design-decisions.md).
+   * Komt een potje na zijn resultaat terug met dezelfde naam, dan telt enkel
+   * het meest recente blad.
    */
   begrotingDevCents: number | null;
   /**
@@ -538,8 +540,16 @@ export function buildOverview(
   for (const items of groups.values()) {
     const budgetItems = items.filter((c) => c.view.kind === "BUDGET").sort(byMeeting);
     const resultItems = items.filter((c) => c.view.kind === "RESULT").sort(byMeeting);
-    const lastBudget = budgetItems.at(-1);
     const lastResult = resultItems.at(-1);
+    // Een potje komt terug: na het resultaat passeert een nieuw budget met
+    // dezelfde naam. Dan telt enkel het meest recente blad, en wacht dat budget
+    // op zijn eigen resultaat (zie docs/design-decisions.md). Een budget voor
+    // een BO die nog moet komen, is nog niet goedgekeurd en verandert niets.
+    const resultTime = lastResult?.view.meetingDate?.getTime();
+    const after = (c: Classified) => resultTime !== undefined && (c.view.meetingDate?.getTime() ?? -Infinity) > resultTime;
+    const nextRound = budgetItems.filter(after);
+    const reopenedAt = nextRound.find((c) => c.view.meetingDate && dayStart(c.view.meetingDate) <= todayStart)?.view.meetingDate ?? null;
+    const lastBudget = (reopenedAt ? nextRound : budgetItems.filter((c) => !after(c))).at(-1) ?? budgetItems.at(-1);
     // De posten en de naam komen uit het budget (dat kwam eerst); een resultaat
     // dat met de hand gekoppeld werd, volgt ze.
     const lead = budgetItems[0] ?? items[0];
@@ -560,17 +570,20 @@ export function buildOverview(
 
     const waiver = resultItems.find((c) => c.view.waiver)?.view.waiver ?? null;
     let status: DossierStatus;
-    if (resultItems.length > 0) status = budgetItems.length > 0 || waiver ? "DONE" : "NO_BUDGET";
+    if (reopenedAt) status = "OPEN";
+    else if (resultItems.length > 0) status = budgetItems.length > 0 || waiver ? "DONE" : "NO_BUDGET";
     // Een budget voor een BO die nog moet komen: dan wacht nog niemand op een resultaat.
     else status = date && dayStart(date) > todayStart ? "UPCOMING" : "OPEN";
 
     const budgetCents = lastBudget?.doc.budgetTotalCents ?? null;
-    const resultCents = lastResult?.doc.resultTotalCents ?? null;
-    const allocationCents = lastBudget?.doc.allocationCents ?? lastResult?.doc.allocationCents ?? null;
+    // Het resultaat van een vorige ronde hoort niet bij het nieuwe budget.
+    const roundResult = reopenedAt ? undefined : lastResult;
+    const resultCents = roundResult?.doc.resultTotalCents ?? null;
+    const allocationCents = lastBudget?.doc.allocationCents ?? roundResult?.doc.allocationCents ?? null;
     // Het resultaat is het meest accuraat; zolang het er niet is, het budget.
     const standCents = (status === "DONE" ? resultCents : null) ?? budgetCents;
-    const resultDate = lastResult?.view.meetingDate ?? null;
-    const resultLines = lastResult?.doc.lines ?? [];
+    const resultDate = roundResult?.view.meetingDate ?? null;
+    const resultLines = roundResult?.doc.lines ?? [];
     const lines = resultLines.length > 0 ? resultLines : (lastBudget?.doc.lines ?? []);
     const dates = items.map((c) => c.view.meetingDate?.getTime() ?? 0);
 
@@ -592,9 +605,9 @@ export function buildOverview(
         resultCents,
         allocationCents,
         devCents: status === "DONE" && budgetItems.length > 0 && budgetCents !== null && resultCents !== null ? resultCents - budgetCents : null,
-        vtkSharePercent: (lastResult ?? lastBudget)?.doc.vtkSharePercent ?? null,
+        vtkSharePercent: (roundResult ?? lastBudget)?.doc.vtkSharePercent ?? null,
         lagDays: resultDate && date && budgetItems.length > 0 ? Math.max(0, days(date, resultDate)) : null,
-        overdueDays: status === "OPEN" && date ? Math.max(0, days(date, today)) : null,
+        overdueDays: status === "OPEN" && (reopenedAt ?? date) ? Math.max(0, days((reopenedAt ?? date)!, today)) : null,
         begrotingDevCents: allocationCents !== null && standCents !== null ? standCents - allocationCents : null,
         begrotingExcluded: items.find((c) => c.doc.begrotingExcluded)?.doc.begrotingExcluded ?? null,
         overAllocation: budgetCents !== null && allocationCents !== null && budgetCents < allocationCents,

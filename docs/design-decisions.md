@@ -12504,6 +12504,14 @@ post en bovenaan voor Totaal, VTK en Werkgroepen. Plus is beter dan begroot.
   één begrotingslijn) hoort in één blad; een post die het over vier bladen
   verdeelt met telkens de hele begroting erin, doet het verkeerd, en dat
   corrigeert het overzicht niet.
+- **Komt een potje terug met dezelfde naam, dan telt enkel het meest recente
+  blad.** Een potje als IT Nieuw Materiaal (begroting -500) kan na zijn
+  resultaat opnieuw een budget krijgen. Dat blad is dezelfde activiteit en
+  draagt de stand van het hele potje, dus tellen we het niet naast het oude
+  resultaat. Zodra de BO van dat nieuwe budget voorbij is, staat de activiteit
+  weer open, wacht ze op een eigen resultaat, en rekent "open sinds" vanaf die
+  BO; het oude resultaat blijft bij de bestanden staan. Een nieuw budget voor
+  een BO die nog moet komen, verandert niets, net zoals elders.
 - Op een telefoon wijkt de kolom Missend (budgetten min resultaten), zodat de
   naam van de post plaats houdt.
 - **Een activiteit kan buiten de begroting staan en toch meetellen.** Sommige

@@ -24,6 +24,16 @@ import { normalizeKey } from "./names";
  * daarvoor als xlsx geëxporteerd (`downloadSpreadsheet`).
  */
 
+/**
+ * De versie van deze lezer. Een blad wordt enkel opnieuw gedownload wanneer het
+ * in Drive wijzigt, of wanneer dit getal hoger is dan dat waarmee het gelezen
+ * werd (`BoDocument.figuresVersion`). **Verhoog het bij elke wijziging die een
+ * bedrag anders leest**: anders blijft elk blad dat niemand nog aanraakt, op de
+ * oude bedragen staan. Zo bleef IT Nieuw Materiaal na de fix voor een
+ * kostenpost "Totaal" een week op +233 staan in plaats van -233.
+ */
+export const FIGURES_VERSION = 1;
+
 /** Eén regel uit het blok Overzicht: een inkomsten- of kostenpost. */
 export type BoLine = {
   label: string;

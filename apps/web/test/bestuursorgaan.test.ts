@@ -334,6 +334,24 @@ describe("bedragen uit het rekenblad", () => {
     expect(result.figures.resultIncomeCents).toBe(16930);
   });
 
+  it("leest een kostenpost die Totaal heet niet als het totaal van het blad", async () => {
+    // IT Nieuw Materiaal (26-27): onder Inkomsten een post "Totaal" met de
+    // kosten als plus, het echte Totaal onder Uitgaven als min.
+    const rows: XCell[][] = Array.from({ length: 30 }, () => row({}));
+    rows[0] = row({ 1: t("IT"), 6: t("Nieuw IT Materiaal") });
+    rows[3] = row({ 1: t("Overzicht"), 3: t("Budget"), 4: t("Resultaat") });
+    rows[8] = row({ 1: t("Inkomsten"), 3: n(0), 4: n(0) });
+    rows[9] = row({ 1: t("Totaal"), 3: n(234.15), 4: n(233.23) });
+    rows[15] = row({ 1: t("Uitgaven"), 3: n(234.15), 4: n(233.23) });
+    rows[17] = row({ 1: t("Totaal"), 3: n(-234.15), 4: n(-233.23) });
+    rows[18] = row({ 1: t("Begroting"), 3: n(-500), 4: n(-500) });
+    rows[19] = row({ 1: t("Verschil met begroting"), 3: n(265.85), 4: n(266.77) });
+    const result = figuresFromXlsx(await workbook([{ sheet: "BUDGET - overzicht", data: rows }]));
+    if (!("figures" in result)) throw new Error(result.error);
+    expect(result.figures).toMatchObject({ budgetTotalCents: -23415, resultTotalCents: -23323, allocationCents: -50000 });
+    expect(result.figures.lines).toEqual([{ label: "Totaal", side: "out", budgetCents: 23415, resultCents: 23323 }]);
+  });
+
   it("neemt het tabblad met het overzicht, ook als er een ander voor staat", async () => {
     const prices = [row({ 1: t("Prijzen") }), row({ 1: t("Bier"), 2: n(1.2) })];
     const result = figuresFromXlsx(
@@ -721,6 +739,40 @@ describe("budgetten en resultaten samenleggen", () => {
     );
     expect(overview.posts.map((p) => p.name)).toEqual(["Cultuur"]);
     expect(overview.posts[0].dossiers[0]).toMatchObject({ overridden: true });
+  });
+
+  it("telt bij een potje dat terugkomt enkel het meest recente blad", () => {
+    const pot = (later: number) =>
+      buildOverview(
+        [
+          doc("26-27_Budget_IT_Nieuw_Materiaal", { bo: 4, budgetTotalCents: -23415, allocationCents: -50000 }),
+          doc("26-27_Resultaat_IT_Nieuw_Materiaal", { bo: 9, budgetTotalCents: -23415, resultTotalCents: -23323, allocationCents: -50000 }),
+          doc("26-27_Budget_IT_Nieuw_Materiaal", { bo: later, budgetTotalCents: -12000, allocationCents: -26677 }),
+        ],
+        POSTS,
+        new Map(),
+        2026,
+        TODAY,
+      ).posts.flatMap((p) => p.dossiers);
+
+    // Het nieuwe budget passeerde (12 september): één activiteit, die weer op
+    // een resultaat wacht, en enkel het nieuwe blad telt in de begroting.
+    const reopened = pot(12);
+    expect(reopened).toHaveLength(1);
+    expect(reopened[0]).toMatchObject({
+      status: "OPEN",
+      budgetCents: -12000,
+      resultCents: null,
+      devCents: null,
+      allocationCents: -26677,
+      begrotingDevCents: 14677,
+      overdueDays: 33,
+    });
+    expect(statsOf(reopened)).toMatchObject({ begrotingDev: 14677, begrotingCounted: 1, open: 1, done: 0 });
+
+    // Het nieuwe budget komt pas op een BO in oktober: het resultaat blijft gelden.
+    const upcoming = pot(50);
+    expect(upcoming[0]).toMatchObject({ status: "DONE", budgetCents: -23415, resultCents: -23323, devCents: 92, begrotingDevCents: 26677 });
   });
 
   it("rondt een resultaat af dat versneld door de grocomeet ging, zonder afwijking", () => {

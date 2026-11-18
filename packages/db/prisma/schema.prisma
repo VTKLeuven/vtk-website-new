@@ -9864,6 +9864,9 @@ model BoDocument {
   /// De `driveModifiedAt` waarvoor de bedragen gelezen werden. Gelijk aan de
   /// huidige: het bestand hoeft niet opnieuw gedownload te worden.
   figuresReadFor     DateTime? @db.Timestamptz(3)
+  /// `FIGURES_VERSION` uit `lib/bo/figures.ts` waarmee de bedragen gelezen
+  /// werden. Lager dan de huidige: opnieuw lezen, ook al wijzigde het blad niet.
+  figuresVersion     Int       @default(0)
 
   /// Een resultaat dat Groep 5 met de hand bij een budget zette, omdat de
   /// namen te ver uiteenlopen om vanzelf te koppelen.

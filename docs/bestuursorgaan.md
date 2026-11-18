@@ -90,7 +90,8 @@ een post zelf ziet" onderaan.
 4. **De bedragen**, enkel bij een Google Sheet of een xlsx. Een Sheet wordt als
    xlsx geëxporteerd, zodat één lezer (`lib/praesidiumShifts/xlsx.ts`) beide
    leest, met de laatst berekende waarde van elke formule. Een ongewijzigd
-   bestand (zelfde `modifiedTime`) wordt niet opnieuw gedownload.
+   bestand (zelfde `modifiedTime`), gelezen door de huidige versie van de lezer
+   (`FIGURES_VERSION`), wordt niet opnieuw gedownload.
 
 De BO van een bestand is **de map in de hoofdboom waarlangs het gevonden werd**,
 niet de map waar het echt staat: de map van een werkgroep heet `BO 7 - 4/10`
@@ -307,6 +308,13 @@ begroting".
   "openen" in plaats van een bedrag; de bedragen komen terug zodra iemand het in
   Sheets of Excel opent en bewaart, want dan wijzigt het en leest de scan het
   opnieuw.
+- **Een fix aan de lezer bereikt een blad dat niet meer wijzigt niet vanzelf.**
+  De scan downloadt enkel opnieuw wat in Drive wijzigde. De fix voor een
+  kostenpost die "Totaal" heet (IT Nieuw Materiaal, 26-27) stond zo een week
+  in de code terwijl het scherm nog +233 toonde in plaats van -233, en IT
+  daardoor +748 tegenover de begroting. Verhoog daarom `FIGURES_VERSION` in
+  `lib/bo/figures.ts` bij elke wijziging die een bedrag anders leest; de
+  volgende scan leest dan elk blad opnieuw (`BoDocument.figuresVersion`).
 - **De bedragen zijn netto.** Totaal is inkomsten min uitgaven, dus een kost is
   negatief. "Stand" is resultaat min budget: positief is beter dan gepland.
 - **Eén onmogelijke waarde hield de hele scan tegen.** Een cel "5/3/20026" werd
