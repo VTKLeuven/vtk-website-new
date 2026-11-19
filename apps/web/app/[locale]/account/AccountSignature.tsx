@@ -432,7 +432,7 @@ export function AccountSignature({
         </p>
         <div className="rounded-xl border border-vtk-blue/15 bg-white p-5 shadow-xs overflow-x-auto">
           {/* De renderable table die exact de Twig styles repliceert */}
-          <div ref={previewRef} inert className="inline-block min-w-max select-all">
+          <div ref={previewRef} className="inline-block min-w-max select-all">
             <table style={{ borderCollapse: 'collapse', color: '#1f2449' }}>
               <tbody>
                 <tr>
@@ -444,7 +444,7 @@ export function AccountSignature({
                       paddingRight: '12px',
                     }}
                   >
-                    <a href="https://www.vtk.be" target="_blank" rel="noreferrer">
+                    <a href="https://www.vtk.be" target="_blank" rel="noreferrer" tabIndex={-1}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         width="auto"
@@ -515,6 +515,7 @@ export function AccountSignature({
                               href={DEFAULT_MAPS_URL}
                               target="_blank"
                               rel="noreferrer"
+                              tabIndex={-1}
                               style={{
                                 textDecoration: 'underline',
                                 color: '#1f2449',
@@ -540,6 +541,7 @@ export function AccountSignature({
                             <a
                               id="emailVTK"
                               href={`mailto:${emailAddress}`}
+                              tabIndex={-1}
                               style={{
                                 textTransform: 'lowercase',
                                 textDecoration: 'underline',
@@ -567,6 +569,7 @@ export function AccountSignature({
                               <a
                                 id="phoneNumberVTK"
                                 href={`tel:${phoneClean}`}
+                                tabIndex={-1}
                                 style={{
                                   textDecoration: 'underline',
                                   color: '#1f2449',
@@ -594,6 +597,7 @@ export function AccountSignature({
                               href="https://www.vtk.be"
                               target="_blank"
                               rel="noreferrer"
+                              tabIndex={-1}
                               style={{
                                 textDecoration: 'underline',
                                 color: '#1f2449',

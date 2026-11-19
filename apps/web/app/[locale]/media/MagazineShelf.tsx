@@ -320,6 +320,10 @@ function PdfDocumentViewer({ issue, labels }: { issue: MagazineIssue; labels: La
         textLayerDiv.replaceChildren();
 
         renderTask = page.render({ canvasContext: context, viewport });
+        await renderTask.promise;
+        if (disposed) return;
+
+        let hasText = false;
         const nextTextLayer = new pdfjs.TextLayer({
           textContentSource: page.streamTextContent(),
           container: textLayerDiv,
@@ -327,9 +331,18 @@ function PdfDocumentViewer({ issue, labels }: { issue: MagazineIssue; labels: La
         });
         textLayer = nextTextLayer;
 
-        await Promise.all([renderTask.promise, nextTextLayer.render()]);
+        try {
+          await nextTextLayer.render();
+          if (!disposed) {
+            hasText = nextTextLayer.textContentItemsStr.some((item) => item.trim().length > 0);
+          }
+        } catch {
+          if (disposed) return;
+          /* leave hasTextLayer false if text extraction fails */
+          textLayerDiv.replaceChildren();
+        }
+
         if (!disposed) {
-          const hasText = nextTextLayer.textContentItemsStr.some((item) => item.trim().length > 0);
           setHasTextLayer(hasText);
           setStatus('ready');
         }

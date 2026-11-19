@@ -136,7 +136,7 @@ export function generateSignatureHtml(data: SignatureData): string {
                         A:
                         <a href="${DEFAULT_MAPS_URL}"
                            target="_blank"
-                           style="text-decoration: none; color: #1f2449; font-family: 'Century Gothic', Verdana, Arial , sans-serif; font-size: 7pt;">
+                           style="text-decoration: underline; color: #1f2449; font-family: 'Century Gothic', Verdana, Arial , sans-serif; font-size: 7pt;">
                             Studentenwijk Arenberg 6/1, 3001 Heverlee</a>
                     </td>
                 </tr>
@@ -145,7 +145,7 @@ export function generateSignatureHtml(data: SignatureData): string {
                         E:
                         <a id="emailVTK"
                            href="mailto:${email}"
-                           style="text-transform: lowercase; text-decoration: none; color: #1f2449; font-family: 'Century Gothic', Verdana, Arial , sans-serif; font-size: 7pt;">
+                           style="text-transform: lowercase; text-decoration: underline; color: #1f2449; font-family: 'Century Gothic', Verdana, Arial , sans-serif; font-size: 7pt;">
                             ${email}
                         </a>
                     </td>
@@ -154,7 +154,7 @@ export function generateSignatureHtml(data: SignatureData): string {
                     <td colspan="2" style="font-family: 'Century Gothic', Verdana, Arial , sans-serif; font-size: 7pt;">
                         M:
                         <a id="phoneNumberVTK" href="tel:${phoneTel}"
-                           style="text-decoration: none; color:#1f2449; font-family: 'Century Gothic', Verdana, Arial , sans-serif; font-size: 7pt;">
+                           style="text-decoration: underline; color:#1f2449; font-family: 'Century Gothic', Verdana, Arial , sans-serif; font-size: 7pt;">
                             ${phone}
                         </a>
                     </td>
@@ -163,7 +163,7 @@ export function generateSignatureHtml(data: SignatureData): string {
                     <td colspan="2" style="font-family: 'Century Gothic', Verdana, Arial , sans-serif; font-size: 7pt;">
                         W:
                         <a href="${siteUrl}"
-                           style="text-decoration: none; color:#1f2449; font-family: 'Century Gothic', Verdana, Arial , sans-serif; font-size: 7pt;">
+                           style="text-decoration: underline; color:#1f2449; font-family: 'Century Gothic', Verdana, Arial , sans-serif; font-size: 7pt;">
                             www.vtk.be
                         </a>
                     </td>
