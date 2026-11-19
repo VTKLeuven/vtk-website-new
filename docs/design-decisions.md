@@ -1010,6 +1010,17 @@ hoeveel bestellingen eraan hangen.
 
 ---
 
+### Het uitdeelscherm: een werkblad, geen paginakop
+
+Het uitdeelscherm van een bureau of GM (`MeetingHandoutScreen.tsx`, de knop
+"Volledig scherm" op de pagina van een vergadering) toont iedereen met zijn
+broodje op één scherm. Eerst had het de navy kop met de gele streep van een
+publieke paginakop; in november 2026 vond IT dat te zwaar voor wat een lijst
+op een tv is. Het is nu in de stijl van de admin: een witte vlakte, een
+lichte kopregel boven een haarlijn met de soort, de datum en het aantal
+mensen, en een omrande knop Sluiten. De naam blijft het nadrukkelijkst, het
+broodje staat er rustiger onder. Zet er geen navy band of gele streep terug.
+
 ## Statistieken van het VTK Bureau
 
 Onderwijs wil zien wat een mail, een story of een affiche doet voor de
@@ -2776,6 +2787,13 @@ boom die niemand overziet.
     de zijne. In een formulier wordt ze enkel voorgesteld, zodat "Geen" kiezen
     mogelijk blijft.
   - Een subcategorie kiest zelf; die van de hoofdcategorie loopt niet door.
+  - **Omgekeerd volgt de categorie de werkgroep** (november 2026). Een lijst
+    die een werkgroep zelf aanmaakt (`mechanix.g4@vtk.be`), of een adres dat
+    een werkgroep als eigenaar krijgt, komt zonder gekozen categorie meteen in
+    die van haar werkgroep. Eerst stond ze onderaan bij "Zonder categorie" en
+    moest iemand van IT ze er met de hand in zetten. Heeft de werkgroep twee
+    categorieën, dan wint de subcategorie (Werkgroepen › Mechanix), en bij twee
+    de oudste. Een gekozen categorie blijft altijd staan.
 - Alfabetisch, zonder handmatige volgorde, zoals de rollen.
 - De automatische soorten (posten, jaargroepen, POC's) blijven als kleine chips
   naast de opruimfilters. "Met de hand" is weg: dat was elke overgenomen groep
@@ -12599,6 +12617,32 @@ post en bovenaan voor Totaal, VTK en Werkgroepen. Plus is beter dan begroot.
   minst wegneemt. Welke er buiten staan, staat onder Instellingen en onder
   "Resultaten per post", met de reden; terugzetten kan daar en in het detail,
   zodra het blad klopt.
+
+## Bestuursorgaan: potjes
+
+Een potje is een deelbudget waaruit een post door het jaar koopt
+(shiftersvoorzieningen, nieuw materiaal). In november 2026 vroeg Groep 5 om ze
+te kunnen aanduiden, omdat ze in het overzicht scheef liepen: een potje bleef
+"Open" staan terwijl er nog geen resultaat hoort, en een tussentijds resultaat
+van een paar tientjes telde in de stand tegenover de begroting als een
+activiteit die honderden euro beter deed dan begroot.
+
+- **Twee manieren**: de knop "Potje" in het detail van een activiteit
+  (`BoDocument.potAt`, voor al haar bestanden, terug te zetten met dezelfde
+  knop), of de naam: `26-27_Deelbudget_POST_ACTIVITEIT` (en `Deelresultaat`).
+  Die naamgeving stelde Groep 5 zelf voor; een potje door zijn naam heeft
+  geen knop, de naam beslist.
+- **Een potje wacht niet op een resultaat.** Het heeft een eigen stand,
+  "Potje", en telt niet bij open of afgerond (dus ook niet in het percentage
+  of de herinnering op het dashboard). Het blijft wel in het overzicht van de
+  post staan, met een tussentijds resultaat erbij als dat er is.
+- **In de stand tegenover de begroting telt het begrote bedrag**, niet het
+  budget en niet een tussentijds resultaat: zolang een potje loopt, zegt dat
+  niets over wat er tegen het eind van het jaar nog uit gaat. Zo staat een
+  potje op 0 tegenover de begroting, en telt het mee in "over hoeveel
+  budgetten". Een blad zonder regel Begroting telt, zoals elk blad, niet mee.
+- Een resultaat zonder budget wordt nooit een potje, ook niet als het
+  `Deelresultaat` heet: dat blijft iets om na te kijken.
 
 ## Bestuursorgaan: de verkenner
 

@@ -25,8 +25,9 @@ const MAX_COLUMNS = 10;
  * kolommen en de lettergrootte zodat de lijst het scherm vult; past het niet
  * meer leesbaar (een gsm met een groot bureau), dan scrolt ze gewoon.
  *
- * De kop is één dunne regel en de totalen staan er niet: die staan al op de
- * pagina eronder, bij "Uit te delen".
+ * De kop is één lichte regel in de stijl van de admin (geen navy band, geen
+ * gele streep: het is een werkblad, geen paginakop), met enkel het aantal
+ * mensen; de totalen staan al op de pagina eronder, bij "Uit te delen".
  *
  * Het opent over de hele pagina (een portal naar `body`, dus buiten de
  * admin-css) en de knop die het opent, vraagt zelf de Fullscreen API aan: dat
@@ -105,10 +106,17 @@ export default function MeetingHandoutScreen({
           <span className="mh-kicker">{meeting.kind === "BUREAU" ? "VTK Bureau" : "Grocomeet"}</span>
           <span className="mh-date">{meeting.dateLabel}</span>
         </h2>
-        <button type="button" className="mh-close" onClick={onClose} title={nl ? "Sluiten (Esc)" : "Close (Esc)"}>
-          <CloseIcon />
-          <span>{nl ? "Sluiten" : "Close"}</span>
-        </button>
+        <div className="mh-actions">
+          {entries.length > 0 && (
+            <span className="mh-count">
+              {entries.length} {nl ? (entries.length === 1 ? "persoon" : "personen") : entries.length === 1 ? "person" : "people"}
+            </span>
+          )}
+          <button type="button" className="mh-close" onClick={onClose} title={nl ? "Sluiten (Esc)" : "Close (Esc)"}>
+            <CloseIcon />
+            <span>{nl ? "Sluiten" : "Close"}</span>
+          </button>
+        </div>
       </header>
 
       <main ref={bodyRef} className="mh-body">

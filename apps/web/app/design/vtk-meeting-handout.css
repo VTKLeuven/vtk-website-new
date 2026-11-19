@@ -20,7 +20,7 @@
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  background: var(--paper);
+  background: var(--surface);
   color: var(--ink);
   font-family: var(--sans);
   font-variant-numeric: tabular-nums;
@@ -32,33 +32,35 @@
   box-sizing: border-box;
 }
 
-/* Kop: één dunne navy regel met de gele streep, zoals elke paginakop. */
+/* Kop: één lichte regel boven een haarlijn, zoals de kop van een beheerscherm.
+   Geen navy band en geen gele streep: dit is een werkblad, geen paginaopener,
+   en de namen eronder moeten de aandacht krijgen. */
 .mh-head {
   display: flex;
   flex: none;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 6px clamp(12px, 1.5vw, 20px);
-  background: var(--navy);
-  border-bottom: 3px solid var(--yellow);
-  color: var(--paper);
+  padding: 10px clamp(14px, 2.4vw, 40px);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
 }
 
 .mh-title {
   display: flex;
   min-width: 0;
   align-items: baseline;
-  gap: 10px;
+  gap: 12px;
   margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.2;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 .mh-kicker {
   flex: none;
-  color: var(--on-dark-muted);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -75,28 +77,43 @@
   text-transform: uppercase;
 }
 
+.mh-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 14px;
+}
+
+.mh-count {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
 .mh-close {
   display: inline-flex;
   flex: none;
   align-items: center;
   gap: 6px;
-  min-height: 28px;
+  min-height: 30px;
   padding: 0 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--line-2);
   border-radius: 999px;
-  background: transparent;
-  color: var(--on-dark-muted);
+  background: var(--surface);
+  color: var(--ink);
   font: inherit;
   font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
+  transition: background-color 0.15s ease;
 }
 
 .mh-close:hover {
-  color: var(--paper);
+  background: var(--paper);
 }
 
 .mh-close:focus-visible {
-  outline: 2px solid var(--yellow);
+  outline: 2px solid var(--navy);
   outline-offset: 2px;
 }
 
@@ -138,9 +155,19 @@
 
 .mh-list > li {
   min-width: 0;
-  padding: 0.38em 0;
+  padding: 0.42em 0;
   border-top: 1px solid var(--line);
   break-inside: avoid;
+}
+
+/* De naam is waarop je jezelf zoekt; wat je krijgt, staat er rustiger onder. */
+.mh-list > li > :first-child {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.mh-list > li > :not(:first-child) {
+  font-size: 0.9em;
 }
 
 /* In de fit-stand breekt een woord nooit midden in ("Mozarell / a"): een te
@@ -157,6 +184,10 @@
 }
 
 @media (max-width: 640px) {
+  .mh-count {
+    display: none;
+  }
+
   .mh-close span {
     position: absolute;
     width: 1px;
