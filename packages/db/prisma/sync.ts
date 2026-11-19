@@ -28,6 +28,7 @@
  *   --prune     verwijder Permission-rijen die niet meer in de registry staan
  *               (cascade: hun RolePermission-toewijzingen gaan mee)
  */
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -132,6 +133,101 @@ async function syncAdminRolePermissions() {
     if (!dryRun) {
       await prisma.rolePermission.create({
         data: { roleId: adminRole.id, permissionId: perm.id },
+      });
+    }
+  }
+}
+
+/**
+ * Zorgt dat de bestaande `praesidium`-rol op productie en dev `mcp.use` krijgt,
+ * ook wanneer de create-only seed al lang geleden gedraaid is.
+ */
+async function syncPraesidiumMcpPermission() {
+  console.log("Praesidium-rol (mcp.use)...");
+  const praesidiumRole = await prisma.role.findUnique({
+    where: { code: "praesidium" },
+    include: { permissions: { include: { permission: { select: { code: true } } } } },
+  });
+  if (!praesidiumRole) {
+    warn("rol \"praesidium\" bestaat niet; sla mcp.use-sync over");
+    return;
+  }
+
+  const hasMcpUse = praesidiumRole.permissions.some((rp) => rp.permission.code === "mcp.use");
+  if (hasMcpUse) return;
+
+  const perm = await prisma.permission.findUnique({ where: { code: "mcp.use" } });
+  if (!perm) {
+    warn("permissie \"mcp.use\" ontbreekt in de DB; sla praesidium-sync over");
+    return;
+  }
+
+  note('+ praesidium krijgt "mcp.use"');
+  if (!dryRun) {
+    await prisma.rolePermission.create({
+      data: { roleId: praesidiumRole.id, permissionId: perm.id },
+    });
+  }
+}
+
+const MCP_RESOURCE_ALLOWED_SCOPES = ["mcp:read", "mcp:create", "offline_access"];
+
+function resolveMcpResourceUrl(): string | null {
+  const raw = process.env.BETTER_AUTH_URL ?? process.env.VTK_MAIN_URL;
+  if (!raw) return null;
+  try {
+    return `${new URL(raw).origin}/api/mcp`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * RFC 8707 protected resource voor `/api/mcp`. `@better-auth/oauth-provider`
+ * controleert `resource` tegen `oauthResource` en koppelt nieuwe DCR-clients via
+ * `oauthClientResource`.
+ */
+async function syncMcpOauthResource() {
+  console.log("MCP OAuth resource (oauthResource)...");
+  const identifier = resolveMcpResourceUrl();
+  if (!identifier) {
+    warn("BETTER_AUTH_URL/VTK_MAIN_URL ontbreekt of is ongeldig; oauthResource voor /api/mcp niet gesynct.");
+    return;
+  }
+
+  const existing = await prisma.oauthResource.findUnique({
+    where: { identifier },
+    select: { id: true, allowedScopes: true, disabled: true },
+  });
+  if (!existing) {
+    note(`+ oauthResource "${identifier}"`);
+    if (!dryRun) {
+      const now = new Date();
+      await prisma.oauthResource.create({
+        data: {
+          id: randomUUID(),
+          identifier,
+          name: "VTK MCP Server",
+          allowedScopes: MCP_RESOURCE_ALLOWED_SCOPES,
+          disabled: false,
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+    }
+    return;
+  }
+
+  const missingScopes = MCP_RESOURCE_ALLOWED_SCOPES.filter(
+    (scope) => !existing.allowedScopes.includes(scope),
+  );
+  if (missingScopes.length > 0 || existing.disabled) {
+    const mergedScopes = [...new Set([...existing.allowedScopes, ...MCP_RESOURCE_ALLOWED_SCOPES])];
+    note(`~ oauthResource "${identifier}" bijgewerkt`);
+    if (!dryRun) {
+      await prisma.oauthResource.update({
+        where: { id: existing.id },
+        data: { allowedScopes: mergedScopes, disabled: false, updatedAt: new Date() },
       });
     }
   }
@@ -285,6 +381,8 @@ async function main() {
 
   await syncPermissions();
   await syncAdminRolePermissions();
+  await syncPraesidiumMcpPermission();
+  await syncMcpOauthResource();
   await syncBuildings();
   await reportGuiManagedDrift();
 

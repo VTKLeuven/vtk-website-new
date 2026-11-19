@@ -8,7 +8,7 @@ import { hasPermission as rootHasPermission } from '../index';
 
 // Rollen bundelen permissies; hieruit halen we de codes (en het rol-id zelf,
 // voor checks die aan een specifieke rol hangen zoals paginabewerking).
-type RoleWithPerms = { id: string; permissions: { permission: { code: string } }[] };
+type RoleWithPerms = { id: string; code?: string; permissions: { permission: { code: string } }[] };
 
 /**
  * De join die "welke rechten heeft dit lid" beantwoordt: rechtstreeks
@@ -69,6 +69,44 @@ export function deriveAuthz(user: UserWithGrants, addRole: (role: RoleWithPerms)
       addRole(grant.role);
     }
   }
+}
+
+export type McpUserAuthz = {
+  id: string;
+  name: string;
+  active: boolean;
+  isSuperAdmin: boolean;
+  hasMcpUse: boolean;
+  permissions: string[];
+  groupCodes: string[];
+  roleCodes: string[];
+};
+
+export async function resolveMcpUserAuthz(userId: string): Promise<McpUserAuthz | null> {
+  const year = currentWorkingYear();
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: userGrantsInclude(year),
+  });
+  if (!user || !user.active) return null;
+
+  const permissions = new Set<string>();
+  const roleCodes = new Set<string>();
+  deriveAuthz(user, (role) => {
+    if (role.code) roleCodes.add(role.code);
+    for (const rp of role.permissions) permissions.add(rp.permission.code);
+  });
+
+  return {
+    id: user.id,
+    name: user.name,
+    active: user.active,
+    isSuperAdmin: user.isSuperAdmin,
+    hasMcpUse: user.isSuperAdmin || permissions.has('mcp.use'),
+    permissions: [...permissions],
+    groupCodes: user.memberships.map((m) => m.group.code),
+    roleCodes: [...roleCodes],
+  };
 }
 
 export async function getSession(headers: Headers): Promise<SessionPayload | null> {

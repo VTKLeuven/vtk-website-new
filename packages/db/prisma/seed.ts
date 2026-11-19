@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { hash } from "@node-rs/argon2";
 import { PrismaClient } from "@prisma/client";
 import { GROUP_SEEDS, WERKGROEP_SEEDS, HEADER_TABS } from "../src/groups";
@@ -315,6 +316,8 @@ async function main() {
     // verdelen blijft bij de rol admin (IT en Groep 5).
     "tasks.view",
     "tasks.manageOwn",
+    // AI-assistenten koppelen via MCP (OAuth 2.1 op /api/mcp).
+    "mcp.use",
   ]);
   for (const g of GROUP_SEEDS) {
     await grantRoleToGroup(g.code, praesidiumRole.id, "DEFAULT");
@@ -1893,6 +1896,24 @@ async function main() {
   // genoeg inzendingen om een indeling te zien. Create-only op de slug.
   console.log("Seeding group maker demo...");
   await seedGroupMakerDemo(prisma);
+
+  console.log("Seeding MCP OAuth resource...");
+  const mcpBaseUrl = readSeedEnv(process.env.BETTER_AUTH_URL) ?? readSeedEnv(process.env.VTK_MAIN_URL) ?? "http://localhost:3000";
+  const mcpIdentifier = `${new URL(mcpBaseUrl).origin}/api/mcp`;
+  const now = new Date();
+  await prisma.oauthResource.upsert({
+    where: { identifier: mcpIdentifier },
+    update: {},
+    create: {
+      id: randomUUID(),
+      identifier: mcpIdentifier,
+      name: "VTK MCP Server",
+      allowedScopes: ["mcp:read", "mcp:create", "offline_access"],
+      disabled: false,
+      createdAt: now,
+      updatedAt: now,
+    },
+  });
 
   console.log("Seed complete.");
 }

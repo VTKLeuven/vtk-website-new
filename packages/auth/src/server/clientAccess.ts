@@ -14,7 +14,10 @@ import 'server-only';
 
 import { prisma } from '@vtk/db';
 import { accessCodeFor } from '../lib/clientPermissionCodes';
+import { getMcpResourceUrl } from '../lib/mcpResource';
+import { isMcpScope } from '../lib/scopes';
 import { effectiveClientPermissions } from './clientPermissions';
+import { resolveMcpUserAuthz } from './session';
 
 export type ClientAccess = {
   allowed: boolean;
@@ -22,17 +25,38 @@ export type ClientAccess = {
   clientName: string | null;
 };
 
+export type ClientAccessContext = {
+  requestedScopes?: readonly string[];
+  requestedResource?: string | null;
+};
+
 /**
  * Een onbekende client geeft `allowed: false`. Dat is geen toegangsbeslissing:
  * de plugin weigert die aanvraag zelf al met `invalid_client`, en wij mogen hier
  * niet bevestigen of een client_id bestaat.
  */
-export async function checkClientAccess(userId: string, clientId: string): Promise<ClientAccess> {
+export async function checkClientAccess(
+  userId: string,
+  clientId: string,
+  context?: ClientAccessContext,
+): Promise<ClientAccess> {
   const client = await prisma.oauthClient.findUnique({
     where: { clientId },
-    select: { name: true, accessMode: true, permissionNamespace: true },
+    select: { name: true, accessMode: true, permissionNamespace: true, scopes: true },
   });
   if (!client) return { allowed: false, clientName: null };
+
+  const hasMcpScope = context?.requestedScopes?.some((scope) => isMcpScope(scope)) ?? false;
+  const mcpResourceUrl = getMcpResourceUrl();
+  const hasMcpResource = Boolean(mcpResourceUrl && context?.requestedResource === mcpResourceUrl);
+  const isMcpClient = client.scopes.some((scope) => isMcpScope(scope));
+
+  if (hasMcpScope || hasMcpResource || isMcpClient) {
+    const authz = await resolveMcpUserAuthz(userId);
+    if (!authz || !authz.hasMcpUse) {
+      return { allowed: false, clientName: client.name };
+    }
+  }
 
   if (client.accessMode === 'OPEN') return { allowed: true, clientName: client.name };
 

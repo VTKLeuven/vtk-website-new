@@ -204,6 +204,8 @@ export const PERMISSIONS = [
 
   // SSO / OAuth Authorization Server
   { code: "oauth.client.edit", labelNl: "OAuth-clients aanmaken en bewerken", labelEn: "Create and edit OAuth clients", category: "external" },
+  // MCP (AI-assistenten via OAuth)
+  { code: "mcp.use", labelNl: "AI-assistenten koppelen via MCP", labelEn: "Connect AI assistants via MCP", category: "external" },
 
   // Wachtwoordkluis (gedeelde wachtwoorden per post, in Vaultwarden).
   // Let op: wie de kluis mag binnenlogen staat NIET hier. Dat is een
