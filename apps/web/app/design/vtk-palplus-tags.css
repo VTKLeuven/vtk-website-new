@@ -5,6 +5,15 @@
 /* Tags                                                                        */
 /* -------------------------------------------------------------------------- */
 
+.pp-tags {
+  position: relative;
+}
+
+.pp-tags input[aria-disabled='true'] {
+  background: var(--paper-2);
+  cursor: not-allowed;
+}
+
 .pp-tags-presets,
 .pp-tags-chosen,
 .pp-tags-suggest {
@@ -44,8 +53,8 @@
 .pp-tags-chosen li {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 6px 4px 12px;
+  gap: 4px;
+  padding: 2px 4px 2px 12px;
   border-radius: 999px;
   background: var(--yellow);
   font-size: 13px;
@@ -57,8 +66,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  min-width: 28px;
+  min-height: 28px;
   border-radius: 999px;
   font-size: 15px;
   line-height: 1;
@@ -74,6 +83,7 @@
 }
 
 .pp-tags-suggest button {
+  min-height: 28px;
   padding: 3px 10px;
   border: 1px dashed var(--line-2);
   border-radius: 999px;
@@ -186,7 +196,11 @@
 }
 
 .pp-grid-cell {
-  height: 20px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
   border-left: 1px solid var(--line-2);
   border-right: 1px solid var(--line-2);
   border-bottom: 1px dashed var(--line);
@@ -211,9 +225,20 @@
 }
 
 .pp-grid-cell[data-on='true'] {
-  border-left-color: var(--yellow);
-  border-right-color: var(--yellow);
+  border-left-color: var(--ink);
+  border-right-color: var(--ink);
   background: var(--yellow);
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
+.pp-grid-cell[data-on='true']::after {
+  content: "";
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+  transform: translateY(-1px) rotate(-45deg);
+  pointer-events: none;
 }
 
 .pp-grid-cell[aria-disabled='true'] {
@@ -225,7 +250,7 @@
   position: relative;
   z-index: 1;
   outline: 2px solid var(--ink);
-  outline-offset: -1px;
+  outline-offset: 1px;
 }
 
 .pp-grid-summary {

@@ -53,44 +53,69 @@ export function RentalMonthGrid({
   /** Toegankelijk label voor de schermlezer op het aanraakvlak. */
   cellAriaLabel?: (cell: MonthGridCell) => string | undefined;
 }) {
+  const cells = monthCells(cursor);
+  const fullWeekdayFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", { weekday: "long" });
+  const monthFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
+    month: "long",
+    year: "numeric",
+  });
+  const weekdays = weekdayLabels(nl).map((short, index) => ({
+    short,
+    full: fullWeekdayFmt.format(cells[index]!),
+  }));
+  const weeks: Date[][] = [];
+  for (let i = 0; i < cells.length; i += 7) {
+    weeks.push(cells.slice(i, i + 7));
+  }
+
   return (
-    <div className="tv-month">
-      <div className="tv-month-head">
-        {weekdayLabels(nl).map((label) => (
-          <div key={label}>{label}</div>
+    <div className="tv-month" role="grid" aria-label={monthFmt.format(cursor)}>
+      <div className="tv-month-head" role="row">
+        {weekdays.map(({ short, full }) => (
+          <div key={short} role="columnheader">
+            <span aria-hidden="true">{short}</span>
+            <span className="sr-only">{full}</span>
+          </div>
         ))}
       </div>
       <div className="tv-month-body">
-        {monthCells(cursor).map((date) => {
-          const cell: MonthGridCell = {
-            key: dayKey(date),
-            date,
-            outside: date.getMonth() !== cursor.getMonth(),
-            today: dayKey(date) === todayKey,
-          };
-          return (
-            <div
-              key={cell.key}
-              className="tv-day"
-              data-outside={cell.outside}
-              data-today={cell.today}
-              data-state={cellState?.(cell)}
-              data-selected={selectedKey === cell.key}
-            >
-              {onSelectDate ? (
-                <button
-                  type="button"
-                  className="tv-cell-tap"
-                  onClick={() => onSelectDate(cell.key)}
-                  aria-pressed={selectedKey === cell.key}
-                  aria-label={cellAriaLabel?.(cell) ?? cell.key}
-                />
-              ) : null}
-              <span className="tv-daynum">{date.getDate()}</span>
-              {renderCell(cell)}
-            </div>
-          );
-        })}
+        {weeks.map((week) => (
+          <div key={dayKey(week[0]!)} className="tv-month-row" role="row">
+            {week.map((date) => {
+              const cell: MonthGridCell = {
+                key: dayKey(date),
+                date,
+                outside: date.getMonth() !== cursor.getMonth(),
+                today: dayKey(date) === todayKey,
+              };
+              return (
+                <div
+                  key={cell.key}
+                  role="gridcell"
+                  className="tv-day"
+                  data-outside={cell.outside}
+                  data-today={cell.today}
+                  data-state={cellState?.(cell)}
+                  data-selected={selectedKey === cell.key}
+                >
+                  {onSelectDate ? (
+                    <button
+                      type="button"
+                      className="tv-cell-tap"
+                      onClick={() => onSelectDate(cell.key)}
+                      aria-pressed={selectedKey === cell.key}
+                      aria-label={cellAriaLabel?.(cell) ?? cell.key}
+                    />
+                  ) : null}
+                  <span className="tv-daynum" aria-hidden={onSelectDate ? "true" : undefined}>
+                    {date.getDate()}
+                  </span>
+                  {renderCell(cell)}
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );

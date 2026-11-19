@@ -47,7 +47,7 @@ export default async function SsoMetadataPage({
   ];
 
   return (
-    <div className="vtk-page vtk-page-shell vtk-page-narrow space-y-6">
+    <div lang="en" className="vtk-page vtk-page-shell vtk-page-narrow space-y-6">
       <div>
         <div className="vtk-page-kicker">VTK · KU Leuven SSO</div>
         <h1 className="text-4xl font-semibold tracking-tight text-vtk-ink">

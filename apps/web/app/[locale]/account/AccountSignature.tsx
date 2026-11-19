@@ -352,7 +352,7 @@ export function AccountSignature({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-vtk-ink">{t.title}</h3>
+        <h2 className="text-lg font-semibold text-vtk-ink">{t.title}</h2>
         <p className="mt-1 text-sm text-[#5c667f]">{t.intro}</p>
       </div>
 
@@ -425,10 +425,12 @@ export function AccountSignature({
 
       {/* Live Voorbeeld weergave */}
       <div>
-        <Label className="mb-2 block">{t.previewTitle}</Label>
+        <p className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-vtk-muted">
+          {t.previewTitle}
+        </p>
         <div className="rounded-xl border border-vtk-blue/15 bg-white p-5 shadow-xs overflow-x-auto">
           {/* De renderable table die exact de Twig styles repliceert */}
-          <div ref={previewRef} className="inline-block min-w-max select-all">
+          <div ref={previewRef} inert className="inline-block min-w-max select-all">
             <table style={{ borderCollapse: 'collapse', color: '#1f2449' }}>
               <tbody>
                 <tr>
@@ -512,7 +514,7 @@ export function AccountSignature({
                               target="_blank"
                               rel="noreferrer"
                               style={{
-                                textDecoration: 'none',
+                                textDecoration: 'underline',
                                 color: '#1f2449',
                                 fontFamily: "'Century Gothic', Verdana, Arial, sans-serif",
                                 fontSize: '7pt',
@@ -538,7 +540,7 @@ export function AccountSignature({
                               href={`mailto:${emailAddress}`}
                               style={{
                                 textTransform: 'lowercase',
-                                textDecoration: 'none',
+                                textDecoration: 'underline',
                                 color: '#1f2449',
                                 fontFamily: "'Century Gothic', Verdana, Arial, sans-serif",
                                 fontSize: '7pt',
@@ -548,31 +550,33 @@ export function AccountSignature({
                             </a>
                           </td>
                         </tr>
-                        <tr>
-                          <td
-                            colSpan={2}
-                            style={{
-                              fontFamily: "'Century Gothic', Verdana, Arial, sans-serif",
-                              fontSize: '7pt',
-                              color: '#1f2449',
-                              paddingBottom: '2px',
-                            }}
-                          >
-                            M:{' '}
-                            <a
-                              id="phoneNumberVTK"
-                              href={`tel:${phoneClean}`}
+                        {phoneClean ? (
+                          <tr>
+                            <td
+                              colSpan={2}
                               style={{
-                                textDecoration: 'none',
-                                color: '#1f2449',
                                 fontFamily: "'Century Gothic', Verdana, Arial, sans-serif",
                                 fontSize: '7pt',
+                                color: '#1f2449',
+                                paddingBottom: '2px',
                               }}
                             >
-                              {phoneDisplay}
-                            </a>
-                          </td>
-                        </tr>
+                              M:{' '}
+                              <a
+                                id="phoneNumberVTK"
+                                href={`tel:${phoneClean}`}
+                                style={{
+                                  textDecoration: 'underline',
+                                  color: '#1f2449',
+                                  fontFamily: "'Century Gothic', Verdana, Arial, sans-serif",
+                                  fontSize: '7pt',
+                                }}
+                              >
+                                {phoneDisplay}
+                              </a>
+                            </td>
+                          </tr>
+                        ) : null}
                         <tr>
                           <td
                             colSpan={2}
@@ -589,7 +593,7 @@ export function AccountSignature({
                               target="_blank"
                               rel="noreferrer"
                               style={{
-                                textDecoration: 'none',
+                                textDecoration: 'underline',
                                 color: '#1f2449',
                                 fontFamily: "'Century Gothic', Verdana, Arial, sans-serif",
                                 fontSize: '7pt',
@@ -654,8 +658,10 @@ export function AccountSignature({
 
         <button
           type="button"
+          aria-expanded={showHowTo}
+          aria-controls="sig-howto-panel"
           onClick={() => setShowHowTo((v) => !v)}
-          className="text-xs text-vtk-blue hover:underline focus:outline-hidden"
+          className="inline-flex min-h-8 cursor-pointer items-center rounded-md px-2 py-1 text-xs font-medium text-vtk-blue underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink"
         >
           {showHowTo ? (locale === 'nl' ? 'Instructies verbergen' : 'Hide instructions') : t.howToTitle}
         </button>
@@ -663,8 +669,11 @@ export function AccountSignature({
 
       {/* Instructiehandleiding */}
       {showHowTo && (
-        <div className="rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/30 p-4 text-sm text-[#34405e] space-y-2">
-          <h4 className="font-semibold text-vtk-ink">{t.howToTitle}</h4>
+        <div
+          id="sig-howto-panel"
+          className="rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/30 p-4 text-sm text-[#34405e] space-y-2"
+        >
+          <h3 className="font-semibold text-vtk-ink">{t.howToTitle}</h3>
           <ol className="list-decimal list-inside space-y-1 text-xs sm:text-sm text-[#475467]">
             <li>{t.howToStep1}</li>
             <li>{t.howToStep2}</li>

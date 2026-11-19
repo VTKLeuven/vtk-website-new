@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { AddressFields, type AddressLabels, type AddressValues } from "./AddressFields";
 
 type ConfirmationLabels = {
@@ -48,6 +48,10 @@ export function AddressConfirmation({
   labels: ConfirmationLabels;
 }) {
   const [answer, setAnswer] = useState<"yes" | "no">(complete ? "yes" : "no");
+  const idPrefix = useId();
+  const questionId = `${idPrefix}-question`;
+  const incompleteId = `${idPrefix}-incomplete`;
+  const describedBy = complete ? questionId : `${questionId} ${incompleteId}`;
   const kot = formattedAddress(values, "", addressLabels.bus);
   const home = formattedAddress(values, "home", addressLabels.bus);
 
@@ -55,34 +59,45 @@ export function AddressConfirmation({
     <section className="space-y-4 border-t border-vtk-blue/10 pt-6">
       <div>
         <h2 className="text-lg font-semibold text-vtk-ink">{labels.heading}</h2>
-        <p className="mt-1 text-sm text-[#5c667f]">{labels.question}</p>
+        <p id={questionId} className="mt-1 text-sm text-[#5c667f]">
+          {labels.question}
+        </p>
       </div>
 
-      <div className="flex flex-wrap gap-4">
-        <label className="inline-flex items-center gap-2 text-sm text-vtk-ink">
-          <input
-            type="radio"
-            name="addressesCorrect"
-            value="yes"
-            checked={answer === "yes"}
-            disabled={!complete}
-            onChange={() => setAnswer("yes")}
-          />
-          {labels.yes}
-        </label>
-        <label className="inline-flex items-center gap-2 text-sm text-vtk-ink">
-          <input
-            type="radio"
-            name="addressesCorrect"
-            value="no"
-            checked={answer === "no"}
-            onChange={() => setAnswer("no")}
-          />
-          {labels.no}
-        </label>
-      </div>
+      <fieldset aria-describedby={describedBy}>
+        <legend className="sr-only">{labels.heading}</legend>
+        <div className="flex flex-wrap gap-4">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-vtk-ink">
+            <input
+              type="radio"
+              name="addressesCorrect"
+              value="yes"
+              checked={answer === "yes"}
+              disabled={!complete}
+              onChange={() => setAnswer("yes")}
+              className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink"
+            />
+            {labels.yes}
+          </label>
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-vtk-ink">
+            <input
+              type="radio"
+              name="addressesCorrect"
+              value="no"
+              checked={answer === "no"}
+              onChange={() => setAnswer("no")}
+              className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink"
+            />
+            {labels.no}
+          </label>
+        </div>
+      </fieldset>
 
-      {!complete && <p className="text-sm text-[#5c667f]">{labels.incomplete}</p>}
+      {!complete && (
+        <p id={incompleteId} className="text-sm text-[#5c667f]">
+          {labels.incomplete}
+        </p>
+      )}
 
       {answer === "yes" ? (
         <dl className="grid gap-3 sm:grid-cols-2">

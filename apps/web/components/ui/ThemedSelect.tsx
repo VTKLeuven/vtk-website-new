@@ -39,6 +39,7 @@ export function ThemedSelect({
   disabled = false,
   required = false,
   ariaLabel,
+  ariaLabelledBy,
   ariaDescribedBy,
   invalid = false,
   variant = "admin",
@@ -52,6 +53,7 @@ export function ThemedSelect({
   disabled?: boolean;
   required?: boolean;
   ariaLabel?: string;
+  ariaLabelledBy?: string;
   ariaDescribedBy?: string;
   invalid?: boolean;
   variant?: "admin" | "public";
@@ -84,6 +86,11 @@ export function ThemedSelect({
     return () => document.removeEventListener("pointerdown", closeOnOutsideClick);
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    document.getElementById(`${listId}-${highlighted}`)?.scrollIntoView({ block: "nearest" });
+  }, [open, highlighted, listId]);
+
   function moveHighlight(direction: -1 | 1, from = highlighted) {
     if (options.length === 0) return;
     let next = from;
@@ -109,6 +116,10 @@ export function ThemedSelect({
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === "Tab" && open) {
+      setOpen(false);
+      return;
+    }
     if (event.key === "Escape") {
       setOpen(false);
       return;
@@ -166,8 +177,10 @@ export function ThemedSelect({
         type="button"
         role="combobox"
         aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
         aria-describedby={ariaDescribedBy}
         aria-invalid={invalid || undefined}
+        aria-required={required || undefined}
         aria-controls={listId}
         aria-expanded={open}
         aria-haspopup="listbox"
@@ -200,6 +213,7 @@ export function ThemedSelect({
                   id={`${listId}-${index}`}
                   type="button"
                   role="option"
+                  tabIndex={-1}
                   aria-selected={option.value === selectedValue}
                   data-highlighted={index === highlighted || undefined}
                   disabled={option.disabled}

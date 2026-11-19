@@ -115,69 +115,73 @@ export function ConsentScreen({
           )}
         </p>
 
-        <p className="mb-2 text-sm font-medium">{nl ? 'Deze toepassing krijgt:' : 'This application will get:'}</p>
+        <fieldset className="mb-4">
+          <legend className="mb-2 text-sm font-medium">
+            {nl ? 'Deze toepassing krijgt:' : 'This application will get:'}
+          </legend>
 
-        <ul className="mb-4 space-y-2 text-sm">
-          {regular.map((scope) => (
-            <li key={scope.code}>
-              {scope.sensitive ? (
-                <label className="flex items-start gap-2">
-                  <input
-                    type="checkbox"
-                    checked={accepted.includes(scope.code)}
-                    onChange={(e) =>
-                      setAccepted((prev) =>
-                        e.target.checked ? [...prev, scope.code] : prev.filter((code) => code !== scope.code)
-                      )
-                    }
-                    className="mt-1"
-                  />
-                  <span>
-                    <span className="text-amber-800">⚠ {scope.label}</span>
-                    <span className="block text-xs text-[#5c667f]">
-                      {nl ? 'Optioneel; je kan dit weigeren.' : 'Optional; you may refuse this.'}
+          <ul className="space-y-2 text-sm">
+            {regular.map((scope) => (
+              <li key={scope.code}>
+                {scope.sensitive ? (
+                  <label className="flex cursor-pointer items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={accepted.includes(scope.code)}
+                      onChange={(e) =>
+                        setAccepted((prev) =>
+                          e.target.checked ? [...prev, scope.code] : prev.filter((code) => code !== scope.code)
+                        )
+                      }
+                      className="mt-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink"
+                    />
+                    <span>
+                      <span className="text-amber-800">⚠ {scope.label}</span>
+                      <span className="block text-xs text-[#5c667f]">
+                        {nl ? 'Optioneel; je kan dit weigeren.' : 'Optional; you may refuse this.'}
+                      </span>
+                    </span>
+                  </label>
+                ) : (
+                  <span className="flex items-start gap-2">
+                    <span aria-hidden>✓</span>
+                    <span>
+                      {scope.label}
+                      {scope.code === 'email' && <span className="block text-xs text-[#5c667f]">{userEmail}</span>}
                     </span>
                   </span>
-                </label>
-              ) : (
-                <span className="flex items-start gap-2">
-                  <span aria-hidden>✓</span>
-                  <span>
-                    {scope.label}
-                    {scope.code === 'email' && <span className="block text-xs text-[#5c667f]">{userEmail}</span>}
+                )}
+              </li>
+            ))}
+          </ul>
+
+          {offline && requestsOfflineAccess && (
+            <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3">
+              <label className="flex cursor-pointer items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={accepted.includes(offline.code)}
+                  onChange={(e) =>
+                    setAccepted((prev) =>
+                      e.target.checked ? [...prev, offline.code] : prev.filter((code) => code !== offline.code)
+                    )
+                  }
+                  className="mt-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink"
+                />
+                <span>
+                  <span className="font-medium">
+                    {nl ? 'Toegang houden wanneer je niet aangemeld bent' : 'Keep access while you are signed out'}
+                  </span>
+                  <span className="mt-1 block text-xs text-amber-900">
+                    {nl
+                      ? 'De toepassing kan je gegevens ook opvragen wanneer je niet ingelogd bent, tot je de toegang intrekt.'
+                      : 'The application can request your data even when you are not signed in, until you revoke its access.'}
                   </span>
                 </span>
-              )}
-            </li>
-          ))}
-        </ul>
-
-        {offline && requestsOfflineAccess && (
-          <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3">
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={accepted.includes(offline.code)}
-                onChange={(e) =>
-                  setAccepted((prev) =>
-                    e.target.checked ? [...prev, offline.code] : prev.filter((code) => code !== offline.code)
-                  )
-                }
-                className="mt-1"
-              />
-              <span>
-                <span className="font-medium">
-                  {nl ? 'Toegang houden wanneer je niet aangemeld bent' : 'Keep access while you are signed out'}
-                </span>
-                <span className="mt-1 block text-xs text-amber-900">
-                  {nl
-                    ? 'De toepassing kan je gegevens ook opvragen wanneer je niet ingelogd bent, tot je de toegang intrekt.'
-                    : 'The application can request your data even when you are not signed in, until you revoke its access.'}
-                </span>
-              </span>
-            </label>
-          </div>
-        )}
+              </label>
+            </div>
+          )}
+        </fieldset>
 
         {alreadyGranted.length > 0 && (
           <p className="mb-4 text-xs text-[#5c667f]">
@@ -211,7 +215,7 @@ export function ConsentScreen({
         </p>
 
         {state.status === 'error' && (
-          <p className="vtk-auth-error">
+          <p role="alert" className="vtk-auth-error">
             {nl
               ? 'Deze aanvraag is verlopen of ongeldig. Start opnieuw vanuit de toepassing.'
               : 'This request has expired or is invalid. Start again from the application.'}

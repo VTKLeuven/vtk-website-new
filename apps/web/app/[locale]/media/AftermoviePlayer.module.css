@@ -292,6 +292,11 @@
   outline-offset: 3px;
 }
 
+.vtk-media-aftermovie-media:focus-visible {
+  outline: 3px solid var(--yellow, #ffd23f);
+  outline-offset: -3px;
+}
+
 @media (max-width: 860px) {
   .vtk-media-aftermovie-gallery {
     grid-template-columns: minmax(0, 1fr);

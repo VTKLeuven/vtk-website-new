@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Input, Label } from "@vtk/ui";
 import { type Locale } from "@vtk/i18n";
@@ -27,6 +27,18 @@ export function DownloadGate({ locale, ttlMinutes }: { locale: Locale; ttlMinute
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const codeInputRef = useRef<HTMLInputElement>(null);
+  const hasTransitionedRef = useRef(false);
+
+  useEffect(() => {
+    if (!hasTransitionedRef.current) return;
+    if (sent) {
+      codeInputRef.current?.focus();
+    } else {
+      emailInputRef.current?.focus();
+    }
+  }, [sent]);
 
   const steps = (
     <div className="vtk-ulapp-steps">
@@ -68,12 +80,16 @@ export function DownloadGate({ locale, ttlMinutes }: { locale: Locale; ttlMinute
           }}
           fallbackErrorMessage={nl ? "Versturen is niet gelukt." : "Could not send the code."}
           resetOnSuccess={false}
-          onSuccess={() => setSent(true)}
+          onSuccess={() => {
+            hasTransitionedRef.current = true;
+            setSent(true);
+          }}
           className="vtk-ulapp-form"
         >
           <div>
             <Label htmlFor="urenloop-access-email">{nl ? "E-mailadres" : "Email address"}</Label>
             <Input
+              ref={emailInputRef}
               id="urenloop-access-email"
               name="email"
               type="email"
@@ -125,10 +141,32 @@ export function DownloadGate({ locale, ttlMinutes }: { locale: Locale; ttlMinute
         // de server component moet opnieuw draaien om de downloads te tonen.
         onSuccess={() => router.refresh()}
         className="vtk-ulapp-form"
+        footer={({ submitButton, secondaryButtons, confirmDialog }) => (
+          <>
+            <div className="flex flex-wrap items-center gap-3">
+              {submitButton}
+              {secondaryButtons}
+            </div>
+            {confirmDialog}
+            <p className="vtk-ulapp-note">
+              <button
+                type="button"
+                className="vtk-ulapp-again"
+                onClick={() => {
+                  hasTransitionedRef.current = true;
+                  setSent(false);
+                }}
+              >
+                {nl ? "Ander adres gebruiken" : "Use a different address"}
+              </button>
+            </p>
+          </>
+        )}
       >
         <div>
           <Label htmlFor="urenloop-access-code">{nl ? "Code uit de mail" : "Code from the email"}</Label>
           <Input
+            ref={codeInputRef}
             id="urenloop-access-code"
             name="code"
             inputMode="numeric"
@@ -140,11 +178,6 @@ export function DownloadGate({ locale, ttlMinutes }: { locale: Locale; ttlMinute
           />
         </div>
         <input type="hidden" name="email" value={email} />
-        <p className="vtk-ulapp-note">
-          <button type="button" className="vtk-ulapp-again" onClick={() => setSent(false)}>
-            {nl ? "Ander adres gebruiken" : "Use a different address"}
-          </button>
-        </p>
       </SaveForm>
     </>
   );

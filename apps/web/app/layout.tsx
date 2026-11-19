@@ -123,7 +123,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             />
           </>
         )}
-        {children}
         <CookieConsent
           initialConsent={consent}
           analyticsOnConsent={
@@ -134,6 +133,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             }
           }
         />
+        {children}
       </body>
     </html>
   );

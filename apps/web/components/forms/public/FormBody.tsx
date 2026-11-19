@@ -236,7 +236,12 @@ export function FormBody({
               ? "Sorry, this form is only available in Dutch."
               : "Sorry, dit formulier is enkel in het Engels beschikbaar.")}
         </p>
-        <Link href={otherLocaleHref}>
+        <Link
+          href={otherLocaleHref}
+          lang={nl ? "en" : "nl-BE"}
+          hrefLang={nl ? "en" : "nl"}
+          className="vtk-link"
+        >
           {nl ? "Go to the English version" : "Ga naar de Nederlandse versie"}
         </Link>
       </div>

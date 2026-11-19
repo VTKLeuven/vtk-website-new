@@ -45,7 +45,7 @@ export function RegisterForm({
 
   if (state.status === 'success') {
     return (
-      <div>
+      <div role="status">
         <h2 className="vtk-auth-alt-title">{labels.sentTitle}</h2>
         <p className="vtk-auth-done">{labels.sentBody}</p>
         <p className="vtk-auth-hint">{labels.sentSpam}</p>
@@ -69,8 +69,16 @@ export function RegisterForm({
 
       <div>
         <label htmlFor="email">{labels.email}</label>
-        <input id="email" name="email" type="email" autoComplete="email" required />
-        <p className="vtk-auth-hint">{labels.emailHint}</p>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          spellCheck={false}
+          aria-describedby="register-email-hint"
+          required
+        />
+        <p id="register-email-hint" className="vtk-auth-hint">{labels.emailHint}</p>
       </div>
 
       <div className="vtk-auth-row">
@@ -82,9 +90,10 @@ export function RegisterForm({
             type="password"
             autoComplete="new-password"
             minLength={10}
+            aria-describedby="register-password-hint"
             required
           />
-          <p className="vtk-auth-hint">{labels.passwordHint}</p>
+          <p id="register-password-hint" className="vtk-auth-hint">{labels.passwordHint}</p>
         </div>
         <div>
           <label htmlFor="passwordRepeat">{labels.passwordRepeat}</label>
@@ -106,6 +115,7 @@ export function RegisterForm({
           type="checkbox"
           checked={isAlumni}
           onChange={(e) => setIsAlumni(e.target.checked)}
+          className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink"
         />
         <label htmlFor="alumni">{labels.alumni}</label>
       </div>
@@ -123,24 +133,35 @@ export function RegisterForm({
               pattern="[0-9]{4}"
               maxLength={4}
               placeholder="2019"
+              aria-describedby="register-graduation-year-hint"
             />
-            <p className="vtk-auth-hint">{labels.graduationYearHint}</p>
+            <p id="register-graduation-year-hint" className="vtk-auth-hint">{labels.graduationYearHint}</p>
           </div>
 
           <div className="vtk-auth-check">
-            <input id="wasInVtk" name="wasInVtk" type="checkbox" />
+            <input
+              id="wasInVtk"
+              name="wasInVtk"
+              type="checkbox"
+              className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink"
+            />
             <label htmlFor="wasInVtk">{labels.wasInVtk}</label>
           </div>
 
           <div className="vtk-auth-check">
-            <input id="mailOptIn" name="mailOptIn" type="checkbox" />
+            <input
+              id="mailOptIn"
+              name="mailOptIn"
+              type="checkbox"
+              className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink"
+            />
             <label htmlFor="mailOptIn">{labels.mailOptIn}</label>
           </div>
         </>
       )}
 
       {state.status === 'error' && (
-        <p className="vtk-auth-error">{labels.errors[state.code] ?? labels.errorFallback}</p>
+        <p role="alert" className="vtk-auth-error">{labels.errors[state.code] ?? labels.errorFallback}</p>
       )}
 
       <button type="submit" className="vtk-auth-submit" disabled={pending}>

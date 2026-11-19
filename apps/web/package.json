@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e:tickets": "playwright test --config playwright.config.ts e2e/ticketing.smoke.spec.ts",
+    "test:e2e:a11y": "playwright test --config playwright.config.ts e2e/a11y.smoke.spec.ts",
     "test:watch": "vitest"
   },
   "dependencies": {

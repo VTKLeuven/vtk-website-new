@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { trackFaceSearch } from "@/lib/analytics-client";
 import { AlbumViewer } from "./AlbumViewer";
 import type { TakedownLabels } from "./TakedownDialog";
@@ -8,6 +8,7 @@ import type { TakedownLabels } from "./TakedownDialog";
 type Photo = {
   id: string;
   title: string;
+  description?: string;
   width: number;
   height: number;
   thumbnailUrl: string;
@@ -177,13 +178,16 @@ function resultMessage(result: FaceSearchResult, labels: Labels) {
 
 export function FaceSearchPanel({
   albumSlug,
+  albumTitle,
   configured,
   labels,
 }: {
   albumSlug: string;
+  albumTitle?: string;
   configured: boolean;
   labels: Labels;
 }) {
+  const formId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [fileSource, setFileSource] = useState("");
@@ -260,6 +264,7 @@ export function FaceSearchPanel({
           setStatus(result.status);
           const foundMatches = (result.matches || []).map((match) => ({
             ...match.photo,
+            description: match.photo.description,
             matchScore: match.score,
           }));
           setMatches(foundMatches);
@@ -428,6 +433,7 @@ export function FaceSearchPanel({
   }
 
   const hasFinished = !["idle", "processing"].includes(status);
+  const isFaceError = ["failed", "timeout", "multiple_faces", "no_indexed_faces"].includes(status);
 
   return (
     <section className="vtk-immich-face-panel" aria-label={labels.findMyPhotos}>
@@ -439,6 +445,8 @@ export function FaceSearchPanel({
         <button
           className="vtk-button vtk-button-ghost"
           type="button"
+          aria-expanded={isOpen}
+          aria-controls={formId}
           onClick={() => {
             if (isOpen) stopCamera();
             setIsOpen((value) => !value);
@@ -449,125 +457,159 @@ export function FaceSearchPanel({
         </button>
       </div>
 
-      {isOpen ? (
-        <form className="vtk-immich-face-form" onSubmit={submit}>
-          <input
-            ref={fileInputRef}
-            className="vtk-immich-visually-hidden"
-            id={`profile-photo-${albumSlug}`}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-            aria-label={labels.profilePhoto}
-            onChange={(event) => handleFileChange(event, "upload")}
-          />
-          <input
-            ref={cameraInputRef}
-            className="vtk-immich-visually-hidden"
-            type="file"
-            accept="image/*"
-            capture="user"
-            aria-label={labels.deviceCameraUpload}
-            onChange={(event) => handleFileChange(event, "camera")}
-          />
+      <form id={formId} className="vtk-immich-face-form" hidden={!isOpen} onSubmit={submit}>
+        <input
+          ref={fileInputRef}
+          className="vtk-immich-visually-hidden"
+          id={`profile-photo-${albumSlug}`}
+          type="file"
+          tabIndex={-1}
+          aria-hidden="true"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+          aria-label={labels.profilePhoto}
+          onChange={(event) => handleFileChange(event, "upload")}
+        />
+        <input
+          ref={cameraInputRef}
+          className="vtk-immich-visually-hidden"
+          type="file"
+          tabIndex={-1}
+          aria-hidden="true"
+          accept="image/*"
+          capture="user"
+          aria-label={labels.deviceCameraUpload}
+          onChange={(event) => handleFileChange(event, "camera")}
+        />
 
-          <div className="vtk-immich-selfie-picker">
-            <div className={`vtk-immich-selfie-preview ${previewUrl ? "has-image" : ""}`}>
-              {/* previewUrl is een blob-URL van de foto die de bezoeker net koos;
-                  die bestaat enkel in dit tabblad en valt niet te optimaliseren. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              {previewUrl ? <img src={previewUrl} alt={labels.selectedProfilePhoto} /> : <FileIcon />}
-              {file ? (
-                <button
-                  className="vtk-immich-preview-clear"
-                  type="button"
-                  onClick={clearSelection}
-                  aria-label={labels.removePhoto}
-                >
-                  <XIcon />
-                </button>
-              ) : null}
-            </div>
-            <div className="vtk-immich-selfie-body">
-              <div>
-                <h3>{labels.recognitionPhoto}</h3>
-                <p>{selectedFileLabel}</p>
-              </div>
-              <div className="vtk-immich-selfie-actions" aria-label={labels.choosePhotoOrSelfie}>
-                <button
-                  className="vtk-button vtk-button-ghost"
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={status === "processing"}
-                >
-                  <UploadIcon />
-                  {labels.choosePhoto}
-                </button>
-                <button
-                  className="vtk-button vtk-button-ghost"
-                  type="button"
-                  onClick={startCamera}
-                  disabled={status === "processing" || cameraStatus === "starting"}
-                >
-                  <CameraIcon />
-                  {labels.takeSelfie}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {cameraStatus !== "idle" ? (
-            <div className={`vtk-immich-camera-panel ${cameraStatus}`}>
-              {cameraStatus === "ready" || cameraStatus === "starting" ? (
-                <div className="vtk-immich-camera-frame">
-                  <video ref={videoRef} autoPlay playsInline muted />
-                </div>
-              ) : null}
-              {cameraStatus === "starting" ? <p>{labels.openingCamera}</p> : null}
-              {cameraMessage ? <p>{cameraMessage}</p> : null}
-              <div className="vtk-immich-camera-actions">
-                {cameraStatus === "ready" ? (
-                  <button className="vtk-button vtk-button-primary" type="button" onClick={captureSelfie}>
-                    <CameraIcon />
-                    {labels.useSelfie}
-                  </button>
-                ) : null}
-                {cameraStatus === "error" ? (
-                  <button className="vtk-button vtk-button-ghost" type="button" onClick={() => cameraInputRef.current?.click()}>
-                    <CameraIcon />
-                    {labels.openDeviceCamera}
-                  </button>
-                ) : null}
-                <button className="vtk-button vtk-button-ghost" type="button" onClick={stopCamera}>
-                  <RetryIcon />
-                  {labels.cancel}
-                </button>
-              </div>
-            </div>
-          ) : null}
-
-          <label className="vtk-immich-consent">
-            <input
-              type="checkbox"
-              checked={consent}
-              onChange={(event) => setConsent(event.target.checked)}
-            />
-            <span>{labels.consent}</span>
-          </label>
-
-          <div className="vtk-immich-face-actions">
-            <button className="vtk-button vtk-button-primary" type="submit" disabled={!file || !consent || status === "processing"}>
-              {status === "processing" ? labels.processing : labels.start}
-            </button>
-            {hasFinished ? (
-              <button className="vtk-button vtk-button-ghost" type="button" onClick={reset}>
-                {labels.again}
+        <div className="vtk-immich-selfie-picker">
+          <div className={`vtk-immich-selfie-preview ${previewUrl ? "has-image" : ""}`}>
+            {/* previewUrl is een blob-URL van de foto die de bezoeker net koos;
+                die bestaat enkel in dit tabblad en valt niet te optimaliseren. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {previewUrl ? <img src={previewUrl} alt={labels.selectedProfilePhoto} /> : <FileIcon />}
+            {file ? (
+              <button
+                className="vtk-immich-preview-clear"
+                type="button"
+                onClick={clearSelection}
+                aria-label={labels.removePhoto}
+              >
+                <XIcon />
               </button>
             ) : null}
           </div>
-        </form>
-      ) : null}
+          <div className="vtk-immich-selfie-body">
+            <div>
+              <h3>{labels.recognitionPhoto}</h3>
+              <p role="status" aria-live="polite">
+                {selectedFileLabel}
+              </p>
+            </div>
+            <div
+              className="vtk-immich-selfie-actions"
+              role="group"
+              aria-label={labels.choosePhotoOrSelfie}
+            >
+              <button
+                className="vtk-button vtk-button-ghost"
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={status === "processing"}
+              >
+                <UploadIcon />
+                {labels.choosePhoto}
+              </button>
+              <button
+                className="vtk-button vtk-button-ghost"
+                type="button"
+                onClick={startCamera}
+                disabled={status === "processing" || cameraStatus === "starting"}
+              >
+                <CameraIcon />
+                {labels.takeSelfie}
+              </button>
+            </div>
+          </div>
+        </div>
 
-      {message ? <p className={`vtk-immich-face-message ${status}`}>{message}</p> : null}
+        {cameraStatus !== "idle" ? (
+          <div className={`vtk-immich-camera-panel ${cameraStatus}`}>
+            {cameraStatus === "ready" || cameraStatus === "starting" ? (
+              <div className="vtk-immich-camera-frame">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  aria-label={labels.takeSelfie}
+                />
+              </div>
+            ) : null}
+            {cameraStatus === "starting" ? (
+              <p role="status" aria-live="polite">
+                {labels.openingCamera}
+              </p>
+            ) : null}
+            {cameraMessage ? <p role="alert">{cameraMessage}</p> : null}
+            <div className="vtk-immich-camera-actions">
+              {cameraStatus === "ready" ? (
+                <button className="vtk-button vtk-button-primary" type="button" onClick={captureSelfie}>
+                  <CameraIcon />
+                  {labels.useSelfie}
+                </button>
+              ) : null}
+              {cameraStatus === "error" ? (
+                <button
+                  className="vtk-button vtk-button-ghost"
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                >
+                  <CameraIcon />
+                  {labels.openDeviceCamera}
+                </button>
+              ) : null}
+              <button className="vtk-button vtk-button-ghost" type="button" onClick={stopCamera}>
+                <RetryIcon />
+                {labels.cancel}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <label className="vtk-immich-consent">
+          <input
+            type="checkbox"
+            checked={consent}
+            onChange={(event) => setConsent(event.target.checked)}
+          />
+          <span>{labels.consent}</span>
+        </label>
+
+        <div className="vtk-immich-face-actions">
+          <button
+            className="vtk-button vtk-button-primary"
+            type="submit"
+            disabled={!file || !consent || status === "processing"}
+          >
+            {status === "processing" ? labels.processing : labels.start}
+          </button>
+          {hasFinished ? (
+            <button className="vtk-button vtk-button-ghost" type="button" onClick={reset}>
+              {labels.again}
+            </button>
+          ) : null}
+        </div>
+      </form>
+
+      {message ? (
+        <p
+          className={`vtk-immich-face-message ${status}`}
+          role={isFaceError ? "alert" : "status"}
+          aria-live={isFaceError ? "assertive" : "polite"}
+        >
+          {message}
+        </p>
+      ) : null}
 
       {matches.length > 0 ? (
         <div className="vtk-immich-match-results">
@@ -579,6 +621,7 @@ export function FaceSearchPanel({
           </div>
           <AlbumViewer
             albumSlug={albumSlug}
+            albumTitle={albumTitle}
             photos={matches}
             labels={{
               ...labels,

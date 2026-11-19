@@ -71,8 +71,14 @@ export function EventStar({
   onChanged?: (interested: boolean) => void;
 }) {
   const [interested, setInterested] = useState(initialInterested);
+  const [sourceInterested, setSourceInterested] = useState(initialInterested);
   const [pending, startTransition] = useTransition();
   const showToast = useToast();
+
+  if (initialInterested !== sourceInterested) {
+    setSourceInterested(initialInterested);
+    setInterested(initialInterested);
+  }
 
   if (!signedIn) {
     return (

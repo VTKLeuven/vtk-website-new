@@ -33,7 +33,7 @@ export default async function BancontactPaymentPage({ params }: { params: Params
   if (!payment?.providerDeeplink) redirect(`${base}/tickets/bestelling/${orderId}`);
 
   return (
-    <main className="vtk-page ticket-order-page">
+    <div className="vtk-page ticket-order-page">
       <BancontactPayment
         orderId={orderId}
         locale={localeParam}
@@ -43,6 +43,6 @@ export default async function BancontactPaymentPage({ params }: { params: Params
         orderNumber={order.orderNumber}
         amountLabel={formatTicketPrice(order.totalCents, order.currency, localeParam)}
       />
-    </main>
+    </div>
   );
 }

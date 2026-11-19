@@ -36,9 +36,9 @@ export function AccountShifts({
     <Card className="p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-vtk-ink">
+          <h2 className="text-lg font-semibold text-vtk-ink">
             {nl ? "Mijn komende shiften" : "My upcoming shifts"}
-          </h3>
+          </h2>
           <p className="mt-1 text-sm text-[#5c667f]">
             {nl
               ? "Shiften waarvoor je momenteel ingeschreven bent."
@@ -82,7 +82,7 @@ export function AccountShifts({
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <h4 className="font-semibold text-vtk-ink">{shift.name}</h4>
+                  <h3 className="font-semibold text-vtk-ink">{shift.name}</h3>
                   <p className="mt-1 text-sm capitalize text-[#34405e]">
                     {dateFormatter.format(shift.startTime)},{" "}
                     {timeFormatter.format(shift.startTime)}–

@@ -42,6 +42,7 @@
   --color-vtk-on-yellow: #05070a;
   --color-vtk-body: #c2cad4;
   --color-vtk-muted: #8d99a8;
+  --color-vtk-danger: #f87171;
   --font-sans: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
 }
 

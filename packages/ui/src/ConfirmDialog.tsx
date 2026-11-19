@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { Button } from "./Button";
 
 type Props = {
@@ -34,45 +34,111 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: Props) {
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onCancel();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onCancel]);
+  const titleId = useId();
+  const descId = useId();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const pressedOutsideRef = useRef(false);
+  const suppressCloseCountRef = useRef(0);
 
-  if (!open) return null;
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    if (!open) {
+      if (dialog.open) {
+        suppressCloseCountRef.current += 1;
+        dialog.close();
+      }
+      return;
+    }
+
+    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+    cancelRef.current?.focus();
+
+    return () => {
+      if (dialog.open) {
+        suppressCloseCountRef.current += 1;
+        dialog.close();
+      }
+      const opener = openerRef.current;
+      openerRef.current = null;
+      if (opener?.isConnected && (!document.activeElement || document.activeElement === document.body)) {
+        opener.focus();
+      }
+    };
+  }, [open]);
+
+  function isOutsideDialog(clientX: number, clientY: number, dialog: HTMLDialogElement) {
+    const rect = dialog.getBoundingClientRect();
+    return clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom;
+  }
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-900/40 p-4"
-      role="dialog"
-      aria-modal="true"
-      onClick={onCancel}
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      aria-describedby={description ? descId : undefined}
+      {...({ closedby: pending ? "none" : "any" } as Record<string, string>)}
+      onCancel={(e) => {
+        e.preventDefault();
+        if (!pending) onCancel();
+      }}
+      onClose={(e) => {
+        if (suppressCloseCountRef.current > 0) {
+          suppressCloseCountRef.current -= 1;
+          return;
+        }
+        if (e.currentTarget.open) return;
+        if (open && !pending) onCancel();
+      }}
+      onPointerDown={(e) => {
+        if (pending || "closedBy" in HTMLDialogElement.prototype) {
+          pressedOutsideRef.current = false;
+          return;
+        }
+        pressedOutsideRef.current = e.target === e.currentTarget && isOutsideDialog(e.clientX, e.clientY, e.currentTarget);
+      }}
+      onPointerUp={(e) => {
+        if (pending || "closedBy" in HTMLDialogElement.prototype) return;
+        const wasOutside = pressedOutsideRef.current;
+        pressedOutsideRef.current = false;
+        if (wasOutside && e.target === e.currentTarget && isOutsideDialog(e.clientX, e.clientY, e.currentTarget)) {
+          onCancel();
+        }
+      }}
+      className="m-auto w-[calc(100%-2rem)] max-w-sm rounded-2xl border border-vtk-muted/60 bg-vtk-surface-elevated p-0 text-vtk-ink shadow-lg backdrop:bg-zinc-900/45"
     >
-      <div
-        className="w-full max-w-sm rounded-2xl border border-vtk-blue/15 bg-vtk-surface-elevated p-5 shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="font-semibold text-vtk-ink">{title}</h2>
-        {description ? <div className="mt-2 text-sm text-vtk-muted">{description}</div> : null}
-        <div className="mt-5 flex items-center justify-end gap-2">
-          <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={pending}>
-            {cancelLabel}
-          </Button>
-          <Button
-            type="button"
-            variant={destructive ? "danger" : "primary"}
-            size="sm"
-            onClick={onConfirm}
-            disabled={pending}
-          >
-            {confirmLabel}
-          </Button>
+      {open ? (
+        <div className="p-5">
+          <h2 id={titleId} className="font-semibold text-vtk-ink">
+            {title}
+          </h2>
+          {description ? (
+            <div id={descId} className="mt-2 text-sm text-vtk-muted">
+              {description}
+            </div>
+          ) : null}
+          <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
+            <Button ref={cancelRef} type="button" variant="ghost" size="sm" onClick={onCancel} disabled={pending}>
+              {cancelLabel}
+            </Button>
+            <Button
+              type="button"
+              variant={destructive ? "danger" : "primary"}
+              size="sm"
+              onClick={onConfirm}
+              disabled={pending}
+            >
+              {confirmLabel}
+            </Button>
+          </div>
         </div>
-      </div>
-    </div>
+      ) : null}
+    </dialog>
   );
 }

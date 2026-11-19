@@ -72,7 +72,7 @@ export default async function FormsIndexPage({
         </div>
       </header>
 
-      <main className="vtk-form-page">
+      <div className="vtk-form-page">
         {forms.length === 0 ? (
           <p className="vtk-form-empty">
             {nl
@@ -111,7 +111,7 @@ export default async function FormsIndexPage({
             })}
           </ul>
         )}
-      </main>
+      </div>
     </>
   );
 }

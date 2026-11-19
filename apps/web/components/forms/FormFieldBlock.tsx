@@ -17,6 +17,16 @@ import {
   type PublicFormField,
 } from "./FormFieldInput";
 
+const NON_NATIVE_LABEL_TYPES = new Set([
+  "BOOLEAN",
+  "CONSENT",
+  "DROPDOWN",
+  "CALENDAR_EVENT",
+  "SCALE",
+  "SINGLE_CHOICE",
+  "MULTIPLE_CHOICE",
+]);
+
 /**
  * Label, toelichting, eventuele afbeelding, het veld zelf en zijn foutmelding.
  *
@@ -42,30 +52,43 @@ export function FormFieldBlock({
   shuffleSeed?: string;
 }) {
   const uid = useId();
+  const inputId = `${uid}-${field.code}`;
+  const labelId = `${uid}-label`;
   const helpId = `${uid}-help`;
   const errorId = `${uid}-error`;
   const help = locale === "en" && field.helpEn ? field.helpEn : field.helpNl;
   // Ja/nee en toestemming dragen hun label in het vinkje zelf; een tweede label
   // erboven leest dubbel.
   const labelInsideInput = field.type === "BOOLEAN" || field.type === "CONSENT";
+  const usesNativeLabel = !NON_NATIVE_LABEL_TYPES.has(field.type);
 
-  const describedBy = [help ? helpId : null, error ? errorId : null]
+  const describedBy = [help ? helpId : null, Boolean(error) ? errorId : null]
     .filter(Boolean)
     .join(" ");
 
+  const labelContent = (
+    <>
+      {fieldLabel(field, locale)}
+      {field.required ? (
+        <>
+          <span className="vtk-form-required" aria-hidden="true">
+            *
+          </span>
+          <span className="sr-only">{locale === "nl" ? " (verplicht)" : " (required)"}</span>
+        </>
+      ) : null}
+    </>
+  );
+
   return (
     <div className="vtk-form-field" data-invalid={error ? "true" : undefined}>
-      {labelInsideInput ? null : (
-        <span className="vtk-form-label">
-          {fieldLabel(field, locale)}
-          {field.required ? (
-            <span className="vtk-form-required" aria-hidden="true">
-              *
-            </span>
-          ) : null}
-          {field.required ? (
-            <span className="sr-only">{locale === "nl" ? "(verplicht)" : "(required)"}</span>
-          ) : null}
+      {labelInsideInput ? null : usesNativeLabel ? (
+        <label id={labelId} htmlFor={inputId} className="vtk-form-label">
+          {labelContent}
+        </label>
+      ) : (
+        <span id={labelId} className="vtk-form-label">
+          {labelContent}
         </span>
       )}
 
@@ -81,7 +104,9 @@ export function FormFieldBlock({
 
       {help ? (
         <div className="vtk-form-help prose-vtk" id={helpId}>
-          <Markdown>{help}</Markdown>
+          <Markdown baseHeadingLevel={4} locale={locale}>
+            {help}
+          </Markdown>
         </div>
       ) : null}
 
@@ -92,6 +117,8 @@ export function FormFieldBlock({
         locale={locale}
         disabled={disabled}
         shuffleSeed={shuffleSeed}
+        inputId={inputId}
+        labelId={labelId}
         describedById={describedBy || undefined}
         invalid={Boolean(error)}
       />

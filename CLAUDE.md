@@ -284,6 +284,49 @@ toevoegt aan `UitleenTransportBooking`. De kringkeuzes staan in
   de nieuwe velden door `tripsForDriver`, `tripsForGroups` en
   `buildTransportFeed`.
 
+# Accessibility (WCAG 2.2 AA)
+
+Public and member-facing routes of `vtk.be` (`apps/web` excluding `/admin` and
+`(scanner)`, plus shared primitives in `packages/ui` excluding `AdminNav*`)
+target **WCAG 2.2 Level AA** conformance across both Dutch (`/`) and English
+(`/en`). `docs/wcag-plan.md` holds the audit methodology, codebase watchpoints,
+and subagent workstreams. Every UI change in scope must uphold these rules:
+
+- **Semantics, headings & language (1.3.1, 2.4.1, 2.4.6, 3.1.1, 3.1.2)**:
+  keep one `<h1>` per page with an unbroken heading hierarchy (`h1` -> `h2` ->
+  `h3`), expose a skip-to-content link targeting `<main id="main">`, label
+  multiple `<nav>` landmarks with `aria-label`, and mark inline language
+  switches (such as Dutch CMS fallback content rendered on `/en/...`) with
+  `lang="nl-BE"`.
+- **Contrast on every surface (1.4.1, 1.4.3, 1.4.11)**: maintain at least
+  `4.5:1` for normal text, `3:1` for large text (`>= 18pt` or `>= 14pt` bold),
+  and `3:1` for interactive boundaries, focus indicators, and meaningful icons
+  across `--paper`, `--paper-2`, `--surface`, `--navy`, `--yellow`, and photo
+  scrims. Never use `--yellow` as text or as a sole `3:1` indicator on light
+  grounds, and never convey state by colour alone.
+- **Keyboard, focus & overlays (2.1.1, 2.1.2, 2.4.3, 2.4.7, 2.4.11)**: every
+  interactive control must use a native interactive element (`<button>`, `<a>`,
+  form input) or complete ARIA keyboard semantics, show a visible
+  `:focus-visible` ring (`>= 3:1` on both light and `--navy` bands), never hide
+  focused elements behind the sticky header or banners (`2.4.11`), and trap and
+  restore focus cleanly in modal dialogs.
+- **Pointer gestures & target size (2.5.7, 2.5.8)**: interactive pointer targets
+  must measure at least `24x24` CSS px (or have equivalent spacing), accounting
+  for the laptop `:root { zoom: 0.9 }` media query in `vtk-base.css` where a
+  nominal `24px` box renders at `21.6px` visual px. Any drag interaction (such
+  as avatar cropping or file drops) must include a single-pointer and keyboard
+  alternative.
+- **Forms, status updates & authentication (1.3.5, 3.3.1-3.3.4, 3.3.7, 3.3.8,
+  4.1.3)**: associate every input with a programmatic `<label>`, set
+  `autocomplete` tokens on personal and auth fields, link validation messages
+  via `aria-describedby` + `aria-invalid`, announce `SaveForm` toasts and async
+  status changes through ARIA live regions, avoid redundant re-entry across
+  steps, and never block paste or password managers on authentication screens.
+- **Reflow, text zoom & motion (1.4.4, 1.4.10, 2.2.2)**: pages must reflow at
+  `320` CSS px width and scale to `200%` zoom without horizontal scrolling or
+  clipped copy, auto-rotating UI must provide a keyboard-accessible pause
+  control, and animations must honour `prefers-reduced-motion: reduce`.
+
 # Styling Guidelines
 
 Use `design/new-design.html` as the visual source of truth for VTK surfaces.

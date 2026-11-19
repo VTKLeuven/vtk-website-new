@@ -47,7 +47,7 @@ export function AccountMembership({
 
   return (
     <Card className="p-6">
-      <h3 className="mb-2 text-lg font-semibold text-vtk-ink">{t.accountHeading}</h3>
+      <h2 className="mb-2 text-lg font-semibold text-vtk-ink">{t.accountHeading}</h2>
       <p className="text-sm text-[#34405e]">{status}</p>
       {/* Wie de vraag bij de studiebevestiging liet staan, komt hier alsnog aan
           het aanmeldscherm. Bewust één plek om lid te worden, met een link

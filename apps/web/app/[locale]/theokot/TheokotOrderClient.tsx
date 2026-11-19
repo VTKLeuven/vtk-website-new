@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
+import { forwardRef, useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import { ConfirmDialog } from "@vtk/ui";
 import type { TheokotOrderStatus } from "@prisma/client";
 import { formatEuro, type TheokotItemLayout } from "@/lib/theokot";
@@ -417,7 +417,7 @@ function ListLayout({ nl, sessions, session, onSelect, order, limits, disabled }
           {regular.length > 0 && (
             <ul className="th-rows">
               {specials.length > 0 && (
-                <li className="th-rows-label" aria-hidden="true">
+                <li className="th-rows-label">
                   {nl ? "Vast aanbod" : "Regular menu"}
                 </li>
               )}
@@ -703,35 +703,51 @@ function GridCard({
   const [showInfo, setShowInfo] = useState(false);
   const infoId = useId();
   const rootRef = useRef<HTMLLIElement>(null);
+  const infoBtnRef = useRef<HTMLButtonElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const restoreFocusRef = useRef(false);
 
   // Escape en een klik ernaast sluiten de ingrediënten, zoals bij elk ander
   // paneel op de site. Enkel luisteren wanneer er iets open staat.
   useEffect(() => {
-    if (!showInfo) return;
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setShowInfo(false);
+    if (showInfo) {
+      closeBtnRef.current?.focus();
+      function onKeyDown(event: KeyboardEvent) {
+        if (event.key === "Escape") {
+          restoreFocusRef.current = true;
+          setShowInfo(false);
+        }
+      }
+      function onPointerDown(event: PointerEvent) {
+        if (!rootRef.current?.contains(event.target as Node)) {
+          restoreFocusRef.current = false;
+          setShowInfo(false);
+        }
+      }
+      document.addEventListener("keydown", onKeyDown);
+      document.addEventListener("pointerdown", onPointerDown);
+      return () => {
+        document.removeEventListener("keydown", onKeyDown);
+        document.removeEventListener("pointerdown", onPointerDown);
+      };
     }
-    function onPointerDown(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setShowInfo(false);
+    if (restoreFocusRef.current) {
+      restoreFocusRef.current = false;
+      infoBtnRef.current?.focus();
     }
-    document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("pointerdown", onPointerDown);
-    };
   }, [showInfo]);
 
   const picked = quantity > 0 || reserved > 0;
   return (
     <li ref={rootRef} className={`th-gcard${picked ? " is-picked" : ""}${item.isWeeklySpecial ? " is-special" : ""}`}>
       <Thumb item={item} className="th-gcard-photo" sizes="(max-width: 640px) 50vw, 240px" />
-      <div className="th-gcard-body">
+      <div className="th-gcard-body" inert={showInfo}>
         {item.isWeeklySpecial && <SpecialLabel nl={nl} />}
         <div className="th-name">
           <span>{item.name}</span>
           {item.ingredients && (
             <InfoButton
+              ref={infoBtnRef}
               nl={nl}
               name={item.name}
               open={showInfo}
@@ -760,7 +776,14 @@ function GridCard({
         <div id={infoId} className="th-gcard-info">
           <div className="th-gcard-info-head">
             <span>{nl ? "Ingrediënten" : "Ingredients"}</span>
-            <button type="button" onClick={() => setShowInfo(false)}>
+            <button
+              ref={closeBtnRef}
+              type="button"
+              onClick={() => {
+                restoreFocusRef.current = true;
+                setShowInfo(false);
+              }}
+            >
               <span aria-hidden="true">✕</span>
               <span className="sr-only">{nl ? "Ingrediënten sluiten" : "Close ingredients"}</span>
             </button>
@@ -844,17 +867,20 @@ function DayTabs({
             type="button"
             className={`th-tab${on ? " is-on" : ""}`}
             aria-pressed={on}
-            aria-label={capitalize(s.dateLabel)}
             onClick={() => onSelect(s.id)}
           >
             <span className="th-tab-full">
-              <span className="th-tab-day">{capitalize(s.shortLabel)}</span>
+              <span className="th-tab-day">{capitalize(s.shortLabel)}</span>{" "}
               <DayState nl={nl} session={s} />
             </span>
-            <span className="th-tab-compact" aria-hidden="true">
-              <span className="th-tab-dow">{s.dow}</span>
+            <span className="th-tab-compact">
+              <span className="th-tab-dow">{s.dow}</span>{" "}
               <span className="th-tab-num th-tn">{s.dayNumber}</span>
-              {s.existingOrder?.status === "RESERVED" && <span className="th-dot" />}
+              {s.existingOrder?.status === "RESERVED" && <span className="th-dot" aria-hidden="true" />}
+              <span className="sr-only">
+                {" "}
+                <DayState nl={nl} session={s} />
+              </span>
             </span>
           </button>
         );
@@ -1450,26 +1476,30 @@ function SpecialLabel({ nl }: { nl: boolean }) {
   );
 }
 
-function InfoButton({
-  nl,
-  name,
-  open,
-  controls,
-  onToggle,
-}: {
-  nl: boolean;
-  name: string;
-  open: boolean;
-  controls: string;
-  onToggle: () => void;
-}) {
+const InfoButton = forwardRef<
+  HTMLButtonElement,
+  {
+    nl: boolean;
+    name: string;
+    open: boolean;
+    controls: string;
+    onToggle: () => void;
+  }
+>(function InfoButton({ nl, name, open, controls, onToggle }, ref) {
   return (
-    <button type="button" className="th-info" onClick={onToggle} aria-expanded={open} aria-controls={controls}>
+    <button
+      ref={ref}
+      type="button"
+      className="th-info"
+      onClick={onToggle}
+      aria-expanded={open}
+      aria-controls={controls}
+    >
       <span aria-hidden="true">i</span>
       <span className="sr-only">{nl ? `Ingrediënten van ${name}` : `Ingredients of ${name}`}</span>
     </button>
   );
-}
+});
 
 function DatePin({ dow, day, large = false }: { dow: string; day: string; large?: boolean }) {
   return (

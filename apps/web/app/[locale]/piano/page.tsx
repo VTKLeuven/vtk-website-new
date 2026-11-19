@@ -3,8 +3,9 @@ import { staticMetadata } from "@/lib/pageMetadata";
 import { notFound } from "next/navigation";
 import Link from "@/components/ui/Link";
 import { prisma } from "@vtk/db";
-import { getDictionary, pick, type Locale } from "@vtk/i18n";
+import { getDictionary, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
+import { pickWithLang } from "@/lib/langFallback";
 import { getCurrentSession } from "@/lib/session";
 import { Markdown } from "@/components/ui/Markdown";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
@@ -135,6 +136,8 @@ export default async function PianoPage({
   const showPrev = ymdKey(monday) > ymdKey(currentMonday);
   const showNext = ymdKey(shiftYMD(monday, 7)) <= ymdKey(horizonEnd);
 
+  const infoBody = pickWithLang(info.bodyNl, info.bodyEn, locale);
+
   return (
     <div className="vtk-page vtk-basic">
       <header className="vtk-page-head">
@@ -148,8 +151,8 @@ export default async function PianoPage({
         <div className="vtk-piano-layout">
           <div className="vtk-piano-intro">
             <section className="vtk-basic-panel">
-              <div className="prose-vtk">
-                <Markdown locale={locale}>{pick(info.bodyNl, info.bodyEn, locale)}</Markdown>
+              <div className="prose-vtk" lang={infoBody.lang}>
+                <Markdown locale={locale}>{infoBody.text}</Markdown>
               </div>
             </section>
 

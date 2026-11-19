@@ -162,7 +162,7 @@ export function AudienceCombobox({
           setIsOpen(true);
           inputRef.current?.focus();
         }}
-        className="flex min-h-[42px] w-full flex-wrap items-center gap-1.5 rounded-xl border border-vtk-blue/20 bg-white px-3 py-1.5 pr-9 text-sm text-vtk-ink shadow-xs transition-colors hover:border-vtk-blue/30 focus-within:border-vtk-blue focus-within:ring-2 focus-within:ring-vtk-blue/20 cursor-text"
+        className="flex min-h-[42px] w-full flex-wrap items-center gap-1.5 rounded-xl border border-vtk-muted/80 bg-white px-3 py-1.5 pr-9 text-sm text-vtk-ink shadow-xs transition-colors hover:border-vtk-ink/70 focus-within:border-vtk-ink focus-within:outline focus-within:outline-2 focus-within:outline-offset-0 focus-within:outline-vtk-ink cursor-text"
       >
         {selected.map((item) => (
           <span
@@ -213,7 +213,7 @@ export function AudienceCombobox({
           placeholder={selected.length === 0 ? (placeholder ?? defaultPlaceholderText) : ""}
           maxLength={maxLength}
           autoComplete="off"
-          className="min-w-[100px] flex-1 bg-transparent py-0.5 text-sm text-vtk-ink placeholder:text-zinc-400 focus:outline-none"
+          className="min-w-[100px] flex-1 bg-transparent py-0.5 text-sm text-vtk-ink placeholder:text-vtk-muted focus:outline-none"
         />
 
         <button

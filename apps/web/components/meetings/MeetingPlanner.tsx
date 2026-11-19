@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { MeetingKind } from "@prisma/client";
 import { Input, Label } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
@@ -57,6 +57,7 @@ export function MeetingPlanner({
   defaultTime?: string;
   defaultOpensDaysBefore?: number;
 }) {
+  const id = useId();
   const plannedByDay = new Map(planned.map((entry) => [entry.day, entry]));
   const [parity, setParity] = useState<WeekParity>(MEETING_DEFAULTS[kind].parity);
   const [newDayTime, setNewDayTime] = useState(defaultTime ?? MEETING_DEFAULTS[kind].time);
@@ -136,6 +137,14 @@ export function MeetingPlanner({
       day: "numeric",
       month: "short",
     }).format(new Date(`${day}T12:00:00Z`));
+  const fullDayLabel = (day: string) =>
+    new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(new Date(`${day}T12:00:00Z`));
 
   const selectedDays = [...days.keys()].sort();
 
@@ -209,6 +218,7 @@ export function MeetingPlanner({
                   key={day.value}
                   nl={nl}
                   day={day}
+                  fullLabel={fullDayLabel(day.value)}
                   first={index === 0}
                   selected={days.has(day.value)}
                   locked={(plannedByDay.get(day.value)?.reservations ?? 0) > 0}
@@ -222,12 +232,20 @@ export function MeetingPlanner({
 
       <div className="grid gap-3 sm:grid-cols-3">
         <div>
-          <Label>{nl ? "Uur voor een nieuwe dag" : "Time for a new day"}</Label>
-          <Input type="time" value={newDayTime} onChange={(event) => setNewDayTime(event.target.value)} />
+          <Label htmlFor={`${id}-time`}>{nl ? "Uur voor een nieuwe dag" : "Time for a new day"}</Label>
+          <Input
+            id={`${id}-time`}
+            type="time"
+            value={newDayTime}
+            onChange={(event) => setNewDayTime(event.target.value)}
+          />
         </div>
         <div>
-          <Label>{nl ? "Plaats voor een nieuwe dag" : "Location for a new day"}</Label>
+          <Label htmlFor={`${id}-location`}>
+            {nl ? "Plaats voor een nieuwe dag" : "Location for a new day"}
+          </Label>
           <Input
+            id={`${id}-location`}
             value={newDayLocation}
             onChange={(event) => setNewDayLocation(event.target.value)}
             placeholder={nl ? "bv. Kelder" : "e.g. Basement"}
@@ -235,8 +253,16 @@ export function MeetingPlanner({
         </div>
         {kind === "BUREAU" && (
           <div>
-            <Label>{nl ? "Formulier opent (dagen vooraf)" : "Form opens (days before)"}</Label>
-            <Input type="number" min={0} name="opensDaysBefore" defaultValue={defaultOpensDaysBefore ?? 7} />
+            <Label htmlFor={`${id}-opens`}>
+              {nl ? "Formulier opent (dagen vooraf)" : "Form opens (days before)"}
+            </Label>
+            <Input
+              id={`${id}-opens`}
+              type="number"
+              min={0}
+              name="opensDaysBefore"
+              defaultValue={defaultOpensDaysBefore ?? 7}
+            />
           </div>
         )}
       </div>
@@ -253,46 +279,61 @@ export function MeetingPlanner({
             <span>{nl ? "Uur" : "Time"}</span>
             <span>{nl ? "Plaats" : "Location"}</span>
           </div>
-          {selectedDays.map((day, index) => (
-            <div
-              key={day}
-              className="grid gap-2 rounded-xl border border-vtk-blue/10 p-3 sm:grid-cols-[8rem_7rem_1fr] sm:items-center"
-            >
-              <input type="hidden" name={`day-${index}-date`} value={day} />
-              <div className="text-sm text-vtk-ink">
-                <span className="capitalize">{dayLabel(day)}</span>
-                {(plannedByDay.get(day)?.reservations ?? 0) > 0 && (
-                  <span className="ml-2 text-xs text-[#5c667f]">
-                    {plannedByDay.get(day)?.reservations}{" "}
-                    {nl ? "bestellingen" : "orders"}
-                  </span>
-                )}
+          {selectedDays.map((day, index) => {
+            const fullDay = fullDayLabel(day);
+            const timeId = `${id}-day-${day}-time`;
+            const locationId = `${id}-day-${day}-location`;
+            return (
+              <div
+                key={day}
+                className="grid gap-2 rounded-xl border border-vtk-blue/10 p-3 sm:grid-cols-[8rem_7rem_1fr] sm:items-center"
+              >
+                <input type="hidden" name={`day-${index}-date`} value={day} />
+                <div className="text-sm text-vtk-ink">
+                  <span className="capitalize">{dayLabel(day)}</span>
+                  {(plannedByDay.get(day)?.reservations ?? 0) > 0 && (
+                    <span className="ml-2 text-xs text-[#5c667f]">
+                      {plannedByDay.get(day)?.reservations}{" "}
+                      {nl ? "bestellingen" : "orders"}
+                    </span>
+                  )}
+                </div>
+                <div className="relative grid gap-1">
+                  <label
+                    htmlFor={timeId}
+                    className="text-xs font-semibold uppercase tracking-[0.08em] text-[#5c667f] sm:sr-only"
+                  >
+                    {nl ? "Uur" : "Time"}
+                  </label>
+                  <Input
+                    id={timeId}
+                    type="time"
+                    name={`day-${index}-time`}
+                    aria-label={`${nl ? "Uur" : "Time"}: ${fullDay}`}
+                    value={days.get(day)?.time ?? ""}
+                    onChange={(event) => updateDay(day, { time: event.target.value })}
+                    required
+                  />
+                </div>
+                <div className="relative grid gap-1">
+                  <label
+                    htmlFor={locationId}
+                    className="text-xs font-semibold uppercase tracking-[0.08em] text-[#5c667f] sm:sr-only"
+                  >
+                    {nl ? "Plaats" : "Location"}
+                  </label>
+                  <Input
+                    id={locationId}
+                    name={`day-${index}-location`}
+                    aria-label={`${nl ? "Plaats" : "Location"}: ${fullDay}`}
+                    value={days.get(day)?.location ?? ""}
+                    onChange={(event) => updateDay(day, { location: event.target.value })}
+                    placeholder={nl ? "bv. Kelder" : "e.g. Basement"}
+                  />
+                </div>
               </div>
-              <div className="grid gap-1">
-                <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[#5c667f] sm:hidden">
-                  {nl ? "Uur" : "Time"}
-                </span>
-                <Input
-                  type="time"
-                  name={`day-${index}-time`}
-                  value={days.get(day)?.time ?? ""}
-                  onChange={(event) => updateDay(day, { time: event.target.value })}
-                  required
-                />
-              </div>
-              <div className="grid gap-1">
-                <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[#5c667f] sm:hidden">
-                  {nl ? "Plaats" : "Location"}
-                </span>
-                <Input
-                  name={`day-${index}-location`}
-                  value={days.get(day)?.location ?? ""}
-                  onChange={(event) => updateDay(day, { location: event.target.value })}
-                  placeholder={nl ? "bv. Kelder" : "e.g. Basement"}
-                />
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </SaveForm>
@@ -302,6 +343,7 @@ export function MeetingPlanner({
 function DayCell({
   nl,
   day,
+  fullLabel,
   first,
   selected,
   locked,
@@ -309,31 +351,29 @@ function DayCell({
 }: {
   nl: boolean;
   day: { value: string; day: number; weekday: number };
+  fullLabel: string;
   first: boolean;
   selected: boolean;
   locked: boolean;
   onToggle: () => void;
 }) {
   const weekend = day.weekday >= 6;
+  const lockedNote = nl ? "Er is al besteld voor deze dag" : "Orders already exist for this day";
   return (
     <button
       type="button"
       onClick={onToggle}
       aria-pressed={selected}
-      title={
-        locked
-          ? nl
-            ? "Er is al besteld voor deze dag"
-            : "Orders already exist for this day"
-          : day.value
-      }
+      aria-disabled={locked || undefined}
+      aria-label={locked ? `${fullLabel} (${lockedNote})` : fullLabel}
+      title={locked ? lockedNote : fullLabel}
       // De eerste dag van de maand schuift naar haar weekdag; de rest volgt vanzelf.
       style={first ? { gridColumnStart: day.weekday } : undefined}
       className={`h-8 rounded-lg border text-xs tabular-nums transition-colors ${
         selected
           ? "border-vtk-ink bg-vtk-ink text-white"
           : weekend
-            ? "border-vtk-blue/10 bg-vtk-blue-soft/40 text-[#8b95ad]"
+            ? "border-vtk-muted/40 bg-vtk-blue-soft/40 text-vtk-muted"
             : "border-vtk-blue/10 text-vtk-ink hover:bg-vtk-blue-soft"
       } ${locked ? "cursor-not-allowed opacity-80" : ""}`}
     >

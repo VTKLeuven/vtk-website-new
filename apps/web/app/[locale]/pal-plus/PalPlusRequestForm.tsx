@@ -180,9 +180,10 @@ export function PalPlusRequestForm({
                 name="courseOther"
                 maxLength={PAL_PLUS_LIMITS.courseOther}
                 defaultValue={respondsTo && !respondsTo.courseId ? respondsTo.courseLabel : ""}
+                aria-describedby="pp-course-other-help"
                 required
               />
-              <p className="pp-help">{copy.courseOtherHelp}</p>
+              <p id="pp-course-other-help" className="pp-help">{copy.courseOtherHelp}</p>
             </div>
           )}
 
@@ -232,17 +233,18 @@ export function PalPlusRequestForm({
 
           {give ? (
             <>
-              <fieldset className="pp-moment">
+              <fieldset className="pp-moment" aria-describedby="pp-moments-help">
                 <legend className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-vtk-muted">
                   {copy.momentsLabel}
                 </legend>
-                <p className="pp-help pp-moments-help">{copy.momentsHelp}</p>
+                <p id="pp-moments-help" className="pp-help pp-moments-help">{copy.momentsHelp}</p>
                 <MomentGrid
                   days={grid.days}
                   today={grid.today}
                   nowMinutes={grid.nowMinutes}
                   locale={nl ? "nl" : "en"}
                   copy={copy.grid}
+                  ariaDescribedBy="pp-moments-help"
                 />
                 <div className="mt-3">
                   <Label htmlFor="pp-availability-note">{copy.availabilityNoteLabel}</Label>
@@ -265,8 +267,9 @@ export function PalPlusRequestForm({
                   autoComplete="off"
                   spellCheck={false}
                   maxLength={12}
+                  aria-describedby="pp-cotutor-help"
                 />
-                <p className="pp-help">{copy.coTutorHelp}</p>
+                <p id="pp-cotutor-help" className="pp-help">{copy.coTutorHelp}</p>
               </div>
             </>
           ) : (

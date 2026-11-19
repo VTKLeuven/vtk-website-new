@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Megaphone } from "lucide-react";
 import { isExternalUrl } from "@/lib/href";
 
@@ -66,6 +66,7 @@ export function AnnouncementCard({
   const [expanded, setExpanded] = useState(false);
   const [overflows, setOverflows] = useState(false);
   const textRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLElement>(null);
   const open = isClient && !closed && !readDismissed().includes(id);
 
   // Een lang bericht staat ingeklapt op drie regels; "Lees verder" verschijnt
@@ -85,7 +86,7 @@ export function AnnouncementCard({
     return () => observer.disconnect();
   }, [open, expanded]);
 
-  function dismiss() {
+  const dismiss = useCallback(() => {
     setClosed(true);
     try {
       // Enkel de laatste tien bijhouden: oudere aankondigingen bestaan niet meer,
@@ -95,17 +96,26 @@ export function AnnouncementCard({
     } catch {
       /* Geen opslag beschikbaar (private mode): dan verschijnt ze opnieuw. */
     }
-  }
+  }, [id]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      if (!cardRef.current?.contains(document.activeElement)) return;
+      dismiss();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, dismiss]);
 
   if (!open) return null;
 
   return (
     <aside
+      ref={cardRef}
       className="vtk-announcement"
       aria-labelledby="vtk-announcement-title"
-      onKeyDown={(event) => {
-        if (event.key === "Escape") dismiss();
-      }}
     >
       <div className="vtk-announcement-top">
         <span className="vtk-announcement-kicker">{kicker}</span>

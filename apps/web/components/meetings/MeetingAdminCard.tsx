@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import type { MeetingKind } from "@prisma/client";
 import { Button, Card, Input, Label, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
@@ -95,6 +95,7 @@ export type MeetingAdminView = {
  * in de kolommen ernaast.
  */
 export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: MeetingAdminView }) {
+  const formId = useId();
   const [useTheokot, setUseTheokot] = useState(meeting.useTheokot);
   const [bigBureau, setBigBureau] = useState(meeting.bigBureau);
   const invalidCount = meeting.reservations.filter((row) => row.invalid).length;
@@ -195,17 +196,28 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
           <input type="hidden" name="locale" value={nl ? "nl" : "en"} />
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <Label>{nl ? "Wanneer" : "When"}</Label>
-              <Input type="datetime-local" name="startsAt" defaultValue={meeting.startsAtValue} required />
+              <Label htmlFor={`${formId}-starts-at`}>{nl ? "Wanneer" : "When"}</Label>
+              <Input
+                id={`${formId}-starts-at`}
+                type="datetime-local"
+                name="startsAt"
+                defaultValue={meeting.startsAtValue}
+                required
+              />
             </div>
             <div>
-              <Label>{nl ? "Plaats" : "Location"}</Label>
-              <Input name="location" defaultValue={meeting.location} />
+              <Label htmlFor={`${formId}-location`}>{nl ? "Plaats" : "Location"}</Label>
+              <Input id={`${formId}-location`} name="location" defaultValue={meeting.location} />
             </div>
             {meeting.kind === "BUREAU" && (
               <div>
-                <Label>{nl ? "Formulier opent" : "Form opens"}</Label>
-                <Input type="datetime-local" name="opensAt" defaultValue={meeting.opensAtValue} />
+                <Label htmlFor={`${formId}-opens-at`}>{nl ? "Formulier opent" : "Form opens"}</Label>
+                <Input
+                  id={`${formId}-opens-at`}
+                  type="datetime-local"
+                  name="opensAt"
+                  defaultValue={meeting.opensAtValue}
+                />
               </div>
             )}
           </div>
@@ -275,12 +287,12 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <Label>{nl ? "Toelichting (NL)" : "Note (NL)"}</Label>
-              <Textarea name="noteNl" defaultValue={meeting.noteNl} />
+              <Label htmlFor={`${formId}-note-nl`}>{nl ? "Toelichting (NL)" : "Note (NL)"}</Label>
+              <Textarea id={`${formId}-note-nl`} name="noteNl" defaultValue={meeting.noteNl} />
             </div>
             <div>
-              <Label>{nl ? "Toelichting (EN)" : "Note (EN)"}</Label>
-              <Textarea name="noteEn" defaultValue={meeting.noteEn} />
+              <Label htmlFor={`${formId}-note-en`}>{nl ? "Toelichting (EN)" : "Note (EN)"}</Label>
+              <Textarea id={`${formId}-note-en`} name="noteEn" defaultValue={meeting.noteEn} />
             </div>
           </div>
         </SaveForm>
@@ -467,6 +479,7 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
 
 /** Rijen van het eigen aanbod: naam en prijs, meer heeft een lasagne niet nodig. */
 function OptionRows({ nl, initial }: { nl: boolean; initial: MeetingOptionView[] }) {
+  const rowsId = useId();
   const [rows, setRows] = useState(initial);
 
   function update(index: number, patch: Partial<MeetingOptionView>) {
@@ -480,8 +493,9 @@ function OptionRows({ nl, initial }: { nl: boolean; initial: MeetingOptionView[]
         <div key={row.id || `new-${index}`} className="grid gap-2 sm:grid-cols-[1fr_1fr_6rem_2rem] sm:items-end">
           <input type="hidden" name={`option-${index}-id`} value={row.id} />
           <div>
-            <Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label>
+            <Label htmlFor={`${rowsId}-${index}-name-nl`}>{nl ? "Naam (NL)" : "Name (NL)"}</Label>
             <Input
+              id={`${rowsId}-${index}-name-nl`}
               name={`option-${index}-nameNl`}
               value={row.nameNl}
               onChange={(event) => update(index, { nameNl: event.target.value })}
@@ -489,30 +503,33 @@ function OptionRows({ nl, initial }: { nl: boolean; initial: MeetingOptionView[]
             />
           </div>
           <div>
-            <Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label>
+            <Label htmlFor={`${rowsId}-${index}-name-en`}>{nl ? "Naam (EN)" : "Name (EN)"}</Label>
             <Input
+              id={`${rowsId}-${index}-name-en`}
               name={`option-${index}-nameEn`}
               value={row.nameEn}
               onChange={(event) => update(index, { nameEn: event.target.value })}
             />
           </div>
           <div>
-            <Label>{nl ? "Prijs €" : "Price €"}</Label>
+            <Label htmlFor={`${rowsId}-${index}-price`}>{nl ? "Prijs €" : "Price €"}</Label>
             <Input
+              id={`${rowsId}-${index}-price`}
               name={`option-${index}-price`}
               value={row.priceEuro}
               onChange={(event) => update(index, { priceEuro: event.target.value })}
               inputMode="decimal"
             />
           </div>
-          <button
-            type="button"
+          <IconButton
+            tone="danger"
+            label={nl ? "Verwijderen" : "Remove"}
+            srLabel={`${nl ? "Verwijderen" : "Remove"}: ${row.nameNl || (nl ? `keuze ${index + 1}` : `choice ${index + 1}`)}`}
+            className="sm:mb-0.5"
             onClick={() => setRows((current) => current.filter((_, i) => i !== index))}
-            className="mb-2 text-sm text-zinc-400 hover:text-red-600"
-            title={nl ? "Verwijderen" : "Remove"}
           >
-            ✕
-          </button>
+            <span aria-hidden="true">✕</span>
+          </IconButton>
         </div>
       ))}
       <Button

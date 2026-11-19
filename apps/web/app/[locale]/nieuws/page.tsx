@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
-import { pick, type Locale } from "@vtk/i18n";
+import { type Locale } from "@vtk/i18n";
 import Link from "@/components/ui/Link";
+import { pickWithLang } from "@/lib/langFallback";
 import { hasLocale } from "@/lib/locale";
 import { staticMetadata } from "@/lib/pageMetadata";
 import { markdownToPlainText } from "@/lib/markdown";
@@ -131,19 +132,23 @@ export default async function NewsPage({
   const current = candidates.filter((entry) => !entry.hidden);
   const earlier: NewsEntry[] = earlierPosts.map((post) => {
     const praeses = post.kind === "PRAESES";
+    const title = pickWithLang(post.titleNl, post.titleEn, locale);
+    const body = pickWithLang(post.bodyNl, post.bodyEn, locale);
     return {
       key: `${praeses ? "praeses" : "notice"}:${post.id}`,
       source: praeses ? "praeses" : "notice",
       ref: post.id,
       date: post.publishedAt.toISOString(),
       featured: false,
-      title: pick(post.titleNl, post.titleEn, locale),
+      title: title.text,
+      titleLang: title.lang,
       line:
         praeses && post.authorName
           ? nl
             ? `Een woordje van ${post.authorName}`
             : `A word from ${post.authorName}`
-          : markdownToPlainText(pick(post.bodyNl, post.bodyEn, locale)),
+          : markdownToPlainText(body.text),
+      lineLang: praeses && post.authorName ? undefined : body.lang,
       body: null,
       href: `/nieuws/${post.id}`,
       ctaLabel: "",
@@ -162,19 +167,27 @@ export default async function NewsPage({
 
   const issues = newestIssues(media.publications, now);
   const letter = letterPost
-    ? {
-        title: pick(letterPost.titleNl, letterPost.titleEn, locale),
-        excerpt: markdownToPlainText(pick(letterPost.bodyNl, letterPost.bodyEn, locale)),
-        date: letterPost.publishedAt.toISOString(),
-        href: `/nieuws/${letterPost.id}`,
-        author: letterPost.authorName
-          ? {
-              name: letterPost.authorName,
-              role: pick(letterPost.authorRoleNl ?? "", letterPost.authorRoleEn, locale) || null,
-              imageUrl: publicUrl(letterPost.imageKey),
-            }
-          : null,
-      }
+    ? (() => {
+        const letterTitle = pickWithLang(letterPost.titleNl, letterPost.titleEn, locale);
+        const letterBody = pickWithLang(letterPost.bodyNl, letterPost.bodyEn, locale);
+        const letterRole = pickWithLang(letterPost.authorRoleNl ?? "", letterPost.authorRoleEn, locale);
+        return {
+          title: letterTitle.text,
+          titleLang: letterTitle.lang,
+          excerpt: markdownToPlainText(letterBody.text),
+          excerptLang: letterBody.lang,
+          date: letterPost.publishedAt.toISOString(),
+          href: `/nieuws/${letterPost.id}`,
+          author: letterPost.authorName
+            ? {
+                name: letterPost.authorName,
+                role: letterRole.text || null,
+                roleLang: letterRole.text ? letterRole.lang : undefined,
+                imageUrl: publicUrl(letterPost.imageKey),
+              }
+            : null,
+        };
+      })()
     : null;
   const hasRail = Boolean(letter) || issues.length > 0;
 
@@ -192,7 +205,7 @@ export default async function NewsPage({
         </div>
       </header>
 
-      <main className={`vtk-page-shell news-page${hasRail ? "" : " is-solo"}`}>
+      <div className={`vtk-page-shell news-page${hasRail ? "" : " is-solo"}`}>
         <div className="news-main">
           {/* Links en geen knoppen, zoals op /tickets: een filter hoort in de
               URL, zodat je "enkel de inschrijvingen" kan doorsturen. */}
@@ -251,8 +264,10 @@ export default async function NewsPage({
               <section>
                 <h2>{newsSourceLabel("praeses", locale)}</h2>
                 {letter.author ? <NewsAuthor author={letter.author} /> : null}
-                <b className="news-rail-title">{letter.title}</b>
-                <p>{letter.excerpt}</p>
+                <b className="news-rail-title" lang={letter.titleLang}>
+                  {letter.title}
+                </b>
+                <p lang={letter.excerptLang}>{letter.excerpt}</p>
                 <div>
                   <Link href={`${base}${letter.href}`} className="news-more">
                     {nl ? "Lees de brief" : "Read the letter"}
@@ -265,6 +280,8 @@ export default async function NewsPage({
                 <h2>{nl ? "Tijdschriften" : "Magazines"}</h2>
                 {issues.map((issue) => {
                   const source: NewsSource = issue.kind === "bakske" ? "bakske" : "irreeel";
+                  const issueTitle = pickWithLang(issue.titleNl, issue.titleEn, locale);
+                  const issueNumber = pickWithLang(issue.issueNl, issue.issueEn, locale);
                   return (
                     <NewsLink
                       key={issue.id}
@@ -282,7 +299,8 @@ export default async function NewsPage({
                       )}
                       <span>
                         <b>
-                          {pick(issue.titleNl, issue.titleEn, locale)}, {pick(issue.issueNl, issue.issueEn, locale)}
+                          <span lang={issueTitle.lang}>{issueTitle.text}</span>,{" "}
+                          <span lang={issueNumber.lang}>{issueNumber.text}</span>
                         </b>
                         <span>{newsDate(issue.publishedAt!, locale)} · pdf</span>
                       </span>
@@ -293,7 +311,7 @@ export default async function NewsPage({
             ) : null}
           </aside>
         ) : null}
-      </main>
+      </div>
     </div>
   );
 }

@@ -29,7 +29,7 @@ export function ForgotPasswordForm({
 
   if (state.status === 'success') {
     return (
-      <div>
+      <div role="status">
         <h2 className="vtk-auth-alt-title">{labels.sentTitle}</h2>
         <p className="vtk-auth-done">{labels.sentBody}</p>
       </div>
@@ -41,9 +41,9 @@ export function ForgotPasswordForm({
       <input type="hidden" name="locale" value={locale} />
       <div>
         <label htmlFor="email">{labels.email}</label>
-        <input id="email" name="email" type="email" autoComplete="email" required />
+        <input id="email" name="email" type="email" autoComplete="email" spellCheck={false} required />
       </div>
-      {state.status === 'error' && <p className="vtk-auth-error">{labels.error}</p>}
+      {state.status === 'error' && <p role="alert" className="vtk-auth-error">{labels.error}</p>}
       <button type="submit" className="vtk-auth-submit" disabled={pending}>
         {labels.submit}
       </button>

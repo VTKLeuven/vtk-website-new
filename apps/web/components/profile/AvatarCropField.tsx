@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Button } from "@vtk/ui";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { Button, Label } from "@vtk/ui";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp } from "lucide-react";
 import { FileDropOverlay, useFileDrop } from "@/components/ui/FileDrop";
 
 type Crop = { zoom: number; x: number; y: number };
@@ -57,6 +58,18 @@ export function AvatarCropField({
   currentAvatar: string | null;
 }) {
   const nl = locale === "nl";
+  const baseId = useId();
+  const fileInputId = `${baseId}-file`;
+  const dropHintId = `${baseId}-hint`;
+  const readyId = `${baseId}-ready`;
+  const errorId = `${baseId}-error`;
+  const titleId = `${baseId}-title`;
+  const descId = `${baseId}-desc`;
+  const zoomId = `${baseId}-zoom`;
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const suppressCloseCountRef = useRef(0);
+  const pressedOutsideRef = useRef(false);
+  const wasOpenRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
@@ -90,6 +103,35 @@ export function AvatarCropField({
     if (editorOpen) redraw();
   }, [editorOpen, redraw]);
 
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    if (!editorOpen) {
+      if (dialog.open) {
+        suppressCloseCountRef.current += 1;
+        dialog.close();
+      }
+      if (wasOpenRef.current) {
+        wasOpenRef.current = false;
+        inputRef.current?.focus();
+      }
+      return;
+    }
+
+    wasOpenRef.current = true;
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+
+    return () => {
+      if (dialog.open) {
+        suppressCloseCountRef.current += 1;
+        dialog.close();
+      }
+    };
+  }, [editorOpen]);
+
   useEffect(
     () => () => {
       if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
@@ -100,6 +142,8 @@ export function AvatarCropField({
 
   function resetPendingSelection() {
     setEditorOpen(false);
+    dragRef.current = null;
+    setDragging(false);
     imageRef.current = null;
     if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
     sourceUrlRef.current = null;
@@ -231,12 +275,49 @@ export function AvatarCropField({
     setEditorOpen(false);
   }
 
-  let canPan = false;
+  let canPanX = false;
+  let canPanY = false;
   if (imageDims) {
     const { centeredX, centeredY } = cropGeometry(imageDims.w, imageDims.h, crop.zoom);
-    canPan = centeredX > 0.5 || centeredY > 0.5;
+    canPanX = centeredX > 0.5;
+    canPanY = centeredY > 0.5;
   }
+  const canPan = canPanX || canPanY;
   const cursorClass = canPan ? (dragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default";
+
+  function nudgeCrop(dx: number, dy: number) {
+    setCrop((value) => ({
+      ...value,
+      x: canPanX ? clamp(value.x + dx, -1, 1) : value.x,
+      y: canPanY ? clamp(value.y + dy, -1, 1) : value.y,
+    }));
+  }
+
+  function handleCanvasKeyDown(event: React.KeyboardEvent<HTMLCanvasElement>) {
+    const step = event.shiftKey ? 0.25 : 0.08;
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      nudgeCrop(step, 0);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      nudgeCrop(-step, 0);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      nudgeCrop(0, step);
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      nudgeCrop(0, -step);
+    }
+  }
+
+  function isOutsideDialog(clientX: number, clientY: number, dialog: HTMLDialogElement) {
+    const rect = dialog.getBoundingClientRect();
+    return clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom;
+  }
+
+  const describedBy = [dropHintId, cropReady ? readyId : null, error ? errorId : null]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <>
@@ -251,63 +332,166 @@ export function AvatarCropField({
             // Een blob-URL van de bijsnede die nog in de browser zit; die bestaat
             // enkel in dit tabblad en valt niet te optimaliseren.
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={previewUrl} alt="" className="h-full w-full object-cover" />
+            <img
+              src={previewUrl}
+              alt={nl ? "Huidige profielfoto" : "Current profile picture"}
+              className="h-full w-full object-cover"
+            />
           ) : null}
         </div>
         <div className="space-y-2">
+          <Label htmlFor={fileInputId} className="mb-0">
+            {nl ? "Profielfoto kiezen" : "Choose profile photo"}
+          </Label>
           <input
             ref={inputRef}
+            id={fileInputId}
             type="file"
             name={cropReady ? "photo" : undefined}
             accept="image/*"
+            aria-describedby={describedBy}
+            aria-invalid={error ? true : undefined}
             onChange={(event) => chooseFile(event.currentTarget.files?.[0])}
-            className="block max-w-full text-sm text-[#34405e] file:mr-3 file:rounded-full file:border-0 file:bg-vtk-ink file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:opacity-90"
+            className="block max-w-full rounded-lg text-sm text-[#34405e] file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-vtk-ink file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink"
           />
           {/* Enkel met een muis: op een telefoon sleep je geen bestanden. */}
-          <p className="hidden text-xs text-[#5c667f] pointer-fine:block">
+          <p id={dropHintId} className="hidden text-xs text-[#5c667f] pointer-fine:block">
             {nl ? "Of sleep een foto hierheen." : "Or drop a photo here."}
           </p>
           {cropReady ? (
-            <p className="text-xs font-medium text-emerald-700">
+            <p id={readyId} role="status" className="text-xs font-medium text-emerald-700">
               {nl ? "Uitsnede klaar om op te slaan." : "Crop ready to save."}
             </p>
           ) : null}
-          {error ? <p className="text-xs text-red-700">{error}</p> : null}
+          {error ? (
+            <p id={errorId} role="alert" className="text-xs text-red-700">
+              {error}
+            </p>
+          ) : null}
         </div>
       </div>
 
-      {editorOpen ? (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-vtk-ink/70 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="avatar-crop-title"
-        >
-          <div className="max-h-[calc(100vh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
-            <h3 id="avatar-crop-title" className="text-lg font-semibold text-vtk-ink">
+      <dialog
+        ref={dialogRef}
+        aria-labelledby={titleId}
+        aria-describedby={descId}
+        {...({ closedby: "any" } as Record<string, string>)}
+        onCancel={(event) => {
+          event.preventDefault();
+          resetPendingSelection();
+        }}
+        onClose={(event) => {
+          if (suppressCloseCountRef.current > 0) {
+            suppressCloseCountRef.current -= 1;
+            return;
+          }
+          if (event.currentTarget.open) return;
+          if (editorOpen) resetPendingSelection();
+        }}
+        onPointerDown={(event) => {
+          if ("closedBy" in HTMLDialogElement.prototype) {
+            pressedOutsideRef.current = false;
+            return;
+          }
+          pressedOutsideRef.current =
+            event.target === event.currentTarget &&
+            isOutsideDialog(event.clientX, event.clientY, event.currentTarget);
+        }}
+        onPointerUp={(event) => {
+          if ("closedBy" in HTMLDialogElement.prototype) return;
+          const wasOutside = pressedOutsideRef.current;
+          pressedOutsideRef.current = false;
+          if (
+            wasOutside &&
+            event.target === event.currentTarget &&
+            isOutsideDialog(event.clientX, event.clientY, event.currentTarget)
+          ) {
+            resetPendingSelection();
+          }
+        }}
+        className="m-auto max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-2xl border border-vtk-blue/15 bg-white p-0 text-vtk-ink shadow-2xl backdrop:bg-vtk-ink/70"
+      >
+        {editorOpen ? (
+          <div className="p-5">
+            <h2 id={titleId} className="text-lg font-semibold text-vtk-ink">
               {nl ? "Profielfoto uitsnijden" : "Crop profile photo"}
-            </h3>
-            <p className="mt-1 text-sm text-[#5c667f]">
+            </h2>
+            <p id={descId} className="mt-1 text-sm text-[#5c667f]">
               {nl
-                ? "Sleep de foto om ze te verplaatsen en gebruik de zoom. Alleen dit vierkant wordt geüpload."
-                : "Drag the photo to reposition and use the zoom. Only this square will be uploaded."}
+                ? "Sleep de foto of gebruik de knoppen om ze te verplaatsen, en gebruik de zoom. Alleen dit vierkant wordt geüpload."
+                : "Drag the photo or use the buttons to reposition, and use the zoom. Only this square will be uploaded."}
             </p>
 
             <canvas
               ref={canvasRef}
+              tabIndex={0}
+              role="application"
               onPointerDown={startDrag}
               onPointerMove={moveDrag}
               onPointerUp={endDrag}
               onPointerCancel={endDrag}
-              className={`mx-auto mt-4 aspect-square w-full max-w-80 touch-none select-none rounded-2xl bg-vtk-blue-soft object-contain ${cursorClass}`}
-              aria-label={nl ? "Voorbeeld van de uitsnede" : "Crop preview"}
+              onKeyDown={handleCanvasKeyDown}
+              className={`mx-auto mt-4 aspect-square w-full max-w-80 touch-none select-none rounded-2xl bg-vtk-blue-soft object-contain focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink ${cursorClass}`}
+              aria-label={
+                nl
+                  ? "Voorbeeld van de uitsnede. Gebruik de pijltoetsen om de foto te verplaatsen (Shift voor grotere stappen)."
+                  : "Crop preview. Use arrow keys to pan the photo (Shift for larger steps)."
+              }
             />
 
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={!canPanX}
+                onClick={() => nudgeCrop(0.1, 0)}
+                aria-label={nl ? "Foto naar links" : "Move photo left"}
+              >
+                <ArrowLeft size={16} aria-hidden="true" />
+                <span>{nl ? "Links" : "Left"}</span>
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={!canPanX}
+                onClick={() => nudgeCrop(-0.1, 0)}
+                aria-label={nl ? "Foto naar rechts" : "Move photo right"}
+              >
+                <ArrowRight size={16} aria-hidden="true" />
+                <span>{nl ? "Rechts" : "Right"}</span>
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={!canPanY}
+                onClick={() => nudgeCrop(0, 0.1)}
+                aria-label={nl ? "Foto omhoog" : "Move photo up"}
+              >
+                <ArrowUp size={16} aria-hidden="true" />
+                <span>{nl ? "Omhoog" : "Up"}</span>
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={!canPanY}
+                onClick={() => nudgeCrop(0, -0.1)}
+                aria-label={nl ? "Foto omlaag" : "Move photo down"}
+              >
+                <ArrowDown size={16} aria-hidden="true" />
+                <span>{nl ? "Omlaag" : "Down"}</span>
+              </Button>
+            </div>
+
             <div className="mt-5 space-y-3">
-              <label className="block text-sm font-medium text-vtk-ink">
+              <label htmlFor={zoomId} className="block text-sm font-medium text-vtk-ink">
                 {nl ? "Zoom" : "Zoom"}
                 <input
-                  className="mt-1 block w-full accent-vtk-ink"
+                  id={zoomId}
+                  className="mt-1 block w-full accent-vtk-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink"
                   type="range"
                   min="1"
                   max="3"
@@ -327,8 +511,8 @@ export function AvatarCropField({
               </Button>
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </dialog>
     </>
   );
 }

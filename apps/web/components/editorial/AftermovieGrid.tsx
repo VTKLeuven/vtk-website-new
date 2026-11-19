@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trackAftermovie } from "@/lib/analytics-client";
+import { type FallbackLang } from "@/lib/langFallback";
 
 export type AftermovieGridItem = {
   id: string;
   title: string;
+  titleLang?: FallbackLang;
   embedUrl: string;
   externalUrl: string;
   posterUrl: string | null;
@@ -26,6 +28,13 @@ export function AftermovieGrid({
   playLabel: string;
 }) {
   const [startedId, setStartedId] = useState<string | null>(null);
+  const activeIframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    if (startedId) {
+      activeIframeRef.current?.focus();
+    }
+  }, [startedId]);
 
   return (
     <div className="am-grid">
@@ -34,7 +43,9 @@ export function AftermovieGrid({
           <div className="am-frame">
             {startedId === item.id ? (
               <iframe
-                className="am-media"
+                ref={activeIframeRef}
+                tabIndex={-1}
+                className="am-media focus-visible:outline focus-visible:outline-2 focus-visible:outline-vtk-yellow"
                 src={`${item.embedUrl}&autoplay=1`}
                 title={item.title}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -72,7 +83,7 @@ export function AftermovieGrid({
             )}
           </div>
           <figcaption className="am-cap">
-            <h3>{item.title}</h3>
+            <h3 lang={item.titleLang}>{item.title}</h3>
           </figcaption>
         </figure>
       ))}

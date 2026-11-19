@@ -68,7 +68,7 @@ export default async function PublicFormPage({
         </div>
       </header>
 
-      <main className="vtk-form-page">
+      <div className="vtk-form-page">
         <FormBody
           surface={surface}
           successHref={`${base}/formulieren/${slug}/bedankt`}
@@ -76,7 +76,7 @@ export default async function PublicFormPage({
           loginHref={`${base}/inloggen?next=${encodeURIComponent(`${base}/formulieren/${slug}`)}`}
           otherLocaleHref={`${nl ? "/en" : ""}/formulieren/${slug}`}
         />
-      </main>
+      </div>
     </>
   );
 }

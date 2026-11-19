@@ -79,7 +79,7 @@ export async function EventTicketsPage({
     <article className="vtk-page vtk-tickets-page">
       {before}
       <EventHead event={event} locale={locale} />
-      <main className="tshop-shell">
+      <div className="tshop-shell">
         <TicketShop
           // Een andere verkoop is een ander winkelmandje: zonder sleutel bleven de
           // aantallen van de vorige tab staan na het wisselen.
@@ -136,7 +136,7 @@ export async function EventTicketsPage({
             </>
           }
         />
-      </main>
+      </div>
     </article>
   );
 }

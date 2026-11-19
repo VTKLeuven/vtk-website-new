@@ -260,6 +260,10 @@ jobs:
         if: contains(format(' {0} ', steps.affected.outputs.apps), ' web ')
         run: npm run test:e2e:tickets --workspace=@vtk/web
 
+      - name: Run WCAG 2.2 AA smoke
+        if: contains(format(' {0} ', steps.affected.outputs.apps), ' web ')
+        run: npm run test:e2e:a11y --workspace=@vtk/web
+
   deploy:
     name: Deploy to dev (elise)
     # Alleen deployen bij een push naar main of handmatige workflow_dispatch; nooit bij pull_request.

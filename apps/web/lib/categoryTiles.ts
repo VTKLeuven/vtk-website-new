@@ -21,12 +21,16 @@ export type CategoryTile = {
   key: string;
   labelNl: string;
   labelEn: string;
+  /** Taalcode wanneer de Engelse titel ontbreekt en terugvalt op Nederlands. */
+  labelFallbackLang?: "nl-BE";
   /** Intern pad zonder taalprefix (`/info/shiften`) of een volledig adres. */
   href: string;
   external: boolean;
   /** Enkel pagina's hebben een korte beschrijving; menu-items niet. */
   excerptNl: string | null;
   excerptEn: string | null;
+  /** Taalcode wanneer de Engelse beschrijving ontbreekt en terugvalt op Nederlands. */
+  excerptFallbackLang?: "nl-BE";
   /**
    * Storage-key van de foto op de kaart. Zowel pagina's als vaste routes en
    * externe links kunnen er een hebben; zonder foto verschijnt het technische
@@ -73,10 +77,14 @@ export function categoryTiles(tab: {
       key: `page:${page.id}`,
       labelNl: page.titleNl,
       labelEn: page.titleEn ?? page.titleNl,
+      labelFallbackLang:
+        !page.titleEn?.trim() && Boolean(page.titleNl.trim()) ? ("nl-BE" as const) : undefined,
       href: `/${tab.slug}/${page.slug}`,
       external: false,
       excerptNl: page.excerptNl,
       excerptEn: page.excerptEn,
+      excerptFallbackLang:
+        !page.excerptEn?.trim() && Boolean(page.excerptNl?.trim()) ? ("nl-BE" as const) : undefined,
       imageKey: page.imageKey,
       focus: toImageFocus(page.imageFocusX, page.imageFocusY),
       order: page.order ?? 0,
@@ -85,10 +93,13 @@ export function categoryTiles(tab: {
       key: `link:${link.id}`,
       labelNl: link.labelNl,
       labelEn: link.labelEn,
+      labelFallbackLang:
+        !link.labelEn.trim() && Boolean(link.labelNl.trim()) ? ("nl-BE" as const) : undefined,
       href: link.url,
       external: isExternalUrl(link.url),
       excerptNl: null,
       excerptEn: null,
+      excerptFallbackLang: undefined,
       imageKey: link.imageKey,
       focus: null,
       order: link.order ?? 0,
@@ -97,15 +108,31 @@ export function categoryTiles(tab: {
 
   return tiles
     .sort((a, b) => a.order - b.order)
-    .map(({ key, labelNl, labelEn, href, external, excerptNl, excerptEn, imageKey, focus }) => ({
-      key,
-      labelNl,
-      labelEn,
-      href,
-      external,
-      excerptNl,
-      excerptEn,
-      imageKey,
-      focus,
-    }));
+    .map(
+      ({
+        key,
+        labelNl,
+        labelEn,
+        labelFallbackLang,
+        href,
+        external,
+        excerptNl,
+        excerptEn,
+        excerptFallbackLang,
+        imageKey,
+        focus,
+      }) => ({
+        key,
+        labelNl,
+        labelEn,
+        ...(labelFallbackLang ? { labelFallbackLang } : {}),
+        href,
+        external,
+        excerptNl,
+        excerptEn,
+        ...(excerptFallbackLang ? { excerptFallbackLang } : {}),
+        imageKey,
+        focus,
+      }),
+    );
 }

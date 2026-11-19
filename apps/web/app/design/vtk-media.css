@@ -112,7 +112,7 @@
 }
 
 .vtk-media-page .vtk-immich-album-card:focus-visible .vtk-immich-album-cover {
-  outline: 3px solid var(--yellow);
+  outline: 3px solid var(--ink);
   outline-offset: 3px;
 }
 
@@ -150,7 +150,7 @@
 }
 
 .vtk-media-album-disclosure button:focus-visible {
-  outline: 3px solid var(--yellow);
+  outline: 3px solid var(--ink);
   outline-offset: 3px;
 }
 
@@ -234,7 +234,7 @@
 .vtk-media-magazine-archive-toggle:focus-visible,
 .vtk-media-magazine-archive-open:focus-visible {
   z-index: 1;
-  outline: 3px solid var(--yellow);
+  outline: 3px solid var(--ink);
   outline-offset: 2px;
 }
 
@@ -356,7 +356,7 @@
 
 .vtk-media-magazine-open:focus-visible {
   z-index: 1;
-  outline: 3px solid var(--yellow);
+  outline: 3px solid var(--ink);
   outline-offset: -3px;
 }
 
@@ -570,15 +570,16 @@
   font-size: 12px;
 }
 
-.vtk-media-document-bar nav {
+.vtk-media-document-bar [role="toolbar"] {
+  position: relative;
   display: flex;
   flex: 0 0 auto;
   align-items: center;
   gap: 6px;
 }
 
-.vtk-media-document-bar nav a,
-.vtk-media-document-bar nav button {
+.vtk-media-document-bar [role="toolbar"] a,
+.vtk-media-document-bar [role="toolbar"] button {
   display: inline-flex;
   min-height: 40px;
   align-items: center;
@@ -595,23 +596,23 @@
   cursor: pointer;
 }
 
-.vtk-media-document-bar nav button {
+.vtk-media-document-bar [role="toolbar"] button {
   width: 40px;
   padding: 0;
 }
 
-.vtk-media-document-bar nav a:hover,
-.vtk-media-document-bar nav button:hover {
+.vtk-media-document-bar [role="toolbar"] a:hover,
+.vtk-media-document-bar [role="toolbar"] button:hover {
   border-color: var(--ink);
 }
 
-.vtk-media-document-bar nav a:focus-visible,
-.vtk-media-document-bar nav button:focus-visible {
-  outline: 3px solid var(--yellow);
+.vtk-media-document-bar [role="toolbar"] a:focus-visible,
+.vtk-media-document-bar [role="toolbar"] button:focus-visible {
+  outline: 3px solid var(--ink);
   outline-offset: 2px;
 }
 
-.vtk-media-document-bar nav svg {
+.vtk-media-document-bar [role="toolbar"] svg {
   width: 17px;
   height: 17px;
 }
@@ -650,6 +651,73 @@
   width: max-content;
   align-items: center;
   justify-content: center;
+}
+
+.vtk-media-pdf-stage {
+  position: relative;
+}
+
+.vtk-media-pdf-stage .textLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  text-align: initial;
+  -webkit-text-size-adjust: none;
+  -moz-text-size-adjust: none;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+}
+
+.vtk-media-pdf-stage .textLayer :is(span, br) {
+  position: absolute;
+  color: transparent;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+
+.vtk-media-pdf-stage .textLayer > :not(.markedContent),
+.vtk-media-pdf-stage .textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+}
+
+.vtk-media-pdf-stage .textLayer span.markedContent {
+  top: 0;
+  height: 0;
+}
+
+.vtk-media-pdf-stage .textLayer span[role="img"] {
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
+.vtk-media-pdf-stage .textLayer ::selection {
+  background: rgba(0, 0, 255, 0.25);
+  background: color-mix(in srgb, AccentColor, transparent 75%);
+}
+
+.vtk-media-pdf-stage .textLayer br::selection {
+  background: transparent;
+}
+
+.vtk-media-pdf-stage .textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.vtk-media-pdf-stage .textLayer.selecting .endOfContent {
+  top: 0;
 }
 
 .vtk-media-pdf-viewer canvas {
@@ -753,8 +821,9 @@
 }
 
 .vtk-media-pdf-pagination button:focus-visible {
-  outline: 3px solid var(--yellow);
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
+  box-shadow: 0 0 0 2px #fff;
 }
 
 .vtk-media-pdf-pagination svg {
@@ -872,12 +941,12 @@
     padding-left: 14px;
   }
 
-  .vtk-media-document-bar nav a {
+  .vtk-media-document-bar [role="toolbar"] a {
     width: 40px;
     padding: 0;
   }
 
-  .vtk-media-document-bar nav a span {
+  .vtk-media-document-bar [role="toolbar"] a span {
     position: absolute;
     width: 1px;
     height: 1px;

@@ -3,6 +3,7 @@ import { pick, type Locale } from "@vtk/i18n";
 import { Markdown } from "@/components/ui/Markdown";
 import { MapPinIcon, UsersIcon } from "@/components/ui/icons";
 import { organiserName } from "@/lib/calendar/organiser";
+import { catChipStyle } from "@/lib/catContrast";
 import { EVENT_MOMENTS_VISIBLE, momentsSummary } from "@/lib/calendar/moments";
 import { publicUrl } from "@/lib/storage";
 import { defaultEventImageFor, eventCategorySlugs } from "@/lib/defaultEventImage";
@@ -159,7 +160,7 @@ export function EventHead({ event, locale }: { event: CalendarEventPageData; loc
                 key={c.slug}
                 href={`${base}/kalender/${c.slug}`}
                 className="vtk-event-tag audience"
-                style={{ background: c.colour, borderColor: c.colour }}
+                style={catChipStyle(c.colour)}
               >
                 {audienceLabel(c, locale)}
               </Link>
@@ -243,7 +244,9 @@ export async function EventPhotoAndAbout({
         <h2>{locale === "nl" ? "Over dit event" : "About this event"}</h2>
         {description ? (
           <div className="prose-vtk vtk-event-description">
-            <Markdown locale={locale}>{description}</Markdown>
+            <Markdown baseHeadingLevel={3} locale={locale}>
+              {description}
+            </Markdown>
           </div>
         ) : (
           <p>

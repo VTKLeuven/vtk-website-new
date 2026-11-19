@@ -31,6 +31,7 @@ function HoursViz({
   now: Date;
   locale: Locale;
 }) {
+  const nl = locale === "nl";
   const todayNl = dutchDayNameForDate(now);
   return (
     <div className="hours-viz">
@@ -39,20 +40,32 @@ function HoursViz({
         const dayIndex = Math.max(0, DUTCH_FULL_DAYS.indexOf(full as (typeof DUTCH_FULL_DAYS)[number]));
         const row = findEntryForFullDay(entries, full);
         const hours =
-          row?.hours ?? (locale === "nl" ? "Gesloten" : "Closed");
+          row?.hours ?? (nl ? "Gesloten" : "Closed");
         const closed = isClosedHours(hours);
         const pct = barPercentForHours(hours);
         const isToday = full === todayNl;
-        const abb = shortWeekday(new Date(2020, 0, 6 + dayIndex), locale);
+        const dayDate = new Date(2020, 0, 6 + dayIndex);
+        const abb = shortWeekday(dayDate, locale);
+        const fullDay = nl
+          ? entry.dayNl
+          : entry.dayEn?.trim() || dayDate.toLocaleDateString("en-GB", { weekday: "long" });
         return (
           <div key={entry.dayNl} style={{ display: "contents" }}>
-            <div className={`day-lbl${isToday ? " today" : ""}`}>{abb}</div>
+            <div className={`day-lbl${isToday ? " today" : ""}`}>
+              <span aria-hidden="true">{abb}</span>
+              <span className="sr-only">
+                {fullDay}
+                {isToday ? (nl ? " (vandaag)" : " (today)") : ""}
+              </span>
+            </div>
             <div className={`bar-track${closed ? " closed" : ""}${isToday ? " today-row" : ""}`}>
               {!closed && pct ? (
                 <div className="bar" style={{ left: pct.left, width: pct.width }}>
                   {hours.replace(/\s*[\u2013\u2014–-]\s*/, " → ")}
                 </div>
-              ) : null}
+              ) : (
+                <span className="sr-only">{closed ? (nl ? "gesloten" : "closed") : hours}</span>
+              )}
             </div>
           </div>
         );
@@ -135,7 +148,7 @@ export async function AanbodEditorial({ locale }: { locale: Locale }) {
         </div>
       </header>
 
-      <main className="aanbod-wrap">
+      <div className="aanbod-wrap">
         <section className="live-ribbon">
           <div className="now-label">
             {locale === "nl" ? "Vandaag" : "Today"}
@@ -285,27 +298,27 @@ export async function AanbodEditorial({ locale }: { locale: Locale }) {
             <p style={{ margin: "14px 0", fontSize: 12, color: "var(--muted)", lineHeight: 1.45 }}>
               {locale === "nl" ? (
                 <>
-                  Vergeet{" "}
+                  Vergeet niet{" "}
                   <a
                     href="https://cudi.vtk.be/vtk/account/slots"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="vtk-link"
                   >
-                    hier
-                  </a>{" "}
-                  geen tijdslot te boeken! Zonder een tijdslot kan je je boeken niet ophalen!
+                    een tijdslot te boeken
+                  </a>
+                  ! Zonder een tijdslot kan je je boeken niet ophalen!
                 </>
               ) : (
                 <>
-                  Don&apos;t forget to book a time slot{" "}
+                  Don&apos;t forget to{" "}
                   <a
                     href="https://cudi.vtk.be/vtk/account/slots"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="vtk-link"
                   >
-                    here
+                    book a time slot
                   </a>
                   ! Without a time slot you cannot pick up your books!
                 </>
@@ -512,7 +525,7 @@ export async function AanbodEditorial({ locale }: { locale: Locale }) {
             <span className="coords">50.861° N · 4.685° E · Heverlee</span>
           </div>
         </section>
-      </main>
+      </div>
     </div>
   );
 }

@@ -15,7 +15,15 @@ import { useLandingSource } from "./useLandingSource";
  * ticketpagina ziet dan de eventpagina als referrer en telt het als
  * `kalender-event`.
  */
-export function TicketShopLink({ href, ...props }: ComponentProps<typeof Link> & { href: string }) {
+export function TicketShopLink({
+  href,
+  children,
+  ...props
+}: ComponentProps<typeof Link> & { href: string }) {
   const source = useLandingSource();
-  return <Link href={`${href}${sourceQuery(source)}`} {...props} />;
+  return (
+    <Link href={`${href}${sourceQuery(source)}`} {...props}>
+      {children}
+    </Link>
+  );
 }

@@ -18,7 +18,7 @@
 
 .tshop {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 400px;
+  grid-template-columns: minmax(0, 1fr);
   gap: clamp(24px, 3.5vw, 44px);
   align-items: start;
 }
@@ -27,6 +27,18 @@
   display: grid;
   gap: clamp(24px, 3vw, 36px);
   min-width: 0;
+}
+
+.tshop-practical {
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+}
+
+.tshop-practical .tshop-rail,
+.tshop-practical .tshop-event-actions,
+.tshop-practical .tshop-event-when {
+  margin: 0;
 }
 
 /* Dezelfde gele streep als "Over dit event" in de kalender, even breed als de kop. */
@@ -134,23 +146,7 @@
 
 /* ---------- Het ticketpaneel ---------- */
 
-/* De rechterkolom: het paneel en het praktische eronder blijven samen staan
-   terwijl je door de beschrijving scrolt. */
-.tshop-side {
-  position: sticky;
-  top: 96px;
-  display: grid;
-  gap: 22px;
-  align-self: start;
-}
-
-.tshop-side > .tshop-panel {
-  position: static;
-}
-
 .tshop-panel {
-  position: sticky;
-  top: 96px;
   display: grid;
   gap: 14px;
   padding: 22px;
@@ -310,7 +306,7 @@
   grid-template-columns: 38px 32px 38px;
   height: 40px;
   overflow: hidden;
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--control-border);
   border-radius: 999px;
   background: var(--surface);
 }
@@ -329,17 +325,18 @@
   cursor: pointer;
 }
 
-.tshop-stepper button:hover:not(:disabled) {
+.tshop-stepper button:hover:not(:disabled):not([aria-disabled="true"]) {
   background: var(--paper-2);
 }
 
-.tshop-stepper button:disabled {
+.tshop-stepper button:disabled,
+.tshop-stepper button[aria-disabled="true"] {
   color: rgba(14, 26, 54, 0.25);
   cursor: default;
 }
 
 .tshop-stepper button:focus-visible {
-  outline: 2px solid var(--accent-2);
+  outline: 2px solid var(--ink);
   outline-offset: -2px;
 }
 
@@ -366,6 +363,7 @@
 }
 
 .tshop-summary {
+  position: relative;
   display: grid;
   gap: 12px;
 }
@@ -627,34 +625,214 @@
   font-size: 13px;
 }
 
-@media (max-width: 960px) {
+/* ---------- Bestelling nakijken (stap 2) ---------- */
+
+.tshop-review-section {
+  display: grid;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.tshop-review-section h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.tshop-review-event {
+  display: grid;
+  gap: 3px;
+  color: var(--body);
+  font-size: 14px;
+}
+
+.tshop-review-event strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.tshop-review-lines {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.tshop-review-lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--body);
+}
+
+.tshop-review-lines li span:last-child {
+  color: var(--ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tshop-review-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.tshop-review-total strong {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tshop-review-attendees {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tshop-review-attendees > li {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  font-size: 14px;
+}
+
+.tshop-review-attendee-type {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tshop-review-attendees strong {
+  color: var(--ink);
+}
+
+.tshop-review-answers {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.tshop-review-answers > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 12px;
+}
+
+.tshop-review-answers dt {
+  color: var(--muted);
+}
+
+.tshop-review-answers dd {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.tshop-review-meta {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+}
+
+.tshop-review-meta > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.tshop-review-meta dt {
+  color: var(--muted);
+}
+
+.tshop-review-meta dd {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.tshop-review-notice {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: inset 3px 0 0 var(--yellow);
+  background: var(--paper);
+  color: var(--body);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.tshop-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tshop-review-actions .tshop-cta {
+  flex: 1 1 220px;
+  width: auto;
+}
+
+.tshop-review-actions .ticket-secondary-button {
+  cursor: pointer;
+}
+
+@media (min-width: 961px) {
   .tshop {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 400px;
+    grid-template-rows: auto 1fr;
+    column-gap: clamp(24px, 3.5vw, 44px);
+    row-gap: 22px;
   }
 
-  /* Op een smal scherm staan de tickets eerst: daarvoor kwam je. Het
-     praktische zakt dan onder de beschrijving, zodat het niet tussen de
-     tickets en de poster in staat. */
-  .tshop-side {
-    display: contents;
+  .tshop-main {
+    grid-column: 1;
+    grid-row: 1 / -1;
   }
 
   .tshop-panel {
-    position: static;
-    order: -1;
+    grid-column: 2;
+    grid-row: 1;
   }
 
-  .tshop-side > .tshop-rail {
-    order: 1;
-    margin: 0;
+  .tshop-practical {
+    grid-column: 2;
+    grid-row: 2;
   }
 
-  /* Op de eventpagina volgen interesse en agenda meteen op de tickets, voor de
-     affiche: het zijn dezelfde soort beslissingen. */
-  .tshop-side > .tshop-event-actions,
-  .tshop-side > .tshop-event-when {
-    order: -1;
-    margin: 0;
+  .tshop-practical .tshop-rail,
+  .tshop-practical .tshop-event-when {
+    margin: 0 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tshop-cta {
+    transition: none;
   }
 }
 

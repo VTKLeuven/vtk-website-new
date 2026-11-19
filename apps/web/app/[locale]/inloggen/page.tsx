@@ -68,7 +68,7 @@ export default async function LoginPage({
       <div className="vtk-auth-panel">
         <p className="vtk-auth-kicker">{dict.auth.signInLead}</p>
         <h1 className="vtk-auth-title">{dict.auth.signIn}</h1>
-        {hasKulError && <p className="vtk-auth-error">{dict.auth.kulSignInFailed}</p>}
+        {hasKulError && <p role="alert" className="vtk-auth-error">{dict.auth.kulSignInFailed}</p>}
 
         {/* Eén grote knop, want dit is de weg voor bijna iedereen die hier komt.
             Het wachtwoordformulier staat eronder achter een regel tekst; zie

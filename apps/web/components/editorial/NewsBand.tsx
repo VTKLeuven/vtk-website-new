@@ -4,6 +4,7 @@ import type { Locale } from "@vtk/i18n";
 import { ArrowRight } from "lucide-react";
 import { Markdown } from "@/components/ui/Markdown";
 import { isExternalUrl, withLocaleBase } from "@/lib/href";
+import type { FallbackLang } from "@/lib/langFallback";
 import { magazineEventName, umamiEvent } from "@/lib/analytics";
 import { NEWS_LETTER_LINES, composeNews, isFreshNews, type NewsSource } from "@/lib/news/rules";
 import type { NewsEntry } from "@/lib/news/load";
@@ -61,6 +62,7 @@ export function NewsLink({
   base,
   className,
   style,
+  lang,
   tracking,
   ariaHidden,
   children,
@@ -69,6 +71,7 @@ export function NewsLink({
   base: string;
   className?: string;
   style?: CSSProperties;
+  lang?: FallbackLang;
   /** Umami-attributen, uit `umamiEvent`. */
   tracking?: Record<string, string>;
   /** Een tweede link naar dezelfde plek: niet nog eens voorlezen, niet nog eens tabben. */
@@ -85,6 +88,7 @@ export function NewsLink({
         href={target}
         target="_blank"
         rel="noopener noreferrer"
+        lang={lang}
         {...hidden}
         {...tracking}
       >
@@ -93,7 +97,7 @@ export function NewsLink({
     );
   }
   return (
-    <Link className={className} style={style} href={target} {...hidden} {...tracking}>
+    <Link className={className} style={style} href={target} lang={lang} {...hidden} {...tracking}>
       {children}
     </Link>
   );
@@ -130,10 +134,13 @@ export function pinParts(date: string, locale: Locale) {
 function CardPin({ date, locale }: { date: string; locale: Locale }) {
   const { weekday, day, month } = pinParts(date, locale);
   return (
-    <span className="ev-card-pin" aria-hidden="true">
-      <i>{weekday}</i>
-      <b>{day}</b>
-      <i>{month}</i>
+    <span className="ev-card-pin">
+      <i aria-hidden="true">{weekday}</i>
+      <b aria-hidden="true">{day}</b>
+      <i aria-hidden="true">{month}</i>
+      <time className="sr-only" dateTime={date}>
+        {newsDate(date, locale)}
+      </time>
     </span>
   );
 }
@@ -189,7 +196,7 @@ export function NewsAuthor({ author }: { author: NonNullable<NewsEntry["author"]
       )}
       <div>
         <b>{author.name}</b>
-        {author.role ? <span>{author.role}</span> : null}
+        {author.role ? <span lang={author.roleLang}>{author.role}</span> : null}
       </div>
     </div>
   );
@@ -223,7 +230,7 @@ function FeaturedLetter({
           <NewsKicker entry={entry} locale={locale} now={now} />
         )}
         <h3 className="news-title">
-          <NewsLink href={entry.href} base={base} className="news-title-link">
+          <NewsLink href={entry.href} base={base} className="news-title-link" lang={entry.titleLang}>
             {entry.title}
           </NewsLink>
         </h3>
@@ -234,11 +241,21 @@ function FeaturedLetter({
             less: nl ? "Minder tonen" : "Show less",
           }}
         >
-          <Markdown locale={locale}>{entry.body ?? ""}</Markdown>
+          {entry.bodyLang ? (
+            <div lang={entry.bodyLang}>
+              <Markdown locale={locale} baseHeadingLevel={4}>
+                {entry.body ?? ""}
+              </Markdown>
+            </div>
+          ) : (
+            <Markdown locale={locale} baseHeadingLevel={4}>
+              {entry.body ?? ""}
+            </Markdown>
+          )}
         </NewsLetter>
         {entry.ctaHref ? (
           <div className="news-feat-foot">
-            <NewsLink href={entry.ctaHref} base={base} className="news-go">
+            <NewsLink href={entry.ctaHref} base={base} className="news-go" lang={entry.ctaLang}>
               {entry.ctaLabel} <ArrowRight size={15} aria-hidden="true" />
             </NewsLink>
           </div>
@@ -273,16 +290,25 @@ function FeaturedPost({
       <div className="news-feat-body">
         <NewsKicker entry={entry} locale={locale} now={now} date={!entry.imageUrl} />
         <h3 className="news-title">
-          <NewsLink href={entry.href} base={base} className="news-feat-link" tracking={newsTracking(entry)}>
+          <NewsLink
+            href={entry.href}
+            base={base}
+            className="news-feat-link"
+            lang={entry.titleLang}
+            tracking={newsTracking(entry)}
+          >
             {entry.title}
           </NewsLink>
         </h3>
-        <p className="news-excerpt">{entry.line}</p>
+        <p className="news-excerpt" lang={entry.lineLang}>
+          {entry.line}
+        </p>
         <div className="news-feat-foot">
           <NewsLink
             href={entry.ctaHref ?? entry.href}
             base={base}
             className="news-go is-primary"
+            lang={entry.ctaLang}
             tracking={newsTracking(entry)}
           >
             {entry.ctaLabel} <ArrowRight size={15} aria-hidden="true" />
@@ -307,6 +333,13 @@ function tileAction(entry: NewsEntry, nl: boolean): string {
     default:
       return nl ? "Lezen" : "Read";
   }
+}
+
+function tileActionLang(entry: NewsEntry): FallbackLang | undefined {
+  if (entry.source === "signup" || (entry.source === "notice" && entry.ctaHref)) {
+    return entry.ctaLang;
+  }
+  return undefined;
 }
 
 /**
@@ -345,17 +378,26 @@ function NewsTile({
           <NewsKicker entry={entry} locale={locale} now={now} date={false} />
         </div>
         <h3 className="ev-card-title">
-          <NewsLink href={entry.href} base={base} className="ev-card-link" tracking={tracking}>
+          <NewsLink
+            href={entry.href}
+            base={base}
+            className="ev-card-link"
+            lang={entry.titleLang}
+            tracking={tracking}
+          >
             {entry.title}
           </NewsLink>
         </h3>
         <div className="ev-card-foot">
-          <span className="ev-card-when">{entry.place || entry.line}</span>
+          <span className="ev-card-when" lang={!entry.place ? entry.lineLang : undefined}>
+            {entry.place || entry.line}
+          </span>
           <span className="ev-card-actions">
             <NewsLink
               href={ownTarget ? entry.ctaHref! : entry.href}
               base={base}
               className="news-go is-small"
+              lang={tileActionLang(entry)}
               tracking={tracking}
               ariaHidden={!ownTarget}
             >
@@ -397,8 +439,10 @@ export function NewsRow({
       </span>
       <span className="news-row-text">
         <NewsKicker entry={entry} locale={locale} now={now} />
-        <b>{entry.title}</b>
-        <span className="news-row-line">{entry.line}</span>
+        <b lang={entry.titleLang}>{entry.title}</b>
+        <span className="news-row-line" lang={entry.lineLang}>
+          {entry.line}
+        </span>
       </span>
       <span className={`news-thumb${entry.imageUrl ? "" : " is-blank"}`} aria-hidden="true">
         {entry.imageUrl ? (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { CheckCircle2, Clock3, Download, Maximize2, QrCode, XCircle } from "lucide-react";
 import type { PublicTicket } from "./types";
 import { TicketQrModal } from "./TicketQrModal";
@@ -31,10 +31,15 @@ export function TicketPass({
   eventLocation?: string | null;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
+  const closeModal = useCallback(() => {
+    setModalOpen(false);
+  }, []);
   const valid = ticket.status === "VALID" || ticket.status === "ISSUED";
   const checkedIn = Boolean(ticket.checkedInAt) || ticket.status === "CHECKED_IN";
   const showQr = Boolean(ticket.credential) && (valid || checkedIn);
   const nl = locale === "nl";
+  const shortCode = ticket.publicId.slice(-6).toUpperCase();
+  const ticketDescriptor = `${ticket.attendeeName} (${shortCode})`;
 
   return (
     <>
@@ -47,7 +52,11 @@ export function TicketPass({
               type="button"
               className="ticket-pass-qr-trigger"
               onClick={() => setModalOpen(true)}
-              aria-label={nl ? "QR-code vergroten om te scannen" : "Enlarge QR code to scan"}
+              aria-label={
+                nl
+                  ? `QR-code vergroten voor ${ticketDescriptor}`
+                  : `Enlarge QR code for ${ticketDescriptor}`
+              }
               title={nl ? "Klik om te vergroten" : "Click to enlarge"}
             >
               <div className="ticket-pass-qr-box">
@@ -56,18 +65,22 @@ export function TicketPass({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`/api/tickets/${encodeURIComponent(ticket.id)}/qr`}
-                  alt={nl ? "QR-code van ticket" : "Ticket QR code"}
+                  alt={
+                    nl
+                      ? `QR-code van ticket voor ${ticketDescriptor}`
+                      : `Ticket QR code for ${ticketDescriptor}`
+                  }
                 />
                 <span className="ticket-pass-qr-zoom-badge" aria-hidden="true">
                   <Maximize2 size={12} />
                 </span>
               </div>
-              <span>{ticket.publicId.slice(-6).toUpperCase()}</span>
+              <span>{shortCode}</span>
             </button>
           ) : (
             <>
               <QrCode size={40} aria-hidden="true" />
-              <span>{ticket.publicId.slice(-6).toUpperCase()}</span>
+              <span>{shortCode}</span>
             </>
           )}
         </div>
@@ -106,6 +119,11 @@ export function TicketPass({
               href={ticket.pdfUrl}
               target="_blank"
               rel="noreferrer"
+              aria-label={
+                nl
+                  ? `Open ticket voor ${ticketDescriptor}`
+                  : `Open ticket for ${ticketDescriptor}`
+              }
             >
               <Download size={17} aria-hidden="true" />
               {nl ? "Open ticket" : "Open ticket"}
@@ -137,7 +155,7 @@ export function TicketPass({
         eventTitle={eventTitle}
         eventDate={eventDate}
         eventLocation={eventLocation}
-        onClose={() => setModalOpen(false)}
+        onClose={closeModal}
       />
     ) : null}
   </>

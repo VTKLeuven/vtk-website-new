@@ -6,6 +6,7 @@ import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import { OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
 import { categoryTiles } from "@/lib/categoryTiles";
 import { focusPosition } from "@/lib/imageFocus";
+import { fallbackLang, pickWithLang } from "@/lib/langFallback";
 import { hasLocale } from "@/lib/locale";
 import { loadHeaderTabWithPages } from "@/lib/pageQueries";
 import { buildMetadata } from "@/lib/seo";
@@ -43,22 +44,29 @@ export default async function HeaderOverviewPage({ params }: { params: Params })
   if (tab.externalUrl) redirect(tab.externalUrl);
 
   const tiles = categoryTiles(tab);
-  const intro = pick(tab.introNl ?? "", tab.introEn ?? "", locale);
-  const ctaLabel = pick(tab.ctaLabelNl ?? "", tab.ctaLabelEn ?? "", locale);
+  const title = pickWithLang(tab.labelNl, tab.labelEn, locale);
+  const intro = pickWithLang(tab.introNl ?? "", tab.introEn ?? "", locale);
+  const ctaLabel = pickWithLang(tab.ctaLabelNl ?? "", tab.ctaLabelEn ?? "", locale);
   // Intro en knop komen uit de categorie zelf, beheerd via /admin/inhoud.
-  const showCta = Boolean(ctaLabel && tab.ctaUrl);
+  const showCta = Boolean(ctaLabel.text && tab.ctaUrl);
 
   return (
     <div className="vtk-page">
       <header className="vtk-page-head">
         <div>
-          <h1 className="vtk-page-title">{pick(tab.labelNl, tab.labelEn, locale)}</h1>
-          {intro && <p className="vtk-page-subtitle">{intro}</p>}
+          <h1 className="vtk-page-title" lang={title.lang}>
+            {title.text}
+          </h1>
+          {intro.text && (
+            <p className="vtk-page-subtitle" lang={intro.lang}>
+              {intro.text}
+            </p>
+          )}
         </div>
         {showCta && (
           <div>
-            <a href={tab.ctaUrl!} className="vtk-button vtk-button-primary arrow">
-              {ctaLabel}
+            <a href={tab.ctaUrl!} className="vtk-button vtk-button-primary arrow" lang={ctaLabel.lang}>
+              {ctaLabel.text}
             </a>
           </div>
         )}
@@ -70,7 +78,11 @@ export default async function HeaderOverviewPage({ params }: { params: Params })
         ) : (
           <ul className="vtk-tile-grid">
             {tiles.map((tile) => {
-              const excerpt = pick(tile.excerptNl ?? "", tile.excerptEn ?? "", locale);
+              const tileTitle = pick(tile.labelNl, tile.labelEn, locale);
+              const tileTitleLang =
+                locale === "en" ? tile.labelFallbackLang : fallbackLang(tile.labelNl, tile.labelEn, locale);
+              const excerpt = pickWithLang(tile.excerptNl ?? "", tile.excerptEn ?? "", locale);
+              const excerptLang = excerpt.lang ?? (locale === "en" ? tile.excerptFallbackLang : undefined);
               const photo = publicUrl(tile.imageKey);
               const card = (
                 <article className="vtk-tile">
@@ -92,8 +104,12 @@ export default async function HeaderOverviewPage({ params }: { params: Params })
                     )}
                   </span>
                   <div className="vtk-tile-body">
-                    <h2>{pick(tile.labelNl, tile.labelEn, locale)}</h2>
-                    {excerpt && <p className="line-clamp-3">{excerpt}</p>}
+                    <h2 lang={tileTitleLang}>{tileTitle}</h2>
+                    {excerpt.text && (
+                      <p className="line-clamp-3" lang={excerptLang}>
+                        {excerpt.text}
+                      </p>
+                    )}
                     <span className="vtk-tile-cta">{dict.home.readMore} →</span>
                   </div>
                 </article>

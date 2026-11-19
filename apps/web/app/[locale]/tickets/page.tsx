@@ -77,7 +77,7 @@ export default async function TicketsPage({
         </Link>
       </header>
 
-      <main className="tcat-shell">
+      <div className="tcat-shell">
         {/* Links en geen knoppen: een filter hoort in de URL, zodat je "wat
             binnenkort komt" kan doorsturen en de pagina zonder JavaScript werkt. */}
         <nav className="tcat-filters" aria-label={nl ? "Filter de events" : "Filter the events"}>
@@ -148,7 +148,7 @@ export default async function TicketsPage({
             )}
           </section>
         )}
-      </main>
+      </div>
     </div>
   );
 }

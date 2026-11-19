@@ -63,6 +63,7 @@ export function MomentGrid({
   nowMinutes,
   locale,
   copy,
+  ariaDescribedBy,
 }: {
   days: MomentGridDay[];
   /** Vandaag in Brussel (`YYYY-MM-DD`) en hoe laat het er is: wat voorbij is, staat uit. */
@@ -70,12 +71,23 @@ export function MomentGrid({
   nowMinutes: number;
   locale: "nl" | "en";
   copy: MomentGridCopy;
+  ariaDescribedBy?: string;
 }) {
   const slots = useMemo(() => palPlusGridSlots(), []);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [focus, setFocus] = useState<Cell>({ day: 0, slot: 0 });
   const drag = useRef<Drag | null>(null);
+  const pointerHandledRef = useRef(false);
+  const pointerResetTimer = useRef<number | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pointerResetTimer.current !== null) {
+        window.clearTimeout(pointerResetTimer.current);
+      }
+    };
+  }, []);
 
   const past = (cell: Cell) => palPlusSlotIsPast(days[cell.day]!.date, slots[cell.slot]!, today, nowMinutes);
   const keyOf = (cell: Cell) => palPlusSlotKey(days[cell.day]!.date, slots[cell.slot]!);
@@ -113,6 +125,12 @@ export function MomentGrid({
     }
     function end() {
       drag.current = null;
+      if (pointerHandledRef.current && pointerResetTimer.current === null) {
+        pointerResetTimer.current = window.setTimeout(() => {
+          pointerHandledRef.current = false;
+          pointerResetTimer.current = null;
+        }, 0);
+      }
     }
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", end);
@@ -127,6 +145,11 @@ export function MomentGrid({
   function start(event: PointerEvent<HTMLDivElement>, cell: Cell) {
     if (past(cell) || event.button !== 0) return;
     event.preventDefault();
+    if (pointerResetTimer.current !== null) {
+      window.clearTimeout(pointerResetTimer.current);
+      pointerResetTimer.current = null;
+    }
+    pointerHandledRef.current = true;
     // Een vinger houdt anders de pointer vast op het eerste vakje.
     (event.target as HTMLElement).releasePointerCapture?.(event.pointerId);
     const current = { anchor: cell, add: !selected.has(keyOf(cell)), base: new Set(selected) };
@@ -146,20 +169,45 @@ export function MomentGrid({
     });
   }
 
+  function onCellClick(cell: Cell) {
+    if (pointerHandledRef.current) {
+      pointerHandledRef.current = false;
+      return;
+    }
+    setFocus(cell);
+    toggle(cell);
+  }
+
+  function onCellKeyDown(event: KeyboardEvent<HTMLDivElement>, cell: Cell) {
+    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key === " " || event.key === "Enter") {
+      event.preventDefault();
+      event.stopPropagation();
+      toggle(cell);
+    }
+  }
+
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    const moves: Record<string, Cell> = {
-      ArrowUp: { day: focus.day, slot: Math.max(0, focus.slot - 1) },
-      ArrowDown: { day: focus.day, slot: Math.min(slots.length - 1, focus.slot + 1) },
-      ArrowLeft: { day: Math.max(0, focus.day - 1), slot: focus.slot },
-      ArrowRight: { day: Math.min(days.length - 1, focus.day + 1), slot: focus.slot },
+    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+      return;
+    }
+    const moves: Record<string, Cell | null> = {
+      ArrowUp: focus.slot > 0 ? { day: focus.day, slot: focus.slot - 1 } : null,
+      ArrowDown: focus.slot < slots.length - 1 ? { day: focus.day, slot: focus.slot + 1 } : null,
+      ArrowLeft: focus.day > 0 ? { day: focus.day - 1, slot: focus.slot } : null,
+      ArrowRight: focus.day < days.length - 1 ? { day: focus.day + 1, slot: focus.slot } : null,
     };
-    const target = moves[event.key];
-    if (target) {
+    if (event.key in moves) {
+      const target = moves[event.key];
+      if (!target) return;
+      const element = gridRef.current?.querySelector<HTMLElement>(
+        `[data-pp-cell][data-day="${target.day}"][data-slot="${target.slot}"]`,
+      );
+      if (!element) return;
       event.preventDefault();
       setFocus(target);
-      gridRef.current
-        ?.querySelector<HTMLElement>(`[data-pp-cell][data-day="${target.day}"][data-slot="${target.slot}"]`)
-        ?.focus();
+      element.focus();
+      element.scrollIntoView({ block: "nearest", inline: "nearest" });
       return;
     }
     if (event.key === " " || event.key === "Enter") {
@@ -185,9 +233,18 @@ export function MomentGrid({
         </span>
       ))}
 
-      <div ref={gridRef} className="pp-grid" role="grid" aria-label={copy.label} aria-multiselectable="true" onKeyDown={onKeyDown}>
+      <div
+        ref={gridRef}
+        className="pp-grid"
+        role="grid"
+        tabIndex={-1}
+        aria-label={copy.label}
+        aria-describedby={ariaDescribedBy}
+        aria-multiselectable="true"
+        onKeyDown={onKeyDown}
+      >
         <div className="pp-grid-row pp-grid-head" role="row" style={columns}>
-          <span role="columnheader" aria-hidden="true" />
+          <span role="columnheader" aria-label={locale === "nl" ? "Uur" : "Time"} />
           {days.map((day) => (
             <span key={day.date} role="columnheader" aria-label={day.long} className="pp-grid-day">
               <span className="pp-grid-weekday">{day.weekday}</span>
@@ -229,6 +286,8 @@ export function MomentGrid({
                   tabIndex={focused ? 0 : -1}
                   className="pp-grid-cell"
                   onPointerDown={(event) => start(event, cell)}
+                  onClick={() => onCellClick(cell)}
+                  onKeyDown={(event) => onCellKeyDown(event, cell)}
                   onFocus={() => setFocus(cell)}
                 />
               );

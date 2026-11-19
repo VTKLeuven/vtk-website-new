@@ -131,17 +131,21 @@ export function InfoTip({
   };
 
   return (
-    <span className={["inline-flex align-middle", className ?? ""].join(" ")}>
+    <span
+      className={["inline-flex align-middle", className ?? ""].join(" ")}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(null);
+      }}
+    >
       <button
         ref={buttonRef}
         type="button"
         aria-label={label}
         aria-expanded={open !== null}
         aria-controls={panelId}
-        aria-describedby={open ? panelId : undefined}
         data-row-action
         className={[
-          "grid size-5 place-items-center rounded-full text-vtk-muted transition-colors hover:text-vtk-ink focus-visible:text-vtk-ink",
+          "grid size-7 place-items-center rounded-full text-vtk-muted transition-colors hover:text-vtk-ink focus-visible:text-vtk-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink",
           open === "pinned" ? "text-vtk-ink" : "",
         ].join(" ")}
         onPointerEnter={hoverIn}
@@ -165,11 +169,11 @@ export function InfoTip({
           ref={panelRef}
           id={panelId}
           popover="manual"
-          role="tooltip"
+          role="region"
           aria-label={label}
           onPointerEnter={hoverIn}
           onPointerLeave={hoverOut}
-          className="vtk-info-tip fixed inset-auto m-0 w-max max-w-[min(26rem,calc(100%-16px))] space-y-2 rounded-xl border border-vtk-blue/15 bg-white p-3 text-left text-xs leading-relaxed font-normal text-vtk-ink normal-case tracking-normal shadow-[0_12px_28px_rgb(10_15_31/0.14)]"
+          className="vtk-info-tip fixed inset-auto m-0 w-max max-w-[min(26rem,calc(100%-16px))] space-y-2 rounded-xl border border-vtk-muted/70 bg-vtk-surface-elevated p-3 text-left text-xs leading-relaxed font-normal text-vtk-ink normal-case tracking-normal shadow-[0_12px_28px_rgb(10_15_31/0.14)]"
         >
           {children}
         </div>

@@ -80,7 +80,7 @@ export default async function FormThanksPage({
         </div>
       </header>
 
-      <main className="vtk-form-page">
+      <div className="vtk-form-page">
         <div className="vtk-form-notice" data-tone="done">
           {query.wachtlijst ? (
             <p>
@@ -124,7 +124,7 @@ export default async function FormThanksPage({
             {nl ? "Naar alle formulieren" : "To all forms"}
           </Link>
         </div>
-      </main>
+      </div>
     </>
   );
 }

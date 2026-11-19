@@ -5,7 +5,7 @@
      eventuele overlap achter de header tuckt i.p.v. erover. */
   top: calc(var(--vtk-header-height, 0px) + 16px);
   right: 16px;
-  z-index: 40;
+  z-index: 140;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -20,7 +20,7 @@
   align-items: flex-start;
   gap: 10px;
   padding: 12px 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-border, rgba(14, 26, 54, 0.5));
   border-radius: 14px;
   background: #fff;
   color: var(--ink);
@@ -47,38 +47,56 @@
 
 .vtk-toast-close {
   flex: none;
-  padding: 0 2px;
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  min-height: 28px;
+  margin: -4px -4px -4px 0;
+  padding: 0;
   border: 0;
+  border-radius: 8px;
   background: transparent;
-  color: inherit;
-  opacity: 0.6;
+  color: currentColor;
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
 }
 
 .vtk-toast-close:hover {
-  opacity: 1;
+  background: rgba(10, 15, 31, 0.08);
+}
+
+.vtk-toast-close:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
 }
 
 .vtk-toast-success {
-  border-color: #b8dec1;
+  border-color: #2f6f33;
   background: #eef8ea;
   color: #2f6f33;
 }
 
 .vtk-toast-error {
-  border-color: #f0c6bd;
+  border-color: #b42318;
   background: #fff0ed;
   color: #9d2f1f;
 }
 
 .vtk-toast-warning {
-  border-color: #f0d76d;
+  border-color: #966900;
   background: #fff7cf;
+  color: #5c4200;
 }
 
 .vtk-toast-info {
-  border-color: #c9d5ff;
+  border-color: #3a5fc4;
   background: #eef2ff;
+  color: #1e3a8a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vtk-toast {
+    animation: none;
+  }
 }

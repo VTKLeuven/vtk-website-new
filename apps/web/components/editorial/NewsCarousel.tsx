@@ -50,11 +50,71 @@ export function NewsCarousel({
   const root = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLOListElement>(null);
   const hold = useRef(false);
+  const isAutoplayStep = useRef(false);
+  const userInteracted = useRef(false);
+  const settleTimer = useRef<number>(0);
+  const autoplayResetTimer = useRef<number>(0);
   const [scrollable, setScrollable] = useState(false);
   const [paused, setPaused] = useState(false);
   const [reduced, setReduced] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
   // Telt handmatige stappen, zodat de wekker na een klik opnieuw begint te tellen.
   const [nudge, setNudge] = useState(0);
+
+  const announceVisibleRange = useCallback(() => {
+    const el = track.current;
+    if (!el) return;
+    const slides = Array.from(el.children).filter(
+      (child): child is HTMLElement => child instanceof HTMLElement,
+    );
+    if (slides.length === 0) return;
+
+    const leftEdge = el.scrollLeft;
+    const rightEdge = leftEdge + el.clientWidth;
+    const visibleIndices: number[] = [];
+    slides.forEach((slide, index) => {
+      const start = slide.offsetLeft;
+      const end = start + slide.offsetWidth;
+      const overlap = Math.min(end, rightEdge) - Math.max(start, leftEdge);
+      if (overlap >= slide.offsetWidth * 0.5) {
+        visibleIndices.push(index);
+      }
+    });
+
+    if (visibleIndices.length === 0) {
+      let closest = 0;
+      let bestDist = Number.POSITIVE_INFINITY;
+      slides.forEach((slide, index) => {
+        const dist = Math.abs(slide.offsetLeft - leftEdge);
+        if (dist < bestDist) {
+          bestDist = dist;
+          closest = index;
+        }
+      });
+      visibleIndices.push(closest);
+    }
+
+    const first = visibleIndices[0]!;
+    const last = visibleIndices[visibleIndices.length - 1]!;
+    const rangeLabel = first === last ? String(first + 1) : `${first + 1}-${last + 1}`;
+    setAnnouncement(
+      labels.slide.replace("{n}", rangeLabel).replace("{total}", String(items.length)),
+    );
+  }, [items.length, labels.slide]);
+
+  const scheduleAnnouncement = useCallback(() => {
+    window.clearTimeout(settleTimer.current);
+    settleTimer.current = window.setTimeout(() => {
+      announceVisibleRange();
+    }, 180);
+  }, [announceVisibleRange]);
+
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(settleTimer.current);
+      window.clearTimeout(autoplayResetTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     const el = track.current;
@@ -124,7 +184,14 @@ export function NewsCarousel({
       timer = window.setTimeout(tick, AUTOPLAY_MS);
     };
     const tick = () => {
-      if (!document.hidden && !hold.current) step(1);
+      if (!document.hidden && !hold.current) {
+        isAutoplayStep.current = true;
+        window.clearTimeout(autoplayResetTimer.current);
+        autoplayResetTimer.current = window.setTimeout(() => {
+          isAutoplayStep.current = false;
+        }, 650);
+        step(1);
+      }
       arm();
     };
     arm();
@@ -136,8 +203,11 @@ export function NewsCarousel({
   }, [autoplay, step, nudge]);
 
   const go = (direction: 1 | -1) => {
+    isAutoplayStep.current = false;
+    userInteracted.current = true;
     step(direction);
     setNudge((value) => value + 1);
+    scheduleAnnouncement();
   };
 
   return (
@@ -153,8 +223,25 @@ export function NewsCarousel({
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) hold.current = false;
       }}
+      onPointerDown={() => {
+        userInteracted.current = true;
+      }}
+      onTouchStart={() => {
+        userInteracted.current = true;
+      }}
+      onKeyDown={() => {
+        userInteracted.current = true;
+      }}
     >
-      <ol ref={track} className="news-track" aria-live={autoplay ? "off" : "polite"}>
+      <ol
+        ref={track}
+        className="news-track"
+        onScroll={() => {
+          if (userInteracted.current && !isAutoplayStep.current) {
+            scheduleAnnouncement();
+          }
+        }}
+      >
         {items.map((item, index) => (
           <li
             key={index}
@@ -168,6 +255,9 @@ export function NewsCarousel({
           </li>
         ))}
       </ol>
+      <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </span>
       {scrollable ? (
         <>
           <button type="button" className="news-nav is-prev" onClick={() => go(-1)} aria-label={labels.prev} title={labels.prev}>

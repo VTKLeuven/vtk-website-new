@@ -1,8 +1,17 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
-import { SaveForm } from "@/components/ui/SaveForm";
+import {
+  startTransition,
+  useActionState,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { submitTakedownAction } from "@/app/actions/takedown";
+import { SAVE_IDLE } from "@/lib/saveState";
 
 /**
  * "Deze foto laten verwijderen", vanuit de lightbox.
@@ -54,20 +63,38 @@ function FlagIcon() {
   );
 }
 
+function isOutsideDialog(clientX: number, clientY: number, dialog: HTMLDialogElement) {
+  const rect = dialog.getBoundingClientRect();
+  return clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom;
+}
+
 export function TakedownDialog({
   albumSlug,
   assetId,
   photoTitle,
   labels,
+  onOpenChange,
 }: {
   albumSlug: string;
   assetId: string;
   photoTitle: string;
   labels: TakedownLabels;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [done, setDone] = useState(false);
+  const [state, formAction, pending] = useActionState(submitTakedownAction, SAVE_IDLE);
+  const done = state.status === "success";
   const fieldId = useId();
+  const titleId = useId();
+  const errorId = useId();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const doneCloseBtnRef = useRef<HTMLButtonElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(false);
+  const suppressCloseCountRef = useRef(0);
+  const pressedOutsideRef = useRef(false);
 
   const errorMessages: Record<string, string> = {
     NAME_REQUIRED: labels.takedownNameRequired,
@@ -82,45 +109,152 @@ export function TakedownDialog({
     SAVE_FAILED: labels.takedownSaveFailed,
   };
 
+  const errorMessage =
+    state.status === "error"
+      ? errorMessages[state.code] ?? state.detail ?? labels.takedownFailed
+      : null;
+
+  const openDialog = useCallback(() => {
+    openerRef.current =
+      document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+        ? document.activeElement
+        : triggerRef.current;
+    setOpen(true);
+    onOpenChange?.(true);
+  }, [onOpenChange]);
+
+  const closeDialog = useCallback(() => {
+    setOpen(false);
+    onOpenChange?.(false);
+  }, [onOpenChange]);
+
   useEffect(() => {
-    if (!open) return undefined;
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
+    const dialog = dialogRef.current;
+    const trigger = triggerRef.current;
+    if (!dialog) return;
+
+    if (open) {
+      wasOpenRef.current = true;
+      if (!openerRef.current) {
+        openerRef.current =
+          document.activeElement instanceof HTMLElement ? document.activeElement : trigger;
+      }
+      if (!dialog.open) {
+        dialog.showModal();
+      }
+      if (!dialog.contains(document.activeElement)) {
+        closeBtnRef.current?.focus({ preventScroll: true });
+      }
+
+      return () => {
+        if (dialog.open) {
+          suppressCloseCountRef.current += 1;
+          dialog.close();
+        }
+        const target = trigger?.isConnected ? trigger : openerRef.current;
+        if (
+          target?.isConnected &&
+          (!document.activeElement || document.activeElement === document.body)
+        ) {
+          target.focus({ preventScroll: true });
+        }
+      };
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+
+    if (dialog.open) {
+      suppressCloseCountRef.current += 1;
+      dialog.close();
+    }
+    if (wasOpenRef.current) {
+      wasOpenRef.current = false;
+      const target = trigger?.isConnected ? trigger : openerRef.current;
+      openerRef.current = null;
+      if (target?.isConnected) {
+        target.focus({ preventScroll: true });
+      }
+    }
   }, [open]);
+
+  useEffect(() => {
+    if (open && done) {
+      doneCloseBtnRef.current?.focus({ preventScroll: true });
+    }
+  }, [done, open]);
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    startTransition(() => formAction(data));
+  }
 
   return (
     <>
       <button
+        ref={triggerRef}
         type="button"
         className="vtk-immich-icon-button"
-        onClick={() => setOpen(true)}
+        onClick={openDialog}
         title={labels.reportPhoto}
         aria-label={`${labels.reportPhoto}: ${photoTitle}`}
       >
         <FlagIcon />
       </button>
 
-      {open ? (
-        <div
-          className="vtk-takedown-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label={labels.takedownTitle}
-          onClick={() => setOpen(false)}
-        >
-          <div className="vtk-takedown-panel" onClick={(event) => event.stopPropagation()}>
+      <dialog
+        ref={dialogRef}
+        className="vtk-takedown-dialog"
+        aria-labelledby={titleId}
+        {...({ closedby: "any" } as Record<string, string>)}
+        onCancel={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          closeDialog();
+        }}
+        onClose={(event) => {
+          event.stopPropagation();
+          if (suppressCloseCountRef.current > 0) {
+            suppressCloseCountRef.current -= 1;
+            return;
+          }
+          if (event.currentTarget.open) return;
+          closeDialog();
+        }}
+        onPointerDown={(event) => {
+          event.stopPropagation();
+          if ("closedBy" in HTMLDialogElement.prototype) {
+            pressedOutsideRef.current = false;
+            return;
+          }
+          pressedOutsideRef.current =
+            event.target === event.currentTarget &&
+            isOutsideDialog(event.clientX, event.clientY, event.currentTarget);
+        }}
+        onPointerUp={(event) => {
+          event.stopPropagation();
+          if ("closedBy" in HTMLDialogElement.prototype) return;
+          const wasOutside = pressedOutsideRef.current;
+          pressedOutsideRef.current = false;
+          if (
+            wasOutside &&
+            event.target === event.currentTarget &&
+            isOutsideDialog(event.clientX, event.clientY, event.currentTarget)
+          ) {
+            closeDialog();
+          }
+        }}
+      >
+        {open ? (
+          <div className="vtk-takedown-panel">
             <div className="vtk-takedown-head">
               <div>
-                <h2>{labels.takedownTitle}</h2>
+                <h2 id={titleId}>{labels.takedownTitle}</h2>
                 <p>{photoTitle}</p>
               </div>
               <button
+                ref={closeBtnRef}
                 type="button"
                 className="vtk-takedown-close"
-                onClick={() => setOpen(false)}
+                onClick={closeDialog}
                 title={labels.close}
                 aria-label={labels.close}
               >
@@ -131,24 +265,26 @@ export function TakedownDialog({
             </div>
 
             {done ? (
-              <div className="vtk-takedown-done">
+              <div className="vtk-takedown-done" role="status" aria-live="polite">
                 <p>{labels.takedownDone}</p>
-                <button type="button" className="vtk-button vtk-button-primary" onClick={() => setOpen(false)}>
+                <button
+                  ref={doneCloseBtnRef}
+                  type="button"
+                  className="vtk-button vtk-button-primary"
+                  onClick={closeDialog}
+                >
                   {labels.close}
                 </button>
               </div>
             ) : (
-              <SaveForm
-                action={submitTakedownAction}
-                submitLabel={labels.takedownSubmit}
-                savingLabel={labels.takedownSending}
-                savedMessage={labels.takedownSent}
-                errorMessages={errorMessages}
-                fallbackErrorMessage={labels.takedownFailed}
-                onSuccess={() => setDone(true)}
-                className="vtk-takedown-form"
-              >
+              <form className="vtk-takedown-form" onSubmit={handleSubmit}>
                 <p className="vtk-takedown-intro">{labels.takedownIntro}</p>
+
+                {errorMessage ? (
+                  <p role="alert" id={errorId} className="vtk-takedown-error">
+                    {errorMessage}
+                  </p>
+                ) : null}
 
                 <input type="hidden" name="albumSlug" value={albumSlug} />
                 <input type="hidden" name="assetId" value={assetId} />
@@ -164,7 +300,13 @@ export function TakedownDialog({
 
                 <label htmlFor={`${fieldId}-name`}>
                   <span>{labels.takedownName}</span>
-                  <input id={`${fieldId}-name`} name="name" required maxLength={120} autoComplete="name" />
+                  <input
+                    id={`${fieldId}-name`}
+                    name="name"
+                    required
+                    maxLength={120}
+                    autoComplete="name"
+                  />
                 </label>
 
                 <label htmlFor={`${fieldId}-email`}>
@@ -194,11 +336,21 @@ export function TakedownDialog({
                 </label>
 
                 <p className="vtk-takedown-privacy">{labels.takedownPrivacy}</p>
-              </SaveForm>
+
+                <div>
+                  <button
+                    type="submit"
+                    className="vtk-button vtk-button-primary"
+                    disabled={pending}
+                  >
+                    {pending ? labels.takedownSending : labels.takedownSubmit}
+                  </button>
+                </div>
+              </form>
             )}
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </dialog>
     </>
   );
 }

@@ -6,18 +6,20 @@ export function CheckboxChip({
   value,
   defaultChecked,
   label,
+  ariaDescribedBy,
   className,
 }: {
   name: string;
   value: string;
   defaultChecked: boolean;
   label: string;
+  ariaDescribedBy?: string;
   className?: string;
 }) {
   return (
     <label
       className={cn(
-        "inline-flex items-center gap-2 rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/30 px-3 py-2 text-sm",
+        "inline-flex cursor-pointer items-center gap-2 rounded-xl border border-vtk-muted/80 bg-vtk-blue-soft/30 px-3 py-2 text-sm has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-vtk-ink",
         className,
       )}
     >
@@ -26,6 +28,7 @@ export function CheckboxChip({
         name={name}
         value={value}
         defaultChecked={defaultChecked}
+        aria-describedby={ariaDescribedBy}
         className="shrink-0"
       />
       <span className="min-w-0 break-words">{label}</span>

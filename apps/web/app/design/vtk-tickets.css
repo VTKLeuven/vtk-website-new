@@ -59,7 +59,7 @@
 }
 
 .ticket-secondary-button {
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--control-border);
   padding: 11px 15px;
   background: white;
   color: var(--ink);
@@ -108,6 +108,30 @@
   font-weight: 600;
 }
 
+.ticket-attendee-actions {
+  margin: 4px 0 10px;
+}
+
+.ticket-copy-buyer {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 12px;
+  border: 1px solid var(--control-border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ticket-copy-buyer:hover {
+  border-color: var(--ink);
+  background: var(--paper-2);
+}
+
 .ticket-fields-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -130,7 +154,7 @@
 .ticket-input-icon {
   width: 100%;
   min-height: 44px;
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--control-border);
   border-radius: 6px;
   background: white;
   color: var(--ink);
@@ -150,8 +174,18 @@
 .ticket-field textarea:focus,
 .ticket-input-icon:focus-within {
   border-color: var(--ink);
-  outline: 3px solid rgba(255, 210, 63, 0.35);
-  outline-offset: 1px;
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.ticket-field input[aria-invalid="true"],
+.ticket-field select[aria-invalid="true"],
+.ticket-field textarea[aria-invalid="true"],
+.ticket-input-icon:has([aria-invalid="true"]),
+.ticket-checkbox:has([aria-invalid="true"]),
+.ticket-choice-field[aria-invalid="true"] .ticket-choice-list,
+.ticket-terms-check:has([aria-invalid="true"]) {
+  border-color: var(--danger-line);
 }
 
 .ticket-input-icon {
@@ -178,12 +212,18 @@
   font-weight: 500;
 }
 
+.ticket-checkbox-wrap {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
 .ticket-checkbox {
   display: flex;
   min-height: 44px;
   align-items: flex-start;
   gap: 10px;
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--control-border);
   border-radius: 6px;
   padding: 11px 12px;
   background: white;
@@ -229,8 +269,8 @@
   display: flex;
   min-height: 44px;
   flex-wrap: wrap;
-  gap: 8px;
-  border: 1px solid var(--line-2);
+  gap: 10px;
+  border: 1px solid var(--control-border);
   border-radius: 6px;
   padding: 9px 11px;
   background: white;
@@ -240,6 +280,8 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-height: 28px;
+  padding: 4px 8px;
   color: var(--body);
   font-size: 12px;
   font-weight: 600;
@@ -257,6 +299,17 @@
   margin-top: 5px;
   color: var(--muted);
   font-size: 11px;
+}
+
+.ticket-field small.ticket-field-error,
+.ticket-choice-field > small.ticket-field-error,
+.ticket-field-error {
+  display: block;
+  margin-top: 2px;
+  color: var(--danger-ink);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .ticket-boolean-options label {
@@ -479,6 +532,19 @@
 @media (min-width: 961px) {
   .tshop.torder {
     grid-template-columns: minmax(0, 1fr) 440px;
+    grid-template-rows: auto;
+  }
+
+  .tshop.torder > .tshop-main {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .tshop.torder > .tshop-panel {
+    position: sticky;
+    top: 96px;
+    grid-column: 2;
+    grid-row: 1;
   }
 }
 
@@ -829,37 +895,45 @@
 
 /* --- Ticket QR Detailvenster (matches ShiftDialog / Kalenderblad) --- */
 
-.ticket-dialog-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+dialog.ticket-dialog {
+  zoom: calc(1 / var(--vtk-zoom, 1));
+  position: relative;
+  width: min(480px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  border: 0;
   overflow-y: auto;
-  padding: clamp(24px, calc(5 * var(--vtk-vh, 1vh)), 48px) 16px;
+  overflow-x: hidden;
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--sans);
+  box-shadow: 0 30px 70px -30px rgba(10, 15, 31, 0.75);
+}
+
+dialog.ticket-dialog[open] {
+  display: block;
+}
+
+dialog.ticket-dialog::backdrop {
   background: rgba(10, 15, 31, 0.55);
   backdrop-filter: blur(2px);
 }
 
-.ticket-dialog-overlay,
-.ticket-dialog-overlay * {
+dialog.ticket-dialog,
+dialog.ticket-dialog * {
   box-sizing: border-box;
 }
 
-.ticket-dialog {
-  position: relative;
-  width: 100%;
-  max-width: 480px;
-  margin: auto;
-  overflow: clip;
-  border-radius: 20px;
-  background: var(--surface);
-  box-shadow: 0 30px 70px -30px rgba(10, 15, 31, 0.75);
+dialog.ticket-dialog:focus {
+  outline: none;
 }
 
-.ticket-dialog:focus {
-  outline: none;
+dialog.ticket-dialog :where(a, button):focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 
 .ticket-dialog-top {
@@ -963,6 +1037,12 @@
   border-color: var(--paper);
   background: var(--paper);
   color: var(--ink);
+}
+
+dialog.ticket-dialog .ticket-dialog-close:focus-visible,
+.ticket-dialog-close:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 2px;
 }
 
 .ticket-dialog-body {
@@ -1134,19 +1214,30 @@
   }
 }
 
+.ticket-terms-wrap {
+  display: grid;
+  gap: 6px;
+}
+
 .ticket-terms-check {
   /* Zelfde inspringing als de rest van de kaart (18px): zonder dat liep dit
      vlak tot tegen de rand terwijl de knop eronder wel insprong, en dan botst
      de rand van dit vlak op de rand van de kaart. */
   margin: 0 18px 12px;
   padding: 13px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-border);
   border-radius: 8px;
   background: var(--paper);
 }
 
-.ticket-terms-check a {
+.ticket-terms-link {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
   color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -1161,19 +1252,6 @@
 
 .ticket-order-actions button {
   cursor: pointer;
-}
-
-@media (max-width: 960px) {
-  /* De shop zet haar paneel altijd bovenaan; hier hangt het van de bestelling
-     af. Wie betaald heeft, wil zijn QR-code zien; wie nog moet betalen, wil de
-     betaalknop. */
-  .torder .tshop-panel {
-    order: 0;
-  }
-
-  .torder[data-panel-first] .tshop-panel {
-    order: -1;
-  }
 }
 
 @media (max-width: 620px) {
@@ -2244,11 +2322,25 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .is-spinning,
   .ticket-primary-button,
+  .ticket-secondary-button,
+  .ticket-pass-qr-box img,
+  .ticket-pass-stub img,
+  .ticket-pass-qr-zoom-badge,
+  .ticket-dialog-close,
+  .ticket-pay-option,
   .scanner-feedback,
   .scanner-attendance > div > span {
     animation: none;
     transition: none;
+  }
+
+  .ticket-primary-button:hover,
+  .ticket-pass-qr-trigger:hover .ticket-pass-qr-box img,
+  .ticket-pass-qr-trigger:hover .ticket-pass-qr-zoom-badge,
+  .ticket-pay-option:hover:not(:has(input:disabled)) {
+    transform: none;
   }
 }
 
@@ -2819,7 +2911,16 @@
   background: var(--surface);
 }
 
+.ticket-pay-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.ticket-pay-legend,
 .ticket-pay-choice h2 {
+  padding: 0;
   margin: 0 0 14px;
   font-size: 16px;
   font-weight: 700;
@@ -2850,6 +2951,7 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  min-height: 28px;
   margin-top: 12px;
   padding: 6px 2px;
   border: 0;
@@ -2873,7 +2975,7 @@
   align-items: center;
   width: 100%;
   padding: 15px 17px;
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--control-border);
   border-radius: 14px;
   background: var(--surface);
   color: var(--ink);
@@ -2883,15 +2985,35 @@
   transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
 }
 
-.ticket-pay-option:hover:not(:disabled) {
+.ticket-pay-option input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin: 0;
+  accent-color: var(--ink);
+}
+
+.ticket-pay-option:has(input:checked),
+.ticket-pay-option[data-selected="true"] {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+.ticket-pay-option:hover:not(:has(input:disabled)) {
   border-color: var(--ink);
   background: var(--paper-2);
   transform: translateY(-1px);
 }
 
-.ticket-pay-option:disabled {
+.ticket-pay-option:has(input:disabled) {
   cursor: progress;
   opacity: 0.65;
+}
+
+.ticket-pay-submit {
+  width: 100%;
+  margin-top: 14px;
+  cursor: pointer;
 }
 
 .ticket-pay-option-text {
@@ -2922,6 +3044,7 @@
    vooral op aan de wachtbalk en de knop eronder, die niets hebben om hun
    breedte tegen te houden. */
 .ticket-bancontact {
+  position: relative;
   width: min(100%, 860px);
   margin: 0 auto;
 }

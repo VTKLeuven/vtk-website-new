@@ -105,16 +105,35 @@ export function CookieConsent({
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [draft, setDraft] = useState<CookieConsentChoice>("essential");
   const panelRef = useRef<HTMLElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const firstButtonRef = useRef<HTMLButtonElement>(null);
   const visible = !hidesCookieBanner(pathname) && (preferencesOpen || current === null);
 
   useEffect(() => {
     const showPreferences = () => {
+      openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setDraft(browserCookieConsent() ?? "essential");
       setPreferencesOpen(true);
     };
     window.addEventListener(OPEN_COOKIE_PREFERENCES_EVENT, showPreferences);
     return () => window.removeEventListener(OPEN_COOKIE_PREFERENCES_EVENT, showPreferences);
   }, []);
+
+  useEffect(() => {
+    if (!preferencesOpen) return;
+    requestAnimationFrame(() => firstButtonRef.current?.focus());
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setPreferencesOpen(false);
+      const opener = openerRef.current;
+      openerRef.current = null;
+      if (opener?.isConnected) {
+        requestAnimationFrame(() => opener.focus());
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [preferencesOpen]);
 
   // Hoeveel van de onderkant van het scherm de banner inneemt, als variabele op
   // <html>. De aankondiging (AnnouncementCard) staat rechtsonder en schuift
@@ -149,14 +168,25 @@ export function CookieConsent({
 
   const save = (next: CookieConsentChoice) => {
     const previous = current;
+    const activeInside = Boolean(
+      document.activeElement && panelRef.current?.contains(document.activeElement),
+    );
     setConsent(next);
     setPreferencesOpen(false);
+    const opener = openerRef.current;
+    openerRef.current = null;
     if (next === "analytics" && previous !== "analytics") {
       startAnalytics(analyticsOnConsent);
     } else if (next !== "analytics" && previous === "analytics") {
       // Sentry en Umami draaien al en zijn niet netjes te stoppen; enkel een
       // nieuwe pagina zonder hun scripts doet dat meteen.
       window.location.reload();
+      return;
+    }
+    if (opener?.isConnected) {
+      requestAnimationFrame(() => opener.focus());
+    } else if (activeInside) {
+      requestAnimationFrame(() => document.getElementById("main")?.focus());
     }
   };
 
@@ -165,8 +195,6 @@ export function CookieConsent({
       <section
         ref={panelRef}
         className="vtk-cookie-consent"
-        role="dialog"
-        aria-modal="true"
         aria-labelledby="vtk-cookie-title"
       >
         <div className="vtk-cookie-consent-copy">
@@ -186,7 +214,12 @@ export function CookieConsent({
             <span>{labels.analytics}</span>
           </label>
           <div className="vtk-cookie-consent-actions">
-            <button type="button" className="vtk-cookie-secondary" onClick={() => save("essential")}>
+            <button
+              ref={firstButtonRef}
+              type="button"
+              className="vtk-cookie-secondary"
+              onClick={() => save("essential")}
+            >
               {labels.reject}
             </button>
             <button type="button" className="vtk-cookie-secondary" onClick={() => save(draft)}>

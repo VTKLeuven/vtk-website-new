@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, Input, Label } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { setOwnPasswordAction } from "@/app/actions/register";
@@ -39,12 +39,21 @@ export function PasswordPanel({
 }) {
   const nl = locale === "nl";
   const [open, setOpen] = useState(!hasPassword && urgent);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+  const userOpenedRef = useRef(false);
+
+  useEffect(() => {
+    if (open && userOpenedRef.current) {
+      userOpenedRef.current = false;
+      passwordInputRef.current?.focus();
+    }
+  }, [open]);
 
   return (
     <Card className={`p-6${urgent ? " shadow-[inset_3px_0_0_var(--yellow)]" : ""}`}>
-      <h3 className="text-lg font-semibold text-vtk-ink">
+      <h2 className="text-lg font-semibold text-vtk-ink">
         {nl ? "Inloggen zonder KU Leuven" : "Signing in without KU Leuven"}
-      </h3>
+      </h2>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-[#5c667f]">
         {nl
           ? "Je KU Leuven-account verdwijnt een tijd na je afstuderen. Stel nu een wachtwoord in, dan blijf je met je e-mailadres inloggen wanneer die login het opgeeft."
@@ -93,8 +102,11 @@ export function PasswordPanel({
       {!open ? (
         <button
           type="button"
-          className="mt-4 rounded-full border border-vtk-ink bg-vtk-ink px-4 py-2 text-sm font-medium text-vtk-surface transition-colors hover:bg-vtk-navy"
-          onClick={() => setOpen(true)}
+          className="mt-4 min-h-10 cursor-pointer rounded-full border border-vtk-ink bg-vtk-ink px-4 py-2 text-sm font-medium text-vtk-surface transition-colors hover:bg-vtk-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink"
+          onClick={() => {
+            userOpenedRef.current = true;
+            setOpen(true);
+          }}
         >
           {hasPassword
             ? nl
@@ -143,14 +155,16 @@ export function PasswordPanel({
               <div>
                 <Label htmlFor="new-password">{nl ? "Nieuw wachtwoord" : "New password"}</Label>
                 <Input
+                  ref={passwordInputRef}
                   id="new-password"
                   name="password"
                   type="password"
                   autoComplete="new-password"
                   minLength={10}
+                  aria-describedby="new-password-hint"
                   required
                 />
-                <p className="mt-1 text-xs text-[#5c667f]">
+                <p id="new-password-hint" className="mt-1 text-xs text-[#5c667f]">
                   {nl ? "Minstens 10 tekens." : "At least 10 characters."}
                 </p>
               </div>

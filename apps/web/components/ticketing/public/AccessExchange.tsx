@@ -50,7 +50,7 @@ export function AccessExchange({ locale }: { locale: "nl" | "en" }) {
   }, [attempt, locale, router]);
 
   return (
-    <main className="ticket-access-page">
+    <div className="ticket-access-page">
       <div className="ticket-access-state" role="status">
         {error ? <AlertCircle aria-hidden="true" /> : <LoaderCircle className="is-spinning" aria-hidden="true" />}
         <h1>
@@ -80,6 +80,6 @@ export function AccessExchange({ locale }: { locale: "nl" | "en" }) {
           </button>
         ) : null}
       </div>
-    </main>
+    </div>
   );
 }

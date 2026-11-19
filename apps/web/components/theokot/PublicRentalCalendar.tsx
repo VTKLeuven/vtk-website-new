@@ -318,14 +318,8 @@ export function PublicRentalCalendar({
             const cellSlots = byDay.get(cell.key) ?? [];
             return (
               <>
-                {/* Kleur is hier het hele verhaal, en een schermlezer hoort geen
-                    gele streep. Eén woord per dag, onzichtbaar, maakt het raster
-                    ook voorleesbaar: "12, vrij". */}
-                {state && state in STATE_WORD && (
-                  <span className="sr-only">{STATE_WORD[state](copy)}</span>
-                )}
                 {cellSlots.map((slot) => (
-                  <span key={slot.id} className="tv-slot">
+                  <span key={slot.id} className="tv-slot" aria-hidden="true">
                     <strong>{slot.timeLabel}</strong>
                     <span>{slot.title ?? copy.busy}</span>
                   </span>

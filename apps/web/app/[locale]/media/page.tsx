@@ -61,7 +61,7 @@ export default async function MediaPage({ params }: { params: Promise<{ locale: 
         </div>
       </header>
 
-      <main>
+      <div>
         <section id="photos" className="vtk-media-section vtk-media-photos-section">
           <div className="vtk-media-section-inner">
             <header className="vtk-media-section-head">
@@ -125,6 +125,8 @@ export default async function MediaPage({ params }: { params: Promise<{ locale: 
                 play: dict.media.playVideo,
                 unavailable: dict.media.videoUnavailable,
                 openExternal: dict.media.openVideoExternal,
+                captionsLang: locale,
+                captionsLabel: locale === 'en' ? 'Captions' : 'Ondertitels',
               }}
             />
           </div>
@@ -180,7 +182,7 @@ export default async function MediaPage({ params }: { params: Promise<{ locale: 
             )}
           </div>
         </section>
-      </main>
+      </div>
     </div>
   );
 }

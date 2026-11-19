@@ -199,7 +199,9 @@ export function MeetingReservationCard({ nl, meeting }: { nl: boolean; meeting: 
           <input type="hidden" name="meetingId" value={meeting.id} />
 
           <div>
-            <Label>{nl ? "Broodje" : "Sandwich"}</Label>
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-vtk-muted">
+              {nl ? "Broodje" : "Sandwich"}
+            </span>
             <ExclusiveChoiceGroup
               name="choice"
               value={choice}

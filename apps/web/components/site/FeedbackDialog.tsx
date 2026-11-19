@@ -59,15 +59,34 @@ function FeedbackFrame({
   onClose: () => void;
 }) {
   const pathname = usePathname();
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const pressedOutsideRef = useRef(false);
+  const suppressCloseCountRef = useRef(0);
   const [src] = useState(() => doplFeedbackEmbedUrl(window.location.origin, context));
   const [height, setHeight] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (!dialog.open) {
+      dialog.showModal();
     }
+    closeBtnRef.current?.focus();
+    return () => {
+      if (dialog.open) {
+        // React Strict Mode dubbelt mounts door cleanup + remount te draaien; een
+        // programmatisch `dialog.close()` vuurt een asynchroon `close`-event.
+        // Sla dat event over zodat remount niet meteen `onClose` triggert.
+        suppressCloseCountRef.current += 1;
+        dialog.close();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     // Enkel van Dopl en enkel van deze iframe: elk ander venster kan ook
     // berichten sturen, en "sluit" of "word 9000 px hoog" hoort daar niet bij.
     function onMessage(event: MessageEvent) {
@@ -78,23 +97,56 @@ function FeedbackFrame({
         setHeight(Math.ceil(data.height));
       }
     }
-    window.addEventListener("keydown", onKey);
     window.addEventListener("message", onMessage);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("message", onMessage);
-    };
+    return () => window.removeEventListener("message", onMessage);
   }, [onClose]);
 
+  function isOutside(clientX: number, clientY: number, dialog: HTMLDialogElement) {
+    const r = dialog.getBoundingClientRect();
+    return clientX < r.left || clientX > r.right || clientY < r.top || clientY > r.bottom;
+  }
+
   return (
-    <div
-      className="vtk-feedback-backdrop"
-      role="dialog"
-      aria-modal="true"
+    <dialog
+      ref={dialogRef}
+      className="vtk-feedback-dialog"
       aria-label={dict.title}
-      onClick={onClose}
+      {...({ closedby: "any" } as Record<string, string>)}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+      onClose={(event) => {
+        if (suppressCloseCountRef.current > 0) {
+          suppressCloseCountRef.current -= 1;
+          return;
+        }
+        if (event.currentTarget.open) return;
+        onClose();
+      }}
+      onPointerDown={(event) => {
+        if ("closedBy" in HTMLDialogElement.prototype) {
+          pressedOutsideRef.current = false;
+          return;
+        }
+        pressedOutsideRef.current =
+          event.target === event.currentTarget &&
+          isOutside(event.clientX, event.clientY, event.currentTarget);
+      }}
+      onPointerUp={(event) => {
+        if ("closedBy" in HTMLDialogElement.prototype) return;
+        const wasOutside = pressedOutsideRef.current;
+        pressedOutsideRef.current = false;
+        if (
+          wasOutside &&
+          event.target === event.currentTarget &&
+          isOutside(event.clientX, event.clientY, event.currentTarget)
+        ) {
+          onClose();
+        }
+      }}
     >
-      <div className="vtk-feedback-embed" onClick={(event) => event.stopPropagation()}>
+      <div className="vtk-feedback-embed">
         <div className="vtk-feedback-frame" data-loaded={loaded || undefined}>
           {loaded ? null : (
             <p className="vtk-feedback-loading" role="status">
@@ -108,7 +160,6 @@ function FeedbackFrame({
             style={height ? { height } : undefined}
             onLoad={() => {
               setLoaded(true);
-              frameRef.current?.focus();
             }}
           />
         </div>
@@ -122,11 +173,11 @@ function FeedbackFrame({
           </a>
           <span aria-hidden="true"> · </span>
           {/* Ook wanneer Dopl niet laadt, en dus zijn eigen sluitknop er niet is. */}
-          <button type="button" onClick={onClose}>
+          <button ref={closeBtnRef} type="button" onClick={onClose}>
             {dict.close}
           </button>
         </p>
       </div>
-    </div>
+    </dialog>
   );
 }

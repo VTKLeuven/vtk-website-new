@@ -18,16 +18,9 @@ import { MAX_QUERY_LENGTH } from "@/lib/search";
 export function SiteSearchForm({
   locale,
   defaultValue = "",
-  autoFocus = false,
 }: {
   locale: Locale;
   defaultValue?: string;
-  /**
-   * Enkel op /zoeken zonder zoekterm: wie daar aankomt, komt om te typen. Met
-   * een zoekterm blijft de focus weg, anders springt het scherm naar het veld
-   * in plaats van naar de resultaten die er net gerenderd zijn.
-   */
-  autoFocus?: boolean;
 }) {
   const t = getDictionary(locale).search;
   const base = locale === "nl" ? "" : "/en";
@@ -50,7 +43,6 @@ export function SiteSearchForm({
         aria-label={t.inputLabel}
         maxLength={MAX_QUERY_LENGTH}
         autoComplete="off"
-        autoFocus={autoFocus}
       />
       <button type="submit" className="vtk-search-submit" data-umami-event="zoekopdracht-uitgevoerd">
         {t.submit}
