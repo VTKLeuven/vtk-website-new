@@ -1,12 +1,12 @@
 # De app-API (`/api/app/v1`)
 
-De JSON-API waar de **VTK-app** (Expo, iOS + Android, `mobile/` in deze repo) op draait.
+De JSON-API waar de **VTK-app** (Expo, iOS + Android, de repo [vtk-app](https://github.com/VTKLeuven/vtk-app)) op draait.
 Dit document beschrijft het contract en de regels errond. Voor een inventaris van
 alles wat er voor de app aan deze site toegevoegd is (endpoints, migraties,
 rechten, wat er nog moet gebeuren), zie [`app-toevoegingen.md`](./app-toevoegingen.md).
-Het plan van de app zelf staat in `mobile/docs/plan.md`.
+Het plan van de app zelf staat in `vtk-app/docs/plan.md`.
 
-De scanner aan de deur zit sinds november 2026 in de app (`mobile/docs/scanner.md`),
+De scanner aan de deur zit sinds november 2026 in de app (`vtk-app/docs/scanner.md`),
 maar praat voor het scannen zelf met `/api/tickets/...`, de routes van de
 webscanner, en niet met deze boom. Enkel de lijst van events en het inwisselen van
 een uitnodiging staan hier.
@@ -48,7 +48,7 @@ zitten.
 
 | Bestand | Wat |
 |---|---|
-| `apps/web/lib/app-api/contract.ts` | Types en zod-schema's. **Geen server-imports**, want dit bestand wordt gekopieerd naar `mobile/src/api/contract.ts`. |
+| `apps/web/lib/app-api/contract.ts` | Types en zod-schema's. **Geen server-imports**, want dit bestand wordt gekopieerd naar `vtk-app/src/api/contract.ts`. |
 | `apps/web/lib/app-api/respond.ts` | `appJson`, `appError`, `appErrorResponse`, `readAppJson`. Eén plek voor de foutvorm en de CORS-headers. |
 | `apps/web/lib/app-api/media.ts` | `requestOrigin`, `absoluteMediaUrl`, `absoluteUrl`. |
 | `apps/web/lib/app-api/version.ts` | `minimumAppVersion()` en `compareVersions()`. |
@@ -261,7 +261,7 @@ De app mag ook de volledige URL doorsturen; dat is wat een camera leest.
 routes van de webscanner (`scanner/bootstrap`, `scan`, `scan/batch`, `scan/card`,
 `scan/reverse` en het scannerspaneel), want die dragen de hele beoordeling
 (geldig, al gescand, verkeerd evenement, terugbetaald) plus het scanlogboek. Zie
-`mobile/docs/scanner.md`.
+`vtk-app/docs/scanner.md`.
 
 ### `POST /api/app/v1/fakbar/checkin`
 
@@ -550,6 +550,10 @@ onder Kalender › Planning in de app. **Niets hiervan staat in onze database**:
 elke route geeft de aanvraag ondertekend door aan Burgieclan en zet het antwoord
 om naar `AppPlanning` (`lib/burgieclan/planning.ts`). Het hele verhaal, met de
 configuratie en de vallen, staat in [`burgieclan-planning.md`](./burgieclan-planning.md).
+
+Het tabblad staat enkel in de app wanneer `bootstrap.abilities.planning` waar
+is, dus wanneer deze server met Burgieclan gekoppeld is. Zonder koppeling geen
+tabblad dat "niet beschikbaar" zegt.
 
 ### `GET`/`DELETE /api/app/v1/planning`
 

@@ -7965,7 +7965,7 @@ deelnemers. De uitnodigings-QR legt die beslissing bij wie aan de deur staat.
 **Het manifest blijft niet liggen.** Het draagt de naam van elke deelnemer en
 staat nu op veel meer telefoons dan de scanners van vroeger. De app wist het na
 twee dagen en bij het uitloggen; de wachtrij met nog niet verstuurde scans blijft
-wel staan. Zie `mobile/docs/scanner.md`.
+wel staan. Zie `vtk-app/docs/scanner.md`.
 
 ---
 

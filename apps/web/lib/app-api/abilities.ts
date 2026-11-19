@@ -1,5 +1,6 @@
 import "server-only";
 
+import { burgieclanConfig } from "@/lib/burgieclan/client";
 import { getCurrentSession } from "@/lib/session";
 import { hasScannableTicketEvent } from "@/lib/ticketing/authorization";
 import type { AppAbilities } from "./contract";
@@ -32,5 +33,6 @@ export async function appAbilities(): Promise<AppAbilities | null> {
     scanTickets: await hasScannableTicketEvent(session),
     acceptVouchers: has("shift.rewardRedeem"),
     theokotPickup: has("theokot.pickup"),
+    planning: burgieclanConfig() !== null,
   };
 }

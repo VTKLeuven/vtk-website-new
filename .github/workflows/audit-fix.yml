@@ -12,8 +12,8 @@ name: Audit fix
 # dependency nodig hebben. Die horen op het Renovate-dashboard, niet in een
 # automatische PR.
 #
-# De mobiele app blijft hier bewust buiten: die heeft na een merge altijd een
-# EAS Update nodig (zie docs/app-ontwikkelen.md), en dat kan deze job niet doen.
+# De mobiele app staat sinds november 2026 in een eigen repo (vtk-app), met
+# haar eigen audit en Renovate.
 
 on:
   schedule:

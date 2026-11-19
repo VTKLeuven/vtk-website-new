@@ -101,7 +101,7 @@ describe('welke apps de CI-build bouwt (scripts/affected-apps.mjs)', () => {
     [['packages/i18n/package.json'], ['web', 'logistiek', 'fakbar']],
     [['apps/web/test/foo.test.ts', 'apps/web/e2e/x.spec.ts'], []],
     [['infra/docker/fakbar.Dockerfile'], ['fakbar']],
-    [['infra/docker-compose.yml', 'infra/deploy.sh', 'mobile/app.json', 'README.md'], []],
+    [['infra/docker-compose.yml', 'infra/deploy.sh', 'README.md'], []],
     [['.github/workflows/deploy-dev.yml'], ['web', 'logistiek', 'fakbar']],
   ])('%j bouwt %j', async (changed, expected) => {
     const { affectedApps } = await load();

@@ -116,30 +116,6 @@
       "enabled": false
     },
     {
-      "description": "The mobile app lives outside the workspaces and needs an EAS Update after every merge, so it is never automerged. See docs/app-ontwikkelen.md.",
-      "matchFileNames": ["mobile/package.json"],
-      "addLabels": ["mobile"],
-      "automerge": false
-    },
-    {
-      "description": "Expo ships its SDK as one set: expo, the expo-* modules, React, React Native and the babel/eslint presets belong in a single PR.",
-      "matchFileNames": ["mobile/package.json"],
-      "matchPackageNames": [
-        "expo",
-        "expo-*",
-        "@expo/*",
-        "@expo-google-fonts/*",
-        "react",
-        "react-dom",
-        "@types/react",
-        "react-native",
-        "react-native-*",
-        "babel-preset-expo",
-        "eslint-config-expo"
-      ],
-      "groupName": "expo sdk"
-    },
-    {
       "description": "Action digest pins in one weekly PR. A major bump of an action stays manual: it can change inputs.",
       "matchManagers": ["github-actions"],
       "matchUpdateTypes": ["patch", "minor", "digest", "pin"],

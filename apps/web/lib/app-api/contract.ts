@@ -1,9 +1,10 @@
 /**
- * Het contract tussen de site en de VTK-app (`mobile/`).
+ * Het contract tussen de site en de VTK-app (de repo vtk-app).
  *
  * **Dit bestand wordt letterlijk gekopieerd naar `src/api/contract.ts` in de
- * app-repo.** Daarom staan er enkel types en pure helpers in: geen prisma, geen
- * `server-only`, geen import uit `@/lib/...`, en zelfs geen zod. Dat laatste is
+ * app-repo** (`npm run contract:sync` daar). Daarom staan er enkel types en
+ * pure helpers in: geen prisma, geen `server-only`, geen import uit
+ * `@/lib/...`, en zelfs geen zod. Dat laatste is
  * geen principe maar rekenwerk: de app heeft geen enkele reden om een
  * validatiebibliotheek mee te slepen voor een contract dat ze enkel leest. De
  * zod-schema's staan daarom in `schemas.ts` ernaast, aan de serverkant.
@@ -1333,6 +1334,12 @@ export type AppAbilities = {
   scanTickets: boolean;
   acceptVouchers: boolean;
   theokotPickup: boolean;
+  /**
+   * Deze server is gekoppeld met Burgieclan, dus het tabblad Planning onder
+   * Kalender werkt. Optioneel: een server van vóór de planning stuurt het niet,
+   * en dan toont de app het tabblad niet.
+   */
+  planning?: boolean;
 };
 
 // -----------------------------------------------------------------------------
