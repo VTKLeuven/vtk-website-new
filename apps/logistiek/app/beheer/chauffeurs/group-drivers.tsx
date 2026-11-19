@@ -106,6 +106,7 @@ function GroupSection({ title, groups, empty }: { title: string; groups: GroupDr
 export function GroupDriverList({ groups }: { groups: GroupDrivers[] }) {
   const posts = groups.filter((group) => group.type === 'PRAESIDIUM');
   const workgroups = groups.filter((group) => group.type === 'WERKGROEP');
+  const yearly = groups.filter((group) => group.type === 'JAARWERKING');
   // Het getal dat de reden van dit scherm is: zoveel posten kunnen vandaag geen
   // chauffeur aanduiden op een rit die ze krijgen.
   const withoutDriver = groups.filter((group) => group.drivers.length === 0).length;
@@ -114,7 +115,8 @@ export function GroupDriverList({ groups }: { groups: GroupDrivers[] }) {
     <div className="grid gap-5">
       {withoutDriver > 0 ? (
         <p className="rounded-[12px] border border-vtk-warn-line bg-vtk-warn-soft px-4 py-2.5 text-sm text-vtk-ink">
-          Bij {withoutDriver} van de {groups.length} posten en werkgroepen staat nog niemand in de chauffeurslijst.
+          Bij {withoutDriver} van de {groups.length} posten, werkgroepen en jaarwerkingen staat nog niemand in de
+          chauffeurslijst.
         </p>
       ) : null}
 
@@ -124,6 +126,11 @@ export function GroupDriverList({ groups }: { groups: GroupDrivers[] }) {
         groups={workgroups}
         empty="Geen enkele werkgroep heeft dit werkingsjaar al leden."
       />
+      {/* Enkel wanneer er een jaarwerking met leden is: de meeste krijgen hun
+          ploeg pas laat in het jaar, en een lege sectie zegt dan niets. */}
+      {yearly.length > 0 ? (
+        <GroupSection title="Jaarwerkingen" groups={yearly} empty="Geen enkele jaarwerking heeft dit werkingsjaar al leden." />
+      ) : null}
     </div>
   );
 }

@@ -14,7 +14,7 @@ import { getBoConfig, getScanStatus, type BoScanStatus } from "@/lib/bo/settings
 import { deleteBoPostAliasAction } from "@/app/actions/bestuursorgaan";
 import { BO_VIEW_SCREEN, parseBoView } from "@/lib/bo/views";
 import { BoViews } from "./BoViews";
-import { BoSettingsForm, RestoreFileButton, ScanButton } from "./BoControls";
+import { BoSettingsForm, RestoreBegrotingButton, RestoreFileButton, ScanButton } from "./BoControls";
 import { BoReview } from "./BoReview";
 import { BoSummary } from "./BoSummary";
 import { buildSummary } from "@/lib/bo/summary";
@@ -22,7 +22,7 @@ import { postName, postOptions } from "@/lib/bo/posts";
 import { boErrorMessages } from "./messages";
 
 /*
- * /admin/bestuursorgaan ("Budgetten & Resultaten" in de zijbalk): welke
+ * /admin/bestuursorgaan ("Resultatenoverzicht" in de zijbalk): welke
  * budgetten en resultaten er per post langs het BO passeerden, met de bedragen uit de rekenbladen. Gelezen uit de gedeelde
  * drive (`lib/bo/scan.ts`); deze pagina schrijft daar nooit iets in.
  *
@@ -67,7 +67,10 @@ export default async function BestuursorgaanPage({
     getGoogleStatus(),
     getBoConfig(),
     getScanStatus(),
+    // Zonder jaarwerkingen: die staan als eigen vak in de keuzelijst
+    // (`BO_EXTRA_POSTS`), zie lib/bo/overview.ts.
     prisma.group.findMany({
+      where: { type: { not: "JAARWERKING" } },
       orderBy: [{ orderInPraesidium: "asc" }, { nameNl: "asc" }],
       select: { id: true, code: true, slug: true, nameNl: true, nameEn: true, type: true, active: true, orderInPraesidium: true },
     }),
@@ -92,18 +95,21 @@ export default async function BestuursorgaanPage({
   const namesOf = (keys: string[]) => keys.map((key) => postName(key, posts, nl) ?? key).join(" + ");
 
   const data = toExplorerData(overview, year, today);
+  // Wat bewust buiten de stand tegenover de begroting staat, dit werkingsjaar.
+  const outOfPlan = data.dossiers.filter((d) => d.begrotingExcluded);
   const tabs = workingYearTabs(years);
 
   return (
     <div className="space-y-7">
       <div className="space-y-4">
-        <div>
-          <h1 className="text-2xl font-semibold">{nl ? "Budgetten & Resultaten" : "Budgets & Results"}</h1>
-          <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
-            {nl
-              ? "Welke budgetten en resultaten er per post langs het BO passeerden, met de bedragen uit de rekenbladen. Gelezen uit de map Bestuursorgaan op de gedeelde drive; wat daar verandert, staat hier binnen het halfuur."
-              : "Which budgets and results each post took to the board meeting, with the amounts from the spreadsheets. Read from the Bestuursorgaan folder on the shared drive; changes there show up here within half an hour."}
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
+              {nl
+                ? "Welke budgetten en resultaten er per post langs het BO passeerden, met de bedragen uit de rekenbladen. Gelezen uit de map Bestuursorgaan op de gedeelde drive; wat daar verandert, staat hier binnen het halfuur."
+                : "Which budgets and results each post took to the board meeting, with the amounts from the spreadsheets. Read from the Bestuursorgaan folder on the shared drive; changes there show up here within half an hour."}
+            </p>
+          </div>
         </div>
         {tabs.length > 1 && (
           <div className="flex flex-wrap items-center gap-1.5" aria-label={nl ? "Werkingsjaar" : "Working year"}>
@@ -180,8 +186,8 @@ export default async function BestuursorgaanPage({
             <span className="block font-semibold text-vtk-ink">{nl ? "Instellingen" : "Settings"}</span>
             <span className="block text-xs text-vtk-muted">
               {nl
-                ? `Waar de BO-map staat, ${aliases.length} ${aliases.length === 1 ? "postnaam" : "postnamen"} die met de hand gekoppeld zijn, en ${hidden.length} ${hidden.length === 1 ? "bestand dat" : "bestanden die"} niet meetellen.`
-                : `Where the board folder is, ${aliases.length} post names linked by hand, and ${hidden.length} files that do not count.`}
+                ? `Waar de BO-map staat, ${aliases.length} ${aliases.length === 1 ? "postnaam" : "postnamen"} die met de hand gekoppeld zijn, ${hidden.length} ${hidden.length === 1 ? "bestand dat" : "bestanden die"} niet meetellen, en ${outOfPlan.length} ${outOfPlan.length === 1 ? "activiteit" : "activiteiten"} buiten de begroting.`
+                : `Where the board folder is, ${aliases.length} post names linked by hand, ${hidden.length} files that do not count, and ${outOfPlan.length} activities left out of the annual plan.`}
             </span>
           </span>
         }
@@ -266,6 +272,37 @@ export default async function BestuursorgaanPage({
                       </span>
                     </span>
                     <RestoreFileButton docId={doc.id} name={doc.name} locale={locale} errorMessages={errorMessages} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="grid gap-2">
+            <h3 className="text-sm font-semibold text-vtk-ink">
+              {nl ? `Niet in de begroting (${formatWorkingYear(year)})` : `Left out of the annual plan (${formatWorkingYear(year)})`}
+            </h3>
+            {outOfPlan.length === 0 ? (
+              <p className="text-sm text-vtk-muted">
+                {nl
+                  ? 'Nog niets. Met "Niet meetellen" en dan "Enkel niet in de begroting" blijft een activiteit in het overzicht, maar telt ze niet mee in de stand tegenover de begroting: wat de stad betaalt, of een blad dat nog maar half is.'
+                  : 'Nothing yet. "Do not count" and then "Only not in the annual plan" keeps an activity in the overview, but leaves it out of the standing against the annual plan: what the city pays, or a sheet that is only half done.'}
+              </p>
+            ) : (
+              <ul className="divide-y divide-[var(--rule-soft)] rounded-xl border border-vtk-blue/10">
+                {outOfPlan.map((d) => (
+                  <li key={d.key} className="flex items-center gap-3 px-3 py-2 text-sm">
+                    <span className="min-w-0 flex-1">
+                      <span className="block break-words font-semibold text-vtk-ink">{d.activity}</span>
+                      <span className="block text-xs text-vtk-muted">
+                        {[d.postName, d.begrotingExcluded?.reason].filter(Boolean).join(" · ")}
+                      </span>
+                    </span>
+                    <RestoreBegrotingButton
+                      docIds={[...d.budgets, ...d.results].map((doc) => doc.id)}
+                      activity={d.activity}
+                      locale={locale}
+                      errorMessages={errorMessages}
+                    />
                   </li>
                 ))}
               </ul>

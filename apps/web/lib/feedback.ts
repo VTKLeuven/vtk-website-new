@@ -4,9 +4,9 @@ import type { Locale } from "@vtk/i18n";
  * Websitefeedback: wat een lid via het accountmenu over de site zelf meldt.
  *
  * Sinds oktober 2026 landt die feedback in Dopl, het platform waar IT al zijn
- * werk bijhoudt; de site toont enkel dat formulier (`FeedbackDialog`). De rest
- * van dit bestand (categorieën, statussen, labels) dient nog voor het beheer van
- * de meldingen die de site zelf bewaarde, op /admin/it/feedback.
+ * werk bijhoudt; de site toont enkel dat formulier (`FeedbackDialog`). Het
+ * beheerscherm voor wat de site daarvoor zelf bewaarde (/admin/it/feedback) is
+ * in november 2026 weggehaald; de tabel `WebsiteFeedback` blijft staan.
  */
 
 /** Waar Dopl draait; enkel berichten van deze oorsprong worden gelezen. */
@@ -20,8 +20,11 @@ const DOPL_FEEDBACK_FORM_BASE = `${DOPL_ORIGIN}/f/${DOPL_FEEDBACK_FORM_SLUG}`;
 /**
  * Wat Dopl van wie feedback geeft al kan weten: de taal van de pagina, en bij
  * een ingelogd lid zijn naam en adres. Dopl zelf is Engelstalig; enkel het
- * publieke formulier spreekt Nederlands, met `?lang=nl`. Naam en adres vullen
- * de twee contactvelden in, die het lid nog kan wijzigen (Dopl D-142).
+ * publieke formulier spreekt Nederlands, met `?lang=nl`: Dopls eigen woorden
+ * (D-142) en de velden van het formulier zelf, voor zover die in de builder van
+ * Dopl een Nederlandse versie hebben (D-143). De taal van de site beslist dus de
+ * taal van het formulier. Naam en adres vullen de twee contactvelden in, die het
+ * lid nog kan wijzigen.
  */
 export type DoplFeedbackContext = {
   locale: Locale;
@@ -55,47 +58,4 @@ export function doplFeedbackEmbedUrl(hostOrigin: string, context: DoplFeedbackCo
   const params = new URLSearchParams({ embed: "modal", origin: hostOrigin });
   for (const [key, value] of contextParams(context)) params.set(key, value);
   return `${DOPL_FEEDBACK_FORM_BASE}?${params.toString()}`;
-}
-
-export const FEEDBACK_LIMITS = {
-  note: 1000,
-} as const;
-
-/** Waarover de melding gaat; volgt de enum `WebsiteFeedbackKind`. */
-export const FEEDBACK_KINDS = ["BUG", "CONTENT", "DESIGN", "FEATURE", "OTHER"] as const;
-export type FeedbackKind = (typeof FEEDBACK_KINDS)[number];
-
-export const FEEDBACK_STATUSES = ["NEW", "PLANNED", "DONE", "DISMISSED"] as const;
-export type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number];
-
-export function isFeedbackKind(value: unknown): value is FeedbackKind {
-  return typeof value === "string" && (FEEDBACK_KINDS as readonly string[]).includes(value);
-}
-
-export function isFeedbackStatus(value: unknown): value is FeedbackStatus {
-  return typeof value === "string" && (FEEDBACK_STATUSES as readonly string[]).includes(value);
-}
-
-/** De categorie in één woord, in beide talen van het beheer. */
-export const FEEDBACK_KIND_LABELS: Record<FeedbackKind, { nl: string; en: string }> = {
-  BUG: { nl: "Bug", en: "Bug" },
-  CONTENT: { nl: "Inhoud", en: "Content" },
-  DESIGN: { nl: "Design", en: "Design" },
-  FEATURE: { nl: "Idee", en: "Idea" },
-  OTHER: { nl: "Iets anders", en: "Something else" },
-};
-
-export const FEEDBACK_STATUS_LABELS: Record<FeedbackStatus, { nl: string; en: string }> = {
-  NEW: { nl: "Nieuw", en: "New" },
-  PLANNED: { nl: "Op de lijst", en: "On the list" },
-  DONE: { nl: "Opgelost", en: "Done" },
-  DISMISSED: { nl: "Niets mee gedaan", en: "No action" },
-};
-
-export function feedbackKindLabel(kind: FeedbackKind, locale: Locale): string {
-  return locale === "nl" ? FEEDBACK_KIND_LABELS[kind].nl : FEEDBACK_KIND_LABELS[kind].en;
-}
-
-export function feedbackStatusLabel(status: FeedbackStatus, locale: Locale): string {
-  return locale === "nl" ? FEEDBACK_STATUS_LABELS[status].nl : FEEDBACK_STATUS_LABELS[status].en;
 }

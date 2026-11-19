@@ -230,7 +230,7 @@ export default async function PraesidiumShiftListPage({
         </Link>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-[28px] font-bold tracking-tight">{list.name}</h1>
+            <h2 className="text-[28px] font-bold tracking-tight">{list.name}</h2>
             <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusChip.tone}`}>{statusChip.text}</span>
           </div>
           {draft ? (

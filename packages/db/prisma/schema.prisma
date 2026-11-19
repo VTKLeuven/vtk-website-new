@@ -27,9 +27,13 @@ enum MembershipRole {
 // Soort Group. PRAESIDIUM = een praesidiumpost (op /praesidium). WERKGROEP = een
 // werkgroep (BEST, Revue, ...): dezelfde leden/rollen-machinerie, maar niet op
 // /praesidium; ze verschijnen op /werkgroepen met een eigen infotekst + website.
+// JAARWERKING = een jaarwerking (Kanweek, Halftime, ...): ook leden en rollen per
+// werkingsjaar, met een eigen beheerrecht en /admin/jaarwerkingen, maar zonder
+// publieke pagina van de site. Zie docs/design-decisions.md, "Jaarwerkingen".
 enum GroupType {
   PRAESIDIUM
   WERKGROEP
+  JAARWERKING
 }
 
 // Hoe een post (Group) een rol toekent aan haar leden.
@@ -478,10 +482,19 @@ enum StudyProgramme {
 /// Wat een `@vtk.be`-account mag. Afgeleid uit de posten en de kiesploeg, met
 /// een override per persoon; zie docs/design-decisions.md, "Google Workspace".
 enum GoogleAccountState {
-  /// Kiesploeglid: mailbox stuurt door, verzenden gebeurt via de kiesploegalias.
+  /// Kiesploeglid dat enkel ontvangt: geen enkel uitgaand bericht, de mailbox
+  /// mag doorsturen.
   RESTRICTED
+  /// Kiesploeglid dat mag mailen, maar enkel vanaf zijn kiesploegadres (de
+  /// alias). Een eigen organisatie-eenheid met een routing-regel die het
+  /// primaire adres weigert.
+  ALIAS_SENDER
   /// Volwaardig: eigen mailbox, mag mailen vanaf het eigen adres.
   FULL
+  /// Geschorst door de sync: een kiesploeglid dat op 15 juli van het jaar
+  /// waarin de ploeg aantreedt geen post kreeg. Zie
+  /// docs/design-decisions.md, "Na de verkiezing".
+  SUSPENDED
 }
 
 /// Functie van een lid dat zichzelf als academisch personeel aanduidt. `null`
@@ -634,6 +647,13 @@ model User {
   isStudent               Boolean             @default(true)
   studyYears              StudyYear[]         @default([])
   studyProgrammes         StudyProgramme[]    @default([])
+  /// Het Discord-account dat dit lid zelf koppelde om peilingen op Discord te
+  /// beantwoorden. Zie docs/poc-peilingen.md.
+  discordId               String?             @unique
+  discordUsername         String?
+  /// De POC-rollen die de site dit account op Discord gaf. Zo ziet de worker
+  /// zonder Discord te bevragen bij wie er iets moet veranderen.
+  discordRoleIds          String[]            @default([])
   // Lid dat niet aan de faculteit Ingenieurswetenschappen studeert. Bewust geen
   // `StudyProgramme`-waarde: het is geen richting, en als enum-waarde zou het
   // overal opduiken waar richtingen opgelijst worden (o.a. de career-export).
@@ -752,6 +772,7 @@ model User {
   meetingReservations       MeetingReservation[]       @relation("MeetingReservationUser")
   meetingPaymentsProcessed  MeetingReservation[]       @relation("MeetingReservationPaidBy")
   meetingPlans              MeetingPlan[]              @relation("MeetingPlanBy")
+  meetingPromotions         MeetingPromotion[]         @relation("MeetingPromotionCreatedBy")
   theokotOrders             TheokotOrder[]             @relation("TheokotOrderUser")
   theokotPickedUp           TheokotOrder[]             @relation("TheokotPickedUpBy")
   theokotVoucherRedemptions TheokotVoucherRedemption[] @relation("TheokotVoucherUser")
@@ -767,6 +788,8 @@ model User {
   /// De weergave die iemand koos op een beheerscherm met meer dan één weergave.
   viewPreferences         UserViewPreference[]
   calendarInterests       CalendarEventInterest[]     @relation("CalendarInterestUser")
+  calendarSignupMails     CalendarEventSignupMail[]   @relation("CalendarSignupMailUser")
+  calendarWeekMails       CalendarWeekMail[]          @relation("CalendarWeekMailUser")
   calendarCategoryFollows CalendarCategoryFollow[]    @relation("CalendarFollowUser")
   shiftRewardRedemptions  ShiftRewardRedemption[]     @relation("ShiftRewardRedemptionUser")
   shiftRewardsProcessed   ShiftRewardRedemption[]     @relation("ShiftRewardRedemptionProcessedBy")
@@ -780,6 +803,7 @@ model User {
   galleryPhotosDetached GalleryDetachedPhoto[] @relation("GalleryPhotoDetacher")
   galleryPhotosTrashed  GalleryTrashedPhoto[]  @relation("GalleryPhotoTrasher")
   galleryAlbumsTrashed  GalleryTrashedAlbum[]  @relation("GalleryAlbumTrasher")
+  galleryShareLinks     GalleryShareLink[]     @relation("GalleryShareLinkCreator")
 
   websiteFeedback        WebsiteFeedback[] @relation("WebsiteFeedbackAuthor")
   websiteFeedbackHandled WebsiteFeedback[] @relation("WebsiteFeedbackHandler")
@@ -849,6 +873,14 @@ model User {
   urenloopEditionsImported UrenloopEdition[]       @relation("UrenloopEditionImportedBy")
 
   kiesploegMemberships KiesploegMember[]
+  /// Extra accounts van een werkgroep (statix.voornaam.naam@vtk.be), naast het
+  /// persoonlijke account in `googleEmail`.
+  werkgroepAccounts          WerkgroepAccount[] @relation("WerkgroepAccountUser")
+  werkgroepAccountSkips WerkgroepAccountSkip[]
+  werkgroepAccountsRequested WerkgroepAccount[] @relation("WerkgroepAccountRequestedBy")
+  werkgroepAccountsDecided   WerkgroepAccount[] @relation("WerkgroepAccountDecidedBy")
+  /// Rechtstreeks in een groepsadres gezet, zonder post (statix.pr@vtk.be).
+  mailGroupMemberships       MailGroupExtra[]
 
   // Rekeningen (billsheet): ingediend, terugbetaald, ingeboekt.
   expensesSubmitted      Expense[]            @relation("ExpenseSubmittedBy")
@@ -906,6 +938,11 @@ model Group {
   // "Verantwoordelijke" houden.
   leadLabel         String         @default("G3")
   website           String?
+  /// Voorvoegsel van de eigen adressen van een werkgroep, bv. "statix": de
+  /// accounts heten dan statix.voornaam.achternaam@vtk.be en de lijsten die de
+  /// werkgroep zelf aanmaakt beginnen met "statix.". Leeg = de werkgroep kan
+  /// geen eigen lijsten of accounts aanvragen. Enkel IT vult dit in.
+  mailPrefix        String?        @unique
   // Een gedeactiveerde post verdwijnt uit de nieuwe-shift-keuzes en het
   // postenbeheer voor nieuwe jaren, maar de historiek (memberships per jaar)
   // blijft bewaard i.p.v. de post te verwijderen.
@@ -936,6 +973,14 @@ model Group {
   ticketTemplates          TicketEventTemplate[]
   uitleenEventsGroup       UitleenEvent[]
   mailGroupSources         MailGroupSource[]
+  /// Groepsadressen die deze werkgroep zelf beheert (statix.pr@vtk.be).
+  ownedMailGroups          MailGroup[]               @relation("MailGroupOwner")
+  /// Categorieën van groepsadressen die bij deze werkgroep horen.
+  ownedMailGroupCategories MailGroupCategory[]       @relation("MailGroupCategoryOwner")
+  /// Hoofdgroepen waarvan de jaargroepen uit deze post komen.
+  yearlyMailGroups         MailGroup[]               @relation("MailGroupYearlyPost")
+  werkgroepAccounts        WerkgroepAccount[]
+  werkgroepAccountSkips WerkgroepAccountSkip[]
   expenses                 Expense[]
   cashRegisters            CashRegister[]
   /// Het kasboek van de vaste kassa (enkel Cursusdienst, Theokot, Fakbar).
@@ -945,6 +990,8 @@ model Group {
   /// Taken van een andere post die het aanspreekpunt voor deze post zijn
   /// ("IT-contact voor Theokot").
   tasksFor                 GroupTask[]               @relation("GroupTaskFor")
+  /// Privélinks naar een album die enkel de leden van deze werkgroep openen.
+  galleryShareLinks        GalleryShareLink[]
 }
 
 model GroupMembership {
@@ -1312,6 +1359,53 @@ model MailGroup {
   /// Aantal leden dat de laatste geslaagde sync in Google zette.
   lastMemberCount Int       @default(0)
 
+  /// Wie de site na de laatste geslaagde ronde in Google zette (gewone leden).
+  /// Een verschil met wat er nu in Google staat, is een wijziging van een mens
+  /// in de Admin console: die neemt de site over in plaats van ze terug te
+  /// draaien. Zie `lib/google/twoWay.ts`.
+  syncedMembers  String[]  @default([])
+  /// Leeg = er is nog geen onthouden lijst; dan haalt de sync niemand weg.
+  syncBaselineAt DateTime?
+
+  /// De werkgroep die deze lijst zelf mag beheren (leden erbij en eraf), naast
+  /// wie `mailgroups.manage` heeft. Een lid van die werkgroep krijgt in deze
+  /// lijst zijn werkgroepadres in plaats van zijn persoonlijke.
+  ownerGroupId String?
+  ownerGroup   Group?  @relation("MailGroupOwner", fields: [ownerGroupId], references: [id], onDelete: SetNull)
+
+  /// Jaargroep (activiteiten_2627@vtk.be): de bronnen tellen voor dit vaste
+  /// werkingsjaar in plaats van het huidige. Een jaargroep van een voorbij jaar
+  /// wordt niet meer aangeraakt: ze is het archief van die ploeg.
+  year     Int?
+  /// De hoofdgroep waarin deze jaargroep als lid hangt, zolang `year` het
+  /// huidige werkingsjaar is.
+  parentId String?
+  parent   MailGroup?  @relation("MailGroupYearly", fields: [parentId], references: [id], onDelete: SetNull)
+  children MailGroup[] @relation("MailGroupYearly")
+
+  /// Op een hoofdgroep: het adres van de jaargroepen, met {jj} (2627) of
+  /// {jaar} (2026), bv. "activiteiten_{jj}". De sync maakt de jaargroep van
+  /// het huidige werkingsjaar aan (en die van volgend jaar zodra daar iemand
+  /// in de post staat) en hangt op 15 juli de nieuwe in de plaats van de oude.
+  yearlyTemplate String?
+  /// De post waarvan de leden in de jaargroepen komen.
+  yearlyGroupId  String?
+  yearlyGroup    Group?  @relation("MailGroupYearlyPost", fields: [yearlyGroupId], references: [id], onDelete: SetNull)
+
+  /// Overgenomen uit Google in plaats van hier aangemaakt. Enkel ter info.
+  importedAt DateTime?
+
+  /// Enkel voor het overzicht op /admin/groepsadressen ("Praesidium ›
+  /// Activiteiten"). Zegt niets over wie erin zit en de sync leest het niet.
+  categoryId String?
+  category   MailGroupCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  /// Uit de nakijkmodus op /admin/groepsadressen/nakijken: houden of weg.
+  /// Leeg = nog niet nagekeken. "Weg" verwijdert nog niets; dat gebeurt pas
+  /// wanneer iemand de lijst van te verwijderen groepen bevestigt.
+  reviewDecision MailGroupReview?
+  reviewedAt     DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1319,6 +1413,42 @@ model MailGroup {
   extras  MailGroupExtra[]
 
   @@index([enabled])
+  @@index([ownerGroupId])
+  @@index([parentId])
+  @@index([categoryId])
+}
+
+enum MailGroupReview {
+  KEEP
+  DELETE
+}
+
+/// Een map voor groepsadressen in het overzicht, met hoogstens één niveau
+/// subcategorieën (Praesidium › Activiteiten). Ordening: een categorie
+/// verwijderen laat de adressen staan, zonder categorie. Alfabetisch, zonder
+/// handmatige volgorde. Zie docs/design-decisions.md.
+model MailGroupCategory {
+  id       String              @id @default(cuid())
+  name     String
+  parentId String?
+  parent   MailGroupCategory?  @relation("MailGroupCategoryTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children MailGroupCategory[] @relation("MailGroupCategoryTree")
+
+  /// De werkgroep waartoe deze categorie hoort (Werkgroepen › Biomedix). Geen
+  /// overerving die de sync leest: opslaan zet ze als `MailGroup.ownerGroupId`
+  /// op de adressen in de categorie die nog geen werkgroep hadden of nog de
+  /// vorige van de categorie, en een adres dat in de categorie komt zonder
+  /// werkgroep, krijgt ze erbij. Een adres met een andere werkgroep houdt die.
+  ownerGroupId String?
+  ownerGroup   Group?  @relation("MailGroupCategoryOwner", fields: [ownerGroupId], references: [id], onDelete: SetNull)
+
+  mailGroups MailGroup[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([parentId, name])
+  @@index([parentId])
+  @@index([ownerGroupId])
 }
 
 /// Een post of werkgroep waarvan de leden van dit werkingsjaar in de lijst
@@ -1342,10 +1472,15 @@ model MailGroupSource {
   groupType       GroupType?
   kiesploegId     String?
   kiesploegPostId String?
+  /// De vertegenwoordigers van een POC, van het jaar in `Poc.mailYear`. Dat jaar
+  /// verandert enkel met de knop "verkozen", niet wanneer iemand vooraf voor
+  /// volgend jaar ingevoerd wordt.
+  pocId           String?
   /// Enkel de verantwoordelijke (`role = LEAD`) i.p.v. elk lid.
   onlyLead        Boolean    @default(false)
 
   mailGroup     MailGroup      @relation(fields: [mailGroupId], references: [id], onDelete: Cascade)
+  poc           Poc?           @relation(fields: [pocId], references: [id], onDelete: Cascade)
   group         Group?         @relation(fields: [groupId], references: [id], onDelete: Cascade)
   kiesploeg     Kiesploeg?     @relation(fields: [kiesploegId], references: [id], onDelete: Cascade)
   kiesploegPost KiesploegPost? @relation(fields: [kiesploegPostId], references: [id], onDelete: Cascade)
@@ -1354,9 +1489,11 @@ model MailGroupSource {
   @@unique([mailGroupId, groupType, onlyLead])
   @@unique([mailGroupId, kiesploegId, onlyLead])
   @@unique([mailGroupId, kiesploegPostId, onlyLead])
+  @@unique([mailGroupId, pocId, onlyLead])
   @@index([groupId])
   @@index([kiesploegId])
   @@index([kiesploegPostId])
+  @@index([pocId])
 }
 
 // -----------------------------------------------------------------------------
@@ -1387,8 +1524,13 @@ model Kiesploeg {
   /// Sjablonen voor de adressen, met {code}, {voornaam}, {achternaam} en {post}.
   /// Sjablonen en geen code, want de conventie verschilt nu al per ploeg.
   accountTemplate String @default("{voornaam}.{achternaam}")
-  aliasTemplate   String @default("kiesploeg{code}.{voornaam}.{achternaam}")
-  listTemplate    String @default("{post}.{code}")
+  aliasTemplate   String @default("{voornaam}.{achternaam}.kiesploeg{code}")
+  listTemplate    String @default("{code}.{post}")
+
+  /// Wanneer de sync de ploeg na 15 juli van haar werkingsjaar afhandelde:
+  /// aliassen weg, wie een post heeft volwaardig, wie geen post kreeg
+  /// geschorst. Leeg zolang dat nog moet gebeuren.
+  transitionedAt DateTime?
 
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -1428,11 +1570,20 @@ model KiesploegMember {
   /// de g5 bekend.
   postId        String?
   role          MembershipRole @default(MEMBER)
-  /// Override: dit lid mag nu al mailen vanaf zijn eigen adres (de
-  /// marketingmensen). Wint van de afgeleide staat.
-  mailboxActive Boolean        @default(false)
+  /// Dit lid mag mailen, maar enkel vanaf zijn kiesploegadres. Vanaf zijn
+  /// primaire adres mailt geen enkel kiesploeglid voor de ploeg aantreedt; wie
+  /// dit niet heeft, ontvangt enkel.
+  sendFromAlias Boolean        @default(false)
   /// Waar de mail naartoe gaat zolang de mailbox niet actief is.
   forwardTo     String?
+  /// Het kiesploegadres zoals het effectief op het account gezet werd (een
+  /// naamgenoot kan een cijfer krijgen). Leeg = nog geen alias.
+  aliasEmail    String?
+  /// Wanneer de sync de alias weghaalde (na 15 juli van het werkingsjaar).
+  aliasRemovedAt DateTime?
+  /// Een beheerder hief de schorsing op: de sync schorst dit account niet
+  /// opnieuw, ook al heeft het lid geen post.
+  keepAccount   Boolean        @default(false)
   createdAt     DateTime       @default(now())
 
   kiesploeg Kiesploeg      @relation(fields: [kiesploegId], references: [id], onDelete: Cascade)
@@ -1456,15 +1607,86 @@ enum MailGroupExtraKind {
 model MailGroupExtra {
   id          String             @id @default(cuid())
   mailGroupId String
-  /// Kleine letters; een vrij adres, dus niet noodzakelijk van een lid.
-  email       String
+  /// Precies één van de twee is ingevuld. Een vrij adres (kleine letters, ook
+  /// een andere groep zoals groep5@vtk.be), of een lid van de site: dan volgt
+  /// het adres zijn gekoppelde account, en verandert het mee wanneer dat
+  /// account verandert.
+  email       String?
+  userId      String?
   kind        MailGroupExtraKind @default(INCLUDE)
   note        String?
   createdAt   DateTime           @default(now())
 
   mailGroup MailGroup @relation(fields: [mailGroupId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([mailGroupId, email])
+  @@unique([mailGroupId, userId])
+  @@index([userId])
+}
+
+enum WerkgroepAccountStatus {
+  /// Aangevraagd door de werkgroep, wacht op IT of de vice.
+  REQUESTED
+  REJECTED
+  /// Aangemaakt in Google.
+  ACTIVE
+  SUSPENDED
+}
+
+/// Een extra account van een werkgroep (statix.voornaam.achternaam@vtk.be),
+/// naast het persoonlijke account van het lid. De werkgroep vraagt het aan,
+/// iemand met `googleAccounts.manage` keurt het goed en dan pas maakt de site
+/// het aan. Zie docs/design-decisions.md, "Werkgroepen beheren hun eigen
+/// adressen".
+model WerkgroepAccount {
+  id            String                 @id @default(cuid())
+  userId        String
+  groupId       String
+  /// Het adres, berekend uit `Group.mailPrefix` bij de aanvraag en opnieuw
+  /// bij de goedkeuring.
+  email         String                 @unique
+  googleUserId  String?                @unique
+  status        WerkgroepAccountStatus @default(REQUESTED)
+  requestedById String?
+  requestedAt   DateTime               @default(now())
+  decidedById   String?
+  decidedAt     DateTime?
+  /// Waarom een aanvraag geweigerd werd; de werkgroep ziet dit.
+  rejectReason  String?
+
+  user        User  @relation("WerkgroepAccountUser", fields: [userId], references: [id], onDelete: Cascade)
+  group       Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  requestedBy User? @relation("WerkgroepAccountRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  decidedBy   User? @relation("WerkgroepAccountDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@unique([userId, groupId])
+  @@index([groupId])
+  @@index([status])
+}
+
+/// Een lid van een werkgroep dat geen werkgroepaccount nodig heeft, aangeduid
+/// door de werkgroep of IT op /admin/groepsadressen/aanvragen. Zonder dit stond
+/// elk lid zonder aanvraag als "geen account", ook wie er al een had in Google
+/// van voor de site of het gewoon niet nodig heeft, en las de lijst als werk dat
+/// nog moest gebeuren.
+///
+/// Per lid en werkgroep, niet per werkingsjaar: wie het dit jaar niet nodig
+/// heeft, staat volgend jaar niet opnieuw als werk. Een aanvraag haalt de
+/// markering weg. Een eigen tabel en geen status op `WerkgroepAccount`: die rij
+/// draagt een uniek adres, en "niet nodig" heeft er geen.
+model WerkgroepAccountSkip {
+  id         String   @id @default(cuid())
+  userId     String
+  groupId    String
+  markedById String?
+  markedAt   DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+  @@index([groupId])
 }
 
 model Permission {
@@ -1949,6 +2171,11 @@ model CalendarEvent {
   /// het begint. NULL = niet aangeduid (ook voor alles van voor deze kolom).
   registrationNewsAt DateTime? @db.Timestamptz(3)
 
+  /// Wanneer dit evenement in /admin/kalender uitgelicht werd voor de vier
+  /// affiches in de hero van de homepage. NULL = niet uitgelicht; de site vult de
+  /// plaatsen dan zelf met de eerstvolgende evenementen. Zie lib/home/heroEvents.ts.
+  homeFeaturedAt DateTime? @db.Timestamptz(3)
+
   group          Group                        @relation(fields: [groupId], references: [id], onDelete: Cascade)
   createdBy      User?                        @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   /// De ticketverkoop(en) van dit evenement; meestal één, soms meer (zie
@@ -1960,6 +2187,7 @@ model CalendarEvent {
   uitleenEvent   UitleenEvent?
   categories     CalendarEventCategory[]
   interests      CalendarEventInterest[]
+  signupMails    CalendarEventSignupMail[]
   guestInterests CalendarEventGuestInterest[]
   /// De losse momenten van dit evenement, wanneer het er meer dan één heeft. Leeg
   /// = het evenement loopt gewoon van `start` tot `end` door. Zie
@@ -1987,9 +2215,10 @@ model CalendarEvent {
 /// de kalenderpagina: de ICS-feed maakt er één afspraak van die een week lang in
 /// ieders agenda staat, en het maandraster tekent er een balk over alle dagen van.
 ///
-/// Het evenement blijft dus één record met één URL, één affiche, één beschrijving,
-/// één ster, één ticketshop en één formulier; de momenten zeggen enkel wannéér het
-/// doorgaat.
+/// Het evenement blijft dus één record met één URL, één ster, één ticketshop en
+/// één formulier. De affiche, de beschrijving en de locatie van het evenement
+/// gelden voor elk moment, tenzij een moment er zelf een heeft: zie de velden
+/// hieronder.
 ///
 /// **`CalendarEvent.start` en `.end` blijven de envelop**: de start van het eerste
 /// moment en het einde van het laatste, door de save-action bijgehouden. Alles wat
@@ -2011,6 +2240,28 @@ model CalendarEventMoment {
   /// Een korte eigen naam voor dit ene moment ("Ploegenloop", "Nachtloop").
   /// Leeg = het moment draagt gewoon de titel van het evenement.
   label String?
+
+  /// Wat alleen voor dit moment geldt: een andere startplaats, een eigen tekst,
+  /// een eigen affiche. Alles is optioneel, en leeg betekent dat het moment de
+  /// waarde van het evenement volgt (`eventForMoment` in lib/calendar/moments.ts).
+  ///
+  /// De eigen tekst staat **naast** de beschrijving van het evenement en vervangt
+  /// ze niet: wat altijd geldt, hoeft zo niet per week overgetikt te worden. Wat
+  /// een bezoeker ziet, is de affiche en de locatie van het eerstvolgende moment;
+  /// is de reeks voorbij, dan weer die van het evenement.
+  ///
+  /// Geen eigen telefoonuitsnede: een telefoon volgt hier het focuspunt.
+  ///
+  /// **Elk veld hier moet ook door het formulier**, want de save-action gooit de
+  /// momenten weg en maakt ze opnieuw aan. `test/calendarMomentForm.test.ts` faalt
+  /// zodra een kolom die weg niet aflegt.
+  location      String?
+  descriptionNl String?
+  descriptionEn String?
+  imageKey      String?
+  /// 0..1, zoals `CalendarEvent.imageFocusX/Y`.
+  imageFocusX   Float   @default(0.5)
+  imageFocusY   Float   @default(0.5)
 
   event CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
@@ -2336,6 +2587,10 @@ model TicketEvent {
   // staan even vaak achter de toog als een praesidiumlid, maar zitten in geen
   // enkele post en vielen dus buiten elke voorverkoop.
   presaleHelpers        Boolean           @default(true)
+  // En de ereleden (`User.honoraryMember`): die hebben bij de kring van oudsher
+  // voorrang, zoals bij een praesidiumpost. Standaard aan, net als de twee
+  // hierboven; uit te zetten per event.
+  presaleHonorary       Boolean           @default(true)
   // Geheime sleutel voor de private voorverkooplink: wie ze heeft, koopt al
   // tijdens de voorverkoop, zonder post en zonder shiften. Bedoeld om te delen
   // met een groep die de site niet kent (de band, de sponsors, de ouders van).
@@ -2353,6 +2608,12 @@ model TicketEvent {
   status                TicketEventStatus @default(DRAFT)
   currency              String            @default("EUR")
   maxTicketsPerOrder    Int               @default(8)
+  // Een erelid koopt voor dit event hoogstens één ticket in totaal: over alle
+  // tickettypes en al zijn bestellingen heen, aan welke prijs ook. Zonder dit
+  // vinkje geldt enkel de grens op de ereledenprijs (`TicketType.honoraryPriceCents`)
+  // en koopt een erelid daarnaast tickets voor vrienden aan de gewone prijs.
+  // Zie docs/design-decisions.md, "Ereleden: één ticket in totaal".
+  honoraryOneTicket     Boolean           @default(false)
   // Aanmelden met de studentenkaart aan de deur (cantus). Staat dit aan, dan
   // koppelt de kassa het r-nummer van de ingelogde koper aan zijn ticket en kan
   // de scanner een gescande kaart tot een ticket herleiden.
@@ -3027,12 +3288,15 @@ model TicketEventTemplate {
   salesClosesMinutesBefore Int?
 
   maxTicketsPerOrder    Int     @default(8)
+  /// Zie `TicketEvent.honoraryOneTicket`.
+  honoraryOneTicket     Boolean @default(false)
   contactEmail          String?
   cardCheckIn           Boolean @default(false)
   openScanning          Boolean @default(true)
   presaleLeadMinutes    Int?
   presalePraesidium     Boolean @default(true)
   presaleHelpers        Boolean @default(true)
+  presaleHonorary       Boolean @default(true)
   confirmationMessageNl String  @default("")
   confirmationMessageEn String  @default("")
 
@@ -3203,7 +3467,38 @@ model Poc {
   // per POC kan: één POC bedient soms verschillende opleidingen.
   studyProgrammes StudyProgramme[] @default([])
 
-  representatives PocRepresentative[]
+  /// De rollen op de studentendiscord die de studenten van deze POC krijgen,
+  /// eventueel per fase. Zie docs/poc-peilingen.md.
+  discordRoles     PocDiscordRole[]
+  /// Het kanaal waar de peilingen van deze POC komen, en waar enkel haar rollen
+  /// in kunnen. VTK Onderwijs stelt het in op /admin/peilingen; een RiVer post
+  /// altijd hier, enkel `pocs.manage` kan per peiling afwijken.
+  discordChannelId String?
+
+  /// Het werkingsjaar waarvan de vertegenwoordigers in het groepsadres van de
+  /// POC staan. Verandert enkel met de knop "verkozen" in /admin/pocs: wie je
+  /// vooraf voor volgend jaar invoert, komt pas in de lijst wanneer de
+  /// verkiezing achter de rug is. Leeg = het huidige werkingsjaar.
+  mailYear Int?
+
+  representatives  PocRepresentative[]
+  polls            PocPoll[]
+  mailGroupSources MailGroupSource[]
+}
+
+/// Een rol op de studentendiscord die de bot geeft aan de studenten van een POC.
+/// Met fases krijgt enkel wie in een van die fases zit de rol (bv. "1ste
+/// bachelor" bij de BPOC); zonder fases iedereen van de POC. Studenten kunnen
+/// dezelfde rol ook zelf kiezen op Discord: de site neemt enkel af wat ze zelf
+/// gaf (`User.discordRoleIds`).
+model PocDiscordRole {
+  pocId      String
+  roleId     String
+  studyYears StudyYear[] @default([])
+
+  poc Poc @relation(fields: [pocId], references: [id], onDelete: Cascade)
+
+  @@id([pocId, roleId])
 }
 
 model PocRepresentative {
@@ -3221,6 +3516,107 @@ model PocRepresentative {
   @@unique([pocId, userId, year])
   @@index([pocId])
   @@index([year])
+}
+
+// -----------------------------------------------------------------------------
+// POC-peilingen: de RiVers vragen de studenten van hun richting om hun mening.
+// Beantwoorden gebeurt in de POC-band op de homepage. De kringkeuzes staan in
+// docs/design-decisions.md, "POC-peilingen".
+// -----------------------------------------------------------------------------
+
+enum PocPollQuestionKind {
+  YES_NO
+  SCORE
+  OPEN
+}
+
+model PocPoll {
+  id    String  @id @default(cuid())
+  /// Leeg: een algemene peiling van VTK Onderwijs, voor de studenten van alle
+  /// richtingen. Enkel wie `pocs.manage` heeft, maakt die.
+  pocId String?
+
+  titleNl String
+  titleEn String?
+
+  /// De vergadering waarvoor de RiVers dit verzamelen. Optioneel; de strook
+  /// bovenaan de site vertelt ermee waarom je antwoord telt.
+  meetingDate DateTime?   @db.Date
+  /// Leeg: een concept, dat enkel de RiVers zien. Publiceren opent de peiling
+  /// meteen; vanaf dan liggen de vragen vast.
+  publishedAt DateTime?   @db.Timestamptz(3)
+  opensAt     DateTime    @db.Timestamptz(3)
+  closesAt    DateTime    @db.Timestamptz(3)
+  /// De fases waarvoor de peiling is. Leeg: alle fases van de richting.
+  studyYears  StudyYear[] @default([])
+
+  /// Het kanaal en het bericht op Discord. Bij een POC-peiling het kanaal van
+  /// de POC, tenzij VTK Onderwijs een ander koos; leeg is enkel op de website. `discordClosedAt` zegt dat de knoppen
+  /// na de deadline uitgezet zijn, `discordError` waarom posten mislukte.
+  discordChannelId String?
+  discordMessageId String?
+  discordClosedAt  DateTime? @db.Timestamptz(3)
+  discordError     String?
+
+  /// Wat de RiVers na de POC aan de studenten vertellen, in Markdown.
+  summaryNl          String?
+  summaryPublishedAt DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  poc       Poc?              @relation(fields: [pocId], references: [id], onDelete: Cascade)
+  questions PocPollQuestion[]
+
+  @@index([pocId])
+  @@index([closesAt])
+}
+
+model PocPollQuestion {
+  id     String              @id @default(cuid())
+  pollId String
+  order  Int                 @default(0)
+  kind   PocPollQuestionKind
+  textNl String
+  textEn String?
+
+  /// Wat 1 en 5 betekenen bij een score. Leeg: oneens en eens.
+  lowLabelNl  String?
+  lowLabelEn  String?
+  highLabelNl String?
+  highLabelEn String?
+
+  poll    PocPoll         @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  answers PocPollAnswer[]
+
+  @@index([pollId])
+}
+
+/// Eén antwoord van één student, zonder dat de rij zegt van wie.
+///
+/// `voterKey` is een HMAC over de peiling en de gebruiker (`lib/pocPolls/voterKey.ts`):
+/// de site herkent er je eigen antwoord mee, zodat je het kan wijzigen en één keer
+/// telt, maar uit de rij zelf is geen persoon af te leiden. Daarom ook geen eigen
+/// id (een cuid bevat een tijdstip) en geen tijdstempels: die zouden een antwoord
+/// aan de toegangslogs kunnen koppelen. Voeg ze niet toe.
+model PocPollAnswer {
+  questionId String
+  voterKey   String
+  /// `YES_NO`: 1 of 0. `SCORE`: 1 tot en met 5. `OPEN`: leeg.
+  value      Int?
+  /// Enkel bij `OPEN`.
+  text       String?
+  /// De fases van de student op het moment van antwoorden, voor de deelname per
+  /// fase. Een fase met minder dan vijf antwoorden wordt nooit apart getoond.
+  studyYears StudyYear[] @default([])
+  /// Door de RiVers: open antwoord markeren voor de POC, of verbergen.
+  starred    Boolean     @default(false)
+  hidden     Boolean     @default(false)
+
+  question PocPollQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@id([questionId, voterKey])
+  @@index([voterKey])
 }
 
 // -----------------------------------------------------------------------------
@@ -3245,6 +3641,24 @@ model Setting {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Opruiming van de bucket (apps/web/lib/storage-cleanup.ts)
+// -----------------------------------------------------------------------------
+// Een object in de bucket waar geen enkele rij in de database nog naar
+// verwijst, en sinds wanneer dat zo is. Elke nacht doorzoekt de opruiming de
+// hele database naar de key; duikt die weer op, dan verdwijnt de rij, en wie
+// 30 dagen aan één stuk hier staat, wordt uit de bucket verwijderd.
+//
+// Deze tabel draagt zelf de keys, dus de scan slaat ze over: anders zou elk
+// object zijn eigen verwijzing zijn en nooit weggaan.
+model StorageOrphan {
+  key         String   @id
+  sizeBytes   Int
+  firstSeenAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([firstSeenAt])
 }
 
 // -----------------------------------------------------------------------------
@@ -3361,6 +3775,13 @@ model Shift {
   // korte `description`. Leeg (NULL of "") = de frontend toont het blok niet.
   instructions String?
 
+  // De Engelse versie van naam, beschrijving en uitleg, voor /en/shift en de
+  // app in het Engels. Optioneel: leeg (NULL) = de Nederlandse tekst, zoals bij
+  // elke shift van voor november 2026 (`localizeShift` in lib/shift/localize.ts).
+  nameEn         String?
+  descriptionEn  String?
+  instructionsEn String?
+
   // Postcode (Group.code) waarvoor deze shift telt; los tekstveld i.p.v. een
   // relatie, zodat een oude postcode behouden blijft ook als de post later
   // gedeactiveerd of hernoemd wordt.
@@ -3380,6 +3801,19 @@ model Shift {
   manualGrantId String?
   manualGrant   ManualShiftGrant? @relation(fields: [manualGrantId], references: [id], onDelete: Cascade)
 
+  /// De Theokot-verkoopdag waarvoor deze shift aangemaakt is ("Week aanmaken").
+  ///
+  /// Zonder deze koppeling raadde de code welke shiften bij een dag horen ("een
+  /// shift met post THEOKOT op die dag"), en dan hield één losse opkuisshift de
+  /// drie gewone shiften tegen. Nu weet een dag precies welke shiften de zijne zijn:
+  /// aanvullen zet er nooit een tweede reeks bij, en verwijderen neemt enkel die mee.
+  ///
+  /// `SetNull` en geen `Cascade`: een voorbije dag wissen (`purgeFinishedSession`)
+  /// mag de shift met haar inschrijvingen en bonnetjes niet meenemen. Een dag die
+  /// niet doorgaat, verwijdert haar shiften zelf, na een vraag in de popup.
+  theokotSessionId String?
+  theokotSession   TheokotSession? @relation(fields: [theokotSessionId], references: [id], onDelete: SetNull)
+
   /// Wanneer deze shift voor het laatst gewijzigd is.
   ///
   /// Bestaat voor de agendafeed. Die vult `LAST-MODIFIED` en `SEQUENCE` van een
@@ -3392,6 +3826,7 @@ model Shift {
 
   @@unique([sourceSystem, sourceId])
   @@index([manualGrantId])
+  @@index([theokotSessionId])
 }
 
 model ShiftParticipant {
@@ -3426,6 +3861,14 @@ model ShiftParticipant {
   /// Gezet in het shiftenoverzicht van het praesidium: deze inschrijving was
   /// uit noodzaak (zie `PraesidiumShiftNecessity`).
   praesidiumNecessity PraesidiumShiftNecessity?
+
+  /// Een praesidiumlid dat zich inschreef "omdat het moest", mag vervangen
+  /// worden: schrijft een student (iemand zonder post in het werkingsjaar van
+  /// de shift) zich in terwijl de shift vol is, dan neemt die deze plaats in en
+  /// krijgt het praesidiumlid een mail. Voor een student telt deze plaats als
+  /// vrij, en de naam staat niet in zijn lijst. Zie `lib/shift/replace.ts` en
+  /// docs/design-decisions.md, "Vervangbaar op een shift".
+  replaceable Boolean @default(false)
 
   @@id([shiftId, userId])
 }
@@ -3880,6 +4323,8 @@ model TheokotSession {
 
   items  TheokotSessionItem[]
   orders TheokotOrder[]
+  /// De shiften die "Week aanmaken" voor deze dag zette; zie `Shift.theokotSessionId`.
+  shifts Shift[]
 
   @@index([date])
   @@index([processedAt, isOpen, pickupEnd])
@@ -4062,6 +4507,11 @@ model Meeting {
   slug     String      @unique
 
   startsAt DateTime  @db.Timestamptz(3)
+  /// De Brusselse kalenderdag van `startsAt`. Een trigger
+  /// (`meeting_set_day`) vult het bij elke schrijfactie; de code zet het
+  /// nooit zelf. Bestaat enkel voor de regel hieronder: één bureau en één
+  /// grocomeet per dag.
+  day      DateTime  @default(dbgenerated("CURRENT_DATE")) @db.Date
   location String?
   /// Vanaf wanneer studenten dit bureau kunnen invullen. Leeg = meteen open.
   /// Een GM staat altijd open: de grocos bestellen weken op voorhand.
@@ -4092,12 +4542,43 @@ model Meeting {
   reservations  MeetingReservation[]
   /// Wat grocos die dag zelf bij Theokot bestelden (enkel bij een GM).
   theokotOrders TheokotOrder[]
+  /// Reclamemomenten (mail, story) die Onderwijs zelf noteerde.
+  promotions    MeetingPromotion[]
 
+  /// Op productie stond elk bureau dubbel (semester 1 nog eens ingepland onder
+  /// semester 2). Een tweede op dezelfde dag faalt nu met P2002; zie
+  /// `DAY_TAKEN`.
+  @@unique([kind, day])
   @@index([kind, startsAt])
   @@index([year, semester, kind])
 }
 
 /// Eén keuze uit het eigen aanbod van een moment (enkel bij `useTheokot=false`).
+/// Een reclamemoment voor een bureau: wanneer Onderwijs een mail stuurde of
+/// een story postte. Zelf ingevuld in /admin/bureau/statistieken, want die
+/// momenten gebeuren buiten de site. Verschijnt als verticale markering op de
+/// cumulatieve lijn, zodat je ziet wat erna gebeurde.
+model MeetingPromotion {
+  id             String   @id @default(cuid())
+  meetingId      String
+  /// Wanneer de mail vertrok of de post online kwam.
+  at             DateTime @db.Timestamptz(3)
+  /// Vrije omschrijving: "Mail naar bureau", "Story Instagram".
+  label          String
+  /// Optioneel het kanaal en de naam van de link die erbij hoorde
+  /// (`?via=mail&c=week-3`), om het moment naast de herkomst te leggen.
+  source         String?
+  sourceCampaign String?
+
+  createdById String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  meeting   Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("MeetingPromotionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([meetingId, at])
+}
+
 model MeetingOption {
   id         String  @id @default(cuid())
   meetingId  String
@@ -4150,6 +4631,15 @@ model MeetingReservation {
 
   /// Opmerking bij een bureau (onderwijsfeedback vooraf).
   comment String?
+
+  /// Langs welk kanaal de eerste inschrijving binnenkwam (`?via=mail`), zoals
+  /// `TicketOrder.source`. Enkel gezet bij het aanmaken van de rij: een
+  /// wijziging via een andere link laat ze staan. `null` = inschrijving van
+  /// voor die meting, op het scherm "niet gemeten" en nooit "rechtstreeks".
+  /// Zie `lib/ticketing/source.ts` en docs/design-decisions.md.
+  source         String?
+  /// `?c=` uit dezelfde link, om twee posts op hetzelfde kanaal te scheiden.
+  sourceCampaign String?
 
   /// Ongeldig gemaakt omdat het gekozen broodje die dag niet bestaat. De persoon
   /// kreeg er een mail over en ziet het op de reservatiepagina.
@@ -5024,6 +5514,15 @@ model UitleenVehicle {
   /// icoon bij zetten is een SVG erbij en hoort geen migratie te vragen.
   icon String?
 
+  /// Mogen leden dit voertuig zelf aanvragen? Uit = enkel het team plant het in
+  /// (een gehuurd busje, of een voertuig dat Logistiek zelf bestuurt). Het
+  /// voertuig blijft in de planning en op het bezettingsoverzicht staan.
+  ///
+  /// Een vlag en geen aparte lijst, en afgedwongen in de actie en niet enkel in
+  /// het formulier (F6.21): een verborgen keuze houdt niemand tegen die de actie
+  /// rechtstreeks aanroept. Bestaande voertuigen blijven aanvraagbaar.
+  requestableByMembers Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -5051,8 +5550,8 @@ model UitleenDriver {
   // vlag zet; tot dan gelden ze als autochauffeur.
   canDriveVan Boolean @default(false)
 
-  /// De kleur van deze chauffeur in de transportplanning, 1 tot 8
-  /// (`--driver-1` .. `--driver-8` in app/globals.css).
+  /// De kleur van deze chauffeur in de transportplanning, 1 tot 40
+  /// (`--driver-1` .. `--driver-40` in app/design/theme.css).
   ///
   /// `null` = de kleur die uit zijn id volgt (`driverColorIndex` in
   /// lib/driver-colors.ts). Die hash blijft de standaard: het doel is
@@ -5064,6 +5563,16 @@ model UitleenDriver {
   /// Een lid van de post Logistiek zonder rij in deze tabel krijgt er een zodra
   /// iemand zijn kleur zet, net zoals `canDriveVan` dat al doet.
   colorIndex Int?
+
+  /// Een eigen kleur uit de drie schuiven in /beheer/chauffeurs, als
+  /// `tint,levendigheid,kracht` (bv. `210,60,35`); zie `CustomDriverColor` in
+  /// lib/driver-colors.ts.
+  ///
+  /// Wint van `colorIndex`, maar de actie zet er altijd één van de twee op
+  /// `null`, dus in de praktijk staat er hooguit één. `null` = geen eigen kleur.
+  /// Een tekst die er niet als kleur uitziet, wordt genegeerd (`parseCustomColor`)
+  /// en laat de paletkleur of de hash gelden.
+  customColor String?
 
   /// Het nummer waarop deze chauffeur bereikbaar is onderweg.
   ///
@@ -5253,6 +5762,13 @@ model UitleenTransportBooking {
   /// één hernoemde melding van stuk. Zie docs/design-decisions.md.
   plannedByTeam Boolean @default(false)
 
+  /// Reeks waartoe deze rit hoort (F6.22): een herhaalde rit (C&G, containerpark,
+  /// BO) is een rij gewone ritten met dezelfde `seriesId`. `NULL` = geen deel van
+  /// een reeks, en dat is wat elke rit van voor november 2026 heeft: niemand kan
+  /// achteraf weten welke oude ritten bij elkaar hoorden. Geen tabel: een reeks
+  /// heeft geen eigen eigenschappen buiten wat elke rit al draagt.
+  seriesId String?
+
   // Tarief gesnapshot bij de aanvraag (en her-gesnapshot bij een voertuigwissel).
   pricingMode UitleenPricingMode
   rateCents   Int
@@ -5321,6 +5837,7 @@ model UitleenTransportBooking {
   @@index([eventId])
   @@index([reservationId])
   @@index([tripGroupId])
+  @@index([seriesId])
   // "Mijn ritten" voor een chauffeur, en de rittentelling per chauffeur in het
   // chauffeursbeheer.
   @@index([driverId, startAt])
@@ -7794,6 +8311,61 @@ model CalendarEventInterest {
   @@index([mailRemindedAt])
 }
 
+/// "De ticketverkoop of de inschrijvingen zijn open": de mail aan wie interesse
+/// aanduidde in een evenement, één keer per manier om binnen te geraken.
+///
+/// Een eigen tabel en geen kolom op `CalendarEventInterest`, om twee redenen.
+/// Een lid heeft bij een reeks momenten meer dan één interesserij voor
+/// hetzelfde evenement, en hoort toch maar één mail te krijgen. En een
+/// evenement kan meer dan één ticketverkoop hebben (de waves van Galabal): elke
+/// verkoop die opengaat, is een eigen bericht.
+///
+/// De rij is de claim: eerst aanmaken (de unieke sleutel houdt een tweede
+/// container tegen), dan versturen, en bij een mislukte verzending weer weg.
+/// Zie apps/web/lib/calendar/signupOpened.ts en docs/design-decisions.md.
+model CalendarEventSignupMail {
+  id      String  @id @default(cuid())
+  userId  String
+  eventId String
+  /// Wat er openging: `ticket:<TicketEvent.id>`, `form` (het formulier bij het
+  /// evenement) of `link` (de externe link met "deze link opent de
+  /// inschrijvingen" aangevinkt).
+  source  String
+  /// Of de mail over de voorverkoop ging. Enkel ter info: de sleutel is
+  /// dezelfde, zodat wie in de voorverkoop een mail kreeg, er bij de publieke
+  /// start geen tweede krijgt.
+  presale Boolean @default(false)
+  sentAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  user  User          @relation("CalendarSignupMailUser", fields: [userId], references: [id], onDelete: Cascade)
+  event CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId, source])
+  @@index([eventId])
+}
+
+/// De weekmail van de kalender: zaterdagavond het overzicht van de week die
+/// komt, aan wie de mailinglijst Evenementen aan heeft. Eén rij per lid per
+/// week.
+///
+/// De rij is de claim, zoals bij `CalendarEventSignupMail`: eerst aanmaken (de
+/// unieke sleutel houdt een tweede container tegen), dan versturen, en bij een
+/// mislukte verzending weer weg. Zie apps/web/lib/calendar/weekOverview.ts.
+model CalendarWeekMail {
+  id     String   @id @default(cuid())
+  userId String
+  /// De maandag van de week waarover de mail ging, als Brusselse datum
+  /// ("2026-11-23"). Een tekst en geen tijdstip, zodat het omschakelen naar
+  /// winteruur de sleutel niet verschuift.
+  week   String
+  sentAt DateTime @default(now()) @db.Timestamptz(3)
+
+  user User @relation("CalendarWeekMailUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, week])
+  @@index([week])
+}
+
 /// "Ik kom naar dit alumni-evenement", aangeduid door iemand zonder account.
 ///
 /// Bestaat enkel voor **alumni-evenementen**. Een afgestudeerde van 2004 heeft
@@ -8236,6 +8808,13 @@ model CashRegister {
   /// Opmerking van Beheer bij het tellen. Enkel voor wie kassa's beheert.
   note String?
 
+  /// De kassa waarvan de eindkassa hier als startkassa doorgeschoven werd: het
+  /// cash ging zonder leegmaken naar deze activiteit. NULL = de startkassa kwam
+  /// van Beheer, of van voor november 2026, toen dat enkel in het rekenblad
+  /// kon (en dat is niet te kennen). `@unique`: één kassa ligt op één plaats.
+  /// `SetNull`: een verwijderde kassa laat deze startkassa staan.
+  startFromId String? @unique
+
   /// De boekhoudcode van wat er op de toestellen van deze kassa binnenkwam,
   /// voor de online inkomsten (koppelregel 4). Beheer kiest ze bij het
   /// aanvaarden, niet de post. NULL = nog geen: dan koppelt de kassa niets.
@@ -8246,6 +8825,8 @@ model CashRegister {
   /// Wanneer de mail met de aanvaarding vertrok. NULL bij een aanvaarding
   /// zonder mail (geen mailserver, of de aanvrager heeft geen account meer).
   acceptedMailSentAt DateTime? @db.Timestamptz(3)
+  /// Wanneer Beheer het laatst mailde dat de kassa geteld is. NULL = nog niet.
+  countedMailSentAt  DateTime? @db.Timestamptz(3)
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -8253,6 +8834,9 @@ model CashRegister {
   group        Group?                    @relation(fields: [groupId], references: [id], onDelete: SetNull)
   requestedBy  User?                     @relation("CashRegisterRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
   acceptedBy   User?                     @relation("CashRegisterAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+  startFrom    CashRegister?             @relation("CashRegisterCarryOver", fields: [startFromId], references: [id], onDelete: SetNull)
+  /// De kassa die met de eindkassa van deze verderging.
+  carriedTo    CashRegister?             @relation("CashRegisterCarryOver")
   payments     CashRegisterPayment[]
   ticketEvents CashRegisterTicketEvent[]
   /// `SetNull`: een verwijderde code laat de kassa zonder code.
@@ -8322,9 +8906,11 @@ model PermanentCashEntry {
   /// dezelfde dag geldt de volgorde van ingeven (`createdAt`).
   date    DateTime               @db.Date
 
-  /// Cash in centen. Bij een telling de som van `counts`, gezet door de action.
+  /// Cash in centen. Staan er `counts`, dan de som daarvan, gezet door de action.
   cashCents Int
-  /// Stuks per coupure, zoals `CashRegister.endCounts`. Enkel bij een telling.
+  /// Stuks per coupure, zoals `CashRegister.endCounts`: bij een telling, en bij
+  /// meegeven en teruggeven vanaf november 2026. NULL bij een oudere regel, die
+  /// enkel `cashCents` heeft.
   counts    Json?
 
   /// Bonnen in de kassa (telling) of mee afgegeven aan Beheer (teruggegeven).
@@ -8950,6 +9536,10 @@ model GalleryTrashedAlbum {
   photoCount Int
   /// Stond het album al van de site? Dan blijft het na terugzetten verborgen.
   wasHidden  Boolean
+  /// Was het privé (`[gallery-private]`)? Dan wordt het na terugzetten weer privé
+  /// en geen openbaar album in het overzicht. Rijen van voor deze kolom: false,
+  /// en dat klopt, want privé bestond toen nog niet.
+  wasPrivate Boolean @default(false)
 
   trashedById String?
   trashedAt   DateTime @default(now()) @db.Timestamptz(3)
@@ -8957,6 +9547,61 @@ model GalleryTrashedAlbum {
   trashedBy User? @relation("GalleryAlbumTrasher", fields: [trashedById], references: [id], onDelete: SetNull)
 
   @@index([gallery, trashedAt])
+}
+
+/// Wie er met een privélink van een album binnen mag. Zie
+/// `docs/immich-gallery.md`, "Een album delen met een link".
+enum GalleryShareAudience {
+  /// Iedereen met de link, ook zonder account.
+  LINK
+  /// Inloggen, en dit werkingsjaar een post van het praesidium hebben.
+  PRAESIDIUM
+  /// Inloggen, en dit werkingsjaar lid zijn van de werkgroep in `groupId`.
+  GROUP
+}
+
+/// Een privélink naar een album van vtk.be. Wie hem heeft, ziet het album op
+/// /media/gedeeld/<token>, ook wanneer het niet op de site staat; hij toont
+/// enkel de zichtbare foto's. Draagt een geheim: nooit in de fixtures en nooit
+/// in een MCP-leesresource.
+model GalleryShareLink {
+  id      String               @id @default(cuid())
+  gallery PhotoTakedownGallery
+
+  /// Het hoofdalbum in Immich; zijn tabs horen er vanzelf bij.
+  albumId String
+  /// Voor wie, enkel voor het beheer ("Praesidium 2026-2027").
+  label   String
+
+  /// sha256 van het token, om op te zoeken. Het token zelf staat nergens leesbaar.
+  tokenHash   String @unique
+  /// Het token, versleuteld met `encryptSecret`, om de link later opnieuw te
+  /// kopiëren. De link van een album is van het team, niet van één persoon.
+  tokenSecret String
+
+  audience      GalleryShareAudience @default(LINK)
+  /// Enkel bij GROUP: de werkgroep. Een CHECK in de migratie eist hem daar en
+  /// verbiedt hem elders; verdwijnt de werkgroep, dan gaan haar links mee.
+  groupId       String?
+  allowDownload Boolean              @default(true)
+  /// Nooit voorbij 15 juli: dan wisselt het werkingsjaar, en met hem wie er in
+  /// het praesidium of een werkgroep zit.
+  expiresAt     DateTime             @db.Timestamptz(3)
+
+  /// Een telling, geen lijst van wie er keek.
+  openCount    Int       @default(0)
+  lastOpenedAt DateTime? @db.Timestamptz(3)
+
+  createdById String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  group     Group? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  /// `SetNull`: wie de link maakte, mag de kring verlaten zonder de link mee te nemen.
+  createdBy User?  @relation("GalleryShareLinkCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([gallery, albumId])
+  @@index([groupId])
 }
 
 /// Waarover de feedback gaat. Vier categorieën plus een restcategorie: meer
@@ -9223,6 +9868,9 @@ model BoDocument {
   /// De `driveModifiedAt` waarvoor de bedragen gelezen werden. Gelijk aan de
   /// huidige: het bestand hoeft niet opnieuw gedownload te worden.
   figuresReadFor     DateTime? @db.Timestamptz(3)
+  /// `FIGURES_VERSION` uit `lib/bo/figures.ts` waarmee de bedragen gelezen
+  /// werden. Lager dan de huidige: opnieuw lezen, ook al wijzigde het blad niet.
+  figuresVersion     Int       @default(0)
 
   /// Een resultaat dat Groep 5 met de hand bij een budget zette, omdat de
   /// namen te ver uiteenlopen om vanzelf te koppelen.
@@ -9237,6 +9885,18 @@ model BoDocument {
   /// versie, een kopie, iets wat er niet hoort. In Drive verandert er niets, en
   /// de scan zet het niet terug. Null = telt mee.
   hiddenAt       DateTime? @db.Timestamptz(3)
+  /// Telt wel mee in het overzicht (budget, resultaat, percentage), maar niet
+  /// in de stand tegenover de begroting: een activiteit die de stad betaalt,
+  /// of waarvan het blad nog maar half is. Groep 5 zet het terug zodra het
+  /// klopt. Null = telt mee in de begroting.
+  begrotingExcludedAt     DateTime? @db.Timestamptz(3)
+  /// Waarom, zodat wie de lijst later nakijkt weet wat er nog moet gebeuren.
+  begrotingExcludedReason String?
+  /// Groep 5 duidde dit als potje aan (een deelbudget waaruit door het jaar
+  /// gekocht wordt): het wacht niet op een resultaat en telt in de stand
+  /// tegenover de begroting voor het begrote bedrag. Een bestand dat
+  /// "Deelbudget" heet, is dat ook zonder deze kolom. Null = geen potje.
+  potAt                   DateTime? @db.Timestamptz(3)
 
   firstSeenAt  DateTime  @default(now()) @db.Timestamptz(3)
   lastSeenAt   DateTime  @db.Timestamptz(3)
@@ -9255,6 +9915,95 @@ model BoDocument {
 /// Hoe een post in de bestandsnamen heet wanneer de site dat niet zelf
 /// herkent: "WERKGROEPEN" is Overige, "Biomedix" een werkgroep. Eén keer
 /// gekoppeld, geldt het voor elk bestand met die schrijfwijze, ook de volgende.
+enum BoBudgetStatus {
+  /// Een post is het aan het opstellen.
+  DRAFT
+  /// Ingediend voor een BO: de GM kijkt het na, de post wijzigt niets meer
+  /// tot ze het terug in opmaak zet.
+  SUBMITTED
+}
+
+/// Een budget dat een post op de site opstelt, in plaats van een rekenblad in
+/// de map Budgetten van de gedeelde drive. De site rekent alles zelf uit
+/// (`lib/bo/budget/calc.ts`); zie docs/bestuursorgaan.md ("Budgetten op de
+/// site"). Drive blijft bestaan voor wie er nog in werkt.
+model BoBudget {
+  id           String         @id @default(cuid())
+  workingYear  Int
+  /// De post: `g:<groupId>` of een vak uit `lib/bo/posts.ts` (`x:vice`). Geen
+  /// vreemde sleutel, zoals bij `BoPostAlias`: een vak is geen `Group`.
+  postKey      String
+  title        String
+  /// Het sjabloon waarmee de post begon (`lib/bo/budget/types.ts`).
+  template     String
+  status       BoBudgetStatus @default(DRAFT)
+  /// De datum van het BO waarvoor de post het indient.
+  targetDate   DateTime?      @db.Date
+  /// Parameters, secties en regels (`BudgetContent`). Geen sommen of
+  /// totalen: die rekent de site uit de regels.
+  content      Json
+  /// Afgeleid uit `content` bij elke bewaring, voor de lijsten. Een kost is
+  /// negatief in `totalCents`, zoals in het blad.
+  incomeCents  Int            @default(0)
+  expenseCents Int            @default(0)
+  totalCents   Int            @default(0)
+  submittedAt  DateTime?      @db.Timestamptz(3)
+  /// Wie het aanmaakte. Geen relatie: het logboek (`AdminAuditLog`) houdt bij
+  /// wie wat wijzigde, en een budget hoort bij een post, niet bij een persoon.
+  createdById  String?
+  /// Deellinks (`/budget/<token>`): wie de link heeft, ziet het budget
+  /// (`viewToken`) of mag het aanpassen (`editToken`), zonder account. Voor
+  /// een kring waarmee samengewerkt wordt en voor de slides van het BO. Null
+  /// = geen link; een nieuwe waarde trekt de oude in.
+  viewToken    String?        @unique
+  editToken    String?        @unique
+  createdAt    DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime       @updatedAt @db.Timestamptz(3)
+
+  @@index([workingYear, postKey])
+}
+
+/// Elke keer dat de site een prijs bij een webshop opvroeg voor een budget op de
+/// site, of bij de test op de instellingen (`lib/priceCheck/log.ts`). Voor
+/// /admin/bestuursorgaan/prijzen: wanneer liep de ronde, welke winkel weigert,
+/// waarom kreeg een regel "geen antwoord". Ook een antwoord uit het geheugen
+/// van vier uur staat erin (`cached`), zodat je ziet waarom een ronde niets
+/// nieuws vroeg. Na zestig dagen weg.
+model BoPriceCheckLog {
+  id         String   @id @default(cuid())
+  at         DateTime @default(now()) @db.Timestamptz(3)
+  /// Waarom de site vroeg: ronde (de worker om de vier uur), openen, nieuwe
+  /// link, nakijken (een regel vers), knop (alles vers), test.
+  trigger    String
+  /// Geen vreemde sleutel: een verwijderd budget laat zijn log niet vallen.
+  budgetId   String?
+  /// De naam van het budget op het moment van de controle.
+  budgetName String?
+  /// `ShopId` uit `lib/priceCheck/shops.ts`.
+  shop       String
+  /// De pagina die de site opvroeg (opgebouwd uit het herkende product).
+  url        String
+  /// fetch of browser (de prijsbrowser).
+  via        String
+  /// found, notfound of failed.
+  status     String
+  price      Float?
+  /// Is `price` incl. of excl. BTW?
+  basis      String?
+  /// De productnaam op de site van de winkel.
+  product    String?
+  /// Waarom er geen antwoord was.
+  reason     String?
+  /// Hoe lang de winkel (of de prijsbrowser) erover deed; 0 uit het geheugen.
+  durationMs Int      @default(0)
+  /// Uit het geheugen van vier uur, zonder de winkel te vragen.
+  cached     Boolean  @default(false)
+
+  @@index([at])
+  @@index([budgetId, at])
+  @@index([shop, at])
+}
+
 model BoPostAlias {
   /// De schrijfwijze, genormaliseerd met `normalizeKey`.
   key       String   @id

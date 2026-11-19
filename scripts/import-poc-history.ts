@@ -13,7 +13,7 @@
  *       npx tsx scripts/import-poc-history.ts scripts/poc-history.json
  *       npx tsx scripts/import-poc-history.ts scripts/poc-history.json --dry-run
  *   - Remote (stuurt via admin endpoint naar dev.vtk.be):
- *       npx tsx scripts/import-poc-history.ts scripts/poc-history.json --remote https://dev.vtk.be --email seppe@vtk.be --password "condense.masses.pampered"
+ *       npx tsx scripts/import-poc-history.ts scripts/poc-history.json --remote https://dev.vtk.be --email <jouw-adres> --password "<jouw-wachtwoord>"
  */
 
 import { readFileSync } from "node:fs";

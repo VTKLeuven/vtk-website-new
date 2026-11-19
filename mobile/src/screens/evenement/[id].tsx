@@ -2,29 +2,30 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
 
 import * as WebBrowser from 'expo-web-browser';
-import { ArrowLeft, CalendarDays, CalendarPlus, MapPin, Star, Users } from 'lucide-react-native';
+import { CalendarPlus, Star } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { baseUrl } from '../../api/client';
 import { fetchCalendarEvent, setEventInterest } from '../../api/endpoints';
 import { messageFor, useResource } from '../../api/useResource';
 import { Prose } from '../../components/Prose';
-import { Button, Card, ErrorState, Loading } from '../../components/ui';
+import { PageHead } from '../../components/PageHead';
+import { Button, ErrorState, Loading, SectionHeading } from '../../components/ui';
 import { addEventToDeviceCalendar, addResultMessage } from '../../deviceCalendar';
-import { formatEventWhen } from '../../format';
+import { formatDayShort, formatEventWhen, formatTimeRange } from '../../format';
 import { markdownToPlainText } from '../../markdown';
+import { leadMoment } from '../../moments';
 import { useApp } from '../../state/app';
 import { useTabRouter } from '../../navigation';
-import { COLORS, RADIUS, SPACING, TYPE } from '../../theme/tokens';
+import { COLORS, FONTS, RADIUS, SPACING, TYPE } from '../../theme/tokens';
 
 /**
  * Eén evenement.
  *
- * De foto onder een navy scrim is de enige donkere kaartvulling die de huisstijl
- * toelaat, en ze doet hier het werk van de paginakop: er staat al een beeld, dus
- * er hoeft geen tweede donkere band boven.
+ * Opgebouwd zoals de eventpagina van de site (`/kalender/<slug>`): de donkere
+ * paginakop met de titel, de affiche als plaat zonder waas eronder, de feiten als
+ * gelabelde rijen (geen kaart) en "Over dit event" met de gele lijn.
  *
  * Tickets openen het native verkoopscherm. Inschrijven gaat nog naar de site: een
  * formulier met eigen validatie is fase 4 werk, en een knop naar de echte pagina
@@ -47,12 +48,15 @@ import { COLORS, RADIUS, SPACING, TYPE } from '../../theme/tokens';
  * kan enkel op de site: in de app ben je per definitie ingelogd, en dan is de
  * ster de juiste knop.
  */
+/** Zoveel dagen van een reeks staan er meteen; zeven past een loopweek, zoals op de site. */
+const MOMENTS_VISIBLE = 7;
+
 export default function EventScreen() {
   const router = useTabRouter();
-  const insets = useSafeAreaInsets();
   const { locale, viewer } = useApp();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [addingToCalendar, setAddingToCalendar] = useState(false);
+  const [allDays, setAllDays] = useState(false);
 
   const resource = useResource(
     `evenement:${id}`,
@@ -68,6 +72,14 @@ export default function EventScreen() {
   }
 
   const event = resource.data;
+  // Een reeks (een loopweek, drie filmavonden): de dagen die nog komen, zoals het
+  // paneel op de eventpagina van de site. Wat voorbij is, telt niet meer mee.
+  const now = new Date();
+  const moments = event.moments ?? [];
+  const upcomingMoments = moments.filter((moment) => new Date(moment.end) >= now);
+  const series = moments.length >= 2;
+  const shownMoments = allDays ? upcomingMoments : upcomingMoments.slice(0, MOMENTS_VISIBLE);
+  const next = leadMoment(event, now);
 
   const toggleInterest = () => {
     void setEventInterest(event.id, !event.interested)
@@ -78,12 +90,14 @@ export default function EventScreen() {
   const addToCalendar = async () => {
     setAddingToCalendar(true);
     try {
+      // Bij een reeks de eerstvolgende keer: een blok van een hele week in je
+      // agenda zegt niets over wanneer je er moet zijn.
       const result = await addEventToDeviceCalendar({
-        title: event.title,
-        start: event.start,
-        end: event.end,
+        title: next?.label ? `${event.title}: ${next.label}` : event.title,
+        start: next?.start ?? event.start,
+        end: next?.end ?? event.end,
         allDay: event.allDay,
-        location: event.location,
+        location: next?.location ?? event.location,
         notes: event.description ? markdownToPlainText(event.description).slice(0, 600) : null,
       });
       if (result.ok) {
@@ -96,65 +110,100 @@ export default function EventScreen() {
     }
   };
 
+  const themes = event.categories.map((category) => category.name).join(', ');
+
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-      <View style={styles.hero}>
-        {event.imageUrl ? (
-          <Image source={{ uri: event.imageUrl }} style={styles.photo} contentFit="cover" />
-        ) : null}
-        <View style={styles.scrim} />
-        <View style={[styles.heroText, { paddingTop: insets.top + SPACING.xxl }]}>
-          <Text style={styles.group}>{event.groupName.toUpperCase()}</Text>
-          <Text style={styles.title}>{event.title}</Text>
+      <View style={styles.overscroll} />
+      <PageHead title={event.title} subtitle={event.groupName} />
+
+      {event.imageUrl ? (
+        // De affiche als plaat zonder waas, zoals op de eventpagina van de site:
+        // er staat geen tekst op, dus er hoeft niets over.
+        <View style={styles.plate}>
+          <Image source={{ uri: event.imageUrl }} style={styles.photo} contentFit="cover" transition={150} />
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Terug"
-          onPress={() => router.back()}
-          hitSlop={12}
-          style={[styles.back, { top: insets.top + SPACING.sm }]}
-        >
-          <ArrowLeft color={COLORS.onDark} size={22} />
-        </Pressable>
-      </View>
+      ) : null}
 
       <View style={styles.body}>
-        <Card>
-          <View style={styles.fact}>
-            <CalendarDays color={COLORS.muted} size={18} />
-            <Text style={styles.factText}>
-              {formatEventWhen(event.start, event.end, event.allDay, locale)}
-            </Text>
-          </View>
+        <View style={styles.facts}>
+          <Fact label="Wanneer">
+            {series && upcomingMoments.length > 0 ? (
+              <View style={styles.moments}>
+                {shownMoments.map((moment, index) => (
+                  <View key={moment.start} style={styles.momentRow}>
+                    <Text style={[styles.momentDay, index === 0 && styles.momentNext]}>
+                      {formatDayShort(moment.start, locale)}
+                    </Text>
+                    <View style={styles.momentText}>
+                      <Text style={styles.momentTime}>
+                        {event.allDay ? '' : formatTimeRange(moment.start, moment.end, locale)}
+                        {moment.label ? `${event.allDay ? '' : ', '}${moment.label}` : ''}
+                      </Text>
+                      {moment.location ? (
+                        <Text style={styles.momentPlace}>{moment.location}</Text>
+                      ) : null}
+                    </View>
+                  </View>
+                ))}
+                {upcomingMoments.length > MOMENTS_VISIBLE ? (
+                  <Pressable accessibilityRole="button" onPress={() => setAllDays(!allDays)} hitSlop={8}>
+                    <Text style={styles.momentsToggle}>
+                      {allDays ? 'Minder dagen' : `Toon alle ${upcomingMoments.length} dagen`}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : (
+              <Text style={styles.factText}>
+                {formatEventWhen(event.start, event.end, event.allDay, locale)}
+              </Text>
+            )}
+          </Fact>
           {event.location ? (
-            <View style={styles.fact}>
-              <MapPin color={COLORS.muted} size={18} />
+            <Fact label="Waar">
               <Text style={styles.factText}>{event.location}</Text>
-            </View>
+            </Fact>
           ) : null}
-        </Card>
+          {themes ? (
+            <Fact label="Thema">
+              <Text style={styles.factText}>{themes}</Text>
+            </Fact>
+          ) : null}
+        </View>
+
+        {event.ticketSlug ? (
+          <Button label="Tickets" onPress={() => router.push(`/ticket/${event.ticketSlug}`)} />
+        ) : null}
+        {event.formSlug ? (
+          <Button
+            label="Inschrijven"
+            variant={event.ticketSlug ? 'ghost' : 'primary'}
+            onPress={() =>
+              void WebBrowser.openBrowserAsync(`${baseUrl()}/formulieren/${event.formSlug}`)
+            }
+          />
+        ) : null}
 
         <View style={styles.actions}>
           {viewer ? (
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ selected: event.interested }}
-              accessibilityLabel={
-                event.interested ? 'Uit mijn lijst halen' : 'In mijn lijst zetten'
-              }
+              accessibilityLabel={event.interested ? 'Uit mijn lijst halen' : 'In mijn lijst zetten'}
               onPress={toggleInterest}
               style={({ pressed }) => [
                 styles.action,
-                event.interested && styles.actionActive,
+                event.interested ? styles.actionActive : styles.actionPrimary,
                 pressed && styles.actionPressed,
               ]}
             >
               <Star
-                color={event.interested ? COLORS.ink : COLORS.navy}
+                color={event.interested ? COLORS.ink : COLORS.paper}
                 fill={event.interested ? COLORS.ink : 'transparent'}
-                size={18}
+                size={17}
               />
-              <Text style={styles.actionLabel}>
+              <Text style={[styles.actionLabel, !event.interested && styles.actionLabelPrimary]}>
                 {event.interested ? 'In mijn lijst' : 'Ik ga misschien'}
               </Text>
             </Pressable>
@@ -167,41 +216,36 @@ export default function EventScreen() {
             onPress={() => void addToCalendar()}
             style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
           >
-            <CalendarPlus color={COLORS.navy} size={18} />
-            <Text style={styles.actionLabel}>In agenda</Text>
+            <CalendarPlus color={COLORS.navy} size={17} />
+            <Text style={styles.actionLabel}>Zet in agenda</Text>
           </Pressable>
         </View>
 
-        {viewer && event.interested ? (
+        {/* De server beslist over de drempel en stuurt hieronder niets mee zolang
+            die niet gehaald is; zo tonen de app en de site hetzelfde getal. */}
+        {event.interestedCount || (viewer && event.interested) ? (
           <Text style={styles.note}>
-            Je krijgt een dag vooraf een bericht. Dit is geen inschrijving en geen ticket.
+            {event.interestedCount
+              ? locale === 'en'
+                ? `${event.interestedCount} going. `
+                : `${event.interestedCount} studenten komen. `
+              : ''}
+            {viewer && event.interested
+              ? 'Je krijgt een dag vooraf een bericht. Dit is geen inschrijving en geen ticket.'
+              : ''}
           </Text>
         ) : null}
 
-        {/* De server beslist over de drempel en stuurt hieronder niets mee zolang
-            die niet gehaald is; zo tonen de app en de site hetzelfde getal. */}
-        {event.interestedCount ? (
-          <View style={styles.interestRow}>
-            <Users color={COLORS.ink} size={15} />
-            <Text style={styles.goingText}>
-              {locale === 'en'
-                ? `${event.interestedCount} going`
-                : `${event.interestedCount} komen`}
-            </Text>
+        {event.description ? (
+          <View style={styles.about}>
+            <SectionHeading>Over dit event</SectionHeading>
+            <Prose>{event.description}</Prose>
           </View>
         ) : null}
 
-        {event.description ? (
-          <Card>
-            <Prose>{event.description}</Prose>
-          </Card>
-        ) : null}
-
         {event.isAlumniEvent && event.attendees.length > 0 ? (
-          <Card>
-            <Text style={styles.attendeesTitle}>
-              {locale === 'en' ? 'Who is coming' : 'Wie er komt'}
-            </Text>
+          <View style={styles.about}>
+            <SectionHeading>{locale === 'en' ? 'Who is coming' : 'Wie er komt'}</SectionHeading>
             <Text style={styles.note}>
               {locale === 'en'
                 ? 'Only those who chose to be visible. The counter above counts everyone.'
@@ -219,26 +263,14 @@ export default function EventScreen() {
                       attendee.wasInVtk ? 'VTK' : null,
                     ]
                       .filter(Boolean)
-                      .join(' · ') || '—'}
+                      .join(', ') || '-'}
                   </Text>
                 </View>
               ))}
             </View>
-          </Card>
+          </View>
         ) : null}
 
-        {event.ticketSlug ? (
-          <Button label="Tickets" onPress={() => router.push(`/ticket/${event.ticketSlug}`)} />
-        ) : null}
-        {event.formSlug ? (
-          <Button
-            label="Inschrijven"
-            variant={event.ticketSlug ? 'ghost' : 'primary'}
-            onPress={() =>
-              void WebBrowser.openBrowserAsync(`${baseUrl()}/formulieren/${event.formSlug}`)
-            }
-          />
-        ) : null}
         {event.url ? (
           // De redacteur kiest zelf wat er op deze knop staat ("Inschrijflink",
           // "Ticketverkoop"); de server stuurt ze al in de juiste taal mee.
@@ -253,21 +285,67 @@ export default function EventScreen() {
   );
 }
 
+/** Een gelabelde rij, zoals een `dl` op de site: het label in kleine kapitalen links. */
+function Fact({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.fact}>
+      <Text style={styles.factLabel}>{label}</Text>
+      <View style={styles.factValue}>{children}</View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.paper },
   content: { paddingBottom: SPACING.xxl },
-  hero: { backgroundColor: COLORS.navy, minHeight: 220, justifyContent: 'flex-end' },
+  overscroll: {
+    position: 'absolute',
+    top: -1000,
+    left: 0,
+    right: 0,
+    height: 1000,
+    backgroundColor: COLORS.navy,
+  },
+  plate: {
+    marginHorizontal: SPACING.xl - 4,
+    marginTop: SPACING.xl - 4,
+    aspectRatio: 16 / 9,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: COLORS.paper2,
+  },
   photo: { ...StyleSheet.absoluteFill },
-  // De scrim is zwaarst linksonder, waar de tekst staat; zonder dat verdwijnt een
-  // titel in een lichte foto.
-  scrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(14, 26, 54, 0.55)' },
-  heroText: { padding: SPACING.lg, gap: SPACING.xs },
-  group: { ...TYPE.kicker, color: COLORS.yellow },
-  title: { ...TYPE.pageTitle, color: COLORS.onDark },
-  back: { position: 'absolute', left: SPACING.lg },
-  body: { padding: SPACING.lg, gap: SPACING.md },
-  fact: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.md },
-  factText: { ...TYPE.body, color: COLORS.ink, flex: 1 },
+  body: { paddingHorizontal: SPACING.xl - 4, paddingTop: SPACING.lg, gap: SPACING.md },
+
+  facts: { borderTopWidth: 1, borderTopColor: COLORS.line2 },
+  fact: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.line2,
+  },
+  factLabel: {
+    width: 92,
+    paddingTop: 3,
+    fontFamily: FONTS.semibold,
+    fontSize: 11.5,
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+    color: COLORS.muted,
+  },
+  factValue: { flex: 1 },
+  factText: { ...TYPE.body, color: COLORS.ink },
+
+  moments: { gap: SPACING.sm },
+  momentRow: { flexDirection: 'row', gap: SPACING.md, alignItems: 'flex-start' },
+  momentDay: { ...TYPE.body, color: COLORS.body, width: 86 },
+  // De eerstvolgende keer in het vet, zoals het gele vakje in de strip op de site.
+  momentNext: { fontFamily: FONTS.semibold, color: COLORS.ink },
+  momentText: { flex: 1 },
+  momentTime: { ...TYPE.body, color: COLORS.ink },
+  momentPlace: { ...TYPE.small, color: COLORS.muted },
+  momentsToggle: { ...TYPE.small, color: COLORS.navy, textDecorationLine: 'underline' },
 
   actions: { flexDirection: 'row', gap: SPACING.sm },
   action: {
@@ -281,26 +359,23 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.pill,
     borderWidth: 1,
     borderColor: COLORS.line2,
-    backgroundColor: COLORS.surface,
   },
+  actionPrimary: { backgroundColor: COLORS.ink, borderColor: COLORS.ink },
   actionActive: { backgroundColor: COLORS.yellow, borderColor: COLORS.yellow },
-  actionPressed: { opacity: 0.75 },
-  actionLabel: { ...TYPE.small, fontFamily: TYPE.cardTitle.fontFamily, color: COLORS.ink },
-  interestRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  actionPressed: { opacity: 0.8 },
+  actionLabel: { fontFamily: FONTS.semibold, fontSize: 14, color: COLORS.ink },
+  actionLabelPrimary: { color: COLORS.paper },
   note: { ...TYPE.small, color: COLORS.muted },
-  goingText: { ...TYPE.small, fontFamily: TYPE.cardTitle.fontFamily, color: COLORS.ink },
-  attendeesTitle: { ...TYPE.cardTitle, color: COLORS.ink, marginBottom: 2 },
-  attendees: { marginTop: SPACING.sm },
-  // Naam links, de rest rechts: twee gelabelde kolommen in plaats van één regel
-  // met middots, precies zoals de tabel op de site (zie CLAUDE.md).
+
+  about: { gap: SPACING.md, marginTop: SPACING.md },
+  attendees: { marginTop: SPACING.xs, borderTopWidth: 1, borderTopColor: COLORS.line },
   attendee: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     gap: SPACING.md,
-    paddingVertical: SPACING.xs,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.line,
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.line,
   },
   attendeeName: { ...TYPE.body, color: COLORS.ink, flex: 1 },
   attendeeAnon: { color: COLORS.muted, fontStyle: 'italic' },

@@ -49,11 +49,6 @@ export default async function FlesserkePage() {
           {en ? 'internal' : 'intern'}
         </>
       }
-      intro={
-        en
-          ? 'Consumables (food, drinks, cleaning) prepared per event for VTK\u2019s own activities: posts, work groups and year committees alike. Closed items come back; opened ones are consumed.'
-          : 'Verbruiksgoederen (voeding, drank, kuis) die per event worden klaargezet voor de eigen werking: posten, werkgroepen en jaarwerkingen evengoed. Gesloten komt terug; geopend is verbruik.'
-      }
     >
       {catalog.length === 0 ? (
         <p className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-7 text-vtk-body">

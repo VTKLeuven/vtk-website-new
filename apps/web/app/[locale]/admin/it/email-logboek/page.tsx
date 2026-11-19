@@ -176,9 +176,6 @@ export default async function EmailLogPage({
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold text-vtk-ink">
-          {nl ? "Email-logboek" : "Email log"}
-        </h1>
         <p className="mt-1 max-w-4xl text-sm text-[#5c667f]">
           {nl
             ? `Elke verzendpoging vanuit de website, inclusief inhoud, SMTP-resultaat en bijlagemetadata. "Verstuurd" betekent dat de mailserver het bericht aanvaardde; aflevering in de inbox kan hij niet bevestigen. Omdat mails persoonsgegevens en eenmalige links kunnen bevatten, is dit scherm enkel voor superadmins en worden regels na ${EMAIL_LOG_RETENTION_DAYS} dagen verwijderd.`

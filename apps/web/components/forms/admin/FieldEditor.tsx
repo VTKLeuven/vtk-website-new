@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -366,7 +367,8 @@ export function FieldEditor({
     };
 
     startTransition(async () => {
-      const state = await saveFormFieldAction(formId, payload);
+      const state = await unsentGuard.run(() => saveFormFieldAction(formId, payload));
+      if (state === UNSENT) return;
       if (state.status === "error") {
         reportError(state.code);
         return;
@@ -384,7 +386,7 @@ export function FieldEditor({
 
   function saveSection(current: SectionDraft) {
     startTransition(async () => {
-      const state = await saveFormSectionAction(formId, {
+      const state = await unsentGuard.run(() => saveFormSectionAction(formId, {
         id: current.id,
         titleNl: current.titleNl,
         titleEn: current.titleEn || null,
@@ -392,7 +394,8 @@ export function FieldEditor({
         descriptionEn: current.descriptionEn || null,
         nextSectionId: current.nextSectionId,
         endsForm: current.endsForm,
-      });
+      }));
+      if (state === UNSENT) return;
       if (state.status === "error") {
         showToast({
           message:
@@ -432,10 +435,11 @@ export function FieldEditor({
     setFields([...flat, ...archived]);
 
     startTransition(async () => {
-      const state = await reorderFormStructureAction(formId, {
+      const state = await unsentGuard.run(() => reorderFormStructureAction(formId, {
         sections: nextSections.map((section) => section.id),
         fields: flat.map((field) => ({ id: field.id, sectionId: field.sectionId })),
-      });
+      }));
+      if (state === UNSENT) return;
       if (state.status === "error") {
         showToast({
           message: nl ? "Volgorde opslaan is niet gelukt." : "Saving the order failed.",
@@ -529,7 +533,8 @@ export function FieldEditor({
 
   function duplicate(fieldId: string) {
     startTransition(async () => {
-      const state = await duplicateFormFieldAction(formId, fieldId);
+      const state = await unsentGuard.run(() => duplicateFormFieldAction(formId, fieldId));
+      if (state === UNSENT) return;
       showToast(
         state.status === "error"
           ? {

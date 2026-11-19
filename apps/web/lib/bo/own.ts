@@ -9,9 +9,9 @@ import { BO_EXTRA_POSTS, postName, type PostCandidate } from "./posts";
  *
  * Het volledige overzicht blijft van Groep 5 (`bestuursorgaan.manage`). Dit
  * volgt het lidmaatschap van dit werkingsjaar, zonder apart recht: wie in een
- * post of werkgroep zit, ziet wat die post langs het BO bracht, en niets van
- * een andere post. Zie docs/design-decisions.md ("Bestuursorgaan: de post
- * ziet haar eigen budgetten").
+ * post zit of een werkgroep trekt (`countsForBo`), ziet wat die post langs het
+ * BO bracht, en niets van een andere post. Zie docs/design-decisions.md
+ * ("Bestuursorgaan: de post ziet haar eigen budgetten").
  *
  * Puur, zodat de regels getest kunnen worden; de sessie en het overzicht komen
  * binnen.
@@ -28,19 +28,44 @@ export type OwnPost = {
 
 const G5_KEYS = BO_EXTRA_POSTS.filter((p) => p.section === "g5").map((p) => p.key);
 
+/** Wat `ownPostKeys` en de zijbalk van een lidmaatschap moeten weten. */
+export type BoMembership = Pick<OwnGroup, "id" | "code"> & { type?: string; role?: string };
+
 /**
- * De posten van één lid: elke post en werkgroep waarvan hij dit werkingsjaar
- * lid is. Wie in Groep 5 zit, krijgt er de vier vakken van Groep 5 bij
- * (Praeses, Vice-praeses, Secretaris, Beheer): daar dienen ze hun eigen
- * budgetten onder in.
+ * Telt dit lidmaatschap mee voor het BO (Mijn budgetten, de BO-mappen, het
+ * blok op het dashboard)?
+ *
+ * - Een praesidiumpost: elk lid, zonder recht. Het zijn de eigen rekenbladen
+ *   van de post, die ze al in haar eigen map in Drive ziet.
+ * - Een werkgroep: enkel de verantwoordelijke (de G3/G4,
+ *   `GroupMembership.role = LEAD`). Die brengt de budgetten van de werkgroep
+ *   naar het BO; een gewoon lid van een werkgroep heeft er niets te zoeken.
+ * - Een jaarwerking nooit: het BO kent Kanweek en co. als eigen vak
+ *   (`x:kanweek`, zie `BO_EXTRA_POSTS`) en nooit als groep, dus ze gaf hier
+ *   enkel een leeg blok "nog niets".
+ *
+ * Een lidmaatschap zonder `type` telt als post.
  */
-export function ownPostKeys(groups: readonly Pick<OwnGroup, "id" | "code">[]): string[] {
-  const keys = groups.map((group) => `g:${group.id}`);
+export function countsForBo(group: Pick<BoMembership, "type" | "role">): boolean {
+  if (group.type === "JAARWERKING") return false;
+  if (group.type === "WERKGROEP") return group.role === "LEAD";
+  return true;
+}
+
+/**
+ * De posten van één lid: elke post waarvan hij dit werkingsjaar lid is, en
+ * elke werkgroep waarvan hij verantwoordelijke is (zie `countsForBo`). Wie in
+ * Groep 5 zit, krijgt er de vier vakken van Groep 5 bij (Praeses,
+ * Vice-praeses, Secretaris, Beheer): daar dienen ze hun eigen budgetten onder
+ * in.
+ */
+export function ownPostKeys(groups: readonly BoMembership[]): string[] {
+  const keys = groups.filter(countsForBo).map((group) => `g:${group.id}`);
   if (groups.some((group) => group.code === "GROEP5")) keys.push(...G5_KEYS);
   return [...new Set(keys)];
 }
 
-const STATUS_ORDER: Record<XDossier["status"], number> = { OPEN: 0, UPCOMING: 1, NO_BUDGET: 2, DONE: 3 };
+const STATUS_ORDER: Record<XDossier["status"], number> = { OPEN: 0, UPCOMING: 1, NO_BUDGET: 2, POT: 3, DONE: 4 };
 
 /**
  * Eerst wat nog moet komen, het langst open bovenaan (een schriftelijke
@@ -79,9 +104,32 @@ export function ownPosts(data: ExplorerData, keys: readonly string[], groups: re
     .sort((a, b) => (order.get(a.key) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.key) ?? Number.MAX_SAFE_INTEGER));
 }
 
-/** Voor het dashboard: per post enkel de resultaten die nog moeten komen, en enkel de posten waar dat er zijn. */
-export function openResults(posts: readonly OwnPost[]): OwnPost[] {
+/**
+ * Moet de activiteit zelf nog plaatsvinden? Op de datum uit het rekenblad
+ * (`eventDate`), en vandaag telt nog als "nog bezig". Zonder datum weten we het
+ * niet, en dan geldt de BO-datum zoals overal.
+ */
+export function activityStillToCome(dossier: Pick<XDossier, "eventDate">, today: string): boolean {
+  return dossier.eventDate !== null && dossier.eventDate >= today;
+}
+
+/**
+ * Voor het dashboard: per post enkel de resultaten die nog moeten komen, en
+ * enkel de posten waar dat er zijn.
+ *
+ * Een budget passeert het BO vóór de activiteit, dus een activiteit in december
+ * stond hier al vanaf de BO van september als "open". Een resultaat kan pas na
+ * de activiteit, dus de herinnering wacht tot de dag erna. Enkel deze
+ * herinnering: status, "open sinds" en de tellingen blijven op de BO-datum (zie
+ * `Dossier.date` en docs/design-decisions.md).
+ *
+ * `today` is `yyyy-mm-dd` op de Brusselse klok.
+ */
+export function openResults(posts: readonly OwnPost[], today: string): OwnPost[] {
   return posts
-    .map((post) => ({ ...post, dossiers: post.dossiers.filter((d) => d.status === "OPEN") }))
+    .map((post) => ({
+      ...post,
+      dossiers: post.dossiers.filter((d) => d.status === "OPEN" && !activityStillToCome(d, today)),
+    }))
     .filter((post) => post.dossiers.length > 0);
 }

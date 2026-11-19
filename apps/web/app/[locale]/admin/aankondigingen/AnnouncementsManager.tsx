@@ -1,5 +1,6 @@
 "use client";
 
+import { unsentGuard } from "@/components/ui/unsentGuard";
 import { useState } from "react";
 import { Card, Input, Label } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
@@ -306,7 +307,7 @@ export function AnnouncementsManager({
                 </span>
 
                 <div className="ml-auto flex shrink-0 items-center gap-3">
-                  <form action={setAnnouncementActiveAction}>
+                  <form action={unsentGuard.form(setAnnouncementActiveAction)}>
                     <input type="hidden" name="id" value={announcement.id} />
                     <input type="hidden" name="active" value={announcement.active ? "0" : "1"} />
                     <button

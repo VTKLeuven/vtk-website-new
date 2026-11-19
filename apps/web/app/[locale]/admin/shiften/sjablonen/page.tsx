@@ -7,7 +7,6 @@ import { listShiftTemplates } from '@/lib/shift/templateStore';
 import { utcToLocalDateTime } from '@/lib/ticketing/time';
 import type { Locale } from '@vtk/i18n';
 import { ShiftTemplateBuilder } from './ShiftTemplateBuilder';
-import { ShiftTemplateNav } from './ShiftTemplateNav';
 
 export default async function AdminShiftTemplates({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: localeParam } = await params;
@@ -16,7 +15,6 @@ export default async function AdminShiftTemplates({ params }: { params: Promise<
   const session = await requireAnyPermission(['shift.edit', 'shift.editAll']);
 
   const nl = locale === 'nl';
-  const canManage = session.user.isSuperAdmin || session.permissions.includes('shift.templates');
 
   // Zelfde keuzelijst als het gewone shiftformulier: enkel actieve posten.
   const [templates, activeGroups] = await Promise.all([
@@ -36,8 +34,7 @@ export default async function AdminShiftTemplates({ params }: { params: Promise<
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-semibold">{nl ? 'Meerdere shiften aanmaken' : 'Create multiple shifts'}</h1>
-      <ShiftTemplateNav locale={locale} current="build" canManage={canManage} />
+      <h2 className="text-lg font-semibold">{nl ? 'Meerdere shiften aanmaken' : 'Create multiple shifts'}</h2>
       <p className="max-w-3xl text-sm text-vtk-muted">
         {nl
           ? 'Maak meerdere shiften of een hele reeks in één keer aan. Je kan vertrekken vanaf nul of optioneel een sjabloon kiezen als startpunt. Bij opslaan worden ze meteen aangemaakt en staan ze op de shiftpagina.'

@@ -22,12 +22,15 @@ export function AlbumTabViewer({
   subAlbumsLabel = "Sub-albums",
   subAlbums,
   labels,
+  allowDownload = true,
 }: {
-  albumSlug: string;
+  /** Zonder slug (een privélink naar een verborgen album) geen meldknop; zie `AlbumViewer`. */
+  albumSlug?: string;
   albumTitle?: string;
   subAlbumsLabel?: string;
   subAlbums: SubAlbumData[];
   labels: Labels;
+  allowDownload?: boolean;
 }) {
   const searchParams = useSearchParams();
   const subParam = searchParams.get("sub");
@@ -124,6 +127,7 @@ export function AlbumTabViewer({
           albumTitle={albumTitle ? `${albumTitle} - ${activeSub.title}` : activeSub.title}
           photos={activeSub.photos}
           labels={labels}
+          allowDownload={allowDownload}
         />
       </div>
     </div>

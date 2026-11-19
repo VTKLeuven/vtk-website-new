@@ -49,6 +49,7 @@ export function TripEditForm({
   currentGroup,
   reservationId,
   locked,
+  notesSlot,
   onSaved,
 }: {
   bookingId: string;
@@ -68,6 +69,14 @@ export function TripEditForm({
   reservationId: string | null;
   /** Afgerond of geannuleerd: de rit is geschiedenis en staat enkel nog te lezen. */
   locked: boolean;
+  /**
+   * De eigen nota's (F4.20), direct onder "Extra info van Logistiek" (F6.15). Het zijn
+   * twee soorten nota met een andere betekenis (die van Logistiek gaat mee in de
+   * mail, een eigen nota heeft een zichtbaarheid) en ze blijven daarom twee
+   * dingen; maar wie nota's schrijft, zoekt ze op dezelfde plek. De nota's
+   * bewaren zichzelf, los van "Opslaan" onderaan.
+   */
+  notesSlot?: React.ReactNode;
   onSaved?: () => void;
 }) {
   const showToast = useToast();
@@ -144,9 +153,13 @@ export function TripEditForm({
 
   if (locked) {
     return (
-      <p className="text-sm text-vtk-muted">
-        Deze rit is afgerond of geannuleerd; er kan niets meer aan gewijzigd worden.
-      </p>
+      <div className="grid gap-3">
+        <p className="text-sm text-vtk-muted">
+          Deze rit is afgerond of geannuleerd; er kan niets meer aan gewijzigd worden.
+        </p>
+        {/* Een nota verandert niets aan de rit, dus ook op een gereden rit. */}
+        {notesSlot}
+      </div>
     );
   }
 
@@ -295,6 +308,8 @@ export function TripEditForm({
           className={inputClass}
         />
       </label>
+
+      {notesSlot ? <div className="border-t border-vtk-navy/10 pt-3">{notesSlot}</div> : null}
 
       {error ? (
         <p role="alert" className="rounded-lg border border-vtk-danger-line bg-vtk-danger-soft px-3 py-2 text-sm text-vtk-danger">

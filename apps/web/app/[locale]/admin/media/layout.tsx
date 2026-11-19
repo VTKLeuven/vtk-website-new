@@ -8,6 +8,7 @@ import { hasPermission } from "@vtk/auth";
 import { hasLocale } from "@/lib/locale";
 import { requireAnyPermission } from "@/lib/session";
 import { MediaAdminNav } from "./MediaAdminNav";
+import { ALBUM_UPLOAD_PERMISSIONS } from "@/lib/media-album-access";
 
 /**
  * Het mediabeheer: één kop met de tabbladen van Tickets (`.ticket-admin-tabs`)
@@ -29,7 +30,7 @@ export default async function MediaAdminLayout({
   if (!hasLocale(locale)) notFound();
   // Twee rechten die apart toegekend kunnen worden: de fotoalbums
   // (photos.manageAlbums) en de rest van de mediapagina (media.manage).
-  const session = await requireAnyPermission(["media.manage", "photos.manageAlbums"]);
+  const session = await requireAnyPermission([...ALBUM_UPLOAD_PERMISSIONS]);
   const canManageMedia = hasPermission(session, "media.manage");
   const nl = locale === "nl";
   const base = nl ? "" : "/en";

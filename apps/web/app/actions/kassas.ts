@@ -24,7 +24,9 @@ import {
   cashRegisterMailTo,
   getCashRegisterConfig,
   requireCashRegisterAccess,
+  resultFor,
   terminalConflict,
+  ticketIncomeByEvent,
   type CashRegisterAccess,
   type TerminalChoice,
 } from "@/lib/kassas/server";
@@ -40,13 +42,16 @@ import {
   parsePick,
   PERMANENT_POST_CODES,
   registerInterval,
+  resultSharedWithPost,
   startCountsFromPicks,
   statusLabel,
+  YEARLY_EVENT_CHOICE,
+  YEARLY_EVENT_LABEL,
   type Counts,
   type Denomination,
   type PaymentMethod,
 } from "@/lib/kassas/kassa";
-import { cashRegisterAcceptedMail } from "@/lib/kassas/mail";
+import { cashRegisterAcceptedMail, cashRegisterCountedMail } from "@/lib/kassas/mail";
 import { rematchOpenTransactions } from "@/lib/inkomsten/server";
 
 const ADMIN_PATHS = ["/admin/kassas", "/en/admin/kassas"];
@@ -117,7 +122,8 @@ type RequestFields = {
   endsAt: Date;
   workingYear: number;
   activity: string;
-  groupId: string;
+  /** `null` voor een jaarwerking: die staat op geen post. */
+  groupId: string | null;
   postLabel: string;
   responsibleName: string;
   wantsBancontact: boolean;
@@ -140,7 +146,13 @@ async function readRequest(
   const startTime = text(formData, "startTime", 5);
   const endTime = text(formData, "endTime", 5);
   if (!startTime || !endTime) return { error: "MISSING_TIME" };
-  const interval = activityInterval(date, startTime, endTime);
+  // Enkel bij een activiteit over meerdere dagen (de onthaaldagen): dan staat
+  // het einduur op deze laatste dag in plaats van op `date`.
+  const endDateText = text(formData, "endDate", 10);
+  const endDate = endDateText ? parseDateInput(endDateText) : null;
+  if (endDateText && !endDate) return { error: "BAD_DATE" };
+  if (endDate && endDate < date) return { error: "BAD_END_DATE" };
+  const interval = activityInterval(date, startTime, endTime, endDate);
   if (!interval) return { error: "BAD_TIME" };
 
   const activity = text(formData, "activity", 120);
@@ -148,17 +160,24 @@ async function readRequest(
   if (!activity || !responsibleName) return { error: "MISSING_FIELD" };
 
   const groupId = text(formData, "groupId", 60);
-  const group = groupId
-    ? await prisma.group.findUnique({
-        where: { id: groupId },
-        select: { id: true, nameNl: true, active: true },
-      })
-    : null;
-  // Een gedeactiveerde post kies je niet meer, behalve je eigen of de post waar
-  // de kassa al op stond.
-  const allowedInactive =
-    group && (access.postIds.includes(group.id) || current?.groupId === group.id);
-  if (!group || (!group.active && !allowedInactive)) return { error: "BAD_POST" };
+  let post: { groupId: string | null; postLabel: string };
+  if (groupId === YEARLY_EVENT_CHOICE) {
+    // Een jaarwerking is van verschillende posten samen en staat op geen post.
+    post = { groupId: null, postLabel: YEARLY_EVENT_LABEL };
+  } else {
+    const group = groupId
+      ? await prisma.group.findUnique({
+          where: { id: groupId },
+          select: { id: true, nameNl: true, active: true },
+        })
+      : null;
+    // Een gedeactiveerde post kies je niet meer, behalve je eigen of de post waar
+    // de kassa al op stond.
+    const allowedInactive =
+      group && (access.postIds.includes(group.id) || current?.groupId === group.id);
+    if (!group || (!group.active && !allowedInactive)) return { error: "BAD_POST" };
+    post = { groupId: group.id, postLabel: group.nameNl };
+  }
 
   // De startkassa. Een post duidt aan wat ze nodig heeft (`pick`) en krijgt het
   // standaardaantal; enkel Beheer telt ze per coupure (`count`). Bij `keep`
@@ -187,8 +206,7 @@ async function readRequest(
     endsAt: interval.end,
     workingYear: workingYearOf(date),
     activity,
-    groupId: group.id,
-    postLabel: group.nameNl,
+    ...post,
     responsibleName,
     wantsBancontact: formData.get("wantsBancontact") === "on",
     wantsPayconiq: formData.get("wantsPayconiq") === "on",
@@ -413,10 +431,12 @@ export async function acceptCashRegisterAction(
     where: { id },
     include: {
       payments: { orderBy: { sortOrder: "asc" }, select: { method: true, terminal: true } },
+      group: { select: { code: true, type: true } },
       requestedBy: {
         select: {
           name: true,
           firstName: true,
+          lastName: true,
           email: true,
           personalEmail: true,
           emailPreference: true,
@@ -453,7 +473,7 @@ export async function acceptCashRegisterAction(
       contactEmail: config.contactEmail,
       url: `${siteBaseUrl()}${locale === "en" ? "/en" : ""}/admin/kassas/${register.id}`,
     });
-    const to = cashRegisterMailTo(requester);
+    const to = cashRegisterMailTo(requester, register.group);
     const result = await deliverWebsiteMail(
       { to, subject: mail.subject, text: mail.text, html: mail.html, replyTo: config.contactEmail },
       { source: "cashRegisters" },
@@ -643,6 +663,171 @@ export async function saveCashRegisterCountAction(
   return saveOk();
 }
 
+/**
+ * De eindkassa doorschuiven naar een volgende kassa: het cash gaat zonder
+ * leegmaken naar een volgende activiteit, dus de eindkassa van deze kassa wordt
+ * per munt en briefje de startkassa van die andere. Enkel het cash: de bonnen,
+ * Bancontact en Payconiq brachten hier op en blijven bij deze kassa.
+ *
+ * Opnieuw doorschuiven naar dezelfde kassa zet haar startkassa weer gelijk na
+ * een rechtgezette telling. Naar een andere kassa verhuist de koppeling; de
+ * vorige houdt haar startkassa, want wat daar anders had moeten staan, is niet
+ * te kennen.
+ */
+export async function carryOverCashRegisterAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const access = await requireManager();
+  if (!access) return saveError("FORBIDDEN");
+  const id = text(formData, "id", 60);
+  const targetId = text(formData, "targetId", 60);
+  const source = await prisma.cashRegister.findUnique({
+    where: { id },
+    select: { status: true, date: true, activity: true, postLabel: true, endCounts: true },
+  });
+  if (!source) return saveError("NOT_FOUND");
+  if (source.status === "REQUESTED") return saveError("NOT_ACCEPTED");
+  if (source.endCounts === null) return saveError("CARRY_NOT_COUNTED");
+  const target =
+    targetId && targetId !== id
+      ? await prisma.cashRegister.findUnique({
+          where: { id: targetId },
+          select: {
+            id: true,
+            date: true,
+            activity: true,
+            postLabel: true,
+            startCounts: true,
+            endCounts: true,
+            startFromId: true,
+          },
+        })
+      : null;
+  if (!target) return saveError("BAD_TARGET");
+  // Vooruit in de tijd, en niet naar een kassa die al geteld is: dan verschuift
+  // haar resultaat. Behalve als ze al van deze kassa kwam: dan is het net de
+  // bedoeling dat haar startkassa de rechtgezette telling volgt.
+  if (target.startFromId !== id) {
+    if (target.date < source.date) return saveError("BAD_TARGET");
+    if (target.endCounts !== null) return saveError("TARGET_COUNTED");
+  }
+
+  const startCounts = normaliseCounts(source.endCounts);
+  const before = countsTotalCents(normaliseCounts(target.startCounts));
+  const after = countsTotalCents(startCounts);
+  await prisma.$transaction([
+    // Eén kassa ligt op één plaats: een vorige volgende kassa laat ze los.
+    prisma.cashRegister.updateMany({
+      where: { startFromId: id, id: { not: target.id } },
+      data: { startFromId: null },
+    }),
+    prisma.cashRegister.update({
+      where: { id: target.id },
+      data: { startCounts, startFromId: id },
+    }),
+  ]);
+
+  await logAudit({
+    action: "update",
+    entity: "cashRegister",
+    entityId: target.id,
+    target: `${target.activity} (${target.postLabel})`,
+    summary: `startkassa ${formatEuro(before)} → ${formatEuro(after)}, eindkassa van ${source.activity} (${formatSpentOn(source.date)})`,
+  });
+  await logAudit({
+    action: "update",
+    entity: "cashRegister",
+    entityId: id,
+    target: `${source.activity} (${source.postLabel})`,
+    summary: `eindkassa doorgeschoven naar ${target.activity} (${formatSpentOn(target.date)})`,
+  });
+  revalidateCashRegisters(id);
+  revalidateCashRegisters(target.id);
+  return saveOk(`De startkassa van ${target.activity} staat nu op ${formatEuro(after)}.`);
+}
+
+/**
+ * De aanvrager laten weten dat de kassa geteld is. De mail linkt naar de kassa,
+ * en daar ziet de post het resultaat pas vanaf "doorgegeven": een kassa die nog
+ * niet zo ver staat, schuift daarom mee op. Lukt de mail niet, dan verandert er
+ * niets. Opnieuw sturen kan, bijvoorbeeld na een rechtgezette telling.
+ */
+export async function sendCashRegisterCountedMailAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const access = await requireManager();
+  if (!access) return saveError("FORBIDDEN");
+  const id = text(formData, "id", 60);
+  const register = await prisma.cashRegister.findUnique({
+    where: { id },
+    include: {
+      payments: { select: { method: true, amountCents: true } },
+      ticketEvents: { select: { ticketEventId: true } },
+      group: { select: { code: true, type: true } },
+      requestedBy: {
+        select: {
+          name: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          personalEmail: true,
+          emailPreference: true,
+          googleEmail: true,
+          locale: true,
+        },
+      },
+    },
+  });
+  if (!register) return saveError("NOT_FOUND");
+  if (register.status === "REQUESTED") return saveError("NOT_ACCEPTED");
+  if (register.endCounts === null) return saveError("NOT_COUNTED");
+  const requester = register.requestedBy;
+  if (!requester) return saveError("NO_REQUESTER");
+
+  const locale = requester.locale === "EN" ? "en" : "nl";
+  const income = await ticketIncomeByEvent(register.ticketEvents.map((link) => link.ticketEventId));
+  const mail = cashRegisterCountedMail({
+    locale,
+    name: requester.firstName?.trim() || requester.name,
+    activity: register.activity,
+    date: register.date,
+    postLabel: register.postLabel,
+    result: resultFor(register, income),
+    url: `${siteBaseUrl()}${locale === "en" ? "/en" : ""}/admin/kassas/${register.id}`,
+  });
+  const config = await getCashRegisterConfig();
+  const to = cashRegisterMailTo(requester, register.group);
+  const delivery = await deliverWebsiteMail(
+    { to, subject: mail.subject, text: mail.text, html: mail.html, replyTo: config.contactEmail },
+    { source: "cashRegisters" },
+  );
+  if (delivery.status === "simulated") {
+    return saveOk("Er is hier geen mailserver, dus de mail staat enkel in de serverlog. De status bleef staan.");
+  }
+  if (delivery.status !== "sent" && delivery.status !== "partial") {
+    return saveError("MAIL_FAILED", `De mail naar ${to} kon niet vertrekken. Laat het ${requester.name} zelf weten.`);
+  }
+
+  const passOn = !resultSharedWithPost(register.status);
+  await prisma.cashRegister.update({
+    where: { id },
+    data: { countedMailSentAt: new Date(), ...(passOn ? { status: "PASSED_ON" as const } : {}) },
+  });
+  await logAudit({
+    action: "update",
+    entity: "cashRegister",
+    entityId: id,
+    target: `${register.activity} (${register.postLabel})`,
+    summary: passOn
+      ? `mail "geteld" gestuurd, status ${statusLabel(register.status, true).toLowerCase()} → ${statusLabel("PASSED_ON", true).toLowerCase()}`
+      : `mail "geteld" gestuurd`,
+  });
+  revalidateCashRegisters(id);
+  return saveOk(`${requester.name} kreeg een mail op ${to}.`);
+}
+
 // -----------------------------------------------------------------------------
 // Instellingen
 // -----------------------------------------------------------------------------
@@ -746,15 +931,17 @@ export async function savePermanentEntryAction(_prev: SaveState, formData: FormD
 
   let cashCents: number;
   let counts: Counts | null = null;
-  if (kind === "COUNT") {
-    const read = readCounts(formData, "c_");
-    if (read === "BAD_COUNT") return saveError("BAD_COUNT");
-    // Alles leeg is geen lege kassa maar een vergeten telling; een lege kassa
-    // tel je met een 0.
-    if (read === null) return saveError("EMPTY_COUNT");
+  const read = readCounts(formData, "c_");
+  if (read === "BAD_COUNT") return saveError("BAD_COUNT");
+  // Alles leeg is geen lege kassa maar een vergeten telling; een lege kassa
+  // tel je met een 0. Bij een teruggave mag het wel: die kan enkel bonnen zijn.
+  if (kind === "COUNT" && read === null) return saveError("EMPTY_COUNT");
+  if (read) {
     counts = read;
     cashCents = countsTotalCents(read);
   } else {
+    // Een regel van voor er per coupure ingegeven werd: dat formulier stuurt
+    // geen raster maar één bedrag.
     const amount = parseAmountInput(text(formData, "cash", 20));
     if (amount === undefined) return saveError("BAD_AMOUNT");
     cashCents = amount ?? 0;

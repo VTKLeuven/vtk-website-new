@@ -6,11 +6,18 @@ import { PublicWeek } from './public-week';
 import { TransportLegend } from '@/components/transport-calendar/legend';
 import type { TripBlock } from '@/components/transport-calendar/types';
 import { getLocale } from '@/lib/i18n';
-import { canEditAllHelpers, canManage, canSeeTripDetails, getSession } from '@/lib/session';
+import {
+  canEditAllHelpers,
+  canManage,
+  canSeeTripDetails,
+  getSession,
+  isPraesidiumMember,
+} from '@/lib/session';
 import {
   formatBrusselsDay,
   formatDateRange,
   isoWeekNumber,
+  onTripForNotes,
   ownsTransportBooking,
   parseDateOnly,
   requesterLabel,
@@ -23,6 +30,7 @@ import {
 } from '@/lib/uitleen';
 import {
   activeGroups,
+  adminNotesForTrips,
   calendarVehicles,
   driverColorOverrides,
   driverOptions,
@@ -31,6 +39,7 @@ import {
   transportWeekForMembers,
   transportWeekForPraesidium,
   transportWeekPublic,
+  tripNotesFor,
 } from '@/lib/uitleen-server';
 import { filtersToQuery, parseTransportFilters } from '@/lib/transport-filters';
 import type { BezettingTrip } from './trip-card';
@@ -177,6 +186,9 @@ export default async function VervoerBezettingPage({
    * ook (`addTripHelperAction`).
    */
   const allHelpers = session ? canEditAllHelpers(session) : false;
+  // Elk praesidiumlid mag bij elke rit een bijrijder toevoegen (F6.24), maar enkel
+  // de eigen toevoegingen weghalen; de server toetst dat nog eens.
+  const addsEverywhere = session ? isPraesidiumMember(session) : false;
   const viewer = session
     ? { userId: session.user.id, groupIds: session.groups.map((group) => group.id) }
     : null;
@@ -188,7 +200,7 @@ export default async function VervoerBezettingPage({
     assignedGroupId: string | null;
   }) =>
     (booking.status === 'REQUESTED' || booking.status === 'APPROVED') &&
-    (allHelpers || (viewer !== null && ownsTransportBooking(booking, viewer)));
+    (allHelpers || addsEverywhere || (viewer !== null && ownsTransportBooking(booking, viewer)));
 
   /**
    * Is dit een rit van een post of werkgroep van de kijker (F4.15)?
@@ -219,6 +231,26 @@ export default async function VervoerBezettingPage({
   const cardDriverPhones = await driverPhones(
     [...new Set(cardBookings.map((booking) => booking.driverId).filter((id): id is string => Boolean(id)))]
   );
+
+  // De nota's (F6.16). Het team leest ze alle, een post enkel die van de ritten
+  // waar hij zelf bij hoort (aanvrager, chauffeur of de post erachter). Voor de
+  // rest van de ritten vragen we ze niet eens op: een nota die niet uit de
+  // databank komt, kan het scherm ook niet laten lekken.
+  const onTripIds = new Set(
+    viewer
+      ? cardBookings.filter((booking) => onTripForNotes(booking, viewer)).map((booking) => booking.id)
+      : []
+  );
+  const [notesPerTrip, ownAdminNotes] = await Promise.all([
+    session && cardBookings.length > 0
+      ? tripNotesFor(teamBookings ? cardBookings.map((booking) => booking.id) : [...onTripIds], {
+          userId: session.user.id,
+          onTripIds: [...onTripIds],
+          logistiek: Boolean(teamBookings),
+        })
+      : Promise.resolve(new Map()),
+    postBookings ? adminNotesForTrips([...onTripIds]) : Promise.resolve(new Map<string, string>()),
+  ]);
 
   /**
    * Wat er in het kaartje staat wanneer iemand een rit aanklikt.
@@ -253,6 +285,8 @@ export default async function VervoerBezettingPage({
     memberNote: booking.memberNote,
     adminNote: booking.adminNote,
     reservationId: booking.reservationId,
+    notes: notesPerTrip.get(booking.id) ?? [],
+    canNote: true,
   })) ??
   postBookings?.map((booking) => {
     // `postBookings` bestaat enkel met een sessie, dus `viewer` staat er.
@@ -280,20 +314,27 @@ export default async function VervoerBezettingPage({
       // niet bij de hele kring: bij de rit van iemand anders blijft de naam
       // staan en valt het nummer weg. Wie de bijrijders van elke rit regelt
       // (`logistiek.helpers`), houdt het nummer: die belt ze.
-      helpers:
-        own || allHelpers
-          ? booking.helpers
-          : booking.helpers.map((helper) => ({ ...helper, phone: null })),
+      // `removable`: bij een rit die niet van jou is, enkel wie je zelf toevoegde
+      // (F6.24). `addedById` zelf reist niet mee naar de browser.
+      helpers: booking.helpers.map((helper) => ({
+        id: helper.id,
+        name: helper.name,
+        phone: own || allHelpers ? helper.phone : null,
+        removable: own || allHelpers || helper.addedById === viewer?.userId,
+      })),
       helpersNote: booking.helpersNote,
       canEditHelpers: helpersEditable(booking),
-      // Van het team: een nummer en een kotadres zijn van een persoon, de nota's
-      // zijn het werkblad van Logistiek.
+      // Van het team: een nummer en een kotadres zijn van een persoon. De nota van
+      // het lid blijft ook weg. "Extra info van Logistiek" en de nota's staan er
+      // enkel bij een rit van je eigen post (F6.16); andermans rit krijgt niets.
       pickupAddress: null,
       helpersPhone: null,
       contactPhone: null,
       memberNote: null,
-      adminNote: null,
+      adminNote: ownAdminNotes.get(booking.id) ?? null,
       reservationId: null,
+      notes: notesPerTrip.get(booking.id) ?? [],
+      canNote: onTripIds.has(booking.id),
     };
   });
 
@@ -372,19 +413,6 @@ export default async function VervoerBezettingPage({
   return (
     <PageShell
       title={en ? 'When is a vehicle free?' : 'Wanneer is een voertuig vrij?'}
-      intro={
-        team || praesidium
-          ? en
-            ? 'The same planning Logistics works from, without the decision buttons. Click a trip to see the post, the reason, the driver and the rest.'
-            : 'Dezelfde planning als waar Logistiek mee werkt, zonder de beslisknoppen. Klik een rit aan voor de post, de reden, de chauffeur en de rest.'
-          : session
-            ? en
-              ? 'The same planning Logistics works from, without the decision buttons.'
-              : 'Dezelfde planning als waar Logistiek mee werkt, zonder de beslisknoppen.'
-            : en
-              ? 'Vehicle, day and time only. Log in to request a trip; who is driving and what for is not shown here.'
-              : 'Enkel voertuig, dag en uur. Log in om een rit aan te vragen; wie rijdt en waarvoor staat hier niet bij.'
-      }
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>

@@ -15,6 +15,8 @@ import type {
   AppPassHolder,
   AppPiano,
   AppPoc,
+  AppPollAnswerInput,
+  AppPolls,
   AppPraesidium,
   AppProfile,
   AppRooms,
@@ -27,9 +29,10 @@ import type {
   AppStudyStopResult,
   AppTheokot,
   AppTheokotOrderInput,
+  AppTheokotReleaseInput,
+  AppTheokotUpdateInput,
   AppTicketEvent,
   AppTicketEventDetail,
-  AppTicketScanResult,
   AppToday,
   AppVoucherRedeemInput,
   AppVoucherRedeemResult,
@@ -84,6 +87,25 @@ export function placeTheokotOrder(
 
 export function cancelTheokotOrder(orderId: string): Promise<{ ok: true }> {
   return apiFetch(appApi('/theokot/order'), { method: 'DELETE', body: { orderId } });
+}
+
+/** Een reservatie aanpassen zolang het bestelvenster open is. */
+export function updateTheokotOrder(
+  input: AppTheokotUpdateInput,
+): Promise<{ orderId: string; totalCents: number }> {
+  return apiFetch(appApi('/theokot/order'), { method: 'PATCH', body: input });
+}
+
+/** Na de deadline: broodjes vrijgeven voor overname. Zonder `lines` alles. */
+export function releaseTheokotOrder(input: AppTheokotReleaseInput): Promise<{ ok: true }> {
+  return apiFetch(appApi('/theokot/vrijgeven'), { method: 'POST', body: input });
+}
+
+/** Eén vrijgegeven broodje overnemen. */
+export function takeOverTheokotSandwich(
+  sessionItemId: string,
+): Promise<{ orderId: string; totalCents: number }> {
+  return apiFetch(appApi('/theokot/overnemen'), { method: 'POST', body: { sessionItemId } });
 }
 
 // ── Tickets ─────────────────────────────────────────────────────────────────
@@ -177,12 +199,40 @@ export function fetchShifts(locale: AppLocale): Promise<AppShifts> {
  * overdoen zou betekenen dat een uitschrijving in de app op cudi kan blijven
  * staan.
  */
-export function registerForShift(shiftId: string): Promise<unknown> {
-  return apiFetch(`/api/shift/register?id=${encodeURIComponent(shiftId)}`, { method: 'POST' });
+/**
+ * `replaceable`: enkel voor een praesidiumlid (`AppShift.replaceableOption`).
+ * Een student mag dan deze plaats innemen wanneer de shift vol staat.
+ */
+export function registerForShift(
+  shiftId: string,
+  options: { replaceable?: boolean } = {},
+): Promise<unknown> {
+  const extra = options.replaceable ? '&replaceable=1' : '';
+  return apiFetch(`/api/shift/register?id=${encodeURIComponent(shiftId)}${extra}`, {
+    method: 'POST',
+  });
+}
+
+/** Achteraf aanzetten of uitzetten of een student je plaats mag innemen. */
+export function setShiftReplaceable(shiftId: string, replaceable: boolean): Promise<unknown> {
+  return apiFetch(`/api/shift/register?id=${encodeURIComponent(shiftId)}`, {
+    method: 'PATCH',
+    body: { replaceable },
+  });
 }
 
 export function unregisterFromShift(shiftId: string): Promise<unknown> {
   return apiFetch(`/api/shift/register?id=${encodeURIComponent(shiftId)}`, { method: 'DELETE' });
+}
+
+// ── Peilingen ───────────────────────────────────────────────────────────────
+
+export function fetchPolls(locale: AppLocale): Promise<AppPolls> {
+  return apiFetch<AppPolls>(appApi('/peilingen', { locale }));
+}
+
+export function answerPoll(input: AppPollAnswerInput): Promise<{ ok: true }> {
+  return apiFetch(appApi('/peilingen'), { method: 'POST', body: input });
 }
 
 // ── Groepen ─────────────────────────────────────────────────────────────────
@@ -219,7 +269,7 @@ export function cancelPianoSlot(id: string): Promise<{ ok: true }> {
  * nog op de vorige versie van de app zitten.
  */
 export function fetchToday(locale: AppLocale): Promise<AppToday> {
-  return apiFetch<AppToday>(appApi('/vandaag', { locale }));
+  return apiFetch<AppToday>(appApi('/vandaag', { locale, peilingen: '1' }));
 }
 
 // ── Interesse en gevolgde categorieën ───────────────────────────────────────
@@ -270,27 +320,6 @@ export function fetchScanEvents(locale: AppLocale): Promise<AppScanEvent[]> {
 
 export function redeemScannerInvite(code: string): Promise<AppScannerInviteResult> {
   return apiFetch(appApi('/scan/uitnodiging'), { method: 'POST', body: { code } });
-}
-
-/**
- * Een ticket scannen gaat naar de bestaande route van de webscanner en niet naar
- * `/app/v1`. Dezelfde reden als bij afrekenen en bij inschrijven op een shift:
- * die route draagt de hele beoordeling (geldig, al gescand, verkeerd evenement,
- * terugbetaald) plus het scanlogboek, en een wrapper zou daar niets doen dan
- * doorgeven of, erger, de helft vergeten.
- *
- * `clientScanId` maakt de aanroep idempotent: dezelfde id twee keer sturen geeft
- * hetzelfde antwoord in plaats van een tweede scan. Dat is precies wat je wil
- * wanneer het netwerk aan een deur wegvalt en de app opnieuw probeert.
- */
-export function scanTicket(
-  eventId: string,
-  input: { credential: string; clientScanId: string; deviceId: string; clientScannedAt: string },
-): Promise<AppTicketScanResult> {
-  return apiFetch(`/api/tickets/events/${encodeURIComponent(eventId)}/scan`, {
-    method: 'POST',
-    body: input,
-  });
 }
 
 // ── Fakbar ──────────────────────────────────────────────────────────────────

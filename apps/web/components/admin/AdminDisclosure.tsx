@@ -20,6 +20,8 @@ export function AdminDisclosure({
   summary,
   actions,
   defaultOpen = false,
+  open: controlledOpen,
+  onOpenChange,
   variant = "card",
   className,
   children,
@@ -33,6 +35,12 @@ export function AdminDisclosure({
   actions?: ReactNode;
   defaultOpen?: boolean;
   /**
+   * Gecontroleerd openen, voor een actie in `actions` die de kaart moet openen
+   * (een bewerkknop waarvan het formulier in de kaart staat).
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /**
    * `card` staat op zichzelf op de pagina; `row` is een item binnen een kaart
    * (een rij in een lijst), met enkel een rand: geen kaart in een kaart.
    */
@@ -40,8 +48,14 @@ export function AdminDisclosure({
   className?: string;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
-  const [mounted, setMounted] = useState(defaultOpen);
+  const [ownOpen, setOwnOpen] = useState(defaultOpen);
+  const open = controlledOpen ?? ownOpen;
+  const [mountedState, setMounted] = useState(defaultOpen);
+  const mounted = mountedState || open;
+  const setOpen = (next: boolean) => {
+    setOwnOpen(next);
+    onOpenChange?.(next);
+  };
   const panelId = useId();
 
   return (

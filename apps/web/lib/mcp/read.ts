@@ -58,7 +58,7 @@ export type McpReadResource = (typeof MCP_READ_RESOURCES)[number];
 const RESOURCE_PERMISSIONS = {
   user_search: ["users.search", "users.view", "users.edit", "users.bulkImport"],
   users: ["users.view", "users.edit", "users.bulkImport"],
-  groups: ["groups.manage", "werkgroepen.manage", "roles.manage", "users.view"],
+  groups: ["groups.manage", "werkgroepen.manage", "jaarwerkingen.manage", "roles.manage", "users.view"],
   roles: ["roles.manage"],
   pages: ["pages.edit", "pages.editAll", "pages.manage", "pages.publish", "pages.delete"],
   navigation: ["header.manage", "pages.manage"],
@@ -68,7 +68,7 @@ const RESOURCE_PERMISSIONS = {
   ticket_orders: ["tickets.manageAll"],
   forms: ["forms.create", "forms.manageAll"],
   form_entries: ["forms.manageAll"],
-  photos: ["photos.upload", "photos.manageAlbums", "media.manage"],
+  photos: ["photos.upload", "photos.createAlbums", "photos.manageAlbums", "media.manage"],
   pocs: ["pocs.manage"],
   partners: ["partners.manage"],
   editorial_settings: ["home.edit", "openingHours.manageOwn", "media.manage"],
@@ -229,7 +229,7 @@ export async function adminRead(principal: McpPrincipal, raw: McpAdminReadInput)
     case "roles": {
       const items = await prisma.role.findMany({
         where: { ...idWhere(input.id), ...(contains ? { OR: [{ code: contains }, { nameNl: contains }, { nameEn: contains }] } : {}) },
-        take, skip, orderBy: [{ order: "asc" }, { nameNl: "asc" }],
+        take, skip, orderBy: { nameNl: "asc" },
         select: {
           id: true, code: true, nameNl: true, nameEn: true, descriptionNl: true,
           descriptionEn: true, color: true, order: true, system: true,
@@ -306,7 +306,7 @@ export async function adminRead(principal: McpPrincipal, raw: McpAdminReadInput)
           id: true, slug: true, titleNl: true, titleEn: true, descriptionNl: true,
           descriptionEn: true, location: true, startsAt: true, endsAt: true,
           salesStartAt: true, salesEndAt: true, status: true, currency: true,
-          maxTicketsPerOrder: true, contactEmail: true, publishedAt: true,
+          maxTicketsPerOrder: true, honoraryOneTicket: true, contactEmail: true, publishedAt: true,
           // Wel de vlag, nooit `privateToken` of `presaleToken`: die zijn de
           // toegang zelf en horen bij geen enkele lezer.
           isPrivate: true,

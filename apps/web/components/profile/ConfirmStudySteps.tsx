@@ -1,5 +1,6 @@
 "use client";
 
+import { useUnsentGuard } from "@/components/ui/unsentGuard";
 import {
   startTransition,
   useActionState,
@@ -99,8 +100,9 @@ export function ConfirmStudySteps(
   const stepKickerRef = useRef<HTMLParagraphElement>(null);
   const pendingFocusStepRef = useRef(false);
   const [secondVisible, setSecondVisible] = useState(props.secondVisible ?? true);
+  const unsent = useUnsentGuard();
   const [state, formAction, pending] = useActionState(
-    props.preview ? idleAction : props.action,
+    unsent.state(props.preview ? idleAction : props.action),
     SAVE_IDLE,
   );
   const showToast = useToast();

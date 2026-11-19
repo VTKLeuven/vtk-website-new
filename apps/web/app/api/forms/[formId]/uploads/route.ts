@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@vtk/db";
-import { newStorageKey, putObject } from "@vtk/storage";
+import { newStorageKey, putObject, uploadContentType } from "@vtk/storage";
 import { getCurrentSession } from "@/lib/session";
 import { readLimitedFormData, RequestBodyTooLargeError } from "@/lib/ticketing/http";
 import {
@@ -94,11 +94,11 @@ export async function POST(
   }
 
   const storageKey = newStorageKey(`forms/${formId}`, file.name);
-  await putObject(
-    storageKey,
-    Buffer.from(await file.arrayBuffer()),
-    file.type || "application/octet-stream"
-  );
+  // Het type volgt de extensie, nooit `file.type`: dat kiest de browser, en dus
+  // ook wie een `text/html` meestuurt met een bestand dat `cv.pdf` heet. Dat
+  // bestand opende dan als pagina in een VTK-origin.
+  const contentType = uploadContentType(file.name);
+  await putObject(storageKey, Buffer.from(await file.arrayBuffer()), contentType);
 
   return NextResponse.json({
     token: createUploadToken({
@@ -106,7 +106,7 @@ export async function POST(
       fieldId,
       storageKey,
       originalName: file.name.slice(0, 200),
-      contentType: file.type || null,
+      contentType,
       sizeBytes: file.size,
     }),
     name: file.name.slice(0, 200),

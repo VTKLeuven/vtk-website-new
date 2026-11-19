@@ -3,5 +3,5 @@
 import { Redirect } from 'expo-router';
 
 export default function OudAdres() {
-  return <Redirect href="/meer/profiel" />;
+  return <Redirect href="/meer/profiel" withAnchor />;
 }

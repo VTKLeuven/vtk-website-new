@@ -4,7 +4,6 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { AppCalendarEvent, AppLocale } from '../api/contract';
 import {
-  dayKeyOf,
   monthGrid,
   monthLabel,
   shiftMonth,
@@ -12,6 +11,7 @@ import {
   weekdayLabels,
   type MonthAnchor,
 } from '../monthGrid';
+import { eventDayKeys } from '../moments';
 import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
 
 /** Hoogstens zoveel stipjes per dag; daarboven wordt het een vlek. */
@@ -45,21 +45,33 @@ export function MonthView({
   selected: string | null;
   onSelect: (key: string | null) => void;
 }) {
-  const cells = useMemo(() => monthGrid(anchor), [anchor]);
+  /**
+   * Het rooster als zes rijen van zeven, en niet als één lijst die afbreekt.
+   * Met `flexWrap` en een breedte van `100/7%` per vakje passen er op sommige
+   * schermbreedtes maar zes op een rij: Yoga rekent in floats, en zeven keer
+   * dat getal komt dan net boven de breedte uit. Elke dag schoof dan een kolom
+   * op tegenover de koppen, en woensdag 18 november stond onder zaterdag.
+   */
+  const weeks = useMemo(() => {
+    const cells = monthGrid(anchor);
+    return Array.from({ length: cells.length / 7 }, (_, row) => cells.slice(row * 7, row * 7 + 7));
+  }, [anchor]);
   const weekdays = useMemo(() => weekdayLabels(locale), [locale]);
   const today = todayKey();
 
   /**
    * De categoriekleuren per dag. Een evenement over meerdere dagen zetten we op
    * zijn startdag: het rooster zegt wanneer iets begint, niet hoe lang het duurt.
+   * Een reeks met losse momenten (een loopweek) staat op elke dag met een moment.
    */
   const byDay = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const event of events) {
-      const key = dayKeyOf(event.start);
-      const colours = map.get(key) ?? [];
-      colours.push(event.categories[0]?.colour ?? COLORS.navy);
-      map.set(key, colours);
+      for (const key of eventDayKeys(event)) {
+        const colours = map.get(key) ?? [];
+        colours.push(event.categories[0]?.colour ?? COLORS.navy);
+        map.set(key, colours);
+      }
     }
     return map;
   }, [events]);
@@ -98,58 +110,62 @@ export function MonthView({
         ))}
       </View>
 
-      <View style={styles.grid}>
-        {cells.map((cell) => {
-          const colours = byDay.get(cell.key) ?? [];
-          const isToday = cell.key === today;
-          const isSelected = cell.key === selected;
+      <View>
+        {weeks.map((week) => (
+          <View key={week[0].key} style={styles.week}>
+            {week.map((cell) => {
+              const colours = byDay.get(cell.key) ?? [];
+              const isToday = cell.key === today;
+              const isSelected = cell.key === selected;
 
-          return (
-            <Pressable
-              key={cell.key}
-              accessibilityRole="button"
-              accessibilityState={{ selected: isSelected }}
-              accessibilityLabel={
-                colours.length === 0
-                  ? `${cell.day}, niets gepland`
-                  : `${cell.day}, ${colours.length} ${colours.length === 1 ? 'activiteit' : 'activiteiten'}`
-              }
-              onPress={() => onSelect(isSelected ? null : cell.key)}
-              style={styles.cellWrap}
-            >
-              <View
-                style={[
-                  styles.cell,
-                  isToday && styles.cellToday,
-                  isSelected && styles.cellSelected,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.day,
-                    !cell.inMonth && styles.dayOutside,
-                    isSelected && styles.daySelected,
-                  ]}
+              return (
+                <Pressable
+                  key={cell.key}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSelected }}
+                  accessibilityLabel={
+                    colours.length === 0
+                      ? `${cell.day}, niets gepland`
+                      : `${cell.day}, ${colours.length} ${colours.length === 1 ? 'activiteit' : 'activiteiten'}`
+                  }
+                  onPress={() => onSelect(isSelected ? null : cell.key)}
+                  style={styles.cellWrap}
                 >
-                  {cell.day}
-                </Text>
-                <View style={styles.dots}>
-                  {colours.slice(0, MAX_DOTS).map((colour, index) => (
-                    <View
-                      key={index}
+                  <View
+                    style={[
+                      styles.cell,
+                      isToday && styles.cellToday,
+                      isSelected && styles.cellSelected,
+                    ]}
+                  >
+                    <Text
                       style={[
-                        styles.dot,
-                        { backgroundColor: colour ?? COLORS.navy },
-                        // Op een geel vakje zou een geel stipje verdwijnen.
-                        isSelected && styles.dotOnSelected,
+                        styles.day,
+                        !cell.inMonth && styles.dayOutside,
+                        isSelected && styles.daySelected,
                       ]}
-                    />
-                  ))}
-                </View>
-              </View>
-            </Pressable>
-          );
-        })}
+                    >
+                      {cell.day}
+                    </Text>
+                    <View style={styles.dots}>
+                      {colours.slice(0, MAX_DOTS).map((colour, index) => (
+                        <View
+                          key={index}
+                          style={[
+                            styles.dot,
+                            { backgroundColor: colour ?? COLORS.navy },
+                            // Op een geel vakje zou een geel stipje verdwijnen.
+                            isSelected && styles.dotOnSelected,
+                          ]}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -172,11 +188,11 @@ const styles = StyleSheet.create({
     ...TYPE.small,
     fontSize: 11,
     color: COLORS.muted,
-    width: `${100 / 7}%`,
+    flex: 1,
     textAlign: 'center',
   },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cellWrap: { width: `${100 / 7}%`, aspectRatio: 1, padding: 2 },
+  week: { flexDirection: 'row' },
+  cellWrap: { flex: 1, aspectRatio: 1, padding: 2 },
   cell: {
     flex: 1,
     borderRadius: RADIUS.sm,

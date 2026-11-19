@@ -1,5 +1,6 @@
 'use client';
 
+import { useUnsentGuard } from '@/components/ui/unsentGuard';
 import { useActionState, useState } from 'react';
 import { Button } from '@vtk/ui';
 import { SaveForm } from '@/components/ui/SaveForm';
@@ -44,7 +45,8 @@ export function ClientEditor({
   /** Waar we naartoe gaan na verwijderen; deze pagina bestaat dan niet meer. */
   listHref: string;
 }) {
-  const [rotateState, rotateAction, rotating] = useActionState(rotateSecretAction, ROTATE_IDLE);
+  const unsent = useUnsentGuard();
+  const [rotateState, rotateAction, rotating] = useActionState(unsent.state(rotateSecretAction), ROTATE_IDLE);
   const [secretDismissed, setSecretDismissed] = useState(false);
   const showSecret = rotateState.status === 'success' && !secretDismissed;
 

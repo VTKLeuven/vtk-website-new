@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "@vtk/db";
 import { deleteObject } from "@vtk/storage";
+import { removeDiscordRoles } from "@/lib/discord/pocAccess";
 
 /**
  * A data-subject export deliberately excludes credentials, session tokens,
@@ -17,6 +18,9 @@ export async function exportUserData(userId: string) {
       email: true,
       rNumber: true,
       rNumberFromKul: true,
+      discordId: true,
+      discordUsername: true,
+      discordRoleIds: true,
       firwStudent: true,
       firwStudentChangedAt: true,
       emailVerified: true,
@@ -340,7 +344,7 @@ async function removeObject(key: string): Promise<void> {
 export async function eraseUserData(userId: string) {
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { email: true, name: true, avatarKey: true, rNumber: true },
+    select: { email: true, name: true, avatarKey: true, rNumber: true, discordId: true, discordRoleIds: true },
   });
   const tombstone = randomUUID();
   const deletedEmail = `deleted+${tombstone}@vtk.invalid`;
@@ -374,6 +378,12 @@ export async function eraseUserData(userId: string) {
       await tx.groupMembership.deleteMany({ where: { userId } });
       await tx.userRole.deleteMany({ where: { userId } });
       await tx.pocRepresentative.deleteMany({ where: { userId } });
+      // Google Workspace: rechtstreeks in een groepsadres, in een kiesploeg, en
+      // de aanvragen en koppelingen van werkgroepaccounts. Het account in Google
+      // zelf blijft: dat is van de kring, niet van deze rij.
+      await tx.mailGroupExtra.deleteMany({ where: { userId } });
+      await tx.kiesploegMember.deleteMany({ where: { userId } });
+      await tx.werkgroepAccount.deleteMany({ where: { userId } });
       await tx.userDashboardTilePref.deleteMany({ where: { userId } });
       await tx.dashboardTile.deleteMany({ where: { userId } });
       await tx.shiftParticipant.deleteMany({ where: { userId } });
@@ -429,6 +439,9 @@ export async function eraseUserData(userId: string) {
       // alumni-evenement staat er mogelijk een naam van hem publiek op de site.
       // Een tombstone hoort daar niet meer in te staan.
       await tx.calendarEventInterest.deleteMany({ where: { userId } });
+      // En de sporen van de mails over die interesses: welke evenementen iemand
+      // volgde, hoort niet aan een tombstone te blijven hangen.
+      await tx.calendarEventSignupMail.deleteMany({ where: { userId } });
       // De bevestigingen dragen een momentopname van studiejaar en richting; aan
       // een tombstone hoort die niet meer te hangen. De tellingen van die rondes
       // zakken daardoor met één, en dat is de prijs van een echte verwijdering.
@@ -518,6 +531,9 @@ export async function eraseUserData(userId: string) {
           email: deletedEmail,
           rNumber: null,
           rNumberFromKul: false,
+          discordId: null,
+          discordUsername: null,
+          discordRoleIds: { set: [] },
           firwStudent: false,
           firwStudentChangedAt: null,
           emailVerified: false,
@@ -583,4 +599,8 @@ export async function eraseUserData(userId: string) {
       maxWait: 15_000,
     },
   );
+
+  // Na de transactie: Discord mag het wissen niet tegenhouden. De koppeling is
+  // dan al weg, dus dit is de enige kans om de POC-rollen weg te halen.
+  if (user.discordId) await removeDiscordRoles(user.discordId, user.discordRoleIds);
 }

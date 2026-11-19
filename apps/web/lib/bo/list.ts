@@ -8,7 +8,7 @@ import type { XDoc, XDossier, XMeeting, XPost } from "./explorer";
  * allebei.
  */
 
-export const LIST_FILTERS = ["open", "komt", "af", "slechter", "boven"] as const;
+export const LIST_FILTERS = ["open", "komt", "af", "potje", "slechter", "boven"] as const;
 export type ListFilter = (typeof LIST_FILTERS)[number];
 
 export const LIST_GROUPS = ["post", "bo", "stand", "maand"] as const;
@@ -24,6 +24,7 @@ export function matchesFilters(d: XDossier, filters: readonly ListFilter[], quer
       (f === "open" && (d.status === "OPEN" || (d.status === "NO_BUDGET" && d.results[0]?.workingYear === d.year))) ||
       (f === "komt" && d.status === "UPCOMING") ||
       (f === "af" && d.status === "DONE") ||
+      (f === "potje" && d.status === "POT") ||
       (f === "slechter" && (d.devCents ?? 0) < 0) ||
       (f === "boven" && d.overAllocation),
   );
@@ -43,6 +44,7 @@ const STATUS_ORDER = [
   ["UPCOMING", "Komt nog", "Upcoming"],
   ["DONE", "Resultaat binnen", "Result in"],
   ["NO_BUDGET", "Zonder budget", "Without a budget"],
+  ["POT", "Potjes", "Pots"],
 ] as const;
 
 /** De laatste datum waarop een dossier langs een BO passeerde, om nieuwste eerst te zetten. */

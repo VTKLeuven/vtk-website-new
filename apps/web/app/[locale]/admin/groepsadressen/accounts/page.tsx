@@ -1,4 +1,3 @@
-import Link from "@/components/ui/Link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import type { Locale } from "@vtk/i18n";
@@ -48,7 +47,17 @@ export default async function AdminProvisionAccounts({
     ...kiesploegen.map((k) => ({ value: `kiesploeg:${k.id}`, label: k.formalName })),
     ...groups.map((g) => ({
       value: `group:${g.id}`,
-      label: `${nl ? g.nameNl : g.nameEn}${g.type === "WERKGROEP" ? (nl ? " (werkgroep)" : " (work group)") : ""}`,
+      label: `${nl ? g.nameNl : g.nameEn}${
+        g.type === "WERKGROEP"
+          ? nl
+            ? " (werkgroep)"
+            : " (work group)"
+          : g.type === "JAARWERKING"
+            ? nl
+              ? " (jaarwerking)"
+              : " (yearly event)"
+            : ""
+      }`,
     })),
   ];
 
@@ -69,23 +78,21 @@ export default async function AdminProvisionAccounts({
       name: row.name,
       email: row.email,
       alias: row.alias,
+      mode: row.mode,
       blocked: row.blocked,
     })) ?? [];
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-vtk-ink">
+        <h2 className="text-lg font-semibold text-vtk-ink">
           {nl ? "Accounts aanmaken" : "Create accounts"}
-        </h1>
+        </h2>
         <p className="mt-1 max-w-3xl text-sm text-zinc-500">
           {nl
             ? "Maakt een @-account per lid en koppelt het meteen aan zijn website-account. Wie hier een account krijgt, hoeft zich niet meer zelf te koppelen."
             : "Creates an account per member and links it to their website account right away. Whoever gets an account here does not need to link it themselves."}
         </p>
-        <Link href={base} className="vtk-link mt-2 inline-block text-sm">
-          {nl ? "Terug naar groepsadressen" : "Back to group addresses"}
-        </Link>
       </div>
 
       {!cfg && (

@@ -13,11 +13,6 @@ export default async function NotFound() {
     <PageShell
       kicker="404"
       title={nl ? 'Deze pagina bestaat niet' : 'This page does not exist'}
-      intro={
-        nl
-          ? 'Misschien is de link verouderd, of is de aanvraag intussen verwijderd.'
-          : 'The link may be out of date, or the request may have been removed since.'
-      }
     >
       <p className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6 text-vtk-body">
         {nl ? 'Ga terug naar ' : 'Go back to '}

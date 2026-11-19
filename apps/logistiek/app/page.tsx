@@ -66,7 +66,6 @@ export default async function LogistiekHome() {
             {t.homeEyebrow}
           </p>
           <h1>{t.homeAccent} {t.homeTitle}</h1>
-          <p className="logistics-page-intro">{content.homeLead}</p>
         </div>
       </header>
 

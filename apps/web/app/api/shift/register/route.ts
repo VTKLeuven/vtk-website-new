@@ -8,6 +8,10 @@ import { pushCudiRegistration } from '@/lib/cudiRegistrationSync';
 import { handledLeadFields } from '@/lib/shift/reminders';
 import { withSerializableTransaction } from '@/lib/ticketing/transactions';
 import { registeredShifts } from '@/lib/shift/lists';
+import { praesidiumYears } from '@/lib/shift/voucherEligibility';
+import { canBeReplaceable, canReplace, pickReplaced, shiftReplacedMail } from '@/lib/shift/replace';
+import { sendMail } from '@/lib/email';
+import { preferredEmail } from '@/lib/brevo/contacts';
 
 /** Binnen dit venster voor de start kan een user zichzelf niet meer uitschrijven. */
 const UNREGISTER_LOCK_MS = 24 * 60 * 60 * 1000;
@@ -52,7 +56,12 @@ export async function GET(request: Request) {
 /**
  * Registreer een user voor een bepaalde shift
  *
- * Requests zijn van de vorm /api/shift/register?id=*****
+ * Requests zijn van de vorm /api/shift/register?id=*****[&replaceable=1]
+ *
+ * `replaceable=1` (enkel voor een praesidiumlid): een student mag deze plaats
+ * later innemen. Staat de shift vol en schrijft een student zich in, dan neemt
+ * die de plaats in van het laatst ingeschreven vervangbare praesidiumlid, dat
+ * daarna een mail krijgt. Zie `lib/shift/replace.ts`.
  */
 export async function POST(request: Request) {
   let session;
@@ -62,21 +71,33 @@ export async function POST(request: Request) {
     return authErrorResponse(err);
   }
 
-  const id = new URL(request.url).searchParams.get('id');
+  const params = new URL(request.url).searchParams;
+  const id = params.get('id');
   if (!id) {
     return NextResponse.json({ error: 'id query parameter is required' }, { status: 400 });
   }
+  const wantsReplaceable = params.get('replaceable') === '1';
 
   let registration;
   try {
     registration = await withSerializableTransaction(async (tx) => {
       const shift = await tx.shift.findUnique({
         where: { id },
-        include: { _count: { select: { participants: true } } },
+        include: {
+          participants: { select: { userId: true, replaceable: true, registeredAt: true } },
+        },
       });
       if (!shift) return { status: 'NOT_FOUND' as const };
       if (shift.startTime <= new Date()) return { status: 'STARTED' as const };
-      if (shift._count.participants >= shift.maxParticipants) {
+      const praesidium = await praesidiumYears([session.user.id], tx);
+      // Vol, maar er staat een praesidiumlid op dat vervangen mag worden: een
+      // student neemt die plaats in. Een ander praesidiumlid niet.
+      const replaced =
+        shift.participants.length >= shift.maxParticipants &&
+        canReplace(session.user.id, shift, praesidium)
+          ? pickReplaced(shift.participants)
+          : null;
+      if (shift.participants.length >= shift.maxParticipants && !replaced) {
         return { status: 'FULL' as const };
       }
 
@@ -92,11 +113,19 @@ export async function POST(request: Request) {
       });
       if (overlap) return { status: 'OVERLAP' as const, overlap };
 
+      if (replaced) {
+        await tx.shiftParticipant.delete({
+          where: { shiftId_userId: { shiftId: id, userId: replaced.userId } },
+        });
+      }
       await tx.shiftParticipant.create({
         data: {
           shiftId: id,
           userId: session.user.id,
           payedOut: false,
+          // Stil genegeerd voor wie geen praesidium is: de knop staat er voor
+          // hem niet, dus dit komt enkel van een oude of nagemaakte aanvraag.
+          replaceable: wantsReplaceable && canBeReplaceable(session.user.id, shift, praesidium),
           // Wie zich vlak voor de start inschrijft, krijgt geen mail meer die
           // begint met "morgen sta je ingepland": die vensters zijn al voorbij
           // en worden meteen als afgehandeld gemarkeerd.
@@ -107,6 +136,13 @@ export async function POST(request: Request) {
         status: 'OK' as const,
         sourceSystem: shift.sourceSystem,
         sourceId: shift.sourceId,
+        replacedUserId: replaced?.userId ?? null,
+        shift: {
+          name: shift.name,
+          startTime: shift.startTime,
+          endTime: shift.endTime,
+          location: shift.location,
+        },
       };
     });
   } catch (err) {
@@ -152,7 +188,89 @@ export async function POST(request: Request) {
     }
   }
 
+  if (registration.replacedUserId) {
+    await mailReplacedParticipant(registration.replacedUserId, registration.shift);
+  }
+
   return NextResponse.json({ success: true }, { status: 201 });
+}
+
+/**
+ * Laat het vervangen praesidiumlid weten dat het niet meer moet komen. De
+ * inschrijving is dan al omgewisseld: een mail die niet vertrekt, mag die niet
+ * terugdraaien, dus een fout hier wordt gelogd en niet gegooid.
+ */
+async function mailReplacedParticipant(
+  userId: string,
+  shift: { name: string; startTime: Date; endTime: Date; location: string },
+): Promise<void> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, locale: true, email: true, personalEmail: true, emailPreference: true },
+    });
+    if (!user) return;
+    const mail = shiftReplacedMail({ name: user.name, locale: user.locale }, shift);
+    await sendMail(
+      {
+        to: preferredEmail(user),
+        from: 'VTK Shiften <shiften@vtk.be>',
+        subject: mail.subject,
+        text: mail.text,
+        html: mail.html,
+      },
+      { source: 'shifts' },
+    );
+  } catch (error) {
+    console.error('Could not mail a replaced shift participant', { userId, error });
+  }
+}
+
+/**
+ * Zet "een student mag mijn plaats innemen" aan of uit op de eigen inschrijving.
+ *
+ * Requests zijn van de vorm /api/shift/register?id=***** met als body
+ * `{ "replaceable": true | false }`. Enkel voor een praesidiumlid, en enkel zolang
+ * de shift niet begonnen is.
+ */
+export async function PATCH(request: Request) {
+  let session;
+  try {
+    session = await requireSession();
+  } catch (err) {
+    return authErrorResponse(err);
+  }
+
+  const id = new URL(request.url).searchParams.get('id');
+  if (!id) {
+    return NextResponse.json({ error: 'id query parameter is required' }, { status: 400 });
+  }
+  const body = (await request.json().catch(() => null)) as { replaceable?: unknown } | null;
+  if (typeof body?.replaceable !== 'boolean') {
+    return NextResponse.json({ error: 'replaceable must be a boolean' }, { status: 400 });
+  }
+
+  const shift = await prisma.shift.findUnique({
+    where: { id },
+    select: { startTime: true, sourceSystem: true },
+  });
+  if (!shift) return NextResponse.json({ error: 'Shift not found' }, { status: 404 });
+  if (shift.startTime <= new Date()) {
+    return NextResponse.json({ error: 'Registration has closed for this shift' }, { status: 409 });
+  }
+  const praesidium = await praesidiumYears([session.user.id]);
+  if (body.replaceable && !canBeReplaceable(session.user.id, shift, praesidium)) {
+    return NextResponse.json({ error: 'Only praesidium can be replaced' }, { status: 403 });
+  }
+
+  const { count } = await prisma.shiftParticipant.updateMany({
+    where: { shiftId: id, userId: session.user.id },
+    data: { replaceable: body.replaceable },
+  });
+  if (count === 0) {
+    return NextResponse.json({ error: 'You are not registered for this shift' }, { status: 404 });
+  }
+  return NextResponse.json({ success: true, replaceable: body.replaceable });
 }
 
 /**

@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { Input, Label, Select, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { requestLesbezoekAction } from "@/app/actions/lesbezoeken";
-import { LESBEZOEK_LIMITS, LESBEZOEK_MIN_LEAD_DAYS } from "@/lib/lesbezoeken";
+import { LESBEZOEK_LIMITS, lesbezoekDateWindow } from "@/lib/lesbezoeken";
 import { lesbezoekRequestErrors } from "@/lib/lesbezoekenMessages";
 import { AudienceCombobox } from "@/app/[locale]/admin/lesbezoeken/AudienceCombobox";
 
@@ -51,15 +51,6 @@ export type RequestCopy = {
 };
 
 const OTHER = "__other__";
-
-/** De vroegste datum die het formulier aanvaardt, als "YYYY-MM-DD". */
-function earliestDate(): string {
-  const date = new Date();
-  date.setDate(date.getDate() + LESBEZOEK_MIN_LEAD_DAYS);
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
-}
 
 export function LesbezoekRequestForm({
   nl,
@@ -254,7 +245,7 @@ export function LesbezoekRequestForm({
           <div className="lb-row">
             <div className="lb-field">
               <Label htmlFor="lb-date">{copy.dateLabel} *</Label>
-              <Input id="lb-date" name="date" type="date" min={earliestDate()} required />
+              <Input id="lb-date" name="date" type="date" min={lesbezoekDateWindow().earliest} required />
             </div>
             <div className="lb-field">
               <Label htmlFor="lb-time">{copy.timeLabel} *</Label>

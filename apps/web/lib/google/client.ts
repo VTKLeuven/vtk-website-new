@@ -70,6 +70,14 @@ export const GMAIL_SCOPES = [
  */
 export const DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.readonly";
 
+/**
+ * Scope om het logboek van de Admin console te lezen, voor het terugzetten van
+ * organisatie-eenheden (/admin/groepsadressen/organisatie-eenheden). Een eigen
+ * tokenaanvraag, net als Drive: staat de scope niet in de delegatie, dan faalt
+ * enkel dat scherm en niet de groepssync.
+ */
+export const REPORTS_SCOPES = "https://www.googleapis.com/auth/admin.reports.audit.readonly";
+
 export class GoogleError extends Error {
   constructor(
     message: string,
@@ -224,6 +232,10 @@ export type GoogleGroup = {
   email: string;
   name: string;
   description?: string;
+  /** Aantal directe leden, als string zoals Google het teruggeeft. */
+  directMembersCount?: string;
+  /** Andere adressen van dezelfde groep. */
+  aliases?: string[];
 };
 
 export async function getGroup(cfg: GoogleConfig, key: string): Promise<GoogleGroup | null> {
@@ -245,6 +257,30 @@ export async function updateGroup(
   input: { name?: string; description?: string },
 ): Promise<void> {
   await request(cfg, "PUT", `${DIRECTORY}/groups/${encodeURIComponent(key)}`, input);
+}
+
+/**
+ * Verwijdert een groep in Google, met haar aliassen en het archief van haar
+ * berichten. Een groep die er al niet meer is, geeft `false` en geen fout:
+ * dat is de toestand die we wilden.
+ *
+ * Enkel aangeroepen vanuit een expliciete keuze van een beheerder op
+ * /admin/groepsadressen, nooit door de sync. Zie docs/design-decisions.md.
+ */
+export async function deleteGroup(cfg: GoogleConfig, key: string): Promise<boolean> {
+  const res = await authorizedFetch(
+    cfg,
+    "DELETE",
+    `${DIRECTORY}/groups/${encodeURIComponent(key)}`,
+    undefined,
+    {},
+  );
+  if (res.status === 404) return false;
+  if (!res.ok) {
+    const parsed = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+    throw new GoogleError(parsed?.error?.message ?? `${res.status} ${res.statusText}`, res.status, parsed);
+  }
+  return true;
 }
 
 /** Alle groepen van het domein, voor het koppelscherm. */
@@ -336,6 +372,9 @@ export type GoogleGroupSettings = {
   allowExternalMembers?: string;
   whoCanJoin?: string;
   whoCanViewGroup?: string;
+  whoCanContactOwner?: string;
+  whoCanViewMembership?: string;
+  whoCanModerateMembers?: string;
   messageModerationLevel?: string;
 };
 
@@ -403,6 +442,36 @@ export async function listUsers(cfg: GoogleConfig): Promise<GoogleUser[]> {
 }
 
 
+/**
+ * Elk account, maar enkel wat een overzicht nodig heeft: adres, naam, OU en of
+ * het geschorst is. Met `fields` en 500 per pagina in plaats van 200 met alles
+ * erbij; dat maakt van een tiental zware aanroepen er een paar lichte, en dat
+ * merk je op /admin/groepsadressen/organisatie-eenheden bij elke keer laden.
+ * Geen aliassen: wie die nodig heeft, gebruikt `listUsers`.
+ */
+export async function listUsersLite(cfg: GoogleConfig): Promise<GoogleUser[]> {
+  const out: GoogleUser[] = [];
+  let pageToken: string | undefined;
+  do {
+    const params = new URLSearchParams({
+      domain: cfg.domain,
+      maxResults: "500",
+      orderBy: "email",
+      projection: "basic",
+      fields: "nextPageToken,users(id,primaryEmail,name/fullName,suspended,orgUnitPath)",
+    });
+    if (pageToken) params.set("pageToken", pageToken);
+    const page = await request<{ users?: GoogleUser[]; nextPageToken?: string }>(
+      cfg,
+      "GET",
+      `${DIRECTORY}/users?${params.toString()}`,
+    );
+    out.push(...(page?.users ?? []));
+    pageToken = page?.nextPageToken;
+  } while (pageToken);
+  return out;
+}
+
 export async function getUser(cfg: GoogleConfig, key: string): Promise<GoogleUser | null> {
   return request<GoogleUser>(cfg, "GET", `${DIRECTORY}/users/${encodeURIComponent(key)}`);
 }
@@ -443,6 +512,28 @@ export async function moveUser(
   orgUnitPath: string,
 ): Promise<void> {
   await request(cfg, "PUT", `${DIRECTORY}/users/${encodeURIComponent(key)}`, { orgUnitPath });
+}
+
+/**
+ * Schorst een account of heft de schorsing op. Een geschorst account kan niet
+ * aanmelden en ontvangt geen mail meer, maar het adres en de mailbox blijven
+ * bestaan; dat is waarom we schorsen en nooit verwijderen.
+ */
+export async function setUserSuspended(
+  cfg: GoogleConfig,
+  key: string,
+  suspended: boolean,
+): Promise<void> {
+  await request(cfg, "PUT", `${DIRECTORY}/users/${encodeURIComponent(key)}`, { suspended });
+}
+
+/** Haalt een alias van een account. Een alias die er al niet meer is, is goed. */
+export async function removeAlias(cfg: GoogleConfig, key: string, alias: string): Promise<void> {
+  await request(
+    cfg,
+    "DELETE",
+    `${DIRECTORY}/users/${encodeURIComponent(key)}/aliases/${encodeURIComponent(alias)}`,
+  );
 }
 
 export async function addAlias(cfg: GoogleConfig, key: string, alias: string): Promise<void> {
@@ -517,6 +608,34 @@ export async function ensureDefaultSendAs(
     "PATCH",
     `${GMAIL}/${encodeURIComponent(email)}/settings/sendAs/${encodeURIComponent(alias)}`,
     { isDefault: true },
+    asUser(email),
+  );
+}
+
+/**
+ * Zet een alias als bijkomend afzenderadres, zonder er de standaard van te
+ * maken. Voor wie al een volwaardig account heeft en daarnaast vanaf zijn
+ * kiesploegadres moet kunnen mailen.
+ */
+export async function addSendAs(cfg: GoogleConfig, email: string, alias: string): Promise<void> {
+  const existing = await listSendAs(cfg, email);
+  if (existing.some((s) => s.sendAsEmail.toLowerCase() === alias.toLowerCase())) return;
+  await request(
+    cfg,
+    "POST",
+    `${GMAIL}/${encodeURIComponent(email)}/settings/sendAs`,
+    { sendAsEmail: alias, treatAsAlias: true },
+    asUser(email),
+  );
+}
+
+/** Haalt een afzenderadres weg in Gmail (na het wegnemen van de alias). */
+export async function deleteSendAs(cfg: GoogleConfig, email: string, alias: string): Promise<void> {
+  await request(
+    cfg,
+    "DELETE",
+    `${GMAIL}/${encodeURIComponent(email)}/settings/sendAs/${encodeURIComponent(alias)}`,
+    undefined,
     asUser(email),
   );
 }
@@ -679,4 +798,75 @@ export async function downloadSpreadsheet(
     throw new GoogleError(parsed?.error?.message ?? `${res.status} ${res.statusText}`, res.status, parsed);
   }
   return Buffer.from(await res.arrayBuffer());
+}
+
+// -----------------------------------------------------------------------------
+// Logboek van de Admin console (Reports API, enkel lezen)
+// -----------------------------------------------------------------------------
+
+const REPORTS = "https://admin.googleapis.com/admin/reports/v1";
+
+export type OrgUnitMoveEvent = {
+  email: string;
+  /** De OU waar het account stond (`ORG_UNIT_NAME`). */
+  from: string;
+  /** De OU waarheen het verplaatst werd (`NEW_VALUE`). */
+  to: string;
+  at: string;
+  /** Wie het deed: het beheerdersaccount van de site of een mens. */
+  actor: string | null;
+};
+
+/**
+ * Elke verhuizing van een account naar een andere organisatie-eenheid in de
+ * periode, uit het logboek van de Admin console (`MOVE_USER_TO_ORG_UNIT`, de
+ * regel "x is verplaatst van /A naar /B").
+ */
+export async function listOrgUnitMoves(
+  cfg: GoogleConfig,
+  startTime: Date,
+  endTime: Date,
+): Promise<OrgUnitMoveEvent[]> {
+  type Activity = {
+    id?: { time?: string };
+    actor?: { email?: string };
+    events?: { name?: string; parameters?: { name?: string; value?: string }[] }[];
+  };
+  const out: OrgUnitMoveEvent[] = [];
+  let pageToken: string | undefined;
+  do {
+    const params = new URLSearchParams({
+      eventName: "MOVE_USER_TO_ORG_UNIT",
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+      maxResults: "1000",
+    });
+    if (pageToken) params.set("pageToken", pageToken);
+    const page = await request<{ items?: Activity[]; nextPageToken?: string }>(
+      cfg,
+      "GET",
+      `${REPORTS}/activity/users/all/applications/admin?${params.toString()}`,
+      undefined,
+      { scope: REPORTS_SCOPES },
+    );
+    for (const item of page?.items ?? []) {
+      for (const event of item.events ?? []) {
+        if (event.name !== "MOVE_USER_TO_ORG_UNIT") continue;
+        const value = (name: string) => event.parameters?.find((p) => p.name === name)?.value ?? null;
+        const email = value("USER_EMAIL");
+        const from = value("ORG_UNIT_NAME");
+        const to = value("NEW_VALUE");
+        if (!email || !from || !to) continue;
+        out.push({
+          email: email.toLowerCase(),
+          from,
+          to,
+          at: item.id?.time ?? "",
+          actor: item.actor?.email?.toLowerCase() ?? null,
+        });
+      }
+    }
+    pageToken = page?.nextPageToken;
+  } while (pageToken);
+  return out;
 }

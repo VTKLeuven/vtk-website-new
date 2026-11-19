@@ -1,5 +1,6 @@
 "use client";
 
+import { useUnsentGuard } from "@/components/ui/unsentGuard";
 import { startTransition, useActionState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
@@ -124,7 +125,8 @@ function Toggle({
     errorMessages: Record<string, string>;
   };
 }) {
-  const [state, formAction, pending] = useActionState(action, SAVE_IDLE);
+  const unsent = useUnsentGuard();
+  const [state, formAction, pending] = useActionState(unsent.state(action), SAVE_IDLE);
   const showToast = useToast();
   const router = useRouter();
   const handled = useRef<number | null>(null);

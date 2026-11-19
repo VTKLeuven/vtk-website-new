@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useTransition } from "react";
 import { Input, Label } from "@vtk/ui";
 import { SearchPicker, type SearchPickerOption } from "@/components/admin/SearchPicker";
@@ -64,7 +65,8 @@ export function AliasTargetSelect({
       const data = new FormData();
       data.set("label", label);
       data.set("target", target);
-      const result = await savePraesidiumShiftAliasAction(SAVE_IDLE, data);
+      const result = await unsentGuard.run(() => savePraesidiumShiftAliasAction(SAVE_IDLE, data));
+      if (result === UNSENT) return;
       if (result.status === "error") {
         showToast({
           message: errorMessages[result.code] ?? (nl ? "Niet opgeslagen: er ging iets mis." : "Not saved: something went wrong."),

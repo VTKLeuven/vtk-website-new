@@ -6,8 +6,10 @@ alles wat er voor de app aan deze site toegevoegd is (endpoints, migraties,
 rechten, wat er nog moet gebeuren), zie [`app-toevoegingen.md`](./app-toevoegingen.md).
 Het plan van de app zelf staat in `mobile/docs/plan.md`.
 
-Niet te verwarren met de scanner: `vtk-scanner-app` praat met `/api/tickets/...`
-en staat hier los van.
+De scanner aan de deur zit sinds november 2026 in de app (`mobile/docs/scanner.md`),
+maar praat voor het scannen zelf met `/api/tickets/...`, de routes van de
+webscanner, en niet met deze boom. Enkel de lijst van events en het inwisselen van
+een uitnodiging staan hier.
 
 ## Waarom een eigen boom
 
@@ -87,6 +89,11 @@ beveiliging** (elke route controleert het daarna nog eens zelf); zonder dit zou 
 app knoppen tonen die bij de helft "geen toegang" antwoorden, en dat is erger dan
 een knop die er niet is.
 
+`scanTickets` volgt precies `/scan/events`: is die lijst leeg, dan is het `false`
+(`hasScannableTicketEvent` in `lib/ticketing/authorization.ts`, met hetzelfde
+filter als de lijst). Een gewone student ziet de scanner aan de deur dus niet,
+tot hij een uitnodiging inwisselt; de app haalt de bootstrap daarna opnieuw op.
+
 ### `GET /api/app/v1/vandaag`
 
 Het beginscherm van de app. Bewust een eigen route naast `/home`: die laatste is
@@ -99,14 +106,29 @@ bovenhaalt: **wat is er open** en **wat wacht er op mij**.
   in `lib/app-api/serviceStatus.ts`, **op de Brusselse klok** en niet op die van
   de server: `isOpenAt` in `hoursUtils` gebruikt `Date#getHours()` en is dus stil
   fout zodra de container niet op Europe/Brussels staat.
-- Een dag kan een bereik zijn (`12:00 - 14:00`) of één tijdstip (`22:00`). Dat
-  tweede is 't ElixIr: een fakbar opent om tien uur en sluit wanneer ze sluit.
-  `parseHoursRange` kent enkel het eerste, en daardoor stond de bar de hele week
-  als gesloten op het beginscherm tot dit erbij kwam.
+- Een dag kan een bereik zijn (`12:00 - 14:00`), twee bereiken (de cursusdienst
+  's middags en 's avonds) of één tijdstip (`22:00`, 't ElixIr: een fakbar opent
+  om tien uur en sluit wanneer ze sluit). De dag gaat langs `parseHoursWindows`
+  uit `lib/openingHoursWeek.ts`, dezelfde lezer als de band op de homepage.
+  **Niet `parseHoursRange`**: die kent enkel het eerste venster, en daardoor
+  stond eerst de bar de hele week en daarna de cursusdienst elke avond als
+  gesloten op het beginscherm.
+- `today` bij elke dienst: de vensters van vandaag in minuten sinds middernacht
+  in Brussel, voor de tijdlijn met de nu-lijn in de app.
 - `tasks`: wat er op deze gebruiker wacht, gesorteerd op dringendheid door de
   server. De app tekent enkel; zou ze zelf beslissen wat dringend is, dan stond
   die regel op twee plaatsen.
+  Een peiling van je RiVers waarop je nog niet antwoordde, is ook een taak
+  (`kind: "poll"`), maar enkel met `?peilingen=1`: een oudere app kent het scherm
+  `/peilingen` niet en zou een kaart krijgen die nergens heen leidt.
+  Wie als scanner toegevoegd is (een `SCANNER`-toekenning op zijn naam) op een
+  event dat binnen 24 uur begint of al loopt, krijgt `kind: "scan"` met het pad
+  `/scan/<id>`. Bewust niet voor de standaardregel: dan kreeg elk praesidiumlid
+  elke avond een kaart voor een deur waar hij niet staat. Dat pad bestaat ook in
+  een oudere app, en een onbekende `kind` krijgt daar het standaardicoon.
 - `vouchers`: het openstaande bonnetjessaldo, of `null` zonder login.
+- `upcomingEvents`: ook een reeks die al loopt (een loopweek die maandag begon),
+  op de plaats van haar eerstvolgende moment.
 
 ### `POST /api/app/v1/push/register` en `/push/unregister`
 
@@ -128,7 +150,13 @@ de site zelf gebruikt (`readOpeningHoursSetting`, `getCursusdienstHours`,
 en de doelgroepfilter niet twee keer berekend worden.
 
 De kalender filtert op `end >= nu` en niet op `start`: anders verdwijnt een
-festival op zijn tweede dag. Zonder categorie geldt de doelgroepfilter; met een
+festival op zijn tweede dag.
+
+**Een evenement met losse momenten** (een loopweek, drie filmavonden) draagt ze
+in `moments`. `start` en `end` blijven de envelop, zodat een oudere app niets
+breekt; de locatie, de affiche en de omschrijving zijn al die van het
+eerstvolgende moment (`eventAsOfNow`). De app zet de rij op dat eerstvolgende
+moment en het stipje in het maandrooster op elke dag met een moment. Zonder categorie geldt de doelgroepfilter; met een
 categorie niet, want wie om de eerstejaarskalender vraagt, wil ze zien.
 
 ### `POST`/`DELETE /api/app/v1/kalender/[id]/interesse`
@@ -229,9 +257,11 @@ van een telefoon. Eén soort code die overal werkt is makkelijker uit te leggen 
 wie hem aan de deur moet tonen, en er is maar één plek waar een grant ontstaat.
 De app mag ook de volledige URL doorsturen; dat is wat een camera leest.
 
-**Scannen zelf loopt niet langs `/app/v1`.** De app post naar
-`/api/tickets/events/[eventId]/scan`, want die route draagt de hele beoordeling
-(geldig, al gescand, verkeerd evenement, terugbetaald) plus het scanlogboek.
+**Scannen zelf loopt niet langs `/app/v1`.** De scanner in de app gebruikt de
+routes van de webscanner (`scanner/bootstrap`, `scan`, `scan/batch`, `scan/card`,
+`scan/reverse` en het scannerspaneel), want die dragen de hele beoordeling
+(geldig, al gescand, verkeerd evenement, terugbetaald) plus het scanlogboek. Zie
+`mobile/docs/scanner.md`.
 
 ### `POST /api/app/v1/fakbar/checkin`
 
@@ -254,7 +284,7 @@ tijdvak, enkel binnen het dagelijkse venster. Buiten dat venster komt er
 `period` (naam of null) en `freeBeers` vertellen de app dat `total` dan de stand
 van die periode is, en of er pinten bij horen.
 
-### `GET /api/app/v1/theokot` en `POST`/`DELETE /api/app/v1/theokot/order`
+### `GET /api/app/v1/theokot`, `POST`/`PATCH`/`DELETE /theokot/order`, `POST /theokot/vrijgeven` en `/theokot/overnemen`
 
 Broodjes bij het Theokot. **De logica staat in `lib/theokot-orders.ts` en wordt
 gedeeld met de server-actions van de website**; deze routes vertalen alleen een
@@ -266,11 +296,27 @@ Annuleren is `DELETE` met het order-id in de **body** en niet in het pad: een id
 in een URL komt in server- en proxylogs terecht. "Bestaat niet" en "niet van jou"
 geven hetzelfde antwoord.
 
+Sinds november 2026 kan de app ook wat /theokot kan:
+
+- **Aanpassen** (`PATCH /theokot/order`, `updateOrder`) zolang het bestelvenster
+  open is, met de eigen reservatie als vrije voorraad (`canEdit`).
+- **Laat annuleren** (`POST /theokot/vrijgeven`, `releaseOrder`): na de deadline
+  geeft annuleren de broodjes vrij voor overname. Niet voor de doos van een
+  grocomeet (`canRelease`). Wat bij het einde van de afhaal niet overgenomen is,
+  telt als no-show.
+- **Overnemen** (`POST /theokot/overnemen`, `takeOverSandwich`): per broodje,
+  in hetzelfde venster (`canTakeOver`, `released` per item).
+
+Een bestelling die helemaal vrijgegeven is, stuurt de server nog steeds niet mee:
+een oudere app zou er anders een lege afhaalkaart van maken.
+
 ### `GET /api/app/v1/tickets` en `/tickets/[slug]`
 
 De ticketverkoop, uit dezelfde `listPublishedTicketEvents` /
 `getPublishedTicketEventBySlug` als de webshop. De lijst draagt geen tickettypes;
-die zijn pas op het detailscherm nodig.
+die zijn pas op het detailscherm nodig. `imageUrl` is de banner zoals op /tickets
+(`lib/ticketing/poster.ts`): een eigen foto, de themabanner of de affiche van
+het gekoppelde evenement.
 
 **Afrekenen heeft geen eigen app-route.** De app post rechtstreeks naar het
 bestaande `POST /api/tickets/checkout` en opent de `checkoutUrl` die daaruit komt
@@ -327,6 +373,17 @@ mobiele data is dat een galerij die niet laadt.
 Valt Immich weg, dan blijft de albumlijst leeg en gaan de aftermovies en
 magazines gewoon door; die staan er los van.
 
+- Een album draagt naast `coverUrl` (de thumbnail van 250 px) ook
+  `coverPreviewUrl`, dezelfde cover in schermmaat. De app gebruikt die enkel
+  voor de grote tegel bovenaan een lijst; over de volle breedte van een
+  telefoon wordt de thumbnail wazig.
+- De magazines komen **nieuwste eerst**, met hun kaft (`coverUrl`, bladzijde 1
+  uit `coverKey`), het nummer apart (`issue`) en `publishedAt`. De app zet het
+  eerste nummer van elk blad vooraan op de plank. `title` blijft de naam plus
+  het nummer, voor een app van voor november 2026.
+- `/media/[slug]` stuurt de delen van een album mee (`subAlbums`); vanaf twee
+  delen toont de app ze als tabs, zoals de site.
+
 ### `GET /api/app/v1/praesidium`
 
 Het praesidium per werkingsjaar. De jarenlijst komt uit de data zelf en niet uit
@@ -344,6 +401,12 @@ overlappende shiften en de 24-uursgrens, en ze duwt een cursusdienst-shift door
 naar cudi. Een tweede implementatie zou betekenen dat een uitschrijving in de app
 op cudi kan blijven staan.
 
+Een student ziet de plaats van een **vervangbaar praesidiumlid** als vrij
+(`visibleParticipants`, zoals /shift), en de inschrijving neemt die plaats in.
+Een praesidiumlid krijgt `replaceableOption` en kiest bij het inschrijven
+(`&replaceable=1`) of achteraf (`PATCH /api/shift/register?id=`) of een student
+zijn plaats mag innemen.
+
 `canUnregister` is de uitkomst van de 24-uursgrens plus de bedenktijd, berekend
 op de server zodat de app die twee regels niet nabouwt. De twee constanten staan
 wel op twee plaatsen; het ergste dat een verschil oplevert is een knop die de
@@ -354,6 +417,15 @@ server weigert, en dat is een melding en geen fout in de data.
 De werkgroepen per werkingsjaar, en alle POC's. De jarenlijst van de werkgroepen
 loopt wél via `workingYearTabs()`, anders dan bij het praesidium: werkgroepen
 bestaan pas sinds `FIRST_WORKING_YEAR`, dus die klem doet daar geen kwaad.
+
+### `GET`/`POST /api/app/v1/peilingen`
+
+De peilingen van de RiVers voor de richting en fase van deze student, zoals de
+POC-band op de homepage ze toont: dezelfde `getViewerPocPolls` en dezelfde
+zinnen (`pollPanelData`). Insturen loopt langs `submitPollAnswers`
+(`lib/pocPolls/submit.ts`), dezelfde functie als het formulier op de site.
+Opnieuw insturen vervangt alles. **Geen tussenstand en geen telling** in het
+antwoord; zie `docs/poc-peilingen.md` voor waarom de antwoorden anoniem zijn.
 
 ## Pushberichten versturen
 

@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { Card, Label, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
+import { useLandingSource } from "@/components/ticketing/public/useLandingSource";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
 import { ExclusiveChoiceGroup, type ExclusiveChoice } from "@/components/ui/ExclusiveChoiceGroup";
 import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import { formatEuro } from "@/lib/theokot";
+import type { TicketSource } from "@/lib/ticketing/source";
 import { hasMeetingOrder } from "@/lib/meetings";
 import {
   cancelMeetingReservationAction,
@@ -89,10 +91,26 @@ function choiceDescription(
  * met de knop onderaan, want anders is er geen verschil tussen "ik kom, zonder
  * broodje" en "ik kom niet".
  */
-export function MeetingReservationCard({ nl, meeting }: { nl: boolean; meeting: MeetingCardView }) {
+export function MeetingReservationCard({
+  nl,
+  meeting,
+  serverLanding = null,
+}: {
+  nl: boolean;
+  meeting: MeetingCardView;
+  /**
+   * De herkomst uit de link, al op de server gelezen (`taggedLanding`). Zo
+   * staat ze al in het formulier voor de browser `useLandingSource` kon lezen:
+   * wie zo snel instuurt, telt toch onder zijn link en niet als "direct".
+   */
+  serverLanding?: TicketSource | null;
+}) {
   const reservation = meeting.reservation;
   const [choice, setChoice] = useState(reservation?.choiceKey ?? NONE);
   const [drink, setDrink] = useState(reservation?.drink ?? NONE);
+  // Langs waar dit bezoek binnenkwam (`?via=`, `?c=` of de referrer). Haalt de
+  // parameters uit de adresbalk, zodat een doorgestuurde link ze niet meeneemt.
+  const landing = useLandingSource() ?? serverLanding;
 
   // Wat er bewaard staat, niet wat er nu in het formulier gekozen is.
   const registeredWithoutOrder =
@@ -197,6 +215,16 @@ export function MeetingReservationCard({ nl, meeting }: { nl: boolean; meeting: 
           }
         >
           <input type="hidden" name="meetingId" value={meeting.id} />
+          {/* Herkomst van dit bezoek; de action bewaart ze enkel bij een nieuwe
+              inschrijving, dus een bestaande hoeft ze niet mee te sturen. */}
+          {!reservation && landing ? (
+            <>
+              <input type="hidden" name="source" value={landing.source} />
+              {landing.campaign ? (
+                <input type="hidden" name="sourceCampaign" value={landing.campaign} />
+              ) : null}
+            </>
+          ) : null}
 
           <div>
             <span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-vtk-muted">

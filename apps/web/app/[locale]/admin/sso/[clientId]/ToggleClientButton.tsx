@@ -1,5 +1,6 @@
 'use client';
 
+import { UNSENT, unsentGuard } from '@/components/ui/unsentGuard';
 import { useTransition } from 'react';
 import { Button } from '@vtk/ui';
 import { useToast } from '@/components/ui/toast';
@@ -25,7 +26,7 @@ export function ToggleClientButton({ clientId, disabled, nl }: { clientId: strin
           const form = new FormData();
           form.append('clientId', clientId);
           form.append('disabled', disabled ? '0' : '1');
-          await toggleClientAction(form);
+          if ((await unsentGuard.run(() => toggleClientAction(form))) === UNSENT) return;
           showToast({
             message: disabled
               ? nl

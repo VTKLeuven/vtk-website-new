@@ -84,13 +84,17 @@ export function useResource<T>(
     void load('initial');
   }, [key, load]);
 
+  // Stabiel, zodat een scherm `refresh` in de afhankelijkheden van een effect of
+  // van `useFocusEffect` kan zetten zonder bij elke render opnieuw op te halen.
+  const refresh = useCallback(() => load('refresh'), [load]);
+
   return {
     data,
     loading,
     refreshing,
     stale,
     error,
-    refresh: () => load('refresh'),
+    refresh,
   };
 }
 

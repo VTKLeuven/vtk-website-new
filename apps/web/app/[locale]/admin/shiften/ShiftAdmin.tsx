@@ -1,5 +1,4 @@
 "use client";
-import { useState } from "react";
 import type { Locale } from "@vtk/i18n";
 import { ShiftManage } from "./ShiftManage";
 import { ShiftRanking } from "./ShiftRanking";
@@ -27,6 +26,9 @@ export type AdminShift = {
   post: string | null;
   openToInternationals: boolean;
   instructions: string | null;
+  nameEn: string | null;
+  descriptionEn: string | null;
+  instructionsEn: string | null;
   participants: AdminParticipant[];
 };
 export type RankingRow = { userId: string; name: string; post: string; count: number };
@@ -51,9 +53,11 @@ export type Capabilities = {
   canManual: boolean;
 };
 
-type Tab = "manage" | "ranking" | "rewards" | "manual";
+/** Elk tabblad is een eigen route onder /admin/shiften; zie de layout. */
+export type ShiftAdminTab = "manage" | "ranking" | "rewards" | "manual";
 
 export function ShiftAdmin({
+  tab,
   locale,
   capabilities,
   shifts,
@@ -68,6 +72,7 @@ export function ShiftAdmin({
   year,
   years,
 }: {
+  tab: ShiftAdminTab;
   locale: Locale;
   capabilities: Capabilities;
   shifts: AdminShift[];
@@ -83,35 +88,8 @@ export function ShiftAdmin({
   year: number;
   years: number[];
 }) {
-  const nl = locale === "nl";
-  const tabs: { key: Tab; label: string; show: boolean }[] = [
-    { key: "manage", label: nl ? "Beheer" : "Manage", show: capabilities.canEdit },
-    { key: "ranking", label: nl ? "Ranglijst" : "Rankings", show: capabilities.canRanking },
-    { key: "rewards", label: nl ? "Bonnetjes" : "Vouchers", show: capabilities.canReward },
-    { key: "manual", label: nl ? "Extra shiften" : "Extra shifts", show: capabilities.canManual },
-  ];
-  const visible = tabs.filter((t) => t.show);
-  const [tab, setTab] = useState<Tab>(visible[0]?.key ?? "manage");
-
   return (
     <div className="space-y-4">
-      <div className="flex gap-1 border-b border-vtk-navy/10">
-        {visible.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTab(t.key)}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${
-              tab === t.key
-                ? "border-vtk-blue text-vtk-blue"
-                : "border-transparent text-vtk-muted hover:text-vtk-ink"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
       {tab === "manage" && capabilities.canEdit && (
         <ShiftManage
           locale={locale}

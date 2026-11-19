@@ -225,7 +225,9 @@ table whose rows expand into per-category editors, with create/import in modals.
 | --- | --- | --- |
 | `/admin/roles` (`RolesTable`) | `roles.manage` | Row = role + effective holder count. Expands to: direct holders, posts that grant it (edit needs `groups.manage`), permissions. |
 | `/admin/groepen` (`PostsTable`) | `groups.manage` | Per working-year tabs. Row = post + member count. Expands to: members, roles this post grants (DEFAULT/LEADER), post settings (incl. `active`). Posts are deactivated, never hard-deleted. Filtered to `Group.type = PRAESIDIUM`. |
-| `/admin/werkgroepen` (`WerkgroepenTable`) | `werkgroepen.manage` **or** werkgroep member | Werkgroepen = `Group` with `type = WERKGROEP`. Managers see all and manage members/roles/settings like posts; a plain member sees only their own werkgroep(s) and may edit just the info text + website (`saveWerkgroepInfoAction`, scoped to their own membership). With `werkgroepen.manageOwnMembers` (see "Werkgroepleden door de G3/G4") a member also adds and removes the plain members of this working year. Public page: `/werkgroepen`. |
+| `/admin/werkgroepen` (`WerkingenTable`) | `werkgroepen.manage` **or** `werkgroepen.editOwnInfo` / `werkgroepen.manageOwnMembers` through the werkgroep | Werkgroepen = `Group` with `type = WERKGROEP`. Managers see all and manage members/roles/settings like posts. Without that, you see only the werkgroep(s) whose grant gives you one of the two own-rights (in production the G3/G4, via the LEADER grant): `werkgroepen.editOwnInfo` for the info text + website (`saveWerkgroepInfoAction`), `werkgroepen.manageOwnMembers` for the plain members of this working year (see "Werkgroepleden door de G3/G4"). A plain member has neither and does not see the tab. Public page: `/werkgroepen`. |
+| `/admin/peilingen` | `pocs.manage` **of** RiVer dit werkingsjaar | POC-peilingen opstellen en de resultaten bekijken. Een RiVer (`PocRepresentative` van het huidige werkingsjaar) ziet enkel de eigen POC, zonder apart recht; `pocs.manage` ziet alles. Scope in `lib/pocPolls/access.ts`; vraag RiVer-zijn altijd aan `representedPocIds`, die in het autorisatievoorbeeld de daar aangevinkte POC's teruggeeft. Een RiVer zonder post, werkgroep of jaarwerking (`isPocOnly`) ziet in de zijbalk enkel de peilingen: geen dashboard en geen uitleendienst (`notForPocOnly` in `lib/admin-nav.ts`), en `/admin` stuurt hem door naar `/admin/peilingen`. |
+| `/admin/jaarwerkingen` (`WerkingenTable`) | `jaarwerkingen.manage` **or** `jaarwerkingen.manageOwnMembers` through the jaarwerking | Jaarwerkingen = `Group` with `type = JAARWERKING` (Kanweek, Halftime, ...). Same screen and rules as werkgroepen (`WerkingenAdmin`, `lib/groupKinds.ts`), with its own permissions that do not carry over to werkgroepen or back. No info text and no public page, so a plain member does not see the tab; the lead with `jaarwerkingen.manageOwnMembers` manages the plain members of this working year. |
 | `/admin/gebruikers` | `users.view` (edit needs `users.edit`) | **Server-driven** table (URL `?q&sort&dir&page`, `count` + `findMany` with `take`/`skip`, no memberships join), built to scale to tens of thousands of users. Editing opens `/admin/gebruikers/[id]`. |
 | `/admin/leden` | `leden.manage` | Wie dit **academiejaar** lid is van de kring (`Membership`, cutover 14 september), niet te verwarren met `/admin/gebruikers` (elk account) of `/admin/groepen` (posten per werkingsjaar). Ledenaantal + omzet bovenaan, jaartabs, instellingen (prijs, welke wegen openstaan), iemand handmatig lid maken, en een xlsx-export (`/api/admin/leden/export`). Los van `users.view`: die tab toont elk account, deze toont persoonsgegevens mét betaalstatus. |
 | `/admin/pocs` (`PocsTable`) | `pocs.manage` | Row = POC + representative count. Expands to representatives (added via the `/api/users/search` typeahead) and POC settings. |
@@ -236,7 +238,6 @@ table whose rows expand into per-category editors, with create/import in modals.
 | `/admin/pal-plus` | `pal.manage` | PAL+ (peer assisted learning op aanvraag) voor VTK Onderwijs: het werkbakje (aanvragen nakijken en online zetten, verwerkt), de sessies (plannen, lokaal, tutors, aanwezigheid, annuleren), de tutorlijst per werkingsjaar (bonnetjes corrigeren) en de lijsten (vakken, snelle tags, dagdelen van het rooster). Uitbetalen gebeurt niet hier maar onder /admin/shiften (Bonnetjes, `shift.reward`), waar de PAL+-sessies naast de shiften staan. Aanwezigheid aanduiden mag ook een tutor van die sessie, zonder `pal.manage`, op het publieke `/pal-plus`. Tutors zoeken gaat via een eigen zoekactie achter `pal.manage`, niet via `users.search`. Aanvragen komen binnen via het publieke `/pal-plus`, waar elke ingelogde gebruiker mag aanbieden, hulp vragen en steunen. Eén recht voor het hele beheer: wie beoordeelt, plant ook en corrigeert de bonnetjes. Geen MCP-toegang (namen van wie hulp vraagt, bonnetjes). Zie `docs/design-decisions.md` ("PAL+"). |
 | `/admin/deur` (door access) | `door.manage` | Usage stats (1/7/30 d), temporary access grants (`DoorAccessGrant`, user typeahead + window), and the full access log (`DoorAccessLog`, incl. denied/unknown scans). |
 | `/admin/it/logboek` (admin audit log) | `audit.view` | Every changing admin action in one table (`AdminAuditLog`, written by `logAudit` in `apps/web/lib/audit.ts`), with filters on person, section, kind of action and date, plus a search over subject and detail. Kept for 30 days. Sits under the IT group but is a plain permission, not superadmin-only, so it can be handed to a role. Rationale and what is *not* logged: `docs/design-decisions.md` ("Adminlogboek"). |
-| `/admin/it/feedback` (websitefeedback) | `feedback.manage` | Wat leden via "Feedback Website" in het accountmenu melden over de site zelf (`WebsiteFeedback`): categorie, bericht, optionele screenshot, het pad waar ze stonden en hun browser. Filters op status en categorie staan in de URL. Een melding kan anoniem zijn; dan is er geen `authorId` en dus niemand om iets aan terug te vragen. Afgehandelde meldingen worden na een jaar losgekoppeld van hun melder (`PRIVACY_FEEDBACK_DAYS`). Zie `docs/design-decisions.md` ("Feedback over de website"). |
 | `/admin/rekeningen` (rekeningen / het oude billsheet) | `expenses.submit` (indienen + eigen lijst), `expenses.managePost` (eigen post), `expenses.reimbursePost` (eigen post op terugbetaald zetten), `expenses.manage` (alles) | Werkbank per werkingsjaar: statustabs (terug te betalen / door te sturen / in te boeken / afgehandeld) als afgeleide van `paidAt`/`sentAt`/`bookedAt`, filters in de URL, en de geopende rekening in `?sel=` met het bonnetje ernaast. Inboeken, doorsturen en de instellingen zitten enkel in `expenses.manage`; terugbetalen ook, behalve voor de eigen post met `expenses.reimbursePost`. Toegang wordt per rekening getoetst in `lib/rekeningen/server.ts`, niet per scherm. Zie `docs/design-decisions.md` ("Rekeningen"). |
 | `/admin/bestuursorgaan` (budgetten en resultaten per post) | `bestuursorgaan.manage` | Welke budgetten en resultaten per post langs het BO passeerden, met de bedragen, gelezen uit de gedeelde drive (`lib/bo`). Het recht hangt via de rol `bestuursorgaan` enkel aan Groep 5; de rol `admin` draagt het bewust níét (`ADMIN_EXCLUDED_PERMISSIONS` in `packages/db/src/permissions.ts`, gevolgd door de seed én door `prisma/sync.ts`), zodat IT de koppeling kan opzetten zonder de cijfers te zien. Een superadmin ziet het wel. Zie `docs/bestuursorgaan.md`. |
 | `/admin/fakscanner` (bar check-ins) | `fakscanner.manage` | Per working year (`?jaar=`): the points ranking (`FakTally`, 30 per page via `?rang=`), the settings (double-count window, points per free beer, bar-day rollover) and the log of **failed** scans only (`FakScanLog`). Rows are keyed on r-number, so people without a VTK account appear too, by r-number rather than name. |
@@ -263,6 +264,14 @@ would only mean handing out two roles to the same person. Its device endpoint
 the DB, unlike the door secret); see `docs/design-decisions.md` ("Fakscanner") and
 `scripts/fakscanner.py`.
 
+**Photo albums** (`/admin/media`, Foto's) have three tiers, each including the
+previous one (`apps/web/lib/media-album-access.ts`): `photos.upload` adds photos
+to an existing album, `photos.createAlbums` also creates albums (always hidden)
+and edits an album while it is still hidden, `photos.manageAlbums` (and
+`media.manage`) publishes, hides, shares, downloads and deletes. Publishing means
+choosing between public, private (`[gallery-private]`, only on its own address)
+and hidden; see `docs/immich-gallery.md`, "Wie wat mag".
+
 ## Seeded baseline
 
 `packages/db/prisma/seed.ts` seeds the role set and wires posts to them (all grants `DEFAULT`, so
@@ -276,16 +285,21 @@ every member of the post gets the role):
 | `medewerker` | none (fill in the GUI) | - |
 | `theokot` | `theokot.manage`, `theokot.pickup` | Theokot |
 | `grocomeet-deelnemer` | `grocomeet.reserve` | **LEADER** of every post, plus Groep 5 (DEFAULT) |
-| `grocomeet-beheer` | `grocomeet.manage`, `grocomeet.reserve` | Groep 5 |
+| `grocomeet-beheer` | `grocomeet.manage`, `grocomeet.reserve` | **LEADER** of Theokot (Groep 5 and IT have it through `admin`) |
 | `bureau` | `bureau.manage` | Onderwijs |
 | `pal-plus` | `pal.manage` | Onderwijs |
 | `post-<code>` (one per post) | none, except: `post-fakbar` also carries `openingHours.manageOwn`, `fakbar.manage` | its own post |
 
-`grocomeet-deelnemer` is the one seeded role granted with **`LEADER`** instead of `DEFAULT`: the
+`grocomeet-deelnemer` and `grocomeet-beheer` are the seeded roles granted with **`LEADER`** instead of `DEFAULT`: the
 grocomeet is a meeting of the people responsible for a post, not of every post member. Group 5 gets
 it as `DEFAULT` because all five of them attend. Whoever holds it sees the "Broodje grocomeet" entry
 in the profile menu; that entry is gated on the permission, not on a hard-coded "is lead of a
 praesidium post" check, so the board can add someone (a co-responsible) without a code change.
+
+`grocomeet.manage` (planning, who owes what, the overview for the budget) is for `admin` and the lead
+of Theokot only, who supplies the sandwiches. It must not sit in a role every post lead gets: on the
+production site it once did (a GUI role `groco` carried it), and then every post lead could see the
+debts of every other groco. A role that every groco gets carries `grocomeet.reserve`, not `.manage`.
 
 `grocomeet.reserve` does one more thing: a Theokot order placed by a holder on a day with a
 grocomeet goes into the GM box instead of the counter (`TheokotOrder.grocomeetId`, see "Een groco
@@ -450,6 +464,10 @@ formulier. Zoals elke rol reset dit op 15 juli met het lidmaatschap.
 
 ## Werkgroepleden door de G3/G4
 
+(Jaarwerkingen werken precies zo met `jaarwerkingen.manageOwnMembers` op
+`/admin/jaarwerkingen`; lees hieronder "werkgroep" als "jaarwerking". De twee
+rechten tellen elk enkel in hun eigen soort groep.)
+
 `werkgroepen.manageOwnMembers` laat de verantwoordelijke van een werkgroep zelf
 leden toevoegen en verwijderen op `/admin/werkgroepen`. Het is bewust smaller
 dan `werkgroepen.manage`, dat voor elke werkgroep geldt en via
@@ -471,6 +489,15 @@ Wat het recht toelaat (`lib/werkgroepMembers.ts`, de grenzen in
   in plaats van een stille degradatie.
 - **Enkel het huidige werkingsjaar.** De ploeg van volgend jaar zet IT klaar.
 
+**De infotekst en website op `/werkgroepen`** volgen dezelfde regel met een eigen
+recht, `werkgroepen.editOwnInfo` (`werkgroepenWithInfoRights`). Tot november 2026
+mocht elk lid van de werkgroep ze aanpassen, zonder recht, en dus stond de tekst
+op de site open voor iedere student in een werkgroep. De migratie
+`20261118170000_werkgroep_info_permission` gaf het recht aan elke rol die al
+`werkgroepen.manageOwnMembers` had, zodat de G3/G4 het niet verloor. Het is een
+apart recht en niet een deel van `manageOwnMembers`, zodat een werkgroep de tekst
+aan iemand kan geven die de leden niet beheert.
+
 **Opzetten:** vink in `/admin/roles` `werkgroepen.manageOwnMembers` aan bij de rol
 die als **verantwoordelijke** (LEADER-grant) aan de werkgroepen hangt (in
 productie `werkgroepen-g3-g4`), plus `users.search`: zonder dat laatste geeft het
@@ -479,7 +506,15 @@ zoekveld een 403, en het formulier zegt dan welk recht ontbreekt.
 **Bonnetjes van werkgroepleden** hebben geen eigen recht nodig: `expenses.submit`
 is precies "indienen en enkel je eigen rekeningen zien", en de postkeuze bij het
 indienen bevat de werkgroepen al. Vink het aan bij de rol die als DEFAULT aan elke
-werkgroep hangt (in productie `werkgroepen`).
+werkgroep hangt (in productie `werkgroepen`). Zet op die rol niets anders: alles
+wat ze draagt, krijgt elk gewoon lid. `cashRegisters.request` (de tab Kassa's)
+en `expenses.managePost` / `expenses.reimbursePost` (alle rekeningen van de
+werkgroep) horen bij de G3/G4-rol op de LEADER-grant.
+
+**Mijn budgetten en Bestuursorgaan** volgen voor een werkgroep geen recht maar
+het lidmaatschap als verantwoordelijke: enkel de G3/G4 (`role = LEAD`) ziet de
+budgetten van de werkgroep, een gewoon lid niet (`countsForBo` in
+`lib/bo/own.ts`). Een praesidiumpost blijft voor elk lid.
 
 ## Boekhoudcodes
 

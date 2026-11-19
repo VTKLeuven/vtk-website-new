@@ -23,6 +23,7 @@ const gallery = createGalleryClient({
 });
 
 export type {
+  AlbumVisibility,
   AdminAlbum,
   AdminAlbumPart,
   AmbiguousAlbum,
@@ -37,8 +38,10 @@ export type {
 
 export {
   deleteImmichAlbum,
+  deleteImmichAlbumSharedLinks,
   deleteImmichAssets,
   downloadImmichOriginal,
+  getImmichAsset,
   getImmichAssetThumbnail,
   immichWebUrl,
   listImmichAlbumAssets,
@@ -46,6 +49,7 @@ export {
   restoreImmichAssets,
   runImmichAssetJob,
   setImmichAlbumCover,
+  replaceVisibilityMarker,
   setMarker,
   succeededAssetIds,
   swapMarker,
@@ -69,3 +73,5 @@ export const getManageableGalleryAlbum = gallery.getManageableAlbum;
 export const listAdminGalleryAlbums = gallery.listAdminAlbums;
 export const galleryAlbumMarker = gallery.marker;
 export const galleryHiddenAlbumMarker = gallery.hiddenMarker;
+export const galleryPrivateAlbumMarker = gallery.privateMarker;
+export const galleryAlbumVisibilityOf = gallery.albumVisibilityOf;

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { hasLocale } from "@/lib/locale";
+import { sortRolesByName } from "@/lib/roleOrder";
 import { requireSession } from "@/lib/session";
 import { AuthorizationPreviewPanel } from "@/components/admin/AuthorizationPreviewPanel";
 
@@ -18,9 +19,8 @@ export default async function AdminAuthorizationPreview({
   const session = await requireSession();
   if (!session.user.isSuperAdmin) notFound();
 
-  const [roles, groups] = await Promise.all([
+  const [roles, groups, pocs] = await Promise.all([
     prisma.role.findMany({
-      orderBy: [{ order: "asc" }, { nameNl: "asc" }],
       select: {
         id: true,
         code: true,
@@ -44,13 +44,18 @@ export default async function AdminAuthorizationPreview({
         },
       },
     }),
+    prisma.poc.findMany({ orderBy: { order: "asc" }, select: { id: true, nameNl: true, nameEn: true } }),
   ]);
 
   return (
     <AuthorizationPreviewPanel
       locale={localeParam === "en" ? "en" : "nl"}
-      roles={roles}
+      roles={sortRolesByName(roles, localeParam)}
       groups={groups}
+      pocs={pocs.map((poc) => ({
+        id: poc.id,
+        name: (localeParam === "en" ? (poc.nameEn ?? poc.nameNl) : poc.nameNl).replace(/^POC\s+/i, ""),
+      }))}
     />
   );
 }

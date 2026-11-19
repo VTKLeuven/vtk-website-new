@@ -1,59 +1,39 @@
-
-import {
-  BookOpen,
-  ChevronRight,
-  Coins,
-  ExternalLink,
-  Images,
-  MapPin,
-  QrCode,
-  Sandwich,
-  Wrench,
-} from 'lucide-react-native';
+import { Image } from 'expo-image';
+import { Coins, ExternalLink, QrCode } from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
-import {
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { fetchToday, setEventInterest } from '../api/endpoints';
 import { messageFor, useResource } from '../api/useResource';
-import { EventRow } from '../components/EventRow';
+import { EventTile } from '../components/EventTile';
+import { PageHead } from '../components/PageHead';
 import { Prose } from '../components/Prose';
 import { ServiceList } from '../components/ServiceList';
 import { TaskCard } from '../components/TaskCard';
-import { Button, Card, ErrorState, Loading, StaleNotice } from '../components/ui';
+import { Button, Card, ErrorState, Loading, SectionHeading, StaleNotice } from '../components/ui';
 import { formatVouchers } from '../format';
 import { useApp } from '../state/app';
 import { useTabRouter } from '../navigation';
-import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
+import { COLORS, FONTS, RADIUS, SPACING, TYPE } from '../theme/tokens';
 
 /**
- * Home: **vandaag**.
+ * Home: **vandaag**, in de banden van de homepage.
  *
  * Dit scherm beantwoordt de twee vragen waarmee iemand de app opent: *wat is er
  * open* en *wat wacht er op mij*. In die volgorde, allebei boven de vouw.
  *
- * De vorige versie was de voorpagina van de site: fotohero, aftermovies, career,
- * partners, en jouw broodje ergens onderaan. Dat is een goede voorpagina en een
- * slecht beginscherm; op een telefoon open je de app niet om te lezen wat VTK
- * doet, maar om iets te doen. De hero is daarom een compacte donkere kop met de
- * datum, en aftermovies, career en partners staan er niet meer in. Wie de site
- * wil lezen, vindt alles onder Meer.
+ * De opbouw volgt de homepage van vtk.be (voorstel A van november 2026): een
+ * navy kop met het technische patroon en de gele onderlijn, met de openingsuren
+ * erin als "zonder kader"; daarna "Voor jou" als register op papier, de
+ * aankomende evenementen als de eventtegels van de site op een lichtblauwe band,
+ * en "Snel naar" als de kaarten van "Wat we doen", met een foto en de gele lijn.
  *
- * Wat er wél bleef van het ontwerp van de site: de donkere kop met de gele
- * onderlijn, de witte kaarten met dunne rand op papieren grond, de gele rail voor
- * wat dringend is, en geel enkel als accent.
+ * De kop scrolt mee en staat niet vast: met de openingsuren erin is ze te hoog om
+ * het halve scherm te blijven innemen. Een navy vlak boven de inhoud vangt het
+ * omlaag trekken op, zodat er geen papieren strook boven de kop verschijnt.
  */
 export default function HomeScreen() {
   const router = useTabRouter();
-  const insets = useSafeAreaInsets();
   const { locale, viewer, gate, refresh: refreshApp } = useApp();
   const resource = useResource('vandaag', () => fetchToday(locale), locale);
 
@@ -83,57 +63,17 @@ export default function HomeScreen() {
     day: 'numeric',
     month: 'long',
   }).format(new Date(today.now));
+  const kicker = dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1);
 
   return (
     <View style={styles.root}>
-      {/* De donkere kop staat buiten de scroll, net als `PageHead` elders. Zat hij
-          erbinnen, dan kon je hem naar beneden trekken en verscheen er een lege
-          strook; dat gebeurt nergens anders in de app. */}
-      <View style={[styles.head, { paddingTop: insets.top + SPACING.lg }]}>
-        <View style={styles.headRow}>
-          <View style={styles.headText}>
-            <Text style={styles.kicker}>{dayLabel.toUpperCase()}</Text>
-            <Text style={styles.title}>
-              {today.greetingName ? `Dag ${today.greetingName}` : 'VTK Leuven'}
-            </Text>
-          </View>
-
-          {viewer ? (
-            <View style={styles.headActions}>
-              {today.canScanTickets || today.canAcceptVouchers ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Een code scannen"
-                  onPress={() => router.push('/scannen')}
-                  hitSlop={10}
-                  style={({ pressed }) => [styles.headButton, pressed && styles.pressedDark]}
-                >
-                  <QrCode color={COLORS.yellow} size={20} />
-                </Pressable>
-              ) : null}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Bonnetjes, ${formatVouchers(today.vouchers ?? 0, locale)} openstaand`}
-                onPress={() => router.push('/bonnetjes')}
-                hitSlop={10}
-                style={({ pressed }) => [styles.coins, pressed && styles.pressedDark]}
-              >
-                <Coins color={COLORS.yellow} size={16} />
-                <Text style={styles.coinsValue}>{formatVouchers(today.vouchers ?? 0, locale)}</Text>
-              </Pressable>
-            </View>
-          ) : null}
-        </View>
-      </View>
-
-      {resource.stale ? <StaleNotice onRetry={() => void resource.refresh()} /> : null}
-
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl
             refreshing={resource.refreshing}
+            tintColor={COLORS.onDark}
             onRefresh={() => {
               void resource.refresh();
               void refreshApp();
@@ -141,33 +81,62 @@ export default function HomeScreen() {
           />
         }
       >
-        {/* Openingsuren eerst. Het is de vraag die het vaakst gesteld wordt, en de
-            enige reden waarom sommigen de app überhaupt openen. */}
-        <Section title="Nu open">
-          <ServiceList services={today.services} />
-        </Section>
+        <View style={styles.overscroll} />
+        <PageHead
+          title={today.greetingName ? `Dag ${today.greetingName}` : 'VTK Leuven'}
+          kicker={kicker}
+          back={false}
+          right={
+            viewer ? (
+              <View style={styles.headActions}>
+                {today.canScanTickets || today.canAcceptVouchers ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Een code scannen"
+                    onPress={() => router.push('/scannen')}
+                    hitSlop={10}
+                    style={({ pressed }) => [styles.glassButton, pressed && styles.pressedDark]}
+                  >
+                    <QrCode color={COLORS.yellow} size={18} />
+                  </Pressable>
+                ) : null}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Bonnetjes, ${formatVouchers(today.vouchers ?? 0, locale)} openstaand`}
+                  onPress={() => router.push('/bonnetjes')}
+                  hitSlop={10}
+                  style={({ pressed }) => [styles.glass, pressed && styles.pressedDark]}
+                >
+                  <Coins color={COLORS.yellow} size={15} />
+                  <Text style={styles.glassText}>{formatVouchers(today.vouchers ?? 0, locale)}</Text>
+                </Pressable>
+              </View>
+            ) : undefined
+          }
+        >
+          <View style={styles.hours}>
+            <ServiceList services={today.services} />
+          </View>
+        </PageHead>
+
+        {resource.stale ? <StaleNotice onRetry={() => void resource.refresh()} /> : null}
 
         {today.tasks.length > 0 ? (
-          <Section title="Voor jou">
-            <View style={styles.stack}>
+          <View style={styles.section}>
+            <View style={styles.pad}>
+              <SectionHeading>Voor jou</SectionHeading>
+            </View>
+            <View style={styles.register}>
               {today.tasks.map((task, index) => (
                 <TaskCard key={`${task.kind}-${task.at ?? index}`} task={task} />
               ))}
             </View>
-          </Section>
+          </View>
         ) : null}
 
-        <Section>
-          <Shortcuts
-            onOpen={(route) => router.push(route as never)}
-            onExternal={(url) => void WebBrowser.openBrowserAsync(url)}
-          />
-        </Section>
-
         {today.announcement ? (
-          <Section>
-            <Card>
-              <Text style={styles.announceKicker}>AANKONDIGING</Text>
+          <View style={[styles.section, styles.pad]}>
+            <Card featured>
               <Text style={styles.cardTitle}>{today.announcement.title}</Text>
               <Prose>{today.announcement.body}</Prose>
               {today.announcement.ctaUrl ? (
@@ -180,42 +149,59 @@ export default function HomeScreen() {
                 />
               ) : null}
             </Card>
-          </Section>
+          </View>
         ) : null}
 
         {today.upcomingEvents.length > 0 ? (
           <View style={styles.band}>
-            <View style={styles.bandHead}>
-              <Text style={styles.sectionTitle}>Binnenkort</Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Naar de kalender"
-                onPress={() => router.push('/kalender')}
-                style={styles.more}
+            <View style={styles.pad}>
+              <SectionHeading
+                right={
+                  <Pressable
+                    accessibilityRole="link"
+                    accessibilityLabel="Naar de kalender"
+                    onPress={() => router.push('/kalender')}
+                    hitSlop={8}
+                  >
+                    <Text style={styles.link}>Kalender →</Text>
+                  </Pressable>
+                }
               >
-                <Text style={styles.moreText}>kalender</Text>
-                <ChevronRight color={COLORS.muted} size={16} />
-              </Pressable>
+                Aankomende evenementen
+              </SectionHeading>
             </View>
-            <View style={styles.stack}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.carousel}
+              decelerationRate="fast"
+              snapToInterval={292 + SPACING.md}
+            >
               {today.upcomingEvents.map((event) => (
-                <EventRow
+                <EventTile
                   key={event.id}
                   event={event}
                   locale={locale}
+                  width={292}
                   onPress={() => router.push(`/evenement/${event.id}`)}
-                  onToggleInterest={
-                    viewer ? (next) => toggleInterest(event.id, next) : undefined
-                  }
+                  onToggleInterest={viewer ? (next) => toggleInterest(event.id, next) : undefined}
                 />
               ))}
-            </View>
+            </ScrollView>
           </View>
         ) : null}
 
+        <View style={[styles.section, styles.pad]}>
+          <SectionHeading>Snel naar</SectionHeading>
+          <Shortcuts
+            onOpen={(route) => router.push(route as never)}
+            onExternal={(url) => void WebBrowser.openBrowserAsync(url)}
+          />
+        </View>
+
         {!viewer ? (
-          <Section>
-            <Card>
+          <View style={[styles.section, styles.pad]}>
+            <Card featured>
               <Text style={styles.cardTitle}>Log in met je VTK-account</Text>
               <Text style={styles.cardBody}>
                 Zonder inloggen kan je alles lezen. Broodjes, tickets, je bonnetjes en je shiften
@@ -223,56 +209,49 @@ export default function HomeScreen() {
               </Text>
               <Button label="Inloggen" onPress={() => router.push('/inloggen')} />
             </Card>
-          </Section>
+          </View>
         ) : null}
 
         {viewer && !gate && today.tasks.length === 0 ? (
-          <Section>
+          <View style={[styles.section, styles.pad]}>
             <Text style={styles.quiet}>
               Er wacht niets op je. Wat je bestelt of koopt, verschijnt hier vanzelf.
             </Text>
-          </Section>
+          </View>
         ) : null}
       </ScrollView>
     </View>
   );
 }
 
-function Section({ title, children }: { title?: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.section}>
-      {title ? <Text style={styles.sectionTitle}>{title}</Text> : null}
-      {children}
-    </View>
-  );
-}
-
 /**
- * De dingen die geen eigen tab hebben maar wel vaak gebruikt worden, plus die
- * de app verlaten.
+ * De dingen die geen eigen tab hebben maar wel vaak gebruikt worden, als de
+ * kaarten van "Wat we doen" op de homepage: een foto bovenaan, de titel met de
+ * gele lijn. Lokalen staat er niet bij: dat heeft een eigen plek onder Studeren.
  *
- * Cursusdienst en tijdsloten draaien op Cudi en niet op deze site, dus die
- * krijgen het pijltje naar buiten: je hoort te weten dat je in een browser
- * terechtkomt voor je tikt, niet erna. Burgieclan idem.
- *
- * **Waarom deze rij schuift en de rest van de app niet.** De styleguide wijst
- * horizontale scrollers af waar ze navigatie verbergen (elf tabs in de
- * siteheader, vijftien in het beheer). Hier is het omgekeerde waar: er zijn er
- * vijf en er staan er ruim vier in beeld, dus je ziet wat er is en dat er meer
- * is. Vijf tegels naast elkaar persen zou van "Cursusdienst" een afgekapt woord
- * maken, en de rij naar twee regels laten breken kost een halve schermhoogte op
- * het scherm dat juist snel moet zijn.
+ * De cursusdienst draait op Cudi en niet op deze site, dus die krijgt het pijltje
+ * naar buiten: je hoort te weten dat je in een browser terechtkomt voor je tikt.
  */
 const CUDI = 'https://cudi.vtk.be';
 
-/**
- * Hoeveel tegels er in beeld staan.
- *
- * Bewust géén rond getal: bij precies vier valt de vijfde exact buiten beeld en
- * ziet niemand dat er nog iets is, dus schuift ook niemand. De rest van een
- * tegel die over de rand steekt is het enige wat dat verklapt.
- */
-const TILES_IN_VIEW = 4.35;
+const SHORTCUTS: {
+  key: string;
+  label: string;
+  to: string;
+  photo: number;
+  external?: boolean;
+}[] = [
+  { key: 'broodjes', label: 'Broodjes', to: '/broodjes', photo: require('../../assets/snel/theokot.jpg') },
+  { key: 'shiften', label: 'Shiften', to: '/shiften', photo: require('../../assets/snel/onderwijs.jpg') },
+  { key: 'media', label: "Foto's", to: '/media', photo: require('../../assets/snel/sport.jpg') },
+  {
+    key: 'cursusdienst',
+    label: 'Cursusdienst',
+    to: `${CUDI}/vtk/shop`,
+    photo: require('../../assets/snel/cursusdienst.jpg'),
+    external: true,
+  },
+];
 
 function Shortcuts({
   onOpen,
@@ -281,53 +260,32 @@ function Shortcuts({
   onOpen: (route: string) => void;
   onExternal: (url: string) => void;
 }) {
-  const { width } = useWindowDimensions();
-  // De rij loopt van rand tot rand, dus enkel de binnenmarges van de sectie gaan
-  // eraf; het overschot is de tegel die half buiten beeld hangt.
-  const size = (width - SPACING.lg * 2 - SPACING.sm * (TILES_IN_VIEW - 1)) / TILES_IN_VIEW;
-
-  const items = [
-    { key: 'shiften', label: 'Shiften', icon: <Wrench color={COLORS.navy} size={20} />, to: '/shiften' },
-    { key: 'media', label: "Foto's", icon: <Images color={COLORS.navy} size={20} />, to: '/media' },
-    { key: 'lokalen', label: 'Lokalen', icon: <MapPin color={COLORS.navy} size={20} />, to: '/lokalen' },
-    { key: 'broodjes', label: 'Broodjes', icon: <Sandwich color={COLORS.navy} size={20} />, to: '/broodjes' },
-    {
-      key: 'cursusdienst',
-      label: 'Cursusdienst',
-      icon: <BookOpen color={COLORS.navy} size={20} />,
-      to: `${CUDI}/vtk/shop`,
-      external: true,
-    },
-  ];
-
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      // De sectie geeft zijn eigen marge door aan de inhoud, zodat de eerste
-      // tegel uitlijnt met de rest van het scherm terwijl de rij zelf tot de
-      // rand loopt en de laatste tegel er netjes onder schuift.
-      style={styles.tilesBleed}
-      contentContainerStyle={styles.tiles}
-    >
-      {items.map((item) => (
+    <View style={styles.grid}>
+      {SHORTCUTS.map((item) => (
         <Pressable
           key={item.key}
           accessibilityRole="button"
           accessibilityLabel={item.external ? `${item.label}, opent cudi.vtk.be` : item.label}
           onPress={() => (item.external ? onExternal(item.to) : onOpen(item.to))}
-          style={({ pressed }) => [styles.tile, { width: size }, pressed && styles.tilePressed]}
+          style={({ pressed }) => [styles.aanbod, pressed && styles.aanbodPressed]}
         >
-          <View style={styles.tileTop}>
-            {item.icon}
-            {item.external ? <ExternalLink color={COLORS.muted} size={12} /> : null}
+          <Image source={item.photo} style={styles.aanbodPhoto} contentFit="cover" />
+          <View style={styles.aanbodBody}>
+            <View style={styles.aanbodTitle}>
+              <Text style={styles.aanbodLabel} numberOfLines={1}>
+                {item.label}
+              </Text>
+            </View>
+            {item.external ? (
+              <ExternalLink color={COLORS.muted} size={13} />
+            ) : (
+              <Text style={styles.ontdek}>Ontdek</Text>
+            )}
           </View>
-          <Text style={styles.tileLabel} numberOfLines={1}>
-            {item.label}
-          </Text>
         </Pressable>
       ))}
-    </ScrollView>
+    </View>
   );
 }
 
@@ -335,73 +293,85 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.paper },
   scroll: { flex: 1 },
   content: { paddingBottom: SPACING.xxl },
-
-  head: {
+  // Vangt het omlaag trekken op iOS op: daar verschijnt dan navy in plaats van papier.
+  overscroll: {
+    position: 'absolute',
+    top: -1000,
+    left: 0,
+    right: 0,
+    height: 1000,
     backgroundColor: COLORS.navy,
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.lg,
-    borderBottomWidth: 3,
-    borderBottomColor: COLORS.yellow,
   },
-  headRow: { flexDirection: 'row', alignItems: 'flex-end', gap: SPACING.md },
-  headText: { flex: 1, gap: SPACING.xs },
+
   headActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  headButton: {
-    width: 38,
-    height: 38,
+  // Op een navy band zijn panelen "dark glass", zoals op de site.
+  glassButton: {
+    width: 36,
+    height: 36,
     borderRadius: RADIUS.pill,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: 'rgba(255,255,255,0.14)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  coins: {
+  glass: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    height: 38,
+    height: 36,
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.pill,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: 'rgba(255,255,255,0.14)',
   },
-  coinsValue: { ...TYPE.body, fontFamily: TYPE.cardTitle.fontFamily, color: COLORS.onDark },
+  glassText: { fontFamily: FONTS.semibold, fontSize: 14, color: COLORS.onDark },
   pressedDark: { opacity: 0.6 },
-  kicker: { ...TYPE.kicker, color: COLORS.yellow },
-  title: { ...TYPE.pageTitle, color: COLORS.onDark },
+  hours: { marginTop: SPACING.xl },
 
-  section: { padding: SPACING.lg, paddingBottom: 0, gap: SPACING.md },
-  sectionTitle: { ...TYPE.sectionTitle, color: COLORS.ink },
-  stack: { gap: SPACING.sm },
+  section: { marginTop: SPACING.xl, gap: SPACING.md },
+  pad: { paddingHorizontal: SPACING.xl - 4 },
+  register: { borderTopWidth: 1, borderTopColor: COLORS.line },
 
   band: {
-    marginTop: SPACING.lg,
+    marginTop: SPACING.xl,
     backgroundColor: COLORS.paper2,
-    padding: SPACING.lg,
-    gap: SPACING.md,
+    paddingVertical: SPACING.xl,
+    gap: SPACING.lg,
   },
-  bandHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  more: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  moreText: { ...TYPE.small, color: COLORS.muted },
+  link: { ...TYPE.small, fontFamily: FONTS.semibold, color: COLORS.navy },
+  carousel: { gap: SPACING.md, paddingHorizontal: SPACING.xl - 4 },
 
-  // `marginHorizontal` duwt de scroller tot de schermrand, `paddingHorizontal`
-  // zet de tegels weer op de lijn van de rest van het scherm.
-  tilesBleed: { marginHorizontal: -SPACING.lg },
-  tiles: { flexDirection: 'row', gap: SPACING.sm, paddingHorizontal: SPACING.lg },
-  tile: {
-    aspectRatio: 1,
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md },
+  aanbod: {
+    width: '47.8%',
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: COLORS.line,
-    padding: SPACING.md,
-    justifyContent: 'space-between',
+    overflow: 'hidden',
   },
-  tilePressed: { backgroundColor: COLORS.paper2 },
-  tileTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  tileLabel: { ...TYPE.small, fontFamily: TYPE.cardTitle.fontFamily, color: COLORS.ink },
+  aanbodPressed: { borderColor: COLORS.line2, opacity: 0.92 },
+  aanbodPhoto: { width: '100%', aspectRatio: 16 / 9, backgroundColor: COLORS.paper2 },
+  aanbodBody: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    paddingTop: 10,
+    paddingBottom: SPACING.md,
+  },
+  aanbodTitle: {
+    flexShrink: 1,
+    paddingBottom: 5,
+    borderBottomWidth: 3,
+    borderBottomColor: COLORS.yellow,
+  },
+  aanbodLabel: { fontFamily: FONTS.semibold, fontSize: 14, color: COLORS.ink },
+  ontdek: { ...TYPE.small, fontSize: 12, color: COLORS.muted },
 
-  announceKicker: { ...TYPE.kicker, color: COLORS.muted },
   cardTitle: { ...TYPE.cardTitle, color: COLORS.ink },
   cardBody: { ...TYPE.body, color: COLORS.body },
   quiet: { ...TYPE.small, color: COLORS.muted },

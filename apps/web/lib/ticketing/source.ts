@@ -169,6 +169,38 @@ export function sourceQuery(source: TicketSource | null): string {
   return `?${params.toString()}`;
 }
 
+/**
+ * {@link sourceQuery} op de server, uit de `searchParams` van een pagina die
+ * doorstuurt (een redirect of de login). Enkel wat in de link staat: de
+ * referrer ziet de volgende pagina zelf, want een redirect laat die staan.
+ */
+export function landingQuery(searchParams: Record<string, string | string[] | undefined>): string {
+  return sourceQuery(sourceFromLanding(flattenSearchParams(searchParams), "", ""));
+}
+
+/**
+ * De herkomst uit de link zelf, op de server, of null wanneer de link er geen
+ * draagt. Voor een formulier dat al instuurt voor de browser het script
+ * geladen heeft: `useLandingSource` is in die eerste render nog null, en dan
+ * zou een inschrijving uit de mail als "direct" bewaard worden. De referrer
+ * telt hier niet: die leest de browser zelf zodra hij kan.
+ */
+export function taggedLanding(searchParams: Record<string, string | string[] | undefined>): TicketSource | null {
+  const search = flattenSearchParams(searchParams);
+  const params = new URLSearchParams(search);
+  if (!SOURCE_URL_PARAMS.some((param) => params.has(param))) return null;
+  return sourceFromLanding(search, "", "");
+}
+
+function flattenSearchParams(searchParams: Record<string, string | string[] | undefined>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams)) {
+    const first = Array.isArray(value) ? value[0] : value;
+    if (first !== undefined) params.set(key, first);
+  }
+  return params.toString();
+}
+
 /** Een link naar een pagina met een vaste `via`, voor onze eigen links. */
 export function withSource(href: string, source: string): string {
   const separator = href.includes("?") ? "&" : "?";
@@ -186,6 +218,7 @@ type SourceInfo = { nl: string; en: string; kind: SourceKind };
 const SOURCES: Record<string, SourceInfo> = {
   "home-agenda": { nl: "Homepage: agenda bovenaan", en: "Homepage: agenda at the top", kind: "site" },
   "home-evenementen": { nl: "Homepage: aankomende evenementen", en: "Homepage: upcoming events", kind: "site" },
+  "home-hero": { nl: "Homepage: affiches in de hero", en: "Homepage: posters in the hero", kind: "site" },
   home: { nl: "Homepage (elders)", en: "Homepage (elsewhere)", kind: "site" },
   nieuws: { nl: "Nieuws", en: "News", kind: "site" },
   kalender: { nl: "Kalender", en: "Calendar", kind: "site" },

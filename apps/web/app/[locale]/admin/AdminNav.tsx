@@ -1,10 +1,12 @@
 'use client';
 
+import { UNSENT, unsentGuard } from '@/components/ui/unsentGuard';
 import { AdminNav as SharedAdminNav, type AdminNavItem, type AdminNavNode } from '@vtk/ui';
 import type { ReactNode } from 'react';
 import { toggleAdminNavPinAction } from '@/app/actions/admin-nav';
 import { useToast } from '@/components/ui/toast';
 import { ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/adminNavCookie';
+import { useAdminDensity } from './AdminSurface';
 
 export type NavItem = AdminNavItem;
 export type NavNode = AdminNavNode;
@@ -32,6 +34,7 @@ export function AdminNav({
   collapsed,
   collapseLabels,
   searchLabels,
+  densityLabel,
 }: {
   title: string;
   nodes: NavNode[];
@@ -40,8 +43,10 @@ export function AdminNav({
   collapsed: boolean;
   collapseLabels: { collapse: string; expand: string; shortcut: string };
   searchLabels: { open: string; placeholder: string; empty: string };
+  densityLabel: string;
 }) {
   const showToast = useToast();
+  const density = useAdminDensity();
   const { error, ...labels } = pinLabels;
 
   return (
@@ -51,6 +56,7 @@ export function AdminNav({
       icons={icons}
       collapse={{ initial: collapsed, onChange: rememberCollapsed, labels: collapseLabels }}
       search={{ labels: searchLabels }}
+      density={density ? { compact: density.compact, onChange: density.setCompact, label: densityLabel } : undefined}
       pins={{
         keys: pinnedKeys,
         labels,
@@ -61,7 +67,8 @@ export function AdminNav({
         onToggle: async (key, pinned) => {
           let result;
           try {
-            result = await toggleAdminNavPinAction(key, pinned);
+            result = await unsentGuard.run(() => toggleAdminNavPinAction(key, pinned));
+            if (result === UNSENT) return;
           } catch (cause) {
             showToast({ message: error, variant: 'error', duration: 0 });
             throw cause;
@@ -239,6 +246,14 @@ const icons: Record<string, ReactNode> = {
       <path d="M6 12v5c0 1 2.5 3 6 3s6-2 6-3v-5" />
     </Svg>
   ),
+  // polls: de vragen van de RiVers -> balkjes
+  polls: (
+    <Svg>
+      <path d="M4 20V10" />
+      <path d="M12 20V4" />
+      <path d="M20 20v-7" />
+    </Svg>
+  ),
   // partners: bedrijven/sponsors -> aktetas
   partners: (
     <Svg>
@@ -407,6 +422,16 @@ const icons: Record<string, ReactNode> = {
       <path d="m2 17 10 5 10-5" />
     </Svg>
   ),
+  // jaarwerkingen: kalender met een ster (een werking die elk jaar terugkomt)
+  jaarwerkingen: (
+    <Svg>
+      <rect width="18" height="18" x="3" y="4" rx="2" />
+      <path d="M16 2v4" />
+      <path d="M8 2v4" />
+      <path d="M3 10h18" />
+      <path d="m12 12.5 1.1 2.2 2.4.3-1.75 1.7.4 2.4-2.15-1.15-2.15 1.15.4-2.4-1.75-1.7 2.4-.3Z" />
+    </Svg>
+  ),
   // roles: rechtenbundel -> schild met vinkje
   roles: (
     <Svg>
@@ -507,6 +532,13 @@ const icons: Record<string, ReactNode> = {
       <path d="m9 13.5 2 2 4-4" />
     </Svg>
   ),
+  // bestuursorgaanFolders: een open map (Mappen per BO)
+  bestuursorgaanFolders: (
+    <Svg>
+      <path d="M3 8V6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v1" />
+      <path d="M3.5 19 5.6 11a1.5 1.5 0 0 1 1.45-1.1H20.5a1 1 0 0 1 .97 1.25L19.6 18a1.5 1.5 0 0 1-1.45 1.1H3.5A.5.5 0 0 1 3 18.6V8" />
+    </Svg>
+  ),
   // bestuursorgaanOwn: dezelfde map, met de post erin (Mijn budgetten)
   bestuursorgaanOwn: (
     <Svg>
@@ -547,6 +579,17 @@ const icons: Record<string, ReactNode> = {
       <path d="m10 13 8.5-8.5" />
       <path d="m16 7 2 2" />
       <path d="m19 4 2 2" />
+    </Svg>
+  ),
+  // theokotShiften: wanneer er iemand nodig is -> een kalender met een klok
+  theokotShiften: (
+    <Svg>
+      <path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5" />
+      <path d="M16 2v4" />
+      <path d="M8 2v4" />
+      <path d="M3 10h5" />
+      <path d="M17.5 17.5 16 16.3V14" />
+      <circle cx="16" cy="16" r="6" />
     </Svg>
   ),
   // apps: een raster van vier tegels
@@ -598,6 +641,13 @@ const icons: Record<string, ReactNode> = {
   ),
   // it: terminal (de groep met de technische tabs)
   it: (
+    <Svg>
+      <polyline points="4 17 10 11 4 5" />
+      <line x1="12" y1="19" x2="20" y2="19" />
+    </Svg>
+  ),
+  // itModule: het ene item onder IT met de technische tabbladen (terminal, als de groep)
+  itModule: (
     <Svg>
       <polyline points="4 17 10 11 4 5" />
       <line x1="12" y1="19" x2="20" y2="19" />
@@ -655,14 +705,6 @@ const icons: Record<string, ReactNode> = {
       <path d="m10.7 12.3 8.5-8.5" />
       <path d="m17 6 2.5 2.5" />
       <path d="m14.5 8.5 2.5 2.5" />
-    </Svg>
-  ),
-  // feedback: tekstballon met een uitroepteken; wat leden over de site melden
-  feedback: (
-    <Svg>
-      <path d="M21 14a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2Z" />
-      <path d="M12 7v4" />
-      <path d="M12 13.5h.01" />
     </Svg>
   ),
   // door: deur met klink

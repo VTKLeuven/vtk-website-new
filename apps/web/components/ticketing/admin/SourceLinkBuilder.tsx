@@ -1,17 +1,10 @@
 "use client";
 
-import { useId, useState, useSyncExternalStore } from "react";
+import { useId, useSyncExternalStore } from "react";
 import { Check, Copy } from "lucide-react";
-import {
-  CAMPAIGN_PARAM,
-  describeSource,
-  SHAREABLE_SOURCES,
-  SOURCE_PARAM,
-  sanitizeSourceKey,
-} from "@/lib/ticketing/source";
+import { describeSource, SHAREABLE_SOURCES } from "@/lib/ticketing/source";
+import { OTHER_SOURCE as OTHER, useSourceLink } from "./useSourceLink";
 import type { AdminLocale } from "./format";
-
-const OTHER = "__other";
 
 /**
  * Een deelbare link naar de ticketpagina met de herkomst erin
@@ -41,30 +34,9 @@ export function SourceLinkBuilder({
     () => window.location.origin,
     () => "",
   );
-  const [channel, setChannel] = useState<string>(SHAREABLE_SOURCES[0]);
-  const [custom, setCustom] = useState("");
-  const [campaign, setCampaign] = useState("");
-  // De link die gekopieerd werd; verandert de link, dan staat er geen vinkje meer.
-  const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
-
-  const source = channel === OTHER ? sanitizeSourceKey(custom) : channel;
-  const campaignKey = sanitizeSourceKey(campaign);
-  const params = new URLSearchParams();
-  if (source) params.set(SOURCE_PARAM, source);
-  if (source && campaignKey) params.set(CAMPAIGN_PARAM, campaignKey);
-  const query = params.toString();
-  const url = `${origin}${nl ? "" : "/en"}${path}${query ? `?${query}` : ""}`;
-
-  const copied = copiedUrl === url;
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopiedUrl(url);
-    } catch {
-      /* geen klembord: de link staat leesbaar in het veld */
-    }
-  }
+  const { channel, setChannel, custom, setCustom, campaign, setCampaign, url, copied, copy } = useSourceLink(
+    `${origin}${nl ? "" : "/en"}${path}`,
+  );
 
   return (
     <div className="ticket-admin-form">

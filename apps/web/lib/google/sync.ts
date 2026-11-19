@@ -9,20 +9,26 @@ import {
   type GoogleGroupSettings,
   addMember,
   createGroup,
+  deleteSendAs,
   getGroup,
   getGroupSettings,
   listMembers,
   patchGroupSettings,
+  removeAlias,
   removeMember,
 } from "./client";
-import {
-  type KiesploegMembershipRow,
-  type MembershipRow,
-  desiredMembers,
-  normaliseEmail,
-} from "./members";
+import { memberAddress, normaliseEmail } from "./members";
+import { planTwoWay } from "./twoWay";
 import { type AccountState, applyAccountState, desiredAccountState } from "./accountState";
-import { renderAddress } from "./addresses";
+import { renderAddress, yearVars } from "./addresses";
+import {
+  type DesiredContext,
+  type MailGroupForSync,
+  MAIL_GROUP_SELECT,
+  desiredFor,
+  isArchivedYear,
+  loadDesiredContext,
+} from "./desired";
 
 /**
  * Zet de groepsadressen in Google Workspace gelijk met de posten van dit
@@ -57,47 +63,14 @@ export type ReconcileOutcome =
       /** Leden die in een lijst horen maar nog geen gekoppeld @vtk.be-adres hebben. */
       unlinked: number;
       failed: number;
-      /** Accounts waarvan de staat (beperkt/volwaardig) aangepast werd. */
+      /** Accounts waarvan de staat (beperkt/volwaardig/geschorst) aangepast werd. */
       accountsChanged: number;
       /** Deelstappen die niet lukten, bv. een Gmail-instelling zonder scope. */
       accountWarnings: string[];
     };
 
-type MailGroupRow = {
-  id: string;
-  email: string;
-  name: string;
-  description: string | null;
-  googleId: string | null;
-  allowExternalSenders: boolean;
-  sources: {
-    groupId: string | null;
-    groupType: "PRAESIDIUM" | "WERKGROEP" | null;
-    kiesploegId: string | null;
-    kiesploegPostId: string | null;
-    onlyLead: boolean;
-  }[];
-  extras: { email: string; kind: "INCLUDE" | "EXCLUDE" }[];
-};
-
-const SELECT = {
-  id: true,
-  email: true,
-  name: true,
-  description: true,
-  googleId: true,
-  allowExternalSenders: true,
-  sources: {
-    select: {
-      groupId: true,
-      groupType: true,
-      kiesploegId: true,
-      kiesploegPostId: true,
-      onlyLead: true,
-    },
-  },
-  extras: { select: { email: true, kind: true } },
-} as const;
+type MailGroupRow = MailGroupForSync & { syncedMembers: string[]; syncBaselineAt: Date | null };
+const SELECT = { ...MAIL_GROUP_SELECT, syncedMembers: true, syncBaselineAt: true } as const;
 
 /**
  * Zorgt dat de groep in Google bestaat en geeft de sleutel terug waarmee we
@@ -131,115 +104,146 @@ async function ensureGroup(cfg: GoogleConfig, row: MailGroupRow): Promise<string
 }
 
 /**
- * Zet wie er naar dit adres mag mailen.
+ * De toegangsinstellingen die VTK voor elke groep wil (Toegangsinstellingen in
+ * de Admin console):
+ *
+ * | Wie kan...                      | eigenaars | beheerders | leden | organisatie | extern |
+ * | ------------------------------- | --------- | ---------- | ----- | ----------- | ------ |
+ * | contact opnemen met eigenaars   | ja        | ja         | ja    | ja          | ja     |
+ * | gesprekken bekijken             | ja        | ja         | ja    |             |        |
+ * | posten                          | ja        | ja         | ja    | ja          | ja     |
+ * | leden bekijken                  | ja        | ja         | ja    |             |        |
+ * | leden beheren                   | ja        | ja         |       |             |        |
+ *
+ * plus externe leden toegelaten, omdat een lijst een extern adres kan bevatten.
+ * "Posten" volgt het vinkje `allowExternalSenders`: uit = enkel de organisatie.
+ *
+ * Exported voor de test, zodat deze tabel en de code niet uit elkaar lopen.
+ */
+export function wantedGroupSettings(row: { allowExternalSenders: boolean }): GoogleGroupSettings {
+  return {
+    whoCanContactOwner: "ANYONE_CAN_CONTACT",
+    whoCanViewGroup: "ALL_MEMBERS_CAN_VIEW",
+    whoCanPostMessage: row.allowExternalSenders ? "ANYONE_CAN_POST" : "ALL_IN_DOMAIN_CAN_POST",
+    whoCanViewMembership: "ALL_MEMBERS_CAN_VIEW",
+    whoCanModerateMembers: "OWNERS_AND_MANAGERS",
+    allowExternalMembers: "true",
+  };
+}
+
+/**
+ * Zet de toegangsinstellingen.
  *
  * Dit is de stille faalmodus van de hele koppeling: met Google's defaults kan
  * mail van een bedrijf naar `activiteiten@vtk.be` geweigerd worden of in een
- * moderatiewachtrij belanden die niemand leest. `allowExternalMembers` staat
- * altijd aan omdat een lijst een extern adres als extra kan bevatten.
+ * moderatiewachtrij belanden die niemand leest.
  *
  * De spam-moderatie raken we bewust niet aan: dat is een afweging die iemand
  * met een gezicht hoort te maken, niet een sync.
  */
 async function ensureSettings(cfg: GoogleConfig, row: MailGroupRow): Promise<void> {
-  const wanted: GoogleGroupSettings = {
-    whoCanPostMessage: row.allowExternalSenders ? "ANYONE_CAN_POST" : "ALL_IN_DOMAIN_CAN_POST",
-    allowExternalMembers: "true",
-  };
+  const wanted = wantedGroupSettings(row);
   const current = await getGroupSettings(cfg, row.email);
-  if (
-    current &&
-    current.whoCanPostMessage === wanted.whoCanPostMessage &&
-    current.allowExternalMembers === wanted.allowExternalMembers
-  ) {
-    return;
-  }
+  const differs =
+    !current ||
+    (Object.keys(wanted) as (keyof GoogleGroupSettings)[]).some((key) => current[key] !== wanted[key]);
+  if (!differs) return;
   await patchGroupSettings(cfg, row.email, wanted);
 }
 
-type Memberships = {
-  posts: MembershipRow[];
-  kiesploeg: KiesploegMembershipRow[];
-};
+/** De notitie op een los lid dat in Google toegevoegd en door de site overgenomen werd. */
+export const ADDED_IN_GOOGLE_NOTE = "toegevoegd in Google";
+/** De notitie op een uitsluiting voor iemand die in Google verwijderd werd. */
+export const REMOVED_IN_GOOGLE_NOTE = "verwijderd in Google";
 
-/** Alle lidmaatschappen die de opgegeven lijsten samen nodig hebben, in twee queries. */
-async function loadMemberships(rows: MailGroupRow[]): Promise<Memberships> {
-  const groupIds = [
-    ...new Set(rows.flatMap((r) => r.sources.map((s) => s.groupId).filter(isId))),
-  ];
-  // "Elke praesidiumpost" en "elke werkgroep": dan hangt de lijst niet aan
-  // vijftien id's die je moet aanvullen zodra er een post bijkomt.
-  const groupTypes = [
-    ...new Set(rows.flatMap((r) => r.sources.map((s) => s.groupType).filter(isKind))),
-  ];
-  const kiesploegIds = [
-    ...new Set(rows.flatMap((r) => r.sources.map((s) => s.kiesploegId).filter(isId))),
-  ];
-  const postIds = [
-    ...new Set(rows.flatMap((r) => r.sources.map((s) => s.kiesploegPostId).filter(isId))),
-  ];
+/**
+ * Zet in de regel op de site wat iemand in Google veranderde, en geeft de
+ * nieuwe ledenlijst terug.
+ *
+ * - Toegevoegd in Google: een los lid (het account van een lid van de site als
+ *   het adres zijn gekoppelde account is, anders het vrije adres).
+ * - Verwijderd in Google: een los lid verdwijnt; wie er dan nog via een bron
+ *   in zit (een post), krijgt een uitsluiting, anders zet de sync hem terug.
+ */
+async function adoptGoogleChanges(
+  row: MailGroupRow,
+  ctx: DesiredContext,
+  takeOver: string[],
+  dropped: string[],
+) {
+  const reload = async () =>
+    (await prisma.mailGroup.findUniqueOrThrow({ where: { id: row.id }, select: SELECT })) as unknown as MailGroupRow;
+  const addressOf = (extra: MailGroupRow["extras"][number]) =>
+    extra.email
+      ? normaliseEmail(extra.email)
+      : extra.user
+        ? memberAddress(
+            {
+              id: extra.user.id,
+              name: extra.user.name,
+              googleEmail: extra.user.googleEmail,
+              werkgroepEmails: Object.fromEntries(extra.user.werkgroepAccounts.map((a) => [a.groupId, a.email])),
+            },
+            row.ownerGroupId,
+          )
+        : null;
 
-  const [posts, kiesploeg] = await Promise.all([
-    groupIds.length === 0 && groupTypes.length === 0
-      ? []
-      : prisma.groupMembership.findMany({
-          where: {
-            year: currentWorkingYear(),
-            OR: [
-              ...(groupIds.length ? [{ groupId: { in: groupIds } }] : []),
-              ...(groupTypes.length
-                ? [{ group: { type: { in: groupTypes }, active: true } }]
-                : []),
-            ],
-            // Een gedeactiveerd of gewist account hoort in geen enkele lijst
-            // meer, ook niet wanneer het lidmaatschap van dit jaar nog bestaat.
-            user: { active: true, deletedAt: null },
-          },
-          select: {
-            groupId: true,
-            role: true,
-            group: { select: { type: true } },
-            user: { select: { id: true, name: true, googleEmail: true } },
-          },
-        }),
-    kiesploegIds.length === 0 && postIds.length === 0
-      ? []
-      : prisma.kiesploegMember.findMany({
-          where: {
-            OR: [{ kiesploegId: { in: kiesploegIds } }, { postId: { in: postIds } }],
-            user: { active: true, deletedAt: null },
-          },
-          select: {
-            kiesploegId: true,
-            postId: true,
-            role: true,
-            user: { select: { id: true, name: true, googleEmail: true } },
-          },
-        }),
-  ]);
+  if (dropped.length > 0) {
+    const current = await prisma.mailGroupExtra.findMany({
+      where: { mailGroupId: row.id, kind: "INCLUDE" },
+      select: { id: true, email: true, user: { select: MAIL_GROUP_SELECT.extras.select.user.select } },
+    });
+    const loose = current.filter((e) => {
+      const address = addressOf({ ...e, kind: "INCLUDE" } as MailGroupRow["extras"][number]);
+      return address !== null && dropped.includes(address);
+    });
+    if (loose.length) await prisma.mailGroupExtra.deleteMany({ where: { id: { in: loose.map((e) => e.id) } } });
+    // Zit iemand er nog altijd in (via een post), dan een uitsluiting.
+    const still = desiredFor(await reload(), ctx).emails.filter((e) => dropped.includes(e));
+    if (still.length) {
+      const users = await prisma.user.findMany({
+        where: { googleEmail: { in: still }, deletedAt: null },
+        select: { id: true, googleEmail: true },
+      });
+      const userBy = new Map(users.map((u) => [u.googleEmail as string, u.id]));
+      await prisma.mailGroupExtra.createMany({
+        data: still.map((email) =>
+          userBy.has(email)
+            ? { mailGroupId: row.id, userId: userBy.get(email), kind: "EXCLUDE" as const, note: REMOVED_IN_GOOGLE_NOTE }
+            : { mailGroupId: row.id, email, kind: "EXCLUDE" as const, note: REMOVED_IN_GOOGLE_NOTE },
+        ),
+        skipDuplicates: true,
+      });
+    }
+  }
 
-  return {
-    posts: posts.map((m) => ({
-      groupId: m.groupId,
-      groupType: m.group.type,
-      role: m.role,
-      user: m.user,
-    })),
-    kiesploeg: kiesploeg.map((m) => ({
-      kiesploegId: m.kiesploegId,
-      postId: m.postId,
-      role: m.role,
-      user: m.user,
-    })),
-  };
-}
+  if (takeOver.length > 0) {
+    // Een lid van de site herkennen we enkel op zijn gekoppelde account, zoals
+    // bij het overnemen (lib/google/import.ts); nooit op naam.
+    const users = await prisma.user.findMany({
+      where: { googleEmail: { in: takeOver }, deletedAt: null },
+      select: { id: true, googleEmail: true },
+    });
+    const userBy = new Map(users.map((u) => [u.googleEmail as string, u.id]));
+    // Een uitsluiting voor hetzelfde adres valt weg: iemand zette hem net bewust terug.
+    await prisma.mailGroupExtra.deleteMany({
+      where: {
+        mailGroupId: row.id,
+        kind: "EXCLUDE",
+        OR: [{ email: { in: takeOver } }, { userId: { in: users.map((u) => u.id) } }],
+      },
+    });
+    await prisma.mailGroupExtra.createMany({
+      data: takeOver.map((email) =>
+        userBy.has(email)
+          ? { mailGroupId: row.id, userId: userBy.get(email), kind: "INCLUDE" as const, note: ADDED_IN_GOOGLE_NOTE }
+          : { mailGroupId: row.id, email, kind: "INCLUDE" as const, note: ADDED_IN_GOOGLE_NOTE },
+      ),
+      skipDuplicates: true,
+    });
+  }
 
-function isId(value: string | null): value is string {
-  return value !== null;
-}
-
-function isKind(value: "PRAESIDIUM" | "WERKGROEP" | null): value is "PRAESIDIUM" | "WERKGROEP" {
-  return value !== null;
+  return desiredFor(await reload(), ctx);
 }
 
 type Counters = { added: number; removed: number; unlinked: number; failed: number };
@@ -247,23 +251,34 @@ type Counters = { added: number; removed: number; unlinked: number; failed: numb
 async function syncOne(
   cfg: GoogleConfig,
   row: MailGroupRow,
-  memberships: Memberships,
+  ctx: DesiredContext,
   counters: Counters,
 ): Promise<void> {
+  // Het archief van een vorige ploeg: niet meer aanraken.
+  if (isArchivedYear(row, ctx.year)) return;
   try {
     const key = await ensureGroup(cfg, row);
     await ensureSettings(cfg, row);
 
-    const desired = desiredMembers({
-      sources: row.sources,
-      memberships: memberships.posts,
-      kiesploegMemberships: memberships.kiesploeg,
-      extras: row.extras,
-    });
-    counters.unlinked += desired.unlinked.length;
-
+    let desired = desiredFor(row, ctx);
     const remote = await listMembers(cfg, key);
     const remoteByEmail = new Map(remote.map((m) => [normaliseEmail(m.email), m]));
+    const isPlainMember = (email: string) => remoteByEmail.get(email)?.role === "MEMBER";
+
+    // Tweerichtingsverkeer: wat een mens in de Admin console veranderde sinds
+    // de vorige ronde, neemt de site over in plaats van het terug te draaien.
+    // Eigenaars en beheerders blijven buiten beschouwing, zoals altijd.
+    const plan = planTwoWay({
+      desired: desired.emails,
+      remote: [...remoteByEmail.keys()],
+      baseline: row.syncBaselineAt ? row.syncedMembers : null,
+    });
+    const takeOver = plan.takeOver.filter(isPlainMember);
+    const dropped = plan.dropped;
+    if (takeOver.length > 0 || dropped.length > 0) {
+      desired = await adoptGoogleChanges(row, ctx, takeOver, dropped);
+    }
+    counters.unlinked += desired.unlinked.length;
     const wanted = new Set(desired.emails);
 
     let added = 0;
@@ -282,6 +297,21 @@ async function syncOne(
       removed += 1;
     }
 
+    if (takeOver.length > 0 || dropped.length > 0) {
+      await logAudit({
+        action: "sync",
+        entity: "mailGroup",
+        entityId: row.id,
+        target: row.email,
+        summary: [
+          takeOver.length ? `in Google toegevoegd, overgenomen als los lid: ${takeOver.join(", ")}` : null,
+          dropped.length ? `in Google verwijderd, ook hier uit de lijst: ${dropped.join(", ")}` : null,
+        ]
+          .filter(Boolean)
+          .join("; "),
+      });
+    }
+
     counters.added += added;
     counters.removed += removed;
 
@@ -291,6 +321,10 @@ async function syncOne(
         lastSyncAt: new Date(),
         lastError: null,
         lastMemberCount: desired.emails.length,
+        // Wie er nu in Google staat (gewone leden die wij zetten): de lijst
+        // waartegen de volgende ronde een wijziging in Google herkent.
+        syncedMembers: desired.emails,
+        syncBaselineAt: new Date(),
       },
     });
 
@@ -316,36 +350,115 @@ async function syncOne(
 }
 
 /**
+ * Zorgt dat elke hoofdgroep met een jaarsjabloon haar jaargroepen heeft.
+ *
+ * VTK maakt elk jaar `activiteiten_2627@vtk.be` met de post van dat jaar en
+ * hangt die in `activiteiten@vtk.be`. Hier gebeurt dat vanzelf: de jaargroep
+ * van het lopende jaar bestaat altijd, die van volgend jaar zodra er iemand in
+ * de post van volgend jaar staat (de nieuwe ploeg kan ze dan al gebruiken). Op
+ * 15 juli kantelt het werkingsjaar, en `desiredFor` hangt dan de nieuwe
+ * jaargroep in de hoofdgroep en haalt de oude eruit. De oude blijft bestaan.
+ *
+ * Een bestaande rij met het adres (bv. overgenomen uit Google) wordt
+ * hergebruikt, niet verdubbeld.
+ */
+export async function ensureYearlyGroups(cfg: GoogleConfig, year: number): Promise<number> {
+  const parents = await prisma.mailGroup.findMany({
+    where: { enabled: true, yearlyTemplate: { not: null }, yearlyGroupId: { not: null } },
+    select: {
+      id: true,
+      name: true,
+      ownerGroupId: true,
+      allowExternalSenders: true,
+      yearlyTemplate: true,
+      yearlyGroupId: true,
+    },
+  });
+
+  let created = 0;
+  for (const parent of parents) {
+    const groupId = parent.yearlyGroupId as string;
+    const nextHasMembers =
+      (await prisma.groupMembership.count({ where: { groupId, year: year + 1 } })) > 0;
+    const years = nextHasMembers ? [year, year + 1] : [year];
+
+    for (const y of years) {
+      const email = renderAddress(parent.yearlyTemplate as string, yearVars(y), cfg.domain);
+      const existing = await prisma.mailGroup.findUnique({
+        where: { email },
+        select: { id: true, parentId: true, year: true, sources: { select: { groupId: true } } },
+      });
+      if (existing) {
+        if (existing.parentId !== parent.id || existing.year !== y) {
+          await prisma.mailGroup.update({
+            where: { id: existing.id },
+            data: { parentId: parent.id, year: y },
+          });
+        }
+        if (!existing.sources.some((src) => src.groupId === groupId)) {
+          await prisma.mailGroupSource.create({ data: { mailGroupId: existing.id, groupId } });
+        }
+        continue;
+      }
+      const row = await prisma.mailGroup.create({
+        data: {
+          email,
+          name: `${parent.name} ${yearVars(y).jj}`,
+          description: `Jaargroep van ${parent.name}, werkingsjaar ${y}-${y + 1}.`,
+          parentId: parent.id,
+          year: y,
+          ownerGroupId: parent.ownerGroupId,
+          allowExternalSenders: parent.allowExternalSenders,
+          sources: { create: [{ groupId }] },
+        },
+        select: { id: true },
+      });
+      created += 1;
+      await logAudit({
+        action: "create",
+        entity: "mailGroup",
+        entityId: row.id,
+        target: email,
+        summary: `jaargroep aangemaakt voor ${parent.name}`,
+      });
+    }
+  }
+  return created;
+}
+
+/**
  * Het vangnet: herbereken alles uit de database en zet het in Google recht.
  * Bedoeld voor de worker (`/api/google/maintenance`) en voor de knop "Nu
  * synchroniseren" in de admin.
  *
- * Twee delen: de groepsadressen, en de staat van de accounts (beperkt versus
- * volwaardig). Dat tweede deel is wat op 15 juli een kiesploeglid vanzelf een
- * werkende mailbox geeft.
+ * Drie delen: de jaargroepen, de groepsadressen, en de staat van de accounts.
+ * Dat laatste is wat op 15 juli een kiesploeglid vanzelf een werkende mailbox
+ * geeft, of een schorsing wanneer het geen post kreeg.
  */
 export async function reconcileGoogle(): Promise<ReconcileOutcome> {
   const cfg = await getGoogleConfig();
   if (!cfg) return { skipped: true };
 
-  const groups = await syncGroups(cfg);
-  const accounts = await reconcileAccountStates(cfg);
+  const year = currentWorkingYear();
+  await ensureYearlyGroups(cfg, year).catch((err) => {
+    console.error("[google] jaargroepen aanmaken mislukt", err);
+  });
+  const groups = await syncGroups(cfg, year);
+  const accounts = await reconcileAccountStates(cfg, year);
+  const transition = await transitionKiesploegen(cfg, year);
 
   return {
     ...groups,
     accountsChanged: accounts.changed,
-    accountWarnings: accounts.warnings,
-    failed: groups.failed + accounts.failed,
+    accountWarnings: [...accounts.warnings, ...transition.warnings],
+    failed: groups.failed + accounts.failed + transition.failed,
   };
 }
 
-async function syncGroups(cfg: GoogleConfig): Promise<{
-  groups: number;
-  added: number;
-  removed: number;
-  unlinked: number;
-  failed: number;
-}> {
+async function syncGroups(
+  cfg: GoogleConfig,
+  year: number,
+): Promise<{ groups: number; added: number; removed: number; unlinked: number; failed: number }> {
   const rows = (await prisma.mailGroup.findMany({
     where: { enabled: true },
     select: SELECT,
@@ -355,16 +468,45 @@ async function syncGroups(cfg: GoogleConfig): Promise<{
     return { groups: 0, added: 0, removed: 0, unlinked: 0, failed: 0 };
   }
 
-  const memberships = await loadMemberships(rows);
+  const ctx = await loadDesiredContext(rows, year);
   const counters: Counters = { added: 0, removed: 0, unlinked: 0, failed: 0 };
   for (const row of rows) {
-    await syncOne(cfg, row, memberships, counters);
+    await syncOne(cfg, row, ctx, counters);
   }
 
   return { groups: rows.length, ...counters };
 }
 
 export type AccountStateOutcome = { changed: number; warnings: string[]; failed: number };
+
+/** Het kiesploegadres van een lid: wat er effectief gezet werd, anders het sjabloon. */
+export function kiesploegAlias(
+  member: {
+    aliasEmail: string | null;
+    kiesploeg: { code: string; aliasTemplate: string };
+  },
+  user: { firstName: string | null; lastName: string | null },
+  domain: string,
+): string | null {
+  if (member.aliasEmail) return member.aliasEmail;
+  if (!user.firstName || !user.lastName) return null;
+  return renderAddress(
+    member.kiesploeg.aliasTemplate,
+    { code: member.kiesploeg.code, voornaam: user.firstName, achternaam: user.lastName },
+    domain,
+  );
+}
+
+/**
+ * Is de postverdeling van dit werkingsjaar ingevoerd? Enkel dan mag de sync
+ * kiesploegleden zonder post schorsen. Zie `desiredAccountState`.
+ */
+export async function postsEnteredFor(year: number): Promise<boolean> {
+  const count = await prisma.groupMembership.count({
+    where: { year, group: { type: "PRAESIDIUM" } },
+  });
+  return count > 0;
+}
 
 /**
  * Zet de staat van elk gekoppeld account gelijk met wat de posten en de
@@ -374,10 +516,12 @@ export type AccountStateOutcome = { changed: number; warnings: string[]; failed:
  * laatst toegepaste, vertrekt er een aanroep. Zo kost deze ronde niets zolang
  * er niets verandert, en wordt het op 16 juli in één keer wel wat werk.
  *
- * Degraderen gebeurt hier nooit; zie `applyAccountState`.
+ * Wat mag zonder dat iemand erom vroeg, staat in `transitionAllowed`.
  */
-export async function reconcileAccountStates(cfg: GoogleConfig): Promise<AccountStateOutcome> {
-  const year = currentWorkingYear();
+export async function reconcileAccountStates(
+  cfg: GoogleConfig,
+  year: number = currentWorkingYear(),
+): Promise<AccountStateOutcome> {
   const users = await prisma.user.findMany({
     where: { googleUserId: { not: null }, googleEmail: { not: null }, deletedAt: null },
     select: {
@@ -390,15 +534,28 @@ export async function reconcileAccountStates(cfg: GoogleConfig): Promise<Account
       memberships: { where: { year }, select: { id: true }, take: 1 },
       kiesploegMemberships: {
         where: { kiesploeg: { active: true } },
+        // De jongste ploeg telt: wie twee jaar na elkaar in een ploeg zit, hoort
+        // de regels van de lopende te volgen.
+        orderBy: { kiesploeg: { workingYear: "desc" } },
         select: {
-          mailboxActive: true,
+          sendFromAlias: true,
           forwardTo: true,
-          kiesploeg: { select: { code: true, aliasTemplate: true } },
+          aliasEmail: true,
+          keepAccount: true,
+          kiesploeg: { select: { code: true, aliasTemplate: true, workingYear: true } },
         },
         take: 1,
       },
     },
   });
+
+  const postsEntered = new Map<number, boolean>();
+  const suspensionAllowed = async (workingYear: number) => {
+    if (!postsEntered.has(workingYear)) {
+      postsEntered.set(workingYear, await postsEnteredFor(workingYear));
+    }
+    return postsEntered.get(workingYear) as boolean;
+  };
 
   let changed = 0;
   let failed = 0;
@@ -406,24 +563,20 @@ export async function reconcileAccountStates(cfg: GoogleConfig): Promise<Account
 
   for (const user of users) {
     const kiesploeg = user.kiesploegMemberships[0] ?? null;
+    const tookOffice = kiesploeg ? kiesploeg.kiesploeg.workingYear <= year : false;
     const desired = desiredAccountState({
       hasCurrentPost: user.memberships.length > 0,
-      kiesploeg: kiesploeg ? { mailboxActive: kiesploeg.mailboxActive } : null,
+      kiesploeg: kiesploeg
+        ? {
+            sendFromAlias: kiesploeg.sendFromAlias,
+            tookOffice,
+            keepAccount: kiesploeg.keepAccount,
+          }
+        : null,
+      suspensionAllowed:
+        kiesploeg && tookOffice ? await suspensionAllowed(kiesploeg.kiesploeg.workingYear) : false,
     });
     if (!desired) continue;
-
-    const alias =
-      kiesploeg && user.firstName && user.lastName
-        ? renderAddress(
-            kiesploeg.kiesploeg.aliasTemplate,
-            {
-              code: kiesploeg.kiesploeg.code,
-              voornaam: user.firstName,
-              achternaam: user.lastName,
-            },
-            cfg.domain,
-          )
-        : null;
 
     try {
       const outcome = await applyAccountState(
@@ -433,7 +586,7 @@ export async function reconcileAccountStates(cfg: GoogleConfig): Promise<Account
           name: user.name,
           googleEmail: user.googleEmail as string,
           current: user.googleAccountState as AccountState | null,
-          alias,
+          alias: kiesploeg ? kiesploegAlias(kiesploeg, user, cfg.domain) : null,
           forwardTo: kiesploeg?.forwardTo ?? null,
         },
         desired,
@@ -450,6 +603,99 @@ export async function reconcileAccountStates(cfg: GoogleConfig): Promise<Account
 }
 
 /**
+ * Na 15 juli van het werkingsjaar van een ploeg: haal het kiesploegadres weg bij
+ * iedereen van die ploeg.
+ *
+ * Bewust op 15 juli en niet bij de verkiezing: tot het nieuwe werkingsjaar
+ * begint, is dat adres het enige waarmee de ploeg als ploeg mailt. Een lid per
+ * keer, en per lid onthouden (`aliasRemovedAt`), zodat een hapering bij één
+ * persoon de rest niet tegenhoudt en de volgende ronde enkel de rest doet.
+ *
+ * De staat van de accounts (volwaardig of geschorst) regelt
+ * `reconcileAccountStates`; dit doet enkel de alias.
+ */
+export async function transitionKiesploegen(
+  cfg: GoogleConfig,
+  year: number = currentWorkingYear(),
+): Promise<{ warnings: string[]; failed: number }> {
+  const kiesploegen = await prisma.kiesploeg.findMany({
+    where: { active: true, workingYear: { lte: year }, transitionedAt: null },
+    select: {
+      id: true,
+      formalName: true,
+      code: true,
+      aliasTemplate: true,
+      members: {
+        where: { aliasRemovedAt: null },
+        select: {
+          id: true,
+          aliasEmail: true,
+          user: { select: { name: true, firstName: true, lastName: true, googleEmail: true } },
+        },
+      },
+    },
+  });
+
+  const warnings: string[] = [];
+  let failed = 0;
+
+  for (const k of kiesploegen) {
+    let open = 0;
+    for (const member of k.members) {
+      const googleEmail = member.user.googleEmail;
+      const alias = kiesploegAlias(
+        { aliasEmail: member.aliasEmail, kiesploeg: { code: k.code, aliasTemplate: k.aliasTemplate } },
+        member.user,
+        cfg.domain,
+      );
+      if (!googleEmail || !alias) {
+        // Geen account of geen naam: er is geen alias om weg te halen.
+        await prisma.kiesploegMember.update({
+          where: { id: member.id },
+          data: { aliasRemovedAt: new Date() },
+        });
+        continue;
+      }
+      try {
+        await removeAlias(cfg, googleEmail, alias);
+        try {
+          await deleteSendAs(cfg, googleEmail, alias);
+        } catch (err) {
+          // Een geschorst account laat zich niet impersoneren; de alias is wel
+          // weg, en zonder alias werkt dat afzenderadres toch niet meer.
+          warnings.push(
+            `${member.user.name}: afzenderadres ${alias} niet weggehaald: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+        await prisma.kiesploegMember.update({
+          where: { id: member.id },
+          data: { aliasRemovedAt: new Date() },
+        });
+      } catch (err) {
+        open += 1;
+        failed += 1;
+        warnings.push(
+          `${member.user.name}: kiesploegadres ${alias} niet weggehaald: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
+    if (open === 0) {
+      await prisma.kiesploeg.update({ where: { id: k.id }, data: { transitionedAt: new Date() } });
+      await logAudit({
+        action: "update",
+        entity: "kiesploeg",
+        entityId: k.id,
+        target: k.formalName,
+        summary: "aangetreden: kiesploegadressen weggehaald",
+      });
+    }
+  }
+
+  return { warnings, failed };
+}
+
+/**
  * Best-effort push na een wijziging aan één post: enkel de lijsten die deze
  * post als bron hebben. Gooit nooit; een hapering bij Google mag het opslaan
  * van een lidmaatschap niet breken, want de reconcile haalt het toch weer in.
@@ -462,10 +708,12 @@ export async function pushMailGroupsForGroup(groupId: string): Promise<void> {
     .findUnique({ where: { id: groupId }, select: { type: true } })
     .catch(() => null);
   // Ook de lijsten die "elke praesidiumpost" als bron hebben: die veranderen
-  // mee wanneer er in één post iemand bijkomt.
+  // mee wanneer er in één post iemand bijkomt. En de lijsten die de werkgroep
+  // zelf beheert: daar staan haar leden met hun werkgroepadres in.
   await pushFor({
     OR: [
       { sources: { some: { groupId } } },
+      { ownerGroupId: groupId },
       ...(group ? [{ sources: { some: { groupType: group.type } } }] : []),
     ],
   });
@@ -481,6 +729,22 @@ export async function pushMailGroupsForKiesploeg(kiesploegId: string): Promise<v
   });
 }
 
+/** Idem, na een wijziging aan de vertegenwoordigers van een POC. */
+export async function pushMailGroupsForPoc(pocId: string): Promise<void> {
+  await pushFor({ sources: { some: { pocId } } });
+}
+
+/** Idem, voor één lijst (na een wijziging aan haar losse leden of instellingen). */
+export async function pushMailGroup(mailGroupId: string): Promise<void> {
+  await pushFor({ id: mailGroupId });
+}
+
+/** Idem, voor een handvol lijsten tegelijk (na een wijziging aan hun werkgroep). */
+export async function pushMailGroups(mailGroupIds: string[]): Promise<void> {
+  if (mailGroupIds.length === 0) return;
+  await pushFor({ id: { in: mailGroupIds } });
+}
+
 async function pushFor(where: Prisma.MailGroupWhereInput): Promise<void> {
   try {
     const cfg = await getGoogleConfig();
@@ -492,10 +756,10 @@ async function pushFor(where: Prisma.MailGroupWhereInput): Promise<void> {
     })) as MailGroupRow[];
     if (rows.length === 0) return;
 
-    const memberships = await loadMemberships(rows);
+    const ctx = await loadDesiredContext(rows);
     const counters: Counters = { added: 0, removed: 0, unlinked: 0, failed: 0 };
     for (const row of rows) {
-      await syncOne(cfg, row, memberships, counters);
+      await syncOne(cfg, row, ctx, counters);
     }
   } catch (err) {
     console.error("[google] push na wijziging mislukt", err);

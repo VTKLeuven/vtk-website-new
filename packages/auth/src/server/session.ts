@@ -150,7 +150,7 @@ export type GateUser = {
   studyConfirmedYear: number | null;
   googleLinked: boolean;
   googleLinkDeferredAt: string | null;
-  /** Zit dit lid dit werkingsjaar in een post of werkgroep? */
+  /** Zit dit lid dit werkingsjaar in een post of werkgroep (een jaarwerking telt niet)? */
   hasGroups: boolean;
 };
 
@@ -168,7 +168,14 @@ export async function getGateUser(headers: Headers): Promise<GateUser | null> {
       googleUserId: true,
       googleLinkDeferredAt: true,
       // Enkel het aantal, niet de rijen: de gate wil weten óf er een post is.
-      _count: { select: { memberships: { where: { year: currentWorkingYear() } } } },
+      // Een jaarwerking telt niet: wie enkel in Kanweek zit, krijgt niet
+      // plots een poort die een @vtk.be-account eist. Staat zo iemand in een
+      // groepsadres, dan toont dat scherm hem als niet gekoppeld.
+      _count: {
+        select: {
+          memberships: { where: { year: currentWorkingYear(), group: { type: { not: 'JAARWERKING' } } } },
+        },
+      },
     },
   });
 

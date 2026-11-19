@@ -1,5 +1,6 @@
 'use client';
 
+import { useUnsentGuard } from '@/components/ui/unsentGuard';
 import { useActionState, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@vtk/ui';
@@ -31,7 +32,8 @@ type Step = 0 | 1 | 2;
 export function NewClientWizard({ nl, scopes, listHref }: { nl: boolean; scopes: ScopeChoice[]; listHref: string }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(0);
-  const [state, formAction, actionPending] = useActionState(createClientAction, IDLE);
+  const unsent = useUnsentGuard();
+  const [state, formAction, actionPending] = useActionState(unsent.state(createClientAction), IDLE);
   const [transitionPending, startTransition] = useTransition();
   const pending = actionPending || transitionPending;
 

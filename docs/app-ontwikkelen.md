@@ -117,8 +117,8 @@ nodig:
 npx eas-cli@latest build --profile preview --platform android
 ```
 
-`runtimeVersion` staat op `"exposdk:57.0.0"`, en die waarde is dezelfde voor élke
-SDK 57-build. Een update bereikt dus ook toestellen met een oudere APK, ook
+`runtimeVersion` staat op `"exposdk:58.0.0"`, en die waarde is dezelfde voor élke
+SDK 58-build. Een update bereikt dus ook toestellen met een oudere APK, ook
 wanneer de JavaScript erin een module importeert die daar niet in zit; dat geeft
 een rood scherm op het moment dat zo'n scherm laadt. Bouw daarom eerst, verspreid
 de APK, en zeg erbij dat wie een oudere versie heeft moet herinstalleren. Zie
@@ -136,7 +136,8 @@ De volgorde die klopt:
 Wijzigde er niets aan de native kant, dan volstaat stap 3 alleen.
 
 **Na een SDK-sprong is stap 1 niet optioneel.** De app ging in september 2026 van
-SDK 54 naar 57, en daarmee verschoof `runtimeVersion` mee. Elke APK van vóór die
+SDK 54 naar 57 en in november 2026 naar 58, en daarmee verschoof `runtimeVersion`
+telkens mee. Elke APK van vóór die
 sprong krijgt dus geen enkele update meer aangeboden, en dat is niet te zien: de
 app blijft gewoon draaien op wat er al in zat. Iedereen met een oude APK moet
 opnieuw installeren, anders zit het bestuur maandenlang naar een bevroren app te
@@ -157,7 +158,7 @@ er ook nooit een geweest. De weg naar een iPhone loopt daarom via **Expo Go**:
    `preview`-kanaal.
 
 Daarvoor is geen dev server nodig en er hoeft niets gebouwd te worden: een
-`eas update` volstaat, want Expo Go draait op `exposdk:57.0.0`. Wat er niet werkt
+`eas update` volstaat, want Expo Go draait op `exposdk:58.0.0`. Wat er niet werkt
 is push, want Expo Go verstuurt sinds SDK 53 geen pushberichten meer; daarvoor
 heb je een echte build nodig.
 
@@ -166,7 +167,8 @@ heb je een echte build nodig.
 niet installeren, en Expo's uitweg daarvoor (`eas go`, een eigen Expo Go op
 TestFlight) vraagt net het Developer-account dat er niet is. Publiceert Expo een
 nieuwe SDK, dan kan geen enkele iPhone-tester de app nog openen tot wij mee zijn.
-Upgrade dan meteen, en in één beurt met vtk-scanner-app en vtk-floorplan-app:
+Upgrade dan meteen, en in één beurt met vtk-floorplan-app (de scanner zit sinds
+november 2026 in deze app):
 `npx expo install expo@^<versie> --fix` per SDK, één versie tegelijk, en daarna
 `npx expo-doctor@latest` en `npm run app:check`.
 

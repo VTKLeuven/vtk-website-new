@@ -119,7 +119,7 @@ export default function ZoekenScreen() {
           </Pressable>
         )}
         ListEmptyComponent={
-          busy ? null : searched ? (
+          busy ? undefined : searched ? (
             <Empty title="Niets gevonden" hint={`Geen resultaten voor "${query.trim()}".`} />
           ) : (
             <Empty title="Typ om te zoeken" hint="Vanaf twee letters gaat de zoektocht van start." />

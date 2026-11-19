@@ -13,7 +13,9 @@ import {
 import { Button, ConfirmDialog } from "@vtk/ui";
 import { useToast } from "@/components/ui/toast";
 import { FormBusyProvider, useFormBusy } from "@/components/ui/formBusy";
-import { SAVE_IDLE, type SaveAction, type SaveState } from "@/lib/saveState";
+import { SAVE_IDLE, saveError, type SaveAction, type SaveState } from "@/lib/saveState";
+import { UNSENT_SAVE_CODES, unsentSaveReason } from "@/lib/unsentSave";
+import { useUnsentGuard } from "@/components/ui/unsentGuard";
 
 type SecondarySubmit = {
   name: string;
@@ -79,6 +81,11 @@ export function SaveForm({
     description: ReactNode;
     confirmLabel: string;
     cancelLabel: string;
+    /**
+     * Rode bevestigknop (standaard). Uit voor een vraag die niets weggooit maar
+     * een keuze laat maken, zoals welke dagen van een verkoopweek shiften krijgen.
+     */
+    destructive?: boolean;
   } | null;
   savingLabel: string;
   savedMessage: string;
@@ -133,6 +140,7 @@ export function SaveForm({
   children?: ReactNode;
 }) {
   const showToast = useToast();
+  const unsent = useUnsentGuard();
   /**
    * De toast vertrekt zodra de action antwoordt, niet pas in een effect na het
    * hertekenen. Een formulier dat door zijn eigen succes verdwijnt (een aanvraag
@@ -141,7 +149,19 @@ export function SaveForm({
    * toast ging stil verloren. De toastprovider staat hoger en blijft.
    */
   async function actionWithToast(previous: SaveState, data: FormData): Promise<SaveState> {
-    const result = await action(previous, data);
+    let result: SaveState;
+    try {
+      result = await action(previous, data);
+    } catch (error) {
+      // Een opslag die de server nooit verwerkte (een pagina van vóór de
+      // laatste deploy, of geen verbinding) wordt een gewone rode toast, en het
+      // formulier blijft staan zoals het was. Doorgooien liet de error boundary
+      // het hele scherm vervangen, met alles wat er ingevuld was. Al de rest,
+      // ook een `redirect()` uit de action, gaat door zoals voordien.
+      const reason = unsentSaveReason(error);
+      if (!reason || !unsent.report(error)) throw error;
+      return saveError(UNSENT_SAVE_CODES[reason]);
+    }
     if (result.status === "success") {
       showToast({ message: result.detail ?? savedMessage, variant: "success" });
     } else if (result.status === "error") {
@@ -285,6 +305,7 @@ export function SaveForm({
       description={confirmSubmit.description}
       confirmLabel={confirmSubmit.confirmLabel}
       cancelLabel={confirmSubmit.cancelLabel}
+      destructive={confirmSubmit.destructive}
       pending={pending}
       onConfirm={submitPlain}
       onCancel={() => setConfirmingSubmit(false)}

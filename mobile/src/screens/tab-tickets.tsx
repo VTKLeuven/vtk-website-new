@@ -1,7 +1,8 @@
 import { useLocalSearchParams } from 'expo-router';
 
 import * as WebBrowser from 'expo-web-browser';
-import { ChevronRight, CircleCheck, ScanLine } from 'lucide-react-native';
+import { Image } from 'expo-image';
+import { CircleCheck, ScanLine } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   Pressable,
@@ -18,19 +19,19 @@ import type { AppMyTicket } from '../api/contract';
 import { fetchMyTickets, fetchTicketEvents } from '../api/endpoints';
 import { messageFor, useResource } from '../api/useResource';
 import { PageHead } from '../components/PageHead';
-import { Segmented } from '../components/Segmented';
+import { DatePin } from '../components/DatePin';
 import { VtkQr } from '../components/VtkQr';
-import { Button, Card, Empty, ErrorState, Loading, StaleNotice } from '../components/ui';
-import { formatDay, formatDayShort, formatEuro } from '../format';
+import { Button, Card, Empty, ErrorState, Loading, SectionHeading, StaleNotice } from '../components/ui';
+import { formatDay, formatEuro } from '../format';
 import { useApp } from '../state/app';
 import { useTabRouter } from '../navigation';
-import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
+import { COLORS, FONTS, RADIUS, SPACING, TYPE } from '../theme/tokens';
 import { useTabParam } from '../useTabParam';
 
 type Tab = 'kopen' | 'mijne';
 
 /**
- * Tickets: kopen en tonen, in één tab met twee segmenten.
+ * Tickets: kopen en tonen, in één tab met twee tabbladen in de kop.
  *
  * Dat is een van de twee redenen waarom tickets een eigen plaats in de onderbalk
  * kregen. De andere is dat tonen tijdgevoelig is: aan de deur van een cantus wil
@@ -47,9 +48,10 @@ type Tab = 'kopen' | 'mijne';
  * je aan elke deur. Wie niet ingelogd is, ziet wel de verkoop, want zijn eigen
  * tickets zijn dan enkel een aanmeldscherm.
  *
- * De scanknop staat er ook, maar enkel voor wie mag scannen. Zo hoeft een shifter
- * die komt bijspringen niets te installeren: hij scant de uitnodigings-QR die een
- * praesidiumlid toont en kan meteen aan de deur staan.
+ * De scanknop staat er ook, maar enkel voor wie iets te scannen heeft
+ * (`abilities.scanTickets`): een gewone student ziet hem niet. Wie komt shiften,
+ * scant onder Meer de uitnodigings-QR die de organisator toont, en heeft vanaf
+ * dan deze knop en dat event onder Aan de deur.
  */
 export default function TicketsScreen() {
   const router = useTabRouter();
@@ -76,27 +78,26 @@ export default function TicketsScreen() {
         title="Tickets"
         subtitle="Voor cantussen, galabals en andere VTK-events"
         back={false}
+        tabs={{
+          value: tab,
+          onChange: setTab,
+          options: [
+            { value: 'kopen', label: 'Kopen' },
+            { value: 'mijne', label: 'Mijn tickets', badge: ticketCount },
+          ],
+        }}
         right={
           bootstrap?.abilities?.scanTickets ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Tickets scannen"
-              onPress={() => router.push('/scannen')}
+              accessibilityLabel="Tickets scannen aan de deur"
+              onPress={() => router.push('/deur')}
               hitSlop={10}
             >
               <ScanLine color={COLORS.yellow} size={22} />
             </Pressable>
           ) : undefined
         }
-      />
-
-      <Segmented
-        value={tab}
-        onChange={setTab}
-        options={[
-          { value: 'mijne', label: 'Mijn tickets', badge: ticketCount },
-          { value: 'kopen', label: 'Kopen' },
-        ]}
       />
 
       {tab === 'kopen' ? (
@@ -155,24 +156,46 @@ function SalesList({
           accessibilityRole="button"
           accessibilityLabel={event.title}
           onPress={() => onOpen(event.slug)}
-          style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.ticket, pressed && styles.pressed]}
         >
-          <View style={styles.rowText}>
-            <Text style={styles.when}>{formatDayShort(event.startsAt, locale)}</Text>
-            <Text style={styles.rowTitle}>{event.title}</Text>
-            <Text style={styles.meta}>{event.ownerGroupName}</Text>
-            {event.location ? <Text style={styles.meta}>{event.location}</Text> : null}
-            <Text style={styles.price}>
-              {event.requiresLogin
-                ? 'Log in om de ledentickets te zien'
-                : event.fromPriceCents === null
-                  ? 'Geen tickets meer beschikbaar'
-                  : event.fromPriceCents === 0
-                    ? 'Gratis'
-                    : `Vanaf ${formatEuro(event.fromPriceCents)}`}
-            </Text>
+          <View style={styles.shot}>
+            {event.imageUrl ? (
+              <Image source={{ uri: event.imageUrl }} style={styles.photo} contentFit="cover" transition={120} />
+            ) : null}
+            <View style={styles.pin}>
+              <DatePin iso={event.startsAt} locale={locale} shadow />
+            </View>
           </View>
-          <ChevronRight color={COLORS.muted} size={18} />
+          <View style={styles.ticketBody}>
+            <Text style={styles.org} numberOfLines={1}>
+              {event.ownerGroupName}
+              {event.location ? `, ${event.location}` : ''}
+            </Text>
+            <View style={styles.titleWrap}>
+              <Text style={styles.rowTitle} numberOfLines={2}>
+                {event.title}
+              </Text>
+            </View>
+            <View style={styles.buy}>
+              <View style={styles.priceCol}>
+                {event.requiresLogin ? (
+                  <Text style={styles.priceHint}>Log in om de ledentickets te zien</Text>
+                ) : event.fromPriceCents === null ? (
+                  <Text style={styles.priceHint}>Geen tickets meer beschikbaar</Text>
+                ) : (
+                  <>
+                    <Text style={styles.priceHint}>{event.fromPriceCents === 0 ? 'Prijs' : 'Vanaf'}</Text>
+                    <Text style={styles.price}>
+                      {event.fromPriceCents === 0 ? 'Gratis' : formatEuro(event.fromPriceCents)}
+                    </Text>
+                  </>
+                )}
+              </View>
+              <View style={styles.cta}>
+                <Text style={styles.ctaLabel}>Tickets</Text>
+              </View>
+            </View>
+          </View>
         </Pressable>
       ))}
     </ScrollView>
@@ -233,7 +256,7 @@ function MyTickets({
 
       {resource.data.map((order) => (
         <View key={order.id} style={styles.order}>
-          <Text style={styles.eventTitle}>{order.event.title}</Text>
+          <SectionHeading>{order.event.title}</SectionHeading>
           <Text style={styles.hint}>{formatDay(order.event.startsAt, locale)}</Text>
           {order.event.location ? <Text style={styles.hint}>{order.event.location}</Text> : null}
           <Text style={styles.hint}>Bestelling {order.orderNumber}</Text>
@@ -309,28 +332,52 @@ function TicketCard({ ticket }: { ticket: AppMyTicket }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.paper },
-  list: { padding: SPACING.lg, gap: SPACING.md, paddingBottom: SPACING.xxl },
-  content: { padding: SPACING.lg, gap: SPACING.lg, paddingBottom: SPACING.xxl },
+  list: { padding: SPACING.xl - 4, gap: SPACING.lg, paddingBottom: SPACING.xxl },
+  content: { padding: SPACING.xl - 4, gap: SPACING.xl, paddingBottom: SPACING.xxl },
 
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
+  // De kaart van /tickets: banner met de gele datumpin, de titel met de gele lijn,
+  // de prijs en de knop onderaan. Lager dan 16:9, zodat er meer onder elkaar past.
+  ticket: {
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: COLORS.line,
-    padding: SPACING.lg,
+    overflow: 'hidden',
   },
-  pressed: { backgroundColor: COLORS.paper2 },
-  rowText: { flex: 1, gap: 2 },
-  when: { ...TYPE.kicker, color: COLORS.muted },
-  rowTitle: { ...TYPE.cardTitle, color: COLORS.ink },
-  meta: { ...TYPE.small, color: COLORS.muted },
-  price: { ...TYPE.small, color: COLORS.body, marginTop: 2 },
+  pressed: { opacity: 0.92 },
+  shot: { aspectRatio: 2.4, backgroundColor: COLORS.paper2 },
+  photo: { ...StyleSheet.absoluteFill },
+  pin: { position: 'absolute', right: SPACING.lg, bottom: -24 },
+  ticketBody: { paddingHorizontal: SPACING.lg, paddingTop: 8, paddingBottom: SPACING.md, gap: 4 },
+  org: { fontFamily: FONTS.medium, fontSize: 12.5, color: COLORS.muted, paddingRight: 70 },
+  titleWrap: {
+    alignSelf: 'flex-start',
+    paddingBottom: 5,
+    borderBottomWidth: 3,
+    borderBottomColor: COLORS.yellow,
+  },
+  rowTitle: { fontFamily: FONTS.semibold, fontSize: 17, lineHeight: 22, color: COLORS.ink },
+  buy: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.line,
+  },
+  priceCol: { flex: 1 },
+  priceHint: { ...TYPE.small, fontSize: 12, color: COLORS.muted },
+  price: { fontFamily: FONTS.semibold, fontSize: 16, color: COLORS.ink, fontVariant: ['tabular-nums'] },
+  cta: {
+    backgroundColor: COLORS.ink,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+  },
+  ctaLabel: { fontFamily: FONTS.semibold, fontSize: 14, color: COLORS.paper },
 
   order: { gap: SPACING.sm },
-  eventTitle: { ...TYPE.sectionTitle, color: COLORS.ink },
   cardTitle: { ...TYPE.cardTitle, color: COLORS.ink },
   body: { ...TYPE.body, color: COLORS.body },
   hint: { ...TYPE.small, color: COLORS.muted },

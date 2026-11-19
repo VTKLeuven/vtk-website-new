@@ -1,3 +1,5 @@
+import type { AlbumVisibility } from './config';
+
 export type GalleryPhoto = {
   id: string;
   title: string;
@@ -38,6 +40,11 @@ export type GalleryAlbum = {
   shareUrl: string;
   updatedAt: string | null;
   subAlbums?: GallerySubAlbum[];
+  /**
+   * Privé (`[gallery-private]`): gepubliceerd, maar enkel op zijn eigen adres.
+   * `listAlbums()` laat zo'n album weg; zie `privateMarker` in config.ts.
+   */
+  unlisted?: boolean;
 };
 
 export type GalleryAlbumSummary = Omit<GalleryAlbum, 'photos' | 'shareUrl' | 'subAlbums'> & {
@@ -69,6 +76,8 @@ export type ManageableAlbum = {
   /** De beschrijving zonder merkers, zoals ze op de site zou staan. */
   publicDescription: string;
   photoCount: number;
+  /** De stand van dit album, of `null` wanneer het niet bij deze galerij hoort. */
+  visibility: AlbumVisibility | null;
   /** Staat het album niet op de site (`[gallery-uit]`)? */
   hidden: boolean;
   parent?: string;
@@ -100,6 +109,8 @@ export type AdminAlbum = {
   /** De vroegste datum van de foto's, uit Immich. */
   date: string | null;
   photoCount: number;
+  /** Op de site, enkel via zijn adres, of verborgen; de stand van het hoofdalbum. */
+  visibility: AlbumVisibility;
   /** Staat het album van de site af (`[gallery-uit]` op het hoofdalbum)? */
   hidden: boolean;
   /** De cover zoals Immich ze bijhoudt, om een duimnagel te tonen zonder gedeelde link. */

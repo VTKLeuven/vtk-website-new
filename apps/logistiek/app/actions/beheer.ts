@@ -12,7 +12,13 @@ import {
 } from '@/lib/calendar/feed-token';
 import { logistiekBaseUrl } from '@/lib/payments';
 import { writeAudit } from '@/lib/audit';
-import { isDriverColorIndex, isVehiclePattern } from '@/lib/driver-colors';
+import {
+  isCustomDriverColor,
+  isDriverColorIndex,
+  isVehiclePattern,
+  NEW_DRIVER_COLOR_INDEX,
+  serializeCustomColor,
+} from '@/lib/driver-colors';
 import { isVehicleIcon } from '@/lib/vehicle-icon';
 import { normaliseBelgianPhone } from '@/lib/vcard';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
@@ -57,8 +63,15 @@ import {
   parseBrusselsDateTime,
   type ReservationFormInput,
 } from '@/lib/reservation-form';
-import { buildTransportBookings, type TransportFormInput } from '@/lib/transport-form';
+import { buildTransportBookings, buildTransportSeries, type TransportFormInput } from '@/lib/transport-form';
+import {
+  MAX_SERIES_OCCURRENCES,
+  seriesOccurrences,
+  type RecurrenceEnd,
+  type RecurrenceRule,
+} from '@/lib/recurrence';
 import { runSerializable } from '@/lib/tx';
+import { windowMoved } from '@/lib/transport-conflicts';
 import type { ActionResult } from './uitleen';
 
 function revalidateBeheer() {
@@ -1853,6 +1866,7 @@ export async function createTransportForReservationAction(
     groupId: reservation.groupId,
     requesterName: reservation.requesterName,
     reservationId: reservation.id,
+    byTeam: true,
   });
   if (!built.ok) return { ok: false, error: built.error };
 
@@ -2274,6 +2288,8 @@ export async function adminCreateTransportAction(
     assignedGroupId?: string | null;
     /** Bewust over een bestaande rit inplannen; zie `overlapAuditNote`. */
     allowOverlap?: boolean;
+    /** Herhaal deze rit (F6.22): C&G, het containerpark, de BO-rit. */
+    repeat?: { rule: RecurrenceRule; end: RecurrenceEnd };
   }
 ): Promise<ActionResult> {
   const session = await requireManage();
@@ -2291,13 +2307,17 @@ export async function adminCreateTransportAction(
     return { ok: false, error: 'Vul in voor wie deze rit rijdt, of kies een post.' };
   }
 
-  const built = await buildTransportBookings(input, {
+  const owner = {
     userId: ownerId,
     eventId: input.eventId?.trim() || null,
     requesterType,
     groupId: input.groupId?.trim() || null,
     requesterName,
-  });
+    byTeam: true,
+  };
+  const built = input.repeat
+    ? await buildTransportSeries(input, owner, input.repeat)
+    : await buildTransportBookings(input, owner);
   if (!built.ok) return { ok: false, error: built.error };
 
   // Een chauffeur toewijzen mag enkel aan iemand uit de chauffeurslijst; dat is
@@ -2358,6 +2378,8 @@ export async function adminCreateTransportAction(
         plannedByTeam: true,
         driverId,
         assignedGroupId: assignedGroup?.id ?? null,
+        // Een herhaling: alle ritten delen dit (F6.22). `null` bij één rit.
+        seriesId: built.seriesId ?? null,
         decidedAt: now,
         decidedById: session.user.id,
         // Het team tekent dit zelf in en vraagt niets aan zichzelf; direct
@@ -2370,9 +2392,27 @@ export async function adminCreateTransportAction(
       await writeAudit(tx, { transportBookingId: row.id }, {
         kind: 'STATUS_CHANGED',
         toStatus: 'APPROVED',
+        // De tekst "ingepland door Logistiek" is een sleutel: de migratie van
+        // `plannedByTeam` leest ze terug. Het staartje eronder niet.
         note: 'ingepland door Logistiek',
         actorId: session.user.id,
       });
+      if (built.seriesId) {
+        await writeAudit(tx, { transportBookingId: row.id }, {
+          kind: 'NOTE',
+          note: `Deel van een reeks van ${built.occurrences ?? created.length} ritten`,
+          actorId: session.user.id,
+        });
+      }
+      // Een rit in het verleden is administratie (F6.19); dat hoort in de
+      // historiek te staan, want ze telt mee in de statistieken.
+      if ((built.bookings[index]?.startAt as Date) <= now) {
+        await writeAudit(tx, { transportBookingId: row.id }, {
+          kind: 'NOTE',
+          note: 'Ingepland met terugwerkende kracht: het startmoment lag in het verleden.',
+          actorId: session.user.id,
+        });
+      }
       const overlapNote = overlapsPerIndex.get(index);
       if (overlapNote) {
         await writeAudit(tx, { transportBookingId: row.id }, {
@@ -2399,12 +2439,18 @@ export async function adminCreateTransportAction(
 
   revalidateBeheer();
   const overlaps = outcome.overlaps ?? [];
+  // Bij een reeks kunnen het er tientallen zijn; de eerste drie zeggen genoeg en de
+  // rest staat als rode blokken in de planning.
+  const shownOverlaps = overlaps.slice(0, 3).join('; ');
+  const moreOverlaps = overlaps.length > 3 ? ` en nog ${overlaps.length - 3}` : '';
   const base =
     overlaps.length > 0
-      ? `Ingepland, maar het voertuig staat nu dubbel geboekt: ${overlaps.join('; ')}. Verschuif een van beide.`
-      : built.roundTrip || built.vehicleCount > 1
-        ? 'Ritten ingepland.'
-        : 'Rit ingepland.';
+      ? `Ingepland, maar het voertuig staat nu dubbel geboekt: ${shownOverlaps}${moreOverlaps}. Verschuif een van beide.`
+      : built.seriesId
+        ? `Reeks van ${built.occurrences ?? 'meerdere'} ritten ingepland.`
+        : built.roundTrip || built.vehicleCount > 1
+          ? 'Ritten ingepland.'
+          : 'Rit ingepland.';
   if (!assignedGroup) return { ok: true, warning: overlaps.length > 0, message: base };
 
   // Ná de write, zoals elke mail hier, en per aangemaakte rit: zijn het er meer
@@ -2412,7 +2458,10 @@ export async function adminCreateTransportAction(
   // daarvan een chauffeur en gaat het dus over meer dan een rit.
   revalidatePath('/ritten');
   const outcomes: TripHandoverOutcome[] = [];
-  for (const id of outcome.ids ?? []) {
+  // Bij een reeks één bericht en niet één per herhaling: een post die vijftig
+  // mails krijgt voor wat één afspraak is, leest er geen enkele meer.
+  const toNotify = built.seriesId ? (outcome.ids ?? []).slice(0, 1) : (outcome.ids ?? []);
+  for (const id of toNotify) {
     outcomes.push(await notifyGroupAssignedForTrip(id));
   }
   const note = handoverNote(assignedGroup.nameNl, mergeHandover(outcomes));
@@ -2422,6 +2471,92 @@ export async function adminCreateTransportAction(
     // ze vraagt nog iets van je.
     warning: overlaps.length > 0 || note.warning,
     message: `${base} ${note.message}`,
+  };
+}
+
+/**
+ * De ritten van een herhaling vóór ze bestaan (F6.22), met welke botsen.
+ *
+ * Twaalf ritten aanmaken om er daarna twee rood te zien staan, is de fout die dit
+ * voorkomt. Het schrijft niets: dezelfde `seriesOccurrences` en dezelfde
+ * botsingscontrole als `adminCreateTransportAction`, maar enkel om te tonen.
+ */
+export async function previewTripSeriesAction(input: {
+  startAt: string;
+  endAt: string;
+  vehicleId: string;
+  repeat: { rule: RecurrenceRule; end: RecurrenceEnd };
+}): Promise<
+  | {
+      ok: true;
+      items: Array<{ startAt: string; endAt: string; clash: string | null }>;
+      /** Het maximum is bereikt: er zouden er meer geweest zijn. */
+      capped: boolean;
+    }
+  | { ok: false; error: string }
+> {
+  await requireManage();
+  if (!input.startAt || !input.endAt) {
+    return { ok: false, error: 'Kies eerst een start- en eindmoment.' };
+  }
+  const windows = seriesOccurrences(
+    { startAt: input.startAt, endAt: input.endAt },
+    input.repeat.rule,
+    input.repeat.end
+  );
+  if (windows.length === 0) return { ok: false, error: 'Kies eerst een start- en eindmoment.' };
+
+  const items: Array<{ startAt: string; endAt: string; clash: string | null }> = [];
+  for (const window of windows) {
+    const startAt = parseBrusselsDateTime(window.startAt);
+    const endAt = parseBrusselsDateTime(window.endAt);
+    if (!startAt || !endAt) return { ok: false, error: 'Vul een geldig begin- en einduur in.' };
+    const clashes = input.vehicleId
+      ? await overlappingBookings(prisma, input.vehicleId, startAt, endAt, [])
+      : [];
+    items.push({ ...window, clash: clashes.length > 0 ? overlapLabel(clashes) : null });
+  }
+  return { ok: true, items, capped: windows.length >= MAX_SERIES_OCCURRENCES };
+}
+
+/**
+ * Een rit en alle volgende van haar reeks verwijderen (F6.22).
+ *
+ * Enkel "vanaf hier", nooit de hele reeks met wat al gereden is: gereden ritten
+ * (`COMPLETED`) en ritten met een betaling blijven staan, want dat is
+ * geschiedenis en een databankregel (zie `deleteTransportAction`). De melding
+ * zegt hoeveel er bleven. Elke andere rit van de reeks, ook een eerdere die nog
+ * niet gereden is, blijft ongemoeid.
+ */
+export async function deleteTripSeriesFromAction(bookingId: string): Promise<ActionResult> {
+  await requireManage();
+
+  const booking = await prisma.uitleenTransportBooking.findUnique({
+    where: { id: bookingId },
+    select: { id: true, seriesId: true, startAt: true },
+  });
+  if (!booking) return { ok: false, error: 'Rit niet gevonden.' };
+  if (!booking.seriesId) return { ok: false, error: 'Deze rit hoort niet bij een reeks.' };
+
+  const following = await prisma.uitleenTransportBooking.findMany({
+    where: { seriesId: booking.seriesId, startAt: { gte: booking.startAt } },
+    select: { id: true, status: true, _count: { select: { payments: true } } },
+  });
+  const removable = following.filter(
+    (row) => row.status !== 'COMPLETED' && row._count.payments === 0
+  );
+  const kept = following.length - removable.length;
+
+  const { count } = await prisma.uitleenTransportBooking.deleteMany({
+    where: { id: { in: removable.map((row) => row.id) } },
+  });
+
+  revalidateBeheer();
+  return {
+    ok: true,
+    message:
+      `${count === 1 ? '1 rit' : `${count} ritten`} van de reeks verwijderd.` +
+      (kept > 0 ? ` ${kept} bleven staan omdat ze al gereden zijn of een betaling hebben.` : ''),
   };
 }
 
@@ -2576,8 +2711,14 @@ export async function adminEditTransportAction(
 
     // Enkel een goedgekeurde rit houdt een voertuig bezet; een aanvraag mag nog
     // botsen (zie "Conflicten: aanvragen mag, goedkeuren niet").
+    //
+    // Enkel wanneer het venster verschuift. Een rit die het team met opzet over
+    // een andere zette (om eerst het geheel te overzien en daarna te schuiven),
+    // moest anders bij elke opslag, ook voor een nota of een adres, "Toch
+    // verschuiven" bevestigen terwijl er niets verschuift, en schreef elke keer
+    // opnieuw een overlap-nota in de historiek (F6.26).
     let overlapNote: string | null = null;
-    if (existing.status === 'APPROVED') {
+    if (existing.status === 'APPROVED' && windowMoved(existing, { startAt, endAt })) {
       const clashes = await overlappingBookings(tx, existing.vehicleId, startAt, endAt, [bookingId]);
       if (clashes.length > 0) {
         if (!input.allowOverlap) return { error: 'OVERLAP' as const, detail: overlapLabel(clashes) };
@@ -2859,6 +3000,12 @@ export async function changeVehicleAction(
       }
       const vehicle = await tx.uitleenVehicle.findFirst({ where: { id: vehicleId, active: true } });
       if (!vehicle) return { error: 'NO_VEHICLE' as const };
+      // Voor de historiek: wat het was, want "voertuig: Kar" zegt niet wat er
+      // veranderde, en de aanvrager leest deze regel (F6.11).
+      const before = await tx.uitleenVehicle.findUnique({
+        where: { id: booking.vehicleId },
+        select: { nameNl: true },
+      });
 
       let overlapNote: string | undefined;
       if (booking.status === 'APPROVED') {
@@ -2887,7 +3034,7 @@ export async function changeVehicleAction(
       });
       await writeAudit(tx, { transportBookingId: booking.id }, {
         kind: 'EDITED',
-        note: `voertuig: ${vehicle.nameNl}`,
+        note: `Voertuig: ${before?.nameNl ?? 'onbekend'} → ${vehicle.nameNl}`,
         actorId: session.user.id,
       });
       if (overlapNote) {
@@ -3162,7 +3309,13 @@ async function createDriverRow(
   const existing = await prisma.uitleenDriver.count({ where: { userId } });
   if (existing > 0) return 'ALREADY_DRIVER';
 
-  await prisma.uitleenDriver.create({ data: { userId, note, addedById } });
+  // Een toegevoegde chauffeur start op Salie (F6.7) en niet op de hash: zo valt hij
+  // niet toevallig samen met iemand die zijn kleur al koos, en zie je aan Salie dat
+  // niemand er nog een koos. Wie via de post chauffeur is, heeft geen rij en houdt
+  // zijn hashkleur.
+  await prisma.uitleenDriver.create({
+    data: { userId, note, addedById, colorIndex: NEW_DRIVER_COLOR_INDEX },
+  });
   revalidateBeheer();
   return null;
 }
@@ -3352,6 +3505,11 @@ export async function setDriverVanAction(
  * niet "geen kleur", want een blok zonder vulling is niet te onderscheiden van
  * een blok zonder chauffeur.
  *
+ * Een paletkleur en een eigen kleur sluiten elkaar uit: wie een nummer kiest,
+ * wist de eigen kleur, en `setDriverCustomColorAction` doet het omgekeerde.
+ * Anders blijft er na "Standaard" een eigen kleur in de rij staan die de hash
+ * blijft overschrijven.
+ *
  * Upsert, zoals `setDriverVanAction`: een lid van de post Logistiek heeft pas een
  * rij zodra iemand er iets aan instelt.
  */
@@ -3373,7 +3531,7 @@ export async function setDriverColorAction(
 
   await prisma.uitleenDriver.upsert({
     where: { userId },
-    update: { colorIndex },
+    update: { colorIndex, customColor: null },
     create: { userId, colorIndex },
   });
 
@@ -3381,6 +3539,46 @@ export async function setDriverColorAction(
   // Ook het publieke bezettingsoverzicht draagt deze kleuren.
   revalidatePath('/vervoer/bezetting');
   return { ok: true, message: colorIndex === null ? 'Terug op de standaardkleur.' : 'Kleur opgeslagen.' };
+}
+
+/**
+ * Een eigen kleur voor een chauffeur, uit de drie schuiven (tint, levendigheid,
+ * kracht; zie `CustomDriverColor`).
+ *
+ * De server controleert de bereiken zelf: de schuiven kunnen niets anders geven,
+ * maar een aanroep hoeft niet via de schuiven te komen, en een kleur buiten het
+ * bereik is er een waarop de tekst in het blok niet meer leesbaar is. De
+ * helderheid zelf wordt hier niet bewaard maar volgt uit de modus (`theme.css`),
+ * dus een waarde die klopt, kan het scherm nooit onleesbaar maken.
+ */
+export async function setDriverCustomColorAction(
+  userId: string,
+  color: { hue: number; chroma: number; tone: number }
+): Promise<ActionResult> {
+  await requireManage();
+
+  if (!isCustomDriverColor(color)) {
+    return { ok: false, error: 'Die kleur kan niet: de schuiven staan buiten hun bereik.' };
+  }
+
+  const user = await prisma.user.findFirst({
+    where: { id: userId, deletedAt: null },
+    select: { id: true },
+  });
+  if (!user) return { ok: false, error: 'Dit lid bestaat niet (meer) op vtk.be.' };
+
+  // Alleen de drie velden uit `color`, niet het object zelf: een aanroep kan er
+  // meer in stoppen dan de schuiven kennen.
+  const customColor = serializeCustomColor({ hue: color.hue, chroma: color.chroma, tone: color.tone });
+  await prisma.uitleenDriver.upsert({
+    where: { userId },
+    update: { customColor, colorIndex: null },
+    create: { userId, customColor },
+  });
+
+  revalidateBeheer();
+  revalidatePath('/vervoer/bezetting');
+  return { ok: true, message: 'Eigen kleur opgeslagen.' };
 }
 
 /**
@@ -3431,6 +3629,9 @@ export async function saveVehicleAction(_prev: SaveState, formData: FormData): P
     rateCents: pricingMode === 'FREE' ? 0 : rateCents,
     needsVanDriver: String(formData.get('needsVanDriver') ?? '') === 'on',
     needsDriver: String(formData.get('needsDriver') ?? '') === 'on',
+    // Enkel het team plant dit voertuig in wanneer het uit staat (F6.21). De poort
+    // zelf staat in `buildTransportBookings`, niet in het formulier.
+    requestableByMembers: String(formData.get('requestableByMembers') ?? '') === 'on',
     // "Geen arcering" bewaren we als null en niet als de string 'none': in de
     // databank is dat dezelfde toestand, en twee schrijfwijzen voor hetzelfde
     // lopen vroeg of laat uiteen in een query.

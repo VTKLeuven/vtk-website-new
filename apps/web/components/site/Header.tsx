@@ -1,6 +1,6 @@
+import { SiteHeaderShell } from './SiteHeaderShell';
 import Image from 'next/image';
 import Link from '@/components/ui/Link';
-import { Search } from 'lucide-react';
 import { getDictionary, pick, type Locale } from '@vtk/i18n';
 import { entryForDate, isClosedHours } from '@/components/editorial/hoursUtils';
 import { getCachedHeaderTabs, getCachedSetting } from '@/lib/cachedContent';
@@ -14,6 +14,7 @@ import { EditorialNavLinks } from './EditorialNavLinks';
 import { LocaleSwitcher } from './LocaleSwitcher';
 import { ProfileMenu } from './ProfileMenu';
 import { SiteSearchForm } from './SiteSearchForm';
+import { SiteSearchButton } from './SiteSearchButton';
 
 type OpeningHoursSetting = {
   titleNl: string;
@@ -84,7 +85,7 @@ export async function Header({ locale }: { locale: Locale }) {
       ];
 
   return (
-    <header className="vtk-site-header">
+    <SiteHeaderShell>
       <div className="utility">
         <div className="utility-inner">
           <Link href={`${base}/theokot`} className="flex items-center gap-1.5" {...umamiEvent("openingsuren-bekeken")}>
@@ -151,14 +152,9 @@ export async function Header({ locale }: { locale: Locale }) {
               stopt met groeien op --max (1320px), dus er komt geen ruimte bij op
               een breder scherm. Een veld ernaast zou de tabs eroverheen duwen.
               Op /zoeken staat de cursor meteen in het veld. */}
-          <Link
-            href={`${base}/zoeken`}
-            aria-label={dict.search.title}
-            title={dict.search.title}
-            className="nav-search"
-          >
-            <Search aria-hidden="true" size={18} />
-          </Link>
+          {/* Ook Ctrl+K / Cmd+K, behalve in de admin: daar hoort die sneltoets
+              bij de zoekbalk van de zijbalk. */}
+          <SiteSearchButton base={base} label={dict.search.title} />
           <LocaleSwitcher locale={locale} variant="editorial" />
           {session ? (
             <ProfileMenu
@@ -197,6 +193,6 @@ export async function Header({ locale }: { locale: Locale }) {
           )}
         </div>
       </div>
-    </header>
+    </SiteHeaderShell>
   );
 }

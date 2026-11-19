@@ -2,6 +2,7 @@ import { cache } from "react";
 import { prisma } from "@vtk/db";
 import { getDefaultEventImages } from "@/lib/defaultEventImage";
 import { EVENT_PAGE_TICKET_SELECT } from "@/lib/ticketing/eventPage";
+import { MOMENT_DETAIL_SELECT } from "@/lib/calendar/moments";
 
 /**
  * De queries die een publieke route twee keer nodig heeft: één keer voor
@@ -80,7 +81,7 @@ export const loadCalendarEvent = cache(async (slugOrId: string) =>
       group: true,
       // De losse momenten van het evenement; leeg bij een evenement dat gewoon
       // doorloopt. Zie `CalendarEventMoment`.
-      moments: { orderBy: { start: "asc" }, select: { start: true, end: true, label: true } },
+      moments: { orderBy: { start: "asc" }, select: MOMENT_DETAIL_SELECT },
       // Alle verkopen van dit evenement: die op de eventpagina zelf staan
       // (`onEventPage`) en die met een eigen ticketpagina. Zie
       // lib/ticketing/eventPage.ts.

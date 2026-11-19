@@ -1,5 +1,6 @@
 "use client";
 
+import { unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, type FormEvent } from "react";
 import { Download, QrCode } from "lucide-react";
 import { Button, Card, Input, Label } from "@vtk/ui";
@@ -279,7 +280,19 @@ function EditModal({
           </button>
         </div>
 
-        <form action={saveShortLinkAction} onSubmit={handleSubmit} className="space-y-4">
+        <form
+          action={unsentGuard.form(async (formData: FormData) => {
+            // Niet verstuurd: de knop weer vrijgeven, anders blijft hij op bezig.
+            try {
+              await saveShortLinkAction(formData);
+            } catch (error) {
+              setBusy(false);
+              throw error;
+            }
+          })}
+          onSubmit={handleSubmit}
+          className="space-y-4"
+        >
           {isEdit && <input type="hidden" name="id" value={link.id} />}
           <div>
             <Label>Slug</Label>
@@ -458,7 +471,7 @@ function DeleteModal({
             : ". Visitors of this link will then get a 404. This cannot be undone."}
         </p>
         <form
-          action={deleteShortLinkAction}
+          action={unsentGuard.form(deleteShortLinkAction)}
           onSubmit={() => setBusy(true)}
           className="mt-5 flex justify-end gap-2"
         >

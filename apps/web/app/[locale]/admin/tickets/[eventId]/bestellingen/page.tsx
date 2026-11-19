@@ -1,3 +1,4 @@
+import { ActionForm } from "@/components/ui/unsentGuard";
 import { InteractiveRow } from "@/components/ticketing/admin/InteractiveRow";
 import Link from "@/components/ui/Link";
 import { notFound } from "next/navigation";
@@ -401,7 +402,7 @@ export default async function TicketOrdersPage({
 
                             {canResendConfirmation ? (
                               <div className="ticket-admin-detail-actions">
-                                <form action={resendTicketOrderConfirmationAction}>
+                                <ActionForm action={resendTicketOrderConfirmationAction}>
                                   <input type="hidden" name="locale" value={locale} />
                                   <input type="hidden" name="eventId" value={eventId} />
                                   <input type="hidden" name="orderId" value={order.id} />
@@ -409,7 +410,7 @@ export default async function TicketOrdersPage({
                                     <MailPlus aria-hidden="true" size={15} />
                                     {locale === "nl" ? "Bevestiging opnieuw versturen" : "Resend confirmation"}
                                   </button>
-                                </form>
+                                </ActionForm>
                               </div>
                             ) : null}
 

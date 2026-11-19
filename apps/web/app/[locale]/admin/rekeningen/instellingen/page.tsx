@@ -9,7 +9,6 @@ import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
 import { saveExpenseSettingsAction } from "@/app/actions/expenses";
 import { expenseAccess, getExpenseConfig, MAX_WORDS_RANGE } from "@/lib/rekeningen/server";
 import { formatBytes } from "@/lib/rekeningen/expenses";
-import { RekeningenNav } from "../RekeningenNav";
 import { expenseErrorMessages } from "../messages";
 
 export default async function RekeningenInstellingen({
@@ -37,20 +36,13 @@ export default async function RekeningenInstellingen({
   return (
     <div className="space-y-5">
       <header>
-        <h1 className="text-2xl font-semibold">{nl ? "Instellingen" : "Settings"}</h1>
+        <h2 className="text-lg font-semibold">{nl ? "Instellingen" : "Settings"}</h2>
         <p className="mt-1 max-w-5xl text-sm text-[#5c667f]">
           {nl
             ? "Waar de bladen naartoe gaan, hoe kort activiteit en omschrijving zijn, en wat een indiener te lezen krijgt voor hij het formulier invult."
             : "Where the sheets go, how short activity and description are, and what a submitter reads before filling in the form."}
         </p>
       </header>
-
-      <RekeningenNav
-        base={base}
-        nl={nl}
-        active="instellingen"
-        caps={{ submit: access.canSubmit, overview: access.canSeeOverview, settings: true }}
-      />
 
       <div className="rounded-2xl border border-vtk-blue/12 bg-white p-5">
         <SaveForm

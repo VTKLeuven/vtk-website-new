@@ -1,0 +1,1017 @@
+import { notFound } from "next/navigation";
+import { prisma } from "@vtk/db";
+import { getDictionary, type Locale } from "@vtk/i18n";
+import { hasLocale } from "@/lib/locale";
+import { requireSession } from "@/lib/session";
+import {
+  currentStudyYear,
+  formatWorkingYear,
+  studyConfirmationStart,
+  studyConfirmationYear,
+} from "@/lib/workingYear";
+import { needsStudyConfirmation } from "@vtk/auth";
+import { previewNoopAction } from "@/app/actions/flowPreview";
+import { ProfileForm } from "@/components/profile/ProfileForm";
+import { StudyFieldset } from "@/components/profile/StudyFieldset";
+import { AddressConfirmation } from "@/components/profile/AddressConfirmation";
+import { MembershipChoice } from "@/components/profile/MembershipChoice";
+import { CareerOptIn } from "@/components/profile/CareerOptIn";
+import { ConfirmStudySteps } from "@/components/profile/ConfirmStudySteps";
+import { hasCompleteAddresses } from "@/lib/profile-address";
+import { shouldAskCareerOptIn } from "@/lib/careerOptIn";
+import { careerOptInCopy } from "@/lib/careerOptInCopy";
+import "@/app/design/vtk-career-optin.css";
+import {
+  getMembership,
+  getMembershipConfig,
+  membershipChoiceLabels,
+  membershipOffer,
+  type MembershipOffer,
+} from "@/lib/membership";
+import { SaveForm } from "@/components/ui/SaveForm";
+import { mailPreviewGroups } from "@/lib/mailPreviews";
+import { UnsubscribePanel } from "@/components/profile/UnsubscribePanel";
+import { DiscordMessagePreview } from "@/components/admin/DiscordMessagePreview";
+import { discordEventMessage, DISCORD_AVATAR_PATH } from "@/lib/discord/eventMessage";
+import { siteUrl } from "@/lib/seo";
+import { discordBotConfigured } from "@/lib/discord/bot";
+import { RunnerYearPanel } from "@/components/urenloop/RunnerStats";
+import { sampleRunnerStats } from "@/lib/urenloop/laps";
+import { getRunnerStats } from "@/lib/urenloop/runnerStats";
+import { PocPollPanel } from "@/components/editorial/PocPollPanel";
+import { PocPollStripBar } from "@/components/site/PocPollStripBar";
+import { pollPanelData, pollPanelLabels, pollStripCopy } from "@/lib/pocPolls/copy";
+import { getViewerPocPolls } from "@/lib/pocPolls/read";
+import { samplePocPoll } from "@/lib/pocPolls/sample";
+import { DiscordLinkForm } from "@/components/profile/DiscordLinkForm";
+import { discordLinkLabels } from "@/lib/discord/linkCopy";
+import {
+  discordAccessMessage,
+  discordConfirmStudyMessage,
+  discordLinkPanelMessage,
+  discordNoPocMessage,
+  pollChannelMessage,
+  pollClosedChannelMessage,
+  pollDoneMessage,
+  pollLinkAccountMessage,
+  pollStepMessage,
+  type DiscordPollView,
+  type PollBotMessage,
+} from "@/lib/discord/pollMessages";
+import "@/app/design/vtk-poc-poll.css";
+import { SharedAlbumGateCard } from "@/components/media/SharedAlbumGate";
+import { FlowPreview } from "./FlowPreview";
+import { MailPreviewList } from "./MailPreviewList";
+
+/**
+ * Voorvertoning van alles wat je op de site zelf niet te zien krijgt: de twee
+ * gates (onboarding en de jaarlijkse studiebevestiging) en elke mail die de
+ * site opstelt.
+ *
+ * Beide schermen zie je precies één keer, en daarna nooit meer. Daardoor is er
+ * geen manier om te controleren of ze nog kloppen: je eigen account is al
+ * onboarded, en het werkingsjaar rolt maar één keer per jaar om. Wie het toch
+ * wou zien, moest een testaccount aanmaken of `onboardedAt` in de database op
+ * null zetten, en dat laatste is precies hoe je per ongeluk je eigen profiel
+ * wist.
+ *
+ * Deze pagina toont daarom **de echte formulieren**, met een opslaan-actie die
+ * niets bewaart (`previewNoopAction`). Een nagebouwde kopie zou vroeg of laat
+ * afwijken van wat een nieuw lid werkelijk ziet, en dan is de voorvertoning
+ * erger dan geen voorvertoning.
+ *
+ * Voor de mails geldt hetzelfde, en om dezelfde reden: die vertrekken wanneer
+ * iemand anders iets doet, soms dagen later en soms enkel op een server met een
+ * mailserver erachter. `lib/mailPreviews.ts` roept per mail de echte template
+ * aan met verzonnen gegevens. **Komt er een mail bij (of een scherm dat je enkel
+ * onder bepaalde omstandigheden ziet), dan hoort ze daar meteen bij**; zie
+ * CLAUDE.md.
+ *
+ * De regels erboven zijn geen documentatie maar afgeleide waarden: het huidige
+ * academiejaar, de eerstvolgende omslag, en de eigen staat van de kijker.
+ */
+/** Vaste momenten voor de Discord-voorvertoning: 2 oktober 2026, twee weken vooraf bekeken. */
+const DISCORD_SAMPLE_START = Date.parse("2026-10-02T18:00:00.000Z");
+const DISCORD_SAMPLE_NOW = Date.parse("2026-09-18T12:00:00.000Z");
+
+/** De tabbladen; elk is een eigen route onder deze module (zie de layout). */
+export type FlowsSection = "schermen" | "mails";
+
+export async function FlowsAdminPage({
+  section,
+  params,
+}: {
+  section: FlowsSection;
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: localeParam } = await params;
+  if (!hasLocale(localeParam)) notFound();
+  const locale: Locale = localeParam;
+  const nl = locale === "nl";
+
+  // Superadmin-only, net als de rest van de IT-groep.
+  const session = await requireSession();
+  if (!session.user.isSuperAdmin) notFound();
+
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: session.user.id },
+    select: {
+      email: true,
+      selfRegisteredAt: true,
+      name: true,
+      firstName: true,
+      lastName: true,
+      rNumber: true,
+      rNumberFromKul: true,
+      avatarKey: true,
+      noKot: true,
+      street: true,
+      houseNumber: true,
+      bus: true,
+      postalCode: true,
+      city: true,
+      homeStreet: true,
+      homeHouseNumber: true,
+      homeBus: true,
+      homePostalCode: true,
+      homeCity: true,
+      birthDate: true,
+      personalEmail: true,
+      phone: true,
+      emailPreference: true,
+      mailCategories: true,
+      mailUnsubscribedAt: true,
+      shiftReminderDayBefore: true,
+      shiftReminderSoon: true,
+      calendarOnlyMyAudiences: true,
+      studyYears: true,
+      studyProgrammes: true,
+      isStudent: true,
+      firwStudent: true,
+      honoraryMember: true,
+      notAtFaculty: true,
+      notStudying: true,
+      academicStaffRole: true,
+      internationalStudent: true,
+      sideEntrant: true,
+      alumni: true,
+      graduationYear: true,
+      wasInVtk: true,
+      alumniMailOptIn: true,
+      onboardedAt: true,
+      studyConfirmedYear: true,
+    },
+  });
+
+  const dict = getDictionary(locale);
+  const year = currentStudyYear();
+  const ownUrenloop = await getRunnerStats(user.rNumber);
+  // De ronde loopt een week achter op de jaarnaam; de gate hangt aan de ronde.
+  const confirmationYear = studyConfirmationYear();
+
+  // Beide schermen dragen ook de lidmaatschapsvraag, dus draagt de
+  // voorvertoning ze ook. Het echte aanbod hangt aan de eigen staat van de
+  // kijker: wie dit academiejaar al lid is, of wiens weg gesloten staat, krijgt
+  // van `membershipOffer` een `none` terug en dus geen vinkje. In een
+  // voorvertoning is dat het verkeerde antwoord, want dan lijkt de vraag niet
+  // te bestaan. We tonen daarom altijd de weg die bij deze kijker hoort (gratis
+  // voor een student van de faculteit, betalend voor de rest) en zeggen ernaast
+  // wanneer een lid ze werkelijk ziet.
+  const [membership, membershipConfig] = await Promise.all([
+    getMembership(session.user.id, year),
+    getMembershipConfig(),
+  ]);
+  const offer = membershipOffer(user, membership, membershipConfig);
+  const previewOffer: MembershipOffer = user.firwStudent
+    ? { kind: "faculty", priceCents: 0 }
+    : { kind: "external", priceCents: membershipConfig.externalPriceCents };
+  const previewLabels = membershipChoiceLabels(locale, previewOffer, year);
+  const membershipRule = nl
+    ? "Onderaan staat de lidmaatschapsvraag: gratis voor een student van de faculteit (User.firwStudent, uit de SSO), betalend voor wie dat niet is. Ze valt weg voor wie dit academiejaar al lid is en wanneer die weg gesloten staat in /admin/leden; hieronder staat ze altijd, anders lijkt ze niet te bestaan."
+    : "The membership question sits at the bottom: free for a faculty student (User.firwStudent, from SSO), paid for anyone else. It falls away for anyone who is already a member this academic year and when that route is closed in /admin/leden; below it is always shown, or it would look like it does not exist.";
+  const membershipState = (
+    <>
+      <div className="flex justify-between gap-4">
+        <dt>firwStudent</dt>
+        <dd className="text-right">{user.firwStudent ? (nl ? "ja" : "yes") : nl ? "nee" : "no"}</dd>
+      </div>
+      <div className="flex justify-between gap-4">
+        <dt>{nl ? `Lid voor ${formatWorkingYear(year)}` : `Member for ${formatWorkingYear(year)}`}</dt>
+        <dd className="text-right">{membership ? (nl ? "ja" : "yes") : nl ? "nee" : "no"}</dd>
+      </div>
+      <div className="flex justify-between gap-4">
+        <dt>{nl ? "Lidmaatschapsvraag" : "Membership question"}</dt>
+        <dd className="text-right">
+          {offer.kind === "none" ? (nl ? "nee" : "no") : nl ? "ja" : "yes"}
+        </dd>
+      </div>
+    </>
+  );
+
+  // Dezelfde redenering voor de Career-opt-in, die enkel op de bevestiging
+  // staat: wie ze ooit aanduidde krijgt ze niet meer te zien, dus zou ze uit de
+  // voorvertoning verdwijnen net wanneer je ze wil nakijken.
+  const askCareer = shouldAskCareerOptIn(user);
+  const careerCopy = careerOptInCopy(locale);
+  const careerState = (
+    <>
+      <div className="flex justify-between gap-4">
+        <dt>{nl ? "Career aangeduid" : "Career opted in"}</dt>
+        <dd className="text-right">
+          {user.mailCategories.includes("CAREER") ? (nl ? "ja" : "yes") : nl ? "nee" : "no"}
+        </dd>
+      </div>
+      <div className="flex justify-between gap-4">
+        <dt>{nl ? "Career-vraag" : "Career question"}</dt>
+        <dd className="text-right">{askCareer ? (nl ? "ja" : "yes") : nl ? "nee" : "no"}</dd>
+      </div>
+    </>
+  );
+
+  // De eerstvolgende 21 september: dat is het moment waarop iedereen tegelijk
+  // de bevestigingsgate voor zijn neus krijgt. Op de bevestigingsronde en niet
+  // op het academiejaar: dat laatste is op 14 september al omgeslagen.
+  const rollover = studyConfirmationStart(confirmationYear + 1).toLocaleDateString(nl ? "nl-BE" : "en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Europe/Brussels",
+  });
+
+  const dateOrNever = (value: Date | null) =>
+    value
+      ? value.toLocaleDateString(nl ? "nl-BE" : "en-GB", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        })
+      : nl
+        ? "nooit"
+        : "never";
+
+  const previewSaved = nl
+    ? "Voorbeeld: er is niets opgeslagen."
+    : "Preview: nothing was saved.";
+
+  // De Discord-post met verzonnen gegevens, door dezelfde functie als een echte
+  // post. Een vast moment, zodat "over 2 weken" niet elke dag verschuift.
+  const discordWebhooks = await prisma.discordWebhook.count();
+
+  // De strook en de vragen van een POC-peiling, met dezelfde teksten als op de
+  // site. De strook staat hier naast elkaar in elke situatie.
+  const pollNow = new Date();
+  const pollSample = samplePocPoll(pollNow);
+  const myOpenPolls = await getViewerPocPolls(session.user.id);
+  const pollDiscordView: DiscordPollView = {
+    id: "voorbeeld",
+    title: pollSample.titleNl,
+    pocName: "Computerwetenschappen",
+    closesAt: new Date(pollSample.closesAt),
+    meetingDate: pollSample.meetingDate,
+    siteOrigin: siteUrl(),
+    questions: pollSample.questions.map((question) => ({
+      id: question.id,
+      kind: question.kind,
+      text: question.textNl,
+      low: null,
+      high: null,
+    })),
+  };
+  const asPollPreview = (message: PollBotMessage) => ({
+    ...message,
+    username: "VTK Peilingen",
+    avatar_url: DISCORD_AVATAR_PATH,
+  });
+  const pollDiscordMessages = [
+    { label: nl ? "Koppelbericht in het publieke kanaal" : "Link message in the public channel", ephemeral: false, message: discordLinkPanelMessage() },
+    { label: nl ? "Na een klik: al gekoppeld" : "After a click: already linked", ephemeral: true, message: discordAccessMessage(["Computerwetenschappen"]) },
+    { label: nl ? "Na een klik: geen richting met een kanaal" : "After a click: no programme with a channel", ephemeral: true, message: discordNoPocMessage(`${siteUrl()}/account#profile`, ["POC Energie heeft nog geen kanaal op Discord. Vraag het aan je RiVers of aan VTK Onderwijs."]) },
+    { label: nl ? "Na een klik: studie niet bevestigd" : "After a click: study not confirmed", ephemeral: true, message: discordConfirmStudyMessage(`${siteUrl()}/studie-bevestigen`) },
+    { label: nl ? "In het kanaal" : "In the channel", ephemeral: false, message: pollChannelMessage(pollDiscordView) },
+    {
+      label: nl ? "In het kanaal, algemene peiling van VTK Onderwijs" : "In the channel, general poll by VTK Onderwijs",
+      ephemeral: false,
+      message: pollChannelMessage({ ...pollDiscordView, pocName: null }),
+    },
+    { label: nl ? "Vraag per vraag" : "Question by question", ephemeral: true, message: pollStepMessage(pollDiscordView, 1, undefined) },
+    { label: nl ? "Klaar" : "Done", ephemeral: true, message: pollDoneMessage() },
+    { label: nl ? "Eerste keer: koppelen" : "First time: linking", ephemeral: true, message: pollLinkAccountMessage(`${siteUrl()}/koppel-discord`) },
+    { label: nl ? "Na de deadline" : "After the deadline", ephemeral: false, message: pollClosedChannelMessage(pollDiscordView, 84, { summaryPublished: false, meetingAhead: true }) },
+  ];
+  const pollFaces = [
+    { initials: "LJ", avatarUrl: null },
+    { initials: "AP", avatarUrl: null },
+    { initials: "NE", avatarUrl: null },
+  ];
+  const pollStrips = [
+    {
+      label: nl ? "Op de homepage" : "On the homepage",
+      place: "home" as const,
+      jump: true,
+      faces: pollFaces,
+      copy: pollStripCopy("poll", { locale, questionCount: 4, meetingDate: pollSample.meetingDate, closesAt: pollSample.closesAt, now: pollNow }),
+    },
+    {
+      label: nl ? "Op een andere pagina" : "On another page",
+      place: "away" as const,
+      jump: true,
+      faces: pollFaces,
+      copy: pollStripCopy("poll", { locale, questionCount: 4, meetingDate: pollSample.meetingDate, closesAt: pollSample.closesAt, now: pollNow }),
+    },
+    {
+      label: nl ? "De laatste dagen" : "The last days",
+      place: "home" as const,
+      jump: true,
+      faces: pollFaces,
+      copy: pollStripCopy("poll", { locale, questionCount: 4, meetingDate: pollSample.meetingDate, closesAt: new Date(pollNow.getTime() + 24 * 60 * 60 * 1000).toISOString(), now: pollNow }),
+    },
+    {
+      label: nl ? "Algemene peiling van VTK Onderwijs" : "General poll by VTK Onderwijs",
+      place: "away" as const,
+      jump: true,
+      faces: [],
+      copy: pollStripCopy("poll", { locale, questionCount: 4, meetingDate: null, closesAt: pollSample.closesAt, now: pollNow, general: true }),
+    },
+    {
+      label: nl ? "Niet aangemeld, enkel op de homepage" : "Signed out, homepage only",
+      place: "home" as const,
+      jump: false,
+      faces: [],
+      copy: pollStripCopy("signIn", { locale, now: pollNow }),
+    },
+    {
+      label: nl ? "Aangemeld zonder richting, enkel op de homepage" : "Signed in without a programme, homepage only",
+      place: "home" as const,
+      jump: false,
+      faces: [],
+      copy: pollStripCopy("noProgramme", { locale, now: pollNow }),
+    },
+  ];
+  const origin = siteUrl();
+  const discordSample = discordEventMessage(
+    {
+      title: "Voorbeeldcantus",
+      description:
+        "Een avond vol **liederen**, bier en nieuwe vrienden. Iedereen welkom, ook wie nog nooit een cantus meemaakte.\n\nMeer uitleg over de [codex](/kalender) op de site.",
+      start: new Date(DISCORD_SAMPLE_START),
+      end: new Date(DISCORD_SAMPLE_START + 4 * 60 * 60 * 1000),
+      allDay: false,
+      moments: [],
+      location: "Theokot",
+      organiser: "Onthaal",
+      imageUrl: `${origin}/default-event.jpg`,
+      infoUrl: `${origin}/kalender`,
+      link: { kind: "tickets", label: "Tickets kopen", url: `${origin}/tickets` },
+      siteOrigin: origin,
+    },
+    { avatarUrl: `${origin}${DISCORD_AVATAR_PATH}` },
+  );
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="mt-1 max-w-3xl text-sm text-[#5c667f]">
+          {nl
+            ? "Alles wat je op de site zelf niet te zien krijgt: de schermen die een lid maar één keer of via een mail ziet, de Discord-post van een nieuw evenement, en elke mail die de site opstelt. Hieronder staat per stuk wanneer het verschijnt en hoe het eruitziet. Het zijn de echte formulieren en de echte templates, maar er wordt hier niets opgeslagen en er vertrekt niets."
+            : "Everything you cannot see on the site itself: the screens a member only sees once or through an email, the Discord post for a new event, and every email the site composes. Below is when each one appears and what it looks like. These are the real forms and the real templates, but nothing is saved here and nothing is sent."}
+        </p>
+      </div>
+
+      {section === "schermen" && (
+      <FlowPreview
+        title={nl ? "Onboarding" : "Onboarding"}
+        when={
+          nl
+            ? "Verschijnt bij élke paginanavigatie zolang het lid zijn profiel nog niet invulde."
+            : "Appears on every page navigation as long as the member has not filled in their profile."
+        }
+        openLabel={nl ? "Toon het formulier" : "Show the form"}
+        closeLabel={nl ? "Verberg het formulier" : "Hide the form"}
+        rules={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Wanneer" : "When"}</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4">
+              <li>
+                {nl
+                  ? "Zodra iemand voor het eerst inlogt via KU Leuven SSO of zelf een account aanmaakt: hij start met onboardedAt = null."
+                  : "As soon as someone signs in with KU Leuven SSO for the first time or creates an account: they start with onboardedAt = null."}
+              </li>
+              <li>
+                {nl
+                  ? "De gate staat op de netwerkgrens (proxy.ts), niet in een layout: een redirect uit een gedeelde layout zet de router in een oneindige lus."
+                  : "The gate lives at the network edge (proxy.ts), not in a layout: a redirect from a shared layout puts the router in an infinite loop."}
+              </li>
+              <li>
+                {nl
+                  ? "Enkel /privacy en /cookies blijven bereikbaar, want het formulier linkt er zelf naartoe."
+                  : "Only /privacy and /cookies stay reachable, because the form itself links to them."}
+              </li>
+              <li>
+                {nl
+                  ? "Invullen stempelt onboardedAt en, enkel voor de status Student, studyConfirmedYear."
+                  : "Submitting stamps onboardedAt and, only for the Student status, studyConfirmedYear."}
+              </li>
+              <li>{membershipRule}</li>
+            </ul>
+          </>
+        }
+        yourState={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Jouw account" : "Your account"}</p>
+            <dl className="mt-2 space-y-1">
+              <div className="flex justify-between gap-4">
+                <dt>onboardedAt</dt>
+                <dd className="text-right">{dateOrNever(user.onboardedAt)}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt>{nl ? "Gate actief" : "Gate active"}</dt>
+                <dd className="text-right">
+                  {user.onboardedAt ? (nl ? "nee" : "no") : nl ? "ja" : "yes"}
+                </dd>
+              </div>
+              {membershipState}
+            </dl>
+          </>
+        }
+      >
+        <ProfileForm
+          locale={locale}
+          user={user}
+          submitLabel={dict.onboarding.submit}
+          action={previewNoopAction}
+          savedMessage={previewSaved}
+          showCalendarPreference={false}
+          membership={{ offer: previewOffer, labels: previewLabels }}
+        />
+      </FlowPreview>
+      )}
+
+      {section === "schermen" && (
+      <FlowPreview
+        title={nl ? "Jaarlijkse studiebevestiging" : "Yearly study confirmation"}
+        when={
+          nl
+            ? "Verschijnt na de onboarding, zodra het academiejaar omslaat en het lid zijn studie nog niet opnieuw bevestigde."
+            : "Appears after onboarding, once the academic year rolls over and the member has not reconfirmed their studies."
+        }
+        openLabel={nl ? "Toon het formulier" : "Show the form"}
+        closeLabel={nl ? "Verberg het formulier" : "Hide the form"}
+        rules={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Wanneer" : "When"}</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4">
+              <li>
+                {nl
+                  ? `Enkel met de status Student, zodra User.studyConfirmedYear achterloopt op de lopende bevestigingsronde (${formatWorkingYear(confirmationYear)}). Het lopende academiejaar is ${formatWorkingYear(year)}.`
+                  : `Only with the Student status, as soon as User.studyConfirmedYear lags behind the running confirmation round (${formatWorkingYear(confirmationYear)}). The current academic year is ${formatWorkingYear(year)}.`}
+              </li>
+              <li>
+                {nl
+                  ? `Het academiejaar rolt om op 14 september, na de herexamens; de bevestigingsronde opent een week later op 21 september, zodat niemand geblokkeerd wordt voor de eerste lesweek. De eerstvolgende omslag is ${rollover}; dan krijgen alle studenten dit scherm.`
+                  : `The academic year rolls over on 14 September, after the resits; the confirmation round opens a week later on 21 September, so nobody is blocked before the first week of classes. The next rollover is ${rollover}; all students then get this screen.`}
+              </li>
+              <li>
+                {nl
+                  ? "De vorige studiegegevens en adressen staan voorgevuld: bevestigen blijft snel voor wie niets wijzigt."
+                  : "The previous study details and addresses are prefilled, so confirming stays quick when nothing changed."}
+              </li>
+              <li>
+                {nl
+                  ? "Wie hier niet bevestigt, valt uit elke studiegerichte mailinglijst. Alumni, personeel en andere niet-studenten krijgen deze gate niet."
+                  : "Anyone who does not confirm falls out of every study-related mailing list. Alumni, staff and other non-students do not get this gate."}
+              </li>
+              <li>
+                {nl
+                  ? "Het lid ziet dit in twee stappen: eerst studie en adressen, dan het lidmaatschap en Career, met één keer versturen op het einde. Hieronder staan beide stappen onder elkaar."
+                  : "The member sees this in two steps: studies and addresses first, then membership and Career, submitted once at the end. Below, both steps are shown one after another."}
+              </li>
+              <li>{membershipRule}</li>
+              <li>
+                {nl
+                  ? "Daaronder staat de Career-opt-in: één vinkje voor de mailinglijst Career, niet voor de andere categorieën. We vragen ze enkel aan wie ze nog nooit aanduidde; ook wie zich via een mail uitschreef, buiten de faculteit studeert, geen richting aanduidt of enkel in eerste bachelor zit krijgt ze niet, want hun aanduiding zou geen mail opleveren. Dat laatste beslist het blok op wat het lid in stap 1 invult, niet op het profiel van vorig jaar: wie vorig jaar eerste bachelor was, krijgt ze nu dus wel. Hieronder staat ze altijd; de titel volgt wel wat je in stap 1 aanduidt."
+                  : "Below that sits the Career opt-in: one checkbox for the Career mailing list, not for the other categories. We only ask it of anyone who never ticked it; anyone who unsubscribed by email, studies outside the faculty, picks no programme or is only in first bachelor does not get it either, as their tick would never produce a mail. The block decides that last part on what the member fills in at step 1, not on last year's profile: someone who was in first bachelor last year does get it now. Below it is always shown; the title does follow what you pick in step 1."}
+              </li>
+            </ul>
+          </>
+        }
+        yourState={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Jouw account" : "Your account"}</p>
+            <dl className="mt-2 space-y-1">
+              <div className="flex justify-between gap-4">
+                <dt>isStudent</dt>
+                <dd className="text-right">{user.isStudent ? (nl ? "ja" : "yes") : nl ? "nee" : "no"}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt>studyConfirmedYear</dt>
+                <dd className="text-right">
+                  {user.studyConfirmedYear
+                    ? formatWorkingYear(user.studyConfirmedYear)
+                    : nl
+                      ? "nooit"
+                      : "never"}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt>{nl ? "Huidig academiejaar" : "Current academic year"}</dt>
+                <dd className="text-right">{formatWorkingYear(year)}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt>{nl ? "Gate actief" : "Gate active"}</dt>
+                <dd className="text-right">
+                  {needsStudyConfirmation(user) ? (nl ? "ja" : "yes") : nl ? "nee" : "no"}
+                </dd>
+              </div>
+              {membershipState}
+              {careerState}
+            </dl>
+          </>
+        }
+      >
+        {/* Hetzelfde fieldset als /studie-bevestigen, met dezelfde name-attributen:
+            zo blijft deze voorvertoning vanzelf gelijklopen met het echte scherm. */}
+        <SaveForm
+          action={previewNoopAction}
+          className="space-y-6"
+          submitLabel={dict.confirmStudy.submit}
+          savingLabel={dict.common.saving}
+          savedMessage={previewSaved}
+          fallbackErrorMessage={dict.common.saveError}
+          resetOnSuccess={false}
+        >
+          <p className="text-sm text-[#34405e]">{dict.confirmStudy.intro}</p>
+          {/* Dezelfde twee stappen als op het echte scherm, maar onder elkaar:
+              `SaveForm` bezit hier het formulier en de submitknop, en een
+              beheerder wil de volledige inhoud zien zonder door te klikken. */}
+          <ConfirmStudySteps
+            preview
+            labels={{
+              stepOf: dict.confirmStudy.stepOf,
+              continueLabel: dict.confirmStudy.continueLabel,
+              backLabel: dict.confirmStudy.back,
+              submitLabel: dict.confirmStudy.submit,
+              unchangedHint: dict.confirmStudy.unchangedHint,
+            }}
+            first={
+              <>
+                <StudyFieldset
+                  locale={locale}
+                  studyYears={user.studyYears}
+                  studyProgrammes={user.studyProgrammes}
+                  isStudent={user.isStudent}
+                  notAtFaculty={user.notAtFaculty}
+                  notStudying={user.notStudying}
+                  academicStaffRole={user.academicStaffRole}
+                  internationalStudent={user.internationalStudent}
+                  sideEntrant={user.sideEntrant}
+                  alumni={user.alumni}
+                  graduationYear={user.graduationYear}
+                  wasInVtk={user.wasInVtk}
+                  alumniMailOptIn={user.alumniMailOptIn}
+                />
+                <AddressConfirmation
+                  values={user}
+                  complete={hasCompleteAddresses(user)}
+                  addressLabels={{
+                    noKot: dict.onboarding.noKot,
+                    kotAddressHeading: dict.onboarding.kotAddressHeading,
+                    homeAddressHeading: dict.onboarding.homeAddressHeading,
+                    homeAddressHint: dict.onboarding.homeAddressHint,
+                    street: dict.onboarding.street,
+                    houseNumber: dict.onboarding.houseNumber,
+                    bus: dict.onboarding.bus,
+                    busHint: dict.onboarding.busHint,
+                    postalCode: dict.onboarding.postalCode,
+                    city: dict.onboarding.city,
+                  }}
+                  labels={{
+                    heading: dict.confirmStudy.addressesHeading,
+                    question: dict.confirmStudy.addressesQuestion,
+                    yes: dict.confirmStudy.addressesYes,
+                    no: dict.confirmStudy.addressesNo,
+                    incomplete: dict.confirmStudy.addressesIncomplete,
+                    noKot: dict.confirmStudy.noKot,
+                    kotAddress: dict.confirmStudy.kotAddress,
+                    homeAddress: dict.confirmStudy.homeAddress,
+                  }}
+                />
+              </>
+            }
+            second={
+              <>
+                <MembershipChoice offer={previewOffer} labels={previewLabels} />
+                <CareerOptIn
+                  copy={careerCopy}
+                  initial={{
+                    isStudent: user.isStudent,
+                    notAtFaculty: user.notAtFaculty,
+                    studyYears: user.studyYears,
+                    studyProgrammes: user.studyProgrammes,
+                  }}
+                  photoAlt={dict.confirmStudy.careerPhotoAlt}
+                  alwaysShow
+                />
+              </>
+            }
+          />
+        </SaveForm>
+      </FlowPreview>
+      )}
+
+      {section === "schermen" && (
+      <FlowPreview
+        title={nl ? "Uitschrijven voor een mailinglijst" : "Unsubscribe from a mailing list"}
+        when={
+          nl
+            ? "Verschijnt via de uitschrijfknop onderaan een mail van een mailinglijst, zoals de herinnering de dag voor een evenement."
+            : "Appears through the unsubscribe button at the bottom of a mailing-list email, such as the reminder the day before an event."
+        }
+        openLabel={nl ? "Toon het scherm" : "Show the screen"}
+        closeLabel={nl ? "Verberg het scherm" : "Hide the screen"}
+        rules={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Wanneer" : "When"}</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4">
+              <li>
+                {nl
+                  ? "Zonder login: de link draagt het lid en de lijst, ondertekend met het sitegeheim (lib/mailUnsubscribe.ts). Hij vervalt niet."
+                  : "Without signing in: the link carries the member and the list, signed with the site secret (lib/mailUnsubscribe.ts). It does not expire."}
+              </li>
+              <li>
+                {nl
+                  ? "Eerst een klik: mailscanners openen elke link in een mail en zouden anders iedereen uitschrijven. De knop van Gmail en Outlook zelf post rechtstreeks naar /api/mail/uitschrijven."
+                  : "A click first: mail scanners open every link in an email and would otherwise unsubscribe everyone. The button Gmail and Outlook show themselves posts straight to /api/mail/uitschrijven."}
+              </li>
+              <li>
+                {nl
+                  ? "Uitschrijven zet enkel die ene lijst uit in het profiel, net als het vinkje op /account, en duwt het meteen naar Brevo. Daarna toont de pagina de bevestiging."
+                  : "Unsubscribing only turns that one list off in the profile, like the checkbox on /account, and pushes it to Brevo right away. The page then shows the confirmation."}
+              </li>
+            </ul>
+          </>
+        }
+        yourState={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Jouw account" : "Your account"}</p>
+            <dl className="mt-2 space-y-1">
+              <div className="flex justify-between gap-4">
+                <dt>{dict.onboarding.categories.EVENEMENTEN}</dt>
+                <dd className="text-right">
+                  {user.mailCategories.includes("EVENEMENTEN") ? (nl ? "aan" : "on") : nl ? "uit" : "off"}
+                </dd>
+              </div>
+            </dl>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <UnsubscribePanel
+            locale={locale}
+            categoryLabel={dict.onboarding.categories.EVENEMENTEN}
+            state="confirm"
+            token=""
+            action={previewNoopAction}
+            accountHref={nl ? "/account" : "/en/account"}
+          />
+          <UnsubscribePanel
+            locale={locale}
+            categoryLabel={dict.onboarding.categories.EVENEMENTEN}
+            state="done"
+            token=""
+            action={previewNoopAction}
+            accountHref={nl ? "/account" : "/en/account"}
+          />
+        </div>
+      </FlowPreview>
+      )}
+
+      {section === "schermen" && (
+      <FlowPreview
+        title={nl ? "Discord-post van een nieuw evenement" : "Discord post for a new event"}
+        when={
+          nl
+            ? "Verschijnt in elk Discord-kanaal uit /admin/kalender/discord twee weken voor een evenement met eigen banner begint, of meteen wanneer het later gepubliceerd wordt of de banner er later bij komt."
+            : "Appears in every Discord channel from /admin/kalender/discord two weeks before an event with its own banner starts, or right away when it is published or gets its banner later than that."
+        }
+        openLabel={nl ? "Toon de post" : "Show the post"}
+        closeLabel={nl ? "Verberg de post" : "Hide the post"}
+        rules={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Wanneer" : "When"}</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4">
+              <li>
+                {nl
+                  ? "Eén keer per kanaal per evenement (lib/discord/rules.ts). Een latere wijziging aan titel, banner of beschrijving post niets opnieuw."
+                  : "Once per channel per event (lib/discord/rules.ts). A later change to the title, banner or description does not post again."}
+              </li>
+              <li>
+                {nl
+                  ? "Wat al binnen de twee weken voor zijn start viel toen de webhook erbij kwam, post je met de hand; de rest volgt vanzelf."
+                  : "What was already within two weeks of its start when the webhook was added is posted by hand; the rest follows by itself."}
+              </li>
+              <li>
+                {nl
+                  ? "De knoppen lopen via een klikteller (/api/discord/klik), zodat het beheer ziet hoeveel mensen er klikten."
+                  : "The buttons go through a click counter (/api/discord/klik), so the admin sees how many people clicked."}
+              </li>
+            </ul>
+          </>
+        }
+        yourState={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Webhooks" : "Webhooks"}</p>
+            <dl className="mt-2 space-y-1">
+              <div className="flex justify-between gap-4">
+                <dt>{nl ? "Kanalen" : "Channels"}</dt>
+                <dd className="text-right">{discordWebhooks}</dd>
+              </div>
+            </dl>
+          </>
+        }
+      >
+        <DiscordMessagePreview message={discordSample} now={new Date(DISCORD_SAMPLE_NOW)} />
+      </FlowPreview>
+      )}
+
+      {section === "schermen" && (
+      <FlowPreview
+        title={nl ? "24 urenloop in het account" : "24-hour run in the account"}
+        when={
+          nl
+            ? "Verschijnt op Mijn VTK (#urenloop) en op /account/24urenloop voor wie een r-nummer in zijn profiel heeft waarop rondes staan, zodra Sport laps.csv oplaadde in /admin/24urenloop."
+            : "Appears on My VTK (#urenloop) and on /account/24urenloop for anyone with an r-number in their profile that has laps, once Sport uploaded laps.csv in /admin/24urenloop."
+        }
+        openLabel={nl ? "Toon het scherm" : "Show the screen"}
+        closeLabel={nl ? "Verberg het scherm" : "Hide the screen"}
+        rules={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Wanneer" : "When"}</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4">
+              <li>
+                {nl
+                  ? "De koppeling gebeurt bij het lezen, op User.rNumber: wie later een account maakt of zijn r-nummer invult, ziet zijn rondes vanzelf."
+                  : "The link is made when reading, on User.rNumber: anyone who creates an account or fills in their r-number later sees their laps automatically."}
+              </li>
+              <li>
+                {nl
+                  ? "De plaatsen tellen elke loper van dat jaar, ook wie geen r-nummer had; de noodrondes van niemand niet."
+                  : "Ranks count every runner of that year, including those without an r-number; emergency laps of nobody do not."}
+              </li>
+              <li>
+                {nl
+                  ? "Hieronder een verzonnen loper, niet iemands echte rondes."
+                  : "Below is an invented runner, not anyone's real laps."}
+              </li>
+            </ul>
+          </>
+        }
+        yourState={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Jouw account" : "Your account"}</p>
+            <dl className="mt-2 space-y-1">
+              <div className="flex justify-between gap-4">
+                <dt>{nl ? "r-nummer" : "r-number"}</dt>
+                <dd className="text-right">{user.rNumber ?? (nl ? "geen" : "none")}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt>{nl ? "Jaren met rondes" : "Years with laps"}</dt>
+                <dd className="text-right">
+                  {ownUrenloop.length > 0 ? ownUrenloop.map((y) => y.year).join(", ") : nl ? "geen" : "none"}
+                </dd>
+              </div>
+            </dl>
+          </>
+        }
+      >
+        <div className="vtk-admin-preview">
+          <RunnerYearPanel stats={sampleRunnerStats()} locale={locale} />
+        </div>
+      </FlowPreview>
+      )}
+
+      {section === "schermen" && (
+      <FlowPreview
+        title={nl ? "POC-peiling: de strook en de vragen" : "POC poll: the strip and the questions"}
+        when={
+          nl
+            ? "Zolang de RiVers van je richting een peiling open hebben staan en je ze nog niet invulde."
+            : "While the student reps of your programme have a poll open and you have not answered it."
+        }
+        openLabel={nl ? "Toon de strook en de vragen" : "Show the strip and the questions"}
+        closeLabel={nl ? "Verberg de strook en de vragen" : "Hide the strip and the questions"}
+        rules={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Wanneer" : "When"}</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li>
+                {nl
+                  ? "De strook staat op elke pagina, behalve in het beheer en tijdens aanmelden, onboarding of afrekenen."
+                  : "The strip is on every page, except in the admin and while signing in, onboarding or checking out."}
+              </li>
+              <li>
+                {nl
+                  ? "Invullen haalt ze meteen weg; wegklikken onthoudt een cookie per peiling."
+                  : "Answering removes it at once; dismissing is remembered in a cookie per poll."}
+              </li>
+              <li>
+                {nl
+                  ? "Hieronder een verzonnen peiling. Versturen bewaart niets."
+                  : "Below is an invented poll. Sending saves nothing."}
+              </li>
+            </ul>
+          </>
+        }
+        yourState={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Jouw account" : "Your account"}</p>
+            <dl className="mt-2 space-y-1">
+              <div className="flex justify-between gap-4">
+                <dt>{nl ? "Richtingen" : "Programmes"}</dt>
+                <dd className="text-right">{user.studyProgrammes.length}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt>{nl ? "Open peilingen voor jou" : "Open polls for you"}</dt>
+                <dd className="text-right">{myOpenPolls.length}</dd>
+              </div>
+            </dl>
+          </>
+        }
+      >
+        <div className="space-y-6">
+          <div className="space-y-3">
+            {pollStrips.map((strip) => (
+              <div key={strip.label}>
+                <p className="mb-1 text-sm text-[#5c667f]">{strip.label}</p>
+                <PocPollStripBar
+                  pollId={pollSample.id}
+                  scope="site"
+                  href="#"
+                  jump={strip.jump}
+                  copy={strip.copy}
+                  faces={strip.faces}
+                  hideLabel={nl ? "Verbergen" : "Hide"}
+                  previewPlace={strip.place}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="rounded-2xl p-5" style={{ background: "var(--navy)" }}>
+            <PocPollPanel
+              poll={pollPanelData(pollSample, locale, pollNow)}
+              labels={pollPanelLabels(locale)}
+              action={previewNoopAction}
+            />
+          </div>
+        </div>
+      </FlowPreview>
+      )}
+
+      {section === "schermen" && (
+      <FlowPreview
+        title={nl ? "POC-peiling op Discord" : "POC poll on Discord"}
+        when={
+          nl
+            ? "Wanneer een RiVer een peiling publiceert met een Discord-kanaal, en wanneer iemand op een knop drukt."
+            : "When a student rep publishes a poll with a Discord channel, and when someone presses a button."
+        }
+        openLabel={nl ? "Toon de berichten" : "Show the messages"}
+        closeLabel={nl ? "Verberg de berichten" : "Hide the messages"}
+        rules={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Wanneer" : "When"}</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li>
+                {nl
+                  ? "Eén ja/nee-vraag of score staat met knoppen in het kanaal; al de rest start met één knop en loopt vraag per vraag."
+                  : "A single yes/no or score question has buttons in the channel; everything else starts with one button and runs question by question."}
+              </li>
+              <li>
+                {nl
+                  ? "Wie nog niet koppelde, krijgt eerst de link naar de site."
+                  : "Anyone who has not linked yet first gets the link to the site."}
+              </li>
+            </ul>
+          </>
+        }
+        yourState={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Koppeling" : "Connection"}</p>
+            <p className="mt-2">
+              {discordBotConfigured()
+                ? nl ? "De Discord-bot is ingesteld." : "The Discord bot is configured."
+                : nl ? "De Discord-bot is nog niet ingesteld." : "The Discord bot is not configured yet."}
+            </p>
+          </>
+        }
+      >
+        <div className="space-y-5">
+          {pollDiscordMessages.map((item) => (
+            <div key={item.label}>
+              <p className="mb-1 text-sm text-[#5c667f]">{item.label}</p>
+              <DiscordMessagePreview message={asPollPreview(item.message)} now={pollNow} ephemeral={item.ephemeral} />
+            </div>
+          ))}
+          <div>
+            <p className="mb-1 text-sm text-[#5c667f]">{nl ? "Koppelen op de site" : "Linking on the site"}</p>
+            <DiscordLinkForm token="voorbeeld" labels={discordLinkLabels(nl, "voorbeeld_student")} action={previewNoopAction} />
+          </div>
+        </div>
+      </FlowPreview>
+      )}
+
+      {section === "schermen" && (
+      <FlowPreview
+        title={nl ? "Privélink naar een album: wanneer ze niet zomaar opengaat" : "Private album link: when it does not just open"}
+        when={
+          nl
+            ? "Verschijnt op /media/gedeeld/<token> in de plaats van de foto's: zonder sessie bij een link voor het praesidium of een werkgroep, ingelogd maar niet in die groep, of wanneer de link verlopen of ingetrokken is."
+            : "Appears on /media/gedeeld/<token> instead of the photos: without a session on a link for the praesidium or a working group, logged in but not in that group, or when the link expired or was revoked."
+        }
+        openLabel={nl ? "Toon de schermen" : "Show the screens"}
+        closeLabel={nl ? "Verberg de schermen" : "Hide the screens"}
+        rules={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Regels" : "Rules"}</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4">
+              <li>
+                {nl
+                  ? "Lidmaatschap telt in het werkingsjaar van vandaag, bij elk bezoek opnieuw (lib/media-share.ts). Geen link loopt voorbij 15 juli."
+                  : "Membership counts in today's working year, again on every visit (lib/media-share.ts). No link runs past 15 July."}
+              </li>
+              <li>
+                {nl
+                  ? "Geen scherm noemt de titel van het album of de groep. Verlopen, ingetrokken en nooit gemaakt geven hetzelfde scherm."
+                  : "No screen names the album title or the group. Expired, revoked and never created give the same screen."}
+              </li>
+              <li>
+                {nl
+                  ? "Na het inloggen gaat de ontvanger terug naar dezelfde link (?next=)."
+                  : "After logging in the recipient returns to the same link (?next=)."}
+              </li>
+            </ul>
+          </>
+        }
+        yourState={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Waar" : "Where"}</p>
+            <p className="mt-2">
+              {nl
+                ? "Links maak je in /admin/media, in het album zelf, bij Delen met een link."
+                : "Links are created in /admin/media, in the album itself, under Share with a link."}
+            </p>
+          </>
+        }
+      >
+        <div className="grid gap-6 lg:grid-cols-2">
+          <SharedAlbumGateCard kind="login" locale={locale} loginHref={`${nl ? "" : "/en"}/inloggen`} />
+          <SharedAlbumGateCard kind="forbidden" locale={locale} />
+          <SharedAlbumGateCard kind="gone" locale={locale} />
+          <SharedAlbumGateCard kind="unavailable" locale={locale} />
+        </div>
+      </FlowPreview>
+      )}
+
+      {section === "mails" && (
+      <section className="space-y-4 pt-2">
+        <div>
+          <h2 className="text-xl font-semibold text-vtk-ink">
+            {nl ? "Mails die de site verstuurt" : "Emails the site sends"}
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm text-[#5c667f]">
+            {nl
+              ? "Elke voorvertoning roept dezelfde template aan als de verzender, met verzonnen gegevens. Wat er werkelijk verstuurd is, staat in het maillogboek."
+              : "Every preview calls the same template as the sender, with made-up data. What was actually sent is in the email log."}
+          </p>
+        </div>
+        <MailPreviewList groups={mailPreviewGroups()} />
+      </section>
+      )}
+
+      {/* De echte schermen, voor wie wil zien hoe ze in hun eigen paginakader
+          staan. Enkel zinvol wanneer de gate voor jou actief is; anders stuurt
+          de pagina je meteen door naar home. */}
+      {section === "schermen" && (
+      <div className="flex flex-wrap items-center gap-3 text-sm text-[#5c667f]">
+        <span>{nl ? "De echte schermen:" : "The real screens:"}</span>
+        <a
+          href={`${nl ? "" : "/en"}/onboarding`}
+          className="rounded-full border border-vtk-blue/15 px-3 py-1.5 font-medium text-vtk-ink transition-colors hover:bg-vtk-blue-soft/70"
+        >
+          /onboarding
+        </a>
+        <a
+          href={`${nl ? "" : "/en"}/studie-bevestigen`}
+          className="rounded-full border border-vtk-blue/15 px-3 py-1.5 font-medium text-vtk-ink transition-colors hover:bg-vtk-blue-soft/70"
+        >
+          /studie-bevestigen
+        </a>
+        <span>
+          {nl
+            ? "(die sturen je door naar home wanneer de gate voor jou niet actief is)"
+            : "(these redirect you home when the gate is not active for you)"}
+        </span>
+      </div>
+      )}
+    </div>
+  );
+}

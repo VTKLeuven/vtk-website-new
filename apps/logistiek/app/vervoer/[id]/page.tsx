@@ -14,7 +14,7 @@ import { reconcilePayments } from '@/lib/payments';
 import { getLocale } from '@/lib/i18n';
 import { getSession } from '@/lib/session';
 import { formatDateTime, formatPriceCents, toDatetimeLocalValue } from '@/lib/uitleen';
-import { hasSucceededPayment, vanBookingForMember } from '@/lib/uitleen-server';
+import { hasSucceededPayment, teamEditsForTransport, vanBookingForMember } from '@/lib/uitleen-server';
 
 export default async function VanBookingDetailPage({
   params,
@@ -44,6 +44,11 @@ export default async function VanBookingDetailPage({
       booking = (await vanBookingForMember(id, session.user.id, postIds))!;
     }
   }
+
+  // Wat Logistiek aan deze aanvraag veranderde (F6.11). Voor wie ze indiende: een
+  // collega ziet haar enkel, en wat hij zelf wijzigde telt niet mee.
+  const teamChanges =
+    (await teamEditsForTransport([{ id: booking.id, userId: booking.user.id }])).get(booking.id) ?? [];
 
   const paid = hasSucceededPayment(booking.payments) || booking.paidOfflineAt !== null;
   const cancellable =
@@ -105,6 +110,22 @@ export default async function VanBookingDetailPage({
                 ? `Requested by ${booking.user.name} for your post. You can see it; changing or cancelling stays with the requester.`
                 : `Aangevraagd door ${booking.user.name} voor jouw post. Je kan ze bekijken; aanpassen of annuleren blijft bij de aanvrager.`}
             </p>
+          ) : null}
+
+          {/* Wat Logistiek aan de aanvraag veranderde (F6.11): bovenaan en met de
+              gele rail, want het is het enige in deze kaart dat jij niet zelf
+              deed, en een goedkeuring met andere uren valt anders niet op. */}
+          {teamChanges.length > 0 ? (
+            <div className="mt-4 rounded-lg bg-vtk-paper px-4 py-3 text-sm text-vtk-body shadow-[inset_3px_0_0_var(--yellow)]">
+              <p className="font-semibold text-vtk-ink">
+                {en ? 'Logistics changed your request' : 'Logistiek paste je aanvraag aan'}
+              </p>
+              <ul className="mt-1 grid gap-0.5">
+                {teamChanges.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
           ) : null}
 
           {booking.memberNote ? (

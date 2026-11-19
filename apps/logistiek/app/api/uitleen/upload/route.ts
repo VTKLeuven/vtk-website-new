@@ -26,7 +26,10 @@ export async function POST(request: Request) {
 
   const bytes = Buffer.from(await file.arrayBuffer());
   let body: Buffer = bytes;
-  let contentType = file.type || 'application/octet-stream';
+  // Nooit `file.type` bewaren: dat kiest de browser. Een afbeelding wordt altijd
+  // een JPEG, en lukt dat niet, dan weigeren we ze. Vroeger bleef dan het
+  // opgegeven type staan, bv. `image/svg+xml`, en dat opent met script.
+  let contentType = 'application/pdf';
   if (isImage) {
     contentType = 'image/jpeg';
     try {
@@ -36,8 +39,10 @@ export async function POST(request: Request) {
         .jpeg({ quality: 84, mozjpeg: true })
         .toBuffer();
     } catch {
-      contentType = file.type || 'application/octet-stream';
+      return NextResponse.json({ error: 'invalid_image' }, { status: 415 });
     }
+  } else if (bytes.subarray(0, 1024).indexOf(Buffer.from('%PDF-')) === -1) {
+    return NextResponse.json({ error: 'invalid_pdf' }, { status: 415 });
   }
 
   const key = newStorageKey('uitleen', isImage ? 'foto.jpg' : file.name);

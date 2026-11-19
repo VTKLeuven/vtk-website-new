@@ -10,8 +10,13 @@ import { canAccessAnyForm } from '@/lib/forms/authorization';
 import { canSeeCommuRequests } from '@/lib/commu/requests';
 import { isExternalUrl } from '@/lib/href';
 import { getAdminNav, type NavGuard, type NavLeaf } from '@/lib/admin-nav';
-import { ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/adminNavCookie';
+import { canSeeMailGroups, mailGroupAccess } from '@/lib/google/access';
+import { isPocOnly, representedPocIds } from '@/lib/pocPolls/access';
+import { postenAccess } from '@/lib/postenAccess';
+import { countsForBo } from '@/lib/bo/own';
+import { ADMIN_DENSITY_COOKIE, ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/adminNavCookie';
 import { AdminNav, type NavItem, type NavNode } from './AdminNav';
+import { AdminSurface } from './AdminSurface';
 
 import '@/app/design/vtk-admin.css';
 
@@ -53,27 +58,45 @@ export default async function AdminLayout({
   const canAccessForms = session.user.isSuperAdmin || (await canAccessAnyForm());
   const canAccessCommuRequests = await canSeeCommuRequests();
 
-  // Is de gebruiker lid van minstens één werkgroep (huidig werkingsjaar)? Zij
-  // krijgen de Werkgroepen-tab om enkel hun eigen infotekst te bewerken.
-  const werkgroepMember =
-    session.groups.length > 0 &&
-    (await prisma.group.count({
-      where: { type: 'WERKGROEP', id: { in: session.groups.map((g) => g.id) } },
-    })) > 0;
+  // RiVers van dit werkingsjaar krijgen de tab Peilingen, zonder apart recht.
+  const pocRep =
+    !session.permissions.includes('pocs.manage') && (await representedPocIds(session.user.id)).length > 0;
+  // Een RiVer zonder post of werkgroep komt enkel voor de peilingen: geen
+  // dashboard en geen uitleendienst in de zijbalk.
+  const pocOnly = await isPocOnly(session);
+
+  // Groepsadressen: wie ze beheert of accounts goedkeurt, en een werkgroep die
+  // haar eigen adressen beheert. Dat laatste vraagt pas iets op met het recht.
+  const mailGroupsVisible =
+    session.permissions.includes('mailgroups.manage') ||
+    session.permissions.includes('googleAccounts.manage') ||
+    (session.permissions.includes('werkgroepen.manageOwnMembers') &&
+      canSeeMailGroups(await mailGroupAccess(session)));
+
+  // Posten & werkgroepen: één item voor vier tabbladen met elk hun eigen recht.
+  const posten = await postenAccess(session);
+  const postenVisible = posten.posts || posten.werkgroepen || posten.jaarwerkingen || posten.kiesploeg;
 
   // Mag de huidige gebruiker deze entry zien? Superadmin ziet alles.
   const canSee = (guard: NavGuard): boolean => {
     if (session.user.isSuperAdmin) return true;
     if (guard.superAdminOnly) return false;
+    if (guard.notForPocOnly && pocOnly) return false;
     // Ticketing-tab hangt af van ticket-toegang (eigen grant of globale perm),
     // niet van de gewone admin-permissies. canAccessTickets dekt superadmins al.
     if (guard.ticketing) return canAccessTickets;
     if (guard.forms) return canAccessForms;
     if (guard.commuRequests) return canAccessCommuRequests;
     // Werkgroepen-tab: beheerders óf gewone werkgroepleden.
-    if (guard.werkgroep) return session.permissions.includes('werkgroepen.manage') || werkgroepMember;
-    // Mijn budgetten: elk lid van een post of werkgroep, voor zijn eigen post.
-    if (guard.post) return session.groups.length > 0;
+    if (guard.werkgroep) return posten.werkgroepen;
+    if (guard.jaarwerking) return posten.jaarwerkingen;
+    // Mijn budgetten: elk lid van een post en de G3/G4 van een werkgroep, voor
+    // zijn eigen post. Een gewoon werkgroeplid en een jaarwerking tellen niet
+    // (zie `countsForBo` in lib/bo/own.ts).
+    if (guard.post) return session.groups.some(countsForBo);
+    if (guard.pocRep) return session.permissions.includes('pocs.manage') || pocRep;
+    if (guard.mailGroups) return mailGroupsVisible;
+    if (guard.posten) return postenVisible;
     if (guard.anyPerm) return guard.anyPerm.some((p) => session.permissions.includes(p));
     if (guard.perm) return session.permissions.includes(guard.perm);
     return true;
@@ -84,6 +107,7 @@ export default async function AdminLayout({
     href: isExternalUrl(leaf.href) ? leaf.href : `${base}/admin${leaf.href}`,
     label: adminDict[leaf.key],
     exact: leaf.exact,
+    hidden: leaf.hidden,
   });
 
   // Bouw de zichtbare nav. De volgorde staat vast in admin-nav.ts, ook
@@ -98,8 +122,12 @@ export default async function AdminLayout({
       // Een groep waarvan je maar één item mag zien, is een klik om niets: toon
       // dat item dan gewoon als los item. Behalve bij een groep die bewust
       // groeit (Apps): die blijft staan, zodat het item niet van plaats wisselt.
-      if (items.length === 1 && !entry.keepSingle) {
-        nodes.push({ type: 'item', item: items[0] });
+      // Verborgen items tellen niet mee: die staan niet in de lijst. Ze gaan
+      // wel mee in de nodes, voor het zoeken en de pins.
+      const listed = items.filter((i) => !i.hidden);
+      if (listed.length === 1 && !entry.keepSingle) {
+        nodes.push({ type: 'item', item: listed[0] });
+        for (const hidden of items.filter((i) => i.hidden)) nodes.push({ type: 'item', item: hidden });
       } else if (items.length > 0) {
         nodes.push({ type: 'group', key: entry.group, label: adminDict[entry.group], items });
       }
@@ -116,10 +144,12 @@ export default async function AdminLayout({
     select: { key: true },
   });
 
-  const collapsed = (await cookies()).get(ADMIN_NAV_COLLAPSED_COOKIE)?.value === '1';
+  const cookieStore = await cookies();
+  const collapsed = cookieStore.get(ADMIN_NAV_COLLAPSED_COOKIE)?.value === '1';
+  const compact = cookieStore.get(ADMIN_DENSITY_COOKIE)?.value === 'compact';
 
   return (
-    <div className="vtk-admin-surface">
+    <AdminSurface initialCompact={compact}>
       <div className="vtk-admin-surface-inner">
         {/* Sticky/scrollgedrag staat in AdminNav (useSmartSticky) plus het
             860px-breekpunt in vtk-admin.css (niet Tailwinds md:, dat 768px is). */}
@@ -146,10 +176,11 @@ export default async function AdminLayout({
               placeholder: adminDict.searchNavPlaceholder,
               empty: adminDict.searchNavEmpty,
             }}
+            densityLabel={adminDict.compactView}
           />
         </aside>
         <section className="vtk-admin-main">{children}</section>
       </div>
-    </div>
+    </AdminSurface>
   );
 }

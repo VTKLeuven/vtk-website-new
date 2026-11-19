@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { unsentGuard } from "@/components/ui/unsentGuard";
+import { useMemo, useState } from "react";
 import { Input, Label, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteButton, DeleteIconButton } from "@/components/ui/DeleteIconButton";
@@ -9,7 +10,6 @@ import {
   deleteRoleAction,
   setRolePermissionAction,
   removeUserRoleAction,
-  reorderRolesAction,
 } from "@/app/actions/roles";
 import { setGroupRoleAction } from "@/app/actions/users-groups";
 import { AddRoleMemberForm } from "./AddRoleMemberForm";
@@ -96,38 +96,16 @@ export function RolesTable({
   saveLabels: SaveLabels;
 }) {
   const nl = locale === "nl";
-  const [prevRoles, setPrevRoles] = useState(roles);
-  const [items, setItems] = useState<RoleRow[]>(roles);
   const [createOpen, setCreateOpen] = useState(false);
-  const [, startTransition] = useTransition();
 
-  if (roles !== prevRoles) {
-    setPrevRoles(roles);
-    setItems(roles);
-  }
-
-  const { query, setQuery, sort, toggleSort, filtered, isOpen, toggleRow } = useTableControls(items, {
+  // De server levert de rollen al alfabetisch (`sortRolesByName`); een klik op
+  // een kolomkop sorteert enkel deze weergave.
+  const { query, setQuery, sort, toggleSort, filtered, isOpen, toggleRow } = useTableControls(roles, {
     searchOf: (r) => r.searchText,
     nameOf: (r) => r.name,
     countOf: (r) => r.holderCount,
     locale,
   });
-
-  const dragFrom = useRef<number | null>(null);
-  const [overIndex, setOverIndex] = useState<number | null>(null);
-  const isReorderable = can.manageRoles && !query && !sort;
-
-  function onDrop(to: number) {
-    const from = dragFrom.current;
-    dragFrom.current = null;
-    setOverIndex(null);
-    if (from === null || from === to) return;
-    const next = [...items];
-    const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved);
-    setItems(next);
-    startTransition(() => void reorderRolesAction(next.map((r) => r.id)));
-  }
 
   return (
     <div className="space-y-4">
@@ -150,7 +128,6 @@ export function RolesTable({
         <table>
           <thead>
             <tr>
-              <th className="w-8" aria-hidden />
               <SortHeader label={nl ? "Rol" : "Role"} active={sort?.key === "name" ? sort.dir : null} onClick={() => toggleSort("name")} />
               <SortHeader
                 label={nl ? "Personen" : "People"}
@@ -162,29 +139,10 @@ export function RolesTable({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((role, index) => (
+            {filtered.map((role) => (
               <RoleRowView
                 key={role.id}
                 role={role}
-                isReorderable={isReorderable}
-                isOver={overIndex === index}
-                onDragStart={() => {
-                  dragFrom.current = index;
-                }}
-                onDragEnd={() => {
-                  dragFrom.current = null;
-                  setOverIndex(null);
-                }}
-                onDragOver={(e) => {
-                  if (!isReorderable) return;
-                  e.preventDefault();
-                  if (overIndex !== index) setOverIndex(index);
-                }}
-                onDrop={(e) => {
-                  if (!isReorderable) return;
-                  e.preventDefault();
-                  onDrop(index);
-                }}
                 isOpen={isOpen(role.id)}
                 onToggle={() => toggleRow(role.id)}
                 nl={nl}
@@ -231,12 +189,6 @@ export function RolesTable({
 
 function RoleRowView({
   role,
-  isReorderable,
-  isOver,
-  onDragStart,
-  onDragEnd,
-  onDragOver,
-  onDrop,
   isOpen,
   onToggle,
   nl,
@@ -250,12 +202,6 @@ function RoleRowView({
   saveLabels,
 }: {
   role: RoleRow;
-  isReorderable: boolean;
-  isOver: boolean;
-  onDragStart: () => void;
-  onDragEnd: () => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent) => void;
   isOpen: boolean;
   onToggle: () => void;
   nl: boolean;
@@ -276,11 +222,6 @@ function RoleRowView({
         tabIndex={0}
         aria-expanded={isOpen}
         aria-controls={detailId}
-        draggable={isReorderable}
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
-        onDragOver={onDragOver}
-        onDrop={onDrop}
         onClick={onToggle}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -288,19 +229,8 @@ function RoleRowView({
             onToggle();
           }
         }}
-        className={`cursor-pointer transition-colors ${isOver ? "border-vtk-blue bg-vtk-yellow/20" : ""}`}
+        className="cursor-pointer transition-colors"
       >
-        <td className="w-8 text-center text-zinc-400" onClick={(e) => isReorderable && e.stopPropagation()}>
-          {isReorderable && (
-            <span
-              className="cursor-grab active:cursor-grabbing hover:text-vtk-ink text-base select-none px-1"
-              title={nl ? "Sleep om volgorde te wijzigen" : "Drag to reorder"}
-              aria-hidden="true"
-            >
-              ⠿
-            </span>
-          )}
-        </td>
         <td>
           <div className="flex items-start gap-2">
             <Chevron open={isOpen} />
@@ -326,7 +256,7 @@ function RoleRowView({
       </tr>
       {isOpen && (
         <tr id={detailId}>
-          <td colSpan={4} className="bg-vtk-blue-soft/20">
+          <td colSpan={3} className="bg-vtk-blue-soft/20">
             <RoleDetail
               role={role}
               nl={nl}
@@ -531,7 +461,7 @@ function RoleDetail({
                       const on = enabledPerms.has(p.id);
                       return (
                         <li key={p.id}>
-                          <form action={setRolePermissionAction}>
+                          <form action={unsentGuard.form(setRolePermissionAction)}>
                             <input type="hidden" name="roleId" value={role.id} />
                             <input type="hidden" name="permissionId" value={p.id} />
                             <input type="hidden" name="enabled" value={on ? "0" : "1"} />
@@ -715,7 +645,7 @@ function GrantToggle({
 }) {
   const which = kind === "DEFAULT" ? (nl ? "elk lid" : "every member") : nl ? "enkel de lead" : "lead only";
   return (
-    <form action={setGroupRoleAction} className="justify-self-center">
+    <form action={unsentGuard.form(setGroupRoleAction)} className="justify-self-center">
       <input type="hidden" name="groupId" value={post.groupId} />
       <input type="hidden" name="roleId" value={roleId} />
       <input type="hidden" name="kind" value={kind} />

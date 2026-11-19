@@ -68,16 +68,29 @@ export function GoogleConfigForm({ status }: { status: GoogleStatus }) {
             <Input name="fullOrgUnit" defaultValue={status.fullOrgUnit ?? ""} placeholder="/" />
           </div>
           <div>
-            <Label>Restricted org unit (kiesploeg)</Label>
+            <Label>Restricted org unit (kiesploeg, receive only)</Label>
             <Input
               name="restrictedOrgUnit"
               defaultValue={status.restrictedOrgUnit ?? ""}
-              placeholder="/Kiesploeg/Beperkt"
+              placeholder="/Kiesploeg/Ontvangen"
             />
             <p className="mt-1 text-xs text-zinc-500">
-              The OU that carries the routing rule refusing outbound mail from the primary
-              address. That rule is Admin console work; there is no API for it. Leave empty and
-              nobody is moved, which also means nothing stops them from sending.
+              The OU that carries the routing rule refusing all outbound mail. That rule is Admin
+              console work; there is no API for it. Leave empty and nobody is moved, which also
+              means nothing stops them from sending.
+            </p>
+          </div>
+          <div>
+            <Label>Alias sender org unit (kiesploeg)</Label>
+            <Input
+              name="aliasSenderOrgUnit"
+              defaultValue={status.aliasSenderOrgUnit ?? ""}
+              placeholder="/Kiesploeg/Verzenden"
+            />
+            <p className="mt-1 text-xs text-zinc-500">
+              For the few kiesploeg members who may send, but only from their kiesploeg address.
+              Its routing rule refuses outbound mail whose sender is the primary address. Leave
+              empty and those members stay where they are.
             </p>
           </div>
           <div className="sm:col-span-2">

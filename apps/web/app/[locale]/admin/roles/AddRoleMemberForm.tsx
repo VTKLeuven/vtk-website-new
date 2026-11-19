@@ -1,5 +1,6 @@
 "use client";
 
+import { unsentGuard } from "@/components/ui/unsentGuard";
 import { useEffect, useState } from "react";
 import { Button, Input } from "@vtk/ui";
 import { assignUserRoleAction } from "@/app/actions/roles";
@@ -58,7 +59,7 @@ export function AddRoleMemberForm({
 
   return (
     <form
-      action={assignUserRoleAction}
+      action={unsentGuard.form(assignUserRoleAction)}
       onSubmit={() => setTimeout(reset, 0)}
       className="flex flex-wrap items-end gap-2 rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/30 p-3"
     >

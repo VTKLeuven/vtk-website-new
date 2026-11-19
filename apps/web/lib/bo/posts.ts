@@ -242,7 +242,7 @@ export function postOptions(
     ...(g5 ? [{ key: `g:${g5.id}`, name: nl ? g5.nameNl : g5.nameEn, group: "Groep 5", section: "g5" as const, catchAll: true as const }] : []),
     ...extra("g5", "Groep 5"),
     ...posts
-      .filter((p) => p.code !== "GROEP5" && p.type !== "WERKGROEP" && p.active !== false)
+      .filter((p) => p.code !== "GROEP5" && p.type !== "WERKGROEP" && p.type !== "JAARWERKING" && p.active !== false)
       .map((p) => ({ key: `g:${p.id}`, name: nl ? p.nameNl : p.nameEn, group: nl ? "Posten" : "Posts", section: "post" as const })),
     ...posts
       .filter((p) => p.type === "WERKGROEP" && p.active !== false)

@@ -4,6 +4,7 @@
  * cannot know its dimensions before the upload. */
 /* eslint-disable @next/next/no-img-element */
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useEffect, useRef, useState, useTransition } from "react";
 import {
   CheckCircle2,
@@ -142,7 +143,7 @@ export function TicketDesignManager({
     setError(null);
     startTransition(async () => {
       try {
-        await saveTicketDesignDraftAction(eventId, locale, design);
+        if ((await unsentGuard.run(() => saveTicketDesignDraftAction(eventId, locale, design))) === UNSENT) return;
         setNotice(message(locale, "Concept opgeslagen.", "Draft saved."));
       } catch (saveError) {
         console.error("Ticket design draft save failed", saveError);
@@ -155,7 +156,8 @@ export function TicketDesignManager({
     setError(null);
     startTransition(async () => {
       try {
-        const result = await publishTicketDesignAction(eventId, locale, design);
+        const result = await unsentGuard.run(() => publishTicketDesignAction(eventId, locale, design));
+        if (result === UNSENT) return;
         setLiveRevision(result.revision);
         setNotice(message(locale, `Ontwerpversie ${result.revision} gepubliceerd.`, `Design revision ${result.revision} published.`));
       } catch (publishError) {

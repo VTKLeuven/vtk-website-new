@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { prisma } from "@vtk/db";
 import { decryptSecret } from "./secrets";
 
@@ -78,7 +79,12 @@ export async function getDoorConfig(): Promise<DoorConfig> {
 export async function isDoorDeviceRequest(request: Request): Promise<boolean> {
   const cfg = await getDoorConfig();
   if (!cfg.deviceSecret) return false;
-  return request.headers.get("authorization") === `Bearer ${cfg.deviceSecret}`;
+  // In constante tijd: `===` stopt bij het eerste verschillende teken, en dat
+  // verschil is in principe te meten. Eerst hashen geeft twee buffers van
+  // gelijke lengte, zodat ook de lengte van het secret niet lekt.
+  const digest = (value: string) => createHash("sha256").update(value).digest();
+  const supplied = request.headers.get("authorization") ?? "";
+  return timingSafeEqual(digest(supplied), digest(`Bearer ${cfg.deviceSecret}`));
 }
 
 export type DoorStatus = {

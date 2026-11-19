@@ -28,6 +28,9 @@ import { appErrorResponse, appJson } from "@/lib/app-api/respond";
 import { serviceStatus } from "@/lib/app-api/serviceStatus";
 import { voucherBalance } from "@/lib/app-api/vouchers";
 import { organiserName } from "@/lib/calendar/organiser";
+import { getViewerPocPolls } from "@/lib/pocPolls/read";
+import { eventAsOfNow, MOMENT_SELECT, nextOccurrenceAt } from "@/lib/calendar/moments";
+import { appMoments } from "@/lib/app-api/moments";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -80,16 +83,20 @@ export async function GET(request: Request) {
     // Dezelfde doelgroepfilter als op de site en als /kalender: geen
     // eerstejaarsevent op het scherm van wie het daar niet zou zien.
     const audiences = await viewerAudienceFilter();
-    const upcoming = await prisma.calendarEvent.findMany({
+    // Een reeks die al loopt (een loopweek die maandag begon) hoort er op woensdag
+    // nog bij zolang er een moment komt, en staat op de plaats van haar
+    // eerstvolgende moment, zoals op de homepage van de site.
+    const candidates = await prisma.calendarEvent.findMany({
       where: {
-        start: { gte: now },
         publishedAt: { not: null },
+        OR: [{ start: { gte: now } }, { moments: { some: { end: { gte: now } } } }],
         ...audiences,
       },
       orderBy: { start: "asc" },
-      take: 5,
+      take: 10,
       include: {
         group: { select: { slug: true, nameNl: true, nameEn: true } },
+        moments: { orderBy: { start: "asc" }, select: MOMENT_SELECT },
         ticketEvents: { select: TICKET_LINK_SELECT },
         categories: {
           select: {
@@ -102,6 +109,10 @@ export async function GET(request: Request) {
       },
     });
 
+    const upcoming = candidates
+      .sort((a, b) => nextOccurrenceAt(a, now).getTime() - nextOccurrenceAt(b, now).getTime())
+      .slice(0, 5);
+
     // De standaardbanner van het thema, en anders de sitebrede foto uit
     // /admin/home; zie lib/defaultEventImage.ts.
     const defaultEventImages = await getDefaultEventImages();
@@ -112,7 +123,10 @@ export async function GET(request: Request) {
       publicInterestCounts(upcoming.map((event) => event.id)),
     ]);
 
-    const upcomingEvents: AppCalendarEvent[] = upcoming.map((event) => ({
+    const upcomingEvents: AppCalendarEvent[] = upcoming.map((row) => {
+      // De locatie en de affiche van het eerstvolgende moment.
+      const event = eventAsOfNow(row, now);
+      return {
       id: event.id,
       title: pick(event.titleNl, event.titleEn, locale) ?? event.titleNl,
       start: event.start.toISOString(),
@@ -136,7 +150,9 @@ export async function GET(request: Request) {
       interested: interested.has(event.id),
       interestedCount: publicCounts.get(event.id) ?? null,
       ticketSlug: publishedTicketSlug(event.ticketEvents),
-    }));
+      moments: appMoments(row.moments),
+      };
+    });
 
     const measured = barStatus && !barStatus.stale ? barStatus.isOpen : null;
     const services = [
@@ -182,7 +198,13 @@ export async function GET(request: Request) {
             stale: barStatus.stale,
           }
         : null,
-      tasks: session ? await tasksFor(session.user.id, session.user, now, horizon) : [],
+      tasks: session
+        ? await tasksFor(session.user.id, session.user, now, horizon, {
+            // Enkel een app die het scherm Peilingen kent, vraagt erom: een
+            // oudere versie zou een kaart krijgen die nergens heen leidt.
+            polls: url.searchParams.get("peilingen") === "1",
+          })
+        : [],
       vouchers: session ? await voucherBalance(session.user.id, now) : null,
       upcomingEvents,
       announcement:
@@ -217,6 +239,7 @@ async function tasksFor(
   user: { onboarded: boolean; isStudent: boolean; studyConfirmedYear: number | null },
   now: Date,
   horizon: Date,
+  include: { polls: boolean },
 ): Promise<AppTodayTask[]> {
   const tasks: AppTodayTask[] = [];
 
@@ -244,7 +267,7 @@ async function tasksFor(
     });
   }
 
-  const [theokotOrders, openSessions, tickets, shifts, piano] = await Promise.all([
+  const [theokotOrders, openSessions, tickets, shifts, doors, piano, polls] = await Promise.all([
     prisma.theokotOrder.findMany({
       where: {
         userId,
@@ -295,12 +318,35 @@ async function tasksFor(
       },
       orderBy: { shift: { startTime: "asc" } },
     }),
+    // De deur waar je vandaag staat. Enkel een expliciete `SCANNER`-toekenning,
+    // dus wie via de uitnodigings-QR of het scannerspaneel toegevoegd werd: een
+    // praesidiumlid kan door de standaardregel bijna elk event scannen, en die
+    // kreeg anders elke avond een kaart voor een deur waar hij niet staat.
+    prisma.ticketEventUserGrant.findMany({
+      where: {
+        userId,
+        role: "SCANNER",
+        event: {
+          endsAt: { gte: now },
+          startsAt: { lte: horizon },
+          archivedAt: null,
+          status: { notIn: ["DRAFT", "CANCELLED", "ARCHIVED"] },
+        },
+      },
+      select: {
+        event: { select: { id: true, titleNl: true, startsAt: true, location: true } },
+      },
+      orderBy: { event: { startsAt: "asc" } },
+    }),
     prisma.pianoReservation.findMany({
       where: { userId, startsAt: { gte: now, lte: horizon } },
       orderBy: { startsAt: "asc" },
       take: 1,
       select: { startsAt: true },
     }),
+    // De peilingen van je RiVers waarop je nog niet antwoordde, zoals de gele
+    // strook op de site. Een fout hier mag het beginscherm niet meenemen.
+    include.polls ? getViewerPocPolls(userId).catch(() => []) : Promise.resolve([]),
   ]);
 
   const timeFormat = new Intl.DateTimeFormat("nl-BE", {
@@ -343,6 +389,20 @@ async function tasksFor(
     });
   }
 
+  for (const door of doors) {
+    tasks.push({
+      kind: "scan",
+      title: `Aan de deur: ${door.event.titleNl}`,
+      detail: door.event.location
+        ? `${timeFormat.format(door.event.startsAt)}, ${door.event.location}`
+        : timeFormat.format(door.event.startsAt),
+      path: `/scan/${door.event.id}`,
+      actionLabel: "Scannen",
+      highlight: door.event.startsAt <= new Date(now.getTime() + 2 * 60 * 60 * 1000),
+      at: door.event.startsAt.toISOString(),
+    });
+  }
+
   for (const ticket of tickets) {
     tasks.push({
       kind: "ticket",
@@ -378,6 +438,21 @@ async function tasksFor(
       actionLabel: null,
       highlight: false,
       at: reservation.startsAt.toISOString(),
+    });
+  }
+
+  for (const poll of polls) {
+    if (poll.answered) continue;
+    const closesAt = new Date(poll.closesAt);
+    tasks.push({
+      kind: "poll",
+      title: poll.pocId ? "Je RiVers vragen je mening" : "VTK Onderwijs vraagt je mening",
+      detail: `${poll.titleNl}, open tot ${dayFormat.format(closesAt)}`,
+      path: "/peilingen",
+      actionLabel: "Antwoorden",
+      // De laatste dag: dan is het dringend genoeg voor de gele rail.
+      highlight: closesAt.getTime() - now.getTime() < TASK_HORIZON_MS,
+      at: closesAt.toISOString(),
     });
   }
 

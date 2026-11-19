@@ -5,6 +5,7 @@ import {
   type AppTicketEventDetail,
   type AppTicketQuestionType,
 } from "@/lib/app-api/contract";
+import { absoluteUrl } from "@/lib/app-api/media";
 import { appErrorResponse, appJson, appNotFound } from "@/lib/app-api/respond";
 
 export const runtime = "nodejs";
@@ -36,7 +37,13 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
       startsAt: event.startsAt.toISOString(),
       endsAt: event.endsAt.toISOString(),
       ownerGroupName: event.ownerGroupName,
-      maxTicketsPerOrder: event.maxTicketsPerOrder,
+      imageUrl: event.poster ? absoluteUrl(request, event.poster.src) : null,
+      // Wat deze koper kan nemen: een erelid op een event met
+      // `honoraryOneTicket` één, of geen wanneer het er al een heeft.
+      maxTicketsPerOrder: event.honoraryOneTicket
+        ? Math.min(event.maxTicketsPerOrder, event.honoraryOneTicket.used ? 0 : 1)
+        : event.maxTicketsPerOrder,
+      honoraryOneTicket: event.honoraryOneTicket ? { used: event.honoraryOneTicket.used } : null,
       currency: event.currency,
       contactEmail: event.contactEmail,
       termsUrl: event.termsUrl,

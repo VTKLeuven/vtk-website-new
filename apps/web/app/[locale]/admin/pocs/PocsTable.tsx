@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useRef, useState, useTransition } from "react";
 import { Input, Label } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
@@ -12,6 +13,7 @@ import {
   reorderPocsAction,
 } from "@/app/actions/pocs-partners";
 import { AddRepresentativeForm } from "./AddRepresentativeForm";
+import { PocDiscordRolesField, type PocDiscordRole } from "./PocDiscordRolesField";
 import { Avatar, Chevron, Modal, Panel, SearchBar, SortHeader, useTableControls } from "../admin-table";
 
 // ---- Data shapes ------------------------------------------------------------
@@ -33,9 +35,11 @@ export type PocRow = {
   email: string;
   order: number;
   studyProgrammes: string[];
+  discordRoles: PocDiscordRole[];
   reps: Rep[];
   searchText: string;
 };
+
 
 /** Richting-waarde uit `StudyProgramme` met haar vertaalde label. */
 export type ProgrammeOption = { value: string; label: string };
@@ -93,6 +97,7 @@ export function PocsTable({
   saveLabels,
   createLabels,
   programmeOptions,
+  discordEnabled,
 }: {
   pocs: PocRow[];
   year?: number;
@@ -100,6 +105,8 @@ export function PocsTable({
   saveLabels: SaveLabels;
   createLabels: SaveLabels;
   programmeOptions: ProgrammeOption[];
+  /** De bot en de server staan ingesteld; de rollen zelf komen pas bij het openklappen. */
+  discordEnabled: boolean;
 }) {
   const nl = locale === "nl";
   const [prevPocs, setPrevPocs] = useState(pocs);
@@ -128,11 +135,21 @@ export function PocsTable({
     dragFrom.current = null;
     setOverIndex(null);
     if (from === null || from === to) return;
+    const before = items;
     const next = [...items];
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
     setItems(next);
-    startTransition(() => void reorderPocsAction(next.map((p) => p.id)));
+    // Niet bewaard (`unsentGuard`): de oude volgorde terug. Een andere fout blijft
+    // zoals voordien los van het scherm.
+    startTransition(
+      () =>
+        void unsentGuard
+          .run(() => reorderPocsAction(next.map((p) => p.id)))
+          .then((result) => {
+            if (result === UNSENT) setItems(before);
+          }),
+    );
   }
 
   return (
@@ -196,6 +213,7 @@ export function PocsTable({
                 locale={locale}
                 saveLabels={saveLabels}
                 programmeOptions={programmeOptions}
+                discordEnabled={discordEnabled}
               />
             ))}
           </tbody>
@@ -245,6 +263,7 @@ function PocRowView({
   locale,
   saveLabels,
   programmeOptions,
+  discordEnabled,
 }: {
   poc: PocRow;
   year?: number;
@@ -260,6 +279,8 @@ function PocRowView({
   locale: "nl" | "en";
   saveLabels: SaveLabels;
   programmeOptions: ProgrammeOption[];
+  /** De bot en de server staan ingesteld; de rollen zelf komen pas bij het openklappen. */
+  discordEnabled: boolean;
 }) {
   const detailId = `poc-detail-${poc.id}`;
   return (
@@ -320,6 +341,7 @@ function PocRowView({
               locale={locale}
               saveLabels={saveLabels}
               programmeOptions={programmeOptions}
+              discordEnabled={discordEnabled}
             />
           </td>
         </tr>
@@ -335,6 +357,7 @@ function PocDetail({
   locale,
   saveLabels,
   programmeOptions,
+  discordEnabled,
 }: {
   poc: PocRow;
   year?: number;
@@ -342,6 +365,8 @@ function PocDetail({
   locale: "nl" | "en";
   saveLabels: SaveLabels;
   programmeOptions: ProgrammeOption[];
+  /** De bot en de server staan ingesteld; de rollen zelf komen pas bij het openklappen. */
+  discordEnabled: boolean;
 }) {
   return (
     <div className="space-y-4 py-1">
@@ -424,6 +449,13 @@ function PocDetail({
               <Label>{nl ? "E-mailadres van de POC" : "POC email address"}</Label>
               <Input name="email" type="email" defaultValue={poc.email} placeholder="wtk-poc@vtk.be" autoComplete="off" />
             </div>
+            {/* Boven de richtingen: de tabel staat in een scroller, en de open lijst
+                heeft ruimte onder zich nodig om niet in die scroller te vallen. */}
+            {discordEnabled ? (
+              <div className="md:col-span-6">
+                <PocDiscordRolesField initial={poc.discordRoles} nl={nl} />
+              </div>
+            ) : null}
             <div className="md:col-span-6">
               <ProgrammesField options={programmeOptions} selected={poc.studyProgrammes} nl={nl} />
             </div>

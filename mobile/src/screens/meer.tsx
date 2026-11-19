@@ -1,31 +1,18 @@
 import { Image } from 'expo-image';
 
 import * as WebBrowser from 'expo-web-browser';
-import {
-  Bell,
-  BookOpen,
-  ChevronRight,
-  Coins,
-  ExternalLink,
-  GraduationCap,
-  Images,
-  Music,
-  QrCode,
-  Search,
-  Users,
-  Wrench,
-} from 'lucide-react-native';
+import { ChevronDown, ChevronRight, ExternalLink, Search } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { baseUrl } from '../api/client';
 import type { AppNavTab } from '../api/contract';
 import { PageHead } from '../components/PageHead';
-import { Card, ErrorState, Loading, StaleNotice } from '../components/ui';
+import { ErrorState, Loading, SectionHeading, StaleNotice } from '../components/ui';
 import { nativeRouteFor, pageSlugFor } from '../nativeRoute';
 import { useApp } from '../state/app';
 import { useTabRouter } from '../navigation';
-import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
+import { COLORS, FONTS, RADIUS, SPACING, TYPE } from '../theme/tokens';
 
 /**
  * Meer: alles wat je opzoekt in plaats van doet.
@@ -34,10 +21,11 @@ import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
  * bestellen). Dit is het zelfstandig naamwoord: de mensen, de foto's, de piano,
  * de shiften, de hele CMS-boom uit het beheer, en je eigen profiel.
  *
- * **De scheiding met Home blijft dezelfde als vroeger tussen Home en Info**: wat
- * je vaak doet staat op Home, wat je opzoekt staat hier. Anders komt de helft
- * twee keer voor, één keer als tegel en één keer als menu-item uit het CMS. Dat
- * is ook de reden dat er hier geen tegelraster staat.
+ * In de vorm van de site (november 2026): je profiel als donker glas in de kop,
+ * de snelkoppelingen als het register in de marge (een kleine kop in kapitalen,
+ * een haarlijn links, gedempte links met lucht ertussen; geen witte groepen met
+ * icoontjes), en de onderdelen van VTK als de tegels van een categoriepagina:
+ * de foto links, de naam rechts.
  *
  * De structuur van de onderste helft komt uit `bootstrap` en dus uit `HeaderTab`
  * in het beheer. Er staat hier geen vaste lijst in de app: wie in de admin een
@@ -52,6 +40,8 @@ import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
 /** Wat op Cudi draait en dus buiten deze app en buiten deze site valt. */
 const CUDI = 'https://cudi.vtk.be';
 const BURGIECLAN = 'https://burgieclan.be';
+
+type Link = { label: string; hint?: string; onPress: () => void; external?: boolean };
 
 export default function MeerScreen() {
   const router = useTabRouter();
@@ -73,33 +63,54 @@ export default function MeerScreen() {
     void WebBrowser.openBrowserAsync(url);
   };
 
+  const doen: Link[] = [
+    ...(viewer ? [{ label: 'Bonnetjes', onPress: () => router.push('/bonnetjes') }] : []),
+    { label: 'Shiften', onPress: () => router.push('/shiften') },
+    { label: "Foto's", onPress: () => router.push('/media') },
+    { label: 'Piano', onPress: () => router.push('/piano') },
+    ...(viewer ? [{ label: 'Code scannen', onPress: () => router.push('/scannen') }] : []),
+    // Enkel voor wie iets te scannen heeft; de rest heeft hier niets aan.
+    ...(bootstrap?.abilities?.scanTickets
+      ? [{ label: 'Aan de deur', onPress: () => router.push('/deur') }]
+      : []),
+  ];
+  const mensen: Link[] = [
+    { label: 'Praesidium', onPress: () => router.push('/praesidium') },
+    { label: 'Werkgroepen', onPress: () => router.push('/werkgroepen') },
+    { label: "POC's", onPress: () => router.push('/pocs') },
+    ...(viewer ? [{ label: 'Peilingen', onPress: () => router.push('/peilingen') }] : []),
+  ];
+  const elders: Link[] = [
+    {
+      label: 'Cursusdienst',
+      hint: 'cudi.vtk.be',
+      external: true,
+      onPress: () => void WebBrowser.openBrowserAsync(`${CUDI}/vtk/shop`),
+    },
+    {
+      label: 'Tijdsloten cursusdienst',
+      hint: 'cudi.vtk.be',
+      external: true,
+      onPress: () => void WebBrowser.openBrowserAsync(`${CUDI}/vtk/account/slots`),
+    },
+    {
+      label: 'Burgieclan',
+      hint: 'burgieclan.be',
+      external: true,
+      onPress: () => void WebBrowser.openBrowserAsync(BURGIECLAN),
+    },
+  ];
+
   return (
     <>
-      <PageHead
-        title="Meer"
-        subtitle="Mensen, foto's en alles van VTK"
-        back={false}
-        right={
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Zoeken"
-            onPress={() => router.push('/zoeken')}
-            hitSlop={10}
-          >
-            <Search color={COLORS.yellow} size={22} />
-          </Pressable>
-        }
-      />
-      <ScrollView contentContainerStyle={styles.content} style={styles.root}>
-        {stale ? <StaleNotice onRetry={() => void refresh()} /> : null}
-
-        {/* Jij, bovenaan. Een eigen tab was dat niet waard: je opent je profiel
-            een paar keer per jaar, niet een paar keer per dag. */}
+      <PageHead title="Meer" back={false}>
+        {/* Jij, in de kop als donker glas. Een eigen tab was dat niet waard: je
+            opent je profiel een paar keer per jaar, niet een paar keer per dag. */}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={viewer ? `Profiel van ${viewer.name}` : 'Inloggen'}
           onPress={() => router.push(viewer ? '/profiel' : '/inloggen')}
-          style={({ pressed }) => [styles.person, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.me, pressed && styles.pressedDark]}
         >
           {viewer?.avatarUrl ? (
             <Image source={{ uri: viewer.avatarUrl }} style={styles.avatar} contentFit="cover" />
@@ -108,177 +119,105 @@ export default function MeerScreen() {
               <Text style={styles.initials}>{viewer ? initialsOf(viewer.name) : '?'}</Text>
             </View>
           )}
-          <View style={styles.personText}>
-            <Text style={styles.personName}>{viewer?.name ?? 'Niet ingelogd'}</Text>
-            <Text style={styles.hint}>
-              {viewer?.email ?? 'Log in om te bestellen, tickets te kopen en je shiften te zien'}
+          <View style={styles.flex}>
+            <Text style={styles.meName} numberOfLines={1}>
+              {viewer?.name ?? 'Niet ingelogd'}
+            </Text>
+            <Text style={styles.meHint} numberOfLines={1}>
+              {viewer ? 'Je profiel en meldingen' : 'Log in om te bestellen en tickets te kopen'}
             </Text>
           </View>
-          <ChevronRight color={COLORS.muted} size={18} />
+          <ChevronRight color={COLORS.onDarkMuted} size={18} />
         </Pressable>
 
-        <Group>
-          {viewer ? (
-            <Row
-              icon={<Coins color={COLORS.navy} size={19} />}
-              label="Mijn bonnetjes"
-              hint="Verdiend met shiften, uit te geven aan de toog"
-              onPress={() => router.push('/bonnetjes')}
-            />
-          ) : null}
-          <Row
-            icon={<Wrench color={COLORS.navy} size={19} />}
-            label="Shiften"
-            onPress={() => router.push('/shiften')}
-          />
-          <Row
-            icon={<Images color={COLORS.navy} size={19} />}
-            label="Foto's en media"
-            onPress={() => router.push('/media')}
-          />
-          <Row
-            icon={<Music color={COLORS.navy} size={19} />}
-            label="Piano reserveren"
-            onPress={() => router.push('/piano')}
-          />
-          {viewer ? (
-            <Row
-              icon={<QrCode color={COLORS.navy} size={19} />}
-              label="Een code scannen"
-              hint="Ticket, uitnodiging, fakbar of een pas"
-              onPress={() => router.push('/scannen')}
-            />
-          ) : null}
-        </Group>
+        <Pressable
+          accessibilityRole="search"
+          accessibilityLabel="Zoeken"
+          onPress={() => router.push('/zoeken')}
+          style={({ pressed }) => [styles.search, pressed && styles.pressedDark]}
+        >
+          <Search color={COLORS.muted} size={16} />
+          <Text style={styles.searchText}>Zoeken op vtk.be</Text>
+        </Pressable>
+      </PageHead>
 
-        <SectionLabel>Mensen</SectionLabel>
-        <Group>
-          <Row
-            icon={<Users color={COLORS.navy} size={19} />}
-            label="Praesidium"
-            onPress={() => router.push('/praesidium')}
-          />
-          <Row
-            icon={<Users color={COLORS.navy} size={19} />}
-            label="Werkgroepen"
-            onPress={() => router.push('/werkgroepen')}
-          />
-          <Row
-            icon={<GraduationCap color={COLORS.navy} size={19} />}
-            label="POC's"
-            onPress={() => router.push('/pocs')}
-          />
-        </Group>
+      <ScrollView contentContainerStyle={styles.content} style={styles.root}>
+        {stale ? <StaleNotice onRetry={() => void refresh()} /> : null}
 
+        <View style={styles.columns}>
+          <Register title="Doen" links={doen} />
+          <Register title="Mensen" links={mensen} />
+        </View>
         {viewer ? (
-          <>
-            <SectionLabel>Meldingen</SectionLabel>
-            <Group>
-              <Row
-                icon={<Bell color={COLORS.navy} size={19} />}
-                label="Wat je wil weten"
-                hint="Broodjes, shiften en de categorieën die je volgt"
-                onPress={() => router.push('/meldingen')}
-              />
-            </Group>
-          </>
+          <Register
+            title="Meldingen"
+            links={[{ label: 'Wat je wil weten', hint: 'Broodjes, shiften, categorieën', onPress: () => router.push('/meldingen') }]}
+          />
         ) : null}
+        <Register title="Elders" links={elders} />
 
-        {/* Twee adressen die deze app en deze site verlaten. Ze staan hier en niet
-            verstopt in de CMS-boom, want ze horen bij wat een student van VTK
-            gebruikt; het pijltje zegt vooraf dat er een browser opengaat. */}
-        <SectionLabel>Elders</SectionLabel>
-        <Group>
-          <Row
-            icon={<BookOpen color={COLORS.navy} size={19} />}
-            label="Cursusdienst"
-            hint="cudi.vtk.be"
-            external
-            onPress={() => void WebBrowser.openBrowserAsync(`${CUDI}/vtk/shop`)}
-          />
-          <Row
-            icon={<BookOpen color={COLORS.navy} size={19} />}
-            label="Tijdsloten cursusdienst"
-            hint="cudi.vtk.be"
-            external
-            onPress={() => void WebBrowser.openBrowserAsync(`${CUDI}/vtk/account/slots`)}
-          />
-          <Row
-            icon={<GraduationCap color={COLORS.navy} size={19} />}
-            label="Burgieclan"
-            hint="burgieclan.be"
-            external
-            onPress={() => void WebBrowser.openBrowserAsync(BURGIECLAN)}
-          />
-        </Group>
-
-        <SectionLabel>Alles van VTK</SectionLabel>
-        {bootstrap.tabs.map((tab) => (
-          <TabRow
-            key={tab.id}
-            tab={tab}
-            expanded={open === tab.id}
-            onToggle={() => setOpen(open === tab.id ? null : tab.id)}
-            onNative={(route) => router.push(route as never)}
-            onCategory={() => router.push(`/categorie/${tab.slug}`)}
-            onPage={(slug) => router.push(`/pagina/${slug}`)}
-            onWeb={openOnWeb}
-          />
-        ))}
-
-        {bootstrap.tabs.length === 0 ? (
-          <Card>
-            <Text style={styles.body}>Er staan nog geen onderdelen klaar.</Text>
-          </Card>
-        ) : null}
+        <View style={styles.tiles}>
+          <SectionHeading>Alles van VTK</SectionHeading>
+          {bootstrap.tabs.map((tab) => (
+            <TabTile
+              key={tab.id}
+              tab={tab}
+              expanded={open === tab.id}
+              onToggle={() => setOpen(open === tab.id ? null : tab.id)}
+              onNative={(route) => router.push(route as never)}
+              onCategory={() => router.push(`/categorie/${tab.slug}`)}
+              onPage={(slug) => router.push(`/pagina/${slug}`)}
+              onWeb={openOnWeb}
+            />
+          ))}
+          {bootstrap.tabs.length === 0 ? (
+            <Text style={styles.hint}>Er staan nog geen onderdelen klaar.</Text>
+          ) : null}
+        </View>
       </ScrollView>
     </>
   );
 }
 
-function SectionLabel({ children }: { children: string }) {
-  return <Text style={styles.sectionLabel}>{children.toUpperCase()}</Text>;
-}
-
-function Group({ children }: { children: React.ReactNode }) {
-  return <View style={styles.group}>{children}</View>;
-}
-
-function Row({
-  icon,
-  label,
-  hint,
-  external = false,
-  onPress,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  hint?: string;
-  external?: boolean;
-  onPress: () => void;
-}) {
+/**
+ * Het register in de marge van de site: een kleine kop in kapitalen, een haarlijn
+ * links, gedempte links met lucht ertussen.
+ */
+function Register({ title, links }: { title: string; links: Link[] }) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={external ? `${label}, opent een browser` : label}
-      onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-    >
-      <View style={styles.rowIcon}>{icon}</View>
-      <View style={styles.rowText}>
-        <Text style={styles.rowLabel}>{label}</Text>
-        {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+    <View style={styles.register}>
+      <Text style={styles.registerTitle}>{title}</Text>
+      <View style={styles.registerLine}>
+        {links.map((link) => (
+          <Pressable
+            key={link.label}
+            accessibilityRole={link.external ? 'link' : 'button'}
+            accessibilityLabel={link.external ? `${link.label}, opent een browser` : link.label}
+            onPress={link.onPress}
+            hitSlop={4}
+            style={({ pressed }) => [styles.registerRow, pressed && styles.pressed]}
+          >
+            <Text style={styles.registerLabel}>{link.label}</Text>
+            {link.hint ? (
+              <Text style={styles.registerHint} numberOfLines={1}>
+                {link.hint}
+                {link.external ? ' ↗' : ''}
+              </Text>
+            ) : null}
+          </Pressable>
+        ))}
       </View>
-      {external ? (
-        <ExternalLink color={COLORS.muted} size={16} />
-      ) : (
-        <ChevronRight color={COLORS.muted} size={18} />
-      )}
-    </Pressable>
+    </View>
   );
 }
 
-function TabRow({
+/**
+ * Een onderdeel van de site als de tegel van een categoriepagina: de foto links
+ * (uit /admin/home), de naam rechts. Zonder foto het gestreepte vlak van de site.
+ * Een onderdeel met items klapt uit en toont ze als register; een onderdeel met
+ * een eigen scherm (Broodjes, Media) opent dat scherm.
+ */
+function TabTile({
   tab,
   expanded,
   onToggle,
@@ -295,12 +234,6 @@ function TabRow({
   onPage: (slug: string) => void;
   onWeb: (href: string) => void;
 }) {
-  // De categorie zelf kan een eigen scherm hebben: "Broodjes" is het
-  // bestelscherm, "Media" de galerij. Dan is uitklappen zinloos.
-  //
-  // Een categorie mét items klapt uit en toont die items rechtstreeks; er staat
-  // geen "Overzicht"-regel meer boven. Het categoriescherm blijft wel bestaan:
-  // het is waar een categorie zónder items op uitkomt.
   const tabNative = tab.externalUrl ? null : nativeRouteFor(`/${tab.slug}`);
   const external = Boolean(tab.externalUrl);
   const expandable = !external && !tabNative && tab.children.length > 0;
@@ -313,23 +246,39 @@ function TabRow({
   };
 
   return (
-    <Card style={styles.tab}>
+    <View style={styles.tile}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={tab.label}
         accessibilityState={{ expanded: expandable ? expanded : undefined }}
         onPress={openTab}
-        style={styles.tabHeader}
+        style={({ pressed }) => [styles.tileHead, pressed && styles.pressed]}
       >
-        <Text style={styles.tabLabel}>{tab.label}</Text>
-        {external ? (
-          <ExternalLink color={COLORS.muted} size={18} />
+        {tab.imageUrl ? (
+          <Image source={{ uri: tab.imageUrl }} style={styles.tilePhoto} contentFit="cover" />
         ) : (
-          <ChevronRight
-            color={COLORS.muted}
-            size={18}
-            style={expandable && expanded ? styles.chevronOpen : undefined}
-          />
+          <View style={[styles.tilePhoto, styles.striped]}>
+            {Array.from({ length: 8 }, (_, index) => (
+              <View key={index} style={[styles.stripe, { left: index * 16 - 30 }]} />
+            ))}
+          </View>
+        )}
+        <View style={styles.tileText}>
+          <Text style={styles.tileLabel}>{tab.label}</Text>
+          <Text style={styles.hint}>
+            {external
+              ? 'Opent een andere site'
+              : expandable
+                ? `${tab.children.length} ${tab.children.length === 1 ? 'onderdeel' : 'onderdelen'}`
+                : 'Lees meer'}
+          </Text>
+        </View>
+        {external ? (
+          <ExternalLink color={COLORS.muted} size={17} />
+        ) : expandable ? (
+          <ChevronDown color={COLORS.muted} size={18} style={expanded ? styles.chevronOpen : undefined} />
+        ) : (
+          <ChevronRight color={COLORS.muted} size={18} />
         )}
       </Pressable>
 
@@ -349,7 +298,7 @@ function TabRow({
                   else if (page) onPage(page);
                   else onWeb(child.href);
                 }}
-                style={styles.child}
+                style={({ pressed }) => [styles.child, pressed && styles.pressed]}
               >
                 <Text style={styles.childLabel}>{child.label}</Text>
                 {/* Enkel wat de app echt verlaat, krijgt het pijltje naar buiten.
@@ -364,7 +313,7 @@ function TabRow({
           })}
         </View>
       ) : null}
-    </Card>
+    </View>
   );
 }
 
@@ -379,67 +328,94 @@ function initialsOf(name: string): string {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.paper },
-  content: { padding: SPACING.lg, gap: SPACING.md, paddingBottom: SPACING.xxl },
+  content: { padding: SPACING.xl - 4, gap: SPACING.xl, paddingBottom: SPACING.xxl },
+  flex: { flex: 1 },
+  pressed: { opacity: 0.6 },
+  pressedDark: { opacity: 0.7 },
+  hint: { ...TYPE.small, color: COLORS.muted },
 
-  person: {
+  // Op de navy band: donker glas, zoals de panelen op de navy banden van de site.
+  me: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.md,
-    backgroundColor: COLORS.surface,
+    marginTop: SPACING.lg,
+    padding: SPACING.md,
     borderRadius: RADIUS.md,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1,
-    borderColor: COLORS.line,
-    padding: SPACING.lg,
+    borderColor: 'rgba(255,255,255,0.14)',
   },
-  avatar: { width: 46, height: 46, borderRadius: RADIUS.pill, backgroundColor: COLORS.paper2 },
+  avatar: { width: 42, height: 42, borderRadius: RADIUS.pill, backgroundColor: COLORS.yellow },
   avatarEmpty: { alignItems: 'center', justifyContent: 'center' },
-  initials: { ...TYPE.cardTitle, color: COLORS.navy },
-  personText: { flex: 1, gap: 2 },
-  personName: { ...TYPE.cardTitle, color: COLORS.ink },
+  initials: { fontFamily: FONTS.semibold, fontSize: 15, color: COLORS.ink },
+  meName: { fontFamily: FONTS.semibold, fontSize: 15, color: COLORS.onDark },
+  meHint: { ...TYPE.small, fontSize: 12.5, color: COLORS.onDarkMuted },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginTop: SPACING.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.paper,
+  },
+  searchText: { ...TYPE.small, fontSize: 14, color: COLORS.muted },
 
-  sectionLabel: { ...TYPE.kicker, color: COLORS.muted, marginTop: SPACING.md },
-  group: {
+  columns: { flexDirection: 'row', gap: SPACING.xl },
+  register: { flex: 1, gap: SPACING.sm },
+  registerTitle: {
+    fontFamily: FONTS.bold,
+    fontSize: 11.5,
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+    color: COLORS.ink,
+  },
+  registerLine: { borderLeftWidth: 1, borderLeftColor: COLORS.line2, paddingLeft: 14 },
+  registerRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: SPACING.sm,
+    paddingVertical: 7,
+  },
+  registerLabel: { ...TYPE.body, color: COLORS.body },
+  registerHint: { ...TYPE.small, fontSize: 12.5, color: COLORS.muted, flexShrink: 1 },
+
+  tiles: { gap: SPACING.md },
+  tile: {
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: COLORS.line,
     overflow: 'hidden',
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.line,
+  tileHead: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingRight: SPACING.lg },
+  tilePhoto: { width: 76, height: 76, backgroundColor: COLORS.paper2 },
+  // Het gestreepte vlak van de site voor een tegel zonder foto.
+  striped: { overflow: 'hidden' },
+  stripe: {
+    position: 'absolute',
+    top: -20,
+    bottom: -20,
+    width: 7,
+    backgroundColor: COLORS.paper,
+    transform: [{ rotate: '35deg' }],
   },
-  rowIcon: { width: 24, alignItems: 'center' },
-  rowText: { flex: 1, gap: 1 },
-  rowLabel: { ...TYPE.body, fontFamily: TYPE.cardTitle.fontFamily, color: COLORS.ink },
-  pressed: { backgroundColor: COLORS.paper2 },
-
-  tab: { padding: 0, gap: 0, overflow: 'hidden', borderRadius: RADIUS.md },
-  tabHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: SPACING.md,
-    padding: SPACING.lg,
-  },
-  tabLabel: { ...TYPE.cardTitle, color: COLORS.ink, flex: 1 },
-  chevronOpen: { transform: [{ rotate: '90deg' }] },
-  children: { borderTopWidth: 1, borderTopColor: COLORS.line, backgroundColor: COLORS.paper2 },
+  tileText: { flex: 1, gap: 2, paddingVertical: SPACING.sm },
+  tileLabel: { fontFamily: FONTS.semibold, fontSize: 16, lineHeight: 21, color: COLORS.ink },
+  chevronOpen: { transform: [{ rotate: '180deg' }] },
+  children: { borderTopWidth: 1, borderTopColor: COLORS.line },
   child: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: SPACING.md,
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.line,
   },
   childLabel: { ...TYPE.body, color: COLORS.body, flex: 1 },
-
-  hint: { ...TYPE.small, color: COLORS.muted },
-  body: { ...TYPE.body, color: COLORS.body },
 });

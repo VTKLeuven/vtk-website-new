@@ -228,6 +228,26 @@ describe("samenstelling", () => {
     expect(rest.map((item) => item.key)).toEqual(["morgen", "eenoktober", "zesoktober", "fiets", "album"]);
   });
 
+  it("zet het nieuwste Bakske altijd als eerste tegel, ook voor wat nog komt", () => {
+    const events = [
+      entry("morgen", "tickets", "2026-09-20T10:00:00Z", false, "2026-09-27T20:00:00Z"),
+      entry("eenoktober", "signup", "2026-09-24T10:00:00Z", false, "2026-10-01T20:00:00Z"),
+      entry("bakske-oud", "bakske", "2026-09-18T12:00:00Z"),
+      entry("bakske", "bakske", "2026-09-22T12:00:00Z"),
+      entry("album", "album", "2026-09-24T08:00:00Z"),
+      entry("praeses", "praeses", "2026-09-21T12:00:00Z"),
+    ];
+    const { rest } = composeNews(events, now);
+    expect(rest.map((item) => item.key)).toEqual(["bakske", "morgen", "eenoktober", "album", "bakske-oud"]);
+  });
+
+  it("zet geen Bakske vooraan dat zelf uitgelicht is", () => {
+    const pinned = entries.map((item) => (item.key === "bakske" ? { ...item, featured: true } : item));
+    const { featured, rest } = composeNews(pinned, now);
+    expect(featured?.key).toBe("bakske");
+    expect(rest.map((item) => item.key)).not.toContain("bakske");
+  });
+
   it("volgt de keuze van de redactie boven het woordje", () => {
     const pinned = entries.map((item) => (item.key === "fiets" ? { ...item, featured: true } : item));
     expect(composeNews(pinned, now).featured?.key).toBe("fiets");

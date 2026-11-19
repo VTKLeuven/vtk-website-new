@@ -15,6 +15,7 @@ import { siteUrl } from "@/lib/seo";
 import { publicUrl } from "@/lib/storage";
 import { INTEREST_REMINDER_HORIZON_MS, interestReminderDue } from "./interestReminder";
 import { interestReminderMail, type InterestReminderMailEvent } from "./interestReminderMail";
+import { eventForMoment, MOMENT_SELECT } from "@/lib/calendar/moments";
 
 /**
  * Verstuurt de herinneringsmail de dag voor een evenement waarin een lid
@@ -46,7 +47,7 @@ const EVENT_SELECT = {
   organiserName: true,
   imageKey: true,
   group: { select: { nameNl: true, nameEn: true } },
-  moments: { select: { start: true, end: true, label: true } },
+  moments: { select: MOMENT_SELECT },
   categories: { select: { category: { select: { slug: true } } } },
   ...SIGNUP_LINK_SELECT,
 } satisfies Prisma.CalendarEventSelect;
@@ -137,8 +138,11 @@ export async function processDueInterestReminderMails(
           : null;
         if (momentStart && !moment) continue;
         const link = eventSignupLink(event, now, locale);
+        // Dit bericht gaat over één keer: die startplaats en die affiche, ook
+        // wanneer er ondertussen een andere keer de eerstvolgende is.
+        const shown = eventForMoment(event, moment);
         const image =
-          publicUrl(event.imageKey) ?? defaultEventImageFor(defaults, eventCategorySlugs(event.categories));
+          publicUrl(shown.imageKey) ?? defaultEventImageFor(defaults, eventCategorySlugs(event.categories));
         events.push({
           sort: (moment?.start ?? event.start).getTime(),
           title: pick(event.titleNl, event.titleEn, locale),
@@ -146,7 +150,7 @@ export async function processDueInterestReminderMails(
           end: moment?.end ?? event.end,
           allDay: moment ? false : event.allDay,
           momentLabel: moment?.label ?? null,
-          location: event.location,
+          location: shown.location,
           organiser: organiserName(event.organiserName, event.group, locale),
           imageUrl: absoluteHref(image, origin),
           eventUrl: `${origin}${base}/kalender/${event.slug}`,

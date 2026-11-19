@@ -118,6 +118,7 @@ export function AlbumViewer({
   labels,
   albumSlug,
   albumTitle,
+  allowDownload = true,
 }: {
   photos: Photo[];
   labels: Labels;
@@ -128,6 +129,12 @@ export function AlbumViewer({
    */
   albumSlug?: string;
   albumTitle?: string;
+  /**
+   * Uit bij een privélink die enkel bekijken toelaat: dan staat er geen
+   * downloadknop op de tegels en in de lightbox, en weigert de route het
+   * origineel ook zelf.
+   */
+  allowDownload?: boolean;
 }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [takedownOpen, setTakedownOpen] = useState(false);
@@ -285,15 +292,17 @@ export function AlbumViewer({
                   decoding="async"
                 />
               </button>
-              <a
-                className="vtk-immich-icon-button vtk-immich-photo-download"
-                href={photo.downloadUrl}
-                title={labels.downloadPhoto}
-                aria-label={`${labels.downloadPhoto}: ${photoLabel}`}
-                onClick={() => trackPhotoDownload(photo)}
-              >
-                <DownloadIcon />
-              </a>
+              {allowDownload ? (
+                <a
+                  className="vtk-immich-icon-button vtk-immich-photo-download"
+                  href={photo.downloadUrl}
+                  title={labels.downloadPhoto}
+                  aria-label={`${labels.downloadPhoto}: ${photoLabel}`}
+                  onClick={() => trackPhotoDownload(photo)}
+                >
+                  <DownloadIcon />
+                </a>
+              ) : null}
               {photo.matchScore ? <span className="vtk-immich-match-badge">{photo.matchScore}%</span> : null}
             </li>
           );
@@ -371,15 +380,17 @@ export function AlbumViewer({
                 {photoCounter}
               </span>
               <div className="vtk-immich-lightbox-actions">
-                <a
-                  className="vtk-immich-icon-button"
-                  href={activePhoto.downloadUrl}
-                  title={labels.downloadPhoto}
-                  aria-label={`${labels.downloadPhoto}: ${activePhotoLabel}`}
-                  onClick={() => trackPhotoDownload(activePhoto)}
-                >
-                  <DownloadIcon />
-                </a>
+                {allowDownload ? (
+                  <a
+                    className="vtk-immich-icon-button"
+                    href={activePhoto.downloadUrl}
+                    title={labels.downloadPhoto}
+                    aria-label={`${labels.downloadPhoto}: ${activePhotoLabel}`}
+                    onClick={() => trackPhotoDownload(activePhoto)}
+                  >
+                    <DownloadIcon />
+                  </a>
+                ) : null}
                 {albumSlug ? (
                   <TakedownDialog
                     /* Remount per foto: zo staat het formulier leeg wanneer je

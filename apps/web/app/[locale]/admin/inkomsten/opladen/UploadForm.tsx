@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
 import { FileField } from "@/components/ui/FileField";
@@ -44,7 +45,10 @@ export function UploadForm({
     }
     const form = new FormData();
     for (const file of Array.from(files)) form.append("file", file);
-    startTransition(async () => setPreview(await previewAction(form)));
+    startTransition(async () => {
+      const result = await unsentGuard.run(() => previewAction(form));
+      if (result !== UNSENT) setPreview(result);
+    });
   }
 
   const files = preview.status === "preview" ? preview.files : [];

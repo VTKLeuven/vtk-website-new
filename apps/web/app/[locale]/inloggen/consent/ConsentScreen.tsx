@@ -1,5 +1,6 @@
 'use client';
 
+import { useUnsentGuard } from '@/components/ui/unsentGuard';
 import { useActionState, useEffect, useState, useTransition } from 'react';
 import { Button } from '@vtk/ui';
 import { consentAction, type ConsentState } from './actions';
@@ -51,7 +52,8 @@ export function ConsentScreen({
   alreadyGranted: string[];
   requestsOfflineAccess: boolean;
 }) {
-  const [state, formAction, actionPending] = useActionState(consentAction, IDLE);
+  const unsent = useUnsentGuard();
+  const [state, formAction, actionPending] = useActionState(unsent.state(consentAction), IDLE);
   const [transitionPending, startTransition] = useTransition();
   const pending = actionPending || transitionPending;
 

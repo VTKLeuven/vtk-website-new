@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useEffect, useRef, useState } from "react";
 import { Input, Label, Select, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
@@ -355,7 +356,11 @@ function TutorPicker({
     }
     setSearching(true);
     timer.current = setTimeout(async () => {
-      const found = await searchPalPlusPeopleAction(needle);
+      const found = await unsentGuard.run(() => searchPalPlusPeopleAction(needle));
+      if (found === UNSENT) {
+        setSearching(false);
+        return;
+      }
       // Een trager antwoord op een oudere zoekterm mag een nieuwer niet overschrijven.
       if (ticket !== latest.current) return;
       setResults(found.map(({ id, name }) => ({ id, name })));

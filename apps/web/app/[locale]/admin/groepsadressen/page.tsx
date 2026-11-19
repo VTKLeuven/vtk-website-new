@@ -1,166 +1,97 @@
 import { notFound } from "next/navigation";
+import { Plus } from "lucide-react";
 import { prisma } from "@vtk/db";
-import { currentWorkingYear } from "@vtk/auth";
+import Link from "@/components/ui/Link";
 import type { Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
-import { requirePermission } from "@/lib/session";
 import { getGoogleStatus } from "@/lib/google/config";
-import {
-  desiredMembers,
-  type KiesploegMembershipRow,
-  type MembershipRow,
-} from "@/lib/google/members";
-import { MailGroupsAdmin, type MailGroupRow, type SourceGroup } from "./MailGroupsAdmin";
+import { canSeeMailGroups, mailGroupAccess } from "@/lib/google/access";
+import { MAIL_GROUP_KINDS, type MailGroupKind, mailGroupKindLabel } from "@/lib/google/kinds";
+import { isEmptyRow, loadMailGroupOverview, normalizeSearchText } from "@/lib/google/overview";
+import { type CategoryNode, MailGroupCategories } from "./MailGroupCategories";
+import { type MailGroupRow, MailGroupTable, type TableSection } from "./MailGroupTable";
+import { type OverviewChip, OverviewFilters } from "./OverviewFilters";
 
 /**
- * Groepsadressen: de eigen adressen van de kring in Google Workspace
- * (`activiteiten@vtk.be`), die de posten van dit werkingsjaar volgen.
+ * Groepsadressen: alle Google-groepen van de kring, beheerd vanuit de site in
+ * plaats van de Admin console.
+ *
+ * Een lijst is een regel (posten, een kiesploeg, een POC, losse leden), en het
+ * scherm berekent de leden zelf, los van wat er in Google staat. Zo zie je
+ * meteen wie een regel oplevert, ook voor de eerste sync.
  *
  * Bewust iets anders dan /admin/mailinglijsten: dat zijn de opt-in
  * nieuwsbrieven naar studenten. Zie docs/design-decisions.md.
  *
- * Het scherm berekent de leden zelf, los van wat er in Google staat. Zo zie je
- * meteen wie een regel oplevert, ook voor de eerste sync en ook wanneer de
- * koppeling nog niet ingesteld is.
+ * Een werkgroep met een voorvoegsel ziet hier enkel haar eigen lijsten; zie
+ * `lib/google/access.ts`.
  */
 export default async function AdminMailGroups({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{
+    soort?: string;
+    q?: string;
+    archief?: string;
+    categorie?: string;
+    opruimen?: string;
+  }>;
 }) {
-  const { locale: localeParam } = await params;
+  const [{ locale: localeParam }, filters] = await Promise.all([params, searchParams]);
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const nl = locale === "nl";
-  await requirePermission("mailgroups.manage");
+  const base = `${nl ? "" : "/en"}/admin/groepsadressen`;
 
-  const year = currentWorkingYear();
-  const [mailGroups, groups, kiesploegen, status, linkedCount, unlinkedInPosts] =
-    await Promise.all([
-    prisma.mailGroup.findMany({
-      orderBy: { email: "asc" },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        description: true,
-        enabled: true,
-        allowExternalSenders: true,
-        googleId: true,
-        lastSyncAt: true,
-        lastError: true,
-        sources: {
-          select: {
-            id: true,
-            groupId: true,
-            groupType: true,
-            kiesploegId: true,
-            kiesploegPostId: true,
-            onlyLead: true,
-            group: { select: { nameNl: true, nameEn: true } },
-            kiesploeg: { select: { formalName: true } },
-            kiesploegPost: { select: { name: true, kiesploeg: { select: { formalName: true } } } },
-          },
-        },
-        extras: {
-          select: { id: true, email: true, kind: true, note: true },
-          orderBy: { email: "asc" },
-        },
-      },
-    }),
-    prisma.group.findMany({
-      where: { active: true },
-      select: { id: true, nameNl: true, nameEn: true, type: true },
-      orderBy: { nameNl: "asc" },
-    }),
-    prisma.kiesploeg.findMany({
-      where: { active: true },
-      select: {
-        id: true,
-        formalName: true,
-        posts: { select: { id: true, name: true }, orderBy: { order: "asc" } },
-      },
-      orderBy: { workingYear: "desc" },
-    }),
+  const access = await mailGroupAccess();
+  if (!canSeeMailGroups(access)) throw new Error("FORBIDDEN");
+
+  // De zoekterm filtert in de browser (`MailGroupTable`), niet hier: zo blijft
+  // ze staan wanneer je een adres opent en terugkeert, zonder elke letter een
+  // volledige render van zevenhonderd groepen.
+  const [overview, status, werkgroepen] = await Promise.all([
+    loadMailGroupOverview({ access, nl, search: { ...filters, q: undefined } }),
     getGoogleStatus(),
-    prisma.user.count({ where: { googleEmail: { not: null }, deletedAt: null } }),
-    // Leden die dit jaar in een post of werkgroep zitten en nog geen gekoppeld
-    // @vtk.be-adres hebben. Dat getal is de reden dat een lijst korter is dan
-    // verwacht, dus het hoort bovenaan te staan en niet weggestopt te zijn.
-    prisma.user.count({
-      where: {
-        googleEmail: null,
-        active: true,
-        deletedAt: null,
-        memberships: { some: { year } },
-      },
-    }),
-  ]);
-
-  // De lidmaatschappen van alle bronposten in één query, en daarna dezelfde
-  // berekening als de sync gebruikt. Zo kan het scherm niet uit elkaar lopen met
-  // wat er straks in Google terechtkomt.
-  const allSources = mailGroups.flatMap((g) => g.sources);
-  const sourceGroupIds = [
-    ...new Set(allSources.map((src) => src.groupId).filter((id): id is string => id !== null)),
-  ];
-  const sourceGroupTypes = [
-    ...new Set(
-      allSources
-        .map((src) => src.groupType)
-        .filter((type): type is "PRAESIDIUM" | "WERKGROEP" => type !== null),
-    ),
-  ];
-  const usesKiesploeg = allSources.some((src) => src.kiesploegId || src.kiesploegPostId);
-
-  const memberships: MembershipRow[] =
-    sourceGroupIds.length || sourceGroupTypes.length
-      ? (
-          await prisma.groupMembership.findMany({
-            where: {
-              year,
-              OR: [
-                ...(sourceGroupIds.length ? [{ groupId: { in: sourceGroupIds } }] : []),
-                ...(sourceGroupTypes.length
-                  ? [{ group: { type: { in: sourceGroupTypes }, active: true } }]
-                  : []),
-              ],
-              user: { active: true, deletedAt: null },
-            },
-            select: {
-              groupId: true,
-              role: true,
-              group: { select: { type: true } },
-              user: { select: { id: true, name: true, googleEmail: true } },
-            },
-          })
-        ).map((m) => ({
-          groupId: m.groupId,
-          groupType: m.group.type,
-          role: m.role,
-          user: m.user,
-        }))
-      : [];
-
-  const kiesploegMemberships: KiesploegMembershipRow[] = usesKiesploeg
-    ? (
-        await prisma.kiesploegMember.findMany({
-          where: { user: { active: true, deletedAt: null } },
-          select: {
-            kiesploegId: true,
-            postId: true,
-            role: true,
-            user: { select: { id: true, name: true, googleEmail: true } },
-          },
+    access.manageAll
+      ? prisma.group.findMany({
+          where: { type: "WERKGROEP", active: true },
+          select: { id: true, nameNl: true, nameEn: true, mailPrefix: true },
+          orderBy: { nameNl: "asc" },
         })
-      ).map((m) => ({
-        kiesploegId: m.kiesploegId,
-        postId: m.postId,
-        role: m.role,
-        user: m.user,
-      }))
-    : [];
+      : [],
+  ]);
+  const { rows, base0, visible, categoryRows, categoryLabel } = overview;
+  const { kind, showArchive, categoryFilter, cleanup } = overview.filter;
 
+  const counts = new Map<MailGroupKind, number>();
+  for (const row of base0) counts.set(row.kind, (counts.get(row.kind) ?? 0) + 1);
+  const archivedCount = rows.filter((row) => row.archived).length;
+  const emptyCount = base0.filter(isEmptyRow).length;
+  const toDeleteCount = base0.filter((row) => row.reviewDecision === "DELETE").length;
+
+  // Per categorie: wat er rechtstreeks in zit.
+  const direct = new Map<string, number>();
+  for (const row of base0) if (row.categoryId) direct.set(row.categoryId, (direct.get(row.categoryId) ?? 0) + 1);
+  const tree: CategoryNode[] = categoryRows
+    .filter((c) => !c.parentId)
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      ownerId: c.ownerGroupId,
+      ownerName: c.ownerGroup ? (nl ? c.ownerGroup.nameNl : c.ownerGroup.nameEn) : null,
+      count: direct.get(c.id) ?? 0,
+      children: categoryRows
+        .filter((s) => s.parentId === c.id)
+        .map((s) => ({
+          id: s.id,
+          name: s.name,
+          ownerId: s.ownerGroupId,
+          ownerName: s.ownerGroup ? (nl ? s.ownerGroup.nameNl : s.ownerGroup.nameEn) : null,
+          count: direct.get(s.id) ?? 0,
+        })),
+    }));
   const dateFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
     day: "2-digit",
     month: "2-digit",
@@ -168,104 +99,150 @@ export default async function AdminMailGroups({
     minute: "2-digit",
   });
 
-  const rows: MailGroupRow[] = mailGroups.map((g) => {
-    const computed = desiredMembers({
-      sources: g.sources,
-      memberships,
-      kiesploegMemberships,
-      extras: g.extras.map((e) => ({ email: e.email, kind: e.kind })),
-    });
-    return {
-      id: g.id,
-      email: g.email,
-      name: g.name,
-      description: g.description,
-      enabled: g.enabled,
-      allowExternalSenders: g.allowExternalSenders,
-      existsInGoogle: Boolean(g.googleId),
-      lastSyncLabel: g.lastSyncAt ? dateFmt.format(g.lastSyncAt) : null,
-      lastError: g.lastError,
-      sources: g.sources.map((src) => ({
-        id: src.id,
-        onlyLead: src.onlyLead,
-        name: sourceName(src, nl),
-      })),
-      extras: g.extras.map((e) => ({
-        id: e.id,
-        email: e.email,
-        kind: e.kind,
-        note: e.note,
-      })),
-      memberCount: computed.emails.length,
-      unlinked: computed.unlinked.map((u) => u.name),
-    };
-  });
+  const tableRows: MailGroupRow[] = visible.map((row) => ({
+    id: row.id,
+    categoryId: row.categoryId,
+    decision: row.reviewDecision,
+    internalOnly: !row.allowExternalSenders,
+    email: row.email,
+    name: row.name,
+    category: categoryLabel(row.categoryId),
+    summary: row.summary,
+    owner: row.owner,
+    archived: row.archived,
+    enabled: row.enabled,
+    memberCount: row.memberCount,
+    active: row.activity.active,
+    lastSync: row.lastSyncAt ? dateFmt.format(row.lastSyncAt) : nl ? "nog niet" : "not yet",
+    notInGoogle: !row.existsInGoogle,
+    lastError: row.lastError,
+    search: normalizeSearchText(
+      [row.email, row.name, row.summary, row.owner ?? "", categoryLabel(row.categoryId) ?? ""].join(" "),
+    ),
+  }));
 
-  // Eén keuzelijst met alles waaruit leden kunnen komen, gegroepeerd per soort.
-  // De waarde draagt het soort mee (`group:`, `kiesploeg:`, `kiesploegPost:`),
-  // zodat de action niet hoeft te raden in welke kolom ze hoort.
-  const sourceOptions: SourceGroup[] = [
-    {
-      label: nl ? "Alles" : "Everything",
-      options: [
-        {
-          value: "type:PRAESIDIUM",
-          label: nl ? "Elke praesidiumpost" : "Every praesidium post",
-        },
-        { value: "type:WERKGROEP", label: nl ? "Elke werkgroep" : "Every work group" },
-      ],
-    },
-    {
-      label: nl ? "Posten" : "Posts",
-      options: groups
-        .filter((g) => g.type === "PRAESIDIUM")
-        .map((g) => ({ value: `group:${g.id}`, label: nl ? g.nameNl : g.nameEn })),
-    },
-    {
-      label: nl ? "Werkgroepen" : "Work groups",
-      options: groups
-        .filter((g) => g.type === "WERKGROEP")
-        .map((g) => ({ value: `group:${g.id}`, label: nl ? g.nameNl : g.nameEn })),
-    },
-    ...kiesploegen.map((k) => ({
-      label: k.formalName,
-      options: [
-        { value: `kiesploeg:${k.id}`, label: nl ? "Volledige kiesploeg" : "Whole kiesploeg" },
-        ...k.posts.map((post) => ({ value: `kiesploegPost:${post.id}`, label: post.name })),
-      ],
+  // Zonder gekozen categorie: per categorie een blok dat dichtklapt, met de
+  // subcategorieën eronder en "Zonder categorie" als laatste. Lege blokken vallen weg.
+  const idsIn = (categoryId: string | null) =>
+    tableRows.filter((r) => r.categoryId === categoryId).map((r) => r.id);
+  const sections: TableSection[] | null =
+    access.manageAll && !categoryFilter && tree.length > 0
+      ? [
+          ...tree.map((c) => ({
+            key: c.id,
+            label: c.name,
+            rowIds: idsIn(c.id),
+            children: c.children
+              .map((sub) => ({ key: sub.id, label: sub.name, rowIds: idsIn(sub.id) }))
+              .filter((sub) => sub.rowIds.length > 0),
+          })),
+          { key: "geen", label: nl ? "Zonder categorie" : "No category", rowIds: idsIn(null), children: [] },
+        ].filter((s) => s.rowIds.length > 0 || s.children.length > 0)
+      : null;
+
+  const chips: OverviewChip[] = [
+    ...MAIL_GROUP_KINDS.filter((k) => k !== "overig" && counts.get(k)).map((k) => ({
+      param: "soort",
+      value: k,
+      label: mailGroupKindLabel(k, nl),
+      count: counts.get(k) ?? 0,
+      active: kind === k,
     })),
-  ].filter((group) => group.options.length > 0);
+    ...(emptyCount > 0
+      ? [{ param: "opruimen", value: "leeg", label: nl ? "Leeg" : "Empty", count: emptyCount, active: cleanup === "leeg" }]
+      : []),
+    ...(toDeleteCount > 0
+      ? [
+          {
+            param: "opruimen",
+            value: "verwijderen",
+            label: nl ? "Te verwijderen" : "To delete",
+            count: toDeleteCount,
+            active: cleanup === "verwijderen",
+          },
+        ]
+      : []),
+  ];
 
   return (
-    <MailGroupsAdmin
-      nl={nl}
-      rows={rows}
-      sourceOptions={sourceOptions}
-      configured={status.configured}
-      domain={status.domain}
-      linkedCount={linkedCount}
-      unlinkedInPosts={unlinkedInPosts}
-      koppelingenHref={`${nl ? "" : "/en"}/admin/groepsadressen/koppelingen`}
-    />
-  );
-}
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="max-w-2xl text-sm text-zinc-500">
+          {access.manageAll
+            ? nl
+              ? "Alle Google-groepen van de kring. Een adres beschrijft wie erin hoort: posten, een kiesploeg, een POC of losse leden; wat hier staat, staat binnen de vijf minuten in Google."
+              : "All Google groups of the association. An address describes who belongs in it: posts, a kiesploeg, a POC or loose members; what is here is in Google within five minutes."
+            : nl
+              ? "De groepsadressen van je werkgroep. Je zet hier zelf leden in en uit en maakt een nieuw adres met het voorvoegsel van je werkgroep."
+              : "Your work group's addresses. Add and remove members yourself and create a new address with your work group's prefix."}
+        </p>
+        {(access.manageAll || access.werkgroepIds.size > 0) && (
+          <Link
+            href={`${base}/nieuw`}
+            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-vtk-ink px-4 text-sm font-medium text-vtk-surface no-underline hover:opacity-90"
+          >
+            <Plus aria-hidden="true" size={16} />
+            {nl ? "Nieuw groepsadres" : "New group address"}
+          </Link>
+        )}
+      </div>
 
-/** Hoe een bron heet in de lijst: een post, een hele kiesploeg of één kiesploegpost. */
-function sourceName(
-  src: {
-    group: { nameNl: string; nameEn: string } | null;
-    groupType: "PRAESIDIUM" | "WERKGROEP" | null;
-    kiesploeg: { formalName: string } | null;
-    kiesploegPost: { name: string; kiesploeg: { formalName: string } } | null;
-  },
-  nl: boolean,
-): string {
-  if (src.group) return nl ? src.group.nameNl : src.group.nameEn;
-  if (src.groupType === "PRAESIDIUM") return nl ? "Elke praesidiumpost" : "Every praesidium post";
-  if (src.groupType === "WERKGROEP") return nl ? "Elke werkgroep" : "Every work group";
-  if (src.kiesploeg) return src.kiesploeg.formalName;
-  if (src.kiesploegPost) {
-    return `${src.kiesploegPost.name} (${src.kiesploegPost.kiesploeg.formalName})`;
-  }
-  return "?";
+      {!status.configured && (
+        <p className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {nl
+            ? "Google Workspace is nog niet ingesteld (Admin > IT). Je kan de lijsten hier al opbouwen; er wordt nog niets naar Google geschreven."
+            : "Google Workspace is not set up yet (Admin > IT). You can already build the lists here; nothing is written to Google yet."}
+        </p>
+      )}
+
+      {access.manageAll && (chips.length > 0 || archivedCount > 0) && (
+        <OverviewFilters
+          nl={nl}
+          chips={chips}
+          archivedCount={archivedCount}
+          showArchive={showArchive}
+          note={
+            cleanup === "verwijderen"
+              ? nl
+                ? "Wat je in de nakijkmodus op \"weg\" zette. Er is nog niets verwijderd: vink alles aan en kies \"Verwijderen uit Google\"."
+                : "What you marked \"remove\" in review mode. Nothing has been deleted yet: select all and choose \"Delete from Google\"."
+              : null
+          }
+        />
+      )}
+
+      <MailGroupTable
+        // Een andere filter is een nieuwe lijst: selectie en open blokken beginnen opnieuw.
+        key={`${categoryFilter}|${kind}|${cleanup}|${showArchive}`}
+        sections={sections}
+        sectionsOpen={Boolean(kind || cleanup)}
+        nl={nl}
+        base={base}
+        manageAll={access.manageAll}
+        canSync={access.manageAll}
+        rows={tableRows}
+        categoryOptions={tree.flatMap((c) => [
+          // Per hoofdcategorie één kop, met de hoofdcategorie zelf bovenaan.
+          { value: c.id, label: c.name, hint: nl ? "hoofdcategorie" : "main category", group: c.name },
+          ...c.children.map((sub) => ({ value: sub.id, label: sub.name, group: c.name })),
+        ])}
+      />
+
+      {rows.length === 0 && (
+        <p className="text-sm text-zinc-500">{nl ? "Nog geen groepsadressen." : "No group addresses yet."}</p>
+      )}
+
+      {access.manageAll && (
+        <MailGroupCategories
+          nl={nl}
+          categories={tree}
+          werkgroepen={werkgroepen.map((w) => ({
+            id: w.id,
+            name: nl ? w.nameNl : w.nameEn,
+            prefix: w.mailPrefix,
+          }))}
+        />
+      )}
+    </div>
+  );
 }

@@ -5,7 +5,6 @@ import { requirePermission } from '@/lib/session';
 import { canManageAllShifts } from '@/lib/shift/authorization';
 import { listShiftTemplates } from '@/lib/shift/templateStore';
 import type { Locale } from '@vtk/i18n';
-import { ShiftTemplateNav } from '../ShiftTemplateNav';
 import { ShiftTemplateManager } from './ShiftTemplateManager';
 
 /**
@@ -45,8 +44,7 @@ export default async function AdminShiftTemplateManage({ params }: { params: Pro
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-semibold">{nl ? 'Shiftsjablonen' : 'Shift templates'}</h1>
-      <ShiftTemplateNav locale={locale} current="manage" canManage />
+      <h2 className="text-lg font-semibold">{nl ? 'Shiftsjablonen' : 'Shift templates'}</h2>
       <p className="max-w-3xl text-sm text-vtk-muted">
         {nl
           ? 'Een sjabloon is de vaste reeks shiften van een evenement dat telkens terugkomt: een cantus, een TD, een verkoopdag. Wie shiften mag aanmaken, zet ze hiermee in twee klikken neer. Wat je hier wijzigt, geldt vanaf de volgende reeks; shiften die al op de kalender staan, blijven met hun inschrijvingen ongemoeid.'

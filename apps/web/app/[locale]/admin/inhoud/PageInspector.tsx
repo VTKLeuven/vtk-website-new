@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useId, useState, useTransition } from "react";
 import Link from "@/components/ui/Link";
 import { Button, Card, ConfirmDialog, Input, Label, Select, Textarea } from "@vtk/ui";
@@ -250,7 +251,8 @@ function UnlinkPageButton({
     const form = new FormData();
     form.append("id", page.id);
     startTransition(async () => {
-      const result = await unlinkPageFromTabAction(SAVE_IDLE, form);
+      const result = await unsentGuard.run(() => unlinkPageFromTabAction(SAVE_IDLE, form));
+      if (result === UNSENT) return;
       if (result.status === "error") {
         showToast({
           message: contentErrorMessages(locale)[result.code] ?? dict.common.saveError,
@@ -310,7 +312,8 @@ function DeletePageButton({
     const form = new FormData();
     form.append("id", page.id);
     startTransition(async () => {
-      const result = await deletePageAction(SAVE_IDLE, form);
+      const result = await unsentGuard.run(() => deletePageAction(SAVE_IDLE, form));
+      if (result === UNSENT) return;
       setConfirming(false);
       if (result.status === "error") {
         // Bv. een pagina die iemand anders intussen verwijderde: melden, niet

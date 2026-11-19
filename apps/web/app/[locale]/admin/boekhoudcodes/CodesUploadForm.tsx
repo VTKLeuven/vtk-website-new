@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { FileField } from "@/components/ui/FileField";
@@ -50,7 +51,10 @@ export function CodesUploadForm({
     }
     const form = new FormData();
     form.append("file", file);
-    startTransition(async () => setPreview(await previewAction(form)));
+    startTransition(async () => {
+      const result = await unsentGuard.run(() => previewAction(form));
+      if (result !== UNSENT) setPreview(result);
+    });
   }
 
   const plan = preview.status === "preview" ? preview.plan : null;

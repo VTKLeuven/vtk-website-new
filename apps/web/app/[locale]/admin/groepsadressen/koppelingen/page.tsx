@@ -1,4 +1,3 @@
-import Link from "@/components/ui/Link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import type { Locale } from "@vtk/i18n";
@@ -32,17 +31,14 @@ export default async function AdminGoogleLinks({
   if (!cfg) {
     return (
       <div className="space-y-3">
-        <h1 className="text-xl font-semibold text-vtk-ink">
+        <h2 className="text-lg font-semibold text-vtk-ink">
           {nl ? "Accounts koppelen" : "Link accounts"}
-        </h1>
+        </h2>
         <p className="text-sm text-zinc-500">
           {nl
             ? "Google Workspace is nog niet ingesteld (Admin > IT). Zonder koppeling kan de directory niet uitgelezen worden."
             : "Google Workspace is not set up yet (Admin > IT). Without it the directory cannot be read."}
         </p>
-        <Link href={back} className="vtk-link text-sm">
-          {nl ? "Terug naar groepsadressen" : "Back to group addresses"}
-        </Link>
       </div>
     );
   }

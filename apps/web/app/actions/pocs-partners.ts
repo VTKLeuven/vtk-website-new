@@ -1,12 +1,16 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { Prisma } from "@prisma/client";
+import { Prisma, type StudyYear } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { describeChanges, logAudit } from "@/lib/audit";
+import { listDiscordRoles } from "@/lib/discord/bot";
+import { placeLinkPanel } from "@/lib/discord/pocAccess";
+import { pushMailGroupsForPoc } from "@/lib/google/sync";
 import { STUDY_PROGRAMMES } from "@/lib/profile";
 import { deleteObject } from "@vtk/storage";
 import { currentWorkingYear } from "@/lib/workingYear";
@@ -31,6 +35,9 @@ function isUniqueViolation(err: unknown, field: string): boolean {
 
 // ---- POCs -------------------------------------------------------------------
 
+/** Een id van Discord: enkel cijfers, en dus nooit iets om in een pad te plakken. */
+const DISCORD_ID = /^\d{5,25}$/;
+
 const pocSchema = z.object({
   id: z.string().optional(),
   slug: z.string().min(1).regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/),
@@ -43,6 +50,48 @@ const pocSchema = z.object({
   studyProgrammes: z.array(z.enum(STUDY_PROGRAMMES)).default([]),
 });
 
+const STUDY_YEARS = ["BACHELOR_1", "BACHELOR_2", "BACHELOR_3", "MASTER_1", "MASTER_2"] as const;
+
+const discordRolesSchema = z
+  .array(z.object({ roleId: z.string().regex(DISCORD_ID), studyYears: z.array(z.enum(STUDY_YEARS)).default([]) }))
+  .max(25);
+
+/**
+ * De Discord-rollen uit het formulier. Zonder bot of wanneer de lijst niet
+ * geladen raakte, staat het veld er niet; dan blijft wat er was gewoon staan.
+ * Dezelfde rol twee keer valt samen, met de fases van beide.
+ */
+function discordRolesField(formData: FormData): { roleId: string; studyYears: StudyYear[] }[] | null | "invalid" {
+  const raw = formData.get("discordRoles");
+  if (typeof raw !== "string") return null;
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    return "invalid";
+  }
+  const parsed = discordRolesSchema.safeParse(value);
+  if (!parsed.success) return "invalid";
+  const merged = new Map<string, Set<StudyYear>>();
+  for (const role of parsed.data) {
+    const years = merged.get(role.roleId) ?? new Set<StudyYear>();
+    for (const year of role.studyYears) years.add(year);
+    merged.set(role.roleId, years);
+  }
+  // Een rol voor alle fases en dezelfde rol voor één fase is gewoon voor iedereen.
+  return [...merged].map(([roleId, years]) => ({
+    roleId,
+    studyYears: parsed.data.some((role) => role.roleId === roleId && role.studyYears.length === 0) ? [] : [...years],
+  }));
+}
+
+function rolesSummary(roles: { roleId: string; studyYears: readonly string[] }[]): string {
+  return roles
+    .map((role) => `${role.roleId}${role.studyYears.length > 0 ? ` (${[...role.studyYears].sort().join(", ")})` : ""}`)
+    .sort()
+    .join("; ");
+}
+
 export async function savePocAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requirePermission("pocs.manage");
   const parsed = pocSchema.safeParse({
@@ -54,25 +103,44 @@ export async function savePocAction(_prev: SaveState, formData: FormData): Promi
     studyProgrammes: formData.getAll("studyProgrammes"),
   });
   if (!parsed.success) return saveError("INVALID_INPUT");
+  const discordRoles = discordRolesField(formData);
+  if (discordRoles === "invalid") return saveError("INVALID_INPUT");
 
   try {
     if (parsed.data.id) {
-      const existing = await prisma.poc.findUnique({ where: { id: parsed.data.id } });
-      await prisma.poc.update({ where: { id: parsed.data.id }, data: parsed.data });
+      const pocId = parsed.data.id;
+      const existing = await prisma.poc.findUnique({
+        where: { id: pocId },
+        include: { discordRoles: { select: { roleId: true, studyYears: true } } },
+      });
+      await prisma.$transaction([
+        prisma.poc.update({ where: { id: pocId }, data: parsed.data }),
+        ...(discordRoles
+          ? [
+              prisma.pocDiscordRole.deleteMany({ where: { pocId } }),
+              prisma.pocDiscordRole.createMany({ data: discordRoles.map((role) => ({ ...role, pocId })) }),
+            ]
+          : []),
+      ]);
+      const changes = existing
+        ? describeChanges(existing, parsed.data, {
+            slug: "slug",
+            nameNl: "naam",
+            nameEn: "Engelse naam",
+            email: "e-mailadres",
+            studyProgrammes: "richtingen",
+          })
+        : null;
+      const rolesChanged =
+        existing && discordRoles && rolesSummary(existing.discordRoles) !== rolesSummary(discordRoles)
+          ? `Discord-rollen: ${rolesSummary(discordRoles) || "geen"}`
+          : null;
       await logAudit({
         action: "update",
         entity: "poc",
-        entityId: parsed.data.id,
+        entityId: pocId,
         target: parsed.data.nameNl,
-        summary: existing
-          ? describeChanges(existing, parsed.data, {
-              slug: "slug",
-              nameNl: "naam",
-              nameEn: "Engelse naam",
-              email: "e-mailadres",
-              studyProgrammes: "richtingen",
-            })
-          : null,
+        summary: [changes, rolesChanged].filter(Boolean).join("; ") || null,
       });
     } else {
       const last = await prisma.poc.findFirst({ orderBy: { order: "desc" }, select: { order: true } });
@@ -92,10 +160,34 @@ export async function savePocAction(_prev: SaveState, formData: FormData): Promi
   }
 
   revalidatePath("/pocs");
-  revalidatePath("/admin/pocs");
+  revalidatePath("/[locale]/admin/pocs", "layout");
   // De homepage toont de POC's van je eigen richtingen; een gewijzigde
   // richting of naam hoort daar meteen door te komen.
   revalidatePath("/", "layout");
+  return saveOk();
+}
+
+/**
+ * De rollen van de studentendiscord, pas wanneer iemand een POC openklapt. Dat
+ * is een aanroep naar Discord, en die hoort het laden van /admin/pocs niet op te
+ * houden. `null`: de bot is niet ingesteld of Discord antwoordde niet.
+ */
+export async function loadDiscordRolesAction(): Promise<Array<{ id: string; name: string }> | null> {
+  await requirePermission("pocs.manage");
+  return listDiscordRoles();
+}
+
+/** Het publieke bericht met de koppelknop, in het gekozen kanaal. */
+export async function placeDiscordLinkPanelAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  await requirePermission("pocs.manage");
+  const channelId = formData.get("channelId");
+  if (typeof channelId !== "string" || !DISCORD_ID.test(channelId)) return saveError("INVALID_INPUT");
+
+  const result = await placeLinkPanel(channelId);
+  if (!result.ok) return saveError("DISCORD_LINK_PANEL", result.message);
+
+  await logAudit({ action: "update", entity: "poc", target: "Discord-koppelbericht", summary: "geplaatst" });
+  revalidatePath("/[locale]/admin/pocs", "layout");
   return saveOk();
 }
 
@@ -111,7 +203,7 @@ export async function reorderPocsAction(ids: string[]): Promise<void> {
     summary: "volgorde van POC's gewijzigd",
   });
   revalidatePath("/pocs");
-  revalidatePath("/admin/pocs");
+  revalidatePath("/[locale]/admin/pocs", "layout");
   revalidatePath("/", "layout");
 }
 
@@ -124,7 +216,7 @@ export async function deletePocAction(formData: FormData): Promise<void> {
   }
   revalidatePath("/pocs");
   // Geen redirect: de lijst staat op deze pagina en ververst ter plaatse.
-  revalidatePath("/admin/pocs");
+  revalidatePath("/[locale]/admin/pocs", "layout");
   revalidatePath("/", "layout");
 }
 
@@ -173,8 +265,11 @@ export async function addPocRepresentativeAction(formData: FormData): Promise<vo
     target: poc.nameNl ?? parsed.pocId,
     summary: `${user.name} toegevoegd als vertegenwoordiger`,
   });
+  // Enkel van belang wanneer dit het jaar is dat het groepsadres volgt; anders
+  // vindt de push niets te veranderen.
+  after(() => pushMailGroupsForPoc(parsed.pocId));
   revalidatePath("/pocs");
-  revalidatePath("/admin/pocs");
+  revalidatePath("/[locale]/admin/pocs", "layout");
   revalidatePath("/", "layout");
 }
 
@@ -193,9 +288,10 @@ export async function removePocRepresentativeAction(formData: FormData): Promise
       target: rep.poc.nameNl,
       summary: `${rep.user.name} verwijderd als vertegenwoordiger`,
     });
+    after(() => pushMailGroupsForPoc(rep.pocId));
   }
   revalidatePath("/pocs");
-  revalidatePath("/admin/pocs");
+  revalidatePath("/[locale]/admin/pocs", "layout");
   revalidatePath("/", "layout");
 }
 
@@ -400,7 +496,7 @@ export async function savePocBandAction(_prev: SaveState, formData: FormData): P
   });
 
   revalidatePath("/", "layout");
-  revalidatePath("/admin/pocs");
+  revalidatePath("/[locale]/admin/pocs", "layout");
   revalidatePath("/pocs");
   return saveOk();
 }

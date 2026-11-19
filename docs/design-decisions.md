@@ -72,7 +72,9 @@ acties zijn daarom verwijderd.
 - `photos.manageAlbums` blijft de permissie voor fotoalbums: ze geeft nu toegang
   tot het albumgedeelte van `/admin/media`. `media.manage` blijft over voor
   magazines en promovideo's, zodat Communicatie en de fotografen apart bediend
-  kunnen worden.
+  kunnen worden. Sinds november 2026 zijn er twee lichtere rechten naast:
+  `photos.upload` en `photos.createAlbums`; zie "Rechten op de fotoalbums" onder
+  "Mediabeheer".
 - De homepage-instelling **"Uitgelichte albums"** is mee verdwenen. Ze schreef
   `home.featuredAlbums` weg met vrij getypte slugs, maar de homepage toonde die
   albums nergens. Wil je later toch uitgelichte albums op de homepage, bouw dan
@@ -206,19 +208,37 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   op het bord), is in migratie `20260928100000_theokot_reprice_open_orders`
   rechtgezet.
 - **Een verkoopdag aanmaken zet meteen de shiften van die dag neer.** Wie de week
-  online zet, vinkt de dagen aan; voor elke dag die daadwerkelijk nieuw is, komen
-  ook de drie Theokot-shiften (smeren, middag, namiddag) op `/shift` te staan. Dat
-  was vroeger een tweede, losse handeling in het shiftscherm, en precies dát werd
-  vergeten: een verkoopdag zonder shifters is een dag waarop niemand de balie doet
-  terwijl de broodjes wel besteld zijn.
-  - **De uren volgen het afhaaluur van die dag**, niet een vast uur: zet je een dag
-    later open, dan schuiven de shiften mee. De reeks zelf (welke shiften, hoe lang,
-    hoeveel plaatsen, hoeveel bonnetjes) komt uit hetzelfde sjabloon als het scherm
-    "Shiften uit sjabloon", zodat een aangepaste Theokot-shift op beide plaatsen
-    tegelijk verandert.
-  - **Een dag waar al een Theokot-shift op staat, blijft ongemoeid.** Anders krijgt
-    wie de shiften al met de hand zette een tweede reeks bovenop de eerste, en
-    schrijven leden zich in op de verkeerde helft.
+  online zet, vinkt de dagen aan; elke dag krijgt ook de Theokot-shiften (smeren,
+  middag, namiddag) op `/shift`. Dat was vroeger een tweede, losse handeling in het
+  shiftscherm, en precies dát werd vergeten: een verkoopdag zonder shifters is een
+  dag waarop niemand de balie doet terwijl de broodjes wel besteld zijn.
+  - **De uren komen uit het sjabloon, niet uit het afhaaluur** (november 2026). De
+    shiften staan op het startuur van het sjabloon "Theokot opening" plus de offset
+    van elke shift; dezelfde rekensom die het sjabloonbeheer en de Theokot-tijdlijn
+    maken. Vroeger rekende de verkoopweek vanaf het afhaaluur (12:00) terwijl die
+    twee schermen vanaf het startuur (10:30) rekenden: elke automatische shift
+    stond anderhalf uur te laat, en het startuur in het sjabloon aanpassen haalde
+    niets uit, want de verkoopweek negeerde het. Wie de uren wil veranderen, doet
+    dat dus in het sjabloon, en het formulier "Nieuwe verkoopweek" toont ze vooraf.
+    Een week met een later afhaaluur verschuift de shiften bewust niet: één uur
+    waar alles vanaf rekent, is belangrijker dan een week die zichzelf bijstuurt.
+  - **Een shift weet bij welke verkoopdag ze hoort** (`Shift.theokotSessionId`).
+    Vroeger raadde de code "een shift met post THEOKOT op die dag", waardoor één
+    losse opkuisshift de drie gewone shiften tegenhield. De koppeling is `SetNull`:
+    een voorbije dag wissen laat de shifthistoriek en de bonnetjes staan.
+  - **Een dag met gekoppelde shiften krijgt nooit een tweede reeks.** Anders
+    schrijven leden zich in op de verkeerde helft. Een bestaande dag **zonder**
+    shiften kan wel aangevuld worden: opnieuw "Week aanmaken" voor die week.
+  - **Een gewone nieuwe week vraagt niets; staat er al iets, dan wel.** Is er in de
+    gekozen week al een verkoopdag of een Theokot-shift, dan vraagt een popup per
+    dag wat er gebeurt: nieuw, aanvullen, of ongemoeid. Een dag met met de hand
+    gezette Theokot-shiften staat daar standaard uitgevinkt, zodat er geen tweede
+    reeks bovenop komt zonder dat iemand dat koos.
+  - **Een verkoopdag verwijderen neemt haar shiften mee, na een vinkje.** De
+    verwijderpopup zegt hoeveel shiften en inschrijvingen er zijn; het vinkje staat
+    standaard aan. Wie ingeschreven was, krijgt geen mail, net zoals bij een shift
+    verwijderen in /admin/shiften. Met de hand gezette Theokot-shiften blijven
+    altijd staan; enkel de gekoppelde gaan mee.
   - **Wie de week aanmaakt heeft geen `shift.edit` nodig.** De shiften zijn hier een
     gevolg van het openzetten van een verkoopdag, geen aparte bevoegdheid; een extra
     recht eisen zou betekenen dat Theokot de week niet meer alleen online kan zetten.
@@ -730,7 +750,25 @@ identiek; enkel het publiek en de beheerder verschillen.
 | Ingang | tabje in het profielmenu (`/grocomeet`) | gedeelde link per bureau (`/bureau/<slug>`) |
 | Opent | meteen; grocos bestellen weken vooruit | instelbaar per bureau (`opensAt`) |
 | Geld | per persoon bijgehouden en af te vinken | enkel totalen, Onderwijs betaalt |
-| Beheer | Groep 5 (`grocomeet.manage`) | Onderwijs (`bureau.manage`) |
+| Beheer | Groep 5, IT en de verantwoordelijke van Theokot (`grocomeet.manage`) | Onderwijs (`bureau.manage`) |
+
+**Eén bureau en één grocomeet per dag.** Een bureau en een grocomeet mogen
+dezelfde dag vallen, twee bureaus niet: er is maar één bureau per donderdag, en
+een tweede met dezelfde dag verdeelt de inschrijvingen over twee links. De
+database dwingt het af (`@@unique([kind, day])`, met `day` door een trigger uit
+`startsAt`), zodat ook een dubbele klik of twee tabbladen het niet omzeilen. In
+november 2026 stond op productie elk bureau van het eerste semester dubbel. Op 6
+september had de planning van semester 2 de zeven dagen van semester 1 er een
+tweede keer in gezet: de planner (`MeetingPlanner`) bewaart zijn selectie in
+state, en die bleef na het wisselen van semestertab staan, onzichtbaar omdat de
+dagen buiten de getoonde maanden vielen. Waarschijnlijk wiste diezelfde opslag
+ook de bureaus van februari tot juni die op 24 augustus ingepland waren. De
+planner krijgt daarom een `key` per semester, en de action weigert een dag
+buiten de maanden van het semester (`DAY_OUTSIDE_SEMESTER`). De migratie `20261117180000_meeting_one_per_day` voegde ze samen in de oudste (die
+met de gewone link zonder `-2`); wie op beide stond, hield zijn laatste keuze met
+de herkomst van zijn eerste inschrijving. Een tweede op dezelfde dag toevoegen
+of een bestaande ernaar verplaatsen geeft nu `DAY_TAKEN`; de planning slaat een
+dag die al bestaat stil over.
 
 ### Waarom dit geen formulier uit de formulierenmodule is
 
@@ -924,6 +962,32 @@ deadline per vergadering: twee deadlines voor hetzelfde broodje is één te veel
 - Bij het **bureau** betaalt de student niets: daar staan enkel totalen per bureau, per
   werkingsjaar en over alle bureaus heen, voor de boekhouding van Onderwijs.
 
+### Overzicht van de GM voor de herbegroting
+
+Groep 5 heeft voor de herbegroting nodig wat er op de grocomeets al gegeten en gedronken
+is. Daarvoor heeft `/admin/grocomeet` het tabblad Overzicht, met een Excel-download
+(`/api/admin/grocomeet/export`). De optelling staat in `lib/grocomeetSummary.ts`.
+
+- **Het totaal staat vooraan**, op het scherm en als eerste blad van de Excel: dat is het
+  getal dat de herbegroting vraagt. De tabellen eronder verklaren het.
+- **Het beheer is vier tabbladen** (Vergaderingen, Openstaand, Overzicht, Drankjes), elk
+  met een eigen adres. Het was één lange pagina waarin het overzicht onder de kalender en
+  alle vergaderingen verdween.
+
+- **Het formulier en de GM-doos staan apart**, met een totaal erbij. Wat een groco die dag
+  zelf bij Theokot bestelde, gaat wel mee in de doos, maar het is een andere post: wie
+  begroot, moet kunnen kiezen welke van de twee erin hoort.
+- **Enkel wat al geweest is**: een vergadering telt vanaf haar beginuur. De
+  bestellingen voor een GM van volgende week staan er nog niet in. Het scherm zegt hoeveel
+  er nog komen.
+- **Een ongeldige inschrijving telt niet**, want daar stond geen broodje tegenover. Een
+  inschrijving zonder bestelling telt wel als aanwezige, maar zonder bedrag. Uit de GM-doos
+  telt hetzelfde als in het geldoverzicht: open of afgegeven, geen annulering en geen
+  no-show.
+- **Het lopende werkingsjaar**, per semester en samen. Vorige jaren zijn niet gevraagd.
+- Een product wordt **op naam** samengeteld (`offeringNameKey`), net als bij het koppelen
+  aan een verkoopdag: hetzelfde broodje heeft op elke dag een ander id.
+
 ### Plannen per semester
 
 De kalender wordt **per semester** ingevuld: bij het begin van het academiejaar voor
@@ -945,6 +1009,84 @@ hoeveel bestellingen eraan hangen.
   waarvoor al besteld is, blijven bij zo'n omschakeling staan.
 
 ---
+
+### Het uitdeelscherm: een werkblad, geen paginakop
+
+Het uitdeelscherm van een bureau of GM (`MeetingHandoutScreen.tsx`, de knop
+"Volledig scherm" op de pagina van een vergadering) toont iedereen met zijn
+broodje op één scherm. Eerst had het de navy kop met de gele streep van een
+publieke paginakop; in november 2026 vond IT dat te zwaar voor wat een lijst
+op een tv is. Het is nu in de stijl van de admin: een witte vlakte, een
+lichte kopregel boven een haarlijn met de soort, de datum en het aantal
+mensen, en een omrande knop Sluiten. De naam blijft het nadrukkelijkst, het
+broodje staat er rustiger onder. Zet er geen navy band of gele streep terug.
+
+## Statistieken van het VTK Bureau
+
+Onderwijs wil zien wat een mail, een story of een affiche doet voor de
+inschrijvingen van een bureau. De tab Statistieken op `/admin/bureau`
+(`app/[locale]/admin/bureau/statistieken`, rekenwerk in `lib/meetingStats.ts`)
+toont drie blokken: één bureau (de inschrijvingen per dag, het totaal door de
+tijd en het logboek van reclamemomenten), de herkomst van dat bureau, en het
+jaar met een staaf per bureau en nieuw tegenover terugkerend. Bewust niet meer:
+geen richting of studiejaar, geen Umami-cijfers, niets voor de grocomeet en
+geen herkomst per persoon in "Wie komt".
+
+- **De herkomst hangt aan de inschrijving en wordt maar één keer gezet.**
+  `MeetingReservation.source` en `sourceCampaign` volgen het systeem van de
+  tickets (`?via=` en `?c=`, `lib/ticketing/source.ts`). Ze gaan enkel in de
+  `create` van de upsert: wie later zijn broodje wijzigt via een andere link,
+  verandert niet langs waar hij eerst binnenkwam.
+- **"Niet gemeten" is iets anders dan "rechtstreeks".** Een inschrijving van
+  voor de meting heeft `source = null` en staat apart. Een nieuwe inschrijving
+  zonder herkomst in het formulier (iemand die instuurt voor de browser de
+  herkomst las) wordt `direct`, zodat `null` voorbehouden blijft voor wat er
+  echt niet gemeten werd.
+- **Er telt wie nu ingeschreven is.** Annuleren wist de rij, dus wie zich
+  uitschreef, telt nergens mee, en wie annuleert en opnieuw inschrijft via een
+  andere link, krijgt de nieuwe herkomst. Geen soft delete in deze versie. Enkel
+  `ACTIVE` rijen tellen, zodat het aantal gelijk is aan "Ingeschreven" op de tab
+  Beheer.
+- **Het totaal loopt per uur**, niet per dag: het effect van een mail zit in de
+  uren erna. Staat een bureau langer dan een week open, dan per drie uur, en
+  na drie weken per zes uur, zodat de lijn en haar tabel leesbaar blijven
+  (`cumulativeCurve`). De sleutels zijn UTC-tijdstippen, getoond op de
+  Brusselse klok, want bij de overgang naar wintertijd komt 02:00 twee keer
+  voor.
+- **Reclamemomenten vult Onderwijs zelf in** (`MeetingPromotion`): wanneer een
+  mail vertrok of een story online kwam, optioneel met het kanaal en de naam
+  van de link. De site kan die momenten niet weten, want ze gebeuren buiten de
+  site, en de eerste inschrijving via een link is maar een benadering: die
+  komt altijd later, en een mail die niets opleverde, heeft er geen. Ze staan
+  als genummerde gestippelde lijn op het totaal, met de nummers ook in de lijst
+  eronder, in de tooltip en in de tabel (een label in de grafiek zelf schuift
+  over de lijn). Een aankondiging van voor het openen rekt de as naar achter
+  op; een moment na nu krijgt geen lijn en geen nummer. De staven per dag
+  volgen dezelfde as, zodat beide grafieken op dezelfde dag beginnen. Een
+  moment ligt ten vroegste 60 dagen voor het bureau (of voor het openen) en
+  ten laatste op de dag zelf: een verkeerd jaartal zou de as anders maanden
+  oprekken, dus de action weigert het (`DATE_OUT_OF_RANGE`). Het kanaal mag
+  ook een eigen naam zijn ("Iets anders..."), zoals in de linkbouwer.
+- **Eén kleur per kanaal over de hele tab.** De reeksen (de grootste drie
+  kanalen, Andere, niet gemeten) komen uit het hele jaar en gelden ook voor
+  de grafiek van één bureau. Per bureau gerangschikt kreeg mail daar een
+  andere kleur dan in het jaaroverzicht.
+- **Terugkerend** = stond dit werkingsjaar (vanaf 15 juli, `Meeting.year`) al
+  ingeschreven op een eerder bureau. Het eerste bureau van het jaar heeft dus
+  enkel nieuwe mensen.
+- **"Rechtstreeks" ligt te hoog, en dat is gekend.** Wie uitgelogd binnenkomt,
+  gaat langs de login; `?via=` reist mee (`landingQuery`), maar de referrer
+  niet, dus wie zonder link met kanaal kwam, komt terug als `direct`. Het
+  antwoord daarop is de linkbouwer (het linkicoon bij een bureau op de tab
+  Beheer, dezelfde sleutels als bij de tickets via `useSourceLink`), niet meer
+  code. Ook de vaste link `/bureau-inschrijving` geeft `?via=` en `?c=` door.
+  De linkbouwer van een bureau opent op "Geen kanaal (gewone link)": wie
+  meteen kopieert, deelt geen kanaal dat hij niet koos (bij de tickets stond
+  Facebook voorgeselecteerd, en dat bleef zo).
+- **De herkomst staat al in de HTML.** De bureaupagina leest `?via=` en `?c=`
+  op de server (`taggedLanding`) en zet ze in het formulier, want
+  `useLandingSource` is in de eerste render nog leeg. Wie instuurt voor de
+  pagina klaar is met laden, telt zo toch onder zijn link.
 
 ## Lesbezoeken
 
@@ -2252,11 +2394,17 @@ terug (`apps/web/lib/brevo/unsubscribe.ts`).
   naam en de rollen.
 - **Wie mag wat.** Leden en rollen beheren vraagt het aparte recht
   `werkgroepen.manage` (los van `groups.manage`, zodat het delegeerbaar is). De
-  **infotekst + website** mag daarnaast **elk lid van díe werkgroep** zelf
-  aanpassen (huidig werkingsjaar), maar enkel van de eigen werkgroep: de
-  admin-tab toont een gewoon lid enkel zijn eigen werkgroep(en) en enkel het
-  infotekst-formulier; `saveWerkgroepInfoAction` checkt het lidmaatschap
-  server-side. Beheerders (met het recht of superadmin) zien en beheren alles.
+  **infotekst + website** past de G3/G4 van díe werkgroep aan, met
+  `werkgroepen.editOwnInfo` via de LEADER-grant; enkel van de eigen werkgroep,
+  en `saveWerkgroepInfoAction` toetst dat server-side. Beheerders (met het recht
+  of superadmin) zien en beheren alles.
+- **Een gewoon werkgroeplid heeft in het beheer bijna niets te doen** (november
+  2026). Eerst mocht elk lid de infotekst aanpassen en zag het Mijn budgetten en
+  de BO-mappen van zijn werkgroep, en de rol die als DEFAULT aan elke werkgroep
+  hing, gaf ook Kassa's. Dat was te ruim: een werkgroep telt tientallen leden,
+  en de tekst op de site, de budgetten en de kassa's zijn het werk van de
+  G3/G4. Een gewoon lid dient enkel nog zijn eigen rekeningen in
+  (`expenses.submit`); de rest gaat via de G3/G4. Zie `docs/permissions.md`.
 - **De G3/G4 beheert zijn gewone leden zelf, de verantwoordelijken niet.**
   Met `werkgroepen.manageOwnMembers` voegt de verantwoordelijke van een
   werkgroep leden toe en verwijdert hij ze, enkel voor het huidige werkingsjaar
@@ -2366,6 +2514,27 @@ verstopte regel in de code: de volgende IT'er moet het kunnen zien en wijzigen
 zonder de code te lezen. Het aanmaakscherm zet die rij vanzelf klaar wanneer je
 een lijst uit een post maakt.
 
+### Een wijziging in Google wordt overgenomen, niet teruggedraaid
+
+Eerst was de site de enige bron: wie in de Admin console een lid toevoegde,
+zag het binnen de vijf minuten weer verdwijnen ("die bot reverteert al mijn
+changes", wgalumni@vtk.be, 17 november 2026). Mensen blijven de Admin console
+gebruiken, dus nu werkt de sync in twee richtingen (`lib/google/twoWay.ts`):
+
+- De site onthoudt na elke ronde wie ze in Google zette
+  (`MailGroup.syncedMembers`). Een verschil met wat er nu staat, is een mens.
+- **Toegevoegd in Google** wordt een los lid op de site, met de notitie
+  "toegevoegd in Google". Een uitsluiting voor dat adres valt weg.
+- **Verwijderd in Google**: een los lid verdwijnt ook op de site; wie er via
+  een bron (een post) in zit, krijgt een uitsluiting "verwijderd in Google".
+- Wat op de site veranderde, gaat zoals altijd naar Google.
+- Zonder onthouden lijst (de eerste ronde na de migratie, een nieuwe groep)
+  neemt de site over wat extra in Google staat en haalt ze niemand weg.
+- Eigenaars en beheerders blijven buiten de sync, zoals voorheen.
+
+Het blijft een regel: een in Google toegevoegd lid staat er als los lid, niet
+als bron. Wie wil dat een lijst een post volgt, zet de post als bron op de site.
+
 ### De 15-juli-wissel kost geen cron
 
 Precies zoals bij de wachtwoordkluis: omdat `GroupMembership` per werkingsjaar
@@ -2377,21 +2546,288 @@ Hetzelfde geldt voor "haal mij van die lijst": wie niet meer in een bronpost van
 dit jaar zit, verdwijnt bij de eerstvolgende reconcile. Enkel een handmatige
 extra vraagt een handeling, en dat is één rij verwijderen.
 
+### Alle groepen vanuit de site, niet enkel de nieuwe
+
+De Admin console is voor het dagelijkse werk onhandig: geen zicht op waarom
+iemand in een lijst zit, geen manier om een werkgroep haar eigen lijsten te
+laten beheren, en elk jaar dezelfde handelingen. Daarom beheert de site **elke**
+groep van de kring, ook de bestaande (`statix.*`, de POC-lijsten, de
+jaargroepen), en niet enkel de lijsten die ze zelf aanmaakte.
+
+**Overnemen kopieert en verandert niets in Google.** Wie er als gewoon lid in
+stond, komt mee als los lid (een lid van de site wanneer het adres zijn
+gekoppelde account is, anders een vrij adres). De eerste sync vindt dus exact
+wat er stond. Pas daarna zet iemand de bron (de post, de POC) en wist hij de
+overgenomen adressen, met een bevestiging die zegt wie er blijft. Zo kan een
+overname nooit in één klik een lijst leegmaken.
+
+**De standaardinstellingen van VTK gelden voor elke beheerde groep**
+(Toegangsinstellingen in de Admin console): iedereen mag de eigenaars
+contacteren en posten, enkel leden zien de gesprekken en de ledenlijst, enkel
+eigenaars en beheerders beheren de leden, externe leden mogen. De sync zet ze bij
+elke ronde, niet enkel bij het aanmaken, zodat een groep die iemand met de hand
+anders zette, terugkomt. Een groep die bewust anders moet, beheert de site niet
+(het vinkje "de site beheert dit adres"). Enkel "wie mag posten" heeft een eigen
+vinkje, omdat een interne lijst daar echt van afwijkt; bij het overnemen volgt
+het de huidige instelling.
+
+### Jaargroepen: activiteiten_2627 in activiteiten@vtk.be
+
+VTK maakt elk jaar per post een jaargroep (`activiteiten_2627@vtk.be`) met de
+leden van dat jaar, en hangt die in de hoofdgroep (`activiteiten@vtk.be`), naast
+Groep 5 en de tablet. Die structuur blijft, en de site neemt het jaarlijkse werk
+over: een hoofdgroep krijgt een sjabloon (`activiteiten_{jj}`) en een post, en
+de sync maakt de jaargroep van het lopende jaar, die van volgend jaar zodra daar
+iemand in de post staat, en wisselt op 15 juli de jaargroep in de hoofdgroep.
+
+- **Behouden in plaats van platslaan** (de hoofdgroep rechtstreeks de post laten
+  volgen was het alternatief): oude jaargroepen zijn het archief van die ploeg,
+  er kan Drive-toegang aan hangen, en wie het adres van vorig jaar nog gebruikt,
+  bereikt nog altijd die ploeg.
+- **Een jaargroep van een voorbij jaar raakt de sync niet meer aan**
+  (`isArchivedYear`). Zou ze de post van dat jaar blijven volgen, dan liep ze
+  leeg of veranderde ze, want de site houdt oude jaren minder volledig bij dan
+  wat er in Google staat.
+- De jaargroep van volgend jaar hangt nog niet in de hoofdgroep: wie al voor
+  volgend jaar ingevoerd is, krijgt de mail van de post pas op 15 juli.
+
+### POC-lijsten volgen de verkiezing, niet de invoer
+
+Een POC-lijst (`ene-poc@vtk.be`) hangt aan de POC zoals de site die al
+bijhoudt, en bevat de vertegenwoordigers van **één werkingsjaar**
+(`Poc.mailYear`). Dat jaar verschuift enkel met de knop "verkozen" op
+`/admin/pocs`, per POC of voor alle POC's met vertegenwoordigers in dat jaar.
+
+Niet op 15 juli zoals de posten: de vertegenwoordigers van een nieuw jaar worden
+vaak vooraf ingevoerd, en de lijst mag pas wisselen wanneer ze effectief
+verkozen zijn. Tot dan krijgt de vorige ploeg de mail.
+
+Een vertegenwoordiger is meestal een student zonder `@vtk.be`-account. Voor een
+POC-bron valt de lijst daarom terug op het adres waarmee hij op de site staat,
+waar een postenlijst iemand zonder koppeling bewust weglaat. Dat is geen
+privéadres dat iemand ongevraagd in een interne lijst zet: het is het adres
+waarop een POC-vertegenwoordiger zijn POC-mail verwacht.
+
+### Werkgroepen beheren hun eigen adressen
+
+Statix (en elke werkgroep met een eigen domein aan lijsten) mailde elk jaar een
+lijst namen naar IT om `statix.voornaam.naam@vtk.be`-accounts te maken en mensen
+in `statix.pr` of `statix.info` te zetten. Dat doet de werkgroep nu zelf:
+
+- **IT geeft de werkgroep een voorvoegsel** (`Group.mailPrefix`). Pas dan kan
+  ze iets: lijsten maken die met dat voorvoegsel beginnen, haar eigen lijsten
+  (`MailGroup.ownerGroupId`) beheren, en accounts aanvragen. Zonder voorvoegsel
+  zou ze een adres kunnen kiezen dat op een post lijkt.
+- **Wie dat binnen de werkgroep mag, is wie haar leden mag beheren**
+  (`werkgroepen.manageOwnMembers`, met dezelfde regel als in
+  `lib/werkgroepMembers.ts`). Geen nieuw recht: wie de ploeg samenstelt, beslist
+  ook wie in welke lijst zit.
+- **Een werkgroep zet enkel haar eigen leden van dit werkingsjaar in een lijst**,
+  plus vrije adressen. Bronnen als posten, kiesploegen en POC's blijven IT.
+- **Accounts worden aangevraagd, niet aangemaakt.** IT of de vice
+  (`googleAccounts.manage`) keurt goed, en dan maakt de site het account meteen.
+  Een account kost een licentie en is een adres van de kring; dat beslist niet
+  de werkgroep alleen.
+- **Een werkgroepaccount is een tweede account** (`WerkgroepAccount`), naast het
+  persoonlijke op `User`. In een lijst van de werkgroep komt het werkgroepadres,
+  elders het persoonlijke (`memberAddress`); wie enkel een werkgroepaccount
+  heeft, krijgt dat overal.
+
 ### Wat de sync nooit doet
 
 Drie grenzen, om dezelfde reden als bij de kluis: een bug in een sync die alles
 mag, wist dingen die niemand kan terughalen.
 
 - **Enkel gekoppelde groepen.** Een Google-groep zonder `MailGroup`-rij wordt
-  niet gelezen en niet aangeraakt. IT kan dus lijsten met de hand blijven
-  beheren zonder dat wij ze leegmaken.
+  niet aangeraakt; enkel het overnemenscherm leest de lijst van groepen. IT kan
+  dus lijsten met de hand blijven beheren zonder dat wij ze leegmaken.
 - **Enkel gewone leden.** `OWNER` en `MANAGER` van een groep blijven staan, ook
   als ze niet in onze berekening zitten. Daar zit het botaccount tussen, en een
   sync die zichzelf uit de groep gooit kan nadien niets meer rechtzetten.
-- **Nooit een groep verwijderen.** Verdwijnt de bron (post opgeheven), dan
+- **Nooit zelf een groep verwijderen.** Verdwijnt de bron (post opgeheven), dan
   laten we de groep staan en beheren we ze niet meer. Aan een groepsadres hangt
   het archief van de conversaties, en het adres staat op affiches, in
-  mailhandtekeningen en op de site van een bedrijf.
+  mailhandtekeningen en op de site van een bedrijf. Verwijderen gebeurt enkel
+  door iemand met `mailgroups.manage`, op het overzicht; zie "Opruimen" hieronder.
+
+### Opruimen: een mens verwijdert, met de leden ernaast
+
+Na het overnemen stonden er ruim zevenhonderd groepen op de site, waarvan een
+groot deel van lang geleden (`activiteiten_1112`, `cantus_1617`). Wie wil weten
+of zo'n groep weg mag, wil weten of er nog iemand in zit die nu bij de kring
+hoort. Daarom toonde het overzicht per groep **hoeveel leden nog actief zijn**, en
+klikte dat cijfer open tot de lijst met per adres de status. Na het grote
+nakijken is die kolom weg (zie "Google Admin: één item, tabbladen erin"); de
+regel hieronder geldt nog voor de nakijkmodus en het venster met de leden.
+
+- **Actief** is een post, werkgroep of jaarwerking dit werkingsjaar, een lopende
+  kiesploeg, of een studie die dit academiejaar bevestigd is (dezelfde grens als
+  de mailinglijsten). Een andere groep van de kring telt als actief wanneer er,
+  **hoe diep ook**, iemand actief in zit: `24urenloop` bevat `sport`, dat
+  `sport_2627` bevat, en daar zit de ploeg. Eén niveau diep (de eerste versie)
+  toonde `24urenloop` als "niemand", en dat was misleidend.
+- **Een groep die naar dit of volgend werkingsjaar heet** (`sport_2627`,
+  `activiteiten_2728`) is per definitie van de huidige ploeg, ook wanneer haar
+  leden nog geen gekoppeld account hebben. Ze valt nooit onder "Niemand meer
+  actief"; het overzicht zegt "groep van dit jaar".
+- In het venster met de leden klik je een geneste groep open, met het pad
+  erboven: zo zie je waarom een groep actief telt. Bewust **niet** wanneer iemand laatst in
+  Google aanmeldde: een oud-praesidiumlid dat zijn mailbox nog gebruikt, is geen
+  reden om `cantus_1617` te houden. De regel staat in `lib/google/activity.ts`.
+- Bij nul actief toont de rij **het jongste jaar** waarin nog iemand actief was
+  ("laatst 17-18"), of "niemand gekend" wanneer de site geen enkel adres kent.
+  Dat jaar zegt meer dan de naam van de groep.
+- **Verwijderen haalt de groep in Google weg**, met haar aliassen en het archief
+  van haar berichten, en daarna de regel op de site en het adres als los lid in
+  andere lijsten (anders probeert de sync elke vijf minuten een groep toe te
+  voegen die niet meer bestaat). Wie erin zat, staat per groep in het
+  adminlogboek. Terugzetten kan niet vanuit de site, en dat zegt de bevestiging.
+- **In bulk**, tot 200 per klik: zoeken (`activiteiten_`), alles in de filter
+  aanvinken, verwijderen. De bevestiging noemt de adressen, telt de leden en
+  waarschuwt wanneer er een groep met nog actieve leden tussen zit.
+- **Eén uitzondering:** de jaargroep van dit of volgend werkingsjaar van een
+  hoofdgroep met een sjabloon. Die maakt de sync bij de volgende ronde opnieuw
+  aan, dus die slaat de verwijdering over en zegt waarom.
+- "Loskoppelen" blijft bestaan naast verwijderen: dat haalt enkel de regel hier
+  weg en laat de groep in Google staan.
+
+### Nakijken, één voor één
+
+Zevenhonderd groepen nakijken in een tabel is omslachtig: telkens openen,
+terugkeren, de volgende zoeken. De nakijkmodus (`/admin/groepsadressen/nakijken`)
+toont de groepen van de huidige filter één voor één, met wie erin zit en de
+status per adres, en drie knoppen: **Houden** (H), **Weg ermee** (V) en
+**Overslaan** (S); met de pijltjes ga je vooruit en terug.
+
+- **Een beslissing wordt bewaard** (`MailGroup.reviewDecision`), zodat je kan
+  stoppen en later verdergaan: de nakijkmodus begint bij de eerste groep die nog
+  niet nagekeken is. Het overzicht toont "op weg" of "houden" bij de groep.
+- **"Weg" verwijdert nog niets.** De groep komt op de lijst "Te verwijderen"
+  (ook een filter op het overzicht), en die bevestig je in één keer, met
+  dezelfde bevestiging als de bulkverwijdering. Een vergissing tijdens het
+  doorklikken is zo nog terug te draaien met "Beslissing wissen".
+- **De filter van het overzicht gaat mee**: wie "Niemand meer actief" of één
+  categorie aanklikt en dan "Eén voor één nakijken", ziet precies die groepen,
+  in dezelfde volgorde (`lib/google/overview.ts` is de gedeelde lijst).
+- Tijdens het nakijken kan je de groep meteen in een categorie zetten; een
+  geneste groep klik je open zoals in het venster op het overzicht.
+- Geen regel in het adminlogboek per beslissing (zevenhonderd regels zeggen
+  niets); de verwijdering zelf staat er wel in, met wie erin zat.
+
+### Google Admin: één item, tabbladen erin
+
+De groepsadressen hadden boven hun overzicht een rij links (Overnemen uit
+Google, Accountaanvragen, Accounts aanmaken, Organisatie-eenheden, Accounts
+koppelen), elk naar een losse pagina met "Terug naar groepsadressen", en een
+grote knop "Nu synchroniseren" die bijna nooit nodig is. Op vraag van de
+beheerder (november 2026) is het een eigen item in de zijbalk, **Google
+Admin**, met tabbladen zoals Media en Tickets.
+
+- **Wat zelden gebruikt wordt, is een icoon naast het zoekveld**: "Nu
+  synchroniseren" (de sync draait toch elke vijf minuten) en "Eén voor één
+  nakijken" (een keer per jaar). "Nieuw groepsadres" werd net prominenter,
+  rechtsboven, want dat stond in een dichtgeklapt blok onderaan.
+- **Een nieuw adres krijgt meteen zijn bronnen, losse leden en categorie**, in
+  één formulier (`/nieuw`). Eerst een lege groep maken en dan op de detailpagina
+  vullen, was twee keer hetzelfde werk. Een werkgroep krijgt enkel het adres;
+  haar leden zet ze er op de volgende pagina in.
+- **Geen categoriechips meer boven de lijst**: de lijst is onder "Alle" al per
+  categorie gegroepeerd in blokken die dichtklappen, en twee manieren om
+  hetzelfde te kiezen was er een te veel. `?categorie=` werkt nog (de
+  nakijkmodus gebruikt het).
+- **Zoeken gebeurt in de browser, met Cmd/Ctrl+F**, en de zoekterm en de open
+  blokken staan in de URL (`?q=`, `?open=`, met `history.replaceState`). Wie een
+  adres opende en terugkeerde, begon anders met alles dicht en een leeg
+  zoekveld. De link "Groepsadressen" op een adres gaat naar dezelfde lijst
+  (`overviewMemory.ts`). Een tweede Cmd+F in het veld opent de zoekbalk van de
+  browser, zodat het gewone gedrag bereikbaar blijft.
+- **Geen kolom "nog actief" en geen "x zonder actieve leden" meer.** Dat was
+  het werktuig voor het grote nakijken; daarna bleven vooral alumnilijsten over
+  waarin niemand "gekend" is, en die horen te blijven. Het venster met wie erin
+  zit (een klik op "wie erin zit") toont de status per adres nog wel.
+- **Organisatie-eenheden** kiest de OU in een zoekbare keuzelijst in plaats van
+  een rij chips, leest enkel de velden die het scherm toont (`listUsersLite`)
+  in een eigen `Suspense`, en toont 100 rijen per keer. Het terugzetten uit het
+  logboek staat onderaan en dicht: dat was één keer nodig.
+
+### Categorieën: ordening, geen regel
+
+Zevenhonderd adressen in één alfabetische lijst zijn niet te overzien. Een
+groepsadres kan in één categorie staan, met hoogstens één niveau
+subcategorieën (Praesidium › Activiteiten). Dieper maakt van de filterrij een
+boom die niemand overziet.
+
+- De categorieën waren eerst chips boven de lijst; die zijn weg sinds de
+  blokken hieronder er zijn (zie "Google Admin: één item, tabbladen erin").
+- **Onder "Alle" is de lijst per categorie gegroepeerd**, in blokken die
+  standaard dicht staan, met de subcategorieën als blokken erin en "Zonder
+  categorie" als laatste. Het vinkje van een blok neemt alles erin. Bij een
+  zoekterm of een filter staan de blokken open: dan wil je zien wat gevonden is.
+- **Aanvinken werkt zoals in een bestandsbeheerder**: shift-klik neemt alles
+  tussen de vorige klik en deze (op het vinkje of op de rij), Ctrl- of Cmd-klik
+  op de rij vinkt aan in plaats van te openen.
+- **Toewijzen gebeurt in bulk**: aanvinken (of alles in de filter) en "In
+  categorie zetten". Per groep kan het ook bij Instellingen.
+- Een categorie zegt niets over wie erin zit: de sync leest ze niet. Weghalen
+  laat de adressen staan, zonder categorie; de subcategorieën gaan mee.
+- **Een categorie kan bij een werkgroep horen** (Werkgroepen › Biomedix), in
+  te stellen met het potlood bij "Categorieën". Werkgroepen › Biomedix had 28
+  adressen, en "Beheerd door werkgroep" adres per adres invullen was voor 78
+  adressen een middag werk. Het is **geen overerving** die de sync of de
+  rechten lezen: opslaan zet de werkgroep als `MailGroup.ownerGroupId` op de
+  adressen, zodat elke bestaande check op `ownerGroupId` blijft kloppen.
+  - Ze komt op elk adres rechtstreeks in de categorie zonder werkgroep, of met
+    nog de vorige werkgroep van de categorie. **Een adres met een andere
+    werkgroep houdt die**: dat is een bewuste uitzondering, en de melding zegt
+    hoeveel er zo zijn. Een werkgroep weghalen haalt ze dus ook enkel weg waar
+    de categorie ze gezet had.
+  - Een adres dat later in de categorie komt (in bulk, bij Instellingen of bij
+    een nieuw adres) en nog geen werkgroep heeft, krijgt ze erbij. In bulk
+    neemt verplaatsen niemand het beheer af: een adres met een werkgroep houdt
+    de zijne. In een formulier wordt ze enkel voorgesteld, zodat "Geen" kiezen
+    mogelijk blijft.
+  - Een subcategorie kiest zelf; die van de hoofdcategorie loopt niet door.
+  - **Omgekeerd volgt de categorie de werkgroep** (november 2026). Een lijst
+    die een werkgroep zelf aanmaakt (`mechanix.g4@vtk.be`), of een adres dat
+    een werkgroep als eigenaar krijgt, komt zonder gekozen categorie meteen in
+    die van haar werkgroep. Eerst stond ze onderaan bij "Zonder categorie" en
+    moest iemand van IT ze er met de hand in zetten. Heeft de werkgroep twee
+    categorieën, dan wint de subcategorie (Werkgroepen › Mechanix), en bij twee
+    de oudste. Een gekozen categorie blijft altijd staan.
+- Alfabetisch, zonder handmatige volgorde, zoals de rollen.
+- De automatische soorten (posten, jaargroepen, POC's) blijven als kleine chips
+  naast de opruimfilters. "Met de hand" is weg: dat was elke overgenomen groep
+  en zei dus niets.
+
+### Eén groepsadres in tabbladen
+
+De detailpagina was vijf secties onder elkaar, en bij een overgenomen lijst
+stond elk adres twee keer (bij "Wie erin zit" en bij "Losse leden"). Vier
+richtingen zijn op een bord vergeleken (tabbladen, één lijst met de regels
+erboven, regel en resultaat naast elkaar, dichtgeklapte kaarten); gekozen zijn
+de **tabbladen**: Leden, Bronnen, Jaargroepen en Instellingen.
+
+- **Leden is één tabel**: elk adres één keer, met waarom het erin zit (via een
+  bron, los, jaargroep, uitgesloten) en of het nog actief is, plus de knop om
+  een los lid of een uitsluiting weg te halen. Toevoegen staat bovenaan die
+  tabel, met een keuze tussen een lid van de site en een mailadres.
+- Bovenaan de pagina een zin die de groep samenvat ("9 leden, waarvan 2 nog
+  actief. Geen bronnen, enkel 9 losse adressen.").
+- Het tabblad staat in de URL (`?tab=instellingen`). Loskoppelen en
+  verwijderen staan onderaan Instellingen.
+- Keuzes uit een lange lijst (bron, post, categorie) zijn een zoekbare
+  keuzelijst (`SearchPicker`), geen keuzelijst van de browser.
+
+### Accounts koppelen begint bij de mensen
+
+Het koppelscherm toonde elk vrij `@vtk.be`-account (ruim zevenhonderd, meestal
+oud-leden) met naast elk een keuzelijst van leden. Wat er toe doet, is de
+andere richting: **wie een post heeft en nog niet gekoppeld is**, want die valt
+uit elke lijst. Dat zijn er tientallen, en die staan nu bovenaan, elk met de
+vrije accounts in een zoekbare lijst en een link naar "Accounts aanmaken" voor
+wie er nog geen heeft. De accounts zonder lid en de al gekoppelde staan
+dichtgeklapt eronder; die eerste lijst toont enkel wat bij de zoekterm past, en
+hoogstens vijftig.
 
 ### Deze adressen ontvangen mail van buiten
 
@@ -2527,6 +2963,11 @@ samengeplakt, en bij een botsing een cijfer erachter.
 
 #### De standaardlijsten worden in één klik aangemaakt
 
+De standaardvormen volgen sinds november 2026 wat VTK effectief gebruikt:
+`epsilon.g5@vtk.be` (`{code}.{post}`) en
+`voornaam.naam.kiesploegepsilon@vtk.be` (`{voornaam}.{achternaam}.kiesploeg{code}`),
+met de naam van de ploeg als code. Bestaande ploegen houden hun eigen sjablonen.
+
 De knop "standaardlijsten aanmaken" maakt per kiesploegpost een groepsadres uit
 het lijstsjabloon, met **twee zichtbare bronrijen**: die post en de g5 van de
 ploeg. Dat de g5 in elke lijst zit, staat dus in de bronnenlijst en niet als
@@ -2536,18 +2977,65 @@ adressen worden overgeslagen, zodat de knop twee keer indrukken niets breekt.
 #### De accountstaat is afgeleid, met een override
 
 Net als het groepslidmaatschap wordt de staat van een account **berekend** en
-niet als losse knoppen bijgehouden:
+niet als losse knoppen bijgehouden (`desiredAccountState`):
 
-- **beperkt**: zit enkel in een kiesploeg. Geen verzendrecht vanaf het primaire
-  adres, mailbox stuurt door, de kiesploeg-alias is de standaardafzender.
-- **volwaardig**: zit in een post of werkgroep van het huidige werkingsjaar.
-- **override per persoon**: wint van allebei, voor de marketingmensen uit stap 2.
+- **enkel ontvangen** (`RESTRICTED`): zit enkel in een kiesploeg. Geen enkel
+  uitgaand bericht; de mailbox mag doorsturen.
+- **mailen vanaf het kiesploegadres** (`ALIAS_SENDER`): een kiesploeglid dat de
+  ploeg aanduidt (het vinkje per lid). Vanaf het primaire adres mailt **geen
+  enkel** kiesploeglid voor de ploeg aantreedt: dat adres wordt pas na 15 juli
+  van hen, en enkel als ze een post krijgen.
+- **volwaardig** (`FULL`): zit in een post of werkgroep van het huidige
+  werkingsjaar.
+- **geschorst** (`SUSPENDED`): zie "Na de verkiezing" hieronder.
 
-**Een afgeleide staat mag automatisch upgraden, nooit automatisch degraderen.**
-Zonder die regel verliest op 15 juli het hele vertrekkende praesidium in één
-reconcile zijn mailbox en zijn verzendrecht, want hun memberships van vorig jaar
-tellen dan niet meer mee. Afsluiten, suspenderen en verzendrecht intrekken zijn
-expliciete handelingen.
+Dat zijn er twee voor de kiesploeg en niet één met een override "mag mailen",
+omdat VTK het zo vroeg: de paar mensen die voor de ploeg mailen, doen dat als
+ploeg, vanaf `voornaam.naam.kiesploegepsilon@vtk.be`, en de rest leest enkel
+mee. Elke staat heeft zijn eigen organisatie-eenheid met een eigen
+routing-regel.
+
+**Een afgeleide staat mag automatisch upgraden, nooit automatisch degraderen**
+(`transitionAllowed`). Zonder die regel verliest op 15 juli het hele vertrekkende
+praesidium in één reconcile zijn mailbox en zijn verzendrecht, want hun
+memberships van vorig jaar tellen dan niet meer mee. Een volwaardig account
+wordt dus nooit vanzelf beperkt of geschorst; een account waarvan de site de
+staat nooit zette, ook niet.
+
+#### Een praesidiumlid in de kiesploeg krijgt geen tweede account
+
+Wie al `voornaam.naam@vtk.be` heeft (de huidige g5 die de nieuwe ploeg trekt),
+krijgt bij "accounts aanmaken" enkel het kiesploegadres erbij als alias, en als
+afzender wanneer hij mag mailen. Een tweede account zou zijn mail over twee
+mailboxen verdelen, en op 15 juli zou het nieuwe precies het adres zijn dat hij
+al had. Zijn staat blijft volwaardig: die degradeert de sync niet.
+
+#### Na de verkiezing
+
+Wie verkozen wordt, zit daarom nog niet in het praesidium: het gebeurt dat
+iemand in de kiesploeg zat, verkozen werd, en toch geen post kreeg. Daarom
+beslist niet de verkiezing maar **de postverdeling van het nieuwe werkingsjaar**,
+en gebeurt alles op 15 juli, wanneer `currentWorkingYear()` kantelt:
+
+- **Het kiesploegadres verdwijnt bij iedereen van de ploeg**
+  (`transitionKiesploegen`). Op 15 juli en niet bij de verkiezing: tot dan is
+  het het adres waarmee de ploeg als ploeg mailt. Mail naar dat adres bouncet
+  daarna; dat is gekozen, het adres hoorde bij de campagne.
+- **Wie een post heeft, wordt volwaardig**: eigen mailbox, mailen vanaf het eigen
+  adres, doorsturen uit.
+- **Wie geen post kreeg, wordt geschorst**, niet verwijderd. Een geschorst
+  account kan niet aanmelden en kost op termijn geen licentie, maar het adres
+  blijft gereserveerd en het account kan terug open. Verwijderen is onomkeerbaar
+  en het adres komt dan niet meteen vrij.
+
+Twee vangnetten, omdat dit het enige is wat de sync uit zichzelf afsluit:
+
+- **Zonder postverdeling schorst de sync niemand** (`postsEnteredFor`). Anders
+  schorst de eerste ronde na 15 juli de hele ploeg wanneer niemand de posten op
+  tijd invulde. Het kiesploegscherm toont vooraf wie er geschorst zou worden.
+- **Een schorsing opheffen is een knop**, en daarna schorst de sync dat account
+  niet opnieuw (`KiesploegMember.keepAccount`). Krijgt iemand later toch een
+  post, dan maakt de sync hem vanzelf volwaardig.
 
 ### Wat handmatig in de Admin console blijft
 
@@ -2605,15 +3093,23 @@ avond werk voor niets.
 - Wat er gebeurt met het account van iemand die de kring verlaat, en na hoeveel
   tijd (mail en Drive-bestanden hangen eraan). Tot dat beslist is, degradeert de
   sync niemand automatisch en suspendt ze niemand.
-- Of de kiesploegalias blijft staan als ontvangend adres nadat de ploeg
-  aantreedt. Nu blijft hij staan: hij verwijderen zou mail doen bouncen die naar
-  een adres uit die periode gestuurd wordt.
+- (Beslist in november 2026: de kiesploegalias verdwijnt op 15 juli, zie "Na
+  de verkiezing".)
 
 ## Kalender: de agenda en de week
 
 De kalender heeft drie weergaven: het raster met affiches (de standaard), de
 agenda en de week. De agenda en de week zijn in oktober 2026 herwerkt; vijf
 richtingen werden in een canvas naast elkaar gelegd.
+
+### Het raster toont altijd de komende twee weken
+
+Het raster met affiches werkt per maand, en op het einde van een maand stond er
+daardoor bijna niets: op 30 oktober één kaart, terwijl de evenementen van begin
+november gewoon gepland waren. In de maand van vandaag loopt het raster daarom
+door tot de komende veertien dagen erin staan, in hele weken zoals de rest van
+het raster (`posterGridDays`). De kop zegt dat dan ook ("Oktober - november
+2026"). Bladeren blijft per maand; een andere maand toont enkel haar eigen weken.
 
 ### De agenda blijft een maandraster
 
@@ -2847,9 +3343,10 @@ wat het was:
   de eerste dag.
 
 Daarom is er een derde vorm: **één evenement met meerdere momenten**
-(`CalendarEventMoment`). Het evenement blijft één record met één URL, één
-affiche, één beschrijving, één ster, één ticketshop en één formulier; de momenten
-zeggen enkel wannéér het doorgaat.
+(`CalendarEventMoment`). Het evenement blijft één record met één URL, één ster,
+één ticketshop en één formulier; de momenten zeggen wannéér het doorgaat, en waar
+nodig wat er die keer anders is (zie "Eigen locatie, tekst en affiche per moment"
+hieronder).
 
 - **`CalendarEvent.start` en `.end` blijven de envelop** eromheen: de start van
   het eerste moment en het einde van het laatste, door de save-action
@@ -2906,6 +3403,43 @@ kalender leest, en levert momenten op zonder eigen rij, terwijl de ster, de
 tellers, de tickets en de formulieren allemaal aan een id hangen. Een opsomming
 van momenten is voor een kring die zoiets een paar keer per jaar doet het
 eerlijkere model, en een editor kan een reeks dagen in één klik klaarzetten.
+
+### Eigen locatie, tekst en affiche per moment
+
+De wekelijkse loopjes van Sport draaiden op één evenement met een moment per week,
+en dan botst "één affiche, één beschrijving": de startplaats verschilt per loopje,
+het ene loopje is een Pinguino Run en het andere niet. Een moment kan daarom een
+eigen locatie, tekst en affiche hebben. Alles is optioneel en leeg volgt het
+evenement (`eventForMoment` in lib/calendar/moments.ts, de enige plek met die
+regel).
+
+- **De eigen tekst staat naast de beschrijving en vervangt ze niet.** Wat altijd
+  geldt (WhatsApp-groep, wie welkom is) staat in de beschrijving van het
+  evenement en hoeft zo niet per week overgetikt te worden. Op de eventpagina komt
+  een blok "Volgende keer" boven "Over dit event".
+- **De site toont de eerstvolgende keer, en wisselt vanzelf.** Zodra een moment
+  afgelopen is, staan de affiche en de locatie van het volgende klaar
+  (`upcomingMoment`), overal waar het evenement als één geheel staat: de
+  eventpagina, de kaarten op /kalender en de homepage, de post-pagina's, het
+  nieuws, het linkvoorbeeld en de app. Geen cron nodig; die pagina's renderen per
+  request. Is de reeks voorbij, dan weer die van het evenement: de pagina gaat dan
+  over de reeks en niet over haar laatste avond.
+- **Wat over één keer gaat, neemt die keer** en niet de eerstvolgende: een afspraak
+  in de agenda-feed, een blok in de week, de herinneringsmail en de push.
+- **Een naam alleen maakt geen "Volgende keer".** Het blok verschijnt enkel met een
+  eigen tekst of locatie; de naam staat al in de lijst ernaast, en een reeks zonder
+  eigen tekst hoort eruit te zien zoals voordien.
+- **De app kent geen momenten en hoeft dat niet.** De API vult locatie, affiche en
+  omschrijving al voor de eerstvolgende keer in, dus dit vroeg geen app-update.
+- **Discord krijgt wel de affiche van het evenement.** Die post vertrekt één keer
+  bij het aankondigen en kan dus niet meewisselen.
+- **Geen eigen URL, ster-teller of telefoonuitsnede per moment.** Een link naar het
+  evenement toont vanzelf de eerstvolgende keer, en dat is wat iemand wil die hem
+  in een groepsgesprek krijgt. Een telefoon volgt het focuspunt van de eigen affiche.
+- **Een nieuw veld op een moment moet door het formulier.** De save-action gooit de
+  momenten weg en maakt ze opnieuw aan, dus wat niet heen en terug gaat, is stil
+  weg. `test/calendarMomentForm.test.ts` leest de DMMF en faalt zodra een kolom die
+  weg niet aflegt.
 
 ### Twee weergaven: Agenda en Lijst
 
@@ -3161,16 +3695,19 @@ afwisselen (zie ook de styling-sectie in `CLAUDE.md`). De volgorde van de
 homepage is een ontwerpkeuze, geen toeval:
 
 - **Hero** (navy + technisch patroon + gele onderlijn) → **Nieuws** (lichtblauw, `--paper-2`) →
-  **Aankomende evenementen** (lichtblauw, `--paper-2`) → **Openingsuren** (navy) →
+  **Openingsuren** (navy) → **Aankomende evenementen** (lichtblauw, `--paper-2`) →
   **POC's** (navy, wanneer getoond) → **Shiften** (lichtblauw, wanneer aan en er
   shiften zijn) → **Aftermovies** (navy + technisch patroon) → **Wat we doen**
   (paper) → **VTK Career** (navy) → **Hoofdpartners** (paper).
-- **Waarom de evenementen direct onder het nieuws?** Sinds eind oktober 2026:
-  evenementen en nieuws staan bovenaan omdat wat er nu en deze week speelt de
-  belangrijkste reden is om de site te bezoeken. Tussen nieuws en evenementen zorgt
-  de bovenmarge van `.events-band` voor een rustig paper-gat tussen de twee
-  `--paper-2`-banden. Zonder nieuws raakt de navy hero de evenementen direct met een
-  strakke naad (`.vtk-blueprint-hero + .band { margin-top: 0 }`).
+- **Waarom de evenementen tussen de openingsuren en de POC's?** Zo wisselen
+  lichtblauw en navy af. Bij de nieuwe hero (eind oktober 2026) zijn de
+  evenementen even direct onder het nieuws gezet; dan lagen twee lichtblauwe
+  banden op elkaar en raakten de navy openingsuren de navy POC's zonder iets
+  ertussen. Op vraag van de kring staat de volgorde weer zoals hierboven. De
+  evenementen volgen op de navy openingsuren met een strakke naad
+  (`.hours-strip + .band { margin-top: 0 }`), en de POC's op de evenementen met
+  `.band + .band`. Zonder nieuws raakt de hero de openingsuren: de gele onderlijn
+  van de hero (of de lichtblauwe strook onder de affiches) scheidt de twee.
 - **Waarom de shiften vóór "Wat we doen"?** Sinds oktober 2026 op vraag van de
   kring, om dezelfde reden als de evenementen: de open shiften van deze week
   vragen iets van wie kijkt, en dat mag niet onder het vaste aanbod verdwijnen.
@@ -3213,6 +3750,80 @@ homepage is een ontwerpkeuze, geen toeval:
   van de zes bestemmingen met subtiele scheidingslijnen en pijltjes. Slechts een
   van beide linksets is tegelijk in de DOM zichtbaar (`display: none` op de
   andere), zodat een screenreader links niet dubbel voorleest.
+
+### Evenementen in de hero: losse affiches, en wie ze kiest
+
+Sinds 30 oktober 2026 hangen vier evenementen als losse affiches over de gele
+streep van de hero. Dit was richting B op het bord
+https://claude.ai/artifact/Xo3uPbxNUGSqPb9kKuGftr, uitgewerkt op
+https://claude.ai/artifact/LcyfRnnKaK2fknXX2Kh3uN.
+
+- **Geen witte kaart.** De eerste versie had de witte evenementkaart in klein, en
+  op navy tekende dat wit een rand rond elke foto. Nu hangt enkel de foto over de
+  streep; titel en uur staan zonder kaart op de lichte band eronder. Donker glas,
+  tekst op de affiche, een doorlopende strook, leiders vanuit het logo en één
+  grote plaat zijn bekeken en niet gekozen.
+- **Wie kiest.** In `/admin/kalender` licht je met de ster in de rij een evenement
+  uit, enkel met `calendar.manageAll`: de hero is de plek van de hele kring, en
+  wie voor zijn post evenementen mag aanmaken, beslist niet mee wat bovenaan de
+  site staat. Bovenaan die lijst staat welke vier er nu in staan.
+- **Wat er getoond wordt.** Eerst wat uitgelicht is, en de overige plaatsen gaan
+  vanzelf naar de eerstvolgende evenementen, zodat de hero nooit half leeg staat
+  omdat niemand iets aanduidde. De kaarten staan altijd op datum, ook wanneer een
+  uitgelicht evenement ver vooruit ligt: de datumpins lezen als een agenda.
+- **Hoogstens vier uitgelicht, en de vijfde wordt geweigerd.** Stilletjes aanvaarden
+  en dan niet tonen zou een ster opleveren die niets doet. Een concept of een
+  evenement dat al begonnen is, kan om dezelfde reden niet uitgelicht worden. Na
+  afloop telt een uitgelicht evenement niet meer mee, dus de plaats komt vanzelf vrij.
+- **De kop zegt enkel wat klopt.** "Deze week" staat er enkel wanneer elke kaart
+  binnen de zeven dagen valt, anders "Binnenkort". De kaarten volgen de doelgroepfilter
+  van de bezoeker, net als de rest van de homepage: wie zijn kalender toespitste,
+  kan dus een andere vier zien dan de lijst in het beheer.
+- **Niets dubbel.** De band Aankomende evenementen begint na deze vier. De ster en
+  "Zet in mijn agenda" staan enkel op de kaarten in die band; een affiche in de
+  hero is als geheel één link.
+
+### De hero kiezen in /admin/home
+
+Sinds 31 oktober 2026 kiest een redacteur met `home.edit` de hero zelf, met het
+voorbeeld meteen erboven. Bewaren geldt voor iedereen en meteen. Alles over de hero
+staat op dat ene scherm: een eerste versie verspreidde het over Homepagina, Frontpage
+en Slogans, en dat las niet als één keuze.
+
+- **Bouwtekening** (de standaard). Zonder rij in `home.heroDesign` verandert er
+  niets aan de site.
+- **Constructielogo.** De lijnen en cirkels zijn de echte, uit `VTK technisch.ai`
+  (`lib/home/heroConstruction.ts`), niet verzonnen zoals de hulplijnen van de
+  bouwtekening. Drie opstellingen: op de lijnuiteinden, met leiders rond het logo,
+  links groot met register rechts. De arcering loopt evenwijdig aan de lange schuine
+  zijde van het logo (38,15 graden), niet op 45 graden zoals bij de bouwtekening.
+- **Oude hero, 24 urenloop en jobfair.** De hero's met een foto uit de tijd voor
+  b9ff2fcb. Hun teksten staan vast in de code: de slogans werden niet gebruikt, en een
+  apart beheerscherm voor drie hero's die zelden wisselen was meer dan het waard was.
+  De stijl "nieuw" kwam bewust niet mee, en een hero voor het galabal heeft nooit
+  bestaan in de code. De 24 urenloop haalt haar uren en stand uit /admin/24urenloop, de
+  jobfair haar logo's uit /admin/partners.
+- **Hoverkleur en snelheid** gelden voor de bouwtekening en het constructielogo; wit
+  is wat er altijd al stond, 100% de snelheid van voordien.
+- **De tekstjes onder de zes bestemmingen** zijn sinds november 2026 aan te passen,
+  in beide talen, voor de bouwtekening en het constructielogo samen. De namen zelf
+  (Kalender, Tickets, ...) blijven in de code: die horen bij een vaste bestemming, en
+  een andere naam op dezelfde link zou enkel verwarren. Een leeg veld zet de
+  standaardtekst terug. Maximaal 60 tekens, zodat een tekstje op twee regels naast de
+  tekening past.
+
+Wat bij de hero's met een foto bewust niet terugkwam, omdat het los staat van hoe ze
+eruitzien:
+
+- **De kolom `heroWeek` en de permissie `calendar.heroWeek`.** Voorrang in het
+  weekoverzicht volgt nu de ster in /admin/kalender (`homeFeaturedAt`). Een evenement
+  uit het overzicht verbergen kan dus niet meer.
+- **De mail aan de post** dat een evenement in het weekoverzicht komt. Die liep op de
+  achtergrond, ook wanneer die hero niet gekozen is, en zou elke post opnieuw mailen
+  omdat de kolom die dat bijhield weg is.
+
+De oude code en uitleg staan nog in de geschiedenis
+(`git show b9ff2fcb~1:docs/design-decisions.md`).
 
 ### Aftermovies op de homepage
 
@@ -3407,6 +4018,34 @@ nu-lijn, en daaronder de week als rij met de uren in tekst
 - **De logo's** staan als lichte versies voor navy in `public/openingsuren/`. Het
   Theokot houdt zijn rood. Van de cursusdienst staat enkel het hoofd van de kat
   erin, want de volledige tekening wordt op deze grootte een vlek.
+
+### Openingsuren: twee weergaven, week in strepen als standaard
+
+De werking hierboven bleef, maar de vorm las als een sjabloon: een glazen paneel
+met een kader, gele kapitalen boven de as, gekleurde bolletjes voor de status,
+balken als pillen en de week in gevulde vakjes. Op een bord (november 2026) met de
+band zoals hij was en drie richtingen die de werking houden (zonder kader,
+wijzerplaat, week in strepen) koos de kring er twee, met een keuze in /admin/home
+(`home.hoursLayout`, `lib/home/hoursLayout.ts`). De opmaak staat in
+`app/design/vtk-hours.css`.
+
+- **Week in strepen (`strips`, de standaard).** Per dienst een kolom met de week
+  als dunne rijen op dezelfde tijdas; vandaag is de dikste rij en draagt de gele
+  nu-lijn. De uren staan in de balk, of ernaast als die te smal is (een container
+  query op de balk). Je ziet in één oogopslag dat Theokot vrijdag vroeger sluit en
+  dat 't ElixIr enkel 's avonds draait, en de band is veel korter. De week staat
+  voor een schermlezer ook als tekst. Smaller dan 980px staan de diensten onder
+  elkaar.
+- **Zonder kader (`plain`).** Dezelfde opbouw als voorheen (vandaag als tijdlijn,
+  de week als tekst eronder), zonder paneel: elke dienst een rij op de band met
+  een haarlijn ertussen, vandaag als dunne lijn met de vensters erop, één nu-lijn
+  door alle diensten, "gesloten" in plaats van een streepje en vandaag geel
+  onderlijnd.
+- **In beide geen statusbolletje.** Open staat in het wit, dicht gedempt met enkel
+  het uur in het wit ("Opent vandaag om **10:30**"), "Mogelijk nog open" in het
+  geel. Een dag zonder uren heet "gesloten", zoals de statuszin, en niet "dicht".
+- **De wijzerplaat** (een klok van 24 uur per dienst) viel af: een venster van een
+  uur, zoals de cursusdienst, is op een ring een kort boogje.
 
 ---
 
@@ -3736,24 +4375,61 @@ ze staan naast elkaar op twee assen die je tegelijk kan lezen.
   (een handmatige update, een ooit verkleind palet) valt terug op de hash in
   plaats van een token te vragen dat niet bestaat, want een blok zonder vulling
   ziet eruit als een blok zonder chauffeur.
-- **Een palet van vierentwintig, geen vrij kleurenwiel.** Het waren er acht in
+- **Een palet van veertig, met daarnaast drie schuiven (zie "Eigen kleur met
+  schuiven" hieronder).** Het waren er acht in
   een rijtje, en dat was te weinig zodra er meer dan acht mensen rijden: dan
   deelden twee chauffeurs een kleur op precies de week waarin het druk was. Nu
   staan ze als raster van zes bij vier in het kiesscherm, in de volgorde van het
   spectrum (blauw, groen, geel, oranje, rood, roze, paars, neutraal), elk met een
   naam als tooltip; "Kleur 17" zegt niets.
 
-  Een **vrije** kleurkiezer blijft er bewust niet: de tekst in een blok is donker
-  en de arcering van het voertuig ligt eroverheen, dus een vulling moet licht
-  blijven. Met een kleurenwiel staat er binnen de maand een donkerblauw tussen
-  waarop niemand het uur nog leest. Alle vierentwintig tinten in
-  `apps/logistiek/app/globals.css` zijn daarop gekozen.
+  Een **volledig vrije** kleurkiezer blijft er bewust niet: de tekst in een blok
+  heeft één kleur en de arcering van het voertuig ligt eroverheen, dus een vulling
+  moet binnen een bereik blijven. Met een kleurenwiel met vrije helderheid staat
+  er binnen de maand een donkerblauw tussen waarop niemand het uur nog leest. Alle
+  tinten van het palet in `apps/logistiek/app/design/theme.css` zijn daarop
+  gekozen, en de schuiven hieronder houden dezelfde grens aan.
 
   **Ingeklapt tot één knop.** Vierentwintig bolletjes bij elke chauffeur maakten
   van een lijst van tien mensen een muur van tweehonderdveertig stippen, en je
   kijkt naar hoogstens één ervan. De knop toont de kleur die deze chauffeur nu
   heeft, met haar naam; het palet klapt eronder open en sluit met Escape of door
   ernaast te klikken.
+- **Eigen kleur met schuiven (drie: tint, levendigheid, kracht).** Het palet van
+  veertig was nog altijd te beperkt voor wie een kleur wil die er niet tussen
+  staat, en "oneindig veel opties" is dan het antwoord op de vraag. Onder het
+  palet staat een ingeklapte knop "Eigen kleur" met drie schuiven en een voorbeeld
+  van een rit.
+  - **Tint en levendigheid zijn vrij, de kracht niet.** De tint (0 tot 359 graden)
+    en de levendigheid (grijs tot zo levendig als hier mag) lopen over het hele
+    bereik. De kracht, de derde schuif, kiest enkel tussen "zacht" en "krachtig",
+    en dat bereik is het stuk waarin de tekst in het blok 4.5:1 haalt. Een vrije
+    helderheid was precies de val waar het palet van vierentwintig voor gekozen
+    werd.
+  - **Er staan drie getallen in de databank, geen kleur.** `UitleenDriver.customColor`
+    bewaart `tint,levendigheid,kracht` (bv. `210,60,35`), en de echte helderheid
+    komt uit `--driver-l0` en `--driver-l1` in `theme.css`, per modus (`customColorCss`
+    in `lib/driver-colors.ts`). Zo wordt dezelfde keuze in het donker vanzelf een
+    donkere vulling met lichte tekst, zonder dat iemand ze opnieuw opslaat. Een hex
+    kon dat niet: dat is één vaste kleur.
+  - **`oklch` en geen `hsl`.** Bij `hsl` is geel bij dezelfde "lightness" veel
+    lichter dan blauw, dus de kracht-schuif zou bij elke tint iets anders doen en
+    de leesbaarheid zou per tint anders uitvallen. Bij `oklch` is één grens genoeg.
+  - **De grens wordt nagerekend.** `test/driver-colors.test.ts` leest de tokens uit
+    `theme.css` en zoekt de slechtste combinatie van tint, levendigheid en kracht
+    met de strengste arcering erover, in beide modi. Schuift iemand `--driver-l1`
+    op, dan faalt die test; dat is de bedoeling.
+  - **Een paletkleur en een eigen kleur sluiten elkaar uit.** Een nummer kiezen
+    (of "Standaard") zet `customColor` op `null`, en een eigen kleur zet
+    `colorIndex` op `null`. Anders bleef er na "Standaard" een eigen kleur staan
+    die de hash bleef overschrijven. Een tekst in de databank die geen kleur is,
+    valt terug op palet of hash (`parseCustomColor`), net als een onzinnige
+    `colorIndex`.
+  - **Bestaande chauffeurs veranderen niet.** De kolom is nullable en `NULL` is
+    "geen eigen kleur"; er is geen backfill.
+  - **De schuiven bewaren niets per pixel.** Een knop "Eigen kleur toepassen" slaat
+    op; een schuif die bij elke beweging opslaat is honderd server actions voor
+    één kleur.
 - **Een postlid krijgt pas een `UitleenDriver`-rij zodra iemand er iets aan
   instelt**, net zoals bij `canDriveVan`. De rij is de plek voor wat het team
   handmatig bijhoudt; het lidmaatschap zelf blijft uit de post komen.
@@ -5332,16 +6008,17 @@ de streep zijn de **staat**. Die drie assen mogen elkaars taal niet lenen.
 
 ### Een rit van je post staat op "Mijn ritten", ook als jij hem rijdt
 
-`/ritten` heeft twee lijsten, en die beantwoorden twee verschillende vragen:
-**"Komende ritten"** is *wat moet ik doen*, **"Ritten van mijn post"** is *wat
-staat er bij ons open*. Een rit kan in allebei thuishoren.
+`/ritten` beantwoordt twee vragen: *wat moet ik doen* en *wat staat er bij ons
+open*. Een rit kan op allebei het antwoord zijn. Dat waren eerst twee lijsten
+("Komende ritten" en "Ritten van mijn post"); sinds november 2026 is het één
+agenda met een filter, zie "Mijn ritten als agenda" hieronder.
 
-- **Kies je jezelf als chauffeur van een rit van je post, dan blijft hij ook in
-  de postlijst staan.** Hij verdween daar, omdat dezelfde rit twee keer op één
-  scherm als twee ritten leest. In de praktijk was het omgekeerde erger: de
-  andere postleden zagen de rit verdwijnen zodra er iemand op stond, en wisten
-  dus niet meer of er al iemand reed. De kaart draagt daarom het merkteken
-  **"Jij rijdt"**; dat is wat het verschil tussen de twee lijsten leesbaar houdt.
+- **Kies je jezelf als chauffeur van een rit van je post, dan blijft hij bij de
+  post staan.** Hij verdween eerst uit de postlijst, omdat dezelfde rit twee keer
+  op één scherm als twee ritten leest. In de praktijk was het omgekeerde erger:
+  de andere postleden zagen de rit verdwijnen zodra er iemand op stond, en
+  wisten dus niet meer of er al iemand reed. In de ene lijst staat zo'n rit nu
+  één keer, met "Jij rijdt" bij de chauffeur, en hij valt onder beide filters.
 - **Een goedgekeurde rit die je post zelf aanvroeg, staat er ook zonder
   chauffeur.** Dat is net de rit waar een post iets mee moet. Hij verscheen pas
   zodra Logistiek er iemand op zette of hem uitdrukkelijk doorgaf, en dat is de
@@ -5355,6 +6032,48 @@ staat er bij ons open*. Een rit kan in allebei thuishoren.
   collega van dezelfde post dat al toe; ze stonden er enkel te lezen, dus moest
   een post naar het bezettingsoverzicht voor iets wat op haar eigen ritlijst
   hoort.
+
+### "Mijn ritten" als agenda
+
+`/ritten` was een kaart per rit, met alles open: adressen met een kaartlink,
+contactpersoon met mail en nummer, bijrijders, nota's. Op een telefoon was dat
+een halve meter per rit, en met een drukke week vond een chauffeur de rit van
+morgen niet meer terug. Het is nu een agenda per week, zoals `/shift` op de
+website (`app/ritten/trips-agenda.tsx`).
+
+- **Elke rit is één regel die openklapt.** De regel zegt wanneer, wat, voor wie,
+  van waar naar waar en wie rijdt; adressen voluit, nummers en nota's staan één
+  tik verder. Alles staat dicht bij het laden, ook op een groot scherm: een eerste
+  rit die pas in de browser openspringt, doet de pagina verspringen. Een link met
+  `?rit=<id>` opent die ene rit.
+- **Minder woorden, niet minder informatie.** Het uur, het voertuig, de route en
+  de chauffeur dragen een icoon, een bolletje of een kleur in plaats van een
+  label ervoor (open bolletje is vertrek, geel is bestemming). Een nummer staat
+  achter een belknop en een e-mailadres achter een mailknop, met het nummer in de
+  tooltip: wie het nodig heeft, wil bellen en niet overtypen.
+- **Eén knop naar de kaart.** "Route in Google Maps", in de kleur van Google Maps
+  (`--maps` in `theme.css`), opent de route van laadadres naar bestemming. De
+  "kaart"-link achter elk adres is weg: naast de route zei die niets meer.
+- **Eigen ritten en die van je post in één lijst, met een filter** (Alles, Ik rij,
+  de naam van je post). Twee lijsten zetten de rit die je zelf voor je post rijdt
+  twee keer op het scherm. De rit die aan je post doorgegeven is en nog niemand
+  heeft, is de enige taak hier; die staat daarom als gele melding bovenaan, met
+  een knop die de rit opent, en kan dus niet achter een filter verdwijnen.
+- **Gereden ritten staan dicht, per maand.** Ze zijn er om iets terug te vinden;
+  een zoekopdracht opent ze wel, want dan zoek je net dat.
+- **In de regel staat enkel de naam van een adres**, het stuk voor de eerste
+  komma ("Brouwerij Haacht"). Het volledige adres staat in het opengeklapte deel.
+- **Een link in de lading of een nota is een knopje met wat het is, nooit een
+  lang adres.** In de lading staat bijna altijd een materiaallijst: een Google
+  Sheet, een Doc, een pdf of iets anders, en die url voluit vulde op een telefoon
+  drie regels. Nu staat er "Google Sheet" (met het groene raster van Sheets,
+  `--sheets`), "Google Doc", een korte bestandsnaam of anders de soort ("PDF"),
+  "OneDrive", of de naam van de site. Het adres zelf staat in de tooltip
+  (`describeLink` in `lib/linkify.ts`). Dat geldt overal waar `LinkedText` staat,
+  ook in het beheer.
+- **De mensen dragen de kleur uit het chauffeurspalet.** Een chauffeur heeft er
+  dezelfde kleur als in de planning; wie geen chauffeur is, krijgt er een uit zijn
+  naam. Jij bent altijd geel.
 
 ### Een rit doorgeven aan een post mailt standaard niemand
 
@@ -5394,10 +6113,17 @@ naast hun bestaande Excels. Een externe student kan voorlopig niets indienen.
 - **Eén schakelaar, geen deploy** (`externalRequestsOpen` in
   `logistiek.settings`, op /beheer/instellingen). Het team beslist wanneer het
   opengaat, en dat moment valt niet samen met een release.
-- **Kijken mag, indienen niet.** De catalogus, de tarieven en het
+- **Kijken mag, indienen niet, behalve bij het materiaal.** De tarieven en het
   bezettingsoverzicht blijven zichtbaar; in de plaats van de indienknop staat het
   mailadres van Logistiek. Een externe die een leeg scherm krijgt, mailt niet en
   komt ook niet terug wanneer het wél opengaat.
+  **Uitzondering (november 2026, F6.23):** `/materiaal` en `/materiaal/[id]`
+  tonen een externe enkel de melding, geen catalogus. De hele inventaris tonen
+  aan wie er niets mee kan, is werking van de kring die niet bij een
+  buitenstaander hoeft te belanden. De catalogus wordt voor hem niet eens
+  opgehaald, zodat ze ook niet in de HTML staat, en een rechtstreekse link naar
+  een item geeft dezelfde melding. Vervoer en het bezettingsoverzicht blijven
+  zoals ze waren.
 - **De poort staat in de server action** (`externalGate` in
   `app/actions/uitleen.ts`), niet enkel in het formulier. De knop verbergen houdt
   niemand tegen die de actie rechtstreeks aanroept, en het is precies deze poort
@@ -7209,6 +7935,38 @@ of de koper hangen.
 deelnemer in, met zijn naam in het scanlogboek. Dat is geen testmodus en het
 paneel zegt dat er ook bij; terugdraaien doe je in de scanner zelf.
 
+### De scanner zit in de VTK-app, enkel voor wie iets te scannen heeft
+
+Tot november 2026 was de native scanner een aparte app (vtk-scanner-app), naast
+een lichte scanner in de VTK-app. Nu zit de volledige scanner in de VTK-app, met
+het offline manifest, de wachtrij, de namenlijst, de kaartlezer en het
+scannerspaneel. Eén app is makkelijker uit te leggen aan wie komt helpen: een
+shifter die één avond aan de deur staat, installeert geen tweede app.
+
+**Enkel wie iets te scannen heeft, ziet hem.** De scanknop in Tickets en de regel
+Aan de deur onder Meer volgen `abilities.scanTickets`, en dat is precies "is
+de lijst van events die je mag scannen niet leeg". Een gewone student ziet de
+scanner dus niet. Daarvoor zijn geen nieuwe rechten nodig, want wie mag scannen
+stond al vast (de standaardregel en de toekenningen hierboven).
+
+**Een gewone student die komt shiften, komt erbij met de uitnodigings-QR.** Die
+scant hij onder Meer, Code scannen; dat scherm staat voor iedereen open, want ook
+de fakbar-QR wordt daar gescand. Vanaf dan ziet hij de scanner en dat ene event,
+tot twaalf uur na afloop. Wie als scanner toegevoegd werd, krijgt op de dag zelf
+ook een taak op Home ("Aan de deur: ..."); een praesidiumlid dat enkel door de
+standaardregel kan scannen niet, anders kreeg het elke avond een kaart voor een
+deur waar het niet staat.
+
+**Bewust niet:** een shift koppelen aan een ticketevent, zodat wie zich voor die
+shift inschrijft vanzelf scanrechten krijgt. Dat was een voorstel, maar inschrijven
+op een shift staat open voor elke student, en scanrechten tonen de namen van alle
+deelnemers. De uitnodigings-QR legt die beslissing bij wie aan de deur staat.
+
+**Het manifest blijft niet liggen.** Het draagt de naam van elke deelnemer en
+staat nu op veel meer telefoons dan de scanners van vroeger. De app wist het na
+twee dagen en bij het uitloggen; de wachtrij met nog niet verstuurde scans blijft
+wel staan. Zie `mobile/docs/scanner.md`.
+
 ---
 
 ## Wanneer de app een pushbericht stuurt
@@ -7490,6 +8248,25 @@ Wat de kring aan haar ereleden geeft, hoort geen zichtbare uitzondering te zijn
 waar de rest van de site zich vragen bij stelt; wie geen erelid is, ziet gewoon
 het gewone aanbod. `createTicketCheckout` weigert zo'n type ook serverside, met
 dezelfde fout als bij een onbestaand type.
+
+**Een erelid is ook lid van de kring**, in elk academiejaar dat hij erelid is
+(november 2026, op vraag van wie de ereleden bijhoudt: ereleden kregen geen
+ledenprijs en geen ticket "alleen leden"). Dat staat in `userIsMember` als derde
+weg naast `firwStudent` en een geactiveerd lidmaatschap, en geldt dus overal
+waar de site naar het lidmaatschap kijkt: de ledenprijs, ledentickets, de
+ledenplaatsen en "lid" op de deelnemerslijst.
+
+- **Afgeleid, geen `Membership`-rij bij het toekennen.** Een erelid is erelid
+  tot een beheerder het intrekt; een rij voor één academiejaar zou op
+  14 september vervallen terwijl de vlag blijft staan, en dan stond hetzelfde
+  probleem er het jaar nadien opnieuw.
+- **Geen aanbod om lid te worden.** `membershipOffer` geeft een erelid niets
+  (`already`), zodat /account, /lidmaatschap en de studiebevestiging hem niet
+  vragen te betalen voor wat hij al heeft. Die schermen zeggen "Je bent erelid
+  van VTK, dus je telt als lid".
+- **De ledenlijst op /admin/leden toont enkel rijen**, zoals een student van de
+  faculteit die de vraag oversloeg er ook niet in staat. De ereleden hebben
+  daar hun eigen lijst.
 
 ### Een tickettype kiest zijn kopers, en dat blijft aanpasbaar
 
@@ -8155,9 +8932,25 @@ de post weet wat ze komt ophalen.
 **De mail gaat naar het `@vtk.be`-adres.** Een kassa vraag je aan als lid van een
 post, en dat is werk van de kring. De mailvoorkeur in het profiel kiest tussen het
 universiteits- en het persoonlijke adres en is er voor wat de site aan iedereen
-stuurt; enkel wie geen `@vtk.be`-account heeft, krijgt de mail daar
-(`cashRegisterMailTo`). Dit kwam van Beheer: de mail van een eigen aanvraag
-kwam op het persoonlijke adres toe.
+stuurt. Dit kwam van Beheer: de mail van een eigen aanvraag kwam op het
+persoonlijke adres toe. Sinds november 2026 is dat ook zo voor wie zijn account
+niet koppelde (`cashRegisterMailTo`):
+
+- Een gekoppeld account gaat voor: dat adres bestaat zeker, en een naamgenoot
+  heeft een ander adres (`jan.peeters2`) dan wat je uit de naam zou bouwen.
+- Zonder koppeling: `voornaam.achternaam@vtk.be`, met een achternaam uit meerdere
+  delen aan elkaar (`jasper.vanelsacker@vtk.be`).
+- Staat de kassa op een werkgroep: `werkgroep.voornaam.achternaam@vtk.be`. Het gaat
+  om de post die op de kassa staat, niet om waar de aanvrager lid van is.
+- BEST krijgt altijd het voorkeursadres, ook met een gekoppeld account.
+
+**Mailen dat een kassa geteld is, is een knop.** Beheer klikt erop op de pagina van
+de kassa, zodat de post niet zelf moet gaan kijken. Niet automatisch bij het
+opslaan van de telling: die wordt vaak in stappen ingevuld en nog rechtgezet. De
+mail linkt naar de kassa, en daar ziet de post het resultaat pas vanaf
+"doorgegeven"; een kassa die nog niet zo ver staat, schuift daarom mee op. Lukt de
+mail niet, dan blijft de status staan. Opnieuw sturen mag, want een telling kan
+later nog veranderen. De opmerking van Beheer bij het tellen staat niet in de mail.
 
 **Een toestel ligt nooit op twee plaatsen tegelijk.** Daarom vraagt de aanvraag
 een begin- en einduur; een einduur dat vroeger op de klok staat dan het begin,
@@ -8169,6 +8962,17 @@ zet (aanvaarden, de telling, andere uren in de aanvraag) weigert een dubbele
 uitlening. Een kassa van voor de uren gevraagd werden, heeft er geen en houdt haar
 toestellen de hele dag bezet: welk deel van de dag het was, is niet te kennen, en
 een fail-safe die bij twijfel doorlaat, is er geen.
+
+**Een kassa kan over meerdere dagen lopen (november 2026).** Voor de
+onthaaldagen houdt een post één kassa een hele week bij zich; daarvoor moest er
+per dag een aanvraag komen. Het vinkje "Over meerdere dagen" vraagt een eerste en
+een laatste dag: het beginuur geldt op de eerste dag, het einduur op de laatste,
+en de toestellen blijven die hele tijd bezet, ook 's nachts. Het is één kassa
+met één telling, niet één per dag. `CashRegister.date` blijft de eerste dag
+(werkingsjaar, sortering); de laatste dag zit in `endsAt`, zodat er geen kolom
+bij moest en bestaande kassa's niets veranderen. Een einde de dag erna dat
+vroeger op de klok staat dan het begin, leest het scherm als een nacht en niet
+als twee dagen.
 
 **De statussen zijn die van het rekenblad, met de hand gezet.** Te maken,
 gemaakt, meegegeven, teruggebracht, geteld, doorgegeven, kasboek. Anders dan bij
@@ -8222,6 +9026,41 @@ hele semester meegaat, en het blad had er een eigen tabblad voor. In het
 overzicht is dat één keuze in de postfilter, naast elke post apart. Het gaat op
 de code van de post (`PERMANENT_POST_CODES`), net als `EXPENSE_POST_SPLITS`.
 
+**Een jaarwerking is een keuze in de postlijst, geen post (november 2026).**
+Beheer vroeg "Jaarwerking" naast de posten: Kanweek, Studentenwelkom of Skireis
+zijn van verschillende posten samen. Zo'n kassa staat op geen post (`groupId`
+leeg, postnaam "Jaarwerking", `isYearlyEvent`), en welke jaarwerking het is,
+zegt de activiteit. Eén keuze en niet een per jaarwerking zoals op het BO-scherm:
+de activiteit noemt ze al, en een lijst jaarwerkingen in de code veroudert. De
+keuze staat net onder je eigen post, niet onderaan tussen de werkgroepen. Omdat
+er geen post achter zit, ziet enkel de aanvrager (en Beheer) zo'n kassa, en gaat
+de mail naar `voornaam.achternaam@vtk.be`. In het overzicht is ze een keuze in
+de postfilter.
+
+**De eindkassa schuift door naar de volgende kassa (november 2026).** Gaat het
+cash zonder leegmaken van de ene activiteit naar de volgende, dan kopieerde
+Beheer in het rekenblad de eindkassa naar de startkassa van het volgende blok.
+Op de pagina van een getelde kassa staat daarvoor "Doorschuiven naar de volgende
+kassa": kies een latere kassa die nog niet geteld is (ook een aanvraag, ook van
+een andere post), en haar startkassa wordt per munt en briefje deze eindkassa.
+
+- Het heet doorschuiven en niet doorgeven, want "doorgegeven" is al de status
+  waarin de post haar resultaat ziet.
+- Enkel het cash. De bonnen, Bancontact en Payconiq brachten op bij de eerste
+  activiteit en blijven daar; elke kassa rekent haar eigen resultaat als
+  eindkassa min startkassa, dus de tweede telt enkel wat ze zelf bijbracht.
+- De volgende kassa onthoudt van welke kassa ze kwam (`startFromId`), en één
+  kassa schuift naar één andere: naar een andere doorschuiven verhuist de
+  koppeling, en de vorige houdt haar startkassa (wat daar anders had moeten
+  staan, is niet te kennen). Waar een startkassa vandaan komt, toont enkel
+  Beheer; de kassa ervoor is vaak van een andere post.
+- Een telling die nadien rechtgezet wordt, schuift niet vanzelf mee: de telling
+  wordt in stappen ingevuld, en de startkassa van de volgende kan intussen
+  bijgesteld zijn. De kassa zegt wel wanneer de twee niet meer gelijk zijn, en
+  opnieuw doorschuiven naar dezelfde kassa mag dan ook als die al geteld is.
+- Kassa's van voor november 2026 hebben geen koppeling: wat in het rekenblad
+  doorgeschoven werd, staat nergens.
+
 ## Vaste kassa's van Cudi, Theokot en Fakbar (oktober 2026)
 
 Een kassa per activiteit past niet op die drie posten: daar is de kassa een
@@ -8273,6 +9112,15 @@ past alles aan. Een datum in de toekomst kan niet.
 einde van het jaar helemaal terug, dan geeft Beheer het hele bedrag in als
 teruggegeven en vinkt aan dat de kassa volledig terugkwam. Daarna staat ze op
 nul, en het volgende jaar begint van daar, niet van de laatste telling.
+
+**Wat meegaat en terugkomt, gaat per munt en briefje (november 2026).** Beheer wil
+bijhouden welke munten en briefjes er meegegeven en teruggebracht worden, niet
+enkel hoeveel, dus "Meegeven" en "Terugkrijgen" hebben hetzelfde raster als een
+telling en het bedrag is de som daarvan. Een leeg veld is hier gewoon nul stuks.
+Bij terugkrijgen mag het hele raster leeg blijven: een afgifte kan enkel uit bonnen
+bestaan. Een regel van daarvoor heeft geen coupures (`counts` NULL) en houdt bij
+het aanpassen haar bedragveld: welke munten het waren is niet meer te kennen, en
+een leeg raster zou haar bedrag op nul zetten.
 
 **Op dezelfde dag geldt de volgorde van ingeven.** Een regel heeft een datum en
 geen uur; telt de post 's ochtends en geeft ze 's middags geld af, dan hoort de
@@ -8328,8 +9176,12 @@ twee mag zien, krijgt dat ene item vanzelf als los item terug.
 - *Forms en Shiften* staan bij Website, niet bij Evenementen. Ze hangen niet
   altijd aan een evenement; een formulier of een shift kan evengoed op zichzelf
   staan.
-- *Media* staat bij Communicatie, samen met de mailinglijsten, de groepsadressen
-  en de app-pushberichten. Dat is wat de kring naar buiten brengt.
+- *Media* staat bij Communicatie, samen met de mailinglijsten en de
+  app-pushberichten. Dat is wat de kring naar buiten brengt. De groepsadressen
+  stonden er ook, maar zijn sinds november 2026 een eigen item, **Google Admin**:
+  met de accounts, hun organisatie-eenheden en de koppelingen erbij is het meer
+  het werk van IT en de vice dan van communicatie. Zie "Google Admin: één item,
+  tabbladen erin".
   *App-pushberichten* stond onder IT, maar wie een pushbericht stuurt doet
   communicatie, geen systeembeheer.
 - *Dashboard* is een groep met Overzicht en Dashboardtegels. Die tegels kan elke
@@ -8824,9 +9676,10 @@ een fout in de inhoud, iets aan het ontwerp of een idee.
 werk bijhoudt, bij de intake van het project Website (het publieke formulier
 `website-feedback-nieuwe-website`). Voordien bewaarde de site de meldingen zelf
 en las IT ze op `/admin/it/feedback`; dat was een tweede werklijst naast die in
-Dopl, en wat daar binnenkwam, moest iemand overtypen. Dat beheerscherm blijft
-bestaan voor de meldingen die er nog liggen, tot ze afgehandeld zijn; er komt
-niets meer bij. De upload `feedback` voor screenshots is weg: Dopl neemt zelf
+Dopl, en wat daar binnenkwam, moest iemand overtypen. Dat beheerscherm en het
+recht `feedback.manage` zijn in november 2026 weggehaald: alles loopt nu via
+Dopl. De tabel `WebsiteFeedback` blijft staan met wat er nog in zat (de
+bewaartermijn koppelt de melders na een jaar los), maar geen scherm leest ze nog. De upload `feedback` voor screenshots is weg: Dopl neemt zelf
 bijlagen aan, en een uploadsoort die elk lid mag gebruiken zonder dat er nog
 een formulier bij hoort, is enkel een open opslagplaats.
 
@@ -9219,6 +10072,24 @@ niet opdagen, of er is een andere reden (oktober 2026). Het is dezelfde tabel
   adminlogboek (`shiftManual`), met de reden. Wie een afname intrekt, haalt ze
   uit de tellingen, maar het logboek houdt bij dat ze er was.
 
+## Een nieuwe ticketverkoop staat standaard op je eigen post
+
+November 2026. De "Verantwoordelijke groep" bij een nieuwe verkoop
+(`/admin/tickets/new`) stond op de eerste post in de praesidiumvolgorde. Wie
+alles beheert, maakte zo ongemerkt verkopen aan voor een post die er niets mee
+te maken had, en die post kreeg dan de rol Eventbeheerder (de leads van de
+verantwoordelijke groep krijgen `MANAGER` bij het aanmaken).
+
+- **Standaard je eigen post** van dit werkingsjaar, eerst een praesidiumpost en
+  anders een werkgroep of jaarwerking, zolang je er een verkoop voor mag
+  aanmaken.
+- **Een gekoppeld kalenderevent en een sjabloon gaan voor.** Die zeggen allebei
+  uitdrukkelijk van wie de verkoop is. Mag je niet aanmaken voor de groep van
+  het sjabloon, dan valt de keuze terug op je eigen post en niet op de eerste
+  optie van de lijst.
+- De keuze blijft een gewone lijst: wie voor een andere post aanmaakt, kiest die
+  zelf.
+
 ## Ticketsjablonen: een cantus is elke keer dezelfde verkoop op een andere dag
 
 Drie cantussen die binnen twee dagen na elkaar aangemaakt werden, verschilden op
@@ -9411,6 +10282,57 @@ voor iedereen anders bestaat de prijs niet, ook niet in de paginabron.
 - De bestelregel heet "Bierticket (erelid)", zodat de mail, de pdf en de scanner
   het zonder eigen logica tonen.
 
+## Deelnemers per groep: praesidium, ereleden, leden, niet-leden
+
+Op de deelnemerslijst van een event filter en sorteer je op wie er komt, en de
+statistieken tellen dezelfde groepen ("Wie komt er"). De vraag kwam van wie
+een alumni-avond organiseerde en wilde weten hoeveel ereleden er kwamen, en van
+wie aan de deur wilde zien wie van het praesidium was.
+
+- **Eén groep per deelnemer, met voorrang**: praesidium (een post in het
+  lopende werkingsjaar), dan erelid, dan lid, dan niet-lid. Zo telt het
+  overzicht op tot het totaal, en zegt de filter hetzelfde als het getal.
+- **Het gaat om de deelnemer, niet om de koper.** Een lid dat vier tickets koopt,
+  brengt geen vier leden mee. Daarom is dit niet `memberSeat`: dat is de plaats
+  die de koper nam, en die blijft voor het plafond van de pot.
+- **Een deelnemer koppelen we aan een account** langs zijn e-mailadres (het
+  eerste ticket van een ingelogde koper draagt dat van zijn account), zijn
+  r-nummer, of zonder e-mailadres de naam van de koper. Wie we zo niet
+  terugvinden, is niet-lid: meer weten we niet. Een ticket aan de
+  ereledenprijs is altijd een erelid.
+- **Gerekend op het moment van kijken**, niet bij de aankoop: wie na 15 juli
+  geen post meer heeft, staat bij een oud event niet meer als praesidium. Een
+  overzicht van wie er nu komt, hoort te kloppen met wie het nu is.
+- De code staat in `lib/ticketing/attendeeGroups.ts` (puur) en
+  `attendeeAccounts.ts` (het opzoeken), en de CSV van de deelnemers krijgt
+  dezelfde kolom.
+
+## Ereleden: één ticket in totaal, als vinkje per event
+
+Bovenop de ereledenprijs kan een event zeggen dat een erelid er **hoogstens één
+ticket in totaal** koopt (`TicketEvent.honoraryOneTicket`, het vinkje "Ereleden
+kopen hoogstens één ticket" bij de instellingen en in het sjabloon). Zonder dat
+vinkje neemt een erelid zijn ticket aan de ereledenprijs en koopt het daarnaast
+gewoon tickets voor vrienden; met het vinkje niet.
+
+- **Standaard uit**, en bestaande events en sjablonen staan uit: daar verandert
+  niets aan een lopende verkoop.
+- **Over alle tickettypes en al zijn bestellingen heen, aan welke prijs ook.**
+  Ook een type met doelgroep "Alleen ereleden" of een gewoon ticket aan de
+  ledenprijs telt mee. Het is één ticket voor het erelid zelf, niet één
+  goedkoop ticket.
+- **Dezelfde telling als bij de ereledenprijs** (`lib/ticketing/honorary.ts`):
+  een bestelling die nog op betaling wacht telt, een vervallen bestelling of een
+  terugbetaald ticket niet. Binnen hetzelfde slot op de koper, zodat twee
+  gelijktijdige bestellingen er samen geen twee krijgen.
+- **Het hangt aan het account.** Een erelid dat uitgelogd koopt, is voor de shop
+  iedereen, net zoals het dan de ereledenprijs niet ziet. De grens regelt wat
+  een erelid als erelid krijgt, geen deurbeleid.
+- De shop toont het vooraf ("Als erelid koop je voor dit event één ticket") en
+  laat niet meer kiezen dan dat; de checkout is het slot erachter
+  (`HONORARY_TICKET_LIMIT`). Voor wie geen erelid is, staat er niets over op de
+  pagina.
+
 ## De e-mailhandtekening is een recht, geen ledenfunctie
 
 De handtekeninggenerator op `/account` bouwt een mailhandtekening met het
@@ -9551,6 +10473,14 @@ vaakst achter de toog staan er dan net buiten vielen. De drempel telt enkel
 voltooide shiften van het lopende werkingsjaar, dezelfde definitie als de
 ranglijst, en reset dus mee op 15 juli. Per event uit te zetten naast het
 praesidium-vinkje (`presaleHelpers`).
+
+**En de ereleden, standaard.** Een erelid (`User.honoraryMember`) koopt mee in
+de voorverkoop, zoals de oude site dat deed: ereleden hebben bij de kring van
+oudsher voorrang op de voorinschrijving. De nieuwe site had ze daar eerst niet
+bij, en dat werd als gemis gemeld. Daarom zette de migratie het ook voor
+bestaande events aan; per event uit te zetten bij de voorverkoop
+(`presaleHonorary`). Het hangt aan het account, dus een erelid moet ingelogd
+zijn, net als een praesidiumlid.
 
 **Een tickettype volgt de voorverkoop, tenzij het echt later start.** Een eigen
 verkoopstart die op of vóór de publieke verkoopstart valt, zegt niets bovenop
@@ -10360,7 +11290,9 @@ hetzelfde soort vlak onder.
 **De chauffeurskleuren hebben een tweede reeks.** De vierentwintig tinten waren
 bewust licht met donkere tekst; in het donker zijn dat vierentwintig felle
 vlakken op bijna zwart. Er is dus een donkere reeks met dezelfde tinten in
-dezelfde huisvolgorde, en `--driver-ink` keert mee. De arcering per voertuig en
+dezelfde huisvolgorde, en `--driver-ink` keert mee. Een eigen kleur met schuiven
+doet hetzelfde met drie tokens (`--driver-l0`, `--driver-l1`, `--driver-c-max`)
+in plaats van veertig. De arcering per voertuig en
 het streeppatroon voor "nog te beslissen" gaan van donkere naar lichte alfa,
 anders verdwijnen ze in hun eigen blok. De helderheid wisselt licht per buur
 (0,23 en 0,29), want vierentwintig kleuren enkel op tint uit elkaar houden lukt
@@ -10383,6 +11315,85 @@ Datzelfde script bewaakt het attribuut met een `MutationObserver`. Dat is geen
 overdaad: faalt de hydratie ergens op een pagina, dan tekent React de hele boom
 opnieuw vanaf `<html>` en gooit het attribuut weg dat de server nooit
 gerenderd heeft, en dan sprong het scherm middenin het kijken terug naar licht.
+
+## Transportronde 6 (november 2026)
+
+De zesde feedbackronde van Logistiek (werkplan: `docs/logistiek-transport-ronde-6.md`).
+De keuzes die niet uit de code te lezen zijn:
+
+- **Een bewust dubbele rit is een gewone rit.** De botsingscontrole bij een
+  wijziging loopt enkel wanneer het venster verschuift (`windowMoved`). Wie
+  eerst dubbel inplant om het geheel te overzien en daarna schuift, moest bij elke
+  opslag, ook voor een nota, "Toch verschuiven" bevestigen terwijl er niets
+  verschoof, en schreef telkens een overlap-nota in de historiek.
+- **Een dubbelboeking toont nog steeds welk voertuig.** De arcering van het
+  voertuig blijft op de rode vulling staan, en het voertuig staat altijd in het
+  blok, ook als "Weergave" het uit heeft: een botsing gaat over een voertuig, en
+  de rode kleur zegt enkel dat er iets mis is.
+- **Een rit in het verleden kan enkel het team aanmaken** (`byTeam` in
+  `buildTransportBookings`), voor de administratie. Ze komt goedgekeurd binnen, de
+  historiek zegt "met terugwerkende kracht", en ze telt mee in de statistieken. Een
+  lid blijft geweigerd: die aanvraag zou nooit meer beslist worden.
+- **De aanvragende post kiest standaard zelf de chauffeur.** Op elke aanvraag via de
+  site staat `assignedGroupId` op de gekozen post of werkgroep, behalve bij de kar
+  (die vraagt een goedgekeurde karchauffeur). Bij een werkgroep is `groupId` leeg;
+  `assignedGroupId` mag wel de werkgroep zijn, en dan staat de rit ook onder
+  "Ritten van mijn post" voor haar leden. Bestaande ritten veranderen niet mee.
+  Bij een voertuig zonder chauffeur (de bakfiets) verdwijnt de keuzelijst.
+- **Een voertuig kan voorbehouden zijn aan het team** (`requestableByMembers`).
+  Een gehuurd busje staat zo in de planning maar niet in het aanvraagformulier. De
+  poort zit in `buildTransportBookings` en niet enkel in het formulier.
+- **Externen zien het materiaal niet** zolang indienen dicht is (zie "De
+  uitleendienst gaat in fases open"). Jaarwerkingen bestonden in productie niet
+  als groep en telden daardoor als extern; ze zijn sindsdien een eigen soort groep
+  (zie "Jaarwerkingen als derde soort groep"), dus hun leden zijn geen externen.
+- **Elk praesidiumlid mag bij elke rit een bijrijder toevoegen, maar enkel de eigen
+  toevoegingen weghalen.** De nummers van andermans ritten blijven bij de post van
+  de rit. Een werkgroeplid valt hier niet onder: die regelt de bijrijders van de
+  eigen ritten via zijn groep.
+- **De rail van "van mijn post" is de nadrukkelijke kleur, niet geel.** Geel viel
+  weg op een pastelkleur die zelf geel is. Daarnaast zet "Enkel mijn post
+  benadrukken" de andere ritten lichter; dat is een voorkeur in de browser.
+- **Het palet heeft veertig kleuren, maar de hash blijft op vierentwintig.** De
+  zestien middentonen zijn enkel te kiezen. Verhoog je de modulus van de hash,
+  dan krijgt elke chauffeur zonder gekozen kleur een andere; een test legt de
+  uitkomsten van voor de uitbreiding vast. Een toegevoegde chauffeur start op
+  Salie.
+- **Nota's en "Extra info van Logistiek" blijven twee dingen, naast elkaar.** De
+  extra info gaat mee in de mail naar de aanvrager en is de afwijzingsreden; een
+  eigen nota heeft een zichtbaarheid. Samenvoegen geeft één veld met twee
+  betekenissen. De nota's staan daarom direct onder de extra info in het paneel.
+- **Op de publieke planning leest een post enkel de nota's van de ritten waar hij
+  zelf bij hoort.** "Extra info van Logistiek" en de nota's met zichtbaarheid post
+  (of post en Logistiek) komen enkel voor de eigen ritten uit de databank. Het
+  team leest ze allemaal, de privénota's nooit.
+- **Een wijziging van Logistiek is zichtbaar voor de aanvrager én het team.** De
+  bron is de auditlog (`teamChangeLines`), geen nieuwe kolom: de aanvrager leest
+  "Logistiek paste je aanvraag aan" op zijn lijst, zijn ritpagina en bovenaan de
+  goedkeuringsmail, het team ziet een badge "Gewijzigd t.o.v. aanvraag".
+- **Een herhaalde rit is een rij gewone ritten met dezelfde `seriesId`.** Geen tabel
+  en geen regel die in de planning leeft: elke herhaling kan je openen, schuiven
+  of een chauffeur geven. Bestaande ritten hebben `NULL`, "geen reeks"; niemand kan
+  achteraf weten welke oude ritten bij elkaar hoorden. De data worden berekend op
+  Brusselse klokstrings, zodat een wekelijkse rit om 18:00 over de zomertijdwissel
+  18:00 blijft. Een maand zonder de dag (de 31ste) valt over in plaats van te
+  verspringen. De voorvertoning toont vooraf welke ritten botsen. Verwijderen kan
+  enkel "deze en de volgende", en niet wat al gereden is of een betaling heeft.
+  Een herhaling gaat niet samen met heen en terug.
+- **De drukteweergave volgt de gekozen chauffeur**, en "Op welk uur" kan ook per
+  weekdag en per chauffeur naast elkaar. Een gestapelde balk heeft enkel voor het
+  onderste segment een gedeelde basislijn; "Per chauffeur" zet elke chauffeur op
+  dezelfde schaal.
+- **Een klok kent geen 24:35.** Een kalenderdag kan voorbij middernacht doortellen
+  (het intekenscherm loopt van 05:00 tot 05:00), maar de klok niet: enkel 24:00
+  zelf blijft staan, als einde van de dag (`clockLabel`). De omzetting
+  vergeleek uren (`> 24`) in plaats van minuten, en een band tot 00:35 stond als
+  "24:35" op het scherm.
+- **"Hele dag" toont de hele dag.** De ondergrens per uur is 18 pixels, de
+  evenementenstrook heeft hoogstens twee rijen (de rest achter "+N meer"), en de
+  pane heeft op een breed scherm een minimumhoogte van 36rem. De meting gebruikt
+  enkel layout-pixels: onder het 90%-zoom van de site mengde ze visuele en
+  layout-pixels.
 
 ## Interesse per dag van een reeks
 
@@ -10635,6 +11646,14 @@ een album, een Bakske), het recentste eerst (`compareNewsTiles` in
 `lib/news/rules.ts`). Een tijdlijn van oud naar nieuw werd niet gekozen: dan
 opent de band met het oudste album.
 
+**Het Bakske staat altijd als eerste tegel.** Op zijn pin viel het nieuwste
+nummer achter elke ticketverkoop en inschrijving, en stond het met drie of meer
+verkopen buiten beeld tot de carrousel er eens langs schoof. Het blad van de
+kring hoort meteen naast het uitgelichte bericht, dus `composeNews` zet het
+nieuwste Bakske vooraan en laat de rest de volgorde van hun pin houden. Enkel
+het Bakske: Ir.Reëel en de andere berichten volgen gewoon hun pin. Is het
+Bakske zelf uitgelicht, dan verandert er niets aan de tegels.
+
 **Er is geen maximum aantal berichten.** Er was een instelling van 3 tot 8, en
 wat erbuiten viel, stond in het beheer als "Band vol". Maar de tegels staan in
 een carrousel die schuift, dus er is geen plaats die volloopt; het maximum liet
@@ -10761,6 +11780,11 @@ en bestanden: `docs/ticketing.md`, "Boekhoudcodes".
   van de penning, hier om onze fout. Bleef de oude schrijfwijze staan, dan
   telden de statistieken dezelfde rekening twee keer, en voor Onthaal en
   Bedrijvenrelaties een code die in de boekhouding niet bestaat.
+- **Bij elke code staat wat er via de ticketverkoop binnenkwam.** Netto na
+  terugbetalingen, op dezelfde bestellingen als de omzet per event, over alle jaren
+  samen. Een hoofdrekening telt haar subcodes mee. Wat onder een oude code of zonder
+  code verkocht is, staat in een eigen blok onder de lijst, zodat de som blijft
+  kloppen met wat er echt binnenkwam.
 - **Het beheer is een register zoals het rekenblad van de penning.** Elke
   hoofdrekening een kop, haar subcodes ingesprongen eronder, één regel per code,
   een zoekveld bovenaan, en een klik op een rij bewerkt ze ter plaatse. De
@@ -11022,6 +12046,39 @@ de zijbalk helemaal weg achter één knop.
   `AdminNav`, dus ook in de admin van vtk.be. Hij doet niets terwijl je typt
   (daar is Ctrl+B vet) en niets onder 860px, waar er geen rail is.
 
+## Admin: de compacte stand
+
+November 2026. Op een laptop toonde een beheertabel zoals /admin/gebruikers elf
+rijen, en de zijbalk met één groep open was langer dan het scherm. Drie
+richtingen zijn naast elkaar gelegd op een nabouw van /admin/rekeningen, met het
+aantal rijen dat in beeld bleef: alles kleiner zoomen (`zoom: 0.85`), lucht
+weghalen met een tweede reeks maten, en enkel tabellen compacter maken met een
+knop per tabel.
+
+- **Lucht weghalen won; de letters blijven staan.** De zoom gaf minder rijen in
+  beeld dan de compacte stand, en zette de tabeltekst op een laptop op 10,7px
+  (de site staat daar al op 90%). Enkel tabellen raakte de kop boven de tabel
+  niet, en die nam met titel, uitleg en filters al ruim 300px in. Gemeten op
+  /admin/gebruikers: van 11 naar 17 rijen, een rij met icoonknoppen van 57 naar
+  41px, en de hele zijbalk past weer op één scherm.
+- **Standaard verandert er niets.** Compact is een knop naast "Zijbalk
+  inklappen", per browser in een cookie (`vtk-admin-density`), om dezelfde reden
+  als het inklappen: op een groot scherm is er plaats, op een laptop niet. Per
+  account bewaren is afgewezen omdat het je dan ook op dat grote scherm volgt;
+  automatisch op schermhoogte ook, omdat er dan geen uitweg is voor wie de ruime
+  stand verkiest.
+- **Enkel vanaf 860px en met een muis of trackpad.** Op een telefoon of tablet
+  blijft alles even groot om te tikken, en de knop staat er dan ook niet.
+- **28px is het kleinste klikdoel** (icoonknoppen, kleine knoppen). Onder de
+  laptopzoom is dat 25,2px, net boven de 24px die WCAG 2.2 vraagt.
+- **Wat niet meekrimpt**: een bevestigingsdialoog (de onomkeerbare actie mag
+  ruim blijven), een voorvertoning van een publiek scherm (`.vtk-admin-preview`),
+  een tekstvak, en alles met een eigen padding die niet `p-4`, `p-5` of `p-6` op
+  een `Card` is. Dat laatste breekt niets; zo'n blok blijft gewoon ruim.
+- **De uitleendienst en de Fakbar doen (nog) niet mee.** Ze gebruiken dezelfde
+  `AdminNav`, maar zonder de prop `density` is er geen knop, en de zijbalk leest
+  zijn maten met de gewone waarde als fallback.
+
 ## Mediabeheer: twee panelen, en nooit Immich
 
 Oktober 2026. `/admin/media` was één lange pagina: bovenaan de leescijfers
@@ -11059,6 +12116,125 @@ album wilde nakijken, moest in Immich zijn.
 - **Het woord Immich staat nergens in het beheer.** Foutmeldingen spreken van "de
   fotobibliotheek"; de merkers (`[gallery]`, `[tab:]`) blijven een detail van de
   code. Hoe dat technisch werkt, staat in `docs/immich-gallery.md`.
+- **Downloaden (november 2026): een album als zip en elke foto apart.**
+  Communicatie haalt de foto's van een evenement op voor een partner of een
+  nieuwsbrief, en moest daarvoor bij Immich zijn. Drie keuzes:
+  - **Een verborgen album kan wel gedownload worden.** "Verborgen" betekent hier
+    enkel dat het niet op vtk.be staat, bijvoorbeeld omdat het nog nagekeken
+    wordt; juist dan wil Communicatie ermee werken.
+  - **Verborgen foto's zitten wel in de zip.** Communicatie wil het hele album
+    kunnen doorgeven, en een zip waar je moet uitzoeken wat ontbreekt, helpt
+    niemand. Het eerste ontwerp liet ze weg, omdat een foto vaak verborgen wordt
+    na een verwijderverzoek en een zip de site verlaat; dat is op uitdrukkelijke
+    vraag omgekeerd. Wie een foto om die reden verborg, moet dus weten dat ze met
+    een zip mee kan gaan. Een verborgen foto staat achter de zichtbare van haar
+    tab.
+  - **Altijd het origineel, nooit een verkleinde versie.** Wie een nieuwsbrief of
+    affiche maakt, wil de volle resolutie.
+- **Privélinks (november 2026): een album delen zonder het op de site te zetten.**
+  Communicatie kon een album enkel tonen door het publiek te maken. Nu kan het
+  vanuit het album een link maken naar `/media/gedeeld/<token>`; de techniek
+  staat in `docs/immich-gallery.md`, "Een album delen met een link". De keuzes:
+  - **Drie soorten link, op vraag van IT:** iedereen met de link, met de link
+    enkel het praesidium, of met de link enkel één werkgroep, gekozen in een
+    keuzelijst. Een post of een jaarwerking als groep kan (nog) niet: niet
+    gevraagd, en het is later dezelfde keuzelijst met meer groepen.
+  - **Een eigen link op vtk.be, geen gedeelde link van Immich.** Enkel zo kan een
+    link vragen dat iemand inlogt, zie je hoe vaak hij geopend is, en staat er
+    geen sleutel in de foto-URL's die het album op de fotoproxy opent.
+  - **Standaard een maand, en nooit voorbij 15 juli.** Een vergeten link verloopt
+    vanzelf. Op 15 juli wisselt het werkingsjaar, en daarmee wie er in het
+    praesidium of een werkgroep zit en wie er in Communicatie zit; wie daarna
+    nog moet kijken, krijgt een nieuwe link van de nieuwe ploeg. Er is geen
+    link zonder einddatum.
+  - **Downloaden staat standaard aan.** Meestal is dat net de bedoeling: een
+    partner of een fotograaf wil de foto's hebben. Uit is enkel bekijken, en het
+    venster zegt eerlijk dat een schermafbeelding dat niet tegenhoudt.
+  - **Verborgen foto's gaan nooit mee**, ook niet in de zip van een link. Dat is
+    het omgekeerde van de zip in het beheer, en bewust: die zip blijft bij
+    Communicatie, een link gaat naar buiten, en een foto wordt vaak verborgen na
+    een verwijderverzoek. Wie ze toch moet doorgeven, gebruikt de zip.
+  - **Geen eigen recht.** Wie een album als zip kan downloaden, kan het nu al
+    doorsturen; een link is daar de veiligere vorm van. Dus `media.manage` of
+    `photos.manageAlbums`, zoals de rest van het albumbeheer.
+  - **Een telling, geen lijst van wie keek.** Ook bij een link voor het
+    praesidium, waar de site weet wie er inlogt, staat enkel hoe vaak en wanneer
+    laatst. Wie er keek, is een vraag die niemand moet kunnen beantwoorden.
+  - **Geen wachtwoord en geen mail vanaf de site** in deze versie. Een wachtwoord
+    in hetzelfde bericht als de link beschermt niets extra, en praesidium of
+    werkgroep dekt het interne geval. Een link gaat nu via WhatsApp of mail; een
+    mail vanaf de site vraagt een sjabloon en een voorvertoning op
+    /admin/it/flows, en komt er pas als iemand erom vraagt.
+  - **Intrekken staat in het venster van de link, niet in de rij.** Een klik op de
+    rij opent de link; het icoon in de rij kopieert hem, want dat doe je het vaakst.
+    Intrekken is de enige onomkeerbare actie, en de bevestiging zegt wat er weg is
+    (de URL) en wat blijft (het album, de andere links).
+  - **Verbergen sluit ook de oude publieke link van Immich**, en dat hoort hierbij:
+    met privélinks ernaast moet "Verborgen" in het beheer kloppen. Voordien was
+    een verborgen album via de fotoproxy nog te openen voor wie ooit een
+    foto-URL had.
+- **Rechten op de fotoalbums (november 2026): drie trappen.** Tot dan gaf elk
+  recht op albums alles, ook publiceren en weggooien, en `photos.upload` (in de
+  basisrol van het praesidium) gaf eigenlijk niets in het mediabeheer. Nu, in
+  `lib/media-album-access.ts`:
+  - **`photos.upload`: foto's toevoegen aan een album dat er al is.** Het tabblad
+    Foto's opent, de dropzone werkt, en dat is het. Geen nieuw album, geen
+    titel of cover, geen foto verbergen, niets downloaden of delen. Een upload in
+    een album dat op de site staat, staat meteen online: dat is de bedoeling (wie
+    op de activiteit fotografeerde, vult het album aan), en daarom controleert de
+    server dat het album bij vtk.be hoort en niet in de prullenmand ligt.
+  - **`photos.createAlbums`: ook een album aanmaken, maar niet publiceren of
+    verwijderen.** Een nieuw album begint altijd verborgen, wat het formulier ook
+    meestuurt. Zolang het verborgen is, is het een kladversie en mag deze trap de
+    titel, de beschrijving, de cover en de tabs nog wijzigen; eens het op de site
+    staat (openbaar of privé), niet meer, want elke wijziging is dan een
+    publicatie. Een tab toevoegen mag wel bij elk album: dat is een album
+    aanmaken, en de tab krijgt de stand van zijn album.
+  - **`photos.manageAlbums` en `media.manage`: alles**, ook de stand kiezen, foto's
+    verbergen, privélinks, downloaden en de prullenmand.
+  - Er is geen eigenaar per album: wie albums aanmaakt, mag elke kladversie
+    bewerken, niet enkel de eigen. Een eigenaar bijhouden vraagt een tabel naast
+    Immich, en daar was (nog) geen vraag naar.
+- **Een derde stand: privé (`[gallery-private]`).** Naast "op vtk.be" en
+  "verborgen" kan een album gepubliceerd zijn zonder in het overzicht te staan:
+  niet op /media, niet in de zoekfunctie, niet in de nieuwsband en niet in de
+  app, en `noindex` voor zoekmachines, maar wie het adres `/media/<slug>` heeft,
+  ziet de foto's zonder in te loggen. Dat is iets anders dan een privélink: die
+  werkt ook voor een verborgen album, verloopt, kan inloggen vragen en telt hoe
+  vaak hij geopend is. Privé is voor een album dat gewoon niet in de etalage
+  hoort (een bedankavond voor de helpers), niet voor iets dat geheim moet
+  blijven: het adres volgt uit de titel en is dus te raden. Wie dat niet wil,
+  verbergt het album en maakt een privélink.
+
+## Vervangbaar op een shift: een student neemt de plaats van het praesidium in
+
+Een praesidiumlid vult soms een shift in omdat ze anders leeg blijft. Schrijft er
+later toch een student in, dan had dat praesidiumlid die shift niet hoeven te
+doen. Wie zich daarom inschrijft, vinkt "Een student mag mijn plaats innemen"
+aan (`ShiftParticipant.replaceable`, ook achteraf aan of uit te zetten in het
+venster van de shift).
+
+- **Enkel voor het praesidium**, in het werkingsjaar van de shift (dezelfde
+  grens als de bonnetjes: `praesidiumYears`, kantelt op 15 juli). Voor wie
+  geen post heeft, staat het vinkje er niet, en de server negeert het.
+- **Enkel een student vervangt**, nooit een ander praesidiumlid: het doel is dat
+  de shift naar een student gaat, niet dat het praesidium onderling schuift.
+- **De student ziet het niet.** Voor hem telt die plaats als vrij (3/4 in plaats
+  van 4/4) en staat die naam niet in de lijst "Al ingeschreven". Hij schrijft
+  zich in zoals op elke shift met plaats; dat hij iemand vervangt, is niet zijn
+  zaak. Het praesidium ziet de echte bezetting.
+- **Wie er vervangen wordt: de laatst ingeschreven vervangbare.** Wie zich het
+  laatst inschreef, heeft er het minst lang op gerekend.
+- **Het praesidiumlid krijgt meteen een mail** dat het niet meer moet komen
+  (`shiftReplacedMail`, voorvertoning op /admin/it/flows). Vertrekt die mail
+  niet, dan blijft de vervanging staan; de fout gaat naar de log.
+- **Tot de start van de shift**, ook binnen de 24 uur waarin uitschrijven niet
+  meer kan: een student die er toch nog bij komt, is precies wat de optie wil.
+- **Niet op een cursusdienst-shift**: die inschrijving staat ook op cudi.vtk.be
+  en kan daar niet mee omgewisseld worden.
+- Bestaande inschrijvingen staan uit: niemand wordt vervangen zonder het zelf
+  aangeduid te hebben. De app schrijft in langs dezelfde route, dus een student
+  in de app vervangt net zo; het vinkje zelf staat (nog) enkel op de site.
 
 ## Shiftenoverzicht praesidium
 
@@ -11245,6 +12421,14 @@ Hoe het werkt staat in `docs/bestuursorgaan.md`; dit zijn de keuzes erachter.
   dagen open". De BO-datum is er altijd en zegt wat Groep 5 wil weten: hoe lang
   wachten we al op dit resultaat. De datum uit het rekenblad staat nog ter info
   in het detail. Enkel een budget op een BO die nog moet komen, "komt nog".
+- **Eén uitzondering: de herinnering op het dashboard wacht op de activiteit**
+  (november 2026). "Nog te brengen resultaten" op /admin toont een open
+  resultaat pas vanaf de dag na de activiteit (de datum uit het rekenblad). Een
+  budget passeert het BO vóór de activiteit, dus een activiteit in december
+  stond er al vanaf september, terwijl er nog niets te brengen viel. Zonder
+  datum in het rekenblad blijft de herinnering zoals voordien. Status, "open
+  sinds" en alle tellingen blijven op de BO-datum; ook "Mijn budgetten" toont
+  zo'n resultaat gewoon als open (`openResults` in `lib/bo/own.ts`).
 - **Het lopende werkingsjaar en het vorige.** De resultaten van vorig jaar
   komen nog binnen in de eerste BO's van het nieuwe, en hun budgetten staan in
   de map van vorig jaar. De jaarmap zoekt de site zelf ("2026 - 2027 ..."), zodat
@@ -11259,7 +12443,9 @@ Hoe het werkt staat in `docs/bestuursorgaan.md`; dit zijn de keuzes erachter.
 Na de eerste week met echte bestanden (oktober 2026) bleek "een post" voor het
 BO ruimer dan een `Group`. Wat Groep 5 vroeg, en waarom het zo gebouwd is:
 
-- **Het scherm heet "Budgetten & Resultaten"**, in de zijbalk en als titel.
+- **Het scherm heette "Budgetten & Resultaten"**, in de zijbalk en als titel;
+  sinds november 2026 heet het "Resultatenoverzicht", en is "Bestuursorgaan"
+  de naam van de mappen per BO (zie "Bestuursorgaan: budgetten op de site").
   "Bestuursorgaan" is de vergadering, niet wat je er komt zoeken. De URL
   (`/admin/bestuursorgaan`), het recht en de rol blijven: een label wijzigen is
   geen reden om bladwijzers en rechten te breken.
@@ -11379,8 +12565,11 @@ allebei): allebei.
   activiteit met haar BO's, budget, resultaat en stand, in dezelfde tabel en
   dezelfde vier woorden als de lijst van Groep 5. Een post en Groep 5 lezen
   over één activiteit dus hetzelfde.
-- **Het lidmaatschap beslist, geen recht.** Wie dit werkingsjaar in een post of
-  werkgroep zit, ziet die post; niets van een andere. Een recht zou betekenen
+- **Het lidmaatschap beslist, geen recht.** Wie dit werkingsjaar in een post
+  zit, ziet die post; niets van een andere. Bij een werkgroep enkel de G3/G4
+  (`role = LEAD`, `countsForBo` in `lib/bo/own.ts`): sinds november 2026 zag een
+  gewoon lid de budgetten van zijn werkgroep niet meer, omdat de G3/G4 ze naar
+  het BO brengt en de werkgroep tientallen leden telt. Een recht zou betekenen
   dat iemand het aan elke post moet hangen, en een post die het niet kreeg,
   ziet dan niet wat ze nog moet brengen. Het zijn haar eigen rekenbladen: ze
   staan al in haar eigen map in Drive. Het overzicht van alle posten blijft
@@ -11388,6 +12577,72 @@ allebei): allebei.
 - **Groep 5 krijgt er haar vier vakken bij** (Praeses, Vice-praeses,
   Secretaris, Beheer), maar enkel wanneer er iets in zit. Jaarwerkingen en
   Overige hebben geen leden en staan bij niemand.
+
+## Bestuursorgaan: de stand tegenover de begroting
+
+In november 2026 vroeg Groep 5 om op "Resultaten per post" ook te zien hoe goed
+het jaar loopt tegenover de begroting, om sneller te kunnen bijsturen. Elk blad
+heeft een regel Begroting; het getal is per activiteit het resultaat min die
+regel, of zolang er geen resultaat is het budget min die regel, opgeteld per
+post en bovenaan voor Totaal, VTK en Werkgroepen. Plus is beter dan begroot.
+
+- **Het resultaat wint van het budget**: dat is het meest accuraat. Een budget
+  telt pas mee zodra zijn BO voorbij is (of het schriftelijk goedgekeurd werd),
+  dezelfde activiteiten als de kolom Budgetten; een budget voor een BO die nog
+  moet komen, is nog niet goedgekeurd.
+- **Een blad zonder regel Begroting telt niet mee**, en het scherm zegt over
+  hoeveel van de budgetten het getal gaat ("22 van 27"). Een lege regel als 0
+  lezen zou elk zo'n budget volledig als afwijking tellen.
+- **Elke activiteit telt apart, ook bij een potje.** Een potje (meer uitgaven op
+  één begrotingslijn) hoort in één blad; een post die het over vier bladen
+  verdeelt met telkens de hele begroting erin, doet het verkeerd, en dat
+  corrigeert het overzicht niet.
+- **Komt een potje terug met dezelfde naam, dan telt enkel het meest recente
+  blad.** Een potje als IT Nieuw Materiaal (begroting -500) kan na zijn
+  resultaat opnieuw een budget krijgen. Dat blad is dezelfde activiteit en
+  draagt de stand van het hele potje, dus tellen we het niet naast het oude
+  resultaat. Zodra de BO van dat nieuwe budget voorbij is, staat de activiteit
+  weer open, wacht ze op een eigen resultaat, en rekent "open sinds" vanaf die
+  BO; het oude resultaat blijft bij de bestanden staan. Een nieuw budget voor
+  een BO die nog moet komen, verandert niets, net zoals elders.
+- Op een telefoon wijkt de kolom Missend (budgetten min resultaten), zodat de
+  naam van de post plaats houdt.
+- **Een activiteit kan buiten de begroting staan en toch meetellen.** Sommige
+  budgetten horen niet in de stand: Studentenwelkom betaalt de stad, en een
+  blad dat nog maar half is (de cultuurreis) trekt het getal scheef. "Niet
+  meetellen" vraagt daarom hoe: "Enkel niet in de begroting" (met een reden)
+  houdt de activiteit in budgetten, resultaten en percentage, maar laat ze
+  weg uit het bedrag; "Helemaal niet meetellen" is het oude gedrag voor een
+  kopie of een oude versie. De eerste keuze staat bovenaan, omdat ze het
+  minst wegneemt. Welke er buiten staan, staat onder Instellingen en onder
+  "Resultaten per post", met de reden; terugzetten kan daar en in het detail,
+  zodra het blad klopt.
+
+## Bestuursorgaan: potjes
+
+Een potje is een deelbudget waaruit een post door het jaar koopt
+(shiftersvoorzieningen, nieuw materiaal). In november 2026 vroeg Groep 5 om ze
+te kunnen aanduiden, omdat ze in het overzicht scheef liepen: een potje bleef
+"Open" staan terwijl er nog geen resultaat hoort, en een tussentijds resultaat
+van een paar tientjes telde in de stand tegenover de begroting als een
+activiteit die honderden euro beter deed dan begroot.
+
+- **Twee manieren**: de knop "Potje" in het detail van een activiteit
+  (`BoDocument.potAt`, voor al haar bestanden, terug te zetten met dezelfde
+  knop), of de naam: `26-27_Deelbudget_POST_ACTIVITEIT` (en `Deelresultaat`).
+  Die naamgeving stelde Groep 5 zelf voor; een potje door zijn naam heeft
+  geen knop, de naam beslist.
+- **Een potje wacht niet op een resultaat.** Het heeft een eigen stand,
+  "Potje", en telt niet bij open of afgerond (dus ook niet in het percentage
+  of de herinnering op het dashboard). Het blijft wel in het overzicht van de
+  post staan, met een tussentijds resultaat erbij als dat er is.
+- **In de stand tegenover de begroting telt het begrote bedrag**, niet het
+  budget en niet een tussentijds resultaat: zolang een potje loopt, zegt dat
+  niets over wat er tegen het eind van het jaar nog uit gaat. Zo staat een
+  potje op 0 tegenover de begroting, en telt het mee in "over hoeveel
+  budgetten". Een blad zonder regel Begroting telt, zoals elk blad, niet mee.
+- Een resultaat zonder budget wordt nooit een potje, ook niet als het
+  `Deelresultaat` heet: dat blijft iets om na te kijken.
 
 ## Bestuursorgaan: de verkenner
 
@@ -11438,6 +12693,220 @@ https://claude.ai/artifact/VpxcbRLcNKHuuaxpYKnejB
   hangt af van de schermgrootte, dit van hoe iemand werkt. Wie nog niets koos,
   krijgt de verkenner. Wisselen meldt zich niet met een toast: de weergave
   wisselt zichtbaar, en enkel een mislukte bewaring krijgt een melding.
+
+## Bestuursorgaan: budgetten op de site
+
+Op een BO gaat veel tijd naar controles die een machine kan doen: werken de
+links, kloppen de prijzen, is de BTW juist toegepast, kloppen de sommen, komen
+de percentages op 100 %. In november 2026 bekeken we BO 12 (13 budgetten, 3
+resultaten) op een bord met hoe dat op de site zou gaan
+(https://claude.ai/artifact/Ug2f5LKzJ4ALofmuuCBSBv), en daarna is de eerste
+stap gebouwd. Hoe het werkt staat in `docs/bestuursorgaan.md` ("Budgetten op de
+site").
+
+- **Een proef naast Drive, geen vervanging** (november 2026, op vraag van IT:
+  "we zijn nog niet zeker of we gaan overstappen"). "Drive blijft de bron"
+  hierboven geldt nog: het BO, de verkenner, de lijst, "Mijn budgetten" en het
+  dashboard lezen enkel de BO-map. Een post die de proef doet, stelt haar budget
+  op de site op en downloadt het als rekenblad voor de map Budgetten; de scan
+  leest dat zoals elk blad. Zo kan de kring proberen zonder dat er een tweede
+  plek ontstaat waar het BO moet gaan kijken.
+- **Groep 5 kiest wie meedoet.** Groep 5 zelf altijd, een andere post pas als ze
+  aangevinkt is bij de instellingen. Wie niet meedoet, ziet niets nieuws: een
+  knop "Nieuw budget" voor elke post zou zeggen dat dit de nieuwe werkwijze is.
+- **Een rekenblad zonder formules, geen formulier.** Naam, aantal en prijs typ
+  je in de cel, met Enter naar de volgende regel; wat de site rekent, staat
+  zonder vlak en is niet te typen. Bron, BTW, Flesserke en opmerking staan in
+  een paneel achter het potlood. Het bord toonde ook gestructureerde regels die
+  openklappen; die vroegen een klik per regel om iets te typen, en dat is
+  precies wat een post in Sheets niet hoeft.
+- **De kop scrolt mee, zoals het evenementenformulier**: naam, totaal, verschil
+  met de begroting, "Bewaard om ..." en de download. Bewaren gebeurt vanzelf,
+  een halve seconde na elke wijziging, zoals in Sheets.
+- **BTW per regel: incl. of excl., en het tarief van het product.** Niemand
+  typt nog een BTW-formule. De site rekent excl. × (1 + tarief van de post),
+  zoals Bedrijvenrelaties (`=1.85/1.06`), IT (`=(119/1.21)*1.105`) en Cultuur
+  (`=SUM(...)*1.21`) het met de hand deden. Enkel die drie tarieven zijn
+  gekend; de andere vult Beheer in, en tot dan telt elke prijs zoals ingetypt.
+  Open: geldt 21 % van Cultuur ook op een product met 6 %?
+- **Percentages per verdeling, niet over alles samen.** Een rest-regel (water
+  op een cantus) en een mix (Mimosa) zijn eigen begrippen. Zo klopt Live
+  Cantus met 89,25 %, FIESTA I met 200 % en PeMe met 114 %.
+- **Live prijzen bij Collect&Go, op vraag.** De site leest de productpagina
+  zoals een browser, met een eerlijke user-agent, en vergelijkt met de regel.
+  Er is geen openbare prijs-API (de productsearch van colruyt.be vraagt een
+  sleutel) en Colruyt weert bots; lukt het niet, dan zegt de editor dat en
+  bevestigt de post de prijs met datum. Bewust op vraag en niet elke nacht voor
+  elk budget: een paar pagina's wanneer een post erom vraagt, valt niet op, een
+  nachtelijke ronde over alles wel. Groep 5 kan het uitzetten.
+- **Een bron per regel, niet enkel een link.** Ruim een derde van de regels in
+  BO 12 had geen link, vaak terecht (huur, offerte, servicekost). Daarom kiest
+  elke regel een soort bron: webshop, Collect&Go, offerte, Flesserke of vaste
+  afspraak met reden, of de prijs van de zaal.
+- **Locaties, BTW per post en de Collect&Go-servicekost staan één keer**, bij
+  de instellingen van Groep 5, in plaats van in elk blad. In de code staat geen
+  tarief, geen zaal en geen prijs als standaard, behalve de servicekost (6,95)
+  en de sangria zonder prijs van de zaal (1,95), allebei aan te passen.
+- **Flesserke telt mee als kost**, zoals Heverlicht het deed, met een
+  schakelaar bij de instellingen. Open: hoort dat zo?
+- **Een budget op de site staat onder de tabel van "Mijn budgetten"**, in een
+  eigen blok "Op de site (proef)". Bovenaan blijft wat in Drive staat, met de
+  uitleg van voordien; in die tabel is de stand altijd een van vier woorden.
+- **Nog niet gebouwd**: de wachtrij voor de GM, de BO-modus, het resultaat naast
+  het budget, de begroting uit één bron, en de site-budgetten in de verkenner.
+  Klein of groot bleek in BO 12 niet aan het bedrag te hangen (Live Cantus
+  −1.167 was klein, Poolavond −144 groot), maar aan of er iets te bespreken
+  viel; dat beslist de GM.
+
+### Budgetten op de site: tweede ronde (november 2026)
+
+Na de eerste stap zijn alle 209 bladen van 26-27 naast de site gelegd; de
+telling staat in `docs/bestuursorgaan.md` ("Wat de 209 bladen van 26-27
+vroegen").
+
+- **Maken en nakijken zijn twee weergaven, geen twee schermen.** Wie een budget
+  opstelt, heeft cellen, knoppen en panelen nodig; wie het nakijkt (de GM, het
+  BO, een andere kring) wil alles op één blad zien en niets kunnen aanraken. Eén
+  schakelaar in de kop, dezelfde URL, en `?weergave=nakijken` voor wie van
+  buitenaf komt. In Nakijken staat per regel de som uitgeschreven en de bron met
+  de stand van de prijscontrole: dat is precies wat op het BO nu mondeling
+  gevraagd wordt.
+- **Berekeningen in een cel, maar geen rekenblad.** 67 bladen hadden een losse
+  som in een cel en 96 verwezen naar een eigen parameter; zonder dat moest een
+  post buiten de site rekenen en zag niemand nog waar "0,6975" vandaan kwam.
+  Verwijzen naar een andere regel en ALS() kunnen bewust niet: daar gingen de
+  bladen stuk (een som die een rij mist, een percentage dat over twee secties
+  heen telt), en dat was de reden om van de bladen weg te willen.
+- **Een leeg resultaat is "nog niet ingevuld", geen nul.** Zo is een
+  tussentijds resultaat gewoon een resultaat dat nog niet af is, en zegt de site
+  hoeveel regels nog ontbreken in plaats van een te goed totaal te tonen.
+- **Een potje is een lijn uit de begroting, geen eigen ding.** Twee budgetten
+  die dezelfde lijn kiezen, horen samen; er is niets om aan te maken of te
+  beheren. De begroting komt uit het rekenblad van Beheer, opgeladen bij de
+  instellingen: geen lijn en geen bedrag in de code. Een budget houdt het
+  bedrag dat het overnam, ook wanneer de begroting later vervangen wordt.
+- **Een deellink is een geheim in de URL, zonder account.** De vraag kwam van
+  twee kanten: een kring waarmee samengewerkt wordt en die niet in de admin
+  kan, en de slides van het BO. Twee links, bekijken en aanpassen, elk
+  intrekbaar; een link geeft toegang tot één budget en tot niets anders, en
+  verwijderen of delen blijft bij de post. Geen inlog voor de andere kring:
+  dat vroeg een account per persoon voor iets wat één avond duurt.
+- **Mappen per BO, zoals Drive.** De verkenner en de lijst groeperen op post
+  en stand; wie een budget zoekt, weet meestal op welke BO het passeerde. De
+  mappen tonen de bladen uit Drive en de budgetten op de site door elkaar, met
+  erbij waar een bestand staat. Een post ziet enkel haar eigen bestanden: de
+  regel "een post ziet enkel haar eigen budgetten" geldt hier ook.
+- **Prijzen: automatisch bij de vijf meest gebruikte winkels, ook waar dat
+  een echte browser vraagt.** bol.com, Partywinkel en Action weigeren alles wat
+  geen browser is. De kring wilde geen tussenstap voor wie een budget maakt
+  (geen extensie, geen klik per product), dus opent een Chromium in een eigen
+  container die pagina's, op vraag en traag (`docs/bestuursorgaan.md`, "De
+  prijsbrowser"). De grens: een gewone browser die een openbare productpagina
+  laadt, niets dat een captcha oplost of zich voordoet als iets anders. Colruyt
+  heeft een prijs per winkel: Groep 5 stelt de postcode in van de winkel waar
+  de kring koopt, zodat de prijs die van die winkel is en niet een gemiddelde.
+  Helloprint en Drukzo geven de prijs excl. BTW, en zo neemt de site ze over.
+
+- **Na de eerste dag met echte bladen (13 november 2026) vroeg Groep 5 dit:**
+  - *Geen lijst "Aandachtspunten" in Nakijken.* Ze herhaalde wat al bij de regel
+    stond, en met overgenomen bladen was ze langer dan het budget.
+  - *Vaste prijzen.* De huur en de drank van een zaal zijn elk jaar dezelfde,
+    zonder offerte per activiteit. "Geen bron" bij elk budget is dan lawaai, en
+    wie lawaai ziet, leest de echte vragen niet meer. Groep 5 houdt een lijst
+    bij; een regel met die omschrijving en die prijs vraagt geen bron.
+  - *Prijzen vanzelf, om de vier uur, tot het budget vastligt.* Een knop die
+    enkel in Maken stond, drukte wie nakijkt nooit in. Vier uur is de afweging
+    tussen een verse prijs op het BO en een winkel die niet bestookt wordt;
+    honderd kijkers tegelijk zijn één aanvraag. Na het BO verandert een budget
+    niet meer, dus ook zijn prijzen niet.
+  - *Bron en controle als twee kolommen, de controle als icoon (14 november
+    2026).* De kolom "Bron en controle" zette per regel een link met pijltje,
+    een zin en een omkaderde knop naast elkaar, en las als een muur van
+    "Collect&Go ↗ wordt vanzelf nagekeken [Zelf nagekeken]". Vier richtingen
+    zijn bekeken (icoon, twee kolommen met een woord, enkel wat scheelt, per
+    winkel gegroepeerd); gekozen is het icoon, met de uitleg in de tooltip,
+    zoals de rij-acties elders in de admin. Wat aandacht vraagt, blijft een
+    zichtbaar woord.
+  - *De budgetten van het eerstvolgende BO ook zonder bezoek (14 november
+    2026).* Wachten tot iemand een budget opent, betekende dat de GM een budget
+    opende waarvan de helft nog "wordt vanzelf nagekeken" zei. De server kijkt
+    dus om de vier uur de niet-ingediende budgetten na met een BO-datum tot en
+    met het eerstvolgende BO in Drive. Budgetten voor een later BO wachten nog
+    op een bezoek: die zijn nog in opbouw, en hun prijs is tegen het BO toch
+    weer vier uur oud.
+  - *Zelf nagekeken, met naam en uur.* Een link naar een frituur kan de site
+    niet lezen. Dan zegt een mens dat hij keek, en staat erbij wie en wanneer:
+    zonder naam is "nagekeken" een vinkje dat niemand hoeft te verantwoorden.
+    De naam komt van de server.
+  - *Het totaal onder de regels*, zoals in het blad: boven de regels moest je
+    geloven dat ze ertoe optellen.
+  - *Negatief is een min in het rood.* Uitgaven stonden als een positief getal
+    onder een kop "Uitgaven", en in een tabel zonder die kop las een kost als
+    een inkomst.
+  - *De link in de tabel.* Het potlood openen voor elke link was de traagste
+    stap van een budget overtypen.
+  - *Vrije secties.* De soorten (kosten, kosten per persoon, inkomsten) zeggen
+    hoe er gerekend wordt, niet hoe een budget ingedeeld moet zijn.
+  - *Geen gekleurde rand links van een blok.* Dat patroon staat elders op de
+    site als accent op een uitgelichte kaart; hier stond het op elk bericht, en
+    las het als een sjabloon. In de budgetten is het weg.
+  - *Namen.* "Mappen per BO" werd "Bestuursorgaan" en "Budgetten & Resultaten"
+    werd "Resultatenoverzicht"; de instellingen voor budgetten hangen onder
+    Bestuursorgaan. De URL's en het recht blijven.
+  - *Eén rij per activiteit in een map.* Na "Bladen van deze BO op de site
+    zetten" stond alles dubbel: het blad in Drive en het budget op de site. Nu
+    is dat één rij met twee links.
+  - *De proef is dicht.* Een post die niet aangevinkt is, ziet niets van de
+    site, ook niet wat Groep 5 voor haar overnam.
+
+- **Bestaande rekenbladen overnemen, als uitkomst en niet als berekening.**
+  Om te beslissen of de kring wil overstappen, moet ze de site zien met wat al
+  passeerde. Een blad komt binnen met dezelfde regels en hetzelfde totaal, maar
+  een variabele regel is op de site het aantal eenheden tegen de prijs: de
+  formule naspelen zou bij de helft van de bladen een ander bedrag geven dan wat
+  het BO goedkeurde, en dan vertrouwt niemand de import. Waar de regels niet op
+  het totaal uitkomen, neemt de site enkel het overzicht en zegt ze dat. Een
+  import raakt nooit een budget dat op de site zelf opgesteld is.
+
+### Budgetten op de site: één blad, zoals het rekenblad (14 november 2026)
+
+De nakijkweergave vond de gebruiker onoverzichtelijk, en het rekenblad van
+voordien duidelijker: bovenaan een Overzicht met per sectie Budget en Resultaat,
+ernaast de Parameters, en daaronder elke sectie als band met een totaalrij.
+Vier richtingen zijn bekeken op een bord
+(https://claude.ai/artifact/XUsYV9fGnVGKJr9NRt2Q66): A overzicht en parameters
+bovenaan, B één doorlopende afrekening, C een overzicht dat openklapt, D het
+rekenblad met raster. Gekozen is A.
+
+- **Maken en Nakijken zijn één blad.** De schakelaar is weg, en
+  `?weergave=nakijken` ook. Wie maakt, ziet bij elke regel meteen de bron en de
+  controle; wie nakijkt, kan een prijs verbeteren in dezelfde cel. Twee
+  weergaven van hetzelfde budget betekende dat een post nooit zag wat de GM zag.
+  Wie niet mag wijzigen, krijgt hetzelfde blad met tekst in plaats van cellen.
+  Dit vervangt "Maken en nakijken zijn twee weergaven" hierboven.
+- **Overzicht en Parameters naast elkaar, bovenaan.** Zoals het blad: eerst waar
+  het geld heen gaat (elke sectie, de sommen, de begroting), dan waarmee
+  gerekend wordt. Het navy blok met de bedragen is weg: een donkere kaart in een
+  lichte admin, en het herhaalde wat in de kop stond. Het totaal staat in de
+  meescrollende kop pas wanneer het overzicht uit beeld is.
+- **Geen sectie "Nog na te kijken voor het BO"** (expliciet gevraagd). Wat
+  scheelt, staat bij de regel, onder de sectie of onder het veld; het overzicht
+  telt per sectie "N open", en de kop zegt hoeveel er in totaal openstaan met
+  een klik naar het eerste.
+- **De knop "Prijzen opnieuw ophalen" is terug**, naast het vanzelf nakijken om
+  de vier uur. Wie een prijs net aanpaste bij de winkel of een budget voor het
+  BO nog eens wil nakijken, wil niet wachten. De knop vraagt elke winkel vers,
+  dus hoogstens om de twee minuten per budget: tien kliks na elkaar zijn anders
+  tien bezoeken per product. Niet meer eens het budget vastligt, zoals de ronde.
+- **De stand van de prijzen staat apart boven de secties**, geteld met dezelfde
+  iconen als de kolom Controle, met wanneer de laatste ronde liep en vanaf
+  wanneer de volgende kan. Zo zie je zonder door de regels te scrollen of er
+  iets gewijzigd is of een winkel niet antwoordde.
+- **Een logboek van elke prijscontrole** (/admin/bestuursorgaan/prijzen, enkel
+  Groep 5, zestig dagen). Zonder logboek was "geen antwoord" bij een regel niet
+  na te gaan: lag het aan de winkel, aan de prijsbrowser, of liep de ronde niet?
+  Ook een antwoord uit het geheugen staat erin, met de reden waarom de site
+  vroeg. De link staat bij de instellingen en in het blok van elk budget.
 
 ## Nieuwe evenementen in Discord
 
@@ -11524,6 +12993,44 @@ heeft in zijn account, krijgt de dag ervoor om **12u** een mail. Regels in
   `/api/mail/uitschrijven`, en een scanner post niet. Uitschrijven gaat meteen
   naar Brevo, net als het vinkje op /account, en `/uitschrijven` staat open
   tijdens de onboarding- en studiebevestigingsgate.
+
+## Een mail wanneer de ticketverkoop of de inschrijvingen opengaan
+
+November 2026. Wie interesse aanduidt in een evenement, wil weten wanneer hij
+een ticket kan kopen of zich kan inschrijven, en niet pas de dag ervoor horen
+dat het uitverkocht is. Regels in `apps/web/lib/calendar/signupOpened.ts`, de
+verzender in `signupOpenedMailer.ts` (achtergrondworker, elke vijf minuten), de
+mail in `signupOpenedMail.ts`, voorvertoning op /admin/it/flows.
+
+- **Dezelfde schakelaar als de herinnering**: de mailinglijst Evenementen, en
+  een uitschrijving via een mail geldt ook hier. Interesse alleen is geen
+  toestemming voor mail.
+- **Drie manieren om binnen te geraken**, elk één keer per lid: een
+  ticketverkoop van VTK bij het evenement, het formulier bij het evenement, en
+  de externe link, maar die laatste enkel met "deze link opent de inschrijvingen"
+  aangevinkt (`registrationNewsAt`, hetzelfde vinkje als het nieuws op de
+  homepage). Een link zonder dat vinkje is meestal een Facebook-event, en dan
+  gaat er niets open. Een externe link toevoegen zonder vinkje stuurt dus geen
+  mail.
+- **Elke ticketverkoop apart.** De tweede wave van Galabal is een eigen
+  bericht; wie interesse had, wil ook die weten.
+- **Wie in de voorverkoop zit, krijgt de mail bij de start van de
+  voorverkoop**, en bij de publieke start geen tweede. Dezelfde regel als de
+  shop (`inPresaleAudience`): praesidiumposten, ereleden, vaste medewerkers en
+  de groepen die de beheerder erbij zette, elk volgens de vinkjes van die
+  verkoop. De private voorverkooplink telt niet: die hangt aan een cookie in een
+  browser, niet aan een account; wie zo binnen mag, krijgt de mail bij de
+  publieke start.
+- **Enkel wie al interesse had voor het openging.** Wie pas daarna op de ster
+  klikt, zag de knop al staan.
+- **Gemist is gemist na 24 uur**, of zodra het evenement begint of de verkoop
+  sluit. Lag de worker even plat, dan vertrekt de mail nog; een verkoop die al
+  dagen loopt, levert na een deploy geen golf mails op.
+- **Eén mail per lid per ronde**, met alles wat voor hem openging. Welke mails
+  vertrokken, staat in `CalendarEventSignupMail`: de rij is ook de claim, zodat
+  twee containers niet allebei versturen.
+- **Een alumnus zonder account** (`CalendarEventGuestInterest`) krijgt deze mail
+  niet: die gaf geen toestemming om gemaild te worden.
 
 ## Commu-aanvraag
 
@@ -11827,3 +13334,353 @@ had.
   hangen eraan; de voorvertoning toont ze en verwijderen blijft een aparte,
   bevestigde stap. Enkel een volledige lijst bepaalt de volgorde: met een
   bestand van twee nieuwe codes zou de rest anders door elkaar geschud worden.
+
+## Theokot: shiftenoverzicht
+
+Theokot wilde in één oogopslag zien op welke dagen en uren er nog shifters
+nodig zijn. Dat staat op `/admin/theokot/shiften` (`lib/theokotShifts.ts`,
+`ShiftTimeline.tsx`), november 2026.
+
+- **Een eigen pagina in de groep Theokot, geen tab binnen Broodjes.** Naast
+  Broodjes en Verhuur in de zijbalk, op vraag van Theokot: de shiften horen bij
+  het draaien van de zaak, niet bij het aanbod van een verkoopdag.
+- **Een tijdlijn per dag.** Vier richtingen lagen voor (een weekraster, een
+  lijst met eerst wat open staat, een agenda per dag zoals /shift, en deze
+  tijdlijn); Theokot koos de tijdlijn. Elke shift is een balk op haar uur, dus
+  een extra of een ontbrekende shift valt op zonder dat het scherm daar een
+  regel voor nodig heeft.
+- **Maandag tot vrijdag, nooit het weekend.** Theokot verkoopt niet op zaterdag
+  of zondag. In het weekend opent het scherm op de volgende week: van de week
+  die net voorbij is, valt niets meer te regelen.
+- **Wat een Theokot-shift is, zegt het sjabloon `theokot`.** De post van dat
+  sjabloon (en THEOKOT, altijd), dezelfde post waarmee een verkoopweek haar
+  shiften neerzet.
+- **Een vaste shift die er niet is, staat er gestreept.** Het vaste rooster komt
+  uit hetzelfde sjabloon (het uur van de eerste shift plus de offsets). Een vaste
+  shift telt als aanwezig zodra een shift die dag ermee overlapt, niet enkel bij
+  een gelijk uur, zodat een dag die een halfuur later opent er niet uitziet
+  alsof alles ontbreekt. Een dag zonder één shift is gewoon dicht en krijgt geen
+  strepen.
+- **Kleur en tekst zeggen hetzelfde.** Rood is nog niemand, geel nog plaats,
+  grijs volzet, en in de balk staat "2 open" of "volzet". Een afgelopen shift
+  blijft zichtbaar maar vaag, en telt niet mee in wat er nog nodig is.
+- **In de balk staat de naam zonder het evenement** ("Broodjes smeren", niet
+  "Broodjes smeren - Theokot"): op een pagina die enkel Theokot toont, zegt dat
+  achtervoegsel niets en kost het de regel die de balk niet heeft. De volledige
+  naam blijft in de tooltip en in het paneel eronder. De balk is hoog genoeg voor
+  twee regels plus de plaatsenrij; daarvoor kromp de naam en stond de tweede regel
+  er half afgeknipt.
+- **Het recht is `theokot.manage`**, wie de broodjes beheert. Geen apart recht:
+  de rol van Theokot draagt het al, en de afhaalbalie (`theokot.pickup`) plant
+  geen shiften.
+
+## Opruiming van de bucket
+
+Wie in de editor een nieuwe PDF uploadt en de link naar de oude weghaalt, liet
+de oude voorgoed in de bucket staan: de algemene uploader (`/api/admin/upload`)
+maakt geen rij in de database, het bestand leeft enkel als link in een tekst.
+Over jaren worden dat duizenden bestanden die niemand nog toont. De opruiming
+staat in `apps/web/lib/storage-cleanup*.ts`, het scherm op
+`/admin/it/storage/cleanup`, november 2026.
+
+- **Niet bij het opslaan, maar elke nacht.** De oude en de nieuwe tekst
+  vergelijken en weggooien wat verdween, breekt de andere plekken waar
+  hetzelfde bestand staat (de NL- en de EN-tab, een nieuwsbericht dat naar
+  hetzelfde reglement linkt), moet in elke opslaan-actie zitten, en heeft geen
+  weg terug voor wie per ongeluk een link wist.
+- **De hele database wordt doorzocht, niet een lijst kolommen.** Elke tekst-,
+  JSON- en arraykolom van elke tabel, naar `<map>/<24 hex>`, het formaat van
+  `newStorageKey`. Een nieuwe feature met een eigen key-kolom of markdownveld
+  zit er zo vanzelf in. Ook het e-maillogboek telt mee: een afbeelding in een
+  mail die net vertrok, blijft zolang dat logboek ze bewaart.
+- **30 dagen aan één stuk zonder verwijzing**, en pas na 7 dagen beoordeeld
+  (de editor uploadt voor het opslaan). Links die mensen buiten de site deelden
+  (Discord, Instagram), breken na die termijn; daarom geen dag of een week.
+- **Eerst enkel rapporteren.** Verwijderen staat standaard uit; een superadmin
+  zet het aan op het scherm, nadat de lijst een tijd klopte. Hoogstens 500 per
+  nacht, en een scan die geen enkele verwijzing vindt, raakt niets aan.
+- **Enkel de mappen van de algemene uploader**: `images/`, `pdfs/`, `files/`,
+  `logos/`, `tiles/`, `badges/`, `uploads/`. `bonnetjes/` blijft er bewust
+  buiten, want de boekhouding heeft een bewaarplicht; `forms/`, `avatars/`,
+  `publications/`, `uitleen/`, `ticket-design/` en `theokot/contracten/` hebben
+  een eigenaar-rij en hun eigen opruiming.
+- **Verwijderd is weg.** Er is geen prullenmand in de bucket; wat terug moet,
+  moet opnieuw geüpload worden.
+
+## Jaarwerkingen als derde soort groep
+
+Kanweek, Halftime, Parttime, Fulltime, Duplex en Triplex hebben elk een ploeg
+per werkingsjaar en kunnen, net als een werkgroep, rollen aan hun leden
+toekennen. Ze zijn een derde soort `Group` (`type = JAARWERKING`) naast de
+praesidiumposten en de werkgroepen, beheerd op `/admin/jaarwerkingen` onder
+Ledenbeheer, november 2026. Hetzelfde scherm als de werkgroepen
+(`WerkingenAdmin`), met wat per soort verschilt in `apps/web/lib/groupKinds.ts`.
+
+- **Een eigen beheerrecht, niet dat van de werkgroepen.**
+  `jaarwerkingen.manage` en `jaarwerkingen.manageOwnMembers` volgen exact de
+  regels van hun werkgroep-tegenhanger (zie `docs/permissions.md`), maar lopen
+  er niet in over: wie werkgroepen beheert, beheert daarmee geen Kanweek. Elke
+  actie controleert dat de groep van het juiste soort is.
+- **Een eigen rol per jaarwerking** (`jaarwerking-<code>`), aan elk lid
+  toegekend, als lege container zoals bij de werkgroepen. De migratie maakte
+  de zes jaarwerkingen en hun rol eenmalig aan; daarna zijn ze GUI-beheerd.
+- **Geen publieke pagina en geen infotekst.** Er is al een contentpagina
+  "Jaarwerkingen"; de site toont de groepen nergens publiek. Daarom ziet een
+  gewoon lid van een jaarwerking het beheerscherm ook niet: er valt voor hem
+  niets te bewerken. De verantwoordelijke met `manageOwnMembers` wel.
+- **De titel van de verantwoordelijke** begint op "Verantwoordelijke" en is vrij
+  te kiezen, zoals G3 of G4 bij een werkgroep.
+- **Het BO blijft de jaarwerkingen als vak kennen** (`x:kanweek`, zie
+  "Bestuursorgaan: posten, rollen en categorieën"), niet als groep. De groepen
+  staan buiten de postherkenning en buiten "Mijn budgetten": met de groep erbij
+  zou "Kanw" voor twee doelen passen en niet meer herkend worden, en een lid
+  van Kanweek kreeg een leeg blok terwijl er wel budgetten van Kanweek zijn.
+  Het lidmaatschap koppelen aan het vak is een latere keuze van Groep 5.
+- **De kassa's houden de ene keuze "Jaarwerking"** (zie hierboven, november
+  2026). De groepen staan daar niet nog eens apart in de lijst.
+- **De koppel-je-@vtk.be-poort telt een jaarwerking niet mee.** Wie enkel in
+  Kanweek zit, krijgt geen poort die een kringaccount eist. Staat een
+  jaarwerking als bron in een groepsadres ("Elke jaarwerking" of één
+  jaarwerking), dan toont dat scherm wie nog niet gekoppeld is.
+- **Verder gedraagt een jaarwerking zich als een werkgroep**: ze staat in de
+  keuzelijsten die elke groep tonen (eigenaar van een evenement, ticketverkoop,
+  formulier, rekening), in de uitleendienst vraagt ze aan onder het type
+  "werkgroep of jaarwerking", en haar ticketverkoop komt zoals die van een post
+  vanzelf in het nieuws (enkel een werkgroep vraagt eerst de redactie).
+
+## POC-peilingen
+
+De RiVers zetelen in de POC om de mening van de studenten te brengen, maar op de
+tweewekelijkse vergadering zitten vaak maar een paar mensen per richting. Een
+peiling laat hen de hele richting bevragen: ja of nee, een score van 1 tot 5, of
+een open vraag. Code in `apps/web/lib/pocPolls`.
+
+- **De vragen staan op de homepage, in de POC-band, en niet op een eigen pagina.**
+  Een aparte pagina bezoekt niemand. Alle vragen staan tegelijk in rijen; één vraag
+  per keer en een los formulier zijn bekeken en afgewezen.
+- **Een gele strook onder de sitekop wijst ernaar.** De band staat vier schermen
+  naar beneden, en wie enkel voor de kalender komt, scrolt daar nooit langs. Op de
+  homepage scrolt de pijl naar de vragen, op elke andere pagina brengt ze je terug
+  naar de homepage. Niet op de hero zelf: dat werkte maar op een of twee van de
+  vijf hero-ontwerpen. Niet zwevend onderaan: daar zit de aankondigingskaart al.
+- **De strook vertelt waarom je antwoord telt** ("Op 24 november zitten je RiVers
+  met je proffen rond de tafel op de POC"). Zonder gekende vergadering valt die zin terug op
+  een algemene, en de laatste twee dagen is de deadline het verhaal.
+- **Wie we niet aan een richting kunnen koppelen, krijgt de strook enkel op de
+  homepage**, met de vraag om aan te melden of een richting in te stellen. Op elke
+  pagina zou ze ook ouders en bedrijven lastigvallen.
+- **Niemand ziet een tussenstand.** Wat anderen antwoordden, kan je eigen mening
+  kleuren; daarom toont de site na het versturen enkel je bevestiging.
+- **Een antwoord is anoniem, en dat zit in de tabel.** `PocPollAnswer` heeft geen
+  userId, geen eigen id en geen tijdstempels, enkel een HMAC over de peiling en de
+  gebruiker. Daarmee telt iedereen één keer en kan je wijzigen tot de peiling
+  sluit. Wie zowel de database als `BETTER_AUTH_SECRET` heeft, kan die sleutel voor
+  een gekende gebruiker wel narekenen; de RiVers horen enkel totalen te zien.
+- **Een vraag overslaan mag.** Wie geen mening heeft, hoort geen antwoord te
+  verzinnen om verder te geraken. Minstens één antwoord is genoeg om te versturen.
+- **De RiVers stellen hun eigen peilingen op, zonder apart recht.** Wie dit
+  werkingsjaar RiVer is, krijgt de tab Peilingen voor de eigen POC; `pocs.manage`
+  ziet alle POC's. Na publiceren liggen de vragen vast, anders gaan de antwoorden
+  niet meer over dezelfde vraag.
+- **De RiVers zien de cijfers live, ook tijdens de looptijd, en per fase hoe klein
+  die ook is** (november 2026). Eerst zagen ze tijdens de looptijd enkel de
+  deelname, en werd een fase met minder dan vijf antwoorden nooit apart getoond.
+  Dat vond VTK Onderwijs onlogisch: wie een peiling uitzet, wil zien hoe ze loopt.
+  De prijs is bewust aanvaard: bij een handvol antwoorden, of wie na elk nieuw
+  antwoord herlaadt, kan een RiVer een antwoord tot een persoon herleiden. De
+  studenten zelf zien nog steeds geen tussenstand, en de tekst bij de peiling
+  belooft enkel nog dat niemand ziet wie wat antwoordde. Open antwoorden markeren
+  kan pas na de deadline: tot dan kan een student zijn antwoord nog wijzigen.
+- **Na de POC vertellen de RiVers wat er met de antwoorden gebeurde**: een
+  samenvatting staat 30 dagen bij de POC op de homepage. Wie ziet dat zijn stem
+  iets deed, antwoordt de volgende keer weer.
+- **Op Discord telt een student één keer, en enkel met een gekoppeld VTK-account.**
+  Zonder koppeling kan de site niet weten of iemand tot de richting behoort of al
+  stemde. De koppeling kost één klik extra, één keer. Een ingebouwde Discord-poll
+  kan niet: daar is de tussenstand zichtbaar.
+- **Op Discord krijgt elke POC rollen en een eigen kanaal.** Studenten koppelen hun
+  account onder één publiek bericht, en de bot geeft hen de rollen van hun POC. Zo
+  zien ze enkel de peilingen van hun eigen richting. Eén kanaal voor alles kan niet:
+  Discord kent geen zichtbaarheid per bericht. Privéberichten van de bot zijn bekeken
+  en afgewezen.
+- **Het kanaal hoort bij de POC, en staat ingesteld op /admin/peilingen** (november
+  2026). Het stond eerst in /admin/pocs, onder de POC-instellingen; Onderwijs zoekt
+  het bij de peilingen, dus daar staat nu de lijst "Discord-kanalen per POC". Een
+  RiVer kiest geen kanaal: zijn peiling komt in dat van zijn POC, of niet op
+  Discord. Enkel VTK Onderwijs (`pocs.manage`) kan bij een peiling een ander kanaal
+  kiezen. De site dwingt dat af in de action, niet enkel in het formulier.
+- **Een POC kan meerdere rollen hebben, elk eventueel voor bepaalde fases.** De BPOC
+  hangt aan "1ste bachelor", "2de bachelor" en "3de bachelor"; een eerstejaars krijgt
+  enkel de eerste. Een rol zonder fase krijgt iedereen van de POC.
+- **De site neemt enkel een rol af die ze zelf gaf.** Studenten kiezen die jaarrollen
+  ook zelf op Discord. Wat de site gaf, staat in `User.discordRoleIds`; een rol die
+  een lid al had of zelf koos, blijft van de site af, ook na een klik op het
+  koppelbericht.
+- **VTK Onderwijs kan een peiling voor alle richtingen maken** (`pocId` leeg, enkel
+  met `pocs.manage`), eventueel beperkt tot fases zoals de eerstejaars of de
+  laatstejaars. Ze staat naast de peiling van een POC en niet in de plaats ervan: in
+  de POC-band een eigen rij "VTK Onderwijs" onder de POC's, en in de strook de
+  eerste peiling die je nog niet invulde. Wie beide heeft, ziet ze dus allebei.
+- **De rol volgt het account, ook de jaarlijkse bevestiging.** Wie sinds 21 september
+  de studie niet bevestigde, verliest de rol en krijgt ze terug na het bevestigen.
+  Anders stemt iemand die de site niet meer opent nog jaren met de richting van toen.
+- **Een open peiling gaat voor de stand van de band.** Staat de band in
+  `/admin/pocs` verborgen of op de verkiezingen, dan blijven de POC's met een open
+  peiling er toch staan: anders wijst de strook naar niets.
+
+## Beheermodules in tabbladen
+
+November 2026. Grocomeet, VTK Bureau, POC's, Lesbezoeken en PAL+ waren elk
+één lange pagina met kaarten onder elkaar, of tabbladen als `?tab=`-pillen
+onder een losse titel. Ze krijgen nu dezelfde kop als Tickets en Media:
+`ModuleAdminShell` (`apps/web/components/admin/ModuleAdminShell.tsx`), met de
+pillen van `.ticket-admin-tabs`, een icoon per tabblad, en elk tabblad een
+eigen route onder de layout van de module. Een tabblad is zo te delen en te
+bookmarken, en laadt enkel wat het toont.
+
+- **Eén component voor de kop**, niet nog vijf kopieën van `MediaAdminNav`.
+  Media, de formulieren en een ticketevent hebben hun eigen nav nog; zet een
+  nieuwe module op `ModuleAdminShell`.
+- **Het werk van elke week is het eerste tabblad.** Bij Grocomeet en het
+  Bureau is dat Vergaderingen, niet de kalender: de kalender en een losse
+  vergadering toevoegen delen het tabblad Planning, omdat je die een keer per
+  semester gebruikt. Bij POC's staan de POC's met hun vertegenwoordigers eerst,
+  en de groepsadressen, de homepageband en Discord elk apart.
+- **Een vergadering heeft een eigen pagina** (`.../vergadering/<id>`), vanuit
+  een tabel met een rij per vergadering. Vroeger stond elke vergadering als
+  kaart onder elkaar met de bestellingen achter een uitklapper; met tien per
+  semester vond je die van deze week niet terug. Bovenaan die pagina staat
+  **Uit te delen**: hoeveel van elk broodje en elk drankje er mee moet, over
+  alle inschrijvingen samen en bij een GM met wat grocos zelf bij Theokot
+  bestelden. Daaronder **Per persoon**, standaard alfabetisch in twee kolommen
+  zodat de hele groep bij het uitdelen op één scherm past, en met één klik de
+  tabel met bedragen en afvinken.
+- **De "Organisaties & mails" van Lesbezoeken zijn drie tabbladen**:
+  Organisaties, Bijzonderheden en Mails. Drie kaarten onder één naam lieten je
+  zoeken naar wat je kwam aanpassen.
+- **Een oude `?tab=`-link stuurt door** naar het nieuwe tabblad (Lesbezoeken,
+  PAL+), zodat een bladwijzer blijft werken.
+- **Een teller staat in de naam van het tabblad** ("Aanvragen (3)"), berekend
+  in de layout voor het lopende werkingsjaar. Elke action van die module
+  vernieuwt de hele layout (`revalidatePath("/[locale]/admin/...", "layout")`),
+  anders blijft de teller staan.
+
+**Dit is de standaard voor elk beheerscherm (november 2026).** Na de eerste
+vijf modules volgden de homepage, openingsuren, nieuws, de header en de
+pagina's, shiften, piano, de 24 urenloop, de kalender, leden, het
+shiftenoverzicht, alumni, de mailinglijsten, rekeningen, kassa's, de online
+inkomsten, het bestuursorgaan (resultatenoverzicht, mijn budgetten met de
+budgetten op de site, de BO-mappen), Theokot (broodjes en verhuur), IT
+(configuratie, storage, logboeken, autorisatievoorbeeld, mails en schermen,
+de 24UL-app) en de deur. Een nieuw beheerscherm begint dus met een
+`layout.tsx` op `ModuleAdminShell`, ook wanneer het voorlopig maar één tabblad
+heeft: dan toont de kop enkel de titel, en het tweede tabblad past er later
+zonder ombouw bij. De regels staan in CLAUDE.md onder "Admin".
+
+- **Tabbladen in de pagina zelf zijn verdwenen.** Leden en Ereleden
+  (`?lijst=`), de tabs van Shiften in een clientcomponent, de `?tab=` van
+  Lesbezoeken, PAL+ en de verhuur, en de eigen navs van Rekeningen, Kassa's,
+  Online inkomsten en Theokot: allemaal één kop. Een verzamelbak
+  ("Instellingen" met zes kaarten bij de verhuur, "Organisaties & mails" bij
+  de lesbezoeken) werd een tabblad per taak.
+- **Wat vroeger een link of knop naast de titel was, is een tabblad** wanneer
+  het een eigen scherm is (de categorieën en Discord-webhooks van de kalender,
+  de bijnamen en de shiften op /shift in het shiftenoverzicht). Een knop die
+  iets doet ("Nieuw evenement", "Rekening indienen") blijft een knop.
+- **Een dienst per tabblad** bij de openingsuren: elke post ziet enkel haar
+  eigen dienst, en wie er maar één heeft, krijgt geen tabbalk.
+
+### Tweede ronde: wat er dubbel stond, en wat te veel plaats nam
+
+November 2026, na een week werken met de tabbladen.
+
+- **Een tabblad staat niet nog eens in de zijbalk.** IT is in de zijbalk vier
+  items: Deur, Kluisbeheer, SSO & apps en IT. Configuratie, storage, de twee
+  logboeken, het autorisatievoorbeeld, mails & schermen en de 24UL-app zijn
+  tabbladen onder IT, en stonden er ook nog als losse items naast. Hetzelfde
+  voor Verwijderverzoeken (een tabblad van Media) en Alumni (nu een tabblad van
+  Leden). Zo'n tabblad blijft wel een **verborgen item** (`hidden` in
+  `lib/admin-nav.ts`): Ctrl/Cmd+K vindt "Adminlogboek" nog, en wie het al had
+  vastgepind, houdt zijn pin. Een item dat niet in de lijst staat maar wel
+  zoekbaar is, is goedkoper dan een pin die stil verdwijnt.
+- **Wie enkel een tabblad van IT mag zien** (`audit.view`,
+  `urenloopApp.manage`), krijgt het item IT ook, en `/admin/it` stuurt hem naar
+  dat tabblad: de configuratie zelf blijft voor superadmins.
+- **Posten, werkgroepen, jaarwerkingen en de kiesploeg zijn één module**
+  ("Posten & werkgroepen", route-groep `(posten)`), met elk tabblad op zijn
+  eigen recht (`lib/postenAccess.ts`). Het zijn vier lijsten van wie in welke
+  ploeg zit; vier items in de zijbalk lieten dat lijken op vier soorten werk.
+  Het item houdt de key `groups`, zodat een pin blijft staan, en wie geen
+  posten beheert, komt via `/admin/groepen` op zijn eerste tabblad.
+- **Iemand lid maken staat op het tabblad Leden**, boven de ledenlijst, zoals
+  iemand erelid maken op het tabblad Ereleden staat. Een eigen tabblad "Lid
+  maken" naast Ereleden was ongelijk: bij het ene tabblad kon je iemand
+  toevoegen, bij het andere moest je eerst naar een derde.
+- **Header en Pagina's zijn terug twee modules.** Samen onder "Header &
+  pagina's" stonden ze twee keer: als twee items in de zijbalk en als twee
+  tabbladen onder één kop. Elk heeft zijn eigen recht, dus twee items en twee
+  koppen; de tekst bij de pagina's linkt naar de header.
+- **De standaardbanner van een evenement hoort bij de kalender**
+  (`/admin/kalender/standaardbanner`, `calendar.manageAll`), naast de banners
+  per categorie, en niet bij de homepage: ze geldt op elke eventpagina.
+- **Een evenement bewerken ziet eruit als een ticketevent**: een eigen kop met
+  "Alle evenementen", de titel, de status en de opslagknoppen, en daaronder
+  tabbladen (Algemeen, Wanneer, Beschrijving, Affiche, Doelgroep, Link, en bij
+  een bestaand evenement Interesse en Tickets). Daarom staan `[id]` en `new`
+  buiten de route-groep `(overzicht)` van de kalender. **Dit zijn knoppen in
+  één formulier en geen routes**, anders dan bij elke module: het evenement
+  slaat in één keer op, en een route per tabblad zou het in zes formulieren
+  knippen die elk apart bewaren. Alle velden blijven gemonteerd; een verplicht
+  veld op een verborgen tabblad opent dat tabblad bij het opslaan. Het
+  tabblad staat in de hash.
+- **Bovenaan de evenementenlijst staat één regel**, geen drie blokken: de
+  filter, "Nieuw evenement" en welke evenementen in de hero staan. De uitleg
+  over de hero zit achter een "i".
+- **Grocomeet en Bureau tonen enkel wat nog komt**, met "Toon voorbije (n)".
+  Wie het tabblad opent, zoekt de volgende vergadering.
+- **Een grocoschuld los je in één keer af** (Openstaand, het vinkje per
+  persoon): een groco betaalt alles samen, niet per grocomeet. Per bestelling
+  afvinken kan nog op de vergadering zelf.
+- **Een werkgroepaccount kan "niet nodig" zijn** (`WerkgroepAccountSkip`), per
+  lid en werkgroep en niet per jaar. De lijst op Aanvragen las anders als werk
+  dat nog moest gebeuren, terwijl bijna iedereen er al een had. Bestaat het
+  adres dat de site zou voorstellen al in Google, dan staat het lid als
+  "bestaat al in Google" in plaats van "geen account", en kan IT of de vice
+  het koppelen zonder een nieuw account te maken.
+- **Een shift heeft een Engelse naam, beschrijving en uitleg**, optioneel, met
+  dezelfde NL/EN-schakelaar als het evenementformulier. Leeg toont het
+  Nederlands; elke shift van daarvoor blijft dus wat ze was
+  (`lib/shift/localize.ts`).
+
+## Weekmail van de kalender
+
+Elke zaterdagavond krijgt wie de mailinglijst Evenementen aan heeft een
+overzicht van de week die komt (`lib/calendar/weekOverview*.ts`). Uit drie
+ontwerpen (een agenda per dag, één uitgelicht evenement met de rest als lijst,
+een raster van affiches) is het uitgelichte gekozen: een week heeft meestal één
+activiteit waar mensen een ticket voor moeten kopen, en die hoort de knop
+bovenaan te krijgen.
+
+- **Zaterdag vanaf 19u**, over maandag tot en met zondag. Zaterdagavond is een
+  moment waarop mensen hun week nog plannen. Lag de worker plat, dan vertrekt ze
+  zondag nog, maar nooit meer zodra de week begonnen is.
+- **Een lege week geeft geen mail.** Een mail die zegt dat er niets is, leert
+  mensen deze mail niet te openen.
+- **Bovenaan staat wat met de ster in /admin/kalender uitgelicht is**, dezelfde
+  ster als de affiches in de hero. Zonder ster het eerste evenement met tickets
+  of een inschrijving, en anders het eerste van de week. Zo kiest niemand elke
+  week met de hand, en staat er nooit een lege kop.
+- **Wat in die week begint, één keer per evenement.** Een reeks met momenten
+  staat op haar eerste moment in de week, met "Nog 2 keer deze week". Wat vóór
+  maandag begon, staat er niet in: wie het wou, zag het vorige week.
+- **Alle evenementen, ook die van Feest, Sport of Career.** De lijst Evenementen
+  is de algemene lijst; wie ook Feest aan heeft, krijgt de cantus dus in beide.
+  Wie op /account de doelgroepfilter aanzette, krijgt enkel wat hij op de
+  kalender ziet, en geen mail wanneer daarvan niets overblijft.
+- **Niet vergeten**: een publieke ticketverkoop die opent, of een inschrijving
+  bij een evenement die sluit, tussen het versturen en het einde van de week.
+  Ook wanneer het evenement zelf later valt: dat is net wat iemand mist.
+- Eén rij per lid per week in `CalendarWeekMail` is de claim, zoals bij de
+  andere kalendermails, zodat geen lid er twee krijgt wanneer de website op meer
+  dan één container draait. De worker verstuurt in rondes van 300 leden om de
+  vijf minuten.

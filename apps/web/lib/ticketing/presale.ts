@@ -41,6 +41,7 @@ export type PresaleConfig = {
   presaleLeadMinutes?: number | null;
   presalePraesidium?: boolean;
   presaleHelpers?: boolean;
+  presaleHonorary?: boolean;
   presaleGroups?: readonly { groupId: string }[];
 };
 
@@ -49,6 +50,8 @@ export type PresaleViewer = {
   groups: readonly { id: string; type: string }[];
   /** Voltooide shiften in het lopende werkingsjaar; zie `presaleViewer.ts`. */
   completedShifts?: number;
+  /** Erelid (`User.honoraryMember`); zie `presaleViewer.ts`. */
+  honorary?: boolean;
   /**
    * Volgde de private voorverkooplink van dit event (zie `presaleLink.ts`).
    * Bewust per event bepaald en niet een lijst tokens hier: de regel hoeft geen
@@ -79,8 +82,9 @@ export function presaleStart(
 }
 
 /**
- * Mag deze bezoeker in de voorverkoop? Standaard elke praesidiumpost én elke
- * vaste medewerker, plus de groepen die de beheerder er expliciet bij zette.
+ * Mag deze bezoeker in de voorverkoop? Standaard elke praesidiumpost, elke
+ * vaste medewerker en elk erelid, plus de groepen die de beheerder er
+ * expliciet bij zette.
  *
  * Die vaste medewerker staat er bewust bij. Wie dit werkingsjaar vijftien
  * shiften deed, staat even vaak achter de toog als een praesidiumlid, maar zit
@@ -96,6 +100,8 @@ export function inPresaleAudience(viewer: PresaleViewer, event: PresaleConfig): 
   // De private link is zelf het bewijs: wie hem volgde, hoort erbij, ook zonder
   // post en zonder shiften.
   if (viewer.hasPresaleLink) return true;
+  // Ereleden hebben bij de kring van oudsher voorrang, zoals een praesidiumpost.
+  if (event.presaleHonorary !== false && viewer.honorary) return true;
   if (
     event.presaleHelpers !== false &&
     (viewer.completedShifts ?? 0) >= PRESALE_SHIFT_THRESHOLD

@@ -15,7 +15,7 @@ import { postOptions, resolvePost, resolvePostKeys, splitPost } from "@/lib/bo/p
 import { findDossier, toExplorerData } from "@/lib/bo/explorer";
 import { groupByMeeting, groupDossiers, matchesFilters } from "@/lib/bo/list";
 import { buildSummary } from "@/lib/bo/summary";
-import { openResults, ownPostKeys, ownPosts } from "@/lib/bo/own";
+import { countsForBo, openResults, ownPostKeys, ownPosts } from "@/lib/bo/own";
 
 /*
  * Het overzicht van het Bestuursorgaan. De namen hieronder komen letterlijk uit
@@ -44,6 +44,10 @@ describe("bestandsnamen", () => {
     ["2026/09/07 Eetstand Wiskundeweek Begroting", { year: null, kind: "BUDGET", post: "Eetstand", activity: "Wiskundeweek" }],
     // Het soort en de post in één stuk, met twee posten.
     ["26-27_Budget Cultuur+Onthaal_Jeneverwandeling", { year: 2026, kind: "BUDGET", post: "Cultuur+Onthaal", activity: "Jeneverwandeling" }],
+    // Een potje heet Deelbudget.
+    ["26-27_Deelbudget_Cursusdienst_Teldagen", { year: 2026, kind: "BUDGET", post: "Cursusdienst", activity: "Teldagen", pot: true }],
+    ["26-27_Deelresultaat_Cursusdienst_Teldagen", { year: 2026, kind: "RESULT", post: "Cursusdienst", activity: "Teldagen", pot: true }],
+    ["Deelbudget Cursusdienst Teldagen", { year: null, kind: "BUDGET", post: "Cursusdienst", activity: "Teldagen", pot: true }],
   ])("%s", (name, expected) => {
     expect(parseDocumentName(name)).toEqual(expected);
   });
@@ -225,6 +229,14 @@ describe("posten", () => {
       "Andere jaarwerking",
     ]);
   });
+
+  it("biedt een jaarwerking als groep niet nog eens aan als post", () => {
+    // Sinds /admin/jaarwerkingen bestaat Kanweek ook als `Group`. Het BO kent ze
+    // als eigen vak (`x:kanweek`); de groep hoort niet tussen de posten.
+    const kanweek = { id: "kanweek", code: "KANWEEK", slug: "kanweek", nameNl: "Kanweek", nameEn: "Kanweek", type: "JAARWERKING" };
+    const options = postOptions([...POSTS, ...WERKGROEPEN, kanweek], true);
+    expect(options.filter((o) => o.name === "Kanweek").map((o) => o.key)).toEqual(["x:kanweek"]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -324,6 +336,24 @@ describe("bedragen uit het rekenblad", () => {
     expect(result.figures.budgetTotalCents).toBe(-33456);
     expect(result.figures.resultTotalCents).toBe(-20552);
     expect(result.figures.resultIncomeCents).toBe(16930);
+  });
+
+  it("leest een kostenpost die Totaal heet niet als het totaal van het blad", async () => {
+    // IT Nieuw Materiaal (26-27): onder Inkomsten een post "Totaal" met de
+    // kosten als plus, het echte Totaal onder Uitgaven als min.
+    const rows: XCell[][] = Array.from({ length: 30 }, () => row({}));
+    rows[0] = row({ 1: t("IT"), 6: t("Nieuw IT Materiaal") });
+    rows[3] = row({ 1: t("Overzicht"), 3: t("Budget"), 4: t("Resultaat") });
+    rows[8] = row({ 1: t("Inkomsten"), 3: n(0), 4: n(0) });
+    rows[9] = row({ 1: t("Totaal"), 3: n(234.15), 4: n(233.23) });
+    rows[15] = row({ 1: t("Uitgaven"), 3: n(234.15), 4: n(233.23) });
+    rows[17] = row({ 1: t("Totaal"), 3: n(-234.15), 4: n(-233.23) });
+    rows[18] = row({ 1: t("Begroting"), 3: n(-500), 4: n(-500) });
+    rows[19] = row({ 1: t("Verschil met begroting"), 3: n(265.85), 4: n(266.77) });
+    const result = figuresFromXlsx(await workbook([{ sheet: "BUDGET - overzicht", data: rows }]));
+    if (!("figures" in result)) throw new Error(result.error);
+    expect(result.figures).toMatchObject({ budgetTotalCents: -23415, resultTotalCents: -23323, allocationCents: -50000 });
+    expect(result.figures.lines).toEqual([{ label: "Totaal", side: "out", budgetCents: 23415, resultCents: 23323 }]);
   });
 
   it("neemt het tabblad met het overzicht, ook als er een ander voor staat", async () => {
@@ -600,6 +630,63 @@ describe("budgetten en resultaten samenleggen", () => {
     expect(overview.totals).toMatchObject({ budgets: 1, results: 1 });
   });
 
+  it("haalt de post uit de snelkoppeling wanneer het blad zelf er geen noemt", () => {
+    // Cursusdienst in BO 3 (26-27): de snelkoppeling in de BO-map heet zoals het
+    // hoort, het blad zelf is een kopie van het sjabloon.
+    const overview = buildOverview(
+      [
+        doc("Kopie van Budget sjabloon", {
+          bo: 3,
+          folderKind: "BUDGET",
+          linkName: "26-27_Budget_Cursusdienst_shiftersvoorzieningen teldagen",
+          budgetTotalCents: -12000,
+        }),
+      ],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    expect(overview.unknownPosts).toEqual([]);
+    expect(overview.posts.map((p) => p.key)).toEqual(["g:curs"]);
+    expect(overview.posts[0].dossiers[0]).toMatchObject({ activity: "shiftersvoorzieningen teldagen", budgetCents: -12000 });
+  });
+
+  it("haalt de post uit de snelkoppeling wanneer het blad een kopie van een ander budget is", () => {
+    // Een kopie van het budget van een andere post: die naam zegt iets over het
+    // blad waarvan gekopieerd werd, niet over dit.
+    const overview = buildOverview(
+      [
+        doc("Kopie van 26-27_Budget_Onthaal_Stadsspel", {
+          bo: 3,
+          folderKind: "BUDGET",
+          driveFileId: "kopie",
+          linkName: "26-27_Budget_Cursusdienst_shiftersvoorzieningen teldagen",
+          budgetTotalCents: -12000,
+        }),
+        doc("26-27_resultaat_cursusdienst_shiftersvoorzieningen_teldagen", { bo: 11, folderKind: "RESULT", resultTotalCents: -4544 }),
+      ],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    expect(overview.posts.map((p) => p.key)).toEqual(["g:curs"]);
+    expect(overview.posts[0].dossiers).toHaveLength(1);
+    expect(overview.posts[0].dossiers[0]).toMatchObject({ activity: "shiftersvoorzieningen teldagen", status: "DONE" });
+  });
+
+  it("houdt de post uit het blad wanneer de site die kent", () => {
+    const overview = buildOverview(
+      [stadsspel({ bo: 3, folderKind: "BUDGET", linkName: "26-27_Budget_Cursusdienst_Stadsspel" })],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    expect(overview.posts.map((p) => p.key)).toEqual(["g:onth"]);
+  });
+
   it("volgt de map wanneer de oude naam nergens meer staat", () => {
     // Een werkgroep hangt haar map in de BO-map: geen snelkoppeling per blad,
     // en voor de scan de nieuwe naam liest, is er ook nog geen.
@@ -680,6 +767,40 @@ describe("budgetten en resultaten samenleggen", () => {
     );
     expect(overview.posts.map((p) => p.name)).toEqual(["Cultuur"]);
     expect(overview.posts[0].dossiers[0]).toMatchObject({ overridden: true });
+  });
+
+  it("telt bij een potje dat terugkomt enkel het meest recente blad", () => {
+    const pot = (later: number) =>
+      buildOverview(
+        [
+          doc("26-27_Budget_IT_Nieuw_Materiaal", { bo: 4, budgetTotalCents: -23415, allocationCents: -50000 }),
+          doc("26-27_Resultaat_IT_Nieuw_Materiaal", { bo: 9, budgetTotalCents: -23415, resultTotalCents: -23323, allocationCents: -50000 }),
+          doc("26-27_Budget_IT_Nieuw_Materiaal", { bo: later, budgetTotalCents: -12000, allocationCents: -26677 }),
+        ],
+        POSTS,
+        new Map(),
+        2026,
+        TODAY,
+      ).posts.flatMap((p) => p.dossiers);
+
+    // Het nieuwe budget passeerde (12 september): één activiteit, die weer op
+    // een resultaat wacht, en enkel het nieuwe blad telt in de begroting.
+    const reopened = pot(12);
+    expect(reopened).toHaveLength(1);
+    expect(reopened[0]).toMatchObject({
+      status: "OPEN",
+      budgetCents: -12000,
+      resultCents: null,
+      devCents: null,
+      allocationCents: -26677,
+      begrotingDevCents: 14677,
+      overdueDays: 33,
+    });
+    expect(statsOf(reopened)).toMatchObject({ begrotingDev: 14677, begrotingCounted: 1, open: 1, done: 0 });
+
+    // Het nieuwe budget komt pas op een BO in oktober: het resultaat blijft gelden.
+    const upcoming = pot(50);
+    expect(upcoming[0]).toMatchObject({ status: "DONE", budgetCents: -23415, resultCents: -23323, devCents: 92, begrotingDevCents: 26677 });
   });
 
   it("rondt een resultaat af dat versneld door de grocomeet ging, zonder afwijking", () => {
@@ -975,6 +1096,77 @@ describe("het overzicht per post (voor de slide)", () => {
     expect(summary.werkgroepen).toMatchObject({ due: 1, done: 0, pct: 0 });
     expect(summary.lastMeeting).toBe("BO 40");
   });
+
+  it("telt per post hoe ze ervoor staat tegenover de begroting", () => {
+    const withPlan = toExplorerData(
+      buildOverview(
+        [
+          // Resultaat binnen: dat telt, niet het budget. -900 tegen -1000: +100.
+          doc("26-27_Budget_IT_Router", { bo: 5, budgetTotalCents: -95000, allocationCents: -100000 }),
+          doc("26-27_Resultaat_IT_Router", { bo: 9, resultTotalCents: -90000, allocationCents: -100000 }),
+          // Nog geen resultaat: het budget. -1200 tegen -1000: -200.
+          doc("26-27_Budget_IT_Server", { bo: 9, budgetTotalCents: -120000, allocationCents: -100000 }),
+          // Geen regel Begroting: telt niet mee.
+          doc("26-27_Budget_IT_Kabels", { bo: 9, budgetTotalCents: -5000 }),
+          // Een BO die nog moet komen: nog niet goedgekeurd, telt niet mee.
+          doc("26-27_Budget_IT_Scherm", { bo: 30, year: 2026, budgetTotalCents: -1000, allocationCents: -50000 }),
+          doc("26-27_Budget_Statix_Talks", { bo: 9, budgetTotalCents: 2000, allocationCents: 0 }),
+        ],
+        posts,
+        new Map(),
+        2026,
+        new Date(Date.UTC(2026, 8, 20)),
+        true,
+        meetings,
+      ),
+      2026,
+      new Date(Date.UTC(2026, 8, 20)),
+    );
+    const plan = buildSummary(withPlan, postOptions(posts, true));
+    const row = (name: string) => plan.sections.flatMap((s) => s.rows).find((r) => r.name === name)!;
+    expect(row("IT")).toMatchObject({ due: 3, begroting: -10000, begrotingCounted: 2 });
+    expect(row("Statix")).toMatchObject({ begroting: 2000, begrotingCounted: 1 });
+    expect(row("Sport")).toMatchObject({ begroting: null, begrotingCounted: 0 });
+    expect(plan.total).toMatchObject({ due: 4, begrotingDev: -8000, begrotingCounted: 3 });
+    expect(plan.vtk).toMatchObject({ begrotingDev: -10000 });
+    expect(plan.werkgroepen).toMatchObject({ begrotingDev: 2000 });
+    expect(plan.outOfPlan).toEqual([]);
+  });
+
+  it("laat een activiteit buiten de begroting wel meetellen in het overzicht", () => {
+    const today = new Date(Date.UTC(2026, 8, 20));
+    const withPlan = toExplorerData(
+      buildOverview(
+        [
+          doc("26-27_Budget_IT_Router", { bo: 5, budgetTotalCents: -95000, allocationCents: -100000 }),
+          // De stad betaalt: het budget staat op het resultaat, het resultaat
+          // (een ander bestand) volgt de markering van het budget.
+          doc("26-27_Budget_IT_Welkom", {
+            bo: 5,
+            budgetTotalCents: -7146793,
+            allocationCents: -7500000,
+            begrotingExcluded: { reason: "betaald door de stad" },
+          }),
+          doc("26-27_Resultaat_IT_Welkom", { bo: 9, resultTotalCents: -7000000, allocationCents: -7500000 }),
+        ],
+        posts,
+        new Map(),
+        2026,
+        today,
+        true,
+        meetings,
+      ),
+      2026,
+      today,
+    );
+    const welkom = withPlan.dossiers.find((d) => d.activity === "Welkom")!;
+    expect(welkom).toMatchObject({ status: "DONE", begrotingExcluded: { reason: "betaald door de stad" } });
+    const plan = buildSummary(withPlan, postOptions(posts, true));
+    const it = plan.sections.flatMap((s) => s.rows).find((r) => r.name === "IT")!;
+    expect(it).toMatchObject({ due: 2, done: 1, begroting: 5000, begrotingCounted: 1 });
+    expect(plan.total).toMatchObject({ begrotingDev: 5000, begrotingCounted: 1, begrotingExcluded: 1 });
+    expect(plan.outOfPlan).toEqual([{ key: welkom.key, activity: "Welkom", postName: "IT", reason: "betaald door de stad" }]);
+  });
 });
 
 describe("wat een post zelf ziet", () => {
@@ -1017,6 +1209,21 @@ describe("wat een post zelf ziet", () => {
     expect(onthaal.dossiers.some((d) => d.activity === "Toneel")).toBe(false);
   });
 
+  it("geeft een jaarwerking geen leeg blok: het BO kent haar enkel als vak", () => {
+    const own = [...ownGroups(["ONTHAAL"]), { id: "kanweek", code: "KANWEEK", slug: "kanweek", nameNl: "Kanweek", nameEn: "Kanweek", type: "JAARWERKING" }];
+    expect(ownPostKeys(own)).toEqual(ownPostKeys(ownGroups(["ONTHAAL"])));
+  });
+
+  it("toont een werkgroep enkel aan haar G3/G4, niet aan een gewoon lid", () => {
+    const werkgroep = (role: "LEAD" | "MEMBER") => ({ id: "statix", code: "STATIX", type: "WERKGROEP", role });
+    expect(ownPostKeys([werkgroep("LEAD")])).toEqual(["g:statix"]);
+    expect(ownPostKeys([werkgroep("MEMBER")])).toEqual([]);
+    // Een praesidiumpost blijft voor elk lid, ook wie er geen verantwoordelijke is.
+    expect(ownPostKeys([{ id: "onthaal", code: "ONTHAAL", type: "PRAESIDIUM", role: "MEMBER" }])).toEqual(["g:onthaal"]);
+    expect(countsForBo({ type: "WERKGROEP", role: "MEMBER" })).toBe(false);
+    expect(countsForBo({ type: "JAARWERKING", role: "LEAD" })).toBe(false);
+  });
+
   it("geeft wie in Groep 5 zit ook de vakken van Groep 5, maar enkel als er iets in zit", () => {
     const own = ownGroups(["GROEP5"]);
     expect(ownPostKeys(own)).toEqual(["g:g5", "x:praeses", "x:vice", "x:secretaris", "x:beheer"]);
@@ -1029,9 +1236,92 @@ describe("wat een post zelf ziet", () => {
 
   it("zet op het dashboard enkel de open resultaten", () => {
     const own = ownGroups(["ONTHAAL", "CULTUUR", "IT"]);
-    expect(openResults(ownPosts(data, ownPostKeys(own), own, true)).map((p) => [p.name, p.dossiers.map((d) => d.activity)])).toEqual([
+    expect(openResults(ownPosts(data, ownPostKeys(own), own, true), "2026-10-15").map((p) => [p.name, p.dossiers.map((d) => d.activity)])).toEqual([
       ["Cultuur", ["Toneel", "Jeneverwandeling"]],
       ["Onthaal", ["Outdoor theokot", "Jeneverwandeling", "Cantusconvent"]],
     ]);
+  });
+
+  it("herinnert pas aan een resultaat wanneer de activiteit voorbij is", () => {
+    const dated = toExplorerData(
+      buildOverview(
+        [
+          // Budget al op het BO, activiteit pas in november.
+          doc("26-27_Budget_Onthaal_Cantusconvent", { bo: 2, eventDate: new Date(Date.UTC(2026, 10, 20)) }),
+          // Vandaag: nog bezig.
+          doc("26-27_Budget_Onthaal_Ontbijt", { bo: 3, eventDate: new Date(Date.UTC(2026, 9, 15)) }),
+          doc("26-27_Budget_Onthaal_Stadsspel", { bo: 4, eventDate: new Date(Date.UTC(2026, 9, 1)) }),
+          // Zonder datum in het rekenblad: zoals voordien, op de BO-datum.
+          doc("26-27_Budget_Onthaal_Flyers", { bo: 5 }),
+        ],
+        POSTS,
+        new Map(),
+        2026,
+        TODAY,
+      ),
+      2026,
+      TODAY,
+    );
+    const own = ownGroups(["ONTHAAL"]);
+    const posts = ownPosts(dated, ownPostKeys(own), own, true);
+    expect(openResults(posts, "2026-10-15").flatMap((p) => p.dossiers.map((d) => d.activity)).sort()).toEqual([
+      "Flyers",
+      "Stadsspel",
+    ]);
+    // Enkel de herinnering wacht: op "Mijn budgetten" staan ze alle vier open.
+    expect(posts[0].dossiers.map((d) => d.status)).toEqual(["OPEN", "OPEN", "OPEN", "OPEN"]);
+  });
+});
+
+describe("potjes", () => {
+  it("laat een potje niet op een resultaat wachten", () => {
+    const overview = buildOverview(
+      [doc("26-27_Budget_Cursusdienst_Teldagen", { bo: 3, budgetTotalCents: -30000, allocationCents: -30000, pot: true })],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    const [dossier] = overview.posts[0].dossiers;
+    expect(dossier).toMatchObject({ status: "POT", pot: "manual", overdueDays: null });
+    expect(overview.global).toMatchObject({ due: 0, open: 0, pots: 1 });
+  });
+
+  it("herkent een potje aan Deelbudget in de naam", () => {
+    const overview = buildOverview(
+      [doc("26-27_Deelbudget_Cursusdienst_Teldagen", { bo: 3, budgetTotalCents: -30000 })],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    expect(overview.posts[0].dossiers[0]).toMatchObject({ status: "POT", pot: "name", activity: "Teldagen" });
+  });
+
+  it("telt een potje in de begroting voor het begrote bedrag, niet voor een tussentijds resultaat", () => {
+    const overview = buildOverview(
+      [
+        doc("26-27_Deelbudget_Cursusdienst_Teldagen", { bo: 3, budgetTotalCents: -25000, allocationCents: -30000 }),
+        doc("26-27_Resultaat_Cursusdienst_Teldagen", { bo: 11, resultTotalCents: -4544 }),
+      ],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    const [dossier] = overview.posts[0].dossiers;
+    expect(dossier).toMatchObject({ status: "POT", resultCents: -4544, devCents: null, begrotingDevCents: 0 });
+    expect(overview.global).toMatchObject({ begrotingDev: 0, begrotingCounted: 1, done: 0 });
+  });
+
+  it("maakt van een los resultaat geen potje", () => {
+    const overview = buildOverview(
+      [doc("26-27_Deelresultaat_Cursusdienst_Teldagen", { bo: 11, resultTotalCents: -4544 })],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    expect(overview.posts[0].dossiers[0]).toMatchObject({ status: "NO_BUDGET", pot: null });
   });
 });

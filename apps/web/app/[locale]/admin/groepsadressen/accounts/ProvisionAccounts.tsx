@@ -1,16 +1,20 @@
 "use client";
 
+import { useUnsentGuard } from "@/components/ui/unsentGuard";
 import { useActionState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Select } from "@vtk/ui";
+import { Button } from "@vtk/ui";
+import { SearchPicker } from "@/components/admin/SearchPicker";
 import { useToast } from "@/components/ui/toast";
-import { PROVISION_IDLE, createGoogleAccountsAction } from "./actions";
+import { createGoogleAccountsAction } from "./actions";
+import { PROVISION_IDLE } from "./state";
 
 export type ProvisionRow = {
   userId: string;
   name: string;
   email: string;
   alias: string | null;
+  mode: "create" | "alias";
   blocked: string | null;
 };
 
@@ -42,7 +46,8 @@ export function ProvisionAccounts({
   disabled: boolean;
 }) {
   const router = useRouter();
-  const [state, formAction, pending] = useActionState(createGoogleAccountsAction, PROVISION_IDLE);
+  const unsent = useUnsentGuard();
+  const [state, formAction, pending] = useActionState(unsent.state(createGoogleAccountsAction), PROVISION_IDLE);
   const showToast = useToast();
   const lastNonce = useRef(0);
 
@@ -53,7 +58,8 @@ export function ProvisionAccounts({
         plan: (label: string) => `Voorstel voor ${label}`,
         member: "Lid",
         address: "Adres",
-        alias: "Alias",
+        alias: "Kiesploegadres",
+        aliasOnly: "bestaand account: enkel het kiesploegadres erbij",
         create: "Geselecteerde accounts aanmaken",
         creating: "Bezig met aanmaken...",
         nothing: "Niemand die een account nodig heeft.",
@@ -63,7 +69,8 @@ export function ProvisionAccounts({
           "Deze wachtwoorden staan nergens bewaard en zijn na het verlaten van dit scherm weg. Geef ze door; bij de eerste aanmelding moet het lid zelf een nieuw wachtwoord kiezen.",
         error: "Fout",
         restrictedNote:
-          "Kiesploegaccounts komen meteen in de beperkte organisatie-eenheid terecht, met de alias als afzender en met doorsturen aan waar een adres ingevuld is.",
+          "Nieuwe kiesploegaccounts kunnen enkel ontvangen; wie in het kiesploegscherm mag mailen, kan dat enkel vanaf zijn kiesploegadres. Wie al een account heeft (bv. een praesidiumlid), krijgt geen tweede account maar enkel het kiesploegadres erbij.",
+        noPassword: "geen nieuw wachtwoord: bestaand account",
       }
     : {
         source: "For whom",
@@ -71,7 +78,8 @@ export function ProvisionAccounts({
         plan: (label: string) => `Proposal for ${label}`,
         member: "Member",
         address: "Address",
-        alias: "Alias",
+        alias: "Kiesploeg address",
+        aliasOnly: "existing account: only the kiesploeg address is added",
         create: "Create selected accounts",
         creating: "Creating...",
         nothing: "Nobody needs an account.",
@@ -81,7 +89,8 @@ export function ProvisionAccounts({
           "These passwords are stored nowhere and are gone once you leave this screen. Pass them on; the member has to pick a new one at first sign-in.",
         error: "Error",
         restrictedNote:
-          "Kiesploeg accounts land in the restricted organisational unit right away, with the alias as sender and forwarding on where an address is filled in.",
+          "New kiesploeg accounts can only receive; whoever may send (set in the kiesploeg screen) can do so only from their kiesploeg address. Someone who already has an account (a praesidium member, say) gets no second account, only the kiesploeg address.",
+        noPassword: "no new password: existing account",
       };
 
   useEffect(() => {
@@ -109,22 +118,20 @@ export function ProvisionAccounts({
 
   return (
     <div className="space-y-6">
-      <div className="w-80">
+      <div className="w-80 max-w-full">
         <label className="mb-1 block text-sm font-medium text-vtk-ink" htmlFor="provision-source">
           {t.source}
         </label>
-        <Select
+        <SearchPicker
           id="provision-source"
+          options={sources}
           value={selectedSource}
-          onChange={(e) => router.push(`${basePath}?bron=${encodeURIComponent(e.target.value)}`)}
-        >
-          <option value="">{t.choose}</option>
-          {sources.map((source) => (
-            <option key={source.value} value={source.value}>
-              {source.label}
-            </option>
-          ))}
-        </Select>
+          onChange={(value) => router.push(value ? `${basePath}?bron=${encodeURIComponent(value)}` : basePath)}
+          placeholder={t.choose}
+          searchPlaceholder={nl ? "Zoek, bv. Cultuur" : "Search, e.g. Cultuur"}
+          ariaLabel={t.source}
+          emptyText={(q) => (nl ? `Geen post of kiesploeg "${q}".` : `No post or kiesploeg "${q}".`)}
+        />
       </div>
 
       {planLabel && (
@@ -164,9 +171,11 @@ export function ProvisionAccounts({
                       <td className="px-4 py-3 font-medium text-vtk-ink">{row.name}</td>
                       <td className="px-4 py-3 text-zinc-600">
                         {row.email || "-"}
-                        {row.blocked && (
+                        {row.blocked ? (
                           <span className="block text-xs text-amber-700">{row.blocked}</span>
-                        )}
+                        ) : row.mode === "alias" ? (
+                          <span className="block text-xs text-zinc-500">{t.aliasOnly}</span>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3 text-zinc-600">{row.alias ?? "-"}</td>
                     </tr>
@@ -207,6 +216,8 @@ export function ProvisionAccounts({
                         <code className="rounded bg-vtk-blue-soft/60 px-2 py-1">
                           {account.password}
                         </code>
+                      ) : !account.error ? (
+                        <span className="text-xs text-zinc-500">{t.noPassword}</span>
                       ) : (
                         <span className="text-xs text-red-700">
                           {t.error}: {account.error}

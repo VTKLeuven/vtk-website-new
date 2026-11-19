@@ -12,8 +12,9 @@ export function kassaErrorMessages(locale: Locale): Record<string, string> {
     return {
       ...shared,
       BAD_DATE: "Niet opgeslagen: die datum bestaat niet.",
+      BAD_END_DATE: "Niet opgeslagen: de laatste dag valt voor de eerste dag van de activiteit.",
       MISSING_TIME: "Niet opgeslagen: vul het begin- en einduur van de activiteit in.",
-      BAD_TIME: "Niet opgeslagen: begin- en einduur moeten een uur zijn, en mogen niet gelijk zijn.",
+      BAD_TIME: "Niet opgeslagen: begin- en einduur moeten een uur zijn, en het einde moet na het begin vallen.",
       MISSING_TERMINAL:
         "Niet aanvaard: kies een Bancontact-bakje of Payconiq-rekening voor wat de post vroeg. Heeft ze er toch geen nodig, vink het dan uit in de aanvraag.",
       MISSING_FIELD: "Niet opgeslagen: vul de activiteit en de verantwoordelijke in.",
@@ -25,6 +26,9 @@ export function kassaErrorMessages(locale: Locale): Record<string, string> {
       BAD_STATUS: "Die status bestaat niet.",
       BAD_EMAIL: "Niet opgeslagen: dat e-mailadres klopt niet.",
       NOT_ACCEPTED: "Deze kassa is nog niet aanvaard. Aanvaard ze eerst, dan vertrekt ook de mail.",
+      NOT_COUNTED: "Geen mail verstuurd: de eindkassa is nog niet geteld en opgeslagen.",
+      NO_REQUESTER: "Geen mail verstuurd: de aanvrager heeft geen account meer. Laat het de post zelf weten.",
+      MAIL_FAILED: "De mail kon niet vertrekken. Laat het de aanvrager zelf weten.",
       ALREADY_ACCEPTED: "Deze kassa was al aanvaard; ververs de pagina.",
       NOT_FOUND: "Die kassa bestaat niet meer; ververs de pagina.",
       LOCKED: "Beheer heeft deze aanvraag al aanvaard. Wil je nog iets wijzigen, mail dan naar Beheer.",
@@ -32,14 +36,18 @@ export function kassaErrorMessages(locale: Locale): Record<string, string> {
       EMPTY_COUNT: "Niet opgeslagen: vul in hoeveel stuks er van elke munt en elk briefje in de kassa zitten. Een lege kassa tel je met een 0.",
       FUTURE_DATE: "Niet opgeslagen: die datum ligt in de toekomst.",
       OUTSIDE_WINDOW: `Niet opgeslagen: een telling geef je in binnen ${POST_COUNT_WINDOW_DAYS} dagen. Voor een oudere telling mail je Beheer.`,
-      MISSING_AMOUNT: "Niet opgeslagen: vul het bedrag in.",
+      MISSING_AMOUNT: "Niet opgeslagen: er staat nog geen bedrag, munt, briefje of bon ingevuld.",
+      CARRY_NOT_COUNTED: "Niet doorgeschoven: de eindkassa is nog niet geteld en opgeslagen.",
+      BAD_TARGET: "Niet doorgeschoven: kies een andere kassa, op dezelfde dag of later.",
+      TARGET_COUNTED: "Niet doorgeschoven: die kassa is al geteld, en haar resultaat zou mee verschuiven. Ververs de pagina.",
     };
   }
   return {
     ...shared,
     BAD_DATE: "Not saved: that date does not exist.",
+    BAD_END_DATE: "Not saved: the last day is before the first day of the activity.",
     MISSING_TIME: "Not saved: fill in the start and end time of the activity.",
-    BAD_TIME: "Not saved: start and end must be a time of day, and cannot be the same.",
+    BAD_TIME: "Not saved: start and end must be a time of day, and the end must come after the start.",
     MISSING_TERMINAL:
       "Not accepted: choose a Bancontact terminal or Payconiq account for what the post asked for. If they do not need one after all, untick it in the request.",
     MISSING_FIELD: "Not saved: fill in the activity and the person responsible.",
@@ -51,6 +59,9 @@ export function kassaErrorMessages(locale: Locale): Record<string, string> {
     BAD_STATUS: "That status does not exist.",
     BAD_EMAIL: "Not saved: that email address is not valid.",
     NOT_ACCEPTED: "This cash register has not been accepted yet. Accept it first, so the email goes out too.",
+    NOT_COUNTED: "No email sent: the closing count has not been saved yet.",
+    NO_REQUESTER: "No email sent: the requester no longer has an account. Let the post know yourself.",
+    MAIL_FAILED: "The email could not be sent. Let the requester know yourself.",
     ALREADY_ACCEPTED: "This cash register was already accepted; refresh the page.",
     NOT_FOUND: "That cash register no longer exists; refresh the page.",
     LOCKED: "Administration already accepted this request. To change anything, email Administration.",
@@ -58,6 +69,9 @@ export function kassaErrorMessages(locale: Locale): Record<string, string> {
     EMPTY_COUNT: "Not saved: fill in how many of each coin and note are in the register. Count an empty register with a 0.",
     FUTURE_DATE: "Not saved: that date is in the future.",
     OUTSIDE_WINDOW: `Not saved: enter a count within ${POST_COUNT_WINDOW_DAYS} days. For an older count, email Administration.`,
-    MISSING_AMOUNT: "Not saved: fill in the amount.",
+    MISSING_AMOUNT: "Not saved: no amount, coin, note or voucher has been filled in yet.",
+    CARRY_NOT_COUNTED: "Not carried over: the closing count has not been saved yet.",
+    BAD_TARGET: "Not carried over: choose another register, on the same day or later.",
+    TARGET_COUNTED: "Not carried over: that register has already been counted, and its result would shift. Refresh the page.",
   };
 }

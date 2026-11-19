@@ -100,6 +100,34 @@ Twee keer draaien levert geen tweede set op: het script onthoudt in de setting
 `theokot.demo.broodjes` wat het aanmaakte en gooit precies dat weg voor het
 opnieuw begint. Verkoopdagen die je zelf aanmaakte, blijven staan.
 
+## 2c. Privélinks naar een album
+
+`scripts/seed-media-share-demo.ts` zet alles klaar om de privélinks uit
+[immich-gallery.md](immich-gallery.md) ("Een album delen met een link") te
+proberen: een verborgen album "Praesidiumweekend 2026" met de tabs Zaterdag en
+Zondag (en twee verborgen foto's), vier links en een demostudent.
+
+```bash
+GALLERY_IMMICH_API_URL=http://localhost:2283/api GALLERY_IMMICH_API_KEY=<sleutel> \
+  npm run db:demo:delen
+npm run db:demo:delen -- --reset   # enkel opruimen
+```
+
+Het draait **enkel tegen een lokale databank** en heeft een werkende Immich nodig
+(zie hieronder); de foto's komen uit `infra/immich/seed/photos`. De URL's van de
+links verschijnen in de terminal. Twee keer draaien levert geen tweede set op:
+de setting `media.demo.delen` onthoudt wat het script maakte.
+
+| Link | Waarvoor |
+| --- | --- |
+| Praesidium 2026-2027 | Enkel het praesidium, tot 15 juli. Zonder sessie zie je het inlogscherm, als `student.delen@vtk.prototype` "niet met jou gedeeld", als `it@vtk.prototype` de foto's. |
+| Fotograaf (nakijken) | Iedereen met de link, een week, downloaden uit: geen knoppen om te downloaden, en de route weigert het origineel. |
+| Werkgroep Revue | Enkel werkgroep Revue. De demostudent zit erin, `it@vtk.prototype` niet. |
+| Kookploeg | Verlopen: het scherm "werkt niet meer", en gedimd in het beheer. |
+
+De demostudent is `student.delen@vtk.prototype` met wachtwoord `prototype`: geen
+post, wel lid van Revue in het lopende werkingsjaar.
+
 ## 3. Immich: albums en foto's
 
 Dev heeft een eigen Immich (`infra-immich-server-1`, poort 2283 op localhost).
@@ -131,6 +159,48 @@ photos.dev.vtk.be {
 ```
 
 Daarna `sudo systemctl reload caddy`; Caddy haalt het certificaat zelf op.
+
+## Nooit op productie
+
+De seed maakt de prototype-accounts aan (`<post>@vtk.prototype`, wachtwoord
+`prototype` uit de repo), zet ze in de posten van het werkingsjaar, en voegt
+verzonnen shiften, kalenderevents en een demoformulier toe. Op vtk.be stonden
+die mensen zo op /praesidium en kon iedereen als "praeses" aanmelden. Dat
+gebeurde meer dan eens, omdat het commando hierboven op liv precies hetzelfde
+doet als op elise.
+
+Daarom weigert `seed.ts` op productie (`packages/db/src/productionGuard.ts`),
+zonder vlag om het toch te doen. Productie herkent hij aan:
+
+- de env: `BETTER_AUTH_URL` of `VTK_MAIN_URL` wijst naar vtk.be;
+- de database: de rij `instance.environment` in `Setting` zegt `production`.
+  `prisma/sync.ts` schrijft die bij elke start op productie, zodat de seed ook
+  weigert wanneer iemand hem van een laptop tegen de productiedatabase draait.
+
+Een kopie van de productiedatabase op dev of lokaal neemt die markering mee, en
+dan weigert de seed daar ook; dat is de bedoeling, want daar staan dan echte
+leden in. Wil je er toch testdata op, verwijder die ene rij dan bewust.
+
+Wat iemand op productie van de seed leek nodig te hebben (nieuwe permissies, de
+rechten van de rol admin, de gebouwen), doet `sync.ts` al bij elke start.
+
+### Opruimen wat er toch staat
+
+`packages/db/prisma/remove-seed-data.ts` haalt de testdata van de seed en van
+de demoscripts weer weg, enkel op hun markeringen (`@vtk.prototype`,
+`seed-shift-*`, de events uit `seed-calendar-events.ts` die niemand aanmaakte,
+het demoformulier). Zonder `--apply` toont het enkel wat weg zou gaan:
+
+```bash
+docker compose -f infra/docker-compose.yml exec web sh -lc \
+  "cd /app && npx tsx packages/db/prisma/remove-seed-data.ts"
+docker compose -f infra/docker-compose.yml exec web sh -lc \
+  "cd /app && npx tsx packages/db/prisma/remove-seed-data.ts --apply"
+```
+
+Pagina's, POC's, partners, posten, rollen en het Theokot-aanbod uit de seed
+laat het staan: die kunnen op productie echt zijn. Het script noemt ze, kijk ze
+zelf na in de admin.
 
 ## Waarom dit niet automatisch bij een deploy gebeurt
 

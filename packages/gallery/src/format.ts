@@ -39,6 +39,13 @@ export function slugify(value: string): string {
 }
 
 /**
+ * Mappen naast `/media/[albumSlug]` op de site. Een album dat zo zou heten,
+ * krijgt meteen `-2`: anders wint de map en is het album onbereikbaar.
+ * `gedeeld` draagt de privélinks (`/media/gedeeld/<token>`).
+ */
+const RESERVED_SLUGS = new Set(['gedeeld']);
+
+/**
  * Twee albums met dezelfde naam mogen niet dezelfde slug krijgen; de tweede
  * wordt `-2`. De teller leeft per momentopname, zodat de slug van een album
  * niet verschuift zolang de albums ervoor niet veranderen.
@@ -48,7 +55,7 @@ export function createSlugAllocator(): (title: string) => string {
 
   return (title: string) => {
     const base = slugify(title);
-    const count = counts.get(base) || 0;
+    const count = counts.get(base) ?? (RESERVED_SLUGS.has(base) ? 1 : 0);
     counts.set(base, count + 1);
     return count === 0 ? base : `${base}-${count + 1}`;
   };
@@ -171,6 +178,35 @@ export function swapMarker(description: string | null | undefined, from: string,
   if (raw.includes(from)) return tidyDescription(raw.split(from).join(to));
   if (raw.includes(to)) return tidyDescription(raw);
   return tidyDescription(raw.trim() ? `${raw.trim()}\n\n${to}` : to);
+}
+
+/**
+ * Zet de galerijmerker van een album op `to` en haalt elke andere stand weg.
+ *
+ * `swapMarker` volstond zolang er twee standen waren. Met drie kan een album van
+ * elke stand naar elke andere, en mag er na afloop maar één merker staan: een
+ * album met `[gallery]` naast `[gallery-private]` staat gewoon in het overzicht.
+ * De nieuwe merker komt op de plaats van de eerste die er stond, zodat de rest
+ * van de beschrijving niet verschuift; stond er geen, dan komt ze achteraan.
+ */
+export function replaceVisibilityMarker(
+  description: string | null | undefined,
+  markers: readonly string[],
+  to: string,
+): string {
+  const raw = String(description || '');
+  const present = markers
+    .filter((marker) => marker && raw.includes(marker))
+    .map((marker) => ({ marker, at: raw.indexOf(marker) }))
+    .sort((left, right) => left.at - right.at);
+  if (present.length === 0) return tidyDescription(raw.trim() ? `${raw.trim()}\n\n${to}` : to);
+
+  const placeholder = '\u0000';
+  let next = raw.slice(0, present[0].at) + placeholder + raw.slice(present[0].at + present[0].marker.length);
+  for (const marker of markers) {
+    if (marker) next = next.split(marker).join('');
+  }
+  return tidyDescription(next.replace(placeholder, to));
 }
 
 export function stripMarkers(description: string | null | undefined, markers: string[]): string {

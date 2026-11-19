@@ -1,5 +1,5 @@
 import { immichConfig } from './config';
-import type { ImmichAsset, ImmichSearchResponse } from './types';
+import type { ImmichAsset, ImmichSearchResponse, ImmichSharedLink } from './types';
 
 /** Fout van de Immich-laag, met de HTTP-status die de route moet teruggeven. */
 export class GalleryError extends Error {
@@ -164,6 +164,15 @@ export async function uploadImmichAsset({
   form.set('visibility', visibility);
 
   return immichJson<{ id?: string; status?: string }>('/assets', { method: 'POST', body: form });
+}
+
+/**
+ * De gegevens van één asset: naam en soort. Nodig voor een verborgen foto, die
+ * in geen album meer zit en dus niet in een albumlijst staat; haar rij in de
+ * databank bewaart geen naam.
+ */
+export async function getImmichAsset(assetId: string): Promise<ImmichAsset> {
+  return immichJson<ImmichAsset>(`/assets/${encodeURIComponent(assetId)}`);
 }
 
 export async function downloadImmichOriginal(assetId: string): Promise<Response> {
@@ -334,6 +343,38 @@ export async function updateImmichAlbum(
  */
 export async function deleteImmichAlbum(albumId: string): Promise<unknown> {
   return immichJson<unknown>(`/albums/${encodeURIComponent(albumId)}`, { method: 'DELETE' });
+}
+
+/**
+ * Verwijdert de gedeelde albumlinks van Immich voor één album, en geeft terug
+ * hoeveel het er waren.
+ *
+ * Een album op de site krijgt zo'n link van de momentopname, en de sleutel staat
+ * in elke foto-URL op /media/<slug>. Wie die sleutel kent, opent op de
+ * fotoproxy (`/share/<sleutel>`) het hele album, ook nadat het van de site
+ * gehaald is. Verbergen roept dit dus aan; wie het album terugzet, krijgt van de
+ * momentopname een nieuwe link met een nieuwe sleutel. Enkel links van het type
+ * ALBUM: een link voor één foto hoort niet bij het album.
+ */
+export async function deleteImmichAlbumSharedLinks(albumId: string): Promise<number> {
+  const links = await immichJson<ImmichSharedLink[]>(`/shared-links?albumId=${encodeURIComponent(albumId)}`);
+  const own = (links || []).filter(
+    (link) => link.type === 'ALBUM' && (link.album?.id === albumId || link.albumId === albumId),
+  );
+  for (const link of own) {
+    // Geen `immichJson`: Immich antwoordt hier met een lege body, en die is geen JSON.
+    const response = await immichRequest(`/shared-links/${encodeURIComponent(link.id)}`, { method: 'DELETE' });
+    if (!response.ok && response.status !== 404) {
+      const body = await readErrorBody(response);
+      throw new GalleryError(
+        response.status,
+        errorMessage(body, `Immich shared link delete failed with HTTP ${response.status}`),
+        'immich_shared_link_delete_failed',
+        body,
+      );
+    }
+  }
+  return own.length;
 }
 
 /**

@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useTransition } from "react";
 import { setPalPlusBackingAction } from "@/app/actions/palPlus";
 import { useToast } from "@/components/ui/toast";
@@ -42,7 +43,8 @@ export function BackingButton({
     data.set("requestId", requestId);
     data.set("intent", backed ? "unback" : "back");
     startTransition(async () => {
-      const result = await setPalPlusBackingAction(data);
+      const result = await unsentGuard.run(() => setPalPlusBackingAction(data));
+      if (result === UNSENT) return;
       if (result.status === "error") {
         showToast({
           message: copy.errors[result.code] ?? copy.fallbackError,

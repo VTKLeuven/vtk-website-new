@@ -9,6 +9,13 @@ import type { CalendarView } from '@/lib/calendar/viewCookie';
  */
 export const AGENDA_WEEKS = 4;
 
+/**
+ * Hoeveel dagen het affichesraster vanaf vandaag minstens vooruitkijkt. Zonder
+ * dit stond er op het einde van een maand bijna niets, terwijl de evenementen
+ * van volgende week gewoon gepland zijn.
+ */
+export const GRID_LOOKAHEAD_DAYS = 14;
+
 export type GridDay = {
   date: Date;
   inMonth: boolean;
@@ -43,6 +50,26 @@ export function monthWeekDays(year: number, monthIndex: number): Date[] {
   for (let index = 0; index < cells.length; index += 7) {
     const week = cells.slice(index, index + 7);
     if (week.some((cell) => cell.inMonth)) days.push(...week.map((cell) => cell.date));
+  }
+  return days;
+}
+
+/**
+ * De dagen die het affichesraster voor deze maand toont: de weken van de maand,
+ * en in de maand van vandaag ook de weken die nodig zijn om de komende
+ * `GRID_LOOKAHEAD_DAYS` dagen te tonen. Altijd hele weken, om dezelfde reden als
+ * bij `monthWeekDays`. Een andere maand blijft precies haar eigen weken.
+ */
+export function posterGridDays(year: number, monthIndex: number, now: Date): Date[] {
+  const days = monthWeekDays(year, monthIndex);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (today < days[0]! || today > days.at(-1)!) return days;
+  const horizon = new Date(today.getFullYear(), today.getMonth(), today.getDate() + GRID_LOOKAHEAD_DAYS);
+  while (days.at(-1)! < horizon) {
+    const last = days.at(-1)!;
+    for (let offset = 1; offset <= 7; offset++) {
+      days.push(new Date(last.getFullYear(), last.getMonth(), last.getDate() + offset));
+    }
   }
   return days;
 }
@@ -103,7 +130,7 @@ export function dayRange(days: Date[]): { start: Date; end: Date } {
 
 /**
  * Het bereik dat de kalender bij het openen toont, in de weergave waarin hij
- * opent: het maandraster rond `now` voor het affichesraster (de standaard), de
+ * opent: de weken die het affichesraster rond `now` toont (de standaard), de
  * vier weken vanaf deze week voor de agenda, en deze week voor de week. De
  * pagina haalt precies dit bereik al op de server op, zodat de eerste HTML de
  * evenementen al bevat; de browser rekent met dezelfde functies.
@@ -111,7 +138,7 @@ export function dayRange(days: Date[]): { start: Date; end: Date } {
 export function openingRange(now: Date, view: CalendarView = 'grid'): { start: Date; end: Date } {
   if (view === 'week') return dayRange(weekGridDays(now));
   if (view === 'agenda') return dayRange(rollingWeeksGridCells(now, AGENDA_WEEKS).map((cell) => cell.date));
-  return dayRange(monthGridCells(now.getFullYear(), now.getMonth()).map((cell) => cell.date));
+  return dayRange(posterGridDays(now.getFullYear(), now.getMonth(), now));
 }
 
 /**

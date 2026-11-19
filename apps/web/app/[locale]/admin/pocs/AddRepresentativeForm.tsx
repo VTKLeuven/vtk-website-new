@@ -1,5 +1,6 @@
 "use client";
 
+import { unsentGuard } from "@/components/ui/unsentGuard";
 import { useEffect, useState } from "react";
 import { Button, Input } from "@vtk/ui";
 import { addPocRepresentativeAction } from "@/app/actions/pocs-partners";
@@ -58,7 +59,7 @@ export function AddRepresentativeForm({
 
   return (
     <form
-      action={addPocRepresentativeAction}
+      action={unsentGuard.form(addPocRepresentativeAction)}
       onSubmit={(e) => {
         if (!selected) {
           e.preventDefault();

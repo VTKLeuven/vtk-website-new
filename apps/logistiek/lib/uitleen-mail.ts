@@ -13,7 +13,12 @@ import {
   type NotifyKind,
   type TripHandoverOutcome,
 } from './uitleen';
-import { getLogistiekSettings, groupLeads, groupMailAddress } from './uitleen-server';
+import {
+  getLogistiekSettings,
+  groupLeads,
+  groupMailAddress,
+  teamEditsForTransport,
+} from './uitleen-server';
 import type { LogistiekLocale } from './i18n-shared';
 import { logistiekBaseUrl } from './payments';
 
@@ -317,6 +322,7 @@ export async function notifyTransport(
       where: { id: { in: bookingIds } },
       orderBy: { startAt: 'asc' },
       select: {
+        id: true,
         userId: true,
         plannedByTeam: true,
         purpose: true,
@@ -363,9 +369,30 @@ export async function notifyTransport(
 
     const reason = event === 'REJECTED' ? note ?? first.adminNote : note;
 
+    // Bij het goedkeuren: wat Logistiek aan de aanvraag veranderde, bovenaan en
+    // niet verstopt in de lijst met uren (F6.11). Anders leest het lid een
+    // goedkeuring met andere uren zonder te merken dat ze anders zijn.
+    // Heen en terug (of twee voertuigen) zijn één aanvraag: de regels van alle
+    // ritten samen, zonder dubbels.
+    const teamChanges =
+      event === 'APPROVED'
+        ? [
+            ...new Set(
+              [...(await teamEditsForTransport(bookings)).values()].flat()
+            ),
+          ]
+        : [];
+    const changesBlock =
+      teamChanges.length > 0
+        ? `${nl ? 'Logistiek paste je aanvraag aan:' : 'Logistics changed your request:'}\n${teamChanges
+            .map((line) => `- ${line}`)
+            .join('\n')}`
+        : null;
+
     const text = joinBlocks([
       nl ? `Dag ${recipient.name},` : `Hi ${recipient.name},`,
       words.lead,
+      changesBlock,
       `${nl ? 'Rit' : 'Trip'}: ${first.purpose}`,
       trips,
       detailBlock(reason, event, recipient.locale),

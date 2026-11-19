@@ -1,4 +1,5 @@
 import { apiFetch, ApiError, baseUrl } from '../api/client';
+import { clearManifests } from '../scanner/storage';
 import { clearCache } from '../storage';
 import type { AppViewer } from '../api/contract';
 
@@ -57,7 +58,9 @@ function pathOf(url: string): string {
 
 /**
  * Uitloggen op de server; het cookie verdwijnt daarmee ook uit de WebView. De
- * leescache gaat mee weg, want die hoort bij het account dat net vertrok.
+ * leescache gaat mee weg, want die hoort bij het account dat net vertrok, en de
+ * manifesten van de scanner ook: dat zijn namenlijsten die bij zijn scanrechten
+ * hoorden. De wachtrij van de scanner blijft staan (zie `scanner/storage.ts`).
  */
 export async function signOut(): Promise<void> {
   try {
@@ -67,6 +70,7 @@ export async function signOut(): Promise<void> {
     if (!(error instanceof ApiError)) console.warn('Uitloggen mislukte', error);
   }
   clearCache();
+  clearManifests();
 }
 
 /** Welke poort er nu openstaat, of `null` wanneer alles in orde is. */

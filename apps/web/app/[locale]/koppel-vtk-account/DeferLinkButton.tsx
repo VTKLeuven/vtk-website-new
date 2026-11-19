@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { Button } from "@vtk/ui";
 import { deferGoogleLinkAction } from "@/app/actions/googleLink";
+import { unsentGuard } from "@/components/ui/unsentGuard";
 
 /**
  * De uitweg voor wie nog geen `@vtk.be`-account heeft.
@@ -27,7 +28,7 @@ export function DeferLinkButton({
         variant="ghost"
         size="sm"
         disabled={pending}
-        onClick={() => startTransition(() => deferGoogleLinkAction(home))}
+        onClick={() => startTransition(() => unsentGuard.form(deferGoogleLinkAction)(home))}
       >
         {label}
       </Button>

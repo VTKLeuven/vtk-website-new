@@ -26,6 +26,7 @@ import {
   calendarRange,
   isCurrentPeriod,
   parseCalendarView,
+  parseDaysCount,
   shiftAnchor,
   type CalendarView,
 } from '@/lib/calendar-range';
@@ -39,6 +40,8 @@ import {
   eventsInRange,
   getLogistiekSettings,
   selectableEvents,
+  seriesPositions,
+  teamEditsForTransport,
   transportAuditLogsByBooking,
   tripNotesFor,
   transportRange,
@@ -89,8 +92,9 @@ function endOfDay(moment: Date): Date {
 }
 
 /** De kop boven de kalender: "Week 36", "september 2026" of de dag zelf. */
-function periodTitle(view: CalendarView, anchor: Date): string {
+function periodTitle(view: CalendarView, anchor: Date, count: number): string {
   if (view === 'dag') return formatDateOnly(anchor);
+  if (view === 'dagen') return `Komende ${count} dagen`;
   if (view === 'maand') return monthFormatter.format(anchor);
   return `Week ${isoWeekNumber(anchor)}`;
 }
@@ -102,6 +106,7 @@ export default async function VervoerWeekPage({
     weergave?: string;
     datum?: string;
     week?: string;
+    aantal?: string;
     voertuig?: string;
     chauffeur?: string;
     status?: string;
@@ -113,11 +118,12 @@ export default async function VervoerWeekPage({
   const { weergave, datum, week } = query;
 
   const view = parseCalendarView(weergave);
+  const daysCount = parseDaysCount(query.aantal);
   const filters = parseTransportFilters(query);
   // `?week=` is de oude parameter van het weekoverzicht; links en bladwijzers uit
   // die tijd blijven werken in plaats van op deze week uit te komen.
   const anchor = (datum && parseDateOnly(datum)) || (week && parseDateOnly(week)) || todayDateOnly();
-  const { days, from, to } = calendarRange(view, anchor);
+  const { days, from, to } = calendarRange(view, anchor, daysCount);
 
   const [
     bookings,
@@ -182,6 +188,10 @@ export default async function VervoerWeekPage({
   // waar dit teamlid zelf bij hoort, want daar leest hij ook de nota's die enkel
   // voor de post bedoeld zijn: dan ís het zijn post.
   const viewer = { userId: session.user.id, groupIds: session.groups.map((group) => group.id) };
+  const teamEdits = await teamEditsForTransport(
+    bookings.map((booking) => ({ id: booking.id, userId: booking.userId }))
+  );
+  const seriesPlaces = await seriesPositions(bookings);
   const notesPerTrip = await tripNotesFor(
     bookings.map((booking) => booking.id),
     {
@@ -196,8 +206,8 @@ export default async function VervoerWeekPage({
   const filterQuery = new URLSearchParams(filtersToQuery(filters)).toString();
   const hrefFor = (target: Date) =>
     `/beheer/vervoer/week?weergave=${view}&datum=${toDateInputValue(target)}${
-      filterQuery ? `&${filterQuery}` : ''
-    }`;
+      view === 'dagen' ? `&aantal=${daysCount}` : ''
+    }${filterQuery ? `&${filterQuery}` : ''}`;
 
   const blocks: TripBlock[] = bookings.map((booking) => ({
     id: booking.id,
@@ -301,6 +311,8 @@ export default async function VervoerWeekPage({
       deleteDescription: transportDeleteDescription(legs),
       history: history.get(booking.id) ?? [],
       notes: notesPerTrip.get(booking.id) ?? [],
+      teamChanges: teamEdits.get(booking.id) ?? [],
+      series: seriesPlaces.get(booking.id) ?? null,
       legs: legs
         .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
         .map((leg) => ({
@@ -344,7 +356,7 @@ export default async function VervoerWeekPage({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
-            {periodTitle(view, anchor)}
+            {periodTitle(view, anchor, daysCount)}
           </h2>
           <p className="text-sm text-vtk-muted">
             {view === 'dag'
@@ -396,6 +408,7 @@ export default async function VervoerWeekPage({
             id: vehicle.id,
             name: vehicle.nameNl,
             needsVanDriver: vehicle.needsVanDriver,
+            needsDriver: vehicle.needsDriver,
           }))}
         groups={groups.map((group) => ({ id: group.id, name: group.nameNl }))}
         handoverNotify={settings.tripHandover.mode}
@@ -446,11 +459,11 @@ export default async function VervoerWeekPage({
           };
         })}
         nav={{
-          previousHref: hrefFor(shiftAnchor(view, anchor, -1)),
-          nextHref: hrefFor(shiftAnchor(view, anchor, 1)),
+          previousHref: hrefFor(shiftAnchor(view, anchor, -1, daysCount)),
+          nextHref: hrefFor(shiftAnchor(view, anchor, 1, daysCount)),
           todayHref: hrefFor(todayDateOnly()),
           isToday: isCurrentPeriod(view, anchor),
-          label: view,
+          label: view === 'dagen' ? `${daysCount} dagen` : view,
         }}
       />
     </div>

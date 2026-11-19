@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import Link from "@/components/ui/Link";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ConfirmDialog } from "@vtk/ui";
@@ -131,6 +132,8 @@ export function DashboardTiles({
   // Re-sync from the server whenever the props change (after a revalidation),
   // unless the user is mid-drag.
   const dragging = useRef<string | null>(null);
+  // De volgorde van voor het slepen, om naar terug te keren als ze niet bewaard raakt.
+  const dragStartList = useRef<EffectiveTile[] | null>(null);
   const signature = tiles
     .map((x) => `${x.key}:${x.order}:${x.hidden}:${x.label}:${x.icon}:${x.color}:${x.imageKey}:${x.url}`)
     .join("|");
@@ -173,15 +176,25 @@ export function DashboardTiles({
     return map;
   }, [sections]);
 
-  function persistLayout(next: EffectiveTile[]) {
+  /**
+   * Elke wijziging staat al in beeld voor de server antwoordt. Bereikt ze de
+   * server niet (`unsentGuard`), dan zet dit de lijst terug zoals ze was:
+   * anders toont het dashboard iets wat niet bewaard is.
+   */
+  function persist(before: EffectiveTile[], call: () => Promise<unknown>) {
     startTransition(async () => {
-      await saveDashboardLayoutAction(buildLayout(next));
+      if ((await unsentGuard.run(call)) === UNSENT) setList(before);
     });
+  }
+
+  function persistLayout(next: EffectiveTile[], before: EffectiveTile[]) {
+    persist(before, () => saveDashboardLayoutAction(buildLayout(next)));
   }
 
   // --- drag & drop reordering (edit mode only) ---
   function onDragStart(key: string) {
     dragging.current = key;
+    dragStartList.current = listRef.current;
   }
   function onDragEnter(targetKey: string) {
     const fromKey = dragging.current;
@@ -199,31 +212,32 @@ export function DashboardTiles({
   }
   function onDragEnd() {
     dragging.current = null;
-    persistLayout(listRef.current);
+    persistLayout(listRef.current, dragStartList.current ?? listRef.current);
+    dragStartList.current = null;
   }
 
   function toggleHidden(tile: EffectiveTile) {
     const next = list.map((x) => (x.key === tile.key ? { ...x, hidden: !x.hidden } : x));
     setList(next);
-    persistLayout(next);
+    persistLayout(next, list);
   }
 
   function removeTile(tile: EffectiveTile) {
+    const before = list;
     setList((cur) => cur.filter((x) => x.key !== tile.key));
-    startTransition(async () => {
-      await deletePersonalTileAction(tile.tileId);
-    });
+    persist(before, () => deletePersonalTileAction(tile.tileId));
   }
 
   function resetTile(tile: EffectiveTile) {
     startTransition(async () => {
-      await resetSharedTileAction(tile.tileId);
+      await unsentGuard.run(() => resetSharedTileAction(tile.tileId));
     });
   }
 
   function resetLayout() {
     startTransition(async () => {
-      await resetLayoutAction();
+      // Ook niet verstuurd sluit de bevestiging: de melding zegt wat er gebeurde.
+      await unsentGuard.run(() => resetLayoutAction());
       setResetting(false);
     });
   }
@@ -391,12 +405,12 @@ export function DashboardTiles({
                 hidden: false,
                 overridden: false,
               };
+              const before = list;
               setList((cur) => [...cur, optimisticTile]);
-              startTransition(async () => {
-                await addPersonalTileAction(data);
-              });
+              persist(before, () => addPersonalTileAction(data));
             } else if (editor.tile.source === "personal") {
               const tileId = editor.tile.tileId;
+              const before = list;
               setList((cur) =>
                 cur.map((t) =>
                   t.key === editor.tile.key
@@ -411,11 +425,10 @@ export function DashboardTiles({
                     : t
                 )
               );
-              startTransition(async () => {
-                await updatePersonalTileAction({ ...data, id: tileId });
-              });
+              persist(before, () => updatePersonalTileAction({ ...data, id: tileId }));
             } else {
               const tileId = editor.tile.tileId;
+              const before = list;
               setList((cur) =>
                 cur.map((t) =>
                   t.key === editor.tile.key
@@ -431,9 +444,7 @@ export function DashboardTiles({
                     : t
                 )
               );
-              startTransition(async () => {
-                await overrideSharedTileAction({ ...data, tileId });
-              });
+              persist(before, () => overrideSharedTileAction({ ...data, tileId }));
             }
             setEditor(null);
           }}

@@ -52,12 +52,22 @@ export default async function NewEventPage({
     )
   ).some(Boolean);
 
+  // De groep staat standaard op je eigen groep, en blijft aan te passen: eerst
+  // je praesidiumpost, dan een werkgroep, dan een jaarwerking, en binnen
+  // hetzelfde soort in de volgorde van het praesidium. Zonder eigen groep
+  // (een superadmin die nergens in zit) blijft het veld leeg.
+  const typeRank = { PRAESIDIUM: 0, WERKGROEP: 1, JAARWERKING: 2 } as const;
+  const ownType = new Map(session.groups.map((g) => [g.id, typeRank[g.type]]));
+  const defaultGroupId = groups
+    .filter((g) => ownType.has(g.id))
+    .sort((a, b) => ownType.get(a.id)! - ownType.get(b.id)!)[0]?.id;
+
   // Geen <h1> hier: de titel staat in de meescrollende kop van het formulier,
   // samen met de status en de opslagknoppen.
   return (
     <div className="space-y-4">
       <EventForm
-        event={{}}
+        event={{ groupId: defaultGroupId }}
         groups={groups}
         categories={categories}
         locale={locale}

@@ -48,7 +48,7 @@ export default async function RekeningBewerken({
   if (!canEdit(access, expense)) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-semibold">{nl ? "Rekening bewerken" : "Edit expense"}</h1>
+        <h2 className="text-lg font-semibold">{nl ? "Rekening bewerken" : "Edit expense"}</h2>
         <p className="max-w-5xl rounded-2xl border border-vtk-blue/12 bg-white p-5 text-sm text-[#34405e]">
           {(expense.paymentMethod === "PERSONAL" && expense.paidAt) || expense.sentAt || expense.bookedAt
             ? nl
@@ -102,7 +102,7 @@ export default async function RekeningBewerken({
         >
           {nl ? "← Terug naar de lijst" : "← Back to the list"}
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold">{nl ? "Rekening bewerken" : "Edit expense"}</h1>
+        <h2 className="mt-2 text-lg font-semibold">{nl ? "Rekening bewerken" : "Edit expense"}</h2>
         <p className="mt-1 max-w-5xl text-sm text-[#5c667f]">
           {nl
             ? "Laat je het bonnetje ongemoeid, dan blijft het huidige staan. Kies je een nieuw bestand, dan vervangt het het oude en wordt dat uit de opslag gewist."

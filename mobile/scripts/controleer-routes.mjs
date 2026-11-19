@@ -125,8 +125,21 @@ const indexSchermen = {};
   }
 }
 
-/** Adressen die met opzet buiten de tab liggen: de tabs zelf en de modals. */
-const BUITEN = new Set(['/', '/kalender', '/studeren', '/tickets', '/meer', '/inloggen', '/instellingen', '/poort']);
+/**
+ * Adressen die met opzet buiten de tab liggen: de tabs zelf, de modals, en de
+ * scanner aan de deur, die als volledig scherm over de tabbalk ligt.
+ */
+const BUITEN = new Set([
+  '/',
+  '/kalender',
+  '/studeren',
+  '/tickets',
+  '/meer',
+  '/inloggen',
+  '/instellingen',
+  '/poort',
+  '/scan/*',
+]);
 
 /** De adressen die één scherm duwt, genormaliseerd. */
 function duwtNaar(scherm) {

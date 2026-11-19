@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { RewardCoins } from "@/components/shift/RewardCoins";
 import Link from "@/components/ui/Link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
@@ -215,7 +216,13 @@ export function ShiftManage({
                 <td className="px-4 py-2 text-vtk-muted">
                   {s.participants.length}/{s.maxParticipants}
                 </td>
-                <td className="px-4 py-2 text-vtk-muted">{s.reward}</td>
+                <td className="px-4 py-2">
+                  <RewardCoins
+                    amount={s.reward}
+                    size="sm"
+                    label={nl ? `${s.reward} ${s.reward === 1 ? "bonnetje" : "bonnetjes"}` : `${s.reward} ${s.reward === 1 ? "voucher" : "vouchers"}`}
+                  />
+                </td>
               </tr>
             ))}
             {rows.length === 0 && (

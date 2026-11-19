@@ -1,4 +1,3 @@
-import Link from "@/components/ui/Link";
 import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
@@ -7,11 +6,18 @@ import { getDictionary, type Locale } from "@vtk/i18n";
 import { publicUrl } from "@/lib/storage";
 import { saveErrorMessages } from "@/lib/saveMessages";
 import { STUDY_PROGRAMMES } from "@/lib/profile";
-import { formatWorkingYear, parseWorkingYear, workingYearTabs } from "@/lib/workingYear";
-import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
+import { parseWorkingYear } from "@/lib/workingYear";
+import { discordGuildConfigured } from "@/lib/discord/bot";
 import { PocsTable, type PocRow } from "./PocsTable";
-import { PocBandAdminCard } from "./PocBandAdminCard";
+import { PocYearTabs } from "./PocYearTabs";
 
+/**
+ * Tabblad POC's: de POC's en hun vertegenwoordigers van één werkingsjaar.
+ *
+ * Niets van Discord hier: dat zijn aanroepen over het net, en ze hielden het
+ * laden van de hele pagina op. De rollen komen pas wanneer je een POC
+ * openklapt; het koppelbericht staat op het tabblad Discord.
+ */
 export default async function AdminPocs({
   params,
   searchParams,
@@ -30,31 +36,19 @@ export default async function AdminPocs({
 
   const year = parseWorkingYear(jaar);
 
-  // Enkel de POC's + hun vertegenwoordigers van het geselecteerde werkingsjaar;
-  // de user-picker zoekt server-side (/api/users/search).
-  const [pocs, distinctYears, pocBandSettingRow] = await Promise.all([
-    prisma.poc.findMany({
-      orderBy: { order: "asc" },
-      include: {
-        representatives: {
-          where: { year },
-          orderBy: { order: "asc" },
-          include: { user: true },
-        },
+  // Enkel de vertegenwoordigers van het geselecteerde werkingsjaar; de
+  // user-picker zoekt server-side (/api/users/search).
+  const pocs = await prisma.poc.findMany({
+    orderBy: { order: "asc" },
+    include: {
+      discordRoles: { select: { roleId: true, studyYears: true } },
+      representatives: {
+        where: { year },
+        orderBy: { order: "asc" },
+        include: { user: true },
       },
-    }),
-    prisma.pocRepresentative.findMany({
-      distinct: ["year"],
-      select: { year: true },
-    }),
-    prisma.setting.findUnique({
-      where: { key: POC_BAND_SETTING },
-    }),
-  ]);
-
-  const pocBandSetting = readPocBandSetting(pocBandSettingRow?.value);
-
-  const tabs = workingYearTabs(distinctYears.map((r) => r.year));
+    },
+  });
 
   const pocRows: PocRow[] = pocs.map((poc) => {
     const reps = poc.representatives.map((r) => ({
@@ -79,6 +73,7 @@ export default async function AdminPocs({
       email: poc.email ?? "",
       order: poc.order,
       studyProgrammes: poc.studyProgrammes,
+      discordRoles: poc.discordRoles,
       reps,
       searchText,
     };
@@ -106,39 +101,8 @@ export default async function AdminPocs({
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">{nl ? "POC's" : "POCs"}</h1>
-        <p className="mt-1 text-sm text-[#5c667f]">
-          {nl
-            ? "Aanspreekpunten per studierichting. Klik een POC open om de vertegenwoordigers te beheren. Vertegenwoordigers gelden per werkingsjaar."
-            : "Points of contact per study track. Open a POC to manage its representatives. Representatives apply per working year."}
-        </p>
-      </div>
-
-      <PocBandAdminCard setting={pocBandSetting} locale={locale} />
-
-      {/* Werkingsjaar-tabjes */}
-      <div className="flex flex-wrap gap-2">
-        {tabs.map((y) => {
-          const active = y === year;
-          return (
-            <Link
-              key={y}
-              href={`${base}/admin/pocs?jaar=${y}`}
-              className={
-                "rounded-full border px-4 py-1.5 text-sm font-medium transition " +
-                (active
-                  ? "border-vtk-ink bg-vtk-ink text-white"
-                  : "border-vtk-blue/20 bg-white text-vtk-ink hover:bg-vtk-blue-soft/50")
-              }
-            >
-              {formatWorkingYear(y)}
-            </Link>
-          );
-        })}
-      </div>
-
+    <div className="space-y-5">
+      <PocYearTabs year={year} href={(y) => `${base}/admin/pocs?jaar=${y}`} />
       <PocsTable
         pocs={pocRows}
         year={year}
@@ -146,6 +110,7 @@ export default async function AdminPocs({
         saveLabels={saveLabels}
         createLabels={createLabels}
         programmeOptions={programmeOptions}
+        discordEnabled={discordGuildConfigured()}
       />
     </div>
   );

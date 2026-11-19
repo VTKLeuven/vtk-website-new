@@ -46,6 +46,7 @@ export default async function AdminPages({
 
   const session = await requireAnyPermission(["pages.edit", "pages.editAll"]);
   const canEditAll = hasPermission(session, "pages.editAll");
+  const canManageHeader = hasPermission(session, "pages.manage");
   const host = publicRequestHost(await headers(), "vtk.be");
 
   const q = (sp.q ?? "").trim();
@@ -182,11 +183,20 @@ export default async function AdminPages({
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold">{nl ? "Pagina's" : "Pages"}</h1>
         <p className="mt-1 text-sm text-[#5c667f]">
+          {nl ? "De inhoud van deze pagina's mag jij bewerken. Slug, categorie en publicatie beheer je " : "You can edit the content of these pages. Slug, category and publication are managed "}
+          {canManageHeader ? (
+            <Link href={`${base}/admin/header`} className="font-medium text-vtk-ink underline underline-offset-2">
+              {nl ? "in de header" : "in the header"}
+            </Link>
+          ) : nl ? (
+            "in de header"
+          ) : (
+            "in the header"
+          )}
           {nl
-            ? "De inhoud van deze pagina's mag jij bewerken. Slug, categorie en publicatie beheer je via Header. De categorie van een pagina is gekoppeld aan de header; enkel groco's kunnen die aanpassen onder het tabblad Header."
-            : "You can edit the content of these pages. Slug, category and publication are managed via Header. A page's category is linked to the header; only GroCos can change it under the Header tab."}
+            ? "; enkel groco's kunnen de categorie van een pagina aanpassen."
+            : "; only GroCos can change a page's category."}
         </p>
       </div>
 

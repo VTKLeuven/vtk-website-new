@@ -1,5 +1,6 @@
 "use client";
 
+import { unsentGuard, UNSENT } from "@/components/ui/unsentGuard";
 import { audienceSelectOptions } from "./AudienceOptions";
 import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import { poolSellableCapacity, poolTaken } from "@/lib/ticketing/seats";
@@ -753,6 +754,7 @@ export function TicketTypeManager({
     dragFrom.current = null;
     setOverIndex(null);
     if (from === null || from === to) return;
+    const before = items;
     const next = [...items];
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
@@ -762,7 +764,8 @@ export function TicketTypeManager({
       fd.set("eventId", eventId);
       fd.set("locale", locale);
       for (const t of next) fd.append("ids", t.id);
-      await reorderTicketTypesAction(fd);
+      // Niet bewaard: de oude volgorde terug, anders toont de lijst een andere dan de shop.
+      if ((await unsentGuard.run(() => reorderTicketTypesAction(fd))) === UNSENT) setItems(before);
     });
   }
 
@@ -1044,7 +1047,7 @@ export function TicketTypeManager({
                       blijft naar zijn type wijzen. */}
                   <div className="ticket-admin-row-actions">
                     {ticketType.active ? (
-                      <form action={archiveTicketTypeAction}>
+                      <form action={unsentGuard.form(archiveTicketTypeAction)}>
                         <input type="hidden" name="locale" value={locale} />
                         <input type="hidden" name="eventId" value={eventId} />
                         <input type="hidden" name="ticketTypeId" value={ticketType.id} />

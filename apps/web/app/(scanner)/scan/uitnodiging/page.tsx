@@ -77,11 +77,12 @@ export default async function ScannerInvitePage({
       <Link className="scanner-invite-primary" href={`/scan/${event.id}`}>
         <ScanLine size={18} aria-hidden="true" /> Scannen
       </Link>
-      {/* Wie de app heeft, komt hiermee meteen in het juiste event; wie ze niet
-          heeft, gebruikt gewoon de knop hierboven. Het event staat sowieso in de
-          lijst van de app, want dat volgt uit de toekenning die net gemaakt is. */}
-      <a className="scanner-invite-secondary" href={`vtk-scanner://scan/${event.id}`}>
-        <Smartphone size={16} aria-hidden="true" /> Open in de VTK Scanner-app
+      {/* Wie de VTK-app heeft, komt hiermee meteen in de scanner van dit event;
+          wie ze niet heeft, gebruikt gewoon de knop hierboven. Het event staat
+          sowieso onder Aan de deur in de app, want dat volgt uit de toekenning die
+          net gemaakt is. */}
+      <a className="scanner-invite-secondary" href={`vtk://scan/${event.id}`}>
+        <Smartphone size={16} aria-hidden="true" /> Open in de VTK-app
       </a>
     </main>
   );

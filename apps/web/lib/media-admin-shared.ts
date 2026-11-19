@@ -28,5 +28,23 @@ export function adminThumbnailUrl(assetId: string): string {
   return `/api/admin/immich-gallery/assets/${encodeURIComponent(assetId)}/thumbnail`;
 }
 
+/**
+ * Het hele album als zip: alle tabs, ook van een verborgen album. Een gewone
+ * link, zodat de browser het bestand zelf wegschrijft zonder het in het
+ * geheugen te laden; zie de route zelf.
+ */
+export function albumZipUrl(albumId: string): string {
+  return `/api/admin/immich-gallery/albums/${encodeURIComponent(albumId)}/download`;
+}
+
+/**
+ * Het origineel van één foto van een album, ook een verborgen foto of een foto
+ * van een verborgen album. Het album zit in het adres: de route controleert dat
+ * de foto er bij hoort.
+ */
+export function photoDownloadUrl(albumId: string, assetId: string): string {
+  return `/api/admin/immich-gallery/albums/${encodeURIComponent(albumId)}/photos/${encodeURIComponent(assetId)}/download`;
+}
+
 /** Hoeveel foto's het albumscherm in één keer toont, en per klik op "meer". */
 export const PHOTO_PAGE_SIZE = 96;

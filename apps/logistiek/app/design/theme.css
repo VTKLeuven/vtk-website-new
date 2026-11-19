@@ -68,6 +68,16 @@
   --yellow-dark: #edbd22;
   --on-yellow: #0a0f1f; /* tekst op geel, in beide modi donker */
 
+  /* De knop "Route in Google Maps" op /ritten draagt de kleur van Google Maps,
+     zodat je ze herkent als de knop die de kaart-app opent. Enkel daar. */
+  --maps: #1a73e8;
+  --maps-hover: #1765cc;
+  --on-maps: #ffffff;
+  /* Het groen van Google Sheets, op het icoon van een sheet-link in de lading
+     (`components/linked-text.tsx`). Enkel daar. */
+  --sheets: #188038;
+  --on-sheets: #ffffff;
+
   /* --- Statuskleuren ---------------------------------------------------- */
   /* Drie per status: de tekstkleur, het zachte vlak eronder en de rand. Eén hex
      met een alfa volstaat niet: rood op 10% over wit is roze, over bijna zwart
@@ -159,7 +169,33 @@
   --driver-22: #ded9cd;
   --driver-23: #d8dde6;
   --driver-24: #d6dcd8;
+  /* Middentonen (F6.7): enkel te kiezen, nooit uit de hash. */
+  --driver-25: #f59aa1;
+  --driver-26: #f2a07c;
+  --driver-27: #e1ad63;
+  --driver-28: #c2bb64;
+  --driver-29: #99c77f;
+  --driver-30: #6ccea6;
+  --driver-31: #4fcdcd;
+  --driver-32: #5ec6ec;
+  --driver-33: #87bafd;
+  --driver-34: #b0adfb;
+  --driver-35: #d2a2e8;
+  --driver-36: #ea9bc7;
+  --driver-37: #d67d5e;
+  --driver-38: #5dad70;
+  --driver-39: #639be1;
+  --driver-40: #c27cbb;
   --driver-none: #e2e6ee;
+  /* De grenzen van de schuiven bij een eigen kleur (`customColorCss` in
+     lib/driver-colors.ts). `l0` is de zachtste vulling, `l1` de krachtigste;
+     `c-max` is hoe levendig 100% mag zijn. Lager dan 0.70 bij `l1` (donkerder)
+     zakt de tekst onder 4.5:1 met de arcering eroverheen, en `test/driver-colors.test.ts`
+     rekent dat na over het hele kleurenwiel; pas ze dus nooit zonder die test
+     aan. In de donkere modus staan ze omgekeerd: zacht is daar het donkerst. */
+  --driver-l0: 0.94;
+  --driver-l1: 0.7;
+  --driver-c-max: 0.13;
   --driver-ink: #0a0f1f; /* tekst in een blok */
   --driver-edge: rgba(14, 26, 54, 0.45); /* streepjesrand "nog geen chauffeur" */
   --driver-pattern: rgba(14, 26, 54, 0.13); /* arcering per voertuig */
@@ -210,6 +246,13 @@
   --yellow: #ffd23f;
   --yellow-dark: #edbd22;
   --on-yellow: #0a0f1f;
+
+  /* Het lichtere blauw dat Google Maps zelf in het donker gebruikt. */
+  --maps: #8ab4f8;
+  --maps-hover: #aecbfa;
+  --on-maps: #0a0f1f;
+  --sheets: #81c995;
+  --on-sheets: #0a0f1f;
 
   /* --- Statuskleuren ---------------------------------------------------- */
   --danger: #ff9d9d;
@@ -284,7 +327,27 @@
   --driver-22: #5a5038;
   --driver-23: #2c374a;
   --driver-24: #395944;
+  /* Middentonen (F6.7), in het donker net iets lichter dan de 24 hierboven. */
+  --driver-25: #76363d;
+  --driver-26: #743b1f;
+  --driver-27: #694500;
+  --driver-28: #554f00;
+  --driver-29: #375822;
+  --driver-30: #005c41;
+  --driver-31: #005b5c;
+  --driver-32: #005672;
+  --driver-33: #284e7d;
+  --driver-34: #49457c;
+  --driver-35: #5f3d6f;
+  --driver-36: #6f3758;
+  --driver-37: #632914;
+  --driver-38: #0d4a22;
+  --driver-39: #183d6b;
+  --driver-40: #572953;
   --driver-none: #262c38;
+  --driver-l0: 0.26;
+  --driver-l1: 0.36;
+  --driver-c-max: 0.11;
   --driver-ink: #f2f6ff;
   --driver-edge: rgba(255, 255, 255, 0.45);
   --driver-pattern: rgba(255, 255, 255, 0.16);
@@ -332,6 +395,10 @@
     --danger-fill: #ffffff;
     --warn-fill: #ffffff;
     --driver-ink: #000000;
+    /* Een eigen kleur drukt licht af, net als de zwarte tekst erop verwacht. */
+    --driver-l0: 0.94;
+    --driver-l1: 0.7;
+    --driver-c-max: 0.13;
     /* De statusstreep blijft ook op papier zichtbaar; ze zegt of een moment nog
        kan vrijkomen, en dat is precies wat er op een afgedrukte week toe doet. */
     --driver-requested: #000000;

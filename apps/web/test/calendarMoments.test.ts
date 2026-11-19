@@ -1,14 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  eventAsOfNow,
+  eventForMoment,
   hasUpcomingMoment,
   leadMoment,
   momentDayParts,
+  momentDescription,
   momentStrip,
   momentStripRest,
   momentsEnvelope,
   momentsSummary,
   nextOccurrenceAt,
   sharedMomentTime,
+  upcomingMoment,
 } from "@/lib/calendar/moments";
 
 /**
@@ -116,6 +120,57 @@ describe("the next occurrence of an event", () => {
     const gala = { start: new Date("2026-10-21T20:00:00+02:00") };
     expect(nextOccurrenceAt(gala, now)).toEqual(gala.start);
     expect(hasUpcomingMoment(gala, now)).toBe(true);
+  });
+});
+
+describe("what a moment can override", () => {
+  const event = { location: "De Baarr", imageKey: "images/general.jpg", imageFocusX: 0.2, imageFocusY: 0.3 };
+  const first = { ...moment("12", "20:30", "21:30"), location: "Sportkot" };
+  const second = {
+    ...moment("19", "20:30", "21:30"),
+    imageKey: "images/second.jpg",
+    imageFocusX: 0.9,
+    imageFocusY: 0.8,
+  };
+  const series = { ...event, moments: [first, second] };
+
+  it("takes the poster and location of the next moment, and switches once it is over", () => {
+    expect(eventAsOfNow(series, new Date("2026-10-10T09:00:00Z"))).toMatchObject({
+      location: "Sportkot",
+      imageKey: "images/general.jpg",
+      imageFocusX: 0.2,
+    });
+    // Tijdens het loopje blijft het nog over dat loopje gaan.
+    expect(eventAsOfNow(series, new Date("2026-10-12T19:00:00Z")).location).toBe("Sportkot");
+    expect(eventAsOfNow(series, new Date("2026-10-13T09:00:00Z"))).toMatchObject({
+      location: "De Baarr",
+      imageKey: "images/second.jpg",
+      imageFocusX: 0.9,
+      imageFocusY: 0.8,
+    });
+  });
+
+  it("goes back to the event once the whole series is over", () => {
+    const after = new Date("2026-11-01T09:00:00Z");
+    expect(upcomingMoment(series.moments, after)).toBeNull();
+    expect(eventAsOfNow(series, after)).toMatchObject({
+      location: "De Baarr",
+      imageKey: "images/general.jpg",
+    });
+  });
+
+  it("leaves an event without moments alone", () => {
+    expect(eventAsOfNow(event, NOW)).toEqual(event);
+  });
+
+  it("treats a blank location as not filled in", () => {
+    expect(eventForMoment(event, { location: "   " }).location).toBe("De Baarr");
+  });
+
+  it("falls back to Dutch when a moment has no English text", () => {
+    expect(momentDescription({ descriptionNl: "Tekst", descriptionEn: "  " }, "en")).toBe("Tekst");
+    expect(momentDescription({ descriptionNl: "Tekst", descriptionEn: "Text" }, "en")).toBe("Text");
+    expect(momentDescription({}, "nl")).toBe("");
   });
 });
 
@@ -231,6 +286,28 @@ describe("the calendar feed for an event with moments", () => {
       "SUMMARY:Loopweek",
       "SUMMARY:Loopweek",
       "SUMMARY:Loopweek: Nachtloop",
+    ]);
+  });
+
+  it("gives each appointment its own start location and text, above the general text", async () => {
+    findMany.mockResolvedValue([
+      {
+        ...event,
+        descriptionNl: "Voor iedereen.",
+        moments: [
+          { ...moment("12", "18:00", "19:00"), location: "De Baarr", descriptionNl: "Rustig tempo." },
+          moment("13", "18:00", "19:00"),
+        ],
+      },
+    ]);
+    const feed = lines(await buildFeed({ kind: "all" }, "nl", NOW));
+    expect(feed.filter((line) => line.startsWith("LOCATION:"))).toEqual([
+      "LOCATION:De Baarr",
+      "LOCATION:Sportkot",
+    ]);
+    expect(feed.filter((line) => line.startsWith("DESCRIPTION:") && line.includes("iedereen"))).toEqual([
+      "DESCRIPTION:Rustig tempo.\\n\\nVoor iedereen.",
+      "DESCRIPTION:Voor iedereen.",
     ]);
   });
 

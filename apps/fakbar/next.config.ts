@@ -14,6 +14,10 @@ const nextConfig: NextConfig = {
   // the production declarations.
   typescript: {
     tsconfigPath: process.env.NODE_ENV === "production" ? "tsconfig.build.json" : "tsconfig.json",
+    // Enkel in de Docker-build (infra/docker/*.Dockerfile): daar zou de typecheck
+    // dubbel gebeuren, want de job "Types and lint" doet ze al en een deploy
+    // schakelt pas om als die groen is. Lokaal en in CI blijft ze aan.
+    ignoreBuildErrors: process.env.VTK_SKIP_BUILD_TYPECHECK === "1",
   },
   // Een dev-server die je over het netwerk opent (LAN, Tailscale, tunnel) moet
   // hier staan. Anders weigert Next de HMR-websocket en hydrateert de pagina
@@ -35,6 +39,16 @@ const nextConfig: NextConfig = {
           ...(process.env.NODE_ENV === "production"
             ? [{ key: "Strict-Transport-Security", value: "max-age=31536000" }]
             : []),
+        ],
+      },
+      // Zelfde minimale CSP als apps/web/next.config.ts; de uitleg staat daar.
+      {
+        source: "/((?!api/)(?!.*\\.pdf$).*)",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: "base-uri 'self'; object-src 'none'; frame-ancestors 'self'",
+          },
         ],
       },
     ];

@@ -2,7 +2,7 @@ import { pick } from "@vtk/i18n";
 
 import { corsPreflight } from "@/lib/cors";
 import { listImmichGalleryAlbums } from "@/lib/immich-gallery";
-import { getMediaContent } from "@/lib/media-content";
+import { getMediaContent, type MediaPublication } from "@/lib/media-content";
 import { publicUrl } from "@/lib/storage";
 import { videoEmbed } from "@/lib/videoEmbed";
 import { appLocaleFrom, type AppMedia } from "@/lib/app-api/contract";
@@ -41,6 +41,7 @@ export async function GET(request: Request) {
         date: album.date,
         photoCount: album.photoCount,
         coverUrl: absoluteUrl(request, album.coverPhoto?.thumbnailUrl ?? null),
+        coverPreviewUrl: absoluteUrl(request, album.coverPhoto?.previewUrl ?? null),
       })),
 
       aftermovies: media.videos
@@ -52,36 +53,53 @@ export async function GET(request: Request) {
               id: video.id,
               title: pick(video.titleNl, video.titleEn ?? video.titleNl, locale),
               externalUrl: embed.externalUrl,
-              posterUrl: embed.posterUrl ?? null,
+              // `videoEmbed` geeft een pad op onze eigen proxy terug
+              // (`/api/video-thumbnail`); de app heeft een volledig adres nodig.
+              posterUrl: absoluteUrl(request, embed.posterUrl ?? null),
             },
           ];
         }),
 
-      publications: media.publications.map((publication) => ({
-        id: publication.id,
-        // De titel plus het nummer, want "Bakske" alleen zegt niet welk nummer je
-        // openslaat en dat is precies wat iemand in een lijst zoekt.
-        title: [
-          pick(publication.titleNl, publication.titleEn ?? publication.titleNl, locale),
-          pick(publication.issueNl, publication.issueEn ?? publication.issueNl, locale),
-        ]
-          .filter(Boolean)
-          .join(" "),
-        kind: publication.kind,
-        coverUrl: null,
-        // Een magazine staat ofwel bij ons in de opslag, ofwel op een extern
-        // adres; `absoluteUrl` handelt allebei af.
-        url: absoluteUrl(
-          request,
-          publication.storageKey ? publicUrl(publication.storageKey) : (publication.pdfUrl ?? null),
-        ),
-      })),
+      // Nieuwste eerst, zoals de plank op /media: de app zet het eerste nummer
+      // van elk blad vooraan en de rest in de rij met eerdere nummers.
+      publications: [...media.publications].sort(newestFirst).map((publication) => {
+        const issue = pick(publication.issueNl, publication.issueEn ?? publication.issueNl, locale);
+        return {
+          id: publication.id,
+          // De titel plus het nummer, want "Bakske" alleen zegt niet welk nummer
+          // je openslaat. Een app van na november 2026 toont `issue` apart.
+          title: [pick(publication.titleNl, publication.titleEn ?? publication.titleNl, locale), issue]
+            .filter(Boolean)
+            .join(" "),
+          kind: publication.kind,
+          // Bladzijde 1, bewaard bij het uploaden (zie lib/magazineCover.ts).
+          coverUrl: absoluteUrl(request, publicUrl(publication.coverKey)),
+          // Een magazine staat ofwel bij ons in de opslag, ofwel op een extern
+          // adres; `absoluteUrl` handelt allebei af.
+          url: absoluteUrl(
+            request,
+            publication.storageKey ? publicUrl(publication.storageKey) : (publication.pdfUrl ?? null),
+          ),
+          issue: issue || null,
+          publishedAt: publication.publishedAt ?? null,
+        };
+      }),
     };
 
     return appJson(request, payload);
   } catch (error) {
     return appErrorResponse(request, error);
   }
+}
+
+/** Op `publishedAt`, nieuwste eerst; een nummer zonder datum achteraan. */
+function newestFirst(left: MediaPublication, right: MediaPublication): number {
+  const a = left.publishedAt ? Date.parse(left.publishedAt) : Number.NaN;
+  const b = right.publishedAt ? Date.parse(right.publishedAt) : Number.NaN;
+  if (Number.isFinite(a) && Number.isFinite(b)) return b - a;
+  if (Number.isFinite(a)) return -1;
+  if (Number.isFinite(b)) return 1;
+  return 0;
 }
 
 export function OPTIONS(request: Request) {

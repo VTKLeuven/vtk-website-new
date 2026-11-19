@@ -31,33 +31,31 @@ jobs:
           # Vraag alle check-runs op via de GitHub API voor deze commit
           CHECKS_JSON=$(gh api "repos/${{ github.repository }}/commits/$COMMIT_SHA/check-runs")
 
-          # We vereisen dat 'Types, lint and tests' en 'Production build and browser smoke' beide geslaagd zijn.
+          # We vereisen dat types/lint, de tests en 'Production build and browser smoke' geslaagd zijn.
           # Bij eventuele retries nemen we per job de meest recente run (max_by(.id)).
-          CHECK_RESULT=$(echo "$CHECKS_JSON" | jq -r '
-            [ .check_runs[]? | select(.name == "Types, lint and tests" or .name == "Production build and browser smoke") ]
-            | group_by(.name)
-            | map(max_by(.id)) as $latest
-            | {
-                types_lint_tests: ($latest[]? | select(.name == "Types, lint and tests") | {status, conclusion}),
-                build_smoke: ($latest[]? | select(.name == "Production build and browser smoke") | {status, conclusion})
-              }
-          ')
+          # Sinds november 2026 zijn types/lint en de tests twee aparte checks;
+          # een oudere commit heeft nog de samengevoegde "Types, lint and tests".
+          # Per naam telt de laatste run.
+          latest() {
+            echo "$CHECKS_JSON" | jq -r --arg name "$1" '
+              [ .check_runs[]? | select(.name == $name) ] | max_by(.id) // {}
+              | "\(.status // "")/\(.conclusion // "")"'
+          }
+          TYPES="$(latest "Types and lint")"
+          TESTS="$(latest "Unit and integration tests")"
+          LEGACY="$(latest "Types, lint and tests")"
+          BUILD="$(latest "Production build and browser smoke")"
 
-          TYPES_STATUS=$(echo "$CHECK_RESULT" | jq -r '.types_lint_tests.status // empty')
-          TYPES_CONCLUSION=$(echo "$CHECK_RESULT" | jq -r '.types_lint_tests.conclusion // empty')
-          BUILD_STATUS=$(echo "$CHECK_RESULT" | jq -r '.build_smoke.status // empty')
-          BUILD_CONCLUSION=$(echo "$CHECK_RESULT" | jq -r '.build_smoke.conclusion // empty')
+          echo "Types and lint: $TYPES"
+          echo "Unit and integration tests: $TESTS"
+          echo "Types, lint and tests (oud): $LEGACY"
+          echo "Production build and browser smoke: $BUILD"
 
-          echo "Status 'Types, lint and tests': status='$TYPES_STATUS', conclusion='$TYPES_CONCLUSION'"
-          echo "Status 'Production build and browser smoke': status='$BUILD_STATUS', conclusion='$BUILD_CONCLUSION'"
-
-          if [ "$TYPES_STATUS" = "completed" ] && [ "$TYPES_CONCLUSION" = "success" ] && \
-             [ "$BUILD_STATUS" = "completed" ] && [ "$BUILD_CONCLUSION" = "success" ]; then
-            echo "✅ Alle vereiste tests ('Types, lint and tests' en 'Production build and browser smoke') zijn geslaagd voor commit $COMMIT_SHA."
+          ok=completed/success
+          if { { [ "$TYPES" = "$ok" ] && [ "$TESTS" = "$ok" ]; } || [ "$LEGACY" = "$ok" ]; } && [ "$BUILD" = "$ok" ]; then
+            echo "✅ Alle vereiste checks zijn geslaagd voor commit $COMMIT_SHA."
           else
             echo "::error::Productie-deployment geblokkeerd! Commit $COMMIT_SHA is nog niet geslaagd voor alle vereiste checks op main."
-            echo " - 'Types, lint and tests': status='$TYPES_STATUS', conclusion='$TYPES_CONCLUSION'"
-            echo " - 'Production build and browser smoke': status='$BUILD_STATUS', conclusion='$BUILD_CONCLUSION'"
             echo ""
             echo "Zorg ervoor dat de checks op main groen zijn voordat je naar productie deployt."
             exit 1

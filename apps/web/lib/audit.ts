@@ -59,6 +59,7 @@ export const AUDIT_ENTITIES = {
   post: { nl: "Post", en: "Post", group: "users" },
   postTask: { nl: "Taak van een post", en: "Post task", group: "users" },
   werkgroep: { nl: "Werkgroep", en: "Werkgroep", group: "users" },
+  jaarwerking: { nl: "Jaarwerking", en: "Yearly event", group: "users" },
   poc: { nl: "POC", en: "POC", group: "users" },
   role: { nl: "Rol", en: "Role", group: "roles" },
   rolePermission: { nl: "Rolrecht", en: "Role permission", group: "roles" },
@@ -78,12 +79,14 @@ export const AUDIT_ENTITIES = {
   shortLink: { nl: "Verkorte link", en: "Short link", group: "shortlinks" },
   media: { nl: "Mediapagina", en: "Media page", group: "media" },
   photoAlbum: { nl: "Fotoalbum", en: "Photo album", group: "media" },
+  photoAlbumShareLink: { nl: "Privélink naar een album", en: "Private album link", group: "media" },
   dashboardTile: { nl: "Dashboardtegel", en: "Dashboard tile", group: "dashboard" },
 
   // Evenementen
   calendarEvent: { nl: "Evenement", en: "Event", group: "calendar" },
   calendarCategory: { nl: "Kalendercategorie", en: "Calendar category", group: "calendar" },
   discordWebhook: { nl: "Discord-webhook", en: "Discord webhook", group: "calendar" },
+  pocPoll: { nl: "POC-peiling", en: "POC poll", group: "users" },
   ticketEvent: { nl: "Ticketevenement", en: "Ticket event", group: "tickets" },
   ticketType: { nl: "Tickettype", en: "Ticket type", group: "tickets" },
   ticketQuestion: { nl: "Ticketvraag", en: "Ticket question", group: "tickets" },
@@ -152,9 +155,12 @@ export const AUDIT_ENTITIES = {
   boSettings: { nl: "Instelling Bestuursorgaan", en: "Board meeting setting", group: "bestuursorgaan" },
   boPostAlias: { nl: "Postnaam in BO-bestanden", en: "Post name in board files", group: "bestuursorgaan" },
   boDocument: { nl: "Budget of resultaat", en: "Budget or result", group: "bestuursorgaan" },
+  boBudget: { nl: "Budget op de site", en: "Budget on the site", group: "bestuursorgaan" },
   vaultItem: { nl: "Kluiswachtwoord", en: "Vault password", group: "vault" },
   mailGroup: { nl: "Groepsadres", en: "Group address", group: "google" },
+  mailGroupCategory: { nl: "Categorie van groepsadressen", en: "Group address category", group: "google" },
   kiesploeg: { nl: "Kiesploeg", en: "Kiesploeg", group: "google" },
+  werkgroepAccount: { nl: "Werkgroepaccount", en: "Work group account", group: "google" },
   vaultPost: { nl: "Kluiskoppeling", en: "Vault link", group: "vault" },
   vaultAccess: { nl: "Kluistoegang", en: "Vault access", group: "vault" },
 
@@ -167,6 +173,7 @@ export const AUDIT_ENTITIES = {
   urenloopDownload: { nl: "24UL-app downloadlijst", en: "24UL app download list", group: "it" },
   appPush: { nl: "Pushbericht", en: "Push notification", group: "it" },
   websiteFeedback: { nl: "Websitefeedback", en: "Website feedback", group: "it" },
+  storageCleanup: { nl: "Opruiming van de bucket", en: "Storage cleanup", group: "it" },
 } as const;
 
 export type AuditEntity = keyof typeof AUDIT_ENTITIES;

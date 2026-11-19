@@ -1,5 +1,6 @@
 "use client";
 
+import { unsentGuard } from "@/components/ui/unsentGuard";
 import Image from "next/image";
 import Link from "@/components/ui/Link";
 import { usePathname } from "next/navigation";
@@ -340,7 +341,7 @@ export function ProfileMenu({
               </button>
             </form>
           ) : (
-            <form action={logoutAction}>
+            <form action={unsentGuard.form(logoutAction)}>
               <button type="submit" className={`${itemClass} text-left`} role="menuitem" tabIndex={-1}>
                 {labels.logout}
               </button>

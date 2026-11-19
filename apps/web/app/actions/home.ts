@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { prisma } from "@vtk/db";
 import { deleteObject } from "@vtk/storage";
 import { requirePermission } from "@/lib/session";
@@ -18,6 +18,9 @@ import {
   SHIFTS_BAND_SETTING,
   type ShiftsBandSetting,
 } from "@/lib/home/shiftBand";
+import { HERO_DESIGN_SETTING, parseHeroDesignForm } from "@/lib/home/heroDesign";
+import { HOURS_LAYOUT_SETTING, isHoursLayout, type HoursLayoutSetting } from "@/lib/home/hoursLayout";
+import { SITE_CONTENT_TAG } from "@/lib/cachedContent";
 
 /** Tekstveld uit het formulier: leeg betekent "terug naar de standaardzin". */
 function readOptionalText(formData: FormData, name: string): string | null {
@@ -95,7 +98,9 @@ export async function saveDefaultEventImageAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  await requirePermission("home.edit");
+  // Een instelling van de kalender (/admin/kalender/standaardbanner), net als
+  // de banners per categorie: wie alle evenementen beheert.
+  await requirePermission("calendar.manageAll");
   const image = readImageField(formData);
   if (image.kind === "invalid") return saveError("INVALID_INPUT");
 
@@ -129,7 +134,7 @@ export async function saveDefaultEventImageAction(
 
   // Elke eventpagina en de homepage kunnen deze foto tonen.
   revalidatePath("/", "layout");
-  revalidatePath("/admin/home");
+  revalidatePath("/[locale]/admin/kalender/standaardbanner", "page");
   return saveOk();
 }
 
@@ -258,6 +263,63 @@ export async function saveHomeShiftsBandAction(
     target: "Shiften-band",
     summary: visible ? "ingeschakeld" : "uitgeschakeld",
   });
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/home");
+  return saveOk();
+}
+
+/** Hoe de openingsurenband eruitziet: week in strepen of zonder kader. */
+export async function saveHomeHoursLayoutAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requirePermission("home.edit");
+  const layout = formData.get("layout");
+  if (!isHoursLayout(layout)) return saveError("INVALID_INPUT");
+  const value: HoursLayoutSetting = { layout };
+  await prisma.setting.upsert({
+    where: { key: HOURS_LAYOUT_SETTING },
+    update: { value },
+    create: { key: HOURS_LAYOUT_SETTING, value },
+  });
+  await logAudit({
+    action: "update",
+    entity: "home",
+    target: "Openingsuren",
+    summary: layout === "strips" ? "week in strepen" : "zonder kader",
+  });
+  // De homepage leest dit uit de gedeelde cache, zoals de hero.
+  updateTag(SITE_CONTENT_TAG);
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/home");
+  return saveOk();
+}
+
+/** Het design van de hero: het huidige, of het constructielogo met zijn opties. */
+export async function saveHomeHeroDesignAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requirePermission("home.edit");
+  const value = parseHeroDesignForm(formData);
+  if (!value) return saveError("INVALID_INPUT");
+  await prisma.setting.upsert({
+    where: { key: HERO_DESIGN_SETTING },
+    update: { value },
+    create: { key: HERO_DESIGN_SETTING, value },
+  });
+  await logAudit({
+    action: "update",
+    entity: "home",
+    target: "Hero",
+    summary:
+      value.design === "construction"
+        ? `constructielogo (${value.layout}, ${value.fill}, ${value.lineWeight}, ${value.lineStrength}%, patroon ${value.pattern ? "aan" : "uit"})`
+        : value.design,
+  });
+  // De homepage leest dit uit de gedeelde cache; zonder dit duurt het tot een
+  // minuut voor wie net wisselde het resultaat ziet.
+  updateTag(SITE_CONTENT_TAG);
   revalidatePath("/", "layout");
   revalidatePath("/admin/home");
   return saveOk();

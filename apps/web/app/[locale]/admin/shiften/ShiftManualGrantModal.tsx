@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useEffect, useState } from "react";
 import type { Locale } from "@vtk/i18n";
 import { Button, FormError, Input, Label, Select } from "@vtk/ui";
@@ -115,7 +116,7 @@ export function ShiftManualGrantModal({
     setBusy(true);
     setError(null);
 
-    const res = await grantManualShiftsAction({
+    const res = await unsentGuard.run(() => grantManualShiftsAction({
       userId: selectedUser.id,
       count: deduct ? -parsedCount : parsedCount,
       post: post === "" ? null : post,
@@ -123,9 +124,9 @@ export function ShiftManualGrantModal({
       reason: reason.trim(),
       reward: parsedReward,
       payedOut: deduct ? true : payedOut,
-    });
-
+    }));
     setBusy(false);
+    if (res === UNSENT) return;
 
     if (res.success) {
       showToast({

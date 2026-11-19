@@ -231,6 +231,15 @@ export function VanRequestForm({
         ok: Boolean(purpose.trim()),
         message: en ? 'Describe what the trip is for.' : 'Beschrijf waarvoor de rit dient.',
       },
+      // Het vakje "Maak hier een nieuw evenement van" gebruikt de naam hieronder; zonder
+      // naam deed het stil niets en leek de knop stuk (F6.14).
+      {
+        name: 'eventName',
+        ok: !eventLink.createEvent || Boolean(eventName.trim()),
+        message: en
+          ? 'Name the event, or untick "Create a new event for this".'
+          : 'Geef het evenement een naam, of vink "Maak hier een nieuw evenement van" uit.',
+      },
     ]);
     setMissing(missingField);
     if (missingField) {
@@ -259,7 +268,7 @@ export function VanRequestForm({
       });
       if (result.ok) {
         draft.clear();
-        router.push('/reservaties?aangevraagd=1');
+        router.push(result.eventCreated ? '/reservaties?aangevraagd=1&evenement=1' : '/reservaties?aangevraagd=1');
       } else {
         setError(result.error);
       }
@@ -313,6 +322,7 @@ export function VanRequestForm({
             onChange={chooseEvent}
             locale={locale}
             newEventName={eventName}
+            nameFieldBelow
           />
         </div>
       ) : null}
@@ -487,7 +497,14 @@ export function VanRequestForm({
         ) : (
           <label className="grid gap-1 text-sm sm:col-span-2">
             <span className="font-medium text-vtk-ink">{en ? 'Event (optional)' : 'Evenement (optioneel)'}</span>
-            <input type="text" value={eventName} onChange={(e) => setEventName(e.target.value)} className={inputClass} />
+            <input
+              type="text"
+              value={eventName}
+              onChange={(e) => setEventName(e.target.value)}
+              data-field="eventName"
+              aria-invalid={missing?.name === 'eventName'}
+              className={fieldClass(inputClass, 'eventName', missing)}
+            />
           </label>
         )}
         <label className="grid gap-1 text-sm">

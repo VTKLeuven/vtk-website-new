@@ -31,6 +31,7 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
       date: album.date,
       photoCount: album.photoCount,
       coverUrl: absoluteUrl(request, album.coverPhoto?.thumbnailUrl ?? null),
+      coverPreviewUrl: absoluteUrl(request, album.coverPhoto?.previewUrl ?? null),
       photos: album.photos.map((photo) => ({
         id: photo.id,
         url: absoluteUrl(request, photo.previewUrl) as string,

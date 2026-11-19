@@ -1,0 +1,1033 @@
+/*
+ * "Mijn ritten" (/ritten), zie app/ritten/trips-agenda.tsx.
+ *
+ * Enkel tokens uit app/design/theme.css: deze pagina staat net zo goed in de
+ * donkere modus op de telefoon van een chauffeur in een kelder. `--emphasis` is
+ * daar licht, dus een volle knop is `--emphasis` met `--on-emphasis` erop.
+ *
+ * De smalle stand hangt aan de breedte van de lijst zelf (container query) en
+ * niet aan het venster, zodat ze ook klopt naast de zijbalk van het beheer.
+ */
+
+.trips {
+  container: trips / inline-size;
+  display: grid;
+  gap: 22px;
+}
+
+/* --- Een rit die nog een chauffeur zoekt -------------------------------- */
+.trips-alert {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 14px;
+  padding: 12px 14px 12px 12px;
+  border: 1px solid var(--warn-line);
+  border-radius: 16px;
+  background: var(--warn-soft);
+}
+
+.trips-alert-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--yellow);
+  color: var(--on-yellow);
+}
+
+.trips-alert-text {
+  display: grid;
+  flex: 1 1 220px;
+  gap: 1px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--body);
+  font-variant-numeric: tabular-nums;
+}
+
+.trips-alert-text strong {
+  font-size: 14.5px;
+  color: var(--ink);
+}
+
+.trips-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--emphasis);
+  border-radius: 999px;
+  background: var(--emphasis);
+  color: var(--on-emphasis);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.trips-button:hover {
+  filter: brightness(1.15);
+}
+
+.trips-button-light {
+  border-color: var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.trips-button-light:hover {
+  filter: none;
+  background: var(--surface-2);
+}
+
+/* --- Filter en zoeken -------------------------------------------------- */
+.trips-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.trips-seg {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.trips-seg-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  color: var(--body);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.trips-seg-button:hover {
+  background: var(--surface-2);
+}
+
+.trips-seg-button[aria-pressed='true'] {
+  background: var(--emphasis);
+  color: var(--on-emphasis);
+}
+
+.trips-seg-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--emphasis);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.trips-seg-button[aria-pressed='true'] .trips-seg-count {
+  background: var(--yellow);
+  color: var(--on-yellow);
+}
+
+.trips-search {
+  display: flex;
+  flex: 0 1 340px;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--field);
+  color: var(--muted);
+}
+
+.trips-search:focus-within {
+  border-color: var(--emphasis);
+}
+
+.trips-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.trips-search input::placeholder {
+  color: var(--muted);
+}
+
+.trips-empty {
+  margin: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--body);
+  font-size: 14px;
+}
+
+.trips-empty-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.trips-empty-row p {
+  margin: 0;
+}
+
+/* --- Weken en de lijst ------------------------------------------------- */
+.trips-weeks {
+  display: grid;
+  gap: 22px;
+}
+
+.trips-week {
+  display: grid;
+  gap: 10px;
+}
+
+.trips-week-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.trips-week-title span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.trips-month-title {
+  margin: 4px 0 -2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.trips-panel {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  list-style: none;
+}
+
+.trips-panel > li + li {
+  border-top: 1px solid var(--line);
+}
+
+/* Bovenaan uitlijnen wanneer de rit uit een mail of de melding geopend wordt,
+   onder de kleverige kop. */
+.trips-item {
+  scroll-margin-top: 84px;
+}
+
+.trips-item[data-open='true'] {
+  background: var(--surface-2);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+/* --- Eén rit ----------------------------------------------------------- */
+.trips-row {
+  display: grid;
+  grid-template-areas: 'date main route side chevron';
+  grid-template-columns: 52px minmax(0, 1.25fr) minmax(0, 1.2fr) minmax(200px, 260px) 28px;
+  align-items: center;
+  gap: 8px 20px;
+  width: 100%;
+  padding: 12px 18px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.trips-row:hover {
+  background: var(--surface-2);
+}
+
+.trips-row:focus-visible {
+  outline: 2px solid var(--emphasis);
+  outline-offset: -2px;
+}
+
+.trips-date {
+  display: grid;
+  grid-area: date;
+  align-content: center;
+  justify-items: center;
+  width: 52px;
+  height: 56px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--surface);
+  line-height: 1;
+}
+
+.trips-date-day {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.trips-date-number {
+  margin-top: 4px;
+  color: var(--ink);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.trips-date[data-today='true'] {
+  border-color: var(--yellow);
+  background: var(--yellow);
+}
+
+.trips-date[data-today='true'] .trips-date-day,
+.trips-date[data-today='true'] .trips-date-number {
+  color: var(--on-yellow);
+}
+
+.trips-date[data-past='true'] {
+  border-color: transparent;
+  background: var(--paper-2);
+}
+
+.trips-main {
+  display: grid;
+  grid-area: main;
+  gap: 5px;
+  min-width: 0;
+}
+
+.trips-title-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.trips-title {
+  color: var(--ink);
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.trips-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--emphasis);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.trips-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  font-size: 13px;
+}
+
+.trips-time,
+.trips-vehicle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.trips-time {
+  color: var(--emphasis);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.trips-time svg,
+.trips-vehicle {
+  color: var(--muted);
+}
+
+.trips-vehicle {
+  font-weight: 500;
+}
+
+.trips-time-until {
+  margin-left: 4px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* De route als twee bolletjes met een stippellijn ertussen: open is vertrek,
+   geel is bestemming. Dat zegt "van" en "naar" zonder de twee woorden. */
+.trips-route {
+  display: grid;
+  grid-area: route;
+  gap: 4px;
+  min-width: 0;
+  color: var(--body);
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+
+.trips-route-line {
+  position: relative;
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  align-items: start;
+  gap: 9px;
+  overflow-wrap: anywhere;
+}
+
+.trips-route-line .trips-dot {
+  margin-top: 4px;
+}
+
+.trips-route-line:first-child:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 15px;
+  left: 4px;
+  height: calc(100% - 7px);
+  border-left: 2px dotted var(--line-2);
+}
+
+.trips-dot {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--emphasis);
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.trips-dot-end {
+  background: var(--yellow);
+}
+
+.trips-side {
+  display: flex;
+  grid-area: side;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.trips-who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.trips-who-name {
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.trips-avatar {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--driver-ink);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.trips-avatar-small {
+  width: 28px;
+  height: 28px;
+  font-size: 10px;
+}
+
+.trips-avatar-me {
+  background: var(--yellow);
+  color: var(--on-yellow);
+}
+
+.trips-avatar-empty {
+  border: 1.5px dashed var(--line-2);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.trips-flags {
+  display: flex;
+  gap: 5px;
+}
+
+.trips-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--emphasis);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.trips-flag-logistics {
+  padding: 0 5px;
+  background: var(--yellow);
+  color: var(--on-yellow);
+}
+
+.trips-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--emphasis);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.trips-chevron {
+  display: grid;
+  grid-area: chevron;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.trips-chevron svg {
+  transition: transform 0.15s ease;
+}
+
+.trips-item[data-open='true'] .trips-row .trips-chevron,
+.trips-past-toggle[aria-expanded='true'] .trips-chevron {
+  background: var(--emphasis);
+  color: var(--on-emphasis);
+}
+
+.trips-item[data-open='true'] .trips-row .trips-chevron svg,
+.trips-past-toggle[aria-expanded='true'] .trips-chevron svg {
+  transform: rotate(180deg);
+}
+
+/* --- Het opengeklapte deel --------------------------------------------- */
+.trips-detail {
+  display: grid;
+  gap: 16px;
+  /* Onder de titel en niet onder de datum: 18 + 52 + 20. */
+  padding: 4px 18px 22px 90px;
+}
+
+.trips-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.trips-block {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 2px 22px 2px 0;
+}
+
+.trips-block + .trips-block {
+  padding-left: 22px;
+  border-left: 1px solid var(--line);
+}
+
+.trips-block-title {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.trips-quiet {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.trips-timeline {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trips-timeline li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  gap: 12px;
+  overflow-wrap: anywhere;
+}
+
+.trips-timeline .trips-dot {
+  width: 12px;
+  height: 12px;
+  margin-top: 4px;
+}
+
+.trips-timeline li:first-child:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 19px;
+  bottom: -15px;
+  left: 5px;
+  border-left: 2px dotted var(--line-2);
+}
+
+.trips-place {
+  display: block;
+  color: var(--ink);
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.trips-address {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.trips-maps {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 20px 0 9px;
+  border-radius: 999px;
+  background: var(--maps);
+  color: var(--on-maps);
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: var(--shadow-1);
+  transition: background 0.15s ease;
+}
+
+.trips-maps:hover {
+  background: var(--maps-hover);
+  color: var(--on-maps);
+}
+
+.trips-maps-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--on-maps);
+  color: var(--maps);
+}
+
+.trips-facts {
+  display: grid;
+  gap: 8px;
+}
+
+.trips-fact {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 13.5px;
+  overflow-wrap: anywhere;
+}
+
+.trips-fact-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--paper-2);
+  color: var(--emphasis);
+}
+
+/* Mensen: een rondje, de naam, wat die persoon hier doet, en belknoppen. */
+.trips-people {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trips-person {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.trips-person-text {
+  min-width: 0;
+}
+
+.trips-person-name {
+  display: block;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.trips-person-role {
+  display: block;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.trips-person-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.trips-round {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line-2);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--emphasis);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.trips-round:hover {
+  border-color: var(--emphasis);
+  background: var(--emphasis);
+  color: var(--on-emphasis);
+}
+
+.trips-add {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px dashed var(--line-2);
+  border-radius: 999px;
+  color: var(--emphasis);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.trips-add:hover {
+  border-style: solid;
+  border-color: var(--emphasis);
+}
+
+/* Nota's: die van Logistiek in het gele vlak, de rest als ballon. */
+.trips-logistics-note {
+  display: grid;
+  gap: 4px;
+  padding: 11px 14px;
+  border: 1px solid var(--warn-line);
+  border-radius: 14px;
+  background: var(--warn-soft);
+  color: var(--ink);
+  font-size: 13.5px;
+  overflow-wrap: anywhere;
+}
+
+.trips-logistics-note-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--warn);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.trips-thread {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trips-bubble {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+}
+
+.trips-bubble-text {
+  padding: 8px 12px;
+  border-radius: 4px 14px 14px 14px;
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: 13.5px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.trips-bubble-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: normal;
+}
+
+.trips-visibility {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--emphasis);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.trips-text-button {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* De chauffeur kiezen, op een rit die aan je post doorgegeven is. */
+.trips-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--body);
+  font-size: 14px;
+}
+
+.trips-picker[data-empty='true'] {
+  border-color: var(--warn-line);
+  background: var(--warn-soft);
+}
+
+.trips-picker-label {
+  flex: 1 1 200px;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.trips-picker select {
+  min-width: 210px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--field);
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.trips-collapse {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--emphasis);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* --- Gereden ritten ---------------------------------------------------- */
+.trips-past {
+  display: grid;
+  gap: 12px;
+}
+
+.trips-past-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-align: left;
+  cursor: pointer;
+}
+
+.trips-past-toggle .trips-chevron {
+  margin-left: auto;
+}
+
+/* --- Smal: een telefoon, of een smalle kolom --------------------------- */
+@container trips (max-width: 720px) {
+  .trips-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .trips-seg {
+    display: flex;
+  }
+
+  .trips-seg-button {
+    flex: 1 1 0;
+    padding: 0 8px;
+  }
+
+  .trips-search {
+    flex: 1 1 auto;
+  }
+
+  /* Datum links; titel en uur bovenaan, de route eronder en de chauffeur met de
+     merktekens op een eigen regel. Die stond eerst naast de route, maar dan
+     werd de kolom rechts zo breed als het rondje met de merktekens en kreeg de
+     titel nog de helft van de breedte. */
+  .trips-row {
+    grid-template-areas:
+      'date main chevron'
+      'date route route'
+      'date side side';
+    grid-template-columns: 46px minmax(0, 1fr) 28px;
+    align-items: start;
+    gap: 8px 12px;
+    padding: 12px 14px;
+  }
+
+  .trips-date {
+    width: 46px;
+    height: 52px;
+  }
+
+  .trips-date-number {
+    font-size: 19px;
+  }
+
+  .trips-title {
+    font-size: 15px;
+  }
+
+  .trips-side {
+    gap: 8px;
+  }
+
+  .trips-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 10px;
+  }
+
+  .trips-detail {
+    padding: 2px 14px 16px;
+  }
+
+  .trips-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .trips-block {
+    padding: 16px 0 4px;
+  }
+
+  .trips-block + .trips-block {
+    padding-left: 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .trips-maps {
+    justify-self: stretch;
+    min-height: 48px;
+  }
+
+  .trips-picker select {
+    width: 100%;
+  }
+
+  .trips-collapse {
+    display: flex;
+  }
+}

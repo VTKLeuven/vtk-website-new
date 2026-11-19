@@ -57,6 +57,17 @@ export default async function NewTicketEventPage({
       )
         .filter((entry) => entry.allowed)
         .map((entry) => entry.group);
+  // Standaard de eigen post: wie een verkoop aanmaakt, doet dat bijna altijd
+  // voor de post waar hij zelf in zit, en die groep wordt Eventbeheerder (de
+  // leads krijgen MANAGER bij het aanmaken). Zonder dit stond de keuze op de
+  // eerste post in de praesidiumvolgorde, en wie alles beheert, maakte zo
+  // ongemerkt verkopen aan voor een andere post. Eerst een praesidiumpost, dan
+  // een werkgroep of jaarwerking; `session.groups` is al dit werkingsjaar.
+  const ownGroups = [...session.groups].sort(
+    (a, b) => Number(b.type === "PRAESIDIUM") - Number(a.type === "PRAESIDIUM"),
+  );
+  const defaultOwnerGroupId =
+    ownGroups.find((own) => groups.some((group) => group.id === own.id))?.id ?? undefined;
   const calendarEvents = groups.length
     ? await prisma.calendarEvent.findMany({
         where: {
@@ -136,6 +147,7 @@ export default async function NewTicketEventPage({
               ? { ownerGroupId: linkedCalendarEvent.groupId, slug: slugify(linkedCalendarEvent.titleNl) }
               : undefined
           }
+          defaultOwnerGroupId={defaultOwnerGroupId}
           canManageTemplates={canManageTemplates}
           locale={locale}
         />

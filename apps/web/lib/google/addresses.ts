@@ -14,7 +14,25 @@ export type AddressVars = {
   voornaam?: string;
   achternaam?: string;
   post?: string;
+  /** Voorvoegsel van een werkgroep, bv. "statix". */
+  prefix?: string;
+  /** Werkingsjaar als vier cijfers: 2026 -> "2627" (activiteiten_2627). */
+  jj?: string;
+  /** Werkingsjaar als startjaar: "2026". */
+  jaar?: string;
 };
+
+/** 2026 -> "2627": de vorm van de jaargroepen (activiteiten_2627@vtk.be). */
+export function workingYearSuffix(year: number): string {
+  const start = year % 100;
+  const end = (year + 1) % 100;
+  return `${String(start).padStart(2, "0")}${String(end).padStart(2, "0")}`;
+}
+
+/** De variabelen van een werkingsjaar voor een sjabloon. */
+export function yearVars(year: number): Pick<AddressVars, "jj" | "jaar"> {
+  return { jj: workingYearSuffix(year), jaar: String(year) };
+}
 
 /**
  * Een naamdeel zoals het in een adres past: kleine letters, accenten weg, en
@@ -35,7 +53,7 @@ export function normaliseNamePart(raw: string): string {
 
 /** Vult een sjabloon in. Onbekende placeholders blijven staan, zichtbaar fout. */
 export function renderTemplate(template: string, vars: AddressVars): string {
-  return template.replace(/\{(code|voornaam|achternaam|post)\}/g, (match, key: string) => {
+  return template.replace(/\{(code|voornaam|achternaam|post|prefix|jj|jaar)\}/g, (match, key: string) => {
     const value = vars[key as keyof AddressVars];
     if (value === undefined) return match;
     return normaliseNamePart(value);

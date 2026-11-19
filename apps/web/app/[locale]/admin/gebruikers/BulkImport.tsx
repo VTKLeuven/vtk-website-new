@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import { Button, Textarea } from "@vtk/ui";
 import { bulkImportUsersAction } from "@/app/actions/users-groups";
@@ -14,7 +15,8 @@ export function BulkImport({ locale }: { locale: "nl" | "en" }) {
       action={(fd) => {
         fd.set("csv", csv);
         startTransition(async () => {
-          const r = await bulkImportUsersAction(fd);
+          const r = await unsentGuard.run(() => bulkImportUsersAction(fd));
+          if (r === UNSENT) return;
           setResult(r);
         });
       }}

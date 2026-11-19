@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   theokotSessionFindUnique: vi.fn(),
   theokotSessionFindUniqueOrThrow: vi.fn(),
   theokotSessionDelete: vi.fn(),
+  shiftDeleteMany: vi.fn(),
   theokotSessionUpdate: vi.fn(),
   theokotSessionUpdateMany: vi.fn(),
   theokotOrderFindUnique: vi.fn(),
@@ -28,7 +29,9 @@ const txPrisma = {
   theokotSession: {
     findUniqueOrThrow: mocks.theokotSessionFindUniqueOrThrow,
     update: mocks.theokotSessionUpdate,
+    delete: mocks.theokotSessionDelete,
   },
+  shift: { deleteMany: mocks.shiftDeleteMany },
   theokotOrder: {
     updateMany: mocks.theokotOrderUpdateMany,
     count: mocks.theokotOrderCount,
@@ -241,8 +244,10 @@ describe("removeSession", () => {
     mocks.sendMail.mockResolvedValue({ ok: true });
 
     const res = await removeSession("sess-2");
-    expect(res).toEqual({ ok: true, orders: 1 });
+    expect(res).toEqual({ ok: true, orders: 1, shifts: 0 });
     expect(mocks.theokotSessionDelete).toHaveBeenCalledWith({ where: { id: "sess-2" } });
+    // Zonder vinkje blijven de shiften staan.
+    expect(mocks.shiftDeleteMany).not.toHaveBeenCalled();
     expect(mocks.sendMail).toHaveBeenCalledTimes(1);
     expect(mocks.sendMail).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -251,6 +256,48 @@ describe("removeSession", () => {
       }),
       expect.any(Object),
     );
+  });
+});
+
+describe("removeSession met shiften", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("neemt enkel de gekoppelde shiften mee, samen met de dag", async () => {
+    mocks.theokotSessionFindUnique.mockResolvedValue({
+      id: "sess-3",
+      date: new Date("2026-11-16T00:00:00.000Z"),
+      orders: [],
+    });
+    mocks.shiftDeleteMany.mockResolvedValue({ count: 3 });
+    mocks.theokotSessionDelete.mockResolvedValue({});
+
+    const res = await removeSession("sess-3", { removeShifts: true });
+    expect(res).toEqual({ ok: true, orders: 0, shifts: 3 });
+    expect(mocks.shiftDeleteMany).toHaveBeenCalledWith({ where: { theokotSessionId: "sess-3" } });
+    expect(mocks.theokotSessionDelete).toHaveBeenCalledWith({ where: { id: "sess-3" } });
+  });
+
+  it("raakt geen shiften aan wanneer de dag niet weg mag", async () => {
+    mocks.theokotSessionFindUnique.mockResolvedValue({
+      id: "sess-4",
+      date: new Date("2026-11-16T00:00:00.000Z"),
+      orders: [
+        {
+          id: "ord-4",
+          status: "PICKED_UP",
+          pickedUpAt: new Date(),
+          voucherRedemption: null,
+          user: { name: "Jan", email: "jan@vtk.be", locale: "NL" },
+          lines: [],
+        },
+      ],
+    });
+
+    const res = await removeSession("sess-4", { removeShifts: true });
+    expect(res).toEqual({ ok: false, code: "SESSION_HAS_PICKUPS" });
+    expect(mocks.shiftDeleteMany).not.toHaveBeenCalled();
   });
 });
 

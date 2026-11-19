@@ -3,11 +3,11 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const pageSource = readFileSync(
-  path.join(process.cwd(), "app/[locale]/admin/kalender/categorieen/page.tsx"),
+  path.join(process.cwd(), "app/[locale]/admin/kalender/(overzicht)/categorieen/page.tsx"),
   "utf8",
 );
 const formSource = readFileSync(
-  path.join(process.cwd(), "app/[locale]/admin/kalender/categorieen/CategoryForm.tsx"),
+  path.join(process.cwd(), "app/[locale]/admin/kalender/(overzicht)/categorieen/CategoryForm.tsx"),
   "utf8",
 );
 

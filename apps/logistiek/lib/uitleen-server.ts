@@ -9,12 +9,14 @@ import type {
   UitleenTransportNoteVisibility,
 } from '@prisma/client';
 import { currentWorkingYear } from '@vtk/auth';
+import { parseCustomColor, type CustomDriverColor, type DriverColorChoice } from './driver-colors';
 import { resolveDriverPhones, type DriverPhone, type DriverPhoneSource } from './driver-phones';
 import {
   DEFAULT_LAST_MINUTE_DAYS,
   NOTIFY_KINDS,
   STOCK_CONSUMING_STATUSES,
   isTripHandoverMode,
+  teamChangeLines,
   type LogistiekNotifyEmails,
   type NotifyKind,
   type TripHandoverNotify,
@@ -575,6 +577,17 @@ export async function activeVehicles() {
   });
 }
 
+/**
+ * De voertuigen die een lid zelf mag aanvragen (F6.21): actief, en niet door het
+ * team voorbehouden. Het team kiest in de planning uit `activeVehicles`.
+ */
+export async function requestableVehicles() {
+  return prisma.uitleenVehicle.findMany({
+    where: { active: true, requestableByMembers: true },
+    orderBy: { sortIndex: 'asc' },
+  });
+}
+
 export async function adminVehicles() {
   return prisma.uitleenVehicle.findMany({ orderBy: [{ active: 'desc' }, { sortIndex: 'asc' }] });
 }
@@ -1010,6 +1023,98 @@ export async function adminReservation(id: string) {
   });
 }
 
+/**
+ * Waar een rit in haar reeks staat (F6.22): rit x van y, en hoeveel er vanaf hier
+ * nog verwijderd kunnen worden.
+ *
+ * Eén query voor alle reeksen op een scherm. `removable` telt wat
+ * `deleteTripSeriesFromAction` effectief weghaalt: niet gereden en zonder
+ * betaling, zodat de bevestiging geen getal belooft dat de actie niet haalt.
+ */
+export type SeriesPosition = { index: number; total: number; removableFromHere: number };
+
+export async function seriesPositions(
+  trips: ReadonlyArray<{ id: string; seriesId: string | null; startAt: Date }>
+): Promise<Map<string, SeriesPosition>> {
+  const result = new Map<string, SeriesPosition>();
+  const seriesIds = [...new Set(trips.map((trip) => trip.seriesId).filter((id): id is string => Boolean(id)))];
+  if (seriesIds.length === 0) return result;
+
+  const rows = await prisma.uitleenTransportBooking.findMany({
+    where: { seriesId: { in: seriesIds } },
+    orderBy: { startAt: 'asc' },
+    select: { id: true, seriesId: true, startAt: true, status: true, _count: { select: { payments: true } } },
+  });
+  const bySeries = new Map<string, typeof rows>();
+  for (const row of rows) {
+    if (!row.seriesId) continue;
+    bySeries.set(row.seriesId, [...(bySeries.get(row.seriesId) ?? []), row]);
+  }
+  for (const trip of trips) {
+    if (!trip.seriesId) continue;
+    const members = bySeries.get(trip.seriesId) ?? [];
+    result.set(trip.id, {
+      index: members.findIndex((member) => member.id === trip.id) + 1,
+      total: members.length,
+      removableFromHere: members.filter(
+        (member) =>
+          member.startAt >= trip.startAt && member.status !== 'COMPLETED' && member._count.payments === 0
+      ).length,
+    });
+  }
+  return result;
+}
+
+/**
+ * De "Extra info van Logistiek" van enkel deze ritten (F6.16).
+ *
+ * Apart van `transportWeekForPraesidium`, dat de nota's bewust niet ophaalt: wie
+ * dat doet, haalt ze voor élke rit van de week op en vertrouwt erop dat het
+ * scherm de verkeerde weglaat. Hier vraagt de oproeper enkel de ritten van de
+ * eigen post, dus er komt nooit een nota mee van een rit die niet van hem is.
+ */
+export async function adminNotesForTrips(bookingIds: string[]): Promise<Map<string, string>> {
+  const notes = new Map<string, string>();
+  if (bookingIds.length === 0) return notes;
+  const rows = await prisma.uitleenTransportBooking.findMany({
+    where: { id: { in: bookingIds }, adminNote: { not: null } },
+    select: { id: true, adminNote: true },
+  });
+  for (const row of rows) if (row.adminNote) notes.set(row.id, row.adminNote);
+  return notes;
+}
+
+/**
+ * Wat het team aan deze ritten veranderde (F6.11), per rit, als leesbare regels.
+ *
+ * Eén query voor alle ritten van een scherm. De aanvrager hoort er per rit bij
+ * (`userId`): wat hij zelf wijzigde, telt niet mee. Zie `teamChangeLines`.
+ */
+export async function teamEditsForTransport(
+  bookings: ReadonlyArray<{ id: string; userId: string }>
+): Promise<Map<string, string[]>> {
+  const result = new Map<string, string[]>();
+  if (bookings.length === 0) return result;
+
+  const logs = await prisma.uitleenAuditLog.findMany({
+    where: { transportBookingId: { in: bookings.map((booking) => booking.id) }, kind: 'EDITED' },
+    orderBy: { createdAt: 'asc' },
+    select: { transportBookingId: true, kind: true, note: true, actorId: true },
+  });
+  const perBooking = new Map<string, typeof logs>();
+  for (const log of logs) {
+    if (!log.transportBookingId) continue;
+    const list = perBooking.get(log.transportBookingId) ?? [];
+    list.push(log);
+    perBooking.set(log.transportBookingId, list);
+  }
+  for (const booking of bookings) {
+    const lines = teamChangeLines(perBooking.get(booking.id) ?? [], booking.userId);
+    if (lines.length > 0) result.set(booking.id, lines);
+  }
+  return result;
+}
+
 export type UitleenAuditEntry = {
   id: string;
   kind: string;
@@ -1257,6 +1362,8 @@ export async function transportRange(from: Date, to: Date, filters?: TransportFi
       priceCents: true,
       paidOfflineAt: true,
       driverId: true,
+      // De reeks waartoe de rit hoort (F6.22); `null` voor een losse rit.
+      seriesId: true,
       // Twee velden voor de verwijderknop (R1): of er al geld aan hangt (dan
       // mag de rit niet weg), en of het team ze zelf tekende (dan hoeft de
       // bevestiging niet te waarschuwen voor een aanvrager zonder bericht). De
@@ -1365,7 +1472,7 @@ export async function transportWeekForPraesidium(
       group: { select: { nameNl: true } },
       helpers: {
         orderBy: { createdAt: 'asc' as const },
-        select: { id: true, name: true, phone: true },
+        select: { id: true, name: true, phone: true, addedById: true },
       },
     },
     orderBy: { startAt: 'asc' },
@@ -1452,6 +1559,11 @@ export type DriverOption = {
    * (`driverColorIndex` in lib/driver-colors.ts).
    */
   colorIndex: number | null;
+  /**
+   * Een eigen kleur uit de schuiven, of `null`. Wint van `colorIndex`; de actie
+   * zet er altijd één van de twee op `null`.
+   */
+  customColor: CustomDriverColor | null;
   /**
    * Het nummer waarop deze chauffeur bereikbaar is, of `null`. Zie
    * {@link driverPhones}: vastgelegd door het team, anders het gsm-nummer van
@@ -1616,12 +1728,20 @@ export async function feedTokensForUser(userId: string) {
  * wel de kleuren maar mag de chauffeurslijst zelf niet ophalen: dat zou namen
  * meebrengen die daar niet horen.
  */
-export async function driverColorOverrides(): Promise<Record<string, number>> {
+export async function driverColorOverrides(): Promise<Record<string, DriverColorChoice>> {
   const rows = await prisma.uitleenDriver.findMany({
-    where: { colorIndex: { not: null } },
-    select: { userId: true, colorIndex: true },
+    where: { OR: [{ colorIndex: { not: null } }, { customColor: { not: null } }] },
+    select: { userId: true, colorIndex: true, customColor: true },
   });
-  return Object.fromEntries(rows.map((row) => [row.userId, row.colorIndex as number]));
+  const overrides: Record<string, DriverColorChoice> = {};
+  for (const row of rows) {
+    // Een eigen kleur wint. Is de tekst geen kleur (een handmatige update), dan
+    // geldt het palet, en zonder palet de hash.
+    const custom = parseCustomColor(row.customColor);
+    if (custom) overrides[row.userId] = custom;
+    else if (row.colorIndex !== null) overrides[row.userId] = row.colorIndex;
+  }
+  return overrides;
 }
 
 /**
@@ -1637,6 +1757,7 @@ export async function driverOptions(): Promise<DriverOption[]> {
       select: {
         canDriveVan: true,
         colorIndex: true,
+        customColor: true,
         phone: true,
         user: { select: { id: true, name: true } },
       },
@@ -1664,6 +1785,7 @@ export async function driverOptions(): Promise<DriverOption[]> {
       source: 'POST',
       canDriveVan: row?.canDriveVan ?? false,
       colorIndex: row?.colorIndex ?? null,
+      customColor: parseCustomColor(row?.customColor),
       // `row.phone` niet meer apart: dat is de bron TEAM en die wint al binnen
       // `driverPhones` zelf.
       phone: phones.get(member.id)?.number ?? null,
@@ -1677,6 +1799,7 @@ export async function driverOptions(): Promise<DriverOption[]> {
       source: 'EXTRA',
       canDriveVan: row.canDriveVan,
       colorIndex: row.colorIndex,
+      customColor: parseCustomColor(row.customColor),
       phone: phones.get(row.user.id)?.number ?? null,
     });
   }
@@ -1771,6 +1894,7 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
         note: true,
         canDriveVan: true,
         colorIndex: true,
+        customColor: true,
         phone: true,
         user: { select: { id: true, name: true, email: true, active: true } },
       },
@@ -1822,6 +1946,7 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
       note: row?.note ?? null,
       canDriveVan: row?.canDriveVan ?? false,
       colorIndex: row?.colorIndex ?? null,
+      customColor: parseCustomColor(row?.customColor),
       inactive: false,
       phone: phones.get(member.id)?.number ?? null,
       phoneSource: phones.get(member.id)?.source ?? null,
@@ -1837,6 +1962,7 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
       note: row.note,
       canDriveVan: row.canDriveVan,
       colorIndex: row.colorIndex,
+      customColor: parseCustomColor(row.customColor),
       inactive: !row.user.active,
       phone: phones.get(row.user.id)?.number ?? null,
       phoneSource: phones.get(row.user.id)?.source ?? null,
@@ -2118,7 +2244,7 @@ export async function groupMemberOptions(groupId: string) {
 
 const driverTripInclude = {
   user: { select: { name: true, email: true } },
-  vehicle: { select: { nameNl: true, nameEn: true, needsVanDriver: true } },
+  vehicle: { select: { code: true, icon: true, nameNl: true, nameEn: true, needsVanDriver: true, needsDriver: true } },
   group: { select: { nameNl: true, nameEn: true } },
   assignedGroup: { select: { id: true, nameNl: true, nameEn: true } },
   driver: { select: { id: true, name: true } },

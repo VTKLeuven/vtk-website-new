@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import { Button } from "@vtk/ui";
 import { testDoorConnectionAction } from "@/app/actions/it";
@@ -28,7 +29,10 @@ export function DoorTestButton() {
         disabled={pending}
         onClick={() => {
           setResult(null);
-          start(async () => setResult(await testDoorConnectionAction()));
+          start(async () => {
+            const result = await unsentGuard.run(() => testDoorConnectionAction());
+            if (result !== UNSENT) setResult(result);
+          });
         }}
       >
         {pending ? "Testing..." : "Test connection"}

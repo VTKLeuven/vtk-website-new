@@ -416,6 +416,20 @@
   background: var(--surface);
 }
 
+/* Album downloaden: tekst links, knop rechts, en onder elkaar op een smal scherm. */
+.media-album-download {
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.media-album-download > span {
+  flex: 1 1 280px;
+}
+
+.media-album-download .ticket-admin-button {
+  flex: none;
+}
+
 .media-switch-row b {
   display: block;
   font-size: 14px;
@@ -1122,4 +1136,406 @@
   .media-progress i {
     transition: none;
   }
+}
+
+/* ------------------------------------------------------------------------
+   Delen met een link (AlbumShareLinks.tsx): een kaart in het album, tussen de
+   schakelaar Op vtk.be en het downloaden, met een tabel van de links.
+   ------------------------------------------------------------------------ */
+
+.media-share {
+  margin: 0 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.media-share-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 10px 14px;
+}
+
+.media-share-head > span {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.media-share-head b {
+  display: block;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.media-share-head small {
+  display: block;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.media-share-head .ticket-admin-button {
+  flex: none;
+}
+
+.media-share-empty {
+  margin: 0;
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Positioned: een sr-only kop ankert anders op de pagina (zie CLAUDE.md). */
+.media-share-table-wrap {
+  position: relative;
+  overflow-x: auto;
+}
+
+.media-share-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.media-share-table th {
+  padding: 7px 10px;
+  border-top: 1px solid var(--line);
+  background: color-mix(in oklab, var(--paper-2) 40%, var(--surface));
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.media-share-table th:first-child,
+.media-share-table td:first-child {
+  padding-left: 14px;
+}
+
+.media-share-table td {
+  padding: 9px 10px;
+  border-top: 1px solid var(--line);
+  color: var(--body);
+  vertical-align: top;
+}
+
+.media-share-table tbody tr {
+  cursor: pointer;
+}
+
+.media-share-table tbody tr:hover td {
+  background: color-mix(in oklab, var(--paper-2) 35%, var(--surface));
+}
+
+.media-share-table td small {
+  display: block;
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.media-share-table td small.is-warn {
+  color: var(--low-ink, #7a4e05);
+  font-weight: 500;
+}
+
+.media-share-table td.media-share-act {
+  width: 52px;
+  padding-right: 12px;
+  text-align: right;
+  vertical-align: middle;
+}
+
+.media-share-title {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.media-share-title:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--accent-2, #edbd22);
+  outline-offset: 2px;
+}
+
+.media-share-access {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+}
+
+.media-share-table tr[data-expired] .media-share-title,
+.media-share-table tr[data-expired] .media-share-access {
+  color: var(--muted);
+}
+
+.media-share-pill {
+  display: inline-flex;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+/* Smal: de kolomkoppen worden labels per waarde, het kopieericoon rechtsboven. */
+@media (max-width: 640px) {
+  .media-share-table thead {
+    display: none;
+  }
+
+  .media-share-table,
+  .media-share-table tbody,
+  .media-share-table tr,
+  .media-share-table td {
+    display: block;
+    width: auto;
+  }
+
+  .media-share-table tr {
+    position: relative;
+    padding: 10px 14px;
+    border-top: 1px solid var(--line);
+  }
+
+  .media-share-table td,
+  .media-share-table td:first-child {
+    padding: 3px 48px 3px 0;
+    border: 0;
+  }
+
+  .media-share-table td[data-label]:not(:first-child)::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+
+  .media-share-table td.media-share-act {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    width: auto;
+    padding: 0;
+  }
+}
+
+/* Het venster: maken, aanpassen, en net gemaakt. */
+.media-share-dialog {
+  width: min(560px, 100%);
+}
+
+.media-share-dialog-lead {
+  margin: -6px 0 0;
+  font-size: 13px;
+}
+
+.media-share-dialog-lead b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.media-share-form {
+  display: grid;
+  gap: 16px;
+}
+
+.media-share-choices {
+  display: grid;
+  gap: 8px;
+}
+
+.media-share-choice {
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+}
+
+.media-share-choice:has(input:checked) {
+  border-color: var(--navy);
+  background: color-mix(in oklab, var(--paper-2) 30%, var(--surface));
+  box-shadow: inset 0 0 0 1px var(--navy);
+}
+
+.media-share-choice-main {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.media-share-choice-main input {
+  margin: 3px 0 0;
+  accent-color: var(--navy);
+}
+
+.media-share-choice-main b {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.media-share-choice-main small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.media-share-choice-extra {
+  display: grid;
+  gap: 6px;
+  padding: 0 12px 12px 40px;
+}
+
+.media-share-term {
+  cursor: pointer;
+}
+
+.media-share-term:has(input:checked) {
+  border-color: var(--navy);
+  background: var(--navy);
+  color: var(--paper);
+}
+
+.media-share-term:has(input:focus-visible) {
+  outline: 2px solid var(--accent-2, #edbd22);
+  outline-offset: 2px;
+}
+
+.media-share-hint {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.media-share-hint.is-warn {
+  color: var(--low-ink, #7a4e05);
+}
+
+.media-share-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--paper-2);
+  font-size: 12.5px;
+}
+
+.media-share-copy {
+  display: flex;
+  gap: 8px;
+}
+
+.media-share-copy input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono, ui-monospace, monospace) !important;
+  font-size: 12px !important;
+}
+
+.media-share-copy .ticket-admin-button {
+  flex: none;
+}
+
+.media-share-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 16px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.media-share-facts dt {
+  color: var(--muted);
+}
+
+.media-share-facts dd {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.media-share-grow {
+  flex: 1;
+}
+
+/* Het kettingicoon in de albumlijst: een album met een werkende privélink. */
+.media-album-row-flags {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.media-album-row-flag.is-shared {
+  color: var(--ink);
+}
+
+/* ------------------------------------------------------------------------
+   Rechten: wat een uploader of albummaker ziet in plaats van een bewerkveld
+   (lib/media-album-access.ts)
+   ------------------------------------------------------------------------ */
+
+/* De lege toestand voor wie enkel uploadt: dezelfde vorm, maar geen doel. */
+.media-dropzone.is-static {
+  cursor: default;
+}
+
+.media-dropzone.is-static:hover {
+  border-color: color-mix(in oklab, var(--navy) 30%, transparent);
+  background: color-mix(in oklab, var(--paper-2) 35%, var(--surface));
+}
+
+/* De titel van een album dat je niet mag bewerken: zoals het veld, zonder rand. */
+.media-album-static h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.media-album-static p {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+}
+
+/* De stand van het album: uitleg links, de drie keuzes rechts. */
+.media-visibility {
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.media-visibility > span:first-child {
+  flex: 1 1 280px;
+}
+
+.media-visibility .media-chip:disabled {
+  cursor: default;
+}
+
+.media-dialog-note {
+  margin: 0;
+  font-size: 13px;
+}
+
+.media-dialog-note b {
+  color: var(--ink);
 }

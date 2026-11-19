@@ -90,6 +90,18 @@ het gelukt is (toast).
   - Redirect de action na het opslaan (zoals de onboarding doet), dan is die
     navigatie zelf de bevestiging en is een toast niet nodig. Let op dat
     `redirect()` via een throw werkt: hou ze buiten elke try/catch.
+  - **Elke aanroep van een server action loopt langs het vangnet**
+    (`components/ui/unsentGuard.tsx`): een opslag die de server nooit bereikt
+    (een pagina van vóór de laatste deploy, of geen verbinding) wordt een rode
+    toast, en wat er ingevuld stond, blijft staan. `SaveForm`,
+    `DeleteIconButton` en `ActionForm` doen het al; anders `unsentGuard.form`
+    voor `<form action>`, `unsentGuard.state` voor `useActionState`, en
+    `unsentGuard.run` met daarna `if (result === UNSENT) return;` voor een
+    aanroep in code. Zet bij een optimistische wijziging de vorige stand terug
+    op `UNSENT`. Een kale `<form action={serverAction}>` in een servercomponent
+    wordt `<ActionForm>`. Zonder vangnet vervangt de error boundary het hele
+    scherm, met alles wat er ingevuld was, en dat is precies wat een collega
+    tien keer overkwam.
   - **Een `redirect()` naar de pagina waar je al staat is geen feedback.** Dat
     patroon (`saveXAction` → `redirect("/admin/x")` terwijl het formulier op
     `/admin/x` staat) ziet eruit als feedback maar doet niets zichtbaars; gebruik
@@ -202,7 +214,46 @@ herkenning van bestandsnamen of het uitlezen van de rekenbladen komt.
   bevat de posten en verandert na "Post wijzigen".
 - **Alles rekent op de BO-datum (`Dossier.date`)**, niet op de datum uit het
   rekenblad (`eventDate`, enkel ter info): open sinds, komt nog, tot resultaat.
-  Dat is een keuze van Groep 5; zet het niet terug op de activiteit.
+  Dat is een keuze van Groep 5; zet het niet terug op de activiteit. Eén
+  uitzondering: de herinnering "Nog te brengen resultaten" op het dashboard
+  wacht tot de activiteit voorbij is (`openResults` in `lib/bo/own.ts`). Breid
+  die uitzondering niet uit naar de status of de tellingen.
+
+# POC-peilingen
+
+`docs/poc-peilingen.md` is de referentie: hoe de RiVers de studenten van hun
+richting bevragen op de homepage en op Discord, en hoe je de Discord-applicatie
+instelt. Lees het voor je aan `apps/web/lib/pocPolls` of de knoppen in
+`apps/web/lib/discord/poll*` komt. De kringkeuzes staan in
+`docs/design-decisions.md`.
+
+- **`PocPollAnswer` blijft anoniem.** Geen `userId`, geen eigen id en geen
+  tijdstempels: die laatste twee zijn aan de toegangslogs te koppelen.
+- **De studenten zien geen tussenstand; de RiVers zien de cijfers live en per
+  fase**, hoe klein die ook is. Dat laatste is een bewuste keuze van VTK
+  Onderwijs (zie `docs/design-decisions.md`); zet er geen drempel of wachttijd
+  terug zonder het te vragen.
+
+# Opruiming van de bucket
+
+Elke nacht zoekt `apps/web/lib/storage-cleanup*.ts` in elke tekst- en
+JSON-kolom van de database naar de keys van de algemene uploader (`images/`,
+`pdfs/`, `files/`, `logos/`, `tiles/`, `badges/`, `uploads/`). Een bestand dat
+30 dagen nergens vermeld staat, gaat uit de bucket zodra een superadmin dat op
+/admin/it/storage/cleanup aanzette. De kringkeuzes staan in
+`docs/design-decisions.md`, "Opruiming van de bucket".
+
+- **Bewaar een key altijd volledig** (`pdfs/<24 hex>.pdf`) of als
+  `/api/media/...`-URL, in een tekst-, JSON- of arraykolom. Een key die je uit
+  stukken samenstelt (enkel de hex in de kolom en de map in de code), in een
+  `Bytes`-kolom, of enkel buiten de database (een env-var, een constante in de
+  code), ziet de scan niet, en die verwijdert dan een bestand dat nog gebruikt
+  wordt. Dat faalt stil, en pas 30 dagen later.
+- Een nieuwe uploadmap valt er standaard buiten; zet ze pas in
+  `CLEANUP_PREFIXES` als haar bestanden geen eigenaar-rij en geen eigen
+  opruiming hebben. `bonnetjes/` komt er nooit in.
+- `StorageOrphan` draagt zelf keys en wordt dus niet doorzocht. Schrijf ook
+  geen keys in `storage.cleanup.state`: de `Setting`-tabel wordt wel doorzocht.
 
 # MCP-server voor agents
 
@@ -372,14 +423,33 @@ the design language into the application instead of copying mockup content.
   left; Cursusdienst, Shiften, Career on the right). Pure CSS keyframe animations
   (outline draws with `stroke-dashoffset`, hatching wipes with `clip-path`,
   nodes/dimensions fade, labels rise). On mobile (<760px), leader lines hide and
-  destinations appear as a hairline list below the drawing. Do not bring back the
-  old photo hero, slogans, countdown clock, or live status badges.
+  destinations appear as a hairline list below the drawing.
+  - **Alles over de hero staat in /admin/home, en nergens anders**
+    (`lib/home/heroDesign.ts`, de instelling `home.heroDesign`). Vijf keuzes: de
+    bouwtekening hierboven (`classic`, de standaard zonder rij), het constructielogo
+    uit `VTK technisch.ai` (`HeroConstruction.tsx`, met opstelling, vulling, lijnen,
+    patroon, hoverkleur en snelheid), en de drie hero's met een foto: oude hero, 24
+    urenloop en jobfair (`LegacyHero.tsx`). Die laatste drie hebben vaste teksten in
+    de code; breng geen apart scherm voor hun teksten of voor slogans terug. Hun CSS
+    staat bewust in `public/frontpage-legacy/` en niet achter een `import`: een
+    CSS-import laadt Next ook mee wanneer een ander design gekozen is. Zie
+    `docs/design-decisions.md`.
+  - **Vier losse affiches hangen over de gele streep** bij de bouwtekening en het
+    constructielogo (`HeroEventCards.tsx`,
+    `.g-events`): enkel de foto en de datumpin, met titel en uur zonder kaart op
+    de lichte band eronder. Zet er geen witte kaart rond: op navy tekent die een
+    rand rond elke foto. Met kaarten ligt de streep in `.g-events` en niet meer
+    onder de hero; die band is een rij van het raster, zodat de naad meeschaalt
+    met de foto. Welke vier: `lib/home/heroEvents.ts`, eerst wat uitgelicht is met
+    de ster in `/admin/kalender` (`calendar.manageAll`), daarna de eerstvolgende.
+    De band Aankomende evenementen begint na deze vier. Zie
+    `docs/design-decisions.md`.
 - Band rhythm: full-width navy bands return down the page and the site-wide dark
   footer closes the bookend. Header, bands and
   footer share the same `--navy` so the dark chrome reads as one system. The
   homepage alternates navy and light-blue (`--paper-2`) bands:
-  **Hero** (navy) → **Nieuws** (`--paper-2`) → **Aankomende evenementen** (`--paper-2`) →
-  **Openingsuren** (navy) → **POC's** (navy, when shown) → **Shiften** (`--paper-2`, when shown) →
+  **Hero** (navy) → **Nieuws** (`--paper-2`) → **Openingsuren** (navy) →
+  **Aankomende evenementen** (`--paper-2`) → **POC's** (navy, when shown) → **Shiften** (`--paper-2`, when shown) →
   **Aftermovies** (navy) → **Wat we doen** (paper) → **VTK Career** (navy) →
   **Hoofdpartners** (paper). The events and the open shifts come before "Wat we
   doen" on purpose: what is coming up this week matters more than the standing
@@ -392,9 +462,10 @@ the design language into the application instead of copying mockup content.
   bands butt directly against each other with a crisp navy/light-blue seam
   (`.band + .band, .hours-strip + .band, .vtk-blueprint-hero + .band { margin-top: 0 }`)
   rather than a paper gap; the light-blue bands also keep tighter internal padding
-  than the navy ones. Between Nieuws and Evenementen, the margin-top on
-  `.events-band` preserves a restful paper gap between the two `--paper-2` bands;
-  without news, Evenementen touches the hero with a tight seam. On a navy band,
+  than the navy ones. Keep Evenementen between Openingsuren and POC's: with
+  Evenementen right under Nieuws (tried end of October 2026) two `--paper-2`
+  bands sat on top of each other and the navy opening hours touched the navy
+  POC's with nothing in between. On a navy band,
   panels are dark glass
   (`rgba(255,255,255,.06)` fill, `.14` white border), headings go `--paper`,
   muted text uses `--on-dark-muted`, and the primary button inverts to a
@@ -421,9 +492,14 @@ the design language into the application instead of copying mockup content.
   word from the praeses opens with the author's square portrait. See
   `docs/design-decisions.md`.
 - Opening hours (`components/editorial/OpeningHoursBand.tsx`,
-  `lib/openingHoursWeek.ts`): per service, today as a timeline with a yellow
-  now-line, and the week as a row of exact times underneath (Sunday first). Do
-  not go back to one card per service with a list of days: it hid what is open
+  `lib/openingHoursWeek.ts`, `app/design/vtk-hours.css`): today on a time axis
+  with a yellow now-line, and the week (Sunday first). Two layouts, chosen in
+  /admin/home (`home.hoursLayout`): **week in strepen** (default, per service a
+  column with the week as thin rows on one axis, today the thickest row) and
+  **zonder kader** (per service a row, today as a thin line, the week as text,
+  one now-line through all services). Neither has a glass panel, status dots,
+  yellow caps or pill-shaped bars: together those read as a template. Do not
+  go back to one card per service with a list of days: it hid what is open
   now and could not show a second window on a day. Read hours with
   `parseHoursWindows`, never with `parseHoursRange` (first window only), and
   compute "now" on the Brussels clock, not with `getHours()`. An evening without
@@ -719,6 +795,43 @@ the design language into the application instead of copying mockup content.
 - Admin: keep pages operationally dense. Forms, tables, and upload/editor
   surfaces should use the same palette and rounded panels without becoming
   decorative.
+  - **Een beheerscherm werkt in het thema van Tickets: een kop met tabbladen.**
+    Elke module (en elk nieuw beheerscherm) zet zijn `layout.tsx` op
+    `ModuleAdminShell` (`apps/web/components/admin/ModuleAdminShell.tsx`):
+    titel, eventueel een korte uitleg en icoonknoppen rechts, daaronder de
+    pillen met een icoon (`.ticket-admin-tabs`), en elk tabblad een eigen route.
+    Dat geldt voor nieuwe schermen net zo goed als voor de bestaande; bouw geen
+    eigen `<h1>` met een rij pillen eronder, geen `?tab=`-tabs en geen tabs in
+    een clientcomponent.
+    - Het werk van elke dag is het eerste tabblad; instellingen en lijsten die je
+      een keer per semester aanraakt, staan achteraan. Een lange pagina met
+      kaarten onder elkaar splits je in tabbladen per taak.
+    - Elk tabblad volgt een recht: de layout toont enkel wat je mag openen, de
+      pagina controleert het zelf nog eens. Eén zichtbaar tabblad toont geen
+      tabbalk.
+    - Een pagina onder zo'n kop heeft geen eigen `<h1>`: de module heeft de
+      titel, een sectie heet een `<h2>`. Herhaalt een kop enkel de naam van het
+      tabblad, laat hem dan weg.
+    - `fallback` voor een detailroute (`[id]`), een pad als
+      `"sjablonen/beheer"` wanneer twee tabbladen hetzelfde eerste segment
+      delen, `preserveParams={["jaar"]}` wanneer een filter mee moet naar elk
+      tabblad, en `variant="sub"` voor een tweede rij binnen een tabblad (IT ›
+      Mails & schermen). Een route-groep geeft twee mappen één kop zonder hun
+      adres te veranderen (`theokot/(broodjes)`, `(leden)` voor Leden en
+      Alumni, `(posten)`). `isolated` op een tabblad wanneer dezelfde parameter
+      daar iets anders betekent (`jaar` bij Alumni is een lichting).
+    - **Een tabblad staat niet nog eens als item in de zijbalk.** Moet het
+      vindbaar blijven met Ctrl/Cmd+K of als pin, zet het dan als `hidden` in
+      `lib/admin-nav.ts` (zoals de tabbladen van IT).
+    - Eén uitzondering op "elk tabblad een route": een formulier dat in één
+      keer opslaat, zoals een evenement (`kalender/EventForm.tsx`). Daar zijn
+      de tabbladen knoppen in het formulier, en een verplicht veld op een
+      verborgen tabblad opent dat tabblad.
+    - Een oude `?tab=`-link stuurt door naar het nieuwe tabblad.
+    - De kop zet bewust niet `.ticket-admin` op de pagina: die maakt de kleur
+      van elke link `inherit`, en dan staat de tekst van een donkere knop-link
+      donker op donker.
+    Zie `docs/design-decisions.md`, "Beheermodules in tabbladen".
   - Alle beheeromgevingen gebruiken `AdminNav` uit `@vtk/ui`: op desktop een
     compacte, gegroepeerde zijbalk en op smalle schermen één uitklapknop die het
     huidige onderdeel benoemt. Bouw voor Logistiek of een volgende module geen
@@ -748,6 +861,16 @@ the design language into the application instead of copying mockup content.
     `apps/logistiek/lib/admin-nav-cookie.ts`); bouw daar geen eigen inklapknop
     of zwevende "Tabs"-knop meer naast. De sneltoets `[` of Ctrl/Cmd+B zit in
     `AdminNav` zelf.
+  - **Er is een compacte stand, en ook die staat standaard uit.** De knop naast
+    de inklapknop zet `data-density="compact"` op `.vtk-admin-surface`
+    (`AdminSurface.tsx`, cookie `vtk-admin-density`), enkel vanaf 860px met een
+    muis of trackpad. Ze haalt lucht weg en laat de letters staan; zoom de admin
+    niet kleiner. Een vaste maat die je aan `vtk-admin.css` of `admin-nav.css`
+    toevoegt, schrijf je als `var(--admin-..., <gewone maat>)` en krijgt een
+    compacte waarde in het blok "Compacte stand"; zonder fallback valt ze op 0
+    waar `.vtk-admin-main` zonder omslag staat. Geef een kaart `p-4`, `p-5` of
+    `p-6` en gebruik `Button`, `IconButton` en `Input`, dan krimpt een nieuw
+    scherm vanzelf mee. Zie `docs/design-decisions.md`.
   - **Tabs zoeken gaat met Ctrl/Cmd+K, in elke stand van de zijbalk.** Het veld
     bovenaan de zijbalk (in de rail een icoon, smal een knop naast het menu)
     opent een `<dialog>` in `packages/ui/src/AdminNavSearch.tsx`; de rangschikking

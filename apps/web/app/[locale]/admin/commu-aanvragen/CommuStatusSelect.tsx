@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import type { Locale } from "@vtk/i18n";
 import { ThemedSelect } from "@/components/ui/ThemedSelect";
@@ -45,7 +46,11 @@ export function CommuStatusSelect({
     form.append("entryId", entryId);
     form.append("reviewStatus", next);
     startTransition(async () => {
-      const result = await setCommuRequestStatusAction(SAVE_IDLE, form);
+      const result = await unsentGuard.run(() => setCommuRequestStatusAction(SAVE_IDLE, form));
+      if (result === UNSENT) {
+        setValue(previous);
+        return;
+      }
       if (result.status === "error") {
         setValue(previous);
         const message = ERRORS[result.code];

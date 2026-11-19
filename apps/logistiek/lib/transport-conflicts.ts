@@ -70,3 +70,21 @@ function clash(a: ConflictCandidate, b: ConflictCandidate): boolean {
   // mee rekent.
   return a.startAt < b.endAt && b.startAt < a.endAt;
 }
+
+/**
+ * Verschuift het venster van deze rit?
+ *
+ * De botsingscontrole bij een wijziging hoort enkel te lopen wanneer het
+ * moment verandert. Een rit die het team met opzet over een andere zette, moet
+ * een nota of een adres kunnen krijgen zonder dat dat als "verschuiven" geldt
+ * (F6.26).
+ */
+export function windowMoved(
+  before: { startAt: Date; endAt: Date },
+  after: { startAt: Date; endAt: Date }
+): boolean {
+  return (
+    before.startAt.getTime() !== after.startAt.getTime() ||
+    before.endAt.getTime() !== after.endAt.getTime()
+  );
+}

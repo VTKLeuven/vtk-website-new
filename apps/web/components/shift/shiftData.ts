@@ -178,9 +178,13 @@ export function useShiftList(url: string, initial?: ShiftResponse[]): ShiftRespo
 export async function registerShift(
   id: string,
   showToast: ShowToast,
-  t: ShiftDict
+  t: ShiftDict,
+  options: { replaceable?: boolean } = {}
 ): Promise<boolean> {
-  const resp = await fetch('/api/shift/register?id=' + id, { method: 'POST' });
+  const query = options.replaceable ? '&replaceable=1' : '';
+  const resp = await fetch('/api/shift/register?id=' + encodeURIComponent(id) + query, {
+    method: 'POST',
+  });
   if (resp.ok) {
     showToast({ variant: 'success', message: t.toast.registered });
     emitShiftsChanged();
@@ -189,6 +193,34 @@ export async function registerShift(
     showToast({ variant: 'error', message: registerErrorMessage(await safeJson(resp), t) });
     return false;
   }
+}
+
+/**
+ * Zet "een student mag mijn plaats innemen" op de eigen inschrijving aan of uit,
+ * met een toast als uitkomst. Geeft terug of het lukte.
+ */
+export async function setShiftReplaceable(
+  id: string,
+  replaceable: boolean,
+  showToast: ShowToast,
+  t: ShiftDict
+): Promise<boolean> {
+  try {
+    const resp = await fetch('/api/shift/register?id=' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ replaceable }),
+    });
+    if (resp.ok) {
+      showToast({ variant: 'success', message: replaceable ? t.replaceable.on : t.replaceable.off });
+      emitShiftsChanged();
+      return true;
+    }
+  } catch {
+    // Geen verbinding: dezelfde melding als een geweigerde opslag.
+  }
+  showToast({ variant: 'error', message: t.replaceable.failed, duration: 0 });
+  return false;
 }
 
 /** Schrijft de huidige user uit voor een shift; geeft terug of het lukte. */

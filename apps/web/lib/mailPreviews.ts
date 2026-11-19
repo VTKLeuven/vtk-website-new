@@ -7,6 +7,9 @@ import {
   passwordResetMail,
 } from "@/lib/accountMail";
 import { interestReminderMail } from "@/lib/calendar/interestReminderMail";
+import { signupOpenedMail } from "@/lib/calendar/signupOpenedMail";
+import { WEEK_OVERVIEW_SEND_HOUR } from "@/lib/calendar/weekOverview";
+import { weekOverviewMail, type WeekOverviewMailEvent } from "@/lib/calendar/weekOverviewMail";
 import { contactMailBody } from "@/lib/contactForm";
 import type { EmailSource } from "@/lib/email";
 import { confirmationMail, notificationMail } from "@/lib/forms/mail";
@@ -34,8 +37,9 @@ import {
   type PalPlusMailSession,
 } from "@/lib/palPlusMail";
 import { expenseMailDraft } from "@/lib/rekeningen/expenses";
-import { cashRegisterAcceptedMail } from "@/lib/kassas/mail";
+import { cashRegisterAcceptedMail, cashRegisterCountedMail } from "@/lib/kassas/mail";
 import { shiftReminderMail } from "@/lib/shift/reminders";
+import { shiftReplacedMail } from "@/lib/shift/replace";
 import { newLesbezoekNotificationMail } from "@/lib/lesbezoeken-server";
 import { newRentalNotificationMail } from "@/lib/theokotVerhuur-server";
 import { orderConfirmationMail } from "@/lib/ticketing/mail";
@@ -103,8 +107,8 @@ export function mailPreviewGroups(): MailPreviewGroup[] {
     {
       id: "kalender",
       title: "Kalender",
-      description: "De herinnering aan wie interesse aanduidde.",
-      mails: [interestReminderPreview()],
+      description: "De mails aan wie interesse aanduidde (wanneer de verkoop of de inschrijvingen opengaan, en de dag ervoor) en de weekmail aan de lijst Evenementen.",
+      mails: [signupOpenedPreview(), signupOpenedPresalePreview(), interestReminderPreview(), weekOverviewPreview()],
     },
     {
       id: "account",
@@ -115,7 +119,7 @@ export function mailPreviewGroups(): MailPreviewGroup[] {
     {
       id: "shiften",
       title: "Shiften",
-      description: "Twee herinneringen per shift, elk met een eigen venster.",
+      description: "Twee herinneringen per shift, elk met een eigen venster, en de mail aan een praesidiumlid dat door een student vervangen werd.",
       mails: shiftPreviews(),
     },
     {
@@ -141,7 +145,7 @@ export function mailPreviewGroups(): MailPreviewGroup[] {
       id: "kassas",
       title: "Kassa's",
       description: "Naar de post die een kassa aanvroeg.",
-      mails: [cashRegisterAcceptedPreview()],
+      mails: [cashRegisterAcceptedPreview(), cashRegisterCountedPreview()],
     },
     {
       id: "formulieren",
@@ -213,6 +217,93 @@ function ticketOrderPreview(): MailPreview {
   };
 }
 
+const SIGNUP_OPENED_NOTES = [
+  "Drie manieren om binnen te geraken, elk één keer per lid: een ticketverkoop van VTK bij het evenement (elke verkoop apart, dus de tweede wave is een eigen mail), het formulier bij het evenement, en de externe link wanneer \"deze link opent de inschrijvingen\" aangevinkt staat.",
+  "Enkel voor wie al interesse had voor het openging, en tot 24 uur erna; nooit meer zodra het evenement begint of de verkoop sluit.",
+  "Gaat er in dezelfde ronde meer open voor hetzelfde lid, dan staat het in één mail.",
+  "De private voorverkooplink telt niet mee: die hangt aan een browser, niet aan een account. Wie zo binnen mag, krijgt de mail bij de publieke start.",
+  "In het echt staat de banner van het evenement bovenaan de kaart; hier niet, want de voorvertoning laadt geen bestaande foto.",
+];
+
+function signupOpenedPreview(): MailPreview {
+  const mail = signupOpenedMail({
+    locale: "nl",
+    firstName: "Voorbeeldlid",
+    events: [
+      {
+        kind: "tickets",
+        presalePublicStart: null,
+        title: "Voorbeeldcantus",
+        start: SAMPLE_START,
+        end: new Date(SAMPLE_START.getTime() + 4 * 60 * 60 * 1000),
+        allDay: false,
+        momentLabel: null,
+        location: "Theokot",
+        organiser: "Onthaal",
+        imageUrl: null,
+        eventUrl: "https://vtk.be/kalender/voorbeeldcantus-2026",
+        link: { label: "Tickets kopen", url: "https://vtk.be/tickets/voorbeeldcantus" },
+      },
+    ],
+    unsubscribeUrl: "https://vtk.be/uitschrijven?t=voorbeeld",
+    accountUrl: "https://vtk.be/account",
+    logoUrl: "https://vtk.be/vtk-logo.png",
+  });
+  return {
+    id: "signup-opened",
+    title: "De ticketverkoop of de inschrijvingen zijn open",
+    when: "Zodra de ticketverkoop, het formulier of de inschrijflink van een evenement opengaat waarin het lid interesse aanduidde. Via de background-worker, elke vijf minuten.",
+    to: "Het lid, op zijn voorkeursadres, enkel wanneer de mailinglijst Evenementen aan staat in zijn account",
+    source: "calendar",
+    file: "lib/calendar/signupOpenedMail.ts",
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+    notes: SIGNUP_OPENED_NOTES,
+  };
+}
+
+function signupOpenedPresalePreview(): MailPreview {
+  const mail = signupOpenedMail({
+    locale: "nl",
+    firstName: "Voorbeeldlid",
+    events: [
+      {
+        kind: "tickets",
+        presalePublicStart: new Date(SAMPLE_START.getTime() - 9 * 24 * 60 * 60 * 1000),
+        title: "Voorbeeldgala",
+        start: SAMPLE_START,
+        end: new Date(SAMPLE_START.getTime() + 8 * 60 * 60 * 1000),
+        allDay: false,
+        momentLabel: null,
+        location: "Voorbeeldzaal",
+        organiser: "Galabal",
+        imageUrl: null,
+        eventUrl: "https://vtk.be/kalender/voorbeeldgala-2026",
+        link: { label: "Tickets kopen", url: "https://vtk.be/tickets/voorbeeldgala" },
+      },
+    ],
+    unsubscribeUrl: "https://vtk.be/uitschrijven?t=voorbeeld",
+    accountUrl: "https://vtk.be/account",
+    logoUrl: "https://vtk.be/vtk-logo.png",
+  });
+  return {
+    id: "signup-opened-presale",
+    title: "Je voorverkoop is begonnen",
+    when: "Bij de start van de voorverkoop, voor wie interesse aanduidde en erin mag: een praesidiumpost, een erelid, een vaste medewerker of een groep die de beheerder erbij zette. Dezelfde regel als de shop.",
+    to: "Het lid, op zijn voorkeursadres, enkel wanneer de mailinglijst Evenementen aan staat in zijn account",
+    source: "calendar",
+    file: "lib/calendar/signupOpenedMail.ts",
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+    notes: [
+      "Wie deze mail kreeg, krijgt er bij de publieke start geen tweede over dezelfde verkoop.",
+      ...SIGNUP_OPENED_NOTES,
+    ],
+  };
+}
+
 function interestReminderPreview(): MailPreview {
   const end = new Date(SAMPLE_START.getTime() + 4 * 60 * 60 * 1000);
   const mail = interestReminderMail({
@@ -264,6 +355,91 @@ function interestReminderPreview(): MailPreview {
       "De knop onderaan opent /uitschrijven, dat eerst een klik vraagt; de mail draagt ook List-Unsubscribe, zodat Gmail en Outlook hun eigen uitschrijfknop tonen.",
       "In het echt staat de banner van elk evenement bovenaan zijn kaart; hier niet, want de voorvertoning laadt geen bestaande foto.",
       "In de taal van het lid (User.locale), met de Engelse titel wanneer die er is.",
+    ],
+  };
+}
+
+function weekOverviewPreview(): MailPreview {
+  // Een week van maandag 23 tot zondag 29 november 2026.
+  const at = (iso: string) => new Date(iso);
+  const sample = (event: Partial<WeekOverviewMailEvent> & Pick<WeekOverviewMailEvent, "title" | "start" | "end">): WeekOverviewMailEvent => ({
+    allDay: false,
+    momentLabel: null,
+    location: null,
+    organiser: "Activiteiten",
+    imageUrl: null,
+    eventUrl: "https://vtk.be/kalender/voorbeeld-2026",
+    link: null,
+    moreThisWeek: 0,
+    excerpt: null,
+    ...event,
+  });
+  const mail = weekOverviewMail({
+    locale: "nl",
+    weekStart: at("2026-11-23T00:00:00+01:00"),
+    featured: sample({
+      title: "Voorbeeld-TD",
+      start: at("2026-11-26T22:00:00+01:00"),
+      end: at("2026-11-27T04:00:00+01:00"),
+      location: "Recup, Leuven",
+      organiser: "Feest",
+      eventUrl: "https://vtk.be/kalender/voorbeeld-td-2026",
+      link: { label: "Tickets kopen", url: "https://vtk.be/tickets/voorbeeld-td" },
+      excerpt: "De laatste TD voor de blok. Drie dj's, de hele nacht, en de eerste tweehonderd binnen krijgen een jeton.",
+    }),
+    others: [
+      sample({
+        title: "Voorbeeldlezing",
+        start: at("2026-11-23T12:30:00+01:00"),
+        end: at("2026-11-23T13:30:00+01:00"),
+        location: "Campus Arenberg, aula 200C",
+        organiser: "Career",
+      }),
+      sample({
+        title: "Voorbeeldcantus",
+        start: at("2026-11-24T20:00:00+01:00"),
+        end: at("2026-11-25T01:00:00+01:00"),
+        location: "Theokot",
+        organiser: "Cantus",
+        link: { label: "Tickets kopen", url: "https://vtk.be/tickets/voorbeeldcantus" },
+      }),
+      sample({
+        title: "Voorbeeldloopweek",
+        momentLabel: "Ochtendloop",
+        start: at("2026-11-25T07:30:00+01:00"),
+        end: at("2026-11-25T08:30:00+01:00"),
+        location: "Sportkot",
+        organiser: "Sport",
+        moreThisWeek: 2,
+      }),
+    ],
+    reminders: [
+      { kind: "ticketSale", at: at("2026-11-25T12:00:00+01:00"), title: "Voorbeeldgalabal", url: "https://vtk.be/tickets/voorbeeldgalabal" },
+      { kind: "formCloses", at: at("2026-11-27T23:59:00+01:00"), title: "Inschrijving voorbeeldreis", url: "https://vtk.be/formulieren/voorbeeldreis" },
+    ],
+    calendarUrl: "https://vtk.be/kalender",
+    unsubscribeUrl: "https://vtk.be/uitschrijven?t=voorbeeld",
+    accountUrl: "https://vtk.be/account",
+    logoUrl: "https://vtk.be/vtk-logo.png",
+  });
+  return {
+    id: "week-overview",
+    title: "Weekmail: deze week bij VTK",
+    when: `Elke zaterdag vanaf ${WEEK_OVERVIEW_SEND_HOUR}u Brusselse tijd, over de week van maandag tot en met zondag die komt. Lag de worker plat, dan nog op zondag, nooit meer zodra de week begonnen is. Via de background-worker, elke vijf minuten, in rondes van 300 leden.`,
+    to: "Elk actief lid met de mailinglijst Evenementen aan, op zijn voorkeursadres",
+    source: "calendar",
+    file: "lib/calendar/weekOverviewMail.ts",
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+    notes: [
+      "Een week zonder gepubliceerde evenementen geeft geen mail.",
+      "Bovenaan staat wat met de ster in /admin/kalender uitgelicht is; anders het eerste evenement met tickets of een inschrijving, en anders het eerste van de week.",
+      "Een evenement met momenten staat één keer, op het eerste moment van de week, met hoe vaak het nog terugkomt.",
+      "Wie de doelgroepfilter op /account aanzette, krijgt enkel wat hij op de kalender ziet; blijft er niets over, dan geen mail.",
+      "Niet vergeten: een publieke ticketverkoop die opent of een inschrijving bij een evenement die sluit, tussen het versturen en het einde van de week.",
+      "In het echt staat de affiche van het uitgelichte evenement over de hele breedte en heeft elk evenement in de lijst een kleine foto; hier niet, want de voorvertoning laadt geen bestaande foto.",
+      "In de taal van het lid (User.locale). Draagt List-Unsubscribe, zodat Gmail en Outlook hun eigen uitschrijfknop tonen.",
     ],
   };
 }
@@ -331,6 +507,7 @@ function shiftPreviews(): MailPreview[] {
   };
   const dayBefore = shiftReminderMail("dayBefore", { name: "Wannes", locale: "NL" }, shift);
   const soon = shiftReminderMail("soon", { name: "Wannes", locale: "NL" }, shift);
+  const replaced = shiftReplacedMail({ name: "Wannes", locale: "NL" }, shift);
   return [
     {
       id: "shift-day-before",
@@ -353,6 +530,20 @@ function shiftPreviews(): MailPreview[] {
       source: "shifts",
       file: "lib/shift/reminders.ts",
       ...soon,
+    },
+    {
+      id: "shift-replaced",
+      title: "Een student neemt je plaats in",
+      when: "Meteen, wanneer een student zich inschrijft op een volle shift waarop dit praesidiumlid aanduidde dat een student zijn plaats mocht innemen.",
+      to: "Het praesidiumlid dat vervangen werd",
+      source: "shifts",
+      file: "lib/shift/replace.ts",
+      ...replaced,
+      notes: [
+        "Vervangen wordt de laatst ingeschreven vervangbare deelnemer; een ander praesidiumlid neemt die plaats nooit in.",
+        "De student ziet niet dat hij iemand vervangt: voor hem stond die plaats als vrij.",
+        "Vertrekt de mail niet, dan blijft de vervanging staan; de fout komt in de log.",
+      ],
     },
   ];
 }
@@ -939,7 +1130,7 @@ function cashRegisterAcceptedPreview(): MailPreview {
     id: "cash-register-accepted",
     title: "Je kassa is aanvaard",
     when: "Zodra iemand met kassabeheer in /admin/kassas op \"Aanvaarden en mailen\" klikt.",
-    to: "Wie de kassa aanvroeg, op het @vtk.be-adres (zonder dat op het voorkeursadres)",
+    to: "Wie de kassa aanvroeg: het gekoppelde @vtk.be-adres, anders voornaam.achternaam@vtk.be (werkgroep.voornaam.achternaam@vtk.be bij een werkgroep). Bij BEST het voorkeursadres.",
     source: "cashRegisters",
     file: "lib/kassas/mail.ts",
     subject: mail.subject,
@@ -950,6 +1141,44 @@ function cashRegisterAcceptedPreview(): MailPreview {
       "De mail toont de startkassa en de toestellen zoals Beheer ze in het aanvaardformulier zette: het standaardwisselgeld voor wat de post aanduidde, met de aantallen die Beheer nog bijstelde.",
       "Een kassa van voor oktober 2026 heeft geen uren; dan valt de regel \"Uur\" weg.",
       "Heeft de aanvrager geen account meer, dan vertrekt er niets en zegt de melding in het beheer dat.",
+    ],
+  };
+}
+
+function cashRegisterCountedPreview(): MailPreview {
+  const mail = cashRegisterCountedMail({
+    locale: "nl",
+    name: "Wannes",
+    activity: "Voorbeeldcantus",
+    date: new Date("2026-10-08T00:00:00.000Z"),
+    postLabel: "Onthaal",
+    result: {
+      startCents: 15000,
+      endCents: 64250,
+      cashCents: 49250,
+      bancontactCents: 31075,
+      payconiqCents: 0,
+      ticketCents: 0,
+      voucherCents: 2400,
+      totalCents: 82725,
+    },
+    url: "https://vtk.be/admin/kassas/voorbeeld",
+  });
+  return {
+    id: "cash-register-counted",
+    title: "Je kassa is geteld",
+    when: "Zodra iemand met kassabeheer op de pagina van een getelde kassa op \"Mail sturen\" klikt. Vertrekt nooit vanzelf.",
+    to: "Wie de kassa aanvroeg, op hetzelfde adres als de mail van de aanvaarding",
+    source: "cashRegisters",
+    file: "lib/kassas/mail.ts",
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+    notes: [
+      "Staat de kassa nog voor \"doorgegeven\", dan schuift ze daarheen op: pas vanaf daar ziet de post het resultaat op de pagina waar de mail naartoe linkt.",
+      "Bancontact, Payconiq, ticketverkoop en bonnen krijgen geen regel wanneer ze nul zijn.",
+      "De opmerking van Beheer bij het tellen staat er niet in; die is enkel voor Beheer.",
+      "Opnieuw sturen kan, bijvoorbeeld na een rechtgezette telling. De mail toont dan de nieuwe cijfers.",
     ],
   };
 }

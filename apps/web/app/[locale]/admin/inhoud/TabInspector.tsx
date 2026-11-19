@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { Button, Card, ConfirmDialog, Input, Label, Textarea } from "@vtk/ui";
@@ -209,7 +210,7 @@ function DeleteTabButton({
     const form = new FormData();
     form.append("id", tab.id);
     startTransition(async () => {
-      await deleteHeaderTabAction(SAVE_IDLE, form);
+      if ((await unsentGuard.run(() => deleteHeaderTabAction(SAVE_IDLE, form))) === UNSENT) return;
       setConfirming(false);
       onDeleted();
     });

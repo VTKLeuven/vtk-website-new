@@ -43,7 +43,8 @@ function ShiftLocation({ locationText }: { locationText: string }) {
     const check = () => {
       setIsOverflowing(el.scrollWidth > el.clientWidth);
     };
-    check();
+    // De observer meet de eerste keer zelf, na de layout; meteen meten dwong
+    // een synchrone layout af tijdens de hydration.
     const ro = new ResizeObserver(check);
     ro.observe(el);
     return () => ro.disconnect();
@@ -257,6 +258,11 @@ export function HomeShiftBand({
                 sourceSystem: null,
                 sourceId: null,
                 manualGrantId: null,
+                theokotSessionId: null,
+                // Al in de taal van de pagina (`localizeShift` op de server).
+                nameEn: null,
+                descriptionEn: null,
+                instructionsEn: null,
                 ...shift,
                 roster: shift.roster,
               },

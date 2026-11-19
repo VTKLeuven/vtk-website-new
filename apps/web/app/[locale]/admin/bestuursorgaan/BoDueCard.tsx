@@ -5,8 +5,9 @@ import type { OwnPost } from "@/lib/bo/own";
 
 /*
  * Op het dashboard (/admin): de resultaten die de eigen post nog naar het BO
- * moet brengen. Enkel wat open staat, en niets als er niets open staat; de
- * rest staat op "Mijn budgetten". Zie `lib/bo/own.ts`.
+ * moet brengen. Enkel wat open staat en waarvan de activiteit al voorbij is,
+ * en niets als er niets open staat; de rest staat op "Mijn budgetten". Zie
+ * `openResults` in `lib/bo/own.ts`.
  */
 
 /** Per post zoveel regels; wat erover gaat, staat op "Mijn budgetten". */

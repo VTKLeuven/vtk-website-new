@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import { X } from "lucide-react";
 import { PencilIcon, UndoIcon } from "@/components/ui/icons";
@@ -53,7 +54,8 @@ export function EntryRow({
       data.set("cell", entry.cell);
       data.set("nameKey", entry.nameKey);
       data.set("target", target);
-      const result = await setPraesidiumShiftCellAction(data);
+      const result = await unsentGuard.run(() => setPraesidiumShiftCellAction(data));
+      if (result === UNSENT) return;
       if (result.status === "error") {
         showToast({
           message: errorMessages[result.code] ?? (nl ? "Niet opgeslagen: er ging iets mis." : "Not saved: something went wrong."),

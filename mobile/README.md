@@ -19,4 +19,6 @@ je eigen `npm run dev`; vul die URL in bij **Profiel -> Server**.
 - `docs/plan.md` - het plan en hoever het staat
 - `docs/architecture.md` - hoe de app met de site praat
 
-De ticketscanner voor aan de deur is een aparte app: `vtk-scanner-app`.
+De ticketscanner voor aan de deur zit ook in deze app, enkel voor wie iets te
+scannen heeft: `docs/scanner.md`. De vroegere aparte app, `vtk-scanner-app`, staat
+enkel nog als archief.

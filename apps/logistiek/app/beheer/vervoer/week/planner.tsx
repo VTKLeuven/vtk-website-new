@@ -24,6 +24,7 @@ import { TripHelpers } from '@/components/trip-helpers';
 import { TripNotes, type TripNoteView } from '@/components/trip-notes';
 import { EventLink } from '@/components/event-link';
 import type { SelectableEvent } from '@/components/event-picker';
+import { ChangedByTeamBadge } from '@/components/changed-by-team-badge';
 import { VanStatusBadge } from '@/components/status-badge';
 import type { UitleenAuditEntry, DriverOption } from '@/lib/uitleen-server';
 import { TransportControls } from '../transport-controls';
@@ -38,7 +39,11 @@ import {
   type BoardNote,
 } from '@/components/transport-calendar/availability-board';
 import type { CalendarEventBar } from '@/components/transport-calendar/event-bars';
-import { adminEditTransportAction, deleteTransportAction } from '@/app/actions/beheer';
+import {
+  adminEditTransportAction,
+  deleteTransportAction,
+  deleteTripSeriesFromAction,
+} from '@/app/actions/beheer';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { useToast } from '@/components/ui/toast';
@@ -71,6 +76,19 @@ import type {
  * die altijd weigert, leert mensen op knoppen te klikken die niets doen. Zie
  * `canDeleteTransport`, `transportDeleteDescription` en docs/design-decisions.md.
  */
+/**
+ * Wat de bevestiging zegt voor een reeks (F6.22): wat er weggaat, en wat blijft.
+ * Het getal komt uit `seriesPositions`, dus het belooft niet meer dan de actie haalt.
+ */
+function seriesDeleteDescription(series: { index: number; removableFromHere: number }): string {
+  const earlier = series.index - 1;
+  const stays =
+    earlier === 0
+      ? 'Ritten die al gereden zijn of een betaling hebben blijven staan.'
+      : `${earlier === 1 ? 'De eerdere rit blijft' : `De ${earlier} eerdere ritten blijven`} staan, en ritten die al gereden zijn of een betaling hebben ook.`;
+  return `Dit verwijdert deze rit en de volgende van de reeks (samen ${series.removableFromHere}), met hun historiek en bijrijders. ${stays} Er gaat geen bericht naar iemand.`;
+}
+
 export type PlannerTrip = {
   id: string;
   purpose: string;
@@ -135,6 +153,10 @@ export type PlannerTrip = {
    * `tripNotesFor`.
    */
   notes: TripNoteView[];
+  /** Wat het team aan deze aanvraag veranderde (F6.11); leeg als niets. */
+  teamChanges: string[];
+  /** Waar de rit in haar reeks staat (F6.22); `null` voor een losse rit. */
+  series: { index: number; total: number; removableFromHere: number } | null;
 };
 
 export function TransportPlanner({
@@ -165,7 +187,7 @@ export function TransportPlanner({
   blocks: TripBlock[];
   trips: PlannerTrip[];
   drivers: DriverOption[];
-  vehicleOptions: Array<{ id: string; name: string; needsVanDriver: boolean }>;
+  vehicleOptions: Array<{ id: string; name: string; needsVanDriver: boolean; needsDriver?: boolean }>;
   /** Posten en werkgroepen waarvoor het team zelf een rit kan inplannen. */
   groups: Array<{ id: string; name: string }>;
   /**
@@ -368,6 +390,7 @@ export function TransportPlanner({
         cargoNote: '',
         pickupAddress: '',
         destination: '',
+        adminNote: '',
       });
     },
     [showToast, vehicleOptions]
@@ -426,7 +449,9 @@ export function TransportPlanner({
             ? 'Geen ritten op deze dag'
             : view === 'maand'
               ? 'Geen ritten deze maand'
-              : 'Geen ritten deze week') +
+              : view === 'dagen'
+                ? 'Geen ritten in deze dagen'
+                : 'Geen ritten deze week') +
           (hiddenNote.length > 0 ? ` met deze filters (${hiddenNote.join('; ')}).` : '.')
         }
         toolbarExtra={
@@ -572,6 +597,7 @@ export function TransportPlanner({
             <div className="grid gap-5">
               <div className="flex flex-wrap items-center gap-2">
                 <VanStatusBadge status={trip.status} />
+                <ChangedByTeamBadge lines={trip.teamChanges} />
                 <span className="rounded-full bg-vtk-paper-2 px-2.5 py-0.5 text-xs font-semibold text-vtk-navy">
                   {trip.vehicleName}
                 </span>
@@ -720,6 +746,33 @@ export function TransportPlanner({
                 </div>
               </dl>
 
+              {/* Deel van een reeks (F6.22): waar deze rit staat, en de uitweg voor de
+                  rest. Enkel "vanaf hier": wat eerder reed of al gereden is, blijft. */}
+              {trip.series && trip.series.total > 1 ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-[12px] border border-vtk-navy/10 bg-vtk-paper px-3 py-2 text-sm">
+                  <span className="text-vtk-body">
+                    Deel van een reeks:{' '}
+                    <strong className="font-semibold text-vtk-ink">
+                      rit {trip.series.index} van {trip.series.total}
+                    </strong>
+                  </span>
+                  {trip.series.removableFromHere > 0 ? (
+                    <ConfirmActionButton
+                      label={`Deze en de volgende verwijderen (${trip.series.removableFromHere})`}
+                      srLabel={`Deze rit en de volgende van de reeks verwijderen: ${trip.title}`}
+                      confirmLabel="Verwijderen"
+                      variant="danger"
+                      destructive
+                      icon={<LogisticsIcon name="trash" className="h-4 w-4" />}
+                      dialogTitle="Deze en de volgende ritten verwijderen?"
+                      dialogDescription={seriesDeleteDescription(trip.series)}
+                      successMessage="Reeks verwijderd."
+                      action={() => deleteTripSeriesFromAction(trip.id)}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+
               {/* V2: wie er meerijdt, met een nummer per persoon. Ook hier te
                   wijzigen: de chauffeur belt het team wanneer er onderweg iets
                   verandert. */}
@@ -729,12 +782,6 @@ export function TransportPlanner({
                 legacyNote={trip.helpersNote}
                 canEdit={trip.status === 'REQUESTED' || trip.status === 'APPROVED'}
               />
-
-              {/* De eigen nota's (F4.20). Je leest hier wat er met Logistiek
-                  gedeeld is en wat je zelf schreef, nooit de privénota van
-                  iemand anders. Schrijven mag op elke rit: het team slaat ze
-                  hier toch al open, en een nota verandert niets aan de rit. */}
-              <TripNotes bookingId={trip.id} notes={trip.notes} canWrite />
 
               <section>
                 <h3 className="text-sm font-semibold text-vtk-ink">Rit aanpassen</h3>
@@ -746,6 +793,11 @@ export function TransportPlanner({
                     currentGroup={trip.requesterGroup}
                     reservationId={trip.reservationId}
                     locked={trip.status !== 'REQUESTED' && trip.status !== 'APPROVED'}
+                    // De eigen nota's (F4.20) staan onder "Extra info van Logistiek"
+                    // (F6.15). Je leest hier wat er met Logistiek gedeeld is en wat
+                    // je zelf schreef, nooit de privénota van iemand anders.
+                    // Schrijven mag op elke rit: een nota verandert niets aan de rit.
+                    notesSlot={<TripNotes bookingId={trip.id} notes={trip.notes} canWrite />}
                     onSaved={() => router.refresh()}
                   />
                 </div>

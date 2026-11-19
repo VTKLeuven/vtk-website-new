@@ -1,13 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@vtk/db";
-import type { MeetingKind } from "@prisma/client";
+import { Prisma, type MeetingKind } from "@prisma/client";
 import { requirePermission, requireSession } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { logAudit } from "@/lib/audit";
 import { brusselsTimeOnDay, ymdKey } from "@/lib/brussels";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
+import { sanitizeSourceKey } from "@/lib/ticketing/source";
 import {
   bureauStockFor,
   chooseBureauSupply,
@@ -16,6 +18,7 @@ import {
   meetingWindowState,
   parseDayValue,
   semesterForDate,
+  semesterMonths,
   type Semester,
 } from "@/lib/meetings";
 import { currentWorkingYear } from "@/lib/workingYear";
@@ -37,7 +40,7 @@ import {
 // -----------------------------------------------------------------------------
 
 /**
- * Wie dit soort moment mag beheren. De GM hoort bij Groep 5 en het Bureau bij
+ * Wie dit soort moment mag beheren. De GM hoort bij admin en Theokot en het Bureau bij
  * Onderwijs; ze zien elkaars schermen dus niet, ook al draaien ze op dezelfde code.
  */
 async function requireMeetingManager(kind: MeetingKind) {
@@ -48,9 +51,15 @@ function adminPath(kind: MeetingKind): string {
   return kind === "GROCOMEET" ? "/admin/grocomeet" : "/admin/bureau";
 }
 
+/** Het beheer van dit soort moment, met "layout" ook elk tabblad en de pagina van elke vergadering. */
+function revalidateAdmin(kind: MeetingKind) {
+  revalidatePath(adminPath(kind));
+  revalidatePath(`/[locale]${adminPath(kind)}`, "layout");
+}
+
 /** Vernieuwt de schermen die op dit moment steunen, in beide talen. */
 function revalidateMeeting(kind: MeetingKind, slug?: string) {
-  revalidatePath(adminPath(kind));
+  revalidateAdmin(kind);
   if (kind === "GROCOMEET") {
     revalidatePath("/grocomeet");
     revalidatePath("/en/grocomeet");
@@ -80,6 +89,24 @@ function parseKind(value: FormDataEntryValue | null): MeetingKind | null {
 function parseSemester(value: FormDataEntryValue | null): Semester | null {
   const n = Number(value);
   return n === 1 || n === 2 ? (n as Semester) : null;
+}
+
+/**
+ * Er staat al een vergadering van deze soort op die dag (`@@unique([kind, day])`
+ * op `Meeting`). Eén bureau en één grocomeet per dag: op productie stond elk
+ * bureau dubbel nadat de planning van semester 2 de dagen van semester 1 er een
+ * tweede keer in had gezet (zie `planMeetingsAction`). Een botsing
+ * op de slug is iets anders en gooit gewoon door.
+ */
+async function isDayTaken(error: unknown, kind: MeetingKind, startsAt: Date): Promise<boolean> {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") return false;
+  const target = error.meta?.target;
+  if (Array.isArray(target) ? target.includes("day") : String(target ?? "").includes("day")) return true;
+  // Twee aanvragen tegelijk kiezen dezelfde slug (`bureau-2026-10-01`) en botsen
+  // daarop voor ze aan de dag toekomen. Staat die dag er nu, dan is het dezelfde
+  // situatie.
+  const day = new Date(`${ymdKey(dayParts(startsAt))}T00:00:00Z`);
+  return (await prisma.meeting.count({ where: { kind, day } })) > 0;
 }
 
 /** "YYYY-MM-DDTHH:mm" uit een datetime-local, als Brussel-wandkloktijd. */
@@ -160,11 +187,21 @@ export async function planMeetingsAction(_prev: SaveState, formData: FormData): 
   const opensDaysBefore =
     kind === "BUREAU" && Number.isInteger(opensDaysRaw) && opensDaysRaw > 0 ? opensDaysRaw : null;
 
+  // Enkel dagen uit de maanden van dit semester. Zo kwamen de dubbele bureaus
+  // van 2026-27 op productie: de planner hield na het wisselen van semestertab
+  // de dagen van semester 1 vast (onzichtbaar, want buiten de getoonde
+  // maanden), en opslaan zette ze een tweede keer in onder semester 2.
+  const allowedMonths = new Set(semesterMonths(year, semester).map((m) => `${m.year}-${m.month}`));
+
   const dayCount = Number(formData.get("dayCount")) || 0;
   const days: Array<{ day: Date; time: string; location: string | null }> = [];
   for (let i = 0; i < dayCount; i += 1) {
-    const day = parseDayValue(String(formData.get(`day-${i}-date`) ?? ""));
+    const raw = String(formData.get(`day-${i}-date`) ?? "");
+    const day = parseDayValue(raw);
     if (!day) continue;
+    if (!allowedMonths.has(`${Number(raw.slice(0, 4))}-${Number(raw.slice(5, 7))}`)) {
+      return saveError("DAY_OUTSIDE_SEMESTER");
+    }
     const time = String(formData.get(`day-${i}-time`) ?? "");
     if (!HHMM.test(time)) return saveError("INVALID_TIME");
     days.push({
@@ -199,18 +236,26 @@ export async function planMeetingsAction(_prev: SaveState, formData: FormData): 
       continue;
     }
 
-    const created = await prisma.meeting.create({
-      data: {
-        kind,
-        year,
-        semester,
-        slug: await uniqueSlug(kind, startsAt),
-        startsAt,
-        location: entry.location,
-        opensAt: opensDaysBefore ? new Date(startsAt.getTime() - opensDaysBefore * 86400000) : null,
-        createdById: session.user.id,
-      },
-    });
+    let created;
+    try {
+      created = await prisma.meeting.create({
+        data: {
+          kind,
+          year,
+          semester,
+          slug: await uniqueSlug(kind, startsAt),
+          startsAt,
+          location: entry.location,
+          opensAt: opensDaysBefore ? new Date(startsAt.getTime() - opensDaysBefore * 86400000) : null,
+          createdById: session.user.id,
+        },
+      });
+    } catch (error) {
+      // Die dag bestaat al, bv. door een tweede opslag die tegelijk liep. Laten
+      // staan; er is er maar één per dag.
+      if (await isDayTaken(error, kind, startsAt)) continue;
+      throw error;
+    }
     // Een GM die er pas bijkomt terwijl er die dag al besteld is.
     await linkGrocomeetOrders(created);
   }
@@ -264,17 +309,23 @@ export async function createMeetingAction(_prev: SaveState, formData: FormData):
   const location = String(formData.get("location") ?? "").trim() || null;
   const year = Number(formData.get("year"));
 
-  const created = await prisma.meeting.create({
-    data: {
-      kind,
-      year: Number.isInteger(year) ? year : currentWorkingYear(startsAt),
-      semester: semesterForDate(startsAt),
-      slug: await uniqueSlug(kind, startsAt),
-      startsAt,
-      location,
-      createdById: session.user.id,
-    },
-  });
+  let created;
+  try {
+    created = await prisma.meeting.create({
+      data: {
+        kind,
+        year: Number.isInteger(year) ? year : currentWorkingYear(startsAt),
+        semester: semesterForDate(startsAt),
+        slug: await uniqueSlug(kind, startsAt),
+        startsAt,
+        location,
+        createdById: session.user.id,
+      },
+    });
+  } catch (error) {
+    if (await isDayTaken(error, kind, startsAt)) return saveError("DAY_TAKEN");
+    throw error;
+  }
 
   await logAudit({
     action: "create",
@@ -355,6 +406,7 @@ export async function saveMeetingAction(_prev: SaveState, formData: FormData): P
     });
   } catch (error) {
     if (error instanceof ExternalLeftError) return saveError("EXTERNAL_LEFT");
+    if (await isDayTaken(error, meeting.kind, startsAt)) return saveError("DAY_TAKEN");
     throw error;
   }
 
@@ -431,6 +483,12 @@ export async function deleteMeetingAction(formData: FormData): Promise<void> {
     summary: "het moment en alle reservaties erop zijn weg",
   });
   revalidateMeeting(meeting.kind, meeting.slug);
+
+  // Vanop de pagina van de vergadering zelf: die bestaat nu niet meer, dus terug
+  // naar de lijst. Enkel een pad binnen het eigen beheer, geen open redirect.
+  const redirectTo = String(formData.get("redirectTo") ?? "");
+  const listPath = adminPath(meeting.kind);
+  if (redirectTo === listPath || redirectTo === `/en${listPath}`) redirect(redirectTo);
 }
 
 /**
@@ -528,8 +586,8 @@ export async function saveMeetingDrinksAction(
     summary: `${items.length} drank(en) aan ${(priceCents / 100).toFixed(2)} euro`,
   });
 
-  revalidatePath(adminPath("GROCOMEET"));
-  revalidatePath(adminPath("BUREAU"));
+  revalidateAdmin("GROCOMEET");
+  revalidateAdmin("BUREAU");
   revalidateMeeting(kind);
   return saveOk();
 }
@@ -563,7 +621,7 @@ export async function toggleReservationPaidAction(formData: FormData): Promise<v
     summary: reservation.paidAt ? "afgevinkt als niet betaald" : "afgevinkt als betaald",
   });
 
-  revalidatePath(adminPath(reservation.meeting.kind));
+  revalidateAdmin(reservation.meeting.kind);
 }
 
 /**
@@ -594,7 +652,60 @@ export async function toggleGrocomeetOrderPaidAction(formData: FormData): Promis
       : "Theokot-bestelling voor de grocomeet afgevinkt als betaald",
   });
 
-  revalidatePath(adminPath("GROCOMEET"));
+  revalidateAdmin("GROCOMEET");
+}
+
+/**
+ * Vinkt alles af wat iemand nog openstaan heeft over het werkingsjaar: zijn
+ * broodjes en drankjes van elke grocomeet, en wat hij bij Theokot bestelde voor
+ * in de doos. Een groco betaalt zijn schuld in één keer, niet per vergadering;
+ * per vergadering afvinken (op de vergadering zelf) blijft voor wie dat wil.
+ *
+ * Dezelfde rijen als `loadGrocomeetDebts`: enkel wat geld kost en nog niet
+ * betaald is.
+ */
+export async function settleGrocomeetDebtAction(formData: FormData): Promise<SaveState> {
+  const session = await requireMeetingManager("GROCOMEET");
+  const userId = String(formData.get("userId") ?? "");
+  if (!userId) return saveError("NOT_FOUND");
+  const year = currentWorkingYear();
+  const now = new Date();
+
+  const [reservations, orders, user] = await Promise.all([
+    prisma.meetingReservation.updateMany({
+      where: {
+        userId,
+        status: "ACTIVE",
+        paidAt: null,
+        meeting: { kind: "GROCOMEET", year },
+        OR: [{ itemNameNl: { not: null } }, { drinkName: { not: null } }],
+      },
+      data: { paidAt: now, paidById: session.user.id },
+    }),
+    prisma.theokotOrder.updateMany({
+      where: {
+        userId,
+        status: { in: ["RESERVED", "PICKED_UP"] },
+        grocomeetPaidAt: null,
+        grocomeet: { kind: "GROCOMEET", year },
+      },
+      data: { grocomeetPaidAt: now },
+    }),
+    prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+  ]);
+
+  const count = reservations.count + orders.count;
+  if (count > 0) {
+    await logAudit({
+      action: "update",
+      entity: "meetingReservation",
+      target: user?.name ?? userId,
+      summary: `volledige grocomeet-schuld afgevinkt als betaald (${count} ${count === 1 ? "bestelling" : "bestellingen"})`,
+    });
+  }
+
+  revalidateAdmin("GROCOMEET");
+  return saveOk();
 }
 
 // -----------------------------------------------------------------------------
@@ -634,6 +745,18 @@ export async function saveMeetingReservationAction(
   const drinkName = String(formData.get("drink") ?? "").trim();
   const comment =
     meeting.kind === "BUREAU" ? String(formData.get("comment") ?? "").trim() || null : null;
+  // Herkomst van een bureau-inschrijving, enkel voor een nieuwe rij (zie de
+  // `create` hieronder). Opnieuw gesaniteerd: een hidden field is aan te
+  // passen. Leeg wordt "direct" en geen `null`: `null` is voorbehouden voor
+  // inschrijvingen van voor de meting, en wie instuurt voor de browser de
+  // herkomst las, is wel gemeten.
+  const origin =
+    meeting.kind === "BUREAU"
+      ? {
+          source: sanitizeSourceKey(formData.get("source")) ?? "direct",
+          sourceCampaign: sanitizeSourceKey(formData.get("sourceCampaign")),
+        }
+      : {};
 
   const drinks = await getMeetingDrinks();
   if (drinkName && !drinks.items.includes(drinkName)) return saveError("UNKNOWN_DRINK");
@@ -706,10 +829,12 @@ export async function saveMeetingReservationAction(
         invalidatedReason: null,
       };
 
+      // De herkomst gaat enkel in `create`: wie later zijn broodje wijzigt via
+      // een andere link, overschrijft niet langs waar hij eerst binnenkwam.
       await tx.meetingReservation.upsert({
         where: { meetingId_userId: { meetingId, userId } },
         update: data,
-        create: { ...data, meetingId, userId },
+        create: { ...data, ...origin, meetingId, userId },
       });
       if (bigBureau) await rebalanceMeetingSupply(tx, meetingId);
     });
@@ -744,4 +869,79 @@ export async function cancelMeetingReservationAction(formData: FormData): Promis
     await prisma.meetingReservation.deleteMany({ where: { meetingId, userId: session.user.id } });
   }
   revalidateMeeting(meeting.kind, meeting.slug);
+}
+
+const PROMOTION_LABEL_MAX = 120;
+/**
+ * Zo ver voor het bureau mag een reclamemoment liggen. Een bureau opent een
+ * paar weken op voorhand; een moment dat verder ligt, is bijna altijd een
+ * verkeerd jaartal, en dat zou de lijn op de tab Statistieken maanden naar
+ * achter oprekken.
+ */
+const PROMOTION_MAX_DAYS_BEFORE = 60;
+
+/** De keuze "Iets anders..." in het logboek; dan telt `sourceCustom`. */
+const OTHER_PROMOTION_SOURCE = "__other";
+
+function revalidateBureauStats() {
+  revalidatePath("/admin/bureau/statistieken");
+  revalidatePath("/en/admin/bureau/statistieken");
+}
+
+/**
+ * Een reclamemoment noteren bij een bureau: wanneer een mail vertrok of een
+ * story online kwam. Verschijnt als markering op de cumulatieve lijn van
+ * /admin/bureau/statistieken. Het kanaal en de naam zijn optioneel en worden
+ * opgeschoond zoals de herkomst van een inschrijving, zodat ze naast elkaar
+ * te leggen zijn.
+ */
+export async function addMeetingPromotionAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const meetingId = String(formData.get("meetingId") ?? "");
+  const meeting = await prisma.meeting.findUnique({ where: { id: meetingId } });
+  if (!meeting || meeting.kind !== "BUREAU") return saveError("NOT_FOUND");
+  const session = await requireMeetingManager(meeting.kind);
+
+  const at = parseLocalDateTime(String(formData.get("at") ?? ""));
+  if (!at) return saveError("INVALID_DATE");
+  const earliest = new Date(
+    Math.min(meeting.startsAt.getTime(), meeting.opensAt?.getTime() ?? Infinity) -
+      PROMOTION_MAX_DAYS_BEFORE * 86_400_000,
+  );
+  // Ten laatste op de dag van het bureau: wat erna komt, verandert niets meer.
+  const latest = new Date(meeting.startsAt.getTime() + 86_400_000);
+  if (at < earliest || at > latest) return saveError("DATE_OUT_OF_RANGE");
+  const label = String(formData.get("label") ?? "").trim();
+  if (!label) return saveError("LABEL_REQUIRED");
+  if (label.length > PROMOTION_LABEL_MAX) return saveError("LABEL_TOO_LONG");
+
+  await prisma.meetingPromotion.create({
+    data: {
+      meetingId,
+      at,
+      label,
+      source:
+        formData.get("source") === OTHER_PROMOTION_SOURCE
+          ? sanitizeSourceKey(formData.get("sourceCustom"))
+          : sanitizeSourceKey(formData.get("source")),
+      sourceCampaign: sanitizeSourceKey(formData.get("sourceCampaign")),
+      createdById: session.user.id,
+    },
+  });
+  revalidateBureauStats();
+  return saveOk();
+}
+
+/** Een genoteerd reclamemoment weghalen; de inschrijvingen blijven staan. */
+export async function deleteMeetingPromotionAction(formData: FormData): Promise<SaveState> {
+  const id = String(formData.get("promotionId") ?? "");
+  const promotion = await prisma.meetingPromotion.findUnique({
+    where: { id },
+    include: { meeting: { select: { kind: true } } },
+  });
+  if (!promotion) return saveError("NOT_FOUND");
+  await requireMeetingManager(promotion.meeting.kind);
+
+  await prisma.meetingPromotion.delete({ where: { id } });
+  revalidateBureauStats();
+  return saveOk();
 }

@@ -3,7 +3,7 @@ import 'server-only';
 import { prisma } from '@vtk/db';
 import { currentWorkingYear, FIRST_WORKING_YEAR } from '@vtk/auth';
 import type { Prisma } from '@prisma/client';
-import { driverColorIndex } from './driver-colors';
+import { driverColorVar } from './driver-colors';
 import { driverColorOverrides } from './uitleen-server';
 import { tripTitle } from './uitleen';
 
@@ -141,12 +141,23 @@ export type DriverStat = {
    */
   perHour: number[];
   /**
-   * De kleur van deze chauffeur in de planning, 1 tot 24.
+   * Uren per weekdag en uur (F6.4, F6.6): 168 getallen, index `dag * 24 + uur`, met
+   * maandag als dag 0. Uit dezelfde wandeling als `perHour` en de drukteweergave,
+   * dus ze tellen precies hetzelfde: `perHour` is hiervan de som over de dagen en
+   * de weekdagen zijn de som over de uren. Eén getallenrij per chauffeur en geen
+   * `perWeekday` ernaast, want drie opgeslagen lezingen van hetzelfde lopen
+   * vroeg of laat uiteen.
+   */
+  heat: number[];
+  /**
+   * De kleur van deze chauffeur in de planning, als CSS-waarde (een paletkleur
+   * of een eigen kleur).
    *
    * Meegegeven zodat een grafiek dezelfde kleur kan gebruiken als de kalender:
-   * wie daar mint is, is dat hier ook.
+   * wie daar mint is, is dat hier ook. Een CSS-waarde en geen paletnummer, want
+   * een eigen kleur heeft geen nummer.
    */
-  colorIndex: number;
+  color: string;
 };
 
 export type GroupStat = {
@@ -305,7 +316,8 @@ export async function transportStats(filters: StatsFilters): Promise<TransportSt
         hours: 0,
         perVehicle: {},
         perHour: new Array<number>(24).fill(0),
-        colorIndex: driverColorIndex(booking.driverId, colors),
+        heat: new Array<number>(24 * 7).fill(0),
+        color: driverColorVar(booking.driverId, colors),
       };
       entry.trips += 1;
       entry.hours += duration;
@@ -348,7 +360,10 @@ export async function transportStats(filters: StatsFilters): Promise<TransportSt
 
     eachQuarter(booking.startAt, booking.endAt, (day, hour, amount) => {
       heatmap[day][hour] += amount;
-      if (driverEntry) driverEntry.perHour[hour] += amount;
+      if (driverEntry) {
+        driverEntry.perHour[hour] += amount;
+        driverEntry.heat[day * 24 + hour] += amount;
+      }
     });
   }
 
@@ -407,6 +422,7 @@ export async function transportStats(filters: StatsFilters): Promise<TransportSt
           Object.entries(entry.perVehicle).map(([key, value]) => [key, round(value)])
         ),
         perHour: entry.perHour.map(round),
+        heat: entry.heat.map(round),
       }))
       .sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name, 'nl')),
     perGroup: [...perGroup.values()]
@@ -467,21 +483,28 @@ export function resolvePeriod(
     const to = new Date(now.getTime() + 86_400_000);
     return { from: new Date(to.getTime() - 30 * 86_400_000), to, label: 'Laatste 30 dagen', key };
   }
-  if (key === 'vorigjaar') {
-    // Er is geen historiek van voor het eerste werkingsjaar; dan blijft het bij
-    // dat jaar in plaats van een leeg scherm met een jaartal dat niet bestaat.
-    const previous = Math.max(year - 1, FIRST_WORKING_YEAR);
+  // Er is geen historiek van voor het eerste werkingsjaar; dan is "vorig jaar"
+  // gewoon dit jaar, in plaats van een leeg scherm met een jaartal dat niet
+  // bestaat. Het scherm toont die keuze dan ook niet.
+  if (key === 'vorigjaar' && year > FIRST_WORKING_YEAR) {
+    const previous = year - 1;
     return { ...workingYearRange(previous), label: `Werkingsjaar ${workingYearLabel(previous)}`, key };
   }
-  if (key === 'aangepast' && custom.from && custom.to) {
-    return {
-      from: custom.from,
-      // Inclusief de gekozen einddag: wie "tot 30 september" kiest, bedoelt die
-      // dag erbij.
-      to: new Date(custom.to.getTime() + 86_400_000),
-      label: `${dayLabel.format(custom.from)} tot ${dayLabel.format(custom.to)}`,
-      key,
-    };
+  if (key === 'aangepast') {
+    if (custom.from && custom.to) {
+      return {
+        from: custom.from,
+        // Inclusief de gekozen einddag: wie "tot 30 september" kiest, bedoelt
+        // die dag erbij.
+        to: new Date(custom.to.getTime() + 86_400_000),
+        label: `${dayLabel.format(custom.from)} tot ${dayLabel.format(custom.to)}`,
+        key,
+      };
+    }
+    // Nog geen datums: dit werkingsjaar, maar de keuze blijft "aangepast". Wie
+    // net op die knop drukte, moet de datumvelden te zien krijgen; met de sleutel
+    // terug op "jaar" verschenen die nooit.
+    return { ...workingYearRange(year), label: `Werkingsjaar ${workingYearLabel(year)}`, key };
   }
   return { ...workingYearRange(year), label: `Werkingsjaar ${workingYearLabel(year)}`, key: 'jaar' };
 }

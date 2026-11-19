@@ -1,0 +1,314 @@
+"use server";
+
+import { revalidatePath, updateTag } from "next/cache";
+import { redirect } from "next/navigation";
+import type { StudyYear } from "@prisma/client";
+import { prisma } from "@vtk/db";
+import { logAudit } from "@/lib/audit";
+import { SITE_CONTENT_TAG } from "@/lib/cachedContent";
+import { discordBotConfigured, listDiscordChannels } from "@/lib/discord/bot";
+import { postPollToDiscord, refreshPollDiscordMessage, removePollDiscordMessage } from "@/lib/discord/pollPosts";
+import { managedPocIds, managesPoc } from "@/lib/pocPolls/access";
+import { GENERAL_POLL, pollIsOpen } from "@/lib/pocPolls/core";
+import { parseBrusselsInput, parsePollDraft } from "@/lib/pocPolls/draft";
+import { STUDY_YEARS } from "@/lib/pocPolls/population";
+import { pollAnswerRef } from "@/lib/pocPolls/voterKey";
+import { submitPollAnswers } from "@/lib/pocPolls/submit";
+import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { getCurrentSession, requireSession } from "@/lib/session";
+
+const MAX_SUMMARY_LENGTH = 4000;
+
+function text(formData: FormData, name: string): string {
+  const value = formData.get(name);
+  return typeof value === "string" ? value : "";
+}
+
+function adminBase(formData: FormData): string {
+  return `${formData.get("locale") === "en" ? "/en" : ""}/admin/peilingen`;
+}
+
+function refreshPollScreens() {
+  revalidatePath("/[locale]/admin/peilingen", "layout");
+  revalidatePath("/", "layout");
+}
+
+/**
+ * Bewaart de antwoorden van een student op een POC-peiling.
+ *
+ * Opnieuw versturen vervangt alles wat die student eerder antwoordde: zo telt
+ * iedereen één keer, en kan een vraag die je nu overslaat ook weer leeg worden.
+ */
+export async function submitPocPollAction(_previous: SaveState, formData: FormData): Promise<SaveState> {
+  const session = await getCurrentSession();
+  if (!session) return saveError("POLL_SIGN_IN");
+
+  const code = await submitPollAnswers(session.user.id, text(formData, "pollId"), (name) => formData.get(name));
+  if (code) return saveError(code);
+
+  // De layout mee: de strook bovenaan hoort meteen te verdwijnen.
+  revalidatePath("/", "layout");
+  return saveOk();
+}
+
+async function manageScope() {
+  const session = await requireSession();
+  return managedPocIds(session);
+}
+
+/** De peiling, als deze gebruiker ze mag beheren. */
+async function managedPoll(id: string) {
+  const scope = await manageScope();
+  const poll = await prisma.pocPoll.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      pocId: true,
+      titleNl: true,
+      publishedAt: true,
+      opensAt: true,
+      closesAt: true,
+      discordChannelId: true,
+      discordMessageId: true,
+    },
+  });
+  return poll && managesPoc(scope, poll.pocId) ? poll : null;
+}
+
+/** Een concept bewaren, of publiceren: dan gaat de peiling meteen open. */
+export async function savePocPollAction(_previous: SaveState, formData: FormData): Promise<SaveState> {
+  const scope = await manageScope();
+  const publish = formData.get("intent") !== "draft";
+  const now = new Date();
+
+  const parsed = parsePollDraft(
+    {
+      title: text(formData, "title"),
+      closesAt: text(formData, "closesAt"),
+      meetingDate: text(formData, "meetingDate"),
+      questions: text(formData, "questions"),
+      studyYears: formData.getAll("studyYears").filter((year): year is string => typeof year === "string"),
+    },
+    { publish, now },
+  );
+  if (!parsed.ok) return saveError(parsed.code);
+  const { draft } = parsed;
+
+  const id = text(formData, "id");
+  // `GENERAL_POLL` is een algemene peiling van VTK Onderwijs: geen POC.
+  const pocField = text(formData, "pocId");
+  let pocId: string | null = pocField === GENERAL_POLL ? null : pocField;
+  if (id) {
+    const existing = await managedPoll(id);
+    if (!existing) return saveError("POLL_FORBIDDEN");
+    if (existing.publishedAt) return saveError("POLL_LOCKED");
+    pocId = existing.pocId;
+  } else if (!pocField) {
+    return saveError("POLL_FORBIDDEN");
+  }
+  if (!managesPoc(scope, pocId)) return saveError("POLL_FORBIDDEN");
+
+  let pocChannelId: string | null = null;
+  if (pocId !== null) {
+    const poc = await prisma.poc.findUnique({ where: { id: pocId }, select: { studyProgrammes: true, discordChannelId: true } });
+    if (!poc) return saveError("POLL_FORBIDDEN");
+    if (publish && poc.studyProgrammes.length === 0) return saveError("POLL_POC_NO_PROGRAMME");
+    pocChannelId = poc.discordChannelId;
+  }
+
+  // Een RiVer post enkel in het kanaal van de eigen POC: aan of uit, geen keuze.
+  // Enkel VTK Onderwijs (`pocs.manage`) kiest een ander kanaal; een kanaal dat de
+  // bot niet kent, weigeren we dan hier al, en niet pas bij het posten.
+  const channelField = scope === "all" ? text(formData, "discordChannelId").trim() : "";
+  let discordChannelId: string | null =
+    scope !== "all" && discordBotConfigured() && formData.has("postToDiscord") ? pocChannelId : null;
+  if (channelField && discordBotConfigured()) {
+    if (!/^\d{5,25}$/.test(channelField)) return saveError("POLL_CHANNEL");
+    const channels = await listDiscordChannels();
+    if (channels && !channels.some((channel) => channel.id === channelField)) return saveError("POLL_CHANNEL");
+    discordChannelId = channelField;
+  }
+
+  const fields = {
+    titleNl: draft.title,
+    closesAt: draft.closesAt,
+    meetingDate: draft.meetingDate,
+    studyYears: draft.studyYears.filter((year): year is StudyYear => STUDY_YEARS.includes(year as StudyYear)),
+    discordChannelId,
+    ...(publish ? { publishedAt: now, opensAt: now } : {}),
+  };
+
+  const pollId = await prisma.$transaction(async (tx) => {
+    const poll = id
+      ? await tx.pocPoll.update({ where: { id }, data: fields, select: { id: true } })
+      : await tx.pocPoll.create({ data: { ...fields, pocId, opensAt: now }, select: { id: true } });
+    await tx.pocPollQuestion.deleteMany({ where: { pollId: poll.id } });
+    await tx.pocPollQuestion.createMany({
+      data: draft.questions.map((question, order) => ({
+        pollId: poll.id,
+        order,
+        kind: question.kind,
+        textNl: question.text,
+        lowLabelNl: question.low,
+        highLabelNl: question.high,
+      })),
+    });
+    return poll.id;
+  });
+
+  await logAudit({
+    action: publish ? "publish" : id ? "update" : "create",
+    entity: "pocPoll",
+    entityId: pollId,
+    target: draft.title,
+  });
+
+  if (publish) {
+    updateTag(SITE_CONTENT_TAG);
+    await postPollToDiscord(pollId);
+  }
+  refreshPollScreens();
+
+  // Een nieuw concept krijgt zijn eigen adres: een tweede klik op bewaren maakt
+  // anders een duplicaat. Na publiceren is het opstelscherm er niet meer.
+  if (publish || !id) redirect(`${adminBase(formData)}/${pollId}`);
+  return saveOk();
+}
+
+/**
+ * De kanalen van de Discord-server, voor de kaart "Discord-kanalen per POC".
+ * Die vraagt ze pas op wanneer ze opengeklapt wordt: Discord antwoordt soms
+ * traag, en /admin/peilingen hoort daar niet op te wachten.
+ */
+export async function listPocPollChannelsAction(): Promise<
+  { ok: true; channels: Array<{ id: string; name: string }> } | { ok: false; code: "POLL_FORBIDDEN" | "POLL_DISCORD_DOWN" }
+> {
+  const scope = await manageScope();
+  if (scope !== "all") return { ok: false, code: "POLL_FORBIDDEN" };
+  const channels = await listDiscordChannels();
+  return channels ? { ok: true, channels } : { ok: false, code: "POLL_DISCORD_DOWN" };
+}
+
+/**
+ * Welk Discord-kanaal bij welke POC hoort: daar komen de peilingen van haar
+ * RiVers. Enkel VTK Onderwijs (`pocs.manage`) stelt dit in. Een veld dat niet
+ * meekwam (Discord antwoordde niet), laat de POC zoals ze was.
+ */
+export async function savePocPollChannelsAction(_previous: SaveState, formData: FormData): Promise<SaveState> {
+  const scope = await manageScope();
+  if (scope !== "all") return saveError("POLL_FORBIDDEN");
+  const channels = await listDiscordChannels();
+  if (!channels) return saveError("POLL_DISCORD_DOWN");
+
+  const pocs = await prisma.poc.findMany({ select: { id: true, nameNl: true, discordChannelId: true } });
+  const changes: Array<{ id: string; name: string; channelId: string | null }> = [];
+  for (const poc of pocs) {
+    const field = formData.get(`channel_${poc.id}`);
+    if (typeof field !== "string") continue;
+    const channelId = field.trim() || null;
+    if (channelId && !channels.some((channel) => channel.id === channelId)) return saveError("POLL_CHANNEL");
+    if (channelId !== poc.discordChannelId) changes.push({ id: poc.id, name: poc.nameNl, channelId });
+  }
+
+  await prisma.$transaction(
+    changes.map((change) => prisma.poc.update({ where: { id: change.id }, data: { discordChannelId: change.channelId } })),
+  );
+  if (changes.length > 0) {
+    const label = (channelId: string | null) =>
+      channelId ? `#${channels.find((channel) => channel.id === channelId)?.name ?? channelId}` : "geen";
+    await logAudit({
+      action: "update",
+      entity: "poc",
+      target: "Discord-kanalen van de peilingen",
+      summary: changes.map((change) => `${change.name}: ${label(change.channelId)}`).join("; "),
+    });
+  }
+  revalidatePath("/[locale]/admin/peilingen", "layout");
+  return saveOk();
+}
+
+/** De planning van een gepubliceerde peiling; de vragen liggen dan al vast. */
+export async function updatePocPollScheduleAction(_previous: SaveState, formData: FormData): Promise<SaveState> {
+  const poll = await managedPoll(text(formData, "id"));
+  if (!poll?.publishedAt) return saveError("POLL_FORBIDDEN");
+
+  const closesAt = parseBrusselsInput(text(formData, "closesAt"));
+  if (!closesAt) return saveError("POLL_CLOSES_INVALID");
+  const meeting = text(formData, "meetingDate").trim();
+  if (meeting && !/^\d{4}-\d{2}-\d{2}$/.test(meeting)) return saveError("POLL_MEETING_INVALID");
+
+  await prisma.pocPoll.update({
+    where: { id: poll.id },
+    data: { closesAt, meetingDate: meeting ? new Date(`${meeting}T00:00:00.000Z`) : null },
+  });
+  await logAudit({ action: "update", entity: "pocPoll", entityId: poll.id, target: poll.titleNl, summary: "planning" });
+  updateTag(SITE_CONTENT_TAG);
+  await refreshPollDiscordMessage(poll.id);
+  refreshPollScreens();
+  return saveOk();
+}
+
+export async function deletePocPollAction(formData: FormData): Promise<SaveState> {
+  const poll = await managedPoll(text(formData, "id"));
+  if (!poll) return saveError("POLL_FORBIDDEN");
+
+  await prisma.pocPoll.delete({ where: { id: poll.id } });
+  await logAudit({ action: "delete", entity: "pocPoll", entityId: poll.id, target: poll.titleNl });
+  await removePollDiscordMessage(poll.discordChannelId, poll.discordMessageId);
+  updateTag(SITE_CONTENT_TAG);
+  refreshPollScreens();
+  redirect(adminBase(formData));
+}
+
+/** Wat de RiVers na de POC vertellen. Leegmaken haalt de samenvatting weer weg. */
+export async function publishPocPollSummaryAction(_previous: SaveState, formData: FormData): Promise<SaveState> {
+  const poll = await managedPoll(text(formData, "id"));
+  if (!poll?.publishedAt) return saveError("POLL_FORBIDDEN");
+  if (pollIsOpen(poll, new Date())) return saveError("POLL_STILL_OPEN");
+
+  const summary = text(formData, "summary").trim();
+  if (summary.length > MAX_SUMMARY_LENGTH) return saveError("POLL_SUMMARY_LONG");
+
+  await prisma.pocPoll.update({
+    where: { id: poll.id },
+    data: { summaryNl: summary || null, summaryPublishedAt: summary ? new Date() : null },
+  });
+  await logAudit({ action: "publish", entity: "pocPoll", entityId: poll.id, target: poll.titleNl, summary: "samenvatting" });
+  updateTag(SITE_CONTENT_TAG);
+  await refreshPollDiscordMessage(poll.id);
+  refreshPollScreens();
+  return saveOk();
+}
+
+/** Een open antwoord markeren voor de POC, of verbergen. */
+export async function togglePocPollAnswerAction(formData: FormData): Promise<SaveState> {
+  const poll = await managedPoll(text(formData, "id"));
+  if (!poll?.publishedAt || pollIsOpen(poll, new Date())) return saveError("POLL_FORBIDDEN");
+
+  const questionId = text(formData, "questionId");
+  const question = await prisma.pocPollQuestion.findFirst({
+    where: { id: questionId, pollId: poll.id },
+    select: { answers: { select: { voterKey: true, starred: true, hidden: true } } },
+  });
+  const ref = text(formData, "ref");
+  const answer = question?.answers.find((row) => pollAnswerRef(questionId, row.voterKey) === ref);
+  if (!answer) return saveError("POLL_FORBIDDEN");
+
+  const flag = text(formData, "flag") === "hidden" ? "hidden" : "starred";
+  await prisma.pocPollAnswer.update({
+    where: { questionId_voterKey: { questionId, voterKey: answer.voterKey } },
+    data: { [flag]: !answer[flag] },
+  });
+  revalidatePath("/[locale]/admin/peilingen", "layout");
+  return saveOk();
+}
+
+export async function retryPocPollDiscordAction(_previous: SaveState, formData: FormData): Promise<SaveState> {
+  const poll = await managedPoll(text(formData, "id"));
+  if (!poll?.publishedAt) return saveError("POLL_FORBIDDEN");
+
+  await postPollToDiscord(poll.id);
+  refreshPollScreens();
+  const after = await prisma.pocPoll.findUnique({ where: { id: poll.id }, select: { discordError: true } });
+  return after?.discordError ? saveError("POLL_DISCORD", after.discordError) : saveOk();
+}

@@ -60,13 +60,19 @@ export function membershipIsActive(membership: Pick<Membership, "activatedAt"> |
 /**
  * Wie voor de kring als lid telt.
  *
- * Twee wegen, en dat is bewust. Een student van de faculteit is lid zodra KU
+ * Drie wegen, en dat is bewust. Een student van de faculteit is lid zodra KU
  * Leuven dat bevestigt (`User.firwStudent`, uit `eduPersonOrgUnitDN`): die
  * bevestiging is sterker dan een vinkje, en zonder die tak zou het halve
  * publiek van de kring buiten staan tot iedereen het formulier ooit eens
  * invulde. Daarnaast telt een geactiveerd lidmaatschap van dit academiejaar,
  * en daar maakt het niet uit of het gratis, betaald of door een beheerder
  * toegekend is.
+ *
+ * En een erelid (`User.honoraryMember`) is lid in elk academiejaar dat hij
+ * erelid is. Bewust afgeleid en geen `Membership`-rij bij het toekennen: het
+ * erelidmaatschap hangt niet aan een academiejaar, dus een rij voor dat ene
+ * jaar zou op 14 september vervallen terwijl de persoon erelid blijft. Zie
+ * docs/design-decisions.md, "Ereleden".
  *
  * Een DB-lezing, want `SessionPayload` draagt permissies en posten, geen
  * ledenstatus; dat uitbreiden zou elke sessielezing op de hele site duurder
@@ -78,13 +84,16 @@ export async function userIsMember(
 ): Promise<boolean> {
   if (!userId) return false;
   const [user, membership] = await Promise.all([
-    prisma.user.findUnique({ where: { id: userId }, select: { firwStudent: true } }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { firwStudent: true, honoraryMember: true },
+    }),
     prisma.membership.findUnique({
       where: { userId_year: { userId, year } },
       select: { activatedAt: true },
     }),
   ]);
-  return (user?.firwStudent ?? false) || membershipIsActive(membership);
+  return (user?.firwStudent ?? false) || (user?.honoraryMember ?? false) || membershipIsActive(membership);
 }
 
 // Het aanbod zelf is pure logica en staat in `offer.ts`, zodat het
@@ -171,12 +180,67 @@ export type MemberRow = {
  * het beheer wil net kunnen zien wie afhaakte in het betaalscherm. Standaard
  * staan ze er niet bij, want "het ledenaantal" zijn de echte leden.
  */
+/**
+ * De filter op soort lid in de URL van /admin/leden (`?soort=`), in de woorden
+ * van het ledenaantal bovenaan: gratis, betalend, toegekend. Toegekend is een
+ * eigen soort en niet "gratis": wie cash aan de toog betaalde, staat daar ook.
+ */
+export const MEMBER_KIND_FILTERS = {
+  gratis: "FACULTY",
+  betalend: "EXTERNAL",
+  toegekend: "MANUAL",
+} as const satisfies Record<string, MembershipKind>;
+
+export type MemberKindFilter = keyof typeof MEMBER_KIND_FILTERS;
+
+export function parseMemberKindFilter(value: string | null | undefined): MemberKindFilter | null {
+  return value && Object.hasOwn(MEMBER_KIND_FILTERS, value) ? (value as MemberKindFilter) : null;
+}
+
+/** Een zoekterm uit de URL, ingekort zodat een plakfout geen query van een pagina wordt. */
+export function parseMemberSearch(value: string | null | undefined): string {
+  return (value ?? "").trim().slice(0, 100);
+}
+
+/** Zoeken op naam, e-mail of r-nummer, zoals /admin/gebruikers. */
+function userSearchWhere(query: string) {
+  return {
+    OR: [
+      { name: { contains: query, mode: "insensitive" as const } },
+      { firstName: { contains: query, mode: "insensitive" as const } },
+      { lastName: { contains: query, mode: "insensitive" as const } },
+      { email: { contains: query, mode: "insensitive" as const } },
+      { rNumber: { contains: query, mode: "insensitive" as const } },
+    ],
+  };
+}
+
+export type MemberListOptions = {
+  pending?: boolean;
+  kind?: MemberKindFilter | null;
+  query?: string;
+};
+
+function memberWhere(year: number, options: MemberListOptions) {
+  return {
+    year,
+    ...(options.pending ? {} : { activatedAt: { not: null } }),
+    ...(options.kind ? { kind: MEMBER_KIND_FILTERS[options.kind] } : {}),
+    ...(options.query ? { user: userSearchWhere(options.query) } : {}),
+  };
+}
+
+/** Hoeveel rijen de ledenlijst zonder zoekterm en soort telt, voor "3 van de 412". */
+export async function countMembers(year: number, options: { pending?: boolean } = {}): Promise<number> {
+  return prisma.membership.count({ where: memberWhere(year, { pending: options.pending }) });
+}
+
 export async function listMembers(
   year: number,
-  options: { pending?: boolean } = {},
+  options: MemberListOptions = {},
 ): Promise<MemberRow[]> {
   const rows = await prisma.membership.findMany({
-    where: { year, ...(options.pending ? {} : { activatedAt: { not: null } }) },
+    where: memberWhere(year, options),
     include: {
       user: { select: { id: true, name: true, email: true, rNumber: true } },
       grantedBy: { select: { name: true } },
@@ -283,9 +347,14 @@ export type HonoraryMemberRow = {
  * Niet per academiejaar: erelid ben je tot een beheerder het intrekt. Een
  * verwijderd account valt weg, ook al zou de vlag nog staan.
  */
-export async function listHonoraryMembers(): Promise<HonoraryMemberRow[]> {
+/** Alle ereleden, zonder zoekterm, voor "2 van de 7". */
+export async function countHonoraryMembers(): Promise<number> {
+  return prisma.user.count({ where: { honoraryMember: true, deletedAt: null } });
+}
+
+export async function listHonoraryMembers(query = ""): Promise<HonoraryMemberRow[]> {
   const rows = await prisma.user.findMany({
-    where: { honoraryMember: true, deletedAt: null },
+    where: { honoraryMember: true, deletedAt: null, ...(query ? userSearchWhere(query) : {}) },
     select: { id: true, name: true, email: true, rNumber: true },
     orderBy: { name: "asc" },
   });

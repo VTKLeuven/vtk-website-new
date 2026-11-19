@@ -43,6 +43,14 @@ describe('maten in de URL van een afbeelding', () => {
 });
 
 describe('foto’s die tegen elkaar aan staan', () => {
+  it('ziet foto’s op opeenvolgende regels als één galerij, ook met een regeleinde ertussen', () => {
+    const br: ElementContent = { type: 'element', tagName: 'br', properties: {}, children: [] };
+    const photos = galleryPhotos(
+      paragraph(img('/a.jpg'), br, text('\n'), img('/b.jpg'), br, text('\n'), img('/c.jpg')),
+    );
+    expect(photos?.map((photo) => photo.src)).toEqual(['/a.jpg', '/b.jpg', '/c.jpg']);
+  });
+
   it('maakt van twee of meer afbeeldingen een galerij', () => {
     const photos = galleryPhotos(
       paragraph(img('/a.jpg?w=600&h=400', 'Eerste'), text('\n'), img('/b.jpg?w=400&h=600'))

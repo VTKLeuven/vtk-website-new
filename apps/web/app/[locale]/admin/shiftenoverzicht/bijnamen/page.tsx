@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Locale } from "@vtk/i18n";
 import { prisma } from "@vtk/db";
-import Link from "@/components/ui/Link";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
@@ -22,7 +21,6 @@ export default async function PraesidiumShiftAliases({
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const nl = locale === "nl";
-  const base = nl ? "" : "/en";
   await requirePermission("shift.praesidium");
 
   const { jaar } = await searchParams;
@@ -62,11 +60,7 @@ export default async function PraesidiumShiftAliases({
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <Link href={`${base}/admin/shiftenoverzicht?jaar=${year}`} className="text-sm text-vtk-muted hover:text-vtk-ink">
-          {"← "}
-          {nl ? "Shiftenoverzicht praesidium" : "Praesidium shift overview"}
-        </Link>
-        <h1 className="text-2xl font-semibold">{nl ? "Bijnamen op shiftenlijsten" : "Nicknames on shift lists"}</h1>
+        <h2 className="text-lg font-semibold">{nl ? "Bijnamen op shiftenlijsten" : "Nicknames on shift lists"}</h2>
         <p className="max-w-3xl text-sm text-vtk-muted">
           {nl
             ? "Een bijnaam koppelt een schrijfwijze (\"Mekkie\", \"Jarne P\") aan een praesidiumlid, of zegt dat ze nooit iemand van het praesidium is, of dat ze geen persoon is maar een post of taak (\"Iedereen\", \"Cultuur\"). Ze geldt voor elke lijst die je oplaadt, en voor elke lijst waar die naam niet met de hand gekozen is. Klopt er een niet meer, kies hier iemand anders: de lijsten volgen meteen."

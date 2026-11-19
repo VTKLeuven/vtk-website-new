@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useOptimistic, useTransition } from "react";
 import { useToast } from "@/components/ui/toast";
 import { setPraesidiumShiftNecessityAction } from "@/app/actions/praesidiumShifts";
@@ -40,7 +41,11 @@ export function NecessityToggle({
       data.set("shiftId", shiftId);
       data.set("userIds", userIds.join(","));
       data.set("necessary", next ? "1" : "0");
-      const result = await setPraesidiumShiftNecessityAction(data);
+      const result = await unsentGuard.run(() => setPraesidiumShiftNecessityAction(data));
+      if (result === UNSENT) {
+        setShown(!next);
+        return;
+      }
       if (result.status === "error") {
         showToast({
           message: nl

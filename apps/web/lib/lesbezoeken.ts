@@ -423,6 +423,23 @@ export const LESBEZOEK_MIN_LEAD_DAYS = 14;
  */
 export const LESBEZOEK_MAX_LEAD_DAYS = 365;
 
+/**
+ * De vroegste en laatste lesdag die een aanvraag op `now` mag kiezen, als
+ * "yyyy-mm-dd" op de Brusselse kalender.
+ *
+ * De termijn telt in kalenderdagen en niet in uren tot het lesuur: op woensdag
+ * mag je de woensdag twee weken later kiezen, ook wanneer die les 's ochtends
+ * valt en je 's middags aanvraagt. Het formulier biedt die dag aan als vroegste
+ * datum, dus de server moet hem ook aanvaarden.
+ */
+export function lesbezoekDateWindow(now: Date = new Date()): { earliest: string; latest: string } {
+  const today = brusselsYMD(now);
+  return {
+    earliest: ymdKey(shiftYMD(today, LESBEZOEK_MIN_LEAD_DAYS)),
+    latest: ymdKey(shiftYMD(today, LESBEZOEK_MAX_LEAD_DAYS)),
+  };
+}
+
 export type LesbezoekErrorCode =
   | "ORGANISATION_REQUIRED"
   | "ORGANISATION_TOO_LONG"
@@ -626,10 +643,10 @@ export function parseLesbezoekRequest(
     return { status: "error", code: "DATE_INVALID" };
   }
 
-  const now = options.now ?? new Date();
-  const leadMs = options.startsAt.getTime() - now.getTime();
-  if (leadMs < LESBEZOEK_MIN_LEAD_DAYS * 86_400_000) return { status: "error", code: "TOO_SOON" };
-  if (leadMs > LESBEZOEK_MAX_LEAD_DAYS * 86_400_000) return { status: "error", code: "TOO_FAR" };
+  // "yyyy-mm-dd" sorteert als tekst in dezelfde volgorde als de kalender.
+  const allowed = lesbezoekDateWindow(options.now ?? new Date());
+  if (date < allowed.earliest) return { status: "error", code: "TOO_SOON" };
+  if (date > allowed.latest) return { status: "error", code: "TOO_FAR" };
 
   return {
     status: "ok",

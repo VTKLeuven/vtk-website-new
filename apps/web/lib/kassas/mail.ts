@@ -15,6 +15,7 @@ import {
   countsTotalCents,
   denominationLabel,
   timeRangeLabel,
+  type CashRegisterResult,
   type Counts,
 } from "@/lib/kassas/kassa";
 
@@ -139,6 +140,107 @@ export function cashRegisterAcceptedMail(input: CashRegisterAcceptedMailInput): 
         mailParagraph(greeting),
         mailParagraph(intro),
         mailNoticeBox(noticeText, noticeTitle),
+        mailInfoTable(facts),
+        mailParagraph(outro),
+        `<div style="margin-top:22px">${mailButton(input.url, buttonLabel)}</div>`,
+      ].join(""),
+    )}${mailFooterRow(footer)}`,
+  });
+
+  return { subject, text, html };
+}
+
+/**
+ * De mail die Beheer met een knop stuurt zodra een kassa geteld is, zodat de post
+ * niet zelf moet gaan kijken. Dezelfde cijfers als `ResultSummary`; de opmerking
+ * van Beheer bij het tellen staat er bewust niet in, die is enkel voor Beheer.
+ */
+export type CashRegisterCountedMailInput = {
+  locale: "nl" | "en";
+  /** Voornaam of naam van de aanvrager, voor de aanhef. */
+  name: string;
+  activity: string;
+  /** De datum van de activiteit (`@db.Date`, dus middernacht UTC). */
+  date: Date;
+  postLabel: string;
+  result: CashRegisterResult;
+  /** Volledige link naar de kassa in het beheer. */
+  url: string;
+};
+
+export function cashRegisterCountedMail(input: CashRegisterCountedMailInput): {
+  subject: string;
+  text: string;
+  html: string;
+} {
+  const nl = input.locale === "nl";
+  const date = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
+    timeZone: "UTC",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(input.date);
+  const euro = (cents: number) => formatEuro(cents, input.locale);
+  const notCounted = nl ? "Nog niet geteld" : "Not counted yet";
+  const orNotCounted = (cents: number | null) => (cents === null ? notCounted : euro(cents));
+  const { result } = input;
+
+  const subject = nl
+    ? `Je kassa voor ${input.activity} is geteld`
+    : `Your cash register for ${input.activity} was counted`;
+  const heading = nl ? "Je kassa is geteld" : "Your cash register was counted";
+  const greeting = nl ? `Dag ${input.name},` : `Hi ${input.name},`;
+  const intro = nl
+    ? `De kassa van ${input.activity} op ${date} is geteld. Dit is het resultaat.`
+    : `The cash register of ${input.activity} on ${date} has been counted. This is the result.`;
+  const outro = nl
+    ? "Klopt er iets niet? Antwoord op deze mail, dan komt het bij Beheer terecht."
+    : "Does something look wrong? Reply to this email and it reaches Administration.";
+  // Een toestel, ticketverkoop of bon die er niet was, krijgt geen regel.
+  const optional = (label: string, cents: number) => (cents !== 0 ? [{ label, value: euro(cents) }] : []);
+  const facts = [
+    { label: nl ? "Activiteit" : "Activity", value: input.activity },
+    { label: nl ? "Post" : "Post", value: input.postLabel },
+    { label: nl ? "Beginkassa" : "Starting float", value: euro(result.startCents) },
+    { label: nl ? "Eindkassa" : "Closing count", value: orNotCounted(result.endCents) },
+    { label: nl ? "Resultaat kassa" : "Cash result", value: orNotCounted(result.cashCents) },
+    ...optional("Bancontact", result.bancontactCents),
+    ...optional("Payconiq", result.payconiqCents),
+    ...optional(nl ? "Ticketverkoop" : "Ticket sales", result.ticketCents),
+    ...optional(nl ? "Bonnen" : "Vouchers", result.voucherCents),
+    { label: nl ? "Finaal resultaat" : "Final result", value: euro(result.totalCents) },
+  ];
+  const buttonLabel = nl ? "Bekijk je kassa" : "View your cash register";
+  const footer = nl
+    ? "Je krijgt deze mail omdat je op vtk.be een kassa aanvroeg."
+    : "You received this email because you requested a cash register on vtk.be.";
+
+  const text = [
+    greeting,
+    "",
+    intro,
+    "",
+    ...facts.map((fact) => `${fact.label}: ${fact.value}`),
+    "",
+    outro,
+    "",
+    `${buttonLabel}: ${input.url}`,
+    "",
+    nl ? "Groeten,\nBeheer VTK" : "Kind regards,\nVTK Administration",
+    "",
+    "--",
+    footer,
+  ].join("\n");
+
+  const html = mailDocument({
+    lang: input.locale,
+    title: subject,
+    rows: `${mailHeaderRow({ kicker: nl ? "VTK Kassa's" : "VTK Cash registers" })}${mailContentRow(
+      [
+        mailHeading(heading),
+        mailParagraph(greeting),
+        mailParagraph(intro),
         mailInfoTable(facts),
         mailParagraph(outro),
         `<div style="margin-top:22px">${mailButton(input.url, buttonLabel)}</div>`,

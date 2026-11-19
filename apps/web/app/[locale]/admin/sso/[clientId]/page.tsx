@@ -2,6 +2,7 @@ import { headers } from 'next/headers';
 import Link from '@/components/ui/Link';
 import { notFound } from 'next/navigation';
 import { hasLocale } from '@/lib/locale';
+import { sortRolesByName } from '@/lib/roleOrder';
 import { requirePermission } from '@/lib/session';
 import { prisma } from '@vtk/db';
 import {
@@ -38,7 +39,7 @@ export default async function SsoClientDetail({ params }: { params: Promise<{ lo
   const [permissions, grants, roles, accessGrantCount, accessRoleGrants] = await Promise.all([
     listClientPermissions(requestHeaders, clientId),
     listClientGrants(requestHeaders, clientId),
-    prisma.role.findMany({ orderBy: { order: 'asc' }, select: { id: true, nameNl: true, nameEn: true } }),
+    prisma.role.findMany({ select: { id: true, nameNl: true, nameEn: true } }),
     countMembersWithAccess(clientId),
     accessRoleGrantCount(requestHeaders, clientId),
   ]);
@@ -119,7 +120,7 @@ export default async function SsoClientDetail({ params }: { params: Promise<{ lo
           deprecated: permission.deprecated,
         }))}
         grants={{ roles: grants.roles, groups: grants.groups }}
-        roles={roles.map((role) => ({ id: role.id, name: nl ? role.nameNl : role.nameEn }))}
+        roles={sortRolesByName(roles, locale).map((role) => ({ id: role.id, name: nl ? role.nameNl : role.nameEn }))}
         groups={groups.map((group) => ({ id: group.id, name: nl ? group.nameNl : group.nameEn }))}
       />
 

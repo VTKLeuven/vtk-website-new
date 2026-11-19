@@ -13,6 +13,14 @@ export type ChartSeries = {
   reconstructedUntil?: number;
 };
 
+/**
+ * Een gebeurtenis op de x-as, bv. een verstuurde mail. `index` is de sleutel in
+ * `days` waarin ze valt; de beller rekent dat uit, want enkel die weet wat een
+ * sleutel betekent. Het nummer staat in de grafiek, het label in de tooltip en
+ * de tabel, en de beller toont de lijst met nummers ook onder de grafiek.
+ */
+export type ChartMarker = { index: number; number: number; label: string };
+
 export type DailyChartLabels = {
   /** "Toon als tabel" */
   table: string;
@@ -22,16 +30,20 @@ export type DailyChartLabels = {
   total: string;
   /** Legende voor het gestippelde stuk van een lijn. */
   reconstructed?: string;
+  /** Kolomkop in de tabel voor de gebeurtenissen, wanneer er markers zijn. */
+  markers?: string;
 };
 
 /**
  * Wat een sleutel op de x-as is. Standaard een dag; de ticketstatistieken
  * tonen ook weken (de maandag als `yyyy-mm-dd`), uren (`0` tot `23`), weekdagen
- * (`1` = maandag tot `7`) en kwartieren (`20:15`). Een enum en geen functie,
- * want dit is een clientcomponent en een servercomponent kan geen functie
- * meegeven.
+ * (`1` = maandag tot `7`) en kwartieren (`20:15`). `instant` is een
+ * UTC-tijdstip (`toISOString`), getoond als dag en uur op de Brusselse klok,
+ * voor een as die over meerdere dagen per uur loopt (de cumulatieve lijn op
+ * /admin/bureau/statistieken). Een enum en geen functie, want dit is een
+ * clientcomponent en een servercomponent kan geen functie meegeven.
  */
-export type ChartKeyFormat = "day" | "week" | "hour" | "weekday" | "time";
+export type ChartKeyFormat = "day" | "week" | "hour" | "weekday" | "time" | "instant";
 
 type Props = {
   kind: "bars" | "lines";
@@ -43,6 +55,8 @@ type Props = {
   /** De toegankelijke naam van de grafiek; de zichtbare titel staat erboven. */
   title: string;
   labels: DailyChartLabels;
+  /** Gebeurtenissen op de as, als gestippelde lijn met een nummer. */
+  markers?: ChartMarker[];
 };
 
 const HEIGHT = 170;
@@ -79,6 +93,23 @@ function formatKey(key: string, format: ChartKeyFormat, locale: "nl" | "en", ful
     }
     case "time":
       return key;
+    case "instant": {
+      const date = new Date(key);
+      const tag = locale === "nl" ? "nl-BE" : "en-GB";
+      const day = date.toLocaleDateString(tag, {
+        ...(full ? { weekday: "short" as const } : {}),
+        day: "numeric",
+        month: "short",
+        timeZone: "Europe/Brussels",
+      });
+      const time = date.toLocaleTimeString(tag, {
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+        timeZone: "Europe/Brussels",
+      });
+      return `${day} ${!full && locale === "nl" ? `${time.slice(0, 2)}u` : time}`;
+    }
     default:
       return formatDay(key, locale, full);
   }
@@ -114,7 +145,7 @@ function barPath(x: number, top: number, bottom: number, width: number, rounded:
  * mag nooit enkel achter een muisbeweging zitten, en het amber van het palet
  * haalt geen 3:1 op wit.
  */
-export function DailyChart({ kind, days, keyFormat = "day", series, locale, title, labels }: Props) {
+export function DailyChart({ kind, days, keyFormat = "day", series, locale, title, labels, markers = [] }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(720);
   const [active, setActive] = useState<number | null>(null);
@@ -153,14 +184,16 @@ export function DailyChart({ kind, days, keyFormat = "day", series, locale, titl
   // Hoogstens zes datums op de as, en nooit dichter dan één per 64px: een
   // datum is zo'n 40px breed, en op een telefoon schoven ze anders over elkaar.
   // De laatste staat er altijd; een datum die er te dicht bij zou staan, valt weg.
-  const labelCount = Math.max(2, Math.min(6, Math.floor(plotW / LABEL_SPACING)));
+  // Een dag met een uur ("12 nov 21u") is anderhalf keer zo breed als een datum.
+  const spacing = keyFormat === "instant" ? LABEL_SPACING * 1.6 : LABEL_SPACING;
+  const labelCount = Math.max(2, Math.min(6, Math.floor(plotW / spacing)));
   const labelEvery = Math.max(1, Math.ceil(n / labelCount));
   const xLabels = days
     .map((day, i) => ({ day, i }))
     .filter(
       ({ i }) =>
         i === n - 1 ||
-        (i % labelEvery === 0 && xCenter(n - 1) - xCenter(i) >= LABEL_SPACING * 0.8),
+        (i % labelEvery === 0 && xCenter(n - 1) - xCenter(i) >= spacing * 0.8),
     );
 
   const indexAt = (clientX: number, rect: DOMRect) => {
@@ -220,6 +253,13 @@ export function DailyChart({ kind, days, keyFormat = "day", series, locale, titl
   const endsCollide = endYs.some(
     (a, i) => a !== null && endYs.some((b, j) => j > i && b !== null && Math.abs(a - b) < 14),
   );
+
+  // Per sleutel de gebeurtenissen erin; twee mails in hetzelfde uur delen een lijn.
+  const markersAt = new Map<number, ChartMarker[]>();
+  for (const marker of markers) {
+    if (marker.index < 0 || marker.index >= n) continue;
+    markersAt.set(marker.index, [...(markersAt.get(marker.index) ?? []), marker]);
+  }
 
   const tooltipLeft = active === null ? 0 : xCenter(active);
   const tooltipOnLeft = tooltipLeft > width * 0.6;
@@ -288,6 +328,35 @@ export function DailyChart({ kind, days, keyFormat = "day", series, locale, titl
             >
               {formatKey(day, keyFormat, locale)}
             </text>
+          ))}
+
+          {[...markersAt.entries()].map(([index, list]) => (
+            <g key={`marker-${index}`} aria-hidden>
+              <line
+                x1={xCenter(index)}
+                x2={xCenter(index)}
+                y1={MARGIN.top}
+                y2={MARGIN.top + plotH}
+                className="vtk-chart-marker"
+              />
+              <rect
+                x={xCenter(index) - (list.length > 1 ? 13 : 8)}
+                y={MARGIN.top}
+                width={list.length > 1 ? 26 : 16}
+                height={16}
+                rx={8}
+                className="vtk-chart-marker-badge"
+              />
+              <text
+                x={xCenter(index)}
+                y={MARGIN.top + 8}
+                dy="0.35em"
+                textAnchor="middle"
+                className="vtk-chart-marker-number"
+              >
+                {list.map((marker) => marker.number).join(",")}
+              </text>
+            </g>
           ))}
 
           {kind === "bars" && active !== null ? (
@@ -400,6 +469,13 @@ export function DailyChart({ kind, days, keyFormat = "day", series, locale, titl
                 <span>{s.label}</span>
               </p>
             ))}
+            {(markersAt.get(active) ?? []).map((marker) => (
+              <p key={`marker-${marker.number}`} className="vtk-chart-tooltip-row">
+                <span className="vtk-chart-linekey" style={{ background: "var(--navy)" }} />
+                <strong>{marker.number}</strong>
+                <span>{marker.label}</span>
+              </p>
+            ))}
             {kind === "bars" && series.length > 1 ? (
               <p className="vtk-chart-tooltip-row vtk-chart-tooltip-total">
                 <span className="vtk-chart-linekey" style={{ background: "transparent" }} />
@@ -424,6 +500,7 @@ export function DailyChart({ kind, days, keyFormat = "day", series, locale, titl
                   </th>
                 ))}
                 {kind === "bars" && series.length > 1 ? <th scope="col">{labels.total}</th> : null}
+                {markersAt.size > 0 ? <th scope="col">{labels.markers}</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -442,6 +519,11 @@ export function DailyChart({ kind, days, keyFormat = "day", series, locale, titl
                       </td>
                     ))}
                     {kind === "bars" && series.length > 1 ? <td>{fmt.format(totals[i])}</td> : null}
+                    {markersAt.size > 0 ? (
+                      <td>
+                        {(markersAt.get(i) ?? []).map((marker) => `${marker.number}. ${marker.label}`).join("; ")}
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
             </tbody>

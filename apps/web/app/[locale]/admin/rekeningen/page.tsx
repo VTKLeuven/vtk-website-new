@@ -23,7 +23,6 @@ import {
   REIMBURSEMENT_STATES,
   reimbursementLabel,
 } from "@/lib/rekeningen/expenses";
-import { RekeningenNav } from "./RekeningenNav";
 import { ExpenseWorkbench } from "./ExpenseWorkbench";
 import { expenseInclude, toDetail, toRow } from "./rows";
 import {
@@ -220,7 +219,6 @@ export default async function RekeningenOverzicht({
     <div className="space-y-5">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">{nl ? "Rekeningen" : "Expenses"}</h1>
           <p className="mt-1 max-w-5xl text-sm text-[#5c667f]">
             {access.canManageAll
               ? nl
@@ -242,17 +240,6 @@ export default async function RekeningenOverzicht({
           {nl ? "Rekening indienen" : "Submit an expense"}
         </Link>
       </header>
-
-      <RekeningenNav
-        base={base}
-        nl={nl}
-        active="overzicht"
-        caps={{
-          submit: access.canSubmit,
-          overview: access.canSeeOverview,
-          settings: access.canManageAll,
-        }}
-      />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Stat

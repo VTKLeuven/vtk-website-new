@@ -16,7 +16,7 @@ import {
   listDriveChildren,
   type DriveFile,
 } from "@/lib/google/client";
-import { figuresFromXlsx, type BoLine, type Figures } from "./figures";
+import { FIGURES_VERSION, figuresFromXlsx, type BoLine, type Figures } from "./figures";
 import {
   folderKind,
   isBoRootFolderName,
@@ -95,9 +95,10 @@ type FigureFields = Omit<Figures, "lines"> & {
   lines: BoLine[] | null;
   figuresError: string | null;
   figuresReadFor: Date | null;
+  figuresVersion: number;
 };
 
-const NO_FIGURES: Omit<FigureFields, "figuresError" | "figuresReadFor"> = {
+const NO_FIGURES: Omit<FigureFields, "figuresError" | "figuresReadFor" | "figuresVersion"> = {
   sheetPost: null,
   sheetTitle: null,
   eventDate: null,
@@ -298,7 +299,15 @@ class Scan {
    * als pdf in die map, de agenda en het verslag tellen niet.
    */
   private collect(file: DriveFile, kind: BoKind | null, out: Map<string, Found>, linkName?: string): void {
-    if (out.has(file.id)) return;
+    const seen = out.get(file.id);
+    if (seen) {
+      // Hetzelfde blad twee keer in één BO: rechtstreeks in een map die erin
+      // hangt, en via een snelkoppeling. De snelkoppeling zegt wat het op deze
+      // BO was (zie `linkName`), dus die naam mag niet wegvallen omdat de map
+      // eerst gelezen werd.
+      if (linkName && !seen.linkName) out.set(file.id, { ...seen, linkName, folderKind: seen.folderKind ?? kind });
+      return;
+    }
     const named = parseDocumentName(linkName ?? "").kind ?? parseDocumentName(file.name).kind;
     const isSheet = SPREADSHEET_MIMES.has(file.mimeType) || OTHER_SHEET_MIMES.has(file.mimeType);
     if (!named && !(kind && isSheet)) return;
@@ -308,14 +317,16 @@ class Scan {
   private async syncDocuments(meetingId: string, found: Found[]): Promise<void> {
     const existing = await prisma.boDocument.findMany({
       where: { meetingId },
-      select: { driveFileId: true, figuresReadFor: true },
+      select: { driveFileId: true, figuresReadFor: true, figuresVersion: true },
     });
-    const readFor = new Map(existing.map((d) => [d.driveFileId, d.figuresReadFor]));
+    const readFor = new Map(existing.map((d) => [d.driveFileId, d]));
 
     for (const item of found) {
       const modified = item.file.modifiedTime ? new Date(item.file.modifiedTime) : this.now;
       const previous = readFor.get(item.file.id);
-      const fresh = previous && previous.getTime() === modified.getTime();
+      // Ongewijzigd in Drive én gelezen door deze versie van de lezer.
+      const fresh =
+        previous?.figuresReadFor?.getTime() === modified.getTime() && previous.figuresVersion === FIGURES_VERSION;
       const figures = fresh ? null : await this.readFigures(item, modified);
 
       const fields = {
@@ -363,8 +374,8 @@ class Scan {
     // Hetzelfde bestand, ongewijzigd, al gelezen in een andere BO (een budget
     // dat uitgesteld werd): neem die bedragen over in plaats van te downloaden.
     const known = await prisma.boDocument.findFirst({
-      where: { driveFileId: item.file.id, figuresReadFor: modified },
-      select: { ...FIGURE_SELECT, figuresError: true, figuresReadFor: true },
+      where: { driveFileId: item.file.id, figuresReadFor: modified, figuresVersion: FIGURES_VERSION },
+      select: { ...FIGURE_SELECT, figuresError: true, figuresReadFor: true, figuresVersion: true },
     });
     if (known) {
       const copy = { ...known, lines: (known.lines as BoLine[] | null) ?? null };
@@ -378,6 +389,7 @@ class Scan {
       // Een tijdelijke fout (Google gaf een 500) proberen we de volgende scan
       // opnieuw; een blijvende (geen rekenblad) niet, tot het bestand wijzigt.
       figuresReadFor: retry ? null : modified,
+      figuresVersion: FIGURES_VERSION,
     });
 
     let result: FigureFields;
@@ -395,7 +407,7 @@ class Scan {
         result =
           "error" in parsed
             ? fail(parsed.error)
-            : { ...parsed.figures, figuresError: null, figuresReadFor: modified };
+            : { ...parsed.figures, figuresError: null, figuresReadFor: modified, figuresVersion: FIGURES_VERSION };
       } catch (err) {
         if (!(err instanceof GoogleError)) throw err;
         result = fail(err.status === 403 || err.status === 404 ? "NO_ACCESS" : "DOWNLOAD_FAILED", true);

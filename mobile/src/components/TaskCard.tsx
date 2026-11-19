@@ -1,8 +1,10 @@
 import {
   CalendarCheck,
   ChevronRight,
+  MessageSquareText,
   Music,
   Sandwich,
+  ScanLine,
   TicketCheck,
   TriangleAlert,
   Wrench,
@@ -11,7 +13,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { AppTodayTask } from '../api/contract';
 import { useTabRouter } from '../navigation';
-import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
+import { COLORS, SPACING, TYPE } from '../theme/tokens';
 
 /**
  * Eén ding dat op jou wacht: je broodje, je shift van vanavond, je ticket.
@@ -32,6 +34,8 @@ const ICONS: Record<AppTodayTask['kind'], React.ComponentType<{ color: string; s
   ticket: TicketCheck,
   shift: Wrench,
   piano: Music,
+  poll: MessageSquareText,
+  scan: ScanLine,
 };
 
 export function TaskCard({ task }: { task: AppTodayTask }) {
@@ -57,56 +61,40 @@ export function TaskCard({ task }: { task: AppTodayTask }) {
       accessibilityRole="button"
       accessibilityLabel={[task.title, task.detail].filter(Boolean).join(', ')}
       onPress={go}
-      style={({ pressed }) => [
-        styles.card,
-        task.highlight && styles.highlight,
-        pressed && styles.pressed,
-      ]}
+      style={({ pressed }) => [styles.row, task.highlight && styles.highlight, pressed && styles.pressed]}
     >
-      <View style={[styles.icon, task.highlight && styles.iconHighlight]}>
-        <Icon color={task.highlight ? COLORS.ink : COLORS.navy} size={18} />
-      </View>
-
+      <Icon color={task.highlight ? COLORS.ink : COLORS.muted} size={18} />
       <View style={styles.text}>
         <Text style={styles.title}>{task.title}</Text>
         {task.detail ? <Text style={styles.detail}>{task.detail}</Text> : null}
-        {task.actionLabel ? <Text style={styles.action}>{task.actionLabel}</Text> : null}
       </View>
-
-      <ChevronRight color={COLORS.muted} size={18} />
+      {task.actionLabel ? (
+        <Text style={styles.action}>{task.actionLabel}</Text>
+      ) : (
+        <ChevronRight color={COLORS.muted} size={18} />
+      )}
     </Pressable>
   );
 }
 
+/**
+ * Een regel in een register, zoals de lijsten op de site: dunne lijnen ertussen,
+ * geen witte kaart per taak. Wat dringend is, krijgt de gele rail aan de linkerkant.
+ */
 const styles = StyleSheet.create({
-  card: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.md,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.line,
-    padding: SPACING.lg,
+    paddingVertical: SPACING.md + 2,
+    paddingHorizontal: SPACING.xl - 4,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.line,
   },
-  highlight: { borderLeftWidth: 3, borderLeftColor: COLORS.yellow },
+  highlight: { borderLeftWidth: 3, borderLeftColor: COLORS.yellow, paddingLeft: SPACING.xl - 7 },
   pressed: { backgroundColor: COLORS.paper2 },
-  icon: {
-    width: 34,
-    height: 34,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.paper2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconHighlight: { backgroundColor: COLORS.yellow },
   text: { flex: 1, gap: 2 },
-  title: { ...TYPE.cardTitle, color: COLORS.ink },
+  title: { ...TYPE.cardTitle, fontSize: 15, color: COLORS.ink },
   detail: { ...TYPE.small, color: COLORS.muted },
-  action: {
-    ...TYPE.small,
-    fontFamily: TYPE.cardTitle.fontFamily,
-    color: COLORS.ink,
-    marginTop: 2,
-  },
+  action: { ...TYPE.small, fontFamily: TYPE.cardTitle.fontFamily, color: COLORS.navy },
 });

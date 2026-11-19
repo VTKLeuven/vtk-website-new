@@ -182,7 +182,7 @@ export default function ProfielScreen() {
                 <View key={group.id} style={styles.groupRow}>
                   <Text style={styles.groupName}>{group.name}</Text>
                   <Text style={styles.hint}>
-                    {group.type === 'PRAESIDIUM' ? 'Post' : 'Werkgroep'}
+                    {group.type === 'PRAESIDIUM' ? 'Post' : group.type === 'JAARWERKING' ? 'Jaarwerking' : 'Werkgroep'}
                   </Text>
                 </View>
               ))}

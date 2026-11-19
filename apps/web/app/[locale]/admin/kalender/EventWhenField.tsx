@@ -1,10 +1,17 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
-import { Button, Input, Label } from '@vtk/ui';
+import { useRef, useState, type ReactNode } from 'react';
+import { Button, Input, Label, Select } from '@vtk/ui';
 import { IconButton } from '@/components/ui/IconButton';
 import { TrashIcon } from '@/components/ui/icons';
 import { utcToLocalDateTime } from '@/lib/ticketing/time';
+import {
+  EMPTY_MOMENT_DETAILS,
+  momentToDraft,
+  type MomentDraft,
+  type MomentValue,
+} from '@/lib/calendar/momentDraft';
+import { EventMomentDetails } from './EventMomentDetails';
 
 /**
  * Wanneer een evenement doorgaat: één doorlopende periode, of een reeks losse
@@ -15,43 +22,57 @@ import { utcToLocalDateTime } from '@/lib/ticketing/time';
  * formulier op waarin de helft van wat je intikt stil genegeerd wordt.
  *
  * In de momentenmodus stuurt dit veld de rijen als JSON mee in één verborgen
- * `moments`-veld, en laat het start en einde weg: de action leidt de envelop af
- * uit de momenten. In de gewone modus staat er geen `moments`-veld in het
+ * `moments`-veld (met per rij ook wat er eigen is aan dat moment, zie
+ * `EventMomentDetails`), en laat het start en einde weg: de action leidt de
+ * envelop af uit de momenten. In de gewone modus staat er geen `moments`-veld in het
  * formulier, en wist de action de momenten die er eventueel stonden.
  */
 
-export type MomentValue = { start: Date; end: Date; label: string | null };
+export type { MomentValue };
 
-/** Eén rij in de editor. Datum en uren staan los, want zo tik je ze ook in. */
-type MomentDraft = { date: string; start: string; end: string; label: string };
+/**
+ * Een rij met een vaste sleutel. De index is dat niet: de fotovelden houden eigen
+ * toestand bij, dus na het wegdoen van een rij zou de affiche van de ene rij bij
+ * de volgende blijven staan. De sleutel gaat mee in het JSON-veld; de action
+ * negeert hem.
+ */
+type MomentRow = MomentDraft & { key: string };
 
-function toDraft(moment: MomentValue): MomentDraft {
-  const [date, start] = utcToLocalDateTime(moment.start).split('T');
-  // Een moment over middernacht (een nachtloop tot 2u) draagt enkel zijn
-  // starttdag; de action leest een einduur dat niet later is dan het beginuur als
-  // de dag erna. Zo blijft de rij twee uurvelden breed in plaats van twee datums.
-  const end = utcToLocalDateTime(moment.end).split('T')[1];
-  return { date: date ?? '', start: start ?? '', end: end ?? '', label: moment.label ?? '' };
-}
-
-function emptyDraft(after?: MomentDraft): MomentDraft {
-  if (!after) return { date: '', start: '', end: '', label: '' };
-  return { date: nextDay(after.date), start: after.start, end: after.end, label: '' };
-}
-
-/** De dag na deze, of leeg wanneer er nog geen dag staat. */
-function nextDay(date: string): string {
+/** `days` dagen na deze, of leeg wanneer er nog geen dag staat. */
+function addDays(date: string, days: number): string {
   if (!date) return '';
   const next = new Date(`${date}T12:00:00Z`);
-  next.setUTCDate(next.getUTCDate() + 1);
+  next.setUTCDate(next.getUTCDate() + days);
   return next.toISOString().slice(0, 10);
 }
 
-/** Elke dag van `from` tot en met `to`; leeg wanneer het bereik niet klopt. */
-function dayRange(from: string, to: string, max = 60): string[] {
+/** Hoeveel dagen er tussen twee dagen liggen. */
+function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
+}
+
+/**
+ * Een nieuwe rij na de laatste, op dezelfde afstand als de twee rijen ervoor: wie
+ * wekelijkse loopjes invult, krijgt zo de volgende week en niet de volgende dag.
+ */
+function emptyDraft(rows: readonly MomentDraft[]): MomentDraft {
+  const last = rows[rows.length - 1];
+  const before = rows[rows.length - 2];
+  if (!last) return { date: '', start: '', end: '', ...EMPTY_MOMENT_DETAILS };
+  const gap = before?.date && last.date ? daysBetween(before.date, last.date) : 1;
+  return {
+    ...EMPTY_MOMENT_DETAILS,
+    date: addDays(last.date, gap > 0 ? gap : 1),
+    start: last.start,
+    end: last.end,
+  };
+}
+
+/** Elke dag van `from` tot en met `to`, om de `step` dagen; leeg wanneer het bereik niet klopt. */
+function dayRange(from: string, to: string, step: number, max = 60): string[] {
   if (!from || !to || to < from) return [];
   const days: string[] = [];
-  for (let day = from; day <= to && days.length < max; day = nextDay(day)) days.push(day);
+  for (let day = from; day <= to && days.length < max; day = addDays(day, step)) days.push(day);
   return days;
 }
 
@@ -70,6 +91,10 @@ function RowField({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+/** De rij "een reeks toevoegen", los van de rijen zelf. */
+type BulkDraft = { from: string; to: string; every: 'day' | 'week'; start: string; end: string };
+const EMPTY_BULK: BulkDraft = { from: '', to: '', every: 'day', start: '', end: '' };
+
 export function EventWhenField({
   start,
   end,
@@ -87,29 +112,43 @@ export function EventWhenField({
   const [mode, setMode] = useState<'single' | 'moments'>(
     moments.length > 0 ? 'moments' : 'single'
   );
-  const [rows, setRows] = useState<MomentDraft[]>(moments.map(toDraft));
-  const [bulk, setBulk] = useState({ from: '', to: '', start: '', end: '' });
-  const bulkDays = dayRange(bulk.from, bulk.to);
+  // Op de index voor wat de server al rendert, zodat de sleutels en de namen van
+  // de verborgen velden bij de hydratie gelijk zijn; daarna telt dit verder.
+  const [rows, setRows] = useState<MomentRow[]>(
+    moments.map((moment, index) => ({ ...momentToDraft(moment), key: `m${index}` }))
+  );
+  const nextKey = useRef(moments.length);
+  const [bulk, setBulk] = useState<BulkDraft>(EMPTY_BULK);
+  const bulkDays = dayRange(bulk.from, bulk.to, bulk.every === 'week' ? 7 : 1);
 
-  function patch(index: number, field: keyof MomentDraft, value: string) {
-    setRows((current) =>
-      current.map((row, i) => (i === index ? { ...row, [field]: value } : row))
-    );
+  function newKey() {
+    return `m${nextKey.current++}`;
+  }
+
+  function patch(key: string, changes: Partial<MomentDraft>) {
+    setRows((current) => current.map((row) => (row.key === key ? { ...row, ...changes } : row)));
+  }
+
+  function addOne() {
+    setRows([...rows, { ...emptyDraft(rows), key: newKey() }]);
   }
 
   function addBulk() {
-    const days = bulkDays;
-    if (days.length === 0 || !bulk.start || !bulk.end) return;
-    setRows((current) => {
-      const taken = new Set(current.map((row) => row.date));
-      const added = days
-        .filter((day) => !taken.has(day))
-        .map((day) => ({ date: day, start: bulk.start, end: bulk.end, label: '' }));
-      return [...current, ...added].sort(
-        (a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start)
-      );
-    });
-    setBulk({ from: '', to: '', start: '', end: '' });
+    if (bulkDays.length === 0 || !bulk.start || !bulk.end) return;
+    const taken = new Set(rows.map((row) => row.date));
+    const added = bulkDays
+      .filter((day) => !taken.has(day))
+      .map((day) => ({
+        ...EMPTY_MOMENT_DETAILS,
+        date: day,
+        start: bulk.start,
+        end: bulk.end,
+        key: newKey(),
+      }));
+    setRows(
+      [...rows, ...added].sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start))
+    );
+    setBulk(EMPTY_BULK);
   }
 
   return (
@@ -190,12 +229,12 @@ export function EventWhenField({
 
           <p className="text-xs text-vtk-muted">
             {nl
-              ? 'Het blijft één evenement met één pagina en één affiche, maar het staat enkel op de dagen waarop er echt iets is, telkens met het juiste uur. In de agenda van de leden komt er een aparte afspraak per moment.'
-              : 'It stays one event with one page and one poster, but it only shows on the days something actually happens, each with the right time. Members get a separate appointment per moment in their calendar.'}
+              ? 'Het blijft één evenement met één pagina, maar het staat enkel op de dagen waarop er echt iets is, telkens met het juiste uur. In de agenda van de leden komt er een aparte afspraak per moment. Per moment kan je een eigen locatie, tekst en affiche zetten; de site toont telkens die van het eerstvolgende moment.'
+              : 'It stays one event with one page, but it only shows on the days something actually happens, each with the right time. Members get a separate appointment per moment in their calendar. Each moment can have its own location, text and poster; the site always shows those of the next moment.'}
           </p>
 
           {rows.length > 0 ? (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="hidden gap-2 text-xs text-vtk-blue-muted sm:grid sm:grid-cols-[minmax(0,10rem)_minmax(0,7rem)_minmax(0,7rem)_minmax(0,1fr)_2rem]">
                 <span>{nl ? 'Dag' : 'Day'}</span>
                 <span>{nl ? 'Van' : 'From'}</span>
@@ -204,57 +243,62 @@ export function EventWhenField({
                 <span className="sr-only">{nl ? 'Acties' : 'Actions'}</span>
               </div>
               {rows.map((row, index) => (
-                <div
-                  key={index}
-                  className="grid gap-2 sm:grid-cols-[minmax(0,10rem)_minmax(0,7rem)_minmax(0,7rem)_minmax(0,1fr)_2rem] sm:items-center"
-                >
-                  <RowField label={nl ? 'Dag' : 'Day'}>
-                    <Input
-                      type="date"
-                      value={row.date}
-                      aria-label={nl ? `Dag van moment ${index + 1}` : `Day of moment ${index + 1}`}
-                      onChange={(e) => patch(index, 'date', e.target.value)}
-                    />
-                  </RowField>
-                  <RowField label={nl ? 'Van' : 'From'}>
-                    <Input
-                      type="time"
-                      value={row.start}
-                      aria-label={nl ? `Beginuur van moment ${index + 1}` : `Start time of moment ${index + 1}`}
-                      onChange={(e) => patch(index, 'start', e.target.value)}
-                    />
-                  </RowField>
-                  <RowField label={nl ? 'Tot' : 'To'}>
-                    <Input
-                      type="time"
-                      value={row.end}
-                      aria-label={nl ? `Einduur van moment ${index + 1}` : `End time of moment ${index + 1}`}
-                      onChange={(e) => patch(index, 'end', e.target.value)}
-                    />
-                  </RowField>
-                  <RowField label={nl ? 'Naam (optioneel)' : 'Name (optional)'}>
-                    <Input
-                      value={row.label}
-                      maxLength={80}
-                      placeholder={nl ? 'bv. Nachtloop' : 'e.g. Night run'}
-                      aria-label={nl ? `Naam van moment ${index + 1}` : `Name of moment ${index + 1}`}
-                      onChange={(e) => patch(index, 'label', e.target.value)}
-                    />
-                  </RowField>
-                  <div className="flex justify-end sm:justify-center">
-                    <IconButton
-                      label={nl ? 'Moment verwijderen' : 'Remove moment'}
-                      srLabel={
-                        nl
-                          ? `Moment verwijderen: ${row.date || `moment ${index + 1}`}`
-                          : `Remove moment: ${row.date || `moment ${index + 1}`}`
-                      }
-                      tone="danger"
-                      onClick={() => setRows((current) => current.filter((_, i) => i !== index))}
-                    >
-                      <TrashIcon />
-                    </IconButton>
+                <div key={row.key} className="space-y-1.5">
+                  <div className="grid gap-2 sm:grid-cols-[minmax(0,10rem)_minmax(0,7rem)_minmax(0,7rem)_minmax(0,1fr)_2rem] sm:items-center">
+                    <RowField label={nl ? 'Dag' : 'Day'}>
+                      <Input
+                        type="date"
+                        value={row.date}
+                        aria-label={nl ? `Dag van moment ${index + 1}` : `Day of moment ${index + 1}`}
+                        onChange={(e) => patch(row.key, { date: e.target.value })}
+                      />
+                    </RowField>
+                    <RowField label={nl ? 'Van' : 'From'}>
+                      <Input
+                        type="time"
+                        value={row.start}
+                        aria-label={nl ? `Beginuur van moment ${index + 1}` : `Start time of moment ${index + 1}`}
+                        onChange={(e) => patch(row.key, { start: e.target.value })}
+                      />
+                    </RowField>
+                    <RowField label={nl ? 'Tot' : 'To'}>
+                      <Input
+                        type="time"
+                        value={row.end}
+                        aria-label={nl ? `Einduur van moment ${index + 1}` : `End time of moment ${index + 1}`}
+                        onChange={(e) => patch(row.key, { end: e.target.value })}
+                      />
+                    </RowField>
+                    <RowField label={nl ? 'Naam (optioneel)' : 'Name (optional)'}>
+                      <Input
+                        value={row.label}
+                        maxLength={80}
+                        placeholder={nl ? 'bv. Nachtloop' : 'e.g. Night run'}
+                        aria-label={nl ? `Naam van moment ${index + 1}` : `Name of moment ${index + 1}`}
+                        onChange={(e) => patch(row.key, { label: e.target.value })}
+                      />
+                    </RowField>
+                    <div className="flex justify-end sm:justify-center">
+                      <IconButton
+                        label={nl ? 'Moment verwijderen' : 'Remove moment'}
+                        srLabel={
+                          nl
+                            ? `Moment verwijderen: ${row.date || `moment ${index + 1}`}`
+                            : `Remove moment: ${row.date || `moment ${index + 1}`}`
+                        }
+                        tone="danger"
+                        onClick={() => setRows((current) => current.filter((other) => other.key !== row.key))}
+                      >
+                        <TrashIcon />
+                      </IconButton>
+                    </div>
                   </div>
+                  <EventMomentDetails
+                    rowKey={row.key}
+                    draft={row}
+                    locale={locale}
+                    onChange={(changes) => patch(row.key, changes)}
+                  />
                 </div>
               ))}
             </div>
@@ -270,18 +314,19 @@ export function EventWhenField({
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => setRows((current) => [...current, emptyDraft(current[current.length - 1])])}
+            onClick={addOne}
           >
             {nl ? 'Moment toevoegen' : 'Add moment'}
           </Button>
 
-          {/* Een loopweek intikken is zeven keer hetzelfde uur. Deze rij zet de
-              hele reeks in één keer klaar; daarna blijft elke dag apart aanpasbaar. */}
+          {/* Een loopweek of wekelijkse loopjes intikken is telkens hetzelfde uur.
+              Deze rij zet de hele reeks in één keer klaar; daarna blijft elke dag
+              apart aanpasbaar. */}
           <div className="rounded-xl border border-vtk-blue/15 bg-vtk-blue-soft/40 p-3">
             <p className="text-sm font-medium text-vtk-ink">
-              {nl ? 'Elke dag van een periode toevoegen' : 'Add every day of a period'}
+              {nl ? 'Een reeks toevoegen' : 'Add a series'}
             </p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,9rem)_minmax(0,9rem)_minmax(0,6.5rem)_minmax(0,6.5rem)_auto] sm:items-end">
+            <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,9rem)_minmax(0,9rem)_minmax(0,7.5rem)_minmax(0,6.5rem)_minmax(0,6.5rem)_auto] sm:items-end">
               <RowField label={nl ? 'Van dag' : 'From day'}>
                 <Input
                   type="date"
@@ -297,6 +342,16 @@ export function EventWhenField({
                   aria-label={nl ? 'Reeks: laatste dag' : 'Run: last day'}
                   onChange={(e) => setBulk({ ...bulk, to: e.target.value })}
                 />
+              </RowField>
+              <RowField label={nl ? 'Herhaling' : 'Repeat'}>
+                <Select
+                  value={bulk.every}
+                  aria-label={nl ? 'Reeks: herhaling' : 'Series: repeat'}
+                  onChange={(e) => setBulk({ ...bulk, every: e.target.value === 'week' ? 'week' : 'day' })}
+                >
+                  <option value="day">{nl ? 'Elke dag' : 'Every day'}</option>
+                  <option value="week">{nl ? 'Elke week' : 'Every week'}</option>
+                </Select>
               </RowField>
               <RowField label={nl ? 'Van' : 'From'}>
                 <Input
@@ -323,11 +378,11 @@ export function EventWhenField({
               >
                 {bulkDays.length > 0
                   ? nl
-                    ? `${bulkDays.length} dagen toevoegen`
-                    : `Add ${bulkDays.length} days`
+                    ? `${bulkDays.length} toevoegen`
+                    : `Add ${bulkDays.length}`
                   : nl
-                    ? 'Dagen toevoegen'
-                    : 'Add days'}
+                    ? 'Toevoegen'
+                    : 'Add'}
               </Button>
             </div>
             <p className="mt-2 text-xs text-vtk-muted">

@@ -10,6 +10,23 @@ SHA="${1:?geef de commit-sha mee}"
 # `required` = weiger te deployen zonder NFS (prod), `auto` = enkel controleren
 # wanneer .env effectief naar /mnt/immich wijst (dev).
 NFS_MODE="${2:-auto}"
+# `all` (standaard): bouwen en omschakelen in één keer, zoals prod doet.
+# `build`: enkel de images bouwen. Dev start dit meteen bij een push, naast de
+#   checks op de runner, in plaats van erna: zo valt het bouwen weg uit de
+#   wachttijd.
+# `switch`: de containers omschakelen naar wat `build` voor deze commit bouwde.
+#   Dev doet dit pas wanneer de checks groen zijn.
+PHASE="${3:-all}"
+case "$PHASE" in
+  all | build | switch) ;;
+  *)
+    echo "::error::onbekende fase '$PHASE' (all, build of switch)"
+    exit 2
+    ;;
+esac
+# Welke commit `build` het laatst bouwde. `switch` weigert om te schakelen naar
+# images van een andere commit dan die het moet uitrollen.
+BUILT_MARKER="${BUILT_MARKER:-/tmp/vtk-deploy-built-sha}"
 
 REPO_DIR="${REPO_DIR:-/home/it/vtk-website-new}"
 # Het compose-project heet "infra", afgeleid van de map van het compose-bestand.
@@ -31,11 +48,21 @@ log() { printf '\n=== %s ===\n' "$*"; }
 
 cd "$REPO_DIR"
 
+if [ "$PHASE" = switch ]; then
+  # Geen fetch of reset hier: de repo staat al op de commit die `build` bouwde,
+  # en een reset naar iets anders zou de broncode onder de images vandaan halen.
+  if [ "$(git rev-parse HEAD)" != "$(git rev-parse "$SHA^{commit}" 2>/dev/null)" ] ||
+    [ "$(cat "$BUILT_MARKER" 2>/dev/null)" != "$SHA" ]; then
+    echo "::error::De images op de server zijn niet van $SHA (gebouwd: $(cat "$BUILT_MARKER" 2>/dev/null || echo niets), repo op $(git rev-parse --short HEAD)). Draai eerst de fase build."
+    exit 1
+  fi
+else
 log "Repo op $SHA zetten"
 # `--all` haalde elke remote en elke tag op; we hebben enkel origin nodig.
 git fetch --no-tags --prune origin
 git reset --hard "$SHA"
 git --no-pager log -1 --oneline
+fi
 
 if [ "$NFS_MODE" = required ] || grep -qE '^IMMICH_MEDIA_LOCATION=.*/mnt/immich' .env 2>/dev/null; then
   log "NFS-opslag controleren"
@@ -45,8 +72,55 @@ if [ "$NFS_MODE" = required ] || grep -qE '^IMMICH_MEDIA_LOCATION=.*/mnt/immich'
   findmnt -rn -M /mnt/immich -t nfs4 >/dev/null
 fi
 
+# De sleutel achter de ID's van de server actions, voor web, logistiek en fakbar.
+#
+# `next build` haalt de ID van elke server action door een hash met deze
+# sleutel. Zonder vaste sleutel maakt het er in Docker elke build een nieuwe
+# (de cache in .next/cache telt in een container niet als blijvend), dus kreeg
+# elke action na elke deploy een andere ID. Wie dan een formulier openhad en op
+# opslaan klikte, kreeg "Failed to find Server Action" in de logs en verloor
+# wat er ingevuld stond. Met een vaste sleutel blijft een ID gelijk zolang de
+# action zelf in hetzelfde bestand onder dezelfde naam staat.
+#
+# Eén keer aangemaakt en dan in .env bewaard; de containers lezen dezelfde
+# waarde via `env_file`. Vervang ze niet zonder reden: dat zet alle open
+# formulieren nog één keer buiten spel, net als een deploy voorheen.
+key="$(sed -n 's/^NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=//p' .env 2>/dev/null | tail -n 1 | tr -d "\"'")"
+if [ -z "$key" ]; then
+  log "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY aanmaken in .env"
+  key="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
+  printf '\n# Vaste sleutel voor de server actions (web, logistiek, fakbar); zie infra/deploy.sh.\nNEXT_SERVER_ACTIONS_ENCRYPTION_KEY=%s\n' "$key" >>.env
+fi
+export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$key"
+unset key
+
 log "Compose-bestand valideren"
 "${COMPOSE[@]}" config --quiet
+
+# Opruimen staat vóór het omschakelen en hoort bij de fase build, zodat het
+# naast de checks loopt en niet in de wachttijd van een deploy. Bewust NIET
+# `docker system prune -a` + `builder prune -a`: dat gooide ook de npm-cache, de
+# Turbopack-cache in .next/cache, de basisimages en alle layercache weg, precies
+# de dingen waar de Dockerfiles op gebouwd zijn. Elke deploy begon daardoor van
+# nul (~10 min). Dangling images zijn de vorige versies van web/logistiek/fakbar
+# die niet meer draaien; die mogen weg (een image in gebruik raakt prune niet).
+# Zonder --volumes, zodat database- en applicatiedata blijft staan.
+clean_up() {
+  log "Opruimen"
+  docker container prune -f || true
+  docker image prune -f || true
+  docker builder prune -f --keep-storage "$CACHE_KEEP" || true
+
+  avail="$(df --output=avail -B1 "$REPO_DIR" | tail -1)"
+  if [ "$avail" -lt "$MIN_FREE_BYTES" ]; then
+    log "Nog maar $((avail / 1024 / 1024 / 1024)) GB vrij: agressief opruimen"
+    docker image prune -a -f --filter until=24h || true
+    docker builder prune -a -f || true
+  fi
+  docker system df
+}
+
+if [ "$PHASE" != switch ]; then
 
 # Bouwen terwijl de huidige containers verkeer blijven serveren.
 #
@@ -138,6 +212,15 @@ for svc in "${BUILD_SERVICES[@]}"; do
   fi
 done
 
+echo "$SHA" >"$BUILT_MARKER"
+clean_up
+
+if [ "$PHASE" = build ]; then
+  log "Gebouwd; omschakelen gebeurt zodra de checks groen zijn"
+  exit 0
+fi
+fi
+
 # Eenmalige migratie van het oude IPv4-only default network. Expliciet doen
 # voorkomt dat Compose een container hergebruikt die nog naar het verwijderde
 # network-ID verwijst. Named volumes overleven dit.
@@ -187,23 +270,4 @@ for svc in "${BUILD_SERVICES[@]}"; do
   wait_until_up "$svc"
 done
 
-# Opruimen na de switch. Bewust NIET `docker system prune -a` + `builder prune -a`:
-# dat gooide ook de npm-cache, de Turbopack-cache in .next/cache, de basisimages
-# en alle layercache weg, precies de dingen waar de Dockerfiles op gebouwd zijn.
-# Elke deploy begon daardoor van nul (~10 min). Dangling images zijn de vorige
-# versies van web/logistiek/fakbar; die mogen weg. Zonder --volumes, zodat
-# database- en applicatiedata blijft staan.
-log "Opruimen"
-docker container prune -f || true
-docker image prune -f || true
-docker builder prune -f --keep-storage "$CACHE_KEEP" || true
-
-avail="$(df --output=avail -B1 "$REPO_DIR" | tail -1)"
-if [ "$avail" -lt "$MIN_FREE_BYTES" ]; then
-  log "Nog maar $((avail / 1024 / 1024 / 1024)) GB vrij: agressief opruimen"
-  docker image prune -a -f --filter until=24h || true
-  docker builder prune -a -f || true
-fi
-
-docker system df
 log "Deploy klaar"

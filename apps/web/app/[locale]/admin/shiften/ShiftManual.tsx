@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
@@ -68,8 +69,9 @@ export function ShiftManual({
     if (!deleting) return;
     setBusyDelete(true);
 
-    const res = await deleteManualShiftGrantAction(deleting.id);
+    const res = await unsentGuard.run(() => deleteManualShiftGrantAction(deleting.id));
     setBusyDelete(false);
+    if (res === UNSENT) return;
 
     if (res.success) {
       showToast({

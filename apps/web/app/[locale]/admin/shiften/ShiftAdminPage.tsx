@@ -1,0 +1,343 @@
+import { prisma } from "@vtk/db";
+import { format } from "date-fns";
+import { redirect } from "next/navigation";
+import { requireSession } from "@/lib/session";
+import type { Locale } from "@vtk/i18n";
+import { academicYearRange, academicYearRangeFor, currentAcademicYear } from "@/lib/shift";
+import { earnedShiftReward, type PraesidiumYears } from "@/lib/shift/rewards";
+import { canEditShifts, canManageAllShifts } from "@/lib/shift/authorization";
+import { shiftDeductions } from "@/lib/shift/deductions";
+import { praesidiumYears } from "@/lib/shift/voucherEligibility";
+import { loadPalPlusRewardRows } from "@/lib/shift/rewards.server";
+import { ShiftAdmin, type ShiftAdminTab } from "./ShiftAdmin";
+
+/** Het pad van elk tabblad onder /admin/shiften. */
+export const SHIFT_TAB_PATHS: Record<ShiftAdminTab, string> = {
+  manage: "",
+  ranking: "/ranglijst",
+  rewards: "/bonnetjes",
+  manual: "/extra",
+};
+
+/** `yyyy-MM-dd` → lokale middernacht, of null bij ongeldige invoer. */
+function parseLocalDay(value: string | undefined): Date | null {
+  if (!value) return null;
+  const [y, m, d] = value.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const dt = new Date(y, m - 1, d);
+  return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+/**
+ * De tabbladen Beheer, Ranglijst, Bonnetjes en Extra shiften van /admin/shiften:
+ * dezelfde gegevens, elk tabblad een eigen route (zie de layout). Een tabblad
+ * waarvoor je het recht niet hebt, stuurt door naar het eerste dat je wel hebt.
+ */
+export async function ShiftAdminPage({
+  locale,
+  tab,
+  searchParams,
+}: {
+  locale: Locale;
+  tab: ShiftAdminTab;
+  searchParams: Promise<{ from?: string; to?: string; year?: string }>;
+}) {
+  const session = await requireSession();
+
+  const has = (perm: string) => session.user.isSuperAdmin || session.permissions.includes(perm);
+  const canEdit = canEditShifts(session);
+  const canReward = has("shift.reward");
+  const canRanking = has("shift.ranking");
+  const canTemplates = has("shift.templates");
+  const canManual = has("shift.manual");
+
+  if (!canEdit && !canReward && !canRanking && !canManual) {
+    // Wie enkel de sjablonen beheert, heeft hier geen tabblad maar hoort ook
+    // niet op "Geen toegang." te botsen: dit is de tab waarachter zijn scherm
+    // hangt, dus meteen door naar de sjablonen.
+    if (canTemplates) redirect(`${locale === "nl" ? "" : "/en"}/admin/shiften/sjablonen/beheer`);
+    return <p className="text-sm text-vtk-muted">{locale === "nl" ? "Geen toegang." : "No access."}</p>;
+  }
+
+  // Een tabblad zonder recht: naar het eerste tabblad dat je wel mag openen.
+  const allowed: Record<ShiftAdminTab, boolean> = {
+    manage: canEdit,
+    ranking: canRanking,
+    rewards: canReward,
+    manual: canManual,
+  };
+  if (!allowed[tab]) {
+    const first = (["manage", "ranking", "rewards", "manual"] as const).find((key) => allowed[key])!;
+    redirect(`${locale === "nl" ? "" : "/en"}/admin/shiften${SHIFT_TAB_PATHS[first]}`);
+  }
+
+  const now = new Date();
+  const { from: fromParam, to: toParam, year: yearParam } = await searchParams;
+
+  // Geselecteerd academiejaar voor ranglijst + bonnetjes + manuele shiften (standaard huidige).
+  const parsedYear = Number(yearParam);
+  const selectedYear = Number.isInteger(parsedYear) ? parsedYear : currentAcademicYear(now);
+  const ay = academicYearRangeFor(selectedYear);
+  // "Voltooid" = eindtijd in het verleden; voor het huidige jaar dus tot nu.
+  const completedBefore = new Date(Math.min(ay.end.getTime(), now.getTime()));
+
+  // Datumbereik voor de beheertabel (via URL), standaard vandaag → einde huidig academiejaar.
+  const { end: currentAyEnd } = academicYearRange(now);
+  const defaultFrom = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const defaultTo = new Date(currentAyEnd.getFullYear(), currentAyEnd.getMonth(), currentAyEnd.getDate() - 1);
+  const rangeStart = parseLocalDay(fromParam) ?? defaultFrom;
+  const rangeToDay = parseLocalDay(toParam) ?? defaultTo;
+  // `to` is inclusief: tel er een dag bij op voor de exclusieve bovengrens.
+  const rangeEnd = new Date(rangeToDay.getFullYear(), rangeToDay.getMonth(), rangeToDay.getDate() + 1);
+
+  const [shiftsRaw, rankingRaw, rewardsRaw, shiftBounds, manualGrantsRaw, grantYears, deductions] = await Promise.all([
+    canEdit
+      ? prisma.shift.findMany({
+          where: { startTime: { gte: rangeStart, lt: rangeEnd }, manualGrantId: null },
+          orderBy: { startTime: "asc" },
+          include: {
+            participants: {
+              select: {
+                userId: true,
+                payedOut: true,
+                // Het gsm-nummer staat in de ingeschrevenenlijst van het
+                // shiftvenster: wie niet komt opdagen, bel je.
+                user: { select: { name: true, email: true, rNumber: true, phone: true } },
+              },
+            },
+          },
+        })
+      : Promise.resolve([]),
+    canRanking
+      ? prisma.shiftParticipant.findMany({
+          where: { shift: { endTime: { gte: ay.start, lt: completedBefore } } },
+          select: { userId: true, user: { select: { name: true } }, shift: { select: { post: true } } },
+        })
+      : Promise.resolve([]),
+    canReward
+      ? prisma.shiftParticipant.findMany({
+          where: { shift: { endTime: { gte: ay.start, lt: completedBefore } } },
+          select: {
+            userId: true,
+            shiftId: true,
+            rewardPaid: true,
+            user: { select: { name: true, email: true } },
+            shift: { select: { reward: true, startTime: true } },
+          },
+        })
+      : Promise.resolve([]),
+    canRanking || canReward
+      ? prisma.shift.aggregate({ _min: { startTime: true }, _max: { endTime: true } })
+      : Promise.resolve(null),
+    canManual
+      ? prisma.manualShiftGrant.findMany({
+          where: { academicYear: selectedYear },
+          orderBy: { createdAt: "desc" },
+          include: {
+            user: { select: { id: true, name: true, email: true, rNumber: true } },
+            createdBy: { select: { id: true, name: true } },
+          },
+        })
+      : Promise.resolve([]),
+    canManual
+      ? prisma.manualShiftGrant.findMany({
+          select: { academicYear: true },
+          distinct: ["academicYear"],
+        })
+      : Promise.resolve([]),
+    canRanking ? shiftDeductions({ academicYear: selectedYear }) : Promise.resolve([]),
+  ]);
+
+  // Beschikbare academiejaren voor de jaarkiezer: van het vroegste tot het laatste
+  // shift-jaar, plus het huidige en het geselecteerde jaar, én manuele toekenningen.
+  const yearsSet = new Set<number>([currentAcademicYear(now), selectedYear]);
+  const minYear = shiftBounds?._min.startTime ? currentAcademicYear(shiftBounds._min.startTime) : selectedYear;
+  const maxYear = shiftBounds?._max.endTime ? currentAcademicYear(shiftBounds._max.endTime) : selectedYear;
+  for (let y = minYear; y <= maxYear; y += 1) yearsSet.add(y);
+  for (const gy of grantYears) yearsSet.add(gy.academicYear);
+  const availableYears = [...yearsSet].sort((a, b) => b - a);
+
+  const shifts = shiftsRaw.map((s) => ({
+    id: s.id,
+    name: s.name,
+    startTime: s.startTime,
+    endTime: s.endTime,
+    location: s.location,
+    description: s.description,
+    maxParticipants: s.maxParticipants,
+    reward: s.reward,
+    post: s.post,
+    openToInternationals: s.openToInternationals,
+    instructions: s.instructions,
+    nameEn: s.nameEn,
+    descriptionEn: s.descriptionEn,
+    instructionsEn: s.instructionsEn,
+    participants: s.participants.map((p) => ({
+      userId: p.userId,
+      name: p.user.name,
+      email: p.user.email,
+      rNumber: p.user.rNumber,
+      phone: p.user.phone,
+      payedOut: p.payedOut,
+    })),
+  }));
+
+  // Ranglijst: aantal voltooide shiften per (user, post).
+  const rankingMap = new Map<string, { userId: string; name: string; post: string; count: number }>();
+  for (const { userId, user, shift } of rankingRaw) {
+    const post = shift.post ?? "GEEN";
+    const key = `${userId}::${post}`;
+    const entry = rankingMap.get(key);
+    if (entry) entry.count += 1;
+    else rankingMap.set(key, { userId, name: user.name, post, count: 1 });
+  }
+  // Afgenomen shiften (`lib/shift/deductions.ts`) gaan eraf bij hun post. Het
+  // beheer ziet het echte saldo, ook onder nul: dat is een afname die nog loopt.
+  for (const { userId, name, post: deductionPost, count } of deductions) {
+    const post = deductionPost ?? "GEEN";
+    const key = `${userId}::${post}`;
+    const entry = rankingMap.get(key);
+    if (entry) entry.count += count;
+    else rankingMap.set(key, { userId, name, post, count });
+  }
+  const ranking = [...rankingMap.values()];
+
+  // Bonnetjes per user voor het gekozen academiejaar: toegekend vs openstaand.
+  const rewardMap = new Map<
+    string,
+    {
+      userId: string;
+      name: string;
+      email: string;
+      paidShiftCount: number;
+      paidBonnetjes: number;
+      outstandingShiftCount: number;
+      outstandingBonnetjes: number;
+      outstandingShiftIds: string[];
+      paidPalCount: number;
+      outstandingPalCount: number;
+      outstandingPalSessionIds: string[];
+    }
+  >();
+  // Een shift uit een praesidiumjaar levert niets op (`earnedShiftReward`). Wat
+  // er al van uitbetaald werd, telt wel als toegekend: dat is echt gebeurd.
+  const praesidium: PraesidiumYears = canReward
+    ? await praesidiumYears(rewardsRaw.map((row) => row.userId))
+    : new Map();
+  for (const { userId, shiftId, rewardPaid, user, shift } of rewardsRaw) {
+    const entry =
+      rewardMap.get(userId) ??
+      {
+        userId,
+        name: user.name,
+        email: user.email,
+        paidShiftCount: 0,
+        paidBonnetjes: 0,
+        outstandingShiftCount: 0,
+        outstandingBonnetjes: 0,
+        outstandingShiftIds: [],
+        paidPalCount: 0,
+        outstandingPalCount: 0,
+        outstandingPalSessionIds: [],
+      };
+    const paid = Math.max(0, Math.min(rewardPaid, shift.reward));
+    const earned = earnedShiftReward({ userId, reward: shift.reward, startTime: shift.startTime }, praesidium);
+    const outstanding = Math.max(0, earned - paid);
+    if (paid > 0) {
+      entry.paidShiftCount += 1;
+      entry.paidBonnetjes += paid;
+    }
+    if (outstanding > 0) {
+      entry.outstandingShiftCount += 1;
+      entry.outstandingBonnetjes += outstanding;
+      entry.outstandingShiftIds.push(shiftId);
+    }
+    rewardMap.set(userId, entry);
+  }
+  // PAL+-sessies die iemand gaf, tellen in hetzelfde saldo: dezelfde
+  // bonnetjes, op dezelfde manier uit te betalen.
+  const palRewardRows = canReward
+    ? await loadPalPlusRewardRows(prisma, { endedAfter: ay.start, endedBefore: completedBefore })
+    : [];
+  for (const row of palRewardRows) {
+    const entry =
+      rewardMap.get(row.userId) ??
+      {
+        userId: row.userId,
+        name: row.name,
+        email: row.email,
+        paidShiftCount: 0,
+        paidBonnetjes: 0,
+        outstandingShiftCount: 0,
+        outstandingBonnetjes: 0,
+        outstandingShiftIds: [],
+        paidPalCount: 0,
+        outstandingPalCount: 0,
+        outstandingPalSessionIds: [],
+      };
+    const paid = Math.max(0, Math.min(row.rewardPaid, row.reward));
+    const outstanding = Math.max(0, row.earned - paid);
+    if (paid > 0) {
+      entry.paidPalCount += 1;
+      entry.paidBonnetjes += paid;
+    }
+    if (outstanding > 0) {
+      entry.outstandingPalCount += 1;
+      entry.outstandingBonnetjes += outstanding;
+      entry.outstandingPalSessionIds.push(row.sessionId);
+    }
+    rewardMap.set(row.userId, entry);
+  }
+  const rewards = [...rewardMap.values()];
+
+  const manualGrants = manualGrantsRaw.map((g) => ({
+    id: g.id,
+    createdAt: g.createdAt,
+    userId: g.userId,
+    userName: g.user.name,
+    userEmail: g.user.email,
+    userRNumber: g.user.rNumber,
+    count: g.count,
+    post: g.post,
+    reason: g.reason,
+    academicYear: g.academicYear,
+    reward: g.reward,
+    payedOut: g.payedOut,
+    createdByName: g.createdBy?.name ?? null,
+  }));
+
+  // Postkeuzes voor nieuwe/te bewerken shiften: de codes van de actieve posten.
+  // Gedeactiveerde posten vallen weg uit de keuzes; hun historiek op oude shiften
+  // blijft wel als opgeslagen tekst bestaan.
+  const activeGroups = await prisma.group.findMany({
+    where: { active: true, type: "PRAESIDIUM" },
+    orderBy: { orderInPraesidium: "asc" },
+    select: { code: true },
+  });
+  const postOptions = activeGroups.map((g) => g.code);
+  const manageAllPosts = canManageAllShifts(session);
+  const userPostCodes = manageAllPosts
+    ? postOptions
+    : session.groups.filter((g) => g.type === "PRAESIDIUM").map((g) => g.code);
+
+  return (
+    <div className="space-y-5">
+      <ShiftAdmin
+        tab={tab}
+        locale={locale}
+        capabilities={{ canEdit, canReward, canRanking, canManual }}
+        shifts={shifts}
+        ranking={ranking}
+        rewards={rewards}
+        manualGrants={manualGrants}
+        postOptions={postOptions}
+        userPostCodes={userPostCodes}
+        manageAllPosts={manageAllPosts}
+        from={format(rangeStart, "yyyy-MM-dd")}
+        to={format(rangeToDay, "yyyy-MM-dd")}
+        year={selectedYear}
+        years={availableYears}
+      />
+    </div>
+  );
+}

@@ -8,12 +8,11 @@ import { formatEuro } from "@/lib/rekeningen/expenses";
 import { brusselsYMD } from "@/lib/brussels";
 import { parseMonth } from "@/lib/inkomsten/parse";
 import type { OverviewLine } from "@/lib/inkomsten/overview";
-import { countUnassigned, loadIncomeOverview } from "@/lib/inkomsten/server";
+import { loadIncomeOverview } from "@/lib/inkomsten/server";
 import { closeIncomePeriodAction, setPayoutCheckAction } from "@/app/actions/inkomsten";
 import { CheckIcon, InfoIcon } from "@/components/ui/icons";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { AdminDisclosure } from "@/components/admin/AdminDisclosure";
-import { IncomeNav } from "./IncomeNav";
 import { PayoutCheckButton } from "./PayoutCheckButton";
 import { incomeErrorMessages } from "./messages";
 import { SOURCE_LABELS, checkText, periodLabel, quarterOptions } from "./shared";
@@ -45,7 +44,7 @@ export default async function IncomeOverviewPage({
   const toParam = parseMonth(typeof query.tot === "string" ? query.tot : null);
   const [from, to] = fromParam && toParam && fromParam <= toParam ? [fromParam, toParam] : [quarters[0].from, quarters[0].to];
 
-  const [data, openCount] = await Promise.all([loadIncomeOverview(from, to), countUnassigned()]);
+  const data = await loadIncomeOverview(from, to);
   const { overview } = data;
   const money = (cents: number) => (cents === 0 ? "" : formatEuro(cents, locale));
   const transactionsHref = (extra: Record<string, string>) =>
@@ -83,15 +82,12 @@ export default async function IncomeOverviewPage({
   return (
     <div className="space-y-5">
       <header>
-        <h1 className="text-2xl font-semibold">{nl ? "Online inkomsten" : "Online income"}</h1>
         <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
           {nl
             ? "Wat er via Payconiq, Mollie, SumUp en Europabank binnenkwam, per boekhoudcode. Mollie telt in de maand van de uitbetaling, de rest in de maand van de betaling."
             : "What came in through Payconiq, Mollie, SumUp and Europabank, per accounting code. Mollie counts in the month of the payout, the rest in the month of the payment."}
         </p>
       </header>
-
-      <IncomeNav base={base} nl={nl} active="overzicht" openCount={openCount} />
 
       <section className="flex flex-wrap items-end gap-3">
         <nav className="flex flex-wrap gap-2" aria-label={nl ? "Kwartalen" : "Quarters"}>

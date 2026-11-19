@@ -152,6 +152,19 @@ body {
   min-width: 0;
 }
 
+/* Op een breed scherm een ondergrens waarin "hele dag" ook echt de hele dag toont
+   (F6.2). 24 uur aan de minimale uurhoogte (18px, `MIN_HOUR_PX`) is 432px, plus
+   de dagkop en twee rijen evenementen: onder die hoogte scrolt de kalender op zoom
+   1, en op een laptop van 720px hoog was 68dvh daar net onder. De pagina scrolt
+   dan liever een stukje mee dan dat de nacht onderaan wegvalt. Op een telefoon
+   niet: daar past de dag toch nooit, en heeft volledig scherm een eigen
+   dagweergave. */
+@media (min-width: 860px) {
+  .tg-pane {
+    height: var(--tg-height, clamp(36rem, 68dvh, 60rem));
+  }
+}
+
 /* De maandweergave groeit met haar rijen mee; die is al compact en heeft geen
    vaste hoogte nodig. In volledig scherm neemt ze wél de volle rest. */
 .tg-pane-auto {
@@ -728,8 +741,11 @@ body {
   border-top-color: var(--driver-requested);
 }
 
-/* Een rit van je eigen post of werkgroep (F4.15): een gele rail langs de
-   linkerrand, dezelfde taal als een uitgelichte kaart op vtk.be.
+/* Een rit van je eigen post of werkgroep (F4.15, F6.17): een rail langs de
+   linkerrand in de nadrukkelijke kleur (navy, in het donker licht), niet meer in
+   het geel. Geel viel weg op een pastelkleur die zelf geel is (Boter, Amber) en
+   tussen een volle week; de nadrukkelijke kleur leest op elke vulling in beide
+   modi. Vier pixels in plaats van drie.
 
    Een `border-left` en geen `box-shadow`, om dezelfde reden als hierboven plus
    een eigen: de selectie in de kalender is een Tailwind-`ring`, en dat ís een
@@ -742,9 +758,16 @@ body {
    kring kijkt. Op de planning van het team zou het niets onderscheiden: daar is
    alles van jou. */
 .trip-mine {
-  border-left-width: 3px;
+  border-left-width: 4px;
   border-left-style: solid;
-  border-left-color: var(--yellow);
+  border-left-color: var(--emphasis);
+}
+
+/* "Enkel mijn post benadrukken" (F6.17, `mine-focus.tsx`): de ritten die niet van
+   jou zijn, gaan lichter. Een attribuut op `body` en een regel hier, omdat de
+   blokken in drie weergaven staan en de schakelaar in de legende. */
+body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
+  opacity: 0.4;
 }
 
 /* De rit die je aan het aanmaken bent, terwijl het formulier openstaat. Dezelfde
@@ -1618,6 +1641,54 @@ body {
   justify-self: end;
 }
 
+/* De nota's en wat Logistiek aanpaste, onder de rij (F6.11, F6.12). Over de
+   volle breedte van het raster, ingekort tot twee regels: de rij is een link
+   naar het geheel. */
+.logistics-reservation-extra {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-2);
+}
+
+.logistics-reservation-note > span {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.logistics-reservation-note p {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* Wat Logistiek veranderde mag niet ingekort worden: het is het enige wat de
+   aanvrager niet zelf gedaan heeft, en een afgekapte uurwijziging is de fout. */
+.logistics-reservation-note-changed {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--yellow-soft, var(--paper-2));
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.logistics-reservation-note-changed ul {
+  display: grid;
+  gap: 2px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .logistics-admin-request-row {
   display: grid;
   /* Krappe minima met opzet: bij bredere kolommen loopt het raster over zodra
@@ -1960,4 +2031,14 @@ select:focus {
   .print-sheet + .print-sheet {
     break-before: page;
   }
+}
+
+/* Een grid-item krimpt standaard niet onder de breedte van zijn inhoud
+   (`min-width: auto`): één breed onderdeel rekte zo de hele kolom op, en op een
+   telefoon liepen de kaarten op Chauffeurs, Ritten en Instellingen over de rand
+   (tot 377px op een scherm van 360). `min-width: 0` laat de kolom krimpen en de
+   inhoud binnenin wrappen. Gemeten op 320 en 360px: de overloop is weg. */
+main .grid > *,
+main [class*='logistics-form-width'] > * {
+  min-width: 0;
 }

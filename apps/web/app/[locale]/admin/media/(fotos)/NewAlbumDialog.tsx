@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ImagePlus, X } from "lucide-react";
@@ -18,6 +19,7 @@ export function NewAlbumDialog({
   open,
   initialFiles,
   fakbarEnabled,
+  canPublish,
   onClose,
 }: {
   locale: string;
@@ -26,6 +28,12 @@ export function NewAlbumDialog({
   initialFiles: File[];
   /** Mag de fakbargalerij als bestemming? Zie lib/fakbar-gallery.ts. */
   fakbarEnabled: boolean;
+  /**
+   * Mag deze gebruiker een album meteen op de site zetten? Wie enkel albums mag
+   * aanmaken (`photos.createAlbums`), niet: het album begint dan verborgen, en
+   * de server dwingt dat ook af.
+   */
+  canPublish: boolean;
   onClose: () => void;
 }) {
   const nl = locale === "nl";
@@ -51,7 +59,7 @@ export function NewAlbumDialog({
     setFiles(initialFiles);
     setTitle("");
     setDescription("");
-    setVisible(true);
+    setVisible(canPublish);
     setGallery("main");
     setError(null);
   }
@@ -87,9 +95,10 @@ export function NewAlbumDialog({
       const data = new FormData();
       data.set("title", title.trim());
       data.set("description", description.trim());
-      data.set("visible", visible ? "true" : "false");
+      data.set("visible", visible && canPublish ? "true" : "false");
       data.set("gallery", gallery);
-      const result = await createImmichAlbumAction(data);
+      const result = await unsentGuard.run(() => createImmichAlbumAction(data));
+      if (result === UNSENT) return;
       if (!result.ok || !result.albumId) {
         setError(
           result.error === "fakbar_upload_disabled"
@@ -186,6 +195,7 @@ export function NewAlbumDialog({
           />
         </label>
 
+        {canPublish ? (
         <div className="media-switch-row">
           <button
             type="button"
@@ -208,6 +218,14 @@ export function NewAlbumDialog({
             </small>
           </span>
         </div>
+        ) : (
+          <p className="media-dialog-note">
+            <b>{nl ? "Het album begint verborgen." : "The album starts hidden."}</b>{" "}
+            {nl
+              ? "Tot het op de site staat, kan je de titel, de cover en de tabs nog aanpassen. Op de site zetten doet iemand die albums beheert."
+              : "Until it is on the site you can still change the title, the cover and the tabs. Someone who manages albums puts it on the site."}
+          </p>
+        )}
 
         {fakbarEnabled ? (
           <fieldset className="media-gallery-choice">

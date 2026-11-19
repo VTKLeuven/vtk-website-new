@@ -2,12 +2,25 @@
   min-width: 0;
 }
 
+/* De maten van de zijbalk lezen variabelen, met de gewone maat als fallback.
+   Enkel de website zet ze (de compacte stand, `vtk-admin.css`); in de
+   uitleendienst en de Fakbar is er geen waarde en blijft alles zoals het was. */
 .vtk-admin-nav-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin: 0 0 12px;
+  margin: 0 0 var(--admin-nav-head-gap, 12px);
+}
+
+/* De knoppen rechts van ADMIN: de compacte stand en inklappen. De negatieve
+   marge laat de knoppen tot in de rand van de kolom lopen zonder dat de kop
+   er hoger van wordt. */
+.vtk-admin-nav-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: -6px -4px -6px 0;
 }
 
 .vtk-admin-nav-title {
@@ -88,8 +101,8 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  margin: 0 0 10px;
-  padding: 8px 8px 8px 12px;
+  margin: 0 0 var(--admin-nav-search-gap, 10px);
+  padding: var(--admin-nav-search-y, 8px) 8px var(--admin-nav-search-y, 8px) 12px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--surface);
@@ -144,10 +157,10 @@
   .vtk-admin-nav {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--admin-nav-gap, 6px);
     margin-top: 0;
     overflow: visible;
-    padding: 8px;
+    padding: var(--admin-nav-pad, 8px);
     border: 1px solid var(--line);
     border-radius: 18px;
     background: color-mix(in oklab, var(--surface, #ffffff) 56%, transparent);
@@ -173,7 +186,7 @@
 .vtk-admin-nav a {
   flex: 1;
   min-width: 0;
-  padding: 9px 11px;
+  padding: var(--admin-nav-y, 9px) var(--admin-nav-x, 11px);
   border-radius: 999px;
   color: color-mix(in oklab, var(--ink, #0a0f1f) 72%, transparent);
   text-decoration: none;
@@ -201,7 +214,7 @@
 .vtk-admin-nav-pinned {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--admin-nav-sub-gap, 4px);
 }
 
 .vtk-admin-nav-section {
@@ -215,8 +228,8 @@
 }
 
 .vtk-admin-nav-section-all {
-  margin-top: 10px;
-  padding-top: 10px;
+  margin-top: var(--admin-nav-section-gap, 10px);
+  padding-top: var(--admin-nav-section-gap, 10px);
   border-top: 1px solid var(--line);
 }
 
@@ -272,7 +285,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 11px;
+  padding: var(--admin-nav-y, 9px) var(--admin-nav-x, 11px);
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -305,7 +318,7 @@
 .vtk-admin-nav-sub {
   display: none;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--admin-nav-sub-gap, 4px);
   margin: 2px 0 2px 13px;
   padding-left: 8px;
   border-left: 1px solid var(--line);
@@ -337,13 +350,13 @@
    Smaller dan 860px is er al de uitklapknop, dus daar verandert niets.
    --------------------------------------------------------------------------- */
 
-.vtk-admin-nav-collapse {
+.vtk-admin-nav-collapse,
+.vtk-admin-nav-density {
   appearance: none;
   display: none;
   place-items: center;
   width: 28px;
   height: 28px;
-  margin: -6px -4px -6px 0;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -352,9 +365,35 @@
 }
 
 .vtk-admin-nav-collapse:hover,
-.vtk-admin-nav-collapse:focus-visible {
+.vtk-admin-nav-collapse:focus-visible,
+.vtk-admin-nav-density:hover,
+.vtk-admin-nav-density:focus-visible {
   background: var(--paper-2);
   color: var(--ink);
+}
+
+/* Aan: een gele toets, want het is een stand die blijft staan en niet de tab
+   waar je bent (die is lichtblauw). */
+.vtk-admin-nav-density.is-on,
+.vtk-admin-rail-btn.is-on {
+  background: color-mix(in oklab, var(--yellow, #ffd23f) 55%, transparent);
+  color: var(--ink);
+}
+
+/* De compacte stand bestaat enkel vanaf 860px en met een muis of trackpad
+   (zie `vtk-admin.css`); daaronder zou de knop niets zichtbaars doen. */
+.vtk-admin-rail-density {
+  display: none;
+}
+
+@media (min-width: 860px) and (hover: hover) and (pointer: fine) {
+  .vtk-admin-nav-density {
+    display: grid;
+  }
+
+  .vtk-admin-rail-density {
+    display: block;
+  }
 }
 
 .vtk-admin-rail {
@@ -392,7 +431,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: var(--admin-rail-gap, 4px);
   padding: 8px 6px;
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -408,8 +447,8 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: var(--admin-rail-btn, 40px);
+  height: var(--admin-rail-btn, 40px);
   border: 0;
   border-radius: 999px;
   background: transparent;

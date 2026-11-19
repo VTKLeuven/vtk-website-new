@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import { ConfirmDialog } from "@vtk/ui";
 import { useToast } from "@/components/ui/toast";
@@ -47,7 +48,7 @@ export function ClientPermToggle({
 
     startTransition(async () => {
       try {
-        await setRoleClientPermissionAction(form);
+        if ((await unsentGuard.run(() => setRoleClientPermissionAction(form))) === UNSENT) return;
         setConfirming(false);
         showToast({
           message: on

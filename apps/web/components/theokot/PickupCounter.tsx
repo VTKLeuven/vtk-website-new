@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { Button, Card, ConfirmDialog, Input, Label } from "@vtk/ui";
 import { formatEuro } from "@/lib/theokot";
@@ -112,7 +113,8 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
     const request = ++suggestRequest.current;
     suggestTimer.current = window.setTimeout(async () => {
       try {
-        const found = await suggestPickupAction(query);
+        const found = await unsentGuard.run(() => suggestPickupAction(query));
+        if (found === UNSENT) return;
         if (request !== suggestRequest.current) return;
         setSuggestions(found);
         setActiveSuggestion(-1);
@@ -155,7 +157,9 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
       let focusFirstCandidate = false;
       let nextAnnouncement = "";
       try {
-        const res = await fetchResult();
+        // Niet verstuurd: wat er gezocht werd, blijft staan; `finally` geeft vrij.
+        const res = await unsentGuard.run(fetchResult);
+        if (res === UNSENT) return;
         setResult(res);
         const eligibleOrder =
           res.ok
@@ -253,7 +257,8 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
     if (!voucherOrderId || voucherCost === null) return;
     startVoucherTransition(async () => {
       try {
-        const response = await redeemEmployeeVouchersAction(voucherOrderId, voucherCost);
+        const response = await unsentGuard.run(() => redeemEmployeeVouchersAction(voucherOrderId, voucherCost));
+        if (response === UNSENT) return;
         if (!response.ok) {
           setVoucherError(response.error);
           return;
@@ -519,7 +524,8 @@ function PickupOrderPanel({
 
   function mark(how: "auto" | "manual" = "manual") {
     startTransition(async () => {
-      const res = await markPickedUpAction(order.orderId);
+      const res = await unsentGuard.run(() => markPickedUpAction(order.orderId));
+      if (res === UNSENT) return;
       if (res.ok) {
         setStatus("PICKED_UP");
         setMarkedHere(how);
@@ -539,7 +545,8 @@ function PickupOrderPanel({
 
   function undo() {
     startTransition(async () => {
-      const res = await undoPickupAction(order.orderId);
+      const res = await unsentGuard.run(() => undoPickupAction(order.orderId));
+      if (res === UNSENT) return;
       if (res.ok) {
         setStatus("RESERVED");
         setMarkedHere(null);

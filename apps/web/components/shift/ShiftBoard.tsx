@@ -1,5 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
+import { localizeShift } from '@/lib/shift/localize';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import type { ShiftResponse } from '@/lib/shift';
 import { postLabel, useShiftList, type MergedShift, type PostNames } from './shiftData';
@@ -43,8 +44,11 @@ export function ShiftBoard({
 }) {
   const t = getDictionary(locale).shift;
 
-  const available = useShiftList('/api/shift', initialAvailable);
-  const registered = useShiftList('/api/shift/register', initialRegistered);
+  // In het Engels de Engelse naam en uitleg waar die ingevuld zijn.
+  const availableRaw = useShiftList('/api/shift', initialAvailable);
+  const registeredRaw = useShiftList('/api/shift/register', initialRegistered);
+  const available = useMemo(() => availableRaw.map((s) => localizeShift(s, locale)), [availableRaw, locale]);
+  const registered = useMemo(() => registeredRaw.map((s) => localizeShift(s, locale)), [registeredRaw, locale]);
 
   const [now] = useState(() => new Date());
   const [postFilter, setPostFilter] = useState<string>(ALL_POSTS);

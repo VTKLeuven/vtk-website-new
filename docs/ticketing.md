@@ -371,6 +371,13 @@ payout per code without looking up orders. The list lives in
 answered (see below). The kring choices behind it are in
 `docs/design-decisions.md` ("Boekhoudcodes in de betaalinfo").
 
+`/admin/boekhoudcodes` also shows the net ticket revenue per code, summed from the
+copy on the order (`lib/accounting/ticketTotals.ts`). The statuses and the net
+formula are those of the revenue per event, so a refund lowers the total as soon
+as it has succeeded. A main account includes its sub codes. Orders under a code
+that is no longer in the list, or without a code, get their own block under the
+list instead of dropping out of the sum.
+
 | Concern | Location |
 | --- | --- |
 | Table, sub codes (parent code, space, five digits), list order | `AccountingCode` in `schema.prisma` |
@@ -574,6 +581,11 @@ navigatie binnen de site).
   doorstuurt de herkomst niet meegeeft. Geen cookie en geen storage.
 - De checkout schoont de waarde opnieuw op (`sanitizeSourceKey`) en weigert
   nooit een bestelling om een rare herkomst.
+- Het VTK Bureau gebruikt hetzelfde systeem voor zijn inschrijvingen
+  (`MeetingReservation.source`), met een eigen tab Statistieken op
+  `/admin/bureau`. Zie "Statistieken van het VTK Bureau" in
+  `docs/design-decisions.md`. Verander je hier een sleutel of `SOURCES`, dan
+  verandert die ook daar.
 
 ### Kleur per tickettype
 
@@ -685,10 +697,12 @@ klopt; een scanner-URL van één event is dat niet.
 
 ### De native app
 
-Naast de PWA bestaat er een native scanner voor iOS en Android: **VTK Scanner**,
-een Expo-app in een eigen repo (`~/vtk-scanner-app`, op expo.dev onder het account
-`vtk-it`). Ze doet exact hetzelfde werk en praat met dezelfde endpoints; de
-webscanner blijft staan als webweg en als vangnet.
+Naast de PWA zit de scanner ook in de **VTK-app** (`mobile/`, voor iOS en
+Android), enkel zichtbaar voor wie iets te scannen heeft. Tot november 2026 was
+dat een aparte Expo-app, **VTK Scanner** (`vtk-scanner-app`); die is daarin
+opgegaan en staat enkel nog als archief. De app doet exact hetzelfde werk als de
+webscanner en praat met dezelfde endpoints; de webscanner blijft staan als webweg
+en als vangnet. Alles over de app-kant staat in `mobile/docs/scanner.md`.
 
 - **Ze bevat geen tweede kopie van de regels.** De app roept `scanner/bootstrap`,
   `scan`, `scan/batch`, `scan/card` en `scan/reverse` aan zoals `ScannerApp.tsx`
@@ -700,12 +714,13 @@ webscanner blijft staan als webweg en als vangnet.
   is bewust: er ís geen tokenpad naar deze endpoints (de OAuth-provider geeft
   opaque tokens die enkel voor UserInfo gelden, en `TicketScanDevice.tokenHash`
   authenticeert niets), en zo werkt een KU Leuven-login ook gewoon.
-- **`GET /api/tickets/scanner/events` bestaat enkel voor haar.** Het webkeuzescherm
-  is een server component en roept `listScannableTicketEvents()` rechtstreeks aan;
-  de app kan dat niet en heeft dezelfde lijst nodig.
+- **De lijst van events komt uit `GET /api/app/v1/scan/events`**, met de stand per
+  event erbij, en `abilities.scanTickets` volgt diezelfde lijst. `GET
+  /api/tickets/scanner/events` bestond enkel voor de aparte scanner-app en wordt
+  door de VTK-app niet gebruikt.
 - Wijzig je hier het scan-contract, het manifestformaat of het hashformaat van
-  `cardHash.ts`, werk dan die repo mee bij. Het hashformaat faalt stil: de app
-  vindt dan offline geen enkele kaart meer.
+  `cardHash.ts`, werk dan `mobile/src/scanner/` mee bij. Het hashformaat faalt
+  stil: de app vindt dan offline geen enkele kaart meer.
 
 ### API (`apps/web/app/api/tickets/...`)
 - `checkout/route.ts`: start an order + checkout
@@ -715,7 +730,7 @@ webscanner blijft staan als webweg en als vangnet.
 - `orders/[orderId]/bancontact/qr/route.ts`: QR for a live Bancontact payment
 - `mock/complete/route.ts`: dev-only instant "payment complete"
 - `maintenance/route.ts`: reconciliation + outbox flush (Bearer `TICKETING_MAINTENANCE_SECRET`)
-- `scanner/events/route.ts`: de evenementen waarvoor je scanrechten hebt, voor de native app
+- `scanner/events/route.ts`: de evenementen waarvoor je scanrechten hebt, voor de vroegere aparte scanner-app (de VTK-app gebruikt `/api/app/v1/scan/events`)
 - `events/[eventId]/scanners`: scanners van dit event opvragen (`GET`), toevoegen
   (`POST {userId}`) of weghalen (`POST {grantId}`); enkel `MANAGE_SCANNERS`, en
   enkel de rol `SCANNER`, zodat deze weg nooit een OWNER kan degraderen
@@ -727,8 +742,8 @@ webscanner blijft staan als webweg en als vangnet.
   `lib/ticketing/crypto.ts`) leeft 30 seconden en het paneel ververst om de 20;
   daardoor is een doorgestuurde screenshot dood. De landingspagina is
   `app/(scanner)/scan/uitnodiging/page.tsx`, die na het inloggen de rol `SCANNER`
-  toekent en doorverwijst naar `/scan/<eventId>` of naar de app
-  (`vtk-scanner://scan/<eventId>`)
+  toekent en doorverwijst naar `/scan/<eventId>` of naar de VTK-app
+  (`vtk://scan/<eventId>`)
 - `events/[eventId]/scan`, `.../scan/batch`, `.../scan/card`, `.../scan/reverse`,
   `.../scanner/bootstrap`: scanning (`scan/batch` leegt de offline wachtrij,
   `scan/card` checkt in met een studentenkaart)

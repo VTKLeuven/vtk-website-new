@@ -1,0 +1,376 @@
+/* De vragen van een POC-peiling in de navy POC-band. Geladen door `PocBand` en
+   door de voorvertoning op /admin/it/flows. De strook bovenaan de site staat in
+   vtk-site-chrome.css, want die moet op elke pagina beschikbaar zijn. */
+
+.poc-poll-target {
+  scroll-margin-top: 96px;
+}
+
+.poc-poll-target:focus {
+  outline: none;
+}
+
+/* De naam van de POC blijft links staan, maar de gezichten worden een register:
+   de vragen zijn nu waar het om gaat. */
+.vtk-design .poc-wall-row.has-poll {
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+.poc-poll-people {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.poc-poll-people li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.poc-poll-face {
+  flex: none;
+  width: 48px;
+}
+
+.vtk-design .poc-poll-face .poc-wall-face,
+.vtk-design .poc-poll-face .poc-wall-photo {
+  border-radius: 12px;
+}
+
+.vtk-design .poc-poll-face .poc-wall-initial {
+  font-size: 15px;
+}
+
+.poc-poll-person {
+  min-width: 0;
+}
+
+.poc-poll-person b {
+  display: block;
+  color: var(--paper);
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.poc-poll-person i {
+  display: block;
+  color: var(--on-dark-muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.poc-poll-stack {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.poc-poll {
+  box-sizing: border-box;
+  padding: clamp(22px, 3vw, 32px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--paper);
+}
+
+.poc-poll-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 20px;
+}
+
+.poc-poll-head span {
+  color: var(--on-dark-muted);
+  font-size: 13px;
+}
+
+.poc-poll-title {
+  margin: 0;
+  color: var(--paper);
+  font-size: clamp(22px, 2.4vw, 28px);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.022em;
+}
+
+.poc-poll-lead {
+  max-width: 62ch;
+  margin: 8px 0 18px;
+  color: var(--on-dark-muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.poc-poll-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 24px;
+  padding: 16px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.poc-poll-row-open {
+  display: block;
+}
+
+.poc-poll-q {
+  flex: 1 1 300px;
+  min-width: 0;
+  color: var(--paper);
+  font-size: 16.5px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.poc-poll-row-open .poc-poll-q {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.poc-poll-optional {
+  color: var(--on-dark-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.poc-poll-choices {
+  display: flex;
+  gap: 8px;
+}
+
+.poc-poll-choices.is-score {
+  gap: 6px;
+}
+
+.poc-poll-choice {
+  position: relative;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  min-width: 72px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--paper);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.is-score .poc-poll-choice {
+  min-width: 44px;
+  padding: 0;
+}
+
+/* De echte radio blijft staan, onzichtbaar over de hele knop: zo werken het
+   toetsenbord en een screenreader zonder dat er iets nagebouwd is. */
+.poc-poll-choice input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.poc-poll-choice:hover {
+  border-color: var(--yellow);
+}
+
+.poc-poll-choice:has(input:checked) {
+  border-color: var(--yellow);
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.poc-poll-choice:has(input:focus-visible) {
+  outline: 2px solid var(--yellow);
+  outline-offset: 2px;
+}
+
+.poc-poll-legend {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 5px;
+  color: var(--on-dark-muted);
+  font-size: 12px;
+}
+
+.poc-poll textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--paper);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.poc-poll textarea::placeholder {
+  color: var(--on-dark-muted);
+}
+
+.poc-poll textarea:focus-visible,
+.poc-poll-edit:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 2px;
+}
+
+.poc-poll-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.poc-poll-foot p {
+  display: flex;
+  flex: 1 1 320px;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: var(--on-dark-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.poc-poll-foot p svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+}
+
+/* Op een navy band draait de primaire knop om. */
+.poc-poll-foot button[type="submit"] {
+  border-color: var(--surface);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.poc-poll-foot button[type="submit"]:hover {
+  background: var(--paper);
+}
+
+.poc-poll-edit {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--paper);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.poc-poll-edit:hover {
+  border-color: var(--yellow);
+}
+
+@media (max-width: 768px) {
+  .vtk-design .poc-wall-row.has-poll {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Op een telefoon een rij kleine gezichten: de vragen moeten zo hoog mogelijk. */
+  .poc-poll-people {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .poc-poll-person {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .poc-poll-row {
+    display: block;
+  }
+
+  .poc-poll-q {
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  .poc-poll-choices {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .poc-poll-choices.is-score {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .poc-poll-choice {
+    min-width: 0;
+    min-height: 48px;
+  }
+}
+
+.vtk-design .poc-elect + .poc-wall {
+  margin-top: 40px;
+}
+
+/* Wat de RiVers na de POC vertellen, onder de gezichten of de vragen. */
+.poc-poll-summary {
+  grid-column: 2;
+  box-sizing: border-box;
+  padding: clamp(18px, 2.4vw, 24px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--paper);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.poc-poll-summary-kicker {
+  margin: 0 0 8px;
+  color: var(--on-dark-muted);
+  font-size: 13px;
+}
+
+.poc-poll-summary a {
+  color: var(--paper);
+  text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+  .poc-poll-summary {
+    grid-column: 1;
+  }
+}

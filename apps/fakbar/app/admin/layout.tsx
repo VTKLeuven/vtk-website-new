@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getSession, canManageFakbar } from '@/lib/session';
+import { testLoginMode } from '@/lib/test-login-gate';
 import { FakbarAdminNav } from './admin-nav';
 
 export const metadata: Metadata = {
@@ -16,7 +17,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     const publicUrl = process.env.FAKBAR_APP_URL ?? 'https://elixir.vtk.be';
     const destination = `${publicUrl}/admin`;
     const loginUrl =
-      process.env.FAKBAR_TEST_LOGIN === 'true'
+      testLoginMode() === 'open'
         ? '/test-login'
         : `${mainUrl}/inloggen?next=${encodeURIComponent(destination)}`;
     redirect(loginUrl);

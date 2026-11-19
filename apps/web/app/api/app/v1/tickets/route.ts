@@ -1,6 +1,7 @@
 import { corsPreflight } from "@/lib/cors";
 import { listPublishedTicketEvents } from "@/lib/ticketing/queries";
 import { appLocaleFrom, type AppTicketEvent } from "@/lib/app-api/contract";
+import { absoluteUrl } from "@/lib/app-api/media";
 import { appErrorResponse, appJson } from "@/lib/app-api/respond";
 
 export const runtime = "nodejs";
@@ -32,6 +33,7 @@ export async function GET(request: Request) {
       startsAt: event.startsAt.toISOString(),
       endsAt: event.endsAt.toISOString(),
       ownerGroupName: event.ownerGroupName,
+      imageUrl: event.poster ? absoluteUrl(request, event.poster.src) : null,
       ticketTypeCount: event.ticketTypes.length,
       fromPriceCents:
         event.ticketTypes.length > 0

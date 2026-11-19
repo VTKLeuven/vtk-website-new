@@ -16,6 +16,7 @@ import {
 import { DailyChart, type ChartSeries } from "@/components/admin/DailyChart";
 import { describeSource } from "@/lib/ticketing/source";
 import { ticketAudienceLabel } from "@/lib/ticketing/audience";
+import { attendeeGroupLabel } from "@/lib/ticketing/attendeeGroups";
 import type { TicketStats } from "@/lib/ticketing/statsCompute";
 import { AdminEmptyState } from "./AdminEmptyState";
 import { AdminMetric } from "./AdminMetric";
@@ -541,6 +542,43 @@ export function TicketStatsView({
 
       {stats.accountingCodes.length > 0 ? (
         <AccountingCodeSection stats={stats} locale={locale} single={single} money={money} n={n} />
+      ) : null}
+
+      {totals.sold > 0 ? (
+        <section className="ticket-admin-section" aria-labelledby="stats-attendee-groups">
+          <SectionHead
+            id="stats-attendee-groups"
+            icon={UsersRound}
+            title={nl ? "Wie komt er" : "Who is coming"}
+            intro={
+              nl
+                ? "Per deelnemer, niet per koper: praesidium (een post dit werkingsjaar), ereleden, leden en niet-leden. Wie we niet aan een account kunnen koppelen, telt als niet-lid. Op Deelnemers filter je op dezelfde groepen."
+                : "Per attendee, not per buyer: praesidium (a post this working year), honorary members, members and non-members. Anyone we cannot link to an account counts as a non-member. Attendees filters on the same groups."
+            }
+          />
+          <div className="ticket-admin-table-wrap">
+            <table className="ticket-admin-table ticket-stats-table">
+              <thead>
+                <tr>
+                  <th>{nl ? "Groep" : "Group"}</th>
+                  <th data-num>{nl ? "Tickets" : "Tickets"}</th>
+                  <th data-num>{nl ? "Aandeel" : "Share"}</th>
+                  <th data-num>{nl ? "Aanwezig" : "Checked in"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.attendeeGroups.map((row) => (
+                  <tr key={row.group}>
+                    <td><strong>{attendeeGroupLabel(row.group, locale, true)}</strong></td>
+                    <td data-num>{n(row.sold)}</td>
+                    <td data-num>{pct(row.share)}</td>
+                    <td data-num>{row.sold > 0 ? n(row.checkedIn) : "–"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       ) : null}
 
       {stats.types.length > 0 ? (

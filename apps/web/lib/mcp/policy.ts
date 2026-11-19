@@ -41,7 +41,8 @@ export const MCP_PERMISSION_POLICY = {
   "forms.create": { reads: ["forms"], creates: ["app_create:form", "app_create:form_section", "app_create:form_field"], blocked: ["publish forms or submit entries"] },
   "forms.manageAll": { reads: ["forms", "form_entries"], creates: ["app_create:form", "app_create:form_section", "app_create:form_field"], blocked: ["publish forms, submit entries or send mail"] },
   "photos.upload": { reads: ["photos"], creates: ["app_create:photo_album"], blocked: ["upload assets or publish albums"] },
-  "photos.manageAlbums": { reads: ["photos"], creates: ["app_create:photo_album"], blocked: ["modify, publish or delete albums"] },
+  "photos.createAlbums": { reads: ["photos"], creates: ["app_create:photo_album"], blocked: ["upload assets, publish or delete albums"] },
+  "photos.manageAlbums": { reads: ["photos"], creates: ["app_create:photo_album"], blocked: ["modify, publish or delete albums", "create, change or revoke private album links"] },
   "users.search": { reads: ["user_search"], creates: [], blocked: ["create or modify accounts"] },
   "users.view": { reads: ["users"], creates: [], blocked: ["create or modify accounts"] },
   "users.edit": { reads: ["users"], creates: [], blocked: ["create, modify or deactivate accounts"] },
@@ -49,6 +50,9 @@ export const MCP_PERMISSION_POLICY = {
   "groups.manage": { reads: ["groups"], creates: ["app_create:group(PRAESIDIUM)"], blocked: ["modify memberships or grants"] },
   "werkgroepen.manage": { reads: ["groups"], creates: ["app_create:group(WERKGROEP)"], blocked: ["modify memberships or grants"] },
   "werkgroepen.manageOwnMembers": { reads: [], creates: [], blocked: ["modify memberships"] },
+  "werkgroepen.editOwnInfo": { reads: [], creates: [], blocked: ["edit werkgroep info text"] },
+  "jaarwerkingen.manage": { reads: ["groups"], creates: ["app_create:group(JAARWERKING)"], blocked: ["modify memberships or grants"] },
+  "jaarwerkingen.manageOwnMembers": { reads: [], creates: [], blocked: ["modify memberships"] },
   "roles.manage": { reads: ["roles"], creates: ["app_create:role"], blocked: ["assign roles or permissions"] },
   // De taakverdeling koppelt namen van postleden aan wat ze doen. Een agent
   // heeft daar niets te zoeken, en iemand een taak geven is geen create.
@@ -73,7 +77,7 @@ export const MCP_PERMISSION_POLICY = {
   // MCP mag het onder geen enkele voorwaarde.
   "app.push": { reads: [], creates: [], blocked: ["send push notifications"] },
   "openingHours.manageOwn": { reads: ["editorial_settings"], creates: [], blocked: ["overwrite opening hours"] },
-  "media.manage": { reads: ["editorial_settings", "photos"], creates: ["app_create:photo_album"], blocked: ["upload or overwrite media settings"] },
+  "media.manage": { reads: ["editorial_settings", "photos"], creates: ["app_create:photo_album"], blocked: ["upload or overwrite media settings", "create, change or revoke private album links"] },
   "dashboard.manage": { reads: ["dashboard"], creates: ["app_create:dashboard_tile"], blocked: ["update or delete dashboard tiles"] },
   "dashboard.manageOwn": { reads: ["dashboard"], creates: ["app_create:dashboard_tile(GROUP)"], blocked: ["update or delete dashboard tiles"] },
   "shortlinks.manage": { reads: ["shortlinks"], creates: ["app_create:short_link"], blocked: ["enable, update or delete short links"] },
@@ -156,10 +160,6 @@ export const MCP_PERMISSION_POLICY = {
   "income.manage": { reads: [], creates: [], blocked: ["read, import or match online income"] },
   "audit.view": { reads: ["audit_log"], creates: [], blocked: [] },
   "urenloopApp.manage": { reads: ["urenloop_app"], creates: [], blocked: ["grant download access, issue codes or revoke devices"] },
-  // Websitefeedback is vrije tekst van leden over de site, soms anoniem
-  // gemeld. Wie anoniem meldde, deed dat tegenover de kring en niet tegenover
-  // een agent; niets ervan gaat door dit endpoint, ook niet lezend.
-  "feedback.manage": { reads: [], creates: [], blocked: ["read or handle website feedback"] },
 } as const satisfies Record<Permission, McpPermissionPolicy>;
 
 export function parseConfiguredPermissions(raw: string | undefined): {

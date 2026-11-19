@@ -18,6 +18,7 @@ import {
   type TicketTargetAudience,
 } from "./audience";
 import { ticketViewerProfile } from "./viewerProfile";
+import { honoraryHeldTicketsWhere } from "./honorary";
 import { getTicketEventAccess } from "./authorization";
 import {
   isInPresaleNow,
@@ -264,12 +265,7 @@ function forViewer(
  */
 async function honoraryPriceUsed(eventId: string, userId: string): Promise<boolean> {
   const used = await prisma.ticketOrderItem.count({
-    where: {
-      eventId,
-      honoraryPrice: true,
-      order: { buyerUserId: userId, status: { in: ["PENDING_PAYMENT", "PAID", "PARTIALLY_REFUNDED"] } },
-      OR: [{ ticket: null }, { ticket: { status: { not: "REFUNDED" } } }],
-    },
+    where: { ...honoraryHeldTicketsWhere(eventId, userId), honoraryPrice: true },
   });
   return used > 0;
 }
@@ -463,11 +459,24 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
     session && profile.honorary && ticketTypes.some((type) => type.honoraryPriceCents !== null)
       ? await honoraryPriceUsed(event.id, session.user.id)
       : false;
+  // Een erelid op een event met `honoraryOneTicket`: één ticket in totaal.
+  // Dezelfde telling als de checkout, zodat de shop niets laat kiezen wat daar
+  // afketst. Null voor wie geen erelid is of wanneer het vinkje uit staat.
+  const honoraryOneTicket =
+    session && profile.honorary && event.honoraryOneTicket
+      ? {
+          used:
+            (await prisma.ticketOrderItem.count({
+              where: honoraryHeldTicketsWhere(event.id, session.user.id),
+            })) > 0,
+        }
+      : null;
   return {
     ...dto,
     ticketTypes: forViewer(ticketTypes, isMember, profile.honorary && !honoraryUsed),
     // Enkel om het te kunnen zeggen; voor wie geen erelid is, altijd false.
     honoraryPriceUsed: honoraryUsed,
+    honoraryOneTicket,
     memberPriceHint: memberPriceHint(ticketTypes, Boolean(session), isMember),
     requiresLogin:
       !session &&

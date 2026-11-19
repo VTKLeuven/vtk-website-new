@@ -8,6 +8,7 @@ import { STUDY_PROFILE_SELECT, type ProfileAudience } from "@/lib/calendar/audie
 import { usersWantingTopic } from "./notificationPrefs";
 import { dayStart, isLive } from "./study";
 import { sendPushToUsers } from "./push";
+import { eventForMoment } from "@/lib/calendar/moments";
 
 /**
  * De pushberichten die vanzelf vertrekken.
@@ -292,7 +293,15 @@ export async function sendInterestReminderPush(now: Date = new Date()): Promise<
       id: true,
       userId: true,
       momentStart: true,
-      event: { select: { id: true, titleNl: true, start: true, location: true } },
+      event: {
+        select: {
+          id: true,
+          titleNl: true,
+          start: true,
+          location: true,
+          moments: { select: { start: true, location: true } },
+        },
+      },
     },
     take: 500,
   });
@@ -319,9 +328,15 @@ export async function sendInterestReminderPush(now: Date = new Date()): Promise<
     if (wanting.length === 0) continue;
 
     const when = timeFormat.format(interest.momentStart ?? interest.event.start);
+    // Bij een dag uit een reeks de startplaats van die dag.
+    const momentTime = interest.momentStart?.getTime();
+    const { location } = eventForMoment(
+      interest.event,
+      interest.event.moments.find((moment) => moment.start.getTime() === momentTime),
+    );
     const outcome = await sendPushToUsers(wanting, {
       title: interest.event.titleNl,
-      body: interest.event.location ? `${when}, ${interest.event.location}` : when,
+      body: location ? `${when}, ${location}` : when,
       path: `/evenement/${interest.event.id}`,
     });
     users += wanting.length;

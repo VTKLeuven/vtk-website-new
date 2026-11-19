@@ -5,6 +5,7 @@ import { hasPermission } from "@vtk/auth";
 import { getAuthorizationPreview, requireSession } from "@/lib/session";
 import { capabilitiesForTicketRoles } from "./authorization";
 import { presaleStart } from "./presale";
+import { attendeeGroupsFor } from "./attendeeAccounts";
 import {
   computeTicketStats,
   type StatsEventInput,
@@ -126,6 +127,10 @@ export async function loadTicketStats(
             ticketTypeName: true,
             totalCents: true,
             memberPrice: true,
+            attendeeName: true,
+            attendeeEmail: true,
+            rNumber: true,
+            honoraryPrice: true,
             refundItems: { select: { amountCents: true, refund: { select: { status: true } } } },
             order: {
               select: {
@@ -133,6 +138,7 @@ export async function loadTicketStats(
                 paidAt: true,
                 buyerUserId: true,
                 buyerEmail: true,
+                buyerName: true,
                 source: true,
                 sourceCampaign: true,
                 accountingCode: true,
@@ -176,7 +182,8 @@ export async function loadTicketStats(
     finance: access.all || (access.events.get(event.id)?.finance ?? false),
   }));
 
-  const ticketInputs: StatsTicketInput[] = tickets.map((ticket) => {
+  const ticketGroups = await attendeeGroupsFor(tickets.map((ticket) => ticket.orderItem));
+  const ticketInputs: StatsTicketInput[] = tickets.map((ticket, index) => {
     const item = ticket.orderItem;
     return {
       eventId: ticket.eventId,
@@ -192,6 +199,7 @@ export async function loadTicketStats(
         .filter((refundItem) => refundItem.refund.status === "SUCCEEDED")
         .reduce((sum, refundItem) => sum + refundItem.amountCents, 0),
       memberPrice: item.memberPrice,
+      group: ticketGroups[index],
       orderId: item.order.id,
       buyerKey: item.order.buyerUserId ?? item.order.buyerEmail.toLowerCase(),
       signedIn: item.order.buyerUserId !== null,

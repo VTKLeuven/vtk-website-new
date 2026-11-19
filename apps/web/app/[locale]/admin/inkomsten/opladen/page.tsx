@@ -3,9 +3,8 @@ import type { Locale } from "@vtk/i18n";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
-import { countUnassigned, listIncomeImports } from "@/lib/inkomsten/server";
+import { listIncomeImports } from "@/lib/inkomsten/server";
 import { deleteIncomeImportAction, importIncomeAction, previewIncomeImportAction } from "@/app/actions/inkomsten";
-import { IncomeNav } from "../IncomeNav";
 import { incomeErrorMessages } from "../messages";
 import { SOURCE_LABELS } from "../shared";
 import { FormatGuide } from "./FormatGuide";
@@ -16,25 +15,22 @@ export default async function IncomeUploadPage({ params }: { params: Promise<{ l
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const nl = locale === "nl";
-  const base = nl ? "" : "/en";
   await requirePermission("income.manage");
 
-  const [imports, openCount] = await Promise.all([listIncomeImports(), countUnassigned()]);
+  const imports = await listIncomeImports();
   const errorMessages = incomeErrorMessages(locale);
   const date = (value: Date | null) => (value ? value.toLocaleDateString(nl ? "nl-BE" : "en-GB") : "");
 
   return (
     <div className="space-y-5">
       <header>
-        <h1 className="text-2xl font-semibold">{nl ? "Online inkomsten uploaden" : "Upload online income"}</h1>
+        <h2 className="text-lg font-semibold">{nl ? "Online inkomsten uploaden" : "Upload online income"}</h2>
         <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
           {nl
             ? "Wat al eerder geüpload werd, telt niet dubbel: een maand twee keer uploaden kan geen kwaad."
             : "Anything uploaded before does not count twice: uploading a month twice does no harm."}
         </p>
       </header>
-
-      <IncomeNav base={base} nl={nl} active="opladen" openCount={openCount} />
 
       <section className="space-y-4 rounded-2xl border border-vtk-blue/12 bg-white p-5">
         <FormatGuide nl={nl} />

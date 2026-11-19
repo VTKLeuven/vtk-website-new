@@ -1,5 +1,6 @@
 "use client";
 
+import { unsentGuard } from "@/components/ui/unsentGuard";
 import { refundTicketsAction, refundTicketsManuallyAction } from "@/app/actions/tickets";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { AlertTriangle, RotateCcw } from "lucide-react";
@@ -135,7 +136,7 @@ export function RefundOrderForm({
   }
 
   return (
-    <form action={refundTicketsAction} className="ticket-admin-form" onSubmit={handleSubmit}>
+    <form action={unsentGuard.form(refundTicketsAction)} className="ticket-admin-form" onSubmit={handleSubmit}>
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="eventId" value={eventId} />
       <input type="hidden" name="orderId" value={orderId} />

@@ -1,12 +1,22 @@
 "use client";
 
-import { Fragment, type ReactNode } from "react";
-import { ConfirmIconButton, ConfirmTextButton } from "@/components/ui/DeleteIconButton";
+import { Fragment, useState, useTransition, type ReactNode } from "react";
+import { ConfirmDialog, Input } from "@vtk/ui";
+import { ConfirmIconButton } from "@/components/ui/DeleteIconButton";
 import { IconAnchor } from "@/components/ui/IconButton";
-import { ExternalLinkIcon, EyeOffIcon, UndoIcon } from "@/components/ui/icons";
+import { ExternalLinkIcon, EyeOffIcon, JarIcon, UndoIcon } from "@/components/ui/icons";
+import { useToast } from "@/components/ui/toast";
+import { useUnsentGuard } from "@/components/ui/unsentGuard";
 import { formatAmount } from "@/lib/rekeningen/expenses";
+import type { SaveState } from "@/lib/saveState";
 import type { BoLine, XDoc, XDossier } from "@/lib/bo/explorer";
-import { hideBoDocumentAction, unpairBoResultAction } from "@/app/actions/bestuursorgaan";
+import {
+  excludeBoBegrotingAction,
+  hideBoDocumentAction,
+  includeBoBegrotingAction,
+  setBoPotAction,
+  unpairBoResultAction,
+} from "@/app/actions/bestuursorgaan";
 import { figuresErrorText } from "./messages";
 
 /*
@@ -53,8 +63,9 @@ export function Progress({ value }: { value: number | null }) {
 }
 
 /**
- * De stand van een activiteit, altijd een van vier woorden met een vaste kleur:
- * Open (amber), Komt nog (grijs), Afgerond (groen), Geen budget. Wat erbij hoort
+ * De stand van een activiteit, altijd een van vijf woorden met een vaste kleur:
+ * Open (amber), Komt nog (grijs), Afgerond (groen), Geen budget, Potje (grijs).
+ * Wat erbij hoort
  * (hoeveel dagen, de afwijking, "via grocomeet") staat als tekst in
  * `StatusNote`, niet in de pil: vijf soorten labels in één kolom lazen als een
  * raadsel.
@@ -72,6 +83,12 @@ export function StatusPill({ dossier: d, f }: { dossier: XDossier; f: Fmt }) {
       );
     case "OPEN":
       return <span className="vtk-bo-pill" data-tone="low">Open</span>;
+    case "POT":
+      return (
+        <span className="vtk-bo-pill" title={nl ? "Een deelbudget: wacht niet op een resultaat" : "A partial budget: does not wait for a result"}>
+          {nl ? "Potje" : "Pot"}
+        </span>
+      );
     case "NO_BUDGET":
       // Een resultaat van 25-26 op een BO van 26-27: zijn budget passeerde
       // voor de site meelas, en dat is geen fout.
@@ -96,6 +113,13 @@ export function statusNote(d: XDossier, f: Fmt): ReactNode {
       return (
         <span className="tabular-nums" title={nl ? "Dagen sinds de BO van het budget" : "Days since the meeting of the budget"}>
           {d.overdueDays === 1 ? (nl ? "1 dag" : "1 day") : `${d.overdueDays ?? 0} ${nl ? "dagen" : "days"}`}
+        </span>
+      );
+    case "POT":
+      if (d.results.length === 0) return null;
+      return (
+        <span className="tabular-nums" title={nl ? "Het laatste tussentijdse resultaat" : "The latest interim result"}>
+          {nl ? "tussentijds" : "interim"} {f.euro(d.resultCents)}
         </span>
       );
     case "DONE":
@@ -429,7 +453,47 @@ export function HideFileButton({
   );
 }
 
-/** "Niet meetellen" voor een hele activiteit, naast "Post wijzigen". */
+/** Een action uitvoeren met de toast achteraf, en het vangnet voor wat de server niet bereikte. */
+function useBoAction(nl: boolean, errorMessages: Record<string, string>) {
+  const [pending, startTransition] = useTransition();
+  const showToast = useToast();
+  const unsent = useUnsentGuard();
+  function run(action: (data: FormData) => Promise<SaveState>, fields: Record<string, string>, success: string, after?: () => void) {
+    const data = new FormData();
+    for (const [key, value] of Object.entries(fields)) data.set(key, value);
+    startTransition(async () => {
+      let result: SaveState;
+      try {
+        result = await action(data);
+      } catch (error) {
+        after?.();
+        if (unsent.report(error)) return;
+        throw error;
+      }
+      after?.();
+      if (result.status === "error") {
+        showToast({
+          message: errorMessages[result.code] ?? (nl ? "Niet opgeslagen: er ging iets mis." : "Not saved: something went wrong."),
+          variant: "error",
+          duration: 0,
+        });
+        return;
+      }
+      showToast({ message: success, variant: "success" });
+    });
+  }
+  return { pending, run };
+}
+
+type CountChoice = "begroting" | "hide";
+
+/**
+ * "Niet meetellen" voor een hele activiteit, naast "Post wijzigen". De dialoog
+ * vraagt hoe: enkel niet in de stand tegenover de begroting (de stad betaalt,
+ * het blad is nog maar half; de activiteit blijft in het overzicht), of
+ * helemaal niet (een kopie, een oude versie). Het eerste staat bovenaan: dat
+ * is het vaakst bedoeld en het minst ingrijpend.
+ */
 export function HideDossierButton({
   dossier: d,
   nl,
@@ -442,32 +506,224 @@ export function HideDossierButton({
   className?: string;
 }) {
   const docs = [...d.budgets, ...d.results];
+  const excluded = Boolean(d.begrotingExcluded);
+  const [open, setOpen] = useState(false);
+  const [choice, setChoice] = useState<CountChoice>(excluded ? "hide" : "begroting");
+  const [reason, setReason] = useState("");
+  const { pending, run } = useBoAction(nl, errorMessages);
+  const docIds = docs.map((doc) => doc.id).join(",");
+  const what =
+    docs.length === 1
+      ? nl
+        ? `Het bestand "${docs[0].name}"`
+        : `The file "${docs[0].name}"`
+      : nl
+        ? `De ${docs.length} bestanden van "${d.activity}" (${docs.map((doc) => doc.name).join(", ")})`
+        : `The ${docs.length} files of "${d.activity}" (${docs.map((doc) => doc.name).join(", ")})`;
+
+  function show() {
+    setChoice(excluded ? "hide" : "begroting");
+    setReason("");
+    setOpen(true);
+  }
+
+  function confirm() {
+    if (choice === "begroting") {
+      run(
+        excludeBoBegrotingAction,
+        { docIds, reason },
+        nl ? `"${d.activity}" telt niet meer mee in de begroting.` : `"${d.activity}" no longer counts towards the annual plan.`,
+        () => setOpen(false),
+      );
+    } else {
+      run(
+        hideBoDocumentAction,
+        { docIds },
+        nl ? `"${d.activity}" telt niet meer mee.` : `"${d.activity}" no longer counts.`,
+        () => setOpen(false),
+      );
+    }
+  }
+
+  const option = (value: CountChoice, label: string, hint: string, extra?: ReactNode) => (
+    <label className="vtk-bo-choice" data-checked={choice === value || undefined}>
+      <input type="radio" name={`bo-count-${d.key}`} checked={choice === value} disabled={pending} onChange={() => setChoice(value)} />
+      <span>
+        <span className="t">{label}</span>
+        <span className="h">{hint}</span>
+        {choice === value && extra}
+      </span>
+    </label>
+  );
+
   return (
-    <ConfirmTextButton
+    <>
+      <button
+        type="button"
+        className={className}
+        aria-label={nl ? `Niet meetellen: ${d.activity}` : `Do not count: ${d.activity}`}
+        aria-haspopup="dialog"
+        onClick={show}
+      >
+        <EyeOffIcon />
+        {nl ? "Niet meetellen" : "Do not count"}
+      </button>
+      <ConfirmDialog
+        open={open}
+        title={nl ? `"${d.activity}" niet meetellen?` : `Stop counting "${d.activity}"?`}
+        destructive={choice === "hide"}
+        pending={pending}
+        description={
+          <div className="grid gap-2">
+            {excluded ? (
+              <p>
+                {nl
+                  ? "Telt al niet mee in de stand tegenover de begroting. Terugzetten kan in het detail of onder Instellingen."
+                  : "Already left out of the standing against the annual plan. You can undo that in the detail or under Settings."}
+              </p>
+            ) : (
+              option(
+                "begroting",
+                nl ? "Enkel niet in de begroting" : "Only not in the annual plan",
+                nl
+                  ? "Blijft in het overzicht (budget, resultaat, percentage), maar telt niet mee in de stand tegenover de begroting. Voor wat de stad betaalt, of een blad dat nog maar half is."
+                  : "Stays in the overview (budget, result, percentage), but is left out of the standing against the annual plan. For what the city pays, or a sheet that is only half done.",
+                <Input
+                  className="mt-2"
+                  value={reason}
+                  maxLength={300}
+                  disabled={pending}
+                  onChange={(event) => setReason(event.target.value)}
+                  placeholder={nl ? "Waarom? (optioneel, bv. betaald door de stad)" : "Why? (optional, e.g. paid by the city)"}
+                  aria-label={nl ? "Waarom" : "Why"}
+                />,
+              )
+            )}
+            {option(
+              "hide",
+              nl ? "Helemaal niet meetellen" : "Do not count at all",
+              hideText(nl, what, null),
+            )}
+          </div>
+        }
+        confirmLabel={
+          choice === "begroting" ? (nl ? "Uit de begroting halen" : "Leave out of the plan") : nl ? "Niet meetellen" : "Do not count"
+        }
+        cancelLabel={nl ? "Annuleren" : "Cancel"}
+        onConfirm={confirm}
+        onCancel={() => setOpen(false)}
+      />
+    </>
+  );
+}
+
+/**
+ * "Potje" naast "Niet meetellen": een deelbudget waaruit door het jaar gekocht
+ * wordt. Geen bevestiging: er gaat niets verloren, en dezelfde knop zet het
+ * terug. Een potje door zijn naam ("Deelbudget") heeft geen knop; daar beslist
+ * de naam, en `PotNote` zegt dat.
+ */
+export function PotButton({
+  dossier: d,
+  nl,
+  errorMessages,
+  className = "vtk-bo-postedit-open",
+}: {
+  dossier: XDossier;
+  nl: boolean;
+  errorMessages: Record<string, string>;
+  className?: string;
+}) {
+  const { pending, run } = useBoAction(nl, errorMessages);
+  if (d.pot === "name" || d.budgets.length === 0) return null;
+  const marked = d.pot === "manual";
+  const docIds = [...d.budgets, ...d.results].map((doc) => doc.id).join(",");
+  return (
+    <button
+      type="button"
       className={className}
-      ariaLabel={nl ? `Niet meetellen: ${d.activity}` : `Do not count: ${d.activity}`}
-      action={hideBoDocumentAction}
-      fields={{ docIds: docs.map((doc) => doc.id).join(",") }}
-      title={nl ? `"${d.activity}" niet meetellen?` : `Stop counting "${d.activity}"?`}
-      description={hideText(
-        nl,
-        docs.length === 1
-          ? nl
-            ? `Het bestand "${docs[0].name}"`
-            : `The file "${docs[0].name}"`
-          : nl
-            ? `De ${docs.length} bestanden van "${d.activity}" (${docs.map((doc) => doc.name).join(", ")})`
-            : `The ${docs.length} files of "${d.activity}" (${docs.map((doc) => doc.name).join(", ")})`,
-        null,
-      )}
-      confirmLabel={nl ? "Niet meetellen" : "Do not count"}
-      cancelLabel={nl ? "Annuleren" : "Cancel"}
-      successMessage={nl ? `"${d.activity}" telt niet meer mee.` : `"${d.activity}" no longer counts.`}
-      errorMessages={errorMessages}
+      disabled={pending}
+      aria-pressed={marked}
+      aria-label={nl ? `${marked ? "Geen potje" : "Potje"}: ${d.activity}` : `${marked ? "Not a pot" : "Pot"}: ${d.activity}`}
+      title={
+        nl
+          ? marked
+            ? "Weer een gewone activiteit: wacht op een resultaat"
+            : "Een deelbudget waaruit door het jaar gekocht wordt: wacht niet op een resultaat, telt in de begroting voor het begrote bedrag"
+          : marked
+            ? "A regular activity again: waits for a result"
+            : "A partial budget spent through the year: does not wait for a result, counts at the planned amount"
+      }
+      onClick={() =>
+        run(
+          setBoPotAction,
+          { docIds, pot: marked ? "0" : "1" },
+          nl
+            ? marked
+              ? `"${d.activity}" is geen potje meer.`
+              : `"${d.activity}" is een potje.`
+            : marked
+              ? `"${d.activity}" is no longer a pot.`
+              : `"${d.activity}" is a pot.`,
+        )
+      }
     >
-      <EyeOffIcon />
-      {nl ? "Niet meetellen" : "Do not count"}
-    </ConfirmTextButton>
+      <JarIcon />
+      {marked ? (nl ? "Geen potje" : "Not a pot") : nl ? "Potje" : "Pot"}
+    </button>
+  );
+}
+
+/** In het detail van een potje: wat dat betekent, en waarom het er een is. */
+export function PotNote({ dossier: d, nl }: { dossier: XDossier; nl: boolean }) {
+  if (!d.pot) return null;
+  return (
+    <p className="vtk-bo-note">
+      {nl
+        ? "Potje: wacht niet op een resultaat, en telt in de stand tegenover de begroting voor het begrote bedrag."
+        : "Pot: does not wait for a result, and counts towards the annual plan at the planned amount."}
+      {d.pot === "name" && (nl ? " De naam zegt Deelbudget." : " The name says Deelbudget.")}
+    </p>
+  );
+}
+
+/**
+ * In het detail van een activiteit die niet meetelt in de begroting: waarom,
+ * en meteen terugzetten. Zonder bevestiging: er gaat niets verloren, en
+ * "Niet meetellen" zet het zo terug.
+ */
+export function BegrotingExcludedNote({
+  dossier: d,
+  nl,
+  errorMessages,
+}: {
+  dossier: XDossier;
+  nl: boolean;
+  errorMessages: Record<string, string>;
+}) {
+  const { pending, run } = useBoAction(nl, errorMessages);
+  if (!d.begrotingExcluded) return null;
+  const docIds = [...d.budgets, ...d.results].map((doc) => doc.id).join(",");
+  const reason = d.begrotingExcluded.reason;
+  return (
+    <p className="vtk-bo-note">
+      {nl ? "Telt niet mee in de stand tegenover de begroting" : "Left out of the standing against the annual plan"}
+      {reason ? `: ${reason}` : "."}{" "}
+      <button
+        type="button"
+        className="vtk-bo-link"
+        disabled={pending}
+        onClick={() =>
+          run(
+            includeBoBegrotingAction,
+            { docIds },
+            nl ? `"${d.activity}" telt weer mee in de begroting.` : `"${d.activity}" counts towards the annual plan again.`,
+          )
+        }
+      >
+        {nl ? "Weer meetellen" : "Count again"}
+      </button>
+    </p>
   );
 }
 

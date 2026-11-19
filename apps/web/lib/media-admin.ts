@@ -39,7 +39,7 @@ export type LibraryPart = {
 export type LibraryAlbum = {
   album: AdminAlbum;
   parts: LibraryPart[];
-  /** `/media/<slug>` wanneer het album op de site staat, anders `null`. */
+  /** `/media/<slug>` wanneer het album op de site staat (openbaar of privé), anders `null`. */
   publicPath: string | null;
 };
 
@@ -102,7 +102,8 @@ export async function loadLibraryAlbum(idOrSlug: string): Promise<LibraryAlbum |
     }),
     // Enkel voor de link naar de site; een momentopname die niet laadt, mag het
     // beheer niet tegenhouden.
-    album.hidden ? null : listImmichGalleryAlbums().catch(() => null),
+    // Ook een privé album heeft een adres; dat staat niet in het overzicht.
+    album.hidden ? null : listImmichGalleryAlbums({ includeUnlisted: true }).catch(() => null),
   ]);
 
   const parts = album.parts.map((part, index) => {
@@ -208,6 +209,9 @@ export async function purgeExpiredGalleryTrash(now = new Date()): Promise<void> 
         await deleteImmichAlbum(id).catch(() => null);
       }
       await prisma.galleryDetachedPhoto.deleteMany({ where: { albumId: { in: row.partIds } } });
+      // De privélinks naar het album werkten al niet meer zolang het in de
+      // prullenmand lag; nu het weg is, hebben ze geen album meer om naar te wijzen.
+      await prisma.galleryShareLink.deleteMany({ where: { gallery: "MAIN", albumId: row.albumId } });
       await prisma.galleryTrashedAlbum.delete({ where: { id: row.id } });
       await logAudit({
         action: "delete",

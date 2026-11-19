@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AVAILABILITY_KIND_LABEL, availabilityFillClass } from '@/lib/availability-kinds';
 import { driverColorVar, type DriverColorOverrides } from '@/lib/driver-colors';
+import { clockLabel } from '@/lib/quarter-time';
 import { clashingWith } from '@/lib/transport-conflicts';
 import { minutesOfDay, placeForDay, startOfBrusselsDay, type Placed } from '@/lib/week-lanes';
 import { BlockContent, blockLabel, blockLook, formatTime } from './trip-block';
@@ -160,17 +161,6 @@ function momentOn(day: Date, minutes: number): Date {
 
 function snap(minutes: number): number {
   return Math.round(minutes / SNAP_MINUTES) * SNAP_MINUTES;
-}
-
-/** Minuten sinds middernacht als "08:30", voor het opschrift in een band. */
-function minutesLabel(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const rest = Math.round(minutes % 60);
-  // Voorbij middernacht telt de dag door (zie `dayStartHour`), maar de klok
-  // niet. 24:00 blijft wél staan: dat is het einde van de dag en niet het begin
-  // van de volgende, en zo leest een band tot middernacht ook.
-  const clock = hours > 24 ? hours - 24 : hours;
-  return `${String(clock).padStart(2, '0')}:${String(rest).padStart(2, '0')}`;
 }
 
 /** De verticale padding van een element; gaat van de bruikbare hoogte af. */
@@ -426,8 +416,12 @@ export function TimeGrid({
     // de padding van de scroller buiten beschouwing. Met `clientHeight` bleef er
     // precies die padding aan scrollhoogte over, en dus een scrollbalk van 16
     // pixels bij "hele dag".
+    // Alles in layout-pixels. `getBoundingClientRect` geeft onder de 90%-zoom van
+    // de site (laptops, zie vtk-base.css) visuele pixels terwijl `offsetHeight`
+    // layout-pixels geeft; ze mengen liet "hele dag" 10% van de pane onbenut
+    // (F6.2). `clientHeight` is layout, mét padding, en die gaat er hier af.
     const measure = () => {
-      setPaneHeight(node.getBoundingClientRect().height - paddingOf(node));
+      setPaneHeight(node.clientHeight - paddingOf(node));
       setHeadHeight(headNode.offsetHeight);
     };
     const observer = new ResizeObserver(measure);
@@ -1067,7 +1061,7 @@ export function TimeGrid({
                           leer je pas na een keer of drie herkennen. */}
                       {bandsProminent && height >= 26 ? (
                         <>
-                          {`${minutesLabel(band.from)} - ${minutesLabel(band.to)}`}
+                          {`${clockLabel(band.from)} - ${clockLabel(band.to)}`}
                           {height >= 44 && band.kind !== 'JA' ? (
                             <span className="block text-[10px] font-medium">
                               {AVAILABILITY_KIND_LABEL[band.kind]}

@@ -3,5 +3,5 @@
 import { Redirect } from 'expo-router';
 
 export default function OudAdres() {
-  return <Redirect href="/studeren/studiegroep/nieuw" />;
+  return <Redirect href="/studeren/studiegroep/nieuw" withAnchor />;
 }

@@ -13,6 +13,7 @@ import {
   weekFromOpeningTimes,
   type HoursServiceInput,
 } from "@/lib/openingHoursWeek";
+import { isHoursLayout, readHoursLayoutSetting } from "@/lib/home/hoursLayout";
 
 // Oktober 2026 is nog zomertijd (tot zondag 25 oktober): Brussel = UTC+2.
 const TUE_1252 = new Date("2026-10-20T10:52:00Z");
@@ -201,8 +202,44 @@ describe("buildHoursBand", () => {
       TUE_1252,
       "nl",
     );
-    expect(band.services[1]).toMatchObject({ unavailable: true, bars: [], cells: [] });
+    expect(band.services[1]).toMatchObject({ unavailable: true, bars: [], cells: [], rows: [] });
     expect(band.services[1].status.label).toBe("Uren niet beschikbaar");
+  });
+
+  it("geeft per dag van de week de balken, en enkel vandaag kent nu", () => {
+    const band = buildHoursBand(inputs, TUE_1252, "nl");
+    const cudi = band.services[1];
+    expect(cudi.rows.map((row) => row.short)).toEqual(cudi.cells.map((cell) => cell.short));
+    expect(cudi.rows.filter((row) => row.today).map((row) => row.full)).toEqual(["dinsdag"]);
+    const today = cudi.rows.find((row) => row.today)!;
+    // Dezelfde balken als de tijdlijn van vandaag.
+    expect(today.bars).toEqual(cudi.bars);
+    // Op een andere dag licht niets op en loopt geen avond.
+    for (const row of band.services.flatMap((service) => service.rows).filter((row) => !row.today)) {
+      expect(row.bars.every((bar) => !bar.active)).toBe(true);
+      expect(row.bars.filter((bar) => bar.kind === "tail").every((bar) => bar.tail === "idle")).toBe(true);
+    }
+  });
+
+  it("noemt de dag apart, ook in de nacht na middernacht", () => {
+    expect(buildHoursBand(inputs, TUE_1252, "nl")).toMatchObject({ dayName: "dinsdag", overnight: false });
+    const night = buildHoursBand(inputs, WED_0130, "nl");
+    expect(night).toMatchObject({ dayName: "dinsdag", overnight: true, dayLabel: "dinsdagnacht" });
+    expect(night.services[2].rows.find((row) => row.today)?.full).toBe("dinsdag");
+  });
+});
+
+describe("weergave van de band", () => {
+  it("is week in strepen zonder keuze of bij een onbekende waarde", () => {
+    expect(readHoursLayoutSetting(undefined)).toEqual({ layout: "strips" });
+    expect(readHoursLayoutSetting({ layout: "panel" })).toEqual({ layout: "strips" });
+    expect(readHoursLayoutSetting(["plain"])).toEqual({ layout: "strips" });
+  });
+
+  it("volgt de keuze uit /admin/home", () => {
+    expect(readHoursLayoutSetting({ layout: "plain" })).toEqual({ layout: "plain" });
+    expect(isHoursLayout("strips")).toBe(true);
+    expect(isHoursLayout("nu")).toBe(false);
   });
 });
 

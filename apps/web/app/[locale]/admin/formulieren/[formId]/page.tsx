@@ -1,3 +1,4 @@
+import { ActionForm } from "@/components/ui/unsentGuard";
 import Link from "@/components/ui/Link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
@@ -257,14 +258,14 @@ export default async function FormAdminOverviewPage({
             </div>
           </div>
           <div className="ticket-admin-row-actions">
-            <form action={duplicateFormAction}>
+            <ActionForm action={duplicateFormAction}>
               <input type="hidden" name="locale" value={locale} />
               <input type="hidden" name="formId" value={formId} />
               <button className="ticket-admin-button" type="submit">
                 <Copy aria-hidden="true" size={15} />
                 {nl ? "Form dupliceren" : "Duplicate form"}
               </button>
-            </form>
+            </ActionForm>
             <DeleteButton
               action={deleteFormAction}
               fields={{ locale, formId }}

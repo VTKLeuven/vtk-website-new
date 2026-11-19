@@ -6,6 +6,7 @@ import { ToastProvider } from '@/components/ui/toast';
 import { AuthorizationPreviewBanner } from '@/components/site/AuthorizationPreviewBanner';
 import { SiteAnnouncement } from '@/components/site/SiteAnnouncement';
 import { HtmlLangSync } from '@/components/site/HtmlLangSync';
+import { PocPollStrip } from '@/components/site/PocPollStrip';
 import { HTML_LANG, hasLocale } from '@/lib/locale';
 
 import "@/app/design/vtk-base.css";
@@ -39,6 +40,7 @@ export default async function LocaleLayout({
       </a>
       <Header locale={locale} />
       <AuthorizationPreviewBanner locale={locale} />
+      <PocPollStrip locale={locale} />
       <SiteAnnouncement locale={locale} />
       {/* `flex-1` + `min-h-0` pins main to viewport height and lets children overflow;
           that overflow painted over the footer. */}

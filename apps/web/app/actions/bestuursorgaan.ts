@@ -85,7 +85,7 @@ async function validPostKeys(raw: string): Promise<string[] | null> {
   const keys = [...new Set(raw.split(",").map((k) => k.trim()).filter(Boolean))];
   const groupIds = keys.filter((k) => k.startsWith("g:")).map((k) => k.slice(2));
   const found = groupIds.length
-    ? new Set((await prisma.group.findMany({ where: { id: { in: groupIds } }, select: { id: true } })).map((g) => g.id))
+    ? new Set((await prisma.group.findMany({ where: { id: { in: groupIds }, type: { not: "JAARWERKING" } }, select: { id: true } })).map((g) => g.id))
     : new Set<string>();
   const ok = keys.every((k) => EXTRA_POST_KEYS.has(k) || (k.startsWith("g:") && found.has(k.slice(2))));
   return ok ? keys : null;
@@ -259,6 +259,90 @@ export async function hideBoDocumentAction(formData: FormData): Promise<SaveStat
       entityId: doc.id,
       target: doc.name,
       summary: "Telt niet meer mee in het overzicht van de budgetten en resultaten",
+    });
+  }
+  revalidateBo();
+  return saveOk();
+}
+
+/**
+ * "Niet in de begrotingsstand": de activiteit telt mee in het overzicht
+ * (budget, resultaat, percentage), maar niet in de stand tegenover de
+ * begroting. Voor een activiteit die de stad betaalt, of een blad dat nog maar
+ * half is. Terugzetten kan in het detail en onder Instellingen.
+ */
+export async function excludeBoBegrotingAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("bestuursorgaan.manage");
+  const ids = field(formData, "docIds").split(",").filter(Boolean);
+  const reason = field(formData, "reason").slice(0, 300) || null;
+  const docs = await prisma.boDocument.findMany({ where: { id: { in: ids } }, select: { id: true, driveFileId: true, name: true } });
+  if (docs.length === 0) return saveError("DOCUMENT_NOT_FOUND");
+  await prisma.boDocument.updateMany({
+    where: { driveFileId: { in: docs.map((d) => d.driveFileId) } },
+    data: { begrotingExcludedAt: new Date(), begrotingExcludedReason: reason },
+  });
+  for (const doc of docs) {
+    await logAudit({
+      action: "update",
+      entity: "boDocument",
+      entityId: doc.id,
+      target: doc.name,
+      summary: reason
+        ? `Telt niet meer mee in de stand tegenover de begroting: ${reason}`
+        : "Telt niet meer mee in de stand tegenover de begroting",
+    });
+  }
+  revalidateBo();
+  return saveOk();
+}
+
+/**
+ * Een activiteit als potje aanduiden, of niet meer: een deelbudget waaruit
+ * door het jaar gekocht wordt. Het wacht dan niet op een resultaat en telt in
+ * de stand tegenover de begroting voor het begrote bedrag. Alle bestanden van
+ * de activiteit, en hetzelfde bestand in een andere BO volgt mee. Een bestand
+ * dat "Deelbudget" heet, is een potje door zijn naam; dat zet dit niet terug.
+ */
+export async function setBoPotAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("bestuursorgaan.manage");
+  const ids = field(formData, "docIds").split(",").filter(Boolean);
+  const pot = field(formData, "pot") === "1";
+  const docs = await prisma.boDocument.findMany({ where: { id: { in: ids } }, select: { id: true, driveFileId: true, name: true } });
+  if (docs.length === 0) return saveError("DOCUMENT_NOT_FOUND");
+  await prisma.boDocument.updateMany({
+    where: { driveFileId: { in: docs.map((d) => d.driveFileId) } },
+    data: { potAt: pot ? new Date() : null },
+  });
+  for (const doc of docs) {
+    await logAudit({
+      action: "update",
+      entity: "boDocument",
+      entityId: doc.id,
+      target: doc.name,
+      summary: pot ? "Aangeduid als potje" : "Geen potje meer",
+    });
+  }
+  revalidateBo();
+  return saveOk();
+}
+
+/** Weer meetellen in de begroting: alle bestanden van de activiteit, of één. */
+export async function includeBoBegrotingAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("bestuursorgaan.manage");
+  const ids = field(formData, "docIds").split(",").filter(Boolean);
+  const docs = await prisma.boDocument.findMany({ where: { id: { in: ids } }, select: { id: true, driveFileId: true, name: true } });
+  if (docs.length === 0) return saveError("DOCUMENT_NOT_FOUND");
+  await prisma.boDocument.updateMany({
+    where: { driveFileId: { in: docs.map((d) => d.driveFileId) } },
+    data: { begrotingExcludedAt: null, begrotingExcludedReason: null },
+  });
+  for (const doc of docs) {
+    await logAudit({
+      action: "update",
+      entity: "boDocument",
+      entityId: doc.id,
+      target: doc.name,
+      summary: "Telt weer mee in de stand tegenover de begroting",
     });
   }
   revalidateBo();

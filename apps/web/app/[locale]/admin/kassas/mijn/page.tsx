@@ -5,9 +5,8 @@ import type { Locale } from "@vtk/i18n";
 import { LinkedRow } from "@/components/ui/LinkedRow";
 import { hasLocale } from "@/lib/locale";
 import { formatEuro } from "@/lib/rekeningen/expenses";
-import { cashRegisterAccess, permanentTabLabel } from "@/lib/kassas/server";
+import { cashRegisterAccess } from "@/lib/kassas/server";
 import { resultSharedWithPost, STATUS_SLUGS, statusLabel } from "@/lib/kassas/kassa";
-import { KassaNav } from "../KassaNav";
 import { listInclude, toListRows } from "../rows";
 
 /**
@@ -48,7 +47,7 @@ export default async function MijnKassas({ params }: { params: Promise<{ locale:
     <div className="space-y-5">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">{nl ? "Mijn aanvragen" : "My requests"}</h1>
+          <h2 className="text-lg font-semibold">{nl ? "Mijn aanvragen" : "My requests"}</h2>
           <p className="mt-1 max-w-5xl text-sm text-vtk-muted">
             {nl
               ? "De kassa's die jij of je post aanvroeg. Zolang Beheer een aanvraag niet aanvaardde, kan je ze nog aanpassen of intrekken; daarna krijg je een mail om een ophaalmoment af te spreken. Het resultaat zie je zodra Beheer de kassa geteld en doorgegeven heeft."
@@ -62,14 +61,6 @@ export default async function MijnKassas({ params }: { params: Promise<{ locale:
           {nl ? "Kassa aanvragen" : "Request a register"}
         </Link>
       </header>
-
-      <KassaNav
-        base={base}
-        nl={nl}
-        active="mijn"
-        caps={{ request: true, manage: access.canManage, control: access.canCheckIncome }}
-        permanentLabel={permanentTabLabel(access, locale)}
-      />
 
       <section className="overflow-hidden rounded-2xl border border-vtk-blue/12 bg-white">
         {rows.length === 0 ? (

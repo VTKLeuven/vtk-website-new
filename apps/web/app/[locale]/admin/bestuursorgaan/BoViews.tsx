@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import { useToast } from "@/components/ui/toast";
 import type { ExplorerData } from "@/lib/bo/explorer";
@@ -39,7 +40,8 @@ export function BoViews({
     if (next === view) return;
     setView(next);
     startTransition(async () => {
-      const result = await saveBoViewAction(next);
+      const result = await unsentGuard.run(() => saveBoViewAction(next));
+      if (result === UNSENT) return;
       if (result.status === "error") {
         showToast({
           message: nl

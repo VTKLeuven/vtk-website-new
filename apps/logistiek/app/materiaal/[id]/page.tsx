@@ -2,10 +2,16 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
-import { canManage, getSession, requestsAsExternal } from '@/lib/session';
+import { ExternClosed } from '@/components/extern-closed';
+import { canManage, externalRequestsBlocked, getSession, requestsAsExternal } from '@/lib/session';
 import { getLocale } from '@/lib/i18n';
 import { formatEuro, ITEM_CONDITION_LABELS } from '@/lib/uitleen';
-import { frequentlyRequestedWith, itemDetail, itemTeamDetails } from '@/lib/uitleen-server';
+import {
+  frequentlyRequestedWith,
+  getLogistiekSettings,
+  itemDetail,
+  itemTeamDetails,
+} from '@/lib/uitleen-server';
 import { ItemGallery } from './item-gallery';
 
 export default async function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -15,6 +21,16 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
     return <LoginGate variant="item" returnTo={`/materiaal/${id}`} />;
   }
   const en = locale === 'en';
+
+  // Een externe ziet het materiaal niet zolang indienen dicht is (F6.23): ook een
+  // rechtstreekse link naar een item mag er niet omheen.
+  if (externalRequestsBlocked(session, await getLogistiekSettings())) {
+    return (
+      <PageShell title={en ? 'Equipment' : 'Materiaal'}>
+        <ExternClosed locale={locale} />
+      </PageShell>
+    );
+  }
 
   const item = await itemDetail(id);
   if (!item) notFound();

@@ -1,5 +1,6 @@
 "use client";
 
+import { unsentGuard } from "@/components/ui/unsentGuard";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { Plus, X } from "lucide-react";
 import { Button, Card, Input, Label } from "@vtk/ui";
@@ -166,12 +167,17 @@ function clickedControl(event: MouseEvent<HTMLElement>): boolean {
  * van de pagina een muur waarin niet te zien was wat een lijst en wat een
  * invulveld was.
  */
+/** De tabbladen van /admin/nieuws; elk is een eigen route (zie de layout). */
+export type NewsSection = "homepage" | "berichten" | "instellingen";
+
 export function NewsManager({
+  section,
   locale,
   setting,
   candidates,
   posts,
 }: {
+  section: NewsSection;
   locale: Locale;
   setting: NewsSetting;
   candidates: NewsCandidateRow[];
@@ -232,7 +238,6 @@ export function NewsManager({
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1 basis-80">
-          <h1 className="text-2xl font-semibold">{nl ? "Nieuws" : "News"}</h1>
           <p className="mt-1 text-sm text-zinc-500">
             {nl
               ? "De band bovenaan de homepage, boven de openingsuren. Ticketverkoop, inschrijvingen, het Bakske, Ir.Reëel en nieuwe fotoalbums komen er vanzelf in; een mededeling of een woordje van de praeses schrijf je hier."
@@ -250,8 +255,8 @@ export function NewsManager({
       {!setting.enabled ? (
         <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           {nl
-            ? "De nieuwsband staat uit: niets hieronder staat op de homepage. Je zet ze aan onder Instellingen van de band, onderaan."
-            : "The news band is off: none of this is on the homepage. Turn it on under Band settings, at the bottom."}
+            ? "De nieuwsband staat uit: niets van dit nieuws staat op de homepage. Je zet ze aan op het tabblad Instellingen."
+            : "The news band is off: none of this news is on the homepage. Turn it on in the Settings tab."}
         </p>
       ) : null}
 
@@ -296,6 +301,7 @@ export function NewsManager({
       ) : null}
 
       {/* ---------- Wat er nu staat ---------- */}
+      {section === "homepage" && (
       <Card className="p-5">
         <div className="mb-3">
           <h2 className="text-lg font-semibold">{nl ? "Nu op de homepage" : "On the homepage now"}</h2>
@@ -355,7 +361,7 @@ export function NewsManager({
                   </span>
                   <div className="ml-auto flex shrink-0 items-center gap-2">
                     {row.place !== "hidden" ? (
-                      <form action={setNewsFeaturedAction}>
+                      <form action={unsentGuard.form(setNewsFeaturedAction)}>
                         <input type="hidden" name="source" value={row.source} />
                         <input type="hidden" name="ref" value={row.ref} />
                         <input type="hidden" name="title" value={row.title} />
@@ -388,7 +394,7 @@ export function NewsManager({
                       </form>
                     ) : null}
                     {row.automatic ? (
-                      <form action={setNewsHiddenAction}>
+                      <form action={unsentGuard.form(setNewsHiddenAction)}>
                         <input type="hidden" name="source" value={row.source} />
                         <input type="hidden" name="ref" value={row.ref} />
                         <input type="hidden" name="title" value={row.title} />
@@ -467,8 +473,10 @@ export function NewsManager({
           </ul>
         </details>
       </Card>
+      )}
 
       {/* ---------- Zelf geschreven berichten ---------- */}
+      {section === "berichten" && (
       <Card className="p-5">
         <div className="mb-3">
           <h2 className="text-lg font-semibold">{nl ? "Geschreven berichten" : "Written posts"}</h2>
@@ -524,7 +532,7 @@ export function NewsManager({
                   </span>
 
                   <div className="ml-auto flex shrink-0 items-center gap-2">
-                    <form action={setNewsPostActiveAction}>
+                    <form action={unsentGuard.form(setNewsPostActiveAction)}>
                       <input type="hidden" name="id" value={post.id} />
                       <input type="hidden" name="active" value={post.active ? "0" : "1"} />
                       <button
@@ -556,9 +564,12 @@ export function NewsManager({
           </ul>
         )}
       </Card>
+      )}
 
-      {/* ---------- De band zelf: zelden aangeraakt, dus dichtgeklapt ---------- */}
+      {/* ---------- De band zelf: een eigen tabblad, dus meteen open ---------- */}
+      {section === "instellingen" && (
       <AdminDisclosure
+        defaultOpen
         summary={
           <>
             <span className="font-semibold text-vtk-ink">{nl ? "Instellingen van de band" : "Band settings"}</span>
@@ -624,6 +635,7 @@ export function NewsManager({
           </fieldset>
         </SaveForm>
       </AdminDisclosure>
+      )}
     </div>
   );
 }

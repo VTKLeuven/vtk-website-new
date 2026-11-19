@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "@/components/ui/Link";
+import { localizeShift } from "@/lib/shift/localize";
 import type { CSSProperties } from "react";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
@@ -18,10 +19,15 @@ import { getCurrentSession } from "@/lib/session";
 import { addDays } from "date-fns";
 import { getDictionary } from "@vtk/i18n";
 import { PocBand, type PocBandGroup } from "./PocBand";
+import { getCachedPocPollSummaries } from "@/lib/cachedContent";
+import { getViewerPocPolls, getViewerProgrammes } from "@/lib/pocPolls/read";
+import { pollPanelData } from "@/lib/pocPolls/copy";
 import { NewsBand } from "./NewsBand";
 import { getCachedNews, getPresaleNews } from "@/lib/news/load";
 import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
 import { SHIFTS_BAND_SETTING, readShiftsBandSetting } from "@/lib/home/shiftBand";
+import { HOURS_LAYOUT_SETTING, readHoursLayoutSetting } from "@/lib/home/hoursLayout";
+import { HERO_DESIGN_SETTING, isHeroPhotoDesign, readHeroDesignSetting } from "@/lib/home/heroDesign";
 import { HomeShiftBand, type HomeShiftItem } from "./HomeShiftBand";
 import { ROSTER_PARTICIPANT_SELECT, toRoster } from "@/lib/shift/roster";
 import { loadPostNames } from "@/lib/shift/postNames";
@@ -35,7 +41,13 @@ import { EventStar, type EventStarLabels } from "@/components/calendar/EventStar
 import { MomentDays } from "@/components/calendar/MomentDays";
 import { CalendarPlusIcon, TicketIcon } from "@/components/ui/icons";
 import { focusPosition } from "@/lib/imageFocus";
-import { hasUpcomingMoment, momentsSummary, nextOccurrenceAt } from "@/lib/calendar/moments";
+import {
+  eventAsOfNow,
+  hasUpcomingMoment,
+  MOMENT_SELECT,
+  momentsSummary,
+  nextOccurrenceAt,
+} from "@/lib/calendar/moments";
 import { viewerAudienceFilter } from "@/lib/calendar/audience";
 import {
   interestLabel,
@@ -53,6 +65,9 @@ import {
 import { buildHoursBand, weekFromEntries, weekFromOpeningTimes } from "@/lib/openingHoursWeek";
 import { OpeningHoursBand } from "./OpeningHoursBand";
 import { BlueprintHero } from "./BlueprintHero";
+import { LegacyHero } from "./LegacyHero";
+import type { HeroEvents } from "./HeroEventCards";
+import { allWithinWeek, pickHeroEvents, relativeDay } from "@/lib/home/heroEvents";
 
 import "@/app/design/vtk-hero.css";
 import "@/app/design/vtk-home.css";
@@ -108,6 +123,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       "home.career",
       POC_BAND_SETTING,
       SHIFTS_BAND_SETTING,
+      HERO_DESIGN_SETTING,
+      HOURS_LAYOUT_SETTING,
     ]),
     // Dezelfde doelgroepregel als /kalender: standaard staat alles erop, en enkel
     // wie op /account koos zijn kalender toe te spitsen krijgt hier minder.
@@ -116,23 +133,36 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     // eerder begon, loopt vandaag nog. De limiet ligt ruimer dan de zes kaarten
     // hieronder, omdat een reeks waarvan elk moment al voorbij is maar waarvan
     // de envelop nog loopt, daar nog wegvalt.
-    viewerAudienceFilter().then((audiences) =>
-      prisma.calendarEvent.findMany({
-        where: {
-          end: { gte: now },
-          publishedAt: { not: null },
-          ...audiences,
+    //
+    // De uitgelichte evenementen komen er apart bij: wat over drie weken valt, zit
+    // in een drukke periode niet tussen de eerstvolgende zestien.
+    viewerAudienceFilter().then(async (audiences) => {
+      const where = {
+        end: { gte: now },
+        publishedAt: { not: null },
+        ...audiences,
+      };
+      const include = {
+        categories: { include: { category: true } },
+        moments: {
+          orderBy: { start: "asc" as const },
+          select: MOMENT_SELECT,
         },
-        orderBy: { start: "asc" },
-        take: 12,
-        include: {
-          categories: { include: { category: true } },
-          moments: { orderBy: { start: "asc" }, select: { start: true, end: true, label: true } },
-          // Voor het ticketicoon op de evenementkaart; zie `publishedTicketSlug`.
-          ticketEvents: { select: TICKET_LINK_SELECT },
-        },
-      }),
-    ),
+        // Voor het ticketicoon op de evenementkaart; zie `publishedTicketSlug`.
+        ticketEvents: { select: TICKET_LINK_SELECT },
+      };
+      const [next, featured] = await Promise.all([
+        prisma.calendarEvent.findMany({ where, orderBy: { start: "asc" }, take: 16, include }),
+        prisma.calendarEvent.findMany({
+          where: { ...where, homeFeaturedAt: { not: null } },
+          orderBy: { start: "asc" },
+          take: 8,
+          include,
+        }),
+      ]);
+      const seen = new Set(next.map((event) => event.id));
+      return [...next, ...featured.filter((event) => !seen.has(event.id))];
+    }),
     getCachedHeaderTabs(locale),
     // De standaardfoto's voor evenementen zonder eigen affiche: de sitebrede en
     // die per thema. Zie lib/defaultEventImage.ts.
@@ -198,9 +228,88 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     .filter((event) => hasUpcomingMoment(event, now))
     .sort((a, b) => +nextOccurrenceAt(a, now) - +nextOccurrenceAt(b, now));
 
-  // Opkomende evenementen: 2 rijen van 3. Zijn er minder, dan krimpt het
-  // rooster gewoon mee (zie `.ev-grid`), zonder lege plaatsen op te vullen.
-  const eventCards = upcomingEvents.slice(0, 6);
+  // De vier affiches in de hero: eerst wat in /admin/kalender uitgelicht is,
+  // daarna de eerstvolgende. Zie lib/home/heroEvents.ts.
+  //
+  // De hero's met een foto hebben geen affiches; dan begint de band Aankomende
+  // evenementen gewoon bij het eerstvolgende.
+  const heroDesign = readHeroDesignSetting(
+    settings.find((setting) => setting.key === HERO_DESIGN_SETTING)?.value,
+  );
+  const heroPicks = isHeroPhotoDesign(heroDesign.design) ? [] : pickHeroEvents(upcomingEvents);
+  const heroPickIds = new Set(heroPicks.map((event) => event.id));
+  const heroZone = "Europe/Brussels";
+  const heroDay = (date: Date, options: Intl.DateTimeFormatOptions) =>
+    date.toLocaleDateString(dateTag, { timeZone: heroZone, ...options });
+  const restThisWeek = upcomingEvents.filter(
+    (event) => !heroPickIds.has(event.id) && allWithinWeek([event], now),
+  ).length;
+  const heroEvents: HeroEvents = {
+    heading: allWithinWeek(heroPicks, now)
+      ? nl
+        ? "Deze week"
+        : "This week"
+      : nl
+        ? "Binnenkort"
+        : "Coming up",
+    link: {
+      label:
+        restThisWeek > 0
+          ? nl
+            ? `Nog ${restThisWeek} deze week`
+            : `${restThisWeek} more this week`
+          : nl
+            ? "Volledige kalender"
+            : "Full calendar",
+      href: `${base}/kalender`,
+    },
+    cards: heroPicks.map((event) => {
+      const start = nextOccurrenceAt(event, now);
+      const shown = eventAsOfNow(event, now);
+      const eventPhoto = publicUrl(shown.imageKey);
+      const relative = relativeDay(start, now);
+      const prefix =
+        relative === "today"
+          ? nl
+            ? "Vandaag, "
+            : "Today, "
+          : relative === "tomorrow"
+            ? nl
+              ? "Morgen, "
+              : "Tomorrow, "
+            : "";
+      const time = event.allDay
+        ? nl
+          ? "hele dag"
+          : "all day"
+        : (momentsSummary(event.moments, locale, heroZone) ??
+          start.toLocaleTimeString(dateTag, { timeZone: heroZone, hour: "2-digit", minute: "2-digit" }));
+      return {
+        id: event.id,
+        href: withSource(`${base}/kalender/${event.slug}`, "home-hero"),
+        title: pick(event.titleNl, event.titleEn ?? event.titleNl, locale),
+        // Zonder eigen affiche: dezelfde standaardfoto als op de evenementkaart.
+        photo:
+          eventPhoto ??
+          defaultEventImageFor(defaultEventImages, eventCategorySlugs(event.categories)),
+        photoPosition: eventPhoto
+          ? focusPosition({ x: shown.imageFocusX, y: shown.imageFocusY })
+          : undefined,
+        when: prefix ? `${prefix}${time}` : time.charAt(0).toUpperCase() + time.slice(1),
+        location: shown.location?.trim() || null,
+        pin: {
+          weekday: heroDay(start, { weekday: "short" }),
+          day: heroDay(start, { day: "numeric" }),
+          month: heroDay(start, { month: "short" }),
+        },
+      };
+    }),
+  };
+
+  // Opkomende evenementen: 2 rijen van 3, na wat al in de hero staat. Zijn er
+  // minder, dan krimpt het rooster gewoon mee (zie `.ev-grid`), zonder lege
+  // plaatsen op te vullen.
+  const eventCards = upcomingEvents.filter((event) => !heroPickIds.has(event.id)).slice(0, 6);
 
   // "32 komen" bij een evenement waar al volk naartoe gaat. Enkel boven de
   // drempel; zie lib/calendar/interest.ts voor waarom een laag getal averechts
@@ -226,6 +335,9 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         location: true,
         description: true,
         instructions: true,
+        nameEn: true,
+        descriptionEn: true,
+        instructionsEn: true,
         maxParticipants: true,
         reward: true,
         post: true,
@@ -250,7 +362,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     .filter((s) => s.maxParticipants - s._count.participants > 0 || s.participants.some((p) => p.userId === viewerId))
     .slice(0, 4)
     .map(({ _count, participants, ...shift }) => ({
-      ...shift,
+      ...localizeShift(shift, locale),
       takenSpots: _count.participants,
       availableSpots: Math.max(0, shift.maxParticipants - _count.participants),
       viewerRegistered: participants.some((p) => p.userId === viewerId),
@@ -274,14 +386,10 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   // De richtingen komen uit de database en niet uit de sessie: `AuthUser` draagt
   // ze niet, en ze daar bij zetten zou elke sessie-payload zwaarder maken voor
   // één sectie op één pagina. Deze lezing gebeurt enkel voor wie ingelogd is.
-  const myProgrammes = session
-    ? (
-        await prisma.user.findUnique({
-          where: { id: session.user.id },
-          select: { studyProgrammes: true },
-        })
-      )?.studyProgrammes ?? []
-    : [];
+  const myProgrammes = session ? await getViewerProgrammes(session.user.id) : [];
+  const [myPolls, pollSummaries] = session
+    ? await Promise.all([getViewerPocPolls(session.user.id), getCachedPocPollSummaries()])
+    : [[], []];
 
   const myPocs =
     myProgrammes.length > 0
@@ -299,6 +407,33 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       : [];
   // Een POC zonder vertegenwoordigers levert een lege kaart op; die tonen we niet.
   const pocsWithPeople = myPocs.filter((poc) => poc.representatives.length > 0);
+  const summariesFor = (pocId: string | null) =>
+    pollSummaries
+      .filter((summary) => summary.pocId === pocId)
+      .map((summary) => ({
+        id: summary.id,
+        title: pick(summary.titleNl, summary.titleEn ?? "", locale),
+        summary: summary.summary,
+        voters: summary.voters,
+      }));
+  // Een algemene peiling van VTK Onderwijs hangt aan geen POC en staat als eigen
+  // rij onder de POC's, zodat een peiling van je RiVers en die van Onderwijs
+  // allebei zichtbaar zijn. Zonder peiling of samenvatting valt de rij weg.
+  const generalPolls = myPolls.filter((poll) => poll.pocId === null).map((poll) => pollPanelData(poll, locale, now));
+  const generalSummaries = myProgrammes.length > 0 ? summariesFor(null) : [];
+  const generalGroup: PocBandGroup[] =
+    generalPolls.length > 0 || generalSummaries.length > 0
+      ? [
+          {
+            id: "vtk-onderwijs",
+            name: "VTK Onderwijs",
+            email: null,
+            people: [],
+            polls: generalPolls,
+            summaries: generalSummaries,
+          },
+        ]
+      : [];
   const pocGroups: PocBandGroup[] = pocsWithPeople.map((poc) => {
     const pocName = pickWithLang(poc.nameNl, poc.nameEn, locale);
     return {
@@ -316,8 +451,13 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           roleLang: repRole.text ? repRole.lang : undefined,
         };
       }),
+      polls: myPolls
+        .filter((poll) => poll.pocId === poc.id)
+        .map((poll) => pollPanelData(poll, locale, now)),
+      summaries: summariesFor(poc.id),
     };
   });
+  pocGroups.push(...generalGroup);
 
   const dict = getDictionary(locale);
   const myProgrammeNames = myProgrammes.map(
@@ -327,6 +467,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   const map = new Map(settings.map((s) => [s.key, s.value as unknown]));
   const pocSetting = readPocBandSetting(map.get(POC_BAND_SETTING));
   const shiftsBandSetting = readShiftsBandSetting(map.get(SHIFTS_BAND_SETTING));
+  const hoursLayout = readHoursLayoutSetting(map.get(HOURS_LAYOUT_SETTING)).layout;
   const theokot = readOpeningHoursSetting(map.get("home.openingHours.theokot"), "theokot");
   const cursusdienst = readOpeningHoursSetting(
     map.get("home.openingHours.cursusdienst"),
@@ -447,13 +588,41 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   return (
     <div className="vtk-design">
       {/* Hero: de technische bouwtekening van het logo met zes wegwijzers */}
-      <BlueprintHero locale={locale} />
+      {isHeroPhotoDesign(heroDesign.design) ? (
+        <LegacyHero
+          locale={locale}
+          design={heroDesign.design}
+          now={now}
+          session={session}
+          cursusEntries={cursusEntries}
+        />
+      ) : (
+        <BlueprintHero locale={locale} events={heroEvents} design={heroDesign} />
+      )}
 
       {/* Onder de hero: het nieuws in een lichtblauwe band, die helemaal wegvalt
           zonder berichten of wanneer ze uitstaat in /admin/nieuws. Zie lib/news. */}
       {news.enabled ? (
         <NewsBand entries={newsEntries} locale={locale} base={base} now={now} />
       ) : null}
+
+      {/* Nieuws, openingsuren, evenementen en POC's in die volgorde: zo wisselen
+          lichtblauw en navy af en staat er tussen de navy openingsuren en de
+          navy POC's een lichtblauwe band. Zie docs/design-decisions.md. */}
+      <OpeningHoursBand
+        band={hoursBand}
+        meta={now.toLocaleString(dateTag, {
+          timeZone: "Europe/Brussels",
+          weekday: "short",
+          day: "2-digit",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        })}
+        locale={locale}
+        base={base}
+        layout={hoursLayout}
+      />
 
       {eventCards.length > 0 && (
         <section className="section band events-band">
@@ -469,7 +638,10 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
               // De eerstvolgende keer dat er iets is; bij een gewoon evenement
               // gewoon zijn start.
               const start = nextOccurrenceAt(event, now);
-              const eventPhoto = publicUrl(event.imageKey);
+              // De affiche en de locatie van de eerstvolgende keer, net als de
+              // datum op de pin.
+              const shown = eventAsOfNow(event, now);
+              const eventPhoto = publicUrl(shown.imageKey);
               // Zonder eigen affiche: de standaardbanner van het thema, en
               // anders de sitebrede foto.
               const photo =
@@ -477,7 +649,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                 defaultEventImageFor(defaultEventImages, eventCategorySlugs(event.categories));
               const title = pickWithLang(event.titleNl, event.titleEn, locale);
               const going = interestLabel(interested.get(event.id), locale);
-              const location = event.location?.trim() || null;
+              const location = shown.location?.trim() || null;
               const categories = event.categories.map((link) => link.category);
               const theme = categories.find((category) => category.audience === null) ?? null;
               const themeName = theme ? pickWithLang(theme.nameNl, theme.nameEn, locale) : null;
@@ -505,8 +677,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                         eventPhoto
                           ? {
                               objectPosition: focusPosition({
-                                x: event.imageFocusX,
-                                y: event.imageFocusY,
+                                x: shown.imageFocusX,
+                                y: shown.imageFocusY,
                               }),
                             }
                           : undefined
@@ -631,20 +803,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           </div>
         </section>
       )}
-
-      <OpeningHoursBand
-        band={hoursBand}
-        meta={now.toLocaleString(dateTag, {
-          timeZone: "Europe/Brussels",
-          weekday: "short",
-          day: "2-digit",
-          month: "short",
-          hour: "2-digit",
-          minute: "2-digit",
-        })}
-        locale={locale}
-        base={base}
-      />
 
       <PocBand
         locale={locale}

@@ -135,6 +135,8 @@ export type TicketEventTemplate = {
   salesOpensMinutesBefore: number | null;
   salesClosesMinutesBefore: number | null;
   maxTicketsPerOrder: number;
+  /** Ereleden kopen hoogstens één ticket; zie `TicketEvent.honoraryOneTicket`. */
+  honoraryOneTicket: boolean;
   contactEmail: string | null;
   cardCheckIn: boolean;
   openScanning: boolean;
@@ -142,6 +144,8 @@ export type TicketEventTemplate = {
   presalePraesidium: boolean;
   /** Krijgen de vaste medewerkers de voorverkoop mee? Zie `presale.ts`. */
   presaleHelpers: boolean;
+  /** Krijgen de ereleden de voorverkoop mee? Zie `presale.ts`. */
+  presaleHonorary: boolean;
   confirmationMessageNl: string;
   confirmationMessageEn: string;
   /** De som van de potten, voor het overzicht. */
@@ -552,12 +556,14 @@ export function blankTicketTemplate(): TicketEventTemplate {
     salesOpensMinutesBefore: 3 * DAY_MINUTES,
     salesClosesMinutesBefore: 0,
     maxTicketsPerOrder: 8,
+    honoraryOneTicket: false,
     contactEmail: null,
     cardCheckIn: false,
     openScanning: true,
     presaleLeadMinutes: null,
     presalePraesidium: true,
     presaleHelpers: true,
+    presaleHonorary: true,
     confirmationMessageNl: "",
     confirmationMessageEn: "",
     capacity: 100,

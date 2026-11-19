@@ -1,3 +1,4 @@
+import { ActionForm } from '@/components/ui/unsentGuard';
 import type { Metadata } from 'next';
 import { staticMetadata } from '@/lib/pageMetadata';
 import Link from '@/components/ui/Link';
@@ -30,6 +31,8 @@ import { earnedShiftReward } from '@/lib/shift/rewards';
 import { praesidiumYears } from '@/lib/shift/voucherEligibility';
 import { DoorShortcutTokens } from './DoorShortcutTokens';
 import { CalendarFeedTokens } from './CalendarFeedTokens';
+import { DeleteButton } from '@/components/ui/DeleteIconButton';
+import { unlinkDiscordAccountAction } from '@/app/actions/discord-link';
 import { AccountSignature } from './AccountSignature';
 import { AccountMembership } from './AccountMembership';
 import { siteBaseUrl } from '@/lib/calendar/feeds';
@@ -88,6 +91,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
         rNumber: true,
         rNumberFromKul: true,
         firwStudent: true,
+        honoraryMember: true,
         avatarKey: true,
         noKot: true,
         street: true,
@@ -211,6 +215,10 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
       .then((user) => getRunnerStats(user.rNumber)),
   ]);
   const latestUrenloop = urenloopYears[0];
+  const discordAccount = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { discordId: true, discordUsername: true },
+  });
 
   const workingYear = currentWorkingYear(now);
   const userMemberships = memberships.map((m) => ({
@@ -272,6 +280,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
                 locale={locale}
                 year={currentStudyYear(now)}
                 firwStudent={profile.firwStudent}
+                honoraryMember={profile.honoraryMember}
                 membership={membership}
                 canJoin={
                   membershipOffer(profile, membership, membershipConfig).kind !== 'none'
@@ -464,6 +473,33 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
               </Card>
             )}
 
+            {discordAccount?.discordId ? (
+              <Card id="discord" className="scroll-mt-28 p-6">
+                <h2 className="text-lg font-semibold">Discord</h2>
+                <p className="mt-1 text-sm text-vtk-muted">
+                  {nl
+                    ? `Gekoppeld als ${discordAccount.discordUsername ?? 'Discord-gebruiker'}, voor het kanaal van je POC en de peilingen op Discord.`
+                    : `Linked as ${discordAccount.discordUsername ?? 'Discord user'}, for the channel of your POC and the polls on Discord.`}
+                </p>
+                <div className="mt-3">
+                  <DeleteButton
+                    action={unlinkDiscordAccountAction}
+                    fields={{}}
+                    title={nl ? 'Discord ontkoppelen?' : 'Unlink Discord?'}
+                    description={
+                      nl
+                        ? 'Je verliest de toegang tot het kanaal van je POC en kan peilingen op Discord pas weer beantwoorden nadat je opnieuw koppelt. Wat je al antwoordde, blijft meetellen.'
+                        : 'You lose access to the channel of your POC and can only answer polls on Discord again after linking once more. What you already answered still counts.'
+                    }
+                    confirmLabel={nl ? 'Ontkoppelen' : 'Unlink'}
+                    cancelLabel={nl ? 'Annuleren' : 'Cancel'}
+                    successMessage={nl ? 'Discord ontkoppeld.' : 'Discord unlinked.'}
+                  >
+                    {nl ? 'Ontkoppelen' : 'Unlink'}
+                  </DeleteButton>
+                </div>
+              </Card>
+            ) : null}
             <Card id="calendar" className="scroll-mt-28 p-6">
               <CalendarFeedTokens
                 locale={locale}
@@ -608,7 +644,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
                     ? 'Dit wist je login, profiel, lidmaatschappen en huidige rechten. Transacties die VTK wettelijk of voor de integriteit van de administratie moet bewaren, worden geanonimiseerd. Typ DELETE om te bevestigen.'
                     : 'This removes your login, profile, memberships and current permissions. Transactions VTK must keep for legal or administrative integrity reasons are anonymised. Type DELETE to confirm.'}
                 </p>
-                <form action={deleteMyAccountAction} className="mt-4 flex flex-wrap items-end gap-3">
+                <ActionForm action={deleteMyAccountAction} className="mt-4 flex flex-wrap items-end gap-3">
                   <div>
                     <Label htmlFor="delete-confirmation">
                       {nl ? 'Typ DELETE ter bevestiging' : 'Type DELETE to confirm'}
@@ -625,15 +661,15 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
                   <Button type="submit" variant="ghost">
                     {nl ? 'Mijn account verwijderen' : 'Delete my account'}
                   </Button>
-                </form>
+                </ActionForm>
               </div>
             </Card>
 
-            <form action={logoutAction}>
+            <ActionForm action={logoutAction}>
               <Button variant="ghost" type="submit">
                 {dict.auth.signOut}
               </Button>
-            </form>
+            </ActionForm>
           </section>
         }
       />

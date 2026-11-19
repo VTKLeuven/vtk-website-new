@@ -25,20 +25,27 @@ RUN --mount=type=cache,target=/root/.npm,sharing=locked \
   npm install --no-audit --no-fund \
   && node infra/docker/install-alpine-optional-natives.cjs
 
+# De Prisma-client in een eigen stage, los van de build. Ze hangt enkel af van
+# de dependencies en het schema, dus een commit die enkel code raakt, laat ze
+# gecached. De runner neemt ze als eigen kleine laag over de vaste node_modules
+# heen (zie onderaan): een schemawijziging exporteert dan 56 MB in plaats van
+# heel node_modules.
+FROM deps AS prisma
+COPY packages/db/prisma ./packages/db/prisma
+RUN npx --yes prisma generate --schema packages/db/prisma/schema.prisma
+
 FROM node:${NODE_VERSION}-alpine AS builder
 WORKDIR /repo
 ENV NEXT_TELEMETRY_DISABLED=1
 # Vaste heap voor `next build`, net zoals in web.Dockerfile (zie de uitleg daar).
 ENV NODE_OPTIONS=--max-old-space-size=4096
-COPY --from=deps /repo/node_modules ./node_modules
+# Geen typecheck in `next build`: de job "Types and lint" doet die al, en een
+# deploy schakelt pas om wanneer die groen is (zie .github/workflows). Hier
+# kostte ze per app een halve tot een hele minuut op de server.
+ENV VTK_SKIP_BUILD_TYPECHECK=1
+COPY --from=prisma /repo/node_modules ./node_modules
 COPY --from=deps /repo/packages ./packages
-# De Prisma-client hangt enkel van het schema af, dus die genereren we vóór de
-# broncode binnenkomt: zo blijft deze laag gecached zolang het schema niet
-# wijzigt, in plaats van bij elke commit opnieuw te draaien. De client landt in
-# node_modules, en node_modules zit niet in de buildcontext, dus de COPY's
-# hieronder overschrijven ze niet.
-COPY packages/db/prisma ./packages/db/prisma
-RUN npx --yes prisma generate --schema packages/db/prisma/schema.prisma
+# De Prisma-client zit al in node_modules, uit de stage `prisma` hierboven.
 # Enkel wat deze build leest, en niet `COPY . .`: zo bouwt een deploy deze app
 # niet opnieuw wanneer er enkel iets aan de website of in docs/ veranderde (zie
 # web.Dockerfile). De packages die fakbar importeert, rechtstreeks of via een
@@ -52,6 +59,9 @@ COPY packages/mail ./packages/mail
 COPY packages/tsconfig ./packages/tsconfig
 COPY packages/ui ./packages/ui
 COPY apps/fakbar ./apps/fakbar
+# Vaste sleutel voor de ID's van de server actions; zie web.Dockerfile en
+# infra/deploy.sh.
+ARG NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=""
 RUN --mount=type=cache,target=/repo/apps/fakbar/.next/cache,sharing=locked \
   npm run build --workspace=@vtk/fakbar
 
@@ -61,13 +71,18 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV TZ=Europe/Brussels
+# node_modules eerst, en uit `deps` en niet uit `builder`: die laag verandert
+# enkel met de lockfile. Stond ze na .next, dan maakte elke codewijziging ze
+# opnieuw aan, en exporteerde elke deploy per app heel node_modules (50 tot 90
+# seconden "exporting layers"). De Prisma-client komt erbovenop als eigen laag.
+COPY --from=deps /repo/node_modules ./node_modules
+COPY --from=prisma /repo/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /repo/apps/fakbar/.next ./apps/fakbar/.next
 COPY --from=builder /repo/apps/fakbar/public ./apps/fakbar/public
 COPY --from=builder /repo/apps/fakbar/next.config.ts ./apps/fakbar/next.config.ts
 COPY --from=builder /repo/apps/fakbar/package.json ./apps/fakbar/package.json
 COPY --from=builder /repo/packages ./packages
 COPY --from=builder /repo/package.json ./package.json
-COPY --from=builder /repo/node_modules ./node_modules
 WORKDIR /app/apps/fakbar
 EXPOSE 3000
 ENTRYPOINT ["/sbin/tini", "--"]

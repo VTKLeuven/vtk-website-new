@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import Link from "@/components/ui/Link";
 import { useState, useTransition } from "react";
 import { ExternalLink, ListChecks } from "lucide-react";
@@ -561,6 +562,8 @@ function GroupPicker({
           const result = await onPick(next);
           if (result.ok) {
             showToast({ message: nl ? "Verplaatst" : "Moved", variant: "success" });
+          } else if ("unsent" in result && result.unsent) {
+            setValue(previous);
           } else {
             setValue(previous);
             showToast({
@@ -584,6 +587,9 @@ function GroupPicker({
     />
   );
 }
+
+/** Niet verstuurd: de melding staat er al (`unsentGuard`), dus geen tweede. */
+const UNSENT_RESULT = { ok: false, unsent: true } as const;
 
 function stateToResult(state: Awaited<ReturnType<typeof moveGroupingMemberAction>>) {
   return state.status === "success"
@@ -618,7 +624,8 @@ export function MoveMemberSelect({
         data.set("formId", formId);
         data.set("memberId", memberId);
         data.set("groupId", groupId);
-        return stateToResult(await moveGroupingMemberAction(SAVE_IDLE, data));
+        const state = await unsentGuard.run(() => moveGroupingMemberAction(SAVE_IDLE, data));
+        return state === UNSENT ? UNSENT_RESULT : stateToResult(state);
       }}
     />
   );
@@ -649,7 +656,8 @@ export function AddLateEntrySelect({
         data.set("formId", formId);
         data.set("entryId", entryId);
         data.set("groupId", groupId);
-        return stateToResult(await addGroupingMemberAction(SAVE_IDLE, data));
+        const state = await unsentGuard.run(() => addGroupingMemberAction(SAVE_IDLE, data));
+        return state === UNSENT ? UNSENT_RESULT : stateToResult(state);
       }}
     />
   );

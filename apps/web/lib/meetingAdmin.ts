@@ -10,7 +10,7 @@ import { prisma } from "@vtk/db";
 import type { MeetingKind, TheokotOrderStatus } from "@prisma/client";
 import { pick, type Locale } from "@vtk/i18n";
 
-import type { MeetingAdminView } from "@/components/meetings/MeetingAdminCard";
+import type { MeetingAdminView } from "@/components/meetings/MeetingDetail";
 import type { PlannedDay } from "@/components/meetings/MeetingPlanner";
 import { brusselsTimeOnDay, brusselsYMD, ymdKey } from "./brussels";
 import {
@@ -21,6 +21,7 @@ import {
   type Semester,
 } from "./meetings";
 import { siteUrl } from "./seo";
+import { summarizeGrocomeets, type GrocomeetSummary } from "./grocomeetSummary";
 
 function hhmm(date: Date): string {
   return new Intl.DateTimeFormat("en-GB", {
@@ -49,16 +50,21 @@ export type MeetingAdminData = {
   hasPlan: boolean;
 };
 
+/**
+ * De momenten van één semester, of met `meetingId` enkel dat ene moment (de
+ * pagina van een vergadering). Een `meetingId` van een ander soort moment geeft
+ * een lege lijst, zodat het bureau geen grocomeet opent en omgekeerd.
+ */
 export async function loadMeetingAdmin(
   kind: MeetingKind,
-  options: { locale: Locale; workingYear: number; semester: Semester },
+  options: { locale: Locale; workingYear: number; semester: Semester; meetingId?: string },
 ): Promise<MeetingAdminData> {
-  const { locale, workingYear, semester } = options;
+  const { locale, workingYear, semester, meetingId } = options;
   const nl = locale === "nl";
 
   const [meetings, plan] = await Promise.all([
     prisma.meeting.findMany({
-      where: { kind, year: workingYear, semester },
+      where: meetingId ? { kind, id: meetingId } : { kind, year: workingYear, semester },
       orderBy: { startsAt: "asc" },
       include: {
         options: { orderBy: { order: "asc" } },
@@ -129,19 +135,22 @@ export async function loadMeetingAdmin(
       }),
     }));
 
-    const theokotOrders = meeting.theokotOrders.map((order) => ({
-      id: order.id,
-      name: order.user.name,
-      items: [...order.lines]
+    const theokotOrders = meeting.theokotOrders.map((order) => {
+      const lines = [...order.lines]
         .sort((a, b) => a.sessionItem.order - b.sessionItem.order)
-        .map(
-          (line) =>
-            `${line.quantity}× ${pick(line.sessionItem.nameNl, line.sessionItem.nameEn, locale) ?? line.sessionItem.nameNl}`,
-        )
-        .join(", "),
-      totalCents: order.totalCents,
-      paid: order.grocomeetPaidAt !== null,
-    }));
+        .map((line) => ({
+          name: pick(line.sessionItem.nameNl, line.sessionItem.nameEn, locale) ?? line.sessionItem.nameNl,
+          quantity: line.quantity,
+        }));
+      return {
+        id: order.id,
+        name: order.user.name,
+        items: lines.map((line) => `${line.quantity}× ${line.name}`).join(", "),
+        lines,
+        totalCents: order.totalCents,
+        paid: order.grocomeetPaidAt !== null,
+      };
+    });
     const money = [...reservations, ...theokotOrders];
 
     // Wat Onderwijs zelf bij de externe zaak moet bestellen, per broodje.
@@ -170,6 +179,7 @@ export async function loadMeetingAdmin(
       externalItems: [...externalItems.entries()]
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
+      past: meeting.startsAt.getTime() < now.getTime(),
       // Na de deadline werkt Theokot misschien al met de turflijst.
       deadlinePassed: now >= meetingCloseAt(meeting, session ?? null),
       options: meeting.options.map((option) => ({
@@ -336,4 +346,76 @@ export async function loadBureauTotals(
     yearCents: perMeeting.reduce((total, row) => total + row.totalCents, 0),
     allTimeCents: (allTimeItems._sum.itemPriceCents ?? 0) + (allTimeDrinks._sum.drinkPriceCents ?? 0),
   };
+}
+
+/**
+ * Alles wat de grocomeets van een werkingsjaar al kostten, voor de herbegroting:
+ * het formulier en de GM-doos apart. Zie `lib/grocomeetSummary.ts` voor wat er
+ * meetelt.
+ */
+export async function loadGrocomeetSummary(
+  workingYear: number,
+  locale: Locale,
+  now: Date = new Date(),
+): Promise<GrocomeetSummary> {
+  const meetings = await prisma.meeting.findMany({
+    where: { kind: "GROCOMEET", year: workingYear },
+    orderBy: { startsAt: "asc" },
+    select: {
+      id: true,
+      startsAt: true,
+      semester: true,
+      reservations: {
+        select: {
+          status: true,
+          itemNameNl: true,
+          itemNameEn: true,
+          itemPriceCents: true,
+          drinkName: true,
+          drinkPriceCents: true,
+          external: true,
+        },
+      },
+      theokotOrders: {
+        where: { status: { in: GROCOMEET_ORDER_STATUSES } },
+        select: {
+          status: true,
+          lines: {
+            select: {
+              quantity: true,
+              unitPriceCents: true,
+              sessionItem: { select: { nameNl: true, nameEn: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return summarizeGrocomeets(
+    meetings.map((meeting) => ({
+      id: meeting.id,
+      startsAt: meeting.startsAt,
+      semester: meeting.semester,
+      reservations: meeting.reservations.map((reservation) => ({
+        status: reservation.status,
+        itemName: reservation.itemNameNl
+          ? pick(reservation.itemNameNl, reservation.itemNameEn, locale) ?? reservation.itemNameNl
+          : null,
+        itemPriceCents: reservation.itemPriceCents,
+        drinkName: reservation.drinkName,
+        drinkPriceCents: reservation.drinkPriceCents,
+        external: reservation.external,
+      })),
+      boxOrders: meeting.theokotOrders.map((order) => ({
+        status: order.status,
+        lines: order.lines.map((line) => ({
+          name: pick(line.sessionItem.nameNl, line.sessionItem.nameEn, locale) ?? line.sessionItem.nameNl,
+          quantity: line.quantity,
+          unitPriceCents: line.unitPriceCents,
+        })),
+      })),
+    })),
+    now,
+  );
 }

@@ -176,7 +176,6 @@ export default async function AdminAuditLogPage({
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold">{nl ? "Adminlogboek" : "Admin log"}</h1>
         <p className="mt-1 text-sm text-zinc-500">
           {nl
             ? `Wie in het beheer iets aanmaakte, wijzigde, verwijderde of toegang gaf. Alleen wijzigende acties; lezen, exporteren en de eigen instellingen van een lid staan er niet in. Regels worden ${AUDIT_RETENTION_DAYS} dagen bewaard en daarna verwijderd.`

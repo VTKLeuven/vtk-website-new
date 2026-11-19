@@ -5,6 +5,7 @@ import { pick, type Locale } from "@vtk/i18n";
 import { markdownToPlainText } from "@/lib/markdown";
 import { audienceFilterForUser } from "./audience";
 import { buildIcs, formatDate, type IcsCalendar, type IcsEvent } from "./ics";
+import { eventForMoment, momentDescription } from "@/lib/calendar/moments";
 
 /**
  * Welke events een feed bevat. `personal` is de enige die ledenexclusieve
@@ -73,7 +74,14 @@ type EventRow = {
   updatedAt: Date;
   categories: { category: { nameNl: string; nameEn: string } }[];
   /** Zie `CalendarEventMoment`; leeg voor een evenement dat gewoon doorloopt. */
-  moments: { start: Date; end: Date; label: string | null }[];
+  moments: {
+    start: Date;
+    end: Date;
+    label: string | null;
+    location: string | null;
+    descriptionNl: string | null;
+    descriptionEn: string | null;
+  }[];
 };
 
 const eventSelect = {
@@ -90,7 +98,14 @@ const eventSelect = {
   updatedAt: true,
   categories: { select: { category: { select: { nameNl: true, nameEn: true } } } },
   moments: {
-    select: { start: true, end: true, label: true },
+    select: {
+      start: true,
+      end: true,
+      label: true,
+      location: true,
+      descriptionNl: true,
+      descriptionEn: true,
+    },
     orderBy: { start: "asc" },
   },
 } as const;
@@ -129,8 +144,15 @@ function toIcsEvents(event: EventRow, locale: Locale): IcsEvent[] {
       const day = formatDate(moment.start);
       const nth = (perDay.get(day) ?? 0) + 1;
       perDay.set(day, nth);
+      // De eigen tekst van deze keer eerst, dan wat altijd geldt: in een agenda-app
+      // is de bovenkant wat je ziet zonder door te klikken.
+      const own = momentDescription(moment, locale);
       return {
         ...shared,
+        location: eventForMoment(event, moment).location,
+        description: own
+          ? [markdownToPlainText(own), shared.description].filter(Boolean).join("\n\n")
+          : shared.description,
         uid: `${event.id}-${day}${nth > 1 ? `-${nth}` : ""}@vtk.be`,
         start: moment.start,
         end: moment.end,

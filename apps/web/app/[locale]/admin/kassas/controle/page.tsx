@@ -7,11 +7,10 @@ import { CheckIcon } from "@/components/ui/icons";
 import { hasLocale } from "@/lib/locale";
 import { currentWorkingYear, formatWorkingYear, workingYearTabs } from "@/lib/workingYear";
 import { formatEuro, formatSpentOn } from "@/lib/rekeningen/expenses";
-import { cashRegisterAccess, permanentTabLabel } from "@/lib/kassas/server";
+import { cashRegisterAccess } from "@/lib/kassas/server";
 import { timeRangeShort } from "@/lib/kassas/kassa";
 import { kassaControlList } from "@/lib/inkomsten/server";
 import { controlSpanLabel, paymentsLabel, type KassaControlState } from "@/lib/inkomsten/kassa";
-import { KassaNav } from "../KassaNav";
 
 type SearchParams = { jaar?: string; stand?: string };
 
@@ -115,21 +114,13 @@ export default async function KassaControle({
   return (
     <div className="space-y-5">
       <header>
-        <h1 className="text-2xl font-semibold">{nl ? "Kassacontrole" : "Cash register check"}</h1>
+        <h2 className="text-lg font-semibold">{nl ? "Kassacontrole" : "Cash register check"}</h2>
         <p className="mt-1 max-w-5xl text-sm text-vtk-muted">
           {nl
             ? "Per kassa en per toestel het bedrag dat bij het tellen ingetikt is, naast wat de online inkomsten op dat toestel zagen. Een verschil is een waarschuwing: de site past geen bedrag aan. Een rij opent het telformulier van die kassa."
             : "Per register and per device the amount typed when counting, next to what the online income saw on that device. A difference is a warning: the site changes no amount. A row opens the count form of that register."}
         </p>
       </header>
-
-      <KassaNav
-        base={base}
-        nl={nl}
-        active="controle"
-        caps={{ request: access.canRequest, manage: true, control: true }}
-        permanentLabel={permanentTabLabel(access, locale)}
-      />
 
       <nav className="flex flex-wrap items-center gap-2" aria-label={nl ? "Werkingsjaar" : "Working year"}>
         <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">

@@ -95,6 +95,8 @@ const RENTAL_POST_NAME = "Theokot";
 
 function revalidateRentals() {
   for (const path of [...ADMIN_PATHS, ...PUBLIC_PATHS]) revalidatePath(path);
+  // Met "layout" ook elk tabblad eronder (Verwerkt, Kalender, ...) en de teller bij Aanvragen.
+  revalidatePath("/[locale]/admin/theokot/verhuur", "layout");
 }
 
 /** Wandklok naar instant; `null` wanneer datum of uur niet kloppen. */

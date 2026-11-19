@@ -1,3 +1,4 @@
+import { ActionForm } from "@/components/ui/unsentGuard";
 import type { Metadata } from "next";
 import { staticMetadata } from "@/lib/pageMetadata";
 import { notFound, redirect } from "next/navigation";
@@ -72,6 +73,7 @@ export default async function ConfirmStudyPage({
       studyProgrammes: true,
       isStudent: true,
       firwStudent: true,
+      honoraryMember: true,
       notAtFaculty: true,
       notStudying: true,
       academicStaffRole: true,
@@ -222,11 +224,11 @@ export default async function ConfirmStudyPage({
         />
       </Card>
 
-      <form action={logoutAction}>
+      <ActionForm action={logoutAction}>
         <Button variant="ghost" type="submit">
           {getDictionary(locale).auth.signOut}
         </Button>
-      </form>
+      </ActionForm>
     </div>
   );
 }

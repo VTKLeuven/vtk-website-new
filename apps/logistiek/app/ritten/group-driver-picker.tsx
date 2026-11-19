@@ -49,26 +49,26 @@ export function GroupDriverPicker({
   // keuze, en dat is precies wat er moet staan.
   if (members.length === 0 && !driverId) {
     return (
-      <p className="mt-4 rounded-lg bg-vtk-paper px-4 py-3 text-sm leading-6 text-vtk-body shadow-[inset_3px_0_0_var(--yellow)]">
-        <span className="font-medium text-vtk-ink">Niemand van {groupName} staat in de chauffeurslijst.</span>{' '}
-        Mail{' '}
-        <a href="mailto:logistiek@vtk.be" className="font-medium text-vtk-navy underline underline-offset-4">
-          logistiek@vtk.be
-        </a>{' '}
-        met wie er bij jullie mag rijden, dan kan je hier zelf een chauffeur kiezen.
+      <p className="trips-picker" data-empty="true">
+        <span className="trips-picker-label">Niemand van {groupName} staat in de chauffeurslijst.</span>
+        <span>
+          Mail{' '}
+          <a href="mailto:logistiek@vtk.be" className="font-medium text-vtk-navy underline underline-offset-4">
+            logistiek@vtk.be
+          </a>{' '}
+          met wie er bij jullie mag rijden, dan kan je hier zelf een chauffeur kiezen.
+        </span>
       </p>
     );
   }
 
+  // Geel zolang er niemand op staat: dat is de taak waarvoor de post hier komt.
   return (
-    <label className="mt-4 flex flex-wrap items-center gap-2 rounded-lg bg-vtk-paper px-4 py-3 text-sm">
-      <span className="font-medium text-vtk-ink">Chauffeur van {groupName}</span>
-      <select
-        value={driverId ?? ''}
-        disabled={pending}
-        onChange={(event) => choose(event.target.value)}
-        className="h-9 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
-      >
+    <label className="trips-picker" data-empty={driverId ? undefined : 'true'}>
+      <span className="trips-picker-label">
+        {driverId ? `Chauffeur van ${groupName}` : `${groupName} kiest zelf wie rijdt`}
+      </span>
+      <select value={driverId ?? ''} disabled={pending} onChange={(event) => choose(event.target.value)}>
         <option value="">Nog niemand</option>
         {members.map((member) => (
           <option key={member.id} value={member.id}>

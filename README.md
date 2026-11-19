@@ -268,7 +268,7 @@ Production runs on self-hosted Docker Compose with Caddy on the host as the publ
 docker compose -f infra/docker-compose.yml up -d --build --remove-orphans
 ```
 
-The web container runs `prisma migrate deploy` on startup before launching Next.js. The database seed runs only when `RUN_SEED=true`.
+The web container runs `prisma migrate deploy` on startup before launching Next.js. The database seed runs only when `RUN_SEED=true`, and **never on production**: it creates prototype accounts with a known password, so it refuses whenever `BETTER_AUTH_URL`/`VTK_MAIN_URL` points at vtk.be or the database is marked as production. New permissions reach production through `prisma/sync.ts`, which runs on every start. See `docs/dev-testdata.md`.
 
 ### Backups
 

@@ -30,6 +30,15 @@ describe('resolvePeriod', () => {
   it('gaat nooit voor het eerste getrackte werkingsjaar', () => {
     const period = resolvePeriod('vorigjaar', geen, new Date('2026-09-17T12:00:00Z'));
     expect(period.from.toISOString()).toBe('2026-07-15T00:00:00.000Z');
+    // En dan is het gewoon dit jaar, zodat die chip actief staat.
+    expect(period.key).toBe('jaar');
+  });
+
+  it('neemt het vorige werkingsjaar zodra er een is', () => {
+    const period = resolvePeriod('vorigjaar', geen, new Date('2027-09-17T12:00:00Z'));
+    expect(period.from.toISOString()).toBe('2026-07-15T00:00:00.000Z');
+    expect(period.label).toBe('Werkingsjaar 26-27');
+    expect(period.key).toBe('vorigjaar');
   });
 
   it('telt de gekozen einddag mee bij een aangepaste periode', () => {
@@ -43,13 +52,15 @@ describe('resolvePeriod', () => {
     expect(period.to.toISOString()).toBe('2026-10-01T00:00:00.000Z');
   });
 
-  it('valt terug op het werkingsjaar wanneer een aangepaste periode niet volledig is', () => {
-    const period = resolvePeriod(
-      'aangepast',
-      { from: new Date('2026-09-01T00:00:00Z'), to: null },
-      new Date('2026-09-17T12:00:00Z')
-    );
-    expect(period.key).toBe('jaar');
+  it('blijft aangepast zonder datums, met het werkingsjaar als vertrekpunt', () => {
+    // De knop "Aangepast" stuurt enkel `periode=aangepast`. Viel de sleutel hier
+    // terug op "jaar", dan verschenen de datumvelden nooit.
+    for (const custom of [geen, { from: new Date('2026-09-01T00:00:00Z'), to: null }]) {
+      const period = resolvePeriod('aangepast', custom, new Date('2026-09-17T12:00:00Z'));
+      expect(period.key).toBe('aangepast');
+      expect(period.from.toISOString()).toBe('2026-07-15T00:00:00.000Z');
+      expect(period.to.toISOString()).toBe('2027-07-15T00:00:00.000Z');
+    }
   });
 
   it('neemt dertig dagen terug, tot en met vandaag', () => {

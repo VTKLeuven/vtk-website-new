@@ -5,6 +5,7 @@ import { Button } from '@vtk/ui';
 import { addTripHelperAction, removeTripHelperAction } from '@/app/actions/uitleen';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { LogisticsIcon } from '@/components/logistics-icon';
+import { Avatar } from '@/components/person-avatar';
 import { PhoneLink } from '@/components/phone-link';
 import { useToast } from '@/components/ui/toast';
 
@@ -21,7 +22,17 @@ import { useToast } from '@/components/ui/toast';
  * tenminste op wie hij staat te wachten.
  */
 
-export type TripHelper = { id: string; name: string; phone: string | null };
+export type TripHelper = {
+  id: string;
+  name: string;
+  phone: string | null;
+  /**
+   * Mag deze bijrijder weg? Standaard volgt dat `canEdit`. Een praesidiumlid mag
+   * bij elke rit toevoegen maar enkel de eigen toevoegingen weghalen (F6.24),
+   * dus daar staat het per bijrijder.
+   */
+  removable?: boolean;
+};
 
 export function TripHelpers({
   bookingId,
@@ -29,6 +40,7 @@ export function TripHelpers({
   legacyNote,
   canEdit,
   locale = 'nl',
+  variant = 'list',
 }: {
   bookingId: string;
   helpers: TripHelper[];
@@ -36,6 +48,12 @@ export function TripHelpers({
   legacyNote?: string | null;
   canEdit: boolean;
   locale?: 'nl' | 'en';
+  /**
+   * `people`: als rij mensen met een rondje en een belknop, onder de
+   * contactpersoon op "Mijn ritten" (`app/ritten/ritten.css`). Zonder eigen kop:
+   * daar staat het blok al onder "Mensen".
+   */
+  variant?: 'list' | 'people';
 }) {
   const en = locale === 'en';
   const showToast = useToast();
@@ -58,6 +76,120 @@ export function TripHelpers({
 
   const inputClass =
     'h-9 w-full rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink';
+
+  const form = (
+    <div className="grid gap-2 rounded-[12px] border border-dashed border-vtk-navy/25 p-3">
+      <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+        {en ? 'Name' : 'Naam'}
+        <input
+          type="text"
+          value={draft.name}
+          onChange={(event) => setDraft((c) => ({ ...c, name: event.target.value }))}
+          className={inputClass}
+        />
+      </label>
+      <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+        {en ? 'Phone (optional)' : 'Telefoon (optioneel)'}
+        <input
+          type="tel"
+          value={draft.phone}
+          onChange={(event) => setDraft((c) => ({ ...c, phone: event.target.value }))}
+          placeholder="+32 4.."
+          className={inputClass}
+        />
+      </label>
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          onClick={add}
+          disabled={pending || !draft.name.trim()}
+        >
+          {pending ? (en ? 'Adding...' : 'Toevoegen...') : en ? 'Add' : 'Toevoegen'}
+        </Button>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="text-sm font-medium text-vtk-muted underline underline-offset-4"
+        >
+          {en ? 'Cancel' : 'Annuleren'}
+        </button>
+      </div>
+    </div>
+  );
+
+  function removeButton(helper: TripHelper) {
+    return (
+      <ConfirmActionButton
+        label={`${en ? 'Remove' : 'Weghalen'}: ${helper.name}`}
+        confirmLabel={en ? 'Remove' : 'Weghalen'}
+        icon={<LogisticsIcon name="close" className="h-3.5 w-3.5" />}
+        action={removeTripHelperAction.bind(null, helper.id)}
+        successMessage={en ? 'Removed.' : 'Bijrijder weggehaald.'}
+        destructive
+        dialogTitle={en ? 'Remove passenger?' : 'Bijrijder weghalen?'}
+        dialogDescription={
+          en
+            ? `${helper.name} disappears from the trip; the driver will not see the name or number any more. The trip itself does not change.`
+            : `${helper.name} verdwijnt van de rit; de chauffeur ziet de naam en het nummer dan niet meer. Aan de rit zelf verandert er niets.`
+        }
+      />
+    );
+  }
+
+  if (variant === 'people') {
+    return (
+      <>
+        {helpers.length > 0 || legacyNote ? (
+          <ul className="trips-people">
+            {helpers.map((helper) => {
+              const call = helper.phone ? `${en ? 'Call' : 'Bel'} ${helper.name.split(' ')[0]}: ${helper.phone}` : '';
+              return (
+                <li key={helper.id} className="trips-person">
+                  <Avatar name={helper.name} />
+                  <span className="trips-person-text">
+                    <span className="trips-person-name">{helper.name}</span>
+                    <span className="trips-person-role">
+                      {helper.phone
+                        ? en
+                          ? 'Passenger'
+                          : 'Bijrijder'
+                        : en
+                          ? 'Passenger, no number'
+                          : 'Bijrijder, geen nummer'}
+                    </span>
+                  </span>
+                  <span className="trips-person-actions">
+                    {helper.phone ? (
+                      <a
+                        href={`tel:${helper.phone.replace(/[^\d+]/g, '')}`}
+                        className="trips-round"
+                        title={call}
+                        aria-label={call}
+                      >
+                        <LogisticsIcon name="phone" className="h-4 w-4" strokeWidth={2} />
+                      </a>
+                    ) : null}
+                    {(helper.removable ?? canEdit) ? removeButton(helper) : null}
+                  </span>
+                </li>
+              );
+            })}
+            {legacyNote ? <li className="trips-quiet italic">{legacyNote}</li> : null}
+          </ul>
+        ) : null}
+        {canEdit ? (
+          open ? (
+            form
+          ) : (
+            <button type="button" onClick={() => setOpen(true)} className="trips-add">
+              {en ? '+ Passenger' : '+ Bijrijder'}
+            </button>
+          )
+        ) : null}
+      </>
+    );
+  }
 
   return (
     <div className="grid gap-2">
@@ -86,22 +218,7 @@ export function TripHelpers({
                   {en ? 'no number' : 'geen nummer'}
                 </span>
               )}
-              {canEdit ? (
-                <ConfirmActionButton
-                  label={`${en ? 'Remove' : 'Weghalen'}: ${helper.name}`}
-                  confirmLabel={en ? 'Remove' : 'Weghalen'}
-                  icon={<LogisticsIcon name="close" className="h-3.5 w-3.5" />}
-                  action={removeTripHelperAction.bind(null, helper.id)}
-                  successMessage={en ? 'Removed.' : 'Bijrijder weggehaald.'}
-                  destructive
-                  dialogTitle={en ? 'Remove passenger?' : 'Bijrijder weghalen?'}
-                  dialogDescription={
-                    en
-                      ? `${helper.name} disappears from the trip; the driver will not see the name or number any more. The trip itself does not change.`
-                      : `${helper.name} verdwijnt van de rit; de chauffeur ziet de naam en het nummer dan niet meer. Aan de rit zelf verandert er niets.`
-                  }
-                />
-              ) : null}
+              {(helper.removable ?? canEdit) ? removeButton(helper) : null}
             </li>
           ))}
           {/* De vrije tekst van vóór V2 blijft leesbaar staan: ze kan "twee
@@ -119,44 +236,7 @@ export function TripHelpers({
           waarin de knop over het telefoonveld viel. */}
       {canEdit ? (
         open ? (
-          <div className="grid gap-2 rounded-[12px] border border-dashed border-vtk-navy/25 p-3">
-            <label className="grid gap-1 text-xs font-medium text-vtk-muted">
-              {en ? 'Name' : 'Naam'}
-              <input
-                type="text"
-                value={draft.name}
-                onChange={(event) => setDraft((c) => ({ ...c, name: event.target.value }))}
-                className={inputClass}
-              />
-            </label>
-            <label className="grid gap-1 text-xs font-medium text-vtk-muted">
-              {en ? 'Phone (optional)' : 'Telefoon (optioneel)'}
-              <input
-                type="tel"
-                value={draft.phone}
-                onChange={(event) => setDraft((c) => ({ ...c, phone: event.target.value }))}
-                placeholder="+32 4.."
-                className={inputClass}
-              />
-            </label>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                size="sm"
-                onClick={add}
-                disabled={pending || !draft.name.trim()}
-              >
-                {pending ? (en ? 'Adding...' : 'Toevoegen...') : en ? 'Add' : 'Toevoegen'}
-              </Button>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="text-sm font-medium text-vtk-muted underline underline-offset-4"
-              >
-                {en ? 'Cancel' : 'Annuleren'}
-              </button>
-            </div>
-          </div>
+          form
         ) : (
           <button
             type="button"

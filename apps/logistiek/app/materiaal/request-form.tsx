@@ -61,7 +61,9 @@ export function MaterialRequestForm({
       submittingLabel={en ? 'Submitting...' : 'Indienen...'}
       onSubmit={async (payload) => {
         const result = await createReservationAction(payload);
-        if (result.ok) router.push('/reservaties?aangevraagd=1');
+        if (result.ok) {
+          router.push(result.eventCreated ? '/reservaties?aangevraagd=1&evenement=1' : '/reservaties?aangevraagd=1');
+        }
         return result;
       }}
     />

@@ -3,7 +3,17 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import type { DriverStat, GroupStat, StatsRow, TransportStats } from '@/lib/uitleen-stats';
-import { driverHourChart, HOUR_BUCKETS, HOUR_BUCKET_LABELS, REST_KEY, type HourBucket } from '@/lib/driver-hours';
+import {
+  driverHourChart,
+  driverProfiles,
+  driverWeekdayChart,
+  heatmapFor,
+  HOUR_BUCKETS,
+  HOUR_BUCKET_LABELS,
+  REST_KEY,
+  type DriverProfiles,
+  type HourBucket,
+} from '@/lib/driver-hours';
 
 /**
  * De grafieken van het statistiekenscherm, als gewone SVG en HTML.
@@ -121,7 +131,17 @@ function Legend({ entries }: { entries: Array<{ color: string; label: string }> 
   );
 }
 
-function Panel({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+function Panel({
+  id,
+  title,
+  hint,
+  children,
+}: {
+  id?: string;
+  title: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     // `min-w-0`: zonder dat is de kleinste breedte van een raster-item zijn
     // inhoud, en dan groeit de kolom mee met de breedste tabel erin in plaats
@@ -129,7 +149,11 @@ function Panel({ title, hint, children }: { title: string; hint?: string; childr
     // telefoon twee keer zo breed als het venster: de tabel met alle ritten
     // (46rem) en de drukteweergave (34rem) duwden de kolom naar 778px in een
     // venster van 390.
-    <section className="min-w-0 rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-5">
+    <section
+      id={id}
+      tabIndex={id ? -1 : undefined}
+      className="min-w-0 scroll-mt-4 rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-5 outline-none"
+    >
       <h3 className="text-base font-semibold tracking-tight text-vtk-ink">{title}</h3>
       {hint ? <p className="mt-1 text-sm text-vtk-muted">{hint}</p> : null}
       <div className="mt-4">{children}</div>
@@ -187,10 +211,12 @@ const PODIUM = ['🥇', '🥈', '🥉'];
 function DriverLeaderboard({
   drivers,
   vehicles,
+  selected,
   onPickDriver,
 }: {
   drivers: DriverStat[];
   vehicles: Array<{ id: string; name: string }>;
+  selected: string | null;
   onPickDriver: (driverId: string | null) => void;
 }) {
   const [shown, setShown] = useState(10);
@@ -216,11 +242,16 @@ function DriverLeaderboard({
       <ul className="mt-3 grid gap-2">
         {top.map((driver, index) => (
           <li key={driver.id}>
+            {/* Een tweede klik laat los. De filter werkt twee panelen lager; de
+                markering hier is wat je ziet zonder te scrollen. */}
             <button
               type="button"
-              onClick={() => onPickDriver(driver.id)}
+              onClick={() => onPickDriver(selected === driver.id ? null : driver.id)}
+              aria-pressed={selected === driver.id}
               title={`Enkel de uren en de ritten van ${driver.name}`}
-              className="grid w-full grid-cols-[1.25rem_minmax(6rem,9rem)_1fr_4.5rem] items-center gap-2 rounded-lg px-1 py-0.5 text-left transition hover:bg-vtk-paper"
+              className={`grid w-full grid-cols-[1.25rem_minmax(6rem,9rem)_1fr_4.5rem] items-center gap-2 rounded-lg px-1 py-0.5 text-left transition hover:bg-vtk-paper ${
+                selected === driver.id ? 'bg-vtk-paper ring-1 ring-vtk-navy/20' : ''
+              }`}
             >
               <span aria-hidden className="text-sm tabular-nums text-vtk-muted">
                 {PODIUM[index] ?? index + 1}
@@ -351,7 +382,16 @@ function GroupBars({ groups, onPickGroup }: { groups: GroupStat[]; onPickGroup: 
  * (bezette uren), en een verloop over meerdere tinten laat "veel" en "weinig"
  * van plaats wisselen naargelang je scherm.
  */
-function Heatmap({ heatmap }: { heatmap: number[][] }) {
+function Heatmap({
+  heatmap,
+  focusName,
+  onClearFocus,
+}: {
+  heatmap: number[][];
+  /** Enkel de uren van deze chauffeur (F6.6); leeg is het totaal. */
+  focusName?: string | null;
+  onClearFocus?: () => void;
+}) {
   const max = Math.max(1, ...heatmap.flat());
   const step = (value: number) => {
     if (value <= 0) return RAMP[0];
@@ -362,7 +402,11 @@ function Heatmap({ heatmap }: { heatmap: number[][] }) {
   return (
     <div>
       <div className="relative overflow-x-auto">
-        <table className="w-full min-w-[34rem] border-separate border-spacing-[2px] text-[10px]">
+        {/* `table-fixed`: zonder dat krijgen enkel de kolommen met een uurlabel
+            (elk derde) breedte, en zijn de twee uren ertussen een streepje van
+            nul pixels. Een rit van 10:30 tot 13:15 stond er dan voor een derde
+            op. */}
+        <table className="w-full min-w-[34rem] table-fixed border-separate border-spacing-[2px] text-[10px]">
           <caption className="sr-only">Bezette uren per weekdag en uur van de dag</caption>
           <thead>
             <tr>
@@ -399,6 +443,18 @@ function Heatmap({ heatmap }: { heatmap: number[][] }) {
           </tbody>
         </table>
       </div>
+      {focusName ? (
+        <p className="mt-2 text-xs text-vtk-muted">
+          Enkel de uren van {focusName}.{' '}
+          <button
+            type="button"
+            onClick={onClearFocus}
+            className="font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
+          >
+            Alle chauffeurs tonen
+          </button>
+        </p>
+      ) : null}
       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-vtk-muted">
         <span>minder</span>
         {RAMP.map((color) => (
@@ -432,6 +488,105 @@ function Heatmap({ heatmap }: { heatmap: number[][] }) {
  */
 const TOP_DRIVERS = 8;
 
+/** Een rij knoppen waarvan er één aanstaat, met een label ervoor. */
+function ToggleGroup<T extends string>({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: T;
+  onChange: (value: T) => void;
+  options: Array<{ value: T; label: string }>;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={label}>
+      <span className="text-xs font-medium text-vtk-muted">{label}</span>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onChange(option.value)}
+          aria-pressed={value === option.value}
+          className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+            value === option.value
+              ? 'border-vtk-navy bg-vtk-navy text-vtk-on-emphasis'
+              : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
+          }`}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Per chauffeur een eigen kleine grafiek, allemaal op dezelfde schaal (F6.5).
+ *
+ * In een gestapelde balk heeft enkel het onderste segment een gedeelde
+ * basislijn: wie bovenin staat, begint op een hoogte die van de anderen
+ * afhangt, en dus lees je enkel de onderste chauffeur betrouwbaar af. Hier staat
+ * iedereen op de eigen basislijn en tegen dezelfde maximumwaarde, zodat de
+ * profielen naast elkaar te vergelijken zijn.
+ */
+function ProfileGrid({ profiles }: { profiles: DriverProfiles }) {
+  if (profiles.rows.length === 0) return null;
+  const ceiling = niceCeiling(profiles.max);
+  return (
+    <div className="mt-3">
+      <p className="text-xs text-vtk-muted">
+        Elke chauffeur op dezelfde schaal, tot {hours(ceiling)} per kolom.
+      </p>
+      <ul className="mt-2 grid gap-3 sm:grid-cols-2">
+        {profiles.rows.map((row) => (
+          <li key={row.key} className="rounded-[12px] border border-vtk-navy/10 p-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-vtk-ink">
+                <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: row.color }} />
+                <span className="truncate">{row.name}</span>
+              </span>
+              <span className="shrink-0 text-xs tabular-nums text-vtk-muted">{hours(row.hours)}</span>
+            </div>
+            <div className="relative mt-2 h-14">
+              <span aria-hidden className="absolute inset-x-0 bottom-0 border-t border-vtk-navy/20" />
+              <div className="absolute inset-0 flex items-end gap-[2px]">
+                {row.values.map((value, index) => (
+                  <span
+                    key={profiles.columns[index].key}
+                    title={`${row.name} · ${profiles.columns[index].rangeLabel}: ${hours(value)}`}
+                    className="block flex-1 rounded-t-[2px]"
+                    style={{
+                      height: `${ceiling > 0 ? (value / ceiling) * 100 : 0}%`,
+                      backgroundColor: row.color,
+                      minHeight: value > 0 ? 2 : 0,
+                      // De kleuren van de chauffeurs zijn pastels; zonder rand
+                      // verdwijnt een bleke balk (geel, lichtgroen) op het witte vlak.
+                      boxShadow: 'inset 0 0 0 1px var(--driver-edge)',
+                    }}
+                  >
+                    <span className="sr-only">
+                      {profiles.columns[index].rangeLabel}: {hours(value)}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="mt-1 flex gap-[2px]">
+              {profiles.columns.map((column, index) => (
+                <span key={column.key} className="flex-1 text-center text-[9px] tabular-nums text-vtk-muted">
+                  {profiles.columns.length > 12 && index % 3 !== 0 ? '' : column.label}
+                </span>
+              ))}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function HourOfDay({
   drivers,
   focus,
@@ -444,9 +599,18 @@ function HourOfDay({
   onClearFocus: () => void;
 }) {
   const [bucket, setBucket] = useState<HourBucket>(1);
-  const chart = useMemo(
-    () => driverHourChart(focus ? [focus] : drivers, { bucket, top: TOP_DRIVERS }),
-    [drivers, focus, bucket]
+  // Wat op de x-as staat (F6.4) en hoe de chauffeurs getekend worden (F6.5).
+  const [by, setBy] = useState<'hour' | 'weekday'>('hour');
+  const [layout, setLayout] = useState<'stack' | 'profiles'>('stack');
+  const chart = useMemo(() => {
+    const shown = focus ? [focus] : drivers;
+    return by === 'weekday'
+      ? driverWeekdayChart(shown, { top: TOP_DRIVERS })
+      : driverHourChart(shown, { bucket, top: TOP_DRIVERS });
+  }, [drivers, focus, bucket, by]);
+  const profiles = useMemo(
+    () => driverProfiles(focus ? [focus] : drivers, { by, bucket, top: TOP_DRIVERS }),
+    [drivers, focus, bucket, by]
   );
 
   /**
@@ -474,31 +638,51 @@ function HourOfDay({
 
   return (
     <div>
-      <div className="flex flex-wrap gap-1.5">
-        {HOUR_BUCKETS.map((option) => (
-          <button
-            key={option}
-            type="button"
-            onClick={() => setBucket(option)}
-            aria-pressed={bucket === option}
-            className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-              bucket === option
-                ? 'border-vtk-navy bg-vtk-navy text-vtk-on-emphasis'
-                : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
-            }`}
-          >
-            {HOUR_BUCKET_LABELS[option]}
-          </button>
-        ))}
+      {/* Drie keuzes die elkaar niet bijten: wat op de x-as staat, hoe de
+          chauffeurs getekend worden, en (enkel per uur) hoeveel uur een balk is. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <ToggleGroup
+          label="Per"
+          value={by}
+          onChange={setBy}
+          options={[
+            { value: 'hour', label: 'Uur van de dag' },
+            { value: 'weekday', label: 'Weekdag' },
+          ]}
+        />
+        <ToggleGroup
+          label="Weergave"
+          value={layout}
+          onChange={setLayout}
+          options={[
+            { value: 'stack', label: 'Gestapeld' },
+            { value: 'profiles', label: 'Per chauffeur' },
+          ]}
+        />
+        {by === 'hour' ? (
+          <ToggleGroup
+            label="Blok"
+            value={String(bucket)}
+            onChange={(value) => setBucket(Number(value) as HourBucket)}
+            options={HOUR_BUCKETS.map((option) => ({ value: String(option), label: HOUR_BUCKET_LABELS[option] }))}
+          />
+        ) : null}
       </div>
 
-      <Legend entries={chart.legend.map((entry) => ({ color: entry.color, label: entry.name }))} />
+      {layout === 'stack' ? (
+        <Legend entries={chart.legend.map((entry) => ({ color: entry.color, label: entry.name }))} />
+      ) : null}
+
+      {layout === 'profiles' ? <ProfileGrid profiles={profiles} /> : null}
 
       {/* `position: relative` op de scroller, zoals bij elke tabel hier: de
           sr-only tekst per balk is absoluut gepositioneerd en ankert anders op
           de pagina in plaats van op de grafiek. */}
-      <div className="relative mt-3 overflow-x-auto">
-        <div className="grid grid-cols-[2.25rem_1fr] gap-x-1" style={{ minWidth: bucket === 1 ? '22rem' : undefined }}>
+      <div className={`relative mt-3 overflow-x-auto ${layout === 'stack' ? '' : 'hidden'}`}>
+        <div
+          className="grid grid-cols-[2.25rem_1fr] gap-x-1"
+          style={{ minWidth: by === 'hour' && bucket === 1 ? '22rem' : undefined }}
+        >
           <div className="relative h-40">
             {[0, 0.5, 1].map((fraction) => (
               <span
@@ -555,7 +739,7 @@ function HourOfDay({
                 {/* Bij balken van een uur elk derde getal: vierentwintig
                     getallen naast elkaar worden een grijze streep, net als in de
                     drukteweergave. */}
-                {bucket > 1 || index % 3 === 0 ? column.label : ''}
+                {by === 'weekday' || bucket > 1 || index % 3 === 0 ? column.label : ''}
               </span>
             ))}
           </div>
@@ -563,7 +747,7 @@ function HourOfDay({
       </div>
 
       <p className="mt-2 text-xs text-vtk-muted">
-        Het beginuur staat onder de balk; uren in Belgische tijd.
+        {by === 'hour' ? 'Het beginuur staat onder de balk; uren in Belgische tijd.' : 'Uren per weekdag, maandag eerst.'}
         {hoursWithoutDriver > 0 ? (
           <span>
             {' '}
@@ -600,7 +784,7 @@ function HourOfDay({
       ) : null}
 
       <TableView
-        columns={['Uur', 'Uren', 'Wie']}
+        columns={[by === 'hour' ? 'Uur' : 'Weekdag', 'Uren', 'Wie']}
         align={['left', 'right', 'left']}
         rows={chart.columns
           .filter((column) => column.hours > 0)
@@ -730,12 +914,14 @@ function TripTable({
   rows,
   driverFilter,
   groupFilter,
+  filterLabel,
   onClearFilters,
   periodLabel,
 }: {
   rows: StatsRow[];
   driverFilter: string | null;
   groupFilter: string | null;
+  filterLabel: string | null;
   onClearFilters: () => void;
   periodLabel: string;
 }) {
@@ -849,6 +1035,7 @@ function TripTable({
 
       <p className="mt-2 text-xs text-vtk-muted">
         {shown.length} van {rows.length} ritten
+        {filterLabel ? <span>, {filterLabel}</span> : null}
       </p>
 
       {/* `position: relative` op de scroller: `sr-only` is absoluut
@@ -903,6 +1090,28 @@ export function TransportCharts({ stats, periodLabel }: { stats: TransportStats;
 
   const busiest = stats.perGroup[0] ?? null;
   const focusedDriver = stats.perDriver.find((driver) => driver.id === driverFilter) ?? null;
+  const focusedGroup = stats.perGroup.find((group) => group.key === groupFilter) ?? null;
+  const filterLabel = focusedDriver
+    ? `enkel die van ${focusedDriver.name}`
+    : focusedGroup
+      ? `enkel die voor ${focusedGroup.name}`
+      : null;
+
+  /**
+   * Naar de tabel met alle ritten, die vier panelen lager staat.
+   *
+   * De knop "Deze ritten in de tabel onderaan" zette enkel de filter, en die
+   * tabel staat ver buiten beeld: wie erop drukte, zag niets gebeuren en dacht
+   * dat de knop stuk was. Focus erbij, zodat ook een toetsenbord daar verder
+   * gaat.
+   */
+  const showTable = () => {
+    const table = document.getElementById('alle-ritten');
+    if (!table) return;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    table.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    table.focus({ preventScroll: true });
+  };
 
   return (
     <div className="grid gap-5">
@@ -955,6 +1164,7 @@ export function TransportCharts({ stats, periodLabel }: { stats: TransportStats;
         <DriverLeaderboard
           drivers={stats.perDriver}
           vehicles={stats.vehicles}
+          selected={driverFilter}
           onPickDriver={(id) => {
             setDriverFilter(id);
             setGroupFilter(null);
@@ -968,20 +1178,25 @@ export function TransportCharts({ stats, periodLabel }: { stats: TransportStats;
           onPickGroup={(key) => {
             setGroupFilter(key);
             setDriverFilter(null);
+            showTable();
           }}
         />
       </Panel>
 
       <Panel
         title="Wanneer de voertuigen weg zijn"
-        hint="Bezette uren per weekdag en uur van de dag, over de hele periode opgeteld."
+        hint="Bezette uren per weekdag en uur van de dag, over de hele periode opgeteld. Klik bij Wie reed het meest iemand aan om enkel zijn weekdagen en uren te zien."
       >
-        <Heatmap heatmap={stats.heatmap} />
+        <Heatmap
+          heatmap={heatmapFor(stats.heatmap, focusedDriver)}
+          focusName={focusedDriver?.name}
+          onClearFocus={() => setDriverFilter(null)}
+        />
       </Panel>
 
       <Panel
-        title="Op welk uur er gereden wordt"
-        hint="Uren per uur van de dag, met een segment per chauffeur. Op een smal scherm zet je de balken per 2 of 4 uur samen."
+        title="Wanneer er gereden wordt"
+        hint="Uren per uur van de dag of per weekdag. Gestapeld toont wie er samen reed; Per chauffeur zet elke chauffeur op dezelfde schaal, zodat je profielen kan vergelijken."
       >
         <HourOfDay
           drivers={stats.perDriver}
@@ -1012,11 +1227,12 @@ export function TransportCharts({ stats, periodLabel }: { stats: TransportStats;
         </Panel>
       </div>
 
-      <Panel title="Alle ritten">
+      <Panel id="alle-ritten" title="Alle ritten">
         <TripTable
           rows={stats.rows}
           driverFilter={driverFilter}
           groupFilter={groupFilter}
+          filterLabel={filterLabel}
           onClearFilters={() => {
             setDriverFilter(null);
             setGroupFilter(null);

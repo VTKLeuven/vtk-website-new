@@ -1,3 +1,4 @@
+import { ActionForm } from "@/components/ui/unsentGuard";
 import { notFound } from "next/navigation";
 import { Card } from "@vtk/ui";
 import { prisma } from "@vtk/db";
@@ -50,7 +51,6 @@ export default async function AdminUrenloopApp({
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold">24UL App Download</h1>
         <p className="mt-1 text-sm text-zinc-500">
           Who may download the 24urenloop desktop app. The repository is private, so this
           list is the only way in: an address here can request a one-time code by mail and
@@ -137,7 +137,7 @@ export default async function AdminUrenloopApp({
                       <td className="py-2 pr-4 font-medium">{entry.email}</td>
                       <td className="py-2 pr-4 text-zinc-500">{entry.note ?? ""}</td>
                       <td className="py-2 pr-4">
-                        <form action={setDownloadEmailPublishStatsAction}>
+                        <ActionForm action={setDownloadEmailPublishStatsAction}>
                           <input type="hidden" name="id" value={entry.id} />
                           <input
                             type="hidden"
@@ -154,7 +154,7 @@ export default async function AdminUrenloopApp({
                           >
                             {entry.canPublishStats ? "Enabled" : "Off"}
                           </button>
-                        </form>
+                        </ActionForm>
                       </td>
                       <td className="py-2 pr-4 text-zinc-500">{dateFmt.format(entry.createdAt)}</td>
                       <td className="py-2 pr-4 text-zinc-500">{entry.addedBy?.name ?? ""}</td>

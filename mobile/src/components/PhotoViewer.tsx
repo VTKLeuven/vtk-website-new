@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { X } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   Modal,
@@ -109,6 +109,22 @@ function Pager({
   // Bladeren gaat uit zodra er ingezoomd is; anders vecht het slepen binnen de
   // foto met het omslaan naar de volgende.
   const [zoomed, setZoomed] = useState(false);
+  const list = useRef<FlatList<AppPhoto>>(null);
+  const positioned = useRef(false);
+
+  /**
+   * Na de eerste layout nog eens zelf naar de aangetikte foto springen.
+   *
+   * `initialScrollIndex` alleen was niet genoeg: in de modal bleef de lijst op
+   * de eerste foto staan, terwijl ze enkel de aangetikte foto tekende
+   * (`initialNumToRender={1}`). Wie een andere foto dan de eerste aantikte,
+   * keek naar een plek waar niets stond: een zwart scherm.
+   */
+  const onLayout = useCallback(() => {
+    if (positioned.current) return;
+    positioned.current = true;
+    list.current?.scrollToOffset({ offset: initialIndex * width, animated: false });
+  }, [initialIndex, width]);
 
   const onMomentumEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -121,6 +137,7 @@ function Pager({
   return (
     <View style={styles.viewer}>
       <FlatList
+        ref={list}
         data={photos}
         keyExtractor={(photo) => photo.id}
         horizontal
@@ -130,18 +147,21 @@ function Pager({
         initialScrollIndex={initialIndex}
         getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
         onMomentumScrollEnd={onMomentumEnd}
+        onLayout={onLayout}
         // Enkel de buren inladen. Een album van zeventienhonderd foto's mag niet
         // zeventienhonderd keer `expo-image` monteren om er één te tonen.
+        // Bewust geen `removeClippedSubviews`: in een modal liet dat een pagina
+        // leeg, en met een venster van drie foto's valt er niets te winnen.
         initialNumToRender={1}
         maxToRenderPerBatch={2}
         windowSize={3}
-        removeClippedSubviews
         renderItem={({ item, index: position }) => (
           <ZoomablePhoto
             photo={item}
             width={width}
             height={height}
             active={position === index}
+            zoomed={zoomed && position === index}
             onZoomChange={setZoomed}
           />
         )}
@@ -179,12 +199,15 @@ function ZoomablePhoto({
   width,
   height,
   active,
+  zoomed,
   onZoomChange,
 }: {
   photo: AppPhoto;
   width: number;
   height: number;
   active: boolean;
+  /** Staat deze foto ingezoomd; dan pas mag slepen meedoen. */
+  zoomed: boolean;
   onZoomChange: (zoomed: boolean) => void;
 }) {
   const scale = useSharedValue(1);
@@ -193,7 +216,6 @@ function ZoomablePhoto({
   const y = useSharedValue(0);
   const savedX = useSharedValue(0);
   const savedY = useSharedValue(0);
-
   const reset = useCallback(() => {
     scale.value = withTiming(1);
     savedScale.value = 1;
@@ -230,7 +252,14 @@ function ZoomablePhoto({
       }
     });
 
+  /**
+   * Slepen staat **enkel aan wanneer de foto ingezoomd is**. Een actieve
+   * `Pan` neemt elke horizontale veeg over, ook als hij daarna niets doet, en
+   * dan kwam de lijst eronder nooit aan bod: je kon niet naar de volgende foto
+   * vegen. Op ware grootte is vegen bladeren, ingezoomd is het rondkijken.
+   */
   const pan = Gesture.Pan()
+    .enabled(zoomed)
     .averageTouches(true)
     .onUpdate((event) => {
       // Slepen heeft enkel zin wanneer er meer foto is dan er past.
@@ -269,11 +298,18 @@ function ZoomablePhoto({
 
   return (
     <GestureDetector gesture={gesture}>
+      {/* Vaste maten en geen `flex: 1`: in een horizontale lijst is de
+          hoofdas onbegrensd, en een flex-basis van 0 mag daar niet bepalen hoe
+          breed een pagina is. */}
       <Animated.View style={[{ width, height }, styles.page]}>
-        <Animated.View style={[styles.page, animated]}>
+        <Animated.View style={[{ width, height }, animated]}>
           <Image
             source={{ uri: photo.url }}
-            style={styles.full}
+            // De thumbnail staat al in de cache van het raster; die toont meteen,
+            // tot de grote versie binnen is.
+            placeholder={{ uri: photo.thumbUrl }}
+            placeholderContentFit="contain"
+            style={{ width, height }}
             contentFit="contain"
             transition={150}
             recyclingKey={photo.id}
@@ -290,8 +326,7 @@ const styles = StyleSheet.create({
   // Bewust bijna zwart en niet navy: een foto beoordeel je niet tegen een
   // gekleurde achtergrond.
   viewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.94)' },
-  page: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  full: { width: '100%', height: '100%' },
+  page: { alignItems: 'center', justifyContent: 'center' },
   bar: {
     position: 'absolute',
     left: SPACING.lg,

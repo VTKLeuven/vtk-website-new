@@ -16,6 +16,7 @@ import { publishedTicketSlug, TICKET_LINK_SELECT } from "@/lib/ticketing/eventPa
 import { getCurrentSession } from "@/lib/session";
 import { publicUrl } from "@/lib/storage";
 import type { CalendarView } from "@/lib/calendar/viewCookie";
+import { eventAsOfNow, eventForMoment, MOMENT_SELECT } from "@/lib/calendar/moments";
 
 export type CalendarEventsQuery = {
   /** Enkel samen met `end`; zonder bereik komen alle gepubliceerde evenementen terug. */
@@ -71,7 +72,7 @@ export async function loadCalendarEvents(query: CalendarEventsQuery): Promise<Ca
       // zonder ertussen door te lopen; zie `CalendarEventMoment`. De kalender
       // zet het daarmee op elk van die dagen met het juiste uur, in plaats van
       // als één balk over de hele periode.
-      moments: { orderBy: { start: "asc" }, select: { start: true, end: true, label: true } },
+      moments: { orderBy: { start: "asc" }, select: MOMENT_SELECT },
       ticketEvents: { select: TICKET_LINK_SELECT },
       categories: {
         select: {
@@ -107,7 +108,12 @@ export async function loadCalendarEvents(query: CalendarEventsQuery): Promise<Ca
     getDefaultEventImages(),
   ]);
 
-  return events.map((e) => ({
+  const now = new Date();
+  return events.map((e) => {
+    // Eén kaart per evenement, dus die toont de eerstvolgende keer: de server kiest
+    // de affiche en de locatie, zoals hij ook de standaardfoto al kiest.
+    const shown = eventAsOfNow(e, now);
+    return {
     id: e.id,
     slug: e.slug,
     title: e.titleNl,
@@ -116,11 +122,13 @@ export async function loadCalendarEvents(query: CalendarEventsQuery): Promise<Ca
     end: e.end.toISOString(),
     allDay: e.allDay,
     url: e.url,
-    location: e.location,
+    location: shown.location,
     moments: e.moments.map((m) => ({
       start: m.start.toISOString(),
       end: m.end.toISOString(),
       label: m.label,
+      // Een blok in de week staat wel op één moment, en krijgt díé locatie.
+      location: eventForMoment(e, m).location,
     })),
     extendedProps: {
       groupCode: e.group.code,
@@ -134,18 +142,19 @@ export async function loadCalendarEvents(query: CalendarEventsQuery): Promise<Ca
       descriptionNl: e.descriptionNl,
       descriptionEn: e.descriptionEn,
       categories: e.categories.map((c) => c.category),
-      image: publicUrl(e.imageKey) ?? defaultEventImageFor(defaultImages, eventCategorySlugs(e.categories)),
+      image: publicUrl(shown.imageKey) ?? defaultEventImageFor(defaultImages, eventCategorySlugs(e.categories)),
       // Enkel de eigen foto draagt een gekozen uitsnede; de standaardfoto blijft
       // gecentreerd.
-      imagePosition: e.imageKey
-        ? focusPosition({ x: e.imageFocusX, y: e.imageFocusY })
+      imagePosition: shown.imageKey
+        ? focusPosition({ x: shown.imageFocusX, y: shown.imageFocusY })
         : null,
       interestedCount: counts.get(e.id) ?? null,
       viewerInterest: mine.get(e.id) ?? { kind: "none" },
       interested: mine.has(e.id),
       ticketSlug: publishedTicketSlug(e.ticketEvents),
     },
-  }));
+    };
+  });
 }
 
 /**

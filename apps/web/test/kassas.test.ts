@@ -17,12 +17,17 @@ import {
   CASH_REGISTER_STATUSES,
   DEFAULT_CASH_REGISTER_CONFIG,
   activityInterval,
+  lastDayOf,
   intervalsOverlap,
+  isYearlyEvent,
   parsePick,
   registerInterval,
+  sameCounts,
   startCountsFromPicks,
+  YEARLY_EVENT_LABEL,
   timeInputValue,
   timeRangeLabel,
+  timeRangeShort,
   type Counts,
 } from "@/lib/kassas/kassa";
 import {
@@ -34,7 +39,7 @@ import {
   sameTerminal,
   visibilityWhere,
 } from "@/lib/kassas/server";
-import { cashRegisterAcceptedMail } from "@/lib/kassas/mail";
+import { cashRegisterAcceptedMail, cashRegisterCountedMail } from "@/lib/kassas/mail";
 
 const noVouchers = { shiftVouchers: null, elixirVouchers: null, shiftVoucherValueCents: 120, elixirVoucherValueCents: 120 };
 
@@ -141,6 +146,22 @@ describe("kassa's: invoer", () => {
   });
 });
 
+describe("kassa's: doorschuiven en jaarwerking", () => {
+  it("vergelijkt een doorgeschoven kassa per coupure, niet op het totaal", () => {
+    expect(sameCounts({ "100": 3, "200": 1 }, normaliseCounts({ "200": 1, "100": 3 }))).toBe(true);
+    // Allebei € 5, maar andere munten: een andere kassa.
+    expect(sameCounts({ "500": 1 }, { "100": 5 })).toBe(false);
+    expect(sameCounts({}, normaliseCounts({ "100": 0 }))).toBe(true);
+  });
+
+  it("herkent een jaarwerking aan beide velden, niet aan een verwijderde post", () => {
+    expect(isYearlyEvent({ groupId: null, postLabel: YEARLY_EVENT_LABEL })).toBe(true);
+    // Een kassa van een post die intussen verwijderd werd: ook zonder groupId.
+    expect(isYearlyEvent({ groupId: null, postLabel: "Theokot" })).toBe(false);
+    expect(isYearlyEvent({ groupId: "g1", postLabel: YEARLY_EVENT_LABEL })).toBe(false);
+  });
+});
+
 describe("kassa's: standaardwisselgeld", () => {
   it("geeft per aangeduide coupure een volle rol of het vaste aantal briefjes", () => {
     expect(startCountsFromPicks([10, 20, 50, 100, 200, 500, 1000, 2000], {})).toEqual({
@@ -198,6 +219,30 @@ describe("kassa's: uren en toestellen", () => {
     expect(timeInputValue(night.start)).toBe("22:00");
     expect(timeRangeLabel(night.start, night.end, true)).toBe("22:00 tot 03:00 (de dag erna)");
     expect(timeRangeLabel(null, null, true)).toBeNull();
+  });
+
+  it("loopt over meerdere dagen met een laatste dag", () => {
+    const welcome = activityInterval(day, "10:00", "18:00", new Date("2026-10-23T00:00:00.000Z"))!;
+    expect(welcome.start.toISOString()).toBe("2026-10-19T08:00:00.000Z");
+    expect(welcome.end.toISOString()).toBe("2026-10-23T16:00:00.000Z");
+    expect(timeRangeLabel(welcome.start, welcome.end, true)).toBe("10:00 tot 23/10 18:00");
+    expect(timeRangeShort(welcome.start, welcome.end)).toBe("10:00-23/10 18:00");
+    expect(lastDayOf(welcome.start, welcome.end)?.toISOString()).toBe("2026-10-23T00:00:00.000Z");
+    // Twee dagen met een einde vroeger op de klok: geen nacht, want er staat een laatste dag.
+    const twoDays = activityInterval(day, "22:00", "20:00", new Date("2026-10-20T00:00:00.000Z"))!;
+    expect(twoDays.end.toISOString()).toBe("2026-10-20T18:00:00.000Z");
+    expect(lastDayOf(twoDays.start, twoDays.end)).toBeNull();
+    // Dezelfde dag als laatste dag is gewoon één dag, ook over middernacht.
+    const night = activityInterval(day, "22:00", "03:00", day)!;
+    expect(night.end.toISOString()).toBe("2026-10-20T01:00:00.000Z");
+    expect(lastDayOf(night.start, night.end)).toBeNull();
+    expect(intervalsOverlap(welcome, activityInterval(new Date("2026-10-21T00:00:00.000Z"), "12:00", "13:00")!)).toBe(
+      true,
+    );
+  });
+
+  it("weigert een laatste dag waarvan het einde niet na het begin valt", () => {
+    expect(activityInterval(day, "10:00", "18:00", new Date("2026-10-18T00:00:00.000Z"))).toBeNull();
   });
 
   it("ziet overlap, maar niet wanneer de ene stopt waar de andere begint", () => {
@@ -283,14 +328,95 @@ describe("kassa's: toegang", () => {
 });
 
 describe("kassa's: adres van de mail", () => {
-  const user = { email: "r0123@kuleuven.be", personalEmail: "wannes@example.com", emailPreference: "PERSONAL" as const };
+  const user = {
+    email: "r0123@kuleuven.be",
+    personalEmail: "jasper@example.com",
+    emailPreference: "PERSONAL" as const,
+    name: "Jasper van Elsacker",
+    firstName: "Jasper",
+    lastName: "van Elsacker",
+    googleEmail: null,
+  };
+  const post = { code: "ONTHAAL", type: "PRAESIDIUM" };
+  const werkgroep = { code: "CHEMIX", type: "WERKGROEP" };
+  const best = { code: "BEST", type: "WERKGROEP" };
 
-  it("mailt naar het @vtk.be-adres, ook bij een persoonlijke voorkeur", () => {
-    expect(cashRegisterMailTo({ ...user, googleEmail: "wannes.voorbeeld@vtk.be" })).toBe("wannes.voorbeeld@vtk.be");
+  it("bouwt voornaam.achternaam, en plakt een achternaam uit meerdere delen aan elkaar", () => {
+    expect(cashRegisterMailTo(user, post)).toBe("jasper.vanelsacker@vtk.be");
   });
 
-  it("valt zonder @vtk.be-adres terug op het voorkeursadres", () => {
-    expect(cashRegisterMailTo({ ...user, googleEmail: null })).toBe("wannes@example.com");
+  it("zet er bij een werkgroep de werkgroep voor", () => {
+    expect(cashRegisterMailTo(user, werkgroep)).toBe("chemix.jasper.vanelsacker@vtk.be");
+  });
+
+  it("stuurt BEST altijd naar het voorkeursadres, ook met een gekoppeld account", () => {
+    expect(cashRegisterMailTo(user, best)).toBe("jasper@example.com");
+    expect(cashRegisterMailTo({ ...user, googleEmail: "jasper.vanelsacker@vtk.be" }, best)).toBe("jasper@example.com");
+  });
+
+  it("laat een gekoppeld account voorgaan, want een naamgenoot heeft een ander adres", () => {
+    expect(cashRegisterMailTo({ ...user, googleEmail: "jasper.vanelsacker2@vtk.be" }, post)).toBe(
+      "jasper.vanelsacker2@vtk.be",
+    );
+  });
+
+  it("haalt accenten weg en leest de volledige naam wanneer de naamvelden leeg zijn", () => {
+    expect(cashRegisterMailTo({ ...user, name: "Noël D'Hondt", firstName: null, lastName: null }, post)).toBe(
+      "noel.dhondt@vtk.be",
+    );
+  });
+
+  it("behandelt een kassa zonder post als een gewone post", () => {
+    expect(cashRegisterMailTo(user, null)).toBe("jasper.vanelsacker@vtk.be");
+  });
+
+  it("valt terug op het voorkeursadres wanneer er geen adres uit de naam te bouwen is", () => {
+    expect(cashRegisterMailTo({ ...user, name: "Jasper", firstName: null, lastName: null }, post)).toBe(
+      "jasper@example.com",
+    );
+  });
+});
+
+describe("kassa's: mail dat de kassa geteld is", () => {
+  const input = {
+    locale: "nl" as const,
+    name: "Wannes",
+    activity: "Cantus",
+    date: new Date("2026-10-08T00:00:00.000Z"),
+    postLabel: "Onthaal",
+    result: {
+      startCents: 15000,
+      endCents: 64250,
+      cashCents: 49250,
+      bancontactCents: 31075,
+      payconiqCents: 0,
+      ticketCents: 0,
+      voucherCents: 2400,
+      totalCents: 82725,
+    },
+    url: "https://vtk.be/admin/kassas/k1",
+  };
+
+  it("noemt de activiteit in het onderwerp en toont de cijfers", () => {
+    const mail = cashRegisterCountedMail(input);
+    expect(mail.subject).toBe("Je kassa voor Cantus is geteld");
+    expect(mail.text).toContain("Resultaat kassa:");
+    expect(mail.text).toContain("Bancontact:");
+    expect(mail.text).toContain("Finaal resultaat:");
+    expect(mail.text).toContain(input.url);
+    expect(mail.html).toContain(input.url);
+  });
+
+  it("geeft wat er niet was geen regel", () => {
+    const mail = cashRegisterCountedMail(input);
+    expect(mail.text).not.toContain("Payconiq");
+    expect(mail.text).not.toContain("Ticketverkoop");
+  });
+
+  it("volgt de taal van de aanvrager", () => {
+    expect(cashRegisterCountedMail({ ...input, locale: "en" }).subject).toBe(
+      "Your cash register for Cantus was counted",
+    );
   });
 });
 

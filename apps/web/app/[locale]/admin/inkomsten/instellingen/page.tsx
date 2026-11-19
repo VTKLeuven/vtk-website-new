@@ -12,7 +12,6 @@ import { brusselsYMD, ymdKey } from "@/lib/brussels";
 import { channelCodeOn } from "@/lib/inkomsten/match";
 import { accountOn, CHANNEL_FROM_START } from "@/lib/inkomsten/overview";
 import {
-  countUnassigned,
   getIncomeConfig,
   listClosedPeriods,
   listIncomeChannels,
@@ -28,7 +27,6 @@ import {
   saveIncomeChannelAction,
   saveIncomeSettingsAction,
 } from "@/app/actions/inkomsten";
-import { IncomeNav } from "../IncomeNav";
 import { incomeErrorMessages } from "../messages";
 import { SOURCE_LABELS, periodLabel } from "../shared";
 import { ChannelAccountForm, ChannelBasicsForm, ChannelCodeForm, FeeCodeForm } from "./SettingsForms";
@@ -44,16 +42,14 @@ export default async function IncomeSettingsPage({ params }: { params: Promise<{
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const nl = locale === "nl";
-  const base = nl ? "" : "/en";
   await requirePermission("income.manage");
 
-  const [config, codes, channels, rules, periods, openCount, cashConfig] = await Promise.all([
+  const [config, codes, channels, rules, periods, cashConfig] = await Promise.all([
     getIncomeConfig(),
     listAccountingCodes(),
     listIncomeChannels(),
     listIncomeNameRules(),
     listClosedPeriods(),
-    countUnassigned(),
     getCashRegisterConfig(),
   ]);
   const errorMessages = incomeErrorMessages(locale);
@@ -81,10 +77,8 @@ export default async function IncomeSettingsPage({ params }: { params: Promise<{
   return (
     <div className="space-y-5">
       <header>
-        <h1 className="text-2xl font-semibold">{nl ? "Instellingen online inkomsten" : "Online income settings"}</h1>
+        <h2 className="text-lg font-semibold">{nl ? "Instellingen online inkomsten" : "Online income settings"}</h2>
       </header>
-
-      <IncomeNav base={base} nl={nl} active="instellingen" openCount={openCount} />
 
       <section className="rounded-2xl border border-vtk-blue/12 bg-white p-5">
         <h2 className="text-lg font-semibold">{nl ? "Kostencode" : "Fee code"}</h2>

@@ -24,7 +24,35 @@ export type EventMoment = {
   end: Date;
   /** Een eigen naam voor dit ene moment ("Nachtloop"), of niets. */
   label?: string | null;
+  /** Hieronder: wat enkel voor dit moment geldt. Leeg volgt het evenement. */
+  location?: string | null;
+  descriptionNl?: string | null;
+  descriptionEn?: string | null;
+  imageKey?: string | null;
+  imageFocusX?: number;
+  imageFocusY?: number;
 };
+
+/**
+ * Wat een lijst of kaart van een moment nodig heeft. Eén select voor alle lezers:
+ * zo kan geen enkele plek de locatie of de affiche vergeten.
+ */
+export const MOMENT_SELECT = {
+  start: true,
+  end: true,
+  label: true,
+  location: true,
+  imageKey: true,
+  imageFocusX: true,
+  imageFocusY: true,
+} as const;
+
+/** Hetzelfde met de eigen tekst erbij: voor de eventpagina, de feeds en het formulier. */
+export const MOMENT_DETAIL_SELECT = {
+  ...MOMENT_SELECT,
+  descriptionNl: true,
+  descriptionEn: true,
+} as const;
 
 /**
  * De envelop rond een reeks momenten: de start van het eerste en het einde van
@@ -84,6 +112,75 @@ export function leadMoment(
 ): EventMoment | null {
   if (moments.length === 0) return null;
   return moments.find((moment) => moment.end >= now) ?? moments[moments.length - 1]!;
+}
+
+/**
+ * Het moment waar een evenement nu over gaat: het eerstvolgende, of het moment dat
+ * nog bezig is. Anders dan `leadMoment` geeft dit niets wanneer alles voorbij is.
+ *
+ * Dit is wat de affiche en de locatie doet wisselen: zodra een loopje afgelopen
+ * is, staat het volgende klaar, zonder cron of handwerk. Is de hele reeks voorbij,
+ * dan gaat de pagina weer over de reeks en niet over haar laatste avond.
+ */
+export function upcomingMoment<T extends Pick<EventMoment, "end">>(
+  moments: readonly T[],
+  now: Date,
+): T | null {
+  return moments.find((moment) => moment.end >= now) ?? null;
+}
+
+/** Wat een evenement meebrengt en een moment kan overschrijven. */
+type MomentOverridable = {
+  location: string | null;
+  imageKey?: string | null;
+  imageFocusX?: number;
+  imageFocusY?: number;
+};
+
+/**
+ * Het evenement zoals het er op dit ene moment uitziet: de eigen locatie en
+ * affiche van het moment, en voor wat leeg is die van het evenement.
+ *
+ * De enige plek met die terugvalregel. Wie een evenement voor één moment toont
+ * (een afspraak in de feed, een herinnering, een blok in de week), gaat hierlangs.
+ */
+export function eventForMoment<T extends MomentOverridable>(
+  event: T,
+  moment: Pick<EventMoment, "location" | "imageKey" | "imageFocusX" | "imageFocusY"> | null | undefined,
+): T {
+  if (!moment) return event;
+  return {
+    ...event,
+    location: moment.location?.trim() || event.location,
+    ...(moment.imageKey
+      ? {
+          imageKey: moment.imageKey,
+          imageFocusX: moment.imageFocusX ?? 0.5,
+          imageFocusY: moment.imageFocusY ?? 0.5,
+        }
+      : {}),
+  } as T;
+}
+
+/**
+ * Het evenement zoals het er nu uitziet, voor alles wat het als één geheel toont
+ * (een kaart, de eventpagina, een linkvoorbeeld).
+ */
+export function eventAsOfNow<T extends MomentOverridable & { moments?: readonly EventMoment[] }>(
+  event: T,
+  now: Date,
+): T {
+  return eventForMoment(event, upcomingMoment(event.moments ?? [], now));
+}
+
+/** De eigen tekst van een moment in deze taal, of een lege string. */
+export function momentDescription(
+  moment: Pick<EventMoment, "descriptionNl" | "descriptionEn">,
+  locale: "nl" | "en",
+): string {
+  const nl = moment.descriptionNl?.trim() ?? "";
+  const en = moment.descriptionEn?.trim() ?? "";
+  return locale === "en" && en ? en : nl;
 }
 
 /** De eerstvolgende keer dat een evenement doorgaat; zonder momenten is dat zijn start. */

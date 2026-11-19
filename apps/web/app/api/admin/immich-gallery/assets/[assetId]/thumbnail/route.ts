@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getImmichAssetThumbnail, immichGalleryStatus } from "@/lib/immich-gallery";
 import { authErrorResponse, requireAnyPermission } from "@/lib/session";
+import { ALBUM_UPLOAD_PERMISSIONS } from "@/lib/media-album-access";
 
 /**
  * De thumbnail van één foto, met de API-sleutel in plaats van via een gedeelde
@@ -21,7 +22,7 @@ export async function GET(
   context: { params: Promise<{ assetId: string }> },
 ) {
   try {
-    await requireAnyPermission(["media.manage", "photos.manageAlbums"]);
+    await requireAnyPermission([...ALBUM_UPLOAD_PERMISSIONS]);
   } catch (error) {
     return authErrorResponse(error);
   }

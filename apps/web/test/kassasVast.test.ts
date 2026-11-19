@@ -5,6 +5,7 @@ vi.mock("@vtk/db", () => ({ prisma: {} }));
 vi.mock("@/lib/session", () => ({ getCurrentSession: vi.fn(), requireSession: vi.fn() }));
 
 import {
+  entersCashPerPiece,
   ledgerYearOf,
   ledgerYearResultCents,
   quarterLabel,
@@ -125,6 +126,28 @@ describe("vaste kassa's: winst per kwartaal", () => {
     // De afgifte van na de telling hoort bij de volgende periode, niet bij Q4.
     expect(resultOf(sameDay, Q4_2026, "2027-04-02")).toBe(50_000);
     expect(resultOf(sameDay, { year: 2027, quarter: 1 }, "2027-04-02")).toBe(45_000 + 10_000 - 50_000);
+  });
+});
+
+describe("vaste kassa's: per munt en briefje", () => {
+  it("elke nieuwe regel gaat per coupure", () => {
+    expect(entersCashPerPiece("HANDED_OUT", null, "")).toBe(true);
+    expect(entersCashPerPiece("RETURNED", null, "")).toBe(true);
+    expect(entersCashPerPiece("COUNT", null, "")).toBe(true);
+  });
+
+  it("een regel met coupures opent weer met haar raster", () => {
+    expect(entersCashPerPiece("HANDED_OUT", { "200": 25 }, "50,00")).toBe(true);
+    expect(entersCashPerPiece("RETURNED", { "5000": 2 }, "100,00")).toBe(true);
+  });
+
+  it("een oudere regel met enkel een bedrag houdt haar bedragveld", () => {
+    expect(entersCashPerPiece("HANDED_OUT", null, "75,00")).toBe(false);
+    expect(entersCashPerPiece("RETURNED", null, "125,50")).toBe(false);
+  });
+
+  it("een teruggave zonder cash (enkel bonnen) heeft geen bedrag te verliezen", () => {
+    expect(entersCashPerPiece("RETURNED", null, "")).toBe(true);
   });
 });
 

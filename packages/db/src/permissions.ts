@@ -24,9 +24,15 @@ export const PERMISSIONS = [
   { code: "forms.create", labelNl: "Formulieren aanmaken voor eigen groep", labelEn: "Create forms for own group", category: "forms" },
   { code: "forms.manageAll", labelNl: "Alle formulieren beheren", labelEn: "Manage all forms", category: "forms" },
 
-  // Photos
-  { code: "photos.upload", labelNl: "Foto's uploaden", labelEn: "Upload photos", category: "photos" },
-  { code: "photos.manageAlbums", labelNl: "Albums beheren", labelEn: "Manage albums", category: "photos" },
+  // Photos. Drie trappen in /admin/media, elk met wat de vorige kan erbij
+  // (lib/media-album-access.ts): `upload` vult een bestaand album aan,
+  // `createAlbums` maakt een nieuw album dat verborgen begint en mag het
+  // bewerken zolang het verborgen is, `manageAlbums` publiceert en verwijdert.
+  // `photos.upload` opent ook de algemene uploadroute (afbeeldingen voor
+  // pagina's en evenementen), zoals vroeger.
+  { code: "photos.upload", labelNl: "Foto's uploaden naar bestaande albums", labelEn: "Upload photos to existing albums", category: "photos" },
+  { code: "photos.createAlbums", labelNl: "Albums aanmaken (zonder publiceren of verwijderen)", labelEn: "Create albums (without publishing or deleting)", category: "photos" },
+  { code: "photos.manageAlbums", labelNl: "Albums beheren, publiceren en verwijderen", labelEn: "Manage, publish and delete albums", category: "photos" },
 
   // Users & groups
   { code: "users.search", labelNl: "Gebruikers opzoeken (user-pickers)", labelEn: "Search users (user pickers)", category: "users" },
@@ -40,6 +46,15 @@ export const PERMISSIONS = [
   // recht telt enkel in de werkgroep die het je verleent, enkel voor gewone
   // leden en enkel in het huidige werkingsjaar (lib/werkgroepMembers.ts).
   { code: "werkgroepen.manageOwnMembers", labelNl: "Leden van de eigen werkgroep toevoegen en verwijderen", labelEn: "Add and remove members of own werkgroep", category: "users" },
+  // De infotekst en website op /werkgroepen. Stond open voor elk lid van de
+  // werkgroep; nu enkel voor wie een rol met dit recht via die werkgroep krijgt
+  // (in productie de G3/G4, via de LEADER-grant). Zelfde regel als hierboven.
+  { code: "werkgroepen.editOwnInfo", labelNl: "Infotekst en website van de eigen werkgroep aanpassen", labelEn: "Edit info text and website of own werkgroep", category: "users" },
+  // Jaarwerkingen (Kanweek, Halftime, ...) naast de werkgroepen, met dezelfde
+  // twee rechten: alles beheren, of als verantwoordelijke de gewone leden van
+  // de eigen jaarwerking (lib/werkgroepMembers.ts, dezelfde grenzen).
+  { code: "jaarwerkingen.manage", labelNl: "Jaarwerkingen en hun rollen beheren", labelEn: "Manage yearly events (jaarwerkingen) and their roles", category: "users" },
+  { code: "jaarwerkingen.manageOwnMembers", labelNl: "Leden van de eigen jaarwerking toevoegen en verwijderen", labelEn: "Add and remove members of own yearly event (jaarwerking)", category: "users" },
   { code: "roles.manage", labelNl: "Rollen beheren en toewijzen", labelEn: "Manage and assign roles", category: "users" },
   // Wie doet wat (/admin/wie-doet-wat): de taakverdeling binnen de posten.
   // Lezen staat los van bewerken omdat het register er is om iemand te vinden,
@@ -249,10 +264,6 @@ export const PERMISSIONS = [
   // Adminlogboek (wie deed wat in de admin)
   { code: "audit.view", labelNl: "Adminlogboek bekijken", labelEn: "View the admin audit log", category: "it" },
   { code: "urenloopApp.manage", labelNl: "24UL-app: downloadlijst beheren", labelEn: "24UL app: manage the download list", category: "it" },
-  // Feedback over de website zelf, gemeld door leden via het accountmenu. Een
-  // eigen recht en niet `audit.view`: dit is een werklijst voor wie de site
-  // onderhoudt, geen logboek, en er staan vrije teksten van leden in.
-  { code: "feedback.manage", labelNl: "Websitefeedback bekijken en afhandelen", labelEn: "View and handle website feedback", category: "it" },
 
 ] as const;
 

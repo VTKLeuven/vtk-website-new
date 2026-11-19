@@ -52,6 +52,17 @@ export function EyeOffIcon() {
   );
 }
 
+/** Een potje: een deelbudget waaruit door het jaar gekocht wordt. */
+export function JarIcon() {
+  return (
+    <Icon>
+      <path d="M7 4h10" />
+      <path d="M8 4v2.5a3 3 0 0 1-2 2.8V19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9.3a3 3 0 0 1-2-2.8V4" />
+      <path d="M6 13h12" />
+    </Icon>
+  );
+}
+
 export function EyeIcon() {
   return (
     <Icon>
@@ -83,6 +94,53 @@ export function ArrowRightIcon() {
     <Icon>
       <path d="M5 12h14" />
       <path d="m13 6 6 6-6 6" />
+    </Icon>
+  );
+}
+
+export function ArrowUpIcon() {
+  return (
+    <Icon>
+      <path d="M12 19V5" />
+      <path d="m6 11 6-6 6 6" />
+    </Icon>
+  );
+}
+
+export function ArrowDownIcon() {
+  return (
+    <Icon>
+      <path d="M12 5v14" />
+      <path d="m6 13 6 6 6-6" />
+    </Icon>
+  );
+}
+
+export function CloseIcon() {
+  return (
+    <Icon>
+      <path d="m6 6 12 12" />
+      <path d="M18 6 6 18" />
+    </Icon>
+  );
+}
+
+export function MaximizeIcon() {
+  return (
+    <Icon>
+      <path d="M15 3h6v6" />
+      <path d="M9 21H3v-6" />
+      <path d="m21 3-7 7" />
+      <path d="m3 21 7-7" />
+    </Icon>
+  );
+}
+
+export function LockIcon() {
+  return (
+    <Icon>
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
     </Icon>
   );
 }
@@ -338,6 +396,71 @@ export function MegaphoneIcon({ done = false }: { done?: boolean } = {}) {
     <Icon>
       <path d="m3 11 18-5v12L3 14v-3z" />
       <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
+    </Icon>
+  );
+}
+
+/** Wacht op iets dat vanzelf gebeurt, bv. een prijs die de site nog nakijkt. */
+export function ClockIcon() {
+  return (
+    <Icon>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </Icon>
+  );
+}
+
+/** Vraagt aandacht: een andere prijs, of geen antwoord. */
+export function AlertIcon() {
+  return (
+    <Icon>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 8v4" />
+      <path d="M12 16h.01" />
+    </Icon>
+  );
+}
+
+/** Een mens keek het zelf na. */
+export function UserCheckIcon() {
+  return (
+    <Icon>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="m16 11 2 2 4-4" />
+    </Icon>
+  );
+}
+
+/** Zelf aanvinken dat iets nagekeken is. */
+export function CheckSquareIcon() {
+  return (
+    <Icon>
+      <rect x="3" y="3" width="18" height="18" rx="4" />
+      <path d="m8 12 3 3 5-6" />
+    </Icon>
+  );
+}
+
+/** Geen link of geen bron. */
+export function LinkOffIcon() {
+  return (
+    <Icon>
+      <path d="M9 17H7A5 5 0 0 1 7 7h2" />
+      <path d="M15 7h2a5 5 0 0 1 4 8" />
+      <path d="M8 12h4" />
+      <path d="m2 2 20 20" />
+    </Icon>
+  );
+}
+
+/** Een voorgestelde waarde overnemen, bv. de prijs die de winkel nu vraagt. */
+export function TakeOverIcon() {
+  return (
+    <Icon>
+      <path d="M12 3v12" />
+      <path d="m7 10 5 5 5-5" />
+      <path d="M5 21h14" />
     </Icon>
   );
 }

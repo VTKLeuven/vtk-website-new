@@ -79,6 +79,52 @@ achter de mediarechten). Een album in het beheer heeft als adres het Immich-id
 van zijn hoofdalbum, niet de slug: die verandert mee met de titel, en een
 verborgen album heeft er geen.
 
+### De drie standen van een album
+
+Een album van vtk.be draagt precies één van drie merkers, op elk deel (het
+hoofdalbum en zijn tabs):
+
+| Merker | Stand | Overzicht (/media, zoeken, nieuws, app) | Eigen adres `/media/<slug>` | Gedeelde link in Immich |
+| --- | --- | --- | --- | --- |
+| `[gallery]` | op vtk.be | ja | ja | ja |
+| `[gallery-private]` | privé | nee | ja, met `noindex` | ja |
+| `[gallery-uit]` | verborgen | nee | nee (404) | weggehaald |
+
+De fakbar heeft dezelfde drie: `[fakbar]`, `[fakbar-private]`, `[fakbar-uit]`.
+Geen enkele botst met de gewone merker: `"[gallery-private]"` bevat `"[gallery]"`
+niet. `albumVisibility` (`packages/gallery/src/config.ts`) leest de stand; draagt
+een album er toch twee, dan wint de meest openbare. Wisselen gebeurt met
+`replaceVisibilityMarker`, die alle drie weghaalt en er één terugzet.
+
+**Een privé album zit gewoon in de momentopname**, met zijn gedeelde link en zijn
+foto-URL's; enkel `listAlbums()` laat het weg (`unlisted` op het album). Het
+beheer vraagt `listAlbums({ includeUnlisted: true })` om ook van een privé album
+de slug te kennen. In `listAdminAlbums` telt privé als zichtbaar, zodat de slugs
+in dezelfde volgorde vallen als in de momentopname. Een album met tabs neemt de
+stand van zijn hoofdalbum over.
+
+De prullenmand onthoudt de stand (`GalleryTrashedAlbum.wasHidden` en
+`wasPrivate`): terugzetten maakt van een privé album geen openbaar album.
+
+### Wie wat mag
+
+`lib/media-album-access.ts`, drie trappen, elk met alles van de vorige:
+
+| Recht | Mag |
+| --- | --- |
+| `photos.upload` | het tabblad Foto's openen en foto's toevoegen aan een bestaand album van vtk.be |
+| `photos.createAlbums` | ook een album aanmaken (altijd verborgen), een tab toevoegen, en een **verborgen** album bewerken: titel, beschrijving, cover, tabs hernoemen of loskoppelen, foto's tussen tabs verplaatsen |
+| `photos.manageAlbums`, `media.manage` | alles: de stand kiezen, foto's verbergen of tonen, privélinks, downloaden, de prullenmand |
+
+Magazines, aftermovies, verwijderverzoeken en de schakelaar voor de
+fakbargalerij blijven enkel `media.manage`. Elke actie controleert het recht zelf
+nog eens; het scherm verbergt enkel wat je niet mag. Een upload controleert
+bovendien dat het album bij vtk.be hoort en niet in de prullenmand ligt
+(`albumVisibilityOf`, zonder de foto's op te halen): het album-id komt uit de
+browser, en zonder die controle kon wie mag uploaden in elk album van Immich
+schrijven. Naar de fakbargalerij uploaden kan enkel wie albums mag aanmaken,
+want dat gaat altijd via een nieuw album.
+
 ### Een album van de site halen
 
 `[gallery]` wisselen voor **`[gallery-uit]`** haalt het album van de mediapagina
@@ -90,12 +136,71 @@ fakbargalerij is dat `[fakbar-uit]`. Er is geen botsing met de gewone merker:
 `"[gallery-uit]"` bevat `"[gallery]"` niet. Een nieuw album kan meteen verborgen
 beginnen ("Eerst nakijken"); het krijgt dan van bij het aanmaken de uit-merker.
 
+**Verbergen haalt ook de gedeelde link van Immich weg** (`setPartsVisible` in
+`app/actions/media-albums.ts`, met `deleteImmichAlbumSharedLinks`). De sleutel
+van die link staat in elke foto-URL die de site ooit toonde, en op de fotoproxy
+opent `/share/<sleutel>` het hele album, ook de foto's die er later bij kwamen.
+Tot november 2026 bleef die link na het verbergen gewoon bestaan, dus wie een
+foto-URL bewaard had, zag een verborgen album nog. Terugzetten maakt geen link:
+dat doet de momentopname zelf, met een nieuwe sleutel. De prullenmand loopt
+langs dezelfde functie.
+
 ### Een foto verbergen
 
 Verbergen haalt de foto uit haar album (`DELETE /albums/{id}/assets`). Ze blijft
 in Immich, maar heeft geen publieke URL meer: die hangt aan de gedeelde link van
 een *album*. De rij in `GalleryDetachedPhoto` houdt bij waar ze vandaan kwam;
 daarmee toont het beheer haar gedimd in haar eigen album en zet "Tonen" haar terug.
+
+### Een album of een foto downloaden
+
+Twee routes onder `/api/admin/immich-gallery/albums/<albumId>/`, achter
+`media.manage` of `photos.manageAlbums` (Communicatie heeft het eerste), niet
+achter `photos.upload` of `photos.createAlbums`. Beide
+geven het **origineel**, en beide lezen het album uit `loadLibraryAlbum`, net als
+het scherm.
+
+- **`download`: het hele album als zip.** Elke tab in een eigen map zodra er meer
+  dan één is, en ook een album dat van de site staat (`[gallery-uit]`), en ook de
+  verborgen foto's. Wat in de prullenmand ligt, bestaat er niet meer. De
+  naamgeving staat apart in
+  `lib/media-album-zip.ts` (pure functies, getest): twee foto's met dezelfde naam
+  worden `IMG_0001 (2).jpg`, en een naam die enkel uit punten bestaat of een pad
+  bevat kan niet uit zijn map ontsnappen.
+- **`photos/<assetId>/download`: één foto of video**, via het icoon op de tegel.
+  De foto moet bij dit album horen, ook een verborgen foto. Dat is bewust: de
+  thumbnailroute neemt elk Immich-id aan, maar een origineel geven we niet voor
+  alles wat in Immich staat (de fakbargalerij, een tijdelijke selfie van de
+  gezichtszoeker). Dat kost een albumlezing per klik, dus de download begint met
+  een kleine vertraging. De publieke route (`/api/immich-gallery/albums/<slug>/photos/...`)
+  blijft enkel voor wat op de site staat.
+
+Waar je op moet letten:
+
+- **Een verborgen foto kent haar eigen naam niet.** De verberg-actie bewaart geen
+  bestandsnaam in `GalleryDetachedPhoto`, en `loadLibraryAlbum` zet haar altijd
+  op `video: false`. Zonder extra stap heette ze in de zip `foto-0007.jpg`, en
+  kreeg een verborgen video een `.jpg`-extensie. `withHiddenPhotoDetails`
+  (`lib/media-hidden-photos.ts`) vraagt daarom vóór het streamen per verborgen
+  foto `GET /assets/<id>` aan Immich, acht tegelijk. Weet Immich het niet, dan
+  blijft het nummer staan en zegt het openen van het origineel wat er mis is.
+  Zichtbare foto's worden niet nagevraagd.
+- **De zip wordt gestreamd, een origineel per keer** (`streamZip` in
+  `@vtk/storage`, dezelfde functie als de zip van de oude albums). Een album is
+  snel enkele gigabytes en past niet in het geheugen; alles tegelijk openen zou
+  bovendien elke verbinding met Immich bezetten. Zonder compressie, want
+  foto's en video's krimpen niet. Boven 4 GB wordt het archief vanzelf Zip64;
+  gecontroleerd met een archief van 4,7 GB (`unzip -t` en Python `zipfile`).
+- **Er is geen voortgangsbalk.** Streamen betekent dat de lengte vooraf niet
+  bekend is. Het scherm zegt dat een groot album even kan duren.
+- **Een mislukt origineel breekt de hele download af** (na een tweede poging),
+  in plaats van een zip te leveren waar stilletjes foto's ontbreken. De browser
+  meldt een mislukte download en de fout staat in de log.
+- **Het is een gewone `<a download>`**, geen `fetch`: de browser schrijft het
+  bestand zelf weg. Een foutantwoord (404, 502) toont Chrome als mislukte
+  download; het kan dus geen toast worden.
+- **Niet in het adminlogboek**: dat slaat leesacties en exports bewust over
+  (zie `lib/audit.ts`).
 
 ### De prullenmand
 
@@ -113,6 +218,74 @@ het beheer zelf, niet in Immich.
   het beheer (`after()` in de layout van Foto's): een album gaat dan echt weg,
   zijn foto's naar de prullenmand van Immich. Die leegt zich op zijn eigen termijn.
   Staat die korter dan 30 dagen, dan zegt "Terugzetten" dat de foto al weg is.
+
+### Een album delen met een link
+
+Communicatie kan een album delen zonder het op de site te zetten: in het album,
+bij **Delen met een link**, tussen de schakelaar en het downloaden. Elke link heeft
+een naam (voor wie), een vervaldatum, wie er mag kijken en of downloaden mag. De
+kringkeuzes staan in `docs/design-decisions.md`, "Mediabeheer".
+
+- **Wie mag kijken** (`GalleryShareLink.audience`): iedereen met de link
+  (`LINK`), enkel het praesidium (`PRAESIDIUM`: inloggen en dit werkingsjaar een
+  lidmaatschap in een `Group` van type `PRAESIDIUM`), of enkel één werkgroep
+  (`GROUP` met `groupId`: inloggen en dit werkingsjaar lid van die werkgroep).
+  De werkgroep komt uit een keuzelijst met de actieve werkgroepen.
+- **De ontvanger** opent `/media/gedeeld/<token>`: de albumpagina van /media
+  (`AlbumViewer`, `AlbumTabViewer`), zonder gezichtszoeker en zonder meldknop.
+  De foto's lopen via `/api/immich-gallery/gedeeld/<token>/assets/<id>/<size>`,
+  de zip via `/api/immich-gallery/gedeeld/<token>/download`. Wanneer de link niet
+  zomaar opengaat, staat er een kaart in de plaats (`SharedAlbumGate.tsx`):
+  inloggen, niet in de groep, werkt niet meer, of fotobibliotheek onbereikbaar.
+  Die vier staan op /admin/it/flows.
+- **Code**: `lib/media-share.ts` (opzoeken, toegang, het album, het beheer),
+  `lib/media-share-shared.ts` (pure regels, ook in de browser),
+  `lib/media-share-token.ts` (token en hash), `app/actions/media-share.ts`
+  (maken, aanpassen, intrekken) en `AlbumShareLinks.tsx` in het album.
+
+Waar je op moet letten:
+
+- **Een foto-id uit de URL is geen bewijs.** De thumbnailroute van het beheer
+  neemt elk Immich-id aan; die van een link geeft enkel foto's van haar eigen
+  album (`findSharedPhoto`). Anders opent een link naar één album elke foto in
+  Immich, ook de fakbargalerij en de selfies van de gezichtszoeker. Het album zit
+  vijf minuten in het geheugen (`loadSharedAlbum`), zodat een raster van
+  tweehonderd foto's het album niet tweehonderd keer leest; de pagina zelf leest
+  altijd vers. Wat je verbergt, verdwijnt dus pas na hoogstens die vijf minuten
+  uit de foto-route.
+- **Verborgen foto's zitten er niet in.** Ze zijn uit hun album gehaald en staan
+  dus niet in de assets van Immich; de zip van een link zit daarom ook zonder.
+  Anders dan de zip van het beheer, en dat is een keuze, geen vergetelheid.
+- **Het token**: 32 willekeurige bytes in base64url (altijd 43 tekens), eerst een
+  vormcontrole en pas dan de databank, opgezocht op de sha256 (`tokenHash`). Naast
+  de hash staat een kopie die `encryptSecret` (`lib/secrets.ts`) versleutelt, zodat
+  het beheer de link later opnieuw kan tonen; de agendafeed toont haar link maar
+  één keer, maar die is van één persoon, en een albumlink is van het team.
+  Wisselt `BETTER_AUTH_SECRET`, dan werken de links nog, maar toont het beheer ze
+  niet meer.
+- **Lidmaatschap van vandaag**: elke opening kijkt opnieuw wie er in het
+  praesidium of de werkgroep zit, in `currentWorkingYear()`. Daarom loopt geen
+  link voorbij 15 juli 00:00 in Brussel (`shareExpiry`): anders ziet het nieuwe
+  praesidium wat voor het vorige bedoeld was. Een `GROUP`-link zonder werkgroep
+  laat niemand binnen; een CHECK in de migratie houdt die er ook uit, en
+  verdwijnt de werkgroep, dan gaan haar links mee (`onDelete: Cascade`).
+- **Een linkvoorbeeld is ook een bezoek.** WhatsApp en Discord halen de pagina op
+  zodra iemand de link plakt. De metadata draagt daarom geen titel en geen cover
+  van het album, en zo'n bezoek telt niet als geopend (`isLinkPreviewAgent`).
+- **Headers** (`next.config.ts`): `no-referrer`, `private, no-store` en
+  `noindex` op de pagina, zoals bij een ticketbestelling; de foto's zetten hun
+  eigen cache (`private, max-age=600`, het origineel `no-store`).
+- **De slug `gedeeld` is gereserveerd** (`RESERVED_SLUGS` in
+  `packages/gallery/src/format.ts`): `/media/gedeeld` is een map naast
+  `/media/[albumSlug]`, en een album dat zo zou heten, krijgt `gedeeld-2`.
+- **Niet via MCP en niet in de fixtures**: een link maken is publiceren, en de
+  tabel draagt een geheim. Geen leesresource geeft `tokenHash` of `tokenSecret`.
+- **Prullenmand**: een album in de prullenmand laat zijn links niet werken (het
+  staat niet meer in `loadLibraryAlbums`), terugzetten maakt ze weer geldig, en
+  `purgeExpiredGalleryTrash` ruimt ze mee op. Een nieuwe titel breekt niets: een
+  link hangt aan het Immich-id, niet aan de slug.
+
+Testdata maken staat in [dev-testdata.md](dev-testdata.md), "Privélinks naar een album".
 
 ## Environment
 

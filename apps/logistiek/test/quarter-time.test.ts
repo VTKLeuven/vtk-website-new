@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isOnQuarterHour } from '@/lib/uitleen';
-import { QUARTERS, joinMoment, quarterOptions, splitMoment } from '@/lib/quarter-time';
+import { QUARTERS, clockLabel, joinMoment, quarterOptions, splitMoment } from '@/lib/quarter-time';
 
 describe('QUARTERS', () => {
   it('loopt van 00:00 tot 23:45', () => {
@@ -60,5 +60,35 @@ describe('quarterOptions', () => {
     expect(options).toHaveLength(97);
     expect(options).toContain('22:12');
     expect(options.indexOf('22:12')).toBe(options.indexOf('22:00') + 1);
+  });
+});
+
+describe('clockLabel (F6.25)', () => {
+  it('zet minuten binnen de dag om naar een klok', () => {
+    expect(clockLabel(0)).toBe('00:00');
+    expect(clockLabel(510)).toBe('08:30');
+    expect(clockLabel(23 * 60 + 45)).toBe('23:45');
+  });
+
+  it('houdt 24:00 als het einde van de dag', () => {
+    expect(clockLabel(24 * 60)).toBe('24:00');
+  });
+
+  it('toont 24:35 niet: dat is 00:35 de ochtend erna', () => {
+    // De fout die Logistiek zag: een band tot 00:35 stond als "24:35" op het
+    // scherm, want de omzetting vergeleek uren (`> 24`) in plaats van minuten.
+    expect(clockLabel(24 * 60 + 35)).toBe('00:35');
+    expect(clockLabel(24 * 60 + 1)).toBe('00:01');
+    expect(clockLabel(24 * 60 + 59)).toBe('00:59');
+  });
+
+  it('loopt door tot het einde van de intekendag (05:00 de ochtend erna)', () => {
+    expect(clockLabel(25 * 60)).toBe('01:00');
+    expect(clockLabel(29 * 60)).toBe('05:00');
+  });
+
+  it('rondt af op een hele minuut zonder 60 te tonen', () => {
+    expect(clockLabel(59.6)).toBe('01:00');
+    expect(clockLabel(510.4)).toBe('08:30');
   });
 });

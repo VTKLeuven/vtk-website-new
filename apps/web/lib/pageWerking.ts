@@ -4,6 +4,7 @@ import { cache } from "react";
 import { prisma } from "@vtk/db";
 import { currentWorkingYear } from "@/lib/workingYear";
 import { viewerAudienceFilter } from "@/lib/calendar/audience";
+import { eventForMoment, MOMENT_SELECT, upcomingMoment } from "@/lib/calendar/moments";
 import { categoryTiles, type CategoryTile } from "@/lib/categoryTiles";
 
 /**
@@ -119,10 +120,15 @@ export type WerkingEvent = {
  * bezig is, is precies wat iemand op deze pagina zoekt. De doelgroepfilter is
  * dezelfde als op de homepage en de kalender, zodat wie zijn agenda toespitst
  * hier niet plots alles terugkrijgt.
+ *
+ * Een reeks (een wekelijks loopje met momenten) staat op de kaart met de datum
+ * van de eerstvolgende keer, niet met `CalendarEvent.start`: dat is de envelop
+ * en dus de dag waarop de reeks ooit begon. Om dezelfde reden sorteren we pas na
+ * het ophalen, op die eerstvolgende keer; daarom halen we er meer op dan we tonen.
  */
 export const loadWerkingEvents = cache(async (groupId: string): Promise<WerkingEvent[]> => {
   const audience = await viewerAudienceFilter();
-  return prisma.calendarEvent.findMany({
+  const rows = await prisma.calendarEvent.findMany({
     where: {
       groupId,
       publishedAt: { not: null },
@@ -130,7 +136,7 @@ export const loadWerkingEvents = cache(async (groupId: string): Promise<WerkingE
       ...audience,
     },
     orderBy: { start: "asc" },
-    take: MAX_EVENTS,
+    take: MAX_EVENTS * 4,
     select: {
       id: true,
       slug: true,
@@ -142,11 +148,23 @@ export const loadWerkingEvents = cache(async (groupId: string): Promise<WerkingE
       imageKey: true,
       imageFocusX: true,
       imageFocusY: true,
+      moments: { orderBy: { start: "asc" }, select: MOMENT_SELECT },
       // Enkel de slug: het evenement zonder eigen affiche krijgt hiermee de
       // standaardbanner van zijn thema. Zie lib/defaultEventImage.ts.
       categories: { select: { category: { select: { slug: true } } } },
     },
   });
+  // Dezelfde datum, affiche en locatie als op de kaart elders: die van de
+  // eerstvolgende keer. Een reeks waarvan elk moment voorbij is, valt weg.
+  const now = new Date();
+  return rows
+    .flatMap(({ moments, ...event }) => {
+      if (moments.length === 0) return [event];
+      const next = upcomingMoment(moments, now);
+      return next ? [{ ...eventForMoment(event, next), start: next.start }] : [];
+    })
+    .sort((a, b) => +a.start - +b.start)
+    .slice(0, MAX_EVENTS);
 });
 
 /**

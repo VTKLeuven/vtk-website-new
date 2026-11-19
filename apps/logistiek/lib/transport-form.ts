@@ -5,6 +5,7 @@ import type { Prisma, UitleenRequesterType } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { isOnQuarterHour, MAX_HELPERS, parseNotifyEmails, transportPriceCents } from './uitleen';
 import { parseBrusselsDateTime } from './reservation-form';
+import { seriesOccurrences, type RecurrenceEnd, type RecurrenceRule } from './recurrence';
 
 /**
  * De boekingen van één ritaanvraag opbouwen en valideren.
@@ -47,6 +48,12 @@ export type TransportFormInput = {
   /** Tweede tijdvenster: dan wordt dit een heen-en-terugaanvraag (twee ritten). */
   returnStartAt?: string;
   returnEndAt?: string;
+  /**
+   * Extra info van Logistiek (F6.9). Enkel gelezen wanneer het team de rit
+   * aanmaakt (`owner.byTeam`): een lid mag geen tekst onder de naam van
+   * Logistiek zetten door dit veld mee te sturen.
+   */
+  adminNote?: string;
 };
 
 export type TransportOwner = {
@@ -59,6 +66,18 @@ export type TransportOwner = {
   requesterName?: string | null;
   /** Materiaalaanvraag waarvan dit de levering is. */
   reservationId?: string | null;
+  /**
+   * De post of werkgroep die de chauffeur zelf kiest (F6.10). Komt enkel op een
+   * rit met een voertuig dat geen kar is: de kar vraagt een goedgekeurde
+   * karchauffeur en dat is geen keuze van een post.
+   */
+  assignedGroupId?: string | null;
+  /**
+   * Het team maakt dit aan. Dat opent drie dingen die een lid niet heeft: een rit
+   * in het verleden (administratie, F6.19), de extra info van Logistiek (F6.9) en
+   * voertuigen die leden niet zelf mogen aanvragen (F6.21).
+   */
+  byTeam?: boolean;
 };
 
 export type BuiltTransport =
@@ -72,6 +91,10 @@ export type BuiltTransport =
       helpers: Array<{ name: string; phone: string | null }>;
       vehicleCount: number;
       roundTrip: boolean;
+      /** Alle ritten van een herhaling delen dit; `null` bij één rit (F6.22). */
+      seriesId?: string | null;
+      /** Hoeveel herhalingen het zijn, de eerste meegeteld. */
+      occurrences?: number;
     }
   | { ok: false; error: string };
 
@@ -82,12 +105,17 @@ export type BuiltTransport =
 function parseTripWindow(
   startRaw: string,
   endRaw: string,
-  label: string
+  label: string,
+  allowPast = false
 ): { ok: true; startAt: Date; endAt: Date } | { ok: false; error: string } {
   const startAt = parseBrusselsDateTime(startRaw);
   const endAt = parseBrusselsDateTime(endRaw);
   if (!startAt || !endAt) return { ok: false, error: `Kies een start- en eindmoment${label}.` };
-  if (startAt <= new Date()) return { ok: false, error: `Het startmoment${label} ligt in het verleden.` };
+  // Enkel het team mag een rit in het verleden aanmaken, voor de administratie
+  // (F6.19). Een lid blijft geweigerd: die aanvraag zou nooit meer beslist worden.
+  if (!allowPast && startAt <= new Date()) {
+    return { ok: false, error: `Het startmoment${label} ligt in het verleden.` };
+  }
   if (endAt <= startAt) {
     return { ok: false, error: `Het eindmoment${label} ligt voor het startmoment.` };
   }
@@ -114,13 +142,24 @@ export async function buildTransportBookings(
   owner: TransportOwner
 ): Promise<BuiltTransport> {
   const wantsReturn = Boolean(input.returnStartAt && input.returnEndAt);
-  const outbound = parseTripWindow(input.startAt, input.endAt, wantsReturn ? ' van de heenrit' : '');
+  const allowPast = owner.byTeam === true;
+  const outbound = parseTripWindow(
+    input.startAt,
+    input.endAt,
+    wantsReturn ? ' van de heenrit' : '',
+    allowPast
+  );
   if (!outbound.ok) return { ok: false, error: outbound.error };
   const { startAt, endAt } = outbound;
 
   let inbound: { startAt: Date; endAt: Date } | null = null;
   if (wantsReturn) {
-    const parsed = parseTripWindow(input.returnStartAt!, input.returnEndAt!, ' van de terugrit');
+    const parsed = parseTripWindow(
+      input.returnStartAt!,
+      input.returnEndAt!,
+      ' van de terugrit',
+      allowPast
+    );
     if (!parsed.ok) return { ok: false, error: parsed.error };
     if (parsed.startAt < endAt) {
       return { ok: false, error: 'De terugrit start voor de heenrit gedaan is.' };
@@ -146,14 +185,24 @@ export async function buildTransportBookings(
   // en die als twee aanvragen laten indienen betekent dat het team ze ook los kan
   // beslissen. Ze delen daarom één `tripGroupId`, net als heen en terug (V12).
   const chosenIds = (input.vehicleIds ?? (input.vehicleId ? [input.vehicleId] : [])).filter(Boolean);
+  // Een lid kiest enkel uit wat het team openzet (F6.21). De poort staat hier en
+  // niet enkel in het formulier: een verborgen keuze houdt niemand tegen die de
+  // actie rechtstreeks aanroept. Het team plant elk actief voertuig.
+  const available = owner.byTeam
+    ? { active: true }
+    : { active: true, requestableByMembers: true };
   const vehicles = chosenIds.length
-    ? await prisma.uitleenVehicle.findMany({ where: { id: { in: chosenIds }, active: true } })
+    ? await prisma.uitleenVehicle.findMany({ where: { id: { in: chosenIds }, ...available } })
     : await prisma.uitleenVehicle
-        .findFirst({ where: { active: true }, orderBy: { sortIndex: 'asc' } })
+        .findFirst({ where: available, orderBy: { sortIndex: 'asc' } })
         .then((found) => (found ? [found] : []));
   if (vehicles.length === 0) return { ok: false, error: 'Kies een voertuig.' };
   if (vehicles.length !== new Set(chosenIds).size && chosenIds.length > 0) {
-    return { ok: false, error: 'Een van de gekozen voertuigen bestaat niet meer; herlaad de pagina.' };
+    return {
+      ok: false,
+      error:
+        'Een van de gekozen voertuigen bestaat niet meer of kan je niet zelf aanvragen; herlaad de pagina.',
+    };
   }
 
   // Gedeelde velden van elke boeking; voertuig, tarief en tijdvenster verschillen.
@@ -174,6 +223,9 @@ export async function buildTransportBookings(
     contactPhone: input.contactPhone?.trim().slice(0, 60) || null,
     notifyEmail: notifyEmail.slice(0, 300) || null,
     memberNote: input.note.trim().slice(0, MAX_NOTE_LENGTH) || null,
+    ...(owner.byTeam
+      ? { adminNote: input.adminNote?.trim().slice(0, 1000) || null }
+      : {}),
   };
 
   /** Tarief per voertuig gesnapshot; per km blijft de prijs null tot na de rit. */
@@ -186,6 +238,10 @@ export async function buildTransportBookings(
   ) => ({
     ...shared,
     vehicleId: vehicle.id,
+    // De standaard voor "Post kiest zelf de chauffeur" (F6.10): niet bij de kar.
+    ...(owner.assignedGroupId && !vehicle.needsVanDriver
+      ? { assignedGroupId: owner.assignedGroupId }
+      : {}),
     pricingMode: vehicle.pricingMode,
     rateCents: vehicle.rateCents,
     tripGroupId,
@@ -230,5 +286,57 @@ export async function buildTransportBookings(
     helpers,
     vehicleCount: vehicles.length,
     roundTrip: Boolean(inbound),
+  };
+}
+
+/**
+ * De ritten van een herhaling (F6.22): elke herhaling gaat door dezelfde
+ * validatie als een enkele rit (`buildTransportBookings`), en ze delen een
+ * `seriesId`. Eén regelset en geen tweede kopie die uit elkaar loopt.
+ *
+ * Geen heen-en-terug in een herhaling: dat zijn twee ritten per datum die samen
+ * horen, en daar maak je beter twee reeksen van dan één die iets anders
+ * betekent dan "een rit die terugkomt".
+ */
+export async function buildTransportSeries(
+  input: TransportFormInput,
+  owner: TransportOwner,
+  repeat: { rule: RecurrenceRule; end: RecurrenceEnd }
+): Promise<BuiltTransport> {
+  if (input.returnStartAt || input.returnEndAt) {
+    return {
+      ok: false,
+      error: 'Een herhaling kan niet met een terugrit. Plan de terugrit als een eigen reeks.',
+    };
+  }
+  const windows = seriesOccurrences(
+    { startAt: input.startAt, endAt: input.endAt },
+    repeat.rule,
+    repeat.end
+  );
+  if (windows.length === 0) return { ok: false, error: 'Kies een start- en eindmoment.' };
+
+  const parts: Array<Extract<BuiltTransport, { ok: true }>> = [];
+  for (const [index, window] of windows.entries()) {
+    const built = await buildTransportBookings({ ...input, ...window }, owner);
+    if (!built.ok) {
+      return {
+        ok: false,
+        error:
+          windows.length > 1
+            ? `Rit ${index + 1} van ${windows.length} (${window.startAt.slice(0, 10)}): ${built.error}`
+            : built.error,
+      };
+    }
+    parts.push(built);
+  }
+  return {
+    ok: true,
+    bookings: parts.flatMap((part) => part.bookings),
+    helpers: parts[0].helpers,
+    vehicleCount: parts[0].vehicleCount,
+    roundTrip: false,
+    seriesId: windows.length > 1 ? randomUUID() : null,
+    occurrences: windows.length,
   };
 }

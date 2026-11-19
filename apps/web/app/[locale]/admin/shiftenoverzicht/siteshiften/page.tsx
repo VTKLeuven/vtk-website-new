@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import type { Locale } from "@vtk/i18n";
-import Link from "@/components/ui/Link";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import { formatWorkingYear, parseWorkingYear } from "@/lib/workingYear";
@@ -19,7 +18,6 @@ export default async function PraesidiumSiteShifts({
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const nl = locale === "nl";
-  const base = nl ? "" : "/en";
   await requirePermission("shift.praesidium");
 
   const { jaar } = await searchParams;
@@ -63,14 +61,10 @@ export default async function PraesidiumSiteShifts({
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <Link href={`${base}/admin/shiftenoverzicht?jaar=${year}`} className="text-sm text-vtk-muted hover:text-vtk-ink">
-          {"← "}
-          {nl ? "Shiftenoverzicht praesidium" : "Praesidium shift overview"}
-        </Link>
-        <h1 className="text-2xl font-semibold">
+        <h2 className="text-lg font-semibold">
           {nl ? "Shiften op /shift van het praesidium" : "Praesidium shifts on /shift"}
           <span className="ml-2 text-base font-normal text-vtk-muted">{formatWorkingYear(year)}</span>
-        </h1>
+        </h2>
         <p className="max-w-3xl text-sm text-vtk-muted">
           {nl
             ? "Een shift op /shift telt standaard als vrije wil. Raakte een shift niet vol en werd het praesidium gevraagd ze te vullen, duid de inschrijving dan aan als noodzakelijk: die tellen apart in het overzicht. Wie zich laat inschreef, staat in het oranje; dat is vaak zo'n oproep."

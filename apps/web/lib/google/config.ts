@@ -53,6 +53,13 @@ export type StoredGoogle = {
    */
   restrictedOrgUnit?: string;
   /**
+   * OU voor een kiesploeglid dat wél mag mailen, maar enkel vanaf zijn
+   * kiesploegadres. Daarop staat een routing-regel die uitgaande mail weigert
+   * wanneer de afzender het primaire adres is (zie docs/google-workspace.md,
+   * stap 4). Leeg = de sync verplaatst die leden niet.
+   */
+  aliasSenderOrgUnit?: string;
+  /**
    * Het account waarmee de site de BO-map leest (`lib/bo/scan.ts`). Los van
    * `subject`: een beheerder ziet de bestanden van een gedeelde drive enkel als
    * hij er lid van is, en de BO-map hangt via snelkoppelingen ook aan mappen
@@ -72,6 +79,8 @@ export type GoogleConfig = {
   fullOrgUnit: string;
   /** `null` = geen beperkte OU ingesteld; de sync verplaatst dan niemand. */
   restrictedOrgUnit: string | null;
+  /** `null` = geen OU voor kiesploegafzenders ingesteld. */
+  aliasSenderOrgUnit: string | null;
   /** `null` = de BO-scan staat uit. */
   driveSubject: string | null;
 };
@@ -90,6 +99,7 @@ export type GoogleStatus = {
   linkGateEnabled: boolean;
   fullOrgUnit: string | null;
   restrictedOrgUnit: string | null;
+  aliasSenderOrgUnit: string | null;
   driveSubject: string | null;
 };
 
@@ -152,6 +162,7 @@ export async function getGoogleConfig(): Promise<GoogleConfig | null> {
     oauth,
     fullOrgUnit: stored.fullOrgUnit?.trim() || "/",
     restrictedOrgUnit: stored.restrictedOrgUnit?.trim() || null,
+    aliasSenderOrgUnit: stored.aliasSenderOrgUnit?.trim() || null,
     driveSubject: stored.driveSubject?.trim().toLowerCase() || null,
   };
 }
@@ -179,6 +190,7 @@ export async function getGoogleStatus(): Promise<GoogleStatus> {
     linkGateEnabled: Boolean(stored?.linkGateEnabled),
     fullOrgUnit: stored?.fullOrgUnit ?? null,
     restrictedOrgUnit: stored?.restrictedOrgUnit ?? null,
+    aliasSenderOrgUnit: stored?.aliasSenderOrgUnit ?? null,
     driveSubject: stored?.driveSubject ?? null,
   };
 }

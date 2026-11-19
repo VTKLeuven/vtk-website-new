@@ -1,9 +1,9 @@
 # Expo HAS CHANGED
 
-Read the exact versioned docs at https://docs.expo.dev/versions/v54.0.0/ before writing any code.
+Read the exact versioned docs at https://docs.expo.dev/versions/v58.0.0/ before writing any code.
 
 (Dit blok wordt door `expo start` herschreven en kan dan naar een andere versie
-wijzen dan waar deze app op staat. Wij zitten op SDK 54; zie onderaan waarom.)
+wijzen dan waar deze app op staat. Wij zitten op SDK 58; zie onderaan waarom.)
 
 # VTK (Expo)
 
@@ -16,8 +16,10 @@ inhoud van de site zit er nog steeds in, maar onder Meer en niet vooraan.
 
 **De admin hoort hier niet in** en blijft op het web.
 
-Niet te verwarren met **vtk-scanner-app**: dat is de ticketscanner voor aan de
-deur, met zijn eigen offline-werking en een donker scherm. Die blijft apart.
+**De ticketscanner voor aan de deur zit hier ook in**, met zijn offline-werking,
+zijn wachtrij en zijn donkere scherm. Tot november 2026 was dat een aparte app,
+vtk-scanner-app; die staat nu enkel nog als archief. Enkel wie iets te scannen
+heeft, ziet hem. Alles daarover staat in `docs/scanner.md`.
 
 **Lees `docs/` voor je plant of schrijft.** `docs/plan.md` is het plan én het
 logboek (welke fase waar staat), `docs/architecture.md` legt uit hoe de app met
@@ -37,15 +39,18 @@ Lokaal testen vraagt HTTPS, want de weblogin doet KU Leuven-SSO. Draai
 vtk-website-new achter een cloudflared-tunnel en vul die URL in bij
 **Meer -> je naam -> Server**. Zie `docs/architecture.md`.
 
-**De camera, de agenda en de fotobibliotheek gaan niet mee met `eas update`.**
-`expo-camera`, `expo-calendar` en `expo-media-library` zijn native modules. In
-Expo Go zitten ze al ingebouwd, dus daar kan je de scanner, "In agenda" en het
-bewaren van een foto wel gewoon testen. Op een APK moet de module in de build
-zelf zitten; wie een oudere APK heeft, krijgt daar een rood scherm.
+**De camera, de agenda, de fotobibliotheek en de scanner gaan niet mee met `eas update`.**
+`expo-camera`, `expo-calendar`, `expo-media-library` en de modules van de scanner
+(`expo-crypto`, `expo-haptics`, `expo-network`) zijn native. In Expo Go zitten ze
+al ingebouwd, dus daar kan je de scanner, "In agenda" en het bewaren van een foto
+wel gewoon testen. Op een APK moet de module in de build zelf zitten; wie een
+oudere APK heeft, krijgt daar een rood scherm. Laad zo'n module nooit vanuit iets
+dat bij de start geladen wordt, anders valt niet één scherm maar de hele app om;
+zie `docs/scanner.md`.
 
 **Voeg je een native dependency toe, bouw dan voor je publiceert.**
-`runtimeVersion` staat op `"exposdk:54.0.0"`, dezelfde waarde voor élke SDK
-54-build, dus een update wordt ook aangeboden aan een oudere APK die de module
+`runtimeVersion` staat op `"exposdk:58.0.0"`, dezelfde waarde voor élke SDK
+58-build, dus een update wordt ook aangeboden aan een oudere APK die de module
 niet heeft; `requireNativeModule` gooit dan op het scherm waar die import hangt.
 Bouw eerst, verspreid de APK, en vraag om de vorige te vervangen.
 
@@ -57,7 +62,7 @@ opent, en Expo Go laadt enkel een `exposdk`-runtime. Zet dit niet op
 
 **Voeg geen module toe die niet in Expo Go zit.** Alles wat we vandaag gebruiken
 zit erin (camera, agenda, fotobibliotheek, sqlite, bestanden, delen, webview,
-svg). Iets anders erbij betekent dat niemand de app nog op een iPhone kan
+svg, crypto, haptics, netwerk, keep-awake). Iets anders erbij betekent dat niemand de app nog op een iPhone kan
 bekijken. Push is de bestaande uitzondering: die werkt in Expo Go niet.
 
 ## Regels
@@ -69,17 +74,27 @@ bekijken. Push is de bestaande uitzondering: die werkt in Expo Go niet.
    inloggen, de onboarding-poorten en betalen (Mollie). Al de rest wordt een echt
    scherm. Een browser openen voor eigen inhoud is een bug, geen keuze; enkel
    adressen op een andere site (cudi, Career, Burgieclan) horen daar.
-3. **Geen admin.** Ook niet voor wie er rechten voor heeft.
+3. **Geen admin.** Ook niet voor wie er rechten voor heeft. De scanner aan de
+   deur is geen admin: het scannerspaneel kan enkel de rol `SCANNER` geven, aan
+   de deur, aan wie komt bijspringen.
 4. **iOS en Android doen hetzelfde.** Geen platformspecifieke schermen.
 5. **Geen dependency die de Expo SDK al dekt.**
 6. **Geen emoji in de UI**; iconen komen uit `lucide-react-native`.
 7. **Nederlands in de interface**, Engelse vakterminologie waar dat natuurlijker
    is. **Geen em-dashes**, ook niet in code, comments of commits.
 8. **Het ontwerp komt van de site.** De tokens in `src/theme/tokens.ts` zijn de
-   enige plek met kleuren; verzin er geen. Witte kaarten op papier, dunne randen,
-   geel enkel als accent, geen gradienten en geen kaart in een kaart. De donkere
-   `PageHead` opent elk scherm, precies zoals `.vtk-page-head` dat op de site doet;
-   Home tekent dezelfde kop zelf omdat ze buiten de scroll staat.
+   enige plek met kleuren; verzin er geen. Geel enkel als accent, geen gradienten
+   en geen kaart in een kaart. De donkere `PageHead` opent elk scherm, precies
+   zoals `.vtk-page-head` dat op de site doet: navy met het technische patroon
+   (`PatternBand`) en een gele onderlijn van 5 px; tabbladen staan als pillen in
+   die kop. Sinds november 2026 leent elk scherm een patroon van de site in plaats
+   van een eigen app-vorm: de eventtegel met de gele datumpin (`EventTile`),
+   koppen met de gele lijn eronder (`SectionHeading`), registers met haarlijnen in
+   plaats van een witte kaart per regel, de agenda per week (`WeekHead`). Zoek bij
+   een nieuw scherm eerst het overeenkomende scherm op de site en neem dat over.
+   Praesidium hield bewust zijn eigen vorm; de muur van gezichten van de site werd
+   op een telefoon niet beter. De scanner aan de deur is de enige uitzondering op
+   het lichte ontwerp: die is donker, met het palet `SCANNER` van de webscanner.
 9. **Home is vandaag, Meer is waar alles staat.** Home beantwoordt twee vragen:
    wat is er open, en wat wacht er op mij. De CMS-boom, de mensen, de piano en je
    profiel staan onder Meer. Zet een snelkoppeling niet op allebei; anders komt de
@@ -137,12 +152,14 @@ bekijken. Push is de bestaande uitzondering: die werkt in Expo Go niet.
   achterlopen en een pushbericht van vorige week draagt nog het oude pad; dat mag
   niet op een leeg scherm eindigen. Ook deze worden gemaakt.
 - `app/(tabs)/_layout.tsx` is wél met de hand geschreven: **Home, Kalender,
-  Studeren, Tickets, Meer**, met hun iconen. Tickets heeft twee segmenten (Kopen/Mijne); zie
-  `src/components/Segmented.tsx` voor waarom dat geen tabs zijn. Broodjes staat als
-  snelkoppeling op Home.
+  Studeren, Tickets, Meer**, met hun iconen. Tickets heeft twee tabbladen (Kopen/Mijne) als
+  pillen in de kop (`tabs` op `PageHead`), net als Broodjes (Bestellen/Afhalen).
+  Broodjes staat als snelkoppeling op Home.
 - `app/_layout.tsx` draagt enkel nog de tabs plus drie modals (inloggen, de
-  onboardingpoort, de serverinstelling). Die liggen bewust wél over de balk: een
-  modal die de navigatie eronder laat staan, is geen modal.
+  onboardingpoort, de serverinstelling) en de scanner aan de deur
+  (`app/scan/[eventId].tsx`, als `fullScreenModal`). Die liggen bewust wél over de
+  balk: een modal die de navigatie eronder laat staan, is geen modal, en aan een
+  deur is een tabbalk een rij knoppen waar je per ongeluk op tikt.
 - `src/api/` - de HTTP-laag en het contract met de site.
 - `src/auth/` - wie er ingelogd is (er wordt geen token bewaard; zie
   `src/api/client.ts`) en de twee poorten uit `proxy.ts`.
@@ -168,9 +185,12 @@ bekijken. Push is de bestaande uitzondering: die werkt in Expo Go niet.
 - `src/push.ts` - pushberichten. Toestemming wordt gevraagd via de knop onder
   Meer -> Meldingen en **nooit bij de eerste start**; op iOS krijg je maar één
   kans.
-- `src/scanKind.ts` - welk soort code er gescand is. De app heeft één camera en
-  vier soorten QR (ticket, uitnodiging, pas, fakbar), en de prefix zegt welke.
-  Bewust geen menu vooraf: aan een deur weet je zelf wel wat je voorhoudt.
+- `src/scanKind.ts` - welk soort code er gescand is in **Code scannen**
+  (`scannen.tsx`, voor iedereen): uitnodiging, pas of fakbar, en een ticket dat
+  daar niet meetelt en naar Aan de deur verwijst. De prefix zegt welke.
+- `src/scanner/`, `src/components/scanner/`, `src/api/scanner.ts` - de scanner aan
+  de deur (`deur.tsx` kiest het event, `scan/[eventId].tsx` scant). Zie
+  `docs/scanner.md`.
 - `src/deviceCalendar.ts` - een evenement in de agenda van de telefoon zetten.
   Er wordt **niets gelezen**; de module maakt één afspraak wanneer je erom
   vraagt. Dat is iets anders dan de ICS-feed op de site, die je op alles
@@ -179,8 +199,10 @@ bekijken. Push is de bestaande uitzondering: die werkt in Expo Go niet.
   notitie bij een agenda-afspraak).
 - `src/savePhoto.ts` - een foto bewaren in de fotobibliotheek of delen via het
   systeemvenster. Haalt het origineel op en niet wat er op het scherm staat.
-- `src/storage.ts` - voorkeuren en de leescache. **Geen schrijfwachtrij**: dit is
-  niet de scanner, en bestellen vraagt netwerk.
+- `src/storage.ts` - voorkeuren en de leescache. **Geen schrijfwachtrij**:
+  bestellen vraagt netwerk. De enige wachtrij is die van de scanner, in een eigen
+  databank (`src/scanner/storage.ts`), zodat de leescache leegmaken nooit een scan
+  meeneemt.
 
 ## Wat bewust op de site blijft
 
@@ -206,15 +228,20 @@ vergelijkt de eerste rij byte voor byte wanneer beide repo's naast elkaar staan.
 | `src/api/contract.ts` | `apps/web/lib/app-api/contract.ts` |
 | de prefixen in `src/scanKind.ts` | `apps/web/lib/ticketing/crypto.ts` + `apps/web/lib/app-api/tokens.ts` |
 | `src/theme/tokens.ts` | `apps/web/app/design/vtk-base.css` (`:root`) |
-| `src/api/client.ts` | `vtk-scanner-app/src/api/client.ts` |
+| `SCANNER` en `TICKET_COLORS` in `src/theme/tokens.ts` | `apps/web/app/design/vtk-tickets.css` (`.scanner-*`) + `vtk-ticket-colors.css` |
+| `src/scanner/types.ts` | `apps/web/components/ticketing/scanner/types.ts` |
+| `src/scanner/offline.ts` | `apps/web/components/ticketing/scanner/offline.ts` (de beslislogica) |
+| `src/scanner/cardHash.ts` | `apps/web/lib/ticketing/cardHash.ts` (**letterlijk**; faalt stil) |
 
-## Expo SDK 57, gelijk met de andere twee apps
+## Expo SDK 58
 
-Bewust gelijk aan **vtk-scanner-app** en **vtk-floorplan-app**: één toolchain voor
-de drie VTK-apps, en die is al door de EAS-bouwproblemen heen (de `react-dom`-pin,
-het wegvallen van `@react-native-cookies/cookies`, `platforms: ["ios","android"]`
-voor `eas update`). Upgraden is prima, maar doe het dan voor alle drie tegelijk en
-als een eigen taak, niet en passant.
+Tot september 2026 bewust gelijk aan **vtk-scanner-app** en **vtk-floorplan-app**:
+één toolchain voor de drie VTK-apps, en die is al door de EAS-bouwproblemen heen
+(de `react-dom`-pin, het wegvallen van `@react-native-cookies/cookies`,
+`platforms: ["ios","android"]` voor `eas update`). In november 2026 ging deze app
+naar SDK 58, omdat Expo Go in de stores enkel nog SDK 58 opent, en kwam de
+scanner hierin. Enkel vtk-floorplan-app staat nog los; trek die mee wanneer daar
+iets aan gebeurt. Upgraden blijft een eigen taak, niet en passant.
 
 **Die keuze is niet vrijblijvend.** Expo Go in de App Store draait enkel de
 nieuwste SDK, en zonder Apple Developer-account is Expo Go de enige weg naar een
@@ -238,3 +265,20 @@ Wat er bij de sprong van 54 naar 57 uit de weg moest, voor de volgende keer:
 - `eslint-config-expo` zet de React Compiler-regels aan. Zie `eslint.config.js`
   voor welke aan staan en waarom `immutability` uit moet zolang we Reanimated
   gebruiken.
+
+En bij de sprong van 57 naar 58 (React Native 0.88, React 19.3):
+
+- **`expo-calendar` en `expo-media-library` gooien een fout bij de oude
+  functies** wanneer je ze uit het hoofdpakket haalt (`getCalendarsAsync`,
+  `saveToLibraryAsync`, ...): die staan nu onder `expo-calendar/legacy` en
+  `expo-media-library/legacy`. De typecheck ziet het niet, want de stubs hebben
+  dezelfde types; `import/namespace` in eslint wel. Een import uit het hoofdpakket
+  geeft dus pas op het toestel een fout, op de knop "In agenda" of "Bewaren".
+- `ListEmptyComponent` van een `FlatList` aanvaardt geen `null` meer; geef
+  `undefined`.
+- `npx expo install --fix` liep vast op een peer-conflict rond het optionele
+  `@expo/ui`. De verwachte versies met de hand in `package.json` zetten en de
+  lockfile opnieuw oplossen (`rm -rf node_modules package-lock.json && npm install`)
+  werkte wel.
+- `react-native-gesture-handler` ging naar 3 en `react-native-webview` naar 14; de
+  app gebruikt de eerste niet rechtstreeks en de tweede enkel in `WebFlow`.

@@ -1,5 +1,6 @@
 "use client";
 
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
@@ -36,7 +37,8 @@ export function FormStatusSelect({
   function change(next: string) {
     if (next === status) return;
     startTransition(async () => {
-      const state = await setFormStatusAction(formId, next, locale);
+      const state = await unsentGuard.run(() => setFormStatusAction(formId, next, locale));
+      if (state === UNSENT) return;
       if (state.status === "error") {
         showToast({
           message:

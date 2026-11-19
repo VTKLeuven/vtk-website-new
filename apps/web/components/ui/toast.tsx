@@ -1,7 +1,8 @@
 'use client';
 
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
+import { UNSENT_TOAST_EVENT } from './unsentGuard';
 import './toast.css';
 
 export type ToastVariant = 'success' | 'error' | 'warning' | 'info';
@@ -58,6 +59,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     },
     [dismiss],
   );
+
+  // Een opslag die de server nooit bereikte (`unsentGuard`), als rode toast
+  // die blijft staan. Annuleren zegt aan de afzender dat het getoond is.
+  useEffect(() => {
+    const onUnsent = (event: Event) => {
+      const message = (event as CustomEvent<{ message?: string }>).detail?.message;
+      if (!message) return;
+      event.preventDefault();
+      showToast({ message, variant: 'error', duration: 0 });
+    };
+    window.addEventListener(UNSENT_TOAST_EVENT, onUnsent);
+    return () => window.removeEventListener(UNSENT_TOAST_EVENT, onUnsent);
+  }, [showToast]);
 
   return (
     <ToastContext.Provider value={showToast}>

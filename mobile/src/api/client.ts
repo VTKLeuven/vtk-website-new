@@ -28,8 +28,8 @@ import { APP_ERROR, type AppErrorBody } from './contract';
  * Loopt het ooit tóch mis, dan zet `EXPO_PUBLIC_USE_RN_FETCH=1` de oude `fetch`
  * terug.
  *
- * Zelfde bestand als in vtk-scanner-app, op de app-API-paden na. Bewust een
- * kopie: twee losse repo's delen hier geen pakket voor.
+ * De scanner aan de deur (`src/api/scanner.ts`) gebruikt deze laag ook; dit
+ * bestand begon als kopie van die van de vroegere vtk-scanner-app.
  */
 
 const BASE_URL_KEY = 'base-url';
@@ -77,6 +77,21 @@ export function baseUrl(): string {
 
 export function defaultBaseUrl(): string {
   return DEFAULT_BASE_URL;
+}
+
+/**
+ * Een beeld-URL uit de API, altijd als volledig adres.
+ *
+ * De server hoort die al absoluut te maken (`absoluteUrl` in
+ * `lib/app-api/media.ts`), maar niet elk veld deed dat: de poster van een
+ * aftermovie kwam binnen als `/api/video-thumbnail?id=...`, en daar kan
+ * `expo-image` niets mee, dus het vlak bleef leeg zonder foutmelding. Een
+ * relatief pad hoort bij de site waar de app mee praat.
+ */
+export function mediaUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  return `${baseUrl()}${value.startsWith('/') ? value : `/${value}`}`;
 }
 
 /**

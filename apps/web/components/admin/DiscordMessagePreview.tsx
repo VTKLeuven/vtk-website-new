@@ -13,7 +13,22 @@ import type { DiscordMessage } from "@/lib/discord/eventMessage";
  * Discord toont tijdstempels (`<t:...>`) in de taal en tijdzone van wie leest;
  * hier is dat Nederlands in Brusselse tijd, gerekend vanaf `now`.
  */
-export function DiscordMessagePreview({ message, now }: { message: DiscordMessage; now: Date }) {
+type PreviewButton = { label: string; url?: string; style?: number; disabled?: boolean; emoji?: { name: string } };
+
+type PreviewMessage = Omit<DiscordMessage, "components"> & {
+  components?: { components: PreviewButton[] }[];
+};
+
+export function DiscordMessagePreview({
+  message,
+  now,
+  ephemeral = false,
+}: {
+  message: PreviewMessage;
+  now: Date;
+  /** Een antwoord dat enkel de klikker ziet. */
+  ephemeral?: boolean;
+}) {
   const embed = message.embeds?.[0];
   const buttons = message.components?.flatMap((row) => row.components) ?? [];
   const sentAt = new Intl.DateTimeFormat("nl-BE", {
@@ -41,6 +56,7 @@ export function DiscordMessagePreview({ message, now }: { message: DiscordMessag
 
           {embed ? (
             <div className="mt-1.5 grid max-w-[520px] gap-2 rounded-[4px] border-l-4 border-[var(--yellow)] bg-[var(--paper)] py-3 pl-3 pr-4">
+              {embed.author ? <p className="text-xs font-semibold">{embed.author.name}</p> : null}
               {embed.title ? (
                 <p className="font-semibold">
                   {embed.url ? (
@@ -84,7 +100,8 @@ export function DiscordMessagePreview({ message, now }: { message: DiscordMessag
 
           {buttons.length ? (
             <div className="mt-2 flex flex-wrap gap-2">
-              {buttons.map((button) => (
+              {buttons.map((button) =>
+                button.url ? (
                 <a
                   key={button.label}
                   href={button.url}
@@ -100,9 +117,19 @@ export function DiscordMessagePreview({ message, now }: { message: DiscordMessag
                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                   </svg>
                 </a>
-              ))}
+                ) : (
+                  <span
+                    key={button.label}
+                    className={`inline-flex h-8 items-center rounded-[4px] px-4 text-sm font-medium ${button.style === 1 ? "bg-[var(--discord-blurple)] text-[var(--surface)]" : "bg-[var(--paper-2)] text-[var(--ink)]"} ${button.disabled ? "opacity-50" : ""}`}
+                  >
+                    {button.label}
+                  </span>
+                ),
+              )}
             </div>
           ) : null}
+
+          {ephemeral ? <p className="mt-1.5 text-xs text-[var(--muted)]">Alleen jij kunt dit zien</p> : null}
         </div>
       </div>
     </div>

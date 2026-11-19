@@ -9,3 +9,11 @@
  * komt in een server component niet als string binnen.
  */
 export const ADMIN_NAV_COLLAPSED_COOKIE = "vtk-admin-nav-collapsed";
+
+/**
+ * Cookie met de compacte stand van de admin (de knop naast de inklapknop).
+ * Om dezelfde reden een cookie: de layout zet `data-density` al op de server,
+ * dus een compacte pagina komt compact binnen. En ook per browser: compact is
+ * voor een laptop, op een groot scherm hoeft het niet aan.
+ */
+export const ADMIN_DENSITY_COOKIE = "vtk-admin-density";

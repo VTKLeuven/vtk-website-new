@@ -140,6 +140,11 @@ Expliciet, zodat het niet later alsnog binnensluipt:
   > installeren. `vtk-scanner-app` blijft wat ze is (offline manifest,
   > schrijfwachtrij, donker scherm, aan een deur in een kelder); wat hier
   > bijkwam is de lichte versie voor één avond met het netwerk dat er is.
+  >
+  > **Bijgesteld in november 2026.** Die lichte versie is vervangen door de
+  > volledige scanner, en vtk-scanner-app is opgegaan in deze app. Eén app is
+  > makkelijker uit te leggen aan wie komt helpen, en de scanknop staat er enkel
+  > voor wie iets te scannen heeft. Zie `docs/scanner.md`.
 - **geen offline-wachtrij.** De scanner heeft SQLite en een flush-lus omdat een
   deur in een kelder staat. Hier volstaat een leescache op schijf: laatst
   opgehaalde inhoud tonen met een "niet vernieuwd"-melding. Iets bestellen of
@@ -571,14 +576,70 @@ via `/push/maintenance` (claim gezet, tweede beurt doet niets).
 | 2026-08-25 | `Samen blokken` | Studietijd meten, blokgroepen met een code, de skyline. |
 | 2026-08-25 | `App: elke tab een eigen stack, zodat terugvegen werkt` | Schermen naar `src/screens/`, routes gemaakt uit `TAB_ROUTES`, `useTabRouter`, `routes:check`, oude adressen in `app/(oud)`. |
 | 2026-08-25 | `App: elke tab draagt nu alles wat je er kan openen` | Studeren opgenomen in dezelfde stackopsplitsing (zesde tab, `studiegroep/*`); `routes:check` loopt sindsdien elke tab af en eist dat wat een scherm opent ook in diezelfde tab bestaat. |
+| 2026-11-18 | `feat(app): de scanner aan de deur zit in de app` | De volledige scanner van vtk-scanner-app (offline, wachtrij, namen, kaartlezer, scannerspaneel) als volledig scherm, Aan de deur als keuzescherm, `scanTickets` volgt echte scanrechten. Drie native modules erbij, dus een nieuwe APK. |
 
 **Drie afwijkingen van het oorspronkelijke plan.**
 
 - **A7 zei "geen scanner".** De app scant nu wel. De reden staat bij A7 zelf: een
-  shifter die één avond komt bijspringen, installeert geen tweede app.
-  `vtk-scanner-app` blijft bestaan en blijft de zware versie.
+  shifter die één avond komt bijspringen, installeert geen tweede app. In
+  november 2026 ging dat een stap verder: de volledige scanner van
+  vtk-scanner-app (offline manifest, wachtrij, namenlijst, kaartlezer,
+  scannerspaneel) zit nu in de app, enkel zichtbaar voor wie iets te scannen
+  heeft, en die repo staat als archief. Zie `docs/scanner.md`.
 - **De aftermovies en de partners blijven op de site** en komen niet elders in de
   app terug. Ze zijn er om een voorpagina te vullen, en dat doet Home niet meer.
 - **De fakbar-QR verloopt niet.** Dat is met opzet: hij hangt maanden aan een
   muur. Wat hem buiten de bar waardeloos maakt, staat in
   `docs/design-decisions.md` en zit niet in het token.
+
+### Fase 7 - Bijgehaald met de site (20 september tot 18 november 2026)
+
+De site liep twee maanden voor op de app. Wat de app raakte, is bijgewerkt:
+
+- **Kalender**: evenementen met losse momenten (een loopweek) staan op hun
+  eerstvolgende moment, met "Nog 4 keer, telkens 18:00" onder de titel, een stip
+  op elke dag in het maandrooster en de dagen op de eventpagina. "In agenda" zet
+  de eerstvolgende keer in je agenda, niet de hele reeks. Home toont een reeks
+  die al loopt.
+- **Shiften**: per week een kop zoals op /shift. Een student ziet de plaats van
+  een vervangbaar praesidiumlid als vrij; een praesidiumlid kan aanduiden dat een
+  student zijn plaats mag innemen.
+- **Broodjes**: een reservatie aanpassen, na de deadline vrijgeven in plaats van
+  annuleren, en vrijgekomen broodjes overnemen. De voorraad staat er enkel nog
+  wanneer ze laag is.
+- **Tickets**: een erelid op een event met één ticket per erelid krijgt dat te
+  horen, en de nieuwe weigeringen van de checkout hebben een zin.
+- **Peilingen**: de vragen van je RiVers beantwoorden, vanuit een taak op Home of
+  onder Meer.
+- **Openingsuren**: de cursusdienst 's avonds staat niet meer als gesloten (de
+  API las enkel het eerste venster), en elke dienst heeft een dunne tijdlijn van
+  vandaag met een gele nu-lijn, zonder statusbolletjes, zoals op de homepage.
+- **Markdown**: een enkele enter is een regeleinde, en tabellen staan in een
+  witte kaart.
+
+### Fase 8 - Het ontwerp van de site (18 november 2026)
+
+De app zag er niet uit als de site. Per scherm is een patroon van de site
+overgenomen (ontwerpbord: https://claude.ai/artifact/Nn9fxsQCeMZcZ35hQ4XwY8):
+
+- **Overal**: de paginakop met het technische patroon en de gele onderlijn van
+  5 px (`PageHead`, `PatternBand`), tabbladen als pillen in die kop, koppen met
+  de gele lijn eronder (`SectionHeading`), registers met haarlijnen in plaats van
+  een witte kaart per regel.
+- **Home** (voorstel A): de openingsuren als tijdlijn in de navy kop, "Voor jou"
+  als register, de evenementen als eventtegels op een lichtblauwe band, "Snel
+  naar" als de kaarten van "Wat we doen" met een foto.
+- **Kalender**: de eventtegel van /kalender (`EventTile`, lager dan op de site),
+  per week een kop, de thema's als chips, "Mijn lijst" als tabblad.
+- **Evenement**: zoals de eventpagina van de site: kop, affiche als plaat zonder
+  waas, de feiten als gelabelde rijen, "Over dit event".
+- **Tickets**: kaarten met de banner (nieuw veld `imageUrl` in de API), de
+  datumpin en de prijs.
+- **Broodjes**: zoals /theokot: één dag tegelijk via datumpinnen, het broodje van
+  de week uitgelicht, het aanbod als register, het totaal vast onderaan.
+- **Shiften**: de agenda van /shift: per week een kop, per dag een kaart, de
+  shiften als compacte rijen die openklappen.
+- **Meer**: je profiel als donker glas in de kop, de links als het register in de
+  marge van de site, de onderdelen als de tegels van een categoriepagina.
+- **Praesidium** bleef zoals het was: de muur van gezichten was op een telefoon
+  geen verbetering.

@@ -260,7 +260,7 @@ export async function joinMembershipAction(
   const [user, existing, config] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: session.user.id },
-      select: { firwStudent: true },
+      select: { firwStudent: true, honoraryMember: true },
     }),
     prisma.membership.findUnique({
       where: { userId_year: { userId: session.user.id, year } },
@@ -269,8 +269,9 @@ export async function joinMembershipAction(
     getMembershipConfig(),
   ]);
 
-  // Al lid: niets te doen, en zeker geen tweede rij.
-  if (existing?.activatedAt) return saveOk();
+  // Al lid: niets te doen, en zeker geen tweede rij. Een erelid is dat ook
+  // zonder rij (zie `userIsMember`).
+  if (existing?.activatedAt || user.honoraryMember) return saveOk();
 
   const offer = membershipOffer(user, existing, config);
   // Een openstaande betaling is geen nieuw aanbod maar dezelfde afspraak: stuur

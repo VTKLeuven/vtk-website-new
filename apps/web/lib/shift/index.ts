@@ -24,6 +24,10 @@ export type ShiftInput = {
   openToInternationals: boolean;
   /** Langere uitleg (Markdown) over wat de shift inhoudt; null = niets tonen. */
   instructions: string | null;
+  /** De Engelse versies; null of weggelaten = de Nederlandse tekst (lib/shift/localize.ts). */
+  nameEn?: string | null;
+  descriptionEn?: string | null;
+  instructionsEn?: string | null;
 };
 
 /**
@@ -89,6 +93,9 @@ export function parseShift(value: unknown): ShiftInput {
     post,
     openToInternationals,
     instructions,
+    nameEn,
+    descriptionEn,
+    instructionsEn,
   } = value as Record<string, unknown>;
 
   const errors: string[] = [];
@@ -135,6 +142,12 @@ export function parseShift(value: unknown): ShiftInput {
     errors.push('instructions must be a string or null');
   }
 
+  for (const [key, english] of Object.entries({ nameEn, descriptionEn, instructionsEn })) {
+    if (english !== undefined && english !== null && typeof english !== 'string') {
+      errors.push(`${key} must be a string or null`);
+    }
+  }
+
   if (errors.length > 0) {
     throw new ShiftValidationError(errors);
   }
@@ -150,6 +163,9 @@ export function parseShift(value: unknown): ShiftInput {
     post: (post as string | null | undefined) ?? null,
     openToInternationals: (openToInternationals as boolean | undefined) ?? false,
     instructions: emptyToNull(instructions as string | null | undefined),
+    nameEn: emptyToNull(nameEn as string | null | undefined),
+    descriptionEn: emptyToNull(descriptionEn as string | null | undefined),
+    instructionsEn: emptyToNull(instructionsEn as string | null | undefined),
   };
 }
 
@@ -180,6 +196,13 @@ export type ShiftResponse = Shift & {
    * (`viewerReward` in `lib/shift/lists.ts`). Nul of ontbrekend: niets ingehouden.
    */
   withheldReward?: number;
+  /** Op /register: de eigen inschrijving mag door een student overgenomen worden. */
+  replaceable?: boolean;
+  /**
+   * De kijker kan aanduiden dat een student zijn plaats mag innemen: hij zit in
+   * het praesidium van het werkingsjaar van de shift (`lib/shift/replace.ts`).
+   */
+  replaceableOption?: boolean;
 };
 
 /**
@@ -438,6 +461,16 @@ export function parsePartialShift(value: unknown): Partial<ShiftInput> {
       errors.push('instructions must be a string or null');
     } else {
       result.instructions = emptyToNull(instructions as string | null);
+    }
+  }
+
+  for (const key of ['nameEn', 'descriptionEn', 'instructionsEn'] as const) {
+    if (!(key in src)) continue;
+    const english = src[key];
+    if (english !== null && typeof english !== 'string') {
+      errors.push(`${key} must be a string or null`);
+    } else {
+      result[key] = emptyToNull(english as string | null);
     }
   }
 

@@ -1,23 +1,16 @@
 
-import { Beer, Coins, ScanLine, TicketCheck } from 'lucide-react-native';
+import { Beer, Coins, DoorOpen, ScanLine, TicketCheck } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ApiError } from '../api/client';
 import type { AppFakCheckin, AppPassHolder } from '../api/contract';
-import {
-  fakCheckin,
-  fetchScanEvents,
-  lookupPass,
-  redeemScannerInvite,
-  redeemVouchers,
-} from '../api/endpoints';
-import { messageFor, useResource } from '../api/useResource';
+import { fakCheckin, lookupPass, redeemScannerInvite, redeemVouchers } from '../api/endpoints';
 import { PageHead } from '../components/PageHead';
 import { QrScanner } from '../components/QrScanner';
 import { Stepper } from '../components/Stepper';
-import { Button, Card, ErrorState, Loading } from '../components/ui';
-import { formatDayShort, formatEuro, formatVouchers } from '../format';
+import { Button, Card, Loading } from '../components/ui';
+import { formatEuro, formatVouchers } from '../format';
 import { scanKindOf, UNKNOWN_SCAN_MESSAGE } from '../scanKind';
 import { useApp } from '../state/app';
 import { useTabRouter } from '../navigation';
@@ -26,6 +19,7 @@ import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
 type ScanResult =
   | { kind: 'busy' }
   | { kind: 'error'; message: string }
+  | { kind: 'ticket' }
   | { kind: 'invite'; title: string; eventId: string; already: boolean }
   | { kind: 'fakbar'; text: string; detail: string }
   | { kind: 'pass'; pass: string; holder: AppPassHolder };
@@ -40,8 +34,13 @@ type ScanResult =
  *   niets hoeft te installeren en niemand hem met de hand moet toevoegen.
  * - **de code aan de fakbar**: check-in zonder studentenkaart.
  * - **de pas van een student**: bonnetjes aanvaarden als betaling.
- * - **een ticket**: dat kan enkel binnen een evenement, want een ticket is altijd
- *   voor iets. Kies eerst het evenement hieronder.
+ * - **een ticket**: dat scan je niet hier maar aan de deur (`deur.tsx`), want een
+ *   ticket is altijd voor één evenement, en de scanner daar heeft de offline
+ *   lijst, de wachtrij en de namen. Dit scherm verwijst ernaar.
+ *
+ * Dit scherm staat voor iedereen open (onder Meer), want de fakbar-QR en de
+ * uitnodiging scant een gewone student. De deurscanner niet: die bestaat enkel
+ * voor wie iets te scannen heeft (`abilities.scanTickets`).
  *
  * De uitkomst blijft staan tot je ze wegtikt, en de camera pauzeert zolang. Aan
  * een deur wil je zien wat er gebeurde voor de volgende persoon voorstapt; een
@@ -49,27 +48,18 @@ type ScanResult =
  */
 export default function ScannenScreen() {
   const router = useTabRouter();
-  const { locale, viewer, bootstrap } = useApp();
+  const { viewer, bootstrap, refresh } = useApp();
   const [result, setResult] = useState<ScanResult | null>(null);
 
-  const events = useResource(
-    'scan-events',
-    () => (viewer ? fetchScanEvents(locale) : Promise.resolve([])),
-    `${locale}:${viewer?.id ?? 'anon'}`,
-  );
-
   const mayAcceptVouchers = bootstrap?.abilities?.acceptVouchers ?? false;
+  const mayScanTickets = bootstrap?.abilities?.scanTickets ?? false;
 
   const handle = useCallback(
     (value: string) => {
       const kind = scanKindOf(value);
 
       if (kind === 'ticket') {
-        setResult({
-          kind: 'error',
-          message:
-            'Dit is een ticket. Kies eerst hieronder het evenement waarvoor je scant, dan telt de scan ook mee.',
-        });
+        setResult({ kind: 'ticket' });
         return;
       }
       if (kind === 'unknown') {
@@ -88,7 +78,9 @@ export default function ScannenScreen() {
               eventId: invite.eventId,
               already: invite.alreadyHadAccess,
             });
-            void events.refresh();
+            // De rechten opnieuw ophalen: wie net scanner werd, hoort vanaf nu
+            // Aan de deur te zien in Tickets en onder Meer.
+            void refresh();
           })
           .catch((error) => setResult({ kind: 'error', message: scanError(error) }));
         return;
@@ -119,7 +111,7 @@ export default function ScannenScreen() {
         .then((holder) => setResult({ kind: 'pass', pass: value, holder }))
         .catch((error) => setResult({ kind: 'error', message: scanError(error) }));
     },
-    [events, mayAcceptVouchers],
+    [mayAcceptVouchers, refresh],
   );
 
   if (!viewer) {
@@ -142,7 +134,7 @@ export default function ScannenScreen() {
 
   return (
     <>
-      <PageHead title="Scannen" subtitle="Ticket, uitnodiging, fakbar of een pas" />
+      <PageHead title="Scannen" subtitle="Uitnodiging, fakbar of een pas" />
       <ScrollView contentContainerStyle={styles.content} style={styles.root}>
         <QrScanner
           onScan={handle}
@@ -158,40 +150,20 @@ export default function ScannenScreen() {
               setResult(null);
               router.push(`/scan/${id}`);
             }}
+            onOpenDoor={() => {
+              setResult(null);
+              router.push('/deur');
+            }}
+            mayScanTickets={mayScanTickets}
             onRedeemed={() => setResult(null)}
           />
         ) : null}
 
-        <Text style={styles.sectionTitle}>Tickets scannen</Text>
-        {events.loading ? (
-          <Loading label="Evenementen ophalen" />
-        ) : !events.data ? (
-          <ErrorState message={messageFor(events.error)} onRetry={() => void events.refresh()} />
-        ) : events.data.length === 0 ? (
-          <Card>
-            <Text style={styles.body}>
-              Je hebt voor geen enkel evenement scanrechten. Vraag aan wie het evenement
-              organiseert om je de uitnodigings-QR te tonen; die staat in het beheer onder
-              Toegang. Scan hem hierboven en je kan meteen aan de deur.
-            </Text>
-          </Card>
-        ) : (
-          <View style={styles.list}>
-            {events.data.map((event) => (
-              <Card key={event.id} style={styles.eventCard}>
-                <View style={styles.eventText}>
-                  <Text style={styles.kicker}>{formatDayShort(event.startsAt, locale)}</Text>
-                  <Text style={styles.title}>{event.title}</Text>
-                  {event.location ? <Text style={styles.hint}>{event.location}</Text> : null}
-                  <Text style={styles.hint}>
-                    {event.checkedIn} van {event.total} binnen
-                  </Text>
-                </View>
-                <Button label="Scannen" onPress={() => router.push(`/scan/${event.id}`)} />
-              </Card>
-            ))}
-          </View>
-        )}
+        {/* Enkel voor wie iets te scannen heeft. Een gewone student krijgt
+            deze knop pas na een uitnodiging, en dan ook meteen het event. */}
+        {mayScanTickets && !result ? (
+          <Button label="Tickets scannen aan de deur" variant="ghost" onPress={() => router.push('/deur')} />
+        ) : null}
       </ScrollView>
     </>
   );
@@ -202,14 +174,38 @@ function Result({
   result,
   onClose,
   onOpenEvent,
+  onOpenDoor,
+  mayScanTickets,
   onRedeemed,
 }: {
   result: ScanResult;
   onClose: () => void;
   onOpenEvent: (eventId: string) => void;
+  onOpenDoor: () => void;
+  mayScanTickets: boolean;
   onRedeemed: () => void;
 }) {
   if (result.kind === 'busy') return <Loading label="Bezig" />;
+
+  // Een ticket telt pas wanneer het aan de deur van zijn evenement gescand wordt;
+  // hier zou het nergens meetellen.
+  if (result.kind === 'ticket') {
+    return (
+      <Card style={styles.resultCard}>
+        <View style={styles.resultHead}>
+          <DoorOpen color={COLORS.muted} size={18} />
+          <Text style={styles.title}>Dit is een ticket</Text>
+        </View>
+        <Text style={styles.body}>
+          {mayScanTickets
+            ? 'Tickets scan je aan de deur: kies daar het evenement, dan telt de scan ook mee.'
+            : 'Tickets scant wie aan de deur staat. Kom je helpen? Vraag de organisator om de uitnodigings-QR en scan die hier.'}
+        </Text>
+        {mayScanTickets ? <Button label="Naar Aan de deur" onPress={onOpenDoor} /> : null}
+        <Button label="Opnieuw scannen" variant="ghost" onPress={onClose} />
+      </Card>
+    );
+  }
 
   if (result.kind === 'error') {
     return (
@@ -424,8 +420,6 @@ function scanError(error: unknown): string {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.paper },
   content: { padding: SPACING.lg, gap: SPACING.lg, paddingBottom: SPACING.xxl },
-  list: { gap: SPACING.md },
-  sectionTitle: { ...TYPE.sectionTitle, color: COLORS.ink },
   title: { ...TYPE.cardTitle, color: COLORS.ink },
   body: { ...TYPE.body, color: COLORS.body },
   hint: { ...TYPE.small, color: COLORS.muted },
@@ -433,9 +427,6 @@ const styles = StyleSheet.create({
 
   resultCard: { gap: SPACING.md },
   resultHead: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-
-  eventCard: { gap: SPACING.md },
-  eventText: { gap: 2 },
 
   balance: {
     flexDirection: 'row',
