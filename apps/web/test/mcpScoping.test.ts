@@ -81,9 +81,17 @@ describe("MCP scoping voor shiften en kalender", () => {
     await createMcpRecord(editor, { kind: "shift", data: { ...shiftData, post: "FEEST" } });
     expect(mocks.shiftCreate).toHaveBeenCalledTimes(1);
 
+    await createMcpRecord(editor, { kind: "shift", data: { ...shiftData, post: "feest" } });
+    await createMcpRecord(editor, { kind: "shift", data: { ...shiftData, post: "FeEsT" } });
+    expect(mocks.shiftCreate).toHaveBeenCalledTimes(3);
+
+    await expect(
+      createMcpRecord(editor, { kind: "shift", data: { ...shiftData, post: "cultuur" } }),
+    ).rejects.toThrow(/Geen toegang tot groep cultuur/);
+
     const editAll = makePrincipal({ permissions: ["shift.editAll"] });
     await createMcpRecord(editAll, { kind: "shift", data: shiftData });
-    expect(mocks.shiftCreate).toHaveBeenCalledTimes(2);
+    expect(mocks.shiftCreate).toHaveBeenCalledTimes(4);
   });
 
   it("filtert shifts op groupCodes tenzij shift.editAll, shift.reward of allGroups geldt", async () => {
@@ -91,7 +99,7 @@ describe("MCP scoping voor shiften en kalender", () => {
     await adminRead(editor, { resource: "shifts" });
     expect(mocks.shiftFindMany).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ post: { in: ["FEEST"] } }),
+        where: expect.objectContaining({ post: { in: ["FEEST"], mode: "insensitive" } }),
       }),
     );
 

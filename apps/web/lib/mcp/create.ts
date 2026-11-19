@@ -499,7 +499,9 @@ export async function createMcpRecord(principal: McpPrincipal, raw: McpCreateInp
         const post = input.post?.trim();
         if (!canEditAllShifts) {
           if (!post) throw new McpInputError("GROUP_REQUIRED", "post is verplicht zonder shift.editAll.");
-          if (!canUseMcpGroup(principal, post)) throw new McpInputError("FORBIDDEN", `Geen toegang tot groep ${post}.`);
+          const normalizedPost = post.toLowerCase();
+          const hasPostAccess = [...principal.groupCodes].some((code) => code.toLowerCase() === normalizedPost);
+          if (!hasPostAccess) throw new McpInputError("FORBIDDEN", `Geen toegang tot groep ${post}.`);
         }
         // `parseShift` verzamelt de invoerfouten in een eigen error; zonder deze
         // vertaling belandt een te vroege eindtijd als INTERNAL_ERROR in Sentry

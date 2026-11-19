@@ -57,15 +57,17 @@ function warn(line: string) {
   console.log(`  ! ${line}`);
 }
 
-async function syncPermissions() {
+async function syncPermissions(): Promise<Set<string>> {
   console.log("Permissions (registry -> DB)...");
   const existing = await prisma.permission.findMany();
   const byCode = new Map(existing.map((p) => [p.code, p]));
+  const createdCodes = new Set<string>();
 
   for (const p of PERMISSIONS) {
     const current = byCode.get(p.code);
     if (!current) {
       note(`+ permissie "${p.code}" (${p.category})`);
+      createdCodes.add(p.code);
       if (!dryRun) {
         await prisma.permission.create({
           data: { code: p.code, labelNl: p.labelNl, labelEn: p.labelEn, category: p.category },
@@ -102,6 +104,8 @@ async function syncPermissions() {
       );
     }
   }
+
+  return createdCodes;
 }
 
 /**
@@ -139,10 +143,12 @@ async function syncAdminRolePermissions() {
 }
 
 /**
- * Zorgt dat de bestaande `praesidium`-rol op productie en dev `mcp.use` krijgt,
- * ook wanneer de create-only seed al lang geleden gedraaid is.
+ * Zorgt dat de bestaande `praesidium`-rol op productie en dev `mcp.use` krijgt
+ * wanneer `mcp.use` in deze run nieuw werd aangemaakt (create-only, zodat
+ * handmatig intrekken via `/admin/roles` behouden blijft).
  */
-async function syncPraesidiumMcpPermission() {
+async function syncPraesidiumMcpPermission(createdCodes: Set<string>) {
+  if (!createdCodes.has("mcp.use")) return;
   console.log("Praesidium-rol (mcp.use)...");
   const praesidiumRole = await prisma.role.findUnique({
     where: { code: "praesidium" },
@@ -218,16 +224,18 @@ async function syncMcpOauthResource() {
     return;
   }
 
+  if (existing.disabled) return;
+
   const missingScopes = MCP_RESOURCE_ALLOWED_SCOPES.filter(
     (scope) => !existing.allowedScopes.includes(scope),
   );
-  if (missingScopes.length > 0 || existing.disabled) {
+  if (missingScopes.length > 0) {
     const mergedScopes = [...new Set([...existing.allowedScopes, ...MCP_RESOURCE_ALLOWED_SCOPES])];
-    note(`~ oauthResource "${identifier}" bijgewerkt`);
+    note(`~ oauthResource "${identifier}" scopes aangevuld`);
     if (!dryRun) {
       await prisma.oauthResource.update({
         where: { id: existing.id },
-        data: { allowedScopes: mergedScopes, disabled: false, updatedAt: new Date() },
+        data: { allowedScopes: mergedScopes, updatedAt: new Date() },
       });
     }
   }
@@ -379,9 +387,9 @@ async function main() {
 
   await markProduction();
 
-  await syncPermissions();
+  const createdPermissionCodes = await syncPermissions();
   await syncAdminRolePermissions();
-  await syncPraesidiumMcpPermission();
+  await syncPraesidiumMcpPermission(createdPermissionCodes);
   await syncMcpOauthResource();
   await syncBuildings();
   await reportGuiManagedDrift();

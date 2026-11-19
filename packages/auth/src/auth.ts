@@ -90,6 +90,14 @@ function assertAllowedDcrRedirectUris(redirectUris: unknown): void {
       });
     }
     const host = parsed.hostname.toLowerCase();
+    if (parsed.protocol === 'cursor:') {
+      if (host === 'anysphere.cursor-mcp' && parsed.pathname === '/oauth/callback') {
+        continue;
+      }
+      throw new APIError('BAD_REQUEST', {
+        message: `Redirect URI "${raw}" is not allowed for dynamic client registration.`,
+      });
+    }
     if (!allowedHosts.has(host)) {
       throw new APIError('BAD_REQUEST', {
         message: `Redirect URI host "${host}" is not allowed for dynamic client registration.`,

@@ -466,7 +466,7 @@ export async function adminRead(principal: McpPrincipal, raw: McpAdminReadInput)
       const items = await prisma.shift.findMany({
         where: {
           ...idWhere(input.id),
-          ...(canReadAllShifts ? {} : { post: { in: [...principal.groupCodes] } }),
+          ...(canReadAllShifts ? {} : { post: { in: [...principal.groupCodes], mode: "insensitive" } }),
           ...(contains ? { OR: [{ name: contains }, { location: contains }, { description: contains }, { post: contains }] } : {}),
         },
         take, skip, orderBy: { startTime: "desc" },

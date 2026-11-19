@@ -15,7 +15,24 @@ vi.mock("@vtk/db", () => ({
 }));
 
 vi.mock("better-auth/adapters/prisma", () => ({
-  prismaAdapter: vi.fn(() => () => ({})),
+  prismaAdapter: vi.fn(() => () => ({
+    id: "prisma-mock",
+    findOne: vi.fn().mockImplementation(async ({ model }: { model: string }) => {
+      if (model === "oauthResource") {
+        return {
+          id: "res-1",
+          identifier: "https://vtk.be/api/mcp",
+          name: "VTK MCP Server",
+          allowedScopes: ["mcp:read", "mcp:create", "offline_access"],
+          disabled: false,
+        };
+      }
+      return null;
+    }),
+    findMany: vi.fn().mockResolvedValue([]),
+    create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: "mock-id", ...data })),
+    update: vi.fn(async ({ update }: { update: Record<string, unknown> }) => update),
+  })),
 }));
 
 import { MCP_REGISTRATION_SCOPES, SCOPES } from "@vtk/auth";
@@ -285,5 +302,23 @@ describe("MCP OAuth toegangspoort en tokenvalidatie", () => {
       token_endpoint_auth_method: "client_secret_basic",
     });
     expect(confidential.status).toBe(400);
+
+    const evilCursor = await register({
+      client_name: "Evil Cursor",
+      redirect_uris: ["cursor://evil.example/oauth/callback"],
+    });
+    expect(evilCursor.status).toBe(400);
+
+    const evilCursorPath = await register({
+      client_name: "Evil Cursor Path",
+      redirect_uris: ["cursor://anysphere.cursor-mcp/other/callback"],
+    });
+    expect(evilCursorPath.status).toBe(400);
+
+    const validCursor = await register({
+      client_name: "Cursor",
+      redirect_uris: ["cursor://anysphere.cursor-mcp/oauth/callback"],
+    });
+    expect(validCursor.status).toBeLessThan(400);
   });
 });
