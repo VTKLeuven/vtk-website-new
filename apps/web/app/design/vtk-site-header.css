@@ -175,10 +175,8 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-width: 24px;
-  min-height: 24px;
-  padding-inline: 3px;
-  margin-inline: -3px;
+  min-width: 27px;
+  min-height: 28px;
   border-radius: 5px;
 }
 
@@ -189,7 +187,7 @@
 .vtk-site-header .nav-links a:focus-visible::after {
   content: '';
   position: absolute;
-  inset: 1px -2px;
+  inset: 3px -5px;
   border: 2px solid var(--paper);
   border-radius: 8px;
   pointer-events: none;
@@ -199,10 +197,10 @@
   position: relative;
   display: inline-grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
-  min-width: 24px;
-  min-height: 24px;
+  width: 27px;
+  height: 28px;
+  min-width: 27px;
+  min-height: 28px;
   padding: 0;
   border: 0;
   border-radius: 7px;
@@ -212,7 +210,7 @@
 }
 
 .vtk-site-header .nav-submenu-toggle:focus-visible {
-  outline-offset: -2px;
+  outline-offset: -3px;
 }
 
 .vtk-site-header .nav-submenu-toggle:hover,
@@ -468,8 +466,8 @@
 .vtk-site-header .lang-toggle button {
   display: inline-grid;
   place-items: center;
-  min-width: 24px;
-  min-height: 24px;
+  min-width: 27px;
+  min-height: 28px;
   padding: 2px;
   border-radius: 7px;
   color: inherit;
@@ -481,7 +479,7 @@
 }
 
 .vtk-site-header .lang-toggle button:focus-visible {
-  outline-offset: 0;
+  outline-offset: -2px;
 }
 
 .vtk-site-header .lang-toggle button[aria-pressed='true'] {
