@@ -1,0 +1,242 @@
+/*
+ * Het uitdeelscherm van een bureau of GM (components/meetings/MeetingHandoutScreen.tsx).
+ * Staat via een portal rechtstreeks in <body>, dus buiten de admin-css: alles
+ * wat het nodig heeft, staat hier.
+ *
+ * Bijna het hele scherm is voor de tegels. In de fit-stand (`data-fit` op het
+ * raster, gezet door `fitGrid`) heeft het raster vaste kolommen en rijen die
+ * samen de ruimte vullen, en schaalt alles in een tegel in `em` mee met
+ * `--mh-font`. Zonder fit-stand (te klein scherm voor zoveel mensen) is het
+ * een gewoon raster dat scrolt.
+ *
+ * Geen 100vh: onder de zoom van 90% op een laptop reikt dat niet tot de rand.
+ * `inset: 0` op een fixed element wel.
+ */
+
+.mh-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-variant-numeric: tabular-nums;
+}
+
+.mh-screen *,
+.mh-screen *::before,
+.mh-screen *::after {
+  box-sizing: border-box;
+}
+
+/* Kop: één dunne navy regel met de gele streep, zoals elke paginakop. */
+.mh-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px clamp(12px, 1.5vw, 20px);
+  background: var(--navy);
+  border-bottom: 3px solid var(--yellow);
+  color: var(--paper);
+}
+
+.mh-title {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.mh-kicker {
+  flex: none;
+  color: var(--on-dark-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mh-date {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mh-date::first-letter {
+  text-transform: uppercase;
+}
+
+.mh-close {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--on-dark-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.mh-close:hover {
+  color: var(--paper);
+}
+
+.mh-close:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 2px;
+}
+
+/* Inhoud */
+.mh-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: clamp(6px, 0.8vw, 12px);
+}
+
+.mh-empty {
+  padding: 48px 0;
+  color: var(--muted);
+  font-size: 18px;
+  text-align: center;
+}
+
+.mh-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  font-size: 18px;
+  list-style: none;
+}
+
+.mh-grid[data-fit] {
+  height: 100%;
+  grid-template-columns: repeat(var(--mh-cols), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--mh-rows), minmax(0, 1fr));
+  font-size: var(--mh-font);
+}
+
+.mh-tile {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.1em;
+  padding: 0.45em 0.6em;
+  border: 1px solid var(--line);
+  border-radius: clamp(8px, 0.6em, 16px);
+  background: var(--surface);
+}
+
+.mh-grid[data-fit] .mh-tile {
+  overflow: hidden;
+}
+
+/* In de fit-stand breekt een woord nooit midden in ("Mozarell / a"): een te
+   lang woord loopt dan uit de tegel, en `fitGrid` kiest een kleinere letter. */
+.mh-grid[data-fit] :is(.mh-name, .mh-item) {
+  overflow-wrap: normal;
+}
+
+.mh-tile[data-state="invalid"] {
+  border-color: var(--danger-line);
+  background: var(--danger-bg);
+}
+
+.mh-tile[data-state="invalid"] .mh-item {
+  color: var(--danger-ink);
+  text-decoration: line-through;
+}
+
+.mh-name {
+  color: var(--muted);
+  font-size: 0.68em;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: break-word;
+}
+
+.mh-item {
+  color: var(--ink);
+  font-size: 1em;
+  font-weight: 700;
+  line-height: 1.12;
+  overflow-wrap: break-word;
+}
+
+.mh-qty {
+  color: var(--body);
+}
+
+.mh-drink {
+  color: var(--body);
+  font-size: 0.72em;
+  line-height: 1.2;
+}
+
+.mh-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.6em;
+}
+
+.mh-tag {
+  color: var(--muted);
+  font-size: 0.55em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.mh-tag--danger {
+  color: var(--danger-ink);
+}
+
+.mh-comment {
+  color: var(--muted);
+  font-size: 0.6em;
+  font-style: italic;
+  line-height: 1.25;
+}
+
+/* Wie zonder bestelling komt: één regel onderaan, buiten het raster. */
+.mh-foot {
+  flex: none;
+  padding: 6px clamp(12px, 1.5vw, 20px);
+  border-top: 1px solid var(--line);
+  background: var(--paper-2);
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.mh-foot strong {
+  color: var(--ink);
+}
+
+@media (max-width: 640px) {
+  .mh-close span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+}

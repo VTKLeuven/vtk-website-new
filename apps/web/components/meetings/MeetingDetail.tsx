@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
+import dynamic from "next/dynamic";
 import { ArrowLeft } from "lucide-react";
 import Link from "@/components/ui/Link";
 import type { MeetingKind } from "@prisma/client";
@@ -9,9 +10,10 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { BureauLinkButton } from "./BureauLinkButton";
 import { IconButton } from "@/components/ui/IconButton";
-import { CheckIcon } from "@/components/ui/icons";
+import { CheckIcon, MaximizeIcon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
 import { formatEuro } from "@/lib/theokot";
+import { handoutCounts, personEntries, type CountRow } from "./meetingPeople";
 import {
   deleteMeetingAction,
   saveMeetingAction,
@@ -19,6 +21,10 @@ import {
   toggleGrocomeetOrderPaidAction,
   toggleReservationPaidAction,
 } from "@/app/actions/meetings";
+
+// Het uitdeelscherm opent pas na een klik; zijn code en css hoeven niet mee met
+// elke vergaderpagina.
+const MeetingHandoutScreen = dynamic(() => import("./MeetingHandoutScreen"), { ssr: false });
 
 export type MeetingOptionView = { id: string; nameNl: string; nameEn: string; priceEuro: string };
 
@@ -118,6 +124,8 @@ export function MeetingDetail({
   const [useTheokot, setUseTheokot] = useState(meeting.useTheokot);
   const [bigBureau, setBigBureau] = useState(meeting.bigBureau);
   const [personView, setPersonView] = useState<"columns" | "table">("columns");
+  const [handoutOpen, setHandoutOpen] = useState(false);
+  const closeHandout = useCallback(() => setHandoutOpen(false), []);
   const invalidCount = meeting.reservations.filter((row) => row.invalid).length;
   const externalCount = meeting.externalItems.reduce((total, row) => total + row.count, 0);
   const handout = handoutCounts(meeting);
@@ -233,27 +241,45 @@ export function MeetingDetail({
                   : "With the amounts, in order of registration."}
             </p>
           </div>
-          <div className="ticket-admin-subnav" role="group" aria-label={nl ? "Weergave" : "View"}>
-            {(
-              [
-                ["columns", nl ? "Twee kolommen" : "Two columns"],
-                ["table", nl ? "Tabel" : "Table"],
-              ] as const
-            ).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={personView === value}
-                onClick={() => setPersonView(value)}
-                className={`rounded-full px-3 py-1.5 text-sm transition-colors ${
-                  personView === value ? "bg-vtk-blue-soft font-semibold text-vtk-ink" : "text-[#5c667f] hover:text-vtk-ink"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="ticket-admin-subnav" role="group" aria-label={nl ? "Weergave" : "View"}>
+              {(
+                [
+                  ["columns", nl ? "Twee kolommen" : "Two columns"],
+                  ["table", nl ? "Tabel" : "Table"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={personView === value}
+                  onClick={() => setPersonView(value)}
+                  className={`rounded-full px-3 py-1.5 text-sm transition-colors ${
+                    personView === value ? "bg-vtk-blue-soft font-semibold text-vtk-ink" : "text-[#5c667f] hover:text-vtk-ink"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="inline-flex items-center gap-1.5"
+              onClick={() => {
+                // Fullscreen moet in de klik zelf gevraagd worden; het scherm
+                // laadt pas daarna. Lukt het niet, dan blijft het een overlay.
+                void document.documentElement.requestFullscreen?.().catch(() => {});
+                setHandoutOpen(true);
+              }}
+            >
+              <MaximizeIcon />
+              {nl ? "Volledig scherm" : "Full screen"}
+            </Button>
           </div>
         </div>
+        {handoutOpen && <MeetingHandoutScreen nl={nl} meeting={meeting} onClose={closeHandout} />}
 
         {meeting.reservations.length === 0 && meeting.theokotOrders.length === 0 ? (
           <p className="text-sm text-[#5c667f]">{nl ? "Nog niemand ingeschreven." : "Nobody registered yet."}</p>
@@ -448,35 +474,6 @@ export function MeetingDetail({
   );
 }
 
-type CountRow = { name: string; count: number; external: number };
-
-/**
- * Wat er mee moet, per broodje en per drankje. Een ongeldige inschrijving telt
- * niet mee: die persoon moet nog opnieuw kiezen. Wat grocos zelf bij Theokot
- * bestelden, gaat mee in dezelfde doos en telt dus bij de broodjes.
- */
-function handoutCounts(meeting: MeetingAdminView): { items: CountRow[]; drinks: CountRow[] } {
-  const items = new Map<string, CountRow>();
-  const drinks = new Map<string, CountRow>();
-  const add = (map: Map<string, CountRow>, name: string, count: number, external: boolean) => {
-    const row = map.get(name) ?? { name, count: 0, external: 0 };
-    row.count += count;
-    if (external) row.external += count;
-    map.set(name, row);
-  };
-  for (const row of meeting.reservations) {
-    if (row.invalid) continue;
-    if (row.item) add(items, row.item, 1, row.external);
-    if (row.drink) add(drinks, row.drink, 1, false);
-  }
-  for (const order of meeting.theokotOrders) {
-    for (const line of order.lines) add(items, line.name, line.quantity, false);
-  }
-  const sorted = (map: Map<string, CountRow>) =>
-    [...map.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "nl"));
-  return { items: sorted(items), drinks: sorted(drinks) };
-}
-
 function CountTable({
   nl,
   heading,
@@ -529,28 +526,9 @@ function CountTable({
   );
 }
 
-type PersonEntry = {
-  key: string;
-  name: string;
-  reservation: MeetingReservationRow | null;
-  theokot: MeetingTheokotOrderRow[];
-};
-
-/**
- * Per persoon, alfabetisch, in twee kolommen. Een groco met een inschrijving én
- * een eigen Theokot-bestelling staat er één keer, met beide.
- */
+/** Per persoon, alfabetisch, in twee kolommen (zie `personEntries`). */
 function PersonColumns({ nl, meeting }: { nl: boolean; meeting: MeetingAdminView }) {
-  const entries = new Map<string, PersonEntry>();
-  for (const row of meeting.reservations) {
-    entries.set(`r:${row.id}`, { key: `r:${row.id}`, name: row.name, reservation: row, theokot: [] });
-  }
-  for (const order of meeting.theokotOrders) {
-    const existing = [...entries.values()].find((entry) => entry.name === order.name);
-    if (existing) existing.theokot.push(order);
-    else entries.set(`t:${order.id}`, { key: `t:${order.id}`, name: order.name, reservation: null, theokot: [order] });
-  }
-  const sorted = [...entries.values()].sort((a, b) => a.name.localeCompare(b.name, "nl"));
+  const sorted = personEntries(meeting);
 
   return (
     <ul className="grid gap-x-8 sm:grid-cols-2">
