@@ -77,7 +77,7 @@ plaats van te doen alsof het lokaal niet bestaat.
 
 ## De twee harde randvoorwaarden
 
-**1. Geen nieuwe native module.** `mobile/AGENTS.md` is daar expliciet in: er is
+**1. Geen nieuwe native module.** `vtk-app/AGENTS.md` is daar expliciet in: er is
 geen Apple Developer-account, de enige weg naar een iPhone is Expo Go, en Expo Go
 laadt enkel wat er in de SDK-client zit. `react-native-maps` en `expo-maps` staan
 niet in het rijtje dat we vandaag gebruiken. Een kaart bouwen die een nieuwe
@@ -206,13 +206,13 @@ lokalenzoeker doorverwijst wanneer de term op een lokaalnummer lijkt.
 - `GET /api/app/v1/lokalen?q=...` geeft enkel de treffers, voor het typen.
 
 Het type komt in `apps/web/lib/app-api/contract.ts` en wordt overgenomen in
-`mobile/src/api/contract.ts`, zoals elk ander app-type.
+`vtk-app/src/api/contract.ts`, zoals elk ander app-type.
 
 ## De schermen
 
 ### Zoeken
 
-Eén scherm, `mobile/src/screens/lokalen.tsx`, met `SearchField` bovenaan (bestaat
+Eén scherm, `vtk-app/src/screens/lokalen.tsx`, met `SearchField` bovenaan (bestaat
 al) en de campuskaart eronder. Bij een lege zoekterm toont de kaart heel
 Celestijnenlaan 200 met de gebouwlabels; bij een treffer zoomt ze naar het gebouw
 en zet dat in geel.
@@ -223,7 +223,7 @@ Onder de kaart de resultaten als rijen: `200K 00.06` groot, `Aula` eronder,
 
 ### De campuskaart
 
-`mobile/src/components/CampusMap.tsx`.
+`vtk-app/src/components/CampusMap.tsx`.
 
 - Web Mercator van lat/lng naar de `viewBox`, één keer berekend uit de bounding
   box van alle contouren en daarna een constante.
@@ -368,11 +368,11 @@ vervalt zodra er een deur dichtgaat.
 
 **Fase 1, de kern. Staat er.** Prisma-model (`Building`, `Room`), import
 (in `prisma/sync.ts`), `/api/app/v1/lokalen` met zoeken, het zoekscherm
-`mobile/src/screens/lokalen.tsx`, en de tegel op home. Zonder kaart nog, want een
+`vtk-app/src/screens/lokalen.tsx`, en de tegel op home. Zonder kaart nog, want een
 lijst die "200K 00.06, Aula, Auditoria K, gelijkvloers" zegt is op zichzelf al
 bruikbaar; zo staat er iets op een toestel voor de kaart af is.
 
-**Fase 2, de kaart en de route. Staat er.** `mobile/src/components/CampusMap.tsx`
+**Fase 2, de kaart en de route. Staat er.** `vtk-app/src/components/CampusMap.tsx`
 met de drie lagen, `campus/geo.ts` voor de projectie en `campus/route.ts` voor
 Dijkstra. Pannen, knijpen en dubbeltikken om terug te zetten. Het endpoint stuurt
 de OSM-ondergrond mee (`AppCampusMap`), zodat de route offline berekend wordt.
@@ -433,7 +433,7 @@ gepubliceerd wordt.** `expo-location` is een native module. In Expo Go zit ze
 ingebouwd, dus daar werkt ze meteen; op een APK moet ze in de build zelf zitten,
 en `runtimeVersion` is voor élke SDK 54-build dezelfde. Een oudere APK krijgt deze
 update dus ook aangeboden en loopt dan tegen `requireNativeModule` aan. Zie
-`mobile/AGENTS.md`.
+`vtk-app/AGENTS.md`.
 
 - **De toestemming wordt pas gevraagd wanneer erom gevraagd wordt**, achter de
   knop "Vanaf hier". Een scherm dat bij het openen naar je locatie hengelt krijgt
@@ -457,7 +457,7 @@ met vijf keer te veel vormen erop.
 ## Onderweg niet vergeten
 
 - **Routes.** Een nieuw scherm betekent een regel in `TAB_ROUTES` in
-  `mobile/src/navigation.ts` en daarna `npm run routes`; `npm run routes:check`
+  `vtk-app/src/navigation.ts` en daarna `npm run routes`; `npm run routes:check`
   vangt het anders in de verify. Het scherm hoort onder **Meer** (het is iets wat
   je opzoekt) en waarschijnlijk ook onder **Studeren**, want daar zoek je waar je
   les hebt. Staat het in beide tabs, dan hoort het in beide lijsten.
@@ -466,7 +466,7 @@ met vijf keer te veel vormen erop.
 - **`AppNavTab` en Meer.** Het scherm in `src/screens/meer.tsx` zetten met een
   icoon uit `lucide-react-native` (`MapPin` of `Compass`), geen emoji.
 - **EAS Update.** Na elke app-wijziging op `main` meteen
-  `cd mobile && npx eas update --branch preview --environment preview`.
+  `npx eas update (in vtk-app) --branch preview --environment preview`.
 - **Geen kaart in een kaart.** De campuskaart staat direct op het papier, niet in
   een witte kaart met een rand; anders krijg je het geneste-kaartprobleem dat de
   styleguide verbiedt.

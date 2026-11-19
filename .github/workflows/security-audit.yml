@@ -20,8 +20,6 @@ on:
       - 'package-lock.json'
       - 'apps/*/package.json'
       - 'packages/*/package.json'
-      - 'mobile/package.json'
-      - 'mobile/package-lock.json'
   workflow_dispatch:
 
 concurrency:
@@ -48,33 +46,6 @@ jobs:
         run: |
           {
             echo '## npm audit (root, high en hoger)'
-            echo '```'
-            npm audit --audit-level high || true
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Fail on critical advisories
-        run: npm audit --audit-level critical
-
-  npm-audit-mobile:
-    name: Audit mobile app dependencies
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: mobile
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with:
-          node-version: 22
-
-      - name: Report high and critical advisories
-        run: |
-          {
-            echo '## npm audit (mobile, high en hoger)'
             echo '```'
             npm audit --audit-level high || true
             echo '```'

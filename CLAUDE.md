@@ -8,10 +8,11 @@
 - Vertaal technische / IT-termen niet krampachtig naar het Nederlands. Interne,
   technische surfaces (bv. de admin/IT-tab) mogen gewoon Engelse vakterminologie
   gebruiken (bv. "Throw uncaught error" i.p.v. "Onafgevangen fout gooien").
-- **EAS Update na elke app-wijziging.** Pas je iets aan aan de mobiele app (`mobile/`)
-  en push je naar `main`, publiceer dan ook altijd direct een EAS Update zodat
-  toestellen en Expo Go de wijzigingen ontvangen:
-  `cd mobile && npx eas update --branch preview --environment preview --message "<korte beschrijving>"`.
+- **De mobiele app staat in een eigen repo, `vtk-app`** (naast deze, `../vtk-app`).
+  Raak je het app-contract aan (`apps/web/lib/app-api/contract.ts`), zet het dan
+  ook daar met `npm run contract:sync`, push die repo en publiceer een EAS Update
+  vanuit vtk-app:
+  `npx eas update --branch preview --environment preview --message "<korte beschrijving>"`.
 
 # Wat je niet kan zien, zet je in /admin/it/flows
 
@@ -272,6 +273,19 @@ of uitgeschakeld aangemaakt.
   uit de allowlist in `lib/mcp/read.ts` in plaats van een `key` uit de request
   over te nemen: die tabel bevat naast redactionele blokken ook `s3.config`,
   `vault.config`, `door.config` en `brevo.lists`.
+
+# Planning van Burgieclan
+
+`docs/burgieclan-planning.md` is de referentie: de app toont de planner van
+Burgieclan (lessenrooster, deadlines, VTK-evenementen erin) onder Kalender ›
+Planning, en vtk.be spreekt daarvoor namens het lid met de backend van Burgieclan
+(`apps/web/lib/burgieclan`). Lees zeker "Vallen waar we in gelopen zijn".
+
+- **De planner staat enkel bij Burgieclan.** Bewaar er hier niets van, ook geen
+  cache in de database: twee kopieën lopen uit elkaar.
+- **De handtekening heeft twee kanten** (`lib/burgieclan/signature.ts` en
+  `VtkServiceSignature` bij Burgieclan) en een gedeelde testvector. Wijzig ze
+  samen.
 
 # Performance van vtk.be
 

@@ -91,6 +91,7 @@ export default async function LoginPage({
             password: dict.auth.password,
             signIn: dict.auth.signIn,
             invalid: dict.auth.invalidCredentials,
+            tooMany: dict.auth.tooManyAttempts,
             unverified: dict.auth.unverified,
             resend: dict.auth.resendVerification,
             resendSent: dict.auth.resendVerificationSent,

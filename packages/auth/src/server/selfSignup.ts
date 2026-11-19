@@ -346,20 +346,31 @@ export async function passwordStatus(
  * strenger, dan hoort dat bij een "gevoelige actie"-herauthenticatie die de site
  * nergens anders heeft.
  */
-export async function setOwnPassword(userId: string, password: string): Promise<void> {
+export async function setOwnPassword(
+  userId: string,
+  password: string,
+  /** De sessie van wie dit nu doet; die blijft ingelogd, alle andere niet. */
+  currentSessionToken: string,
+): Promise<void> {
   assertPasswordStrongEnough(password);
   const passwordHash = await hashPassword(password);
-  await prisma.account.upsert({
-    where: { id: `credential:${userId}` },
-    update: { password: passwordHash },
-    create: {
-      id: `credential:${userId}`,
-      accountId: userId,
-      providerId: 'credential',
-      userId,
-      password: passwordHash,
-    },
-  });
+  await prisma.$transaction([
+    prisma.account.upsert({
+      where: { id: `credential:${userId}` },
+      update: { password: passwordHash },
+      create: {
+        id: `credential:${userId}`,
+        accountId: userId,
+        providerId: 'credential',
+        userId,
+        password: passwordHash,
+      },
+    }),
+    // Wie zijn wachtwoord wijzigt omdat iemand anders het kende, verwacht dat
+    // die er daarna uit ligt. Enkel de sessies: de SSO-apps van het lid zelf
+    // blijven gekoppeld, want hier was er geen herstel nodig om binnen te komen.
+    prisma.session.deleteMany({ where: { userId, token: { not: currentSessionToken } } }),
+  ]);
 }
 
 /** Zet een nieuw wachtwoord met een herstellink. `false` = link ongeldig of verlopen. */
@@ -389,8 +400,26 @@ export async function resetPasswordWithToken(
     // is. Een zelfgemaakt account dat nooit op de bevestigingslink klikte, raakt
     // zo alsnog binnen zonder een tweede mail.
     prisma.user.update({ where: { id: row.userId }, data: { emailVerified: true } }),
+    // Een herstel is vaak net de reactie op "iemand anders zit in mijn
+    // account". Wie toen binnenkwam, hoort er nu uit te liggen: elke sessie
+    // en elk token dat een SSO-app voor dit lid kreeg, vervalt. Een toestel met
+    // een ondertekende cookie (`cookieCache`) merkt dat binnen vijf minuten.
+    ...revokeAllSessions(row.userId),
   ]);
   return true;
+}
+
+/**
+ * De queries die elke sessie van een lid intrekken, plus de tokens die
+ * SSO-apps voor dat lid kregen (die leven langer dan een sessie en hangen er
+ * niet aan vast). Om in een `$transaction` te zetten.
+ */
+function revokeAllSessions(userId: string) {
+  return [
+    prisma.session.deleteMany({ where: { userId } }),
+    prisma.oauthAccessToken.deleteMany({ where: { userId } }),
+    prisma.oauthRefreshToken.deleteMany({ where: { userId } }),
+  ];
 }
 
 /**

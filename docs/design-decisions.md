@@ -7965,7 +7965,7 @@ deelnemers. De uitnodigings-QR legt die beslissing bij wie aan de deur staat.
 **Het manifest blijft niet liggen.** Het draagt de naam van elke deelnemer en
 staat nu op veel meer telefoons dan de scanners van vroeger. De app wist het na
 twee dagen en bij het uitloggen; de wachtrij met nog niet verstuurde scans blijft
-wel staan. Zie `mobile/docs/scanner.md`.
+wel staan. Zie `vtk-app/docs/scanner.md`.
 
 ---
 
@@ -13684,3 +13684,32 @@ bovenaan te krijgen.
   andere kalendermails, zodat geen lid er twee krijgt wanneer de website op meer
   dan één container draait. De worker verstuurt in rondes van 300 leden om de
   vijf minuten.
+
+## De planning in de app is die van Burgieclan
+
+De app heeft onder Kalender een tabblad Planning: je lessenrooster van KU Leuven,
+je deadlines en VTK-evenementen in één agenda. Dat is de planner van Burgieclan,
+niet een tweede planner. Zie `docs/burgieclan-planning.md` voor hoe.
+
+- **Eén planner, bij Burgieclan.** De site bewaart er niets van en geeft elke
+  aanvraag door. Twee planners die elkaar proberen bij te houden, lopen na de
+  eerste mislukte synchronisatie uit elkaar, en dan weet niemand welke klopt.
+- **VTK-evenementen zet je er zelf in**, apart van de ster ("ik ga misschien").
+  De ster is een lijstje en een herinnering; de planning is een agenda waarop je
+  je agenda-app abonneert. Wie tien dingen stert, wil die niet allemaal tussen
+  zijn lessen.
+- **Een evenement in je planning volgt de kalender.** Verschuift het uur of de
+  plaats, dan verschuift het binnen het uur mee in de planning en de
+  geëxporteerde agenda. Trekt VTK het in, dan verdwijnt het; het staat er weer
+  als het terugkomt.
+- **Drie dagen naast elkaar in de app**, verticaal door alle uren, horizontaal
+  per dag verder. Zeven kolommen zijn op een telefoon te smal voor een vaknaam;
+  vandaag en de twee dagen erna is wat je met een telefoon in je hand wil weten.
+  De gewone kalender met de VTK-evenementen blijft ernaast staan.
+- **Een lessenrooster is de voorwaarde.** Zonder gekoppeld rooster is er geen
+  planning, ook niet voor enkel VTK-evenementen: daarvoor bestaan de ster en de
+  ICS-feeds van de kalender al.
+- **Deadlines toevoegen en het overzicht per vak blijven voorlopig op
+  Burgieclan.** De app vinkt ze af en verwijdert ze; invullen met een vak, een
+  datum en een uur is een formulier dat op een groot scherm beter werkt.
+

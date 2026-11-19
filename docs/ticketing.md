@@ -697,12 +697,12 @@ klopt; een scanner-URL van één event is dat niet.
 
 ### De native app
 
-Naast de PWA zit de scanner ook in de **VTK-app** (`mobile/`, voor iOS en
+Naast de PWA zit de scanner ook in de **VTK-app** (de repo `vtk-app`, voor iOS en
 Android), enkel zichtbaar voor wie iets te scannen heeft. Tot november 2026 was
 dat een aparte Expo-app, **VTK Scanner** (`vtk-scanner-app`); die is daarin
 opgegaan en staat enkel nog als archief. De app doet exact hetzelfde werk als de
 webscanner en praat met dezelfde endpoints; de webscanner blijft staan als webweg
-en als vangnet. Alles over de app-kant staat in `mobile/docs/scanner.md`.
+en als vangnet. Alles over de app-kant staat in `vtk-app/docs/scanner.md`.
 
 - **Ze bevat geen tweede kopie van de regels.** De app roept `scanner/bootstrap`,
   `scan`, `scan/batch`, `scan/card` en `scan/reverse` aan zoals `ScannerApp.tsx`
@@ -719,7 +719,7 @@ en als vangnet. Alles over de app-kant staat in `mobile/docs/scanner.md`.
   /api/tickets/scanner/events` bestond enkel voor de aparte scanner-app en wordt
   door de VTK-app niet gebruikt.
 - Wijzig je hier het scan-contract, het manifestformaat of het hashformaat van
-  `cardHash.ts`, werk dan `mobile/src/scanner/` mee bij. Het hashformaat faalt
+  `cardHash.ts`, werk dan `vtk-app/src/scanner/` mee bij. Het hashformaat faalt
   stil: de app vindt dan offline geen enkele kaart meer.
 
 ### API (`apps/web/app/api/tickets/...`)

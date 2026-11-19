@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { z } from "zod";
 import { AuthError } from "@vtk/auth";
 import {
@@ -15,6 +16,7 @@ import { normalizeLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { sendPasswordResetMail, sendVerificationMail } from "@/lib/accountMail";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { authLimiters, clientIpFromHeaders } from "@/lib/authThrottle";
 
 /**
  * Zelfregistratie, bevestiging en wachtwoordherstel voor accounts zonder KU
@@ -62,7 +64,8 @@ export type RegisterErrorCode =
   | "INVALID_REGISTRATION"
   | "PASSWORD_TOO_SHORT"
   | "PASSWORD_MISMATCH"
-  | "MAIL_FAILED";
+  | "MAIL_FAILED"
+  | "RATE_LIMITED";
 
 export async function registerAction(
   _prev: SaveState,
@@ -91,6 +94,12 @@ export async function registerAction(
   }
 
   const locale = normalizeLocale(data.locale);
+
+  // Pas na de validatie, zodat een tikfout in het formulier niet meetelt. Zie
+  // lib/authThrottle.ts: zonder dit was registreren onbeperkt te scripten.
+  if (!authLimiters().registerPerIp.take(clientIpFromHeaders(await headers()))) {
+    return saveError("RATE_LIMITED" satisfies RegisterErrorCode);
+  }
 
   let result;
   try {
@@ -132,6 +141,25 @@ const emailOnlySchema = z.object({
   locale: z.string().default("nl"),
 });
 
+/**
+ * Mag er nog een herstel- of bevestigingsmail vertrekken?
+ *
+ * - `"ip"`: dit adres vroeg er te veel aan. Dat tonen we: het zegt niets over
+ *   welke accounts er bestaan.
+ * - `"address"`: naar dit mailadres vertrokken er net te veel. Dan vertrekt er
+ *   niets, en antwoorden we toch "ok": een melding zou verklappen dat er een
+ *   account op dat adres staat.
+ *
+ * Herstel en bevestiging delen één teller per adres, anders kon je de ene na de
+ * andere gebruiken om dezelfde mailbox te blijven vullen.
+ */
+async function mailAllowance(email: string): Promise<"ok" | "ip" | "address"> {
+  const limits = authLimiters();
+  if (!limits.mailPerIp.take(clientIpFromHeaders(await headers()))) return "ip";
+  if (!limits.mailPerAddress.take(email)) return "address";
+  return "ok";
+}
+
 /** Nieuwe bevestigingsmail. Antwoordt altijd "ok", ook zonder account. */
 export async function resendVerificationAction(
   _prev: SaveState,
@@ -142,6 +170,10 @@ export async function resendVerificationAction(
     locale: formData.get("locale") ?? "nl",
   });
   if (!parsed.success) return saveError("INVALID_INPUT");
+
+  const allowance = await mailAllowance(parsed.data.email);
+  if (allowance === "ip") return saveError("RATE_LIMITED");
+  if (allowance === "address") return saveOk();
 
   const pending = await reissueEmailVerification(parsed.data.email);
   if (pending) {
@@ -165,6 +197,10 @@ export async function requestPasswordResetAction(
     locale: formData.get("locale") ?? "nl",
   });
   if (!parsed.success) return saveError("INVALID_INPUT");
+
+  const allowance = await mailAllowance(parsed.data.email);
+  if (allowance === "ip") return saveError("RATE_LIMITED");
+  if (allowance === "address") return saveOk();
 
   const reset = await createPasswordReset(parsed.data.email);
   if (reset) {
@@ -248,7 +284,7 @@ export async function setOwnPasswordAction(
   }
 
   try {
-    await setOwnPassword(session.user.id, password);
+    await setOwnPassword(session.user.id, password, session.token);
   } catch (err) {
     if (err instanceof AuthError && err.code === "PASSWORD_TOO_SHORT") {
       return saveError("PASSWORD_TOO_SHORT" satisfies PasswordResetErrorCode);

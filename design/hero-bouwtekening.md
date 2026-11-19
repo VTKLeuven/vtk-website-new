@@ -29,7 +29,7 @@ bouwt, en de exacte geometrie en animatie uit het bord.
 - **Gevraagd:** G1 als echte hero bouwen en naar main pushen, samen met het
   weghalen van de oude hero (nog niet gecommit; alles in de werkboom hoort
   daarbij, ook de migratie `20261029160000_remove_homepage_hero` en de
-  commentaarwijzigingen in `mobile/`, dus na de push een EAS Update).
+  commentaarwijzigingen in de app, dus na de push een EAS Update).
 - **Keuzes voor de bouw:** bestemmingen vast in de code (open vraag 3), de
   standaardstand rechts, de evenementen direct onder het nieuws. Telefoon onder
   760 px. De labels krijgen een vaste breedte (21% van de box) en hun

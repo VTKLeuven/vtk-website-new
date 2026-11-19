@@ -8,7 +8,6 @@ Modular digital platform for **Vlaamse Technische Kring (VTK)**: an npm **worksp
 apps/
   web/         Main site (vtk.be): public CMS, calendar, ticketing, forms, media, member portal, admin, API
   logistiek/   Logistics application (logistiek.vtk.be): equipment rental, transport, 't Flesserke, Collect&Go
-mobile/        Mobile application for iOS and Android (Expo and React Native)
 packages/
   db/          Prisma schema, PostgreSQL client, migrations, seeds, permission registry
   auth/        Better-auth, Argon2 hashing, sessions, RBAC helpers, OAuth2/OIDC SSO provider
@@ -90,15 +89,12 @@ npm run dev --workspace=@vtk/logistiek
 
 Both dev scripts run `next dev --webpack` to avoid PostCSS child process leaks in watch mode.
 
-### 3. Running the mobile app (optional)
+### 3. The mobile app
 
-```bash
-# Install mobile dependencies and start Expo Router
-npm run app:install
-npm run app
-```
-
-Press `i` for iOS Simulator, `a` for Android Emulator, or scan the terminal QR code using Expo Go.
+The iOS and Android app lives in its own repository,
+[VTKLeuven/vtk-app](https://github.com/VTKLeuven/vtk-app) (it was `mobile/` in this
+repository until November 2026). It talks to this site through `/api/app/v1`;
+see [docs/app-api.md](docs/app-api.md).
 
 ### 4. Verification and checks
 
@@ -114,20 +110,12 @@ This runs:
 3. `npm run lint`: runs ESLint;
 4. `npm run test --workspace=@vtk/web` and `npm run test --workspace=@vtk/logistiek`: runs unit and integration test suites.
 
-To check the mobile app:
-
-```bash
-npm run app:check
-```
-
 ### 5. Useful commands
 
 | Command | Description |
 | --- | --- |
 | `npm run dev` | Main web application dev server (`next dev --webpack` on :3000) |
 | `npm run dev --workspace=@vtk/logistiek` | Logistics dev server on :3100 |
-| `npm run app` | Start Expo mobile app |
-| `npm run app:check` | Run mobile TypeScript, lint, and route checks |
 | `npm run verify` | Full repository verification (lockfile, types, lint, tests) |
 | `npm run build` | Production build for database and web workspaces |
 | `npm run db:generate` | Regenerate Prisma client |

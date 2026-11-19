@@ -1,7 +1,7 @@
 # Dependencies bijhouden
 
 Renovate houdt de dependencies van deze repo bij: de npm-workspaces
-(`apps/*`, `packages/*` en de wortel), de mobiele app in `mobile/`, de images in
+(`apps/*`, `packages/*` en de wortel), de mobiele app (sinds november 2026 in de eigen repo `vtk-app`), de images in
 `infra/compose.dev.yml` en `infra/docker-compose.yml`, de basisimages in
 `infra/docker/*.Dockerfile` en de actions in `.github/workflows`. De configuratie
 staat in `renovate.json` in de wortel; dezelfde opzet als in burgieclan, met de
@@ -79,20 +79,10 @@ zijn plugins, de Expo-SDK als één set, en de action-digests in één PR per we
 
 ## De mobiele app
 
-`mobile/` heeft zijn eigen lockfile en staat buiten de workspaces. Renovate
-behandelt hem dus als een apart project, met twee verschillen: zijn PR's krijgen
-het label `mobile` en ze mergen nooit automatisch. Dat laatste is geen
-voorzichtigheid maar de regel uit `AGENTS.md`: na elke wijziging aan de app hoort
-er een EAS Update te vertrekken, anders zien de testtoestellen en Expo Go de
-nieuwe dependencies niet.
-
-```bash
-cd mobile && npx eas update --branch preview --environment preview --message "dependency bump"
-```
-
-Expo, de `expo-*` modules, React, React Native en de presets komen in één PR
-("expo sdk"): die versies horen bij elkaar en los bumpen levert een app op die
-niet meer start.
+De app staat sinds november 2026 in een eigen repo, `vtk-app`, met haar eigen
+`renovate.json` en audit. Daar mergt geen dependency automatisch, omdat na elke
+wijziging een EAS Update hoort te vertrekken, en komen Expo, de `expo-*`
+modules, React en React Native in één PR ("expo sdk").
 
 ## De lockfile-val
 

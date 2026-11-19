@@ -4,22 +4,25 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
-# De mobiele app staat in `mobile/`
+# De mobiele app staat in een eigen repo: `vtk-app`
 
-De VTK-app (Expo, iOS + Android) zit in deze repo maar **buiten de workspaces**:
-alles onder `apps/*` en `packages/*` wordt automatisch een npm-workspace, en de
-dependencies van React Native samenvoegen met die van de website zou de lockfile
-van de hele repo opnieuw laten oplossen. Dat is hier een bekende val (zie
-"Never hand-edit deps" verderop).
+De VTK-app (Expo, iOS + Android) stond tot november 2026 in `mobile/` in deze
+repo en heeft nu haar eigen repo,
+[VTKLeuven/vtk-app](https://github.com/VTKLeuven/vtk-app), met de volledige
+historiek van die map. De handleiding staat daar in `docs/ontwikkelen.md`. Clone
+ze naast deze repo (`../vtk-app`).
 
-De app heeft dus zijn eigen `node_modules` en zijn eigen lockfile. `npm install`
-in de wortel raakt hem niet aan; gebruik `npm run app:install`, `npm run app` en
-`npm run app:check`. De handleiding staat in **`docs/app-ontwikkelen.md`**.
+Wat de twee nog delen, is het contract van de app-API
+(`apps/web/lib/app-api/contract.ts`, zie `docs/app-api.md`). **Het origineel
+staat hier**; de app houdt een letterlijke kopie bij in `src/api/contract.ts`.
 
-- **EAS Update na elke app-wijziging.** Pas je iets aan aan de mobiele app (`mobile/`)
-  en push je naar `main`, publiceer dan ook altijd direct een EAS Update zodat
-  testtoestellen en Expo Go de update direct ontvangen:
-  `cd mobile && npx eas update --branch preview --environment preview --message "<korte beschrijving>"`.
+- **Wijzig je het contract, zet het dan ook in de app**: `npm run contract:sync`
+  in vtk-app, en daarna een EAS Update vanuit die repo. Staat vtk-app naast deze
+  repo, dan faalt `apps/web/test/appApiContract.test.ts` zolang de kopie
+  afwijkt; in CI slaat die test over.
+- **Een nieuwe app-route is achterwaarts compatibel.** Een geïnstalleerde app kan
+  maanden ouder zijn dan deze server; breek je een bestaande vorm, dan komt er
+  `/api/app/v2` naast (zie `docs/app-api.md`).
 
 # Local setup: `make up && make db && make dev`
 

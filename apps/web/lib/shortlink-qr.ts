@@ -167,7 +167,7 @@ function compositeRawImage(canvas: Buffer, image: RawImage, left: number, top: n
  * niet decoderen en gaven daardoor in productie een 500.
  *
  * **Deze opmaak heeft een tweeling in de app**, in
- * `mobile/src/components/vtkQrPaths.ts`. Die tekent hetzelfde in SVG omdat een
+ * `src/components/vtkQrPaths.ts` van vtk-app. Die tekent hetzelfde in SVG omdat een
  * ticket ook zonder netwerk te tonen moet zijn, en gebruikt exact de getallen
  * hieronder. Wijzig je hier iets aan de vorm, wijzig het daar mee.
  */

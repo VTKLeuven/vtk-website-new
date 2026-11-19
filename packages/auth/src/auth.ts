@@ -193,7 +193,18 @@ export const auth = betterAuth({
     nextCookies(),
   ],
 
-  disabledPaths: ['/token'], //disable for Oauth
+  disabledPaths: [
+    '/token', //disable for Oauth
+
+    // Inloggen met een wachtwoord loopt enkel via onze server action
+    // (`loginAction` in apps/web), die `auth.api.signInEmail` rechtstreeks
+    // aanroept; `disabledPaths` geldt enkel voor de HTTP-router, niet voor die
+    // aanroep. De HTTP-route zelf stond open en sloeg twee dingen over: de
+    // snelheidslimiet per account (`lib/authThrottle.ts`) en
+    // `checkLoginBlocked`, waardoor een zelfgemaakt account zonder bevestigd
+    // adres er gewoon mee binnenkwam. Niets van ons gebruikte ze.
+    '/sign-in/email',
+  ],
 
   emailAndPassword: {
     enabled: true,
@@ -282,11 +293,15 @@ export const auth = betterAuth({
   // seconden voor álle bezoekers samen. Bij een piek is iedereen daarna 429, ook
   // de SSO-doorgangen van de cursusdienst, want die lopen over dezelfde routes.
   //
+  // Dit dekt enkel HTTP-verzoeken naar /api/auth/better. De formulieren voor
+  // inloggen, registreren en herstel zijn server actions die hier niet
+  // langskomen; hun drempels staan in `apps/web/lib/authThrottle.ts`.
+  //
   // De getallen hieronder gaan uit van wat deze kring echt is: honderden leden
   // die tegelijk binnenkomen, grotendeels via hetzelfde campusnetwerk en dus met
   // hetzelfde publieke adres. Een limiet per IP is voor zulk verkeer een botte
   // bijl; de echte bescherming tegen het raden van wachtwoorden zit per account
-  // (`checkLoginBlocked` in server/selfSignup.ts), niet hier. Dit blijft staan
+  // (`apps/web/lib/authThrottle.ts`, in `loginAction`), niet hier. Dit blijft staan
   // als vangnet tegen een bot die er in zijn eentje op los gaat.
   //
   // LET OP, dit is de val die ons een tweede keer klemzette: er zijn DRIE lagen,

@@ -73,6 +73,7 @@ export default async function RegisterPage({
               PASSWORD_TOO_SHORT: t.errorPasswordShort,
               PASSWORD_MISMATCH: t.errorPasswordMismatch,
               MAIL_FAILED: t.errorMailFailed,
+              RATE_LIMITED: t.errorRateLimited,
             },
             errorFallback: t.errorInvalid,
           }}

@@ -44,6 +44,7 @@ export default async function ForgotPasswordPage({
             sentTitle: t.sentTitle,
             sentBody: t.sentBody,
             error: t.errorInvalid,
+            rateLimited: t.errorRateLimited,
           }}
         />
 

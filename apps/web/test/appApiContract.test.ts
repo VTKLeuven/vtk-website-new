@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { APP_API_VERSION, appLocaleFrom, isAppPushToken } from '@/lib/app-api/contract';
@@ -49,18 +50,25 @@ describe('app-api contract', () => {
   });
 
   /**
-   * De app staat sinds de verhuizing naar `mobile/` in dezelfde repo, dus deze
-   * test slaat niets meer over: hij faalt gewoon wanneer de kopie uit de pas
-   * loopt. Dat is precies de bedoeling; het was de zwakke plek van de vorige
-   * opzet, waar de vergelijking overgeslagen werd zodra de andere repo ontbrak
-   * (en dus altijd in CI).
+   * De app heeft sinds november 2026 een eigen repo, vtk-app. Staat die naast
+   * deze (of wijst `VTK_APP_DIR` ernaar), dan vergelijkt deze test de kopie byte
+   * voor byte; anders slaat hij over, en dat doet hij dus altijd in CI.
+   *
+   * Dat is de zwakke plek waar de app een tijd lang voor in deze repo stond. Ze
+   * is opgevangen aan de andere kant: `npm run contract:check` in vtk-app doet
+   * dezelfde vergelijking, en het origineel blijft hier de bron
+   * (`npm run contract:sync` haalt het daar op).
    */
-  it('is byte-voor-byte gelijk aan de kopie in de app', () => {
+  const appDir = process.env.VTK_APP_DIR
+    ? resolve(process.env.VTK_APP_DIR)
+    : fileURLToPath(new URL('../../../../vtk-app', import.meta.url));
+  const copy = join(appDir, 'src/api/contract.ts');
+
+  it.skipIf(!existsSync(copy))('is byte-voor-byte gelijk aan de kopie in vtk-app', () => {
     // `fileURLToPath` en niet `.pathname`: op Windows geeft dat laatste
     // "/C:/Users/..." terug, wat `readFileSync` als pad vanaf de schijfwortel
     // leest en dus "C:\C:\Users\..." zoekt.
     const original = fileURLToPath(new URL('../lib/app-api/contract.ts', import.meta.url));
-    const copy = fileURLToPath(new URL('../../../mobile/src/api/contract.ts', import.meta.url));
 
     expect(readFileSync(copy, 'utf8')).toBe(readFileSync(original, 'utf8'));
   });
