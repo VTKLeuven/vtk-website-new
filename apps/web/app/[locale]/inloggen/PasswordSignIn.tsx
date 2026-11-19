@@ -40,6 +40,7 @@ export function PasswordSignIn({
     password: string;
     signIn: string;
     invalid: string;
+    tooMany: string;
     unverified: string;
     resend: string;
     resendSent: string;
@@ -103,6 +104,7 @@ export function PasswordSignIn({
           />
         </div>
         {state?.error === 'INVALID' && <p className="vtk-auth-error">{labels.invalid}</p>}
+        {state?.error === 'TOO_MANY' && <p className="vtk-auth-error">{labels.tooMany}</p>}
         <button
           type="submit"
           // Na login staat de hard-redirect nog te gebeuren; niet opnieuw laten indienen.
@@ -121,6 +123,8 @@ export function PasswordSignIn({
           <p>{labels.unverified}</p>
           {resendState.status === 'success' ? (
             <p className="vtk-auth-notice-done">{labels.resendSent}</p>
+          ) : resendState.status === 'error' ? (
+            <p className="vtk-auth-error">{labels.tooMany}</p>
           ) : (
             <form action={resendAction}>
               <input type="hidden" name="email" value={email} />

@@ -21,6 +21,7 @@ export function ForgotPasswordForm({
     sentTitle: string;
     sentBody: string;
     error: string;
+    rateLimited: string;
   };
 }) {
   const unsent = useUnsentGuard();
@@ -45,7 +46,11 @@ export function ForgotPasswordForm({
         <label htmlFor="email">{labels.email}</label>
         <input id="email" name="email" type="email" autoComplete="email" required />
       </div>
-      {state.status === 'error' && <p className="vtk-auth-error">{labels.error}</p>}
+      {state.status === 'error' && (
+        <p className="vtk-auth-error">
+          {state.code === 'RATE_LIMITED' ? labels.rateLimited : labels.error}
+        </p>
+      )}
       <button type="submit" className="vtk-auth-submit" disabled={pending}>
         {labels.submit}
       </button>

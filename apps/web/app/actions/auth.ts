@@ -8,6 +8,7 @@ import { sanitizeNextUrl } from '@vtk/auth';
 import { prisma } from '@vtk/db';
 import { checkLoginBlocked, resolveLoginEmail, signInEmail, signOut } from '@vtk/auth/server';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
+import { authLimiters, clientIpFromHeaders } from '@/lib/authThrottle';
 import { requireSession } from '@/lib/session';
 
 const loginSchema = z.object({
@@ -41,21 +42,40 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   // in waar hij zijn mail leest; dat vertalen we naar het login-adres.
   const email = await resolveLoginEmail(parsed.data.email);
 
+  // Enkel mislukte pogingen tellen, per account en per adres; zie
+  // lib/authThrottle.ts. Dit staat vóór `checkLoginBlocked`, want ook die toetst
+  // het wachtwoord (bij een onbevestigd account) en is dus een manier om te
+  // raden. 'TOO_MANY' zegt niets over het bestaan van een account: een adres
+  // zonder account loopt even snel vol.
+  const requestHeaders = await headers();
+  const limits = authLimiters();
+  const ip = clientIpFromHeaders(requestHeaders);
+  if (limits.loginPerAccount.isFull(email) || limits.loginPerIp.isFull(ip)) {
+    return { error: 'TOO_MANY' };
+  }
+  const failed = (): LoginState => {
+    limits.loginPerAccount.hit(email);
+    limits.loginPerIp.hit(ip);
+    return { error: 'INVALID' };
+  };
+
   // Foute credentials en een gedeactiveerd account geven allebei 'INVALID'; het
   // formulier mag niet verklappen welke adressen een account hebben. De enige
   // uitzondering is een zelfgemaakt account dat zijn mailadres nog niet
   // bevestigde: dat krijgt 'UNVERIFIED', maar pas nadat het wachtwoord klopte.
   const blocked = await checkLoginBlocked(email, parsed.data.password);
+  if (blocked === 'INVALID') return failed();
   if (blocked !== 'NONE') return { error: blocked };
 
   try {
-    await signInEmail(await headers(), {
+    await signInEmail(requestHeaders, {
       email,
       password: parsed.data.password,
     });
   } catch {
-    return { error: 'INVALID' };
+    return failed();
   }
+  limits.loginPerAccount.clear(email);
 
   const next = sanitizeNextUrl(parsed.data.next);
 

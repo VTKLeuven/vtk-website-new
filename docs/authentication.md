@@ -123,6 +123,25 @@ Belangrijke keuzes:
   4. redirect naar `next` (enkel interne paden).
   Foute credentials en inactieve accounts geven allebei `INVALID` (geen
   user-enumeratie).
+- **Snelheidslimiet** (`apps/web/lib/authThrottle.ts`). De `rateLimit` van
+  better-auth geldt enkel voor HTTP-verzoeken naar `/api/auth/better`; een
+  server action die `auth.api.*` aanroept, komt daar nooit langs. Daarom telt
+  `loginAction` zelf de mislukte pogingen: 10 per account per kwartier (ook
+  vanaf veel adressen) en 100 per IP. Vol is `TOO_MANY`, voor een adres met en
+  zonder account gelijk; een geslaagde login wist de teller van het account.
+  Registreren (10 per IP per uur) en de herstel- en bevestigingsmails (3 per
+  mailadres en 20 per IP per uur) hebben hun eigen drempel; een vol mailadres
+  antwoordt toch "verstuurd", zodat het niets verklapt. De tellers staan in het
+  geheugen van het proces en beginnen na een herstart opnieuw.
+- **De HTTP-route `/sign-in/email` staat uit** (`disabledPaths`). Ze sloeg de
+  limiet en `checkLoginBlocked` over, dus een zelfgemaakt account kwam er
+  zonder bevestigd adres mee binnen. `auth.api.signInEmail` werkt wel nog:
+  `disabledPaths` geldt enkel voor de router.
+- **Een nieuw wachtwoord zet anderen buiten.** Een herstel via de mail
+  (`resetPasswordWithToken`) wist elke sessie en elk SSO-token van het lid;
+  een wijziging vanaf /account (`setOwnPassword`) wist alle sessies behalve de
+  huidige. Een toestel met een ondertekende cookie merkt dat binnen vijf
+  minuten (`cookieCache`).
 
 ## Zelfregistratie met e-mail en wachtwoord (`/registreren`)
 

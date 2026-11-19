@@ -255,6 +255,7 @@
     "signIn": "Sign in",
     "signOut": "Sign out",
     "invalidCredentials": "Invalid credentials",
+    "tooManyAttempts": "Too many failed attempts. Wait fifteen minutes and try again, or request a new password.",
     "account": "My account",
     "updateProfile": "Update profile",
     "changePassword": "Change password",
@@ -1476,7 +1477,8 @@
     "errorInvalid": "Not created: please check the fields you entered.",
     "errorPasswordShort": "Not created: your password must be at least 10 characters long.",
     "errorPasswordMismatch": "Not created: the two passwords do not match.",
-    "errorMailFailed": "Your account was created, but the confirmation email could not be sent. Try asking for a new one on the sign-in screen."
+    "errorMailFailed": "Your account was created, but the confirmation email could not be sent. Try asking for a new one on the sign-in screen.",
+    "errorRateLimited": "Not created: too many accounts were just created from this network. Try again in an hour."
   },
   "passwordReset": {
     "kicker": "Password",
@@ -1497,6 +1499,7 @@
     "expiredTitle": "This link no longer works",
     "expiredBody": "The link has expired or was already used. Ask for a new one below.",
     "errorInvalid": "Failed: please check the address you entered.",
+    "errorRateLimited": "Not sent: too many emails were just requested from this network. Try again in an hour.",
     "errorPasswordShort": "Not saved: your password must be at least 10 characters long.",
     "errorPasswordMismatch": "Not saved: the two passwords do not match."
   },
