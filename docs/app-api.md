@@ -542,3 +542,36 @@ Hernoemen of het groepsdoel zetten (enkel wie de groep maakte, anders
 ### `PATCH /api/app/v1/studeren/doel`
 
 `{ dailyGoalMinutes }`. Bepaalt wat de reeks telt en wanneer een dag "gehaald" is.
+
+## Planning
+
+De planning van Burgieclan (lessenrooster, deadlines, VTK-evenementen erin),
+onder Kalender › Planning in de app. **Niets hiervan staat in onze database**:
+elke route geeft de aanvraag ondertekend door aan Burgieclan en zet het antwoord
+om naar `AppPlanning` (`lib/burgieclan/planning.ts`). Het hele verhaal, met de
+configuratie en de vallen, staat in [`burgieclan-planning.md`](./burgieclan-planning.md).
+
+### `GET`/`DELETE /api/app/v1/planning`
+
+De planning, of ontkoppelen (wist de hele planning, ook op Burgieclan). Zonder
+koppeling met Burgieclan op deze server: `available: false`, en de app toont de
+planning niet. Zonder lessenrooster: `subscribed: false`.
+
+### `POST /api/app/v1/planning/subscription`, `/sync`, `/feed-token`
+
+Een lessenrooster koppelen (`{ icsUrl }`), nu synchroniseren, een nieuwe link
+voor de geëxporteerde agenda. Burgieclan begrenst de eerste twee per lid; een 429
+komt hier aan als `INVALID_REQUEST` met een Nederlandse melding.
+
+### `POST /api/app/v1/planning/operations`
+
+Eén `AppPlanningOperation`, dezelfde als op Burgieclan: `done`, `hide`,
+`mandatory`, `keepOnly`, `addRule`, `removeRule`, `itemDone`, `deleteItem`,
+`addItem`, en `addVtkEvent`/`removeVtkEvent` voor de knop "Zet in mijn planning"
+op een evenement. Antwoordt met de hele planning.
+
+De fouten van Burgieclan zijn Engels; `planningErrorResponse` maakt er voor de
+bekende gevallen (onbekende link, te snel, onbekend evenement) een Nederlandse
+melding van. Een 401 van Burgieclan is een configuratiefout (het geheim klopt
+niet) en komt als 502 naar buiten, met de reden in de logs.
+

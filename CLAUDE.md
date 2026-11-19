@@ -273,6 +273,19 @@ of uitgeschakeld aangemaakt.
   over te nemen: die tabel bevat naast redactionele blokken ook `s3.config`,
   `vault.config`, `door.config` en `brevo.lists`.
 
+# Planning van Burgieclan
+
+`docs/burgieclan-planning.md` is de referentie: de app toont de planner van
+Burgieclan (lessenrooster, deadlines, VTK-evenementen erin) onder Kalender ›
+Planning, en vtk.be spreekt daarvoor namens het lid met de backend van Burgieclan
+(`apps/web/lib/burgieclan`). Lees zeker "Vallen waar we in gelopen zijn".
+
+- **De planner staat enkel bij Burgieclan.** Bewaar er hier niets van, ook geen
+  cache in de database: twee kopieën lopen uit elkaar.
+- **De handtekening heeft twee kanten** (`lib/burgieclan/signature.ts` en
+  `VtkServiceSignature` bij Burgieclan) en een gedeelde testvector. Wijzig ze
+  samen.
+
 # Performance van vtk.be
 
 `docs/performance.md` is de referentie: wat er gemeten is, wat er gedaan is en

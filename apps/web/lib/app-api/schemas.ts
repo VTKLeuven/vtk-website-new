@@ -120,3 +120,35 @@ export const appStudyGroupUpdateSchema = z.object({
 export const appStudyGoalSchema = z.object({
   dailyGoalMinutes: z.number().int().min(15).max(1440),
 });
+
+/**
+ * De planning van Burgieclan (`AppPlanningOperation`). Burgieclan valideert
+ * alles zelf nog eens; dit houdt enkel een onzinnige body weg voor hij de deur
+ * uit gaat.
+ */
+const planningId = z.string().min(1).max(255);
+const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+
+export const appPlanningOperationSchema = z.discriminatedUnion("op", [
+  z.object({ op: z.enum(["done", "hide", "mandatory"]), uid: planningId, value: z.boolean() }),
+  z.object({ op: z.literal("keepOnly"), uid: planningId }),
+  z.object({ op: z.literal("addRule"), uid: planningId, action: z.enum(["hide", "mandatory"]) }),
+  z.object({ op: z.literal("removeRule"), id: z.string().min(1).max(32) }),
+  z.object({ op: z.literal("itemDone"), id: z.string().min(1).max(32), value: z.boolean() }),
+  z.object({ op: z.literal("deleteItem"), id: z.string().min(1).max(32) }),
+  z.object({
+    op: z.literal("addItem"),
+    item: z.object({
+      subject: z.string().min(1).max(255),
+      kind: z.enum(["deadline", "mandatory"]),
+      title: z.string().trim().min(1).max(200),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      time: hhmm.nullable(),
+      end: hhmm.nullable(),
+      note: z.string().max(2000),
+    }),
+  }),
+  z.object({ op: z.enum(["addVtkEvent", "removeVtkEvent"]), vtkEventId: z.string().min(1).max(64) }),
+]);
+
+export const appPlanningSubscriptionSchema = z.object({ icsUrl: z.string().trim().min(1).max(1000) });

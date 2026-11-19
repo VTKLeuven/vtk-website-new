@@ -1529,3 +1529,142 @@ export type AppRooms = {
   /** De ondergrond van de kaart. */
   campus: AppCampusMap;
 };
+
+// -----------------------------------------------------------------------------
+// Planning: het lessenrooster en de deadlines van Burgieclan, met VTK erbij
+// -----------------------------------------------------------------------------
+
+/**
+ * De planning van Burgieclan, zoals de app ze toont. **Dezelfde gegevens als op
+ * burgieclan.be**: de site bewaart hier niets, ze vraagt het bij elke aanvraag
+ * aan de backend van Burgieclan, namens het ingelogde lid (zie
+ * `docs/burgieclan-planning.md`). Wat je in de app afvinkt, staat dus meteen ook
+ * op Burgieclan afgevinkt, en omgekeerd.
+ *
+ * Alle data en uren zijn wandkloktijd in Leuven: `date` "YYYY-MM-DD", `start`
+ * "HH:MM", `startMin`/`endMin` minuten sinds middernacht op `date`.
+ */
+export type AppPlanningMark = "event" | "rule" | null;
+
+/** Een les uit het lessenrooster van KU Leuven. */
+export type AppPlanningSession = {
+  uid: string;
+  date: string;
+  start: string;
+  end: string | null;
+  startMin: number;
+  endMin: number;
+  /** "Power System Calculations: Lecture", zonder de code. */
+  course: string;
+  code: string | null;
+  /** De sleutel van het vak in `subjects`. */
+  subject: string;
+  /** college | practicum | oefenzitting | excursie | opdracht | other */
+  type: string;
+  location: string | null;
+  people: string | null;
+  /** Afgevinkt: gevolgd of ingehaald. */
+  done: boolean;
+  /** Verborgen, enkel deze les (`event`) of elke week op dit uur (`rule`). */
+  hidden: AppPlanningMark;
+  hiddenRule: string | null;
+  mandatory: AppPlanningMark;
+  mandatoryRule: string | null;
+  /** Het vak op Burgieclan, wanneer het daar gekend is. */
+  courseUrl: string | null;
+};
+
+/** Een deadline of een verplichte sessie die iemand zelf invulde. */
+export type AppPlanningItem = {
+  id: string;
+  subject: string;
+  subjectLabel: string;
+  kind: "deadline" | "mandatory";
+  title: string;
+  date: string;
+  /** Leeg bij een deadline op het einde van de dag. */
+  time: string | null;
+  end: string | null;
+  note: string;
+  done: boolean;
+};
+
+/** Eén keer dat een VTK-evenement plaatsvindt: het evenement zelf, of één moment van een reeks. */
+export type AppPlanningOccurrence = {
+  key: string;
+  date: string;
+  /** Na middernacht of over meerdere dagen: de laatste dag. */
+  endDate: string;
+  start: string | null;
+  end: string | null;
+  startMin: number;
+  /** Loopt het na middernacht door, dan 1440 op `date`. */
+  endMin: number;
+  allDay: boolean;
+  label: string | null;
+  location: string | null;
+};
+
+/** Een VTK-evenement dat iemand in zijn planning zette. */
+export type AppPlanningVtkEvent = {
+  /** De id van het evenement, zoals `/kalender/<id>` in de app. */
+  id: string;
+  title: string;
+  location: string | null;
+  url: string;
+  occurrences: AppPlanningOccurrence[];
+};
+
+export type AppPlanning = {
+  /**
+   * `false` wanneer deze site niet met Burgieclan gekoppeld is (geen
+   * `BURGIECLAN_API_URL` of geheim). De app toont de planning dan niet.
+   */
+  available: boolean;
+  /** Een lessenrooster gekoppeld. Zonder is de rest leeg en toont de app de stap om te koppelen. */
+  subscribed: boolean;
+  /** Vandaag in Leuven, "YYYY-MM-DD", en het aantal minuten sinds middernacht. */
+  today: string;
+  now: number;
+  /** ISO, of null voor de eerste geslaagde synchronisatie. */
+  lastSync: string | null;
+  /** Waarom de laatste synchronisatie met KU Leuven mislukte (in het Engels, van Burgieclan). */
+  syncError: string | null;
+  /** De abonnementslink van het lessenrooster, zoals ze bewaard is. */
+  icsUrl: string | null;
+  /** De geëxporteerde agenda: lessen zonder de verborgen, deadlines en VTK-evenementen. */
+  feedUrl: string | null;
+  /** Dezelfde link als `webcal://`, voor "Abonneren" in een agenda-app. */
+  webcalUrl: string | null;
+  /** De planning op Burgieclan zelf. */
+  burgieclanUrl: string;
+  subjects: { key: string; label: string }[];
+  sessions: AppPlanningSession[];
+  items: AppPlanningItem[];
+  vtkEvents: AppPlanningVtkEvent[];
+};
+
+/**
+ * Eén wijziging aan de planning (`POST /planning/operations`). Dezelfde
+ * operaties als op Burgieclan; elke operatie antwoordt met de hele `AppPlanning`.
+ */
+export type AppPlanningOperation =
+  | { op: "done" | "hide" | "mandatory"; uid: string; value: boolean }
+  | { op: "keepOnly"; uid: string }
+  | { op: "addRule"; uid: string; action: "hide" | "mandatory" }
+  | { op: "removeRule"; id: string }
+  | { op: "itemDone"; id: string; value: boolean }
+  | { op: "deleteItem"; id: string }
+  | {
+      op: "addItem";
+      item: {
+        subject: string;
+        kind: "deadline" | "mandatory";
+        title: string;
+        date: string;
+        time: string | null;
+        end: string | null;
+        note: string;
+      };
+    }
+  | { op: "addVtkEvent" | "removeVtkEvent"; vtkEventId: string };
