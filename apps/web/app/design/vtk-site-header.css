@@ -68,6 +68,7 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  border-radius: 5px;
   color: var(--paper);
   text-decoration: none;
   font-weight: 700;
@@ -115,7 +116,7 @@
      toen de container nog tot 1320px groeide; verander je `--max`, kijk dan hier
      opnieuw, want overlopen wordt niet afgeknipt (het uitklappaneel mag niet
      geknipt worden) en de tabs schuiven dan over de knoppen rechts. */
-  gap: clamp(10px, calc(1.6vw - 9px), 15px);
+  gap: clamp(12px, calc(2.2vw - 13px), 16px);
   min-width: 0;
   flex: none;
   height: 100%;
@@ -170,25 +171,48 @@
 }
 
 .vtk-site-header .nav-links a {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 4px;
-  min-width: 27px;
-  min-height: 28px;
+  min-width: 24px;
+  min-height: 24px;
+  padding-inline: 3px;
+  margin-inline: -3px;
+  border-radius: 5px;
+}
+
+.vtk-site-header .nav-links a:focus-visible {
+  outline: none;
+}
+
+.vtk-site-header .nav-links a:focus-visible::after {
+  content: '';
+  position: absolute;
+  inset: 1px -2px;
+  border: 2px solid var(--paper);
+  border-radius: 8px;
+  pointer-events: none;
 }
 
 .vtk-site-header .nav-submenu-toggle {
   position: relative;
   display: inline-grid;
   place-items: center;
-  min-width: 27px;
-  min-height: 28px;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
   padding: 0;
   border: 0;
+  border-radius: 7px;
   background: none;
   color: rgba(250, 250, 247, 0.78);
   cursor: pointer;
+}
+
+.vtk-site-header .nav-submenu-toggle:focus-visible {
+  outline-offset: -2px;
 }
 
 .vtk-site-header .nav-submenu-toggle:hover,
@@ -198,7 +222,7 @@
 
 .vtk-site-header .nav-caret {
   flex: none;
-  opacity: 0.65;
+  opacity: 0.55;
   transition:
     transform 160ms ease,
     opacity 160ms ease;
@@ -444,15 +468,20 @@
 .vtk-site-header .lang-toggle button {
   display: inline-grid;
   place-items: center;
-  min-width: 28px;
-  min-height: 28px;
-  padding: 4px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 2px;
+  border-radius: 7px;
   color: inherit;
   background: none;
   border: 0;
   cursor: pointer;
   font: inherit;
   text-transform: uppercase;
+}
+
+.vtk-site-header .lang-toggle button:focus-visible {
+  outline-offset: 0;
 }
 
 .vtk-site-header .lang-toggle button[aria-pressed='true'] {

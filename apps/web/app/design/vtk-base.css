@@ -161,14 +161,40 @@
   cursor: pointer;
 }
 
+@layer base {
+  :where(.vtk-design, .vtk-page, .vtk-site-header, .vtk-site-footer, .vtk-page-head, .vtk-cookie-consent, .vtk-announcement-top)
+    :where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+    border-radius: 5px;
+  }
+}
+
 :is(.vtk-design, .vtk-page) :where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 
-:is(.vtk-site-header, .vtk-site-footer, .vtk-page-head, .vtk-design .page-head, .vtk-cookie-consent, .vtk-announcement-top)
+:is(
+    .vtk-site-header,
+    .vtk-site-footer,
+    .vtk-page-head,
+    .vtk-design .page-head,
+    .vtk-cookie-consent,
+    .vtk-announcement-top,
+    .vtk-design .hours-strip,
+    .vtk-design .aftermovie-band,
+    .vtk-design .career-band,
+    .vtk-design .poc-band
+  )
   :where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
-  outline: 2px solid var(--yellow);
+  outline: 2px solid var(--paper);
+  outline-offset: 2px;
+}
+
+/* Witte kaarten binnen een donkere navy-band behouden donkere focuslijnen. */
+:is(.vtk-design, .vtk-page)
+  :is(.poc-elect-card, .poc-elect-steps)
+  :where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 
@@ -1298,9 +1324,13 @@
 }
 
 .vtk-search-form:focus-within {
-  border-color: var(--yellow);
+  border-color: rgba(255, 255, 255, 0.55);
   background: rgba(255, 255, 255, 0.22);
-  box-shadow: 0 0 0 2px var(--yellow);
+}
+
+.vtk-search-form:has(:focus-visible) {
+  border-color: var(--paper);
+  box-shadow: 0 0 0 2px var(--paper);
 }
 
 .vtk-search-icon {

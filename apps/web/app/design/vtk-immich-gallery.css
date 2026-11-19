@@ -497,7 +497,7 @@
 
 .vtk-immich-lightbox .vtk-immich-icon-button:focus-visible,
 .vtk-immich-lightbox-nav:focus-visible {
-  outline: 2px solid var(--yellow);
+  outline: 2px solid var(--paper);
   outline-offset: 3px;
   box-shadow: none;
 }

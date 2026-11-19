@@ -202,7 +202,7 @@
 }
 
 .poc-poll-choice:has(input:focus-visible) {
-  outline: 2px solid var(--yellow);
+  outline: 2px solid var(--paper);
   outline-offset: 2px;
 }
 
@@ -236,7 +236,7 @@
 
 .poc-poll textarea:focus-visible,
 .poc-poll-edit:focus-visible {
-  outline: 2px solid var(--yellow);
+  outline: 2px solid var(--paper);
   outline-offset: 2px;
 }
 

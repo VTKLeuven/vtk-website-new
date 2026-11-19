@@ -45,7 +45,7 @@ export function AftermovieGrid({
               <iframe
                 ref={activeIframeRef}
                 tabIndex={-1}
-                className="am-media focus-visible:outline focus-visible:outline-2 focus-visible:outline-vtk-yellow"
+                className="am-media"
                 src={`${item.embedUrl}&autoplay=1`}
                 title={item.title}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"

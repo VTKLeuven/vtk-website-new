@@ -801,7 +801,7 @@
 }
 
 .ticket-pass-qr-trigger:focus-visible {
-  outline: 2px solid var(--yellow);
+  outline: 2px solid var(--ink);
   outline-offset: 4px;
 }
 
@@ -1041,7 +1041,7 @@ dialog.ticket-dialog :where(a, button):focus-visible {
 
 dialog.ticket-dialog .ticket-dialog-close:focus-visible,
 .ticket-dialog-close:focus-visible {
-  outline: 2px solid var(--yellow);
+  outline: 2px solid var(--paper);
   outline-offset: 2px;
 }
 
@@ -3230,7 +3230,7 @@ dialog.ticket-dialog .ticket-dialog-close:focus-visible,
 .scanner-picker-list a { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 18px; }
 .scanner-picker-list span, .scanner-picker-empty p { color: var(--muted); }
 .scanner-picker-list { width: min(100%, 900px); margin: 0 auto; }
-.scanner-route-shell :is(button, a, input, select):focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }
+.scanner-route-shell :is(button, a, input, select):focus-visible { outline: 3px solid var(--paper); outline-offset: 3px; }
 
 .scanner-camera-empty button, .scanner-load-error button { color: var(--ink); border-radius: 999px; }
 .scanner-camera-tools button:hover:not(:disabled), .scanner-camera-tools button.is-active { background: var(--yellow); color: var(--ink); }

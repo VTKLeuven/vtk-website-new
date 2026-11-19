@@ -195,7 +195,7 @@
 }
 
 .vtk-blueprint-hero a:focus-visible {
-  outline: 2px solid var(--yellow);
+  outline: 2px solid var(--paper);
   outline-offset: 3px;
   border-radius: 4px;
 }
@@ -312,7 +312,7 @@
 .g-event:nth-child(4) { grid-column: 4; }
 
 .g-event:focus-visible {
-  outline: 2px solid var(--yellow);
+  outline: 2px solid var(--paper);
   outline-offset: 3px;
   border-radius: 16px;
 }

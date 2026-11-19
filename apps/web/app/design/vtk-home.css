@@ -87,6 +87,8 @@
 }
 
 .vtk-design .sec-head .meta a {
+  padding-inline: 3px;
+  margin-inline: -3px;
   color: var(--ink);
   border-bottom: 1px solid var(--ink);
 }
@@ -587,9 +589,26 @@
   place-items: center;
 }
 
-.vtk-design .am-play:focus-visible {
-  outline: 2px solid var(--yellow);
-  outline-offset: -2px;
+.vtk-design .am-play:focus-visible,
+.vtk-design .am-media:focus-visible {
+  outline: none;
+}
+
+/* De focusring wordt binnen het kader getekend omdat `-webkit-mask-image` op
+   `.am-frame` elke `outline` buiten de rand afknipt. Een donkere buiten- en
+   binnenrand rondom het wit houdt het contrast >15:1 op elke videoposter. */
+.vtk-design .am-play:focus-visible::after,
+.vtk-design .am-frame:has(.am-media:focus-visible)::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: 14px;
+  border: 2px solid var(--paper);
+  box-shadow:
+    0 0 0 2px var(--ink),
+    inset 0 0 0 2px var(--ink);
+  pointer-events: none;
+  z-index: 2;
 }
 
 /* De YouTube-poster is 4:3 met zwarte balken; cover snijdt die weg. */

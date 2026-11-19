@@ -191,7 +191,7 @@ dialog.vtk-gal-lightbox::backdrop {
 
 .vtk-gal-lightbox-bar button:focus-visible,
 .vtk-gal-lightbox-nav:focus-visible {
-  outline: 2px solid var(--yellow);
+  outline: 2px solid var(--paper);
   outline-offset: 2px;
 }
 

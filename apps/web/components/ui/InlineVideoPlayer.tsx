@@ -129,7 +129,7 @@ export function InlineVideoPlayer({
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
           referrerPolicy="strict-origin-when-cross-origin"
-          className="h-full w-full border-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-vtk-yellow"
+          className="h-full w-full border-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
         />
       ) : (
         <div className="group relative h-full w-full">
@@ -149,7 +149,7 @@ export function InlineVideoPlayer({
             <button
               type="button"
               onClick={() => setStarted(true)}
-              className="group/btn flex items-center justify-center transition-transform hover:scale-108 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-vtk-yellow"
+              className="group/btn flex items-center justify-center transition-transform hover:scale-108 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white"
               aria-label={playLabel}
               title={playLabel}
             >

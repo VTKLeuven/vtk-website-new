@@ -74,7 +74,7 @@
 .vtk-link-page-share:focus-visible,
 .vtk-link-page-social:focus-visible,
 .vtk-link-page-link:focus-visible {
-  outline: 3px solid var(--yellow);
+  outline: 3px solid var(--paper);
   outline-offset: 3px;
 }
 

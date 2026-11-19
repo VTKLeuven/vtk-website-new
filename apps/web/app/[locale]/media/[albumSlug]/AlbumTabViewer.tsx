@@ -118,7 +118,6 @@ export function AlbumTabViewer({
         role="tabpanel"
         id={panelId}
         aria-labelledby={activeTabId}
-        tabIndex={0}
         className="vtk-album-tabpanel"
       >
         <AlbumViewer

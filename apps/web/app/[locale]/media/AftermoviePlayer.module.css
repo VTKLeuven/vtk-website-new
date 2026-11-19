@@ -288,12 +288,12 @@
 .vtk-media-aftermovie-play:focus-visible,
 .vtk-media-aftermovie-item:focus-visible,
 .vtk-media-aftermovie-fallback a:focus-visible {
-  outline: 3px solid var(--yellow, #ffd23f);
+  outline: 3px solid var(--paper, #eff2f8);
   outline-offset: 3px;
 }
 
 .vtk-media-aftermovie-media:focus-visible {
-  outline: 3px solid var(--yellow, #ffd23f);
+  outline: 3px solid var(--paper, #eff2f8);
   outline-offset: -3px;
 }
 

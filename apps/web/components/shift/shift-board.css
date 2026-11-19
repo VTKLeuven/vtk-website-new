@@ -1182,7 +1182,7 @@ dialog.vtk-shift-dialog :where(a, button, summary, [tabindex]:not([tabindex='-1'
 }
 
 dialog.vtk-shift-dialog .vtk-shift-dialog-close:focus-visible {
-  outline: 2px solid var(--yellow);
+  outline: 2px solid var(--paper);
   outline-offset: 2px;
 }
 

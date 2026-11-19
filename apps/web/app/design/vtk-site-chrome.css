@@ -76,6 +76,11 @@
   font-size: 14px;
 }
 
+.vtk-site-footer a {
+  padding-inline: 3px;
+  margin-inline: -3px;
+}
+
 .vtk-site-footer a:hover {
   color: #fff;
 }
