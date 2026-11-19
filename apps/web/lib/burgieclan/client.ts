@@ -9,14 +9,20 @@ import { burgieclanAuthHeaders, type BurgieclanIdentity } from "./signature";
  * `docs/burgieclan-planning.md` voor het geheel.
  *
  * Drie env-vars:
- * - `BURGIECLAN_API_URL`: de publieke basis-URL van de Symfony-backend
- *   (`https://api.burgieclan.be`, lokaal `http://localhost:8000`). Ook de
- *   geëxporteerde agenda staat daar, dus de app krijgt die URL te zien.
+ * - `BURGIECLAN_API_URL`: de publieke basis-URL van de Symfony-backend. In
+ *   productie is dat gewoon de site, `https://burgieclan.vtk.be`: de nginx van
+ *   Burgieclan stuurt `/api` daar door naar Symfony. Lokaal
+ *   `http://localhost:8000`. Ook de geëxporteerde agenda staat daar, dus de app
+ *   krijgt die URL te zien.
  * - `BURGIECLAN_SERVICE_SECRET`: gedeeld met `VTK_SERVICE_SECRET` bij
  *   Burgieclan, minstens 32 tekens.
- * - `BURGIECLAN_CLIENT_ID` (optioneel): de SSO-client van Burgieclan. Enkel
- *   nodig wanneer die client op `pairwise` staat; dan is de `sub` die Burgieclan
- *   kent niet de id van het lid, en rekenen we hem hier na.
+ * - `BURGIECLAN_CLIENT_ID` (optioneel, vandaag niet nodig): de SSO-client van
+ *   Burgieclan. Enkel nodig mocht die client ooit op `pairwise` komen te staan;
+ *   dan is de `sub` die Burgieclan kent niet de id van het lid, en rekenen we hem
+ *   hier na. Geen scherm in /admin/sso zet een client op pairwise.
+ * - `BURGIECLAN_URL` (optioneel): de site zelf, voor de links naar een vak en de
+ *   planner. Standaard dezelfde als `BURGIECLAN_API_URL`, want daar staan ze
+ *   allebei.
  *
  * Ontbreekt een van de eerste twee, dan is de planning in de app gewoon niet
  * beschikbaar (`burgieclanConfig()` geeft `null`), in plaats van een 500.
@@ -31,7 +37,7 @@ export function burgieclanConfig(): BurgieclanConfig | null {
     apiUrl,
     secret,
     clientId: process.env.BURGIECLAN_CLIENT_ID?.trim() || null,
-    siteUrl: (process.env.BURGIECLAN_URL?.trim() || "https://burgieclan.be").replace(/\/+$/, ""),
+    siteUrl: (process.env.BURGIECLAN_URL?.trim() || apiUrl).replace(/\/+$/, ""),
   };
 }
 

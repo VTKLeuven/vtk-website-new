@@ -44,7 +44,7 @@ function emptyPlanning(available: boolean, config: BurgieclanConfig | null): App
     icsUrl: null,
     feedUrl: null,
     webcalUrl: null,
-    burgieclanUrl: `${config?.siteUrl ?? "https://burgieclan.be"}/planner`,
+    burgieclanUrl: `${config?.siteUrl ?? "https://burgieclan.vtk.be"}/planner`,
     subjects: [],
     sessions: [],
     items: [],

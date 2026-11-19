@@ -53,10 +53,10 @@ latere login op Burgieclan komt op hetzelfde account uit.
 
 | Waar | Variabele | Wat |
 |---|---|---|
-| vtk.be | `BURGIECLAN_API_URL` | De publieke URL van de backend (`https://api.burgieclan.be`). Ook de geëxporteerde agenda staat daar. |
+| vtk.be | `BURGIECLAN_API_URL` | De publieke URL van de backend: in productie `https://burgieclan.vtk.be` (de nginx van Burgieclan stuurt `/api` naar Symfony), lokaal `http://localhost:8000`. Ook de geëxporteerde agenda staat daar. |
 | vtk.be | `BURGIECLAN_SERVICE_SECRET` | Gedeeld geheim, minstens 32 tekens. |
-| vtk.be | `BURGIECLAN_CLIENT_ID` | Optioneel, enkel voor een pairwise client (zie hieronder). |
-| vtk.be | `BURGIECLAN_URL` | De site zelf, voor links naar een vak of de planner. |
+| vtk.be | `BURGIECLAN_URL` | Optioneel: de site zelf, voor links naar een vak of de planner. Standaard gelijk aan `BURGIECLAN_API_URL`. |
+| vtk.be | `BURGIECLAN_CLIENT_ID` | Vandaag niet nodig; enkel voor een pairwise client (zie hieronder). |
 | Burgieclan | `VTK_SERVICE_SECRET` | Hetzelfde geheim. Leeg = de app krijgt geen toegang. |
 | Burgieclan | `VTK_URL` | vtk.be, voor de VTK-evenementen. Lokaal `http://host.docker.internal:3000`. |
 
@@ -98,7 +98,9 @@ als bij Burgieclan, dus de app vraagt nooit twee keer.
    feed (die heeft geen login nodig). Een gelekt geheim mag niet de documenten of
    de moderatie van Burgieclan openzetten. Breid `PATH_PREFIX` in
    `VtkServiceAuthenticator` niet uit zonder die afweging.
-3. **Een pairwise client.** Staat de client van Burgieclan op `pairwise`, dan is
+3. **Een pairwise client.** Vandaag staat elke client op `public` (geen scherm in
+   /admin/sso zet er een op pairwise), en dan is de `sub` gewoon de id van het
+   lid. Komt de client van Burgieclan ooit op `pairwise`, dan is
    de `sub` die Burgieclan kent een HMAC van host en lid-id, niet de id zelf.
    `subjectFor` in `client.ts` rekent hem na zoals `computePairwiseSub` in
    `@better-auth/oauth-provider`, maar enkel met `BURGIECLAN_CLIENT_ID` erbij.
