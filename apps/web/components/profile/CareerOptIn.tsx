@@ -81,6 +81,9 @@ export function CareerOptIn({
 
   return (
     <fieldset ref={ref} className="vtk-career" hidden={!shown} disabled={!shown}>
+      <legend className="sr-only">
+        {copy.kicker}: {careerHeading(copy, study)}
+      </legend>
       <input type="hidden" name={CAREER_OPT_IN_SHOWN_FIELD} value="1" />
       <div className="vtk-career-shot">
         {/* Dezelfde foto als de Career-band op de homepage. `fill` met een eigen

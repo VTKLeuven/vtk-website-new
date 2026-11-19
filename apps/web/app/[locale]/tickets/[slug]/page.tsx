@@ -187,7 +187,7 @@ export default async function TicketEventPage({
           </div>
         </div>
       </header>
-      <main className="tshop-shell">
+      <div className="tshop-shell">
         <TicketShop
           event={serializeTicketEvent(event)}
           locale={locale}
@@ -196,7 +196,7 @@ export default async function TicketEventPage({
           about={<TicketEventAbout event={event} locale={locale} />}
           practical={<TicketEventPractical event={event} locale={locale} organiser={organiser} location={location} />}
         />
-      </main>
+      </div>
     </div>
   );
 }

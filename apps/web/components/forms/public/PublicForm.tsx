@@ -1,7 +1,7 @@
 "use client";
 
 import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useTransition, type RefObject } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@vtk/ui";
 import { useToast } from "@/components/ui/toast";
@@ -115,18 +115,33 @@ export function PublicForm({
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>(initialAnswers);
   const [files, setFiles] = useState<Record<string, UploadedFile[]>>(initialFiles);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [consentError, setConsentError] = useState<string | null>(null);
+  const [errorSubmitSeq, setErrorSubmitSeq] = useState(0);
   const [consentGiven, setConsentGiven] = useState(false);
   const [isTest, setIsTest] = useState(false);
+  const consentUid = useId();
+  const consentInputId = `${consentUid}-consent`;
+  const consentErrorId = `${consentUid}-consent-error`;
   // Wanneer het formulier op het scherm kwam, om te snel invullen te herkennen.
   // Pas in een effect gezet: tijdens het renderen mag dit niet, en de waarde
   // hoort ook bij de browser en niet bij de server-render.
   const startedAt = useRef<number | null>(null);
   const honeypot = useRef<HTMLInputElement>(null);
   const errorSummary = useRef<HTMLDivElement>(null);
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null);
+  const stepSectionRef = useRef<HTMLElement>(null);
+  const hasMountedStepRef = useRef(false);
 
   useEffect(() => {
     startedAt.current = Date.now();
   }, []);
+
+  useEffect(() => {
+    if (errorSubmitSeq === 0) return;
+    // Na het renderen pas focussen, want de foutmelding staat voor de eerste
+    // mislukte poging nog niet in de DOM.
+    errorSummary.current?.focus();
+  }, [errorSubmitSeq]);
 
   const visible = useMemo(
     () =>
@@ -176,6 +191,19 @@ export function PublicForm({
   const currentStep = Math.min(stepIndex, Math.max(0, formSteps.length - 1));
   const isLastStep = !stepBySections || currentStep >= formSteps.length - 1;
 
+  useEffect(() => {
+    if (!stepBySections) return;
+    if (!hasMountedStepRef.current) {
+      hasMountedStepRef.current = true;
+      return;
+    }
+    if (stepHeadingRef.current) {
+      stepHeadingRef.current.focus();
+    } else {
+      stepSectionRef.current?.focus();
+    }
+  }, [stepBySections, currentStep]);
+
   const visibleFields = fields.filter((field) => visible.has(field.id));
   // De voortgang telt de verplichte velden die zichtbaar én ingevuld zijn; dat
   // is wat een bezoeker wil weten, niet hoeveel velden er in totaal bestaan.
@@ -211,6 +239,7 @@ export function PublicForm({
 
   function send(asDraft: boolean) {
     setErrors({});
+    setConsentError(null);
     startTransition(async () => {
       const result = await unsentGuard.run(() => submitFormAction({
         formId,
@@ -235,6 +264,7 @@ export function PublicForm({
       if (result.status === "invalid") {
         setErrors(result.errors);
         if (result.formError === "CONSENT_REQUIRED") {
+          setConsentError(errorText("CONSENT_REQUIRED", nl));
           showToast({
             message: nl
               ? "Vink de toestemming aan om verder te kunnen."
@@ -242,10 +272,10 @@ export function PublicForm({
             variant: "error",
             duration: 0,
           });
+        } else {
+          setConsentError(null);
         }
-        // Naar de eerste fout springen; een foutmelding onderaan een lang
-        // formulier mis je gemakkelijk.
-        errorSummary.current?.focus();
+        setErrorSubmitSeq((n) => n + 1);
         return;
       }
 
@@ -284,6 +314,7 @@ export function PublicForm({
   }
 
   const errorCount = Object.keys(errors).length;
+  const totalErrorCount = errorCount + (consentError ? 1 : 0);
 
   return (
     <form
@@ -312,16 +343,18 @@ export function PublicForm({
         aria-hidden="true"
       />
 
-      {errorCount > 0 ? (
+      {totalErrorCount > 0 ? (
         <div
           className="vtk-form-summary"
           role="alert"
           tabIndex={-1}
           ref={errorSummary}
         >
-          {nl
-            ? `Er ${errorCount === 1 ? "is 1 vraag" : `zijn ${errorCount} vragen`} die nog niet klopt.`
-            : `There ${errorCount === 1 ? "is 1 question" : `are ${errorCount} questions`} that need attention.`}
+          {errorCount > 0
+            ? nl
+              ? `Er ${totalErrorCount === 1 ? "is 1 vraag" : `zijn ${totalErrorCount} vragen`} die nog niet klopt.`
+              : `There ${totalErrorCount === 1 ? "is 1 question" : `are ${totalErrorCount} questions`} that need attention.`
+            : consentError}
         </div>
       ) : null}
 
@@ -366,6 +399,8 @@ export function PublicForm({
           section={sections.find((entry) => entry.id === formSteps[currentStep]?.sectionId) ?? null}
           fields={stepFields}
           locale={locale}
+          headingRef={stepHeadingRef}
+          sectionRef={stepSectionRef}
           {...{ formId, answers, onAnswer, files, setFiles, errors, nl }}
         />
       ) : null}
@@ -398,20 +433,53 @@ export function PublicForm({
       })}
 
       {consent && isLastStep ? (
-        <label className="vtk-form-check">
-          <input
-            type="checkbox"
-            checked={consentGiven}
-            onChange={(event) => setConsentGiven(event.target.checked)}
-            required={consent.required}
-          />
-          <span>
-            {consent.text}{" "}
-            <a href={privacyUrl} target="_blank" rel="noreferrer">
+        <div
+          className="vtk-form-field vtk-form-consent-wrap"
+          data-invalid={consentError ? "true" : undefined}
+        >
+          <div className="vtk-form-consent-row">
+            <label className="vtk-form-consent-label" htmlFor={consentInputId}>
+              <input
+                id={consentInputId}
+                type="checkbox"
+                checked={consentGiven}
+                onChange={(event) => {
+                  setConsentGiven(event.target.checked);
+                  if (event.target.checked) setConsentError(null);
+                }}
+                required={consent.required}
+                aria-invalid={Boolean(consentError) || undefined}
+                aria-describedby={consentError ? consentErrorId : undefined}
+              />
+              <span>
+                {consent.text}
+                {consent.required ? (
+                  <>
+                    <span className="vtk-form-required" aria-hidden="true">
+                      *
+                    </span>
+                    <span className="sr-only">
+                      {nl ? " (verplicht)" : " (required)"}
+                    </span>
+                  </>
+                ) : null}
+              </span>
+            </label>
+            <a
+              className="vtk-form-consent-link"
+              href={privacyUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
               {nl ? "Privacybeleid" : "Privacy policy"}
             </a>
-          </span>
-        </label>
+          </div>
+          {consentError ? (
+            <p className="vtk-form-error" id={consentErrorId}>
+              {consentError}
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       {canTest && isLastStep ? (
@@ -479,6 +547,73 @@ export function PublicForm({
   );
 }
 
+function PublicFileFieldBlock({
+  field,
+  formId,
+  locale,
+  files,
+  onChange,
+  error,
+  nl,
+}: {
+  field: FieldWithSection;
+  formId: string;
+  locale: "nl" | "en";
+  files: UploadedFile[];
+  onChange: (next: UploadedFile[]) => void;
+  error: string | null;
+  nl: boolean;
+}) {
+  const uid = useId();
+  const labelId = `${uid}-label`;
+  const helpId = `${uid}-help`;
+  const errorId = `${uid}-error`;
+  const help = locale === "en" && field.helpEn ? field.helpEn : field.helpNl;
+  const describedBy = [help ? helpId : null, Boolean(error) ? errorId : null]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <div className="vtk-form-field" data-invalid={error ? "true" : undefined}>
+      <span id={labelId} className="vtk-form-label">
+        {locale === "en" && field.labelEn ? field.labelEn : field.labelNl}
+        {field.required ? (
+          <>
+            <span className="vtk-form-required" aria-hidden="true">
+              *
+            </span>
+            <span className="sr-only">{nl ? " (verplicht)" : " (required)"}</span>
+          </>
+        ) : null}
+      </span>
+      {help ? (
+        <p className="vtk-form-help" id={helpId}>
+          {help}
+        </p>
+      ) : null}
+      <FormFileField
+        formId={formId}
+        fieldId={field.id}
+        locale={locale}
+        maxFiles={field.config.maxFiles ?? DEFAULT_FILE_MAX_FILES}
+        accept={field.config.allowedExtensions
+          ?.map((extension) => `.${extension}`)
+          .join(",")}
+        files={files}
+        onChange={onChange}
+        ariaLabelledBy={labelId}
+        describedById={describedBy || undefined}
+        invalid={Boolean(error)}
+      />
+      {error ? (
+        <p className="vtk-form-error" id={errorId}>
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function FieldGroup({
   fields,
   formId,
@@ -507,31 +642,18 @@ function FieldGroup({
 
         if (field.type === "FILE") {
           return (
-            <div className="vtk-form-field" key={field.id} data-invalid={error ? "true" : undefined}>
-              <span className="vtk-form-label">
-                {locale === "en" && field.labelEn ? field.labelEn : field.labelNl}
-                {field.required ? <span className="vtk-form-required" aria-hidden="true">*</span> : null}
-              </span>
-              {field.helpNl || field.helpEn ? (
-                <p className="vtk-form-help">
-                  {locale === "en" && field.helpEn ? field.helpEn : field.helpNl}
-                </p>
-              ) : null}
-              <FormFileField
-                formId={formId}
-                fieldId={field.id}
-                locale={locale}
-                maxFiles={field.config.maxFiles ?? DEFAULT_FILE_MAX_FILES}
-                accept={field.config.allowedExtensions
-                  ?.map((extension) => `.${extension}`)
-                  .join(",")}
-                files={files[field.id] ?? []}
-                onChange={(next) =>
-                  setFiles((current) => ({ ...current, [field.id]: next }))
-                }
-              />
-              {error ? <p className="vtk-form-error">{error}</p> : null}
-            </div>
+            <PublicFileFieldBlock
+              key={field.id}
+              field={field}
+              formId={formId}
+              locale={locale}
+              files={files[field.id] ?? []}
+              onChange={(next) =>
+                setFiles((current) => ({ ...current, [field.id]: next }))
+              }
+              error={error}
+              nl={nl}
+            />
           );
         }
 
@@ -562,6 +684,8 @@ function StepView({
   setFiles,
   errors,
   nl,
+  headingRef,
+  sectionRef,
 }: {
   section: PublicSection | null;
   fields: FieldWithSection[];
@@ -573,6 +697,8 @@ function StepView({
   setFiles: (next: (current: Record<string, UploadedFile[]>) => Record<string, UploadedFile[]>) => void;
   errors: Record<string, string>;
   nl: boolean;
+  headingRef: RefObject<HTMLHeadingElement | null>;
+  sectionRef: RefObject<HTMLElement | null>;
 }) {
   const title = section
     ? locale === "en" && section.titleEn
@@ -586,8 +712,17 @@ function StepView({
     : null;
 
   return (
-    <section className="vtk-form-section" aria-labelledby={section ? `s-${section.id}` : undefined}>
-      {title ? <h2 id={`s-${section?.id}`}>{title}</h2> : null}
+    <section
+      ref={sectionRef}
+      tabIndex={title ? undefined : -1}
+      className="vtk-form-section"
+      aria-labelledby={section ? `s-${section.id}` : undefined}
+    >
+      {title ? (
+        <h2 ref={headingRef} id={`s-${section?.id}`} tabIndex={-1}>
+          {title}
+        </h2>
+      ) : null}
       {description ? <p className="vtk-form-section-intro">{description}</p> : null}
       <FieldGroup
         fields={fields}

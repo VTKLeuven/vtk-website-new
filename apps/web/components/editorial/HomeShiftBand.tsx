@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Link from "@/components/ui/Link";
 import { isSameDay, addDays } from "date-fns";
 import type { Locale } from "@vtk/i18n";
@@ -13,7 +13,12 @@ import {
   type PostNames,
 } from "@/components/shift/shiftData";
 import { RewardCoins } from "@/components/shift/RewardCoins";
-import { ShiftRosterPopover, shiftRosterSummary } from "./ShiftRosterPopover";
+import {
+  DismissiblePopoverWrap,
+  ShiftRosterPopover,
+  shiftRosterSummary,
+  useEscapeDismiss,
+} from "./ShiftRosterPopover";
 import dynamic from "next/dynamic";
 import type { ShiftDict } from "@/components/shift/shiftData";
 
@@ -28,7 +33,9 @@ import { MapPin, Users } from "lucide-react";
 
 function ShiftLocation({ locationText }: { locationText: string }) {
   const textRef = useRef<HTMLSpanElement>(null);
+  const tooltipId = useId();
   const [isOverflowing, setIsOverflowing] = useState(false);
+  const { dismissed, resetDismissed, handlers } = useEscapeDismiss();
 
   useEffect(() => {
     const el = textRef.current;
@@ -41,25 +48,41 @@ function ShiftLocation({ locationText }: { locationText: string }) {
     const ro = new ResizeObserver(check);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [locationText]);
+  }, [locationText, isOverflowing]);
+
+  if (!isOverflowing) {
+    return (
+      <span className="shift-tile-meta-item shift-tile-meta-loc">
+        <MapPin className="shift-tile-meta-icon" aria-hidden="true" />
+        <span ref={textRef} className="shift-tile-meta-text">
+          {locationText}
+        </span>
+      </span>
+    );
+  }
 
   return (
     <span
       className="shift-tile-meta-item shift-tile-meta-loc"
-      data-overflow={isOverflowing ? "true" : undefined}
-      tabIndex={isOverflowing ? 0 : undefined}
-      title={isOverflowing ? locationText : undefined}
-      aria-label={locationText}
+      data-overflow="true"
+      data-dismissed={dismissed ? "true" : undefined}
+      {...handlers}
     >
-      <MapPin className="shift-tile-meta-icon" aria-hidden="true" />
-      <span ref={textRef} className="shift-tile-meta-text">
-        {locationText}
-      </span>
-      {isOverflowing ? (
-        <span className="shift-tile-loc-tooltip" role="tooltip">
+      <button
+        type="button"
+        className="shift-tile-loc-btn"
+        aria-label={locationText}
+        aria-describedby={tooltipId}
+        onClick={resetDismissed}
+      >
+        <MapPin className="shift-tile-meta-icon" aria-hidden="true" />
+        <span ref={textRef} className="shift-tile-meta-text">
           {locationText}
         </span>
-      ) : null}
+      </button>
+      <span id={tooltipId} className="shift-tile-loc-tooltip" role="tooltip">
+        {locationText}
+      </span>
     </span>
   );
 }
@@ -247,22 +270,10 @@ export function HomeShiftBand({
             };
 
             return (
-              <article
-                key={shift.id}
-                className="shift-tile"
-                role="button"
-                tabIndex={0}
-                onClick={() => setSelectedEntry(entry)}
-                onKeyDown={(e) => {
-                  if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
-                    e.preventDefault();
-                    setSelectedEntry(entry);
-                  }
-                }}
-              >
+              <article key={shift.id} className="shift-tile">
                 <div className="shift-tile-head">
                   <p className="shift-tile-day">{formatShiftTileDay(start, now, locale)}</p>
-                  <div className="shift-spots-wrap" onClick={(e) => e.stopPropagation()}>
+                  <DismissiblePopoverWrap className="shift-spots-wrap">
                     {/* Geen `title`: de popover hieronder toont de namen al, en
                         een native tooltip kwam er na een tel bovenop. */}
                     <button
@@ -279,7 +290,7 @@ export function HomeShiftBand({
                       max={shift.maxParticipants}
                       nl={nl}
                     />
-                  </div>
+                  </DismissiblePopoverWrap>
                 </div>
 
                 <div className="shift-tile-time">
@@ -289,7 +300,15 @@ export function HomeShiftBand({
                   ) : null}
                 </div>
 
-                <h4 title={shift.name}>{shift.name}</h4>
+                <h3 title={shift.name}>
+                  <button
+                    type="button"
+                    className="shift-tile-title-btn"
+                    onClick={() => setSelectedEntry(entry)}
+                  >
+                    {shift.name}
+                  </button>
+                </h3>
 
                 {hasPost || hasLocation ? (
                   <div className="shift-tile-meta">
@@ -320,10 +339,7 @@ export function HomeShiftBand({
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedEntry(entry);
-                      }}
+                      onClick={() => setSelectedEntry(entry)}
                     >
                       {nl ? "Ingeschreven" : "Registered"}
                     </button>
@@ -331,17 +347,11 @@ export function HomeShiftBand({
                     <Link
                       href={`${base}/inloggen?next=${encodeURIComponent(base || "/")}`}
                       className="btn btn-primary btn-sm"
-                      onClick={(e) => e.stopPropagation()}
                     >
                       {nl ? "Inschrijven" : "Sign up"}
                     </Link>
                   ) : free <= 0 ? (
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      disabled
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <button type="button" className="btn btn-ghost btn-sm" disabled>
                       {nl ? "Vol" : "Full"}
                     </button>
                   ) : (
@@ -349,10 +359,7 @@ export function HomeShiftBand({
                       type="button"
                       className="btn btn-primary btn-sm"
                       disabled={registeringId === shift.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRegister(shift);
-                      }}
+                      onClick={() => handleRegister(shift)}
                     >
                       {registeringId === shift.id
                         ? nl
@@ -367,10 +374,7 @@ export function HomeShiftBand({
                   <button
                     type="button"
                     className="shift-tile-details"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedEntry(entry);
-                    }}
+                    onClick={() => setSelectedEntry(entry)}
                   >
                     {nl ? "Details" : "Details"}
                   </button>

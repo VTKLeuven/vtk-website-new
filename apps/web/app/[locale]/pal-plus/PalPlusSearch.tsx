@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type PalPlusSearchCopy = { label: string; placeholder: string; noResults: string; clear: string };
 
@@ -15,10 +15,15 @@ export type PalPlusSearchCopy = { label: string; placeholder: string; noResults:
  */
 export function PalPlusSearch({ copy }: { copy: PalPlusSearchCopy }) {
   const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const en = copy.label.toLowerCase() === "search";
 
   useEffect(() => {
     const terms = normalize(query).split(" ").filter(Boolean);
+    let statusTimer: number | undefined;
     const apply = () => {
+      let totalVisible = 0;
       for (const container of document.querySelectorAll<HTMLElement>("[data-pp-searchable]")) {
         let visible = 0;
         for (const item of container.querySelectorAll<HTMLElement>("[data-pp-search]")) {
@@ -27,6 +32,7 @@ export function PalPlusSearch({ copy }: { copy: PalPlusSearchCopy }) {
           item.hidden = !match;
           if (match) visible += 1;
         }
+        totalVisible += visible;
         for (const group of container.querySelectorAll<HTMLElement>("[data-pp-group]")) {
           group.hidden = group.querySelector("[data-pp-search]:not([hidden])") === null;
         }
@@ -35,6 +41,26 @@ export function PalPlusSearch({ copy }: { copy: PalPlusSearchCopy }) {
           empty.hidden = visible > 0 || terms.length === 0;
           empty.textContent = copy.noResults.replace("{query}", query.trim());
         }
+      }
+
+      if (statusTimer !== undefined) {
+        window.clearTimeout(statusTimer);
+        statusTimer = undefined;
+      }
+      if (terms.length > 0) {
+        const nextStatus =
+          totalVisible === 0
+            ? copy.noResults.replace("{query}", query.trim())
+            : en
+              ? totalVisible === 1
+                ? "1 result"
+                : `${totalVisible} results`
+              : totalVisible === 1
+                ? "1 resultaat"
+                : `${totalVisible} resultaten`;
+        statusTimer = window.setTimeout(() => {
+          setStatus(nextStatus);
+        }, 200);
       }
     };
     apply();
@@ -50,8 +76,11 @@ export function PalPlusSearch({ copy }: { copy: PalPlusSearchCopy }) {
       }
     };
     observe();
-    return () => observer.disconnect();
-  }, [query, copy.noResults]);
+    return () => {
+      observer.disconnect();
+      if (statusTimer !== undefined) window.clearTimeout(statusTimer);
+    };
+  }, [query, copy.noResults, en]);
 
   return (
     <div className="pp-search" role="search">
@@ -59,18 +88,33 @@ export function PalPlusSearch({ copy }: { copy: PalPlusSearchCopy }) {
         {copy.label}
       </label>
       <input
+        ref={inputRef}
         id="pp-search-input"
         type="search"
         value={query}
-        onChange={(event) => setQuery(event.target.value)}
+        onChange={(event) => {
+          const next = event.target.value;
+          setQuery(next);
+          if (!normalize(next)) setStatus("");
+        }}
         placeholder={copy.placeholder}
         autoComplete="off"
       />
       {query && (
-        <button type="button" onClick={() => setQuery("")}>
+        <button
+          type="button"
+          onClick={() => {
+            setQuery("");
+            setStatus("");
+            inputRef.current?.focus();
+          }}
+        >
           {copy.clear}
         </button>
       )}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {status}
+      </p>
     </div>
   );
 }

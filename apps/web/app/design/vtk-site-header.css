@@ -4,6 +4,39 @@
   --vtk-header-height: 73px;
 }
 
+.vtk-skip-link {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 200;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 10px 28px rgba(10, 15, 31, 0.35);
+}
+
+.vtk-skip-link:not(:focus-visible):not(:focus) {
+  position: absolute;
+  clip-path: inset(50%);
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  white-space: nowrap;
+}
+
+.vtk-skip-link:focus-visible {
+  outline: 2px solid var(--paper);
+  outline-offset: 2px;
+}
+
 /* Solide navy header met lichte navigatie: dezelfde donkere boekensteun als de
    footer, in plaats van de doorschijnende paper-balk. */
 .vtk-site-header {
@@ -35,6 +68,7 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  border-radius: 5px;
   color: var(--paper);
   text-decoration: none;
   font-weight: 700;
@@ -82,7 +116,7 @@
      toen de container nog tot 1320px groeide; verander je `--max`, kijk dan hier
      opnieuw, want overlopen wordt niet afgeknipt (het uitklappaneel mag niet
      geknipt worden) en de tabs schuiven dan over de knoppen rechts. */
-  gap: clamp(14px, calc(2.6vw - 17px), 18px);
+  gap: clamp(12px, calc(2.2vw - 13px), 16px);
   min-width: 0;
   flex: none;
   height: 100%;
@@ -93,7 +127,7 @@
   display: inline-flex;
   align-items: center;
   align-self: stretch;
-  gap: 2px;
+  gap: 0;
   flex: none;
 }
 
@@ -115,6 +149,7 @@
 }
 
 .vtk-site-header .nav-item:hover::after,
+.vtk-site-header .nav-item[data-menu-open]::after,
 .vtk-site-header .nav-item:has(:focus-visible)::after {
   transform: scaleX(1);
 }
@@ -135,33 +170,63 @@
   color: #fff;
 }
 
-/* Chevron in de tab zelf: enkel een teken dat er iets uitklapt. Openen doet de
-   CSS hieronder bij hover en bij toetsenbordfocus, zodat er geen extra knop
-   nodig is die de nav breder maakt.
-
-   Let op: `:focus-visible`, niet `:focus-within`. Met focus-within bleef het
-   paneel na een muisklik open hangen: de router navigeert client-side, de
-   aangeklikte link houdt zijn focus, en het menu bleef dus openstaan boven de
-   nieuwe pagina terwijl je muis er al lang weg was. `:focus-visible` staat na
-   een klik niet aan, dus enkel toetsenbordfocus opent nog. `[data-suppressed]`
-   (gezet door EditorialNavLinks bij een klik) sluit het paneel meteen zolang de
-   muis op de tab blijft staan. */
 .vtk-site-header .nav-links a {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-width: 27px;
+  min-height: 28px;
+  border-radius: 5px;
+}
+
+.vtk-site-header .nav-links a:focus-visible {
+  outline: none;
+}
+
+.vtk-site-header .nav-links a:focus-visible::after {
+  content: '';
+  position: absolute;
+  inset: 3px -5px;
+  border: 2px solid var(--paper);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.vtk-site-header .nav-submenu-toggle {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 27px;
+  height: 28px;
+  min-width: 27px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: rgba(250, 250, 247, 0.78);
+  cursor: pointer;
+}
+
+.vtk-site-header .nav-submenu-toggle:focus-visible {
+  outline-offset: -3px;
+}
+
+.vtk-site-header .nav-submenu-toggle:hover,
+.vtk-site-header .nav-item[data-menu-open] .nav-submenu-toggle {
+  color: #fff;
 }
 
 .vtk-site-header .nav-caret {
   flex: none;
-  opacity: 0.45;
+  opacity: 0.55;
   transition:
     transform 160ms ease,
     opacity 160ms ease;
 }
 
-.vtk-site-header .nav-item.has-menu:not([data-suppressed]):hover .nav-caret,
-.vtk-site-header .nav-item.has-menu:not([data-suppressed]):has(:focus-visible) .nav-caret {
+.vtk-site-header .nav-item.has-menu[data-menu-open] .nav-caret {
   opacity: 1;
   transform: rotate(180deg);
 }
@@ -216,8 +281,7 @@
   min-width: 212px;
 }
 
-.vtk-site-header .nav-item.has-menu:not([data-suppressed]):hover .nav-menu,
-.vtk-site-header .nav-item.has-menu:not([data-suppressed]):has(:focus-visible) .nav-menu,
+.vtk-site-header .nav-item.has-menu[data-menu-open] .nav-menu,
 .vtk-site-header .profile-menu[data-open] {
   opacity: 1;
   visibility: visible;
@@ -400,13 +464,22 @@
 }
 
 .vtk-site-header .lang-toggle button {
-  padding: 4px;
+  display: inline-grid;
+  place-items: center;
+  min-width: 27px;
+  min-height: 28px;
+  padding: 2px;
+  border-radius: 7px;
   color: inherit;
   background: none;
   border: 0;
   cursor: pointer;
   font: inherit;
   text-transform: uppercase;
+}
+
+.vtk-site-header .lang-toggle button:focus-visible {
+  outline-offset: -2px;
 }
 
 .vtk-site-header .lang-toggle button[aria-pressed='true'] {
@@ -463,7 +536,7 @@
   display: none;
 }
 
-@media (min-width: 1000px) {
+@media (min-width: 1200px) {
   .vtk-site-header .nav-search {
     display: inline-grid;
   }
@@ -501,16 +574,18 @@
    taal en account; het paneel klapt onder de header uit en toont per categorie
    de pagina's die eronder hangen.
 
-   DE GRENS STAAT HIER: 849px hieronder, en 850px in de `min-width` van de
-   zoekknop verderop. Die twee horen bij elkaar; zet je ze uit elkaar, dan is er
+   DE GRENS STAAT HIER: 1199px hieronder, en 1200px in de `min-width` van de
+   zoekknop hierboven. Die twee horen bij elkaar; zet je ze uit elkaar, dan is er
    een strook waar noch de zoekknop noch het uitklapmenu een zoekingang geeft.
 
-   Ze lag lang op 1210px, gemeten op elf tabs die samen ~725px breed zijn. Hoe
-   laag ze kan, hangt dus af van hoeveel tabs er zijn en hoe lang hun namen zijn:
-   dat is data, geen constante. Overlopen wordt niet afgeknipt (het uitklappaneel
+   Ze lag lang op 1210px, en moet door de losse submenuknoppen naast tabs met
+   kinderen opnieuw op 1199px / 1200px liggen zodat de tabs en submenuknoppen
+   nergens over `.nav-right` (zoeken, taal, account) schuiven. Hoe laag ze kan,
+   hangt dus af van hoeveel tabs er zijn en hoe lang hun namen zijn: dat is
+   data, geen constante. Overlopen wordt niet afgeknipt (het uitklappaneel
    mag niet geknipt worden), dus te laag zetten laat de tabs over de knoppen
    rechts schuiven in plaats van netjes af te breken. */
-@media (max-width: 999px) {
+@media (max-width: 1199px) {
   :root {
     --vtk-header-height: 65px;
   }
@@ -522,9 +597,13 @@
 
   .vtk-site-header .nav-links-shell {
     position: static;
-    order: 3;
+    margin-left: auto;
     flex: 0 0 auto;
     align-self: center;
+  }
+
+  .vtk-site-header .nav-right {
+    margin-left: 0;
   }
 
   .vtk-site-header .nav-links {

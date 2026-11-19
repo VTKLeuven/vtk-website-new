@@ -8,17 +8,20 @@
  */
 
 .vtk-form {
+  position: relative;
   display: grid;
   gap: 22px;
   max-width: 720px;
 }
 
 .vtk-form-field {
+  position: relative;
   display: grid;
   gap: 8px;
 }
 
 .vtk-form-label {
+  position: relative;
   font-weight: 600;
   color: var(--ink);
   line-height: 1.4;
@@ -48,7 +51,7 @@
 .vtk-form-input {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-border, rgba(14, 26, 54, 0.5));
   border-radius: 12px;
   background: var(--surface);
   color: var(--ink);
@@ -137,18 +140,19 @@
   }
 }
 
-.vtk-form-field[data-invalid='true'] .vtk-form-input {
-  border-color: var(--ink);
-  box-shadow: inset 3px 0 0 var(--yellow);
+.vtk-form-field[data-invalid='true'] :is(.vtk-form-input, .vtk-themed-select-trigger, .vtk-form-file-button),
+.vtk-form-consent-wrap[data-invalid='true'] .vtk-form-consent-row {
+  border-color: var(--danger-line, #d92d20);
+  box-shadow: inset 3px 0 0 var(--danger-line, #d92d20);
 }
 
 .vtk-form-error {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--danger-ink, #b42318);
   padding-left: 10px;
-  box-shadow: inset 3px 0 0 var(--yellow);
+  box-shadow: inset 3px 0 0 var(--danger-line, #d92d20);
 }
 
 .vtk-form-options {
@@ -157,15 +161,60 @@
 }
 
 .vtk-form-check {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 10px;
   padding: 10px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-border, rgba(14, 26, 54, 0.5));
   border-radius: 12px;
   background: var(--surface);
   cursor: pointer;
   line-height: 1.4;
+}
+
+.vtk-form-consent-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.vtk-form-consent-row {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--control-border, rgba(14, 26, 54, 0.5));
+  border-radius: 12px;
+  background: var(--surface);
+  line-height: 1.4;
+}
+
+.vtk-form-consent-label {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.vtk-form-consent-label input {
+  margin-top: 2px;
+  flex: none;
+}
+
+.vtk-form-consent-link {
+  color: var(--navy);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 1.5px;
+}
+
+.vtk-form-consent-link:hover {
+  color: var(--ink);
 }
 
 .vtk-form-check:hover {
@@ -222,13 +271,14 @@
 }
 
 .vtk-form-scale-step {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 44px;
   min-height: 44px;
   padding: 0 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-border, rgba(14, 26, 54, 0.5));
   border-radius: 12px;
   background: var(--surface);
   cursor: pointer;
@@ -277,6 +327,16 @@
   padding: 40px 20px 72px;
   display: grid;
   gap: 24px;
+}
+
+.vtk-form-page :where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible,
+.vtk-form :where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.vtk-form-scale-step input:focus-visible {
+  outline: none;
 }
 
 /* Het formulier als paneel in een contentpagina --------------------------------
@@ -415,6 +475,20 @@
   color: var(--body);
 }
 
+.vtk-form-notice a:not(.vtk-form-login) {
+  justify-self: start;
+  color: var(--navy);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 1.5px;
+}
+
+.vtk-form-notice a:not(.vtk-form-login):hover {
+  color: var(--ink);
+}
+
 /* Een blokkade is geen fout van de bezoeker, dus geen alarmkleur: een gele rail
    zoals bij een uitgelichte kaart volstaat om ze te laten opvallen. */
 .vtk-form-notice[data-tone='blocked'],
@@ -444,6 +518,19 @@
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
+}
+
+.vtk-form-actions a:not(.vtk-form-login) {
+  color: var(--navy);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 1.5px;
+}
+
+.vtk-form-actions a:not(.vtk-form-login):hover {
+  color: var(--ink);
 }
 
 .vtk-form-login {
@@ -502,6 +589,7 @@
 /* Bestanden ------------------------------------------------------------------- */
 
 .vtk-form-files {
+  position: relative;
   display: grid;
   gap: 10px;
 }
@@ -536,7 +624,7 @@
   align-items: center;
   gap: 8px;
   padding: 9px 16px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-border, rgba(14, 26, 54, 0.5));
   border-radius: 999px;
   background: var(--surface);
   font: inherit;
@@ -551,6 +639,7 @@
 
 .vtk-form-progress,
 .vtk-form-progress-summary {
+  position: relative;
   display: grid;
   gap: 6px;
 }

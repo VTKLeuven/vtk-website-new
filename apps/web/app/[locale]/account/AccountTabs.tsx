@@ -135,7 +135,6 @@ export function AccountTabs({
             aria-labelledby={`${idPrefix}-${tab.id}-tab`}
             data-account-tab={tab.id}
             hidden={tab.id !== activeTab}
-            tabIndex={0}
             className="mt-6"
           >
             {tab.id === 'vtk' ? vtkContent : detailsContent}

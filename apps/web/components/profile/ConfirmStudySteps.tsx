@@ -97,6 +97,8 @@ export function ConfirmStudySteps(
   const [step, setStep] = useState<1 | 2>(1);
   const formRef = useRef<HTMLFormElement>(null);
   const secondRef = useRef<HTMLDivElement>(null);
+  const stepKickerRef = useRef<HTMLParagraphElement>(null);
+  const pendingFocusStepRef = useRef(false);
   const [secondVisible, setSecondVisible] = useState(props.secondVisible ?? true);
   const unsent = useUnsentGuard();
   const [state, formAction, pending] = useActionState(
@@ -116,6 +118,7 @@ export function ConfirmStudySteps(
   useEffect(() => {
     if (state.status !== "error" || handled.current === state.nonce) return;
     handled.current = state.nonce;
+    if (step !== 1) pendingFocusStepRef.current = true;
     setStep(1);
     formRef.current?.scrollIntoView({ block: "start" });
     showToast({
@@ -123,7 +126,13 @@ export function ConfirmStudySteps(
       variant: "error",
       duration: 0,
     });
-  }, [state, showToast, errorMessages, fallbackErrorMessage]);
+  }, [state, showToast, errorMessages, fallbackErrorMessage, step]);
+
+  useEffect(() => {
+    if (!pendingFocusStepRef.current) return;
+    pendingFocusStepRef.current = false;
+    stepKickerRef.current?.focus({ preventScroll: true });
+  }, [step]);
 
   // De vragen in stap 2 kunnen zichzelf verbergen (de Career-vraag doet dat
   // wanneer stap 1 niet meer bij Career past). Valt daardoor alles weg, dan is
@@ -176,11 +185,13 @@ export function ConfirmStudySteps(
   // foutmelding op een veld te staan dat het lid niet meer ziet.
   const goForward = () => {
     if (formRef.current && !formRef.current.reportValidity()) return;
+    pendingFocusStepRef.current = true;
     setStep(2);
     formRef.current?.scrollIntoView({ block: "start" });
   };
 
   const goBack = () => {
+    pendingFocusStepRef.current = true;
     setStep(1);
     formRef.current?.scrollIntoView({ block: "start" });
   };
@@ -193,6 +204,11 @@ export function ConfirmStudySteps(
    * over; `action={formAction}` blijft staan voor wie zonder JavaScript komt.
    */
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    if (twoStep && step === 1) {
+      event.preventDefault();
+      goForward();
+      return;
+    }
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     startTransition(() => formAction(data));
@@ -221,7 +237,16 @@ export function ConfirmStudySteps(
     >
       <input type="hidden" name="next" value={props.next} />
 
-      {twoStep ? kicker(step) : null}
+      {twoStep ? (
+        <p
+          ref={stepKickerRef}
+          tabIndex={-1}
+          className="text-xs font-semibold uppercase tracking-[0.11em] text-[#5c667f] focus:outline-none"
+          data-step-kicker
+        >
+          {stepLabel(step)}
+        </p>
+      ) : null}
 
       <div className="space-y-6" hidden={twoStep && step !== 1} data-step-pane>
         {first}

@@ -37,12 +37,13 @@
 
 .pp-attendance-choice {
   display: inline-flex;
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--control-border);
   border-radius: 999px;
   overflow: hidden;
 }
 
 .pp-attendance-choice button {
+  min-height: 28px;
   padding: 3px 12px;
   font-size: 12.5px;
   font-weight: 500;
@@ -52,7 +53,16 @@
 }
 
 .pp-attendance-choice button + button {
-  border-left: 1px solid var(--line-2);
+  border-left: 1px solid var(--control-border);
+}
+
+.pp-attendance-choice button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+
+.pp-attendance-choice button[aria-pressed='true']:last-child:focus-visible {
+  outline-color: var(--yellow);
 }
 
 /* De gekozen toestand: geel voor "kwam", een donkere vulling voor "kwam niet",

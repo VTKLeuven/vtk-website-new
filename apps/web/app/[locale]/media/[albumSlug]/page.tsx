@@ -113,6 +113,7 @@ export default async function MediaAlbumPage({ params }: { params: Params }) {
             {faceSearch.enabled ? (
               <FaceSearchPanel
                 albumSlug={album.slug}
+                albumTitle={album.title}
                 configured={faceSearch.configured}
                 labels={{
                   ...viewerLabels,
@@ -162,6 +163,8 @@ export default async function MediaAlbumPage({ params }: { params: Params }) {
             {album.subAlbums && album.subAlbums.length > 1 ? (
               <AlbumTabViewer
                 albumSlug={album.slug}
+                albumTitle={album.title}
+                subAlbumsLabel={locale === "en" ? "Sub-albums" : "Subalbums"}
                 subAlbums={album.subAlbums.map((sub) => ({
                   id: sub.id,
                   slug: sub.slug,
@@ -170,6 +173,7 @@ export default async function MediaAlbumPage({ params }: { params: Params }) {
                   photos: sub.photos.map((photo) => ({
                     id: photo.id,
                     title: photo.title,
+                    description: photo.description,
                     width: photo.width,
                     height: photo.height,
                     thumbnailUrl: photo.thumbnailUrl,
@@ -182,9 +186,11 @@ export default async function MediaAlbumPage({ params }: { params: Params }) {
             ) : (
               <AlbumViewer
                 albumSlug={album.slug}
+                albumTitle={album.title}
                 photos={album.photos.map((photo) => ({
                   id: photo.id,
                   title: photo.title,
+                  description: photo.description,
                   width: photo.width,
                   height: photo.height,
                   thumbnailUrl: photo.thumbnailUrl,

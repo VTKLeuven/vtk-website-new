@@ -6,6 +6,7 @@ import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
 import Link from "@/components/ui/Link";
 import { Markdown } from "@/components/ui/Markdown";
+import { pickWithLang } from "@/lib/langFallback";
 import { hasLocale } from "@/lib/locale";
 import { buildMetadata } from "@/lib/seo";
 import { publicUrl } from "@/lib/storage";
@@ -60,12 +61,14 @@ export default async function NewsPostPage({
   if (!post) notFound();
 
   const praeses = post.kind === "PRAESES";
-  const title = pick(post.titleNl, post.titleEn, locale);
-  const body = pick(post.bodyNl, post.bodyEn, locale);
+  const title = pickWithLang(post.titleNl, post.titleEn, locale);
+  const body = pickWithLang(post.bodyNl, post.bodyEn, locale);
   const photo = praeses ? null : publicUrl(post.imageKey);
   const portrait = praeses ? publicUrl(post.imageKey) : null;
-  const authorRole = pick(post.authorRoleNl ?? "", post.authorRoleEn, locale) || null;
-  const ctaLabel = pick(post.ctaLabelNl ?? "", post.ctaLabelEn, locale) || (nl ? "Meer lezen" : "Read more");
+  const authorRole = pickWithLang(post.authorRoleNl ?? "", post.authorRoleEn, locale);
+  const customCta = pickWithLang(post.ctaLabelNl ?? "", post.ctaLabelEn, locale);
+  const ctaLabel = customCta.text || (nl ? "Meer lezen" : "Read more");
+  const ctaLang = customCta.text ? customCta.lang : undefined;
   const date = post.publishedAt.toLocaleDateString(nl ? "nl-BE" : "en-GB", {
     timeZone: "Europe/Brussels",
     weekday: "long",
@@ -76,7 +79,7 @@ export default async function NewsPostPage({
 
   const cta = post.ctaUrl ? (
     <div>
-      <NewsLink href={post.ctaUrl} base={base} className="news-go is-primary">
+      <NewsLink href={post.ctaUrl} base={base} className="news-go is-primary" lang={ctaLang}>
         {ctaLabel} <ArrowRight size={15} aria-hidden="true" />
       </NewsLink>
     </div>
@@ -93,7 +96,9 @@ export default async function NewsPostPage({
             <span aria-hidden="true"> › </span>
             <span>{newsSourceLabel(praeses ? "praeses" : "notice", locale)}</span>
           </div>
-          <h1 className="vtk-page-title">{title}</h1>
+          <h1 className="vtk-page-title" lang={title.lang}>
+            {title.text}
+          </h1>
           <p className="vtk-page-subtitle">{date}</p>
         </div>
       </header>
@@ -101,7 +106,7 @@ export default async function NewsPostPage({
       {/* Niet `vtk-page-narrow`: dat centreert de hele kolom, en dan begint de
           tekst een eind rechts van de titel erboven. De leesbreedte zit op
           `.news-post` of op de tekstkolom van de brief. */}
-      <main className="vtk-page-shell">
+      <div className="vtk-page-shell">
         {praeses ? (
           // Het woordje: het portret eerst, zoals een tegel op /praesidium, en
           // het blijft staan terwijl je leest. Het is een brief van iemand, dus
@@ -122,20 +127,20 @@ export default async function NewsPostPage({
                 </div>
                 <div>
                   <b>{post.authorName}</b>
-                  {authorRole ? <span>{authorRole}</span> : null}
+                  {authorRole.text ? <span lang={authorRole.lang}>{authorRole.text}</span> : null}
                 </div>
               </aside>
             ) : (
               <span />
             )}
             <article className="vtk-page-content">
-              <div className="prose-vtk">
-                <Markdown locale={locale}>{body}</Markdown>
+              <div className="prose-vtk" lang={body.lang}>
+                <Markdown locale={locale}>{body.text}</Markdown>
               </div>
               {post.authorName ? (
                 <div className="news-sign">
                   <b>{post.authorName}</b>
-                  {authorRole ? <span>{authorRole}</span> : null}
+                  {authorRole.text ? <span lang={authorRole.lang}>{authorRole.text}</span> : null}
                 </div>
               ) : null}
               {cta}
@@ -148,13 +153,13 @@ export default async function NewsPostPage({
               // eslint-disable-next-line @next/next/no-img-element
               <img className="news-post-photo" src={photo} alt="" />
             ) : null}
-            <div className="prose-vtk">
-              <Markdown locale={locale}>{body}</Markdown>
+            <div className="prose-vtk" lang={body.lang}>
+              <Markdown locale={locale}>{body.text}</Markdown>
             </div>
             {cta}
           </article>
         )}
-      </main>
+      </div>
     </div>
   );
 }

@@ -54,6 +54,7 @@ export default async function NewPasswordPage({
               signInHref={`${base}/inloggen?wachtwoord=1`}
               labels={{
                 password: t.password,
+                passwordHint: dict.register.passwordHint,
                 passwordRepeat: t.passwordRepeat,
                 submit: t.newSubmit,
                 signIn: dict.auth.signIn,

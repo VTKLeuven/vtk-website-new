@@ -46,7 +46,7 @@
      de uitleendienst, zodat een klasse in beide apps hetzelfde betekent. */
   --color-vtk-danger: #b42318;
   --color-vtk-danger-soft: #fdecea;
-  --color-vtk-danger-line: #f3c4bf;
+  --color-vtk-danger-line: #d92d20;
   --color-vtk-warn: #7a4e05;
   --color-vtk-warn-soft: #fff2c7;
 
@@ -59,7 +59,7 @@
      non-locale routes, where that file is not loaded, on the same colour. */
   --background: var(--paper, #eff2f8);
   --foreground: var(--ink, #0a0f1f);
-  --vtk-ring: rgba(14, 26, 54, 0.12);
+  --vtk-ring: var(--ink, #0a0f1f);
 }
 
 /* `overflow-x: clip` hoort bij de volle-breedtebanden. Die bleeden met
@@ -72,6 +72,8 @@
 html {
   height: 100%;
   overflow-x: clip;
+  scroll-padding-top: calc(var(--vtk-header-height, 73px) + 16px);
+  scroll-padding-bottom: calc(var(--vtk-cookie-consent-space, 0px) + 16px);
 }
 
 /* min-height, geen vaste height: met `height: 100%` is de body-box maar één
@@ -86,6 +88,15 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+dialog:modal {
+  overscroll-behavior: contain;
+}
+
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
 }
 
 /* Gedeelde opmaak voor content uit de Markdown-renderer. Een woord of link
@@ -108,11 +119,18 @@ body {
 .prose-vtk h3 {
   @apply text-xl font-semibold mt-4 mb-2 text-vtk-ink tracking-tight;
 }
+.prose-vtk h4 {
+  @apply text-lg font-semibold mt-4 mb-1.5 text-vtk-ink tracking-tight;
+}
+.prose-vtk h5,
+.prose-vtk h6 {
+  @apply text-base font-semibold mt-3 mb-1 text-vtk-ink;
+}
 .prose-vtk p {
   @apply my-3 leading-7 text-[#34405e];
 }
 .prose-vtk a {
-  @apply text-vtk-navy font-medium underline underline-offset-4 decoration-vtk-yellow/90 hover:text-vtk-ink;
+  @apply text-vtk-navy font-medium underline underline-offset-4 decoration-vtk-navy/70 decoration-2 hover:text-vtk-ink hover:decoration-vtk-ink;
 }
 .prose-vtk ul {
   @apply list-disc pl-6 my-3;
@@ -153,6 +171,10 @@ body {
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--surface);
+}
+.prose-vtk .vtk-table:focus-visible {
+  outline: 2px solid var(--ink, #0a0f1f);
+  outline-offset: 2px;
 }
 .prose-vtk table {
   width: 100%;

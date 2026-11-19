@@ -85,7 +85,12 @@ function LinkField({
 }) {
   const { nl, readOnly } = api;
   const [editing, setEditing] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const url = row.source?.url ?? '';
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
   const isLink = /^https?:\/\//i.test(url.trim());
   const offerte = row.source?.type === 'offerte';
   const who =
@@ -134,12 +139,12 @@ function LinkField({
   return (
     <span className="vtk-bud-linkcell">
       <input
+        ref={inputRef}
         className="vtk-bud-bare vtk-bud-cell"
         data-danger={danger ? '1' : undefined}
         value={url}
         data-col="link"
         inputMode="url"
-        autoFocus={editing}
         placeholder={placeholder}
         aria-label={nl ? `Link van ${row.name || 'deze regel'}` : `Link of ${row.name || 'this row'}`}
         onChange={(e) => onUrl(e.target.value)}

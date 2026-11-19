@@ -308,6 +308,10 @@ jobs:
         if: contains(format(' {0} ', steps.affected.outputs.apps), ' web ')
         run: npm run test:e2e:tickets --workspace=@vtk/web
 
+      - name: Run WCAG 2.2 AA smoke
+        if: contains(format(' {0} ', steps.affected.outputs.apps), ' web ')
+        run: npm run test:e2e:a11y --workspace=@vtk/web
+
   # Bouwen op de server begint meteen bij de push, naast de checks, en niet pas
   # erna: dat was zes minuten wachten na vier minuten checks. Omschakelen gebeurt
   # pas in `deploy` hieronder, wanneer alle checks groen zijn; tot dan blijven de

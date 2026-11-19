@@ -22,8 +22,14 @@ export default function GlobalError({
     void import("@sentry/nextjs").then((Sentry) => Sentry.captureException(error));
   }, [error]);
 
+  const lang =
+    typeof window !== "undefined" &&
+    (window.location.pathname === "/en" || window.location.pathname.startsWith("/en/"))
+      ? "en"
+      : "nl-BE";
+
   return (
-    <html lang="nl">
+    <html lang={lang}>
       <body>
         <NextError statusCode={0} />
       </body>

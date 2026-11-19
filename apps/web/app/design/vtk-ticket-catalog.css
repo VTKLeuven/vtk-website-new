@@ -17,6 +17,7 @@
   align-items: center;
   gap: 8px;
   padding: 11px 18px;
+  border: 1px solid var(--control-border);
   border-radius: 999px;
   background: var(--surface);
   color: var(--ink);
@@ -46,7 +47,7 @@
   gap: 6px;
   min-height: 38px;
   padding: 0 15px;
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--control-border);
   border-radius: 999px;
   background: var(--surface);
   color: var(--body);
@@ -69,7 +70,11 @@
 .tcat-filters a span {
   font-weight: 500;
   font-variant-numeric: tabular-nums;
-  opacity: 0.7;
+  color: var(--muted);
+}
+
+.tcat-filters a[aria-current="page"] span {
+  color: var(--on-dark-muted);
 }
 
 /* ---------- Kaart ---------- */
@@ -194,6 +199,11 @@
   outline: none;
 }
 
+.tcat-card:has(.tcat-title a:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
 .tcat-facts {
   display: flex;
   flex-wrap: wrap;
@@ -234,7 +244,7 @@
   border-left: 1px solid var(--line);
 }
 
-.tcat-side h4 {
+.tcat-side :is(h3, h4) {
   margin: 0 0 4px;
   color: var(--muted);
   font-size: 11px;

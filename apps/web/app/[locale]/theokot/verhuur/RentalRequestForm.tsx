@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Input, Label, Select, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { requestRentalAction } from "@/app/actions/theokotVerhuur";
@@ -66,7 +66,18 @@ export function RentalRequestForm({
   copy: RentalCopy;
 }) {
   const [sent, setSent] = useState(false);
+  const sentPanelRef = useRef<HTMLDivElement>(null);
+  const focusNameOnReturnRef = useRef(false);
   const core = questions.core;
+
+  useEffect(() => {
+    if (sent) {
+      sentPanelRef.current?.focus();
+    } else if (focusNameOnReturnRef.current) {
+      focusNameOnReturnRef.current = false;
+      document.getElementById("tv-name")?.focus();
+    }
+  }, [sent]);
 
   const onSuccess = useCallback(() => setSent(true), []);
 
@@ -76,7 +87,11 @@ export function RentalRequestForm({
 
   if (sent) {
     return (
-      <div className="space-y-4 pt-2">
+      <div
+        ref={sentPanelRef}
+        tabIndex={-1}
+        className="space-y-4 pt-2 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink"
+      >
         <p className="tv-notice" data-tone="ok" role="status">
           <span>{copy.sent}</span>
         </p>
@@ -84,7 +99,10 @@ export function RentalRequestForm({
           type="button"
           variant="secondary"
           size="sm"
-          onClick={() => setSent(false)}
+          onClick={() => {
+            focusNameOnReturnRef.current = true;
+            setSent(false);
+          }}
         >
           {copy.newRequest}
         </Button>
@@ -119,9 +137,14 @@ export function RentalRequestForm({
               name="responsibleName"
               maxLength={RENTAL_LIMITS.name}
               autoComplete="name"
+              aria-describedby={help("responsible") ? "tv-name-help" : undefined}
               required
             />
-            {help("responsible") && <p className="tv-help">{help("responsible")}</p>}
+            {help("responsible") && (
+              <p id="tv-name-help" className="tv-help">
+                {help("responsible")}
+              </p>
+            )}
           </div>
 
           <div className="tv-row">
@@ -136,9 +159,14 @@ export function RentalRequestForm({
                 type="email"
                 maxLength={RENTAL_LIMITS.email}
                 autoComplete="email"
+                aria-describedby={help("email") ? "tv-email-help" : undefined}
                 required
               />
-              {help("email") && <p className="tv-help">{help("email")}</p>}
+              {help("email") && (
+                <p id="tv-email-help" className="tv-help">
+                  {help("email")}
+                </p>
+              )}
             </div>
 
             <div className="tv-field">
@@ -152,9 +180,14 @@ export function RentalRequestForm({
                 type="tel"
                 maxLength={RENTAL_LIMITS.phone}
                 autoComplete="tel"
+                aria-describedby={help("phone") ? "tv-phone-help" : undefined}
                 required={core.phone.required}
               />
-              {help("phone") && <p className="tv-help">{help("phone")}</p>}
+              {help("phone") && (
+                <p id="tv-phone-help" className="tv-help">
+                  {help("phone")}
+                </p>
+              )}
             </div>
           </div>
 
@@ -166,11 +199,20 @@ export function RentalRequestForm({
             {/* De taalkeuze staat er ondanks dat de site de taal al kent: wie het
                 formulier in het Nederlands invult, kan evengoed liever een Engels
                 antwoord krijgen, en die keuze stuurt het mailsjabloon. */}
-            <Select id="tv-locale" name="locale" defaultValue={nl ? "nl" : "en"}>
+            <Select
+              id="tv-locale"
+              name="locale"
+              defaultValue={nl ? "nl" : "en"}
+              aria-describedby={help("language") ? "tv-locale-help" : undefined}
+            >
               <option value="nl">{copy.languageNl}</option>
               <option value="en">{copy.languageEn}</option>
             </Select>
-            {help("language") && <p className="tv-help">{help("language")}</p>}
+            {help("language") && (
+              <p id="tv-locale-help" className="tv-help">
+                {help("language")}
+              </p>
+            )}
           </div>
         </fieldset>
 
@@ -182,8 +224,19 @@ export function RentalRequestForm({
               {label("day")}
               {star("day")}
             </Label>
-            <Input id="tv-date" name="date" type="date" min={earliestDate(minLeadDays)} required />
-            {help("day") && <p className="tv-help">{help("day")}</p>}
+            <Input
+              id="tv-date"
+              name="date"
+              type="date"
+              min={earliestDate(minLeadDays)}
+              aria-describedby={help("day") ? "tv-date-help" : undefined}
+              required
+            />
+            {help("day") && (
+              <p id="tv-date-help" className="tv-help">
+                {help("day")}
+              </p>
+            )}
           </div>
 
           <div className="tv-row">
@@ -192,8 +245,18 @@ export function RentalRequestForm({
                 {label("startTime")}
                 {star("startTime")}
               </Label>
-              <Input id="tv-start" name="startTime" type="time" required />
-              {help("startTime") && <p className="tv-help">{help("startTime")}</p>}
+              <Input
+                id="tv-start"
+                name="startTime"
+                type="time"
+                aria-describedby={help("startTime") ? "tv-start-help" : undefined}
+                required
+              />
+              {help("startTime") && (
+                <p id="tv-start-help" className="tv-help">
+                  {help("startTime")}
+                </p>
+              )}
             </div>
 
             <div className="tv-field">
@@ -201,8 +264,18 @@ export function RentalRequestForm({
                 {label("endTime")}
                 {star("endTime")}
               </Label>
-              <Input id="tv-end" name="endTime" type="time" required />
-              {help("endTime") && <p className="tv-help">{help("endTime")}</p>}
+              <Input
+                id="tv-end"
+                name="endTime"
+                type="time"
+                aria-describedby={help("endTime") ? "tv-end-help" : undefined}
+                required
+              />
+              {help("endTime") && (
+                <p id="tv-end-help" className="tv-help">
+                  {help("endTime")}
+                </p>
+              )}
             </div>
           </div>
         </fieldset>
@@ -219,9 +292,14 @@ export function RentalRequestForm({
               id="tv-purpose"
               name="purpose"
               maxLength={RENTAL_LIMITS.purpose}
+              aria-describedby={help("purpose") ? "tv-purpose-help" : undefined}
               required={core.purpose.required}
             />
-            {help("purpose") && <p className="tv-help">{help("purpose")}</p>}
+            {help("purpose") && (
+              <p id="tv-purpose-help" className="tv-help">
+                {help("purpose")}
+              </p>
+            )}
           </div>
 
           <div className="tv-field">
@@ -237,17 +315,29 @@ export function RentalRequestForm({
               max={RENTAL_LIMITS.attendees}
               step={1}
               className="max-w-32"
+              aria-describedby={help("attendees") ? "tv-attendees-help" : undefined}
               required={core.attendees.required}
             />
-            {help("attendees") && <p className="tv-help">{help("attendees")}</p>}
+            {help("attendees") && (
+              <p id="tv-attendees-help" className="tv-help">
+                {help("attendees")}
+              </p>
+            )}
           </div>
 
-          <div className="tv-field">
-            <span className="block text-sm font-medium text-vtk-ink">
+          <fieldset
+            className="tv-field border-0 p-0 m-0 min-w-0"
+            aria-describedby={help("deposit") ? "tv-deposit-help" : undefined}
+          >
+            <legend className="block text-sm font-medium text-vtk-ink">
               {label("deposit")}
               {star("deposit")}
-            </span>
-            {help("deposit") && <p className="tv-help">{help("deposit")}</p>}
+            </legend>
+            {help("deposit") && (
+              <p id="tv-deposit-help" className="tv-help">
+                {help("deposit")}
+              </p>
+            )}
             <div className="tv-choices">
               {(
                 [
@@ -266,7 +356,7 @@ export function RentalRequestForm({
                 </label>
               ))}
             </div>
-          </div>
+          </fieldset>
         </fieldset>
 
         <fieldset className="tv-fieldset">
@@ -282,9 +372,14 @@ export function RentalRequestForm({
               name="remarks"
               rows={8}
               maxLength={RENTAL_LIMITS.remarks}
+              aria-describedby={help("remarks") ? "tv-remarks-help" : undefined}
               required={core.remarks.required}
             />
-            {help("remarks") && <p className="tv-help">{help("remarks")}</p>}
+            {help("remarks") && (
+              <p id="tv-remarks-help" className="tv-help">
+                {help("remarks")}
+              </p>
+            )}
           </div>
 
           {questions.extra.map((question) => (
@@ -307,19 +402,31 @@ function ExtraField({ nl, question }: { nl: boolean; question: ExtraQuestion }) 
   const name = `extra:${question.id}`;
   const label = questionLabel(question, nl);
   const help = questionHelp(question, nl);
+  const helpId = help ? `${id}-help` : undefined;
   const star = question.required ? " *" : "";
 
   if (question.type === "checkbox") {
     return (
       <div className="tv-field">
         <label className="tv-check">
-          <input id={id} name={name} type="checkbox" value={nl ? "Ja" : "Yes"} required={question.required} />
+          <input
+            id={id}
+            name={name}
+            type="checkbox"
+            value={nl ? "Ja" : "Yes"}
+            aria-describedby={helpId}
+            required={question.required}
+          />
           <span>
             {label}
             {star}
           </span>
         </label>
-        {help && <p className="tv-help">{help}</p>}
+        {help && (
+          <p id={helpId} className="tv-help">
+            {help}
+          </p>
+        )}
       </div>
     );
   }
@@ -331,9 +438,22 @@ function ExtraField({ nl, question }: { nl: boolean; question: ExtraQuestion }) 
         {star}
       </Label>
       {question.type === "textarea" ? (
-        <Textarea id={id} name={name} rows={5} maxLength={RENTAL_LIMITS.extraAnswer} required={question.required} />
+        <Textarea
+          id={id}
+          name={name}
+          rows={5}
+          maxLength={RENTAL_LIMITS.extraAnswer}
+          aria-describedby={helpId}
+          required={question.required}
+        />
       ) : question.type === "choice" ? (
-        <Select id={id} name={name} defaultValue="" required={question.required}>
+        <Select
+          id={id}
+          name={name}
+          defaultValue=""
+          aria-describedby={helpId}
+          required={question.required}
+        >
           <option value="">—</option>
           {question.options.map((option) => (
             <option key={option.value} value={option.value}>
@@ -342,9 +462,19 @@ function ExtraField({ nl, question }: { nl: boolean; question: ExtraQuestion }) 
           ))}
         </Select>
       ) : (
-        <Input id={id} name={name} maxLength={RENTAL_LIMITS.extraAnswer} required={question.required} />
+        <Input
+          id={id}
+          name={name}
+          maxLength={RENTAL_LIMITS.extraAnswer}
+          aria-describedby={helpId}
+          required={question.required}
+        />
       )}
-      {help && <p className="tv-help">{help}</p>}
+      {help && (
+        <p id={helpId} className="tv-help">
+          {help}
+        </p>
+      )}
     </div>
   );
 }

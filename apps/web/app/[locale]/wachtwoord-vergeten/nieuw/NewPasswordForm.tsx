@@ -16,6 +16,7 @@ export function NewPasswordForm({
   signInHref: string;
   labels: {
     password: string;
+    passwordHint: string;
     passwordRepeat: string;
     submit: string;
     signIn: string;
@@ -33,7 +34,7 @@ export function NewPasswordForm({
 
   if (state.status === 'success') {
     return (
-      <div>
+      <div role="status">
         <h2 className="vtk-auth-alt-title">{labels.doneTitle}</h2>
         <p className="vtk-auth-done">{labels.doneBody}</p>
         <Link
@@ -58,8 +59,10 @@ export function NewPasswordForm({
           type="password"
           autoComplete="new-password"
           minLength={10}
+          aria-describedby="new-password-hint"
           required
         />
+        <p id="new-password-hint" className="vtk-auth-hint">{labels.passwordHint}</p>
       </div>
       <div>
         <label htmlFor="passwordRepeat">{labels.passwordRepeat}</label>
@@ -73,7 +76,7 @@ export function NewPasswordForm({
         />
       </div>
       {state.status === 'error' && (
-        <p className="vtk-auth-error">{labels.errors[state.code] ?? labels.errorFallback}</p>
+        <p role="alert" className="vtk-auth-error">{labels.errors[state.code] ?? labels.errorFallback}</p>
       )}
       <button type="submit" className="vtk-auth-submit" disabled={pending}>
         {labels.submit}

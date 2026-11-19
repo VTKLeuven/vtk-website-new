@@ -4,8 +4,9 @@ import Image from "next/image";
 import Link from "@/components/ui/Link";
 import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";
-import { getDictionary, pick, type Locale } from "@vtk/i18n";
+import { getDictionary, type Locale } from "@vtk/i18n";
 import { Markdown } from "@/components/ui/Markdown";
+import { pickWithLang } from "@/lib/langFallback";
 import { hasLocale } from "@/lib/locale";
 import { publicUrl } from "@/lib/storage";
 import { formatWorkingYear, parseWorkingYear, workingYearTabs } from "@/lib/workingYear";
@@ -90,17 +91,20 @@ export default async function WerkgroepenPage({
             {/* Gewone ankers en geen <Link>: dit springt binnen dezelfde pagina. */}
             <nav className="vtk-wall-jump vtk-werkgroep-jump" aria-label={t.title}>
               <span className="vtk-wall-jump-label">{t.title}</span>
-              {werkgroepen.map((group) => (
-                <a key={group.id} href={`#werkgroep-${group.slug}`}>
-                  {pick(group.nameNl, group.nameEn, locale)}
-                </a>
-              ))}
+              {werkgroepen.map((group) => {
+                const name = pickWithLang(group.nameNl, group.nameEn, locale);
+                return (
+                  <a key={group.id} href={`#werkgroep-${group.slug}`} lang={name.lang}>
+                    {name.text}
+                  </a>
+                );
+              })}
             </nav>
 
             <div className="mt-6">
               {werkgroepen.map((group) => {
-                const name = pick(group.nameNl, group.nameEn, locale);
-                const description = pick(group.descriptionNl ?? "", group.descriptionEn ?? "", locale);
+                const name = pickWithLang(group.nameNl, group.nameEn, locale);
+                const description = pickWithLang(group.descriptionNl ?? "", group.descriptionEn ?? "", locale);
                 const byName = (a: Membership, b: Membership) =>
                   a.user.name.localeCompare(b.user.name, locale);
                 // De kern en de leden staan elk in hun eigen blok: de leden
@@ -117,7 +121,9 @@ export default async function WerkgroepenPage({
                   >
                     <div className="vtk-werkgroep-text">
                       <div className="vtk-werkgroep-head">
-                        <h2 id={headingId}>{name}</h2>
+                        <h2 id={headingId} lang={name.lang}>
+                          {name.text}
+                        </h2>
                         {group.website && (
                           <a
                             href={group.website}
@@ -129,14 +135,16 @@ export default async function WerkgroepenPage({
                           </a>
                         )}
                       </div>
-                      {description && (
-                        <div className="prose-vtk">
-                          <Markdown locale={locale}>{description}</Markdown>
+                      {description.text && (
+                        <div className="prose-vtk" lang={description.lang}>
+                          <Markdown locale={locale} baseHeadingLevel={3}>
+                            {description.text}
+                          </Markdown>
                         </div>
                       )}
                     </div>
 
-                    <aside className="vtk-werkgroep-team" aria-label={t.team.replace("{name}", name)}>
+                    <aside className="vtk-werkgroep-team" aria-label={t.team.replace("{name}", name.text)}>
                       {leads.length === 0 && members.length === 0 && (
                         <p className="vtk-muted text-sm">{t.noMembers}</p>
                       )}
@@ -150,7 +158,7 @@ export default async function WerkgroepenPage({
                           <ul className="vtk-werkgroep-leads">
                             {leads.map((m) => {
                               const src = publicUrl(m.user.avatarKey);
-                              const title = pick(m.titleNl ?? "", m.titleEn ?? "", locale);
+                              const title = pickWithLang(m.titleNl ?? "", m.titleEn ?? "", locale);
                               return (
                                 <li key={m.id}>
                                   <span className="vtk-werkgroep-face">
@@ -165,7 +173,11 @@ export default async function WerkgroepenPage({
                                   <span className="vtk-werkgroep-who">
                                     <span className="vtk-werkgroep-name">{m.user.name}</span>
                                     <span className="vtk-werkgroep-role">{group.leadLabel}</span>
-                                    {title && <span className="vtk-werkgroep-role">{title}</span>}
+                                    {title.text && (
+                                      <span className="vtk-werkgroep-role" lang={title.lang}>
+                                        {title.text}
+                                      </span>
+                                    )}
                                   </span>
                                 </li>
                               );
@@ -181,7 +193,7 @@ export default async function WerkgroepenPage({
                           <ul className="vtk-werkgroep-members">
                             {members.map((m) => {
                               const src = publicUrl(m.user.avatarKey);
-                              const title = pick(m.titleNl ?? "", m.titleEn ?? "", locale);
+                              const title = pickWithLang(m.titleNl ?? "", m.titleEn ?? "", locale);
                               return (
                                 <li key={m.id}>
                                   <span className={"vtk-werkgroep-mini" + (src ? "" : " is-blank")}>
@@ -193,7 +205,11 @@ export default async function WerkgroepenPage({
                                   </span>
                                   <span className="vtk-werkgroep-who">
                                     <span className="vtk-werkgroep-name">{m.user.name}</span>
-                                    {title && <span className="vtk-werkgroep-role">{title}</span>}
+                                    {title.text && (
+                                      <span className="vtk-werkgroep-role" lang={title.lang}>
+                                        {title.text}
+                                      </span>
+                                    )}
                                   </span>
                                 </li>
                               );

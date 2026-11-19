@@ -119,8 +119,14 @@ function RequestTable({
     minute: "2-digit",
   });
 
+  const tableLabel = past
+    ? locale === "nl"
+      ? "Voorbije aanvragen"
+      : "Past requests"
+    : copy.title;
+
   return (
-    <div className="lb-mine-wrap">
+    <div className="lb-mine-wrap" tabIndex={0} role="region" aria-label={tableLabel}>
       <table className="lb-mine-table">
         <thead>
           <tr>

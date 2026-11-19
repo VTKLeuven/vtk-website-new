@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CheckIcon, CopyIcon } from "@/components/ui/icons";
 import { trackCalendarFeedCopy } from "@/lib/analytics-client";
+import { catChipStyle } from "@/lib/catContrast";
 
 /**
  * Abonneren op de kalender. Bewust abonneren en niet downloaden: een gedownload
@@ -63,9 +64,16 @@ export function CalendarSubscribe({
   compact?: boolean;
 }) {
   const nl = locale === "nl";
+  const headingId = useId();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState<"link" | "google" | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const pressedOutsideRef = useRef(false);
+  const suppressCloseCountRef = useRef(0);
+  const wasOpenRef = useRef(false);
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
 
   // De wortel van het ontwerp op deze pagina, waar het venster in komt te hangen.
@@ -97,13 +105,42 @@ export function CalendarSubscribe({
   }, [copied]);
 
   useEffect(() => {
-    if (!open) return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (open) {
+      wasOpenRef.current = true;
+      if (!openerRef.current && document.activeElement instanceof HTMLElement) {
+        openerRef.current = document.activeElement;
+      }
+      if (!dialog.open) {
+        dialog.showModal();
+      }
+      if (!dialog.contains(document.activeElement)) {
+        closeBtnRef.current?.focus();
+      }
+      return () => {
+        if (dialog.open) {
+          suppressCloseCountRef.current += 1;
+          dialog.close();
+        }
+      };
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+    if (dialog.open) {
+      suppressCloseCountRef.current += 1;
+      dialog.close();
+    }
+    if (wasOpenRef.current) {
+      wasOpenRef.current = false;
+      const opener = openerRef.current;
+      openerRef.current = null;
+      if (opener && opener.isConnected) opener.focus();
+    }
+  }, [open, portalHost]);
+
+  function isOutside(clientX: number, clientY: number, dialog: HTMLDialogElement) {
+    const r = dialog.getBoundingClientRect();
+    return clientX < r.left || clientX > r.right || clientY < r.top || clientY > r.bottom;
+  }
 
   const feedUrl = useMemo(() => {
     const url = new URL(feedBaseUrl);
@@ -213,141 +250,203 @@ export function CalendarSubscribe({
             : "In your calendar app, in Google Calendar, or through a subscription link."}
         </p>
       ) : null}
-      <button type="button" className="btn btn-primary arrow subscribe-open" onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        className="btn btn-primary arrow subscribe-open"
+        onClick={(event) => {
+          openerRef.current = event.currentTarget;
+          setOpen(true);
+        }}
+      >
         {compact ? labels.title : buttonLabel}
       </button>
 
-      {/* Het venster hangt niet hier maar in de designwortel. De donkere paginakop
-          zet `position: relative; z-index: 0` om haar volle-breedte `::before` en
-          `::after` achter de tekst te houden (vtk-base.css), en dat is een
-          stacking context: een `position: fixed` met `z-index: 80` erbinnen blijft
-          onder alles wat verderop op de pagina staat, dus de eventkaarten schoven
-          over dit venster heen. Naar `document.body` kan het niet: de stylesheet
-          hangt volledig onder `.vtk-design`, en daarbuiten valt de opmaak weg. */}
-      {open && portalHost
+      {/* Het venster hangt in de designwortel zodat de stylesheet onder
+          `.vtk-design` mee blijft werken; met `<dialog>` + `showModal()` ligt
+          het venster zelf in de top layer boven elke stacking context. */}
+      {portalHost
         ? createPortal(
-            <div
-              className="subscribe-overlay"
-              role="dialog"
-              aria-modal="true"
-              aria-label={labels.title}
-              onClick={() => setOpen(false)}
+            <dialog
+              ref={dialogRef}
+              className="subscribe-dialog"
+              aria-labelledby={open ? headingId : undefined}
+              {...({ closedby: "any" } as Record<string, string>)}
+              onCancel={(event) => {
+                event.preventDefault();
+                setOpen(false);
+              }}
+              onClose={(event) => {
+                if (suppressCloseCountRef.current > 0) {
+                  suppressCloseCountRef.current -= 1;
+                  return;
+                }
+                if (event.currentTarget.open) return;
+                setOpen(false);
+              }}
+              onPointerDown={(event) => {
+                if ("closedBy" in HTMLDialogElement.prototype) {
+                  pressedOutsideRef.current = false;
+                  return;
+                }
+                pressedOutsideRef.current =
+                  event.target === event.currentTarget &&
+                  isOutside(event.clientX, event.clientY, event.currentTarget);
+              }}
+              onPointerUp={(event) => {
+                if ("closedBy" in HTMLDialogElement.prototype) return;
+                const wasOutside = pressedOutsideRef.current;
+                pressedOutsideRef.current = false;
+                if (
+                  wasOutside &&
+                  event.target === event.currentTarget &&
+                  isOutside(event.clientX, event.clientY, event.currentTarget)
+                ) {
+                  setOpen(false);
+                }
+              }}
             >
-              <div className="subscribe-modal" onClick={(event) => event.stopPropagation()}>
-                <div className="subscribe-modal-head">
-                  <h3>{nl ? "Wat wil je in je agenda?" : "What do you want in your calendar?"}</h3>
-                  <button
-                    type="button"
-                    className="subscribe-close"
-                    onClick={() => setOpen(false)}
-                    aria-label={nl ? "Sluiten" : "Close"}
-                  >
-                    ×
-                  </button>
-                </div>
-
-                <div className="subscribe-choices">
-                  {options.map((option) => (
-                    <label key={option.value} className={mode === option.value ? "on" : ""}>
-                      <input
-                        type="radio"
-                        name="subscribe-mode"
-                        value={option.value}
-                        checked={mode === option.value}
-                        onChange={() => setMode(option.value)}
-                      />
-                      <span>
-                        <b>{option.label}</b>
-                        <small>{option.hint}</small>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-
-                {mode === "custom" && (
-                  <div className="subscribe-custom">
-                    <label className="subscribe-chip">
-                      <input
-                        type="checkbox"
-                        checked={customGeneral}
-                        onChange={(event) => setCustomGeneral(event.target.checked)}
-                      />
-                      {nl ? "Algemene evenementen" : "General events"}
-                    </label>
-                    {categories.map((category) => (
-                      <label
-                        key={category.slug}
-                        className="subscribe-chip"
-                        style={{ "--cat": category.colour } as React.CSSProperties}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={customSlugs.includes(category.slug)}
-                          onChange={() => toggleCustom(category.slug)}
-                        />
-                        {categoryName(category)}
-                      </label>
-                    ))}
+              {open ? (
+                <div className="subscribe-modal">
+                  <div className="subscribe-modal-head">
+                    <h3 id={headingId}>
+                      {nl ? "Wat wil je in je agenda?" : "What do you want in your calendar?"}
+                    </h3>
+                    <button
+                      ref={closeBtnRef}
+                      type="button"
+                      className="subscribe-close"
+                      onClick={() => setOpen(false)}
+                      aria-label={nl ? "Sluiten" : "Close"}
+                    >
+                      ×
+                    </button>
                   </div>
-                )}
 
-                <p className="subscribe-how subscribe-how-modal">
-                  {nl
-                    ? "Kies hieronder hoe je hem toevoegt. Je agenda haalt de kalender daarna zelf op, dus nieuwe evenementen komen er vanzelf bij."
-                    : "Choose below how to add it. Your calendar fetches it from then on, so new events appear on their own."}
-                </p>
+                  <fieldset className="subscribe-fieldset">
+                    <legend className="sr-only">
+                      {nl ? "Wat wil je in je agenda?" : "What do you want in your calendar?"}
+                    </legend>
+                    <div className="subscribe-choices">
+                      {options.map((option) => (
+                        <label key={option.value} className={mode === option.value ? "on" : ""}>
+                          <input
+                            type="radio"
+                            name="subscribe-mode"
+                            value={option.value}
+                            checked={mode === option.value}
+                            onChange={() => setMode(option.value)}
+                          />
+                          <span>
+                            <b>{option.label}</b>
+                            <small>{option.hint}</small>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
 
-                <div className="subscribe-actions">
-                  <a className="btn btn-ghost arrow" href={webcalUrl}>
-                    {nl ? "Agenda-app" : "Calendar app"}
-                  </a>
-                  <a
-                    className="btn btn-ghost arrow"
-                    href={googleUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={() => void copy("google")}
-                  >
+                  {mode === "custom" && (
+                    <fieldset className="subscribe-fieldset">
+                      <legend className="sr-only">
+                        {nl ? "Categorieën in eigen selectie" : "Categories in custom selection"}
+                      </legend>
+                      <div className="subscribe-custom">
+                        <label className="subscribe-chip">
+                          <input
+                            type="checkbox"
+                            checked={customGeneral}
+                            onChange={(event) => setCustomGeneral(event.target.checked)}
+                          />
+                          {nl ? "Algemene evenementen" : "General events"}
+                        </label>
+                        {categories.map((category) => (
+                          <label
+                            key={category.slug}
+                            className="subscribe-chip"
+                            style={catChipStyle(category.colour)}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={customSlugs.includes(category.slug)}
+                              onChange={() => toggleCustom(category.slug)}
+                            />
+                            {categoryName(category)}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  )}
+
+                  <p className="subscribe-how subscribe-how-modal">
+                    {nl
+                      ? "Kies hieronder hoe je hem toevoegt. Je agenda haalt de kalender daarna zelf op, dus nieuwe evenementen komen er vanzelf bij."
+                      : "Choose below how to add it. Your calendar fetches it from then on, so new events appear on their own."}
+                  </p>
+
+                  <p className="sr-only" role="status" aria-live="polite">
                     {copied === "google"
                       ? nl
-                        ? "Link gekopieerd. Plak hem in Google"
-                        : "Link copied. Paste it in Google"
-                      : "Google Calendar"}
-                  </a>
-                  <button
-                    type="button"
-                    className="btn btn-ghost subscribe-copy"
-                    onClick={() => void copy("link")}
-                    title={
-                      copied === "link"
+                        ? "Feed-link gekopieerd naar klembord. Plak hem in Google Calendar."
+                        : "Feed link copied to clipboard. Paste it in Google Calendar."
+                      : copied === "link"
                         ? nl
-                          ? "Gekopieerd"
-                          : "Copied"
-                        : nl
-                          ? "Kopieer feed-link"
-                          : "Copy feed link"
-                    }
-                  >
-                    {copied === "link" ? <CheckIcon /> : <CopyIcon />}
-                    <span>
-                      {copied === "link"
-                        ? nl
-                          ? "Gekopieerd"
-                          : "Copied"
-                        : nl
-                          ? "Kopieer link"
-                          : "Copy link"}
-                    </span>
-                  </button>
-                </div>
+                          ? "Feed-link gekopieerd naar klembord."
+                          : "Feed link copied to clipboard."
+                        : ""}
+                  </p>
 
-                <p className="subscribe-hint">
-                  {nl
-                    ? "Google opent ‘Via URL’. Plak daar de feed-link die bij je klik wordt gekopieerd."
-                    : "Google opens ‘From URL’. Paste the feed link copied when you click."}
-                </p>
-              </div>
-            </div>,
+                  <div className="subscribe-actions">
+                    <a className="btn btn-ghost arrow" href={webcalUrl}>
+                      {nl ? "Agenda-app" : "Calendar app"}
+                    </a>
+                    <a
+                      className="btn btn-ghost arrow"
+                      href={googleUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => void copy("google")}
+                    >
+                      {copied === "google"
+                        ? nl
+                          ? "Link gekopieerd. Plak hem in Google"
+                          : "Link copied. Paste it in Google"
+                        : "Google Calendar"}
+                    </a>
+                    <button
+                      type="button"
+                      className="btn btn-ghost subscribe-copy"
+                      onClick={() => void copy("link")}
+                      title={
+                        copied === "link"
+                          ? nl
+                            ? "Gekopieerd"
+                            : "Copied"
+                          : nl
+                            ? "Kopieer feed-link"
+                            : "Copy feed link"
+                      }
+                    >
+                      {copied === "link" ? <CheckIcon /> : <CopyIcon />}
+                      <span>
+                        {copied === "link"
+                          ? nl
+                            ? "Gekopieerd"
+                            : "Copied"
+                          : nl
+                            ? "Kopieer link"
+                            : "Copy link"}
+                      </span>
+                    </button>
+                  </div>
+
+                  <p className="subscribe-hint">
+                    {nl
+                      ? "Google opent ‘Via URL’. Plak daar de feed-link die bij je klik wordt gekopieerd."
+                      : "Google opens ‘From URL’. Paste the feed link copied when you click."}
+                  </p>
+                </div>
+              ) : null}
+            </dialog>,
             portalHost,
           )
         : null}

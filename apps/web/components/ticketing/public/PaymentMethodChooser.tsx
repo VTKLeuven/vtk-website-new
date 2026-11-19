@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { AlertTriangle, ChevronDown, CreditCard, Loader2, Smartphone } from "lucide-react";
 
 export type PaymentMethodOption = {
@@ -82,15 +82,42 @@ export function PaymentMethodChooser({
   orderId,
   locale,
   choice,
-  checkout,
+  value,
+  onChange,
+  disabled = false,
+  error: externalError,
+  errorId,
 }: {
   orderId?: string;
   locale: "nl" | "en";
   choice: PaymentMethodChoice;
-  checkout?: { busy: boolean; busyProvider?: string | null; disabled: boolean };
+  value?: PaymentMethodOption["provider"];
+  onChange?: (provider: PaymentMethodOption["provider"]) => void;
+  disabled?: boolean;
+  error?: string | null;
+  errorId?: string;
 }) {
+  const baseId = useId();
+  const optionsId = `${baseId}-options`;
+  const [internalProvider, setInternalProvider] = useState<PaymentMethodOption["provider"] | undefined>(
+    () => choice.options[0]?.provider,
+  );
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const isControlled = onChange !== undefined;
+  const selectedProvider = isControlled
+    ? value
+    : choice.options.some((option) => option.provider === internalProvider)
+      ? internalProvider
+      : choice.options[0]?.provider;
+
+  function selectProvider(provider: PaymentMethodOption["provider"]) {
+    if (onChange) {
+      onChange(provider);
+    } else {
+      setInternalProvider(provider);
+    }
+  }
 
   async function start(provider: PaymentMethodOption["provider"]) {
     if (!orderId || busy) return;
@@ -121,70 +148,122 @@ export function PaymentMethodChooser({
     }
   }
 
-  const message = errorMessage(error, locale);
+  const message = externalError ?? errorMessage(error, locale);
   // Bij `collapsed` staat enkel de eerste betaalwijze er; de rest komt pas na een
   // klik. Dat is de nudge naar de goedkoopste betaalwijze: geen andere kleur,
   // maar één klik verschil.
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(() => {
+    const selectedIndex = value ? choice.options.findIndex((option) => option.provider === value) : -1;
+    return selectedIndex > 0;
+  });
+  const prevExpandedRef = useRef(expanded);
+  const optionRefs = useRef<Array<HTMLInputElement | null>>([]);
   const collapsed = choice.variant === "collapsed" && !expanded;
   const visible = collapsed ? choice.options.slice(0, 1) : choice.options;
   const hiddenCount = choice.options.length - visible.length;
 
-  return (
-    <section className="ticket-pay-choice" aria-labelledby="ticket-pay-choice-title">
-      <h2 id="ticket-pay-choice-title">
-        {locale === "nl" ? "Hoe wil je betalen?" : "How would you like to pay?"}
-      </h2>
+  useEffect(() => {
+    if (!prevExpandedRef.current && expanded) {
+      optionRefs.current[1]?.focus();
+    }
+    prevExpandedRef.current = expanded;
+  }, [expanded]);
 
-      {message ? (
-        <p className="ticket-pay-error" role="alert">
-          <AlertTriangle size={17} aria-hidden="true" /> {message}
-        </p>
-      ) : null}
+  const fieldsetContent = (
+    <>
+      <fieldset
+        className="ticket-pay-fieldset"
+        aria-invalid={externalError ? true : undefined}
+        aria-describedby={externalError && errorId ? errorId : undefined}
+      >
+        <legend className="ticket-pay-legend">
+          {locale === "nl" ? "Hoe wil je betalen?" : "How would you like to pay?"}
+        </legend>
 
-      <div className="ticket-pay-options" id="ticket-pay-options">
-        {visible.map((option) => {
-          const label = LABELS[option.provider][locale];
-          return (
-            <button
-              key={option.provider}
-              type={checkout ? "submit" : "button"}
-              name={checkout ? "paymentProvider" : undefined}
-              value={option.provider}
-              className="ticket-pay-option"
-              onClick={checkout ? undefined : () => void start(option.provider)}
-              disabled={checkout ? checkout.disabled || checkout.busy : busy !== null}
-            >
-              <PaymentMethodMark
-                option={option}
-                busy={
-                  checkout
-                    ? checkout.busy && (checkout.busyProvider ? checkout.busyProvider === option.provider : true)
-                    : busy === option.provider
-                }
-                title={label.title}
-              />
-              <span className="ticket-pay-option-text">
-                <strong>{label.title}</strong>
-                <small>{label.hint}</small>
-              </span>
-            </button>
-          );
-        })}
-      </div>
+        {message ? (
+          <p id={externalError ? errorId : undefined} className="ticket-pay-error" role="alert">
+            <AlertTriangle size={17} aria-hidden="true" /> {message}
+          </p>
+        ) : null}
 
-      {hiddenCount > 0 ? (
+        <div className="ticket-pay-options" id={optionsId}>
+          {visible.map((option, index) => {
+            const label = LABELS[option.provider][locale];
+            const checked = selectedProvider === option.provider;
+            const inputId = `${baseId}-${option.provider}`;
+            return (
+              <label
+                key={option.provider}
+                htmlFor={inputId}
+                className="ticket-pay-option"
+                data-selected={checked || undefined}
+              >
+                <input
+                  ref={(node) => {
+                    optionRefs.current[index] = node;
+                  }}
+                  id={inputId}
+                  type="radio"
+                  name={`${baseId}-provider`}
+                  value={option.provider}
+                  checked={checked}
+                  disabled={disabled || busy !== null}
+                  onChange={() => selectProvider(option.provider)}
+                />
+                <PaymentMethodMark
+                  option={option}
+                  busy={busy === option.provider}
+                />
+                <span className="ticket-pay-option-text">
+                  <strong>{label.title}</strong>
+                  <small>{label.hint}</small>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+
+        {hiddenCount > 0 ? (
+          <button
+            type="button"
+            className="ticket-pay-more"
+            onClick={() => setExpanded(true)}
+            aria-expanded={false}
+            aria-controls={optionsId}
+          >
+            <ChevronDown size={16} aria-hidden="true" />
+            {locale === "nl" ? "Meer betaalmethodes" : "More payment methods"}
+          </button>
+        ) : null}
+      </fieldset>
+
+      {orderId ? (
         <button
-          type="button"
-          className="ticket-pay-more"
-          onClick={() => setExpanded(true)}
-          aria-expanded={false}
-          aria-controls="ticket-pay-options"
+          type="submit"
+          className="ticket-primary-button ticket-pay-submit"
+          disabled={disabled || busy !== null || !selectedProvider}
         >
-          <ChevronDown size={16} aria-hidden="true" />
-          {locale === "nl" ? "Meer betaalmethodes" : "More payment methods"}
+          {busy ? <Loader2 className="is-spinning" size={17} aria-hidden="true" /> : null}
+          {locale === "nl" ? "Nu betalen" : "Pay now"}
         </button>
       ) : null}
+    </>
+  );
+
+  return (
+    <section className="ticket-pay-choice">
+      {orderId ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (selectedProvider) void start(selectedProvider);
+          }}
+        >
+          {fieldsetContent}
+        </form>
+      ) : (
+        fieldsetContent
+      )}
     </section>
   );
 }
@@ -201,18 +280,16 @@ export function PaymentMethodChooser({
 function PaymentMethodMark({
   option,
   busy,
-  title,
 }: {
   option: PaymentMethodOption;
   busy: boolean;
-  title: string;
 }) {
   if (busy) return <Loader2 className="is-spinning" size={20} aria-hidden="true" />;
   if (option.logo) {
     // Bewust een gewone <img>: een klein statisch merkbestand haalt niets uit de
     // optimizer van next/image.
     // eslint-disable-next-line @next/next/no-img-element
-    return <img className="ticket-pay-logo" src={option.logo} alt={title} />;
+    return <img className="ticket-pay-logo" src={option.logo} alt="" />;
   }
   const Icon = option.provider === "bancontact" ? Smartphone : CreditCard;
   return <Icon size={20} aria-hidden="true" />;

@@ -76,6 +76,11 @@
   font-size: 14px;
 }
 
+.vtk-site-footer a {
+  padding-inline: 3px;
+  margin-inline: -3px;
+}
+
 .vtk-site-footer a:hover {
   color: #fff;
 }
@@ -137,6 +142,8 @@
 
 .vtk-cookie-consent {
   width: min(100%, var(--max));
+  max-height: calc(calc(100 * var(--vtk-dvh, 1dvh)) - 24px);
+  overflow-y: auto;
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(360px, auto);
   align-items: center;
@@ -184,6 +191,7 @@
 .vtk-cookie-consent-option {
   display: flex;
   align-items: center;
+  min-height: 28px;
   gap: 8px;
   color: var(--on-dark-muted);
   font-size: 12.5px;
@@ -197,8 +205,8 @@
 }
 
 .vtk-cookie-consent-option input {
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   margin: 0;
   accent-color: var(--yellow);
   cursor: pointer;
@@ -226,7 +234,7 @@
 }
 
 .vtk-cookie-secondary {
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: 1px solid var(--on-dark-control-border, rgba(239, 242, 248, 0.48));
   background: transparent;
   color: var(--paper);
 }
@@ -302,17 +310,18 @@
 .vtk-auth-form input {
   width: 100%;
   padding: 11px 12px;
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--control-border, rgba(14, 26, 54, 0.5));
   border-radius: 12px;
   background: var(--paper);
   color: var(--ink);
   font: inherit;
 }
 
-.vtk-auth-form input:focus {
-  outline: none;
+.vtk-auth-form input:focus-visible {
   border-color: var(--ink);
-  box-shadow: 0 0 0 3px rgba(14, 26, 54, 0.08);
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+  box-shadow: none;
 }
 
 .vtk-auth-error {
@@ -346,7 +355,7 @@
   width: 100%;
   min-height: 44px;
   margin-top: 12px;
-  border: 1px solid color-mix(in srgb, var(--navy) 22%, transparent);
+  border: 1px solid var(--control-border, rgba(14, 26, 54, 0.5));
   border-radius: 999px;
   background: var(--paper);
   color: var(--ink);
@@ -641,8 +650,13 @@ body:has(.vtk-preview-bar) .vtk-cookie-consent-positioner {
   min-width: 0;
   min-height: 56px;
   padding: 8px 0;
+  border: 0;
+  background: transparent;
   color: var(--ink);
+  font: inherit;
+  text-align: left;
   text-decoration: none;
+  cursor: pointer;
 }
 
 .vtk-poll-strip-link:focus-visible,

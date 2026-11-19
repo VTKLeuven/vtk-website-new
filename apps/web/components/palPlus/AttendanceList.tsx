@@ -81,6 +81,7 @@ export function AttendanceList({
             <span className="pp-attendance-choice">
               <button
                 type="button"
+                aria-label={`${copy.came}: ${attendee.name}`}
                 aria-pressed={attendee.attended === true}
                 onClick={() => mark(attendee.userId, attendee.attended === true ? null : true)}
               >
@@ -88,6 +89,7 @@ export function AttendanceList({
               </button>
               <button
                 type="button"
+                aria-label={`${copy.didNotCome}: ${attendee.name}`}
                 aria-pressed={attendee.attended === false}
                 onClick={() => mark(attendee.userId, attendee.attended === false ? null : false)}
               >

@@ -78,6 +78,8 @@ export function FormFieldInput({
   locale,
   disabled = false,
   shuffleSeed = "",
+  inputId: providedInputId,
+  labelId,
   describedById,
   invalid = false,
 }: {
@@ -87,11 +89,13 @@ export function FormFieldInput({
   locale: FieldLocale;
   disabled?: boolean;
   shuffleSeed?: string;
+  inputId?: string;
+  labelId?: string;
   describedById?: string;
   invalid?: boolean;
 }) {
   const uid = useId();
-  const inputId = `${uid}-${field.code}`;
+  const inputId = providedInputId ?? `${uid}-${field.code}`;
   const config = field.config;
 
   const options = useMemo(() => {
@@ -188,7 +192,19 @@ export function FormFieldInput({
             checked={Boolean(value.checked)}
             onChange={(event) => onChange({ checked: event.target.checked })}
           />
-          <span>{fieldLabel(field, locale)}</span>
+          <span>
+            {fieldLabel(field, locale)}
+            {field.required ? (
+              <>
+                <span className="vtk-form-required" aria-hidden="true">
+                  *
+                </span>
+                <span className="sr-only">
+                  {locale === "nl" ? " (verplicht)" : " (required)"}
+                </span>
+              </>
+            ) : null}
+          </span>
         </label>
       );
 
@@ -201,8 +217,11 @@ export function FormFieldInput({
         <div
           className="vtk-form-scale"
           role="radiogroup"
-          aria-label={fieldLabel(field, locale)}
+          aria-labelledby={labelId}
+          aria-label={labelId ? undefined : fieldLabel(field, locale)}
           aria-describedby={describedById}
+          aria-invalid={invalid || undefined}
+          aria-required={field.required || undefined}
         >
           {config.minLabelNl || config.minLabelEn ? (
             <span className="vtk-form-scale-label">
@@ -240,6 +259,8 @@ export function FormFieldInput({
           variant="public"
           disabled={disabled}
           required={field.required}
+          ariaLabelledBy={labelId}
+          ariaLabel={labelId ? undefined : fieldLabel(field, locale)}
           ariaDescribedBy={describedById}
           invalid={invalid}
           value={value.options?.[0] ?? ""}
@@ -284,6 +305,8 @@ export function FormFieldInput({
           variant="public"
           disabled={disabled}
           required={field.required}
+          ariaLabelledBy={labelId}
+          ariaLabel={labelId ? undefined : fieldLabel(field, locale)}
           ariaDescribedBy={describedById}
           invalid={invalid}
           value={value.text ?? ""}
@@ -316,8 +339,11 @@ export function FormFieldInput({
         <div
           className="vtk-form-options"
           role={multiple ? "group" : "radiogroup"}
-          aria-label={fieldLabel(field, locale)}
+          aria-labelledby={labelId}
+          aria-label={labelId ? undefined : fieldLabel(field, locale)}
           aria-describedby={describedById}
+          aria-invalid={invalid || undefined}
+          aria-required={!multiple && field.required ? true : undefined}
         >
           {options.map((option) => (
             <label

@@ -35,10 +35,11 @@ function PhoneField({
         name="phone"
         type="tel"
         autoComplete="tel"
+        aria-describedby="phone-hint"
         defaultValue={defaultValue ?? ""}
         placeholder="+32 470 12 34 56"
       />
-      <p className="mt-1 text-xs text-[#5c667f]">{hint}</p>
+      <p id="phone-hint" className="mt-1 text-xs text-[#5c667f]">{hint}</p>
     </div>
   );
 }
@@ -184,11 +185,23 @@ export function ProfileForm({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <Label htmlFor="firstName">{t.firstName}</Label>
-            <Input id="firstName" name="firstName" defaultValue={firstName} required />
+            <Input
+              id="firstName"
+              name="firstName"
+              autoComplete="given-name"
+              defaultValue={firstName}
+              required
+            />
           </div>
           <div>
             <Label htmlFor="lastName">{t.lastName}</Label>
-            <Input id="lastName" name="lastName" defaultValue={lastName} required />
+            <Input
+              id="lastName"
+              name="lastName"
+              autoComplete="family-name"
+              defaultValue={lastName}
+              required
+            />
           </div>
           <div>
             <Label htmlFor="rNumber">{t.rNumber}</Label>
@@ -197,8 +210,13 @@ export function ProfileForm({
               // Geen `name`, dus het wordt niet meegepost; saveProfileAction
               // laat het r-nummer sowieso ongemoeid wanneer deze vlag staat.
               <>
-                <Input id="rNumber" defaultValue={user.rNumber ?? ""} disabled />
-                <p className="mt-1 text-xs text-[#5c667f]">{t.rNumberFromKul}</p>
+                <Input
+                  id="rNumber"
+                  defaultValue={user.rNumber ?? ""}
+                  aria-describedby="rNumber-hint"
+                  disabled
+                />
+                <p id="rNumber-hint" className="mt-1 text-xs text-[#5c667f]">{t.rNumberFromKul}</p>
               </>
             ) : (
               <>
@@ -209,8 +227,9 @@ export function ProfileForm({
                   placeholder="r0123456"
                   pattern={R_NUMBER_PATTERN}
                   title={t.rNumberHint}
+                  aria-describedby="rNumber-hint"
                 />
-                <p className="mt-1 text-xs text-[#5c667f]">
+                <p id="rNumber-hint" className="mt-1 text-xs text-[#5c667f]">
                   {selfRegistered ? t.rNumberOptionalHint : t.rNumberHint}
                 </p>
               </>
@@ -223,6 +242,7 @@ export function ProfileForm({
             id="birthDate"
             name="birthDate"
             type="date"
+            autoComplete="bday"
             defaultValue={dateInputValue(user.birthDate)}
           />
         </div>
@@ -254,8 +274,13 @@ export function ProfileForm({
         {selfRegistered ? (
           <div className="sm:max-w-md">
             <Label htmlFor="accountEmail">{t.accountEmail}</Label>
-            <Input id="accountEmail" defaultValue={user.email} disabled />
-            <p className="mt-1 text-xs text-[#5c667f]">{t.accountEmailHint}</p>
+            <Input
+              id="accountEmail"
+              defaultValue={user.email}
+              aria-describedby="accountEmail-hint"
+              disabled
+            />
+            <p id="accountEmail-hint" className="mt-1 text-xs text-[#5c667f]">{t.accountEmailHint}</p>
             {/* Een persoonlijk loginadres heeft geen tweede universiteitsadres
                 en dus ook geen zinvolle communicatiekeuze. Bestaande optionele
                 data blijft wel behouden wanneer het profiel wordt opgeslagen. */}
@@ -270,8 +295,13 @@ export function ProfileForm({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <Label htmlFor="universityEmail">{t.universityEmail}</Label>
-                <Input id="universityEmail" defaultValue={user.email} disabled />
-                <p className="mt-1 text-xs text-[#5c667f]">{t.universityEmailHint}</p>
+                <Input
+                  id="universityEmail"
+                  defaultValue={user.email}
+                  aria-describedby="universityEmail-hint"
+                  disabled
+                />
+                <p id="universityEmail-hint" className="mt-1 text-xs text-[#5c667f]">{t.universityEmailHint}</p>
               </div>
               <div>
                 <Label htmlFor="personalEmail">{t.personalEmail}</Label>
@@ -279,53 +309,57 @@ export function ProfileForm({
                   id="personalEmail"
                   name="personalEmail"
                   type="email"
+                  autoComplete="email"
                   defaultValue={user.personalEmail ?? ""}
                 />
               </div>
               <PhoneField defaultValue={user.phone} label={t.phone} hint={t.phoneHint} />
             </div>
-            <div>
-              <span className="text-sm font-medium text-vtk-ink">{t.preferenceHeading}</span>
-              <p className="text-xs text-[#5c667f]">{t.preferenceHint}</p>
+            <fieldset aria-describedby="preference-hint">
+              <legend className="text-sm font-medium text-vtk-ink">{t.preferenceHeading}</legend>
+              <p id="preference-hint" className="text-xs text-[#5c667f]">{t.preferenceHint}</p>
               <div className="mt-2 flex flex-wrap gap-4">
-                <label className="inline-flex items-center gap-2 text-sm">
+                <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
                   <input
                     type="radio"
                     name="emailPreference"
                     value="UNIVERSITY"
                     defaultChecked={user.emailPreference !== "PERSONAL"}
+                    className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink"
                   />
                   {t.preferenceUniversity}
                 </label>
-                <label className="inline-flex items-center gap-2 text-sm">
+                <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
                   <input
                     type="radio"
                     name="emailPreference"
                     value="PERSONAL"
                     defaultChecked={user.emailPreference === "PERSONAL"}
+                    className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink"
                   />
                   {t.preferencePersonal}
                 </label>
               </div>
-            </div>
+            </fieldset>
           </>
         )}
         {/* Mailinglijsten (opt-in) horen bij de contactgegevens. */}
-        <div>
-          <span className="text-sm font-medium text-vtk-ink">{t.mailHeading}</span>
-          <p className="text-xs text-[#5c667f]">{t.mailIntro}</p>
+        <fieldset aria-describedby="mail-intro">
+          <legend className="text-sm font-medium text-vtk-ink">{t.mailHeading}</legend>
+          <p id="mail-intro" className="text-xs text-[#5c667f]">{t.mailIntro}</p>
           {/* Een uitschrijving via de mail komt uit Brevo terug (zie
               lib/brevo/unsubscribe.ts). Zonder deze uitleg staan de vinkjes
               hieronder aan terwijl er niets vertrekt, en dat leest als een bug. */}
           {unsubscribed && (
             <div className="mt-3 rounded-2xl border border-vtk-blue/15 bg-vtk-surface p-4 shadow-[inset_3px_0_0_var(--yellow)]">
               <p className="text-sm font-medium text-vtk-ink">{t.mailUnsubscribedHeading}</p>
-              <p className="mt-1 text-xs text-[#5c667f]">{t.mailUnsubscribedHint}</p>
+              <p id="mail-unsubscribed-hint" className="mt-1 text-xs text-[#5c667f]">{t.mailUnsubscribedHint}</p>
               <CheckboxChip
                 name="mailResubscribe"
                 value="on"
                 defaultChecked={false}
                 label={t.mailResubscribe}
+                ariaDescribedBy="mail-unsubscribed-hint"
                 className="mt-3"
               />
             </div>
@@ -341,13 +375,13 @@ export function ProfileForm({
               />
             ))}
           </div>
-        </div>
+        </fieldset>
         {/* Herinneringen voor een shift staan bewust náást de mailinglijsten en
             niet ertussen: dit is post over iets waarvoor je jezelf inschreef, en
             geen categorie waar je je op abonneert. */}
-        <div>
-          <span className="text-sm font-medium text-vtk-ink">{t.shiftRemindersHeading}</span>
-          <p className="text-xs text-[#5c667f]">{t.shiftRemindersHint}</p>
+        <fieldset aria-describedby="shift-reminders-hint">
+          <legend className="text-sm font-medium text-vtk-ink">{t.shiftRemindersHeading}</legend>
+          <p id="shift-reminders-hint" className="text-xs text-[#5c667f]">{t.shiftRemindersHint}</p>
           <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
             <CheckboxChip
               name="shiftReminderDayBefore"
@@ -362,22 +396,23 @@ export function ProfileForm({
               label={t.shiftReminderSoon}
             />
           </div>
-        </div>
+        </fieldset>
         {/* Wat je te zien krijgt, niet wat je toegestuurd krijgt; daarom onderaan
             deze groep en niet tussen de mailinglijsten. Standaard uit: elk
             evenement is publiek en een doelgroep is een label, geen slot. */}
         {showCalendarPreference && (
-          <div>
-            <span className="text-sm font-medium text-vtk-ink">{t.calendarHeading}</span>
-            <p className="text-xs text-[#5c667f]">{t.calendarHint}</p>
+          <fieldset>
+            <legend className="text-sm font-medium text-vtk-ink">{t.calendarHeading}</legend>
+            <p id="calendar-hint" className="text-xs text-[#5c667f]">{t.calendarHint}</p>
             <CheckboxChip
               name="calendarOnlyMyAudiences"
               value="on"
               defaultChecked={user.calendarOnlyMyAudiences}
               label={t.calendarOnlyMyAudiences}
+              ariaDescribedBy="calendar-hint"
               className="mt-2"
             />
-          </div>
+          </fieldset>
         )}
       </fieldset>
 

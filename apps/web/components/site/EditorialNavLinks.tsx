@@ -52,14 +52,16 @@ export function EditorialNavLinks({
 }) {
   const pathname = usePathname() ?? "/";
   const shellRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const toggleRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const isClient = useSyncExternalStore(subscribeToClient, () => true, () => false);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [expanded, setExpanded] = useState<string[]>([]);
   const [menuPath, setMenuPath] = useState(pathname);
-  // Tab waarvan het uitklappaneel onderdrukt is omdat je er net op geklikt hebt.
-  // Zonder dit blijft het paneel na de klik openstaan zolang je muis op de tab
-  // rust, terwijl de router al naar de nieuwe pagina is gegaan.
+  const [openSubmenu, setOpenSubmenu] = useState<{ id: string; mode: "hover" | "pinned" } | null>(null);
+  // Tab waarvan het uitklappaneel onderdrukt is omdat je er net op geklikt hebt
+  // of omdat het met Escape gesloten werd.
   const [suppressed, setSuppressed] = useState<string | null>(null);
 
   const nl = locale === "nl";
@@ -73,12 +75,24 @@ export function EditorialNavLinks({
     setMenuPath(pathname);
     setMenuOpen(false);
     setExpanded([]);
+    setOpenSubmenu(null);
   }
 
   useEffect(() => {
     if (!menuOpen) return;
+    const targets = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        "main, footer, .vtk-site-header .brand, .vtk-site-header .nav-right, .vtk-cookie-consent-positioner, .vtk-announcement, .vtk-preview-bar",
+      ),
+    );
+    const previous = targets.map((el) => ({ el, inert: el.inert }));
+    for (const el of targets) el.inert = true;
+
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setMenuOpen(false);
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+        requestAnimationFrame(() => triggerRef.current?.focus());
+      }
     }
     function onPointerDown(event: PointerEvent) {
       if (shellRef.current?.contains(event.target as Node)) return;
@@ -87,10 +101,36 @@ export function EditorialNavLinks({
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("pointerdown", onPointerDown);
     return () => {
+      for (const item of previous) item.el.inert = item.inert;
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("pointerdown", onPointerDown);
     };
   }, [menuOpen]);
+
+  useEffect(() => {
+    if (!openSubmenu) return;
+    const activeId = openSubmenu.id;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      const panel = document.getElementById(`nav-submenu-${activeId}`);
+      const insidePanel = panel?.contains(document.activeElement);
+      setSuppressed(activeId);
+      setOpenSubmenu(null);
+      if (insidePanel) {
+        requestAnimationFrame(() => toggleRefs.current[activeId]?.focus());
+      }
+    }
+    function onPointerDown(event: PointerEvent) {
+      if (shellRef.current?.contains(event.target as Node)) return;
+      setOpenSubmenu(null);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [openSubmenu]);
 
   function tabHref(tab: NavTab): string {
     if (tab.externalUrl) {
@@ -118,16 +158,21 @@ export function EditorialNavLinks({
     );
   }
 
-  function renderChildLink(child: NavChild) {
+  function renderChildLink(child: NavChild, parentTabId?: string) {
     const href = childHref(child);
     const label = pick(child.labelNl, child.labelEn, locale);
     const active = pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
+    const closeDesktopMenu = () => {
+      if (parentTabId) setSuppressed(parentTabId);
+      setOpenSubmenu(null);
+    };
     if (child.external) {
       return (
         <a
           href={href}
           target="_blank"
           rel="noreferrer noopener"
+          onClick={closeDesktopMenu}
           {...umamiEvent(OUTBOUND_EVENT, { bestemming: outboundHost(href), vanaf: "menu" })}
         >
           {label}
@@ -135,35 +180,47 @@ export function EditorialNavLinks({
       );
     }
     return (
-      <Link href={href} className={isClient && active ? "active" : undefined}>
+      <Link
+        href={href}
+        className={isClient && active ? "active" : undefined}
+        aria-current={isClient && active ? "page" : undefined}
+        onClick={closeDesktopMenu}
+      >
         {label}
       </Link>
     );
   }
 
-  function renderTabLink(tab: NavTab, active: boolean, withCaret = false) {
+  function renderTabLink(tab: NavTab, active: boolean) {
     const label = pick(tab.labelNl, tab.labelEn, locale);
-    const caret = withCaret ? <ChevronDown className="nav-caret" aria-hidden="true" size={14} /> : null;
+    const closeDesktopMenu = () => {
+      setSuppressed(tab.id);
+      setOpenSubmenu(null);
+    };
     if (tab.externalUrl && isExternalUrl(tab.externalUrl)) {
       return (
         <a
           href={tab.externalUrl}
           target="_blank"
           rel="noreferrer noopener"
+          onClick={closeDesktopMenu}
           {...umamiEvent(OUTBOUND_EVENT, {
             bestemming: outboundHost(tab.externalUrl),
             vanaf: "menu",
           })}
         >
           {label}
-          {caret}
         </a>
       );
     }
     return (
-      <Link href={tabHref(tab)} className={isClient && active ? "active" : undefined}>
+      <Link
+        href={tabHref(tab)}
+        className={isClient && active ? "active" : undefined}
+        aria-current={isClient && active ? "page" : undefined}
+        onClick={closeDesktopMenu}
+      >
         {label}
-        {caret}
       </Link>
     );
   }
@@ -181,27 +238,56 @@ export function EditorialNavLinks({
               </div>
             );
           }
-          // Openen gebeurt met CSS (hover en :focus-visible): de links zitten
-          // altijd in de DOM, dus toetsenbord en screenreader komen erbij
-          // zonder extra knop die de nav alleen maar breder maakt. Een klik
-          // onderdrukt het paneel tot de muis de tab verlaat of de focus
-          // wegvalt; anders blijft het na het navigeren hangen.
+          // Openen op desktop via de aparte toggleknop (Enter/Space/klik) of
+          // via muis-hover; nooit automatisch bij focus op de link zelf, zodat
+          // toetsenbordgebruikers niet door 26 sublinks gedwongen worden.
           const isSuppressed = suppressed === tab.id;
-          const release = () => setSuppressed((current) => (current === tab.id ? null : current));
+          const isSubmenuOpen = openSubmenu?.id === tab.id && !isSuppressed;
+          const label = pick(tab.labelNl, tab.labelEn, locale);
           return (
             <div
               key={tab.id}
               className="nav-item has-menu"
+              data-menu-open={isSubmenuOpen ? "" : undefined}
               data-suppressed={isSuppressed ? "" : undefined}
-              onClick={() => setSuppressed(tab.id)}
-              onPointerLeave={release}
-              onBlur={release}
+              onPointerEnter={(event) => {
+                if (event.pointerType !== "mouse" || isSuppressed) return;
+                setOpenSubmenu((cur) => (cur?.id === tab.id && cur.mode === "pinned" ? cur : { id: tab.id, mode: "hover" }));
+              }}
+              onPointerLeave={(event) => {
+                if (event.pointerType !== "mouse") return;
+                setSuppressed((cur) => (cur === tab.id ? null : cur));
+                setOpenSubmenu((cur) => (cur?.id === tab.id && cur.mode === "hover" ? null : cur));
+              }}
+              onBlur={(event) => {
+                if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+                setSuppressed((cur) => (cur === tab.id ? null : cur));
+                setOpenSubmenu((cur) => (cur?.id === tab.id ? null : cur));
+              }}
             >
-              {renderTabLink(tab, active, true)}
-              <div className="nav-menu">
+              {renderTabLink(tab, active)}
+              <button
+                ref={(el) => {
+                  toggleRefs.current[tab.id] = el;
+                }}
+                type="button"
+                className="nav-submenu-toggle"
+                aria-expanded={isSubmenuOpen}
+                aria-controls={`nav-submenu-${tab.id}`}
+                aria-label={`${label}: ${nl ? "toon submenu" : "toggle submenu"}`}
+                onClick={() => {
+                  setSuppressed(null);
+                  setOpenSubmenu((cur) =>
+                    cur?.id === tab.id && cur.mode === "pinned" ? null : { id: tab.id, mode: "pinned" },
+                  );
+                }}
+              >
+                <ChevronDown className="nav-caret" aria-hidden="true" size={14} />
+              </button>
+              <div className="nav-menu" id={`nav-submenu-${tab.id}`}>
                 <ul>
                   {children.map((child) => (
-                    <li key={child.id}>{renderChildLink(child)}</li>
+                    <li key={child.id}>{renderChildLink(child, tab.id)}</li>
                   ))}
                 </ul>
               </div>
@@ -211,6 +297,7 @@ export function EditorialNavLinks({
       </nav>
 
       <button
+        ref={triggerRef}
         type="button"
         className="nav-menu-trigger"
         aria-expanded={menuOpen}

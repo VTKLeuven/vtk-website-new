@@ -54,6 +54,11 @@ type Labels = {
 
 type PdfJs = typeof import('pdfjs-dist');
 type PdfRenderTask = { cancel: () => void; promise: Promise<void> };
+type PdfTextLayer = {
+  render: () => Promise<void>;
+  cancel: () => void;
+  textContentItemsStr: string[];
+};
 type PdfDocument = import('pdfjs-dist').PDFDocumentProxy;
 
 let pdfJsPromise: Promise<PdfJs> | null = null;
@@ -113,10 +118,7 @@ const READ_MIN_WIDTH = 720;
 function loadPdfJs() {
   if (!pdfJsPromise) {
     pdfJsPromise = import('pdfjs-dist').then((pdfjs) => {
-      pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-        'pdfjs-dist/build/pdf.worker.min.mjs',
-        import.meta.url
-      ).toString();
+      pdfjs.GlobalWorkerOptions.workerSrc = `/api/pdf-worker?v=${encodeURIComponent(pdfjs.version)}`;
       return pdfjs;
     });
   }
@@ -209,7 +211,7 @@ function PdfThumbnail({ issue, labels }: { issue: MagazineIssue; labels: Labels 
   }, [issue.documentUrl, visible]);
 
   return (
-    <div ref={rootRef} className="vtk-media-magazine-preview" aria-hidden="true">
+    <div ref={rootRef} className="vtk-media-magazine-preview">
       <canvas ref={canvasRef} className={status === 'ready' ? 'is-ready' : ''} />
       {status === 'loading' ? (
         <span className="vtk-media-preview-state">
@@ -229,12 +231,15 @@ function PdfThumbnail({ issue, labels }: { issue: MagazineIssue; labels: Labels 
 
 function PdfDocumentViewer({ issue, labels }: { issue: MagazineIssue; labels: Labels }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const textLayerRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [document, setDocument] = useState<PdfDocument | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [pageCount, setPageCount] = useState(0);
   const [bounds, setBounds] = useState({ width: 0, height: 0 });
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [hasTextLayer, setHasTextLayer] = useState(false);
   const [zoomIndex, setZoomIndex] = useState<number>(DEFAULT_ZOOM_INDEX);
 
   useEffect(() => {
@@ -279,12 +284,16 @@ function PdfDocumentViewer({ issue, labels }: { issue: MagazineIssue; labels: La
 
     let disposed = false;
     let renderTask: PdfRenderTask | null = null;
+    let textLayer: PdfTextLayer | null = null;
 
     async function renderPage() {
       try {
+        const pdfjs = await loadPdfJs();
         const page = await document!.getPage(pageNumber);
         const canvas = canvasRef.current;
-        if (!canvas || disposed) return;
+        const stage = stageRef.current;
+        const textLayerDiv = textLayerRef.current;
+        if (!canvas || !stage || !textLayerDiv || disposed) return;
 
         const baseViewport = page.getViewport({ scale: 1 });
         // Standaard de hele bladzijde in de hoogte, zoals je een blad vasthoudt.
@@ -297,6 +306,7 @@ function PdfDocumentViewer({ issue, labels }: { issue: MagazineIssue; labels: La
         const baseWidth = Math.min(availableWidth, Math.max(fitHeightWidth, READ_MIN_WIDTH));
         const cssScale = (baseWidth / baseViewport.width) * ZOOM_STEPS[zoomIndex];
         const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+        const cssViewport = page.getViewport({ scale: cssScale });
         const viewport = page.getViewport({ scale: cssScale * pixelRatio });
         const context = canvas.getContext('2d', { alpha: false });
         if (!context) throw new Error('Canvas is unavailable');
@@ -306,13 +316,43 @@ function PdfDocumentViewer({ issue, labels }: { issue: MagazineIssue; labels: La
         canvas.style.width = `${Math.ceil(viewport.width / pixelRatio)}px`;
         canvas.style.height = `${Math.ceil(viewport.height / pixelRatio)}px`;
 
+        stage.style.setProperty('--scale-factor', String(cssViewport.scale));
+        textLayerDiv.replaceChildren();
+
         renderTask = page.render({ canvasContext: context, viewport });
         await renderTask.promise;
-        if (!disposed) setStatus('ready');
+        if (disposed) return;
+
+        let hasText = false;
+        const nextTextLayer = new pdfjs.TextLayer({
+          textContentSource: page.streamTextContent(),
+          container: textLayerDiv,
+          viewport: cssViewport,
+        });
+        textLayer = nextTextLayer;
+
+        try {
+          await nextTextLayer.render();
+          if (!disposed) {
+            hasText = nextTextLayer.textContentItemsStr.some((item) => item.trim().length > 0);
+          }
+        } catch {
+          if (disposed) return;
+          /* leave hasTextLayer false if text extraction fails */
+          textLayerDiv.replaceChildren();
+        }
+
+        if (!disposed) {
+          setHasTextLayer(hasText);
+          setStatus('ready');
+        }
       } catch (error) {
         if (
           !disposed &&
-          !(error instanceof Error && error.name === 'RenderingCancelledException')
+          !(
+            error instanceof Error &&
+            (error.name === 'RenderingCancelledException' || error.name === 'AbortException')
+          )
         ) {
           setStatus('error');
         }
@@ -323,11 +363,13 @@ function PdfDocumentViewer({ issue, labels }: { issue: MagazineIssue; labels: La
     return () => {
       disposed = true;
       renderTask?.cancel();
+      textLayer?.cancel();
     };
   }, [bounds.height, bounds.width, document, pageNumber, zoomIndex]);
 
   function selectPage(nextPage: number) {
     setStatus('loading');
+    setHasTextLayer(false);
     setPageNumber(nextPage);
     viewportRef.current?.scrollTo({ top: 0, left: 0 });
   }
@@ -340,28 +382,39 @@ function PdfDocumentViewer({ issue, labels }: { issue: MagazineIssue; labels: La
     <div className="vtk-media-pdf-viewer" aria-busy={status === 'loading'}>
       <div ref={viewportRef} className="vtk-media-pdf-scroll">
         <div className="vtk-media-pdf-page">
-          <canvas
-            ref={canvasRef}
-            className={status === 'ready' ? 'is-ready' : ''}
-            role="img"
-            aria-label={`${issue.publicationTitle}, ${counter}`}
-          />
+          <div
+            ref={stageRef}
+            className="vtk-media-pdf-stage"
+            role={hasTextLayer ? undefined : 'img'}
+            aria-label={hasTextLayer ? undefined : `${issue.publicationTitle}, ${counter}`}
+          >
+            <canvas
+              ref={canvasRef}
+              className={status === 'ready' ? 'is-ready' : ''}
+              role={hasTextLayer ? 'presentation' : undefined}
+            />
+            <div ref={textLayerRef} className="textLayer" />
+          </div>
         </div>
       </div>
       {status === 'loading' ? (
-        <span className="vtk-media-document-loading">
+        <span className="vtk-media-document-loading" role="status" aria-live="polite" aria-atomic="true">
           <LoaderCircle aria-hidden="true" />
           {labels.viewerFallback}
         </span>
       ) : null}
       {status === 'error' ? (
-        <span className="vtk-media-document-loading is-error" role="status">
+        <span className="vtk-media-document-loading is-error" role="status" aria-live="polite" aria-atomic="true">
           <FileText aria-hidden="true" />
           {labels.viewerError}
         </span>
       ) : null}
       {pageCount > 0 ? (
-        <nav className="vtk-media-pdf-pagination" aria-label={labels.viewerTitle}>
+        <div
+          role="toolbar"
+          className="vtk-media-pdf-pagination"
+          aria-label={`${labels.previousPage}, ${labels.nextPage}, ${labels.zoomIn}, ${labels.zoomOut}`}
+        >
           <button
             type="button"
             onClick={() => selectPage(pageNumber - 1)}
@@ -371,7 +424,7 @@ function PdfDocumentViewer({ issue, labels }: { issue: MagazineIssue; labels: La
             <ChevronLeft aria-hidden="true" />
             <span className="vtk-immich-visually-hidden">{labels.previousPage}</span>
           </button>
-          <span>{counter}</span>
+          <span role="status" aria-live="polite" aria-atomic="true">{counter}</span>
           <button
             type="button"
             onClick={() => selectPage(pageNumber + 1)}
@@ -396,6 +449,7 @@ function PdfDocumentViewer({ issue, labels }: { issue: MagazineIssue; labels: La
               className="vtk-media-pdf-zoom-level"
               onClick={() => setZoomIndex(DEFAULT_ZOOM_INDEX)}
               title={labels.resetZoom}
+              aria-label={`${labels.resetZoom} (${Math.round(ZOOM_STEPS[zoomIndex] * 100)}%)`}
             >
               {Math.round(ZOOM_STEPS[zoomIndex] * 100)}%
             </button>
@@ -411,10 +465,15 @@ function PdfDocumentViewer({ issue, labels }: { issue: MagazineIssue; labels: La
               <span className="vtk-immich-visually-hidden">{labels.zoomIn}</span>
             </button>
           </span>
-        </nav>
+        </div>
       ) : null}
     </div>
   );
+}
+
+function isOutsideDialog(clientX: number, clientY: number, dialog: HTMLDialogElement) {
+  const rect = dialog.getBoundingClientRect();
+  return clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom;
 }
 
 export function MagazineShelf({ issues, labels }: { issues: MagazineIssue[]; labels: Labels }) {
@@ -425,7 +484,11 @@ export function MagazineShelf({ issues, labels }: { issues: MagazineIssue[]; lab
   });
   const shelfId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const returnFocusRef = useRef<HTMLButtonElement | null>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(false);
+  const suppressCloseCountRef = useRef(0);
+  const pressedOutsideRef = useRef(false);
   const publicationGroups = PUBLICATION_KINDS.map((kind) => ({
     kind,
     issues: issues.filter((issue) => issue.kind === kind).sort(compareIssuesByPublicationDate),
@@ -433,16 +496,50 @@ export function MagazineShelf({ issues, labels }: { issues: MagazineIssue[]; lab
 
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (!activeIssue || !dialog) return;
+    if (!dialog) return;
 
-    dialog.showModal();
-    return () => {
-      if (dialog.open) dialog.close();
-    };
+    if (activeIssue) {
+      wasOpenRef.current = true;
+      if (!openerRef.current) {
+        openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      }
+      if (!dialog.open) {
+        dialog.showModal();
+      }
+      if (!dialog.contains(document.activeElement)) {
+        closeBtnRef.current?.focus({ preventScroll: true });
+      }
+      return () => {
+        if (dialog.open) {
+          suppressCloseCountRef.current += 1;
+          dialog.close();
+        }
+        const opener = openerRef.current;
+        if (opener?.isConnected && (!document.activeElement || document.activeElement === document.body)) {
+          opener.focus({ preventScroll: true });
+        }
+      };
+    }
+
+    if (dialog.open) {
+      suppressCloseCountRef.current += 1;
+      dialog.close();
+    }
+    if (wasOpenRef.current) {
+      wasOpenRef.current = false;
+      const opener = openerRef.current;
+      openerRef.current = null;
+      if (opener?.isConnected) {
+        opener.focus({ preventScroll: true });
+      }
+    }
   }, [activeIssue]);
 
   function openIssue(issue: MagazineIssue, event: ReactMouseEvent<HTMLButtonElement>) {
-    returnFocusRef.current = event.currentTarget;
+    openerRef.current =
+      document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+        ? document.activeElement
+        : event.currentTarget;
     setActiveIssue(issue);
     // Elk nummer krijgt een eigen paginaweergave, anders ziet de redactie enkel
     // dat /media bezocht is en niet wat er gelezen werd. Doet niets zonder
@@ -451,11 +548,7 @@ export function MagazineShelf({ issues, labels }: { issues: MagazineIssue[]; lab
   }
 
   function closeIssue() {
-    const dialog = dialogRef.current;
-    const returnFocus = returnFocusRef.current;
-    if (dialog?.open) dialog.close();
     setActiveIssue(null);
-    returnFocus?.focus({ preventScroll: true });
   }
 
   function toggleArchive(kind: MagazineIssue['kind']) {
@@ -485,8 +578,8 @@ export function MagazineShelf({ issues, labels }: { issues: MagazineIssue[]; lab
                   type="button"
                   className="vtk-media-magazine-open"
                   onClick={(event) => openIssue(latestIssue, event)}
-                  aria-label={`${labels.open}: ${latestIssue.publicationTitle}, ${latestIssue.issueLabel}`}
                 >
+                  <span className="sr-only">{`${labels.open}: ${latestIssue.publicationTitle}, ${latestIssue.issueLabel}. `}</span>
                   <PdfThumbnail issue={latestIssue} labels={labels} />
                   <span className="vtk-media-preview-action" aria-hidden="true">
                     <FileText />
@@ -517,10 +610,12 @@ export function MagazineShelf({ issues, labels }: { issues: MagazineIssue[]; lab
                     className="vtk-media-magazine-archive-toggle"
                     aria-expanded={expanded}
                     aria-controls={archiveId}
-                    aria-label={`${archiveToggleLabel}: ${latestIssue.publicationTitle}`}
                     onClick={() => toggleArchive(kind)}
                   >
-                    <span>{archiveToggleLabel}</span>
+                    <span>
+                      {archiveToggleLabel}
+                      <span className="sr-only">{`: ${latestIssue.publicationTitle}`}</span>
+                    </span>
                     {expanded ? (
                       <ChevronUp aria-hidden="true" />
                     ) : (
@@ -542,8 +637,8 @@ export function MagazineShelf({ issues, labels }: { issues: MagazineIssue[]; lab
                             type="button"
                             className="vtk-media-magazine-archive-open"
                             onClick={(event) => openIssue(issue, event)}
-                            aria-label={`${labels.open}: ${issue.publicationTitle}, ${issue.issueLabel}`}
                           >
+                            <span className="sr-only">{`${labels.open}: ${issue.publicationTitle}, `}</span>
                             <span className="vtk-media-magazine-archive-copy">
                               <strong>{issue.issueLabel}</strong>
                               {issue.dateLabel ? (
@@ -565,26 +660,55 @@ export function MagazineShelf({ issues, labels }: { issues: MagazineIssue[]; lab
         })}
       </div>
 
-      {activeIssue ? (
-        <dialog
-          ref={dialogRef}
-          className="vtk-media-document-dialog"
-          aria-label={`${labels.viewerTitle}: ${activeIssue.publicationTitle}`}
-          onCancel={(event) => {
-            event.preventDefault();
+      <dialog
+        ref={dialogRef}
+        className="vtk-media-document-dialog"
+        aria-label={
+          activeIssue ? `${labels.viewerTitle}: ${activeIssue.publicationTitle}` : labels.viewerTitle
+        }
+        {...({ closedby: 'any' } as Record<string, string>)}
+        onCancel={(event) => {
+          event.preventDefault();
+          closeIssue();
+        }}
+        onClose={(event) => {
+          if (suppressCloseCountRef.current > 0) {
+            suppressCloseCountRef.current -= 1;
+            return;
+          }
+          if (event.currentTarget.open) return;
+          closeIssue();
+        }}
+        onPointerDown={(event) => {
+          if ('closedBy' in HTMLDialogElement.prototype) {
+            pressedOutsideRef.current = false;
+            return;
+          }
+          pressedOutsideRef.current =
+            event.target === event.currentTarget &&
+            isOutsideDialog(event.clientX, event.clientY, event.currentTarget);
+        }}
+        onPointerUp={(event) => {
+          if ('closedBy' in HTMLDialogElement.prototype) return;
+          const wasOutside = pressedOutsideRef.current;
+          pressedOutsideRef.current = false;
+          if (
+            wasOutside &&
+            event.target === event.currentTarget &&
+            isOutsideDialog(event.clientX, event.clientY, event.currentTarget)
+          ) {
             closeIssue();
-          }}
-          onClick={(event) => {
-            if (event.target === event.currentTarget) closeIssue();
-          }}
-        >
+          }
+        }}
+      >
+        {activeIssue ? (
           <div className="vtk-media-document-shell">
             <header className="vtk-media-document-bar">
               <div>
                 <strong>{activeIssue.publicationTitle}</strong>
                 <span>{activeIssue.issueLabel}</span>
               </div>
-              <nav aria-label={labels.viewerTitle}>
+              <div role="toolbar" aria-label={labels.viewerTitle}>
                 <a
                   href={activeIssue.documentUrl}
                   target="_blank"
@@ -604,18 +728,18 @@ export function MagazineShelf({ issues, labels }: { issues: MagazineIssue[]; lab
                   <Download aria-hidden="true" />
                   <span>{labels.download}</span>
                 </a>
-                <button type="button" onClick={closeIssue} title={labels.close} autoFocus>
+                <button ref={closeBtnRef} type="button" onClick={closeIssue} title={labels.close}>
                   <X aria-hidden="true" />
                   <span className="vtk-immich-visually-hidden">{labels.close}</span>
                 </button>
-              </nav>
+              </div>
             </header>
             <div className="vtk-media-document-frame">
               <PdfDocumentViewer key={activeIssue.id} issue={activeIssue} labels={labels} />
             </div>
           </div>
-        </dialog>
-      ) : null}
+        ) : null}
+      </dialog>
     </>
   );
 }

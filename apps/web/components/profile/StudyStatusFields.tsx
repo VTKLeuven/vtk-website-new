@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { AcademicStaffRole, StudyProgramme, StudyYear } from "@prisma/client";
+import { Input } from "@vtk/ui";
 import { ACADEMIC_STAFF_ROLES, isValidGraduationYear } from "@/lib/profile";
 import { CheckboxChip } from "./CheckboxChip";
 
@@ -81,6 +82,7 @@ export function StudyStatusFields({
   programmeOptions: readonly StudyProgramme[];
   labels: Labels;
 }) {
+  const idPrefix = useId();
   const [isStudent, setIsStudent] = useState(initialStudent);
   const [isAlumni, setIsAlumni] = useState(initialAlumni);
   const [isAcademicStaff, setIsAcademicStaff] = useState(academicStaffRole !== null);
@@ -88,7 +90,18 @@ export function StudyStatusFields({
   const selectedYears = new Set(studyYears);
   const selectedProgrammes = new Set(studyProgrammes);
   const statusClass =
-    "inline-flex items-center gap-2 rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/30 px-3 py-2 text-sm";
+    "inline-flex cursor-pointer items-center gap-2 rounded-xl border border-vtk-muted/80 bg-vtk-blue-soft/30 px-3 py-2 text-sm has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-vtk-ink";
+  const statusHintId = `${idPrefix}-status-hint`;
+  const studyYearHintId = `${idPrefix}-study-year-hint`;
+  const programmesHintId = `${idPrefix}-programmes-hint`;
+  const notAtFacultyHintId = `${idPrefix}-not-at-faculty-hint`;
+  const intlHintId = `${idPrefix}-intl-hint`;
+  const sideEntrantHintId = `${idPrefix}-side-entrant-hint`;
+  const graduationYearId = `${idPrefix}-graduationYear`;
+  const graduationYearHintId = `${idPrefix}-graduationYearHint`;
+  const wasInVtkHintId = `${idPrefix}-was-in-vtk-hint`;
+  const alumniMailHintId = `${idPrefix}-alumni-mail-hint`;
+  const academicStaffHintId = `${idPrefix}-academic-staff-hint`;
 
   // Dezelfde grens als de server, maar dan vóór het versturen: een student die
   // het verwachte afstudeerjaar invult, krijgt de uitleg bij het veld zelf en
@@ -102,9 +115,9 @@ export function StudyStatusFields({
 
   return (
     <div className="space-y-5">
-      <div>
-        <span className="text-sm font-medium text-vtk-ink">{labels.statusLabel}</span>
-        <p className="text-xs text-[#5c667f]">{labels.statusHint}</p>
+      <fieldset aria-describedby={statusHintId}>
+        <legend className="text-sm font-medium text-vtk-ink">{labels.statusLabel}</legend>
+        <p id={statusHintId} className="text-xs text-[#5c667f]">{labels.statusHint}</p>
         <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <label className={statusClass}>
             <input
@@ -159,13 +172,13 @@ export function StudyStatusFields({
             {labels.statusNotStudying}
           </label>
         </div>
-      </div>
+      </fieldset>
 
       {isStudent ? (
         <div className="space-y-4 border-l-2 border-vtk-blue/15 pl-4">
-          <div>
-            <span className="text-sm font-medium text-vtk-ink">{labels.studyYearLabel}</span>
-            <p className="text-xs text-[#5c667f]">{labels.studyYearHint}</p>
+          <fieldset aria-describedby={studyYearHintId}>
+            <legend className="text-sm font-medium text-vtk-ink">{labels.studyYearLabel}</legend>
+            <p id={studyYearHintId} className="text-xs text-[#5c667f]">{labels.studyYearHint}</p>
             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
               {studyYearOptions.map((year) => (
                 <CheckboxChip
@@ -177,11 +190,11 @@ export function StudyStatusFields({
                 />
               ))}
             </div>
-          </div>
+          </fieldset>
 
-          <div>
-            <span className="text-sm font-medium text-vtk-ink">{labels.programmesLabel}</span>
-            <p className="text-xs text-[#5c667f]">{labels.programmesHint}</p>
+          <fieldset aria-describedby={programmesHintId}>
+            <legend className="text-sm font-medium text-vtk-ink">{labels.programmesLabel}</legend>
+            <p id={programmesHintId} className="text-xs text-[#5c667f]">{labels.programmesHint}</p>
             <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
               {programmeOptions.map((programme) => (
                 <CheckboxChip
@@ -197,11 +210,12 @@ export function StudyStatusFields({
                 value="on"
                 defaultChecked={notAtFaculty}
                 label={labels.notAtFaculty}
+                ariaDescribedBy={notAtFacultyHintId}
                 className="sm:col-span-2"
               />
             </div>
-            <p className="mt-2 text-xs text-[#5c667f]">{labels.notAtFacultyHint}</p>
-          </div>
+            <p id={notAtFacultyHintId} className="mt-2 text-xs text-[#5c667f]">{labels.notAtFacultyHint}</p>
+          </fieldset>
 
           <div>
             <CheckboxChip
@@ -209,8 +223,9 @@ export function StudyStatusFields({
               value="on"
               defaultChecked={internationalStudent}
               label={labels.internationalStudent}
+              ariaDescribedBy={intlHintId}
             />
-            <p className="mt-1 text-xs text-[#5c667f]">{labels.internationalStudentHint}</p>
+            <p id={intlHintId} className="mt-1 text-xs text-[#5c667f]">{labels.internationalStudentHint}</p>
           </div>
 
           <div>
@@ -219,8 +234,9 @@ export function StudyStatusFields({
               value="on"
               defaultChecked={sideEntrant}
               label={labels.sideEntrant}
+              ariaDescribedBy={sideEntrantHintId}
             />
-            <p className="mt-1 text-xs text-[#5c667f]">{labels.sideEntrantHint}</p>
+            <p id={sideEntrantHintId} className="mt-1 text-xs text-[#5c667f]">{labels.sideEntrantHint}</p>
           </div>
         </div>
       ) : null}
@@ -229,22 +245,24 @@ export function StudyStatusFields({
         <div className="space-y-3 border-l-2 border-vtk-blue/15 pl-4">
           <p className="text-xs text-[#5c667f]">{labels.alumniDetailsHint}</p>
           <div>
-            <label htmlFor="graduationYear" className="block text-sm font-medium text-vtk-ink">
+            <label htmlFor={graduationYearId} className="block text-sm font-medium text-vtk-ink">
               {labels.graduationYear}
             </label>
-            <input
-              id="graduationYear"
-              name="graduationYear"
-              inputMode="numeric"
-              pattern="[0-9]{4}"
-              maxLength={4}
-              ref={checkGraduationYear}
-              onChange={(event) => checkGraduationYear(event.currentTarget)}
-              defaultValue={graduationYear ?? ""}
-              placeholder="2019"
-              className="mt-1 w-32 rounded-xl border border-vtk-blue/15 bg-white px-3 py-2 text-sm"
-            />
-            <p className="mt-1 text-xs text-[#5c667f]">{labels.graduationYearHint}</p>
+            <div className="mt-1 w-32">
+              <Input
+                id={graduationYearId}
+                name="graduationYear"
+                inputMode="numeric"
+                pattern="[0-9]{4}"
+                maxLength={4}
+                ref={checkGraduationYear}
+                onChange={(event) => checkGraduationYear(event.currentTarget)}
+                defaultValue={graduationYear ?? ""}
+                placeholder="2019"
+                aria-describedby={graduationYearHintId}
+              />
+            </div>
+            <p id={graduationYearHintId} className="mt-1 text-xs text-[#5c667f]">{labels.graduationYearHint}</p>
           </div>
           <div>
             <CheckboxChip
@@ -252,8 +270,9 @@ export function StudyStatusFields({
               value="on"
               defaultChecked={wasInVtk}
               label={labels.wasInVtk}
+              ariaDescribedBy={wasInVtkHintId}
             />
-            <p className="mt-1 text-xs text-[#5c667f]">{labels.wasInVtkHint}</p>
+            <p id={wasInVtkHintId} className="mt-1 text-xs text-[#5c667f]">{labels.wasInVtkHint}</p>
           </div>
           <div>
             <CheckboxChip
@@ -261,16 +280,20 @@ export function StudyStatusFields({
               value="on"
               defaultChecked={alumniMailOptIn}
               label={labels.alumniMailOptIn}
+              ariaDescribedBy={alumniMailHintId}
             />
-            <p className="mt-1 text-xs text-[#5c667f]">{labels.alumniMailOptInHint}</p>
+            <p id={alumniMailHintId} className="mt-1 text-xs text-[#5c667f]">{labels.alumniMailOptInHint}</p>
           </div>
         </div>
       ) : null}
 
       {isAcademicStaff ? (
-        <fieldset className="space-y-2 border-l-2 border-vtk-blue/15 pl-4">
+        <fieldset
+          aria-describedby={academicStaffHintId}
+          className="space-y-2 border-l-2 border-vtk-blue/15 pl-4"
+        >
           <legend className="text-sm font-medium text-vtk-ink">{labels.academicStaffRoleLabel}</legend>
-          <p className="text-xs text-[#5c667f]">{labels.academicStaffRoleHint}</p>
+          <p id={academicStaffHintId} className="text-xs text-[#5c667f]">{labels.academicStaffRoleHint}</p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {ACADEMIC_STAFF_ROLES.map((role) => (
               <label key={role} className={statusClass}>

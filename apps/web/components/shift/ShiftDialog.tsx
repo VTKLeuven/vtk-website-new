@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Globe } from 'lucide-react';
 import { getDictionary, type Locale } from '@vtk/i18n';
@@ -53,7 +53,7 @@ export function InternationalsBadge({ locale }: { locale: Locale }) {
   return (
     <span className="vtk-shift-intl" title={t.intl.hint}>
       <Globe aria-hidden="true" />
-      <span>{t.intl.badge}</span>
+      <span lang={locale === 'nl' ? 'en' : undefined}>{t.intl.badge}</span>
     </span>
   );
 }
@@ -67,6 +67,11 @@ const MONTH_SHORT: Record<Locale, string[]> = {
   nl: ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'],
   en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
 };
+
+function isOutsideDialog(clientX: number, clientY: number, dialog: HTMLDialogElement) {
+  const rect = dialog.getBoundingClientRect();
+  return clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom;
+}
 
 /**
  * Het detailvenster van één shift volgens Richting A (Kalenderblad):
@@ -91,7 +96,15 @@ export function ShiftDialog({
 }) {
   const t = getDictionary(locale).shift;
   const showToast = useToast();
-  const panelRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const rosterTitleId = useId();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const suppressCloseCountRef = useRef(0);
+  const pressedOutsideRef = useRef(false);
+  const closingRef = useRef(false);
+  const onCloseRef = useRef(onClose);
   const [busy, setBusy] = useState(false);
   // Klok bij openen: de 24u-grens verschuift niet terwijl het venster openstaat.
   const [now] = useState(() => Date.now());
@@ -108,18 +121,53 @@ export function ShiftDialog({
   const taken = takenSpots(shift);
 
   useEffect(() => {
-    panelRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  const requestClose = useCallback(() => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    onCloseRef.current();
+  }, []);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    closingRef.current = false;
+    const activeElement = document.activeElement;
+    if (!openerRef.current && activeElement instanceof HTMLElement && !dialog.contains(activeElement)) {
+      openerRef.current = activeElement;
+    }
+
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+    closeBtnRef.current?.focus({ preventScroll: true });
+
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    document.addEventListener('keydown', onKey);
+
     return () => {
-      document.removeEventListener('keydown', onKey);
       document.body.style.overflow = previousOverflow;
+      if (dialog.open) {
+        suppressCloseCountRef.current += 1;
+        dialog.close();
+      }
+      const opener = openerRef.current;
+      if (opener && opener.isConnected) {
+        opener.focus({ preventScroll: true });
+      }
     };
-  }, [onClose]);
+  }, []);
+
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLDialogElement>) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      requestClose();
+    }
+  }
 
   const dateFmt = new Intl.DateTimeFormat(locale === 'nl' ? 'nl-BE' : 'en-GB', {
     weekday: 'long',
@@ -146,7 +194,7 @@ export function ShiftDialog({
     setBusy(false);
     if (ok) {
       onSuccess?.(!registered);
-      onClose();
+      requestClose();
     }
   }
 
@@ -167,168 +215,201 @@ export function ShiftDialog({
   if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <div className="vtk-shift-overlay" onClick={onClose}>
-      <div
-        className="vtk-shift-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="vtk-shift-dialog-title"
-        tabIndex={-1}
-        ref={panelRef}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="vtk-shift-dialog-top">
-          {shift.post ? (
-            <span className="vtk-shift-dialog-top-post">{postLabel(shift.post, postNames)}</span>
-          ) : null}
-          <span className="vtk-shift-dialog-top-when">{when}</span>
+    <dialog
+      ref={dialogRef}
+      className="vtk-shift-dialog"
+      aria-labelledby={titleId}
+      tabIndex={-1}
+      {...({ closedby: 'any' } as Record<string, string>)}
+      onKeyDown={handleKeyDown}
+      onCancel={(event) => {
+        event.preventDefault();
+        requestClose();
+      }}
+      onClose={(event) => {
+        if (suppressCloseCountRef.current > 0) {
+          suppressCloseCountRef.current -= 1;
+          return;
+        }
+        if (event.currentTarget.open) return;
+        requestClose();
+      }}
+      onPointerDown={(event) => {
+        if ('closedBy' in HTMLDialogElement.prototype) {
+          pressedOutsideRef.current = false;
+          return;
+        }
+        pressedOutsideRef.current =
+          event.target === event.currentTarget &&
+          isOutsideDialog(event.clientX, event.clientY, event.currentTarget);
+      }}
+      onPointerUp={(event) => {
+        if ('closedBy' in HTMLDialogElement.prototype) return;
+        const wasOutside = pressedOutsideRef.current;
+        pressedOutsideRef.current = false;
+        if (
+          wasOutside &&
+          event.target === event.currentTarget &&
+          isOutsideDialog(event.clientX, event.clientY, event.currentTarget)
+        ) {
+          requestClose();
+        }
+      }}
+    >
+      <div className="vtk-shift-dialog-top">
+        {shift.post ? (
+          <span className="vtk-shift-dialog-top-post">{postLabel(shift.post, postNames)}</span>
+        ) : null}
+        <span className="vtk-shift-dialog-top-when">{when}</span>
 
-          {/* Hangende gele datumpin van Richting A */}
-          <span className="vtk-shift-pin vtk-shift-dialog-pin" aria-hidden="true">
-            <i>{dowStr}</i>
-            <b>{shift.startTime.getDate()}</b>
-            <i>{monthStr}</i>
-          </span>
+        {/* Hangende gele datumpin van Richting A */}
+        <span className="vtk-shift-pin vtk-shift-dialog-pin" aria-hidden="true">
+          <i>{dowStr}</i>
+          <b>{shift.startTime.getDate()}</b>
+          <i>{monthStr}</i>
+        </span>
 
+        <button
+          ref={closeBtnRef}
+          type="button"
+          className="vtk-shift-dialog-close"
+          onClick={requestClose}
+          aria-label={t.dialog.close}
+          title={t.dialog.close}
+        >
+          <span aria-hidden="true">✕</span>
+        </button>
+      </div>
+
+      <div className="vtk-shift-dialog-body">
+        <div className="vtk-shift-dialog-tags">
+          {registered ? (
+            <span className="vtk-shift-spots vtk-shift-spots-mine">
+              {t.isRegistered}
+            </span>
+          ) : (
+            <span
+              className={`vtk-shift-spots vtk-shift-spots-${spotsVariant(shift)}`}
+              aria-label={spotsSpoken(shift, t)}
+            >
+              {spotsLabel(shift)}
+            </span>
+          )}
+          {shift.openToInternationals ? <InternationalsBadge locale={locale} /> : null}
+        </div>
+
+        <h2 className="vtk-shift-dialog-title" id={titleId}>
+          {shift.name}
+        </h2>
+
+        {shift.description ? (
+          <p className="vtk-shift-dialog-lead">{shift.description}</p>
+        ) : null}
+
+        <dl className="vtk-shift-facts">
+          <Detail k={t.detail.location} v={shift.location} />
+          {shift.post ? <Detail k={t.detail.post} v={postLabel(shift.post, postNames)} /> : null}
+          <Detail k={t.detail.reward} v={viewerRewardLabel(shift, t)} />
+          <Detail
+            k={t.detail.spots}
+            v={fill(t.spots.taken, { taken, max: shift.maxParticipants })}
+          />
+        </dl>
+
+        {/* Enkel namen, geen profielfoto: zie docs/design-decisions.md */}
+        {shift.roster ? (
+          <section className="vtk-shift-sec" aria-labelledby={rosterTitleId}>
+            <h3 id={rosterTitleId}>{t.roster.title}</h3>
+            {shift.roster.length === 0 ? (
+              <p className="vtk-shift-roster-empty">{t.roster.empty}</p>
+            ) : (
+              <ul className="vtk-shift-roster-list">
+                {shift.roster.map((person, index) => (
+                  <li
+                    key={`${index}-${person.name}`}
+                    className="vtk-shift-person"
+                    data-self={person.isSelf ? 'true' : undefined}
+                  >
+                    <span className="vtk-shift-person-initial" aria-hidden="true">
+                      {person.name.trim().slice(0, 1).toUpperCase() || '?'}
+                    </span>
+                    <span>
+                      {person.name}
+                      {person.isSelf ? (
+                        <span className="vtk-shift-person-you"> ({t.roster.you})</span>
+                      ) : null}
+                    </span>
+                  </li>
+                ))}
+                {free > 0 && !registered ? (
+                  <li className="vtk-shift-person vtk-shift-person-open">
+                    {freeLabel}
+                  </li>
+                ) : null}
+              </ul>
+            )}
+          </section>
+        ) : null}
+
+        {shift.replaceableOption && !signInHref ? (
+          <label className="vtk-shift-replaceable">
+            <input
+              type="checkbox"
+              checked={replaceable}
+              disabled={savingReplaceable || busy}
+              onChange={(event) => toggleReplaceable(event.target.checked)}
+            />
+            <span>
+              <strong>{t.replaceable.label}</strong>
+              <small>{t.replaceable.hint}</small>
+            </span>
+          </label>
+        ) : null}
+
+        {/* Instructies met gele ruitjes */}
+        {shift.instructions?.trim() ? (
+          <section className="vtk-shift-sec">
+            <h3>{t.instructions}</h3>
+            <div className="vtk-shift-instructions-prose prose-vtk">
+              <Markdown locale={locale} baseHeadingLevel={4}>
+                {shift.instructions}
+              </Markdown>
+            </div>
+          </section>
+        ) : null}
+      </div>
+
+      <div className="vtk-shift-dialog-foot">
+        {locked ? (
+          <span className="vtk-shift-dialog-note">{t.error.tooLateToUnregister}</span>
+        ) : (
+          <span />
+        )}
+        <div className="vtk-shift-dialog-actions">
           <button
             type="button"
-            className="vtk-shift-dialog-close"
-            onClick={onClose}
-            aria-label={t.dialog.close}
-            title={t.dialog.close}
+            className="vtk-shift-btn vtk-shift-btn-ghost"
+            onClick={requestClose}
           >
-            ✕
+            {t.dialog.cancel}
           </button>
-        </div>
-
-        <div className="vtk-shift-dialog-body">
-          <div className="vtk-shift-dialog-tags">
-            {registered ? (
-              <span className="vtk-shift-spots vtk-shift-spots-mine">
-                {t.isRegistered}
-              </span>
-            ) : (
-              <span
-                className={`vtk-shift-spots vtk-shift-spots-${spotsVariant(shift)}`}
-                aria-label={spotsSpoken(shift, t)}
-              >
-                {spotsLabel(shift)}
-              </span>
-            )}
-            {shift.openToInternationals ? <InternationalsBadge locale={locale} /> : null}
-          </div>
-
-          <h2 className="vtk-shift-dialog-title" id="vtk-shift-dialog-title">
-            {shift.name}
-          </h2>
-
-          {shift.description ? (
-            <p className="vtk-shift-dialog-lead">{shift.description}</p>
-          ) : null}
-
-          <dl className="vtk-shift-facts">
-            <Detail k={t.detail.location} v={shift.location} />
-            {shift.post ? <Detail k={t.detail.post} v={postLabel(shift.post, postNames)} /> : null}
-            <Detail k={t.detail.reward} v={viewerRewardLabel(shift, t)} />
-            <Detail
-              k={t.detail.spots}
-              v={fill(t.spots.taken, { taken, max: shift.maxParticipants })}
-            />
-          </dl>
-
-          {/* Enkel namen, geen profielfoto: zie docs/design-decisions.md */}
-          {shift.roster ? (
-            <section className="vtk-shift-sec" aria-labelledby="vtk-shift-roster-title">
-              <h3 id="vtk-shift-roster-title">{t.roster.title}</h3>
-              {shift.roster.length === 0 ? (
-                <p className="vtk-shift-roster-empty">{t.roster.empty}</p>
-              ) : (
-                <ul className="vtk-shift-roster-list">
-                  {shift.roster.map((person, index) => (
-                    <li
-                      key={`${index}-${person.name}`}
-                      className="vtk-shift-person"
-                      data-self={person.isSelf ? 'true' : undefined}
-                    >
-                      <span className="vtk-shift-person-initial" aria-hidden="true">
-                        {person.name.trim().slice(0, 1).toUpperCase() || '?'}
-                      </span>
-                      <span>
-                        {person.name}
-                        {person.isSelf ? (
-                          <span className="vtk-shift-person-you"> ({t.roster.you})</span>
-                        ) : null}
-                      </span>
-                    </li>
-                  ))}
-                  {free > 0 && !registered ? (
-                    <li className="vtk-shift-person vtk-shift-person-open">
-                      {freeLabel}
-                    </li>
-                  ) : null}
-                </ul>
-              )}
-            </section>
-          ) : null}
-
-          {shift.replaceableOption && !signInHref ? (
-            <label className="vtk-shift-replaceable">
-              <input
-                type="checkbox"
-                checked={replaceable}
-                disabled={savingReplaceable || busy}
-                onChange={(event) => toggleReplaceable(event.target.checked)}
-              />
-              <span>
-                <strong>{t.replaceable.label}</strong>
-                <small>{t.replaceable.hint}</small>
-              </span>
-            </label>
-          ) : null}
-
-          {/* Instructies met gele ruitjes */}
-          {shift.instructions?.trim() ? (
-            <section className="vtk-shift-sec">
-              <h3>{t.instructions}</h3>
-              <div className="vtk-shift-instructions-prose prose-vtk">
-                <Markdown>{shift.instructions}</Markdown>
-              </div>
-            </section>
-          ) : null}
-        </div>
-
-        <div className="vtk-shift-dialog-foot">
-          {locked ? (
-            <span className="vtk-shift-dialog-note">{t.error.tooLateToUnregister}</span>
+          {signInHref && !registered ? (
+            <a href={signInHref} className="vtk-shift-btn">
+              {t.register}
+            </a>
           ) : (
-            <span />
-          )}
-          <div className="vtk-shift-dialog-actions">
             <button
               type="button"
-              className="vtk-shift-btn vtk-shift-btn-ghost"
-              onClick={onClose}
+              className={`vtk-shift-btn${registered ? ' vtk-shift-btn-danger' : ''}`}
+              disabled={busy || isFull || locked}
+              onClick={act}
             >
-              {t.dialog.cancel}
+              {registered ? t.unregister : t.register}
             </button>
-            {signInHref && !registered ? (
-              <a href={signInHref} className="vtk-shift-btn">
-                {t.register}
-              </a>
-            ) : (
-              <button
-                type="button"
-                className={`vtk-shift-btn${registered ? ' vtk-shift-btn-danger' : ''}`}
-                disabled={busy || isFull || locked}
-                onClick={act}
-              >
-                {registered ? t.unregister : t.register}
-              </button>
-            )}
-          </div>
+          )}
         </div>
       </div>
-    </div>,
+    </dialog>,
     document.body
   );
 }

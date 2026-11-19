@@ -100,6 +100,22 @@ function splitAroundVideos(node: Element | undefined, children: ReactNode): Reac
   return parts;
 }
 
+function hasTopLevelH1(markdown: string): boolean {
+  let inFence = false;
+  for (const line of markdown.split("\n")) {
+    if (/^\s*(```|~~~)/.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    if (/^#\s+/.test(line)) return true;
+  }
+  return false;
+}
+
+type HeadingLevel = 1 | 2 | 3 | 4 | 5 | 6;
+type HeadingTag = `h${HeadingLevel}`;
+
 /**
  * Gedeelde markdown-renderer: dezelfde uitvoer op de publieke pagina's (server
  * component) en in het voorbeeld van de MarkdownEditor (client). Styling komt
@@ -123,12 +139,15 @@ export function Markdown({
    * een dialoog, waar een `view()`-tijdlijn niet klopt.
    */
   reveal = false,
+  baseHeadingLevel = 2,
 }: {
   children: string;
   locale?: Locale;
   reveal?: boolean;
+  baseHeadingLevel?: HeadingLevel;
 }) {
   const content = preprocessMarkdownVideos(children);
+  const headingOffset = hasTopLevelH1(content) ? baseHeadingLevel - 1 : baseHeadingLevel - 2;
 
   // `data-reveal` zegt wat er animeert: de losse woorden, of het kopje als
   // geheel wanneer er opmaak in staat en er dus niets te splitsen valt zonder
@@ -141,40 +160,38 @@ export function Markdown({
     return { "data-reveal": words ? "words" : "block", content: words ?? headingChildren };
   };
 
+  const renderHeading = (rawLevel: HeadingLevel, headingChildren: ReactNode) => {
+    const level = Math.min(6, Math.max(baseHeadingLevel, rawLevel + headingOffset)) as HeadingLevel;
+    const Tag = `h${level}` as HeadingTag;
+    const id = headingId(headingText(headingChildren));
+    if (level === 2) {
+      const { content: headingContent, ...reveals } = revealHeading(headingChildren);
+      return (
+        <Tag id={id} {...reveals}>
+          {headingContent}
+        </Tag>
+      );
+    }
+    return (
+      <Tag id={id} data-reveal={reveal && level <= 3 ? "block" : undefined}>
+        {headingChildren}
+      </Tag>
+    );
+  };
+
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm, remarkLineBreaks]}
       components={{
         // Kopjes krijgen een anker, zodat de "Op deze pagina"-rail ernaartoe kan
         // linken. De id komt uit dezelfde helper als die rail (pageOutline).
-        // Ook H1: de paginatitel is de echte H1, dus een `#` in de tekst is een
-        // sectiekop zoals elke andere.
-        h1: ({ children: headingChildren }) => (
-          <h1
-            id={headingId(headingText(headingChildren))}
-            data-reveal={reveal ? "block" : undefined}
-          >
-            {headingChildren}
-          </h1>
-        ),
-        h2: ({ children: headingChildren }) => {
-          const { content: headingContent, ...reveals } = revealHeading(headingChildren);
-          return (
-            <h2 id={headingId(headingText(headingChildren))} {...reveals}>
-              {headingContent}
-            </h2>
-          );
-        },
-        // H3 komt als blok binnen en niet woord per woord: tussentitels staan
-        // dicht bij elkaar en woord-voor-woord wordt dan onrustig.
-        h3: ({ children: headingChildren }) => (
-          <h3
-            id={headingId(headingText(headingChildren))}
-            data-reveal={reveal ? "block" : undefined}
-          >
-            {headingChildren}
-          </h3>
-        ),
+        // `baseHeadingLevel` (standaard 2) voorkomt dubbele <h1> of overgeslagen niveaus.
+        h1: ({ children: headingChildren }) => renderHeading(1, headingChildren),
+        h2: ({ children: headingChildren }) => renderHeading(2, headingChildren),
+        h3: ({ children: headingChildren }) => renderHeading(3, headingChildren),
+        h4: ({ children: headingChildren }) => renderHeading(4, headingChildren),
+        h5: ({ children: headingChildren }) => renderHeading(5, headingChildren),
+        h6: ({ children: headingChildren }) => renderHeading(6, headingChildren),
         // Twee of meer afbeeldingen die in de markdown tegen elkaar aan staan,
         // vormen samen een galerij. Alles wat daar niet aan voldoet (tekst
         // ertussen, een enkele foto, een video) blijft een gewone alinea.
@@ -224,7 +241,12 @@ export function Markdown({
         // passen op een telefoon niet in de tekstkolom en duwden anders de hele
         // pagina breder. De opmaak staat bij `.prose-vtk` in globals.css.
         table: ({ children: tableChildren }) => (
-          <div className="vtk-table">
+          <div
+            className="vtk-table"
+            tabIndex={0}
+            role="region"
+            aria-label={locale === "en" ? "Table" : "Tabel"}
+          >
             <table>{tableChildren}</table>
           </div>
         ),
@@ -255,7 +277,7 @@ export function Markdown({
         img: ({ src, alt }) => {
           const srcString = typeof src === "string" ? src : undefined;
           if (srcString && isVideoUrl(srcString)) {
-            return <InlineVideoPlayer src={srcString} title={alt || undefined} />;
+            return <InlineVideoPlayer src={srcString} title={alt || undefined} locale={locale} />;
           }
           // De maten uit de URL (`?w=&h=`, geschreven bij het uploaden) horen op
           // de `img` zelf. De CSS geeft haar `width: 100%; height: auto`, dus

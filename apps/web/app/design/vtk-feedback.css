@@ -13,24 +13,30 @@
    formulier links in de modal stond met een brede witte strook rechts. Chrome
    deed het goed. Op 100% is er niets meer om dubbel te tellen; daarom hier ook
    `dvh` zonder de variabele, die net die zoom compenseert. */
-.vtk-feedback-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 130;
+.vtk-feedback-dialog {
   zoom: calc(1 / var(--vtk-zoom, 1));
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 6dvh 16px 16px;
-  background: rgba(10, 15, 31, 0.55);
-  overflow-y: auto;
+  margin: auto;
+  width: min(560px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.vtk-feedback-dialog[open] {
+  display: grid;
+}
+
+.vtk-feedback-dialog::backdrop {
+  background: rgba(10, 15, 31, 0.62);
 }
 
 .vtk-feedback-embed {
   display: grid;
   gap: 10px;
   width: 100%;
-  max-width: 560px;
 }
 
 /* Het formulier van Dopl draagt zijn eigen kop en sluitknop; dit is enkel het
@@ -50,7 +56,7 @@
   display: block;
   width: 100%;
   height: 560px;
-  max-height: 82dvh;
+  max-height: 78dvh;
   border: 0;
   opacity: 0;
   transition: opacity 150ms ease;
@@ -70,9 +76,18 @@
   font-size: 14px;
 }
 
-/* Op de donkere achtergrond, onder het kader: waar je stond en de uitwegen. */
+/* Op een dekkende donkere strook onder het kader: waar je stond en de uitwegen. */
 .vtk-feedback-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 6px;
   margin: 0;
+  padding: 8px 14px;
+  border: 1px solid var(--on-dark-control-border, rgba(239, 242, 248, 0.48));
+  border-radius: 14px;
+  background: var(--navy);
   color: var(--on-dark-muted);
   font-size: 13px;
   text-align: center;
@@ -84,14 +99,23 @@
 }
 
 .vtk-feedback-context :is(a, button) {
-  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 2px 6px;
   border: 0;
+  border-radius: 6px;
   background: none;
   color: var(--paper);
   font: inherit;
   text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer;
+}
+
+.vtk-feedback-context :is(a, button):focus-visible {
+  outline: 2px solid var(--paper);
+  outline-offset: 2px;
 }
 
 /* ── Het beheerscherm (/admin/it/feedback) ───────────────────────────────── */

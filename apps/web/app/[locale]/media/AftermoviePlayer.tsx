@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ExternalLink, Play, Video, VideoOff } from "lucide-react";
 
 import { safeUrl, smallVideoThumbnailUrl, vimeoVideoId, youtubeThumbnailUrl, youtubeVideoId } from "@/lib/videoEmbed";
@@ -13,12 +13,15 @@ export type AftermoviePlayerItem = {
   url: string;
   posterUrl?: string | null;
   publishedLabel?: string | null;
+  captionsUrl?: string | null;
 };
 
 export type AftermoviePlayerLabels = {
   play: string;
   unavailable: string;
   openExternal: string;
+  captionsLang?: string;
+  captionsLabel?: string;
 };
 
 type NormalizedSource =
@@ -177,6 +180,12 @@ function DirectVideo({ item, labels }: { item: NormalizedItem; labels: Aftermovi
       onError={() => setFailed(true)}
     >
       <source src={item.source.externalUrl} type={item.source.mediaType} />
+      <track
+        kind="captions"
+        src={item.captionsUrl ?? "data:text/vtt;charset=utf-8,WEBVTT"}
+        srcLang={labels.captionsLang ?? "nl"}
+        label={labels.captionsLabel ?? "Ondertitels"}
+      />
       <a href={item.source.externalUrl} target="_blank" rel="noreferrer">
         {labels.openExternal}
       </a>
@@ -195,6 +204,14 @@ function ActivePlayer({
   started: boolean;
   onPlay: () => void;
 }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    if (started && item.source.kind === "embed") {
+      iframeRef.current?.focus({ preventScroll: true });
+    }
+  }, [item.id, item.source.kind, started]);
+
   if (item.source.kind === "file") {
     return <DirectVideo key={`${item.id}:${item.source.externalUrl}`} item={item} labels={labels} />;
   }
@@ -203,7 +220,9 @@ function ActivePlayer({
     if (started) {
       return (
         <iframe
+          ref={iframeRef}
           key={item.id}
+          tabIndex={-1}
           className={styles["vtk-media-aftermovie-media"]}
           src={withAutoplay(item.source.embedUrl)}
           title={item.title}

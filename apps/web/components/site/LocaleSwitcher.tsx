@@ -31,6 +31,7 @@ export function LocaleSwitcher({
       <div className="lang-toggle" role="group" aria-label="Taal / Language">
         <button
           type="button"
+          lang="nl-BE"
           onClick={() => switchTo("nl")}
           aria-pressed={locale === "nl"}
           data-umami-event="taal-gewisseld"
@@ -43,6 +44,7 @@ export function LocaleSwitcher({
         </span>
         <button
           type="button"
+          lang="en"
           onClick={() => switchTo("en")}
           aria-pressed={locale === "en"}
           data-umami-event="taal-gewisseld"
@@ -55,11 +57,16 @@ export function LocaleSwitcher({
   }
 
   return (
-    <div className="flex items-center rounded-full border border-vtk-blue/15 bg-vtk-blue-muted/80 p-0.5 text-xs shadow-sm">
+    <div
+      role="group"
+      aria-label="Taal / Language"
+      className="flex items-center rounded-full border border-vtk-blue/15 bg-vtk-blue-muted/80 p-0.5 text-xs shadow-sm"
+    >
       {(["nl", "en"] as Locale[]).map((code) => (
         <button
           key={code}
           type="button"
+          lang={code === "nl" ? "nl-BE" : "en"}
           onClick={() => switchTo(code)}
           data-umami-event="taal-gewisseld"
           data-umami-event-taal={code}
@@ -67,7 +74,7 @@ export function LocaleSwitcher({
             "rounded-full px-2.5 py-1.5 uppercase tracking-wide transition " +
             (code === locale
               ? "bg-vtk-blue font-semibold text-white shadow-sm"
-              : "text-vtk-blue/65 hover:bg-white/80 hover:text-vtk-blue")
+              : "text-vtk-body hover:bg-white/80 hover:text-vtk-ink")
           }
           aria-pressed={code === locale}
         >

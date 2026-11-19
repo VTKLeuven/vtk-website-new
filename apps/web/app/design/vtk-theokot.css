@@ -66,6 +66,7 @@
 }
 
 .th-tab-compact {
+  position: relative;
   display: none;
 }
 
@@ -222,16 +223,16 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: 18px;
-  height: 18px;
+  min-width: 28px;
+  min-height: 28px;
   flex-shrink: 0;
-  margin-top: 1px;
+  margin-top: -3px;
   padding: 0;
   border: 1.5px solid var(--line-2);
   border-radius: 999px;
   background: transparent;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
@@ -626,6 +627,10 @@
   box-shadow: 0 8px 24px rgba(14, 26, 54, 0.08);
 }
 
+html:has(.th-bar-sticky:not(.th-mobile-only)) {
+  scroll-padding-bottom: calc(var(--vtk-cookie-consent-space, 0px) + 140px);
+}
+
 .th-bar-sticky {
   position: sticky;
   bottom: 16px;
@@ -910,7 +915,7 @@
 
 .th-gcard-info-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
   color: var(--muted);
@@ -922,8 +927,13 @@
 
 .th-gcard-info-head button {
   position: relative;
-  padding: 0 4px;
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
   border: 0;
+  border-radius: 999px;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -942,6 +952,10 @@
    --------------------------------------------------------------------------- */
 
 @media (max-width: 899px) {
+  html:has(.th-bar-sticky) {
+    scroll-padding-bottom: calc(var(--vtk-cookie-consent-space, 0px) + 140px);
+  }
+
   .th-mobile-only {
     display: flex !important;
   }

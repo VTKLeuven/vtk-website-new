@@ -1,11 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+} from "react";
 import { createPortal } from "react-dom";
 import type { Dictionary } from "@vtk/i18n";
 import type { GalleryPhoto } from "@/lib/gallery";
 
 import "@/app/design/vtk-gallery.css";
+
+const emptySubscribe = () => () => {};
+
+function isOutsideDialog(clientX: number, clientY: number, dialog: HTMLDialogElement) {
+  const rect = dialog.getBoundingClientRect();
+  return clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom;
+}
 
 /**
  * Een reeks foto's in de tekst van een pagina: een uitgevulde strook waarin elke
@@ -88,8 +102,15 @@ export function PageGallery({
   labels: PageGalleryLabels;
 }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const isClient = useSyncExternalStore(emptySubscribe, () => true, () => false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
   const pointerStartX = useRef<number | null>(null);
-  const openerRef = useRef<HTMLButtonElement | null>(null);
+  const pressedBackdropRef = useRef(false);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(false);
+  const suppressCloseCountRef = useRef(0);
+  const isOpen = openIndex !== null;
 
   const move = useCallback(
     (delta: number) => {
@@ -102,27 +123,73 @@ export function PageGallery({
 
   const close = useCallback(() => {
     setOpenIndex(null);
-    openerRef.current?.focus();
   }, []);
 
   useEffect(() => {
-    if (openIndex === null) return undefined;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    if (isOpen) {
+      wasOpenRef.current = true;
+      if (!openerRef.current) {
+        openerRef.current =
+          document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      }
+      if (!dialog.open) {
+        dialog.showModal();
+      }
+      if (!dialog.contains(document.activeElement)) {
+        closeBtnRef.current?.focus({ preventScroll: true });
+      }
+
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+
+      return () => {
+        document.body.style.overflow = previousOverflow;
+        if (dialog.open) {
+          suppressCloseCountRef.current += 1;
+          dialog.close();
+        }
+        const opener = openerRef.current;
+        if (
+          opener?.isConnected &&
+          (!document.activeElement || document.activeElement === document.body)
+        ) {
+          opener.focus({ preventScroll: true });
+        }
+      };
+    }
+
+    if (dialog.open) {
+      suppressCloseCountRef.current += 1;
+      dialog.close();
+    }
+    if (wasOpenRef.current) {
+      wasOpenRef.current = false;
+      const opener = openerRef.current;
+      openerRef.current = null;
+      if (opener?.isConnected) {
+        opener.focus({ preventScroll: true });
+      }
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") close();
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close();
+      }
       if (event.key === "ArrowLeft") move(-1);
       if (event.key === "ArrowRight") move(1);
     }
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [close, move, openIndex]);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [close, isOpen, move]);
 
   if (photos.length === 0) return null;
 
@@ -160,7 +227,11 @@ export function PageGallery({
                   className="vtk-gal-item"
                   style={sized ? ({ "--ar": ratio(photo) } as CSSProperties) : undefined}
                   onClick={(event) => {
-                    openerRef.current = event.currentTarget;
+                    openerRef.current =
+                      document.activeElement instanceof HTMLElement &&
+                      document.activeElement !== document.body
+                        ? document.activeElement
+                        : event.currentTarget;
                     setOpenIndex(index);
                   }}
                   aria-label={`${t.openPhoto}: ${photo.alt || counter(index)}`}
@@ -183,76 +254,99 @@ export function PageGallery({
         ))}
       </div>
 
-      {/* `document` bestaat hier altijd: het paneel gaat pas open na een klik, dus
-          bij het renderen op de server is `active` nog null. */}
-      {active
+      {isClient
         ? createPortal(
-            <div
+            <dialog
+              ref={dialogRef}
               className="vtk-gal-lightbox"
-              role="dialog"
-              aria-modal="true"
-              aria-label={active.alt || counter(openIndex as number)}
-              onClick={close}
+              aria-label={active ? active.alt || counter(openIndex as number) : t.openPhoto}
+              {...({ closedby: "any" } as Record<string, string>)}
+              onCancel={(event) => {
+                event.preventDefault();
+                close();
+              }}
+              onClose={(event) => {
+                if (suppressCloseCountRef.current > 0) {
+                  suppressCloseCountRef.current -= 1;
+                  return;
+                }
+                if (event.currentTarget.open) return;
+                close();
+              }}
               onPointerDown={(event) => {
                 pointerStartX.current = event.clientX;
+                pressedBackdropRef.current =
+                  event.target === event.currentTarget &&
+                  (event.pointerType !== "mouse" || event.button === 0);
               }}
               onPointerUp={(event) => {
-                if (pointerStartX.current === null) return;
-                const delta = event.clientX - pointerStartX.current;
+                const startX = pointerStartX.current;
+                const wasBackdrop = pressedBackdropRef.current;
                 pointerStartX.current = null;
-                if (Math.abs(delta) < 44) return;
-                move(delta > 0 ? -1 : 1);
+                pressedBackdropRef.current = false;
+
+                if (startX !== null) {
+                  const delta = event.clientX - startX;
+                  if (Math.abs(delta) >= 44) {
+                    move(delta > 0 ? -1 : 1);
+                    return;
+                  }
+                }
+
+                if (
+                  wasBackdrop &&
+                  event.target === event.currentTarget &&
+                  (event.pointerType !== "mouse" || event.button === 0)
+                ) {
+                  if (
+                    !("closedBy" in HTMLDialogElement.prototype) ||
+                    !isOutsideDialog(event.clientX, event.clientY, event.currentTarget)
+                  ) {
+                    close();
+                  }
+                }
               }}
             >
-              <div className="vtk-gal-lightbox-bar" onClick={(event) => event.stopPropagation()}>
-                <span>{counter(openIndex as number)}</span>
-                <button type="button" onClick={close} aria-label={t.close}>
-                  {t.close}
-                </button>
-              </div>
+              {active ? (
+                <>
+                  <div className="vtk-gal-lightbox-bar">
+                    <span role="status" aria-live="polite" aria-atomic="true">
+                      {counter(openIndex as number)}
+                    </span>
+                    <button ref={closeBtnRef} type="button" onClick={close} aria-label={t.close}>
+                      {t.close}
+                    </button>
+                  </div>
 
-              {photos.length > 1 ? (
-                <button
-                  type="button"
-                  className="vtk-gal-lightbox-nav prev"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    move(-1);
-                  }}
-                  aria-label={t.previousPhoto}
-                >
-                  ‹
-                </button>
+                  {photos.length > 1 ? (
+                    <button
+                      type="button"
+                      className="vtk-gal-lightbox-nav prev"
+                      onClick={() => move(-1)}
+                      aria-label={t.previousPhoto}
+                    >
+                      ‹
+                    </button>
+                  ) : null}
+
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img className="vtk-gal-lightbox-image" src={active.src} alt={active.alt} />
+
+                  {photos.length > 1 ? (
+                    <button
+                      type="button"
+                      className="vtk-gal-lightbox-nav next"
+                      onClick={() => move(1)}
+                      aria-label={t.nextPhoto}
+                    >
+                      ›
+                    </button>
+                  ) : null}
+
+                  {active.alt ? <p className="vtk-gal-lightbox-caption">{active.alt}</p> : null}
+                </>
               ) : null}
-
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                className="vtk-gal-lightbox-image"
-                src={active.src}
-                alt={active.alt}
-                onClick={(event) => event.stopPropagation()}
-              />
-
-              {photos.length > 1 ? (
-                <button
-                  type="button"
-                  className="vtk-gal-lightbox-nav next"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    move(1);
-                  }}
-                  aria-label={t.nextPhoto}
-                >
-                  ›
-                </button>
-              ) : null}
-
-              {active.alt ? (
-                <p className="vtk-gal-lightbox-caption" onClick={(event) => event.stopPropagation()}>
-                  {active.alt}
-                </p>
-              ) : null}
-            </div>,
+            </dialog>,
             document.body
           )
         : null}

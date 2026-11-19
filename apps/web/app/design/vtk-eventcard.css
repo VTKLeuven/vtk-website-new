@@ -45,11 +45,27 @@
 }
 
 .vtk-design .ev-card.is-past {
-  opacity: 0.72;
+  background: var(--paper-2);
 }
 
 .vtk-design .ev-card.is-past:hover {
-  opacity: 1;
+  background: var(--surface);
+}
+
+.vtk-design .ev-card.is-past .ev-card-title a {
+  color: var(--body);
+}
+
+.vtk-design .ev-card.is-past .ev-card-pin {
+  background: var(--paper);
+  color: var(--muted);
+  box-shadow:
+    0 0 0 1px var(--line-2),
+    0 10px 22px -10px rgba(8, 13, 28, 0.35);
+}
+
+.vtk-design .ev-card.is-past .ev-card-pin i {
+  color: var(--muted);
 }
 
 /* 16:9 en niet 3:2: dat is de verhouding waarin een evenementenbanner sowieso al
@@ -115,6 +131,12 @@
   box-shadow: 0 10px 22px -10px rgba(8, 13, 28, 0.75);
 }
 
+.vtk-design .ev-card-pin-visual {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+}
+
 .vtk-design .ev-card-pin b {
   font-family: var(--mono);
   font-size: 20px;
@@ -175,7 +197,7 @@
   padding: 3px 9px;
   border-radius: 999px;
   background: var(--cat);
-  color: #fff;
+  color: var(--cat-fg, #fff);
   font-size: 10.5px;
   font-weight: 600;
   line-height: 1.45;

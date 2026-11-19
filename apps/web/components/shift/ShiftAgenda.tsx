@@ -5,6 +5,11 @@ import { AlertTriangle, MapPin } from 'lucide-react';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import { canUnregister, type ShiftResponse } from '@/lib/shift';
 import { useToast } from '@/components/ui/toast';
+import {
+  DismissiblePopoverWrap,
+  ShiftRosterPopover,
+  shiftRosterSummary,
+} from '@/components/editorial/ShiftRosterPopover';
 import { InternationalsBadge } from './ShiftDialog';
 import { RewardCoins } from './RewardCoins';
 import {
@@ -278,15 +283,7 @@ function WeekDays({
 
                   const roster = shift.roster ?? [];
                   const nl = locale === 'nl';
-                  const rosterNames = roster.map((p) =>
-                    p.isSelf ? `${p.name} (${nl ? 'jij' : 'you'})` : p.name
-                  );
-                  const spotsTitle =
-                    rosterNames.length > 0
-                      ? `${nl ? 'Ingeschreven' : 'Registered'}: ${rosterNames.join(', ')}`
-                      : nl
-                        ? 'Nog geen inschrijvingen'
-                        : 'No sign-ups yet';
+                  const spotsTitle = shiftRosterSummary(roster, nl);
                   const taken = takenSpots(shift);
                   const spotsBadgeLabel = registered ? t.isRegistered : spotsLabel(shift);
                   const spotsBadgeClass = registered
@@ -356,61 +353,23 @@ function WeekDays({
                       </button>
 
                       <div className="vtk-shift-act">
-                        <div className="vtk-shift-spots-wrap">
-                          <span
+                        <DismissiblePopoverWrap className="vtk-shift-spots-wrap">
+                          <button
+                            type="button"
                             className={`vtk-shift-spots ${spotsBadgeClass}`}
-                            tabIndex={0}
-                            role="button"
                             onClick={() => onOpen(entry)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                onOpen(entry);
-                              }
-                            }}
                             aria-label={`${registered ? t.isRegistered : spotsSpoken(shift, t)}. ${spotsTitle}`}
                           >
                             {spotsBadgeLabel}
-                          </span>
-                          <div className="vtk-shift-spots-popover" role="tooltip" aria-hidden="true">
-                            <div className="vtk-shift-spots-popover-head">
-                              <span className="vtk-shift-spots-popover-title">
-                                {nl ? 'Ingeschreven' : 'Registered'}
-                              </span>
-                              <span className="vtk-shift-spots-popover-count">
-                                {taken}/{shift.maxParticipants}
-                              </span>
-                            </div>
-                            {roster.length === 0 ? (
-                              <p className="vtk-shift-spots-popover-empty">
-                                {nl ? 'Nog geen inschrijvingen' : 'No sign-ups yet'}
-                              </p>
-                            ) : (
-                              <ul className="vtk-shift-spots-popover-list">
-                                {roster.map((person, idx) => (
-                                  <li
-                                    key={idx}
-                                    className="vtk-shift-spots-popover-person"
-                                    data-self={person.isSelf ? 'true' : undefined}
-                                  >
-                                    <span className="vtk-shift-spots-popover-initial">
-                                      {person.name.trim().slice(0, 1).toUpperCase() || '?'}
-                                    </span>
-                                    <span className="vtk-shift-spots-popover-name">
-                                      {person.name}
-                                      {person.isSelf ? (
-                                        <span className="vtk-shift-spots-popover-you">
-                                          {' '}
-                                          ({nl ? 'jij' : 'you'})
-                                        </span>
-                                      ) : null}
-                                    </span>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        </div>
+                          </button>
+                          <ShiftRosterPopover
+                            roster={roster}
+                            taken={taken}
+                            max={shift.maxParticipants}
+                            nl={nl}
+                            classPrefix="vtk-shift-spots-popover"
+                          />
+                        </DismissiblePopoverWrap>
 
                         {registered ? (
                           <button

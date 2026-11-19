@@ -121,10 +121,10 @@ export function FileField({
       )}
       <div className="flex flex-wrap items-center gap-3">
         <label
-          className={`inline-flex items-center gap-2 rounded-full border border-vtk-blue/15 px-4 py-2 text-sm font-medium transition-colors ${
+          className={`relative inline-flex items-center gap-2 rounded-full border border-vtk-muted/80 px-4 py-2 text-sm font-medium transition-colors has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-vtk-ink ${
             disabled
               ? "cursor-default opacity-60"
-              : "cursor-pointer hover:border-vtk-blue/30 hover:bg-vtk-blue-soft/70"
+              : "cursor-pointer hover:border-vtk-ink hover:bg-vtk-blue-soft/70"
           }`}
         >
           <UploadIcon />
@@ -141,7 +141,7 @@ export function FileField({
             className="sr-only"
           />
         </label>
-        <span className="min-w-0 text-sm text-vtk-blue-muted">
+        <span className="min-w-0 text-sm text-vtk-muted">
           {names.length === 0 ? (
             <>
               {/* Enkel met een muis: op een telefoon sleep je geen bestanden. */}
@@ -165,7 +165,7 @@ export function FileField({
           )}
         </span>
       </div>
-      {hint ? <p className="text-xs text-vtk-blue-muted">{hint}</p> : null}
+      {hint ? <p className="text-xs text-vtk-muted">{hint}</p> : null}
       {error ? (
         <p role="alert" className="text-xs text-red-600">
           {error}

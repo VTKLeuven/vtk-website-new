@@ -9,7 +9,7 @@ import type {
 import { cn } from "./cn";
 
 const base =
-  "w-full rounded-xl border border-vtk-blue/12 bg-vtk-surface-elevated px-3 py-2 text-sm text-vtk-ink shadow-sm placeholder:text-zinc-400 focus:border-vtk-ink focus:outline-none focus:ring-2 focus:ring-vtk-blue/10 disabled:cursor-not-allowed disabled:opacity-50";
+  "w-full rounded-xl border border-vtk-muted/80 bg-vtk-surface-elevated px-3 py-2 text-sm text-vtk-ink shadow-sm placeholder:text-vtk-muted focus-visible:border-vtk-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-vtk-ink disabled:cursor-not-allowed disabled:opacity-50";
 
 // forwardRef zodat callers (bvb een auto-focus scannerveld) een ref kunnen meegeven.
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
@@ -47,7 +47,11 @@ export function Label({
   );
 }
 
-export function FormError({ children }: { children?: ReactNode }) {
+export function FormError({ children, id }: { children?: ReactNode; id?: string }) {
   if (!children) return null;
-  return <p className="mt-1 text-sm text-red-600">{children}</p>;
+  return (
+    <p id={id} role="alert" className="mt-1 text-sm text-vtk-danger">
+      {children}
+    </p>
+  );
 }

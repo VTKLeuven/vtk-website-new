@@ -120,13 +120,13 @@ export default async function LinkVtkAccountPage({
         </div>
 
         {query.gekoppeld && user.googleEmail && (
-          <p className="rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+          <p role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
             {t.linked(user.googleEmail)}
           </p>
         )}
 
         {error && (
-          <p className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">
+          <p role="alert" className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">
             {error}
             {query.adres && <span className="mt-1 block text-xs">{query.adres}</span>}
           </p>
@@ -142,7 +142,10 @@ export default async function LinkVtkAccountPage({
               {t.warning}
             </p>
             <div className="flex flex-wrap items-center gap-3">
-              <a className="vtk-btn vtk-btn-primary" href={startHref}>
+              <a
+                className="inline-flex min-h-10 items-center justify-center rounded-full border border-vtk-ink bg-vtk-ink px-4 py-2 text-sm font-medium text-vtk-surface shadow-sm transition-colors hover:bg-vtk-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink"
+                href={startHref}
+              >
                 {user.googleEmail ? t.change : t.button}
               </a>
               {user.googleEmail && (

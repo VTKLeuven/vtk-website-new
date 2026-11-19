@@ -96,6 +96,8 @@
 }
 
 .vtk-design .hours-cta {
+  padding-inline: 3px;
+  margin-inline: -3px;
   color: var(--paper);
   font-size: 14px;
   font-weight: 500;
@@ -103,6 +105,10 @@
   text-decoration-color: var(--yellow);
   text-decoration-thickness: 1.5px;
   text-underline-offset: 4px;
+}
+
+.vtk-design .hours-cta:focus-visible {
+  outline-offset: 3px;
 }
 
 .vtk-design .hours-cta:hover {

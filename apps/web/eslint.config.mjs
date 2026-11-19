@@ -60,6 +60,79 @@ const eslintConfig = defineConfig([
     files: ["components/ui/Link.tsx"],
     rules: { "no-restricted-imports": "off" },
   },
+  {
+    // WCAG 2.2 AA regressiebewaking op publieke en leden-TSX-bestanden.
+    // Gebruikt minimatch-veilige ignores (geen ongedescapte [locale] of (scanner)).
+    files: ["**/*.tsx"],
+    ignores: [
+      "**/admin/**",
+      "app/*scanner*/**",
+      "components/ticketing/scanner/**",
+    ],
+    settings: {
+      "jsx-a11y": {
+        polymorphicPropName: "as",
+        components: {
+          Link: "a",
+          IconLink: "a",
+          Button: "button",
+          IconButton: "button",
+          DeleteButton: "button",
+          DeleteIconButton: "button",
+        },
+      },
+    },
+    rules: {
+      "jsx-a11y/alt-text": "error",
+      "jsx-a11y/anchor-ambiguous-text": [
+        "error",
+        {
+          words: ["click here", "here", "klik hier", "meer info", "read more"],
+        },
+      ],
+      "jsx-a11y/anchor-has-content": "error",
+      "jsx-a11y/anchor-is-valid": "error",
+      "jsx-a11y/aria-activedescendant-has-tabindex": "error",
+      "jsx-a11y/aria-props": "error",
+      "jsx-a11y/aria-proptypes": "error",
+      "jsx-a11y/aria-role": "error",
+      "jsx-a11y/aria-unsupported-elements": "error",
+      "jsx-a11y/click-events-have-key-events": "error",
+      "jsx-a11y/heading-has-content": "error",
+      "jsx-a11y/html-has-lang": "error",
+      "jsx-a11y/iframe-has-title": "error",
+      "jsx-a11y/img-redundant-alt": "error",
+      "jsx-a11y/interactive-supports-focus": "error",
+      "jsx-a11y/label-has-associated-control": [
+        "error",
+        {
+          assert: "either",
+          depth: 4,
+          labelComponents: ["Label"],
+          controlComponents: ["Input", "Textarea", "Select", "ThemedSelect"],
+        },
+      ],
+      "jsx-a11y/media-has-caption": "error",
+      "jsx-a11y/mouse-events-have-key-events": "error",
+      "jsx-a11y/no-access-key": "error",
+      "jsx-a11y/no-aria-hidden-on-focusable": "error",
+      "jsx-a11y/no-autofocus": "error",
+      "jsx-a11y/no-distracting-elements": "error",
+      "jsx-a11y/no-interactive-element-to-noninteractive-role": [
+        "error",
+        { canvas: ["img", "application"] },
+      ],
+      "jsx-a11y/no-noninteractive-tabindex": [
+        "error",
+        { allowExpressionValues: true, roles: ["tabpanel", "region"] },
+      ],
+      "jsx-a11y/no-redundant-roles": "error",
+      "jsx-a11y/role-has-required-aria-props": "error",
+      "jsx-a11y/role-supports-aria-props": "error",
+      "jsx-a11y/scope": "error",
+      "jsx-a11y/tabindex-no-positive": "error",
+    },
+  },
 ]);
 
 export default eslintConfig;

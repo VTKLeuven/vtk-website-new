@@ -21,7 +21,10 @@ export async function AuthorizationPreviewBanner({ locale }: { locale: Locale })
     // Zwevend onderaan en niet in de flow onder de kop: vast in beeld is ze op
     // elke pagina en bij elke scrollpositie de uitweg. Zie
     // `.vtk-preview-bar` in vtk-site-chrome.css.
-    <aside className="vtk-preview-bar" role="status">
+    <aside
+      className="vtk-preview-bar"
+      aria-label={nl ? "Autorisatievoorbeeld" : "Authorization preview"}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0 text-sm">
           <strong>{nl ? "Alleen-lezen autorisatievoorbeeld" : "Read-only authorization preview"}</strong>

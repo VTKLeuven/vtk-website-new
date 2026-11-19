@@ -2,14 +2,27 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { hasLocale } from "@/lib/locale";
+import { buildMetadata } from "@/lib/seo";
 
 import "@/app/design/vtk-basic.css";
 
-export const metadata: Metadata = {
-  title: "Fakbar 't ElixIr huren | VTK Leuven",
-  description:
-    "Tarieven en voorwaarden om 't ElixIr, de fakbar van VTK, af te huren voor een cantus, een TD of een receptie.",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  const nl = locale === "nl";
+  return buildMetadata({
+    title: nl ? "Fakbar 't ElixIr huren" : "Renting fakbar 't ElixIr",
+    description: nl
+      ? "Tarieven en voorwaarden om 't ElixIr, de fakbar van VTK, af te huren voor een cantus, een TD of een receptie."
+      : "Rates and conditions for renting 't ElixIr, VTK's student bar, for a cantus, a party or a reception.",
+    path: "/fakbar-huren",
+    locale,
+  });
+}
 
 /**
  * De verhuurpagina van de fakbar op de hoofdsite.
@@ -112,13 +125,17 @@ export default async function FakbarHurenPage({ params }: { params: Promise<{ lo
         <div className="vtk-basic-section">
           <div className="vtk-basic-grid">
             <section className="vtk-basic-panel">
-              <p className="vtk-basic-kicker">{nl ? "Huurprijs" : "Rate"}</p>
+              <h2 className="vtk-basic-kicker">{nl ? "Huurprijs" : "Rate"}</h2>
               <p className="vtk-basic-title">{fee}</p>
-              {rental.period ? <p className="vtk-basic-copy">{rental.period}</p> : null}
+              {rental.period ? (
+                <p className="vtk-basic-copy" lang={!nl ? "nl-BE" : undefined}>
+                  {rental.period}
+                </p>
+              ) : null}
             </section>
 
             <section className="vtk-basic-panel vtk-basic-panel-dark">
-              <p className="vtk-basic-kicker">{nl ? "Een datum vastleggen" : "Booking a date"}</p>
+              <h2 className="vtk-basic-kicker">{nl ? "Een datum vastleggen" : "Booking a date"}</h2>
               <p className="vtk-basic-copy">
                 {nl
                   ? "Mail ons met je vereniging, de gewenste datum en het soort activiteit. We laten weten of die datum nog vrij is."
@@ -136,8 +153,12 @@ export default async function FakbarHurenPage({ params }: { params: Promise<{ lo
           </div>
 
           <section className="vtk-basic-panel">
-            <p className="vtk-basic-kicker">{nl ? "Voorwaarden" : "Conditions"}</p>
-            <dl className="vtk-basic-stack" style={{ marginTop: 12 }}>
+            <h2 className="vtk-basic-kicker">{nl ? "Voorwaarden" : "Conditions"}</h2>
+            <dl
+              className="vtk-basic-stack"
+              style={{ marginTop: 12 }}
+              lang={!nl && rental.conditions.length > 0 ? "nl-BE" : undefined}
+            >
               {conditions.map((condition) => (
                 <div key={condition.title}>
                   <dt style={{ fontWeight: 600 }}>{condition.title}</dt>

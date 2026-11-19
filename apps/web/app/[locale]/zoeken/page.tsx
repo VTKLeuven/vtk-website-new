@@ -102,10 +102,9 @@ export default async function SearchPage({ params, searchParams }: PageProps) {
           <h1 className="vtk-page-title">{t.title}</h1>
           <p className="vtk-page-subtitle">{t.subtitle}</p>
           {/* Het veld staat in de kop en niet onderaan: verfijnen is hier de
-              meest waarschijnlijke volgende handeling. Wie via de knop in de
-              sitekop binnenkomt, heeft nog geen zoekterm en kan meteen typen. */}
+              meest waarschijnlijke volgende handeling. */}
           <div className="vtk-search-head-form">
-            <SiteSearchForm locale={locale} defaultValue={query} autoFocus={query === ""} />
+            <SiteSearchForm locale={locale} defaultValue={query} />
           </div>
         </div>
       </header>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { getISOWeek } from 'date-fns';
@@ -42,6 +42,7 @@ import {
   type GridDay,
 } from './calendarGrid';
 import { withSource } from '@/lib/ticketing/source';
+import { catChipStyle } from '@/lib/catContrast';
 import { CALENDAR_VIEW_COOKIE, type CalendarView } from '@/lib/calendar/viewCookie';
 import { weekTimeline, type TimelineBlock } from '@/lib/calendar/weekTimeline';
 
@@ -257,7 +258,20 @@ export function KalenderEditorialView({
   // opent eerst dit kaartje: in een cel past hoogstens een afgekapte titel, en
   // meteen doorsturen naar een volledige pagina is een dure manier om te
   // ontdekken dat je het verkeerde evenement aanklikte.
-  const [preview, setPreview] = useState<CalendarApiEvent | null>(null);
+  const [previewState, setPreviewState] = useState<{
+    event: CalendarApiEvent;
+    opener: HTMLElement | null;
+  } | null>(null);
+  const preview = previewState?.event ?? null;
+  const previewOpener = previewState?.opener ?? null;
+  const previewTitleId = useId();
+  const previewDialogRef = useRef<HTMLDialogElement>(null);
+  const previewCloseBtnRef = useRef<HTMLButtonElement>(null);
+  const previewOpenerRef = useRef<HTMLElement | null>(null);
+  const previewPressedOutsideRef = useRef(false);
+  const previewSuppressCloseCountRef = useRef(0);
+  const previewWasOpenRef = useRef(false);
+  const isPreviewOpen = preview !== null;
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
@@ -325,13 +339,39 @@ export function KalenderEditorialView({
   }, [rangeDays, filter, onlyMyAudiences, fetchForRange]);
 
   useEffect(() => {
-    if (!preview) return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') setPreview(null);
+    const dialog = previewDialogRef.current;
+    if (!dialog) return;
+    if (isPreviewOpen) {
+      previewWasOpenRef.current = true;
+      if (previewOpener) {
+        previewOpenerRef.current = previewOpener;
+      } else if (!previewOpenerRef.current && document.activeElement instanceof HTMLElement) {
+        previewOpenerRef.current = document.activeElement;
+      }
+      if (!dialog.open) {
+        dialog.showModal();
+      }
+      if (!dialog.contains(document.activeElement)) {
+        previewCloseBtnRef.current?.focus();
+      }
+      return () => {
+        if (dialog.open) {
+          previewSuppressCloseCountRef.current += 1;
+          dialog.close();
+        }
+      };
     }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [preview]);
+    if (dialog.open) {
+      previewSuppressCloseCountRef.current += 1;
+      dialog.close();
+    }
+    if (previewWasOpenRef.current) {
+      previewWasOpenRef.current = false;
+      const opener = previewOpenerRef.current;
+      previewOpenerRef.current = null;
+      if (opener && opener.isConnected) opener.focus();
+    }
+  }, [isPreviewOpen, previewOpener]);
 
   // Een dag die openklapt in de onderste weekrij, valt anders net onder de
   // vouw; "nearest" schuift enkel wanneer dat nodig is. Escape klapt hem dicht,
@@ -648,13 +688,16 @@ export function KalenderEditorialView({
    * horen gewoon naar de pagina te gaan, en een zoekmachine ziet nog altijd een
    * echte link.
    */
-  function openPreview(event: React.MouseEvent, item: CalendarApiEvent) {
+  const openPreview = useCallback((event: React.MouseEvent, item: CalendarApiEvent) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
       return;
     }
     event.preventDefault();
-    setPreview(item);
-  }
+    const opener =
+      (event.currentTarget instanceof HTMLElement ? event.currentTarget : null) ??
+      (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    setPreviewState({ event: item, opener });
+  }, []);
 
   /**
    * Werkt de lokaal geladen evenementen bij na een klik op "ik kom".
@@ -684,18 +727,22 @@ export function KalenderEditorialView({
           : item
       );
     setMonthEvents(apply);
-    setPreview((current) =>
-      current && current.id === eventId
+    setPreviewState((current) =>
+      current && current.event.id === eventId
         ? {
             ...current,
-            extendedProps: {
-              ...current.extendedProps,
-              interested: next,
-              viewerInterest: nextViewer,
-              interestedCount:
-                current.extendedProps.interestedCount === null || current.extendedProps.interested === next
-                  ? current.extendedProps.interestedCount
-                  : Math.max(0, current.extendedProps.interestedCount + (next ? 1 : -1)),
+            event: {
+              ...current.event,
+              extendedProps: {
+                ...current.event.extendedProps,
+                interested: next,
+                viewerInterest: nextViewer,
+                interestedCount:
+                  current.event.extendedProps.interestedCount === null ||
+                  current.event.extendedProps.interested === next
+                    ? current.event.extendedProps.interestedCount
+                    : Math.max(0, current.event.extendedProps.interestedCount + (next ? 1 : -1)),
+              },
             },
           }
         : current
@@ -811,20 +858,28 @@ export function KalenderEditorialView({
               aan de foto en steekt er onderuit, zodat het tekstblok bovenaan
               begint en het klikvlak van de titel de hele kaart houdt. */}
           <span className="ev-card-pin">
-            <i>{start.toLocaleDateString(dateLocale, { weekday: 'short' })}</i>
-            <b>{start.getDate()}</b>
-            <i>{start.toLocaleDateString(dateLocale, { month: 'short' })}</i>
+            <span className="ev-card-pin-visual" aria-hidden="true">
+              <i>{start.toLocaleDateString(dateLocale, { weekday: 'short' })}</i>
+              <b>{start.getDate()}</b>
+              <i>{start.toLocaleDateString(dateLocale, { month: 'short' })}</i>
+            </span>
+            <time
+              className="sr-only"
+              dateTime={`${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`}
+            >
+              {longDay(start)}
+            </time>
           </span>
         </div>
         <div className="ev-card-body">
           <div className="ev-card-tags">
             {cat ? (
-              <span className="ev-card-cat" style={{ '--cat': cat.colour } as React.CSSProperties}>
+              <span className="ev-card-cat" style={catChipStyle(cat.colour)}>
                 {categoryName(cat)}
               </span>
             ) : null}
             {audienceCategories(e).map((a) => (
-              <span key={a.slug} className="ev-card-aud" style={{ '--cat': a.colour } as React.CSSProperties}>
+              <span key={a.slug} className="ev-card-aud" style={catChipStyle(a.colour)}>
                 {categoryName(a)}
               </span>
             ))}
@@ -845,7 +900,7 @@ export function KalenderEditorialView({
             <span className="ev-card-actions">
               {going ? <span className="ev-going">{going}</span> : null}
               <EventStar
-                key={`${e.id}:${e.extendedProps.interested}`}
+                key={e.id}
                 eventId={e.id}
                 title={title}
                 interested={e.extendedProps.interested}
@@ -952,8 +1007,8 @@ export function KalenderEditorialView({
                   style={
                     lanes > 0
                       ? ({
-                          '--kal-month-lanes': `repeat(${lanes}, 28px)`,
-                          '--kal-month-lanes-sm': `repeat(${lanes}, 7px)`,
+                          '--kal-month-lanes': `repeat(${lanes}, 30px)`,
+                          '--kal-month-lanes-sm': `repeat(${lanes}, 0px)`,
                         } as React.CSSProperties)
                       : undefined
                   }
@@ -1012,7 +1067,7 @@ export function KalenderEditorialView({
                           {
                             gridColumn: `${start + 1} / ${end + 2}`,
                             gridRow: lane + 2,
-                            '--cat': cat?.colour,
+                            ...(cat ? catChipStyle(cat.colour) : {}),
                           } as React.CSSProperties
                         }
                         title={`${pickTitle(event)} · ${range}`}
@@ -1047,7 +1102,7 @@ export function KalenderEditorialView({
                               key={e.id}
                               href={eventHref(e)}
                               className={`kal-month-ev${past ? ' is-past' : ''}`}
-                              style={cat ? ({ '--cat': cat.colour } as React.CSSProperties) : undefined}
+                              style={cat ? catChipStyle(cat.colour) : undefined}
                               onClick={(clicked) => openDayFromEvent(clicked, key)}
                             >
                               <time>{eventTime(e, date)}</time>
@@ -1056,7 +1111,7 @@ export function KalenderEditorialView({
                                 <span
                                   key={a.slug}
                                   className="kal-month-aud"
-                                  style={{ '--cat': a.colour } as React.CSSProperties}
+                                  style={catChipStyle(a.colour)}
                                 >
                                   {categoryName(a)}
                                 </span>
@@ -1074,7 +1129,7 @@ export function KalenderEditorialView({
                                 key={e.id}
                                 style={
                                   primaryCategory(e)
-                                    ? ({ '--cat': primaryCategory(e)!.colour } as React.CSSProperties)
+                                    ? catChipStyle(primaryCategory(e)!.colour)
                                     : undefined
                                 }
                               />
@@ -1145,7 +1200,7 @@ export function KalenderEditorialView({
                   key={e.id}
                   href={eventHref(e)}
                   className="kal-month-run"
-                  style={primaryCategory(e) ? ({ '--cat': primaryCategory(e)!.colour } as React.CSSProperties) : undefined}
+                  style={primaryCategory(e) ? catChipStyle(primaryCategory(e)!.colour) : undefined}
                   onClick={(clicked) => openPreview(clicked, e)}
                 >
                   {pickTitle(e)}
@@ -1170,7 +1225,7 @@ export function KalenderEditorialView({
     const cat = primaryCategory(e);
     const title = pickTitle(e);
     const top = (block.from - timelineFrom) * TIMELINE_HOUR_PX + 1;
-    const height = Math.max(26, (Math.min(block.to, timelineTo) - block.from) * TIMELINE_HOUR_PX - 3);
+    const height = Math.max(28, (Math.min(block.to, timelineTo) - block.from) * TIMELINE_HOUR_PX - 3);
     const time = `${clock(block.start)} ${locale === 'nl' ? 'tot' : 'to'} ${clock(block.end)}`;
     // Dit blok is één moment: de locatie van díé keer, niet die van de eerstvolgende.
     const blockStart = block.start.getTime();
@@ -1188,18 +1243,19 @@ export function KalenderEditorialView({
             height,
             '--lane': block.lane,
             '--lanes': block.lanes,
-            '--cat': cat?.colour,
+            ...(cat ? catChipStyle(cat.colour) : {}),
           } as React.CSSProperties
         }
+        aria-label={`${title}, ${time}`}
         title={`${title} · ${time}${location ? ` · ${location}` : ''}`}
         onClick={(clicked) => openPreview(clicked, e)}
       >
-        <span className="kal-tl-time">{time}</span>
+        {height >= 42 ? <span className="kal-tl-time">{time}</span> : null}
         <b>{title}</b>
         {height >= 74 && location ? <small>{location}</small> : null}
         {height >= 96
           ? audienceCategories(e).map((a) => (
-              <span key={a.slug} className="kal-tl-aud" style={{ '--cat': a.colour } as React.CSSProperties}>
+              <span key={a.slug} className="kal-tl-aud" style={catChipStyle(a.colour)}>
                 {categoryName(a)}
               </span>
             ))
@@ -1294,7 +1350,7 @@ export function KalenderEditorialView({
                         {
                           gridColumn: `${start + 2} / ${end + 3}`,
                           gridRow: lane + 1,
-                          '--cat': cat?.colour,
+                          ...(cat ? catChipStyle(cat.colour) : {}),
                         } as React.CSSProperties
                       }
                       title={`${pickTitle(event)} · ${range}`}
@@ -1365,122 +1421,161 @@ export function KalenderEditorialView({
     );
   }
 
-  const previewCard = preview ? (
-    <div
-      className="ev-preview-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label={pickTitle(preview)}
-      onClick={() => setPreview(null)}
+  function isOutsidePreview(clientX: number, clientY: number, dialog: HTMLDialogElement) {
+    const r = dialog.getBoundingClientRect();
+    return clientX < r.left || clientX > r.right || clientY < r.top || clientY > r.bottom;
+  }
+
+  const previewCard = (
+    <dialog
+      ref={previewDialogRef}
+      className="ev-preview-dialog"
+      aria-labelledby={preview ? previewTitleId : undefined}
+      {...({ closedby: 'any' } as Record<string, string>)}
+      onCancel={(event) => {
+        event.preventDefault();
+        setPreviewState(null);
+      }}
+      onClose={(event) => {
+        if (previewSuppressCloseCountRef.current > 0) {
+          previewSuppressCloseCountRef.current -= 1;
+          return;
+        }
+        if (event.currentTarget.open) return;
+        setPreviewState(null);
+      }}
+      onPointerDown={(event) => {
+        if ('closedBy' in HTMLDialogElement.prototype) {
+          previewPressedOutsideRef.current = false;
+          return;
+        }
+        previewPressedOutsideRef.current =
+          event.target === event.currentTarget &&
+          isOutsidePreview(event.clientX, event.clientY, event.currentTarget);
+      }}
+      onPointerUp={(event) => {
+        if ('closedBy' in HTMLDialogElement.prototype) return;
+        const wasOutside = previewPressedOutsideRef.current;
+        previewPressedOutsideRef.current = false;
+        if (
+          wasOutside &&
+          event.target === event.currentTarget &&
+          isOutsidePreview(event.clientX, event.clientY, event.currentTarget)
+        ) {
+          setPreviewState(null);
+        }
+      }}
     >
-      <div
-        className={`ev-preview${
-          preview.extendedProps.viewerInterest.kind !== 'none' &&
-          preview.extendedProps.categories.some((category) => category.audience === 'ALUMNI')
-            ? ' has-interest'
-            : ''
-        }`}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <button
-          type="button"
-          className="ev-preview-close"
-          onClick={() => setPreview(null)}
-          aria-label={locale === 'nl' ? 'Sluiten' : 'Close'}
+      {preview ? (
+        <div
+          className={`ev-preview${
+            preview.extendedProps.viewerInterest.kind !== 'none' &&
+            preview.extendedProps.categories.some((category) => category.audience === 'ALUMNI')
+              ? ' has-interest'
+              : ''
+          }`}
         >
-          ×
-        </button>
+          <button
+            ref={previewCloseBtnRef}
+            type="button"
+            className="ev-preview-close"
+            onClick={() => setPreviewState(null)}
+            aria-label={locale === 'nl' ? 'Sluiten' : 'Close'}
+          >
+            ×
+          </button>
 
-        <div className="ev-preview-tags">
-          {preview.extendedProps.categories.map((c) => (
-            <span
-              key={c.slug}
-              className={`ev-preview-tag${c.audience ? ' audience' : ''}`}
-              style={{ '--cat': c.colour } as React.CSSProperties}
-            >
-              {categoryName(c)}
-            </span>
-          ))}
-        </div>
-
-        <h3>{pickTitle(preview)}</h3>
-
-        <dl className="ev-preview-meta">
-          <div>
-            <dt>{locale === 'nl' ? 'Wanneer' : 'When'}</dt>
-            <dd>{whenLine(preview)}</dd>
+          <div className="ev-preview-tags">
+            {preview.extendedProps.categories.map((c) => (
+              <span
+                key={c.slug}
+                className={`ev-preview-tag${c.audience ? ' audience' : ''}`}
+                style={catChipStyle(c.colour)}
+              >
+                {categoryName(c)}
+              </span>
+            ))}
           </div>
-          {preview.location ? (
+
+          <h3 id={previewTitleId}>{pickTitle(preview)}</h3>
+
+          <dl className="ev-preview-meta">
             <div>
-              <dt>{locale === 'nl' ? 'Waar' : 'Where'}</dt>
-              <dd>{preview.location}</dd>
+              <dt>{locale === 'nl' ? 'Wanneer' : 'When'}</dt>
+              <dd>{whenLine(preview)}</dd>
             </div>
-          ) : null}
-          <div>
-            <dt>{locale === 'nl' ? 'Door' : 'By'}</dt>
-            <dd>{pickGroup(preview)}</dd>
+            {preview.location ? (
+              <div>
+                <dt>{locale === 'nl' ? 'Waar' : 'Where'}</dt>
+                <dd>{preview.location}</dd>
+              </div>
+            ) : null}
+            <div>
+              <dt>{locale === 'nl' ? 'Door' : 'By'}</dt>
+              <dd>{pickGroup(preview)}</dd>
+            </div>
+          </dl>
+
+          {pickDesc(preview) ? <p className="ev-preview-desc">{previewSummary(pickDesc(preview))}</p> : null}
+
+          {interestLine(preview) ? <p className="ev-preview-going">{interestLine(preview)}</p> : null}
+
+          {/* Aanduiden dat je komt hoort hier al te kunnen: wie in de kalender op
+              een evenement klikt, heeft precies dan de vraag "ga ik?" in zijn
+              hoofd, en hem daarvoor eerst naar een tweede pagina sturen kost de
+              helft van de klikken. */}
+          <div className="ev-preview-actions">
+            <EventInterest
+              eventId={preview.id}
+              isAlumniEvent={preview.extendedProps.categories.some((category) => category.audience === 'ALUMNI')}
+              signedIn={signedIn}
+              viewer={preview.extendedProps.viewerInterest}
+              loginHref={`${base}/inloggen?next=${encodeURIComponent(eventHref(preview))}`}
+              labels={{
+                interested: locale === 'nl' ? 'Geïnteresseerd' : 'Interested',
+                removeInterest: locale === 'nl' ? 'Niet meer geïnteresseerd' : 'Remove interest',
+                saving: locale === 'nl' ? 'Bezig...' : 'Working...',
+                countLine: null,
+                loginCta: locale === 'nl' ? 'Log in' : 'Sign in',
+                detailsHeading:
+                  locale === 'nl'
+                    ? 'Wat mogen anderen zien bij ‘Wie er komt’?'
+                    : 'What may others see under ‘Who is coming’?',
+                detailsHint:
+                  locale === 'nl'
+                    ? 'Zo zien anderen wie er komt, en help je dus mede alumni te overtuigen om te komen door ze te laten weten dat ze mensen zullen herkennen!'
+                    : 'This shows others who is coming and helps convince fellow alumni by letting them know they will recognise people there.',
+                name: locale === 'nl' ? 'Naam (optioneel)' : 'Name (optional)',
+                namePlaceholder: locale === 'nl' ? 'Jouw naam' : 'Your name',
+                showName: locale === 'nl' ? 'Toon mijn naam' : 'Show my name',
+                graduationYear: locale === 'nl' ? 'Afstudeerjaar (optioneel)' : 'Graduation year (optional)',
+                showGraduationYear: locale === 'nl' ? 'Toon mijn afstudeerjaar' : 'Show my graduation year',
+                wasInVtk: locale === 'nl' ? 'Ik zat in VTK Praesidium' : 'I was in the VTK Praesidium',
+                showWasInVtk:
+                  locale === 'nl' ? 'Toon mijn antwoord over VTK Praesidium' : 'Show my answer about the VTK Praesidium',
+                perEventHint:
+                  locale === 'nl'
+                    ? 'Deze gegevens gelden alleen voor dit evenement en komen niet uit je profiel. Alleen aangevinkte informatie wordt publiek getoond.'
+                    : 'These details apply only to this event and do not come from your profile. Only selected information is shown publicly.',
+                saveDetails: locale === 'nl' ? 'Bewaren' : 'Save',
+                detailsSaved: locale === 'nl' ? 'Opgeslagen.' : 'Saved.',
+                errorVisibleValue:
+                  locale === 'nl'
+                    ? 'Vul eerst de naam of het afstudeerjaar in dat je zichtbaar wilt maken.'
+                    : 'First enter the name or graduation year you want to make visible.',
+                errorGeneric:
+                  locale === 'nl' ? 'Dat lukte niet. Probeer het opnieuw.' : 'That did not work. Please try again.',
+              }}
+              onChanged={(viewer) => markInterest(preview.id, viewer)}
+            />
+            <a href={eventHref(preview)} className="btn btn-ghost arrow ev-preview-go">
+              {locale === 'nl' ? 'Evenementpagina' : 'Event page'}
+            </a>
           </div>
-        </dl>
-
-        {pickDesc(preview) ? <p className="ev-preview-desc">{previewSummary(pickDesc(preview))}</p> : null}
-
-        {interestLine(preview) ? <p className="ev-preview-going">{interestLine(preview)}</p> : null}
-
-        {/* Aanduiden dat je komt hoort hier al te kunnen: wie in de kalender op
-            een evenement klikt, heeft precies dan de vraag "ga ik?" in zijn
-            hoofd, en hem daarvoor eerst naar een tweede pagina sturen kost de
-            helft van de klikken. */}
-        <div className="ev-preview-actions">
-          <EventInterest
-            eventId={preview.id}
-            isAlumniEvent={preview.extendedProps.categories.some((category) => category.audience === 'ALUMNI')}
-            signedIn={signedIn}
-            viewer={preview.extendedProps.viewerInterest}
-            loginHref={`${base}/inloggen?next=${encodeURIComponent(eventHref(preview))}`}
-            labels={{
-              interested: locale === 'nl' ? 'Geïnteresseerd' : 'Interested',
-              removeInterest: locale === 'nl' ? 'Niet meer geïnteresseerd' : 'Remove interest',
-              saving: locale === 'nl' ? 'Bezig...' : 'Working...',
-              countLine: null,
-              loginCta: locale === 'nl' ? 'Log in' : 'Sign in',
-              detailsHeading:
-                locale === 'nl'
-                  ? 'Wat mogen anderen zien bij ‘Wie er komt’?'
-                  : 'What may others see under ‘Who is coming’?',
-              detailsHint:
-                locale === 'nl'
-                  ? 'Zo zien anderen wie er komt, en help je dus mede alumni te overtuigen om te komen door ze te laten weten dat ze mensen zullen herkennen!'
-                  : 'This shows others who is coming and helps convince fellow alumni by letting them know they will recognise people there.',
-              name: locale === 'nl' ? 'Naam (optioneel)' : 'Name (optional)',
-              namePlaceholder: locale === 'nl' ? 'Jouw naam' : 'Your name',
-              showName: locale === 'nl' ? 'Toon mijn naam' : 'Show my name',
-              graduationYear: locale === 'nl' ? 'Afstudeerjaar (optioneel)' : 'Graduation year (optional)',
-              showGraduationYear: locale === 'nl' ? 'Toon mijn afstudeerjaar' : 'Show my graduation year',
-              wasInVtk: locale === 'nl' ? 'Ik zat in VTK Praesidium' : 'I was in the VTK Praesidium',
-              showWasInVtk:
-                locale === 'nl' ? 'Toon mijn antwoord over VTK Praesidium' : 'Show my answer about the VTK Praesidium',
-              perEventHint:
-                locale === 'nl'
-                  ? 'Deze gegevens gelden alleen voor dit evenement en komen niet uit je profiel. Alleen aangevinkte informatie wordt publiek getoond.'
-                  : 'These details apply only to this event and do not come from your profile. Only selected information is shown publicly.',
-              saveDetails: locale === 'nl' ? 'Bewaren' : 'Save',
-              detailsSaved: locale === 'nl' ? 'Opgeslagen.' : 'Saved.',
-              errorVisibleValue:
-                locale === 'nl'
-                  ? 'Vul eerst de naam of het afstudeerjaar in dat je zichtbaar wilt maken.'
-                  : 'First enter the name or graduation year you want to make visible.',
-              errorGeneric:
-                locale === 'nl' ? 'Dat lukte niet. Probeer het opnieuw.' : 'That did not work. Please try again.',
-            }}
-            onChanged={(viewer) => markInterest(preview.id, viewer)}
-          />
-          <a href={eventHref(preview)} className="btn btn-ghost arrow ev-preview-go">
-            {locale === 'nl' ? 'Evenementpagina' : 'Event page'}
-          </a>
         </div>
-      </div>
-    </div>
-  ) : null;
+      ) : null}
+    </dialog>
+  );
 
   return (
     <>
@@ -1513,7 +1608,9 @@ export function KalenderEditorialView({
           </h1>
           {selectedDescription ? (
             <div className="page-head-intro prose-vtk">
-              <Markdown>{selectedDescription}</Markdown>
+              <Markdown baseHeadingLevel={3} locale={locale}>
+                {selectedDescription}
+              </Markdown>
             </div>
           ) : null}
         </div>
@@ -1609,7 +1706,7 @@ export function KalenderEditorialView({
               op "Alumni" duwt meteen dát er een alumnikalender bestaat. De chip
               die al aanstaat wijst terug naar /kalender en zet zichzelf dus uit. */}
           <div className="toolbar-filters">
-            <div className="filters">
+            <nav className="filters" aria-label={locale === 'nl' ? 'Categorieën' : 'Categories'}>
               <a
                 href={`${base}/kalender`}
                 className={`filter${filter === 'all' ? ' on' : ''}`}
@@ -1624,13 +1721,13 @@ export function KalenderEditorialView({
                   href={filter === c.slug ? `${base}/kalender` : `${base}/kalender/${c.slug}`}
                   className={`filter category-filter${filter === c.slug ? ' on' : ''}`}
                   aria-current={filter === c.slug ? 'page' : undefined}
-                  style={{ '--cat': c.colour } as React.CSSProperties}
+                  style={catChipStyle(c.colour)}
                   onClick={(event) => switchFilter(event, c.slug)}
                 >
                   {categoryName(c)}
                 </a>
               ))}
-            </div>
+            </nav>
             {/* Rechts op dezelfde rij als de categorieën: het is geen filter op
                 inhoud maar op de periode, en het hoort wel bij deze rij knoppen
                 in plaats van als losse balk boven het raster te hangen. Enkel in
@@ -1649,7 +1746,7 @@ export function KalenderEditorialView({
               </button>
             ) : null}
             {audienceOptions.length > 0 ? (
-              <div className="audience-filters" aria-label={labels.audienceFilters}>
+              <div className="audience-filters" role="group" aria-label={labels.audienceFilters}>
                 <span>{labels.audienceFilters}</span>
                 {audienceOptions.map((c) => (
                   <a
@@ -1657,7 +1754,7 @@ export function KalenderEditorialView({
                     href={filter === c.slug ? `${base}/kalender` : `${base}/kalender/${c.slug}`}
                     className={`filter audience-filter${filter === c.slug ? ' on' : ''}`}
                     aria-current={filter === c.slug ? 'page' : undefined}
-                    style={{ '--cat': c.colour } as React.CSSProperties}
+                    style={catChipStyle(c.colour)}
                     onClick={(event) => switchFilter(event, c.slug)}
                   >
                     {categoryName(c)}

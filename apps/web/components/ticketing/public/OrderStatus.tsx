@@ -253,6 +253,212 @@ export function OrderStatus({
     ? withSource(`${base}/tickets/${order.event.slug}`, "bestelling")
     : `${base}/tickets`;
 
+  const mainBlock = (
+    <div className="tshop-main" key="main">
+      {pollError && !failed ? (
+        <p className="torder-warning" role="status">
+          <AlertTriangle size={18} aria-hidden="true" />
+          {t.pollFailed}
+        </p>
+      ) : null}
+
+      {paid && order.event.confirmationMessage ? (
+        <p className="torder-message">{order.event.confirmationMessage}</p>
+      ) : null}
+
+      {paid && order.tickets.length > 0 ? (
+        <section aria-labelledby="issued-tickets-title">
+          <div className="torder-section-head">
+            <span className="torder-eyebrow">
+              {order.tickets.length}{" "}
+              {order.tickets.length === 1 ? t.ticket : t.ticketsPlural}
+            </span>
+            <h2 id="issued-tickets-title" className="tshop-heading">
+              {t.passes}
+            </h2>
+          </div>
+          <div className="ticket-pass-list">
+            {order.tickets.map((ticket) => (
+              <TicketPass
+                key={ticket.id}
+                ticket={ticket}
+                locale={locale}
+                eventTitle={order.event.title}
+                eventDate={order.event.startsAt}
+                eventLocation={order.event.location}
+              />
+            ))}
+          </div>
+          <p className="torder-mail">
+            <MailCheck size={18} aria-hidden="true" />
+            {t.inMailbox}
+          </p>
+        </section>
+      ) : (
+        <section className="torder-wait" data-tone={tone}>
+          <span className="torder-wait-icon">
+            {failed ? (
+              <XCircle size={24} aria-hidden="true" />
+            ) : (
+              <CircleDashed className="is-spinning" size={24} aria-hidden="true" />
+            )}
+          </span>
+          <h2>{failed ? t.noneTitle : t.waitingTitle}</h2>
+          <p>{failed ? t.noneLead : t.waitingLead}</p>
+          {failed ? (
+            <Link className="ticket-primary-button" href={orderAgainHref}>
+              <RotateCcw size={17} aria-hidden="true" />
+              {t.orderAgain}
+            </Link>
+          ) : null}
+        </section>
+      )}
+    </div>
+  );
+
+  const panelBlock = (
+    <aside className="tshop-panel torder-panel" key="panel" aria-labelledby="torder-panel-title">
+      <div className="tshop-panel-head">
+        <h2 id="torder-panel-title">{t.orderPanel}</h2>
+        <small>{order.orderNumber}</small>
+      </div>
+
+      <div className="torder-event">
+        <span className="torder-poster">
+          {order.event.poster ? (
+            <Image
+              src={order.event.poster.src}
+              alt=""
+              fill
+              sizes="88px"
+              style={{ objectFit: "cover", objectPosition: order.event.poster.position }}
+            />
+          ) : null}
+        </span>
+        <div>
+          <strong>{order.event.title}</strong>
+          <span>
+            <CalendarDays size={14} aria-hidden="true" />
+            {formatTicketDate(order.event.startsAt, locale)}
+          </span>
+          {order.event.location ? (
+            <span>
+              <MapPin size={14} aria-hidden="true" />
+              {order.event.location}
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      {order.lines.length > 0 ? (
+        <ul className="torder-lines">
+          {order.lines.map((line) => (
+            <li key={line.key}>
+              <i>{line.quantity}&times;</i>
+              <span>
+                {line.name}
+                {/* De stukprijs enkel bij meer dan één: anders staat er
+                    twee keer hetzelfde bedrag onder elkaar. */}
+                {line.quantity > 1 ? (
+                  <small>
+                    {formatTicketPrice(line.unitPriceCents, order.currency, locale)}{" "}
+                    {locale === "nl" ? "per stuk" : "each"}
+                  </small>
+                ) : null}
+              </span>
+              <b>{formatTicketPrice(line.totalCents, order.currency, locale)}</b>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <div className="tshop-total">
+        <span>{t.total}</span>
+        <strong>{formatTicketPrice(order.totalCents, order.currency, locale)}</strong>
+      </div>
+
+      <dl className="torder-facts">
+        <div>
+          <dt>{t.buyer}</dt>
+          <dd>{order.buyerName}</dd>
+        </div>
+        <div>
+          <dt>{t.confirmationTo}</dt>
+          <dd>
+            {/* Past een adres toch niet, dan breekt het voor de @ en niet
+                voor de laatste letter. */}
+            {order.buyerEmail.split("@").map((part, i) => (
+              <Fragment key={i}>
+                {i > 0 ? (
+                  <>
+                    <wbr />@
+                  </>
+                ) : null}
+                {part}
+              </Fragment>
+            ))}
+          </dd>
+        </div>
+        <div>
+          <dt>{t.status}</dt>
+          <dd>
+            <span className="torder-chip" data-tone={tone}>
+              {formatTicketOrderStatus(order.status, locale)}
+            </span>
+          </dd>
+        </div>
+      </dl>
+
+      {showOpenBancontact ? (
+        <div className="torder-open-payment">
+          <div>
+            <strong>{t.openBancontactTitle}</strong>
+            <p>{t.openBancontactLead}</p>
+          </div>
+          <Link
+            className="ticket-primary-button"
+            href={`${base}/tickets/bestelling/${order.id}/bancontact`}
+          >
+            <Smartphone size={17} aria-hidden="true" />
+            {t.openBancontactAction}
+          </Link>
+        </div>
+      ) : null}
+
+      {canChoosePayment ? (
+        <PaymentMethodChooser orderId={order.id} locale={locale} choice={paymentChoice} />
+      ) : null}
+
+      {!paid && !failed && !canChoosePayment ? (
+        <p className="torder-processing">
+          <Clock3 size={17} aria-hidden="true" />
+          {t.waitingProvider}
+        </p>
+      ) : null}
+
+      <div className="torder-actions">
+        <Link className="ticket-secondary-button" href={`${base}/account#mijn-vtk-tickets`}>
+          <TicketCheck size={17} aria-hidden="true" />
+          {t.myTickets}
+        </Link>
+        <Link className="ticket-secondary-button" href={`${base}/tickets`}>
+          <ArrowLeft size={17} aria-hidden="true" />
+          {t.allEvents}
+        </Link>
+        {pollError ? (
+          <button
+            type="button"
+            className="ticket-secondary-button"
+            onClick={() => window.location.reload()}
+          >
+            <RefreshCw size={17} aria-hidden="true" />
+            {t.refresh}
+          </button>
+        ) : null}
+      </div>
+    </aside>
+  );
+
   return (
     <>
       {/* Dezelfde kop als de ticketpagina van het event, met de status van de
@@ -292,213 +498,25 @@ export function OrderStatus({
         </div>
       </header>
 
-      <main className="tshop-shell">
-        {/* Op een smal scherm staan de tickets eerst; wie nog moet betalen,
-            krijgt het paneel eerst, want dat is dan de handeling. */}
-        <div className="tshop torder" data-panel-first={!paid || undefined}>
-          <div className="tshop-main">
-            {pollError && !failed ? (
-              <p className="torder-warning" role="status">
-                <AlertTriangle size={18} aria-hidden="true" />
-                {t.pollFailed}
-              </p>
-            ) : null}
-
-            {paid && order.event.confirmationMessage ? (
-              <p className="torder-message">{order.event.confirmationMessage}</p>
-            ) : null}
-
-            {paid && order.tickets.length > 0 ? (
-              <section aria-labelledby="issued-tickets-title">
-                <div className="torder-section-head">
-                  <span className="torder-eyebrow">
-                    {order.tickets.length}{" "}
-                    {order.tickets.length === 1 ? t.ticket : t.ticketsPlural}
-                  </span>
-                  <h2 id="issued-tickets-title" className="tshop-heading">
-                    {t.passes}
-                  </h2>
-                </div>
-                <div className="ticket-pass-list">
-                  {order.tickets.map((ticket) => (
-                    <TicketPass
-                      key={ticket.id}
-                      ticket={ticket}
-                      locale={locale}
-                      eventTitle={order.event.title}
-                      eventDate={order.event.startsAt}
-                      eventLocation={order.event.location}
-                    />
-                  ))}
-                </div>
-                <p className="torder-mail">
-                  <MailCheck size={18} aria-hidden="true" />
-                  {t.inMailbox}
-                </p>
-              </section>
-            ) : (
-              <section className="torder-wait" data-tone={tone}>
-                <span className="torder-wait-icon">
-                  {failed ? (
-                    <XCircle size={24} aria-hidden="true" />
-                  ) : (
-                    <CircleDashed className="is-spinning" size={24} aria-hidden="true" />
-                  )}
-                </span>
-                <h2>{failed ? t.noneTitle : t.waitingTitle}</h2>
-                <p>{failed ? t.noneLead : t.waitingLead}</p>
-                {failed ? (
-                  <Link className="ticket-primary-button" href={orderAgainHref}>
-                    <RotateCcw size={17} aria-hidden="true" />
-                    {t.orderAgain}
-                  </Link>
-                ) : null}
-              </section>
-            )}
-          </div>
-
-          <aside className="tshop-panel torder-panel" aria-labelledby="torder-panel-title">
-            <div className="tshop-panel-head">
-              <h2 id="torder-panel-title">{t.orderPanel}</h2>
-              <small>{order.orderNumber}</small>
-            </div>
-
-            <div className="torder-event">
-              <span className="torder-poster">
-                {order.event.poster ? (
-                  <Image
-                    src={order.event.poster.src}
-                    alt=""
-                    fill
-                    sizes="88px"
-                    style={{ objectFit: "cover", objectPosition: order.event.poster.position }}
-                  />
-                ) : null}
-              </span>
-              <div>
-                <strong>{order.event.title}</strong>
-                <span>
-                  <CalendarDays size={14} aria-hidden="true" />
-                  {formatTicketDate(order.event.startsAt, locale)}
-                </span>
-                {order.event.location ? (
-                  <span>
-                    <MapPin size={14} aria-hidden="true" />
-                    {order.event.location}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-
-            {order.lines.length > 0 ? (
-              <ul className="torder-lines">
-                {order.lines.map((line) => (
-                  <li key={line.key}>
-                    <i>{line.quantity}&times;</i>
-                    <span>
-                      {line.name}
-                      {/* De stukprijs enkel bij meer dan één: anders staat er
-                          twee keer hetzelfde bedrag onder elkaar. */}
-                      {line.quantity > 1 ? (
-                        <small>
-                          {formatTicketPrice(line.unitPriceCents, order.currency, locale)}{" "}
-                          {locale === "nl" ? "per stuk" : "each"}
-                        </small>
-                      ) : null}
-                    </span>
-                    <b>{formatTicketPrice(line.totalCents, order.currency, locale)}</b>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-
-            <div className="tshop-total">
-              <span>{t.total}</span>
-              <strong>{formatTicketPrice(order.totalCents, order.currency, locale)}</strong>
-            </div>
-
-            <dl className="torder-facts">
-              <div>
-                <dt>{t.buyer}</dt>
-                <dd>{order.buyerName}</dd>
-              </div>
-              <div>
-                <dt>{t.confirmationTo}</dt>
-                <dd>
-                  {/* Past een adres toch niet, dan breekt het voor de @ en niet
-                      voor de laatste letter. */}
-                  {order.buyerEmail.split("@").map((part, i) => (
-                    <Fragment key={i}>
-                      {i > 0 ? (
-                        <>
-                          <wbr />@
-                        </>
-                      ) : null}
-                      {part}
-                    </Fragment>
-                  ))}
-                </dd>
-              </div>
-              <div>
-                <dt>{t.status}</dt>
-                <dd>
-                  <span className="torder-chip" data-tone={tone}>
-                    {formatTicketOrderStatus(order.status, locale)}
-                  </span>
-                </dd>
-              </div>
-            </dl>
-
-            {showOpenBancontact ? (
-              <div className="torder-open-payment">
-                <div>
-                  <strong>{t.openBancontactTitle}</strong>
-                  <p>{t.openBancontactLead}</p>
-                </div>
-                <Link
-                  className="ticket-primary-button"
-                  href={`${base}/tickets/bestelling/${order.id}/bancontact`}
-                >
-                  <Smartphone size={17} aria-hidden="true" />
-                  {t.openBancontactAction}
-                </Link>
-              </div>
-            ) : null}
-
-            {canChoosePayment ? (
-              <PaymentMethodChooser orderId={order.id} locale={locale} choice={paymentChoice} />
-            ) : null}
-
-            {!paid && !failed && !canChoosePayment ? (
-              <p className="torder-processing">
-                <Clock3 size={17} aria-hidden="true" />
-                {t.waitingProvider}
-              </p>
-            ) : null}
-
-            <div className="torder-actions">
-              <Link className="ticket-secondary-button" href={`${base}/account#mijn-vtk-tickets`}>
-                <TicketCheck size={17} aria-hidden="true" />
-                {t.myTickets}
-              </Link>
-              <Link className="ticket-secondary-button" href={`${base}/tickets`}>
-                <ArrowLeft size={17} aria-hidden="true" />
-                {t.allEvents}
-              </Link>
-              {pollError ? (
-                <button
-                  type="button"
-                  className="ticket-secondary-button"
-                  onClick={() => window.location.reload()}
-                >
-                  <RefreshCw size={17} aria-hidden="true" />
-                  {t.refresh}
-                </button>
-              ) : null}
-            </div>
-          </aside>
+      <div className="tshop-shell">
+        {/* Op een smal scherm staan de tickets eerst als de bestelling betaald
+            is; wie nog moet betalen, krijgt het paneel eerst in DOM-volgorde.
+            Op breed scherm plaatst CSS Grid altijd hoofdinhoud links en paneel
+            rechts. */}
+        <div className="tshop torder">
+          {paid ? (
+            <>
+              {mainBlock}
+              {panelBlock}
+            </>
+          ) : (
+            <>
+              {panelBlock}
+              {mainBlock}
+            </>
+          )}
         </div>
-      </main>
+      </div>
     </>
   );
 }

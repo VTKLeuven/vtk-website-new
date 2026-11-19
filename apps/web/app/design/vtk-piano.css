@@ -89,6 +89,7 @@
 }
 
 .vtk-piano-dayname {
+  margin: 0;
   color: var(--ink);
   font-size: 15px;
   font-weight: 600;

@@ -17,7 +17,7 @@
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--on-dark-muted);
   margin-bottom: 8px;
 }
 .vtk-design .page-head h1 {
@@ -27,14 +27,14 @@
   font-weight: 500;
 }
 .vtk-design .page-head h1 em {
-  color: oklch(0.62 0.01 260);
+  color: var(--yellow);
   font-style: normal;
   font-weight: 400;
 }
 .vtk-design .page-head .crumbs a {
   color: inherit;
   text-decoration: none;
-  border-bottom: 1px solid var(--line-2);
+  border-bottom: 1px solid var(--on-dark-control-border);
 }
 /* Deze kop is de donkere band (vtk-base.css), dus het kruimelpad licht op naar
    `--paper` en niet naar `--ink`: dat is de tekstkleur van een lichte
@@ -49,9 +49,32 @@
 .vtk-design .page-head-intro {
   max-width: 68ch;
   margin-top: 10px;
-  color: var(--body);
+  color: var(--on-dark-muted);
   font-size: 15px;
   line-height: 1.55;
+}
+
+.vtk-design .page-head .page-head-intro.prose-vtk :is(p, li) {
+  color: var(--on-dark-muted);
+}
+
+.vtk-design .page-head .page-head-intro.prose-vtk :is(strong, h2, h3, h4) {
+  color: var(--paper);
+}
+
+.vtk-design .page-head .page-head-intro.prose-vtk a {
+  color: var(--yellow);
+  text-decoration-color: var(--yellow);
+}
+
+.vtk-design .page-head .page-head-intro.prose-vtk a:hover {
+  color: var(--paper);
+  text-decoration-color: var(--paper);
+}
+
+.vtk-design .page-head .page-head-intro.prose-vtk code {
+  background: rgba(239, 242, 248, 0.14);
+  color: var(--paper);
 }
 
 .vtk-design .page-head-meta {
@@ -60,11 +83,11 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   text-align: right;
-  color: var(--muted);
+  color: var(--on-dark-muted);
   line-height: 1.9;
 }
 .vtk-design .page-head-meta b {
-  color: var(--ink);
+  color: var(--paper);
   font-weight: 500;
 }
 
@@ -713,30 +736,47 @@
   margin-top: 4px;
 }
 
-/* De abonneerdialoog. Vast in het scherm, want ze wordt geopend vanuit een
-   zijkolom die op een telefoon onderaan de pagina staat; een paneel dat daar
-   openklapt valt buiten beeld. */
-.vtk-design .subscribe-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
+/* De abonneerdialoog. Vast in het scherm als native modal <dialog>, want ze
+   wordt geopend vanuit een zijkolom die op een telefoon onderaan de pagina
+   staat; een paneel dat daar openklapt valt buiten beeld. */
+.vtk-design .subscribe-dialog {
+  margin: auto;
+  width: min(480px, calc(calc(100 * var(--vtk-vw, 1vw)) - 32px));
+  max-width: none;
+  max-height: calc(calc(100 * var(--vtk-dvh, 1dvh)) - 32px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.vtk-design .subscribe-dialog[open] {
+  display: grid;
+}
+
+.vtk-design .subscribe-dialog::backdrop {
   background: rgba(10, 15, 31, 0.45);
 }
 
 .vtk-design .subscribe-modal {
+  position: relative;
   width: 100%;
   max-width: 480px;
-  max-height: calc(calc(100 * var(--vtk-dvh, 1dvh)) - 40px);
+  max-height: calc(calc(100 * var(--vtk-dvh, 1dvh)) - 32px);
   overflow-y: auto;
   padding: 22px;
   border: 1px solid var(--line);
   border-radius: 20px;
   background: var(--surface);
   box-shadow: 0 24px 70px rgba(10, 15, 31, 0.22);
+}
+
+.vtk-design .subscribe-fieldset {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
 }
 
 .vtk-design .subscribe-modal-head {
@@ -756,19 +796,27 @@
 
 .vtk-design .subscribe-close {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--line);
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--control-border);
   border-radius: 999px;
   background: var(--paper);
-  color: var(--muted);
+  color: var(--ink);
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
 }
 
 .vtk-design .subscribe-close:hover {
-  color: var(--ink);
+  border-color: var(--ink);
+  background: var(--paper-2);
+}
+
+.vtk-design .subscribe-close:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 
 .vtk-design .subscribe-choices {
@@ -1027,7 +1075,7 @@
 .vtk-design .audience-filter.on {
   background: var(--cat);
   border-color: var(--cat);
-  color: #fff;
+  color: var(--cat-fg, #fff);
 }
 
 /* De filter is meteen de legenda: het kleurpunt gebruikt exact dezelfde
@@ -1059,7 +1107,7 @@
 .vtk-design .audience-filter.on {
   background: var(--cat);
   border-color: var(--cat);
-  color: #fff;
+  color: var(--cat-fg, #fff);
 }
 
 .vtk-design .category-filter.on::before,
@@ -1108,14 +1156,26 @@
    een dure manier om te ontdekken dat je het verkeerde evenement aanklikte.
    -------------------------------------------------------------------------- */
 
-.vtk-design .ev-preview-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
+.vtk-design .ev-preview-dialog {
+  margin: auto;
+  width: min(460px, calc(calc(100 * var(--vtk-vw, 1vw)) - 32px));
+  max-width: none;
+  max-height: calc(calc(100 * var(--vtk-dvh, 1dvh)) - 32px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.vtk-design .ev-preview-dialog:has(.ev-preview.has-interest) {
+  width: min(680px, calc(calc(100 * var(--vtk-vw, 1vw)) - 32px));
+}
+
+.vtk-design .ev-preview-dialog[open] {
+  display: grid;
+}
+
+.vtk-design .ev-preview-dialog::backdrop {
   background: rgba(10, 15, 31, 0.45);
 }
 
@@ -1123,7 +1183,7 @@
   position: relative;
   width: 100%;
   max-width: 460px;
-  max-height: calc(calc(100 * var(--vtk-dvh, 1dvh)) - 40px);
+  max-height: calc(calc(100 * var(--vtk-dvh, 1dvh)) - 32px);
   overflow-y: auto;
   padding: 24px;
   border: 1px solid var(--line);
@@ -1136,19 +1196,27 @@
   position: absolute;
   top: 16px;
   right: 16px;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--line);
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--control-border);
   border-radius: 999px;
   background: var(--paper);
-  color: var(--muted);
+  color: var(--ink);
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
 }
 
 .vtk-design .ev-preview-close:hover {
-  color: var(--ink);
+  border-color: var(--ink);
+  background: var(--paper-2);
+}
+
+.vtk-design .ev-preview-close:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 
 .vtk-design .ev-preview-tags {
@@ -1172,7 +1240,7 @@
 .vtk-design .ev-preview-tag.audience {
   border-color: var(--cat);
   background: var(--cat);
-  color: #fff;
+  color: var(--cat-fg, #fff);
 }
 
 .vtk-design .ev-preview h3 {
@@ -1848,7 +1916,8 @@
   align-items: center;
   gap: 7px;
   min-width: 0;
-  height: 24px;
+  min-height: 27px;
+  height: 27px;
   margin: 0 6px;
   padding: 0 9px;
   overflow: hidden;
@@ -1926,7 +1995,7 @@
   z-index: 1;
   display: grid;
   align-content: start;
-  gap: 1px;
+  gap: 3px;
   min-width: 0;
   padding: 4px 5px 10px;
   pointer-events: none;
@@ -1939,6 +2008,7 @@
   grid-template-columns: auto minmax(0, 1fr);
   align-items: baseline;
   column-gap: 7px;
+  min-height: 27px;
   padding: 4px 6px;
   border-radius: 7px;
   color: var(--ink);
@@ -2002,7 +2072,7 @@
   padding: 1px 6px;
   border-radius: 999px;
   background: var(--cat);
-  color: #fff;
+  color: var(--cat-fg, #fff);
   font-size: 10px;
   font-weight: 600;
   line-height: 1.5;
@@ -2184,20 +2254,7 @@
 
   .vtk-design .kal-month-wk,
   .vtk-design .kal-month-ev,
-  .vtk-design .kal-month-span small,
-  .vtk-design .kal-month-span-title {
-    display: none;
-  }
-
   .vtk-design .kal-month-span {
-    height: 5px;
-    margin: 0 2px;
-    padding: 0;
-    border-radius: 3px;
-    background: var(--cat, var(--chart-context));
-  }
-
-  .vtk-design .kal-month-span::before {
     display: none;
   }
 
@@ -2364,7 +2421,8 @@
   align-items: center;
   gap: 7px;
   min-width: 0;
-  height: 26px;
+  min-height: 27px;
+  height: 27px;
   margin: 0 6px;
   padding: 0 10px;
   overflow: hidden;
@@ -2452,7 +2510,12 @@
 }
 
 .vtk-design .kal-tl-block.is-past {
-  opacity: 0.72;
+  background: var(--paper-2);
+  color: var(--muted);
+}
+
+.vtk-design .kal-tl-block.is-past b {
+  color: var(--body);
 }
 
 /* Loopt verder dan het venster: de onderkant arceert uit, in de tekentaal van

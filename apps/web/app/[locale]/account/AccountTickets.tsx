@@ -36,7 +36,7 @@ export function AccountTickets({ locale, orders }: { locale: 'nl' | 'en'; orders
     <Card id="mijn-vtk-tickets" className="scroll-mt-28 p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h3 className="text-lg font-semibold text-vtk-ink">{nl ? 'Mijn tickets' : 'My tickets'}</h3>
+          <h2 className="text-lg font-semibold text-vtk-ink">{nl ? 'Mijn tickets' : 'My tickets'}</h2>
           <p className="mt-1 text-sm text-[#5c667f]">
             {nl ? 'Al je betaalde VTK-tickets op één plek.' : 'All your paid VTK tickets in one place.'}
           </p>
@@ -83,7 +83,7 @@ export function AccountTickets({ locale, orders }: { locale: 'nl' | 'en'; orders
                   </span>
 
                   <div className="min-w-0">
-                    <h4 className="truncate font-semibold">{order.event.title}</h4>
+                    <h3 className="truncate font-semibold">{order.event.title}</h3>
                     <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#5c667f]">
                       <span className="inline-flex items-center gap-1.5">
                         <CalendarDays size={14} aria-hidden="true" />
@@ -125,7 +125,7 @@ export function AccountTickets({ locale, orders }: { locale: 'nl' | 'en'; orders
       ) : (
         <div className="mt-5 flex flex-col items-start rounded-2xl border border-dashed border-vtk-blue/20 bg-vtk-blue-soft/25 p-5">
           <TicketCheck size={24} aria-hidden="true" className="text-[#5c667f]" />
-          <h4 className="mt-3 font-semibold text-vtk-ink">{nl ? 'Nog geen tickets' : 'No tickets yet'}</h4>
+          <h3 className="mt-3 font-semibold text-vtk-ink">{nl ? 'Nog geen tickets' : 'No tickets yet'}</h3>
           <p className="mt-1 text-sm text-[#5c667f]">
             {nl
               ? 'Je betaalde bestellingen verschijnen automatisch hier.'

@@ -1,7 +1,7 @@
 'use client';
 
 import { useUnsentGuard } from '@/components/ui/unsentGuard';
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 import Link from '@/components/ui/Link';
 import { loginAction, type LoginState } from '@/app/actions/auth';
 import { resendVerificationAction } from '@/app/actions/register';
@@ -50,6 +50,8 @@ export function PasswordSignIn({
   };
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const userOpenedRef = useRef(false);
   const unsent = useUnsentGuard();
   const [state, formAction, pending] = useActionState<LoginState, FormData>(unsent.state(loginAction), undefined);
   const [resendState, resendAction, resendPending] = useActionState<SaveState, FormData>(
@@ -62,11 +64,26 @@ export function PasswordSignIn({
     if (state?.redirectTo) window.location.assign(state.redirectTo);
   }, [state?.redirectTo]);
 
+  useEffect(() => {
+    if (open && userOpenedRef.current) {
+      userOpenedRef.current = false;
+      emailInputRef.current?.focus();
+    }
+  }, [open]);
+
   if (!open) {
     return (
       <p className="vtk-auth-alt">
         {labels.lead}{' '}
-        <button type="button" className="vtk-auth-alt-link" onClick={() => setOpen(true)}>
+        <button
+          type="button"
+          className="vtk-auth-alt-link rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink"
+          aria-label={`${labels.lead} ${labels.link}`}
+          onClick={() => {
+            userOpenedRef.current = true;
+            setOpen(true);
+          }}
+        >
           {labels.link}
         </button>
       </p>
@@ -84,10 +101,12 @@ export function PasswordSignIn({
         <div>
           <label htmlFor="email">{labels.email}</label>
           <input
+            ref={emailInputRef}
             id="email"
             name="email"
             type="email"
             autoComplete="email"
+            spellCheck={false}
             required
             value={email}
             onChange={(event) => setEmail(event.target.value)}
@@ -103,8 +122,12 @@ export function PasswordSignIn({
             required
           />
         </div>
-        {state?.error === 'INVALID' && <p className="vtk-auth-error">{labels.invalid}</p>}
-        {state?.error === 'TOO_MANY' && <p className="vtk-auth-error">{labels.tooMany}</p>}
+        {(state?.error === 'INVALID' || state?.error === 'Invalid input') && (
+          <p role="alert" className="vtk-auth-error">{labels.invalid}</p>
+        )}
+        {state?.error === 'TOO_MANY' && (
+          <p role="alert" className="vtk-auth-error">{labels.tooMany}</p>
+        )}
         <button
           type="submit"
           // Na login staat de hard-redirect nog te gebeuren; niet opnieuw laten indienen.
@@ -119,17 +142,21 @@ export function PasswordSignIn({
           Dat onderscheid maakt de server (zie checkLoginBlocked), zodat dit
           bericht niet verklapt welke adressen een account hebben. */}
       {state?.error === 'UNVERIFIED' && (
-        <div className="vtk-auth-notice">
+        <div role="status" className="vtk-auth-notice">
           <p>{labels.unverified}</p>
           {resendState.status === 'success' ? (
-            <p className="vtk-auth-notice-done">{labels.resendSent}</p>
+            <p role="status" className="vtk-auth-notice-done">{labels.resendSent}</p>
           ) : resendState.status === 'error' ? (
-            <p className="vtk-auth-error">{labels.tooMany}</p>
+            <p role="alert" className="vtk-auth-error">{labels.tooMany}</p>
           ) : (
             <form action={resendAction}>
               <input type="hidden" name="email" value={email} />
               <input type="hidden" name="locale" value={base === '/en' ? 'en' : 'nl'} />
-              <button type="submit" className="vtk-auth-alt-link" disabled={resendPending}>
+              <button
+                type="submit"
+                className="vtk-auth-alt-link rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink"
+                disabled={resendPending}
+              >
                 {labels.resend}
               </button>
             </form>

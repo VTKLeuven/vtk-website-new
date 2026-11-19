@@ -49,16 +49,17 @@ export function SlugField({
           pattern={SLUG_PATTERN}
           required
           aria-invalid={!valid}
+          aria-describedby={!valid ? `${id}-error` : `${id}-help`}
         />
       </div>
       {!valid ? (
-        <p className="mt-1 text-xs text-red-600">
+        <p id={`${id}-error`} role="alert" className="mt-1 text-xs text-vtk-danger">
           {nl
             ? "Enkel kleine letters, cijfers en koppeltekens; niet beginnen of eindigen met een koppelteken."
             : "Lowercase letters, digits and hyphens only; cannot start or end with a hyphen."}
         </p>
       ) : (
-        <p className="mt-1 text-xs text-[#5c667f]">
+        <p id={`${id}-help`} className="mt-1 text-xs text-[#5c667f]">
           {nl
             ? "Het adres van deze pagina. Moet uniek zijn over de hele site; bij een wijziging verhuist de pagina en werken bestaande links naar het oude adres niet meer."
             : "This page's address. Must be unique across the whole site; changing it moves the page and existing links to the old address stop working."}

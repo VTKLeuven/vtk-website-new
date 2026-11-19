@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "@/components/ui/Link";
-import { PaymentMethodChooser, type PaymentMethodChoice } from "./PaymentMethodChooser";
+import { PaymentMethodChooser, type PaymentMethodChoice, type PaymentMethodOption } from "./PaymentMethodChooser";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
+  ArrowLeft,
   ArrowRight,
   Check,
   Clock,
@@ -55,8 +56,10 @@ type CheckoutResponse = {
   url?: string;
   checkout?: { url?: string };
   error?: string;
-  /** Bij SOLD_OUT: `MEMBER_SEATS` of `NON_MEMBER_SEATS` wanneer enkel dat plafond vol zit. */
+  /** Bij SOLD_OUT: `MEMBER_SEATS` of `NON_MEMBER_SEATS`, bij INVALID_ANSWER: `question.code`. */
   field?: string;
+  /** Bij INVALID_REQUEST (ZodError): veldnamen en foutmeldingen. */
+  fields?: Record<string, string[] | undefined>;
   message?: string;
 };
 
@@ -86,6 +89,86 @@ export function attendeesForQuantity(
   });
 }
 
+/**
+ * Behoudt eerder ingevulde deelnemers in state wanneer het aantal daalt,
+ * zodat een stap terug omhoog niets wist. Het weergeven en insturen gebruiken
+ * `.slice(0, quantity)`.
+ */
+export function retainAttendeesForQuantity(
+  values: Record<string, Attendee[]>,
+  ticketTypeId: string,
+  quantity: number,
+  viewer?: { name: string; email: string } | null,
+  quantities?: Record<string, number>,
+): Attendee[] {
+  const currentAttendees = values[ticketTypeId] ?? [];
+  if (quantity <= currentAttendees.length) {
+    return currentAttendees;
+  }
+  const hasActiveAttendees = Object.entries(values).some(([key, list]) => {
+    const activeCount = quantities ? Math.min(list.length, quantities[key] ?? 0) : list.length;
+    return activeCount > 0;
+  });
+  let prefillBuyer = Boolean(viewer) && !hasActiveAttendees;
+  const extra = Array.from({ length: quantity - currentAttendees.length }, () => {
+    if (prefillBuyer) {
+      prefillBuyer = false;
+      return emptyAttendee(viewer);
+    }
+    return emptyAttendee();
+  });
+  return [...currentAttendees, ...extra];
+}
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function isValidEmail(value: string): boolean {
+  return value.length <= 320 && EMAIL_PATTERN.test(value);
+}
+
+const PAYMENT_PROVIDER_LABELS: Record<
+  PaymentMethodOption["provider"],
+  { nl: string; en: string }
+> = {
+  bancontact: { nl: "Bancontact", en: "Bancontact" },
+  mollie: { nl: "Mollie", en: "Mollie" },
+  mock: { nl: "Testbetaling", en: "Test payment" },
+};
+
+function formatAnswerForReview(
+  question: TicketQuestion,
+  value: string | string[] | boolean | undefined,
+  locale: "nl" | "en",
+): string | null {
+  if (value === undefined || value === "") return null;
+  const type = question.type ?? "TEXT";
+  const optionMap = new Map(
+    (question.options ?? []).map((option) =>
+      typeof option === "string"
+        ? [option, option]
+        : [option.value, option.label ?? option.value],
+    ),
+  );
+  if (type === "BOOLEAN" || type === "CHECKBOX") {
+    if (typeof value !== "boolean") return null;
+    if (type === "CHECKBOX" && !value) return null;
+    return value ? (locale === "nl" ? "Ja" : "Yes") : locale === "nl" ? "Nee" : "No";
+  }
+  if (type === "MULTIPLE_CHOICE") {
+    if (!Array.isArray(value) || value.length === 0) return null;
+    return value.map((item) => optionMap.get(item) ?? item).join(", ");
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (type === "SELECT" || type === "SINGLE_CHOICE") {
+      return optionMap.get(trimmed) ?? trimmed;
+    }
+    return trimmed;
+  }
+  return null;
+}
+
 function checkoutErrorMessage(
   code: string | undefined,
   locale: "nl" | "en",
@@ -107,6 +190,7 @@ function checkoutErrorMessage(
     INVALID_TICKET_TYPE: { nl: "Een gekozen tickettype is niet meer beschikbaar.", en: "A selected ticket type is no longer available." },
     LOGIN_REQUIRED: { nl: "Log in om deze bestelling af te ronden.", en: "Sign in to complete this order." },
     MEMBERSHIP_REQUIRED: { nl: "Dit ticket is er voor leden van VTK.", en: "This ticket is for members of VTK." },
+    INVALID_REQUEST: { nl: "Controleer de ingevulde gegevens.", en: "Check the entered details." },
     INVALID_QUANTITY: { nl: "Controleer het gekozen aantal tickets.", en: "Check the selected ticket quantity." },
     INVALID_ANSWER: { nl: "Controleer de antwoorden bij de aanwezigen.", en: "Check the attendee answers." },
     TOO_MANY_RESERVATIONS: { nl: "Er staan al meerdere reservaties open. Probeer later opnieuw.", en: "Several reservations are already pending. Try again later." },
@@ -128,15 +212,21 @@ function QuestionField({
   value,
   onChange,
   locale,
+  error,
+  isFirstAttendee,
 }: {
   question: TicketQuestion;
   fieldPrefix: string;
   value: string | string[] | boolean | undefined;
   onChange: (value: string | string[] | boolean) => void;
   locale: "nl" | "en";
+  error?: string;
+  isFirstAttendee: boolean;
 }) {
   const fieldId = `${fieldPrefix}-question-${question.id}`;
   const descriptionId = question.description ? `${fieldId}-description` : undefined;
+  const errorId = `${fieldId}-error`;
+  const describedBy = [descriptionId, error ? errorId : undefined].filter(Boolean).join(" ") || undefined;
   const type = question.type ?? "TEXT";
 
   const options = (question.options ?? []).map((option) =>
@@ -147,7 +237,12 @@ function QuestionField({
 
   if (type === "BOOLEAN") {
     return (
-      <fieldset className="ticket-choice-field" aria-required={question.required}>
+      <fieldset
+        className="ticket-choice-field"
+        aria-required={question.required || undefined}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy}
+      >
         <legend>{question.label}{question.required ? " *" : ""}</legend>
         <div className="ticket-choice-list ticket-boolean-options">
           <label htmlFor={`${fieldId}-yes`}>
@@ -157,7 +252,7 @@ function QuestionField({
               type="radio"
               checked={value === true}
               required={question.required}
-              aria-describedby={descriptionId}
+              aria-describedby={describedBy}
               onChange={() => onChange(true)}
             />
             {locale === "nl" ? "Ja" : "Yes"}
@@ -169,40 +264,53 @@ function QuestionField({
               type="radio"
               checked={value === false}
               required={question.required}
-              aria-describedby={descriptionId}
+              aria-describedby={describedBy}
               onChange={() => onChange(false)}
             />
             {locale === "nl" ? "Nee" : "No"}
           </label>
         </div>
         {question.description ? <small id={descriptionId}>{question.description}</small> : null}
+        {error ? <small id={errorId} className="ticket-field-error">{error}</small> : null}
       </fieldset>
     );
   }
 
   if (type === "CHECKBOX") {
     return (
-      <label className="ticket-checkbox" htmlFor={fieldId}>
-        <input
-          id={fieldId}
-          type="checkbox"
-          checked={value === true}
-          required={question.required}
-          aria-describedby={descriptionId}
-          onChange={(event) => onChange(event.target.checked)}
-        />
-        <span>
-          <strong>{question.label}</strong>
-          {question.description ? <small id={descriptionId}>{question.description}</small> : null}
-        </span>
-      </label>
+      <div className="ticket-checkbox-wrap">
+        <label className="ticket-checkbox" htmlFor={fieldId}>
+          <input
+            id={fieldId}
+            type="checkbox"
+            checked={value === true}
+            required={question.required}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={describedBy}
+            onChange={(event) => onChange(event.target.checked)}
+          />
+          <span>
+            <strong>
+              {question.label}
+              {question.required ? " *" : ""}
+            </strong>
+            {question.description ? <small id={descriptionId}>{question.description}</small> : null}
+          </span>
+        </label>
+        {error ? <small id={errorId} className="ticket-field-error">{error}</small> : null}
+      </div>
     );
   }
 
   if (type === "MULTIPLE_CHOICE") {
     const selected = Array.isArray(value) ? value : [];
     return (
-      <fieldset className="ticket-choice-field" aria-required={question.required}>
+      <fieldset
+        className="ticket-choice-field"
+        aria-required={question.required || undefined}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy}
+      >
         <legend>{question.label}{question.required ? " *" : ""}</legend>
         <div className="ticket-choice-list">
           {options.map((option, index) => (
@@ -211,8 +319,8 @@ function QuestionField({
                 id={`${fieldId}-${index}`}
                 type="checkbox"
                 checked={selected.includes(option.value)}
-                required={question.required && selected.length === 0 && index === 0}
-                aria-describedby={descriptionId}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={describedBy}
                 onChange={(event) =>
                   onChange(
                     event.target.checked
@@ -226,21 +334,23 @@ function QuestionField({
           ))}
         </div>
         {question.description ? <small id={descriptionId}>{question.description}</small> : null}
+        {error ? <small id={errorId} className="ticket-field-error">{error}</small> : null}
       </fieldset>
     );
   }
 
   return (
-    <label className="ticket-field" htmlFor={fieldId}>
-      <span>
+    <div className="ticket-field">
+      <label htmlFor={fieldId}>
         {question.label}
         {question.required ? " *" : ""}
-      </span>
+      </label>
       {type === "SELECT" || type === "SINGLE_CHOICE" ? (
         <select
           id={fieldId}
           required={question.required}
-          aria-describedby={descriptionId}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
           value={typeof value === "string" ? value : ""}
           onChange={(event) => onChange(event.target.value)}
         >
@@ -256,7 +366,8 @@ function QuestionField({
           id={fieldId}
           rows={4}
           required={question.required}
-          aria-describedby={descriptionId}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
           value={typeof value === "string" ? value : ""}
           onChange={(event) => onChange(event.target.value)}
         />
@@ -264,14 +375,17 @@ function QuestionField({
         <input
           id={fieldId}
           type={type === "EMAIL" ? "email" : "text"}
+          autoComplete={type === "EMAIL" ? (isFirstAttendee ? "email" : "off") : undefined}
           required={question.required}
-          aria-describedby={descriptionId}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
           value={typeof value === "string" ? value : ""}
           onChange={(event) => onChange(event.target.value)}
         />
       )}
       {question.description ? <small id={descriptionId}>{question.description}</small> : null}
-    </label>
+      {error ? <small id={errorId} className="ticket-field-error">{error}</small> : null}
+    </div>
   );
 }
 /** Onder dit aantal zegt de shop hoeveel er nog zijn; daarboven helpt het getal niemand kiezen. */
@@ -301,8 +415,10 @@ function TicketStepper({
         type="button"
         title={locale === "nl" ? "Eén minder" : "Decrease"}
         aria-label={locale === "nl" ? `Minder ${label}` : `Decrease ${label}`}
-        disabled={!canDecrease}
-        onClick={onDecrease}
+        aria-disabled={!canDecrease}
+        onClick={() => {
+          if (canDecrease) onDecrease();
+        }}
       >
         <Minus size={16} aria-hidden="true" />
       </button>
@@ -311,8 +427,10 @@ function TicketStepper({
         type="button"
         title={locale === "nl" ? "Eén meer" : "Increase"}
         aria-label={locale === "nl" ? `Meer ${label}` : `Increase ${label}`}
-        disabled={!canIncrease}
-        onClick={onIncrease}
+        aria-disabled={!canIncrease}
+        onClick={() => {
+          if (canIncrease) onIncrease();
+        }}
       >
         <Plus size={16} aria-hidden="true" />
       </button>
@@ -390,28 +508,77 @@ export function TicketShop({
   const loginHref = `${base}/inloggen?next=${encodeURIComponent(`${base}/tickets/${event.slug}${sourceQuery(landingSource)}`)}`;
   const membershipHref = `${base}/lidmaatschap`;
   const audienceHint = audienceLoginHintQuestion(event.audienceLoginHint ?? [], locale);
-  const detailsRef = useRef<HTMLFormElement>(null);
+  const detailsRef = useRef<HTMLDivElement>(null);
+  const detailsHeadingRef = useRef<HTMLHeadingElement>(null);
+  const reviewHeadingRef = useRef<HTMLHeadingElement>(null);
   // Per regel (type × prijs), niet per type: zie `TicketLine`.
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [attendees, setAttendees] = useState<Record<string, Attendee[]>>({});
   const [buyerName, setBuyerName] = useState(event.viewer?.name ?? "");
   const [buyerEmail, setBuyerEmail] = useState(event.viewer?.email ?? "");
   const [sameBuyer, setSameBuyer] = useState(true);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [checkoutStep, setCheckoutStep] = useState<"details" | "review">("details");
+  const [selectedProvider, setSelectedProvider] = useState<PaymentMethodOption["provider"] | undefined>(
+    () => paymentChoice.options[0]?.provider,
+  );
   const [showDetails, setShowDetails] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [submittingProvider, setSubmittingProvider] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const pendingFocusIdRef = useRef<string | null>(null);
+  const [errorFocusRequest, setErrorFocusRequest] = useState(0);
   // Telt op bij elke klik op "Verder": ook wanneer de gegevens al openstaan, moet
   // die klik je er terug naartoe brengen.
   const [detailsRequest, setDetailsRequest] = useState(0);
+  const [editDetailsRequest, setEditDetailsRequest] = useState(0);
+
+  function scrollIntoViewRespectingMotion(element: HTMLElement) {
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    element.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+  }
 
   useEffect(() => {
     if (detailsRequest === 0) return;
     const section = detailsRef.current;
     if (!section) return;
-    section.scrollIntoView({ behavior: "smooth", block: "start" });
-    section.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
+    scrollIntoViewRespectingMotion(section);
+    const firstInput = section.querySelector<HTMLElement>("input, select, textarea");
+    if (firstInput) {
+      firstInput.focus({ preventScroll: true });
+    } else {
+      detailsHeadingRef.current?.focus({ preventScroll: true });
+    }
   }, [detailsRequest]);
+
+  useEffect(() => {
+    if (editDetailsRequest === 0 || checkoutStep !== "details") return;
+    const section = detailsRef.current;
+    if (section) scrollIntoViewRespectingMotion(section);
+    detailsHeadingRef.current?.focus({ preventScroll: true });
+  }, [editDetailsRequest, checkoutStep]);
+
+  useEffect(() => {
+    if (checkoutStep !== "review") return;
+    const section = detailsRef.current;
+    if (section) scrollIntoViewRespectingMotion(section);
+    reviewHeadingRef.current?.focus({ preventScroll: true });
+  }, [checkoutStep]);
+
+  useEffect(() => {
+    if (errorFocusRequest === 0 || checkoutStep !== "details") return;
+    const targetId = pendingFocusIdRef.current;
+    if (!targetId) return;
+    pendingFocusIdRef.current = null;
+    const target =
+      targetId === "paymentProvider"
+        ? detailsRef.current?.querySelector<HTMLElement>('.ticket-pay-options input[type="radio"]') ?? null
+        : document.getElementById(targetId);
+    if (target) {
+      scrollIntoViewRespectingMotion(target);
+      target.focus({ preventScroll: true });
+    }
+  }, [errorFocusRequest, checkoutStep]);
 
   const activeTypes = useMemo(
     () => event.ticketTypes.filter((type) => type.active),
@@ -435,6 +602,18 @@ export function TicketShop({
     [lines, quantities],
   );
   const selectedLines = lines.filter((line) => (quantities[line.key] ?? 0) > 0);
+  const activeAttendeeEntries = useMemo(
+    () =>
+      lines.flatMap((line) => {
+        const count = quantities[line.key] ?? 0;
+        return (attendees[line.key] ?? []).slice(0, count).map((attendee, index) => ({
+          line,
+          index,
+          attendee,
+        }));
+      }),
+    [attendees, lines, quantities],
+  );
   const detailsOpen = showDetails && selectedCount > 0;
 
   const now = new Date(event.currentTime).getTime();
@@ -448,6 +627,15 @@ export function TicketShop({
     !preview &&
     salesOpen &&
     lines.some((line) => line.type.memberPriceCents == null && ticketLineWaitsForMembers(line, now));
+
+  function clearFieldError(key: string) {
+    setFieldErrors((current) => {
+      if (!(key in current)) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }
 
   function setQuantity(line: TicketLine, direction: "decrease" | "increase") {
     const current = quantities[line.key] ?? 0;
@@ -466,8 +654,10 @@ export function TicketShop({
     setQuantities((values) => ({ ...values, [line.key]: next }));
     setAttendees((values) => ({
       ...values,
-      [line.key]: attendeesForQuantity(values, line.key, next, event.viewer),
+      [line.key]: retainAttendeesForQuantity(values, line.key, next, event.viewer, quantities),
     }));
+    setCheckoutStep("details");
+    setFieldErrors({});
     setError(null);
   }
 
@@ -482,39 +672,281 @@ export function TicketShop({
 
   function openDetails() {
     setShowDetails(true);
+    setCheckoutStep("details");
     setDetailsRequest((request) => request + 1);
   }
 
-  async function submitCheckout(event_: FormEvent<HTMLFormElement>) {
+  function focusTargetIdForError(errorKey: string): string {
+    if (errorKey === "buyer-name") return "ticket-buyer-name";
+    if (errorKey === "buyer-email") return "ticket-buyer-email";
+    if (errorKey === "terms") return "ticket-terms-accepted";
+    if (errorKey === "paymentProvider") return "paymentProvider";
+    const questionMatch = errorKey.match(/^(.*)-question-([^/]+)$/);
+    if (questionMatch) {
+      const [, prefix, qId] = questionMatch;
+      const matchingQuestion = activeAttendeeEntries
+        .find((entry) => `${entry.line.key}-${entry.index}` === prefix)
+        ?.line.type.questions?.find((question) => question.id === qId);
+      if (matchingQuestion?.type === "BOOLEAN") return `${errorKey}-yes`;
+      if (matchingQuestion?.type === "MULTIPLE_CHOICE") return `${errorKey}-0`;
+    }
+    return errorKey;
+  }
+
+  function validateDetails(): { errors: Record<string, string>; firstKey: string | null } {
+    const nl = locale === "nl";
+    const errors: Record<string, string> = {};
+    let firstKey: string | null = null;
+    const addError = (key: string, message: string) => {
+      if (!(key in errors)) {
+        errors[key] = message;
+        if (!firstKey) firstKey = key;
+      }
+    };
+
+    for (const { line, index, attendee } of activeAttendeeEntries) {
+      const prefix = `${line.key}-${index}`;
+      const trimmedName = attendee.attendeeName.trim();
+      const trimmedEmail = attendee.attendeeEmail.trim();
+      if (trimmedName.length === 0) {
+        addError(
+          `${prefix}-name`,
+          nl ? "Vul de naam van de aanwezige in." : "Enter the attendee's name.",
+        );
+      } else if (trimmedName.length < 2) {
+        addError(
+          `${prefix}-name`,
+          nl ? "Vul minstens 2 tekens in." : "Enter at least 2 characters.",
+        );
+      }
+
+      if (trimmedEmail.length === 0) {
+        addError(
+          `${prefix}-email`,
+          nl ? "Vul het e-mailadres van de aanwezige in." : "Enter the attendee's email address.",
+        );
+      } else if (!isValidEmail(trimmedEmail)) {
+        addError(
+          `${prefix}-email`,
+          nl ? "Vul een geldig e-mailadres in." : "Enter a valid email address.",
+        );
+      }
+
+      for (const question of line.type.questions ?? []) {
+        const qKey = `${prefix}-question-${question.id}`;
+        const value = attendee.answers[question.id];
+        const qType = question.type ?? "TEXT";
+        if (question.required) {
+          if (qType === "BOOLEAN") {
+            if (typeof value !== "boolean") {
+              addError(qKey, nl ? "Kies ja of nee." : "Select yes or no.");
+            }
+          } else if (qType === "CHECKBOX") {
+            if (value !== true) {
+              addError(qKey, nl ? "Vink dit vakje aan." : "Check this box.");
+            }
+          } else if (qType === "MULTIPLE_CHOICE") {
+            if (!Array.isArray(value) || value.length === 0) {
+              addError(qKey, nl ? "Kies minstens één optie." : "Select at least one option.");
+            }
+          } else if (qType === "SELECT" || qType === "SINGLE_CHOICE") {
+            if (typeof value !== "string" || value.trim().length === 0) {
+              addError(qKey, nl ? "Maak een keuze." : "Make a selection.");
+            }
+          } else if (typeof value !== "string" || value.trim().length === 0) {
+            addError(qKey, nl ? "Vul dit veld in." : "Fill in this field.");
+          }
+        }
+        if (
+          qType === "EMAIL" &&
+          typeof value === "string" &&
+          value.trim().length > 0 &&
+          !isValidEmail(value.trim())
+        ) {
+          addError(qKey, nl ? "Vul een geldig e-mailadres in." : "Enter a valid email address.");
+        }
+      }
+    }
+
+    if (!sameBuyer) {
+      const trimmedBuyerName = buyerName.trim();
+      const trimmedBuyerEmail = buyerEmail.trim();
+      if (trimmedBuyerName.length === 0) {
+        addError("buyer-name", nl ? "Vul je volledige naam in." : "Enter your full name.");
+      } else if (trimmedBuyerName.length < 2) {
+        addError("buyer-name", nl ? "Vul minstens 2 tekens in." : "Enter at least 2 characters.");
+      }
+      if (trimmedBuyerEmail.length === 0) {
+        addError("buyer-email", nl ? "Vul je e-mailadres in." : "Enter your email address.");
+      } else if (!isValidEmail(trimmedBuyerEmail)) {
+        addError("buyer-email", nl ? "Vul een geldig e-mailadres in." : "Enter a valid email address.");
+      }
+    }
+
+    if (!termsAccepted) {
+      addError(
+        "terms",
+        nl
+          ? "Ga akkoord met de verkoop- en terugbetalingsvoorwaarden om verder te gaan."
+          : "Agree to the sales and refund terms to continue.",
+      );
+    }
+
+    if (totalCents > 0 && paymentChoice.options.length > 0 && !selectedProvider) {
+      addError(
+        "paymentProvider",
+        nl ? "Kies een betaalmethode." : "Choose a payment method.",
+      );
+    }
+
+    return { errors, firstKey };
+  }
+
+  function handleDetailsSubmit(event_: FormEvent<HTMLFormElement>) {
     event_.preventDefault();
+    if (selectedCount < 1) {
+      setError(locale === "nl" ? "Kies minstens één ticket." : "Choose at least one ticket.");
+      return;
+    }
+    const { errors, firstKey } = validateDetails();
+    if (firstKey) {
+      setFieldErrors(errors);
+      setError(
+        locale === "nl"
+          ? "Controleer de gemarkeerde velden."
+          : "Check the highlighted fields.",
+      );
+      pendingFocusIdRef.current = focusTargetIdForError(firstKey);
+      setErrorFocusRequest((request) => request + 1);
+      return;
+    }
+    setFieldErrors({});
+    setError(null);
+    setCheckoutStep("review");
+  }
+
+  function mapServerFieldErrors(payload: CheckoutResponse): {
+    errors: Record<string, string>;
+    firstKey: string | null;
+  } {
+    const nl = locale === "nl";
+    const mapped: Record<string, string> = {};
+    let firstKey: string | null = null;
+    const addMapped = (key: string, message: string) => {
+      if (!(key in mapped)) {
+        mapped[key] = message;
+        if (!firstKey) firstKey = key;
+      }
+    };
+
+    if (payload.error === "INVALID_REQUEST" && payload.fields) {
+      if (payload.fields.buyerName?.length) {
+        if (!sameBuyer) {
+          addMapped("buyer-name", nl ? "Vul een geldige naam in (minstens 2 tekens)." : "Enter a valid name (at least 2 characters).");
+        } else if (activeAttendeeEntries[0]) {
+          addMapped(
+            `${activeAttendeeEntries[0].line.key}-${activeAttendeeEntries[0].index}-name`,
+            nl ? "Vul een geldige naam in (minstens 2 tekens)." : "Enter a valid name (at least 2 characters).",
+          );
+        }
+      }
+      if (payload.fields.buyerEmail?.length) {
+        if (!sameBuyer) {
+          addMapped("buyer-email", nl ? "Vul een geldig e-mailadres in." : "Enter a valid email address.");
+        } else if (activeAttendeeEntries[0]) {
+          addMapped(
+            `${activeAttendeeEntries[0].line.key}-${activeAttendeeEntries[0].index}-email`,
+            nl ? "Vul een geldig e-mailadres in." : "Enter a valid email address.",
+          );
+        }
+      }
+      if (payload.fields.termsAccepted?.length) {
+        addMapped(
+          "terms",
+          nl ? "Ga akkoord met de verkoop- en terugbetalingsvoorwaarden." : "Agree to the sales and refund terms.",
+        );
+      }
+      if (payload.fields.paymentProvider?.length) {
+        addMapped(
+          "paymentProvider",
+          nl ? "Kies een geldige betaalmethode." : "Choose a valid payment method.",
+        );
+      }
+      if (payload.fields.items?.length) {
+        const localCheck = validateDetails();
+        for (const [k, v] of Object.entries(localCheck.errors)) {
+          addMapped(k, v);
+        }
+      }
+    }
+
+    if (payload.error === "INVALID_ANSWER" && payload.field) {
+      const targetCode = payload.field;
+      const candidates: Array<{ key: string; invalid: boolean }> = [];
+      for (const { line, index, attendee } of activeAttendeeEntries) {
+        for (const question of line.type.questions ?? []) {
+          if (question.code === targetCode || question.id === targetCode) {
+            const val = attendee.answers[question.id];
+            const empty =
+              val == null ||
+              val === "" ||
+              (Array.isArray(val) && val.length === 0) ||
+              (question.type === "CHECKBOX" && val !== true);
+            candidates.push({
+              key: `${line.key}-${index}-question-${question.id}`,
+              invalid: empty,
+            });
+          }
+        }
+      }
+      const chosen = candidates.find((candidate) => candidate.invalid) ?? candidates[0];
+      if (chosen) {
+        addMapped(
+          chosen.key,
+          nl ? "Controleer dit antwoord." : "Check this answer.",
+        );
+      }
+    }
+
+    return { errors: mapped, firstKey };
+  }
+
+  async function submitCheckout() {
     if (preview) return;
     if (selectedCount < 1 || submitting) {
       setError(locale === "nl" ? "Kies minstens één ticket." : "Choose at least one ticket.");
       return;
     }
+    const { errors: localErrors, firstKey: localFirstKey } = validateDetails();
+    if (localFirstKey) {
+      setFieldErrors(localErrors);
+      setCheckoutStep("details");
+      setError(
+        locale === "nl"
+          ? "Controleer de gemarkeerde velden."
+          : "Check the highlighted fields.",
+      );
+      pendingFocusIdRef.current = focusTargetIdForError(localFirstKey);
+      setErrorFocusRequest((request) => request + 1);
+      return;
+    }
 
-    const submitter = (event_.nativeEvent as SubmitEvent).submitter;
-    const provider = submitter instanceof HTMLButtonElement && submitter.value
-      ? submitter.value
-      : paymentChoice.options[0]?.provider;
+    const provider = totalCents > 0 ? (selectedProvider ?? paymentChoice.options[0]?.provider) : undefined;
     setSubmitting(true);
-    setSubmittingProvider(provider ?? null);
     setError(null);
     // Hoeveel mensen die een evenement openen ook effectief beginnen af te
     // rekenen. Zonder bestelnummer: dat hoort bij een persoon, en de
     // bestelpagina's worden juist daarom niet gemeten.
     trackCheckoutStart({ slug: event.slug, title: event.title });
 
-    const items = lines.flatMap((line) =>
-      (attendees[line.key] ?? []).map((attendee) => ({
-        ticketTypeId: line.type.id,
-        memberPrice: line.memberPrice,
-        honoraryPrice: Boolean(line.honorary),
-        attendeeName: attendee.attendeeName.trim(),
-        attendeeEmail: attendee.attendeeEmail.trim(),
-        answers: attendee.answers,
-      })),
-    );
+    const items = activeAttendeeEntries.map(({ line, attendee }) => ({
+      ticketTypeId: line.type.id,
+      memberPrice: line.memberPrice,
+      honoraryPrice: Boolean(line.honorary),
+      attendeeName: attendee.attendeeName.trim(),
+      attendeeEmail: attendee.attendeeEmail.trim(),
+      answers: attendee.answers,
+    }));
 
     try {
       const response = await fetch("/api/tickets/checkout", {
@@ -526,7 +958,7 @@ export function TicketShop({
           buyerName: sameBuyer ? items[0].attendeeName : buyerName.trim(),
           buyerEmail: sameBuyer ? items[0].attendeeEmail : buyerEmail.trim(),
           locale,
-          termsAccepted: true,
+          termsAccepted,
           items,
           // Een lege string als de pagina nog niet gemount was: dat is
           // "direct", en geen oude pagina zonder meting.
@@ -536,6 +968,13 @@ export function TicketShop({
       });
       const payload = (await response.json().catch(() => ({}))) as CheckoutResponse;
       if (!response.ok) {
+        const mapped = mapServerFieldErrors(payload);
+        if (mapped.firstKey) {
+          setFieldErrors(mapped.errors);
+          setCheckoutStep("details");
+          pendingFocusIdRef.current = focusTargetIdForError(mapped.firstKey);
+          setErrorFocusRequest((request) => request + 1);
+        }
         throw new Error(payload.message ?? checkoutErrorMessage(payload.error, locale, payload.field));
       }
 
@@ -558,7 +997,6 @@ export function TicketShop({
             : "Checkout failed. Please try again.",
       );
       setSubmitting(false);
-      setSubmittingProvider(null);
     }
   }
 
@@ -684,170 +1122,517 @@ export function TicketShop({
       : locale === "nl" ? "Verkoop gesloten" : "Sales closed"
     : locale === "nl" ? "Kies eerst een ticket" : "Select tickets first";
 
-  // Het formulier omvat enkel de gegevens: daar staan de verplichte velden en de
-  // betaalknoppen. Het paneel stuurt niets in (de tellers zijn gewone knoppen),
-  // en het praktische eronder kan eigen formulieren dragen, die niet genest
-  // mogen worden.
-  return (
-    <div className="tshop">
-      <div className="tshop-main">
-        {detailsOpen ? (
-          <form
-            className="tshop-details"
-            ref={detailsRef}
-            onSubmit={submitCheckout}
-            aria-labelledby="ticket-details-heading"
-          >
-            <h2 id="ticket-details-heading" className="tshop-heading">
-              {locale === "nl" ? "Jouw gegevens" : "Your details"}
-            </h2>
-            <p className="tshop-lede">
-              {locale === "nl" ? "Elk ticket wordt op naam gezet." : "Each ticket is issued to one attendee."}
-            </p>
+  const trimmedBuyerName = buyerName.trim();
+  const trimmedBuyerEmail = buyerEmail.trim();
+  const firstActiveAttendee = activeAttendeeEntries[0]?.attendee;
+  const buyerInfoForSlot = (globalIndex: number) => {
+    if (!sameBuyer && (trimmedBuyerName || trimmedBuyerEmail)) {
+      return { name: trimmedBuyerName, email: trimmedBuyerEmail };
+    }
+    if (
+      sameBuyer &&
+      globalIndex > 0 &&
+      firstActiveAttendee &&
+      (firstActiveAttendee.attendeeName.trim() || firstActiveAttendee.attendeeEmail.trim())
+    ) {
+      return {
+        name: firstActiveAttendee.attendeeName.trim(),
+        email: firstActiveAttendee.attendeeEmail.trim(),
+      };
+    }
+    if (event.viewer && (event.viewer.name || event.viewer.email)) {
+      return { name: event.viewer.name, email: event.viewer.email };
+    }
+    return null;
+  };
 
-            <div className="ticket-attendee-list">
-              {lines.flatMap((line) =>
-                (attendees[line.key] ?? []).map((attendee, index) => (
-                  <fieldset className="ticket-attendee" key={`${line.key}-${index}`}>
-                    <legend>
-                      <Ticket size={16} aria-hidden="true" />
-                      {lineLabel(line, locale)} · {index + 1}
-                    </legend>
-                    <div className="ticket-fields-grid">
-                      <label className="ticket-field">
-                        <span>{locale === "nl" ? "Naam aanwezige" : "Attendee name"} *</span>
-                        <div className="ticket-input-icon">
-                          <UserRound size={17} aria-hidden="true" />
-                          <input
-                            value={attendee.attendeeName}
-                            autoComplete="name"
-                            required
-                            onChange={(event_) => updateAttendee(line.key, index, { attendeeName: event_.target.value })}
-                          />
-                        </div>
-                      </label>
-                      <label className="ticket-field">
-                        <span>{locale === "nl" ? "E-mail aanwezige" : "Attendee email"} *</span>
-                        <div className="ticket-input-icon">
-                          <Mail size={17} aria-hidden="true" />
-                          <input
-                            type="email"
-                            value={attendee.attendeeEmail}
-                            autoComplete="email"
-                            required
-                            onChange={(event_) => updateAttendee(line.key, index, { attendeeEmail: event_.target.value })}
-                          />
-                        </div>
-                      </label>
-                      {(line.type.questions ?? []).map((question) => (
-                        <QuestionField
-                          key={question.id}
-                          question={question}
-                          fieldPrefix={`${line.key}-${index}`}
-                          value={attendee.answers[question.id]}
-                          locale={locale}
-                          onChange={(value) =>
-                            updateAttendee(line.key, index, {
-                              answers: { ...attendee.answers, [question.id]: value },
-                            })
-                          }
-                        />
-                      ))}
-                    </div>
-                  </fieldset>
-                )),
-              )}
-            </div>
+  const resolvedBuyerName = sameBuyer
+    ? (firstActiveAttendee?.attendeeName.trim() ?? "")
+    : trimmedBuyerName;
+  const resolvedBuyerEmail = sameBuyer
+    ? (firstActiveAttendee?.attendeeEmail.trim() ?? "")
+    : trimmedBuyerEmail;
 
-            <label className="ticket-checkbox ticket-same-buyer">
-              <input type="checkbox" checked={sameBuyer} onChange={(event_) => setSameBuyer(event_.target.checked)} />
-              <span>{locale === "nl" ? "Stuur de bestelling naar de eerste aanwezige" : "Send the order to the first attendee"}</span>
-            </label>
+  const detailsForm = (
+    <div ref={detailsRef}>
+      <form
+        className="tshop-details"
+        noValidate
+        onSubmit={handleDetailsSubmit}
+        aria-labelledby="ticket-details-heading"
+      >
+        <h2
+          id="ticket-details-heading"
+          className="tshop-heading"
+          tabIndex={-1}
+          ref={detailsHeadingRef}
+        >
+          {locale === "nl" ? "Jouw gegevens" : "Your details"}
+        </h2>
+        <p className="tshop-lede">
+          {locale === "nl" ? "Elk ticket wordt op naam gezet." : "Each ticket is issued to one attendee."}
+        </p>
 
-            {!sameBuyer ? (
-              <fieldset className="ticket-attendee">
-                <legend>{locale === "nl" ? "Gegevens koper" : "Buyer details"}</legend>
+        <div className="ticket-attendee-list">
+          {activeAttendeeEntries.map(({ line, index, attendee }, globalIndex) => {
+            const fieldPrefix = `${line.key}-${index}`;
+            const nameId = `${fieldPrefix}-name`;
+            const nameErrorId = `${nameId}-error`;
+            const nameError = fieldErrors[nameId];
+            const emailId = `${fieldPrefix}-email`;
+            const emailErrorId = `${emailId}-error`;
+            const emailError = fieldErrors[emailId];
+            const isBlankAttendee =
+              attendee.attendeeName.trim() === "" && attendee.attendeeEmail.trim() === "";
+            const copySource = isBlankAttendee ? buyerInfoForSlot(globalIndex) : null;
+
+            return (
+              <fieldset className="ticket-attendee" key={fieldPrefix}>
+                <legend>
+                  <Ticket size={16} aria-hidden="true" />
+                  {lineLabel(line, locale)} · {index + 1}
+                </legend>
+                {copySource ? (
+                  <div className="ticket-attendee-actions">
+                    <button
+                      type="button"
+                      className="ticket-copy-buyer"
+                      aria-label={
+                        locale === "nl"
+                          ? `Zelfde als koper (${lineLabel(line, locale)} ${index + 1})`
+                          : `Copy buyer details (${lineLabel(line, locale)} ${index + 1})`
+                      }
+                      onClick={() => {
+                        updateAttendee(line.key, index, {
+                          attendeeName: copySource.name,
+                          attendeeEmail: copySource.email,
+                        });
+                        clearFieldError(nameId);
+                        clearFieldError(emailId);
+                        document.getElementById(nameId)?.focus();
+                      }}
+                    >
+                      {locale === "nl" ? "Zelfde als koper" : "Copy buyer details"}
+                    </button>
+                  </div>
+                ) : null}
                 <div className="ticket-fields-grid">
-                  <label className="ticket-field">
-                    <span>{locale === "nl" ? "Volledige naam" : "Full name"} *</span>
+                  <div className="ticket-field">
+                    <label htmlFor={nameId}>
+                      {locale === "nl" ? "Naam aanwezige" : "Attendee name"} *
+                    </label>
                     <div className="ticket-input-icon">
                       <UserRound size={17} aria-hidden="true" />
-                      <input value={buyerName} autoComplete="name" required onChange={(event_) => setBuyerName(event_.target.value)} />
+                      <input
+                        id={nameId}
+                        value={attendee.attendeeName}
+                        autoComplete={sameBuyer && globalIndex === 0 ? "name" : "off"}
+                        required
+                        aria-invalid={nameError ? true : undefined}
+                        aria-describedby={nameError ? nameErrorId : undefined}
+                        onChange={(event_) => {
+                          updateAttendee(line.key, index, { attendeeName: event_.target.value });
+                          clearFieldError(nameId);
+                        }}
+                      />
                     </div>
-                  </label>
-                  <label className="ticket-field">
-                    <span>{locale === "nl" ? "E-mailadres" : "Email address"} *</span>
+                    {nameError ? (
+                      <small id={nameErrorId} className="ticket-field-error">
+                        {nameError}
+                      </small>
+                    ) : null}
+                  </div>
+                  <div className="ticket-field">
+                    <label htmlFor={emailId}>
+                      {locale === "nl" ? "E-mail aanwezige" : "Attendee email"} *
+                    </label>
                     <div className="ticket-input-icon">
                       <Mail size={17} aria-hidden="true" />
-                      <input type="email" value={buyerEmail} autoComplete="email" required onChange={(event_) => setBuyerEmail(event_.target.value)} />
+                      <input
+                        id={emailId}
+                        type="email"
+                        value={attendee.attendeeEmail}
+                        autoComplete={sameBuyer && globalIndex === 0 ? "email" : "off"}
+                        required
+                        aria-invalid={emailError ? true : undefined}
+                        aria-describedby={emailError ? emailErrorId : undefined}
+                        onChange={(event_) => {
+                          updateAttendee(line.key, index, { attendeeEmail: event_.target.value });
+                          clearFieldError(emailId);
+                        }}
+                      />
                     </div>
-                  </label>
+                    {emailError ? (
+                      <small id={emailErrorId} className="ticket-field-error">
+                        {emailError}
+                      </small>
+                    ) : null}
+                  </div>
+                  {(line.type.questions ?? []).map((question) => {
+                    const qKey = `${fieldPrefix}-question-${question.id}`;
+                    return (
+                      <QuestionField
+                        key={question.id}
+                        question={question}
+                        fieldPrefix={fieldPrefix}
+                        value={attendee.answers[question.id]}
+                        locale={locale}
+                        error={fieldErrors[qKey]}
+                        isFirstAttendee={globalIndex === 0}
+                        onChange={(value) => {
+                          updateAttendee(line.key, index, {
+                            answers: { ...attendee.answers, [question.id]: value },
+                          });
+                          clearFieldError(qKey);
+                        }}
+                      />
+                    );
+                  })}
                 </div>
               </fieldset>
-            ) : null}
+            );
+          })}
+        </div>
 
-            <label className="ticket-checkbox ticket-terms-check">
-              <input type="checkbox" required />
-              <span>
-                <strong>
-                  {locale === "nl"
-                    ? "Ik ga akkoord met de verkoop- en terugbetalingsvoorwaarden."
-                    : "I agree to the sales and refund terms."}
-                </strong>
-                {event.termsUrl ? (
-                  <small>
-                    <a href={event.termsUrl} target="_blank" rel="noreferrer">
-                      {locale === "nl" ? "Lees de voorwaarden" : "Read the terms"}
-                    </a>
+        <label className="ticket-checkbox ticket-same-buyer">
+          <input
+            type="checkbox"
+            checked={sameBuyer}
+            onChange={(event_) => {
+              const checked = event_.target.checked;
+              setSameBuyer(checked);
+              if (checked) {
+                clearFieldError("buyer-name");
+                clearFieldError("buyer-email");
+              }
+            }}
+          />
+          <span>
+            {locale === "nl"
+              ? "Stuur de bestelling naar de eerste aanwezige"
+              : "Send the order to the first attendee"}
+          </span>
+        </label>
+
+        {!sameBuyer ? (
+          <fieldset className="ticket-attendee">
+            <legend>{locale === "nl" ? "Gegevens koper" : "Buyer details"}</legend>
+            <div className="ticket-fields-grid">
+              <div className="ticket-field">
+                <label htmlFor="ticket-buyer-name">
+                  {locale === "nl" ? "Volledige naam" : "Full name"} *
+                </label>
+                <div className="ticket-input-icon">
+                  <UserRound size={17} aria-hidden="true" />
+                  <input
+                    id="ticket-buyer-name"
+                    value={buyerName}
+                    autoComplete="name"
+                    required
+                    aria-invalid={fieldErrors["buyer-name"] ? true : undefined}
+                    aria-describedby={fieldErrors["buyer-name"] ? "ticket-buyer-name-error" : undefined}
+                    onChange={(event_) => {
+                      setBuyerName(event_.target.value);
+                      clearFieldError("buyer-name");
+                    }}
+                  />
+                </div>
+                {fieldErrors["buyer-name"] ? (
+                  <small id="ticket-buyer-name-error" className="ticket-field-error">
+                    {fieldErrors["buyer-name"]}
                   </small>
                 ) : null}
-              </span>
-            </label>
-
-            {error ? <div className="ticket-error" role="alert"><AlertCircle size={17} aria-hidden="true" /> {error}</div> : null}
-
-            <div className="tshop-pay">
-              {totalCents > 0 ? (
-                <PaymentMethodChooser
-                  locale={locale}
-                  choice={paymentChoice}
-                  checkout={{
-                    busy: submitting,
-                    busyProvider: submittingProvider,
-                    disabled: preview || !salesOpen,
-                  }}
-                />
-              ) : (
-                <button className="tshop-cta" type="submit" disabled={preview || !salesOpen || submitting}>
-                  {submitting ? <LoaderCircle className="is-spinning" size={18} aria-hidden="true" /> : <Check size={18} aria-hidden="true" />}
-                  <span>{submitting
-                    ? locale === "nl" ? "Bestelling verwerken…" : "Processing order…"
-                    : locale === "nl" ? "Gratis tickets bevestigen" : "Confirm free tickets"}</span>
-                </button>
-              )}
-              {preview ? (
-                <p className="tshop-muted">
-                  {locale === "nl" ? "Voorbeeld: bestellen is uitgeschakeld." : "Preview: ordering is disabled."}
-                </p>
-              ) : null}
+              </div>
+              <div className="ticket-field">
+                <label htmlFor="ticket-buyer-email">
+                  {locale === "nl" ? "E-mailadres" : "Email address"} *
+                </label>
+                <div className="ticket-input-icon">
+                  <Mail size={17} aria-hidden="true" />
+                  <input
+                    id="ticket-buyer-email"
+                    type="email"
+                    value={buyerEmail}
+                    autoComplete="email"
+                    required
+                    aria-invalid={fieldErrors["buyer-email"] ? true : undefined}
+                    aria-describedby={fieldErrors["buyer-email"] ? "ticket-buyer-email-error" : undefined}
+                    onChange={(event_) => {
+                      setBuyerEmail(event_.target.value);
+                      clearFieldError("buyer-email");
+                    }}
+                  />
+                </div>
+                {fieldErrors["buyer-email"] ? (
+                  <small id="ticket-buyer-email-error" className="ticket-field-error">
+                    {fieldErrors["buyer-email"]}
+                  </small>
+                ) : null}
+              </div>
             </div>
-
-            <p className="ticket-privacy-note">
-              {locale === "nl"
-                ? "VTK gebruikt deze gegevens om je bestelling uit te voeren, tickets te leveren, fraude te voorkomen en de boekhouding bij te houden. "
-                : "VTK uses these details to fulfil your order, deliver tickets, prevent fraud and maintain accounting records. "}
-              <a href={`${base}/privacy`} className="font-medium text-vtk-ink underline">
-                {locale === "nl" ? "Lees de privacyverklaring." : "Read the privacy statement."}
-              </a>
-            </p>
-          </form>
+          </fieldset>
         ) : null}
 
-        {about}
-      </div>
+        <div className="ticket-terms-wrap">
+          <label className="ticket-checkbox ticket-terms-check" htmlFor="ticket-terms-accepted">
+            <input
+              id="ticket-terms-accepted"
+              type="checkbox"
+              checked={termsAccepted}
+              aria-invalid={fieldErrors.terms ? true : undefined}
+              aria-describedby={fieldErrors.terms ? "ticket-terms-accepted-error" : undefined}
+              onChange={(event_) => {
+                setTermsAccepted(event_.target.checked);
+                clearFieldError("terms");
+              }}
+            />
+            <span>
+              <strong>
+                {locale === "nl"
+                  ? "Ik ga akkoord met de verkoop- en terugbetalingsvoorwaarden."
+                  : "I agree to the sales and refund terms."}
+              </strong>
+            </span>
+          </label>
+          {event.termsUrl ? (
+            <a className="ticket-terms-link" href={event.termsUrl} target="_blank" rel="noreferrer">
+              {locale === "nl" ? "Lees de voorwaarden" : "Read the terms"}
+            </a>
+          ) : null}
+          {fieldErrors.terms ? (
+            <small id="ticket-terms-accepted-error" className="ticket-field-error">
+              {fieldErrors.terms}
+            </small>
+          ) : null}
+        </div>
 
-      <div className="tshop-side">
-        <aside className="tshop-panel" aria-labelledby="ticket-types-heading">
+        {totalCents > 0 ? (
+          <div className="tshop-pay">
+            <PaymentMethodChooser
+              locale={locale}
+              choice={paymentChoice}
+              value={selectedProvider}
+              onChange={(provider) => {
+                setSelectedProvider(provider);
+                clearFieldError("paymentProvider");
+              }}
+              disabled={submitting}
+              error={fieldErrors.paymentProvider ?? null}
+              errorId="ticket-payment-provider-error"
+            />
+          </div>
+        ) : null}
+
+        {error ? (
+          <div className="ticket-error" role="alert">
+            <AlertCircle size={17} aria-hidden="true" /> {error}
+          </div>
+        ) : null}
+
+        <button className="tshop-cta" type="submit">
+          <span>{locale === "nl" ? "Bestelling nakijken" : "Review order"}</span>
+          <ArrowRight size={17} aria-hidden="true" />
+        </button>
+
+        <p className="ticket-privacy-note">
+          {locale === "nl"
+            ? "VTK gebruikt deze gegevens om je bestelling uit te voeren, tickets te leveren, fraude te voorkomen en de boekhouding bij te houden. "
+            : "VTK uses these details to fulfil your order, deliver tickets, prevent fraud and maintain accounting records. "}
+          <a href={`${base}/privacy`} className="font-medium text-vtk-ink underline">
+            {locale === "nl" ? "Lees de privacyverklaring." : "Read the privacy statement."}
+          </a>
+        </p>
+      </form>
+    </div>
+  );
+
+  const reviewSection = (
+    <div ref={detailsRef}>
+      <section className="tshop-details tshop-review" aria-labelledby="ticket-review-heading">
+        <h2
+          id="ticket-review-heading"
+          className="tshop-heading"
+          tabIndex={-1}
+          ref={reviewHeadingRef}
+        >
+          {locale === "nl" ? "Bestelling nakijken" : "Review your order"}
+        </h2>
+        <p className="tshop-lede">
+          {locale === "nl"
+            ? "Controleer je gegevens voordat je de bestelling bevestigt."
+            : "Check your details before confirming your order."}
+        </p>
+
+        <div className="tshop-review-section">
+          <h3>{locale === "nl" ? "Event" : "Event"}</h3>
+          <div className="tshop-review-event">
+            <strong>
+              {event.title}
+              {event.label ? ` · ${event.label}` : null}
+            </strong>
+            <span>{formatTicketDate(event.startsAt, locale)}</span>
+            {event.location ? <span>{event.location}</span> : null}
+          </div>
+        </div>
+
+        <div className="tshop-review-section">
+          <h3>{locale === "nl" ? "Gekozen tickets" : "Selected tickets"}</h3>
+          <ul className="tshop-review-lines">
+            {selectedLines.map((line) => {
+              const qty = quantities[line.key] ?? 0;
+              return (
+                <li key={line.key}>
+                  <span>
+                    {qty} × {lineLabel(line, locale)}
+                    {qty > 1
+                      ? ` (${formatTicketPrice(line.priceCents, event.currency, locale)} ${locale === "nl" ? "per stuk" : "each"})`
+                      : null}
+                  </span>
+                  <span>
+                    {line.priceCents === 0
+                      ? locale === "nl" ? "Gratis" : "Free"
+                      : formatTicketPrice(qty * line.priceCents, event.currency, locale)}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="tshop-review-total">
+            <span>{locale === "nl" ? "Totaal" : "Total"}</span>
+            <strong>{formatTicketPrice(totalCents, event.currency, locale)}</strong>
+          </div>
+        </div>
+
+        <div className="tshop-review-section">
+          <h3>{locale === "nl" ? "Aanwezigen" : "Attendees"}</h3>
+          <ul className="tshop-review-attendees">
+            {activeAttendeeEntries.map(({ line, index, attendee }) => {
+              const answered = (line.type.questions ?? [])
+                .map((question) => ({
+                  question,
+                  answer: formatAnswerForReview(question, attendee.answers[question.id], locale),
+                }))
+                .filter((entry): entry is { question: TicketQuestion; answer: string } => entry.answer !== null);
+
+              return (
+                <li key={`${line.key}-${index}`}>
+                  <span className="tshop-review-attendee-type">
+                    {lineLabel(line, locale)} · {index + 1}
+                  </span>
+                  <strong>{attendee.attendeeName.trim()}</strong>
+                  <span>{attendee.attendeeEmail.trim()}</span>
+                  {answered.length > 0 ? (
+                    <dl className="tshop-review-answers">
+                      {answered.map(({ question, answer }) => (
+                        <div key={question.id}>
+                          <dt>{question.label}</dt>
+                          <dd>{answer}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        <div className="tshop-review-section">
+          <h3>{locale === "nl" ? "Koper en betaling" : "Buyer and payment"}</h3>
+          <dl className="tshop-review-meta">
+            <div>
+              <dt>{locale === "nl" ? "Koper" : "Buyer"}</dt>
+              <dd>{resolvedBuyerName}</dd>
+            </div>
+            <div>
+              <dt>{locale === "nl" ? "Bevestiging naar" : "Confirmation to"}</dt>
+              <dd>{resolvedBuyerEmail}</dd>
+            </div>
+            <div>
+              <dt>{locale === "nl" ? "Betaalmethode" : "Payment method"}</dt>
+              <dd>
+                {totalCents === 0
+                  ? locale === "nl" ? "Gratis bestelling" : "Free order"
+                  : selectedProvider
+                    ? PAYMENT_PROVIDER_LABELS[selectedProvider][locale]
+                    : (locale === "nl" ? "Niet gekozen" : "Not selected")}
+              </dd>
+            </div>
+          </dl>
+        </div>
+
+        <p className="tshop-review-notice">
+          {locale === "nl"
+            ? "Tickets worden na aankoop niet terugbetaald, behalve wanneer het event wordt geannuleerd of zoals bepaald in de verkoopvoorwaarden."
+            : "Tickets are non-refundable after purchase, unless the event is cancelled or as set out in the sales terms."}
+        </p>
+
+        {error ? (
+          <div className="ticket-error" role="alert">
+            <AlertCircle size={17} aria-hidden="true" /> {error}
+          </div>
+        ) : null}
+
+        <div className="tshop-review-actions">
+          <button
+            type="button"
+            className="ticket-secondary-button"
+            disabled={submitting}
+            onClick={() => {
+              setError(null);
+              setCheckoutStep("details");
+              setEditDetailsRequest((request) => request + 1);
+            }}
+          >
+            <ArrowLeft size={16} aria-hidden="true" />
+            {locale === "nl" ? "Gegevens aanpassen" : "Edit details"}
+          </button>
+          <button
+            type="button"
+            className="tshop-cta"
+            disabled={preview || !salesOpen || submitting}
+            onClick={() => void submitCheckout()}
+          >
+            {submitting ? (
+              <LoaderCircle className="is-spinning" size={18} aria-hidden="true" />
+            ) : (
+              <Check size={18} aria-hidden="true" />
+            )}
+            <span>
+              {submitting
+                ? locale === "nl" ? "Bestelling verwerken..." : "Processing order..."
+                : totalCents === 0
+                  ? locale === "nl" ? "Gratis tickets bevestigen" : "Confirm free tickets"
+                  : locale === "nl" ? "Bestelling bevestigen en betalen" : "Confirm order and pay"}
+            </span>
+          </button>
+        </div>
+
+        {preview ? (
+          <p className="tshop-muted">
+            {locale === "nl" ? "Voorbeeld: bestellen is uitgeschakeld." : "Preview: ordering is disabled."}
+          </p>
+        ) : null}
+
+        <p className="ticket-privacy-note">
+          {locale === "nl"
+            ? "VTK gebruikt deze gegevens om je bestelling uit te voeren, tickets te leveren, fraude te voorkomen en de boekhouding bij te houden. "
+            : "VTK uses these details to fulfil your order, deliver tickets, prevent fraud and maintain accounting records. "}
+          <a href={`${base}/privacy`} className="font-medium text-vtk-ink underline">
+            {locale === "nl" ? "Lees de privacyverklaring." : "Read the privacy statement."}
+          </a>
+        </p>
+      </section>
+    </div>
+  );
+
+  // Op een smal scherm staat het ticketpaneel bovenaan in natuurlijke
+  // DOM-volgorde, gevolgd door de gegevens/over-sectie en daarna het
+  // praktische blok. Op breed scherm zet CSS Grid `.tshop-main` links en
+  // `.tshop-panel` + `.tshop-practical` rechts.
+  return (
+    <div className="tshop">
+      <aside className="tshop-panel" aria-labelledby="ticket-types-heading">
           <div className="tshop-panel-head">
             <h2 id="ticket-types-heading">Tickets</h2>
             {lines.length > 0 && !event.honoraryOneTicket?.used ? (
@@ -1042,6 +1827,15 @@ export function TicketShop({
               ) : null}
 
               <div className="tshop-summary">
+                <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+                  {selectedCount === 0
+                    ? locale === "nl"
+                      ? "Geen tickets geselecteerd."
+                      : "No tickets selected."
+                    : locale === "nl"
+                      ? `${selectedCount} ${selectedCount === 1 ? "ticket" : "tickets"} geselecteerd, totaal ${formatTicketPrice(totalCents, event.currency, locale)}.`
+                      : `${selectedCount} ${selectedCount === 1 ? "ticket" : "tickets"} selected, total ${formatTicketPrice(totalCents, event.currency, locale)}.`}
+                </p>
                 {selectedLines.length > 0 ? (
                   <ul className="tshop-summary-lines">
                     {selectedLines.map((line) => (
@@ -1082,8 +1876,11 @@ export function TicketShop({
             </>
           )}
         </aside>
-        {practical}
-      </div>
+        <div className="tshop-main">
+          {detailsOpen ? (checkoutStep === "review" ? reviewSection : detailsForm) : null}
+          {about}
+        </div>
+        {practical ? <div className="tshop-practical">{practical}</div> : null}
     </div>
   );
 }

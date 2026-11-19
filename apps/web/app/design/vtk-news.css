@@ -467,7 +467,7 @@
 :is(.vtk-design, .vtk-page) .news-nav:focus-visible,
 :is(.vtk-design, .vtk-page) .news-pause:focus-visible {
   outline: 2px solid var(--ink);
-  outline-offset: 2px;
+  outline-offset: 1px;
 }
 
 :is(.vtk-design, .vtk-page) .news-nav.is-prev {
@@ -534,6 +534,7 @@
 /* De pin van Theokot en /tickets, in de stroom van de regel. Geel is een dag
    die nog moet komen, grijs een datum die voorbij is. */
 .news-pin {
+  position: relative;
   display: grid;
   width: 50px;
   height: 54px;
@@ -905,14 +906,22 @@
 }
 
 /* Op een telefoon: één tegel en een stukje van de volgende, zodat je ziet dat
-   er te swipen valt; de knoppen vallen weg. */
+   er te swipen valt; de knoppen blijven binnen de rand voor wie niet swipet. */
 @media (max-width: 620px) {
   .news-track {
     --news-tile-w: 84cqw;
   }
 
   :is(.vtk-design, .vtk-page) .news-nav {
-    display: none;
+    --news-tile: 84cqw;
+  }
+
+  :is(.vtk-design, .vtk-page) .news-nav.is-prev {
+    left: 6px;
+  }
+
+  :is(.vtk-design, .vtk-page) .news-nav.is-next {
+    right: 6px;
   }
 }
 

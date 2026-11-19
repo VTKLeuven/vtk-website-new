@@ -64,7 +64,13 @@ test("public purchase, admin dashboard and scanner", async ({ page }) => {
   expect(orderSummary).not.toBeNull();
   expect(orderSummary!.y).toBeGreaterThan(buyerSection!.y);
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.getByRole("button", { name: /Testbetaling/ }).click();
+  const testPaymentRadio = page.getByRole("radio", { name: /Testbetaling/ });
+  if (await testPaymentRadio.isVisible()) {
+    await testPaymentRadio.check();
+  }
+  await page.getByRole("button", { name: "Bestelling nakijken" }).click();
+  await expect(page.getByRole("heading", { name: "Bestelling nakijken" })).toBeVisible();
+  await page.getByRole("button", { name: /Bestelling bevestigen/ }).click();
   await page.waitForURL(/\/tickets\/bestelling\//);
   await expect(page.getByRole("heading", { name: "Je tickets zijn klaar" })).toBeVisible();
   await expect(page.getByAltText("QR-code van ticket")).toBeVisible();

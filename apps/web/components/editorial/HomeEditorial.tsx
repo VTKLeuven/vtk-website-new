@@ -5,6 +5,8 @@ import type { CSSProperties } from "react";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
 import { AANBOD_PHOTOS, aanbodCardBody } from "@/lib/aanbodCards";
+import { catChipStyle } from "@/lib/catContrast";
+import { fallbackLang, pickWithLang, type FallbackLang } from "@/lib/langFallback";
 import {
   getCachedHeaderTabs,
   getCachedMediaContent,
@@ -204,9 +206,11 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     .flatMap((video) => {
       const embed = videoEmbed(video.url, video.posterUrl);
       if (!embed) return [];
+      const title = pickWithLang(video.titleNl, video.titleEn, locale);
       return [{
         id: video.id,
-        title: pick(video.titleNl, video.titleEn ?? video.titleNl, locale),
+        title: title.text,
+        titleLang: title.lang,
         embedUrl: embed.embedUrl,
         externalUrl: embed.externalUrl,
         posterUrl: embed.posterUrl,
@@ -430,21 +434,29 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           },
         ]
       : [];
-  const pocGroups: PocBandGroup[] = pocsWithPeople.map((poc) => ({
-    id: poc.id,
-    name: pick(poc.nameNl, poc.nameEn ?? poc.nameNl, locale),
-    email: poc.email,
-    people: poc.representatives.map((rep) => ({
-      id: rep.id,
-      name: rep.user.name,
-      avatarUrl: publicUrl(rep.user.avatarKey),
-      role: pick(rep.roleNl ?? "", rep.roleEn ?? rep.roleNl ?? "", locale) || null,
-    })),
-    polls: myPolls
-      .filter((poll) => poll.pocId === poc.id)
-      .map((poll) => pollPanelData(poll, locale, now)),
-    summaries: summariesFor(poc.id),
-  }));
+  const pocGroups: PocBandGroup[] = pocsWithPeople.map((poc) => {
+    const pocName = pickWithLang(poc.nameNl, poc.nameEn, locale);
+    return {
+      id: poc.id,
+      name: pocName.text,
+      nameLang: pocName.lang,
+      email: poc.email,
+      people: poc.representatives.map((rep) => {
+        const repRole = pickWithLang(rep.roleNl ?? "", rep.roleEn, locale);
+        return {
+          id: rep.id,
+          name: rep.user.name,
+          avatarUrl: publicUrl(rep.user.avatarKey),
+          role: repRole.text || null,
+          roleLang: repRole.text ? repRole.lang : undefined,
+        };
+      }),
+      polls: myPolls
+        .filter((poll) => poll.pocId === poc.id)
+        .map((poll) => pollPanelData(poll, locale, now)),
+      summaries: summariesFor(poc.id),
+    };
+  });
   pocGroups.push(...generalGroup);
 
   const dict = getDictionary(locale);
@@ -463,6 +475,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   );
   const elixir = readOpeningHoursSetting(map.get("home.openingHours.elixir"), "elixir");
   const career = map.get("home.career") as CareerSetting | undefined;
+  const careerTitle = career ? pickWithLang(career.titleNl, career.titleEn, locale) : null;
+  const careerBody = career ? pickWithLang(career.bodyNl, career.bodyEn, locale) : null;
 
   // De titel is "Openingsuren Theokot"; de band toont enkel de naam zelf.
   const serviceName = (title: string) =>
@@ -553,16 +567,23 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
 
   const aanbodCards =
     aanbodTabs.length > 0
-      ? aanbodTabs.map((tab) => ({
-          labelNl: tab.labelNl,
-          labelEn: tab.labelEn,
-          titleNl: tab.labelNl,
-          titleEn: tab.labelEn,
-          ...aanbodCardBody(tab.homeBodyNl, tab.homeBodyEn),
-          href: `${base}/${tab.slug}`,
-          photo: publicUrl(tab.imageKey) ?? AANBOD_PHOTOS[tab.slug],
-        }))
-      : fallbackAanbod;
+      ? aanbodTabs.map((tab) => {
+          const hasCustomBody = Boolean(tab.homeBodyNl?.trim() || tab.homeBodyEn?.trim());
+          return {
+            labelNl: tab.labelNl,
+            labelEn: tab.labelEn,
+            titleNl: tab.labelNl,
+            titleEn: tab.labelEn,
+            ...aanbodCardBody(tab.homeBodyNl, tab.homeBodyEn),
+            bodyLang: hasCustomBody ? fallbackLang(tab.homeBodyNl, tab.homeBodyEn, locale) : undefined,
+            href: `${base}/${tab.slug}`,
+            photo: publicUrl(tab.imageKey) ?? AANBOD_PHOTOS[tab.slug],
+          };
+        })
+      : fallbackAanbod.map((card) => ({
+          ...card,
+          bodyLang: undefined as FallbackLang | undefined,
+        }));
 
   return (
     <div className="vtk-design">
@@ -626,11 +647,12 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
               const photo =
                 eventPhoto ??
                 defaultEventImageFor(defaultEventImages, eventCategorySlugs(event.categories));
-              const title = pick(event.titleNl, event.titleEn ?? event.titleNl, locale);
+              const title = pickWithLang(event.titleNl, event.titleEn, locale);
               const going = interestLabel(interested.get(event.id), locale);
               const location = shown.location?.trim() || null;
               const categories = event.categories.map((link) => link.category);
               const theme = categories.find((category) => category.audience === null) ?? null;
+              const themeName = theme ? pickWithLang(theme.nameNl, theme.nameEn, locale) : null;
               const audiences = categories.filter((category) => category.audience !== null);
               const ticketSlug = publishedTicketSlug(event.ticketEvents);
               return (
@@ -668,34 +690,52 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                         zodat het tekstblok bovenaan begint en het klikvlak van
                         de titel de hele kaart houdt. */}
                     <span className="ev-card-pin">
-                      <i>{start.toLocaleDateString(dateTag, { weekday: "short" })}</i>
-                      <b>{start.getDate()}</b>
-                      <i>{start.toLocaleDateString(dateTag, { month: "short" })}</i>
+                      <time className="sr-only" dateTime={start.toISOString()}>
+                        {start.toLocaleDateString(dateTag, {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                        })}
+                      </time>
+                      <span className="contents" aria-hidden="true">
+                        <i>{start.toLocaleDateString(dateTag, { weekday: "short" })}</i>
+                        <b>{start.getDate()}</b>
+                        <i>{start.toLocaleDateString(dateTag, { month: "short" })}</i>
+                      </span>
                     </span>
                   </div>
                   <div className="ev-card-body">
                     <div className="ev-card-tags">
-                      {theme ? (
+                      {theme && themeName ? (
                         <span
                           className="ev-card-cat"
                           style={{ "--cat": theme.colour } as CSSProperties}
+                          lang={themeName.lang}
                         >
-                          {pick(theme.nameNl, theme.nameEn, locale)}
+                          {themeName.text}
                         </span>
                       ) : null}
-                      {audiences.map((audience) => (
-                        <span
-                          key={audience.id}
-                          className="ev-card-aud"
-                          style={{ "--cat": audience.colour } as CSSProperties}
-                        >
-                          {pick(audience.nameNl, audience.nameEn, locale)}
-                        </span>
-                      ))}
+                      {audiences.map((audience) => {
+                        const audienceName = pickWithLang(audience.nameNl, audience.nameEn, locale);
+                        return (
+                          <span
+                            key={audience.id}
+                            className="ev-card-aud"
+                            style={catChipStyle(audience.colour)}
+                            lang={audienceName.lang}
+                          >
+                            {audienceName.text}
+                          </span>
+                        );
+                      })}
                     </div>
                     <h3 className="ev-card-title">
-                      <Link href={withSource(`${base}/kalender/${event.slug}`, "home-evenementen")} className="ev-card-link">
-                        {title}
+                      <Link
+                        href={withSource(`${base}/kalender/${event.slug}`, "home-evenementen")}
+                        className="ev-card-link"
+                        lang={title.lang}
+                      >
+                        {title.text}
                       </Link>
                     </h3>
                     {/* Dezelfde strip als op /kalender: de dagen die de reeks nog
@@ -723,7 +763,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                         {going ? <span className="ev-going">{going}</span> : null}
                         <EventStar
                           eventId={event.id}
-                          title={title}
+                          title={title.text}
                           interested={viewerInterestIds.has(event.id)}
                           signedIn={Boolean(session)}
                           loginHref={eventLoginHref}
@@ -737,7 +777,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                           href={`/api/calendar/event/${event.id}${locale === "en" ? "?lang=en" : ""}`}
                           className="ev-card-action"
                           title={nl ? "Zet in mijn agenda" : "Add to my calendar"}
-                          aria-label={`${nl ? "Zet in mijn agenda" : "Add to my calendar"}: ${title}`}
+                          aria-label={`${nl ? "Zet in mijn agenda" : "Add to my calendar"}: ${title.text}`}
                         >
                           <CalendarPlusIcon />
                         </a>
@@ -749,7 +789,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                             href={withSource(`${base}/tickets/${ticketSlug}`, "home-evenementen")}
                             className="ev-card-action"
                             title={nl ? "Tickets kopen" : "Buy tickets"}
-                            aria-label={`${nl ? "Tickets kopen" : "Buy tickets"}: ${title}`}
+                            aria-label={`${nl ? "Tickets kopen" : "Buy tickets"}: ${title.text}`}
                           >
                             <TicketIcon />
                           </Link>
@@ -812,8 +852,9 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         <div className="aanbod">
           {aanbodCards.slice(0, 6).map((card) => {
             const photo = card.photo;
-            const label = pick(card.labelNl, card.labelEn, locale);
-            const cardTitle = pick(card.titleNl, card.titleEn, locale);
+            const label = pickWithLang(card.labelNl, card.labelEn, locale);
+            const cardTitle = pickWithLang(card.titleNl, card.titleEn, locale);
+            const body = pickWithLang(card.bodyNl, card.bodyEn, locale);
             // Alle aanbod-kaarten zijn identiek: dezelfde fotokop in 16:9 en
             // dezelfde witte body als een eventkaart. Geen enkele kaart krijgt
             // een aparte featured-stijl.
@@ -840,12 +881,16 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                 <div className="acard-body">
                   {/* Bij een headertab is het label de titel; dan stond hier
                       hetzelfde woord twee keer onder elkaar. */}
-                  {label && label !== cardTitle ? <div className="tag">{label}</div> : null}
+                  {label.text && label.text !== cardTitle.text ? (
+                    <div className="tag" lang={label.lang}>
+                      {label.text}
+                    </div>
+                  ) : null}
                   <div className="acard-head">
-                    <h3>{cardTitle}</h3>
+                    <h3 lang={cardTitle.lang}>{cardTitle.text}</h3>
                     <span className="cta">{nl ? "Ontdek" : "Explore"}</span>
                   </div>
-                  <p>{pick(card.bodyNl, card.bodyEn, locale)}</p>
+                  <p lang={card.bodyLang ?? body.lang}>{body.text}</p>
                 </div>
               </Link>
             );
@@ -855,23 +900,23 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
 
       <section className="section band career-band">
         <div className="sec-head">
-          <h2>
+          <h2 lang={nl ? "en" : undefined}>
             Never too early to build <span className="accent">your career</span>
           </h2>
           <div className="meta">career.vtk.be · {nl ? "vacatures & events" : "vacancies & events"}</div>
         </div>
         <div className="career">
           <div>
-            <h3>
-              {career
-                ? pick(career.titleNl, career.titleEn, locale)
+            <h3 lang={careerTitle?.lang}>
+              {careerTitle
+                ? careerTitle.text
                 : nl
                   ? "Ontmoet bedrijven voordat je moet solliciteren."
                   : "Meet companies before you have to apply."}
             </h3>
-            <p>
-              {career
-                ? pick(career.bodyNl, career.bodyEn, locale)
+            <p lang={careerBody?.lang}>
+              {careerBody
+                ? careerBody.text
                 : nl
                   ? "Doorheen het jaar brengen we studenten en bedrijven samen via career events, bedrijfsrelaties en praktische kansen."
                   : "Throughout the year we bring students and companies together through career events, company relations and practical opportunities."}
@@ -933,7 +978,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
               <span className="dot" />
               {nl ? "Mede mogelijk gemaakt door" : "With support from"}
             </div>
-            <h3>{nl ? "Hoofdpartners" : "Main partners"}</h3>
+            <h2>{nl ? "Hoofdpartners" : "Main partners"}</h2>
           </div>
           {/* Bedrijven die partner willen worden komen bij VTK Career terecht,
               niet bij de algemene contactpagina. */}

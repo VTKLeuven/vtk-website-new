@@ -4,7 +4,7 @@ import { unsentGuard } from "@/components/ui/unsentGuard";
 import Image from "next/image";
 import Link from "@/components/ui/Link";
 import { usePathname } from "next/navigation";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useId, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { logoutAction } from "@/app/actions/auth";
 import { AUTHORIZATION_PREVIEW_STOP_PATH } from "@/lib/authorization-preview-constants";
 import { OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
@@ -60,10 +60,13 @@ export function ProfileMenu({
   previewActive?: boolean;
 }) {
   const pathname = usePathname() ?? "/";
+  const menuId = useId();
   const [open, setOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [menuPath, setMenuPath] = useState(pathname);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Navigeren sluit het menu: anders blijft het paneel over de nieuwe pagina
@@ -85,6 +88,66 @@ export function ProfileMenu({
     setOpen(false);
   }
 
+  function focusItem(target: "first" | "last" | number) {
+    const items = Array.from(
+      menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? [],
+    );
+    if (items.length === 0) return;
+    const index =
+      target === "first"
+        ? 0
+        : target === "last"
+          ? items.length - 1
+          : (target + items.length) % items.length;
+    items[index]?.focus();
+  }
+
+  function handleTriggerKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      cancelClose();
+      setOpen(true);
+      requestAnimationFrame(() => focusItem("first"));
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      cancelClose();
+      setOpen(true);
+      requestAnimationFrame(() => focusItem("last"));
+    }
+  }
+
+  function handleMenuKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    const items = Array.from(
+      menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? [],
+    );
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      closeMenu();
+      triggerRef.current?.focus();
+      return;
+    }
+    if (event.key === "Tab") {
+      closeMenu();
+      return;
+    }
+    if (items.length === 0) return;
+    const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      focusItem(currentIndex < 0 ? 0 : currentIndex + 1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      focusItem(currentIndex < 0 ? items.length - 1 : currentIndex - 1);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      focusItem("first");
+    } else if (event.key === "End") {
+      event.preventDefault();
+      focusItem("last");
+    }
+  }
+
   function hoverOpen() {
     cancelClose();
     setOpen(true);
@@ -102,7 +165,12 @@ export function ProfileMenu({
       if (!ref.current?.contains(e.target as Node)) setOpen(false);
     }
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key !== "Escape") return;
+      const hadFocusInside = ref.current?.contains(document.activeElement);
+      setOpen(false);
+      if (hadFocusInside) {
+        triggerRef.current?.focus();
+      }
     }
     document.addEventListener("pointerdown", onDocPointer);
     document.addEventListener("keydown", onKeyDown);
@@ -140,15 +208,34 @@ export function ProfileMenu({
       className={editorial ? "profile-shell" : "relative"}
       data-open={openAttr}
       ref={ref}
-      onMouseEnter={hoverOpen}
-      onMouseLeave={hoverClose}
+      onPointerEnter={(event) => {
+        if (event.pointerType === "mouse") hoverOpen();
+      }}
+      onPointerLeave={(event) => {
+        if (event.pointerType === "mouse") hoverClose();
+      }}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) closeMenu();
+      }}
     >
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={(event) => {
+          const fromKeyboard = event.detail === 0;
+          setOpen((v) => {
+            const next = !v;
+            if (next && fromKeyboard) {
+              requestAnimationFrame(() => focusItem("first"));
+            }
+            return next;
+          });
+        }}
+        onKeyDown={handleTriggerKeyDown}
         className={triggerClass}
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-controls={menuId}
         aria-label={editorial ? name : undefined}
         title={editorial ? name : undefined}
       >
@@ -173,12 +260,21 @@ export function ProfileMenu({
         )}
       </button>
       {(editorial || open) && (
-        <div role="menu" className={menuClass} data-open={openAttr}>
-          <Link href={`${base}/account`} className={itemClass} role="menuitem" onClick={closeMenu}>
+        <div
+          id={menuId}
+          ref={menuRef}
+          role="menu"
+          tabIndex={-1}
+          aria-label={name}
+          className={menuClass}
+          data-open={openAttr}
+          onKeyDown={handleMenuKeyDown}
+        >
+          <Link href={`${base}/account`} className={itemClass} role="menuitem" tabIndex={-1} onClick={closeMenu}>
             {labels.myAccount}
           </Link>
           {isAdmin && (
-            <Link href={`${base}/admin`} className={itemClass} role="menuitem" onClick={closeMenu}>
+            <Link href={`${base}/admin`} className={itemClass} role="menuitem" tabIndex={-1} onClick={closeMenu}>
               {labels.admin}
             </Link>
           )}
@@ -193,6 +289,7 @@ export function ProfileMenu({
               rel="noreferrer noopener"
               className={itemClass}
               role="menuitem"
+              tabIndex={-1}
               onClick={closeMenu}
               {...umamiEvent(OUTBOUND_EVENT, {
                 bestemming: outboundHost(tool.href),
@@ -203,7 +300,7 @@ export function ProfileMenu({
             </a>
           ))}
           {canReserveGrocomeet && (
-            <Link href={`${base}/grocomeet`} className={itemClass} role="menuitem" onClick={closeMenu}>
+            <Link href={`${base}/grocomeet`} className={itemClass} role="menuitem" tabIndex={-1} onClick={closeMenu}>
               {labels.grocomeet}
               {grocomeetNeedsAttention && (
                 <>
@@ -225,6 +322,7 @@ export function ProfileMenu({
             type="button"
             className={`${itemClass} text-left`}
             role="menuitem"
+            tabIndex={-1}
             onClick={() => {
               setFeedbackOpen(true);
               setOpen(false);
@@ -238,13 +336,13 @@ export function ProfileMenu({
             <form action={AUTHORIZATION_PREVIEW_STOP_PATH} method="post">
               <input type="hidden" name="locale" value={locale} />
               <input type="hidden" name="logout" value="1" />
-              <button type="submit" className={`${itemClass} text-left`} role="menuitem">
+              <button type="submit" className={`${itemClass} text-left`} role="menuitem" tabIndex={-1}>
                 {labels.logout}
               </button>
             </form>
           ) : (
             <form action={unsentGuard.form(logoutAction)}>
-              <button type="submit" className={`${itemClass} text-left`} role="menuitem">
+              <button type="submit" className={`${itemClass} text-left`} role="menuitem" tabIndex={-1}>
                 {labels.logout}
               </button>
             </form>
@@ -258,7 +356,10 @@ export function ProfileMenu({
           locale={locale}
           name={name}
           email={email}
-          onClose={() => setFeedbackOpen(false)}
+          onClose={() => {
+            setFeedbackOpen(false);
+            requestAnimationFrame(() => triggerRef.current?.focus());
+          }}
         />
       ) : null}
     </div>

@@ -50,16 +50,21 @@ export function PianoAgenda({
     <>
       <p className="vtk-basic-copy">{t.agenda.intro}</p>
       <div className="vtk-piano-days" style={{ marginTop: 16 }}>
-        {days.map((day) => (
-          <div key={day.date} className="vtk-piano-day">
-            <div className="vtk-piano-dayname">{day.label}</div>
-            <div className="vtk-piano-slots">
-              {day.slots.map((slot) => (
-                <SlotButton key={slot.startsAt} locale={locale} slot={slot} canReserve={canReserve} />
-              ))}
+        {days.map((day) => {
+          const headingId = `piano-day-${day.date}`;
+          return (
+            <div key={day.date} className="vtk-piano-day">
+              <h3 id={headingId} className="vtk-piano-dayname">
+                {day.label}
+              </h3>
+              <div className="vtk-piano-slots" role="group" aria-labelledby={headingId}>
+                {day.slots.map((slot) => (
+                  <SlotButton key={slot.startsAt} locale={locale} slot={slot} canReserve={canReserve} />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </>
   );

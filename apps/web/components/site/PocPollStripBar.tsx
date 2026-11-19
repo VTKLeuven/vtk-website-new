@@ -101,9 +101,9 @@ export function PocPollStripBar({
     <div className="vtk-poll-strip">
       <div className="vtk-poll-strip-inner">
         {previewPlace ? (
-          <a className="vtk-poll-strip-link" href="#" onClick={(event) => event.preventDefault()}>
+          <button type="button" className="vtk-poll-strip-link">
             {content}
-          </a>
+          </button>
         ) : scrolls ? (
           <a className="vtk-poll-strip-link" href={`#${POLL_ANCHOR}`} onClick={scrollToPoll}>
             {content}

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Play } from "lucide-react";
+import { DEFAULT_LOCALE, type Locale } from "@vtk/i18n";
 import { safeUrl, vimeoVideoId, youtubeThumbnailUrl, youtubeVideoId } from "@/lib/videoEmbed";
 
 function withAutoplay(embedUrl: string): string {
@@ -18,12 +19,29 @@ export function InlineVideoPlayer({
   src,
   title,
   poster,
+  locale = DEFAULT_LOCALE,
+  captionsSrc,
+  captionsLang,
+  captionsLabel,
 }: {
   src: string;
   title?: string;
   poster?: string;
+  locale?: Locale;
+  captionsSrc?: string;
+  captionsLang?: string;
+  captionsLabel?: string;
 }) {
   const [started, setStarted] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const en = locale === "en";
+
+  useEffect(() => {
+    if (started) {
+      iframeRef.current?.focus();
+    }
+  }, [started]);
+
   const media = safeUrl(src);
   if (!media) return null;
 
@@ -33,6 +51,12 @@ export function InlineVideoPlayer({
     media.parsed.pathname.endsWith(".mp4") ||
     media.parsed.pathname.endsWith(".webm") ||
     media.parsed.pathname.endsWith(".ogg");
+
+  const videoWord = "Video";
+  const downloadLabel = en ? "Download video" : "Video downloaden";
+  const watchLabel = en ? "Watch video" : "Video bekijken";
+  const playVerb = en ? "Play video" : "Video afspelen";
+  const playLabel = title ? `${playVerb}: ${title}` : playVerb;
 
   if (isDirectVideo) {
     const mimeType = media.parsed.pathname.endsWith(".webm")
@@ -48,12 +72,18 @@ export function InlineVideoPlayer({
           playsInline
           preload="metadata"
           poster={poster}
-          aria-label={title || "Video"}
+          aria-label={title || videoWord}
           className="aspect-video w-full object-contain"
         >
           <source src={media.href} type={mimeType} />
+          <track
+            kind="captions"
+            src={captionsSrc ?? "data:text/vtt;charset=utf-8,WEBVTT"}
+            srcLang={captionsLang ?? (en ? "en" : "nl")}
+            label={captionsLabel ?? (en ? "Captions" : "Ondertitels")}
+          />
           <a href={media.href} target="_blank" rel="noopener noreferrer" className="p-4 text-white underline">
-            {title || "Video downloaden"}
+            {title || downloadLabel}
           </a>
         </video>
       </div>
@@ -82,7 +112,7 @@ export function InlineVideoPlayer({
           rel="noopener noreferrer"
           className="font-medium text-vtk-blue underline"
         >
-          {title || "Video bekijken"}
+          {title || watchLabel}
         </a>
       </div>
     );
@@ -92,12 +122,14 @@ export function InlineVideoPlayer({
     <div className="not-prose my-6 mx-auto relative aspect-video w-full max-w-3xl overflow-hidden rounded-2xl border border-vtk-blue/15 bg-vtk-ink shadow-sm">
       {started ? (
         <iframe
+          ref={iframeRef}
+          tabIndex={-1}
           src={withAutoplay(embedUrl)}
-          title={title || "Video"}
+          title={title || videoWord}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
           referrerPolicy="strict-origin-when-cross-origin"
-          className="h-full w-full border-0"
+          className="h-full w-full border-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
         />
       ) : (
         <div className="group relative h-full w-full">
@@ -105,7 +137,7 @@ export function InlineVideoPlayer({
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={posterUrl}
-              alt={title || "Video thumbnail"}
+              alt=""
               className="h-full w-full object-cover opacity-90 transition-opacity duration-200 group-hover:opacity-100"
               loading="lazy"
             />
@@ -117,9 +149,9 @@ export function InlineVideoPlayer({
             <button
               type="button"
               onClick={() => setStarted(true)}
-              className="group/btn flex items-center justify-center transition-transform hover:scale-108 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-vtk-yellow"
-              aria-label={title ? `Video afspelen: ${title}` : "Video afspelen"}
-              title={title ? `Video afspelen: ${title}` : "Video afspelen"}
+              className="group/btn flex items-center justify-center transition-transform hover:scale-108 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white"
+              aria-label={playLabel}
+              title={playLabel}
             >
               {isYouTube ? (
                 <svg width="68" height="48" viewBox="0 0 68 48" className="drop-shadow-lg" aria-hidden="true">

@@ -42,6 +42,7 @@ import { getCachedUrenloopData } from "@/lib/urenloop/server";
 import { UrenloopPageBlock } from "@/components/site/UrenloopPageBlock";
 import { outlineFromMarkdown, outlineFromTiptap, type OutlineItem } from "@/lib/pageOutline";
 import { revealWords } from "@/lib/revealWords";
+import { fallbackLang, pickWithLang, type FallbackLang } from "@/lib/langFallback";
 import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import type { HeaderTab, Page, PageAsset } from "@prisma/client";
 
@@ -66,6 +67,23 @@ function contentFor(page: Page, locale: Locale): PageContent {
   }
   if (page.contentMdNl !== null) return { kind: "markdown", markdown: page.contentMdNl };
   return { kind: "tiptap", doc: page.contentJsonNl };
+}
+
+function formatWithLangPart(
+  template: string,
+  placeholder: string,
+  part: { text: string; lang: FallbackLang | undefined },
+) {
+  if (!part.lang) return template.replace(placeholder, part.text);
+  const idx = template.indexOf(placeholder);
+  if (idx === -1) return template;
+  return (
+    <>
+      {template.slice(0, idx)}
+      <span lang={part.lang}>{part.text}</span>
+      {template.slice(idx + placeholder.length)}
+    </>
+  );
 }
 
 export type PageViewPage = Page & {
@@ -102,13 +120,13 @@ export async function PageView({
   const t = dict.pages;
   const readMore = dict.home.readMore;
   const downloads = page.assets.filter((a) => a.kind === "DOWNLOAD");
-  const title = pick(page.titleNl, page.titleEn, locale);
-  const excerpt = pick(page.excerptNl ?? "", page.excerptEn ?? "", locale);
+  const title = pickWithLang(page.titleNl, page.titleEn, locale);
+  const excerpt = pickWithLang(page.excerptNl ?? "", page.excerptEn ?? "", locale);
   const tab = page.headerTab ?? null;
   // Knop naast de titel, net als op de categoriepagina. Zonder label of zonder
   // adres is er geen knop: een knop zonder bestemming is een dode klik.
-  const ctaLabel = pick(page.ctaLabelNl ?? "", page.ctaLabelEn ?? "", locale);
-  const showCta = Boolean(ctaLabel && page.ctaUrl);
+  const ctaLabel = pickWithLang(page.ctaLabelNl ?? "", page.ctaLabelEn ?? "", locale);
+  const showCta = Boolean(ctaLabel.text && page.ctaUrl);
   // Wijst de knop naar deze site, dan moet ze in dezelfde taal blijven.
   const ctaHref = page.ctaUrl ? withLocaleBase(page.ctaUrl, base) : "";
 
@@ -122,8 +140,8 @@ export async function PageView({
     page.headerTabId ? loadSiblingTiles(page.headerTabId, page.id) : [],
     page.groupId ? loadDefaultEventImages() : null,
   ]);
-  const groupName = group ? pick(group.nameNl, group.nameEn, locale) : "";
-  const tabLabel = tab ? pick(tab.labelNl, tab.labelEn, locale) : "";
+  const groupName = group ? pickWithLang(group.nameNl, group.nameEn, locale) : null;
+  const tabLabel = tab ? pickWithLang(tab.labelNl, tab.labelEn, locale) : null;
 
   // Een concept of een gearchiveerd formulier laat het paneel weg in plaats van
   // de hele pagina te weigeren: de tekst eromheen hoort er gewoon te staan. Wie
@@ -137,6 +155,13 @@ export async function PageView({
       : null;
 
   const content = contentFor(page, locale);
+  const contentFallbackLang =
+    locale === "en" &&
+    page.contentMdEn === null &&
+    !page.contentJsonEn &&
+    Boolean(page.contentMdNl || page.contentJsonNl)
+      ? ("nl-BE" as const)
+      : undefined;
   const now = new Date();
   const hasMarker = content.kind === "markdown" && hasUrenloopMarker(content.markdown);
   const urenloopData = hasMarker ? await getCachedUrenloopData().catch(() => null) : null;
@@ -187,7 +212,7 @@ export async function PageView({
   const railForm = formPanel
     ? {
         id: FORM_ANCHOR,
-        label: pick(formPanel.form.titleNl, formPanel.form.titleEn, locale),
+        label: pickWithLang(formPanel.form.titleNl, formPanel.form.titleEn, locale).text,
         meta: formRailMeta(formPanel),
         closed: formPanel.blocked,
       }
@@ -210,7 +235,7 @@ export async function PageView({
   // was er niets van te zien. De kop toont nu op elke pagina het technische
   // patroon, zonder uitzondering.
   const platePhoto = publicUrl(page.imageKey);
-  const plateCaption = pick(page.imageCaptionNl ?? "", page.imageCaptionEn ?? "", locale);
+  const plateCaption = pickWithLang(page.imageCaptionNl ?? "", page.imageCaptionEn ?? "", locale);
 
   // Staat er onder de tekst nog iets, dan mag de staartpadding van de tekstkolom
   // krimpen: de band sluit de pagina af in plaats van de lege ruimte.
@@ -226,21 +251,29 @@ export async function PageView({
     <div className="vtk-page">
       <header className="vtk-page-head">
         <div>
-          {tab ? (
+          {tab && tabLabel ? (
             <div className="vtk-page-kicker">
-              <Link href={`${base}/${tab.slug}`} className="vtk-crumb">
-                {tabLabel}
+              <Link href={`${base}/${tab.slug}`} className="vtk-crumb" lang={tabLabel.lang}>
+                {tabLabel.text}
               </Link>
               <span aria-hidden="true"> › </span>
-              <span>{title}</span>
+              <span lang={title.lang}>{title.text}</span>
             </div>
           ) : null}
-          <h1 className="vtk-page-title">{revealWords(title)}</h1>
-          {excerpt ? <p className="vtk-page-subtitle">{excerpt}</p> : null}
-          {group ? (
+          <h1 className="vtk-page-title" lang={title.lang}>
+            {revealWords(title.text)}
+          </h1>
+          {excerpt.text ? (
+            <p className="vtk-page-subtitle" lang={excerpt.lang}>
+              {excerpt.text}
+            </p>
+          ) : null}
+          {group && groupName ? (
             <div className="vtk-page-headline">
               <span>
-                <Link href={`${base}/praesidium#post-${group.slug}`}>{groupName}</Link>
+                <Link href={`${base}/praesidium#post-${group.slug}`} lang={groupName.lang}>
+                  {groupName.text}
+                </Link>
               </span>
               {events.length > 0 ? <span>{upcomingLabel}</span> : null}
             </div>
@@ -251,6 +284,7 @@ export async function PageView({
             <a
               href={ctaHref}
               className="vtk-button vtk-button-primary arrow"
+              lang={ctaLabel.lang}
               {...(isExternalUrl(ctaHref)
                 ? umamiEvent(OUTBOUND_EVENT, {
                     bestemming: outboundHost(ctaHref),
@@ -258,7 +292,7 @@ export async function PageView({
                   })
                 : umamiEvent(PAGE_CTA_EVENT, { pagina: page.slug, naar: ctaHref }))}
             >
-              {ctaLabel}
+              {ctaLabel.text}
             </a>
           </div>
         ) : null}
@@ -269,7 +303,8 @@ export async function PageView({
           <div className="vtk-page-plate-frame">
             <Image
               src={platePhoto}
-              alt={plateCaption}
+              alt={plateCaption.text}
+              lang={plateCaption.text ? plateCaption.lang : undefined}
               fill
               sizes="(min-width: 1240px) 1168px, 100vw"
               style={{
@@ -278,7 +313,9 @@ export async function PageView({
               priority
             />
           </div>
-          {plateCaption ? <figcaption>{plateCaption}</figcaption> : null}
+          {plateCaption.text ? (
+            <figcaption lang={plateCaption.lang}>{plateCaption.text}</figcaption>
+          ) : null}
         </figure>
       ) : null}
 
@@ -291,7 +328,7 @@ export async function PageView({
             niet op elke `.prose-vtk`: in het voorbeeldvenster van de editor zit
             de tekst in een eigen scrollcontainer, waar een `view()`-tijdlijn een
             kopje halverwege zijn animatie kan laten staan. */}
-        <div className="vtk-page-content vtk-motion">
+        <div className="vtk-page-content vtk-motion" lang={contentFallbackLang}>
           {content.kind === "markdown" ? (
             <>
               <MarkdownSegment
@@ -317,21 +354,35 @@ export async function PageView({
         {showRail ? (
           <aside className={hasWerkingRail ? "vtk-page-side" : "vtk-page-rail"}>
             {showOutline || railForm ? (
-              <PageOutline
-                items={headings}
-                label={onThisPageLabel}
-                form={railForm}
-                formIndex={formIndex}
-              />
+              contentFallbackLang ? (
+                <div
+                  lang={contentFallbackLang}
+                  style={hasWerkingRail ? { order: -1, paddingTop: 0, borderTop: 0 } : undefined}
+                >
+                  <PageOutline
+                    items={headings}
+                    label={onThisPageLabel}
+                    form={railForm}
+                    formIndex={formIndex}
+                  />
+                </div>
+              ) : (
+                <PageOutline
+                  items={headings}
+                  label={onThisPageLabel}
+                  form={railForm}
+                  formIndex={formIndex}
+                />
+              )
             ) : null}
 
-            {group ? (
+            {group && groupName ? (
               <section className="vtk-page-side-box">
                 <h2>{t.werking}</h2>
                 <ul>
                   <li>
                     <Link href={`${base}/praesidium#post-${group.slug}`}>
-                      {t.werkingMembers.replace("{group}", groupName)}
+                      {formatWithLangPart(t.werkingMembers, "{group}", groupName)}
                     </Link>
                   </li>
                   <li>
@@ -369,6 +420,7 @@ export async function PageView({
                   {downloads.map((a) => {
                     const href = publicUrl(a.storageKey);
                     if (!href) return null;
+                    const label = pickWithLang(a.labelNl, a.labelEn, locale);
                     return (
                       <li key={a.id}>
                         <a
@@ -376,10 +428,10 @@ export async function PageView({
                           download
                           {...umamiEvent(DOWNLOAD_EVENT, {
                             pagina: page.slug,
-                            bestand: pick(a.labelNl, a.labelEn, locale),
+                            bestand: label.text,
                           })}
                         >
-                          {pick(a.labelNl, a.labelEn, locale)}
+                          <span lang={label.lang}>{label.text}</span>
                           {a.sizeBytes ? (
                             <span className="vtk-rail-meta">
                               {" "}
@@ -418,11 +470,11 @@ export async function PageView({
       {/* Banden onder de tekst, in het ritme van de homepage: eerst wat de
           werking binnenkort doet, dan wie ze is, dan waar je verder kan kijken.
           Elke band verschijnt enkel wanneer ze iets te tonen heeft. */}
-      {events.length > 0 && group ? (
+      {events.length > 0 && group && groupName ? (
         <section className="vtk-page-band vtk-page-band-dark">
           <div className="vtk-page-band-inner">
             <div className="vtk-page-band-head">
-              <h2>{t.upcomingTitle.replace("{group}", groupName)}</h2>
+              <h2>{formatWithLangPart(t.upcomingTitle, "{group}", groupName)}</h2>
               <Link href={`${base}/kalender`}>{t.upcomingAll} →</Link>
             </div>
             <ul className="vtk-page-evgrid">
@@ -442,11 +494,11 @@ export async function PageView({
         </section>
       ) : null}
 
-      {group && group.members.length > 0 ? (
+      {group && groupName && group.members.length > 0 ? (
         <section className="vtk-page-band vtk-page-band-tint">
           <div className="vtk-page-band-inner">
             <div className="vtk-page-band-head">
-              <h2>{t.teamTitle.replace("{group}", groupName)}</h2>
+              <h2>{formatWithLangPart(t.teamTitle, "{group}", groupName)}</h2>
               <span className="vtk-page-side-stamp">
                 {t.teamYear.replace("{year}", formatWorkingYear(currentWorkingYear()))}
               </span>
@@ -457,7 +509,7 @@ export async function PageView({
             >
               {group.members.map((member) => {
                 const src = publicUrl(member.avatarKey);
-                const memberTitle = pick(member.titleNl ?? "", member.titleEn ?? "", locale);
+                const memberTitle = pickWithLang(member.titleNl ?? "", member.titleEn ?? "", locale);
                 return (
                   <li key={member.id} className="vtk-roster-cell">
                     <div className={"vtk-roster-photo" + (src ? "" : " is-blank")}>
@@ -470,7 +522,11 @@ export async function PageView({
                       )}
                     </div>
                     <div className="vtk-roster-name">{member.name}</div>
-                    {memberTitle ? <div className="vtk-roster-title">{memberTitle}</div> : null}
+                    {memberTitle.text ? (
+                      <div className="vtk-roster-title" lang={memberTitle.lang}>
+                        {memberTitle.text}
+                      </div>
+                    ) : null}
                   </li>
                 );
               })}
@@ -479,23 +535,31 @@ export async function PageView({
         </section>
       ) : null}
 
-      {siblings.length > 0 && tab ? (
+      {siblings.length > 0 && tab && tabLabel ? (
         <section className="vtk-page-band vtk-page-band-plain">
           <div className="vtk-page-band-inner">
             <div className="vtk-page-band-head">
-              <h2>{t.moreIn.replace("{category}", tabLabel)}</h2>
+              <h2>{formatWithLangPart(t.moreIn, "{category}", tabLabel)}</h2>
               <Link href={`${base}/${tab.slug}`}>
-                {t.allIn.replace("{category}", tabLabel)} →
+                {formatWithLangPart(t.allIn, "{category}", tabLabel)} →
               </Link>
             </div>
             <ul className="vtk-tile-grid">
               {siblings.map((sibling) => {
                 const photo = publicUrl(sibling.imageKey);
-                const siblingExcerpt = pick(
+                const siblingTitle = pick(sibling.labelNl, sibling.labelEn, locale);
+                const siblingTitleLang =
+                  locale === "en"
+                    ? sibling.labelFallbackLang
+                    : fallbackLang(sibling.labelNl, sibling.labelEn, locale);
+                const siblingExcerpt = pickWithLang(
                   sibling.excerptNl ?? "",
                   sibling.excerptEn ?? "",
                   locale,
                 );
+                const siblingExcerptLang =
+                  siblingExcerpt.lang ??
+                  (locale === "en" ? sibling.excerptFallbackLang : undefined);
                 const card = (
                   <article className="vtk-tile">
                     {/* Decoratief: de titel ernaast zegt al waar de kaart heen
@@ -520,8 +584,12 @@ export async function PageView({
                       )}
                     </span>
                     <div className="vtk-tile-body">
-                      <h2>{pick(sibling.labelNl, sibling.labelEn, locale)}</h2>
-                      {siblingExcerpt ? <p className="line-clamp-3">{siblingExcerpt}</p> : null}
+                      <h2 lang={siblingTitleLang}>{siblingTitle}</h2>
+                      {siblingExcerpt.text ? (
+                        <p className="line-clamp-3" lang={siblingExcerptLang}>
+                          {siblingExcerpt.text}
+                        </p>
+                      ) : null}
                       <span className="vtk-tile-cta">{readMore} →</span>
                     </div>
                   </article>
@@ -588,6 +656,8 @@ function EventCard({
     ? allDayLabel
     : event.start.toLocaleTimeString(tag, { hour: "2-digit", minute: "2-digit" });
 
+  const eventTitle = pickWithLang(event.titleNl, event.titleEn, locale);
+
   return (
     <Link href={`${base}/kalender/${event.slug}`} className="vtk-page-ev">
       {photo ? (
@@ -609,7 +679,7 @@ function EventCard({
         <span className="vtk-page-ev-when">
           {when} · {time}
         </span>
-        <h3>{pick(event.titleNl, event.titleEn, locale)}</h3>
+        <h3 lang={eventTitle.lang}>{eventTitle.text}</h3>
         {event.location ? <p>{event.location}</p> : null}
       </div>
     </Link>

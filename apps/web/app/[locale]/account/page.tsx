@@ -295,9 +295,9 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
 
             {meetingReservations.length > 0 && (
               <Card id="meetings" className="scroll-mt-28 p-6">
-                <h3 className="mb-4 text-lg font-semibold text-vtk-ink">
+                <h2 className="mb-4 text-lg font-semibold text-vtk-ink">
                   {nl ? 'Vergaderingen' : 'Meetings'}
-                </h3>
+                </h2>
                 <ul className="space-y-3 text-sm">
                   {meetingReservations.map((reservation) => {
                     const invalid = reservation.status === 'INVALIDATED';
@@ -367,9 +367,9 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
             )}
 
             <Card id="theokot" className="scroll-mt-28 p-6">
-              <h3 className="mb-4 text-lg font-semibold text-vtk-ink">
+              <h2 className="mb-4 text-lg font-semibold text-vtk-ink">
                 {nl ? 'Gereserveerde broodjes' : 'Reserved sandwiches'}
-              </h3>
+              </h2>
               {reservations.length === 0 ? (
                 <p className="text-sm text-[#5c667f]">
                   {nl ? (
@@ -454,9 +454,9 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
               <Card id="urenloop" className="scroll-mt-28 p-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-lg font-semibold text-vtk-ink">
+                    <h2 className="text-lg font-semibold text-vtk-ink">
                       {nl ? `24 urenloop ${latestUrenloop.year}` : `24-hour run ${latestUrenloop.year}`}
-                    </h3>
+                    </h2>
                     <p className="mt-1 text-sm text-[#5c667f]">
                       {nl
                         ? 'Je rondes, gekoppeld via je r-nummer.'
@@ -551,7 +551,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
             ) : null}
 
             <Card id="apps" className="scroll-mt-28 p-6">
-              <h3 className="mb-2 text-lg font-semibold text-vtk-ink">{nl ? 'Verbonden apps' : 'Connected apps'}</h3>
+              <h2 className="mb-2 text-lg font-semibold text-vtk-ink">{nl ? 'Verbonden apps' : 'Connected apps'}</h2>
               <p className="mb-4 text-sm text-[#5c667f]">
                 {nl
                   ? 'Bekijk welke applicaties toegang hebben tot je VTK-account, en verbreek de verbinding wanneer je wil.'
@@ -575,9 +575,9 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
             </p>
 
             <Card id="preferences" className="scroll-mt-28 p-6">
-              <h3 className="mb-4 text-lg font-semibold text-vtk-ink">
+              <h2 className="mb-4 text-lg font-semibold text-vtk-ink">
                 {nl ? 'Accountvoorkeuren' : 'Account preferences'}
-              </h3>
+              </h2>
               <SaveForm
                 action={updateProfileAction}
                 className="space-y-4"
@@ -587,8 +587,8 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
                 fallbackErrorMessage={dict.common.saveError}
               >
                 <div>
-                  <Label>{dict.auth.email}</Label>
-                  <Input defaultValue={session.user.email} disabled />
+                  <Label htmlFor="account-pref-email">{dict.auth.email}</Label>
+                  <Input id="account-pref-email" defaultValue={session.user.email} disabled />
                 </div>
                 <div>
                   <Label htmlFor="locale">{dict.header.language}</Label>
@@ -615,14 +615,14 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
             </div>
 
             <Card id="profile" className="scroll-mt-28 p-6">
-              <h3 className="mb-4 text-lg font-semibold text-vtk-ink">{nl ? 'Profiel' : 'Profile'}</h3>
+              <h2 className="mb-4 text-lg font-semibold text-vtk-ink">{nl ? 'Profiel' : 'Profile'}</h2>
               <ProfileForm locale={locale} user={profile} submitLabel={nl ? 'Gegevens opslaan' : 'Save details'} />
             </Card>
 
             <Card id="privacy" className="scroll-mt-28 p-6">
-              <h3 className="text-lg font-semibold text-vtk-ink">
+              <h2 className="text-lg font-semibold text-vtk-ink">
                 {nl ? 'Jouw privacyrechten' : 'Your privacy rights'}
-              </h3>
+              </h2>
               <p className="mt-2 text-sm leading-6 text-[#5c667f]">
                 {nl
                   ? 'Download een machineleesbare kopie van je profiel, lidmaatschappen, reservaties, ticketbestellingen en toegangslogs. Geheime tokens worden niet opgenomen en gestructureerde gegevens van andere deelnemers worden afgeschermd.'
@@ -638,16 +638,25 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
               </a>
 
               <div className="mt-8 border-t border-vtk-blue/12 pt-6">
-                <h4 className="font-semibold text-red-800">{nl ? 'Account verwijderen' : 'Delete account'}</h4>
-                <p className="mt-2 text-sm leading-6 text-[#5c667f]">
+                <h3 className="font-semibold text-red-800">{nl ? 'Account verwijderen' : 'Delete account'}</h3>
+                <p id="delete-account-warning" className="mt-2 text-sm leading-6 text-[#5c667f]">
                   {nl
                     ? 'Dit wist je login, profiel, lidmaatschappen en huidige rechten. Transacties die VTK wettelijk of voor de integriteit van de administratie moet bewaren, worden geanonimiseerd. Typ DELETE om te bevestigen.'
                     : 'This removes your login, profile, memberships and current permissions. Transactions VTK must keep for legal or administrative integrity reasons are anonymised. Type DELETE to confirm.'}
                 </p>
                 <ActionForm action={deleteMyAccountAction} className="mt-4 flex flex-wrap items-end gap-3">
                   <div>
-                    <Label htmlFor="delete-confirmation">DELETE</Label>
-                    <Input id="delete-confirmation" name="confirmation" autoComplete="off" pattern="DELETE" required />
+                    <Label htmlFor="delete-confirmation">
+                      {nl ? 'Typ DELETE ter bevestiging' : 'Type DELETE to confirm'}
+                    </Label>
+                    <Input
+                      id="delete-confirmation"
+                      name="confirmation"
+                      autoComplete="off"
+                      pattern="DELETE"
+                      aria-describedby="delete-account-warning"
+                      required
+                    />
                   </div>
                   <Button type="submit" variant="ghost">
                     {nl ? 'Mijn account verwijderen' : 'Delete my account'}

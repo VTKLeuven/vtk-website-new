@@ -228,21 +228,27 @@ export function BancontactPayment({
         </section>
       )}
 
-      <div className="ticket-bancontact-waiting" role="status" aria-live="polite">
+      <div
+        className={expired && !done ? "sr-only" : "ticket-bancontact-waiting"}
+        role="status"
+        aria-live="polite"
+      >
         {done ? (
           <>
             <CheckCircle2 size={18} aria-hidden="true" />
             {locale === "nl" ? "Betaling ontvangen" : "Payment received"}
           </>
+        ) : expired ? (
+          locale === "nl"
+            ? "Deze QR-code is vervallen. Vraag een nieuwe code aan om verder te betalen."
+            : "This QR code has expired. Request a new code to continue paying."
         ) : (
-          expired ? null : (
-            <>
-              <CircleDashed className="is-spinning" size={18} aria-hidden="true" />
-              {locale === "nl"
-                ? "We wachten op je betaling. Deze pagina springt vanzelf verder."
-                : "Waiting for your payment. This page continues on its own."}
-            </>
-          )
+          <>
+            <CircleDashed className="is-spinning" size={18} aria-hidden="true" />
+            {locale === "nl"
+              ? "We wachten op je betaling. Deze pagina springt vanzelf verder."
+              : "Waiting for your payment. This page continues on its own."}
+          </>
         )}
       </div>
 

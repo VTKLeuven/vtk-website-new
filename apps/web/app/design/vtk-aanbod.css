@@ -86,10 +86,10 @@
   font-weight: 500;
 }
 .vtk-design .live-ribbon .summary .op {
-  color: oklch(0.85 0.17 145);
+  color: var(--ok-ink);
 }
 .vtk-design .live-ribbon .summary .cl {
-  color: oklch(0.75 0.12 30);
+  color: var(--danger-ink);
 }
 
 .vtk-design .services {
@@ -152,7 +152,7 @@
   text-transform: uppercase;
 }
 .vtk-design .svc-status .state.open {
-  color: oklch(0.55 0.18 145);
+  color: var(--ok-ink);
 }
 .vtk-design .svc-status .state.open::before {
   content: "●";
@@ -160,7 +160,7 @@
   animation: vtk-pulse 2s ease-in-out infinite;
 }
 .vtk-design .svc-status .state.closed {
-  color: oklch(0.55 0.12 30);
+  color: var(--danger-ink);
 }
 .vtk-design .svc-status .state.closed::before {
   content: "●";
@@ -181,6 +181,7 @@
   gap: 12px;
 }
 .vtk-design .hours-viz .day-lbl {
+  position: relative;
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.06em;
@@ -190,8 +191,12 @@
   align-self: center;
 }
 .vtk-design .hours-viz .day-lbl.today {
-  color: var(--accent-2);
+  color: var(--ink);
+  background: var(--yellow);
+  border-radius: 6px;
+  padding: 2px 6px;
   font-weight: 600;
+  width: fit-content;
 }
 .vtk-design .hours-viz .bar-track {
   height: 20px;
@@ -400,14 +405,14 @@
   font-weight: 500;
 }
 .vtk-design .menu-item.sold-out {
-  opacity: 0.5;
+  background: var(--paper-2);
 }
 .vtk-design .menu-item.sold-out::after {
   content: "UITVERKOCHT";
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.08em;
-  color: oklch(0.55 0.12 30);
+  color: var(--danger-ink);
   margin-top: 8px;
 }
 
@@ -485,7 +490,7 @@
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: oklch(0.6 0.02 260);
+  color: var(--on-dark-muted);
 }
 
 @media (max-width: 960px) {
@@ -775,5 +780,12 @@
   .vtk-design .locations,
   .vtk-design .menu-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vtk-design .svc-status .state.open::before,
+  .vtk-design .map-ph::before {
+    animation: none;
   }
 }

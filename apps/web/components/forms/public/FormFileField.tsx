@@ -21,7 +21,9 @@ export function FormFileField({
   files,
   onChange,
   disabled,
+  ariaLabelledBy,
   describedById,
+  invalid = false,
 }: {
   formId: string;
   fieldId: string;
@@ -31,7 +33,9 @@ export function FormFileField({
   files: UploadedFile[];
   onChange: (next: UploadedFile[]) => void;
   disabled?: boolean;
+  ariaLabelledBy?: string;
   describedById?: string;
+  invalid?: boolean;
 }) {
   const nl = locale === "nl";
   const inputRef = useRef<HTMLInputElement>(null);
@@ -83,7 +87,7 @@ export function FormFileField({
   const full = files.length >= maxFiles;
 
   return (
-    <div className="vtk-form-files" aria-describedby={describedById}>
+    <div className="vtk-form-files">
       <ul className="vtk-form-file-list">
         {files.map((file) => (
           <li key={file.token}>
@@ -114,12 +118,18 @@ export function FormFileField({
         </div>
       ) : null}
 
-      {error ? <p className="vtk-form-error">{error}</p> : null}
+      {error ? (
+        <p className="vtk-form-error" role="alert">
+          {error}
+        </p>
+      ) : null}
 
       <input
         ref={inputRef}
         type="file"
         className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
         accept={accept}
         disabled={disabled || full}
         onChange={(event) => {
@@ -131,6 +141,9 @@ export function FormFileField({
       <button
         type="button"
         className="vtk-form-file-button"
+        aria-labelledby={ariaLabelledBy}
+        aria-describedby={describedById}
+        data-invalid={invalid || undefined}
         disabled={disabled || full || Boolean(progress)}
         onClick={() => inputRef.current?.click()}
       >

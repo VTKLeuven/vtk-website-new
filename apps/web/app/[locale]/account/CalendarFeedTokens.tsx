@@ -132,7 +132,7 @@ export function CalendarFeedTokens({
   return (
     <div className="space-y-5">
       <div>
-        <h3 className="text-lg font-semibold text-vtk-ink">{t.title}</h3>
+        <h2 className="text-lg font-semibold text-vtk-ink">{t.title}</h2>
         <p className="mt-2 text-sm leading-6 text-[#5c667f]">{t.intro}</p>
       </div>
 

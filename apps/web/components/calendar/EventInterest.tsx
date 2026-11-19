@@ -168,7 +168,9 @@ export function EventInterest({
           ) : joined ? (
             <>
               <span className="ev-interest-default">{labels.interested}</span>
-              <span className="ev-interest-hover">{labels.removeInterest}</span>
+              <span className="ev-interest-hover" aria-hidden="true">
+                {labels.removeInterest}
+              </span>
             </>
           ) : (
             labels.interested

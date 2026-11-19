@@ -45,11 +45,14 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
   const [value, setValue] = useState("");
   const [suggestions, setSuggestions] = useState<PickupCandidate[]>([]);
   const [activeSuggestion, setActiveSuggestion] = useState(-1);
+  const inputId = useId();
+  const hintId = useId();
   const listId = useId();
   const suggestTimer = useRef<number | null>(null);
   // Elke vraag krijgt een nummer; een antwoord op een oudere vraag telt niet meer.
   const suggestRequest = useRef(0);
   const [result, setResult] = useState<PickupSearchResult | null>(null);
+  const [announcement, setAnnouncement] = useState("");
   const [pending, startTransition] = useTransition();
   const [voucherPending, startVoucherTransition] = useTransition();
   const [voucherOrderId, setVoucherOrderId] = useState<string | null>(null);
@@ -59,8 +62,15 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
   // wanneer dat nog klopt.
   const [voucherCost, setVoucherCost] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const firstCandidateRef = useRef<HTMLButtonElement>(null);
   // Voorkomt dubbel zoeken wanneer de scanner én een newline-char én een Enter stuurt.
   const busyRef = useRef(false);
+
+  const hasCandidates = Boolean(result && !result.ok && "candidates" in result);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   // De kaartlezer is een toetsenbord: wat hij tikt, moet in het scanveld landen,
   // ook als de focus net op een knop staat. Zie `shouldRedirectToScanner`.
@@ -70,14 +80,17 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
     function onKeyDown(event: KeyboardEvent) {
       const input = inputRef.current;
       if (!input || document.activeElement === input) return;
+      if (hasCandidates) return;
       const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      const dialogOpen = document.querySelector('[role="dialog"][aria-modal="true"]') !== null;
+      const dialogOpen =
+        voucherOrderId !== null ||
+        document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]') !== null;
       if (!shouldRedirectToScanner(event, active, dialogOpen)) return;
       input.focus();
     }
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, []);
+  }, [hasCandidates, voucherOrderId]);
 
   function clearSuggestions() {
     suggestRequest.current += 1;
@@ -140,6 +153,9 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
     if (busyRef.current) return;
     busyRef.current = true;
     startTransition(async () => {
+      let shouldFocusInput = true;
+      let focusFirstCandidate = false;
+      let nextAnnouncement = "";
       try {
         // Niet verstuurd: wat er gezocht werd, blijft staan; `finally` geeft vrij.
         const res = await unsentGuard.run(fetchResult);
@@ -163,9 +179,32 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
         // Enkel wissen wat er gezocht werd. Hangt een kaartcontrole even, dan
         // tikt de shifter intussen de naam al in; die mag niet verdwijnen.
         setValue((current) => (current.trim() === submitted ? "" : current));
+
+        if (eligibleOrder) {
+          shouldFocusInput = false;
+        } else if (!res.ok && "candidates" in res && res.candidates.length > 0) {
+          shouldFocusInput = false;
+          focusFirstCandidate = true;
+        }
+
+        if (res.ok) {
+          const count = res.orders.length;
+          nextAnnouncement = nl
+            ? `${res.userName}: ${count} ${count === 1 ? "bestelling" : "bestellingen"} gevonden.`
+            : `${res.userName}: ${count} ${count === 1 ? "order" : "orders"} found.`;
+        } else if ("candidates" in res) {
+          nextAnnouncement = nl
+            ? `${res.candidates.length} personen gevonden. Kies de juiste persoon.`
+            : `${res.candidates.length} people found. Choose the right person.`;
+        }
       } finally {
         busyRef.current = false;
-        requestAnimationFrame(() => inputRef.current?.focus());
+        if (nextAnnouncement) setAnnouncement(nextAnnouncement);
+        if (focusFirstCandidate) {
+          requestAnimationFrame(() => firstCandidateRef.current?.focus());
+        } else if (shouldFocusInput) {
+          requestAnimationFrame(() => inputRef.current?.focus());
+        }
       }
     });
   }
@@ -205,6 +244,7 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
   function reset() {
     clearSuggestions();
     setResult(null);
+    setAnnouncement("");
     setVoucherOrderId(null);
     setVoucherCovers(null);
     setVoucherCost(null);
@@ -241,6 +281,12 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
         });
         setVoucherOrderId(null);
         setVoucherError(null);
+        setAnnouncement(nl ? "Medewerkersbonnetjes verwerkt." : "Staff vouchers redeemed.");
+        requestAnimationFrame(() => {
+          if (!document.activeElement || document.activeElement === document.body) {
+            inputRef.current?.focus();
+          }
+        });
       } catch {
         setVoucherError(
           nl
@@ -252,36 +298,40 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
   }
 
   return (
-    <div className="space-y-5">
+    <div className="relative space-y-5">
+      <p className="sr-only" role="status" aria-live="polite">
+        {announcement}
+      </p>
       <Card className="p-5">
         <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[220px]">
-            <Label>
+            <Label htmlFor={inputId}>
               {nl
                 ? "Naam, r-nummer, studentenkaart of de code uit de app"
                 : "Name, r-number, student card or the code from the app"}
             </Label>
             <div className="relative">
               <Input
+                id={inputId}
                 ref={inputRef}
                 value={value}
                 onChange={onChange}
                 onKeyDown={onKeyDown}
                 onBlur={() => window.setTimeout(clearSuggestions, 120)}
-                autoFocus
                 autoComplete="off"
                 placeholder={nl ? "r0123456 of Jan Peeters" : "r0123456 or Jan Peeters"}
                 spellCheck={false}
                 role="combobox"
                 aria-autocomplete="list"
                 aria-expanded={suggestions.length > 0}
-                aria-controls={listId}
+                aria-controls={suggestions.length > 0 ? listId : undefined}
+                aria-describedby={hintId}
                 aria-activedescendant={
                   activeSuggestion >= 0 ? `${listId}-${activeSuggestion}` : undefined
                 }
               />
               {suggestions.length > 0 ? (
-                <ul
+                <div
                   id={listId}
                   role="listbox"
                   aria-label={nl ? "Suggesties" : "Suggestions"}
@@ -290,10 +340,11 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
                   {suggestions.map((candidate, index) => {
                     const note = candidateStatus(candidate, nl);
                     return (
-                      <li
+                      <div
                         key={candidate.userId}
                         id={`${listId}-${index}`}
                         role="option"
+                        tabIndex={-1}
                         aria-selected={index === activeSuggestion}
                         // mousedown en niet click: een click komt pas na de blur
                         // van het veld, en die sluit de lijst.
@@ -311,13 +362,13 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
                           {note ? <span className="text-xs">{note}</span> : null}
                           {candidate.rNumber ?? (nl ? "geen r-nummer" : "no r-number")}
                         </span>
-                      </li>
+                      </div>
                     );
                   })}
-                </ul>
+                </div>
               ) : null}
             </div>
-            <p className="mt-1 text-xs text-[#5c667f]">
+            <p id={hintId} className="mt-1 text-xs text-[#5c667f]">
               {nl
                 ? "Scan de kaart, of tik een r-nummer of naam: kies uit de suggesties of druk op Enter. Op naam vind je enkel wie vandaag iets besteld heeft. Scannen werkt overal op deze pagina, ook zonder eerst in dit veld te klikken."
                 : "Scan the card, or type an r-number or name: pick a suggestion or press Enter. A name only finds people who ordered today. Scanning works anywhere on this page, without clicking this field first."}
@@ -335,7 +386,7 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
       </Card>
 
       {result && !result.ok && (
-        <div className="vtk-basic-alert vtk-basic-alert-warning">
+        <div className="vtk-basic-alert vtk-basic-alert-warning" role="alert">
           <div className="vtk-basic-alert-text">{result.error}</div>
         </div>
       )}
@@ -343,9 +394,10 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
       {result && !result.ok && "candidates" in result && (
         <Card className="p-2">
           <ul aria-label={nl ? "Kies de juiste persoon" : "Choose the right person"}>
-            {result.candidates.map((candidate) => (
+            {result.candidates.map((candidate, index) => (
               <li key={candidate.userId}>
                 <button
+                  ref={index === 0 ? firstCandidateRef : undefined}
                   type="button"
                   onClick={() => choose(candidate)}
                   disabled={pending}
@@ -386,6 +438,7 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
                 // Pas na de bonnetjesvraag: eerst weten of er nog iets te
                 // betalen valt, dan pas uitdelen.
                 autoMark={autoPickup && voucherOrderId === null}
+                onAnnounce={setAnnouncement}
               />
             ))}
           </div>
@@ -416,7 +469,11 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
                 ? "Kies Nee wanneer de student ter plaatse betaalt of fysieke bonnetjes gebruikt."
                 : "Choose No when the student pays on site or uses physical vouchers."}
             </p>
-            {voucherError ? <p className="font-medium text-red-600">{voucherError}</p> : null}
+            {voucherError ? (
+              <p className="font-medium text-red-600" role="alert">
+                {voucherError}
+              </p>
+            ) : null}
           </div>
         }
         confirmLabel={nl ? "Ja" : "Yes"}
@@ -429,6 +486,11 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
           setVoucherOrderId(null);
           setVoucherCost(null);
           setVoucherError(null);
+          requestAnimationFrame(() => {
+            if (!document.activeElement || document.activeElement === document.body) {
+              inputRef.current?.focus();
+            }
+          });
         }}
       />
     </div>
@@ -439,11 +501,13 @@ function PickupOrderPanel({
   nl,
   order,
   autoMark,
+  onAnnounce,
 }: {
   nl: boolean;
   order: PickupOrder;
   /** Meteen op opgehaald zetten, zonder klik; enkel voor een gewone reservatie. */
   autoMark: boolean;
+  onAnnounce: (message: string) => void;
 }) {
   const [status, setStatus] = useState(order.status);
   const [pending, startTransition] = useTransition();
@@ -454,6 +518,9 @@ function PickupOrderPanel({
   const autoTried = useRef(false);
   // Alles na de deadline vrijgegeven: niets op deze naam om mee te geven.
   const nothingHere = order.lines.length === 0;
+  const orderSummary = order.lines
+    .map((l) => `${l.quantity}x ${nl ? l.nameNl : l.nameEn ?? l.nameNl}`)
+    .join(", ");
 
   function mark(how: "auto" | "manual" = "manual") {
     startTransition(async () => {
@@ -463,6 +530,15 @@ function PickupOrderPanel({
         setStatus("PICKED_UP");
         setMarkedHere(how);
         setError(null);
+        onAnnounce(
+          how === "auto"
+            ? nl
+              ? `Automatisch als opgehaald gemarkeerd${orderSummary ? `: ${orderSummary}` : ""}.`
+              : `Automatically marked as picked up${orderSummary ? `: ${orderSummary}` : ""}.`
+            : nl
+              ? `Gemarkeerd als opgehaald${orderSummary ? `: ${orderSummary}` : ""}.`
+              : `Marked as picked up${orderSummary ? `: ${orderSummary}` : ""}.`,
+        );
       } else setError(res.error);
     });
   }
@@ -475,6 +551,11 @@ function PickupOrderPanel({
         setStatus("RESERVED");
         setMarkedHere(null);
         setError(null);
+        onAnnounce(
+          nl
+            ? `Opgehaald markeren ongedaan gemaakt${orderSummary ? `: ${orderSummary}` : ""}.`
+            : `Pickup undone${orderSummary ? `: ${orderSummary}` : ""}.`,
+        );
       } else setError(res.error);
     });
   }
@@ -618,7 +699,11 @@ function PickupOrderPanel({
                   : "Mark as picked up"}
           </Button>
         )}
-        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+        {error && (
+          <p className="mt-2 text-sm text-red-600" role="alert">
+            {error}
+          </p>
+        )}
       </div>
     </div>
   );

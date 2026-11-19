@@ -578,7 +578,13 @@ export default async function PalPlusPage({
                             {state === "running" && <span className="pp-session-flag">{t.sessions.running}</span>}
                           </div>
                           <div className="pp-session-main">
-                            <p className="pp-course">{palPlusCourseLabel(row.course, locale)}</p>
+                            <p className="pp-course">
+                              {state === "cancelled" ? (
+                                <s>{palPlusCourseLabel(row.course, locale)}</s>
+                              ) : (
+                                palPlusCourseLabel(row.course, locale)
+                              )}
+                            </p>
                             {row.description && <p className="pp-text">{row.description}</p>}
                             <TagList tags={row.tags} />
                             <dl className="pp-facts">
@@ -949,14 +955,26 @@ function MomentsSummary({
           <dt>{label}</dt>
           <dd>
             <ul className="pp-moments-read">
-              {moments.map((moment) => (
-                <li
-                  key={moment.startsAt.toISOString()}
-                  data-past={moment.startsAt <= now ? "true" : undefined}
-                >
-                  {palPlusMomentLabel(moment, locale)}
-                </li>
-              ))}
+              {moments.map((moment) => {
+                const past = moment.startsAt <= now;
+                const text = palPlusMomentLabel(moment, locale);
+                return (
+                  <li
+                    key={moment.startsAt.toISOString()}
+                    className={past ? "relative" : undefined}
+                    data-past={past ? "true" : undefined}
+                  >
+                    {past ? (
+                      <>
+                        <s>{text}</s>
+                        <span className="sr-only">{locale === "nl" ? " (voorbij)" : " (passed)"}</span>
+                      </>
+                    ) : (
+                      text
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </dd>
         </div>

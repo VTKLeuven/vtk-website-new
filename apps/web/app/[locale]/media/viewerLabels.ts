@@ -43,5 +43,6 @@ export function albumViewerLabels(dict: Dictionary) {
     nextPhoto: dict.photos.nextPhoto,
     downloadPhoto: dict.photos.downloadPhoto,
     photoCounter: dict.photos.photoCounter,
+    photo: dict.photos.photo,
   };
 }

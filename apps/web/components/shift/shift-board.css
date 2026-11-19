@@ -78,7 +78,7 @@
   gap: 8px;
   min-height: 32px;
   padding: 6px 14px;
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--control-border);
   border-radius: 999px;
   background: var(--surface);
   color: var(--body);
@@ -93,7 +93,7 @@
 }
 
 .vtk-shift-chip:hover {
-  border-color: var(--line-2);
+  border-color: var(--ink);
 }
 
 /* Actief is een inktpil, zoals de filters op /kalender. Geel is op deze site een
@@ -519,16 +519,12 @@
   mask: url('/vtk-logo-mask.png') center / 74% auto no-repeat;
 }
 
-/* Het schijfje dat achter de voorste munt uitsteekt is donkerder en zijn stempel
-   staat flauwer: het ligt in de schaduw van de munt erboven. Twee muntjes zeggen
+/* Het schijfje dat achter de voorste munt uitsteekt is donkerder; de stempel
+   behoudt volle contrastwaarde (>= 3:1) op --accent-2. Twee muntjes zeggen
    "bonnen" zonder dat er iets te tellen valt; hoeveel het er zijn, zegt het
    cijfer ernaast. */
 .vtk-reward-coin-back {
   background: var(--accent-2);
-}
-
-.vtk-reward-coin-back::after {
-  opacity: 0.7;
 }
 
 .vtk-reward-coin-face {
@@ -609,6 +605,8 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-width: 28px;
+  min-height: 28px;
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 12px;
@@ -620,7 +618,6 @@
   margin: 0;
   width: auto;
   height: auto;
-  min-height: 0;
   flex: none;
   flex-shrink: 0;
   cursor: pointer;
@@ -662,6 +659,15 @@
 .vtk-shift-spots-popover::before {
   content: '';
   position: absolute;
+  top: -8px;
+  left: 0;
+  right: 0;
+  height: 8px;
+}
+
+.vtk-shift-spots-popover::after {
+  content: '';
+  position: absolute;
   top: -5px;
   right: 14px;
   width: 8px;
@@ -672,8 +678,8 @@
   transform: rotate(45deg);
 }
 
-.vtk-shift-spots-wrap:hover .vtk-shift-spots-popover,
-.vtk-shift-spots-wrap:focus-within:has(:focus-visible) .vtk-shift-spots-popover {
+.vtk-shift-spots-wrap:not([data-dismissed='true']):hover .vtk-shift-spots-popover,
+.vtk-shift-spots-wrap:not([data-dismissed='true']):focus-within:has(:focus-visible) .vtk-shift-spots-popover {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
@@ -856,7 +862,7 @@
 }
 
 .vtk-shift-btn-ghost {
-  border-color: var(--line-2);
+  border-color: var(--control-border);
   background: var(--surface);
   color: var(--body);
 }
@@ -880,18 +886,23 @@
 
 /* `width: fit-content` naast `justify-self`: dat laatste werkt enkel in een
    grid, en in de rail (een flexkolom) rekte de link zich uit tot de volle
-   breedte, met de gele lijn eronder mee. De lijn is zo breed als de tekst. */
+   breedte, met de onderlijn mee. De lijn is zo breed als de tekst. */
 .vtk-shift-btn-link {
   justify-self: start;
+  display: inline-flex;
+  align-items: center;
   width: fit-content;
-  padding: 0 0 1px;
+  min-height: 28px;
+  padding: 0;
   border: 0;
-  border-bottom: 2px solid var(--yellow);
   background: none;
   color: var(--ink);
   font-size: 13px;
   font-weight: 600;
-  text-decoration: none;
+  text-decoration: underline;
+  text-decoration-color: var(--coin-rim);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
   cursor: pointer;
 }
 
@@ -1056,32 +1067,44 @@
 
 /* --- Detailvenster (Option A Dialog) --- */
 
-.vtk-shift-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+dialog.vtk-shift-dialog {
+  position: relative;
+  width: min(580px, calc(calc(100 * var(--vtk-vw, 1vw)) - 32px));
+  max-width: none;
+  max-height: calc(calc(100 * var(--vtk-dvh, 1dvh)) - 32px);
+  margin: auto;
+  padding: 0;
+  border: 0;
   overflow-y: auto;
-  padding: clamp(24px, 5vh, 48px) 16px;
+  overflow-x: hidden;
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--sans);
+  box-shadow: 0 30px 70px -30px rgba(10, 15, 31, 0.75);
+}
+
+dialog.vtk-shift-dialog[open] {
+  display: block;
+}
+
+dialog.vtk-shift-dialog::backdrop {
   background: rgba(10, 15, 31, 0.55);
   backdrop-filter: blur(2px);
 }
 
-.vtk-shift-dialog {
-  position: relative;
-  width: 100%;
-  max-width: 580px;
-  margin: auto;
-  overflow: clip;
-  border-radius: 20px;
-  background: var(--surface);
-  box-shadow: 0 30px 70px -30px rgba(10, 15, 31, 0.75);
+dialog.vtk-shift-dialog,
+dialog.vtk-shift-dialog * {
+  box-sizing: border-box;
 }
 
-.vtk-shift-dialog:focus {
+dialog.vtk-shift-dialog:focus {
   outline: none;
+}
+
+dialog.vtk-shift-dialog :where(a, button, summary, [tabindex]:not([tabindex='-1'])):focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 
 .vtk-shift-dialog-top {
@@ -1139,7 +1162,7 @@
   place-items: center;
   width: 32px;
   height: 32px;
-  border: 1px solid rgba(183, 192, 220, 0.34);
+  border: 1px solid var(--on-dark-control-border, rgba(239, 242, 248, 0.48));
   border-radius: 999px;
   background: transparent;
   color: var(--paper);
@@ -1156,6 +1179,11 @@
   border-color: var(--paper);
   background: var(--paper);
   color: var(--ink);
+}
+
+dialog.vtk-shift-dialog .vtk-shift-dialog-close:focus-visible {
+  outline: 2px solid var(--paper);
+  outline-offset: 2px;
 }
 
 .vtk-shift-dialog-body {

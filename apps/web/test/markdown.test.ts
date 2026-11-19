@@ -79,12 +79,18 @@ describe("isVideoUrl", () => {
   });
 });
 
-import { createElement } from "react";
+import { createElement, type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { InlineVideoPlayer } from "@/components/ui/InlineVideoPlayer";
 import { Markdown } from "@/components/ui/Markdown";
 
-function render(markdown: string): string {
-  return renderToStaticMarkup(createElement(Markdown, null, markdown));
+function render(
+  markdown: string,
+  props: { baseHeadingLevel?: 2 | 3 | 4 | 5 | 6; locale?: "nl" | "en" } = {},
+): string {
+  return renderToStaticMarkup(
+    createElement(Markdown, props as ComponentProps<typeof Markdown>, markdown),
+  );
 }
 
 /**
@@ -154,6 +160,112 @@ describe("miniatuur van een videoposter", () => {
 
   it("laat een poster die een redacteur opgaf ongemoeid", () => {
     expect(smallVideoThumbnailUrl("https://example.com/poster.jpg")).toBe("https://example.com/poster.jpg");
+  });
+});
+
+describe("Markdown baseHeadingLevel en tabeltoegankelijkheid", () => {
+  it("behoudt ## als h2 wanneer er geen # in de markdown staat en verschuift zodra # voorkomt", () => {
+    const withoutH1 = render("## Sectie\n\n### Subsectie");
+    expect(withoutH1).toContain("<h2 ");
+    expect(withoutH1).toContain("<h3 ");
+    expect(withoutH1).not.toContain("<h1");
+
+    const withH1 = render("# Hoofdstuk\n\n## Sectie");
+    expect(withH1).not.toContain("<h1");
+    expect(withH1).toContain("<h2 ");
+    expect(withH1).toContain("<h3 ");
+  });
+
+  it("verschuift koppen op basis van baseHeadingLevel 3 en 4", () => {
+    const level3 = render("## Sectie\n\n### Sub", { baseHeadingLevel: 3 });
+    expect(level3).toContain("<h3 ");
+    expect(level3).toContain("<h4 ");
+    expect(level3).not.toContain("<h2");
+
+    const level3WithH1 = render("# Titel\n\n## Sectie", { baseHeadingLevel: 3 });
+    expect(level3WithH1).toContain("<h3 ");
+    expect(level3WithH1).toContain("<h4 ");
+
+    const level4 = render("## Sectie", { baseHeadingLevel: 4 });
+    expect(level4).toContain("<h4 ");
+    expect(level4).not.toContain("<h2");
+    expect(level4).not.toContain("<h3");
+  });
+
+  it("wikkelt tabellen in een toetsenbordfocusbare regio met gelokaliseerd label", () => {
+    const tableMd = "| Kolom A | Kolom B |\n| --- | --- |\n| 1 | 2 |";
+    const nlHtml = render(tableMd, { locale: "nl" });
+    expect(nlHtml).toContain('class="vtk-table"');
+    expect(nlHtml).toContain('tabindex="0"');
+    expect(nlHtml).toContain('role="region"');
+    expect(nlHtml).toContain('aria-label="Tabel"');
+
+    const enHtml = render(tableMd, { locale: "en" });
+    expect(enHtml).toContain('tabindex="0"');
+    expect(enHtml).toContain('role="region"');
+    expect(enHtml).toContain('aria-label="Table"');
+  });
+});
+
+describe("InlineVideoPlayer locale labels", () => {
+  it("gebruikt Nederlandse en Engelse labels voor Play video", () => {
+    const nlHtml = renderToStaticMarkup(
+      createElement(InlineVideoPlayer, {
+        src: "https://www.youtube.com/watch?v=WdGqhrVUJog",
+        title: "Aftermovie",
+        locale: "nl",
+      }),
+    );
+    expect(nlHtml).toContain('aria-label="Video afspelen: Aftermovie"');
+
+    const enHtml = renderToStaticMarkup(
+      createElement(InlineVideoPlayer, {
+        src: "https://www.youtube.com/watch?v=WdGqhrVUJog",
+        title: "Aftermovie",
+        locale: "en",
+      }),
+    );
+    expect(enHtml).toContain('aria-label="Play video: Aftermovie"');
+  });
+
+  it("gebruikt Nederlandse en Engelse ondertitel- en downloadlabels op directe video", () => {
+    const nlHtml = renderToStaticMarkup(
+      createElement(InlineVideoPlayer, {
+        src: "https://example.com/clip.mp4",
+        locale: "nl",
+      }),
+    );
+    expect(nlHtml).toContain('srcLang="nl"');
+    expect(nlHtml).toContain('label="Ondertitels"');
+    expect(nlHtml).toContain("Video downloaden");
+
+    const enHtml = renderToStaticMarkup(
+      createElement(InlineVideoPlayer, {
+        src: "https://example.com/clip.mp4",
+        locale: "en",
+      }),
+    );
+    expect(enHtml).toContain('srcLang="en"');
+    expect(enHtml).toContain('label="Captions"');
+    expect(enHtml).toContain("Download video");
+  });
+
+  it("gebruikt Nederlandse en Engelse fallback-linklabels voor overige videolinks", () => {
+    const nlHtml = renderToStaticMarkup(
+      createElement(InlineVideoPlayer, {
+        src: "https://example.com/watch-page",
+        locale: "nl",
+      }),
+    );
+    expect(nlHtml).toContain("Video bekijken");
+
+    const enHtml = renderToStaticMarkup(
+      createElement(InlineVideoPlayer, {
+        src: "https://example.com/watch-page",
+        locale: "en",
+      }),
+    );
+    expect(enHtml).toContain("Watch video");
   });
 });
 

@@ -2,7 +2,8 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { after } from "next/server";
 import { prisma } from "@vtk/db";
-import { pick, type Locale } from "@vtk/i18n";
+import { type Locale } from "@vtk/i18n";
+import { pickWithLang, type FallbackLang } from "@/lib/langFallback";
 import { publicUrl } from "@/lib/storage";
 import { eventAsOfNow, MOMENT_SELECT } from "@/lib/calendar/moments";
 import { markdownToPlainText } from "@/lib/markdown";
@@ -49,10 +50,13 @@ import { ticketPosterSelect, ticketPosterUrl, type TicketPosterSource } from "@/
 export type NewsEntry = NewsComposable & {
   ref: string;
   title: string;
+  titleLang?: FallbackLang;
   /** De regel onder de titel in het register. */
   line: string;
+  lineLang?: FallbackLang;
   /** Markdown; enkel bij een zelfgeschreven bericht. */
   body: string | null;
+  bodyLang?: FallbackLang;
   /**
    * Waar het bericht zelf naartoe gaat: een pad op deze site zonder taalprefix
    * (`/tickets/galabal-2026`) of een volledig adres.
@@ -60,6 +64,7 @@ export type NewsEntry = NewsComposable & {
   href: string;
   /** De knop in de uitgelichte kaart. */
   ctaLabel: string;
+  ctaLang?: FallbackLang;
   /** Waar die knop naartoe gaat, als dat iets anders is dan `href`. */
   ctaHref: string | null;
   imageUrl: string | null;
@@ -68,7 +73,12 @@ export type NewsEntry = NewsComposable & {
    * een Bakske is een staande bladzijde, en de kop staat bovenaan.
    */
   imagePosition?: string;
-  author: { name: string; role: string | null; imageUrl: string | null } | null;
+  author: {
+    name: string;
+    role: string | null;
+    roleLang?: FallbackLang;
+    imageUrl: string | null;
+  } | null;
   /**
    * Een korte regel onder de titel van een tegel, waar `line` te lang is: de
    * plaats van een evenement of het aantal foto's van een album. Leeg valt de
@@ -150,6 +160,7 @@ function ticketEntry(event: TicketNewsEvent, date: Date, locale: Locale, presale
   const nl = locale === "nl";
   const day = newsDay(event.startsAt, locale);
   const where = event.location ? `, ${event.location}` : "";
+  const title = pickWithLang(event.titleNl, event.titleEn, locale);
   return {
     key: `tickets:${event.id}`,
     source: "tickets",
@@ -157,7 +168,8 @@ function ticketEntry(event: TicketNewsEvent, date: Date, locale: Locale, presale
     date: date.toISOString(),
     shownDate: event.startsAt.toISOString(),
     featured: false,
-    title: pick(event.titleNl, event.titleEn, locale),
+    title: title.text,
+    titleLang: title.lang,
     line: presale
       ? nl
         ? `Voorverkoop voor ${day}${where}, jij kan al bestellen`
@@ -256,31 +268,49 @@ export async function collectNews(
     if (!postInNews(post, now)) continue;
     const praeses = post.kind === "PRAESES";
     const source: NewsSource = praeses ? "praeses" : "notice";
-    const body = pick(post.bodyNl, post.bodyEn, locale);
-    const authorRole = pick(post.authorRoleNl ?? "", post.authorRoleEn, locale) || null;
+    const title = pickWithLang(post.titleNl, post.titleEn, locale);
+    const body = pickWithLang(post.bodyNl, post.bodyEn, locale);
+    const authorRole = pickWithLang(post.authorRoleNl ?? "", post.authorRoleEn, locale);
+    const customCta = pickWithLang(post.ctaLabelNl ?? "", post.ctaLabelEn, locale);
+    const defaultCta = praeses
+      ? nl
+        ? "Lees de hele brief"
+        : "Read the whole letter"
+      : nl
+        ? "Lees verder"
+        : "Read more";
     entries.push({
       key: `${source}:${post.id}`,
       source,
       ref: post.id,
       date: post.publishedAt.toISOString(),
       featured: post.featured,
-      title: pick(post.titleNl, post.titleEn, locale),
-      line: praeses && post.authorName
-        ? nl
-          ? `Een woordje van ${post.authorName}`
-          : `A word from ${post.authorName}`
-        : markdownToPlainText(body),
-      body,
+      title: title.text,
+      titleLang: title.lang,
+      line:
+        praeses && post.authorName
+          ? nl
+            ? `Een woordje van ${post.authorName}`
+            : `A word from ${post.authorName}`
+          : markdownToPlainText(body.text),
+      lineLang: praeses && post.authorName ? undefined : body.lang,
+      body: body.text,
+      bodyLang: body.lang,
       href: `/nieuws/${post.id}`,
-      ctaLabel:
-        pick(post.ctaLabelNl ?? "", post.ctaLabelEn, locale) ||
-        (praeses ? (nl ? "Lees de hele brief" : "Read the whole letter") : nl ? "Lees verder" : "Read more"),
+      ctaLabel: customCta.text || defaultCta,
+      ctaLang: customCta.text ? customCta.lang : undefined,
       ctaHref: post.ctaUrl || null,
       // Bij een woordje is de foto het portret, niet de kop van de kaart.
       imageUrl: praeses ? null : publicUrl(post.imageKey),
-      author: praeses && post.authorName
-        ? { name: post.authorName, role: authorRole, imageUrl: publicUrl(post.imageKey) }
-        : null,
+      author:
+        praeses && post.authorName
+          ? {
+              name: post.authorName,
+              role: authorRole.text || null,
+              roleLang: authorRole.text ? authorRole.lang : undefined,
+              imageUrl: publicUrl(post.imageKey),
+            }
+          : null,
     });
   }
 
@@ -295,6 +325,8 @@ export async function collectNews(
     if (!signupInNews(event, now)) continue;
     const date = signupNewsDate(event)!;
     const day = newsDay(event.start, locale);
+    const title = pickWithLang(event.titleNl, event.titleEn, locale);
+    const customCta = pickWithLang(event.urlLabelNl ?? "", event.urlLabelEn, locale);
     const shown = eventAsOfNow(event, now);
     entries.push({
       key: `signup:${event.id}`,
@@ -303,13 +335,15 @@ export async function collectNews(
       date: date.toISOString(),
       shownDate: event.start.toISOString(),
       featured: false,
-      title: pick(event.titleNl, event.titleEn, locale),
+      title: title.text,
+      titleLang: title.lang,
       line: nl
         ? `Inschrijven kan tot ${day}${shown.location ? `, ${shown.location}` : ""}`
         : `Sign up before ${day}${shown.location ? `, ${shown.location}` : ""}`,
       body: null,
       href: withSource(`/kalender/${event.slug}`, "nieuws"),
-      ctaLabel: pick(event.urlLabelNl ?? "", event.urlLabelEn, locale) || (nl ? "Inschrijven" : "Sign up"),
+      ctaLabel: customCta.text || (nl ? "Inschrijven" : "Sign up"),
+      ctaLang: customCta.text ? customCta.lang : undefined,
       ctaHref: event.url,
       imageUrl: publicUrl(shown.imageKey),
       author: null,
@@ -326,14 +360,16 @@ export async function collectNews(
   );
   for (const item of magazines) {
     const source: NewsSource = item.kind === "bakske" ? "bakske" : "irreeel";
-    const issue = pick(item.issueNl, item.issueEn, locale);
+    const title = pickWithLang(item.titleNl, item.titleEn, locale);
+    const issue = pickWithLang(item.issueNl, item.issueEn, locale);
     entries.push({
       key: `${source}:${item.id}`,
       source,
       ref: item.id,
       date: isoDate(item.publishedAt!),
       featured: false,
-      title: `${pick(item.titleNl, item.titleEn, locale)}, ${issue}`,
+      title: `${title.text}, ${issue.text}`,
+      titleLang: title.lang ?? issue.lang,
       line: nl ? "Nieuw nummer, als pdf" : "New issue, as a pdf",
       body: null,
       href: publicationHref(item.id),

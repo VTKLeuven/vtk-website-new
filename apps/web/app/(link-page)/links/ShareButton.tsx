@@ -28,15 +28,20 @@ export function ShareButton({ title }: { title: string }) {
   }
 
   return (
-    <button
-      type="button"
-      onClick={share}
-      className="vtk-link-page-share"
-      data-umami-event="linkpagina-gedeeld"
-      aria-label={copied ? "Link gekopieerd" : "Deze pagina delen"}
-      title={copied ? "Link gekopieerd" : "Delen"}
-    >
-      {copied ? <Check aria-hidden="true" /> : <Share2 aria-hidden="true" />}
-    </button>
+    <div className="pointer-events-none absolute inset-0 z-10">
+      <button
+        type="button"
+        onClick={share}
+        className="vtk-link-page-share pointer-events-auto"
+        data-umami-event="linkpagina-gedeeld"
+        aria-label="Deze pagina delen"
+        title={copied ? "Link gekopieerd" : "Delen"}
+      >
+        {copied ? <Check aria-hidden="true" /> : <Share2 aria-hidden="true" />}
+      </button>
+      <span className="sr-only" role="status" aria-live="polite">
+        {copied ? "Link gekopieerd" : ""}
+      </span>
+    </div>
   );
 }

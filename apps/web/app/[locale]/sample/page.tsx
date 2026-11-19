@@ -3,6 +3,7 @@ import { staticMetadata } from "@/lib/pageMetadata";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import type { Locale } from "@vtk/i18n";
+import { SampleMarquee } from "./SampleMarquee";
 
 import "@/app/design/vtk-basic.css";
 import "@/app/design/vtk-home.css";
@@ -75,7 +76,7 @@ export default async function SamplePage({
         </div>
       </header>
 
-      <main className="vtk-page-shell flex flex-col gap-16">
+      <div className="vtk-page-shell flex flex-col gap-16">
         <section className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
           <div>
             <div className="label">
@@ -307,13 +308,13 @@ export default async function SamplePage({
                 <h3 className="text-2xl font-semibold tracking-tight">Tabs and lists</h3>
               </div>
               <div className="vtk-basic-tabs" role="tablist" aria-label="Sample tabs">
-                <button className="vtk-basic-tab vtk-basic-tab-active" type="button">
+                <button className="vtk-basic-tab vtk-basic-tab-active" type="button" role="tab" aria-selected={true}>
                   Overview
                 </button>
-                <button className="vtk-basic-tab" type="button">
+                <button className="vtk-basic-tab" type="button" role="tab" aria-selected={false}>
                   Details
                 </button>
-                <button className="vtk-basic-tab" type="button">
+                <button className="vtk-basic-tab" type="button" role="tab" aria-selected={false}>
                   Archive
                 </button>
               </div>
@@ -348,14 +349,14 @@ export default async function SamplePage({
                   <code> vtk-basic.css</code>.
                 </p>
               </div>
-              <div className="vtk-basic-table-wrap">
+              <div className="vtk-basic-table-wrap" tabIndex={0} role="region" aria-label="Sample shifts">
                 <table className="vtk-basic-table">
                   <thead>
                     <tr>
-                      <th>Shift</th>
-                      <th>Time</th>
-                      <th>Status</th>
-                      <th>Owner</th>
+                      <th scope="col">Shift</th>
+                      <th scope="col">Time</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Owner</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -421,7 +422,7 @@ export default async function SamplePage({
             <a className="vtk-basic-page-link" href="#basic" aria-label="Previous page">
               &lt;
             </a>
-            <a className="vtk-basic-page-link vtk-basic-page-link-active" href="#basic">
+            <a className="vtk-basic-page-link vtk-basic-page-link-active" href="#basic" aria-current="page">
               1
             </a>
             <a className="vtk-basic-page-link" href="#basic">
@@ -487,9 +488,9 @@ export default async function SamplePage({
           <div className="page-head !px-0 !pt-0">
             <div>
               <div className="crumbs">Home / Kalender</div>
-              <h1>
+              <h2 className="vtk-page-title !text-[var(--paper)] [&_em]:!text-[var(--yellow)]">
                 Calendar <em>surface</em>
-              </h1>
+              </h2>
             </div>
             <div className="page-head-meta">
               <div>
@@ -744,11 +745,11 @@ export default async function SamplePage({
 
         <section id="prose" className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
           <article className="vtk-card prose-vtk max-w-none">
-            <h1>Prose content</h1>
+            <h2>Prose content</h2>
             <p>
               This block exercises the global Tiptap prose styles for headings, paragraphs, links, lists and quotes.
             </p>
-            <h2>Heading level two</h2>
+            <h3>Heading level two</h3>
             <p>
               Links use the VTK underline treatment, like <a href="#admin">this inline example</a>, and body copy keeps a
               readable line height.
@@ -762,7 +763,7 @@ export default async function SamplePage({
 
           <aside id="admin" className="vtk-admin-main">
             <div data-vtk-ui="card" className="p-5">
-              <h1 className="text-2xl font-semibold">Admin surface</h1>
+              <h2 className="text-2xl font-semibold">Admin surface</h2>
               <p className="mt-2 text-sm text-zinc-500">
                 Admin overrides normalize cards, tables, forms, badges and buttons inside .vtk-admin-main.
               </p>
@@ -770,8 +771,8 @@ export default async function SamplePage({
                 <table>
                   <thead className="bg-vtk-blue-soft">
                     <tr>
-                      <th>Element</th>
-                      <th>State</th>
+                      <th scope="col">Element</th>
+                      <th scope="col">State</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -795,30 +796,16 @@ export default async function SamplePage({
                   Label
                   <input className="mt-1 w-full rounded border px-3 py-2" defaultValue="Sample input" />
                 </label>
-                <button type="button" className="inline-flex bg-vtk-blue px-4 py-2 text-sm font-semibold">
+                <button type="button" className="inline-flex bg-vtk-blue px-4 py-2 text-sm font-semibold text-white">
                   Admin button
                 </button>
               </form>
             </div>
           </aside>
         </section>
-      </main>
-
-      <div className="marquee">
-        <div className="marquee-track">
-          <span>VTK sample page</span>
-          <span className="star">*</span>
-          <span>Existing classes only</span>
-          <span className="star">*</span>
-          <span>Manual development reference</span>
-          <span className="star">*</span>
-          <span>VTK sample page</span>
-          <span className="star">*</span>
-          <span>Existing classes only</span>
-          <span className="star">*</span>
-          <span>Manual development reference</span>
-        </div>
       </div>
+
+      <SampleMarquee nl={nl} />
     </div>
   );
 }

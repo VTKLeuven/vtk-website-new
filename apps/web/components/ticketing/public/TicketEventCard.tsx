@@ -99,9 +99,9 @@ export function TicketEventCard({
       <div className="tcat-body">
         <span className="tcat-owner">{event.ownerGroupName ?? "VTK"}</span>
         {/* De titel draagt de link; `::after` spant ze over de hele kaart. */}
-        <h3 className="tcat-title">
+        <h2 className="tcat-title">
           <Link href={withSource(`${base}/tickets/${event.slug}`, "tickets")}>{event.title}</Link>
-        </h3>
+        </h2>
         <p className="tcat-facts">
           <span>
             <CalendarDays size={15} aria-hidden="true" />
@@ -117,7 +117,7 @@ export function TicketEventCard({
 
       <div className="tcat-side">
         <div>
-          <h4>Tickets</h4>
+          <h3>Tickets</h3>
           {shownTypes.length > 0 ? (
             <ul className="tcat-prices">
               {shownTypes.map((type) => {

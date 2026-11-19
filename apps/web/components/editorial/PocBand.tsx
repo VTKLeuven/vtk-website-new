@@ -4,6 +4,7 @@ import Link from "@/components/ui/Link";
 import { type Locale } from "@vtk/i18n";
 import { Markdown } from "@/components/ui/Markdown";
 import { isExternalUrl, withLocaleBase } from "@/lib/href";
+import { pickWithLang, type FallbackLang } from "@/lib/langFallback";
 import { publicUrl } from "@/lib/storage";
 import {
   pocBandDaysLeft,
@@ -46,11 +47,13 @@ export type PocBandPerson = {
   name: string;
   avatarUrl: string | null;
   role?: string | null;
+  roleLang?: FallbackLang;
 };
 
 export type PocBandGroup = {
   id: string;
   name: string;
+  nameLang?: FallbackLang;
   email: string | null;
   people: PocBandPerson[];
   /** De open peilingen van deze POC voor deze bezoeker. Een rij zonder mensen is
@@ -112,7 +115,7 @@ function PocWall({ groups, locale }: { groups: PocBandGroup[]; locale: Locale })
             tabIndex={group === target ? -1 : undefined}
           >
             <div className="poc-wall-label">
-              <h3>{group.name}</h3>
+              <h3 lang={group.nameLang}>{group.name}</h3>
               {/* Studenten mailen de POC als geheel, niet één vertegenwoordiger. */}
               {group.email ? (
                 <a className="poc-wall-mail" href={`mailto:${group.email}`}>
@@ -128,7 +131,7 @@ function PocWall({ groups, locale }: { groups: PocBandGroup[]; locale: Locale })
                       </span>
                       <span className="poc-poll-person">
                         <b>{person.name}</b>
-                        {person.role ? <i>{person.role}</i> : null}
+                        {person.role ? <i lang={person.roleLang}>{person.role}</i> : null}
                       </span>
                     </li>
                   ))}
@@ -152,7 +155,11 @@ function PocWall({ groups, locale }: { groups: PocBandGroup[]; locale: Locale })
                   <li key={person.id}>
                     <Face person={person} />
                     <p className="poc-wall-name">{person.name}</p>
-                    {person.role ? <p className="poc-wall-role">{person.role}</p> : null}
+                    {person.role ? (
+                      <p className="poc-wall-role" lang={person.roleLang}>
+                        {person.role}
+                      </p>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -183,22 +190,24 @@ function BandLink({
   href,
   base,
   className,
+  lang,
   children,
 }: {
   href: string;
   base: string;
   className: string;
+  lang?: FallbackLang;
   children: React.ReactNode;
 }) {
   if (isExternalUrl(href)) {
     return (
-      <a className={className} href={href} target="_blank" rel="noopener noreferrer">
+      <a className={className} href={href} target="_blank" rel="noopener noreferrer" lang={lang}>
         {children}
       </a>
     );
   }
   return (
-    <Link className={className} href={withLocaleBase(href, base)}>
+    <Link className={className} href={withLocaleBase(href, base)} lang={lang}>
       {children}
     </Link>
   );
@@ -222,38 +231,51 @@ export function PocBand({
   myProgrammes: string[];
 }) {
   const nl = locale === "nl";
-  const pick = (dutch: string, english: string) => (nl ? dutch : english || dutch);
 
   // Een open peiling staat er altijd: de strook bovenaan de site wijst ernaar,
   // ook wanneer de band verborgen is of de verkiezingen toont.
   const pollGroups = groups.filter((group) => (group.polls?.length ?? 0) > 0);
 
+  const heading = pickWithLang(setting.headingNl, setting.headingEn, locale);
+  const headingText = heading.text.trim();
+  const body = pickWithLang(setting.bodyNl, setting.bodyEn, locale);
+  const bodyText = body.text.trim();
+  const title = pickWithLang(setting.titleNl, setting.titleEn, locale);
+  const titleText = title.text.trim();
   const electionsHaveText =
-    setting.mode === "elections" &&
-    Boolean(
-      pick(setting.headingNl, setting.headingEn).trim() ||
-        pick(setting.bodyNl, setting.bodyEn).trim() ||
-        pick(setting.titleNl, setting.titleEn).trim(),
-    );
+    setting.mode === "elections" && Boolean(headingText || bodyText || titleText);
 
   if (electionsHaveText) {
-    const heading = pick(setting.headingNl, setting.headingEn).trim();
-    const body = pick(setting.bodyNl, setting.bodyEn).trim();
-    const title = pick(setting.titleNl, setting.titleEn).trim();
-    const ctaLabel = pick(setting.ctaLabelNl, setting.ctaLabelEn).trim();
-    const secondaryLabel = pick(setting.secondaryLabelNl, setting.secondaryLabelEn).trim();
+    const ctaLabel = pickWithLang(setting.ctaLabelNl, setting.ctaLabelEn, locale);
+    const ctaLabelText = ctaLabel.text.trim();
+    const secondaryLabel = pickWithLang(setting.secondaryLabelNl, setting.secondaryLabelEn, locale);
+    const secondaryLabelText = secondaryLabel.text.trim();
     const open = pocBandIsOpen(setting, now);
     const daysLeft = pocBandDaysLeft(setting.deadline, now);
 
-    const meta = pick(setting.metaNl, setting.metaEn).trim();
+    const meta = pickWithLang(setting.metaNl, setting.metaEn, locale);
+    const metaText = meta.text.trim();
     const photo = publicUrl(setting.imageKey) ?? POC_BAND_DEFAULT_PHOTO;
 
     return (
-      <section className="section band poc-band" aria-labelledby="poc-band-head">
-        <div className="sec-head">
-          <h2 id="poc-band-head">{heading}</h2>
-          {meta ? <div className="meta">{meta}</div> : null}
-        </div>
+      <section
+        className="section band poc-band"
+        aria-labelledby={headingText ? "poc-band-head" : undefined}
+      >
+        {(headingText || metaText) ? (
+          <div className="sec-head">
+            {headingText ? (
+              <h2 id="poc-band-head" lang={heading.lang}>
+                {headingText}
+              </h2>
+            ) : null}
+            {metaText ? (
+              <div className="meta" lang={meta.lang}>
+                {metaText}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="poc-elect">
           <div className="poc-elect-panel">
@@ -269,8 +291,14 @@ export function PocBand({
             </span>
 
             <div className="poc-elect-prose">
-              {title ? <h3>{title}</h3> : null}
-              {body ? <Markdown locale={locale}>{body}</Markdown> : null}
+              {titleText ? <h3 lang={title.lang}>{titleText}</h3> : null}
+              {bodyText ? (
+                <div lang={body.lang}>
+                  <Markdown locale={locale} baseHeadingLevel={titleText ? 4 : 3}>
+                    {bodyText}
+                  </Markdown>
+                </div>
+              ) : null}
             </div>
 
             <aside className="poc-elect-aside">
@@ -313,20 +341,26 @@ export function PocBand({
                 </div>
               ) : null}
 
-              {(ctaLabel && setting.ctaUrl) || (secondaryLabel && setting.secondaryUrl) ? (
+              {(ctaLabelText && setting.ctaUrl) || (secondaryLabelText && setting.secondaryUrl) ? (
                 <div className="poc-elect-actions">
-                  {ctaLabel && setting.ctaUrl ? (
+                  {ctaLabelText && setting.ctaUrl ? (
                     <BandLink
                       href={setting.ctaUrl}
                       base={base}
+                      lang={ctaLabel.lang}
                       className={open ? "btn btn-primary" : "btn btn-ghost"}
                     >
-                      {ctaLabel}
+                      {ctaLabelText}
                     </BandLink>
                   ) : null}
-                  {secondaryLabel && setting.secondaryUrl ? (
-                    <BandLink href={setting.secondaryUrl} base={base} className="btn btn-ghost">
-                      {secondaryLabel}
+                  {secondaryLabelText && setting.secondaryUrl ? (
+                    <BandLink
+                      href={setting.secondaryUrl}
+                      base={base}
+                      lang={secondaryLabel.lang}
+                      className="btn btn-ghost"
+                    >
+                      {secondaryLabelText}
                     </BandLink>
                   ) : null}
                 </div>
@@ -351,6 +385,8 @@ export function PocBand({
             <ol className="poc-elect-steps">
               {setting.steps.map((step) => {
                 const when = pocBandStepWhen(step, locale);
+                const stepTitle = pickWithLang(step.titleNl, step.titleEn, locale);
+                const stepBody = pickWithLang(step.bodyNl, step.bodyEn, locale);
                 return (
                   <li
                     key={`${step.titleNl}-${step.from ?? ""}`}
@@ -358,8 +394,8 @@ export function PocBand({
                     data-state={pocBandStepState(step, now)}
                   >
                     {when ? <p className="when">{when}</p> : null}
-                    <h4>{pick(step.titleNl, step.titleEn)}</h4>
-                    {pick(step.bodyNl, step.bodyEn) ? <p>{pick(step.bodyNl, step.bodyEn)}</p> : null}
+                    <h3 lang={stepTitle.lang}>{stepTitle.text}</h3>
+                    {stepBody.text ? <p lang={stepBody.lang}>{stepBody.text}</p> : null}
                   </li>
                 );
               })}

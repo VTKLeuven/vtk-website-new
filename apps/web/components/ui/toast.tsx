@@ -79,12 +79,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div
         className="vtk-toast-viewport"
         role="region"
-        aria-live="polite"
         aria-label={nl ? 'Meldingen' : 'Notifications'}
       >
         {toasts.map((toast) => (
-          <div key={toast.id} className={`vtk-toast vtk-toast-${toast.variant}`} role="status">
-            <span className="vtk-toast-message">{toast.message}</span>
+          <div key={toast.id} className={`vtk-toast vtk-toast-${toast.variant}`}>
+            <div
+              className="vtk-toast-message"
+              role={toast.variant === 'error' ? 'alert' : 'status'}
+              aria-live={toast.variant === 'error' ? 'assertive' : 'polite'}
+            >
+              {toast.message}
+            </div>
             <button
               type="button"
               className="vtk-toast-close"

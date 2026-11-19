@@ -3,14 +3,30 @@ import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
+import { buildMetadata } from "@/lib/seo";
 import { verifyUnsubscribeToken } from "@/lib/mailUnsubscribe";
 import { UnsubscribePanel, type UnsubscribeState } from "@/components/profile/UnsubscribePanel";
 import { unsubscribeMailCategoryAction } from "@/app/actions/mailUnsubscribe";
 
-export const metadata: Metadata = {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  const nl = locale === "nl";
   // Een persoonlijke link uit een mail; niets voor een zoekmachine.
-  robots: { index: false, follow: false },
-};
+  return buildMetadata({
+    title: nl ? "Uitschrijven" : "Unsubscribe",
+    description: nl
+      ? "Beheer je uitschrijving voor een VTK-mailinglijst."
+      : "Manage your unsubscribe request for a VTK mailing list.",
+    path: "/uitschrijven",
+    locale,
+    noIndex: true,
+  });
+}
 
 /**
  * Uitschrijven voor één mailinglijst vanuit de knop in een mail, zonder login.

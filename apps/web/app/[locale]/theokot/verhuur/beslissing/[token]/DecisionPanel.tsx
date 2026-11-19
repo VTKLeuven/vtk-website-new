@@ -191,7 +191,7 @@ export function DecisionPanel({
 
       <div className="tv-section">
         <div className="tv-section-head">
-          <h3>{nl ? "De mail naar de aanvrager" : "The email to the requester"}</h3>
+          <h2>{nl ? "De mail naar de aanvrager" : "The email to the requester"}</h2>
           <span className="tv-section-note">
             {nl ? "Je kan hem hier nog aanpassen." : "You can still edit it here."}
           </span>
@@ -292,7 +292,7 @@ export function DecisionPanel({
 
       <div className="tv-section">
         <div className="tv-section-head">
-          <h3>{nl ? "Of enkel de status zetten" : "Or only set the status"}</h3>
+          <h2>{nl ? "Of enkel de status zetten" : "Or only set the status"}</h2>
         </div>
         <p className="text-sm text-[#34405e]">
           {nl
