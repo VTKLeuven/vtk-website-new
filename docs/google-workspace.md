@@ -336,8 +336,12 @@ Ordenen gaat met **categorieën** (Praesidium › Activiteiten): maak ze bij
 "Categorieën", vink groepen aan en kies "In categorie zetten". Hoort een
 categorie bij een werkgroep (Werkgroepen › Biomedix), kies die dan met het
 potlood bij de categorie: ze komt op elk adres erin zonder werkgroep, en op wat
-er later in komt. Een adres met een andere werkgroep houdt die. Zie
-`docs/design-decisions.md`, "Categorieën: ordening, geen regel".
+er later in komt. Een adres met een andere werkgroep houdt die. Omgekeerd
+komt een nieuw adres van een werkgroep (zelf aangemaakt, of een werkgroep die
+eigenaar wordt) zonder gekozen categorie vanzelf in de categorie van die
+werkgroep (`werkgroepCategoryId` in `lib/google/werkgroepCategory.ts`; een
+subcategorie wint). Zie `docs/design-decisions.md`, "Categorieën: ordening,
+geen regel".
 
 ### Organisatie-eenheden
 

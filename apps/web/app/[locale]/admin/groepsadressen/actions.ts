@@ -16,6 +16,7 @@ import { mailGroupAccess, requireMailGroupEditor } from "@/lib/google/access";
 import { normaliseNamePart, renderAddress, yearVars } from "@/lib/google/addresses";
 import { everyGroupOfKindLabel, isGroupKind, normaliseEmail, type GroupKind } from "@/lib/google/members";
 import { pushMailGroup, reconcileGoogle } from "@/lib/google/sync";
+import { werkgroepCategoryId } from "@/lib/google/werkgroepCategory";
 import { IMPORTED_NOTE, type ImportOutcome, importGoogleGroup } from "@/lib/google/import";
 
 /**
@@ -169,6 +170,10 @@ export async function createMailGroupAction(
     }
   }
 
+  // Zonder gekozen categorie: die van de werkgroep, zodat een lijst die een
+  // werkgroep zelf maakt meteen bij haar andere adressen staat.
+  categoryId ??= await werkgroepCategoryId(ownerGroupId);
+
   const created = await prisma.mailGroup.create({
     data: {
       email,
@@ -273,6 +278,11 @@ export async function saveMailGroupAction(
   }
 
   await prisma.mailGroup.update({ where: { id: input.id }, data });
+  // Een nieuwe werkgroep als eigenaar, en nog geen categorie: die van de werkgroep.
+  if (data.ownerGroupId && !data.categoryId) {
+    const categoryId = await werkgroepCategoryId(data.ownerGroupId);
+    if (categoryId) await prisma.mailGroup.updateMany({ where: { id: input.id, categoryId: null }, data: { categoryId } });
+  }
   await logAudit({
     action: "update",
     entity: "mailGroup",
