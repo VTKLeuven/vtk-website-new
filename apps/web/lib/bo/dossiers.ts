@@ -66,6 +66,8 @@ export type DocInput = {
   driveFileId?: string;
   /** Een resultaat zonder budget op het BO: "grocomeet" of "geen". */
   budgetWaiver?: string | null;
+  /** Groep 5 duidde het als potje aan (`BoDocument.potAt`); zie `Dossier.pot`. */
+  pot?: boolean;
 };
 
 /** Een map in de BO-map, ook zonder bestanden: een BO waar niets passeerde, telt ook. */
@@ -118,7 +120,13 @@ export type DossierStatus =
   /** Budget gezien, activiteit voorbij (of zonder datum), geen resultaat. */
   | "OPEN"
   /** Een resultaat waarvan het budget niet gevonden werd. */
-  | "NO_BUDGET";
+  | "NO_BUDGET"
+  /**
+   * Een potje: een deelbudget waaruit door het jaar gekocht wordt. Het wacht
+   * niet op een resultaat (een tussentijds resultaat mag), en telt dus niet
+   * bij open of afgerond.
+   */
+  | "POT";
 
 export type Dossier = {
   key: string;
@@ -146,6 +154,12 @@ export type Dossier = {
   waiver: string | null;
   /** De posten werden met de hand gekozen, niet uit de naam gehaald. */
   overridden: boolean;
+  /**
+   * Een potje, en waarom: "name" wanneer een bestand `Deelbudget` heet (dan
+   * beslist de naam, en is er niets terug te zetten), "manual" wanneer Groep 5
+   * het aanduidde. Null = een gewone activiteit.
+   */
+  pot: "name" | "manual" | null;
   budgetCents: number | null;
   resultCents: number | null;
   allocationCents: number | null;
@@ -157,7 +171,9 @@ export type Dossier = {
    * beter dan begroot. Null zonder begroting in het blad. Een potje staat in
    * één blad, dus elke activiteit telt apart (zie docs/design-decisions.md).
    * Komt een potje na zijn resultaat terug met dezelfde naam, dan telt enkel
-   * het meest recente blad.
+   * het meest recente blad. Een aangeduid potje (`pot`) telt voor het begrote
+   * bedrag: 0 zolang er een begroting in het blad staat, wat er tussentijds
+   * ook al uitgegeven is.
    */
   begrotingDevCents: number | null;
   /**
@@ -185,6 +201,8 @@ export type Stats = {
   results: number;
   /** Activiteiten die voorbij zijn (of geen datum hebben): daar hoort een resultaat bij. */
   due: number;
+  /** Potjes: die wachten niet op een resultaat en tellen dus niet in `due`. */
+  pots: number;
   done: number;
   /** done / due; null zolang er niets voorbij is. */
   pct: number | null;
@@ -202,8 +220,8 @@ export type Stats = {
   overAllocation: number;
   /**
    * De som van `begrotingDevCents` over de activiteiten met een BO die al
-   * voorbij is (`due`), en over hoeveel daarvan: een blad zonder begroting
-   * telt niet mee.
+   * voorbij is (`due`) en de potjes, en over hoeveel daarvan: een blad zonder
+   * begroting telt niet mee.
    */
   begrotingDev: number;
   begrotingCounted: number;
@@ -295,6 +313,8 @@ type Classified = {
   activityKey: string;
   /** Uit de naam ("_v2"); 0 zonder. Bij twee versies op dezelfde BO wint de hoogste. */
   version: number;
+  /** De naam zegt `Deelbudget` of `Deelresultaat`. */
+  potByName: boolean;
 };
 
 const DAY = 86_400_000;
@@ -318,6 +338,9 @@ export type StatsInput = Pick<
 /** De cijfers van een rij dossiers: een post, het hele jaar, of een groep in de lijst. */
 export function statsOf(dossiers: readonly StatsInput[]): Stats {
   const due = dossiers.filter((d) => d.status === "DONE" || d.status === "OPEN");
+  const pots = dossiers.filter((d) => d.status === "POT");
+  // In de stand tegenover de begroting: wat al langs een BO kwam, en de potjes.
+  const inPlan = [...due, ...pots].filter((d) => !d.begrotingExcluded);
   const done = dossiers.filter((d) => d.status === "DONE");
   const open = dossiers.filter((d) => d.status === "OPEN");
   const lags = done.map((d) => d.lagDays).filter((x): x is number => x !== null);
@@ -327,6 +350,7 @@ export function statsOf(dossiers: readonly StatsInput[]): Stats {
     budgets: dossiers.filter((d) => d.budgets.length > 0).length,
     results: dossiers.filter((d) => d.results.length > 0).length,
     due: due.length,
+    pots: pots.length,
     done: done.length,
     pct: due.length ? done.length / due.length : null,
     open: open.length,
@@ -340,9 +364,9 @@ export function statsOf(dossiers: readonly StatsInput[]): Stats {
     worse: done.filter((d) => (d.devCents ?? 0) < 0).length,
     avgLagDays: lags.length ? Math.round(lags.reduce((a, b) => a + b, 0) / lags.length) : null,
     overAllocation: dossiers.filter((d) => d.overAllocation).length,
-    begrotingDev: sum(due.filter((d) => !d.begrotingExcluded).map((d) => d.begrotingDevCents)),
-    begrotingCounted: due.filter((d) => !d.begrotingExcluded && d.begrotingDevCents !== null).length,
-    begrotingExcluded: due.filter((d) => d.begrotingExcluded).length,
+    begrotingDev: sum(inPlan.map((d) => d.begrotingDevCents)),
+    begrotingCounted: inPlan.filter((d) => d.begrotingDevCents !== null).length,
+    begrotingExcluded: [...due, ...pots].filter((d) => d.begrotingExcluded).length,
     oldest: oldest ? { key: oldest.key, activity: oldest.activity, days: oldest.overdueDays ?? 0 } : null,
   };
 }
@@ -365,6 +389,12 @@ export function kindAt(doc: Pick<DocInput, "name" | "linkName" | "folderKind">):
  * naam soms enkel op de snelkoppeling in de BO-map ("Kopie van Budget
  * sjabloon" achter "26-27_Budget_Cursusdienst_..."). Zegt het blad geen post
  * die de site kent en de snelkoppeling wel, dan wint de snelkoppeling.
+ *
+ * Ook wanneer het blad wel een post noemt, maar nooit een eigen naam kreeg:
+ * een kopie van het budget van een andere post ("Kopie van
+ * 26-27_Budget_Theokot_Frigo") of een naam zonder jaar, terwijl de
+ * snelkoppeling de afspraak volgt. Die naam zegt dan iets over het blad
+ * waarvan gekopieerd werd, niet over dit.
  */
 function namesOf(
   doc: Pick<DocInput, "name" | "linkName">,
@@ -374,10 +404,15 @@ function namesOf(
   const own = parseDocumentName(doc.name);
   if (!doc.linkName) return own;
   const known = (p: ParsedDocumentName) => Boolean(p.post && splitPost(p.post, p.activity, posts, aliases).postKeys.length > 0);
-  if (known(own)) return own;
   const link = parseDocumentName(doc.linkName);
-  return known(link) ? link : own;
+  if (!known(link)) return own;
+  if (!known(own)) return link;
+  const unnamed = COPY_OF.test(doc.name.trim()) || (own.year === null && link.year !== null);
+  return unnamed ? link : own;
 }
+
+/** "Kopie van ..." of "Copy of ...": een blad dat zijn naam van een ander kreeg. */
+const COPY_OF = /^(?:kopie van|copy of)\s/i;
 
 const SECTION_ORDER: Record<PostSection, number> = { g5: 0, post: 1, werkgroep: 2, jaarwerking: 3, extra: 4, unknown: 5 };
 
@@ -481,6 +516,7 @@ export function buildOverview(
       activity,
       activityKey: normalizeKey(activity),
       version: parsed.version ?? 0,
+      potByName: Boolean(parseDocumentName(doc.linkName ?? "").pot || parseDocumentName(doc.name).pot),
     };
     const fileKind = `${doc.driveFileId}|${kind}`;
     const same = doc.driveFileId ? byFile.get(fileKind) : undefined;
@@ -569,8 +605,13 @@ export function buildOverview(
     }
 
     const waiver = resultItems.find((c) => c.view.waiver)?.view.waiver ?? null;
+    // Een potje wacht niet op een resultaat. Enkel met een budget: een los
+    // resultaat zonder budget blijft iets om na te kijken.
+    const pot: Dossier["pot"] =
+      budgetItems.length === 0 ? null : items.some((c) => c.potByName) ? "name" : items.some((c) => c.doc.pot) ? "manual" : null;
     let status: DossierStatus;
-    if (reopenedAt) status = "OPEN";
+    if (pot) status = "POT";
+    else if (reopenedAt) status = "OPEN";
     else if (resultItems.length > 0) status = budgetItems.length > 0 || waiver ? "DONE" : "NO_BUDGET";
     // Een budget voor een BO die nog moet komen: dan wacht nog niemand op een resultaat.
     else status = date && dayStart(date) > todayStart ? "UPCOMING" : "OPEN";
@@ -581,7 +622,9 @@ export function buildOverview(
     const resultCents = roundResult?.doc.resultTotalCents ?? null;
     const allocationCents = lastBudget?.doc.allocationCents ?? roundResult?.doc.allocationCents ?? null;
     // Het resultaat is het meest accuraat; zolang het er niet is, het budget.
-    const standCents = (status === "DONE" ? resultCents : null) ?? budgetCents;
+    // Een potje telt voor wat begroot werd: een tussentijds resultaat zegt
+    // niet wat er tegen het eind van het jaar nog uit gaat.
+    const standCents = pot ? allocationCents : ((status === "DONE" ? resultCents : null) ?? budgetCents);
     const resultDate = roundResult?.view.meetingDate ?? null;
     const resultLines = roundResult?.doc.lines ?? [];
     const lines = resultLines.length > 0 ? resultLines : (lastBudget?.doc.lines ?? []);
@@ -601,6 +644,7 @@ export function buildOverview(
         location: lastBudget?.doc.location ?? lastResult?.doc.location ?? null,
         waiver,
         overridden: items.some((c) => c.view.overridden),
+        pot,
         budgetCents,
         resultCents,
         allocationCents,

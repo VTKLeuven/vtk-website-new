@@ -96,7 +96,7 @@ export function buildSummary(data: ExplorerData, options: readonly PostOption[])
     werkgroepen: statsOf(data.dossiers.filter(isWerkgroep)),
     lastMeeting: past[0]?.label ?? null,
     outOfPlan: data.dossiers
-      .filter((d) => d.begrotingExcluded && (d.status === "DONE" || d.status === "OPEN"))
+      .filter((d) => d.begrotingExcluded && (d.status === "DONE" || d.status === "OPEN" || d.status === "POT"))
       .map((d) => ({ key: d.key, activity: d.activity, postName: d.postName, reason: d.begrotingExcluded?.reason ?? null })),
   };
 }

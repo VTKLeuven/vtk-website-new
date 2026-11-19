@@ -4,7 +4,7 @@ import { Fragment, useState, useTransition, type ReactNode } from "react";
 import { ConfirmDialog, Input } from "@vtk/ui";
 import { ConfirmIconButton } from "@/components/ui/DeleteIconButton";
 import { IconAnchor } from "@/components/ui/IconButton";
-import { ExternalLinkIcon, EyeOffIcon, UndoIcon } from "@/components/ui/icons";
+import { ExternalLinkIcon, EyeOffIcon, JarIcon, UndoIcon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
 import { useUnsentGuard } from "@/components/ui/unsentGuard";
 import { formatAmount } from "@/lib/rekeningen/expenses";
@@ -14,6 +14,7 @@ import {
   excludeBoBegrotingAction,
   hideBoDocumentAction,
   includeBoBegrotingAction,
+  setBoPotAction,
   unpairBoResultAction,
 } from "@/app/actions/bestuursorgaan";
 import { figuresErrorText } from "./messages";
@@ -62,8 +63,9 @@ export function Progress({ value }: { value: number | null }) {
 }
 
 /**
- * De stand van een activiteit, altijd een van vier woorden met een vaste kleur:
- * Open (amber), Komt nog (grijs), Afgerond (groen), Geen budget. Wat erbij hoort
+ * De stand van een activiteit, altijd een van vijf woorden met een vaste kleur:
+ * Open (amber), Komt nog (grijs), Afgerond (groen), Geen budget, Potje (grijs).
+ * Wat erbij hoort
  * (hoeveel dagen, de afwijking, "via grocomeet") staat als tekst in
  * `StatusNote`, niet in de pil: vijf soorten labels in één kolom lazen als een
  * raadsel.
@@ -81,6 +83,12 @@ export function StatusPill({ dossier: d, f }: { dossier: XDossier; f: Fmt }) {
       );
     case "OPEN":
       return <span className="vtk-bo-pill" data-tone="low">Open</span>;
+    case "POT":
+      return (
+        <span className="vtk-bo-pill" title={nl ? "Een deelbudget: wacht niet op een resultaat" : "A partial budget: does not wait for a result"}>
+          {nl ? "Potje" : "Pot"}
+        </span>
+      );
     case "NO_BUDGET":
       // Een resultaat van 25-26 op een BO van 26-27: zijn budget passeerde
       // voor de site meelas, en dat is geen fout.
@@ -105,6 +113,13 @@ export function statusNote(d: XDossier, f: Fmt): ReactNode {
       return (
         <span className="tabular-nums" title={nl ? "Dagen sinds de BO van het budget" : "Days since the meeting of the budget"}>
           {d.overdueDays === 1 ? (nl ? "1 dag" : "1 day") : `${d.overdueDays ?? 0} ${nl ? "dagen" : "days"}`}
+        </span>
+      );
+    case "POT":
+      if (d.results.length === 0) return null;
+      return (
+        <span className="tabular-nums" title={nl ? "Het laatste tussentijdse resultaat" : "The latest interim result"}>
+          {nl ? "tussentijds" : "interim"} {f.euro(d.resultCents)}
         </span>
       );
     case "DONE":
@@ -599,6 +614,76 @@ export function HideDossierButton({
         onCancel={() => setOpen(false)}
       />
     </>
+  );
+}
+
+/**
+ * "Potje" naast "Niet meetellen": een deelbudget waaruit door het jaar gekocht
+ * wordt. Geen bevestiging: er gaat niets verloren, en dezelfde knop zet het
+ * terug. Een potje door zijn naam ("Deelbudget") heeft geen knop; daar beslist
+ * de naam, en `PotNote` zegt dat.
+ */
+export function PotButton({
+  dossier: d,
+  nl,
+  errorMessages,
+  className = "vtk-bo-postedit-open",
+}: {
+  dossier: XDossier;
+  nl: boolean;
+  errorMessages: Record<string, string>;
+  className?: string;
+}) {
+  const { pending, run } = useBoAction(nl, errorMessages);
+  if (d.pot === "name" || d.budgets.length === 0) return null;
+  const marked = d.pot === "manual";
+  const docIds = [...d.budgets, ...d.results].map((doc) => doc.id).join(",");
+  return (
+    <button
+      type="button"
+      className={className}
+      disabled={pending}
+      aria-pressed={marked}
+      aria-label={nl ? `${marked ? "Geen potje" : "Potje"}: ${d.activity}` : `${marked ? "Not a pot" : "Pot"}: ${d.activity}`}
+      title={
+        nl
+          ? marked
+            ? "Weer een gewone activiteit: wacht op een resultaat"
+            : "Een deelbudget waaruit door het jaar gekocht wordt: wacht niet op een resultaat, telt in de begroting voor het begrote bedrag"
+          : marked
+            ? "A regular activity again: waits for a result"
+            : "A partial budget spent through the year: does not wait for a result, counts at the planned amount"
+      }
+      onClick={() =>
+        run(
+          setBoPotAction,
+          { docIds, pot: marked ? "0" : "1" },
+          nl
+            ? marked
+              ? `"${d.activity}" is geen potje meer.`
+              : `"${d.activity}" is een potje.`
+            : marked
+              ? `"${d.activity}" is no longer a pot.`
+              : `"${d.activity}" is a pot.`,
+        )
+      }
+    >
+      <JarIcon />
+      {marked ? (nl ? "Geen potje" : "Not a pot") : nl ? "Potje" : "Pot"}
+    </button>
+  );
+}
+
+/** In het detail van een potje: wat dat betekent, en waarom het er een is. */
+export function PotNote({ dossier: d, nl }: { dossier: XDossier; nl: boolean }) {
+  if (!d.pot) return null;
+  return (
+    <p className="vtk-bo-note">
+      {nl
+        ? "Potje: wacht niet op een resultaat, en telt in de stand tegenover de begroting voor het begrote bedrag."
+        : "Pot: does not wait for a result, and counts towards the annual plan at the planned amount."}
+      {d.pot === "name" && (nl ? " De naam zegt Deelbudget." : " The name says Deelbudget.")}
+    </p>
   );
 }
 

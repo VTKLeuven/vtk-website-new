@@ -52,6 +52,17 @@ export function EyeOffIcon() {
   );
 }
 
+/** Een potje: een deelbudget waaruit door het jaar gekocht wordt. */
+export function JarIcon() {
+  return (
+    <Icon>
+      <path d="M7 4h10" />
+      <path d="M8 4v2.5a3 3 0 0 1-2 2.8V19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9.3a3 3 0 0 1-2-2.8V4" />
+      <path d="M6 13h12" />
+    </Icon>
+  );
+}
+
 export function EyeIcon() {
   return (
     <Icon>

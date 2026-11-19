@@ -65,7 +65,7 @@ export function ownPostKeys(groups: readonly BoMembership[]): string[] {
   return [...new Set(keys)];
 }
 
-const STATUS_ORDER: Record<XDossier["status"], number> = { OPEN: 0, UPCOMING: 1, NO_BUDGET: 2, DONE: 3 };
+const STATUS_ORDER: Record<XDossier["status"], number> = { OPEN: 0, UPCOMING: 1, NO_BUDGET: 2, POT: 3, DONE: 4 };
 
 /**
  * Eerst wat nog moet komen, het langst open bovenaan (een schriftelijke

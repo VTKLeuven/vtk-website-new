@@ -11,7 +11,8 @@
  * - een dubbelpunt in plaats van een underscore (`Sport: VTKlimmen`);
  * - de post vóór het soort (`26-27_Cultuur_Budget_VTK-Reis_Vluchten`);
  * - helemaal geen soort (`26-27_Development_ECC`), dan beslist de map;
- * - spaties in de activiteit (`Pirates of the fakbar`).
+ * - spaties in de activiteit (`Pirates of the fakbar`);
+ * - `Deelbudget` of `Deelresultaat` voor een potje (`26-27_Deelbudget_Cursusdienst_Teldagen`).
  *
  * Alles hier is puur, zodat de herkenning getest kan worden zonder Drive.
  */
@@ -51,6 +52,11 @@ export type ParsedDocumentName = {
    * Weg wanneer de naam er geen noemt.
    */
   version?: number;
+  /**
+   * De naam zegt dat het een potje is: `Deelbudget` of `Deelresultaat` in
+   * plaats van `Budget` of `Resultaat`. Weg wanneer de naam het niet zegt.
+   */
+  pot?: true;
 };
 
 const EXTENSION = /\.(xlsx|xlsm|xls|ods|csv|pdf|docx?)\s*$/i;
@@ -77,17 +83,22 @@ const YEAR_PREFIX = /^(?:20)?(\d{2})\s*[-_./ ]?\s*(?:20)?(\d{2})(?=[\s_:-]|$)/;
 const DATE_PREFIX = /^(?:\d{4}[/.-]\d{1,2}[/.-]\d{1,2}|\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})(?=[\s_:-]|$)[\s_:-]*/;
 
 function kindOf(segment: string): BoKind | null {
-  const key = normalizeKey(segment);
+  const key = normalizeKey(segment).replace(/^deel/, "");
   if (key === "budget" || key === "budgetten") return "BUDGET";
   if (key === "resultaat" || key === "resultaten") return "RESULT";
   return null;
 }
 
+/** "Deelbudget" of "Deelresultaat": een potje (zie `ParsedDocumentName.pot`). */
+function isPotWord(segment: string): boolean {
+  return normalizeKey(segment).startsWith("deel");
+}
+
 /** "Budget Cultuur+Onthaal" (een spatie waar een underscore hoorde): het soort en de rest. */
-function leadingKind(segment: string): { kind: BoKind; rest: string } | null {
-  const match = /^(budgetten|budget|resultaten|resultaat)[\s-]+(.+)$/i.exec(segment);
+function leadingKind(segment: string): { kind: BoKind; rest: string; pot: boolean } | null {
+  const match = /^((?:deel)?(?:budgetten|budget|resultaten|resultaat))[\s-]+(.+)$/i.exec(segment);
   if (!match) return null;
-  return { kind: kindOf(match[1])!, rest: match[2].trim() };
+  return { kind: kindOf(match[1])!, rest: match[2].trim(), pot: isPotWord(match[1]) };
 }
 
 export function parseDocumentName(raw: string): ParsedDocumentName {
@@ -125,16 +136,19 @@ export function parseDocumentName(raw: string): ParsedDocumentName {
   // woord in een activiteit is geen soort. Wel het laatste woord: "Eetstand
   // Wiskundeweek Begroting" is een budget.
   let kind: BoKind | null = null;
+  let pot = false;
   for (let i = 0; i < Math.min(2, segments.length); i += 1) {
     const found = kindOf(segments[i]);
     if (found) {
       kind = found;
+      pot = isPotWord(segments[i]);
       segments = [...segments.slice(0, i), ...segments.slice(i + 1)];
       break;
     }
     const lead = leadingKind(segments[i]);
     if (lead) {
       kind = lead.kind;
+      pot = lead.pot;
       segments = [...segments.slice(0, i), lead.rest, ...segments.slice(i + 1)];
       break;
     }
@@ -143,18 +157,26 @@ export function parseDocumentName(raw: string): ParsedDocumentName {
     const last = normalizeKey(segments.at(-1)!);
     if (kindOf(segments.at(-1)!) || last === "begroting") {
       kind = last === "begroting" ? "BUDGET" : kindOf(segments.at(-1)!);
+      pot = isPotWord(segments.at(-1)!);
       segments = segments.slice(0, -1);
     }
   }
 
   const post = segments[0] ?? null;
   const activity = segments.slice(1).join(" ").replace(/\s+/g, " ").trim() || null;
-  return version === undefined ? { year, kind, post, activity } : { year, kind, post, activity, version };
+  return {
+    year,
+    kind,
+    post,
+    activity,
+    ...(version === undefined ? {} : { version }),
+    ...(pot ? { pot: true as const } : {}),
+  };
 }
 
-/** "Budgetten" en "Resultaten", ook als "Budgetten Statix" of "resultaat". */
+/** "Budgetten" en "Resultaten", ook als "Budgetten Statix", "resultaat" of "Deelbudgetten". */
 export function folderKind(name: string): BoKind | null {
-  const key = normalizeKey(name);
+  const key = normalizeKey(name).replace(/^deel/, "");
   if (key.startsWith("budget")) return "BUDGET";
   if (key.startsWith("resulta")) return "RESULT";
   return null;

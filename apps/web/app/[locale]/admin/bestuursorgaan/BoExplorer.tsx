@@ -3,7 +3,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { findDossier, SECTIONS, type ExplorerData, type Stats, type XDossier, type XMeeting, type XPost } from "@/lib/bo/explorer";
-import { BegrotingExcludedNote, dossierNotes, Files, HideDossierButton, Lines, linesOf, PostLinks, StatusNote, statusNote, StatusPill, Tiles, Timeline, useFormat, type Fmt, type Locale, type Sheet } from "./BoParts";
+import { BegrotingExcludedNote, dossierNotes, Files, HideDossierButton, PotButton, PotNote, Lines, linesOf, PostLinks, StatusNote, statusNote, StatusPill, Tiles, Timeline, useFormat, type Fmt, type Locale, type Sheet } from "./BoParts";
 import { ChangePosts, type PostChoice } from "./BoReview";
 
 /*
@@ -199,7 +199,7 @@ export function BoExplorer({
   let mid: ReactNode = null;
   if (tab === "posten" && post) {
     const list = data.dossiers.filter((d) => d.postKeys.includes(post.key));
-    const order = { OPEN: 0, UPCOMING: 1, DONE: 2, NO_BUDGET: 2 } as const;
+    const order = { OPEN: 0, UPCOMING: 1, POT: 2, DONE: 3, NO_BUDGET: 3 } as const;
     list.sort(
       (a, b) =>
         order[a.status] - order[b.status] ||
@@ -526,6 +526,7 @@ function DossierDetail({
               errorMessages={errorMessages}
             />
           )}
+          <PotButton dossier={d} nl={nl} errorMessages={errorMessages} />
           <HideDossierButton dossier={d} nl={nl} errorMessages={errorMessages} />
         </div>
         <h2 className="text-xl font-bold tracking-tight">{d.activity}</h2>
@@ -560,6 +561,7 @@ function DossierDetail({
           {note}
         </p>
       ))}
+      <PotNote dossier={d} nl={nl} />
       <BegrotingExcludedNote dossier={d} nl={nl} errorMessages={errorMessages} />
       <div className="vtk-bo-tabs" role="group" aria-label={nl ? "Onderdeel" : "Section"}>
         {(

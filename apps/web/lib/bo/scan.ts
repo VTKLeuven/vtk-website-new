@@ -299,7 +299,15 @@ class Scan {
    * als pdf in die map, de agenda en het verslag tellen niet.
    */
   private collect(file: DriveFile, kind: BoKind | null, out: Map<string, Found>, linkName?: string): void {
-    if (out.has(file.id)) return;
+    const seen = out.get(file.id);
+    if (seen) {
+      // Hetzelfde blad twee keer in één BO: rechtstreeks in een map die erin
+      // hangt, en via een snelkoppeling. De snelkoppeling zegt wat het op deze
+      // BO was (zie `linkName`), dus die naam mag niet wegvallen omdat de map
+      // eerst gelezen werd.
+      if (linkName && !seen.linkName) out.set(file.id, { ...seen, linkName, folderKind: seen.folderKind ?? kind });
+      return;
+    }
     const named = parseDocumentName(linkName ?? "").kind ?? parseDocumentName(file.name).kind;
     const isSheet = SPREADSHEET_MIMES.has(file.mimeType) || OTHER_SHEET_MIMES.has(file.mimeType);
     if (!named && !(kind && isSheet)) return;

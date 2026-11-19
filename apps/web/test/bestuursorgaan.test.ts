@@ -44,6 +44,10 @@ describe("bestandsnamen", () => {
     ["2026/09/07 Eetstand Wiskundeweek Begroting", { year: null, kind: "BUDGET", post: "Eetstand", activity: "Wiskundeweek" }],
     // Het soort en de post in één stuk, met twee posten.
     ["26-27_Budget Cultuur+Onthaal_Jeneverwandeling", { year: 2026, kind: "BUDGET", post: "Cultuur+Onthaal", activity: "Jeneverwandeling" }],
+    // Een potje heet Deelbudget.
+    ["26-27_Deelbudget_Cursusdienst_Teldagen", { year: 2026, kind: "BUDGET", post: "Cursusdienst", activity: "Teldagen", pot: true }],
+    ["26-27_Deelresultaat_Cursusdienst_Teldagen", { year: 2026, kind: "RESULT", post: "Cursusdienst", activity: "Teldagen", pot: true }],
+    ["Deelbudget Cursusdienst Teldagen", { year: null, kind: "BUDGET", post: "Cursusdienst", activity: "Teldagen", pot: true }],
   ])("%s", (name, expected) => {
     expect(parseDocumentName(name)).toEqual(expected);
   });
@@ -648,6 +652,30 @@ describe("budgetten en resultaten samenleggen", () => {
     expect(overview.posts[0].dossiers[0]).toMatchObject({ activity: "shiftersvoorzieningen teldagen", budgetCents: -12000 });
   });
 
+  it("haalt de post uit de snelkoppeling wanneer het blad een kopie van een ander budget is", () => {
+    // Een kopie van het budget van een andere post: die naam zegt iets over het
+    // blad waarvan gekopieerd werd, niet over dit.
+    const overview = buildOverview(
+      [
+        doc("Kopie van 26-27_Budget_Onthaal_Stadsspel", {
+          bo: 3,
+          folderKind: "BUDGET",
+          driveFileId: "kopie",
+          linkName: "26-27_Budget_Cursusdienst_shiftersvoorzieningen teldagen",
+          budgetTotalCents: -12000,
+        }),
+        doc("26-27_resultaat_cursusdienst_shiftersvoorzieningen_teldagen", { bo: 11, folderKind: "RESULT", resultTotalCents: -4544 }),
+      ],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    expect(overview.posts.map((p) => p.key)).toEqual(["g:curs"]);
+    expect(overview.posts[0].dossiers).toHaveLength(1);
+    expect(overview.posts[0].dossiers[0]).toMatchObject({ activity: "shiftersvoorzieningen teldagen", status: "DONE" });
+  });
+
   it("houdt de post uit het blad wanneer de site die kent", () => {
     const overview = buildOverview(
       [stadsspel({ bo: 3, folderKind: "BUDGET", linkName: "26-27_Budget_Cursusdienst_Stadsspel" })],
@@ -1242,5 +1270,58 @@ describe("wat een post zelf ziet", () => {
     ]);
     // Enkel de herinnering wacht: op "Mijn budgetten" staan ze alle vier open.
     expect(posts[0].dossiers.map((d) => d.status)).toEqual(["OPEN", "OPEN", "OPEN", "OPEN"]);
+  });
+});
+
+describe("potjes", () => {
+  it("laat een potje niet op een resultaat wachten", () => {
+    const overview = buildOverview(
+      [doc("26-27_Budget_Cursusdienst_Teldagen", { bo: 3, budgetTotalCents: -30000, allocationCents: -30000, pot: true })],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    const [dossier] = overview.posts[0].dossiers;
+    expect(dossier).toMatchObject({ status: "POT", pot: "manual", overdueDays: null });
+    expect(overview.global).toMatchObject({ due: 0, open: 0, pots: 1 });
+  });
+
+  it("herkent een potje aan Deelbudget in de naam", () => {
+    const overview = buildOverview(
+      [doc("26-27_Deelbudget_Cursusdienst_Teldagen", { bo: 3, budgetTotalCents: -30000 })],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    expect(overview.posts[0].dossiers[0]).toMatchObject({ status: "POT", pot: "name", activity: "Teldagen" });
+  });
+
+  it("telt een potje in de begroting voor het begrote bedrag, niet voor een tussentijds resultaat", () => {
+    const overview = buildOverview(
+      [
+        doc("26-27_Deelbudget_Cursusdienst_Teldagen", { bo: 3, budgetTotalCents: -25000, allocationCents: -30000 }),
+        doc("26-27_Resultaat_Cursusdienst_Teldagen", { bo: 11, resultTotalCents: -4544 }),
+      ],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    const [dossier] = overview.posts[0].dossiers;
+    expect(dossier).toMatchObject({ status: "POT", resultCents: -4544, devCents: null, begrotingDevCents: 0 });
+    expect(overview.global).toMatchObject({ begrotingDev: 0, begrotingCounted: 1, done: 0 });
+  });
+
+  it("maakt van een los resultaat geen potje", () => {
+    const overview = buildOverview(
+      [doc("26-27_Deelresultaat_Cursusdienst_Teldagen", { bo: 11, resultTotalCents: -4544 })],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    expect(overview.posts[0].dossiers[0]).toMatchObject({ status: "NO_BUDGET", pot: null });
   });
 });

@@ -9892,6 +9892,11 @@ model BoDocument {
   begrotingExcludedAt     DateTime? @db.Timestamptz(3)
   /// Waarom, zodat wie de lijst later nakijkt weet wat er nog moet gebeuren.
   begrotingExcludedReason String?
+  /// Groep 5 duidde dit als potje aan (een deelbudget waaruit door het jaar
+  /// gekocht wordt): het wacht niet op een resultaat en telt in de stand
+  /// tegenover de begroting voor het begrote bedrag. Een bestand dat
+  /// "Deelbudget" heet, is dat ook zonder deze kolom. Null = geen potje.
+  potAt                   DateTime? @db.Timestamptz(3)
 
   firstSeenAt  DateTime  @default(now()) @db.Timestamptz(3)
   lastSeenAt   DateTime  @db.Timestamptz(3)

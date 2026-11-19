@@ -14,7 +14,7 @@ import {
   type ListFilter,
   type ListGroup,
 } from "@/lib/bo/list";
-import { BegrotingExcludedNote, boRange, dossierNotes, Files, HideDossierButton, Lines, linesOf, PostLinks, Progress, Stand, sumLines, Timeline, useFormat, type Fmt, type Locale, type Sheet } from "./BoParts";
+import { BegrotingExcludedNote, boRange, dossierNotes, Files, HideDossierButton, PotButton, PotNote, Lines, linesOf, PostLinks, Progress, Stand, sumLines, Timeline, useFormat, type Fmt, type Locale, type Sheet } from "./BoParts";
 import { ChangePosts, type PostChoice } from "./BoReview";
 
 /*
@@ -32,6 +32,7 @@ const FILTER_LABELS: Record<ListFilter, [string, string]> = {
   open: ["Resultaat open", "Result missing"],
   komt: ["Komt nog", "Upcoming"],
   af: ["Resultaat binnen", "Result in"],
+  potje: ["Potjes", "Pots"],
   slechter: ["Slechter dan budget", "Worse than budget"],
   boven: ["Budget boven begroting", "Budget above allocation"],
 };
@@ -671,6 +672,7 @@ function DossierForm({
 }) {
   const { nl } = f;
   const latest: XDoc | undefined = d.results.at(-1) ?? d.budgets.at(-1);
+  // Een potje staat na het budget: het wacht niet op een activiteit of resultaat.
   const stage = d.status === "DONE" || d.status === "NO_BUDGET" ? 3 : d.status === "OPEN" ? 2 : 1;
   const steps: [string, number][] = [
     ["Budget", 1],
@@ -721,6 +723,7 @@ function DossierForm({
               {nl ? "Openen in Drive" : "Open in Drive"}
             </a>
           )}
+          <PotButton dossier={d} nl={nl} errorMessages={errorMessages} className="vtk-bo-l-dd" />
           <HideDossierButton dossier={d} nl={nl} errorMessages={errorMessages} className="vtk-bo-l-dd" />
         </div>
         <span className="vtk-bo-l-status" aria-label={nl ? "Stadium" : "Stage"}>
@@ -752,6 +755,7 @@ function DossierForm({
               {note}
             </p>
           ))}
+          <PotNote dossier={d} nl={nl} />
           <BegrotingExcludedNote dossier={d} nl={nl} errorMessages={errorMessages} />
           <div className="vtk-bo-l-fields">
             <Field label={d.postKeys.length > 1 ? (nl ? "Posten" : "Posts") : "Post"}>

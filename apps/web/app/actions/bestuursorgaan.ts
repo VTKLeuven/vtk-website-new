@@ -296,6 +296,36 @@ export async function excludeBoBegrotingAction(formData: FormData): Promise<Save
   return saveOk();
 }
 
+/**
+ * Een activiteit als potje aanduiden, of niet meer: een deelbudget waaruit
+ * door het jaar gekocht wordt. Het wacht dan niet op een resultaat en telt in
+ * de stand tegenover de begroting voor het begrote bedrag. Alle bestanden van
+ * de activiteit, en hetzelfde bestand in een andere BO volgt mee. Een bestand
+ * dat "Deelbudget" heet, is een potje door zijn naam; dat zet dit niet terug.
+ */
+export async function setBoPotAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("bestuursorgaan.manage");
+  const ids = field(formData, "docIds").split(",").filter(Boolean);
+  const pot = field(formData, "pot") === "1";
+  const docs = await prisma.boDocument.findMany({ where: { id: { in: ids } }, select: { id: true, driveFileId: true, name: true } });
+  if (docs.length === 0) return saveError("DOCUMENT_NOT_FOUND");
+  await prisma.boDocument.updateMany({
+    where: { driveFileId: { in: docs.map((d) => d.driveFileId) } },
+    data: { potAt: pot ? new Date() : null },
+  });
+  for (const doc of docs) {
+    await logAudit({
+      action: "update",
+      entity: "boDocument",
+      entityId: doc.id,
+      target: doc.name,
+      summary: pot ? "Aangeduid als potje" : "Geen potje meer",
+    });
+  }
+  revalidateBo();
+  return saveOk();
+}
+
 /** Weer meetellen in de begroting: alle bestanden van de activiteit, of één. */
 export async function includeBoBegrotingAction(formData: FormData): Promise<SaveState> {
   await requirePermission("bestuursorgaan.manage");

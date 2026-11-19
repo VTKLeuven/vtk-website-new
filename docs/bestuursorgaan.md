@@ -118,6 +118,7 @@ daarnaast aanvaardt, omdat het in de map van 26-27 voorkwam:
 | `2026/09/07 Eetstand Wiskundeweek Begroting`  | een datum vooraan valt weg; "Begroting" achteraan is een budget |
 | `26-27_Budget_Statix-Talks`                   | een streepje waar een underscore hoorde: Statix, activiteit Talks |
 | `26-27_Budget Cultuur+Onthaal_Jeneverwandeling` | soort en post in één stuk, en twee posten   |
+| `26-27_Deelbudget_Cursusdienst_Teldagen`      | een potje (zie "Potjes" hieronder)             |
 
 **De post** wordt herkend aan de naam, de code of de slug van een post, en aan
 een afkorting die van precies één post het begin is (`Acti` is Activiteiten).
@@ -169,6 +170,17 @@ resultaat op de latere, elk met "zelfde blad als ...". Het budget is de kolom
 Budget, het resultaat de kolom Resultaat. Een blad dat nog `Budget` heet maar
 op een latere BO in Resultaten staat, blijft volgens de naam een budget ("ook
 in BO 9").
+
+**Potjes.** Een deelbudget waaruit door het jaar gekocht wordt, heeft een
+eigen stand, "Potje" (`DossierStatus` `POT`): het wacht niet op een resultaat,
+telt dus niet bij open, afgerond of het percentage, en telt in de stand
+tegenover de begroting voor het begrote bedrag (`begrotingDevCents` is 0 zolang
+het blad een regel Begroting heeft), wat een tussentijds resultaat ook zegt.
+Een activiteit is een potje wanneer een van haar bestanden `Deelbudget` of
+`Deelresultaat` heet (`ParsedDocumentName.pot`), of wanneer Groep 5 de knop
+"Potje" in het detail gebruikte (`BoDocument.potAt`, voor elke rij met
+hetzelfde `driveFileId`). Een resultaat zonder budget wordt nooit een potje.
+Het waarom staat in `docs/design-decisions.md`, "Bestuursorgaan: potjes".
 
 **Een versie** achteraan de naam (`_v2`, `versie 3`, `(1)`, `_final`) of
 "Kopie van" vooraan valt weg uit de activiteit (`ParsedDocumentName.version`):
@@ -356,6 +368,18 @@ begroting".
   de naam van de snelkoppeling, dus niemand zag waarom. Noemt het blad
   geen post die de site kent en de snelkoppeling wel, dan wint de snelkoppeling
   (`namesOf` in `lib/bo/dossiers.ts`).
+  Dat bleek niet genoeg: het blad kan ook een kopie van het budget van een
+  andere post zijn ("Kopie van 26-27_Budget_Theokot_Frigo"), en dan noemt het
+  wel een post die de site kent, maar de verkeerde. Dan staat het resultaat
+  "zonder budget", en het budget bij een andere activiteit of post. Een blad dat met
+  "Kopie van" begint, of geen jaar in zijn naam heeft terwijl de
+  snelkoppeling dat wel heeft, kreeg nooit een eigen naam: dan wint de
+  snelkoppeling ook als het blad een post noemt.
+- **Hetzelfde blad kan twee keer in één BO-map staan**: rechtstreeks in de
+  map van een post die er als snelkoppeling in hangt, en als snelkoppeling
+  met haar eigen naam. De scan bewaarde het eerste wat ze tegenkwam, en dan
+  viel de naam van de snelkoppeling weg. Nu wint die altijd (`collect` in
+  `lib/bo/scan.ts`).
 - **Een fout in de scan breekt de groepssync niet.** De worker roept beide in
   dezelfde ronde aan, maar de statuscode volgt enkel de groepssync; een fout in
   de BO-scan staat op `/admin/bestuursorgaan`.
