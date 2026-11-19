@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { getSession, canManageFakbar } from '@/lib/session';
-import { testLoginEnabled } from '@/lib/test-users';
+import { testLoginMode } from '@/lib/test-login-gate';
 import { HeaderShell } from './header-shell';
 
 const MAIN_URL = process.env.VTK_MAIN_URL || 'https://vtk.be';
@@ -21,9 +21,10 @@ const LINKS: HeaderLink[] = [
 export async function SiteHeader() {
   const session = await getSession();
   const isFakbar = session ? canManageFakbar(session) : false;
-  // Op een testomgeving wijst de login naar de test-picker in plaats van naar
-  // de KU Leuven-login op de hoofdsite. Zie lib/test-users.ts.
-  const testMode = testLoginEnabled();
+  // Lokaal (`open`) wijst de login naar de test-picker in plaats van naar de
+  // KU Leuven-login op de hoofdsite: daar is geen echte login. Op een gedeelde
+  // testomgeving (`true`) log je eerst echt in. Zie lib/test-login-gate.ts.
+  const testMode = testLoginMode() === 'open';
 
   const links = isFakbar ? [...LINKS, { href: '/admin', label: 'Beheer' }] : LINKS;
 

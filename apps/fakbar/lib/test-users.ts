@@ -3,16 +3,17 @@ import { prisma } from '@vtk/db';
 import { currentWorkingYear, type SessionPayload } from '@vtk/auth';
 
 /**
- * Test-login voor de Fakbar-app. Zelfde principe als de logistiek-app:
- * op lokale dev is er geen gedeelde .vtk.be-cookie, dus activeer je met
- * FAKBAR_TEST_LOGIN=true een lokale test-picker op /test-login.
+ * Test-login voor de Fakbar-app, met dezelfde drie standen als de
+ * uitleendienst (zie `lib/test-login-gate.ts`):
  *
- * STAAT DIT NOOIT AAN IN PRODUCTIE.
+ * - leeg: uit.
+ * - `true`: enkel wie de fakbar mag beheren kan een profiel kiezen. Voor een
+ *   gedeelde testomgeving.
+ * - `open`: iedereen. ENKEL LOKAAL, waar er geen gedeelde .vtk.be-cookie is
+ *   en dus geen echte login om op te gaten.
+ *
+ * Laat de waarde op productie leeg: de persona `it` is superadmin.
  */
-
-export function testLoginEnabled(): boolean {
-  return process.env.FAKBAR_TEST_LOGIN === 'true';
-}
 
 export const TEST_USER_COOKIE = 'fakbar-test-user';
 export type TestUserKey = 'student' | 'fakbar' | 'it';
