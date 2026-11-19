@@ -41,6 +41,16 @@ const nextConfig: NextConfig = {
             : []),
         ],
       },
+      // Zelfde minimale CSP als apps/web/next.config.ts; de uitleg staat daar.
+      {
+        source: "/((?!api/)(?!.*\\.pdf$).*)",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: "base-uri 'self'; object-src 'none'; frame-ancestors 'self'",
+          },
+        ],
+      },
     ];
   },
   turbopack: {

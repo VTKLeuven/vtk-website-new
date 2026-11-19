@@ -189,6 +189,22 @@ const nextConfig: NextConfig = {
             : []),
         ],
       },
+      // Een minimale CSP, die geen script of stijl beperkt en dus niets breekt:
+      // geen <base> die elke relatieve URL omleidt, geen plugins, en geen
+      // framing door een andere site. Niet op `/api/` en niet op een `.pdf`:
+      // Chrome weigert een PDF te tonen wanneer de PDF-response zelf
+      // `object-src 'none'` draagt, en de PDF's (tickets, magazines, bijlagen)
+      // komen van daar. Een volledige `script-src` vraagt nonces voor de inline
+      // scripts van Next en Umami; dat is apart werk.
+      {
+        source: "/((?!api/)(?!.*\\.pdf$).*)",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: "base-uri 'self'; object-src 'none'; frame-ancestors 'self'",
+          },
+        ],
+      },
       {
         source: "/scan/:path*",
         headers: [

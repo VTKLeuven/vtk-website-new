@@ -4,6 +4,7 @@ import sharp from "sharp";
 import { prisma } from "@vtk/db";
 import { newStorageKey, putObject } from "@vtk/storage";
 import { requirePermission, authErrorResponse } from "@/lib/session";
+import { fetchPublicUrl } from "@/lib/publicFetch";
 import type { StudyProgramme } from "@prisma/client";
 
 export const runtime = "nodejs";
@@ -42,13 +43,15 @@ async function uploadAvatarFromUrl(url: string): Promise<string | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15_000);
   try {
-    const res = await fetch(url, {
+    // Enkel een publieke https-host: de URL komt uit een JSON die iemand
+    // oplaadt, en anders haalt de server ook `http://postgres:5432` op.
+    const res = await fetchPublicUrl(url, {
       signal: controller.signal,
       headers: {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
       },
     });
-    if (!res.ok) return null;
+    if (!res?.ok) return null;
     const input = Buffer.from(await res.arrayBuffer());
     const body = await sharp(input)
       .rotate()
