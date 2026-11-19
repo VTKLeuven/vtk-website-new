@@ -18,6 +18,16 @@ describe('isSafeRedirectUrl', () => {
     expect(isSafeRedirectUrl('\\evil.com')).toBe(false);
   });
 
+  // De browser haalt tab en newline uit een URL voor hij hem leest, dus
+  // `/<tab>/evil.com` wordt `//evil.com`.
+  it('rejects paths that become protocol-relative once control characters are stripped', () => {
+    expect(isSafeRedirectUrl('/\t/evil.com')).toBe(false);
+    expect(isSafeRedirectUrl('/\n/evil.com')).toBe(false);
+    expect(isSafeRedirectUrl('/\r/evil.com')).toBe(false);
+    expect(isSafeRedirectUrl('/\t\\evil.com')).toBe(false);
+    expect(sanitizeNextUrl('/\t/evil.com')).toBe('/');
+  });
+
   it('accepts HTTPS URLs on trusted VTK domains', () => {
     expect(isSafeRedirectUrl('https://vtk.be')).toBe(true);
     expect(isSafeRedirectUrl('https://vtk.be/account')).toBe(true);

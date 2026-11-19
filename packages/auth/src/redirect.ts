@@ -15,9 +15,22 @@ export function isSafeRedirectUrl(url: string | null | undefined): boolean {
   const trimmed = url.trim();
   if (!trimmed) return false;
 
+  // Geen controletekens. De URL-parser van de browser gooit tab en newline
+  // weg, dus `/<tab>/evil.com` kwam door de check hieronder (één `/`, geen
+  // `\`) en werd daarna `//evil.com`: een redirect naar een andere site.
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f]/.test(trimmed)) return false;
+
   // Relative paths: must start with a single '/' and not contain backslashes or protocol-relative '//'
   if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.includes('\\')) {
-    return true;
+    // Tweede slot: wat de parser er zelf van maakt, moet op dezelfde origin
+    // blijven. Vangt elke variant die de regel hierboven niet voorzag.
+    const base = 'https://redirect-check.invalid';
+    try {
+      return new URL(trimmed, base).origin === base;
+    } catch {
+      return false;
+    }
   }
 
   // Absolute URLs
