@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PERMISSIONS } from "@vtk/auth";
 import {
   MCP_CREATE_TOOL_NAMES,
@@ -7,9 +7,14 @@ import {
 } from "@/lib/mcp/server";
 import { canCreateMcpKind, MCP_CREATE_KINDS } from "@/lib/mcp/create";
 import { MCP_PERMISSION_POLICY, principalFromAuthInfo } from "@/lib/mcp/policy";
-import { canReadMcpResource, MCP_READ_RESOURCES } from "@/lib/mcp/read";
+import {
+  canReadMcpResource,
+  MCP_OAUTH_SAFE_READ_RESOURCES,
+  MCP_READ_RESOURCES,
+} from "@/lib/mcp/read";
 
 describe("MCP toolbeleid", () => {
+  afterEach(() => vi.unstubAllEnvs());
   it("registreert brede read- en create-catalogi naast de kalenderaliases", () => {
     expect(MCP_READ_TOOL_NAMES).toContain("app_read");
     expect(MCP_CREATE_TOOL_NAMES).toContain("app_create");
@@ -77,6 +82,58 @@ describe("MCP toolbeleid", () => {
   it("heeft geen toolnaam die een destructive of overschrijvende mutatie suggereert", () => {
     for (const name of MCP_TOOL_NAMES) {
       expect(name).not.toMatch(/delete|remove|destroy|update|edit|save|upsert|publish|unpublish|refund|revoke|send|open_door/i);
+    }
+  });
+
+  it("dwingt OAuth-scopes en een strikte lees-allowlist zonder persoonsgegevens af", () => {
+    const readOnly = principalFromAuthInfo({
+      token: "[redacted]",
+      clientId: "Claude",
+      scopes: ["mcp:read"],
+      extra: {
+        authKind: "oauth",
+        userId: "u1",
+        permissions: PERMISSIONS.map(({ code }) => code),
+        allPermissions: false,
+        groupCodes: ["CULTUUR"],
+        allGroups: false,
+        roleCodes: [],
+      },
+    });
+    expect(canCreateMcpKind(readOnly, "calendar_event")).toBe(false);
+
+    for (const resource of MCP_READ_RESOURCES) {
+      expect(canReadMcpResource(readOnly, resource)).toBe(
+        MCP_OAUTH_SAFE_READ_RESOURCES.has(resource),
+      );
+    }
+
+    for (const blockedResource of [
+      "users",
+      "user_search",
+      "ticket_orders",
+      "form_entries",
+      "door",
+      "mailing_lists",
+      "shifts",
+      "shift_ranking",
+      "theokot",
+      "meetings",
+      "piano",
+      "logistiek",
+      "pocs",
+      "vault_metadata",
+      "lesbezoeken",
+      "urenloop_app",
+      "audit_log",
+      "oauth_clients",
+    ] as const) {
+      expect(canReadMcpResource(readOnly, blockedResource)).toBe(false);
+    }
+
+    vi.stubEnv("MCP_OAUTH_ALLOW_PII_READS", "true");
+    for (const resource of MCP_READ_RESOURCES) {
+      expect(canReadMcpResource(readOnly, resource)).toBe(true);
     }
   });
 });
