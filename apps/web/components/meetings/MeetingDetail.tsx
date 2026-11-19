@@ -14,6 +14,7 @@ import { CheckIcon, MaximizeIcon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
 import { formatEuro } from "@/lib/theokot";
 import { handoutCounts, personEntries, type CountRow } from "./meetingPeople";
+import { PersonSummary } from "./PersonSummary";
 import {
   deleteMeetingAction,
   saveMeetingAction,
@@ -537,29 +538,7 @@ function PersonColumns({ nl, meeting }: { nl: boolean; meeting: MeetingAdminView
         return (
           <li key={entry.key} className="flex items-start justify-between gap-3 border-t border-vtk-blue/10 py-2">
             <div className="min-w-0 text-sm">
-              <span className="block font-semibold text-vtk-ink">{entry.name}</span>
-              {row && (
-                <span className={`block ${row.invalid ? "text-red-600" : "text-[#34405e]"}`}>
-                  {row.hasOrder ? (
-                    <>
-                      {row.item ?? (nl ? "geen broodje" : "no sandwich")}
-                      {row.external && (nl ? " (extern)" : " (external)")}
-                      {row.extra && (nl ? " (bureauvoorraad)" : " (bureau stock)")}
-                      {row.drink ? ` · ${row.drink}` : ""}
-                      {row.invalid && (nl ? " (ongeldig)" : " (invalid)")}
-                    </>
-                  ) : (
-                    <span className="text-[#5c667f]">{nl ? "komt zonder bestelling" : "coming without an order"}</span>
-                  )}
-                </span>
-              )}
-              {entry.theokot.map((order) => (
-                <span key={order.id} className="block text-[#34405e]">
-                  {order.items}
-                  <span className="text-[#5c667f]">{nl ? " (zelf bij Theokot)" : " (ordered at Theokot)"}</span>
-                </span>
-              ))}
-              {row?.comment && <span className="block text-xs text-[#5c667f]">“{row.comment}”</span>}
+              <PersonSummary nl={nl} entry={entry} />
             </div>
             {meeting.showPaid && (
               <div className="flex shrink-0 gap-1">

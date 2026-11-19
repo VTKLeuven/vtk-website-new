@@ -4,24 +4,29 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { CloseIcon } from "@/components/ui/icons";
 import type { MeetingAdminView } from "./MeetingDetail";
-import { personEntries, type PersonEntry } from "./meetingPeople";
+import { personEntries } from "./meetingPeople";
+import { PersonSummary } from "./PersonSummary";
 
 import "@/app/design/vtk-meeting-handout.css";
 
-/** Onder deze lettergrootte (in px) vult het raster niet meer, maar scrolt het. */
+/** Onder deze lettergrootte (in px) vult de lijst niet meer, maar scrolt ze. */
 const MIN_FIT_FONT = 13;
-const MAX_FIT_FONT = 96;
+const MAX_FIT_FONT = 64;
+const MAX_COLUMNS = 10;
 
 /**
- * Het uitdeelscherm: alle broodjes van één vergadering op één scherm, zodat
+ * Het uitdeelscherm: iedereen van één vergadering op één scherm, zodat
  * iedereen op een laptop of tv zelf ziet welk broodje van hem is.
  *
- * Het scherm is bijna enkel tegels. De kop is één dunne regel en de totalen
- * staan er niet: die staan al op de pagina eronder, bij "Uit te delen". Het
- * raster kiest zelf hoeveel kolommen en hoe groot de letters zijn
- * (`fitGrid`), zodat alle tegels samen het scherm vullen, hoeveel mensen er
- * ook besteld hebben. Past het niet meer leesbaar (een gsm met een groot
- * bureau), dan scrolt het gewoon.
+ * Het is dezelfde lijst als "Per persoon" › "Twee kolommen" (`PersonSummary`):
+ * alfabetisch, de naam vet en daaronder het broodje en het drankje, met een
+ * haarlijn tussen de mensen. Enkel zijn er hier meer kolommen, en de lijst
+ * loopt van boven naar onder, kolom per kolom. `fitList` kiest het aantal
+ * kolommen en de lettergrootte zodat de lijst het scherm vult; past het niet
+ * meer leesbaar (een gsm met een groot bureau), dan scrolt ze gewoon.
+ *
+ * De kop is één dunne regel en de totalen staan er niet: die staan al op de
+ * pagina eronder, bij "Uit te delen".
  *
  * Het opent over de hele pagina (een portal naar `body`, dus buiten de
  * admin-css) en de knop die het opent, vraagt zelf de Fullscreen API aan: dat
@@ -42,7 +47,7 @@ export default function MeetingHandoutScreen({
   onClose: () => void;
 }) {
   const bodyRef = useRef<HTMLElement>(null);
-  const gridRef = useRef<HTMLUListElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
     // Wie de browser uit fullscreen haalt (Esc, F11, de knop van het
@@ -54,12 +59,16 @@ export default function MeetingHandoutScreen({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    // Het slot moet op <html>, niet op <body>: `html` heeft `overflow-x: clip`
+    // (globals.css), en dan gaat de overflow van body niet meer naar het
+    // venster. Met enkel body bleef de pagina onder dit scherm scrollen.
+    const root = document.documentElement;
+    const previousOverflow = root.style.overflow;
+    root.style.overflow = "hidden";
     document.addEventListener("fullscreenchange", onFullscreenChange);
     document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.body.style.overflow = previousOverflow;
+      root.style.overflow = previousOverflow;
       document.removeEventListener("fullscreenchange", onFullscreenChange);
       document.removeEventListener("keydown", onKeyDown);
       if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
@@ -70,14 +79,14 @@ export default function MeetingHandoutScreen({
   // een tablet die draait, en zodra het lettertype geladen is.
   useLayoutEffect(() => {
     const body = bodyRef.current;
-    const grid = gridRef.current;
-    if (!body || !grid) return;
+    const list = listRef.current;
+    if (!body || !list) return;
     let frame = 0;
     const schedule = () => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => fitGrid(body, grid));
+      frame = requestAnimationFrame(() => fitList(list));
     };
-    fitGrid(body, grid);
+    fitList(list);
     const observer = new ResizeObserver(schedule);
     observer.observe(body);
     void document.fonts?.ready.then(schedule);
@@ -88,17 +97,6 @@ export default function MeetingHandoutScreen({
   }, []);
 
   const entries = personEntries(meeting);
-  const ordered = entries.filter(
-    (entry) => entry.theokot.length > 0 || (entry.reservation?.hasOrder && !entry.reservation.invalid),
-  );
-  // Ongeldig staat achteraan in hetzelfde raster, in het rood: zo blijft het
-  // hele scherm voor tegels.
-  const invalid = entries.filter((entry) => entry.theokot.length === 0 && entry.reservation?.invalid);
-  const withoutOrder = entries.filter(
-    (entry) =>
-      entry.theokot.length === 0 && entry.reservation && !entry.reservation.hasOrder && !entry.reservation.invalid,
-  );
-  const tiles = [...ordered, ...invalid];
 
   return createPortal(
     <div className="mh-screen" role="dialog" aria-modal="true" aria-labelledby="mh-title">
@@ -114,136 +112,67 @@ export default function MeetingHandoutScreen({
       </header>
 
       <main ref={bodyRef} className="mh-body">
-        {tiles.length === 0 ? (
-          <div className="mh-empty">
-            {entries.length === 0
-              ? nl
-                ? "Nog niemand ingeschreven."
-                : "Nobody registered yet."
-              : nl
-                ? "Nog niets besteld."
-                : "Nothing ordered yet."}
-          </div>
+        {entries.length === 0 ? (
+          <div className="mh-empty">{nl ? "Nog niemand ingeschreven." : "Nobody registered yet."}</div>
         ) : (
-          <ul ref={gridRef} className="mh-grid">
-            {tiles.map((entry) => (
-              <PersonTile key={entry.key} nl={nl} entry={entry} />
+          <ul ref={listRef} className="mh-list">
+            {entries.map((entry) => (
+              <li key={entry.key}>
+                <PersonSummary nl={nl} entry={entry} />
+              </li>
             ))}
           </ul>
         )}
       </main>
-
-      {withoutOrder.length > 0 && (
-        <footer className="mh-foot">
-          <strong>{nl ? "Zonder bestelling" : "Without an order"}:</strong>{" "}
-          {withoutOrder.map((entry) => entry.name).join(", ")}
-        </footer>
-      )}
     </div>,
     document.body,
   );
 }
 
 /**
- * Kiest het aantal kolommen en de lettergrootte waarbij alle tegels samen de
- * ruimte vullen en de grootste letters krijgen. Per kolomaantal zoekt het
- * binair naar de grootste letter waarbij niets uit een tegel loopt; dat meet
- * het in de DOM zelf, zodat een lange naam of een broodje dat op twee regels
- * valt vanzelf meetelt. Alles in layoutpixels (`clientWidth`, `scrollHeight`),
- * dus de zoom van 90% op een laptop maakt hier niets uit.
+ * Kiest het aantal kolommen en de lettergrootte waarbij de hele lijst op het
+ * scherm past met de grootste letters. Per kolomaantal zoekt het binair naar
+ * de grootste letter waarbij er geen kolom bij moet komen buiten beeld en
+ * geen naam of broodje uit zijn kolom loopt. Dat meet het in de DOM zelf,
+ * zodat een lange naam of een broodje over twee regels vanzelf meetelt. Alles
+ * in layoutpixels (`clientWidth`, `scrollWidth`), dus de zoom van 90% op een
+ * laptop maakt hier niets uit.
  */
-function fitGrid(body: HTMLElement, grid: HTMLUListElement) {
-  const tiles = [...grid.children] as HTMLElement[];
-  const count = tiles.length;
-  if (count === 0) return;
+function fitList(list: HTMLUListElement) {
+  const items = [...list.children] as HTMLElement[];
+  if (items.length === 0) return;
 
-  const style = getComputedStyle(body);
-  const width = body.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-  const height = body.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
-  const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;
-
-  const apply = (cols: number, rows: number, font: number) => {
-    grid.dataset.fit = "";
-    grid.style.setProperty("--mh-cols", String(cols));
-    grid.style.setProperty("--mh-rows", String(rows));
-    grid.style.setProperty("--mh-font", `${font}px`);
+  const apply = (cols: number, font: number) => {
+    list.dataset.fit = "";
+    list.style.setProperty("--mh-cols", String(cols));
+    list.style.setProperty("--mh-font", `${font}px`);
   };
   const fits = () =>
-    tiles.every((tile) => tile.scrollHeight <= tile.clientHeight + 1 && tile.scrollWidth <= tile.clientWidth + 1);
+    list.scrollWidth <= list.clientWidth + 1 &&
+    list.scrollHeight <= list.clientHeight + 1 &&
+    items.every((item) => item.scrollWidth <= item.clientWidth + 1);
 
-  let best: { cols: number; rows: number; font: number } | null = null;
-  for (let cols = 1; cols <= count; cols++) {
-    const rows = Math.ceil(count / cols);
-    // Een kolom erbij die geen rij uitspaart, maakt de tegels enkel smaller.
-    if (cols > 1 && Math.ceil(count / (cols - 1)) === rows) continue;
-    const tileWidth = (width - gap * (cols - 1)) / cols;
-    const tileHeight = (height - gap * (rows - 1)) / rows;
-    // Tegels die veel hoger dan breed of veel breder dan hoog zijn, lezen
-    // slecht en winnen het toch nooit; die vormen slaan we over.
-    const ratio = tileWidth / tileHeight;
-    if (ratio < 0.8 || ratio > 8) continue;
-
-    let low = MIN_FIT_FONT;
-    let high = Math.min(MAX_FIT_FONT, Math.floor(tileHeight / 2));
-    if (high < low) continue;
-    apply(cols, rows, low);
+  let best: { cols: number; font: number } | null = null;
+  for (let cols = 1; cols <= Math.min(items.length, MAX_COLUMNS); cols++) {
+    apply(cols, MIN_FIT_FONT);
     if (!fits()) continue;
+    let low = MIN_FIT_FONT;
+    let high = MAX_FIT_FONT;
     while (low < high) {
       const mid = Math.ceil((low + high) / 2);
-      apply(cols, rows, mid);
+      apply(cols, mid);
       if (fits()) low = mid;
       else high = mid - 1;
     }
-    if (!best || low > best.font) best = { cols, rows, font: low };
+    if (!best || low > best.font) best = { cols, font: low };
   }
 
   if (best) {
-    apply(best.cols, best.rows, best.font);
+    apply(best.cols, best.font);
   } else {
-    // Leesbaar vullen lukt niet: dan een gewoon raster dat scrolt.
-    delete grid.dataset.fit;
-    grid.style.removeProperty("--mh-cols");
-    grid.style.removeProperty("--mh-rows");
-    grid.style.removeProperty("--mh-font");
+    // Leesbaar vullen lukt niet: dan een gewone lijst die scrolt.
+    delete list.dataset.fit;
+    list.style.removeProperty("--mh-cols");
+    list.style.removeProperty("--mh-font");
   }
-}
-
-/** Eén persoon: de naam, en daaronder groot wat die mag nemen. */
-function PersonTile({ nl, entry }: { nl: boolean; entry: PersonEntry }) {
-  const row = entry.reservation;
-  const invalid = Boolean(row?.invalid);
-  return (
-    <li className="mh-tile" data-state={invalid ? "invalid" : undefined}>
-      <span className="mh-name">{entry.name}</span>
-      {row?.hasOrder && (
-        <>
-          {/* Enkel een drankje: dan is dat wat die persoon neemt, groot. */}
-          <span className="mh-item">{row.item ?? row.drink}</span>
-          {(row.external || row.extra || invalid || !row.item) && (
-            <span className="mh-tags">
-              {invalid && <span className="mh-tag mh-tag--danger">{nl ? "ongeldig" : "invalid"}</span>}
-              {!row.item && <span className="mh-tag">{nl ? "enkel een drankje" : "drink only"}</span>}
-              {row.external && <span className="mh-tag">{nl ? "extern" : "external"}</span>}
-              {row.extra && <span className="mh-tag">{nl ? "bureauvoorraad" : "bureau stock"}</span>}
-            </span>
-          )}
-          {row.item && row.drink && <span className="mh-drink">+ {row.drink}</span>}
-        </>
-      )}
-      {entry.theokot.map((order) =>
-        order.lines.map((line, index) => (
-          <span key={`${order.id}-${index}`} className="mh-item">
-            {line.quantity > 1 && <span className="mh-qty">{line.quantity}× </span>}
-            {line.name}
-          </span>
-        )),
-      )}
-      {entry.theokot.length > 0 && (
-        <span className="mh-tags">
-          <span className="mh-tag">{nl ? "zelf bij Theokot" : "ordered at Theokot"}</span>
-        </span>
-      )}
-      {row?.comment && <span className="mh-comment">“{row.comment}”</span>}
-    </li>
-  );
 }
