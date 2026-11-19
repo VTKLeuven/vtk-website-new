@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
 
 import * as WebBrowser from 'expo-web-browser';
-import { CalendarPlus, Star } from 'lucide-react-native';
+import { CalendarCheck, CalendarPlus, Star } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -16,6 +16,7 @@ import { addEventToDeviceCalendar, addResultMessage } from '../../deviceCalendar
 import { formatDayShort, formatEventWhen, formatTimeRange } from '../../format';
 import { markdownToPlainText } from '../../markdown';
 import { leadMoment } from '../../moments';
+import { usePlanning } from '../../planning/usePlanning';
 import { useApp } from '../../state/app';
 import { useTabRouter } from '../../navigation';
 import { COLORS, FONTS, RADIUS, SPACING, TYPE } from '../../theme/tokens';
@@ -42,6 +43,11 @@ import { COLORS, FONTS, RADIUS, SPACING, TYPE } from '../../theme/tokens';
  *   en een herinnering. Dat is iets anders dan de ICS-feed op de site: die
  *   abonneert je op álles, dit is dit ene ding.
  *
+ * - **In mijn planning** zet het in de planning van Burgieclan, naast je lessen
+ *   (Kalender, tabblad Planning) en in de agenda die die planning exporteert.
+ *   Enkel zichtbaar wanneer je een lessenrooster koppelde: zonder is er geen
+ *   planning om het in te zetten.
+ *
  * Bij een **alumni-evenement** staat er onderaan wie er komt. Die lijst bevat
  * enkel wie op de site zelf aanvinkte zichtbaar te willen zijn; wie dat niet deed
  * telt mee in het getal en staat er niet in. Aanduiden dat je komt zonder account
@@ -57,6 +63,7 @@ export default function EventScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [addingToCalendar, setAddingToCalendar] = useState(false);
   const [allDays, setAllDays] = useState(false);
+  const planning = usePlanning(locale);
 
   const resource = useResource(
     `evenement:${id}`,
@@ -109,6 +116,11 @@ export default function EventScreen() {
       setAddingToCalendar(false);
     }
   };
+
+  const plannable = viewer !== null && planning.data?.available === true && planning.data.subscribed;
+  const inPlanning = planning.data?.vtkEvents.some((item) => item.id === event.id) ?? false;
+  const togglePlanning = () =>
+    void planning.run({ op: inPlanning ? 'removeVtkEvent' : 'addVtkEvent', vtkEventId: event.id });
 
   const themes = event.categories.map((category) => category.name).join(', ');
 
@@ -220,6 +232,25 @@ export default function EventScreen() {
             <Text style={styles.actionLabel}>Zet in agenda</Text>
           </Pressable>
         </View>
+
+        {plannable ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: inPlanning, busy: planning.busy }}
+            accessibilityLabel={inPlanning ? 'Uit mijn planning halen' : 'In mijn planning zetten'}
+            disabled={planning.busy}
+            onPress={togglePlanning}
+            style={({ pressed }) => [
+              styles.action,
+              styles.actionWide,
+              inPlanning && styles.actionActive,
+              (pressed || planning.busy) && styles.actionPressed,
+            ]}
+          >
+            <CalendarCheck color={COLORS.navy} size={17} />
+            <Text style={styles.actionLabel}>{inPlanning ? 'In mijn planning' : 'Zet in mijn planning'}</Text>
+          </Pressable>
+        ) : null}
 
         {/* De server beslist over de drempel en stuurt hieronder niets mee zolang
             die niet gehaald is; zo tonen de app en de site hetzelfde getal. */}
@@ -360,6 +391,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.line2,
   },
+  actionWide: { flex: 0 },
   actionPrimary: { backgroundColor: COLORS.ink, borderColor: COLORS.ink },
   actionActive: { backgroundColor: COLORS.yellow, borderColor: COLORS.yellow },
   actionPressed: { opacity: 0.8 },

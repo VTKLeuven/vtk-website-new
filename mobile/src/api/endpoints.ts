@@ -14,6 +14,8 @@ import type {
   AppPage,
   AppPassHolder,
   AppPiano,
+  AppPlanning,
+  AppPlanningOperation,
   AppPoc,
   AppPollAnswerInput,
   AppPolls,
@@ -406,4 +408,44 @@ export function leaveStudyGroup(groupId: string, memberId?: string): Promise<App
  */
 export function fetchRooms(query?: string): Promise<AppRooms> {
   return apiFetch<AppRooms>(appApi('/lokalen', { q: query?.trim() || undefined }));
+}
+
+// ── Planning (Burgieclan) ───────────────────────────────────────────────────
+
+/**
+ * De planning van Burgieclan: lessenrooster, deadlines en de VTK-evenementen
+ * erin. De site geeft alles door aan Burgieclan, dus dit zijn dezelfde gegevens
+ * als op burgieclan.be. Een sync van het lessenrooster mag even duren, vandaar
+ * de ruimere timeout.
+ */
+export function fetchPlanning(locale: AppLocale): Promise<AppPlanning> {
+  return apiFetch<AppPlanning>(appApi('/planning', { locale }), { timeout: 35_000 });
+}
+
+export function planningOperation(locale: AppLocale, operation: AppPlanningOperation): Promise<AppPlanning> {
+  return apiFetch<AppPlanning>(appApi('/planning/operations', { locale }), {
+    method: 'POST',
+    body: operation,
+    timeout: 20_000,
+  });
+}
+
+export function subscribePlanning(locale: AppLocale, icsUrl: string): Promise<AppPlanning> {
+  return apiFetch<AppPlanning>(appApi('/planning/subscription', { locale }), {
+    method: 'POST',
+    body: { icsUrl },
+    timeout: 35_000,
+  });
+}
+
+export function unsubscribePlanning(locale: AppLocale): Promise<AppPlanning> {
+  return apiFetch<AppPlanning>(appApi('/planning', { locale }), { method: 'DELETE', timeout: 20_000 });
+}
+
+export function syncPlanning(locale: AppLocale): Promise<AppPlanning> {
+  return apiFetch<AppPlanning>(appApi('/planning/sync', { locale }), { method: 'POST', timeout: 35_000 });
+}
+
+export function rotatePlanningFeed(locale: AppLocale): Promise<AppPlanning> {
+  return apiFetch<AppPlanning>(appApi('/planning/feed-token', { locale }), { method: 'POST' });
 }

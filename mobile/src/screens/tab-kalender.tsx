@@ -7,6 +7,7 @@ import { fetchCalendar, setEventInterest } from '../api/endpoints';
 import { messageFor, useResource } from '../api/useResource';
 import { EventTile } from '../components/EventTile';
 import { MonthView } from '../components/MonthView';
+import { PlanningView } from '../components/planning/PlanningView';
 import { PageHead } from '../components/PageHead';
 import { Empty, ErrorState, Loading, StaleNotice, WeekHead } from '../components/ui';
 import { formatDay } from '../format';
@@ -18,7 +19,7 @@ import { useTabRouter } from '../navigation';
 import { COLORS, FONTS, RADIUS, SPACING, TYPE } from '../theme/tokens';
 import { groupByWeek } from '../weeks';
 
-type Weergave = 'lijst' | 'maand';
+type Weergave = 'lijst' | 'maand' | 'planning';
 
 const VIEW_KEY = 'kalender-weergave';
 
@@ -39,6 +40,10 @@ const MINE = '__mijn__';
  * De keuze blijft bewaard. Wie de maandweergave verkiest, wil die niet elke keer
  * opnieuw aanzetten.
  *
+ * **Planning** is iets anders: de planning van Burgieclan (lessenrooster,
+ * deadlines en de VTK-evenementen die je erin zette) als drie dagen naast
+ * elkaar. Ze staat naast de kalender en vervangt hem niet; zie `PlanningView`.
+ *
  * De twee halen ook andere gegevens op: de lijst vraagt alles vanaf nu, de
  * maandweergave precies het zichtbare rooster, inclusief het verleden. Anders zou
  * bladeren naar vorige maand een leeg rooster geven.
@@ -58,9 +63,10 @@ export default function KalenderScreen() {
   const router = useTabRouter();
   const { locale, viewer } = useApp();
 
-  const [view, setViewState] = useState<Weergave>(() =>
-    getPref(VIEW_KEY) === 'maand' ? 'maand' : 'lijst',
-  );
+  const [view, setViewState] = useState<Weergave>(() => {
+    const saved = getPref(VIEW_KEY);
+    return saved === 'maand' || saved === 'planning' ? saved : 'lijst';
+  });
   const [category, setCategory] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<MonthAnchor>(() => anchorOf(todayKey()));
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -70,6 +76,8 @@ export default function KalenderScreen() {
     setViewState(next);
   };
 
+  // De planning vraagt een login; uitgelogd valt een bewaarde keuze terug op de lijst.
+  const planning = view === 'planning' && viewer !== null;
   const range = view === 'maand' ? gridRange(anchor) : null;
   const mine = category === MINE;
 
@@ -122,6 +130,56 @@ export default function KalenderScreen() {
 
   const weeks = useMemo(() => groupByWeek(events, (event) => displayStart(event), locale), [events, locale]);
 
+  const headTabs = {
+    onChange: (next: 'lijst' | 'maand' | 'mijn' | 'planning') => {
+      if (next === 'mijn') {
+        setView('lijst');
+        setCategory(MINE);
+      } else {
+        setView(next);
+        if (mine) setCategory(null);
+      }
+    },
+    options: [
+      { value: 'lijst' as const, label: 'Agenda' },
+      { value: 'maand' as const, label: 'Maand' },
+      ...(viewer
+        ? [
+            { value: 'mijn' as const, label: 'Mijn lijst' },
+            { value: 'planning' as const, label: 'Planning' },
+          ]
+        : []),
+    ],
+  };
+
+  const bell = viewer ? (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Meldingen instellen"
+      onPress={() => router.push('/meldingen')}
+      hitSlop={10}
+    >
+      <Bell color={COLORS.yellow} size={20} />
+    </Pressable>
+  ) : undefined;
+
+  // De planning heeft haar eigen verticale scroll (de uren van de dag), dus de
+  // kop staat hier vast in plaats van mee te schuiven zoals in de lijst.
+  if (planning) {
+    return (
+      <View style={styles.root}>
+        <PageHead
+          title="Kalender"
+          subtitle="Je lessen en VTK in één agenda"
+          back={false}
+          right={bell}
+          tabs={{ ...headTabs, value: 'planning' }}
+        />
+        <PlanningView locale={locale} onOpenEvent={(id) => router.push(`/evenement/${id}`)} />
+      </View>
+    );
+  }
+
   if (resource.loading) return <Loading label="Kalender ophalen" />;
   if (!resource.data) {
     return (
@@ -132,7 +190,7 @@ export default function KalenderScreen() {
   const { categories, filteredByAudience } = resource.data;
   // "Mijn lijst" staat als derde tabblad in de kop: het is een andere lijst, geen
   // thema om op te filteren.
-  const headTab: 'lijst' | 'maand' | 'mijn' = mine ? 'mijn' : view;
+  const headTab: 'lijst' | 'maand' | 'mijn' = mine ? 'mijn' : view === 'maand' ? 'maand' : 'lijst';
 
   return (
     <View style={styles.root}>
@@ -152,35 +210,8 @@ export default function KalenderScreen() {
           title="Kalender"
           subtitle="Alles wat er bij VTK te doen is"
           back={false}
-          right={
-            viewer ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Meldingen instellen"
-                onPress={() => router.push('/meldingen')}
-                hitSlop={10}
-              >
-                <Bell color={COLORS.yellow} size={20} />
-              </Pressable>
-            ) : undefined
-          }
-          tabs={{
-            value: headTab,
-            onChange: (next) => {
-              if (next === 'mijn') {
-                setView('lijst');
-                setCategory(MINE);
-              } else {
-                setView(next);
-                if (mine) setCategory(null);
-              }
-            },
-            options: [
-              { value: 'lijst', label: 'Agenda' },
-              { value: 'maand', label: 'Maand' },
-              ...(viewer ? [{ value: 'mijn' as const, label: 'Mijn lijst' }] : []),
-            ],
-          }}
+          right={bell}
+          tabs={{ ...headTabs, value: headTab }}
         />
 
         {categories.length > 0 && !mine ? (

@@ -43,6 +43,30 @@ export const DARK_GLASS = {
   border: 'rgba(255, 255, 255, 0.14)',
 } as const;
 
+/**
+ * De planning (Kalender, tabblad Planning): de lessen uit het KU Leuven-rooster
+ * per soort, zoals de planner van Burgieclan ze kleurt (`--color-plan-*` in
+ * `frontend/src/app/globals.css` van burgieclan, lichte modus). Het is dezelfde
+ * planning op twee plaatsen, dus een les heeft op beide dezelfde kleur.
+ *
+ * Een VTK-evenement krijgt geen eigen tint maar de gele rail, zoals een
+ * uitgelichte kaart op de site; een verplichte les de rode rail van Burgieclan.
+ */
+export const PLANNING = {
+  lectureBg: '#eef1f8',
+  lectureBorder: '#c5cde0',
+  lectureText: '#1d2b52',
+  practiceBg: '#ecf4f2',
+  practiceBorder: '#b4d2cc',
+  practiceText: '#24524c',
+  otherBg: '#f3f3f5',
+  otherBorder: '#d3d4db',
+  otherText: '#484a55',
+  /** De rail van een verplichte les en de nu-lijn, `--color-danger` bij Burgieclan. */
+  danger: '#dc2626',
+  dangerText: '#b91c1c',
+} as const;
+
 export const SPACING = {
   xs: 4,
   sm: 8,
