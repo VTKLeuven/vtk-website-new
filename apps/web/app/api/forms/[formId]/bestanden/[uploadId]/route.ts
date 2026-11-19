@@ -1,5 +1,5 @@
 import { prisma } from "@vtk/db";
-import { getObjectStream, objectResponse } from "@vtk/storage";
+import { SANDBOX_CSP, getObjectStream, objectResponse } from "@vtk/storage";
 import { contentDisposition } from "@/lib/contentDisposition";
 import { getCurrentSession } from "@/lib/session";
 import { getFormAccess } from "@/lib/forms/authorization";
@@ -47,6 +47,9 @@ export async function GET(
         "Content-Disposition": contentDisposition("attachment", upload.originalName),
         "Cache-Control": "private, no-store",
         "X-Content-Type-Options": "nosniff",
+        // Oudere uploads dragen nog het type dat de browser opgaf; opent iemand
+        // er toch een, dan draait het zonder origin.
+        "Content-Security-Policy": SANDBOX_CSP,
       },
     }));
   } catch (error) {

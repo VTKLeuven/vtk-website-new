@@ -134,4 +134,55 @@ describe("GET /api/media/[...key]", () => {
 
     expect(res.status).toBe(404);
   });
+
+  // Een bonnetje of formulierbestand heeft een eigen leesroute met rechten.
+  it("never serves a private folder, even with a valid key", async () => {
+    for (const segments of [
+      ["bonnetjes", "abc.jpg"],
+      ["forms", "form1", "abc.pdf"],
+      ["images", "..", "forms", "form1", "abc.pdf"],
+    ]) {
+      const res = await GET(createRequest(`/api/media/${segments.join("/")}`), createContext(segments));
+      expect(res.status).toBe(404);
+    }
+    expect(mocks.getObjectStream).not.toHaveBeenCalled();
+  });
+
+  // De oude denylist liet `application/atom+xml` inline openen, en een browser
+  // voert dat als XHTML met script uit.
+  it("downloads any type outside the allowlist in a sandbox", async () => {
+    mocks.getObjectStream.mockResolvedValue({
+      stream: Readable.from(Buffer.from("<html/>")),
+      contentType: "application/atom+xml",
+      contentLength: 7,
+      contentRange: undefined,
+      etag: '"etag789"',
+      lastModified: new Date("2026-09-01T12:00:00Z"),
+    });
+
+    const res = await GET(
+      createRequest("/api/media/images/abc.xml"),
+      createContext(["images", "abc.xml"]),
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-security-policy")).toContain("sandbox");
+    expect(res.headers.get("content-disposition")).toMatch(/^attachment/);
+  });
+
+  it("keeps images inline without a sandbox", async () => {
+    mocks.getObjectStream.mockResolvedValue({
+      stream: Readable.from(Buffer.from("jpeg")),
+      contentType: "image/jpeg",
+      contentLength: 4,
+      contentRange: undefined,
+      etag: '"etagimg"',
+      lastModified: new Date("2026-09-01T12:00:00Z"),
+    });
+
+    const res = await GET(createRequest("/api/media/images/abc.jpg"), createContext(["images", "abc.jpg"]));
+
+    expect(res.headers.get("content-security-policy")).toBeNull();
+    expect(res.headers.get("content-disposition")).toBeNull();
+  });
 });

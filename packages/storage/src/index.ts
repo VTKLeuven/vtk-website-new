@@ -12,6 +12,15 @@ import { extname } from "node:path";
 import { Readable } from "node:stream";
 import { ZipArchive } from "archiver";
 
+export {
+  PRIVATE_MEDIA_PREFIXES,
+  SANDBOX_CSP,
+  isInlineSafeContentType,
+  isPublicMediaKey,
+  normalizeContentType,
+  uploadContentType,
+} from "./serve";
+
 export type S3Config = {
   endpoint: string;
   accessKeyId: string;
