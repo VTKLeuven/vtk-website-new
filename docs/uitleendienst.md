@@ -217,7 +217,10 @@ De transportplanning als `.ics`, met het geheim in de URL omdat een agenda-clien
 geen cookies meestuurt. `Cache-Control: private, no-store`, `X-Robots-Tag:
 noindex`, 404 (niet 403) bij een onbekend of ingetrokken token. Twee scopes:
 `TEAM` (de hele planning, vraagt `logistiek.manage`) en `DRIVER` (enkel de eigen
-ritten, vraagt dat je chauffeur bent). De URL komt één keer terug, bij het
+ritten, vraagt dat je chauffeur bent). Een `TEAM`-feed toetst dat recht bij elke
+lezing opnieuw (`lib/live-permission.ts`), niet enkel bij het aanmaken: na de
+reset van 15 juli geeft de feed van wie het recht kwijt is een 404, en krijgt
+hij het terug, dan werkt dezelfde URL weer. De URL komt één keer terug, bij het
 aanmaken; enkel de sha256 staat in de databank.
 
 `lib/calendar/ics.ts` is een **kopie** van `apps/web/lib/calendar/ics.ts`. Hoisten
