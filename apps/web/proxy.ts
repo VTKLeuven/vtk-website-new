@@ -13,6 +13,7 @@ import {
 // het endpoint dat de plugin al bedient; zo blijft er één handler. De
 // OIDC-variant zit al onder basePath en heeft dit niet nodig.
 const RFC8414_METADATA_PATH = '/.well-known/oauth-authorization-server';
+const RFC9728_METADATA_PATH = '/.well-known/oauth-protected-resource';
 
 const LOCALES = ['nl', 'en'] as const;
 const DEFAULT_LOCALE = 'nl';
@@ -234,6 +235,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
+  // RFC 9728 Protected Resource Metadata voor /api/mcp (niet herschrijven naar /[locale]).
+  if (pathname === RFC9728_METADATA_PATH || pathname === `${RFC9728_METADATA_PATH}/api/mcp`) {
+    return NextResponse.next();
+  }
+
   // De scanner en Linktree hebben elk hun eigen full-screen route group en
   // mogen dus niet naar `[locale]` herschreven worden (daar zit de site-header).
   if (
@@ -290,5 +296,7 @@ export const config = {
     // Moet een letterlijke string zijn: Next leest de matcher bij build-time,
     // dus AUTH_BASE_PATH kan hier niet geïnterpoleerd worden.
     '/.well-known/oauth-authorization-server/:path*',
+    '/.well-known/oauth-protected-resource',
+    '/.well-known/oauth-protected-resource/:path*',
   ],
 };

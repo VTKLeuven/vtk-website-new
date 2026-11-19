@@ -34,6 +34,7 @@ import {
 import {
   hasAnyMcpPermission,
   hasMcpPermission,
+  hasMcpScope,
   listMcpCapabilities,
   principalFromAuthInfo,
 } from "@/lib/mcp/policy";
@@ -304,7 +305,7 @@ function createServer(context: McpRequestContext): McpServer {
       inputSchema: listEventsSchema,
       annotations: readAnnotations,
     },
-    (input) => runTool(() => listCalendarEvents(input)),
+    (input) => runTool(() => listCalendarEvents(input, principal)),
   );
   if (canReadMcpResource(principal, "calendar")) server.registerTool(
     "calendar_get_event",
@@ -314,7 +315,7 @@ function createServer(context: McpRequestContext): McpServer {
       inputSchema: eventIdSchema,
       annotations: readAnnotations,
     },
-    (input) => runTool(() => getCalendarEvent(input)),
+    (input) => runTool(() => getCalendarEvent(input, principal)),
   );
   if (canReadMcpResource(principal, "calendar")) server.registerTool(
     "calendar_list_categories",
@@ -406,7 +407,7 @@ function createServer(context: McpRequestContext): McpServer {
     },
     (input) => runTool(() => createMcpRecord(principal, input)),
   );
-  if (hasAnyMcpPermission(principal, ["calendar.create", "calendar.manageAll"])) server.registerTool(
+  if (hasMcpScope(principal, "mcp:create") && hasAnyMcpPermission(principal, ["calendar.create", "calendar.manageAll"])) server.registerTool(
     "calendar_create_event",
     {
       title: "Kalenderevenement aanmaken",
@@ -419,7 +420,7 @@ function createServer(context: McpRequestContext): McpServer {
       data: { ...input, publish: false },
     })),
   );
-  if (hasMcpPermission(principal, "calendar.manageAll")) server.registerTool(
+  if (hasMcpScope(principal, "mcp:create") && hasMcpPermission(principal, "calendar.manageAll")) server.registerTool(
     "calendar_create_category",
     {
       title: "Kalendercategorie aanmaken",
