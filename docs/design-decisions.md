@@ -11809,6 +11809,16 @@ erbij kwam, viel eruit tot iemand ze erin zette; dat was de bedoeling. Het
 paneel "Openbaar of privé" van zo'n event belooft daarom ook geen plaats in het
 nieuws.
 
+**Een uitverkochte ticketverkoop valt uit het nieuws** (november 2026). Een
+tegel die naar een shop wijst waar niets meer te koop is, is geen nieuws. Dat
+geldt voor de homepage, /nieuws en /admin/nieuws samen (ze lezen dezelfde
+`collectNews`), en ook voor de voorverkoop. Uitverkocht betekent hier: geen
+enkel actief tickettype heeft nog een vrije plaats, voor een lid noch voor een
+niet-lid (`ticketSoldOut` in `lib/news/rules.ts`). Een pot met enkel nog
+ledenplaatsen blijft dus in het nieuws, want het nieuws is voor iedereen
+hetzelfde. Een plaats in een lopende reservatie telt als bezet, zoals op
+/tickets; vervalt de reservatie, dan komt het bericht binnen de minuut terug.
+
 **Een ticketverkoop en een inschrijving tonen de dag van het evenement.** De
 datumpin en de kopregel stonden op het moment dat de verkoop opende, en "do 24
 sep" boven een uitstap op de 29ste las als de dag van de uitstap. Wanneer de

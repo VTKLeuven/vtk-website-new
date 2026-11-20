@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ticketSoldOut,
   albumInNews,
   composeNews,
   groupNewsByPeriod,
@@ -355,5 +356,49 @@ describe("/nieuws per periode", () => {
       ["later-2026-11", null, ["galabal"]],
       ["last-week", "2026-09-14", ["bakske"]],
     ]);
+  });
+});
+
+describe("een uitverkochte ticketverkoop", () => {
+  const pool = (over: Record<string, unknown> = {}) => ({
+    active: true,
+    capacity: 100,
+    reservedCount: 0,
+    soldCount: 0,
+    memberCapacity: null,
+    nonMemberCapacity: null,
+    memberReservedCount: 0,
+    memberSoldCount: 0,
+    ...over,
+  });
+
+  it("valt uit het nieuws wanneer geen enkel type nog een plaats heeft", () => {
+    expect(ticketSoldOut({ ticketTypes: [{ inventoryPool: pool({ soldCount: 100 }) }] })).toBe(true);
+    expect(
+      ticketSoldOut({ ticketTypes: [{ inventoryPool: pool({ soldCount: 90, reservedCount: 10 }) }] }),
+    ).toBe(true);
+  });
+
+  it("blijft staan zolang één type nog plaatsen heeft", () => {
+    expect(
+      ticketSoldOut({
+        ticketTypes: [{ inventoryPool: pool({ soldCount: 100 }) }, { inventoryPool: pool({ soldCount: 99 }) }],
+      }),
+    ).toBe(false);
+  });
+
+  it("blijft staan wanneer er enkel nog ledenplaatsen zijn: het nieuws is voor iedereen", () => {
+    expect(
+      ticketSoldOut({
+        ticketTypes: [
+          { inventoryPool: pool({ nonMemberCapacity: 20, soldCount: 20, memberSoldCount: 0 }) },
+        ],
+      }),
+    ).toBe(false);
+  });
+
+  it("telt een gesloten pot als uitverkocht, maar een verkoop zonder types niet", () => {
+    expect(ticketSoldOut({ ticketTypes: [{ inventoryPool: pool({ active: false }) }] })).toBe(true);
+    expect(ticketSoldOut({ ticketTypes: [] })).toBe(false);
   });
 });
