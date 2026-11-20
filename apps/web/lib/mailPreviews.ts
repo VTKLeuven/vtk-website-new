@@ -42,7 +42,7 @@ import { shiftReminderMail } from "@/lib/shift/reminders";
 import { shiftReplacedMail } from "@/lib/shift/replace";
 import { newLesbezoekNotificationMail } from "@/lib/lesbezoeken-server";
 import { newRentalNotificationMail } from "@/lib/theokotVerhuur-server";
-import { orderConfirmationMail } from "@/lib/ticketing/mail";
+import { orderConfirmationMail, ticketCancelledMail } from "@/lib/ticketing/mail";
 import { urenloopDownloadCodeMail, urenloopPairCodeMail } from "@/lib/urenloopAppMail";
 
 /**
@@ -102,7 +102,7 @@ export function mailPreviewGroups(): MailPreviewGroup[] {
       id: "tickets",
       title: "Tickets",
       description: "De post van de ticketverkoop.",
-      mails: [ticketOrderPreview()],
+      mails: [ticketOrderPreview(), ticketCancelledPreview()],
     },
     {
       id: "kalender",
@@ -213,6 +213,43 @@ function ticketOrderPreview(): MailPreview {
     notes: [
       "De poster van het gekoppelde kalender-event staat er in het echt bovenaan; hier staat ze niet, want de voorvertoning laadt geen bestaande foto.",
       "De pdf met de tickets en de Apple Wallet-passen gaan als bijlage mee; de tekst noemt enkel wat er echt bij zit.",
+    ],
+  };
+}
+
+function ticketCancelledPreview(): MailPreview {
+  const mail = ticketCancelledMail({
+    locale: "nl",
+    buyerName: "Wannes",
+    buyerEmail: "wannes@voorbeeld.test",
+    attendeeName: "Voorbeeldvriend",
+    ticketTypeName: "Voorverkoop",
+    eventName: "Voorbeeldcantus",
+    orderNumber: "VTK-26-VOORBEELD",
+    reason:
+      "De voorverkoop is enkel voor jezelf. Dit ticket kocht je voor iemand anders; die kan het vanaf de publieke verkoop zelf kopen.",
+    refund: { amountCents: 1200, currency: "EUR" },
+    remainingTickets: 1,
+    event: {
+      startsAt: SAMPLE_START,
+      timeZone: "Europe/Brussels",
+      location: "Theokot, Studentenwijk Arenberg",
+    },
+  });
+  return {
+    id: "ticket-cancelled",
+    title: "Een ticket geannuleerd door het beheer",
+    when: "Wanneer iemand een deelnemer verwijdert op het tabblad Deelnemers en \"De koper mailen\" aan laat staan, via de ticket-outbox (elke minuut).",
+    to: "De koper van de bestelling",
+    source: "ticketing",
+    file: "lib/ticketing/mail.ts",
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+    notes: [
+      "De reden is wat het beheer in de bevestiging intikte, letterlijk.",
+      "De regel over het geld staat er enkel wanneer de terugbetaling via Mollie meeging; zonder terugbetaling (of bij Bancontact) zegt de mail niets over geld, en hoort dat in de reden.",
+      "Is het ticket van de koper zelf, dan heet het \"je ticket\" in plaats van het ticket van iemand anders. De regel over de andere tickets valt weg wanneer er geen meer over zijn.",
     ],
   };
 }

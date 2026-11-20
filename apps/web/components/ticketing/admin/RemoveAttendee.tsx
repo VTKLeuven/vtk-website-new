@@ -1,5 +1,5 @@
 import { removeTicketAttendeeAction } from "@/app/actions/tickets";
-import { DeleteButton } from "@/components/ui/DeleteIconButton";
+import { RemoveAttendeeDialog } from "./RemoveAttendeeDialog";
 import type { AdminLocale } from "./format";
 
 /**
@@ -9,13 +9,15 @@ import type { AdminLocale } from "./format";
  *
  * Terugbetalen is een vinkje in de bevestiging, enkel waar de site dat zelf kan
  * (Mollie, met het recht `REFUND`). Bancontact betaalt niet terug via de API;
- * daar zegt de uitleg waar het met de hand moet.
+ * daar zegt de uitleg waar het met de hand moet. Een tweede vinkje (standaard
+ * aan) mailt de koper met de reden die het beheer intikt.
  */
 export function RemoveAttendee({
   locale,
   eventId,
   orderItemId,
   attendeeName,
+  buyerEmail,
   checkedIn,
   otherTickets,
   canVoid,
@@ -27,6 +29,7 @@ export function RemoveAttendee({
   eventId: string;
   orderItemId: string;
   attendeeName: string;
+  buyerEmail: string;
   checkedIn: boolean;
   /** Geldige tickets in dezelfde bestelling naast dit ene. */
   otherTickets: number;
@@ -95,7 +98,7 @@ export function RemoveAttendee({
           ? "Voor een ticket dat er niet had mogen zijn, zoals een voorverkoopticket dat voor iemand anders gekocht werd. Enkel dit ticket verdwijnt; de rest van de bestelling blijft."
           : "For a ticket that should not exist, such as a presale ticket bought for someone else. Only this ticket goes; the rest of the order stays."}
       </p>
-      <DeleteButton
+      <RemoveAttendeeDialog
         action={removeTicketAttendeeAction}
         fields={{
           locale,
@@ -103,22 +106,35 @@ export function RemoveAttendee({
           orderItemId,
           ...(refundable && !canVoid ? { refund: "on" } : {}),
         }}
-        title={nl ? `Ticket van ${attendeeName} verwijderen?` : `Remove ${attendeeName}'s ticket?`}
-        description={description}
-        confirmLabel={nl ? "Ticket verwijderen" : "Remove ticket"}
-        cancelLabel={nl ? "Annuleren" : "Cancel"}
-        option={
-          refundable && canVoid
-            ? {
-                name: "refund",
-                label: nl ? `Ook ${amount} terugbetalen via Mollie` : `Also refund ${amount} through Mollie`,
-                hint: nl
-                  ? "Uitgevinkt blijft het geld staan. Achteraf terugbetalen kan dan niet meer via de site, enkel rechtstreeks in Mollie."
-                  : "Unchecked, the money stays. Refunding afterwards is then no longer possible through the site, only directly in Mollie.",
-              }
-            : undefined
-        }
-        successMessage={nl ? `Ticket van ${attendeeName} verwijderd.` : `${attendeeName}'s ticket removed.`}
+        labels={{
+          button: heading,
+          title: nl ? `Ticket van ${attendeeName} verwijderen?` : `Remove ${attendeeName}'s ticket?`,
+          description,
+          confirm: nl ? "Ticket verwijderen" : "Remove ticket",
+          cancel: nl ? "Annuleren" : "Cancel",
+          refund:
+            refundable && canVoid
+              ? {
+                  label: nl ? `Ook ${amount} terugbetalen via Mollie` : `Also refund ${amount} through Mollie`,
+                  hint: nl
+                    ? "Uitgevinkt blijft het geld staan. Achteraf terugbetalen kan dan niet meer via de site, enkel rechtstreeks in Mollie."
+                    : "Unchecked, the money stays. Refunding afterwards is then no longer possible through the site, only directly in Mollie.",
+                }
+              : undefined,
+          notify: nl ? `De koper mailen (${buyerEmail})` : `Email the buyer (${buyerEmail})`,
+          reason: nl ? "Reden" : "Reason",
+          reasonHint: nl
+            ? "Staat zo in de mail, onder de melding dat het ticket geannuleerd is. Gaat er geld terug via Mollie, dan zegt de mail dat zelf."
+            : "Appears as written in the email, below the notice that the ticket was cancelled. If money goes back through Mollie, the email says so itself.",
+          reasonRequired: nl
+            ? "Geef een reden voor de mail, of vink de mail uit."
+            : "Give a reason for the email, or uncheck the email.",
+          success: nl ? `Ticket van ${attendeeName} verwijderd.` : `${attendeeName}'s ticket removed.`,
+          successNotified: nl
+            ? `Ticket van ${attendeeName} verwijderd. De koper krijgt een mail.`
+            : `${attendeeName}'s ticket removed. The buyer gets an email.`,
+          errorFallback: nl ? "Ticket niet verwijderd." : "Ticket was not removed.",
+        }}
         errorMessages={
           nl
             ? {
@@ -128,8 +144,10 @@ export function RemoveAttendee({
                 TICKET_ALREADY_CHECKED_IN: "Niet verwijderd: dit ticket is intussen gescand aan de ingang.",
                 REFUND_ALREADY_REQUESTED: "Niet verwijderd: voor dit ticket loopt al een terugbetaling.",
                 REFUND_MANUAL_ONLY: "Niet verwijderd: deze bestelling is met Bancontact betaald en kan niet via de site terugbetaald worden.",
+                REFUND_FAILED: "Niet verwijderd: Mollie weigerde de terugbetaling, dus het ticket blijft geldig. Probeer zonder terugbetaling, of kijk de betaling na in Mollie.",
                 PAYMENT_NOT_FOUND: "Niet verwijderd: er is geen geslaagde betaling om van terug te betalen.",
                 PAYMENT_REFERENCE_MISSING: "Niet verwijderd: de betaling heeft geen referentie bij Mollie, dus terugbetalen lukt niet. Verwijder zonder terugbetaling en betaal terug in Mollie.",
+                REASON_REQUIRED: "Niet verwijderd: geef een reden voor de mail, of vink de mail uit.",
               }
             : {
                 ATTENDEE_NOT_FOUND: "Not removed: this attendee no longer exists.",
@@ -138,14 +156,13 @@ export function RemoveAttendee({
                 TICKET_ALREADY_CHECKED_IN: "Not removed: this ticket has meanwhile been scanned at the entrance.",
                 REFUND_ALREADY_REQUESTED: "Not removed: a refund is already running for this ticket.",
                 REFUND_MANUAL_ONLY: "Not removed: this order was paid with Bancontact and cannot be refunded through the site.",
+                REFUND_FAILED: "Not removed: Mollie refused the refund, so the ticket stays valid. Try without refund, or check the payment in Mollie.",
                 PAYMENT_NOT_FOUND: "Not removed: there is no successful payment to refund from.",
                 PAYMENT_REFERENCE_MISSING: "Not removed: the payment has no Mollie reference, so the refund cannot go through. Remove without refund and refund in Mollie.",
+                REASON_REQUIRED: "Not removed: give a reason for the email, or uncheck the email.",
               }
         }
-        errorFallback={nl ? "Ticket niet verwijderd." : "Ticket was not removed."}
-      >
-        {heading}
-      </DeleteButton>
+      />
     </div>
   );
 }

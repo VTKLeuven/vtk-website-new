@@ -465,6 +465,7 @@ export default async function TicketAttendeesPage({
                                 eventId={eventId}
                                 orderItemId={item.id}
                                 attendeeName={item.attendeeName}
+                                buyerEmail={item.order.buyerEmail}
                                 checkedIn={Boolean(ticket.checkedInAt)}
                                 otherTickets={otherTickets}
                                 canVoid={canVoid}

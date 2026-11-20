@@ -7,6 +7,7 @@ import {
   escapeHtml,
   mailButton,
   mailDocument,
+  mailMessageBox,
 } from "@/lib/mailDesign";
 import { formatMoney } from "./money";
 
@@ -354,4 +355,93 @@ export function orderConfirmationMail(input: {
     text: textLines.join("\n"),
     html,
   };
+}
+
+/**
+ * Een ticket dat het beheer verwijderde (tabblad Deelnemers), met de reden die
+ * het beheer opgaf. Gaat naar de koper: die kreeg de tickets en die moet weten
+ * dat er een niet meer werkt. Zegt of er geld teruggaat enkel wanneer dat via
+ * de site gebeurde; anders staat het, als het moet, in de reden.
+ */
+export function ticketCancelledMail(input: {
+  locale: "nl" | "en";
+  buyerName: string;
+  buyerEmail: string;
+  attendeeName: string;
+  ticketTypeName: string;
+  eventName: string;
+  orderNumber: string;
+  reason: string;
+  /** Wat er via Mollie teruggaat; `null` wanneer er via de site niets terugging. */
+  refund: { amountCents: number; currency: string } | null;
+  /** Geldige tickets die de koper voor dit event nog in deze bestelling heeft. */
+  remainingTickets: number;
+  replyTo?: string | null;
+  event?: OrderMailEvent;
+}): MailMessage {
+  const nl = input.locale === "nl";
+  const own = sameName(input.attendeeName, input.buyerName);
+  const subject = nl
+    ? `${own ? "Je ticket" : `Ticket van ${input.attendeeName}`} voor ${input.eventName} geannuleerd`
+    : `${own ? "Your ticket" : `${input.attendeeName}'s ticket`} for ${input.eventName} cancelled`;
+  const intro = nl
+    ? `Dag ${input.buyerName}, ${own ? "je ticket" : `het ticket van ${input.attendeeName}`} (${input.ticketTypeName}) voor ${input.eventName} is geannuleerd. Het werkt niet meer aan de ingang.`
+    : `Hi ${input.buyerName}, ${own ? "your ticket" : `${input.attendeeName}'s ticket`} (${input.ticketTypeName}) for ${input.eventName} has been cancelled. It no longer works at the entrance.`;
+  const reasonLabel = nl ? "Reden" : "Reason";
+  const refundLine = input.refund
+    ? nl
+      ? `Je krijgt ${formatMoney(input.refund.amountCents, input.refund.currency, moneyLocale(nl))} terug op de rekening waarmee je betaalde. Dat kan enkele dagen duren.`
+      : `You will get ${formatMoney(input.refund.amountCents, input.refund.currency, moneyLocale(nl))} back on the account you paid with. This can take a few days.`
+    : "";
+  const remainingLine =
+    input.remainingTickets > 0
+      ? nl
+        ? input.remainingTickets === 1
+          ? "Je andere ticket van deze bestelling blijft geldig."
+          : `Je ${input.remainingTickets} andere tickets van deze bestelling blijven geldig.`
+        : input.remainingTickets === 1
+          ? "The other ticket in this order stays valid."
+          : `The ${input.remainingTickets} other tickets in this order stay valid.`
+      : "";
+  const questions = nl
+    ? "Vragen? Antwoord gewoon op deze mail."
+    : "Questions? Just reply to this email.";
+
+  const textLines = [
+    intro,
+    "",
+    `${reasonLabel}:`,
+    input.reason,
+    ...(refundLine ? ["", refundLine] : []),
+    ...(remainingLine ? ["", remainingLine] : []),
+    "",
+    questions,
+    input.orderNumber,
+  ];
+
+  const paragraph = (text: string) =>
+    `<p style="margin:16px 0 0;font-size:15.5px;line-height:1.6;color:${COLOR.body}">${escapeHtml(text)}</p>`;
+  const headHtml = input.event
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%"><tr><td valign="top" style="padding-right:14px">${titleHtml(input.eventName)}${factsHtml(input.event, nl)}</td><td valign="top" align="right" width="64" style="width:64px">${pinHtml(input.event, nl)}</td></tr></table>`
+    : titleHtml(input.eventName);
+  const html = mailDocument({
+    lang: nl ? "nl" : "en",
+    title: subject,
+    preheader: intro,
+    rows: `<tr><td style="padding:26px 30px 30px">${headHtml}<p style="margin:20px 0 0;font-size:15.5px;line-height:1.6;color:${COLOR.body}">${escapeHtml(intro)}</p>${mailMessageBox(input.reason, reasonLabel)}${refundLine ? paragraph(refundLine) : ""}${remainingLine ? paragraph(remainingLine) : ""}</td></tr><tr><td style="padding:16px 30px;background:${COLOR.paper2};border-top:1px solid ${COLOR.line}"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%"><tr><td style="font-size:12px;line-height:1.5;color:${COLOR.muted}">${escapeHtml(questions)}</td><td align="right" style="font-size:12px;font-weight:600;color:${COLOR.muted};white-space:nowrap;padding-left:14px">${escapeHtml(input.orderNumber)}</td></tr></table></td></tr>`,
+  });
+
+  return {
+    to: input.buyerEmail,
+    replyTo: input.replyTo,
+    subject,
+    text: textLines.join("\n"),
+    html,
+  };
+}
+
+/** Hoofdletters en dubbele spaties tellen niet, net als bij de voorverkoop. */
+function sameName(left: string, right: string): boolean {
+  const normalize = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleLowerCase("nl-BE");
+  return normalize(left) === normalize(right);
 }

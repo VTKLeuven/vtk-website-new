@@ -764,6 +764,8 @@ en als vangnet. Alles over de app-kant staat in `vtk-app/docs/scanner.md`.
   without refund (`VOID`, seat freed, order stays paid). The attendees tab
   offers it next to a refund through Mollie; see `docs/design-decisions.md`,
   "Een deelnemer verwijderen".
+  With "De koper mailen" the buyer gets `ticketCancelledMail` with the admin's
+  reason, as a `TICKET_CANCELLED` outbox message next to `ORDER_CONFIRMATION`.
 - `reconciliation.ts`: polls PENDING payments/refunds against the provider
 - `scanner.ts`: scan authorization + validation
 - `authorization.ts`: capability checks (`canCreateTicketEventForGroup`, `requireTicketEventCapability`)

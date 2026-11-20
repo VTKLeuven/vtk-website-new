@@ -10507,6 +10507,15 @@ enkel die: wie er vijf kocht, houdt het ticket dat wel voor hemzelf was.
 - **Een ingetrokken ticket kan je daarna niet meer via de site terugbetalen**
   (de terugbetaling vraagt een geldig ticket); dat moet dan rechtstreeks in
   Mollie. Een gescand ticket kan je niet verwijderen.
+- **De koper krijgt een mail met de reden, tenzij je dat uitvinkt.** Het vinkje
+  "De koper mailen" staat standaard aan: wie zonder bericht een dood ticket
+  heeft, staat anders aan de deur. Met de mail is een reden verplicht; die staat
+  letterlijk in de mail (`ticketCancelledMail`, voorvertoning op
+  /admin/it/flows). De mail zegt zelf enkel iets over geld wanneer de
+  terugbetaling via Mollie meeging; bij Bancontact of zonder terugbetaling hoort
+  dat in de reden. Ze gaat naar de koper en niet naar de deelnemer: de koper
+  kreeg de tickets. De reden komt niet in het auditlog van het event, want dat
+  overleeft het archiveren en die vrije tekst noemt vaak mensen.
 - **Een ingetrokken ticket telt nog mee voor de koper** bij één ticket per
   account en in de voorverkoop (`accountHeldTicketsWhere` sluit enkel
   terugbetaalde tickets uit): wie te veel kocht, krijgt er zo geen nieuwe

@@ -20,6 +20,7 @@ import { markPaymentRefundedManually } from "@/lib/ticketing/orders";
 import { fetchBancontactRefundAccount } from "@/lib/ticketing/refundAccount";
 import { requestTicketRefund } from "@/lib/ticketing/refunds";
 import { voidTicketWithoutRefund } from "@/lib/ticketing/voidTicket";
+import { TICKET_CANCELLED, type TicketCancelledPayload } from "@/lib/ticketing/outbox";
 import { slugify } from "@/lib/ticketing/slug";
 import { ticketColorKey } from "@/lib/ticketing/ticketColors";
 import { geocodeAddress } from "@/lib/ticketing/geocode";
@@ -2427,7 +2428,10 @@ const EXPECTED_REMOVE_ERRORS = new Set([
  * Mollie (recht `REFUND`); zonder wordt het ticket enkel ingetrokken en blijft
  * het geld staan (recht `MANAGE_ORDERS`). In beide gevallen werkt het ticket
  * niet meer aan de ingang, komt de plaats vrij en blijven de andere tickets van
- * de bestelling geldig. Zie docs/design-decisions.md, "Een deelnemer
+ * de bestelling geldig.
+ *
+ * Met `notify=on` krijgt de koper een mail met de `reason` (verplicht dan),
+ * via de ticket-outbox. Zie docs/design-decisions.md, "Een deelnemer
  * verwijderen".
  */
 export async function removeTicketAttendeeAction(formData: FormData): Promise<SaveState> {
@@ -2435,25 +2439,31 @@ export async function removeTicketAttendeeAction(formData: FormData): Promise<Sa
   const orderItemId = value(formData, "orderItemId");
   const locale = localeSchema.parse(value(formData, "locale") || "nl");
   const refund = checkboxValue(formData, "refund");
+  const notify = checkboxValue(formData, "notify");
+  const reason = limitedOptionalValue(formData, "reason", 2_000);
   const { session } = await requireTicketEventCapability(
     eventId,
     refund ? "REFUND" : "MANAGE_ORDERS"
   );
+  if (notify && !reason) return saveError("REASON_REQUIRED");
   const item = await prisma.ticketOrderItem.findFirst({
     where: { id: orderItemId, eventId },
-    select: { orderId: true, attendeeName: true },
+    select: { orderId: true, attendeeName: true, totalCents: true, order: { select: { buyerEmail: true } } },
   });
   if (!item) return saveError("ATTENDEE_NOT_FOUND");
 
   try {
     if (refund) {
-      await requestTicketRefund({
+      const result = await requestTicketRefund({
         eventId,
         orderId: item.orderId,
         orderItemIds: [orderItemId],
         requestedById: session.user.id,
-        reason: "Deelnemer verwijderd",
+        reason: reason ?? "Deelnemer verwijderd",
       });
+      // Een terugbetaling die Mollie meteen weigert, zet het ticket terug op
+      // geldig (`failTicketRefund`): dan is er niets verwijderd.
+      if (result.status === "FAILED") return saveError("REFUND_FAILED");
     } else {
       await voidTicketWithoutRefund({ eventId, orderItemId, actorUserId: session.user.id });
     }
@@ -2463,14 +2473,31 @@ export async function removeTicketAttendeeAction(formData: FormData): Promise<Sa
     }
     throw error;
   }
+  if (notify && reason) {
+    const payload: TicketCancelledPayload = {
+      orderItemId,
+      reason,
+      refundCents: refund ? item.totalCents : null,
+    };
+    await prisma.ticketOutboxMessage.create({
+      data: {
+        eventId,
+        // Met de bestelling erbij: het wissen van een account ruimt zo ook
+        // deze mail (en de reden erin) op.
+        orderId: item.orderId,
+        type: TICKET_CANCELLED,
+        dedupeKey: `ticket-cancelled:${orderItemId}`,
+        recipient: item.order.buyerEmail,
+        payload,
+      },
+    });
+  }
   await logAudit({
     action: refund ? "refund" : "delete",
     entity: "ticketOrder",
     entityId: item.orderId,
     target: await ticketEventTitle(eventId),
-    summary: refund
-      ? `ticket van ${item.attendeeName} verwijderd en terugbetaald`
-      : `ticket van ${item.attendeeName} verwijderd, zonder terugbetaling`,
+    summary: `ticket van ${item.attendeeName} verwijderd, ${refund ? "terugbetaald" : "zonder terugbetaling"}${notify ? ", koper gemaild" : ""}`,
   });
   refreshTicketEvent(locale, eventId);
   revalidatePath(localePath(locale, `/admin/tickets/${eventId}/deelnemers`));

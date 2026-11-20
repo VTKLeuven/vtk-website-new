@@ -3,7 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@vtk/db";
 import { createOrderAccessToken } from "./crypto";
-import { orderConfirmationMail, sendMail, type OrderMailLine } from "./mail";
+import { orderConfirmationMail, sendMail, ticketCancelledMail, type OrderMailLine } from "./mail";
 import { orderMailBundle } from "./mailBundle";
 import { ticketingBaseUrl } from "./config";
 import { ticketPosterSelect, ticketPosterUrl } from "./poster";
@@ -12,7 +12,18 @@ type ClaimedMessage = {
   id: string;
   type: string;
   orderId: string | null;
+  payload: unknown;
   attempts: number;
+};
+
+/** Mail aan de koper dat het beheer een van zijn tickets verwijderde. */
+export const TICKET_CANCELLED = "TICKET_CANCELLED";
+
+export type TicketCancelledPayload = {
+  orderItemId: string;
+  reason: string;
+  /** Wat er via de site teruggaat; `null` wanneer er niets terugging. */
+  refundCents: number | null;
 };
 
 async function claimMessages(workerId: string, limit: number): Promise<ClaimedMessage[]> {
@@ -40,7 +51,7 @@ async function claimMessages(workerId: string, limit: number): Promise<ClaimedMe
       "updatedAt" = NOW()
     FROM candidates
     WHERE message."id" = candidates."id"
-    RETURNING message."id", message."type", message."orderId", message."attempts"
+    RETURNING message."id", message."type", message."orderId", message."payload", message."attempts"
   `;
 }
 
@@ -72,7 +83,61 @@ function orderMailLines(
   return [...lines.values()];
 }
 
+function isCancelledPayload(payload: unknown): payload is TicketCancelledPayload {
+  if (!payload || typeof payload !== "object") return false;
+  const value = payload as Record<string, unknown>;
+  return (
+    typeof value.orderItemId === "string" &&
+    typeof value.reason === "string" &&
+    (value.refundCents === null || typeof value.refundCents === "number")
+  );
+}
+
+async function deliverCancellation(message: ClaimedMessage): Promise<string> {
+  if (!isCancelledPayload(message.payload)) throw new Error("Invalid cancellation payload");
+  const payload = message.payload;
+  const item = await prisma.ticketOrderItem.findUnique({
+    where: { id: payload.orderItemId },
+    include: {
+      order: {
+        include: {
+          event: true,
+          // Wat de koper nog heeft, op het moment dat de mail vertrekt.
+          items: { where: { ticket: { is: { status: "VALID" } } }, select: { id: true } },
+        },
+      },
+    },
+  });
+  if (!item) throw new Error("Order item not found");
+  const { order } = item;
+  const locale = order.locale === "EN" ? "en" : "nl";
+  return sendMail(
+    ticketCancelledMail({
+      locale,
+      buyerName: order.buyerName,
+      buyerEmail: order.buyerEmail,
+      attendeeName: item.attendeeName,
+      ticketTypeName: item.ticketTypeName,
+      eventName: locale === "en" && order.event.titleEn ? order.event.titleEn : order.event.titleNl,
+      orderNumber: order.reference,
+      reason: payload.reason,
+      refund:
+        payload.refundCents && payload.refundCents > 0
+          ? { amountCents: payload.refundCents, currency: order.currency }
+          : null,
+      remainingTickets: order.items.filter((other) => other.id !== item.id).length,
+      replyTo: order.event.contactEmail,
+      event: {
+        startsAt: order.event.startsAt,
+        timeZone: order.event.timeZone,
+        location: order.event.location,
+      },
+    })
+  );
+}
+
 async function deliver(message: ClaimedMessage): Promise<string> {
+  if (message.type === TICKET_CANCELLED) return deliverCancellation(message);
   if (message.type !== "ORDER_CONFIRMATION" || !message.orderId) {
     throw new Error(`Unsupported outbox message: ${message.type}`);
   }

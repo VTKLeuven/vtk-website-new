@@ -16,7 +16,7 @@ import {
   expirePendingOrder,
   fulfillPaidOrder,
 } from "@/lib/ticketing/orders";
-import { processTicketOutbox } from "@/lib/ticketing/outbox";
+import { processTicketOutbox, TICKET_CANCELLED } from "@/lib/ticketing/outbox";
 import {
   completeTicketRefund,
   failTicketRefund,
@@ -1126,6 +1126,23 @@ describe("ticketing database invariants", () => {
       refundedCents: 0,
     });
     expect(await prisma.ticketRefund.count({ where: { orderId } })).toBe(0);
+
+    // De mail aan de koper gaat langs de outbox, met de reden erin.
+    const cancelMail = await prisma.ticketOutboxMessage.create({
+      data: {
+        eventId: ids.event,
+        orderId,
+        type: TICKET_CANCELLED,
+        dedupeKey: `ticket-cancelled:${itemIds[1]}`,
+        recipient: "buyer@example.test",
+        payload: { orderItemId: itemIds[1], reason: "Voor iemand anders gekocht.", refundCents: null },
+      },
+    });
+    const delivered = await processTicketOutbox(10);
+    expect(delivered.failed).toBe(0);
+    expect(await prisma.ticketOutboxMessage.findUnique({ where: { id: cancelMail.id } })).toMatchObject({
+      status: "SENT",
+    });
 
     // Twee keer intrekken geeft de plaats geen tweede keer vrij.
     await expect(

@@ -62,6 +62,8 @@ export async function voidTicketWithoutRefund(input: {
         action: "TICKET_VOIDED",
         entityType: "Ticket",
         entityId: orderItem.ticket.id,
+        // Bewust zonder de reden uit de mail: dit logboek overleeft het
+        // archiveren van het event, en die vrije tekst noemt vaak mensen.
         metadata: { orderId: orderItem.orderId, orderItemId: orderItem.id, refunded: false },
       },
     });
