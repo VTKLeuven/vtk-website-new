@@ -18,6 +18,8 @@ import { expandRecipients, type Expansion } from "./recipients";
 
 export type AddressOwner = {
   kind: "group" | "user";
+  /** Het id in de directory; Chat noemt een lid `users/{id}` of `groups/{id}`. */
+  id: string;
   email: string;
   name: string;
   aliases: string[];
@@ -41,6 +43,8 @@ export type DirectoryAddresses = {
   aliases: AliasRow[];
   /** Elk adres (hoofdadres en alias) in kleine letters, naar zijn eigenaar. */
   byAddress: Map<string, AddressOwner>;
+  /** `users/{id}` en `groups/{id}`, zoals Chat een lid noemt, naar zijn eigenaar. */
+  byId: Map<string, AddressOwner>;
 };
 
 async function activeKiesploegAliases(domain: string): Promise<Set<string>> {
@@ -72,6 +76,7 @@ export async function directoryAddresses(cfg: GoogleConfig): Promise<DirectoryAd
   const owners: AddressOwner[] = [
     ...groups.map((group) => ({
       kind: "group" as const,
+      id: group.id,
       email: group.email,
       name: group.name,
       aliases: group.aliases ?? [],
@@ -80,6 +85,7 @@ export async function directoryAddresses(cfg: GoogleConfig): Promise<DirectoryAd
     })),
     ...users.map((user) => ({
       kind: "user" as const,
+      id: user.id,
       email: user.primaryEmail,
       name: user.name?.fullName ?? user.primaryEmail,
       aliases: user.aliases ?? [],
@@ -89,8 +95,10 @@ export async function directoryAddresses(cfg: GoogleConfig): Promise<DirectoryAd
   ];
 
   const byAddress = new Map<string, AddressOwner>();
+  const byId = new Map<string, AddressOwner>();
   const aliases: AliasRow[] = [];
   for (const owner of owners) {
+    byId.set(`${owner.kind === "group" ? "groups" : "users"}/${owner.id}`, owner);
     byAddress.set(owner.email.toLowerCase(), owner);
     for (const alias of owner.aliases) {
       byAddress.set(alias.toLowerCase(), owner);
@@ -99,7 +107,7 @@ export async function directoryAddresses(cfg: GoogleConfig): Promise<DirectoryAd
   }
   aliases.sort((a, b) => a.alias.localeCompare(b.alias));
   owners.sort((a, b) => a.email.localeCompare(b.email));
-  return { owners, aliases, byAddress };
+  return { owners, aliases, byAddress, byId };
 }
 
 /**

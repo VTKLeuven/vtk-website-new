@@ -78,6 +78,22 @@ export const DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.readonly";
  */
 export const REPORTS_SCOPES = "https://www.googleapis.com/auth/admin.reports.audit.readonly";
 
+/**
+ * Scopes om de chatruimtes van het domein te beheren (Google Admin ›
+ * Chatruimtes), met `useAdminAccess`: als de beheerder uit `subject`, op elke
+ * ruimte van het domein, ook waar die zelf geen lid van is.
+ *
+ * Eigen tokenaanvragen, zoals Drive: staan ze niet in de delegatie, dan faalt
+ * enkel dat scherm. Verwijderen heeft een aparte scope (`chat.admin.delete`,
+ * door Google "restricted" genoemd), zodat wie die niet wil delegeren, wel kan
+ * bekijken en beheren maar niet verwijderen.
+ */
+export const CHAT_SCOPES = [
+  "https://www.googleapis.com/auth/chat.admin.spaces",
+  "https://www.googleapis.com/auth/chat.admin.memberships",
+].join(" ");
+export const CHAT_DELETE_SCOPES = "https://www.googleapis.com/auth/chat.admin.delete";
+
 export class GoogleError extends Error {
   constructor(
     message: string,
@@ -895,4 +911,209 @@ export async function listOrgUnitMoves(
     pageToken = page?.nextPageToken;
   } while (pageToken);
   return out;
+}
+
+// -----------------------------------------------------------------------------
+// Chatruimtes (Google Chat, met beheerderstoegang)
+// -----------------------------------------------------------------------------
+// Alles met `useAdminAccess=true`, als de beheerder (`cfg.subject`). Zie
+// docs/google-workspace.md, "Chatruimtes".
+
+const CHAT = "https://chat.googleapis.com/v1";
+const chatAs = (scope: string = CHAT_SCOPES): As => ({ scope });
+
+export type ChatSpace = {
+  /** `spaces/AAAA...` */
+  name: string;
+  displayName?: string;
+  spaceType?: string;
+  externalUserAllowed?: boolean;
+  spaceDetails?: { description?: string; guidelines?: string };
+  membershipCount?: { joinedDirectHumanUserCount?: number; joinedGroupCount?: number };
+  createTime?: string;
+  lastActiveTime?: string;
+  spaceUri?: string;
+};
+
+export type ChatSpaceOrder = "members" | "lastActive" | "created";
+
+const CHAT_ORDER: Record<ChatSpaceOrder, string> = {
+  members: "membershipCount.joined_direct_human_user_count",
+  lastActive: "lastActiveTime",
+  created: "createTime",
+};
+
+/** Een ruimte-id uit de URL: enkel wat Google zelf in een id zet. */
+export function assertChatSpaceId(id: string): string {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) throw new GoogleError(`Ongeldige ruimte-id: ${id}`, 0, null);
+  return id;
+}
+
+/** Een tekst in een zoekvraag van Chat: tussen aanhalingstekens, zonder ze te breken. */
+function chatQueryString(value: string): string {
+  return `"${value.replace(/["\\]/g, " ").trim()}"`;
+}
+
+/**
+ * Eén pagina ruimtes van het domein. Google bladert met een token, niet met
+ * een paginanummer; het totaal is een schatting boven 10.000.
+ */
+export async function searchChatSpaces(
+  cfg: GoogleConfig,
+  options: {
+    name?: string;
+    external?: boolean | null;
+    order: ChatSpaceOrder;
+    direction: "asc" | "desc";
+    pageSize?: number;
+    pageToken?: string;
+  },
+): Promise<{ spaces: ChatSpace[]; nextPageToken: string | null; totalSize: number | null }> {
+  const clauses = ['customer = "customers/my_customer"', 'spaceType = "SPACE"'];
+  const name = options.name?.trim();
+  if (name) clauses.push(`displayName:${chatQueryString(name)}`);
+  if (options.external === true) clauses.push("externalUserAllowed = true");
+  if (options.external === false) clauses.push("externalUserAllowed = false");
+  const params = new URLSearchParams({
+    useAdminAccess: "true",
+    query: clauses.join(" AND "),
+    orderBy: `${CHAT_ORDER[options.order]} ${options.direction === "asc" ? "ASC" : "DESC"}`,
+    pageSize: String(Math.min(Math.max(options.pageSize ?? 50, 1), 1000)),
+  });
+  if (options.pageToken) params.set("pageToken", options.pageToken);
+  const page = await request<{
+    results?: { space?: ChatSpace }[];
+    spaces?: ChatSpace[];
+    nextPageToken?: string;
+    totalSize?: number;
+  }>(cfg, "GET", `${CHAT}/spaces:search?${params.toString()}`, undefined, chatAs());
+  const spaces =
+    page?.results?.flatMap((result) => (result.space ? [result.space] : [])) ?? page?.spaces ?? [];
+  return {
+    spaces,
+    nextPageToken: page?.nextPageToken || null,
+    totalSize: typeof page?.totalSize === "number" ? page.totalSize : null,
+  };
+}
+
+export async function getChatSpace(cfg: GoogleConfig, spaceId: string): Promise<ChatSpace | null> {
+  return request<ChatSpace>(
+    cfg,
+    "GET",
+    `${CHAT}/spaces/${assertChatSpaceId(spaceId)}?useAdminAccess=true`,
+    undefined,
+    chatAs(),
+  );
+}
+
+/** De naam en de beschrijving. Google wil `description` en `guidelines` samen. */
+export async function updateChatSpace(
+  cfg: GoogleConfig,
+  spaceId: string,
+  input: { displayName: string; description: string; guidelines: string },
+): Promise<void> {
+  const params = new URLSearchParams({ useAdminAccess: "true", updateMask: "displayName,spaceDetails" });
+  await request(
+    cfg,
+    "PATCH",
+    `${CHAT}/spaces/${assertChatSpaceId(spaceId)}?${params.toString()}`,
+    {
+      displayName: input.displayName,
+      spaceDetails: { description: input.description, guidelines: input.guidelines },
+    },
+    chatAs(),
+  );
+}
+
+/** Verwijdert een ruimte met al haar berichten en leden. Een ruimte die er al niet is, is goed. */
+export async function deleteChatSpace(cfg: GoogleConfig, spaceId: string): Promise<void> {
+  await request(
+    cfg,
+    "DELETE",
+    `${CHAT}/spaces/${assertChatSpaceId(spaceId)}?useAdminAccess=true`,
+    undefined,
+    chatAs(CHAT_DELETE_SCOPES),
+  );
+}
+
+export type ChatMembership = {
+  /** `spaces/AAAA/members/BBBB` */
+  name: string;
+  state?: string;
+  role?: string;
+  /** `users/{id}`: het id van het account in de directory. */
+  member?: { name?: string; displayName?: string; type?: string };
+  /** `groups/{id}`: het id van de groep in de directory. */
+  groupMember?: { name?: string };
+};
+
+/** Alle mensen en groepen in een ruimte (bots kunnen niet met beheerderstoegang). */
+export async function listChatMembers(cfg: GoogleConfig, spaceId: string): Promise<ChatMembership[]> {
+  const out: ChatMembership[] = [];
+  let pageToken: string | undefined;
+  do {
+    const params = new URLSearchParams({
+      useAdminAccess: "true",
+      pageSize: "1000",
+      showGroups: "true",
+      filter: 'member.type != "BOT"',
+    });
+    if (pageToken) params.set("pageToken", pageToken);
+    const page = await request<{ memberships?: ChatMembership[]; nextPageToken?: string }>(
+      cfg,
+      "GET",
+      `${CHAT}/spaces/${assertChatSpaceId(spaceId)}/members?${params.toString()}`,
+      undefined,
+      chatAs(),
+    );
+    out.push(...(page?.memberships ?? []));
+    pageToken = page?.nextPageToken || undefined;
+  } while (pageToken);
+  return out;
+}
+
+/** Een account (op e-mailadres) of een groep (op id uit de directory) toevoegen. */
+export async function addChatMember(
+  cfg: GoogleConfig,
+  spaceId: string,
+  target: { userEmail: string } | { groupId: string },
+): Promise<void> {
+  const body =
+    "userEmail" in target
+      ? { member: { name: `users/${target.userEmail}`, type: "HUMAN" } }
+      : { groupMember: { name: `groups/${target.groupId}` } };
+  await request(
+    cfg,
+    "POST",
+    `${CHAT}/spaces/${assertChatSpaceId(spaceId)}/members?useAdminAccess=true`,
+    body,
+    chatAs(),
+  );
+}
+
+/** Rol van een lid: eigenaar (`ROLE_MANAGER`), beheerder (`ROLE_ASSISTANT_MANAGER`) of lid. */
+export async function setChatMemberRole(
+  cfg: GoogleConfig,
+  membershipName: string,
+  role: "ROLE_MEMBER" | "ROLE_MANAGER" | "ROLE_ASSISTANT_MANAGER",
+): Promise<void> {
+  const params = new URLSearchParams({ useAdminAccess: "true", updateMask: "role" });
+  await request(cfg, "PATCH", `${CHAT}/${assertMembershipName(membershipName)}?${params.toString()}`, { role }, chatAs());
+}
+
+export async function removeChatMember(cfg: GoogleConfig, membershipName: string): Promise<void> {
+  await request(
+    cfg,
+    "DELETE",
+    `${CHAT}/${assertMembershipName(membershipName)}?useAdminAccess=true`,
+    undefined,
+    chatAs(),
+  );
+}
+
+function assertMembershipName(name: string): string {
+  if (!/^spaces\/[A-Za-z0-9_-]{1,64}\/members\/[A-Za-z0-9_.@+-]{1,128}$/.test(name)) {
+    throw new GoogleError(`Ongeldig lidmaatschap: ${name}`, 0, null);
+  }
+  return name;
 }

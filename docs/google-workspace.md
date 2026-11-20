@@ -101,7 +101,9 @@ Maak (of kies) een Google Cloud-project en zet daar twee API's aan:
 Wil je later de Gmail-instellingen laten werken (afzenderadres en doorsturen bij
 kiesploegaccounts), zet dan ook de **Gmail API** aan. Voor het overzicht van het
 Bestuursorgaan (`/admin/bestuursorgaan`) is ook de **Google Drive API** nodig;
-zie "Het Drive-account voor het Bestuursorgaan" hieronder.
+zie "Het Drive-account voor het Bestuursorgaan" hieronder. Voor Google Admin ›
+Chatruimtes de **Google Chat API**, en die moet ook geconfigureerd zijn; zie
+"Chatruimtes" hieronder.
 
 ### 2. Service-account met domain-wide delegation
 
@@ -125,12 +127,18 @@ zie "Het Drive-account voor het Bestuursorgaan" hieronder.
    https://www.googleapis.com/auth/gmail.settings.basic,
    https://www.googleapis.com/auth/gmail.settings.sharing,
    https://www.googleapis.com/auth/drive.readonly,
-   https://www.googleapis.com/auth/admin.reports.audit.readonly
+   https://www.googleapis.com/auth/admin.reports.audit.readonly,
+   https://www.googleapis.com/auth/chat.admin.spaces,
+   https://www.googleapis.com/auth/chat.admin.memberships,
+   https://www.googleapis.com/auth/chat.admin.delete
    ```
 
    Ze staan ook in `apps/web/lib/google/client.ts` (`GOOGLE_SCOPES`,
-   `GMAIL_SCOPES`, `DRIVE_SCOPES` en `REPORTS_SCOPES`); dat is de bron van waarheid als er ooit één
-   bijkomt.
+   `GMAIL_SCOPES`, `DRIVE_SCOPES`, `REPORTS_SCOPES`, `CHAT_SCOPES` en
+   `CHAT_DELETE_SCOPES`); dat is de bron van waarheid als er ooit één
+   bijkomt. De laatste drie zijn voor de chatruimtes en vragen elk een eigen
+   token: ontbreken ze, dan faalt enkel dat scherm (en zonder
+   `chat.admin.delete` enkel het verwijderen van een ruimte).
 
    **Ontbreekt er één, dan faalt élke aanroep** met `unauthorized_client`. Dat
    leest als een kapotte sleutel maar is de delegatie. Voeg je later een scope
@@ -372,6 +380,34 @@ niets gelijk te houden.
   alias van iemand anders dus als gelukt melden.
 - **Kiesploegadressen zet de sync zelf** en haalt ze op 15 juli weg. Het
   scherm markeert ze; wie er een wijzigt, botst met de sync.
+
+### Chatruimtes
+
+Google Admin › **Chatruimtes** (recht `mailgroups.manage`) toont elke ruimte
+van Google Chat in het domein, ook die waar de beheerder zelf niet in zit, zoals
+Apps › Google Chat › Ruimtes beheren in de Admin console. Zoeken op naam,
+filteren op externe gebruikers en sorteren op leden, laatste activiteit of
+datum gebeuren bij Google (`spaces.search`); op naam sorteren kan Chat niet.
+Per ruimte: de leden en groepen met hun rol (eigenaar, beheerder, lid), iemand
+of een groep van het domein toevoegen, de rol wijzigen, iemand eruit halen, de
+naam, beschrijving en richtlijnen wijzigen, en de ruimte verwijderen.
+
+Alles loopt met **beheerderstoegang** (`useAdminAccess=true`) als het account
+uit `subject`. Opzetten, eenmalig:
+
+1. Zet in het Cloud-project de **Google Chat API** aan.
+2. Vul op haar tabblad **Configuratie** een naam, avatar en beschrijving in.
+   Zonder die configuratie leest Chat wel, maar weigert het elke wijziging met
+   een 403.
+3. Zet de drie `chat.admin.*`-scopes uit stap 2 in de delegatie.
+4. De geïmpersonateerde beheerder moet ruimtes mogen beheren (een superadmin
+   kan dat).
+
+Wat niet kan met beheerderstoegang, en het scherm daarom niet aanbiedt:
+externe leden toevoegen, bots of apps beheren, en het type of de
+toegangsinstellingen van een ruimte wijzigen. Een lid noemt Chat `users/{id}`
+of `groups/{id}`; dat zijn de ids van de directory, dus de namen en adressen
+haalt het scherm daar (`lib/google/chatSpaces.ts`).
 
 ### Organisatie-eenheden
 
