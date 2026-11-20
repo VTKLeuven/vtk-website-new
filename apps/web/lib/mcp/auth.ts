@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHash, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import type { AuthInfo } from "@modelcontextprotocol/server";
 import { verifyMcpAccessToken } from "@vtk/auth/server";
 import { getMcpResourceMetadataUrl } from "@/lib/mcp/metadata";
@@ -155,7 +155,10 @@ export async function authenticateMcpRequest(request: Request): Promise<McpAuthe
       return jsonError(503, "MCP_PERMISSIONS_NOT_CONFIGURED");
     }
 
-    const rateLimitKey = createHash("sha256").update(configured).digest("hex");
+    // Er bestaat maar één statisch token, dus een vaste sleutel volstaat. Een
+    // hash van het token voegde niets toe en las voor CodeQL als een te snel
+    // gehasht wachtwoord (js/insufficient-password-hash).
+    const rateLimitKey = "static";
     return {
       // De protocolhandler heeft de geheime bearerwaarde niet nodig. Geef alleen
       // de gevalideerde identiteit en capabilities door, zodat het token niet per
