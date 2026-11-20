@@ -595,8 +595,19 @@ export type AppTicketEvent = {
 export type AppTicketEventDetail = AppTicketEvent & {
   /** Markdown. */
   description: string;
-  /** Wat deze koper in één bestelling kan nemen; nul wanneer een erelid zijn ene ticket al heeft. */
+  /**
+   * Wat deze koper in één bestelling kan nemen. Hoogstens één in de voorverkoop,
+   * voor een erelid met "één ticket per erelid" of op een event met één ticket
+   * per account; nul wanneer het account dat ene ticket al heeft.
+   */
   maxTicketsPerOrder: number;
+  /**
+   * Deze ingelogde koper zit nu in de voorverkoop: hij koopt enkel voor
+   * zichzelf, op de naam en het adres van zijn account. Toon die velden dan
+   * vast ingevuld; de checkout weigert een andere naam met `PRESALE_SELF_ONLY`.
+   * Optioneel voor een oudere server.
+   */
+  presaleSelfOnly?: boolean;
   /**
    * Een erelid op een event met "één ticket per erelid": `used` zegt of het dat
    * ticket al heeft. `null` voor iedereen anders. Optioneel voor een oudere server.

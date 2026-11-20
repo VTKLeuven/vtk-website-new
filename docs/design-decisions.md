@@ -10333,6 +10333,44 @@ gewoon tickets voor vrienden; met het vinkje niet.
   (`HONORARY_TICKET_LIMIT`). Voor wie geen erelid is, staat er niets over op de
   pagina.
 
+## Voorverkoop koop je voor jezelf, en "1 ticket" is één per account
+
+De voorverkoop is een voorrecht voor de praesidiumposten, de vaste medewerkers
+en de ereleden, niet een manier om vóór de rest een tafel voor je vrienden vast
+te leggen. Twee grenzen houden dat zo, allebei aan het account:
+
+**In de voorverkoop koopt een ingelogd account één ticket, op eigen naam.** Eén
+ticket in de bestelling, en de koper en de aanwezige zijn de naam en het adres
+van het account (hoofdletters en dubbele spaties tellen niet, een leeg adres bij
+de aanwezige mag). De shop vult die velden zelf in en zet ze vast; de checkout
+is het slot erachter (`PRESALE_SELF_ONLY`). Ook een tweede bestelling tijdens de
+voorverkoop kan niet (`ACCOUNT_TICKET_LIMIT`). Zodra de verkoop voor iedereen
+opengaat, valt dit weg en koopt hij zoals iedereen.
+
+- **Wie met de private voorverkooplink koopt zonder in te loggen, valt
+  erbuiten.** Die link is er voor de band, sponsors en helpers zonder account,
+  die net voor anderen kopen. Wie met de link koopt terwijl hij ingelogd is,
+  heeft wel een account en krijgt dezelfde grens.
+
+**Staat een event op 1 ticket per bestelling, dan is dat één ticket per
+account**, over alle bestellingen heen. Zonder die regel kon wie ingelogd is
+gewoon tien keer na elkaar één ticket bestellen. Het geldt ook voor events die
+al op 1 stonden: wie daar al een ticket heeft, kan geen tweede meer kopen.
+
+- **Uitgelogd geldt het niet.** Een event met enkel publieke tickets kan je
+  uitgelogd blijven kopen, net zoals een erelid uitgelogd iedereen is. Enkel
+  een ticket dat inloggen vraagt (een ledenticket, een ereledenticket, een
+  doelgroep of een gratis ticket, zie `ticketTypeRequiresLogin`) houdt het
+  echt bij één per persoon.
+- **Dezelfde telling als bij de ereleden** (`accountHeldTicketsWhere` in
+  `lib/ticketing/honorary.ts`): een bestelling die nog op betaling wacht telt
+  mee, een vervallen bestelling of een terugbetaald ticket niet. Wie de
+  betaling afbreekt, kan dus pas opnieuw kopen wanneer de reservatie vervalt.
+
+Het maximum dat de shop en de app tonen, komt uit één functie
+(`accountOrderMax` in `lib/ticketing/accountLimit.ts`), zodat geen van beide
+iets laat kiezen wat de checkout daarna weigert.
+
 ## De e-mailhandtekening is een recht, geen ledenfunctie
 
 De handtekeninggenerator op `/account` bouwt een mailhandtekening met het

@@ -49,12 +49,12 @@ import {
   ticketTypeNeedsMembership,
   ticketTypeRequiresLogin,
 } from "./audience";
-import { nonMemberTypeSalesStart, viewerSalesStart, viewerTypeSalesStart } from "./presale";
+import { isInPresaleNow, nonMemberTypeSalesStart, viewerSalesStart, viewerTypeSalesStart } from "./presale";
 import { presaleViewerFor } from "./presaleViewer";
 import { hasPrivateTicketAccess } from "./privateLink";
 import { userIsMember } from "@/lib/membership";
 import { ticketViewerProfile } from "./viewerProfile";
-import { honoraryHeldTicketsWhere } from "./honorary";
+import { accountHeldTicketsWhere, honoraryHeldTicketsWhere } from "./honorary";
 import { sanitizeSourceKey } from "./source";
 
 const answerValueSchema = z.union([
@@ -115,6 +115,8 @@ export class TicketCheckoutError extends Error {
       | "SOLD_OUT"
       | "HONORARY_PRICE_USED"
       | "HONORARY_TICKET_LIMIT"
+      | "ACCOUNT_TICKET_LIMIT"
+      | "PRESALE_SELF_ONLY"
       | "PAYMENT_UNAVAILABLE",
     public readonly field?: string
   ) {
@@ -262,6 +264,30 @@ export async function createTicketCheckout(
   if (input.items.length > event.maxTicketsPerOrder) {
     throw new TicketCheckoutError("INVALID_QUANTITY", "items");
   }
+  // Tijdens de voorverkoop koopt een ingelogd account hoogstens één ticket,
+  // en enkel op zijn eigen naam en e-mailadres. Wie met een privélink zonder
+  // account koopt (bv. de band of sponsors), heeft geen account om op te sluiten.
+  const presaleSelfOnly = isInPresaleNow(event, presaleBuyer, now) && session !== null;
+  if (presaleSelfOnly) {
+    if (input.items.length > 1) {
+      throw new TicketCheckoutError("PRESALE_SELF_ONLY", "items");
+    }
+    // Hoofdletters en dubbele spaties tellen niet: de shop stuurt de naam en het
+    // adres van het account zoals ze opgeslagen staan, en enkel `buyerEmail`
+    // komt al in kleine letters uit het schema.
+    const normalize = (value: string) => value.trim().replace(/\s+/g, " ").toLowerCase();
+    const accountName = normalize(session.user.name);
+    const accountEmail = normalize(session.user.email);
+    const singleItem = input.items[0];
+    if (
+      normalize(input.buyerName) !== accountName ||
+      normalize(input.buyerEmail) !== accountEmail ||
+      normalize(singleItem.attendeeName) !== accountName ||
+      (singleItem.attendeeEmail !== null && normalize(singleItem.attendeeEmail) !== accountEmail)
+    ) {
+      throw new TicketCheckoutError("PRESALE_SELF_ONLY");
+    }
+  }
 
   const typeById = new Map(event.ticketTypes.map((type) => [type.id, type]));
   const countByType = new Map<string, number>();
@@ -401,6 +427,10 @@ export async function createTicketCheckout(
   if (honoraryOneTicket && normalizedItems.length > 1) {
     throw new TicketCheckoutError("HONORARY_TICKET_LIMIT");
   }
+  // Staat het event op 1 ticket per bestelling, of zitten we in voorverkoop,
+  // dan geldt voor wie ingelogd is ook over de bestellingen heen: hoogstens één
+  // ticket per account.
+  const oneTicketPerAccount = (event.maxTicketsPerOrder === 1 || presaleSelfOnly) && session !== null;
 
   // Enkel de eerste bestelregel draagt het r-nummer: het is dat van de koper, en
   // een r-nummer kan per event maar aan één ticket hangen.
@@ -463,13 +493,17 @@ export async function createTicketCheckout(
           });
           if (used > 0) throw new TicketCheckoutError("HONORARY_PRICE_USED");
         }
-        // Dezelfde telling voor de grens van één ticket in totaal, maar over
-        // elke bestelregel van deze koper en niet enkel die aan de ereledenprijs.
-        if (honoraryOneTicket && session) {
+        // Dezelfde telling voor de grens van één ticket in totaal, zowel bij
+        // `honoraryOneTicket` als bij een event met max. 1 ticket per account.
+        if ((honoraryOneTicket || oneTicketPerAccount) && session) {
           const held = await tx.ticketOrderItem.count({
-            where: honoraryHeldTicketsWhere(event.id, session.user.id),
+            where: accountHeldTicketsWhere(event.id, session.user.id),
           });
-          if (held > 0) throw new TicketCheckoutError("HONORARY_TICKET_LIMIT");
+          if (held > 0) {
+            throw new TicketCheckoutError(
+              honoraryOneTicket ? "HONORARY_TICKET_LIMIT" : "ACCOUNT_TICKET_LIMIT",
+            );
+          }
         }
         if (totalCents === 0 && session) {
           // Bestelregels en geen tickets: een gratis bestelling krijgt haar

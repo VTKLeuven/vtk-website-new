@@ -1,16 +1,17 @@
 import type { Prisma } from "@prisma/client";
 
 /**
- * De bestelregels die een erelid voor dit event nog heeft. Een vervallen
+ * De bestelregels die één account voor dit event nog heeft. Een vervallen
  * bestelling of een terugbetaald ticket telt niet meer, een bestelling die nog
  * op betaling wacht wel.
  *
- * Eén bron voor de checkout en de shop, voor beide grenzen: één ticket aan de
- * ereledenprijs (met `honoraryPrice: true` erbij) en één ticket in totaal
- * (`TicketEvent.honoraryOneTicket`). Zo laat de shop niets kiezen wat de
- * checkout daarna weigert.
+ * Eén bron voor de checkout en de shop, voor alle drie de per-accountgrenzen:
+ * één ticket aan de ereledenprijs (met `honoraryPrice: true` erbij), één ticket
+ * in totaal voor een erelid (`TicketEvent.honoraryOneTicket`), en één ticket
+ * per account bij een event met `maxTicketsPerOrder === 1`. Zo laat de shop
+ * niets kiezen wat de checkout daarna weigert.
  */
-export function honoraryHeldTicketsWhere(
+export function accountHeldTicketsWhere(
   eventId: string,
   userId: string,
 ): Prisma.TicketOrderItemWhereInput {
@@ -23,3 +24,6 @@ export function honoraryHeldTicketsWhere(
     OR: [{ ticket: null }, { ticket: { status: { not: "REFUNDED" } } }],
   };
 }
+
+/** Alias voor bestaande aanroepers rond het erelidticket. */
+export const honoraryHeldTicketsWhere = accountHeldTicketsWhere;

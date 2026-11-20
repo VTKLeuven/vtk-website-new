@@ -650,6 +650,105 @@ describe("ticketing database invariants", () => {
     }
   });
 
+  it("limits logged-in accounts to one own ticket in presale, lifts it at public sale, and holds max 1 per account", async () => {
+    const accountUser = randomUUID();
+    const accountEmail = `${accountUser}@example.test`;
+    await prisma.user.create({
+      data: {
+        id: accountUser,
+        name: "Single Ticket Account",
+        email: accountEmail,
+        active: true,
+        honoraryMember: true,
+      },
+    });
+    const order = (name: string, email: string, count = 1) =>
+      createTicketCheckout(
+        {
+          eventId: ids.rateEvent,
+          buyerName: name,
+          buyerEmail: email,
+          locale: "nl",
+          termsAccepted: true,
+          paymentProvider: "mock",
+          items: Array.from({ length: count }, () => ({
+            ticketTypeId: ids.rateType,
+            attendeeName: name,
+            attendeeEmail: email,
+          })),
+        },
+        `account-limit-${email}`
+      );
+
+    vi.mocked(getSession).mockResolvedValue({
+      user: { id: accountUser, name: "Single Ticket Account", email: accountEmail, isSuperAdmin: false },
+    } as never);
+    // 1. Tijdens voorverkoop mag zelfs op een event met maxTicketsPerOrder=8 maar 1 ticket, en enkel voor jezelf.
+    await prisma.ticketEvent.update({
+      where: { id: ids.rateEvent },
+      data: {
+        salesStartAt: new Date(Date.now() + 24 * 3600_000),
+        presaleLeadMinutes: 48 * 60,
+        maxTicketsPerOrder: 8,
+      },
+    });
+    try {
+      await expect(order("Single Ticket Account", accountEmail, 2)).rejects.toMatchObject({
+        code: "PRESALE_SELF_ONLY",
+      });
+      await expect(order("Friend Name", "friend@example.test", 1)).rejects.toMatchObject({
+        code: "PRESALE_SELF_ONLY",
+      });
+      const first = await order("Single Ticket Account", accountEmail, 1);
+      await expect(order("Single Ticket Account", accountEmail, 1)).rejects.toMatchObject({
+        code: "ACCOUNT_TICKET_LIMIT",
+      });
+
+      // 2. Zodra de verkoop voor iedereen open is, valt de grens weg: hetzelfde
+      // account koopt weer meerdere tickets, ook voor iemand anders.
+      await expirePendingOrder(first.orderId);
+      await prisma.ticketEvent.update({
+        where: { id: ids.rateEvent },
+        data: { salesStartAt: null, presaleLeadMinutes: null },
+      });
+      const open = await createTicketCheckout(
+        {
+          eventId: ids.rateEvent,
+          buyerName: "Single Ticket Account",
+          buyerEmail: accountEmail,
+          locale: "nl",
+          termsAccepted: true,
+          paymentProvider: "mock",
+          items: [
+            { ticketTypeId: ids.rateType, attendeeName: "Single Ticket Account", attendeeEmail: accountEmail },
+            { ticketTypeId: ids.rateType, attendeeName: "Friend Name", attendeeEmail: "friend@example.test" },
+          ],
+        },
+        `account-limit-${accountEmail}`
+      );
+      await expirePendingOrder(open.orderId);
+
+      // 3. Bij maxTicketsPerOrder=1 in de publieke verkoop: de eerste lukt, een
+      // tweede bestelling op hetzelfde account wordt geweigerd.
+      await prisma.ticketEvent.update({
+        where: { id: ids.rateEvent },
+        data: { maxTicketsPerOrder: 1 },
+      });
+      await expect(order("Single Ticket Account", accountEmail, 1)).resolves.toMatchObject({
+        orderId: expect.any(String),
+      });
+      await expect(order("Single Ticket Account", accountEmail, 1)).rejects.toMatchObject({
+        code: "ACCOUNT_TICKET_LIMIT",
+      });
+    } finally {
+      vi.mocked(getSession).mockResolvedValue(null);
+      await prisma.ticketEvent.update({
+        where: { id: ids.rateEvent },
+        data: { salesStartAt: null, presaleLeadMinutes: null, maxTicketsPerOrder: 8 },
+      });
+    }
+  });
+
   it("fulfills a Mollie webhook once and deduplicates its retry", async () => {
     const accessExpiresAt = new Date("2027-06-20T00:00:00.000Z");
     const access = createOrderAccessToken(ids.mollieOrder, accessExpiresAt);

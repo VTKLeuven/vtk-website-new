@@ -18,7 +18,7 @@ import {
   type TicketTargetAudience,
 } from "./audience";
 import { ticketViewerProfile } from "./viewerProfile";
-import { honoraryHeldTicketsWhere } from "./honorary";
+import { accountHeldTicketsWhere, honoraryHeldTicketsWhere } from "./honorary";
 import { getTicketEventAccess } from "./authorization";
 import {
   isInPresaleNow,
@@ -459,17 +459,26 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
     session && profile.honorary && ticketTypes.some((type) => type.honoraryPriceCents !== null)
       ? await honoraryPriceUsed(event.id, session.user.id)
       : false;
-  // Een erelid op een event met `honoraryOneTicket`: één ticket in totaal.
-  // Dezelfde telling als de checkout, zodat de shop niets laat kiezen wat daar
-  // afketst. Null voor wie geen erelid is of wanneer het vinkje uit staat.
+  // Een erelid op een event met `honoraryOneTicket`, of elk ingelogd account
+  // op een event met `maxTicketsPerOrder === 1` of tijdens de voorverkoop:
+  // één ticket in totaal. Dezelfde telling als de checkout, zodat de shop
+  // niets laat kiezen wat daar afketst.
+  const inPresale = dto.presale !== null;
+  const checkAccountHeld =
+    session !== null &&
+    ((profile.honorary && event.honoraryOneTicket) || event.maxTicketsPerOrder === 1 || inPresale);
+  const accountHeldCount = checkAccountHeld
+    ? await prisma.ticketOrderItem.count({
+        where: accountHeldTicketsWhere(event.id, session.user.id),
+      })
+    : 0;
   const honoraryOneTicket =
     session && profile.honorary && event.honoraryOneTicket
-      ? {
-          used:
-            (await prisma.ticketOrderItem.count({
-              where: honoraryHeldTicketsWhere(event.id, session.user.id),
-            })) > 0,
-        }
+      ? { used: accountHeldCount > 0 }
+      : null;
+  const oneTicketPerAccount =
+    session && (event.maxTicketsPerOrder === 1 || inPresale)
+      ? { used: accountHeldCount > 0 }
       : null;
   return {
     ...dto,
@@ -477,6 +486,10 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
     // Enkel om het te kunnen zeggen; voor wie geen erelid is, altijd false.
     honoraryPriceUsed: honoraryUsed,
     honoraryOneTicket,
+    oneTicketPerAccount,
+    // Dezelfde voorwaarde als `presaleSelfOnly` in de checkout: ingelogd en nu
+    // in de voorverkoop. Wie met een privélink zonder account koopt, valt erbuiten.
+    presaleSelfOnly: session !== null && inPresale,
     memberPriceHint: memberPriceHint(ticketTypes, Boolean(session), isMember),
     requiresLogin:
       !session &&
