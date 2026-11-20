@@ -301,6 +301,32 @@ export async function listGroups(cfg: GoogleConfig): Promise<GoogleGroup[]> {
   return out;
 }
 
+/**
+ * Een extra adres op een groep. Een alias die er al op staat, is goed (409);
+ * een alias die bij een ander adres hoort, geeft wel een fout.
+ */
+export async function addGroupAlias(cfg: GoogleConfig, groupKey: string, alias: string): Promise<void> {
+  try {
+    await request(cfg, "POST", `${DIRECTORY}/groups/${encodeURIComponent(groupKey)}/aliases`, { alias });
+  } catch (err) {
+    if (err instanceof GoogleError && err.status === 409) {
+      // 409 zegt enkel "bestaat al": staat ze op deze groep, dan is dat goed.
+      const group = await getGroup(cfg, groupKey);
+      if (group?.aliases?.some((existing) => existing.toLowerCase() === alias.toLowerCase())) return;
+    }
+    throw err;
+  }
+}
+
+/** Haalt een alias van een groep. Een alias die er al niet meer is, is goed. */
+export async function removeGroupAlias(cfg: GoogleConfig, groupKey: string, alias: string): Promise<void> {
+  await request(
+    cfg,
+    "DELETE",
+    `${DIRECTORY}/groups/${encodeURIComponent(groupKey)}/aliases/${encodeURIComponent(alias)}`,
+  );
+}
+
 // -----------------------------------------------------------------------------
 // Leden
 // -----------------------------------------------------------------------------

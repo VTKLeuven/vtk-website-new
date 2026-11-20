@@ -160,6 +160,7 @@ export const AUDIT_ENTITIES = {
   mailGroup: { nl: "Groepsadres", en: "Group address", group: "google" },
   mailGroupCategory: { nl: "Categorie van groepsadressen", en: "Group address category", group: "google" },
   kiesploeg: { nl: "Kiesploeg", en: "Kiesploeg", group: "google" },
+  googleAlias: { nl: "Alias", en: "Alias", group: "google" },
   werkgroepAccount: { nl: "Werkgroepaccount", en: "Work group account", group: "google" },
   vaultPost: { nl: "Kluiskoppeling", en: "Vault link", group: "vault" },
   vaultAccess: { nl: "Kluistoegang", en: "Vault access", group: "vault" },

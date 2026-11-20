@@ -343,6 +343,36 @@ werkgroep (`werkgroepCategoryId` in `lib/google/werkgroepCategory.ts`; een
 subcategorie wint). Zie `docs/design-decisions.md`, "Categorieën: ordening,
 geen regel".
 
+### Aliassen
+
+Google Admin › **Aliassen** (recht `mailgroups.manage`) doet twee dingen.
+
+**Wie krijgt de mail?** Tik een adres in (een hoofdadres of een alias, van een
+groep of een account) en het scherm zegt van wie het is. Een groep wordt
+recursief uitgeklapt: zit er een groep in, dan ook die, tot op de postbussen
+die de mail echt krijgen, met per postbus het pad ("loko-av › loko › jan").
+Google bezorgt één keer per postbus, dus de lijst ontdubbelt; een groep die
+zichzelf via een omweg bevat, staat als lus in de structuur en wordt niet
+nog eens uitgeklapt. De logica staat los van Google in
+`lib/google/recipients.ts` (getest met een nagebootste directory); het ophalen
+in `lib/google/aliases.ts`. Een geschorst account staat erbij met "krijgt
+niets"; doorsturen dat een lid zelf in Gmail instelde, ziet dit scherm niet.
+
+**Aliassen beheren**: elke alias van een groep of een account, doorzoekbaar,
+met toevoegen, wijzigen (ander adres, andere eigenaar of beide) en
+verwijderen. Rechtstreeks in Google: de site bewaart geen aliassen, dus er valt
+niets gelijk te houden.
+
+- Een **nieuw adres komt er eerst bij**, pas daarna gaat het oude weg. Verhuist
+  hetzelfde adres naar een andere eigenaar, dan kan dat niet zonder het eerst
+  weg te halen (Google aanvaardt een adres één keer); mislukt het toevoegen,
+  dan zet de actie het terug op zijn oude plaats.
+- **Een bezet adres wordt vooraf geweigerd**, met de directory erbij: `addAlias`
+  op een account slikt een 409 stil in (dat is daar de bedoeling), en zou een
+  alias van iemand anders dus als gelukt melden.
+- **Kiesploegadressen zet de sync zelf** en haalt ze op 15 juli weg. Het
+  scherm markeert ze; wie er een wijzigt, botst met de sync.
+
 ### Organisatie-eenheden
 
 `/admin/groepsadressen/organisatie-eenheden` toont elk `@vtk.be`-account met
