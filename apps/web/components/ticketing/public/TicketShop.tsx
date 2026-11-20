@@ -1659,9 +1659,12 @@ export function TicketShop({
   // Op een smal scherm staat het ticketpaneel bovenaan in natuurlijke
   // DOM-volgorde, gevolgd door de gegevens/over-sectie en daarna het
   // praktische blok. Op breed scherm zet CSS Grid `.tshop-main` links en
-  // `.tshop-panel` + `.tshop-practical` rechts.
+  // `.tshop-panel` + `.tshop-practical` rechts. Het paneel schuift mee binnen
+  // `.tshop-panel-track`, niet binnen heel `.tshop`: anders schoof het over het
+  // praktische blok eronder.
   return (
     <div className="tshop">
+      <div className="tshop-panel-track">
       <aside className="tshop-panel" aria-labelledby="ticket-types-heading">
           <div className="tshop-panel-head">
             <h2 id="ticket-types-heading">Tickets</h2>
@@ -1919,6 +1922,7 @@ export function TicketShop({
             </>
           )}
         </aside>
+      </div>
         <div className="tshop-main">
           {detailsOpen ? (checkoutStep === "review" ? reviewSection : detailsForm) : null}
           {about}

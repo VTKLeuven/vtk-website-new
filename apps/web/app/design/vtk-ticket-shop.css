@@ -814,11 +814,19 @@
     grid-row: 1 / -1;
   }
 
+  /* Een sticky element schuift binnen zijn ouder. Als grid-item van `.tshop`
+     zelf schoof het paneel dus tot onderaan de hele grid, over het praktische
+     blok in rij 2 (de interesseknop kwam bovenop "Totaal" te liggen). Dit spoor
+     vult rij 1 en houdt het paneel daarbinnen. */
+  .tshop-panel-track {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: stretch;
+  }
+
   .tshop-panel {
     position: sticky;
     top: 96px;
-    grid-column: 2;
-    grid-row: 1;
   }
 
   .tshop-practical {
