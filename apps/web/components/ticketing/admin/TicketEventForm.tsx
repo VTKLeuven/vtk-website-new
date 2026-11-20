@@ -695,8 +695,8 @@ export function TicketEventForm({
               />
               <span className="ticket-admin-help">
                 {locale === "nl"
-                  ? "Bovenop het maximum van elk ticket (bij Tickettypes). De shop toont het kleinste van de twee."
-                  : "On top of each ticket's own maximum (under Ticket types). The shop shows whichever is lower."}
+                  ? "Bovenop het maximum van elk ticket (bij Tickettypes). De shop toont het kleinste van de twee; bij 1 ticket geldt dat per account."
+                  : "On top of each ticket's own maximum (under Ticket types). The shop shows whichever is lower; at 1 ticket, the limit applies per account."}
               </span>
             </div>
           ) : null}

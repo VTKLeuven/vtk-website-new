@@ -732,8 +732,8 @@ export function TicketSetupEditor({
           />
           <span className="ticket-admin-help">
             {nl
-              ? "Bovenop het maximum van elk ticket. De shop toont het kleinste van de twee."
-              : "On top of each ticket's own maximum. The shop shows whichever is lower."}
+              ? "Bovenop het maximum van elk ticket. De shop toont het kleinste van de twee; bij 1 ticket geldt dat per account."
+              : "On top of each ticket's own maximum. The shop shows whichever is lower; at 1 ticket, the limit applies per account."}
           </span>
         </div>
       </div>

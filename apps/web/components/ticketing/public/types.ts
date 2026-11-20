@@ -140,6 +140,18 @@ export type PublicTicketEvent = {
    */
   honoraryOneTicket?: { used: boolean } | null;
   /**
+   * Dit event staat op max. 1 ticket per bestelling, en de bezoeker is
+   * ingelogd: die grens geldt dan ook over alle bestellingen van dat account
+   * heen. `used` zegt of het account al een ticket heeft.
+   */
+  oneTicketPerAccount?: { used: boolean } | null;
+  /**
+   * De bezoeker is ingelogd en koopt nu in de voorverkoop: hoogstens één
+   * ticket, op de naam en het adres van zijn account. De checkout weigert al
+   * het andere met `PRESALE_SELF_ONLY`.
+   */
+  presaleSelfOnly?: boolean;
+  /**
    * Doelgroepen (eerstejaars, alumni, ...) met een ticket dat deze uitgelogde
    * bezoeker niet ziet. Leeg voor wie ingelogd is: wie er dan niet bij hoort,
    * hoort er ook na inloggen niet bij.
