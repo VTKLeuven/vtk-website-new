@@ -330,6 +330,14 @@
   font-size: 13px;
 }
 
+.vtk-auth-error p {
+  margin: 0;
+}
+
+.vtk-auth-error p + p {
+  margin-top: 4px;
+}
+
 .vtk-auth-submit {
   width: 100%;
   min-height: 44px;

@@ -7,7 +7,7 @@ import { prisma } from '@vtk/db';
 import { Card, Label, Input, Select, Button } from '@vtk/ui';
 import { hasLocale } from '@/lib/locale';
 import { requireSession } from '@/lib/session';
-import { passwordStatus } from '@vtk/auth/server';
+import { isKulEnabled, passwordStatus } from '@vtk/auth/server';
 import { getDictionary, pick } from '@vtk/i18n';
 import { hasPermission } from '@vtk/auth';
 import { formatEuro } from '@/lib/theokot';
@@ -20,6 +20,7 @@ import {
 import { updateProfileAction, logoutAction } from '@/app/actions/auth';
 import { ProfileForm } from '@/components/profile/ProfileForm';
 import { PasswordPanel } from '@/components/profile/PasswordPanel';
+import { KulLoginsPanel, type KulLinkOutcome } from '@/components/profile/KulLoginsPanel';
 import { SaveForm } from '@/components/ui/SaveForm';
 import { deleteMyAccountAction } from '@/app/actions/privacy';
 import { listTicketsForCurrentUser } from '@/lib/ticketing/queries';
@@ -51,8 +52,47 @@ export async function generateMetadata({
   return staticMetadata('account', '/account', locale, { noIndex: true });
 }
 
-export default async function AccountPage({ params }: { params: Promise<{ locale: string }> }) {
+/** Komt de pagina terug van een koppeling met KU Leuven, en hoe liep die af? */
+function kulLinkOutcome(
+  sp: Record<string, string | string[] | undefined>,
+  loginsNow: number,
+): KulLinkOutcome | null {
+  const first = (key: string) => {
+    const value = sp[key];
+    return Array.isArray(value) ? value[0] : value;
+  };
+  const kul = first('kul');
+  if (kul === 'gekoppeld') {
+    // Zonder nieuwe rij logde het lid bij KU Leuven in met een login die al
+    // aan dit account hing; better-auth meldt dat gewoon als gelukt.
+    const before = Number(first('voor'));
+    return Number.isFinite(before) && loginsNow > before ? { kind: 'linked' } : { kind: 'same' };
+  }
+  if (kul === 'fout') {
+    const code = first('error') ?? null;
+    if (code === 'account_already_linked_to_different_user') return { kind: 'taken' };
+    // Enkel een code van de vorm die better-auth en KU Leuven gebruiken; het
+    // is tekst uit de URL die in de melding belandt.
+    return { kind: 'failed', code: code && /^[a-z0-9_]{1,64}$/i.test(code) ? code : null };
+  }
+  return null;
+}
+
+/** `r0123456@kuleuven.be` wordt `r0123456`; een andere vorm tonen we niet. */
+function kulAccountName(accountId: string): string | null {
+  const local = accountId.split('@')[0] ?? '';
+  return /^[a-z]\d{7}$/i.test(local) ? local.toLowerCase() : null;
+}
+
+export default async function AccountPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { locale } = await params;
+  const sp = await searchParams;
   if (!hasLocale(locale)) notFound();
   const nl = locale === 'nl';
   const session = await requireSession(`/inloggen?next=${nl ? '' : '/en'}/account`);
@@ -219,6 +259,15 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
     where: { id: session.user.id },
     select: { discordId: true, discordUsername: true },
   });
+  const kulEnabled = isKulEnabled();
+  const kulLogins = kulEnabled
+    ? await prisma.account.findMany({
+        where: { userId: session.user.id, providerId: 'kuleuven' },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, accountId: true, createdAt: true },
+      })
+    : [];
+  const kulOutcome = kulEnabled ? kulLinkOutcome(sp, kulLogins.length) : null;
 
   const workingYear = currentWorkingYear(now);
   const userMemberships = memberships.map((m) => ({
@@ -613,6 +662,26 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
                 urgent={!password.hasPassword && !profile.isStudent}
               />
             </div>
+
+            {kulEnabled ? (
+              <div id="kul" className="scroll-mt-28">
+                <KulLoginsPanel
+                  locale={locale}
+                  returnPath={nl ? '/account' : '/en/account'}
+                  outcome={kulOutcome}
+                  logins={kulLogins.map((login) => ({
+                    id: login.id,
+                    accountName: kulAccountName(login.accountId),
+                    linkedOn: new Intl.DateTimeFormat(nl ? 'nl-BE' : 'en-GB', {
+                      timeZone: 'Europe/Brussels',
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    }).format(login.createdAt),
+                  }))}
+                />
+              </div>
+            ) : null}
 
             <Card id="profile" className="scroll-mt-28 p-6">
               <h2 className="mb-4 text-lg font-semibold text-vtk-ink">{nl ? 'Profiel' : 'Profile'}</h2>

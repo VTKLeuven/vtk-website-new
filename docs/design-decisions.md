@@ -8245,6 +8245,31 @@ Drie stukken, samen het pad:
   Enkel wanneer het persoonlijke adres precies één account aanwijst; botst het,
   dan faalt de login als een gewone foute login. Raden doen we hier niet.
 
+### Een persoon, een account, ook met een r- en een u-nummer
+
+Een doctoraatsstudent (en een student die bij de KU Leuven werkt) heeft twee
+KU Leuven-logins: een r-nummer op `student.kuleuven.be` en een u-nummer op
+`kuleuven.be`. Voor de site waren dat twee mensen. Wie met het andere nummer
+inlogde, kwam op een tweede, leeg account, zonder zijn lidmaatschap, tickets of
+erelidmaatschap (dat is een vlag op één account). En wie daarna een account op
+zijn persoonlijke adres maakte, botste in de onboarding op zijn eigen r-nummer.
+
+- **Het lid koppelt zelf, vanaf `/account#kul`.** Een knop start de
+  KU Leuven-login opnieuw (`prompt=login`, anders geeft de IdP meteen dezelfde
+  sessie terug) en hangt de tweede login aan het account waarmee hij nu
+  ingelogd is (`linkSocial`). Daarvoor staat `allowDifferentEmails` aan; dat
+  geldt enkel voor deze expliciete koppeling, niet voor gewoon inloggen.
+- **Automatisch samenvoegen doen we niet.** Een u-nummer draagt geen r-nummer,
+  en op naam koppelen is raden. Het lid weet welke twee nummers van hem zijn.
+- **Hangt het tweede nummer al aan een ander account**, dan weigert better-auth
+  de koppeling. IT koppelt het dan los op `/admin/gebruikers/<id>` (dat account
+  blijft staan, met zijn historiek) en het lid probeert opnieuw.
+- **De studentenlogin is de bron voor de status.** Een u-login op een account
+  met nog een andere KU Leuven-login zet `firwStudent` en `kulStudent` niet
+  (`kulStatusFromThisLogin`). Anders verloor een doctoraatsstudent bij elke
+  personeelslogin zijn FirW-status, en daarmee zijn ledenprijs. Een prof met
+  enkel een u-nummer krijgt zijn status gewoon van die login.
+
 ### Het inlogscherm is één knop, met een regeltje eronder
 
 Verreweg de meeste bezoekers zijn student. Twee even grote formulieren naast

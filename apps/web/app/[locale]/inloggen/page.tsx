@@ -39,6 +39,11 @@ export default async function LoginPage({
   // `error=kul` ondersteunt callbacks die vóór de nieuwe `source`-parameter
   // gestart zijn. Nieuwe callbacks behouden Better Auths eigen foutcode.
   const hasKulError = source === 'kul' || error === 'kul';
+  // De code van better-auth (of van KU Leuven, bv. `access_denied`). Twee
+  // krijgen een eigen uitleg; voor de rest tonen we de code, zodat een lid dat
+  // it@vtk.be mailt zegt wát er misging. Een doctoraatsstudent met een u-nummer
+  // kon dat niet, en zonder code was het niet na te gaan.
+  const kulErrorCode = hasKulError && error && error !== 'kul' && /^[a-z0-9_]{1,64}$/i.test(error) ? error : null;
   // `?wachtwoord=1` komt van de registratie- en herstelschermen: die sturen het
   // lid terug naar de inlogpagina waar hij net een wachtwoord instelde, dus daar
   // hoort het e-mailformulier al open te staan.
@@ -68,7 +73,18 @@ export default async function LoginPage({
       <div className="vtk-auth-panel">
         <p className="vtk-auth-kicker">{dict.auth.signInLead}</p>
         <h1 className="vtk-auth-title">{dict.auth.signIn}</h1>
-        {hasKulError && <p role="alert" className="vtk-auth-error">{dict.auth.kulSignInFailed}</p>}
+        {hasKulError && (
+          <div role="alert" className="vtk-auth-error">
+            <p>
+              {kulErrorCode === 'account_not_linked'
+                ? dict.auth.kulSignInNotLinked
+                : kulErrorCode === 'access_denied'
+                  ? dict.auth.kulSignInDenied
+                  : dict.auth.kulSignInFailed}
+            </p>
+            {kulErrorCode ? <p>{dict.auth.kulSignInErrorCode.replace('{code}', kulErrorCode)}</p> : null}
+          </div>
+        )}
 
         {/* Eén grote knop, want dit is de weg voor bijna iedereen die hier komt.
             Het wachtwoordformulier staat eronder achter een regel tekst; zie

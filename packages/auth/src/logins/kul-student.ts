@@ -58,6 +58,22 @@ export function kulStudentFromProfile(
   return names.length > 0 && names.every((name) => STUDENT_ACCOUNT_NAME.test(name));
 }
 
+/**
+ * Mag deze login de student- en FirW-status van het account zetten?
+ *
+ * Een account kan twee KU Leuven-logins dragen: het r-nummer en het u-nummer
+ * van een doctoraatsstudent of van een student die ook bij de KU Leuven werkt
+ * (gekoppeld vanaf /account). De studentenlogin is dan de bron. Een
+ * personeelslogin zet de status enkel wanneer ze de enige KU Leuven-login van
+ * het account is, zoals bij een prof.
+ */
+export function kulStatusFromThisLogin(
+  kulStudent: boolean,
+  accountHasOtherKulLogin: boolean,
+): boolean {
+  return kulStudent || !accountHasOtherKulLogin;
+}
+
 type UpdateMany = (args: Prisma.UserUpdateManyArgs) => Promise<{ count: number }>;
 
 const updateManyUsers: UpdateMany = (args) => prisma.user.updateMany(args);

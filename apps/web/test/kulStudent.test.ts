@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  kulStatusFromThisLogin,
   kulStudentFromProfile,
   syncKulStudent,
 } from "../../../packages/auth/src/logins/kul-student";
@@ -80,5 +81,24 @@ describe("syncKulStudent", () => {
   it("reports no change when nothing matched", async () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 0 });
     await expect(syncKulStudent("user-1", false, new Date(), updateMany)).resolves.toBe(false);
+  });
+});
+
+/**
+ * Een account met een r- én een u-nummer (een doctoraatsstudent): de
+ * personeelslogin mag de status van de studentenlogin niet overschrijven.
+ */
+describe("kulStatusFromThisLogin", () => {
+  it("lets a student login set the status, also beside a staff login", () => {
+    expect(kulStatusFromThisLogin(true, false)).toBe(true);
+    expect(kulStatusFromThisLogin(true, true)).toBe(true);
+  });
+
+  it("lets a staff login set the status when it is the only KU Leuven login", () => {
+    expect(kulStatusFromThisLogin(false, false)).toBe(true);
+  });
+
+  it("keeps a staff login from overwriting the status of a linked student login", () => {
+    expect(kulStatusFromThisLogin(false, true)).toBe(false);
   });
 });

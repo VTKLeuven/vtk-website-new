@@ -264,6 +264,9 @@
     "saved": "Opgeslagen",
     "signInWithKul": "Inloggen met KU Leuven",
     "kulSignInFailed": "Inloggen via KU Leuven is mislukt. Probeer het later opnieuw.",
+    "kulSignInNotLinked": "Er bestaat al een VTK-account op het adres van deze KU Leuven-login, maar dat adres is nog niet bevestigd. Bevestig het via de mail die je kreeg toen je je registreerde, of log in met je e-mailadres en wachtwoord.",
+    "kulSignInDenied": "KU Leuven liet deze login niet door naar de VTK-site. Heb je ook een r-nummer, log dan daarmee in, of gebruik je e-mailadres en wachtwoord.",
+    "kulSignInErrorCode": "Foutcode: {code}. Vermeld die als je it@vtk.be mailt.",
     "loginRequiredKicker": "Inloggen vereist",
     "loginRequiredTitle": "Log in om deze pagina te bekijken",
     "loginRequiredBody": "Je moet ingelogd zijn voordat je de inhoud van deze pagina kan bekijken.",
@@ -366,7 +369,7 @@
     "saved": "Gegevens opgeslagen",
     "errorInvalid": "Niet opgeslagen: kijk de ingevulde gegevens na.",
     "errorGraduationYear": "Niet opgeslagen: het afstudeerjaar kan ten laatste {max} zijn. Vul het jaar in waarin je afstudeerde, niet dat waarin je verwacht af te studeren.",
-    "errorRnumberTaken": "Niet opgeslagen: dit r-nummer hoort al bij een ander lid.",
+    "errorRnumberTaken": "Niet opgeslagen: dit r-nummer hoort al bij een ander account. Logde je al eens in via KU Leuven met je r-nummer, dan is dat jouw account: log daarmee in en stel onder Mijn gegevens een wachtwoord en je persoonlijke adres in. Of laat het veld hier leeg.",
     "errorAvatarTooLarge": "Niet opgeslagen: je profielfoto is groter dan 8 MB.",
     "errorAvatarFailed": "Niet opgeslagen: je profielfoto kon niet verwerkt worden.",
     "categories": {

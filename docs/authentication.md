@@ -205,6 +205,11 @@ Eén grote knop voor KU Leuven, en daaronder in het klein "Geen KU Leuven studen
 daarin de links naar registratie en wachtwoordherstel. Staat SSO uit (geen
 env-vars), dan staat dat formulier open: er valt dan niets te verbergen.
 
+Mislukt een KU Leuven-login, dan toont het scherm de foutcode uit `?error=`
+(van better-auth, of van KU Leuven zelf, zoals `access_denied`), zodat een lid
+dat it@vtk.be mailt zegt wat er misging. `account_not_linked` en
+`access_denied` krijgen een eigen uitleg.
+
 ## KU Leuven SSO (OpenID Connect)
 
 ### Wat het is
@@ -344,6 +349,18 @@ duplicaat.
   exacte match op het KU Leuven-adres wint altijd, en het r-nummer wordt
   hoofdletterongevoelig vergeleken. Zonder r-nummer en met een ander adres
   ontstaat er wél een tweede account; die smelten achteraf niet vanzelf samen.
+
+- **Twee KU Leuven-logins op één account** (r- en u-nummer van een
+  doctoraatsstudent): het lid koppelt de tweede zelf op `/account#kul`
+  (`linkKul` in `src/client.ts`, better-auths `linkSocial` met
+  `prompt=login`). `accountLinking.allowDifferentEmails` staat daarvoor aan;
+  better-auth leest die vlag enkel in de expliciete link-flow. Komt de koppeling
+  terug zonder nieuwe `Account`-rij, dan koos het lid bij KU Leuven dezelfde
+  login en zegt /account dat (`voor` in de callback-URL). Hangt de login al aan
+  een ander account, dan is de fout `account_already_linked_to_different_user`;
+  IT koppelt hem los op `/admin/gebruikers/<id>`. Een personeelslogin naast een
+  andere KU Leuven-login zet de FirW- en studentstatus niet
+  (`kulStatusFromThisLogin`). Zie `docs/design-decisions.md`.
 
 Vallen waar we in gelopen zijn:
 

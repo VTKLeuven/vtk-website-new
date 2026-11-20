@@ -264,6 +264,9 @@
     "saved": "Saved",
     "signInWithKul": "Sign in with KU Leuven",
     "kulSignInFailed": "Signing in through KU Leuven failed. Please try again later.",
+    "kulSignInNotLinked": "A VTK account already exists on the address of this KU Leuven login, but that address has not been confirmed yet. Confirm it through the mail you got when you registered, or sign in with your email address and password.",
+    "kulSignInDenied": "KU Leuven did not let this login through to the VTK site. If you also have an r-number, sign in with that one, or use your email address and password.",
+    "kulSignInErrorCode": "Error code: {code}. Mention it when you email it@vtk.be.",
     "loginRequiredKicker": "Login required",
     "loginRequiredTitle": "Please log in to view this page",
     "loginRequiredBody": "You must be logged in before you can view the content on this page.",
@@ -366,7 +369,7 @@
     "saved": "Details saved",
     "errorInvalid": "Not saved: please check the details you entered.",
     "errorGraduationYear": "Not saved: the graduation year can be {max} at the latest. Enter the year you graduated, not the year you expect to graduate.",
-    "errorRnumberTaken": "Not saved: this r-number already belongs to another member.",
+    "errorRnumberTaken": "Not saved: this r-number already belongs to another account. If you signed in through KU Leuven with your r-number before, that is your account: sign in with it and set a password and your personal address under My details. Or leave this field empty.",
     "errorAvatarTooLarge": "Not saved: your profile picture is larger than 8 MB.",
     "errorAvatarFailed": "Not saved: your profile picture could not be processed.",
     "categories": {

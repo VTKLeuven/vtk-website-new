@@ -227,6 +227,13 @@ export const auth = betterAuth({
     accountLinking: {
       enabled: true,
       trustedProviders: [KUL_PROVIDER_ID],
+      // Enkel voor het expliciete koppelen vanaf /account (`linkKul` in
+      // client.ts): een doctoraatsstudent of personeelslid heeft naast zijn
+      // r-nummer op student.kuleuven.be een u-nummer op kuleuven.be, en dat
+      // adres verschilt per definitie van het loginadres. better-auth leest
+      // deze vlag nergens anders; het gewone inloggen koppelt nog altijd enkel
+      // op e-mail en r-nummer (`resolveKulLink`).
+      allowDifferentEmails: true,
     },
   },
 
