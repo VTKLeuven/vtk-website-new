@@ -21,6 +21,9 @@ import { hasLocale } from "@/lib/locale";
 import { requireTicketEventCapability } from "@/lib/ticketing/authorization";
 import { saveAttendeeRNumberAction } from "@/app/actions/tickets";
 import { SaveForm } from "@/components/ui/SaveForm";
+import { RemoveAttendee } from "@/components/ticketing/admin/RemoveAttendee";
+import { notSetAside } from "@/lib/ticketing/paymentFlags";
+import { refundsManually } from "@/lib/ticketing/refunds";
 import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
 import { AttendeeQr } from "@/components/ticketing/admin/AttendeeQr";
 import { AdminMetric } from "@/components/ticketing/admin/AdminMetric";
@@ -34,6 +37,7 @@ import {
 import { attendeeGroupsFor } from "@/lib/ticketing/attendeeAccounts";
 import {
   formatDateTime,
+  formatMoney,
   formatNumber,
   type AdminLocale,
 } from "@/components/ticketing/admin/format";
@@ -61,7 +65,9 @@ export default async function TicketAttendeesPage({
   const [{ locale: localeParam, eventId }, filters] = await Promise.all([params, searchParams]);
   if (!hasLocale(localeParam)) notFound();
   const locale: AdminLocale = localeParam;
-  const { event } = await requireTicketEventCapability(eventId, "VIEW_ATTENDEES");
+  const { event, capabilities } = await requireTicketEventCapability(eventId, "VIEW_ATTENDEES");
+  const canVoid = capabilities.includes("MANAGE_ORDERS");
+  const canRefund = capabilities.includes("REFUND");
 
   const query = filters.q?.trim() ?? "";
   const attendance = ["CHECKED_IN", "NOT_CHECKED_IN", ...TICKET_STATUSES].includes(filters.attendance ?? "")
@@ -145,7 +151,21 @@ export default async function TicketAttendeesPage({
       where: { id: { in: pageIds } },
       include: {
         order: {
-          select: { reference: true, buyerName: true, buyerEmail: true, status: true },
+          select: {
+            reference: true,
+            buyerName: true,
+            buyerEmail: true,
+            status: true,
+            currency: true,
+            // De betaling van de tickets: bepaalt of verwijderen ook kan
+            // terugbetalen (Mollie wel, Bancontact enkel met de hand).
+            payments: {
+              where: { status: "SUCCEEDED", ...notSetAside },
+              orderBy: { succeededAt: "desc" },
+              take: 1,
+              select: { provider: true },
+            },
+          },
         },
         answers: { orderBy: { createdAt: "asc" } },
         ticket: {
@@ -169,6 +189,20 @@ export default async function TicketAttendeesPage({
     prisma.ticket.count({ where: { eventId, status: "REFUNDED" } }),
   ]);
   const rowById = new Map(rows.map((row) => [row.id, row]));
+  // Hoeveel geldige tickets elke bestelling op deze pagina heeft, voor de
+  // uitleg bij verwijderen ("de 4 andere tickets blijven geldig").
+  const validItemsOnPage = await prisma.ticketOrderItem.findMany({
+    where: {
+      eventId,
+      orderId: { in: [...new Set(rows.map((row) => row.orderId))] },
+      ticket: { is: { status: "VALID" } },
+    },
+    select: { orderId: true },
+  });
+  const attendeeCountByOrder = new Map<string, number>();
+  for (const { orderId } of validItemsOnPage) {
+    attendeeCountByOrder.set(orderId, (attendeeCountByOrder.get(orderId) ?? 0) + 1);
+  }
   const attendees = pageIds.flatMap((id) => rowById.get(id) ?? []);
 
   return (
@@ -296,6 +330,7 @@ export default async function TicketAttendeesPage({
                   if (!ticket) return null;
                   const latestScan = ticket.scanLogs[0];
                   const group = groupById.get(item.id) ?? "NON_MEMBER";
+                  const otherTickets = Math.max(0, (attendeeCountByOrder.get(item.orderId) ?? 1) - 1);
                   return (
                     <InteractiveRow key={item.id}>
                       <td data-wrap="true">
@@ -423,6 +458,28 @@ export default async function TicketAttendeesPage({
                                   </div>
                                 </SaveForm>
                               </div>
+                            ) : null}
+                            {ticket.status === "VALID" && (canVoid || canRefund) ? (
+                              <RemoveAttendee
+                                locale={locale}
+                                eventId={eventId}
+                                orderItemId={item.id}
+                                attendeeName={item.attendeeName}
+                                checkedIn={Boolean(ticket.checkedInAt)}
+                                otherTickets={otherTickets}
+                                canVoid={canVoid}
+                                refundable={
+                                  canRefund &&
+                                  item.totalCents > 0 &&
+                                  Boolean(item.order.payments[0]) &&
+                                  item.order.payments[0].provider !== "free" &&
+                                  !refundsManually(item.order.payments[0].provider)
+                                }
+                                manualProvider={Boolean(
+                                  item.order.payments[0] && refundsManually(item.order.payments[0].provider),
+                                )}
+                                amount={formatMoney(item.totalCents, item.order.currency, locale)}
+                              />
                             ) : null}
                             {item.answers.length > 0 ? (
                               <div className="ticket-admin-detail-section">

@@ -10483,6 +10483,35 @@ Dit staat los van `signature.generate` hierboven. Dat recht gaat over de kaart o
 /account; deze ondertekening hoort bij het versturen van een mail en zit al
 achter het beheerrecht van de werking zelf.
 
+## Een deelnemer verwijderen, met of zonder terugbetaling
+
+Tot november 2026 kon een ticket enkel verdwijnen door het terug te betalen.
+Toen bleek dat een paar mensen in de voorverkoop tickets voor anderen gekocht
+hadden (van vóór de grens hierboven), wou het beheer die tickets weghalen, maar
+enkel die: wie er vijf kocht, houdt het ticket dat wel voor hemzelf was.
+
+- **Per deelnemer, niet per bestelling.** De knop "Ticket verwijderen" staat in
+  het uitklappaneel van elke deelnemer op het tabblad Deelnemers
+  (`RemoveAttendee.tsx`). De andere tickets van de bestelling blijven geldig.
+- **Of het geld teruggaat, kies je in de bevestiging.** Een vinkje "Ook ... terugbetalen
+  via Mollie" loopt langs de gewone terugbetaling (`requestTicketRefund`, recht
+  `REFUND`). Uitgevinkt wordt het ticket enkel ingetrokken
+  (`voidTicketWithoutRefund`, recht `MANAGE_ORDERS`): status `VOID`, de scanner
+  weigert het, de plaats komt vrij, de bestelling blijft betaald en er gaat
+  geen geld terug. Het vinkje staat standaard uit: geld terugsturen maak je
+  niet ongedaan.
+- **Bancontact krijgt geen vinkje.** Die provider betaalt voor ons niet terug
+  via de API. De bevestiging zegt dan dat wie terug wil betalen dat met de hand
+  doet en "Met de hand terugbetalen" bij de bestelling gebruikt; dat trekt het
+  ticket ook in.
+- **Een ingetrokken ticket kan je daarna niet meer via de site terugbetalen**
+  (de terugbetaling vraagt een geldig ticket); dat moet dan rechtstreeks in
+  Mollie. Een gescand ticket kan je niet verwijderen.
+- **Een ingetrokken ticket telt nog mee voor de koper** bij één ticket per
+  account en in de voorverkoop (`accountHeldTicketsWhere` sluit enkel
+  terugbetaalde tickets uit): wie te veel kocht, krijgt er zo geen nieuwe
+  kans bij.
+
 ## Voorverkoop: een duur voor de verkoopstart, niet een tweede datum
 
 Een ticketevent kan een **voorverkoop** hebben: een periode waarin enkel het

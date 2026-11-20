@@ -19,6 +19,7 @@ import { NEWS_TAG } from "@/lib/news/load";
 import { markPaymentRefundedManually } from "@/lib/ticketing/orders";
 import { fetchBancontactRefundAccount } from "@/lib/ticketing/refundAccount";
 import { requestTicketRefund } from "@/lib/ticketing/refunds";
+import { voidTicketWithoutRefund } from "@/lib/ticketing/voidTicket";
 import { slugify } from "@/lib/ticketing/slug";
 import { ticketColorKey } from "@/lib/ticketing/ticketColors";
 import { geocodeAddress } from "@/lib/ticketing/geocode";
@@ -2407,6 +2408,72 @@ export async function refundTicketsManuallyAction(
     summary: `${orderItemIds.length} ticket(s) met de hand terugbetaald (Bancontact)`,
   });
   refreshTicketEvent(locale, eventId);
+  revalidatePath(localePath(locale, `/admin/tickets/${eventId}/bestellingen`));
+  return saveOk();
+}
+
+/** Wat het verwijderen van een deelnemer verwacht kan zien en zelf uitlegt. */
+const EXPECTED_REMOVE_ERRORS = new Set([
+  ...EXPECTED_REFUND_ERRORS,
+  "ATTENDEE_NOT_FOUND",
+  "TICKET_NOT_VALID",
+  "REFUND_MANUAL_ONLY",
+  "PAYMENT_REFERENCE_MISSING",
+]);
+
+/**
+ * Eén deelnemer (één ticket) uit een bestelling halen, vanaf het tabblad
+ * Deelnemers. Met `refund=on` loopt het langs de gewone terugbetaling via
+ * Mollie (recht `REFUND`); zonder wordt het ticket enkel ingetrokken en blijft
+ * het geld staan (recht `MANAGE_ORDERS`). In beide gevallen werkt het ticket
+ * niet meer aan de ingang, komt de plaats vrij en blijven de andere tickets van
+ * de bestelling geldig. Zie docs/design-decisions.md, "Een deelnemer
+ * verwijderen".
+ */
+export async function removeTicketAttendeeAction(formData: FormData): Promise<SaveState> {
+  const eventId = value(formData, "eventId");
+  const orderItemId = value(formData, "orderItemId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  const refund = checkboxValue(formData, "refund");
+  const { session } = await requireTicketEventCapability(
+    eventId,
+    refund ? "REFUND" : "MANAGE_ORDERS"
+  );
+  const item = await prisma.ticketOrderItem.findFirst({
+    where: { id: orderItemId, eventId },
+    select: { orderId: true, attendeeName: true },
+  });
+  if (!item) return saveError("ATTENDEE_NOT_FOUND");
+
+  try {
+    if (refund) {
+      await requestTicketRefund({
+        eventId,
+        orderId: item.orderId,
+        orderItemIds: [orderItemId],
+        requestedById: session.user.id,
+        reason: "Deelnemer verwijderd",
+      });
+    } else {
+      await voidTicketWithoutRefund({ eventId, orderItemId, actorUserId: session.user.id });
+    }
+  } catch (error) {
+    if (error instanceof Error && EXPECTED_REMOVE_ERRORS.has(error.message)) {
+      return saveError(error.message);
+    }
+    throw error;
+  }
+  await logAudit({
+    action: refund ? "refund" : "delete",
+    entity: "ticketOrder",
+    entityId: item.orderId,
+    target: await ticketEventTitle(eventId),
+    summary: refund
+      ? `ticket van ${item.attendeeName} verwijderd en terugbetaald`
+      : `ticket van ${item.attendeeName} verwijderd, zonder terugbetaling`,
+  });
+  refreshTicketEvent(locale, eventId);
+  revalidatePath(localePath(locale, `/admin/tickets/${eventId}/deelnemers`));
   revalidatePath(localePath(locale, `/admin/tickets/${eventId}/bestellingen`));
   return saveOk();
 }

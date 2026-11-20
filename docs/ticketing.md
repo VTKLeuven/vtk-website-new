@@ -760,6 +760,10 @@ en als vangnet. Alles over de app-kant staat in `vtk-app/docs/scanner.md`.
   checkout, the shop queries and the admin. See "Plaatsen: potten met een
   plafond voor leden" in `docs/design-decisions.md`
 - `refunds.ts`: `requestTicketRefund`, `completeTicketRefund`, `failTicketRefund`
+- `voidTicket.ts`: `voidTicketWithoutRefund`, one attendee out of an order
+  without refund (`VOID`, seat freed, order stays paid). The attendees tab
+  offers it next to a refund through Mollie; see `docs/design-decisions.md`,
+  "Een deelnemer verwijderen".
 - `reconciliation.ts`: polls PENDING payments/refunds against the provider
 - `scanner.ts`: scan authorization + validation
 - `authorization.ts`: capability checks (`canCreateTicketEventForGroup`, `requireTicketEventCapability`)
