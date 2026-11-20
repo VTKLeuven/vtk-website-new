@@ -540,3 +540,22 @@ sloten mag stukgaan zonder dat er een kluis openstaat.
 Omdat Vaultwarden op de `email`-claim matcht, is dat het universitaire adres: de
 sync moet leden op datzelfde adres uitnodigen. Zie `docs/wachtwoorden.md`.
 
+## MCP-assistenten via OAuth 2.1 + DCR
+
+Praesidiumleden kunnen externe AI-assistenten (Claude, ChatGPT, Cursor) koppelen
+aan `POST /api/mcp` via dezelfde OAuth-provider. Zie `docs/mcp.md` voor het
+volledige overzicht; de SSO-afspraken zijn:
+
+- **Geen algemene OIDC-clients via DCR:** `/oauth2/register` is beperkt tot
+  publieke PKCE-clients (`token_endpoint_auth_method: "none"`), de MCP-scopes
+  (`mcp:read`, `mcp:create`, `offline_access`), een vaste redirect-host-allowlist
+  (`claude.ai`, `chatgpt.com`, `chat.openai.com`, `cursor.sh`, loopback en
+  optioneel `MCP_DCR_ALLOWED_REDIRECT_HOSTS`), een dedicated rate limit (5/min)
+  en de MCP-resource `<origin>/api/mcp` (`OauthResource` + `OauthClientResource`).
+- **Toegangspoort `mcp.use`:** `signup.shouldRedirect` / `checkClientAccess`
+  eisen de canonieke permissie `mcp.use` zodra `mcp:*`-scopes, een MCP-client of
+  de MCP-resource in beeld komen.
+- **Consent tegen phishing:** `ConsentScreen.tsx` toont expliciet de
+  redirect-host en laat `mcp:create` standaard uitgevinkt.
+
+

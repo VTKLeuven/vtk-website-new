@@ -7,7 +7,7 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { genericOAuth, jwt } from 'better-auth/plugins';
-import { APIError } from 'better-auth/api';
+import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { oauthProvider, getOAuthProviderState } from '@better-auth/oauth-provider';
 import { prisma } from '@vtk/db';
 import { nextCookies } from 'better-auth/next-js';
@@ -17,7 +17,13 @@ import { checkClientAccess } from './server/clientAccess';
 
 import { hashPassword, verifyPassword } from './logins/password';
 import { kulOAuthConfig, KUL_PROVIDER_ID } from './logins/kul';
-import { AUTH_BASE_PATH, OAUTH_CLIENT_OWNER, SCOPE_CODES } from './index';
+import {
+  AUTH_BASE_PATH,
+  MCP_REGISTRATION_SCOPES,
+  OAUTH_CLIENT_OWNER,
+  SCOPE_CODES,
+  getMcpResourceUrl,
+} from './index';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -41,7 +47,73 @@ const TRUSTED_PROXIES = (
   .map((entry) => entry.trim())
   .filter(Boolean);
 
+const DEFAULT_DCR_ALLOWED_REDIRECT_HOSTS = [
+  'claude.ai',
+  'chatgpt.com',
+  'chat.openai.com',
+  'cursor.sh',
+  'localhost',
+  '127.0.0.1',
+  '[::1]',
+  '::1',
+] as const;
+
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+
+function getAllowedDcrRedirectHosts(): Set<string> {
+  const extra = (process.env.MCP_DCR_ALLOWED_REDIRECT_HOSTS ?? '')
+    .split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+  return new Set([...DEFAULT_DCR_ALLOWED_REDIRECT_HOSTS, ...extra]);
+}
+
+function assertAllowedDcrRedirectUris(redirectUris: unknown): void {
+  if (!Array.isArray(redirectUris) || redirectUris.length === 0) {
+    throw new APIError('BAD_REQUEST', {
+      message: 'Dynamic client registration requires at least one allowed redirect_uri.',
+    });
+  }
+  const allowedHosts = getAllowedDcrRedirectHosts();
+  for (const raw of redirectUris) {
+    if (typeof raw !== 'string') {
+      throw new APIError('BAD_REQUEST', {
+        message: 'Invalid redirect_uri in dynamic client registration.',
+      });
+    }
+    let parsed: URL;
+    try {
+      parsed = new URL(raw);
+    } catch {
+      throw new APIError('BAD_REQUEST', {
+        message: 'Invalid redirect_uri in dynamic client registration.',
+      });
+    }
+    const host = parsed.hostname.toLowerCase();
+    if (parsed.protocol === 'cursor:') {
+      if (host === 'anysphere.cursor-mcp' && parsed.pathname === '/oauth/callback') {
+        continue;
+      }
+      throw new APIError('BAD_REQUEST', {
+        message: `Redirect URI "${raw}" is not allowed for dynamic client registration.`,
+      });
+    }
+    if (!allowedHosts.has(host)) {
+      throw new APIError('BAD_REQUEST', {
+        message: `Redirect URI host "${host}" is not allowed for dynamic client registration.`,
+      });
+    }
+    const isLoopback = LOOPBACK_HOSTS.has(host);
+    if (parsed.protocol !== 'https:' && !(isLoopback && parsed.protocol === 'http:')) {
+      throw new APIError('BAD_REQUEST', {
+        message: `Redirect URI protocol "${parsed.protocol}" is not allowed for host "${host}".`,
+      });
+    }
+  }
+}
+
 const kulConfig = kulOAuthConfig();
+const mcpResourceUrl = getMcpResourceUrl();
 
 export const auth = betterAuth({
   appName: 'VTK',
@@ -96,12 +168,22 @@ export const auth = betterAuth({
         page: '/inloggen/geen-toegang',
         shouldRedirect: async ({ user }) => {
           const state = await getOAuthProviderState();
-          const clientId = state?.query ? new URLSearchParams(state.query).get('client_id') : null;
+          const params = state?.query ? new URLSearchParams(state.query) : null;
+          const clientId = params?.get('client_id') ?? null;
           // Geen client in beeld: dit is geen autorisatieflow, dus niets te
           // blokkeren. Doorlaten en de plugin haar werk laten doen.
           if (!clientId) return false;
 
-          const { allowed } = await checkClientAccess(user.id, clientId);
+          const requestedScopes = (params?.get('scope') ?? '')
+            .split(/\s+/)
+            .map((s) => s.trim())
+            .filter(Boolean);
+          const requestedResource = params?.get('resource') ?? null;
+
+          const { allowed } = await checkClientAccess(user.id, clientId, {
+            requestedScopes,
+            requestedResource,
+          });
           return allowed ? false : '/inloggen/geen-toegang';
         },
       },
@@ -111,24 +193,54 @@ export const auth = betterAuth({
       // permissie werken": tien minuten, altijd, zonder dat de client iets moet
       // doen. Een gewoon `openid profile`-token houdt zijn volle uur.
       //
+      // Voor MCP-scopes geldt 15 minuten: gecombineerd met `offline_access`
+      // blijft de AI-assistent vlot verbonden terwijl ingetrokken rechten snel
+      // doorwerken.
+      //
       // LET OP: dit moet een duurstring zijn, geen getal. De plugin duwt deze
       // waarde door `toExpJWT()`, en dat behandelt een getal als een absolute
       // epoch-seconde (`600` = 1 januari 1970, 00:10 UTC), niet als "over 600
       // seconden". Met een getal krijgt elke client die `entitlements` vraagt
       // een token dat al verlopen is; UserInfo antwoordt dan met het misleidende
       // `invalid_scope` / "Missing required scope".
-      scopeExpirations: { entitlements: '10m' },
+      scopeExpirations: {
+        entitlements: '10m',
+        'mcp:read': '15m',
+        'mcp:create': '15m',
+      },
       // De scope-registry (lib/scopes.ts) is de bron; zonder deze regel staat de
       // plugin enkel haar vier standaardscopes toe en faalt het aanmaken van een
       // client met bv. `vtk:study_programme` op `invalid_scope`.
       scopes: [...SCOPE_CODES],
 
-      // We publiceren geen losse RFC 8707 resource servers. De upstream plugin
-      // bindt toegelaten `resource`-audiences momenteel niet per OAuth-client
-      // (GHSA-p2fr-6hmx-4528). Een lege expliciete lijst schakelt die globale
-      // resource-indicatorroute uit; enkel de door de plugin afgeleide UserInfo-
-      // audience blijft beschikbaar voor normale OpenID Connect-clients.
-      validAudiences: [],
+      // RFC 8707 resource indicators: enkel de MCP-server (`/api/mcp`) is een
+      // geldige resource-audience. `@better-auth/oauth-provider@1.7.14` koppelt
+      // clients via `oauthResource` + `oauthClientResource`, en elke
+      // autorisatie met `mcp:*` of deze resource wordt in
+      // `signup.shouldRedirect` / `checkClientAccess` op `mcp.use` gegated.
+      resources: mcpResourceUrl
+        ? [
+            {
+              identifier: mcpResourceUrl,
+              name: 'VTK MCP Server',
+              allowedScopes: [...MCP_REGISTRATION_SCOPES],
+            },
+          ]
+        : [],
+      resourceSeedMode: 'merge',
+
+      // Dynamic Client Registration (RFC 7591) voor MCP-clients (Claude.ai,
+      // Claude Desktop, ChatGPT, Cursor). Strikt beperkt tot publieke PKCE-
+      // clients, enkel de MCP-scopes (+ offline_access), en enkel de MCP-resource.
+      allowDynamicClientRegistration: true,
+      allowUnauthenticatedClientRegistration: true,
+      clientRegistrationDefaultScopes: ['mcp:read', 'offline_access'],
+      clientRegistrationAllowedScopes: [...MCP_REGISTRATION_SCOPES],
+      clientRegistrationDefaultResources: mcpResourceUrl ? [mcpResourceUrl] : [],
+      clientRegistrationDefaultApplicationType: 'infer',
+      rateLimit: {
+        register: { window: 60, max: 5 },
+      },
 
       // Welke claims onder welke scope vrijkomen, staat in lib/claims.ts. De
       // meeste zitten enkel in UserInfo en niet in het ID token: dat wordt één
@@ -205,6 +317,21 @@ export const auth = betterAuth({
     // adres er gewoon mee binnenkwam. Niets van ons gebruikte ze.
     '/sign-in/email',
   ],
+
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== '/oauth2/register') return;
+      const body = ctx.body as Record<string, unknown> | undefined;
+      if (!body || typeof body !== 'object') return;
+      if (body.token_endpoint_auth_method !== undefined && body.token_endpoint_auth_method !== 'none') {
+        throw new APIError('BAD_REQUEST', {
+          message: 'Dynamic client registration only supports public PKCE clients (token_endpoint_auth_method: none).',
+        });
+      }
+      assertAllowedDcrRedirectUris(body.redirect_uris);
+      body.token_endpoint_auth_method = 'none';
+    }),
+  },
 
   emailAndPassword: {
     enabled: true,

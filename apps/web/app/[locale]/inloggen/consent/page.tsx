@@ -98,6 +98,16 @@ export default async function ConsentPage({
   const requested = (one(sp.scope) ?? '').split(' ').filter(Boolean);
   if (!requested.length) return <ConsentError nl={nl} kind="expired" />;
 
+  let redirectHost: string | null = null;
+  const redirectUri = one(sp.redirect_uri);
+  if (redirectUri) {
+    try {
+      redirectHost = new URL(redirectUri).host || null;
+    } catch {
+      redirectHost = null;
+    }
+  }
+
   // Wat het lid deze client al eerder toestond. De plugin stuurt enkel hierheen
   // wanneer er iets nieuws bij is, dus dit is de "delta"-berekening uit 13.5.
   const existing = await prisma.oauthConsent.findFirst({
@@ -118,6 +128,9 @@ export default async function ConsentPage({
       // Een scope die we niet kennen behandelen we als gevoelig: dan staat ze
       // niet voorgevinkt en beslist het lid er zelf over.
       sensitive: known.has(code) ? isSensitiveScope(code) : true,
+      // `mcp:create` blijft standaard uitgevinkt zodat een lid bewust kiest
+      // voor schrijfrechten (concepten aanmaken) via een AI-assistent.
+      defaultSelected: code !== 'mcp:create',
       isNew: isNew(code),
     }));
 
@@ -126,6 +139,7 @@ export default async function ConsentPage({
       nl={nl}
       oauthQuery={oauthQuery}
       userEmail={session.user.email}
+      redirectHost={redirectHost}
       client={{
         name: client.name ?? client.clientId,
         logoUri: client.icon,

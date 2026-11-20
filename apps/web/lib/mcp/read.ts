@@ -11,6 +11,7 @@ import { praesidiumYears } from "@/lib/shift/voucherEligibility";
 import {
   hasAnyMcpPermission,
   hasMcpPermission,
+  hasMcpScope,
   type McpPrincipal,
 } from "@/lib/mcp/policy";
 
@@ -147,7 +148,40 @@ function page<T>(items: T[], input: z.output<typeof inputSchema>) {
   };
 }
 
+/**
+ * Enkel redactionele, catalogus- en definitieresources zonder persoonsgegevens
+ * mogen standaard gelezen worden door OAuth-gebruikers (externe AI-assistenten),
+ * tenzij expliciet anders ingesteld via `MCP_OAUTH_ALLOW_PII_READS=true`.
+ */
+export const MCP_OAUTH_SAFE_READ_RESOURCES: ReadonlySet<McpReadResource> = new Set([
+  "pages",
+  "navigation",
+  "announcements",
+  "calendar",
+  "tickets",
+  "forms",
+  "photos",
+  "partners",
+  "editorial_settings",
+  "dashboard",
+  "shortlinks",
+  "groups",
+  "roles",
+  "logistiek_catalog",
+  "meeting_schedule",
+  "lesbezoek_calendar",
+  "module_access",
+]);
+
 export function canReadMcpResource(principal: McpPrincipal, resource: McpReadResource): boolean {
+  if (!hasMcpScope(principal, "mcp:read")) return false;
+  if (
+    principal.authKind === "oauth" &&
+    !MCP_OAUTH_SAFE_READ_RESOURCES.has(resource) &&
+    process.env.MCP_OAUTH_ALLOW_PII_READS !== "true"
+  ) {
+    return false;
+  }
   return hasAnyMcpPermission(principal, RESOURCE_PERMISSIONS[resource]);
 }
 
@@ -428,8 +462,13 @@ export async function adminRead(principal: McpPrincipal, raw: McpAdminReadInput)
       return page(items, input);
     }
     case "shifts": {
+      const canReadAllShifts = principal.allGroups || hasAnyMcpPermission(principal, ["shift.editAll", "shift.reward"]);
       const items = await prisma.shift.findMany({
-        where: { ...idWhere(input.id), ...(contains ? { OR: [{ name: contains }, { location: contains }, { description: contains }, { post: contains }] } : {}) },
+        where: {
+          ...idWhere(input.id),
+          ...(canReadAllShifts ? {} : { post: { in: [...principal.groupCodes], mode: "insensitive" } }),
+          ...(contains ? { OR: [{ name: contains }, { location: contains }, { description: contains }, { post: contains }] } : {}),
+        },
         take, skip, orderBy: { startTime: "desc" },
         include: { participants: { select: { userId: true, payedOut: true, rewardPaid: true, registeredAt: true, user: { select: { name: true, email: true } } } } },
       });

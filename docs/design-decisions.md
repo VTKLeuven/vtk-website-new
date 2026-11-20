@@ -13713,3 +13713,29 @@ niet een tweede planner. Zie `docs/burgieclan-planning.md` voor hoe.
   Burgieclan.** De app vinkt ze af en verwijdert ze; invullen met een vak, een
   datum en een uur is een formulier dat op een groot scherm beter werkt.
 
+## Praesidium koppelt AI-assistenten via OAuth 2.1, DCR en een lees-allowlist
+
+Praesidiumleden kunnen een eigen AI-assistent (Claude, ChatGPT, Cursor) met de
+site verbinden op `POST /api/mcp` via hun gewone VTK-login (`docs/mcp.md`), naast
+het statische `MCP_API_TOKEN` voor coding agents.
+
+- **OAuth 2.1 + DCR binnen strikte grenzen.** Dynamic Client Registration
+  (`/oauth2/register`) laat geen vertrouwelijke clients en geen identiteitsscopes
+  (`vtk:student_number`, `vtk:contact`, `entitlements`) toe: enkel publieke
+  PKCE-clients met `mcp:read`, `mcp:create` en `offline_access`, een vaste
+  redirect-host-allowlist (`claude.ai`, `chatgpt.com`, `chat.openai.com`,
+  `cursor.sh`, loopback + `MCP_DCR_ALLOWED_REDIRECT_HOSTS`), een dedicated rate
+  limit en de ene `OauthResource` (`<origin>/api/mcp` via
+  `OauthClientResource`). Het toestemmingsscherm toont de redirect-host en laat
+  `mcp:create` standaard uitgevinkt.
+- **Live rechten op `mcp.use` en per-request.** De toegangspoort (`mcp.use` in
+  `checkClientAccess` én bij elke `/api/mcp`-call) en de live databaserollen en
+  actieve postlidmaatschappen worden bij elk verzoek opnieuw opgelost, met
+  korte access tokens (15 minuten) en `offline_access` voor vernieuwing.
+- **Strenge lees-allowlist tegen datalekken.** OAuth-principals mogen standaard
+  enkel redactionele, catalogus- en definitieresources zonder persoonsgegevens
+  lezen (`MCP_OAUTH_SAFE_READ_RESOURCES`). Alles met namen, e-mails, bestellingen
+  of logs blijft dicht tenzij `MCP_OAUTH_ALLOW_PII_READS="true"` expliciet wordt
+  gezet.
+
+

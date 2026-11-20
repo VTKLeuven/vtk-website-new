@@ -1,7 +1,9 @@
 import "server-only";
 
-import { createHash, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import type { AuthInfo } from "@modelcontextprotocol/server";
+import { verifyMcpAccessToken } from "@vtk/auth/server";
+import { getMcpResourceMetadataUrl } from "@/lib/mcp/metadata";
 import { principalAuthExtra } from "@/lib/mcp/policy";
 
 const MAX_REQUEST_BYTES = 256 * 1024;
@@ -118,39 +120,103 @@ function validateNetworkBoundary(request: Request): Response | null {
   return null;
 }
 
+function wwwAuthenticateHeader(request: Request, extraParams?: string): string {
+  const metadataUrl = getMcpResourceMetadataUrl(request);
+  const parts = ['Bearer realm="VTK MCP"'];
+  if (metadataUrl) parts.push(`resource_metadata="${metadataUrl}"`);
+  if (extraParams) parts.push(extraParams);
+  return parts.join(", ");
+}
+
+function unauthenticated(request: Request): Response {
+  return jsonError(401, "MCP_UNAUTHENTICATED", {
+    "www-authenticate": wwwAuthenticateHeader(request),
+  });
+}
+
 export async function authenticateMcpRequest(request: Request): Promise<McpAuthentication | Response> {
   const boundaryError = validateNetworkBoundary(request);
   if (boundaryError) return boundaryError;
 
   const configured = process.env.MCP_API_TOKEN?.trim();
-  if (!configured || configured.length < 32) {
+  if (configured && configured.length < 32) {
     return jsonError(503, "MCP_NOT_CONFIGURED");
   }
 
   const supplied = parseBearer(request.headers.get("authorization"));
-  if (!supplied || !safeEqual(configured, supplied)) {
-    return jsonError(401, "MCP_UNAUTHENTICATED", {
-      "www-authenticate": 'Bearer realm="VTK MCP"',
-    });
+  if (!supplied) {
+    return unauthenticated(request);
   }
 
-  const extra = await principalAuthExtra();
-  if (!extra) {
-    return jsonError(503, "MCP_PERMISSIONS_NOT_CONFIGURED");
+  // 1. Bestaande statische serviceaccount (coding agents via MCP_API_TOKEN).
+  if (configured && safeEqual(configured, supplied)) {
+    const extra = await principalAuthExtra();
+    if (!extra) {
+      return jsonError(503, "MCP_PERMISSIONS_NOT_CONFIGURED");
+    }
+
+    // Er bestaat maar één statisch token, dus een vaste sleutel volstaat. Een
+    // hash van het token voegde niets toe en las voor CodeQL als een te snel
+    // gehasht wachtwoord (js/insufficient-password-hash).
+    const rateLimitKey = "static";
+    return {
+      // De protocolhandler heeft de geheime bearerwaarde niet nodig. Geef alleen
+      // de gevalideerde identiteit en capabilities door, zodat het token niet per
+      // ongeluk in een toolresultaat of foutlog terecht kan komen.
+      authInfo: {
+        token: "[redacted]",
+        clientId: process.env.MCP_CLIENT_NAME?.trim() || "vtk-mcp-agent",
+        scopes: ["mcp:read", "mcp:create"],
+        extra: {
+          authKind: "static",
+          ...extra,
+        },
+      },
+      rateLimitKey,
+    };
   }
 
-  const rateLimitKey = createHash("sha256").update(configured).digest("hex");
+  // 2. OAuth 2.1 access token voor praesidiumleden (RFC 8707 + RFC 9728).
+  const baseUrl = getMcpResourceMetadataUrl(request);
+  const expectedAudience = baseUrl ? `${new URL(baseUrl).origin}/api/mcp` : null;
+  if (!expectedAudience) {
+    return unauthenticated(request);
+  }
+
+  const verified = await verifyMcpAccessToken(supplied, expectedAudience);
+  if (verified.status === "invalid_token") {
+    return unauthenticated(request);
+  }
+  if (verified.status === "forbidden") {
+    if (verified.error === "insufficient_scope" && verified.scope) {
+      return jsonError(403, "MCP_INSUFFICIENT_SCOPE", {
+        "www-authenticate": wwwAuthenticateHeader(
+          request,
+          `error="insufficient_scope", scope="${verified.scope}"`,
+        ),
+      });
+    }
+    return jsonError(403, "MCP_FORBIDDEN");
+  }
+
+  const { user, clientName, scopes } = verified.data;
   return {
-    // De protocolhandler heeft de geheime bearerwaarde niet nodig. Geef alleen
-    // de gevalideerde identiteit en capabilities door, zodat het token niet per
-    // ongeluk in een toolresultaat of foutlog terecht kan komen.
     authInfo: {
       token: "[redacted]",
-      clientId: process.env.MCP_CLIENT_NAME?.trim() || "vtk-mcp-agent",
-      scopes: ["mcp:read", "mcp:create"],
-      extra,
+      clientId: clientName,
+      scopes,
+      extra: {
+        authKind: "oauth",
+        userId: user.id,
+        userName: user.name,
+        permissions: user.permissions,
+        allPermissions: user.isSuperAdmin,
+        groupCodes: user.groupCodes,
+        allGroups: user.isSuperAdmin,
+        roleCodes: user.roleCodes,
+      },
     },
-    rateLimitKey,
+    rateLimitKey: `user:${user.id}`,
   };
 }
 

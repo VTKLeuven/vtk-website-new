@@ -24,11 +24,15 @@ export {
   SCOPES,
   SCOPE_CODES,
   DEFAULT_SCOPE_CODES,
+  MCP_SCOPES,
+  MCP_REGISTRATION_SCOPES,
+  isMcpScope,
   describeScope,
   isSensitiveScope,
   type Scope,
   type ScopeDefinition,
 } from './lib/scopes';
+export { getMcpResourceUrl } from './lib/mcpResource';
 export {
   CLAIMS,
   CLAIM_NAMES,

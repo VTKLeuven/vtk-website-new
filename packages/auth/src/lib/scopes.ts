@@ -109,11 +109,33 @@ export const SCOPES = [
     consentNl: 'Je persoonlijke contactgegevens en geboortedatum',
     consentEn: 'Your personal contact details and date of birth',
   },
+
+  {
+    code: 'mcp:read',
+    sensitive: true,
+    defaultSelected: false,
+    consentNl: 'Gegevens van je VTK-rechten lezen via een AI-assistent',
+    consentEn: 'Read data within your VTK permissions via an AI assistant',
+  },
+  {
+    code: 'mcp:create',
+    sensitive: true,
+    defaultSelected: false,
+    consentNl: 'Concepten aanmaken op de VTK-site via een AI-assistent',
+    consentEn: 'Create drafts on the VTK site via an AI assistant',
+  },
 ] as const satisfies readonly ScopeDefinition[];
 
 export type Scope = (typeof SCOPES)[number]['code'];
 
 export const SCOPE_CODES: readonly string[] = SCOPES.map((s) => s.code);
+
+export const MCP_SCOPES = ['mcp:read', 'mcp:create'] as const;
+export const MCP_REGISTRATION_SCOPES = ['mcp:read', 'mcp:create', 'offline_access'] as const;
+
+export function isMcpScope(code: string): boolean {
+  return code === 'mcp:read' || code === 'mcp:create';
+}
 
 const BY_CODE = new Map<string, ScopeDefinition>(SCOPES.map((s) => [s.code, s]));
 

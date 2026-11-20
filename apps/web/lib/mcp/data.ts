@@ -6,6 +6,7 @@ import { prisma } from "@vtk/db";
 import { z } from "zod";
 import { logSystemAudit } from "@/lib/audit";
 import { eventSlugBase, uniqueEventSlug } from "@/lib/calendar/slug";
+import { canUseMcpGroup, hasMcpPermission, type McpPrincipal } from "@/lib/mcp/policy";
 
 const MAX_LIST_RESULTS = 200;
 
@@ -69,7 +70,7 @@ const listEventsInput = z.object({
 
 export type ListEventsInput = z.input<typeof listEventsInput>;
 
-export async function listCalendarEvents(raw: ListEventsInput) {
+export async function listCalendarEvents(raw: ListEventsInput, principal?: McpPrincipal) {
   const input = listEventsInput.parse(raw);
   const where: Prisma.CalendarEventWhereInput = {};
 
@@ -80,6 +81,18 @@ export async function listCalendarEvents(raw: ListEventsInput) {
   if (input.groupCode) where.group = { code: input.groupCode };
   if (input.categorySlug) {
     where.categories = { some: { category: { slug: input.categorySlug } } };
+  }
+  const canSeeAllDrafts = !principal || principal.allGroups || hasMcpPermission(principal, "calendar.manageAll");
+  if (!canSeeAllDrafts) {
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : []),
+      {
+        OR: [
+          { publishedAt: { not: null } },
+          { group: { code: { in: [...principal.groupCodes] } } },
+        ],
+      },
+    ];
   }
 
   const rows = await prisma.calendarEvent.findMany({
@@ -143,7 +156,7 @@ export async function listCalendarEvents(raw: ListEventsInput) {
 
 const idInput = z.object({ id: z.string().trim().min(1).max(100) }).strict();
 
-export async function getCalendarEvent(raw: { id: string }) {
+export async function getCalendarEvent(raw: { id: string }, principal?: McpPrincipal) {
   const { id } = idInput.parse(raw);
   const row = await prisma.calendarEvent.findUnique({
     where: { id },
@@ -173,6 +186,10 @@ export async function getCalendarEvent(raw: { id: string }) {
     },
   });
   if (!row) throw new McpInputError("EVENT_NOT_FOUND", `Evenement ${id} bestaat niet.`);
+  const canSeeAllDrafts = !principal || principal.allGroups || hasMcpPermission(principal, "calendar.manageAll");
+  if (!canSeeAllDrafts && !row.publishedAt && !canUseMcpGroup(principal, row.group.code)) {
+    throw new McpInputError("FORBIDDEN", "Geen toegang tot dit concept-evenement.");
+  }
 
   return {
     item: {
@@ -518,7 +535,12 @@ const createEventInput = z.object({
 
 export type CreateCalendarEventInput = z.input<typeof createEventInput>;
 
-export async function createCalendarEvent(raw: CreateCalendarEventInput) {
+export type McpAuditActor = {
+  actorId?: string | null;
+  actorName?: string;
+};
+
+export async function createCalendarEvent(raw: CreateCalendarEventInput, actor?: McpAuditActor) {
   const input = createEventInput.parse(raw);
   const start = new Date(input.start);
   const end = new Date(input.end);
@@ -572,7 +594,7 @@ export async function createCalendarEvent(raw: CreateCalendarEventInput) {
       allDay: input.allDay,
       url: nullIfEmpty(input.url),
       publishedAt: input.publish ? new Date() : null,
-      createdById: null,
+      createdById: actor?.actorId ?? null,
       categories: {
         create: categories.map((category) => ({ categoryId: category.id })),
       },
@@ -597,7 +619,8 @@ export async function createCalendarEvent(raw: CreateCalendarEventInput) {
       target: row.titleNl,
       summary: input.publish ? "aangemaakt en gepubliceerd via MCP" : "aangemaakt als concept via MCP",
     },
-    actorName(),
+    actor?.actorName ?? actorName(),
+    ...(actor?.actorId ? [actor.actorId] : []),
   );
   revalidateCalendarContent();
 
@@ -625,7 +648,7 @@ const createCategoryInput = z.object({
 
 export type CreateCalendarCategoryInput = z.input<typeof createCategoryInput>;
 
-export async function createCalendarCategory(raw: CreateCalendarCategoryInput) {
+export async function createCalendarCategory(raw: CreateCalendarCategoryInput, actor?: McpAuditActor) {
   const input = createCategoryInput.parse(raw);
   const existing = await prisma.calendarCategory.findUnique({
     where: { slug: input.slug },
@@ -678,7 +701,8 @@ export async function createCalendarCategory(raw: CreateCalendarCategoryInput) {
       target: row.nameNl,
       summary: "gewone kalendercategorie aangemaakt via MCP",
     },
-    actorName(),
+    actor?.actorName ?? actorName(),
+    ...(actor?.actorId ? [actor.actorId] : []),
   );
   revalidateCalendarContent();
 

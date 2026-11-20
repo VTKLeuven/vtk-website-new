@@ -1,4 +1,4 @@
-# MCP-server voor coding agents
+# MCP-server voor coding agents en praesidium
 
 De website biedt een stateless Streamable HTTP MCP-endpoint op:
 
@@ -6,8 +6,34 @@ De website biedt een stateless Streamable HTTP MCP-endpoint op:
 POST /api/mcp
 ```
 
-Hij is standaard uitgeschakeld. Zet `MCP_API_TOKEN` op een willekeurig geheim
-van minstens 32 tekens en configureer daarnaast de serviceaccountrechten:
+Er zijn twee manieren om te authenticeren:
+
+1. **OAuth 2.1 voor praesidiumleden** (Claude.ai, Claude Desktop, ChatGPT, Cursor): plak de server-URL (`https://vtk.be/api/mcp`) in je AI-client en meld je aan via de browser.
+2. **Statisch serviceaccounttoken (`MCP_API_TOKEN`)** voor coding agents en CI.
+
+## OAuth 2.1 voor praesidiumleden (RFC 8707 + RFC 9728)
+
+AI-clients ontdekken de VTK OAuth-server automatisch via:
+
+- `GET /.well-known/oauth-protected-resource`
+- `GET /.well-known/oauth-protected-resource/api/mcp`
+- `WWW-Authenticate: Bearer realm="VTK MCP", resource_metadata="..."` op `401`-antwoorden van `POST /api/mcp`.
+
+Toegang, scopes en gegevensbescherming:
+
+- **Toegangspoort (`mcp.use`):** Enkel actieve leden met de canonieke permissie `mcp.use` (standaard toegekend aan de rollen `praesidium` en `admin`, plus superadmins) kunnen OAuth-autorisaties voor MCP doorlopen en tokens gebruiken.
+- **Dynamic Client Registration (RFC 7591):** `POST /api/auth/better/oauth2/register` staat open voor publieke PKCE-clients (`token_endpoint_auth_method: "none"`) en is strikt beperkt tot:
+  - MCP-scopes (`mcp:read`, `mcp:create`, `offline_access`; nooit `vtk:student_number`, `vtk:contact`, `entitlements`, enz.);
+  - de MCP-resource (`<origin>/api/mcp`) via `OauthResource` + `OauthClientResource` (`clientRegistrationDefaultResources`);
+  - een expliciete redirect-host-allowlist (`claude.ai`, `chatgpt.com`, `chat.openai.com`, `cursor.sh`, loopback-hosts `localhost`, `127.0.0.1`, `[::1]`, plus optionele `MCP_DCR_ALLOWED_REDIRECT_HOSTS`) en een dedicated rate limit (5 registraties per minuut per IP).
+- **Toestemmingsscherm:** Toont de werkelijke redirect-host ("Je wordt teruggestuurd naar `<host>`") en laat `mcp:create` standaard uitgevinkt zodat een lid bewust opt-in kiest voor concept-creatie.
+- **Live rechten & scope-grens:** Bij elke MCP-request worden de live databaserollen, permissies en actieve postlidmaatschappen van het huidige werkingsjaar opgehaald. Een token met enkel `mcp:read` kan geen create-tools uitvoeren, ook al heeft het lid create-permissies. Access tokens vervallen na 15 minuten (`scopeExpirations`), zodat ingetrokken rechten snel doorwerken.
+- **Auditlogboek:** Alle `create`-acties via OAuth worden in **Admin -> IT -> Logboek** toegeschreven aan het betrokken praesidiumlid (`actorId` + naam en client).
+- **Strenge GDPR/PII-allowlist (standaard):** Voor OAuth-gebruikers geldt een strikte read-allowlist (`MCP_OAUTH_SAFE_READ_RESOURCES` in `apps/web/lib/mcp/read.ts`): enkel redactionele, catalogus- en definitieresources zonder persoonsgegevens (`pages`, `navigation`, `announcements`, `calendar`, `tickets`, `forms`, `photos`, `partners`, `editorial_settings`, `dashboard`, `shortlinks`, `groups`, `roles`, `logistiek_catalog`, `meeting_schedule`, `lesbezoek_calendar`, `module_access`) zijn toegestaan. Alle andere resources (zoals `users`, `user_search`, `ticket_orders`, `form_entries`, `door`, `mailing_lists`, `shifts`, `shift_ranking`, `theokot`, `meetings`, `piano`, `logistiek`, `pocs`, `vault_metadata`, `lesbezoeken`, `urenloop_app`, `audit_log`, `oauth_clients`) blijven geblokkeerd tenzij `MCP_OAUTH_ALLOW_PII_READS="true"` in `.env` staat (statische `MCP_API_TOKEN`-serviceaccounts blijven ongewijzigd).
+
+## Statisch serviceaccount (`MCP_API_TOKEN`)
+
+Het statische serviceaccount is standaard uitgeschakeld. Zet `MCP_API_TOKEN` op een willekeurig geheim van minstens 32 tekens en configureer daarnaast de serviceaccountrechten:
 
 ```dotenv
 MCP_CLIENT_NAME="Codex productie"
@@ -125,11 +151,7 @@ allowlist overschrijven in plaats van ze te verfijnen, en `Setting` bevat ook
   minuut per proces. Stel daarnaast een gedeelde limiet in op de reverse proxy
   wanneer er meerdere webreplica's draaien.
 - Alle creaties verschijnen in het bestaande adminlogboek.
-
-De bestaande VTK OAuth-provider wordt voorlopig niet als MCP-authorization
-server gebruikt. Hij schakelt RFC 8707 resource-audiences bewust uit wegens een
-upstream beveiligingsprobleem. Het MCP-token houdt die trust boundary apart in
-plaats van de OAuth-configuratie te versoepelen.
+- `@better-auth/oauth-provider@1.7.14` valideert RFC 8707 `resource`-indicators tegen `OauthResource` en per-clientkoppelingen in `OauthClientResource` (`clientRegistrationDefaultResources` koppelt DCR-clients automatisch aan `<origin>/api/mcp`). Elke autorisatie met `mcp:*`-scopes of deze resource wordt in `signup.shouldRedirect` / `checkClientAccess` op `mcp.use` gegated.
 
 ## Vallen waar we in gelopen zijn
 
