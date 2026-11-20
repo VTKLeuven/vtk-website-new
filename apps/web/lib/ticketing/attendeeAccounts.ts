@@ -46,7 +46,7 @@ export async function attendeeGroupsFor(items: AttendeeGroupItem[]): Promise<Att
       rNumber: true,
       honoraryMember: true,
       firwStudent: true,
-      vtkMemberships: { where: { year: studyYear }, select: { activatedAt: true }, take: 1 },
+      vtkMemberships: { where: { year: studyYear }, select: { kind: true, activatedAt: true }, take: 1 },
       memberships: {
         where: { year: workingYear, group: { type: "PRAESIDIUM" } },
         select: { id: true },
@@ -55,14 +55,21 @@ export async function attendeeGroupsFor(items: AttendeeGroupItem[]): Promise<Att
     },
   });
 
-  const accounts: AttendeeAccount[] = users.map((user) => ({
-    id: user.id,
-    email: user.email,
-    rNumber: user.rNumber,
-    praesidium: user.memberships.length > 0,
-    honorary: user.honoraryMember,
-    member: user.firwStudent || user.honoraryMember || membershipIsActive(user.vtkMemberships[0] ?? null),
-  }));
+  const accounts: AttendeeAccount[] = users.map((user) => {
+    const membership = user.vtkMemberships[0] ?? null;
+    // Een betalend erelid van dit academiejaar is evengoed erelid (zie
+    // `isHonoraryMember`); de rij is er hier al, dus geen tweede select.
+    const honorary =
+      user.honoraryMember || (membership?.kind === "HONORARY" && membershipIsActive(membership));
+    return {
+      id: user.id,
+      email: user.email,
+      rNumber: user.rNumber,
+      praesidium: user.memberships.length > 0,
+      honorary,
+      member: user.firwStudent || honorary || membershipIsActive(membership),
+    };
+  });
   const index = indexAttendeeAccounts(accounts);
   return items.map((item) => attendeeGroup(item, attendeeAccount(item, index)));
 }

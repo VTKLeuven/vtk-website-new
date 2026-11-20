@@ -1548,6 +1548,15 @@
     "joined": "Je bent nu lid.",
     "joinFailed": "Lid worden is niet gelukt. Probeer het opnieuw.",
     "joinClosed": "Lid worden kan op dit moment niet.",
-    "accountJoin": "Word lid van VTK"
+    "accountJoin": "Word lid van VTK",
+    "statusActiveHonorary": "Je bent erelid van VTK voor {year}. Bedankt om de kring te steunen.",
+    "statusPendingHonorary": "Je erelidmaatschap voor {year} staat klaar zodra je {price} betaald hebt.",
+    "honoraryHeading": "Word erelid",
+    "honoraryIntro": "Als erelid steun je de kring voor academiejaar {year}. Je telt als lid en krijgt wat VTK voor haar ereleden voorziet, zoals tickets en prijzen voor ereleden. Na het bevestigen ga je meteen naar de betaalpagina; je bent erelid zodra de betaling binnen is, tot het einde van het academiejaar.",
+    "joinHonorary": "Word erelid voor {price}",
+    "joinHonoraryFailed": "Erelid worden is niet gelukt. Probeer het opnieuw.",
+    "joinHonoraryClosed": "Erelid worden kan op dit moment niet.",
+    "joinAlreadyHonorary": "Je bent al erelid van VTK.",
+    "joinAlreadyMember": "Je bent dit academiejaar al lid van VTK, dus erelid worden kan pas vanaf het volgende academiejaar."
   }
 }

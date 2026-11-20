@@ -39,6 +39,7 @@ import { AccountMembership } from './AccountMembership';
 import { siteBaseUrl } from '@/lib/calendar/feeds';
 import { currentWorkingYear, currentStudyYear, formatWorkingYear } from '@/lib/workingYear';
 import { getMembership, getMembershipConfig, membershipOffer } from '@/lib/membership';
+import { honoraryOffer } from '@/lib/membership/offer';
 import { getRunnerStats } from '@/lib/urenloop/runnerStats';
 import { RunnerStatsFacts } from '@/components/urenloop/RunnerStats';
 
@@ -332,7 +333,8 @@ export default async function AccountPage({
                 honoraryMember={profile.honoraryMember}
                 membership={membership}
                 canJoin={
-                  membershipOffer(profile, membership, membershipConfig).kind !== 'none'
+                  membershipOffer(profile, membership, membershipConfig).kind !== 'none' ||
+                  honoraryOffer(profile, membership, membershipConfig) !== null
                 }
               />
             </div>

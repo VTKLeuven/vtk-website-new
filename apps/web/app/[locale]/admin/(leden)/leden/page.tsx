@@ -4,7 +4,7 @@ import { getCurrentSession } from "@/lib/session";
 import { LedenAdminPage } from "./LedenAdminPage";
 
 /** Tabblad Leden: het ledenaantal, de uitsplitsing en de ledenlijst. */
-export default async function AdminLeden({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams: Promise<{ jaar?: string; openstaand?: string; lijst?: string; zoek?: string; soort?: string }> }) {
+export default async function AdminLeden({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams: Promise<{ jaar?: string; openstaand?: string; lijst?: string; zoek?: string; soort?: string; sorteer?: string; richting?: string }> }) {
   // De ereleden waren eerst `?lijst=ereleden`; een bladwijzer van toen komt nog aan.
   const [{ locale }, { lijst }] = await Promise.all([params, searchParams]);
   const base = `${locale === "en" ? "/en" : ""}/admin`;

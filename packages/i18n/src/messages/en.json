@@ -1548,6 +1548,15 @@
     "joined": "You are a member now.",
     "joinFailed": "Becoming a member failed. Please try again.",
     "joinClosed": "Becoming a member is not possible right now.",
-    "accountJoin": "Become a member of VTK"
+    "accountJoin": "Become a member of VTK",
+    "statusActiveHonorary": "You are an honorary member of VTK for {year}. Thank you for supporting us.",
+    "statusPendingHonorary": "Your honorary membership for {year} is ready once you have paid {price}.",
+    "honoraryHeading": "Become an honorary member",
+    "honoraryIntro": "As an honorary member you support VTK for academic year {year}. You count as a member and get what VTK offers its honorary members, such as tickets and prices for honorary members. After confirming you go straight to the payment page; you are an honorary member as soon as the payment arrives, until the end of the academic year.",
+    "joinHonorary": "Become an honorary member for {price}",
+    "joinHonoraryFailed": "Becoming an honorary member failed. Please try again.",
+    "joinHonoraryClosed": "Becoming an honorary member is not possible right now.",
+    "joinAlreadyHonorary": "You are already an honorary member of VTK.",
+    "joinAlreadyMember": "You are already a member of VTK this academic year, so you can become an honorary member from next academic year."
   }
 }

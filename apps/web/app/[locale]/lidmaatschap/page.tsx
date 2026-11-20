@@ -9,6 +9,7 @@ import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { currentStudyYear, formatWorkingYear } from "@/lib/workingYear";
 import { getMembership, getMembershipConfig, membershipOffer } from "@/lib/membership";
+import { honoraryOffer } from "@/lib/membership/offer";
 import { JoinMembershipCard } from "./JoinMembershipCard";
 import { formatEuro } from "@/lib/membership/config";
 
@@ -49,7 +50,7 @@ export default async function MembershipPage({
   const [user, membership, config] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: session.user.id },
-      select: { firwStudent: true, honoraryMember: true },
+      select: { firwStudent: true, honoraryMember: true, isStudent: true },
     }),
     getMembership(session.user.id, year),
     getMembershipConfig(),
@@ -67,15 +68,21 @@ export default async function MembershipPage({
   // aanbod wordt op dezelfde manier bepaald als daar, en de action rekent het
   // serverside nog eens na.
   const offer = membershipOffer(user, membership, config);
+  // Betalend erelid worden, voor wie geen student is (zie `honoraryOffer`).
+  const honorary = honoraryOffer(user, membership, config);
 
   const status = active
     ? membership.kind === "FACULTY"
       ? t.statusActiveFaculty.replace("{year}", yearLabel)
-      : t.statusActive.replace("{year}", yearLabel)
+      : membership.kind === "HONORARY"
+        ? t.statusActiveHonorary.replace("{year}", yearLabel)
+        : t.statusActive.replace("{year}", yearLabel)
     : user.honoraryMember
       ? t.statusHonorary
       : pending
-      ? t.statusPending.replace("{year}", yearLabel).replace("{price}", price)
+      ? (membership.kind === "HONORARY" ? t.statusPendingHonorary : t.statusPending)
+          .replace("{year}", yearLabel)
+          .replace("{price}", price)
       : user.firwStudent
         ? t.statusFirw
         : t.statusNone;
@@ -148,6 +155,27 @@ export default async function MembershipPage({
           failedMessage={t.joinFailed}
         />
       )}
+
+      {honorary ? (
+        <JoinMembershipCard
+          locale={locale === "en" ? "en" : "nl"}
+          honorary
+          heading={t.honoraryHeading}
+          intro={t.honoraryIntro.replace("{year}", yearLabel)}
+          submitLabel={t.joinHonorary.replace(
+            "{price}",
+            formatEuro(honorary.priceCents, locale === "en" ? "en" : "nl"),
+          )}
+          savingLabel={t.joinSaving}
+          savedMessage={t.joined}
+          closedMessage={t.joinHonoraryClosed}
+          failedMessage={t.joinHonoraryFailed}
+          errorMessages={{
+            ALREADY_HONORARY: t.joinAlreadyHonorary,
+            ALREADY_MEMBER: t.joinAlreadyMember,
+          }}
+        />
+      ) : null}
     </div>
   );
 }

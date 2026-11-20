@@ -85,10 +85,13 @@ export async function startMembershipCheckout(input: {
   if (membership.priceCents <= 0) throw new Error("MEMBERSHIP_NOT_PAYABLE");
 
   const now = new Date();
+  // Enkel een poging voor hetzelfde bedrag: wie van "lid" naar "erelid" wisselde,
+  // mag niet terugvallen op de betaalpagina van het goedkopere lidmaatschap.
   const live = membership.payments.find(
     (payment) =>
       payment.status === "PENDING" &&
       payment.checkoutUrl &&
+      payment.amountCents === membership.priceCents &&
       (!payment.expiresAt || payment.expiresAt > now),
   );
   if (live?.checkoutUrl) return live.checkoutUrl;
@@ -119,10 +122,11 @@ export async function startMembershipCheckout(input: {
   const prefix = input.locale === "en" ? "/en" : "";
   const returnUrl = `${base}${prefix}/lidmaatschap`;
   const gateway = membershipGatewayFor(provider);
+  const honorary = membership.kind === "HONORARY";
   const label =
     input.locale === "en"
-      ? `VTK membership ${formatWorkingYear(membership.year)}`
-      : `VTK-lidmaatschap ${formatWorkingYear(membership.year)}`;
+      ? `VTK ${honorary ? "honorary membership" : "membership"} ${formatWorkingYear(membership.year)}`
+      : `VTK-${honorary ? "erelidmaatschap" : "lidmaatschap"} ${formatWorkingYear(membership.year)}`;
 
   let checkout: CheckoutResult;
   try {
@@ -178,6 +182,33 @@ export async function startMembershipCheckout(input: {
 }
 
 /**
+ * Sluit de openstaande betaalpogingen van een lidmaatschap dat nog niet betaald
+ * is, wanneer het van soort of prijs verandert (lid wordt erelid). Anders kan
+ * een oude betaalpagina van 25 euro later alsnog afgerond worden en een
+ * erelidmaatschap van 75 euro activeren. Best effort bij de provider: wat daar
+ * niet lukt, verloopt na een half uur vanzelf, en lokaal staat de rij al dicht.
+ */
+export async function closeOpenMembershipCheckouts(membershipId: string): Promise<void> {
+  const open = await prisma.membershipPayment.findMany({
+    where: { membershipId, status: { in: ["CREATED", "PENDING"] } },
+    select: { id: true, provider: true, providerCheckoutId: true },
+  });
+  for (const payment of open) {
+    if (payment.providerCheckoutId) {
+      await membershipGatewayFor(payment.provider)
+        .expireCheckout(payment.providerCheckoutId)
+        .catch(() => null);
+    }
+  }
+  if (open.length > 0) {
+    await prisma.membershipPayment.updateMany({
+      where: { id: { in: open.map((payment) => payment.id) }, status: { in: ["CREATED", "PENDING"] } },
+      data: { status: "CANCELLED", failedAt: new Date() },
+    });
+  }
+}
+
+/**
  * Past de providerstatus toe op een betaalrij, en activeert het lidmaatschap
  * zodra het geld er is. Idempotent, met dezelfde uitzondering als bij uitleen:
  * een late, provider-bevestigde SUCCEEDED wint van een lokale eindstatus.
@@ -189,7 +220,10 @@ export async function applyMembershipPaymentStatus(
 ): Promise<void> {
   const now = new Date();
   const activate = await prisma.$transaction(async (tx) => {
-    const payment = await tx.membershipPayment.findUnique({ where: { id: paymentId } });
+    const payment = await tx.membershipPayment.findUnique({
+      where: { id: paymentId },
+      include: { membership: { select: { priceCents: true } } },
+    });
     if (!payment) return null;
     if (payment.status === "SUCCEEDED") return null;
     if (
@@ -235,7 +269,20 @@ export async function applyMembershipPaymentStatus(
         failedAt: status === "FAILED" || status === "EXPIRED" ? now : payment.failedAt,
       },
     });
-    return status === "SUCCEEDED" ? payment.membershipId : null;
+    if (status !== "SUCCEEDED") return null;
+    // Een late betaling van een poging die gesloten werd toen het lidmaatschap
+    // van soort veranderde (lid werd erelid): het geld staat geboekt, maar het
+    // dekt het lidmaatschap niet. Dat los je met de hand op, niet stil.
+    if (payment.amountCents < payment.membership.priceCents) {
+      console.error("Membership payment succeeded for less than the membership price", {
+        paymentId: payment.id,
+        membershipId: payment.membershipId,
+        amountCents: payment.amountCents,
+        priceCents: payment.membership.priceCents,
+      });
+      return null;
+    }
+    return payment.membershipId;
   });
 
   if (activate) await activateMembership(activate);

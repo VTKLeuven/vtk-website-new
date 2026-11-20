@@ -15,10 +15,13 @@ import {
   saveMembershipConfig,
 } from "@/lib/membership";
 import { MAX_MEMBERSHIP_PRICE_CENTS } from "@/lib/membership/config";
+import { honoraryOffer } from "@/lib/membership/offer";
+import { closeOpenMembershipCheckouts } from "@/lib/membership/payments";
 
 /** Foutcodes die het beheerscherm zelf vertaalt. */
 export type MembershipErrorCode =
   | "INVALID_PRICE"
+  | "INVALID_HONORARY_PRICE"
   | "INVALID_ACCOUNTING_CODE"
   | "INVALID_USER"
   | "ALREADY_MEMBER"
@@ -27,12 +30,14 @@ export type MembershipErrorCode =
 
 function revalidate(): void {
   revalidatePath("/admin/leden");
+  revalidatePath("/admin/leden/ereleden");
   revalidatePath("/lidmaatschap");
   revalidatePath("/account");
 }
 
 function revalidateHonorary(userId: string): void {
   revalidatePath("/admin/leden");
+  revalidatePath("/admin/leden/ereleden");
   revalidatePath(`/admin/gebruikers/${userId}`);
 }
 
@@ -55,6 +60,12 @@ export async function saveMembershipConfigAction(
 
   const parsed = priceSchema.safeParse(String(formData.get("externalPrice") ?? ""));
   if (!parsed.success) return saveError("INVALID_PRICE" satisfies MembershipErrorCode);
+  // Een erelidmaatschap is altijd betalend: 0 zou iedereen zonder studie gratis
+  // erelid laten worden, en daarvoor is "Iemand erelid maken" er.
+  const honoraryPrice = priceSchema.safeParse(String(formData.get("honoraryPrice") ?? ""));
+  if (!honoraryPrice.success || honoraryPrice.data <= 0) {
+    return saveError("INVALID_HONORARY_PRICE" satisfies MembershipErrorCode);
+  }
 
   // Leeg = de standaardcode (730000). Een id die niet (meer) bestaat, is een
   // pagina die ouder is dan de codelijst: liever een melding dan stil terugvallen.
@@ -73,6 +84,8 @@ export async function saveMembershipConfigAction(
     externalPriceCents: parsed.data,
     facultyOpen: formData.get("facultyOpen") === "on",
     externalOpen: formData.get("externalOpen") === "on",
+    honoraryPriceCents: honoraryPrice.data,
+    honoraryOpen: formData.get("honoraryOpen") === "on",
     accountingCodeId,
   };
   const previous = await getMembershipConfig();
@@ -87,6 +100,8 @@ export async function saveMembershipConfigAction(
       `${(config.externalPriceCents / 100).toFixed(2)} euro, ` +
       `gratis ${config.facultyOpen ? "open" : "dicht"}, ` +
       `betalend ${config.externalOpen ? "open" : "dicht"}, ` +
+      `erelid ${(previous.honoraryPriceCents / 100).toFixed(2)} -> ` +
+      `${(config.honoraryPriceCents / 100).toFixed(2)} euro ${config.honoraryOpen ? "open" : "dicht"}, ` +
       `boekhoudcode ${accountingCode?.code ?? "standaard"}`,
   });
   revalidate();
@@ -253,8 +268,9 @@ export async function joinMembershipAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  const session = await requireSession();
   const locale = String(formData.get("locale") ?? "nl") === "en" ? "en" : "nl";
+  if (formData.get("soort") === "erelid") return joinHonorary(locale);
+  const session = await requireSession();
   const year = currentStudyYear();
 
   const [user, existing, config] = await Promise.all([
@@ -292,4 +308,50 @@ export async function joinMembershipAction(
     redirect(`${locale === "en" ? "/en" : ""}/lidmaatschap/betalen`);
   }
   return saveOk();
+}
+
+/**
+ * Betalend erelid worden, voor dit academiejaar, vanaf `/lidmaatschap`.
+ *
+ * Zoals bij het lidmaatschap wordt het aanbod hier opnieuw bepaald
+ * (`honoraryOffer`): wie student is, of wiens weg dicht staat, kan het niet
+ * kopen door het formulier na te bouwen. Een openstaand, onbetaald
+ * lidmaatschap van een andere soort wordt omgezet, en zijn oude betaalpogingen
+ * gaan dicht, zodat een oude betaalpagina van het goedkopere lidmaatschap het
+ * erelidmaatschap niet kan activeren. Daarna door naar de betaalpagina: een
+ * ander scherm, dus de redirect is de bevestiging.
+ */
+async function joinHonorary(locale: "nl" | "en"): Promise<SaveState> {
+  const session = await requireSession();
+  const year = currentStudyYear();
+  const [user, existing, config] = await Promise.all([
+    prisma.user.findUniqueOrThrow({
+      where: { id: session.user.id },
+      select: { isStudent: true, honoraryMember: true },
+    }),
+    prisma.membership.findUnique({
+      where: { userId_year: { userId: session.user.id, year } },
+      select: { id: true, kind: true, activatedAt: true, priceCents: true },
+    }),
+    getMembershipConfig(),
+  ]);
+
+  const payPage = `${locale === "en" ? "/en" : ""}/lidmaatschap/betalen`;
+  if (existing?.activatedAt) return saveError("ALREADY_MEMBER" satisfies MembershipErrorCode);
+  // Al een openstaande erelidrij: dezelfde afspraak, dus naar het betaalscherm.
+  if (existing?.kind === "HONORARY") redirect(payPage);
+
+  const offer = honoraryOffer(user, existing, config);
+  if (!offer) {
+    return saveError(
+      (user.honoraryMember ? "ALREADY_HONORARY" : "MEMBERSHIP_CLOSED") satisfies MembershipErrorCode,
+    );
+  }
+
+  if (existing) await closeOpenMembershipCheckouts(existing.id);
+  await recordMembershipChoice(session.user.id, "HONORARY", { year, priceCents: offer.priceCents });
+
+  revalidate();
+  // Buiten elke try/catch: redirect() werkt via een throw.
+  redirect(payPage);
 }

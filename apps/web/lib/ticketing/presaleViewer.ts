@@ -5,7 +5,8 @@ import { cookies } from "next/headers";
 import { prisma } from "@vtk/db";
 import type { SessionPayload } from "@vtk/auth";
 import { deductedShifts, netShiftCount, shiftDeductions } from "@/lib/shift/deductions";
-import { currentWorkingYear, workingYearStart } from "@/lib/workingYear";
+import { currentStudyYear, currentWorkingYear, workingYearStart } from "@/lib/workingYear";
+import { honoraryMembershipSelect, isHonoraryMember as honoraryFromUser } from "@/lib/membership/honorary";
 import { hasPresale, type PresaleConfig, type PresaleViewer } from "./presale";
 import { presaleCookieName, presaleTokenMatches } from "./presaleLink";
 
@@ -49,9 +50,9 @@ export const completedShiftsThisWorkingYear = cache(async (userId: string): Prom
 const isHonoraryMember = cache(async (userId: string): Promise<boolean> => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { honoraryMember: true },
+    select: { honoraryMember: true, ...honoraryMembershipSelect(currentStudyYear()) },
   });
-  return user?.honoraryMember ?? false;
+  return user ? honoraryFromUser(user) : false;
 });
 
 type PresaleEvent = PresaleConfig & {

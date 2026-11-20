@@ -39,11 +39,13 @@ export function AccountMembership({
   const status = active
     ? membership.kind === "FACULTY"
       ? t.statusActiveFaculty.replace("{year}", yearLabel)
-      : t.statusActive.replace("{year}", yearLabel)
+      : membership.kind === "HONORARY"
+        ? t.statusActiveHonorary.replace("{year}", yearLabel)
+        : t.statusActive.replace("{year}", yearLabel)
     : honoraryMember
       ? t.statusHonorary
       : pending
-      ? t.statusPending
+      ? (membership.kind === "HONORARY" ? t.statusPendingHonorary : t.statusPending)
           .replace("{year}", yearLabel)
           .replace("{price}", formatEuro(membership.priceCents, locale === "en" ? "en" : "nl"))
       : firwStudent

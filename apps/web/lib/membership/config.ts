@@ -1,6 +1,6 @@
 /**
  * De instelbare kant van het lidmaatschap: de prijs voor een niet-facultair lid
- * en of de twee wegen naar een lidmaatschap openstaan.
+ * en voor een betalend erelid, en of die wegen naar een lidmaatschap openstaan.
  *
  * Bewust een `Setting` en geen constante: de prijs is een bestuursbeslissing die
  * per academiejaar kan wijzigen, en dat hoort geen deploy te vragen. De pure
@@ -17,6 +17,10 @@ export type MembershipConfig = {
   facultyOpen: boolean;
   /** Staat de betalende weg open voor wie niet aan de faculteit studeert? */
   externalOpen: boolean;
+  /** Wat een betalend erelidmaatschap voor één academiejaar kost, in cent. */
+  honoraryPriceCents: number;
+  /** Kan wie geen student is zichzelf betalend erelid maken op /lidmaatschap? */
+  honoraryOpen: boolean;
   /**
    * De boekhoudcode die met het lidgeld meegaat in de betaalinfo. Null = de
    * standaard, 730000 Lidgelden (`MEMBERSHIP_DEFAULT_ACCOUNTING_CODE`). Een id
@@ -30,6 +34,8 @@ export const DEFAULT_MEMBERSHIP_CONFIG: MembershipConfig = {
   externalPriceCents: 2500,
   facultyOpen: true,
   externalOpen: true,
+  honoraryPriceCents: 7500,
+  honoraryOpen: true,
   accountingCodeId: null,
 };
 
@@ -38,6 +44,13 @@ export const MAX_MEMBERSHIP_PRICE_CENTS = 20_000;
 
 function boolean(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
+}
+
+function price(value: unknown, fallback: number, min = 0): number {
+  const cents = Number(value);
+  return Number.isInteger(cents) && cents >= min && cents <= MAX_MEMBERSHIP_PRICE_CENTS
+    ? cents
+    : fallback;
 }
 
 /**
@@ -49,14 +62,14 @@ export function parseMembershipConfig(raw: unknown): MembershipConfig {
     return DEFAULT_MEMBERSHIP_CONFIG;
   }
   const value = raw as Record<string, unknown>;
-  const price = Number(value.externalPriceCents);
   return {
-    externalPriceCents:
-      Number.isInteger(price) && price >= 0 && price <= MAX_MEMBERSHIP_PRICE_CENTS
-        ? price
-        : DEFAULT_MEMBERSHIP_CONFIG.externalPriceCents,
+    externalPriceCents: price(value.externalPriceCents, DEFAULT_MEMBERSHIP_CONFIG.externalPriceCents),
     facultyOpen: boolean(value.facultyOpen, DEFAULT_MEMBERSHIP_CONFIG.facultyOpen),
     externalOpen: boolean(value.externalOpen, DEFAULT_MEMBERSHIP_CONFIG.externalOpen),
+    // Een erelidmaatschap is altijd betalend: een prijs van 0 zou iedereen
+    // zonder studie gratis erelid laten worden, en daar is de vlag voor.
+    honoraryPriceCents: price(value.honoraryPriceCents, DEFAULT_MEMBERSHIP_CONFIG.honoraryPriceCents, 1),
+    honoraryOpen: boolean(value.honoraryOpen, DEFAULT_MEMBERSHIP_CONFIG.honoraryOpen),
     accountingCodeId:
       typeof value.accountingCodeId === "string" && value.accountingCodeId
         ? value.accountingCodeId

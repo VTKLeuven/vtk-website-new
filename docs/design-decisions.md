@@ -10736,6 +10736,56 @@ iemand op dat moment níét wilde nemen. Het blijft één plek om lid te worden:
 accountpagina toont de status en linkt ernaartoe, ze bouwt geen tweede
 formulier.
 
+## Betalende ereleden
+
+Naast het gratis erelidmaatschap dat een beheerder toekent (`User.honoraryMember`,
+zie "Ereleden") kan iemand **zelf betalend erelid worden op `/lidmaatschap`**,
+standaard voor €75 (november 2026). De prijs en of de weg openstaat, staan bij
+/admin/leden › Instellingen (`leden.config`, `honoraryPriceCents` en
+`honoraryOpen`).
+
+- **Per academiejaar, niet blijvend.** Een betalend erelid is een `Membership`
+  van soort `HONORARY` voor één academiejaar, en vervalt op 14 september zoals
+  elk lidmaatschap; volgend jaar betaal je opnieuw. Daarom is het een rij en
+  geen vlag: de vlag blijft wat een beheerder blijvend toekent.
+- **Enkel voor wie geen student is** (`User.isStudent` uit): alumni, personeel
+  en externen. Een student wordt lid, geen erelid. `honoraryOffer` in
+  `lib/membership/offer.ts` beslist, en de action rekent het opnieuw na.
+- **Eén rij per lid per jaar.** Wie dit jaar al een geldig lidmaatschap heeft
+  (ook een betaald van €25), krijgt het aanbod niet: een tweede betaling
+  bovenop de eerste zou een terugbetaling worden. Een **onbetaald**
+  lidmaatschap van een andere soort wordt wel omgezet, en zijn openstaande
+  betaalpogingen gaan dicht (`closeOpenMembershipCheckouts`), zodat een oude
+  betaalpagina van €25 het erelidmaatschap niet kan activeren. Komt zo'n oude
+  betaling toch nog binnen, dan wordt ze geboekt maar activeert ze niets
+  (te laag bedrag), en dat staat in de logs.
+- **Een betalend erelid is overal erelid**: ledenprijs en ledentickets (via
+  het lidmaatschap), en daarnaast de ticketsoorten en de ereledenprijs voor
+  ereleden, de voorverkoop, de groep "erelid" op de deelnemerslijst en de mail
+  bij een geopende inschrijving. Elke plek die vroeger enkel naar de vlag keek,
+  leest de betaalde rij mee met `honoraryMembershipSelect` en
+  `isHonoraryMember` (`lib/membership/honorary.ts`). Wie nieuwe code schrijft
+  die vraagt "is dit een erelid?", gebruikt die helper en niet de kale vlag.
+- **Hetzelfde betaalspoor en dezelfde boekhoudcode als het lidgeld**: Mollie,
+  de webhook van het lidmaatschap, met "VTK-erelidmaatschap 26-27" als
+  omschrijving.
+- **Het tabblad Ereleden toont beide soorten**, te filteren op gratis en
+  betalend, met een jaarkeuze voor de betalende. Wie beide is, staat één keer
+  in de lijst en in beide filters. Het betalende intrekken verwijdert de rij en
+  betaalt niets terug, net als bij een lidmaatschap. In de ledenlijst staan de
+  betalende ereleden als soort "Betalend erelid", zodat het ledenaantal en de
+  ontvangsten kloppen.
+
+## Sorteren in de ledenlijst
+
+De leden- en de ereledenlijst op /admin/leden sorteer je met een klik op de
+kolomkop, en die sortering staat in de URL (`?sorteer=naam&richting=op`), net
+als de zoekterm en de soort. Bewust op de server en niet in de browser: een
+ledenlijst telt duizenden faculteitsstudenten, en de Excel-export volgt zo
+vanzelf dezelfde volgorde als het scherm. Een lege waarde (geen r-nummer, nog
+niet betaald) staat altijd achteraan. Zonder keuze staan de nieuwste leden
+bovenaan en de ereleden op naam.
+
 ## Ledenprijs: één ticket met twee prijzen
 
 Een cantus verkoopt hetzelfde bierticket aan €14 voor leden en €17 voor

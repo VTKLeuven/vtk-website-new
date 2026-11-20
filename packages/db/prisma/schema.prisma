@@ -721,7 +721,9 @@ model User {
   alumniMailOptIn         Boolean             @default(false)
   // Erelid. Enkel door een beheerder te zetten (/admin/leden, `leden.manage`), nooit door
   // het lid zelf. Geeft toegang tot ticketsoorten met `TicketAudience.HONORARY`,
-  // die voor iedereen anders onzichtbaar blijven.
+  // die voor iedereen anders onzichtbaar blijven. Dit is het gratis, blijvende
+  // erelidmaatschap; een betalend erelid heeft een `Membership` van soort
+  // `HONORARY` voor één academiejaar (zie `isHonoraryMember`).
   honoraryMember          Boolean             @default(false)
   // Wanneer dit account zichzelf met e-mail en wachtwoord aanmaakte (de weg voor
   // wie geen KU Leuven-login (meer) heeft). Bewust een datum en geen boolean:
@@ -1111,6 +1113,12 @@ enum MembershipKind {
   EXTERNAL
   /// Door een beheerder toegekend, zonder betaling.
   MANUAL
+  /// Betalend erelid voor dit academiejaar (prijs in `leden.config`,
+  /// standaard 75 euro). Enkel voor wie geen student is. Telt als lid en als
+  /// erelid, maar enkel in dat academiejaar; het blijvende, gratis
+  /// erelidmaatschap is `User.honoraryMember`. Zie docs/design-decisions.md,
+  /// "Betalende ereleden".
+  HONORARY
 }
 
 enum MembershipPaymentStatus {
