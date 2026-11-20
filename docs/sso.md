@@ -142,6 +142,38 @@ Punt 3 kijkt bewust enkel naar rollen. Een applicatie die enkel op losse
 toekenningen aan personen draait, werkt vandaag en valt stil zodra die ene
 persoon vertrekt; dat is precies wat de lijst moet opmerken.
 
+### Een KU Leuven-login of een student vragen
+
+Bovenop de toegangsmodus kan een client een KU Leuven-login vragen
+(`OauthClient.kulRequirement`). Dezelfde poort (`checkClientAccess`) beslist, en
+op hetzelfde moment, dus `skipConsent` en een eerdere toestemming omzeilen het
+niet.
+
+| Stand | Wie raakt binnen |
+|---|---|
+| `NONE` | Iedereen die de toegangsmodus binnenlaat; zoals voorheen |
+| `LINKED` | Er hangt een `Account` met `providerId: 'kuleuven'` aan het lid |
+| `STUDENT` | Die koppeling, én `User.kulStudent` is waar |
+
+`User.kulStudent` wordt bij elke KU Leuven-login gezet
+(`packages/auth/src/logins/kul-student.ts`): waar wanneer de accountnaam (`sub`,
+`uid` of `preferred_username`, enkel wat op `x0000000` lijkt) een r-nummer is
+en het adres op `student.kuleuven.be` staat. Een u-nummer in één van die claims
+maakt het onwaar. Lees het r-nummer daarvoor niet met `profileRNumber`: die
+scant elke claim en zegt dus niet met welk account iemand inlogde.
+
+`kulStudentChangedAt` leeg betekent "nog niet gecontroleerd". De poort geeft dan
+dezelfde reden als zonder koppeling (`kul`), zodat de blokpagina een knop toont
+om via KU Leuven aan te melden in plaats van te zeggen dat het lid geen student
+is. De redenen (`permission`, `kul`, `student`) staan in `ClientAccessDenial`;
+de permissie gaat voor, want daar helpt een nieuwe login niet. De drie schermen
+staan op /admin/it/flows.
+
+Strenger zetten trekt de tokens in van de leden die er niet aan voldoen, zoals
+het beperken doet. Wat dit niet kan (een doctoraatsonderzoeker met een
+r-nummer herkennen) en waarom de status geen vervaldatum heeft, staat in
+`docs/design-decisions.md`.
+
 ---
 
 ## Per-client permissies

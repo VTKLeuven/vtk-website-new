@@ -23,6 +23,7 @@ import {
   setAccessModeAction,
   updatePermissionAction,
 } from '../actions';
+import { KulRequirement } from './KulRequirement';
 
 type Permission = {
   id: string;
@@ -72,6 +73,7 @@ export function ClientPermissions({
   nl,
   clientId,
   accessMode,
+  kulRequirement,
   permissionNamespace,
   accessGrantCount,
   permissions,
@@ -82,6 +84,7 @@ export function ClientPermissions({
   nl: boolean;
   clientId: string;
   accessMode: 'OPEN' | 'RESTRICTED';
+  kulRequirement: 'NONE' | 'LINKED' | 'STUDENT';
   permissionNamespace: string | null;
   accessGrantCount: number;
   permissions: Permission[];
@@ -198,6 +201,8 @@ export function ClientPermissions({
           )}
         </SaveForm>
       </section>
+
+      <KulRequirement nl={nl} clientId={clientId} kulRequirement={kulRequirement} />
 
       <section className="rounded-2xl border border-zinc-200 bg-white p-4">
         <h2 className="text-sm font-semibold">{nl ? 'Rechten' : 'Permissions'}</h2>

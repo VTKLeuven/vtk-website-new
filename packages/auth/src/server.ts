@@ -61,7 +61,12 @@ export {
   type FlowTestSetup,
 } from './server/sso';
 export { effectiveClientPermissions } from './server/clientPermissions';
-export { checkClientAccess, countMembersWithAccess, type ClientAccess } from './server/clientAccess';
+export {
+  checkClientAccess,
+  countMembersWithAccess,
+  type ClientAccess,
+  type ClientAccessDenial,
+} from './server/clientAccess';
 export {
   listClientPermissions,
   listClientGrants,
@@ -70,6 +75,7 @@ export {
   listAllClientPermissions,
   setRoleClientPermission,
   setClientAccessMode,
+  setClientKulRequirement,
   createClientPermission,
   updateClientPermission,
   deleteClientPermission,

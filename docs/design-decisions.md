@@ -6461,6 +6461,34 @@ De blokkade zit in de aanmeldflow bij VTK, niet in de applicatie zelf. Een app
 die zelf moet controleren of je binnen mag, vergeet dat ooit; en dan staat de
 deur open zonder dat iemand het merkt.
 
+### Een applicatie kan een KU Leuven-login of een student vragen
+
+Los van open of beperkt kan een applicatie vragen hoe iemand bij de KU Leuven
+bekend is (`OauthClient.kulRequirement`, op /admin/sso onder "KU Leuven-login"):
+
+- **Gekoppeld**: het VTK-account hangt aan een KU Leuven-login. Studenten en
+  personeel allebei; een account met enkel een wachtwoord raakt niet binnen.
+- **Enkel studenten**: de laatste KU Leuven-login was een **r-nummer met een
+  adres op student.kuleuven.be**. Personeel en proffen hebben een u-nummer en
+  een adres op kuleuven.be en vallen dus af. Dit is de stand voor Burgieclan:
+  het cursusmateriaal is er voor studenten, niet voor wie aan de KU Leuven
+  werkt.
+
+Wat we bewust aanvaarden:
+
+- **Een doctoraatsonderzoeker die met een r-nummer inlogt, raakt binnen.** Aan
+  het account en het adres is die niet van een andere student te onderscheiden.
+  Dat kan pas met de opleidingscode die KU Leuven meestuurt (`KULopl`), en
+  welke codes doctoraatsopleidingen zijn, weten we (nog) niet.
+- **De status geldt tot de volgende KU Leuven-login.** Wie afstudeert en daarna
+  enkel nog met een wachtwoord aanmeldt, blijft student tot een volgende login
+  via KU Leuven. Een vervaldatum zou elke student die met een
+  wachtwoord werkt elk jaar opnieuw via KU Leuven laten aanmelden.
+- **Wie koppelde vóór deze controle bestond, is "niet gecontroleerd" en niet
+  "geen student".** Die krijgt bij de eerste poging een knop om eenmaal via
+  KU Leuven aan te melden en gaat daarna meteen verder. Er is niets te
+  backfillen: het adres van de KU Leuven-login stond nergens bewaard.
+
 ### Toegang is een permissie, geen rol
 
 Een beperkte applicatie heeft één speciale permissie, `<namespace>.access`, die

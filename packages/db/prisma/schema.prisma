@@ -55,6 +55,16 @@ enum SsoAccessMode {
   RESTRICTED
 }
 
+// Welke KU Leuven-login een OAuth-client vraagt, bovenop SsoAccessMode.
+// NONE: geen. LINKED: het VTK-account hangt aan een KU Leuven-login.
+// STUDENT: die login is een studentenaccount (r-nummer en een adres op
+// student.kuleuven.be, zie `User.kulStudent`). Zie docs/sso.md.
+enum SsoKulRequirement {
+  NONE
+  LINKED
+  STUDENT
+}
+
 enum PageAssetKind {
   EMBEDDED_PDF
   DOWNLOAD
@@ -527,6 +537,14 @@ model User {
   // wordt enkel bij de eerste controle of een echte booleanwijziging aangepast.
   firwStudent          Boolean   @default(false)
   firwStudentChangedAt DateTime?
+  // Of de laatste KU Leuven-login een studentenaccount was: een r-nummer als
+  // account en een adres op student.kuleuven.be. Personeel en proffen loggen
+  // in met een u-nummer en vallen er dus buiten. Gezet bij elke KU Leuven-login
+  // (packages/auth/src/logins/kul-student.ts); de datum enkel bij de eerste
+  // controle of een echte wijziging. Null = sinds deze kolom nog geen
+  // KU Leuven-login gezien, dus "niet gevraagd" en niet "geen student".
+  kulStudent           Boolean   @default(false)
+  kulStudentChangedAt  DateTime?
   emailVerified        Boolean   @default(false)
   avatarKey            String?
   image                String?
@@ -6676,6 +6694,9 @@ model OauthClient {
   /// autorisatie en moet zonder join te beantwoorden zijn. De plugin negeert
   /// kolommen die ze niet kent.
   accessMode          SsoAccessMode @default(OPEN)
+  /// Welke KU Leuven-login deze client vraagt; zie SsoKulRequirement. Staat
+  /// los van accessMode, zodat een beperkte client ook studenten kan vragen.
+  kulRequirement      SsoKulRequirement @default(NONE)
   /// Prefix waarop de permissiecodes van deze client gevalideerd worden
   /// ("wiki" -> wiki.read, wiki.access). Null zolang er geen vocabulaire is.
   permissionNamespace String?

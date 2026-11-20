@@ -33,6 +33,7 @@ import { prisma } from "@vtk/db";
 import { KUL_CALLBACK_PATH } from "../index";
 import { firwStudentFromProfile, syncFirwStudent } from "./kul-firw";
 import { resolveKulLink, type KulLinkLookups } from "./kul-link";
+import { kulStudentFromProfile, syncKulStudent } from "./kul-student";
 import {
   getKulUserInfo,
   KUL_USERINFO_URL,
@@ -237,6 +238,10 @@ export function kulOAuthConfig() {
       const hasUserInfo = wasKulUserInfoFetched(profile);
       const firwStudent = hasUserInfo ? firwStudentFromProfile(profile) : undefined;
       const firwStudentChangedAt = firwStudent === undefined ? undefined : new Date();
+      // Uit de accountnaam en het adres, die ook in het ID-token staan: dit hoeft
+      // dus niet op userinfo te wachten, anders dan de faculteit.
+      const kulStudent = kulStudentFromProfile(profile, email);
+      const kulStudentChangedAt = new Date();
 
       // Het account waarop deze login landt, en het adres waarmee better-auth
       // het moet zoeken. Dat laatste is het adres van het account dat dit
@@ -256,6 +261,9 @@ export function kulOAuthConfig() {
       if (link?.userId && firwStudent !== undefined && firwStudentChangedAt) {
         await syncFirwStudent(link.userId, firwStudent, firwStudentChangedAt);
       }
+      if (link?.userId) {
+        await syncKulStudent(link.userId, kulStudent, kulStudentChangedAt);
+      }
 
       return {
         email: link?.email ?? email,
@@ -269,6 +277,8 @@ export function kulOAuthConfig() {
         ...(firwStudent !== undefined && firwStudentChangedAt
           ? { firwStudent, firwStudentChangedAt }
           : {}),
+        kulStudent,
+        kulStudentChangedAt,
       };
     },
   };

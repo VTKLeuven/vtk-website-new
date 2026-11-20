@@ -109,6 +109,7 @@ export default async function SsoClientDetail({ params }: { params: Promise<{ lo
         nl={nl}
         clientId={client.clientId}
         accessMode={client.accessMode}
+        kulRequirement={client.kulRequirement}
         permissionNamespace={client.permissionNamespace}
         accessGrantCount={accessGrantCount}
         permissions={permissions.map((permission) => ({

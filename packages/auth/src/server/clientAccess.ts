@@ -6,6 +6,10 @@
  * bepalen wie er méér mag; een RESTRICTED client (de interne wiki) laat enkel
  * binnen wie de `<namespace>.access`-permissie houdt.
  *
+ * Daarnaast kan een client een KU Leuven-login vragen (`kulRequirement`),
+ * los van die modus: LINKED wil dat het VTK-account aan een KU Leuven-login
+ * hangt, STUDENT dat die login een studentenaccount was (Burgieclan).
+ *
  * De blokkade zit in de autorisatieflow zelf (zie de `signup`-hook in auth.ts)
  * en niet in de applicatie: een app die zelf moet controleren of je binnen mag,
  * vergeet dat ooit.
@@ -13,13 +17,29 @@
 import 'server-only';
 
 import { prisma } from '@vtk/db';
+import type { SsoKulRequirement } from '@prisma/client';
+import { KUL_PROVIDER_ID } from '../logins/kul';
 import { accessCodeFor } from '../lib/clientPermissionCodes';
 import { effectiveClientPermissions } from './clientPermissions';
+
+/**
+ * Waarom een lid tegenhoudt, voor de blokpagina:
+ * - `permission`: de client is beperkt en het lid houdt `<ns>.access` niet;
+ * - `kul`: er is een KU Leuven-login nodig die er niet is, of die sinds de
+ *   studentencontrole nog niet gebeurde. Eén keer via KU Leuven aanmelden lost
+ *   het op;
+ * - `student`: de KU Leuven-login is gecontroleerd en is geen studentenaccount.
+ */
+export type ClientAccessDenial = 'permission' | 'kul' | 'student';
 
 export type ClientAccess = {
   allowed: boolean;
   /** Voor de blokpagina: de naam van de app, niet haar client_id. */
   clientName: string | null;
+  /** Enkel bij `allowed: false` en een bestaande client. */
+  reason?: ClientAccessDenial;
+  /** Wat de client vraagt, zodat de blokpagina het juiste kan uitleggen. */
+  kulRequirement?: SsoKulRequirement;
 };
 
 /**
@@ -30,19 +50,58 @@ export type ClientAccess = {
 export async function checkClientAccess(userId: string, clientId: string): Promise<ClientAccess> {
   const client = await prisma.oauthClient.findUnique({
     where: { clientId },
-    select: { name: true, accessMode: true, permissionNamespace: true },
+    select: { name: true, accessMode: true, permissionNamespace: true, kulRequirement: true },
   });
   if (!client) return { allowed: false, clientName: null };
 
-  if (client.accessMode === 'OPEN') return { allowed: true, clientName: client.name };
+  const base = { clientName: client.name, kulRequirement: client.kulRequirement };
 
-  // Beperkt, maar zonder namespace bestaat er geen access-code en kan niemand
-  // ze houden. Dichthouden is hier het juiste antwoord: een beperkte client
-  // waarvan de configuratie half af is, hoort niet open te vallen.
-  if (!client.permissionNamespace) return { allowed: false, clientName: client.name };
+  // Eerst de permissie: wie ze mist, helpt een KU Leuven-login niet verder, en
+  // de blokpagina mag dan niet suggereren dat het wel zo is.
+  if (client.accessMode === 'RESTRICTED') {
+    // Beperkt, maar zonder namespace bestaat er geen access-code en kan niemand
+    // ze houden. Dichthouden is hier het juiste antwoord: een beperkte client
+    // waarvan de configuratie half af is, hoort niet open te vallen.
+    if (!client.permissionNamespace) return { ...base, allowed: false, reason: 'permission' };
 
-  const codes = await effectiveClientPermissions(userId, clientId);
-  return { allowed: codes.includes(accessCodeFor(client.permissionNamespace)), clientName: client.name };
+    const codes = await effectiveClientPermissions(userId, clientId);
+    if (!codes.includes(accessCodeFor(client.permissionNamespace))) {
+      return { ...base, allowed: false, reason: 'permission' };
+    }
+  }
+
+  const kul = await kulDenial(userId, client.kulRequirement);
+  return kul ? { ...base, allowed: false, reason: kul } : { ...base, allowed: true };
+}
+
+/**
+ * `null` wanneer het lid aan de KU Leuven-voorwaarde voldoet.
+ *
+ * Bij STUDENT moet de koppeling er nog zijn én de laatste KU Leuven-login een
+ * studentenaccount geweest zijn. `kulStudentChangedAt` leeg betekent "nog niet
+ * gecontroleerd" (een koppeling van vóór deze controle), niet "geen student":
+ * die krijgt `kul`, zodat de blokpagina vraagt om opnieuw via KU Leuven aan te
+ * melden in plaats van te zeggen dat het lid geen student is.
+ */
+export async function kulDenial(
+  userId: string,
+  requirement: SsoKulRequirement
+): Promise<'kul' | 'student' | null> {
+  if (requirement === 'NONE') return null;
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      kulStudent: true,
+      kulStudentChangedAt: true,
+      accounts: { where: { providerId: KUL_PROVIDER_ID }, select: { id: true }, take: 1 },
+    },
+  });
+  if (!user || user.accounts.length === 0) return 'kul';
+  if (requirement === 'LINKED') return null;
+
+  if (!user.kulStudentChangedAt) return 'kul';
+  return user.kulStudent ? null : 'student';
 }
 
 /** Hoeveel leden er na een omschakeling naar RESTRICTED nog binnen zouden raken. */
