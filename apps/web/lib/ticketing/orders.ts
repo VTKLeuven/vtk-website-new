@@ -1659,3 +1659,180 @@ export async function startOrderPayment(input: {
 
   return { ok: true, provider: input.provider, checkoutUrl: checkout.url };
 }
+
+/** Waarom een manueel ticket niet uitgegeven kon worden; het beheer vertaalt dit. */
+export type ManualTicketErrorCode =
+  | "EVENT_CLOSED"
+  | "TICKET_TYPE_NOT_FOUND"
+  | "SOLD_OUT"
+  | "MEMBER_SEATS"
+  | "NON_MEMBER_SEATS";
+
+export class ManualTicketError extends Error {
+  constructor(readonly code: ManualTicketErrorCode) {
+    super(code);
+    this.name = "ManualTicketError";
+  }
+}
+
+/**
+ * Een ticket dat de organisator zelf uitgeeft, zonder dat de deelnemer door de
+ * shop gaat: een gast, een medewerker, iemand die cash betaalde.
+ *
+ * Het is een gewone bestelling van één ticket, met de deelnemer als koper en
+ * een betaling van provider `manual`: zo werkt alles erna zoals bij elke andere
+ * bestelling (de mail met het ticket, de bestelpagina, de scanner, verwijderen,
+ * de statistieken). Het bedrag is wat de organisator invult, standaard 0; wat
+ * er buiten de site betaald werd, telt zo mee in de ontvangsten van het event,
+ * onder de betaalwijze "Manueel". Terugbetalen gaat dan ook met de hand
+ * (`refundsManually`).
+ *
+ * Het ticket neemt een plaats in de pot van zijn type, en een ledenplaats
+ * wanneer het e-mailadres bij een account hoort dat lid is. Zit de pot vol, dan
+ * weigert het, net als in de shop: verhoog dan eerst de capaciteit. Een
+ * organisator die het plafond stil overschrijdt, verkoopt anders een plaats die
+ * er niet is.
+ *
+ * De grenzen per koper uit de shop (maximum per bestelling, één erelidticket)
+ * gelden hier niet: het is een beslissing van de organisator, niet van de koper.
+ */
+export async function issueManualTicket(input: {
+  eventId: string;
+  ticketTypeId: string;
+  attendeeName: string;
+  attendeeEmail: string;
+  amountCents: number;
+  actorUserId: string;
+  /** Stuur de deelnemer de gewone mail met het ticket. */
+  notify: boolean;
+  locale: "nl" | "en";
+}): Promise<{ orderId: string; reference: string }> {
+  const now = new Date();
+  const event = await prisma.ticketEvent.findUnique({
+    where: { id: input.eventId },
+    select: {
+      id: true,
+      status: true,
+      endsAt: true,
+      currency: true,
+      accountingCode: { select: { code: true, name: true } },
+    },
+  });
+  if (!event || event.status === "CANCELLED" || event.status === "ARCHIVED" || event.endsAt <= now) {
+    throw new ManualTicketError("EVENT_CLOSED");
+  }
+  const type = await prisma.ticketType.findFirst({
+    where: { id: input.ticketTypeId, eventId: input.eventId, active: true },
+    select: { id: true, code: true, nameNl: true, nameEn: true, inventoryPoolId: true },
+  });
+  if (!type) throw new ManualTicketError("TICKET_TYPE_NOT_FOUND");
+
+  const email = input.attendeeEmail.trim().toLowerCase();
+  const account = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" }, deletedAt: null },
+    select: { id: true },
+  });
+  const memberSeat = account ? await userIsMember(account.id) : false;
+
+  const orderId = randomUUID();
+  const accessExpiresAt = orderAccessExpiry(event.endsAt, now);
+  const access = createOrderAccessToken(orderId, accessExpiresAt);
+  const orderNumber = createOrderNumber(now);
+  const typeName = input.locale === "en" && type.nameEn ? type.nameEn : type.nameNl;
+  const item = { inventoryPoolId: type.inventoryPoolId, memberSeat };
+
+  try {
+    await withOrderLock(orderId, async (tx) => {
+      await tx.ticketOrder.create({
+        data: {
+          id: orderId,
+          eventId: event.id,
+          reference: orderNumber,
+          accessTokenHash: secureTokenHash(access),
+          accessExpiresAt,
+          buyerUserId: account?.id ?? null,
+          buyerName: input.attendeeName,
+          buyerEmail: email,
+          locale: input.locale === "en" ? "EN" : "NL",
+          currency: event.currency,
+          subtotalCents: input.amountCents,
+          totalCents: input.amountCents,
+          // Een openstaande bestelling moet een vervaldatum hebben (een check
+          // in de databank); ze is betaald voor deze transactie sluit.
+          reservationExpiresAt: new Date(now.getTime() + reservationMinutes() * 60_000),
+          // Geen verkoopkanaal: dit kwam niet via een link binnen.
+          source: null,
+          accountingCode: event.accountingCode?.code ?? null,
+          accountingCodeName: event.accountingCode?.name ?? null,
+          items: {
+            create: [
+              {
+                ticketTypeId: type.id,
+                inventoryPoolId: type.inventoryPoolId,
+                memberSeat,
+                ticketTypeCode: type.code,
+                ticketTypeName: typeName,
+                unitPriceCents: input.amountCents,
+                totalCents: input.amountCents,
+                attendeeName: input.attendeeName,
+                attendeeEmail: email,
+              },
+            ],
+          },
+        },
+      });
+      await tx.ticketPayment.create({
+        data: {
+          orderId,
+          provider: "manual",
+          idempotencyKey: `${orderId}:1`,
+          status: "CREATED",
+          amountCents: input.amountCents,
+          currency: event.currency,
+        },
+      });
+      await reserveInventory(tx, event.id, quantitiesByPool([item]));
+      await fulfillPaidOrderWithTx(tx, {
+        orderId,
+        provider: "manual",
+        providerPaymentId: `manual_${orderId}`,
+        amountCents: input.amountCents,
+        currency: event.currency,
+      });
+      // De gewone mail met het ticket staat nu in de outbox; wie ze niet wil
+      // (het ticket wordt op papier afgegeven), haalt ze er hier weer uit.
+      if (!input.notify) {
+        await tx.ticketOutboxMessage.deleteMany({
+          where: { dedupeKey: `order-confirmation:${orderId}`, status: "PENDING" },
+        });
+      }
+      await tx.ticketAuditLog.create({
+        data: {
+          eventId: event.id,
+          actorUserId: input.actorUserId,
+          action: "ORDER_CREATED_MANUALLY",
+          entityType: "TicketOrder",
+          entityId: orderId,
+          metadata: {
+            orderNumber,
+            ticketTypeId: type.id,
+            amountCents: input.amountCents,
+            notified: input.notify,
+          },
+        },
+      });
+    });
+  } catch (error) {
+    if (error instanceof TicketInventoryError && error.code === "SOLD_OUT") {
+      throw new ManualTicketError(
+        error.shortage === "MEMBER_SEATS"
+          ? "MEMBER_SEATS"
+          : error.shortage === "NON_MEMBER_SEATS"
+            ? "NON_MEMBER_SEATS"
+            : "SOLD_OUT",
+      );
+    }
+    throw error;
+  }
+  return { orderId, reference: orderNumber };
+}

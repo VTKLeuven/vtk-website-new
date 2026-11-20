@@ -12,8 +12,11 @@ import { withSerializableTransaction } from "./transactions";
  * contract geen refund-product: de penning stort het geld met de hand terug op
  * de rekening uit `lib/ticketing/refundAccount.ts`, en vinkt het daarna hier af
  * met `manual: true`. Mollie betaalt zelf terug en kan dus niet met de hand.
+ *
+ * `manual` is een ticket dat het beheer zelf uitgaf (`issueManualTicket`): het
+ * geld kwam buiten de site binnen, dus het gaat er ook buiten de site terug.
  */
-const MANUAL_REFUND_PROVIDERS = new Set(["bancontact"]);
+const MANUAL_REFUND_PROVIDERS = new Set(["bancontact", "manual"]);
 
 export function refundsManually(provider: string): boolean {
   return MANUAL_REFUND_PROVIDERS.has(provider);

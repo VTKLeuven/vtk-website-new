@@ -23,6 +23,7 @@ export function RemoveAttendee({
   canVoid,
   refundable,
   manualProvider,
+  paidOutsideSite = false,
   amount,
 }: {
   locale: AdminLocale;
@@ -37,8 +38,10 @@ export function RemoveAttendee({
   canVoid: boolean;
   /** Kan via de site terugbetaald worden: Mollie, niet gratis, recht `REFUND`. */
   refundable: boolean;
-  /** Betaald met Bancontact: terugbetalen gebeurt met de hand. */
+  /** Betaald met Bancontact (of buiten de site): terugbetalen gebeurt met de hand. */
   manualProvider: boolean;
+  /** Een manueel uitgegeven ticket: het geld kwam buiten de site binnen. */
+  paidOutsideSite?: boolean;
   amount: string;
 }) {
   if (!canVoid && !refundable) return null;
@@ -76,6 +79,10 @@ export function RemoveAttendee({
     money = nl
       ? "Kies hieronder of het geld teruggaat."
       : "Choose below whether the money goes back.";
+  } else if (manualProvider && paidOutsideSite) {
+    money = nl
+      ? `Er gaat geen geld terug: dit ticket werd manueel uitgegeven en buiten de site betaald. Moet ${amount} terug, geef het dan zelf terug en gebruik "Met de hand terugbetalen" bij de bestelling op het tabblad Bestellingen; dat verwijdert het ticket ook.`
+      : `No money goes back: this ticket was issued by hand and paid outside the site. If ${amount} must go back, return it yourself and use "Refund by hand" on the order in the Orders tab; that removes the ticket as well.`;
   } else if (manualProvider) {
     money = nl
       ? `Er gaat geen geld terug: deze bestelling is met Bancontact betaald, en dat kan de site niet terugstorten. Moet ${amount} terug, stort het dan zelf terug en gebruik "Met de hand terugbetalen" bij de bestelling op het tabblad Bestellingen; dat verwijdert het ticket ook.`

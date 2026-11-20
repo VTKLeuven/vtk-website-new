@@ -22,6 +22,10 @@ import { requireTicketEventCapability } from "@/lib/ticketing/authorization";
 import { saveAttendeeRNumberAction } from "@/app/actions/tickets";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { RemoveAttendee } from "@/components/ticketing/admin/RemoveAttendee";
+import { ManualTicketForm } from "@/components/ticketing/admin/ManualTicketForm";
+import { ChangeTicketTypeForm } from "@/components/ticketing/admin/ChangeTicketTypeForm";
+import { AttendeeMessageForm } from "@/components/ticketing/admin/AttendeeMessageForm";
+import { recipientCandidates } from "@/lib/ticketing/attendeeRecipientsServer";
 import { notSetAside } from "@/lib/ticketing/paymentFlags";
 import { refundsManually } from "@/lib/ticketing/refunds";
 import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
@@ -75,7 +79,7 @@ export default async function TicketAttendeesPage({
     : "";
   const ticketTypes = await prisma.ticketType.findMany({
     where: { eventId },
-    select: { id: true, nameNl: true, nameEn: true, active: true },
+    select: { id: true, nameNl: true, nameEn: true, active: true, unitPriceCents: true },
     orderBy: [{ active: "desc" }, { sortOrder: "asc" }],
   });
   const selectedTicketType = ticketTypes.some((type) => type.id === filters.ticketType)
@@ -205,6 +209,28 @@ export default async function TicketAttendeesPage({
   }
   const attendees = pageIds.flatMap((id) => rowById.get(id) ?? []);
 
+  // Voor "Ticket aanmaken", "Type wijzigen" en "Deelnemers mailen".
+  const typeName = (type: { nameNl: string; nameEn: string | null }) =>
+    locale === "en" && type.nameEn ? type.nameEn : type.nameNl;
+  const activeTypes = ticketTypes
+    .filter((type) => type.active)
+    .map((type) => ({
+      id: type.id,
+      name: typeName(type),
+      price: formatMoney(type.unitPriceCents, event.currency, locale),
+    }));
+  // De kandidaten voor een bericht zonder hun adres: een volgnummer per adres
+  // volstaat om in de browser te tellen, en een adres hoort niet in de HTML.
+  const messageCandidates = canVoid
+    ? await recipientCandidates(eventId).then((rows) => {
+        const keys = new Map<string, number>();
+        return rows.map((row) => {
+          if (!keys.has(row.email)) keys.set(row.email, keys.size);
+          return { key: keys.get(row.email)!, ticketTypeId: row.ticketTypeId, group: row.group };
+        });
+      })
+    : [];
+
   return (
     <div className="ticket-admin-page">
       <div className="ticket-admin-page-head">
@@ -221,6 +247,37 @@ export default async function TicketAttendeesPage({
           {locale === "nl" ? "Deelnemers CSV" : "Attendees CSV"}
         </Link>
       </div>
+
+      {canVoid ? (
+        <div className="ticket-admin-actions-row">
+          <details className="ticket-admin-details">
+            <summary>
+              {locale === "nl" ? "Ticket aanmaken" : "Issue a ticket"}
+            </summary>
+            <div className="ticket-admin-details-body">
+              <p className="ticket-admin-help">
+                {locale === "nl"
+                  ? "Een ticket voor iemand, zonder dat die zelf door de shop moet: een gast, een medewerker, of wie cash betaalde. Het neemt een plaats in de pot van zijn type."
+                  : "A ticket for someone who does not go through the shop: a guest, a helper, or someone who paid cash. It takes a place in its type's pool."}
+              </p>
+              <ManualTicketForm locale={locale} eventId={eventId} ticketTypes={activeTypes} />
+            </div>
+          </details>
+          <details className="ticket-admin-details">
+            <summary>
+              {locale === "nl" ? "Deelnemers mailen" : "Email attendees"}
+            </summary>
+            <div className="ticket-admin-details-body">
+              <AttendeeMessageForm
+                locale={locale}
+                eventId={eventId}
+                ticketTypes={ticketTypes.map((type) => ({ id: type.id, name: typeName(type) }))}
+                candidates={messageCandidates}
+              />
+            </div>
+          </details>
+        </div>
+      ) : null}
 
       <div className="ticket-admin-metrics">
         <AdminMetric icon={UsersRound} label={locale === "nl" ? "Uitgegeven" : "Issued"} value={formatNumber(issuedCount, locale)} />
@@ -459,6 +516,20 @@ export default async function TicketAttendeesPage({
                                 </SaveForm>
                               </div>
                             ) : null}
+                            {ticket.status === "VALID" && canVoid ? (
+                              <div className="ticket-admin-detail-section">
+                                <h3>{locale === "nl" ? "Type wijzigen" : "Change type"}</h3>
+                                <ChangeTicketTypeForm
+                                  locale={locale}
+                                  eventId={eventId}
+                                  orderItemId={item.id}
+                                  attendeeName={item.attendeeName}
+                                  currentTypeId={item.ticketTypeId}
+                                  paid={formatMoney(item.totalCents, item.order.currency, locale)}
+                                  ticketTypes={activeTypes}
+                                />
+                              </div>
+                            ) : null}
                             {ticket.status === "VALID" && (canVoid || canRefund) ? (
                               <RemoveAttendee
                                 locale={locale}
@@ -479,6 +550,7 @@ export default async function TicketAttendeesPage({
                                 manualProvider={Boolean(
                                   item.order.payments[0] && refundsManually(item.order.payments[0].provider),
                                 )}
+                                paidOutsideSite={item.order.payments[0]?.provider === "manual"}
                                 amount={formatMoney(item.totalCents, item.order.currency, locale)}
                               />
                             ) : null}

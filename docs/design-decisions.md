@@ -10546,6 +10546,62 @@ enkel die: wie er vijf kocht, houdt het ticket dat wel voor hemzelf was.
   terugbetaalde tickets uit): wie te veel kocht, krijgt er zo geen nieuwe
   kans bij.
 
+## Tickets met de hand: uitgeven, van type wisselen, deelnemers mailen
+
+Op vraag van de organisatoren (november 2026) kan het tabblad Deelnemers van
+een ticketevent drie dingen die eerst enkel via de shop of buiten de site
+konden. Het recht is `MANAGE_ORDERS`, hetzelfde als een deelnemer verwijderen.
+
+**Een ticket uitgeven** ("Ticket aanmaken") voor een gast, een medewerker of
+iemand die cash betaalde, zonder dat die zelf door de shop gaat.
+
+- Het is een gewone bestelling van één ticket, met de deelnemer als koper:
+  de mail met het ticket, de bestelpagina, de scanner, verwijderen en de
+  statistieken werken zoals bij elke bestelling.
+- **Het bedrag kiest de organisator**, standaard 0. Een bedrag dat buiten de
+  site betaald werd, telt mee in de ontvangsten van het event onder de
+  betaalwijze "Manueel (buiten de site)" (provider `manual`). Terugbetalen gaat
+  dan, zoals bij Bancontact, met de hand.
+- **Het neemt een plaats in de pot van zijn type**, een ledenplaats wanneer het
+  adres bij een account hoort dat lid is. Zit de pot vol, dan weigert het: wie
+  er toch iemand bij wil, verhoogt eerst de capaciteit. Een stille uitzondering
+  op het plafond verkoopt een plaats die er niet is.
+- De grenzen per koper uit de shop (maximum per bestelling, één erelidticket)
+  gelden niet: het is de beslissing van de organisator.
+- De mail met het ticket staat standaard aan; uit voor wie het ticket anders
+  krijgt.
+
+**Een ticket van type wisselen** (upgrade of downgrade), per deelnemer.
+
+- **Enkel het type wisselt, het geld niet.** Het betaalde bedrag blijft staan
+  en een prijsverschil regelt de organisator buiten de site (bijbetalen aan de
+  toog, of een deel met de hand terugstorten). Zo blijven de ontvangsten gelijk
+  aan wat er echt binnenkwam. Automatisch terugstorten bij een downgrade werd
+  niet gekozen.
+- Het ticket houdt zijn code en QR: de scanner leest het type uit de
+  bestelregel. De plaats verhuist naar de pot van het nieuwe type; zit die vol,
+  dan gebeurt er niets. Mag ook na het inchecken: een upgrade aan de deur is
+  net het geval waarvoor dit bestaat.
+- De koper kan een mail krijgen (standaard aan) met een optioneel bericht,
+  bijvoorbeeld wat er nog bij te betalen valt.
+
+**Deelnemers mailen**: een onderwerp en een bericht aan alle deelnemers met een
+geldig ticket, of aan die van een of meer tickettypes en/of groepen
+(praesidium, erelid, lid, niet-lid). Beide samen gelden allebei: leden met een
+bierticket.
+
+- **Eén mail per adres**, aan de deelnemer, en zonder eigen adres aan de koper,
+  zoals de deelnemerslijst het toont. Verwijderde en terugbetaalde tickets
+  krijgen niets.
+- Het formulier telt de adressen terwijl je kiest en de bevestiging noemt het
+  aantal: een verstuurde mail krijg je niet terug. De adressen zelf staan niet
+  in de pagina; de server rekent de ontvangers bij het versturen opnieuw uit.
+- De mails gaan langs de ticket-outbox, maar **na** de bestelbevestigingen:
+  een bericht aan honderden mag niet minutenlang tussen een koper en zijn
+  ticket staan. Bij veel deelnemers duurt het daardoor enkele minuten.
+- De tekst van het bericht staat niet in het auditlog van het event, enkel
+  het aantal en de keuze: dat logboek overleeft het archiveren.
+
 ## Voorverkoop: een duur voor de verkoopstart, niet een tweede datum
 
 Een ticketevent kan een **voorverkoop** hebben: een periode waarin enkel het

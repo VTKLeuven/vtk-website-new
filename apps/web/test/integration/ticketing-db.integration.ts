@@ -15,7 +15,10 @@ import {
   createTicketCheckout,
   expirePendingOrder,
   fulfillPaidOrder,
+  issueManualTicket,
+  ManualTicketError,
 } from "@/lib/ticketing/orders";
+import { changeTicketType } from "@/lib/ticketing/changeTicketType";
 import { processTicketOutbox, TICKET_CANCELLED } from "@/lib/ticketing/outbox";
 import {
   completeTicketRefund,
@@ -1338,5 +1341,86 @@ describe("ticketing database invariants", () => {
     await expect(prisma.ticketAuditLog.deleteMany({ where: { id: log.id } })).resolves.toMatchObject(
       { count: 1 }
     );
+  });
+
+  it("issues a ticket by hand and moves it to another type without touching the money", async () => {
+    const poolA = randomUUID();
+    const poolB = randomUUID();
+    const typeA = randomUUID();
+    const typeB = randomUUID();
+    await prisma.ticketInventoryPool.createMany({
+      data: [
+        { id: poolA, eventId: ids.event, code: `MAN-A-${poolA}`, nameNl: "Manueel A", capacity: 2 },
+        { id: poolB, eventId: ids.event, code: `MAN-B-${poolB}`, nameNl: "Manueel B", capacity: 1 },
+      ],
+    });
+    await prisma.ticketType.createMany({
+      data: [
+        { id: typeA, eventId: ids.event, inventoryPoolId: poolA, code: `MAN-A-${typeA}`, nameNl: "Inkom", unitPriceCents: 500 },
+        { id: typeB, eventId: ids.event, inventoryPoolId: poolB, code: `MAN-B-${typeB}`, nameNl: "Inkom + drank", unitPriceCents: 1000 },
+      ],
+    });
+
+    const { orderId } = await issueManualTicket({
+      eventId: ids.event,
+      ticketTypeId: typeA,
+      attendeeName: "Gast",
+      attendeeEmail: "Gast@Example.test",
+      amountCents: 500,
+      actorUserId: ids.user,
+      notify: false,
+      locale: "nl",
+    });
+    const order = await prisma.ticketOrder.findUnique({
+      where: { id: orderId },
+      include: { items: { include: { ticket: true } }, payments: true },
+    });
+    expect(order).toMatchObject({ status: "PAID", totalCents: 500, buyerEmail: "gast@example.test" });
+    expect(order?.payments[0]).toMatchObject({ provider: "manual", status: "SUCCEEDED", amountCents: 500 });
+    expect(order?.items[0].ticket?.status).toBe("VALID");
+    expect(await prisma.ticketInventoryPool.findUnique({ where: { id: poolA } })).toMatchObject({ soldCount: 1, reservedCount: 0 });
+    // Zonder "mailen" staat er geen bevestiging klaar.
+    expect(await prisma.ticketOutboxMessage.count({ where: { orderId, type: "ORDER_CONFIRMATION" } })).toBe(0);
+
+    const itemId = order!.items[0].id;
+    const changed = await changeTicketType({ eventId: ids.event, orderItemId: itemId, ticketTypeId: typeB, actorUserId: ids.user });
+    expect(changed).toMatchObject({ fromName: "Inkom", toName: "Inkom + drank" });
+    expect(await prisma.ticketInventoryPool.findUnique({ where: { id: poolA } })).toMatchObject({ soldCount: 0 });
+    expect(await prisma.ticketInventoryPool.findUnique({ where: { id: poolB } })).toMatchObject({ soldCount: 1 });
+    const item = await prisma.ticketOrderItem.findUnique({ where: { id: itemId }, include: { ticket: true } });
+    // Het type wisselt, het geld en de ticketcode niet.
+    expect(item).toMatchObject({ ticketTypeId: typeB, inventoryPoolId: poolB, totalCents: 500, ticketTypeName: "Inkom + drank" });
+    expect(item?.ticket?.publicCode).toBe(order!.items[0].ticket!.publicCode);
+
+    // Pot B zit nu vol: een tweede ticket daar gaat niet, met de hand niet en via een wissel niet.
+    await expect(
+      issueManualTicket({
+        eventId: ids.event,
+        ticketTypeId: typeB,
+        attendeeName: "Tweede gast",
+        attendeeEmail: "tweede@example.test",
+        amountCents: 0,
+        actorUserId: ids.user,
+        notify: true,
+        locale: "nl",
+      })
+    ).rejects.toBeInstanceOf(ManualTicketError);
+    const second = await issueManualTicket({
+      eventId: ids.event,
+      ticketTypeId: typeA,
+      attendeeName: "Tweede gast",
+      attendeeEmail: "tweede@example.test",
+      amountCents: 0,
+      actorUserId: ids.user,
+      notify: true,
+      locale: "nl",
+    });
+    expect(await prisma.ticketOutboxMessage.count({ where: { orderId: second.orderId, type: "ORDER_CONFIRMATION" } })).toBe(1);
+    const secondItem = await prisma.ticketOrderItem.findFirstOrThrow({ where: { orderId: second.orderId } });
+    await expect(
+      changeTicketType({ eventId: ids.event, orderItemId: secondItem.id, ticketTypeId: typeB, actorUserId: ids.user })
+    ).rejects.toThrow("SOLD_OUT");
+    expect(await prisma.ticketInventoryPool.findUnique({ where: { id: poolA } })).toMatchObject({ soldCount: 1 });
+    expect(await prisma.ticketInventoryPool.findUnique({ where: { id: poolB } })).toMatchObject({ soldCount: 1 });
   });
 });

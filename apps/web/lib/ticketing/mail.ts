@@ -445,3 +445,128 @@ function sameName(left: string, right: string): boolean {
   const normalize = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleLowerCase("nl-BE");
   return normalize(left) === normalize(right);
 }
+
+/** De voet van een ticketmail: links een regel uitleg, rechts het bestelnummer. */
+function footerRow(note: string, orderNumber: string | null): string {
+  const number = orderNumber
+    ? `<td align="right" style="font-size:12px;font-weight:600;color:${COLOR.muted};white-space:nowrap;padding-left:14px">${escapeHtml(orderNumber)}</td>`
+    : "";
+  return `<tr><td style="padding:16px 30px;background:${COLOR.paper2};border-top:1px solid ${COLOR.line}"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%"><tr><td style="font-size:12px;line-height:1.5;color:${COLOR.muted}">${escapeHtml(note)}</td>${number}</tr></table></td></tr>`;
+}
+
+function eventHead(eventName: string, event: OrderMailEvent | undefined, nl: boolean): string {
+  return event
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%"><tr><td valign="top" style="padding-right:14px">${titleHtml(eventName)}${factsHtml(event, nl)}</td><td valign="top" align="right" width="64" style="width:64px">${pinHtml(event, nl)}</td></tr></table>`
+    : titleHtml(eventName);
+}
+
+/**
+ * Een ticket dat het beheer van type wisselde (upgrade of downgrade, tabblad
+ * Deelnemers). Gaat naar de koper, zoals de annulatie. De code en de QR blijven
+ * dezelfde, dus er hoeft niets opnieuw gedownload te worden; dat zegt de mail
+ * er uitdrukkelijk bij, anders zoekt de deelnemer een nieuw ticket. Over geld
+ * zegt ze niets: een prijsverschil regelt de organisator buiten de site, en
+ * staat, als het moet, in het bericht.
+ */
+export function ticketChangedMail(input: {
+  locale: "nl" | "en";
+  buyerName: string;
+  buyerEmail: string;
+  attendeeName: string;
+  fromName: string;
+  toName: string;
+  eventName: string;
+  orderNumber: string;
+  orderUrl: string;
+  /** Een optionele uitleg van de organisator, letterlijk in de mail. */
+  message: string | null;
+  replyTo?: string | null;
+  event?: OrderMailEvent;
+}): MailMessage {
+  const nl = input.locale === "nl";
+  const own = sameName(input.attendeeName, input.buyerName);
+  const subject = nl
+    ? `${own ? "Je ticket" : `Ticket van ${input.attendeeName}`} voor ${input.eventName} gewijzigd`
+    : `${own ? "Your ticket" : `${input.attendeeName}'s ticket`} for ${input.eventName} changed`;
+  const intro = nl
+    ? `Dag ${input.buyerName}, ${own ? "je ticket" : `het ticket van ${input.attendeeName}`} voor ${input.eventName} is omgezet van ${input.fromName} naar ${input.toName}.`
+    : `Hi ${input.buyerName}, ${own ? "your ticket" : `${input.attendeeName}'s ticket`} for ${input.eventName} has been changed from ${input.fromName} to ${input.toName}.`;
+  const same = nl
+    ? "Het ticket en de QR-code blijven dezelfde: je hoeft niets opnieuw te downloaden. Aan de ingang geldt het meteen als het nieuwe type."
+    : "The ticket and its QR code stay the same: there is nothing to download again. At the entrance it counts as the new type right away.";
+  const button = nl ? "Bekijk je tickets" : "View your tickets";
+  const messageLabel = nl ? "Bericht van de organisator" : "Message from the organiser";
+  const questions = nl
+    ? "Vragen? Antwoord gewoon op deze mail."
+    : "Questions? Just reply to this email.";
+
+  const textLines = [
+    intro,
+    "",
+    same,
+    ...(input.message ? ["", `${messageLabel}:`, input.message] : []),
+    "",
+    input.orderUrl,
+    "",
+    questions,
+    input.orderNumber,
+  ];
+  const html = mailDocument({
+    lang: nl ? "nl" : "en",
+    title: subject,
+    preheader: intro,
+    rows: `<tr><td style="padding:26px 30px 30px">${eventHead(input.eventName, input.event, nl)}<p style="margin:20px 0 0;font-size:15.5px;line-height:1.6;color:${COLOR.body}">${escapeHtml(intro)}</p><p style="margin:16px 0 0;font-size:15.5px;line-height:1.6;color:${COLOR.body}">${escapeHtml(same)}</p>${input.message ? mailMessageBox(input.message, messageLabel) : ""}<p style="margin:22px 0 0">${mailButton(input.orderUrl, button)}</p></td></tr>${footerRow(questions, input.orderNumber)}`,
+  });
+  return { to: input.buyerEmail, replyTo: input.replyTo, subject, text: textLines.join("\n"), html };
+}
+
+/**
+ * Een bericht van de organisator aan de deelnemers van een event (tabblad
+ * Deelnemers, "Deelnemers mailen"): het onderwerp en de tekst zoals de
+ * organisator ze schreef, onder de kop van het event. Antwoorden gaat naar het
+ * contactadres van het event. Eén mail per adres, ook wanneer iemand meerdere
+ * tickets heeft.
+ */
+export function attendeeMessageMail(input: {
+  locale: "nl" | "en";
+  to: string;
+  name: string | null;
+  eventName: string;
+  subject: string;
+  message: string;
+  senderName: string | null;
+  replyTo?: string | null;
+  event?: OrderMailEvent;
+}): MailMessage {
+  const nl = input.locale === "nl";
+  const greeting = input.name ? (nl ? `Dag ${input.name},` : `Hi ${input.name},`) : nl ? "Dag," : "Hi,";
+  const why = nl
+    ? `Je krijgt deze mail omdat je een ticket hebt voor ${input.eventName}.`
+    : `You are receiving this email because you have a ticket for ${input.eventName}.`;
+  const reply = input.replyTo
+    ? nl
+      ? "Vragen? Antwoord gewoon op deze mail."
+      : "Questions? Just reply to this email."
+    : why;
+  const label = input.senderName
+    ? nl
+      ? `Bericht van ${input.senderName}`
+      : `Message from ${input.senderName}`
+    : nl
+      ? "Bericht van de organisator"
+      : "Message from the organiser";
+  const textLines = [greeting, "", input.message, "", why];
+  const html = mailDocument({
+    lang: nl ? "nl" : "en",
+    title: input.subject,
+    preheader: input.message.slice(0, 140),
+    rows: `<tr><td style="padding:26px 30px 30px">${eventHead(input.eventName, input.event, nl)}<p style="margin:20px 0 0;font-size:15.5px;line-height:1.6;color:${COLOR.body}">${escapeHtml(greeting)}</p>${mailMessageBox(input.message, label)}<p style="margin:16px 0 0;font-size:13px;line-height:1.5;color:${COLOR.muted}">${escapeHtml(why)}</p></td></tr>${footerRow(reply, null)}`,
+  });
+  return {
+    to: input.to,
+    replyTo: input.replyTo,
+    subject: input.subject,
+    text: textLines.join("\n"),
+    html,
+  };
+}
