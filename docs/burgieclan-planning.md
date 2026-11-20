@@ -89,6 +89,35 @@ Zie `app-api.md`, "Planning". Kort: `GET`/`DELETE /planning`, `POST
 `/planning/feed-token`. Elke aanvraag antwoordt met de hele `AppPlanning`, net
 als bij Burgieclan, dus de app vraagt nooit twee keer.
 
+## Peilingen
+
+Ook de POC-peilingen staan op Burgieclan, als tab in de zijbalk die er enkel is
+wanneer er voor het lid een peiling open staat. Hier loopt het **omgekeerd**:
+Burgieclan vraagt aan vtk.be, namens het lid dat daar aangemeld is.
+
+```
+  Burgieclan /api/vtk_polls ──▶ vtk.be /api/burgieclan/v1/polls
+     ondertekend: X-Vtk-User / -Timestamp / -Signature (zelfde geheim)
+```
+
+| Kant | Bestand |
+|---|---|
+| Burgieclan tekent | `backend/src/Service/VtkService/VtkPolls.php` |
+| VTK controleert | `apps/web/lib/burgieclan/signature.ts` (`verifyBurgieclanRequest`), `apps/web/app/api/burgieclan/v1/polls/route.ts` |
+
+- De route geeft dezelfde `AppPolls` als de app (`lib/pocPolls/appPolls.ts`) en
+  neemt antwoorden aan zoals de app ze stuurt. Wie de peiling krijgt en hoe een
+  antwoord anoniem bewaard wordt, beslist enkel vtk.be; Burgieclan bewaart niets.
+- vtk.be zoekt het lid op de `sub` (de id, bij een publieke client), anders op
+  het universitaire adres. Een verwijderd of onbekend account krijgt een 404, en
+  dan toont Burgieclan gewoon geen peilingen.
+- Enkel accounts die via VTK aanmeldden (`fluxusSub` bij Burgieclan) kunnen
+  peilingen krijgen; voor de andere vraagt Burgieclan niets.
+- Het pad zit in de handtekening, dus wat Burgieclan voor deze route tekent,
+  opent niets anders op vtk.be. Ook hier een gedeelde vector:
+  `apps/web/test/burgieclanPolls.test.ts` en
+  `VtkPollsTest::testSignatureMatchesTheVtkWebsite` bij Burgieclan.
+
 ## Vallen waar we in gelopen zijn
 
 1. **API Platform spreekt enkel JSON-LD.** Een `Content-Type: application/json`
