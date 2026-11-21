@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { ArrowLeftRight, Languages, Loader2 } from "lucide-react";
-import { Button, ConfirmDialog, Input, Label, Textarea } from "@vtk/ui";
+import { ConfirmDialog, Input, Label, Textarea } from "@vtk/ui";
 import type { Locale } from "@vtk/i18n";
 import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
 import { useAiTranslateConfig } from "@/components/admin/AiTranslateContext";
@@ -403,62 +403,42 @@ export function BilingualBar({
     const nextDirection: TranslateDirection =
       effectiveDirection === "nl-to-en" ? "en-to-nl" : "nl-to-en";
 
-    if (compact) {
-      return (
-        <div className={["flex items-center justify-end gap-1", className].filter(Boolean).join(" ")}>
-          <button
-            type="button"
-            disabled={translating}
-            onClick={() => triggerTranslate(effectiveDirection)}
-            title={sideBySideLabel}
-            className="inline-flex h-6 items-center gap-1 rounded-full border border-vtk-blue/15 bg-white px-2.5 text-[11px] font-medium text-vtk-ink transition-colors hover:border-vtk-blue/30 hover:bg-vtk-blue-soft/70 disabled:opacity-50"
-          >
-            {translating ? (
-              <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-            ) : (
-              <Languages className="h-3 w-3" aria-hidden="true" />
-            )}
-            <span>{translating ? (nl ? "Vertalen…" : "Translating…") : sideBySideLabel}</span>
-          </button>
-          <button
-            type="button"
-            disabled={translating}
-            onClick={() => setDirectionOverride(nextDirection)}
-            title={flipTitle}
-            aria-label={flipTitle}
-            className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-vtk-blue/15 bg-white text-[#5c667f] transition-colors hover:border-vtk-blue/30 hover:bg-vtk-blue-soft/70 hover:text-vtk-ink disabled:opacity-50"
-          >
-            <ArrowLeftRight className="h-3 w-3" aria-hidden="true" />
-          </button>
-        </div>
-      );
-    }
-
     return (
-      <div className={["flex items-center justify-end gap-1", className].filter(Boolean).join(" ")}>
-        <Button
+      <div
+        className={[
+          "flex items-center justify-end gap-1.5 text-xs font-medium text-[#5c667f]",
+          compact ? "" : "-mb-2",
+          className,
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        <button
           type="button"
-          variant="ghost"
-          size="sm"
           disabled={translating}
           onClick={() => triggerTranslate(effectiveDirection)}
+          title={sideBySideLabel}
+          className="inline-flex items-center gap-1 transition-colors hover:text-vtk-ink disabled:opacity-50"
         >
           {translating ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
           ) : (
             <Languages className="h-3.5 w-3.5" aria-hidden="true" />
           )}
-          {translating ? (nl ? "Vertalen…" : "Translating…") : sideBySideLabel}
-        </Button>
+          <span>{translating ? (nl ? "Vertalen…" : "Translating…") : sideBySideLabel}</span>
+        </button>
+        <span aria-hidden="true" className="opacity-35">
+          ·
+        </span>
         <button
           type="button"
           disabled={translating}
           onClick={() => setDirectionOverride(nextDirection)}
           title={flipTitle}
           aria-label={flipTitle}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-vtk-blue/15 text-[#5c667f] transition-colors hover:border-vtk-blue/30 hover:bg-vtk-blue-soft/70 hover:text-vtk-ink disabled:opacity-50"
+          className="inline-flex items-center justify-center rounded p-0.5 transition-colors hover:text-vtk-ink disabled:opacity-50"
         >
-          <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden="true" />
+          <ArrowLeftRight className="h-3 w-3" aria-hidden="true" />
         </button>
       </div>
     );
@@ -514,7 +494,7 @@ export function BilingualBar({
             disabled={translating}
             onClick={() => triggerTranslate(direction)}
             title={buttonLabel}
-            className="inline-flex h-6 items-center gap-1 rounded-full border border-vtk-blue/15 bg-white px-2.5 text-[11px] font-medium text-vtk-ink transition-colors hover:border-vtk-blue/30 hover:bg-vtk-blue-soft/70 disabled:opacity-50"
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-[#5c667f] transition-colors hover:text-vtk-ink disabled:opacity-50"
           >
             {translating ? (
               <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
@@ -570,20 +550,19 @@ export function BilingualBar({
       </div>
 
       {aiEnabled ? (
-        <Button
+        <button
           type="button"
-          variant="ghost"
-          size="sm"
           disabled={translating}
           onClick={() => triggerTranslate(direction)}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-[#5c667f] transition-colors hover:text-vtk-ink disabled:opacity-50"
         >
           {translating ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
           ) : (
             <Languages className="h-3.5 w-3.5" aria-hidden="true" />
           )}
-          {translating ? (nl ? "Vertalen…" : "Translating…") : buttonLabel}
-        </Button>
+          <span>{translating ? (nl ? "Vertalen…" : "Translating…") : buttonLabel}</span>
+        </button>
       ) : null}
     </div>
   );
