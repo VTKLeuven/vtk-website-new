@@ -6090,6 +6090,54 @@ website (`app/ritten/trips-agenda.tsx`).
   dezelfde kleur als in de planning; wie geen chauffeur is, krijgt er een uit zijn
   naam. Jij bent altijd geel.
 
+### Een annulatie door de aanvrager meldt het team en de chauffeur
+
+Tot november 2026 vertrok er niets wanneer een lid een goedgekeurde aanvraag of
+rit annuleerde, en er kwam ook geen regel in de historiek. Een chauffeur die op
+de rit stond, merkte het pas wanneer hij de planning opende; het team zette
+materiaal klaar voor een activiteit die niet meer doorging.
+
+- **De chauffeur krijgt meteen een mail**, niet in de bundel: hij leest de
+  teammelding niet, en hij is degene die anders voor niets aan het logikot
+  staat. Annuleert hij zijn eigen aanvraag, dan vertrekt er niets.
+- **Het team hoort het via dezelfde wachtrij als een nieuwe aanvraag**
+  (`teamNotifiedAt` terug op `null`): in de uurlijkse bundel, en meteen wanneer
+  het binnen het etmaal begint. Geen aparte mailsoort en geen aparte kolom; de
+  bundel herkent een annulatie aan de status plus de historiekregel die het
+  annuleren schrijft. Dat laatste is nodig omdat oude annulaties (van voor deze
+  regel) ook een lege `teamNotifiedAt` hebben; zonder de historiekregel kwamen
+  ze allemaal in de eerstvolgende bundel.
+- **Wat het team nooit zag, verdwijnt zonder melding.** Een aanvraag die nog in
+  geen enkele bundel zat, wordt bij het annuleren meteen gestempeld: een mail
+  "nieuw" gevolgd door "geannuleerd" over iets wat niemand vroeg te bekijken, is
+  ruis. Wat het team al zag maar nog niet besliste, komt er wel in, met "ze was
+  nog niet beslist".
+- **Een doorgegeven rit zonder chauffeur mailt de post niet.** De bundel zegt
+  wel dat de post nog niets weet; het team verwittigt hen zelf als het moet. De
+  postmail volgt een eigen instelling ("Een rit doorgeven aan een post mailt
+  standaard niemand"), en een annulatie daar ook nog aan hangen, was een tweede
+  instelling voor iets wat zelden gebeurt.
+
+### Mails van de uitleendienst: pure templates, platte tekst
+
+De teksten staan sinds november 2026 in `@vtk/mail/logistiek` als pure functies
+die `{ subject, text }` teruggeven; `lib/uitleen-mail.ts` haalt op, zet data om
+naar tekst en verstuurt. In een pakket en niet in de app, omdat /admin/it/flows
+de echte template moet aanroepen en apps/web niet in apps/logistiek kan
+importeren. Data komen als tekst binnen: de uitleendienst formatteert ze zelf op
+de Brusselse klok, en een tweede kopie van die helpers in het pakket zou
+afwijken.
+
+Ze blijven **platte tekst** en niet de opgemaakte mail van vtk.be
+(`mailDesign.ts`). Het zijn werkberichten met lijsten (materiaal, uren,
+bijrijders) die als tekst goed lezen, de huisstijl woont in apps/web, en een
+team dat de meldingen doorstuurt of in een ticketsysteem plakt, heeft niets aan
+HTML. Herbekijk dat per mail wanneer de huisstijl naar een pakket verhuist.
+
+Ze staan **niet in het maillogboek** (/admin/it/email-logboek): dat schrijft
+`deliverWebsiteMail` in apps/web, en de uitleendienst verstuurt rechtstreeks met
+`sendMail`. In het register is `source` daarom leeg.
+
 ### Een rit doorgeven aan een post mailt standaard niemand
 
 Geeft Logistiek een autorit door aan een post, dan duidt die post zelf de

@@ -188,8 +188,12 @@ apps gebruiken hem, inclusief de EHLO- en STARTTLS-lessen die erin zitten.
 `apps/web/lib/mail.ts` houdt enkel nog de Theokot-berichten over.
 
 `lib/uitleen-mail.ts` stuurt bij vier momenten: goedgekeurd, afgewezen, gewijzigd
-en teruggedraaid (`notifyReservation` / `notifyTransport`). Drie regels, alle drie
-met een reden (zie `docs/design-decisions.md`):
+en teruggedraaid (`notifyReservation` / `notifyTransport`). De teksten zelf staan
+in `packages/mail/src/logistiek.ts` (`@vtk/mail/logistiek`), als pure functies die
+`{ subject, text }` teruggeven; /admin/it/flows toont ze met verzonnen gegevens
+(`apps/web/lib/mailPreviews.ts`, groep "Uitleendienst"). Een nieuwe mail krijgt
+daar meteen een rij bij. Drie regels, alle drie met een reden (zie
+`docs/design-decisions.md`):
 
 1. **Ná de transactie aanroepen**, nooit erin: anders vertrekt er een mail over
    een wijziging die door een rollback niet gebeurd is.
@@ -200,11 +204,18 @@ met een reden (zie `docs/design-decisions.md`):
 `notifyEmail` op `UitleenReservation`/`UitleenTransportBooking` gaat in kopie; het
 lid zelf krijgt de mail op zijn voorkeursadres (`emailPreference`).
 
-Sinds ronde 3 gaat er ook een mail de **andere kant** op: `notifyTeamNewRequest`
-waarschuwt het team zodra er iets ingediend wordt, met per soort (materiaal,
-flesserke, transport) een eigen lijst adressen in `logistiek.settings`. Een lege
-lijst betekent geen mail, en `/beheer/instellingen` zegt dat in het rood. Dezelfde
-drie regels gelden: ná de write, faalt nooit de actie, en enkel bij het indienen.
+Sinds ronde 3 gaat er ook een mail de **andere kant** op: de teammelding
+(`sendTeamDigests`, `notifyTeamIfUrgent`) waarschuwt het team zodra er iets
+ingediend wordt, met per soort (materiaal, flesserke, transport) een eigen lijst
+adressen in `logistiek.settings`. Een lege lijst betekent geen mail, en
+`/beheer/instellingen` zegt dat in het rood. Dezelfde drie regels gelden: ná de
+write, faalt nooit de actie, en enkel bij het indienen.
+
+Annuleert een lid iets wat het team al zag of goedkeurde, dan komt dat in
+dezelfde melding (`teamNotifiedAt` terug op `null`, herkend aan de historiekregel
+die het annuleren schrijft), en krijgt een chauffeur die op de rit stond meteen
+een mail (`notifyDriversOfCancellation`). Zie "Een annulatie door de aanvrager
+meldt het team en de chauffeur" in `docs/design-decisions.md`.
 
 Zonder `SMTP_HOST` wordt de mail gelogd in plaats van verstuurd. Draait er lokaal
 een mailcatcher zonder STARTTLS (bv. op `127.0.0.1:1025`), dan mislukt de

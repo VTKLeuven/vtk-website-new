@@ -53,7 +53,12 @@ import {
   type Range,
 } from '@/lib/availability-day';
 import { writeAudit } from '@/lib/audit';
-import { notifyReservation, notifyTeamIfUrgent, notifyTransport } from '@/lib/uitleen-mail';
+import {
+  notifyDriversOfCancellation,
+  notifyReservation,
+  notifyTeamIfUrgent,
+  notifyTransport,
+} from '@/lib/uitleen-mail';
 
 /**
  * `code` is optioneel en enkel voor een fout waar de client iets méér mee doet
@@ -696,20 +701,59 @@ export async function cancelReservationAction(reservationId: string): Promise<Ac
     };
   }
 
-  const cancelled = await prisma.uitleenReservation.updateMany({
-    where: {
-      id: reservation.id,
-      userId: session.user.id,
-      status: { in: ['REQUESTED', 'APPROVED'] },
-      payments: { none: { status: 'SUCCEEDED' } },
-    },
-    data: { status: 'CANCELLED' },
+  // Lezen, annuleren en de historiek schrijven in één transactie: wat het team
+  // te horen krijgt, hangt af van de toestand vlak voor het annuleren (L1).
+  const outcome = await runSerializable(async (tx) => {
+    const current = await tx.uitleenReservation.findFirst({
+      where: {
+        id: reservation.id,
+        userId: session.user.id,
+        status: { in: ['REQUESTED', 'APPROVED'] },
+        payments: { none: { status: 'SUCCEEDED' } },
+      },
+      select: {
+        status: true,
+        teamNotifiedAt: true,
+        lines: { select: { id: true }, take: 1 },
+        flesserkeLines: { select: { id: true }, take: 1 },
+      },
+    });
+    if (!current) return null;
+    // Kreeg het team de aanvraag al te zien, of stond ze goedgekeurd, dan gaat
+    // de annulatie terug in de wachtrij van de teammelding (`teamNotifiedAt`
+    // null). Een aanvraag die nog niemand zag, verdwijnt gewoon: stempelen.
+    const tellTeam = current.status === 'APPROVED' || current.teamNotifiedAt !== null;
+    await tx.uitleenReservation.update({
+      where: { id: reservation.id },
+      data: { status: 'CANCELLED', teamNotifiedAt: tellTeam ? null : new Date() },
+    });
+    await writeAudit(
+      tx,
+      { reservationId: reservation.id },
+      {
+        kind: 'STATUS_CHANGED',
+        fromStatus: current.status,
+        toStatus: 'CANCELLED',
+        note: 'Geannuleerd door de aanvrager',
+        actorId: session.user.id,
+      }
+    );
+    const kinds: Array<'materiaal' | 'flesserke'> = [];
+    if (current.lines.length > 0) kinds.push('materiaal');
+    if (current.flesserkeLines.length > 0) kinds.push('flesserke');
+    return { tellTeam, kinds };
   });
-  if (cancelled.count === 0) {
+  if (!outcome) {
     return { ok: false, error: 'Deze reservatie kan niet meer veilig geannuleerd worden.' };
   }
 
   revalidateMember();
+  revalidatePath('/beheer');
+  revalidatePath('/beheer/aanvragen');
+  // Begint ze binnen het etmaal, dan meteen; anders in de uurlijkse bundel.
+  if (outcome.tellTeam) {
+    for (const kind of outcome.kinds) await notifyTeamIfUrgent(kind, reservation.id);
+  }
   return { ok: true, message: 'Reservatie geannuleerd.' };
 }
 
@@ -914,24 +958,65 @@ export async function cancelVanBookingAction(bookingId: string): Promise<ActionR
   }
 
   // Een heen-en-terugaanvraag annuleer je in haar geheel: enkel de heenrit
-  // annuleren laat een terugrit staan die niemand meer gaat rijden.
-  const cancelled = await prisma.uitleenTransportBooking.updateMany({
-    where: {
-      ...(booking.tripGroupId ? { tripGroupId: booking.tripGroupId } : { id: booking.id }),
-      userId: session.user.id,
-      status: { in: ['REQUESTED', 'APPROVED'] },
-      payments: { none: { status: 'SUCCEEDED' } },
-    },
-    data: { status: 'CANCELLED' },
+  // annuleren laat een terugrit staan die niemand meer gaat rijden. Lezen,
+  // annuleren en de historiek schrijven in één transactie, zoals bij een
+  // materiaalaanvraag (L1).
+  const legs = await runSerializable(async (tx) => {
+    const current = await tx.uitleenTransportBooking.findMany({
+      where: {
+        ...(booking.tripGroupId ? { tripGroupId: booking.tripGroupId } : { id: booking.id }),
+        userId: session.user.id,
+        status: { in: ['REQUESTED', 'APPROVED'] },
+        payments: { none: { status: 'SUCCEEDED' } },
+      },
+      select: { id: true, status: true, teamNotifiedAt: true },
+    });
+    if (current.length === 0) return [];
+    // Zie `cancelReservationAction`: wat het team al zag of goedkeurde, komt in
+    // de teammelding; wat nog niemand zag, wordt gestempeld en verdwijnt.
+    const tellTeam = current.some((leg) => leg.status === 'APPROVED' || leg.teamNotifiedAt !== null);
+    await tx.uitleenTransportBooking.updateMany({
+      where: { id: { in: current.map((leg) => leg.id) } },
+      data: { status: 'CANCELLED', teamNotifiedAt: tellTeam ? null : new Date() },
+    });
+    for (const leg of current) {
+      await writeAudit(
+        tx,
+        { transportBookingId: leg.id },
+        {
+          kind: 'STATUS_CHANGED',
+          fromStatus: leg.status,
+          toStatus: 'CANCELLED',
+          note: 'Geannuleerd door de aanvrager',
+          actorId: session.user.id,
+        }
+      );
+    }
+    return current.map((leg) => ({ id: leg.id, tellTeam }));
   });
-  if (cancelled.count === 0) {
+  if (legs.length === 0) {
     return { ok: false, error: 'Deze rit kan niet meer veilig geannuleerd worden.' };
   }
 
   revalidateMember();
+  revalidatePath('/beheer');
+  revalidatePath('/beheer/vervoer');
+  revalidatePath('/beheer/vervoer/week');
+  // De chauffeur meteen; het team meteen als de rit binnen het etmaal vertrekt,
+  // anders in de uurlijkse bundel.
+  await notifyDriversOfCancellation(
+    legs.map((leg) => leg.id),
+    session.user.id
+  );
+  // Elke helft proberen: de wachtrij neemt van een heen-en-terugaanvraag maar
+  // één helft op, en welke dat is, hangt af van de volgorde van aanmaken. De
+  // eerste die raak is, stempelt ze allebei.
+  if (legs[0].tellTeam) {
+    for (const leg of legs) await notifyTeamIfUrgent('transport', leg.id);
+  }
   return {
     ok: true,
-    message: cancelled.count > 1 ? 'Heen- en terugrit geannuleerd.' : 'Rit geannuleerd.',
+    message: legs.length > 1 ? 'Heen- en terugrit geannuleerd.' : 'Rit geannuleerd.',
   };
 }
 
