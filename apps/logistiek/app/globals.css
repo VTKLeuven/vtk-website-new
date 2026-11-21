@@ -28,6 +28,13 @@
  * en niet `var(--color-vtk-yellow)`.
  */
 @theme inline {
+  /* Vorm en maat; zie "Vorm en maat" in theme.css. */
+  --radius-control: var(--shape-control);
+  --radius-card: var(--shape-card);
+  --radius-pill: var(--shape-pill);
+  --spacing-control: var(--control-h);
+  --spacing-control-compact: var(--control-h-compact);
+
   --color-vtk-ink: var(--ink);
   --color-vtk-body: var(--body);
   --color-vtk-muted: var(--muted);
@@ -72,6 +79,12 @@
   --color-vtk-success-line: var(--success-line);
 
   --font-sans: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* De twee eigen breekpunten (N5); zie "Vorm en maat" in theme.css. */
+@theme {
+  --breakpoint-split: 45rem;
+  --breakpoint-side: 53.75rem;
 }
 
 html,
@@ -858,7 +871,7 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  min-height: 40px;
+  min-height: var(--control-h);
   color: var(--on-chrome);
   text-decoration: none;
 }
@@ -901,7 +914,7 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
 
 .vtk-site-header .nav-links a {
   display: inline-flex;
-  min-height: 40px;
+  min-height: var(--control-h);
   align-items: center;
   color: rgba(250, 250, 247, 0.78);
   font-size: 14px;
@@ -915,8 +928,8 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
   color: #fff;
 }
 
-/* De menuknop en zijn paneel (M3): onder 850 px vervangen ze de links in de
-   kop. Zie `components/header-menu.tsx`. */
+/* De menuknop en zijn paneel (M3): onder 860 px, het breekpunt `side` uit
+   theme.css, vervangen ze de links in de kop. Zie `components/header-menu.tsx`. */
 .vtk-site-header .nav-menu-trigger {
   display: none;
   align-items: center;
@@ -962,7 +975,7 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
   color: var(--yellow);
 }
 
-@media (max-width: 849px) {
+@media (max-width: 859px) {
   .vtk-site-header .nav-links-shell {
     display: none;
   }
@@ -994,7 +1007,7 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
 .vtk-site-header .lang-toggle button {
   display: inline-grid;
   min-width: 32px;
-  min-height: 40px;
+  min-height: var(--control-h);
   place-items: center;
   padding: 0 4px;
   border: 0;
@@ -1024,8 +1037,8 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
    pictogram toont waar je naartoe gaat, niet waar je staat. */
 .vtk-site-header .theme-toggle {
   display: inline-grid;
-  width: 40px;
-  height: 40px;
+  width: var(--control-h);
+  height: var(--control-h);
   place-items: center;
   border: 0;
   border-radius: 999px;
@@ -1055,9 +1068,9 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
 .vtk-site-header .profile-menu-trigger,
 .vtk-site-header .nav-login {
   display: inline-grid;
-  width: 40px;
-  min-width: 40px;
-  height: 40px;
+  width: var(--control-h);
+  min-width: var(--control-h);
+  height: var(--control-h);
   place-items: center;
   border: 1px solid rgba(250, 250, 247, 0.34);
   border-radius: 999px;
@@ -1118,7 +1131,7 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
 /* Op een telefoon één rij: logo, menuknop en de kleine bedieningen. De links
    staan achter de menuknop (M3); ze schoven hier vroeger op een tweede rij
    zijwaarts. */
-@media (max-width: 720px) {
+@media (max-width: 719px) {
   :root {
     --vtk-header-height: 64px;
   }
@@ -1230,7 +1243,7 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
   padding-bottom: 6px;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 719px) {
   .logistics-page-head-row {
     flex-direction: column;
     align-items: flex-start;

@@ -252,7 +252,7 @@ function DriverLeaderboard({
               onClick={() => onPickDriver(selected === driver.id ? null : driver.id)}
               aria-pressed={selected === driver.id}
               title={`Enkel de uren en de ritten van ${driver.name}`}
-              className={`grid min-h-9 w-full grid-cols-[1.25rem_minmax(6rem,9rem)_1fr_4.5rem] items-center gap-2 rounded-lg px-1 py-0.5 text-left transition hover:bg-vtk-paper md:min-h-0 ${
+              className={`grid min-h-control-compact w-full grid-cols-[1.25rem_minmax(6rem,9rem)_1fr_4.5rem] items-center gap-2 rounded-lg px-1 py-0.5 text-left transition hover:bg-vtk-paper md:min-h-0 ${
                 selected === driver.id ? 'bg-vtk-paper ring-1 ring-vtk-navy/20' : ''
               }`}
             >
@@ -329,7 +329,7 @@ function GroupBars({ groups, onPickGroup }: { groups: GroupStat[]; onPickGroup: 
               type="button"
               onClick={() => setOpen((current) => (current === group.key ? null : group.key))}
               aria-expanded={open === group.key}
-              className="grid min-h-9 w-full grid-cols-[minmax(6rem,10rem)_1fr_6rem] items-center gap-2 rounded-lg px-1 py-0.5 text-left transition hover:bg-vtk-paper md:min-h-0"
+              className="grid min-h-control-compact w-full grid-cols-[minmax(6rem,10rem)_1fr_6rem] items-center gap-2 rounded-lg px-1 py-0.5 text-left transition hover:bg-vtk-paper md:min-h-0"
             >
               <span className="truncate text-sm font-medium text-vtk-ink">{group.name}</span>
               <span className="h-4 rounded-[4px] bg-vtk-paper">
@@ -545,7 +545,7 @@ function ToggleGroup<T extends string>({
           type="button"
           onClick={() => onChange(option.value)}
           aria-pressed={value === option.value}
-          className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1 text-xs font-medium transition md:min-h-0 ${
+          className={`inline-flex min-h-control-compact items-center rounded-full border px-3 py-1 text-xs font-medium transition md:min-h-0 ${
             value === option.value
               ? 'border-vtk-navy bg-vtk-navy text-vtk-on-emphasis'
               : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
@@ -1101,7 +1101,7 @@ function TripTable({
         <button
           type="button"
           onClick={() => setAllOnPhone(true)}
-          className="mt-2 inline-flex min-h-10 items-center rounded-full border border-vtk-navy/15 px-4 text-sm font-medium text-vtk-ink md:hidden"
+          className="mt-2 inline-flex min-h-control items-center rounded-pill border border-vtk-navy/15 px-4 text-sm font-medium text-vtk-ink md:hidden"
         >
           Toon alle {shown.length} ritten
         </button>

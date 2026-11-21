@@ -3,20 +3,20 @@ import { LogisticsIcon } from '@/components/logistics-icon';
 
 const VARIANTS = {
   card: {
-    box: 'rounded-[18px] border border-vtk-navy/10 bg-vtk-surface',
-    summary: 'rounded-[18px] p-5 sm:px-6',
+    box: 'rounded-card border border-vtk-navy/10 bg-vtk-surface',
+    summary: 'rounded-card p-5 sm:px-6',
     title: 'text-lg font-semibold tracking-tight text-vtk-ink',
     body: 'px-5 pb-5 sm:px-6 sm:pb-6',
   },
   row: {
-    box: 'rounded-[14px] border border-vtk-navy/10 bg-vtk-paper/50',
-    summary: 'rounded-[14px] px-4 py-3',
+    box: 'rounded-card border border-vtk-navy/10 bg-vtk-paper/50',
+    summary: 'rounded-card px-4 py-3',
     title: 'font-semibold text-vtk-ink',
     body: 'px-4 pb-4',
   },
   plain: {
     box: '',
-    summary: 'rounded-[10px] py-1',
+    summary: 'rounded-control py-1',
     title: 'text-sm font-semibold text-vtk-ink',
     body: 'pt-2',
   },
@@ -59,7 +59,7 @@ export function Disclosure({
   return (
     <details open={open} className={`group ${style.box}`}>
       <summary
-        className={`flex min-h-10 cursor-pointer list-none items-center gap-3 [&::-webkit-details-marker]:hidden ${style.summary}`}
+        className={`flex min-h-control cursor-pointer list-none items-center gap-3 [&::-webkit-details-marker]:hidden ${style.summary}`}
       >
         <span className="min-w-0 flex-1">
           <Heading className={style.title}>{title}</Heading>

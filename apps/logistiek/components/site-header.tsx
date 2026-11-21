@@ -73,7 +73,7 @@ export async function SiteHeader() {
           />
         </Link>
 
-        {/* Breed scherm: de links in de kop. Smal (< 850 px): één menuknop. */}
+        {/* Breed scherm: de links in de kop. Smal (< 860 px, `side`): één menuknop. */}
         <div className="nav-links-shell">
           <nav className="nav-links" aria-label={navLabel}>
             {links.map((link) => (

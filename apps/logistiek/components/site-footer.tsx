@@ -4,7 +4,7 @@ import { getPublicCopy } from '@/lib/public-copy';
 
 const MAIN_URL = process.env.VTK_MAIN_URL || 'https://vtk.be';
 const FOOTER_LINK =
-  'inline-flex min-h-10 items-center text-vtk-on-dark underline decoration-vtk-yellow underline-offset-4';
+  'inline-flex min-h-control items-center text-vtk-on-dark underline decoration-vtk-yellow underline-offset-4';
 
 export async function SiteFooter() {
   const locale = await getLocale();

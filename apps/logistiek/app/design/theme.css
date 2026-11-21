@@ -361,6 +361,35 @@
 }
 
 /*
+ * Vorm en maat (N5 uit de audit van november 2026).
+ *
+ * Er waren negen afrondingen in gebruik (3 tot 18 px, plus `rounded-lg` 129
+ * keer), drie bedieningshoogtes en vijf eigen breekpunten naast die van
+ * Tailwind. Dit is de schaal; vervang een losse waarde door een token wanneer je
+ * het bestand toch aanraakt, niet allemaal in één keer.
+ *
+ * - `--shape-control` voor een knop of veld (`rounded-control`, hetzelfde als
+ *   `rounded-lg`), `--shape-card` voor een kaart, paneel of rij in een kaart
+ *   (`rounded-card`), `--shape-pill` voor een chip of label (`rounded-pill`).
+ * - `--control-h` (40 px, `h-control`) voor elke bediening die je met een vinger
+ *   bedient, en altijd in de kop en de voet (M5). `--control-h-compact` (36 px,
+ *   `h-control-compact`) enkel voor dichte rijen in het beheer.
+ * - Twee eigen breekpunten, als Tailwind-varianten in globals.css: `split:`
+ *   vanaf 720 px (de kop op één rij, formulieren in twee kolommen) en `side:`
+ *   vanaf 860 px (de zijbalk van het beheer naast de inhoud, de links in de
+ *   kop). Een media query kan geen variabele lezen, dus in CSS schrijf je die
+ *   twee getallen uit: `(min-width: 720px)` en `(min-width: 860px)`, of hun
+ *   `max-width` één pixel eronder. Geen derde getal erbij.
+ */
+:root {
+  --shape-control: 8px;
+  --shape-card: 18px;
+  --shape-pill: 999px;
+  --control-h: 40px;
+  --control-h-compact: 36px;
+}
+
+/*
  * De toasts komen uit @vtk/ui (`toast.css`) en lezen eigen `--toast-*`-
  * variabelen, met de kleuren van vtk.be als standaard. Hier wijzen ze naar de
  * tokens van deze app; die flippen in de donkere modus en bij het afdrukken

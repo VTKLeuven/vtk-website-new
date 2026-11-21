@@ -92,7 +92,7 @@ export default async function StatistiekenPage({
   // Op een telefoon 40 px hoog (M4): de chips waren 28 px, en wie een post
   // aantikte, raakte even vaak de buur.
   const chip = (active: boolean) =>
-    `inline-flex min-h-10 items-center rounded-full border px-3 py-1 text-sm font-medium transition md:min-h-0 ${
+    `inline-flex min-h-control items-center rounded-pill border px-3 py-1 text-sm font-medium transition md:min-h-0 ${
       active
         ? 'border-vtk-navy bg-vtk-navy text-vtk-on-emphasis'
         : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'

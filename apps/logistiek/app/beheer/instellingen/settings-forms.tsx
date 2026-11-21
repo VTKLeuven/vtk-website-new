@@ -288,7 +288,7 @@ export function VehicleSettings({ vehicles }: { vehicles: UitleenVehicle[] }) {
       </ul>
 
       <details className="mt-4 rounded-[14px] border border-dashed border-vtk-navy/25 px-4 py-2">
-        <summary className="flex min-h-10 cursor-pointer list-none items-center text-sm font-semibold text-vtk-ink [&::-webkit-details-marker]:hidden">
+        <summary className="flex min-h-control cursor-pointer list-none items-center text-sm font-semibold text-vtk-ink [&::-webkit-details-marker]:hidden">
           + Voertuig toevoegen
         </summary>
         <div className="mt-3">
