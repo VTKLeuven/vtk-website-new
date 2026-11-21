@@ -32,18 +32,16 @@ export default async function BeheerLayout({ children }: { children: React.React
   // zijbalk; op het scherm waar dit om begonnen was, de weekplanning, is dat
   // precies de winst die telt.
   return (
-    <main className="logistics-gutter flex-1 py-8">
-      <div data-print="hide" className="border-b border-vtk-navy/10 pb-5">
-        <p className="flex items-center gap-2 text-sm text-vtk-muted">
-          <span className="h-1.5 w-1.5 rounded-full bg-vtk-yellow" aria-hidden />
-          {t.manageKicker}
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-vtk-ink">{t.manageTitle}</h1>
-      </div>
+    <main className="logistics-gutter flex-1 py-6 md:py-8">
+      {/* De titel enkel voor een screenreader (M2, C2). Het zichtbare blok
+          "VTK Logistiek / Beheer uitleendienst" herhaalde wat de zijbalk al
+          zegt, en kostte op een telefoon honderd pixels voor er iets van het
+          werk te zien was. */}
+      <h1 className="sr-only">{t.manageTitle}</h1>
 
       {/* Sticky, de rail en de sneltoets zitten in AdminNav; het 860px-breekpunt
           van de kolommen staat bij `.logistics-admin-layout` in globals.css. */}
-      <div className="logistics-admin-layout mt-8">
+      <div className="logistics-admin-layout">
         <aside data-print="hide">
           <BeheerNav
             collapsed={collapsed}

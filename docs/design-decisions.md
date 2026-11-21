@@ -11595,6 +11595,55 @@ ingevuld stond.
   catalogus en het "gezien"-merkteken vangen hun fout stil op: een rode melding
   over iets waar niemand op klikte, verwart meer dan ze helpt.
 
+## Ritaanvragen: rijen, en één paneel tegelijk
+
+`/beheer/vervoer` renderde voor elke rit het volledige beslis- of beheerpaneel,
+twee keer (kaarten voor de telefoon en een tabel voor een breed scherm), met de
+keuzelijsten van chauffeurs, posten en evenementen erin. Gemeten in november 2026:
+344 kB HTML voor elf ritten, 866 `<option>`-elementen, en op een telefoon een
+pagina van 11.366 pixels hoog. En de query stopte bij 200 ritten, aflopend op
+datum: zodra er meer waren, vielen net de oudste weg, ook een rit die nog betaald
+moest worden.
+
+- **De lijst toont rijen, het paneel staat voor één rit open.** Een klik zet
+  `?rit=<id>` in de URL; enkel die rit haalt zijn chauffeurs, voertuigen, posten,
+  evenementen en historiek op (`trip-panel.tsx`). Zonder open paneel staat er
+  geen enkele keuzelijst op de pagina. Via de URL en niet via clientstate: een
+  rit blijft deelbaar en de terugknop sluit hem, en vanuit de kalender kom je
+  met dezelfde link binnen.
+- **Eén opbouw voor elk scherm.** Op een breed scherm de kolommen met koppen
+  erboven, op een telefoon twee regels (wanneer en voertuig met de status; wie en
+  waarvoor), met de labels op een eigen regel. Het paneel staat op een breed
+  scherm onder zijn rij en schuift op een telefoon als blad onderaan over de
+  lijst.
+- **Open werk zonder bovengrens, de rest in een archief per werkingsjaar.** Open
+  is te beslissen, goedgekeurd, of gereden door een externe die nog niet
+  betaalde (`OPEN_TRANSPORT_WHERE`). Het archief toont één werkingsjaar, nieuwste
+  eerst, met pagina's van vijftig en "x tot y van z". De sorteerpillen gelden
+  voor het open werk.
+- **Afwijzen is omlijnd rood, verwijderen staat onderaan.** Afwijzen is routine;
+  verwijderen is de ene onomkeerbare actie. Een vol rode afwijsknop vlak boven een
+  rode verwijderknop riep allebei even hard (knopvariant `dangerOutline` in
+  `@vtk/ui`).
+
+## Het beheer op een telefoon begint bij het werk
+
+Op een telefoon begon de inhoud van elk beheerscherm 404 pixels onder de
+bovenkant, en in de weekplanning pas rond 700: de kop, een blok "VTK Logistiek /
+Beheer uitleendienst", de tabknop en vier rijen werkbalk.
+
+- **Geen titelblok.** De zijbalk zegt al dat je in het beheer bent; de titel
+  staat er nog voor een screenreader.
+- **De kalender heeft op een telefoon één rij werkbalk**: vooruit, achteruit,
+  vandaag, een nieuwe rit en de dagweergave. Weergave, filters, wat er in een
+  blok staat en de zoom staan achter "Meer" (`toolbarMenu` van
+  `TransportCalendar`).
+- **De planning opent op een telefoon op één dag**, zolang er geen weergave in de
+  URL staat. Zeven kolommen van vijftig pixels lezen daar niet.
+- **De week opent op de werkdag**: op de eerste rit overdag, anders om 07:00. Een
+  nachtrit (de terugrit van een fuif om 01:00) trok de hele week naar
+  middernacht.
+
 ## De donkere modus van de uitleendienst
 
 De uitleendienst wordt gebruikt waar het donker is: in de kelder bij het

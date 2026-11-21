@@ -48,6 +48,9 @@ import { byLocale, useCalendarCopy } from './copy';
  *    en vúlt de kalender het scherm. Zie `types.ts` voor het waarom.
  */
 
+/** Vanaf wanneer een rit "overdag" is, voor waar de week opent (V2). */
+const DAYTIME_FROM_MINUTES = 6 * 60;
+
 const WEEKDAY = byLocale({ timeZone: 'Europe/Brussels', weekday: 'short' });
 const DAY_NUMBER = byLocale({ timeZone: 'Europe/Brussels', day: 'numeric', month: 'short' });
 const dayKeyFormatter = new Intl.DateTimeFormat('en-CA', {
@@ -454,17 +457,31 @@ export function TimeGrid({
     if (!node || paneHeight === 0) return;
     const key = days.join('|');
     if (scrolledFor.current === key) return;
-    scrolledFor.current = key;
 
+    // De eerste rit overdag (V2). Een nachtrit (de terugrit van een fuif om
+    // 01:00) trok anders de hele week naar middernacht, en dan opende de
+    // planning op tien lege nachturen. Zonder rit overdag: 07:00.
     let earliest = 8 * 60;
     for (const day of placedPerDay) {
-      for (const block of day) earliest = Math.min(earliest, block.from);
+      for (const block of day) {
+        if (block.from >= firstHour * 60 + DAYTIME_FROM_MINUTES) earliest = Math.min(earliest, block.from);
+      }
     }
     // Gerekend vanaf het eerste uur van de kolom, niet vanaf middernacht: op het
     // beschikbaarheidsscherm begint de kolom om 05:00, en dan scrolde dit vijf
     // uur te ver.
     const target = Math.max(0, ((earliest - firstHour * 60) / 60 - 1) * hourPx);
-    node.scrollTop = Math.min(target, Math.max(0, node.scrollHeight - node.clientHeight));
+    // Twee frames later: bij de eerste meting staat het rooster soms nog niet op
+    // zijn volle hoogte, en dan knipte de bovengrens het doel af tot bijna nul.
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        node.scrollTop = Math.min(target, Math.max(0, node.scrollHeight - node.clientHeight));
+        // Pas nu als gedaan aanduiden: een tussentijdse hertekening annuleert
+        // de frames hierboven, en dan moet de volgende het nog doen.
+        scrolledFor.current = key;
+      });
+    });
+    return () => cancelAnimationFrame(frame);
   }, [days, firstHour, hourPx, paneHeight, placedPerDay, scroller]);
 
   /**

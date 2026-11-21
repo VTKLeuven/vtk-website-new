@@ -459,23 +459,6 @@ export function TransportPlanner({
         toolbarExtra={
           <>
             <CalendarNav {...nav} />
-            <TransportFilterBar
-              filters={filters}
-              vehicles={vehicles.map((vehicle) => ({ id: vehicle.id, name: vehicle.name }))}
-              drivers={drivers.map((driver) => ({ id: driver.id, name: driver.name }))}
-              posts={groups}
-              driverColors={driverColors}
-            />
-            {clashing.length > 0 ? (
-              <button
-                type="button"
-                onClick={nextClash}
-                className="rounded-full border border-vtk-danger-line bg-vtk-danger-soft px-3 py-1.5 text-sm font-semibold text-vtk-danger transition hover:bg-vtk-danger-fill"
-              >
-                {clashing.length} {clashing.length === 1 ? 'botsing' : 'botsingen'}
-              </button>
-            ) : null}
-
             {/* Ook als knop en niet enkel als sleep: op een touchscreen is
                 verticaal vegen scrollen, dus daar valt er niets in te tekenen. */}
             <button
@@ -492,6 +475,26 @@ export function TransportPlanner({
             >
               Nieuwe rit
             </button>
+          </>
+        }
+        toolbarMenu={
+          <>
+            <TransportFilterBar
+              filters={filters}
+              vehicles={vehicles.map((vehicle) => ({ id: vehicle.id, name: vehicle.name }))}
+              drivers={drivers.map((driver) => ({ id: driver.id, name: driver.name }))}
+              posts={groups}
+              driverColors={driverColors}
+            />
+            {clashing.length > 0 ? (
+              <button
+                type="button"
+                onClick={nextClash}
+                className="rounded-full border border-vtk-danger-line bg-vtk-danger-soft px-3 py-1.5 text-sm font-semibold text-vtk-danger transition hover:bg-vtk-danger-fill"
+              >
+                {clashing.length} {clashing.length === 1 ? 'botsing' : 'botsingen'}
+              </button>
+            ) : null}
           </>
         }
       >

@@ -19,6 +19,7 @@ import type { TripBlockField } from './types';
 const COPY = {
   nl: {
     view: 'Weergave',
+    menu: 'Meer',
     days: 'Dagen',
     dayCount: 'Aantal dagen',
     zoomOut: 'Uitzoomen',
@@ -88,6 +89,7 @@ const COPY = {
   },
   en: {
     view: 'View',
+    menu: 'More',
     days: 'Days',
     dayCount: 'Number of days',
     zoomOut: 'Zoom out',

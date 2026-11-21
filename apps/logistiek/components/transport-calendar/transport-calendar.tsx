@@ -72,6 +72,7 @@ function TransportCalendarShell({
   emptyLabel,
   showDriver = true,
   toolbarExtra,
+  toolbarMenu,
   onMoveBlock,
   onCreateRange,
   events,
@@ -96,6 +97,11 @@ function TransportCalendarShell({
   showDriver?: boolean;
   /** Extra knoppen in de werkbalk (filters, "nieuwe rit", ...). */
   toolbarExtra?: React.ReactNode;
+  /**
+   * Werkbalkknoppen die op een breed scherm naast `toolbarExtra` staan en op een
+   * telefoon achter "Meer" gaan (M2): wat je niet bij elke blik nodig hebt.
+   */
+  toolbarMenu?: React.ReactNode;
   /** Een rit verslepen of rekken; enkel in dag- en weekweergave (P4). */
   onMoveBlock?: (blockId: string, startAt: Date, endAt: Date) => void;
   /** Slepen op lege ruimte: een nieuwe rit op dat moment. */
@@ -407,6 +413,14 @@ function TransportCalendarShell({
     return () => query.removeEventListener('change', apply);
   }, []);
 
+  // Op een telefoon opent de planning op één dag (M2): zeven kolommen van vijftig
+  // pixels lezen daar niet. Enkel zolang er geen keuze in de URL staat; wie zelf
+  // "Week" kiest, houdt de week.
+  useEffect(() => {
+    if (!narrow || !views || params.get('weergave')) return;
+    router.replace(hrefFor({ weergave: 'dag' }), { scroll: false });
+  }, [narrow, views, params, router, hrefFor]);
+
   useEffect(() => {
     function onChange() {
       // Sluiten via de Escape-toets of de systeemknop laat de API los zonder ons
@@ -504,12 +518,9 @@ function TransportCalendarShell({
     );
   }
 
-  return (
-    <div ref={shell} className="transport-calendar grid gap-3" data-fullscreen={fullscreen || undefined}>
-      <div className="transport-calendar-toolbar flex flex-wrap items-center gap-2">
-        {/* Weergavekeuze. Segmenten en geen keuzelijst: het zijn er drie, en je
-            wisselt er de hele tijd tussen. */}
-        {views ? (
+  // De onderdelen van de werkbalk, één keer gebouwd en per schermbreedte anders
+  // geschikt (zie de werkbalk hieronder).
+  const viewSegments = views ? (
           <div
             className="inline-flex overflow-hidden rounded-full border border-vtk-navy/15"
             role="group"
@@ -533,11 +544,10 @@ function TransportCalendarShell({
               </Link>
             ))}
           </div>
-        ) : null}
-
-        {/* Hoeveel dagen "komende dagen" toont (F6.3). Een keuzelijst en geen
-            segmenten: er zijn er dertien, en je zet ze zelden om. */}
-        {views && view === 'dagen' ? (
+        ) : null;
+  // Hoeveel dagen "komende dagen" toont (F6.3). Een keuzelijst en geen
+  // segmenten: er zijn er dertien, en je zet ze zelden om.
+  const daysSelect = views && view === 'dagen' ? (
           <label className="flex items-center gap-1.5 text-sm text-vtk-muted">
             <span>{t.days}</span>
             <select
@@ -556,20 +566,10 @@ function TransportCalendarShell({
               ))}
             </select>
           </label>
-        ) : null}
-
-        {toolbarExtra}
-
-        {/* Wat er in een blok staat. Naast de filters, want het is dezelfde
-            soort vraag over hetzelfde scherm: die kiezen wélke ritten er staan,
-            deze wat je van elke rit ziet. */}
-        <TripFieldPicker fields={fields} onChange={chooseFields} canShowDriver={showDriver} />
-
-        {/* Zoom en volledig scherm helemaal rechts: het zijn kijkinstellingen en
-            geen acties op de planning. In de maandweergave is de uurhoogte
-            betekenisloos, dus daar staat de zoom er niet. */}
-        <div className="ml-auto flex items-center gap-1.5">
-          {view === 'maand' ? null : (
+        ) : null;
+  // Wat er in een blok staat; naast de filters, want het is dezelfde soort vraag.
+  const fieldPicker = <TripFieldPicker fields={fields} onChange={chooseFields} canShowDriver={showDriver} />;
+  const zoomButtons = (
             <>
               <button
                 type="button"
@@ -604,14 +604,15 @@ function TransportCalendarShell({
                 <span className="sr-only">{t.zoomIn}</span>
               </button>
             </>
-          )}
-          {/* Op een telefoon is dit geen kijkinstelling maar de manier waarop
-              je deze kalender leest: volledig scherm geeft daar één dag over de
-              volle breedte, met vegen tussen de dagen en knijpen om de uren
-              groter te maken (zie `MobileCalendar`). Als naamloos icoontje
-              tussen twee andere icoontjes vond niemand dat, dus staat het er
-              met zijn naam. Op een laptop blijft het het icoontje rechts: daar
-              is de weekweergave zelf al leesbaar. */}
+  );
+  // Op een telefoon is dit geen kijkinstelling maar de manier waarop
+  // je deze kalender leest: volledig scherm geeft daar één dag over de
+  // volle breedte, met vegen tussen de dagen en knijpen om de uren
+  // groter te maken (zie `MobileCalendar`). Als naamloos icoontje
+  // tussen twee andere icoontjes vond niemand dat, dus staat het er
+  // met zijn naam. Op een laptop blijft het het icoontje rechts: daar
+  // is de weekweergave zelf al leesbaar.
+  const fullscreenButton = (
           <button
             type="button"
             onClick={toggleFullscreen}
@@ -634,7 +635,50 @@ function TransportCalendarShell({
               {fullscreen ? t.fullscreenClose : narrow ? t.dayViewFullscreen : t.fullscreen}
             </span>
           </button>
-        </div>
+  );
+
+  return (
+    <div ref={shell} className="transport-calendar grid gap-3" data-fullscreen={fullscreen || undefined}>
+      <div className="transport-calendar-toolbar relative flex flex-wrap items-center gap-2">
+        {narrow ? (
+          // Op een telefoon één rij (M2): wat de pagina zelf meegeeft (vooruit,
+          // achteruit, een nieuwe rit) en de dagweergave; de kijkinstellingen
+          // staan achter "Meer". Vier rijen knoppen duwden het rooster daar tot
+          // halverwege het scherm.
+          <>
+            {toolbarExtra}
+            {/* Het paneel hangt aan de werkbalk en niet aan de knop: waar "Meer"
+                na het afbreken van de rij staat, verschilt per telefoon. */}
+            <details>
+              <summary className="cursor-pointer list-none rounded-full border border-vtk-navy/15 px-3 py-1.5 text-sm font-medium text-vtk-ink [&::-webkit-details-marker]:hidden">
+                {t.menu}
+              </summary>
+              <div className="absolute left-0 top-full z-40 mt-2 grid w-[min(21rem,100%)] gap-3 rounded-[16px] border border-vtk-navy/15 bg-vtk-surface p-3 shadow-lg">
+                {viewSegments}
+                {daysSelect}
+                {toolbarMenu}
+                {fieldPicker}
+                {view === 'maand' ? null : <div className="flex items-center gap-1.5">{zoomButtons}</div>}
+              </div>
+            </details>
+            <div className="ml-auto">{fullscreenButton}</div>
+          </>
+        ) : (
+          <>
+            {viewSegments}
+            {daysSelect}
+            {toolbarExtra}
+            {toolbarMenu}
+            {fieldPicker}
+            {/* Zoom en volledig scherm helemaal rechts: het zijn kijkinstellingen en
+                geen acties op de planning. In de maandweergave is de uurhoogte
+                betekenisloos, dus daar staat de zoom er niet. */}
+            <div className="ml-auto flex items-center gap-1.5">
+              {view === 'maand' ? null : zoomButtons}
+              {fullscreenButton}
+            </div>
+          </>
+        )}
       </div>
 
       {view === 'maand' ? (
