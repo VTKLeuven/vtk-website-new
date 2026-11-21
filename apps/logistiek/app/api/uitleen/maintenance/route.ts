@@ -1,6 +1,7 @@
 import { prisma } from '@vtk/db';
 import { maintenanceSecret, reconcilePayments } from '@/lib/payments';
 import { sendTeamDigests } from '@/lib/uitleen-mail';
+import { bearerMatches } from '@/lib/bearer';
 
 export const runtime = 'nodejs';
 
@@ -17,8 +18,9 @@ export const runtime = 'nodejs';
 export async function POST(request: Request): Promise<Response> {
   const secret = maintenanceSecret();
   if (!secret) return new Response('maintenance disabled', { status: 503 });
-  const auth = request.headers.get('authorization');
-  if (auth !== `Bearer ${secret}`) return new Response('forbidden', { status: 403 });
+  if (!bearerMatches(request.headers.get('authorization'), secret)) {
+    return new Response('forbidden', { status: 403 });
+  }
 
   const now = new Date();
   const open = await prisma.uitleenPayment.findMany({

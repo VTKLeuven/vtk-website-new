@@ -29,6 +29,8 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@prisma/client", ".prisma/client", "sharp"],
   outputFileTracingRoot: monorepoRoot,
   // Dezelfde basis als apps/web/next.config.ts; de uitleg per header staat daar.
+  // De Content-Security-Policy staat niet hier maar in proxy.ts: ze noemt de URL
+  // van Umami, en die is pas bekend wanneer de server start, niet bij de build.
   poweredByHeader: false,
   async headers() {
     return [

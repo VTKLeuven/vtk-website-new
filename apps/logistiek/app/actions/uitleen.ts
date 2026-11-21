@@ -1167,7 +1167,10 @@ async function startPaymentActionImpl(
     });
 
     return { ok: true, url: checkout.url };
-  } catch {
+  } catch (error) {
+    // Zonder deze regel liet een storing bij Mollie geen enkel spoor na: het lid
+    // zag "niet bereikbaar", de logs bleven leeg (S7).
+    console.error(`[betaling] checkout aanmaken mislukt voor ${target} ${record.id}:`, error);
     await prisma.uitleenPayment.update({
       where: { id: payment.id },
       data: { status: 'FAILED', failedAt: new Date() },

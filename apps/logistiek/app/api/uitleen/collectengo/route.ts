@@ -1,5 +1,6 @@
 import { maintenanceSecret } from '@/lib/payments';
 import { collectEnGoImapConfig, pollCollectEnGoMailbox } from '@/lib/collectengo/imap';
+import { bearerMatches } from '@/lib/bearer';
 
 export const runtime = 'nodejs';
 
@@ -14,8 +15,9 @@ export const runtime = 'nodejs';
 export async function POST(request: Request): Promise<Response> {
   const secret = maintenanceSecret();
   if (!secret) return new Response('maintenance disabled', { status: 503 });
-  const auth = request.headers.get('authorization');
-  if (auth !== `Bearer ${secret}`) return new Response('forbidden', { status: 403 });
+  if (!bearerMatches(request.headers.get('authorization'), secret)) {
+    return new Response('forbidden', { status: 403 });
+  }
   if (!collectEnGoImapConfig()) return new Response('collectengo imap not configured', { status: 503 });
 
   const result = await pollCollectEnGoMailbox();
