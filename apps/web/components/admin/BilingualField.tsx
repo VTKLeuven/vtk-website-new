@@ -10,7 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Languages, Loader2 } from "lucide-react";
+import { ArrowLeftRight, Languages, Loader2 } from "lucide-react";
 import { Button, ConfirmDialog, Input, Label, Textarea } from "@vtk/ui";
 import type { Locale } from "@vtk/i18n";
 import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
@@ -25,6 +25,7 @@ import {
 import type { TranslateDirection } from "@/lib/ai/translate";
 
 export type BilingualLang = "nl" | "en";
+export type BilingualLayout = "tabs" | "side-by-side";
 
 export type BilingualPairHandle = {
   key: string;
@@ -38,6 +39,7 @@ export type BilingualPairHandle = {
 type BilingualGroupContextValue = {
   lang: BilingualLang;
   setLang: (lang: BilingualLang) => void;
+  layout: BilingualLayout;
   locale: Locale;
   translating: boolean;
   aiEnabled: boolean;
@@ -99,15 +101,18 @@ export function useRegisterBilingualPair(
  */
 export function BilingualGroup({
   locale,
+  layout = "tabs",
   showBar = true,
   enHint,
   className = "space-y-4",
   children,
 }: {
   locale: Locale;
+  /** `"tabs"` (standaard) toont NL/EN via tabbladen; `"side-by-side"` toont beide naast elkaar. */
+  layout?: BilingualLayout;
   /** Zet op false om `<BilingualBar />` zelf op een of meer eigen plekken te plaatsen. */
   showBar?: boolean;
-  /** Optionele hulptekst onderaan wanneer de Engelse tab actief is. */
+  /** Optionele hulptekst onderaan wanneer de Engelse tab actief is (of altijd bij `"side-by-side"`). */
   enHint?: string;
   className?: string;
   children: ReactNode;
@@ -209,7 +214,9 @@ export function BilingualGroup({
         }
 
         // Schakel naar de doeltaal zodat de admin de vertaling direct kan nalezen.
-        setLang(direction === "nl-to-en" ? "en" : "nl");
+        if (layout === "tabs") {
+          setLang(direction === "nl-to-en" ? "en" : "nl");
+        }
         requestAnimationFrame(recomputeStatus);
 
         const targetLabel =
@@ -231,7 +238,7 @@ export function BilingualGroup({
         setTranslating(false);
       }
     },
-    [nl, recomputeStatus, showToast],
+    [layout, nl, recomputeStatus, showToast],
   );
 
   const triggerTranslate = useCallback(
@@ -280,6 +287,7 @@ export function BilingualGroup({
       value={{
         lang,
         setLang,
+        layout,
         locale,
         translating,
         aiEnabled,
@@ -294,7 +302,7 @@ export function BilingualGroup({
       <div className={className}>
         {showBar ? <BilingualBar /> : null}
         {children}
-        {enHint && lang === "en" ? (
+        {enHint && (layout === "side-by-side" || lang === "en") ? (
           <p className="text-xs text-[#5c667f]">{enHint}</p>
         ) : null}
       </div>
@@ -342,6 +350,9 @@ export function BilingualGroup({
  *   een `ghost`-knop met tekst ("Vertaal → EN" of "Vertaal uit NL").
  * - Compact (`compact = true`): korte pill (`NL | EN`) + compact `ghost`-knopje,
  *   ideaal op dezelfde regel rechts naast een veldlabel (zoals in `EventForm`).
+ * - In `layout="side-by-side"` zijn beide talen tegelijk zichtbaar, dus toont
+ *   de balk enkel rechts een compacte vertaalknop met richtingswissel (of
+ *   `null` wanneer AI-vertaling niet ingeschakeld is).
  */
 export function BilingualBar({
   compact = false,
@@ -353,6 +364,7 @@ export function BilingualBar({
   const {
     lang,
     setLang,
+    layout,
     locale,
     translating,
     aiEnabled,
@@ -362,10 +374,97 @@ export function BilingualBar({
     triggerTranslate,
   } = useBilingualGroup();
   const nl = locale === "nl";
+  const [directionOverride, setDirectionOverride] = useState<TranslateDirection | null>(null);
 
   // Slimme standaardrichting: normaal NL -> EN, maar als enkel EN gevuld is
   // bieden we meteen EN -> NL aan.
-  const direction: TranslateDirection = !hasAnyNl && hasAnyEn ? "en-to-nl" : "nl-to-en";
+  const smartDirection: TranslateDirection = !hasAnyNl && hasAnyEn ? "en-to-nl" : "nl-to-en";
+
+  if (layout === "side-by-side") {
+    if (!aiEnabled) return null;
+
+    const effectiveDirection = directionOverride ?? smartDirection;
+    const sideBySideLabel =
+      effectiveDirection === "nl-to-en"
+        ? nl
+          ? "Vertaal → EN"
+          : "Translate → EN"
+        : nl
+          ? "Vertaal → NL"
+          : "Translate → NL";
+    const flipTitle =
+      effectiveDirection === "nl-to-en"
+        ? nl
+          ? "Wissel richting naar EN → NL"
+          : "Switch direction to EN → NL"
+        : nl
+          ? "Wissel richting naar NL → EN"
+          : "Switch direction to NL → EN";
+    const nextDirection: TranslateDirection =
+      effectiveDirection === "nl-to-en" ? "en-to-nl" : "nl-to-en";
+
+    if (compact) {
+      return (
+        <div className={["flex items-center justify-end gap-1", className].filter(Boolean).join(" ")}>
+          <button
+            type="button"
+            disabled={translating}
+            onClick={() => triggerTranslate(effectiveDirection)}
+            title={sideBySideLabel}
+            className="inline-flex h-6 items-center gap-1 rounded-full border border-vtk-blue/15 bg-white px-2.5 text-[11px] font-medium text-vtk-ink transition-colors hover:border-vtk-blue/30 hover:bg-vtk-blue-soft/70 disabled:opacity-50"
+          >
+            {translating ? (
+              <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+            ) : (
+              <Languages className="h-3 w-3" aria-hidden="true" />
+            )}
+            <span>{translating ? (nl ? "Vertalen…" : "Translating…") : sideBySideLabel}</span>
+          </button>
+          <button
+            type="button"
+            disabled={translating}
+            onClick={() => setDirectionOverride(nextDirection)}
+            title={flipTitle}
+            aria-label={flipTitle}
+            className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-vtk-blue/15 bg-white text-[#5c667f] transition-colors hover:border-vtk-blue/30 hover:bg-vtk-blue-soft/70 hover:text-vtk-ink disabled:opacity-50"
+          >
+            <ArrowLeftRight className="h-3 w-3" aria-hidden="true" />
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className={["flex items-center justify-end gap-1", className].filter(Boolean).join(" ")}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={translating}
+          onClick={() => triggerTranslate(effectiveDirection)}
+        >
+          {translating ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+          ) : (
+            <Languages className="h-3.5 w-3.5" aria-hidden="true" />
+          )}
+          {translating ? (nl ? "Vertalen…" : "Translating…") : sideBySideLabel}
+        </Button>
+        <button
+          type="button"
+          disabled={translating}
+          onClick={() => setDirectionOverride(nextDirection)}
+          title={flipTitle}
+          aria-label={flipTitle}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-vtk-blue/15 text-[#5c667f] transition-colors hover:border-vtk-blue/30 hover:bg-vtk-blue-soft/70 hover:text-vtk-ink disabled:opacity-50"
+        >
+          <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+      </div>
+    );
+  }
+
+  const direction = smartDirection;
 
   const buttonLabel =
     direction === "nl-to-en"
@@ -490,52 +589,28 @@ export function BilingualBar({
   );
 }
 
-/**
- * Eén-regel tweetalig tekstveld binnen een `BilingualGroup`. Beide inputs
- * blijven gemount (de inactieve taal is verborgen) zodat `FormData` altijd
- * zowel `*Nl` als `*En` meestuurt.
- */
-export function BilingualInput({
-  label,
+function useBilingualPairState({
   nameNl,
-  nameEn,
-  defaultValueNl = "",
-  defaultValueEn = "",
-  valueNl: controlledNl,
-  valueEn: controlledEn,
+  defaultValueNl,
+  defaultValueEn,
+  controlledNl,
+  controlledEn,
   onChangeNl,
   onChangeEn,
-  placeholderNl,
-  placeholderEn,
-  requiredNl = false,
-  requiredEn = false,
-  maxLength,
-  hintEn,
   idPrefix,
-  showBar = false,
-  className,
+  markdown,
 }: {
-  label: string;
   nameNl: string;
-  nameEn: string;
   defaultValueNl?: string | null;
   defaultValueEn?: string | null;
-  valueNl?: string;
-  valueEn?: string;
+  controlledNl?: string;
+  controlledEn?: string;
   onChangeNl?: (value: string) => void;
   onChangeEn?: (value: string) => void;
-  placeholderNl?: string;
-  placeholderEn?: string;
-  requiredNl?: boolean;
-  requiredEn?: boolean;
-  maxLength?: number;
-  hintEn?: string;
   idPrefix?: string;
-  /** Toon een compacte `NL | EN` + vertaalknop rechts op de labelregel. */
-  showBar?: boolean;
-  className?: string;
+  markdown?: boolean;
 }) {
-  const { lang, notifyChange } = useBilingualGroup();
+  const { lang, layout, notifyChange } = useBilingualGroup();
   const uid = useId();
   const prefix = idPrefix ?? uid;
   const [internalNl, setInternalNl] = useState(defaultValueNl ?? "");
@@ -561,46 +636,177 @@ export function BilingualInput({
     [onChangeEn, notifyChange],
   );
 
-  useRegisterBilingualPair(nameNl, () => nlVal, updateNl, () => enVal, updateEn);
+  useRegisterBilingualPair(nameNl, () => nlVal, updateNl, () => enVal, updateEn, { markdown });
+
+  return { lang, layout, prefix, nlVal, enVal, updateNl, updateEn };
+}
+
+function BilingualFieldColumns({
+  lang,
+  layout,
+  label,
+  prefix,
+  showBar,
+  hintEn,
+  className,
+  gridClassName,
+  defaultGridClass,
+  preamble,
+  nlNode,
+  enNode,
+}: {
+  lang: BilingualLang;
+  layout: BilingualLayout;
+  label?: string;
+  prefix: string;
+  showBar: boolean;
+  hintEn?: string;
+  className?: string;
+  gridClassName?: string;
+  defaultGridClass: string;
+  preamble?: ReactNode;
+  nlNode: ReactNode;
+  enNode: ReactNode;
+}) {
+  if (layout === "side-by-side") {
+    return (
+      <div className={className}>
+        {preamble}
+        {showBar ? <BilingualBar compact className="mb-1.5" /> : null}
+        <div className={gridClassName ?? defaultGridClass}>
+          <div>
+            {label ? <Label htmlFor={`${prefix}-nl`}>{label} (NL)</Label> : null}
+            {nlNode}
+          </div>
+          <div>
+            {label ? <Label htmlFor={`${prefix}-en`}>{label} (EN)</Label> : null}
+            {enNode}
+            {hintEn ? <p className="mt-1 text-xs text-[#5c667f]">{hintEn}</p> : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={className}>
-      {showBar ? (
-        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-          <Label htmlFor={lang === "nl" ? `${prefix}-nl` : `${prefix}-en`} className="mb-0">
+      {preamble}
+      {label ? (
+        showBar ? (
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+            <Label htmlFor={lang === "nl" ? `${prefix}-nl` : `${prefix}-en`} className="mb-0">
+              {label} ({lang === "nl" ? "NL" : "EN"})
+            </Label>
+            <BilingualBar compact />
+          </div>
+        ) : (
+          <Label htmlFor={lang === "nl" ? `${prefix}-nl` : `${prefix}-en`}>
             {label} ({lang === "nl" ? "NL" : "EN"})
           </Label>
-          <BilingualBar compact />
-        </div>
-      ) : (
-        <Label htmlFor={lang === "nl" ? `${prefix}-nl` : `${prefix}-en`}>
-          {label} ({lang === "nl" ? "NL" : "EN"})
-        </Label>
-      )}
-      <div className={lang === "nl" ? undefined : "hidden"}>
+        )
+      ) : null}
+      <div className={lang === "nl" ? undefined : "hidden"}>{nlNode}</div>
+      <div className={lang === "en" ? undefined : "hidden"}>
+        {enNode}
+        {hintEn ? <p className="mt-1 text-xs text-[#5c667f]">{hintEn}</p> : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Eén-regel tweetalig tekstveld binnen een `BilingualGroup`. Beide inputs
+ * blijven gemount (in `"tabs"` is de inactieve taal verborgen; in `"side-by-side"`
+ * staan ze naast elkaar) zodat `FormData` altijd zowel `*Nl` als `*En` meestuurt.
+ */
+export function BilingualInput({
+  label,
+  nameNl,
+  nameEn,
+  defaultValueNl = "",
+  defaultValueEn = "",
+  valueNl: controlledNl,
+  valueEn: controlledEn,
+  onChangeNl,
+  onChangeEn,
+  placeholderNl,
+  placeholderEn,
+  requiredNl = false,
+  requiredEn = false,
+  maxLength,
+  hintEn,
+  idPrefix,
+  showBar = false,
+  className,
+  gridClassName,
+}: {
+  label: string;
+  nameNl: string;
+  nameEn: string;
+  defaultValueNl?: string | null;
+  defaultValueEn?: string | null;
+  valueNl?: string;
+  valueEn?: string;
+  onChangeNl?: (value: string) => void;
+  onChangeEn?: (value: string) => void;
+  placeholderNl?: string;
+  placeholderEn?: string;
+  requiredNl?: boolean;
+  requiredEn?: boolean;
+  maxLength?: number;
+  hintEn?: string;
+  idPrefix?: string;
+  /** Toon een compacte `NL | EN` + vertaalknop rechts op de labelregel. */
+  showBar?: boolean;
+  className?: string;
+  gridClassName?: string;
+}) {
+  const { lang, layout, prefix, nlVal, enVal, updateNl, updateEn } = useBilingualPairState({
+    nameNl,
+    defaultValueNl,
+    defaultValueEn,
+    controlledNl,
+    controlledEn,
+    onChangeNl,
+    onChangeEn,
+    idPrefix,
+  });
+  const isSideBySide = layout === "side-by-side";
+
+  return (
+    <BilingualFieldColumns
+      lang={lang}
+      layout={layout}
+      label={label}
+      prefix={prefix}
+      showBar={showBar}
+      hintEn={hintEn}
+      className={className}
+      gridClassName={gridClassName}
+      defaultGridClass="grid grid-cols-1 gap-4 sm:grid-cols-2"
+      nlNode={
         <Input
           id={`${prefix}-nl`}
           name={nameNl}
           value={nlVal}
           onChange={(e) => updateNl(e.target.value)}
           placeholder={placeholderNl}
-          required={requiredNl && lang === "nl"}
+          required={requiredNl && (isSideBySide || lang === "nl")}
           maxLength={maxLength}
         />
-      </div>
-      <div className={lang === "en" ? undefined : "hidden"}>
+      }
+      enNode={
         <Input
           id={`${prefix}-en`}
           name={nameEn}
           value={enVal}
           onChange={(e) => updateEn(e.target.value)}
           placeholder={placeholderEn}
-          required={requiredEn && lang === "en"}
+          required={requiredEn && (isSideBySide || lang === "en")}
           maxLength={maxLength}
         />
-        {hintEn ? <p className="mt-1 text-xs text-[#5c667f]">{hintEn}</p> : null}
-      </div>
-    </div>
+      }
+    />
   );
 }
 
@@ -627,6 +833,7 @@ export function BilingualTextarea({
   idPrefix,
   showBar = false,
   className,
+  gridClassName,
 }: {
   label: string;
   nameNl: string;
@@ -648,50 +855,34 @@ export function BilingualTextarea({
   /** Toon een compacte `NL | EN` + vertaalknop rechts op de labelregel. */
   showBar?: boolean;
   className?: string;
+  gridClassName?: string;
 }) {
-  const { lang, notifyChange } = useBilingualGroup();
-  const uid = useId();
-  const prefix = idPrefix ?? uid;
-  const [internalNl, setInternalNl] = useState(defaultValueNl ?? "");
-  const [internalEn, setInternalEn] = useState(defaultValueEn ?? "");
-
-  const nlVal = controlledNl ?? internalNl;
-  const enVal = controlledEn ?? internalEn;
-
-  const updateNl = useCallback(
-    (next: string) => {
-      if (onChangeNl) onChangeNl(next);
-      else setInternalNl(next);
-      notifyChange();
-    },
-    [onChangeNl, notifyChange],
-  );
-  const updateEn = useCallback(
-    (next: string) => {
-      if (onChangeEn) onChangeEn(next);
-      else setInternalEn(next);
-      notifyChange();
-    },
-    [onChangeEn, notifyChange],
-  );
-
-  useRegisterBilingualPair(nameNl, () => nlVal, updateNl, () => enVal, updateEn);
+  const { lang, layout, prefix, nlVal, enVal, updateNl, updateEn } = useBilingualPairState({
+    nameNl,
+    defaultValueNl,
+    defaultValueEn,
+    controlledNl,
+    controlledEn,
+    onChangeNl,
+    onChangeEn,
+    idPrefix,
+  });
+  const isSideBySide = layout === "side-by-side";
+  const defaultGridClass =
+    rows >= 4 ? "grid grid-cols-1 gap-4 lg:grid-cols-2" : "grid grid-cols-1 gap-4 sm:grid-cols-2";
 
   return (
-    <div className={className}>
-      {showBar ? (
-        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-          <Label htmlFor={lang === "nl" ? `${prefix}-nl` : `${prefix}-en`} className="mb-0">
-            {label} ({lang === "nl" ? "NL" : "EN"})
-          </Label>
-          <BilingualBar compact />
-        </div>
-      ) : (
-        <Label htmlFor={lang === "nl" ? `${prefix}-nl` : `${prefix}-en`}>
-          {label} ({lang === "nl" ? "NL" : "EN"})
-        </Label>
-      )}
-      <div className={lang === "nl" ? undefined : "hidden"}>
+    <BilingualFieldColumns
+      lang={lang}
+      layout={layout}
+      label={label}
+      prefix={prefix}
+      showBar={showBar}
+      hintEn={hintEn}
+      className={className}
+      gridClassName={gridClassName}
+      defaultGridClass={defaultGridClass}
+      nlNode={
         <Textarea
           id={`${prefix}-nl`}
           name={nameNl}
@@ -699,11 +890,11 @@ export function BilingualTextarea({
           onChange={(e) => updateNl(e.target.value)}
           placeholder={placeholderNl}
           rows={rows}
-          required={requiredNl && lang === "nl"}
+          required={requiredNl && (isSideBySide || lang === "nl")}
           maxLength={maxLength}
         />
-      </div>
-      <div className={lang === "en" ? undefined : "hidden"}>
+      }
+      enNode={
         <Textarea
           id={`${prefix}-en`}
           name={nameEn}
@@ -711,12 +902,11 @@ export function BilingualTextarea({
           onChange={(e) => updateEn(e.target.value)}
           placeholder={placeholderEn}
           rows={rows}
-          required={requiredEn && lang === "en"}
+          required={requiredEn && (isSideBySide || lang === "en")}
           maxLength={maxLength}
         />
-        {hintEn ? <p className="mt-1 text-xs text-[#5c667f]">{hintEn}</p> : null}
-      </div>
-    </div>
+      }
+    />
   );
 }
 
@@ -743,6 +933,8 @@ export function BilingualMarkdown({
   hintEn,
   idPrefix,
   showBar = false,
+  className,
+  gridClassName,
 }: {
   label?: string;
   nameNl: string;
@@ -762,56 +954,39 @@ export function BilingualMarkdown({
   idPrefix?: string;
   /** Toon een compacte `NL | EN` + vertaalknop rechts op de labelregel. */
   showBar?: boolean;
+  className?: string;
+  gridClassName?: string;
 }) {
-  const { lang, notifyChange } = useBilingualGroup();
-  const uid = useId();
-  const prefix = idPrefix ?? uid;
-  const [internalNl, setInternalNl] = useState(defaultValueNl ?? "");
-  const [internalEn, setInternalEn] = useState(defaultValueEn ?? "");
-
-  const nlVal = controlledNl ?? internalNl;
-  const enVal = controlledEn ?? internalEn;
-
-  const updateNl = useCallback(
-    (next: string) => {
-      if (onChangeNl) onChangeNl(next);
-      else setInternalNl(next);
-      notifyChange();
-    },
-    [onChangeNl, notifyChange],
-  );
-  const updateEn = useCallback(
-    (next: string) => {
-      if (onChangeEn) onChangeEn(next);
-      else setInternalEn(next);
-      notifyChange();
-    },
-    [onChangeEn, notifyChange],
-  );
-
-  useRegisterBilingualPair(nameNl, () => nlVal, updateNl, () => enVal, updateEn, {
+  const { lang, layout, prefix, nlVal, enVal, updateNl, updateEn } = useBilingualPairState({
+    nameNl,
+    defaultValueNl,
+    defaultValueEn,
+    controlledNl,
+    controlledEn,
+    onChangeNl,
+    onChangeEn,
+    idPrefix,
     markdown: true,
   });
 
   return (
-    <div>
-      <input type="hidden" name={nameNl} value={nlVal} />
-      <input type="hidden" name={nameEn} value={enVal} />
-      {label ? (
-        showBar ? (
-          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-            <Label htmlFor={lang === "nl" ? `${prefix}-nl` : `${prefix}-en`} className="mb-0">
-              {label} ({lang === "nl" ? "NL" : "EN"})
-            </Label>
-            <BilingualBar compact />
-          </div>
-        ) : (
-          <Label htmlFor={lang === "nl" ? `${prefix}-nl` : `${prefix}-en`}>
-            {label} ({lang === "nl" ? "NL" : "EN"})
-          </Label>
-        )
-      ) : null}
-      <div className={lang === "nl" ? undefined : "hidden"}>
+    <BilingualFieldColumns
+      lang={lang}
+      layout={layout}
+      label={label}
+      prefix={prefix}
+      showBar={showBar}
+      hintEn={hintEn}
+      className={className}
+      gridClassName={gridClassName}
+      defaultGridClass="grid grid-cols-1 gap-4 lg:grid-cols-2"
+      preamble={
+        <>
+          <input type="hidden" name={nameNl} value={nlVal} />
+          <input type="hidden" name={nameEn} value={enVal} />
+        </>
+      }
+      nlNode={
         <MarkdownEditor
           value={nlVal}
           onChange={updateNl}
@@ -822,8 +997,8 @@ export function BilingualMarkdown({
           maxLength={maxLength}
           textareaId={`${prefix}-nl`}
         />
-      </div>
-      <div className={lang === "en" ? undefined : "hidden"}>
+      }
+      enNode={
         <MarkdownEditor
           value={enVal}
           onChange={updateEn}
@@ -834,9 +1009,8 @@ export function BilingualMarkdown({
           maxLength={maxLength}
           textareaId={`${prefix}-en`}
         />
-        {hintEn ? <p className="mt-1 text-xs text-[#5c667f]">{hintEn}</p> : null}
-      </div>
-    </div>
+      }
+    />
   );
 }
 
@@ -846,10 +1020,12 @@ export function BilingualMarkdown({
  */
 export function BilingualField({
   locale,
+  layout = "tabs",
   className,
   ...inputProps
 }: {
   locale: Locale;
+  layout?: BilingualLayout;
   label: string;
   nameNl: string;
   nameEn: string;
@@ -862,10 +1038,11 @@ export function BilingualField({
   maxLength?: number;
   hintEn?: string;
   idPrefix?: string;
+  gridClassName?: string;
   className?: string;
 }) {
   return (
-    <BilingualGroup locale={locale} showBar={false} className={className}>
+    <BilingualGroup locale={locale} layout={layout} showBar={false} className={className}>
       <BilingualInput {...inputProps} showBar />
     </BilingualGroup>
   );
