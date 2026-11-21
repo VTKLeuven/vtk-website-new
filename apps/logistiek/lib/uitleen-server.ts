@@ -2994,6 +2994,48 @@ export async function selectableEvents(
  * kalenderregel met enkel de naam van de aanvrager zegt het team te weinig om
  * zonder doorklikken te weten waarover het gaat.
  */
+/**
+ * Wat er op het overzicht van het beheer staat: werk, geen geschiedenis (L3).
+ *
+ * Het overzicht telde "teruggebracht", "uitgevoerd" en "niet doorgegaan" sinds
+ * het begin: getallen die enkel groeien en niets vragen. Dit zijn de dingen die
+ * iemand nu moet doen. Enkel externen betalen en krijgen een waarborg terug
+ * (`chargesRequester`), dus enkel zij tellen voor geld.
+ */
+export async function adminWorkCounts(now = new Date()) {
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const unpaid = { paidOfflineAt: null, payments: { none: { status: 'SUCCEEDED' as const } } };
+  const [decideMaterial, tripRequests, overdue, noDriver, unpaidReservations, unpaidTrips, deposits] =
+    await Promise.all([
+      prisma.uitleenReservation.count({ where: { status: 'REQUESTED' } }),
+      prisma.uitleenTransportBooking.findMany({
+        where: { status: 'REQUESTED' },
+        select: { id: true, tripGroupId: true },
+      }),
+      prisma.uitleenReservation.count({ where: { status: 'PICKED_UP', returnDate: { lt: today } } }),
+      prisma.uitleenTransportBooking.count({
+        where: { status: 'APPROVED', driverId: null, endAt: { gte: now }, vehicle: { needsDriver: true } },
+      }),
+      prisma.uitleenReservation.count({
+        where: {
+          requesterType: 'EXTERN',
+          status: { in: ['APPROVED', 'PICKED_UP', 'RETURNED'] },
+          totalPriceCents: { gt: 0 },
+          ...unpaid,
+        },
+      }),
+      prisma.uitleenTransportBooking.count({
+        where: { requesterType: 'EXTERN', status: { in: ['APPROVED', 'COMPLETED'] }, priceCents: { gt: 0 }, ...unpaid },
+      }),
+      prisma.uitleenReservation.count({
+        where: { requesterType: 'EXTERN', status: 'RETURNED', totalDepositCents: { gt: 0 }, depositReturnedAt: null },
+      }),
+    ]);
+  // Heen en terug zijn twee ritten maar één aanvraag.
+  const decideTrips = new Set(tripRequests.map((trip) => trip.tripGroupId ?? trip.id)).size;
+  return { decideMaterial, decideTrips, overdue, noDriver, unpaid: unpaidReservations + unpaidTrips, deposits };
+}
+
 export async function adminAgenda(from: Date, to: Date) {
   const agendaReservationInclude = {
     lines: true,

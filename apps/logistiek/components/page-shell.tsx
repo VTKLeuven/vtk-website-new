@@ -39,10 +39,9 @@ export function PageShell({
         <div className="logistics-page-head-inner">
           <div className="logistics-page-head-row">
             <div className="min-w-0">
-              <p className="logistics-eyebrow">
-                <span className="h-1.5 w-1.5 rounded-full bg-vtk-yellow" aria-hidden />
-                {kicker}
-              </p>
+              {/* Zonder het gele bolletje (C2): op elke pagina hetzelfde
+                  ornament, dat niets zei wat de kop zelf niet zegt. */}
+              <p className="logistics-eyebrow">{kicker}</p>
               <h1>
                 {title}
               </h1>
