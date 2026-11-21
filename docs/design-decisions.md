@@ -12850,6 +12850,15 @@ post en bovenaan voor Totaal, VTK en Werkgroepen. Plus is beter dan begroot.
   weer open, wacht ze op een eigen resultaat, en rekent "open sinds" vanaf die
   BO; het oude resultaat blijft bij de bestanden staan. Een nieuw budget voor
   een BO die nog moet komen, verandert niets, net zoals elders.
+- **Bij een activiteit met een andere kring telt enkel het deel van VTK**
+  (november 2026). Het blad staat er met het volle bedrag in, en het blok
+  "Organisatie / Verdeling" zegt hoeveel VTK draagt; de regel Begroting is
+  enkel het deel van VTK. HalloweenParty (BO 9, 26-27) stond op -512,27 met
+  20% voor VTK en een begroting van -200, en de site meldde "€ 312,27
+  slechter dan de begroting" terwijl VTK -102,45 draagt. Budget, resultaat en
+  afwijking blijven het volle bedrag, zoals in het blad; tegenover de
+  begroting staat het deel van VTK (`vtkPartCents` in `lib/bo/share.ts`, en
+  `vtkShareOf` in de budgeteditor), ook in "budget erboven" en in een potje.
 - Op een telefoon wijkt de kolom Missend (budgetten min resultaten), zodat de
   naam van de post plaats houdt.
 - **Een activiteit kan buiten de begroting staan en toch meetellen.** Sommige

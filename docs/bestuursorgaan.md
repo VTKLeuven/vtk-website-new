@@ -289,7 +289,10 @@ wanneer er iets in zit.
 Per post en bij de totalen staat ook **de stand tegenover de begroting**
 (`Dossier.begrotingDevCents`, `Stats.begrotingDev`): per activiteit met een BO
 die al voorbij is, het resultaat (of zolang dat er niet is het budget) min de
-regel Begroting, opgeteld. Plus is beter dan begroot. Een blad zonder regel
+regel Begroting, opgeteld. Plus is beter dan begroot. Bij een activiteit met
+een andere kring (`vtkSharePercent`) staat enkel het deel van VTK tegenover de
+begroting (`vtkPartCents`), want de begroting is enkel dat deel; het budget en
+het resultaat zelf blijven het volle bedrag uit het blad. Een blad zonder regel
 Begroting telt niet mee; `Stats.begrotingCounted` zegt over hoeveel het gaat.
 Een activiteit die Groep 5 met "Niet meetellen" en dan "Enkel niet in de
 begroting" markeerde (`BoDocument.begrotingExcludedAt`, met een reden), telt

@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/toast";
 import { useUnsentGuard } from "@/components/ui/unsentGuard";
 import { formatAmount } from "@/lib/rekeningen/expenses";
 import type { SaveState } from "@/lib/saveState";
-import type { BoLine, XDoc, XDossier } from "@/lib/bo/explorer";
+import { vtkPartCents, type BoLine, type XDoc, type XDossier } from "@/lib/bo/explorer";
 import {
   excludeBoBegrotingAction,
   hideBoDocumentAction,
@@ -217,6 +217,8 @@ export type LinesData = {
   devCents: number | null;
   /** Null laat de regel Begroting weg. */
   allocationCents: number | null;
+  /** Het deel van VTK bij een activiteit met een andere kring; null = alles. */
+  vtkSharePercent: number | null;
   /** Waarom er geen posten zijn, als er geen zijn. */
   empty: string;
 };
@@ -230,6 +232,7 @@ export function linesOf(d: XDossier, nl: boolean): LinesData {
     resultCents: d.results.length ? d.resultCents : null,
     devCents: d.devCents,
     allocationCents: d.allocationCents,
+    vtkSharePercent: d.vtkSharePercent,
     empty: error
       ? figuresErrorText(error, nl)
       : nl
@@ -263,6 +266,7 @@ export function sumLines(dossiers: XDossier[], nl: boolean): LinesData {
     resultCents: sum((d) => d.resultCents),
     devCents: sum((d) => d.devCents),
     allocationCents: null,
+    vtkSharePercent: null,
     empty: nl ? "Nog geen afgeronde activiteit met posten in het rekenblad." : "No closed activity with lines in the spreadsheet yet.",
   };
 }
@@ -271,6 +275,7 @@ export function Lines({ data, f }: { data: LinesData; f: Fmt }) {
   const { nl } = f;
   if (data.lines.length === 0) return <p className="text-sm text-vtk-muted">{data.empty}</p>;
   const { hasResult } = data;
+  const vtkBudget = vtkPartCents(data.budgetCents, data.vtkSharePercent);
   const max = Math.max(...data.lines.map((l) => Math.max(Math.abs(l.budgetCents ?? 0), Math.abs(l.resultCents ?? 0))), 1);
   // Bij een inkomst is meer beter, bij een kost minder.
   const diff = (l: BoLine) =>
@@ -318,13 +323,23 @@ export function Lines({ data, f }: { data: LinesData; f: Fmt }) {
         <span className="num">{hasResult ? f.euro(data.resultCents) : "–"}</span>
         <span className="num">{data.devCents === null ? "" : f.signed(data.devCents)}</span>
       </div>
+      {data.vtkSharePercent !== null && (
+        <div className="vtk-bo-line muted">
+          <span>{nl ? `Deel VTK (${data.vtkSharePercent}%)` : `VTK share (${data.vtkSharePercent}%)`}</span>
+          <span />
+          <span className="num">{f.euro(vtkBudget)}</span>
+          <span className="num">{hasResult ? f.euro(vtkPartCents(data.resultCents, data.vtkSharePercent)) : "–"}</span>
+          <span />
+        </div>
+      )}
       {data.allocationCents !== null && (
         <div className="vtk-bo-line muted">
           <span>{nl ? "Begroting" : "Allocation"}</span>
           <span />
           <span className="num">{f.euro(data.allocationCents)}</span>
           <span />
-          <span className="num">{data.budgetCents !== null ? f.signed(data.budgetCents - data.allocationCents) : ""}</span>
+          {/* Bij een gedeelde activiteit staat enkel het deel van VTK tegenover de begroting. */}
+          <span className="num">{vtkBudget !== null ? f.signed(vtkBudget - data.allocationCents) : ""}</span>
         </div>
       )}
     </div>

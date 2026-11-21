@@ -283,13 +283,24 @@ export type Overview = {
   /** Inkomsten min uitgaven: een kost is negatief, zoals in het blad. */
   total: number;
   begroting: number | null;
-  /** Totaal min begroting: positief is beter dan gepland. */
+  /** Het deel van VTK in het totaal (`vtkShareOf`) min de begroting: positief is beter dan gepland. */
   diff: number | null;
 };
 
 export function sectionAmount(content: BudgetContent, ctx: CalcContext, section: Section): number {
   if (section.type === 'income') return section.rows.reduce((sum, row) => sum + incomeAmount(content, row), 0);
   return section.rows.reduce((sum, row) => sum + costAmount(content, ctx, section, row), 0);
+}
+
+/**
+ * Het deel van VTK uit de verdeling per organisatie (1 = een eigen activiteit).
+ * De begroting is enkel het deel van VTK, dus bij een activiteit met een andere
+ * kring telt enkel dat deel tegenover de begroting; het totaal blijft het volle
+ * bedrag, zoals in het blad.
+ */
+export function vtkShareOf(content: BudgetContent): number {
+  const vtk = content.allocation.find((a) => a.org.trim().toLowerCase() === 'vtk');
+  return vtk && Number.isFinite(vtk.share) && vtk.share > 0 && vtk.share <= 1 ? vtk.share : 1;
 }
 
 export function overviewOf(content: BudgetContent, ctx: CalcContext): Overview {
@@ -305,7 +316,7 @@ export function overviewOf(content: BudgetContent, ctx: CalcContext): Overview {
   const begroting = content.begroting;
   // Een potje: wat de andere budgetten op dezelfde lijn al namen, telt mee.
   const others = ctx.pot?.others ?? 0;
-  return { lines, income, expense, total, begroting, diff: begroting == null ? null : total + others - begroting };
+  return { lines, income, expense, total, begroting, diff: begroting == null ? null : total * vtkShareOf(content) + others - begroting };
 }
 
 /** Een bedrag in centen, zoals de lijst het bewaart: de helft weg van nul, zoals Sheets. */
@@ -368,6 +379,7 @@ export function resultOverviewOf(content: BudgetContent, ctx: CalcContext): Resu
     expense,
     total,
     diffBudget: total - budget,
-    diffBegroting: content.begroting == null ? null : total + (ctx.pot?.othersResult ?? 0) - content.begroting,
+    diffBegroting:
+      content.begroting == null ? null : total * vtkShareOf(content) + (ctx.pot?.othersResult ?? 0) - content.begroting,
   };
 }

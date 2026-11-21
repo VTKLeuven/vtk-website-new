@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
-import { findDossier, SECTIONS, type ExplorerData, type Stats, type XDossier, type XMeeting, type XPost } from "@/lib/bo/explorer";
+import { findDossier, SECTIONS, vtkPartCents, type ExplorerData, type Stats, type XDossier, type XMeeting, type XPost } from "@/lib/bo/explorer";
 import { BegrotingExcludedNote, dossierNotes, Files, HideDossierButton, PotButton, PotNote, Lines, linesOf, PostLinks, StatusNote, statusNote, StatusPill, Tiles, Timeline, useFormat, type Fmt, type Locale, type Sheet } from "./BoParts";
 import { ChangePosts, type PostChoice } from "./BoReview";
 
@@ -497,16 +497,20 @@ function DossierDetail({
 }) {
   const { nl } = f;
   const fileCount = d.budgets.length + d.results.length;
+  // Bij een activiteit met een andere kring staat tegenover de begroting enkel
+  // het deel van VTK, niet het volle bedrag uit het blad.
+  const vtkBudget = vtkPartCents(d.budgetCents, d.vtkSharePercent);
+  const vtkResult = d.results.length ? vtkPartCents(d.resultCents, d.vtkSharePercent) : null;
   const notes = [
-    d.overAllocation && d.budgetCents !== null && d.allocationCents !== null
+    d.overAllocation && vtkBudget !== null && d.allocationCents !== null
       ? nl
-        ? `Het budget plant ${f.euro(d.allocationCents - d.budgetCents)} slechter dan de begroting.`
-        : `The budget plans ${f.euro(d.allocationCents - d.budgetCents)} worse than the allocation.`
+        ? `Het budget plant ${f.euro(d.allocationCents - vtkBudget)} slechter dan de begroting${d.vtkSharePercent !== null ? ", voor het deel van VTK" : ""}.`
+        : `The budget plans ${f.euro(d.allocationCents - vtkBudget)} worse than the allocation${d.vtkSharePercent !== null ? ", for the VTK share" : ""}.`
       : null,
     d.vtkSharePercent !== null
       ? nl
-        ? `Gedeeld met een andere kring: VTK draagt ${d.vtkSharePercent}% van het totaal.`
-        : `Shared with another association: VTK carries ${d.vtkSharePercent}% of the total.`
+        ? `Gedeeld met een andere kring: VTK draagt ${d.vtkSharePercent}% van het totaal${vtkBudget !== null ? `, ${f.euro(vtkBudget)} van het budget` : ""}${vtkResult !== null ? ` en ${f.euro(vtkResult)} van het resultaat` : ""}. Enkel dat deel staat tegenover de begroting.`
+        : `Shared with another association: VTK carries ${d.vtkSharePercent}% of the total${vtkBudget !== null ? `, ${f.euro(vtkBudget)} of the budget` : ""}${vtkResult !== null ? ` and ${f.euro(vtkResult)} of the result` : ""}. Only that share is compared with the allocation.`
       : null,
     ...dossierNotes(d, f),
   ].filter(Boolean);

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import writeXlsxFile from "write-excel-file/node";
 import { figuresFromXlsx } from "@/lib/bo/figures";
 import { buildOverview, statsOf, type DocInput, type MeetingInput, type PostRow } from "@/lib/bo/dossiers";
+import { vtkPartCents } from "@/lib/bo/share";
 import {
   folderKind,
   normalizeKey,
@@ -452,6 +453,24 @@ describe("budgetten en resultaten samenleggen", () => {
     expect(dossier.allocationCents).toBe(-105000);
     expect(dossier.budgets.map((b) => b.meetingLabel)).toEqual(["BO 5"]);
     expect(dossier.results.map((r) => r.meetingLabel)).toEqual(["BO 9"]);
+  });
+
+  it("zet bij een activiteit met een andere kring enkel het deel van VTK tegenover de begroting", () => {
+    // HalloweenParty (BO 9, 26-27): -512,27 in het blad, VTK draagt 20%, begroting -200.
+    const overview = buildOverview(
+      [doc("26-27_Budget_IT_HalloweenParty", { budgetTotalCents: -51227, allocationCents: -20000, vtkSharePercent: 20 })],
+      POSTS,
+      new Map(),
+      2026,
+      TODAY,
+    );
+    const [dossier] = overview.posts[0].dossiers;
+    // Het budget blijft het volle bedrag uit het blad.
+    expect(dossier.budgetCents).toBe(-51227);
+    expect(vtkPartCents(dossier.budgetCents, dossier.vtkSharePercent)).toBe(-10245);
+    // -102,45 tegenover -200: beter dan begroot, dus niet "budget erboven".
+    expect(dossier.overAllocation).toBe(false);
+    expect(dossier.begrotingDevCents).toBe(9755);
   });
 
   it("rekent op de BO van het budget, niet op de datum in het rekenblad", () => {
