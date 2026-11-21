@@ -501,7 +501,7 @@ export default async function BeheerVervoerPage({
         <div className="flex flex-wrap items-center gap-2">
           {/* T6: losse links, elk met een eigen bestemming en een titel die zegt
               waar ze heen gaan, zodat ze niet door elkaar lopen met de
-              "Transportplanning"-tab in de navigatie (N1, zelfde bestemming als
+              "Weekplanning"-tab in de navigatie (N1, zelfde bestemming als
               hieronder).
 
               "Mijn beschikbaarheid" staat vooraan en is de enige gevulde knop
@@ -520,17 +520,17 @@ export default async function BeheerVervoerPage({
           </Link>
           <Link
             href="/beheer/vervoer/week"
-            title="Weekraster per voertuig, met beheeracties (zelfde als Transportplanning in de navigatie)"
+            title="Weekraster per voertuig, met beheeracties (zelfde als Weekplanning in de navigatie)"
             className="rounded-full border border-vtk-navy/15 px-3.5 py-1.5 text-sm font-semibold text-vtk-ink transition hover:border-vtk-navy/40"
           >
-            Transportplanning
+            Weekplanning
           </Link>
           <Link
             href="/vervoer/bezetting"
-            title="Publiek bezettingsoverzicht met enkel de goedgekeurde ritten"
+            title="De publieke bezetting, met enkel de goedgekeurde ritten"
             className="rounded-full border border-vtk-navy/15 px-3.5 py-1.5 text-sm font-semibold text-vtk-ink transition hover:border-vtk-navy/40"
           >
-            Bezettingsoverzicht
+            Bezetting
           </Link>
         </div>
       </div>

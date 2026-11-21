@@ -182,7 +182,7 @@ export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElem
         <circle cx="7.5" cy="17" r="2" />
       </>
     ),
-    /** Transportplanning: een week als raster, het beeld van de planning zelf. */
+    /** Weekplanning: een week als raster, het beeld van de planning zelf. */
     planning: (
       <>
         <rect x="3.5" y="5" width="17" height="15" rx="2" />

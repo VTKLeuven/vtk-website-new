@@ -39,6 +39,26 @@ zelf doet staat in `docs/logistiek-ingebruikname.md`.
    (`quantity - returned`) wordt in dezelfde tx van de flesserke-voorraad
    afgeboekt. Daarna "waarborg terug".
 
+## Woordenlijst
+
+Eén woord per ding, overal op het scherm (N1 uit de audit van november 2026).
+Daarvoor heette de publieke bezettingspagina "Transportplanning",
+"Bezettingsoverzicht" en "Publieke bezetting", en stuurde een melding mensen naar
+"Mijn aanvragen" terwijl de pagina "Mijn reservaties" heette.
+
+| Op het scherm | Wat het is | Adres |
+| --- | --- | --- |
+| Materiaal | De catalogus, en een materiaalaanvraag indienen | `/materiaal` |
+| Transport | Een rit aanvragen met de kar, de auto of de bakfiets | `/vervoer` |
+| Mijn aanvragen | Alles wat je aanvroeg: materiaal, flesserke en ritten | `/reservaties` |
+| Bezetting | Publiek: wanneer een voertuig bezet is | `/vervoer/bezetting` |
+| Materiaalaanvragen | Beheer: materiaal- en flesserke-aanvragen beslissen | `/beheer/aanvragen` |
+| Ritaanvragen | Beheer: ritten beslissen en opvolgen | `/beheer/vervoer` |
+| Weekplanning | Beheer: de week per voertuig, met chauffeurs | `/beheer/vervoer/week` |
+
+De adressen bleven staan: ze staan in mails, bladwijzers en de agendafeed. In de
+code heet het vervoer nog `van`/`transport`; dat ziet niemand.
+
 ## Datamodel (packages/db/prisma/schema.prisma)
 
 | Model | Wat |

@@ -15,14 +15,14 @@ const nodes: AdminNavNode[] = [
   },
   {
     type: 'item',
-    item: { key: 'requests', href: '/beheer/aanvragen', label: 'Aanvragen' },
+    item: { key: 'requests', href: '/beheer/aanvragen', label: 'Materiaalaanvragen' },
   },
   {
-    // exact: /beheer/vervoer/week (Transportplanning) heeft zijn eigen
-    // hoofdnavigatie-item; zonder exact zou dat subpad ook "Ritten" als
+    // exact: /beheer/vervoer/week (Weekplanning) heeft zijn eigen
+    // hoofdnavigatie-item; zonder exact zou dat subpad ook "Ritaanvragen" als
     // actief markeren, wat de twee juist verwarrend naast elkaar zet.
     type: 'item',
-    item: { key: 'trips', href: '/beheer/vervoer', label: 'Ritten', exact: true },
+    item: { key: 'trips', href: '/beheer/vervoer', label: 'Ritaanvragen', exact: true },
   },
   {
     type: 'item',
@@ -34,7 +34,7 @@ const nodes: AdminNavNode[] = [
   },
   {
     type: 'item',
-    item: { key: 'transportplanning', href: '/beheer/vervoer/week', label: 'Transportplanning' },
+    item: { key: 'transportplanning', href: '/beheer/vervoer/week', label: 'Weekplanning' },
   },
   {
     type: 'group',
@@ -61,8 +61,8 @@ const nodes: AdminNavNode[] = [
 // blaadje, waardoor de zijbalk enkel nog op het woord te lezen was.
 //
 // Tweede ronde, om dezelfde reden. Sjablonen, Teksten en Instellingen droegen
-// alle drie het potlood van de groep "Overig" waarin ze staan, en Ritten,
-// Transportplanning en Collect&Go alle drie dezelfde bestelwagen. Een icoon dat
+// alle drie het potlood van de groep "Overig" waarin ze staan, en Ritaanvragen,
+// Weekplanning en Collect&Go alle drie dezelfde bestelwagen. Een icoon dat
 // naast zijn buur hetzelfde is, is geen icoon meer maar een opvulling.
 const icons = {
   overview: <LogisticsIcon name="dashboard" className="h-4 w-4 shrink-0" />,

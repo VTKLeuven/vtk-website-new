@@ -563,7 +563,7 @@ export async function myVanBookings(userId: string, groupIds: string[] = []) {
       vehicle: { select: { nameNl: true, nameEn: true } },
       user: { select: { id: true, name: true } },
       payments: { where: { status: 'SUCCEEDED' }, select: { id: true, status: true } },
-      // Voor R1: het evenement waar de rit bij hoort, zodat "Mijn reservaties"
+      // Voor R1: het evenement waar de rit bij hoort, zodat "Mijn aanvragen"
       // dezelfde koppeling toont als het materiaalgedeelte.
       event: { select: { id: true, name: true } },
     },

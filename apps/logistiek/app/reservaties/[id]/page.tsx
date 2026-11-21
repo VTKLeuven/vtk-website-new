@@ -103,7 +103,7 @@ export default async function ReservatieDetailPage({
     <PageShell
       kicker={
         <Link href="/reservaties" className="hover:underline">
-          ← {en ? 'My reservations' : 'Mijn reservaties'}
+          ← {en ? 'My requests' : 'Mijn aanvragen'}
         </Link>
       }
       title={reservation.eventName}

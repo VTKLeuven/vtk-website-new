@@ -375,7 +375,7 @@ export default async function VervoerWeekPage({
             href="/vervoer/bezetting"
             className="font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
           >
-            Publieke bezetting
+            Bezetting
           </Link>
         </div>
       </div>

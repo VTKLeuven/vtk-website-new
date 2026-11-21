@@ -14,7 +14,7 @@ const SHOWN_LINES = 4;
  *
  * /beheer/evenementen bestond al voor Logistiek, maar een postverantwoordelijke
  * had geen enkel scherm waar alles van één evenement samen stond: hij zag drie
- * losse aanvragen onder "Mijn reservaties" en moest zelf onthouden dat ze bij
+ * losse aanvragen onder "Mijn aanvragen" en moest zelf onthouden dat ze bij
  * elkaar hoorden.
  *
  * Per evenement staat elke aanvraag op een eigen regel, met moment en stand
