@@ -354,10 +354,16 @@ de same-origin `publicUrl`.
   importscherm per bestelling), `kalender/`, `statistieken/` (wie reed wanneer,
   hoelang en voor wie; zie hieronder), `instellingen/` (voertuigtarieven +
   huurprijs-toggle, en het icoon per voertuig).
-- **Actions**: `app/actions/uitleen.ts` (leden), `app/actions/beheer.ts` (team),
-  `app/actions/collectengo.ts` (mails ophalen, plakken, importeren).
-- **Lib**: `lib/uitleen.ts` (helpers), `lib/uitleen-server.ts` (queries +
-  voorraad), `lib/uitleen-stats.ts` (de cijfers achter de planning, uit één
+- **Actions**: `app/actions/uitleen.ts` (leden), `app/actions/beheer/` (team, per
+  domein: inventaris, evenementen, sjablonen, aanvragen, terugdraaien, vervoer,
+  chauffeurs, instellingen, agendafeed, flesserke; `app/actions/beheer.ts` geeft
+  ze enkel door), `app/actions/collectengo.ts` (mails ophalen, plakken,
+  importeren). Wat een lid indient, gaat eerst langs `lib/action-input.ts`
+  (gewone JSON, niet te diep, geen reuzentekst) en `lib/request-limits.ts`
+  (de plafonds per lid; zie `docs/design-decisions.md`).
+- **Lib**: `lib/uitleen.ts` (helpers), `lib/uitleen-server/` (queries +
+  voorraad, per domein; `lib/uitleen-server.ts` geeft ze enkel door),
+  `lib/uitleen-stats.ts` (de cijfers achter de planning, uit één
   query), `lib/driver-hours.ts` (de balken per uur van de dag; puur en getest,
   want dat rekenwerk draait in de browser),
   `lib/reservation-form.ts` (`buildReservationData`, gedeeld),
@@ -388,6 +394,15 @@ de same-origin `publicUrl`.
 - Deps `sharp` + `xlsx` toegevoegd: lockfile from scratch regenereren (AGENTS.md).
   Idem voor `imapflow` + `mailparser` (Collect&Go).
 - Dev: `npm run dev -w @vtk/logistiek` (poort 3100, webpack; nooit Turbopack).
+- **De Content-Security-Policy staat in `proxy.ts`** (opgebouwd in `lib/csp.ts`),
+  niet in `next.config.ts`: ze noemt de URL van Umami, en die komt pas bij het
+  starten uit de omgeving, niet bij de Docker-build. Laadt de app ooit iets van
+  een nieuw domein (een script, een `fetch`, een afbeelding), zet dat domein dan
+  in `lib/csp.ts`; anders weigert de browser het op productie zonder dat de
+  server er iets van merkt.
+- De stijlen staan per schermfamilie in `app/design/*.css`, ingeladen vanuit
+  `app/globals.css` in een vaste volgorde; afronding, bedieningshoogte en de twee
+  eigen breekpunten staan als tokens in `app/design/theme.css` ("Vorm en maat").
 
 ## Importscript
 

@@ -11674,6 +11674,57 @@ Beheer uitleendienst", de tabknop en vier rijen werkbalk.
   nachtrit (de terugrit van een fuif om 01:00) trok de hele week naar
   middernacht.
 
+## Plafonds per lid in de uitleendienst
+
+Wat één account kan aanvragen, publiceren en aan teammails kan uitlokken, heeft
+een bovengrens (S4, S5 uit de audit van november 2026). Zonder die grenzen kon
+één account de tabellen vullen, en met dringende aanvragen ook de mailbox van
+het team.
+
+- **Twintig openstaande aanvragen per lid**, materiaal, flesserke en ritten
+  samen (`MAX_OPEN_REQUESTS` in `lib/request-limits.ts`). Een materiaalaanvraag
+  telt zolang ze op een beslissing wacht of het materiaal buiten is; een rit
+  zolang ze niet voorbij is; heen en terug zijn één aanvraag. Twintig is ruim
+  meer dan een post voor een druk weekend nodig heeft. Wie er toch tegenaan
+  loopt, krijgt een melding met het adres van Logistiek, geen foutpagina.
+- **Tien actieve sjablonen per persoon**, en **een externe publiceert er
+  geen**: een sjabloon is voor iedereen te kiezen, en een externe krijgt de
+  sjablonen ook niet te zien.
+- **Hoogstens drie teammails per uur over de aanvragen van één lid.** Een
+  aanvraag die binnen het etmaal begint, omzeilt de uurlijkse bundel; na drie
+  mails in een uur wacht de volgende toch op de bundel, die hoogstens een uur
+  later vertrekt. Drie omdat een post die vanavond materiaal, flesserke en een
+  rit nodig heeft, dat alle drie meteen gemeld wil zien. Een bundel telt als één
+  mail (`recentTeamMailsFor` telt verschillende tijdstempels).
+
+## De focusring van de uitleendienst
+
+Eén focusring voor alles wat je met het toetsenbord bereikt (V4 uit de audit
+van november 2026), in `app/design/controls.css`. De audit stelde geel voor;
+het werd **navy (`--emphasis`) op papier en kaarten, en geel op de donkere kop,
+paginakop en voet**. Geel op het lichte papier haalt het contrast van 3:1 niet
+dat een focusring nodig heeft, en vtk.be doet het ook zo (inkt op licht, geel op
+donker). In het donker is `--emphasis` licht, dus de ring blijft zichtbaar.
+
+De regel staat in `@layer base` en in `:where()`: een onderdeel met een eigen
+ring (een tekstveld met zijn gele gloed) of een Tailwind-klasse wint. Buiten een
+laag zou de regel van elke utility winnen, hoe specifiek die ook is.
+
+## Lange beheerschermen op een telefoon
+
+Instellingen, chauffeurs en statistieken waren op een telefoon vijf tot acht
+schermen lang (M4 uit de audit van november 2026).
+
+- **Instellingen en chauffeurs klappen dicht** (`components/disclosure.tsx`, een
+  native `<details>` zoals `AdminDisclosure` op vtk.be). De kop zegt wat er nu
+  ingesteld staat: het tarief van een voertuig, of de externen kunnen aanvragen,
+  welke soort geen meldingsadres heeft; bij een chauffeur zijn kleur, of hij met
+  de kar rijdt, zijn nummer en zijn ritten.
+- **De statistieken tonen op een telefoon een samenvatting** in plaats van de
+  volle tabellen: de vijf drukste uren in plaats van het rooster van 168
+  vakjes, en de eerste tien ritten als lijst met "Toon alle" in plaats van de
+  tabel van acht kolommen. Op een breder scherm blijft alles zoals het was.
+
 ## De donkere modus van de uitleendienst
 
 De uitleendienst wordt gebruikt waar het donker is: in de kelder bij het
