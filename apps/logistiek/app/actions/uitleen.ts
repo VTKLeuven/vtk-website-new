@@ -171,8 +171,13 @@ async function deriveMemberRequester(
  * gegevens die ik net invulde", zodat de volgende aanvraag (het vervoer) eraan
  * kan hangen zonder op het team te wachten. Een onbekend id negeren we stil: dan
  * is het evenement intussen verwijderd, en de aanvraag zelf is belangrijker.
+ *
+ * In de transactie van de aanvraag zelf (L6 uit de audit van november 2026):
+ * mislukte het schrijven van de aanvraag, dan bleef er voordien een evenement
+ * zonder aanvraag achter, met de naam die het lid net opnieuw zou intikken.
  */
 async function resolveEventId(
+  tx: Prisma.TransactionClient,
   session: SessionLike,
   input: {
     eventId?: string | null;
@@ -183,17 +188,17 @@ async function resolveEventId(
   },
   groupId: string | null
 ): Promise<{ ok: true; eventId: string | null; created: boolean } | { ok: false; error: string }> {
-  const chosen = (input.eventId ?? '').trim();
+  const chosen = str(input.eventId).trim();
   if (chosen) {
-    const found = await prisma.uitleenEvent.findUnique({
+    const found = await tx.uitleenEvent.findUnique({
       where: { id: chosen },
       select: { id: true },
     });
     return { ok: true, eventId: found?.id ?? null, created: false };
   }
-  if (!input.createEvent) return { ok: true, eventId: null, created: false };
+  if (input.createEvent !== true) return { ok: true, eventId: null, created: false };
 
-  const name = (input.eventName ?? '').trim();
+  const name = str(input.eventName).trim();
   // Het vakje staat aan maar er is geen naam: dat gaf vroeger stil geen
   // evenement en geen foutmelding, en las als een knop die niet werkt (F6.14).
   if (!name) {
@@ -202,11 +207,11 @@ async function resolveEventId(
       error: 'Geef het evenement een naam, of vink "Maak hier een nieuw evenement van" uit.',
     };
   }
-  const created = await prisma.uitleenEvent.create({
+  const created = await tx.uitleenEvent.create({
     data: {
       name: name.slice(0, 200),
-      location: (input.eventLocation ?? '').trim().slice(0, 300) || null,
-      startAt: input.eventStart ? parseBrusselsDateTime(input.eventStart) : null,
+      location: str(input.eventLocation).trim().slice(0, 300) || null,
+      startAt: str(input.eventStart) ? parseBrusselsDateTime(str(input.eventStart)) : null,
       groupId,
       createdById: session.user.id,
     },
@@ -233,17 +238,22 @@ async function createReservationActionImpl(input: ReservationFormInput): Promise
   );
   if (!built.ok) return built;
 
-  const event = await resolveEventId(session, input, built.scalars.groupId);
-  if (!event.ok) return { ok: false, error: event.error };
-  const created = await prisma.uitleenReservation.create({
-    data: {
-      userId: session.user.id,
-      ...built.scalars,
-      eventId: event.eventId,
-      lines: { create: built.lineCreates },
-    },
-    select: { id: true },
+  const outcome = await runSerializable(async (tx) => {
+    const event = await resolveEventId(tx, session, input, built.scalars.groupId);
+    if (!event.ok) return event;
+    const created = await tx.uitleenReservation.create({
+      data: {
+        userId: session.user.id,
+        ...built.scalars,
+        eventId: event.eventId,
+        lines: { create: built.lineCreates },
+      },
+      select: { id: true },
+    });
+    return { ok: true as const, event, created };
   });
+  if (!outcome.ok) return { ok: false, error: outcome.error };
+  const { event, created } = outcome;
 
   // Ná de write en zonder de aanvraag te kunnen doen falen (M1); wie een fout
   // ziet omdat de mailserver plat ligt, dient opnieuw in en dan staan er twee.
@@ -373,17 +383,23 @@ async function createFlesserkeReservationActionImpl(input: ReservationFormInput)
   );
   if (!built.ok) return built;
 
-  const event = await resolveEventId(session, input, built.scalars.groupId);
-  if (!event.ok) return { ok: false, error: event.error };
-  const created = await prisma.uitleenReservation.create({
-    data: {
-      userId: session.user.id,
-      ...built.scalars,
-      eventId: event.eventId,
-      flesserkeLines: { create: built.flesserkeLineCreates },
-    },
-    select: { id: true },
+  // Evenement en aanvraag samen, zoals bij de materiaalaanvraag (L6).
+  const outcome = await runSerializable(async (tx) => {
+    const event = await resolveEventId(tx, session, input, built.scalars.groupId);
+    if (!event.ok) return event;
+    const created = await tx.uitleenReservation.create({
+      data: {
+        userId: session.user.id,
+        ...built.scalars,
+        eventId: event.eventId,
+        flesserkeLines: { create: built.flesserkeLineCreates },
+      },
+      select: { id: true },
+    });
+    return { ok: true as const, event, created };
   });
+  if (!outcome.ok) return { ok: false, error: outcome.error };
+  const { event, created } = outcome;
 
   // Zie de materiaalaanvraag hierboven: gebundeld, tenzij het dringend is.
   await notifyTeamIfUrgent('flesserke', created.id);
@@ -494,26 +510,32 @@ async function createTemplateFromSelectionActionImpl(input: {
       ? input.groupId
       : null;
 
-  const existing = await prisma.uitleenRequestTemplate.findFirst({
-    where: { name, active: true },
-    select: { id: true },
+  // De naamcontrole en het aanmaken samen (L6): twee leden die tegelijk een
+  // sjabloon "Cantus" bewaren, kregen er anders allebei een. De naam is hierboven
+  // al ingekort, dus de controle kijkt naar wat er echt bewaard wordt.
+  const outcome = await runSerializable(async (tx) => {
+    const existing = await tx.uitleenRequestTemplate.findFirst({
+      where: { name, active: true },
+      select: { id: true },
+    });
+    if (existing) return 'DUPLICATE' as const;
+    await tx.uitleenRequestTemplate.create({
+      data: {
+        name,
+        description: str(input.description).trim().slice(0, 300) || null,
+        groupId,
+        createdById: session.user.id,
+        lines: { create: lines.map(([itemId, quantity]) => ({ itemId, quantity })) },
+      },
+    });
+    return 'CREATED' as const;
   });
-  if (existing) {
+  if (outcome === 'DUPLICATE') {
     return {
       ok: false,
       error: `Er bestaat al een sjabloon met de naam "${name}". Kies een andere naam, of gebruik het bestaande.`,
     };
   }
-
-  await prisma.uitleenRequestTemplate.create({
-    data: {
-      name,
-      description: str(input.description).trim().slice(0, 300) || null,
-      groupId,
-      createdById: session.user.id,
-      lines: { create: lines.map(([itemId, quantity]) => ({ itemId, quantity })) },
-    },
-  });
 
   revalidatePath('/materiaal');
   revalidatePath('/beheer/sjablonen');
@@ -819,31 +841,37 @@ async function createVanBookingActionImpl(input: TransportFormInput & {
   });
   if (!built.ok) return { ok: false, error: built.error };
 
-  // Het evenement pas ná de validatie van de rit: zo blijft er geen evenement
-  // achter van een aanvraag die daarna toch geweigerd werd.
-  const event = await resolveEventId(session, { ...input, eventStart: undefined }, requester.groupId);
-  if (!event.ok) return { ok: false, error: event.error };
+  // Het evenement pas ná de validatie van de rit, en in dezelfde transactie als
+  // de ritten en hun bijrijders (L6): zo blijft er geen evenement of halve
+  // aanvraag achter van iets wat daarna toch mislukte.
+  const outcome = await runSerializable(async (tx) => {
+    const event = await resolveEventId(tx, session, { ...input, eventStart: undefined }, requester.groupId);
+    if (!event.ok) return event;
 
-  const created = await prisma.uitleenTransportBooking.createManyAndReturn({
-    data: built.bookings.map((booking) => ({ ...booking, eventId: event.eventId })),
-    select: { id: true },
-  });
-
-  // Bijrijders per boeking (V2). `createMany` kan geen geneste rijen schrijven,
-  // en heen en terug krijgen dezelfde rijen: daarna leiden ze hun eigen leven,
-  // want op de terugrit kan iemand anders meerijden.
-  if (built.helpers.length > 0) {
-    await prisma.uitleenTransportHelper.createMany({
-      data: created.flatMap((booking) =>
-        built.helpers.map((helper) => ({
-          transportBookingId: booking.id,
-          name: helper.name,
-          phone: helper.phone,
-          addedById: session.user.id,
-        }))
-      ),
+    const created = await tx.uitleenTransportBooking.createManyAndReturn({
+      data: built.bookings.map((booking) => ({ ...booking, eventId: event.eventId })),
+      select: { id: true },
     });
-  }
+
+    // Bijrijders per boeking (V2). `createMany` kan geen geneste rijen
+    // schrijven, en heen en terug krijgen dezelfde rijen: daarna leiden ze hun
+    // eigen leven, want op de terugrit kan iemand anders meerijden.
+    if (built.helpers.length > 0) {
+      await tx.uitleenTransportHelper.createMany({
+        data: created.flatMap((booking) =>
+          built.helpers.map((helper) => ({
+            transportBookingId: booking.id,
+            name: helper.name,
+            phone: helper.phone,
+            addedById: session.user.id,
+          }))
+        ),
+      });
+    }
+    return { ok: true as const, event, created };
+  });
+  if (!outcome.ok) return { ok: false, error: outcome.error };
+  const { event, created } = outcome;
 
   // Eén melding per aanvraag en niet per boeking: heen en terug (of twee
   // voertuigen) zijn samen één vraag, en de mail toont ze allebei. Ze vertrekt
