@@ -314,9 +314,13 @@ export async function logAudit(entry: AuditEntry): Promise<void> {
  * alsof ze een ingelogd lid is. De naam komt uit serverconfiguratie, nooit uit
  * request-input. Dit is onder meer de actor voor create-only MCP-tools.
  */
-export async function logSystemAudit(entry: AuditEntry, actorName: string): Promise<void> {
+export async function logSystemAudit(
+  entry: AuditEntry,
+  actorName: string,
+  actorId?: string | null,
+): Promise<void> {
   try {
-    await writeAudit(entry, { actorId: null, actorName: actorName || "Systeem" });
+    await writeAudit(entry, { actorId: actorId ?? null, actorName: actorName || "Systeem" });
   } catch (err) {
     console.error("[audit] kon systeemactie niet loggen", err);
     Sentry.captureException(err);

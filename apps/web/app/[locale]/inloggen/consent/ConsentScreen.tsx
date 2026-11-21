@@ -11,6 +11,7 @@ export type ConsentScopeRow = {
   code: string;
   label: string;
   sensitive: boolean;
+  defaultSelected?: boolean;
   /** Nog niet eerder toegestaan; bepaalt of het lid er nu over beslist. */
   isNew: boolean;
 };
@@ -32,6 +33,7 @@ export function ConsentScreen({
   nl,
   oauthQuery,
   userEmail,
+  redirectHost = null,
   client,
   scopes,
   alreadyGranted,
@@ -40,6 +42,7 @@ export function ConsentScreen({
   nl: boolean;
   oauthQuery: string;
   userEmail: string;
+  redirectHost?: string | null;
   client: {
     name: string;
     logoUri: string | null;
@@ -57,8 +60,11 @@ export function ConsentScreen({
   const [transitionPending, startTransition] = useTransition();
   const pending = actionPending || transitionPending;
 
-  // Alles staat voorgevinkt; het lid vinkt af wat het niet wil afstaan.
-  const [accepted, setAccepted] = useState<string[]>(() => scopes.map((scope) => scope.code));
+  // Gevoelige scopes staan standaard aan op vraag van VTK, behalve waar
+  // `defaultSelected: false` expliciet opt-in vraagt (zoals `mcp:create`).
+  const [accepted, setAccepted] = useState<string[]>(() =>
+    scopes.filter((scope) => scope.defaultSelected !== false).map((scope) => scope.code)
+  );
 
   useEffect(() => {
     if (state.status === 'done') window.location.assign(state.redirectTo);
@@ -116,6 +122,20 @@ export function ConsentScreen({
             </>
           )}
         </p>
+
+        {redirectHost && (
+          <p className="mb-4 text-center text-xs text-[#5c667f]">
+            {nl ? (
+              <>
+                Je wordt teruggestuurd naar <span className="font-mono font-medium text-vtk-ink">{redirectHost}</span>
+              </>
+            ) : (
+              <>
+                You will be redirected to <span className="font-mono font-medium text-vtk-ink">{redirectHost}</span>
+              </>
+            )}
+          </p>
+        )}
 
         <fieldset className="mb-4">
           <legend className="mb-2 text-sm font-medium">

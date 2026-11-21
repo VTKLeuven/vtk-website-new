@@ -16,7 +16,20 @@ import { AUTH_BASE_PATH } from './index';
 export { hashPassword } from './logins/password';
 export { isKulEnabled } from './logins/kul';
 export { ApiHandler } from './apiHandlers/apiHandler';
-export { getSession, getGateUser, type GateUser } from './server/session';
+export {
+  getSession,
+  getGateUser,
+  resolveMcpUserAuthz,
+  userGrantsInclude,
+  deriveAuthz,
+  type GateUser,
+  type McpUserAuthz,
+} from './server/session';
+export {
+  verifyMcpAccessToken,
+  type VerifiedMcpOAuthToken,
+  type VerifyMcpAccessTokenResult,
+} from './server/mcpAuth';
 export { resolveClaims, type ResolveClaimsInput } from './server/claims';
 export { verifySignedOAuthQuery } from './server/oauthQuery';
 export { createUser, updateUser, setUserPassword, deleteUser } from './server/users';
@@ -65,6 +78,7 @@ export {
   checkClientAccess,
   countMembersWithAccess,
   type ClientAccess,
+  type ClientAccessContext,
   type ClientAccessDenial,
 } from './server/clientAccess';
 export {

@@ -73,7 +73,14 @@ export default async function NoAccessPage({
   // dus niets. Dezelfde controle als de poort, zodat de uitleg niet afwijkt van
   // wat de poort besliste.
   const clientId = one(sp.client_id);
-  const access = clientId ? await checkClientAccess(session.user.id, clientId) : null;
+  const requestedScopes = (one(sp.scope) ?? '')
+    .split(/\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const requestedResource = one(sp.resource) ?? null;
+  const access = clientId
+    ? await checkClientAccess(session.user.id, clientId, { requestedScopes, requestedResource })
+    : null;
 
   // Intussen wel binnen (bv. net via KU Leuven aangemeld in een ander tabblad):
   // gewoon verder met de autorisatie in plaats van een blokpagina die niet meer klopt.

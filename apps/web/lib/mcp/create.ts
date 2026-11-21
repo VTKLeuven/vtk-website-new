@@ -19,6 +19,7 @@ import {
   canUseMcpGroup,
   hasAnyMcpPermission,
   hasMcpPermission,
+  hasMcpScope,
   type McpPrincipal,
 } from "@/lib/mcp/policy";
 
@@ -163,8 +164,21 @@ function uniqueError(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }
 
+function auditActor(principal: McpPrincipal) {
+  if (principal.userId) {
+    const label = principal.userName ? `${principal.userName} (${principal.clientName})` : principal.clientName;
+    return { actorId: principal.userId, actorName: label };
+  }
+  return { actorId: null, actorName: principal.clientName };
+}
+
 async function audit(principal: McpPrincipal, entity: AuditEntity, id: string, target: string, summary: string) {
-  await logSystemAudit({ action: "create", entity, entityId: id, target, summary }, principal.clientName);
+  const actor = auditActor(principal);
+  if (actor.actorId) {
+    await logSystemAudit({ action: "create", entity, entityId: id, target, summary }, actor.actorName, actor.actorId);
+  } else {
+    await logSystemAudit({ action: "create", entity, entityId: id, target, summary }, actor.actorName);
+  }
 }
 
 function refresh() {
@@ -196,6 +210,7 @@ async function formForCreate(principal: McpPrincipal, formId: string) {
 }
 
 export function canCreateMcpKind(principal: McpPrincipal, kind: McpCreateKind): boolean {
+  if (!hasMcpScope(principal, "mcp:create")) return false;
   return hasAnyMcpPermission(principal, CREATE_PERMISSIONS[kind]);
 }
 
@@ -370,10 +385,10 @@ export async function createMcpRecord(principal: McpPrincipal, raw: McpCreateInp
       case "calendar_event": {
         const input = schemas.calendar_event.parse(data);
         await groupForCreate(principal, input.groupCode, "calendar.manageAll");
-        result = await createCalendarEvent(input); break;
+        result = await createCalendarEvent(input, auditActor(principal)); break;
       }
       case "calendar_category": {
-        result = await createCalendarCategory(schemas.calendar_category.parse(data)); break;
+        result = await createCalendarCategory(schemas.calendar_category.parse(data), auditActor(principal)); break;
       }
       case "ticket_event": {
         const input = schemas.ticket_event.parse(data);
@@ -480,7 +495,14 @@ export async function createMcpRecord(principal: McpPrincipal, raw: McpCreateInp
       }
       case "shift": {
         const input = schemas.shift.parse(data);
-        if (input.post && !principal.allGroups && !canUseMcpGroup(principal, input.post)) throw new McpInputError("FORBIDDEN", `Geen toegang tot groep ${input.post}.`);
+        const canEditAllShifts = principal.allGroups || hasMcpPermission(principal, "shift.editAll");
+        const post = input.post?.trim();
+        if (!canEditAllShifts) {
+          if (!post) throw new McpInputError("GROUP_REQUIRED", "post is verplicht zonder shift.editAll.");
+          const normalizedPost = post.toLowerCase();
+          const hasPostAccess = [...principal.groupCodes].some((code) => code.toLowerCase() === normalizedPost);
+          if (!hasPostAccess) throw new McpInputError("FORBIDDEN", `Geen toegang tot groep ${post}.`);
+        }
         // `parseShift` verzamelt de invoerfouten in een eigen error; zonder deze
         // vertaling belandt een te vroege eindtijd als INTERNAL_ERROR in Sentry
         // in plaats van als leesbare melding bij de agent.

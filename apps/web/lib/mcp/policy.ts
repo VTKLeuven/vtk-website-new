@@ -4,8 +4,14 @@ import { PERMISSIONS, isPermission, type Permission } from "@vtk/auth";
 import type { AuthInfo } from "@modelcontextprotocol/server";
 import { prisma } from "@vtk/db";
 
+export type McpAuthKind = "static" | "oauth";
+
 export type McpPrincipal = {
+  authKind: McpAuthKind;
+  userId: string | null;
+  userName: string | null;
   clientName: string;
+  scopes: ReadonlySet<string>;
   permissions: ReadonlySet<Permission>;
   allPermissions: boolean;
   groupCodes: ReadonlySet<string>;
@@ -129,6 +135,9 @@ export const MCP_PERMISSION_POLICY = {
   "modules.logistiek.access": { reads: ["logistiek_catalog"], creates: [], blocked: ["change module access"] },
   "modules.cursusdienst.access": { reads: ["module_access"], creates: [], blocked: ["change module access"] },
   "oauth.client.edit": { reads: ["oauth_clients"], creates: ["app_create:oauth_client"], blocked: ["enable clients, reveal or rotate secrets, grant access or revoke tokens"] },
+  // Toegangspoort voor AI-assistenten via OAuth 2.1 op /api/mcp; verleent zelf
+  // geen extra data- of create-rechten.
+  "mcp.use": { reads: [], creates: [], blocked: [] },
   // Groepsadressen bevatten de mailadressen van elk lid van een post, en de sync
   // schrijft rechtstreeks in Google. Niets van dit alles gaat via MCP.
   "mailgroups.manage": { reads: [], creates: [], blocked: ["read or change group addresses, their members or the Google Workspace link"] },
@@ -221,6 +230,7 @@ export async function principalAuthExtra(): Promise<Record<string, unknown> | nu
 
 export function principalFromAuthInfo(authInfo: AuthInfo | undefined): McpPrincipal {
   const extra = authInfo?.extra ?? {};
+  const authKind: McpAuthKind = extra.authKind === "oauth" ? "oauth" : "static";
   const permissions = Array.isArray(extra.permissions)
     ? extra.permissions.filter((value): value is Permission => typeof value === "string" && isPermission(value))
     : [];
@@ -228,13 +238,21 @@ export function principalFromAuthInfo(authInfo: AuthInfo | undefined): McpPrinci
     ? value.filter((entry): entry is string => typeof entry === "string")
     : [];
   return {
+    authKind,
+    userId: typeof extra.userId === "string" ? extra.userId : null,
+    userName: typeof extra.userName === "string" ? extra.userName : null,
     clientName: authInfo?.clientId || "vtk-mcp-agent",
+    scopes: new Set(authInfo?.scopes ?? []),
     permissions: new Set(permissions),
     allPermissions: extra.allPermissions === true,
     groupCodes: new Set(strings(extra.groupCodes)),
     allGroups: extra.allGroups === true,
     roleCodes: new Set(strings(extra.roleCodes)),
   };
+}
+
+export function hasMcpScope(principal: McpPrincipal, scope: "mcp:read" | "mcp:create"): boolean {
+  return principal.scopes.has(scope);
 }
 
 export function hasMcpPermission(principal: McpPrincipal, permission: Permission): boolean {
@@ -252,7 +270,10 @@ export function canUseMcpGroup(principal: McpPrincipal, groupCode: string): bool
 export function listMcpCapabilities(principal: McpPrincipal) {
   return {
     principal: {
+      authKind: principal.authKind,
+      userId: principal.userId,
       clientName: principal.clientName,
+      scopes: [...principal.scopes].sort(),
       allPermissions: principal.allPermissions,
       permissions: [...principal.permissions].sort(),
       allGroups: principal.allGroups,
