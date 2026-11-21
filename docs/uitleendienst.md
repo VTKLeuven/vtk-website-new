@@ -59,6 +59,27 @@ Daarvoor heette de publieke bezettingspagina "Transportplanning",
 De adressen bleven staan: ze staan in mails, bladwijzers en de agendafeed. In de
 code heet het vervoer nog `van`/`transport`; dat ziet niemand.
 
+## Twee talen
+
+De ledenkant volgt de taalcookie (`vtk-logistiek-locale`), het beheer blijft
+Nederlands. Drie plekken, elk met een eigen reden (N3 uit de audit van november
+2026):
+
+- **Vaste teksten** staan in een woordenboek: `lib/copy.ts` voor wat op meerdere
+  schermen staat (los van `next/headers`, dus ook in een clientcomponent te
+  gebruiken), en een `copy.ts(x)` naast de componenten voor één scherm
+  (`app/ritten/beschikbaarheid/copy.tsx`, `components/transport-calendar/copy.tsx`).
+  Schrijf geen nieuwe `en ? ... : ...`-ternary; verhuis een bestaande naar het
+  woordenboek wanneer je het bestand aanraakt.
+- **De gedeelde kalender** neemt een `locale` (standaard Nederlands): de
+  planning geeft niets mee, de publieke bezetting en het intekenscherm de taal
+  van de bezoeker.
+- **Meldingen van de ledenacties**: de Nederlandse zin in `app/actions/uitleen.ts`
+  is de bron, `lib/action-translations.ts` vertaalt aan de rand
+  (gettext-stijl). `test/action-translations.test.ts` faalt voor een nieuwe zin
+  zonder vertaling. De validatie van het aanvraagformulier (`buildReservationData`,
+  `buildTransportBookings`) krijgt de taal mee en gebruikt `lib/form-messages.ts`.
+
 ## Datamodel (packages/db/prisma/schema.prisma)
 
 | Model | Wat |

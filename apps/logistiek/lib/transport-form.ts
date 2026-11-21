@@ -6,6 +6,8 @@ import { randomUUID } from 'node:crypto';
 import { isOnQuarterHour, MAX_HELPERS, parseNotifyEmails, transportPriceCents } from './uitleen';
 import { parseBrusselsDateTime } from './reservation-form';
 import { seriesOccurrences, type RecurrenceEnd, type RecurrenceRule } from './recurrence';
+import { FORM_MESSAGES, type FormMessages } from './form-messages';
+import type { LogistiekLocale } from './i18n-shared';
 
 /**
  * De boekingen van één ritaanvraag opbouwen en valideren.
@@ -78,6 +80,8 @@ export type TransportOwner = {
    * voertuigen die leden niet zelf mogen aanvragen (F6.21).
    */
   byTeam?: boolean;
+  /** De taal van de foutmeldingen; het lid zijn taal, het team Nederlands. */
+  locale?: LogistiekLocale;
 };
 
 export type BuiltTransport =
@@ -106,30 +110,31 @@ function parseTripWindow(
   startRaw: string,
   endRaw: string,
   label: string,
-  allowPast = false
+  allowPast = false,
+  m: FormMessages = FORM_MESSAGES.nl
 ): { ok: true; startAt: Date; endAt: Date } | { ok: false; error: string } {
   const startAt = parseBrusselsDateTime(startRaw);
   const endAt = parseBrusselsDateTime(endRaw);
-  if (!startAt || !endAt) return { ok: false, error: `Kies een start- en eindmoment${label}.` };
+  if (!startAt || !endAt) return { ok: false, error: m.chooseStartEnd(label) };
   // Enkel het team mag een rit in het verleden aanmaken, voor de administratie
   // (F6.19). Een lid blijft geweigerd: die aanvraag zou nooit meer beslist worden.
   if (!allowPast && startAt <= new Date()) {
-    return { ok: false, error: `Het startmoment${label} ligt in het verleden.` };
+    return { ok: false, error: m.startInPast(label) };
   }
   if (endAt <= startAt) {
-    return { ok: false, error: `Het eindmoment${label} ligt voor het startmoment.` };
+    return { ok: false, error: m.endBeforeStart(label) };
   }
   if (!isOnQuarterHour(startAt) || !isOnQuarterHour(endAt)) {
     return {
       ok: false,
-      error: `Kies een begin- en einduur op het kwartier (bv. 14:00, 14:15)${label}.`,
+      error: m.quarterHour(label),
     };
   }
   const days = (endAt.getTime() - startAt.getTime()) / (24 * 60 * 60 * 1000);
   if (days > MAX_VAN_BOOKING_DAYS) {
     return {
       ok: false,
-      error: `Een rit kan maximaal ${MAX_VAN_BOOKING_DAYS} dagen duren; controleer de datums${label}.`,
+      error: m.tripTooLong(MAX_VAN_BOOKING_DAYS, label),
     };
   }
   return { ok: true, startAt, endAt };
@@ -143,11 +148,14 @@ export async function buildTransportBookings(
 ): Promise<BuiltTransport> {
   const wantsReturn = Boolean(input.returnStartAt && input.returnEndAt);
   const allowPast = owner.byTeam === true;
+  // In de taal van het lid; het beheer geeft geen taal mee en blijft Nederlands.
+  const m = FORM_MESSAGES[owner.locale ?? 'nl'];
   const outbound = parseTripWindow(
     input.startAt,
     input.endAt,
-    wantsReturn ? ' van de heenrit' : '',
-    allowPast
+    wantsReturn ? m.tripLegOutbound : '',
+    allowPast,
+    m
   );
   if (!outbound.ok) return { ok: false, error: outbound.error };
   const { startAt, endAt } = outbound;
@@ -157,18 +165,19 @@ export async function buildTransportBookings(
     const parsed = parseTripWindow(
       input.returnStartAt!,
       input.returnEndAt!,
-      ' van de terugrit',
-      allowPast
+      m.tripLegReturn,
+      allowPast,
+      m
     );
     if (!parsed.ok) return { ok: false, error: parsed.error };
     if (parsed.startAt < endAt) {
-      return { ok: false, error: 'De terugrit start voor de heenrit gedaan is.' };
+      return { ok: false, error: m.returnBeforeOutbound };
     }
     inbound = { startAt: parsed.startAt, endAt: parsed.endAt };
   }
 
   const purpose = input.purpose.trim();
-  if (!purpose) return { ok: false, error: 'Beschrijf waarvoor je het voertuig nodig hebt.' };
+  if (!purpose) return { ok: false, error: m.describePurpose };
 
   // Meerdere adressen mogen, gescheiden door een komma; zie `parseNotifyEmails`.
   const notifyEmails = parseNotifyEmails(input.notifyEmail ?? '');
@@ -196,7 +205,7 @@ export async function buildTransportBookings(
     : await prisma.uitleenVehicle
         .findFirst({ where: available, orderBy: { sortIndex: 'asc' } })
         .then((found) => (found ? [found] : []));
-  if (vehicles.length === 0) return { ok: false, error: 'Kies een voertuig.' };
+  if (vehicles.length === 0) return { ok: false, error: m.chooseVehicle };
   if (vehicles.length !== new Set(chosenIds).size && chosenIds.length > 0) {
     return {
       ok: false,

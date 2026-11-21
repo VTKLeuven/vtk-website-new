@@ -8,6 +8,8 @@ import {
   todayDateOnly,
   type ReservationLineInput,
 } from './uitleen';
+import { FORM_MESSAGES } from './form-messages';
+import type { LogistiekLocale } from './i18n-shared';
 
 type DayPart = (typeof DAY_PARTS)[number];
 
@@ -113,7 +115,9 @@ export function parseBrusselsDateTime(value: string): Date | null {
  */
 export async function buildReservationData(
   input: ReservationFormInput,
-  allowedGroupIds: string[] | null
+  allowedGroupIds: string[] | null,
+  /** De taal van de foutmeldingen; het beheer geeft niets mee en blijft Nederlands. */
+  locale: LogistiekLocale = 'nl'
 ): Promise<
   | { ok: false; error: string }
   | {
@@ -123,20 +127,21 @@ export async function buildReservationData(
       flesserkeLineCreates: FlesserkeLineCreate[];
     }
 > {
+  const m = FORM_MESSAGES[locale];
   const eventName = (input.eventName ?? '').trim();
-  if (!eventName) return { ok: false, error: 'Geef je activiteit een naam.' };
+  if (!eventName) return { ok: false, error: m.nameActivity };
 
   const requesterType = input.requesterType;
   if (requesterType !== 'INTERN' && requesterType !== 'WERKGROEP' && requesterType !== 'EXTERN') {
-    return { ok: false, error: 'Kies namens wie je aanvraagt.' };
+    return { ok: false, error: m.chooseRequester };
   }
   let groupId: string | null = null;
   let requesterName: string | null = null;
   if (requesterType === 'INTERN') {
     const chosen = (input.groupId ?? '').trim();
-    if (!chosen) return { ok: false, error: 'Kies de post waarvoor je aanvraagt.' };
+    if (!chosen) return { ok: false, error: m.choosePost };
     if (allowedGroupIds !== null && !allowedGroupIds.includes(chosen)) {
-      return { ok: false, error: 'Je kan enkel aanvragen voor een post waar je lid van bent.' };
+      return { ok: false, error: m.notYourPost };
     }
     groupId = chosen;
   } else {
@@ -154,16 +159,16 @@ export async function buildReservationData(
 
   const pickupDate = parseDateOnly(input.pickupDate);
   const returnDate = parseDateOnly(input.returnDate);
-  if (!pickupDate || !returnDate) return { ok: false, error: 'Kies een afhaal- en terugbrengdatum.' };
-  if (pickupDate < todayDateOnly()) return { ok: false, error: 'De afhaaldatum ligt in het verleden.' };
+  if (!pickupDate || !returnDate) return { ok: false, error: m.chooseDates };
+  if (pickupDate < todayDateOnly()) return { ok: false, error: m.pickupInPast };
   if (returnDate < pickupDate) {
-    return { ok: false, error: 'De terugbrengdatum ligt voor de afhaaldatum.' };
+    return { ok: false, error: m.returnBeforePickup };
   }
   const days = (returnDate.getTime() - pickupDate.getTime()) / (24 * 60 * 60 * 1000) + 1;
   if (days > MAX_RESERVATION_DAYS) {
     return {
       ok: false,
-      error: `Een reservatie kan maximaal ${MAX_RESERVATION_DAYS} dagen duren; mail logistiek@vtk.be voor langere periodes.`,
+      error: m.reservationTooLong(MAX_RESERVATION_DAYS),
     };
   }
 
@@ -171,14 +176,14 @@ export async function buildReservationData(
   if (input.expectedAttendance && input.expectedAttendance.trim() !== '') {
     const parsed = Number.parseInt(input.expectedAttendance, 10);
     if (!Number.isInteger(parsed) || parsed < 0) {
-      return { ok: false, error: 'De verwachte opkomst moet een positief getal zijn.' };
+      return { ok: false, error: m.attendancePositive };
     }
     expectedAttendance = parsed;
   }
 
   const eventStart = input.eventStart ? parseBrusselsDateTime(input.eventStart) : null;
   if (input.eventStart && !eventStart) {
-    return { ok: false, error: 'Het startmoment van het evenement is ongeldig.' };
+    return { ok: false, error: m.eventStartInvalid };
   }
 
   // Meerdere adressen mogen, gescheiden door een komma: een werkgroep heeft
@@ -196,21 +201,21 @@ export async function buildReservationData(
   const lines = input.lines.filter((line) => Number.isInteger(line.quantity) && line.quantity > 0);
   const itemIds = lines.map((line) => line.itemId);
   if (new Set(itemIds).size !== itemIds.length) {
-    return { ok: false, error: 'Elk item mag maar één keer in de aanvraag staan.' };
+    return { ok: false, error: m.itemTwice };
   }
 
   const items = itemIds.length
     ? await prisma.uitleenItem.findMany({ where: { id: { in: itemIds }, active: true } })
     : [];
   if (items.length !== itemIds.length) {
-    return { ok: false, error: 'Een van de gekozen items bestaat niet meer; herlaad de catalogus.' };
+    return { ok: false, error: m.itemGone };
   }
   const byId = new Map(items.map((item) => [item.id, item]));
 
   for (const line of lines) {
     const item = byId.get(line.itemId)!;
     if (line.quantity > item.quantity) {
-      return { ok: false, error: `Van "${item.name}" zijn er maar ${item.quantity} beschikbaar.` };
+      return { ok: false, error: m.itemAvailable(item.name, item.quantity) };
     }
   }
 
@@ -219,28 +224,28 @@ export async function buildReservationData(
     (line) => Number.isInteger(line.quantity) && line.quantity > 0
   );
   if (flesserkeInput.length > 0 && requesterType === 'EXTERN') {
-    return { ok: false, error: 'Flesserke is enkel voor interne werking beschikbaar.' };
+    return { ok: false, error: m.flesserkeInternal };
   }
   const flesserkeIds = flesserkeInput.map((l) => l.itemId);
   if (new Set(flesserkeIds).size !== flesserkeIds.length) {
-    return { ok: false, error: 'Elk flesserke-item mag maar één keer in de aanvraag staan.' };
+    return { ok: false, error: m.flesserkeTwice };
   }
   const flesserkeItems = flesserkeIds.length
     ? await prisma.uitleenFlesserkeItem.findMany({ where: { id: { in: flesserkeIds }, active: true } })
     : [];
   if (flesserkeItems.length !== flesserkeIds.length) {
-    return { ok: false, error: 'Een van de flesserke-items bestaat niet meer; herlaad de lijst.' };
+    return { ok: false, error: m.flesserkeGone };
   }
   const flesserkeById = new Map(flesserkeItems.map((i) => [i.id, i]));
   for (const line of flesserkeInput) {
     const item = flesserkeById.get(line.itemId)!;
     if (line.quantity > item.quantity) {
-      return { ok: false, error: `Van "${item.name}" zijn er maar ${item.quantity} in stock.` };
+      return { ok: false, error: m.flesserkeStock(item.name, item.quantity) };
     }
   }
 
   if (lines.length === 0 && flesserkeInput.length === 0) {
-    return { ok: false, error: 'Kies minstens één item.' };
+    return { ok: false, error: m.chooseOneItem };
   }
 
   let totalPriceCents = 0;

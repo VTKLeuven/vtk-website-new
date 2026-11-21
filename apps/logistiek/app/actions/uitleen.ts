@@ -13,6 +13,7 @@ import {
   requireSession,
 } from '@/lib/session';
 import { getLocale } from '@/lib/i18n';
+import { localizeActionResult } from '@/lib/action-translations';
 import {
   isEmailish,
   isOnQuarterHour,
@@ -211,14 +212,15 @@ async function resolveEventId(
   return { ok: true, eventId: created.id, created: true };
 }
 
-export async function createReservationAction(input: ReservationFormInput): Promise<ActionResult> {
+async function createReservationActionImpl(input: ReservationFormInput): Promise<ActionResult> {
   const session = await requireSession();
   const blocked = await externalGate(session);
   if (blocked) return blocked;
   const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
   const built = await buildReservationData(
     { ...input, ...requester, flesserkeLines: [] },
-    session.groups.map((g) => g.id)
+    session.groups.map((g) => g.id),
+    await getLocale()
   );
   if (!built.ok) return built;
 
@@ -249,7 +251,7 @@ export async function createReservationAction(input: ReservationFormInput): Prom
   };
 }
 
-export async function editReservationAction(
+async function editReservationActionImpl(
   reservationId: string,
   input: ReservationFormInput
 ): Promise<ActionResult> {
@@ -260,7 +262,8 @@ export async function editReservationAction(
   const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
   const built = await buildReservationData(
     { ...input, ...requester, flesserkeLines: [] },
-    session.groups.map((g) => g.id)
+    session.groups.map((g) => g.id),
+    await getLocale()
   );
   if (!built.ok) return built;
 
@@ -346,7 +349,7 @@ function revalidateFlesserke() {
  * interne werking, dus elk lid van een post, werkgroep of jaarwerking
  * (`FLESSERKE_REQUESTER_TYPES`); externen kunnen dit niet aanvragen.
  */
-export async function createFlesserkeReservationAction(input: ReservationFormInput): Promise<ActionResult> {
+async function createFlesserkeReservationActionImpl(input: ReservationFormInput): Promise<ActionResult> {
   const session = await requireSession();
   if (session.groups.length === 0) {
     return { ok: false, error: 'Flesserke is enkel voor de interne werking van VTK.' };
@@ -354,7 +357,8 @@ export async function createFlesserkeReservationAction(input: ReservationFormInp
   const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
   const built = await buildReservationData(
     { ...input, ...requester, lines: [] },
-    session.groups.map((g) => g.id)
+    session.groups.map((g) => g.id),
+    await getLocale()
   );
   if (!built.ok) return built;
 
@@ -381,7 +385,7 @@ export async function createFlesserkeReservationAction(input: ReservationFormInp
   };
 }
 
-export async function editFlesserkeReservationAction(
+async function editFlesserkeReservationActionImpl(
   reservationId: string,
   input: ReservationFormInput
 ): Promise<ActionResult> {
@@ -393,7 +397,8 @@ export async function editFlesserkeReservationAction(
   const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
   const built = await buildReservationData(
     { ...input, ...requester, lines: [] },
-    session.groups.map((g) => g.id)
+    session.groups.map((g) => g.id),
+    await getLocale()
   );
   if (!built.ok) return built;
 
@@ -433,7 +438,7 @@ export async function editFlesserkeReservationAction(
  * `requestTemplates`). Hij komt uit de groep waarnamens je aanvraagt, en enkel
  * als je daar echt bij hoort.
  */
-export async function createTemplateFromSelectionAction(input: {
+async function createTemplateFromSelectionActionImpl(input: {
   name: string;
   description?: string;
   groupId?: string | null;
@@ -509,7 +514,7 @@ export async function createTemplateFromSelectionAction(input: {
  * Enkel voor een evenement van je eigen post of werkgroep, of een dat je zelf
  * aanmaakte; dezelfde grens als `memberEvents`.
  */
-export async function saveMemberEventAction(input: {
+async function saveMemberEventActionImpl(input: {
   eventId: string;
   location: string;
   startDate: string;
@@ -576,7 +581,7 @@ export async function saveMemberEventAction(input: {
  * dag zelf meegaat compleet is; stond de helft in een spreadsheet, dan gaat er
  * mis met precies dat deel dat niemand kon nalezen.
  */
-export async function addEventExtraItemAction(input: {
+async function addEventExtraItemActionImpl(input: {
   eventId: string;
   source: string;
   itemName: string;
@@ -624,7 +629,7 @@ export async function addEventExtraItemAction(input: {
 }
 
 /** Zo'n genoteerd stuk materiaal weer weghalen (E5). */
-export async function removeEventExtraItemAction(itemId: string): Promise<ActionResult> {
+async function removeEventExtraItemActionImpl(itemId: string): Promise<ActionResult> {
   const session = await requireSession();
   const groupIds = session.groups.map((group) => group.id);
 
@@ -677,7 +682,7 @@ export async function markVanBookingSeenAction(bookingId: string): Promise<void>
   revalidatePath('/reservaties');
 }
 
-export async function cancelReservationAction(reservationId: string): Promise<ActionResult> {
+async function cancelReservationActionImpl(reservationId: string): Promise<ActionResult> {
   const session = await requireSession();
 
   const reservation = await prisma.uitleenReservation.findFirst({
@@ -758,7 +763,7 @@ export async function cancelReservationAction(reservationId: string): Promise<Ac
 }
 
 /** Live beschikbaarheid voor de gekozen periode (zachte indicatie in de catalogus). */
-export async function checkAvailabilityAction(input: {
+async function checkAvailabilityActionImpl(input: {
   pickupDate: string;
   returnDate: string;
 }): Promise<{ ok: true; availability: Array<{ itemId: string; available: number }> } | { ok: false }> {
@@ -769,7 +774,7 @@ export async function checkAvailabilityAction(input: {
   return { ok: true, availability: await availabilityForRange(pickupDate, returnDate) };
 }
 
-export async function createVanBookingAction(input: TransportFormInput & {
+async function createVanBookingActionImpl(input: TransportFormInput & {
   /** Koepel-evenement (A8), of `createEvent` om er een te maken van `eventName`. */
   eventId?: string | null;
   createEvent?: boolean;
@@ -793,6 +798,7 @@ export async function createVanBookingAction(input: TransportFormInput & {
     // De aanvragende post kiest standaard zelf de chauffeur (F6.10). Een extern
     // lid heeft geen post, en bij de kar valt het in `buildTransportBookings` weg.
     assignedGroupId: requester.memberGroupId,
+    locale: await getLocale(),
   });
   if (!built.ok) return { ok: false, error: built.error };
 
@@ -853,7 +859,7 @@ export async function createVanBookingAction(input: TransportFormInput & {
  * ritten op hetzelfde moment kunnen zetten. Vanaf het afronden kan er niets meer
  * aan: die rit is gereden.
  */
-export async function editVanBookingAction(
+async function editVanBookingActionImpl(
   bookingId: string,
   input: {
     startAt: string;
@@ -938,7 +944,7 @@ export async function editVanBookingAction(
   return { ok: true, message: 'Rit bijgewerkt.' };
 }
 
-export async function cancelVanBookingAction(bookingId: string): Promise<ActionResult> {
+async function cancelVanBookingActionImpl(bookingId: string): Promise<ActionResult> {
   const session = await requireSession();
 
   const booking = await prisma.uitleenTransportBooking.findFirst({
@@ -1033,7 +1039,7 @@ const CHECKOUT_MINUTES = 30;
  * checkout-URL van de provider terug; de client stuurt de browser erheen.
  * Enkel de huurprijs wordt online betaald; de waarborg blijft cash bij afhaling.
  */
-export async function startPaymentAction(
+async function startPaymentActionImpl(
   target: 'reservation' | 'van',
   id: string
 ): Promise<StartPaymentResult> {
@@ -1168,7 +1174,7 @@ export async function startPaymentAction(
  * Overlappende vensters worden samengevoegd: twee keer "zaterdagvoormiddag"
  * intekenen hoort geen twee banden op te leveren die je apart moet weghalen.
  */
-export async function addAvailabilityAction(input: {
+async function addAvailabilityActionImpl(input: {
   startAt: string;
   endAt: string;
   note?: string;
@@ -1207,7 +1213,7 @@ export async function addAvailabilityAction(input: {
  * schuift ze over een andere soort, dan maakt die plaats. De nota gaat mee, en
  * de soort ook, tenzij je er een nieuwe meegeeft.
  */
-export async function editAvailabilityAction(
+async function editAvailabilityActionImpl(
   id: string,
   input: { startAt: string; endAt: string; kind?: AvailabilityKind }
 ): Promise<ActionResult> {
@@ -1259,7 +1265,7 @@ const MAX_RESTORE_WINDOWS = 300;
  * ligt, blijft staan (`replaceRange`), ook wanneer de server je venster bij de
  * wijziging met dat ernaast had samengevoegd.
  */
-export async function restoreAvailabilityAction(input: {
+async function restoreAvailabilityActionImpl(input: {
   startAt: string;
   endAt: string;
   windows: Array<{ startAt: string; endAt: string; kind: AvailabilityKind; note: string | null }>;
@@ -1313,7 +1319,7 @@ export async function restoreAvailabilityAction(input: {
  * dezelfde weekgrens als het raster: maandag 05:00. De weeknota gaat niet mee;
  * "ik ben er vrijdag niet" van vorige week geldt deze week niet vanzelf.
  */
-export async function copyPreviousWeekAvailabilityAction(input: {
+async function copyPreviousWeekAvailabilityActionImpl(input: {
   /** Een dag in de week, als `YYYY-MM-DD`; de maandag volgt eruit. */
   week: string;
 }): Promise<ActionResult> {
@@ -1485,7 +1491,7 @@ async function placeAvailabilityWindow(
  * herschrijven mag de dagen ernaast niet stil wegvegen. Zie
  * `lib/availability-day.ts`, waar dat rekenwerk puur en getest staat.
  */
-export async function setAvailabilityDayAction(input: {
+async function setAvailabilityDayActionImpl(input: {
   /** De dag, als `YYYY-MM-DD` in Belgische tijd. */
   day: string;
   /** De vakjes die aan staan (0 tot en met 23 vanaf 05:00), met hun soort. */
@@ -1561,7 +1567,7 @@ const MAX_AVAILABILITY_NOTE = 500;
  * woensdag binnen, dan stond er een tweede rij voor dezelfde week en won stil de
  * ene of de andere tekst.
  */
-export async function setAvailabilityNoteAction(input: {
+async function setAvailabilityNoteActionImpl(input: {
   /** Een dag in de week, als `YYYY-MM-DD`; de maandag volgt eruit. */
   week: string;
   text: string;
@@ -1598,7 +1604,7 @@ export async function setAvailabilityNoteAction(input: {
 }
 
 /** Een venster weghalen. Enkel je eigen; het team beheert dit niet voor je. */
-export async function removeAvailabilityAction(id: string): Promise<ActionResult> {
+async function removeAvailabilityActionImpl(id: string): Promise<ActionResult> {
   const session = await requireSession();
   const deleted = await prisma.uitleenDriverAvailability.deleteMany({
     where: { id, userId: session.user.id },
@@ -1691,7 +1697,7 @@ function revalidateTripNotes() {
   revalidatePath('/beheer/vervoer/week');
 }
 
-export async function addTripNoteAction(
+async function addTripNoteActionImpl(
   bookingId: string,
   input: { text: string; visibility: string }
 ): Promise<ActionResult> {
@@ -1724,7 +1730,7 @@ export async function addTripNoteAction(
   return { ok: true, message: 'Nota opgeslagen.' };
 }
 
-export async function editTripNoteAction(
+async function editTripNoteActionImpl(
   noteId: string,
   input: { text: string; visibility: string }
 ): Promise<ActionResult> {
@@ -1748,7 +1754,7 @@ export async function editTripNoteAction(
   return { ok: true, message: 'Nota aangepast.' };
 }
 
-export async function removeTripNoteAction(noteId: string): Promise<ActionResult> {
+async function removeTripNoteActionImpl(noteId: string): Promise<ActionResult> {
   const session = await requireSession();
 
   const removed = await prisma.uitleenTransportNote.deleteMany({
@@ -1760,7 +1766,7 @@ export async function removeTripNoteAction(noteId: string): Promise<ActionResult
   return { ok: true, message: 'Nota weggehaald.' };
 }
 
-export async function addTripHelperAction(
+async function addTripHelperActionImpl(
   bookingId: string,
   input: { name: string; phone?: string }
 ): Promise<ActionResult> {
@@ -1807,7 +1813,7 @@ export async function addTripHelperAction(
   return { ok: true, message: 'Bijrijder toegevoegd.' };
 }
 
-export async function removeTripHelperAction(helperId: string): Promise<ActionResult> {
+async function removeTripHelperActionImpl(helperId: string): Promise<ActionResult> {
   const session = await requireSession();
 
   const helper = await prisma.uitleenTransportHelper.findUnique({
@@ -1854,7 +1860,7 @@ export async function removeTripHelperAction(helperId: string): Promise<ActionRe
  *    chauffeurslijst.** Anders is dit een manier om iedereen op de site
  *    leestoegang tot een rit te geven.
  */
-export async function setGroupTripDriverAction(
+async function setGroupTripDriverActionImpl(
   bookingId: string,
   driverId: string
 ): Promise<ActionResult> {
@@ -1923,4 +1929,119 @@ export async function setGroupTripDriverAction(
     ok: true,
     message: driverName ? `${driverName} rijdt deze rit.` : 'Chauffeur verwijderd.',
   };
+}
+
+// ---------------------------------------------------------------------------
+// De geëxporteerde actions: dezelfde als hierboven, met hun melding in de taal
+// van het lid (N3). De zinnen hierboven blijven Nederlands en zijn de bron;
+// `lib/action-translations.ts` vertaalt ze, en de test daarvan faalt voor een
+// nieuwe zin zonder vertaling.
+// ---------------------------------------------------------------------------
+
+export async function createReservationAction(...args: Parameters<typeof createReservationActionImpl>): ReturnType<typeof createReservationActionImpl> {
+  return localizeActionResult(await createReservationActionImpl(...args), await getLocale());
+}
+
+export async function editReservationAction(...args: Parameters<typeof editReservationActionImpl>): ReturnType<typeof editReservationActionImpl> {
+  return localizeActionResult(await editReservationActionImpl(...args), await getLocale());
+}
+
+export async function createFlesserkeReservationAction(...args: Parameters<typeof createFlesserkeReservationActionImpl>): ReturnType<typeof createFlesserkeReservationActionImpl> {
+  return localizeActionResult(await createFlesserkeReservationActionImpl(...args), await getLocale());
+}
+
+export async function editFlesserkeReservationAction(...args: Parameters<typeof editFlesserkeReservationActionImpl>): ReturnType<typeof editFlesserkeReservationActionImpl> {
+  return localizeActionResult(await editFlesserkeReservationActionImpl(...args), await getLocale());
+}
+
+export async function createTemplateFromSelectionAction(...args: Parameters<typeof createTemplateFromSelectionActionImpl>): ReturnType<typeof createTemplateFromSelectionActionImpl> {
+  return localizeActionResult(await createTemplateFromSelectionActionImpl(...args), await getLocale());
+}
+
+export async function saveMemberEventAction(...args: Parameters<typeof saveMemberEventActionImpl>): ReturnType<typeof saveMemberEventActionImpl> {
+  return localizeActionResult(await saveMemberEventActionImpl(...args), await getLocale());
+}
+
+export async function addEventExtraItemAction(...args: Parameters<typeof addEventExtraItemActionImpl>): ReturnType<typeof addEventExtraItemActionImpl> {
+  return localizeActionResult(await addEventExtraItemActionImpl(...args), await getLocale());
+}
+
+export async function removeEventExtraItemAction(...args: Parameters<typeof removeEventExtraItemActionImpl>): ReturnType<typeof removeEventExtraItemActionImpl> {
+  return localizeActionResult(await removeEventExtraItemActionImpl(...args), await getLocale());
+}
+
+export async function cancelReservationAction(...args: Parameters<typeof cancelReservationActionImpl>): ReturnType<typeof cancelReservationActionImpl> {
+  return localizeActionResult(await cancelReservationActionImpl(...args), await getLocale());
+}
+
+export async function checkAvailabilityAction(...args: Parameters<typeof checkAvailabilityActionImpl>): ReturnType<typeof checkAvailabilityActionImpl> {
+  return localizeActionResult(await checkAvailabilityActionImpl(...args), await getLocale());
+}
+
+export async function createVanBookingAction(...args: Parameters<typeof createVanBookingActionImpl>): ReturnType<typeof createVanBookingActionImpl> {
+  return localizeActionResult(await createVanBookingActionImpl(...args), await getLocale());
+}
+
+export async function editVanBookingAction(...args: Parameters<typeof editVanBookingActionImpl>): ReturnType<typeof editVanBookingActionImpl> {
+  return localizeActionResult(await editVanBookingActionImpl(...args), await getLocale());
+}
+
+export async function cancelVanBookingAction(...args: Parameters<typeof cancelVanBookingActionImpl>): ReturnType<typeof cancelVanBookingActionImpl> {
+  return localizeActionResult(await cancelVanBookingActionImpl(...args), await getLocale());
+}
+
+export async function startPaymentAction(...args: Parameters<typeof startPaymentActionImpl>): ReturnType<typeof startPaymentActionImpl> {
+  return localizeActionResult(await startPaymentActionImpl(...args), await getLocale());
+}
+
+export async function addAvailabilityAction(...args: Parameters<typeof addAvailabilityActionImpl>): ReturnType<typeof addAvailabilityActionImpl> {
+  return localizeActionResult(await addAvailabilityActionImpl(...args), await getLocale());
+}
+
+export async function editAvailabilityAction(...args: Parameters<typeof editAvailabilityActionImpl>): ReturnType<typeof editAvailabilityActionImpl> {
+  return localizeActionResult(await editAvailabilityActionImpl(...args), await getLocale());
+}
+
+export async function restoreAvailabilityAction(...args: Parameters<typeof restoreAvailabilityActionImpl>): ReturnType<typeof restoreAvailabilityActionImpl> {
+  return localizeActionResult(await restoreAvailabilityActionImpl(...args), await getLocale());
+}
+
+export async function copyPreviousWeekAvailabilityAction(...args: Parameters<typeof copyPreviousWeekAvailabilityActionImpl>): ReturnType<typeof copyPreviousWeekAvailabilityActionImpl> {
+  return localizeActionResult(await copyPreviousWeekAvailabilityActionImpl(...args), await getLocale());
+}
+
+export async function setAvailabilityDayAction(...args: Parameters<typeof setAvailabilityDayActionImpl>): ReturnType<typeof setAvailabilityDayActionImpl> {
+  return localizeActionResult(await setAvailabilityDayActionImpl(...args), await getLocale());
+}
+
+export async function setAvailabilityNoteAction(...args: Parameters<typeof setAvailabilityNoteActionImpl>): ReturnType<typeof setAvailabilityNoteActionImpl> {
+  return localizeActionResult(await setAvailabilityNoteActionImpl(...args), await getLocale());
+}
+
+export async function removeAvailabilityAction(...args: Parameters<typeof removeAvailabilityActionImpl>): ReturnType<typeof removeAvailabilityActionImpl> {
+  return localizeActionResult(await removeAvailabilityActionImpl(...args), await getLocale());
+}
+
+export async function addTripNoteAction(...args: Parameters<typeof addTripNoteActionImpl>): ReturnType<typeof addTripNoteActionImpl> {
+  return localizeActionResult(await addTripNoteActionImpl(...args), await getLocale());
+}
+
+export async function editTripNoteAction(...args: Parameters<typeof editTripNoteActionImpl>): ReturnType<typeof editTripNoteActionImpl> {
+  return localizeActionResult(await editTripNoteActionImpl(...args), await getLocale());
+}
+
+export async function removeTripNoteAction(...args: Parameters<typeof removeTripNoteActionImpl>): ReturnType<typeof removeTripNoteActionImpl> {
+  return localizeActionResult(await removeTripNoteActionImpl(...args), await getLocale());
+}
+
+export async function addTripHelperAction(...args: Parameters<typeof addTripHelperActionImpl>): ReturnType<typeof addTripHelperActionImpl> {
+  return localizeActionResult(await addTripHelperActionImpl(...args), await getLocale());
+}
+
+export async function removeTripHelperAction(...args: Parameters<typeof removeTripHelperActionImpl>): ReturnType<typeof removeTripHelperActionImpl> {
+  return localizeActionResult(await removeTripHelperActionImpl(...args), await getLocale());
+}
+
+export async function setGroupTripDriverAction(...args: Parameters<typeof setGroupTripDriverActionImpl>): ReturnType<typeof setGroupTripDriverActionImpl> {
+  return localizeActionResult(await setGroupTripDriverActionImpl(...args), await getLocale());
 }
