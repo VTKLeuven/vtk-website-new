@@ -15,6 +15,8 @@ import { isPocOnly, representedPocIds } from '@/lib/pocPolls/access';
 import { postenAccess } from '@/lib/postenAccess';
 import { countsForBo } from '@/lib/bo/own';
 import { ADMIN_DENSITY_COOKIE, ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/adminNavCookie';
+import { isAiConfigured } from '@/lib/ai/config';
+import { AiTranslateProvider } from '@/components/admin/AiTranslateContext';
 import { AdminNav, type NavItem, type NavNode } from './AdminNav';
 import { AdminSurface } from './AdminSurface';
 
@@ -144,7 +146,7 @@ export default async function AdminLayout({
     select: { key: true },
   });
 
-  const cookieStore = await cookies();
+  const [cookieStore, aiEnabled] = await Promise.all([cookies(), isAiConfigured()]);
   const collapsed = cookieStore.get(ADMIN_NAV_COLLAPSED_COOKIE)?.value === '1';
   const compact = cookieStore.get(ADMIN_DENSITY_COOKIE)?.value === 'compact';
 
@@ -179,7 +181,11 @@ export default async function AdminLayout({
             densityLabel={adminDict.compactView}
           />
         </aside>
-        <section className="vtk-admin-main">{children}</section>
+        <section className="vtk-admin-main">
+          <AiTranslateProvider enabled={aiEnabled} locale={locale}>
+            {children}
+          </AiTranslateProvider>
+        </section>
       </div>
     </AdminSurface>
   );
