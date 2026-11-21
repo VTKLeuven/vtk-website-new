@@ -7,7 +7,11 @@ import Link from '@/components/ui/Link';
 import { Card, Input, Label } from '@vtk/ui';
 import { saveEventAction } from '@/app/actions/calendar';
 import { DEFAULT_EVENT_LINK_LABEL, EVENT_LINK_LABEL_MAX } from '@/lib/calendar/eventLink';
-import { MarkdownEditorField } from '@/components/editor/MarkdownEditor';
+import {
+  BilingualGroup,
+  BilingualInput,
+  BilingualMarkdown,
+} from '@/components/admin/BilingualField';
 import { SaveForm } from '@/components/ui/SaveForm';
 import { ExternalLinkIcon } from '@/components/ui/icons';
 import { saveErrorMessages } from '@/lib/saveMessages';
@@ -15,7 +19,6 @@ import { mobileCropFrom, toImageFocus } from '@/lib/imageFocus';
 import { ORGANISER_PRESETS } from '@/lib/calendar/organiser';
 import { SearchPicker } from '@/components/admin/SearchPicker';
 import { EventImageField } from './EventImageField';
-import { LangTabs, type Lang } from './LangTabs';
 import { EventWhenField, type MomentValue } from './EventWhenField';
 
 type Event = {
@@ -201,7 +204,6 @@ export function EventForm({
    * staan (de verborgen taal in een `hidden` blok), zodat wat je in de andere
    * taal tikte niet verdwijnt bij het wisselen en gewoon mee opgeslagen wordt.
    */
-  const [activeLang, setActiveLang] = useState<Lang>('nl');
 
   /**
    * De tabbladen, zoals bij een ticketevent. Eén formulier dat in één keer
@@ -508,6 +510,7 @@ export function EventForm({
     >
       {event.id ? <input type="hidden" name="id" value={event.id} /> : null}
 
+      <BilingualGroup locale={locale} showBar={false} className="contents">
       <div {...panel('algemeen')} className="vtk-ef-panel">
       {event.id ? (
         <div className={`vtk-ef-todo ${allReady ? 'is-done' : ''}`}>
@@ -542,41 +545,18 @@ export function EventForm({
         }
       >
         <div className="space-y-4">
-          <div>
-            <div className="vtk-ef-field-head">
-              <Label htmlFor={`event-title-${activeLang}`}>
-                {activeLang === 'nl'
-                  ? nl
-                    ? 'Titel (NL)'
-                    : 'Title (NL)'
-                  : nl
-                    ? 'Titel (EN)'
-                    : 'Title (EN)'}
-              </Label>
-              <LangTabs value={activeLang} onChange={setActiveLang} nl={nl} />
-            </div>
-            {/* Beide talen blijven staan; de verborgene stuurt zijn waarde mee.
-                `required` hangt aan de zichtbare taal: een verplicht veld in een
-                `display: none` blok kan de browser niet aanwijzen, en dan gebeurt
-                er bij het verzenden helemaal niets. */}
-            <div className={activeLang === 'nl' ? undefined : 'hidden'}>
-              <Input
-                id="event-title-nl"
-                name="titleNl"
-                defaultValue={event.titleNl ?? ''}
-                placeholder={nl ? 'bv. Galabal 2026' : 'e.g. Gala 2026'}
-                required={activeLang === 'nl'}
-              />
-            </div>
-            <div className={activeLang === 'en' ? undefined : 'hidden'}>
-              <Input
-                id="event-title-en"
-                name="titleEn"
-                defaultValue={event.titleEn ?? ''}
-                placeholder={nl ? 'Leeg = de Nederlandse titel' : 'Empty = the Dutch title'}
-              />
-            </div>
-          </div>
+          <BilingualInput
+            label={nl ? 'Titel' : 'Title'}
+            nameNl="titleNl"
+            nameEn="titleEn"
+            defaultValueNl={event.titleNl ?? ''}
+            defaultValueEn={event.titleEn ?? ''}
+            placeholderNl={nl ? 'bv. Galabal 2026' : 'e.g. Gala 2026'}
+            placeholderEn={nl ? 'Leeg = de Nederlandse titel' : 'Empty = the Dutch title'}
+            requiredNl
+            idPrefix="event-title"
+            showBar
+          />
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
@@ -702,36 +682,17 @@ export function EventForm({
             : 'What appears on the event page. Leave the English text empty and the site shows the Dutch one there.'
         }
       >
-        <div className="vtk-ef-field-head">
-          <Label htmlFor={activeLang === 'nl' ? 'calendar-description-nl' : 'calendar-description-en'}>
-            {activeLang === 'nl'
-              ? nl
-                ? 'Tekst (NL)'
-                : 'Text (NL)'
-              : nl
-                ? 'Tekst (EN)'
-                : 'Text (EN)'}
-          </Label>
-          <LangTabs value={activeLang} onChange={setActiveLang} nl={nl} />
-        </div>
-        <div className={activeLang === 'nl' ? undefined : 'hidden'}>
-          <MarkdownEditorField
-            name="descriptionNl"
-            defaultValue={event.descriptionNl}
-            locale={locale}
-            rows={8}
-            textareaId="calendar-description-nl"
-          />
-        </div>
-        <div className={activeLang === 'en' ? undefined : 'hidden'}>
-          <MarkdownEditorField
-            name="descriptionEn"
-            defaultValue={event.descriptionEn}
-            locale={locale}
-            rows={8}
-            textareaId="calendar-description-en"
-          />
-        </div>
+        <BilingualMarkdown
+          label={nl ? 'Tekst' : 'Text'}
+          nameNl="descriptionNl"
+          nameEn="descriptionEn"
+          defaultValueNl={event.descriptionNl}
+          defaultValueEn={event.descriptionEn}
+          locale={locale}
+          rows={8}
+          idPrefix="calendar-description"
+          showBar
+        />
       </Section>
       </div>
 
@@ -875,36 +836,18 @@ export function EventForm({
             <Label htmlFor="event-url">{nl ? 'Externe link' : 'External link'}</Label>
             <Input id="event-url" name="url" defaultValue={event.url ?? ''} placeholder="https://..." />
             <div className="mt-3">
-              <div className="vtk-ef-field-head">
-                <Label htmlFor={activeLang === 'nl' ? 'event-url-label-nl' : 'event-url-label-en'}>
-                  {activeLang === 'nl'
-                    ? nl
-                      ? 'Knoptekst (NL)'
-                      : 'Button text (NL)'
-                    : nl
-                      ? 'Knoptekst (EN)'
-                      : 'Button text (EN)'}
-                </Label>
-                <LangTabs value={activeLang} onChange={setActiveLang} nl={nl} />
-              </div>
-              <div className={activeLang === 'nl' ? undefined : 'hidden'}>
-                <Input
-                  id="event-url-label-nl"
-                  name="urlLabelNl"
-                  defaultValue={event.urlLabelNl ?? ''}
-                  maxLength={EVENT_LINK_LABEL_MAX}
-                  placeholder={DEFAULT_EVENT_LINK_LABEL.nl}
-                />
-              </div>
-              <div className={activeLang === 'en' ? undefined : 'hidden'}>
-                <Input
-                  id="event-url-label-en"
-                  name="urlLabelEn"
-                  defaultValue={event.urlLabelEn ?? ''}
-                  maxLength={EVENT_LINK_LABEL_MAX}
-                  placeholder={DEFAULT_EVENT_LINK_LABEL.en}
-                />
-              </div>
+              <BilingualInput
+                label={nl ? 'Knoptekst' : 'Button text'}
+                nameNl="urlLabelNl"
+                nameEn="urlLabelEn"
+                defaultValueNl={event.urlLabelNl ?? ''}
+                defaultValueEn={event.urlLabelEn ?? ''}
+                maxLength={EVENT_LINK_LABEL_MAX}
+                placeholderNl={DEFAULT_EVENT_LINK_LABEL.nl}
+                placeholderEn={DEFAULT_EVENT_LINK_LABEL.en}
+                idPrefix="event-url-label"
+                showBar
+              />
               <p className="vtk-ef-hint">
                 {nl
                   ? 'Laat leeg voor "Externe eventlink". Gaat de link naar de inschrijvingen of de ticketverkoop van iemand anders, zet er dan "Inschrijflink" of "Ticketverkoop": dat scheelt of iemand klikt. De Engelse tekst valt terug op de Nederlandse.'
@@ -933,6 +876,7 @@ export function EventForm({
         </div>
       </Section>
       </div>
+      </BilingualGroup>
     </SaveForm>
     {extraTabs.map((t) => (
       <div key={t.key} {...panel(t.key)} className="vtk-ef-panel">

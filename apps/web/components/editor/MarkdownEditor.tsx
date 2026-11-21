@@ -5,6 +5,7 @@ import type { Locale } from "@vtk/i18n";
 import { withImageSize } from "@/lib/gallery";
 import { Markdown } from "@/components/ui/Markdown";
 import { useReportFormBusy } from "@/components/ui/formBusy";
+import { useRegisterTranslatableField } from "@/components/ui/formTranslate";
 
 /**
  * Herbruikbare markdown-editor met werkbalk en visueel voorbeeld. De werkbalk
@@ -649,6 +650,8 @@ export function MarkdownEditorField({
       inputRef.current?.dispatchEvent(new Event("input", { bubbles: true }));
     });
   }
+
+  useRegisterTranslatableField(name, () => value, changeValue, { markdown: true });
 
   return (
     <>
