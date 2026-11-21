@@ -2,6 +2,16 @@ import "server-only";
 
 import { takedownMailBody } from "@vtk/gallery";
 import {
+  reservationDecisionMail,
+  reservationRequestSummary,
+  teamDigestMail,
+  tripCancelledDriverMail,
+  tripDecisionMail,
+  tripHandoverMail,
+  tripRequestSummary,
+  type TripMailFacts,
+} from "@vtk/mail/logistiek";
+import {
   accountVerificationMail,
   managedPasswordSetupMail,
   passwordResetMail,
@@ -78,8 +88,12 @@ export type MailPreview = {
   when: string;
   /** Wie ze krijgt. */
   to: string;
-  /** Herkomst in het maillogboek (/admin/it/email-logboek). */
-  source: EmailSource;
+  /**
+   * Herkomst in het maillogboek (/admin/it/email-logboek). Leeg voor een mail
+   * die niet via vtk.be vertrekt, zoals die van de uitleendienst: die verstuurt
+   * logistiek.vtk.be zelf, buiten het logboek om.
+   */
+  source?: EmailSource;
   /** Waar de template staat, voor wie ze wil aanpassen. */
   file: string;
   subject: string;
@@ -170,6 +184,13 @@ export function mailPreviewGroups(): MailPreviewGroup[] {
       title: "24urenloop-app",
       description: "Twee codes, elk voor een andere stap.",
       mails: urenloopPreviews(),
+    },
+    {
+      id: "uitleendienst",
+      title: "Uitleendienst",
+      description:
+        "De mails van logistiek.vtk.be: naar wie aanvroeg wanneer Logistiek beslist, naar een post die een rit krijgt, naar een chauffeur wiens rit geannuleerd werd, en de bundel naar het team. Ze vertrekken vanuit de uitleendienst en staan niet in het maillogboek.",
+      mails: uitleendienstPreviews(),
     },
   ];
 }
@@ -1320,6 +1341,189 @@ function urenloopPreviews(): MailPreview[] {
       source: "urenloopApp",
       file: "lib/urenloopAppMail.ts",
       ...pair,
+    },
+  ];
+}
+
+/** Een vaste basis-URL, zodat de voorvertoning niet afhangt van de omgeving. */
+const LOGISTIEK_URL = "https://logistiek.vtk.be";
+const LOGISTIEK_FILE = "packages/mail/src/logistiek.ts";
+
+function uitleendienstPreviews(): MailPreview[] {
+  const trip: TripMailFacts = {
+    title: "Tafels naar de voorbeeldzaal",
+    eventName: "Voorbeeldgala",
+    start: "za 3 okt. 2026 14:00",
+    end: "za 3 okt. 2026 16:00",
+    startDate: "za 3 okt. 2026",
+    vehicle: "Kar",
+    pickupAddress: "Logikot",
+    destination: "Voorbeeldzaal, Arenberg",
+    cargoNote: "20 tafels en 8 banken",
+  };
+  const reservation = (cancelled?: { wasApproved: boolean }) =>
+    reservationRequestSummary({
+      id: "voorbeeld",
+      requestName: "Voorbeeldgala",
+      requester: "Feest",
+      userName: "Wannes Voorbeeld",
+      pickupDate: "vr 2 okt. 2026",
+      returnDate: "ma 5 okt. 2026",
+      lines: [
+        { quantity: 4, name: "Statafel" },
+        { quantity: 2, name: "Spot" },
+      ],
+      delivery: true,
+      memberNote: "Graag voor 14 uur klaar.",
+      baseUrl: LOGISTIEK_URL,
+      cancelled,
+    });
+  const tripSummary = (cancelled?: Parameters<typeof tripRequestSummary>[0]["cancelled"]) =>
+    tripRequestSummary({
+      id: "voorbeeld",
+      title: trip.title,
+      purpose: trip.title,
+      eventName: trip.eventName,
+      requester: "Feest",
+      userName: "Wannes Voorbeeld",
+      legs: [{ start: trip.start, end: trip.end, vehicle: trip.vehicle }],
+      cargoNote: trip.cargoNote,
+      helpers: [{ name: "Lotte Voorbeeld", phone: "0470 00 00 00" }],
+      pickupAddress: trip.pickupAddress,
+      destination: trip.destination,
+      memberNote: null,
+      baseUrl: LOGISTIEK_URL,
+      cancelled,
+    });
+
+  const approved = reservationDecisionMail({
+    locale: "nl",
+    recipientName: "Wannes",
+    event: "APPROVED",
+    requestName: "Voorbeeldgala",
+    pickupDate: "vr 2 okt. 2026",
+    returnDate: "ma 5 okt. 2026",
+    lines: [
+      { quantity: 4, name: "Statafel", note: "liefst de hoge" },
+      { quantity: 2, name: "Spot", adminNote: "staat klaar bij het rek" },
+      { quantity: 1, name: "Rookmachine", adminNote: "is in herstelling", refused: true },
+    ],
+    flesserkeLines: [{ quantity: 3, name: "Bak cola" }],
+    baseUrl: LOGISTIEK_URL,
+  });
+  const rejected = reservationDecisionMail({
+    locale: "nl",
+    recipientName: "Wannes",
+    event: "REJECTED",
+    requestName: "Voorbeeldquiz",
+    pickupDate: "vr 2 okt. 2026",
+    returnDate: "ma 5 okt. 2026",
+    lines: [{ quantity: 10, name: "Statafel" }],
+    detail: "Alle statafels zijn dat weekend al weg.",
+    baseUrl: LOGISTIEK_URL,
+  });
+  const tripApproved = tripDecisionMail({
+    locale: "nl",
+    recipientName: "Wannes",
+    event: "APPROVED",
+    purpose: trip.title,
+    legs: [
+      { leg: "HEEN", start: trip.start, end: trip.end, vehicle: "Kar" },
+      { leg: "TERUG", start: "zo 4 okt. 2026 10:00", end: "zo 4 okt. 2026 12:00", vehicle: "Kar" },
+    ],
+    teamChanges: ["Uren verschoven naar 14:00"],
+    baseUrl: LOGISTIEK_URL,
+  });
+  const handover = tripHandoverMail({
+    locale: "nl",
+    recipientName: "Lotte",
+    groupName: "Sport",
+    trip,
+    adminNote: "De sleutel hangt in het logikot.",
+    baseUrl: LOGISTIEK_URL,
+  });
+  const driver = tripCancelledDriverMail({ locale: "nl", recipientName: "Jonas", trip, baseUrl: LOGISTIEK_URL });
+  const digest = teamDigestMail({ kind: "transport", baseUrl: LOGISTIEK_URL, requests: [tripSummary()] });
+  const digestCancelled = teamDigestMail({
+    kind: "materiaal",
+    baseUrl: LOGISTIEK_URL,
+    requests: [reservation()],
+    cancellations: [reservation({ wasApproved: true })],
+  });
+
+  const decisionNotes = [
+    "Zelfde mail bij \"aangepast\" en \"terug open\", met een andere eerste zin; bij een wijziging staat er wat er veranderde.",
+    "In de taal van de aanvrager, en in kopie naar het extra adres uit de aanvraag. Wie zelf de actie deed, krijgt niets.",
+  ];
+  return [
+    {
+      id: "uitleen-materiaal-beslist",
+      title: "Materiaalaanvraag goedgekeurd",
+      when: "Zodra Logistiek een materiaal- of flesserke-aanvraag goedkeurt, aanpast of terug openzet.",
+      to: "Wie de aanvraag indiende",
+      file: LOGISTIEK_FILE,
+      ...approved,
+      notes: decisionNotes,
+    },
+    {
+      id: "uitleen-materiaal-afgewezen",
+      title: "Materiaalaanvraag afgewezen",
+      when: "Zodra Logistiek een aanvraag afwijst.",
+      to: "Wie de aanvraag indiende",
+      file: LOGISTIEK_FILE,
+      ...rejected,
+      notes: ["De reden is de nota die het team bij het afwijzen schreef."],
+    },
+    {
+      id: "uitleen-rit-beslist",
+      title: "Rit goedgekeurd",
+      when: "Zodra Logistiek een rit goedkeurt, afwijst, aanpast of terug openzet. Heen en terug zijn één mail.",
+      to: "Wie de rit aanvroeg",
+      file: LOGISTIEK_FILE,
+      ...tripApproved,
+      notes: [
+        ...decisionNotes,
+        "Een rit die het team zelf plande, mailt niemand.",
+      ],
+    },
+    {
+      id: "uitleen-rit-doorgegeven",
+      title: "Rit doorgegeven aan een post",
+      when: "Zodra Logistiek een autorit aan een post of werkgroep doorgeeft, als /beheer/instellingen dat zo zegt.",
+      to: "De verantwoordelijken van de post, het postadres of een vast adres (instelling); standaard niemand",
+      file: LOGISTIEK_FILE,
+      ...handover,
+      notes: ["Naar een gedeelde mailbox zonder aanhef en altijd in het Nederlands."],
+    },
+    {
+      id: "uitleen-rit-geannuleerd-chauffeur",
+      title: "Rit geannuleerd, aan de chauffeur",
+      when: "Zodra de aanvrager een rit annuleert waarop een chauffeur stond.",
+      to: "De chauffeur van die rit",
+      file: LOGISTIEK_FILE,
+      ...driver,
+      notes: ["Meteen en niet in de bundel. Annuleert de chauffeur zijn eigen aanvraag, dan vertrekt er niets."],
+    },
+    {
+      id: "uitleen-team-nieuw",
+      title: "Nieuwe aanvraag, aan het team",
+      when: "Hoogstens één keer per uur per soort (materiaal, flesserke, transport), meteen als het binnen het etmaal begint.",
+      to: "De adressen per soort uit /beheer/instellingen",
+      file: LOGISTIEK_FILE,
+      ...digest,
+      notes: ["Met meer aanvragen staan ze genummerd onder elkaar, elk met hun eigen beslislink."],
+    },
+    {
+      id: "uitleen-team-geannuleerd",
+      title: "Nieuw en geannuleerd, aan het team",
+      when: "In dezelfde bundel: een aanvraag die het team al zag of goedkeurde, en die de aanvrager daarna annuleerde.",
+      to: "De adressen per soort uit /beheer/instellingen",
+      file: LOGISTIEK_FILE,
+      ...digestCancelled,
+      notes: [
+        "Een aanvraag die het team nog nooit te zien kreeg, verdwijnt bij het annuleren zonder melding.",
+        "Enkel annulaties kan ook: dan heet de mail \"materiaalaanvraag geannuleerd\".",
+      ],
     },
   ];
 }
