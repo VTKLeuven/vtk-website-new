@@ -231,7 +231,9 @@ export function TransportDecisionForms({
         savingLabel="Afwijzen..."
         savedMessage={multiple ? 'Alle ritten van deze aanvraag afgewezen.' : 'Rit afgewezen.'}
         errorMessages={REJECT_ERRORS}
-        submitVariant="danger"
+        // Omlijnd en niet vol rood (V3): afwijzen is routine; vol rood is voor
+        // verwijderen, de ene onomkeerbare actie, onderaan het paneel.
+        submitVariant="dangerOutline"
         className="grid gap-3 rounded-[14px] border border-vtk-navy/10 bg-vtk-paper p-4"
       >
         <input type="hidden" name="bookingId" value={bookingId} />

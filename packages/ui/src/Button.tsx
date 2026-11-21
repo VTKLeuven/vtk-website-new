@@ -1,7 +1,7 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { cn } from "./cn";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "secondary" | "ghost" | "danger" | "dangerOutline";
 type Size = "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
@@ -12,6 +12,10 @@ const variants: Record<Variant, string> = {
   ghost:
     "border border-vtk-muted/80 text-vtk-ink hover:border-vtk-ink hover:bg-vtk-blue-soft/70",
   danger: "bg-red-600 text-white hover:bg-red-700",
+  // Voor een actie die routine is maar wel iets weigert (een rit afwijzen):
+  // rood genoeg om op te vallen, zonder even hard te roepen als verwijderen.
+  dangerOutline:
+    "border border-vtk-danger-line bg-transparent text-vtk-danger hover:bg-vtk-danger-soft focus-visible:outline-vtk-danger",
 };
 
 const sizes: Record<Size, string> = {

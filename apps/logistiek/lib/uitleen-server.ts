@@ -8,7 +8,7 @@ import type {
   UitleenTransportBookingStatus,
   UitleenTransportNoteVisibility,
 } from '@prisma/client';
-import { currentWorkingYear } from '@vtk/auth';
+import { currentWorkingYear, workingYearOf } from '@vtk/auth';
 import { parseCustomColor, type CustomDriverColor, type DriverColorChoice } from './driver-colors';
 import { resolveDriverPhones, type DriverPhone, type DriverPhoneSource } from './driver-phones';
 import {
@@ -1150,10 +1150,7 @@ export async function transportAuditLogsByBooking(
   return byBooking;
 }
 
-export async function adminVanBookings() {
-  return prisma.uitleenTransportBooking.findMany({
-    orderBy: [{ startAt: 'desc' }],
-    include: {
+const ADMIN_TRANSPORT_INCLUDE = {
       user: { select: { id: true, name: true, email: true } },
       driver: { select: { id: true, name: true } },
       // `needsDriver`: bij de bakfiets hoort geen chauffeur, dus die rit mag ook
@@ -1165,13 +1162,171 @@ export async function adminVanBookings() {
       // De materiaalaanvraag waarvan dit de levering is, zodat de chauffeur ziet
       // wat er mee moet en het team van hieruit naar die aanvraag kan.
       reservation: { select: { id: true, eventName: true } },
-      helpers: { orderBy: { createdAt: 'asc' }, select: { id: true, name: true, phone: true } },
+      helpers: { orderBy: { createdAt: 'asc' as const }, select: { id: true, name: true, phone: true } },
+} satisfies Prisma.UitleenTransportBookingInclude;
+
+/** Een rit met alles wat het paneel in het beheer toont (`adminTransportDetail`). */
+export type AdminTransportBooking = Prisma.UitleenTransportBookingGetPayload<{
+  include: typeof ADMIN_TRANSPORT_INCLUDE;
+}>;
+
+// ---------------------------------------------------------------------------
+// De ritlijst in het beheer (P1, L2 uit de audit van november 2026)
+// ---------------------------------------------------------------------------
+
+/**
+ * Wat er van een rit in de lijst staat, en niets meer.
+ *
+ * De lijst laadde vroeger elke rit met alle relaties én renderde per rit het
+ * volledige beslis- en beheerpaneel, met de keuzelijsten van chauffeurs, posten
+ * en evenementen erin: zo'n 31 kB per rit. Het paneel staat nu enkel voor de
+ * gekozen rit open (`adminTransportDetail`); de lijst heeft genoeg aan dit.
+ */
+const ADMIN_TRIP_ROW_SELECT = {
+  id: true,
+  userId: true,
+  startAt: true,
+  endAt: true,
+  status: true,
+  tripLeg: true,
+  tripGroupId: true,
+  vehicleId: true,
+  driverId: true,
+  decidedAt: true,
+  purpose: true,
+  eventName: true,
+  requesterType: true,
+  requesterName: true,
+  priceCents: true,
+  paidOfflineAt: true,
+  user: { select: { name: true } },
+  driver: { select: { name: true } },
+  vehicle: { select: { nameNl: true, needsDriver: true } },
+  group: { select: { nameNl: true } },
+  reservation: { select: { id: true } },
+  payments: { select: { status: true } },
+} satisfies Prisma.UitleenTransportBookingSelect;
+
+export type AdminTripRow = Prisma.UitleenTransportBookingGetPayload<{ select: typeof ADMIN_TRIP_ROW_SELECT }>;
+
+/**
+ * Open werk: wat nog beslist, gereden of betaald moet worden.
+ *
+ * Zonder bovengrens. De lijst haalde de laatste 200 ritten op, aflopend op
+ * startdatum, en zodra er meer waren vielen precies de oudste weg: ook een rit
+ * die nog afgerond of betaald moest worden. Open werk is per definitie klein
+ * genoeg om altijd helemaal te tonen; de rest staat in het archief.
+ */
+export const OPEN_TRANSPORT_WHERE: Prisma.UitleenTransportBookingWhereInput = {
+  OR: [
+    { status: { in: ['REQUESTED', 'APPROVED'] } },
+    // Gereden maar nog niet betaald: enkel externen betalen (`chargesRequester`).
+    {
+      status: 'COMPLETED',
+      requesterType: 'EXTERN',
+      priceCents: { gt: 0 },
+      paidOfflineAt: null,
+      payments: { none: { status: 'SUCCEEDED' } },
     },
-    take: 200,
+  ],
+};
+
+export async function adminTransportOpen(): Promise<AdminTripRow[]> {
+  return prisma.uitleenTransportBooking.findMany({
+    where: OPEN_TRANSPORT_WHERE,
+    orderBy: [{ startAt: 'asc' }],
+    select: ADMIN_TRIP_ROW_SELECT,
   });
 }
 
-export type AdminTransportBooking = Awaited<ReturnType<typeof adminVanBookings>>[number];
+/** De grenzen van een werkingsjaar: 15 juli, middernacht op de Brusselse klok. */
+export function workingYearBounds(year: number): { from: Date; to: Date } {
+  // 15 juli valt altijd in de zomertijd (UTC+2), dus 22:00 UTC de dag ervoor.
+  return { from: new Date(Date.UTC(year, 6, 14, 22)), to: new Date(Date.UTC(year + 1, 6, 14, 22)) };
+}
+
+export const TRIP_ARCHIVE_PAGE_SIZE = 50;
+
+/**
+ * Het archief: al de rest, per werkingsjaar, met pagina's.
+ *
+ * Per werkingsjaar omdat het team zo terugzoekt ("die rit van vorig jaar
+ * voor de revue"), en omdat een jaar met pagina's begrensd is waar "de
+ * laatste 200" dat niet was. Nieuwste eerst.
+ */
+export async function adminTransportArchive(
+  year: number,
+  page: number
+): Promise<{ rows: AdminTripRow[]; total: number; page: number; pageCount: number }> {
+  const { from, to } = workingYearBounds(year);
+  const where: Prisma.UitleenTransportBookingWhereInput = {
+    startAt: { gte: from, lt: to },
+    NOT: OPEN_TRANSPORT_WHERE,
+  };
+  const total = await prisma.uitleenTransportBooking.count({ where });
+  const pageCount = Math.max(1, Math.ceil(total / TRIP_ARCHIVE_PAGE_SIZE));
+  const current = Math.min(Math.max(1, page), pageCount);
+  const rows = await prisma.uitleenTransportBooking.findMany({
+    where,
+    orderBy: [{ startAt: 'desc' }],
+    select: ADMIN_TRIP_ROW_SELECT,
+    skip: (current - 1) * TRIP_ARCHIVE_PAGE_SIZE,
+    take: TRIP_ARCHIVE_PAGE_SIZE,
+  });
+  return { rows, total, page: current, pageCount };
+}
+
+/** De werkingsjaren met ritten, nieuwste eerst, voor de keuze van het archief. */
+export async function adminTransportYears(): Promise<number[]> {
+  const [first, last] = await Promise.all([
+    prisma.uitleenTransportBooking.findFirst({ orderBy: { startAt: 'asc' }, select: { startAt: true } }),
+    prisma.uitleenTransportBooking.findFirst({ orderBy: { startAt: 'desc' }, select: { startAt: true } }),
+  ]);
+  const now = currentWorkingYear();
+  if (!first || !last) return [now];
+  const from = Math.min(workingYearOf(first.startAt), now);
+  const to = Math.max(workingYearOf(last.startAt), now);
+  const years: number[] = [];
+  for (let year = to; year >= from; year--) years.push(year);
+  return years;
+}
+
+/**
+ * Eén rit met alles wat het paneel nodig heeft, plus de andere helft van een
+ * heen-en-terugaanvraag. `null` wanneer de rit niet bestaat.
+ */
+export async function adminTransportDetail(id: string) {
+  const booking = await prisma.uitleenTransportBooking.findUnique({
+    where: { id },
+    select: { tripGroupId: true },
+  });
+  if (!booking) return null;
+  const legs = await prisma.uitleenTransportBooking.findMany({
+    where: booking.tripGroupId ? { tripGroupId: booking.tripGroupId } : { id },
+    orderBy: [{ startAt: 'asc' }],
+    include: ADMIN_TRANSPORT_INCLUDE,
+  });
+  return legs.length > 0 ? legs : null;
+}
+
+/**
+ * Wat er die dag al vaststaat met datzelfde voertuig, zodat je bij het
+ * beslissen meteen ziet waar plaats is. Enkel goedgekeurde ritten: een andere
+ * aanvraag is nog geen bezetting.
+ */
+export async function approvedSameDay(vehicleId: string, day: Date, exceptIds: string[]) {
+  const dayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Brussels' }).format(day);
+  // Ruim genoeg om elke rit van die Brusselse dag te vangen; daarna precies filteren.
+  const from = new Date(day.getTime() - 36 * 60 * 60 * 1000);
+  const to = new Date(day.getTime() + 36 * 60 * 60 * 1000);
+  const rows = await prisma.uitleenTransportBooking.findMany({
+    where: { vehicleId, status: 'APPROVED', startAt: { gte: from, lt: to }, id: { notIn: exceptIds } },
+    orderBy: [{ startAt: 'asc' }],
+    select: { id: true, startAt: true, endAt: true, purpose: true },
+  });
+  const key = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Brussels' });
+  return rows.filter((row) => key.format(row.startAt) === dayKey);
+}
 
 /**
  * Statussen die op een bezettingsoverzicht horen: wat het voertuig bezet houdt.

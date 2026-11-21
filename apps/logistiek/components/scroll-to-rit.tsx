@@ -23,6 +23,11 @@ export function ScrollToRit({ id }: { id?: string }) {
       // `display: none` (de verborgen helft van het responsieve paar) heeft geen
       // offsetParent; daar scrollen zou nergens heen scrollen.
       if (target.offsetParent === null) continue;
+      // Enkel wanneer de rij niet al in beeld staat. Een klik op een rij in de
+      // lijst zet `?rit=` ook, en dan hoort de pagina niet te verspringen; wie
+      // vanuit de kalender binnenkomt, landt wel bij zijn rit.
+      const box = target.getBoundingClientRect();
+      if (box.top >= 0 && box.bottom <= window.innerHeight) return;
       target.scrollIntoView({ block: 'center' });
       return;
     }

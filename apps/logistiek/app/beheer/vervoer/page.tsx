@@ -1,882 +1,380 @@
+import { Suspense, type ReactNode } from 'react';
 import Link from '@vtk/ui/link';
-import { ChangedByTeamBadge } from '@/components/changed-by-team-badge';
-import { VanStatusBadge } from '@/components/status-badge';
+import { currentWorkingYear } from '@vtk/auth';
 import { requireManage } from '@/lib/session';
 import { SortChipLinks, nextSortDir, type SortDir } from '@/app/beheer/sort';
 import { TRIP_SORTS, compareTrips, isTripSort, type TripSort } from '@/lib/transport-sort';
-import {
-  canDeleteTransport,
-  chargesRequester,
-  eventOptions,
-  formatPriceCents,
-  requesterLabel,
-  toDatetimeLocalValue,
-  transportDeleteDescription,
-  tripEventName,
-  tripTitle,
-} from '@/lib/uitleen';
-import { AuditTimeline } from '@/components/audit-timeline';
-import { PhoneLink } from '@/components/phone-link';
-import { LinkedText } from '@/components/linked-text';
-import { EventLink } from '@/components/event-link';
 import { LogisticsIcon } from '@/components/logistics-icon';
-import {
-  adminVanBookings,
-  adminVehicles,
-  activeGroups,
-  driverOptions,
-  selectableEvents,
-  hasSucceededPayment,
-  teamEditsForTransport,
-  transportAuditLogsByBooking,
-  type AdminTransportBooking,
-} from '@/lib/uitleen-server';
 import { ScrollToRit } from '@/components/scroll-to-rit';
-import { TripHelpers } from '@/components/trip-helpers';
-import { BookingRow } from './booking-row';
-import { TransportControls } from './transport-controls';
-import { TransportDecisionForms } from './transport-decision-forms';
-import { TransportUndoButtons } from './transport-undo';
-import { TransportDeleteButton } from './transport-delete';
-
-const dateFormatter = new Intl.DateTimeFormat('nl-BE', {
-  timeZone: 'Europe/Brussels',
-  weekday: 'short',
-  day: 'numeric',
-  month: 'short',
-});
-
-const timeFormatter = new Intl.DateTimeFormat('nl-BE', {
-  timeZone: 'Europe/Brussels',
-  hour: '2-digit',
-  minute: '2-digit',
-});
-
-const dayKeyFormatter = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'Europe/Brussels',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
-
-/** Uren van de rit; bij een rit over meerdere dagen ook de einddag. */
-function hoursLabel(booking: AdminTransportBooking): string {
-  const sameDay = dayKeyFormatter.format(booking.startAt) === dayKeyFormatter.format(booking.endAt);
-  const hours = `${timeFormatter.format(booking.startAt)}-${timeFormatter.format(booking.endAt)}`;
-  return sameDay ? hours : `${hours} (${dateFormatter.format(booking.endAt)})`;
-}
+import {
+  TRIP_ARCHIVE_PAGE_SIZE,
+  adminTransportArchive,
+  adminTransportOpen,
+  adminTransportYears,
+  driverOptions,
+  teamEditsForTransport,
+  type AdminTripRow,
+} from '@/lib/uitleen-server';
+import { TripPanel } from './trip-panel';
+import { TripRow, TripRowHeader, type TripBadge } from './trip-row';
 
 /**
- * Wacht deze rit nog op een chauffeur?
+ * Ritaanvragen: open werk bovenaan, het archief per werkingsjaar eronder.
  *
- * Enkel wanneer Logistiek het voertuig ook rijdt. De bakfiets neemt de aanvrager
- * zelf mee (`vehicle.needsDriver`), dus die rit geel markeren als "nog geen
- * chauffeur" zet een taak op het scherm die niemand ooit kan afvinken. (T13)
+ * De lijst toont enkel rijen; het paneel van één rit (beslissen, chauffeur,
+ * historiek) opent met `?rit=<id>` en wordt enkel voor die rit gerenderd. Zie
+ * `trip-row.tsx` en `trip-panel.tsx` voor het waarom (P1, M1, L2 uit de audit
+ * van november 2026), en docs/design-decisions.md.
  */
-function awaitsDriver(booking: {
-  driverId: string | null;
-  vehicle: { needsDriver: boolean };
-}): boolean {
-  return booking.vehicle.needsDriver && booking.driverId === null;
+type SearchParams = {
+  rit?: string;
+  sorteer?: string;
+  richting?: string;
+  jaar?: string;
+  pagina?: string;
+};
+
+const TOOLBAR_LINKS = [
+  { href: '/beheer/vervoer/week', label: 'Weekplanning', title: 'Weekraster per voertuig, met beheeracties' },
+  { href: '/vervoer/bezetting', label: 'Bezetting', title: 'De publieke bezetting, met enkel de goedgekeurde ritten' },
+];
+
+/** Wacht deze rit nog op een chauffeur? Enkel wanneer Logistiek het voertuig rijdt (T13). */
+function awaitsDriver(trip: Pick<AdminTripRow, 'driverId' | 'vehicle'>): boolean {
+  return trip.vehicle.needsDriver && trip.driverId === null;
 }
 
-export default async function BeheerVervoerPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ rit?: string; sorteer?: string; richting?: string }>;
-}) {
+export default async function BeheerVervoerPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   await requireManage();
-  // S3: vanuit de kalender klik je op één rit, en die hoort hier opengeklapt en
-  // gemarkeerd te staan in plaats van ergens in een lijst van twintig.
-  const { rit, sorteer, richting } = await searchParams;
+  const params = await searchParams;
+  const { rit, sorteer, richting } = params;
 
   const chosenSort = isTripSort(sorteer) ? sorteer : null;
   const sort: TripSort = chosenSort ?? 'datum';
-  const dir: SortDir =
-    richting === 'asc' || richting === 'desc' ? richting : TRIP_SORTS[sort].defaultDir;
-  const byChoice = (a: AdminTransportBooking, b: AdminTransportBooking) =>
-    compareTrips(a, b, sort, dir);
+  const dir: SortDir = richting === 'asc' || richting === 'desc' ? richting : TRIP_SORTS[sort].defaultDir;
+  const byChoice = (a: AdminTripRow, b: AdminTripRow) => compareTrips(a, b, sort, dir);
 
-  const [bookings, drivers, vehicles, events, groups] = await Promise.all([
-    adminVanBookings(),
+  const thisYear = currentWorkingYear();
+  const parsedYear = Number(params.jaar);
+  const archiveYear = Number.isInteger(parsedYear) && parsedYear > 2000 ? parsedYear : thisYear;
+  const parsedPage = Number(params.pagina);
+  const archivePage = Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+
+  const [open, archive, years, drivers] = await Promise.all([
+    adminTransportOpen(),
+    adminTransportArchive(archiveYear, archivePage),
+    adminTransportYears(),
     driverOptions(),
-    adminVehicles(),
-    selectableEvents(),
-    // Aan wie een autorit doorgegeven kan worden; de post vult dan zelf de
-    // chauffeur in (zie `assignTripGroupAction`).
-    activeGroups(),
   ]);
-  const groupOptions = groups.map((group) => ({ id: group.id, name: group.nameNl }));
-  const eventChoices = eventOptions(events);
-  const activeVehicleOptions = vehicles
-    .filter((v) => v.active)
-    .map((v) => ({
-      id: v.id,
-      name: v.nameNl,
-      needsVanDriver: v.needsVanDriver,
-      needsDriver: v.needsDriver,
-    }));
+  const teamEdits = await teamEditsForTransport(
+    [...open, ...archive.rows].map((trip) => ({ id: trip.id, userId: trip.userId }))
+  );
 
-  const open = bookings.filter((booking) => booking.status === 'REQUESTED');
   // Heen en terug zijn twee boekingen maar één aanvraag: het team beslist er in
-  // één keer over, dus staan ze onder één kaart met één beslisformulier.
-  const openGroups: AdminTransportBooking[][] = [];
-  const seenGroups = new Set<string>();
-  for (const booking of [...open].sort(byChoice)) {
-    if (!booking.tripGroupId) {
-      openGroups.push([booking]);
+  // één keer over, dus staan ze als één rij. De sortering bepaalt waar de groep
+  // staat; de rij toont de eerste helft.
+  const requested = open.filter((trip) => trip.status === 'REQUESTED').sort(byChoice);
+  const requestedGroups: AdminTripRow[][] = [];
+  const seen = new Set<string>();
+  for (const trip of requested) {
+    if (!trip.tripGroupId) {
+      requestedGroups.push([trip]);
       continue;
     }
-    if (seenGroups.has(booking.tripGroupId)) continue;
-    seenGroups.add(booking.tripGroupId);
-    // De sortering bepaalt waar de **groep** staat; bínnen een aanvraag blijven
-    // heen en terug chronologisch, wat je ook kiest. Anders staat de terugrit
-    // boven de heenrit zodra je op voertuig sorteert.
-    openGroups.push(
-      open
-        .filter((other) => other.tripGroupId === booking.tripGroupId)
+    if (seen.has(trip.tripGroupId)) continue;
+    seen.add(trip.tripGroupId);
+    requestedGroups.push(
+      requested
+        .filter((other) => other.tripGroupId === trip.tripGroupId)
         .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
     );
   }
+  const approved = open.filter((trip) => trip.status === 'APPROVED').sort(byChoice);
+  const unpaid = open.filter((trip) => trip.status === 'COMPLETED').sort(byChoice);
 
-  /**
-   * Wat er die dag al vaststaat met datzelfde voertuig, zodat je bij het
-   * verschuiven meteen ziet waar plaats is. Enkel goedgekeurde ritten: een
-   * andere aanvraag is nog geen bezetting.
-   */
-  function sameDayLines(booking: AdminTransportBooking): string[] {
-    const day = dayKeyFormatter.format(booking.startAt);
-    return bookings
-      .filter(
-        (other) =>
-          other.status === 'APPROVED' &&
-          other.vehicleId === booking.vehicleId &&
-          dayKeyFormatter.format(other.startAt) === day
-      )
-      .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
-      .map((other) => `${hoursLabel(other)} · ${tripTitle(other)}`);
+  /** Een adres op deze pagina met dezelfde sortering en archiefkeuze. */
+  function hrefWith(changes: Partial<Record<keyof SearchParams, string | null>>): string {
+    const next = new URLSearchParams();
+    const merged: Record<string, string | undefined | null> = { ...params, ...changes };
+    for (const [key, value] of Object.entries(merged)) {
+      if (value) next.set(key, value);
+    }
+    const query = next.toString();
+    return query ? `/beheer/vervoer?${query}` : '/beheer/vervoer';
   }
-  const approved = bookings.filter((booking) => booking.status === 'APPROVED').sort(byChoice);
-  const rest = bookings
-    .filter((booking) => !['REQUESTED', 'APPROVED'].includes(booking.status))
-    .sort(byChoice);
-  // R2: ritten waarvan de rit al voorbij is, staan standaard ingeklapt achter
-  // een teller. Nog niet voorbije historiek (bv. een geannuleerde rit die nog
-  // moest plaatsvinden) blijft gewoon zichtbaar.
-  const now = new Date();
-  const restUpcoming = rest.filter((booking) => booking.endAt >= now);
-  const restPast = rest.filter((booking) => booking.endAt < now);
+  const closeHref = hrefWith({ rit: null });
+  const sortOptions = (Object.keys(TRIP_SORTS) as TripSort[]).map((key) => ({
+    key,
+    label: TRIP_SORTS[key].label,
+    href: sortHref(key),
+  }));
 
-  // Historiek van alle getoonde ritten in één query; de details staan wel
-  // ingeklapt, maar worden hier server-side gerenderd.
-  const auditLogs = await transportAuditLogsByBooking(bookings.map((booking) => booking.id));
-  // Welke ritten het team aanpaste t.o.v. wat gevraagd werd (F6.11).
-  const teamEdits = await teamEditsForTransport(
-    bookings.map((booking) => ({ id: booking.id, userId: booking.userId }))
-  );
-
-  function paidOf(booking: AdminTransportBooking): boolean {
-    return hasSucceededPayment(booking.payments) || booking.paidOfflineAt !== null;
-  }
-
-  /**
-   * Waar een sorteerknop heen gaat; een tweede klik op dezelfde draait om.
-   *
-   * `?rit=` blijft staan: je komt hier vaak vanuit de kalender met één rit
-   * opengeklapt, en die mag niet verdwijnen omdat je even anders sorteert.
-   */
   function sortHref(key: TripSort): string {
-    const params = new URLSearchParams();
-    if (rit) params.set('rit', rit);
-    params.set('sorteer', key);
-    params.set('richting', nextSortDir(key, chosenSort, dir, TRIP_SORTS[key].defaultDir));
-    return `/beheer/vervoer?${params.toString()}`;
+    return hrefWith({
+      sorteer: key,
+      richting: nextSortDir(key, chosenSort, dir, TRIP_SORTS[key].defaultDir),
+    });
   }
 
-  /**
-   * De ritten die weggaan als je deze verwijdert, of `null` wanneer het niet mag
-   * (R1).
-   *
-   * Heen en terug zijn samen ingetekend en gaan samen weg, dus telt de hele
-   * tripgroep: mag één helft niet weg, dan geen enkele. Eén functie voor "mag
-   * het" en "welke", want de bevestigingstekst zegt hoeveel ritten er weggaan en
-   * wie het merkt.
-   */
-  function deletableGroup(booking: AdminTransportBooking): AdminTransportBooking[] | null {
-    const legs = booking.tripGroupId
-      ? bookings.filter((other) => other.tripGroupId === booking.tripGroupId)
-      : [booking];
-    return legs.every(canDeleteTransport) ? legs : null;
+  function badgesFor(trip: AdminTripRow, group: AdminTripRow[] = [trip]): TripBadge[] {
+    const badges: TripBadge[] = [];
+    if (trip.reservation) badges.push({ label: 'Levering', tone: 'quiet' });
+    // Al eens goedgekeurd en daarna aangepast door de aanvrager (T5): de uren
+    // waarover beslist was, zijn niet meer de uren die er nu staan.
+    if (trip.status === 'REQUESTED' && trip.decidedAt) {
+      badges.push({ label: 'Gewijzigd, opnieuw beslissen', tone: 'warn' });
+    }
+    if (group.some((leg) => (teamEdits.get(leg.id) ?? []).length > 0)) {
+      badges.push({ label: 'Gewijzigd t.o.v. aanvraag', tone: 'yellow' });
+    }
+    if (trip.status === 'APPROVED' && awaitsDriver(trip)) {
+      badges.push({ label: 'Nog geen chauffeur', tone: 'warn' });
+    }
+    return badges;
   }
 
-  /** Wat niet in de samenvattingsrij past, plus de beheeracties. */
-  function BookingDetails({
-    booking,
-    children,
-  }: {
-    booking: AdminTransportBooking;
-    children?: React.ReactNode;
-  }) {
-    const lines: Array<[string, React.ReactNode]> = [];
-    // R4: enkel externen betalen; prijs en betaalstatus verschijnen daarom
-    // nergens voor een interne aanvraag (post, werkgroep), ook niet hier in de
-    // uitgeklapte weergave. Zie chargesRequester() in lib/uitleen.ts.
-    if (chargesRequester(booking.requesterType)) {
-      lines.push(['Prijs', formatPriceCents(booking.priceCents)]);
-      if (booking.paymentMode) {
-        lines.push(['Betaald', paidOf(booking) ? 'ja' : 'nog niet']);
-      }
-    }
-    if (booking.reservation) {
-      lines.push([
-        'Levering voor',
-        <Link
-          key="reservation"
-          href={`/beheer/aanvragen/${booking.reservation.id}`}
-          className="font-medium text-vtk-navy underline underline-offset-2"
-        >
-          {booking.reservation.eventName}
-        </Link>,
-      ]);
-    }
-    // Wat er mee moet, met de link naar de materiaallijst erin aanklikbaar.
-    if (booking.cargoNote) {
-      lines.push(['Lading', <LinkedText key="cargo" text={booking.cargoNote} />]);
-    }
-    if (booking.pickupAddress) lines.push(['Laadadres', booking.pickupAddress]);
-    if (booking.destination) lines.push(['Bestemming', booking.destination]);
-    // Het nummer van de chauffeur staat bij de andere nummers en niet bij zijn
-    // naam in de rij erboven: bellen is bellen, of het nu de aanvrager, de
-    // bijrijder of de chauffeur is. Zie `driverPhones` voor waar het vandaan
-    // komt; is er geen, dan staat de regel er niet.
-    const driverPhone = booking.driverId
-      ? (drivers.find((driver) => driver.id === booking.driverId)?.phone ?? null)
-      : null;
-    if (driverPhone) {
-      lines.push(['Chauffeur bellen', <PhoneLink key="driverphone" number={driverPhone} />]);
-    }
-    if (booking.contactPhone) {
-      lines.push(['Aanvrager bellen', <PhoneLink key="contact" number={booking.contactPhone} />]);
-    }
-    // V2: bijrijders staan als eigen rijen, met een nummer per persoon. De oude
-    // vrije tekst blijft leesbaar zolang ze op een rit staat.
-    lines.push([
-      'Bijrijders',
-      <TripHelpers
-        key="helpers"
-        bookingId={booking.id}
-        helpers={booking.helpers}
-        legacyNote={booking.helpersNote}
-        canEdit={booking.status === 'REQUESTED' || booking.status === 'APPROVED'}
-      />,
-    ]);
-    if (booking.helpersPhone) {
-      lines.push(['Bijrijder bellen', <PhoneLink key="helpersphone" number={booking.helpersPhone} />]);
-    }
-    if (booking.memberNote) lines.push(['Nota van het lid', booking.memberNote]);
-    if (booking.adminNote) lines.push(['Nota van Logistiek', booking.adminNote]);
-    if (booking.kilometers !== null) lines.push(['Gereden', `${booking.kilometers} km`]);
-    // Eén rij voor het evenement. Er stonden er twee: "Evenement" met de naam
-    // die op de rit stond, en deze met de koppeling. Na "Loskoppelen" bleef de
-    // eerste staan, en daardoor leek de knop niets te doen. Een naam zonder
-    // koppeling (wat een lid vrij intikte) toont deze rij nu zelf, met "Wissen".
-    lines.push([
-      'Hoort bij evenement',
-      <EventLink
-        key="event"
-        target={{ kind: 'transport', id: booking.id }}
-        events={eventChoices}
-        current={booking.event}
-        looseName={booking.event ? null : booking.eventName}
-        showLabel={false}
-      />,
-    ]);
-    const deleteLegs = deletableGroup(booking);
+  /** Het paneel van de gekozen rit; het komt onder zijn rij (zie `rowsWithPanel`). */
+  const panel = rit ? (
+    <li key={`panel-${rit}`} className="list-none">
+      <Suspense
+        fallback={
+          <div className="my-3 h-40 rounded-[18px] border border-vtk-navy/10 bg-vtk-surface motion-safe:animate-pulse" />
+        }
+      >
+        <TripPanel id={rit} closeHref={closeHref} />
+      </Suspense>
+    </li>
+  ) : null;
 
-    return (
-      <div className="rounded-[14px] bg-vtk-paper px-4 py-3">
-        <p className="text-sm text-vtk-ink">{booking.purpose}</p>
-        {lines.length > 0 ? (
-          <dl className="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-            {lines.map(([term, value], index) => (
-              <div key={`${term}-${index}`} className="flex gap-2">
-                <dt className="shrink-0 text-vtk-muted">{term}</dt>
-                <dd className="min-w-0 text-vtk-body">{value}</dd>
-              </div>
-            ))}
-          </dl>
-        ) : null}
-        {children}
-        <TransportUndoButtons
-          bookingId={booking.id}
-          status={booking.status}
-          paidOffline={booking.paidOfflineAt !== null}
-          paidOnline={hasSucceededPayment(booking.payments)}
-        />
-        {/* Bij elke rit zonder betaling (R1). Bij een heen-en-terugrit gaan
-            beide helften mee, dus telt de groep en niet deze ene rij. */}
-        {deleteLegs ? (
-          <TransportDeleteButton
-            bookingId={booking.id}
-            title={tripTitle(booking)}
-            count={deleteLegs.length}
-            description={transportDeleteDescription(deleteLegs)}
+  function rowsWithPanel(rows: Array<{ ids: string[]; node: ReactNode }>) {
+    const out: ReactNode[] = [];
+    for (const row of rows) {
+      out.push(row.node);
+      if (rit && row.ids.includes(rit)) out.push(panel);
+    }
+    return out;
+  }
+
+  const requestedRows = rowsWithPanel(
+    requestedGroups.map((group) => {
+      const [first] = group;
+      return {
+        ids: group.map((leg) => leg.id),
+        node: (
+          <TripRow
+            key={first.id}
+            trip={first}
+            href={hrefWith({ rit: first.id })}
+            selected={group.some((leg) => leg.id === rit)}
+            extraLegs={first.tripLeg ? 0 : group.length - 1}
+            showDriver={false}
+            showStatus={false}
+            badges={badgesFor(first, group)}
           />
-        ) : null}
-        <div className="mt-3">
-          <AuditTimeline entries={auditLogs.get(booking.id) ?? []} />
-        </div>
-      </div>
-    );
-  }
-
-  /**
-   * Details van een nog te beslissen aanvraag: de feitenlijst van de eerste
-   * rit (`BookingDetails`, inclusief prijs/betaald als die relevant zijn,
-   * R4), de eventuele tweede rit van de groep (heen/terug of een tweede
-   * voertuig), en het beslisformulier eronder.
-   */
-  function OpenGroupDetails({ group }: { group: AdminTransportBooking[] }) {
-    const [first] = group;
-    return (
-      <BookingDetails booking={first}>
-        {group.length > 1 ? (
-          <ul className="mt-2 grid gap-0.5 text-sm text-vtk-muted">
-            {group.slice(1).map((leg) => (
-              <li key={leg.id}>
-                {leg.tripLeg === 'TERUG' ? 'Terugrit' : leg.vehicle.nameNl}:{' '}
-                {dateFormatter.format(leg.startAt)} · {hoursLabel(leg)}
-                {leg.tripLeg === 'TERUG' && leg.vehicleId !== first.vehicleId
-                  ? ` (${leg.vehicle.nameNl})`
-                  : ''}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        <div className="mt-4">
-          <TransportDecisionForms
-            bookingId={first.id}
-            legs={group.map((leg) => ({
-              id: leg.id,
-              startAt: toDatetimeLocalValue(leg.startAt),
-              endAt: toDatetimeLocalValue(leg.endAt),
-              // Waarom deze rit apart staat: heen/terug (V12), een
-              // tweede voertuig (V1), of allebei. Zonder dat opschrift
-              // staan er twee identieke urenblokken onder elkaar.
-              label:
-                group.length > 1
-                  ? [
-                      leg.tripLeg === 'TERUG'
-                        ? 'Terugrit'
-                        : leg.tripLeg === 'HEEN'
-                          ? 'Heenrit'
-                          : null,
-                      new Set(group.map((other) => other.vehicleId)).size > 1
-                        ? leg.vehicle.nameNl
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ') || 'Rit'
-                  : null,
-            }))}
-            drivers={drivers}
-            pricingIsPerKm={first.pricingMode === 'PER_KM'}
-            requesterType={first.requesterType}
-            needsDriver={first.vehicle.needsDriver}
-            needsVanDriver={
-              vehicles.find((v) => v.id === first.vehicleId)?.needsVanDriver ?? false
-            }
-            sameDayBookings={sameDayLines(first)}
+        ),
+      };
+    })
+  );
+  const rowsFor = (list: AdminTripRow[], options: { showStatus: boolean }) =>
+    rowsWithPanel(
+      list.map((trip) => ({
+        ids: [trip.id],
+        node: (
+          <TripRow
+            key={trip.id}
+            trip={trip}
+            href={hrefWith({ rit: trip.id })}
+            selected={trip.id === rit}
+            showStatus={options.showStatus}
+            badges={badgesFor(trip)}
           />
-        </div>
-      </BookingDetails>
+        ),
+      }))
     );
-  }
+  const approvedRows = rowsFor(approved, { showStatus: false });
+  const unpaidRows = rowsFor(unpaid, { showStatus: false });
+  const archiveRows = rowsFor(archive.rows, { showStatus: true });
 
-  const headerClass = 'py-2 pr-3 font-medium';
-
-  function HistoryList({ bookings: list }: { bookings: AdminTransportBooking[] }) {
-    return (
-      <>
-        <ul className="mt-4 grid gap-3 md:hidden">
-          {list.map((booking) => (
-            <li
-              key={booking.id}
-              data-rit={booking.id}
-              className={`rounded-[16px] border bg-vtk-surface p-4 ${
-                booking.id === rit
-                  ? 'border-vtk-yellow bg-vtk-yellow/15 outline outline-2 outline-vtk-yellow'
-                  : 'border-vtk-navy/10'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-medium text-vtk-ink">
-                    {booking.vehicle.nameNl}
-                    <span className="ml-2 text-sm font-normal text-vtk-muted">{requesterLabel(booking)}</span>
-                  </p>
-                  <p className="mt-0.5 text-sm text-vtk-muted">{booking.user.name}</p>
-                  <TripWhatLine booking={booking} />
-                  <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                    <div><dt className="text-vtk-muted">Wanneer</dt><dd className="text-vtk-body">{dateFormatter.format(booking.startAt)}</dd></div>
-                    <div><dt className="text-vtk-muted">Uren</dt><dd className="tabular-nums text-vtk-body">{hoursLabel(booking)}</dd></div>
-                    {booking.driver ? <div><dt className="text-vtk-muted">Chauffeur</dt><dd className="text-vtk-body">{booking.driver.name}</dd></div> : null}
-                  </dl>
-                </div>
-                <VanStatusBadge status={booking.status} />
-                <ChangedByTeamBadge lines={teamEdits.get(booking.id)} />
-              </div>
-              <BookingDetails booking={booking} />
-            </li>
-          ))}
-        </ul>
-
-        <div className="relative mt-4 hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[860px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-vtk-navy/10 text-left text-xs text-vtk-muted">
-                <th className={headerClass}>Wanneer</th>
-                <th className={headerClass}>Uren</th>
-                <th className={headerClass}>Voertuig</th>
-                <th className={headerClass}>Aanvrager</th>
-                <th className={headerClass}>Chauffeur</th>
-                <th className={headerClass}>Waarvoor</th>
-                <th className={headerClass}>Status</th>
-                <th className="py-2 pl-2"></th>
-              </tr>
-            </thead>
-            {list.map((booking) => (
-              <BookingRow
-                key={booking.id}
-                columns={7}
-                ritId={booking.id}
-                defaultOpen={booking.id === rit}
-                label={`${booking.vehicle.nameNl}, ${requesterLabel(booking)}, ${dateFormatter.format(booking.startAt)}`}
-                summary={
-                  <>
-                    <td className="py-2 pr-3 text-vtk-ink">{dateFormatter.format(booking.startAt)}</td>
-                    <td className="py-2 pr-3 tabular-nums text-vtk-body">{hoursLabel(booking)}</td>
-                    <td className="py-2 pr-3 text-vtk-body">{booking.vehicle.nameNl}</td>
-                    <td className="py-2 pr-3 text-vtk-body">
-                      {requesterLabel(booking)}
-                      <span className="block text-xs text-vtk-muted">{booking.user.name}</span>
-                    </td>
-                    <td className="py-2 pr-3 text-vtk-body">{booking.driver?.name ?? ''}</td>
-                    <td className="py-2 pr-3 text-vtk-body">
-                      <TripWhatCell booking={booking} />
-                    </td>
-                    <td className="py-2 pr-3">
-                      <VanStatusBadge status={booking.status} />
-                <ChangedByTeamBadge lines={teamEdits.get(booking.id)} />
-                    </td>
-                  </>
-                }
-                details={<BookingDetails booking={booking} />}
-              />
-            ))}
-          </table>
-        </div>
-      </>
-    );
-  }
+  const firstShown = (archive.page - 1) * TRIP_ARCHIVE_PAGE_SIZE + 1;
+  const lastShown = firstShown + archive.rows.length - 1;
 
   return (
-    <div className="grid gap-8">
-      {/* Vanuit de kalender kom je met ?rit=<id> binnen; die rit staat dan
-          opengeklapt, en dit brengt hem in beeld (S3). */}
+    <div className="grid gap-7">
+      {/* Vanuit de kalender kom je met ?rit=<id> binnen; dit brengt de rit in beeld (S3). */}
       <ScrollToRit id={rit} />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-vtk-muted">
+      {/* Een rit die in geen van de lijsten hieronder staat (een ander jaar of
+          een andere pagina van het archief): dan opent het paneel hier. */}
+      {rit && !shownIn(rit, [requestedGroups.flat(), approved, unpaid, archive.rows]) ? (
+        <ul>{panel}</ul>
+      ) : null}
+
+      {/* Eén werkbalk (M2). Op een telefoon stonden hier vier rijen knoppen en
+          sorteerpillen voor de eerste rit; daar blijft enkel wat je dagelijks
+          nodig hebt zichtbaar, en de rest zit achter "Meer" en "Sorteren". */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* "Mijn beschikbaarheid" is de enige gevulde knop: het enige scherm
+            hier waar je zelf iets invult. */}
+        <Link
+          href="/ritten/beschikbaarheid"
+          title="Doorgeven wanneer je zelf kan rijden"
+          className="inline-flex items-center gap-2 rounded-full bg-vtk-navy px-3.5 py-1.5 text-sm font-semibold text-vtk-on-emphasis transition hover:bg-vtk-navy/90"
+        >
+          <LogisticsIcon name="driver" className="h-4 w-4" />
+          Mijn beschikbaarheid
+        </Link>
+        {TOOLBAR_LINKS.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            title={link.title}
+            className="hidden rounded-full border border-vtk-navy/15 px-3.5 py-1.5 text-sm font-semibold text-vtk-ink transition hover:border-vtk-navy/40 sm:inline-flex"
+          >
+            {link.label}
+          </Link>
+        ))}
+        <details className="relative sm:hidden">
+          <summary className="cursor-pointer list-none rounded-full border border-vtk-navy/15 px-3.5 py-1.5 text-sm font-semibold text-vtk-ink [&::-webkit-details-marker]:hidden">
+            Meer
+          </summary>
+          <div className="absolute left-0 top-full z-30 mt-2 grid min-w-48 gap-1 rounded-[14px] border border-vtk-navy/15 bg-vtk-surface p-2 shadow-lg">
+            {[...TOOLBAR_LINKS, { href: '/beheer/chauffeurs', label: 'Chauffeurs beheren', title: '' }].map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="rounded-lg px-3 py-2 text-sm font-medium text-vtk-ink hover:bg-vtk-navy/5"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        </details>
+        <details className="sm:hidden">
+          <summary className="cursor-pointer list-none rounded-full border border-vtk-navy/15 px-3.5 py-1.5 text-sm font-semibold text-vtk-ink [&::-webkit-details-marker]:hidden">
+            Sorteren
+          </summary>
+          <div className="mt-2">
+            <SortChipLinks activeKey={chosenSort} dir={dir} options={sortOptions} />
+          </div>
+        </details>
+        <p className="ml-auto hidden text-sm text-vtk-muted sm:block">
           {drivers.length === 0
-            ? 'Er staat nog niemand in de chauffeurslijst, dus je kan nog geen chauffeur toewijzen. '
-            : `${drivers.length} chauffeur${drivers.length === 1 ? '' : 's'} beschikbaar. `}
+            ? 'Nog niemand in de chauffeurslijst. '
+            : `${drivers.length} chauffeur${drivers.length === 1 ? '' : 's'}. `}
           <Link
             href="/beheer/chauffeurs"
             className="font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
           >
-            Chauffeurs beheren
+            Beheren
           </Link>
         </p>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* T6: losse links, elk met een eigen bestemming en een titel die zegt
-              waar ze heen gaan, zodat ze niet door elkaar lopen met de
-              "Weekplanning"-tab in de navigatie (N1, zelfde bestemming als
-              hieronder).
-
-              "Mijn beschikbaarheid" staat vooraan en is de enige gevulde knop
-              van de drie: het is het enige scherm hier waar je zelf iets
-              invult, en dat is iets anders dan de twee overzichten ernaast. Ze
-              gaat rechtstreeks naar het invulscherm en niet naar "Mijn ritten"
-              met een stap ertussen; wie zijn eigen ritten zoekt, vindt ze via de
-              knop in de kop daar. */}
-          <Link
-            href="/ritten/beschikbaarheid"
-            title="Doorgeven wanneer je zelf kan rijden; vandaar kan je ook naar je eigen ritten"
-            className="inline-flex items-center gap-2 rounded-full bg-vtk-navy px-3.5 py-1.5 text-sm font-semibold text-vtk-on-emphasis transition hover:bg-vtk-navy/90"
-          >
-            <LogisticsIcon name="driver" className="h-4 w-4" />
-            Mijn beschikbaarheid
-          </Link>
-          <Link
-            href="/beheer/vervoer/week"
-            title="Weekraster per voertuig, met beheeracties (zelfde als Weekplanning in de navigatie)"
-            className="rounded-full border border-vtk-navy/15 px-3.5 py-1.5 text-sm font-semibold text-vtk-ink transition hover:border-vtk-navy/40"
-          >
-            Weekplanning
-          </Link>
-          <Link
-            href="/vervoer/bezetting"
-            title="De publieke bezetting, met enkel de goedgekeurde ritten"
-            className="rounded-full border border-vtk-navy/15 px-3.5 py-1.5 text-sm font-semibold text-vtk-ink transition hover:border-vtk-navy/40"
-          >
-            Bezetting
-          </Link>
-        </div>
       </div>
 
-      {/* Sorteren geldt voor de drie lijsten tegelijk (R3). Eén rij en niet drie:
-          "waar staat de kar deze maand" is één vraag, en je wil ze niet per
-          sectie opnieuw stellen. */}
-      <SortChipLinks
-        activeKey={chosenSort}
-        dir={dir}
-        options={(Object.keys(TRIP_SORTS) as TripSort[]).map((key) => ({
-          key,
-          label: TRIP_SORTS[key].label,
-          href: sortHref(key),
-        }))}
-      />
+      {/* Sorteren geldt voor het open werk; het archief staat altijd nieuwste eerst. */}
+      <div className="hidden sm:block">
+        <SortChipLinks activeKey={chosenSort} dir={dir} options={sortOptions} />
+      </div>
 
       <section>
-        <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
-          Te beslissen ({openGroups.length})
-        </h2>
-        {open.length === 0 ? (
+        <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">Te beslissen ({requestedGroups.length})</h2>
+        {requestedGroups.length === 0 ? (
           <p className="mt-3 text-sm text-vtk-muted">Geen open ritaanvragen.</p>
         ) : (
-          <>
-            {/* Kaartjesweergave: zichtbaar op mobile, verborgen op md+. Zelfde
-                opbouw als "Goedgekeurd": compacte samenvatting, details en
-                beslisformulier direct eronder (niet toegeklapt op mobile). */}
-            <ul className="mt-4 grid gap-3 md:hidden">
-              {openGroups.map((group) => {
-                const [first] = group;
-                return (
-                  <li
-                    key={first.id}
-                    data-rit={first.id}
-                    className={`rounded-[16px] border bg-vtk-surface p-4 ${
-                      group.some((leg) => leg.id === rit)
-                        ? 'border-vtk-yellow bg-vtk-yellow/15 outline outline-2 outline-vtk-yellow'
-                        : 'border-vtk-navy/10'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium text-vtk-ink">{first.vehicle.nameNl}</span>
-                          {first.tripLeg ? (
-                            <span className="rounded-full bg-vtk-yellow/25 px-2 py-0.5 text-[11px] font-semibold text-vtk-ink">
-                              {first.tripLeg === 'HEEN' ? 'Heenrit' : 'Terugrit'}
-                            </span>
-                          ) : null}
-                          {first.reservation ? (
-                            <span className="rounded-full bg-vtk-paper-2 px-2 py-0.5 text-[11px] font-semibold text-vtk-navy">
-                              Levering
-                            </span>
-                          ) : null}
-                          {/* Al eens goedgekeurd en daarna aangepast door de
-                              aanvrager (T5): de uren waarover je beslist had,
-                              zijn niet meer de uren die er nu staan. */}
-                          {first.decidedAt ? (
-                            <span className="rounded-full bg-vtk-warn-fill px-2 py-0.5 text-[11px] font-semibold text-vtk-warn">
-                              Gewijzigd, opnieuw beslissen
-                            </span>
-                          ) : null}
-                        </p>
-                        <p className="mt-0.5 text-sm text-vtk-muted">
-                          {requesterLabel(first)}
-                          <span className="ml-1">{first.user.name}</span>
-                        </p>
-                        <TripWhatLine booking={first} />
-                        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                          <div><dt className="text-vtk-muted">Wanneer</dt><dd className="text-vtk-body">{dateFormatter.format(first.startAt)}</dd></div>
-                          <div><dt className="text-vtk-muted">Uren</dt><dd className="tabular-nums text-vtk-body">{hoursLabel(first)}</dd></div>
-                        </dl>
-                        {group.length > 1 ? (
-                          <p className="mt-1 text-xs text-vtk-muted">
-                            + {group.length - 1} extra rit{group.length - 1 > 1 ? 'ten' : ''} in deze aanvraag
-                          </p>
-                        ) : null}
-                      </div>
-                      <VanStatusBadge status={first.status} />
-                      <ChangedByTeamBadge lines={teamEdits.get(first.id)} />
-                    </div>
-                    <div className="mt-3">
-                      <OpenGroupDetails group={group} />
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-
-            {/* Tabelweergave: verborgen op mobile, zichtbaar op md+. Compact per
-                rij, details en beslisformulier pas bij uitklappen (T3), zelfde
-                BookingRow-mechanisme als "Goedgekeurd". */}
-            <div className="relative mt-4 hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[760px] border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-vtk-navy/10 text-left text-xs text-vtk-muted">
-                    <th className={headerClass}>Wanneer</th>
-                    <th className={headerClass}>Uren</th>
-                    <th className={headerClass}>Voertuig</th>
-                    <th className={headerClass}>Aanvrager</th>
-                    <th className={headerClass}>Waarvoor</th>
-                    <th className="py-2 pl-2"></th>
-                  </tr>
-                </thead>
-                {openGroups.map((group) => {
-                  const [first] = group;
-                  return (
-                    <BookingRow
-                      key={first.id}
-                      columns={5}
-                      ritId={first.id}
-                      // Heen en terug staan onder één kaart: de rit waarop je
-                      // klikte kan de tweede helft zijn.
-                      defaultOpen={group.some((leg) => leg.id === rit)}
-                      label={`${first.vehicle.nameNl}, ${requesterLabel(first)}, ${dateFormatter.format(first.startAt)}`}
-                      summary={
-                        <>
-                          <td className="py-2 pr-3 text-vtk-ink">{dateFormatter.format(first.startAt)}</td>
-                          <td className="py-2 pr-3 tabular-nums text-vtk-body">{hoursLabel(first)}</td>
-                          <td className="py-2 pr-3 text-vtk-body">
-                            {first.vehicle.nameNl}
-                            {first.tripLeg ? (
-                              <span className="ml-1 text-xs text-vtk-muted">
-                                ({first.tripLeg === 'HEEN' ? 'heen' : 'terug'})
-                              </span>
-                            ) : group.length > 1 ? (
-                              <span className="ml-1 text-xs text-vtk-muted">+{group.length - 1}</span>
-                            ) : null}
-                          </td>
-                          <td className="py-2 pr-3 text-vtk-body">
-                            {requesterLabel(first)}
-                            <span className="block text-xs text-vtk-muted">{first.user.name}</span>
-                          </td>
-                          <td className="py-2 pr-3 text-vtk-body">
-                            <TripWhatCell booking={first} />
-                          </td>
-                        </>
-                      }
-                      details={<OpenGroupDetails group={group} />}
-                    />
-                  );
-                })}
-              </table>
-            </div>
-          </>
+          <div className="mt-3">
+            <TripRowHeader showDriver={false} showStatus={false} />
+            <ul>{requestedRows}</ul>
+          </div>
         )}
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
-          Goedgekeurd ({approved.length})
-        </h2>
+        <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">Goedgekeurd ({approved.length})</h2>
         {approved.length === 0 ? (
           <p className="mt-3 text-sm text-vtk-muted">Geen goedgekeurde ritten.</p>
         ) : (
-          <>
-            <ul className="mt-4 grid gap-3 md:hidden">
-              {approved.map((booking) => {
-                const paid = paidOf(booking);
-                return (
-                  <li
-                    key={booking.id}
-                    data-rit={booking.id}
-                    className={`rounded-[16px] border bg-vtk-surface p-4 ${
-                      booking.id === rit
-                        ? 'border-vtk-yellow bg-vtk-yellow/15 outline outline-2 outline-vtk-yellow'
-                        : awaitsDriver(booking)
-                          ? 'border-vtk-warn-line bg-vtk-warn-soft'
-                          : 'border-vtk-navy/10'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="font-medium text-vtk-ink">
-                          {booking.vehicle.nameNl}
-                          <span className="ml-2 text-sm font-normal text-vtk-muted">{requesterLabel(booking)}</span>
-                        </p>
-                        <p className="mt-0.5 text-sm text-vtk-muted">{booking.user.name}</p>
-                        <TripWhatLine booking={booking} />
-                        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                          <div><dt className="text-vtk-muted">Wanneer</dt><dd className="text-vtk-body">{dateFormatter.format(booking.startAt)}</dd></div>
-                          <div><dt className="text-vtk-muted">Uren</dt><dd className="tabular-nums text-vtk-body">{hoursLabel(booking)}</dd></div>
-                          <div><dt className="text-vtk-muted">Chauffeur</dt><dd className={booking.driver || !booking.vehicle.needsDriver ? 'text-vtk-body' : 'font-semibold text-vtk-ink'}>{booking.driver?.name ?? (booking.vehicle.needsDriver ? 'nog geen' : 'niet nodig')}</dd></div>
-                        </dl>
-                      </div>
-                      <VanStatusBadge status={booking.status} />
-                <ChangedByTeamBadge lines={teamEdits.get(booking.id)} />
-                    </div>
-                    <BookingDetails booking={booking}>
-                      <TransportControls
-                        bookingId={booking.id}
-                        vehicleId={booking.vehicleId}
-                        driverId={booking.driverId}
-                        driver={booking.driver}
-                        pricingMode={booking.pricingMode}
-                        paid={paid}
-                        requesterType={booking.requesterType}
-                        drivers={drivers}
-                        vehicles={activeVehicleOptions}
-                        groups={groupOptions}
-                        assignedGroupId={booking.assignedGroupId}
-                      />
-                    </BookingDetails>
-                  </li>
-                );
-              })}
-            </ul>
-
-            <div className="relative mt-4 hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[860px] border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-vtk-navy/10 text-left text-xs text-vtk-muted">
-                    <th className={headerClass}>Wanneer</th>
-                    <th className={headerClass}>Uren</th>
-                    <th className={headerClass}>Voertuig</th>
-                    <th className={headerClass}>Aanvrager</th>
-                    <th className={headerClass}>Chauffeur</th>
-                    <th className={headerClass}>Waarvoor</th>
-                    <th className="py-2 pl-2"></th>
-                  </tr>
-                </thead>
-                {approved.map((booking) => {
-                  const paid = paidOf(booking);
-                  return (
-                    <BookingRow
-                      key={booking.id}
-                      columns={6}
-                      ritId={booking.id}
-                      defaultOpen={booking.id === rit}
-                      label={`${booking.vehicle.nameNl}, ${requesterLabel(booking)}, ${dateFormatter.format(booking.startAt)}`}
-                      highlight={awaitsDriver(booking)}
-                      summary={
-                        <>
-                          <td className="py-2 pr-3 text-vtk-ink">{dateFormatter.format(booking.startAt)}</td>
-                          <td className="py-2 pr-3 tabular-nums text-vtk-body">{hoursLabel(booking)}</td>
-                          <td className="py-2 pr-3 text-vtk-body">{booking.vehicle.nameNl}</td>
-                          <td className="py-2 pr-3 text-vtk-body">
-                            {requesterLabel(booking)}
-                            <span className="block text-xs text-vtk-muted">{booking.user.name}</span>
-                          </td>
-                          <td className="py-2 pr-3">
-                            {booking.driver ? (
-                              <span className="text-vtk-body">{booking.driver.name}</span>
-                            ) : booking.vehicle.needsDriver ? (
-                              <span className="font-semibold text-vtk-ink">nog geen</span>
-                            ) : (
-                              <span className="text-vtk-muted">niet nodig</span>
-                            )}
-                          </td>
-                          <td className="py-2 pr-3 text-vtk-body">
-                            <TripWhatCell booking={booking} />
-                          </td>
-                        </>
-                      }
-                      details={
-                        <BookingDetails booking={booking}>
-                          <TransportControls
-                            bookingId={booking.id}
-                            vehicleId={booking.vehicleId}
-                            driverId={booking.driverId}
-                            driver={booking.driver}
-                            pricingMode={booking.pricingMode}
-                            paid={paid}
-                            requesterType={booking.requesterType}
-                            drivers={drivers}
-                            vehicles={activeVehicleOptions}
-                            groups={groupOptions}
-                            assignedGroupId={booking.assignedGroupId}
-                          />
-                        </BookingDetails>
-                      }
-                    />
-                  );
-                })}
-              </table>
-            </div>
-            {approved.some((booking) => awaitsDriver(booking)) ? (
-              <p className="mt-2 text-xs text-vtk-muted">
-                Geel gemarkeerd: er is nog geen chauffeur toegewezen.
-              </p>
-            ) : null}
-          </>
+          <div className="mt-3">
+            <TripRowHeader showStatus={false} />
+            <ul>{approvedRows}</ul>
+          </div>
         )}
       </section>
 
+      {unpaid.length > 0 ? (
+        <section>
+          <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">Gereden, nog niet betaald ({unpaid.length})</h2>
+          <div className="mt-3">
+            <TripRowHeader showStatus={false} />
+            <ul>{unpaidRows}</ul>
+          </div>
+        </section>
+      ) : null}
+
       <section>
-        <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">Historiek ({rest.length})</h2>
-        {rest.length === 0 ? (
-          <p className="mt-3 text-sm text-vtk-muted">Nog geen afgeronde of afgewezen ritten.</p>
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">Archief</h2>
+          {years.length > 1 ? (
+            <nav aria-label="Werkingsjaar" className="flex flex-wrap gap-1.5">
+              {years.map((year) => (
+                <Link
+                  key={year}
+                  href={hrefWith({ jaar: year === thisYear ? null : String(year), pagina: null, rit: null })}
+                  aria-current={year === archiveYear ? 'true' : undefined}
+                  className={`rounded-full border px-3 py-1 text-sm font-medium transition ${
+                    year === archiveYear
+                      ? 'border-vtk-navy bg-vtk-navy text-vtk-on-emphasis'
+                      : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
+                  }`}
+                >
+                  {`${String(year).slice(2)}-${String(year + 1).slice(2)}`}
+                </Link>
+              ))}
+            </nav>
+          ) : null}
+        </div>
+        <p className="mt-1 text-sm text-vtk-muted">
+          Afgerond, afgewezen en geannuleerd in werkingsjaar {String(archiveYear).slice(2)}-
+          {String(archiveYear + 1).slice(2)}, nieuwste eerst.
+          {archive.total > 0
+            ? ` ${firstShown}${lastShown > firstShown ? ` tot ${lastShown}` : ''} van ${archive.total}.`
+            : ''}
+        </p>
+        {archive.total === 0 ? (
+          <p className="mt-3 text-sm text-vtk-muted">Nog niets in het archief van dit jaar.</p>
         ) : (
-          <>
-            {restUpcoming.length > 0 ? <HistoryList bookings={restUpcoming} /> : null}
-            {restPast.length > 0 ? (
-              // R2: ritten waarvan de rit al voorbij is (endAt < vandaag), standaard
-              // ingeklapt achter een teller. Zelfde patroon als PastGroup in
-              // app/reservaties/page.tsx.
-              // Staat de gezochte rit hierin, dan gaat de uitklapper open: anders
-              // landt ?rit=<id> op een teller waarachter niets te zien is (S3).
-              <details className="group mt-4" open={restPast.some((booking) => booking.id === rit)}>
-                <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-vtk-muted [&::-webkit-details-marker]:hidden">
-                  <span
-                    aria-hidden="true"
-                    className="inline-block transition-transform group-open:rotate-90"
+          <div className="mt-3">
+            <TripRowHeader />
+            <ul>{archiveRows}</ul>
+            {archive.pageCount > 1 ? (
+              <nav aria-label="Pagina's van het archief" className="mt-3 flex items-center gap-2 text-sm">
+                {archive.page > 1 ? (
+                  <Link
+                    href={hrefWith({ pagina: String(archive.page - 1), rit: null })}
+                    className="rounded-full border border-vtk-navy/15 px-3 py-1.5 font-medium text-vtk-ink transition hover:border-vtk-navy/40"
                   >
-                    ▸
-                  </span>
-                  Afgelopen ({restPast.length})
-                </summary>
-                <div className="mt-4">
-                  <HistoryList bookings={restPast} />
-                </div>
-              </details>
+                    ← Nieuwer
+                  </Link>
+                ) : null}
+                <span className="tabular-nums text-vtk-muted">
+                  Pagina {archive.page} van {archive.pageCount}
+                </span>
+                {archive.page < archive.pageCount ? (
+                  <Link
+                    href={hrefWith({ pagina: String(archive.page + 1), rit: null })}
+                    className="rounded-full border border-vtk-navy/15 px-3 py-1.5 font-medium text-vtk-ink transition hover:border-vtk-navy/40"
+                  >
+                    Ouder →
+                  </Link>
+                ) : null}
+              </nav>
             ) : null}
-          </>
+          </div>
         )}
       </section>
     </div>
   );
 }
 
-/**
- * Waarvoor de rit dient, met het evenement er klein onder.
- *
- * Deze kolom heette "Evenement" en toonde enkel de naam van het evenement; bij
- * vijf ritten voor hetzelfde galabal zei ze dan vijf keer hetzelfde, en wat de
- * rit deed stond pas in het uitgeklapte detail. Twee regels afgekapt: `purpose`
- * is vrije tekst, en het volledige verhaal staat in het detail.
- */
-function TripWhatCell({ booking }: { booking: { purpose: string; eventName: string | null } }) {
-  const event = tripEventName(booking);
-  return (
-    <>
-      <span className="line-clamp-2 max-w-[18rem]">{tripTitle(booking)}</span>
-      {event ? <span className="block text-xs text-vtk-muted">{event}</span> : null}
-    </>
-  );
-}
-
-/** Hetzelfde voor de kaarten op een smal scherm. */
-function TripWhatLine({ booking }: { booking: { purpose: string; eventName: string | null } }) {
-  const event = tripEventName(booking);
-  return (
-    <>
-      <p className="mt-0.5 line-clamp-2 text-sm text-vtk-ink">{tripTitle(booking)}</p>
-      {event ? <p className="mt-0.5 text-xs font-medium text-vtk-navy">{event}</p> : null}
-    </>
-  );
+/** Of de gekozen rit in een van de getoonde lijsten staat. */
+function shownIn(rit: string, lists: AdminTripRow[][]): boolean {
+  return lists.some((list) => list.some((trip) => trip.id === rit));
 }

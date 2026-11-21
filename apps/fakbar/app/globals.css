@@ -39,6 +39,10 @@
      vult elke app het zelf in. De waarden hier zijn wat de correcties onderaan
      dit bestand al afdwongen. */
   --color-vtk-surface-elevated: #171d26;
+  /* Voor de knopvariant `dangerOutline` uit @vtk/ui; de waarden volgen --danger. */
+  --color-vtk-danger: #f87171;
+  --color-vtk-danger-soft: rgba(248, 113, 113, 0.12);
+  --color-vtk-danger-line: rgba(248, 113, 113, 0.45);
   --color-vtk-on-yellow: #05070a;
   --color-vtk-body: #c2cad4;
   --color-vtk-muted: #8d99a8;
