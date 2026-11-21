@@ -3,6 +3,8 @@ import { copy, getLocale } from '@/lib/i18n';
 import { getPublicCopy } from '@/lib/public-copy';
 
 const MAIN_URL = process.env.VTK_MAIN_URL || 'https://vtk.be';
+const FOOTER_LINK =
+  'inline-flex min-h-10 items-center text-vtk-on-dark underline decoration-vtk-yellow underline-offset-4';
 
 export async function SiteFooter() {
   const locale = await getLocale();
@@ -24,23 +26,24 @@ export async function SiteFooter() {
             ) : null}
           </div>
         </div>
-        <p className="text-sm leading-6 text-vtk-on-dark-muted md:text-right">
-          {t.questions} Mail{' '}
-          <a href="mailto:logistiek@vtk.be" className="text-vtk-on-dark underline decoration-vtk-yellow underline-offset-4">
-            logistiek@vtk.be
-          </a>{' '}
-          <br className="hidden md:block" />
-          <a href={MAIN_URL} className="text-vtk-on-dark underline decoration-vtk-yellow underline-offset-4">
-            vtk.be
-          </a>
-          {' · '}
-          <a
-            href={`${MAIN_URL}${locale === 'en' ? '/en' : ''}/privacy`}
-            className="text-vtk-on-dark underline decoration-vtk-yellow underline-offset-4"
-          >
-            {locale === 'en' ? 'Privacy' : 'Privacy'}
-          </a>
-        </p>
+        {/* Elke link 40 px hoog (M5): als tekstlink in een zin was hij 17 px, en
+            op een telefoon lagen vtk.be en Privacy daardoor net te dicht. */}
+        <div className="text-sm leading-6 text-vtk-on-dark-muted md:text-right">
+          <p>
+            {t.questions} Mail{' '}
+            <a href="mailto:logistiek@vtk.be" className={FOOTER_LINK}>
+              logistiek@vtk.be
+            </a>
+          </p>
+          <p className="flex flex-wrap gap-x-5 md:justify-end">
+            <a href={MAIN_URL} className={FOOTER_LINK}>
+              vtk.be
+            </a>
+            <a href={`${MAIN_URL}${locale === 'en' ? '/en' : ''}/privacy`} className={FOOTER_LINK}>
+              Privacy
+            </a>
+          </p>
+        </div>
       </div>
     </footer>
   );

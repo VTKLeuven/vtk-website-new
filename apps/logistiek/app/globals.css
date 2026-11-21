@@ -858,6 +858,7 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
+  min-height: 40px;
   color: var(--on-chrome);
   text-decoration: none;
 }
@@ -899,6 +900,9 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
 }
 
 .vtk-site-header .nav-links a {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
   color: rgba(250, 250, 247, 0.78);
   font-size: 14px;
   font-weight: 500;
@@ -976,6 +980,9 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
   margin-left: auto;
 }
 
+/* Elke bediening in de kop en de voet is minstens 40 px hoog (M5 uit de audit
+   van november 2026): NL en EN waren 28 px, de themaknop 34, en de links in de
+   voet zo hoog als hun tekst. Op een telefoon raakte je zo even vaak de buur. */
 .vtk-site-header .lang-toggle {
   display: inline-flex;
   align-items: center;
@@ -985,7 +992,11 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
 }
 
 .vtk-site-header .lang-toggle button {
-  padding: 4px;
+  display: inline-grid;
+  min-width: 32px;
+  min-height: 40px;
+  place-items: center;
+  padding: 0 4px;
   border: 0;
   background: none;
   color: inherit;
@@ -1013,8 +1024,8 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
    pictogram toont waar je naartoe gaat, niet waar je staat. */
 .vtk-site-header .theme-toggle {
   display: inline-grid;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   place-items: center;
   border: 0;
   border-radius: 999px;
@@ -1044,9 +1055,9 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
 .vtk-site-header .profile-menu-trigger,
 .vtk-site-header .nav-login {
   display: inline-grid;
-  width: 38px;
-  min-width: 38px;
-  height: 38px;
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
   place-items: center;
   border: 1px solid rgba(250, 250, 247, 0.34);
   border-radius: 999px;
