@@ -103,7 +103,7 @@ export function cellText(cell: Cell | undefined): string {
 // Zip
 // ---------------------------------------------------------------------------
 
-function readZip(buffer: Buffer): Map<string, () => Buffer> {
+export function readZip(buffer: Buffer): Map<string, () => Buffer> {
   const minEocd = 22;
   if (buffer.length < minEocd) throw new XlsxError('NOT_ZIP');
   let eocd = -1;
@@ -151,7 +151,7 @@ function readZip(buffer: Buffer): Map<string, () => Buffer> {
 // vorm, geen willekeurige invoer van een mens.
 // ---------------------------------------------------------------------------
 
-function decodeXml(text: string): string {
+export function decodeXml(text: string): string {
   return text.replace(/&(#x[0-9a-fA-F]+|#\d+|lt|gt|amp|quot|apos);/g, (_, code: string) => {
     switch (code) {
       case 'lt':

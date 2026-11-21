@@ -420,6 +420,51 @@ Het dashboard leest hiervoor het hele overzicht van het jaar
 
 ---
 
+## Aanwezigheden
+
+`/admin/apps/aanwezigheden` (onder Apps in de zijbalk) toont wie er op elke BO
+was. De bron is het verslag in de map van de vergadering: bovenaan staat onder
+de kop "Aanwezigheden" het hele praesidium, één naam per regel, groen voor
+aanwezig, oranje voor verontschuldigd en rood voor afwezig, met daaronder de
+legende "Aanwezig - Verontschuldigd - Afwezig". Het was eerst een los projectje
+dat verslagen las die als HTML geëxporteerd waren; nu leest de BO-scan ze
+rechtstreeks uit Drive.
+
+- **De scan leest het verslag mee** (`findMinutes` en `syncMinutes` in
+  `lib/bo/scan.ts`): een Google Doc of Word-bestand rechtstreeks in de map van
+  de vergadering, of een snelkoppeling ernaar, met "verslag" in de naam. Staan
+  er twee, dan wint wat met "Verslag" begint, en daarna het laatst gewijzigde.
+  Eén verslag per BO (`BoMinutes`, uniek op `meetingId`).
+- **Eén lezer voor beide formaten.** Een Google Doc wordt als docx
+  geëxporteerd (`downloadDocument` in `lib/google/client.ts`), zodat
+  `lib/bo/attendance/parse.ts` enkel docx leest, met dezelfde zip- en
+  XML-helpers als de rekenbladen.
+- **De legende gaat voor de tint.** De kleur van elke naam wordt eerst
+  opgezocht in de legende van dat verslag, en pas daarna op tint ingedeeld
+  (`statusOfColor`): in de verslagen van 26-27 stond al eens een naam in een
+  andere tint oranje of groen. Zwart is "nog niet ingekleurd" en telt nergens.
+- **Wie wie is, wordt bij het tonen beslist** (`lib/bo/attendance/stats.ts`).
+  `BoMinutes.attendance` bewaart de namen zoals ze in het verslag staan; de
+  pagina koppelt ze met `proposeMatch` (dezelfde als bij de shiftenlijsten)
+  aan het praesidium van dat werkingsjaar. Wie niet te koppelen is, blijft een
+  persoon op naam en staat bij "Na te kijken".
+- **Zoals bij de bladen**: niet opnieuw downloaden zolang `driveModifiedAt` en
+  `MINUTES_VERSION` gelijk blijven; een verdwenen verslag krijgt
+  `missingSince` en blijft tellen.
+- **Wie het ziet**: de rol admin (`bestuursorgaan.attendance`) en Groep 5 (ook
+  met `bestuursorgaan.manage`); "Nu lezen" enkel Groep 5, want dat leest de
+  hele BO-map. Zie `docs/design-decisions.md`, "Bestuursorgaan: aanwezigheden".
+
+Vallen:
+
+- **De kop moet "Aanwezigheden" heten, op een eigen regel.** Zonder die kop
+  geeft het verslag `NO_ATTENDANCE`. Zonder legende stopt de lijst bij de
+  eerste regel die geen gekleurde naam is.
+- **Een echt verslag hoort niet in de repo**: er staan namen in. De tests in
+  `test/boAttendance.test.ts` bouwen de XML zelf, met verzonnen namen.
+
+---
+
 ## Budgetten op de site (proef)
 
 **Een proef naast Drive, geen vervanging.** Het BO werkt met de rekenbladen in

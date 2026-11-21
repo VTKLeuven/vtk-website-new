@@ -203,7 +203,7 @@ async function main() {
   console.log("Seeding roles and post role grants...");
   // Posten kennen rechten niet meer direct toe: ze verlenen ROLLEN aan hun leden
   // (GroupRole, kind DEFAULT = elk lid). De geseede rolset:
-  //   - admin (alle rechten behalve bestuursorgaan.*,     -> IT + Groep 5
+  //   - admin (alle rechten behalve bestuursorgaan.manage, -> IT + Groep 5
   //       systeemrol)
   //   - praesidium (calendar.create + photos.upload +    -> elke post
   //       tickets.create + forms.create + users.search +

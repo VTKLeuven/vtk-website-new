@@ -9849,8 +9849,45 @@ model BoMeeting {
   updatedAt     DateTime      @updatedAt @db.Timestamptz(3)
 
   documents BoDocument[]
+  minutes   BoMinutes?
 
   @@index([workingYear])
+}
+
+/// Het verslag van een BO, en de aanwezigheden die bovenaan staan
+/// (`lib/bo/attendance/parse.ts`). Eén per vergadering: het bestand in de
+/// BO-map dat "Verslag" heet. Voor /admin/apps/aanwezigheden; zie
+/// docs/bestuursorgaan.md ("Aanwezigheden").
+model BoMinutes {
+  id              String    @id @default(cuid())
+  meetingId       String    @unique
+  driveFileId     String
+  name            String
+  mimeType        String
+  webUrl          String
+  driveModifiedAt DateTime  @db.Timestamptz(3)
+  /// De regel onder "VERSLAG": nummer, datum, uur en lokaal.
+  title           String?
+  /// De namen zoals ze in het verslag staan, met hun kleur en status
+  /// (`MinutesEntry[]`). Wie welke gebruiker is, wordt pas bij het tonen
+  /// bepaald, zodat een betere koppeling ook de oude verslagen juist zet.
+  attendance      Json?
+  /// Waarom er geen aanwezigheden zijn (`NOT_DOCX`, `NO_ATTENDANCE`,
+  /// `NO_ACCESS`, ...). Null wanneer het lezen lukte.
+  error           String?
+  /// De `driveModifiedAt` waarvoor het verslag gelezen werd. Gelijk aan de
+  /// huidige: niet opnieuw downloaden.
+  readFor         DateTime? @db.Timestamptz(3)
+  /// `MINUTES_VERSION` van de lezer. Lager dan de huidige: opnieuw lezen.
+  readVersion     Int       @default(0)
+  lastSeenAt      DateTime  @db.Timestamptz(3)
+  /// Niet meer gevonden bij de laatste scan. De rij blijft: een verwijderd
+  /// verslag laat de aanwezigheden van die BO niet verdwijnen.
+  missingSince    DateTime? @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
+
+  meeting BoMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
 }
 
 /// Eén budget of resultaat zoals het in een BO-map stond, of via een

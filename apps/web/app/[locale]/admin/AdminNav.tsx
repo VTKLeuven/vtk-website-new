@@ -612,6 +612,17 @@ const icons: Record<string, ReactNode> = {
       <circle cx="18" cy="17" r="2" />
     </Svg>
   ),
+  // boAttendance: een presentielijst -> een lijst met vinkjes
+  boAttendance: (
+    <Svg>
+      <path d="M4 6.5 5.5 8 8 5" />
+      <path d="M4 12.5 5.5 14 8 11" />
+      <path d="M4.5 18h3" />
+      <path d="M11 6.5h9" />
+      <path d="M11 12.5h9" />
+      <path d="M11 18h9" />
+    </Svg>
+  ),
   // grocomeet: vergaderen -> mensen rond een tafel
   grocomeet: (
     <Svg>

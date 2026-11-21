@@ -842,6 +842,32 @@ export async function downloadSpreadsheet(
   return Buffer.from(await res.arrayBuffer());
 }
 
+export const DRIVE_DOC_MIME = "application/vnd.google-apps.document";
+export const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+/**
+ * Een tekstdocument als docx: een Google Doc wordt geëxporteerd, een opgeladen
+ * docx gewoon gedownload. Zoals bij de rekenbladen leest zo één lezer beide
+ * (`lib/bo/attendance/parse.ts`, de verslagen van het BO).
+ */
+export async function downloadDocument(
+  cfg: GoogleConfig,
+  subject: string,
+  file: { id: string; mimeType: string },
+): Promise<Buffer> {
+  const id = assertDriveId(file.id);
+  const url =
+    file.mimeType === DRIVE_DOC_MIME
+      ? `${DRIVE}/files/${id}/export?${new URLSearchParams({ mimeType: DOCX_MIME }).toString()}`
+      : `${DRIVE}/files/${id}?${new URLSearchParams({ alt: "media", supportsAllDrives: "true" }).toString()}`;
+  const res = await authorizedFetch(cfg, "GET", url, undefined, { subject, scope: DRIVE_SCOPES });
+  if (!res.ok) {
+    const parsed = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+    throw new GoogleError(parsed?.error?.message ?? `${res.status} ${res.statusText}`, res.status, parsed);
+  }
+  return Buffer.from(await res.arrayBuffer());
+}
+
 // -----------------------------------------------------------------------------
 // Logboek van de Admin console (Reports API, enkel lezen)
 // -----------------------------------------------------------------------------

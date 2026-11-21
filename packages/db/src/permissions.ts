@@ -260,6 +260,11 @@ export const PERMISSIONS = [
   // cijfers van elke post zijn het werk van het dagelijks bestuur. Zie
   // docs/design-decisions.md ("Bestuursorgaan").
   { code: "bestuursorgaan.manage", labelNl: "Budgetten en resultaten van het Bestuursorgaan opvolgen", labelEn: "Follow up budgets and results of the board meeting", category: "bestuursorgaan" },
+  // De aanwezigheden op het BO (/admin/apps/aanwezigheden), uit de verslagen in
+  // dezelfde BO-map. Wel in de rol admin (IT en Groep 5): wie er op een
+  // vergadering zat, is geen cijfer van een post. Groep 5 ziet ze ook met
+  // `bestuursorgaan.manage`.
+  { code: "bestuursorgaan.attendance", labelNl: "Aanwezigheden op het Bestuursorgaan bekijken", labelEn: "View attendance at the board meeting", category: "bestuursorgaan" },
 
   // Adminlogboek (wie deed wat in de admin)
   { code: "audit.view", labelNl: "Adminlogboek bekijken", labelEn: "View the admin audit log", category: "it" },

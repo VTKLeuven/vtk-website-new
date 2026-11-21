@@ -13176,6 +13176,27 @@ rekenblad met raster. Gekozen is A.
   Ook een antwoord uit het geheugen staat erin, met de reden waarom de site
   vroeg. De link staat bij de instellingen en in het blok van elk budget.
 
+## Bestuursorgaan: aanwezigheden
+
+In november 2026 kwam de telling van wie er op het BO was op de site
+(`/admin/apps/aanwezigheden`), uit de kleuren in de verslagen. De keuzes:
+
+- **IT en Groep 5, verder niemand.** Anders dan de budgetten zit dit wel in de
+  rol admin (`bestuursorgaan.attendance`): wie er op een vergadering zat, is
+  geen cijfer van een post, en IT hield de telling al bij. Een post ziet haar
+  eigen aanwezigheid hier niet.
+- **Onder Apps, niet onder Bestuursorgaan.** Die module is van Groep 5 en de
+  posten (budgetten); de aanwezigheden zijn een hulpmiddel ernaast.
+- **De aanwezigheidsgraad is aanwezig op wie ingekleurd was**: aanwezig gedeeld
+  door aanwezig, verontschuldigd en afwezig. Verontschuldigd telt dus als
+  niet aanwezig, en staat er apart naast ("aanwezig of verontschuldigd"). Een
+  BO waarop iemand niet op de lijst stond, telt voor die persoon niet.
+- **Op te volgen** is wie drie keer of meer onverwittigd afwezig was, of de
+  laatste twee BO's na elkaar. Dat is een eerste voorstel; verander de drempel
+  in `buildAttendance` als Groep 5 een andere wil.
+- **De site schrijft niets in Drive.** Een fout in een verslag (een naam niet
+  ingekleurd, een tikfout) pas je daar aan; de volgende scan neemt het over.
+
 ## Nieuwe evenementen in Discord
 
 Op /admin/kalender/discord hangt de kring Discord-webhooks aan de kalender. Een

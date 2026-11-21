@@ -154,6 +154,8 @@ export const MCP_PERMISSION_POLICY = {
   // De budgetten en resultaten van elke post zijn voor Groep 5, en het IT-recht
   // admin draagt dit bewust niet; een agent leest ze dus ook niet.
   "bestuursorgaan.manage": { reads: [], creates: [], blocked: ["read budgets and results, scan the board folder or link posts"] },
+  // Wie er op een BO was, is persoonsgegeven over het praesidium; een agent leest het niet.
+  "bestuursorgaan.attendance": { reads: [], creates: [], blocked: ["read attendance at the board meeting"] },
   // De codelijst stuurt wat er in de betaalinfo van elke verkoop staat; een
   // agent hoort die niet aan te passen, en er is geen create-kind.
   "accounting.manage": { reads: [], creates: [], blocked: ["create, edit or delete accounting codes"] },
