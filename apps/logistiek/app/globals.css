@@ -1731,6 +1731,11 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
 
 .logistics-footer {
   border-top: 1px solid var(--chrome-line);
+  /* De body is een flexkolom van precies het scherm hoog (`height: 100%`), en
+     een kind met `overflow: hidden` mag in zo'n kolom tot nul krimpen. Op elke
+     pagina die langer is dan het scherm was de voet daardoor één pixel hoog:
+     enkel zijn rand bleef over. */
+  flex-shrink: 0;
 }
 
 .logistics-footer::after {
