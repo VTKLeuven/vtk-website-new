@@ -11611,6 +11611,20 @@ tot"). Niets daarvan vertelde een lid dat terugkomt iets wat het niet al wist.
 - **Geen stappen en geen afsluitende band**, en hun teksten zijn uit
   /beheer/teksten weg. Hoe aanvragen werkt, staat bij het formulier zelf.
 
+## In een aanvraagformulier staat enkel "optioneel" aangeduid
+
+Het transportformulier duidde velden op drie manieren aan: een rood sterretje
+bij sommige verplichte velden, "(optioneel)" in het label van andere, "Optioneel."
+in de uitleg onder een derde, en niets bij het telefoonnummer. In het
+materiaalformulier had "Afhalen op" een sterretje en "Terugbrengen op", even
+verplicht, niet.
+
+- **Enkel wat optioneel is, staat aangeduid, en altijd in het label**: "Laadadres
+  (optioneel)". Verplicht is de standaard; wie iets vergeet, krijgt bij het
+  indienen een melding en de focus op dat veld.
+- **"Extra adres dat op de hoogte blijft" heet "E-mail in kopie"**: het is een
+  e-mailveld, en zo zegt de naam wat het doet.
+
 ## Ritaanvragen: rijen, en één paneel tegelijk
 
 `/beheer/vervoer` renderde voor elke rit het volledige beslis- of beheerpaneel,

@@ -389,7 +389,6 @@ export function FlesserkeForm({
             <label className="grid gap-1 text-sm">
               <span className="font-medium text-vtk-ink">
                 {en ? 'Ready by' : 'Klaarzetten tegen'}
-                <span aria-hidden="true" className="text-vtk-danger"> *</span>
               </span>
               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                 <input

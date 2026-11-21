@@ -281,12 +281,6 @@ export function VanRequestForm({
   }
 
   const inputClass = 'h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-vtk-ink';
-  /* Rood sterretje bij wat verplicht is (R7). */
-  const required = (
-    <span aria-hidden="true" className="text-vtk-danger">
-      {' '}*
-    </span>
-  );
 
   return (
     <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
@@ -352,7 +346,6 @@ export function VanRequestForm({
       <fieldset className="mt-4">
         <legend className="text-sm font-medium text-vtk-ink">
           {en ? 'Vehicle' : 'Voertuig'}
-          {required}
         </legend>
         {/* Meerdere voertuigen kiezen is met opzet mogelijk (zie
             docs/design-decisions.md, § Meerdere voertuigen: één aanvraag, N
@@ -404,7 +397,6 @@ export function VanRequestForm({
         <label className="grid gap-1 text-sm">
           <span className="font-medium text-vtk-ink">
             {en ? 'From' : 'Van'}
-            {required}
           </span>
           {/* Ritten worden op het kwartier gepland en de server weigert een ander
               tijdstip, dus staan er ook enkel kwartieren in de lijst. */}
@@ -420,7 +412,6 @@ export function VanRequestForm({
         <label className="grid gap-1 text-sm">
           <span className="font-medium text-vtk-ink">
             {en ? 'Until' : 'Tot'}
-            {required}
           </span>
           <QuarterDateTime
             value={endAt}
@@ -477,7 +468,6 @@ export function VanRequestForm({
         <label className="grid gap-1 text-sm sm:col-span-2">
           <span className="font-medium text-vtk-ink">
             {en ? 'What is the trip for?' : 'Waarvoor dient de rit?'}
-            {required}
           </span>
           <input
             type="text"
@@ -558,7 +548,7 @@ export function VanRequestForm({
         </fieldset>
         <label className="grid gap-1 text-sm sm:col-span-2">
           <span className="font-medium text-vtk-ink">
-            {en ? 'Your phone number' : 'Jouw telefoonnummer'}
+            {en ? 'Your phone number (optional)' : 'Jouw telefoonnummer (optioneel)'}
           </span>
           <input
             type="tel"
@@ -575,7 +565,7 @@ export function VanRequestForm({
         </label>
         <label className="grid gap-1 text-sm sm:col-span-2">
           <span className="font-medium text-vtk-ink">
-            {en ? 'Extra address to keep posted' : 'Extra adres dat op de hoogte blijft'}
+            {en ? 'Email in copy (optional)' : 'E-mail in kopie (optioneel)'}
           </span>
           {/* `multiple`: meerdere adressen mogen, gescheiden door een komma
               (T13). Zonder dat attribuut weigert de browser de tweede al voor
@@ -590,8 +580,8 @@ export function VanRequestForm({
           />
           <span className="text-xs text-vtk-muted">
             {en
-              ? 'Optional. Gets a copy of every mail about this trip. Separate addresses with a comma.'
-              : 'Optioneel. Krijgt elke mail over deze rit in kopie. Splits meerdere adressen met een komma.'}
+              ? 'Gets a copy of every mail about this trip. Separate addresses with a comma.'
+              : 'Krijgt elke mail over deze rit in kopie. Splits meerdere adressen met een komma.'}
           </span>
         </label>
         <label className="grid gap-1 text-sm sm:col-span-2">

@@ -189,7 +189,6 @@ export function EventRequesterFields({
           <label className="grid gap-1 text-sm sm:col-span-2">
             <span className="font-medium text-vtk-ink">
               {en ? 'Event / activity' : 'Evenement / activiteit'}
-              <span aria-hidden="true" className="text-vtk-danger"> *</span>
             </span>
             <input
               type="text"
@@ -202,7 +201,7 @@ export function EventRequesterFields({
           </label>
         )}
         <label className="grid gap-1 text-sm">
-          <span className="font-medium text-vtk-ink">{en ? 'Location' : 'Locatie'}</span>
+          <span className="font-medium text-vtk-ink">{en ? 'Location (optional)' : 'Locatie (optioneel)'}</span>
           <input
             type="text"
             value={value.eventLocation}
@@ -211,7 +210,7 @@ export function EventRequesterFields({
           />
         </label>
         <label className="grid gap-1 text-sm">
-          <span className="font-medium text-vtk-ink">{en ? 'Event start' : 'Startuur evenement'}</span>
+          <span className="font-medium text-vtk-ink">{en ? 'Event start (optional)' : 'Startuur evenement (optioneel)'}</span>
           <input
             type="datetime-local"
             value={value.eventStart}
@@ -220,7 +219,7 @@ export function EventRequesterFields({
           />
         </label>
         <label className="grid gap-1 text-sm">
-          <span className="font-medium text-vtk-ink">{en ? 'Expected attendance' : 'Verwachte opkomst'}</span>
+          <span className="font-medium text-vtk-ink">{en ? 'Expected attendance (optional)' : 'Verwachte opkomst (optioneel)'}</span>
           <input
             type="number"
             min={0}
@@ -230,7 +229,7 @@ export function EventRequesterFields({
           />
         </label>
         <label className="grid gap-1 text-sm">
-          <span className="font-medium text-vtk-ink">{en ? 'Contact person' : 'Contactpersoon'}</span>
+          <span className="font-medium text-vtk-ink">{en ? 'Contact person (optional)' : 'Contactpersoon (optioneel)'}</span>
           <input
             type="text"
             value={value.contactName}
@@ -239,7 +238,7 @@ export function EventRequesterFields({
           />
         </label>
         <label className="grid gap-1 text-sm">
-          <span className="font-medium text-vtk-ink">{en ? 'Contact phone' : 'Telefoon contactpersoon'}</span>
+          <span className="font-medium text-vtk-ink">{en ? 'Contact phone (optional)' : 'Telefoon contactpersoon (optioneel)'}</span>
           <input
             type="tel"
             value={value.contactPhone}
@@ -252,7 +251,7 @@ export function EventRequesterFields({
             vindt niets terug. Een mailbox van de werkgroep in kopie lost dat op. */}
         <label className="grid gap-1 text-sm">
           <span className="font-medium text-vtk-ink">
-            {en ? 'Extra address to keep posted' : 'Extra adres dat op de hoogte blijft'}
+            {en ? 'Email in copy (optional)' : 'E-mail in kopie (optioneel)'}
           </span>
           {/* `multiple`: meerdere adressen mogen, gescheiden door een komma
               (T13). Zonder dat attribuut weigert de browser de tweede al voor
@@ -267,8 +266,8 @@ export function EventRequesterFields({
           />
           <span className="text-xs text-vtk-muted">
             {en
-              ? 'Optional. Gets a copy of every mail about this request. Separate addresses with a comma.'
-              : 'Optioneel. Krijgt elke mail over deze aanvraag in kopie. Splits meerdere adressen met een komma.'}
+              ? 'Gets a copy of every mail about this request. Separate addresses with a comma.'
+              : 'Krijgt elke mail over deze aanvraag in kopie. Splits meerdere adressen met een komma.'}
           </span>
         </label>
 
