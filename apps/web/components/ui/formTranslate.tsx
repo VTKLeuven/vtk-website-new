@@ -11,7 +11,7 @@ import {
   type RefObject,
 } from "react";
 import { ArrowLeftRight, Languages, Loader2 } from "lucide-react";
-import { Button, ConfirmDialog } from "@vtk/ui";
+import { ConfirmDialog } from "@vtk/ui";
 import { useAiTranslateConfig } from "@/components/admin/AiTranslateContext";
 import { useToast } from "@/components/ui/toast";
 import { useReportFormBusy } from "@/components/ui/formBusy";
@@ -449,30 +449,32 @@ export function FormTranslateControl({
 
   return (
     <>
-      <div className="inline-flex items-center gap-1">
-        <Button
+      <div className="inline-flex items-center gap-1.5 text-xs font-medium text-[#5c667f]">
+        <button
           type="button"
-          variant="ghost"
-          size="sm"
           disabled={disabled || translating}
           onClick={handleClick}
+          className="inline-flex items-center gap-1 transition-colors hover:text-vtk-ink disabled:opacity-50"
         >
           {translating ? (
-            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
           ) : (
-            <Languages className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+            <Languages className="h-3.5 w-3.5" aria-hidden="true" />
           )}
-          {translating ? (nl ? "Vertalen…" : "Translating…") : label}
-        </Button>
+          <span>{translating ? (nl ? "Vertalen…" : "Translating…") : label}</span>
+        </button>
+        <span aria-hidden="true" className="opacity-35">
+          ·
+        </span>
         <button
           type="button"
           disabled={disabled || translating}
           onClick={() => setDirection((d) => (d === "nl-to-en" ? "en-to-nl" : "nl-to-en"))}
           title={flipTitle}
           aria-label={flipTitle}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-vtk-blue/15 text-[#5c667f] transition hover:bg-vtk-blue-soft/60 hover:text-vtk-ink disabled:opacity-50"
+          className="inline-flex items-center justify-center rounded p-0.5 transition-colors hover:text-vtk-ink disabled:opacity-50"
         >
-          <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden="true" />
+          <ArrowLeftRight className="h-3 w-3" aria-hidden="true" />
         </button>
       </div>
 
