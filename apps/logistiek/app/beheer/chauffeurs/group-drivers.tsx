@@ -1,6 +1,7 @@
 import { addDriverFromGroupAction } from '@/app/actions/beheer';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { LogisticsIcon } from '@/components/logistics-icon';
+import { Disclosure } from '@/components/disclosure';
 import type { GroupDrivers } from '@/lib/uitleen-server';
 
 /**
@@ -84,22 +85,35 @@ function GroupRow({ group }: { group: GroupDrivers }) {
   );
 }
 
+/**
+ * Posten, werkgroepen of jaarwerkingen, dichtgeklapt achter een kop die zegt
+ * hoeveel er nog geen chauffeur hebben (M4 uit de audit van november 2026).
+ * Open stonden de drie lijsten op een telefoon samen twee schermen lang onder de
+ * chauffeurslijst.
+ */
 function GroupSection({ title, groups, empty }: { title: string; groups: GroupDrivers[]; empty: string }) {
+  // Niets om open te klappen: dan gewoon de kop en de zin.
+  if (groups.length === 0) {
+    return (
+      <section>
+        <h3 className="text-sm font-semibold text-vtk-ink">{title} (0)</h3>
+        <p className="mt-1 text-sm text-vtk-muted">{empty}</p>
+      </section>
+    );
+  }
+  const missing = groups.filter((group) => group.drivers.length === 0).length;
+  const summary =
+    missing === 0
+      ? 'Overal staat al iemand in de chauffeurslijst.'
+      : `${missing} van de ${groups.length} zonder chauffeur.`;
   return (
-    <section>
-      <h3 className="text-sm font-semibold text-vtk-ink">
-        {title} ({groups.length})
-      </h3>
-      {groups.length === 0 ? (
-        <p className="mt-2 text-sm text-vtk-muted">{empty}</p>
-      ) : (
-        <ul className="mt-3 grid gap-2">
-          {groups.map((group) => (
-            <GroupRow key={group.id} group={group} />
-          ))}
-        </ul>
-      )}
-    </section>
+    <Disclosure variant="plain" title={`${title} (${groups.length})`} summary={summary}>
+      <ul className="grid gap-2">
+        {groups.map((group) => (
+          <GroupRow key={group.id} group={group} />
+        ))}
+      </ul>
+    </Disclosure>
   );
 }
 

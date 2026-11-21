@@ -24,6 +24,7 @@ import {
 import { CustomColorSliders } from './custom-color-sliders';
 import { useToast } from '@vtk/ui/toast';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
+import { Disclosure } from '@/components/disclosure';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { SaveForm } from '@/components/ui/save-form';
 import { PhoneLink } from '@/components/phone-link';
@@ -288,20 +289,44 @@ function DriverColorPicker({ entry }: { entry: DriverPoolEntry }) {
   );
 }
 
+/**
+ * Eén chauffeur, dichtgeklapt (M4 uit de audit van november 2026): zijn kleur,
+ * of hij met de kar rijdt, zijn nummer en zijn ritten staan in de kop, de rest
+ * na een klik. Open was elke chauffeur op een telefoon een scherm hoog.
+ */
 function DriverRow({ entry }: { entry: DriverPoolEntry }) {
+  const swatch = entry.customColor
+    ? customColorCss(entry.customColor)
+    : `var(--driver-${entry.colorIndex ?? driverColorIndex(entry.id)})`;
+  const summary = [
+    entry.canDriveVan ? 'Rijdt met de kar' : 'Niet met de kar',
+    entry.phone ?? 'geen telefoon',
+    tripsLabel(entry),
+  ].join(' · ');
   return (
-    <li className="rounded-[14px] border border-vtk-navy/10 bg-vtk-paper/40 px-4 py-3">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="min-w-0 flex-1">
-          <p className="flex flex-wrap items-center gap-2">
-            <span className="font-medium text-vtk-ink">{entry.name}</span>
+    <li>
+      <Disclosure
+        variant="row"
+        title={
+          <span className="flex flex-wrap items-center gap-2">
+            <span
+              aria-hidden
+              className="h-3.5 w-3.5 shrink-0 rounded-full border border-vtk-navy/20"
+              style={{ backgroundColor: swatch }}
+            />
+            {entry.name}
             {entry.inactive ? (
               <span className="rounded-full bg-vtk-navy/8 px-2.5 py-0.5 text-xs font-semibold text-vtk-muted">
                 Gedeactiveerd
               </span>
             ) : null}
-          </p>
-          <dl className="mt-2 grid gap-3 text-sm sm:grid-cols-2">
+          </span>
+        }
+        summary={summary}
+      >
+      <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
+        <div className="min-w-0 flex-1">
+          <dl className="grid gap-3 text-sm sm:grid-cols-2">
             <div>
               <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">E-mail</dt>
               <dd className="mt-0.5 break-all text-vtk-body">{entry.email}</dd>
@@ -426,6 +451,7 @@ function DriverRow({ entry }: { entry: DriverPoolEntry }) {
           </SaveForm>
         </details>
       ) : null}
+      </Disclosure>
     </li>
   );
 }
