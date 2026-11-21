@@ -23,6 +23,11 @@ import { AddressPicker } from "./AddressPicker";
 import { PresaleFields, type PresaleGroupOption } from "./PresaleFields";
 import { SettingsPanel } from "./SettingsPanel";
 import { TicketSetupEditor } from "./TicketSetupEditor";
+import {
+  BilingualGroup,
+  BilingualInput,
+  BilingualTextarea,
+} from "@/components/admin/BilingualField";
 import { TicketBannerField } from "./TicketBannerField";
 import {
   blankTicketTemplateType,
@@ -368,6 +373,7 @@ export function TicketEventForm({
       {event.id ? <input type="hidden" name="eventId" value={event.id} /> : null}
       {template && !isEdit ? <input type="hidden" name="templateSlug" value={template.slug} /> : null}
 
+      <BilingualGroup locale={locale} showBar={false} className="contents">
       <SettingsPanel
         title={locale === "nl" ? "Basisinformatie" : "Basic information"}
         status={isEdit ? basicsStatus : undefined}
@@ -384,16 +390,18 @@ export function TicketEventForm({
         ) : null}
         <div className="ticket-admin-form-grid">
           {linkedCalendarEvent ? null : (
-            <>
-              <div className="ticket-admin-field">
-                <label htmlFor="ticket-title-nl">Titel (NL)</label>
-                <input id="ticket-title-nl" name="titleNl" defaultValue={event.titleNl ?? ""} required />
-              </div>
-              <div className="ticket-admin-field">
-                <label htmlFor="ticket-title-en">Titel (EN)</label>
-                <input id="ticket-title-en" name="titleEn" defaultValue={event.titleEn ?? ""} />
-              </div>
-            </>
+            <div data-span="2">
+              <BilingualInput
+                label={nl ? "Titel" : "Title"}
+                nameNl="titleNl"
+                nameEn="titleEn"
+                defaultValueNl={event.titleNl ?? ""}
+                defaultValueEn={event.titleEn ?? ""}
+                requiredNl
+                idPrefix="ticket-title"
+                showBar
+              />
+            </div>
           )}
           <div className="ticket-admin-field">
             <label htmlFor="ticket-slug">URL-naam</label>
@@ -473,22 +481,18 @@ export function TicketEventForm({
                   ? `Dan staan de tickets in het paneel van de eventpagina, en toont /tickets/${event.slug || "…"} diezelfde pagina met deze tickets gekozen. Uit: een eigen ticketpagina, met een knop op de eventpagina.`
                   : `The tickets then sit in the panel of the event page, and /tickets/${event.slug || "…"} shows that same page with these tickets selected. Off: a separate ticket page, with a button on the event page.`}
               </span>
-              <div className="ticket-admin-form-grid">
-                <div className="ticket-admin-field">
-                  <label htmlFor="ticket-label-nl">{nl ? "Naam op de eventpagina (NL)" : "Name on the event page (NL)"}</label>
-                  <input
-                    id="ticket-label-nl"
-                    name="labelNl"
-                    maxLength={80}
-                    defaultValue={event.labelNl ?? ""}
-                    placeholder={nl ? "Volledige 12u" : "Full 12 hours"}
-                  />
-                </div>
-                <div className="ticket-admin-field">
-                  <label htmlFor="ticket-label-en">{nl ? "Naam op de eventpagina (EN)" : "Name on the event page (EN)"}</label>
-                  <input id="ticket-label-en" name="labelEn" maxLength={80} defaultValue={event.labelEn ?? ""} />
-                </div>
-              </div>
+              <BilingualInput
+                label={nl ? "Naam op de eventpagina" : "Name on the event page"}
+                nameNl="labelNl"
+                nameEn="labelEn"
+                defaultValueNl={event.labelNl ?? ""}
+                defaultValueEn={event.labelEn ?? ""}
+                placeholderNl={nl ? "Volledige 12u" : "Full 12 hours"}
+                placeholderEn="Full 12 hours"
+                maxLength={80}
+                idPrefix="ticket-label"
+                showBar
+              />
               <span className="ticket-admin-help">
                 {nl
                   ? "De tab van deze tickets wanneer er meer dan één ticketpagina op het event staat, zoals \"Wave 1\" of \"Eerstejaars\". Dan is ze verplicht; met één ticketpagina mag ze leeg blijven."
@@ -782,26 +786,18 @@ export function TicketEventForm({
             locale={locale}
           />
           {linkedCalendarEvent ? null : (
-            <>
-              <div className="ticket-admin-field" data-span="2">
-                <label htmlFor="ticket-description-nl">Beschrijving (NL)</label>
-                <textarea
-                  id="ticket-description-nl"
-                  name="descriptionNl"
-                  defaultValue={event.descriptionNl ?? ""}
-                  rows={4}
-                />
-              </div>
-              <div className="ticket-admin-field" data-span="2">
-                <label htmlFor="ticket-description-en">Beschrijving (EN)</label>
-                <textarea
-                  id="ticket-description-en"
-                  name="descriptionEn"
-                  defaultValue={event.descriptionEn ?? ""}
-                  rows={4}
-                />
-              </div>
-            </>
+            <div data-span="2">
+              <BilingualTextarea
+                label={nl ? "Beschrijving" : "Description"}
+                nameNl="descriptionNl"
+                nameEn="descriptionEn"
+                defaultValueNl={event.descriptionNl ?? ""}
+                defaultValueEn={event.descriptionEn ?? ""}
+                rows={4}
+                idPrefix="ticket-description"
+                showBar
+              />
+            </div>
           )}
         </div>
       </SettingsPanel>
@@ -897,28 +893,27 @@ export function TicketEventForm({
               </Link>
             </span>
           </div>
-          <div className="ticket-admin-field" data-span="2">
-            <label htmlFor="ticket-confirmation-nl">{locale === "nl" ? "Bevestigingsbericht na betaling en in e-mail (NL)" : "Confirmation message after payment and in email (NL)"}</label>
-            <textarea
-              id="ticket-confirmation-nl"
-              name="confirmationMessageNl"
-              defaultValue={event.confirmationMessageNl ?? ""}
-              placeholder={locale === "nl" ? "Bijv. 'Vergeet je studentenkaart en identiteitskaart niet mee te nemen naar de ingang.'" : "E.g. 'Please bring your student card and ID to the entrance.'"}
+          <div data-span="2">
+            <BilingualTextarea
+              label={
+                locale === "nl"
+                  ? "Bevestigingsbericht na betaling en in e-mail"
+                  : "Confirmation message after payment and in email"
+              }
+              nameNl="confirmationMessageNl"
+              nameEn="confirmationMessageEn"
+              defaultValueNl={event.confirmationMessageNl ?? ""}
+              defaultValueEn={event.confirmationMessageEn ?? ""}
+              placeholderNl="Bijv. 'Vergeet je studentenkaart en identiteitskaart niet mee te nemen naar de ingang.'"
+              placeholderEn="E.g. 'Please bring your student ID and identity card to the entrance.'"
               rows={3}
-            />
-          </div>
-          <div className="ticket-admin-field" data-span="2">
-            <label htmlFor="ticket-confirmation-en">{locale === "nl" ? "Bevestigingsbericht na betaling en in e-mail (EN)" : "Confirmation message after payment and in email (EN)"}</label>
-            <textarea
-              id="ticket-confirmation-en"
-              name="confirmationMessageEn"
-              defaultValue={event.confirmationMessageEn ?? ""}
-              placeholder={locale === "nl" ? "Bijv. 'Please bring your student ID and identity card to the entrance.'" : "E.g. 'Please bring your student ID and identity card to the entrance.'"}
-              rows={3}
+              idPrefix="ticket-confirmation"
+              showBar
             />
           </div>
         </div>
       </SettingsPanel>
+      </BilingualGroup>
 
       {state.status === "error" ? (
         <div className="ticket-admin-alert" data-tone="danger" role="alert">

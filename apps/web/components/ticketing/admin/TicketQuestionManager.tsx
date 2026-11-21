@@ -15,6 +15,11 @@ import {
 } from "lucide-react";
 import type { AdminLocale } from "./format";
 import { DangerActionButton } from "./DangerActionButton";
+import {
+  BilingualGroup,
+  BilingualInput,
+  BilingualTextarea,
+} from "@/components/admin/BilingualField";
 
 type Question = {
   id: string;
@@ -231,21 +236,17 @@ export function TicketQuestionManager({
                 gebruiker niets en de waarde is nergens zichtbaar. */}
             <input type="hidden" name="type" value={questionType(kind, longText, multiple)} />
 
-            <div className="ticket-admin-form-grid">
-              <div className="ticket-admin-field">
-                <label htmlFor="question-label-nl">{nl ? "Vraag (NL)" : "Question (NL)"}</label>
-                <input
-                  id="question-label-nl"
-                  name="labelNl"
-                  placeholder={nl ? "Heb je allergieën?" : "Do you have any allergies?"}
-                  required
-                />
-              </div>
-              <div className="ticket-admin-field">
-                <label htmlFor="question-label-en">{nl ? "Vraag (EN)" : "Question (EN)"}</label>
-                <input id="question-label-en" name="labelEn" />
-              </div>
-            </div>
+            <BilingualGroup locale={locale} showBar={false} className="contents">
+            <BilingualInput
+              label={nl ? "Vraag" : "Question"}
+              nameNl="labelNl"
+              nameEn="labelEn"
+              placeholderNl={nl ? "Heb je allergieën?" : "Do you have any allergies?"}
+              placeholderEn="Do you have any allergies?"
+              requiredNl
+              idPrefix="question-label"
+              showBar
+            />
 
             <fieldset className="ticket-admin-choice-set">
               <legend>{nl ? "Hoe antwoordt de deelnemer?" : "How does the attendee answer?"}</legend>
@@ -338,19 +339,18 @@ export function TicketQuestionManager({
                   ))}
                 </select>
               </div>
-              <div className="ticket-admin-field" data-span="2">
-                <label htmlFor="question-description-nl">
-                  {nl ? "Toelichting (NL)" : "Explanation (NL)"}
-                </label>
-                <textarea id="question-description-nl" name="descriptionNl" rows={2} />
-              </div>
-              <div className="ticket-admin-field" data-span="2">
-                <label htmlFor="question-description-en">
-                  {nl ? "Toelichting (EN)" : "Explanation (EN)"}
-                </label>
-                <textarea id="question-description-en" name="descriptionEn" rows={2} />
+              <div className="md:col-span-2" data-span="2">
+                <BilingualTextarea
+                  label={nl ? "Toelichting" : "Explanation"}
+                  nameNl="descriptionNl"
+                  nameEn="descriptionEn"
+                  rows={2}
+                  idPrefix="question-description"
+                  showBar
+                />
               </div>
             </div>
+            </BilingualGroup>
 
             <label className="ticket-admin-check">
               <input type="checkbox" name="required" value="true" />

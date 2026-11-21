@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Label } from "@vtk/ui";
 import { saveMagazineAction } from "@/app/actions/media";
+import { BilingualGroup, BilingualInput } from "@/components/admin/BilingualField";
 import { FileField } from "@/components/ui/FileField";
 
 const ERRORS: Record<string, { nl: string; en: string }> = {
@@ -68,31 +69,27 @@ export function MagazineUploadForm({ locale }: { locale: "nl" | "en" }) {
         <Label>{nl ? "Publicatiedatum" : "Publish date"}</Label>
         <Input name="publishedAt" type="date" />
       </div>
-      <div>
-        <Label>{nl ? "Titel (NL)" : "Title (NL)"}</Label>
-        <Input
-          name="titleNl"
-          required
-          defaultValue={kind === "bakske" ? "Het Bakske" : "Ir.Reëel"}
-          key={`titleNl-${kind}`}
-        />
-      </div>
-      <div>
-        <Label>{nl ? "Titel (EN)" : "Title (EN)"}</Label>
-        <Input
-          name="titleEn"
-          defaultValue={kind === "bakske" ? "Het Bakske" : "Ir.Reëel"}
-          key={`titleEn-${kind}`}
-        />
-      </div>
-      <div>
-        <Label>{nl ? "Editie (NL)" : "Issue (NL)"}</Label>
-        <Input name="issueNl" required placeholder={nl ? "Week 8 / Semester 2, 2025-2026" : "Week 8 / Semester 2, 2025-2026"} />
-      </div>
-      <div>
-        <Label>{nl ? "Editie (EN)" : "Issue (EN)"}</Label>
-        <Input name="issueEn" placeholder="Week 8 / Semester 2, 2025-2026" />
-      </div>
+      <BilingualGroup locale={locale} className="md:col-span-2 space-y-4">
+        <div className="grid gap-4 md:grid-cols-2">
+          <BilingualInput
+            key={`title-${kind}`}
+            label={nl ? "Titel" : "Title"}
+            nameNl="titleNl"
+            nameEn="titleEn"
+            defaultValueNl={kind === "bakske" ? "Het Bakske" : "Ir.Reëel"}
+            defaultValueEn={kind === "bakske" ? "Het Bakske" : "Ir.Reëel"}
+            requiredNl
+          />
+          <BilingualInput
+            label={nl ? "Editie" : "Issue"}
+            nameNl="issueNl"
+            nameEn="issueEn"
+            placeholderNl="Week 8 / Semester 2, 2025-2026"
+            placeholderEn="Week 8 / Semester 2, 2025-2026"
+            requiredNl
+          />
+        </div>
+      </BilingualGroup>
       <div className="md:col-span-2">
         <Label>PDF</Label>
         <FileField
