@@ -5,7 +5,8 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./logistiek": "./src/logistiek.ts"
   },
   "dependencies": {
     "nodemailer": "^10.0.0",

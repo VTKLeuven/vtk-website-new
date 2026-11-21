@@ -3,6 +3,18 @@ import 'server-only';
 import { prisma } from '@vtk/db';
 import { sendMail } from '@vtk/mail';
 import {
+  reservationDecisionMail,
+  reservationRequestSummary,
+  teamDigestMail,
+  tripCancelledDriverMail,
+  tripDecisionMail,
+  tripHandoverMail,
+  tripRequestSummary,
+  type TripMailFacts,
+  type UitleenDigestEntry,
+  type UitleenMailEvent,
+} from '@vtk/mail/logistiek';
+import {
   NOTIFY_KINDS,
   formatDateOnly,
   formatDateTime,
@@ -40,9 +52,13 @@ import { logistiekBaseUrl } from './payments';
  * 3. **Niet elke statusstap mailt.** Goedgekeurd, afgewezen, gewijzigd en
  *    teruggedraaid; niet "afgehaald" of "betaald". Wie voor elke klik een mail
  *    krijgt, leest ze geen van alle nog.
+ *
+ * De teksten zelf staan in `@vtk/mail/logistiek`, als pure functies: daar roept
+ * ook de voorvertoning op /admin/it/flows ze aan. Dit bestand haalt op, zet data
+ * om naar tekst en verstuurt.
  */
 
-export type UitleenMailEvent = 'APPROVED' | 'REJECTED' | 'EDITED' | 'REOPENED';
+export type { UitleenMailEvent };
 
 type Recipient = { to: string; cc: string[] | undefined; name: string; locale: LogistiekLocale };
 
@@ -67,87 +83,6 @@ function recipientOf(
     name: user.name,
     locale: user.locale === 'EN' ? 'en' : 'nl',
   };
-}
-
-const SUBJECT_PREFIX = 'VTK Logistiek';
-
-/** Waar de mail over gaat; bepaalt of we "je aanvraag" of "je rit" schrijven. */
-type MailSubject = 'reservation' | 'trip';
-
-function eventWords(event: UitleenMailEvent, subject: MailSubject, locale: LogistiekLocale) {
-  const nl = locale !== 'en';
-  const thing = nl
-    ? subject === 'trip'
-      ? 'je rit'
-      : 'je aanvraag'
-    : subject === 'trip'
-      ? 'your trip'
-      : 'your request';
-  const Thing = thing.charAt(0).toUpperCase() + thing.slice(1);
-  switch (event) {
-    case 'APPROVED':
-      return nl
-        ? { subject: 'goedgekeurd', lead: `${Thing} is goedgekeurd.` }
-        : { subject: 'approved', lead: `${Thing} has been approved.` };
-    case 'REJECTED':
-      return nl
-        ? { subject: 'afgewezen', lead: `${Thing} is afgewezen.` }
-        : { subject: 'rejected', lead: `${Thing} has been rejected.` };
-    case 'EDITED':
-      return nl
-        ? { subject: 'aangepast', lead: `Logistiek heeft ${thing} aangepast.` }
-        : { subject: 'changed', lead: `Logistics changed ${thing}.` };
-    case 'REOPENED':
-      return nl
-        ? {
-            subject: 'terug open',
-            lead: `Logistiek heeft de beslissing over ${thing} teruggedraaid; ze staat weer open.`,
-          }
-        : {
-            subject: 'reopened',
-            lead: `Logistics undid the decision on ${thing}; it is open again.`,
-          };
-  }
-}
-
-/** Ondertekening plus de link naar het overzicht van het lid zelf. */
-function footer(subject: MailSubject, locale: LogistiekLocale): string {
-  const nl = locale !== 'en';
-  const url = `${logistiekBaseUrl()}${subject === 'trip' ? '/ritten' : '/reservaties'}`;
-  if (nl) {
-    const what = subject === 'trip' ? 'Je rit bekijken' : 'Je aanvraag bekijken';
-    return `${what}: ${url}\n\nGroeten,\nLogistiek VTK`;
-  }
-  const what = subject === 'trip' ? 'View your trip' : 'View your request';
-  return `${what}: ${url}\n\nRegards,\nLogistics VTK`;
-}
-
-/**
- * Blokken aan elkaar met een lege regel ertussen. Een blok dat er niet is, valt
- * weg zonder een dubbele witregel achter te laten; daarom `null` en niet `''`
- * als "geen blok" (een lege string is hier een bewuste lege regel).
- */
-function joinBlocks(blocks: Array<string | null>): string {
-  return blocks.filter((block): block is string => block !== null).join('\n\n');
-}
-
-/**
- * De toelichting van het team, indien er een is. Bij een wijziging is dit de
- * historiekregel uit A6 ("Tafel: 5 → 3", "Uren verschoven naar 14:30"): zeggen
- * wát er veranderd is, niet enkel dát er iets veranderd is. Bij een afwijzing is
- * het de reden, en bij de rest een gewone zin die geen kopje nodig heeft.
- */
-function detailBlock(
-  note: string | null | undefined,
-  event: UitleenMailEvent,
-  locale: LogistiekLocale
-): string | null {
-  const text = note?.trim();
-  if (!text) return null;
-  const nl = locale !== 'en';
-  if (event === 'EDITED') return `${nl ? 'Wat er veranderde:' : 'What changed:'}\n${text}`;
-  if (event === 'REJECTED') return `${nl ? 'Reden:' : 'Reason:'} ${text}`;
-  return text;
 }
 
 /**
@@ -247,59 +182,31 @@ export async function notifyReservation(
     if (!shouldNotifyReservation(reservation, options)) return;
 
     const recipient = recipientOf(reservation.user, reservation.notifyEmail);
-    const nl = recipient.locale !== 'en';
-    const words = eventWords(event, 'reservation', recipient.locale);
-
-    // De opmerkingen per item horen in de mail (E6): de aanvrager leest die mail
-    // en niet het scherm, en "zie vorig event" of "graag de zwarte" is precies
-    // de afspraak die daarna misloopt als ze er niet in staat.
-    const lineText = (line: {
-      itemName: string;
-      quantity: number;
-      note?: string | null;
-      adminNote?: string | null;
-    }) => {
-      const notes = [line.note, line.adminNote].filter(Boolean).join(' | ');
-      return `- ${line.quantity} x ${line.itemName}${notes ? ` (${notes})` : ''}`;
-    };
-
-    const granted = reservation.lines.filter((line) => line.lineStatus !== 'REJECTED');
-    const refused = reservation.lines.filter((line) => line.lineStatus === 'REJECTED');
-    const items = [...granted.map(lineText), ...reservation.flesserkeLines.map(lineText)].join('\n');
-    // Niet toegekende items staan apart onderaan, niet tussen de rest: tussen de
-    // goedgekeurde lijst gelezen worden ze meegenomen naar het evenement (E6).
-    const refusedBlock =
-      refused.length > 0
-        ? `\n\n${nl ? 'Niet toegekend:' : 'Not granted:'}\n${refused
-            .map(
-              (line) =>
-                `- ${line.quantity} x ${line.itemName}${line.adminNote ? ` (${line.adminNote})` : ''}`
-            )
-            .join('\n')}`
-        : '';
-    const period = `${formatDateOnly(reservation.pickupDate, recipient.locale)} - ${formatDateOnly(
-      reservation.returnDate,
-      recipient.locale
-    )}`;
-
     // Bij een afwijzing is de nota van het team de reden; die hoort in de mail,
     // anders is "afgewezen" alles wat de aanvrager weet.
     const reason = event === 'REJECTED' ? note ?? reservation.adminNote : note;
-
-    const text = joinBlocks([
-      nl ? `Dag ${recipient.name},` : `Hi ${recipient.name},`,
-      words.lead,
-      `${nl ? 'Aanvraag' : 'Request'}: ${reservation.eventName}\n${nl ? 'Periode' : 'Period'}: ${period}`,
-      items ? `${nl ? 'Materiaal' : 'Items'}:\n${items}${refusedBlock}` : refusedBlock.trim() || null,
-      detailBlock(reason, event, recipient.locale),
-      footer('reservation', recipient.locale),
-    ]);
-
-    await deliver(
-      recipient,
-      `${SUBJECT_PREFIX}: ${reservation.eventName} ${words.subject}`,
-      text
-    );
+    const mail = reservationDecisionMail({
+      locale: recipient.locale,
+      recipientName: recipient.name,
+      event,
+      requestName: reservation.eventName,
+      pickupDate: formatDateOnly(reservation.pickupDate, recipient.locale),
+      returnDate: formatDateOnly(reservation.returnDate, recipient.locale),
+      lines: reservation.lines.map((line) => ({
+        quantity: line.quantity,
+        name: line.itemName,
+        note: line.note,
+        adminNote: line.adminNote,
+        refused: line.lineStatus === 'REJECTED',
+      })),
+      flesserkeLines: reservation.flesserkeLines.map((line) => ({
+        quantity: line.quantity,
+        name: line.itemName,
+      })),
+      detail: reason,
+      baseUrl: logistiekBaseUrl(),
+    });
+    await deliver(recipient, mail.subject, mail.text);
   } catch (err) {
     console.error('[uitleen-mail] reservatiemail mislukt:', err);
   }
@@ -349,60 +256,66 @@ export async function notifyTransport(
     if (!shouldNotifyTransport(first, options)) return;
 
     const recipient = recipientOf(first.user, first.notifyEmail);
-    const nl = recipient.locale !== 'en';
-    const words = eventWords(event, 'trip', recipient.locale);
-
-    const legLabel = (leg: string | null) => {
-      if (leg === 'HEEN') return nl ? 'Heenrit' : 'Outbound';
-      if (leg === 'TERUG') return nl ? 'Terugrit' : 'Return';
-      return nl ? 'Rit' : 'Trip';
-    };
-    const trips = bookings
-      .map(
-        (booking) =>
-          `- ${legLabel(booking.tripLeg)}: ${formatDateTime(booking.startAt, recipient.locale)} - ${formatDateTime(
-            booking.endAt,
-            recipient.locale
-          )} (${nl ? booking.vehicle.nameNl : booking.vehicle.nameEn})`
-      )
-      .join('\n');
-
     const reason = event === 'REJECTED' ? note ?? first.adminNote : note;
 
-    // Bij het goedkeuren: wat Logistiek aan de aanvraag veranderde, bovenaan en
-    // niet verstopt in de lijst met uren (F6.11). Anders leest het lid een
-    // goedkeuring met andere uren zonder te merken dat ze anders zijn.
     // Heen en terug (of twee voertuigen) zijn één aanvraag: de regels van alle
     // ritten samen, zonder dubbels.
     const teamChanges =
       event === 'APPROVED'
-        ? [
-            ...new Set(
-              [...(await teamEditsForTransport(bookings)).values()].flat()
-            ),
-          ]
+        ? [...new Set([...(await teamEditsForTransport(bookings)).values()].flat())]
         : [];
-    const changesBlock =
-      teamChanges.length > 0
-        ? `${nl ? 'Logistiek paste je aanvraag aan:' : 'Logistics changed your request:'}\n${teamChanges
-            .map((line) => `- ${line}`)
-            .join('\n')}`
-        : null;
 
-    const text = joinBlocks([
-      nl ? `Dag ${recipient.name},` : `Hi ${recipient.name},`,
-      words.lead,
-      changesBlock,
-      `${nl ? 'Rit' : 'Trip'}: ${first.purpose}`,
-      trips,
-      detailBlock(reason, event, recipient.locale),
-      footer('trip', recipient.locale),
-    ]);
-
-    await deliver(recipient, `${SUBJECT_PREFIX}: ${first.purpose} ${words.subject}`, text);
+    const mail = tripDecisionMail({
+      locale: recipient.locale,
+      recipientName: recipient.name,
+      event,
+      purpose: first.purpose,
+      legs: bookings.map((booking) => ({
+        leg: booking.tripLeg === 'HEEN' || booking.tripLeg === 'TERUG' ? booking.tripLeg : null,
+        start: formatDateTime(booking.startAt, recipient.locale),
+        end: formatDateTime(booking.endAt, recipient.locale),
+        vehicle: recipient.locale === 'en' ? booking.vehicle.nameEn : booking.vehicle.nameNl,
+      })),
+      teamChanges,
+      detail: reason,
+      baseUrl: logistiekBaseUrl(),
+    });
+    await deliver(recipient, mail.subject, mail.text);
   } catch (err) {
     console.error('[uitleen-mail] ritmail mislukt:', err);
   }
+}
+
+/**
+ * Wat een chauffeur of een post over een rit leest, in de taal van de mail.
+ *
+ * De dag in het onderwerp staat in die taal; tot november 2026 was hij altijd
+ * Nederlands, ook in een Engelse mail.
+ */
+function tripFacts(
+  booking: {
+    purpose: string;
+    eventName: string | null;
+    startAt: Date;
+    endAt: Date;
+    pickupAddress: string | null;
+    destination: string | null;
+    cargoNote: string | null;
+    vehicle: { nameNl: string };
+  },
+  locale: LogistiekLocale
+): TripMailFacts {
+  return {
+    title: tripTitle(booking),
+    eventName: tripEventName(booking),
+    start: formatDateTime(booking.startAt, locale),
+    end: formatDateTime(booking.endAt, locale),
+    startDate: formatDateOnly(booking.startAt, locale),
+    vehicle: booking.vehicle.nameNl,
+    pickupAddress: booking.pickupAddress,
+    destination: booking.destination,
+    cargoNote: booking.cargoNote,
+  };
 }
 
 /**
@@ -463,37 +376,17 @@ export async function notifyGroupAssignedForTrip(
     if (!booking?.assignedGroup) return { mode: 'MISLUKT' };
 
     const group = booking.assignedGroup;
-    const what = tripTitle(booking);
-    const event = tripEventName(booking);
-    const url = `${logistiekBaseUrl()}/ritten`;
 
     /** De mail zelf, in de taal van wie ze krijgt. */
-    const body = (name: string, locale: LogistiekLocale) => {
-      const nl = locale !== 'en';
-      return joinBlocks([
-        name ? (nl ? `Dag ${name},` : `Hi ${name},`) : null,
-        nl
-          ? `Logistiek heeft een rit met ${booking.vehicle.nameNl} doorgegeven aan ${group.nameNl}. Jullie duiden zelf de chauffeur aan (en eventuele bijrijders).`
-          : `Logistics assigned a trip with ${booking.vehicle.nameNl} to ${group.nameNl}. Your post picks the driver (and any passengers).`,
-        [
-          `${nl ? 'Rit' : 'Trip'}: ${what}`,
-          event ? `${nl ? 'Evenement' : 'Event'}: ${event}` : null,
-          `${nl ? 'Wanneer' : 'When'}: ${formatDateTime(booking.startAt, locale)} - ${formatDateTime(booking.endAt, locale)}`,
-          booking.pickupAddress ? `${nl ? 'Laadadres' : 'Loading address'}: ${booking.pickupAddress}` : null,
-          booking.destination ? `${nl ? 'Bestemming' : 'Destination'}: ${booking.destination}` : null,
-          booking.cargoNote ? `${nl ? 'Lading' : 'Cargo'}: ${booking.cargoNote}` : null,
-          booking.adminNote ? `${nl ? 'Van Logistiek' : 'From Logistics'}: ${booking.adminNote}` : null,
-        ]
-          .filter(Boolean)
-          .join('\n'),
-        nl ? `Chauffeur invullen: ${url}` : `Pick a driver: ${url}`,
-        nl ? 'Groeten,\nLogistiek VTK' : 'Regards,\nLogistics VTK',
-      ]);
-    };
-    const subjectFor = (locale: LogistiekLocale) =>
-      locale !== 'en'
-        ? `${SUBJECT_PREFIX}: chauffeur gezocht voor ${what} (${formatDateOnly(booking.startAt)})`
-        : `${SUBJECT_PREFIX}: driver needed for ${what} (${formatDateOnly(booking.startAt)})`;
+    const mailFor = (name: string, locale: LogistiekLocale) =>
+      tripHandoverMail({
+        locale,
+        recipientName: name,
+        groupName: group.nameNl,
+        trip: tripFacts(booking, locale),
+        adminNote: booking.adminNote,
+        baseUrl: logistiekBaseUrl(),
+      });
 
     if (handover.mode === 'LEADS') {
       const leads = await groupLeads(group.id);
@@ -501,8 +394,8 @@ export async function notifyGroupAssignedForTrip(
       let sent = 0;
       for (const lead of leads) {
         const recipient = recipientOf(lead, null);
-        if (await deliver(recipient, subjectFor(recipient.locale), body(recipient.name, recipient.locale)))
-          sent += 1;
+        const mail = mailFor(recipient.name, recipient.locale);
+        if (await deliver(recipient, mail.subject, mail.text)) sent += 1;
       }
       return { mode: 'LEADS', leads: leads.length, sent };
     }
@@ -520,7 +413,8 @@ export async function notifyGroupAssignedForTrip(
         ? { mode: 'POSTADRES', address: null, sent: 0 }
         : { mode: 'MISLUKT' };
     }
-    const sent = (await deliver({ to: address, cc: undefined, name: '', locale: 'nl' }, subjectFor('nl'), body('', 'nl')))
+    const mail = mailFor('', 'nl');
+    const sent = (await deliver({ to: address, cc: undefined, name: '', locale: 'nl' }, mail.subject, mail.text))
       ? 1
       : 0;
     return handover.mode === 'POSTADRES'
@@ -553,8 +447,14 @@ export async function notifyGroupAssignedForTrip(
  * 2. **Falen mag de aanvraag niet doen falen**, en mag ze ook niet doen
  *    verdwijnen: een mislukte verzending stempelt **niet**, zodat de melding bij
  *    de volgende tick opnieuw geprobeerd wordt in plaats van stil weg te zijn.
- * 3. **Enkel bij het indienen.** Elke wijziging melden zou dezelfde mailbox
- *    vullen tot niemand ze nog leest.
+ * 3. **Enkel bij het indienen, en wanneer de aanvrager annuleert.** Elke
+ *    wijziging melden zou dezelfde mailbox vullen tot niemand ze nog leest. Een
+ *    annulatie wel: misschien ligt het materiaal al klaar of rekent een chauffeur
+ *    op de rit. De annulatie zet `teamNotifiedAt` terug op `null` (zie
+ *    `cancelReservationAction`), en de bundel herkent ze aan de status en aan
+ *    de historiekregel die het annuleren schrijft. Een aanvraag die het team nog
+ *    nooit te zien kreeg, wordt bij het annuleren meteen gestempeld: daar valt
+ *    niets te melden.
  *
  * Naar welk adres staat per soort op /beheer/instellingen. Is dat leeg, dan
  * vertrekt er niets (dat scherm zegt dat), maar wordt er wél gestempeld: anders
@@ -598,20 +498,38 @@ async function writeDigestState(state: DigestState): Promise<void> {
   });
 }
 
+/** Een aanvraag in de wachtrij van de teammelding. */
+type PendingEntry = {
+  id: string;
+  startsAt: Date;
+  /** Geannuleerd door de aanvrager, en niet nieuw binnengekomen. */
+  cancelled: boolean;
+};
+
+/**
+ * Een annulatie door de aanvrager, te herkennen aan de historiekregel die
+ * `cancelReservationAction` en `cancelVanBookingAction` schrijven. Zonder die
+ * voorwaarde kwam elke oude geannuleerde aanvraag met een lege `teamNotifiedAt`
+ * (van voor er annulaties gemeld werden) in de eerstvolgende bundel terecht.
+ */
+const CANCELLED_BY_REQUESTER = {
+  status: 'CANCELLED',
+  auditLogs: { some: { kind: 'STATUS_CHANGED', toStatus: 'CANCELLED' } },
+} as const;
+
 /** De aanvragen van deze soort die nog gemeld moeten worden, oudste eerst. */
-async function pendingFor(kind: NotifyKind): Promise<Array<{ id: string; startsAt: Date }>> {
+async function pendingFor(kind: NotifyKind): Promise<PendingEntry[]> {
   if (kind === 'transport') {
     const rows = await prisma.uitleenTransportBooking.findMany({
       where: {
         teamNotifiedAt: null,
-        plannedByTeam: false,
-        status: 'REQUESTED',
+        OR: [{ plannedByTeam: false, status: 'REQUESTED' }, CANCELLED_BY_REQUESTER],
       },
       orderBy: { createdAt: 'asc' },
       // Een bovengrens tegen een bundel van honderd aanvragen na een storing:
       // de rest volgt bij de volgende tick.
       take: 25,
-      select: { id: true, startAt: true, tripGroupId: true },
+      select: { id: true, startAt: true, tripGroupId: true, status: true },
     });
     // Heen en terug zijn twee boekingen maar één aanvraag, en de samenvatting
     // toont ze allebei; ze apart opnemen zou ze dubbel in de mail zetten.
@@ -621,14 +539,14 @@ async function pendingFor(kind: NotifyKind): Promise<Array<{ id: string; startsA
         if (seen.has(row.tripGroupId)) return [];
         seen.add(row.tripGroupId);
       }
-      return [{ id: row.id, startsAt: row.startAt }];
+      return [{ id: row.id, startsAt: row.startAt, cancelled: row.status === 'CANCELLED' }];
     });
   }
 
   const rows = await prisma.uitleenReservation.findMany({
     where: {
       teamNotifiedAt: null,
-      status: 'REQUESTED',
+      OR: [{ status: 'REQUESTED' }, CANCELLED_BY_REQUESTER],
       // Materiaal en flesserke zijn twee soorten melding op dezelfde tabel; welke
       // het is, volgt uit de lijnen die eraan hangen. Een aanvraag met allebei
       // hoort in allebei de bundels, want er kijken twee mensen naar.
@@ -638,9 +556,9 @@ async function pendingFor(kind: NotifyKind): Promise<Array<{ id: string; startsA
     },
     orderBy: { createdAt: 'asc' },
     take: 25,
-    select: { id: true, pickupDate: true },
+    select: { id: true, pickupDate: true, status: true },
   });
-  return rows.map((row) => ({ id: row.id, startsAt: row.pickupDate }));
+  return rows.map((row) => ({ id: row.id, startsAt: row.pickupDate, cancelled: row.status === 'CANCELLED' }));
 }
 
 /** Zet `teamNotifiedAt`; welke tabel hangt af van de soort. */
@@ -668,40 +586,35 @@ async function markNotified(kind: NotifyKind, ids: string[], at: Date): Promise<
   });
 }
 
-async function summaryFor(
-  kind: NotifyKind,
-  id: string
-): Promise<{ title: string; text: string } | null> {
-  return kind === 'transport' ? transportSummary(id) : reservationSummary(id);
+async function summaryFor(kind: NotifyKind, entry: PendingEntry): Promise<UitleenDigestEntry | null> {
+  return kind === 'transport'
+    ? transportSummary(entry.id, entry.cancelled)
+    : reservationSummary(entry.id, entry.cancelled);
+}
+
+/** De samenvattingen van deze wachtrij, nieuw en geannuleerd apart. */
+async function digestBodies(kind: NotifyKind, entries: PendingEntry[]) {
+  const bodies = await Promise.all(
+    entries.map(async (entry) => ({ entry, body: await summaryFor(kind, entry) }))
+  );
+  const present = bodies.filter(
+    (row): row is { entry: PendingEntry; body: UitleenDigestEntry } => row.body !== null
+  );
+  return {
+    requests: present.filter((row) => !row.entry.cancelled).map((row) => row.body),
+    cancellations: present.filter((row) => row.entry.cancelled).map((row) => row.body),
+  };
 }
 
 async function deliverDigest(
   kind: NotifyKind,
   to: string[],
-  bodies: Array<{ title: string; text: string }>
+  bodies: { requests: UitleenDigestEntry[]; cancellations: UitleenDigestEntry[] }
 ): Promise<boolean> {
-  const noun = kind === 'transport' ? 'ritaanvraag' : `${kind}aanvraag`;
-  const subject =
-    bodies.length === 1
-      ? `${SUBJECT_PREFIX}: nieuwe ${noun}, ${bodies[0].title}`
-      : `${SUBJECT_PREFIX}: ${bodies.length} nieuwe ${noun.replace(/aanvraag$/, 'aanvragen')}`;
-
-  // Elke aanvraag houdt haar eigen blok met haar eigen beslis-link: dat is
-  // waarvoor de mail bestaat. De aanhef staat er één keer boven en niet per
-  // blok; drie keer "er is een nieuwe aanvraag binnengekomen" in dezelfde mail
-  // leest als drie mails die per ongeluk aan elkaar geplakt zijn.
-  const text = joinBlocks([
-    bodies.length === 1
-      ? `Er is een nieuwe ${noun} binnengekomen op ${logistiekBaseUrl()}.`
-      : `Er staan ${bodies.length} nieuwe aanvragen klaar op ${logistiekBaseUrl()}.`,
-    ...bodies.map((body, index) =>
-      bodies.length === 1 ? body.text : `${index + 1}. ${body.title}\n\n${body.text}`
-    ),
-  ]);
-
+  const mail = teamDigestMail({ kind, baseUrl: logistiekBaseUrl(), ...bodies });
   // Naar één adres met de rest in kopie: drie losse mails naar dezelfde mailbox
   // lezen als drie aanvragen.
-  return deliver({ to: to[0], cc: to.slice(1), name: '', locale: 'nl' }, subject, text);
+  return deliver({ to: to[0], cc: to.slice(1), name: '', locale: 'nl' }, mail.subject, mail.text);
 }
 
 /**
@@ -736,10 +649,9 @@ export async function sendTeamDigests(
         continue;
       }
 
-      const bodies = (
-        await Promise.all(pending.map((entry) => summaryFor(kind, entry.id)))
-      ).filter((body): body is { title: string; text: string } => body !== null);
-      if (bodies.length === 0) continue;
+      const bodies = await digestBodies(kind, pending);
+      const count = bodies.requests.length + bodies.cancellations.length;
+      if (count === 0) continue;
 
       // Enkel afvinken wanneer het bericht écht vertrokken is. Mislukt het, dan
       // blijft de wachtrij staan en probeert de volgende tick het opnieuw; stil
@@ -749,7 +661,7 @@ export async function sendTeamDigests(
       await markNotified(kind, pending.map((entry) => entry.id), now);
       next[kind] = now.toISOString();
       changed = true;
-      sent[kind] = bodies.length;
+      sent[kind] = count;
     }
 
     if (changed) await writeDigestState(next);
@@ -780,12 +692,12 @@ export async function notifyTeamIfUrgent(kind: NotifyKind, id: string): Promise<
 
     const settings = await getLogistiekSettings();
     const to = settings.notifyEmails[kind] ?? [];
-    const body = await summaryFor(kind, id);
-    if (!body) return;
+    const bodies = await digestBodies(kind, [entry]);
+    if (bodies.requests.length + bodies.cancellations.length === 0) return;
 
     // Geen adres ingesteld is een geldige keuze; dan is er niets te versturen en
     // wordt de rij toch afgevinkt, zodat ze niet in de bundel blijft hangen.
-    if (to.length > 0 && !(await deliverDigest(kind, to, [body]))) return;
+    if (to.length > 0 && !(await deliverDigest(kind, to, bodies))) return;
     await markNotified(kind, [id], new Date());
   } catch (err) {
     console.error('[uitleen-mail] dringende teammelding mislukt:', err);
@@ -793,7 +705,7 @@ export async function notifyTeamIfUrgent(kind: NotifyKind, id: string): Promise<
 }
 
 /** De samenvatting van een materiaal- of flesserke-aanvraag voor de teammelding. */
-async function reservationSummary(id: string): Promise<{ title: string; text: string } | null> {
+async function reservationSummary(id: string, cancelled: boolean): Promise<UitleenDigestEntry | null> {
   const reservation = await prisma.uitleenReservation.findUnique({
     where: { id },
     select: {
@@ -808,28 +720,31 @@ async function reservationSummary(id: string): Promise<{ title: string; text: st
       group: { select: { nameNl: true } },
       lines: { select: { itemName: true, quantity: true } },
       flesserkeLines: { select: { itemName: true, quantity: true } },
+      ...(cancelled ? cancelledFromSelect : {}),
     },
   });
   if (!reservation) return null;
 
-  const items = [...reservation.lines, ...reservation.flesserkeLines]
-    .map((line) => `- ${line.quantity} x ${line.itemName}`)
-    .join('\n');
-
-  return {
-    title: reservation.eventName,
-    text: joinBlocks([
-      `Aanvraag: ${reservation.eventName}\nVan: ${requesterLabel(reservation)} (${reservation.user.name})\nPeriode: ${formatDateOnly(reservation.pickupDate)} - ${formatDateOnly(reservation.returnDate)}`,
-      items ? `Gevraagd:\n${items}` : null,
-      reservation.delivery ? 'Er is levering gevraagd.' : null,
-      reservation.memberNote ? `Nota van het lid:\n${reservation.memberNote}` : null,
-      `Beslissen: ${logistiekBaseUrl()}/beheer/aanvragen/${id}`,
-    ]),
-  };
+  return reservationRequestSummary({
+    id,
+    requestName: reservation.eventName,
+    requester: requesterLabel(reservation),
+    userName: reservation.user.name,
+    pickupDate: formatDateOnly(reservation.pickupDate),
+    returnDate: formatDateOnly(reservation.returnDate),
+    lines: [...reservation.lines, ...reservation.flesserkeLines].map((line) => ({
+      quantity: line.quantity,
+      name: line.itemName,
+    })),
+    delivery: reservation.delivery,
+    memberNote: reservation.memberNote,
+    baseUrl: logistiekBaseUrl(),
+    cancelled: cancelled ? { wasApproved: wasApproved(reservation) } : undefined,
+  });
 }
 
 /** Idem voor een rit; bij een heen-en-terugaanvraag staan beide ritten erin. */
-async function transportSummary(id: string): Promise<{ title: string; text: string } | null> {
+async function transportSummary(id: string, cancelled: boolean): Promise<UitleenDigestEntry | null> {
   const booking = await prisma.uitleenTransportBooking.findUnique({
     where: { id },
     select: {
@@ -847,7 +762,10 @@ async function transportSummary(id: string): Promise<{ title: string; text: stri
       user: { select: { name: true } },
       group: { select: { nameNl: true } },
       vehicle: { select: { nameNl: true } },
+      driver: { select: { name: true } },
+      assignedGroup: { select: { nameNl: true } },
       helpers: { orderBy: { createdAt: 'asc' }, select: { name: true, phone: true } },
+      ...(cancelled ? cancelledFromSelect : {}),
     },
   });
   if (!booking) return null;
@@ -862,33 +780,94 @@ async function transportSummary(id: string): Promise<{ title: string; text: stri
       })
     : [{ startAt: booking.startAt, endAt: booking.endAt, vehicle: booking.vehicle }];
 
-  return {
+  return tripRequestSummary({
+    id,
     title: tripTitle(booking),
-    text: joinBlocks([
-      [
-        `Waarvoor: ${booking.purpose}`,
-        tripEventName(booking) ? `Evenement: ${tripEventName(booking)}` : null,
-        `Van: ${requesterLabel(booking)} (${booking.user.name})`,
-      ]
-        .filter(Boolean)
-        .join('\n'),
-      legs
-        .map(
-          (leg) =>
-            `- ${formatDateTime(leg.startAt)} tot ${formatDateTime(leg.endAt)} (${leg.vehicle.nameNl})`
-        )
-        .join('\n'),
-      booking.cargoNote ? `Lading: ${booking.cargoNote}` : null,
-      booking.helpers.length > 0
-        ? `Bijrijders: ${booking.helpers
-            .map((helper) => `${helper.name}${helper.phone ? ` (${helper.phone})` : ''}`)
-            .join(', ')}`
-        : null,
-      [booking.pickupAddress, booking.destination].some(Boolean)
-        ? `Van: ${booking.pickupAddress ?? 'niet ingevuld'}\nNaar: ${booking.destination ?? 'niet ingevuld'}`
-        : null,
-      booking.memberNote ? `Nota van het lid:\n${booking.memberNote}` : null,
-      `Beslissen: ${logistiekBaseUrl()}/beheer/vervoer?rit=${id}`,
-    ]),
-  };
+    purpose: booking.purpose,
+    eventName: tripEventName(booking),
+    requester: requesterLabel(booking),
+    userName: booking.user.name,
+    legs: legs.map((leg) => ({
+      start: formatDateTime(leg.startAt),
+      end: formatDateTime(leg.endAt),
+      vehicle: leg.vehicle.nameNl,
+    })),
+    cargoNote: booking.cargoNote,
+    helpers: booking.helpers,
+    pickupAddress: booking.pickupAddress,
+    destination: booking.destination,
+    memberNote: booking.memberNote,
+    baseUrl: logistiekBaseUrl(),
+    cancelled: cancelled
+      ? {
+          wasApproved: wasApproved(booking),
+          driverName: booking.driver?.name ?? null,
+          assignedGroupName: booking.assignedGroup?.nameNl ?? null,
+        }
+      : undefined,
+  });
+}
+
+/** De laatste annulatie in de historiek: van welke status kwam ze? */
+const cancelledFromSelect = {
+  auditLogs: {
+    where: { kind: 'STATUS_CHANGED' as const, toStatus: 'CANCELLED' },
+    orderBy: { createdAt: 'desc' as const },
+    take: 1,
+    select: { fromStatus: true },
+  },
+};
+
+function wasApproved(row: { auditLogs?: Array<{ fromStatus: string | null }> }): boolean {
+  return row.auditLogs?.[0]?.fromStatus === 'APPROVED';
+}
+
+// ---------------------------------------------------------------------------
+// Annuleren door de aanvrager
+// ---------------------------------------------------------------------------
+
+/**
+ * Verwittigt de chauffeurs van ritten die de aanvrager net annuleerde.
+ *
+ * Meteen en niet in de bundel: een chauffeur leest de teammelding niet, en hij
+ * is degene die anders voor niets aan het logikot staat. Niet naar wie zelf
+ * annuleerde (een chauffeur die zijn eigen aanvraag schrapt, weet het al).
+ *
+ * Aan te roepen ná de transactie; falen mag de annulatie niet ongedaan maken.
+ */
+export async function notifyDriversOfCancellation(bookingIds: string[], actorId: string): Promise<void> {
+  try {
+    if (bookingIds.length === 0) return;
+    const bookings = await prisma.uitleenTransportBooking.findMany({
+      where: { id: { in: bookingIds }, driverId: { not: null } },
+      orderBy: { startAt: 'asc' },
+      select: {
+        driverId: true,
+        purpose: true,
+        eventName: true,
+        startAt: true,
+        endAt: true,
+        pickupAddress: true,
+        destination: true,
+        cargoNote: true,
+        vehicle: { select: { nameNl: true } },
+        driver: {
+          select: { name: true, email: true, personalEmail: true, emailPreference: true, locale: true },
+        },
+      },
+    });
+    for (const booking of bookings) {
+      if (!booking.driver || booking.driverId === actorId) continue;
+      const recipient = recipientOf(booking.driver, null);
+      const mail = tripCancelledDriverMail({
+        locale: recipient.locale,
+        recipientName: recipient.name,
+        trip: tripFacts(booking, recipient.locale),
+        baseUrl: logistiekBaseUrl(),
+      });
+      await deliver(recipient, mail.subject, mail.text);
+    }
+  } catch (err) {
+    console.error('[uitleen-mail] chauffeur verwittigen van een annulatie mislukt:', err);
+  }
 }
