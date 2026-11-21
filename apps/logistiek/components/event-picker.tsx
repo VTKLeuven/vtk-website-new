@@ -34,6 +34,7 @@ export function EventPicker({
   newEventName,
   /** Staat het naamveld onder de keuzelijst in plaats van erboven? Enkel voor de tekst. */
   nameFieldBelow = false,
+  nameField,
 }: {
   events: SelectableEvent[];
   eventId: string;
@@ -42,6 +43,17 @@ export function EventPicker({
   locale: LogistiekLocale;
   newEventName: string;
   nameFieldBelow?: boolean;
+  /**
+   * Het naamveld zelf, in dit blok in plaats van elders in het formulier (L5).
+   *
+   * Het transportformulier vroeg het evenement twee keer: bovenaan deze keuze
+   * met een vinkje "maak hier een nieuw evenement van (gebruikt de naam die je
+   * hieronder invult)", en verderop een los veld "Evenement (optioneel)". Welke
+   * van de twee telde, zei niets. Met `nameField` kies je hier een bestaand
+   * evenement óf typ je de naam van een nieuw, op dezelfde plek; het vinkje om er
+   * een echt evenement van te maken, verschijnt pas wanneer er een naam staat.
+   */
+  nameField?: { value: string; onChange: (value: string) => void; invalid?: boolean };
 }) {
   const en = locale === 'en';
   const [search, setSearch] = useState('');
@@ -130,6 +142,34 @@ export function EventPicker({
             </>
           ) : null}
 
+          {nameField ? (
+            <label className="mt-2 grid gap-1 text-sm">
+              <span className="font-medium text-vtk-ink">
+                {events.length > 0
+                  ? en
+                    ? 'Or the name of a new event'
+                    : 'Of de naam van een nieuw evenement'
+                  : en
+                    ? 'Name of the event'
+                    : 'Naam van het evenement'}
+              </span>
+              <input
+                type="text"
+                value={nameField.value}
+                onChange={(event) => nameField.onChange(event.target.value)}
+                data-field="eventName"
+                aria-invalid={nameField.invalid}
+                placeholder={en ? 'E.g. Gala 2026' : 'Bv. Galabal 2026'}
+                className={`h-10 rounded-lg border bg-vtk-field px-3 text-sm text-vtk-ink ${
+                  nameField.invalid ? 'border-vtk-danger' : 'border-vtk-navy/15'
+                }`}
+              />
+            </label>
+          ) : null}
+
+          {/* Met een eigen naamveld pas zodra er een naam staat: een vinkje
+              "maak hier een evenement van" zonder naam erbij zegt niets. */}
+          {nameField && !nameField.value.trim() ? null : (
           <label className="mt-1 flex items-start gap-2 text-sm">
             <input
               type="checkbox"
@@ -139,19 +179,30 @@ export function EventPicker({
             />
             <span>
               <span className="font-medium text-vtk-ink">
-                {en ? 'Create a new event for this' : 'Maak hier een nieuw evenement van'}
+                {nameField
+                  ? en
+                    ? 'Save it as an event'
+                    : 'Bewaar het als evenement'
+                  : en
+                    ? 'Create a new event for this'
+                    : 'Maak hier een nieuw evenement van'}
               </span>
               <span className="block text-xs text-vtk-muted">
-                {newEventName.trim()
+                {nameField
                   ? en
-                    ? `Called "${newEventName.trim()}". Your next request can hang under it.`
-                    : `Met de naam "${newEventName.trim()}". Je volgende aanvraag kan er dan onder hangen.`
-                  : en
-                    ? `Uses the event name you fill in ${nameFieldBelow ? 'below' : 'above'}.`
-                    : `Gebruikt de naam die je ${nameFieldBelow ? 'hieronder' : 'hierboven'} invult.`}
+                    ? 'Then your next request can hang under it. Without the tick, the name only stays on this request.'
+                    : 'Dan kan je volgende aanvraag eronder hangen. Zonder vinkje staat de naam enkel bij deze aanvraag.'
+                  : newEventName.trim()
+                    ? en
+                      ? `Called "${newEventName.trim()}". Your next request can hang under it.`
+                      : `Met de naam "${newEventName.trim()}". Je volgende aanvraag kan er dan onder hangen.`
+                    : en
+                      ? `Uses the event name you fill in ${nameFieldBelow ? 'below' : 'above'}.`
+                      : `Gebruikt de naam die je ${nameFieldBelow ? 'hieronder' : 'hierboven'} invult.`}
               </span>
             </span>
           </label>
+          )}
         </div>
       )}
     </section>

@@ -73,13 +73,16 @@ export function VanRequestForm({
   const [eventLink, setEventLink] = useState({ eventId: '', createEvent: false });
   /**
    * Een gekozen evenement vult de naam in plaats van dat je ze opnieuw typt; zie
-   * het materiaalformulier. Loskoppelen geeft het veld weer vrij.
+   * het materiaalformulier. Loskoppelen maakt het naamveld weer leeg, als er nog
+   * de naam van dat evenement in stond: anders blijft het als een nieuw
+   * evenement met dezelfde naam staan.
    */
-  const linkedEvent = events?.find((entry) => entry.id === eventLink.eventId) ?? null;
   function chooseEvent(next: { eventId: string; createEvent: boolean }) {
+    const previous = events?.find((entry) => entry.id === eventLink.eventId);
     setEventLink(next);
     const picked = events?.find((entry) => entry.id === next.eventId);
     if (picked) setEventName(picked.name);
+    else if (!next.eventId && previous && previous.name === eventName) setEventName('');
   }
   const [error, setError] = useState<string | null>(null);
   /** Het eerste verplichte veld dat nog leeg is (R7). */
@@ -324,7 +327,7 @@ export function VanRequestForm({
             onChange={chooseEvent}
             locale={locale}
             newEventName={eventName}
-            nameFieldBelow
+            nameField={{ value: eventName, onChange: setEventName, invalid: missing?.name === 'eventName' }}
           />
         </div>
       ) : null}
@@ -486,17 +489,10 @@ export function VanRequestForm({
             className={fieldClass(inputClass, 'purpose', missing)}
           />
         </label>
-        {linkedEvent ? (
-          <div className="grid gap-1 text-sm sm:col-span-2">
-            <span className="font-medium text-vtk-ink">{en ? 'Event' : 'Evenement'}</span>
-            <p className="flex h-10 items-center rounded-lg border border-dashed border-vtk-navy/20 bg-vtk-paper px-3 text-vtk-muted">
-              {linkedEvent.name}
-            </p>
-            <span className="text-xs text-vtk-muted">
-              {en ? 'Comes from the event you picked above.' : 'Volgt uit het evenement dat je hierboven koos.'}
-            </span>
-          </div>
-        ) : (
+        {/* Het evenement staat bovenaan, in het blok "Hoort dit bij een
+            evenement?" (L5). Enkel wie dat blok niet krijgt (een externe heeft
+            geen evenementen), tikt de naam hier. */}
+        {events ? null : (
           <label className="grid gap-1 text-sm sm:col-span-2">
             <span className="font-medium text-vtk-ink">{en ? 'Event (optional)' : 'Evenement (optioneel)'}</span>
             <input
