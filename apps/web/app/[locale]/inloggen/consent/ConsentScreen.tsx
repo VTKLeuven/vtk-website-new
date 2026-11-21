@@ -37,6 +37,7 @@ export function ConsentScreen({
   client,
   scopes,
   alreadyGranted,
+  requestedOpenid = true,
   requestsOfflineAccess,
 }: {
   nl: boolean;
@@ -53,6 +54,7 @@ export function ConsentScreen({
   };
   scopes: ConsentScopeRow[];
   alreadyGranted: string[];
+  requestedOpenid?: boolean;
   requestsOfflineAccess: boolean;
 }) {
   const unsent = useUnsentGuard();
@@ -74,14 +76,18 @@ export function ConsentScreen({
   const offline = scopes.find((scope) => scope.code === 'offline_access');
   const regular = scopes.filter((scope) => scope.code !== 'offline_access');
 
+  const grantedScopes = Array.from(
+    new Set([...(requestedOpenid ? ['openid'] : []), ...alreadyGranted, ...accepted])
+  );
+
   function submit(accept: boolean) {
     const formData = new FormData();
     formData.set('oauthQuery', oauthQuery);
     formData.set('accept', accept ? '1' : '0');
-    // `openid` blijft altijd mee: zonder die scope is het geen OIDC-login meer.
-    // Eerder toegestane scopes gaan ook mee, anders vervangt de plugin de rij
-    // en verliest het lid wat het eerder al gaf.
-    for (const scope of new Set(['openid', ...alreadyGranted, ...accepted])) {
+    // `openid` enkel mee als de client die scope ook vroeg (OIDC-clients wel,
+    // pure OAuth 2.1 MCP-clients niet; een ongevraagde scope laat oauth2/consent
+    // falen). Eerder toegestane scopes gaan mee zodat ze niet wegvallen.
+    for (const scope of grantedScopes) {
       formData.append('scopes', scope);
     }
     // Er staat hier geen <form>, dus geen `action`-prop die dit voor ons doet:
@@ -249,7 +255,12 @@ export function ConsentScreen({
           <Button variant="ghost" type="button" disabled={pending || done} onClick={() => submit(false)}>
             {nl ? 'Weigeren' : 'Refuse'}
           </Button>
-          <Button variant="primary" type="button" disabled={pending || done} onClick={() => submit(true)}>
+          <Button
+            variant="primary"
+            type="button"
+            disabled={pending || done || grantedScopes.length === 0}
+            onClick={() => submit(true)}
+          >
             {nl ? 'Toestaan' : 'Allow'}
           </Button>
         </div>

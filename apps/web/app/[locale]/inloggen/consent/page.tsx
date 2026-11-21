@@ -152,6 +152,7 @@ export default async function ConsentPage({
       // Meesturen zodat een gedeeltelijke toestemming de eerder gegeven scopes
       // niet wegduwt: de plugin vervangt de rij, ze vult niet aan.
       alreadyGranted={alreadyGranted}
+      requestedOpenid={requested.includes('openid')}
       requestsOfflineAccess={requested.includes('offline_access')}
     />
   );

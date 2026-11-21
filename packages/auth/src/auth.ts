@@ -49,6 +49,7 @@ const TRUSTED_PROXIES = (
 
 const DEFAULT_DCR_ALLOWED_REDIRECT_HOSTS = [
   'claude.ai',
+  'claude.com',
   'chatgpt.com',
   'chat.openai.com',
   'cursor.sh',
@@ -57,6 +58,8 @@ const DEFAULT_DCR_ALLOWED_REDIRECT_HOSTS = [
   '[::1]',
   '::1',
 ] as const;
+
+const ALLOWED_DCR_AUTH_METHODS = new Set(['none', 'client_secret_basic', 'client_secret_post']);
 
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 
@@ -323,13 +326,25 @@ export const auth = betterAuth({
       if (ctx.path !== '/oauth2/register') return;
       const body = ctx.body as Record<string, unknown> | undefined;
       if (!body || typeof body !== 'object') return;
-      if (body.token_endpoint_auth_method !== undefined && body.token_endpoint_auth_method !== 'none') {
+      if (
+        body.token_endpoint_auth_method !== undefined &&
+        (typeof body.token_endpoint_auth_method !== 'string' ||
+          !ALLOWED_DCR_AUTH_METHODS.has(body.token_endpoint_auth_method))
+      ) {
         throw new APIError('BAD_REQUEST', {
-          message: 'Dynamic client registration only supports public PKCE clients (token_endpoint_auth_method: none).',
+          message:
+            'Dynamic client registration only supports token_endpoint_auth_method none, client_secret_basic, or client_secret_post.',
+        });
+      }
+      if (Array.isArray(body.grant_types) && body.grant_types.includes('client_credentials')) {
+        throw new APIError('BAD_REQUEST', {
+          message: 'Dynamic client registration does not allow the client_credentials grant type.',
         });
       }
       assertAllowedDcrRedirectUris(body.redirect_uris);
-      body.token_endpoint_auth_method = 'none';
+      if (body.token_endpoint_auth_method === undefined) {
+        body.token_endpoint_auth_method = 'none';
+      }
     }),
   },
 

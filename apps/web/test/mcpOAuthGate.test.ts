@@ -311,12 +311,20 @@ describe("MCP OAuth toegangspoort en tokenvalidatie", () => {
     });
     expect(nonHttps.status).toBe(400);
 
-    const confidential = await register({
-      client_name: "Confidential",
+    const privateKeyJwt = await register({
+      client_name: "PrivateKeyJwt",
       redirect_uris: ["https://claude.ai/api/mcp/auth_callback"],
-      token_endpoint_auth_method: "client_secret_basic",
+      token_endpoint_auth_method: "private_key_jwt",
     });
-    expect(confidential.status).toBe(400);
+    expect(privateKeyJwt.status).toBe(400);
+
+    const clientCredentials = await register({
+      client_name: "M2M",
+      redirect_uris: ["https://claude.com/api/mcp/auth_callback"],
+      token_endpoint_auth_method: "client_secret_post",
+      grant_types: ["client_credentials"],
+    });
+    expect(clientCredentials.status).toBe(400);
 
     const evilCursor = await register({
       client_name: "Evil Cursor",
