@@ -1,11 +1,9 @@
 /**
  * Wat de transportplanning tekent.
  *
- * Bewust een eigen module zonder `'use client'`: in een client-module wordt élke
- * export een client-referentie, ook een gewone array of een constante. De
- * server-component kreeg dan geen lijst maar een proxy. Zie de gelijkaardige
- * comment in `app/beheer/kalender/kalender-kinds.ts`; het heeft daar ooit een
- * pagina omgegooid met "CALENDAR_KINDS is not iterable".
+ * Bewust zonder `'use client'`: in een client-module wordt elke export een
+ * client-referentie, ook een array, en dan krijgt een server-component een proxy
+ * in plaats van een lijst ("... is not iterable", zie `kalender-kinds.ts`).
  */
 
 import type { AvailabilityKind } from '@/lib/availability-day';
@@ -18,63 +16,39 @@ export type TripBlock = {
   endAt: string;
   status: string;
   /**
-   * Bovenste regel in het blok: waarvoor de rit dient (`tripTitle`). Niet het
-   * evenement: onder één evenement rijden vaak vijf ritten, en vijf blokken met
-   * "Galabal" zeggen niet welke de tafels brengt. Zie docs/design-decisions.md.
+   * Bovenste regel: waarvoor de rit dient (`tripTitle`), niet het evenement; vijf
+   * blokken "Galabal" zeggen niet welke de tafels brengt. Zie design-decisions.
    */
   title: string;
-  /**
-   * Het evenement waar de rit bij hoort, als eigen regel die je in "Weergave"
-   * aanvinkt. Enkel gevuld op de planning van het team.
-   */
+  /** Het evenement, als regel die je in "Weergave" aanvinkt; enkel voor het team. */
   eventName?: string | null;
   /** Tweede regel: de aanvrager, of niets op het publieke overzicht. */
   subtitle: string | null;
   driver: { id: string; name: string } | null;
-  /**
-   * Waar de rit heen gaat, en wat er mee moet. Allebei enkel gevuld op de
-   * planning van het team: ze staan standaard niet in het blok en verschijnen
-   * pas wanneer iemand ze in "Weergave" aanvinkt (zie {@link TRIP_BLOCK_FIELDS}).
-   */
+  /** Bestemming en lading: enkel voor het team, en standaard uitgevinkt ({@link TRIP_BLOCK_FIELDS}). */
   destination?: string | null;
   cargoNote?: string | null;
   /** Rood: twee goedgekeurde ritten met hetzelfde voertuig op hetzelfde moment. */
   conflict: boolean;
   /**
-   * Deze rit is van een post of werkgroep van de kijker (F4.15): gele rail links.
-   *
-   * Een vlag op het blok en geen groep-id plus een vergelijking in de kalender:
-   * wie de kijker is, weet de server, en de kalender is een client-component die
-   * op drie schermen hergebruikt wordt. Op de planning van het team staat ze
-   * nergens aan; daar is elke rit van jou en zou ze niets onderscheiden.
+   * Van een post of werkgroep van de kijker: gele rail links (F4.15). Een vlag van
+   * de server, want enkel die weet wie kijkt; op de planning van het team staat
+   * ze nooit aan, daar zou ze niets onderscheiden.
    */
   mine?: boolean;
 };
 
 /**
- * Wat er in een rit-blok mag staan, en wat er standaard staat.
+ * Wat er in een rit-blok mag staan. Instelbaar omdat een rit van een kwartier
+ * 24 px hoog is: wie chauffeurs indeelt, wil de naam, wie zijn post nakijkt de
+ * post, en alles tegelijk past niet.
  *
- * Waarom dit instelbaar is: wie chauffeurs indeelt, kijkt naar de naam in het
- * blok; wie de week van zijn post nakijkt, wil de post zien; wie een verhuis
- * plant, de bestemming. Alles tegelijk tonen kan niet, want een rit van een
- * kwartier is 24 pixels hoog. Eén vaste keuze maakt dus telkens iemand anders
- * ongelijk, en daarom kiest hij het zelf.
- *
- * De **post of werkgroep** was hier de aanleiding: die stond al in
- * `TripBlock.subtitle`, maar kwam enkel in de tooltip terecht.
- *
- * Wat hier bewust **niet** in staat:
- *
- * - **De maandweergave.** Een balk daar is één regel van veertien pixels; die
- *   toont beginuur, voertuig en titel en daar past niets bij. Velden aanvinken
- *   die er toch niet in passen, is een instelling die liegt.
- * - **De tooltip en de screenreader.** `blockLabel` blijft alles zeggen. Iets
- *   weglaten omdat het blok smal is, is een weergavekeuze; een screenreader
- *   heeft geen smal blok.
- * - **De chauffeur op het publieke overzicht.** Dat is `showDriver`, en dat is
- *   een serverbeslissing (daar staan geen namen) en geen voorkeur. De twee
- *   staan naast elkaar: uitgevinkt óf niet toegestaan betekent allebei "niet
- *   tonen", maar enkel het eerste mag de bezoeker zelf terugzetten.
+ * Bewust niet hierdoor geregeld:
+ * - de maandweergave: een balk van 14 px toont uur, voertuig en titel, meer past
+ *   er niet, en een vinkje dat niets doet liegt;
+ * - de tooltip en de screenreader: `blockLabel` zegt altijd alles;
+ * - de chauffeur op het publieke overzicht: dat is `showDriver`, een beslissing
+ *   van de server (daar staan geen namen) die de bezoeker niet kan terugzetten.
  */
 export const TRIP_BLOCK_FIELDS = [
   { key: 'time', label: 'Uur' },
@@ -92,14 +66,9 @@ export type TripBlockField = (typeof TRIP_BLOCK_FIELDS)[number]['key'];
 export type TripFields = Record<TripBlockField, boolean>;
 
 /**
- * Wat er stond voor deze instelling bestond, plus de nieuwe velden uit.
- *
- * De standaard is met opzet de oude weergave: wie niets instelt, hoort niets te
- * merken. Post, bestemming en lading staan uit omdat ze in een blok van een
- * kwartier de vier regels eronder wegduwen die er altijd al stonden. Het
- * evenement ook: tot september 2026 was het de titel zelf, en sindsdien staat
- * daar waarvoor de rit dient; wie het evenement toch in het blok wil, vinkt het
- * aan.
+ * De standaard: wie niets instelt, merkt niets. Post, bestemming, lading en
+ * evenement staan uit omdat ze in een blok van een kwartier de vaste regels
+ * wegduwen.
  */
 export const DEFAULT_TRIP_FIELDS: TripFields = {
   time: true,
@@ -115,12 +84,9 @@ export const DEFAULT_TRIP_FIELDS: TripFields = {
 export const TRIP_FIELDS_STORAGE_KEY = 'logistiek.transportplanning.velden';
 
 /**
- * De bewaarde keuze inlezen.
- *
- * Alles wat niet klopt valt terug op de standaard, per veld: dit is een
- * voorkeur uit `localStorage` en geen invoer, en een kalender hoort niet leeg te
- * blijven omdat er ooit iets raars in die sleutel geschreven is. Een veld dat
- * later bijkomt, krijgt zo vanzelf zijn eigen standaard in plaats van `false`.
+ * De bewaarde keuze uit `localStorage`. Wat niet klopt, valt per veld terug op de
+ * standaard, en een veld dat later bijkomt krijgt zo zijn standaard in plaats
+ * van `false`.
  */
 export function parseTripFields(raw: string | null): TripFields {
   if (!raw) return DEFAULT_TRIP_FIELDS;
@@ -150,39 +116,19 @@ export type CalendarVehicle = {
   name: string;
   /** `kar`, `auto`, `bakfiets`, ...: bepaalt welk icoon in het blok staat. */
   code: string;
-  /**
-   * Het ingestelde icoon (F4.21), of niets. Weggelaten of `null` = automatisch,
-   * en dan leidt `vehicleIconName` het af uit `code`.
-   */
+  /** Het ingestelde icoon (F4.21); leeg = afgeleid uit `code` (`vehicleIconName`). */
   icon?: string | null;
   /** Arcering van dit voertuig (K1); null of `none` = geen. */
   pattern?: string | null;
-  /**
-   * Rijdt Logistiek dit voertuig? De bakfiets neemt de aanvrager zelf mee, dus
-   * daar is "nog geen chauffeur" geen openstaande taak maar de normale gang van
-   * zaken (T13). Weggelaten = wel, zoals het veld in de databank.
-   */
+  /** Rijdt Logistiek dit voertuig? Bij de bakfiets niet, dus is "geen chauffeur" daar normaal (T13). */
   needsDriver?: boolean;
 };
 
 /**
- * De zoom van de kalender, als **factor op "de hele dag past in beeld"**.
- *
- * Niet in pixels per uur, en dat is het verschil met de eerste versie. Een vaste
- * pixelmaat weet niet hoe groot het scherm is: dezelfde 42px per uur vulde een
- * laptop half en een volledig scherm voor een derde, en "inzoomen" betekende dan
- * iets anders naargelang waar je zat.
- *
- * Zo werkt het nu, zoals een agenda-app het doet:
- *
- * - **Zoom 1 = de hele dag past exact in het venster.** Geen verticale
- *   scrollbalk, van 00:00 tot 24:00 in beeld. In volledig scherm is dat venster
- *   groter, dus wordt een uur vanzelf hoger; de kalender vúlt het scherm in
- *   plaats van er klein in te blijven staan.
- * - **Boven 1 wordt een uur hoger en scrolt de dag.** Dat is wat je wil zodra
- *   er iets te lezen valt in een blok van een kwartier.
- * - **Onder 1 bestaat niet.** Bij 1 zie je de dag al helemaal; verder uitzoomen
- *   voegt enkel wit toe.
+ * De zoom als factor op "de hele dag past in beeld", niet in pixels per uur: een
+ * vaste pixelmaat vult elk scherm anders. Zoom 1 toont 00:00 tot 24:00 zonder
+ * scrollbalk, daarboven wordt een uur hoger en scrolt de dag, en onder 1 voegt
+ * enkel wit toe en bestaat dus niet.
  */
 export const ZOOM_MIN = 1;
 export const ZOOM_MAX = 8;
@@ -195,14 +141,9 @@ export function clampZoom(value: number): number {
 }
 
 /**
- * Ondergrens in pixels per uur. Op een korte pagina zou "de hele dag past" op
- * 14px per uur uitkomen, en dan is een uurlijn niet meer van de volgende te
- * onderscheiden. Onder deze grens scrolt de kalender dus toch, ook op zoom 1.
- *
- * 18 en niet 22 (F6.2): op een laptop is de pane ruim 600px hoog, en met twee
- * rijen evenementen in de kop bleef er minder dan 22px per uur over. De
- * kalender scrolde dan op "hele dag" met een stuk van de nacht onderaan buiten
- * beeld, precies wat "hele dag" moet voorkomen.
+ * Ondergrens in pixels per uur; daaronder zijn de uurlijnen niet meer uit elkaar
+ * te houden en scrolt de kalender toch, ook op zoom 1. 18 en niet 22 (F6.2): met
+ * twee rijen evenementen op een laptop viel "hele dag" anders onderaan af.
  */
 export const MIN_HOUR_PX = 18;
 /** Bovengrens, zodat een misgelopen berekening geen kalender van 40 schermen maakt. */
@@ -212,39 +153,17 @@ export const MAX_HOUR_PX = 320;
 export const DAY_HOURS = 24;
 
 /**
- * De strook die rechts van een rit vrij blijft, in pixels.
- *
- * Een blok liep tot voor kort over de volle breedte van zijn baan, en bij één
- * rit is dat de hele dagkolom. Slepen op lege ruimte start enkel op de kolom
- * zelf (`event.target === event.currentTarget` in `beginCreate`), dus over de
- * hele hoogte van die rit viel er niets meer in te tekenen: je klikte altijd het
- * blok aan, en een tweede rit op dat uur moest via de knop in de werkbalk.
- *
- * Elke agenda-app houdt daarom die strook vrij, maar één keer per dagkolom: aan
- * de rechterrand, na de laatste baan. Ze hing eerst aan elk blok, en dan stond
- * er bij twee ritten naast elkaar ook een gat van veertien pixels tussen de
- * linker en de rechter, waar niets in te tekenen valt dat niet al op die
- * rechterrand kan. Tussen de banen zit nu enkel `LANE_GAP_PX`.
- *
- * Gedeeld met de telefoonweergave, waar er niet in getekend wordt (verticaal
- * vegen is daar scrollen): daar is het enkel zodat de twee weergaven er
- * hetzelfde uitzien.
+ * De strook rechts in elke dagkolom die vrij blijft, zodat je naast een rit nog
+ * een tweede kan tekenen: slepen start enkel op de kolom zelf
+ * (`beginCreate`). Eén keer per kolom, na de laatste baan, en niet per blok;
+ * tussen de banen zit enkel `LANE_GAP_PX`.
  */
 export const BLOCK_GUTTER_PX = 14;
 
-/**
- * De naad tussen twee ritten die naast elkaar staan, in pixels. Even smal als
- * die tussen twee ritten onder elkaar (de hoogte min 2 in `TimeGrid`): genoeg om
- * twee blokken van dezelfde kleur uit elkaar te houden, te weinig om als lege
- * plek te lezen.
- */
+/** De naad tussen twee ritten naast elkaar, even smal als die tussen twee onder elkaar. */
 export const LANE_GAP_PX = 2;
 
-/**
- * Waar een blok staat en hoe breed het is, binnen een dagkolom met `lanes`
- * banen. De strook rechts (`BLOCK_GUTTER_PX`) gaat eerst van de kolom af, de
- * rest wordt verdeeld; enkel de laatste baan raakt die strook.
- */
+/** Plaats en breedte van een blok in een kolom met `lanes` banen, na aftrek van de strook rechts. */
 export function laneBox(lane: number, lanes: number): { left: string; width: string } {
   const share = `(100% - ${BLOCK_GUTTER_PX}px) / ${lanes}`;
   const last = lane === lanes - 1;
@@ -255,54 +174,29 @@ export function laneBox(lane: number, lanes: number): { left: string; width: str
 }
 
 /**
- * De uurhoogte die bij deze pane-hoogte en deze zoom hoort.
- *
- * Eén functie voor beide kanten: het rooster tekent ermee, en de werkbalk rekent
- * er de scrollpositie mee om bij het zoomen. Twee keer dezelfde klemming
- * schrijven betekent dat het anker na de eerste wijziging een halve schermhoogte
- * verkeerd zit.
+ * De uurhoogte bij deze pane-hoogte en zoom. Het rooster en de werkbalk (het
+ * scrollanker bij zoomen) gebruiken allebei deze ene klemming.
  */
 export function hourPxFor(fitHourPx: number, zoom: number): number {
   return Math.min(MAX_HOUR_PX, Math.max(MIN_HOUR_PX, fitHourPx * zoom));
 }
 
 /**
- * Hoeveel het wiel zoomt, per pixel gescrolde afstand.
- *
- * Niet een vaste factor per gebeurtenis, en dat is het verschil met de eerste
- * versie. Die deed 1,25x per `wheel`-event, en een trackpad vuurt er dertig per
- * gebaar: één veeg sloeg dan meteen tegen het maximum aan. Dat is wat er
- * "glitchte". Nu telt de afstand, dus een muiswiel met grote stappen en een
- * trackpad met kleine stapjes komen op ongeveer hetzelfde uit, en een gebaar
- * loopt vloeiend in plaats van in sprongen.
- *
- * De waarde is het midden tussen twee klachten. Eerst was het 1,25 per
- * gebeurtenis en dat was onbestuurbaar; op 0,0015 per pixel was het te traag.
- * Hier is één muisklik ongeveer een vijfde erbij, en één trackpadgebaar
- * ongeveer een verdubbeling.
+ * Zoom per pixel gescrolde afstand, niet per `wheel`-gebeurtenis: een trackpad
+ * vuurt er dertig per gebaar, en een vaste factor per gebeurtenis sloeg meteen
+ * tegen het maximum. 0,0015 was te traag; nu is een muisklik ongeveer een vijfde
+ * erbij en een trackpadgebaar ongeveer een verdubbeling.
  */
 export const ZOOM_WHEEL_PER_PX = 0.003;
 
-/**
- * Bovengrens op wat één gebeurtenis mag doen.
- *
- * Een muiswiel meldt soms 100 of zelfs 240 pixels per klik, en op een
- * versnelde trackpadveeg lopen ze op tot in de honderden. Zonder deze grens
- * springt de kalender bij zo'n enkele gebeurtenis alsnog een heel bereik door.
- */
+/** Bovengrens per gebeurtenis: een muiswiel meldt soms 240 px per klik. */
 export const ZOOM_WHEEL_MAX_PX = 60;
 
 /** Eén regel en één pagina in pixels, om `deltaMode` 1 en 2 om te rekenen. */
 const WHEEL_LINE_PX = 16;
 const WHEEL_PAGE_PX = 400;
 
-/**
- * De scrollafstand van een `wheel`-gebeurtenis in pixels.
- *
- * Firefox en sommige muizen melden regels (`deltaMode` 1) of pagina's (2) in
- * plaats van pixels; zonder omrekening zoomt dezelfde muis daar honderd keer
- * trager dan in Chrome.
- */
+/** De scrollafstand in pixels; Firefox meldt soms regels (`deltaMode` 1) of pagina's (2). */
 export function wheelPixels(event: { deltaY: number; deltaMode: number }): number {
   if (event.deltaMode === 1) return event.deltaY * WHEEL_LINE_PX;
   if (event.deltaMode === 2) return event.deltaY * WHEEL_PAGE_PX;
@@ -318,14 +212,7 @@ export function zoomByWheel(zoom: number, deltaPx: number): number {
 
 export const ZOOM_STORAGE_KEY = 'logistiek.transportplanning.zoom';
 
-/**
- * Een venster waarin een chauffeur kan rijden (V1), als lichte band achter het
- * rooster.
- *
- * Achter en niet tussen de ritten: het is context en geen afspraak. Een band die
- * er even zwaar uitziet als een rit, laat je twee keer kijken om te zien wat er
- * effectief gepland is.
- */
+/** Wanneer een chauffeur kan rijden: een lichte band achter de ritten, context en geen afspraak (V1). */
 export type AvailabilityBand = {
   id: string;
   driverId: string;

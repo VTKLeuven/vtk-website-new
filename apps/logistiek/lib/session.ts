@@ -12,25 +12,15 @@ import {
   type TestUserKey,
 } from './test-users';
 
-/**
- * Wie je écht bent, los van welk test-profiel je speelt.
- *
- * In `cache()`: de poort hieronder heeft deze sessie nodig bij elke
- * `getSession()`, en zonder dit belde één pagina er meerdere keren voor naar de
- * hoofdsite.
- */
+/** Wie je écht bent, los van een test-profiel; in `cache()`, één vraag aan vtk.be per request. */
 export const getRealSession = cache(
   async (): Promise<SessionPayload | null> => fetchSession(await headers())
 );
 
 /**
- * Het test-profiel dat deze aanvraag mag spelen, of null.
- *
- * De controle staat hier en niet enkel op de picker: `/test-login` verbergen
- * belet niemand om de server action rechtstreeks aan te roepen, en die zet de
- * cookie. De cookie wordt daarom bij élke aanvraag opnieuw getoetst aan de
- * échte sessie. Wie zijn beheerrechten verliest, valt zo vanzelf terug op
- * zichzelf in plaats van vast te blijven zitten in een profiel.
+ * Het test-profiel dat deze aanvraag mag spelen, of null. De cookie wordt bij
+ * elke aanvraag opnieuw aan de échte sessie getoetst, niet enkel op de picker:
+ * de server action die haar zet, kan iedereen rechtstreeks aanroepen.
  */
 async function activeTestUser(): Promise<TestUserKey | null> {
   const mode = testLoginMode();
@@ -44,20 +34,14 @@ async function activeTestUser(): Promise<TestUserKey | null> {
 
 /** Sessie of null; voor pagina's die zelf een login-uitnodiging tonen. */
 export async function getSession(): Promise<SessionPayload | null> {
-  // Speel je een test-profiel, dan doet de hele app alsof je die persoon bent.
-  // Zonder (geldige) cookie is dat gewoon je echte sessie, zodat de normale
-  // website-login ernaast blijft werken. Zie lib/test-users.ts.
+  // Met een geldig test-profiel doet de hele app alsof je die persoon bent;
+  // anders je echte sessie. Zie lib/test-users.ts.
   const key = await activeTestUser();
   if (key) return buildTestSession(key);
   return getRealSession();
 }
 
-/**
- * Mag je hier van test-gebruiker wisselen?
- *
- * Voor de picker en voor de plekken die ernaar linken: een menu-item dat 404
- * geeft, is erger dan geen menu-item.
- */
+/** Mag je hier van test-gebruiker wisselen? Ook voor wie ernaar linkt: liever geen link dan een 404. */
 export async function canUseTestLogin(): Promise<boolean> {
   const mode = testLoginMode();
   if (mode === 'off') return false;
@@ -66,11 +50,8 @@ export async function canUseTestLogin(): Promise<boolean> {
 }
 
 /**
- * Speel je iemand anders? Dan wie, en wie ben je zelf.
- *
- * Waarvoor dit bestaat: zonder dit stond nergens op het scherm dát je iemand
- * anders bent, en was terugkeren naar jezelf eerst `/test-login` terugvinden.
- * `real` mag null zijn in de ongegrendelde stand, waar er geen echte login is.
+ * Speel je iemand anders? Dan wie, en wie ben je zelf (voor de banner bovenaan).
+ * `real` is null in de ongegrendelde stand, zonder echte login.
  */
 export async function getImpersonation(): Promise<{
   real: SessionPayload | null;
@@ -83,30 +64,18 @@ export async function getImpersonation(): Promise<{
 }
 
 /**
- * Vraagt dit lid aan als externe? Dat is zo zodra het bij geen enkele groep
- * hoort; `deriveMemberRequester` in app/actions/uitleen.ts volgt dezelfde regel
- * bij het indienen.
- *
- * Een externe krijgt geen evenementen en geen sjablonen te zien (B3): hij kan er
- * toch niet aan koppelen, en de namen van de evenementen zijn werking van de
- * kring die niet bij een buitenstaander hoeft te belanden. Daarom valt die keuze
- * op de server, en worden ze niet enkel verborgen in het formulier.
+ * Vraagt dit lid aan als externe, omdat het bij geen enkele groep hoort? Dezelfde
+ * regel als `deriveMemberRequester`. Een externe krijgt geen evenementen of
+ * sjablonen te zien (B3), en dat beslist de server, niet enkel het formulier.
  */
 export function requestsAsExternal(session: { groups: Array<unknown> }): boolean {
   return session.groups.length === 0;
 }
 
 /**
- * Mag deze persoon nu iets indienen?
- *
- * De uitleendienst is in het semester 2026-2027 in gebruik genomen bij de posten
- * en de werkgroepen; externe aanvragen lopen zolang nog per mail. Zonder deze
- * poort zou een externe student intussen indienen in een systeem waar niemand
- * naar kijkt, en dan staat zijn materiaal er niet.
- *
- * Kijken blijft wel toegestaan: de catalogus en de voertuigen zijn geen geheim,
- * en wie ziet wát er is, weet waarvoor hij mailt. `externalRequestsOpen` op
- * /beheer/instellingen zet het open.
+ * Mag deze persoon nu niets indienen? Een externe niet, zolang
+ * `externalRequestsOpen` op /beheer/instellingen uit staat; externe aanvragen
+ * lopen dan per mail. Kijken naar de catalogus en de voertuigen mag wel.
  */
 export function externalRequestsBlocked(
   session: { groups: Array<unknown> },
@@ -134,23 +103,12 @@ export function canManage(session: SessionPayload): boolean {
 /**
  * Mag deze persoon zien wát een rit is, en niet enkel dát het voertuig bezet is?
  *
- * Het praesidium, werkgroepen en jaarwerkingen, plus Logistiek en IT via
- * `canManage` (waar de superadmin-bypass in zit). Een post of werkgroep die zijn
- * weekend of activiteit plant, moet kunnen zien welke groep de kar al vroeg en
- * waarvoor; dat nu bij Logistiek moeten gaan vragen is precies de omweg die dit
- * overzicht moest wegnemen.
- *
- * Iedereen met een groep (praesidiumposten, werkgroepen en jaarwerkingen)
- * krijgt deze laag. Gewone leden/studenten zonder groep zien enkel het raster
- * met titel en chauffeur, zonder detailkaart.
- *
- * **`logistiek.helpers` hoort erbij**: wie de bijrijders van elke rit aanpast
- * (`canEditAllHelpers`), moet kunnen zien over welke rit het gaat. Die persoon
- * krijgt dezelfde laag als een post of werkgroep en niet die van het team.
- *
- * Wát ze dan zien, verschilt nog: `transportWeekForPraesidium` laat de
- * telefoonnummers, het ophaaladres en de nota's weg, `transportRange` (het
- * team) niet.
+ * Wie in een praesidiumpost, werkgroep of jaarwerking zit, het team
+ * (`canManage`, met de superadmin-bypass) en wie `logistiek.helpers` heeft, want
+ * die moet weten over welke rit het gaat. Een lid zonder groep ziet enkel het
+ * raster met titel en chauffeur. Ook met deze laag laat
+ * `transportWeekForPraesidium` telefoonnummers, ophaaladres en nota's weg; enkel
+ * `transportRange` (het team) toont ze.
  */
 export function canSeeTripDetails(session: SessionPayload): boolean {
   return (
@@ -172,36 +130,24 @@ export async function requireManage(): Promise<SessionPayload> {
   return session;
 }
 
-/**
- * Zit deze persoon dit werkingsjaar in een praesidiumpost?
- *
- * Een werkgroep of een jaarwerking telt hier niet mee: die hebben een eigen
- * rit, en wie er in zit, doet de bijrijders van die rit via zijn groep.
- */
+/** Zit deze persoon dit werkingsjaar in een praesidiumpost? Een werkgroep of jaarwerking telt niet mee. */
 export function isPraesidiumMember(session: Pick<SessionPayload, 'groups'>): boolean {
   return session.groups.some((group) => group.type === 'PRAESIDIUM');
 }
 
 /**
- * Mag deze persoon bij élke rit een bijrijder **toevoegen** (F6.24)?
- *
- * Elk praesidiumlid, naast wie het al kon via `canEditAllHelpers`. Wie een
- * andere post meerijdt, is vaak pas de dag voordien bekend en dan zit de
- * aanvrager niet naast je. Weghalen mag niet overal: zie
- * `removeTripHelperAction`, dat enkel de eigen toevoegingen vrijgeeft.
+ * Mag deze persoon bij élke rit een bijrijder toevoegen (F6.24)? Elk
+ * praesidiumlid, plus `canEditAllHelpers`. Weghalen mag enkel bij de eigen
+ * toevoegingen (`removeTripHelperAction`).
  */
 export function canAddHelpersEverywhere(session: SessionPayload): boolean {
   return canEditAllHelpers(session) || isPraesidiumMember(session);
 }
 
 /**
- * Mag deze persoon de bijrijders van élke rit aanpassen?
- *
- * Het team kan het via `logistiek.manage`. `logistiek.helpers` is hetzelfde
- * recht zonder de rest van het beheer: voor wie de bijrijders over alle posten
- * heen regelt en daarvoor de inventaris, de aanvragen en de beslisknoppen niet
- * nodig heeft. Dat gebeurt in het ritkaartje op de transportplanning
- * (/vervoer/bezetting), niet in /beheer. Zie docs/design-decisions.md.
+ * Mag deze persoon de bijrijders van élke rit aanpassen? Het team, en wie
+ * `logistiek.helpers` heeft: hetzelfde recht zonder de rest van het beheer, in
+ * het ritkaartje op /vervoer/bezetting. Zie docs/design-decisions.md.
  */
 export function canEditAllHelpers(session: SessionPayload): boolean {
   return canManage(session) || hasPermission(session, 'logistiek.helpers');
