@@ -139,7 +139,7 @@ export function describeLink(href: string, locale: 'nl' | 'en' = 'nl'): { kind: 
     return { kind: 'file', label: fileName.length <= MAX_NAME ? fileName : en ? fileType.en : fileType.nl };
   }
 
-  if (host.endsWith('sharepoint.com') || host === '1drv.ms' || host === 'onedrive.live.com') {
+  if (host === 'sharepoint.com' || host.endsWith('.sharepoint.com') || host === '1drv.ms' || host === 'onedrive.live.com') {
     return { kind: 'drive', label: 'OneDrive' };
   }
   if (host === 'dropbox.com' || host.endsWith('.dropbox.com')) return { kind: 'drive', label: 'Dropbox' };

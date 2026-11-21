@@ -32,8 +32,9 @@ export function slugify(value: string): string {
     .toLowerCase()
     .replace(/&/g, ' en ')
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .replace(/-{2,}/g, '-');
+    // Na de regel hierboven staat er hoogstens één koppelteken op een rij;
+    // `^-+|-+$` zou op een lange reeks koppeltekens kwadratisch lopen.
+    .replace(/^-|-$/g, '');
 
   return slug || 'album';
 }
@@ -96,30 +97,61 @@ export type ParsedAlbumMarkers = {
   titleSuffix?: string;
 };
 
+const TITLE_DELIMITERS = ['::', ':', '//'] as const;
+
+/**
+ * "Prefix :: rest" in twee stukken, op het eerste scheidingsteken met tekst
+ * aan beide kanten. Met de hand en niet als `^(.+?)\s*(?:::|:|\/\/)\s*(.+)$`:
+ * die regex liep kwadratisch op een titel met veel spaties.
+ */
+function splitTitle(title: string): [string, string] | null {
+  if (title.includes('\n')) return null;
+  for (let at = 1; at < title.length; at += 1) {
+    for (const delimiter of TITLE_DELIMITERS) {
+      if (!title.startsWith(delimiter, at)) continue;
+      const prefix = title.slice(0, at).trim();
+      const rest = title.slice(at + delimiter.length).trim();
+      if (prefix && rest) return [prefix, rest];
+    }
+  }
+  return null;
+}
+
+/** Spaties en tabs aan het einde van elke regel weg, zonder regex die terugloopt. */
+function trimLineEnds(value: string): string {
+  return value
+    .split('\n')
+    .map((line) => {
+      let end = line.length;
+      while (end > 0 && (line[end - 1] === ' ' || line[end - 1] === '\t')) end -= 1;
+      return line.slice(0, end);
+    })
+    .join('\n');
+}
+
 export function parseAlbumMarkers(description: string | null | undefined, title = ''): ParsedAlbumMarkers {
   const desc = String(description || '');
   const result: ParsedAlbumMarkers = {};
 
-  const parentMatch = desc.match(/\[parent:\s*([^\]]+)\]/i);
+  const parentMatch = desc.match(/\[parent:([^\]]+)\]/i);
   if (parentMatch?.[1]) {
     result.parent = parentMatch[1].trim();
   }
 
-  const groupMatch = desc.match(/\[group:\s*([^\]]+)\]/i);
+  const groupMatch = desc.match(/\[group:([^\]]+)\]/i);
   if (groupMatch?.[1]) {
     result.group = groupMatch[1].trim();
   }
 
-  const tabMatch = desc.match(/\[tab:\s*([^\]]+)\]/i);
+  const tabMatch = desc.match(/\[tab:([^\]]+)\]/i);
   if (tabMatch?.[1]) {
     result.tab = tabMatch[1].trim();
   }
 
-  const trimmedTitle = title.trim();
-  const delimiterMatch = trimmedTitle.match(/^(.+?)\s*(?:::|:|\/\/)\s*(.+)$/);
-  if (delimiterMatch?.[1] && delimiterMatch?.[2]) {
-    result.titlePrefix = delimiterMatch[1].trim();
-    result.titleSuffix = delimiterMatch[2].trim();
+  const split = splitTitle(title.trim());
+  if (split) {
+    result.titlePrefix = split[0];
+    result.titleSuffix = split[1];
   }
 
   return result;
@@ -162,9 +194,7 @@ export function setMarker(
 
 /** Dubbele spaties en lege regels die het weghalen van een merker achterlaat. */
 function tidyDescription(value: string): string {
-  return value
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/[ \t]+\n/g, '\n')
+  return trimLineEnds(value.replace(/[ \t]{2,}/g, ' '))
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -215,10 +245,9 @@ export function stripMarkers(description: string | null | undefined, markers: st
     if (!marker) continue;
     raw = raw.split(marker).join('');
   }
-  raw = raw.replace(/\[(parent|group|tab):\s*[^\]]+\]/gi, '');
+  raw = raw.replace(/\[(parent|group|tab):[^\]]+\]/gi, '');
 
-  return raw
-    .replace(/[ \t]+\n/g, '\n')
+  return trimLineEnds(raw)
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

@@ -5,7 +5,7 @@ import "server-only";
  * kunnen geen knoppen met een actie sturen; daarom een eigen bot.
  * Zonder de variabelen hieronder staat Discord voor peilingen gewoon uit.
  */
-const API = "https://discord.com/api/v10";
+const DISCORD_ORIGIN = "https://discord.com";
 const TIMEOUT_MS = 10_000;
 
 export type BotResult<T> = { ok: true; data: T } | { ok: false; status: number | null; message: string };
@@ -14,12 +14,21 @@ export function discordBotConfigured(): boolean {
   return Boolean(process.env.DISCORD_BOT_TOKEN?.trim() && process.env.DISCORD_PUBLIC_KEY?.trim());
 }
 
+/**
+ * Elk stuk van het pad is een vast woord (`channels`, `messages`) of een
+ * Discord-id (een snowflake). Geen punt, geen schuine streep, geen `?` of `#`:
+ * zo kan een kanaal-id uit de database of een rol-id uit een formulier nooit
+ * `../` of een ander adres in de aanvraag zetten.
+ */
+const SAFE_PATH = /^(?:\/[A-Za-z0-9_-]{1,40})+$/;
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<BotResult<T>> {
   const token = process.env.DISCORD_BOT_TOKEN?.trim();
   if (!token) return { ok: false, status: null, message: "De Discord-bot is niet ingesteld." };
+  if (!SAFE_PATH.test(path)) return { ok: false, status: null, message: "Dat is geen geldig Discord-id." };
   let response: Response;
   try {
-    response = await fetch(`${API}${path}`, {
+    response = await fetch(new URL(`/api/v10${path}`, DISCORD_ORIGIN).toString(), {
       method,
       headers: { Authorization: `Bot ${token}`, "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),

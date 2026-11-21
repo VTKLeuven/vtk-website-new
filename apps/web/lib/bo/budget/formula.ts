@@ -174,7 +174,8 @@ export function evalFormula(text: string, scope: Record<string, number>): Formul
       pos += 1;
       const key = normalizeName(tok.v);
       if (peekOp('(')) {
-        const fn = FUNCTIONS[key];
+        // Enkel eigen sleutels: "constructor" of "valueOf" komen anders uit het prototype.
+        const fn = Object.hasOwn(FUNCTIONS, key) ? FUNCTIONS[key] : undefined;
         if (!fn) return fail(`"${tok.v}" is geen functie die de site kent`);
         pos += 1;
         const args: number[] = [];
@@ -190,7 +191,7 @@ export function evalFormula(text: string, scope: Record<string, number>): Formul
         const result = fn(args);
         return typeof result === 'string' ? fail(result) : result;
       }
-      if (!(key in scope)) return fail(`er is geen parameter "${tok.v}"`);
+      if (!Object.hasOwn(scope, key)) return fail(`er is geen parameter "${tok.v}"`);
       return scope[key];
     }
     if (tok.v === '(') {

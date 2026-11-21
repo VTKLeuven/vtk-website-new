@@ -147,22 +147,43 @@ export async function lookupShopProduct(ref: ShopRef, options: LookupOptions = {
   return job;
 }
 
-async function fetchShopProduct(ref: ShopRef, options: LookupOptions): Promise<ShopLookup> {
-  let lookup: ShopLookup;
-  try {
-    if (routeOf(ref) === 'browser') return await lookupInBrowser(ref, options);
-    const res = await fetch(ref.page, {
+const MAX_REDIRECTS = 5;
+
+/**
+ * De pagina ophalen en elke doorverwijzing zelf volgen, maar enkel binnen de
+ * winkel. Met `redirect: 'follow'` was de controle pas achteraf: dan had de
+ * server de vreemde URL (een intern adres achter een open redirect) al
+ * opgevraagd. Null wanneer een doorverwijzing de winkel uit wil.
+ */
+async function fetchWithinShop(ref: ShopRef): Promise<Response | null> {
+  const signal = AbortSignal.timeout(12_000);
+  let current = ref.page;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+    if (shopOfUrl(current) !== ref.shop) return null;
+    const res = await fetch(current, {
       headers: {
         'User-Agent': USER_AGENT,
         Accept: 'text/html',
         'Accept-Language': 'nl-BE,nl;q=0.9',
       },
-      redirect: 'follow',
+      redirect: 'manual',
       cache: 'no-store',
-      signal: AbortSignal.timeout(12_000),
+      signal,
     });
-    // Een doorverwijzing mag binnen de winkel blijven, niet ergens anders uitkomen.
-    if (shopOfUrl(res.url) !== ref.shop) {
+    const location = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+    if (!location) return res;
+    await res.body?.cancel();
+    current = new URL(location, current).toString();
+  }
+  return null;
+}
+
+async function fetchShopProduct(ref: ShopRef, options: LookupOptions): Promise<ShopLookup> {
+  let lookup: ShopLookup;
+  try {
+    if (routeOf(ref) === 'browser') return await lookupInBrowser(ref, options);
+    const res = await fetchWithinShop(ref);
+    if (!res) {
       lookup = { status: 'failed', reason: 'doorverwezen naar een andere site' };
     } else {
       const body = (await res.text()).slice(0, MAX_BYTES);

@@ -21,4 +21,7 @@ export const THEME_STORAGE_KEY = 'vtk-logistiek-theme';
 
 export type Theme = 'light' | 'dark';
 
-export const THEME_SCRIPT = `(function(){var k=${JSON.stringify(THEME_STORAGE_KEY)},d=document.documentElement;function s(){try{return localStorage.getItem(k)}catch(e){return null}}function m(){try{return window.matchMedia('(prefers-color-scheme: dark)')}catch(e){return null}}function set(){var v=s(),q=m();d.setAttribute('data-theme',v==='dark'||(v!=='light'&&q&&q.matches)?'dark':'light')}set();var q=m();if(q&&q.addEventListener){q.addEventListener('change',function(){var v=s();if(v!=='dark'&&v!=='light')set()})}try{new MutationObserver(function(){if(!d.getAttribute('data-theme'))set()}).observe(d,{attributes:true,attributeFilter:['data-theme']})}catch(e){}})();`;
+// De sleutel staat letterlijk in het script en niet als ${...}: zo kan er nooit
+// iets in dat het script openbreekt. Moet gelijk blijven aan THEME_STORAGE_KEY
+// (`test/theme-script.test.ts`).
+export const THEME_SCRIPT = `(function(){var k='vtk-logistiek-theme',d=document.documentElement;function s(){try{return localStorage.getItem(k)}catch(e){return null}}function m(){try{return window.matchMedia('(prefers-color-scheme: dark)')}catch(e){return null}}function set(){var v=s(),q=m();d.setAttribute('data-theme',v==='dark'||(v!=='light'&&q&&q.matches)?'dark':'light')}set();var q=m();if(q&&q.addEventListener){q.addEventListener('change',function(){var v=s();if(v!=='dark'&&v!=='light')set()})}try{new MutationObserver(function(){if(!d.getAttribute('data-theme'))set()}).observe(d,{attributes:true,attributeFilter:['data-theme']})}catch(e){}})();`;

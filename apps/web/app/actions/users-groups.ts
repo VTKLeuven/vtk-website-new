@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { after } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { revalidatePath } from "next/cache";
@@ -765,7 +766,7 @@ function splitCsv(line: string): string[] {
 }
 
 function cryptoRandomPassword() {
-  return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  return randomBytes(24).toString("base64url");
 }
 
 // ---- Groups (posten) --------------------------------------------------------

@@ -91,13 +91,22 @@ function decodeEntities(input: string): string {
  * van de mail tussen de producten.
  */
 export function htmlToText(html: string): string {
-  const text = html
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<(style|script|head)[\s\S]*?<\/\1>/gi, '')
+  // Herhaal tot er niets meer verandert: een tag of comment die pas ontstaat
+  // nadat een andere wegviel (`<scr<script></script>ipt>`), moet ook weg.
+  let text = html;
+  let previous: string;
+  do {
+    previous = text;
+    text = text.replace(/<!--[\s\S]*?-->/g, '').replace(/<(style|script|head)[\s\S]*?<\/\1>/gi, '');
+  } while (text !== previous);
+  text = text
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(p|div|tr|td|th|li|h[1-6]|table|tbody|section|span)>/gi, '\n')
-    .replace(/<(p|div|tr|li|h[1-6]|table)\b[^>]*>/gi, '\n')
-    .replace(/<[^>]+>/g, '');
+    .replace(/<(p|div|tr|li|h[1-6]|table)\b[^>]*>/gi, '\n');
+  do {
+    previous = text;
+    text = text.replace(/<[^>]+>/g, '');
+  } while (text !== previous);
   return normalizeText(decodeEntities(text));
 }
 

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHash, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import type { AuthInfo } from "@modelcontextprotocol/server";
 import { principalAuthExtra } from "@/lib/mcp/policy";
 
@@ -139,14 +139,17 @@ export async function authenticateMcpRequest(request: Request): Promise<McpAuthe
     return jsonError(503, "MCP_PERMISSIONS_NOT_CONFIGURED");
   }
 
-  const rateLimitKey = createHash("sha256").update(configured).digest("hex");
+  // Er is één token, dus één emmer. Het token zelf (of een hash ervan) hoeft
+  // daar niet in; de clientnaam volstaat.
+  const clientId = process.env.MCP_CLIENT_NAME?.trim() || "vtk-mcp-agent";
+  const rateLimitKey = `mcp:${clientId}`;
   return {
     // De protocolhandler heeft de geheime bearerwaarde niet nodig. Geef alleen
     // de gevalideerde identiteit en capabilities door, zodat het token niet per
     // ongeluk in een toolresultaat of foutlog terecht kan komen.
     authInfo: {
       token: "[redacted]",
-      clientId: process.env.MCP_CLIENT_NAME?.trim() || "vtk-mcp-agent",
+      clientId,
       scopes: ["mcp:read", "mcp:create"],
       extra,
     },
