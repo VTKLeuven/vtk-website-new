@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Button, Card, Input, Label, Textarea } from "@vtk/ui";
+import { BilingualGroup, BilingualInput } from "@/components/admin/BilingualField";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
 import {
@@ -258,32 +259,24 @@ function CourseForm({
     >
       {course && <input type="hidden" name="id" value={course.id} />}
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <Label htmlFor={`pal-course-nl-${prefix}`}>{nl ? "Naam (Nederlands)" : "Name (Dutch)"}</Label>
-          <Input
-            id={`pal-course-nl-${prefix}`}
-            name="nameNl"
-            defaultValue={course?.nameNl ?? ""}
-            maxLength={PAL_PLUS_LIMITS.courseName}
-            placeholder="Analyse I"
-            required
-          />
-        </div>
-        <div>
-          <Label htmlFor={`pal-course-en-${prefix}`}>{nl ? "Naam (Engels)" : "Name (English)"}</Label>
-          <Input
-            id={`pal-course-en-${prefix}`}
-            name="nameEn"
-            defaultValue={course?.nameEn ?? ""}
-            maxLength={PAL_PLUS_LIMITS.courseName}
-            placeholder="Analysis I"
-          />
-          <p className="mt-1 text-xs text-vtk-muted">
-            {nl ? "Leeg = de Engelse site toont de Nederlandse naam." : "Empty = the English site shows the Dutch name."}
-          </p>
-        </div>
-      </div>
+      <BilingualGroup locale={nl ? "nl" : "en"} layout="side-by-side">
+        <BilingualInput
+          label={nl ? "Naam" : "Name"}
+          nameNl="nameNl"
+          nameEn="nameEn"
+          defaultValueNl={course?.nameNl ?? ""}
+          defaultValueEn={course?.nameEn ?? ""}
+          maxLength={PAL_PLUS_LIMITS.courseName}
+          placeholderNl="Analyse I"
+          placeholderEn="Analysis I"
+          requiredNl
+          idPrefix={`pal-course-${prefix}`}
+          gridClassName="grid gap-3 sm:grid-cols-2"
+          hintEn={
+            nl ? "Leeg = de Engelse site toont de Nederlandse naam." : "Empty = the English site shows the Dutch name."
+          }
+        />
+      </BilingualGroup>
 
       <div className="sm:max-w-56">
         <Label htmlFor={`pal-course-code-${prefix}`}>{nl ? "OPO-code" : "Course code"}</Label>

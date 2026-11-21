@@ -4,6 +4,7 @@ import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useRef, useState, useTransition } from "react";
 import { Card, Input, Label } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
+import { BilingualGroup, BilingualInput } from "@/components/admin/BilingualField";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { IconButton } from "@/components/ui/IconButton";
@@ -61,6 +62,7 @@ export function PianoWindowsManager({ locale, windows }: { locale: Locale; windo
   const dict = getDictionary(locale);
   const dayLabels = WEEKDAY_LABELS[nl ? "nl" : "en"];
   const [editing, setEditing] = useState<WindowRow>(EMPTY);
+  const [resetNonce, setResetNonce] = useState(0);
   const [prevWindows, setPrevWindows] = useState<WindowRow[]>(windows);
   const [items, setItems] = useState<WindowRow[]>(windows);
   const [, startTransition] = useTransition();
@@ -142,7 +144,7 @@ export function PianoWindowsManager({ locale, windows }: { locale: Locale; windo
         </p>
 
         <SaveForm
-          key={editing.id || "new"}
+          key={editing.id || `new-${resetNonce}`}
           action={savePianoWindowAction}
           className="space-y-4"
           submitLabel={isNew ? (nl ? "Venster toevoegen" : "Add window") : dict.admin.save}
@@ -150,20 +152,24 @@ export function PianoWindowsManager({ locale, windows }: { locale: Locale; windo
           savedMessage={nl ? "Venster opgeslagen" : "Window saved"}
           errorMessages={errorMessages}
           fallbackErrorMessage={dict.common.saveError}
-          onSuccess={() => setEditing(EMPTY)}
+          onSuccess={() => {
+            setEditing(EMPTY);
+            setResetNonce((n) => n + 1);
+          }}
         >
           {!isNew && <input type="hidden" name="id" value={editing.id} />}
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="piano-label-nl">{nl ? "Naam (NL)" : "Name (NL)"}</Label>
-              <Input id="piano-label-nl" name="labelNl" defaultValue={editing.labelNl} required />
-            </div>
-            <div>
-              <Label htmlFor="piano-label-en">{nl ? "Naam (EN)" : "Name (EN)"}</Label>
-              <Input id="piano-label-en" name="labelEn" defaultValue={editing.labelEn ?? ""} />
-            </div>
-          </div>
+          <BilingualGroup locale={locale} layout="side-by-side">
+            <BilingualInput
+              label={nl ? "Naam" : "Name"}
+              nameNl="labelNl"
+              nameEn="labelEn"
+              defaultValueNl={editing.labelNl}
+              defaultValueEn={editing.labelEn ?? ""}
+              requiredNl
+              idPrefix="piano-label"
+            />
+          </BilingualGroup>
 
           <div>
             <Label>{nl ? "Weekdagen" : "Weekdays"}</Label>

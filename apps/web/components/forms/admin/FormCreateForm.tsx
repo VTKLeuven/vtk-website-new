@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createFormAction } from "@/app/actions/forms";
+import { BilingualGroup, BilingualInput } from "@/components/admin/BilingualField";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import { slugify } from "@/lib/ticketing/slug";
@@ -71,28 +72,25 @@ export function FormCreateForm({
       <input type="hidden" name="locale" value={locale} />
 
       <div className="ticket-admin-form-grid">
-        <div className="ticket-admin-field" data-span="2">
-          <label htmlFor="form-title-nl">{nl ? "Titel (NL)" : "Title (NL)"}</label>
-          <input
-            id="form-title-nl"
-            name="titleNl"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder={nl ? "Inschrijving galabal" : "Gala sign-up"}
-            maxLength={200}
-            required
-          />
-        </div>
-        <div className="ticket-admin-field" data-span="2">
-          <label htmlFor="form-title-en">
-            {nl ? "Titel (EN, optioneel)" : "Title (EN, optional)"}
-          </label>
-          <input id="form-title-en" name="titleEn" maxLength={200} />
-          <span className="ticket-admin-help">
-            {nl
-              ? "Laat leeg als het formulier enkel in het Nederlands bestaat; je kiest bij de instellingen wat een Engelstalige bezoeker dan ziet."
-              : "Leave empty when the form only exists in Dutch; the settings decide what an English visitor sees."}
-          </span>
+        <div data-span="2">
+          <BilingualGroup locale={locale} layout="side-by-side" className="space-y-2">
+            <BilingualInput
+              label={nl ? "Titel" : "Title"}
+              nameNl="titleNl"
+              nameEn="titleEn"
+              valueNl={title}
+              onChangeNl={setTitle}
+              placeholderNl={nl ? "Inschrijving galabal" : "Gala sign-up"}
+              maxLength={200}
+              requiredNl
+              hintEn={
+                nl
+                  ? "Laat leeg als het formulier enkel in het Nederlands bestaat; je kiest bij de instellingen wat een Engelstalige bezoeker dan ziet."
+                  : "Leave empty when the form only exists in Dutch; the settings decide what an English visitor sees."
+              }
+              idPrefix="form-title"
+            />
+          </BilingualGroup>
         </div>
 
         <div className="ticket-admin-field" data-span="2">

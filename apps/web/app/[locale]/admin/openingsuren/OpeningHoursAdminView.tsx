@@ -1,9 +1,14 @@
 import { isMemberOfGroup } from "@vtk/auth";
 import { prisma } from "@vtk/db";
 import type { Locale } from "@vtk/i18n";
-import { Card, Input, Label, Textarea } from "@vtk/ui";
+import { Card, Input, Label } from "@vtk/ui";
 import { notFound } from "next/navigation";
 import { saveOpeningHoursAction } from "@/app/actions/opening-hours";
+import {
+  BilingualGroup,
+  BilingualInput,
+  BilingualTextarea,
+} from "@/components/admin/BilingualField";
 import { SaveForm } from "@/components/ui/SaveForm";
 import {
   entriesForService,
@@ -78,14 +83,33 @@ export async function OpeningHoursAdminView({ locale, service }: { locale: Local
               fallbackErrorMessage={nl ? "Opslaan mislukt." : "Saving failed."}
             >
               <input type="hidden" name="service" value={service} />
-              <div className="grid gap-3 md:grid-cols-2">
-                <div><Label>Titel (NL)</Label><Input name="titleNl" defaultValue={setting.titleNl} /></div>
-                <div><Label>Title (EN)</Label><Input name="titleEn" defaultValue={setting.titleEn} /></div>
-                <div><Label>Ondertitel (NL)</Label><Input name="subtitleNl" defaultValue={setting.subtitleNl} /></div>
-                <div><Label>Subtitle (EN)</Label><Input name="subtitleEn" defaultValue={setting.subtitleEn} /></div>
-                <div><Label>{nl ? "Extra uitleg (NL, optioneel)" : "Extra note (NL, optional)"}</Label><Textarea name="noteNl" defaultValue={setting.noteNl} rows={3} /></div>
-                <div><Label>{nl ? "Extra uitleg (EN, optioneel)" : "Extra note (EN, optional)"}</Label><Textarea name="noteEn" defaultValue={setting.noteEn} rows={3} /></div>
-              </div>
+              <BilingualGroup locale={locale} layout="side-by-side" className="space-y-3">
+                <BilingualInput
+                  label={nl ? "Titel" : "Title"}
+                  nameNl="titleNl"
+                  nameEn="titleEn"
+                  defaultValueNl={setting.titleNl}
+                  defaultValueEn={setting.titleEn}
+                  gridClassName="grid gap-3 md:grid-cols-2"
+                />
+                <BilingualInput
+                  label={nl ? "Ondertitel" : "Subtitle"}
+                  nameNl="subtitleNl"
+                  nameEn="subtitleEn"
+                  defaultValueNl={setting.subtitleNl}
+                  defaultValueEn={setting.subtitleEn}
+                  gridClassName="grid gap-3 md:grid-cols-2"
+                />
+                <BilingualTextarea
+                  label={nl ? "Extra uitleg (optioneel)" : "Extra note (optional)"}
+                  nameNl="noteNl"
+                  nameEn="noteEn"
+                  defaultValueNl={setting.noteNl}
+                  defaultValueEn={setting.noteEn}
+                  rows={3}
+                  gridClassName="grid gap-3 md:grid-cols-2"
+                />
+              </BilingualGroup>
 
               {service !== "cursusdienst" ? (
                 <div className="space-y-2">

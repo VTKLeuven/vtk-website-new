@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
-import { Card, Input, Label, Textarea } from "@vtk/ui";
+import { Card, Input, Label } from "@vtk/ui";
+import { BilingualGroup, BilingualTextarea } from "@/components/admin/BilingualField";
 import { formatEuro, parseTheokotConfig, sandwichVoucherCost } from "@/lib/theokot";
 import { formatVouchers } from "@/lib/shift/rewards";
 import { saveBureauStockAction, saveConfigAction, saveOrderMessageAction } from "@/app/actions/theokot";
@@ -272,14 +273,15 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
           savedMessage={nl ? "Bericht opgeslagen" : "Message saved"}
           fallbackErrorMessage={nl ? "Opslaan van het bericht mislukt." : "Saving the message failed."}
         >
-          <div>
-            <Label>{nl ? "Bericht (NL)" : "Message (NL)"}</Label>
-            <Textarea name="bodyNl" defaultValue={message.bodyNl ?? ""} />
-          </div>
-          <div>
-            <Label>{nl ? "Bericht (EN)" : "Message (EN)"}</Label>
-            <Textarea name="bodyEn" defaultValue={message.bodyEn ?? ""} />
-          </div>
+          <BilingualGroup locale={locale} layout="side-by-side">
+            <BilingualTextarea
+              label={nl ? "Bericht" : "Message"}
+              nameNl="bodyNl"
+              nameEn="bodyEn"
+              defaultValueNl={message.bodyNl ?? ""}
+              defaultValueEn={message.bodyEn ?? ""}
+            />
+          </BilingualGroup>
         </SaveForm>
       </Card>
     </div>

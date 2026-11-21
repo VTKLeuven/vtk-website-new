@@ -2,7 +2,8 @@
 
 import { unsentGuard, UNSENT } from "@/components/ui/unsentGuard";
 import { useMemo, useRef, useState, useTransition } from "react";
-import { Input, Label, Textarea } from "@vtk/ui";
+import { Input, Label } from "@vtk/ui";
+import { BilingualGroup, BilingualInput, BilingualTextarea } from "@/components/admin/BilingualField";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { saveGroupAction, reorderGroupsAction, setGroupRoleAction } from "@/app/actions/users-groups";
 import { AddMemberForm } from "./AddMemberForm";
@@ -213,10 +214,22 @@ export function PostsTable({
             onSuccess={() => setCreateOpen(false)}
           >
             <input type="hidden" name="type" value="PRAESIDIUM" />
-            <div><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" required /></div>
-            <div><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" required /></div>
-            <div className="md:col-span-2"><Label>{nl ? "Beschrijving (NL)" : "Description (NL)"}</Label><Textarea name="descriptionNl" /></div>
-            <div className="md:col-span-2"><Label>{nl ? "Beschrijving (EN)" : "Description (EN)"}</Label><Textarea name="descriptionEn" /></div>
+            <BilingualGroup locale={locale} layout="side-by-side" className="md:col-span-2 space-y-3">
+              <BilingualInput
+                label={nl ? "Naam" : "Name"}
+                nameNl="nameNl"
+                nameEn="nameEn"
+                requiredNl
+                requiredEn
+                gridClassName="grid grid-cols-1 gap-3 md:grid-cols-2"
+              />
+              <BilingualTextarea
+                label={nl ? "Beschrijving" : "Description"}
+                nameNl="descriptionNl"
+                nameEn="descriptionEn"
+                gridClassName="grid grid-cols-1 gap-3 md:grid-cols-2"
+              />
+            </BilingualGroup>
             <div className="md:col-span-2"><Label>{nl ? "Code" : "Code"}</Label><Input name="code" placeholder={nl ? "auto" : "auto"} /></div>
             <input type="hidden" name="active" value="on" />
           </SaveForm>
@@ -475,10 +488,27 @@ function PostDetail({
             {...saveLabels}
           >
             <input type="hidden" name="id" value={post.id} />
-            <div><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" defaultValue={post.nameNl} required /></div>
-            <div><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" defaultValue={post.nameEn} required /></div>
-            <div className="md:col-span-2"><Label>{nl ? "Beschrijving (NL)" : "Description (NL)"}</Label><Textarea name="descriptionNl" defaultValue={post.descriptionNl} rows={2} /></div>
-            <div className="md:col-span-2"><Label>{nl ? "Beschrijving (EN)" : "Description (EN)"}</Label><Textarea name="descriptionEn" defaultValue={post.descriptionEn} rows={2} /></div>
+            <BilingualGroup locale={locale} layout="side-by-side" className="md:col-span-2 space-y-3">
+              <BilingualInput
+                label={nl ? "Naam" : "Name"}
+                nameNl="nameNl"
+                nameEn="nameEn"
+                defaultValueNl={post.nameNl}
+                defaultValueEn={post.nameEn}
+                requiredNl
+                requiredEn
+                gridClassName="grid grid-cols-1 gap-3 md:grid-cols-2"
+              />
+              <BilingualTextarea
+                label={nl ? "Beschrijving" : "Description"}
+                nameNl="descriptionNl"
+                nameEn="descriptionEn"
+                defaultValueNl={post.descriptionNl}
+                defaultValueEn={post.descriptionEn}
+                rows={2}
+                gridClassName="grid grid-cols-1 gap-3 md:grid-cols-2"
+              />
+            </BilingualGroup>
             <label className="md:col-span-2 inline-flex items-center gap-2 text-sm text-vtk-ink">
               <input type="checkbox" name="active" defaultChecked={post.active} className="size-4 rounded border-zinc-400" />
               {nl

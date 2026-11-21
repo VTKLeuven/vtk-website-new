@@ -2,6 +2,12 @@
 
 import { useState } from "react";
 import { Button, Card, Input, Label, Select, Textarea } from "@vtk/ui";
+import {
+  BilingualGroup,
+  BilingualInput,
+  BilingualMarkdown,
+  BilingualTextarea,
+} from "@/components/admin/BilingualField";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { FileField } from "@/components/ui/FileField";
@@ -128,26 +134,18 @@ export function RentalConfigCard({
         </label>
 
         {!open && (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="tv-closed-nl">{nl ? "Tekst bij gesloten (NL)" : "Closed text (NL)"}</Label>
-              <Textarea
-                id="tv-closed-nl"
-                name="closedNoticeNl"
-                rows={3}
-                defaultValue={config.closedNoticeNl}
-              />
-            </div>
-            <div>
-              <Label htmlFor="tv-closed-en">{nl ? "Tekst bij gesloten (EN)" : "Closed text (EN)"}</Label>
-              <Textarea
-                id="tv-closed-en"
-                name="closedNoticeEn"
-                rows={3}
-                defaultValue={config.closedNoticeEn}
-              />
-            </div>
-          </div>
+          <BilingualGroup locale={nl ? "nl" : "en"} layout="side-by-side">
+            <BilingualTextarea
+              label={nl ? "Tekst bij gesloten" : "Closed text"}
+              nameNl="closedNoticeNl"
+              nameEn="closedNoticeEn"
+              defaultValueNl={config.closedNoticeNl}
+              defaultValueEn={config.closedNoticeEn}
+              rows={3}
+              idPrefix="tv-closed"
+              gridClassName="grid gap-3 sm:grid-cols-2"
+            />
+          </BilingualGroup>
         )}
         {open && (
           <>
@@ -253,45 +251,28 @@ export function RentalQuestionsCard({
               </summary>
 
               <div className="mt-3 space-y-3 border-t border-vtk-blue/10 pt-3">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <Label htmlFor={`cl-${key}`}>{nl ? "Label (NL)" : "Label (NL)"}</Label>
-                    <Input
-                      id={`cl-${key}`}
-                      name={`core:${key}:labelNl`}
-                      defaultValue={question.labelNl}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor={`cle-${key}`}>{nl ? "Label (EN)" : "Label (EN)"}</Label>
-                    <Input
-                      id={`cle-${key}`}
-                      name={`core:${key}:labelEn`}
-                      defaultValue={question.labelEn}
-                    />
-                  </div>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <Label htmlFor={`ch-${key}`}>{nl ? "Uitleg (NL)" : "Help text (NL)"}</Label>
-                    <Textarea
-                      id={`ch-${key}`}
-                      name={`core:${key}:helpNl`}
-                      rows={4}
-                      defaultValue={question.helpNl}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor={`che-${key}`}>{nl ? "Uitleg (EN)" : "Help text (EN)"}</Label>
-                    <Textarea
-                      id={`che-${key}`}
-                      name={`core:${key}:helpEn`}
-                      rows={4}
-                      defaultValue={question.helpEn}
-                    />
-                  </div>
-                </div>
+                <BilingualGroup locale={nl ? "nl" : "en"} layout="side-by-side" className="space-y-3">
+                  <BilingualInput
+                    label="Label"
+                    nameNl={`core:${key}:labelNl`}
+                    nameEn={`core:${key}:labelEn`}
+                    defaultValueNl={question.labelNl}
+                    defaultValueEn={question.labelEn}
+                    requiredNl
+                    idPrefix={`core-label-${key}`}
+                    gridClassName="grid gap-3 sm:grid-cols-2"
+                  />
+                  <BilingualTextarea
+                    label={nl ? "Uitleg" : "Help text"}
+                    nameNl={`core:${key}:helpNl`}
+                    nameEn={`core:${key}:helpEn`}
+                    defaultValueNl={question.helpNl}
+                    defaultValueEn={question.helpEn}
+                    rows={4}
+                    idPrefix={`core-help-${key}`}
+                    gridClassName="grid gap-3 sm:grid-cols-2"
+                  />
+                </BilingualGroup>
                 {!locked && (
                   <label className="tv-check">
                     <input
@@ -327,77 +308,62 @@ export function RentalQuestionsCard({
         {extra.map((question) => (
           <div key={question.id} className="space-y-3 rounded-2xl border border-vtk-blue/15 bg-white p-4">
             <input type="hidden" name="extraId" value={question.id} />
-            <div className="flex items-start justify-between gap-3">
-              <div className="grid flex-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <Label htmlFor={`el-${question.id}`}>{nl ? "Label (NL)" : "Label (NL)"}</Label>
-                  <Input
-                    id={`el-${question.id}`}
-                    name={`extra:${question.id}:labelNl`}
-                    value={question.labelNl}
-                    onChange={(event) => update(question.id, { labelNl: event.target.value })}
-                    required
+            <BilingualGroup locale={nl ? "nl" : "en"} layout="side-by-side" className="space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <BilingualInput
+                    label="Label"
+                    nameNl={`extra:${question.id}:labelNl`}
+                    nameEn={`extra:${question.id}:labelEn`}
+                    valueNl={question.labelNl}
+                    valueEn={question.labelEn}
+                    onChangeNl={(value) => update(question.id, { labelNl: value })}
+                    onChangeEn={(value) => update(question.id, { labelEn: value })}
+                    requiredNl
+                    idPrefix={`extra-label-${question.id}`}
+                    gridClassName="grid gap-3 sm:grid-cols-2"
                   />
                 </div>
-                <div>
-                  <Label htmlFor={`ele-${question.id}`}>{nl ? "Label (EN)" : "Label (EN)"}</Label>
-                  <Input
-                    id={`ele-${question.id}`}
-                    name={`extra:${question.id}:labelEn`}
-                    value={question.labelEn}
-                    onChange={(event) => update(question.id, { labelEn: event.target.value })}
-                  />
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setExtra((prev) => prev.filter((item) => item.id !== question.id))}
-                className="mt-6 rounded-lg p-1 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
-                title={nl ? "Vraag weghalen" : "Remove question"}
-              >
-                <span className="sr-only">
-                  {nl ? `Vraag weghalen: ${question.labelNl}` : `Remove question: ${question.labelNl}`}
-                </span>
-                <svg
-                  aria-hidden="true"
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                <button
+                  type="button"
+                  onClick={() => setExtra((prev) => prev.filter((item) => item.id !== question.id))}
+                  className="mt-6 rounded-lg p-1 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                  title={nl ? "Vraag weghalen" : "Remove question"}
                 >
-                  <path d="M3 6h18" />
-                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                </svg>
-              </button>
-            </div>
+                  <span className="sr-only">
+                    {nl ? `Vraag weghalen: ${question.labelNl}` : `Remove question: ${question.labelNl}`}
+                  </span>
+                  <svg
+                    aria-hidden="true"
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M3 6h18" />
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                  </svg>
+                </button>
+              </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <Label htmlFor={`eh-${question.id}`}>{nl ? "Uitleg (NL)" : "Help text (NL)"}</Label>
-                <Textarea
-                  id={`eh-${question.id}`}
-                  name={`extra:${question.id}:helpNl`}
-                  rows={2}
-                  value={question.helpNl}
-                  onChange={(event) => update(question.id, { helpNl: event.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor={`ehe-${question.id}`}>{nl ? "Uitleg (EN)" : "Help text (EN)"}</Label>
-                <Textarea
-                  id={`ehe-${question.id}`}
-                  name={`extra:${question.id}:helpEn`}
-                  rows={2}
-                  value={question.helpEn}
-                  onChange={(event) => update(question.id, { helpEn: event.target.value })}
-                />
-              </div>
-            </div>
+              <BilingualTextarea
+                label={nl ? "Uitleg" : "Help text"}
+                nameNl={`extra:${question.id}:helpNl`}
+                nameEn={`extra:${question.id}:helpEn`}
+                valueNl={question.helpNl}
+                valueEn={question.helpEn}
+                onChangeNl={(value) => update(question.id, { helpNl: value })}
+                onChangeEn={(value) => update(question.id, { helpEn: value })}
+                rows={2}
+                idPrefix={`extra-help-${question.id}`}
+                gridClassName="grid gap-3 sm:grid-cols-2"
+              />
+            </BilingualGroup>
 
             <div className="grid items-end gap-3 sm:grid-cols-2">
               <div>
@@ -593,32 +559,19 @@ export function RentalGuideCard({ nl, guide }: { nl: boolean; guide: RentalGuide
         resetOnSuccess={false}
         className="space-y-4"
       >
-        <div>
-          <Label htmlFor="tv-guide-nl">
-            {nl ? "Richtlijnen op de publieke pagina (NL)" : "Guidelines on the public page (NL)"}
-          </Label>
-          <MarkdownEditorField
-            textareaId="tv-guide-nl"
+        <BilingualGroup locale={nl ? "nl" : "en"} layout="side-by-side">
+          <BilingualMarkdown
+            label={nl ? "Richtlijnen op de publieke pagina" : "Guidelines on the public page"}
+            nameNl="guidelinesNl"
+            nameEn="guidelinesEn"
+            defaultValueNl={guide.guidelinesNl}
+            defaultValueEn={guide.guidelinesEn}
             locale={nl ? "nl" : "en"}
-            name="guidelinesNl"
-            defaultValue={guide.guidelinesNl}
             rows={12}
             allowImages={false}
+            idPrefix="tv-guide"
           />
-        </div>
-        <div>
-          <Label htmlFor="tv-guide-en">
-            {nl ? "Richtlijnen op de publieke pagina (EN)" : "Guidelines on the public page (EN)"}
-          </Label>
-          <MarkdownEditorField
-            textareaId="tv-guide-en"
-            locale={nl ? "nl" : "en"}
-            name="guidelinesEn"
-            defaultValue={guide.guidelinesEn}
-            rows={12}
-            allowImages={false}
-          />
-        </div>
+        </BilingualGroup>
         <div>
           <Label htmlFor="tv-handbook">
             {nl ? "Handleiding voor het beheer" : "Handbook for the admin"}

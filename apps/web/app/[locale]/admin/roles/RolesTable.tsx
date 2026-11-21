@@ -2,7 +2,8 @@
 
 import { unsentGuard } from "@/components/ui/unsentGuard";
 import { useMemo, useState } from "react";
-import { Input, Label, Textarea } from "@vtk/ui";
+import { Input, Label } from "@vtk/ui";
+import { BilingualGroup, BilingualInput, BilingualTextarea } from "@/components/admin/BilingualField";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteButton, DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import {
@@ -174,11 +175,23 @@ export function RolesTable({
             {...saveLabels}
             onSuccess={() => setCreateOpen(false)}
           >
-            <div className="md:col-span-3"><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" required /></div>
-            <div className="md:col-span-3"><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" required /></div>
-            <div className="md:col-span-6"><Label>{nl ? "Code" : "Code"}</Label><Input name="code" placeholder={nl ? "auto" : "auto"} /></div>
-            <div className="md:col-span-3"><Label>{nl ? "Beschrijving (NL)" : "Description (NL)"}</Label><Input name="descriptionNl" /></div>
-            <div className="md:col-span-3"><Label>{nl ? "Beschrijving (EN)" : "Description (EN)"}</Label><Input name="descriptionEn" /></div>
+            <BilingualGroup locale={locale} layout="side-by-side" className="md:col-span-6 space-y-3">
+              <BilingualInput
+                label={nl ? "Naam" : "Name"}
+                nameNl="nameNl"
+                nameEn="nameEn"
+                requiredNl
+                requiredEn
+                gridClassName="grid grid-cols-1 gap-3 md:grid-cols-2"
+              />
+              <BilingualInput
+                label={nl ? "Beschrijving" : "Description"}
+                nameNl="descriptionNl"
+                nameEn="descriptionEn"
+                gridClassName="grid grid-cols-1 gap-3 md:grid-cols-2"
+              />
+            </BilingualGroup>
+            <div className="md:col-span-3"><Label>{nl ? "Code" : "Code"}</Label><Input name="code" placeholder={nl ? "auto" : "auto"} /></div>
             <div className="md:col-span-3"><Label>{nl ? "Kleur (optioneel)" : "Color (optional)"}</Label><Input name="color" placeholder="#FFD23F" /></div>
           </SaveForm>
         </Modal>
@@ -562,15 +575,32 @@ function RoleDetail({
               {...saveLabels}
             >
               <input type="hidden" name="id" value={role.id} />
-              <div className="md:col-span-3"><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" defaultValue={role.nameNl} required /></div>
-              <div className="md:col-span-3"><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" defaultValue={role.nameEn} required /></div>
-              <div className="md:col-span-2">
+              <BilingualGroup locale={locale} layout="side-by-side" className="md:col-span-6 space-y-3">
+                <BilingualInput
+                  label={nl ? "Naam" : "Name"}
+                  nameNl="nameNl"
+                  nameEn="nameEn"
+                  defaultValueNl={role.nameNl}
+                  defaultValueEn={role.nameEn}
+                  requiredNl
+                  requiredEn
+                  gridClassName="grid grid-cols-1 gap-3 md:grid-cols-2"
+                />
+                <BilingualTextarea
+                  label={nl ? "Beschrijving" : "Description"}
+                  nameNl="descriptionNl"
+                  nameEn="descriptionEn"
+                  defaultValueNl={role.descriptionNl}
+                  defaultValueEn={role.descriptionEn}
+                  rows={2}
+                  gridClassName="grid grid-cols-1 gap-3 md:grid-cols-2"
+                />
+              </BilingualGroup>
+              <div className="md:col-span-3">
                 <Label>{nl ? "Code" : "Code"}</Label>
                 <Input name="code" defaultValue={role.code} disabled={role.system} />
               </div>
-              <div className="md:col-span-2"><Label>{nl ? "Kleur (optioneel)" : "Color (optional)"}</Label><Input name="color" defaultValue={role.color ?? ""} placeholder="#FFD23F" /></div>
-              <div className="md:col-span-4"><Label>{nl ? "Beschrijving (NL)" : "Description (NL)"}</Label><Textarea name="descriptionNl" defaultValue={role.descriptionNl} rows={2} /></div>
-              <div className="md:col-span-6"><Label>{nl ? "Beschrijving (EN)" : "Description (EN)"}</Label><Textarea name="descriptionEn" defaultValue={role.descriptionEn} rows={2} /></div>
+              <div className="md:col-span-3"><Label>{nl ? "Kleur (optioneel)" : "Color (optional)"}</Label><Input name="color" defaultValue={role.color ?? ""} placeholder="#FFD23F" /></div>
             </SaveForm>
 
             {role.system ? (
