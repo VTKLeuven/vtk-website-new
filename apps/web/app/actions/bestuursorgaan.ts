@@ -18,8 +18,9 @@ import { BO_VIEW_SCREEN, BO_VIEWS } from "@/lib/bo/views";
  * naar Drive; de map blijft de bron.
  */
 
+/** Heel de module: het overzicht, de mappen en Mijn budgetten tonen dezelfde bestanden. */
 function revalidateBo() {
-  revalidatePath("/[locale]/admin/bestuursorgaan", "page");
+  revalidatePath("/[locale]/admin/bestuursorgaan", "layout");
 }
 
 function field(formData: FormData, name: string): string {

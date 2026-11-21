@@ -383,6 +383,13 @@ begroting".
   met haar eigen naam. De scan bewaarde het eerste wat ze tegenkwam, en dan
   viel de naam van de snelkoppeling weg. Nu wint die altijd (`collect` in
   `lib/bo/scan.ts`).
+- **"Niet meetellen" mag geen bestand laten verdwijnen.** Een weggezet
+  bestand viel uit het overzicht én uit de map op /mappen, terwijl het in
+  Drive gewoon in die map bleef staan. In november 2026 meldde Groep 5 dat
+  `26-27_Budget_Cursusdienst_shiftersvoorzieningen teldagen` en een deelbudget
+  van Internationaal in BO 3 "niet herkend" werden: de scan las ze prima, maar
+  ze waren een maand eerder weggezet, en niets op het scherm zei dat nog. Een
+  map toont ze nu onder "Telt niet mee", met de knop om ze terug te zetten.
 - **Een fout in de scan breekt de groepssync niet.** De worker roept beide in
   dezelfde ronde aan, maar de statuscode volgt enkel de groepssync; een fout in
   de BO-scan staat op `/admin/bestuursorgaan`.
