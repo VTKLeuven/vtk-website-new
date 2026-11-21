@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import type { UitleenVehicle } from '@prisma/client';
 import {
+  formatEuro,
   NOTIFY_KINDS,
+  PRICING_MODE_LABELS,
   TRIP_HANDOVER_MODES,
   type LogistiekNotifyEmails,
   type NotifyKind,
@@ -20,6 +22,7 @@ import { VEHICLE_ICONS, VEHICLE_ICON_LABELS, vehicleIconName } from '@/lib/vehic
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { SaveForm } from '@/components/ui/save-form';
+import { Disclosure } from '@/components/disclosure';
 
 const VEHICLE_ERRORS = {
   NAME_REQUIRED: 'Geef het voertuig een naam.',
@@ -232,6 +235,15 @@ function VehicleFields({ vehicle }: { vehicle?: UitleenVehicle }) {
   );
 }
 
+/** "€ 0,35 per kilometer · chauffeur van Logistiek", in de kop van een dichtgeklapt voertuig. */
+function vehicleSummary(vehicle: UitleenVehicle): string {
+  const tariff =
+    vehicle.pricingMode === 'FREE'
+      ? 'Gratis'
+      : `${formatEuro(vehicle.rateCents)} ${PRICING_MODE_LABELS[vehicle.pricingMode].toLowerCase()}`;
+  return `${tariff} · ${vehicle.needsDriver ? 'chauffeur van Logistiek' : 'de aanvrager rijdt zelf'}`;
+}
+
 export function VehicleSettings({ vehicles }: { vehicles: UitleenVehicle[] }) {
   const active = vehicles.filter((v) => v.active);
   const inactive = vehicles.filter((v) => !v.active);
@@ -244,35 +256,41 @@ export function VehicleSettings({ vehicles }: { vehicles: UitleenVehicle[] }) {
         afronden van de rit.
       </p>
 
+      {/* Elk voertuig dichtgeklapt, met zijn tarief in de kop (M4): open waren het
+          drie formulieren van elk een scherm hoog op een telefoon. */}
       <ul className="mt-4 grid gap-3">
         {active.map((vehicle) => (
-          <li key={vehicle.id} className="rounded-[14px] border border-vtk-navy/10 bg-vtk-paper/50 p-4">
-            <SaveForm
-              action={saveVehicleAction}
-              submitLabel="Opslaan"
-              savingLabel="Opslaan..."
-              savedMessage="Voertuig opgeslagen."
-              errorMessages={VEHICLE_ERRORS}
-              className="grid gap-3"
-            >
-              <VehicleFields vehicle={vehicle} />
-            </SaveForm>
-            <div className="mt-2">
-              <ConfirmActionButton
-                label="Deactiveren"
-                successMessage="Voertuig gedeactiveerd."
-                action={setVehicleActiveAction.bind(null, vehicle.id, false)}
-                destructive
-                dialogTitle="Voertuig deactiveren?"
-                dialogDescription="Leden kunnen dit voertuig niet meer kiezen. Bestaande ritten blijven bewaard."
-              />
-            </div>
+          <li key={vehicle.id}>
+            <Disclosure variant="row" title={vehicle.nameNl} summary={vehicleSummary(vehicle)}>
+              <SaveForm
+                action={saveVehicleAction}
+                submitLabel="Opslaan"
+                savingLabel="Opslaan..."
+                savedMessage="Voertuig opgeslagen."
+                errorMessages={VEHICLE_ERRORS}
+                className="grid gap-3"
+              >
+                <VehicleFields vehicle={vehicle} />
+              </SaveForm>
+              <div className="mt-2">
+                <ConfirmActionButton
+                  label="Deactiveren"
+                  successMessage="Voertuig gedeactiveerd."
+                  action={setVehicleActiveAction.bind(null, vehicle.id, false)}
+                  destructive
+                  dialogTitle="Voertuig deactiveren?"
+                  dialogDescription="Leden kunnen dit voertuig niet meer kiezen. Bestaande ritten blijven bewaard."
+                />
+              </div>
+            </Disclosure>
           </li>
         ))}
       </ul>
 
-      <details className="mt-4 rounded-[14px] border border-dashed border-vtk-navy/25 p-4">
-        <summary className="cursor-pointer text-sm font-semibold text-vtk-ink">+ Voertuig toevoegen</summary>
+      <details className="mt-4 rounded-[14px] border border-dashed border-vtk-navy/25 px-4 py-2">
+        <summary className="flex min-h-10 cursor-pointer list-none items-center text-sm font-semibold text-vtk-ink [&::-webkit-details-marker]:hidden">
+          + Voertuig toevoegen
+        </summary>
         <div className="mt-3">
           <SaveForm
             action={saveVehicleAction}
@@ -418,16 +436,30 @@ export function GeneralSettings({
   notifyEmails: LogistiekNotifyEmails;
   tripHandover: TripHandoverNotify;
 }) {
+  // Wat er nu ingesteld staat, in de kop van het dichtgeklapte blok (M4). Een
+  // soort zonder meldingsadres staat erbij: dat is de instelling die stil iets
+  // laat liggen.
+  const silent = NOTIFY_KINDS.filter((kind) => notifyEmails[kind].length === 0).map((kind) =>
+    NOTIFY_LABELS[kind].title.toLowerCase()
+  );
+  const summary = [
+    showRentPrices ? 'Huurprijzen zichtbaar' : 'Enkel waarborg zichtbaar',
+    `last minute ${lastMinuteDays} ${lastMinuteDays === 1 ? 'dag' : 'dagen'}`,
+    externalRequestsOpen ? 'externen kunnen aanvragen' : 'externen kunnen niet aanvragen',
+    silent.length > 0 ? `geen melding voor ${silent.join(' en ')}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
-    <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
-      <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">Algemeen</h2>
+    <Disclosure title="Algemeen" summary={summary}>
       <SaveForm
         action={saveLogistiekSettingsAction}
         submitLabel="Opslaan"
         savingLabel="Opslaan..."
         savedMessage="Instellingen opgeslagen."
         errorMessages={GENERAL_ERRORS}
-        className="mt-4 grid gap-3"
+        className="grid gap-3"
       >
         <label className="flex items-center gap-2 text-sm text-vtk-ink">
           <input type="checkbox" name="showRentPrices" defaultChecked={showRentPrices} className="h-4 w-4" />
@@ -513,6 +545,6 @@ export function GeneralSettings({
 
         <TripHandoverField value={tripHandover} />
       </SaveForm>
-    </section>
+    </Disclosure>
   );
 }
