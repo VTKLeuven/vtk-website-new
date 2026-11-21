@@ -8,7 +8,11 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { IconButton } from "@/components/ui/IconButton";
 import { PencilIcon } from "@/components/ui/icons";
-import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
+import {
+  BilingualGroup,
+  BilingualInput,
+  BilingualMarkdown,
+} from "@/components/admin/BilingualField";
 import { saveErrorMessages } from "@/lib/saveMessages";
 import {
   deleteAnnouncementAction,
@@ -143,61 +147,48 @@ export function AnnouncementsManager({
         >
           {!isNew && <input type="hidden" name="id" value={editing.id} />}
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="titleNl">{nl ? "Titel (NL)" : "Title (NL)"}</Label>
-              <Input id="titleNl" name="titleNl" defaultValue={editing.titleNl} required />
-            </div>
-            <div>
-              <Label htmlFor="titleEn">{nl ? "Titel (EN)" : "Title (EN)"}</Label>
-              <Input id="titleEn" name="titleEn" defaultValue={editing.titleEn} required />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div>
-              <Label htmlFor="announcement-body-nl">{nl ? "Bericht (NL)" : "Message (NL)"}</Label>
-              <MarkdownEditorField
-                name="bodyNl"
-                defaultValue={editing.bodyNl}
-                locale={locale}
-                rows={7}
-                allowImages={false}
-                textareaId="announcement-body-nl"
+          <BilingualGroup locale={locale}>
+            <BilingualInput
+              label={nl ? "Titel" : "Title"}
+              nameNl="titleNl"
+              nameEn="titleEn"
+              defaultValueNl={editing.titleNl}
+              defaultValueEn={editing.titleEn}
+              requiredNl
+              requiredEn
+              idPrefix="announcement-title"
+            />
+            <BilingualMarkdown
+              label={nl ? "Bericht" : "Message"}
+              nameNl="bodyNl"
+              nameEn="bodyEn"
+              defaultValueNl={editing.bodyNl}
+              defaultValueEn={editing.bodyEn}
+              locale={locale}
+              rows={7}
+              allowImages={false}
+              idPrefix="announcement-body"
+            />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <BilingualInput
+                label={nl ? "Knoptekst" : "Button label"}
+                nameNl="ctaLabelNl"
+                nameEn="ctaLabelEn"
+                defaultValueNl={editing.ctaLabelNl}
+                defaultValueEn={editing.ctaLabelEn}
+                idPrefix="announcement-cta"
               />
+              <div>
+                <Label htmlFor="ctaUrl">{nl ? "Knop-link" : "Button link"}</Label>
+                <Input
+                  id="ctaUrl"
+                  name="ctaUrl"
+                  placeholder={nl ? "/kalender of https://..." : "/kalender or https://..."}
+                  defaultValue={editing.ctaUrl}
+                />
+              </div>
             </div>
-            <div>
-              <Label htmlFor="announcement-body-en">{nl ? "Bericht (EN)" : "Message (EN)"}</Label>
-              <MarkdownEditorField
-                name="bodyEn"
-                defaultValue={editing.bodyEn}
-                locale={locale}
-                rows={7}
-                allowImages={false}
-                textareaId="announcement-body-en"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div>
-              <Label htmlFor="ctaLabelNl">{nl ? "Knoptekst (NL)" : "Button label (NL)"}</Label>
-              <Input id="ctaLabelNl" name="ctaLabelNl" defaultValue={editing.ctaLabelNl} />
-            </div>
-            <div>
-              <Label htmlFor="ctaLabelEn">{nl ? "Knoptekst (EN)" : "Button label (EN)"}</Label>
-              <Input id="ctaLabelEn" name="ctaLabelEn" defaultValue={editing.ctaLabelEn} />
-            </div>
-            <div>
-              <Label htmlFor="ctaUrl">{nl ? "Knop-link" : "Button link"}</Label>
-              <Input
-                id="ctaUrl"
-                name="ctaUrl"
-                placeholder={nl ? "/kalender of https://..." : "/kalender or https://..."}
-                defaultValue={editing.ctaUrl}
-              />
-            </div>
-          </div>
+          </BilingualGroup>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>

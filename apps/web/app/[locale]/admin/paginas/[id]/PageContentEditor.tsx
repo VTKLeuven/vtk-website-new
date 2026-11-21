@@ -3,9 +3,13 @@
 import { useId, useState } from "react";
 import Link from "@/components/ui/Link";
 import { QrCode } from "lucide-react";
-import { Card, Input, Label } from "@vtk/ui";
+import { Card } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
-import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
+import {
+  BilingualGroup,
+  BilingualInput,
+  BilingualMarkdown,
+} from "@/components/admin/BilingualField";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { savePageContentAction } from "@/app/actions/pages";
 import { hasFormMarker } from "@/lib/pageForm";
@@ -90,7 +94,6 @@ export function PageContentEditor({
   const uid = useId();
   const base = nl ? "" : "/en";
 
-  const [lang, setLang] = useState<"nl" | "en">("nl");
   const [contentNl, setContentNl] = useState(initialNl);
   const [contentEn, setContentEn] = useState(initialEn);
   const [qrOpen, setQrOpen] = useState(false);
@@ -161,48 +164,35 @@ export function PageContentEditor({
           fallbackErrorMessage={dict.common.saveError}
         >
           <input type="hidden" name="id" value={page.id} />
-          <input type="hidden" name="contentMdNl" value={contentNl} />
-          <input type="hidden" name="contentMdEn" value={contentEn} />
 
-          <div className="flex rounded-lg border border-vtk-blue/15 p-0.5 w-fit" role="tablist">
-            <LangTab active={lang === "nl"} onClick={() => setLang("nl")}>
-              Nederlands
-            </LangTab>
-            <LangTab active={lang === "en"} onClick={() => setLang("en")}>
-              English
-              {contentEn.trim() === "" && (
-                <span className="ml-1.5 text-[10px] font-normal opacity-70">
-                  {nl ? "leeg" : "empty"}
-                </span>
-              )}
-            </LangTab>
-          </div>
-
-          {/* Beide talen blijven gemount zodat er niets verloren gaat bij het
-              wisselen; de inactieve taal is enkel verborgen. */}
-          <div className={lang === "nl" ? "space-y-4" : "hidden"}>
-            {/* Geen `required`: dit veld kan verborgen zijn (EN-tab actief) en een
-                verborgen ongeldig veld blokkeert de submit geluidloos. De action
-                valideert en antwoordt met een rode toast. */}
-            <div className="max-w-xl">
-              <Label htmlFor={`${uid}-titleNl`}>{nl ? "Titel (NL)" : "Title (NL)"}</Label>
-              <Input id={`${uid}-titleNl`} name="titleNl" defaultValue={page.titleNl} />
-            </div>
-            <MarkdownEditor value={contentNl} onChange={setContentNl} locale={locale} />
-          </div>
-
-          <div className={lang === "en" ? "space-y-4" : "hidden"}>
-            <div className="max-w-xl">
-              <Label htmlFor={`${uid}-titleEn`}>Title (EN)</Label>
-              <Input id={`${uid}-titleEn`} name="titleEn" defaultValue={page.titleEn ?? ""} />
-            </div>
-            <MarkdownEditor value={contentEn} onChange={setContentEn} locale={locale} />
-            <p className="text-xs text-[#5c667f]">
-              {nl
+          <BilingualGroup
+            locale={locale}
+            enHint={
+              nl
                 ? "Laat leeg om geen Engelse versie te tonen; de site valt dan terug op het Nederlands."
-                : "Leave empty to publish no English version; the site falls back to Dutch."}
-            </p>
-          </div>
+                : "Leave empty to publish no English version; the site falls back to Dutch."
+            }
+          >
+            <BilingualInput
+              label={nl ? "Titel" : "Title"}
+              nameNl="titleNl"
+              nameEn="titleEn"
+              defaultValueNl={page.titleNl}
+              defaultValueEn={page.titleEn ?? ""}
+              idPrefix={`${uid}-title`}
+              className="max-w-xl"
+            />
+            <BilingualMarkdown
+              nameNl="contentMdNl"
+              nameEn="contentMdEn"
+              valueNl={contentNl}
+              valueEn={contentEn}
+              onChangeNl={setContentNl}
+              onChangeEn={setContentEn}
+              locale={locale}
+              idPrefix={`${uid}-md`}
+            />
+          </BilingualGroup>
         </SaveForm>
       </Card>
 
@@ -274,30 +264,5 @@ export function PageContentEditor({
         />
       )}
     </div>
-  );
-}
-
-function LangTab({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={active}
-      onClick={onClick}
-      className={[
-        "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-        active ? "bg-vtk-ink text-white" : "text-[#5c667f] hover:text-vtk-ink",
-      ].join(" ")}
-    >
-      {children}
-    </button>
   );
 }
