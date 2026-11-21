@@ -1,3 +1,11 @@
+/*
+ * De meldingen rechtsboven, gedeeld door vtk.be en de uitleendienst.
+ *
+ * Kleuren via eigen `--toast-*`-variabelen met de waarden van vtk.be als
+ * standaard. Een app met een eigen palet (de uitleendienst, met een donkere
+ * modus) zet die variabelen op haar tokens; zo pikt de toast nooit per ongeluk
+ * een gelijknamige variabele op die in een andere app iets anders betekent.
+ */
 .vtk-toast-viewport {
   position: fixed;
   /* Val onder de header; --vtk-header-height wordt door de site gezet (fallback
@@ -22,9 +30,9 @@
   padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: var(--surface);
+  background: var(--toast-surface, #fff);
   color: var(--ink);
-  box-shadow: var(--shadow-1);
+  box-shadow: var(--toast-shadow, 0 8px 24px rgba(10, 15, 31, 0.12));
   font-size: 14px;
   line-height: 1.45;
   animation: vtk-toast-in 160ms ease-out;
@@ -76,28 +84,25 @@
   opacity: 1;
 }
 
-/* De vier soorten dragen hun eigen kleur. De waarden staan in
-   app/design/theme.css, zodat ze in de donkere modus meeflippen: een groene
-   toast op wit is daar een groene toast op bijna zwart, met lichte tekst. */
 .vtk-toast-success {
-  border-color: var(--success-line);
-  background: var(--success-soft);
-  color: var(--success);
+  border-color: var(--toast-success-line, #b8dec1);
+  background: var(--toast-success-soft, #eef8ea);
+  color: var(--toast-success, #2f6f33);
 }
 
 .vtk-toast-error {
-  border-color: var(--danger-line);
-  background: var(--danger-soft);
-  color: var(--danger);
+  border-color: var(--toast-danger-line, #f0c6bd);
+  background: var(--toast-danger-soft, #fff0ed);
+  color: var(--toast-danger, #9d2f1f);
 }
 
 .vtk-toast-warning {
-  border-color: var(--warn-line);
-  background: var(--warn-soft);
-  color: var(--warn);
+  border-color: var(--toast-warn-line, #f0d76d);
+  background: var(--toast-warn-soft, #fff7cf);
+  color: var(--toast-warn, var(--ink));
 }
 
 .vtk-toast-info {
-  border-color: var(--info-line);
-  background: var(--info-soft);
+  border-color: var(--toast-info-line, #c9d5ff);
+  background: var(--toast-info-soft, #eef2ff);
 }

@@ -1,106 +1,22 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
-import { UNSENT_TOAST_EVENT } from './unsentGuard';
-import './toast.css';
+import { ToastProvider as SharedToastProvider, type ToastLabels } from '@vtk/ui/toast';
 
-export type ToastVariant = 'success' | 'error' | 'warning' | 'info';
+/**
+ * De toasts staan sinds november 2026 in `@vtk/ui/toast`, gedeeld met de
+ * uitleendienst. Hier enkel de taal van vtk.be: die volgt het pad (`/en/...`).
+ */
+export { useToast, type ShowToast, type ToastInput, type ToastVariant } from '@vtk/ui/toast';
 
-export type ToastInput = {
-  message: string;
-  /** Visuele stijl. Standaard `info`. */
-  variant?: ToastVariant;
-  /** Auto-verdwijntijd in ms. `0` = blijft staan tot manueel gesloten. Standaard 4000. */
-  duration?: number;
+const LABELS: Record<'nl' | 'en', ToastLabels> = {
+  nl: { region: 'Meldingen', close: 'Sluiten' },
+  en: { region: 'Notifications', close: 'Close' },
 };
 
-type Toast = { id: number; message: string; variant: ToastVariant };
-
-type ShowToast = (input: ToastInput) => void;
-
-const DEFAULT_DURATION = 4000;
-
-const ToastContext = createContext<ShowToast | null>(null);
-
-/**
- * Geeft een `showToast(...)`-functie terug om een pop-upmelding te tonen.
- * Moet binnen een {@link ToastProvider} gebruikt worden.
- */
-export function useToast(): ShowToast {
-  const ctx = useContext(ToastContext);
-  if (!ctx) {
-    throw new Error('useToast must be used within a <ToastProvider>');
-  }
-  return ctx;
-}
-
-/**
- * Levert de toast-context en rendert de meldingen rechtsboven, bovenop de rest
- * van de pagina. Plaats dit één keer hoog in de boom (bvb in de layout).
- */
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const nextId = useRef(0);
   const pathname = usePathname();
-  const nl = !(pathname === '/en' || pathname?.startsWith('/en/'));
-
-  const dismiss = useCallback((id: number) => {
-    setToasts((cur) => cur.filter((t) => t.id !== id));
-  }, []);
-
-  const showToast = useCallback<ShowToast>(
-    ({ message, variant = 'info', duration = DEFAULT_DURATION }) => {
-      const id = ++nextId.current;
-      setToasts((cur) => [...cur, { id, message, variant }]);
-      if (duration > 0) {
-        setTimeout(() => dismiss(id), duration);
-      }
-    },
-    [dismiss],
-  );
-
-  // Een opslag die de server nooit bereikte (`unsentGuard`), als rode toast
-  // die blijft staan. Annuleren zegt aan de afzender dat het getoond is.
-  useEffect(() => {
-    const onUnsent = (event: Event) => {
-      const message = (event as CustomEvent<{ message?: string }>).detail?.message;
-      if (!message) return;
-      event.preventDefault();
-      showToast({ message, variant: 'error', duration: 0 });
-    };
-    window.addEventListener(UNSENT_TOAST_EVENT, onUnsent);
-    return () => window.removeEventListener(UNSENT_TOAST_EVENT, onUnsent);
-  }, [showToast]);
-
-  return (
-    <ToastContext.Provider value={showToast}>
-      {children}
-      <div
-        className="vtk-toast-viewport"
-        role="region"
-        aria-label={nl ? 'Meldingen' : 'Notifications'}
-      >
-        {toasts.map((toast) => (
-          <div key={toast.id} className={`vtk-toast vtk-toast-${toast.variant}`}>
-            <div
-              className="vtk-toast-message"
-              role={toast.variant === 'error' ? 'alert' : 'status'}
-              aria-live={toast.variant === 'error' ? 'assertive' : 'polite'}
-            >
-              {toast.message}
-            </div>
-            <button
-              type="button"
-              className="vtk-toast-close"
-              aria-label={nl ? 'Sluiten' : 'Close'}
-              onClick={() => dismiss(toast.id)}
-            >
-              ×
-            </button>
-          </div>
-        ))}
-      </div>
-    </ToastContext.Provider>
-  );
+  const en = pathname === '/en' || pathname?.startsWith('/en/');
+  return <SharedToastProvider labels={LABELS[en ? 'en' : 'nl']}>{children}</SharedToastProvider>;
 }

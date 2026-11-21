@@ -92,7 +92,8 @@ het gelukt is (toast).
     navigatie zelf de bevestiging en is een toast niet nodig. Let op dat
     `redirect()` via een throw werkt: hou ze buiten elke try/catch.
   - **Elke aanroep van een server action loopt langs het vangnet**
-    (`components/ui/unsentGuard.tsx`): een opslag die de server nooit bereikt
+    (`components/ui/unsentGuard.tsx`, een doorgeefluik naar
+    `@vtk/ui/unsent-guard`; de uitleendienst gebruikt hetzelfde vangnet): een opslag die de server nooit bereikt
     (een pagina van vóór de laatste deploy, of geen verbinding) wordt een rode
     toast, en wat er ingevuld stond, blijft staan. `SaveForm`,
     `DeleteIconButton` en `ActionForm` doen het al; anders `unsentGuard.form`

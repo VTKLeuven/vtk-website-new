@@ -11,7 +11,7 @@
  */
 export type SaveState =
   | { status: "idle" }
-  | { status: "success"; nonce: number; message?: string }
+  | { status: "success"; nonce: number; detail?: string }
   | { status: "error"; code: string; nonce: number; detail?: string };
 
 /** Beginwaarde voor `useActionState`. */
@@ -21,12 +21,13 @@ export const SAVE_IDLE: SaveState = { status: "idle" };
 export type SaveAction = (prev: SaveState, formData: FormData) => Promise<SaveState>;
 
 /**
- * `message` vervangt de vaste succesmelding van het formulier, voor het geval de
- * actie meer deed dan het formulier kon voorzien ("de exemplaren zijn weer één
- * rij"). Laat ze weg wanneer "Item opgeslagen." het hele verhaal is.
+ * `detail` vervangt de vaste succesmelding van het formulier wanneer de uitkomst
+ * pas op de server te kennen is ("3 verkoopdagen aangemaakt, 2 bestonden al").
+ * Zelfde bedoeling als `detail` bij `saveError`. Laat hem weg wanneer de vaste
+ * melding volstaat.
  */
-export function saveOk(message?: string): SaveState {
-  return { status: "success", nonce: Date.now(), message };
+export function saveOk(detail?: string): SaveState {
+  return { status: "success", nonce: Date.now(), detail };
 }
 
 /**

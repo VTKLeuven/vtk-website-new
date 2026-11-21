@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AdminNavNode } from "@vtk/ui";
-import { matchAdminNav } from "@vtk/ui/src/admin-nav-match";
+import { matchAdminNav } from "@vtk/ui/admin-nav-match";
 
 const item = (key: string, label: string, path: string) => ({ key, label, href: `/nl/admin${path}` });
 

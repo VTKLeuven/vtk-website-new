@@ -4,6 +4,18 @@
   "private": true,
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./toast": "./src/toast.tsx",
+    "./save-form": "./src/SaveForm.tsx",
+    "./save-state": "./src/saveState.ts",
+    "./form-busy": "./src/formBusy.tsx",
+    "./unsent-guard": "./src/unsentGuard.tsx",
+    "./unsent-save": "./src/unsentSave.ts",
+    "./action-errors": "./src/actionErrors.ts",
+    "./link": "./src/Link.tsx",
+    "./admin-nav-match": "./src/admin-nav-match.ts"
+  },
   "peerDependencies": {
     "react": "^19.0.0"
   },

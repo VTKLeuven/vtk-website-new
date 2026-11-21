@@ -1,44 +1,6 @@
 /**
- * Gedeelde uitkomst van een opslaan-actie, gebruikt door `SaveForm`.
- *
- * Server actions die iets opslaan geven dit terug in plaats van `void`, zodat het
- * formulier kan tonen of het gelukt is. Verwachte invoerfouten (een dubbel
- * r-nummer, een te grote foto) horen hier als `status: "error"` terug te komen;
- * onverwachte serverfouten mogen gewoon gooien en horen in de error boundary.
- *
- * `nonce` onderscheidt twee opeenvolgende, verder identieke resultaten van
- * elkaar, zodat de client per submit exact één toast toont.
+ * Gedeelde uitkomst van een opslaan-actie; staat sinds november 2026 in
+ * `@vtk/ui/save-state`, zodat de uitleendienst dezelfde `SaveForm` gebruikt.
+ * Dit bestand blijft het adres voor vtk.be.
  */
-export type SaveState =
-  | { status: "idle" }
-  | { status: "success"; nonce: number; detail?: string }
-  | { status: "error"; code: string; nonce: number; detail?: string };
-
-/** Beginwaarde voor `useActionState`. */
-export const SAVE_IDLE: SaveState = { status: "idle" };
-
-/** Handtekening die `SaveForm` van een opslaan-actie verwacht. */
-export type SaveAction = (prev: SaveState, formData: FormData) => Promise<SaveState>;
-
-/**
- * `detail` vervangt de vaste succesmelding van het formulier wanneer de uitkomst
- * pas op de server te kennen is ("3 verkoopdagen aangemaakt, 2 bestonden al").
- * Zelfde bedoeling als `detail` bij `saveError`. Laat hem weg wanneer de vaste
- * melding volstaat.
- */
-export function saveOk(detail?: string): SaveState {
-  return { status: "success", nonce: Date.now(), detail };
-}
-
-/**
- * `code` wordt clientside op een vertaalde melding gemapt; onbekende codes vallen
- * terug op de standaardmelding.
- *
- * `detail` is voor het geval de melding een gegeven bevat dat de client niet kan
- * kennen ("botst met de rit van Feest op za 12 sep 14:00-18:00"). Het vervangt de
- * standaardmelding, maar niet een vertaling die de client zelf voor die code
- * heeft: die blijft voorgaan. Schrijf hier dus een volledige, leesbare zin.
- */
-export function saveError(code: string, detail?: string): SaveState {
-  return { status: "error", code, nonce: Date.now(), detail };
-}
+export { SAVE_IDLE, saveError, saveOk, type SaveAction, type SaveState } from "@vtk/ui/save-state";
