@@ -3,8 +3,8 @@
 import { useState, type ReactNode } from "react";
 import { Button } from "@vtk/ui";
 import type { SaveAction } from "@/lib/saveState";
-import type { PermanentEntryKind } from "@/lib/kassas/permanent";
-import { EntryForm } from "./EntryForm";
+import type { PermanentEntryKind, VoucherValues } from "@/lib/kassas/permanent";
+import { EntryForm, NO_VOUCHERS } from "./EntryForm";
 
 /**
  * De kaart van een post voor Beheer, met de drie handelingen op een vaste kassa
@@ -18,8 +18,7 @@ export function ManagerActions({
   groupId,
   postName,
   today,
-  shiftVoucherValueCents,
-  elixirVoucherValueCents,
+  voucherValues,
   errorMessages,
   children,
 }: {
@@ -30,8 +29,7 @@ export function ManagerActions({
   postName: string;
   /** "YYYY-MM-DD", de standaarddatum en de laatste die je kan kiezen. */
   today: string;
-  shiftVoucherValueCents: number;
-  elixirVoucherValueCents: number;
+  voucherValues: VoucherValues;
   errorMessages: Record<string, string>;
 }) {
   const nl = locale === "nl";
@@ -90,8 +88,8 @@ export function ManagerActions({
             action={action}
             postName={postName}
             maxDate={today}
-            shiftVoucherValueCents={shiftVoucherValueCents}
-            elixirVoucherValueCents={elixirVoucherValueCents}
+            voucherValues={voucherValues}
+            vouchersInTotal={false}
             errorMessages={errorMessages}
             onCancel={() => setOpen(null)}
             onSaved={() => setOpen(null)}
@@ -101,8 +99,7 @@ export function ManagerActions({
               date: today,
               cash: "",
               counts: null,
-              shiftVouchers: "",
-              elixirVouchers: "",
+              vouchers: NO_VOUCHERS,
               closesRegister: false,
               note: "",
             }}

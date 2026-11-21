@@ -8943,12 +8943,19 @@ model PermanentCashEntry {
   counts    Json?
 
   /// Bonnen in de kassa (telling) of mee afgegeven aan Beheer (teruggegeven).
+  /// Ze tellen in wat de post ziet, niet in het totaal en de winst bij Beheer.
   shiftVouchers           Int @default(0)
   elixirVouchers          Int @default(0)
   /// Wat één bon waard is, vastgeklikt uit de instellingen bij het ingeven,
   /// zoals bij `CashRegister`.
   shiftVoucherValueCents  Int
   elixirVoucherValueCents Int
+  /// Guidobonnen en bonnen voor een gratis broodje (november 2026). De waarde
+  /// staat op 0 bij een regel van daarvoor; die had er nooit.
+  guidoVouchers             Int @default(0)
+  sandwichVouchers          Int @default(0)
+  guidoVoucherValueCents    Int @default(0)
+  sandwichVoucherValueCents Int @default(0)
 
   /// Enkel bij `RETURNED`: de volledige kassa kwam terug, dus daarna staat ze
   /// op nul. Telt in de winst als een telling van € 0 na de teruggave.

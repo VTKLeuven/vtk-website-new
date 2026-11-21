@@ -15,7 +15,15 @@ import {
   toDateInputValue,
   workingYearOf,
 } from "@/lib/rekeningen/expenses";
-import { isPermanentEntryKind, postSlug, type PermanentEntryKind } from "@/lib/kassas/permanent";
+import {
+  isPermanentEntryKind,
+  PERMANENT_VOUCHERS,
+  postSlug,
+  voucherCountOf,
+  voucherValuesFor,
+  type PermanentEntryKind,
+  type VoucherCounts,
+} from "@/lib/kassas/permanent";
 import {
   brusselsToday,
   canEditPermanentEntry,
@@ -843,7 +851,11 @@ export async function saveCashRegisterConfigAction(
 
   const shift = parseAmountInput(text(formData, "shiftVoucherValue", 12));
   const elixir = parseAmountInput(text(formData, "elixirVoucherValue", 12));
-  if (shift === undefined || elixir === undefined) return saveError("BAD_AMOUNT");
+  const guido = parseAmountInput(text(formData, "guidoVoucherValue", 12));
+  const sandwich = parseAmountInput(text(formData, "sandwichVoucherValue", 12));
+  if (shift === undefined || elixir === undefined || guido === undefined || sandwich === undefined) {
+    return saveError("BAD_AMOUNT");
+  }
   const contactEmail = text(formData, "contactEmail", 200);
   if (!EMAIL_PATTERN.test(contactEmail)) return saveError("BAD_EMAIL");
 
@@ -852,6 +864,8 @@ export async function saveCashRegisterConfigAction(
     payconiqAccounts: cleanTerminalNames(texts(formData, "payconiq")),
     shiftVoucherValueCents: shift ?? 0,
     elixirVoucherValueCents: elixir ?? 0,
+    guidoVoucherValueCents: guido ?? 0,
+    sandwichVoucherValueCents: sandwich ?? 0,
     contactEmail,
   };
   await prisma.setting.upsert({
@@ -925,9 +939,15 @@ export async function savePermanentEntryAction(_prev: SaveState, formData: FormD
     return saveError(access.canManage || kind !== "COUNT" ? "FORBIDDEN" : "OUTSIDE_WINDOW");
   }
 
-  const shiftVouchers = kind === "HANDED_OUT" ? 0 : parseCountInput(text(formData, "shiftVouchers", 12));
-  const elixirVouchers = kind === "HANDED_OUT" ? 0 : parseCountInput(text(formData, "elixirVouchers", 12));
-  if (shiftVouchers === undefined || elixirVouchers === undefined) return saveError("BAD_COUNT");
+  // Bonnen zitten in een telling of komen terug; meegeven is enkel wisselgeld.
+  const vouchers = {} as VoucherCounts;
+  for (const voucher of PERMANENT_VOUCHERS) {
+    const field = `${voucher.key}Vouchers` as const;
+    const count = kind === "HANDED_OUT" ? 0 : parseCountInput(text(formData, field, 12));
+    if (count === undefined) return saveError("BAD_COUNT");
+    vouchers[field] = count ?? 0;
+  }
+  const anyVouchers = PERMANENT_VOUCHERS.some((voucher) => voucherCountOf(vouchers, voucher.key) > 0);
 
   let cashCents: number;
   let counts: Counts | null = null;
@@ -947,17 +967,17 @@ export async function savePermanentEntryAction(_prev: SaveState, formData: FormD
     cashCents = amount ?? 0;
   }
   const closesRegister = kind === "RETURNED" && formData.get("closesRegister") === "on";
-  if (kind !== "COUNT" && cashCents === 0 && !shiftVouchers && !elixirVouchers && !closesRegister) {
+  if (kind !== "COUNT" && cashCents === 0 && !anyVouchers && !closesRegister) {
     return saveError("MISSING_AMOUNT");
   }
 
-  const config = existing ? null : await getCashRegisterConfig();
+  const values = voucherValuesFor(existing, await getCashRegisterConfig());
   const data = {
     date,
     cashCents,
     counts: counts ?? Prisma.DbNull,
-    shiftVouchers: shiftVouchers ?? 0,
-    elixirVouchers: elixirVouchers ?? 0,
+    ...vouchers,
+    ...values,
     closesRegister,
     note: text(formData, "note", 500) || null,
   };
@@ -968,10 +988,6 @@ export async function savePermanentEntryAction(_prev: SaveState, formData: FormD
           ...data,
           groupId: group.id,
           kind,
-          // Vastgeklikt zoals bij een gewone kassa: een nieuwe bonwaarde
-          // herrekent geen telling van vorig jaar.
-          shiftVoucherValueCents: config!.shiftVoucherValueCents,
-          elixirVoucherValueCents: config!.elixirVoucherValueCents,
           createdById: access.session.user.id,
         },
       });

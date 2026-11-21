@@ -9,6 +9,7 @@ import { formatDayMonth, formatEuro, formatSpentOn, toDateInputValue } from "@/l
 import { brusselsToday, canEditPermanentEntry, cashRegisterAccess, getCashRegisterConfig, permanentPostsFor } from "@/lib/kassas/server";
 import {
   daysBetween,
+  entryCashCents,
   entryValueCents,
   isCheckpoint,
   lastClosedQuarter,
@@ -26,11 +27,13 @@ import {
   quarterStart,
   resultsPerCheckpoint,
   sortEntries,
+  voucherValuesFor,
+  vouchersText,
   type PermanentEntryKind,
 } from "@/lib/kassas/permanent";
 import { savePermanentEntryAction } from "@/app/actions/kassas";
 import { kassaErrorMessages } from "../messages";
-import { EntryForm } from "./EntryForm";
+import { EntryForm, NO_VOUCHERS } from "./EntryForm";
 import { ManagerActions } from "./ManagerActions";
 
 type SearchParams = { post?: string; jaar?: string };
@@ -71,8 +74,8 @@ export default async function VasteKassas({
       <p className="mt-1 max-w-5xl text-sm text-vtk-muted">
         {manage
           ? nl
-            ? "De kassa's van Cursusdienst, Theokot en Fakbar blijven het hele semester bij de post. Hier staat wat Beheer meegaf en terugkreeg, wat de post telde, en de winst die daaruit volgt."
-            : "The Cursusdienst, Theokot and Fakbar registers stay with the post all semester. Here is what Administration handed out and got back, what the post counted, and the profit that follows."
+            ? "De kassa's van Cursusdienst, Theokot en Fakbar blijven het hele semester bij de post. Hier staat wat Beheer meegaf en terugkreeg, wat de post telde, en de winst die daaruit volgt. De bedragen en de winst zijn enkel cash; de bonnen staan erbij, maar tellen enkel voor het resultaat van de post."
+            : "The Cursusdienst, Theokot and Fakbar registers stay with the post all semester. Here is what Administration handed out and got back, what the post counted, and the profit that follows. Amounts and profit are cash only; vouchers are listed, but only count for the post's result."
           : nl
             ? "Jullie kassa blijft het hele semester bij jullie. Tel ze wanneer Beheer erom vraagt, en zeker op het einde van elk kwartaal: Beheer rekent er de winst van het kwartaal mee uit."
             : "Your register stays with you all semester. Count it when Administration asks, and at least at the end of every quarter: Administration uses it to work out the quarter's profit."}
@@ -109,6 +112,11 @@ export default async function VasteKassas({
   const sorted = sortEntries(entries);
   const perCheckpoint = resultsPerCheckpoint(sorted);
   const errorMessages = kassaErrorMessages(locale);
+  const voucherValues = voucherValuesFor(null, config);
+  // De post ziet haar tellingen met de bonnen erbij: die tellen voor haar
+  // resultaat. Beheer telt enkel het cash, ook in de winst (zie
+  // docs/design-decisions.md, "Vaste kassa's").
+  const valueOf = manage ? entryCashCents : entryValueCents;
   const euro = (cents: number) => formatEuro(cents, locale);
   const dayMonth = (date: Date) => formatDayMonth(date, "UTC", locale);
 
@@ -156,7 +164,7 @@ export default async function VasteKassas({
   const facts: Array<{ label: string; value: string; sub: string; warn?: boolean }> = [
     {
       label: nl ? "Laatste telling" : "Last count",
-      value: lastCheckpoint ? euro(lastCheckpoint.kind === "COUNT" ? entryValueCents(lastCheckpoint) : 0) : nl ? "Nog geen" : "None yet",
+      value: lastCheckpoint ? euro(lastCheckpoint.kind === "COUNT" ? valueOf(lastCheckpoint) : 0) : nl ? "Nog geen" : "None yet",
       sub: lastCheckpoint
         ? `${lastCheckpoint.kind === "COUNT" ? "" : nl ? "Volledig terug, " : "Fully returned, "}${formatSpentOn(lastCheckpoint.date, locale)}, ${ago(daysBetween(lastCheckpoint.date, today))}`
         : nl
@@ -222,11 +230,6 @@ export default async function VasteKassas({
     RETURNED: nl ? "Teruggegeven aan Beheer" : "Returned to Administration",
     COUNT: nl ? "Telling" : "Count",
   };
-  const vouchersText = (shift: number, elixir: number) =>
-    [
-      shift ? `${shift} ${nl ? (shift === 1 ? "shiftersbon" : "shiftersbonnen") : shift === 1 ? "shift voucher" : "shift vouchers"}` : "",
-      elixir ? `${elixir} ${nl ? (elixir === 1 ? "elixirbon" : "elixirbonnen") : elixir === 1 ? "elixir voucher" : "elixir vouchers"}` : "",
-    ].filter(Boolean);
 
   const columns = manage ? 6 : 5;
   const groups = quarters.map((quarter) => {
@@ -297,8 +300,7 @@ export default async function VasteKassas({
           groupId={post.id}
           postName={postName}
           today={todayValue}
-          shiftVoucherValueCents={config.shiftVoucherValueCents}
-          elixirVoucherValueCents={config.elixirVoucherValueCents}
+          voucherValues={voucherValues}
           errorMessages={errorMessages}
         >
           {factList}
@@ -323,8 +325,8 @@ export default async function VasteKassas({
               postName={postName}
               minDate={toDateInputValue(new Date(today.getTime() - POST_COUNT_WINDOW_DAYS * 86_400_000))}
               maxDate={todayValue}
-              shiftVoucherValueCents={config.shiftVoucherValueCents}
-              elixirVoucherValueCents={config.elixirVoucherValueCents}
+              voucherValues={voucherValues}
+              vouchersInTotal
               errorMessages={errorMessages}
               values={{
                 groupId: post.id,
@@ -332,8 +334,7 @@ export default async function VasteKassas({
                 date: todayValue,
                 cash: "",
                 counts: null,
-                shiftVouchers: "",
-                elixirVouchers: "",
+                vouchers: NO_VOUCHERS,
                 closesRegister: false,
                 note: "",
               }}
@@ -419,7 +420,7 @@ export default async function VasteKassas({
                     </tr>
                   )}
                   {group.rows.map((entry) => {
-                    const value = euro(entryValueCents(entry));
+                    const value = euro(valueOf(entry));
                     const period = perCheckpoint.get(entry.id);
                     const editable = canEditPermanentEntry(access, entry, today);
                     const href = `${base}/admin/kassas/vast/${entry.id}`;
@@ -429,8 +430,8 @@ export default async function VasteKassas({
                         : `${KIND_LABEL[entry.kind]}${entry.closesRegister ? (nl ? ", volledige kassa" : ", whole register") : ""}`;
                     const details = [
                       ...(entry.kind === "COUNT"
-                        ? [`${euro(entry.cashCents)} cash`, ...vouchersText(entry.shiftVouchers, entry.elixirVouchers)]
-                        : vouchersText(entry.shiftVouchers, entry.elixirVouchers).map((text) => (nl ? `met ${text}` : `with ${text}`))),
+                        ? [`${euro(entry.cashCents)} cash`, ...vouchersText(entry, nl)]
+                        : vouchersText(entry, nl).map((text) => (nl ? `met ${text}` : `with ${text}`))),
                       ...(entry.note ? [entry.note] : []),
                     ].join(", ");
                     const cells = (

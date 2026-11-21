@@ -9140,10 +9140,24 @@ maart enzovoort, de kwartalen van de boekhouding. Het kasboekjaar loopt van juli
 tot juni en niet vanaf 15 juli zoals het werkingsjaar, zodat geen kwartaal half
 in twee jaren valt.
 
-**Bonnen tellen mee aan hun waarde, vastgeklikt bij het ingeven.** Net als bij
-een gewone kassa (en zoals het tabblad CUDITHEOFAK, `=1.2*(I+J)`): een telling
-en een afgifte kunnen shifters- en elixirbonnen bevatten, en die tellen aan de
-waarde uit de instellingen op het moment van ingeven.
+**Bonnen tellen voor de post, niet voor Beheer (november 2026).** Een telling
+en een afgifte kunnen shifters-, elixir- en Guidobonnen en bonnen voor een
+gratis broodje bevatten, aan de waarde uit de instellingen op het moment van
+ingeven (standaard € 1,20, € 1,20, € 1 en € 2,60; het gratis broodje is een
+schatting van Beheer). Eerst telden ze ook mee in de winst, zoals het tabblad
+CUDITHEOFAK (`=1.2*(I+J)`), maar Beheer vroeg het anders: voor Beheer telt
+enkel het cash, de bonnen zeggen iets over het resultaat van de post. Dus:
+
+- De post ziet haar telling met de bonnen erbij (`entryValueCents`).
+- Beheer ziet in het kasboek, de kerncijfers en de winst enkel cash
+  (`entryCashCents`); de bonnen staan wel in de omschrijving van de regel.
+- Een bonsoort die er later bijkomt, krijgt bij een oude regel waarde 0 met 0
+  stuks; wie zo'n regel aanpast, krijgt de huidige waarde
+  (`voucherValuesFor`), want met nul stuks telde ze nergens mee.
+
+De Guidobonnen en de broodjes bestaan enkel in de vaste kassa's; de gewone
+kassa per activiteit houdt haar twee soorten en rekent ze nog mee in haar
+resultaat.
 
 **Beheer geeft meegeven en teruggeven in, de post telt.** Beheer geeft of krijgt
 het geld, dus enkel zij weten het bedrag zeker; de post ziet die regels wel in

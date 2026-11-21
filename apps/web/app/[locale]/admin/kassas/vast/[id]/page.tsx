@@ -10,11 +10,23 @@ import {
   brusselsToday,
   canEditPermanentEntry,
   cashRegisterAccess,
+  getCashRegisterConfig,
 } from "@/lib/kassas/server";
-import { entryValueCents, POST_COUNT_WINDOW_DAYS, postSlug } from "@/lib/kassas/permanent";
+import {
+  entryCashCents,
+  entryValueCents,
+  PERMANENT_VOUCHERS,
+  POST_COUNT_WINDOW_DAYS,
+  postSlug,
+  voucherCountOf,
+  voucherCountText,
+  voucherValueOf,
+  voucherValuesFor,
+  vouchersText,
+} from "@/lib/kassas/permanent";
 import { deletePermanentEntryAction, savePermanentEntryAction } from "@/app/actions/kassas";
 import { kassaErrorMessages } from "../../messages";
-import { EntryForm } from "../EntryForm";
+import { EntryForm, type EntryFormValues } from "../EntryForm";
 
 /**
  * Eén regel uit het kasboek van een vaste kassa, om aan te passen of te
@@ -30,6 +42,7 @@ export default async function VasteKassaRegel({ params }: { params: Promise<{ lo
   const base = nl ? "" : "/en";
 
   const access = await cashRegisterAccess(`${base}/inloggen?next=${base}/admin/kassas/vast/${id}`);
+  const config = await getCashRegisterConfig();
   const entry = await prisma.permanentCashEntry.findUnique({
     where: { id },
     include: {
@@ -41,6 +54,8 @@ export default async function VasteKassaRegel({ params }: { params: Promise<{ lo
   if (!entry || !access.canRequest || (!access.canManage && !access.postIds.includes(entry.groupId))) notFound();
 
   const today = brusselsToday();
+  // Beheer telt enkel het cash; de post ziet haar telling met de bonnen erbij.
+  const valueOf = access.canManage ? entryCashCents : entryValueCents;
   const editable = canEditPermanentEntry(access, entry, today);
   const postName = pick(entry.group.nameNl, entry.group.nameEn, locale);
   const euro = (cents: number) => formatEuro(cents, locale);
@@ -56,7 +71,7 @@ export default async function VasteKassaRegel({ params }: { params: Promise<{ lo
 
   const facts: Array<{ label: string; value: string }> = [
     { label: "Post", value: postName },
-    { label: nl ? "Bedrag" : "Amount", value: euro(entryValueCents(entry)) },
+    { label: nl ? (access.canManage ? "Bedrag cash" : "Bedrag") : access.canManage ? "Cash amount" : "Amount", value: euro(valueOf(entry)) },
     ...(counts
       ? [
           {
@@ -68,19 +83,12 @@ export default async function VasteKassaRegel({ params }: { params: Promise<{ lo
           },
         ]
       : []),
-    ...(entry.shiftVouchers || entry.elixirVouchers
+    ...(vouchersText(entry, nl).length > 0
       ? [
           {
             label: nl ? "Bonnen" : "Vouchers",
-            value: [
-              entry.shiftVouchers
-                ? `${entry.shiftVouchers} ${nl ? "shiftersbonnen" : "shift vouchers"} × ${euro(entry.shiftVoucherValueCents)}`
-                : "",
-              entry.elixirVouchers
-                ? `${entry.elixirVouchers} ${nl ? "elixirbonnen" : "elixir vouchers"} × ${euro(entry.elixirVoucherValueCents)}`
-                : "",
-            ]
-              .filter(Boolean)
+            value: PERMANENT_VOUCHERS.filter((voucher) => voucherCountOf(entry, voucher.key) > 0)
+              .map((voucher) => `${voucherCountText(voucher.key, voucherCountOf(entry, voucher.key), nl)} × ${euro(voucherValueOf(entry, voucher.key))}`)
               .join(", "),
           },
         ]
@@ -131,8 +139,8 @@ export default async function VasteKassaRegel({ params }: { params: Promise<{ lo
                   : toDateInputValue(new Date(today.getTime() - POST_COUNT_WINDOW_DAYS * 86_400_000))
               }
               maxDate={toDateInputValue(today)}
-              shiftVoucherValueCents={entry.shiftVoucherValueCents}
-              elixirVoucherValueCents={entry.elixirVoucherValueCents}
+              voucherValues={voucherValuesFor(entry, config)}
+              vouchersInTotal={!access.canManage}
               errorMessages={kassaErrorMessages(locale)}
               values={{
                 id: entry.id,
@@ -141,8 +149,12 @@ export default async function VasteKassaRegel({ params }: { params: Promise<{ lo
                 date: toDateInputValue(entry.date),
                 cash: entry.kind === "COUNT" || entry.cashCents === 0 ? "" : amountInputValue(entry.cashCents),
                 counts,
-                shiftVouchers: entry.shiftVouchers ? String(entry.shiftVouchers) : "",
-                elixirVouchers: entry.elixirVouchers ? String(entry.elixirVouchers) : "",
+                vouchers: Object.fromEntries(
+                  PERMANENT_VOUCHERS.map((voucher) => {
+                    const count = voucherCountOf(entry, voucher.key);
+                    return [voucher.key, count ? String(count) : ""];
+                  }),
+                ) as EntryFormValues["vouchers"],
                 closesRegister: entry.closesRegister,
                 note: entry.note ?? "",
               }}
@@ -155,8 +167,8 @@ export default async function VasteKassaRegel({ params }: { params: Promise<{ lo
               title={nl ? "Regel verwijderen?" : "Delete this line?"}
               description={
                 nl
-                  ? `${title} (${euro(entryValueCents(entry))}) verdwijnt uit het kasboek van ${postName}. De winst van het kwartaal en die van de telling erna worden opnieuw gerekend zonder deze regel. De andere regels blijven staan, net als het adminlogboek.`
-                  : `${title} (${euro(entryValueCents(entry))}) disappears from the ${postName} ledger. The quarter's profit and that of the next count are worked out again without this line. The other lines stay, as does the admin log.`
+                  ? `${title} (${euro(valueOf(entry))}) verdwijnt uit het kasboek van ${postName}. De winst van het kwartaal en die van de telling erna worden opnieuw gerekend zonder deze regel. De andere regels blijven staan, net als het adminlogboek.`
+                  : `${title} (${euro(valueOf(entry))}) disappears from the ${postName} ledger. The quarter's profit and that of the next count are worked out again without this line. The other lines stay, as does the admin log.`
               }
               confirmLabel={nl ? "Verwijderen" : "Delete"}
               cancelLabel={nl ? "Annuleren" : "Cancel"}

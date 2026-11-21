@@ -7,7 +7,9 @@
  * (de startkassa, extra munten), de post geeft tussendoor geld af, en de post
  * telt op gezette tijden. De winst van een periode volgt daaruit zoals Beheer
  * ze rekende: wat binnenkwam bij Beheer (de afgiftes en de slottelling) min wat
- * eruit ging (de openingstelling en wat meegegeven werd).
+ * eruit ging (de openingstelling en wat meegegeven werd). Die winst rekent
+ * enkel met cash: de bonnen tellen voor het resultaat van de post, niet voor
+ * Beheer (november 2026, zie docs/design-decisions.md).
  */
 
 export const PERMANENT_ENTRY_KINDS = ["HANDED_OUT", "RETURNED", "COUNT"] as const;
@@ -28,33 +30,104 @@ export function entersCashPerPiece(kind: PermanentEntryKind, counts: object | nu
   return kind === "COUNT" || counts !== null || cash === "";
 }
 
+/**
+ * De soorten bonnen in een vaste kassa. Elke soort heeft in
+ * `PermanentCashEntry` een kolom `<key>Vouchers` (het aantal) en
+ * `<key>VoucherValueCents` (de waarde van één bon, vastgeklikt bij het
+ * ingeven), en een waarde in de instellingen (`CashRegisterConfig`).
+ */
+export const PERMANENT_VOUCHERS = [
+  { key: "shift", labelNl: "Shiftersbonnen", labelEn: "Shift vouchers", nl: ["shiftersbon", "shiftersbonnen"], en: ["shift voucher", "shift vouchers"] },
+  { key: "elixir", labelNl: "Elixirbonnen", labelEn: "Elixir vouchers", nl: ["elixirbon", "elixirbonnen"], en: ["elixir voucher", "elixir vouchers"] },
+  { key: "guido", labelNl: "Guidobonnen", labelEn: "Guido vouchers", nl: ["Guidobon", "Guidobonnen"], en: ["Guido voucher", "Guido vouchers"] },
+  {
+    key: "sandwich",
+    labelNl: "Bonnen gratis broodje",
+    labelEn: "Free sandwich vouchers",
+    nl: ["bon voor een gratis broodje", "bonnen voor een gratis broodje"],
+    en: ["free sandwich voucher", "free sandwich vouchers"],
+  },
+] as const;
+
+export type PermanentVoucherKey = (typeof PERMANENT_VOUCHERS)[number]["key"];
+export type VoucherCounts = { [K in PermanentVoucherKey as `${K}Vouchers`]: number };
+export type VoucherValues = { [K in PermanentVoucherKey as `${K}VoucherValueCents`]: number };
+
+export function voucherCountOf(entry: VoucherCounts, key: PermanentVoucherKey): number {
+  return entry[`${key}Vouchers`];
+}
+
+export function voucherValueOf(entry: VoucherValues, key: PermanentVoucherKey): number {
+  return entry[`${key}VoucherValueCents`];
+}
+
+/**
+ * Aan welke waarde de bonnen van een regel tellen. De waarde wordt vastgeklikt
+ * bij het ingeven (`current` komt uit de instellingen), zodat een nieuwe waarde
+ * geen telling van vorig jaar herrekent. Een soort die een bestaande regel nog
+ * niet had (de Guidobonnen en broodjes kwamen er in november 2026 bij, met
+ * waarde 0), krijgt de huidige waarde: met nul stuks telde ze nergens mee.
+ */
+export function voucherValuesFor(
+  existing: (VoucherCounts & VoucherValues) | null,
+  current: VoucherValues,
+): VoucherValues {
+  const values = {} as VoucherValues;
+  for (const voucher of PERMANENT_VOUCHERS) {
+    const field = `${voucher.key}VoucherValueCents` as const;
+    const unused = !existing || (existing[field] === 0 && voucherCountOf(existing, voucher.key) === 0);
+    values[field] = unused ? current[field] : existing[field];
+  }
+  return values;
+}
+
+/** "3 shiftersbonnen". */
+export function voucherCountText(key: PermanentVoucherKey, count: number, nl: boolean): string {
+  const voucher = PERMANENT_VOUCHERS.find((candidate) => candidate.key === key)!;
+  const [one, many] = nl ? voucher.nl : voucher.en;
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+/** "3 shiftersbonnen, 1 Guidobon": enkel de soorten die er zijn. */
+export function vouchersText(entry: VoucherCounts, nl: boolean): string[] {
+  return PERMANENT_VOUCHERS.flatMap((voucher) => {
+    const count = voucherCountOf(entry, voucher.key);
+    return count ? [voucherCountText(voucher.key, count, nl)] : [];
+  });
+}
+
 /** Wat de berekening van een regel nodig heeft, zoals het uit de database komt. */
-export type PermanentEntry = {
-  id: string;
-  kind: PermanentEntryKind;
-  /** De kalenderdag (`@db.Date`): middernacht UTC. */
-  date: Date;
-  createdAt: Date;
-  cashCents: number;
-  shiftVouchers: number;
-  elixirVouchers: number;
-  shiftVoucherValueCents: number;
-  elixirVoucherValueCents: number;
-  closesRegister: boolean;
-};
+export type PermanentEntry = VoucherCounts &
+  VoucherValues & {
+    id: string;
+    kind: PermanentEntryKind;
+    /** De kalenderdag (`@db.Date`): middernacht UTC. */
+    date: Date;
+    createdAt: Date;
+    cashCents: number;
+    closesRegister: boolean;
+  };
 
-type Valued = Pick<
-  PermanentEntry,
-  "cashCents" | "shiftVouchers" | "elixirVouchers" | "shiftVoucherValueCents" | "elixirVoucherValueCents"
->;
-
-/** Cash plus de bonnen aan hun vastgeklikte waarde. */
-export function entryValueCents(entry: Valued): number {
-  return (
-    entry.cashCents +
-    entry.shiftVouchers * entry.shiftVoucherValueCents +
-    entry.elixirVouchers * entry.elixirVoucherValueCents
+/** De bonnen aan hun vastgeklikte waarde. */
+export function entryVoucherCents(entry: VoucherCounts & VoucherValues): number {
+  return PERMANENT_VOUCHERS.reduce(
+    (sum, voucher) => sum + voucherCountOf(entry, voucher.key) * voucherValueOf(entry, voucher.key),
+    0,
   );
+}
+
+/**
+ * Cash plus de bonnen: wat de post in haar kassa telde. Enkel voor wat de post
+ * ziet; Beheer telt enkel het cash (`entryCashCents`), want de bonnen zeggen
+ * iets over het resultaat van de post maar brengen Beheer geen geld op.
+ */
+export function entryValueCents(entry: Pick<PermanentEntry, "cashCents"> & VoucherCounts & VoucherValues): number {
+  return entry.cashCents + entryVoucherCents(entry);
+}
+
+/** Wat een regel voor Beheer waard is: enkel het cash. */
+export function entryCashCents(entry: Pick<PermanentEntry, "cashCents">): number {
+  return entry.cashCents;
 }
 
 /** Op datum, en op dezelfde dag in de volgorde van ingeven. */
@@ -75,9 +148,9 @@ export function isCheckpoint(entry: Pick<PermanentEntry, "kind" | "closesRegiste
   return entry.kind === "COUNT" || (entry.kind === "RETURNED" && entry.closesRegister);
 }
 
-/** Wat er na een ijkpunt in de kassa zit. */
+/** Wat er na een ijkpunt in de kassa zit, in cash (zie `entryCashCents`). */
 function checkpointValueCents(entry: PermanentEntry): number {
-  return entry.kind === "COUNT" ? entryValueCents(entry) : 0;
+  return entry.kind === "COUNT" ? entryCashCents(entry) : 0;
 }
 
 // -----------------------------------------------------------------------------
@@ -162,7 +235,7 @@ export type PeriodResult = {
   handedOutCents: number;
   /** Wat de post afgaf, de teruggave van de volledige kassa inbegrepen. */
   returnedCents: number;
-  /** Binnengekomen bij Beheer min uitgegaan: de winst van de periode. */
+  /** Binnengekomen bij Beheer min uitgegaan, in cash: de winst van de periode. */
   resultCents: number;
 };
 
@@ -177,8 +250,8 @@ function periodBetween(sorted: PermanentEntry[], openingIndex: number, closingIn
   let returnedCents = 0;
   for (let index = openingIndex + 1; index <= closingIndex; index++) {
     const entry = sorted[index];
-    if (entry.kind === "HANDED_OUT") handedOutCents += entryValueCents(entry);
-    if (entry.kind === "RETURNED") returnedCents += entryValueCents(entry);
+    if (entry.kind === "HANDED_OUT") handedOutCents += entryCashCents(entry);
+    if (entry.kind === "RETURNED") returnedCents += entryCashCents(entry);
   }
   const resultCents =
     checkpointValueCents(closing) + returnedCents - handedOutCents - (opening ? checkpointValueCents(opening) : 0);

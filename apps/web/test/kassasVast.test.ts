@@ -6,6 +6,11 @@ vi.mock("@/lib/session", () => ({ getCurrentSession: vi.fn(), requireSession: vi
 
 import {
   entersCashPerPiece,
+  entryCashCents,
+  entryValueCents,
+  entryVoucherCents,
+  voucherValuesFor,
+  vouchersText,
   ledgerYearOf,
   ledgerYearResultCents,
   quarterLabel,
@@ -38,8 +43,12 @@ function entry(
     cashCents,
     shiftVouchers: 0,
     elixirVouchers: 0,
+    guidoVouchers: 0,
+    sandwichVouchers: 0,
     shiftVoucherValueCents: 120,
     elixirVoucherValueCents: 120,
+    guidoVoucherValueCents: 100,
+    sandwichVoucherValueCents: 260,
     closesRegister: false,
     ...extra,
   };
@@ -65,12 +74,39 @@ describe("vaste kassa's: winst per kwartaal", () => {
     entry("2026-12-19", "COUNT", 45_510, { shiftVouchers: 61 }),
   ];
 
-  it("rekent binnengekomen min uitgegaan, met de bonnen aan hun waarde", () => {
-    // 612,40 + 14 bonnen - 300 startkassa.
-    expect(resultOf(theokot, Q3_2026, "2027-01-06")).toBe(32_920);
-    // 455,10 + 61 bonnen + 900 terug - 629,20 opening - 50 meegegeven.
-    expect(resultOf(theokot, Q4_2026, "2027-01-06")).toBe(74_910);
-    expect(ledgerYearResultCents(sortEntries(theokot), 2026, day("2027-01-06"))).toBe(107_830);
+  it("rekent binnengekomen min uitgegaan, enkel in cash", () => {
+    // 612,40 - 300 startkassa; de 14 bonnen tellen voor Beheer niet mee.
+    expect(resultOf(theokot, Q3_2026, "2027-01-06")).toBe(31_240);
+    // 455,10 + 900 terug - 612,40 opening - 50 meegegeven.
+    expect(resultOf(theokot, Q4_2026, "2027-01-06")).toBe(69_270);
+    expect(ledgerYearResultCents(sortEntries(theokot), 2026, day("2027-01-06"))).toBe(100_510);
+  });
+
+  it("telt de bonnen wel in wat de post telde, en niet in het cash voor Beheer", () => {
+    const count = entry("2026-12-19", "COUNT", 45_510, { shiftVouchers: 2, elixirVouchers: 1, guidoVouchers: 3, sandwichVouchers: 2 });
+    // 2 × 1,20 + 1 × 1,20 + 3 × 1,00 + 2 × 2,60.
+    expect(entryVoucherCents(count)).toBe(1_180);
+    expect(entryValueCents(count)).toBe(45_510 + 1_180);
+    expect(entryCashCents(count)).toBe(45_510);
+    expect(vouchersText(count, true)).toEqual([
+      "2 shiftersbonnen",
+      "1 elixirbon",
+      "3 Guidobonnen",
+      "2 bonnen voor een gratis broodje",
+    ]);
+  });
+
+  it("klikt de waarde van een nieuwe bonsoort vast bij een oude regel", () => {
+    const current = { shiftVoucherValueCents: 150, elixirVoucherValueCents: 150, guidoVoucherValueCents: 100, sandwichVoucherValueCents: 260 };
+    // Een regel van voor de Guidobonnen: die soort stond op 0, met 0 stuks.
+    const old = entry("2026-10-01", "COUNT", 10_000, { shiftVouchers: 4, guidoVoucherValueCents: 0, sandwichVoucherValueCents: 0 });
+    expect(voucherValuesFor(old, current)).toEqual({
+      shiftVoucherValueCents: 120,
+      elixirVoucherValueCents: 120,
+      guidoVoucherValueCents: 100,
+      sandwichVoucherValueCents: 260,
+    });
+    expect(voucherValuesFor(null, current)).toEqual(current);
   });
 
   it("onderscheidt een lopend kwartaal van een kwartaal zonder telling", () => {
@@ -86,7 +122,7 @@ describe("vaste kassa's: winst per kwartaal", () => {
     expect(resultOf(october, Q4_2026, "2026-10-24")).toBe("open");
     expect(resultOf(october, { year: 2027, quarter: 1 }, "2026-10-24")).toBe("future");
     // Zonder telling eind september schuift die winst mee naar het vierde kwartaal.
-    expect(resultOf(fakbar, Q4_2026, "2027-01-06")).toBe(253_060);
+    expect(resultOf(fakbar, Q4_2026, "2027-01-06")).toBe(245_260);
   });
 
   it("verandert de som niet door een tussentijdse telling", () => {

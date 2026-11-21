@@ -7,7 +7,14 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import type { SaveAction } from "@/lib/saveState";
 import { formatEuro } from "@/lib/rekeningen/expenses";
 import { parseCountInput, type Counts } from "@/lib/kassas/kassa";
-import { entersCashPerPiece, type PermanentEntryKind } from "@/lib/kassas/permanent";
+import {
+  entersCashPerPiece,
+  PERMANENT_VOUCHERS,
+  voucherValueOf,
+  type PermanentEntryKind,
+  type PermanentVoucherKey,
+  type VoucherValues,
+} from "@/lib/kassas/permanent";
 import { countInputsFrom, DenominationGrid, inputsTotalCents } from "../DenominationGrid";
 
 export type EntryFormValues = {
@@ -21,24 +28,30 @@ export type EntryFormValues = {
   cash: string;
   /** Stuks per coupure; `null` = geen coupures. */
   counts: Counts | null;
-  shiftVouchers: string;
-  elixirVouchers: string;
+  /** Het aantal bonnen per soort, zoals in het veld. */
+  vouchers: Record<PermanentVoucherKey, string>;
   closesRegister: boolean;
   note: string;
 };
+
+/** Geen bonnen: de beginstand van een nieuwe regel. */
+export const NO_VOUCHERS: Record<PermanentVoucherKey, string> = { shift: "", elixir: "", guido: "", sandwich: "" };
 
 /**
  * Eén regel van een vaste kassa: meegeven, terugkrijgen of tellen. Alle drie
  * gaan per coupure, met hetzelfde raster als de gewone kassa's, en rekenen het
  * totaal mee terwijl je typt; zo zie je een tikfout aan een vreemd bedrag.
+ *
+ * De post ziet de bonnen in haar totaal; Beheer niet (`vouchersInTotal`), want
+ * voor Beheer telt enkel het cash (zie docs/design-decisions.md).
  */
 export function EntryForm({
   locale,
   action,
   values,
   postName,
-  shiftVoucherValueCents,
-  elixirVoucherValueCents,
+  voucherValues,
+  vouchersInTotal,
   minDate,
   maxDate,
   errorMessages,
@@ -49,8 +62,9 @@ export function EntryForm({
   action: SaveAction;
   values: EntryFormValues;
   postName: string;
-  shiftVoucherValueCents: number;
-  elixirVoucherValueCents: number;
+  voucherValues: VoucherValues;
+  /** Tellen de bonnen mee in het totaal onderaan? Ja voor de post, nee voor Beheer. */
+  vouchersInTotal: boolean;
   /** De vroegste datum die je mag kiezen (een post: veertien dagen terug). */
   minDate?: string;
   maxDate: string;
@@ -71,17 +85,21 @@ export function EntryForm({
   // Bij meegeven en teruggeven is een leeg veld gewoon nul stuks; bij een
   // telling toont een opgeslagen regel haar nullen.
   const [coins, setCoins] = useState(() => countInputsFrom(values.counts, !isCount));
-  const [shift, setShift] = useState(values.shiftVouchers);
-  const [elixir, setElixir] = useState(values.elixirVouchers);
+  const [voucherInputs, setVoucherInputs] = useState(values.vouchers);
   const [closes, setCloses] = useState(values.closesRegister);
 
   const pieces = (raw: string) => {
     const parsed = parseCountInput(raw);
     return typeof parsed === "number" ? parsed : 0;
   };
-  const vouchers = pieces(shift) + pieces(elixir);
-  const voucherCents = pieces(shift) * shiftVoucherValueCents + pieces(elixir) * elixirVoucherValueCents;
+  const vouchers = PERMANENT_VOUCHERS.reduce((sum, voucher) => sum + pieces(voucherInputs[voucher.key]), 0);
+  const voucherCents = PERMANENT_VOUCHERS.reduce(
+    (sum, voucher) => sum + pieces(voucherInputs[voucher.key]) * voucherValueOf(voucherValues, voucher.key),
+    0,
+  );
   const cashCents = inputsTotalCents(coins);
+  const vouchersLabel = (count: number) =>
+    `${count} ${nl ? (count === 1 ? "bon" : "bonnen") : count === 1 ? "voucher" : "vouchers"}`;
 
   const saved = {
     HANDED_OUT: nl ? "Meegegeven opgeslagen." : "Handed out saved.",
@@ -118,8 +136,7 @@ export function EntryForm({
         // Het raster volgt `form.reset()` zelf; de bonnen en het vinkje zijn
         // gecontroleerd en moeten mee leeg.
         if (!isEdit) {
-          setShift("");
-          setElixir("");
+          setVoucherInputs(NO_VOUCHERS);
           setCloses(false);
         }
         router.refresh();
@@ -199,37 +216,28 @@ export function EntryForm({
 
       {(isCount || isReturn) && (
         <div className="flex flex-wrap gap-4">
-          <div className="w-36">
-            <Label htmlFor={`${uid}-shift`}>{nl ? "Shiftersbonnen" : "Shift vouchers"}</Label>
-            <Input
-              id={`${uid}-shift`}
-              name="shiftVouchers"
-              inputMode="numeric"
-              autoComplete="off"
-              placeholder="0"
-              value={shift}
-              onChange={(event) => setShift(event.target.value)}
-              className="text-right tabular-nums"
-            />
-          </div>
-          <div className="w-36">
-            <Label htmlFor={`${uid}-elixir`}>{nl ? "Elixirbonnen" : "Elixir vouchers"}</Label>
-            <Input
-              id={`${uid}-elixir`}
-              name="elixirVouchers"
-              inputMode="numeric"
-              autoComplete="off"
-              placeholder="0"
-              value={elixir}
-              onChange={(event) => setElixir(event.target.value)}
-              className="text-right tabular-nums"
-            />
-          </div>
-          <p className="self-end pb-2 text-xs text-vtk-muted">
-            {nl
-              ? `Een shiftersbon telt aan ${euro(shiftVoucherValueCents)}, een elixirbon aan ${euro(elixirVoucherValueCents)}.`
-              : `A shift voucher counts at ${euro(shiftVoucherValueCents)}, an elixir voucher at ${euro(elixirVoucherValueCents)}.`}
-          </p>
+          {PERMANENT_VOUCHERS.map((voucher) => (
+            <div key={voucher.key} className="w-40">
+              <Label htmlFor={`${uid}-${voucher.key}`}>{nl ? voucher.labelNl : voucher.labelEn}</Label>
+              <Input
+                id={`${uid}-${voucher.key}`}
+                name={`${voucher.key}Vouchers`}
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="0"
+                aria-describedby={`${uid}-${voucher.key}-value`}
+                value={voucherInputs[voucher.key]}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  setVoucherInputs((current) => ({ ...current, [voucher.key]: next }));
+                }}
+                className="text-right tabular-nums"
+              />
+              <p id={`${uid}-${voucher.key}-value`} className="mt-1 text-xs text-vtk-muted">
+                {euro(voucherValueOf(voucherValues, voucher.key))} {nl ? "per bon" : "per voucher"}
+              </p>
+            </div>
+          ))}
         </div>
       )}
 
@@ -283,11 +291,17 @@ export function EntryForm({
       {perPiece && (
         <p className="border-t border-vtk-blue/10 pt-4 text-sm text-vtk-body">
           {totalLabel}{" "}
-          <strong className="text-base tabular-nums text-vtk-ink">{euro(cashCents + voucherCents)}</strong>
+          <strong className="text-base tabular-nums text-vtk-ink">
+            {euro(vouchersInTotal ? cashCents + voucherCents : cashCents)}
+          </strong>
           {vouchers > 0 && (
             <span className="text-vtk-muted">
               {" "}
-              ({euro(cashCents)} {nl ? "cash en" : "cash and"} {vouchers} {nl ? (vouchers === 1 ? "bon" : "bonnen") : vouchers === 1 ? "voucher" : "vouchers"})
+              {vouchersInTotal
+                ? `(${euro(cashCents)} ${nl ? "cash en" : "cash and"} ${vouchersLabel(vouchers)})`
+                : nl
+                  ? `cash, plus ${vouchersLabel(vouchers)} (${euro(voucherCents)}) die enkel voor de post meetellen`
+                  : `cash, plus ${vouchersLabel(vouchers)} (${euro(voucherCents)}) that only count for the post`}
             </span>
           )}
         </p>

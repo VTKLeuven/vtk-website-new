@@ -486,6 +486,9 @@ export type CashRegisterConfig = {
   /** Wat één ontvangen bon waard is in het resultaat. 0 = telt niet mee. */
   shiftVoucherValueCents: number;
   elixirVoucherValueCents: number;
+  /** Enkel in de vaste kassa's: een Guidobon en een bon voor een gratis broodje. */
+  guidoVoucherValueCents: number;
+  sandwichVoucherValueCents: number;
   /** Waar de aanvrager een ophaalmoment afspreekt; staat in de mail en is het reply-to. */
   contactEmail: string;
 };
@@ -496,6 +499,10 @@ export const DEFAULT_CASH_REGISTER_CONFIG: CashRegisterConfig = {
   // Het tabblad CUDITHEOFAK rekende elke bon aan € 1,20 (`=1.2*(I+J)`).
   shiftVoucherValueCents: 120,
   elixirVoucherValueCents: 120,
+  // Zoals Beheer ze in november 2026 opgaf: een Guidobon is € 1 waard, een
+  // gratis broodje rekent Theokot aan ongeveer € 2,60.
+  guidoVoucherValueCents: 100,
+  sandwichVoucherValueCents: 260,
   contactEmail: "beheer@vtk.be",
 };
 
@@ -539,6 +546,8 @@ export function parseCashRegisterConfig(raw: unknown): CashRegisterConfig {
       : defaults.payconiqAccounts,
     shiftVoucherValueCents: voucherValue(value.shiftVoucherValueCents, defaults.shiftVoucherValueCents),
     elixirVoucherValueCents: voucherValue(value.elixirVoucherValueCents, defaults.elixirVoucherValueCents),
+    guidoVoucherValueCents: voucherValue(value.guidoVoucherValueCents, defaults.guidoVoucherValueCents),
+    sandwichVoucherValueCents: voucherValue(value.sandwichVoucherValueCents, defaults.sandwichVoucherValueCents),
     contactEmail:
       typeof value.contactEmail === "string" && value.contactEmail.trim()
         ? value.contactEmail.trim()
