@@ -181,7 +181,7 @@ export async function buildTransportBookings(
   if (!purpose) return { ok: false, error: m.describePurpose };
 
   // Meerdere adressen mogen, gescheiden door een komma; zie `parseNotifyEmails`.
-  const notifyEmails = parseNotifyEmails(input.notifyEmail ?? '');
+  const notifyEmails = parseNotifyEmails(str(input.notifyEmail));
   if (notifyEmails === null) {
     return {
       ok: false,

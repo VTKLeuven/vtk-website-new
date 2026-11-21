@@ -16,7 +16,7 @@ type DayPart = (typeof DAY_PARTS)[number];
 
 /** Een dagdeel uit het formulier, of null wanneer het leeg of onzin is. */
 function parseDayPart(value: string | undefined): DayPart | null {
-  const trimmed = (value ?? '').trim();
+  const trimmed = str(value).trim();
   return DAY_PARTS.includes(trimmed as DayPart) ? (trimmed as DayPart) : null;
 }
 
@@ -129,7 +129,7 @@ export async function buildReservationData(
     }
 > {
   const m = FORM_MESSAGES[locale];
-  const eventName = (input.eventName ?? '').trim();
+  const eventName = str(input.eventName).trim();
   if (!eventName) return { ok: false, error: m.nameActivity };
 
   const requesterType = input.requesterType;
@@ -139,14 +139,14 @@ export async function buildReservationData(
   let groupId: string | null = null;
   let requesterName: string | null = null;
   if (requesterType === 'INTERN') {
-    const chosen = (input.groupId ?? '').trim();
+    const chosen = str(input.groupId).trim();
     if (!chosen) return { ok: false, error: m.choosePost };
     if (allowedGroupIds !== null && !allowedGroupIds.includes(chosen)) {
       return { ok: false, error: m.notYourPost };
     }
     groupId = chosen;
   } else {
-    requesterName = (input.requesterName ?? '').trim();
+    requesterName = str(input.requesterName).trim();
     if (!requesterName) {
       return {
         ok: false,
@@ -189,7 +189,7 @@ export async function buildReservationData(
 
   // Meerdere adressen mogen, gescheiden door een komma: een werkgroep heeft
   // vaak zowel een gedeelde mailbox als een verantwoordelijke die meeleest.
-  const notifyEmails = parseNotifyEmails(input.notifyEmail ?? '');
+  const notifyEmails = parseNotifyEmails(str(input.notifyEmail));
   if (notifyEmails === null) {
     return {
       ok: false,
@@ -259,7 +259,7 @@ export async function buildReservationData(
       quantity: line.quantity,
       unitPriceCents: item.priceCents,
       unitDepositCents: item.depositCents,
-      note: line.note && line.note.trim() ? line.note.trim().slice(0, FIELD_MAX) : null,
+      note: str(line.note).trim().slice(0, FIELD_MAX) || null,
     };
   });
 
@@ -269,7 +269,7 @@ export async function buildReservationData(
     quantity: line.quantity,
   }));
 
-  const trim = (v?: string) => (v && v.trim() ? v.trim().slice(0, FIELD_MAX) : null);
+  const trim = (v?: string) => str(v).trim().slice(0, FIELD_MAX) || null;
 
   return {
     ok: true,
