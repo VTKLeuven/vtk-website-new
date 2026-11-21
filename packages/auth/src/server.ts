@@ -150,11 +150,18 @@ export async function oauthConsent(
   const consentUrl = `${process.env.BETTER_AUTH_URL ?? ''}${AUTH_BASE_PATH}/oauth2/consent`;
   const request = new Request(consentUrl, { method: 'POST', headers: mutableHeaders });
 
-  const result = await auth.api.oauth2Consent({ headers: mutableHeaders, body, request });
+  // `asResponse: false` is nodig sinds better-auth 1.7: zodra `request` meegegeven
+  // wordt, zet `dispatchAuthEndpoint` anders `shouldReturnResponse = true` en komt
+  // een `Response` terug (met lege `.url`) in plaats van `{ redirect, url }`.
+  const result = await auth.api.oauth2Consent({
+    headers: mutableHeaders,
+    body,
+    request,
+    asResponse: false,
+  });
 
-  // De plugin zet zelf `accept: application/json`, dus komt de bestemming als
-  // waarde terug in plaats van als een echte 302.
-  const url = (result as { redirect?: boolean; url?: string })?.url;
+  const payload = result instanceof Response ? await result.json() : result;
+  const url = (payload as { redirect?: boolean; url?: string })?.url;
   if (!url) throw new Error('oauth2Consent gaf geen redirect-URL terug');
   return { url };
 }
