@@ -21,6 +21,9 @@ import {
 } from '@/lib/uitleen-server';
 import { copy, getLocale } from '@/lib/i18n';
 import type { LogistiekLocale } from '@/lib/i18n-shared';
+import { localizedTitle } from '@/lib/page-title';
+
+export const generateMetadata = localizedTitle({ nl: copy.nl.navReservations, en: copy.en.navReservations });
 
 /**
  * Drie items en de rest geteld. Een volledige opsomming van een grote aanvraag

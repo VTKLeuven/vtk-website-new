@@ -1,7 +1,7 @@
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
 import { getSession } from '@/lib/session';
-import { getLocale } from '@/lib/i18n';
+import { getLocale, copy } from '@/lib/i18n';
 import { emptyEventValues, requesterOptions } from '@/app/materiaal/event-values';
 import {
   getFlesserkeCatalog,
@@ -10,6 +10,9 @@ import {
 } from '@/lib/uitleen-server';
 import { eventOptions } from '@/lib/uitleen';
 import { FlesserkeForm } from './request-form';
+import { localizedTitle } from '@/lib/page-title';
+
+export const generateMetadata = localizedTitle({ nl: copy.nl.navFlesserke, en: copy.en.navFlesserke });
 
 export default async function FlesserkePage() {
   const [session, locale] = await Promise.all([getSession(), getLocale()]);

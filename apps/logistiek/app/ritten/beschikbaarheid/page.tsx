@@ -20,6 +20,7 @@ import {
 } from '@/lib/uitleen-server';
 import { availabilityWeekBounds } from '@/lib/availability-day';
 import { AvailabilityEditor } from './availability-editor';
+import { localizedTitle } from '@/lib/page-title';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -31,7 +32,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * Het team ziet het resultaat als lichte band in de transportplanning.
  * Enkel karchauffeurs geven hun beschikbaarheid door.
  */
-export const metadata = { title: 'Wanneer kan ik rijden' };
+export const generateMetadata = localizedTitle({ nl: 'Wanneer kan ik rijden?', en: 'When can I drive?' });
 
 export default async function BeschikbaarheidPage({
   searchParams,

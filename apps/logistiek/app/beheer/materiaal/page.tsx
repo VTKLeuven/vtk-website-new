@@ -2,6 +2,8 @@ import { requireManage } from '@/lib/session';
 import { adminInventory } from '@/lib/uitleen-server';
 import { InventoryManager } from './inventory-manager';
 
+export const metadata = { title: 'Inventaris' };
+
 export default async function BeheerMateriaalPage() {
   await requireManage();
   const { categories, items } = await adminInventory();

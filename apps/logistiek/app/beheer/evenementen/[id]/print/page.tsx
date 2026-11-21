@@ -9,6 +9,16 @@ import {
 } from '@/lib/uitleen';
 import { adminEvent } from '@/lib/uitleen-server';
 import { PrintButton } from '../../../aanvragen/print-button';
+import { manageTitle } from '@/lib/page-title';
+import { prisma } from '@vtk/db';
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return manageTitle('Afdruk van een evenement', async () => {
+    const event = await prisma.uitleenEvent.findUnique({ where: { id }, select: { name: true } });
+    return event ? `Afdruk: ${event.name}` : null;
+  });
+}
 
 /**
  * Eén blad met alles wat er voor dit evenement moet zijn (E4).

@@ -4,6 +4,14 @@ import { prisma } from '@vtk/db';
 import { requireManage } from '@/lib/session';
 import { formatDateTime, isNightTrip, tripHoursLabel, tripTitle } from '@/lib/uitleen';
 import { tripsForDriver } from '@/lib/uitleen-server';
+import { manageTitle } from '@/lib/page-title';
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return manageTitle('Chauffeur', async () =>
+    (await prisma.user.findUnique({ where: { id }, select: { name: true } }))?.name
+  );
+}
 
 /**
  * Alle ritten van één chauffeur (T9).

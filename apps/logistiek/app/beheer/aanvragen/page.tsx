@@ -28,6 +28,8 @@ import {
   SelectAllCheckbox,
 } from './bulk-request-actions';
 
+export const metadata = { title: 'Materiaalaanvragen' };
+
 const TABS: Array<{ value: string; label: string }> = [
   { value: 'all', label: 'Alle' },
   { value: 'INTERN', label: 'Interne posten' },

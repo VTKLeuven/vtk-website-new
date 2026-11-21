@@ -3,6 +3,8 @@ import { adminVehicles, feedTokensForUser, getLogistiekSettings, isDriver } from
 import { FeedTokens } from '@/components/feed-tokens';
 import { GeneralSettings, VehicleSettings } from './settings-forms';
 
+export const metadata = { title: 'Instellingen' };
+
 export default async function BeheerInstellingenPage() {
   const session = await requireManage();
   const [vehicles, settings, tokens, driver] = await Promise.all([

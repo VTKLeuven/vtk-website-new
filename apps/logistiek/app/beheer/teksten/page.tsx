@@ -7,6 +7,8 @@ import {
 } from '@/lib/public-copy';
 import { requireManage } from '@/lib/session';
 
+export const metadata = { title: 'Teksten' };
+
 const SECTIONS: Array<{
   title: string;
   description: string;

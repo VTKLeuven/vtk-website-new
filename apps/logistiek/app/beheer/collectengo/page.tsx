@@ -3,6 +3,8 @@ import { collectEnGoImapConfig } from '@/lib/collectengo/imap';
 import { collectEnGoOrders } from '@/lib/collectengo/server';
 import { CollectEnGoInbox } from './collectengo-inbox';
 
+export const metadata = { title: 'Collect&Go' };
+
 export default async function BeheerCollectEnGoPage() {
   await requireManage();
   const imap = collectEnGoImapConfig();

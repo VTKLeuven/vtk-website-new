@@ -2,6 +2,8 @@ import { requireManage } from '@/lib/session';
 import { adminRequestTemplates, getCatalog } from '@/lib/uitleen-server';
 import { TemplatesManager } from './templates-manager';
 
+export const metadata = { title: 'Sjablonen' };
+
 export default async function BeheerSjablonenPage() {
   await requireManage();
   // Dezelfde catalogus als het aanvraagformulier: enkel actieve items, per

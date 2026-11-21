@@ -13,6 +13,9 @@ import { copy, getLocale } from '@/lib/i18n';
 import { getPublicCopy } from '@/lib/public-copy';
 import { requesterOptions } from './event-values';
 import { MaterialRequestForm } from './request-form';
+import { localizedTitle } from '@/lib/page-title';
+
+export const generateMetadata = localizedTitle({ nl: copy.nl.navMaterial, en: copy.en.navMaterial });
 
 export default async function MateriaalPage() {
   const [session, locale] = await Promise.all([getSession(), getLocale()]);

@@ -4,6 +4,15 @@ import { prisma } from '@vtk/db';
 import { requireManage } from '@/lib/session';
 import { PrintSheet, printSheetSelect } from '../../print-sheet';
 import { PrintButton } from '../../print-button';
+import { manageTitle } from '@/lib/page-title';
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return manageTitle('Afdruk van een aanvraag', async () => {
+    const reservation = await prisma.uitleenReservation.findUnique({ where: { id }, select: { eventName: true } });
+    return reservation ? `Afdruk: ${reservation.eventName}` : null;
+  });
+}
 
 export default async function AanvraagPrintPage({
   params,

@@ -6,6 +6,16 @@ import { EventLink } from '@/components/event-link';
 import { eventOptions } from '@/lib/uitleen';
 import { selectableEvents } from '@/lib/uitleen-server';
 import { ImportOrderForm } from './import-form';
+import { manageTitle } from '@/lib/page-title';
+import { prisma } from '@vtk/db';
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return manageTitle('Collect&Go-bestelling', async () => {
+    const order = await prisma.collectEnGoOrder.findUnique({ where: { id }, select: { reservationNumber: true } });
+    return order ? `Collect&Go ${order.reservationNumber}` : null;
+  });
+}
 
 export default async function BeheerCollectEnGoOrderPage({
   params,

@@ -4,7 +4,7 @@ import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
 import { ExternClosed } from '@/components/extern-closed';
 import { canManage, externalRequestsBlocked, getSession, requestsAsExternal } from '@/lib/session';
-import { getLocale } from '@/lib/i18n';
+import { getLocale, copy } from '@/lib/i18n';
 import { formatEuro, ITEM_CONDITION_LABELS } from '@/lib/uitleen';
 import {
   frequentlyRequestedWith,
@@ -13,6 +13,9 @@ import {
   itemTeamDetails,
 } from '@/lib/uitleen-server';
 import { ItemGallery } from './item-gallery';
+import { localizedTitle } from '@/lib/page-title';
+
+export const generateMetadata = localizedTitle({ nl: copy.nl.navMaterial, en: copy.en.navMaterial });
 
 export default async function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

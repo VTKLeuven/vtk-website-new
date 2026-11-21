@@ -1,9 +1,20 @@
+import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { LoginGate } from '@/components/login-gate';
 import { ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/admin-nav-cookie';
 import { canManage, getSession } from '@/lib/session';
 import { BeheerNav } from './beheer-nav';
 import { copy, getLocale } from '@/lib/i18n';
+
+/**
+ * "Ritaanvragen · Beheer uitleendienst": een tabblad van het beheer is niet te
+ * verwarren met de pagina van een lid die toevallig even heet (Flesserke).
+ * Een sjabloon geldt niet voor het segment zelf, enkel voor de pagina's eronder.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = copy[await getLocale()];
+  return { title: { default: t.manageTitle, template: `%s · ${t.manageTitle}` } };
+}
 
 export default async function BeheerLayout({ children }: { children: React.ReactNode }) {
   const [session, locale] = await Promise.all([getSession(), getLocale()]);

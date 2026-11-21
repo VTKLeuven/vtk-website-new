@@ -5,6 +5,8 @@ import { DriverPicker } from './driver-picker';
 import { GroupDriverList } from './group-drivers';
 import { PhoneImport } from './phone-import';
 
+export const metadata = { title: 'Chauffeurs' };
+
 export default async function BeheerChauffeursPage() {
   await requireManage();
   const [drivers, groups] = await Promise.all([driverPool(), driversPerGroup()]);

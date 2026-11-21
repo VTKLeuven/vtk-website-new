@@ -53,6 +53,14 @@ import { PrepareList } from './prepare-list';
 import { DeliveryPanel } from './delivery-panel';
 import { SaveTemplateForm } from './save-template-form';
 import { ReturnForm } from './return-form';
+import { manageTitle } from '@/lib/page-title';
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return manageTitle('Aanvraag', async () =>
+    (await prisma.uitleenReservation.findUnique({ where: { id }, select: { eventName: true } }))?.eventName
+  );
+}
 
 export default async function BeheerAanvraagDetailPage({
   params,

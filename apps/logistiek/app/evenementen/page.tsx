@@ -4,7 +4,10 @@ import { PageShell } from '@/components/page-shell';
 import { getSession } from '@/lib/session';
 import { eventRequestLines, formatEventMoment } from '@/lib/uitleen';
 import { memberEvents } from '@/lib/uitleen-server';
-import { getLocale } from '@/lib/i18n';
+import { getLocale, copy } from '@/lib/i18n';
+import { localizedTitle } from '@/lib/page-title';
+
+export const generateMetadata = localizedTitle({ nl: copy.nl.navEvents, en: copy.en.navEvents });
 
 /** Hoeveel regels per evenement in de lijst; de rest staat op de detailpagina. */
 const SHOWN_LINES = 4;

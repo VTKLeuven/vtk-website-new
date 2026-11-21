@@ -1,11 +1,10 @@
 import Link from '@vtk/ui/link';
-import type { Metadata } from 'next';
 import type { UitleenRequesterType } from '@prisma/client';
 import { PageShell } from '@/components/page-shell';
 import { PublicWeek } from './public-week';
 import { TransportLegend } from '@/components/transport-calendar/legend';
 import type { TripBlock } from '@/components/transport-calendar/types';
-import { getLocale } from '@/lib/i18n';
+import { getLocale, copy } from '@/lib/i18n';
 import {
   canEditAllHelpers,
   canManage,
@@ -43,6 +42,7 @@ import {
 } from '@/lib/uitleen-server';
 import { filtersToQuery, parseTransportFilters } from '@/lib/transport-filters';
 import type { BezettingTrip } from './trip-card';
+import { localizedTitle } from '@/lib/page-title';
 
 /**
  * Wanneer is een voertuig vrij? (T8)
@@ -73,10 +73,10 @@ import type { BezettingTrip } from './trip-card';
  * haalt zijn eigen velden op, zodat een vergeten `if` geen namen aan de
  * straatkant kan zetten.
  */
-export const metadata: Metadata = {
-  title: 'Wanneer is de kar vrij?',
-  robots: { index: false, follow: false },
-};
+export const generateMetadata = localizedTitle(
+  { nl: copy.nl.navPlanning, en: copy.en.navPlanning },
+  { robots: { index: false, follow: false } }
+);
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

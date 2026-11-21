@@ -5,6 +5,8 @@ import { listTestPersonas } from '@/lib/test-users';
 import { loginAsTestUser, logoutTestUser } from './actions';
 import { ActionForm } from '@vtk/ui/unsent-guard';
 
+export const metadata = { title: 'Testlogin' };
+
 /**
  * Test-login picker. Enkel bereikbaar voor wie mag wisselen: in productie
  * niemand, op een gedeelde testomgeving enkel IT en Logistiek, en op een laptop

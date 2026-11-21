@@ -24,6 +24,8 @@ import {
   type ContentKind,
 } from './kalender-kinds';
 
+export const metadata = { title: 'Kalender' };
+
 const DEFAULT_DAYS = 30;
 const PRESET_DAYS = [7, 30, 90];
 /** Grens tegen een verkeerd getypt jaartal in de datumvelden. */

@@ -9,6 +9,9 @@ import { getLogistiekSettings, requestableVehicles, selectableEvents } from '@/l
 import { getPublicCopy } from '@/lib/public-copy';
 import { requesterOptions } from '@/app/materiaal/event-values';
 import { VanRequestForm } from './request-form';
+import { localizedTitle } from '@/lib/page-title';
+
+export const generateMetadata = localizedTitle({ nl: copy.nl.navVan, en: copy.en.navVan });
 
 export default async function VervoerPage() {
   const [session, locale] = await Promise.all([getSession(), getLocale()]);

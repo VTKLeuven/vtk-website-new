@@ -31,6 +31,9 @@ import {
 } from '@/lib/uitleen-server';
 import { ReservationEditor } from './edit-form';
 import { FlesserkeEditor } from '@/app/flesserke/edit-form';
+import { localizedTitle } from '@/lib/page-title';
+
+export const generateMetadata = localizedTitle({ nl: 'Aanvraag', en: 'Request' });
 
 export default async function ReservatieDetailPage({
   params,

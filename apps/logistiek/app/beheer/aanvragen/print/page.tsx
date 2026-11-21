@@ -5,6 +5,8 @@ import { formatDateOnly, parseDateOnly, todayDateOnly, toDateInputValue } from '
 import { PrintSheet, printSheetSelect } from '../print-sheet';
 import { PrintButton } from '../print-button';
 
+export const metadata = { title: 'Afdruk van de afhalingen' };
+
 /**
  * Alle afhalingen van één dag, één A4 per aanvraag.
  *

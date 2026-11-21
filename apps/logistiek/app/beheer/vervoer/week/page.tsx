@@ -53,6 +53,8 @@ import { startOfBrusselsDay } from '@/lib/week-lanes';
 import { TransportPlanner, type PlannerTrip } from './planner';
 import type { TripBlock } from '@/components/transport-calendar/types';
 
+export const metadata = { title: 'Weekplanning' };
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**

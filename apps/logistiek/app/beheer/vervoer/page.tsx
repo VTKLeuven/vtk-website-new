@@ -17,6 +17,19 @@ import {
 } from '@/lib/uitleen-server';
 import { TripPanel } from './trip-panel';
 import { TripRow, TripRowHeader, type TripBadge } from './trip-row';
+import { manageTitle } from '@/lib/page-title';
+import { prisma } from '@vtk/db';
+import { tripTitle } from '@/lib/uitleen';
+
+/** Met een rit open draagt het tabblad de naam van die rit, anders "Ritaanvragen". */
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ rit?: string | string[] }> }) {
+  const { rit } = await searchParams;
+  if (typeof rit !== 'string' || !rit) return { title: 'Ritaanvragen' };
+  return manageTitle('Ritaanvragen', async () => {
+    const trip = await prisma.uitleenTransportBooking.findUnique({ where: { id: rit }, select: { purpose: true } });
+    return trip ? tripTitle(trip) : null;
+  });
+}
 
 /**
  * Ritaanvragen: open werk bovenaan, het archief per werkingsjaar eronder.

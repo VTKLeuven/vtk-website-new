@@ -15,6 +15,9 @@ import { memberEvent } from '@/lib/uitleen-server';
 import { getLocale } from '@/lib/i18n';
 import { EventExtraItems } from './extra-items';
 import { MemberEventForm } from './event-form';
+import { localizedTitle } from '@/lib/page-title';
+
+export const generateMetadata = localizedTitle({ nl: 'Evenement', en: 'Event' });
 
 /**
  * Eén evenement, voor de aanvrager (E1).

@@ -1,7 +1,14 @@
 import Link from '@vtk/ui/link';
 import { formatDateOnly, todayDateOnly } from '@/lib/uitleen';
 import { requireManage } from '@/lib/session';
+import { copy, getLocale } from '@/lib/i18n';
 import { adminAgenda, adminWorkCounts } from '@/lib/uitleen-server';
+
+// Absoluut: de pagina deelt haar segment met de layout van het beheer, en een
+// sjabloon geldt enkel voor de pagina's eronder.
+export async function generateMetadata() {
+  return { title: { absolute: `Overzicht · ${copy[await getLocale()].manageTitle}` } };
+}
 
 /**
  * Het overzicht van het beheer: wat er te doen is, en wat er vandaag gebeurt.

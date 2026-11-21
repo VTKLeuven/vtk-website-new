@@ -14,6 +14,9 @@ import { getLocale } from '@/lib/i18n';
 import { getSession } from '@/lib/session';
 import { formatDateTime, formatPriceCents, toDatetimeLocalValue } from '@/lib/uitleen';
 import { hasSucceededPayment, teamEditsForTransport, vanBookingForMember } from '@/lib/uitleen-server';
+import { localizedTitle } from '@/lib/page-title';
+
+export const generateMetadata = localizedTitle({ nl: 'Ritaanvraag', en: 'Trip request' });
 
 export default async function VanBookingDetailPage({
   params,

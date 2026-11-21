@@ -11,6 +11,8 @@ import { currentWorkingYear, FIRST_WORKING_YEAR } from '@vtk/auth';
 import { parseDateOnly, toDateInputValue } from '@/lib/uitleen';
 import { TransportCharts } from './charts';
 
+export const metadata = { title: 'Statistieken' };
+
 /**
  * Wie reed er wanneer, hoelang en voor welke post (T11).
  *

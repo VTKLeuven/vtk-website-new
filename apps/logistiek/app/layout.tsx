@@ -15,7 +15,9 @@ const inter = Inter({ variable: "--font-vtk-sans", subsets: ["latin"] });
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
   return {
-    title: copy[locale].appTitle,
+    // Elke pagina geeft enkel wat ze zelf is; de naam van de app komt erachter
+    // (V1). Een pagina zonder eigen titel, zoals de startpagina, heet gewoon zo.
+    title: { default: copy[locale].appTitle, template: `%s · ${copy[locale].appTitle}` },
     description: copy[locale].appDescription,
     icons: {
       icon: [

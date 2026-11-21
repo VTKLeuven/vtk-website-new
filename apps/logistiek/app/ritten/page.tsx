@@ -29,6 +29,9 @@ import {
 import { vehicleIconName } from '@/lib/vehicle-icon';
 import type { TripMonth, TripView, TripWeek } from './trip-view';
 import { TripsAgenda } from './trips-agenda';
+import { localizedTitle } from '@/lib/page-title';
+
+export const generateMetadata = localizedTitle({ nl: copy.nl.navTrips, en: copy.en.navTrips });
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
