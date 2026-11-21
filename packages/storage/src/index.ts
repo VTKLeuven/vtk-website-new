@@ -221,6 +221,88 @@ export function objectResponse(
   }
 }
 
+/**
+ * Een `content-disposition`-header voor een bestandsnaam zoals een gebruiker
+ * die koos.
+ *
+ * Een header mag enkel tekens tot 0xFF dragen. Een gedachtestreepje, een
+ * gekrulde apostrof of een emoji in `filename="..."` laat `Headers.set` gooien,
+ * en dan kreeg wie het bestand opende een 404. Het oude `filename` krijgt daarom
+ * een ASCII-versie; de echte naam reist mee in `filename*` (RFC 6266), die elke
+ * browser verkiest.
+ */
+export function contentDisposition(type: "inline" | "attachment", filename: string): string {
+  const ascii = filename.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
+  // encodeURIComponent laat ' ( ) * staan, maar in `filename*` horen ze gecodeerd.
+  const encoded = encodeURIComponent(filename).replace(
+    /['()*]/g,
+    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`
+  );
+  return `${type}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+}
+
+/** Types die in de browser code kunnen draaien wanneer ze inline geopend worden. */
+const UNSAFE_INLINE_TYPE = /(?:svg\+xml|text\/html|application\/(?:xhtml\+xml|xml)|text\/xml)/i;
+
+/**
+ * Status en headers voor een object uit de bucket, voor de `/api/media`-route
+ * van elke app (vtk.be en de uitleendienst delen ze).
+ *
+ * - Range wordt doorgegeven: een PDF-lezer haalt zo enkel de stukken op die hij
+ *   nodig heeft, met een echte 206.
+ * - ETag en Last-Modified gaan mee, en de keys zijn onraadbare random hex en dus
+ *   onveranderlijk: hard cachen.
+ * - Een type dat in de browser code kan draaien (SVG, HTML, XML) krijgt een
+ *   sandbox-CSP en gaat als download: een oud object van voor de uploadcontrole
+ *   kan zo nooit uitvoeren in de origin van de site.
+ * - `?download` forceert een download, `?filename=` geeft de naam mee.
+ *   `attachmentPrefixes` zijn mappen die altijd downloaden (op vtk.be `files/`).
+ *
+ * Bewust een functie voor de headers en niet voor de hele route: de route haalt
+ * het object zelf op met `getObjectStream` en geeft het aan `objectResponse`,
+ * zodat een test die ophaling kan vervangen.
+ */
+export function mediaResponseInit(
+  request: Request,
+  key: string,
+  object: {
+    contentType: string | undefined;
+    contentLength: number | undefined;
+    contentRange: string | undefined;
+    etag: string | undefined;
+    lastModified: Date | undefined;
+  },
+  options: { attachmentPrefixes?: readonly string[] } = {}
+): ResponseInit {
+  const headers = new Headers();
+  const type = object.contentType ?? "application/octet-stream";
+  headers.set("content-type", type);
+  if (object.contentLength != null) headers.set("content-length", String(object.contentLength));
+  if (object.contentRange) headers.set("content-range", object.contentRange);
+  if (object.etag) headers.set("etag", object.etag);
+  if (object.lastModified) headers.set("last-modified", object.lastModified.toUTCString());
+  headers.set("accept-ranges", "bytes");
+  headers.set("x-content-type-options", "nosniff");
+  headers.set("referrer-policy", "no-referrer");
+  const unsafeInlineType = UNSAFE_INLINE_TYPE.test(type);
+  if (unsafeInlineType) {
+    headers.set("content-security-policy", "sandbox; default-src 'none'; style-src 'unsafe-inline'");
+  }
+  const url = new URL(request.url);
+  const requestedFilename = url.searchParams.get("filename")?.trim();
+  const forceDownload = url.searchParams.has("download");
+  const filename = requestedFilename || key.split("/").at(-1) || "download";
+  const alwaysAttachment = (options.attachmentPrefixes ?? []).some((prefix) => key.startsWith(prefix));
+
+  if (alwaysAttachment || unsafeInlineType || forceDownload) {
+    headers.set("content-disposition", contentDisposition("attachment", filename));
+  } else if (requestedFilename) {
+    headers.set("content-disposition", contentDisposition("inline", filename));
+  }
+  headers.set("cache-control", "public, max-age=31536000, immutable");
+  return { status: object.contentRange ? 206 : 200, headers };
+}
+
 export async function getObjectBuffer(key: string): Promise<Buffer> {
   const { stream } = await getObjectStream(key);
   const chunks: Buffer[] = [];

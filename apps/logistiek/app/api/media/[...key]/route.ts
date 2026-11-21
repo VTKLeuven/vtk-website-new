@@ -1,45 +1,25 @@
-import {
-  SANDBOX_CSP,
-  getObjectStream,
-  isInlineSafeContentType,
-  isPublicMediaKey,
-  objectResponse,
-} from '@vtk/storage';
+import { getObjectStream, mediaResponseInit, objectResponse } from '@vtk/storage';
 
 export const runtime = 'nodejs';
 
 /**
- * Serveert opgeslagen objecten (item-foto's) via de app zelf, zodat de browser
- * enkel met deze origin praat. Keys zijn onraadbare random hex.
+ * Serveert opgeslagen objecten (item-foto's en pdf's) via de app zelf, zodat de
+ * browser enkel met deze origin praat. Keys zijn onraadbare random hex, dus het
+ * toegangsmodel blijft gelijk.
  *
- * Deze app deelt de bucket met de website, dus dezelfde twee regels als
- * `apps/web/app/api/media/[...key]` (zie `serve.ts` in `@vtk/storage`): een
- * private map (bonnetjes, formulierbestanden) gaat hier nooit naar buiten, en
- * enkel een type uit de allowlist opent in de browser. Zonder die regels
- * opende een formulierbestand met `text/html` hier als pagina, in een origin
- * die de sessiecookie van `.vtk.be` deelt.
+ * Dezelfde headers als vtk.be (`mediaResponseInit` in @vtk/storage): Range voor
+ * een pdf-lezer, ETag, `nosniff`, en een sandbox plus download voor een type dat
+ * in de browser code kan draaien. Die laatste stond hier niet, en een upload
+ * bewaarde tot november 2026 ruwe bytes onder het type dat de browser opgaf.
  */
 export async function GET(request: Request, context: { params: Promise<{ key: string[] }> }) {
   const { key: segments } = await context.params;
   const key = segments.join('/');
-  if (!isPublicMediaKey(key)) return new Response('Not found', { status: 404 });
+  if (!key) return new Response('Not found', { status: 404 });
 
   try {
-    const { stream, contentType, contentLength } = await getObjectStream(key);
-    return objectResponse(request, stream, () => {
-      const headers = new Headers();
-      const type = contentType ?? 'application/octet-stream';
-      headers.set('content-type', type);
-      if (contentLength != null) headers.set('content-length', String(contentLength));
-      headers.set('x-content-type-options', 'nosniff');
-      headers.set('referrer-policy', 'no-referrer');
-      if (!isInlineSafeContentType(type)) {
-        headers.set('content-security-policy', SANDBOX_CSP);
-        headers.set('content-disposition', 'attachment');
-      }
-      headers.set('cache-control', 'public, max-age=31536000, immutable');
-      return { headers };
-    });
+    const object = await getObjectStream(key, request.headers.get('range'));
+    return objectResponse(request, object.stream, () => mediaResponseInit(request, key, object));
   } catch {
     return new Response('Not found', { status: 404 });
   }

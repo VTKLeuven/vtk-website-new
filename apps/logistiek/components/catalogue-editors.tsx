@@ -6,12 +6,31 @@ import { PhotoCropper } from '@/components/photo-cropper';
 type Upload = { key: string; label?: string };
 const mediaUrl = (key: string) => `/api/media/${key.split('/').map(encodeURIComponent).join('/')}`;
 
+/** De codes van `/api/uitleen/upload` als zin; zie `lib/upload.ts`. */
+const UPLOAD_ERRORS: Record<string, string> = {
+  too_large: 'Dit bestand is groter dan 15 MB. Verklein het en probeer opnieuw.',
+  unsupported_file: 'Dit is geen foto of pdf die we kunnen lezen. Probeer een JPEG, PNG of pdf.',
+  no_file: 'Er kwam geen bestand mee. Probeer opnieuw.',
+  unauthenticated: 'Je bent niet meer ingelogd. Log in een ander tabblad opnieuw in en probeer het dan nog eens.',
+  forbidden: 'Enkel het Logistiek-team kan bestanden opladen.',
+};
+
+class UploadFailed extends Error {}
+
 async function upload(file: File): Promise<Upload> {
   const form = new FormData();
   form.set('file', file);
   const response = await fetch('/api/uitleen/upload', { method: 'POST', body: form });
-  if (!response.ok) throw new Error('upload_failed');
+  if (!response.ok) {
+    const code = ((await response.json().catch(() => null)) as { error?: string } | null)?.error;
+    throw new UploadFailed(UPLOAD_ERRORS[code ?? ''] ?? 'Uploaden mislukt. Probeer opnieuw.');
+  }
   return response.json() as Promise<Upload>;
+}
+
+/** De zin voor een mislukte upload: die van de server, of een algemene. */
+function uploadMessage(error: unknown, fallback: string): string {
+  return error instanceof UploadFailed ? error.message : fallback;
 }
 
 /**
@@ -38,7 +57,7 @@ export function PhotosEditor({ initial }: { initial: Array<{ key: string }> }) {
     try {
       const added = await Promise.all(Array.from(files).map(upload));
       setPhotos((current) => [...current, ...added.map(({ key }) => ({ key }))]);
-    } catch { setError('Uploaden mislukt. Probeer opnieuw.'); }
+    } catch (error) { setError(uploadMessage(error, 'Uploaden mislukt. Probeer opnieuw.')); }
     finally { setBusy(false); }
   }
 
@@ -58,8 +77,8 @@ export function PhotosEditor({ initial }: { initial: Array<{ key: string }> }) {
     try {
       const added = await upload(file);
       setPhotos((all) => [{ key: added.key }, ...all.filter((photo) => photo.key !== added.key)]);
-    } catch {
-      setError('Bijsnijden mislukt. Probeer opnieuw.');
+    } catch (error) {
+      setError(uploadMessage(error, 'Bijsnijden mislukt. Probeer opnieuw.'));
     } finally {
       setBusy(false);
     }
@@ -131,11 +150,16 @@ type Download = { key: string; label: string };
 export function DownloadsEditor({ initial }: { initial: Download[] }) {
   const [rows, setRows] = useState(initial);
   const [busy, setBusy] = useState(false);
+  // Zonder dit faalde een geweigerde pdf stil: de knop werd weer klikbaar en er
+  // verscheen niets.
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   async function add(file: File | undefined) {
     if (!file) return;
     setBusy(true);
+    setError(null);
     try { const result = await upload(file); setRows((all) => [...all, { key: result.key, label: file.name.replace(/\.pdf$/i, '') }]); }
+    catch (failure) { setError(uploadMessage(failure, 'Uploaden mislukt. Probeer opnieuw.')); }
     finally { setBusy(false); }
   }
   return <div className="grid gap-2">
@@ -145,6 +169,7 @@ export function DownloadsEditor({ initial }: { initial: Download[] }) {
       <button type="button" onClick={() => setRows((all) => all.filter((_, i) => i !== index))} className="h-10 rounded-full border border-vtk-navy/15 px-3 text-sm text-vtk-muted">Verwijderen</button>
     </div>)}
     <button type="button" onClick={() => inputRef.current?.click()} disabled={busy} className="justify-self-start rounded-full border border-vtk-navy/15 px-3 py-1.5 text-sm font-semibold text-vtk-ink">{busy ? 'Uploaden…' : '+ Pdf toevoegen'}</button>
+    {error ? <p role="alert" className="text-sm text-vtk-danger">{error}</p> : null}
     <input ref={inputRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e) => { add(e.target.files?.[0]); e.target.value = ''; }} />
   </div>;
 }

@@ -1,52 +1,40 @@
 import { NextResponse } from 'next/server';
-import sharp from 'sharp';
 import { newStorageKey, putObject } from '@vtk/storage';
-import { hasPermission } from '@vtk/auth';
-import { requireSession } from '@/lib/session';
+import { canManage, getSession } from '@/lib/session';
 import { publicUrl } from '@/lib/storage';
+import { prepareUpload, requestTooLarge, type UploadError } from '@/lib/upload';
 
 export const runtime = 'nodejs';
 
-/** Foto- en pdf-upload voor catalogusitems. Enkel voor het Logistiek-team. */
+function refuse(error: UploadError | 'unauthenticated' | 'forbidden', status: number) {
+  return NextResponse.json({ error }, { status });
+}
+
+/**
+ * Foto- en pdf-upload voor catalogusitems. Enkel voor het Logistiek-team.
+ *
+ * Wat er in de bucket komt, beslist `prepareUpload` op de bytes zelf, niet op
+ * wat de browser opgaf (zie `lib/upload.ts`). Een geweigerde upload geeft een
+ * code die `catalogue-editors.tsx` op een zin mapt.
+ */
 export async function POST(request: Request) {
-  const session = await requireSession();
-  if (!session.user.isSuperAdmin && !hasPermission(session, 'logistiek.manage')) {
-    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
-  }
+  // 401 en geen 500: een verlopen sessie is geen serverfout.
+  const session = await getSession();
+  if (!session) return refuse('unauthenticated', 401);
+  if (!canManage(session)) return refuse('forbidden', 403);
+
+  // Voor `formData()`, want dat leest het hele verzoek in het geheugen.
+  if (requestTooLarge(request.headers.get('content-length'))) return refuse('too_large', 413);
 
   const form = await request.formData();
   const file = form.get('file');
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: 'no_file' }, { status: 400 });
-  }
-  const isImage = file.type.startsWith('image/');
-  if (!isImage && file.type !== 'application/pdf') {
-    return NextResponse.json({ error: 'unsupported_file' }, { status: 400 });
-  }
+  if (!(file instanceof File)) return refuse('no_file', 400);
 
-  const bytes = Buffer.from(await file.arrayBuffer());
-  let body: Buffer = bytes;
-  // Nooit `file.type` bewaren: dat kiest de browser. Een afbeelding wordt altijd
-  // een JPEG, en lukt dat niet, dan weigeren we ze. Vroeger bleef dan het
-  // opgegeven type staan, bv. `image/svg+xml`, en dat opent met script.
-  let contentType = 'application/pdf';
-  if (isImage) {
-    contentType = 'image/jpeg';
-    try {
-      body = await sharp(bytes)
-        .rotate()
-        .resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 84, mozjpeg: true })
-        .toBuffer();
-    } catch {
-      return NextResponse.json({ error: 'invalid_image' }, { status: 415 });
-    }
-  } else if (bytes.subarray(0, 1024).indexOf(Buffer.from('%PDF-')) === -1) {
-    return NextResponse.json({ error: 'invalid_pdf' }, { status: 415 });
-  }
+  const prepared = await prepareUpload(Buffer.from(await file.arrayBuffer()), file.name);
+  if (!prepared.ok) return refuse(prepared.error, prepared.error === 'too_large' ? 413 : 400);
 
-  const key = newStorageKey('uitleen', isImage ? 'foto.jpg' : file.name);
-  await putObject(key, body, contentType);
+  const key = newStorageKey('uitleen', prepared.name);
+  await putObject(key, prepared.body, prepared.contentType);
 
   return NextResponse.json({ key, url: publicUrl(key) });
 }
