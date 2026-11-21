@@ -798,6 +798,9 @@ model User {
   theokotVoucherRedemptions TheokotVoucherRedemption[] @relation("TheokotVoucherUser")
   theokotVouchersProcessed  TheokotVoucherRedemption[] @relation("TheokotVoucherProcessedBy")
   theokotBans               TheokotBan[]
+  theokotDutyAvailability   TheokotDutyAvailability[]
+  theokotDutyAssignments    TheokotDutyAssignment[]
+  theokotDutyCarryOvers     TheokotDutyCarryOver[]
   theokotRentalsDecided     TheokotRental[]            @relation("TheokotRentalDecidedBy")
   theokotRentalsCreated     TheokotRental[]            @relation("TheokotRentalCreatedBy")
   theokotRentalMessages     TheokotRentalMessage[]     @relation("TheokotRentalMessageSentBy")
@@ -4724,6 +4727,74 @@ model TheokotBan {
 
   @@index([userId])
   @@index([active])
+}
+
+// -----------------------------------------------------------------------------
+// Verantwoordelijken van Theokot (/admin/theokot/shiften/verantwoordelijken)
+// -----------------------------------------------------------------------------
+//
+// Wie van de post Theokot de zaak openhoudt. Elke verantwoordelijke duidt zelf
+// aan in welke blokken die kan, iemand van Theokot deelt per blok in, en de
+// telling per werkingsjaar houdt het eerlijk. Dit verving een rekenblad. Een
+// blok is een kalenderdag plus een sleutel uit `DUTY_SLOTS`
+// (lib/theokotDuty.ts); er is geen rij per blok nodig zolang het de standaard
+// volgt. Bewust geen `Shift`: het verschijnt niet op /shift, levert geen
+// bonnetjes op en staat niet in de shiftgeschiedenis. Zie
+// docs/design-decisions.md, "Theokot: verantwoordelijken".
+
+/// Een verantwoordelijke kan in dit blok. Enkel de persoon zelf zet of wist dit.
+model TheokotDutyAvailability {
+  /// De Brusselse kalenderdag.
+  date      DateTime @db.Date
+  /// Sleutel uit `DUTY_SLOTS`: ochtend, middag, namiddag of avond.
+  slot      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([date, slot, userId])
+  @@index([userId])
+}
+
+/// Deze verantwoordelijke houdt dit blok open. Kan enkel wie in het blok kan:
+/// wie de beschikbaarheid wist, valt ook hier weg.
+model TheokotDutyAssignment {
+  date      DateTime @db.Date
+  slot      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([date, slot, userId])
+  @@index([userId, date])
+}
+
+/// Een blok dat afwijkt van de standaard: een tweede verantwoordelijke, een
+/// notitie ("Bureau"), of een blok dat er die dag niet is (of wel, zoals een
+/// avond op vrijdag). Geen rij = de standaard uit `DUTY_SLOTS`.
+model TheokotDutyBlock {
+  date      DateTime @db.Date
+  slot      String
+  capacity  Int
+  open      Boolean
+  note      String?
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@id([date, slot])
+}
+
+/// De startstand van de telling: hoeveel blokken iemand dit werkingsjaar al
+/// openhield vóór het op de site stond (uit het rekenblad). Telt op bij de
+/// toewijzingen van dat werkingsjaar. Geen rij = 0.
+model TheokotDutyCarryOver {
+  /// Werkingsjaar (startjaar): 2026 = "26-27".
+  year      Int
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  count     Int
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@id([year, userId])
 }
 
 // -----------------------------------------------------------------------------

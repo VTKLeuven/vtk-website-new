@@ -1,13 +1,10 @@
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { prisma } from "@vtk/db";
 import type { Locale } from "@vtk/i18n";
-import Link from "@/components/ui/Link";
-import { IconLink } from "@/components/ui/IconButton";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
-import { brusselsWallClock, isoWeekKey, parseYMD, shiftYMD, ymdKey, type YMD } from "@/lib/brussels";
+import { brusselsWallClock, parseYMD, shiftYMD, ymdKey } from "@/lib/brussels";
 import { canEditShifts } from "@/lib/shift/authorization";
 import { THEOKOT_TEMPLATE_SLUG } from "@/lib/shift/templates";
 import { getShiftTemplate, theokotPostFilter, theokotShiftPosts } from "@/lib/shift/templateStore";
@@ -21,8 +18,7 @@ import {
   type TheokotSlot,
 } from "@/lib/theokotShifts";
 import { ShiftTimeline, type DayLabel } from "./ShiftTimeline";
-
-import "@/app/design/vtk-theokot-shiften.css";
+import { WeekNav, dayLabels as labelsOf } from "./WeekNav";
 
 /**
  * Theokot: de shiften van één werkweek als tijdlijn per dag, zodat Theokot ziet
@@ -30,9 +26,6 @@ import "@/app/design/vtk-theokot-shiften.css";
  * groep Theokot, naast Broodjes en Verhuur, en geen tab binnen Broodjes. Zie
  * docs/design-decisions.md, "Theokot: shiftenoverzicht".
  */
-
-/** Een kalenderdag als Date op de middag in UTC, om met `timeZone: "UTC"` te formatteren. */
-const noonUtc = (ymd: YMD) => new Date(Date.UTC(ymd.year, ymd.month - 1, ymd.day, 12));
 
 export default async function TheokotShiftsPage({
   params,
@@ -112,25 +105,7 @@ export default async function TheokotShiftsPage({
     now,
   });
 
-  const tag = nl ? "nl-BE" : "en-GB";
-  const short = new Intl.DateTimeFormat(tag, { timeZone: "UTC", weekday: "short", day: "numeric", month: "short" });
-  const long = new Intl.DateTimeFormat(tag, { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" });
-  const dayLabels: Record<string, DayLabel> = Object.fromEntries(
-    days.map((day) => [
-      ymdKey(day),
-      { short: short.format(noonUtc(day)).replace(/\./g, ""), long: long.format(noonUtc(day)) },
-    ]),
-  );
-
-  const friday = days[days.length - 1];
-  const month = new Intl.DateTimeFormat(tag, { timeZone: "UTC", month: "long" });
-  const range =
-    monday.month === friday.month
-      ? `${monday.day}–${friday.day} ${month.format(noonUtc(friday))} ${friday.year}`
-      : `${monday.day} ${month.format(noonUtc(monday))} – ${friday.day} ${month.format(noonUtc(friday))} ${friday.year}`;
-  const weekNumber = Number(isoWeekKey(monday).split("-W")[1]);
-  const weekHref = (ymd: YMD) => `${base}/admin/theokot/shiften?week=${ymdKey(ymd)}`;
-  const isDefaultWeek = ymdKey(monday) === ymdKey(defaultMonday);
+  const dayLabels: Record<string, DayLabel> = Object.fromEntries(days.map((day) => [ymdKey(day), labelsOf(day, nl)]));
 
   let summary: ReactNode;
   if (timeline.upcomingShifts === 0) {
@@ -153,33 +128,9 @@ export default async function TheokotShiftsPage({
 
   return (
     <div className="tk-sh">
-      <h1 className="text-2xl font-semibold">Theokot · {nl ? "Shiften" : "Shifts"}</h1>
-
-      <div className="tk-sh-toolbar">
-        <div className="tk-sh-week">
-          <IconLink
-            href={weekHref(shiftYMD(monday, -7))}
-            label={nl ? "Vorige week" : "Previous week"}
-          >
-            <ChevronLeft aria-hidden="true" size={16} />
-          </IconLink>
-          <span className="tk-sh-week-label">
-            {nl ? "Week" : "Week"} {weekNumber} · {range}
-          </span>
-          <IconLink
-            href={weekHref(shiftYMD(monday, 7))}
-            label={nl ? "Volgende week" : "Next week"}
-          >
-            <ChevronRight aria-hidden="true" size={16} />
-          </IconLink>
-          {isDefaultWeek ? null : (
-            <Link href={`${base}/admin/theokot/shiften`} className="tk-sh-today">
-              {nl ? "Naar deze week" : "To this week"}
-            </Link>
-          )}
-        </div>
+      <WeekNav monday={monday} defaultMonday={defaultMonday} path={`${base}/admin/theokot/shiften`} nl={nl}>
         {timeline.totalShifts > 0 ? <p className="tk-sh-summary">{summary}</p> : null}
-      </div>
+      </WeekNav>
 
       {timeline.totalShifts === 0 ? (
         <div className="tk-sh-empty">

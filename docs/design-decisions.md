@@ -13662,6 +13662,47 @@ nodig zijn. Dat staat op `/admin/theokot/shiften` (`lib/theokotShifts.ts`,
 - **Het recht is `theokot.manage`**, wie de broodjes beheert. Geen apart recht:
   de rol van Theokot draagt het al, en de afhaalbalie (`theokot.pickup`) plant
   geen shiften.
+- **Twee tabbladen sinds november 2026**: Shifters (deze tijdlijn) en
+  Verantwoordelijken (hieronder). De gekozen week reist mee.
+
+## Theokot: verantwoordelijken
+
+Theokot duidde in een Google-rekenblad aan wie de zaak openhoudt: elke
+verantwoordelijke typte de eigen naam in de blokken waarin die kon, iemand
+kleurde per blok groen wie het deed, en een overzichtje telde per persoon "deze
+week" en "aller tijden". Dat staat sinds november 2026 op
+`/admin/theokot/shiften/verantwoordelijken` (`lib/theokotDuty.ts`,
+`DutyRoster.tsx`).
+
+- **Het rekenblad, nagebouwd, als tweede tabblad van Shiften.** Vier richtingen
+  lagen voor (dit raster, een laag boven de tijdlijn van de shifters, een rij per
+  persoon, en invullen en verdelen als twee schermen); Theokot koos het raster
+  omdat het hetzelfde leest als hun blad: de dagen naast elkaar, de blokken onder
+  elkaar, in elk vak wie kan. Een klik op een naam deelt die in.
+- **Vier vaste blokken**: 10:00–12:30, 12:30–14:00, 14:00–16:00 en, enkel van
+  maandag tot donderdag, 16:00–18:00. De ochtend begint een halfuur voor de
+  gewone shifters. Wat op één dag afwijkt (een tweede verantwoordelijke, een
+  notitie zoals "Bureau" of "Broodjes gm", een blok dat er niet is of een avond
+  op vrijdag), zet je met het potlood in het vak; dat is een `TheokotDutyBlock`,
+  geen wijziging aan de vaste blokken.
+- **Elk duidt zelf aan.** Enkel wie in het werkingsjaar van die week lid is van
+  de post Theokot, ziet "Ik kan" en het kruisje bij de eigen naam. Wie iets
+  wist, valt ook uit de indeling van dat blok. Indelen kan iedereen met
+  `theokot.manage`, maar enkel wie het blok aanduidde.
+- **Een blok voor één persoon wisselt bij een klik op een andere naam**; in een
+  blok voor meer is vol een foutmelding, want wie er dan moet wijken is niet te
+  raden.
+- **De telling loopt per werkingsjaar** (sinds 15 juli): de startstand plus elk
+  blok waarin iemand dat werkingsjaar ingedeeld is. De startstand
+  (`TheokotDutyCarryOver`) is wat iemand al openhield voor het rooster op de site
+  stond; het rooster kwam er halverwege het jaar, en zonder startstand zou het
+  voorstel wie al twintig keer openhield gelijk zetten met wie nog nooit deed.
+- **"Eerlijk voorstel" vult enkel open plaatsen**, en laat wie al ingedeeld is
+  staan. Eerst de blokken met de minste kandidaten, daarna per plaats wie de
+  laagste telling heeft, liever niet twee blokken op één dag.
+- **Geen `Shift`.** Een verantwoordelijk blok staat niet op /shift, levert geen
+  bonnetjes op en staat niet in de shiftgeschiedenis. Niemand krijgt een mail:
+  de verantwoordelijken kijken zelf op deze pagina.
 
 ## Opruiming van de bucket
 

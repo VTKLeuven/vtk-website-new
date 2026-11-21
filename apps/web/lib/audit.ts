@@ -118,6 +118,7 @@ export const AUDIT_ENTITIES = {
   theokotProduct: { nl: "Theokotproduct", en: "Theokot product", group: "theokot" },
   theokotOrder: { nl: "Theokotbestelling", en: "Theokot order", group: "theokot" },
   theokotBan: { nl: "Theokotban", en: "Theokot ban", group: "theokot" },
+  theokotDuty: { nl: "Verantwoordelijke Theokot", en: "Theokot duty", group: "theokot" },
   theokotSettings: { nl: "Theokotinstelling", en: "Theokot setting", group: "theokot" },
   theokotRental: { nl: "Theokotverhuur", en: "Theokot rental", group: "theokot" },
   theokotRentalContract: { nl: "Huurcontract Theokot", en: "Theokot rental contract", group: "theokot" },

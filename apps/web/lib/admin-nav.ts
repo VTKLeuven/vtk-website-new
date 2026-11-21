@@ -169,6 +169,9 @@ export function getAdminNav(): NavEntry[] {
       // De shiften van een werkweek als tijdlijn: waar er nog shifters nodig
       // zijn. Een eigen pagina en geen tab binnen Broodjes, op vraag van Theokot.
       item('theokotShiften', '/theokot/shiften', { perm: 'theokot.manage' }),
+      // Het tweede tabblad van Shiften: wie de zaak openhoudt. Verborgen in de
+      // zijbalk (het is een tabblad), wel te vinden met Ctrl/Cmd+K.
+      item('theokotVerantwoordelijken', '/theokot/shiften/verantwoordelijken', { perm: 'theokot.manage', hidden: true }),
     ]),
     // Google Admin: de groepsadressen, de @vtk.be-accounts en hun
     // organisatie-eenheden, met tabbladen in de pagina zelf. Stond onder
