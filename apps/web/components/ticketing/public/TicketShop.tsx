@@ -42,6 +42,7 @@ import {
 import { trackCheckoutStart } from "@/lib/analytics-client";
 import { audienceLoginHintQuestion } from "@/lib/ticketing/audience";
 import { sourceQuery } from "@/lib/ticketing/source";
+import { accountOrderMax } from "@/lib/ticketing/accountLimit";
 import { useLandingSource } from "./useLandingSource";
 
 export type Attendee = {
@@ -198,6 +199,8 @@ function checkoutErrorMessage(
     SOLD_OUT: { nl: "Deze tickets zijn net uitverkocht.", en: "These tickets have just sold out." },
     HONORARY_PRICE_USED: { nl: "Je erelidticket voor dit event heb je al. Kies de gewone prijs.", en: "You already have your honorary ticket for this event. Choose the regular price." },
     HONORARY_TICKET_LIMIT: { nl: "Als erelid koop je voor dit event één ticket, en dat heb je al.", en: "As an honorary member you can buy one ticket for this event, and you already have it." },
+    ACCOUNT_TICKET_LIMIT: { nl: "Je hebt voor dit event al een ticket op je account.", en: "You already have a ticket for this event on your account." },
+    PRESALE_SELF_ONLY: { nl: "Tijdens de voorverkoop koop je hoogstens één ticket, enkel op je eigen naam.", en: "During presale you can buy at most one ticket, in your own name only." },
     PAYMENT_UNAVAILABLE: { nl: "De betaalpagina is tijdelijk niet bereikbaar. Probeer straks opnieuw.", en: "The payment page is temporarily unavailable. Try again shortly." },
     REQUEST_BODY_TOO_LARGE: { nl: "De bestelling bevat te veel gegevens.", en: "The order contains too much data." },
     BUSY: { nl: "Het is heel druk. Je bestelling is niet doorgegaan; probeer meteen opnieuw.", en: "It is very busy. Your order did not go through; try again straight away." },
@@ -585,11 +588,15 @@ export function TicketShop({
     [event.ticketTypes],
   );
   const lines = useMemo(() => activeTypes.flatMap(ticketLinesForType), [activeTypes]);
-  // Een erelid op een event met `honoraryOneTicket` koopt één ticket in totaal,
-  // en geen meer wanneer het er al een heeft. Verder het maximum van het event.
-  const orderMax = event.honoraryOneTicket
-    ? Math.min(event.maxTicketsPerOrder, event.honoraryOneTicket.used ? 0 : 1)
-    : event.maxTicketsPerOrder;
+  // Tijdens de voorverkoop koopt een ingelogd account hoogstens één ticket, en
+  // enkel voor zichzelf (op eigen naam en e-mail).
+  const presaleSelfOnly = !preview && Boolean(event.presaleSelfOnly && event.viewer);
+  // Een erelid op een event met `honoraryOneTicket`, of elk ingelogd account
+  // op een event met `maxTicketsPerOrder === 1` of in voorverkoop, koopt één
+  // ticket in totaal, en geen meer wanneer het er al een heeft.
+  const accountLimitUsed =
+    Boolean(event.honoraryOneTicket?.used) || Boolean(event.oneTicketPerAccount?.used);
+  const orderMax = accountOrderMax({ ...event, presaleSelfOnly });
   // Wat één bestelling hier echt kan tellen: het maximum van het event, of
   // minder wanneer de tickets elk een lager maximum hebben.
   const limit = orderLimit(activeTypes, orderMax);
@@ -609,10 +616,16 @@ export function TicketShop({
         return (attendees[line.key] ?? []).slice(0, count).map((attendee, index) => ({
           line,
           index,
-          attendee,
+          attendee: presaleSelfOnly
+            ? {
+                ...attendee,
+                attendeeName: event.viewer!.name,
+                attendeeEmail: event.viewer!.email,
+              }
+            : attendee,
         }));
       }),
-    [attendees, lines, quantities],
+    [attendees, event.viewer, lines, presaleSelfOnly, quantities],
   );
   const detailsOpen = showDetails && selectedCount > 0;
 
@@ -768,7 +781,7 @@ export function TicketShop({
       }
     }
 
-    if (!sameBuyer) {
+    if (!sameBuyer && !presaleSelfOnly) {
       const trimmedBuyerName = buyerName.trim();
       const trimmedBuyerEmail = buyerEmail.trim();
       if (trimmedBuyerName.length === 0) {
@@ -841,7 +854,7 @@ export function TicketShop({
 
     if (payload.error === "INVALID_REQUEST" && payload.fields) {
       if (payload.fields.buyerName?.length) {
-        if (!sameBuyer) {
+        if (!sameBuyer && !presaleSelfOnly) {
           addMapped("buyer-name", nl ? "Vul een geldige naam in (minstens 2 tekens)." : "Enter a valid name (at least 2 characters).");
         } else if (activeAttendeeEntries[0]) {
           addMapped(
@@ -851,7 +864,7 @@ export function TicketShop({
         }
       }
       if (payload.fields.buyerEmail?.length) {
-        if (!sameBuyer) {
+        if (!sameBuyer && !presaleSelfOnly) {
           addMapped("buyer-email", nl ? "Vul een geldig e-mailadres in." : "Enter a valid email address.");
         } else if (activeAttendeeEntries[0]) {
           addMapped(
@@ -1120,7 +1133,9 @@ export function TicketShop({
     ? beforeSales
       ? locale === "nl" ? "Nog niet te koop" : "Not on sale yet"
       : locale === "nl" ? "Verkoop gesloten" : "Sales closed"
-    : locale === "nl" ? "Kies eerst een ticket" : "Select tickets first";
+    : accountLimitUsed
+      ? locale === "nl" ? "Ticket al besteld" : "Ticket already ordered"
+      : locale === "nl" ? "Kies eerst een ticket" : "Select tickets first";
 
   const trimmedBuyerName = buyerName.trim();
   const trimmedBuyerEmail = buyerEmail.trim();
@@ -1146,10 +1161,11 @@ export function TicketShop({
     return null;
   };
 
-  const resolvedBuyerName = sameBuyer
+  const effectiveSameBuyer = presaleSelfOnly || sameBuyer;
+  const resolvedBuyerName = effectiveSameBuyer
     ? (firstActiveAttendee?.attendeeName.trim() ?? "")
     : trimmedBuyerName;
-  const resolvedBuyerEmail = sameBuyer
+  const resolvedBuyerEmail = effectiveSameBuyer
     ? (firstActiveAttendee?.attendeeEmail.trim() ?? "")
     : trimmedBuyerEmail;
 
@@ -1170,7 +1186,13 @@ export function TicketShop({
           {locale === "nl" ? "Jouw gegevens" : "Your details"}
         </h2>
         <p className="tshop-lede">
-          {locale === "nl" ? "Elk ticket wordt op naam gezet." : "Each ticket is issued to one attendee."}
+          {presaleSelfOnly
+            ? locale === "nl"
+              ? "Tijdens de voorverkoop koop je enkel voor jezelf, op naam van je account."
+              : "During presale you can only buy for yourself, in your account's name."
+            : locale === "nl"
+              ? "Elk ticket wordt op naam gezet."
+              : "Each ticket is issued to one attendee."}
         </p>
 
         <div className="ticket-attendee-list">
@@ -1184,7 +1206,7 @@ export function TicketShop({
             const emailError = fieldErrors[emailId];
             const isBlankAttendee =
               attendee.attendeeName.trim() === "" && attendee.attendeeEmail.trim() === "";
-            const copySource = isBlankAttendee ? buyerInfoForSlot(globalIndex) : null;
+            const copySource = !presaleSelfOnly && isBlankAttendee ? buyerInfoForSlot(globalIndex) : null;
 
             return (
               <fieldset className="ticket-attendee" key={fieldPrefix}>
@@ -1226,11 +1248,14 @@ export function TicketShop({
                       <input
                         id={nameId}
                         value={attendee.attendeeName}
-                        autoComplete={sameBuyer && globalIndex === 0 ? "name" : "off"}
+                        readOnly={presaleSelfOnly}
+                        aria-readonly={presaleSelfOnly || undefined}
+                        autoComplete={effectiveSameBuyer && globalIndex === 0 ? "name" : "off"}
                         required
                         aria-invalid={nameError ? true : undefined}
                         aria-describedby={nameError ? nameErrorId : undefined}
                         onChange={(event_) => {
+                          if (presaleSelfOnly) return;
                           updateAttendee(line.key, index, { attendeeName: event_.target.value });
                           clearFieldError(nameId);
                         }}
@@ -1252,11 +1277,14 @@ export function TicketShop({
                         id={emailId}
                         type="email"
                         value={attendee.attendeeEmail}
-                        autoComplete={sameBuyer && globalIndex === 0 ? "email" : "off"}
+                        readOnly={presaleSelfOnly}
+                        aria-readonly={presaleSelfOnly || undefined}
+                        autoComplete={effectiveSameBuyer && globalIndex === 0 ? "email" : "off"}
                         required
                         aria-invalid={emailError ? true : undefined}
                         aria-describedby={emailError ? emailErrorId : undefined}
                         onChange={(event_) => {
+                          if (presaleSelfOnly) return;
                           updateAttendee(line.key, index, { attendeeEmail: event_.target.value });
                           clearFieldError(emailId);
                         }}
@@ -1294,27 +1322,29 @@ export function TicketShop({
           })}
         </div>
 
-        <label className="ticket-checkbox ticket-same-buyer">
-          <input
-            type="checkbox"
-            checked={sameBuyer}
-            onChange={(event_) => {
-              const checked = event_.target.checked;
-              setSameBuyer(checked);
-              if (checked) {
-                clearFieldError("buyer-name");
-                clearFieldError("buyer-email");
-              }
-            }}
-          />
-          <span>
-            {locale === "nl"
-              ? "Stuur de bestelling naar de eerste aanwezige"
-              : "Send the order to the first attendee"}
-          </span>
-        </label>
+        {!presaleSelfOnly ? (
+          <label className="ticket-checkbox ticket-same-buyer">
+            <input
+              type="checkbox"
+              checked={sameBuyer}
+              onChange={(event_) => {
+                const checked = event_.target.checked;
+                setSameBuyer(checked);
+                if (checked) {
+                  clearFieldError("buyer-name");
+                  clearFieldError("buyer-email");
+                }
+              }}
+            />
+            <span>
+              {locale === "nl"
+                ? "Stuur de bestelling naar de eerste aanwezige"
+                : "Send the order to the first attendee"}
+            </span>
+          </label>
+        ) : null}
 
-        {!sameBuyer ? (
+        {!effectiveSameBuyer ? (
           <fieldset className="ticket-attendee">
             <legend>{locale === "nl" ? "Gegevens koper" : "Buyer details"}</legend>
             <div className="ticket-fields-grid">
@@ -1629,17 +1659,22 @@ export function TicketShop({
   // Op een smal scherm staat het ticketpaneel bovenaan in natuurlijke
   // DOM-volgorde, gevolgd door de gegevens/over-sectie en daarna het
   // praktische blok. Op breed scherm zet CSS Grid `.tshop-main` links en
-  // `.tshop-panel` + `.tshop-practical` rechts.
+  // `.tshop-panel` + `.tshop-practical` rechts. Het paneel schuift mee binnen
+  // `.tshop-panel-track`, niet binnen heel `.tshop`: anders schoof het over het
+  // praktische blok eronder.
   return (
     <div className="tshop">
+      <div className="tshop-panel-track">
       <aside className="tshop-panel" aria-labelledby="ticket-types-heading">
           <div className="tshop-panel-head">
             <h2 id="ticket-types-heading">Tickets</h2>
-            {lines.length > 0 && !event.honoraryOneTicket?.used ? (
+            {lines.length > 0 && !accountLimitUsed ? (
               <small>
-                {locale === "nl"
-                  ? `Max. ${limit} per bestelling`
-                  : `Max. ${limit} per order`}
+                {event.oneTicketPerAccount
+                  ? "Max. 1 per account"
+                  : locale === "nl"
+                    ? `Max. ${limit} per bestelling`
+                    : `Max. ${limit} per order`}
               </small>
             ) : null}
           </div>
@@ -1656,6 +1691,11 @@ export function TicketShop({
                 {locale === "nl"
                   ? `Voor iedereen opent de verkoop ${formatTicketDate(event.presale.publicStart, locale)}.`
                   : `Sales open for everyone on ${formatTicketDate(event.presale.publicStart, locale)}.`}
+                {presaleSelfOnly
+                  ? locale === "nl"
+                    ? " Je kan nu hoogstens één ticket kopen, enkel voor jezelf."
+                    : " You can currently buy at most one ticket, for yourself only."
+                  : null}
               </span>
             </p>
           ) : null}
@@ -1769,6 +1809,12 @@ export function TicketShop({
                       ? "Als erelid koop je voor dit event één ticket."
                       : "As an honorary member you can buy one ticket for this event."}
                 </p>
+              ) : event.oneTicketPerAccount?.used ? (
+                <p className="tshop-hint">
+                  {locale === "nl"
+                    ? "Je hebt voor dit event al een ticket op je account."
+                    : "You already have a ticket for this event on your account."}
+                </p>
               ) : event.honoraryPriceUsed ? (
                 <p className="tshop-hint">
                   {locale === "nl"
@@ -1876,6 +1922,7 @@ export function TicketShop({
             </>
           )}
         </aside>
+      </div>
         <div className="tshop-main">
           {detailsOpen ? (checkoutStep === "review" ? reviewSection : detailsForm) : null}
           {about}

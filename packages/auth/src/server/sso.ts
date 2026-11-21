@@ -58,6 +58,7 @@ export type SsoAuditAction =
   | 'delete'
   | 'revoke-tokens'
   | 'access-mode'
+  | 'kul-requirement'
   | 'permission-create'
   | 'permission-update'
   | 'permission-delete'
@@ -404,6 +405,9 @@ export async function ensureFlowTestClient(
     requirePKCE: true,
     referenceId: OAUTH_CLIENT_OWNER,
     accessMode: setup.accessMode,
+    // De tester test de toegangsmodus; een KU Leuven-vereiste van een vorige
+    // proef zou die uitkomst stil veranderen.
+    kulRequirement: 'NONE' as const,
     permissionNamespace: FLOW_TEST_NAMESPACE,
     updatedAt: new Date(),
   };

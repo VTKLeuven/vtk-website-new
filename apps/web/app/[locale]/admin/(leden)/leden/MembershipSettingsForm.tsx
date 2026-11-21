@@ -12,8 +12,8 @@ import {
 import { AccountingCodePicker } from "@/components/admin/AccountingCodePicker";
 
 /**
- * De prijs van een niet-facultair lidmaatschap, en of de twee wegen naar een
- * lidmaatschap openstaan.
+ * De prijs van een niet-facultair lidmaatschap en van een betalend
+ * erelidmaatschap, en of die wegen naar een lidmaatschap openstaan.
  *
  * Instelbaar en niet hardgecodeerd: de prijs is een bestuursbeslissing die per
  * academiejaar kan wijzigen, en dat hoort geen deploy te vragen. Wat er al
@@ -36,6 +36,10 @@ export function MembershipSettingsForm({
         price: "Prijs niet-facultair lid (EUR)",
         faculty: "Studenten van de faculteit kunnen zich gratis aanmelden",
         external: "Niet-facultaire leden kunnen zich aanmelden en betalen",
+        honoraryPrice: "Prijs betalend erelid (EUR)",
+        honoraryPriceHint: "Per academiejaar. Enkel wie geen student is, ziet het aanbod op /lidmaatschap.",
+        honoraryOpen: "Wie geen student is, kan zichzelf betalend erelid maken",
+        invalidHonorary: "Vul een geldige prijs in voor een erelid, groter dan 0, bijvoorbeeld 75.",
         code: "Boekhoudcode",
         codeDefault: fallback ? `Standaard: ${accountingCodeLabel(fallback)}` : "Geen code",
         codeHint: "Staat vooraan in de betaalinfo bij Mollie, zodat het lidgeld in een uitbetaling herkenbaar is.",
@@ -52,6 +56,10 @@ export function MembershipSettingsForm({
         price: "Price for a non-faculty member (EUR)",
         faculty: "Faculty students can sign up for free",
         external: "Non-faculty members can sign up and pay",
+        honoraryPrice: "Price for a paying honorary member (EUR)",
+        honoraryPriceHint: "Per academic year. Only people who are not a student see the offer on /lidmaatschap.",
+        honoraryOpen: "People who are not a student can become a paying honorary member",
+        invalidHonorary: "Enter a valid honorary member price above 0, for example 75.",
         code: "Accounting code",
         codeDefault: fallback ? `Default: ${accountingCodeLabel(fallback)}` : "No code",
         codeHint: "Leads the payment details at Mollie, so the fee is recognisable in a payout.",
@@ -73,7 +81,11 @@ export function MembershipSettingsForm({
         savingLabel={t.saving}
         savedMessage={t.saved}
         resetOnSuccess={false}
-        errorMessages={{ INVALID_PRICE: t.invalid, INVALID_ACCOUNTING_CODE: t.invalidCode }}
+        errorMessages={{
+          INVALID_PRICE: t.invalid,
+          INVALID_HONORARY_PRICE: t.invalidHonorary,
+          INVALID_ACCOUNTING_CODE: t.invalidCode,
+        }}
         fallbackErrorMessage={t.failed}
         className="space-y-4"
       >
@@ -85,6 +97,21 @@ export function MembershipSettingsForm({
             inputMode="decimal"
             defaultValue={(config.externalPriceCents / 100).toFixed(2).replace(".", ",")}
           />
+        </div>
+        <div>
+          <div className="w-56">
+            <Label htmlFor="membership-honorary-price">{t.honoraryPrice}</Label>
+            <Input
+              id="membership-honorary-price"
+              name="honoraryPrice"
+              inputMode="decimal"
+              aria-describedby="membership-honorary-price-hint"
+              defaultValue={(config.honoraryPriceCents / 100).toFixed(2).replace(".", ",")}
+            />
+          </div>
+          <p id="membership-honorary-price-hint" className="mt-1 text-xs text-[#5c667f]">
+            {t.honoraryPriceHint}
+          </p>
         </div>
         <div className="max-w-md">
           <Label htmlFor="membership-accounting-code">{t.code}</Label>
@@ -115,6 +142,15 @@ export function MembershipSettingsForm({
             className="shrink-0"
           />
           {t.external}
+        </label>
+        <label className="flex items-center gap-2 text-sm text-vtk-ink">
+          <input
+            type="checkbox"
+            name="honoraryOpen"
+            defaultChecked={config.honoraryOpen}
+            className="shrink-0"
+          />
+          {t.honoraryOpen}
         </label>
       </SaveForm>
     </Card>

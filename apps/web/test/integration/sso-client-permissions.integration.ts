@@ -294,3 +294,116 @@ describe('the access gate', () => {
     expect(withoutClient.permissions).toBeUndefined();
   });
 });
+
+describe('the KU Leuven requirement', () => {
+  const suffix = randomUUID().slice(0, 8);
+  const ids = {
+    password: randomUUID(),
+    unchecked: randomUUID(),
+    staff: randomUUID(),
+    student: randomUUID(),
+  };
+  const clientId = `kul-gate-test-${suffix}`;
+  const namespace = `kul${suffix.replace(/[^a-z0-9]/g, '')}`;
+  const checkedAt = new Date('2026-11-20T10:00:00.000Z');
+
+  beforeAll(async () => {
+    const user = (id: string, extra: Record<string, unknown> = {}) => ({
+      id,
+      name: `KUL ${id}`,
+      email: `kul-${id}@example.com`,
+      emailVerified: true,
+      active: true,
+      ...extra,
+    });
+    await prisma.user.createMany({
+      data: [
+        // Enkel een wachtwoord, geen KU Leuven-login.
+        user(ids.password),
+        // Gekoppeld van vóór de studentencontrole: nog niet gecontroleerd.
+        user(ids.unchecked),
+        user(ids.staff, { kulStudent: false, kulStudentChangedAt: checkedAt }),
+        user(ids.student, { kulStudent: true, kulStudentChangedAt: checkedAt }),
+      ],
+    });
+    await prisma.account.createMany({
+      data: [ids.unchecked, ids.staff, ids.student].map((userId) => ({
+        id: randomUUID(),
+        accountId: `${userId}@kuleuven.be`,
+        providerId: 'kuleuven',
+        userId,
+      })),
+    });
+    await prisma.oauthClient.create({
+      data: {
+        id: clientId,
+        clientId,
+        name: 'Burgieclan',
+        redirectUris: ['https://burgieclan.vtk.be/cb'],
+        scopes: ['openid'],
+        accessMode: 'OPEN',
+        permissionNamespace: namespace,
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.oauthClient.deleteMany({ where: { clientId } });
+    await prisma.user.deleteMany({ where: { id: { in: Object.values(ids) } } });
+  });
+
+  const reasons = async () =>
+    Object.fromEntries(
+      await Promise.all(
+        Object.entries(ids).map(async ([key, id]) => {
+          const access = await checkClientAccess(id, clientId);
+          return [key, access.allowed ? 'allowed' : access.reason];
+        })
+      )
+    );
+
+  it('changes nothing for a client without a requirement', async () => {
+    expect(await reasons()).toEqual({
+      password: 'allowed',
+      unchecked: 'allowed',
+      staff: 'allowed',
+      student: 'allowed',
+    });
+  });
+
+  it('LINKED lets in every KU Leuven login, staff included', async () => {
+    await prisma.oauthClient.update({ where: { clientId }, data: { kulRequirement: 'LINKED' } });
+    expect(await reasons()).toEqual({
+      password: 'kul',
+      unchecked: 'allowed',
+      staff: 'allowed',
+      student: 'allowed',
+    });
+  });
+
+  it('STUDENT asks an unchecked link to sign in again instead of calling it staff', async () => {
+    await prisma.oauthClient.update({ where: { clientId }, data: { kulRequirement: 'STUDENT' } });
+    expect(await reasons()).toEqual({
+      password: 'kul',
+      unchecked: 'kul',
+      staff: 'student',
+      student: 'allowed',
+    });
+  });
+
+  it('STUDENT no longer holds once the KU Leuven login is unlinked', async () => {
+    await prisma.account.deleteMany({ where: { userId: ids.student, providerId: 'kuleuven' } });
+    expect((await checkClientAccess(ids.student, clientId)).reason).toBe('kul');
+    await prisma.account.create({
+      data: { id: randomUUID(), accountId: `${ids.student}@kuleuven.be`, providerId: 'kuleuven', userId: ids.student },
+    });
+  });
+
+  it('reports the missing permission before the KU Leuven login', async () => {
+    // Wie de access-permissie mist, helpt een KU Leuven-login niet verder.
+    await prisma.oauthClient.update({ where: { clientId }, data: { accessMode: 'RESTRICTED' } });
+    expect((await checkClientAccess(ids.password, clientId)).reason).toBe('permission');
+    expect((await checkClientAccess(ids.student, clientId)).reason).toBe('permission');
+    await prisma.oauthClient.update({ where: { clientId }, data: { accessMode: 'OPEN' } });
+  });
+});

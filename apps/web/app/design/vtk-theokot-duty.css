@@ -1,0 +1,586 @@
+/* Theokot: verantwoordelijken (/admin/theokot/shiften/verantwoordelijken,
+   `DutyRoster`). Hun rekenblad als raster: de dagen naast elkaar, de blokken
+   onder elkaar, in elk vak wie kan. Een ingedeelde naam is een volle navy pil
+   met een vinkje; rood is een blok waar niemand kan. De kleur zegt nooit iets
+   alleen: het vak zegt "niemand kan" of "nog te kiezen". Op een smal scherm
+   staat elke dag als eigen blok onder elkaar (zelfde DOM, andere plaatsing).
+   Zie docs/design-decisions.md, "Theokot: verantwoordelijken". */
+
+.tk-duty {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  container-type: inline-size;
+}
+
+.tk-duty > * {
+  min-width: 0;
+}
+
+.tk-duty-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.tk-duty-danger {
+  color: var(--danger-ink) !important;
+}
+
+.tk-duty-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 7px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tk-duty-btn:hover:not(:disabled) {
+  border-color: var(--control-border);
+}
+
+.tk-duty-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tk-duty-btn:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+.tk-duty-hint {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Het raster. Elk vak krijgt zijn kolom en rij mee als variabele, zodat de DOM
+   per dag kan lopen (wat een telefoon onder elkaar zet). */
+.tk-duty-grid {
+  display: grid;
+  grid-template-columns: 104px repeat(5, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 12px 40px color-mix(in srgb, var(--ink) 4%, transparent);
+}
+
+.tk-duty-grid > * {
+  grid-column: var(--col, 1);
+  grid-row: var(--row, 1);
+}
+
+.tk-duty-day {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 12px 10px 10px;
+  border-bottom: 1px solid var(--line);
+  border-left: 1px solid var(--rule-soft);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.tk-duty-day small,
+.tk-duty-day small[data-tone] {
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+
+.tk-duty-day small[data-tone="none"] {
+  color: var(--danger-ink);
+  font-weight: 600;
+}
+
+.tk-duty-day small[data-tone="open"] {
+  color: var(--low-ink);
+  font-weight: 600;
+}
+
+.tk-duty-corner {
+  border-bottom: 1px solid var(--line);
+}
+
+.tk-duty-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.tk-duty-slot b {
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.tk-duty-slot span {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-duty-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  min-height: 92px;
+  padding: 8px 8px 10px;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--rule-soft);
+}
+
+.tk-duty-cell[data-state="none"] {
+  background: var(--danger-bg);
+}
+
+.tk-duty-cell[data-state="closed"] {
+  background: repeating-linear-gradient(135deg, var(--paper-2) 0 6px, var(--paper) 6px 12px);
+}
+
+.tk-duty-cell-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-height: 26px;
+}
+
+/* Het blok in het vak zelf staat enkel op een telefoon: daar is er geen kolom links. */
+.tk-duty-cell-slot {
+  display: none;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-duty-cell-slot b {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.tk-duty-note {
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.tk-duty-need {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--low-ink);
+  white-space: nowrap;
+}
+
+.tk-duty-need[data-tone="none"] {
+  color: var(--danger-ink);
+}
+
+.tk-duty-closed {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* Het potlood rechtsboven, klein genoeg om het vak niet te overheersen. */
+.tk-duty-cell .tk-duty-edit {
+  width: 26px;
+  height: 26px;
+  margin-left: auto;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.tk-duty-cell .tk-duty-edit:hover {
+  border-color: var(--line-2);
+  color: var(--ink);
+}
+
+.tk-duty-cell .tk-duty-edit svg {
+  width: 13px;
+  height: 13px;
+}
+
+.tk-duty-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.tk-duty-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  max-width: 100%;
+  padding: 3px 9px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tk-duty-chip:hover {
+  border-color: var(--control-border);
+}
+
+.tk-duty-chip:focus-visible,
+.tk-duty-chip-x:focus-visible,
+.tk-duty-add:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+.tk-duty-chip small {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-duty-chip svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+}
+
+.tk-duty-chip[aria-pressed="true"] {
+  border-color: var(--navy);
+  background: var(--navy);
+  color: var(--paper);
+  font-weight: 600;
+}
+
+.tk-duty-chip[aria-pressed="true"] small {
+  color: var(--on-dark-muted);
+}
+
+/* Een vak dat rond is: wie niet gekozen werd, wijkt terug, zoals de niet-groene
+   namen op het blad. */
+.tk-duty-cell[data-state="done"] .tk-duty-chip[aria-pressed="false"] {
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+/* Jouw eigen naam: een gele onderlijn, en een kruisje om te zeggen dat je toch niet kan. */
+.tk-duty-chip[data-me] {
+  box-shadow: inset 0 -2px 0 var(--yellow);
+}
+
+.tk-duty-chip-wrap {
+  display: inline-flex;
+  max-width: 100%;
+}
+
+.tk-duty-chip-wrap .tk-duty-chip {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.tk-duty-chip-x {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  border: 1px solid var(--line-2);
+  border-left: 0;
+  border-radius: 0 999px 999px 0;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.tk-duty-chip-x:hover {
+  color: var(--ink);
+}
+
+.tk-duty-chip-x svg {
+  width: 11px;
+  height: 11px;
+}
+
+.tk-duty-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 2px 9px;
+  border: 1px dashed var(--control-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--body);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.tk-duty-add:hover {
+  border-style: solid;
+  color: var(--ink);
+}
+
+.tk-duty-add svg {
+  width: 12px;
+  height: 12px;
+}
+
+.tk-duty-chip-sample {
+  min-height: 22px;
+  cursor: default;
+}
+
+/* De telling, zoals het overzichtje naast het blad. */
+.tk-duty-tally {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  max-width: 560px;
+  padding: var(--admin-card-pad, 18px 20px);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.tk-duty-tally-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tk-duty-tally h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.tk-duty-tally-scroll {
+  position: relative;
+  overflow-x: auto;
+}
+
+.tk-duty-tally table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-duty-tally th,
+.tk-duty-tally td {
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+  text-align: right;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.tk-duty-tally thead th {
+  border-top: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tk-duty-tally th:first-child {
+  text-align: left;
+  font-weight: 500;
+}
+
+.tk-duty-tally thead th:first-child {
+  font-weight: 700;
+}
+
+.tk-duty-total {
+  font-weight: 600;
+}
+
+.tk-duty-tally tr[data-low] .tk-duty-total {
+  color: var(--ok-ink);
+  font-weight: 700;
+}
+
+.tk-duty-me {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.tk-duty-fine {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* De modal voor een blok en voor de startstand. */
+.tk-duty-dialog {
+  width: min(460px, calc(100% - 2rem));
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 30px 80px color-mix(in srgb, var(--ink) 25%, transparent);
+}
+
+.tk-duty-dialog::backdrop {
+  background: color-mix(in srgb, var(--ink) 45%, transparent);
+}
+
+.tk-duty-dialog-body {
+  display: grid;
+  gap: 14px;
+  padding: 18px 20px 20px;
+}
+
+.tk-duty-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tk-duty-dialog-head h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.tk-duty-dialog-lead {
+  margin: 0;
+  font-size: 14px;
+}
+
+.tk-duty-form {
+  display: grid;
+  gap: 14px;
+}
+
+.tk-duty-field {
+  display: grid;
+  gap: 5px;
+}
+
+.tk-duty-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.tk-duty-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--navy);
+}
+
+.tk-duty-carry {
+  display: grid;
+  gap: 8px;
+  max-height: min(50vh, 420px);
+  overflow-y: auto;
+}
+
+.tk-duty-carry-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Smal: elke dag een eigen blok onder elkaar, het blok in het vak zelf. */
+@container (max-width: 640px) {
+  .tk-duty-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: visible;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .tk-duty-corner,
+  .tk-duty-slot {
+    display: none;
+  }
+
+  .tk-duty-day {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-top: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-bottom: 0;
+    border-radius: 16px 16px 0 0;
+    background: var(--surface);
+  }
+
+  .tk-duty-day:first-of-type {
+    margin-top: 0;
+  }
+
+  .tk-duty-cell {
+    min-height: 0;
+    padding: 10px 14px 12px;
+    border: 1px solid var(--line);
+    border-bottom: 0;
+    background: var(--surface);
+  }
+
+  /* De laatste van de vier blokken van een dag sluit de kaart af. */
+  .tk-duty-cell:has(+ .tk-duty-day),
+  .tk-duty-cell:last-child {
+    border-bottom: 1px solid var(--line);
+    border-radius: 0 0 16px 16px;
+  }
+
+  .tk-duty-cell-slot {
+    display: inline;
+  }
+
+  .tk-duty-tally {
+    max-width: none;
+  }
+
+  .tk-duty-tally thead th {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+  }
+
+  .tk-duty-tally th:not(:first-child),
+  .tk-duty-tally td {
+    padding-left: 8px;
+  }
+}

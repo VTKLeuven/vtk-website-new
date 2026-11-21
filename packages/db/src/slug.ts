@@ -16,7 +16,9 @@ export function slugify(input: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    // Na de regel hierboven staat er hoogstens één koppelteken op een rij;
+    // `^-+|-+$` zou op een lange reeks koppeltekens kwadratisch lopen.
+    .replace(/^-|-$/g, "")
     .slice(0, 80);
 }
 

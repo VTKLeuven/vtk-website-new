@@ -21,6 +21,7 @@ const KIND_LABEL: Record<string, { nl: string; en: string }> = {
   FACULTY: { nl: "Gratis (faculteit)", en: "Free (faculty)" },
   EXTERNAL: { nl: "Betalend", en: "Paying" },
   MANUAL: { nl: "Toegekend", en: "Granted" },
+  HONORARY: { nl: "Betalend erelid", en: "Paying honorary member" },
 };
 
 export function membershipKindLabel(kind: string, nl: boolean): string {

@@ -44,6 +44,7 @@ Het werkt ook binnen de pagina: een link naar `#shifts` terwijl je op
 | -------------- | ------------------------------------------ |
 | `#preferences` | Accountvoorkeuren (taal)                   |
 | `#password`    | Wachtwoord                                 |
+| `#kul`         | KU Leuven-logins (r- en u-nummer koppelen) |
 | `#profile`     | Profielformulier (de hele kaart)           |
 | `#identity`    | Profiel: naam en identiteit                |
 | `#address`     | Profiel: adres                             |

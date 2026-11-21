@@ -2711,3 +2711,10 @@
 .ticket-admin-placement .ticket-admin-form-grid {
   margin: 4px 0;
 }
+
+/* Tabblad Deelnemers: "Ticket aanmaken" en "Deelnemers mailen" boven de lijst,
+   onder elkaar, zodat een opengeklapt formulier de volle breedte krijgt. */
+.ticket-admin-actions-row { display: flex; flex-direction: column; margin-bottom: 14px; }
+.ticket-admin-actions-row .ticket-admin-details { margin-top: 0; }
+.ticket-admin-form fieldset.ticket-admin-field { border: 0; margin: 0; padding: 0; min-width: 0; }
+.ticket-admin-form fieldset.ticket-admin-field legend { padding: 0; font-size: 13px; font-weight: 600; color: var(--ink); }

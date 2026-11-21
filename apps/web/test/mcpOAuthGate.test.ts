@@ -111,6 +111,7 @@ describe("MCP OAuth toegangspoort en tokenvalidatie", () => {
       accessMode: "OPEN",
       permissionNamespace: null,
       scopes: ["mcp:read", "mcp:create", "offline_access"],
+      kulRequirement: "NONE",
     });
     mocks.userFindUnique.mockResolvedValue(
       userRecord({ permissions: ["calendar.create"] }),
@@ -120,7 +121,12 @@ describe("MCP OAuth toegangspoort en tokenvalidatie", () => {
       requestedScopes: ["mcp:read"],
       requestedResource: "https://vtk.be/api/mcp",
     });
-    expect(denied).toEqual({ allowed: false, clientName: "Claude" });
+    expect(denied).toEqual({
+      allowed: false,
+      clientName: "Claude",
+      kulRequirement: "NONE",
+      reason: "permission",
+    });
 
     mocks.userFindUnique.mockResolvedValue(
       userRecord({ permissions: ["mcp.use", "calendar.create"] }),
@@ -129,7 +135,11 @@ describe("MCP OAuth toegangspoort en tokenvalidatie", () => {
       requestedScopes: ["mcp:read"],
       requestedResource: "https://vtk.be/api/mcp",
     });
-    expect(allowed).toEqual({ allowed: true, clientName: "Claude" });
+    expect(allowed).toEqual({
+      allowed: true,
+      clientName: "Claude",
+      kulRequirement: "NONE",
+    });
   });
 
   it("laat gewone niet-MCP OPEN clients door zonder mcp.use", async () => {
@@ -138,12 +148,17 @@ describe("MCP OAuth toegangspoort en tokenvalidatie", () => {
       accessMode: "OPEN",
       permissionNamespace: null,
       scopes: ["openid", "profile"],
+      kulRequirement: "NONE",
     });
 
     const allowed = await checkClientAccess("user-1", "cudi", {
       requestedScopes: ["openid", "profile"],
     });
-    expect(allowed).toEqual({ allowed: true, clientName: "Cudi" });
+    expect(allowed).toEqual({
+      allowed: true,
+      clientName: "Cudi",
+      kulRequirement: "NONE",
+    });
     expect(mocks.userFindUnique).not.toHaveBeenCalled();
   });
 

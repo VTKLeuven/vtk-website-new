@@ -24,6 +24,7 @@
  */
 
 import { presaleStart, type PresaleConfig } from "@/lib/ticketing/presale";
+import { poolRemaining, type PoolSeatCounts } from "@/lib/ticketing/seats";
 
 /** Waar een bericht vandaan komt. Ook de sleutel van `NewsHidden.source`. */
 export type NewsSource =
@@ -105,6 +106,28 @@ export function ticketInNews(
   if (event.salesEndAt && event.salesEndAt <= now) return false;
   const date = ticketNewsDate(event);
   return date !== null && within(date, now, TICKETS_NEWS_DAYS);
+}
+
+/**
+ * Is deze ticketverkoop uitverkocht? Dan valt ze uit het nieuws: een bericht dat
+ * naar een shop wijst waar niets meer te koop is, is geen nieuws maar een
+ * teleurstelling. Uitverkocht is hier voor iedereen: geen enkel actief
+ * tickettype heeft nog een vrije plaats, voor een lid noch voor een niet-lid
+ * (het nieuws is voor elke bezoeker hetzelfde, dus een pot die enkel nog
+ * ledenplaatsen heeft, telt niet als uitverkocht). Een plaats in een lopende
+ * reservatie telt als bezet, zoals op /tickets; vervalt de reservatie, dan
+ * komt het bericht terug. Een verkoop zonder actieve types valt hier niet
+ * onder: die is niet uitverkocht maar nog niet ingericht.
+ */
+export function ticketSoldOut(event: {
+  ticketTypes: readonly { inventoryPool: PoolSeatCounts & { active: boolean } }[];
+}): boolean {
+  if (event.ticketTypes.length === 0) return false;
+  return event.ticketTypes.every(({ inventoryPool: pool }) => {
+    if (!pool.active) return true;
+    const remaining = poolRemaining(pool);
+    return Math.max(remaining.member, remaining.nonMember) <= 0;
+  });
 }
 
 /**

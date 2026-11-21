@@ -60,6 +60,7 @@ import {
 } from "@/lib/discord/pollMessages";
 import "@/app/design/vtk-poc-poll.css";
 import { SharedAlbumGateCard } from "@/components/media/SharedAlbumGate";
+import { NoAccessPanel } from "@/components/auth/NoAccessPanel";
 import { FlowPreview } from "./FlowPreview";
 import { MailPreviewList } from "./MailPreviewList";
 
@@ -967,6 +968,66 @@ export async function FlowsAdminPage({
           <SharedAlbumGateCard kind="forbidden" locale={locale} />
           <SharedAlbumGateCard kind="gone" locale={locale} />
           <SharedAlbumGateCard kind="unavailable" locale={locale} />
+        </div>
+      </FlowPreview>
+      )}
+
+      {section === "schermen" && (
+      <FlowPreview
+        title={nl ? "Geen toegang tot een SSO-applicatie" : "No access to an SSO application"}
+        when={
+          nl
+            ? "Verschijnt op /inloggen/geen-toegang wanneer een lid bij VTK aangemeld is, maar de poort het tegenhoudt bij een applicatie die via VTK inlogt: een beperkte applicatie zonder de access-permissie, of een applicatie die een KU Leuven-login of een studentenaccount vraagt."
+            : "Appears on /inloggen/geen-toegang when a member is signed in to VTK but the gate stops them at an application that signs in through VTK: a restricted application without the access permission, or one that asks for a KU Leuven login or a student account."
+        }
+        openLabel={nl ? "Toon de schermen" : "Show the screens"}
+        closeLabel={nl ? "Verberg de schermen" : "Hide the screens"}
+        rules={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Regels" : "Rules"}</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4">
+              <li>
+                {nl
+                  ? "De pagina vraagt dezelfde poort opnieuw (checkClientAccess) en toont de reden die die geeft. De permissie gaat voor: wie ze mist, krijgt geen KU Leuven-knop."
+                  : "The page asks the same gate again (checkClientAccess) and shows the reason it gives. The permission comes first: anyone missing it gets no KU Leuven button."}
+              </li>
+              <li>
+                {nl
+                  ? "Student betekent: de laatste KU Leuven-login was een r-nummer met een adres op student.kuleuven.be. Wie koppelde voor die controle bestond, krijgt het middelste scherm tot de volgende KU Leuven-login."
+                  : "Student means: the last KU Leuven login was an r-number with a student.kuleuven.be address. Anyone who linked before that check existed gets the middle screen until their next KU Leuven login."}
+              </li>
+              <li>
+                {nl
+                  ? "Na de KU Leuven-login gaat de autorisatie meteen verder; voldoet het lid intussen, dan stuurt deze pagina zelf door."
+                  : "After the KU Leuven login the authorisation continues straight away; if the member now qualifies, this page forwards on its own."}
+              </li>
+            </ul>
+          </>
+        }
+        yourState={
+          <>
+            <p className="font-medium text-vtk-ink">{nl ? "Waar" : "Where"}</p>
+            <p className="mt-2">
+              {nl
+                ? "Per applicatie in /admin/sso, onder Toegang en KU Leuven-login. De knop hieronder doet niets."
+                : "Per application in /admin/sso, under Access and KU Leuven login. The button below does nothing."}
+            </p>
+          </>
+        }
+      >
+        <div className="grid gap-6 lg:grid-cols-3">
+          {(["permission", "kul", "student"] as const).map((reason) => (
+            <div key={reason} className="vtk-auth rounded-2xl" style={{ padding: 16 }}>
+              <NoAccessPanel
+                nl={nl}
+                appName="Burgieclan"
+                reason={reason}
+                kulRequirement={reason === "permission" ? "NONE" : "STUDENT"}
+                kulLabel={dict.auth.signInWithKulLong}
+                resumeUrl={null}
+              />
+            </div>
+          ))}
         </div>
       </FlowPreview>
       )}

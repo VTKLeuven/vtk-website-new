@@ -50,7 +50,7 @@ export type PresaleViewer = {
   groups: readonly { id: string; type: string }[];
   /** Voltooide shiften in het lopende werkingsjaar; zie `presaleViewer.ts`. */
   completedShifts?: number;
-  /** Erelid (`User.honoraryMember`); zie `presaleViewer.ts`. */
+  /** Erelid, gratis of betalend (`isHonoraryMember`); zie `presaleViewer.ts`. */
   honorary?: boolean;
   /**
    * Volgde de private voorverkooplink van dit event (zie `presaleLink.ts`).

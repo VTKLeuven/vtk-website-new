@@ -11,6 +11,9 @@ import { joinMembershipAction } from "@/app/actions/membership";
  * je faculteit af en niet van een voorkeur; de server bepaalt ze opnieuw. De
  * betalende weg gaat meteen door naar de betaalpagina, de gratis meldt zich met
  * een toast en de status erboven verandert mee.
+ *
+ * Met `honorary` is het de kaart om betalend erelid te worden: dezelfde action
+ * met `soort=erelid`, die het aanbod ook zelf opnieuw nakijkt.
  */
 export function JoinMembershipCard({
   locale,
@@ -21,6 +24,8 @@ export function JoinMembershipCard({
   savedMessage,
   closedMessage,
   failedMessage,
+  honorary = false,
+  errorMessages = {},
 }: {
   locale: "nl" | "en";
   heading: string;
@@ -30,6 +35,9 @@ export function JoinMembershipCard({
   savedMessage: string;
   closedMessage: string;
   failedMessage: string;
+  honorary?: boolean;
+  /** Extra foutmeldingen, bovenop "gesloten". */
+  errorMessages?: Record<string, string>;
 }) {
   return (
     <Card className="p-6">
@@ -40,10 +48,11 @@ export function JoinMembershipCard({
         submitLabel={submitLabel}
         savingLabel={savingLabel}
         savedMessage={savedMessage}
-        errorMessages={{ MEMBERSHIP_CLOSED: closedMessage }}
+        errorMessages={{ ...errorMessages, MEMBERSHIP_CLOSED: closedMessage }}
         fallbackErrorMessage={failedMessage}
       >
         <input type="hidden" name="locale" value={locale} />
+        {honorary ? <input type="hidden" name="soort" value="erelid" /> : null}
       </SaveForm>
     </Card>
   );

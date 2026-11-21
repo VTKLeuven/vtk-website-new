@@ -454,18 +454,29 @@ export default async function TicketOrdersPage({
                               <details className="ticket-admin-details ticket-admin-refund-details">
                                 <summary><RotateCcw aria-hidden="true" size={15} />{locale === "nl" ? "Met de hand terugbetalen" : "Refund by hand"}</summary>
                                 <div className="ticket-admin-details-body">
-                                  <p className="ticket-admin-help">
-                                    {locale === "nl"
-                                      ? "Betaald met Bancontact: dat kan niet automatisch terugbetaald worden. Schrijf het bedrag over naar de rekening hieronder en markeer de tickets daarna als terugbetaald."
-                                      : "Paid with Bancontact, which cannot be refunded automatically. Transfer the amount to the account below, then mark the tickets as refunded."}
-                                  </p>
-                                  <RefundAccount
-                                    eventId={eventId}
-                                    paymentId={paidPayment.id}
-                                    iban={paidPayment.refundIban}
-                                    accountName={paidPayment.refundAccountName}
-                                    locale={locale}
-                                  />
+                                  {paidPayment.provider === "manual" ? (
+                                    // Een ticket dat het beheer zelf uitgaf: betaald buiten de site.
+                                    <p className="ticket-admin-help">
+                                      {locale === "nl"
+                                        ? "Manueel uitgegeven: het bedrag werd buiten de site betaald (bv. cash). Geef het op dezelfde manier terug en markeer de tickets daarna als terugbetaald."
+                                        : "Issued by hand: the amount was paid outside the site (e.g. cash). Give it back the same way, then mark the tickets as refunded."}
+                                    </p>
+                                  ) : (
+                                    <>
+                                      <p className="ticket-admin-help">
+                                        {locale === "nl"
+                                          ? "Betaald met Bancontact: dat kan niet automatisch terugbetaald worden. Schrijf het bedrag over naar de rekening hieronder en markeer de tickets daarna als terugbetaald."
+                                          : "Paid with Bancontact, which cannot be refunded automatically. Transfer the amount to the account below, then mark the tickets as refunded."}
+                                      </p>
+                                      <RefundAccount
+                                        eventId={eventId}
+                                        paymentId={paidPayment.id}
+                                        iban={paidPayment.refundIban}
+                                        accountName={paidPayment.refundAccountName}
+                                        locale={locale}
+                                      />
+                                    </>
+                                  )}
                                   <RefundOrderForm
                                     eventId={eventId}
                                     orderId={order.id}

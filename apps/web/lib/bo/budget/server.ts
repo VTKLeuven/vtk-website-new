@@ -9,7 +9,7 @@ import { postName } from '../posts';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { getCurrentSession } from '@/lib/session';
 import { applyFormulas } from './formula';
-import { hasResult, overviewOf, resultOverviewOf, type CalcContext } from './calc';
+import { hasResult, overviewOf, resultOverviewOf, vtkShareOf, type CalcContext } from './calc';
 import type { Begroting } from './begroting';
 import { potKey, potOf, type Pot, type PotMember } from './pot';
 import { begrotingSchema, parseBudgetContent, parseBudgetSettings } from './schema';
@@ -262,8 +262,10 @@ export async function loadPot(budget: BudgetRecord, settings: BudgetSettings): P
       postKey: record.postKey,
       status: record.status,
       targetDate: record.targetDate,
-      total: overviewOf(record.content, ctx).total,
-      result: hasResult(record.content) ? resultOverviewOf(record.content, ctx).total : null,
+      // Het deel van VTK: een potje is een lijn uit de begroting, en die
+      // draagt enkel wat VTK betaalt.
+      total: overviewOf(record.content, ctx).total * vtkShareOf(record.content),
+      result: hasResult(record.content) ? resultOverviewOf(record.content, ctx).total * vtkShareOf(record.content) : null,
     });
   }
   return potOf(members, budget.id);

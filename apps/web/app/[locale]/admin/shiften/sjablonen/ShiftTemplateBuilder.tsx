@@ -236,7 +236,7 @@ function buildRows(template: ShiftTemplate | null, globals: Globals, postOptions
 
 function blankRow(globals: Globals): Row {
   return {
-    uid: `extra-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    uid: `extra-${crypto.randomUUID()}`,
     enabled: true,
     name: composeName(globals.eventName, 'Extra shift'),
     start: globals.start,

@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { smtpEhloName } from "@vtk/mail";
-import { attachmentLine, orderConfirmationMail } from "@/lib/ticketing/mail";
+import {
+  attachmentLine,
+  attendeeMessageMail,
+  orderConfirmationMail,
+  ticketCancelledMail,
+  ticketChangedMail,
+} from "@/lib/ticketing/mail";
 import {
   MAX_ATTACHMENT_BYTES,
   safeFilename,
@@ -222,5 +228,113 @@ describe("de bijlagen zelf", () => {
     expect(withinBudget(heavy, 100)).toBe(true);
     expect(withinBudget(heavy, 101)).toBe(false);
     expect(withinBudget([], MAX_ATTACHMENT_BYTES)).toBe(true);
+  });
+});
+
+describe("de mail bij een geannuleerd ticket", () => {
+  const cancelled = {
+    locale: "nl" as const,
+    buyerName: "Jonas",
+    buyerEmail: "jonas@example.test",
+    attendeeName: "Pieter",
+    ticketTypeName: "Voorverkoop",
+    eventName: "Galabal",
+    orderNumber: "VTK-0001",
+    reason: "Voorverkoop is <enkel> voor jezelf.\nKoop dit ticket bij de publieke verkoop.",
+    refund: null,
+    remainingTickets: 0,
+  };
+
+  it("gaat naar de koper en noemt het ticket van de deelnemer", () => {
+    const mail = ticketCancelledMail(cancelled);
+    expect(mail.to).toBe("jonas@example.test");
+    expect(mail.subject).toBe("Ticket van Pieter voor Galabal geannuleerd");
+    expect(mail.text).toContain("het ticket van Pieter (Voorverkoop)");
+  });
+
+  it("zegt 'je ticket' wanneer het het ticket van de koper zelf is", () => {
+    const mail = ticketCancelledMail({ ...cancelled, attendeeName: "  jonas " });
+    expect(mail.subject).toBe("Je ticket voor Galabal geannuleerd");
+  });
+
+  it("neemt de reden letterlijk over, en escapet ze in html", () => {
+    // De reden is vrije tekst uit het beheer; een < mag de mail niet breken.
+    const mail = ticketCancelledMail(cancelled);
+    expect(mail.text).toContain(cancelled.reason);
+    expect(mail.html).toContain("Voorverkoop is &lt;enkel&gt; voor jezelf.");
+    expect(mail.html).not.toContain("<enkel>");
+  });
+
+  it("noemt geld enkel wanneer er via de site iets terugging", () => {
+    expect(ticketCancelledMail(cancelled).text).not.toMatch(/terug op de rekening/);
+    const refunded = ticketCancelledMail({ ...cancelled, refund: { amountCents: 2500, currency: "EUR" } });
+    expect(refunded.text).toMatch(/Je krijgt €\s?25,00 terug op de rekening/);
+  });
+
+  it("zegt hoeveel andere tickets geldig blijven", () => {
+    expect(ticketCancelledMail(cancelled).text).not.toContain("andere");
+    expect(ticketCancelledMail({ ...cancelled, remainingTickets: 1 }).text).toContain(
+      "Je andere ticket van deze bestelling blijft geldig."
+    );
+    expect(ticketCancelledMail({ ...cancelled, remainingTickets: 3 }).text).toContain(
+      "Je 3 andere tickets van deze bestelling blijven geldig."
+    );
+  });
+});
+
+describe("ticket van type gewijzigd", () => {
+  const changed = (over: Partial<Parameters<typeof ticketChangedMail>[0]> = {}) =>
+    ticketChangedMail({
+      locale: "nl",
+      buyerName: "Jonas",
+      buyerEmail: "jonas@example.test",
+      attendeeName: "Jonas",
+      fromName: "Inkom",
+      toName: "Inkom + drank",
+      eventName: "Galabal",
+      orderNumber: "VTK-0001",
+      orderUrl: "https://vtk.be/tickets/toegang?orderId=abc",
+      message: null,
+      ...over,
+    });
+
+  it("noemt het oude en het nieuwe type, en zegt dat het ticket hetzelfde blijft", () => {
+    const mail = changed();
+    expect(mail.subject).toBe("Je ticket voor Galabal gewijzigd");
+    expect(mail.text).toContain("van Inkom naar Inkom + drank");
+    expect(mail.text).toContain("niets opnieuw te downloaden");
+    expect(mail.text).not.toContain("Bericht van de organisator");
+  });
+
+  it("neemt het bericht letterlijk over en ontsnapt het in html", () => {
+    const mail = changed({ message: "Betaal <b>5 euro</b> bij." });
+    expect(mail.text).toContain("Betaal <b>5 euro</b> bij.");
+    expect(mail.html).toContain("Betaal &lt;b&gt;5 euro&lt;/b&gt; bij.");
+  });
+
+  it("spreekt over het ticket van iemand anders wanneer de koper niet de deelnemer is", () => {
+    expect(changed({ attendeeName: "Lotte" }).subject).toBe("Ticket van Lotte voor Galabal gewijzigd");
+  });
+});
+
+describe("bericht aan de deelnemers", () => {
+  it("draagt het onderwerp en de tekst van de organisator, en zegt waarom de mail komt", () => {
+    const mail = attendeeMessageMail({
+      locale: "nl",
+      to: "lotte@example.test",
+      name: "Lotte",
+      eventName: "Galabal",
+      subject: "Praktisch",
+      message: "Deuren om 20u.",
+      senderName: "Galabalpost",
+      replyTo: "gala@vtk.be",
+    });
+    expect(mail.to).toBe("lotte@example.test");
+    expect(mail.subject).toBe("Praktisch");
+    expect(mail.replyTo).toBe("gala@vtk.be");
+    expect(mail.text).toContain("Dag Lotte,");
+    expect(mail.text).toContain("Deuren om 20u.");
+    expect(mail.text).toContain("omdat je een ticket hebt voor Galabal");
+    expect(mail.html).toContain("Bericht van Galabalpost");
   });
 });

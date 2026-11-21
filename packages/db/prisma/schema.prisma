@@ -55,6 +55,16 @@ enum SsoAccessMode {
   RESTRICTED
 }
 
+// Welke KU Leuven-login een OAuth-client vraagt, bovenop SsoAccessMode.
+// NONE: geen. LINKED: het VTK-account hangt aan een KU Leuven-login.
+// STUDENT: die login is een studentenaccount (r-nummer en een adres op
+// student.kuleuven.be, zie `User.kulStudent`). Zie docs/sso.md.
+enum SsoKulRequirement {
+  NONE
+  LINKED
+  STUDENT
+}
+
 enum PageAssetKind {
   EMBEDDED_PDF
   DOWNLOAD
@@ -527,6 +537,14 @@ model User {
   // wordt enkel bij de eerste controle of een echte booleanwijziging aangepast.
   firwStudent          Boolean   @default(false)
   firwStudentChangedAt DateTime?
+  // Of de laatste KU Leuven-login een studentenaccount was: een r-nummer als
+  // account en een adres op student.kuleuven.be. Personeel en proffen loggen
+  // in met een u-nummer en vallen er dus buiten. Gezet bij elke KU Leuven-login
+  // (packages/auth/src/logins/kul-student.ts); de datum enkel bij de eerste
+  // controle of een echte wijziging. Null = sinds deze kolom nog geen
+  // KU Leuven-login gezien, dus "niet gevraagd" en niet "geen student".
+  kulStudent           Boolean   @default(false)
+  kulStudentChangedAt  DateTime?
   emailVerified        Boolean   @default(false)
   avatarKey            String?
   image                String?
@@ -703,7 +721,9 @@ model User {
   alumniMailOptIn         Boolean             @default(false)
   // Erelid. Enkel door een beheerder te zetten (/admin/leden, `leden.manage`), nooit door
   // het lid zelf. Geeft toegang tot ticketsoorten met `TicketAudience.HONORARY`,
-  // die voor iedereen anders onzichtbaar blijven.
+  // die voor iedereen anders onzichtbaar blijven. Dit is het gratis, blijvende
+  // erelidmaatschap; een betalend erelid heeft een `Membership` van soort
+  // `HONORARY` voor één academiejaar (zie `isHonoraryMember`).
   honoraryMember          Boolean             @default(false)
   // Wanneer dit account zichzelf met e-mail en wachtwoord aanmaakte (de weg voor
   // wie geen KU Leuven-login (meer) heeft). Bewust een datum en geen boolean:
@@ -778,6 +798,9 @@ model User {
   theokotVoucherRedemptions TheokotVoucherRedemption[] @relation("TheokotVoucherUser")
   theokotVouchersProcessed  TheokotVoucherRedemption[] @relation("TheokotVoucherProcessedBy")
   theokotBans               TheokotBan[]
+  theokotDutyAvailability   TheokotDutyAvailability[]
+  theokotDutyAssignments    TheokotDutyAssignment[]
+  theokotDutyCarryOvers     TheokotDutyCarryOver[]
   theokotRentalsDecided     TheokotRental[]            @relation("TheokotRentalDecidedBy")
   theokotRentalsCreated     TheokotRental[]            @relation("TheokotRentalCreatedBy")
   theokotRentalMessages     TheokotRentalMessage[]     @relation("TheokotRentalMessageSentBy")
@@ -1093,6 +1116,12 @@ enum MembershipKind {
   EXTERNAL
   /// Door een beheerder toegekend, zonder betaling.
   MANUAL
+  /// Betalend erelid voor dit academiejaar (prijs in `leden.config`,
+  /// standaard 75 euro). Enkel voor wie geen student is. Telt als lid en als
+  /// erelid, maar enkel in dat academiejaar; het blijvende, gratis
+  /// erelidmaatschap is `User.honoraryMember`. Zie docs/design-decisions.md,
+  /// "Betalende ereleden".
+  HONORARY
 }
 
 enum MembershipPaymentStatus {
@@ -4701,6 +4730,74 @@ model TheokotBan {
 }
 
 // -----------------------------------------------------------------------------
+// Verantwoordelijken van Theokot (/admin/theokot/shiften/verantwoordelijken)
+// -----------------------------------------------------------------------------
+//
+// Wie van de post Theokot de zaak openhoudt. Elke verantwoordelijke duidt zelf
+// aan in welke blokken die kan, iemand van Theokot deelt per blok in, en de
+// telling per werkingsjaar houdt het eerlijk. Dit verving een rekenblad. Een
+// blok is een kalenderdag plus een sleutel uit `DUTY_SLOTS`
+// (lib/theokotDuty.ts); er is geen rij per blok nodig zolang het de standaard
+// volgt. Bewust geen `Shift`: het verschijnt niet op /shift, levert geen
+// bonnetjes op en staat niet in de shiftgeschiedenis. Zie
+// docs/design-decisions.md, "Theokot: verantwoordelijken".
+
+/// Een verantwoordelijke kan in dit blok. Enkel de persoon zelf zet of wist dit.
+model TheokotDutyAvailability {
+  /// De Brusselse kalenderdag.
+  date      DateTime @db.Date
+  /// Sleutel uit `DUTY_SLOTS`: ochtend, middag, namiddag of avond.
+  slot      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([date, slot, userId])
+  @@index([userId])
+}
+
+/// Deze verantwoordelijke houdt dit blok open. Kan enkel wie in het blok kan:
+/// wie de beschikbaarheid wist, valt ook hier weg.
+model TheokotDutyAssignment {
+  date      DateTime @db.Date
+  slot      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([date, slot, userId])
+  @@index([userId, date])
+}
+
+/// Een blok dat afwijkt van de standaard: een tweede verantwoordelijke, een
+/// notitie ("Bureau"), of een blok dat er die dag niet is (of wel, zoals een
+/// avond op vrijdag). Geen rij = de standaard uit `DUTY_SLOTS`.
+model TheokotDutyBlock {
+  date      DateTime @db.Date
+  slot      String
+  capacity  Int
+  open      Boolean
+  note      String?
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@id([date, slot])
+}
+
+/// De startstand van de telling: hoeveel blokken iemand dit werkingsjaar al
+/// openhield vóór het op de site stond (uit het rekenblad). Telt op bij de
+/// toewijzingen van dat werkingsjaar. Geen rij = 0.
+model TheokotDutyCarryOver {
+  /// Werkingsjaar (startjaar): 2026 = "26-27".
+  year      Int
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  count     Int
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@id([year, userId])
+}
+
+// -----------------------------------------------------------------------------
 // Theokot-verhuur: de zaal zelf uitlenen aan een post, een werkgroep of iemand
 // van buiten de kring.
 //
@@ -6676,6 +6773,9 @@ model OauthClient {
   /// autorisatie en moet zonder join te beantwoorden zijn. De plugin negeert
   /// kolommen die ze niet kent.
   accessMode          SsoAccessMode @default(OPEN)
+  /// Welke KU Leuven-login deze client vraagt; zie SsoKulRequirement. Staat
+  /// los van accessMode, zodat een beperkte client ook studenten kan vragen.
+  kulRequirement      SsoKulRequirement @default(NONE)
   /// Prefix waarop de permissiecodes van deze client gevalideerd worden
   /// ("wiki" -> wiki.read, wiki.access). Null zolang er geen vocabulaire is.
   permissionNamespace String?
@@ -8914,12 +9014,19 @@ model PermanentCashEntry {
   counts    Json?
 
   /// Bonnen in de kassa (telling) of mee afgegeven aan Beheer (teruggegeven).
+  /// Ze tellen in wat de post ziet, niet in het totaal en de winst bij Beheer.
   shiftVouchers           Int @default(0)
   elixirVouchers          Int @default(0)
   /// Wat één bon waard is, vastgeklikt uit de instellingen bij het ingeven,
   /// zoals bij `CashRegister`.
   shiftVoucherValueCents  Int
   elixirVoucherValueCents Int
+  /// Guidobonnen en bonnen voor een gratis broodje (november 2026). De waarde
+  /// staat op 0 bij een regel van daarvoor; die had er nooit.
+  guidoVouchers             Int @default(0)
+  sandwichVouchers          Int @default(0)
+  guidoVoucherValueCents    Int @default(0)
+  sandwichVoucherValueCents Int @default(0)
 
   /// Enkel bij `RETURNED`: de volledige kassa kwam terug, dus daarna staat ze
   /// op nul. Telt in de winst als een telling van € 0 na de teruggave.
@@ -9813,8 +9920,45 @@ model BoMeeting {
   updatedAt     DateTime      @updatedAt @db.Timestamptz(3)
 
   documents BoDocument[]
+  minutes   BoMinutes?
 
   @@index([workingYear])
+}
+
+/// Het verslag van een BO, en de aanwezigheden die bovenaan staan
+/// (`lib/bo/attendance/parse.ts`). Eén per vergadering: het bestand in de
+/// BO-map dat "Verslag" heet. Voor /admin/apps/aanwezigheden; zie
+/// docs/bestuursorgaan.md ("Aanwezigheden").
+model BoMinutes {
+  id              String    @id @default(cuid())
+  meetingId       String    @unique
+  driveFileId     String
+  name            String
+  mimeType        String
+  webUrl          String
+  driveModifiedAt DateTime  @db.Timestamptz(3)
+  /// De regel onder "VERSLAG": nummer, datum, uur en lokaal.
+  title           String?
+  /// De namen zoals ze in het verslag staan, met hun kleur en status
+  /// (`MinutesEntry[]`). Wie welke gebruiker is, wordt pas bij het tonen
+  /// bepaald, zodat een betere koppeling ook de oude verslagen juist zet.
+  attendance      Json?
+  /// Waarom er geen aanwezigheden zijn (`NOT_DOCX`, `NO_ATTENDANCE`,
+  /// `NO_ACCESS`, ...). Null wanneer het lezen lukte.
+  error           String?
+  /// De `driveModifiedAt` waarvoor het verslag gelezen werd. Gelijk aan de
+  /// huidige: niet opnieuw downloaden.
+  readFor         DateTime? @db.Timestamptz(3)
+  /// `MINUTES_VERSION` van de lezer. Lager dan de huidige: opnieuw lezen.
+  readVersion     Int       @default(0)
+  lastSeenAt      DateTime  @db.Timestamptz(3)
+  /// Niet meer gevonden bij de laatste scan. De rij blijft: een verwijderd
+  /// verslag laat de aanwezigheden van die BO niet verdwijnen.
+  missingSince    DateTime? @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
+
+  meeting BoMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
 }
 
 /// Eén budget of resultaat zoals het in een BO-map stond, of via een

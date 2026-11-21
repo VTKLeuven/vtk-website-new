@@ -1,5 +1,6 @@
 import { corsPreflight } from "@/lib/cors";
 import { getPublishedTicketEventBySlug } from "@/lib/ticketing/queries";
+import { accountOrderMax } from "@/lib/ticketing/accountLimit";
 import {
   appLocaleFrom,
   type AppTicketEventDetail,
@@ -38,11 +39,9 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
       endsAt: event.endsAt.toISOString(),
       ownerGroupName: event.ownerGroupName,
       imageUrl: event.poster ? absoluteUrl(request, event.poster.src) : null,
-      // Wat deze koper kan nemen: een erelid op een event met
-      // `honoraryOneTicket` één, of geen wanneer het er al een heeft.
-      maxTicketsPerOrder: event.honoraryOneTicket
-        ? Math.min(event.maxTicketsPerOrder, event.honoraryOneTicket.used ? 0 : 1)
-        : event.maxTicketsPerOrder,
+      // Wat deze koper kan nemen; dezelfde regel als de webshop.
+      maxTicketsPerOrder: accountOrderMax(event),
+      presaleSelfOnly: event.presaleSelfOnly,
       honoraryOneTicket: event.honoraryOneTicket ? { used: event.honoraryOneTicket.used } : null,
       currency: event.currency,
       contactEmail: event.contactEmail,

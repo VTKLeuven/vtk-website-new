@@ -599,7 +599,7 @@ export async function adminRead(principal: McpPrincipal, raw: McpAdminReadInput)
       const items = await prisma.oauthClient.findMany({
         where: { ...(input.id ? { clientId: input.id } : {}), ...(contains ? { OR: [{ clientId: contains }, { name: contains }, { uri: contains }] } : {}) },
         take, skip, orderBy: { clientId: "asc" },
-        select: { id: true, clientId: true, disabled: true, skipConsent: true, enableEndSession: true, subjectType: true, scopes: true, referenceId: true, createdAt: true, updatedAt: true, name: true, uri: true, icon: true, contacts: true, tos: true, policy: true, redirectUris: true, postLogoutRedirectUris: true, tokenEndpointAuthMethod: true, grantTypes: true, responseTypes: true, public: true, type: true, requirePKCE: true, accessMode: true, permissionNamespace: true },
+        select: { id: true, clientId: true, disabled: true, skipConsent: true, enableEndSession: true, subjectType: true, scopes: true, referenceId: true, createdAt: true, updatedAt: true, name: true, uri: true, icon: true, contacts: true, tos: true, policy: true, redirectUris: true, postLogoutRedirectUris: true, tokenEndpointAuthMethod: true, grantTypes: true, responseTypes: true, public: true, type: true, requirePKCE: true, accessMode: true, permissionNamespace: true, kulRequirement: true },
       });
       return page(items, input);
     }

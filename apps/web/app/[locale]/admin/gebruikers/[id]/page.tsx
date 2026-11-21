@@ -23,6 +23,7 @@ import {
   removeMembershipAction,
   saveUserAction,
   sendUserAccessLinkAction,
+  unlinkKulLoginAction,
 } from '@/app/actions/users-groups';
 import { assignUserRoleAction, removeUserRoleAction } from '@/app/actions/roles';
 import { currentWorkingYear, formatWorkingYear } from '@/lib/workingYear';
@@ -44,7 +45,11 @@ export default async function EditUserPage({ params }: { params: Promise<{ local
       include: {
         memberships: { include: { group: true } },
         roles: { where: { year }, include: { role: true } },
-        accounts: { where: { providerId: 'credential' }, select: { id: true } },
+        accounts: {
+          where: { providerId: { in: ['credential', 'kuleuven'] } },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true, providerId: true, accountId: true, createdAt: true },
+        },
         // De richtingen per academiejaar, zoals het lid ze bevestigde.
         studyConfirmations: {
           orderBy: { year: 'desc' },
@@ -65,7 +70,14 @@ export default async function EditUserPage({ params }: { params: Promise<{ local
   // dan tonen we een split van de weergavenaam als startwaarde.
   const parts = nameParts(user);
   const accessEmail = user.personalEmail || (!isKuLeuvenEmail(user.email) ? user.email : '');
-  const hasPassword = user.accounts.length > 0;
+  const hasPassword = user.accounts.some((account) => account.providerId === 'credential');
+  const kulLogins = user.accounts.filter((account) => account.providerId === 'kuleuven');
+  const linkedOnFmt = new Intl.DateTimeFormat(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+    timeZone: 'Europe/Brussels',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
   const accessErrors = {
     ...userErrorMessages(locale),
     NO_PERSONAL_EMAIL:
@@ -340,6 +352,65 @@ export default async function EditUserPage({ params }: { params: Promise<{ local
               : 'Activate this account before sending an access link.'}
           </p>
         ) : null}
+      </Card>
+
+      {/* Een doctoraatsstudent heeft een r- en een u-nummer. Logde hij met allebei
+          in voor ze gekoppeld waren, dan hangt het tweede aan een tweede
+          account; pas na loskoppelen kan hij het op /account aan het zijne
+          hangen. */}
+      <Card className="p-5 space-y-3">
+        <div>
+          <h2 className="font-semibold">{locale === 'nl' ? 'KU Leuven-logins' : 'KU Leuven logins'}</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-[#5c667f]">
+            {locale === 'nl'
+              ? 'Hangt een r- of u-nummer aan het verkeerde account, koppel het hier los. Het lid koppelt het daarna zelf aan het juiste account, onder Mijn gegevens op /account.'
+              : 'If an r- or u-number sits on the wrong account, unlink it here. The member then links it to the right account under My details on /account.'}
+          </p>
+        </div>
+        <ul className="divide-y divide-zinc-200">
+          {kulLogins.map((login) => {
+            const name = login.accountId.split('@')[0] || login.accountId;
+            return (
+              <li key={login.id} className="flex items-center justify-between gap-3 py-2">
+                <span className="text-sm">
+                  <span className="font-medium">{name}</span>
+                  {' · '}
+                  {locale === 'nl' ? 'gekoppeld op ' : 'linked on '}
+                  {linkedOnFmt.format(login.createdAt)}
+                </span>
+                <DeleteIconButton
+                  action={unlinkKulLoginAction}
+                  fields={{ id: login.id, userId: user.id }}
+                  label={locale === 'nl' ? 'Loskoppelen' : 'Unlink'}
+                  srLabel={`${locale === 'nl' ? 'Loskoppelen' : 'Unlink'}: ${name}`}
+                  title={locale === 'nl' ? 'KU Leuven-login loskoppelen?' : 'Unlink KU Leuven login?'}
+                  description={
+                    locale === 'nl'
+                      ? `${name} hangt daarna niet meer aan het account van ${user.name}. Een volgende login met ${name} komt op het account met hetzelfde adres of r-nummer terecht, of maakt een nieuw account. Het account van ${user.name} zelf, met zijn lidmaatschappen, tickets en historiek, blijft staan.${kulLogins.length === 1 && !hasPassword ? ' Dit is de enige manier waarop dit account kan inloggen.' : ''}`
+                      : `${name} will no longer belong to the account of ${user.name}. A next sign-in with ${name} lands on the account with the same address or r-number, or creates a new account. The account of ${user.name} itself, with its memberships, tickets and history, stays.${kulLogins.length === 1 && !hasPassword ? ' This is the only way this account can sign in.' : ''}`
+                  }
+                  confirmLabel={locale === 'nl' ? 'Loskoppelen' : 'Unlink'}
+                  cancelLabel={locale === 'nl' ? 'Annuleren' : 'Cancel'}
+                  successMessage={locale === 'nl' ? 'KU Leuven-login losgekoppeld' : 'KU Leuven login unlinked'}
+                  errorMessages={{
+                    NOT_FOUND:
+                      locale === 'nl'
+                        ? 'Niet losgekoppeld: deze login hangt niet (meer) aan dit account.'
+                        : 'Not unlinked: this login is not (or no longer) on this account.',
+                  }}
+                  errorFallback={dict.common.saveError}
+                />
+              </li>
+            );
+          })}
+          {kulLogins.length === 0 && (
+            <li className="py-2 text-sm text-zinc-500">
+              {locale === 'nl'
+                ? 'Dit account heeft geen KU Leuven-login.'
+                : 'This account has no KU Leuven login.'}
+            </li>
+          )}
+        </ul>
       </Card>
 
       <Card className="p-5 space-y-4">

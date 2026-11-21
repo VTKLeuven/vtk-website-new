@@ -10,10 +10,11 @@
  */
 import 'server-only';
 
-import type { RoleGrantKind, SsoAccessMode, SsoClientPermission } from '@prisma/client';
+import type { RoleGrantKind, SsoAccessMode, SsoClientPermission, SsoKulRequirement } from '@prisma/client';
 import { prisma } from '@vtk/db';
 import { AuthError, hasPermission as rootHasPermission } from '..';
 import { currentWorkingYear } from '../lib/workingYear';
+import { kulDenial } from './clientAccess';
 import { effectiveClientPermissions } from './clientPermissions';
 import { getSessionCached } from './session';
 import {
@@ -49,7 +50,7 @@ function fail(problem: ClientPermissionError): never {
 async function loadClient(clientId: string) {
   const client = await prisma.oauthClient.findUnique({
     where: { clientId },
-    select: { clientId: true, name: true, accessMode: true, permissionNamespace: true },
+    select: { clientId: true, name: true, accessMode: true, permissionNamespace: true, kulRequirement: true },
   });
   if (!client) fail('CLIENT_NOT_FOUND');
   return client;
@@ -334,6 +335,57 @@ export async function setClientAccessMode(
     'access-mode',
     input.accessMode === 'RESTRICTED' ? `beperkt tot ${namespace}.access` : 'open voor elk lid'
   );
+}
+
+/** Hoe streng elke stand is; enkel strenger worden trekt tokens in. */
+const KUL_STRICTNESS: Record<SsoKulRequirement, number> = { NONE: 0, LINKED: 1, STUDENT: 2 };
+
+const KUL_SUMMARY: Record<SsoKulRequirement, string> = {
+  NONE: 'geen KU Leuven-login vereist',
+  LINKED: 'KU Leuven-login vereist',
+  STUDENT: 'enkel KU Leuven-studenten',
+};
+
+/**
+ * Zet welke KU Leuven-login de client vraagt.
+ *
+ * Wordt de vereiste strenger, dan verliezen de leden die er niet aan voldoen
+ * hun lopende tokens, zoals bij het beperken: een refresh token hoort iemand
+ * niet binnen te houden die opnieuw aanmelden niet meer zou toelaten. Enkel
+ * die leden; wie voldoet, hoeft niet opnieuw aan te melden.
+ */
+export async function setClientKulRequirement(
+  headers: Headers,
+  clientId: string,
+  requirement: SsoKulRequirement
+): Promise<void> {
+  const actor = await requireSsoAdmin(headers);
+  const client = await loadClient(clientId);
+
+  await prisma.oauthClient.update({ where: { clientId }, data: { kulRequirement: requirement } });
+
+  if (KUL_STRICTNESS[requirement] > KUL_STRICTNESS[client.kulRequirement]) {
+    const tokenHolders = await prisma.oauthRefreshToken.findMany({
+      where: { clientId },
+      select: { userId: true },
+      distinct: ['userId'],
+    });
+    const accessHolders = await prisma.oauthAccessToken.findMany({
+      where: { clientId, userId: { not: null } },
+      select: { userId: true },
+      distinct: ['userId'],
+    });
+    const candidates = new Set(
+      [...tokenHolders, ...accessHolders].map((token) => token.userId).filter((id): id is string => id !== null)
+    );
+    const losing: string[] = [];
+    for (const userId of candidates) {
+      if (await kulDenial(userId, requirement)) losing.push(userId);
+    }
+    await revokeTokensForUsers(clientId, losing);
+  }
+
+  await writeAudit(actor, client, 'kul-requirement', KUL_SUMMARY[requirement]);
 }
 
 // ── Vocabulaire ──────────────────────────────────────────────────────────────

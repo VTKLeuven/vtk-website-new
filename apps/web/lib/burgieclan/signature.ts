@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 /**
  * De handtekening waarmee VTK namens een lid met de backend van Burgieclan praat.
@@ -69,4 +69,64 @@ export function burgieclanAuthHeaders(input: {
       body: input.body,
     }),
   };
+}
+
+/** Hoe ver de klok van Burgieclan van de onze mag afwijken, in seconden. Zoals `MAX_SKEW` daar. */
+export const MAX_SKEW_SECONDS = 300;
+
+/**
+ * Leest de identiteit uit `X-Vtk-User`. `null` bij alles wat geen
+ * `{ sub, email, name }` met een niet-lege `sub` en `email` is.
+ */
+export function decodeIdentity(encoded: string): BurgieclanIdentity | null {
+  try {
+    const claims: unknown = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
+    if (!claims || typeof claims !== "object") return null;
+    const { sub, email, name } = claims as Record<string, unknown>;
+    if (typeof sub !== "string" || sub === "" || typeof email !== "string" || email === "") return null;
+    return { sub, email, name: typeof name === "string" && name !== "" ? name : email };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * De omgekeerde richting: Burgieclan vraagt iets aan vtk.be namens een lid (de
+ * peilingen, `app/api/burgieclan/v1/polls`). Hetzelfde schema en hetzelfde
+ * geheim; het pad zit in de handtekening, dus een aanvraag die Burgieclan
+ * ondertekende voor de ene route geldt niet voor een andere.
+ *
+ * Geeft het lid terug waarvoor de aanvraag spreekt, of `null` wanneer de
+ * handtekening niet klopt, ontbreekt of te oud is.
+ */
+export function verifyBurgieclanRequest(input: {
+  secret: string;
+  method: string;
+  path: string;
+  body: string;
+  headers: { get(name: string): string | null };
+  now?: number;
+}): BurgieclanIdentity | null {
+  const user = input.headers.get(HEADER_USER);
+  const timestamp = input.headers.get(HEADER_TIMESTAMP);
+  const signature = input.headers.get(HEADER_SIGNATURE);
+  if (!user || !signature || !timestamp || !/^\d{1,12}$/.test(timestamp)) return null;
+
+  const nowSeconds = Math.floor((input.now ?? Date.now()) / 1000);
+  if (Math.abs(nowSeconds - Number(timestamp)) > MAX_SKEW_SECONDS) return null;
+
+  const expected = Buffer.from(
+    signBurgieclanRequest({
+      secret: input.secret,
+      method: input.method,
+      path: input.path,
+      timestamp: Number(timestamp),
+      user,
+      body: input.body,
+    }),
+  );
+  const given = Buffer.from(signature);
+  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
+
+  return decodeIdentity(user);
 }

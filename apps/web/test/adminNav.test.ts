@@ -66,6 +66,7 @@ describe("admin nav structure", () => {
       "theokotBroodjes",
       "theokotVerhuur",
       "theokotShiften",
+      "theokotVerantwoordelijken",
     ]);
   });
 

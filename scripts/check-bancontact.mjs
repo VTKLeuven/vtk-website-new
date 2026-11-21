@@ -30,7 +30,8 @@ if (!key) {
 }
 
 const configured = process.env.BANCONTACT_API_BASE?.trim() || HOSTS.productie;
-console.log(`Sleutel: ${key.slice(0, 4)}... (${key.length} tekens)`);
+// Enkel de lengte: ook een stuk van de sleutel hoort niet in een terminal of log.
+console.log(`Sleutel: gevonden (${key.length} tekens)`);
 console.log(`BANCONTACT_API_BASE: ${process.env.BANCONTACT_API_BASE?.trim() || "(leeg, dus productie)"}\n`);
 
 /** Eén opvraging, met en zonder sleutel, zodat het verschil zichtbaar is. */

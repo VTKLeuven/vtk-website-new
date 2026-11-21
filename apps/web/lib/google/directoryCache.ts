@@ -18,3 +18,8 @@ export async function cachedDirectory(cfg: GoogleConfig): Promise<GoogleUser[]> 
   cache = { key, at: Date.now(), users };
   return users;
 }
+
+/** Na een wijziging aan aliassen: de volgende lezing haalt de directory opnieuw op. */
+export function forgetDirectoryCache(): void {
+  cache = null;
+}

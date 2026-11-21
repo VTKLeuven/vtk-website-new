@@ -58,7 +58,7 @@ export type StatsTicketInput = {
    */
   accountingCode: string | null;
   accountingCodeName: string | null;
-  /** Langs welke weg het geld binnenkwam: "bancontact", "mollie", "free", of null. */
+  /** Langs welke weg het geld binnenkwam: "bancontact", "mollie", "manual" (buiten de site), "free", of null. */
   provider: string | null;
 };
 
@@ -643,7 +643,7 @@ export function computeTicketStats(
 }
 
 /** De volgorde van de betaalwijzen in een rij: zoals ze op het uittreksel binnenkomen. */
-const PROVIDER_ORDER = ["bancontact", "mollie", "free"];
+const PROVIDER_ORDER = ["bancontact", "mollie", "manual", "free"];
 
 /**
  * Tel per boekhoudcode. Een ticket telt onder de code van zijn bestelling, niet

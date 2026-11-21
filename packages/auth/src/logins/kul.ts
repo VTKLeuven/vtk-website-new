@@ -34,6 +34,11 @@ import { KUL_CALLBACK_PATH } from "../index";
 import { firwStudentFromProfile, syncFirwStudent } from "./kul-firw";
 import { resolveKulLink, type KulLinkLookups } from "./kul-link";
 import {
+  kulStatusFromThisLogin,
+  kulStudentFromProfile,
+  syncKulStudent,
+} from "./kul-student";
+import {
   getKulUserInfo,
   KUL_USERINFO_URL,
   wasKulUserInfoFetched,
@@ -108,6 +113,18 @@ function profileRNumber(profile: ProfileLike): string | undefined {
 function profileAccountId(profile: ProfileLike): string | undefined {
   const raw = profile.id ?? profile.sub;
   return typeof raw === "string" || typeof raw === "number" ? String(raw) : undefined;
+}
+
+/** Hangt er aan dit account nog een andere KU Leuven-login dan deze? */
+async function hasOtherKulLogin(userId: string, accountId: string | undefined): Promise<boolean> {
+  const count = await prisma.account.count({
+    where: {
+      userId,
+      providerId: KUL_PROVIDER_ID,
+      ...(accountId ? { NOT: { accountId } } : {}),
+    },
+  });
+  return count > 0;
 }
 
 /** De databankkant van `resolveKulLink`; zie `kul-link.ts` voor de regels. */
@@ -237,6 +254,10 @@ export function kulOAuthConfig() {
       const hasUserInfo = wasKulUserInfoFetched(profile);
       const firwStudent = hasUserInfo ? firwStudentFromProfile(profile) : undefined;
       const firwStudentChangedAt = firwStudent === undefined ? undefined : new Date();
+      // Uit de accountnaam en het adres, die ook in het ID-token staan: dit hoeft
+      // dus niet op userinfo te wachten, anders dan de faculteit.
+      const kulStudent = kulStudentFromProfile(profile, email);
+      const kulStudentChangedAt = new Date();
 
       // Het account waarop deze login landt, en het adres waarmee better-auth
       // het moet zoeken. Dat laatste is het adres van het account dat dit
@@ -253,8 +274,23 @@ export function kulOAuthConfig() {
       // userinfo-call, atomair en enkel bij een echte wijziging. Dat moet hier:
       // better-auth neemt bij een koppeling niets uit het profiel over, dus de
       // velden hieronder landen enkel op een nieuw account.
-      if (link?.userId && firwStudent !== undefined && firwStudentChangedAt) {
+      //
+      // Behalve wanneer dit geen studentenlogin is en het account er nog een
+      // KU Leuven-login naast heeft: een doctoraatsstudent die met zijn
+      // u-nummer inlogt, zegt daarmee niets over zijn inschrijving, en zou
+      // anders bij elke personeelslogin zijn FirW-status verliezen.
+      const syncStatus =
+        link?.userId != null &&
+        kulStatusFromThisLogin(
+          kulStudent,
+          !kulStudent &&
+            (await hasOtherKulLogin(link.userId, profileAccountId(profile))),
+        );
+      if (syncStatus && link?.userId && firwStudent !== undefined && firwStudentChangedAt) {
         await syncFirwStudent(link.userId, firwStudent, firwStudentChangedAt);
+      }
+      if (syncStatus && link?.userId) {
+        await syncKulStudent(link.userId, kulStudent, kulStudentChangedAt);
       }
 
       return {
@@ -269,6 +305,8 @@ export function kulOAuthConfig() {
         ...(firwStudent !== undefined && firwStudentChangedAt
           ? { firwStudent, firwStudentChangedAt }
           : {}),
+        kulStudent,
+        kulStudentChangedAt,
       };
     },
   };

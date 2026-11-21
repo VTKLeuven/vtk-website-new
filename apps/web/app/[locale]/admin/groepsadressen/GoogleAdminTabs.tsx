@@ -1,7 +1,7 @@
 "use client";
 
 import { useSelectedLayoutSegment } from "next/navigation";
-import { Download, FolderTree, Link2, Mail, UserPlus, Users } from "lucide-react";
+import { AtSign, Download, FolderTree, Link2, Mail, MessagesSquare, UserPlus, Users } from "lucide-react";
 import Link from "@/components/ui/Link";
 
 /**
@@ -41,6 +41,8 @@ export function GoogleAdminTabs({
       icon: FolderTree,
       visible: approveAccounts,
     },
+    { segment: "aliassen", label: nl ? "Aliassen" : "Aliases", icon: AtSign, visible: manageAll },
+    { segment: "chatruimtes", label: nl ? "Chatruimtes" : "Chat spaces", icon: MessagesSquare, visible: manageAll },
     { segment: "koppelingen", label: nl ? "Koppelingen" : "Links", icon: Link2, visible: manageAll },
     { segment: "overnemen", label: nl ? "Overnemen" : "Take over", icon: Download, visible: manageAll },
   ].filter((tab) => tab.visible);

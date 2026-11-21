@@ -98,11 +98,17 @@ export function proposeAddress(
  *
  * Geen tekens die op elkaar lijken (l/1/I, O/0): dit wordt overgetypt.
  */
-export function generatePassword(random: () => number = Math.random): string {
+export function generatePassword(): string {
   const alphabet = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  // Uit Web Crypto, niet uit Math.random: dit wordt het eerste wachtwoord van
+  // een echt account. Bytes boven het laatste volle veelvoud van het alfabet
+  // vallen weg, zodat geen letter vaker voorkomt dan een andere.
+  const limit = 256 - (256 % alphabet.length);
   let out = "";
-  for (let i = 0; i < 16; i += 1) {
-    out += alphabet[Math.floor(random() * alphabet.length)];
+  while (out.length < 16) {
+    for (const byte of crypto.getRandomValues(new Uint8Array(32))) {
+      if (byte < limit && out.length < 16) out += alphabet[byte % alphabet.length];
+    }
   }
   return out;
 }

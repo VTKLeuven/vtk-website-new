@@ -12,9 +12,17 @@ import {
   membershipTotals,
   membershipYears,
   parseMemberKindFilter,
+  parseHonoraryKindFilter,
   parseMemberSearch,
   type MemberKindFilter,
 } from "@/lib/membership";
+import {
+  DEFAULT_HONORARY_SORT,
+  memberSortParams,
+  parseMemberSort,
+  type MemberSort,
+} from "@/lib/membership/sort";
+import { SortLinkHeader } from "./SortLinkHeader";
 import { formatEuro } from "@/lib/membership/config";
 import { membershipKindLabel } from "@/lib/membership/export";
 import { revokeMembershipAction } from "@/app/actions/membership";
@@ -41,9 +49,11 @@ import { MemberSearch } from "./MemberSearch";
  * academiejaar, maar wie ze beheert, zoekt ze bij de leden en niet in een
  * vinkje op elk account apart.
  *
- * Beide lijsten zijn doorzoekbaar (`?zoek=`, op de server), en de leden ook te
- * filteren op soort (`?soort=gratis|betalend|toegekend`). De Excel-export volgt
- * dezelfde filters: wat je ziet, is wat je downloadt.
+ * Beide lijsten zijn doorzoekbaar (`?zoek=`, op de server), te filteren op soort
+ * (`?soort=gratis|betalend|toegekend|erelid` bij de leden, `gratis|betalend` bij
+ * de ereleden) en te sorteren met een klik op de kolomkop
+ * (`?sorteer=naam|rnummer|soort|bedrag|datum&richting=op|af`). De Excel-export
+ * volgt dezelfde filters en volgorde: wat je ziet, is wat je downloadt.
  */
 /** De tabbladen; elk is een eigen route onder deze module (zie de layout). */
 export type LedenSection = "leden" | "ereleden" | "instellingen";
@@ -55,7 +65,7 @@ export async function LedenAdminPage({
 }: {
   section: LedenSection;
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ jaar?: string; openstaand?: string; lijst?: string; zoek?: string; soort?: string }>;
+  searchParams: Promise<{ jaar?: string; openstaand?: string; lijst?: string; zoek?: string; soort?: string; sorteer?: string; richting?: string }>;
 }) {
   const [{ locale: localeParam }, filters] = await Promise.all([params, searchParams]);
   if (!hasLocale(localeParam)) notFound();
@@ -70,30 +80,41 @@ export async function LedenAdminPage({
   const honorary = section === "ereleden";
   const query = parseMemberSearch(filters.zoek);
   const kind = parseMemberKindFilter(filters.soort);
+  const sort = parseMemberSort(filters.sorteer, filters.richting);
   const filtered = query !== "" || kind !== null;
 
   /** Een link binnen de ledenlijst die de huidige filters meeneemt, tenzij anders gevraagd. */
-  const listHref = (next: { jaar?: number; openstaand?: boolean; soort?: MemberKindFilter | null } = {}) => {
+  const listHref = (
+    next: { jaar?: number; openstaand?: boolean; soort?: MemberKindFilter | null; sort?: MemberSort } = {},
+  ) => {
     const search = new URLSearchParams({ jaar: String(next.jaar ?? year) });
     if (next.openstaand ?? pending) search.set("openstaand", "1");
     const soort = next.soort === undefined ? kind : next.soort;
     if (soort) search.set("soort", soort);
     if (query) search.set("zoek", query);
+    for (const [key, value] of Object.entries(memberSortParams(next.sort ?? sort))) search.set(key, value);
     return `${base}/admin/leden?${search.toString()}`;
   };
 
   const header = (
     <p className="max-w-3xl text-sm text-[#5c667f]">
       {nl
-        ? "Wie dit academiejaar lid is van VTK: gratis als student van de faculteit Ingenieurswetenschappen, betalend als niet-facultair lid, of hier toegekend. Daarnaast de ereleden."
-        : "Who is a member of VTK this academic year: free as a student of the Faculty of Engineering Science, paying as a non-faculty member, or granted here. Plus the honorary members."}
+        ? "Wie dit academiejaar lid is van VTK: gratis als student van de faculteit Ingenieurswetenschappen, betalend als niet-facultair lid of als erelid, of hier toegekend. De gratis ereleden staan bij Ereleden."
+        : "Who is a member of VTK this academic year: free as a student of the Faculty of Engineering Science, paying as a non-faculty or honorary member, or granted here. The free honorary members are under Honorary members."}
     </p>
   );
 
   if (honorary) {
     return (
       <div className="space-y-6">
-        <HonoraryList nl={nl} query={query} />
+        <HonoraryList
+          nl={nl}
+          base={base}
+          year={year}
+          query={query}
+          kind={parseHonoraryKindFilter(filters.soort)}
+          sort={parseMemberSort(filters.sorteer, filters.richting, DEFAULT_HONORARY_SORT)}
+        />
       </div>
     );
   }
@@ -101,7 +122,7 @@ export async function LedenAdminPage({
   const [years, totals, rows, unfilteredCount, config, accountingCodes] = await Promise.all([
     membershipYears(),
     membershipTotals(year),
-    listMembers(year, { pending, kind, query }),
+    listMembers(year, { pending, kind, query, sort }),
     filtered ? countMembers(year, { pending }) : null,
     getMembershipConfig(),
     listAccountingCodes(),
@@ -118,6 +139,7 @@ export async function LedenAdminPage({
   if (pending) exportSearch.set("openstaand", "1");
   if (kind) exportSearch.set("soort", kind);
   if (query) exportSearch.set("zoek", query);
+  for (const [key, value] of Object.entries(memberSortParams(sort))) exportSearch.set(key, value);
   if (!nl) exportSearch.set("taal", "en");
   const exportHref = `/api/admin/leden/export?${exportSearch.toString()}`;
 
@@ -126,6 +148,7 @@ export async function LedenAdminPage({
     { key: "gratis", label: nl ? "Gratis" : "Free" },
     { key: "betalend", label: nl ? "Betalend" : "Paying" },
     { key: "toegekend", label: nl ? "Toegekend" : "Granted" },
+    { key: "erelid", label: nl ? "Betalend erelid" : "Paying honorary" },
   ];
   const rowWord = (count: number) => (nl ? (count === 1 ? "rij" : "rijen") : count === 1 ? "row" : "rows");
 
@@ -144,8 +167,8 @@ export async function LedenAdminPage({
             <p className="text-4xl font-semibold tabular-nums text-vtk-ink">{totals.active}</p>
             <p className="mt-1 text-sm text-[#5c667f]">
               {nl
-                ? `${totals.byKind.FACULTY} gratis · ${totals.byKind.EXTERNAL} betalend · ${totals.byKind.MANUAL} toegekend`
-                : `${totals.byKind.FACULTY} free · ${totals.byKind.EXTERNAL} paying · ${totals.byKind.MANUAL} granted`}
+                ? `${totals.byKind.FACULTY} gratis · ${totals.byKind.EXTERNAL} betalend · ${totals.byKind.MANUAL} toegekend · ${totals.byKind.HONORARY} betalend erelid`
+                : `${totals.byKind.FACULTY} free · ${totals.byKind.EXTERNAL} paying · ${totals.byKind.MANUAL} granted · ${totals.byKind.HONORARY} paying honorary`}
             </p>
           </div>
           <div className="text-right">
@@ -286,11 +309,11 @@ export async function LedenAdminPage({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-vtk-blue/10 text-left text-xs uppercase tracking-wide text-[#5c667f]">
-                <th className="px-4 py-3 font-medium">{nl ? "Naam" : "Name"}</th>
-                <th className="px-4 py-3 font-medium">{nl ? "R-nummer" : "R-number"}</th>
-                <th className="px-4 py-3 font-medium">{nl ? "Soort" : "Kind"}</th>
-                <th className="px-4 py-3 font-medium">{nl ? "Bedrag" : "Amount"}</th>
-                <th className="px-4 py-3 font-medium">{nl ? "Lid sinds" : "Member since"}</th>
+                <SortLinkHeader nl={nl} label={nl ? "Naam" : "Name"} sortKey="naam" sort={sort} href={(next) => listHref({ sort: next })} />
+                <SortLinkHeader nl={nl} label={nl ? "R-nummer" : "R-number"} sortKey="rnummer" sort={sort} href={(next) => listHref({ sort: next })} />
+                <SortLinkHeader nl={nl} label={nl ? "Soort" : "Kind"} sortKey="soort" sort={sort} href={(next) => listHref({ sort: next })} />
+                <SortLinkHeader nl={nl} label={nl ? "Bedrag" : "Amount"} sortKey="bedrag" sort={sort} href={(next) => listHref({ sort: next })} />
+                <SortLinkHeader nl={nl} label={nl ? "Lid sinds" : "Member since"} sortKey="datum" sort={sort} href={(next) => listHref({ sort: next })} />
                 <th className="px-4 py-3">
                   <span className="sr-only">{nl ? "Acties" : "Actions"}</span>
                 </th>

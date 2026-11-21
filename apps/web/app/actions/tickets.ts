@@ -19,6 +19,20 @@ import { NEWS_TAG } from "@/lib/news/load";
 import { markPaymentRefundedManually } from "@/lib/ticketing/orders";
 import { fetchBancontactRefundAccount } from "@/lib/ticketing/refundAccount";
 import { requestTicketRefund } from "@/lib/ticketing/refunds";
+import { voidTicketWithoutRefund } from "@/lib/ticketing/voidTicket";
+import {
+  ATTENDEE_MESSAGE,
+  TICKET_CANCELLED,
+  TICKET_CHANGED,
+  type AttendeeMessagePayload,
+  type TicketCancelledPayload,
+  type TicketChangedPayload,
+} from "@/lib/ticketing/outbox";
+import { issueManualTicket, ManualTicketError } from "@/lib/ticketing/orders";
+import { CHANGE_TYPE_ERRORS, changeTicketType } from "@/lib/ticketing/changeTicketType";
+import { pickRecipients } from "@/lib/ticketing/attendeeRecipients";
+import { recipientCandidates } from "@/lib/ticketing/attendeeRecipientsServer";
+import { parseAttendeeGroup, type AttendeeGroup } from "@/lib/ticketing/attendeeGroups";
 import { slugify } from "@/lib/ticketing/slug";
 import { ticketColorKey } from "@/lib/ticketing/ticketColors";
 import { geocodeAddress } from "@/lib/ticketing/geocode";
@@ -2411,6 +2425,98 @@ export async function refundTicketsManuallyAction(
   return saveOk();
 }
 
+/** Wat het verwijderen van een deelnemer verwacht kan zien en zelf uitlegt. */
+const EXPECTED_REMOVE_ERRORS = new Set([
+  ...EXPECTED_REFUND_ERRORS,
+  "ATTENDEE_NOT_FOUND",
+  "TICKET_NOT_VALID",
+  "REFUND_MANUAL_ONLY",
+  "PAYMENT_REFERENCE_MISSING",
+]);
+
+/**
+ * Eén deelnemer (één ticket) uit een bestelling halen, vanaf het tabblad
+ * Deelnemers. Met `refund=on` loopt het langs de gewone terugbetaling via
+ * Mollie (recht `REFUND`); zonder wordt het ticket enkel ingetrokken en blijft
+ * het geld staan (recht `MANAGE_ORDERS`). In beide gevallen werkt het ticket
+ * niet meer aan de ingang, komt de plaats vrij en blijven de andere tickets van
+ * de bestelling geldig.
+ *
+ * Met `notify=on` krijgt de koper een mail met de `reason` (verplicht dan),
+ * via de ticket-outbox. Zie docs/design-decisions.md, "Een deelnemer
+ * verwijderen".
+ */
+export async function removeTicketAttendeeAction(formData: FormData): Promise<SaveState> {
+  const eventId = value(formData, "eventId");
+  const orderItemId = value(formData, "orderItemId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  const refund = checkboxValue(formData, "refund");
+  const notify = checkboxValue(formData, "notify");
+  const reason = limitedOptionalValue(formData, "reason", 2_000);
+  const { session } = await requireTicketEventCapability(
+    eventId,
+    refund ? "REFUND" : "MANAGE_ORDERS"
+  );
+  if (notify && !reason) return saveError("REASON_REQUIRED");
+  const item = await prisma.ticketOrderItem.findFirst({
+    where: { id: orderItemId, eventId },
+    select: { orderId: true, attendeeName: true, totalCents: true, order: { select: { buyerEmail: true } } },
+  });
+  if (!item) return saveError("ATTENDEE_NOT_FOUND");
+
+  try {
+    if (refund) {
+      const result = await requestTicketRefund({
+        eventId,
+        orderId: item.orderId,
+        orderItemIds: [orderItemId],
+        requestedById: session.user.id,
+        reason: reason ?? "Deelnemer verwijderd",
+      });
+      // Een terugbetaling die Mollie meteen weigert, zet het ticket terug op
+      // geldig (`failTicketRefund`): dan is er niets verwijderd.
+      if (result.status === "FAILED") return saveError("REFUND_FAILED");
+    } else {
+      await voidTicketWithoutRefund({ eventId, orderItemId, actorUserId: session.user.id });
+    }
+  } catch (error) {
+    if (error instanceof Error && EXPECTED_REMOVE_ERRORS.has(error.message)) {
+      return saveError(error.message);
+    }
+    throw error;
+  }
+  if (notify && reason) {
+    const payload: TicketCancelledPayload = {
+      orderItemId,
+      reason,
+      refundCents: refund ? item.totalCents : null,
+    };
+    await prisma.ticketOutboxMessage.create({
+      data: {
+        eventId,
+        // Met de bestelling erbij: het wissen van een account ruimt zo ook
+        // deze mail (en de reden erin) op.
+        orderId: item.orderId,
+        type: TICKET_CANCELLED,
+        dedupeKey: `ticket-cancelled:${orderItemId}`,
+        recipient: item.order.buyerEmail,
+        payload,
+      },
+    });
+  }
+  await logAudit({
+    action: refund ? "refund" : "delete",
+    entity: "ticketOrder",
+    entityId: item.orderId,
+    target: await ticketEventTitle(eventId),
+    summary: `ticket van ${item.attendeeName} verwijderd, ${refund ? "terugbetaald" : "zonder terugbetaling"}${notify ? ", koper gemaild" : ""}`,
+  });
+  refreshTicketEvent(locale, eventId);
+  revalidatePath(localePath(locale, `/admin/tickets/${eventId}/deelnemers`));
+  revalidatePath(localePath(locale, `/admin/tickets/${eventId}/bestellingen`));
+  return saveOk();
+}
+
 /**
  * Haalt bij Bancontact de rekening op waarop een koper betaalde, voor een
  * betaling waar ze nog niet bij staat (van voor deze kolom bestond, of omdat de
@@ -2647,5 +2753,187 @@ export async function renewPrivateLinkAction(formData: FormData): Promise<SaveSt
     summary: "privélink vernieuwd",
   });
   refreshTicketVisibility(locale, eventId, event.slug);
+  return saveOk();
+}
+
+
+/** Een eenvoudige vorm voor een e-mailadres; de mailserver beslist de rest. */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** Bovengrens op een manueel bedrag: een typfout van een nul mag geen €5000 worden. */
+const MAX_MANUAL_TICKET_CENTS = 100_000;
+
+/**
+ * Een ticket met de hand uitgeven, zonder dat de deelnemer door de shop gaat
+ * (tabblad Deelnemers). Zie `issueManualTicket` voor wat het doet; hier enkel
+ * de invoer en de melding.
+ */
+export async function issueManualTicketAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const eventId = value(formData, "eventId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  const { session } = await requireTicketEventCapability(eventId, "MANAGE_ORDERS");
+  const attendeeName = value(formData, "attendeeName").trim().slice(0, 200);
+  const attendeeEmail = value(formData, "attendeeEmail").trim().toLowerCase();
+  const ticketTypeId = value(formData, "ticketTypeId");
+  const notify = checkboxValue(formData, "notify");
+  if (!attendeeName) return saveError("NAME_REQUIRED");
+  if (!EMAIL_PATTERN.test(attendeeEmail) || attendeeEmail.length > 320) return saveError("INVALID_EMAIL");
+  let amountCents: number;
+  try {
+    amountCents = parseEuroAmount(formData.get("amount") || "0");
+  } catch {
+    return saveError("INVALID_AMOUNT");
+  }
+  if (amountCents > MAX_MANUAL_TICKET_CENTS) return saveError("INVALID_AMOUNT");
+
+  let reference: string;
+  try {
+    ({ reference } = await issueManualTicket({
+      eventId,
+      ticketTypeId,
+      attendeeName,
+      attendeeEmail,
+      amountCents,
+      actorUserId: session.user.id,
+      notify,
+      locale,
+    }));
+  } catch (error) {
+    if (error instanceof ManualTicketError) return saveError(error.code);
+    throw error;
+  }
+  await logAudit({
+    action: "create",
+    entity: "ticketOrder",
+    target: await ticketEventTitle(eventId),
+    summary: `ticket met de hand uitgegeven aan ${attendeeName} (${reference}), ${(amountCents / 100).toFixed(2)} euro${notify ? ", gemaild" : ""}`,
+  });
+  refreshTicketEvent(locale, eventId);
+  revalidatePath(localePath(locale, `/admin/tickets/${eventId}/deelnemers`));
+  revalidatePath(localePath(locale, `/admin/tickets/${eventId}/bestellingen`));
+  return saveOk();
+}
+
+const CHANGE_TYPE_ERROR_SET = new Set<string>(CHANGE_TYPE_ERRORS);
+
+/**
+ * Een ticket van type wisselen (upgrade of downgrade), met desgewenst een mail
+ * aan de koper. Het geld verandert niet mee; zie `changeTicketType`.
+ */
+export async function changeTicketTypeAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const eventId = value(formData, "eventId");
+  const orderItemId = value(formData, "orderItemId");
+  const ticketTypeId = value(formData, "ticketTypeId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  const notify = checkboxValue(formData, "notify");
+  const message = limitedOptionalValue(formData, "message", 2_000);
+  const { session } = await requireTicketEventCapability(eventId, "MANAGE_ORDERS");
+
+  let result: Awaited<ReturnType<typeof changeTicketType>>;
+  try {
+    result = await changeTicketType({ eventId, orderItemId, ticketTypeId, actorUserId: session.user.id });
+  } catch (error) {
+    if (error instanceof Error && CHANGE_TYPE_ERROR_SET.has(error.message)) return saveError(error.message);
+    throw error;
+  }
+  if (notify) {
+    const order = await prisma.ticketOrder.findUnique({
+      where: { id: result.orderId },
+      select: { buyerEmail: true },
+    });
+    if (order) {
+      const payload: TicketChangedPayload = {
+        orderItemId,
+        fromName: result.fromName,
+        toName: result.toName,
+        message,
+      };
+      await prisma.ticketOutboxMessage.create({
+        data: {
+          eventId,
+          orderId: result.orderId,
+          type: TICKET_CHANGED,
+          dedupeKey: `ticket-changed:${orderItemId}:${randomBytes(8).toString("hex")}`,
+          recipient: order.buyerEmail,
+          payload,
+        },
+      });
+    }
+  }
+  await logAudit({
+    action: "update",
+    entity: "ticketOrder",
+    entityId: result.orderId,
+    target: await ticketEventTitle(eventId),
+    summary: `ticket van ${result.attendeeName} omgezet van ${result.fromName} naar ${result.toName}${notify ? ", koper gemaild" : ""}`,
+  });
+  refreshTicketEvent(locale, eventId);
+  revalidatePath(localePath(locale, `/admin/tickets/${eventId}/deelnemers`));
+  revalidatePath(localePath(locale, `/admin/tickets/${eventId}/bestellingen`));
+  return saveOk();
+}
+
+/**
+ * Een bericht aan de deelnemers van een event: allemaal, of die van een of
+ * meer tickettypes en/of groepen (praesidium, erelid, lid, niet-lid). Eén mail
+ * per adres, enkel aan geldige tickets (`pickRecipients`). De mails gaan langs
+ * de ticket-outbox, achter de bevestigingen van wie net kocht; bij honderden
+ * deelnemers duurt het dus enkele minuten voor iedereen ze heeft.
+ */
+export async function sendAttendeeMessageAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const eventId = value(formData, "eventId");
+  const mailLocale = value(formData, "mailLocale") === "en" ? "en" : "nl";
+  const { session } = await requireTicketEventCapability(eventId, "MANAGE_ORDERS");
+  const subject = value(formData, "subject").trim().slice(0, 200);
+  const message = value(formData, "message").trim().slice(0, 5_000);
+  if (!subject) return saveError("SUBJECT_REQUIRED");
+  if (!message) return saveError("MESSAGE_REQUIRED");
+  const ticketTypeIds = formData.getAll("ticketTypeId").map(String).filter(Boolean);
+  const groups = formData
+    .getAll("group")
+    .map((entry) => parseAttendeeGroup(String(entry)))
+    .filter((group): group is AttendeeGroup => group !== null);
+
+  const recipients = pickRecipients(await recipientCandidates(eventId), { ticketTypeIds, groups });
+  if (recipients.length === 0) return saveError("NO_RECIPIENTS");
+
+  const batch = randomBytes(8).toString("hex");
+  const senderName = session.user.name?.trim() || null;
+  await prisma.ticketOutboxMessage.createMany({
+    data: recipients.map((recipient) => {
+      const payload: AttendeeMessagePayload = {
+        name: recipient.name || null,
+        subject,
+        message,
+        senderName,
+        locale: mailLocale,
+      };
+      return {
+        eventId,
+        orderId: recipient.orderId,
+        type: ATTENDEE_MESSAGE,
+        dedupeKey: `attendee-message:${batch}:${recipient.email}`,
+        recipient: recipient.email,
+        payload,
+      };
+    }),
+    skipDuplicates: true,
+  });
+  await prisma.ticketAuditLog.create({
+    data: {
+      eventId,
+      actorUserId: session.user.id,
+      action: "ATTENDEE_MESSAGE_QUEUED",
+      entityType: "TicketEvent",
+      entityId: eventId,
+      // Zonder de tekst: dit logboek overleeft het archiveren van het event.
+      metadata: { batch, recipients: recipients.length, ticketTypeIds, groups },
+    },
+  });
+  await logAudit({
+    action: "send",
+    entity: "ticketOrder",
+    target: await ticketEventTitle(eventId),
+    summary: `bericht "${subject}" aan ${recipients.length} deelnemers`,
+  });
   return saveOk();
 }

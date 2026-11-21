@@ -14,6 +14,7 @@ import {
   revokeSsoClientTokens,
   rotateSsoClientSecret,
   setClientAccessMode,
+  setClientKulRequirement,
   setSsoClientDisabled,
   updateClientPermission,
   updateSsoClient,
@@ -319,6 +320,43 @@ export async function setAccessModeAction(_prev: SaveState, formData: FormData):
       parsed.data.accessMode === 'OPEN'
         ? 'toegang opengezet voor elk lid'
         : `toegang beperkt tot houders van ${parsed.data.permissionNamespace ?? 'de access-permissie'}`,
+  });
+
+  revalidateClient(parsed.data.clientId);
+  return saveOk();
+}
+
+const kulRequirementSchema = z.object({
+  clientId: z.string().min(1),
+  kulRequirement: z.enum(['NONE', 'LINKED', 'STUDENT']),
+});
+
+const KUL_REQUIREMENT_SUMMARY = {
+  NONE: 'geen KU Leuven-login meer vereist',
+  LINKED: 'KU Leuven-login vereist',
+  STUDENT: 'enkel nog KU Leuven-studenten',
+} as const;
+
+export async function setKulRequirementAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const parsed = kulRequirementSchema.safeParse({
+    clientId: formData.get('clientId'),
+    kulRequirement: formData.get('kulRequirement'),
+  });
+  if (!parsed.success) return saveError('INVALID_INPUT');
+
+  try {
+    await setClientKulRequirement(await headers(), parsed.data.clientId, parsed.data.kulRequirement);
+  } catch (error) {
+    console.error('[sso] KU Leuven-vereiste wijzigen mislukt:', error);
+    return saveError(permissionErrorCode(error));
+  }
+
+  await logAudit({
+    action: 'update',
+    entity: 'ssoClient',
+    entityId: parsed.data.clientId,
+    target: await ssoClientName(parsed.data.clientId),
+    summary: KUL_REQUIREMENT_SUMMARY[parsed.data.kulRequirement],
   });
 
   revalidateClient(parsed.data.clientId);

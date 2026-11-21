@@ -19,6 +19,9 @@ Discord. De kringkeuzes staan in `docs/design-decisions.md`, "POC-peilingen".
    deadline: tot dan kan een student zijn antwoord nog wijzigen.
 5. Na de POC publiceren de RiVers een samenvatting, die 30 dagen bij de POC staat.
 
+Ook Burgieclan toont de open peilingen, in een eigen tab. Dat loopt over
+`/api/burgieclan/v1/polls`; zie `docs/burgieclan-planning.md`, "Peilingen".
+
 ## Discord instellen
 
 De kalender post met webhooks, maar die kunnen geen knoppen met een actie sturen.

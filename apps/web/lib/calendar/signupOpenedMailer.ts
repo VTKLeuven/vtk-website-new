@@ -16,7 +16,8 @@ import { siteUrl } from "@/lib/seo";
 import { deductedShifts, netShiftCount, shiftDeductions } from "@/lib/shift/deductions";
 import { publicUrl } from "@/lib/storage";
 import { hasPresale, presaleStart, type PresaleViewer } from "@/lib/ticketing/presale";
-import { currentWorkingYear, workingYearStart } from "@/lib/workingYear";
+import { currentStudyYear, currentWorkingYear, workingYearStart } from "@/lib/workingYear";
+import { honoraryMembershipSelect, isHonoraryMember } from "@/lib/membership/honorary";
 import {
   formOpening,
   linkOpening,
@@ -355,7 +356,10 @@ async function presaleViewers(
       where: { userId: { in: userIds }, year },
       select: { userId: true, group: { select: { id: true, type: true } } },
     }),
-    prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, honoraryMember: true } }),
+    prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, honoraryMember: true, ...honoraryMembershipSelect(currentStudyYear()) },
+    }),
     countShifts
       ? prisma.shiftParticipant.groupBy({
           by: ["userId"],
@@ -374,7 +378,7 @@ async function presaleViewers(
   for (const user of users) {
     viewers.set(user.id, {
       groups: groups.get(user.id) ?? [],
-      honorary: user.honoraryMember,
+      honorary: isHonoraryMember(user),
       completedShifts: countShifts
         ? netShiftCount(
             done.get(user.id) ?? 0,

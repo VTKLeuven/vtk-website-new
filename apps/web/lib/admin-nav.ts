@@ -120,9 +120,15 @@ export function getAdminNav(): NavEntry[] {
     // van elk een eigen tab. Er komen er nog bij, dus de groep blijft staan,
     // ook met één app. De groepjesmaker draait op een form, dus ze volgt de
     // zichtbaarheid van Forms.
-    group('apps', [item('groupMaker', '/apps/groepjesmaker', { forms: true })], {
-      keepSingle: true,
-    }),
+    group(
+      'apps',
+      [
+        item('groupMaker', '/apps/groepjesmaker', { forms: true }),
+        // Enkel IT en Groep 5 (zie `canViewAttendance` in lib/bo/attendance/server.ts).
+        item('boAttendance', '/apps/aanwezigheden', { anyPerm: ['bestuursorgaan.attendance', 'bestuursorgaan.manage'] }),
+      ],
+      { keepSingle: true },
+    ),
     item('grocomeet', '/grocomeet', { perm: 'grocomeet.manage' }),
     ...(logistics ? [item('logistics', logistics, { notForPocOnly: true })] : []),
     // Beheer: alles wat met het geld van de kring te maken heeft, onder één
@@ -163,6 +169,9 @@ export function getAdminNav(): NavEntry[] {
       // De shiften van een werkweek als tijdlijn: waar er nog shifters nodig
       // zijn. Een eigen pagina en geen tab binnen Broodjes, op vraag van Theokot.
       item('theokotShiften', '/theokot/shiften', { perm: 'theokot.manage' }),
+      // Het tweede tabblad van Shiften: wie de zaak openhoudt. Verborgen in de
+      // zijbalk (het is een tabblad), wel te vinden met Ctrl/Cmd+K.
+      item('theokotVerantwoordelijken', '/theokot/shiften/verantwoordelijken', { perm: 'theokot.manage', hidden: true }),
     ]),
     // Google Admin: de groepsadressen, de @vtk.be-accounts en hun
     // organisatie-eenheden, met tabbladen in de pagina zelf. Stond onder

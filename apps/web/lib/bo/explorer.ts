@@ -6,7 +6,8 @@ import type { BoKind, MeetingKind } from "./names";
  * Wat de verkenner op /admin/bestuursorgaan in de browser krijgt: het overzicht
  * van één werkingsjaar, met datums als tekst ("2026-11-04") zodat het van de
  * server naar een clientcomponent kan. Puur, en zonder imports die iets anders
- * dan types meebrengen: dit bestand belandt in de clientbundel.
+ * dan types meebrengen (op het even pure `share.ts` na): dit bestand belandt in
+ * de clientbundel.
  */
 
 export type XDoc = Omit<DocView, "meetingDate"> & { meetingDate: string | null };
@@ -36,6 +37,7 @@ export type ExplorerData = {
 };
 
 export type { BoKind, BoLine, DossierStatus, MeetingKind, PostSection, Stats };
+export { vtkPartCents } from "./share";
 
 const iso = (date: Date | null) => (date ? date.toISOString().slice(0, 10) : null);
 

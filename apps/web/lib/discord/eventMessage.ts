@@ -1,5 +1,5 @@
 import type { EventSignupLinkKind } from "@/lib/calendar/signupLink";
-import { markdownToPlainText } from "@/lib/markdown";
+import { markdownToPlainText, stripIframes } from "@/lib/markdown";
 
 /**
  * Het bericht dat een nieuw evenement in een Discord-kanaal wordt.
@@ -171,10 +171,7 @@ export function discordDescription(
   max: number = DISCORD_DESCRIPTION_MAX,
 ): string {
   if (!markdown) return "";
-  const text = markdown
-    .replace(/\r\n/g, "\n")
-    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
-    .replace(/<iframe[^>]*\/?>/gi, "")
+  const text = stripIframes(markdown.replace(/\r\n/g, "\n"))
     .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
     .replace(/^#{1,6}\s+(.+?)\s*#*\s*$/gm, "**$1**")
     .replace(/^\s*[-*_]{3,}\s*$/gm, "")

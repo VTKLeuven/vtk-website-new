@@ -592,6 +592,15 @@ const icons: Record<string, ReactNode> = {
       <circle cx="16" cy="16" r="6" />
     </Svg>
   ),
+  // theokotVerantwoordelijken: wie de zaak openhoudt -> een sleutel
+  theokotVerantwoordelijken: (
+    <Svg>
+      <circle cx="7.5" cy="15.5" r="3.5" />
+      <path d="m10 13 8.5-8.5" />
+      <path d="m16 7 2 2" />
+      <path d="m19 4 2 2" />
+    </Svg>
+  ),
   // apps: een raster van vier tegels
   apps: (
     <Svg>
@@ -610,6 +619,17 @@ const icons: Record<string, ReactNode> = {
       <circle cx="6" cy="17" r="2" />
       <circle cx="12" cy="19" r="2" />
       <circle cx="18" cy="17" r="2" />
+    </Svg>
+  ),
+  // boAttendance: een presentielijst -> een lijst met vinkjes
+  boAttendance: (
+    <Svg>
+      <path d="M4 6.5 5.5 8 8 5" />
+      <path d="M4 12.5 5.5 14 8 11" />
+      <path d="M4.5 18h3" />
+      <path d="M11 6.5h9" />
+      <path d="M11 12.5h9" />
+      <path d="M11 18h9" />
     </Svg>
   ),
   // grocomeet: vergaderen -> mensen rond een tafel

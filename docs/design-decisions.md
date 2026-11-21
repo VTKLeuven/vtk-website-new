@@ -6461,6 +6461,34 @@ De blokkade zit in de aanmeldflow bij VTK, niet in de applicatie zelf. Een app
 die zelf moet controleren of je binnen mag, vergeet dat ooit; en dan staat de
 deur open zonder dat iemand het merkt.
 
+### Een applicatie kan een KU Leuven-login of een student vragen
+
+Los van open of beperkt kan een applicatie vragen hoe iemand bij de KU Leuven
+bekend is (`OauthClient.kulRequirement`, op /admin/sso onder "KU Leuven-login"):
+
+- **Gekoppeld**: het VTK-account hangt aan een KU Leuven-login. Studenten en
+  personeel allebei; een account met enkel een wachtwoord raakt niet binnen.
+- **Enkel studenten**: de laatste KU Leuven-login was een **r-nummer met een
+  adres op student.kuleuven.be**. Personeel en proffen hebben een u-nummer en
+  een adres op kuleuven.be en vallen dus af. Dit is de stand voor Burgieclan:
+  het cursusmateriaal is er voor studenten, niet voor wie aan de KU Leuven
+  werkt.
+
+Wat we bewust aanvaarden:
+
+- **Een doctoraatsonderzoeker die met een r-nummer inlogt, raakt binnen.** Aan
+  het account en het adres is die niet van een andere student te onderscheiden.
+  Dat kan pas met de opleidingscode die KU Leuven meestuurt (`KULopl`), en
+  welke codes doctoraatsopleidingen zijn, weten we (nog) niet.
+- **De status geldt tot de volgende KU Leuven-login.** Wie afstudeert en daarna
+  enkel nog met een wachtwoord aanmeldt, blijft student tot een volgende login
+  via KU Leuven. Een vervaldatum zou elke student die met een
+  wachtwoord werkt elk jaar opnieuw via KU Leuven laten aanmelden.
+- **Wie koppelde vóór deze controle bestond, is "niet gecontroleerd" en niet
+  "geen student".** Die krijgt bij de eerste poging een knop om eenmaal via
+  KU Leuven aan te melden en gaat daarna meteen verder. Er is niets te
+  backfillen: het adres van de KU Leuven-login stond nergens bewaard.
+
 ### Toegang is een permissie, geen rol
 
 Een beperkte applicatie heeft één speciale permissie, `<namespace>.access`, die
@@ -8217,6 +8245,31 @@ Drie stukken, samen het pad:
   Enkel wanneer het persoonlijke adres precies één account aanwijst; botst het,
   dan faalt de login als een gewone foute login. Raden doen we hier niet.
 
+### Een persoon, een account, ook met een r- en een u-nummer
+
+Een doctoraatsstudent (en een student die bij de KU Leuven werkt) heeft twee
+KU Leuven-logins: een r-nummer op `student.kuleuven.be` en een u-nummer op
+`kuleuven.be`. Voor de site waren dat twee mensen. Wie met het andere nummer
+inlogde, kwam op een tweede, leeg account, zonder zijn lidmaatschap, tickets of
+erelidmaatschap (dat is een vlag op één account). En wie daarna een account op
+zijn persoonlijke adres maakte, botste in de onboarding op zijn eigen r-nummer.
+
+- **Het lid koppelt zelf, vanaf `/account#kul`.** Een knop start de
+  KU Leuven-login opnieuw (`prompt=login`, anders geeft de IdP meteen dezelfde
+  sessie terug) en hangt de tweede login aan het account waarmee hij nu
+  ingelogd is (`linkSocial`). Daarvoor staat `allowDifferentEmails` aan; dat
+  geldt enkel voor deze expliciete koppeling, niet voor gewoon inloggen.
+- **Automatisch samenvoegen doen we niet.** Een u-nummer draagt geen r-nummer,
+  en op naam koppelen is raden. Het lid weet welke twee nummers van hem zijn.
+- **Hangt het tweede nummer al aan een ander account**, dan weigert better-auth
+  de koppeling. IT koppelt het dan los op `/admin/gebruikers/<id>` (dat account
+  blijft staan, met zijn historiek) en het lid probeert opnieuw.
+- **De studentenlogin is de bron voor de status.** Een u-login op een account
+  met nog een andere KU Leuven-login zet `firwStudent` en `kulStudent` niet
+  (`kulStatusFromThisLogin`). Anders verloor een doctoraatsstudent bij elke
+  personeelslogin zijn FirW-status, en daarmee zijn ledenprijs. Een prof met
+  enkel een u-nummer krijgt zijn status gewoon van die login.
+
 ### Het inlogscherm is één knop, met een regeltje eronder
 
 Verreweg de meeste bezoekers zijn student. Twee even grote formulieren naast
@@ -9087,10 +9140,24 @@ maart enzovoort, de kwartalen van de boekhouding. Het kasboekjaar loopt van juli
 tot juni en niet vanaf 15 juli zoals het werkingsjaar, zodat geen kwartaal half
 in twee jaren valt.
 
-**Bonnen tellen mee aan hun waarde, vastgeklikt bij het ingeven.** Net als bij
-een gewone kassa (en zoals het tabblad CUDITHEOFAK, `=1.2*(I+J)`): een telling
-en een afgifte kunnen shifters- en elixirbonnen bevatten, en die tellen aan de
-waarde uit de instellingen op het moment van ingeven.
+**Bonnen tellen voor de post, niet voor Beheer (november 2026).** Een telling
+en een afgifte kunnen shifters-, elixir- en Guidobonnen en bonnen voor een
+gratis broodje bevatten, aan de waarde uit de instellingen op het moment van
+ingeven (standaard € 1,20, € 1,20, € 1 en € 2,60; het gratis broodje is een
+schatting van Beheer). Eerst telden ze ook mee in de winst, zoals het tabblad
+CUDITHEOFAK (`=1.2*(I+J)`), maar Beheer vroeg het anders: voor Beheer telt
+enkel het cash, de bonnen zeggen iets over het resultaat van de post. Dus:
+
+- De post ziet haar telling met de bonnen erbij (`entryValueCents`).
+- Beheer ziet in het kasboek, de kerncijfers en de winst enkel cash
+  (`entryCashCents`); de bonnen staan wel in de omschrijving van de regel.
+- Een bonsoort die er later bijkomt, krijgt bij een oude regel waarde 0 met 0
+  stuks; wie zo'n regel aanpast, krijgt de huidige waarde
+  (`voucherValuesFor`), want met nul stuks telde ze nergens mee.
+
+De Guidobonnen en de broodjes bestaan enkel in de vaste kassa's; de gewone
+kassa per activiteit houdt haar twee soorten en rekent ze nog mee in haar
+resultaat.
 
 **Beheer geeft meegeven en teruggeven in, de post telt.** Beheer geeft of krijgt
 het geld, dus enkel zij weten het bedrag zeker; de post ziet die regels wel in
@@ -10333,6 +10400,44 @@ gewoon tickets voor vrienden; met het vinkje niet.
   (`HONORARY_TICKET_LIMIT`). Voor wie geen erelid is, staat er niets over op de
   pagina.
 
+## Voorverkoop koop je voor jezelf, en "1 ticket" is één per account
+
+De voorverkoop is een voorrecht voor de praesidiumposten, de vaste medewerkers
+en de ereleden, niet een manier om vóór de rest een tafel voor je vrienden vast
+te leggen. Twee grenzen houden dat zo, allebei aan het account:
+
+**In de voorverkoop koopt een ingelogd account één ticket, op eigen naam.** Eén
+ticket in de bestelling, en de koper en de aanwezige zijn de naam en het adres
+van het account (hoofdletters en dubbele spaties tellen niet, een leeg adres bij
+de aanwezige mag). De shop vult die velden zelf in en zet ze vast; de checkout
+is het slot erachter (`PRESALE_SELF_ONLY`). Ook een tweede bestelling tijdens de
+voorverkoop kan niet (`ACCOUNT_TICKET_LIMIT`). Zodra de verkoop voor iedereen
+opengaat, valt dit weg en koopt hij zoals iedereen.
+
+- **Wie met de private voorverkooplink koopt zonder in te loggen, valt
+  erbuiten.** Die link is er voor de band, sponsors en helpers zonder account,
+  die net voor anderen kopen. Wie met de link koopt terwijl hij ingelogd is,
+  heeft wel een account en krijgt dezelfde grens.
+
+**Staat een event op 1 ticket per bestelling, dan is dat één ticket per
+account**, over alle bestellingen heen. Zonder die regel kon wie ingelogd is
+gewoon tien keer na elkaar één ticket bestellen. Het geldt ook voor events die
+al op 1 stonden: wie daar al een ticket heeft, kan geen tweede meer kopen.
+
+- **Uitgelogd geldt het niet.** Een event met enkel publieke tickets kan je
+  uitgelogd blijven kopen, net zoals een erelid uitgelogd iedereen is. Enkel
+  een ticket dat inloggen vraagt (een ledenticket, een ereledenticket, een
+  doelgroep of een gratis ticket, zie `ticketTypeRequiresLogin`) houdt het
+  echt bij één per persoon.
+- **Dezelfde telling als bij de ereleden** (`accountHeldTicketsWhere` in
+  `lib/ticketing/honorary.ts`): een bestelling die nog op betaling wacht telt
+  mee, een vervallen bestelling of een terugbetaald ticket niet. Wie de
+  betaling afbreekt, kan dus pas opnieuw kopen wanneer de reservatie vervalt.
+
+Het maximum dat de shop en de app tonen, komt uit één functie
+(`accountOrderMax` in `lib/ticketing/accountLimit.ts`), zodat geen van beide
+iets laat kiezen wat de checkout daarna weigert.
+
 ## De e-mailhandtekening is een recht, geen ledenfunctie
 
 De handtekeninggenerator op `/account` bouwt een mailhandtekening met het
@@ -10416,6 +10521,100 @@ de handtekening van wie ze ingepland heeft, ook als ze pas dagen later vertrekt.
 Dit staat los van `signature.generate` hierboven. Dat recht gaat over de kaart op
 /account; deze ondertekening hoort bij het versturen van een mail en zit al
 achter het beheerrecht van de werking zelf.
+
+## Een deelnemer verwijderen, met of zonder terugbetaling
+
+Tot november 2026 kon een ticket enkel verdwijnen door het terug te betalen.
+Toen bleek dat een paar mensen in de voorverkoop tickets voor anderen gekocht
+hadden (van vóór de grens hierboven), wou het beheer die tickets weghalen, maar
+enkel die: wie er vijf kocht, houdt het ticket dat wel voor hemzelf was.
+
+- **Per deelnemer, niet per bestelling.** De knop "Ticket verwijderen" staat in
+  het uitklappaneel van elke deelnemer op het tabblad Deelnemers
+  (`RemoveAttendee.tsx`). De andere tickets van de bestelling blijven geldig.
+- **Of het geld teruggaat, kies je in de bevestiging.** Een vinkje "Ook ... terugbetalen
+  via Mollie" loopt langs de gewone terugbetaling (`requestTicketRefund`, recht
+  `REFUND`). Uitgevinkt wordt het ticket enkel ingetrokken
+  (`voidTicketWithoutRefund`, recht `MANAGE_ORDERS`): status `VOID`, de scanner
+  weigert het, de plaats komt vrij, de bestelling blijft betaald en er gaat
+  geen geld terug. Het vinkje staat standaard uit: geld terugsturen maak je
+  niet ongedaan.
+- **Bancontact krijgt geen vinkje.** Die provider betaalt voor ons niet terug
+  via de API. De bevestiging zegt dan dat wie terug wil betalen dat met de hand
+  doet en "Met de hand terugbetalen" bij de bestelling gebruikt; dat trekt het
+  ticket ook in.
+- **Een ingetrokken ticket kan je daarna niet meer via de site terugbetalen**
+  (de terugbetaling vraagt een geldig ticket); dat moet dan rechtstreeks in
+  Mollie. Een gescand ticket kan je niet verwijderen.
+- **De koper krijgt een mail met de reden, tenzij je dat uitvinkt.** Het vinkje
+  "De koper mailen" staat standaard aan: wie zonder bericht een dood ticket
+  heeft, staat anders aan de deur. Met de mail is een reden verplicht; die staat
+  letterlijk in de mail (`ticketCancelledMail`, voorvertoning op
+  /admin/it/flows). De mail zegt zelf enkel iets over geld wanneer de
+  terugbetaling via Mollie meeging; bij Bancontact of zonder terugbetaling hoort
+  dat in de reden. Ze gaat naar de koper en niet naar de deelnemer: de koper
+  kreeg de tickets. De reden komt niet in het auditlog van het event, want dat
+  overleeft het archiveren en die vrije tekst noemt vaak mensen.
+- **Een ingetrokken ticket telt nog mee voor de koper** bij één ticket per
+  account en in de voorverkoop (`accountHeldTicketsWhere` sluit enkel
+  terugbetaalde tickets uit): wie te veel kocht, krijgt er zo geen nieuwe
+  kans bij.
+
+## Tickets met de hand: uitgeven, van type wisselen, deelnemers mailen
+
+Op vraag van de organisatoren (november 2026) kan het tabblad Deelnemers van
+een ticketevent drie dingen die eerst enkel via de shop of buiten de site
+konden. Het recht is `MANAGE_ORDERS`, hetzelfde als een deelnemer verwijderen.
+
+**Een ticket uitgeven** ("Ticket aanmaken") voor een gast, een medewerker of
+iemand die cash betaalde, zonder dat die zelf door de shop gaat.
+
+- Het is een gewone bestelling van één ticket, met de deelnemer als koper:
+  de mail met het ticket, de bestelpagina, de scanner, verwijderen en de
+  statistieken werken zoals bij elke bestelling.
+- **Het bedrag kiest de organisator**, standaard 0. Een bedrag dat buiten de
+  site betaald werd, telt mee in de ontvangsten van het event onder de
+  betaalwijze "Manueel (buiten de site)" (provider `manual`). Terugbetalen gaat
+  dan, zoals bij Bancontact, met de hand.
+- **Het neemt een plaats in de pot van zijn type**, een ledenplaats wanneer het
+  adres bij een account hoort dat lid is. Zit de pot vol, dan weigert het: wie
+  er toch iemand bij wil, verhoogt eerst de capaciteit. Een stille uitzondering
+  op het plafond verkoopt een plaats die er niet is.
+- De grenzen per koper uit de shop (maximum per bestelling, één erelidticket)
+  gelden niet: het is de beslissing van de organisator.
+- De mail met het ticket staat standaard aan; uit voor wie het ticket anders
+  krijgt.
+
+**Een ticket van type wisselen** (upgrade of downgrade), per deelnemer.
+
+- **Enkel het type wisselt, het geld niet.** Het betaalde bedrag blijft staan
+  en een prijsverschil regelt de organisator buiten de site (bijbetalen aan de
+  toog, of een deel met de hand terugstorten). Zo blijven de ontvangsten gelijk
+  aan wat er echt binnenkwam. Automatisch terugstorten bij een downgrade werd
+  niet gekozen.
+- Het ticket houdt zijn code en QR: de scanner leest het type uit de
+  bestelregel. De plaats verhuist naar de pot van het nieuwe type; zit die vol,
+  dan gebeurt er niets. Mag ook na het inchecken: een upgrade aan de deur is
+  net het geval waarvoor dit bestaat.
+- De koper kan een mail krijgen (standaard aan) met een optioneel bericht,
+  bijvoorbeeld wat er nog bij te betalen valt.
+
+**Deelnemers mailen**: een onderwerp en een bericht aan alle deelnemers met een
+geldig ticket, of aan die van een of meer tickettypes en/of groepen
+(praesidium, erelid, lid, niet-lid). Beide samen gelden allebei: leden met een
+bierticket.
+
+- **Eén mail per adres**, aan de deelnemer, en zonder eigen adres aan de koper,
+  zoals de deelnemerslijst het toont. Verwijderde en terugbetaalde tickets
+  krijgen niets.
+- Het formulier telt de adressen terwijl je kiest en de bevestiging noemt het
+  aantal: een verstuurde mail krijg je niet terug. De adressen zelf staan niet
+  in de pagina; de server rekent de ontvangers bij het versturen opnieuw uit.
+- De mails gaan langs de ticket-outbox, maar **na** de bestelbevestigingen:
+  een bericht aan honderden mag niet minutenlang tussen een koper en zijn
+  ticket staan. Bij veel deelnemers duurt het daardoor enkele minuten.
+- De tekst van het bericht staat niet in het auditlog van het event, enkel
+  het aantal en de keuze: dat logboek overleeft het archiveren.
 
 ## Voorverkoop: een duur voor de verkoopstart, niet een tweede datum
 
@@ -10606,6 +10805,56 @@ hetzelfde als "dit academiejaar niet", en dat is precies de beslissing die
 iemand op dat moment níét wilde nemen. Het blijft één plek om lid te worden: de
 accountpagina toont de status en linkt ernaartoe, ze bouwt geen tweede
 formulier.
+
+## Betalende ereleden
+
+Naast het gratis erelidmaatschap dat een beheerder toekent (`User.honoraryMember`,
+zie "Ereleden") kan iemand **zelf betalend erelid worden op `/lidmaatschap`**,
+standaard voor €75 (november 2026). De prijs en of de weg openstaat, staan bij
+/admin/leden › Instellingen (`leden.config`, `honoraryPriceCents` en
+`honoraryOpen`).
+
+- **Per academiejaar, niet blijvend.** Een betalend erelid is een `Membership`
+  van soort `HONORARY` voor één academiejaar, en vervalt op 14 september zoals
+  elk lidmaatschap; volgend jaar betaal je opnieuw. Daarom is het een rij en
+  geen vlag: de vlag blijft wat een beheerder blijvend toekent.
+- **Enkel voor wie geen student is** (`User.isStudent` uit): alumni, personeel
+  en externen. Een student wordt lid, geen erelid. `honoraryOffer` in
+  `lib/membership/offer.ts` beslist, en de action rekent het opnieuw na.
+- **Eén rij per lid per jaar.** Wie dit jaar al een geldig lidmaatschap heeft
+  (ook een betaald van €25), krijgt het aanbod niet: een tweede betaling
+  bovenop de eerste zou een terugbetaling worden. Een **onbetaald**
+  lidmaatschap van een andere soort wordt wel omgezet, en zijn openstaande
+  betaalpogingen gaan dicht (`closeOpenMembershipCheckouts`), zodat een oude
+  betaalpagina van €25 het erelidmaatschap niet kan activeren. Komt zo'n oude
+  betaling toch nog binnen, dan wordt ze geboekt maar activeert ze niets
+  (te laag bedrag), en dat staat in de logs.
+- **Een betalend erelid is overal erelid**: ledenprijs en ledentickets (via
+  het lidmaatschap), en daarnaast de ticketsoorten en de ereledenprijs voor
+  ereleden, de voorverkoop, de groep "erelid" op de deelnemerslijst en de mail
+  bij een geopende inschrijving. Elke plek die vroeger enkel naar de vlag keek,
+  leest de betaalde rij mee met `honoraryMembershipSelect` en
+  `isHonoraryMember` (`lib/membership/honorary.ts`). Wie nieuwe code schrijft
+  die vraagt "is dit een erelid?", gebruikt die helper en niet de kale vlag.
+- **Hetzelfde betaalspoor en dezelfde boekhoudcode als het lidgeld**: Mollie,
+  de webhook van het lidmaatschap, met "VTK-erelidmaatschap 26-27" als
+  omschrijving.
+- **Het tabblad Ereleden toont beide soorten**, te filteren op gratis en
+  betalend, met een jaarkeuze voor de betalende. Wie beide is, staat één keer
+  in de lijst en in beide filters. Het betalende intrekken verwijdert de rij en
+  betaalt niets terug, net als bij een lidmaatschap. In de ledenlijst staan de
+  betalende ereleden als soort "Betalend erelid", zodat het ledenaantal en de
+  ontvangsten kloppen.
+
+## Sorteren in de ledenlijst
+
+De leden- en de ereledenlijst op /admin/leden sorteer je met een klik op de
+kolomkop, en die sortering staat in de URL (`?sorteer=naam&richting=op`), net
+als de zoekterm en de soort. Bewust op de server en niet in de browser: een
+ledenlijst telt duizenden faculteitsstudenten, en de Excel-export volgt zo
+vanzelf dezelfde volgorde als het scherm. Een lege waarde (geen r-nummer, nog
+niet betaald) staat altijd achteraan. Zonder keuze staan de nieuwste leden
+bovenaan en de ereleden op naam.
 
 ## Ledenprijs: één ticket met twee prijzen
 
@@ -11630,6 +11879,16 @@ erbij kwam, viel eruit tot iemand ze erin zette; dat was de bedoeling. Het
 paneel "Openbaar of privé" van zo'n event belooft daarom ook geen plaats in het
 nieuws.
 
+**Een uitverkochte ticketverkoop valt uit het nieuws** (november 2026). Een
+tegel die naar een shop wijst waar niets meer te koop is, is geen nieuws. Dat
+geldt voor de homepage, /nieuws en /admin/nieuws samen (ze lezen dezelfde
+`collectNews`), en ook voor de voorverkoop. Uitverkocht betekent hier: geen
+enkel actief tickettype heeft nog een vrije plaats, voor een lid noch voor een
+niet-lid (`ticketSoldOut` in `lib/news/rules.ts`). Een pot met enkel nog
+ledenplaatsen blijft dus in het nieuws, want het nieuws is voor iedereen
+hetzelfde. Een plaats in een lopende reservatie telt als bezet, zoals op
+/tickets; vervalt de reservatie, dan komt het bericht binnen de minuut terug.
+
 **Een ticketverkoop en een inschrijving tonen de dag van het evenement.** De
 datumpin en de kopregel stonden op het moment dat de verkoop opende, en "do 24
 sep" boven een uitstap op de 29ste las als de dag van de uitstap. Wanneer de
@@ -12605,6 +12864,15 @@ post en bovenaan voor Totaal, VTK en Werkgroepen. Plus is beter dan begroot.
   weer open, wacht ze op een eigen resultaat, en rekent "open sinds" vanaf die
   BO; het oude resultaat blijft bij de bestanden staan. Een nieuw budget voor
   een BO die nog moet komen, verandert niets, net zoals elders.
+- **Bij een activiteit met een andere kring telt enkel het deel van VTK**
+  (november 2026). Het blad staat er met het volle bedrag in, en het blok
+  "Organisatie / Verdeling" zegt hoeveel VTK draagt; de regel Begroting is
+  enkel het deel van VTK. HalloweenParty (BO 9, 26-27) stond op -512,27 met
+  20% voor VTK en een begroting van -200, en de site meldde "€ 312,27
+  slechter dan de begroting" terwijl VTK -102,45 draagt. Budget, resultaat en
+  afwijking blijven het volle bedrag, zoals in het blad; tegenover de
+  begroting staat het deel van VTK (`vtkPartCents` in `lib/bo/share.ts`, en
+  `vtkShareOf` in de budgeteditor), ook in "budget erboven" en in een potje.
 - Op een telefoon wijkt de kolom Missend (budgetten min resultaten), zodat de
   naam van de post plaats houdt.
 - **Een activiteit kan buiten de begroting staan en toch meetellen.** Sommige
@@ -12907,6 +13175,27 @@ rekenblad met raster. Gekozen is A.
   na te gaan: lag het aan de winkel, aan de prijsbrowser, of liep de ronde niet?
   Ook een antwoord uit het geheugen staat erin, met de reden waarom de site
   vroeg. De link staat bij de instellingen en in het blok van elk budget.
+
+## Bestuursorgaan: aanwezigheden
+
+In november 2026 kwam de telling van wie er op het BO was op de site
+(`/admin/apps/aanwezigheden`), uit de kleuren in de verslagen. De keuzes:
+
+- **IT en Groep 5, verder niemand.** Anders dan de budgetten zit dit wel in de
+  rol admin (`bestuursorgaan.attendance`): wie er op een vergadering zat, is
+  geen cijfer van een post, en IT hield de telling al bij. Een post ziet haar
+  eigen aanwezigheid hier niet.
+- **Onder Apps, niet onder Bestuursorgaan.** Die module is van Groep 5 en de
+  posten (budgetten); de aanwezigheden zijn een hulpmiddel ernaast.
+- **De aanwezigheidsgraad is aanwezig op wie ingekleurd was**: aanwezig gedeeld
+  door aanwezig, verontschuldigd en afwezig. Verontschuldigd telt dus als
+  niet aanwezig, en staat er apart naast ("aanwezig of verontschuldigd"). Een
+  BO waarop iemand niet op de lijst stond, telt voor die persoon niet.
+- **Op te volgen** is wie drie keer of meer onverwittigd afwezig was, of de
+  laatste twee BO's na elkaar. Dat is een eerste voorstel; verander de drempel
+  in `buildAttendance` als Groep 5 een andere wil.
+- **De site schrijft niets in Drive.** Een fout in een verslag (een naam niet
+  ingekleurd, een tikfout) pas je daar aan; de volgende scan neemt het over.
 
 ## Nieuwe evenementen in Discord
 
@@ -13373,6 +13662,47 @@ nodig zijn. Dat staat op `/admin/theokot/shiften` (`lib/theokotShifts.ts`,
 - **Het recht is `theokot.manage`**, wie de broodjes beheert. Geen apart recht:
   de rol van Theokot draagt het al, en de afhaalbalie (`theokot.pickup`) plant
   geen shiften.
+- **Twee tabbladen sinds november 2026**: Shifters (deze tijdlijn) en
+  Verantwoordelijken (hieronder). De gekozen week reist mee.
+
+## Theokot: verantwoordelijken
+
+Theokot duidde in een Google-rekenblad aan wie de zaak openhoudt: elke
+verantwoordelijke typte de eigen naam in de blokken waarin die kon, iemand
+kleurde per blok groen wie het deed, en een overzichtje telde per persoon "deze
+week" en "aller tijden". Dat staat sinds november 2026 op
+`/admin/theokot/shiften/verantwoordelijken` (`lib/theokotDuty.ts`,
+`DutyRoster.tsx`).
+
+- **Het rekenblad, nagebouwd, als tweede tabblad van Shiften.** Vier richtingen
+  lagen voor (dit raster, een laag boven de tijdlijn van de shifters, een rij per
+  persoon, en invullen en verdelen als twee schermen); Theokot koos het raster
+  omdat het hetzelfde leest als hun blad: de dagen naast elkaar, de blokken onder
+  elkaar, in elk vak wie kan. Een klik op een naam deelt die in.
+- **Vier vaste blokken**: 10:00–12:30, 12:30–14:00, 14:00–16:00 en, enkel van
+  maandag tot donderdag, 16:00–18:00. De ochtend begint een halfuur voor de
+  gewone shifters. Wat op één dag afwijkt (een tweede verantwoordelijke, een
+  notitie zoals "Bureau" of "Broodjes gm", een blok dat er niet is of een avond
+  op vrijdag), zet je met het potlood in het vak; dat is een `TheokotDutyBlock`,
+  geen wijziging aan de vaste blokken.
+- **Elk duidt zelf aan.** Enkel wie in het werkingsjaar van die week lid is van
+  de post Theokot, ziet "Ik kan" en het kruisje bij de eigen naam. Wie iets
+  wist, valt ook uit de indeling van dat blok. Indelen kan iedereen met
+  `theokot.manage`, maar enkel wie het blok aanduidde.
+- **Een blok voor één persoon wisselt bij een klik op een andere naam**; in een
+  blok voor meer is vol een foutmelding, want wie er dan moet wijken is niet te
+  raden.
+- **De telling loopt per werkingsjaar** (sinds 15 juli): de startstand plus elk
+  blok waarin iemand dat werkingsjaar ingedeeld is. De startstand
+  (`TheokotDutyCarryOver`) is wat iemand al openhield voor het rooster op de site
+  stond; het rooster kwam er halverwege het jaar, en zonder startstand zou het
+  voorstel wie al twintig keer openhield gelijk zetten met wie nog nooit deed.
+- **"Eerlijk voorstel" vult enkel open plaatsen**, en laat wie al ingedeeld is
+  staan. Eerst de blokken met de minste kandidaten, daarna per plaats wie de
+  laagste telling heeft, liever niet twee blokken op één dag.
+- **Geen `Shift`.** Een verantwoordelijk blok staat niet op /shift, levert geen
+  bonnetjes op en staat niet in de shiftgeschiedenis. Niemand krijgt een mail:
+  de verantwoordelijken kijken zelf op deze pagina.
 
 ## Opruiming van de bucket
 

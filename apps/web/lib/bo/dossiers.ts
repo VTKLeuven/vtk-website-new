@@ -1,5 +1,6 @@
 import type { BoLine } from "./figures";
 import { normalizeKey, parseDocumentName, type BoKind, type MeetingKind, type ParsedDocumentName } from "./names";
+import { vtkPartCents } from "./share";
 import { BO_EXTRA_POSTS, postName, resolvePostKeys, splitPost, type PostAliases, type PostCandidate } from "./posts";
 
 /*
@@ -167,7 +168,8 @@ export type Dossier = {
   devCents: number | null;
   /**
    * Hoe de activiteit ervoor staat tegenover de begroting: het resultaat (of,
-   * zolang dat er niet is, het budget) min de regel Begroting. Positief is
+   * zolang dat er niet is, het budget) min de regel Begroting, bij een
+   * activiteit met een andere kring enkel het deel van VTK. Positief is
    * beter dan begroot. Null zonder begroting in het blad. Een potje staat in
    * één blad, dus elke activiteit telt apart (zie docs/design-decisions.md).
    * Komt een potje na zijn resultaat terug met dezelfde naam, dan telt enkel
@@ -187,7 +189,7 @@ export type Dossier = {
   lagDays: number | null;
   /** Bij een open resultaat: dagen sinds de BO van het budget. */
   overdueDays: number | null;
-  /** Het budget plant slechter dan de begroting. */
+  /** Het budget (het deel van VTK) plant slechter dan de begroting. */
   overAllocation: boolean;
   /** De posten uit het laatste resultaat, anders uit het laatste budget. */
   lines: BoLine[];
@@ -624,7 +626,12 @@ export function buildOverview(
     // Het resultaat is het meest accuraat; zolang het er niet is, het budget.
     // Een potje telt voor wat begroot werd: een tussentijds resultaat zegt
     // niet wat er tegen het eind van het jaar nog uit gaat.
-    const standCents = pot ? allocationCents : ((status === "DONE" ? resultCents : null) ?? budgetCents);
+    // Een activiteit die we met een andere kring delen, staat in het blad met
+    // haar volle bedrag, maar de begroting is enkel het deel van VTK. Tegenover
+    // de begroting telt dus het VTK-deel (`vtkPartCents`).
+    const vtkSharePercent = (roundResult ?? lastBudget)?.doc.vtkSharePercent ?? null;
+    const standCents = pot ? allocationCents : vtkPartCents((status === "DONE" ? resultCents : null) ?? budgetCents, vtkSharePercent);
+    const vtkBudgetCents = vtkPartCents(budgetCents, vtkSharePercent);
     const resultDate = roundResult?.view.meetingDate ?? null;
     const resultLines = roundResult?.doc.lines ?? [];
     const lines = resultLines.length > 0 ? resultLines : (lastBudget?.doc.lines ?? []);
@@ -649,12 +656,12 @@ export function buildOverview(
         resultCents,
         allocationCents,
         devCents: status === "DONE" && budgetItems.length > 0 && budgetCents !== null && resultCents !== null ? resultCents - budgetCents : null,
-        vtkSharePercent: (roundResult ?? lastBudget)?.doc.vtkSharePercent ?? null,
+        vtkSharePercent,
         lagDays: resultDate && date && budgetItems.length > 0 ? Math.max(0, days(date, resultDate)) : null,
         overdueDays: status === "OPEN" && (reopenedAt ?? date) ? Math.max(0, days((reopenedAt ?? date)!, today)) : null,
         begrotingDevCents: allocationCents !== null && standCents !== null ? standCents - allocationCents : null,
         begrotingExcluded: items.find((c) => c.doc.begrotingExcluded)?.doc.begrotingExcluded ?? null,
-        overAllocation: budgetCents !== null && allocationCents !== null && budgetCents < allocationCents,
+        overAllocation: vtkBudgetCents !== null && allocationCents !== null && vtkBudgetCents < allocationCents,
         lines,
         lastSeen: dates.length > 0 ? new Date(Math.max(...dates)) : null,
       },

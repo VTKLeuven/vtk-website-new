@@ -26,7 +26,46 @@ const DOC = "application/vnd.google-apps.document";
 
 const drive = new Map<string, FakeFile>();
 const downloads: string[] = [];
+const docDownloads: string[] = [];
 let overviewBuffer: Buffer;
+
+/** Een docx met enkel `word/document.xml`, ongecomprimeerd: genoeg voor de lezer. */
+function docx(xml: string): Buffer {
+  const name = Buffer.from("word/document.xml");
+  const data = Buffer.from(xml);
+  const local = Buffer.alloc(30);
+  local.writeUInt32LE(0x04034b50, 0);
+  local.writeUInt32LE(data.length, 18);
+  local.writeUInt32LE(data.length, 22);
+  local.writeUInt16LE(name.length, 26);
+  const central = Buffer.alloc(46);
+  central.writeUInt32LE(0x02014b50, 0);
+  central.writeUInt32LE(data.length, 20);
+  central.writeUInt32LE(data.length, 24);
+  central.writeUInt16LE(name.length, 28);
+  const centralOffset = local.length + name.length + data.length;
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(1, 8);
+  end.writeUInt16LE(1, 10);
+  end.writeUInt32LE(central.length + name.length, 12);
+  end.writeUInt32LE(centralOffset, 16);
+  return Buffer.concat([local, name, data, central, name, end]);
+}
+
+const run = (text: string, color?: string) =>
+  `<w:r><w:rPr>${color ? `<w:color w:val="${color}"/>` : ""}</w:rPr><w:t>${text}</w:t></w:r>`;
+const MINUTES = docx(
+  `<w:document><w:body>${[
+    run("VERSLAG"),
+    run("BO 5 - 20/09/2026"),
+    run("Aanwezigheden"),
+    run("Ada Peeters", "6aa84f"),
+    run("Bram Claes", "cc0000"),
+  ]
+    .map((r) => `<w:p>${r}</w:p>`)
+    .join("")}</w:body></w:document>`,
+);
 
 vi.mock("@/lib/google/config", () => ({
   getGoogleConfig: async () => ({
@@ -52,6 +91,10 @@ vi.mock("@/lib/google/client", async (importOriginal) => {
       downloads.push(file.id);
       return overviewBuffer;
     },
+    downloadDocument: async (_cfg: unknown, _subject: string, file: { id: string }) => {
+      docDownloads.push(file.id);
+      return MINUTES;
+    },
   };
 });
 
@@ -59,6 +102,7 @@ vi.mock("@/lib/google/client", async (importOriginal) => {
 type Row = Record<string, unknown> & { id: string };
 const meetings = new Map<string, Row>();
 const documents = new Map<string, Row>();
+const minutes = new Map<string, Row>();
 const settings = new Map<string, unknown>();
 let ids = 0;
 
@@ -118,6 +162,19 @@ vi.mock("@vtk/db", () => ({
         for (const row of documents.values()) if (matches(row, where)) Object.assign(row, data);
       },
     },
+    boMinutes: {
+      findUnique: async ({ where }: { where: { meetingId: string } }) => minutes.get(where.meetingId) ?? null,
+      upsert: async ({ where, create, update }: { where: { meetingId: string }; create: Row; update: Row }) => {
+        const existing = minutes.get(where.meetingId);
+        if (existing) return Object.assign(existing, update);
+        const row = { ...create, id: `v${++ids}` };
+        minutes.set(where.meetingId, row);
+        return row;
+      },
+      updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Row }) => {
+        for (const row of minutes.values()) if (matches(row, where)) Object.assign(row, data);
+      },
+    },
   },
 }));
 
@@ -162,8 +219,10 @@ beforeEach(async () => {
   drive.clear();
   meetings.clear();
   documents.clear();
+  minutes.clear();
   settings.clear();
   downloads.length = 0;
+  docDownloads.length = 0;
   overviewBuffer = await overviewSheet();
   settings.set("bestuursorgaan.config", { rootFolderId: "praesidium", yearFolderIds: {} });
 
@@ -231,7 +290,35 @@ describe("de BO-map lezen", () => {
 
     expect(docsIn("BO 7 - 04/10").map((d) => d.driveFileId)).toEqual(["frigo-res"]);
     expect(docsIn("Schriftelijke goedkeuring").map((d) => d.driveFileId)).toEqual(["router"]);
-    expect(outcome.status.read).toBe(5);
+    // Vijf rekenbladen en het verslag van BO 5.
+    expect(outcome.status.read).toBe(6);
+  });
+
+  it("leest het verslag van een BO via de snelkoppeling, en niet opnieuw zolang het niet wijzigt", async () => {
+    await scanBestuursorgaan();
+    const bo5 = [...meetings.values()].find((m) => m.name === "BO 5 - 20/09")!;
+    const bo7 = [...meetings.values()].find((m) => m.name === "BO 7 - 04/10")!;
+    expect(minutes.get(bo5.id as string)).toMatchObject({
+      driveFileId: "verslag-doc",
+      name: "VERSLAG_BO_5",
+      error: null,
+      title: "BO 5 - 20/09/2026",
+      attendance: [
+        { name: "Ada Peeters", status: "PRESENT", color: "6aa84f" },
+        { name: "Bram Claes", status: "ABSENT", color: "cc0000" },
+      ],
+    });
+    // De agenda is geen verslag, en BO 7 heeft er geen.
+    expect(docDownloads).toEqual(["verslag-doc"]);
+    expect(minutes.has(bo7.id as string)).toBe(false);
+
+    await scanBestuursorgaan();
+    expect(docDownloads).toEqual(["verslag-doc"]);
+
+    // Weg uit de map: de aanwezigheden blijven, met `missingSince`.
+    drive.delete("verslag");
+    await scanBestuursorgaan();
+    expect(minutes.get(bo5.id as string)).toMatchObject({ missingSince: expect.any(Date), error: null });
   });
 
   it("downloadt een ongewijzigd rekenblad niet opnieuw, en onthoudt wat verdween", async () => {

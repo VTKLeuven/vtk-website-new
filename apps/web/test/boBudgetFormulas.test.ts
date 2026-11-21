@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import writeXlsxFile from 'write-excel-file/node';
 import { begrotingSheets, findBegrotingLine, sheetForPost } from '@/lib/bo/budget/begroting';
-import { overviewOf, resultOverviewOf, sectionAmount, type CalcContext } from '@/lib/bo/budget/calc';
+import { overviewOf, resultOverviewOf, sectionAmount, vtkShareOf, type CalcContext } from '@/lib/bo/budget/calc';
 import { checksOf } from '@/lib/bo/budget/checks';
 import { applyFormulas, evalFormula } from '@/lib/bo/budget/formula';
 import { potOf, type PotMember } from '@/lib/bo/budget/pot';
@@ -160,6 +160,21 @@ describe('een potje: meer budgetten op één lijn van de begroting', () => {
     expect(pot.others.map((m) => m.id)).toEqual(['a', 'b']);
     expect(pot.othersTotal).toBe(-950);
     expect(pot.othersResult).toBe(-940);
+  });
+
+  it('zet bij een activiteit met een andere kring enkel het deel van VTK tegenover de begroting', () => {
+    const content = templateContent('standaard', true);
+    content.begroting = -200;
+    content.allocation = [
+      { org: 'VTK', share: 0.2 },
+      { org: 'Andere', share: 0.8 },
+    ];
+    (content.sections[1] as CostSection).rows.push({ id: 'c', name: 'Zaal', qty: 1, price: 500, basis: null });
+    const o = overviewOf(content, ctx);
+    expect(o.total).toBe(-500);
+    // -100 voor VTK tegenover -200 begroot.
+    expect(o.diff).toBe(100);
+    expect(vtkShareOf(content)).toBe(0.2);
   });
 
   it('vergelijkt het hele potje met de begroting', () => {

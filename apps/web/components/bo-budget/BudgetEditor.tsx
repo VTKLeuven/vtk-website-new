@@ -22,6 +22,7 @@ import {
   overviewOf,
   priceOf,
   resultOverviewOf,
+  vtkShareOf,
   type CalcContext,
 } from '@/lib/bo/budget/calc';
 import { checksOf, type Check } from '@/lib/bo/budget/checks';
@@ -911,8 +912,9 @@ export function BudgetEditor({
         <PotCard
           pot={pot}
           title={title}
-          total={overview.total}
-          resultTotal={resultOverview ? resultOverview.total : null}
+          // Een potje is een lijn uit de begroting: elk budget telt erin met het deel van VTK.
+          total={overview.total * vtkShareOf(content)}
+          resultTotal={resultOverview ? resultOverview.total * vtkShareOf(content) : null}
           diff={overview.diff}
           nl={nl}
           potHref={token ? null : (id) => `${locale === 'en' ? '/en' : ''}/admin/bestuursorgaan/mijn/${id}`}

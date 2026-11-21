@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import type { Locale } from '@vtk/i18n';
+import { prisma } from '@vtk/db';
 import { hasPermission } from '@vtk/auth';
 import Link from '@/components/ui/Link';
 import { hasLocale } from '@/lib/locale';
@@ -12,6 +13,8 @@ import { getBudgetSettings, listFolderBudgets, postNames, siteBudgetPostKeys } f
 import { AdminDisclosure } from '@/components/admin/AdminDisclosure';
 import { BudgetUpload, DriveImportButton } from '@/components/bo-budget/BudgetImport';
 import { money, shortDate } from '@/components/bo-budget/format';
+import { RestoreFileButton } from '../BoControls';
+import { boErrorMessages } from '../messages';
 
 /*
  * /admin/bestuursorgaan/mappen ("Bestuursorgaan" in de zijbalk): per BO een map, zoals in Drive. Wie een budget
@@ -25,7 +28,22 @@ import { money, shortDate } from '@/components/bo-budget/format';
  * Een activiteit die in Drive én op de site staat, is één rij met twee links.
  * Dat wordt hier op de server gefilterd: de pagina krijgt nooit het hele jaar
  * mee voor wie het niet mag zien (zie `lib/bo/own.ts`).
+ *
+ * Een bestand dat Groep 5 met "Niet meetellen" wegzette, staat nergens in het
+ * overzicht, maar wel nog in de map in Drive. Zonder spoor hier leek het dan
+ * alsof de scan het niet herkende, ook voor wie het zelf wegzette. Daarom
+ * toont een map het onder "Telt niet mee", met een knop om het terug te zetten.
  */
+
+type HiddenRow = {
+  id: string;
+  /** Zoals het in de BO-map staat: de snelkoppeling, anders het blad. */
+  name: string;
+  /** De naam van het blad zelf, wanneer die anders is dan de snelkoppeling. */
+  sheetName: string | null;
+  webUrl: string;
+  hiddenAt: Date | null;
+};
 
 type FileRow = {
   key: string;
@@ -49,6 +67,8 @@ type Folder = {
   upcoming: boolean;
   driveUrl: string | null;
   files: FileRow[];
+  /** Wat in deze BO-map staat maar niet meetelt; enkel voor Groep 5. */
+  hidden: HiddenRow[];
 };
 
 function FolderIcon({ open = false }: { open?: boolean }) {
@@ -94,7 +114,25 @@ export default async function BoFoldersPage({
   const { map: openId, q: query = '' } = await searchParams;
 
   const year = currentWorkingYear();
-  const [{ overview }, settings] = await Promise.all([loadBoOverview(year, nl), getBudgetSettings()]);
+  const [{ overview }, settings, hiddenDocs] = await Promise.all([
+    loadBoOverview(year, nl),
+    getBudgetSettings(),
+    all
+      ? prisma.boDocument.findMany({
+          where: { hiddenAt: { not: null }, missingSince: null, meeting: { workingYear: year } },
+          orderBy: { name: 'asc' },
+          select: { id: true, name: true, linkName: true, webUrl: true, meetingId: true, hiddenAt: true },
+        })
+      : [],
+  ]);
+  const hiddenByMeeting = new Map<string, HiddenRow[]>();
+  for (const doc of hiddenDocs) {
+    const name = doc.linkName ?? doc.name;
+    hiddenByMeeting.set(doc.meetingId, [
+      ...(hiddenByMeeting.get(doc.meetingId) ?? []),
+      { id: doc.id, name, sheetName: name === doc.name ? null : doc.name, webUrl: doc.webUrl, hiddenAt: doc.hiddenAt },
+    ]);
+  }
   const data = toExplorerData(overview, year, new Date());
   const siteBudgets = await listFolderBudgets(all ? 'all' : siteBudgetPostKeys(session, settings), settings);
   const names = await postNames([...new Set(siteBudgets.map((b) => b.postKey))], nl);
@@ -137,6 +175,7 @@ export default async function BoFoldersPage({
       upcoming: m.upcoming,
       driveUrl: all ? m.webUrl : null,
       files: byMeeting.get(m.id) ?? [],
+      hidden: hiddenByMeeting.get(m.id) ?? [],
     }));
   // Budgetten op de site: in de map van de BO waarvoor ze zijn, anders een eigen map.
   const loose: FileRow[] = [];
@@ -166,6 +205,7 @@ export default async function BoFoldersPage({
           upcoming: b.targetDate > data.today,
           driveUrl: null,
           files: [],
+          hidden: [],
         };
         folders.push(dated);
       }
@@ -181,6 +221,7 @@ export default async function BoFoldersPage({
       upcoming: false,
       driveUrl: null,
       files: loose,
+      hidden: [],
     });
 
   const open = openId ? (folders.find((f) => f.id === openId) ?? null) : null;
@@ -192,6 +233,10 @@ export default async function BoFoldersPage({
           .map((x) => ({ folder: f, file: x }))
       )
     : [];
+
+  const errorMessages = boErrorMessages(locale);
+  const hiddenOn = (date: Date) =>
+    date.toLocaleDateString(nl ? 'nl-BE' : 'en-GB', { day: 'numeric', month: 'short', timeZone: 'Europe/Brussels' });
 
   const fileTable = (rows: { file: FileRow; folder?: Folder }[]) => (
     <div className="vtk-fold-list">
@@ -370,6 +415,63 @@ export default async function BoFoldersPage({
               </section>
             );
           })}
+          {open.hidden.length > 0 && (
+            <section className="space-y-2" aria-label={nl ? 'Telt niet mee' : 'Not counted'}>
+              <h2 className="vtk-fold-sub">
+                <span className="vtk-fold-subicon">
+                  <FolderIcon open />
+                </span>
+                {nl ? 'Telt niet mee' : 'Not counted'}
+                <small>{open.hidden.length}</small>
+              </h2>
+              <p className="text-sm text-vtk-muted">
+                {nl
+                  ? 'Deze bestanden staan in de map in Drive, maar zijn met "Niet meetellen" uit het overzicht gehaald. Zet er een terug wanneer het toch meetelt.'
+                  : 'These files are in the Drive folder, but were taken out of the overview with "Do not count". Restore one when it does count.'}
+              </p>
+              <div className="vtk-fold-list">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>{nl ? 'Naam' : 'Name'}</th>
+                      <th>{nl ? 'Weggezet' : 'Put away'}</th>
+                      <th>
+                        <span className="sr-only">{nl ? 'Acties' : 'Actions'}</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {open.hidden.map((doc) => (
+                      <tr key={doc.id}>
+                        <td>
+                          <a href={doc.webUrl} target="_blank" rel="noreferrer" className="vtk-fold-name">
+                            <FileIcon source="drive" />
+                            <span>
+                              {doc.name}
+                              {doc.sheetName && (
+                                <small>
+                                  {nl ? `blad heet nu ${doc.sheetName}` : `sheet is now called ${doc.sheetName}`}
+                                </small>
+                              )}
+                            </span>
+                          </a>
+                        </td>
+                        <td data-label={nl ? 'Weggezet' : 'Put away'}>{doc.hiddenAt ? hiddenOn(doc.hiddenAt) : '–'}</td>
+                        <td>
+                          <RestoreFileButton
+                            docId={doc.id}
+                            name={doc.name}
+                            locale={locale}
+                            errorMessages={errorMessages}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
         </>
       ) : folders.length === 0 ? (
         <p className="vtk-fold-empty">
@@ -394,15 +496,25 @@ export default async function BoFoldersPage({
                   </span>
                   <b>{f.label}</b>
                   <span className="vtk-fold-rowdate">
-                    {/* Een map zonder naam in Drive heet al naar haar datum: die niet twee keer. */}
-                    {!f.date
-                      ? nl
-                        ? 'zonder datum'
-                        : 'no date'
-                      : f.label.includes(shortDate(f.date, nl))
-                        ? ''
-                        : shortDate(f.date, nl)}
-                    {f.upcoming ? (nl ? ' komt nog' : ' upcoming') : ''}
+                    {[
+                      // Een map zonder naam in Drive heet al naar haar datum: die niet twee keer.
+                      !f.date
+                        ? nl
+                          ? 'zonder datum'
+                          : 'no date'
+                        : f.label.includes(shortDate(f.date, nl))
+                          ? ''
+                          : shortDate(f.date, nl),
+                      f.upcoming ? (nl ? 'komt nog' : 'upcoming') : '',
+                      // Staat in Drive, maar telt niet mee: anders lijkt de map hier kleiner dan in Drive.
+                      f.hidden.length > 0
+                        ? nl
+                          ? `${f.hidden.length} ${f.hidden.length === 1 ? 'telt' : 'tellen'} niet mee`
+                          : `${f.hidden.length} not counted`
+                        : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </span>
                   <span className="vtk-fold-rowcount">
                     {nl

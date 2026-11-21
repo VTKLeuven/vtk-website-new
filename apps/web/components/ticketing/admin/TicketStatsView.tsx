@@ -45,6 +45,8 @@ function providerLabel(provider: string | null, locale: AdminLocale): string {
       return "Mollie";
     case "free":
       return nl ? "Gratis" : "Free";
+    case "manual":
+      return nl ? "Manueel (buiten de site)" : "Manual (outside the site)";
     case "mock":
       return nl ? "Testbetaling" : "Test payment";
     case null:

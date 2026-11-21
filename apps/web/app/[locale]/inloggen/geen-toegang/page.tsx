@@ -4,8 +4,10 @@ import { staticMetadata } from '@/lib/pageMetadata';
  * ⚠ DIT IS GEEN VTK-LOGINSCHERM.
  *
  * Hier landt een lid dat wél is ingelogd bij VTK, maar geen toegang heeft tot
- * de applicatie die hem hierheen stuurde. Die applicatie staat op "beperkt" en
- * het lid houdt de `<namespace>.access`-permissie niet.
+ * de applicatie die hierheen stuurde: die staat op "beperkt" en het lid houdt
+ * de `<namespace>.access`-permissie niet, of ze vraagt een KU Leuven-login (of
+ * een studentenaccount) die er niet is. Het paneel zelf staat in
+ * components/auth/NoAccessPanel.tsx, zodat /admin/it/flows het ook toont.
  *
  * De blokkade zelf gebeurt in de autorisatieflow (zie de `signup`-hook in
  * packages/auth/src/auth.ts); deze pagina legt ze enkel uit. Ze stuurt bewust
@@ -14,10 +16,11 @@ import { staticMetadata } from '@/lib/pageMetadata';
  */
 import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
-import { prisma } from '@vtk/db';
-import { getSession, verifySignedOAuthQuery } from '@vtk/auth/server';
+import { getDictionary } from '@vtk/i18n';
+import { checkClientAccess, getSession, verifySignedOAuthQuery } from '@vtk/auth/server';
+import { NoAccessPanel } from '@/components/auth/NoAccessPanel';
 import { hasLocale } from '@/lib/locale';
-import { signedOAuthQuery, type RawSearchParams } from '@/lib/oauthFlow';
+import { resumeAuthorizeUrl, signedOAuthQuery, type RawSearchParams } from '@/lib/oauthFlow';
 
 function one(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -65,43 +68,34 @@ export default async function NoAccessPage({
     redirect(`/en/inloggen/geen-toegang?${oauthQuery}`);
   }
 
-  // Enkel de naam ophalen. De handtekening hierboven is al gecontroleerd, dus
-  // dit `client_id` komt van de plugin en niet van de bezoeker; de naam tonen
-  // verklapt hier dus niets.
+  // De handtekening hierboven is al gecontroleerd, dus dit `client_id` komt van
+  // de plugin en niet van de bezoeker; de naam en de reden tonen verklapt hier
+  // dus niets. Dezelfde controle als de poort, zodat de uitleg niet afwijkt van
+  // wat de poort besliste.
   const clientId = one(sp.client_id);
-  const client = clientId
-    ? await prisma.oauthClient.findUnique({ where: { clientId }, select: { name: true } })
+  const requestedScopes = (one(sp.scope) ?? '')
+    .split(/\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const requestedResource = one(sp.resource) ?? null;
+  const access = clientId
+    ? await checkClientAccess(session.user.id, clientId, { requestedScopes, requestedResource })
     : null;
-  const appName = client?.name ?? null;
 
-  const title = nl
-    ? appName
-      ? `Je hebt geen toegang tot ${appName}`
-      : 'Je hebt geen toegang tot deze toepassing'
-    : appName
-      ? `You do not have access to ${appName}`
-      : 'You do not have access to this application';
+  // Intussen wel binnen (bv. net via KU Leuven aangemeld in een ander tabblad):
+  // gewoon verder met de autorisatie in plaats van een blokpagina die niet meer klopt.
+  if (access?.allowed) redirect(resumeAuthorizeUrl(sp));
 
   return (
     <div className="vtk-auth">
-      <div className="vtk-auth-panel">
-        <h1 className="vtk-auth-title">{title}</h1>
-        <p className="text-sm text-[#5c667f]">
-          {nl
-            ? 'Je bent aangemeld bij VTK, maar deze toepassing is enkel toegankelijk voor leden die er expliciet toegang toe kregen.'
-            : 'You are signed in to VTK, but this application is only available to members who have explicitly been given access.'}
-        </p>
-        <p className="mt-3 text-sm text-[#5c667f]">
-          {nl
-            ? 'Denk je dat je hier wel bij moet kunnen? Vraag toegang aan bij de post die de toepassing beheert, of bij VTK IT.'
-            : 'Think you should have access? Ask the group that manages the application, or VTK IT.'}
-        </p>
-        <p className="mt-6 text-sm">
-          <a className="underline" href={nl ? '/' : '/en'}>
-            {nl ? 'Terug naar vtk.be' : 'Back to vtk.be'}
-          </a>
-        </p>
-      </div>
+      <NoAccessPanel
+        nl={nl}
+        appName={access?.clientName ?? null}
+        reason={access?.reason ?? 'permission'}
+        kulRequirement={access?.kulRequirement ?? 'NONE'}
+        kulLabel={getDictionary(locale).auth.signInWithKulLong}
+        resumeUrl={resumeAuthorizeUrl(sp)}
+      />
     </div>
   );
 }

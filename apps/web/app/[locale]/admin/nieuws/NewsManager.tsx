@@ -10,7 +10,11 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { IconButton } from "@/components/ui/IconButton";
 import { EyeIcon, EyeOffIcon, PencilIcon, StarIcon } from "@/components/ui/icons";
-import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
+import {
+  BilingualGroup,
+  BilingualInput,
+  BilingualMarkdown,
+} from "@/components/admin/BilingualField";
 import { StorageImageField } from "@/components/admin/StorageImageField";
 import { saveErrorMessages } from "@/lib/saveMessages";
 import {
@@ -732,53 +736,36 @@ function PostForm({
       </Group>
 
       <Group title={nl ? "Inhoud" : "Content"}>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="news-title-nl">{nl ? "Titel (NL)" : "Title (NL)"}</Label>
-            <Input
-              id="news-title-nl"
-              name="titleNl"
-              defaultValue={post.titleNl}
-              placeholder={praeses ? (nl ? "Welkom in het nieuwe academiejaar" : "") : ""}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="news-title-en">{nl ? "Titel (EN)" : "Title (EN)"}</Label>
-            <Input id="news-title-en" name="titleEn" defaultValue={post.titleEn} />
-            <p className="mt-1 text-xs text-[#5c667f]">
-              {nl ? "Leeg = de Nederlandse titel." : "Empty = the Dutch title."}
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <div>
-            <Label htmlFor="news-body-nl">{nl ? "Tekst (NL)" : "Text (NL)"}</Label>
-            <MarkdownEditorField
-              name="bodyNl"
-              defaultValue={post.bodyNl}
-              locale={locale}
-              rows={10}
-              allowImages={false}
-              textareaId="news-body-nl"
-            />
-          </div>
-          <div>
-            <Label htmlFor="news-body-en">{nl ? "Tekst (EN)" : "Text (EN)"}</Label>
-            <MarkdownEditorField
-              name="bodyEn"
-              defaultValue={post.bodyEn}
-              locale={locale}
-              rows={10}
-              allowImages={false}
-              textareaId="news-body-en"
-            />
-            <p className="mt-1 text-xs text-[#5c667f]">
-              {nl ? "Leeg = de Nederlandse tekst." : "Empty = the Dutch text."}
-            </p>
-          </div>
-        </div>
+        <BilingualGroup
+          locale={locale}
+          enHint={
+            nl
+              ? "Laat een Engels veld leeg om terug te vallen op het Nederlands."
+              : "Leave an English field empty to fall back to Dutch."
+          }
+        >
+          <BilingualInput
+            label={nl ? "Titel" : "Title"}
+            nameNl="titleNl"
+            nameEn="titleEn"
+            defaultValueNl={post.titleNl}
+            defaultValueEn={post.titleEn}
+            placeholderNl={praeses ? (nl ? "Welkom in het nieuwe academiejaar" : "") : ""}
+            requiredNl
+            idPrefix="news-title"
+          />
+          <BilingualMarkdown
+            label={nl ? "Tekst" : "Text"}
+            nameNl="bodyNl"
+            nameEn="bodyEn"
+            defaultValueNl={post.bodyNl}
+            defaultValueEn={post.bodyEn}
+            locale={locale}
+            rows={10}
+            allowImages={false}
+            idPrefix="news-body"
+          />
+        </BilingualGroup>
       </Group>
 
       {praeses ? (

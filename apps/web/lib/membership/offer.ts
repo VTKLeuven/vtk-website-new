@@ -35,6 +35,31 @@ export function membershipOffer(
     : { kind: "none", reason: "closed" };
 }
 
+/**
+ * Het aanbod om betalend erelid te worden, voor één academiejaar.
+ *
+ * Enkel voor wie geen student is (`User.isStudent`): alumni, personeel en
+ * externen. Een student wordt lid, geen erelid; zo besliste de kring het. Een
+ * blijvend erelid (de vlag) heeft het al, en wie dit jaar al een geldig
+ * lidmaatschap heeft, ook een betaald, krijgt niets: er is één rij per lid per
+ * jaar, en een tweede betaling bovenop de eerste is geen aanbod maar een
+ * terugbetaling die op ons wacht.
+ *
+ * Een openstaand lidmaatschap van een andere soort mag wel omgezet worden: wie
+ * eerst "lid voor 25 euro" aanklikte en niet betaalde, kan alsnog erelid
+ * worden. Een openstaande erelidrij krijgt geen nieuw aanbod; daar staat de
+ * betaalknop al.
+ */
+export function honoraryOffer(
+  user: { isStudent: boolean; honoraryMember: boolean },
+  membership: { kind: string; activatedAt: Date | null } | null,
+  config: MembershipConfig,
+): { kind: "honorary"; priceCents: number } | null {
+  if (!config.honoraryOpen || user.isStudent || user.honoraryMember) return null;
+  if (membership && (membership.activatedAt || membership.kind === "HONORARY")) return null;
+  return { kind: "honorary", priceCents: config.honoraryPriceCents };
+}
+
 /** De drie teksten van het vinkje, klaar om als prop mee te geven. */
 export function membershipChoiceLabels(
   locale: Locale,

@@ -11,6 +11,12 @@ import {
   parseMembershipConfig,
   type MembershipConfig,
 } from "./config";
+import {
+  compareSortValues,
+  DEFAULT_HONORARY_SORT,
+  DEFAULT_MEMBER_SORT,
+  type MemberSort,
+} from "./sort";
 
 /**
  * Lidmaatschap van de kring, per academiejaar.
@@ -72,7 +78,8 @@ export function membershipIsActive(membership: Pick<Membership, "activatedAt"> |
  * erelid is. Bewust afgeleid en geen `Membership`-rij bij het toekennen: het
  * erelidmaatschap hangt niet aan een academiejaar, dus een rij voor dat ene
  * jaar zou op 14 september vervallen terwijl de persoon erelid blijft. Zie
- * docs/design-decisions.md, "Ereleden".
+ * docs/design-decisions.md, "Ereleden". Een betalend erelid heeft wel een rij
+ * (`HONORARY`, één academiejaar) en valt dus onder de tweede weg.
  *
  * Een DB-lezing, want `SessionPayload` draagt permissies en posten, geen
  * ledenstatus; dat uitbreiden zou elke sessielezing op de hele site duurder
@@ -189,6 +196,7 @@ export const MEMBER_KIND_FILTERS = {
   gratis: "FACULTY",
   betalend: "EXTERNAL",
   toegekend: "MANUAL",
+  erelid: "HONORARY",
 } as const satisfies Record<string, MembershipKind>;
 
 export type MemberKindFilter = keyof typeof MEMBER_KIND_FILTERS;
@@ -219,7 +227,30 @@ export type MemberListOptions = {
   pending?: boolean;
   kind?: MemberKindFilter | null;
   query?: string;
+  sort?: MemberSort;
 };
+
+/**
+ * De volgorde van de ledenlijst in prisma. Bij gelijke waarden beslist de naam,
+ * zodat een lijst op soort of bedrag niet bij elke lading anders staat.
+ */
+function memberOrderBy(sort: MemberSort) {
+  const { dir } = sort;
+  const byName = { user: { name: "asc" as const } };
+  switch (sort.key) {
+    case "naam":
+      return [{ user: { name: dir } }, { createdAt: "desc" as const }];
+    case "rnummer":
+      return [{ user: { rNumber: { sort: dir, nulls: "last" as const } } }, byName];
+    case "soort":
+      return [{ kind: dir }, byName];
+    case "bedrag":
+      return [{ priceCents: dir }, byName];
+    case "datum":
+      // Wie nog moet betalen, heeft geen datum en staat achteraan.
+      return [{ activatedAt: { sort: dir, nulls: "last" as const } }, { createdAt: dir }];
+  }
+}
 
 function memberWhere(year: number, options: MemberListOptions) {
   return {
@@ -245,7 +276,7 @@ export async function listMembers(
       user: { select: { id: true, name: true, email: true, rNumber: true } },
       grantedBy: { select: { name: true } },
     },
-    orderBy: [{ activatedAt: "desc" }, { createdAt: "desc" }],
+    orderBy: memberOrderBy(options.sort ?? DEFAULT_MEMBER_SORT),
   });
   return rows.map((row) => ({
     membershipId: row.id,
@@ -293,7 +324,7 @@ export async function membershipTotals(year: number): Promise<MembershipTotals> 
     }),
   ]);
 
-  const byKind: Record<MembershipKind, number> = { FACULTY: 0, EXTERNAL: 0, MANUAL: 0 };
+  const byKind: Record<MembershipKind, number> = { FACULTY: 0, EXTERNAL: 0, MANUAL: 0, HONORARY: 0 };
   let active = 0;
   let revenueCents = 0;
   for (const row of grouped) {
@@ -339,29 +370,114 @@ export type HonoraryMemberRow = {
   name: string;
   email: string;
   rNumber: string | null;
+  /** Gratis erelid: de vlag `User.honoraryMember`, blijvend. */
+  granted: boolean;
+  /** Betalend erelid in dit academiejaar: het geactiveerde lidmaatschap. */
+  paid: { membershipId: string; priceCents: number; activatedAt: Date } | null;
 };
 
 /**
- * De ereleden (`User.honoraryMember`), voor de tweede lijst op /admin/leden.
- *
- * Niet per academiejaar: erelid ben je tot een beheerder het intrekt. Een
- * verwijderd account valt weg, ook al zou de vlag nog staan.
+ * De filter op de ereledenlijst (`?soort=`): gratis (door een beheerder gezet,
+ * blijvend) of betalend (zelf betaald, voor één academiejaar). Wie beide is,
+ * staat in beide.
  */
-/** Alle ereleden, zonder zoekterm, voor "2 van de 7". */
-export async function countHonoraryMembers(): Promise<number> {
-  return prisma.user.count({ where: { honoraryMember: true, deletedAt: null } });
+export const HONORARY_KIND_FILTERS = ["gratis", "betalend"] as const;
+export type HonoraryKindFilter = (typeof HONORARY_KIND_FILTERS)[number];
+
+export function parseHonoraryKindFilter(value: string | null | undefined): HonoraryKindFilter | null {
+  return value && (HONORARY_KIND_FILTERS as readonly string[]).includes(value)
+    ? (value as HonoraryKindFilter)
+    : null;
 }
 
-export async function listHonoraryMembers(query = ""): Promise<HonoraryMemberRow[]> {
-  const rows = await prisma.user.findMany({
-    where: { honoraryMember: true, deletedAt: null, ...(query ? userSearchWhere(query) : {}) },
-    select: { id: true, name: true, email: true, rNumber: true },
-    orderBy: { name: "asc" },
+function paidHonoraryWhere(year: number) {
+  return { year, kind: "HONORARY" as const, activatedAt: { not: null } };
+}
+
+function honoraryWhere(year: number, kind: HonoraryKindFilter | null, query: string) {
+  const paid = { vtkMemberships: { some: paidHonoraryWhere(year) } };
+  return {
+    deletedAt: null,
+    ...(kind === "gratis"
+      ? { honoraryMember: true }
+      : kind === "betalend"
+        ? paid
+        : { OR: [{ honoraryMember: true }, paid] }),
+    ...(query ? { AND: [userSearchWhere(query)] } : {}),
+  };
+}
+
+/** Hoeveel ereleden er zijn, gratis, betalend in dit jaar en samen (wie beide is, telt één keer). */
+export async function honoraryTotals(
+  year: number,
+): Promise<{ total: number; granted: number; paid: number }> {
+  const [total, granted, paid] = await Promise.all([
+    prisma.user.count({ where: honoraryWhere(year, null, "") }),
+    prisma.user.count({ where: honoraryWhere(year, "gratis", "") }),
+    prisma.user.count({ where: honoraryWhere(year, "betalend", "") }),
+  ]);
+  return { total, granted, paid };
+}
+
+/**
+ * De ereleden voor het tabblad Ereleden op /admin/leden: de gratis ereleden
+ * (de vlag, niet per academiejaar) en de betalende van het gekozen
+ * academiejaar. Een verwijderd account valt weg, ook al zou de vlag nog staan.
+ *
+ * Gesorteerd in het geheugen en niet in prisma: de soort en het bedrag zijn
+ * afgeleid uit twee bronnen, en een lijst ereleden is tientallen rijen, geen
+ * duizenden.
+ */
+export async function listHonoraryMembers(
+  year: number,
+  options: { query?: string; kind?: HonoraryKindFilter | null; sort?: MemberSort } = {},
+): Promise<HonoraryMemberRow[]> {
+  const users = await prisma.user.findMany({
+    where: honoraryWhere(year, options.kind ?? null, options.query ?? ""),
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      rNumber: true,
+      honoraryMember: true,
+      vtkMemberships: {
+        where: paidHonoraryWhere(year),
+        select: { id: true, priceCents: true, activatedAt: true },
+        take: 1,
+      },
+    },
   });
-  return rows.map((row) => ({
-    userId: row.id,
-    name: row.name,
-    email: row.email,
-    rNumber: row.rNumber,
-  }));
+  const rows: HonoraryMemberRow[] = users.map((user) => {
+    const paid = user.vtkMemberships[0];
+    return {
+      userId: user.id,
+      name: user.name,
+      email: user.email,
+      rNumber: user.rNumber,
+      granted: user.honoraryMember,
+      paid: paid?.activatedAt
+        ? { membershipId: paid.id, priceCents: paid.priceCents, activatedAt: paid.activatedAt }
+        : null,
+    };
+  });
+
+  const sort = options.sort ?? DEFAULT_HONORARY_SORT;
+  const value = (row: HonoraryMemberRow): string | number | null => {
+    switch (sort.key) {
+      case "naam":
+        return row.name;
+      case "rnummer":
+        return row.rNumber;
+      // Gratis voor betalend bij oplopend; wie beide is, staat ertussen.
+      case "soort":
+        return row.granted ? (row.paid ? 1 : 0) : 2;
+      case "bedrag":
+        return row.paid?.priceCents ?? 0;
+      case "datum":
+        return row.paid?.activatedAt.getTime() ?? null;
+    }
+  };
+  return rows.sort(
+    (a, b) => compareSortValues(value(a), value(b), sort.dir) || compareSortValues(a.name, b.name, "asc"),
+  );
 }

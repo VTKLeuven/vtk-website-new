@@ -16,9 +16,20 @@ export type YearPocs = {
   pocs: ScrapedPoc[];
 };
 
+/** Alle tags weg, herhaald tot er geen meer ontstaat (`<scr<b>ipt>`). */
+function stripTags(html: string): string {
+  let out = html;
+  let previous: string;
+  do {
+    previous = out;
+    out = out.replace(/<[^>]+>/g, "");
+  } while (out !== previous);
+  return out;
+}
+
 function decodeHtmlEntities(str: string): string {
+  // &amp; als laatste: anders wordt "&amp;lt;" eerst "&lt;" en daarna "<".
   return str
-    .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
@@ -27,6 +38,7 @@ function decodeHtmlEntities(str: string): string {
     .replace(/&#x2F;/g, "/")
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -69,7 +81,7 @@ export async function scrapeYear(year: number): Promise<YearPocs> {
     const email = mailtoMatch ? mailtoMatch[1].trim().toLowerCase() : null;
 
     // Extract title text without tags and without parentheses
-    let pocName = rawH3.replace(/<[^>]+>/g, "").replace(/\(.*?\)/g, "").trim();
+    let pocName = stripTags(rawH3).replace(/\(.*?\)/g, "").trim();
     pocName = pocName.replace(/^POC\s+/i, "").trim();
     pocName = decodeHtmlEntities(pocName);
 
@@ -86,7 +98,7 @@ export async function scrapeYear(year: number): Promise<YearPocs> {
       const h5Match = /<h5[^>]*>([\s\S]*?)<\/h5>/i.exec(memberHtml);
       if (!h5Match) continue;
 
-      let name = h5Match[1].replace(/<[^>]+>/g, "").trim();
+      let name = stripTags(h5Match[1]).trim();
       name = decodeHtmlEntities(name);
       if (!name) continue;
 

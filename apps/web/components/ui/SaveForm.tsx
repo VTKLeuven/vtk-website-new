@@ -13,6 +13,11 @@ import {
 import { Button, ConfirmDialog } from "@vtk/ui";
 import { useToast } from "@/components/ui/toast";
 import { FormBusyProvider, useFormBusy } from "@/components/ui/formBusy";
+import {
+  FormTranslateControl,
+  FormTranslateProvider,
+  useFormTranslateRegistry,
+} from "@/components/ui/formTranslate";
 import { SAVE_IDLE, saveError, type SaveAction, type SaveState } from "@/lib/saveState";
 import { UNSENT_SAVE_CODES, unsentSaveReason } from "@/lib/unsentSave";
 import { useUnsentGuard } from "@/components/ui/unsentGuard";
@@ -55,6 +60,7 @@ export function SaveForm({
   onSuccess,
   resetOnSuccess = true,
   submitDisabled = false,
+  disableAutoTranslate = false,
   secondarySubmit,
   header,
   footer,
@@ -98,6 +104,8 @@ export function SaveForm({
   resetOnSuccess?: boolean;
   /** Extra voorwaarde bovenop "bezig met opslaan", bv. een verplichte upload. */
   submitDisabled?: boolean;
+  /** Verberg de automatische AI-vertaalknop voor dit formulier. */
+  disableAutoTranslate?: boolean;
   /**
    * Alternatieve opslaanknoppen die hetzelfde formulier versturen met een extra
    * waarde mee, zodat de action een andere intentie kent (bv. als concept
@@ -121,6 +129,7 @@ export function SaveForm({
     disabled: boolean;
     submitButton: ReactNode;
     secondaryButtons: ReactNode;
+    translateButton: ReactNode;
     confirmDialog: ReactNode;
   }) => ReactNode;
   /**
@@ -134,6 +143,7 @@ export function SaveForm({
     disabled: boolean;
     submitButton: ReactNode;
     secondaryButtons: ReactNode;
+    translateButton: ReactNode;
     confirmDialog: ReactNode;
   }) => ReactNode;
   className?: string;
@@ -179,6 +189,13 @@ export function SaveForm({
   // Een veld kan nog bezig zijn (een upload die pas achteraf zijn key kent).
   // Verzenden zou dan een lege waarde bewaren onder een groene toast.
   const { busy, register } = useFormBusy();
+  const {
+    fieldsRef: translatableFieldsRef,
+    version: translateRegistryVersion,
+    hasInlineTranslate,
+    register: registerTranslatableField,
+    markInlinePresent,
+  } = useFormTranslateRegistry();
   // Per submit één keer resetten en `onSuccess`, ook als de component om een
   // andere reden hertekent met dezelfde state.
   const handled = useRef<number | null>(null);
@@ -312,29 +329,48 @@ export function SaveForm({
     />
   ) : null;
 
+  const translateButton =
+    disableAutoTranslate || hasInlineTranslate ? null : (
+      <FormTranslateControl
+        formRef={formRef}
+        registeredFieldsRef={translatableFieldsRef}
+        registryVersion={translateRegistryVersion}
+        disabled={pending}
+      />
+    );
+
   const chrome = {
     pending,
     disabled: pending || submitDisabled || busy,
     submitButton,
     secondaryButtons,
+    translateButton,
     confirmDialog,
   };
 
   return (
     <form ref={formRef} onSubmit={onSubmit} className={className}>
-      {header ? header(chrome) : null}
-      <FormBusyProvider register={register}>{children}</FormBusyProvider>
-      {footer ? (
-        footer(chrome)
-      ) : header ? null : (
-        <>
-          <div className="flex flex-wrap items-center gap-3">
-            {submitButton}
-            {secondaryButtons}
-          </div>
-          {confirmDialog}
-        </>
-      )}
+      <FormBusyProvider register={register}>
+        <FormTranslateProvider
+          register={registerTranslatableField}
+          markInlinePresent={markInlinePresent}
+        >
+          {header ? header(chrome) : null}
+          {children}
+          {footer ? (
+            footer(chrome)
+          ) : header ? null : (
+            <>
+              <div className="flex flex-wrap items-center gap-3">
+                {submitButton}
+                {secondaryButtons}
+                {translateButton}
+              </div>
+              {confirmDialog}
+            </>
+          )}
+        </FormTranslateProvider>
+      </FormBusyProvider>
     </form>
   );
 }

@@ -27,6 +27,7 @@ import {
   ticketPresaleInNews,
   ticketNeedsNewsOptIn,
   ticketPresaleNewsDate,
+  ticketSoldOut,
   type NewsComposable,
   type NewsSource,
 } from "./rules";
@@ -139,6 +140,24 @@ const TICKET_NEWS_SELECT = {
   publishedAt: true,
   // Een verkoop van een werkgroep staat standaard niet in het nieuws.
   ownerGroup: { select: { type: true } },
+  // Voor `ticketSoldOut`: een uitverkochte verkoop valt uit het nieuws.
+  ticketTypes: {
+    where: { active: true },
+    select: {
+      inventoryPool: {
+        select: {
+          active: true,
+          capacity: true,
+          reservedCount: true,
+          soldCount: true,
+          memberCapacity: true,
+          nonMemberCapacity: true,
+          memberReservedCount: true,
+          memberSoldCount: true,
+        },
+      },
+    },
+  },
   ...ticketPosterSelect,
 } as const;
 
@@ -315,7 +334,7 @@ export async function collectNews(
   }
 
   for (const event of tickets) {
-    if (!ticketInNews(event, now)) continue;
+    if (!ticketInNews(event, now) || ticketSoldOut(event)) continue;
     const entry = ticketEntry(event, ticketNewsDate(event)!, locale, false);
     if (ticketNeedsNewsOptIn(event)) optIn.add(entry.key);
     entries.push(entry);
@@ -508,7 +527,9 @@ export async function getPresaleNews(
       presaleGroups: { select: { groupId: true } },
     },
   });
-  const running = candidates.filter((event) => ticketPresaleInNews(event, now));
+  const running = candidates.filter(
+    (event) => ticketPresaleInNews(event, now) && !ticketSoldOut(event),
+  );
   if (running.length === 0) return [];
 
   const setting = await readNewsSettingFromDb();

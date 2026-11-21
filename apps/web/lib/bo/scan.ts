@@ -6,17 +6,21 @@ import { prisma } from "@vtk/db";
 import { currentWorkingYear } from "@/lib/workingYear";
 import { getGoogleConfig, type GoogleConfig } from "@/lib/google/config";
 import {
+  DOCX_MIME,
+  DRIVE_DOC_MIME,
   DRIVE_FOLDER_MIME,
   DRIVE_SHEET_MIME,
   DRIVE_SHORTCUT_MIME,
   GoogleError,
   XLSX_MIME,
+  downloadDocument,
   downloadSpreadsheet,
   getDriveFile,
   listDriveChildren,
   type DriveFile,
 } from "@/lib/google/client";
 import { FIGURES_VERSION, figuresFromXlsx, type BoLine, type Figures } from "./figures";
+import { MINUTES_VERSION, minutesFromDocx } from "./attendance/parse";
 import {
   folderKind,
   isBoRootFolderName,
@@ -58,6 +62,10 @@ import { getBoConfig, getScanStatus, saveScanStatus, type BoConfig, type BoScanS
  *
  * Wat de scan niet meer vindt, wordt niet gewist maar krijgt `missingSince`:
  * het overzicht is een register van wat er langs het BO passeerde.
+ *
+ * Naast de budgetten leest de scan ook het verslag van elke BO (een Google Doc
+ * of docx die "Verslag" heet, rechtstreeks in de map van de vergadering) voor
+ * de aanwezigheden op /admin/apps/aanwezigheden (`syncMinutes`).
  */
 
 /** Hoe diep de scan onder een vergadering in mappen afdaalt. */
@@ -68,6 +76,7 @@ const MAX_DOWNLOAD_BYTES = 15 * 1024 * 1024;
 export const SCAN_INTERVAL_MS = 30 * 60 * 1000;
 
 const SPREADSHEET_MIMES = new Set([DRIVE_SHEET_MIME, XLSX_MIME]);
+const DOCUMENT_MIMES = new Set([DRIVE_DOC_MIME, DOCX_MIME]);
 const OTHER_SHEET_MIMES = new Set([
   "application/vnd.ms-excel",
   "application/vnd.oasis.opendocument.spreadsheet",
@@ -134,6 +143,8 @@ class Scan {
   readonly status: BoScanStatus;
   /** Eén download per bestand per scan, ook als het in twee BO's staat. */
   private readonly figures = new Map<string, FigureFields>();
+  /** De map van een vergadering wordt voor de budgetten én het verslag gelezen. */
+  private readonly listed = new Map<string, Promise<DriveFile[]>>();
 
   constructor(
     private readonly cfg: GoogleConfig,
@@ -153,8 +164,13 @@ class Scan {
     };
   }
 
-  private list(folderId: string) {
-    return listDriveChildren(this.cfg, this.subject, folderId);
+  private list(folderId: string): Promise<DriveFile[]> {
+    let children = this.listed.get(folderId);
+    if (!children) {
+      children = listDriveChildren(this.cfg, this.subject, folderId);
+      this.listed.set(folderId, children);
+    }
+    return children;
   }
 
   /**
@@ -222,6 +238,7 @@ class Scan {
       await this.walk(folder.id, null, 0, new Set(), found);
       await this.syncDocuments(meeting.id, [...found.values()]);
       documents += found.size;
+      await this.syncMinutes(meeting.id, await this.findMinutes(folder.id));
     }
 
     await prisma.boMeeting.updateMany({
@@ -367,6 +384,113 @@ class Scan {
     });
   }
 
+  /**
+   * Het verslag van een vergadering: een Google Doc of docx rechtstreeks in de
+   * map (of een snelkoppeling ernaar) met "verslag" in de naam. Staan er twee,
+   * dan wint wat met "Verslag" begint, en daarna het laatst gewijzigde: een
+   * kopie heet meestal "Kopie van VERSLAG ...".
+   */
+  private async findMinutes(folderId: string): Promise<{ file: DriveFile; linkName: string | null } | null> {
+    const candidates: { file: DriveFile; linkName: string | null }[] = [];
+    for (const child of await this.list(folderId)) {
+      if (!isMinutesName(child.name)) continue;
+      if (DOCUMENT_MIMES.has(child.mimeType)) {
+        candidates.push({ file: child, linkName: null });
+        continue;
+      }
+      if (
+        child.mimeType === DRIVE_SHORTCUT_MIME &&
+        child.shortcutDetails?.targetId &&
+        DOCUMENT_MIMES.has(child.shortcutDetails.targetMimeType ?? "")
+      ) {
+        const target = await getDriveFile(this.cfg, this.subject, child.shortcutDetails.targetId);
+        if (target) candidates.push({ file: target, linkName: child.name });
+        else this.status.unreachable.push(child.name);
+      }
+    }
+    candidates.sort((a, b) => {
+      const lead = Number(startsWithVerslag(b.linkName ?? b.file.name)) - Number(startsWithVerslag(a.linkName ?? a.file.name));
+      if (lead !== 0) return lead;
+      return (b.file.modifiedTime ?? "").localeCompare(a.file.modifiedTime ?? "");
+    });
+    return candidates[0] ?? null;
+  }
+
+  private async syncMinutes(meetingId: string, found: { file: DriveFile; linkName: string | null } | null): Promise<void> {
+    if (!found) {
+      // Geen verslag (meer): wat er al gelezen was, blijft staan.
+      await prisma.boMinutes.updateMany({ where: { meetingId, missingSince: null }, data: { missingSince: this.now } });
+      return;
+    }
+    const { file } = found;
+    const modified = file.modifiedTime ? new Date(file.modifiedTime) : this.now;
+    const previous = await prisma.boMinutes.findUnique({
+      where: { meetingId },
+      select: { driveFileId: true, readFor: true, readVersion: true },
+    });
+    const fresh =
+      previous?.driveFileId === file.id &&
+      previous.readFor?.getTime() === modified.getTime() &&
+      previous.readVersion === MINUTES_VERSION;
+
+    const base = {
+      driveFileId: file.id,
+      name: found.linkName ?? file.name,
+      mimeType: file.mimeType,
+      webUrl: file.webViewLink ?? `https://docs.google.com/document/d/${file.id}/edit`,
+      driveModifiedAt: modified,
+      lastSeenAt: this.now,
+      missingSince: null,
+    };
+    let read: {
+      title: string | null;
+      attendance: Prisma.InputJsonValue | typeof Prisma.DbNull;
+      error: string | null;
+      readFor: Date | null;
+      readVersion: number;
+    } | null = null;
+    if (!fresh) {
+      const fail = (error: string, retry = false) => ({
+        title: null,
+        attendance: Prisma.DbNull,
+        error,
+        // Zoals bij de rekenbladen: een tijdelijke fout opnieuw proberen.
+        readFor: retry ? null : modified,
+        readVersion: MINUTES_VERSION,
+      });
+      if (Number(file.size ?? 0) > MAX_DOWNLOAD_BYTES) {
+        read = fail("TOO_LARGE");
+      } else {
+        try {
+          const buffer = await downloadDocument(this.cfg, this.subject, file);
+          this.status.read += 1;
+          const parsed = minutesFromDocx(buffer);
+          read =
+            "error" in parsed
+              ? fail(parsed.error)
+              : {
+                  title: parsed.title,
+                  attendance: parsed.entries as unknown as Prisma.InputJsonValue,
+                  error: null,
+                  readFor: modified,
+                  readVersion: MINUTES_VERSION,
+                };
+        } catch (err) {
+          if (!(err instanceof GoogleError)) throw err;
+          read = fail(err.status === 403 || err.status === 404 ? "NO_ACCESS" : "DOWNLOAD_FAILED", true);
+        }
+      }
+    }
+    const fields = { ...base, ...(read ?? {}) };
+    try {
+      await prisma.boMinutes.upsert({ where: { meetingId }, create: { meetingId, ...fields }, update: fields });
+    } catch (err) {
+      console.error("[bestuursorgaan] verslag niet bewaard", file.name, err);
+      Sentry.captureException(err, { extra: { file: file.name } });
+      this.status.failed?.push(file.name);
+    }
+  }
+
   private async readFigures(item: Found, modified: Date): Promise<FigureFields> {
     const cached = this.figures.get(item.file.id);
     if (cached) return cached;
@@ -416,6 +540,15 @@ class Scan {
     this.figures.set(item.file.id, result);
     return result;
   }
+}
+
+/** "VERSLAG_BO_10", "Verslag BO 3 - 20/09", "Kopie van verslag". */
+export function isMinutesName(name: string): boolean {
+  return /verslag/i.test(name);
+}
+
+function startsWithVerslag(name: string): boolean {
+  return /^\s*verslag/i.test(name);
 }
 
 let running: Promise<ScanOutcome> | null = null;

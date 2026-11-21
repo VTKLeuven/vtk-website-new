@@ -540,7 +540,7 @@ export function AccountSignature({
                             E:{' '}
                             <a
                               id="emailVTK"
-                              href={`mailto:${emailAddress}`}
+                              href={`mailto:${encodeURI(emailAddress.trim())}`}
                               tabIndex={-1}
                               style={{
                                 textTransform: 'lowercase',

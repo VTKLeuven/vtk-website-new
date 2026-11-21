@@ -53,10 +53,10 @@ latere login op Burgieclan komt op hetzelfde account uit.
 
 | Waar | Variabele | Wat |
 |---|---|---|
-| vtk.be | `BURGIECLAN_API_URL` | De publieke URL van de backend (`https://api.burgieclan.be`). Ook de geëxporteerde agenda staat daar. |
+| vtk.be | `BURGIECLAN_API_URL` | De publieke URL van de backend: in productie `https://burgieclan.vtk.be` (de nginx van Burgieclan stuurt `/api` naar Symfony), lokaal `http://localhost:8000`. Ook de geëxporteerde agenda staat daar. |
 | vtk.be | `BURGIECLAN_SERVICE_SECRET` | Gedeeld geheim, minstens 32 tekens. |
-| vtk.be | `BURGIECLAN_CLIENT_ID` | Optioneel, enkel voor een pairwise client (zie hieronder). |
-| vtk.be | `BURGIECLAN_URL` | De site zelf, voor links naar een vak of de planner. |
+| vtk.be | `BURGIECLAN_URL` | Optioneel: de site zelf, voor links naar een vak of de planner. Standaard gelijk aan `BURGIECLAN_API_URL`. |
+| vtk.be | `BURGIECLAN_CLIENT_ID` | Vandaag niet nodig; enkel voor een pairwise client (zie hieronder). |
 | Burgieclan | `VTK_SERVICE_SECRET` | Hetzelfde geheim. Leeg = de app krijgt geen toegang. |
 | Burgieclan | `VTK_URL` | vtk.be, voor de VTK-evenementen. Lokaal `http://host.docker.internal:3000`. |
 
@@ -89,6 +89,69 @@ Zie `app-api.md`, "Planning". Kort: `GET`/`DELETE /planning`, `POST
 `/planning/feed-token`. Elke aanvraag antwoordt met de hele `AppPlanning`, net
 als bij Burgieclan, dus de app vraagt nooit twee keer.
 
+## Peilingen
+
+Ook de POC-peilingen staan op Burgieclan, als tab in de zijbalk die er enkel is
+wanneer er voor het lid een peiling open staat. Hier loopt het **omgekeerd**:
+Burgieclan vraagt aan vtk.be, namens het lid dat daar aangemeld is.
+
+```
+  Burgieclan /api/vtk_polls ──▶ vtk.be /api/burgieclan/v1/polls
+     ondertekend: X-Vtk-User / -Timestamp / -Signature (zelfde geheim)
+```
+
+| Kant | Bestand |
+|---|---|
+| Burgieclan tekent | `backend/src/Service/VtkService/VtkPolls.php` |
+| VTK controleert | `apps/web/lib/burgieclan/signature.ts` (`verifyBurgieclanRequest`), `apps/web/app/api/burgieclan/v1/polls/route.ts` |
+
+- De route geeft dezelfde `AppPolls` als de app (`lib/pocPolls/appPolls.ts`) en
+  neemt antwoorden aan zoals de app ze stuurt. Wie de peiling krijgt en hoe een
+  antwoord anoniem bewaard wordt, beslist enkel vtk.be; Burgieclan bewaart niets.
+- vtk.be zoekt het lid op de `sub` (de id, bij een publieke client), anders op
+  het universitaire adres. Een verwijderd of onbekend account krijgt een 404, en
+  dan toont Burgieclan gewoon geen peilingen.
+- Enkel accounts die via VTK aanmeldden (`fluxusSub` bij Burgieclan) kunnen
+  peilingen krijgen; voor de andere vraagt Burgieclan niets.
+- Het pad zit in de handtekening, dus wat Burgieclan voor deze route tekent,
+  opent niets anders op vtk.be. Ook hier een gedeelde vector:
+  `apps/web/test/burgieclanPolls.test.ts` en
+  `VtkPollsTest::testSignatureMatchesTheVtkWebsite` bij Burgieclan.
+
+## Studietimer
+
+De Blok-kalender op Burgieclan heeft een studietimer, en die is **dezelfde sessie
+als Samen blokken** in de app: wat je op Burgieclan start, telt mee in je groepen,
+je dagdoel en je reeks, en een sessie die je in de app startte, loopt op
+Burgieclan gewoon verder. Zelfde richting als de peilingen:
+
+```
+  Burgieclan /api/vtk_study ──▶ vtk.be /api/burgieclan/v1/studeren
+     ondertekend: X-Vtk-User / -Timestamp / -Signature (zelfde geheim)
+```
+
+| Kant | Bestand |
+|---|---|
+| Burgieclan tekent | `backend/src/Service/VtkService/VtkStudy.php` |
+| VTK controleert | `apps/web/app/api/burgieclan/v1/studeren/route.ts`, `apps/web/lib/burgieclan/study.ts` |
+
+- `GET` geeft de stand (`BurgieclanStudy`): de lopende sessie, de sessies van
+  vandaag (wanneer begonnen, wanneer gestopt), dagdoel, reeks, hoeveel
+  groepsgenoten nu zitten en een totaal per dag voor de kalender. Namen en
+  groepen blijven op vtk.be.
+- `POST { action: start | pause | resume | heartbeat | stop }` gebruikt exact de
+  functies van de app (`lib/app-api/study.ts`), dus dezelfde regels: het
+  levensteken, de pauzemarge van een minuut, het maximum van acht uur. Starten
+  stuurt ook hier het bericht "de eerste is begonnen" naar de groep.
+- Burgieclan stuurt elke minuut een `heartbeat` zolang de pagina openstaat, ook
+  in een tabblad op de achtergrond: op een laptop studeer je in een ander
+  tabblad (je cursus), en dat is geen pauze. Sluit je de pagina, dan telt de
+  sessie tot het laatste levensteken, zoals in de app.
+- Enkel accounts die via VTK aanmeldden (`fluxusSub`) gebruiken deze timer; de
+  andere houden de eigen timer van Burgieclan.
+- Gedeelde vector: `apps/web/test/burgieclanStudy.test.ts` en
+  `VtkStudyTest::testSignatureMatchesTheVtkWebsite` bij Burgieclan.
+
 ## Vallen waar we in gelopen zijn
 
 1. **API Platform spreekt enkel JSON-LD.** Een `Content-Type: application/json`
@@ -98,7 +161,9 @@ als bij Burgieclan, dus de app vraagt nooit twee keer.
    feed (die heeft geen login nodig). Een gelekt geheim mag niet de documenten of
    de moderatie van Burgieclan openzetten. Breid `PATH_PREFIX` in
    `VtkServiceAuthenticator` niet uit zonder die afweging.
-3. **Een pairwise client.** Staat de client van Burgieclan op `pairwise`, dan is
+3. **Een pairwise client.** Vandaag staat elke client op `public` (geen scherm in
+   /admin/sso zet er een op pairwise), en dan is de `sub` gewoon de id van het
+   lid. Komt de client van Burgieclan ooit op `pairwise`, dan is
    de `sub` die Burgieclan kent een HMAC van host en lid-id, niet de id zelf.
    `subjectFor` in `client.ts` rekent hem na zoals `computePairwiseSub` in
    `@better-auth/oauth-provider`, maar enkel met `BURGIECLAN_CLIENT_ID` erbij.

@@ -13,6 +13,9 @@ import { VaultConfigForm } from "./VaultConfigForm";
 import { getVaultStatus } from "@/lib/vault/config";
 import { GoogleConfigForm } from "./GoogleConfigForm";
 import { getGoogleStatus } from "@/lib/google/config";
+import { AiConfigForm } from "./AiConfigForm";
+import { AiTestButton } from "./AiTestButton";
+import { getAiStatus } from "@/lib/ai/config";
 
 // This is an internal, superadmin-only tooling page, so the copy stays in
 // English (technical terms) rather than being localized like the public admin.
@@ -35,12 +38,13 @@ export default async function AdminIT({
     notFound();
   }
 
-  const [s3Status, sentryStatus, doorStatus, vaultStatus, googleStatus] = await Promise.all([
+  const [s3Status, sentryStatus, doorStatus, vaultStatus, googleStatus, aiStatus] = await Promise.all([
     getS3Status(),
     getSentryStatus(),
     getDoorStatus(),
     getVaultStatus(),
     getGoogleStatus(),
+    getAiStatus(),
   ]);
 
   return (
@@ -210,6 +214,42 @@ export default async function AdminIT({
           </summary>
           <div className="mt-6 space-y-6 border-t border-vtk-blue/10 pt-5">
             <GoogleConfigForm status={googleStatus} />
+          </div>
+        </details>
+
+        <details className="group rounded-2xl border border-vtk-blue/15 bg-white p-5">
+          <summary className="flex cursor-pointer items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-semibold">AI translation (admin forms)</h2>
+                <span className="rounded-full border border-vtk-blue/15 px-2 py-0.5 text-xs text-zinc-500">
+                  {aiStatus.source === "database"
+                    ? "Database"
+                    : aiStatus.source === "environment"
+                      ? "Env"
+                      : "Inactive"}
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-zinc-500 line-clamp-1 group-open:line-clamp-none">
+                Translates bilingual NL/EN fields in admin forms using vLLM / Open WebUI on kenny.
+                Translate buttons appear automatically on all bilingual admin forms once configured.
+              </p>
+            </div>
+            <span className="text-zinc-400 group-open:rotate-180 transition-transform duration-200 shrink-0">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </span>
+          </summary>
+          <div className="mt-6 space-y-6 border-t border-vtk-blue/10 pt-5">
+            <AiConfigForm status={aiStatus} />
+            <div className="border-t border-vtk-blue/10 pt-5">
+              <h3 className="text-sm font-semibold">Test translation</h3>
+              <p className="mt-1 mb-3 text-xs text-zinc-500">
+                Sends a short test phrase to the configured OpenAI-compatible endpoint.
+              </p>
+              <AiTestButton />
+            </div>
           </div>
         </details>
       </div>

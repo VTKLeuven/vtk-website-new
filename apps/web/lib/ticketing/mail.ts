@@ -7,6 +7,7 @@ import {
   escapeHtml,
   mailButton,
   mailDocument,
+  mailMessageBox,
 } from "@/lib/mailDesign";
 import { formatMoney } from "./money";
 
@@ -351,6 +352,220 @@ export function orderConfirmationMail(input: {
     replyTo: input.replyTo,
     subject,
     attachments: input.attachments,
+    text: textLines.join("\n"),
+    html,
+  };
+}
+
+/**
+ * Een ticket dat het beheer verwijderde (tabblad Deelnemers), met de reden die
+ * het beheer opgaf. Gaat naar de koper: die kreeg de tickets en die moet weten
+ * dat er een niet meer werkt. Zegt of er geld teruggaat enkel wanneer dat via
+ * de site gebeurde; anders staat het, als het moet, in de reden.
+ */
+export function ticketCancelledMail(input: {
+  locale: "nl" | "en";
+  buyerName: string;
+  buyerEmail: string;
+  attendeeName: string;
+  ticketTypeName: string;
+  eventName: string;
+  orderNumber: string;
+  reason: string;
+  /** Wat er via Mollie teruggaat; `null` wanneer er via de site niets terugging. */
+  refund: { amountCents: number; currency: string } | null;
+  /** Geldige tickets die de koper voor dit event nog in deze bestelling heeft. */
+  remainingTickets: number;
+  replyTo?: string | null;
+  event?: OrderMailEvent;
+}): MailMessage {
+  const nl = input.locale === "nl";
+  const own = sameName(input.attendeeName, input.buyerName);
+  const subject = nl
+    ? `${own ? "Je ticket" : `Ticket van ${input.attendeeName}`} voor ${input.eventName} geannuleerd`
+    : `${own ? "Your ticket" : `${input.attendeeName}'s ticket`} for ${input.eventName} cancelled`;
+  const intro = nl
+    ? `Dag ${input.buyerName}, ${own ? "je ticket" : `het ticket van ${input.attendeeName}`} (${input.ticketTypeName}) voor ${input.eventName} is geannuleerd. Het werkt niet meer aan de ingang.`
+    : `Hi ${input.buyerName}, ${own ? "your ticket" : `${input.attendeeName}'s ticket`} (${input.ticketTypeName}) for ${input.eventName} has been cancelled. It no longer works at the entrance.`;
+  const reasonLabel = nl ? "Reden" : "Reason";
+  const refundLine = input.refund
+    ? nl
+      ? `Je krijgt ${formatMoney(input.refund.amountCents, input.refund.currency, moneyLocale(nl))} terug op de rekening waarmee je betaalde. Dat kan enkele dagen duren.`
+      : `You will get ${formatMoney(input.refund.amountCents, input.refund.currency, moneyLocale(nl))} back on the account you paid with. This can take a few days.`
+    : "";
+  const remainingLine =
+    input.remainingTickets > 0
+      ? nl
+        ? input.remainingTickets === 1
+          ? "Je andere ticket van deze bestelling blijft geldig."
+          : `Je ${input.remainingTickets} andere tickets van deze bestelling blijven geldig.`
+        : input.remainingTickets === 1
+          ? "The other ticket in this order stays valid."
+          : `The ${input.remainingTickets} other tickets in this order stay valid.`
+      : "";
+  const questions = nl
+    ? "Vragen? Antwoord gewoon op deze mail."
+    : "Questions? Just reply to this email.";
+
+  const textLines = [
+    intro,
+    "",
+    `${reasonLabel}:`,
+    input.reason,
+    ...(refundLine ? ["", refundLine] : []),
+    ...(remainingLine ? ["", remainingLine] : []),
+    "",
+    questions,
+    input.orderNumber,
+  ];
+
+  const paragraph = (text: string) =>
+    `<p style="margin:16px 0 0;font-size:15.5px;line-height:1.6;color:${COLOR.body}">${escapeHtml(text)}</p>`;
+  const headHtml = input.event
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%"><tr><td valign="top" style="padding-right:14px">${titleHtml(input.eventName)}${factsHtml(input.event, nl)}</td><td valign="top" align="right" width="64" style="width:64px">${pinHtml(input.event, nl)}</td></tr></table>`
+    : titleHtml(input.eventName);
+  const html = mailDocument({
+    lang: nl ? "nl" : "en",
+    title: subject,
+    preheader: intro,
+    rows: `<tr><td style="padding:26px 30px 30px">${headHtml}<p style="margin:20px 0 0;font-size:15.5px;line-height:1.6;color:${COLOR.body}">${escapeHtml(intro)}</p>${mailMessageBox(input.reason, reasonLabel)}${refundLine ? paragraph(refundLine) : ""}${remainingLine ? paragraph(remainingLine) : ""}</td></tr><tr><td style="padding:16px 30px;background:${COLOR.paper2};border-top:1px solid ${COLOR.line}"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%"><tr><td style="font-size:12px;line-height:1.5;color:${COLOR.muted}">${escapeHtml(questions)}</td><td align="right" style="font-size:12px;font-weight:600;color:${COLOR.muted};white-space:nowrap;padding-left:14px">${escapeHtml(input.orderNumber)}</td></tr></table></td></tr>`,
+  });
+
+  return {
+    to: input.buyerEmail,
+    replyTo: input.replyTo,
+    subject,
+    text: textLines.join("\n"),
+    html,
+  };
+}
+
+/** Hoofdletters en dubbele spaties tellen niet, net als bij de voorverkoop. */
+function sameName(left: string, right: string): boolean {
+  const normalize = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleLowerCase("nl-BE");
+  return normalize(left) === normalize(right);
+}
+
+/** De voet van een ticketmail: links een regel uitleg, rechts het bestelnummer. */
+function footerRow(note: string, orderNumber: string | null): string {
+  const number = orderNumber
+    ? `<td align="right" style="font-size:12px;font-weight:600;color:${COLOR.muted};white-space:nowrap;padding-left:14px">${escapeHtml(orderNumber)}</td>`
+    : "";
+  return `<tr><td style="padding:16px 30px;background:${COLOR.paper2};border-top:1px solid ${COLOR.line}"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%"><tr><td style="font-size:12px;line-height:1.5;color:${COLOR.muted}">${escapeHtml(note)}</td>${number}</tr></table></td></tr>`;
+}
+
+function eventHead(eventName: string, event: OrderMailEvent | undefined, nl: boolean): string {
+  return event
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%"><tr><td valign="top" style="padding-right:14px">${titleHtml(eventName)}${factsHtml(event, nl)}</td><td valign="top" align="right" width="64" style="width:64px">${pinHtml(event, nl)}</td></tr></table>`
+    : titleHtml(eventName);
+}
+
+/**
+ * Een ticket dat het beheer van type wisselde (upgrade of downgrade, tabblad
+ * Deelnemers). Gaat naar de koper, zoals de annulatie. De code en de QR blijven
+ * dezelfde, dus er hoeft niets opnieuw gedownload te worden; dat zegt de mail
+ * er uitdrukkelijk bij, anders zoekt de deelnemer een nieuw ticket. Over geld
+ * zegt ze niets: een prijsverschil regelt de organisator buiten de site, en
+ * staat, als het moet, in het bericht.
+ */
+export function ticketChangedMail(input: {
+  locale: "nl" | "en";
+  buyerName: string;
+  buyerEmail: string;
+  attendeeName: string;
+  fromName: string;
+  toName: string;
+  eventName: string;
+  orderNumber: string;
+  orderUrl: string;
+  /** Een optionele uitleg van de organisator, letterlijk in de mail. */
+  message: string | null;
+  replyTo?: string | null;
+  event?: OrderMailEvent;
+}): MailMessage {
+  const nl = input.locale === "nl";
+  const own = sameName(input.attendeeName, input.buyerName);
+  const subject = nl
+    ? `${own ? "Je ticket" : `Ticket van ${input.attendeeName}`} voor ${input.eventName} gewijzigd`
+    : `${own ? "Your ticket" : `${input.attendeeName}'s ticket`} for ${input.eventName} changed`;
+  const intro = nl
+    ? `Dag ${input.buyerName}, ${own ? "je ticket" : `het ticket van ${input.attendeeName}`} voor ${input.eventName} is omgezet van ${input.fromName} naar ${input.toName}.`
+    : `Hi ${input.buyerName}, ${own ? "your ticket" : `${input.attendeeName}'s ticket`} for ${input.eventName} has been changed from ${input.fromName} to ${input.toName}.`;
+  const same = nl
+    ? "Het ticket en de QR-code blijven dezelfde: je hoeft niets opnieuw te downloaden. Aan de ingang geldt het meteen als het nieuwe type."
+    : "The ticket and its QR code stay the same: there is nothing to download again. At the entrance it counts as the new type right away.";
+  const button = nl ? "Bekijk je tickets" : "View your tickets";
+  const messageLabel = nl ? "Bericht van de organisator" : "Message from the organiser";
+  const questions = nl
+    ? "Vragen? Antwoord gewoon op deze mail."
+    : "Questions? Just reply to this email.";
+
+  const textLines = [
+    intro,
+    "",
+    same,
+    ...(input.message ? ["", `${messageLabel}:`, input.message] : []),
+    "",
+    input.orderUrl,
+    "",
+    questions,
+    input.orderNumber,
+  ];
+  const html = mailDocument({
+    lang: nl ? "nl" : "en",
+    title: subject,
+    preheader: intro,
+    rows: `<tr><td style="padding:26px 30px 30px">${eventHead(input.eventName, input.event, nl)}<p style="margin:20px 0 0;font-size:15.5px;line-height:1.6;color:${COLOR.body}">${escapeHtml(intro)}</p><p style="margin:16px 0 0;font-size:15.5px;line-height:1.6;color:${COLOR.body}">${escapeHtml(same)}</p>${input.message ? mailMessageBox(input.message, messageLabel) : ""}<p style="margin:22px 0 0">${mailButton(input.orderUrl, button)}</p></td></tr>${footerRow(questions, input.orderNumber)}`,
+  });
+  return { to: input.buyerEmail, replyTo: input.replyTo, subject, text: textLines.join("\n"), html };
+}
+
+/**
+ * Een bericht van de organisator aan de deelnemers van een event (tabblad
+ * Deelnemers, "Deelnemers mailen"): het onderwerp en de tekst zoals de
+ * organisator ze schreef, onder de kop van het event. Antwoorden gaat naar het
+ * contactadres van het event. Eén mail per adres, ook wanneer iemand meerdere
+ * tickets heeft.
+ */
+export function attendeeMessageMail(input: {
+  locale: "nl" | "en";
+  to: string;
+  name: string | null;
+  eventName: string;
+  subject: string;
+  message: string;
+  senderName: string | null;
+  replyTo?: string | null;
+  event?: OrderMailEvent;
+}): MailMessage {
+  const nl = input.locale === "nl";
+  const greeting = input.name ? (nl ? `Dag ${input.name},` : `Hi ${input.name},`) : nl ? "Dag," : "Hi,";
+  const why = nl
+    ? `Je krijgt deze mail omdat je een ticket hebt voor ${input.eventName}.`
+    : `You are receiving this email because you have a ticket for ${input.eventName}.`;
+  const reply = input.replyTo
+    ? nl
+      ? "Vragen? Antwoord gewoon op deze mail."
+      : "Questions? Just reply to this email."
+    : why;
+  const label = input.senderName
+    ? nl
+      ? `Bericht van ${input.senderName}`
+      : `Message from ${input.senderName}`
+    : nl
+      ? "Bericht van de organisator"
+      : "Message from the organiser";
+  const textLines = [greeting, "", input.message, "", why];
+  const html = mailDocument({
+    lang: nl ? "nl" : "en",
+    title: input.subject,
+    preheader: input.message.slice(0, 140),
+    rows: `<tr><td style="padding:26px 30px 30px">${eventHead(input.eventName, input.event, nl)}<p style="margin:20px 0 0;font-size:15.5px;line-height:1.6;color:${COLOR.body}">${escapeHtml(greeting)}</p>${mailMessageBox(input.message, label)}<p style="margin:16px 0 0;font-size:13px;line-height:1.5;color:${COLOR.muted}">${escapeHtml(why)}</p></td></tr>${footerRow(reply, null)}`,
+  });
+  return {
+    to: input.to,
+    replyTo: input.replyTo,
+    subject: input.subject,
     text: textLines.join("\n"),
     html,
   };

@@ -354,6 +354,13 @@ export const auth = betterAuth({
     accountLinking: {
       enabled: true,
       trustedProviders: [KUL_PROVIDER_ID],
+      // Enkel voor het expliciete koppelen vanaf /account (`linkKul` in
+      // client.ts): een doctoraatsstudent of personeelslid heeft naast zijn
+      // r-nummer op student.kuleuven.be een u-nummer op kuleuven.be, en dat
+      // adres verschilt per definitie van het loginadres. better-auth leest
+      // deze vlag nergens anders; het gewone inloggen koppelt nog altijd enkel
+      // op e-mail en r-nummer (`resolveKulLink`).
+      allowDifferentEmails: true,
     },
   },
 
@@ -365,7 +372,12 @@ export const auth = betterAuth({
         // update-user-calls mogen de autoritatieve waarden nooit overschrijven;
         // latere SSO-syncs schrijven rechtstreeks en conditioneel via Prisma.
         before: async (user) => {
-          if ("firwStudent" in user || "firwStudentChangedAt" in user) {
+          if (
+            "firwStudent" in user ||
+            "firwStudentChangedAt" in user ||
+            "kulStudent" in user ||
+            "kulStudentChangedAt" in user
+          ) {
             throw new APIError("BAD_REQUEST", { message: "FIRW_STATUS_READ_ONLY" });
           }
           return { data: user };
@@ -554,6 +566,18 @@ export const auth = betterAuth({
         defaultValue: false,
       },
       firwStudentChangedAt: {
+        type: "date",
+        required: false,
+      },
+      // Of de laatste KU Leuven-login een studentenaccount was
+      // (logins/kul-student.ts). Zelfde reden als firwStudent: input voor de
+      // eerste OAuth-login, en de user.update-hook houdt het daarna dicht.
+      kulStudent: {
+        type: "boolean",
+        required: false,
+        defaultValue: false,
+      },
+      kulStudentChangedAt: {
         type: "date",
         required: false,
       },

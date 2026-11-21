@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { after } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { revalidatePath } from "next/cache";
@@ -600,6 +601,36 @@ export async function removeMembershipAction(formData: FormData): Promise<void> 
   revalidateMembershipSurfaces(userId || undefined);
 }
 
+/**
+ * Een KU Leuven-login van een account halen.
+ *
+ * Voor wie per ongeluk twee accounts heeft (een doctoraatsstudent die eerst met
+ * zijn r-nummer en later met zijn u-nummer inlogde): zolang het u-nummer aan het
+ * tweede account hangt, kan het lid het niet aan zijn eigen account koppelen.
+ * Na het loskoppelen doet het lid dat zelf op /account. Het account zelf blijft
+ * staan, met al zijn historiek.
+ */
+export async function unlinkKulLoginAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("users.edit");
+  const id = String(formData.get("id") ?? "");
+  const userId = String(formData.get("userId") ?? "");
+  const account = await prisma.account.findFirst({
+    where: { id, userId, providerId: "kuleuven" },
+    select: { accountId: true, user: { select: { name: true } } },
+  });
+  if (!account) return saveError("NOT_FOUND");
+  await prisma.account.delete({ where: { id } });
+  await logAudit({
+    action: "delete",
+    entity: "user",
+    entityId: userId,
+    target: account.user.name,
+    summary: `KU Leuven-login ${account.accountId.split("@")[0]} losgekoppeld`,
+  });
+  revalidatePath("/[locale]/admin/gebruikers/[id]", "page");
+  return saveOk();
+}
+
 // Bulk CSV import. Columns: email,name,password,groupCode,role,year,rNumber
 export async function bulkImportUsersAction(
   formData: FormData,
@@ -735,7 +766,7 @@ function splitCsv(line: string): string[] {
 }
 
 function cryptoRandomPassword() {
-  return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  return randomBytes(24).toString("base64url");
 }
 
 // ---- Groups (posten) --------------------------------------------------------

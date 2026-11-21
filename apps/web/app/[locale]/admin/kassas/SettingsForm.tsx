@@ -81,14 +81,36 @@ export function SettingsForm({
           />
         </div>
         <div>
+          <Label htmlFor="guidoVoucherValue">{nl ? "Waarde Guidobon" : "Guido voucher value"}</Label>
+          <Input
+            id="guidoVoucherValue"
+            name="guidoVoucherValue"
+            inputMode="decimal"
+            aria-describedby="permanentVoucherHint"
+            defaultValue={amountInputValue(config.guidoVoucherValueCents)}
+            className="tabular-nums"
+          />
+        </div>
+        <div>
+          <Label htmlFor="sandwichVoucherValue">{nl ? "Waarde bon gratis broodje" : "Free sandwich voucher value"}</Label>
+          <Input
+            id="sandwichVoucherValue"
+            name="sandwichVoucherValue"
+            inputMode="decimal"
+            aria-describedby="permanentVoucherHint"
+            defaultValue={amountInputValue(config.sandwichVoucherValueCents)}
+            className="tabular-nums"
+          />
+        </div>
+        <div>
           <Label htmlFor="contactEmail">{nl ? "Adres van Beheer" : "Administration address"}</Label>
           <Input id="contactEmail" name="contactEmail" type="email" required defaultValue={config.contactEmail} />
         </div>
       </div>
-      <p className="text-xs text-vtk-muted">
+      <p id="permanentVoucherHint" className="text-xs text-vtk-muted">
         {nl
-          ? "De waarde van een bon telt mee in het finaal resultaat; zet ze op 0 om bonnen enkel te tellen. Een nieuwe waarde geldt voor kassa's die vanaf nu aangevraagd worden, niet voor bestaande. Het adres staat in de mail bij het aanvaarden en krijgt de antwoorden."
-          : "A voucher's value counts in the final result; set it to 0 to only count vouchers. A new value applies to registers requested from now on, not to existing ones. The address is in the acceptance email and receives the replies."}
+          ? "De waarde van een bon telt mee in het finaal resultaat; zet ze op 0 om bonnen enkel te tellen. Een nieuwe waarde geldt voor kassa's die vanaf nu aangevraagd en regels die vanaf nu ingegeven worden, niet voor bestaande. Guidobonnen en bonnen voor een gratis broodje bestaan enkel in de vaste kassa's; daar tellen alle bonnen in wat de post ziet, maar niet in de bedragen en de winst bij Beheer. Het adres staat in de mail bij het aanvaarden en krijgt de antwoorden."
+          : "A voucher's value counts in the final result; set it to 0 to only count vouchers. A new value applies to registers requested and lines entered from now on, not to existing ones. Guido and free sandwich vouchers only exist in the permanent registers; there every voucher counts in what the post sees, but not in Administration's amounts and profit. The address is in the acceptance email and receives the replies."}
       </p>
     </SaveForm>
   );

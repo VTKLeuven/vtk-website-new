@@ -134,9 +134,14 @@ export function PriceCheckTest({ browser, locale }: { browser: 'off' | 'down' | 
             return (
               <li key={row.url} data-tone={d.tone}>
                 <span>{d.text}</span>
-                <a href={row.url} target="_blank" rel="noreferrer">
-                  {row.url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 70)}
-                </a>
+                {/* Enkel een http(s)-adres wordt een link: dit is wat iemand intikte. */}
+                {/^https?:\/\//i.test(row.url) ? (
+                  <a href={row.url} target="_blank" rel="noreferrer">
+                    {row.url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 70)}
+                  </a>
+                ) : (
+                  <span>{row.url.slice(0, 70)}</span>
+                )}
               </li>
             );
           })}

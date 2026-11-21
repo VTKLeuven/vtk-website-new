@@ -18,8 +18,9 @@ import { BO_VIEW_SCREEN, BO_VIEWS } from "@/lib/bo/views";
  * naar Drive; de map blijft de bron.
  */
 
+/** Heel de module: het overzicht, de mappen en Mijn budgetten tonen dezelfde bestanden. */
 function revalidateBo() {
-  revalidatePath("/[locale]/admin/bestuursorgaan", "page");
+  revalidatePath("/[locale]/admin/bestuursorgaan", "layout");
 }
 
 function field(formData: FormData, name: string): string {
@@ -33,6 +34,8 @@ export async function scanBestuursorgaanAction(_prev: SaveState, formData: FormD
 
   const outcome = await scanBestuursorgaan();
   revalidateBo();
+  // De scan leest ook de verslagen.
+  revalidatePath("/[locale]/admin/apps/aanwezigheden", "layout");
   if ("skipped" in outcome) return saveError(outcome.skipped);
   const { status } = outcome;
   if (status.error) {
@@ -45,8 +48,8 @@ export async function scanBestuursorgaanAction(_prev: SaveState, formData: FormD
   const documents = status.years.reduce((sum, y) => sum + y.documents, 0);
   return saveOk(
     nl
-      ? `${meetings} ${meetings === 1 ? "vergadering" : "vergaderingen"} en ${documents} ${documents === 1 ? "bestand" : "bestanden"} gelezen; ${status.read} ${status.read === 1 ? "rekenblad" : "rekenbladen"} opnieuw geopend.`
-      : `Read ${meetings} meetings and ${documents} files; reopened ${status.read} spreadsheets.`,
+      ? `${meetings} ${meetings === 1 ? "vergadering" : "vergaderingen"} en ${documents} ${documents === 1 ? "bestand" : "bestanden"} gelezen; ${status.read} ${status.read === 1 ? "rekenblad of verslag" : "rekenbladen en verslagen"} opnieuw geopend.`
+      : `Read ${meetings} meetings and ${documents} files; reopened ${status.read} spreadsheets and minutes.`,
   );
 }
 

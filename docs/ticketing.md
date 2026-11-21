@@ -760,6 +760,23 @@ en als vangnet. Alles over de app-kant staat in `vtk-app/docs/scanner.md`.
   checkout, the shop queries and the admin. See "Plaatsen: potten met een
   plafond voor leden" in `docs/design-decisions.md`
 - `refunds.ts`: `requestTicketRefund`, `completeTicketRefund`, `failTicketRefund`
+- `voidTicket.ts`: `voidTicketWithoutRefund`, one attendee out of an order
+  without refund (`VOID`, seat freed, order stays paid). The attendees tab
+  offers it next to a refund through Mollie; see `docs/design-decisions.md`,
+  "Een deelnemer verwijderen".
+  With "De koper mailen" the buyer gets `ticketCancelledMail` with the admin's
+  reason, as a `TICKET_CANCELLED` outbox message next to `ORDER_CONFIRMATION`.
+- `orders.ts` › `issueManualTicket`: a ticket issued by the organiser from the
+  attendees tab, as a one-ticket order with payment provider `manual` (amount
+  free to choose, default 0, refunded by hand like Bancontact). See
+  `docs/design-decisions.md`, "Tickets met de hand".
+- `changeTicketType.ts`: upgrade or downgrade one ticket to another type of the
+  same event. Moves the seat between pools, keeps the money and the QR; the
+  buyer can get `ticketChangedMail` (`TICKET_CHANGED` in the outbox).
+- `attendeeRecipients.ts` (pure) and `attendeeRecipientsServer.ts`: who gets
+  "Deelnemers mailen" (`attendeeMessageMail`, `ATTENDEE_MESSAGE`). The outbox
+  claims those last, so a message to hundreds does not hold up order
+  confirmations.
 - `reconciliation.ts`: polls PENDING payments/refunds against the provider
 - `scanner.ts`: scan authorization + validation
 - `authorization.ts`: capability checks (`canCreateTicketEventForGroup`, `requireTicketEventCapability`)

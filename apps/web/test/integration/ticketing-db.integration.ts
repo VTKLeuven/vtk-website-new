@@ -15,13 +15,17 @@ import {
   createTicketCheckout,
   expirePendingOrder,
   fulfillPaidOrder,
+  issueManualTicket,
+  ManualTicketError,
 } from "@/lib/ticketing/orders";
-import { processTicketOutbox } from "@/lib/ticketing/outbox";
+import { changeTicketType } from "@/lib/ticketing/changeTicketType";
+import { processTicketOutbox, TICKET_CANCELLED } from "@/lib/ticketing/outbox";
 import {
   completeTicketRefund,
   failTicketRefund,
   requestTicketRefund,
 } from "@/lib/ticketing/refunds";
+import { voidTicketWithoutRefund } from "@/lib/ticketing/voidTicket";
 
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("@vtk/auth/server", () => ({ getSession: vi.fn(async () => null) }));
@@ -650,6 +654,105 @@ describe("ticketing database invariants", () => {
     }
   });
 
+  it("limits logged-in accounts to one own ticket in presale, lifts it at public sale, and holds max 1 per account", async () => {
+    const accountUser = randomUUID();
+    const accountEmail = `${accountUser}@example.test`;
+    await prisma.user.create({
+      data: {
+        id: accountUser,
+        name: "Single Ticket Account",
+        email: accountEmail,
+        active: true,
+        honoraryMember: true,
+      },
+    });
+    const order = (name: string, email: string, count = 1) =>
+      createTicketCheckout(
+        {
+          eventId: ids.rateEvent,
+          buyerName: name,
+          buyerEmail: email,
+          locale: "nl",
+          termsAccepted: true,
+          paymentProvider: "mock",
+          items: Array.from({ length: count }, () => ({
+            ticketTypeId: ids.rateType,
+            attendeeName: name,
+            attendeeEmail: email,
+          })),
+        },
+        `account-limit-${email}`
+      );
+
+    vi.mocked(getSession).mockResolvedValue({
+      user: { id: accountUser, name: "Single Ticket Account", email: accountEmail, isSuperAdmin: false },
+    } as never);
+    // 1. Tijdens voorverkoop mag zelfs op een event met maxTicketsPerOrder=8 maar 1 ticket, en enkel voor jezelf.
+    await prisma.ticketEvent.update({
+      where: { id: ids.rateEvent },
+      data: {
+        salesStartAt: new Date(Date.now() + 24 * 3600_000),
+        presaleLeadMinutes: 48 * 60,
+        maxTicketsPerOrder: 8,
+      },
+    });
+    try {
+      await expect(order("Single Ticket Account", accountEmail, 2)).rejects.toMatchObject({
+        code: "PRESALE_SELF_ONLY",
+      });
+      await expect(order("Friend Name", "friend@example.test", 1)).rejects.toMatchObject({
+        code: "PRESALE_SELF_ONLY",
+      });
+      const first = await order("Single Ticket Account", accountEmail, 1);
+      await expect(order("Single Ticket Account", accountEmail, 1)).rejects.toMatchObject({
+        code: "ACCOUNT_TICKET_LIMIT",
+      });
+
+      // 2. Zodra de verkoop voor iedereen open is, valt de grens weg: hetzelfde
+      // account koopt weer meerdere tickets, ook voor iemand anders.
+      await expirePendingOrder(first.orderId);
+      await prisma.ticketEvent.update({
+        where: { id: ids.rateEvent },
+        data: { salesStartAt: null, presaleLeadMinutes: null },
+      });
+      const open = await createTicketCheckout(
+        {
+          eventId: ids.rateEvent,
+          buyerName: "Single Ticket Account",
+          buyerEmail: accountEmail,
+          locale: "nl",
+          termsAccepted: true,
+          paymentProvider: "mock",
+          items: [
+            { ticketTypeId: ids.rateType, attendeeName: "Single Ticket Account", attendeeEmail: accountEmail },
+            { ticketTypeId: ids.rateType, attendeeName: "Friend Name", attendeeEmail: "friend@example.test" },
+          ],
+        },
+        `account-limit-${accountEmail}`
+      );
+      await expirePendingOrder(open.orderId);
+
+      // 3. Bij maxTicketsPerOrder=1 in de publieke verkoop: de eerste lukt, een
+      // tweede bestelling op hetzelfde account wordt geweigerd.
+      await prisma.ticketEvent.update({
+        where: { id: ids.rateEvent },
+        data: { maxTicketsPerOrder: 1 },
+      });
+      await expect(order("Single Ticket Account", accountEmail, 1)).resolves.toMatchObject({
+        orderId: expect.any(String),
+      });
+      await expect(order("Single Ticket Account", accountEmail, 1)).rejects.toMatchObject({
+        code: "ACCOUNT_TICKET_LIMIT",
+      });
+    } finally {
+      vi.mocked(getSession).mockResolvedValue(null);
+      await prisma.ticketEvent.update({
+        where: { id: ids.rateEvent },
+        data: { salesStartAt: null, presaleLeadMinutes: null, maxTicketsPerOrder: 8 },
+      });
+    }
+  });
+
   it("fulfills a Mollie webhook once and deduplicates its retry", async () => {
     const accessExpiresAt = new Date("2027-06-20T00:00:00.000Z");
     const access = createOrderAccessToken(ids.mollieOrder, accessExpiresAt);
@@ -951,6 +1054,123 @@ describe("ticketing database invariants", () => {
     });
   });
 
+  it("removes one attendee of a multi-ticket order and leaves the others valid", async () => {
+    const poolId = randomUUID();
+    const typeId = randomUUID();
+    const orderId = randomUUID();
+    const itemIds = [randomUUID(), randomUUID(), randomUUID()];
+    await prisma.ticketInventoryPool.create({
+      // De drie plaatsen van de bestelling hieronder staan al gereserveerd,
+      // zoals na een checkout.
+      data: { id: poolId, eventId: ids.event, code: `VOID-${poolId}`, nameNl: "Intrekken", capacity: 5, reservedCount: 3 },
+    });
+    await prisma.ticketType.create({
+      data: {
+        id: typeId,
+        eventId: ids.event,
+        inventoryPoolId: poolId,
+        code: `VOID-${typeId}`,
+        nameNl: "Voorverkoop",
+        unitPriceCents: 0,
+      },
+    });
+    const expires = new Date("2027-04-20T00:00:00.000Z");
+    await prisma.ticketOrder.create({
+      data: {
+        id: orderId,
+        eventId: ids.event,
+        reference: `VTK-INT-${orderId}`,
+        accessTokenHash: secureTokenHash(createOrderAccessToken(orderId, expires)),
+        accessExpiresAt: expires,
+        buyerName: "Te Gulle Koper",
+        buyerEmail: "buyer@example.test",
+        status: "PENDING_PAYMENT",
+        subtotalCents: 0,
+        totalCents: 0,
+        reservationExpiresAt: new Date("2027-03-01T00:00:00.000Z"),
+        termsAcceptedAt: new Date(),
+        items: {
+          create: itemIds.map((id, index) => ({
+            id,
+            ticketTypeId: typeId,
+            inventoryPoolId: poolId,
+            ticketTypeCode: `VOID-${typeId}`,
+            ticketTypeName: "Voorverkoop",
+            unitPriceCents: 0,
+            totalCents: 0,
+            attendeeName: `Deelnemer ${index}`,
+          })),
+        },
+        payments: {
+          create: { provider: "free", idempotencyKey: `${orderId}:1`, status: "CREATED", amountCents: 0 },
+        },
+      },
+    });
+    await fulfillPaidOrder({
+      orderId,
+      provider: "free",
+      providerPaymentId: `free_${orderId}`,
+      amountCents: 0,
+      currency: "EUR",
+    });
+    expect(await prisma.ticketInventoryPool.findUnique({ where: { id: poolId } })).toMatchObject({ soldCount: 3 });
+
+    await voidTicketWithoutRefund({ eventId: ids.event, orderItemId: itemIds[1], actorUserId: ids.user });
+
+    const tickets = await prisma.ticket.findMany({ where: { orderItemId: { in: itemIds } } });
+    const statusOf = (itemId: string) => tickets.find((ticket) => ticket.orderItemId === itemId)?.status;
+    expect(statusOf(itemIds[0])).toBe("VALID");
+    expect(statusOf(itemIds[1])).toBe("VOID");
+    expect(statusOf(itemIds[2])).toBe("VALID");
+    expect(await prisma.ticketInventoryPool.findUnique({ where: { id: poolId } })).toMatchObject({ soldCount: 2 });
+    // Geen geld terug: de bestelling blijft betaald, zonder terugbetaling.
+    expect(await prisma.ticketOrder.findUnique({ where: { id: orderId } })).toMatchObject({
+      status: "PAID",
+      refundedCents: 0,
+    });
+    expect(await prisma.ticketRefund.count({ where: { orderId } })).toBe(0);
+
+    // De mail aan de koper gaat langs de outbox, met de reden erin.
+    const cancelMail = await prisma.ticketOutboxMessage.create({
+      data: {
+        eventId: ids.event,
+        orderId,
+        type: TICKET_CANCELLED,
+        dedupeKey: `ticket-cancelled:${itemIds[1]}`,
+        recipient: "buyer@example.test",
+        payload: { orderItemId: itemIds[1], reason: "Voor iemand anders gekocht.", refundCents: null },
+      },
+    });
+    const delivered = await processTicketOutbox(10);
+    expect(delivered.failed).toBe(0);
+    expect(await prisma.ticketOutboxMessage.findUnique({ where: { id: cancelMail.id } })).toMatchObject({
+      status: "SENT",
+    });
+
+    // Twee keer intrekken geeft de plaats geen tweede keer vrij.
+    await expect(
+      voidTicketWithoutRefund({ eventId: ids.event, orderItemId: itemIds[1], actorUserId: ids.user })
+    ).rejects.toThrow("TICKET_NOT_VALID");
+    // Een ingetrokken ticket kan daarna niet meer terugbetaald worden.
+    await expect(
+      requestTicketRefund({
+        eventId: ids.event,
+        orderId,
+        orderItemIds: [itemIds[1]],
+        requestedById: ids.user,
+      })
+    ).rejects.toThrow("TICKET_NOT_REFUNDABLE");
+    // Een ingecheckt ticket blijft staan.
+    await prisma.ticket.updateMany({ where: { orderItemId: itemIds[2] }, data: { checkedInAt: new Date() } });
+    await expect(
+      voidTicketWithoutRefund({ eventId: ids.event, orderItemId: itemIds[2], actorUserId: ids.user })
+    ).rejects.toThrow("TICKET_ALREADY_CHECKED_IN");
+    // Een ticket van een ander event is hier onvindbaar.
+    await expect(
+      voidTicketWithoutRefund({ eventId: ids.otherEvent, orderItemId: itemIds[0], actorUserId: ids.user })
+    ).rejects.toThrow("ATTENDEE_NOT_FOUND");
+  });
+
   it("rejects cross-event scan references at the foreign key boundary", async () => {
     const foreignGate = await prisma.ticketGate.create({
       data: { eventId: ids.otherEvent, code: "OTHER", name: "Andere ingang" },
@@ -1121,5 +1341,86 @@ describe("ticketing database invariants", () => {
     await expect(prisma.ticketAuditLog.deleteMany({ where: { id: log.id } })).resolves.toMatchObject(
       { count: 1 }
     );
+  });
+
+  it("issues a ticket by hand and moves it to another type without touching the money", async () => {
+    const poolA = randomUUID();
+    const poolB = randomUUID();
+    const typeA = randomUUID();
+    const typeB = randomUUID();
+    await prisma.ticketInventoryPool.createMany({
+      data: [
+        { id: poolA, eventId: ids.event, code: `MAN-A-${poolA}`, nameNl: "Manueel A", capacity: 2 },
+        { id: poolB, eventId: ids.event, code: `MAN-B-${poolB}`, nameNl: "Manueel B", capacity: 1 },
+      ],
+    });
+    await prisma.ticketType.createMany({
+      data: [
+        { id: typeA, eventId: ids.event, inventoryPoolId: poolA, code: `MAN-A-${typeA}`, nameNl: "Inkom", unitPriceCents: 500 },
+        { id: typeB, eventId: ids.event, inventoryPoolId: poolB, code: `MAN-B-${typeB}`, nameNl: "Inkom + drank", unitPriceCents: 1000 },
+      ],
+    });
+
+    const { orderId } = await issueManualTicket({
+      eventId: ids.event,
+      ticketTypeId: typeA,
+      attendeeName: "Gast",
+      attendeeEmail: "Gast@Example.test",
+      amountCents: 500,
+      actorUserId: ids.user,
+      notify: false,
+      locale: "nl",
+    });
+    const order = await prisma.ticketOrder.findUnique({
+      where: { id: orderId },
+      include: { items: { include: { ticket: true } }, payments: true },
+    });
+    expect(order).toMatchObject({ status: "PAID", totalCents: 500, buyerEmail: "gast@example.test" });
+    expect(order?.payments[0]).toMatchObject({ provider: "manual", status: "SUCCEEDED", amountCents: 500 });
+    expect(order?.items[0].ticket?.status).toBe("VALID");
+    expect(await prisma.ticketInventoryPool.findUnique({ where: { id: poolA } })).toMatchObject({ soldCount: 1, reservedCount: 0 });
+    // Zonder "mailen" staat er geen bevestiging klaar.
+    expect(await prisma.ticketOutboxMessage.count({ where: { orderId, type: "ORDER_CONFIRMATION" } })).toBe(0);
+
+    const itemId = order!.items[0].id;
+    const changed = await changeTicketType({ eventId: ids.event, orderItemId: itemId, ticketTypeId: typeB, actorUserId: ids.user });
+    expect(changed).toMatchObject({ fromName: "Inkom", toName: "Inkom + drank" });
+    expect(await prisma.ticketInventoryPool.findUnique({ where: { id: poolA } })).toMatchObject({ soldCount: 0 });
+    expect(await prisma.ticketInventoryPool.findUnique({ where: { id: poolB } })).toMatchObject({ soldCount: 1 });
+    const item = await prisma.ticketOrderItem.findUnique({ where: { id: itemId }, include: { ticket: true } });
+    // Het type wisselt, het geld en de ticketcode niet.
+    expect(item).toMatchObject({ ticketTypeId: typeB, inventoryPoolId: poolB, totalCents: 500, ticketTypeName: "Inkom + drank" });
+    expect(item?.ticket?.publicCode).toBe(order!.items[0].ticket!.publicCode);
+
+    // Pot B zit nu vol: een tweede ticket daar gaat niet, met de hand niet en via een wissel niet.
+    await expect(
+      issueManualTicket({
+        eventId: ids.event,
+        ticketTypeId: typeB,
+        attendeeName: "Tweede gast",
+        attendeeEmail: "tweede@example.test",
+        amountCents: 0,
+        actorUserId: ids.user,
+        notify: true,
+        locale: "nl",
+      })
+    ).rejects.toBeInstanceOf(ManualTicketError);
+    const second = await issueManualTicket({
+      eventId: ids.event,
+      ticketTypeId: typeA,
+      attendeeName: "Tweede gast",
+      attendeeEmail: "tweede@example.test",
+      amountCents: 0,
+      actorUserId: ids.user,
+      notify: true,
+      locale: "nl",
+    });
+    expect(await prisma.ticketOutboxMessage.count({ where: { orderId: second.orderId, type: "ORDER_CONFIRMATION" } })).toBe(1);
+    const secondItem = await prisma.ticketOrderItem.findFirstOrThrow({ where: { orderId: second.orderId } });
+    await expect(
+      changeTicketType({ eventId: ids.event, orderItemId: secondItem.id, ticketTypeId: typeB, actorUserId: ids.user })
+    ).rejects.toThrow("SOLD_OUT");
+    expect(await prisma.ticketInventoryPool.findUnique({ where: { id: poolA } })).toMatchObject({ soldCount: 1 });
+    expect(await prisma.ticketInventoryPool.findUnique({ where: { id: poolB } })).toMatchObject({ soldCount: 1 });
   });
 });

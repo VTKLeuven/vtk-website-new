@@ -3,10 +3,22 @@
  * rijke HTML niet past. De volledige inhoud moet met de Markdown-component
  * gerenderd worden.
  */
+/**
+ * Haalt elke iframe weg, ook een die pas ontstaat nadat een andere wegviel
+ * (`<ifr<iframe>ame ...>`): herhaal tot er niets meer verandert.
+ */
+export function stripIframes(input: string): string {
+  let out = input;
+  let previous: string;
+  do {
+    previous = out;
+    out = out.replace(/<iframe[\s\S]*?<\/iframe>/gi, "").replace(/<iframe[^>]*\/?>/gi, "");
+  } while (out !== previous);
+  return out;
+}
+
 export function markdownToPlainText(markdown: string): string {
-  return markdown
-    .replace(/<iframe[^>]*>.*?<\/iframe>/gi, "")
-    .replace(/<iframe[^>]*\/?>/gi, "")
+  return stripIframes(markdown)
     .replace(/```[^\n]*\n?([\s\S]*?)```/g, "$1")
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")

@@ -80,7 +80,6 @@ type BuildingListItem = {
 function decodeEntities(str: string): string {
   return str
     .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
@@ -88,6 +87,8 @@ function decodeEntities(str: string): string {
     .replace(/&#x27;/gi, "'")
     .replace(/&#x2F;/gi, "/")
     .replace(/&#(\d+);/g, (_, n: string) => String.fromCharCode(Number(n)))
+    // &amp; als laatste: anders wordt "&amp;lt;" eerst "&lt;" en daarna "<".
+    .replace(/&amp;/g, "&")
     .replace(/\s+/g, " ")
     .trim();
 }

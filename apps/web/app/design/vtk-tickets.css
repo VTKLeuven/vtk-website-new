@@ -188,6 +188,15 @@
   border-color: var(--danger-line);
 }
 
+/* Een veld dat vaststaat (naam en e-mail in de voorverkoop): dezelfde rand,
+   maar op de inset-grond, zodat het niet als invulbaar leest. */
+.ticket-field input[readonly],
+.ticket-input-icon:has(input[readonly]) {
+  background: var(--paper-2);
+  color: var(--body);
+  cursor: default;
+}
+
 .ticket-input-icon {
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr);

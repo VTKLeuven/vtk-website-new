@@ -42,7 +42,12 @@ import { shiftReminderMail } from "@/lib/shift/reminders";
 import { shiftReplacedMail } from "@/lib/shift/replace";
 import { newLesbezoekNotificationMail } from "@/lib/lesbezoeken-server";
 import { newRentalNotificationMail } from "@/lib/theokotVerhuur-server";
-import { orderConfirmationMail } from "@/lib/ticketing/mail";
+import {
+  attendeeMessageMail,
+  orderConfirmationMail,
+  ticketCancelledMail,
+  ticketChangedMail,
+} from "@/lib/ticketing/mail";
 import { urenloopDownloadCodeMail, urenloopPairCodeMail } from "@/lib/urenloopAppMail";
 
 /**
@@ -102,7 +107,7 @@ export function mailPreviewGroups(): MailPreviewGroup[] {
       id: "tickets",
       title: "Tickets",
       description: "De post van de ticketverkoop.",
-      mails: [ticketOrderPreview()],
+      mails: [ticketOrderPreview(), ticketCancelledPreview(), ticketChangedPreview(), attendeeMessagePreview()],
     },
     {
       id: "kalender",
@@ -213,6 +218,114 @@ function ticketOrderPreview(): MailPreview {
     notes: [
       "De poster van het gekoppelde kalender-event staat er in het echt bovenaan; hier staat ze niet, want de voorvertoning laadt geen bestaande foto.",
       "De pdf met de tickets en de Apple Wallet-passen gaan als bijlage mee; de tekst noemt enkel wat er echt bij zit.",
+    ],
+  };
+}
+
+function ticketCancelledPreview(): MailPreview {
+  const mail = ticketCancelledMail({
+    locale: "nl",
+    buyerName: "Wannes",
+    buyerEmail: "wannes@voorbeeld.test",
+    attendeeName: "Voorbeeldvriend",
+    ticketTypeName: "Voorverkoop",
+    eventName: "Voorbeeldcantus",
+    orderNumber: "VTK-26-VOORBEELD",
+    reason:
+      "De voorverkoop is enkel voor jezelf. Dit ticket kocht je voor iemand anders; die kan het vanaf de publieke verkoop zelf kopen.",
+    refund: { amountCents: 1200, currency: "EUR" },
+    remainingTickets: 1,
+    event: {
+      startsAt: SAMPLE_START,
+      timeZone: "Europe/Brussels",
+      location: "Theokot, Studentenwijk Arenberg",
+    },
+  });
+  return {
+    id: "ticket-cancelled",
+    title: "Een ticket geannuleerd door het beheer",
+    when: "Wanneer iemand een deelnemer verwijdert op het tabblad Deelnemers en \"De koper mailen\" aan laat staan, via de ticket-outbox (elke minuut).",
+    to: "De koper van de bestelling",
+    source: "ticketing",
+    file: "lib/ticketing/mail.ts",
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+    notes: [
+      "De reden is wat het beheer in de bevestiging intikte, letterlijk.",
+      "De regel over het geld staat er enkel wanneer de terugbetaling via Mollie meeging; zonder terugbetaling (of bij Bancontact) zegt de mail niets over geld, en hoort dat in de reden.",
+      "Is het ticket van de koper zelf, dan heet het \"je ticket\" in plaats van het ticket van iemand anders. De regel over de andere tickets valt weg wanneer er geen meer over zijn.",
+    ],
+  };
+}
+
+function ticketChangedPreview(): MailPreview {
+  const mail = ticketChangedMail({
+    locale: "nl",
+    buyerName: "Wannes",
+    buyerEmail: "wannes@voorbeeld.test",
+    attendeeName: "Wannes",
+    fromName: "Inkom",
+    toName: "Inkom + bierkaart",
+    eventName: "Voorbeeldcantus",
+    orderNumber: "VTK-26-VOORBEELD",
+    orderUrl: "https://vtk.be/tickets/toegang?orderId=voorbeeld",
+    message: "Betaal het verschil van \u20ac5 aan de inkom.",
+    event: {
+      startsAt: SAMPLE_START,
+      timeZone: "Europe/Brussels",
+      location: "Theokot, Studentenwijk Arenberg",
+    },
+  });
+  return {
+    id: "ticket-changed",
+    title: "Een ticket van type gewijzigd door het beheer",
+    when: "Wanneer iemand op het tabblad Deelnemers \"Type wijzigen\" gebruikt en \"Mail de koper\" aan laat staan, via de ticket-outbox (elke 15 seconden).",
+    to: "De koper van de bestelling",
+    source: "ticketing",
+    file: "lib/ticketing/mail.ts",
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+    notes: [
+      "Over geld zegt de mail niets: het betaalde bedrag blijft staan en een verschil regelt de organisator buiten de site. Wat de deelnemer moet doen, hoort in het bericht.",
+      "Het bericht is optioneel; zonder valt het kader weg.",
+      "De code en de QR blijven dezelfde, en dat zegt de mail uitdrukkelijk: anders zoekt de deelnemer een nieuw ticket.",
+    ],
+  };
+}
+
+function attendeeMessagePreview(): MailPreview {
+  const mail = attendeeMessageMail({
+    locale: "nl",
+    to: "wannes@voorbeeld.test",
+    name: "Wannes",
+    eventName: "Voorbeeldcantus",
+    subject: "Praktische info voor morgen",
+    message:
+      "De deuren gaan open om 20u. Breng je studentenkaart mee: daarmee checken we je in.\n\nTot morgen!",
+    senderName: "Voorbeeldpost",
+    replyTo: "cantus@vtk.be",
+    event: {
+      startsAt: SAMPLE_START,
+      timeZone: "Europe/Brussels",
+      location: "Theokot, Studentenwijk Arenberg",
+    },
+  });
+  return {
+    id: "ticket-attendee-message",
+    title: "Een bericht aan de deelnemers",
+    when: "Wanneer iemand op het tabblad Deelnemers \"Deelnemers mailen\" verstuurt. Via de ticket-outbox, achter de bestelbevestigingen: bij honderden deelnemers duurt het enkele minuten.",
+    to: "Elke deelnemer met een geldig ticket die aan de keuze voldoet (tickettypes en/of groepen), één keer per adres; zonder eigen adres de koper",
+    source: "ticketing",
+    file: "lib/ticketing/mail.ts",
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+    notes: [
+      "Onderwerp en tekst zijn letterlijk wat de organisator schreef; de taal van de rest kiest die in het formulier.",
+      "Antwoorden gaat naar het contactadres van het event. Zonder contactadres zegt de voet waarom de mail binnenkwam.",
+      "Het label boven het bericht noemt wie het verstuurde (de naam van het account).",
     ],
   };
 }

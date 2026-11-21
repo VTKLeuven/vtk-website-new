@@ -175,3 +175,405 @@
     justify-content: center;
   }
 }
+
+/* Aanwezigheden (/admin/apps/aanwezigheden): de verslagen van het BO.
+   Een status is nooit enkel een kleur: elk vakje draagt een letter (A, V, X),
+   en de lichte vlakken met donkere tekst zijn die van de beschikbaarheid
+   (--ok-*, --low-*, --danger-*). */
+
+.bo-att {
+  display: grid;
+  gap: 18px;
+}
+
+.bo-att h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.bo-att-years {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.bo-att-years > span {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.bo-att-years a {
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--body);
+}
+
+.bo-att-years a[aria-current="page"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.bo-att-cell {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 16px;
+  height: 18px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.bo-att-cell[data-status="present"] {
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+}
+
+.bo-att-cell[data-status="excused"] {
+  background: var(--low-bg);
+  color: var(--low-ink);
+}
+
+.bo-att-cell[data-status="absent"] {
+  background: var(--danger-bg);
+  color: var(--danger-ink);
+}
+
+.bo-att-cell[data-status="unknown"],
+.bo-att-cell[data-status="none"] {
+  background: var(--paper-2);
+  color: var(--muted);
+}
+
+.bo-att-timeline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  max-width: 360px;
+}
+
+.bo-att-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+  color: var(--body);
+}
+
+.bo-att-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bo-att-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* De graad: een balk met het gemiddelde als streepje, en het getal erachter. */
+.bo-att-rate {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bo-att-rate-track {
+  position: relative;
+  width: 90px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--paper-2);
+}
+
+.bo-att-rate-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: var(--ok-ink);
+}
+
+.bo-att-rate-avg {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--ink);
+}
+
+.bo-att-rate-num {
+  min-width: 3ch;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.bo-att-stack {
+  display: inline-flex;
+  width: 90px;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--paper-2);
+}
+
+.bo-att-stack > [data-status="present"],
+.bo-att-chart-bar > [data-status="present"] {
+  background: var(--ok-ink);
+}
+
+.bo-att-stack > [data-status="excused"],
+.bo-att-chart-bar > [data-status="excused"] {
+  background: var(--chart-2);
+}
+
+.bo-att-stack > [data-status="absent"],
+.bo-att-chart-bar > [data-status="absent"] {
+  background: var(--danger-ink);
+}
+
+/* De opkomst per BO als kolommen; elke kolom is een link naar die BO. */
+.bo-att-chart {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  /* Geen padding: het gemiddelde staat op een percentage van deze hoogte. De
+     labels hangen eronder, in de marge. */
+  height: 160px;
+  margin: 0 0 34px;
+}
+
+.bo-att-chart-avg {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  height: 0;
+  border-top: 1.5px dashed var(--ink);
+  pointer-events: none;
+}
+
+.bo-att-chart-col {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 44px;
+  border-radius: 6px;
+}
+
+.bo-att-chart-col:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.bo-att-chart-bar {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 6px 6px 2px 2px;
+  background: var(--paper-2);
+}
+
+.bo-att-chart-col:hover .bo-att-chart-bar {
+  opacity: 0.85;
+}
+
+.bo-att-chart-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -20px;
+  overflow: hidden;
+  font-size: 11px;
+  text-align: center;
+  text-overflow: clip;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.bo-att-people,
+.bo-att-checks {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13.5px;
+}
+
+.bo-att-people li {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(120px, 1fr) minmax(0, 1.4fr);
+  gap: 4px 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--body);
+}
+
+.bo-att-checks li {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.35fr) minmax(0, 1fr);
+  gap: 4px 14px;
+  color: var(--body);
+}
+
+.bo-att-people a,
+.bo-att-checks a {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+@media (max-width: 640px) {
+  .bo-att-people li,
+  .bo-att-checks li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.bo-att-sub {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: normal;
+}
+
+.bo-att-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px 22px;
+  margin: 0;
+}
+
+.bo-att-facts dt {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.bo-att-facts dd {
+  margin: 3px 0 0;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.bo-att-facts dd a {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.bo-att-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 18px;
+}
+
+/* Aanwezig is meestal de langste lijst: die krijgt de helft van de breedte en
+   loopt daarin over twee kolommen, zodat de pagina niet drie keer zo lang is
+   als de andere twee lijsten. */
+@media (min-width: 900px) {
+  .bo-att-columns {
+    grid-template-columns: minmax(0, 2fr) repeat(auto-fit, minmax(160px, 1fr));
+  }
+
+  .bo-att-column[data-status="present"] ul {
+    display: block;
+    columns: 2;
+    column-gap: 18px;
+  }
+
+  .bo-att-column[data-status="present"] li {
+    margin-bottom: 6px;
+    break-inside: avoid;
+  }
+}
+
+.bo-att-column h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.bo-att-count {
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.bo-att-column ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13.5px;
+}
+
+.bo-att-column a {
+  color: var(--ink);
+}
+
+.bo-att-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bo-att-pager > span {
+  display: inline-flex;
+  gap: 14px;
+  font-size: 13px;
+}
+
+.bo-att-search {
+  max-width: 320px;
+  margin-bottom: 12px;
+}
+
+.bo-att-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.bo-att-sort:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.bo-att-table td {
+  vertical-align: middle;
+}

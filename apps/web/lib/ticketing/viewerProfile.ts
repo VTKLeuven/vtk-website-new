@@ -6,6 +6,8 @@ import {
   ticketAudiencesForProfile,
   type TicketViewerProfile,
 } from "./audience";
+import { honoraryMembershipSelect, isHonoraryMember } from "@/lib/membership/honorary";
+import { currentStudyYear } from "@/lib/workingYear";
 
 /**
  * Is de ingelogde bezoeker erelid, en bij welke doelgroepen hoort hij? Een
@@ -24,8 +26,10 @@ export async function ticketViewerProfile(userId: string | undefined): Promise<T
       alumni: true,
       isStudent: true,
       studyConfirmedYear: true,
+      // Een betalend erelid van dit academiejaar is evengoed erelid.
+      ...honoraryMembershipSelect(currentStudyYear()),
     },
   });
   if (!user) return NO_TICKET_PROFILE;
-  return { honorary: user.honoraryMember, audiences: ticketAudiencesForProfile(user) };
+  return { honorary: isHonoraryMember(user), audiences: ticketAudiencesForProfile(user) };
 }
