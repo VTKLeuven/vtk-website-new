@@ -1,6 +1,7 @@
 import 'server-only';
 
 import sharp from 'sharp';
+import { THUMB_WIDTH } from './photo-url';
 
 /**
  * Wat er van een upload in de bucket komt (S3 uit de audit van november 2026).
@@ -27,7 +28,14 @@ const MULTIPART_SLACK = 64 * 1024;
 export type UploadError = 'too_large' | 'no_file' | 'unsupported_file';
 
 export type PreparedUpload =
-  | { ok: true; body: Buffer; contentType: 'image/jpeg' | 'application/pdf'; name: string }
+  | {
+      ok: true;
+      body: Buffer;
+      contentType: 'image/jpeg' | 'application/pdf';
+      name: string;
+      /** Enkel bij een foto: de thumbnail van 400 px voor de catalogus (P2). */
+      thumb?: Buffer;
+    }
   | { ok: false; error: UploadError };
 
 /** Wat de `Content-Length` van het verzoek mag zijn, voor `formData()` alles inleest. */
@@ -65,8 +73,16 @@ export async function prepareUpload(bytes: Buffer, originalName: string): Promis
       .resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 84, mozjpeg: true })
       .toBuffer();
-    return { ok: true, body, contentType: 'image/jpeg', name: 'foto.jpg' };
+    return { ok: true, body, contentType: 'image/jpeg', name: 'foto.jpg', thumb: await makeThumb(body) };
   } catch {
     return { ok: false, error: 'unsupported_file' };
   }
+}
+
+/** Een thumbnail van een foto die al een JPEG is (bij het opladen, of achteraf). */
+export async function makeThumb(jpeg: Buffer): Promise<Buffer> {
+  return sharp(jpeg)
+    .resize({ width: THUMB_WIDTH, height: THUMB_WIDTH, fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 78, mozjpeg: true })
+    .toBuffer();
 }

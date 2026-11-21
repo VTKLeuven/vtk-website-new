@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { newStorageKey, putObject } from '@vtk/storage';
 import { canManage, getSession } from '@/lib/session';
 import { publicUrl } from '@/lib/storage';
+import { thumbKey } from '@/lib/photo-url';
 import { prepareUpload, requestTooLarge, type UploadError } from '@/lib/upload';
 
 export const runtime = 'nodejs';
@@ -35,6 +36,14 @@ export async function POST(request: Request) {
 
   const key = newStorageKey('uitleen', prepared.name);
   await putObject(key, prepared.body, prepared.contentType);
+  // De thumbnail ernaast (P2). Mislukt dat, dan maakt de mediaroute hem bij de
+  // eerste vraag alsnog; de upload zelf is gelukt.
+  const thumb = thumbKey(key);
+  if (prepared.thumb && thumb) {
+    await putObject(thumb, prepared.thumb, 'image/jpeg').catch((error) =>
+      console.error('[upload] thumbnail wegschrijven mislukt:', error)
+    );
+  }
 
   return NextResponse.json({ key, url: publicUrl(key) });
 }

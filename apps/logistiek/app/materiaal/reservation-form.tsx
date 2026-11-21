@@ -33,6 +33,7 @@ import {
 } from './event-fields';
 import { trackReservationSubmitted, trackTemplateLoaded } from '@/lib/analytics-client';
 import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
+import { thumbUrl } from '@/lib/photo-url';
 
 /** Waar de kijkvoorkeur voor de catalogus blijft staan (M7). */
 const CATALOGUE_VIEW_KEY = 'vtk-logistiek-catalogusweergave';
@@ -802,8 +803,12 @@ export function ReservationForm({
                       <Link href={`/materiaal/${item.id}`} className="block aspect-[4/3] w-full bg-vtk-paper-2">
                         {imageKey ? (
                           <img
-                            src={`/api/media/${imageKey.split('/').map(encodeURIComponent).join('/')}`}
+                            src={thumbUrl(imageKey)}
                             alt=""
+                            width={400}
+                            height={300}
+                            loading="lazy"
+                            decoding="async"
                             className="h-full w-full object-cover"
                           />
                         ) : (

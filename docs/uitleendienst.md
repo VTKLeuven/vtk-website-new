@@ -288,6 +288,14 @@ RFC-kant (vouwen, escapen, `DTSTAMP`), kijk dan of het daar ook moet.
 
 ## Foto's: @vtk/storage
 
+Naast elke opgeladen foto (`uitleen/<hex>.jpg`, 1200 px) staat een thumbnail van
+400 px (`uitleen/<hex>.thumb.jpg`, `lib/photo-url.ts`); de catalogus en de
+sjablonen laden die, lui en met vaste afmetingen. Een foto van vóór de
+thumbnails krijgt er een bij de eerste vraag: de mediaroute maakt hem uit de
+foto en bewaart hem. Een afgeleide key mag hier, want `uitleen/` staat niet in de
+nachtelijke opruiming van de bucket (`CLEANUP_PREFIXES`); zet die map er dus
+nooit bij zonder de thumbnails een eigen verwijzing te geven.
+
 `instrumentation.ts` registreert de S3-resolver (leest de `s3.config`-`Setting`
 die de web-admin beheert; vereist `BETTER_AUTH_SECRET` om de secret te
 ontsleutelen). Upload `app/api/uitleen/upload` (gate `logistiek.manage`,

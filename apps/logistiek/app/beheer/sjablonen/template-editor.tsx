@@ -7,6 +7,7 @@ import { QuantityInput } from '@/components/quantity-input';
 import { SetContents } from '@/components/set-contents';
 import { SaveForm } from '@/components/ui/save-form';
 import type { CatalogCategory } from '@/lib/uitleen-server';
+import { thumbUrl } from '@/lib/photo-url';
 
 /**
  * Een sjabloon met de hand samenstellen: dezelfde catalogusbrowser als het
@@ -254,8 +255,12 @@ export function TemplateEditor({
                         {imageKey ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={`/api/media/${imageKey.split('/').map(encodeURIComponent).join('/')}`}
+                            src={thumbUrl(imageKey)}
                             alt=""
+                            width={400}
+                            height={300}
+                            loading="lazy"
+                            decoding="async"
                             className="h-full w-full object-cover"
                           />
                         ) : (

@@ -2,9 +2,9 @@
 
 import { useRef, useState } from 'react';
 import { PhotoCropper } from '@/components/photo-cropper';
+import { mediaUrl, thumbUrl } from '@/lib/photo-url';
 
 type Upload = { key: string; label?: string };
-const mediaUrl = (key: string) => `/api/media/${key.split('/').map(encodeURIComponent).join('/')}`;
 
 /** De codes van `/api/uitleen/upload` als zin; zie `lib/upload.ts`. */
 const UPLOAD_ERRORS: Record<string, string> = {
@@ -92,7 +92,7 @@ export function PhotosEditor({ initial }: { initial: Array<{ key: string }> }) {
       {photos.map((photo, index) => (
         <figure key={photo.key} className={`relative h-24 w-24 overflow-hidden rounded-lg border bg-vtk-paper-2 ${index === 0 ? 'border-vtk-yellow' : 'border-vtk-navy/15'}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={mediaUrl(photo.key)} alt={`Foto ${index + 1}`} className="h-full w-full object-cover" />
+          <img src={thumbUrl(photo.key)} alt={`Foto ${index + 1}`} loading="lazy" decoding="async" className="h-full w-full object-cover" />
           <button type="button" onClick={() => setPhotos((all) => all.filter((p) => p.key !== photo.key))} className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-vtk-scrim/80 text-white" aria-label={`Foto ${index + 1} verwijderen`}>×</button>
           {index === 0 ? (
             <figcaption className="absolute inset-x-0 bottom-0 grid bg-vtk-yellow text-center text-[10px] font-semibold text-vtk-ink">

@@ -100,3 +100,32 @@ describe('mediaResponseInit (gedeeld met vtk.be)', () => {
     expect(new Headers(init.headers).get('content-range')).toBe('bytes 0-9/100');
   });
 });
+
+describe('thumbnails van de catalogus (P2)', () => {
+  it('leidt de thumbnail af van de foto, en terug', async () => {
+    const { originalOfThumb, thumbKey, thumbUrl } = await import('@/lib/photo-url');
+    expect(thumbKey('uitleen/abc123.jpg')).toBe('uitleen/abc123.thumb.jpg');
+    expect(originalOfThumb('uitleen/abc123.thumb.jpg')).toBe('uitleen/abc123.jpg');
+    // Een pdf, een thumbnail zelf of iets buiten de uitleendienst heeft er geen.
+    expect(thumbKey('uitleen/handleiding.pdf')).toBeNull();
+    expect(thumbKey('uitleen/abc123.thumb.jpg')).toBeNull();
+    expect(thumbKey('images/abc123.jpg')).toBeNull();
+    expect(originalOfThumb('uitleen/abc123.jpg')).toBeNull();
+    expect(thumbUrl('uitleen/handleiding.pdf')).toBe('/api/media/uitleen/handleiding.pdf');
+  });
+
+  it('maakt bij het opladen een thumbnail van 400 px naast de foto', async () => {
+    const result = await prepareUpload(await png(2400, 1600), 'groot.png');
+    expect(result.ok).toBe(true);
+    if (!result.ok || !result.thumb) throw new Error('geen thumbnail');
+    const meta = await sharp(result.thumb).metadata();
+    expect(meta.format).toBe('jpeg');
+    expect(meta.width).toBe(400);
+    expect(result.thumb.length).toBeLessThan(result.body.length);
+  });
+
+  it('geeft een pdf geen thumbnail', async () => {
+    const result = await prepareUpload(Buffer.from('%PDF-1.7\n%%EOF'), 'x.pdf');
+    expect(result.ok && result.thumb).toBeFalsy();
+  });
+});

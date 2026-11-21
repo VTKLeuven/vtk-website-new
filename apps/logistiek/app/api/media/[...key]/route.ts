@@ -1,4 +1,6 @@
-import { getObjectStream, mediaResponseInit, objectResponse } from '@vtk/storage';
+import { getObjectBuffer, getObjectStream, mediaResponseInit, objectResponse, putObject } from '@vtk/storage';
+import { originalOfThumb } from '@/lib/photo-url';
+import { makeThumb } from '@/lib/upload';
 
 export const runtime = 'nodejs';
 
@@ -21,6 +23,28 @@ export async function GET(request: Request, context: { params: Promise<{ key: st
     const object = await getObjectStream(key, request.headers.get('range'));
     return objectResponse(request, object.stream, () => mediaResponseInit(request, key, object));
   } catch {
+    // Een thumbnail die er nog niet is (een foto van vóór de thumbnails, P2):
+    // maak hem nu uit de foto zelf en bewaar hem, zodat de volgende vraag hem
+    // gewoon vindt.
+    const original = originalOfThumb(key);
+    if (original) {
+      try {
+        const thumb = await makeThumb(await getObjectBuffer(original));
+        await putObject(key, thumb, 'image/jpeg').catch((error) =>
+          console.error('[media] thumbnail bewaren mislukt:', error)
+        );
+        return new Response(new Uint8Array(thumb), {
+          headers: {
+            'content-type': 'image/jpeg',
+            'content-length': String(thumb.length),
+            'cache-control': 'public, max-age=31536000, immutable',
+            'x-content-type-options': 'nosniff',
+          },
+        });
+      } catch {
+        // Ook de foto zelf is er niet: gewoon niet gevonden.
+      }
+    }
     return new Response('Not found', { status: 404 });
   }
 }
