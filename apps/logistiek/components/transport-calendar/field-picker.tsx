@@ -8,6 +8,7 @@ import {
   countChangedFields,
   type TripFields,
 } from './types';
+import { useCalendarCopy } from './copy';
 
 /**
  * Wat er in een rit-blok staat (R7).
@@ -38,6 +39,7 @@ export function TripFieldPicker({
   const [open, setOpen] = useState(false);
   const panel = useRef<HTMLDivElement>(null);
 
+  const t = useCalendarCopy();
   const changed = countChangedFields(fields);
 
   // Buiten het paneel klikken sluit het, zoals bij de filters ernaast.
@@ -76,7 +78,7 @@ export function TripFieldPicker({
         }`}
       >
         <LogisticsIcon name="show" className="h-4 w-4" />
-        Weergave
+        {t.view}
         {changed > 0 ? <span className="tabular-nums">({changed})</span> : null}
         <LogisticsIcon
           name="chevron"
@@ -87,7 +89,7 @@ export function TripFieldPicker({
       {open ? (
         <div className="absolute left-0 top-full z-40 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-[16px] border border-vtk-navy/15 bg-vtk-surface p-4 shadow-lg">
           <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">
-            In het blok
+            {t.inBlock}
           </p>
           <div className="mt-2 grid gap-2">
             {options.map((option) => (
@@ -100,17 +102,14 @@ export function TripFieldPicker({
                   }
                   className="h-4 w-4 accent-vtk-navy"
                 />
-                {option.label}
+                {t.field[option.key]}
               </label>
             ))}
           </div>
           {/* Een rit van een kwartier is 24 pixels hoog: alles aanvinken past
               niet, en dat hoort hier te staan in plaats van dat je het zelf
               ontdekt op de week waarin je iets zoekt. */}
-          <p className="mt-3 text-xs text-vtk-muted">
-            Een kort blok toont enkel de bovenste regels die passen; de rest staat in de tooltip en
-            in het paneel van de rit.
-          </p>
+          <p className="mt-3 text-xs text-vtk-muted">{t.shortBlockHint}</p>
           <div className="mt-4 flex items-center justify-between gap-3 border-t border-vtk-navy/10 pt-3">
             <button
               type="button"
@@ -118,14 +117,14 @@ export function TripFieldPicker({
               disabled={changed === 0}
               className="text-sm font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4 disabled:text-vtk-muted disabled:no-underline"
             >
-              Standaard
+              {t.standard}
             </button>
             <button
               type="button"
               onClick={() => setOpen(false)}
               className="rounded-full border border-vtk-navy/15 px-3 py-1 text-sm font-medium text-vtk-ink transition hover:border-vtk-navy/40"
             >
-              Sluiten
+              {t.close}
             </button>
           </div>
         </div>

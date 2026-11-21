@@ -36,6 +36,8 @@ import {
   type TripBlock,
   type TripFields,
 } from './types';
+import type { LogistiekLocale } from '@/lib/i18n-shared';
+import { CalendarCopyProvider, useCalendarCopy } from './copy';
 
 /**
  * De transportplanning: dag, week of maand, met de navigatie erboven.
@@ -50,7 +52,15 @@ import {
  * van een Belgische dag, zoals overal in deze module (zie `lib/week-lanes.ts`).
  */
 
-export function TransportCalendar({
+export function TransportCalendar(props: Parameters<typeof TransportCalendarShell>[0]) {
+  return (
+    <CalendarCopyProvider locale={props.locale ?? 'nl'}>
+      <TransportCalendarShell {...props} />
+    </CalendarCopyProvider>
+  );
+}
+
+function TransportCalendarShell({
   view,
   anchor,
   days,
@@ -116,7 +126,14 @@ export function TransportCalendar({
   views?: boolean;
   /** Wat onder de kalender komt: de legende staat er al, dit komt erna. */
   children?: React.ReactNode;
+  /**
+   * De taal van de bediening (zoomknoppen, filters, dagkoppen, ritblokken).
+   * Standaard Nederlands, zoals het beheer; de ledenpagina's geven de taal
+   * van de bezoeker mee. Zie `copy.tsx`.
+   */
+  locale?: LogistiekLocale;
 }) {
+  const t = useCalendarCopy();
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -496,7 +513,7 @@ export function TransportCalendar({
           <div
             className="inline-flex overflow-hidden rounded-full border border-vtk-navy/15"
             role="group"
-            aria-label="Weergave"
+            aria-label={t.view}
           >
             {CALENDAR_VIEWS.map((option) => (
               <Link
@@ -522,11 +539,11 @@ export function TransportCalendar({
             segmenten: er zijn er dertien, en je zet ze zelden om. */}
         {views && view === 'dagen' ? (
           <label className="flex items-center gap-1.5 text-sm text-vtk-muted">
-            <span>Dagen</span>
+            <span>{t.days}</span>
             <select
               value={days.length}
               onChange={(event) => router.push(hrefFor({ aantal: Number(event.target.value) }))}
-              aria-label="Aantal dagen"
+              aria-label={t.dayCount}
               className="h-9 rounded-full border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
             >
               {Array.from(
@@ -558,11 +575,11 @@ export function TransportCalendar({
                 type="button"
                 onClick={() => zoomAround(zoom / ZOOM_STEP)}
                 disabled={zoom <= ZOOM_MIN}
-                title="Uitzoomen (of Ctrl/⌘ + scrollen)"
+                title={t.zoomOutHint}
                 className={iconButton}
               >
                 <span aria-hidden className="text-base leading-none">−</span>
-                <span className="sr-only">Uitzoomen</span>
+                <span className="sr-only">{t.zoomOut}</span>
               </button>
               {/* Het zoomniveau in woorden, want een knop die uitgrijst zonder
                   te zeggen waarom, leest als kapot. "Hele dag" is zoom 1: dan
@@ -571,20 +588,20 @@ export function TransportCalendar({
                 type="button"
                 onClick={() => zoomAround(ZOOM_MIN)}
                 disabled={zoom <= ZOOM_MIN}
-                title="Terug naar de hele dag"
+                title={t.backToWholeDay}
                 className="rounded-full border border-vtk-navy/15 px-2.5 py-1 text-xs font-medium tabular-nums text-vtk-ink transition hover:border-vtk-navy/40 disabled:opacity-40"
               >
-                {zoom <= ZOOM_MIN ? 'Hele dag' : `${Math.round(zoom * 100)}%`}
+                {zoom <= ZOOM_MIN ? t.wholeDay : `${Math.round(zoom * 100)}%`}
               </button>
               <button
                 type="button"
                 onClick={() => zoomAround(zoom * ZOOM_STEP)}
                 disabled={zoom >= ZOOM_MAX}
-                title="Inzoomen (of Ctrl/⌘ + scrollen)"
+                title={t.zoomInHint}
                 className={iconButton}
               >
                 <span aria-hidden className="text-base leading-none">+</span>
-                <span className="sr-only">Inzoomen</span>
+                <span className="sr-only">{t.zoomIn}</span>
               </button>
             </>
           )}
@@ -598,7 +615,7 @@ export function TransportCalendar({
           <button
             type="button"
             onClick={toggleFullscreen}
-            title={fullscreen ? 'Volledig scherm sluiten (Esc)' : 'Volledig scherm'}
+            title={fullscreen ? t.fullscreenCloseEsc : t.fullscreen}
             aria-pressed={Boolean(fullscreen)}
             className={
               fullscreen
@@ -612,13 +629,9 @@ export function TransportCalendar({
               name={fullscreen ? 'collapse' : 'expand'}
               className="h-4 w-4"
             />
-            {narrow && !fullscreen ? <span aria-hidden>Dagweergave</span> : null}
+            {narrow && !fullscreen ? <span aria-hidden>{t.dayView}</span> : null}
             <span className="sr-only">
-              {fullscreen
-                ? 'Volledig scherm sluiten'
-                : narrow
-                  ? 'Dagweergave op volledig scherm'
-                  : 'Volledig scherm'}
+              {fullscreen ? t.fullscreenClose : narrow ? t.dayViewFullscreen : t.fullscreen}
             </span>
           </button>
         </div>
@@ -725,12 +738,13 @@ export function CalendarNav({
   /** "week", "maand" of "dag": wat vorige en volgende verschuiven. */
   label: string;
 }) {
+  const t = useCalendarCopy();
   const buttonClass =
     'rounded-full border border-vtk-navy/15 px-3 py-1.5 font-medium text-vtk-ink transition hover:border-vtk-navy/40';
   return (
-    <nav className="flex flex-wrap items-center gap-2 text-sm" aria-label={`${label} kiezen`}>
-      <Link href={previousHref} className={buttonClass} title={`Vorige ${label}`}>
-        ← <span className="sr-only">Vorige {label}</span>
+    <nav className="flex flex-wrap items-center gap-2 text-sm" aria-label={t.choose(label)}>
+      <Link href={previousHref} className={buttonClass} title={t.previous(label)}>
+        ← <span className="sr-only">{t.previous(label)}</span>
       </Link>
       <Link
         href={todayHref}
@@ -741,10 +755,10 @@ export function CalendarNav({
             : buttonClass
         }
       >
-        Vandaag
+        {t.today}
       </Link>
-      <Link href={nextHref} className={buttonClass} title={`Volgende ${label}`}>
-        → <span className="sr-only">Volgende {label}</span>
+      <Link href={nextHref} className={buttonClass} title={t.next(label)}>
+        → <span className="sr-only">{t.next(label)}</span>
       </Link>
     </nav>
   );

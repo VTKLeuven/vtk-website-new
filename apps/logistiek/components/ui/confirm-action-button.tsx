@@ -17,6 +17,7 @@ export function ConfirmActionButton({
   label,
   srLabel,
   confirmLabel,
+  cancelLabel = 'Annuleren',
   action,
   successMessage,
   dialogTitle,
@@ -37,6 +38,8 @@ export function ConfirmActionButton({
   srLabel?: string;
   /** Korte knoptekst in de bevestigingsdialoog; standaard `label`. */
   confirmLabel?: string;
+  /** De annuleerknop van de dialoog; standaard Nederlands, want het beheer is dat. */
+  cancelLabel?: string;
   action: () => Promise<ActionResult>;
   successMessage: string;
   dialogTitle?: string;
@@ -87,7 +90,7 @@ export function ConfirmActionButton({
           title={dialogTitle ?? `${label}?`}
           description={dialogDescription}
           confirmLabel={confirmLabel ?? label}
-          cancelLabel="Annuleren"
+          cancelLabel={cancelLabel}
           destructive={destructive}
           pending={pending}
           onConfirm={run}

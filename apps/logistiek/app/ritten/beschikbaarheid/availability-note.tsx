@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import { setAvailabilityNoteAction } from '@/app/actions/uitleen';
 import { useToast } from '@vtk/ui/toast';
 import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
+import { useAvailabilityCopy } from './copy';
 
 /**
  * Eén algemene nota bij je beschikbaarheid van deze week (F4.5).
@@ -46,6 +47,7 @@ export function AvailabilityNote({
   /** `paint` is de telefoonvorm: één regel, geen kaart eromheen. */
   variant: 'grid' | 'paint';
 }) {
+  const t = useAvailabilityCopy();
   const showToast = useToast();
   const [, startTransition] = useTransition();
   const [text, setText] = useState(initial);
@@ -83,7 +85,7 @@ export function AvailabilityNote({
     });
   }
 
-  const statusLabel = status === 'saving' ? 'Opslaan...' : status === 'done' ? 'Bewaard' : null;
+  const statusLabel = status === 'saving' ? t.saving : status === 'done' ? t.saved : null;
 
   if (variant === 'paint') {
     return (
@@ -94,8 +96,8 @@ export function AvailabilityNote({
           onChange={(event) => setText(event.target.value)}
           onBlur={save}
           maxLength={500}
-          placeholder="Nota voor deze week (optioneel)"
-          aria-label="Algemene nota voor deze week"
+          placeholder={t.notePlaceholderShort}
+          aria-label={t.noteLabel}
           className="min-w-0 flex-1 rounded-full border border-vtk-navy/15 bg-vtk-field px-3 py-1 text-xs text-vtk-ink placeholder:text-vtk-muted"
         />
         {/* Vaste breedte, anders springt het veld ernaast bij elke wissel. */}
@@ -109,23 +111,20 @@ export function AvailabilityNote({
   return (
     <section className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold text-vtk-ink">Nota voor deze week</h2>
+        <h2 className="text-sm font-semibold text-vtk-ink">{t.noteTitle}</h2>
         <span className="text-xs text-vtk-muted" aria-live="polite">
           {statusLabel}
         </span>
       </div>
-      <p className="mt-1 text-xs text-vtk-muted">
-        Iets dat voor de hele week geldt en niet bij één venster hoort. Logistiek leest het onder de
-        beschikbaarheid in de planning. Leeg laten mag.
-      </p>
+      <p className="mt-1 text-xs text-vtk-muted">{t.noteLead}</p>
       <textarea
         value={text}
         onChange={(event) => setText(event.target.value)}
         onBlur={save}
         maxLength={500}
         rows={2}
-        placeholder="Bijvoorbeeld: die week examens, bel me liever dan te mailen."
-        aria-label="Algemene nota voor deze week"
+        placeholder={t.notePlaceholder}
+        aria-label={t.noteLabel}
         className="mt-3 w-full rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 py-2 text-sm text-vtk-ink placeholder:text-vtk-muted"
       />
     </section>

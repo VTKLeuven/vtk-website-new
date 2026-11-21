@@ -5,6 +5,7 @@ import { restoreAvailabilityAction } from '@/app/actions/uitleen';
 import { useToast } from '@vtk/ui/toast';
 import type { AvailabilityWindow } from './availability-editor';
 import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
+import { useAvailabilityCopy } from './copy';
 
 /**
  * Hoe een stuk van je week eruitzag vlak voor een wijziging: genoeg om het met
@@ -52,6 +53,7 @@ export function snapshotOf(
  */
 export function useOfferUndo(onRestore?: (snapshot: AvailabilitySnapshot) => void) {
   const showToast = useToast();
+  const t = useAvailabilityCopy();
   const [, startTransition] = useTransition();
   return useCallback(
     (message: string, snapshot: AvailabilitySnapshot) => {
@@ -59,7 +61,7 @@ export function useOfferUndo(onRestore?: (snapshot: AvailabilitySnapshot) => voi
         message,
         variant: 'success',
         action: {
-          label: 'Ongedaan maken',
+          label: t.undo,
           onClick: () =>
             startTransition(async () => {
               onRestore?.(snapshot);
@@ -67,13 +69,13 @@ export function useOfferUndo(onRestore?: (snapshot: AvailabilitySnapshot) => voi
               if (result === UNSENT) return;
               showToast(
                 result.ok
-                  ? { message: 'Teruggezet zoals het stond.', variant: 'success' }
+                  ? { message: t.restored, variant: 'success' }
                   : { message: result.error, variant: 'error', duration: 0 }
               );
             }),
         },
       });
     },
-    [onRestore, showToast]
+    [onRestore, showToast, t]
   );
 }

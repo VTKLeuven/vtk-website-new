@@ -8,14 +8,13 @@ import {
   FILTER_QUERY_KEYS,
   NO_DRIVER,
   REQUESTER_TYPES,
-  REQUESTER_TYPE_FILTER_LABELS,
   TRIP_STATUSES,
-  TRIP_STATUS_LABELS,
   countActiveFilters,
   filtersToQuery,
   type TransportFilters,
 } from '@/lib/transport-filters';
 import { LogisticsIcon } from '@/components/logistics-icon';
+import { useCalendarCopy } from './copy';
 
 /**
  * De filters van de transportplanning (P3).
@@ -172,6 +171,7 @@ export function TransportFilterBar({
     };
   }, [open]);
 
+  const t = useCalendarCopy();
   const show = {
     vehicles: shown?.vehicles ?? true,
     drivers: shown?.drivers ?? true,
@@ -186,7 +186,7 @@ export function TransportFilterBar({
     <>
       {show.vehicles ? (
         <FilterGroup
-          label="Voertuig"
+          label={t.filterVehicle}
           options={vehicles}
           selected={filters.vehicleIds}
           onToggle={(id) => toggle('vehicleIds', id)}
@@ -194,8 +194,8 @@ export function TransportFilterBar({
       ) : null}
       {show.drivers ? (
         <FilterGroup
-          label="Chauffeur"
-          options={[{ id: NO_DRIVER, name: 'Nog geen' }, ...drivers]}
+          label={t.filterDriver}
+          options={[{ id: NO_DRIVER, name: t.filterNoDriver }, ...drivers]}
           selected={filters.driverIds}
           onToggle={(id) => toggle('driverIds', id)}
           swatch={(id) => (id === NO_DRIVER ? 'var(--driver-none)' : driverColorVar(id, driverColors))}
@@ -207,7 +207,7 @@ export function TransportFilterBar({
           `FilterGroup` laat een lege lijst zelf weg. */}
       {show.posts ? (
         <FilterGroup
-          label="Post of werkgroep"
+          label={t.filterPost}
           options={posts ?? []}
           selected={filters.groupIds}
           onToggle={(id) => toggle('groupIds', id)}
@@ -215,18 +215,18 @@ export function TransportFilterBar({
       ) : null}
       {show.statuses ? (
         <FilterGroup
-          label="Status"
-          options={TRIP_STATUSES.map((status) => ({ id: status, name: TRIP_STATUS_LABELS[status] }))}
+          label={t.filterStatus}
+          options={TRIP_STATUSES.map((status) => ({ id: status, name: t.status[status] }))}
           selected={filters.statuses}
           onToggle={(id) => toggle('statuses', id)}
         />
       ) : null}
       {show.requesters ? (
         <FilterGroup
-          label="Aanvrager"
+          label={t.filterRequester}
           options={REQUESTER_TYPES.map((type) => ({
             id: type,
-            name: REQUESTER_TYPE_FILTER_LABELS[type],
+            name: t.requester[type],
           }))}
           selected={filters.requesterTypes}
           onToggle={(id) => toggle('requesterTypes', id)}
@@ -244,7 +244,7 @@ export function TransportFilterBar({
               onChange={(event) => apply({ ...filters, showEvents: event.target.checked })}
               className="h-4 w-4 accent-vtk-navy"
             />
-            Evenementen boven de kalender
+            {t.filterEvents}
           </label>
         </>
       ) : null}
@@ -257,11 +257,8 @@ export function TransportFilterBar({
             className="mt-0.5 h-4 w-4 accent-vtk-navy"
           />
           <span>
-            Beschikbaarheid van de chauffeurs
-            <span className="mt-0.5 block text-xs font-normal text-vtk-muted">
-              Als lichte band achter het rooster, in de kleur van de chauffeur. Wie niets ingaf,
-              staat er niet: dat betekent niet dat hij niet kan.
-            </span>
+            {t.filterAvailability}
+            <span className="mt-0.5 block text-xs font-normal text-vtk-muted">{t.filterAvailabilityHint}</span>
           </span>
         </label>
       ) : null}
@@ -281,7 +278,7 @@ export function TransportFilterBar({
         }`}
       >
         <LogisticsIcon name="request" className="h-4 w-4" />
-        Filters
+        {t.filters}
         {active > 0 ? <span className="tabular-nums">({active})</span> : null}
         <LogisticsIcon
           name="chevron"
@@ -299,14 +296,14 @@ export function TransportFilterBar({
               disabled={active === 0}
               className="text-sm font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4 disabled:text-vtk-muted disabled:no-underline"
             >
-              Alles tonen
+              {t.showAll}
             </button>
             <button
               type="button"
               onClick={() => setOpen(false)}
               className="rounded-full border border-vtk-navy/15 px-3 py-1 text-sm font-medium text-vtk-ink transition hover:border-vtk-navy/40"
             >
-              Sluiten
+              {t.close}
             </button>
           </div>
         </div>

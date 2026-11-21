@@ -16,6 +16,7 @@ import {
   type TripBlock,
   type TripFields,
 } from './types';
+import { byLocale, useCalendarCopy } from './copy';
 
 /**
  * De transportplanning op een telefoon, in volledig scherm.
@@ -57,20 +58,9 @@ const SWIPE_PX = 56;
 /** Breedte van de urenkolom. */
 const GUTTER = 46;
 
-const weekdayFormatter = new Intl.DateTimeFormat('nl-BE', {
-  timeZone: 'Europe/Brussels',
-  weekday: 'short',
-});
-const dayNumberFormatter = new Intl.DateTimeFormat('nl-BE', {
-  timeZone: 'Europe/Brussels',
-  day: 'numeric',
-});
-const fullDayFormatter = new Intl.DateTimeFormat('nl-BE', {
-  timeZone: 'Europe/Brussels',
-  weekday: 'long',
-  day: 'numeric',
-  month: 'long',
-});
+const WEEKDAY = byLocale({ timeZone: 'Europe/Brussels', weekday: 'short' });
+const DAY_NUMBER = byLocale({ timeZone: 'Europe/Brussels', day: 'numeric' });
+const FULL_DAY = byLocale({ timeZone: 'Europe/Brussels', weekday: 'long', day: 'numeric', month: 'long' });
 const dayKeyFormatter = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Europe/Brussels',
   year: 'numeric',
@@ -127,6 +117,7 @@ export function MobileCalendar({
   onToday?: () => void;
   now?: Date;
 }) {
+  const t = useCalendarCopy();
   const parsedDays = useMemo(() => days.map((day) => new Date(day)), [days]);
   const vehicleById = useMemo(
     () => new Map(vehicles.map((vehicle) => [vehicle.id, vehicle])),
@@ -403,10 +394,10 @@ export function MobileCalendar({
           className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-vtk-navy/15 bg-vtk-surface text-vtk-ink"
         >
           <LogisticsIcon name="close" className="h-4 w-4" />
-          <span className="sr-only">Volledig scherm sluiten</span>
+          <span className="sr-only">{t.fullscreenClose}</span>
         </button>
         <p className="min-w-0 flex-1 truncate text-sm font-semibold capitalize text-vtk-ink">
-          {fullDayFormatter.format(day)}
+          {FULL_DAY[t.locale].format(day)}
         </p>
         {onToday ? (
           <button
@@ -422,7 +413,7 @@ export function MobileCalendar({
             }}
             className="h-9 shrink-0 rounded-full border border-vtk-navy/15 bg-vtk-surface px-3 text-xs font-semibold text-vtk-ink"
           >
-            Vandaag
+            {t.today}
           </button>
         ) : null}
         {onCreate ? (
@@ -441,14 +432,14 @@ export function MobileCalendar({
             className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-vtk-navy text-lg leading-none text-vtk-on-emphasis"
           >
             <span aria-hidden>+</span>
-            <span className="sr-only">Rit toevoegen op deze dag</span>
+            <span className="sr-only">{t.addTripOnDay}</span>
           </button>
         ) : null}
       </header>
 
       {/* De week als zeven knoppen. Een stip zegt dat er die dag iets staat, en
           dat is precies de vraag waarmee je hier komt: waar zit het druk? */}
-      <nav className="mob-cal-days" aria-label="Dag kiezen">
+      <nav className="mob-cal-days" aria-label={t.chooseDay}>
         {parsedDays.map((each, at) => {
           const active = at === index;
           const isNow = todayKey !== null && dayKeyFormatter.format(each) === todayKey;
@@ -460,8 +451,8 @@ export function MobileCalendar({
               aria-current={active ? 'date' : undefined}
               className={`mob-cal-day ${active ? 'is-active' : ''} ${isNow ? 'is-today' : ''}`}
             >
-              <span className="mob-cal-day-name">{weekdayFormatter.format(each)}</span>
-              <span className="mob-cal-day-number">{dayNumberFormatter.format(each)}</span>
+              <span className="mob-cal-day-name">{WEEKDAY[t.locale].format(each)}</span>
+              <span className="mob-cal-day-number">{DAY_NUMBER[t.locale].format(each)}</span>
               <span className={`mob-cal-day-dot ${perDay[at] > 0 ? 'is-on' : ''}`} aria-hidden />
               {perDay[at] > 0 ? (
                 <span className="sr-only">{perDay[at]} ritten</span>
@@ -535,6 +526,7 @@ export function MobileCalendar({
                 awaitsDriver: look.awaitsDriver,
                 start: block.start,
                 end: block.end,
+                t,
               });
               return (
                 <button
@@ -588,7 +580,7 @@ export function MobileCalendar({
         </div>
       </div>
 
-      <p className="mob-cal-hint">Veeg voor een andere dag, knijp om de uren groter te maken.</p>
+      <p className="mob-cal-hint">{t.swipeHint}</p>
     </div>
   );
 }

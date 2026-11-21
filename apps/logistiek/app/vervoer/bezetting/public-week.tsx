@@ -86,6 +86,7 @@ export function PublicWeek({
 
   return (
     <TransportCalendar
+      locale={locale}
       view="week"
       anchor={anchor}
       days={days}

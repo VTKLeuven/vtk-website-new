@@ -20,7 +20,10 @@ import {
   subtractRange,
   type AvailabilityKind,
 } from '@/lib/availability-day';
-import { AVAILABILITY_KIND_HINT, AVAILABILITY_KIND_LABEL, availabilityFillClass } from '@/lib/availability-kinds';
+import { availabilityFillClass } from '@/lib/availability-kinds';
+import type { LogistiekLocale } from '@/lib/i18n-shared';
+import { AvailabilityCopyProvider, useAvailabilityCopy } from './copy';
+import { CalendarCopyProvider } from '@/components/transport-calendar/copy';
 import { AvailabilityNote } from './availability-note';
 import { AvailabilityPaint } from './availability-paint';
 import { snapshotOf, useOfferUndo, type AvailabilitySnapshot } from './availability-undo';
@@ -96,6 +99,7 @@ export function AvailabilityEditor({
   backHref,
   now,
   previousWeekCount,
+  locale,
 }: {
   /** De week, als ISO-strings van UTC-middernacht. */
   days: string[];
@@ -123,7 +127,45 @@ export function AvailabilityEditor({
   now: string;
   /** Hoeveel vensters er vorige week stonden, voor "Neem vorige week over". */
   previousWeekCount: number;
+  locale: LogistiekLocale;
 }) {
+  return (
+    <AvailabilityCopyProvider locale={locale}>
+      <CalendarCopyProvider locale={locale}>
+      <AvailabilityEditorBody
+        days={days}
+        windows={windows}
+        driverId={driverId}
+        driverName={driverName}
+        weekLabel={weekLabel}
+        weekValue={weekValue}
+        note={note}
+        previousHref={previousHref}
+        nextHref={nextHref}
+        backHref={backHref}
+        now={now}
+        previousWeekCount={previousWeekCount}
+      />
+      </CalendarCopyProvider>
+    </AvailabilityCopyProvider>
+  );
+}
+
+function AvailabilityEditorBody({
+  days,
+  windows,
+  driverId,
+  driverName,
+  weekLabel,
+  weekValue,
+  note,
+  previousHref,
+  nextHref,
+  backHref,
+  now,
+  previousWeekCount,
+}: Omit<Parameters<typeof AvailabilityEditor>[0], 'locale'>) {
+  const t = useAvailabilityCopy();
   const showToast = useToast();
   const [pending, startTransition] = useTransition();
   const [draft, setDraft] = useState({ startAt: '', endAt: '', note: '' });
@@ -254,7 +296,7 @@ export function AvailabilityEditor({
         const result = await unsentGuard.run(() => removeAvailabilityAction(id));
         if (result === UNSENT) return;
         if (result.ok) {
-          offerUndo('Venster weggehaald.', snapshot);
+          offerUndo(t.windowRemoved, snapshot);
         } else {
           showToast({ message: result.error, variant: 'error', duration: 0 });
         }
@@ -300,7 +342,7 @@ export function AvailabilityEditor({
         if (result === UNSENT) return;
         if (result.ok) {
           offerUndo(
-            kind ? `Nu: ${AVAILABILITY_KIND_LABEL[kind].toLowerCase()}.` : 'Venster aangepast.',
+            kind ? t.nowKind(t.kindLabel(kind).toLowerCase()) : t.windowChanged,
             snapshot
           );
         } else {
@@ -358,13 +400,11 @@ export function AvailabilityEditor({
 
   const fields = (
     <section className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-5">
-      <h2 className="text-sm font-semibold text-vtk-ink">Venster intikken</h2>
-      <p className="mt-1 text-xs text-vtk-muted">
-        Voor wie een uur precies wil zetten; het rooster hierboven gaat per uur.
-      </p>
+      <h2 className="text-sm font-semibold text-vtk-ink">{t.typeTitle}</h2>
+      <p className="mt-1 text-xs text-vtk-muted">{t.typeLead}</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1 text-xs font-medium text-vtk-muted sm:col-span-2">
-          Hoe graag
+          {t.howKeen}
           <select
             value={brush}
             onChange={(event) => setBrush(event.target.value as AvailabilityKind)}
@@ -372,20 +412,20 @@ export function AvailabilityEditor({
           >
             {AVAILABILITY_KINDS.map((kind) => (
               <option key={kind} value={kind}>
-                {AVAILABILITY_KIND_LABEL[kind]}: {AVAILABILITY_KIND_HINT[kind]}
+                {t.kindLabel(kind)}: {t.kindHint(kind)}
               </option>
             ))}
           </select>
         </label>
         <label className="grid gap-1 text-xs font-medium text-vtk-muted">
-          Van
+          {t.from}
           <QuarterDateTime
             value={draft.startAt}
             onChange={(value) => setDraft((current) => ({ ...current, startAt: value }))}
           />
         </label>
         <label className="grid gap-1 text-xs font-medium text-vtk-muted">
-          Tot
+          {t.until}
           <QuarterDateTime
             value={draft.endAt}
             onChange={(value) => setDraft((current) => ({ ...current, endAt: value }))}
@@ -400,7 +440,7 @@ export function AvailabilityEditor({
         disabled={pending || !draft.startAt || !draft.endAt}
         onClick={() => add({ startAt: draft.startAt, endAt: draft.endAt, kind: brush })}
       >
-        {pending ? 'Opslaan...' : 'Toevoegen'}
+        {pending ? t.saving : t.add}
       </Button>
     </section>
   );
@@ -411,12 +451,9 @@ export function AvailabilityEditor({
 
   const list = (
     <section>
-      <h2 className="text-sm font-semibold text-vtk-ink">Wanneer je kan rijden ({upcoming.length})</h2>
+      <h2 className="text-sm font-semibold text-vtk-ink">{t.listTitle(upcoming.length)}</h2>
       {upcoming.length === 0 ? (
-        <p className="mt-2 text-sm text-vtk-muted">
-          Nog niets ingegeven. Zolang je niets ingeeft, gaat Logistiek er niet van uit dat je niet
-          kan; ze weten het gewoon niet, en bellen je dan.
-        </p>
+        <p className="mt-2 text-sm text-vtk-muted">{t.listEmpty}</p>
       ) : (
         <ul className="mt-3 grid gap-2">
           {upcoming.map((window) => (
@@ -428,30 +465,31 @@ export function AvailabilityEditor({
             >
               <div className="min-w-0">
                 <p className="font-medium text-vtk-ink">
-                  {formatDateTime(new Date(window.startAt))} tot{' '}
-                  {formatDateTime(new Date(window.endAt))}
+                  {formatDateTime(new Date(window.startAt), t.locale)} {t.to}{' '}
+                  {formatDateTime(new Date(window.endAt), t.locale)}
                 </p>
                 <p className="flex items-center gap-1.5 text-xs text-vtk-muted">
                   <span
                     aria-hidden
                     className={`h-2.5 w-2.5 rounded-[3px] border border-vtk-navy/25 bg-vtk-yellow ${availabilityFillClass(window.kind)}`}
                   />
-                  {AVAILABILITY_KIND_LABEL[window.kind]}
+                  {t.kindLabel(window.kind)}
                 </p>
                 {window.note ? <p className="text-xs text-vtk-muted">{window.note}</p> : null}
               </div>
               {isPending(window.id) ? (
-                <span className="text-xs text-vtk-muted">Opslaan...</span>
+                <span className="text-xs text-vtk-muted">{t.saving}</span>
               ) : (
                 <ConfirmActionButton
-                  label={`Weghalen: ${formatDateTime(new Date(window.startAt))}`}
-                  confirmLabel="Venster weghalen"
+                  label={t.removeLabel(formatDateTime(new Date(window.startAt), t.locale))}
+                  confirmLabel={t.removeConfirm}
+                  cancelLabel={t.cancel}
                   icon={<LogisticsIcon name="close" className="h-4 w-4" />}
                   action={removeAvailabilityAction.bind(null, window.id)}
-                  successMessage="Venster weggehaald."
+                  successMessage={t.windowRemoved}
                   destructive
-                  dialogTitle="Venster weghalen?"
-                  dialogDescription="Logistiek weet dan niet meer dat je op dat moment kan rijden. Ritten die al aan jou toegewezen zijn, blijven staan."
+                  dialogTitle={t.removeTitle}
+                  dialogDescription={t.removeDescription}
                 />
               )}
             </li>
@@ -500,7 +538,7 @@ export function AvailabilityEditor({
         dayStartHour={DAG_START_UUR}
         // De uitleg staat al in `above`; hier hoort enkel te staan dat er niets
         // is, anders zeggen twee regels onder elkaar hetzelfde.
-        emptyLabel="Nog niets ingetekend deze week."
+        emptyLabel={t.gridEmpty}
         showDriver={false}
         onCreateRange={onCreateRange}
         onResizeBand={resize}
@@ -513,13 +551,13 @@ export function AvailabilityEditor({
           <div className="grid gap-2 px-1 pb-2">
             {/* Eerst kiezen wát je neerzet, dan slepen. Dezelfde volgorde als op
                 een telefoon, met dezelfde staaltjes, zodat het één gebaar blijft. */}
-            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Wat duid je aan">
+            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t.brushGroup}>
               {AVAILABILITY_KINDS.map((kind) => (
                 <button
                   key={kind}
                   type="button"
                   aria-pressed={brush === kind}
-                  title={AVAILABILITY_KIND_HINT[kind]}
+                  title={t.kindHint(kind)}
                   onClick={() => setBrush(kind)}
                   className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition ${
                     brush === kind
@@ -531,7 +569,7 @@ export function AvailabilityEditor({
                     aria-hidden
                     className={`h-3 w-3 rounded-[3px] border border-vtk-navy/25 bg-vtk-yellow ${availabilityFillClass(kind)}`}
                   />
-                  {AVAILABILITY_KIND_LABEL[kind]}
+                  {t.kindLabel(kind)}
                 </button>
               ))}
               <CopyPreviousWeek
@@ -542,12 +580,7 @@ export function AvailabilityEditor({
                 className="ml-auto rounded-full border border-vtk-navy/20 px-2.5 py-1 text-xs font-semibold text-vtk-ink transition hover:border-vtk-navy/50 disabled:opacity-60"
               />
             </div>
-            <p className="text-xs text-vtk-muted">
-              Sleep met de muis over een dag: het venster staat er meteen, in de gekozen soort.
-              Trek aan de boven- of onderrand om het korter of langer te maken, en klik erop om de
-              soort te veranderen of het weg te halen. Een dag loopt hier van 05:00 tot 05:00, dus
-              de nacht van zaterdag op zondag staat onderaan bij zaterdag.
-            </p>
+            <p className="text-xs text-vtk-muted">{t.dragHelp}</p>
           </div>
         }
       />
@@ -576,14 +609,10 @@ export function AvailabilityEditor({
 
       <ConfirmDialog
         open={confirmRemove !== null}
-        title="Venster weghalen?"
-        description={
-          confirmRemove
-            ? `${windowLabel(confirmRemove)} verdwijnt; Logistiek weet dan niet meer dat je op dat moment kan rijden. Ritten die al aan jou toegewezen zijn, blijven staan.`
-            : undefined
-        }
-        confirmLabel="Venster weghalen"
-        cancelLabel="Annuleren"
+        title={t.removeTitle}
+        description={confirmRemove ? t.removeDescriptionFor(windowLabel(confirmRemove, t)) : undefined}
+        confirmLabel={t.removeConfirm}
+        cancelLabel={t.cancel}
         destructive
         onConfirm={() => {
           if (confirmRemove) remove(confirmRemove.id);

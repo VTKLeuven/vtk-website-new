@@ -420,6 +420,7 @@ function TripItem({
               driverId={trip.picker.driverId}
               members={trip.picker.members}
               groupName={trip.picker.groupName}
+              locale={locale}
             />
           ) : null}
 

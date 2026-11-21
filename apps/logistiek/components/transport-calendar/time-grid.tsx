@@ -18,6 +18,7 @@ import {
   type TripBlock,
   type TripFields,
 } from './types';
+import { byLocale, useCalendarCopy } from './copy';
 
 /**
  * De dag- en weekweergave: de uren verticaal, de dagen naast elkaar, en elke rit
@@ -47,15 +48,8 @@ import {
  *    en vúlt de kalender het scherm. Zie `types.ts` voor het waarom.
  */
 
-const weekdayFormatter = new Intl.DateTimeFormat('nl-BE', {
-  timeZone: 'Europe/Brussels',
-  weekday: 'short',
-});
-const dayNumberFormatter = new Intl.DateTimeFormat('nl-BE', {
-  timeZone: 'Europe/Brussels',
-  day: 'numeric',
-  month: 'short',
-});
+const WEEKDAY = byLocale({ timeZone: 'Europe/Brussels', weekday: 'short' });
+const DAY_NUMBER = byLocale({ timeZone: 'Europe/Brussels', day: 'numeric', month: 'short' });
 const dayKeyFormatter = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Europe/Brussels',
   year: 'numeric',
@@ -347,6 +341,7 @@ export function TimeGrid({
    */
   dayStartHour?: number;
 }) {
+  const t = useCalendarCopy();
   const parsedDays = useMemo(() => days.map((day) => new Date(day)), [days]);
   const vehicleById = useMemo(
     () => new Map(vehicles.map((vehicle) => [vehicle.id, vehicle])),
@@ -956,9 +951,9 @@ export function TimeGrid({
                   <span
                     className={`font-semibold capitalize ${isToday ? 'text-vtk-navy' : 'text-vtk-ink'}`}
                   >
-                    {weekdayFormatter.format(day)}
+                    {WEEKDAY[t.locale].format(day)}
                   </span>{' '}
-                  {dayNumberFormatter.format(day)}
+                  {DAY_NUMBER[t.locale].format(day)}
                 </span>
               );
             })}
@@ -1130,7 +1125,7 @@ export function TimeGrid({
                     {'-'}
                     {formatTime(dragRange(drag, day).end)}
                     {clash ? (
-                      <span className="block truncate font-medium">Botst met {clash.title}</span>
+                      <span className="block truncate font-medium">{t.clashesWith(clash.title)}</span>
                     ) : null}
                   </div>
                 ) : null}
@@ -1225,6 +1220,7 @@ function TimeBlock({
   /** Is er net gesleept? Dan is deze klik het loslaten en geen selectie. */
   justDragged?: () => boolean;
 }) {
+  const t = useCalendarCopy();
   const top = ((block.from - firstHour * 60) / 60) * hourPx;
   const rawHeight = ((block.to - block.from) / 60) * hourPx;
   const look = blockLook({ block, vehicle, showDriver, driverColors, selected });
@@ -1252,6 +1248,7 @@ function TimeBlock({
     awaitsDriver: look.awaitsDriver,
     start: block.start,
     end: block.end,
+    t,
   });
   const content: ReactNode = (
     <BlockContent

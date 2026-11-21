@@ -13,15 +13,12 @@ import {
   DAG_START_UUR,
   type AvailabilityKind,
 } from '@/lib/availability-day';
-import {
-  AVAILABILITY_KIND_LABEL,
-  AVAILABILITY_KIND_SHORT,
-  availabilityFillClass,
-} from '@/lib/availability-kinds';
+import { availabilityFillClass } from '@/lib/availability-kinds';
 import { AvailabilityNote } from './availability-note';
 import { CopyPreviousWeek } from './copy-previous-week';
 import type { AvailabilityWindow } from './availability-editor';
 import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
+import { useAvailabilityCopy } from './copy';
 
 /**
  * Beschikbaarheid intekenen op een telefoon (V1).
@@ -80,10 +77,10 @@ const CELLS = Array.from({ length: 24 }, (_, index) => index);
 
 const ROW_GAP_PX = 2;
 
-const weekdayFormatter = new Intl.DateTimeFormat('nl-BE', {
-  timeZone: 'Europe/Brussels',
-  weekday: 'short',
-});
+const WEEKDAY_FORMATTERS = {
+  nl: new Intl.DateTimeFormat('nl-BE', { timeZone: 'Europe/Brussels', weekday: 'short' }),
+  en: new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Brussels', weekday: 'short' }),
+};
 const dayNumberFormatter = new Intl.DateTimeFormat('nl-BE', {
   timeZone: 'Europe/Brussels',
   day: 'numeric',
@@ -126,6 +123,8 @@ export function AvailabilityPaint({
   nextHref: string;
   backHref: string;
 }) {
+  const t = useAvailabilityCopy();
+  const weekdayFormatter = WEEKDAY_FORMATTERS[t.locale];
   const showToast = useToast();
   const [, startTransition] = useTransition();
   /**
@@ -325,26 +324,26 @@ export function AvailabilityPaint({
           weeknavigatie: samen namen die ruim driehonderd pixels, en die had het
           raster nodig. */}
       <header className="paint-bar">
-        <Link href={backHref} className="paint-icon-button" aria-label="Terug naar mijn ritten">
+        <Link href={backHref} className="paint-icon-button" aria-label={t.back}>
           <LogisticsIcon name="close" className="h-4 w-4" />
         </Link>
         <div className="min-w-0 flex-1 text-center">
           <p className="truncate text-sm font-semibold text-vtk-ink">{weekLabel}</p>
           {/* Kort genoeg om niet af te kappen in de smalle middenkolom; wát je
               neerzet staat in de penseelrij eronder. */}
-          <p className="truncate text-[11px] text-vtk-muted">Veeg over de uren.</p>
+          <p className="truncate text-[11px] text-vtk-muted">{t.swipe}</p>
         </div>
-        <Link href={previousHref} className="paint-icon-button" aria-label="Vorige week">
+        <Link href={previousHref} className="paint-icon-button" aria-label={t.previousWeek}>
           <span aria-hidden>←</span>
         </Link>
-        <Link href={nextHref} className="paint-icon-button" aria-label="Volgende week">
+        <Link href={nextHref} className="paint-icon-button" aria-label={t.nextWeek}>
           <span aria-hidden>→</span>
         </Link>
       </header>
 
       {/* Kiezen wát je neerzet. De volgorde is die van het antwoord: eerst het
           gulste, dan het karigste, en wissen apart achteraan. */}
-      <div className="paint-brush" role="group" aria-label="Wat duid je aan">
+      <div className="paint-brush" role="group" aria-label={t.brushGroup}>
         {AVAILABILITY_KINDS.map((kind) => (
           <button
             key={kind}
@@ -354,7 +353,7 @@ export function AvailabilityPaint({
             className="paint-brush-option"
           >
             <span aria-hidden className={`paint-brush-swatch ${availabilityFillClass(kind)}`} />
-            {AVAILABILITY_KIND_SHORT[kind]}
+            {t.kindShort(kind)}
           </button>
         ))}
         <button
@@ -364,7 +363,7 @@ export function AvailabilityPaint({
           className="paint-brush-option"
         >
           <span aria-hidden className="paint-brush-swatch paint-brush-swatch-off" />
-          Wissen
+          {t.erase}
         </button>
       </div>
 
@@ -452,9 +451,9 @@ export function AvailabilityPaint({
                       }`}
                     >
                       <span className="sr-only">
-                        {weekdayFormatter.format(moment)} {dayNumberFormatter.format(moment)} om{' '}
+                        {weekdayFormatter.format(moment)} {dayNumberFormatter.format(moment)} {t.at}{' '}
                         {String(clock).padStart(2, '0')}:00
-                        {kind ? `, ${AVAILABILITY_KIND_LABEL[kind].toLowerCase()}` : ''}
+                        {kind ? `, ${t.kindLabel(kind).toLowerCase()}` : ''}
                       </span>
                     </button>
                   );
@@ -468,7 +467,7 @@ export function AvailabilityPaint({
       <div ref={footer} className="paint-foot">
         {/* Waarom er onder zaterdag uren van zondagochtend staan. Eén regel,
             want het raster zegt het verder zelf. */}
-        <p className="text-xs text-vtk-muted">De nacht hoort bij de avond ervoor.</p>
+        <p className="text-xs text-vtk-muted">{t.nightNote}</p>
         {/* De telling per soort als staaltje plus uren, en niet uitgeschreven:
             "1u beschikbaar · 1u liever niet · 1u in noodgeval" nam twee regels
             en duwde de nachtknop weg. De pillen erboven zeggen al welk staaltje
@@ -484,7 +483,7 @@ export function AvailabilityPaint({
             className="text-xs font-semibold text-vtk-navy underline underline-offset-2 disabled:opacity-60"
           />
         ) : totals.length === 0 ? (
-          <p className="text-xs text-vtk-muted">Nog niets aangeduid</p>
+          <p className="text-xs text-vtk-muted">{t.nothingMarked}</p>
         ) : (
           <p className="flex items-center gap-2.5 text-xs tabular-nums text-vtk-muted">
             {totals.map((entry) => (
@@ -493,8 +492,8 @@ export function AvailabilityPaint({
                   aria-hidden
                   className={`h-3 w-3 rounded-[3px] border border-vtk-navy/25 bg-vtk-yellow ${availabilityFillClass(entry.kind)}`}
                 />
-                {entry.count}u
-                <span className="sr-only"> {AVAILABILITY_KIND_LABEL[entry.kind].toLowerCase()}</span>
+                {t.hours(entry.count)}
+                <span className="sr-only"> {t.kindLabel(entry.kind).toLowerCase()}</span>
               </span>
             ))}
           </p>

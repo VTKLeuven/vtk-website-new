@@ -125,6 +125,7 @@ export default async function BeschikbaarheidPage({
           </nav>
 
           <AvailabilityEditor
+            locale={locale}
             weekLabel={`${en ? 'Week' : 'Week'} ${isoWeekNumber(monday)}`}
             weekValue={toDateInputValue(monday)}
             note={note ?? ''}

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { placeForWeekRow } from '@/lib/month-lanes';
+import { useCalendarCopy } from './copy';
 
 /**
  * De evenementen boven het tijdrooster (P5).
@@ -58,6 +59,7 @@ export function EventBars({
   /** Hetzelfde `grid-template-columns` als het rooster, zodat de balken uitlijnen. */
   columns: string;
 }) {
+  const t = useCalendarCopy();
   const parsedDays = useMemo(() => days.map((day) => new Date(day)), [days]);
   const allBars = useMemo(() => placeForWeekRow(events, parsedDays), [events, parsedDays]);
   const [expanded, setExpanded] = useState(false);
@@ -76,7 +78,7 @@ export function EventBars({
       {/* Een label in de urenkolom, zodat de strook niet als een zwevende rij
           balken leest. Meescrollend vastgezet, net als de uren eronder. */}
       <span className="sticky left-0 z-20 self-start bg-vtk-surface pt-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-vtk-muted">
-        Events
+        {t.events}
       </span>
       <div
         className="relative"
@@ -97,7 +99,7 @@ export function EventBars({
               bar.name,
               bar.groupName,
               bar.location,
-              bar.timeKnown ? null : 'uur nog niet gekend',
+              bar.timeKnown ? null : t.timeUnknown,
               `${bar.requestCount} aanvragen, ${bar.tripCount} ritten`,
             ]
               .filter(Boolean)
@@ -147,7 +149,7 @@ export function EventBars({
             aria-expanded={expanded}
             className="absolute bottom-0 left-0 h-[18px] text-[11px] font-medium text-vtk-muted underline underline-offset-2 hover:text-vtk-ink"
           >
-            {expanded ? 'Minder tonen' : `+${hidden} meer`}
+            {expanded ? t.showLess : t.more(hidden)}
           </button>
         ) : null}
       </div>

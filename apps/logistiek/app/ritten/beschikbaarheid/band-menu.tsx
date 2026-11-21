@@ -4,13 +4,10 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '@vtk/ui';
 import { formatTime } from '@/components/transport-calendar/trip-block';
 import { AVAILABILITY_KINDS, type AvailabilityKind } from '@/lib/availability-day';
-import {
-  AVAILABILITY_KIND_HINT,
-  AVAILABILITY_KIND_LABEL,
-  availabilityFillClass,
-} from '@/lib/availability-kinds';
+import { availabilityFillClass } from '@/lib/availability-kinds';
 import { formatDateTime, toDatetimeLocalValue } from '@/lib/uitleen';
 import type { AvailabilityWindow } from './availability-editor';
+import { useAvailabilityCopy, type AvailabilityCopy } from './copy';
 
 /** Breedte van het menuutje; ook om te weten of het rechts van de band past. */
 const MENU_WIDTH = 240;
@@ -46,6 +43,7 @@ export function BandMenu({
   onRemove: () => void;
   onClose: () => void;
 }) {
+  const t = useAvailabilityCopy();
   const menu = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState(0);
 
@@ -85,21 +83,21 @@ export function BandMenu({
     <div
       ref={menu}
       role="dialog"
-      aria-label="Venster aanpassen"
+      aria-label={t.editWindow}
       className="fixed z-50 rounded-[14px] border border-vtk-navy/15 bg-vtk-surface p-3 shadow-lg"
       style={{ left, top, width: MENU_WIDTH }}
     >
-      <p className="text-sm font-semibold text-vtk-ink">{windowLabel(entry)}</p>
+      <p className="text-sm font-semibold text-vtk-ink">{windowLabel(entry, t)}</p>
       {entry.note ? <p className="mt-0.5 text-xs text-vtk-muted">{entry.note}</p> : null}
 
-      <div className="mt-3 grid gap-1" role="group" aria-label="Hoe graag">
+      <div className="mt-3 grid gap-1" role="group" aria-label={t.howKeen}>
         {AVAILABILITY_KINDS.map((kind) => (
           <button
             key={kind}
             type="button"
             aria-pressed={entry.kind === kind}
             disabled={pending}
-            title={AVAILABILITY_KIND_HINT[kind]}
+            title={t.kindHint(kind)}
             onClick={() => (kind === entry.kind ? onClose() : onKind(kind))}
             className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-xs font-semibold transition ${
               entry.kind === kind
@@ -111,14 +109,14 @@ export function BandMenu({
               aria-hidden
               className={`h-3 w-3 shrink-0 rounded-[3px] border border-vtk-navy/25 bg-vtk-yellow ${availabilityFillClass(kind)}`}
             />
-            {AVAILABILITY_KIND_LABEL[kind]}
+            {t.kindLabel(kind)}
           </button>
         ))}
       </div>
 
       <div className="mt-3 flex justify-end">
         <Button type="button" variant="danger" size="sm" disabled={pending} onClick={onRemove}>
-          Weghalen
+          {t.remove}
         </Button>
       </div>
     </div>
@@ -130,10 +128,13 @@ export function BandMenu({
  * op een andere dag valt, zoals bij een nacht. Met twee volle datums las een
  * gewoon venster als een week.
  */
-export function windowLabel(entry: Pick<AvailabilityWindow, 'startAt' | 'endAt'>): string {
+export function windowLabel(
+  entry: Pick<AvailabilityWindow, 'startAt' | 'endAt'>,
+  t: Pick<AvailabilityCopy, 'locale' | 'to'>
+): string {
   const startAt = new Date(entry.startAt);
   const endAt = new Date(entry.endAt);
   const sameDay =
     toDatetimeLocalValue(startAt).slice(0, 10) === toDatetimeLocalValue(endAt).slice(0, 10);
-  return `${formatDateTime(startAt)} tot ${sameDay ? formatTime(endAt) : formatDateTime(endAt)}`;
+  return `${formatDateTime(startAt, t.locale)} ${t.to} ${sameDay ? formatTime(endAt) : formatDateTime(endAt, t.locale)}`;
 }

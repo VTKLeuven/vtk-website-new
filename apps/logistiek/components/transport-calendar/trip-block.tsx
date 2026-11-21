@@ -5,6 +5,7 @@ import { driverColorVar, vehiclePatternClass, type DriverColorOverrides } from '
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { vehicleIconName } from '@/lib/vehicle-icon';
 import { DEFAULT_TRIP_FIELDS, type CalendarVehicle, type TripBlock, type TripFields } from './types';
+import { useCalendarCopy, type CalendarCopy } from './copy';
 
 /**
  * Het uiterlijk van één rit, gedeeld door de dag-, week- en maandweergave.
@@ -141,6 +142,7 @@ export function BlockContent({
   fields?: TripFields;
   compact?: boolean;
 }): ReactNode {
+  const t = useCalendarCopy();
   return (
     <>
       {/* Het uur blijft de regel die zegt dát dit blok ergens over gaat: staat
@@ -178,11 +180,11 @@ export function BlockContent({
         block.driver ? (
           <span className="block truncate font-medium">{block.driver.name}</span>
         ) : awaitsDriver ? (
-          <span className="block truncate font-semibold text-vtk-danger">geen chauffeur</span>
+          <span className="block truncate font-semibold text-vtk-danger">{t.noDriver}</span>
         ) : (
           // De aanvrager rijdt zelf (bakfiets): dat is geen ontbrekende
           // chauffeur, dus het staat er gewoon en niet in het rood.
-          <span className="block truncate text-vtk-muted">rijdt zelf</span>
+          <span className="block truncate text-vtk-muted">{t.drivesThemselves}</span>
         )
       ) : null}
       {/* Een pijl ervoor, want "Zaal Alma 3" op een eigen regel is niet van
@@ -214,6 +216,7 @@ export function blockLabel({
   awaitsDriver,
   start,
   end,
+  t,
 }: {
   block: TripBlock;
   vehicle: CalendarVehicle | null;
@@ -221,22 +224,27 @@ export function blockLabel({
   awaitsDriver: boolean;
   start: Date;
   end: Date;
+  /** De woorden, uit `useCalendarCopy()` van wie het label maakt. */
+  t: Pick<
+    CalendarCopy,
+    'eventPrefix' | 'to' | 'driverPrefix' | 'noDriverYet' | 'requesterDrives' | 'toward' | 'cargo'
+  >;
 }): string {
   return [
     block.title,
-    block.eventName ? `evenement ${block.eventName}` : null,
+    block.eventName ? `${t.eventPrefix} ${block.eventName}` : null,
     block.subtitle,
     vehicle?.name,
-    `${formatTime(start)} tot ${formatTime(end)}`,
+    `${formatTime(start)} ${t.to} ${formatTime(end)}`,
     showDriver
       ? block.driver
-        ? `chauffeur ${block.driver.name}`
+        ? `${t.driverPrefix} ${block.driver.name}`
         : awaitsDriver
-          ? 'nog geen chauffeur'
-          : 'de aanvrager rijdt zelf'
+          ? t.noDriverYet
+          : t.requesterDrives
       : null,
-    block.destination ? `naar ${block.destination}` : null,
-    block.cargoNote ? `lading: ${block.cargoNote}` : null,
+    block.destination ? `${t.toward} ${block.destination}` : null,
+    block.cargoNote ? `${t.cargo}: ${block.cargoNote}` : null,
   ]
     .filter(Boolean)
     .join(', ');

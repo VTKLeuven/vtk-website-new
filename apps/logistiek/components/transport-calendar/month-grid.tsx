@@ -8,6 +8,7 @@ import { LogisticsIcon } from '@/components/logistics-icon';
 import { blockLabel, blockLook, formatTime } from './trip-block';
 import { vehicleIconName } from '@/lib/vehicle-icon';
 import type { CalendarVehicle, TripBlock } from './types';
+import { byLocale, useCalendarCopy } from './copy';
 
 /**
  * De maandweergave: hele weken onder elkaar, en elke rit een balk over de dagen
@@ -23,10 +24,7 @@ import type { CalendarVehicle, TripBlock } from './types';
  * planning, maar niet bij de maand waar je naar kijkt.
  */
 
-const weekdayFormatter = new Intl.DateTimeFormat('nl-BE', {
-  timeZone: 'Europe/Brussels',
-  weekday: 'short',
-});
+const WEEKDAY = byLocale({ timeZone: 'Europe/Brussels', weekday: 'short' });
 const dayKeyFormatter = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Europe/Brussels',
   year: 'numeric',
@@ -67,6 +65,7 @@ export function MonthGrid({
   driverColors?: DriverColorOverrides;
   now?: Date;
 }) {
+  const t = useCalendarCopy();
   const parsedDays = useMemo(() => days.map((day) => new Date(day)), [days]);
   const parsedAnchor = useMemo(() => new Date(anchor), [anchor]);
   const rows = useMemo(() => weekRows(parsedDays), [parsedDays]);
@@ -119,7 +118,7 @@ export function MonthGrid({
               key={day.toISOString()}
               className="truncate px-1 text-xs font-semibold capitalize text-vtk-ink"
             >
-              {weekdayFormatter.format(day)}
+              {WEEKDAY[t.locale].format(day)}
             </span>
           ))}
         </div>
@@ -209,6 +208,7 @@ export function MonthGrid({
                         awaitsDriver: look.awaitsDriver,
                         start: bar.start,
                         end: bar.end,
+                        t,
                       });
                       const content = (
                         <span className="flex items-center gap-1 truncate">

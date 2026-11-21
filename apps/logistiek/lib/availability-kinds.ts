@@ -44,6 +44,26 @@ export const AVAILABILITY_KIND_HINT: Record<AvailabilityKind, string> = {
 };
 
 /** Het patroon over de vulkleur; `JA` is de volle kleur zelf. */
+/**
+ * Dezelfde drie, per taal, voor de ledenkant (het intekenscherm). Het beheer
+ * blijft Nederlands en gebruikt de maps hierboven.
+ */
+export const AVAILABILITY_KIND_COPY: Record<
+  'nl' | 'en',
+  { label: Record<AvailabilityKind, string>; short: Record<AvailabilityKind, string>; hint: Record<AvailabilityKind, string> }
+> = {
+  nl: { label: AVAILABILITY_KIND_LABEL, short: AVAILABILITY_KIND_SHORT, hint: AVAILABILITY_KIND_HINT },
+  en: {
+    label: { JA: 'Available', LIEVER_NIET: 'Rather not', NOOD: 'In an emergency' },
+    short: { JA: 'Available', LIEVER_NIET: 'Rather not', NOOD: 'Emergency' },
+    hint: {
+      JA: 'Feel free to ask me.',
+      LIEVER_NIET: 'Possible, but ask someone else first.',
+      NOOD: 'Only if there really is nobody else.',
+    },
+  },
+};
+
 export function availabilityFillClass(kind: AvailabilityKind): string {
   if (kind === 'LIEVER_NIET') return 'avail-fill-liever-niet';
   if (kind === 'NOOD') return 'avail-fill-nood';

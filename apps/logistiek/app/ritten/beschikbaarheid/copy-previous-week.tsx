@@ -8,6 +8,7 @@ import { availabilityWeekBounds } from '@/lib/availability-day';
 import type { AvailabilityWindow } from './availability-editor';
 import { snapshotOf, useOfferUndo, type AvailabilitySnapshot } from './availability-undo';
 import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
+import { useAvailabilityCopy } from './copy';
 
 /**
  * "Neem vorige week over": je rooster van vorige week, op dezelfde uren, in
@@ -42,6 +43,7 @@ export function CopyPreviousWeek({
   onRestore?: (snapshot: AvailabilitySnapshot) => void;
   className?: string;
 }) {
+  const t = useAvailabilityCopy();
   const showToast = useToast();
   const offerUndo = useOfferUndo(onRestore);
   const [pending, startTransition] = useTransition();
@@ -61,7 +63,7 @@ export function CopyPreviousWeek({
       if (result === UNSENT) return;
       setConfirming(false);
       if (result.ok) {
-        offerUndo(result.message ?? 'Vorige week overgenomen.', snapshot);
+        offerUndo(result.message ?? t.copied, snapshot);
       } else {
         showToast({ message: result.error, variant: 'error', duration: 0 });
       }
@@ -76,20 +78,14 @@ export function CopyPreviousWeek({
         onClick={() => (current > 0 ? setConfirming(true) : run())}
         className={className}
       >
-        {pending ? 'Overnemen...' : 'Neem vorige week over'}
+        {pending ? t.copying : t.copyButton}
       </button>
       <ConfirmDialog
         open={confirming}
-        title="Vorige week overnemen?"
-        description={`${
-          current === 1
-            ? 'Het venster dat nu in deze week staat, verdwijnt'
-            : `De ${current} vensters die nu in deze week staan, verdwijnen`
-        }; in de plaats ${
-          previousCount === 1 ? 'komt het venster' : `komen de ${previousCount} vensters`
-        } van vorige week, op dezelfde uren. Je weeknota blijft staan.`}
-        confirmLabel="Vorige week overnemen"
-        cancelLabel="Annuleren"
+        title={t.copyTitle}
+        description={t.copyDescription(current, previousCount)}
+        confirmLabel={t.copyConfirm}
+        cancelLabel={t.cancel}
         destructive
         pending={pending}
         onConfirm={run}
