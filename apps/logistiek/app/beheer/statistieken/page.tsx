@@ -10,6 +10,7 @@ import {
 import { currentWorkingYear, FIRST_WORKING_YEAR } from '@vtk/auth';
 import { parseDateOnly, toDateInputValue } from '@/lib/uitleen';
 import { TransportCharts } from './charts';
+import { Disclosure } from '@/components/disclosure';
 
 export const metadata = { title: 'Statistieken' };
 
@@ -88,12 +89,16 @@ export default async function StatistiekenPage({
     return hrefWith({ [key]: next.join(',') || null });
   };
 
+  // Op een telefoon 40 px hoog (M4): de chips waren 28 px, en wie een post
+  // aantikte, raakte even vaak de buur.
   const chip = (active: boolean) =>
-    `rounded-full border px-3 py-1 text-sm font-medium transition ${
+    `inline-flex min-h-10 items-center rounded-full border px-3 py-1 text-sm font-medium transition md:min-h-0 ${
       active
         ? 'border-vtk-navy bg-vtk-navy text-vtk-on-emphasis'
         : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
     }`;
+
+  const chosenGroups = groups.filter((group) => groupIds.includes(group.id));
 
   const thisYear = currentWorkingYear();
   const previousYear = thisYear - 1;
@@ -114,9 +119,7 @@ export default async function StatistiekenPage({
       <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-5">
         <div className="grid gap-4">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">
-              Periode
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-[0.06em] text-vtk-muted">Periode</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {periods.map((option) => (
                 <Link
@@ -173,7 +176,7 @@ export default async function StatistiekenPage({
           </div>
 
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">
+            <p className="text-xs font-semibold uppercase tracking-[0.06em] text-vtk-muted">
               Voertuig{vehicleIds.length === 0 ? <span className="ml-1.5 font-normal normal-case">alle</span> : null}
             </p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -189,12 +192,20 @@ export default async function StatistiekenPage({
             </div>
           </div>
 
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">
-              Post of werkgroep
-              {groupIds.length === 0 ? <span className="ml-1.5 font-normal normal-case">alle</span> : null}
-            </p>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {/* Twintig posten en werkgroepen als chips waren op een telefoon een
+              half scherm (M4). Dicht, met in de kop wat er gekozen is; open
+              zodra er iets gekozen is, want dan wil je het zien. */}
+          <Disclosure
+            variant="plain"
+            open={groupIds.length > 0}
+            title="Post of werkgroep"
+            summary={
+              chosenGroups.length === 0
+                ? 'Alle posten en werkgroepen'
+                : chosenGroups.map((group) => group.nameNl).join(', ')
+            }
+          >
+            <div className="flex flex-wrap gap-1.5">
               {groups.map((group) => (
                 <Link
                   key={group.id}
@@ -205,7 +216,7 @@ export default async function StatistiekenPage({
                 </Link>
               ))}
             </div>
-          </div>
+          </Disclosure>
         </div>
       </section>
 

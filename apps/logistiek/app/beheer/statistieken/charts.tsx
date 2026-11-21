@@ -51,6 +51,7 @@ const MUTED = 'var(--muted)';
 const GRID = 'var(--chart-grid)';
 
 const WEEKDAYS = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'];
+const WEEKDAYS_LONG = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag'];
 
 function hours(value: number): string {
   return `${value.toLocaleString('nl-BE', { maximumFractionDigits: 1 })} u`;
@@ -182,9 +183,11 @@ function StatTile({
   const trend =
     previous && previous.value > 0 ? Math.round(((previous.now - previous.value) / previous.value) * 100) : null;
   return (
-    <div className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-4 py-3">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-vtk-ink">{value}</p>
+    <div className="min-w-0 rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.06em] text-vtk-muted">{label}</p>
+      <p className="mt-1 break-words text-xl font-semibold tabular-nums tracking-tight text-vtk-ink sm:text-2xl">
+        {value}
+      </p>
       <p className="mt-0.5 text-xs text-vtk-muted">
         {sub}
         {trend !== null ? (
@@ -249,7 +252,7 @@ function DriverLeaderboard({
               onClick={() => onPickDriver(selected === driver.id ? null : driver.id)}
               aria-pressed={selected === driver.id}
               title={`Enkel de uren en de ritten van ${driver.name}`}
-              className={`grid w-full grid-cols-[1.25rem_minmax(6rem,9rem)_1fr_4.5rem] items-center gap-2 rounded-lg px-1 py-0.5 text-left transition hover:bg-vtk-paper ${
+              className={`grid min-h-9 w-full grid-cols-[1.25rem_minmax(6rem,9rem)_1fr_4.5rem] items-center gap-2 rounded-lg px-1 py-0.5 text-left transition hover:bg-vtk-paper md:min-h-0 ${
                 selected === driver.id ? 'bg-vtk-paper ring-1 ring-vtk-navy/20' : ''
               }`}
             >
@@ -326,7 +329,7 @@ function GroupBars({ groups, onPickGroup }: { groups: GroupStat[]; onPickGroup: 
               type="button"
               onClick={() => setOpen((current) => (current === group.key ? null : group.key))}
               aria-expanded={open === group.key}
-              className="grid w-full grid-cols-[minmax(6rem,10rem)_1fr_6rem] items-center gap-2 rounded-lg px-1 py-0.5 text-left transition hover:bg-vtk-paper"
+              className="grid min-h-9 w-full grid-cols-[minmax(6rem,10rem)_1fr_6rem] items-center gap-2 rounded-lg px-1 py-0.5 text-left transition hover:bg-vtk-paper md:min-h-0"
             >
               <span className="truncate text-sm font-medium text-vtk-ink">{group.name}</span>
               <span className="h-4 rounded-[4px] bg-vtk-paper">
@@ -399,14 +402,47 @@ function Heatmap({
     return RAMP[index];
   };
 
+  // Op een telefoon de drukste uren in plaats van het rooster (M4): 24 kolommen
+  // van 20 px passen er niet, en zijwaarts schuiven door een rooster van 168
+  // vakjes leest niemand.
+  const busiest = heatmap
+    .flatMap((row, day) => row.map((value, hour) => ({ day, hour, value })))
+    .filter((cell) => cell.value > 0)
+    .sort((a, b) => b.value - a.value || a.day - b.day || a.hour - b.hour)
+    .slice(0, 5);
+
   return (
     <div>
-      <div className="relative overflow-x-auto">
+      <div className="md:hidden">
+        {busiest.length === 0 ? (
+          <p className="text-sm text-vtk-muted">Geen bezette uren in deze periode.</p>
+        ) : (
+          <>
+            <p className="text-sm font-medium text-vtk-ink">De vijf drukste uren</p>
+            <ol className="mt-2 grid gap-1 text-sm">
+              {busiest.map((cell) => (
+                <li
+                  key={`${cell.day}-${cell.hour}`}
+                  className="flex items-baseline justify-between gap-3 border-b border-vtk-navy/5 pb-1"
+                >
+                  <span className="text-vtk-body">
+                    {WEEKDAYS_LONG[cell.day]} {String(cell.hour).padStart(2, '0')}:00-
+                    {String(cell.hour + 1).padStart(2, '0')}:00
+                  </span>
+                  <span className="tabular-nums text-vtk-ink">{hours(cell.value)}</span>
+                </li>
+              ))}
+            </ol>
+            <p className="mt-2 text-xs text-vtk-muted">Het volledige rooster staat op een breder scherm.</p>
+          </>
+        )}
+      </div>
+      <div className="relative hidden overflow-x-auto md:block">
         {/* `table-fixed`: zonder dat krijgen enkel de kolommen met een uurlabel
             (elk derde) breedte, en zijn de twee uren ertussen een streepje van
             nul pixels. Een rit van 10:30 tot 13:15 stond er dan voor een derde
             op. */}
-        <table className="w-full min-w-[34rem] table-fixed border-separate border-spacing-[2px] text-[10px]">
+        <table className="w-full min-w-[34rem] table-fixed border-separate border-spacing-[2px] text-xs">
           <caption className="sr-only">Bezette uren per weekdag en uur van de dag</caption>
           <thead>
             <tr>
@@ -455,7 +491,7 @@ function Heatmap({
           </button>
         </p>
       ) : null}
-      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-vtk-muted">
+      <div className="mt-2 hidden flex-wrap items-center gap-2 text-xs text-vtk-muted md:flex">
         <span>minder</span>
         {RAMP.map((color) => (
           <span
@@ -509,7 +545,7 @@ function ToggleGroup<T extends string>({
           type="button"
           onClick={() => onChange(option.value)}
           aria-pressed={value === option.value}
-          className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+          className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1 text-xs font-medium transition md:min-h-0 ${
             value === option.value
               ? 'border-vtk-navy bg-vtk-navy text-vtk-on-emphasis'
               : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
@@ -910,6 +946,9 @@ type SortKey = 'date' | 'hours' | 'driver' | 'group';
  * CSV met puntkomma's: dat is wat Excel op een Belgische taalinstelling zonder
  * importdialoog openslaat.
  */
+/** Zoveel ritten toont de lijst op een telefoon voor "Toon alle". */
+const PHONE_ROWS = 10;
+
 function TripTable({
   rows,
   driverFilter,
@@ -928,6 +967,9 @@ function TripTable({
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortKey>('date');
   const [descending, setDescending] = useState(true);
+  // Op een telefoon de eerste tien als lijst (M4); de tabel van 46rem was daar
+  // drie schermen hoog en schoof zijwaarts.
+  const [allOnPhone, setAllOnPhone] = useState(false);
 
   const shown = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -1038,10 +1080,40 @@ function TripTable({
         {filterLabel ? <span>, {filterLabel}</span> : null}
       </p>
 
+      <ul className="mt-2 grid md:hidden">
+        {(allOnPhone ? shown : shown.slice(0, PHONE_ROWS)).map((row) => (
+          <li key={row.id} className="border-b border-vtk-navy/5 py-2">
+            <p className="flex items-baseline justify-between gap-3">
+              <span className="font-medium tabular-nums text-vtk-ink">
+                {row.dateLabel}, {row.timeLabel}
+              </span>
+              <span className="shrink-0 tabular-nums text-vtk-muted">{hours(row.hours)}</span>
+            </p>
+            <p className="text-sm text-vtk-body">{row.purpose}</p>
+            <p className="text-xs text-vtk-muted">
+              {row.vehicleName}, chauffeur {row.driverName || 'nog geen'}, voor {row.groupName}
+              {row.status === 'COMPLETED' ? '' : `, ${(STATUS_LABELS[row.status] ?? row.status).toLowerCase()}`}
+            </p>
+          </li>
+        ))}
+      </ul>
+      {!allOnPhone && shown.length > PHONE_ROWS ? (
+        <button
+          type="button"
+          onClick={() => setAllOnPhone(true)}
+          className="mt-2 inline-flex min-h-10 items-center rounded-full border border-vtk-navy/15 px-4 text-sm font-medium text-vtk-ink md:hidden"
+        >
+          Toon alle {shown.length} ritten
+        </button>
+      ) : null}
+      {shown.length === 0 ? (
+        <p className="py-4 text-sm text-vtk-muted md:hidden">Geen ritten die hierop passen.</p>
+      ) : null}
+
       {/* `position: relative` op de scroller: `sr-only` is absoluut
           gepositioneerd, en zonder gepositioneerde ouder ankert ze op de pagina
           in plaats van op de tabel. Zie de admin-conventies. */}
-      <div className="relative mt-2 overflow-x-auto">
+      <div className="relative mt-2 hidden overflow-x-auto md:block">
         <table className="w-full min-w-[46rem] text-left text-sm">
           <thead className="border-b border-vtk-navy/10 text-xs">
             <tr>
@@ -1115,7 +1187,9 @@ export function TransportCharts({ stats, periodLabel }: { stats: TransportStats;
 
   return (
     <div className="grid gap-5">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Twee per rij, ook op een telefoon (M4): onder elkaar waren de zes
+          tegels samen al een scherm hoog. */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <StatTile
           label="Ritten"
           value={String(stats.totals.trips)}
