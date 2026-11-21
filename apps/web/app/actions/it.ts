@@ -16,6 +16,8 @@ import {
   type StoredSentry,
 } from "@/lib/runtimeConfig";
 import { DOOR_SETTING_KEY, getDoorConfig, type StoredDoor } from "@/lib/door-config";
+import { AI_SETTING_KEY, DEFAULT_AI_MODEL, getAiConfig, type StoredAiConfig } from "@/lib/ai/config";
+import { AiTranslator, type AiTranslateErrorCode } from "@/lib/ai/translate";
 import { VAULT_SETTING_KEY, type StoredVault } from "@/lib/vault/config";
 import {
   GOOGLE_SETTING_KEY,
@@ -473,4 +475,79 @@ export async function saveGoogleConfigAction(
   revalidatePath("/admin/groepsadressen");
   revalidatePath("/admin/bestuursorgaan");
   return saveOk();
+}
+
+// ---- AI-vertaling (vLLM / Open WebUI) ---------------------------------------
+
+/**
+ * Bewaart de AI-vertaalconfiguratie in de `Setting`-tabel. De API-sleutel wordt
+ * versleuteld opgeslagen; leeg laten behoudt de bestaande sleutel (of schakelt
+ * over op zonder sleutel als `clearApiKey` aangevinkt is).
+ */
+export async function saveAiConfigAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requireSuperAdmin();
+
+  const apiUrlRaw = ((formData.get("apiUrl") as string) ?? "").trim().replace(/\/+$/, "");
+  const modelRaw = ((formData.get("model") as string) ?? "").trim();
+  const apiKeyRaw = ((formData.get("apiKey") as string) ?? "").trim();
+  const clearApiKey = formData.get("clearApiKey") === "on";
+
+  if (apiUrlRaw) {
+    try {
+      const u = new URL(apiUrlRaw);
+      if (u.protocol !== "http:" && u.protocol !== "https:") return saveError("INVALID_URL");
+    } catch {
+      return saveError("INVALID_URL");
+    }
+  }
+
+  const existingRow = await prisma.setting.findUnique({ where: { key: AI_SETTING_KEY } });
+  const existing = (existingRow?.value ?? null) as unknown as StoredAiConfig | null;
+
+  let apiKeyEnc: string | undefined;
+  if (clearApiKey) {
+    apiKeyEnc = undefined;
+  } else if (apiKeyRaw) {
+    apiKeyEnc = encryptSecret(apiKeyRaw);
+  } else {
+    apiKeyEnc = existing?.apiKeyEnc;
+  }
+
+  const value: StoredAiConfig = {
+    apiUrl: apiUrlRaw || undefined,
+    model: modelRaw || DEFAULT_AI_MODEL,
+    apiKeyEnc,
+  };
+
+  await prisma.setting.upsert({
+    where: { key: AI_SETTING_KEY },
+    create: { key: AI_SETTING_KEY, value: value as unknown as Prisma.InputJsonValue },
+    update: { value: value as unknown as Prisma.InputJsonValue },
+  });
+
+  await logAudit({
+    action: "update",
+    entity: "itConfig",
+    target: "AI translation",
+    summary: value.apiUrl
+      ? `AI-vertaling bijgewerkt (${value.apiUrl}, model ${value.model})`
+      : "AI-vertaling uitgeschakeld",
+  });
+
+  revalidatePath("/admin", "layout");
+  return saveOk();
+}
+
+/** Test de opgeslagen AI-configuratie met een korte proefvertaling. */
+export async function testAiConnectionAction(): Promise<
+  { ok: true; model: string; sample: string } | { ok: false; error: AiTranslateErrorCode; detail?: string }
+> {
+  await requireSuperAdmin();
+  const cfg = await getAiConfig();
+  if (!cfg.apiUrl) return { ok: false, error: "NOT_CONFIGURED" };
+  const translator = new AiTranslator(cfg, { timeoutMs: 45_000 });
+  return translator.testConnection();
 }
