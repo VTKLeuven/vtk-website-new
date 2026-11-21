@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from './Link';
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 
 import type { AdminNavNode } from './AdminNav';
