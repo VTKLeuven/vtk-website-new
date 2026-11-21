@@ -143,10 +143,14 @@ export async function oauthConsent(
   // De plugin gebruikt `ctx.request` enkel voor die controle en voor
   // `request.headers` in haar redirect-hooks, dus volstaat een verzoek met de
   // echte headers; de body leest ze uit `ctx.body`.
+  // `headers` uit `next/headers` is een ReadonlyHeaders; de plugin roept op het
+  // toestaan-pad `ctx.headers.set('accept', 'application/json')` aan, wat op
+  // ReadonlyHeaders meteen `TypeError: Headers cannot be modified` gooit.
+  const mutableHeaders = new Headers(headers);
   const consentUrl = `${process.env.BETTER_AUTH_URL ?? ''}${AUTH_BASE_PATH}/oauth2/consent`;
-  const request = new Request(consentUrl, { method: 'POST', headers });
+  const request = new Request(consentUrl, { method: 'POST', headers: mutableHeaders });
 
-  const result = await auth.api.oauth2Consent({ headers, body, request });
+  const result = await auth.api.oauth2Consent({ headers: mutableHeaders, body, request });
 
   // De plugin zet zelf `accept: application/json`, dus komt de bestemming als
   // waarde terug in plaats van als een echte 302.
