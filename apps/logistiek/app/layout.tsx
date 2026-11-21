@@ -48,26 +48,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* Als eerste in de body en niet via next/script: dit moet lopen voor de
             browser de eerste pixel tekent, anders flitst elke pagina wit op. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        {/* Enkel de cookieloze teller, geen sessie-opname (S2). De recorder van
+            Umami liep hier op elke pagina, ook in het beheer en op de ritten,
+            waar namen, telefoonnummers en adressen staan, zonder dat iemand er
+            toestemming voor gaf. vtk.be gebruikt hem nergens. */}
         {analytics && (
-          <>
-            <Script
-              strategy="afterInteractive"
-              src={analytics.src}
-              data-website-id={analytics.websiteId}
-              data-exclude-search="true"
-              data-exclude-hash="true"
-              data-performance="true"
-            />
-            {/* Sessie-opname. Dezelfde website-id als het tracker-script
-                hierboven; de recorder start pas zodra
-                `umami.getSession().cache` bestaat en moet er dus na komen. */}
-            <Script
-              strategy="afterInteractive"
-              src={analytics.recorderSrc}
-              data-website-id={analytics.websiteId}
-              data-host-url={analytics.hostUrl}
-            />
-          </>
+          <Script
+            strategy="afterInteractive"
+            src={analytics.src}
+            data-website-id={analytics.websiteId}
+            data-exclude-search="true"
+            data-exclude-hash="true"
+            data-performance="true"
+          />
         )}
         {/* Eén meldingsstapel voor de hele app. Die stond enkel rond /beheer en
             per blok op een paar ledenpagina's; daarbuiten had de melding van
