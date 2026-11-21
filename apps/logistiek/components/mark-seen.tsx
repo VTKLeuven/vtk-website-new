@@ -21,7 +21,8 @@ export function MarkSeen({
   useEffect(() => {
     // Zonder await en zonder foutafhandeling: mislukt dit, dan blijft het
     // merkteken staan, en dat is de onschadelijke kant om op te falen.
-    void (target === 'reservation' ? markReservationSeenAction(id) : markVanBookingSeenAction(id));
+    // Ook geen vangnet met een rode melding: dit vroeg niemand.
+    (target === 'reservation' ? markReservationSeenAction(id) : markVanBookingSeenAction(id)).catch(() => {});
   }, [target, id]);
 
   return null;

@@ -32,6 +32,7 @@ import {
   type RequesterOption,
 } from './event-fields';
 import { trackReservationSubmitted, trackTemplateLoaded } from '@/lib/analytics-client';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /** Waar de kijkvoorkeur voor de catalogus blijft staan (M7). */
 const CATALOGUE_VIEW_KEY = 'vtk-logistiek-catalogusweergave';
@@ -78,7 +79,11 @@ export function ReservationForm({
   initial: ReservationFormInitial;
   submitLabel: string;
   submittingLabel: string;
-  onSubmit: (payload: ReservationFormInput) => Promise<ActionResult>;
+  /**
+   * `UNSENT` wanneer de action de server nooit bereikte (`unsentGuard.run`): de
+   * melding staat dan al, en het formulier blijft gewoon staan.
+   */
+  onSubmit: (payload: ReservationFormInput) => Promise<ActionResult | typeof UNSENT>;
   onCancel?: () => void;
   cancelLabel?: string;
   showRentPrices?: boolean;
@@ -236,11 +241,12 @@ export function ReservationForm({
     const name = newTemplate?.name.trim() ?? '';
     setTemplateNotice(null);
     startTemplateTransition(async () => {
-      const result = await createTemplateFromSelectionAction({
+      const result = await unsentGuard.run(() => createTemplateFromSelectionAction({
         name,
         groupId: event.groupId || null,
         lines: selectedLines(),
-      });
+      }));
+      if (result === UNSENT) return;
       if (!result.ok) {
         setTemplateNotice({ kind: 'error', text: result.error });
         return;
@@ -325,10 +331,15 @@ export function ReservationForm({
       return;
     }
     let cancelled = false;
-    checkAvailabilityAction({ pickupDate, returnDate }).then((result) => {
-      if (cancelled || !result.ok) return;
-      setAvailability(Object.fromEntries(result.availability.map((a) => [a.itemId, a.available])));
-    });
+    // Een zachte hint op de achtergrond: lukt ze niet (een pagina van vóór de
+    // deploy, geen verbinding), dan staat er gewoon geen beschikbaarheid, en
+    // zeker geen foutpagina of rode melding over iets waar niemand op klikte.
+    checkAvailabilityAction({ pickupDate, returnDate })
+      .then((result) => {
+        if (cancelled || !result.ok) return;
+        setAvailability(Object.fromEntries(result.availability.map((a) => [a.itemId, a.available])));
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -413,6 +424,7 @@ export function ReservationForm({
           note: lineNotes[itemId],
         })),
       });
+      if (result === UNSENT) return;
       if (!result.ok) {
         setError(result.error);
         return;

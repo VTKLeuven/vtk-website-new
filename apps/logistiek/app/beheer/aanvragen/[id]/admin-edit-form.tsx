@@ -4,10 +4,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@vtk/ui';
 import { adminEditReservationAction } from '@/app/actions/beheer';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
 import type { RequesterOption } from '@/app/materiaal/event-fields';
 import { ReservationForm, type ReservationFormInitial } from '@/app/materiaal/reservation-form';
 import type { CatalogCategory } from '@/lib/uitleen-server';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /** Team-bewerking van een materiaalaanvraag; opent het gedeelde formulier met alle posten. */
 export function AdminReservationEditor({
@@ -49,7 +50,8 @@ export function AdminReservationEditor({
         cancelLabel="Annuleren"
         onCancel={() => setOpen(false)}
         onSubmit={async (payload) => {
-          const result = await adminEditReservationAction(reservationId, payload);
+          const result = await unsentGuard.run(() => adminEditReservationAction(reservationId, payload));
+          if (result === UNSENT) return UNSENT;
           if (result.ok) {
             showToast({ message: result.message ?? 'Bijgewerkt.', variant: 'success' });
             setOpen(false);

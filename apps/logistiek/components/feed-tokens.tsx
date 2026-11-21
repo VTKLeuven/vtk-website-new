@@ -5,8 +5,9 @@ import { Button } from '@vtk/ui';
 import { createFeedTokenAction, revokeFeedTokenAction } from '@/app/actions/beheer';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { LogisticsIcon } from '@/components/logistics-icon';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
 import { formatDateTime } from '@/lib/uitleen';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * Agenda-abonnementen op de transportplanning (A1).
@@ -51,7 +52,8 @@ export function FeedTokens({
 
   function create() {
     startTransition(async () => {
-      const result = await createFeedTokenAction({ label, scope });
+      const result = await unsentGuard.run(() => createFeedTokenAction({ label, scope }));
+      if (result === UNSENT) return;
       if (result.ok) {
         setFresh(result.url);
         setCopied(false);

@@ -3,7 +3,8 @@
 import { useState, useTransition } from 'react';
 import { Button } from '@vtk/ui';
 import { saveLineDecisionAction } from '@/app/actions/beheer';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * De materiaallijnen van een aanvraag, met per lijn een beslissing en een nota
@@ -50,10 +51,11 @@ function LineRow({ line }: { line: DecisionLine }) {
 
   function save(next: { lineStatus: DecisionLine['lineStatus'] }) {
     startTransition(async () => {
-      const result = await saveLineDecisionAction(line.id, {
+      const result = await unsentGuard.run(() => saveLineDecisionAction(line.id, {
         lineStatus: next.lineStatus,
         adminNote: note,
-      });
+      }));
+      if (result === UNSENT) return;
       if (!result.ok) {
         showToast({ message: result.error, variant: 'error', duration: 0 });
         return;

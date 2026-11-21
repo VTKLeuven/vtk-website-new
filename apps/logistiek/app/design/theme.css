@@ -361,6 +361,28 @@
 }
 
 /*
+ * De toasts komen uit @vtk/ui (`toast.css`) en lezen eigen `--toast-*`-
+ * variabelen, met de kleuren van vtk.be als standaard. Hier wijzen ze naar de
+ * tokens van deze app; die flippen in de donkere modus en bij het afdrukken
+ * mee, dus een groene toast op wit is daar een groene toast op bijna zwart.
+ */
+:root {
+  --toast-surface: var(--surface);
+  --toast-shadow: var(--shadow-1);
+  --toast-success: var(--success);
+  --toast-success-soft: var(--success-soft);
+  --toast-success-line: var(--success-line);
+  --toast-danger: var(--danger);
+  --toast-danger-soft: var(--danger-soft);
+  --toast-danger-line: var(--danger-line);
+  --toast-warn: var(--warn);
+  --toast-warn-soft: var(--warn-soft);
+  --toast-warn-line: var(--warn-line);
+  --toast-info-soft: var(--info-soft);
+  --toast-info-line: var(--info-line);
+}
+
+/*
  * Op papier is alles licht, ongeacht de keuze op het scherm: een klaarzetlijst
  * in de donkere modus is een blad vol inkt en onleesbaar in een kelder. Dit is
  * geen kopie van het lichte palet maar een eigen, kleurloos printpalet; enkel

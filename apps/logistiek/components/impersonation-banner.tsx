@@ -1,6 +1,7 @@
 import { getImpersonation } from '@/lib/session';
 import { getLocale } from '@/lib/i18n';
 import { logoutTestUser } from '@/app/test-login/actions';
+import { ActionForm } from '@vtk/ui/unsent-guard';
 
 /**
  * "Je bekijkt als iemand anders", op elke pagina.
@@ -35,11 +36,11 @@ export async function ImpersonationBanner() {
           </span>
         ) : null}
       </p>
-      <form action={logoutTestUser}>
+      <ActionForm action={logoutTestUser}>
         <button type="submit" className="impersonation-bar-button">
           {nl ? 'Terug naar mijn account' : 'Back to my account'}
         </button>
-      </form>
+      </ActionForm>
     </div>
   );
 }

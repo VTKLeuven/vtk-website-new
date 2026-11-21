@@ -3,6 +3,7 @@ import { getLocale } from '@/lib/i18n';
 import { canUseTestLogin, getImpersonation, getRealSession } from '@/lib/session';
 import { listTestPersonas } from '@/lib/test-users';
 import { loginAsTestUser, logoutTestUser } from './actions';
+import { ActionForm } from '@vtk/ui/unsent-guard';
 
 /**
  * Test-login picker. Enkel bereikbaar voor wie mag wisselen: in productie
@@ -48,14 +49,14 @@ export default async function TestLoginPage() {
               <span className="font-semibold text-vtk-ink">{real.user.name}</span>
             </p>
             {activeKey ? (
-              <form action={logoutTestUser}>
+              <ActionForm action={logoutTestUser}>
                 <button
                   type="submit"
                   className="rounded-full border border-vtk-navy/25 px-3 py-1.5 text-sm font-semibold text-vtk-ink transition hover:border-vtk-navy/60"
                 >
                   {nl ? 'Terug naar mijn account' : 'Back to my account'}
                 </button>
-              </form>
+              </ActionForm>
             ) : null}
           </div>
         ) : null}
@@ -65,7 +66,7 @@ export default async function TestLoginPage() {
             const isActive = p.key === activeKey;
             return (
               <li key={p.key}>
-                <form action={loginAsTestUser}>
+                <ActionForm action={loginAsTestUser}>
                   <input type="hidden" name="key" value={p.key} />
                   <button
                     type="submit"
@@ -84,7 +85,7 @@ export default async function TestLoginPage() {
                       {isActive ? (nl ? 'Actief' : 'Active') : '→'}
                     </span>
                   </button>
-                </form>
+                </ActionForm>
               </li>
             );
           })}
@@ -93,11 +94,11 @@ export default async function TestLoginPage() {
         {/* Zonder echte sessie staat de weg terug niet in het blok hierboven, en
             is dit de enige uitgang. */}
         {activeKey && !real ? (
-          <form action={logoutTestUser} className="mt-6">
+          <ActionForm action={logoutTestUser} className="mt-6">
             <button type="submit" className="text-sm font-semibold text-vtk-muted underline">
               {nl ? 'Uitloggen (test-gebruiker wissen)' : 'Log out (clear test user)'}
             </button>
-          </form>
+          </ActionForm>
         ) : null}
       </section>
     </main>

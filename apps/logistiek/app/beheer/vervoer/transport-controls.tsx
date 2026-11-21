@@ -11,10 +11,11 @@ import {
   completeTransportAction,
   markTransportPaidOfflineAction,
 } from '@/app/actions/beheer';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
 import { chargesRequester } from '@/lib/uitleen';
 import type { DriverOption } from '@/lib/uitleen-server';
 import { DriverOptions } from './driver-select';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 const selectClass = 'h-9 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink';
 
@@ -69,7 +70,8 @@ export function TransportControls({
     action: () => Promise<{ ok: boolean; message?: string; error?: string; warning?: boolean }>
   ) {
     startTransition(async () => {
-      const result = await action();
+      const result = await unsentGuard.run(() => action());
+      if (result === UNSENT) return;
       if (result.ok) {
         // Gelukt met een staartje ("die chauffeur gaf 'liever niet' op", "het
         // voertuig staat nu dubbel"): dan blijft de melding staan tot je ze

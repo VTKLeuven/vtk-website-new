@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, ConfirmDialog } from '@vtk/ui';
 import type { ActionResult } from '@/app/actions/uitleen';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /* Annuleren is onomkeerbaar en krijgt dus altijd eerst een bevestigings-modal
    (zie CLAUDE.md > UX-conventies). */
@@ -28,7 +29,12 @@ export function CancelButton({
   function confirm() {
     setError(null);
     startTransition(async () => {
-      const result = await action();
+      const result = await unsentGuard.run(() => action());
+      if (result === UNSENT) {
+        // De rode melding staat er al; de dialoog zou ze toedekken.
+        setOpen(false);
+        return;
+      }
       if (result.ok) {
         setOpen(false);
         router.refresh();

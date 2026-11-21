@@ -11557,6 +11557,44 @@ Dit is de enige plek waar de uitleendienst van de huisstijl afwijkt. Alles
 anders (het palet, de donkere paginakop, de kaarten, de typografie) blijft
 hetzelfde als op vtk.be; zie de uitzondering in `CLAUDE.md` onder "Layout".
 
+## De uitleendienst deelt het vangnet en de foutpagina met vtk.be
+
+Tot november 2026 had de uitleendienst geen `error.tsx` en geen vangnet rond
+haar server actions. 35 van de 36 clientcomponenten die een action aanriepen,
+vingen geen fout op, en `requireSession` gooit wanneer de sessie verlopen is. Na
+een deploy, zonder verbinding of na een verlopen login verving Next het scherm
+door zijn eigen kale foutmelding (wit, Engels, geen weg terug), met alles wat er
+ingevuld stond.
+
+- **Dezelfde componenten als vtk.be, uit `@vtk/ui`.** `SaveForm`, de toasts,
+  `unsentGuard` en de hover-prefetch `Link` stonden in apps/web, met een
+  vereenvoudigde kopie in de uitleendienst die al zei dat ze kandidaat was om te
+  verhuizen. Ze staan nu in het pakket (`@vtk/ui/save-form`, `/toast`,
+  `/unsent-guard`, `/link`, telkens een eigen ingang en niet in de barrel, zodat
+  wie enkel `Button` importeert er niets van meekrijgt). De bestanden in
+  apps/web zijn doorgeefluiken gebleven, zodat elke import en elke verwijzing in
+  `CLAUDE.md` blijft kloppen.
+- **Eén meldingsstapel, in de root layout.** De ledenkant had geen
+  `ToastProvider`; een paar pagina's zetten er een rond één blok. Zonder
+  provider had de melding van het vangnet geen plek. De toastkleuren lopen via
+  eigen `--toast-*`-variabelen met vtk.be als standaard; de uitleendienst zet ze
+  op haar tokens, zodat ze in de donkere modus meeflippen.
+- **Een verlopen sessie is geen foutpagina.** `requireSession` en
+  `requireManage` gooien een fout met `digest: "UNAUTHENTICATED"` of
+  `"FORBIDDEN"` (`@vtk/ui/action-errors`). Next laat in productie de tekst van
+  een fout uit een action weg, maar geeft een digest die er al op staat
+  ongewijzigd door, zoals bij `redirect()`. Het vangnet herkent die twee en toont
+  een rode toast ("je bent niet meer ingelogd; wat je invulde staat er nog"),
+  zonder dat één van de honderd actions moest veranderen. Een code teruggeven
+  zou elke action raken, en wie er ooit één vergat, kreeg weer het foutscherm.
+- **Een echte fout krijgt een foutpagina binnen de site.** `app/error.tsx` met
+  de donkere paginakop zoals de 404, en `app/beheer/error.tsx` als paneel in de
+  inhoudskolom: de zijbalk blijft staan, zodat je meteen naar een ander tabblad
+  kan. De foutcode (de digest) staat erbij, om in de serverlog terug te vinden.
+- **Achtergrondverzoeken melden niets.** De zachte beschikbaarheidscheck in de
+  catalogus en het "gezien"-merkteken vangen hun fout stil op: een rode melding
+  over iets waar niemand op klikte, verwart meer dan ze helpt.
+
 ## De donkere modus van de uitleendienst
 
 De uitleendienst wordt gebruikt waar het donker is: in de kelder bij het

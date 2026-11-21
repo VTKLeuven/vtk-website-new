@@ -22,7 +22,7 @@ import {
 } from '@/lib/driver-colors';
 import { isVehicleIcon } from '@/lib/vehicle-icon';
 import { normaliseBelgianPhone } from '@/lib/vcard';
-import { saveError, saveOk, type SaveState } from '@/lib/saveState';
+import { saveError, saveOk, type SaveState } from '@vtk/ui/save-state';
 import {
   chargesRequester,
   describeReservationChanges,

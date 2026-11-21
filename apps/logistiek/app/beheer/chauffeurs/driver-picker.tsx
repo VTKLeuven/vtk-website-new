@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import { addDriverAction, searchDriverCandidatesAction } from '@/app/actions/beheer';
 import { SaveForm } from '@/components/ui/save-form';
 import type { DriverCandidate } from '@/lib/uitleen-server';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 const ADD_ERRORS = {
   USER_REQUIRED: 'Kies eerst een lid uit de zoeklijst.',
@@ -35,7 +36,8 @@ export function DriverPicker() {
     if (selected || q.length < 2) return;
     const timer = setTimeout(() => {
       startSearch(async () => {
-        const found = await searchDriverCandidatesAction(q);
+        const found = await unsentGuard.run(() => searchDriverCandidatesAction(q));
+        if (found === UNSENT) return;
         setResults(found);
         setOpen(true);
       });

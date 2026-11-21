@@ -4,8 +4,9 @@ import type { ReactNode } from 'react';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, ConfirmDialog } from '@vtk/ui';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
 import type { ActionResult } from '@/app/actions/uitleen';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * Knop voor een beheer-actie met bevestiging vooraf en een toast achteraf.
@@ -52,8 +53,11 @@ export function ConfirmActionButton({
 
   function run() {
     startTransition(async () => {
-      const result = await action();
+      const result = await unsentGuard.run(() => action());
+      // Ook wanneer de actie de server nooit bereikte: de rode melding staat er
+      // dan al, en een dialoog die openblijft, dekt ze toe.
       setOpen(false);
+      if (result === UNSENT) return;
       if (result.ok) {
         showToast({ message: result.message ?? successMessage, variant: 'success' });
         router.refresh();

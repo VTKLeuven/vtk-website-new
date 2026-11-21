@@ -6,11 +6,12 @@ import Link from 'next/link';
 import { Button } from '@vtk/ui';
 import type { UitleenTransportBookingStatus } from '@prisma/client';
 import { createTransportForReservationAction } from '@/app/actions/beheer';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
 import { VanStatusBadge } from '@/components/status-badge';
 import { QuarterDateTime } from '@/components/quarter-datetime';
 import { formatDateTime } from '@/lib/uitleen';
 import { materialListNote } from '@/lib/material-list-link';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * "Levering nodig" doorschuiven naar een echte rit.
@@ -90,7 +91,7 @@ export function DeliveryPanel({
 
   function submit() {
     startTransition(async () => {
-      const result = await createTransportForReservationAction(reservationId, {
+      const result = await unsentGuard.run(() => createTransportForReservationAction(reservationId, {
         vehicleIds,
         startAt,
         endAt,
@@ -104,7 +105,8 @@ export function DeliveryPanel({
         contactPhone,
         notifyEmail: initial.notifyEmail,
         note,
-      });
+      }));
+      if (result === UNSENT) return;
       if (result.ok) {
         showToast({ message: result.message ?? 'Rit aangemaakt.', variant: 'success' });
         setOpen(false);

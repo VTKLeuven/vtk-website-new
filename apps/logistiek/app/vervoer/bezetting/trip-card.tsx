@@ -6,7 +6,6 @@ import { PhoneLink } from '@/components/phone-link';
 import { VanStatusBadge } from '@/components/status-badge';
 import { TripHelpers } from '@/components/trip-helpers';
 import { TripNotes, type TripNoteView } from '@/components/trip-notes';
-import { ToastProvider } from '@/components/ui/toast';
 import type { LogistiekLocale } from '@/lib/i18n-shared';
 
 /**
@@ -228,15 +227,13 @@ export function TripCard({
           want dan is het gewoon de lijst. */}
       {trip.canEditHelpers || trip.helpers.length > 0 || trip.helpersNote ? (
         <div className="border-t border-vtk-navy/10 pt-4">
-          <ToastProvider>
-            <TripHelpers
-              bookingId={trip.id}
-              helpers={trip.helpers}
-              legacyNote={trip.helpersNote}
-              canEdit={trip.canEditHelpers}
-              locale={locale}
-            />
-          </ToastProvider>
+          <TripHelpers
+            bookingId={trip.id}
+            helpers={trip.helpers}
+            legacyNote={trip.helpersNote}
+            canEdit={trip.canEditHelpers}
+            locale={locale}
+          />
         </div>
       ) : null}
 
@@ -245,9 +242,7 @@ export function TripCard({
           nota's van de mensen rond de rit, elk met een zichtbaarheid. */}
       {trip.canNote || trip.notes.length > 0 ? (
         <div className="border-t border-vtk-navy/10 pt-4">
-          <ToastProvider>
-            <TripNotes bookingId={trip.id} notes={trip.notes} canWrite={trip.canNote} locale={locale} />
-          </ToastProvider>
+          <TripNotes bookingId={trip.id} notes={trip.notes} canWrite={trip.canNote} locale={locale} />
         </div>
       ) : null}
     </div>

@@ -2,7 +2,6 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { cancelVanBookingAction } from '@/app/actions/uitleen';
 import { TripHelpers } from '@/components/trip-helpers';
-import { ToastProvider } from '@/components/ui/toast';
 import { EditTripForm } from './edit-trip-form';
 import { CancelButton } from '@/components/cancel-button';
 import { LoginGate } from '@/components/login-gate';
@@ -199,15 +198,13 @@ export default async function VanBookingDetailPage({
               de rit mag zien en niet enkel op de eigenaar. */}
           {booking.status === 'REQUESTED' || booking.status === 'APPROVED' ? (
             <div className="mt-5 border-t border-vtk-navy/10 pt-4">
-              <ToastProvider>
-                <TripHelpers
-                  bookingId={booking.id}
-                  helpers={booking.helpers}
-                  legacyNote={booking.helpersNote}
-                  canEdit
-                  locale={locale}
-                />
-              </ToastProvider>
+              <TripHelpers
+                bookingId={booking.id}
+                helpers={booking.helpers}
+                legacyNote={booking.helpersNote}
+                canEdit
+                locale={locale}
+              />
             </div>
           ) : null}
 

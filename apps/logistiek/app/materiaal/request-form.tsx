@@ -7,6 +7,7 @@ import type { CatalogCategory, RequestTemplate } from '@/lib/uitleen-server';
 import type { SelectableEvent } from '@/components/event-picker';
 import { emptyEventValues, type RequesterOption } from './event-fields';
 import { ReservationForm } from './reservation-form';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 export function MaterialRequestForm({
   catalog,
@@ -60,7 +61,8 @@ export function MaterialRequestForm({
       submitLabel={en ? 'Submit request' : 'Aanvraag indienen'}
       submittingLabel={en ? 'Submitting...' : 'Indienen...'}
       onSubmit={async (payload) => {
-        const result = await createReservationAction(payload);
+        const result = await unsentGuard.run(() => createReservationAction(payload));
+        if (result === UNSENT) return UNSENT;
         if (result.ok) {
           router.push(result.eventCreated ? '/reservaties?aangevraagd=1&evenement=1' : '/reservaties?aangevraagd=1');
         }

@@ -17,6 +17,7 @@ import {
   type MissingField,
 } from '@/lib/required-fields';
 import type { RequesterOption } from '@/app/materiaal/event-fields';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 type VehicleOption = { id: string; name: string; pricingMode: UitleenPricingMode; rateCents: number };
 
@@ -248,7 +249,7 @@ export function VanRequestForm({
       return;
     }
     startTransition(async () => {
-      const result = await createVanBookingAction({
+      const result = await unsentGuard.run(() => createVanBookingAction({
         vehicleIds,
         startAt,
         endAt,
@@ -265,7 +266,8 @@ export function VanRequestForm({
         note,
         returnStartAt: roundTrip ? returnStartAt : undefined,
         returnEndAt: roundTrip ? returnEndAt : undefined,
-      });
+      }));
+      if (result === UNSENT) return;
       if (result.ok) {
         draft.clear();
         router.push(result.eventCreated ? '/reservaties?aangevraagd=1&evenement=1' : '/reservaties?aangevraagd=1');

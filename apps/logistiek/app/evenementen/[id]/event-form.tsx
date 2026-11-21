@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@vtk/ui';
 import { saveMemberEventAction } from '@/app/actions/uitleen';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * De basisgegevens van je eigen evenement bijwerken (E1).
@@ -42,7 +43,7 @@ export function MemberEventForm({
 
   function save() {
     startTransition(async () => {
-      const result = await saveMemberEventAction({
+      const result = await unsentGuard.run(() => saveMemberEventAction({
         eventId: event.id,
         location: values.location,
         startDate: values.startDate,
@@ -50,7 +51,8 @@ export function MemberEventForm({
         endDate: values.endDate,
         endTime: values.endTime,
         expectedAttendance: values.expectedAttendance,
-      });
+      }));
+      if (result === UNSENT) return;
       if (!result.ok) {
         setNotice({ kind: 'error', text: result.error });
         return;

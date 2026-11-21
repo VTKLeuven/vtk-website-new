@@ -4,7 +4,8 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@vtk/ui';
 import { markReturnedAction } from '@/app/actions/beheer';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 type FlesserkeLine = { id: string; itemName: string; quantity: number };
 
@@ -28,7 +29,8 @@ export function ReturnForm({ reservationId, flesserkeLines }: { reservationId: s
         const v = Number.parseInt(returned[line.id] ?? '0', 10);
         map[line.id] = Number.isInteger(v) ? v : 0;
       }
-      const result = await markReturnedAction(reservationId, map);
+      const result = await unsentGuard.run(() => markReturnedAction(reservationId, map));
+      if (result === UNSENT) return;
       if (result.ok) {
         showToast({ message: result.message ?? 'Teruggebracht.', variant: 'success' });
         router.refresh();

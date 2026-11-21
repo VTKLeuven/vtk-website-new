@@ -46,13 +46,14 @@ import {
 } from '@/app/actions/beheer';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { LogisticsIcon } from '@/components/logistics-icon';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
 import { toDatetimeLocalValue } from '@/lib/uitleen';
 import type {
   UitleenPricingMode,
   UitleenRequesterType,
   UitleenTransportBookingStatus,
 } from '@prisma/client';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * De transportplanning waarop de verantwoordelijke werkt (T7, P1, P4).
@@ -311,12 +312,13 @@ export function TransportPlanner({
             startAt: startAt.toISOString(),
             endAt: endAt.toISOString(),
           });
-          const result = await adminEditTransportAction(blockId, {
+          const result = await unsentGuard.run(() => adminEditTransportAction(blockId, {
             ...fields,
             startAt: toDatetimeLocalValue(startAt),
             endAt: toDatetimeLocalValue(endAt),
             allowOverlap: true,
-          });
+          }));
+          if (result === UNSENT) return;
           if (result.ok) {
             showToast({
               message: undoing ? 'Rit teruggezet.' : (result.message ?? 'Rit verplaatst.'),

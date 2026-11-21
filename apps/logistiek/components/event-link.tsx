@@ -6,8 +6,9 @@ import { useRouter } from 'next/navigation';
 import { ConfirmDialog } from '@vtk/ui';
 import { linkToEventAction } from '@/app/actions/beheer';
 import { linkCollectEnGoOrderToEventAction } from '@/app/actions/collectengo';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
 import type { SelectableEvent } from '@/components/event-picker';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * Een aanvraag of rit onder een evenement hangen vanuit het beheer.
@@ -50,11 +51,13 @@ export function EventLink({
 
   function apply(eventId: string | null) {
     startTransition(async () => {
-      const result =
+      const result = await unsentGuard.run(() =>
         target.kind === 'collectengo'
-          ? await linkCollectEnGoOrderToEventAction(target.id, eventId)
-          : await linkToEventAction({ kind: target.kind, id: target.id }, eventId);
+          ? linkCollectEnGoOrderToEventAction(target.id, eventId)
+          : linkToEventAction({ kind: target.kind, id: target.id }, eventId)
+      );
       setConfirmClear(false);
+      if (result === UNSENT) return;
       if (result.ok) {
         showToast({ message: result.message ?? 'Bijgewerkt.', variant: 'success' });
         setOpen(false);

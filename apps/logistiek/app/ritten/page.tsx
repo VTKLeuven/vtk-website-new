@@ -3,7 +3,6 @@ import { LogisticsIcon } from '@/components/logistics-icon';
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
 import { FeedTokens } from '@/components/feed-tokens';
-import { ToastProvider } from '@/components/ui/toast';
 import { driverColorVar } from '@/lib/driver-colors';
 import { copy, getLocale } from '@/lib/i18n';
 import type { LogistiekLocale } from '@/lib/i18n-shared';
@@ -325,49 +324,44 @@ export default async function RittenPage({ searchParams }: { searchParams: Promi
         </p>
       ) : null}
 
-      {/* De ledenkant heeft geen ToastProvider in de layout (die staat enkel
-          rond /beheer). Hij hangt rond het hele scherm: twee providers tekenen
-          twee meldingsstapels, elk in hun eigen hoek. */}
-      <ToastProvider>
-        <div className="grid gap-8">
-          {driver || upcoming.length > 0 || past.length > 0 ? (
-            <TripsAgenda
-              weeks={weeks}
-              months={months}
-              locale={locale}
-              postLabel={groupNames.length === 1 ? groupNames[0] : en ? 'My post' : 'Mijn post'}
-              emptyText={
-                driver
-                  ? en
-                    ? 'Nothing yet. Logistics usually assigns a driver in the week before the trip.'
-                    : 'Nog niets. Logistiek wijst een chauffeur meestal pas de week voor de rit toe.'
-                  : en
-                    ? 'Nothing planned.'
-                    : 'Niets gepland.'
-              }
-              initialOpen={params.rit && byId.has(params.rit) ? params.rit : null}
-            />
-          ) : null}
+      <div className="grid gap-8">
+        {driver || upcoming.length > 0 || past.length > 0 ? (
+          <TripsAgenda
+            weeks={weeks}
+            months={months}
+            locale={locale}
+            postLabel={groupNames.length === 1 ? groupNames[0] : en ? 'My post' : 'Mijn post'}
+            emptyText={
+              driver
+                ? en
+                  ? 'Nothing yet. Logistics usually assigns a driver in the week before the trip.'
+                  : 'Nog niets. Logistiek wijst een chauffeur meestal pas de week voor de rit toe.'
+                : en
+                  ? 'Nothing planned.'
+                  : 'Niets gepland.'
+            }
+            initialOpen={params.rit && byId.has(params.rit) ? params.rit : null}
+          />
+        ) : null}
 
-          {/* Je ritten in je eigen agenda (A1). Enkel voor wie chauffeur is. */}
-          {driver ? (
-            <FeedTokens
-              canTeam={false}
-              canDriver
-              tokens={feedTokens
-                .filter((token) => token.scope === 'DRIVER')
-                .map((token) => ({
-                  id: token.id,
-                  label: token.label,
-                  scope: token.scope,
-                  createdAt: token.createdAt.toISOString(),
-                  lastUsedAt: token.lastUsedAt?.toISOString() ?? null,
-                  expired: token.expired,
-                }))}
-            />
-          ) : null}
-        </div>
-      </ToastProvider>
+        {/* Je ritten in je eigen agenda (A1). Enkel voor wie chauffeur is. */}
+        {driver ? (
+          <FeedTokens
+            canTeam={false}
+            canDriver
+            tokens={feedTokens
+              .filter((token) => token.scope === 'DRIVER')
+              .map((token) => ({
+                id: token.id,
+                label: token.label,
+                scope: token.scope,
+                createdAt: token.createdAt.toISOString(),
+                lastUsedAt: token.lastUsedAt?.toISOString() ?? null,
+                expired: token.expired,
+              }))}
+          />
+        ) : null}
+      </div>
     </PageShell>
   );
 }

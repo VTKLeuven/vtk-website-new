@@ -11,12 +11,13 @@ import {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, ConfirmDialog } from '@vtk/ui';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
 import {
   bulkMarkPickedUpAction,
   bulkMarkReturnedAction,
   type BulkActionResult,
 } from '@/app/actions/beheer';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 type Selection = {
   selected: Set<string>;
@@ -137,9 +138,11 @@ export function BulkActionBar() {
   function run(kind: 'pickedUp' | 'returned') {
     const ids = Array.from(selected);
     startTransition(async () => {
-      const result: BulkActionResult =
-        kind === 'pickedUp' ? await bulkMarkPickedUpAction(ids) : await bulkMarkReturnedAction(ids);
+      const result: BulkActionResult | typeof UNSENT = await unsentGuard.run(() =>
+        kind === 'pickedUp' ? bulkMarkPickedUpAction(ids) : bulkMarkReturnedAction(ids)
+      );
       setConfirmAction(null);
+      if (result === UNSENT) return;
       if (result.succeeded > 0) {
         clear();
         router.refresh();

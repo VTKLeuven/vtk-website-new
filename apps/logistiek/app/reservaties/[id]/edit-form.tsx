@@ -7,6 +7,7 @@ import { editReservationAction } from '@/app/actions/uitleen';
 import type { RequesterOption } from '@/app/materiaal/event-fields';
 import { ReservationForm, type ReservationFormInitial } from '@/app/materiaal/reservation-form';
 import type { CatalogCategory } from '@/lib/uitleen-server';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 export function ReservationEditor({
   reservationId,
@@ -49,7 +50,8 @@ export function ReservationEditor({
         cancelLabel={en ? 'Cancel' : 'Annuleren'}
         onCancel={() => setOpen(false)}
         onSubmit={async (payload) => {
-          const result = await editReservationAction(reservationId, payload);
+          const result = await unsentGuard.run(() => editReservationAction(reservationId, payload));
+          if (result === UNSENT) return UNSENT;
           if (result.ok) {
             setOpen(false);
             router.refresh();

@@ -4,9 +4,10 @@ import { useEffect, useState, useTransition } from 'react';
 import { Button } from '@vtk/ui';
 import { adminEditTransportAction } from '@/app/actions/beheer';
 import { QuarterDateTime } from '@/components/quarter-datetime';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
 import { materialListHref } from '@/lib/material-list-link';
 import { EXTERN_REQUESTER, OTHER_REQUESTER, requesterFromChoice } from '@/lib/uitleen';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * De feiten van een rit aanpassen, in de inspector naast de kalender (P4).
@@ -127,11 +128,12 @@ export function TripEditForm({
       // het paneel met een eigen actie, voor beide helften en ook op een gereden
       // rit, en het slepen van een blok (dat deze actie ook aanroept) stuurde
       // het anders ongemerkt mee.
-      const result = await adminEditTransportAction(bookingId, {
+      const result = await unsentGuard.run(() => adminEditTransportAction(bookingId, {
         ...fields,
         requester: requesterFromChoice(requesterChoice, requesterOther),
         allowOverlap,
-      });
+      }));
+      if (result === UNSENT) return;
       if (result.ok) {
         // Een bewust geforceerde botsing is goed nieuws met een staartje: die
         // melding blijft staan tot je ze wegklikt.

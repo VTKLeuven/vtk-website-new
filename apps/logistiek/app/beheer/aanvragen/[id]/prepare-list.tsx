@@ -2,7 +2,8 @@
 
 import { useOptimistic, useTransition } from 'react';
 import { setLinePreparedAction } from '@/app/actions/beheer';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * De klaarzetlijst: per lijn een vinkje, met de plaats in de loods ernaast.
@@ -41,7 +42,8 @@ export function PrepareList({ lines }: { lines: PrepareLine[] }) {
   function toggle(line: PrepareLine, prepared: boolean) {
     startTransition(async () => {
       setOptimistic({ id: line.id, prepared });
-      const result = await setLinePreparedAction(line.id, prepared);
+      const result = await unsentGuard.run(() => setLinePreparedAction(line.id, prepared));
+      if (result === UNSENT) return;
       if (!result.ok) showToast({ message: result.error, variant: 'error', duration: 0 });
     });
   }

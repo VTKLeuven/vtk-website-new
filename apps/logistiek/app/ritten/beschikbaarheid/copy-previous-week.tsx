@@ -3,10 +3,11 @@
 import { useState, useTransition } from 'react';
 import { ConfirmDialog } from '@vtk/ui';
 import { copyPreviousWeekAvailabilityAction } from '@/app/actions/uitleen';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
 import { availabilityWeekBounds } from '@/lib/availability-day';
 import type { AvailabilityWindow } from './availability-editor';
 import { snapshotOf, useOfferUndo, type AvailabilitySnapshot } from './availability-undo';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * "Neem vorige week over": je rooster van vorige week, op dezelfde uren, in
@@ -56,7 +57,8 @@ export function CopyPreviousWeek({
   function run() {
     const snapshot = snapshotOf(windows, weekStart, weekEnd);
     startTransition(async () => {
-      const result = await copyPreviousWeekAvailabilityAction({ week });
+      const result = await unsentGuard.run(() => copyPreviousWeekAvailabilityAction({ week }));
+      if (result === UNSENT) return;
       setConfirming(false);
       if (result.ok) {
         offerUndo(result.message ?? 'Vorige week overgenomen.', snapshot);

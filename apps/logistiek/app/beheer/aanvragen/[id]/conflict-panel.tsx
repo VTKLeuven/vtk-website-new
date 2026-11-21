@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { previewShiftAction, shiftReservationDatesAction } from '@/app/actions/beheer';
 import { SaveForm } from '@/components/ui/save-form';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * Twee aanvragen die om hetzelfde materiaal vechten, en de knoppen om ze uit
@@ -51,7 +52,8 @@ function ShiftForm({ party }: { party: ConflictParty }) {
 
   function check() {
     startChecking(async () => {
-      const result = await previewShiftAction(party.id, pickup, ret);
+      const result = await unsentGuard.run(() => previewShiftAction(party.id, pickup, ret));
+      if (result === UNSENT) return;
       setPreview(result.ok ? { fits: result.fits, detail: result.detail } : { fits: false, detail: result.error });
     });
   }

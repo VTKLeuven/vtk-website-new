@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
+import { ToastProvider } from "@vtk/ui/toast";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
@@ -68,10 +69,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             />
           </>
         )}
-        <ImpersonationBanner />
-        <SiteHeader />
-        {children}
-        <SiteFooter />
+        {/* Eén meldingsstapel voor de hele app. Die stond enkel rond /beheer en
+            per blok op een paar ledenpagina's; daarbuiten had de melding van
+            een opslag die de server nooit bereikte (`unsentGuard`) geen plek. */}
+        <ToastProvider labels={copy[locale].toastLabels}>
+          <ImpersonationBanner />
+          <SiteHeader />
+          {children}
+          <SiteFooter />
+        </ToastProvider>
       </body>
     </html>
   );

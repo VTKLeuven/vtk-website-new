@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@vtk/ui';
 import { addEventExtraItemAction, removeEventExtraItemAction } from '@/app/actions/uitleen';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * Materiaal dat niet van Logistiek komt (E5): het theokot, de vicepraeses,
@@ -44,7 +45,8 @@ export function EventExtraItems({
 
   function add() {
     startTransition(async () => {
-      const result = await addEventExtraItemAction({ eventId, ...draft });
+      const result = await unsentGuard.run(() => addEventExtraItemAction({ eventId, ...draft }));
+      if (result === UNSENT) return;
       if (!result.ok) {
         setNotice({ kind: 'error', text: result.error });
         return;
@@ -57,7 +59,8 @@ export function EventExtraItems({
 
   function remove(itemId: string) {
     startTransition(async () => {
-      const result = await removeEventExtraItemAction(itemId);
+      const result = await unsentGuard.run(() => removeEventExtraItemAction(itemId));
+      if (result === UNSENT) return;
       if (!result.ok) {
         setNotice({ kind: 'error', text: result.error });
         return;

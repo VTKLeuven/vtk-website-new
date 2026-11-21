@@ -22,7 +22,7 @@ import {
   type CustomDriverColor,
 } from '@/lib/driver-colors';
 import { CustomColorSliders } from './custom-color-sliders';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { SaveForm } from '@/components/ui/save-form';
@@ -30,6 +30,7 @@ import { PhoneLink } from '@/components/phone-link';
 import { SortChips, useSort } from '@/app/beheer/sortable-header';
 import { compareText, type SortDir } from '@/app/beheer/sort';
 import type { DriverPoolEntry } from '@/lib/uitleen-server';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 const inputClass = 'h-9 w-full rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink';
 
@@ -110,7 +111,8 @@ function DriverColorPicker({ entry }: { entry: DriverPoolEntry }) {
   function choose(colorIndex: number | null) {
     setOpen(false);
     startTransition(async () => {
-      const result = await setDriverColorAction(entry.id, colorIndex);
+      const result = await unsentGuard.run(() => setDriverColorAction(entry.id, colorIndex));
+      if (result === UNSENT) return;
       if (result.ok) {
         showToast({ message: result.message ?? 'Opgeslagen.', variant: 'success' });
       } else {
@@ -122,7 +124,8 @@ function DriverColorPicker({ entry }: { entry: DriverPoolEntry }) {
   function applyCustom() {
     setOpen(false);
     startTransition(async () => {
-      const result = await setDriverCustomColorAction(entry.id, draft);
+      const result = await unsentGuard.run(() => setDriverCustomColorAction(entry.id, draft));
+      if (result === UNSENT) return;
       if (result.ok) {
         showToast({ message: result.message ?? 'Opgeslagen.', variant: 'success' });
       } else {

@@ -16,12 +16,13 @@ import { SetContents } from '@/components/set-contents';
 import { AlternativesEditor } from '@/components/alternatives-editor';
 import { DownloadsEditor, PhotosEditor, PropertiesEditor } from '@/components/catalogue-editors';
 import { SaveForm } from '@/components/ui/save-form';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
 import { SortHeader, useSort } from '@/app/beheer/sortable-header';
 import { compareText } from '@/app/beheer/sort';
 import { UnitsEditor } from './units-editor';
 import { ITEM_CONDITION_LABELS } from '@/lib/uitleen';
 import type { AdminInventoryItem } from '@/lib/uitleen-server';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 type InventorySortKey = 'name' | 'category' | 'condition';
 type InventoryPanel = 'item' | 'categories' | null;
@@ -326,7 +327,8 @@ function QuantityQuickEdit({
     }
     if (parsed === quantity) return;
     setPending(true);
-    const result = await setItemQuantityAction(itemId, parsed);
+    const result = await unsentGuard.run(() => setItemQuantityAction(itemId, parsed));
+    if (result === UNSENT) return;
     setPending(false);
     if (result.ok) {
       showToast({ message: 'Voorraad bijgewerkt.', variant: 'success' });

@@ -4,13 +4,14 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import { Button } from '@vtk/ui';
 import { adminCreateTransportAction } from '@/app/actions/beheer';
 import { QuarterDateTime } from '@/components/quarter-datetime';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
 import { DriverOptions } from '../driver-select';
 import { RepeatFields } from './repeat-fields';
 import { defaultRepeatDraft, repeatFromDraft, weekdayOfLocal, type RepeatDraft } from '@/lib/recurrence';
 import { TripEventSelect, type TripEventOption } from '@/components/trip-event-select';
 import type { DriverOption } from '@/lib/uitleen-server';
 import { OTHER_REQUESTER, toDatetimeLocalValue, type TripHandoverMode } from '@/lib/uitleen';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * Een rit inplannen vanuit de kalender (P4).
@@ -204,7 +205,7 @@ export function NewTripForm({
       return;
     }
     startTransition(async () => {
-      const result = await adminCreateTransportAction({
+      const result = await unsentGuard.run(() => adminCreateTransportAction({
         allowOverlap,
         startAt: values.startAt,
         endAt: values.endAt,
@@ -232,7 +233,8 @@ export function NewTripForm({
         requesterName: isOther ? values.requesterName.trim() : null,
         driverId: values.driverId || null,
         assignedGroupId: values.assignedGroupId || null,
-      });
+      }));
+      if (result === UNSENT) return;
       if (result.ok) {
         // De actie meldt zelf wanneer de rit bewust over een andere ligt; dat is
         // een waarschuwing en geen fout, dus blijft ze staan tot je ze wegklikt.

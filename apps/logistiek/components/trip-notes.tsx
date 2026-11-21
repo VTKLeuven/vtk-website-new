@@ -7,9 +7,10 @@ import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { LinkedText } from '@/components/linked-text';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { Avatar } from '@/components/person-avatar';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
 import { TRIP_NOTE_VISIBILITIES } from '@/lib/uitleen';
 import type { UitleenTransportNoteVisibility } from '@prisma/client';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * Eigen nota's bij een rit, met een zichtbaarheid per nota (F4.20).
@@ -106,10 +107,10 @@ export function TripNotes({
 
   function save() {
     startTransition(async () => {
-      const result =
-        editing === 'nieuw'
-          ? await addTripNoteAction(bookingId, draft)
-          : await editTripNoteAction(editing as string, draft);
+      const result = await unsentGuard.run(() =>
+        editing === 'nieuw' ? addTripNoteAction(bookingId, draft) : editTripNoteAction(editing as string, draft)
+      );
+      if (result === UNSENT) return;
       if (result.ok) {
         showToast({ message: result.message ?? 'Opgeslagen.', variant: 'success' });
         setEditing(null);

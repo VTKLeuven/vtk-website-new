@@ -9,6 +9,7 @@ import {
   WEEKDAY_SHORT_NL,
   type RepeatDraft,
 } from '@/lib/recurrence';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * "Herhalen" in het intekenformulier (F6.22): C&G, het containerpark, de BO-rit.
@@ -88,7 +89,8 @@ export function RepeatFields({
     const repeat = repeatFromDraft(draft);
     if (!repeat) return;
     startTransition(async () => {
-      const result = await previewTripSeriesAction({ startAt, endAt, vehicleId, repeat });
+      const result = await unsentGuard.run(() => previewTripSeriesAction({ startAt, endAt, vehicleId, repeat }));
+      if (result === UNSENT) return;
       setPreview(
         result.ok
           ? { kind: 'ready', items: result.items, capped: result.capped }

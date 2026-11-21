@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { Button } from '@vtk/ui';
 import { startPaymentAction } from '@/app/actions/uitleen';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /* Start de online betaling en stuurt de browser naar de hosted checkout. */
 export function PayButton({
@@ -23,7 +24,8 @@ export function PayButton({
   function pay() {
     setError(null);
     startTransition(async () => {
-      const result = await startPaymentAction(target, id);
+      const result = await unsentGuard.run(() => startPaymentAction(target, id));
+      if (result === UNSENT) return;
       if (result.ok) {
         window.location.assign(result.url);
       } else {

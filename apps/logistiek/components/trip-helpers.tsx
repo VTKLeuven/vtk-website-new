@@ -7,7 +7,8 @@ import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { Avatar } from '@/components/person-avatar';
 import { PhoneLink } from '@/components/phone-link';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * De bijrijders van een rit (V2): wie er meerijdt en op welk nummer.
@@ -63,7 +64,8 @@ export function TripHelpers({
 
   function add() {
     startTransition(async () => {
-      const result = await addTripHelperAction(bookingId, draft);
+      const result = await unsentGuard.run(() => addTripHelperAction(bookingId, draft));
+      if (result === UNSENT) return;
       if (result.ok) {
         showToast({ message: result.message ?? 'Toegevoegd.', variant: 'success' });
         setDraft({ name: '', phone: '' });

@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
-import { ToastProvider } from '@/components/ui/toast';
 import { getLocale } from '@/lib/i18n';
 import { getSession } from '@/lib/session';
 import {
@@ -125,30 +124,26 @@ export default async function BeschikbaarheidPage({
             </Link>
           </nav>
 
-          {/* De ledenkant heeft geen ToastProvider (die staat enkel rond
-              /beheer), dus die komt hier rond dit ene blok. */}
-          <ToastProvider>
-            <AvailabilityEditor
-              weekLabel={`${en ? 'Week' : 'Week'} ${isoWeekNumber(monday)}`}
-              weekValue={toDateInputValue(monday)}
-              note={note ?? ''}
-              previousHref={hrefFor(new Date(monday.getTime() - 7 * DAY_MS))}
-              nextHref={hrefFor(new Date(monday.getTime() + 7 * DAY_MS))}
-              backHref="/ritten"
-              now={now.toISOString()}
-              previousWeekCount={previousWeekCount}
-              days={days}
-              driverId={session.user.id}
-              driverName={session.user.name}
-              windows={windows.map((window) => ({
-                id: window.id,
-                startAt: window.startAt.toISOString(),
-                endAt: window.endAt.toISOString(),
-                kind: window.kind,
-                note: window.note,
-              }))}
-            />
-          </ToastProvider>
+          <AvailabilityEditor
+            weekLabel={`${en ? 'Week' : 'Week'} ${isoWeekNumber(monday)}`}
+            weekValue={toDateInputValue(monday)}
+            note={note ?? ''}
+            previousHref={hrefFor(new Date(monday.getTime() - 7 * DAY_MS))}
+            nextHref={hrefFor(new Date(monday.getTime() + 7 * DAY_MS))}
+            backHref="/ritten"
+            now={now.toISOString()}
+            previousWeekCount={previousWeekCount}
+            days={days}
+            driverId={session.user.id}
+            driverName={session.user.name}
+            windows={windows.map((window) => ({
+              id: window.id,
+              startAt: window.startAt.toISOString(),
+              endAt: window.endAt.toISOString(),
+              kind: window.kind,
+              note: window.note,
+            }))}
+          />
         </div>
       )}
     </PageShell>

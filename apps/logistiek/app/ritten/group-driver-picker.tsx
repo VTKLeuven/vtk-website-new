@@ -2,7 +2,8 @@
 
 import { useTransition } from 'react';
 import { setGroupTripDriverAction } from '@/app/actions/uitleen';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * Wie rijdt deze rit? Ingevuld door de post zelf.
@@ -35,7 +36,8 @@ export function GroupDriverPicker({
 
   function choose(next: string) {
     startTransition(async () => {
-      const result = await setGroupTripDriverAction(bookingId, next);
+      const result = await unsentGuard.run(() => setGroupTripDriverAction(bookingId, next));
+      if (result === UNSENT) return;
       if (result.ok) {
         showToast({ message: result.message ?? 'Opgeslagen.', variant: 'success' });
       } else {

@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@vtk/db';
 import { requireManage } from '@/lib/session';
-import { saveError, saveOk, type SaveState } from '@/lib/saveState';
+import { saveError, saveOk, type SaveState } from '@vtk/ui/save-state';
 import {
   PUBLIC_COPY_KEYS,
   PUBLIC_COPY_MAX_LENGTH,

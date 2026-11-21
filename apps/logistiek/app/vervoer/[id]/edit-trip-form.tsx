@@ -6,6 +6,7 @@ import { Button } from '@vtk/ui';
 import { editVanBookingAction } from '@/app/actions/uitleen';
 import { QuarterDateTime } from '@/components/quarter-datetime';
 import type { LogistiekLocale } from '@/lib/i18n-shared';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * Je eigen rit aanpassen (T5, T13).
@@ -54,7 +55,8 @@ export function EditTripForm({
   function save() {
     setError(null);
     startTransition(async () => {
-      const result = await editVanBookingAction(bookingId, values);
+      const result = await unsentGuard.run(() => editVanBookingAction(bookingId, values));
+      if (result === UNSENT) return;
       if (!result.ok) {
         setError(result.error);
         return;

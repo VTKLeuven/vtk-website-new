@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@vtk/db';
 import { requireManage } from '@/lib/session';
-import { saveError, saveOk, type SaveState } from '@/lib/saveState';
+import { saveError, saveOk, type SaveState } from '@vtk/ui/save-state';
 import { parseCollectEnGoMail } from '@/lib/collectengo/parse';
 import { normalizeProductKey } from '@/lib/collectengo/match';
 import { readMailSource } from '@/lib/collectengo/eml';

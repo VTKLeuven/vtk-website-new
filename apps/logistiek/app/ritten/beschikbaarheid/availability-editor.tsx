@@ -10,7 +10,7 @@ import {
 import { QuarterDateTime } from '@/components/quarter-datetime';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { LogisticsIcon } from '@/components/logistics-icon';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
 import { TimeGrid } from '@/components/transport-calendar/time-grid';
 import type { AvailabilityBand } from '@/components/transport-calendar/types';
 import { formatDateTime, toDatetimeLocalValue } from '@/lib/uitleen';
@@ -26,6 +26,7 @@ import { AvailabilityPaint } from './availability-paint';
 import { snapshotOf, useOfferUndo, type AvailabilitySnapshot } from './availability-undo';
 import { BandMenu, windowLabel } from './band-menu';
 import { CopyPreviousWeek } from './copy-previous-week';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * Wanneer kan je rijden (V1).
@@ -230,7 +231,8 @@ export function AvailabilityEditor({
           endAt: values.endAt,
           kind: values.kind,
         });
-        const result = await addAvailabilityAction(values);
+        const result = await unsentGuard.run(() => addAvailabilityAction(values));
+        if (result === UNSENT) return;
         if (result.ok) {
           setDraft({ startAt: '', endAt: '', note: '' });
         } else {
@@ -249,7 +251,8 @@ export function AvailabilityEditor({
       const snapshot = snapshotOf(shown, new Date(target.startAt), new Date(target.endAt));
       startTransition(async () => {
         applyOptimistic({ what: 'remove', id });
-        const result = await removeAvailabilityAction(id);
+        const result = await unsentGuard.run(() => removeAvailabilityAction(id));
+        if (result === UNSENT) return;
         if (result.ok) {
           offerUndo('Venster weggehaald.', snapshot);
         } else {
@@ -289,11 +292,12 @@ export function AvailabilityEditor({
           endAt: endAt.toISOString(),
           kind,
         });
-        const result = await editAvailabilityAction(id, {
+        const result = await unsentGuard.run(() => editAvailabilityAction(id, {
           startAt: toDatetimeLocalValue(startAt),
           endAt: toDatetimeLocalValue(endAt),
           kind,
-        });
+        }));
+        if (result === UNSENT) return;
         if (result.ok) {
           offerUndo(
             kind ? `Nu: ${AVAILABILITY_KIND_LABEL[kind].toLowerCase()}.` : 'Venster aangepast.',

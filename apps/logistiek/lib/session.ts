@@ -2,6 +2,7 @@ import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
 import { hasPermission, type SessionPayload } from '@vtk/auth';
 import { fetchSession } from '@vtk/auth/remote';
+import { FORBIDDEN_DIGEST, SIGNED_OUT_DIGEST, recognizableActionError } from '@vtk/ui/action-errors';
 import { mayUseTestLogin, testLoginMode } from './test-login-gate';
 import {
   TEST_USER_COOKIE,
@@ -118,7 +119,9 @@ export function externalRequestsBlocked(
 export async function requireSession(): Promise<SessionPayload> {
   const session = await getSession();
   if (!session) {
-    throw new Error('UNAUTHENTICATED');
+    // Met een digest die de client herkent: een rode melding en het formulier
+    // blijft ingevuld, in plaats van de foutpagina (R1, `@vtk/ui/action-errors`).
+    throw recognizableActionError(SIGNED_OUT_DIGEST);
   }
   return session;
 }
@@ -164,7 +167,7 @@ export function canSeeTripDetails(session: SessionPayload): boolean {
 export async function requireManage(): Promise<SessionPayload> {
   const session = await requireSession();
   if (!canManage(session)) {
-    throw new Error('FORBIDDEN');
+    throw recognizableActionError(FORBIDDEN_DIGEST);
   }
   return session;
 }

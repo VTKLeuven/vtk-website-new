@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { setAvailabilityNoteAction } from '@/app/actions/uitleen';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * Eén algemene nota bij je beschikbaarheid van deze week (F4.5).
@@ -70,7 +71,8 @@ export function AvailabilityNote({
     if (next === saved.current) return;
     setStatus('saving');
     startTransition(async () => {
-      const result = await setAvailabilityNoteAction({ week, text: next });
+      const result = await unsentGuard.run(() => setAvailabilityNoteAction({ week, text: next }));
+      if (result === UNSENT) return;
       if (result.ok) {
         saved.current = next;
         setStatus('done');

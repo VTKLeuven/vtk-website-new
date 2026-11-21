@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import Link from 'next/link';
 import { setAvailabilityDayAction } from '@/app/actions/uitleen';
 import { LogisticsIcon } from '@/components/logistics-icon';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
 import {
   AVAILABILITY_KINDS,
   availabilityDayBounds,
@@ -21,6 +21,7 @@ import {
 import { AvailabilityNote } from './availability-note';
 import { CopyPreviousWeek } from './copy-previous-week';
 import type { AvailabilityWindow } from './availability-editor';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * Beschikbaarheid intekenen op een telefoon (V1).
@@ -217,10 +218,11 @@ export function AvailabilityPaint({
         if (kind) hoursOn.push({ hour, kind });
       }
       startTransition(async () => {
-        const result = await setAvailabilityDayAction({
+        const result = await unsentGuard.run(() => setAvailabilityDayAction({
           day: dayKeyFormatter.format(day),
           hours: hoursOn,
-        });
+        }));
+        if (result === UNSENT) return;
         if (!result.ok) {
           showToast({ message: result.error, variant: 'error', duration: 0 });
         }

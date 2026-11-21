@@ -2,8 +2,9 @@
 
 import { useCallback, useTransition } from 'react';
 import { restoreAvailabilityAction } from '@/app/actions/uitleen';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@vtk/ui/toast';
 import type { AvailabilityWindow } from './availability-editor';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 /**
  * Hoe een stuk van je week eruitzag vlak voor een wijziging: genoeg om het met
@@ -62,7 +63,8 @@ export function useOfferUndo(onRestore?: (snapshot: AvailabilitySnapshot) => voi
           onClick: () =>
             startTransition(async () => {
               onRestore?.(snapshot);
-              const result = await restoreAvailabilityAction(snapshot);
+              const result = await unsentGuard.run(() => restoreAvailabilityAction(snapshot));
+              if (result === UNSENT) return;
               showToast(
                 result.ok
                   ? { message: 'Teruggezet zoals het stond.', variant: 'success' }

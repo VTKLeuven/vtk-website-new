@@ -24,6 +24,7 @@ import {
   type EventReservationValues,
   type RequesterOption,
 } from '@/app/materiaal/event-fields';
+import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
 
 export type FlesserkeInitial = {
   event: EventReservationValues;
@@ -198,12 +199,14 @@ export function FlesserkeForm({
         lines: [],
         flesserkeLines: Object.entries(quantities).map(([itemId, quantity]) => ({ itemId, quantity })),
       };
-      const result: ActionResult =
+      const result: ActionResult | typeof UNSENT = await unsentGuard.run(() =>
         mode.kind === 'create'
-          ? await createFlesserkeReservationAction(payload)
+          ? createFlesserkeReservationAction(payload)
           : mode.kind === 'admin-edit'
-            ? await adminEditFlesserkeReservationAction(mode.reservationId, payload)
-            : await editFlesserkeReservationAction(mode.reservationId, payload);
+            ? adminEditFlesserkeReservationAction(mode.reservationId, payload)
+            : editFlesserkeReservationAction(mode.reservationId, payload)
+      );
+      if (result === UNSENT) return;
       if (result.ok) {
         draft.clear();
         if (mode.kind === 'create') {
