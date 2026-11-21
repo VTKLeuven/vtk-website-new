@@ -25,8 +25,13 @@ vi.mock('@vtk/mail', () => ({
   }),
 }));
 
-// Buiten een Next-request bestaat er geen cache om te invalideren.
+// Buiten een Next-request bestaat er geen cache om te invalideren, en geen
+// cookies: de actions lezen er de taal uit om hun melding te vertalen.
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
+vi.mock('next/headers', () => ({
+  cookies: async () => ({ get: () => undefined }),
+  headers: async () => new Headers(),
+}));
 
 const session = vi.hoisted(() => ({ userId: '' }));
 vi.mock('@/lib/session', async (importOriginal) => ({
