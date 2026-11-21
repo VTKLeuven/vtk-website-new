@@ -6,7 +6,7 @@ import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
-import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
+import { BilingualGroup, BilingualMarkdown } from "@/components/admin/BilingualField";
 import { savePianoConfigAction, savePianoInfoAction, deletePianoReservationAction } from "@/app/actions/piano";
 import { formatMinutes } from "@/lib/piano";
 import { getPianoConfig, getPianoInfo } from "@/lib/piano-server";
@@ -194,34 +194,25 @@ export async function PianoAdminPage({
         </p>
         <SaveForm
           action={savePianoInfoAction}
-          className="grid gap-4 lg:grid-cols-2"
+          className="space-y-4"
           submitLabel={dict.admin.save}
           savingLabel={dict.common.saving}
           savedMessage={nl ? "Tekst opgeslagen" : "Text saved"}
           fallbackErrorMessage={dict.common.saveError}
         >
-          <div>
-            <Label htmlFor="piano-info-nl">{nl ? "Tekst (NL)" : "Text (NL)"}</Label>
-            <MarkdownEditorField
-              name="bodyNl"
-              defaultValue={info.bodyNl}
+          <BilingualGroup locale={locale} layout="side-by-side">
+            <BilingualMarkdown
+              label={nl ? "Tekst" : "Text"}
+              nameNl="bodyNl"
+              nameEn="bodyEn"
+              defaultValueNl={info.bodyNl}
+              defaultValueEn={info.bodyEn}
               locale={locale}
               rows={8}
               allowImages={false}
-              textareaId="piano-info-nl"
+              idPrefix="piano-info"
             />
-          </div>
-          <div>
-            <Label htmlFor="piano-info-en">{nl ? "Tekst (EN)" : "Text (EN)"}</Label>
-            <MarkdownEditorField
-              name="bodyEn"
-              defaultValue={info.bodyEn}
-              locale={locale}
-              rows={8}
-              allowImages={false}
-              textareaId="piano-info-en"
-            />
-          </div>
+          </BilingualGroup>
         </SaveForm>
       </Card>
       )}

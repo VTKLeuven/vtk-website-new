@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink, FileText } from "lucide-react";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { saveTicketTermsAction } from "@/app/actions/tickets";
-import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
+import { BilingualGroup, BilingualMarkdown } from "@/components/admin/BilingualField";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
@@ -93,32 +93,20 @@ export default async function TicketTermsAdminPage({
               {nl ? "Bijvoorbeeld 2026-08-21 of 2.1." : "For example 2026-08-21 or 2.1."}
             </span>
           </div>
-          <div className="ticket-admin-form-grid">
-            <div className="ticket-admin-field">
-              <label htmlFor="ticket-terms-nl">{nl ? "Voorwaarden (NL)" : "Terms (NL)"}</label>
-              <MarkdownEditorField
-                name="bodyNl"
-                defaultValue={terms.bodyNl}
-                locale={locale}
-                rows={18}
-                allowImages={false}
-                textareaId="ticket-terms-nl"
-                maxLength={100_000}
-              />
-            </div>
-            <div className="ticket-admin-field">
-              <label htmlFor="ticket-terms-en">{nl ? "Voorwaarden (EN)" : "Terms (EN)"}</label>
-              <MarkdownEditorField
-                name="bodyEn"
-                defaultValue={terms.bodyEn}
-                locale={locale}
-                rows={18}
-                allowImages={false}
-                textareaId="ticket-terms-en"
-                maxLength={100_000}
-              />
-            </div>
-          </div>
+          <BilingualGroup locale={locale} layout="side-by-side" className="space-y-2">
+            <BilingualMarkdown
+              label={nl ? "Voorwaarden" : "Terms"}
+              nameNl="bodyNl"
+              nameEn="bodyEn"
+              defaultValueNl={terms.bodyNl}
+              defaultValueEn={terms.bodyEn}
+              locale={locale}
+              rows={18}
+              allowImages={false}
+              idPrefix="ticket-terms"
+              maxLength={100_000}
+            />
+          </BilingualGroup>
         </SaveForm>
       </section>
     </div>

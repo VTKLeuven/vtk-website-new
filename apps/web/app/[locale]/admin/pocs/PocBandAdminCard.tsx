@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import type { Locale } from "@vtk/i18n";
+import { Input, Label } from "@vtk/ui";
+import { BilingualGroup, BilingualInput, BilingualMarkdown } from "@/components/admin/BilingualField";
 import { SaveForm } from "@/components/ui/SaveForm";
-import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
 import { StorageImageField } from "@/components/admin/StorageImageField";
 import { savePocBandAction } from "@/app/actions/pocs-partners";
 import {
@@ -156,107 +157,47 @@ export function PocBandAdminCard({
 
         {/* Instellingen voor verkiezingen */}
         <div className={mode === "elections" ? "space-y-6 pt-4 border-t border-[#0e1a36]/10" : "hidden"}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-[#5c667f] uppercase tracking-wider mb-1">
-                {nl ? "Koptekst van de band (NL)" : "Band heading (NL)"}
-              </label>
-              <input
-                type="text"
-                name="headingNl"
-                defaultValue={setting.headingNl}
-                className="w-full rounded-lg border border-[#0e1a36]/15 px-3 py-2 text-sm focus:border-[#0e1a36] focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[#5c667f] uppercase tracking-wider mb-1">
-                {nl ? "Koptekst van de band (EN)" : "Band heading (EN)"}
-              </label>
-              <input
-                type="text"
-                name="headingEn"
-                defaultValue={setting.headingEn}
-                className="w-full rounded-lg border border-[#0e1a36]/15 px-3 py-2 text-sm focus:border-[#0e1a36] focus:outline-none"
-              />
-            </div>
-          </div>
+          <BilingualGroup locale={locale} layout="side-by-side" className="space-y-6">
+            <BilingualInput
+              label={nl ? "Koptekst van de band" : "Band heading"}
+              nameNl="headingNl"
+              nameEn="headingEn"
+              defaultValueNl={setting.headingNl}
+              defaultValueEn={setting.headingEn}
+              gridClassName="grid grid-cols-1 sm:grid-cols-2 gap-4"
+            />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-[#5c667f] uppercase tracking-wider mb-1">
-                {nl ? "Regel rechts van kop (NL)" : "Meta text right of heading (NL)"}
-              </label>
-              <input
-                type="text"
-                name="metaNl"
-                defaultValue={setting.metaNl}
-                placeholder="bv. Kandidaatstelling loopt"
-                className="w-full rounded-lg border border-[#0e1a36]/15 px-3 py-2 text-sm focus:border-[#0e1a36] focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[#5c667f] uppercase tracking-wider mb-1">
-                {nl ? "Regel rechts van kop (EN)" : "Meta text right of heading (EN)"}
-              </label>
-              <input
-                type="text"
-                name="metaEn"
-                defaultValue={setting.metaEn}
-                placeholder="e.g. Candidacy open"
-                className="w-full rounded-lg border border-[#0e1a36]/15 px-3 py-2 text-sm focus:border-[#0e1a36] focus:outline-none"
-              />
-            </div>
-          </div>
+            <BilingualInput
+              label={nl ? "Regel rechts van kop" : "Meta text right of heading"}
+              nameNl="metaNl"
+              nameEn="metaEn"
+              defaultValueNl={setting.metaNl}
+              defaultValueEn={setting.metaEn}
+              placeholderNl="bv. Kandidaatstelling loopt"
+              placeholderEn="e.g. Candidacy open"
+              gridClassName="grid grid-cols-1 sm:grid-cols-2 gap-4"
+            />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-[#5c667f] uppercase tracking-wider mb-1">
-                {nl ? "Titel in paneel (NL)" : "Panel title (NL)"}
-              </label>
-              <input
-                type="text"
-                name="titleNl"
-                defaultValue={setting.titleNl}
-                className="w-full rounded-lg border border-[#0e1a36]/15 px-3 py-2 text-sm focus:border-[#0e1a36] focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[#5c667f] uppercase tracking-wider mb-1">
-                {nl ? "Titel in paneel (EN)" : "Panel title (EN)"}
-              </label>
-              <input
-                type="text"
-                name="titleEn"
-                defaultValue={setting.titleEn}
-                className="w-full rounded-lg border border-[#0e1a36]/15 px-3 py-2 text-sm focus:border-[#0e1a36] focus:outline-none"
-              />
-            </div>
-          </div>
+            <BilingualInput
+              label={nl ? "Titel in paneel" : "Panel title"}
+              nameNl="titleNl"
+              nameEn="titleEn"
+              defaultValueNl={setting.titleNl}
+              defaultValueEn={setting.titleEn}
+              gridClassName="grid grid-cols-1 sm:grid-cols-2 gap-4"
+            />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-[#5c667f] uppercase tracking-wider mb-1">
-                {nl ? "Uitleg (Markdown, NL)" : "Explanation (Markdown, NL)"}
-              </label>
-              <MarkdownEditorField
-                name="bodyNl"
-                defaultValue={setting.bodyNl}
-                locale="nl"
-                rows={5}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[#5c667f] uppercase tracking-wider mb-1">
-                {nl ? "Uitleg (Markdown, EN)" : "Explanation (Markdown, EN)"}
-              </label>
-              <MarkdownEditorField
-                name="bodyEn"
-                defaultValue={setting.bodyEn}
-                locale="en"
-                rows={5}
-              />
-            </div>
-          </div>
+            <BilingualMarkdown
+              label={nl ? "Uitleg (Markdown)" : "Explanation (Markdown)"}
+              nameNl="bodyNl"
+              nameEn="bodyEn"
+              defaultValueNl={setting.bodyNl}
+              defaultValueEn={setting.bodyEn}
+              locale={locale}
+              rows={5}
+              gridClassName="grid grid-cols-1 sm:grid-cols-2 gap-4"
+            />
+          </BilingualGroup>
 
           <div>
             <StorageImageField
@@ -292,83 +233,55 @@ export function PocBandAdminCard({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-[#5c667f] uppercase tracking-wider mb-1">
-                {nl ? "Hoofdknop tekst (NL)" : "CTA label (NL)"}
-              </label>
-              <input
-                type="text"
-                name="ctaLabelNl"
-                defaultValue={setting.ctaLabelNl}
-                placeholder="Stel je kandidaat"
-                className="w-full rounded-lg border border-[#0e1a36]/15 px-3 py-2 text-sm focus:border-[#0e1a36] focus:outline-none"
-              />
+          <BilingualGroup locale={locale} layout="side-by-side" className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-start">
+              <div className="sm:col-span-2">
+                <BilingualInput
+                  label={nl ? "Hoofdknop tekst" : "CTA label"}
+                  nameNl="ctaLabelNl"
+                  nameEn="ctaLabelEn"
+                  defaultValueNl={setting.ctaLabelNl}
+                  defaultValueEn={setting.ctaLabelEn}
+                  placeholderNl="Stel je kandidaat"
+                  placeholderEn="Put yourself forward"
+                />
+              </div>
+              <div>
+                <Label htmlFor="poc-cta-url">{nl ? "Hoofdknop URL" : "CTA URL"}</Label>
+                <Input
+                  id="poc-cta-url"
+                  type="text"
+                  name="ctaUrl"
+                  defaultValue={setting.ctaUrl}
+                  placeholder="/formulieren/river-kandidaat"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-[#5c667f] uppercase tracking-wider mb-1">
-                {nl ? "Hoofdknop tekst (EN)" : "CTA label (EN)"}
-              </label>
-              <input
-                type="text"
-                name="ctaLabelEn"
-                defaultValue={setting.ctaLabelEn}
-                placeholder="Put yourself forward"
-                className="w-full rounded-lg border border-[#0e1a36]/15 px-3 py-2 text-sm focus:border-[#0e1a36] focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[#5c667f] uppercase tracking-wider mb-1">
-                {nl ? "Hoofdknop URL" : "CTA URL"}
-              </label>
-              <input
-                type="text"
-                name="ctaUrl"
-                defaultValue={setting.ctaUrl}
-                placeholder="/formulieren/river-kandidaat"
-                className="w-full rounded-lg border border-[#0e1a36]/15 px-3 py-2 text-sm focus:border-[#0e1a36] focus:outline-none"
-              />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-[#5c667f] uppercase tracking-wider mb-1">
-                {nl ? "Secundaire knop tekst (NL)" : "Secondary button label (NL)"}
-              </label>
-              <input
-                type="text"
-                name="secondaryLabelNl"
-                defaultValue={setting.secondaryLabelNl}
-                placeholder="Kandidaten bekijken"
-                className="w-full rounded-lg border border-[#0e1a36]/15 px-3 py-2 text-sm focus:border-[#0e1a36] focus:outline-none"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-start">
+              <div className="sm:col-span-2">
+                <BilingualInput
+                  label={nl ? "Secundaire knop tekst" : "Secondary button label"}
+                  nameNl="secondaryLabelNl"
+                  nameEn="secondaryLabelEn"
+                  defaultValueNl={setting.secondaryLabelNl}
+                  defaultValueEn={setting.secondaryLabelEn}
+                  placeholderNl="Kandidaten bekijken"
+                  placeholderEn="View candidates"
+                />
+              </div>
+              <div>
+                <Label htmlFor="poc-secondary-url">{nl ? "Secundaire knop URL" : "Secondary button URL"}</Label>
+                <Input
+                  id="poc-secondary-url"
+                  type="text"
+                  name="secondaryUrl"
+                  defaultValue={setting.secondaryUrl}
+                  placeholder="/pocs"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-[#5c667f] uppercase tracking-wider mb-1">
-                {nl ? "Secundaire knop tekst (EN)" : "Secondary button label (EN)"}
-              </label>
-              <input
-                type="text"
-                name="secondaryLabelEn"
-                defaultValue={setting.secondaryLabelEn}
-                placeholder="View candidates"
-                className="w-full rounded-lg border border-[#0e1a36]/15 px-3 py-2 text-sm focus:border-[#0e1a36] focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[#5c667f] uppercase tracking-wider mb-1">
-                {nl ? "Secundaire knop URL" : "Secondary button URL"}
-              </label>
-              <input
-                type="text"
-                name="secondaryUrl"
-                defaultValue={setting.secondaryUrl}
-                placeholder="/pocs"
-                className="w-full rounded-lg border border-[#0e1a36]/15 px-3 py-2 text-sm focus:border-[#0e1a36] focus:outline-none"
-              />
-            </div>
-          </div>
+          </BilingualGroup>
 
           {/* Disclaimer op /pocs */}
           <div className="space-y-4 pt-4 border-t border-[#0e1a36]/10">
@@ -382,32 +295,19 @@ export function PocBandAdminCard({
                   : "Shown above the faces on /pocs, but only in election mode and only for the current working year. Leave both fields empty to show none."}
               </p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-[#5c667f] uppercase tracking-wider mb-1">
-                  {nl ? "Disclaimer (Markdown, NL)" : "Notice (Markdown, NL)"}
-                </label>
-                <MarkdownEditorField
-                  name="noticeNl"
-                  defaultValue={setting.noticeNl}
-                  locale="nl"
-                  rows={4}
-                  allowImages={false}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[#5c667f] uppercase tracking-wider mb-1">
-                  {nl ? "Disclaimer (Markdown, EN)" : "Notice (Markdown, EN)"}
-                </label>
-                <MarkdownEditorField
-                  name="noticeEn"
-                  defaultValue={setting.noticeEn}
-                  locale="en"
-                  rows={4}
-                  allowImages={false}
-                />
-              </div>
-            </div>
+            <BilingualGroup locale={locale} layout="side-by-side">
+              <BilingualMarkdown
+                label={nl ? "Disclaimer (Markdown)" : "Notice (Markdown)"}
+                nameNl="noticeNl"
+                nameEn="noticeEn"
+                defaultValueNl={setting.noticeNl}
+                defaultValueEn={setting.noticeEn}
+                locale={locale}
+                rows={4}
+                allowImages={false}
+                gridClassName="grid grid-cols-1 sm:grid-cols-2 gap-4"
+              />
+            </BilingualGroup>
           </div>
 
           {/* Procedure stappen */}
@@ -429,38 +329,28 @@ export function PocBandAdminCard({
                   <div className="text-xs font-bold text-[#5c667f] uppercase tracking-wider">
                     {nl ? `Stap ${idx + 1}` : `Step ${idx + 1}`}
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      name={`step-titleNl-${idx}`}
-                      defaultValue={step.titleNl}
-                      placeholder={nl ? "Titel (NL)" : "Title (NL)"}
-                      className="rounded-lg border border-[#0e1a36]/15 px-3 py-1.5 text-sm bg-white"
+                  <BilingualGroup locale={locale} layout="side-by-side" className="space-y-3">
+                    <BilingualInput
+                      label={nl ? "Titel" : "Title"}
+                      nameNl={`step-titleNl-${idx}`}
+                      nameEn={`step-titleEn-${idx}`}
+                      defaultValueNl={step.titleNl}
+                      defaultValueEn={step.titleEn}
+                      placeholderNl={nl ? "Titel (NL)" : "Title (NL)"}
+                      placeholderEn={nl ? "Titel (EN)" : "Title (EN)"}
+                      gridClassName="grid grid-cols-1 sm:grid-cols-2 gap-3"
                     />
-                    <input
-                      type="text"
-                      name={`step-titleEn-${idx}`}
-                      defaultValue={step.titleEn}
-                      placeholder={nl ? "Titel (EN)" : "Title (EN)"}
-                      className="rounded-lg border border-[#0e1a36]/15 px-3 py-1.5 text-sm bg-white"
+                    <BilingualInput
+                      label={nl ? "Uitleg" : "Explanation"}
+                      nameNl={`step-bodyNl-${idx}`}
+                      nameEn={`step-bodyEn-${idx}`}
+                      defaultValueNl={step.bodyNl}
+                      defaultValueEn={step.bodyEn}
+                      placeholderNl={nl ? "Uitleg (NL)" : "Explanation (NL)"}
+                      placeholderEn={nl ? "Uitleg (EN)" : "Explanation (EN)"}
+                      gridClassName="grid grid-cols-1 sm:grid-cols-2 gap-3"
                     />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      name={`step-bodyNl-${idx}`}
-                      defaultValue={step.bodyNl}
-                      placeholder={nl ? "Uitleg (NL)" : "Explanation (NL)"}
-                      className="rounded-lg border border-[#0e1a36]/15 px-3 py-1.5 text-sm bg-white"
-                    />
-                    <input
-                      type="text"
-                      name={`step-bodyEn-${idx}`}
-                      defaultValue={step.bodyEn}
-                      placeholder={nl ? "Uitleg (EN)" : "Explanation (EN)"}
-                      className="rounded-lg border border-[#0e1a36]/15 px-3 py-1.5 text-sm bg-white"
-                    />
-                  </div>
+                  </BilingualGroup>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] text-[#5c667f] mb-0.5">

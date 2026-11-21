@@ -5,7 +5,8 @@ import dynamic from "next/dynamic";
 import { ArrowLeft } from "lucide-react";
 import Link from "@/components/ui/Link";
 import type { MeetingKind } from "@prisma/client";
-import { Button, Card, Input, Label, Textarea } from "@vtk/ui";
+import { Button, Card, Input, Label } from "@vtk/ui";
+import { BilingualGroup, BilingualInput, BilingualTextarea } from "@/components/admin/BilingualField";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { BureauLinkButton } from "./BureauLinkButton";
@@ -438,16 +439,16 @@ export function MeetingDetail({
               </div>
             )}
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <Label>{nl ? "Toelichting (NL)" : "Note (NL)"}</Label>
-                <Textarea name="noteNl" defaultValue={meeting.noteNl} />
-              </div>
-              <div>
-                <Label>{nl ? "Toelichting (EN)" : "Note (EN)"}</Label>
-                <Textarea name="noteEn" defaultValue={meeting.noteEn} />
-              </div>
-            </div>
+            <BilingualGroup locale={nl ? "nl" : "en"} layout="side-by-side">
+              <BilingualTextarea
+                label={nl ? "Toelichting" : "Note"}
+                nameNl="noteNl"
+                nameEn="noteEn"
+                defaultValueNl={meeting.noteNl}
+                defaultValueEn={meeting.noteEn}
+                gridClassName="grid gap-3 sm:grid-cols-2"
+              />
+            </BilingualGroup>
           </SaveForm>
         </details>
 
@@ -688,28 +689,27 @@ function OptionRows({ nl, initial }: { nl: boolean; initial: MeetingOptionView[]
   }
 
   return (
-    <div className="space-y-2">
+    <BilingualGroup
+      locale={nl ? "nl" : "en"}
+      layout="side-by-side"
+      showBar={rows.length > 0}
+      className="space-y-2"
+    >
       <input type="hidden" name="optionCount" value={rows.length} />
       {rows.map((row, index) => (
-        <div key={row.id || `new-${index}`} className="grid gap-2 sm:grid-cols-[1fr_1fr_6rem_2rem] sm:items-end">
+        <div key={row.id || `new-${index}`} className="grid gap-2 sm:grid-cols-[1fr_6rem_2rem] sm:items-end">
           <input type="hidden" name={`option-${index}-id`} value={row.id} />
-          <div>
-            <Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label>
-            <Input
-              name={`option-${index}-nameNl`}
-              value={row.nameNl}
-              onChange={(event) => update(index, { nameNl: event.target.value })}
-              required
-            />
-          </div>
-          <div>
-            <Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label>
-            <Input
-              name={`option-${index}-nameEn`}
-              value={row.nameEn}
-              onChange={(event) => update(index, { nameEn: event.target.value })}
-            />
-          </div>
+          <BilingualInput
+            label={nl ? "Naam" : "Name"}
+            nameNl={`option-${index}-nameNl`}
+            nameEn={`option-${index}-nameEn`}
+            valueNl={row.nameNl}
+            valueEn={row.nameEn}
+            onChangeNl={(value) => update(index, { nameNl: value })}
+            onChangeEn={(value) => update(index, { nameEn: value })}
+            requiredNl
+            gridClassName="grid gap-2 sm:grid-cols-2"
+          />
           <div>
             <Label>{nl ? "Prijs €" : "Price €"}</Label>
             <Input
@@ -737,7 +737,7 @@ function OptionRows({ nl, initial }: { nl: boolean; initial: MeetingOptionView[]
       >
         + {nl ? "Keuze toevoegen" : "Add choice"}
       </Button>
-    </div>
+    </BilingualGroup>
   );
 }
 

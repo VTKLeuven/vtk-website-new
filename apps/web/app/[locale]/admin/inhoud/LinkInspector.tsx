@@ -3,6 +3,7 @@
 import { Card, Input, Label } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { saveHeaderTabLinkAction } from "@/app/actions/pages";
+import { BilingualGroup, BilingualInput } from "@/components/admin/BilingualField";
 import { StorageImageField } from "@/components/admin/StorageImageField";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { isExternalUrl } from "@/lib/href";
@@ -43,26 +44,18 @@ export function LinkInspector({
       >
         <input type="hidden" name="id" value={link.id} />
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <Label htmlFor={`link-${link.id}-labelNl`}>{nl ? "Label (NL)" : "Label (NL)"}</Label>
-            <Input
-              id={`link-${link.id}-labelNl`}
-              name="labelNl"
-              defaultValue={link.labelNl}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor={`link-${link.id}-labelEn`}>{nl ? "Label (EN)" : "Label (EN)"}</Label>
-            <Input
-              id={`link-${link.id}-labelEn`}
-              name="labelEn"
-              defaultValue={link.labelEn}
-              required
-            />
-          </div>
-        </div>
+        <BilingualGroup locale={locale} layout="side-by-side">
+          <BilingualInput
+            label="Label"
+            nameNl="labelNl"
+            nameEn="labelEn"
+            defaultValueNl={link.labelNl}
+            defaultValueEn={link.labelEn}
+            requiredNl
+            requiredEn
+            idPrefix={`link-${link.id}-label`}
+          />
+        </BilingualGroup>
 
         <div>
           <Label htmlFor={`link-${link.id}-url`}>

@@ -4,8 +4,8 @@ import { hasLocale } from "@/lib/locale";
 import type { Locale } from "@vtk/i18n";
 import { Input, Label } from "@vtk/ui";
 import { smtpConfigured } from "@vtk/mail";
+import { BilingualGroup, BilingualMarkdown } from "@/components/admin/BilingualField";
 import { SaveForm } from "@/components/ui/SaveForm";
-import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
 import { saveExpenseSettingsAction } from "@/app/actions/expenses";
 import { expenseAccess, getExpenseConfig, MAX_WORDS_RANGE } from "@/lib/rekeningen/server";
 import { formatBytes } from "@/lib/rekeningen/expenses";
@@ -110,41 +110,28 @@ export default async function RekeningenInstellingen({
             </p>
           </div>
 
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="guidelinesNl">
-                {nl ? "Richtlijnen boven het formulier (NL)" : "Guidelines above the form (NL)"}
-              </Label>
-              <MarkdownEditorField
-                name="guidelinesNl"
-                textareaId="guidelinesNl"
-                locale={locale}
-                rows={6}
-                maxLength={4000}
-                allowImages={false}
-                defaultValue={config.guidelinesNl}
-              />
-              <p className="mt-1 text-xs text-[#5c667f]">
-                {nl
-                  ? "Bijvoorbeeld: plak het bonnetje volledig en vlak, geen doorhalingen, gebruik meerdere bladen indien nodig."
-                  : "For example: stick the receipt down whole and flat, no crossings-out, use several sheets if needed."}
-              </p>
-            </div>
-            <div>
-              <Label htmlFor="guidelinesEn">
-                {nl ? "Richtlijnen boven het formulier (EN)" : "Guidelines above the form (EN)"}
-              </Label>
-              <MarkdownEditorField
-                name="guidelinesEn"
-                textareaId="guidelinesEn"
-                locale={locale}
-                rows={6}
-                maxLength={4000}
-                allowImages={false}
-                defaultValue={config.guidelinesEn}
-              />
-            </div>
-          </div>
+          <BilingualGroup
+            locale={locale}
+            layout="side-by-side"
+            enHint={
+              nl
+                ? "Bijvoorbeeld: plak het bonnetje volledig en vlak, geen doorhalingen, gebruik meerdere bladen indien nodig."
+                : "For example: stick the receipt down whole and flat, no crossings-out, use several sheets if needed."
+            }
+          >
+            <BilingualMarkdown
+              label={nl ? "Richtlijnen boven het formulier" : "Guidelines above the form"}
+              nameNl="guidelinesNl"
+              nameEn="guidelinesEn"
+              defaultValueNl={config.guidelinesNl}
+              defaultValueEn={config.guidelinesEn}
+              locale={locale}
+              rows={6}
+              maxLength={4000}
+              allowImages={false}
+              idPrefix="guidelines"
+            />
+          </BilingualGroup>
         </SaveForm>
       </div>
 

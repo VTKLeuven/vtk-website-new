@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Card, Input, Label } from "@vtk/ui";
+import { Card } from "@vtk/ui";
 import type { Locale } from "@vtk/i18n";
+import { BilingualGroup, BilingualInput } from "@/components/admin/BilingualField";
 import { StorageImageField } from "@/components/admin/StorageImageField";
 import { ImageFocusField } from "@/components/admin/ImageFocusField";
 import { SaveForm } from "@/components/ui/SaveForm";
@@ -103,37 +104,27 @@ export function PageCategoryImageCard({
         {/* Het bijschrift staat onder de plaat op de pagina zelf. Optioneel: een
             foto die voor zichzelf spreekt heeft er geen nodig, en dan staat er
             gewoon niets. */}
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <Label htmlFor={`caption-nl-${pageId}`}>
-              {nl ? "Bijschrift" : "Caption"}
-            </Label>
-            <Input
-              id={`caption-nl-${pageId}`}
-              name="captionNl"
-              defaultValue={captionNl ?? ""}
+        <div>
+          <BilingualGroup locale={locale} layout="side-by-side">
+            <BilingualInput
+              label={nl ? "Bijschrift" : "Caption"}
+              nameNl="captionNl"
+              nameEn="captionEn"
+              defaultValueNl={captionNl ?? ""}
+              defaultValueEn={captionEn ?? ""}
               maxLength={200}
-              placeholder={nl ? "Wie of wat staat er op?" : "Who or what is in the photo?"}
+              placeholderNl={nl ? "Wie of wat staat er op?" : "Who or what is in the photo?"}
+              placeholderEn={nl ? "Leeg = het Nederlandse" : "Empty = the Dutch one"}
+              idPrefix={`caption-${pageId}`}
+              gridClassName="grid gap-3 sm:grid-cols-2"
             />
-          </div>
-          <div>
-            <Label htmlFor={`caption-en-${pageId}`}>
-              {nl ? "Engels bijschrift" : "English caption"}
-            </Label>
-            <Input
-              id={`caption-en-${pageId}`}
-              name="captionEn"
-              defaultValue={captionEn ?? ""}
-              maxLength={200}
-              placeholder={nl ? "Leeg = het Nederlandse" : "Empty = the Dutch one"}
-            />
-          </div>
+          </BilingualGroup>
+          <p className="mt-1 text-xs text-[#5c667f]">
+            {nl
+              ? "Optioneel. Het bijschrift staat klein onder de plaat en is meteen ook de alt-tekst van de foto."
+              : "Optional. The caption sits below the plate in small type and doubles as the photo's alt text."}
+          </p>
         </div>
-        <p className="text-xs text-[#5c667f]">
-          {nl
-            ? "Optioneel. Het bijschrift staat klein onder de plaat en is meteen ook de alt-tekst van de foto."
-            : "Optional. The caption sits below the plate in small type and doubles as the photo's alt text."}
-        </p>
       </SaveForm>
     </Card>
   );

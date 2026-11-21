@@ -3,9 +3,14 @@
 import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useId, useState, useTransition } from "react";
 import Link from "@/components/ui/Link";
-import { Button, Card, ConfirmDialog, Input, Label, Select, Textarea } from "@vtk/ui";
+import { Button, Card, ConfirmDialog, Input, Label, Select } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { SaveForm } from "@/components/ui/SaveForm";
+import {
+  BilingualGroup,
+  BilingualInput,
+  BilingualTextarea,
+} from "@/components/admin/BilingualField";
 import { StorageImageField } from "@/components/admin/StorageImageField";
 import { SlugField } from "@/components/ui/SlugField";
 import { useToast } from "@/components/ui/toast";
@@ -75,16 +80,17 @@ export function PageInspector({
         <input type="hidden" name="id" value={page.id} />
         <input type="hidden" name="order" value={page.order} />
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <Label htmlFor={`${uid}-titleNl`}>{nl ? "Titel (NL)" : "Title (NL)"}</Label>
-            <Input id={`${uid}-titleNl`} name="titleNl" defaultValue={page.titleNl} required />
-          </div>
-          <div>
-            <Label htmlFor={`${uid}-titleEn`}>{nl ? "Titel (EN)" : "Title (EN)"}</Label>
-            <Input id={`${uid}-titleEn`} name="titleEn" defaultValue={page.titleEn ?? ""} />
-          </div>
-        </div>
+        <BilingualGroup locale={locale} layout="side-by-side">
+          <BilingualInput
+            label={nl ? "Titel" : "Title"}
+            nameNl="titleNl"
+            nameEn="titleEn"
+            defaultValueNl={page.titleNl}
+            defaultValueEn={page.titleEn ?? ""}
+            requiredNl
+            idPrefix={`${uid}-title`}
+          />
+        </BilingualGroup>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <SlugField
@@ -156,24 +162,23 @@ export function PageInspector({
 
         <PageRightsFields locale={locale} page={page} roles={roles} uid={uid} />
 
-        <div className="grid grid-cols-1 gap-4 border-t border-vtk-blue/10 pt-5 sm:grid-cols-2">
-          <div>
-            <Label htmlFor={`${uid}-excerptNl`}>
-              {nl ? "Korte beschrijving (NL)" : "Excerpt (NL)"}
-            </Label>
-            <Textarea id={`${uid}-excerptNl`} name="excerptNl" rows={2} defaultValue={page.excerptNl ?? ""} />
-            <p className="mt-1 text-xs text-[#5c667f]">
-              {nl
-                ? "Verschijnt op de kaart op de categoriepagina."
-                : "Shows on the card on the category page."}
-            </p>
-          </div>
-          <div>
-            <Label htmlFor={`${uid}-excerptEn`}>
-              {nl ? "Korte beschrijving (EN)" : "Excerpt (EN)"}
-            </Label>
-            <Textarea id={`${uid}-excerptEn`} name="excerptEn" rows={2} defaultValue={page.excerptEn ?? ""} />
-          </div>
+        <div className="border-t border-vtk-blue/10 pt-5">
+          <BilingualGroup locale={locale} layout="side-by-side">
+            <BilingualTextarea
+              label={nl ? "Korte beschrijving" : "Excerpt"}
+              nameNl="excerptNl"
+              nameEn="excerptEn"
+              defaultValueNl={page.excerptNl ?? ""}
+              defaultValueEn={page.excerptEn ?? ""}
+              rows={2}
+              idPrefix={`${uid}-excerpt`}
+            />
+          </BilingualGroup>
+          <p className="mt-1 text-xs text-[#5c667f]">
+            {nl
+              ? "Verschijnt op de kaart op de categoriepagina."
+              : "Shows on the card on the category page."}
+          </p>
         </div>
 
         <div className="border-t border-vtk-blue/10 pt-5">
@@ -193,19 +198,23 @@ export function PageInspector({
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-4 border-t border-vtk-blue/10 pt-5 sm:grid-cols-3">
+        <div className="space-y-4 border-t border-vtk-blue/10 pt-5">
           <div>
-            <Label htmlFor={`${uid}-ctaLabelNl`}>{nl ? "Knoptekst (NL)" : "Button label (NL)"}</Label>
-            <Input id={`${uid}-ctaLabelNl`} name="ctaLabelNl" defaultValue={page.ctaLabelNl ?? ""} />
+            <BilingualGroup locale={locale} layout="side-by-side">
+              <BilingualInput
+                label={nl ? "Knoptekst" : "Button label"}
+                nameNl="ctaLabelNl"
+                nameEn="ctaLabelEn"
+                defaultValueNl={page.ctaLabelNl ?? ""}
+                defaultValueEn={page.ctaLabelEn ?? ""}
+                idPrefix={`${uid}-ctaLabel`}
+              />
+            </BilingualGroup>
             <p className="mt-1 text-xs text-[#5c667f]">
               {nl
                 ? "Knop naast de titel, voor de app of het formulier waar deze pagina over gaat. Leeg laten geeft geen knop."
                 : "Button next to the title, for the app or form this page is about. Leave empty for no button."}
             </p>
-          </div>
-          <div>
-            <Label htmlFor={`${uid}-ctaLabelEn`}>{nl ? "Knoptekst (EN)" : "Button label (EN)"}</Label>
-            <Input id={`${uid}-ctaLabelEn`} name="ctaLabelEn" defaultValue={page.ctaLabelEn ?? ""} />
           </div>
           <div>
             <Label htmlFor={`${uid}-ctaUrl`}>{nl ? "Knopadres" : "Button URL"}</Label>

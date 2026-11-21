@@ -8,6 +8,11 @@ import {
 } from "@/app/actions/ticketTemplates";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
 import { SaveForm } from "@/components/ui/SaveForm";
+import {
+  BilingualGroup,
+  BilingualInput,
+  BilingualTextarea,
+} from "@/components/admin/BilingualField";
 import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
 import { PresaleFields } from "@/components/ticketing/admin/PresaleFields";
 import { SettingsPanel } from "@/components/ticketing/admin/SettingsPanel";
@@ -405,13 +410,17 @@ function TemplateEditor({
                 placeholder={nl ? "Eén regel onder de keuzelijst." : "One line below the list."}
               />
             </div>
-            <div className="ticket-admin-field">
-              <label htmlFor={field("titleNl")}>Titel (NL)</label>
-              <input id={field("titleNl")} name="titleNl" defaultValue={template.titleNl} />
-            </div>
-            <div className="ticket-admin-field">
-              <label htmlFor={field("titleEn")}>Titel (EN)</label>
-              <input id={field("titleEn")} name="titleEn" defaultValue={template.titleEn} />
+            <div data-span="2">
+              <BilingualGroup locale={locale} layout="side-by-side" className="space-y-2">
+                <BilingualInput
+                  label={nl ? "Titel" : "Title"}
+                  nameNl="titleNl"
+                  nameEn="titleEn"
+                  defaultValueNl={template.titleNl}
+                  defaultValueEn={template.titleEn}
+                  idPrefix={field("title")}
+                />
+              </BilingualGroup>
             </div>
             <div className="ticket-admin-field">
               <label htmlFor={field("location")}>{nl ? "Locatie" : "Location"}</label>
@@ -585,31 +594,22 @@ function TemplateEditor({
               : "Optional · extra visitor information"
           }
         >
-          <div className="ticket-admin-form-grid">
-            <div className="ticket-admin-field" data-span="2">
-              <label htmlFor={field("descNl")}>{nl ? "Beschrijving (NL)" : "Description (NL)"}</label>
-              <textarea
-                id={field("descNl")}
-                name="descriptionNl"
-                rows={6}
-                defaultValue={template.descriptionNl}
-              />
-              <span className="ticket-admin-help">
-                {nl
-                  ? "De vaste blokken (locatie, timing, prijzen). De datum vul je per editie in."
-                  : "The fixed blocks (location, timing, prices). The date is filled in per edition."}
-              </span>
-            </div>
-            <div className="ticket-admin-field" data-span="2">
-              <label htmlFor={field("descEn")}>{nl ? "Beschrijving (EN)" : "Description (EN)"}</label>
-              <textarea
-                id={field("descEn")}
-                name="descriptionEn"
-                rows={4}
-                defaultValue={template.descriptionEn}
-              />
-            </div>
-          </div>
+          <BilingualGroup locale={locale} layout="side-by-side" className="space-y-2">
+            <BilingualTextarea
+              label={nl ? "Beschrijving" : "Description"}
+              nameNl="descriptionNl"
+              nameEn="descriptionEn"
+              defaultValueNl={template.descriptionNl}
+              defaultValueEn={template.descriptionEn}
+              rows={6}
+              idPrefix={field("desc")}
+            />
+            <span className="ticket-admin-help">
+              {nl
+                ? "De vaste blokken (locatie, timing, prijzen). De datum vul je per editie in."
+                : "The fixed blocks (location, timing, prices). The date is filled in per edition."}
+            </span>
+          </BilingualGroup>
         </SettingsPanel>
 
         <SettingsPanel
@@ -623,30 +623,17 @@ function TemplateEditor({
               ? "Staat op het scherm zodra de bestelling betaald is, en in de bevestigingsmail met de tickets."
               : "Shown once the order is paid, and included in the confirmation email with the tickets."}
           </p>
-          <div className="ticket-admin-form-grid">
-            <div className="ticket-admin-field" data-span="2">
-              <label htmlFor={field("confirmNl")}>
-                {nl ? "Bevestigingsbericht (NL)" : "Confirmation message (NL)"}
-              </label>
-              <textarea
-                id={field("confirmNl")}
-                name="confirmationMessageNl"
-                rows={3}
-                defaultValue={template.confirmationMessageNl}
-              />
-            </div>
-            <div className="ticket-admin-field" data-span="2">
-              <label htmlFor={field("confirmEn")}>
-                {nl ? "Bevestigingsbericht (EN)" : "Confirmation message (EN)"}
-              </label>
-              <textarea
-                id={field("confirmEn")}
-                name="confirmationMessageEn"
-                rows={3}
-                defaultValue={template.confirmationMessageEn}
-              />
-            </div>
-          </div>
+          <BilingualGroup locale={locale} layout="side-by-side" className="space-y-2">
+            <BilingualTextarea
+              label={nl ? "Bevestigingsbericht" : "Confirmation message"}
+              nameNl="confirmationMessageNl"
+              nameEn="confirmationMessageEn"
+              defaultValueNl={template.confirmationMessageNl}
+              defaultValueEn={template.confirmationMessageEn}
+              rows={3}
+              idPrefix={field("confirm")}
+            />
+          </BilingualGroup>
         </SettingsPanel>
       </SaveForm>
 

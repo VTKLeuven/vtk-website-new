@@ -3,8 +3,8 @@
 import { unsentGuard, UNSENT } from "@/components/ui/unsentGuard";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { Input, Label } from "@vtk/ui";
+import { BilingualGroup, BilingualInput, BilingualMarkdown } from "@/components/admin/BilingualField";
 import { SaveForm } from "@/components/ui/SaveForm";
-import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
 import {
   saveWerkgroepAction,
   saveJaarwerkingAction,
@@ -342,8 +342,16 @@ export function WerkingenTable({
             {...saveLabels}
             onSuccess={() => setCreateOpen(false)}
           >
-            <div><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" required /></div>
-            <div><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" required /></div>
+            <BilingualGroup locale={locale} layout="side-by-side" className="md:col-span-2">
+              <BilingualInput
+                label={nl ? "Naam" : "Name"}
+                nameNl="nameNl"
+                nameEn="nameEn"
+                requiredNl
+                requiredEn
+                gridClassName="grid grid-cols-1 gap-3 md:grid-cols-2"
+              />
+            </BilingualGroup>
             <div><Label>{nl ? "Code" : "Code"}</Label><Input name="code" placeholder={nl ? "auto" : "auto"} /></div>
             <LeadLabelField
               id={`${kind.toLowerCase()}-new-lead-label`}
@@ -522,30 +530,18 @@ function WerkgroepDetail({
             {...saveLabels}
           >
             <input type="hidden" name="id" value={werkgroep.id} />
-            <div className="md:col-span-2">
-              <Label htmlFor={`werkgroep-${werkgroep.id}-description-nl`}>
-                {nl ? "Infotekst (NL)" : "Info text (NL)"}
-              </Label>
-              <MarkdownEditorField
-                name="descriptionNl"
-                defaultValue={werkgroep.descriptionNl}
+            <BilingualGroup locale={locale} layout="side-by-side" className="md:col-span-2 space-y-2">
+              <BilingualMarkdown
+                label={nl ? "Infotekst" : "Info text"}
+                nameNl="descriptionNl"
+                nameEn="descriptionEn"
+                defaultValueNl={werkgroep.descriptionNl}
+                defaultValueEn={werkgroep.descriptionEn}
                 locale={locale}
                 rows={8}
-                textareaId={`werkgroep-${werkgroep.id}-description-nl`}
+                idPrefix={`werkgroep-${werkgroep.id}-description`}
               />
-            </div>
-            <div className="md:col-span-2">
-              <Label htmlFor={`werkgroep-${werkgroep.id}-description-en`}>
-                {nl ? "Infotekst (EN)" : "Info text (EN)"}
-              </Label>
-              <MarkdownEditorField
-                name="descriptionEn"
-                defaultValue={werkgroep.descriptionEn}
-                locale={locale}
-                rows={8}
-                textareaId={`werkgroep-${werkgroep.id}-description-en`}
-              />
-            </div>
+            </BilingualGroup>
             <div className="md:col-span-2"><Label>Website</Label><Input name="website" defaultValue={werkgroep.website} placeholder="https://best.vtk.be" /></div>
           </SaveForm>
         </section>
@@ -699,8 +695,18 @@ function WerkgroepDetail({
                 {...saveLabels}
               >
                 <input type="hidden" name="id" value={werkgroep.id} />
-                <div><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" defaultValue={werkgroep.nameNl} required /></div>
-                <div><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" defaultValue={werkgroep.nameEn} required /></div>
+                <BilingualGroup locale={locale} layout="side-by-side" className="md:col-span-2">
+                  <BilingualInput
+                    label={nl ? "Naam" : "Name"}
+                    nameNl="nameNl"
+                    nameEn="nameEn"
+                    defaultValueNl={werkgroep.nameNl}
+                    defaultValueEn={werkgroep.nameEn}
+                    requiredNl
+                    requiredEn
+                    gridClassName="grid grid-cols-1 gap-3 md:grid-cols-2"
+                  />
+                </BilingualGroup>
                 <LeadLabelField
                   id={`${kind.toLowerCase()}-${werkgroep.id}-lead-label`}
                   value={werkgroep.leadLabel}

@@ -31,6 +31,11 @@ import {
   UsersRound,
 } from "lucide-react";
 import { SaveForm } from "@/components/ui/SaveForm";
+import {
+  BilingualGroup,
+  BilingualInput,
+  BilingualTextarea,
+} from "@/components/admin/BilingualField";
 import { DangerActionButton } from "./DangerActionButton";
 import { ticketColorKey, ticketColorLabel } from "@/lib/ticketing/ticketColors";
 import { TicketColorChoice } from "./TicketColorChoice";
@@ -493,22 +498,18 @@ function TicketTypeEditPanel({
           <input type="hidden" name="eventId" value={eventId} />
           <input type="hidden" name="ticketTypeId" value={ticketType.id} />
           <div className="ticket-admin-form-grid">
-            <div className="ticket-admin-field">
-              <label htmlFor={`ticket-type-${ticketType.id}-name-nl`}>Naam (NL)</label>
-              <input
-                id={`ticket-type-${ticketType.id}-name-nl`}
-                name="nameNl"
-                defaultValue={ticketType.nameNl}
-                required
-              />
-            </div>
-            <div className="ticket-admin-field">
-              <label htmlFor={`ticket-type-${ticketType.id}-name-en`}>Naam (EN)</label>
-              <input
-                id={`ticket-type-${ticketType.id}-name-en`}
-                name="nameEn"
-                defaultValue={ticketType.nameEn ?? ""}
-              />
+            <div data-span="2">
+              <BilingualGroup locale={locale} layout="side-by-side" className="space-y-2">
+                <BilingualInput
+                  label={locale === "nl" ? "Naam" : "Name"}
+                  nameNl="nameNl"
+                  nameEn="nameEn"
+                  defaultValueNl={ticketType.nameNl}
+                  defaultValueEn={ticketType.nameEn ?? ""}
+                  requiredNl
+                  idPrefix={`ticket-type-${ticketType.id}-name`}
+                />
+              </BilingualGroup>
             </div>
             <div className="ticket-admin-field">
               <label htmlFor={`ticket-type-${ticketType.id}-price`}>
@@ -720,6 +721,8 @@ export function TicketTypeManager({
 }) {
   const activePools = pools.filter((pool) => pool.active);
   const [newSalesStartLocal, setNewSalesStartLocal] = useState("");
+  const [poolFormKey, setPoolFormKey] = useState(0);
+  const [typeFormKey, setTypeFormKey] = useState(0);
   const [prevTicketTypes, setPrevTicketTypes] = useState<TicketType[]>(ticketTypes);
   const [items, setItems] = useState<TicketType[]>(ticketTypes);
   const [, startTransition] = useTransition();
@@ -861,13 +864,18 @@ export function TicketTypeManager({
                           <input type="hidden" name="eventId" value={eventId} />
                           <input type="hidden" name="poolId" value={pool.id} />
                           <div className="ticket-admin-form-grid">
-                            <div className="ticket-admin-field">
-                              <label htmlFor={`pool-name-nl-${pool.id}`}>Naam (NL)</label>
-                              <input id={`pool-name-nl-${pool.id}`} name="nameNl" defaultValue={pool.nameNl} required />
-                            </div>
-                            <div className="ticket-admin-field">
-                              <label htmlFor={`pool-name-en-${pool.id}`}>Naam (EN)</label>
-                              <input id={`pool-name-en-${pool.id}`} name="nameEn" defaultValue={pool.nameEn ?? ""} />
+                            <div data-span="2">
+                              <BilingualGroup locale={locale} layout="side-by-side" className="space-y-2">
+                                <BilingualInput
+                                  label={nl ? "Naam" : "Name"}
+                                  nameNl="nameNl"
+                                  nameEn="nameEn"
+                                  defaultValueNl={pool.nameNl}
+                                  defaultValueEn={pool.nameEn ?? ""}
+                                  requiredNl
+                                  idPrefix={`pool-name-${pool.id}`}
+                                />
+                              </BilingualGroup>
                             </div>
                             <div className="ticket-admin-field">
                               <label htmlFor={`pool-capacity-${pool.id}`}>{nl ? "Aantal plaatsen" : "Number of places"}</label>
@@ -933,6 +941,7 @@ export function TicketTypeManager({
               <SaveForm
                 action={createInventoryPoolAction}
                 className="ticket-admin-form"
+                onSuccess={() => setPoolFormKey((key) => key + 1)}
                 submitLabel={nl ? "Plaatsen toevoegen" : "Add places"}
                 savingLabel={nl ? "Toevoegen" : "Adding"}
                 savedMessage={
@@ -946,13 +955,22 @@ export function TicketTypeManager({
                 <input type="hidden" name="locale" value={locale} />
                 <input type="hidden" name="eventId" value={eventId} />
                 <div className="ticket-admin-form-grid">
-                  <div className="ticket-admin-field">
-                    <label htmlFor="pool-new-name-nl">Naam (NL)</label>
-                    <input id="pool-new-name-nl" name="nameNl" placeholder={nl ? "Proffen" : "Professors"} required />
-                  </div>
-                  <div className="ticket-admin-field">
-                    <label htmlFor="pool-new-name-en">Naam (EN)</label>
-                    <input id="pool-new-name-en" name="nameEn" />
+                  <div data-span="2">
+                    <BilingualGroup
+                      key={poolFormKey}
+                      locale={locale}
+                      layout="side-by-side"
+                      className="space-y-2"
+                    >
+                      <BilingualInput
+                        label={nl ? "Naam" : "Name"}
+                        nameNl="nameNl"
+                        nameEn="nameEn"
+                        placeholderNl={nl ? "Proffen" : "Professors"}
+                        requiredNl
+                        idPrefix="pool-new-name"
+                      />
+                    </BilingualGroup>
                   </div>
                   <div className="ticket-admin-field">
                     <label htmlFor="pool-new-capacity">{nl ? "Aantal plaatsen" : "Number of places"}</label>
@@ -1125,6 +1143,7 @@ export function TicketTypeManager({
                 onSuccess={() => {
                   setNewAudience("PUBLIC");
                   setNewSalesStartLocal("");
+                  setTypeFormKey((key) => key + 1);
                 }}
                 errorMessages={{
                   NAME_REQUIRED:
@@ -1151,15 +1170,24 @@ export function TicketTypeManager({
               >
                 <input type="hidden" name="locale" value={locale} />
                 <input type="hidden" name="eventId" value={eventId} />
-                <div className="ticket-admin-form-grid">
-                  <div className="ticket-admin-field">
-                    <label htmlFor="ticket-type-name-nl">Naam (NL)</label>
-                    <input id="ticket-type-name-nl" name="nameNl" required />
-                  </div>
-                  <div className="ticket-admin-field">
-                    <label htmlFor="ticket-type-name-en">Naam (EN)</label>
-                    <input id="ticket-type-name-en" name="nameEn" />
-                  </div>
+                <BilingualGroup
+                  key={typeFormKey}
+                  locale={locale}
+                  layout="side-by-side"
+                  showBar={false}
+                  className="contents"
+                >
+                  <div className="ticket-admin-form-grid">
+                    <div data-span="2">
+                      <BilingualInput
+                        label={locale === "nl" ? "Naam" : "Name"}
+                        nameNl="nameNl"
+                        nameEn="nameEn"
+                        requiredNl
+                        idPrefix="ticket-type-name"
+                        showBar
+                      />
+                    </div>
                   {activePools.length > 1 ? (
                     <div className="ticket-admin-field">
                       <label htmlFor="ticket-type-pool">{nl ? "Gaat af van de plaatsen" : "Takes from the places"}</label>
@@ -1236,15 +1264,18 @@ export function TicketTypeManager({
                     <label htmlFor="ticket-type-sales-end">{locale === "nl" ? "Verkoop einde" : "Sales end"}</label>
                     <input id="ticket-type-sales-end" name="salesEndAt" type="datetime-local" />
                   </div>
-                  <div className="ticket-admin-field" data-span="2">
-                    <label htmlFor="ticket-type-description-nl">Beschrijving (NL)</label>
-                    <textarea id="ticket-type-description-nl" name="descriptionNl" rows={2} />
+                    <div data-span="2">
+                      <BilingualTextarea
+                        label={locale === "nl" ? "Beschrijving" : "Description"}
+                        nameNl="descriptionNl"
+                        nameEn="descriptionEn"
+                        rows={2}
+                        idPrefix="ticket-type-description"
+                        showBar
+                      />
+                    </div>
                   </div>
-                  <div className="ticket-admin-field" data-span="2">
-                    <label htmlFor="ticket-type-description-en">Beschrijving (EN)</label>
-                    <textarea id="ticket-type-description-en" name="descriptionEn" rows={2} />
-                  </div>
-                </div>
+                </BilingualGroup>
               </SaveForm>
             )}
           </div>

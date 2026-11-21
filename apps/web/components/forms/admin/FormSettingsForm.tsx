@@ -1,8 +1,14 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { saveFormSettingsAction } from "@/app/actions/forms";
-import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
+import {
+  BilingualGroup,
+  BilingualInput,
+  BilingualMarkdown,
+  BilingualTextarea,
+} from "@/components/admin/BilingualField";
+import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
 import { AutoSaveForm } from "@/components/ui/AutoSaveForm";
 import { ExclusiveChoiceGroup } from "@/components/ui/ExclusiveChoiceGroup";
 import { ThemedSelect } from "@/components/ui/ThemedSelect";
@@ -70,6 +76,29 @@ export function FormSettingsForm({
   const [requireConsent, setRequireConsent] = useState(values.requireConsent);
   const [notifyMode, setNotifyMode] = useState(values.notifyMode);
   const [pageId, setPageId] = useState(values.pageId ?? "");
+  const [titleNl, setTitleNl] = useState(values.titleNl);
+  const [titleEn, setTitleEn] = useState(values.titleEn ?? "");
+  const [introNl, setIntroNl] = useState(values.introNl ?? "");
+  const [introEn, setIntroEn] = useState(values.introEn ?? "");
+  const [thankYouNl, setThankYouNl] = useState(values.thankYouNl ?? "");
+  const [thankYouEn, setThankYouEn] = useState(values.thankYouEn ?? "");
+  const [confirmationSubjectNl, setConfirmationSubjectNl] = useState(
+    values.confirmationSubjectNl ?? "",
+  );
+  const [confirmationSubjectEn, setConfirmationSubjectEn] = useState(
+    values.confirmationSubjectEn ?? "",
+  );
+  const [confirmationBodyNl, setConfirmationBodyNl] = useState(values.confirmationBodyNl ?? "");
+  const [confirmationBodyEn, setConfirmationBodyEn] = useState(values.confirmationBodyEn ?? "");
+  const [consentTextNl, setConsentTextNl] = useState(values.consentTextNl ?? "");
+  const [consentTextEn, setConsentTextEn] = useState(values.consentTextEn ?? "");
+  const formContentRef = useRef<HTMLDivElement>(null);
+
+  function notifyAutoSave() {
+    requestAnimationFrame(() => {
+      formContentRef.current?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
 
   const showEnglish = localeMode !== "NL_ONLY";
   const showDutch = localeMode !== "EN_ONLY";
@@ -122,32 +151,32 @@ export function FormSettingsForm({
           : "That page already carries another form.",
       }}
     >
+      <div ref={formContentRef} className="contents">
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="formId" value={values.id} />
 
       <fieldset className="form-admin-fieldset">
         <legend>{nl ? "De form" : "The form"}</legend>
-        <div className="form-admin-language-grid">
-          <div className="ticket-admin-field">
-            <label htmlFor="settings-title-nl">{nl ? "Titel (NL)" : "Title (NL)"}</label>
-            <input
-              id="settings-title-nl"
-              name="titleNl"
-              defaultValue={values.titleNl}
-              maxLength={200}
-              required
-            />
-          </div>
-          <div className="ticket-admin-field">
-            <label htmlFor="settings-title-en">{nl ? "Titel (EN)" : "Title (EN)"}</label>
-            <input
-              id="settings-title-en"
-              name="titleEn"
-              defaultValue={values.titleEn ?? ""}
-              maxLength={200}
-            />
-          </div>
-        </div>
+        <BilingualGroup locale={locale} layout="side-by-side" className="space-y-2">
+          <BilingualInput
+            label={nl ? "Titel" : "Title"}
+            nameNl="titleNl"
+            nameEn="titleEn"
+            valueNl={titleNl}
+            valueEn={titleEn}
+            onChangeNl={(next) => {
+              setTitleNl(next);
+              notifyAutoSave();
+            }}
+            onChangeEn={(next) => {
+              setTitleEn(next);
+              notifyAutoSave();
+            }}
+            requiredNl
+            maxLength={200}
+            idPrefix="settings-title"
+          />
+        </BilingualGroup>
         <div className="ticket-admin-form-grid form-admin-align-fields">
           <div className="ticket-admin-field">
             <label htmlFor="settings-slug">URL</label>
@@ -163,40 +192,71 @@ export function FormSettingsForm({
           </div>
         </div>
 
-        <div className="form-admin-language-grid">
-          {showDutch ? (
-            <div className="ticket-admin-field">
-              <label htmlFor="settings-intro-nl">
-                {nl ? "Introductie (NL)" : "Introduction (NL)"}
-              </label>
-              <MarkdownEditorField
-                name="introNl"
-                defaultValue={values.introNl}
-                locale={locale}
-                rows={7}
-                textareaId="settings-intro-nl"
-              />
-            </div>
-          ) : (
-            <input type="hidden" name="introNl" value={values.introNl ?? ""} />
-          )}
-          {showEnglish ? (
-            <div className="ticket-admin-field">
-              <label htmlFor="settings-intro-en">
-                {nl ? "Introductie (EN)" : "Introduction (EN)"}
-              </label>
-              <MarkdownEditorField
-                name="introEn"
-                defaultValue={values.introEn}
-                locale={locale}
-                rows={7}
-                textareaId="settings-intro-en"
-              />
-            </div>
-          ) : (
-            <input type="hidden" name="introEn" value={values.introEn ?? ""} />
-          )}
-        </div>
+        {showDutch && showEnglish ? (
+          <BilingualGroup locale={locale} layout="side-by-side" className="space-y-2">
+            <BilingualMarkdown
+              label={nl ? "Introductie" : "Introduction"}
+              nameNl="introNl"
+              nameEn="introEn"
+              valueNl={introNl}
+              valueEn={introEn}
+              onChangeNl={(next) => {
+                setIntroNl(next);
+                notifyAutoSave();
+              }}
+              onChangeEn={(next) => {
+                setIntroEn(next);
+                notifyAutoSave();
+              }}
+              locale={locale}
+              rows={7}
+              idPrefix="settings-intro"
+            />
+          </BilingualGroup>
+        ) : (
+          <div className="form-admin-language-grid">
+            {showDutch ? (
+              <div className="ticket-admin-field">
+                <label htmlFor="settings-intro-nl">
+                  {nl ? "Introductie (NL)" : "Introduction (NL)"}
+                </label>
+                <input type="hidden" name="introNl" value={introNl} />
+                <MarkdownEditor
+                  value={introNl}
+                  onChange={(next) => {
+                    setIntroNl(next);
+                    notifyAutoSave();
+                  }}
+                  locale={locale}
+                  rows={7}
+                  textareaId="settings-intro-nl"
+                />
+              </div>
+            ) : (
+              <input type="hidden" name="introNl" value={introNl} />
+            )}
+            {showEnglish ? (
+              <div className="ticket-admin-field">
+                <label htmlFor="settings-intro-en">
+                  {nl ? "Introductie (EN)" : "Introduction (EN)"}
+                </label>
+                <input type="hidden" name="introEn" value={introEn} />
+                <MarkdownEditor
+                  value={introEn}
+                  onChange={(next) => {
+                    setIntroEn(next);
+                    notifyAutoSave();
+                  }}
+                  locale={locale}
+                  rows={7}
+                  textareaId="settings-intro-en"
+                />
+              </div>
+            ) : (
+              <input type="hidden" name="introEn" value={introEn} />
+            )}
+          </div>
+        )}
       </fieldset>
 
       <fieldset className="form-admin-fieldset">
@@ -399,41 +459,67 @@ export function FormSettingsForm({
 
       <fieldset className="form-admin-fieldset">
         <legend>{nl ? "Na het indienen" : "After submitting"}</legend>
-        <div className="form-admin-language-grid">
-          {showDutch ? (
-            <div className="ticket-admin-field">
-              <label htmlFor="settings-thankyou-nl">
-                {nl ? "Bedanktekst (NL)" : "Thank-you text (NL)"}
-              </label>
-              <textarea
-                id="settings-thankyou-nl"
-                name="thankYouNl"
-                defaultValue={values.thankYouNl ?? ""}
-                rows={3}
-                maxLength={5_000}
-                placeholder={nl ? "Bedankt, we hebben je inzending goed ontvangen." : ""}
-              />
-            </div>
-          ) : (
-            <input type="hidden" name="thankYouNl" value={values.thankYouNl ?? ""} />
-          )}
-          {showEnglish ? (
-            <div className="ticket-admin-field">
-              <label htmlFor="settings-thankyou-en">
-                {nl ? "Bedanktekst (EN)" : "Thank-you text (EN)"}
-              </label>
-              <textarea
-                id="settings-thankyou-en"
-                name="thankYouEn"
-                defaultValue={values.thankYouEn ?? ""}
-                rows={3}
-                maxLength={5_000}
-              />
-            </div>
-          ) : (
-            <input type="hidden" name="thankYouEn" value={values.thankYouEn ?? ""} />
-          )}
-        </div>
+        {showDutch && showEnglish ? (
+          <BilingualGroup locale={locale} layout="side-by-side" className="space-y-2">
+            <BilingualTextarea
+              label={nl ? "Bedanktekst" : "Thank-you text"}
+              nameNl="thankYouNl"
+              nameEn="thankYouEn"
+              valueNl={thankYouNl}
+              valueEn={thankYouEn}
+              onChangeNl={(next) => {
+                setThankYouNl(next);
+                notifyAutoSave();
+              }}
+              onChangeEn={(next) => {
+                setThankYouEn(next);
+                notifyAutoSave();
+              }}
+              placeholderNl={nl ? "Bedankt, we hebben je inzending goed ontvangen." : ""}
+              rows={3}
+              maxLength={5_000}
+              idPrefix="settings-thankyou"
+            />
+          </BilingualGroup>
+        ) : (
+          <div className="form-admin-language-grid">
+            {showDutch ? (
+              <div className="ticket-admin-field">
+                <label htmlFor="settings-thankyou-nl">
+                  {nl ? "Bedanktekst (NL)" : "Thank-you text (NL)"}
+                </label>
+                <textarea
+                  id="settings-thankyou-nl"
+                  name="thankYouNl"
+                  value={thankYouNl}
+                  onChange={(event) => setThankYouNl(event.target.value)}
+                  rows={3}
+                  maxLength={5_000}
+                  placeholder={nl ? "Bedankt, we hebben je inzending goed ontvangen." : ""}
+                />
+              </div>
+            ) : (
+              <input type="hidden" name="thankYouNl" value={thankYouNl} />
+            )}
+            {showEnglish ? (
+              <div className="ticket-admin-field">
+                <label htmlFor="settings-thankyou-en">
+                  {nl ? "Bedanktekst (EN)" : "Thank-you text (EN)"}
+                </label>
+                <textarea
+                  id="settings-thankyou-en"
+                  name="thankYouEn"
+                  value={thankYouEn}
+                  onChange={(event) => setThankYouEn(event.target.value)}
+                  rows={3}
+                  maxLength={5_000}
+                />
+              </div>
+            ) : (
+              <input type="hidden" name="thankYouEn" value={thankYouEn} />
+            )}
+          </div>
+        )}
 
         <SettingToggle
           name="confirmationEnabled"
@@ -449,88 +535,134 @@ export function FormSettingsForm({
 
         {confirmationEnabled ? (
           <div className="ticket-admin-form form-admin-nested-settings">
-            <div className="form-admin-language-grid">
-              {showDutch ? (
-                <div className="ticket-admin-field">
-                  <label htmlFor="settings-confirm-subject-nl">
-                    {nl ? "Onderwerp (NL)" : "Subject (NL)"}
-                  </label>
-                  <input
-                    id="settings-confirm-subject-nl"
-                    name="confirmationSubjectNl"
-                    defaultValue={values.confirmationSubjectNl ?? ""}
-                    maxLength={200}
-                  />
-                </div>
-              ) : (
-                <input
-                  type="hidden"
-                  name="confirmationSubjectNl"
-                  value={values.confirmationSubjectNl ?? ""}
+            {showDutch && showEnglish ? (
+              <BilingualGroup locale={locale} layout="side-by-side" className="space-y-3">
+                <BilingualInput
+                  label={nl ? "Onderwerp" : "Subject"}
+                  nameNl="confirmationSubjectNl"
+                  nameEn="confirmationSubjectEn"
+                  valueNl={confirmationSubjectNl}
+                  valueEn={confirmationSubjectEn}
+                  onChangeNl={(next) => {
+                    setConfirmationSubjectNl(next);
+                    notifyAutoSave();
+                  }}
+                  onChangeEn={(next) => {
+                    setConfirmationSubjectEn(next);
+                    notifyAutoSave();
+                  }}
+                  maxLength={200}
+                  idPrefix="settings-confirm-subject"
                 />
-              )}
-              {showEnglish ? (
-                <div className="ticket-admin-field">
-                  <label htmlFor="settings-confirm-subject-en">
-                    {nl ? "Onderwerp (EN)" : "Subject (EN)"}
-                  </label>
-                  <input
-                    id="settings-confirm-subject-en"
-                    name="confirmationSubjectEn"
-                    defaultValue={values.confirmationSubjectEn ?? ""}
-                    maxLength={200}
-                  />
-                </div>
-              ) : (
-                <input
-                  type="hidden"
-                  name="confirmationSubjectEn"
-                  value={values.confirmationSubjectEn ?? ""}
+                <BilingualTextarea
+                  label={nl ? "Bericht" : "Message"}
+                  nameNl="confirmationBodyNl"
+                  nameEn="confirmationBodyEn"
+                  valueNl={confirmationBodyNl}
+                  valueEn={confirmationBodyEn}
+                  onChangeNl={(next) => {
+                    setConfirmationBodyNl(next);
+                    notifyAutoSave();
+                  }}
+                  onChangeEn={(next) => {
+                    setConfirmationBodyEn(next);
+                    notifyAutoSave();
+                  }}
+                  rows={4}
+                  maxLength={10_000}
+                  idPrefix="settings-confirm-body"
                 />
-              )}
-            </div>
-            <div className="form-admin-language-grid">
-              {showDutch ? (
-                <div className="ticket-admin-field">
-                  <label htmlFor="settings-confirm-body-nl">
-                    {nl ? "Bericht (NL)" : "Message (NL)"}
-                  </label>
-                  <textarea
-                    id="settings-confirm-body-nl"
-                    name="confirmationBodyNl"
-                    defaultValue={values.confirmationBodyNl ?? ""}
-                    rows={4}
-                    maxLength={10_000}
-                  />
+              </BilingualGroup>
+            ) : (
+              <>
+                <div className="form-admin-language-grid">
+                  {showDutch ? (
+                    <div className="ticket-admin-field">
+                      <label htmlFor="settings-confirm-subject-nl">
+                        {nl ? "Onderwerp (NL)" : "Subject (NL)"}
+                      </label>
+                      <input
+                        id="settings-confirm-subject-nl"
+                        name="confirmationSubjectNl"
+                        value={confirmationSubjectNl}
+                        onChange={(event) => setConfirmationSubjectNl(event.target.value)}
+                        maxLength={200}
+                      />
+                    </div>
+                  ) : (
+                    <input
+                      type="hidden"
+                      name="confirmationSubjectNl"
+                      value={confirmationSubjectNl}
+                    />
+                  )}
+                  {showEnglish ? (
+                    <div className="ticket-admin-field">
+                      <label htmlFor="settings-confirm-subject-en">
+                        {nl ? "Onderwerp (EN)" : "Subject (EN)"}
+                      </label>
+                      <input
+                        id="settings-confirm-subject-en"
+                        name="confirmationSubjectEn"
+                        value={confirmationSubjectEn}
+                        onChange={(event) => setConfirmationSubjectEn(event.target.value)}
+                        maxLength={200}
+                      />
+                    </div>
+                  ) : (
+                    <input
+                      type="hidden"
+                      name="confirmationSubjectEn"
+                      value={confirmationSubjectEn}
+                    />
+                  )}
                 </div>
-              ) : (
-                <input
-                  type="hidden"
-                  name="confirmationBodyNl"
-                  value={values.confirmationBodyNl ?? ""}
-                />
-              )}
-              {showEnglish ? (
-                <div className="ticket-admin-field">
-                  <label htmlFor="settings-confirm-body-en">
-                    {nl ? "Bericht (EN)" : "Message (EN)"}
-                  </label>
-                  <textarea
-                    id="settings-confirm-body-en"
-                    name="confirmationBodyEn"
-                    defaultValue={values.confirmationBodyEn ?? ""}
-                    rows={4}
-                    maxLength={10_000}
-                  />
+                <div className="form-admin-language-grid">
+                  {showDutch ? (
+                    <div className="ticket-admin-field">
+                      <label htmlFor="settings-confirm-body-nl">
+                        {nl ? "Bericht (NL)" : "Message (NL)"}
+                      </label>
+                      <textarea
+                        id="settings-confirm-body-nl"
+                        name="confirmationBodyNl"
+                        value={confirmationBodyNl}
+                        onChange={(event) => setConfirmationBodyNl(event.target.value)}
+                        rows={4}
+                        maxLength={10_000}
+                      />
+                    </div>
+                  ) : (
+                    <input
+                      type="hidden"
+                      name="confirmationBodyNl"
+                      value={confirmationBodyNl}
+                    />
+                  )}
+                  {showEnglish ? (
+                    <div className="ticket-admin-field">
+                      <label htmlFor="settings-confirm-body-en">
+                        {nl ? "Bericht (EN)" : "Message (EN)"}
+                      </label>
+                      <textarea
+                        id="settings-confirm-body-en"
+                        name="confirmationBodyEn"
+                        value={confirmationBodyEn}
+                        onChange={(event) => setConfirmationBodyEn(event.target.value)}
+                        rows={4}
+                        maxLength={10_000}
+                      />
+                    </div>
+                  ) : (
+                    <input
+                      type="hidden"
+                      name="confirmationBodyEn"
+                      value={confirmationBodyEn}
+                    />
+                  )}
                 </div>
-              ) : (
-                <input
-                  type="hidden"
-                  name="confirmationBodyEn"
-                  value={values.confirmationBodyEn ?? ""}
-                />
-              )}
-            </div>
+              </>
+            )}
             <div className="form-admin-toggle-grid">
               <SettingToggle
                 name="confirmationIncludeAnswers"
@@ -561,22 +693,22 @@ export function FormSettingsForm({
             <input
               type="hidden"
               name="confirmationSubjectNl"
-              value={values.confirmationSubjectNl ?? ""}
+              value={confirmationSubjectNl}
             />
             <input
               type="hidden"
               name="confirmationSubjectEn"
-              value={values.confirmationSubjectEn ?? ""}
+              value={confirmationSubjectEn}
             />
             <input
               type="hidden"
               name="confirmationBodyNl"
-              value={values.confirmationBodyNl ?? ""}
+              value={confirmationBodyNl}
             />
             <input
               type="hidden"
               name="confirmationBodyEn"
-              value={values.confirmationBodyEn ?? ""}
+              value={confirmationBodyEn}
             />
             <input
               type="hidden"
@@ -661,54 +793,89 @@ export function FormSettingsForm({
           }
         />
         {requireConsent ? (
-          <div className="form-admin-language-grid">
-            {showDutch ? (
-              <div className="ticket-admin-field">
-                <label htmlFor="settings-consent-nl">
-                  {nl ? "Tekst naast het vinkje (NL)" : "Text next to the checkbox (NL)"}
-                </label>
-                <textarea
-                  id="settings-consent-nl"
-                  name="consentTextNl"
-                  defaultValue={values.consentTextNl ?? ""}
-                  rows={3}
-                  maxLength={1_000}
-                  placeholder={
-                    nl
-                      ? "Ik ga ermee akkoord dat VTK deze gegevens gebruikt om mijn inschrijving te verwerken."
-                      : ""
-                  }
-                />
-                <span className="ticket-admin-help">
-                  {nl
-                    ? "Zeg wat je met de gegevens doet en wie ze te zien krijgt, niet enkel dat de bezoeker akkoord gaat."
-                    : "Say what you do with the data and who gets to see it, not only that the visitor agrees."}
-                </span>
-              </div>
-            ) : (
-              <input type="hidden" name="consentTextNl" value={values.consentTextNl ?? ""} />
-            )}
-            {showEnglish ? (
-              <div className="ticket-admin-field">
-                <label htmlFor="settings-consent-en">
-                  {nl ? "Tekst naast het vinkje (EN)" : "Text next to the checkbox (EN)"}
-                </label>
-                <textarea
-                  id="settings-consent-en"
-                  name="consentTextEn"
-                  defaultValue={values.consentTextEn ?? ""}
-                  rows={3}
-                  maxLength={1_000}
-                />
-              </div>
-            ) : (
-              <input type="hidden" name="consentTextEn" value={values.consentTextEn ?? ""} />
-            )}
-          </div>
+          showDutch && showEnglish ? (
+            <BilingualGroup locale={locale} layout="side-by-side" className="space-y-2">
+              <BilingualTextarea
+                label={nl ? "Tekst naast het vinkje" : "Text next to the checkbox"}
+                nameNl="consentTextNl"
+                nameEn="consentTextEn"
+                valueNl={consentTextNl}
+                valueEn={consentTextEn}
+                onChangeNl={(next) => {
+                  setConsentTextNl(next);
+                  notifyAutoSave();
+                }}
+                onChangeEn={(next) => {
+                  setConsentTextEn(next);
+                  notifyAutoSave();
+                }}
+                placeholderNl={
+                  nl
+                    ? "Ik ga ermee akkoord dat VTK deze gegevens gebruikt om mijn inschrijving te verwerken."
+                    : ""
+                }
+                rows={3}
+                maxLength={1_000}
+                idPrefix="settings-consent"
+              />
+              <span className="ticket-admin-help">
+                {nl
+                  ? "Zeg wat je met de gegevens doet en wie ze te zien krijgt, niet enkel dat de bezoeker akkoord gaat."
+                  : "Say what you do with the data and who gets to see it, not only that the visitor agrees."}
+              </span>
+            </BilingualGroup>
+          ) : (
+            <div className="form-admin-language-grid">
+              {showDutch ? (
+                <div className="ticket-admin-field">
+                  <label htmlFor="settings-consent-nl">
+                    {nl ? "Tekst naast het vinkje (NL)" : "Text next to the checkbox (NL)"}
+                  </label>
+                  <textarea
+                    id="settings-consent-nl"
+                    name="consentTextNl"
+                    value={consentTextNl}
+                    onChange={(event) => setConsentTextNl(event.target.value)}
+                    rows={3}
+                    maxLength={1_000}
+                    placeholder={
+                      nl
+                        ? "Ik ga ermee akkoord dat VTK deze gegevens gebruikt om mijn inschrijving te verwerken."
+                        : ""
+                    }
+                  />
+                  <span className="ticket-admin-help">
+                    {nl
+                      ? "Zeg wat je met de gegevens doet en wie ze te zien krijgt, niet enkel dat de bezoeker akkoord gaat."
+                      : "Say what you do with the data and who gets to see it, not only that the visitor agrees."}
+                  </span>
+                </div>
+              ) : (
+                <input type="hidden" name="consentTextNl" value={consentTextNl} />
+              )}
+              {showEnglish ? (
+                <div className="ticket-admin-field">
+                  <label htmlFor="settings-consent-en">
+                    {nl ? "Tekst naast het vinkje (EN)" : "Text next to the checkbox (EN)"}
+                  </label>
+                  <textarea
+                    id="settings-consent-en"
+                    name="consentTextEn"
+                    value={consentTextEn}
+                    onChange={(event) => setConsentTextEn(event.target.value)}
+                    rows={3}
+                    maxLength={1_000}
+                  />
+                </div>
+              ) : (
+                <input type="hidden" name="consentTextEn" value={consentTextEn} />
+              )}
+            </div>
+          )
         ) : (
           <>
-            <input type="hidden" name="consentTextNl" value={values.consentTextNl ?? ""} />
-            <input type="hidden" name="consentTextEn" value={values.consentTextEn ?? ""} />
+            <input type="hidden" name="consentTextNl" value={consentTextNl} />
+            <input type="hidden" name="consentTextEn" value={consentTextEn} />
           </>
         )}
 
@@ -790,6 +957,7 @@ export function FormSettingsForm({
       ) : (
         <input type="hidden" name="calendarEventId" value={values.calendarEventId ?? ""} />
       )}
+      </div>
     </AutoSaveForm>
   );
 }

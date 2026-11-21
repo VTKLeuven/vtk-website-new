@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { Card, Input, Label } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
+import { BilingualGroup, BilingualInput } from "@/components/admin/BilingualField";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { deletePianoClosureAction, savePianoClosureAction } from "@/app/actions/piano";
@@ -28,6 +30,8 @@ export function PianoClosuresManager({
 }) {
   const nl = locale === "nl";
   const dict = getDictionary(locale);
+  const [reasonNl, setReasonNl] = useState("");
+  const [reasonEn, setReasonEn] = useState("");
 
   const errorMessages = nl
     ? {
@@ -59,6 +63,10 @@ export function PianoClosuresManager({
           savedMessage={nl ? "Sluitingsdag toegevoegd" : "Closure added"}
           errorMessages={errorMessages}
           fallbackErrorMessage={dict.common.saveError}
+          onSuccess={() => {
+            setReasonNl("");
+            setReasonEn("");
+          }}
         >
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
@@ -74,16 +82,19 @@ export function PianoClosuresManager({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="closure-reason-nl">{nl ? "Reden (NL)" : "Reason (NL)"}</Label>
-              <Input id="closure-reason-nl" name="reasonNl" required />
-            </div>
-            <div>
-              <Label htmlFor="closure-reason-en">{nl ? "Reden (EN)" : "Reason (EN)"}</Label>
-              <Input id="closure-reason-en" name="reasonEn" />
-            </div>
-          </div>
+          <BilingualGroup locale={locale} layout="side-by-side">
+            <BilingualInput
+              label={nl ? "Reden" : "Reason"}
+              nameNl="reasonNl"
+              nameEn="reasonEn"
+              valueNl={reasonNl}
+              valueEn={reasonEn}
+              onChangeNl={setReasonNl}
+              onChangeEn={setReasonEn}
+              requiredNl
+              idPrefix="closure-reason"
+            />
+          </BilingualGroup>
         </SaveForm>
       </Card>
 

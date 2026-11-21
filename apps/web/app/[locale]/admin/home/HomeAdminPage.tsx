@@ -2,8 +2,13 @@ import Link from "@/components/ui/Link";
 import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
 import { getDictionary, type Locale } from "@vtk/i18n";
-import { Card, Input, Label, Textarea } from "@vtk/ui";
+import { Card, Input, Label } from "@vtk/ui";
 import { ThemedSelect } from "@/components/ui/ThemedSelect";
+import {
+  BilingualGroup,
+  BilingualInput,
+  BilingualTextarea,
+} from "@/components/admin/BilingualField";
 import { StorageImageField } from "@/components/admin/StorageImageField";
 import {
   AANBOD_DEFAULT_BODY_EN,
@@ -248,35 +253,27 @@ export async function HomeAdminPage({ locale, section }: { locale: Locale; secti
                         : "This card has no default photo: without an upload it shows the striped pattern."
                   }
                 />
-                <div className="space-y-1">
-                  <Label htmlFor={`homeBodyNl-${tab.id}`}>
-                    {locale === "nl" ? "Tekst (NL)" : "Text (NL)"}
-                  </Label>
-                  <Textarea
-                    id={`homeBodyNl-${tab.id}`}
-                    name="homeBodyNl"
-                    defaultValue={tab.homeBodyNl ?? ""}
-                    placeholder={AANBOD_DEFAULT_BODY_NL}
-                    rows={2}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor={`homeBodyEn-${tab.id}`}>
-                    {locale === "nl" ? "Tekst (EN)" : "Text (EN)"}
-                  </Label>
-                  <Textarea
-                    id={`homeBodyEn-${tab.id}`}
-                    name="homeBodyEn"
-                    defaultValue={tab.homeBodyEn ?? ""}
-                    placeholder={tab.homeBodyNl?.trim() || AANBOD_DEFAULT_BODY_EN}
-                    rows={2}
-                  />
-                  <p className="text-xs text-[#5c667f]">
-                    {locale === "nl"
+                <BilingualGroup
+                  locale={locale}
+                  layout="side-by-side"
+                  enHint={
+                    locale === "nl"
                       ? "Laat leeg om de standaardzin te tonen; vul je enkel Nederlands in, dan staat die zin ook op de Engelse site."
-                      : "Leave empty to show the default sentence; with only Dutch filled in, that text also appears on the English site."}
-                  </p>
-                </div>
+                      : "Leave empty to show the default sentence; with only Dutch filled in, that text also appears on the English site."
+                  }
+                >
+                  <BilingualTextarea
+                    label={locale === "nl" ? "Tekst" : "Text"}
+                    nameNl="homeBodyNl"
+                    nameEn="homeBodyEn"
+                    defaultValueNl={tab.homeBodyNl ?? ""}
+                    defaultValueEn={tab.homeBodyEn ?? ""}
+                    placeholderNl={AANBOD_DEFAULT_BODY_NL}
+                    placeholderEn={tab.homeBodyNl?.trim() || AANBOD_DEFAULT_BODY_EN}
+                    rows={2}
+                    idPrefix={`homeBody-${tab.id}`}
+                  />
+                </BilingualGroup>
               </SaveForm>
             ))}
           </div>
@@ -392,14 +389,36 @@ export async function HomeAdminPage({ locale, section }: { locale: Locale; secti
           savedMessage={dict.common.saved}
           fallbackErrorMessage={dict.common.saveError}
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <div><Label>Title (NL)</Label><Input name="titleNl" defaultValue={career.titleNl} /></div>
-            <div><Label>Title (EN)</Label><Input name="titleEn" defaultValue={career.titleEn} /></div>
-            <div className="md:col-span-2"><Label>Body (NL)</Label><Textarea name="bodyNl" defaultValue={career.bodyNl} rows={3} /></div>
-            <div className="md:col-span-2"><Label>Body (EN)</Label><Textarea name="bodyEn" defaultValue={career.bodyEn} rows={3} /></div>
-            <div><Label>CTA label (NL)</Label><Input name="ctaLabelNl" defaultValue={career.ctaLabelNl ?? ""} /></div>
-            <div><Label>CTA label (EN)</Label><Input name="ctaLabelEn" defaultValue={career.ctaLabelEn ?? ""} /></div>
-            <div className="md:col-span-2"><Label>CTA URL</Label><Input name="ctaUrl" defaultValue={career.ctaUrl ?? ""} /></div>
+          <BilingualGroup locale={locale} layout="side-by-side" className="space-y-2">
+            <BilingualInput
+              label="Title"
+              nameNl="titleNl"
+              nameEn="titleEn"
+              defaultValueNl={career.titleNl}
+              defaultValueEn={career.titleEn}
+              gridClassName="grid grid-cols-1 gap-2 md:grid-cols-2"
+            />
+            <BilingualTextarea
+              label="Body"
+              nameNl="bodyNl"
+              nameEn="bodyEn"
+              defaultValueNl={career.bodyNl}
+              defaultValueEn={career.bodyEn}
+              rows={3}
+              gridClassName="grid grid-cols-1 gap-2 md:grid-cols-2"
+            />
+            <BilingualInput
+              label="CTA label"
+              nameNl="ctaLabelNl"
+              nameEn="ctaLabelEn"
+              defaultValueNl={career.ctaLabelNl ?? ""}
+              defaultValueEn={career.ctaLabelEn ?? ""}
+              gridClassName="grid grid-cols-1 gap-2 md:grid-cols-2"
+            />
+          </BilingualGroup>
+          <div>
+            <Label>CTA URL</Label>
+            <Input name="ctaUrl" defaultValue={career.ctaUrl ?? ""} />
           </div>
         </SaveForm>
       </Card>
@@ -418,10 +437,16 @@ export async function HomeAdminPage({ locale, section }: { locale: Locale; secti
           savedMessage={dict.common.saved}
           fallbackErrorMessage={dict.common.saveError}
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <div><Label>Title (NL)</Label><Input name="titleNl" defaultValue={after.titleNl} /></div>
-            <div><Label>Title (EN)</Label><Input name="titleEn" defaultValue={after.titleEn} /></div>
-          </div>
+          <BilingualGroup locale={locale} layout="side-by-side" className="space-y-2">
+            <BilingualInput
+              label="Title"
+              nameNl="titleNl"
+              nameEn="titleEn"
+              defaultValueNl={after.titleNl}
+              defaultValueEn={after.titleEn}
+              gridClassName="grid grid-cols-1 gap-2 md:grid-cols-2"
+            />
+          </BilingualGroup>
           <table className="w-full text-sm">
             <thead className="text-left"><tr><th>Type</th><th>URL (YouTube embed / image URL)</th><th>Title (NL)</th><th>Title (EN)</th></tr></thead>
             <tbody>

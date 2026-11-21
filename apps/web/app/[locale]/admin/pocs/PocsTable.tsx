@@ -3,6 +3,7 @@
 import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useRef, useState, useTransition } from "react";
 import { Input, Label } from "@vtk/ui";
+import { BilingualGroup, BilingualInput } from "@/components/admin/BilingualField";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteButton, DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { CheckboxChip } from "@/components/profile/StudyFieldset";
@@ -234,8 +235,16 @@ export function PocsTable({
             {...createLabels}
             onSuccess={() => setCreateOpen(false)}
           >
-            <div><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" required /></div>
-            <div><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" required /></div>
+            <BilingualGroup locale={locale} layout="side-by-side" className="md:col-span-2">
+              <BilingualInput
+                label={nl ? "Naam" : "Name"}
+                nameNl="nameNl"
+                nameEn="nameEn"
+                requiredNl
+                requiredEn
+                gridClassName="grid grid-cols-1 gap-3 md:grid-cols-2"
+              />
+            </BilingualGroup>
             <div><Label>{nl ? "E-mail (optioneel)" : "Email (optional)"}</Label><Input name="email" type="email" placeholder="poc-…@vtk.be" /></div>
             <div><Label>{nl ? "Code" : "Code"}</Label><Input name="code" placeholder={nl ? "auto" : "auto"} /></div>
             <div className="md:col-span-2">
@@ -442,8 +451,17 @@ function PocDetail({
             {...saveLabels}
           >
             <input type="hidden" name="id" value={poc.id} />
-            <div className="md:col-span-3"><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" defaultValue={poc.nameNl} required /></div>
-            <div className="md:col-span-3"><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" defaultValue={poc.nameEn} /></div>
+            <BilingualGroup locale={locale} layout="side-by-side" className="md:col-span-6">
+              <BilingualInput
+                label={nl ? "Naam" : "Name"}
+                nameNl="nameNl"
+                nameEn="nameEn"
+                defaultValueNl={poc.nameNl}
+                defaultValueEn={poc.nameEn}
+                requiredNl
+                gridClassName="grid grid-cols-1 gap-3 md:grid-cols-2"
+              />
+            </BilingualGroup>
             <div className="md:col-span-6"><Label>Slug</Label><Input name="slug" defaultValue={poc.slug} required /></div>
             <div className="md:col-span-6">
               <Label>{nl ? "E-mailadres van de POC" : "POC email address"}</Label>

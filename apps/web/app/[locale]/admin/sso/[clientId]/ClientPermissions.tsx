@@ -13,6 +13,7 @@
  */
 import { useState } from 'react';
 import { Input } from '@vtk/ui';
+import { BilingualGroup, BilingualInput } from '@/components/admin/BilingualField';
 import { SaveForm } from '@/components/ui/SaveForm';
 import { DeleteIconButton } from '@/components/ui/DeleteIconButton';
 import {
@@ -260,16 +261,16 @@ export function ClientPermissions({
                   <label className="mb-1 block text-xs font-medium text-[#5c667f]">{nl ? 'Code' : 'Code'}</label>
                   <Input name="code" placeholder={`${permissionNamespace}.read`} autoComplete="off" required />
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-[#5c667f]">Label (NL)</label>
-                    <Input name="labelNl" required />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-[#5c667f]">Label (EN)</label>
-                    <Input name="labelEn" required />
-                  </div>
-                </div>
+                <BilingualGroup locale={nl ? 'nl' : 'en'} layout="side-by-side">
+                  <BilingualInput
+                    label="Label"
+                    nameNl="labelNl"
+                    nameEn="labelEn"
+                    requiredNl
+                    requiredEn
+                    gridClassName="grid gap-3 sm:grid-cols-2"
+                  />
+                </BilingualGroup>
               </SaveForm>
             </details>
           </>
@@ -422,16 +423,18 @@ function PermissionRow({
         >
           <input type="hidden" name="clientId" value={clientId} />
           <input type="hidden" name="permissionId" value={permission.id} />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[#5c667f]">Label (NL)</label>
-              <Input name="labelNl" defaultValue={permission.labelNl} required />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[#5c667f]">Label (EN)</label>
-              <Input name="labelEn" defaultValue={permission.labelEn} required />
-            </div>
-          </div>
+          <BilingualGroup locale={nl ? 'nl' : 'en'} layout="side-by-side">
+            <BilingualInput
+              label="Label"
+              nameNl="labelNl"
+              nameEn="labelEn"
+              defaultValueNl={permission.labelNl}
+              defaultValueEn={permission.labelEn}
+              requiredNl
+              requiredEn
+              gridClassName="grid gap-3 sm:grid-cols-2"
+            />
+          </BilingualGroup>
           {/* De toegangspermissie afvoeren zou iedereen buitensluiten zonder dat
               er zichtbaar iets verandert; daarom enkel voor de gewone codes. */}
           {!permission.system && (

@@ -3,8 +3,13 @@
 import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import { useState, useTransition } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { Button, Card, ConfirmDialog, Input, Label, Textarea } from "@vtk/ui";
+import { Button, Card, ConfirmDialog, Input, Label } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
+import {
+  BilingualGroup,
+  BilingualInput,
+  BilingualTextarea,
+} from "@/components/admin/BilingualField";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { IconButton } from "@/components/ui/IconButton";
 import { TrashIcon } from "@/components/ui/icons";
@@ -48,16 +53,18 @@ export function TabInspector({
       >
         {tab && <input type="hidden" name="id" value={tab.id} />}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="labelNl">{nl ? "Label (NL)" : "Label (NL)"}</Label>
-            <Input id="labelNl" name="labelNl" defaultValue={tab?.labelNl ?? ""} required />
-          </div>
-          <div>
-            <Label htmlFor="labelEn">{nl ? "Label (EN)" : "Label (EN)"}</Label>
-            <Input id="labelEn" name="labelEn" defaultValue={tab?.labelEn ?? ""} required />
-          </div>
-        </div>
+        <BilingualGroup locale={locale} layout="side-by-side">
+          <BilingualInput
+            label="Label"
+            nameNl="labelNl"
+            nameEn="labelEn"
+            defaultValueNl={tab?.labelNl ?? ""}
+            defaultValueEn={tab?.labelEn ?? ""}
+            requiredNl
+            requiredEn
+            idPrefix="tab-label"
+          />
+        </BilingualGroup>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
@@ -146,35 +153,34 @@ export function TabInspector({
           <legend className="text-sm font-semibold text-vtk-ink">
             {nl ? "Op de categoriepagina" : "On the category page"}
           </legend>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="introNl">{nl ? "Intro (NL)" : "Intro (NL)"}</Label>
-              <Textarea id="introNl" name="introNl" rows={3} defaultValue={tab?.introNl ?? ""} />
-            </div>
-            <div>
-              <Label htmlFor="introEn">{nl ? "Intro (EN)" : "Intro (EN)"}</Label>
-              <Textarea id="introEn" name="introEn" rows={3} defaultValue={tab?.introEn ?? ""} />
-            </div>
-          </div>
+          <BilingualGroup locale={locale} layout="side-by-side">
+            <BilingualTextarea
+              label="Intro"
+              nameNl="introNl"
+              nameEn="introEn"
+              defaultValueNl={tab?.introNl ?? ""}
+              defaultValueEn={tab?.introEn ?? ""}
+              rows={3}
+              idPrefix="tab-intro"
+            />
+            <BilingualInput
+              label={nl ? "Knoptekst" : "Button label"}
+              nameNl="ctaLabelNl"
+              nameEn="ctaLabelEn"
+              defaultValueNl={tab?.ctaLabelNl ?? ""}
+              defaultValueEn={tab?.ctaLabelEn ?? ""}
+              idPrefix="tab-ctaLabel"
+            />
+          </BilingualGroup>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div>
-              <Label htmlFor="ctaLabelNl">{nl ? "Knoptekst (NL)" : "Button label (NL)"}</Label>
-              <Input id="ctaLabelNl" name="ctaLabelNl" defaultValue={tab?.ctaLabelNl ?? ""} />
-            </div>
-            <div>
-              <Label htmlFor="ctaLabelEn">{nl ? "Knoptekst (EN)" : "Button label (EN)"}</Label>
-              <Input id="ctaLabelEn" name="ctaLabelEn" defaultValue={tab?.ctaLabelEn ?? ""} />
-            </div>
-            <div>
-              <Label htmlFor="ctaUrl">{nl ? "Knop-URL" : "Button URL"}</Label>
-              <Input
-                id="ctaUrl"
-                name="ctaUrl"
-                placeholder={nl ? "/shift of https://..." : "/shift or https://..."}
-                defaultValue={tab?.ctaUrl ?? ""}
-              />
-            </div>
+          <div>
+            <Label htmlFor="ctaUrl">{nl ? "Knop-URL" : "Button URL"}</Label>
+            <Input
+              id="ctaUrl"
+              name="ctaUrl"
+              placeholder={nl ? "/shift of https://..." : "/shift or https://..."}
+              defaultValue={tab?.ctaUrl ?? ""}
+            />
           </div>
           <p className="text-xs text-[#5c667f]">
             {nl
