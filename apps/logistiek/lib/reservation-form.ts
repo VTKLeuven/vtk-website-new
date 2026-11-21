@@ -10,6 +10,7 @@ import {
 } from './uitleen';
 import { FORM_MESSAGES } from './form-messages';
 import type { LogistiekLocale } from './i18n-shared';
+import { isQuantityLine, list, str } from './action-input';
 
 type DayPart = (typeof DAY_PARTS)[number];
 
@@ -173,7 +174,7 @@ export async function buildReservationData(
   }
 
   let expectedAttendance: number | null = null;
-  if (input.expectedAttendance && input.expectedAttendance.trim() !== '') {
+  if (input.expectedAttendance && str(input.expectedAttendance).trim() !== '') {
     const parsed = Number.parseInt(input.expectedAttendance, 10);
     if (!Number.isInteger(parsed) || parsed < 0) {
       return { ok: false, error: m.attendancePositive };
@@ -198,7 +199,7 @@ export async function buildReservationData(
   }
   const notifyEmail = notifyEmails.join(', ');
 
-  const lines = input.lines.filter((line) => Number.isInteger(line.quantity) && line.quantity > 0);
+  const lines = list(input.lines).filter(isQuantityLine);
   const itemIds = lines.map((line) => line.itemId);
   if (new Set(itemIds).size !== itemIds.length) {
     return { ok: false, error: m.itemTwice };
@@ -220,9 +221,7 @@ export async function buildReservationData(
   }
 
   // Flesserke (verbruiksgoederen) enkel voor interne werking.
-  const flesserkeInput = (input.flesserkeLines ?? []).filter(
-    (line) => Number.isInteger(line.quantity) && line.quantity > 0
-  );
+  const flesserkeInput = list(input.flesserkeLines).filter(isQuantityLine);
   if (flesserkeInput.length > 0 && requesterType === 'EXTERN') {
     return { ok: false, error: m.flesserkeInternal };
   }
@@ -291,7 +290,7 @@ export async function buildReservationData(
       pickupPart: parseDayPart(input.pickupPart),
       returnPart: parseDayPart(input.returnPart),
       notifyEmail: notifyEmail ? notifyEmail.slice(0, FIELD_MAX) : null,
-      memberNote: input.note && input.note.trim() ? input.note.trim().slice(0, MAX_NOTE_LENGTH) : null,
+      memberNote: input.note && str(input.note).trim() ? str(input.note).trim().slice(0, MAX_NOTE_LENGTH) : null,
       totalPriceCents,
       totalDepositCents,
     },

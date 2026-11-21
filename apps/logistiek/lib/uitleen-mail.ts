@@ -474,6 +474,50 @@ const DIGEST_INTERVAL_MS = 60 * 60 * 1000;
  */
 const URGENT_HOURS = 24;
 
+/**
+ * Hoeveel teammails de aanvragen van één lid per uur mogen uitlokken (S5 uit de
+ * audit van november 2026).
+ *
+ * Een dringende aanvraag omzeilt de bundel; zonder grens kon één account met tien
+ * ritten voor vanavond tien mails sturen. Na drie mails in een uur wacht de
+ * volgende op de bundel, die hoogstens een uur later vertrekt. Drie omdat een
+ * post die vanavond materiaal, flesserke en een rit nodig heeft, dat alle drie
+ * meteen gemeld wil zien.
+ */
+const URGENT_PER_REQUESTER_PER_HOUR = 3;
+
+/**
+ * Hoeveel mails er het laatste uur over de aanvragen van dit lid vertrokken.
+ *
+ * Geteld als verschillende tijdstempels in `teamNotifiedAt`: een dringende mail
+ * stempelt één aanvraag (of één heen-en-terug), een bundel stempelt al haar
+ * aanvragen met hetzelfde tijdstip en is dus ook één mail.
+ */
+async function recentTeamMailsFor(userId: string, now: Date): Promise<number> {
+  const since = new Date(now.getTime() - 60 * 60 * 1000);
+  const [reservations, trips] = await Promise.all([
+    prisma.uitleenReservation.findMany({
+      where: { userId, teamNotifiedAt: { gte: since } },
+      select: { teamNotifiedAt: true },
+      distinct: ['teamNotifiedAt'],
+    }),
+    prisma.uitleenTransportBooking.findMany({
+      where: { userId, teamNotifiedAt: { gte: since } },
+      select: { teamNotifiedAt: true },
+      distinct: ['teamNotifiedAt'],
+    }),
+  ]);
+  return new Set([...reservations, ...trips].map((row) => row.teamNotifiedAt!.getTime())).size;
+}
+
+async function requesterOf(kind: NotifyKind, id: string): Promise<string | null> {
+  const row =
+    kind === 'transport'
+      ? await prisma.uitleenTransportBooking.findUnique({ where: { id }, select: { userId: true } })
+      : await prisma.uitleenReservation.findUnique({ where: { id }, select: { userId: true } });
+  return row?.userId ?? null;
+}
+
 /** Waar staat wanneer er voor het laatst een bundel vertrok, per soort. */
 const DIGEST_SETTINGS_KEY = 'logistiek.teamDigest';
 
@@ -677,7 +721,9 @@ export async function sendTeamDigests(
  * Aan te roepen ná het indienen. Begint het pas over meer dan {@link URGENT_HOURS}
  * uur, dan gebeurt er niets en pikt de bundel het op; is het dringend, dan
  * vertrekt de mail nu en wordt de rij gestempeld zodat ze niet nog eens in de
- * bundel komt.
+ * bundel komt. Vertrokken er het laatste uur al
+ * {@link URGENT_PER_REQUESTER_PER_HOUR} mails over de aanvragen van hetzelfde
+ * lid, dan wacht ook deze op de bundel.
  *
  * Faalt de verzending, dan blijft de rij staan en probeert de bundel het straks
  * opnieuw. Falen mag de aanvraag nooit doen falen: het lid dat "er ging iets mis"
@@ -689,6 +735,10 @@ export async function notifyTeamIfUrgent(kind: NotifyKind, id: string): Promise<
     const entry = pending.find((row) => row.id === id);
     if (!entry) return;
     if (entry.startsAt.getTime() - Date.now() > URGENT_HOURS * 60 * 60 * 1000) return;
+
+    // Te veel mails over dit lid het laatste uur: de bundel neemt het mee.
+    const userId = await requesterOf(kind, id);
+    if (userId && (await recentTeamMailsFor(userId, new Date())) >= URGENT_PER_REQUESTER_PER_HOUR) return;
 
     const settings = await getLogistiekSettings();
     const to = settings.notifyEmails[kind] ?? [];

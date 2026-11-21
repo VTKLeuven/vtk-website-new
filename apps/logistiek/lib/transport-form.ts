@@ -8,6 +8,7 @@ import { parseBrusselsDateTime } from './reservation-form';
 import { seriesOccurrences, type RecurrenceEnd, type RecurrenceRule } from './recurrence';
 import { FORM_MESSAGES, type FormMessages } from './form-messages';
 import type { LogistiekLocale } from './i18n-shared';
+import { list, str } from './action-input';
 
 /**
  * De boekingen van één ritaanvraag opbouwen en valideren.
@@ -176,7 +177,7 @@ export async function buildTransportBookings(
     inbound = { startAt: parsed.startAt, endAt: parsed.endAt };
   }
 
-  const purpose = input.purpose.trim();
+  const purpose = str(input.purpose).trim();
   if (!purpose) return { ok: false, error: m.describePurpose };
 
   // Meerdere adressen mogen, gescheiden door een komma; zie `parseNotifyEmails`.
@@ -223,17 +224,17 @@ export async function buildTransportBookings(
     ...(owner.groupId !== undefined ? { groupId: owner.groupId } : {}),
     ...(owner.requesterName !== undefined ? { requesterName: owner.requesterName } : {}),
     purpose: purpose.slice(0, MAX_NOTE_LENGTH),
-    cargoNote: input.cargoNote?.trim().slice(0, MAX_NOTE_LENGTH) || null,
-    eventName: input.eventName?.trim().slice(0, 300) || null,
-    pickupAddress: input.pickupAddress.trim().slice(0, 300) || null,
-    destination: input.destination.trim().slice(0, 300) || null,
-    helpersNote: input.helpersNote?.trim().slice(0, 300) || null,
-    helpersPhone: input.helpersPhone?.trim().slice(0, 60) || null,
-    contactPhone: input.contactPhone?.trim().slice(0, 60) || null,
+    cargoNote: str(input.cargoNote).trim().slice(0, MAX_NOTE_LENGTH) || null,
+    eventName: str(input.eventName).trim().slice(0, 300) || null,
+    pickupAddress: str(input.pickupAddress).trim().slice(0, 300) || null,
+    destination: str(input.destination).trim().slice(0, 300) || null,
+    helpersNote: str(input.helpersNote).trim().slice(0, 300) || null,
+    helpersPhone: str(input.helpersPhone).trim().slice(0, 60) || null,
+    contactPhone: str(input.contactPhone).trim().slice(0, 60) || null,
     notifyEmail: notifyEmail.slice(0, 300) || null,
-    memberNote: input.note.trim().slice(0, MAX_NOTE_LENGTH) || null,
+    memberNote: str(input.note).trim().slice(0, MAX_NOTE_LENGTH) || null,
     ...(owner.byTeam
-      ? { adminNote: input.adminNote?.trim().slice(0, 1000) || null }
+      ? { adminNote: str(input.adminNote).trim().slice(0, 1000) || null }
       : {}),
   };
 
@@ -279,10 +280,10 @@ export async function buildTransportBookings(
 
   // Een rij zonder naam is geen bijrijder maar een leeg veld dat iemand liet
   // staan; die valt weg in plaats van als "Bijrijder" in de lijst te komen.
-  const helpers = (input.helpers ?? [])
+  const helpers = list(input.helpers)
     .map((helper) => ({
-      name: helper.name.trim().slice(0, 120),
-      phone: helper.phone?.trim().slice(0, 60) || null,
+      name: str(helper?.name).trim().slice(0, 120),
+      phone: str(helper?.phone).trim().slice(0, 60) || null,
     }))
     .filter((helper) => helper.name.length > 0)
     .slice(0, MAX_HELPERS);

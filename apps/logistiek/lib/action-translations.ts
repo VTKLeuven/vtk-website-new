@@ -104,6 +104,9 @@ const EN: Record<string, string> = {
   'Heen- en terugrit geannuleerd.': 'Outbound and return trip cancelled.',
   'Rit geannuleerd.': 'Trip cancelled.',
   'Chauffeur verwijderd.': 'Driver removed.',
+  'Sjablonen zijn er voor de posten en werkgroepen van VTK.': 'Templates are for the posts and work groups of VTK.',
+  'Deze aanvraag kon niet gelezen worden. Herlaad de pagina en probeer opnieuw.':
+    'This request could not be read. Reload the page and try again.',
   '1 venster van vorige week overgenomen.': 'Copied 1 window from last week.',
   // Uit `expireOpenPayments` (lib/payments.ts), bij het annuleren.
   'Deze aanvraag is intussen betaald; mail logistiek@vtk.be om ze te annuleren.':
@@ -124,6 +127,10 @@ const EN_PATTERNS: Array<[RegExp, (...groups: string[]) => string]> = [
     'Trip requested. You can follow the status under My requests.'],
   [/^Er bestaat al een sjabloon met de naam "(.+)"\. Kies een andere naam, of gebruik het bestaande\.$/, (name) =>
     `A template named "${name}" already exists. Choose another name, or use the existing one.`],
+  [/^Je hebt al (\d+) aanvragen openstaan\. Wacht tot er een afgerond is, of mail logistiek@vtk\.be\.$/, (count) =>
+    `You already have ${count} open requests. Wait until one is completed, or mail logistiek@vtk.be.`],
+  [/^Je hebt al (\d+) sjablonen\. Vraag Logistiek om er een op te ruimen\.$/, (count) =>
+    `You already have ${count} templates. Ask Logistics to remove one.`],
   [/^Er passen er maximaal (\d+) op een rit\.$/, (count) => `At most ${count} fit on one trip.`],
   [/^Hou het bij (\d+) tekens; dit staat naast je naam in de planning\.$/, (count) =>
     `Keep it to ${count} characters; it appears next to your name in the planning.`],
