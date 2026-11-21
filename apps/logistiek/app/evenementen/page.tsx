@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
 import { getSession } from '@/lib/session';

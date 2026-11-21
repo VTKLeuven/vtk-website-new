@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import {
   removeDriverAction,
   saveDriverNoteAction,

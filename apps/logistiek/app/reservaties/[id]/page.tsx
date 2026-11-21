@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { cancelReservationAction } from '@/app/actions/uitleen';
 import { CancelButton } from '@/components/cancel-button';
 import { LoginGate } from '@/components/login-gate';

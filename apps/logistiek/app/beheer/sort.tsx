@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 
 /**
  * Sorteren in het beheer: de pijl, de pil en de vergelijkers.

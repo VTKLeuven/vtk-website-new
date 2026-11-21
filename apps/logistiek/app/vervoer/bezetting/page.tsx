@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import type { Metadata } from 'next';
 import type { UitleenRequesterType } from '@prisma/client';
 import { PageShell } from '@/components/page-shell';

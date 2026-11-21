@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { prisma } from '@vtk/db';
 import { requireManage } from '@/lib/session';
 import { formatDateOnly, parseDateOnly, todayDateOnly, toDateInputValue } from '@/lib/uitleen';

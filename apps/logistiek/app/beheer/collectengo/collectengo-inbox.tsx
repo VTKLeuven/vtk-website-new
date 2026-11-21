@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import {
   deleteCollectEnGoOrderAction,
   ignoreCollectEnGoOrderAction,

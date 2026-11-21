@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import type { ReactNode } from 'react';
 import { prisma } from '@vtk/db';
 import { formatDateOnly, todayDateOnly } from '@/lib/uitleen';

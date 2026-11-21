@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { requireManage } from '@/lib/session';
 import { activeGroups, adminVehicles } from '@/lib/uitleen-server';
 import {

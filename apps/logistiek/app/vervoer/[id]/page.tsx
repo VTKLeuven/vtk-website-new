@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { cancelVanBookingAction } from '@/app/actions/uitleen';
 import { TripHelpers } from '@/components/trip-helpers';
 import { EditTripForm } from './edit-trip-form';

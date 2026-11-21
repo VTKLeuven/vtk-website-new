@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { ExternClosed } from '@/components/extern-closed';
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';

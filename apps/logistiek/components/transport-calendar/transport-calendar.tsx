@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { DriverColorOverrides } from '@/lib/driver-colors';
 import { vehiclePatternClass } from '@/lib/driver-colors';

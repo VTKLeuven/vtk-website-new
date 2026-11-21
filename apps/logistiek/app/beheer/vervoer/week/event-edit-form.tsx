@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { saveEventAction } from '@/app/actions/beheer';
 import { SaveForm } from '@/components/ui/save-form';
 

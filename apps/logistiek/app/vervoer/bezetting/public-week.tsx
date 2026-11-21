@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { useState } from 'react';
 import { type DriverColorOverrides } from '@/lib/driver-colors';
 import { TransportCalendar } from '@/components/transport-calendar/transport-calendar';

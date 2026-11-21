@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { setAvailabilityDayAction } from '@/app/actions/uitleen';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { useToast } from '@vtk/ui/toast';

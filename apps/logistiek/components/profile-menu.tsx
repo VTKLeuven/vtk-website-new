@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { useEffect, useRef, useState } from 'react';
 
 export function ProfileMenu({

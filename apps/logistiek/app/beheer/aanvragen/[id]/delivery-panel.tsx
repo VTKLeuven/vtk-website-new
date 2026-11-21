@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { Button } from '@vtk/ui';
 import type { UitleenTransportBookingStatus } from '@prisma/client';
 import { createTransportForReservationAction } from '@/app/actions/beheer';

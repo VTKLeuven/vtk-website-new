@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { copy, getLocale } from '@/lib/i18n';
 import { getPublicCopy } from '@/lib/public-copy';
 import { canUseTestLogin } from '@/lib/session';

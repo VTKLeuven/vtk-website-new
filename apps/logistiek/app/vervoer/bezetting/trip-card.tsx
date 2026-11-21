@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import type { UitleenTransportBookingStatus } from '@prisma/client';
 import { PhoneLink } from '@/components/phone-link';
 import { VanStatusBadge } from '@/components/status-badge';

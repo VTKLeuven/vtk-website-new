@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { notFound } from 'next/navigation';
 import { requireManage } from '@/lib/session';
 import { collectEnGoOrderForImport } from '@/lib/collectengo/server';

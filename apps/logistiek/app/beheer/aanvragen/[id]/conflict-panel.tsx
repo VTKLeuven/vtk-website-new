@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { previewShiftAction, shiftReservationDatesAction } from '@/app/actions/beheer';
 import { SaveForm } from '@/components/ui/save-form';
 import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';

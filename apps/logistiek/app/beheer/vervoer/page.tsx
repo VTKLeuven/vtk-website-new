@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { ChangedByTeamBadge } from '@/components/changed-by-team-badge';
 import { VanStatusBadge } from '@/components/status-badge';
 import { requireManage } from '@/lib/session';

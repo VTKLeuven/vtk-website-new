@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { useMemo, useState } from 'react';
 import type { DriverStat, GroupStat, StatsRow, TransportStats } from '@/lib/uitleen-stats';
 import {

@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { canManage, canUseTestLogin, getSession } from '@/lib/session';
 import { copy, getLocale } from '@/lib/i18n';
 import { driverStatus, showsMyTrips } from '@/lib/uitleen-server';

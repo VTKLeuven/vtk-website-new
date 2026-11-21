@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { useRouter } from 'next/navigation';
 import { ConfirmDialog } from '@vtk/ui';
 import { linkToEventAction } from '@/app/actions/beheer';

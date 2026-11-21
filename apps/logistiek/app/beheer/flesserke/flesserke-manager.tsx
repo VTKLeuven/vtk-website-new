@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useMemo, useState } from 'react';
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import type { UitleenFlesserkeCategory } from '@prisma/client';
 import {
   deactivateFlesserkeCategoryAction,

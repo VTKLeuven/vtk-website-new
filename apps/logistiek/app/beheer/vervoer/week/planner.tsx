@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useOptimistic, useRef, useState, useTransition } from 'react';
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { useRouter } from 'next/navigation';
 import {
   CalendarNav,

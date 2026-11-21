@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { ReservationStatusBadge } from '@/components/status-badge';
 import { requireManage } from '@/lib/session';
 import { SortChipLinks, nextSortDir, type SortDir } from '@/app/beheer/sort';

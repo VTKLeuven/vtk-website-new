@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { describeLink, linkify, type LinkKind } from '@/lib/linkify';
 

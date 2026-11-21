@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@vtk/ui/link';
 import { PageShell } from '@/components/page-shell';
 import { getLocale } from '@/lib/i18n';
 
