@@ -3,6 +3,7 @@ import Link from '@vtk/ui/link';
 import { canManage, canUseTestLogin, getSession } from '@/lib/session';
 import { copy, getLocale } from '@/lib/i18n';
 import { driverStatus, showsMyTrips } from '@/lib/uitleen-server';
+import { HeaderMenu } from './header-menu';
 import { LanguageSwitcher } from './language-switcher';
 import { ProfileMenu } from './profile-menu';
 import { ThemeToggle } from './theme-toggle';
@@ -43,6 +44,21 @@ export async function SiteHeader() {
     ? '/test-login'
     : `${MAIN_URL}/inloggen?next=${encodeURIComponent(publicUrl)}`;
 
+  const navLabel = locale === 'nl' ? 'Hoofdnavigatie' : 'Main navigation';
+  const links: Array<{ href: string; label: string }> = [
+    { href: '/materiaal', label: t.navMaterial },
+    { href: '/vervoer', label: t.navVan },
+    // Voor iedereen: zonder login toont de pagina enkel voertuig, dag en uur,
+    // dus ook wie niet ingelogd is, ziet of de kar vrij is.
+    { href: '/vervoer/bezetting', label: t.navPlanning },
+    ...(session && session.groups.length > 0 ? [{ href: '/flesserke', label: t.navFlesserke }] : []),
+    ...(session ? [{ href: '/reservaties', label: t.navReservations }] : []),
+    // Enkel voor wie bij een groep hoort: een externe heeft geen evenementen en
+    // zou een leeg scherm openen (N5, E3).
+    ...(session && session.groups.length > 0 ? [{ href: '/evenementen', label: t.navEvents }] : []),
+    ...(showTrips ? [{ href: '/ritten', label: t.navTrips }] : []),
+  ];
+
   return (
     <header className="vtk-site-header">
       <div className="nav-inner">
@@ -57,45 +73,26 @@ export async function SiteHeader() {
           />
         </Link>
 
+        {/* Breed scherm: de links in de kop. Smal (< 850 px): één menuknop. */}
         <div className="nav-links-shell">
-          <nav className="nav-links" aria-label={locale === 'nl' ? 'Hoofdnavigatie' : 'Main navigation'}>
-            <Link href="/materiaal">
-              {t.navMaterial}
-            </Link>
-            <Link href="/vervoer">
-              {t.navVan}
-            </Link>
-            {/* Voor iedereen: zonder login toont de pagina enkel voertuig, dag en
-                uur, dus ook wie niet ingelogd is, ziet of de kar vrij is. */}
-            <Link href="/vervoer/bezetting">
-              {t.navPlanning}
-            </Link>
-            {session && session.groups.length > 0 ? (
-              <Link href="/flesserke">
-                {t.navFlesserke}
+          <nav className="nav-links" aria-label={navLabel}>
+            {links.map((link) => (
+              <Link key={link.href} href={link.href}>
+                {link.label}
               </Link>
-            ) : null}
-            {session ? (
-              <Link href="/reservaties">
-                {t.navReservations}
-              </Link>
-            ) : null}
-            {/* Enkel voor wie bij een groep hoort: een externe heeft geen
-                evenementen en zou een leeg scherm openen (N5, E3). */}
-            {session && session.groups.length > 0 ? (
-              <Link href="/evenementen">
-                {t.navEvents}
-              </Link>
-            ) : null}
-            {showTrips ? (
-              <Link href="/ritten">
-                {t.navTrips}
-              </Link>
-            ) : null}
+            ))}
           </nav>
         </div>
 
         <div className="nav-right">
+          <HeaderMenu
+            links={links}
+            labels={{
+              open: locale === 'nl' ? 'Menu' : 'Menu',
+              close: locale === 'nl' ? 'Sluiten' : 'Close',
+              nav: navLabel,
+            }}
+          />
           <ThemeToggle label={t.themeToggle} />
           <LanguageSwitcher locale={locale} />
           {session ? (
