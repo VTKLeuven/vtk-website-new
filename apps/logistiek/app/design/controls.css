@@ -1,0 +1,51 @@
+/* Velden en knoppen: de overgang bij focus, de cursor en de gedeelde focusring.
+   Ingeladen vanuit app/globals.css, in deze volgorde; zie de uitleg daar (T1). */
+
+input,
+textarea,
+select {
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* Eén focusring voor alles wat je met het toetsenbord bereikt (V4 uit de audit
+   van november 2026). Voordien hadden enkel de themaknop, de dienstkaarten en de
+   inlogknop er een, en leunde de rest op wat de browser toevallig tekende.
+
+   Navy (`--emphasis`, in het donker licht) op papier en kaarten, geel op de
+   donkere kop, paginakop en voet: geel op het lichte papier haalt het
+   contrast van 3:1 niet dat een focusring nodig heeft. Zo doet vtk.be het ook.
+
+   In `@layer base` en in `:where()`, dus zonder gewicht: een onderdeel met een
+   eigen ring (een tekstveld met zijn gele gloed hieronder) of een Tailwind-klasse
+   (`outline-none`, `-outline-offset-2`) wint. Buiten een laag zou deze regel van
+   elke utility winnen, hoe specifiek die ook is. */
+@layer base {
+  :where(:focus-visible) {
+    outline: 2px solid var(--emphasis);
+    outline-offset: 2px;
+  }
+
+  :where(.vtk-site-header, .logistics-page-head, .logistics-auth, .logistics-footer)
+    :where(:focus-visible):not(:where(.profile-menu *)) {
+    outline-color: var(--yellow);
+  }
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--emphasis) !important;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--yellow) 32%, transparent);
+}

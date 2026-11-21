@@ -1,0 +1,456 @@
+/* Lijsten en kaarten: sjablonen, aanvragen, nota's, de bulk-acties en het ritkaartje,
+   met hun indeling op een smal scherm.
+   Ingeladen vanuit app/globals.css, in deze volgorde; zie de uitleg daar (T1). */
+
+.logistics-template-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.45fr);
+  gap: 18px 28px;
+  align-items: end;
+  padding: clamp(20px, 3vw, 26px);
+  border: 1px solid color-mix(in oklab, var(--yellow-dark) 55%, transparent);
+  border-radius: 18px;
+  background: color-mix(in oklab, var(--yellow) 13%, transparent);
+  box-shadow: inset 4px 0 0 var(--yellow);
+}
+
+.logistics-form-kicker {
+  margin: 0 0 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.logistics-template-picker h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.logistics-template-picker p:not(.logistics-form-kicker):not(.logistics-template-feedback) {
+  max-width: 62ch;
+  margin: 7px 0 0;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.logistics-template-picker label {
+  display: grid;
+  gap: 6px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.logistics-template-picker select {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+/* "Nieuw sjabloon maken", uitgeklapt onder de keuzelijst (M5). Over de volle
+   breedte, want het is een tweede stap en geen tweede kolom. */
+.logistics-template-new {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in oklab, var(--yellow-dark) 45%, transparent);
+}
+
+/* Uitkomst van "sjabloon bewaren": groen bij succes, rood bij een dubbele naam
+   of een lege selectie. Geen toast, want de ledenkant heeft er geen. */
+.logistics-template-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--success);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.logistics-template-note.is-error {
+  color: var(--danger);
+}
+
+.logistics-template-feedback {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in oklab, var(--yellow-dark) 45%, transparent);
+  color: var(--success);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.logistics-template-feedback span {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--success-soft);
+}
+
+.logistics-stock-table-head,
+.logistics-stock-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(100px, 0.45fr) 90px 80px 132px;
+  gap: 16px;
+  align-items: center;
+}
+
+.logistics-stock-table-head {
+  padding: 0 0 9px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.logistics-stock-table {
+  border-top: 1px solid var(--line);
+}
+
+.logistics-stock-row {
+  min-height: 54px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.logistics-stock-name,
+.logistics-stock-cell {
+  min-width: 0;
+}
+
+.logistics-stock-cell {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.logistics-stock-quantity {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.logistics-mobile-label {
+  display: none;
+}
+
+.logistics-reservation-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.85fr) minmax(190px, 1.2fr) minmax(190px, 1fr) minmax(130px, 0.7fr) auto;
+  gap: 20px;
+  align-items: center;
+  padding: 17px 20px;
+  border: 1px solid var(--line-2);
+  border-radius: 16px;
+  background: var(--surface);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.logistics-reservation-row:hover {
+  border-color: var(--line-2);
+  box-shadow: var(--shadow-1);
+}
+
+.logistics-reservation-cell,
+.logistics-reservation-status {
+  min-width: 0;
+}
+
+.logistics-reservation-cell > span:first-child,
+.logistics-reservation-status > span:first-child {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.logistics-reservation-cell strong {
+  display: block;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.logistics-reservation-cell p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.logistics-reservation-status {
+  justify-self: end;
+}
+
+/* De nota's en wat Logistiek aanpaste, onder de rij (F6.11, F6.12). Over de
+   volle breedte van het raster, ingekort tot twee regels: de rij is een link
+   naar het geheel. */
+.logistics-reservation-extra {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-2);
+}
+
+.logistics-reservation-note > span {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.logistics-reservation-note p {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* Wat Logistiek veranderde mag niet ingekort worden: het is het enige wat de
+   aanvrager niet zelf gedaan heeft, en een afgekapte uurwijziging is de fout. */
+.logistics-reservation-note-changed {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--yellow-soft, var(--paper-2));
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.logistics-reservation-note-changed ul {
+  display: grid;
+  gap: 2px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.logistics-admin-request-row {
+  display: grid;
+  /* Krappe minima met opzet: bij bredere kolommen loopt het raster over zodra
+     de beheerkolom smaller wordt (een laptopscherm, of een rij met een
+     selectievakje ernaast), en dan schuift de periode onder de statusbadge in
+     plaats van te wrappen. Essentiële informatie mag afbreken, niet verdwijnen. */
+  grid-template-columns:
+    minmax(150px, 1fr) minmax(100px, 0.65fr) minmax(170px, 1.1fr)
+    minmax(180px, 1fr) auto;
+  gap: 16px;
+  min-width: 0;
+  align-items: center;
+  padding: 16px 18px;
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  background: var(--surface);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+/* Dezelfde rij met een selectievakje ernaast voor de bulk-acties (N4): nog een
+   dertigtal pixels minder ruimte, dus nog iets krappere minima. */
+.logistics-admin-request-row--selectable {
+  grid-template-columns:
+    minmax(130px, 1fr) minmax(90px, 0.65fr) minmax(150px, 1.1fr)
+    minmax(160px, 1fr) auto;
+}
+
+.logistics-admin-request-row:hover {
+  border-color: var(--line-2);
+  box-shadow: var(--shadow-1);
+}
+
+.logistics-agenda-row {
+  display: grid;
+  grid-template-columns: 116px minmax(140px, 0.55fr) minmax(220px, 1.45fr);
+  gap: 18px;
+  align-items: center;
+  padding: 13px 16px;
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.logistics-agenda-row > span:first-child {
+  justify-self: start;
+}
+
+.logistics-fact-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.logistics-fact-grid > div {
+  min-width: 0;
+}
+
+/* In het kaartje naast een rit is er 324px, geen paginabreedte. Vier kolommen
+   zijn daar 70px elk, en dan breekt een telefoonnummer middenin ("0470 12 /
+   34 56"). Een media query helpt hier niet: het scherm is breed, het kaartje
+   niet. */
+.tg-popover .logistics-fact-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.logistics-fact-grid > div[data-span='2'] {
+  grid-column: span 2;
+}
+
+.logistics-fact-grid dt {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.logistics-fact-grid dd {
+  margin-top: 4px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.logistics-fact-grid dd span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+@media (max-width: 960px) {
+
+  .logistics-template-picker {
+    grid-template-columns: 1fr;
+  }
+
+  .logistics-stock-table-head {
+    display: none;
+  }
+
+  .logistics-stock-table {
+    margin-top: 16px;
+  }
+
+  .logistics-stock-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 20px;
+    padding: 16px 0;
+  }
+
+  .logistics-stock-name {
+    grid-column: 1 / -1;
+  }
+
+  .logistics-stock-quantity {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .logistics-stock-quantity .logistics-mobile-label {
+    margin-right: auto;
+  }
+
+  .logistics-mobile-label {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .logistics-reservation-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 20px;
+  }
+
+  .logistics-admin-request-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 20px;
+  }
+
+  .logistics-agenda-row {
+    grid-template-columns: minmax(120px, 0.65fr) minmax(0, 1.35fr);
+  }
+
+  .logistics-fact-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .logistics-agenda-row > span:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .logistics-reservation-subject,
+  .logistics-reservation-status {
+    grid-column: 1 / -1;
+  }
+
+  .logistics-reservation-status {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 520px) {
+  .logistics-reservation-row {
+    grid-template-columns: 1fr;
+  }
+
+  .logistics-admin-request-row {
+    grid-template-columns: 1fr;
+  }
+
+  .logistics-agenda-row {
+    grid-template-columns: 1fr;
+  }
+
+  .logistics-fact-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .logistics-fact-grid > div[data-span='2'] {
+    grid-column: auto;
+  }
+
+  .logistics-agenda-row > span:first-child {
+    grid-column: auto;
+  }
+
+  .logistics-reservation-subject,
+  .logistics-reservation-status {
+    grid-column: auto;
+  }
+}

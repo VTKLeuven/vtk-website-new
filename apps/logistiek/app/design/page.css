@@ -1,0 +1,282 @@
+/* De paginakop, de zijmarge, de inlogpagina, de voet en de indeling van het beheer.
+   Ingeladen vanuit app/globals.css, in deze volgorde; zie de uitleg daar (T1). */
+
+/* Dezelfde vaste paginakop als op vtk.be. Functionele schermen krijgen geen
+   fotohero of eigen campagnelettertype. */
+.logistics-page-head,
+.logistics-auth,
+.logistics-footer {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--chrome);
+}
+
+.logistics-page-head {
+  box-shadow: inset 0 -5px 0 var(--yellow);
+}
+
+.logistics-page-head::after,
+.logistics-auth::after,
+.logistics-footer::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background-image: url('/technisch-pattern.svg');
+  background-repeat: repeat;
+  background-size: 880px 880px;
+  opacity: var(--pattern-opacity);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 48px, #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 48px, #000 calc(100% - 36px), transparent);
+}
+
+.logistics-page-head::after {
+  background-position: calc(50% + 340px) -160px;
+}
+
+/* Eén zijmarge voor de hele app, en het enige wat de inhoud nog van de
+   vensterrand houdt sinds `--max` weg is (F4.6).
+
+   Alles wat over de volle breedte staat, draagt ze: de paginakop, de inhoud,
+   het beheerblad, de voettekst en de donkere band op de startpagina. Zolang er
+   een kolom van 1240px was, lijnden die vanzelf onder elkaar uit; nu doet enkel
+   deze marge dat nog, dus een blok dat haar niet draagt, springt zichtbaar in.
+   `.logistics-gutter` is daarom de klasse die je op zo'n blok zet. */
+.logistics-page-head-inner,
+.logistics-page-content,
+.logistics-gutter {
+  width: 100%;
+  padding-inline: clamp(20px, 3vw, 36px);
+}
+
+.logistics-page-head-inner {
+  padding-top: clamp(44px, 5vw, 68px);
+  padding-bottom: clamp(40px, 4.5vw, 56px);
+}
+
+.logistics-page-content {
+  padding-top: clamp(28px, 4vw, 40px);
+  padding-bottom: clamp(64px, 8vw, 96px);
+}
+
+/* Een kop die op een telefoon plaats maakt: minder lucht en geen inleiding.
+   Zie de `compact`-prop van PageShell voor het waarom. */
+@media (max-width: 700px) {
+  .logistics-page-head.is-compact .logistics-page-head-inner {
+    padding-top: 20px;
+    padding-bottom: 18px;
+  }
+
+  .logistics-page-head.is-compact h1 {
+    margin-top: 8px;
+    font-size: 26px;
+  }
+
+  .logistics-page-head.is-compact .logistics-page-intro {
+    display: none;
+  }
+
+  /* De ruimte onderaan de pagina is hier de laatste zestig pixels tussen "past
+     op één scherm" en "je moet toch scrollen". Het raster meet zijn hoogte tot
+     de onderrand van het venster; die padding kwam daar nog onder. */
+  .logistics-page-content.is-compact {
+    padding-top: 16px;
+    padding-bottom: 12px;
+  }
+}
+
+/* De titel links, de knop rechts. Op een smal scherm onder elkaar: naast een
+   titel van 32px past er niets meer, en een knop die tot een pictogram krimpt is
+   geen knop meer. */
+.logistics-page-head-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.logistics-page-head-action {
+  flex: 0 0 auto;
+  padding-bottom: 6px;
+}
+
+@media (max-width: 719px) {
+  .logistics-page-head-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .logistics-page-head-action {
+    padding-bottom: 0;
+  }
+}
+
+/* De knop zelf: geel op het donker, zoals de primaire knop op een donkere band
+   elders op de site. */
+.logistics-head-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--on-yellow);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: filter 0.15s ease;
+}
+
+.logistics-head-button:hover {
+  filter: brightness(0.94);
+}
+
+.logistics-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--on-chrome-muted);
+  font-size: 13px;
+}
+
+.logistics-page-head h1 {
+  max-width: 900px;
+  margin: 14px 0 0;
+  color: var(--on-chrome);
+  font-size: clamp(32px, 4.4vw, 56px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.04;
+}
+
+.logistics-page-intro {
+  max-width: 60ch;
+  margin: 18px 0 0;
+  color: var(--on-chrome-muted);
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.logistics-login-button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 10px 18px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.logistics-login-button:hover {
+  transform: translateY(-1px);
+}
+
+/* Een beheerscherm dat uit velden bestaat, houdt een leesbreedte (F4.6).
+
+   Zonder `--max` krijgt elk scherm het volle venster, en dat is precies wat een
+   rooster, een tabel of een lijst kaarten nodig heeft. Een formulier niet: een
+   tekstvak van negenhonderd pixels voor één zin is geen ruimte maar leegte, en
+   je oog moet van het label helemaal naar rechts en weer terug. 1100px is de
+   breedte die deze schermen vóór F4.6 hadden (1440 min de kop, de zijbalk en de
+   kloof ertussen), dus ze zien er nog uit zoals toen. */
+.logistics-form-width {
+  max-width: 1100px;
+}
+
+.logistics-admin-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+@media (min-width: 860px) {
+  .logistics-admin-layout {
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 48px;
+    transition: grid-template-columns 200ms ease, gap 200ms ease;
+  }
+
+  /* Ingeklapt (AdminNav zet `data-collapsed`): een rail van 60px, en de inhoud
+     schuift tot 20px ervan, net als in de admin van vtk.be (vtk-admin.css).
+     De rail blijft staan in plaats van helemaal te verdwijnen: verdwenen, had
+     ze een zwevende knop nodig om terug te komen, en die schoof over de uren
+     van de planning. */
+  .logistics-admin-layout:has(> aside [data-collapsed='true']) {
+    grid-template-columns: 60px minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  /* De kaart van een groep en de tooltips steken over de inhoud. Op vtk.be
+     volstaat de 20 uit admin-nav.css, maar hier ligt de urenkolom van de
+     planning op z-20 (en de dagkop op 30, het filtermenu op 40), later in de
+     pagina, en die won: de kaart van Overig viel achter de uren. Onder de
+     sitekop (50) en volledig scherm (70). */
+  .logistics-admin-layout > aside .vtk-admin-nav-sticky[data-collapsed='true'] {
+    z-index: 45;
+  }
+
+  .logistics-admin-layout > aside {
+    align-self: stretch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logistics-admin-layout {
+    transition: none;
+  }
+}
+
+.logistics-auth {
+  min-height: 480px;
+}
+
+.logistics-auth::after {
+  background-position: calc(50% - 180px) -260px;
+}
+
+.logistics-auth-panel {
+  position: relative;
+  padding: clamp(28px, 5vw, 44px);
+  border: 1px solid var(--chrome-line);
+  border-radius: 22px;
+  background: color-mix(in oklab, var(--surface) 96%, transparent);
+  box-shadow: var(--shadow-3);
+}
+
+.logistics-login-button {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.logistics-login-button:hover {
+  background: var(--emphasis);
+}
+
+.logistics-footer {
+  border-top: 1px solid var(--chrome-line);
+  /* De body is een flexkolom van precies het scherm hoog (`height: 100%`), en
+     een kind met `overflow: hidden` mag in zo'n kolom tot nul krimpen. Op elke
+     pagina die langer is dan het scherm was de voet daardoor één pixel hoog:
+     enkel zijn rand bleef over. */
+  flex-shrink: 0;
+}
+
+.logistics-footer::after {
+  background-position: calc(50% - 240px) -420px;
+  opacity: var(--pattern-opacity-footer);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 28%, #000 72%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 28%, #000 72%, transparent);
+}

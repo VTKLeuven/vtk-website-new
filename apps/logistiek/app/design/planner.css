@@ -1,0 +1,687 @@
+/* De transportplanning: het rooster, de telefoonweergave, het intekenscherm voor de
+   beschikbaarheid en hoe een rit eruitziet.
+   Ingeladen vanuit app/globals.css, in deze volgorde; zie de uitleg daar (T1). */
+
+/* Arcering per voertuig (K1). De vulkleur blijft van de chauffeur, dus het
+   voertuig krijgt het patroon: zo lees je in één blok wie rijdt én waarmee.
+
+   Alle vier zijn `background-image` op een `backgroundColor` die de chauffeur
+   zet. Gebruik daar nooit de `background`-shorthand voor: die wist dit patroon
+   weer uit. Ze zijn bewust licht (alfa rond 0.13): het is een tweede laag
+   informatie, geen tweede kleur, en de tekst in het blok moet leesbaar blijven.
+
+   Een blok kan tegelijk `trip-requested` dragen; die tekent een streep langs de
+   bovenrand en geen tweede arcering, precies zodat ze hier niet mee vecht. */
+.trip-pattern-diagonal {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--driver-pattern) 0 4px,
+    transparent 4px 10px
+  );
+}
+
+.trip-pattern-vertical {
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--driver-pattern) 0 3px,
+    transparent 3px 9px
+  );
+}
+
+.trip-pattern-dots {
+  background-image: radial-gradient(var(--driver-pattern-strong) 1.2px, transparent 1.3px);
+  background-size: 7px 7px;
+}
+
+.trip-pattern-grid {
+  background-image:
+    repeating-linear-gradient(0deg, var(--driver-pattern-faint) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(90deg, var(--driver-pattern-faint) 0 1px, transparent 1px 8px);
+}
+
+/* De transportplanning is een agenda-pane, geen stuk pagina.
+
+   De uren scrollen bínnen de kalender in plaats van met de pagina mee; daardoor
+   kan de dagkop bovenaan blijven plakken en de urenkolom links. Dat vraagt één
+   ding: de pane moet een échte hoogte hebben, want een `overflow: auto` op een
+   doos die met haar inhoud meegroeit, scrolt nooit.
+
+   Buiten volledig scherm is dat een stuk van het scherm (`dvh` en niet `vh`: op
+   een telefoon telt `vh` de adresbalk mee, en dan valt de onderrand eronder). In
+   volledig scherm neemt ze wat er overblijft onder de werkbalk. */
+/* De hoogte staat op de pane zelf en niet enkel op de planning: het publieke
+   bezettingsoverzicht en het beschikbaarheidsscherm gebruiken hetzelfde rooster
+   zonder die shell eromheen, en zonder hoogte scrolt een `overflow: auto`-doos
+   nooit. Wie ze wil bijstellen, zet `--tg-height` op een ouder. */
+.tg-pane {
+  height: var(--tg-height, clamp(22rem, 68dvh, 60rem));
+  min-width: 0;
+}
+
+/* Op een breed scherm een ondergrens waarin "hele dag" ook echt de hele dag toont
+   (F6.2). 24 uur aan de minimale uurhoogte (18px, `MIN_HOUR_PX`) is 432px, plus
+   de dagkop en twee rijen evenementen: onder die hoogte scrolt de kalender op zoom
+   1, en op een laptop van 720px hoog was 68dvh daar net onder. De pagina scrolt
+   dan liever een stukje mee dan dat de nacht onderaan wegvalt. Op een telefoon
+   niet: daar past de dag toch nooit, en heeft volledig scherm een eigen
+   dagweergave. */
+@media (min-width: 860px) {
+  .tg-pane {
+    height: var(--tg-height, clamp(36rem, 68dvh, 60rem));
+  }
+}
+
+/* De maandweergave groeit met haar rijen mee; die is al compact en heeft geen
+   vaste hoogte nodig. In volledig scherm neemt ze wél de volle rest. */
+.tg-pane-auto {
+  height: auto;
+}
+
+/* Zonder deze twee rekt de kalender de pagina op in plaats van in zichzelf te
+   scrollen. Een grid- of flexitem heeft `min-width: auto`, en dat betekent "niet
+   krimpen onder je inhoud": een week van zeven kolommen van 9,5rem duwde de
+   werkbalk en de laatste dag buiten beeld. `min-width: 0` geeft `overflow: auto`
+   pas iets om te doen. */
+.transport-calendar {
+  min-width: 0;
+}
+
+.transport-calendar > * {
+  min-width: 0;
+}
+
+/* De dagkop is `position: sticky` binnen de scroller. Die scroller mag daarom
+   geen `overflow: hidden` op een tussenliggende laag hebben; alles wat hier
+   scrollt, scrollt in .tg-scroller zelf.
+
+   `touch-action: pan-x pan-y` houdt vegen native (en dus vloeiend) maar geeft
+   het knijpgebaar aan ons: op een telefoon zoomt twee vingers de kalender in
+   plaats van de hele pagina. Wie de pagina zelf wil vergroten, knijpt ernaast.
+   Tijdens het knijpen zet de component dit even op `none`, anders scrolt de
+   pane mee met het gebaar. */
+.tg-scroller {
+  scrollbar-gutter: stable;
+  touch-action: pan-x pan-y;
+}
+
+/* Op een telefoon past een week niet, dus schuift ze horizontaal. Zonder
+   vastklikken sta je dan altijd half op twee dagen. Met `proximity` klikt ze
+   enkel vast wanneer je toch al dicht bij een dagrand stopt, dus een bewuste
+   veeg over anderhalve dag blijft mogelijk. `scroll-padding` houdt daarbij
+   rekening met de urenkolom, die links vastgeplakt staat: zonder die marge
+   schuift de dag waar je op mikt eronder. */
+@media (max-width: 700px) {
+  .tg-pane {
+    height: var(--tg-height, clamp(24rem, 78dvh, 60rem));
+  }
+
+  .tg-scroller {
+    scroll-snap-type: x proximity;
+    scroll-padding-inline-start: 3.25rem;
+  }
+
+  .tg-day {
+    scroll-snap-align: start;
+  }
+
+  /* Hier stond ooit `.tg-head { position: static }`, met als reden dat de pane
+     op een telefoon maar iets hoger was dan de dag zelf. Dat klopt niet meer:
+     de pane is hier 78dvh, dus je scrollt wel degelijk door een halve dag en
+     verloor dan meteen de dagnamen bovenaan. De kop plakt daarom overal,
+     precies zoals op een laptop. */
+
+  /* Wat hier bewust niet staat:
+
+     - **De knoppen kleiner maken.** Dat scheelde zeventien pixels werkbalk en
+       bracht de raakvlakken terug tot 27px; daar mik je met een duim naast.
+       Minder lucht ertussen mag wel, en een ondergrens houdt ze aantikbaar.
+     - **De werkbalk vastplakken.** Sticky op `top: 0` legt ze over de bovenste
+       138px van de kalender, dus je verliest precies het stuk dat je wil zien.
+       Wil je de kalender schermvullend, dan is de knop "volledig scherm" de weg;
+       die geeft op een telefoon een vast paneel mét werkbalk erboven, en dat is
+       wat sticky hier had moeten doen. */
+  .transport-calendar-toolbar {
+    gap: 0.375rem;
+  }
+
+  .transport-calendar-toolbar a,
+  .transport-calendar-toolbar button {
+    min-height: 2.25rem;
+  }
+}
+
+/* Het intekenscherm voor de beschikbaarheid op een telefoon.
+
+   Een eigen volledig scherm, want boven het raster stonden de sitekop, de
+   donkere paginakop en de weeknavigatie samen ruim driehonderd pixels; dan
+   blijft er voor achttien rijen te weinig over. Zie
+   app/ritten/beschikbaarheid/availability-paint.tsx. */
+/* De drie beschikbaarheden: het patroon over de vulkleur.
+
+   De vulkleur zegt wíé het is (de chauffeur) of dát het aanstaat (geel op je
+   eigen raster); het patroon zegt hoe graag. Kleur alleen kan dat niet dragen:
+   ze is al bezet, en drie tinten van dezelfde kleur houd je op een telefoon in
+   de zon niet uit elkaar.
+
+   `background-image` en niet de `background`-shorthand: de vulkleur komt als
+   `backgroundColor` uit de stijl en zou er anders mee weggeveegd worden.
+   Dezelfde val als bij de arcering van de voertuigen. */
+.avail-fill-liever-niet {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--avail-pattern) 0 3px,
+    transparent 3px 7px
+  );
+}
+
+.avail-fill-nood {
+  background-image: radial-gradient(var(--avail-pattern-strong) 1.4px, transparent 1.5px);
+  background-size: 7px 7px;
+}
+
+.paint-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  /* `dvh` en niet `vh`: met de adresbalk van een telefoon erbij is `vh` te hoog
+     en valt de voetregel onder het scherm. */
+  height: 100dvh;
+  background: var(--surface);
+}
+
+/* De meldingen staan normaal onder de sitekop (z-index 40), en dus ook onder
+   dit scherm: een foutmelding bij het opslaan van een veeg was hier nooit te
+   zien, en "Ongedaan maken" na "Neem vorige week over" evenmin. Op dit scherm
+   komen ze erboven, onderaan boven de voetregel: bovenaan liggen de pijlen om
+   van week te wisselen. */
+:root:has(.paint-screen) .vtk-toast-viewport {
+  z-index: 70;
+  top: auto;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 52px);
+}
+
+.paint-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.paint-icon-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 15px;
+}
+
+/* De penseelkeuze: welke soort je met een veeg neerzet.
+
+   Een eigen rij en niet in de balk erboven: die draagt al de week en de
+   navigatie, en vier pillen erbij maken er een puzzel van. Deze rij is het
+   antwoord op "hoe duid ik 'liever niet' aan"; zonder haar bestaan de twee
+   andere soorten alleen in de databank. */
+.paint-brush {
+  display: flex;
+  /* Wrappen en niet zijwaarts scrollen: op 390px viel de vierde pil ("Wissen")
+     net buiten beeld, en een keuze die je enkel vindt door opzij te vegen,
+     bestaat niet. Een tweede regel kost één rij vakjes; die rijen delen toch
+     wat er overblijft. */
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 8px 12px 0;
+}
+
+.paint-brush-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 5px 11px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.paint-brush-option[aria-pressed='true'] {
+  border-color: var(--emphasis);
+  background: var(--emphasis);
+  color: var(--on-emphasis);
+}
+
+/* Het staaltje van de soort in de pil: hetzelfde geel met hetzelfde patroon als
+   de vakjes eronder, zodat je de pil aan het vakje herkent en niet aan het
+   woord alleen. */
+.paint-brush-swatch {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  background-color: var(--yellow);
+}
+
+.paint-brush-swatch-off {
+  background-color: var(--paper-2);
+}
+
+.paint-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0%;
+  min-height: 0;
+  padding: 8px 12px 0;
+}
+
+/* De weeknota (F4.5), tussen de penseelrij en het raster.
+
+   Boven het raster en niet in de voetregel: het is iets wat over de hele week
+   gaat, en dat lees je voor je begint aan te duiden, niet erna. Eén regel hoog,
+   want elke pixel hier is er een die het raster niet krijgt. */
+.paint-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.paint-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+}
+
+/* De telefoonweergave in volledig scherm.
+
+   Een eigen weergave en niet de weekweergave die kleiner gezet is: zeven
+   kolommen in 340 pixels werd tweeënhalve dag naast elkaar, met ritten van 112px
+   waarin een naam drie letters is. Dit is één dag over de volle breedte, met de
+   week als knoppenstrip erboven; zie components/transport-calendar/mobile-calendar.tsx. */
+/* De schil eromheen is in volledig scherm al `position: fixed` met een eigen
+   z-index; deze laag hoeft er enkel binnen te vullen. Ze stond op 70 en dat is
+   hoger dan het detailpaneel (60/61) dat in diezelfde schil zit: het formulier
+   voor een nieuwe rit ging dan achter de kalender staan en was onbereikbaar. */
+.mob-cal {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  /* `dvh` en niet `vh`: met de adresbalk van een telefoon erbij is `vh` te hoog
+     en valt de onderste balk onder het scherm. */
+  height: 100dvh;
+  background: var(--paper);
+}
+
+.mob-cal-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.mob-cal-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 8px 8px 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.mob-cal-day {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  /* 44px hoog: een dag aantikken met een duim moet lukken zonder mikken. */
+  min-height: 44px;
+  padding: 4px 0 6px;
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+.mob-cal-day-name {
+  text-transform: capitalize;
+}
+
+.mob-cal-day-number {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.mob-cal-day.is-today .mob-cal-day-number {
+  color: var(--emphasis);
+}
+
+.mob-cal-day.is-active {
+  background: var(--emphasis);
+}
+
+.mob-cal-day.is-active,
+.mob-cal-day.is-active .mob-cal-day-number {
+  color: var(--on-emphasis);
+}
+
+/* Een stip zegt dat er die dag iets staat. Dat is de vraag waarmee je op een
+   telefoon naar de planning gaat: waar zit het druk. */
+.mob-cal-day-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.mob-cal-day-dot.is-on {
+  background: var(--yellow);
+}
+
+.mob-cal-events {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-2);
+}
+
+.mob-cal-event {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--emphasis);
+  font-size: 12px;
+}
+
+/* De doos die verticaal scrolt. `pan-y` laat het vegen naar boven en beneden
+   native (en dus vloeiend) en geeft enkel de horizontale beweging aan ons, voor
+   het wisselen van dag. */
+.mob-cal-body {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  background: var(--surface);
+}
+
+.mob-cal-grid {
+  position: relative;
+  padding: 8px 10px 24px 0;
+}
+
+.mob-cal-gutter {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  bottom: 0;
+}
+
+.mob-cal-hour {
+  position: absolute;
+  right: 8px;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 00:00 hangt op de bovenrand; half omhoog schuiven zou het label afsnijden. */
+.mob-cal-hour:first-child {
+  transform: none;
+}
+
+.mob-cal-day-col {
+  position: relative;
+  height: 100%;
+}
+
+.mob-cal-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--line);
+}
+
+.mob-cal-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: 6px;
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* De inhoud bovenaan en niet gecentreerd. Op een breed scherm is een blok een
+   paar regels hoog en staat het midden goed; op een telefoon is een rit van
+   zeven uur een halve schermhoogte, en dan hangt de tekst in het niets. */
+.mob-cal-block {
+  position: absolute;
+  /* Expliciet `column`: de blokken dragen de klassen van het brede scherm mee
+     (`flex flex-col`), maar gewone CSS wint hier van een Tailwind-utility uit
+     een `@layer`, en dan zet dit `display: flex` alles op één regel. */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  overflow: hidden;
+  padding: 5px 8px;
+  text-align: left;
+}
+
+.mob-cal-now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--now-line);
+}
+
+.mob-cal-hint {
+  flex: 0 0 auto;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+/* Volledig scherm.
+
+   Twee vormen, want `requestFullscreen()` bestaat niet op een `div` in Safari op
+   iOS: lukt de echte fullscreen-API, dan zorgt `:fullscreen` voor de achtergrond
+   (zonder dat is het zwart, want de browser tekent niets achter het element);
+   lukt ze niet, dan zet de component `data-fullscreen="fallback"` en wordt het
+   een vast paneel over de pagina.
+
+   In beide gevallen is de container een **flexkolom over de volle hoogte**: de
+   werkbalk en de legende nemen wat ze nodig hebben, en de pane krijgt de rest.
+   Zonder `min-height: 0` op die pane weigert een flexitem te krimpen onder zijn
+   inhoud en steekt de kalender onderaan het scherm uit; dat is de klassieke
+   valkuil van een scrollende doos in een flexkolom.
+
+   De inspector en de filters horen bínnen deze container te staan; alles wat
+   erbuiten gerenderd wordt, is in echte fullscreen onzichtbaar. */
+.transport-calendar:fullscreen,
+.transport-calendar[data-fullscreen='fallback'] {
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  padding: 1rem;
+}
+
+/* De telefoonweergave brengt haar eigen indeling mee (werkbalk, dagstrip,
+   rooster) en wil de padding en de flexkolom van het brede scherm niet. */
+.transport-calendar[data-phone='true'] {
+  display: block;
+  padding: 0;
+}
+
+.transport-calendar:fullscreen {
+  width: 100%;
+  height: 100%;
+}
+
+.transport-calendar[data-fullscreen='fallback'] {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+}
+
+/* De pane vult wat er overblijft in plaats van haar vaste hoogte aan te houden;
+   dát is wat "volledig scherm" betekent.
+
+   `flex-basis: 0` en niet `height: 100%`: met een basis van 100% moet de
+   flexbox de pane weer laten krimpen om de werkbalk en de legende te laten
+   passen, en die berekening liep er een tiental pixels naast, waardoor de
+   legende net onder de schermrand viel. Met basis 0 krijgt de pane precies de
+   vrije ruimte, en klopt het per definitie. `height: auto` overschrijft zowel de
+   vaste hoogte van .tg-pane als de `auto` van de maandweergave. */
+.transport-calendar:fullscreen .tg-pane,
+.transport-calendar[data-fullscreen='fallback'] .tg-pane {
+  height: auto;
+  min-height: 0;
+  flex: 1 1 0%;
+}
+
+/* Uitleg die je in volledig scherm niet nodig hebt: daar wil je kalender zien.
+   De legende blijft wel staan, want die verklaart de kleuren die je op dat
+   moment bekijkt. */
+.transport-calendar:fullscreen .tg-hint,
+.transport-calendar[data-fullscreen='fallback'] .tg-hint {
+  display: none;
+}
+
+/* De legende en de uitleg onder de kalender mogen in volledig scherm niet
+   meegroeien; ze krijgen wat ze nodig hebben en de kalender de rest. */
+.transport-calendar:fullscreen > *,
+.transport-calendar[data-fullscreen='fallback'] > * {
+  flex: 0 0 auto;
+}
+
+/* In volledig scherm scrollt de kalender binnen de container, en dan zou de
+   werkbalk (weergave, navigatie, zoom, sluiten) mee naar boven verdwijnen. Die
+   blijft dus staan; de knop waarmee je er weer uit komt, hoort altijd zichtbaar
+   te zijn. */
+.transport-calendar:fullscreen .transport-calendar-toolbar,
+.transport-calendar[data-fullscreen='fallback'] .transport-calendar-toolbar {
+  position: sticky;
+  top: -1rem;
+  z-index: 40;
+  margin: -1rem -1rem 0;
+  padding: 1rem;
+  background: var(--paper);
+}
+
+/* Een rit zonder chauffeur: grijs met een streepjesrand. De rand is gestreept en
+   niet vol, zodat "nog niet af" te onderscheiden blijft van de volle rode rand
+   van een conflict (twee goedgekeurde ritten met hetzelfde voertuig op hetzelfde
+   moment). Ze was rood en de vulling geel; dat las als een fout terwijl het
+   gewoon werk is dat nog moet gebeuren, en op een halfverdeelde week stond het
+   hele scherm in alarmkleuren. */
+.trip-no-driver {
+  border-style: dashed;
+  border-color: var(--driver-edge);
+}
+
+/* Nog te beslissen (T7, T8, F4.16): een volle streep langs de bovenrand, zodat
+   je ziet dat dat moment nog kan vrijkomen.
+
+   **Geen arcering**, en dat is de hele correctie. Ze was een schuin streeppatroon
+   op 135 graden, met de gedachte dat het naast de 45 graden van een voertuig als
+   een ruit zou lezen. Twee dingen klopten daar niet aan. Ten eerste zetten
+   allebei `background-image`, dus ze stapelden niet: de arcering van het voertuig
+   won gewoon, waardoor een aangevraagde rit met een gearceerd voertuig géén
+   markering meer droeg. Ten tweede is arcering al de taal van het voertuig; een
+   status in diezelfde taal is niet te lezen, ook niet wanneer ze wél zou
+   stapelen. De vulkleur is de chauffeur, de arcering is het voertuig, en de
+   status hoort dus op een derde as.
+
+   Een rand en geen pseudo-element: hetzelfde blok is in de weekweergave een
+   absoluut gepositioneerde doos, in de maandweergave een `flex`-rij en op gsm nog
+   iets anders. Een `::before` wordt in die tweede een flex-item naast de tekst in
+   plaats van een streep erboven, en absoluut positioneren zou hem in dat geval
+   aan een voorouder ophangen. Een rand ligt altijd waar hij hoort.
+
+   Ná `.trip-no-driver` in dit bestand, want die zet `border-style: dashed` op
+   alle vier de randen; bij gelijke specificiteit wint de laatste regel, en deze
+   streep hoort vol te zijn. */
+.trip-requested {
+  border-top-width: 3px;
+  border-top-style: solid;
+  border-top-color: var(--driver-requested);
+}
+
+/* Een rit van je eigen post of werkgroep (F4.15, F6.17): een rail langs de
+   linkerrand in de nadrukkelijke kleur (navy, in het donker licht), niet meer in
+   het geel. Geel viel weg op een pastelkleur die zelf geel is (Boter, Amber) en
+   tussen een volle week; de nadrukkelijke kleur leest op elke vulling in beide
+   modi. Vier pixels in plaats van drie.
+
+   Een `border-left` en geen `box-shadow`, om dezelfde reden als hierboven plus
+   een eigen: de selectie in de kalender is een Tailwind-`ring`, en dat ís een
+   box-shadow, dus een tweede schaduw hier zou de ring van het aangeklikte blok
+   wegnemen. Ook geen derde randkleur: rood vol blijft een conflict en grijs
+   gestreept blijft "nog geen chauffeur". Die staan op de andere randen en
+   blijven dus zichtbaar naast deze rail.
+
+   Enkel op het bezettingsoverzicht, waar een post naar de planning van de hele
+   kring kijkt. Op de planning van het team zou het niets onderscheiden: daar is
+   alles van jou. */
+.trip-mine {
+  border-left-width: 4px;
+  border-left-style: solid;
+  border-left-color: var(--emphasis);
+}
+
+/* "Enkel mijn post benadrukken" (F6.17, `mine-focus.tsx`): de ritten die niet van
+   jou zijn, gaan lichter. Een attribuut op `body` en een regel hier, omdat de
+   blokken in drie weergaven staan en de schakelaar in de legende. */
+body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
+  opacity: 0.4;
+}
+
+/* De rit die je aan het aanmaken bent, terwijl het formulier openstaat. Dezelfde
+   grijze taal als "nog geen chauffeur", want dat is ze ook. Ze blijft staan tot
+   je opslaat of annuleert: zonder dat verdween je selectie op het moment dat je
+   ze ging invullen, en dan stond je te typen zonder te zien waar de rit komt. */
+.trip-draft {
+  border: 2px dashed var(--driver-edge);
+  background: var(--driver-none);
+  color: var(--driver-ink);
+}

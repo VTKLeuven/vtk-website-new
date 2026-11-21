@@ -1,0 +1,24 @@
+/* De basis: hoogte van de pagina en de kop.
+   Ingeladen vanuit app/globals.css, in deze volgorde; zie de uitleg daar (T1). */
+
+html,
+body {
+  height: 100%;
+  font-family: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* De uitleendienst heeft bewust géén `--max` (F4.6, D1).
+   Op vtk.be staat elke pagina in een kolom van 1240px, want dat is leestekst:
+   een regel die over een breed scherm loopt, raak je kwijt. Dit is geen
+   leestekst maar een werkblad. Een week is een urenkolom plus zeven dagen, en
+   een ritlijst draagt er zeven; wat daar niet past, verdwijnt niet, maar wordt
+   smaller tot je moet inzoomen om een naam te lezen. Logistiek vroeg precies
+   dat: "die zijkanten mogen opgevuld worden, zodat ik niet hoef in te zoomen."
+   De zijmarge blijft wel bestaan (`.logistics-gutter`), dus de inhoud plakt
+   nooit tegen de vensterrand, en wat wél een leesbreedte nodig heeft, zet die
+   met `.logistics-form-width` op zijn eigen blok in plaats van op de hele app.
+   De styleguide in CLAUDE.md pint die 1240px voor vtk.be en noemt deze
+   uitzondering. */
+:root {
+  --vtk-header-height: 73px;
+}
