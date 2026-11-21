@@ -60,7 +60,7 @@ export function TripRow({
         scroll={false}
         aria-current={selected ? 'true' : undefined}
         aria-label={`${tripTitle(trip)}, ${dateLabel(trip.startAt)} ${hoursLabel(trip)}, ${vehicle}, ${requesterLabel(trip)}`}
-        className="block px-3 py-2.5 transition hover:bg-vtk-navy/[0.04] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-vtk-yellow"
+        className="block px-3 py-2.5 transition hover:bg-vtk-navy/[0.04] focus-visible:-outline-offset-2"
       >
         {/* Breed scherm: de kolommen van de kop erboven. */}
         <span className="hidden text-sm md:grid md:items-baseline md:gap-x-3 md:grid-cols-[6.5rem_8rem_8.5rem_minmax(0,1.2fr)_7.5rem_minmax(0,1.8fr)_7.5rem]">

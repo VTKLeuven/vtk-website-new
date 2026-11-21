@@ -887,6 +887,11 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
   overflow-x: auto;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+  /* Een scrollvlak knipt alles af wat buiten zijn rand valt, ook de focusring
+     (V4). Zes pixels lucht rondom, met een negatieve marge die de kop even hoog
+     en de eerste link op dezelfde plek houdt. */
+  padding: 6px;
+  margin: -6px;
 }
 
 .vtk-site-header .nav-links::-webkit-scrollbar {
@@ -1026,11 +1031,6 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
   color: #fff;
 }
 
-.vtk-site-header .theme-toggle:focus-visible {
-  outline: 2px solid var(--yellow);
-  outline-offset: 2px;
-}
-
 .theme-toggle-icon {
   width: 18px;
   height: 18px;
@@ -1097,7 +1097,11 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
 .vtk-site-header .profile-menu-item:hover,
 .vtk-site-header .profile-menu-item:focus-visible {
   background: var(--paper-2);
-  outline: none;
+}
+
+/* Binnen de rand van het menu: daarbuiten valt de ring weg achter de kaart. */
+.vtk-site-header .profile-menu-item:focus-visible {
+  outline-offset: -2px;
 }
 
 /* Op een telefoon één rij: logo, menuknop en de kleine bedieningen. De links
@@ -1293,11 +1297,6 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
 
 .logistics-login-button:hover {
   transform: translateY(-1px);
-}
-
-.logistics-login-button:focus-visible {
-  outline: 3px solid var(--yellow);
-  outline-offset: 3px;
 }
 
 /* Een beheerscherm dat uit velden bestaat, houdt een leesbreedte (F4.6).
@@ -1756,6 +1755,30 @@ button:not(:disabled),
 
 button:disabled {
   cursor: not-allowed;
+}
+
+/* Eén focusring voor alles wat je met het toetsenbord bereikt (V4 uit de audit
+   van november 2026). Voordien hadden enkel de themaknop, de dienstkaarten en de
+   inlogknop er een, en leunde de rest op wat de browser toevallig tekende.
+
+   Navy (`--emphasis`, in het donker licht) op papier en kaarten, geel op de
+   donkere kop, paginakop en voet: geel op het lichte papier haalt het
+   contrast van 3:1 niet dat een focusring nodig heeft. Zo doet vtk.be het ook.
+
+   In `@layer base` en in `:where()`, dus zonder gewicht: een onderdeel met een
+   eigen ring (een tekstveld met zijn gele gloed hieronder) of een Tailwind-klasse
+   (`outline-none`, `-outline-offset-2`) wint. Buiten een laag zou deze regel van
+   elke utility winnen, hoe specifiek die ook is. */
+@layer base {
+  :where(:focus-visible) {
+    outline: 2px solid var(--emphasis);
+    outline-offset: 2px;
+  }
+
+  :where(.vtk-site-header, .logistics-page-head, .logistics-auth, .logistics-footer)
+    :where(:focus-visible):not(:where(.profile-menu *)) {
+    outline-color: var(--yellow);
+  }
 }
 
 input:focus,
