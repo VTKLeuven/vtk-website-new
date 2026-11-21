@@ -1082,7 +1082,6 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
    fotohero of eigen campagnelettertype. */
 .logistics-page-head,
 .logistics-auth,
-.logistics-info-band,
 .logistics-footer {
   position: relative;
   isolation: isolate;
@@ -1096,7 +1095,6 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
 
 .logistics-page-head::after,
 .logistics-auth::after,
-.logistics-info-band::after,
 .logistics-footer::after {
   content: '';
   position: absolute;
@@ -1261,127 +1259,9 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
   transform: translateY(-1px);
 }
 
-.logistics-service-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
-}
-
-.logistics-service-card {
-  min-height: 240px;
-  padding: clamp(22px, 3vw, 28px);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--surface);
-  text-decoration: none;
-  transition:
-    transform 180ms ease,
-    border-color 180ms ease;
-}
-
-.logistics-service-card:hover {
-  transform: translateY(-3px);
-  border-color: var(--line-2);
-}
-
-.logistics-service-card:focus-visible,
 .logistics-login-button:focus-visible {
   outline: 3px solid var(--yellow);
   outline-offset: 3px;
-}
-
-.logistics-service-icon {
-  display: grid;
-  width: 48px;
-  height: 48px;
-  place-items: center;
-  border-radius: 14px;
-  background: var(--yellow);
-  color: var(--on-yellow);
-}
-
-.logistics-home-content {
-  display: grid;
-  gap: clamp(32px, 5vw, 52px);
-}
-
-.logistics-section-head {
-  margin-bottom: 18px;
-}
-
-.logistics-section-head h2,
-.logistics-workflow h2 {
-  margin: 0;
-  color: var(--ink);
-  font-size: clamp(24px, 3vw, 32px);
-  font-weight: 600;
-  letter-spacing: -0.025em;
-}
-
-.logistics-section-head p {
-  margin: 6px 0 0;
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.logistics-workflow {
-  display: grid;
-  grid-template-columns: minmax(180px, 0.35fr) minmax(0, 1fr);
-  gap: 28px;
-  padding: clamp(22px, 3vw, 28px);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--surface);
-}
-
-.logistics-workflow ol {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.logistics-workflow li {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
-  padding: 14px;
-  border-radius: 14px;
-  background: var(--paper);
-  color: var(--body);
-  font-size: 14px;
-  line-height: 1.45;
-}
-
-.logistics-workflow-icon {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border-radius: 10px;
-  background: var(--yellow);
-  color: var(--on-yellow);
-}
-
-.logistics-inline-link {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px 20px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--surface);
-  text-decoration: none;
-  transition: border-color 160ms ease;
-}
-
-.logistics-inline-link:hover {
-  border-color: var(--line-2);
 }
 
 /* Een beheerscherm dat uit velden bestaat, houdt een leesbreedte (F4.6).
@@ -1787,10 +1667,6 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
   font-weight: 400;
 }
 
-.logistics-info-band::after {
-  background-position: calc(50% + 240px) -480px;
-}
-
 .logistics-auth {
   min-height: 480px;
 }
@@ -1855,21 +1731,6 @@ select:focus {
 }
 
 @media (max-width: 960px) {
-  .logistics-service-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .logistics-service-card {
-    min-height: 0;
-  }
-
-  .logistics-workflow {
-    grid-template-columns: 1fr;
-  }
-
-  .logistics-workflow ol {
-    grid-template-columns: 1fr;
-  }
 
   .logistics-template-picker {
     grid-template-columns: 1fr;

@@ -553,6 +553,80 @@ export async function unseenChanges(
 }
 
 /** Zoals `myReservations`: eigen ritten plus die van je posten. */
+/**
+ * Wat de startpagina van een lid toont (C1): zijn openstaande aanvragen en ritten,
+ * en de eerstvolgende ritten die hij (of zijn post) rijdt.
+ *
+ * Bewust klein: enkel wat open is, met een bovengrens en een telling, en niet de
+ * volledige lijsten van /reservaties en /ritten. De startpagina zegt wat er
+ * loopt; de volledige lijst is een klik verder.
+ */
+export async function memberStartOverview(userId: string, groupIds: string[] = []) {
+  const now = new Date();
+  const mineOrPost = (
+    groupIds.length > 0 ? { OR: [{ userId }, { requesterType: 'INTERN' as const, groupId: { in: groupIds } }] } : { userId }
+  );
+  const reservationWhere: Prisma.UitleenReservationWhereInput = {
+    AND: [mineOrPost, { status: { in: ['REQUESTED', 'APPROVED', 'PICKED_UP'] } }],
+  };
+  const tripWhere: Prisma.UitleenTransportBookingWhereInput = {
+    AND: [mineOrPost, { status: { in: ['REQUESTED', 'APPROVED'] } }, { endAt: { gte: now } }],
+  };
+  const drivingWhere: Prisma.UitleenTransportBookingWhereInput = {
+    status: 'APPROVED',
+    endAt: { gte: now },
+    OR: [
+      { driverId: userId },
+      ...(groupIds.length > 0 ? [{ assignedGroupId: { in: groupIds } }] : []),
+    ],
+  };
+  const [reservations, reservationCount, trips, tripCount, driving] = await Promise.all([
+    prisma.uitleenReservation.findMany({
+      where: reservationWhere,
+      orderBy: { pickupDate: 'asc' },
+      take: 5,
+      select: {
+        id: true,
+        eventName: true,
+        status: true,
+        pickupDate: true,
+        returnDate: true,
+        _count: { select: { lines: true, flesserkeLines: true } },
+      },
+    }),
+    prisma.uitleenReservation.count({ where: reservationWhere }),
+    prisma.uitleenTransportBooking.findMany({
+      where: tripWhere,
+      orderBy: { startAt: 'asc' },
+      take: 5,
+      select: {
+        id: true,
+        purpose: true,
+        eventName: true,
+        status: true,
+        startAt: true,
+        endAt: true,
+        vehicle: { select: { nameNl: true, nameEn: true } },
+      },
+    }),
+    prisma.uitleenTransportBooking.count({ where: tripWhere }),
+    prisma.uitleenTransportBooking.findMany({
+      where: drivingWhere,
+      orderBy: { startAt: 'asc' },
+      take: 3,
+      select: {
+        id: true,
+        purpose: true,
+        startAt: true,
+        endAt: true,
+        driverId: true,
+        vehicle: { select: { nameNl: true, nameEn: true } },
+      },
+    }),
+  ]);
+  return { reservations, reservationCount, trips, tripCount, driving };
+}
+
 export async function myVanBookings(userId: string, groupIds: string[] = []) {
   return prisma.uitleenTransportBooking.findMany({
     where:

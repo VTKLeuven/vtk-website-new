@@ -11595,6 +11595,22 @@ ingevuld stond.
   catalogus en het "gezien"-merkteken vangen hun fout stil op: een rode melding
   over iets waar niemand op klikte, verwart meer dan ze helpt.
 
+## De startpagina van de uitleendienst is persoonlijk
+
+De startpagina opende met "Alles wat je nodig hebt", drie kaarten die de
+navigatie herhaalden, een rij "Zo werkt het" in drie icoontjes en een band "Goed
+geregeld" waarvan de titel halverwege een zin afbrak ("Van eerste aanvraag
+tot"). Niets daarvan vertelde een lid dat terugkomt iets wat het niet al wist.
+
+- **Eerst wat loopt.** Je openstaande aanvragen en ritten (ook die van je post),
+  op hun eerste dag en met hun status, en een link naar al je aanvragen. Dan de
+  ritten die jij of je post rijdt, voor wie chauffeur is of er een heeft staan.
+- **Dan drie compacte knoppen** om iets nieuws aan te vragen: materiaal,
+  transport, en flesserke voor wie bij een post of werkgroep hoort. De uitleg
+  onder de eerste twee blijft bewerkbaar op /beheer/teksten.
+- **Geen stappen en geen afsluitende band**, en hun teksten zijn uit
+  /beheer/teksten weg. Hoe aanvragen werkt, staat bij het formulier zelf.
+
 ## Ritaanvragen: rijen, en één paneel tegelijk
 
 `/beheer/vervoer` renderde voor elke rit het volledige beslis- of beheerpaneel,

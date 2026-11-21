@@ -21,17 +21,11 @@ const SECTIONS: Array<{
     ],
   },
   {
-    title: 'Homepage',
-    description: 'De drie kaarten en het stappenoverzicht.',
+    title: 'Startpagina',
+    description: 'De uitleg onder de knoppen om iets aan te vragen.',
     fields: [
-      { key: 'homeMaterialLead', label: 'Kaart Materiaal', rows: 2 },
-      { key: 'homeVanLead', label: 'Kaart Camionette', rows: 2 },
-      { key: 'homeReservationsLead', label: 'Kaart Mijn aanvragen', rows: 2 },
-      { key: 'stepChoose', label: 'Stap 1' },
-      { key: 'stepRequest', label: 'Stap 2' },
-      { key: 'stepReturn', label: 'Stap 3' },
-      { key: 'infoTitle', label: 'Titel informatieband', rows: 2 },
-      { key: 'infoLead', label: 'Tekst informatieband', rows: 3 },
+      { key: 'homeMaterialLead', label: 'Materiaal lenen', rows: 2 },
+      { key: 'homeVanLead', label: 'Transport', rows: 2 },
     ],
   },
   {
