@@ -5,6 +5,7 @@ import type {
   GroupType,
   Prisma,
   UitleenAvailabilityKind,
+  UitleenRequesterType,
   UitleenTransportBookingStatus,
   UitleenTransportNoteVisibility,
 } from '@prisma/client';
@@ -783,7 +784,7 @@ const adminReservationInclude = {
   _count: { select: { transports: true } },
 } satisfies Prisma.UitleenReservationInclude;
 
-export type AdminReservation = Awaited<ReturnType<typeof adminReservations>>[number];
+export type AdminReservation = Prisma.UitleenReservationGetPayload<{ include: typeof adminReservationInclude }>;
 
 /**
  * Een lijn die niet past in de gevraagde periode, met de aanvragen waarmee ze
@@ -961,12 +962,74 @@ export async function conflictingReservationIds(): Promise<Set<string>> {
   return conflicting;
 }
 
-export async function adminReservations() {
+/**
+ * Open werk bij materiaal en flesserke: te beslissen, goedgekeurd en afgehaald,
+ * plus wat teruggebracht is maar nog niet rond (een externe die nog moet betalen
+ * of een waarborg die nog terug moet). Zonder bovengrens (L2): de lijst stopte
+ * bij de laatste 200 aanvragen, en dan viel net de oudste openstaande weg.
+ */
+export const OPEN_RESERVATION_WHERE: Prisma.UitleenReservationWhereInput = {
+  OR: [
+    { status: { in: ['REQUESTED', 'APPROVED', 'PICKED_UP'] } },
+    {
+      status: 'RETURNED',
+      requesterType: 'EXTERN',
+      OR: [
+        { totalPriceCents: { gt: 0 }, paidOfflineAt: null, payments: { none: { status: 'SUCCEEDED' } } },
+        { totalDepositCents: { gt: 0 }, depositReturnedAt: null },
+      ],
+    },
+  ],
+};
+
+export async function adminReservationsOpen(requesterType?: UitleenRequesterType) {
   return prisma.uitleenReservation.findMany({
+    where: { AND: [OPEN_RESERVATION_WHERE, requesterType ? { requesterType } : {}] },
     orderBy: [{ createdAt: 'desc' }],
     include: adminReservationInclude,
-    take: 200,
   });
+}
+
+export const RESERVATION_ARCHIVE_PAGE_SIZE = 50;
+
+/** Het archief: al de rest, per werkingsjaar van de afhaaldatum, met pagina's. */
+export async function adminReservationsArchive(year: number, page: number, requesterType?: UitleenRequesterType) {
+  // `pickupDate` is een datum zonder uur, als middernacht UTC bewaard.
+  const where: Prisma.UitleenReservationWhereInput = {
+    pickupDate: { gte: new Date(Date.UTC(year, 6, 15)), lt: new Date(Date.UTC(year + 1, 6, 15)) },
+    NOT: OPEN_RESERVATION_WHERE,
+    ...(requesterType ? { requesterType } : {}),
+  };
+  const total = await prisma.uitleenReservation.count({ where });
+  const pageCount = Math.max(1, Math.ceil(total / RESERVATION_ARCHIVE_PAGE_SIZE));
+  const current = Math.min(Math.max(1, page), pageCount);
+  const rows = await prisma.uitleenReservation.findMany({
+    where,
+    orderBy: [{ updatedAt: 'desc' }],
+    include: adminReservationInclude,
+    skip: (current - 1) * RESERVATION_ARCHIVE_PAGE_SIZE,
+    take: RESERVATION_ARCHIVE_PAGE_SIZE,
+  });
+  return { rows, total, page: current, pageCount };
+}
+
+/** De werkingsjaren met aanvragen, nieuwste eerst, voor de keuze van het archief. */
+export async function adminReservationYears(): Promise<number[]> {
+  const [first, last] = await Promise.all([
+    prisma.uitleenReservation.findFirst({ orderBy: { pickupDate: 'asc' }, select: { pickupDate: true } }),
+    prisma.uitleenReservation.findFirst({ orderBy: { pickupDate: 'desc' }, select: { pickupDate: true } }),
+  ]);
+  return yearsBetween(first?.pickupDate, last?.pickupDate);
+}
+
+/** Van het jongste werkingsjaar tot het oudste, het lopende altijd erbij. */
+function yearsBetween(first: Date | undefined, last: Date | undefined): number[] {
+  const now = currentWorkingYear();
+  const from = Math.min(first ? workingYearOf(first) : now, now);
+  const to = Math.max(last ? workingYearOf(last) : now, now);
+  const years: number[] = [];
+  for (let year = to; year >= from; year--) years.push(year);
+  return years;
 }
 
 /**
@@ -1282,13 +1345,7 @@ export async function adminTransportYears(): Promise<number[]> {
     prisma.uitleenTransportBooking.findFirst({ orderBy: { startAt: 'asc' }, select: { startAt: true } }),
     prisma.uitleenTransportBooking.findFirst({ orderBy: { startAt: 'desc' }, select: { startAt: true } }),
   ]);
-  const now = currentWorkingYear();
-  if (!first || !last) return [now];
-  const from = Math.min(workingYearOf(first.startAt), now);
-  const to = Math.max(workingYearOf(last.startAt), now);
-  const years: number[] = [];
-  for (let year = to; year >= from; year--) years.push(year);
-  return years;
+  return yearsBetween(first?.startAt, last?.startAt);
 }
 
 /**
@@ -2699,12 +2756,43 @@ export type AdminEvent = Prisma.UitleenEventGetPayload<{ include: typeof eventIn
  * evenement drie soorten aanvragen naast elkaar, en dat per rij ophalen zou
  * tientallen queries kosten.
  */
-export async function adminEvents(): Promise<AdminEvent[]> {
+export async function adminEventsUpcoming(): Promise<AdminEvent[]> {
+  // Komend, gisteren nog bezig, of zonder datum: zonder bovengrens (L2).
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   return prisma.uitleenEvent.findMany({
-    orderBy: [{ startAt: 'desc' }, { createdAt: 'desc' }],
+    where: { OR: [{ startAt: null }, { startAt: { gte: since } }] },
+    orderBy: [{ startAt: 'asc' }, { createdAt: 'desc' }],
     include: eventInclude,
-    take: 200,
   });
+}
+
+export const EVENT_ARCHIVE_PAGE_SIZE = 30;
+
+/** Voorbije evenementen van één werkingsjaar, recentste eerst, met pagina's. */
+export async function adminEventsArchive(year: number, page: number) {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const { from, to } = workingYearBounds(year);
+  const where: Prisma.UitleenEventWhereInput = { startAt: { gte: from, lt: to.getTime() < since.getTime() ? to : since } };
+  const total = await prisma.uitleenEvent.count({ where });
+  const pageCount = Math.max(1, Math.ceil(total / EVENT_ARCHIVE_PAGE_SIZE));
+  const current = Math.min(Math.max(1, page), pageCount);
+  const rows = await prisma.uitleenEvent.findMany({
+    where,
+    orderBy: [{ startAt: 'desc' }],
+    include: eventInclude,
+    skip: (current - 1) * EVENT_ARCHIVE_PAGE_SIZE,
+    take: EVENT_ARCHIVE_PAGE_SIZE,
+  });
+  return { rows, total, page: current, pageCount };
+}
+
+/** De werkingsjaren met evenementen, voor de keuze van het archief. */
+export async function adminEventYears(): Promise<number[]> {
+  const [first, last] = await Promise.all([
+    prisma.uitleenEvent.findFirst({ where: { startAt: { not: null } }, orderBy: { startAt: 'asc' }, select: { startAt: true } }),
+    prisma.uitleenEvent.findFirst({ where: { startAt: { not: null } }, orderBy: { startAt: 'desc' }, select: { startAt: true } }),
+  ]);
+  return yearsBetween(first?.startAt ?? undefined, last?.startAt ?? undefined);
 }
 
 /**

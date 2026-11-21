@@ -1,4 +1,5 @@
 import Link from '@vtk/ui/link';
+import { currentWorkingYear } from '@vtk/auth';
 import {
   GroceryStatusBadge,
   ReservationStatusBadge,
@@ -14,7 +15,14 @@ import {
   toBrusselsDateValue,
   toBrusselsTimeValue,
 } from '@/lib/uitleen';
-import { adminEvents, eventLoad, type AdminEvent } from '@/lib/uitleen-server';
+import {
+  EVENT_ARCHIVE_PAGE_SIZE,
+  adminEventsArchive,
+  adminEventsUpcoming,
+  adminEventYears,
+  eventLoad,
+  type AdminEvent,
+} from '@/lib/uitleen-server';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { EventEditor } from './event-editor';
 
@@ -339,17 +347,37 @@ function sortEvents(events: AdminEvent[], sort: EventSort, dir: SortDir): AdminE
 export default async function BeheerEvenementenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sorteer?: string; richting?: string }>;
+  searchParams: Promise<{ sorteer?: string; richting?: string; jaar?: string; pagina?: string }>;
 }) {
   await requireManage();
-  const { sorteer, richting } = await searchParams;
+  const { sorteer, richting, jaar, pagina } = await searchParams;
   // Zonder parameter blijft het datum-oplopend, zoals het altijd was: bestaande
   // links en bladwijzers komen op dezelfde lijst uit.
   const chosenSort = isEventSort(sorteer) ? sorteer : null;
   const sort: EventSort = chosenSort ?? 'datum';
   const dir: SortDir =
     richting === 'asc' || richting === 'desc' ? richting : EVENT_SORTS[sort].defaultDir;
-  const events = await adminEvents();
+  // Komend zonder bovengrens; wat geweest is per werkingsjaar met pagina's (L2).
+  // Voordien de laatste 200 op startdatum, en dan vielen de oudste stil weg.
+  const thisYear = currentWorkingYear();
+  const archiveYear = Number.isInteger(Number(jaar)) && Number(jaar) > 2000 ? Number(jaar) : thisYear;
+  const archivePage = Number.isInteger(Number(pagina)) && Number(pagina) > 0 ? Number(pagina) : 1;
+  const [comingEvents, archive, years] = await Promise.all([
+    adminEventsUpcoming(),
+    adminEventsArchive(archiveYear, archivePage),
+    adminEventYears(),
+  ]);
+  const events = [...comingEvents, ...archive.rows];
+
+  function archiveHref(year: number, page: number): string {
+    const params = new URLSearchParams();
+    if (chosenSort) params.set('sorteer', chosenSort);
+    if (richting) params.set('richting', richting);
+    if (year !== thisYear) params.set('jaar', String(year));
+    if (page > 1) params.set('pagina', String(page));
+    const query = params.toString();
+    return query ? `/beheer/evenementen?${query}#geweest` : '/beheer/evenementen#geweest';
+  }
 
   /** Waar een sorteerknop heen gaat; een tweede klik op dezelfde draait om. */
   function sortHref(key: EventSort): string {
@@ -428,16 +456,70 @@ export default async function BeheerEvenementenPage({
         </section>
       ) : null}
 
-      {past.length > 0 ? (
-        <section>
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-vtk-muted">Geweest</h3>
-          <ul className="mt-3 grid gap-4">
-            {past.map((event) => (
-              <EventCard key={event.id} event={event} />
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <section id="geweest" className="scroll-mt-24">
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-vtk-muted">
+            Geweest in {String(archiveYear).slice(2)}-{String(archiveYear + 1).slice(2)} ({archive.total})
+          </h3>
+          {years.length > 1 ? (
+            <nav aria-label="Werkingsjaar" className="flex flex-wrap gap-1.5">
+              {years.map((year) => (
+                <Link
+                  key={year}
+                  href={archiveHref(year, 1)}
+                  aria-current={year === archiveYear ? 'true' : undefined}
+                  className={`rounded-full border px-3 py-1 text-sm font-medium transition ${
+                    year === archiveYear
+                      ? 'border-vtk-navy bg-vtk-navy text-vtk-on-emphasis'
+                      : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
+                  }`}
+                >
+                  {`${String(year).slice(2)}-${String(year + 1).slice(2)}`}
+                </Link>
+              ))}
+            </nav>
+          ) : null}
+        </div>
+        {past.length === 0 ? (
+          <p className="mt-3 text-sm text-vtk-muted">Nog niets geweest in dit werkingsjaar.</p>
+        ) : (
+          <>
+            <p className="mt-1 text-sm text-vtk-muted">
+              {(archive.page - 1) * EVENT_ARCHIVE_PAGE_SIZE + 1}
+              {archive.rows.length > 1 ? ` tot ${(archive.page - 1) * EVENT_ARCHIVE_PAGE_SIZE + archive.rows.length}` : ''}{' '}
+              van {archive.total}.
+            </p>
+            <ul className="mt-3 grid gap-4">
+              {past.map((event) => (
+                <EventCard key={event.id} event={event} />
+              ))}
+            </ul>
+          </>
+        )}
+        {archive.pageCount > 1 ? (
+          <nav aria-label="Pagina's van wat geweest is" className="mt-3 flex items-center gap-2 text-sm">
+            {archive.page > 1 ? (
+              <Link
+                href={archiveHref(archiveYear, archive.page - 1)}
+                className="rounded-full border border-vtk-navy/15 px-3 py-1.5 font-medium text-vtk-ink transition hover:border-vtk-navy/40"
+              >
+                ← Recenter
+              </Link>
+            ) : null}
+            <span className="tabular-nums text-vtk-muted">
+              Pagina {archive.page} van {archive.pageCount}
+            </span>
+            {archive.page < archive.pageCount ? (
+              <Link
+                href={archiveHref(archiveYear, archive.page + 1)}
+                className="rounded-full border border-vtk-navy/15 px-3 py-1.5 font-medium text-vtk-ink transition hover:border-vtk-navy/40"
+              >
+                Ouder →
+              </Link>
+            ) : null}
+          </nav>
+        ) : null}
+      </section>
     </div>
   );
 }

@@ -1,4 +1,6 @@
 import Link from '@vtk/ui/link';
+import type { UitleenRequesterType } from '@prisma/client';
+import { currentWorkingYear } from '@vtk/auth';
 import { ReservationStatusBadge } from '@/components/status-badge';
 import { requireManage } from '@/lib/session';
 import { SortChipLinks, nextSortDir, type SortDir } from '@/app/beheer/sort';
@@ -11,7 +13,10 @@ import {
   requesterLabel,
 } from '@/lib/uitleen';
 import {
-  adminReservations,
+  adminReservationsArchive,
+  adminReservationsOpen,
+  adminReservationYears,
+  RESERVATION_ARCHIVE_PAGE_SIZE,
   conflictingReservationIds,
   getLogistiekSettings,
   type AdminReservation,
@@ -100,10 +105,10 @@ function requestKindLabel(reservation: Pick<AdminReservation, 'lines' | 'flesser
 export default async function BeheerAanvragenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string; sort?: string; dir?: string }>;
+  searchParams: Promise<{ type?: string; sort?: string; dir?: string; jaar?: string; pagina?: string }>;
 }) {
   await requireManage();
-  const { type, sort, dir } = await searchParams;
+  const { type, sort, dir, jaar, pagina } = await searchParams;
   const activeTab = TABS.some((t) => t.value === type) ? type! : 'all';
 
   // Zonder expliciete keuze krijgt elke sectie haar eigen logische volgorde:
@@ -113,16 +118,25 @@ export default async function BeheerAanvragenPage({
   const activeSort: SortKey = chosenSort ?? 'pickup';
   const activeDir: SortDir = chosenDir ?? SORTS[activeSort].defaultDir;
 
-  const [all, settings, conflicting] = await Promise.all([
-    adminReservations(),
+  // Open werk zonder bovengrens, de rest per werkingsjaar met pagina's (L2).
+  const requesterType = activeTab === 'all' ? undefined : (activeTab as UitleenRequesterType);
+  const thisYear = currentWorkingYear();
+  const archiveYear = Number.isInteger(Number(jaar)) && Number(jaar) > 2000 ? Number(jaar) : thisYear;
+  const archivePage = Number.isInteger(Number(pagina)) && Number(pagina) > 0 ? Number(pagina) : 1;
+  const [reservations, archive, years, settings, conflicting] = await Promise.all([
+    adminReservationsOpen(requesterType),
+    adminReservationsArchive(archiveYear, archivePage, requesterType),
+    adminReservationYears(),
     getLogistiekSettings(),
     conflictingReservationIds(),
   ]);
-  const reservations = activeTab === 'all' ? all : all.filter((r) => r.requesterType === activeTab);
 
   const open = reservations.filter((r) => r.status === 'REQUESTED');
   const active = reservations.filter((r) => r.status === 'APPROVED' || r.status === 'PICKED_UP');
-  const done = reservations.filter((r) => !['REQUESTED', 'APPROVED', 'PICKED_UP'].includes(r.status));
+  // Teruggebracht maar nog niet rond: een externe die nog moet betalen of een
+  // waarborg die nog terug moet. Die hoort niet in het archief te verdwijnen.
+  const unsettled = reservations.filter((r) => r.status === 'RETURNED');
+  const done = archive.rows;
 
   // "Lopend" krijgt de bulk-selectie (N4); "Afgelopen" (de afgesloten
   // aanvragen: afgewezen, geannuleerd, teruggebracht) staat standaard
@@ -139,6 +153,19 @@ export default async function BeheerAanvragenPage({
     if (activeTab !== 'all') params.set('type', activeTab);
     params.set('sort', key);
     params.set('dir', nextSortDir(key, chosenSort, activeDir, SORTS[key].defaultDir));
+    return `/beheer/aanvragen?${params.toString()}`;
+  }
+
+  /** Een jaar en pagina van het archief, met de andere keuzes erbij. */
+  function archiveLink(year: number, page: number): string {
+    const params = new URLSearchParams();
+    if (activeTab !== 'all') params.set('type', activeTab);
+    if (chosenSort) params.set('sort', chosenSort);
+    if (chosenDir) params.set('dir', chosenDir);
+    if (year !== thisYear) params.set('jaar', String(year));
+    if (page > 1) params.set('pagina', String(page));
+    // Ook voor het lopende jaar op pagina 1 iets in de URL, zodat het archief open blijft.
+    if (!params.has('jaar') && !params.has('pagina')) params.set('jaar', String(year));
     return `/beheer/aanvragen?${params.toString()}`;
   }
 
@@ -374,7 +401,13 @@ export default async function BeheerAanvragenPage({
       {/* Afgelopen (R2): de aanvragen die niets meer nodig hebben (afgewezen,
           geannuleerd, teruggebracht) staan standaard ingeklapt zodat de
           actieve lijsten hierboven het overzicht blijven. */}
-      <details className="group">
+      {unsettled.length > 0 ? (
+        <Section title="Teruggebracht, nog af te ronden" list={unsettled} fallback={byLastTouched} />
+      ) : null}
+
+      {/* Het archief: afgewezen, geannuleerd en teruggebracht, per werkingsjaar
+          van de afhaaldatum en met pagina's (L2). Dicht tot je erin bladert. */}
+      <details className="group" open={Boolean(jaar || pagina)}>
         <summary className="flex cursor-pointer list-none items-center gap-2 text-lg font-semibold tracking-tight text-vtk-ink [&::-webkit-details-marker]:hidden">
           <span
             aria-hidden="true"
@@ -382,17 +415,67 @@ export default async function BeheerAanvragenPage({
           >
             ▸
           </span>
-          Afgelopen ({sortedDone.length})
+          Afgelopen in {String(archiveYear).slice(2)}-{String(archiveYear + 1).slice(2)} ({archive.total})
         </summary>
-        {sortedDone.length === 0 ? (
-          <p className="mt-3 text-sm text-vtk-muted">Niets hier.</p>
-        ) : (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-vtk-muted">
+            {archive.total > 0
+              ? `${(archive.page - 1) * RESERVATION_ARCHIVE_PAGE_SIZE + 1}${
+                  archive.rows.length > 1
+                    ? ` tot ${(archive.page - 1) * RESERVATION_ARCHIVE_PAGE_SIZE + archive.rows.length}`
+                    : ''
+                } van ${archive.total}, laatst gewijzigd eerst.`
+              : 'Niets afgelopen in dit werkingsjaar.'}
+          </p>
+          {years.length > 1 ? (
+            <nav aria-label="Werkingsjaar" className="flex flex-wrap gap-1.5">
+              {years.map((year) => (
+                <Link
+                  key={year}
+                  href={archiveLink(year, 1)}
+                  aria-current={year === archiveYear ? 'true' : undefined}
+                  className={`rounded-full border px-3 py-1 text-sm font-medium transition ${
+                    year === archiveYear
+                      ? 'border-vtk-navy bg-vtk-navy text-vtk-on-emphasis'
+                      : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
+                  }`}
+                >
+                  {`${String(year).slice(2)}-${String(year + 1).slice(2)}`}
+                </Link>
+              ))}
+            </nav>
+          ) : null}
+        </div>
+        {sortedDone.length > 0 ? (
           <ul className="mt-4 grid gap-2">
             {sortedDone.map((reservation) => (
               <ReservationRow key={reservation.id} reservation={reservation} />
             ))}
           </ul>
-        )}
+        ) : null}
+        {archive.pageCount > 1 ? (
+          <nav aria-label="Pagina's van het archief" className="mt-3 flex items-center gap-2 text-sm">
+            {archive.page > 1 ? (
+              <Link
+                href={archiveLink(archiveYear, archive.page - 1)}
+                className="rounded-full border border-vtk-navy/15 px-3 py-1.5 font-medium text-vtk-ink transition hover:border-vtk-navy/40"
+              >
+                ← Nieuwer
+              </Link>
+            ) : null}
+            <span className="tabular-nums text-vtk-muted">
+              Pagina {archive.page} van {archive.pageCount}
+            </span>
+            {archive.page < archive.pageCount ? (
+              <Link
+                href={archiveLink(archiveYear, archive.page + 1)}
+                className="rounded-full border border-vtk-navy/15 px-3 py-1.5 font-medium text-vtk-ink transition hover:border-vtk-navy/40"
+              >
+                Ouder →
+              </Link>
+            ) : null}
+          </nav>
+        ) : null}
       </details>
     </div>
   );
