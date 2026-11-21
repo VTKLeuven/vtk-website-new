@@ -181,27 +181,29 @@ export default async function VervoerWeekPage({
     : [];
 
   const conflicts = conflictPartners(bookings);
-  // De historiek van de getoonde ritten in één query; ze staat ingeklapt in het
-  // paneel, maar wordt hier server-side gerenderd, zoals op /beheer/vervoer.
-  const history = await transportAuditLogsByBooking(bookings.map((booking) => booking.id));
-  // De eigen nota's van de getoonde ritten (F4.20): wat er met Logistiek gedeeld
-  // is, plus wat dit teamlid zelf schreef. Andermans privénota's komen niet uit
-  // de databank, ook niet met `logistiek.manage`. `onTripIds` zijn de ritten
-  // waar dit teamlid zelf bij hoort, want daar leest hij ook de nota's die enkel
-  // voor de post bedoeld zijn: dan ís het zijn post.
   const viewer = { userId: session.user.id, groupIds: session.groups.map((group) => group.id) };
-  const teamEdits = await teamEditsForTransport(
-    bookings.map((booking) => ({ id: booking.id, userId: booking.userId }))
-  );
-  const seriesPlaces = await seriesPositions(bookings);
-  const notesPerTrip = await tripNotesFor(
-    bookings.map((booking) => booking.id),
-    {
-      userId: session.user.id,
-      onTripIds: bookings.filter((booking) => onTripForNotes(booking, viewer)).map((b) => b.id),
-      logistiek: true,
-    }
-  );
+  // Vier queries die enkel de ritten van hierboven nodig hebben, en elkaar niet:
+  // samen in plaats van na elkaar (P4).
+  const [history, teamEdits, seriesPlaces, notesPerTrip] = await Promise.all([
+    // De historiek van de getoonde ritten in één query; ze staat ingeklapt in
+    // het paneel, maar wordt hier server-side gerenderd, zoals op /beheer/vervoer.
+    transportAuditLogsByBooking(bookings.map((booking) => booking.id)),
+    teamEditsForTransport(bookings.map((booking) => ({ id: booking.id, userId: booking.userId }))),
+    seriesPositions(bookings),
+    // De eigen nota's van de getoonde ritten (F4.20): wat er met Logistiek
+    // gedeeld is, plus wat dit teamlid zelf schreef. Andermans privénota's komen
+    // niet uit de databank, ook niet met `logistiek.manage`. `onTripIds` zijn de
+    // ritten waar dit teamlid zelf bij hoort, want daar leest hij ook de nota's
+    // die enkel voor de post bedoeld zijn: dan ís het zijn post.
+    tripNotesFor(
+      bookings.map((booking) => booking.id),
+      {
+        userId: session.user.id,
+        onTripIds: bookings.filter((booking) => onTripForNotes(booking, viewer)).map((b) => b.id),
+        logistiek: true,
+      }
+    ),
+  ]);
 
   // De filters blijven staan wanneer je van week naar week bladert: ze horen bij
   // waar je naar kijkt, niet bij wanneer.

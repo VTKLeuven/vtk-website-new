@@ -1912,11 +1912,28 @@ async function overlappingBookings(
   endAt: Date,
   excludeIds: string[]
 ) {
-  const others = await tx.uitleenTransportBooking.findMany({
-    where: { vehicleId, status: 'APPROVED', id: { notIn: excludeIds } },
+  const others = await approvedTripsBetween(tx, vehicleId, startAt, endAt, excludeIds);
+  return others.filter((other) => momentsOverlap(startAt, endAt, other.startAt, other.endAt));
+}
+
+/**
+ * De goedgekeurde ritten van een voertuig die iets van dit venster raken.
+ *
+ * Met de datum in de query (P4): voordien haalde elke controle alle goedgekeurde
+ * ritten van het voertuig op, sinds het begin, en filterde ze daarna. Dezelfde
+ * voorwaarde als `momentsOverlap`, dus aansluiten blijft mogen.
+ */
+function approvedTripsBetween(
+  tx: Prisma.TransactionClient,
+  vehicleId: string,
+  from: Date,
+  to: Date,
+  excludeIds: string[]
+) {
+  return tx.uitleenTransportBooking.findMany({
+    where: { vehicleId, status: 'APPROVED', id: { notIn: excludeIds }, startAt: { lt: to }, endAt: { gt: from } },
     select: { id: true, startAt: true, endAt: true, eventName: true, purpose: true },
   });
-  return others.filter((other) => momentsOverlap(startAt, endAt, other.startAt, other.endAt));
 }
 
 /**
@@ -2507,16 +2524,25 @@ export async function previewTripSeriesAction(input: {
   );
   if (windows.length === 0) return { ok: false, error: 'Kies eerst een start- en eindmoment.' };
 
-  const items: Array<{ startAt: string; endAt: string; clash: string | null }> = [];
+  const parsed: Array<{ window: (typeof windows)[number]; startAt: Date; endAt: Date }> = [];
   for (const window of windows) {
     const startAt = parseBrusselsDateTime(window.startAt);
     const endAt = parseBrusselsDateTime(window.endAt);
     if (!startAt || !endAt) return { ok: false, error: 'Vul een geldig begin- en einduur in.' };
-    const clashes = input.vehicleId
-      ? await overlappingBookings(prisma, input.vehicleId, startAt, endAt, [])
-      : [];
-    items.push({ ...window, clash: clashes.length > 0 ? overlapLabel(clashes) : null });
+    parsed.push({ window, startAt, endAt });
   }
+
+  // Eén query voor de hele reeks in plaats van één per herhaling (P4): de
+  // ritten tussen het eerste begin en het laatste einde, en dan per herhaling
+  // in het geheugen welke daarvan botsen.
+  const from = new Date(Math.min(...parsed.map((entry) => entry.startAt.getTime())));
+  const to = new Date(Math.max(...parsed.map((entry) => entry.endAt.getTime())));
+  const others = input.vehicleId ? await approvedTripsBetween(prisma, input.vehicleId, from, to, []) : [];
+
+  const items = parsed.map(({ window, startAt, endAt }) => {
+    const clashes = others.filter((other) => momentsOverlap(startAt, endAt, other.startAt, other.endAt));
+    return { ...window, clash: clashes.length > 0 ? overlapLabel(clashes) : null };
+  });
   return { ok: true, items, capped: windows.length >= MAX_SERIES_OCCURRENCES };
 }
 
