@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button, ConfirmDialog } from "@vtk/ui";
 import { IconButton } from "@/components/ui/IconButton";
 import { StorageImageField } from "@/components/admin/StorageImageField";
-import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
+import {
+  BilingualGroup,
+  BilingualInput,
+  BilingualMarkdown,
+} from "@/components/admin/BilingualField";
 import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import {
   canChangeTypeWithAnswers,
@@ -224,61 +228,8 @@ export function FieldSettings({
           </div>
         ) : null}
 
-        <div className="ticket-admin-field">
-          <label htmlFor={`label-nl-${draft.id ?? "new"}`}>
-            {nl ? "Vraag (NL)" : "Question (NL)"}
-          </label>
-          <input
-            id={`label-nl-${draft.id ?? "new"}`}
-            value={draft.labelNl}
-            maxLength={300}
-            onChange={(event) => onChange({ ...draft, labelNl: event.target.value })}
-          />
-        </div>
-        <div className="ticket-admin-field">
-          <label htmlFor={`label-en-${draft.id ?? "new"}`}>
-            {nl ? "Vraag (EN)" : "Question (EN)"}
-          </label>
-          <input
-            id={`label-en-${draft.id ?? "new"}`}
-            value={draft.labelEn}
-            maxLength={300}
-            onChange={(event) => onChange({ ...draft, labelEn: event.target.value })}
-          />
-          {!draft.labelEn ? (
-            <span className="form-admin-lang-flag" data-missing="true">
-              {nl ? "Geen vertaling" : "No translation"}
-            </span>
-          ) : null}
-        </div>
-
-        <div className="ticket-admin-field">
-          <label htmlFor={`help-nl-${draft.id ?? "new"}`}>
-            {nl ? "Toelichting (NL, markdown)" : "Explanation (NL, markdown)"}
-          </label>
-          <MarkdownEditor
-            textareaId={`help-nl-${draft.id ?? "new"}`}
-            locale={locale}
-            rows={6}
-            allowImages={false}
-            value={draft.helpNl}
-            maxLength={2_000}
-            onChange={(helpNl) => onChange({ ...draft, helpNl })}
-          />
-        </div>
-        <div className="ticket-admin-field">
-          <label htmlFor={`help-en-${draft.id ?? "new"}`}>
-            {nl ? "Toelichting (EN, markdown)" : "Explanation (EN, markdown)"}
-          </label>
-          <MarkdownEditor
-            textareaId={`help-en-${draft.id ?? "new"}`}
-            locale={locale}
-            rows={6}
-            allowImages={false}
-            value={draft.helpEn}
-            maxLength={2_000}
-            onChange={(helpEn) => onChange({ ...draft, helpEn })}
-          />
+        <div className="md:col-span-2" data-span="2">
+          <FieldBilingualContent draft={draft} locale={locale} onChange={onChange} />
         </div>
       </div>
 
@@ -913,5 +864,63 @@ function ConditionEditor({
         </>
       )}
     </fieldset>
+  );
+}
+
+/**
+ * Gedeeld tweetalig blok (vraag + markdown-toelichting) voor een formulierveld.
+ * Houdt de laatste `draft` bij in een ref zodat batch-vertaling van zowel vraag
+ * als toelichting binnen één tick geen van beide updates overschrijft.
+ */
+function FieldBilingualContent({
+  draft,
+  locale,
+  onChange,
+}: {
+  draft: FieldDraft;
+  locale: AdminLocale;
+  onChange: (next: FieldDraft) => void;
+}) {
+  const nl = locale === "nl";
+  const draftRef = useRef(draft);
+
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+
+  function patch(partial: Partial<FieldDraft>) {
+    const next = { ...draftRef.current, ...partial };
+    draftRef.current = next;
+    onChange(next);
+  }
+
+  return (
+    <BilingualGroup locale={locale}>
+      <BilingualInput
+        label={nl ? "Vraag" : "Question"}
+        nameNl="labelNl"
+        nameEn="labelEn"
+        valueNl={draft.labelNl}
+        valueEn={draft.labelEn}
+        onChangeNl={(labelNl) => patch({ labelNl })}
+        onChangeEn={(labelEn) => patch({ labelEn })}
+        maxLength={300}
+        idPrefix={`label-${draft.id ?? "new"}`}
+      />
+      <BilingualMarkdown
+        label={nl ? "Toelichting (markdown)" : "Explanation (markdown)"}
+        nameNl="helpNl"
+        nameEn="helpEn"
+        valueNl={draft.helpNl}
+        valueEn={draft.helpEn}
+        onChangeNl={(helpNl) => patch({ helpNl })}
+        onChangeEn={(helpEn) => patch({ helpEn })}
+        locale={locale}
+        rows={6}
+        allowImages={false}
+        maxLength={2_000}
+        idPrefix={`help-${draft.id ?? "new"}`}
+      />
+    </BilingualGroup>
   );
 }

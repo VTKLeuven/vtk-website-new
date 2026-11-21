@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { Languages, Loader2 } from "lucide-react";
-import { Button, ConfirmDialog, Input, Label } from "@vtk/ui";
+import { Button, ConfirmDialog, Input, Label, Textarea } from "@vtk/ui";
 import type { Locale } from "@vtk/i18n";
 import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
 import { useAiTranslateConfig } from "@/components/admin/AiTranslateContext";
@@ -501,6 +501,10 @@ export function BilingualInput({
   nameEn,
   defaultValueNl = "",
   defaultValueEn = "",
+  valueNl: controlledNl,
+  valueEn: controlledEn,
+  onChangeNl,
+  onChangeEn,
   placeholderNl,
   placeholderEn,
   requiredNl = false,
@@ -516,6 +520,10 @@ export function BilingualInput({
   nameEn: string;
   defaultValueNl?: string | null;
   defaultValueEn?: string | null;
+  valueNl?: string;
+  valueEn?: string;
+  onChangeNl?: (value: string) => void;
+  onChangeEn?: (value: string) => void;
   placeholderNl?: string;
   placeholderEn?: string;
   requiredNl?: boolean;
@@ -530,22 +538,27 @@ export function BilingualInput({
   const { lang, notifyChange } = useBilingualGroup();
   const uid = useId();
   const prefix = idPrefix ?? uid;
-  const [nlVal, setNlVal] = useState(defaultValueNl ?? "");
-  const [enVal, setEnVal] = useState(defaultValueEn ?? "");
+  const [internalNl, setInternalNl] = useState(defaultValueNl ?? "");
+  const [internalEn, setInternalEn] = useState(defaultValueEn ?? "");
+
+  const nlVal = controlledNl ?? internalNl;
+  const enVal = controlledEn ?? internalEn;
 
   const updateNl = useCallback(
     (next: string) => {
-      setNlVal(next);
+      if (onChangeNl) onChangeNl(next);
+      else setInternalNl(next);
       notifyChange();
     },
-    [notifyChange],
+    [onChangeNl, notifyChange],
   );
   const updateEn = useCallback(
     (next: string) => {
-      setEnVal(next);
+      if (onChangeEn) onChangeEn(next);
+      else setInternalEn(next);
       notifyChange();
     },
-    [notifyChange],
+    [onChangeEn, notifyChange],
   );
 
   useRegisterBilingualPair(nameNl, () => nlVal, updateNl, () => enVal, updateEn);
@@ -582,6 +595,122 @@ export function BilingualInput({
           value={enVal}
           onChange={(e) => updateEn(e.target.value)}
           placeholder={placeholderEn}
+          required={requiredEn && lang === "en"}
+          maxLength={maxLength}
+        />
+        {hintEn ? <p className="mt-1 text-xs text-[#5c667f]">{hintEn}</p> : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Meerdere-regels tweetalig tekstveld binnen een `BilingualGroup`.
+ */
+export function BilingualTextarea({
+  label,
+  nameNl,
+  nameEn,
+  defaultValueNl = "",
+  defaultValueEn = "",
+  valueNl: controlledNl,
+  valueEn: controlledEn,
+  onChangeNl,
+  onChangeEn,
+  placeholderNl,
+  placeholderEn,
+  rows = 3,
+  requiredNl = false,
+  requiredEn = false,
+  maxLength,
+  hintEn,
+  idPrefix,
+  showBar = false,
+  className,
+}: {
+  label: string;
+  nameNl: string;
+  nameEn: string;
+  defaultValueNl?: string | null;
+  defaultValueEn?: string | null;
+  valueNl?: string;
+  valueEn?: string;
+  onChangeNl?: (value: string) => void;
+  onChangeEn?: (value: string) => void;
+  placeholderNl?: string;
+  placeholderEn?: string;
+  rows?: number;
+  requiredNl?: boolean;
+  requiredEn?: boolean;
+  maxLength?: number;
+  hintEn?: string;
+  idPrefix?: string;
+  /** Toon een compacte `NL | EN` + vertaalknop rechts op de labelregel. */
+  showBar?: boolean;
+  className?: string;
+}) {
+  const { lang, notifyChange } = useBilingualGroup();
+  const uid = useId();
+  const prefix = idPrefix ?? uid;
+  const [internalNl, setInternalNl] = useState(defaultValueNl ?? "");
+  const [internalEn, setInternalEn] = useState(defaultValueEn ?? "");
+
+  const nlVal = controlledNl ?? internalNl;
+  const enVal = controlledEn ?? internalEn;
+
+  const updateNl = useCallback(
+    (next: string) => {
+      if (onChangeNl) onChangeNl(next);
+      else setInternalNl(next);
+      notifyChange();
+    },
+    [onChangeNl, notifyChange],
+  );
+  const updateEn = useCallback(
+    (next: string) => {
+      if (onChangeEn) onChangeEn(next);
+      else setInternalEn(next);
+      notifyChange();
+    },
+    [onChangeEn, notifyChange],
+  );
+
+  useRegisterBilingualPair(nameNl, () => nlVal, updateNl, () => enVal, updateEn);
+
+  return (
+    <div className={className}>
+      {showBar ? (
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <Label htmlFor={lang === "nl" ? `${prefix}-nl` : `${prefix}-en`} className="mb-0">
+            {label} ({lang === "nl" ? "NL" : "EN"})
+          </Label>
+          <BilingualBar compact />
+        </div>
+      ) : (
+        <Label htmlFor={lang === "nl" ? `${prefix}-nl` : `${prefix}-en`}>
+          {label} ({lang === "nl" ? "NL" : "EN"})
+        </Label>
+      )}
+      <div className={lang === "nl" ? undefined : "hidden"}>
+        <Textarea
+          id={`${prefix}-nl`}
+          name={nameNl}
+          value={nlVal}
+          onChange={(e) => updateNl(e.target.value)}
+          placeholder={placeholderNl}
+          rows={rows}
+          required={requiredNl && lang === "nl"}
+          maxLength={maxLength}
+        />
+      </div>
+      <div className={lang === "en" ? undefined : "hidden"}>
+        <Textarea
+          id={`${prefix}-en`}
+          name={nameEn}
+          value={enVal}
+          onChange={(e) => updateEn(e.target.value)}
+          placeholder={placeholderEn}
+          rows={rows}
           required={requiredEn && lang === "en"}
           maxLength={maxLength}
         />
