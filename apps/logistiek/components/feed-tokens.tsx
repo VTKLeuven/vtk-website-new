@@ -23,6 +23,8 @@ export type FeedTokenRow = {
   scope: 'TEAM' | 'DRIVER';
   createdAt: string;
   lastUsedAt: string | null;
+  /** 90 dagen niet opgehaald; de feed antwoordt dan niet meer (`isFeedTokenExpired`). */
+  expired: boolean;
 };
 
 const SCOPE_LABELS: Record<FeedTokenRow['scope'], string> = {
@@ -82,6 +84,8 @@ export function FeedTokens({
         Zet de transportplanning in je eigen agenda (Google, Apple, Outlook). De link is een
         geheim: wie hem heeft, ziet de ritten met adressen en telefoonnummers. Geef hem dus niet
         door; maak liever een tweede abonnement en trek het in wanneer het niet meer nodig is.
+        Een abonnement stopt vanzelf wanneer je rechten wegvallen (na 15 juli, of uit de
+        chauffeurslijst) en wanneer je agenda het 90 dagen niet ophaalde.
       </p>
 
       {fresh ? (
@@ -159,6 +163,12 @@ export function FeedTokens({
                     ? `laatst opgehaald ${formatDateTime(new Date(token.lastUsedAt))}`
                     : 'nog nooit opgehaald'}
                 </p>
+                {token.expired ? (
+                  <p className="mt-1 text-xs font-medium text-vtk-danger">
+                    Verlopen: 90 dagen niet opgehaald. Maak een nieuw abonnement als je het nog
+                    nodig hebt.
+                  </p>
+                ) : null}
               </div>
               <ConfirmActionButton
                 label={`Intrekken: ${token.label}`}

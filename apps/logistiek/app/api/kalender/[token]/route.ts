@@ -1,7 +1,12 @@
 import { prisma } from '@vtk/db';
-import { hashFeedToken, isFeedToken, shouldTouchLastUsed } from '@/lib/calendar/feed-token';
+import { feedOwnerMayRead } from '@/lib/calendar/feed-access';
+import {
+  hashFeedToken,
+  isFeedToken,
+  isFeedTokenExpired,
+  shouldTouchLastUsed,
+} from '@/lib/calendar/feed-token';
 import { buildTransportFeed } from '@/lib/calendar/transport-feed';
-import { hasLivePermission } from '@/lib/live-permission';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,6 +23,10 @@ export const dynamic = 'force-dynamic';
  *   pad onder deze route een query.
  * - **404 en geen 403** bij een ingetrokken of onbekend token: wie een token
  *   probeert, hoort niet te leren dat het ooit bestaan heeft.
+ * - **De rechten van nu, niet die van het aanmaken.** Een teamfeed vraagt bij
+ *   elke poll `logistiek.manage`, een chauffeursfeed de poort van `/ritten`
+ *   (`feedOwnerMayRead`). En wat 90 dagen niemand ophaalde, vervalt
+ *   (`isFeedTokenExpired`).
  *
  * De `.ics`-suffix mag: sommige agenda-apps hangen die aan de URL en tonen de
  * feed anders niet.
@@ -35,21 +44,15 @@ export async function GET(_request: Request, ctx: { params: Promise<{ token: str
       scope: true,
       revokedAt: true,
       lastUsedAt: true,
+      createdAt: true,
       user: { select: { active: true, deletedAt: true } },
     },
   });
   // Een ingetrokken token, of iemand die niet meer op vtk.be staat: dan stopt de
   // feed, want de rechten waarmee ze ooit gemaakt is, gelden niet meer.
   if (!row || row.revokedAt || !row.user.active || row.user.deletedAt) return notFound();
-  // De hele planning (adressen, telefoonnummers van contactpersonen en helpers)
-  // enkel zolang de eigenaar `logistiek.manage` heeft, en niet enkel op het
-  // moment dat hij het token aanmaakte: anders bleef het team van vorig jaar de
-  // planning ontvangen na de reset van 15 juli. Krijgt hij het recht terug, dan
-  // werkt dezelfde URL weer. Een DRIVER-feed toont enkel de eigen ritten en
-  // hoeft dat niet.
-  if (row.scope === 'TEAM' && !(await hasLivePermission(row.userId, 'logistiek.manage'))) {
-    return notFound();
-  }
+  if (isFeedTokenExpired(row)) return notFound();
+  if (!(await feedOwnerMayRead(row.scope, row.userId))) return notFound();
 
   const body = await buildTransportFeed(row.scope, row.userId);
 

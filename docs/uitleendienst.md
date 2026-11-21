@@ -217,11 +217,16 @@ De transportplanning als `.ics`, met het geheim in de URL omdat een agenda-clien
 geen cookies meestuurt. `Cache-Control: private, no-store`, `X-Robots-Tag:
 noindex`, 404 (niet 403) bij een onbekend of ingetrokken token. Twee scopes:
 `TEAM` (de hele planning, vraagt `logistiek.manage`) en `DRIVER` (enkel de eigen
-ritten, vraagt dat je chauffeur bent). Een `TEAM`-feed toetst dat recht bij elke
-lezing opnieuw (`lib/live-permission.ts`), niet enkel bij het aanmaken: na de
-reset van 15 juli geeft de feed van wie het recht kwijt is een 404, en krijgt
-hij het terug, dan werkt dezelfde URL weer. De URL komt één keer terug, bij het
+ritten, vraagt dat je chauffeur bent). De URL komt één keer terug, bij het
 aanmaken; enkel de sha256 staat in de databank.
+
+Die rechten gelden bij elke ophaling opnieuw, niet enkel bij het aanmaken
+(`lib/calendar/feed-access.ts`): `TEAM` lost `logistiek.manage` op met
+`userHasPermission` uit `@vtk/auth/grants`, `DRIVER` volgt de poort van `/ritten`.
+Na de reset van 15 juli geeft de feed van wie het recht kwijt is dus een 404, en
+wie het terugkrijgt, kan dezelfde URL weer gebruiken. Een token dat 90 dagen
+niemand ophaalde, vervalt (`isFeedTokenExpired`, en `liveFeedTokenWhere` voor het
+maximum per persoon).
 
 `lib/calendar/ics.ts` is een **kopie** van `apps/web/lib/calendar/ics.ts`. Hoisten
 naar een gedeeld pakket is netter, maar dat dwingt een volledige

@@ -31,6 +31,7 @@ export default async function BeheerInstellingenPage() {
           scope: token.scope,
           createdAt: token.createdAt.toISOString(),
           lastUsedAt: token.lastUsedAt?.toISOString() ?? null,
+          expired: token.expired,
         }))}
       />
     </div>

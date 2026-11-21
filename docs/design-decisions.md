@@ -5892,6 +5892,21 @@ geeft de planning als `.ics`.
   `DRIVER` (enkel je eigen ritten, vraagt dat je in de chauffeurslijst staat).
   Die tweede is een eigen query en geen filter op de eerste: een filter achteraf
   laat vroeg of laat een rit door zodra iemand aan de select boven raakt.
+- **De rechten van nu, bij elke poll.** Een token verandert nooit, de rechten van
+  zijn eigenaar wel: ze resetten op 15 juli, en een chauffeur kan uit de lijst
+  gehaald worden. Een teamfeed bleef zo na het werkingsjaar de aanvrager, de
+  nummers, de bijrijders en de adressen van elke rit voor het komende jaar
+  uitgeven. De route toetst daarom bij elke ophaling `logistiek.manage` (via
+  `@vtk/auth/grants`, dezelfde regels als een sessie) of de poort van `/ritten`
+  (`feedOwnerMayRead`). Zonder rechten antwoordt ze 404, maar ze trekt het token
+  niet in: wie een dag later in de nieuwe ploeg zit, krijgt zijn feed vanzelf
+  terug.
+- **Wat 90 dagen niemand ophaalde, vervalt.** Dat is iets anders dan de regel op
+  vtk.be dat feedtokens niet verlopen: een geabonneerde agenda haalt de feed om
+  de paar uur op, dus een levend abonnement vervalt nooit. Wat 90 dagen stil
+  bleef, hangt in geen agenda meer, maar wel nog in een back-up of op een
+  vergeten toestel, met namen en nummers erachter. Het scherm toont het als
+  "Verlopen" en het telt niet meer mee voor het maximum van vijf.
 - **Intrekken, niet verwijderen.** Zo blijft zichtbaar dat er een abonnement was,
   en wordt een token nooit hergebruikt. Een ingetrokken of onbekend token geeft
   **404 en geen 403**: wie een token probeert, hoort niet te leren dat het ooit

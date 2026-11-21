@@ -5,71 +5,11 @@ import { currentWorkingYear } from '../lib/workingYear';
 import type { Permission } from '../index';
 import { auth } from '../auth';
 import { hasPermission as rootHasPermission } from '../index';
+import { deriveAuthz, userGrantsInclude, type RoleWithPerms } from './grants';
 
-// Rollen bundelen permissies; hieruit halen we de codes (en het rol-id zelf,
-// voor checks die aan een specifieke rol hangen zoals paginabewerking).
-type RoleWithPerms = { id: string; code?: string; permissions: { permission: { code: string } }[] };
-
-/**
- * De join die "welke rechten heeft dit lid" beantwoordt: rechtstreeks
- * toegewezen rollen plus de rollen die een post toekent, allebei gescoped op
- * het werkingsjaar.
- *
- * Staat los van `getSession`, zijn enige huidige oproeper, omdat fase 5 dezelfde
- * rijen nodig heeft om de permissies van een client op te lossen. Hergebruik ze
- * daar in plaats van de query over te tikken: twee resolvers die van mening
- * kunnen verschillen over wat een lid mag, is hier de slechtst mogelijke afloop.
- *
- * `as const` blijft staan: zonder de letterlijke `true` in `include` verliest
- * Prisma de inferentie en wordt het resultaat te breed getypeerd.
- */
-export function userGrantsInclude(year: number) {
-  return {
-    memberships: {
-      where: { year },
-      include: {
-        group: {
-          include: {
-            // Rollen die de post toekent aan leden (DEFAULT) en lead (LEADER).
-            roleGrants: {
-              include: { role: { include: { permissions: { include: { permission: true } } } } },
-            },
-          },
-        },
-      },
-    },
-    // Direct toegewezen rollen voor dit werkingsjaar.
-    roles: {
-      where: { year },
-      include: { role: { include: { permissions: { include: { permission: true } } } } },
-    },
-  } as const;
-}
-
-/** Wat `deriveAuthz` minimaal nodig heeft; `getSession` laadt meer. */
-type UserWithGrants = {
-  roles: { role: RoleWithPerms }[];
-  memberships: { role: string; group: { roleGrants: { kind: string; role: RoleWithPerms }[] } }[];
-};
-
-/**
- * Loopt de rollen van een lid af: direct toegewezen rollen, plus de rollen die
- * een post toekent (DEFAULT aan elk lid, LEADER enkel aan de verantwoordelijke).
- *
- * Staat apart zodat de claim-resolver dezelfde regels gebruikt als de sessie.
- * Twee implementaties van "welke rechten heeft dit lid" is precies hoe die twee
- * uit elkaar gaan lopen.
- */
-export function deriveAuthz(user: UserWithGrants, addRole: (role: RoleWithPerms) => void): void {
-  for (const userRole of user.roles) addRole(userRole.role);
-
-  for (const membership of user.memberships) {
-    for (const grant of membership.group.roleGrants) {
-      if (grant.kind === 'LEADER' && membership.role !== 'LEAD') continue;
-      addRole(grant.role);
-    }
-  }
-}
+// De join en de interpretatie van rollen staan in `grants.ts`, zodat ook wie
+// zonder sessie werkt (een agendafeed, een client) dezelfde regels gebruikt.
+export { deriveAuthz, userGrantsInclude } from './grants';
 
 export type McpUserAuthz = {
   id: string;

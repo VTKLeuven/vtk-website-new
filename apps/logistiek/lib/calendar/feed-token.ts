@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createHash, randomBytes } from 'node:crypto';
+import type { Prisma } from '@prisma/client';
 
 /**
  * De sleutel van een agendafeed op de transportplanning (A1).
@@ -50,4 +51,36 @@ const LAST_USED_THROTTLE_MS = 60 * 60 * 1000;
 export function shouldTouchLastUsed(lastUsedAt: Date | null, now = new Date()): boolean {
   if (!lastUsedAt) return true;
   return now.getTime() - lastUsedAt.getTime() >= LAST_USED_THROTTLE_MS;
+}
+
+/**
+ * Een abonnement dat zo lang niemand ophaalde, staat in geen enkele agenda
+ * meer: een geabonneerde client haalt de feed om de paar uur op. Het token
+ * blijft dan nog jaren geldig in een oude back-up of een vergeten toestel, met
+ * namen, adressen en telefoonnummers erachter. Dus vervalt het vanzelf.
+ */
+export const FEED_IDLE_DAYS = 90;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Nooit opgehaald telt vanaf het aanmaken. */
+export function isFeedTokenExpired(
+  token: { lastUsedAt: Date | null; createdAt: Date },
+  now = new Date()
+): boolean {
+  const last = token.lastUsedAt ?? token.createdAt;
+  return now.getTime() - last.getTime() > FEED_IDLE_DAYS * DAY_MS;
+}
+
+/**
+ * Dezelfde regel als `isFeedTokenExpired`, als `where` voor de databank: de
+ * abonnementen die nog tellen voor het maximum per persoon. Een vervallen
+ * token neemt geen plaats meer in.
+ */
+export function liveFeedTokenWhere(now = new Date()): Prisma.UitleenFeedTokenWhereInput {
+  const cutoff = new Date(now.getTime() - FEED_IDLE_DAYS * DAY_MS);
+  return {
+    revokedAt: null,
+    OR: [{ lastUsedAt: { gte: cutoff } }, { lastUsedAt: null, createdAt: { gte: cutoff } }],
+  };
 }

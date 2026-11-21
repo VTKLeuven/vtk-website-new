@@ -12,7 +12,7 @@ import 'server-only';
 
 import { prisma } from '@vtk/db';
 import { currentWorkingYear } from '../lib/workingYear';
-import { deriveAuthz, userGrantsInclude } from './session';
+import { deriveAuthz, userGrantsInclude } from './grants';
 
 /**
  * De rol- en post-context van één lid voor dit werkingsjaar.

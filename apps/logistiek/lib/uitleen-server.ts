@@ -22,6 +22,7 @@ import {
   type TripHandoverNotify,
 } from './uitleen';
 import { NO_DRIVER, type TransportFilters } from './transport-filters';
+import { isFeedTokenExpired } from './calendar/feed-token';
 
 export type CatalogItem = {
   id: string;
@@ -1712,13 +1713,17 @@ export async function driverAvailability(
 /**
  * De agenda-abonnementen van deze persoon (A1). Ingetrokken abonnementen vallen
  * weg: die staan er enkel nog om te beletten dat een token hergebruikt wordt.
+ * Een vervallen abonnement (90 dagen niet opgehaald) blijft staan met
+ * `expired`, zodat wie zich afvraagt waarom zijn agenda leeg blijft, het ziet.
  */
 export async function feedTokensForUser(userId: string) {
-  return prisma.uitleenFeedToken.findMany({
+  const rows = await prisma.uitleenFeedToken.findMany({
     where: { userId, revokedAt: null },
     select: { id: true, label: true, scope: true, createdAt: true, lastUsedAt: true },
     orderBy: { createdAt: 'asc' },
   });
+  const now = new Date();
+  return rows.map((row) => ({ ...row, expired: isFeedTokenExpired(row, now) }));
 }
 
 /**

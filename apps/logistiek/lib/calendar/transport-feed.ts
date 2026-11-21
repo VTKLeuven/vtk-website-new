@@ -52,7 +52,7 @@ export function feedWindow(now = new Date()): { from: Date; to: Date } {
  * overal elders: wie vorig jaar bij Feest zat, hoort de ritten van Feest niet
  * meer in zijn agenda te krijgen.
  */
-async function myGroupIds(userId: string): Promise<string[]> {
+export async function myGroupIds(userId: string): Promise<string[]> {
   const memberships = await prisma.groupMembership.findMany({
     where: { userId, year: currentWorkingYear() },
     select: { groupId: true },

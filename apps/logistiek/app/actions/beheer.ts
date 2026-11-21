@@ -8,6 +8,7 @@ import { canManage, requireManage, requireSession } from '@/lib/session';
 import {
   createFeedToken,
   hashFeedToken,
+  liveFeedTokenWhere,
   MAX_ACTIVE_FEED_TOKENS,
 } from '@/lib/calendar/feed-token';
 import { logistiekBaseUrl } from '@/lib/payments';
@@ -3735,9 +3736,8 @@ export async function saveLogistiekSettingsAction(_prev: SaveState, formData: Fo
  *
  * `TEAM` (de hele planning) vraagt `logistiek.manage`; `DRIVER` (enkel je eigen
  * ritten) vraagt dat je in de chauffeurslijst staat. Die check gebeurt bij het
- * aanmaken én bij elke poll (de route kijkt of het account nog actief is), maar
- * niet elk uur opnieuw tegen de post: wie uit de post valt, trekt zijn eigen
- * abonnement in of het team doet het voor hem.
+ * aanmaken én bij elke poll (`feedOwnerMayRead` in de route): wie na 15 juli
+ * zijn rechten kwijt is of uit de chauffeurslijst valt, krijgt niets meer.
  */
 export async function createFeedTokenAction(input: {
   label: string;
@@ -3756,8 +3756,9 @@ export async function createFeedTokenAction(input: {
     return { ok: false, error: 'Je staat niet in de chauffeurslijst.' };
   }
 
+  // Een vervallen abonnement neemt geen plaats meer in (`liveFeedTokenWhere`).
   const active = await prisma.uitleenFeedToken.count({
-    where: { userId: session.user.id, revokedAt: null },
+    where: { userId: session.user.id, ...liveFeedTokenWhere() },
   });
   if (active >= MAX_ACTIVE_FEED_TOKENS) {
     return {

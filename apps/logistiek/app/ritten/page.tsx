@@ -362,6 +362,7 @@ export default async function RittenPage({ searchParams }: { searchParams: Promi
                   scope: token.scope,
                   createdAt: token.createdAt.toISOString(),
                   lastUsedAt: token.lastUsedAt?.toISOString() ?? null,
+                  expired: token.expired,
                 }))}
             />
           ) : null}
