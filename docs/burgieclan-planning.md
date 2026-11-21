@@ -118,6 +118,40 @@ Burgieclan vraagt aan vtk.be, namens het lid dat daar aangemeld is.
   `apps/web/test/burgieclanPolls.test.ts` en
   `VtkPollsTest::testSignatureMatchesTheVtkWebsite` bij Burgieclan.
 
+## Studietimer
+
+De Blok-kalender op Burgieclan heeft een studietimer, en die is **dezelfde sessie
+als Samen blokken** in de app: wat je op Burgieclan start, telt mee in je groepen,
+je dagdoel en je reeks, en een sessie die je in de app startte, loopt op
+Burgieclan gewoon verder. Zelfde richting als de peilingen:
+
+```
+  Burgieclan /api/vtk_study ──▶ vtk.be /api/burgieclan/v1/studeren
+     ondertekend: X-Vtk-User / -Timestamp / -Signature (zelfde geheim)
+```
+
+| Kant | Bestand |
+|---|---|
+| Burgieclan tekent | `backend/src/Service/VtkService/VtkStudy.php` |
+| VTK controleert | `apps/web/app/api/burgieclan/v1/studeren/route.ts`, `apps/web/lib/burgieclan/study.ts` |
+
+- `GET` geeft de stand (`BurgieclanStudy`): de lopende sessie, de sessies van
+  vandaag (wanneer begonnen, wanneer gestopt), dagdoel, reeks, hoeveel
+  groepsgenoten nu zitten en een totaal per dag voor de kalender. Namen en
+  groepen blijven op vtk.be.
+- `POST { action: start | pause | resume | heartbeat | stop }` gebruikt exact de
+  functies van de app (`lib/app-api/study.ts`), dus dezelfde regels: het
+  levensteken, de pauzemarge van een minuut, het maximum van acht uur. Starten
+  stuurt ook hier het bericht "de eerste is begonnen" naar de groep.
+- Burgieclan stuurt elke minuut een `heartbeat` zolang de pagina openstaat, ook
+  in een tabblad op de achtergrond: op een laptop studeer je in een ander
+  tabblad (je cursus), en dat is geen pauze. Sluit je de pagina, dan telt de
+  sessie tot het laatste levensteken, zoals in de app.
+- Enkel accounts die via VTK aanmeldden (`fluxusSub`) gebruiken deze timer; de
+  andere houden de eigen timer van Burgieclan.
+- Gedeelde vector: `apps/web/test/burgieclanStudy.test.ts` en
+  `VtkStudyTest::testSignatureMatchesTheVtkWebsite` bij Burgieclan.
+
 ## Vallen waar we in gelopen zijn
 
 1. **API Platform spreekt enkel JSON-LD.** Een `Content-Type: application/json`
