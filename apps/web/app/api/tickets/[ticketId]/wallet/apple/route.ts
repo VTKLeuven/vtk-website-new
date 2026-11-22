@@ -6,12 +6,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ ticketId: string }> }
 ) {
   if (!isAppleWalletAvailable()) return Response.json({ error: "NOT_CONFIGURED" }, { status: 404 });
   const { ticketId } = await params;
-  const resolved = await resolveAuthorizedTicket(ticketId);
+  const resolved = await resolveAuthorizedTicket(ticketId, new URL(request.url).searchParams.get("t"));
   if (!resolved) return Response.json({ error: "NOT_FOUND" }, { status: 404 });
 
   const pass = await getAppleWalletPass(walletInputFromTicket(resolved.ticket));

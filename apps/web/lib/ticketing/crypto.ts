@@ -11,6 +11,7 @@ import { ticketTokenSecret } from "./config";
 const ORDER_PREFIX = "vtko2";
 const TICKET_PREFIX = "vtkt1";
 const INVITE_PREFIX = "vtks1";
+const TICKET_LINK_PREFIX = "vtkl1";
 
 function sign(value: string): string {
   return createHmac("sha256", ticketTokenSecret()).update(value).digest("base64url");
@@ -53,6 +54,39 @@ export function verifyOrderAccessToken(
   } catch {
     return null;
   }
+}
+
+/**
+ * Een link naar de PDF of de wallet van één ticket, zonder sessie.
+ *
+ * De app opent die bestanden in een in-app browser, en die draagt het
+ * login-token van de app niet mee: zonder dit gaf de downloadknop een 404. Het
+ * token geldt enkel voor dit ticket en deze `credentialVersion`, zodat een
+ * vernieuwde QR (een doorgegeven ticket) ook de oude link ongeldig maakt. Wie
+ * het heeft, kan niets meer dan wie de QR heeft: de PDF draagt die QR.
+ */
+export function createTicketLinkToken(ticketId: string, credentialVersion: number, expiresAt: Date): string {
+  const encodedId = Buffer.from(ticketId, "utf8").toString("base64url");
+  const expires = Math.floor(expiresAt.getTime() / 1000).toString(36);
+  const payload = `${TICKET_LINK_PREFIX}.${encodedId}.${credentialVersion}.${expires}`;
+  return `${payload}.${sign(payload)}`;
+}
+
+export function verifyTicketLinkToken(
+  token: string,
+  ticketId: string,
+  credentialVersion: number,
+  now = new Date()
+): boolean {
+  const [prefix, encodedId, rawVersion, rawExpires, signature, ...rest] = token.split(".");
+  if (prefix !== TICKET_LINK_PREFIX || !encodedId || !rawVersion || !rawExpires || !signature || rest.length > 0) {
+    return false;
+  }
+  if (!safeEqual(signature, sign(`${prefix}.${encodedId}.${rawVersion}.${rawExpires}`))) return false;
+  const expiresAtSeconds = Number.parseInt(rawExpires, 36);
+  if (!Number.isSafeInteger(expiresAtSeconds) || expiresAtSeconds * 1000 <= now.getTime()) return false;
+  if (Number(rawVersion) !== credentialVersion) return false;
+  return Buffer.from(encodedId, "base64url").toString("utf8") === ticketId;
 }
 
 /**

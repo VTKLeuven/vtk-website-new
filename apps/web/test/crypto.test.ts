@@ -2,11 +2,34 @@ import { describe, expect, it } from 'vitest';
 import {
   createOrderAccessToken,
   createPublicTicketId,
+  createTicketLinkToken,
   createTicketCredential,
   extractTicketCredential,
   verifyOrderAccessToken,
   verifyTicketCredential,
+  verifyTicketLinkToken,
 } from '@/lib/ticketing/crypto';
+
+describe('ondertekende downloadlink van een ticket', () => {
+  const expiresAt = new Date('2030-01-01T00:00:00.000Z');
+  const token = createTicketLinkToken('ticket_1', 2, expiresAt);
+
+  it('geldt voor dit ticket en deze versie', () => {
+    expect(verifyTicketLinkToken(token, 'ticket_1', 2)).toBe(true);
+  });
+
+  it('geldt niet voor een ander ticket, een vernieuwde QR of na de vervaldatum', () => {
+    expect(verifyTicketLinkToken(token, 'ticket_2', 2)).toBe(false);
+    expect(verifyTicketLinkToken(token, 'ticket_1', 3)).toBe(false);
+    expect(verifyTicketLinkToken(token, 'ticket_1', 2, expiresAt)).toBe(false);
+  });
+
+  it('weigert een aangepast token', () => {
+    expect(verifyTicketLinkToken(token.replace('.2.', '.3.'), 'ticket_1', 3)).toBe(false);
+    expect(verifyTicketLinkToken(`${token}x`, 'ticket_1', 2)).toBe(false);
+    expect(verifyTicketLinkToken(createOrderAccessToken('ticket_1', expiresAt), 'ticket_1', 2)).toBe(false);
+  });
+});
 
 describe('ticket credentials', () => {
   it('round-trips an order capability and rejects tampering', () => {

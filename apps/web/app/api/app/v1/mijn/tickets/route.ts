@@ -1,6 +1,7 @@
 import { corsPreflight } from "@/lib/cors";
 import { requireSession } from "@/lib/session";
 import { listTicketsForCurrentUser } from "@/lib/ticketing/queries";
+import { signedTicketPath } from "@/lib/ticketing/ticketAccess";
 import type { AppMyOrder } from "@/lib/app-api/contract";
 import { absoluteUrl } from "@/lib/app-api/media";
 import { appErrorResponse, appJson } from "@/lib/app-api/respond";
@@ -38,20 +39,24 @@ export async function GET(request: Request) {
         startsAt: order.event.startsAt.toISOString(),
         location: order.event.location,
       },
-      tickets: order.tickets.map((ticket) => ({
-        id: ticket.id,
-        publicId: ticket.publicId,
-        status: ticket.status,
-        attendeeName: ticket.attendeeName,
-        typeName: ticket.typeName,
-        credential: ticket.credential,
-        checkedInAt: ticket.checkedInAt ? ticket.checkedInAt.toISOString() : null,
-        // De PDF- en walletroutes geven paden terug; een telefoon heeft er een
-        // volledige URL voor nodig.
-        pdfUrl: absoluteUrl(request, ticket.pdfUrl) as string,
-        walletAppleUrl: absoluteUrl(request, ticket.walletAppleUrl),
-        walletGoogleUrl: absoluteUrl(request, ticket.walletGoogleUrl),
-      })),
+      tickets: order.tickets.map((ticket) => {
+        const sign = (path: string) => signedTicketPath(path, ticket.id, ticket.credentialVersion);
+        return {
+          id: ticket.id,
+          publicId: ticket.publicId,
+          status: ticket.status,
+          attendeeName: ticket.attendeeName,
+          typeName: ticket.typeName,
+          credential: ticket.credential,
+          checkedInAt: ticket.checkedInAt ? ticket.checkedInAt.toISOString() : null,
+          // Volledige URL's, en ondertekend: de app opent ze in een in-app
+          // browser, en die draagt het login-token van de app niet mee. Zonder
+          // `?t=` gaf "Download" daar een 404 (`signedTicketPath`).
+          pdfUrl: absoluteUrl(request, sign(ticket.pdfUrl)) as string,
+          walletAppleUrl: absoluteUrl(request, ticket.walletAppleUrl ? sign(ticket.walletAppleUrl) : null),
+          walletGoogleUrl: absoluteUrl(request, ticket.walletGoogleUrl ? sign(ticket.walletGoogleUrl) : null),
+        };
+      }),
     }));
 
     return appJson(request, payload);

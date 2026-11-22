@@ -335,6 +335,15 @@ Een ticket draagt zijn `credential`: de **inhoud** van de QR-code, niet een
 afbeelding. De app tekent de code zelf. Dat scheelt een rondje, en belangrijker:
 een getekende QR werkt ook wanneer er net aan de ingang geen netwerk is.
 
+**`pdfUrl` en de wallet-links zijn ondertekend** (`?t=`, `signedTicketPath` in
+`lib/ticketing/ticketAccess.ts`). De app opent ze met `WebBrowser.openBrowserAsync`,
+en die in-app browser draagt het login-token van de app niet mee: zonder het
+token zag de downloadroute niemand en gaf "Download" een 404 (november 2026).
+Het token geldt veertien dagen, enkel voor dat ticket en zijn
+`credentialVersion`, dus een vernieuwde QR maakt ook de oude link ongeldig.
+Wie het heeft, kan niets meer dan wie de QR heeft. Geef een nieuwe link naar
+een ticketbestand dus altijd ondertekend mee, nooit als kaal pad.
+
 ### `GET /api/app/v1/categorie/[slug]` en `/paginas/[slug]`
 
 De inhoud uit het CMS. De categorie toont dezelfde selectie als het uitklapmenu

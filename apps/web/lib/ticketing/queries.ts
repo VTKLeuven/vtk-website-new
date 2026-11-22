@@ -631,6 +631,8 @@ function orderDto(order: OrderRecord, authenticatedOwner: boolean) {
       unitPriceCents: item.unitPriceCents,
       checkedInAt: item.ticket.checkedInAt,
       credential: createTicketCredential(item.ticket.publicCode, item.ticket.credentialVersion),
+      /** Voor een ondertekende downloadlink (`signedTicketPath`), zoals de app die krijgt. */
+      credentialVersion: item.ticket.credentialVersion,
       pdfUrl: `/api/tickets/${item.ticket.id}/pdf`,
       walletAppleUrl: isAppleWalletAvailable() ? `/api/tickets/${item.ticket.id}/wallet/apple` : null,
       walletGoogleUrl: isGoogleWalletAvailable() ? `/api/tickets/${item.ticket.id}/wallet/google` : null,
