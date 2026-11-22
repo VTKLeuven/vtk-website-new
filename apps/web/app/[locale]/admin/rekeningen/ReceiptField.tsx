@@ -33,10 +33,22 @@ type Existing = { key: string; name: string; mime: string; size: number; preview
 export function ReceiptField({
   locale,
   existing,
+  uploadUrl = "/api/admin/rekeningen/upload",
+  label,
+  hint,
+  required = true,
 }: {
   locale: "nl" | "en";
   /** Bij bewerken: het bonnetje dat er nu aan hangt. */
   existing?: Existing;
+  /** Waar het bestand heen gaat; het kasboek van Beheer heeft een eigen route. */
+  uploadUrl?: string;
+  /** Standaard "Bonnetje". */
+  label?: string;
+  /** De uitleg onder het veld; standaard die voor een kassabon. */
+  hint?: string;
+  /** Moet er bij een nieuw item een bestand gekozen zijn? */
+  required?: boolean;
 }) {
   const nl = locale === "nl";
   const [value, setValue] = useState<{
@@ -110,7 +122,7 @@ export function ReceiptField({
     try {
       const body = new FormData();
       body.append("file", file);
-      const response = await fetch("/api/admin/rekeningen/upload", { method: "POST", body });
+      const response = await fetch(uploadUrl, { method: "POST", body });
       if (!response.ok) {
         setError(
           nl
@@ -153,7 +165,7 @@ export function ReceiptField({
 
   return (
     <div>
-      <Label>{nl ? "Bonnetje" : "Receipt"}</Label>
+      <Label>{label ?? (nl ? "Bonnetje" : "Receipt")}</Label>
       <input type="hidden" name="receiptKey" value={chosenSomethingNew ? value.key : ""} />
       <input type="hidden" name="receiptName" value={chosenSomethingNew ? value.name : ""} />
       <input type="hidden" name="receiptMime" value={chosenSomethingNew ? value.mime : ""} />
@@ -232,7 +244,7 @@ export function ReceiptField({
                 // Bij een nieuwe rekening moet er een bestand gekozen zijn; is er
                 // al één geüpload, dan mag het veld leeg omdat de key intussen in
                 // de verborgen velden zit.
-                required={isNew && value === null}
+                required={required && isNew && value === null}
                 disabled={uploading}
                 onChange={(event) => {
                   const file = event.target.files?.[0];
@@ -270,9 +282,10 @@ export function ReceiptField({
                 : "Nothing selected yet"}
           </p>
           <p className="text-xs text-[#5c667f]">
-            {nl
+            {hint ??
+              (nl
               ? `Foto of PDF, max ${formatBytes(MAX_RECEIPT_BYTES, locale)}. Fotografeer het bonnetje volledig en zo vlak mogelijk; de boekhouder moet de prijzen kunnen lezen.`
-              : `Photo or PDF, max ${formatBytes(MAX_RECEIPT_BYTES, locale)}. Photograph the whole receipt as flat as possible; the accountant has to read the prices.`}
+              : `Photo or PDF, max ${formatBytes(MAX_RECEIPT_BYTES, locale)}. Photograph the whole receipt as flat as possible; the accountant has to read the prices.`)}
           </p>
           {error && <p className="text-sm text-red-600">{error}</p>}
         </div>

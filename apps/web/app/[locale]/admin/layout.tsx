@@ -7,6 +7,7 @@ import { requireSession } from '@/lib/session';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import { canAccessAnyTicketEvent } from '@/lib/ticketing/authorization';
 import { canAccessAnyForm } from '@/lib/forms/authorization';
+import { getExpenseAccess } from '@/lib/rekeningen/server';
 import { canSeeCommuRequests } from '@/lib/commu/requests';
 import { isExternalUrl } from '@/lib/href';
 import { getAdminNav, type NavGuard, type NavLeaf } from '@/lib/admin-nav';
@@ -79,6 +80,10 @@ export default async function AdminLayout({
   const posten = await postenAccess(session);
   const postenVisible = posten.posts || posten.werkgroepen || posten.jaarwerkingen || posten.kiesploeg;
 
+  // Rekeningen: ook een kiesploeglid zonder post dient in op de ploeg.
+  const expenseAccess = await getExpenseAccess();
+  const expensesVisible = Boolean(expenseAccess?.canSubmit || expenseAccess?.canSeeOverview);
+
   // Mag de huidige gebruiker deze entry zien? Superadmin ziet alles.
   const canSee = (guard: NavGuard): boolean => {
     if (session.user.isSuperAdmin) return true;
@@ -99,6 +104,7 @@ export default async function AdminLayout({
     if (guard.pocRep) return session.permissions.includes('pocs.manage') || pocRep;
     if (guard.mailGroups) return mailGroupsVisible;
     if (guard.posten) return postenVisible;
+    if (guard.expenses) return expensesVisible;
     if (guard.anyPerm) return guard.anyPerm.some((p) => session.permissions.includes(p));
     if (guard.perm) return session.permissions.includes(guard.perm);
     return true;

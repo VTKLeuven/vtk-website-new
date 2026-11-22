@@ -155,6 +155,26 @@ export function parsePostOptionValue(raw: string): { groupId: string; sub: strin
 }
 
 /**
+ * De post "Ploeg" van een kiesploeg in een keuzelijst: `ploeg:<kiesploegId>`.
+ * Een cuid is nooit "ploeg", dus dat botst niet met `groupId:Deelpost`.
+ */
+const PLOEG_PREFIX = "ploeg:";
+
+export function ploegOptionValue(kiesploegId: string): string {
+  return `${PLOEG_PREFIX}${kiesploegId}`;
+}
+
+/** De kiesploeg-id uit een postkeuze, of `null` als het een gewone post is. */
+export function parsePloegOptionValue(raw: string): string | null {
+  return raw.startsWith(PLOEG_PREFIX) ? raw.slice(PLOEG_PREFIX.length) || null : null;
+}
+
+/** "Ploeg (Kiesploeg Delta)": de naam in een keuzelijst. */
+export function ploegOptionName(kiesploegName: string): string {
+  return `Ploeg (${kiesploegName})`;
+}
+
+/**
  * De keuzes voor één post: de post zelf, of haar deelposten als ze opgesplitst
  * is. `withWhole` zet de volledige post er nog boven, voor een filter dat de
  * vier deelposten samen wil kunnen tonen.

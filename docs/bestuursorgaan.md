@@ -294,6 +294,8 @@ een andere kring (`vtkSharePercent`) staat enkel het deel van VTK tegenover de
 begroting (`vtkPartCents`), want de begroting is enkel dat deel; het budget en
 het resultaat zelf blijven het volle bedrag uit het blad. Een blad zonder regel
 Begroting telt niet mee; `Stats.begrotingCounted` zegt over hoeveel het gaat.
+De schakelaar boven het kader (`BoSummaryToggle.tsx`) verbergt die stand in
+CSS (`data-begroting`), voor een schermafbeelding zonder bedragen.
 Een activiteit die Groep 5 met "Niet meetellen" en dan "Enkel niet in de
 begroting" markeerde (`BoDocument.begrotingExcludedAt`, met een reden), telt
 ook niet mee in het bedrag, maar wel in budgetten, resultaten en percentage.

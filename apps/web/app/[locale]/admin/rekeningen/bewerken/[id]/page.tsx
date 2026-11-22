@@ -5,11 +5,13 @@ import { hasLocale } from "@/lib/locale";
 import type { Locale } from "@vtk/i18n";
 import { pick } from "@vtk/i18n";
 import { updateExpenseAction } from "@/app/actions/expenses";
-import { canEdit, canView, expenseAccess, getExpenseConfig } from "@/lib/rekeningen/server";
+import { canEdit, canView, expenseAccess, getExpenseConfig, ploegOptionsFor } from "@/lib/rekeningen/server";
 import {
   expensePostSplit,
   formatAmount,
   formatEuro,
+  ploegOptionName,
+  ploegOptionValue,
   postOptions,
   postOptionValue,
   toDateInputValue,
@@ -66,7 +68,7 @@ export default async function RekeningBewerken({
   }
 
   const ownGroupIds = access.session.groups.map((group) => group.id);
-  const [groups, config] = await Promise.all([
+  const [groups, config, ploegen] = await Promise.all([
     prisma.group.findMany({
       where: {
         OR: [
@@ -78,6 +80,7 @@ export default async function RekeningBewerken({
       select: { id: true, code: true, nameNl: true, nameEn: true },
     }),
     getExpenseConfig(),
+    ploegOptionsFor(access, expense.kiesploegId),
   ]);
 
   // Bij een opgesplitste post staat de deelpost in `postLabel`. Een oude
@@ -85,7 +88,9 @@ export default async function RekeningBewerken({
   // bij het opslaan een deelpost.
   const currentGroup = groups.find((group) => group.id === expense.groupId);
   const split = expensePostSplit(currentGroup?.code);
-  const currentPost = expense.groupId
+  const currentPost = expense.kiesploegId
+    ? ploegOptionValue(expense.kiesploegId)
+    : expense.groupId
     ? split
       ? split.includes(expense.postLabel)
         ? postOptionValue(expense.groupId, expense.postLabel)
@@ -115,12 +120,15 @@ export default async function RekeningBewerken({
           locale={nl ? "nl" : "en"}
           action={updateExpenseAction}
           maxWords={config.maxWords}
-          posts={groups.flatMap((group) =>
-            postOptions(group, pick(group.nameNl, group.nameEn, locale)).map((option) => ({
-              id: option.value,
-              name: option.name,
-            })),
-          )}
+          posts={[
+            ...ploegen.map((ploeg) => ({ id: ploegOptionValue(ploeg.id), name: ploegOptionName(ploeg.name) })),
+            ...groups.flatMap((group) =>
+              postOptions(group, pick(group.nameNl, group.nameEn, locale)).map((option) => ({
+                id: option.value,
+                name: option.name,
+              })),
+            ),
+          ]}
           values={{
             id: expense.id,
             groupId: currentPost,

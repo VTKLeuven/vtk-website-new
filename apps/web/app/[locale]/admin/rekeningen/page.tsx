@@ -19,6 +19,8 @@ import {
   formatBytes,
   formatEuro,
   parsePostOptionValue,
+  ploegOptionName,
+  ploegOptionValue,
   postOptions,
   REIMBURSEMENT_STATES,
   reimbursementLabel,
@@ -97,6 +99,7 @@ export default async function RekeningenOverzicht({
 
   const [
     posts,
+    ploegen,
     yearsWithData,
     config,
     counts,
@@ -111,6 +114,13 @@ export default async function RekeningenOverzicht({
       where: access.canManageAll ? {} : { id: { in: access.postScope } },
       orderBy: [{ type: "asc" }, { orderInPraesidium: "asc" }, { nameNl: "asc" }],
       select: { id: true, code: true, nameNl: true, nameEn: true, active: true },
+    }),
+    // De post "Ploeg" per kiesploeg: alle voor Beheer van VTK, de eigen ploeg
+    // voor wie er Beheer is.
+    prisma.kiesploeg.findMany({
+      where: access.canManageAll ? {} : { id: { in: access.ploegScope } },
+      orderBy: { workingYear: "desc" },
+      select: { id: true, formalName: true },
     }),
     prisma.expense.findMany({
       where: visibility,
@@ -172,9 +182,10 @@ export default async function RekeningenOverzicht({
     expense.submittedById !== userId &&
     expense.createdAt >= EXPENSE_VIEWS_SINCE;
 
-  const postFilterOptions = posts.flatMap((post) =>
-    postOptions(post, nl ? post.nameNl : post.nameEn, true),
-  );
+  const postFilterOptions = [
+    ...posts.flatMap((post) => postOptions(post, nl ? post.nameNl : post.nameEn, true)),
+    ...ploegen.map((ploeg) => ({ value: ploegOptionValue(ploeg.id), name: ploegOptionName(ploeg.formalName) })),
+  ];
   const postLabel = (value: string) => {
     const option = postFilterOptions.find((candidate) => candidate.value === value);
     if (option) return option.name;
@@ -224,7 +235,7 @@ export default async function RekeningenOverzicht({
               ? nl
                 ? "Alles wat er voor VTK betaald werd, met het bonnetje erbij. Vink af wat terugbetaald is en stuur het blad door naar de boekhouding."
                 : "Everything paid for VTK, receipt included. Tick off what has been reimbursed and forward the sheet to the accountant."
-              : access.canReimbursePost
+              : access.canReimbursePost || access.ploegScope.length > 0
                 ? nl
                   ? "De rekeningen van je eigen post. Open een rekening en vink af wat je terugbetaalde; doorsturen en inboeken gebeurt door Beheer."
                   : "Your own post's expenses. Open an expense and tick off what you reimbursed; forwarding and booking is done by Administration."

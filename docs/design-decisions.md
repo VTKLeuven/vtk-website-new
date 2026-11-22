@@ -9001,6 +9001,32 @@ Supabase-verbruik met een waarschuwing bij 80% van 1 GB, want daarboven werd het
 hele project geblokkeerd. De objectopslag van de site heeft dat quotum niet, dus
 het cijfer staat er nog als informatie en niet meer als alarm.
 
+### De kiesploeg bij de rekeningen (november 2026)
+
+Beheer vroeg een post "Ploeg" bij de rekeningen, met de ploegbeheerder die alle
+rekeningen van die post ziet. Dat is **geen `Group`**: een kiesploeg heeft al
+een eigen structuur (zie "De kiesploeg is een aparte structuur"), en een
+praesidiumpost "Ploeg" zou elk jaar opnieuw de verkeerde mensen bevatten.
+
+- **De g5 van een kiesploeg krijgt functies**: praeses, vice, secretaris en
+  beheer (`KiesploegMember.function`), in te stellen per lid bij Posten &
+  werkgroepen › Kiesploeg. Los van de vrije post van het lid: de functies zijn
+  er van in het begin, de postverdeling pas later. Meerdere leden mogen
+  dezelfde functie hebben.
+- **"Ploeg" is een keuze in de postlijst** (`Expense.kiesploegId`, postnaam
+  "Ploeg" op het blad, zoals Beheer het vroeg). Elk lid van een actieve
+  kiesploeg mag erop indienen, ook zonder praesidiumpost of het recht
+  "Rekeningen indienen": daarvoor ziet zo iemand Rekeningen in de zijbalk.
+- **Wie in de ploeg Beheer is, beheert haar rekeningen zoals een post de
+  hare**: zien, corrigeren en wissen tot Beheer van VTK ze doorstuurt, en het
+  vinkje "terugbetaald" zetten. Doorsturen en inboeken blijft bij Beheer van
+  VTK. Dat geldt ook na het aantreden, zodat de historiek zichtbaar blijft.
+- **Enkel de eigen ploeg staat in de lijst.** Wie in een kiesploeg zit, is voor
+  de verkiezingen niet publiek, dus een ander lid ziet "Ploeg (Kiesploeg
+  Delta)" niet staan, en de server weigert een vreemde ploeg
+  (`canChoosePloeg`). Volledig beheer ziet elke actieve ploeg.
+- Een bestaande rekening hangt aan geen kiesploeg: die post bestond niet.
+
 ## Kassa's (de opvolger van het rekenblad "Overzichtdocument Kassa's")
 
 Een post die voor een activiteit een kassa met wisselgeld nodig had, mailde
@@ -9255,6 +9281,29 @@ een leeg raster zou haar bedrag op nul zetten.
 **Op dezelfde dag geldt de volgorde van ingeven.** Een regel heeft een datum en
 geen uur; telt de post 's ochtends en geeft ze 's middags geld af, dan hoort de
 afgifte bij de volgende periode zolang ze na de telling ingegeven werd.
+
+## Het kasboek van Beheer (november 2026)
+
+Beheer vroeg om bij de kassa's te kunnen bijhouden wanneer het cash van de kring
+gebruikt of afgehaald wordt: stortingen, afhalingen en aankopen. Dat staat nu
+onder Kassa's › Kasboek (`CashBookEntry`, `lib/kassas/cashBook.ts`), enkel voor
+wie de kassa's beheert.
+
+- **Drie soorten, één bedrag**: een afhaling (van de bank, het cash neemt toe),
+  een storting (naar de bank) en een aankoop met cash. Het bedrag staat altijd
+  positief; de richting zit in de soort. Per werkingsjaar, zoals de rekeningen,
+  met de totalen per soort en het netto (afhalingen min stortingen en
+  aankopen).
+- **Een aankoop heeft altijd een factuur.** De server weigert een aankoop
+  zonder, ook bij aanpassen. De factuur volgt de weg van een bonnetje:
+  `bonnetjes/`, foto's hercodeerd zonder EXIF, en enkel te lezen via een
+  afgeschermde route.
+- **Geen kassastand.** Het kasboek toont wat er in en uit ging, geen saldo: het
+  wisselgeld dat met de kassa's meegaat en terugkomt, staat er niet in, dus een
+  saldo zou verkeerd zijn zonder dat iemand het ziet.
+- **Een aankoop is geen rekening.** Ze staat los van de rekeningen en gaat niet
+  mee op het blad naar de boekhouder; zo koos Beheer het. De factuur zit bij de
+  regel.
 
 ## Admin-navigatie: domeinen, losse modules en vastgepinde tabs
 
@@ -13116,6 +13165,13 @@ post en bovenaan voor Totaal, VTK en Werkgroepen. Plus is beter dan begroot.
   minst wegneemt. Welke er buiten staan, staat onder Instellingen en onder
   "Resultaten per post", met de reden; terugzetten kan daar en in het detail,
   zodra het blad klopt.
+- **De stand tegenover de begroting kan uit, met een schakelaar boven het kader**
+  (november 2026, `BoSummaryToggle.tsx`). Beheer zet het kader op een slide
+  voor het BO, en die bedragen horen daar niet altijd bij. "Zonder begroting"
+  verbergt de kolom, de regel onder elk kerncijfer en de uitleg erover; de rest
+  blijft gelijk. De schakelaar staat buiten het kader, zodat hij niet mee op de
+  schermafbeelding komt, en elke keer staat hij opnieuw op "met begroting": wie
+  niet weet dat hij er is, ziet zo alles.
 
 ## Bestuursorgaan: potjes
 

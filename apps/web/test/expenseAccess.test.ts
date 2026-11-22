@@ -26,6 +26,7 @@ function session(opts: { permissions?: string[]; groups?: string[]; isSuperAdmin
 const expense = (
   overrides: Partial<{
     groupId: string | null;
+    kiesploegId: string | null;
     submittedById: string | null;
     paymentMethod: 'PERSONAL' | 'VTK_CARD';
     paidAt: Date | null;
@@ -34,6 +35,7 @@ const expense = (
   }> = {},
 ) => ({
   groupId: 'cudi',
+  kiesploegId: null as string | null,
   submittedById: 'someone-else',
   paymentMethod: 'PERSONAL' as const,
   paidAt: null,
@@ -97,5 +99,54 @@ describe('terugbetalen zonder expenses.reimbursePost', () => {
   it('staat altijd open voor volledig beheer', () => {
     const beheer = accessFor(session({ permissions: ['expenses.manage'] }));
     expect(canReimburse(beheer, expense({ groupId: 'theokot', sentAt: at }))).toBe(true);
+  });
+});
+
+describe('de post Ploeg van een kiesploeg', () => {
+  const ploeg = (kiesploegId = 'delta') => expense({ groupId: null, kiesploegId });
+
+  it('laat een lid van de ploeg indienen zonder enig recht, maar geeft geen overzicht', () => {
+    const lid = accessFor(session({}), { ploegen: [{ id: 'delta', name: 'Kiesploeg Delta' }], ploegScope: [] });
+    expect(lid.canSubmit).toBe(true);
+    expect(lid.canSeeOverview).toBe(false);
+    expect(canView(lid, ploeg())).toBe(false);
+    expect(visibilityWhere(lid)).toEqual({ submittedById: 'me' });
+  });
+
+  it('geeft Beheer van de ploeg haar rekeningen: zien, corrigeren, wissen en terugbetalen', () => {
+    const beheer = accessFor(session({}), { ploegen: [], ploegScope: ['delta'] });
+    expect(beheer.canSubmit).toBe(true);
+    expect(beheer.canSeeOverview).toBe(true);
+    expect(canView(beheer, ploeg())).toBe(true);
+    expect(canEdit(beheer, ploeg())).toBe(true);
+    expect(canDelete(beheer, ploeg())).toBe(true);
+    expect(canReimburse(beheer, ploeg())).toBe(true);
+    expect(visibilityWhere(beheer)).toEqual({
+      OR: [{ kiesploegId: { in: ['delta'] } }, { submittedById: 'me' }],
+    });
+  });
+
+  it('geeft Beheer van de ploeg niets van een andere ploeg of een gewone post', () => {
+    const beheer = accessFor(session({}), { ploegen: [], ploegScope: ['delta'] });
+    expect(canView(beheer, ploeg('epsilon'))).toBe(false);
+    expect(canView(beheer, expense())).toBe(false);
+    expect(canReimburse(beheer, ploeg('epsilon'))).toBe(false);
+  });
+
+  it('laat de rekening los zodra Beheer van VTK ze doorstuurde of inboekte', () => {
+    const beheer = accessFor(session({}), { ploegen: [], ploegScope: ['delta'] });
+    expect(canEdit(beheer, { ...ploeg(), sentAt: at })).toBe(false);
+    expect(canDelete(beheer, { ...ploeg(), bookedAt: at })).toBe(false);
+    expect(canReimburse(beheer, expense({ groupId: null, kiesploegId: 'delta', paidAt: at, sentAt: at }))).toBe(false);
+  });
+
+  it('combineert een eigen post met de ploeg', () => {
+    const beide = accessFor(session({ permissions: ['expenses.managePost'], groups: ['cudi'] }), {
+      ploegen: [],
+      ploegScope: ['delta'],
+    });
+    expect(visibilityWhere(beide)).toEqual({
+      OR: [{ groupId: { in: ['cudi'] } }, { kiesploegId: { in: ['delta'] } }, { submittedById: 'me' }],
+    });
   });
 });

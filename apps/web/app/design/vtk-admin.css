@@ -3556,6 +3556,23 @@ a.vtk-shortcut-tile:hover {
   min-width: min(100%, 220px);
 }
 
+/* Met of zonder begroting (BoSummaryToggle.tsx). De schakelaar staat boven het
+   kader, zodat hij niet op de schermafbeelding komt; zonder begroting vallen de
+   kolom, de regel onder elk kerncijfer en de uitleg erover weg. */
+.vtk-bo-sum-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.vtk-bo-sum-switch {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.vtk-bo-sum-wrap[data-begroting='off'] :is(.vtk-bo-sum-table .begr, .vtk-bo-sum-kpi .b, .vtk-bo-sum-foot-begr) {
+  display: none;
+}
+
 /* "Resultaten per post": een kader voor op een slide (BoSummary.tsx). Alles
    staat erin, ook de datum, zodat één schermafbeelding volstaat. */
 .vtk-bo-sum {

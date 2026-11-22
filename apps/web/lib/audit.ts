@@ -145,6 +145,7 @@ export const AUDIT_ENTITIES = {
   cashRegister: { nl: "Kassa", en: "Cash register", group: "cashRegisters" },
   cashRegisterSettings: { nl: "Kassa-instelling", en: "Cash register setting", group: "cashRegisters" },
   permanentCashEntry: { nl: "Vaste kassa", en: "Permanent cash register", group: "cashRegisters" },
+  cashBookEntry: { nl: "Kasboek Beheer", en: "Administration cash book", group: "cashRegisters" },
   accountingCode: { nl: "Boekhoudcode", en: "Accounting code", group: "accounting" },
   incomeImport: { nl: "Export online inkomsten", en: "Online income export", group: "accounting" },
   incomeTransaction: { nl: "Online inkomsten", en: "Online income", group: "accounting" },

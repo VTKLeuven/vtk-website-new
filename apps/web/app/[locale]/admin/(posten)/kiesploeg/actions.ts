@@ -226,6 +226,9 @@ const updateMemberSchema = z.object({
   id: z.string().min(1),
   postId: z.string().optional(),
   role: z.enum(["MEMBER", "LEAD"]).optional(),
+  // Leeg = geen functie. Beheer krijgt de rekeningen van de ploeg
+  // (`lib/rekeningen/server.ts`), de andere drie zijn enkel een aanduiding.
+  function: z.enum(["", "PRAESES", "VICE", "SECRETARIS", "BEHEER"]).optional(),
   sendFromAlias: z.string().optional(),
   forwardTo: z.string().trim().max(200).optional(),
 });
@@ -261,6 +264,7 @@ export async function saveKiesploegMemberAction(
     data: {
       postId: parsed.data.postId || null,
       role: parsed.data.role ?? "MEMBER",
+      function: parsed.data.function || null,
       sendFromAlias: parsed.data.sendFromAlias === "on",
       forwardTo,
     },
@@ -275,6 +279,8 @@ export async function saveKiesploegMemberAction(
 
   revalidatePath(ADMIN);
   revalidatePath(ADDRESSES);
+  // De functie Beheer opent of sluit de rekeningen van de ploeg.
+  revalidatePath("/admin/rekeningen");
   after(() => pushMailGroupsForKiesploeg(row.kiesploegId));
   return saveOk();
 }

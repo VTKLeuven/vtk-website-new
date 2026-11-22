@@ -39,11 +39,55 @@ export type ExpenseAccess = {
   postScope: string[];
   /** Ziet het beheeroverzicht (alle posten of enkel de eigen). */
   canSeeOverview: boolean;
+  /**
+   * De actieve kiesploegen waarvan je lid bent: daarop mag je indienen, op de
+   * post "Ploeg". Zie docs/design-decisions.md, "De kiesploeg bij de
+   * rekeningen".
+   */
+  ploegen: PloegChoice[];
+  /**
+   * De kiesploegen waarin je de functie Beheer hebt. Hun rekeningen beheer je
+   * zoals een post de hare: bekijken, bewerken, wissen en terugbetalen tot
+   * Beheer van VTK ze doorstuurt. Ook na het aantreden, voor de historiek.
+   */
+  ploegScope: string[];
 };
+
+/** Een kiesploeg als keuze bij het indienen. */
+export type PloegChoice = { id: string; name: string };
+
+/** Wat een gebruiker met de kiesploegen te maken heeft, voor `accessFor`. */
+export type PloegAccess = { ploegen: PloegChoice[]; ploegScope: string[] };
+
+const NO_PLOEG: PloegAccess = { ploegen: [], ploegScope: [] };
+
+/**
+ * Leest uit de database in welke kiesploegen deze gebruiker zit. Apart van
+ * `accessFor`, die synchroon blijft: de kiesploeg zit niet in de sessie.
+ */
+export async function ploegAccessFor(userId: string): Promise<PloegAccess> {
+  const rows = await prisma.kiesploegMember.findMany({
+    where: { userId },
+    select: {
+      function: true,
+      kiesploeg: { select: { id: true, formalName: true, active: true } },
+    },
+  });
+  return {
+    ploegen: rows
+      .filter((row) => row.kiesploeg.active)
+      .map((row) => ({ id: row.kiesploeg.id, name: row.kiesploeg.formalName })),
+    ploegScope: rows.filter((row) => row.function === "BEHEER").map((row) => row.kiesploeg.id),
+  };
+}
+
+async function loadAccess(session: SessionPayload): Promise<ExpenseAccess> {
+  return accessFor(session, await ploegAccessFor(session.user.id));
+}
 
 export async function getExpenseAccess(): Promise<ExpenseAccess | null> {
   const session = await getCurrentSession();
-  return session ? accessFor(session) : null;
+  return session ? loadAccess(session) : null;
 }
 
 /**
@@ -52,10 +96,10 @@ export async function getExpenseAccess(): Promise<ExpenseAccess | null> {
  * de error boundary die een gegooide `FORBIDDEN` oplevert.
  */
 export async function expenseAccess(redirectTo: string): Promise<ExpenseAccess> {
-  return accessFor(await requireSession(redirectTo));
+  return loadAccess(await requireSession(redirectTo));
 }
 
-export function accessFor(session: SessionPayload): ExpenseAccess {
+export function accessFor(session: SessionPayload, ploeg: PloegAccess = NO_PLOEG): ExpenseAccess {
   const has = (code: string) =>
     session.user.isSuperAdmin || session.permissions.includes(code);
 
@@ -68,12 +112,20 @@ export function accessFor(session: SessionPayload): ExpenseAccess {
     session,
     // Wie mag beheren mag per definitie ook indienen; anders staat een
     // penningmeester met een bonnetje in de hand voor een gesloten formulier.
-    canSubmit: has("expenses.submit") || canManageAll || scoped,
+    // Een kiesploeglid dient in op de ploeg, ook zonder praesidiumpost.
+    canSubmit:
+      has("expenses.submit") ||
+      canManageAll ||
+      scoped ||
+      ploeg.ploegen.length > 0 ||
+      ploeg.ploegScope.length > 0,
     canManageAll,
     canManagePost,
     canReimbursePost,
     postScope: scoped ? session.groups.map((group) => group.id) : [],
-    canSeeOverview: canManageAll || scoped,
+    canSeeOverview: canManageAll || scoped || ploeg.ploegScope.length > 0,
+    ploegen: ploeg.ploegen,
+    ploegScope: canManageAll ? [] : ploeg.ploegScope,
   };
 }
 
@@ -95,35 +147,39 @@ export async function requireExpenseAccess(): Promise<ExpenseAccess> {
  */
 export function visibilityWhere(access: ExpenseAccess) {
   if (access.canManageAll) return undefined;
+  // Eigen posten plus wat je zelf indiende: anders verdwijnt je eigen rekening
+  // uit beeld zodra je ze op naam van een andere post zet.
+  const own = { submittedById: access.session.user.id };
+  const scopes: object[] = [];
   if (access.canManagePost || access.canReimbursePost) {
-    // Eigen posten plus wat je zelf indiende: anders verdwijnt je eigen rekening
-    // uit beeld zodra je ze op naam van een andere post zet.
-    return {
-      OR: [
-        { groupId: { in: access.postScope } },
-        { submittedById: access.session.user.id },
-      ],
-    };
+    scopes.push({ groupId: { in: access.postScope } });
   }
-  return { submittedById: access.session.user.id };
+  if (access.ploegScope.length > 0) scopes.push({ kiesploegId: { in: access.ploegScope } });
+  return scopes.length === 0 ? own : { OR: [...scopes, own] };
 }
 
 type ExpenseGate = Pick<
   Expense,
-  "groupId" | "submittedById" | "paidAt" | "sentAt" | "bookedAt" | "paymentMethod"
+  "groupId" | "kiesploegId" | "submittedById" | "paidAt" | "sentAt" | "bookedAt" | "paymentMethod"
 >;
 
 function inPostScope(access: ExpenseAccess, expense: Pick<Expense, "groupId">): boolean {
   return expense.groupId !== null && access.postScope.includes(expense.groupId);
 }
 
+/** Een rekening op de ploeg van een kiesploeg waarin je Beheer bent. */
+function inPloegScope(access: ExpenseAccess, expense: Pick<Expense, "kiesploegId">): boolean {
+  return expense.kiesploegId !== null && access.ploegScope.includes(expense.kiesploegId);
+}
+
 /** Mag deze gebruiker deze rekening openen (bonnetje, blad, detail)? */
 export function canView(
   access: ExpenseAccess,
-  expense: Pick<Expense, "groupId" | "submittedById">,
+  expense: Pick<Expense, "groupId" | "kiesploegId" | "submittedById">,
 ): boolean {
   if (access.canManageAll) return true;
   if (expense.submittedById === access.session.user.id) return true;
+  if (inPloegScope(access, expense)) return true;
   return (access.canManagePost || access.canReimbursePost) && inPostScope(access, expense);
 }
 
@@ -140,6 +196,7 @@ export function canEdit(access: ExpenseAccess, expense: ExpenseGate): boolean {
   if (access.canManageAll) return true;
   if (expense.sentAt) return false;
   if (expense.submittedById === access.session.user.id) return true;
+  if (inPloegScope(access, expense)) return true;
   return access.canManagePost && inPostScope(access, expense);
 }
 
@@ -155,12 +212,65 @@ export function canDelete(access: ExpenseAccess, expense: ExpenseGate): boolean 
   if (expense.bookedAt || expense.sentAt) return false;
   if (expense.paymentMethod === "PERSONAL" && expense.paidAt) return false;
   if (expense.submittedById === access.session.user.id) return true;
+  if (inPloegScope(access, expense)) return true;
   return access.canManagePost && inPostScope(access, expense);
 }
 
 /** Inboeken en doorsturen: enkel volledig beheer. */
 export function canManageState(access: ExpenseAccess): boolean {
   return access.canManageAll;
+}
+
+/** Mag deze gebruiker ergens het vinkje "terugbetaald" zetten (los van welke rekening)? */
+export function canReimburseSomething(access: ExpenseAccess): boolean {
+  return access.canManageAll || access.canReimbursePost || access.ploegScope.length > 0;
+}
+
+// -----------------------------------------------------------------------------
+// De post "Ploeg"
+// -----------------------------------------------------------------------------
+
+/** De naam van de post op het blad, zoals Beheer ze vroeg. */
+export const PLOEG_POST_LABEL = "Ploeg";
+
+/**
+ * Mag deze gebruiker een rekening op deze kiesploeg zetten? Lid van de ploeg,
+ * Beheer van de ploeg, of volledig beheer. `currentId` is de kiesploeg waar de
+ * rekening al op stond: die mag blijven staan, ook na het aantreden.
+ */
+export function canChoosePloeg(
+  access: ExpenseAccess,
+  kiesploegId: string,
+  currentId?: string | null,
+): boolean {
+  if (access.canManageAll) return true;
+  if (kiesploegId === currentId) return true;
+  return (
+    access.ploegen.some((ploeg) => ploeg.id === kiesploegId) ||
+    access.ploegScope.includes(kiesploegId)
+  );
+}
+
+/**
+ * De kiesploegen die als "Ploeg" in de postlijst van het formulier staan. De
+ * samenstelling van een kiesploeg is voor de verkiezingen niet publiek, dus
+ * enkel de eigen ploeg, behalve voor volledig beheer.
+ */
+export async function ploegOptionsFor(
+  access: ExpenseAccess,
+  currentId?: string | null,
+): Promise<PloegChoice[]> {
+  const ids = new Set([
+    ...access.ploegen.map((ploeg) => ploeg.id),
+    ...access.ploegScope,
+    ...(currentId ? [currentId] : []),
+  ]);
+  const rows = await prisma.kiesploeg.findMany({
+    where: access.canManageAll ? { OR: [{ active: true }, { id: { in: [...ids] } }] } : { id: { in: [...ids] } },
+    orderBy: { workingYear: "desc" },
+    select: { id: true, formalName: true },
+  });
+  return rows.map((row) => ({ id: row.id, name: row.formalName }));
 }
 
 /**
@@ -174,12 +284,14 @@ export function canManageState(access: ExpenseAccess): boolean {
  */
 export function canReimburse(
   access: ExpenseAccess,
-  expense: Pick<Expense, "groupId" | "paymentMethod" | "sentAt" | "bookedAt">,
+  expense: Pick<Expense, "groupId" | "kiesploegId" | "paymentMethod" | "sentAt" | "bookedAt">,
 ): boolean {
   if (access.canManageAll) return true;
-  if (!access.canReimbursePost) return false;
   if (expense.paymentMethod !== "PERSONAL") return false;
   if (expense.sentAt || expense.bookedAt) return false;
+  // Beheer van een kiesploeg betaalt de leden van de ploeg terug.
+  if (inPloegScope(access, expense)) return true;
+  if (!access.canReimbursePost) return false;
   return inPostScope(access, expense);
 }
 

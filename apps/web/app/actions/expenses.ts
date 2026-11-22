@@ -12,8 +12,12 @@ import {
   canEdit,
   canManageState,
   canReimburse,
+  canChoosePloeg,
+  canReimburseSomething,
   canView,
   EXPENSE_CONFIG_KEY,
+  type ExpenseAccess,
+  PLOEG_POST_LABEL,
   getExpenseConfig,
   MAX_WORDS_RANGE,
   requireExpenseAccess,
@@ -29,6 +33,7 @@ import {
   paidStateOnMethodChange,
   parseAmountToCents,
   parseDateInput,
+  parsePloegOptionValue,
   parsePostOptionValue,
   RECEIPT_PREFIX,
   workingYearOf,
@@ -88,6 +93,7 @@ export async function saveDefaultIbanAction(
 
 type ParsedFields = {
   groupId: string | null;
+  kiesploegId: string | null;
   postLabel: string;
   payerName: string;
   activity: string;
@@ -126,9 +132,20 @@ function wordLimitError(
 async function parseFields(
   formData: FormData,
   maxWords: number,
-  existing?: { activity: string; description: string },
+  access: ExpenseAccess,
+  existing?: { activity: string; description: string; kiesploegId: string | null },
 ): Promise<ParsedFields | SaveState> {
-  const post = parsePostOptionValue(text(formData, "groupId", 80));
+  const postRaw = text(formData, "groupId", 80);
+  // De post "Ploeg": een kiesploeg in plaats van een post. Enkel je eigen
+  // ploeg (zie `canChoosePloeg`): wie erin zit, is voor de verkiezingen niet
+  // publiek, dus een vreemde id mag hier niets opleveren.
+  const kiesploegId = parsePloegOptionValue(postRaw);
+  if (kiesploegId) {
+    if (!canChoosePloeg(access, kiesploegId, existing?.kiesploegId)) return saveError("BAD_POST");
+    const ploeg = await prisma.kiesploeg.findUnique({ where: { id: kiesploegId }, select: { id: true } });
+    if (!ploeg) return saveError("BAD_POST");
+  }
+  const post = kiesploegId ? { groupId: "", sub: null } : parsePostOptionValue(postRaw);
   const groupId = post.groupId || null;
   const payerName = text(formData, "payerName", 120);
   const activity = text(formData, "activity", 160);
@@ -165,7 +182,9 @@ async function parseFields(
   // opgesplitste post (Groep 5) is dat de deelpost, en dan moet er één gekozen
   // zijn: de post zelf staat niet meer in de lijst.
   let postLabel = "";
-  if (groupId) {
+  if (kiesploegId) {
+    postLabel = PLOEG_POST_LABEL;
+  } else if (groupId) {
     const group = await prisma.group.findUnique({
       where: { id: groupId },
       select: { code: true, nameNl: true },
@@ -186,6 +205,7 @@ async function parseFields(
 
   return {
     groupId,
+    kiesploegId,
     postLabel,
     payerName,
     activity,
@@ -207,7 +227,7 @@ export async function submitExpenseAction(
   if (!access.canSubmit) return saveError("FORBIDDEN");
 
   const config = await getExpenseConfig();
-  const parsed = await parseFields(formData, config.maxWords);
+  const parsed = await parseFields(formData, config.maxWords, access);
   if ("status" in parsed) return parsed;
 
   const receiptKey = text(formData, "receiptKey", 200);
@@ -263,7 +283,7 @@ export async function updateExpenseAction(
   if (!canEdit(access, existing)) return saveError("LOCKED");
 
   const config = await getExpenseConfig();
-  const parsed = await parseFields(formData, config.maxWords, existing);
+  const parsed = await parseFields(formData, config.maxWords, access, existing);
   if ("status" in parsed) return parsed;
 
   // Een nieuw bonnetje is optioneel: leeg betekent "laat staan wat er stond",
@@ -364,7 +384,7 @@ export async function setExpenseStateAction(
   formData: FormData,
 ): Promise<SaveState> {
   const access = await requireExpenseAccess();
-  if (!canManageState(access) && !access.canReimbursePost) return saveError("FORBIDDEN");
+  if (!canReimburseSomething(access)) return saveError("FORBIDDEN");
 
   const id = text(formData, "id", 40);
   const field = text(formData, "field", 10) as StateField;

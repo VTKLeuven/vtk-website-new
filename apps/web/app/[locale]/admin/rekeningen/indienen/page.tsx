@@ -5,10 +5,12 @@ import type { Locale } from "@vtk/i18n";
 import { pick } from "@vtk/i18n";
 import { Markdown } from "@/components/ui/Markdown";
 import { submitExpenseAction } from "@/app/actions/expenses";
-import { expenseAccess, getExpenseConfig } from "@/lib/rekeningen/server";
+import { expenseAccess, getExpenseConfig, ploegOptionsFor } from "@/lib/rekeningen/server";
 import {
   expensePostSplit,
   formatIban,
+  ploegOptionName,
+  ploegOptionValue,
   postOptions,
   postOptionValue,
   toDateInputValue,
@@ -40,7 +42,7 @@ export default async function RekeningIndienen({
 
   const ownGroupIds = access.session.groups.map((group) => group.id);
 
-  const [groups, previous, profile, config] = await Promise.all([
+  const [groups, previous, profile, config, ploegen] = await Promise.all([
     prisma.group.findMany({
       where: { OR: [{ active: true }, { id: { in: ownGroupIds } }] },
       orderBy: [{ type: "asc" }, { orderInPraesidium: "asc" }, { nameNl: "asc" }],
@@ -49,13 +51,14 @@ export default async function RekeningIndienen({
     prisma.expense.findFirst({
       where: { submittedById: access.session.user.id, paymentMethod: "PERSONAL" },
       orderBy: { createdAt: "desc" },
-      select: { groupId: true, postLabel: true, group: { select: { code: true } } },
+      select: { groupId: true, kiesploegId: true, postLabel: true, group: { select: { code: true } } },
     }),
     prisma.user.findUniqueOrThrow({
       where: { id: access.session.user.id },
       select: { defaultIban: true },
     }),
     getExpenseConfig(),
+    ploegOptionsFor(access),
   ]);
 
   const own = groups.filter((group) => ownGroupIds.includes(group.id));
@@ -75,14 +78,29 @@ export default async function RekeningIndienen({
   // Vooraf de post van je vorige rekening; bij een opgesplitste post enkel als
   // die rekening al een deelpost had, anders de eerste eigen post.
   const previousSplit = expensePostSplit(previous?.group?.code);
-  const previousValue = previous?.groupId
+  // Je eigen ploeg bovenaan, zoals je eigen post; een andere ploeg (enkel voor
+  // volledig beheer) onderaan.
+  const ownPloegIds = new Set([...access.ploegen.map((ploeg) => ploeg.id), ...access.ploegScope]);
+  const ploegOption = (ploeg: { id: string; name: string }) => ({
+    id: ploegOptionValue(ploeg.id),
+    name: `${ploegOptionName(ploeg.name)}${ownPloegIds.has(ploeg.id) ? (nl ? " (jouw ploeg)" : " (your team)") : ""}`,
+  });
+  const ownPloegOptions = ploegen.filter((ploeg) => ownPloegIds.has(ploeg.id)).map(ploegOption);
+  const otherPloegOptions = ploegen.filter((ploeg) => !ownPloegIds.has(ploeg.id)).map(ploegOption);
+
+  const previousPloeg = previous?.kiesploegId;
+  const previousValue = previousPloeg
+    ? ploegen.some((ploeg) => ploeg.id === previousPloeg)
+      ? ploegOptionValue(previousPloeg)
+      : ""
+    : previous?.groupId
     ? previousSplit
       ? previousSplit.includes(previous.postLabel)
         ? postOptionValue(previous.groupId, previous.postLabel)
         : ""
       : previous.groupId
     : "";
-  const firstOwn = own[0] ? (options(own[0])[0]?.id ?? "") : "";
+  const firstOwn = own[0] ? (options(own[0])[0]?.id ?? "") : (ownPloegOptions[0]?.id ?? "");
 
   return (
     <div className="space-y-5">
@@ -108,8 +126,10 @@ export default async function RekeningIndienen({
           defaultIbanHref={`${base}/admin/rekeningen/mijn#standaard-iban`}
           maxWords={config.maxWords}
           posts={[
+            ...ownPloegOptions,
             ...own.flatMap((group) => options(group, nl ? " (jouw post)" : " (your post)")),
             ...others.flatMap((group) => options(group)),
+            ...otherPloegOptions,
           ]}
           values={{
             groupId: previousValue || firstOwn,

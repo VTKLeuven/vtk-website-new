@@ -4,6 +4,7 @@ import type { Prisma } from "@prisma/client";
 import {
   normaliseIban,
   parseDateInput,
+  parsePloegOptionValue,
   parsePostOptionValue,
   type ExpenseStatus,
   type ReimbursementState,
@@ -134,7 +135,11 @@ export function filterWhere(filters: ExpenseFilters): Prisma.ExpenseWhereInput {
   const and: Prisma.ExpenseWhereInput[] = [];
 
   if (filters.year !== "all") and.push({ workingYear: filters.year });
-  if (filters.groupId) {
+  const ploegId = filters.groupId ? parsePloegOptionValue(filters.groupId) : null;
+  if (ploegId) {
+    // `ploeg:<id>`: de post "Ploeg" van één kiesploeg.
+    and.push({ kiesploegId: ploegId });
+  } else if (filters.groupId) {
     // `id:Praeses` is een deelpost van een opgesplitste post (Groep 5); de
     // deelpost staat in `postLabel`.
     const { groupId, sub } = parsePostOptionValue(filters.groupId);

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { ClipboardCheck, FilePlus2, Inbox, LayoutList, Settings2, Store } from "lucide-react";
+import { BookOpen, ClipboardCheck, FilePlus2, Inbox, LayoutList, Settings2, Store } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { getCurrentSession } from "@/lib/session";
 import { accessFor, permanentTabLabel } from "@/lib/kassas/server";
@@ -8,8 +8,8 @@ import { ModuleAdminShell, type ModuleTab } from "@/components/admin/ModuleAdmin
 const ICON = { "aria-hidden": true, size: 15, strokeWidth: 1.8 } as const;
 
 /**
- * Kassa's in tabbladen zoals Tickets: het overzicht en de controle voor
- * Beheer, de vaste kassa's (voor Beheer en de posten die er een hebben), je
+ * Kassa's in tabbladen zoals Tickets: het overzicht, de controle en het
+ * kasboek voor Beheer, de vaste kassa's (voor Beheer en de posten die er een hebben), je
  * eigen aanvragen, een kassa aanvragen, en de instellingen. Elk tabblad volgt
  * een recht; de pagina's zeggen zelf wanneer je geen toegang hebt.
  */
@@ -35,6 +35,10 @@ export default async function AdminCashRegistersLayout({
   }
   if (access?.canCheckIncome) {
     tabs.push({ href: `${base}/controle`, label: nl ? "Controle" : "Check", icon: <ClipboardCheck {...ICON} />, segments: ["controle"] });
+  }
+  if (access?.canManage) {
+    // Het cash van Beheer zelf: stortingen, afhalingen en aankopen.
+    tabs.push({ href: `${base}/kasboek`, label: nl ? "Kasboek" : "Cash book", icon: <BookOpen {...ICON} />, segments: ["kasboek"] });
   }
   if (permanentLabel) {
     tabs.push({ href: `${base}/vast`, label: permanentLabel, icon: <Store {...ICON} />, segments: ["vast"] });

@@ -33,6 +33,7 @@ export async function GET(
     where: { id },
     select: {
       groupId: true,
+      kiesploegId: true,
       submittedById: true,
       paidAt: true,
       sentAt: true,

@@ -60,6 +60,11 @@ export type NavGuard = {
   mailGroups?: boolean;
   /** Posten & werkgroepen: wie minstens één van de vier tabbladen mag zien (lib/postenAccess.ts). */
   posten?: boolean;
+  /**
+   * Rekeningen: `anyPerm`, of lid van een actieve kiesploeg (indienen op de
+   * post "Ploeg") of Beheer van een kiesploeg, ook zonder praesidiumpost.
+   */
+  expenses?: boolean;
   /** Enkel bij exacte padmatch actief markeren (voor de dashboard-landing op /admin). */
   exact?: boolean;
   /**
@@ -138,6 +143,7 @@ export function getAdminNav(): NavEntry[] {
     group('beheer', [
       item('expenses', '/rekeningen', {
         anyPerm: ['expenses.submit', 'expenses.managePost', 'expenses.reimbursePost', 'expenses.manage'],
+        expenses: true,
       }),
       // Een post vraagt hier een kassa met wisselgeld aan, en Beheer maakt,
       // telt en boekt ze.

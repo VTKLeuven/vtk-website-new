@@ -912,6 +912,7 @@ model User {
   cashRegistersRequested CashRegister[]       @relation("CashRegisterRequestedBy")
   cashRegistersAccepted  CashRegister[]       @relation("CashRegisterAcceptedBy")
   permanentCashEntries   PermanentCashEntry[] @relation("PermanentCashEntryCreatedBy")
+  cashBookEntries        CashBookEntry[]      @relation("CashBookEntryCreatedBy")
   incomeImports          IncomeImport[]       @relation("IncomeImportedBy")
   incomeAssignments      IncomeTransaction[]  @relation("IncomeAssignedBy")
   incomeNameRules        IncomeNameRule[]     @relation("IncomeNameRuleCreatedBy")
@@ -1568,6 +1569,9 @@ model Kiesploeg {
   posts      KiesploegPost[]
   members    KiesploegMember[]
   mailGroups MailGroupSource[]
+  /// Rekeningen op de post "Ploeg": wat de ploeg uitgaf. Zie
+  /// docs/design-decisions.md, "De kiesploeg bij de rekeningen".
+  expenses   Expense[]
 }
 
 /// Een post binnen de kiesploeg. Dit zijn níét de praesidiumposten: ze hebben
@@ -1591,6 +1595,16 @@ model KiesploegPost {
   @@index([kiesploegId])
 }
 
+/// De vier functies van een g5, zoals bij Groep 5 van het praesidium. Een
+/// kiesploeg kent haar postverdeling pas laat, maar deze vier zijn er van in
+/// het begin, en Beheer heeft toegang nodig tot de rekeningen van de ploeg.
+enum KiesploegFunction {
+  PRAESES
+  VICE
+  SECRETARIS
+  BEHEER
+}
+
 model KiesploegMember {
   id            String         @id @default(cuid())
   kiesploegId   String
@@ -1599,6 +1613,9 @@ model KiesploegMember {
   /// de g5 bekend.
   postId        String?
   role          MembershipRole @default(MEMBER)
+  /// De functie van dit lid in de g5 van de ploeg, los van de post. NULL = geen
+  /// functie. Beheer ziet en beheert de rekeningen van de ploeg.
+  function      KiesploegFunction?
   /// Dit lid mag mailen, maar enkel vanaf zijn kiesploegadres. Vanaf zijn
   /// primaire adres mailt geen enkel kiesploeglid voor de ploeg aantreedt; wie
   /// dit niet heeft, ontvangt enkel.
@@ -8750,6 +8767,9 @@ model Expense {
   /// Naam van de post op het moment van indienen. Staat zo op het blad dat naar
   /// de boekhouder gaat, en blijft dus staan ook als de post later hernoemt.
   postLabel String
+  /// De post "Ploeg": een uitgave van een kiesploeg. Dan is `groupId` leeg en
+  /// `postLabel` "Ploeg". `SetNull` om dezelfde reden als bij `groupId`.
+  kiesploegId String?
 
   submittedById String?
   /// Wie het betaalde. Standaard de indiener, maar iemand mag het bonnetje van
@@ -8797,7 +8817,8 @@ model Expense {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  group       Group? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  group       Group?     @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  kiesploeg   Kiesploeg? @relation(fields: [kiesploegId], references: [id], onDelete: SetNull)
   submittedBy User?  @relation("ExpenseSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
   paidBy      User?  @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: SetNull)
   bookedBy    User?  @relation("ExpenseBookedBy", fields: [bookedById], references: [id], onDelete: SetNull)
@@ -8805,6 +8826,7 @@ model Expense {
 
   @@index([workingYear])
   @@index([groupId])
+  @@index([kiesploegId])
   @@index([submittedById])
   @@index([spentOn])
   @@index([paidAt])
@@ -9041,6 +9063,48 @@ model PermanentCashEntry {
   createdBy User? @relation("PermanentCashEntryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([groupId, date])
+  @@index([createdById])
+}
+
+/// Wat Beheer met het cash van de kring doet, buiten de kassa's om.
+enum CashBookKind {
+  /// Cash naar de bank gebracht.
+  DEPOSIT
+  /// Cash van de bank afgehaald.
+  WITHDRAWAL
+  /// Iets met cash betaald. Altijd met een factuur.
+  PURCHASE
+}
+
+/// Eén regel in het kasboek van Beheer: een storting, een afhaling of een
+/// aankoop met cash (`/admin/kassas/kasboek`). Zie docs/design-decisions.md,
+/// "Het kasboek van Beheer".
+model CashBookEntry {
+  id          String       @id @default(cuid())
+  kind        CashBookKind
+  /// De dag van de beweging.
+  date        DateTime     @db.Date
+  /// Afgeleid uit `date` met de 15-juli-grens, opgeslagen zoals bij `Expense`.
+  workingYear Int
+  /// Altijd positief; de richting zit in `kind`.
+  amountCents Int
+  description String
+  note        String?
+
+  /// De factuur, verplicht bij een aankoop. Onder `bonnetjes/` en enkel te
+  /// lezen via de afgeschermde route, net als een bonnetje bij een rekening.
+  invoiceKey  String?
+  invoiceName String?
+  invoiceMime String?
+  invoiceSize Int?
+
+  createdById String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  createdBy User? @relation("CashBookEntryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([workingYear, date])
   @@index([createdById])
 }
 

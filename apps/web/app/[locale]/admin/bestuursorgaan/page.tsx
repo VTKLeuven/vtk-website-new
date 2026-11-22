@@ -17,6 +17,7 @@ import { BoViews } from "./BoViews";
 import { BoSettingsForm, RestoreBegrotingButton, RestoreFileButton, ScanButton } from "./BoControls";
 import { BoReview } from "./BoReview";
 import { BoSummary } from "./BoSummary";
+import { BoSummaryToggle } from "./BoSummaryToggle";
 import { buildSummary } from "@/lib/bo/summary";
 import { postName, postOptions } from "@/lib/bo/posts";
 import { boErrorMessages } from "./messages";
@@ -177,7 +178,11 @@ export default async function BestuursorgaanPage({
         />
       )}
 
-      {data.dossiers.length > 0 && <BoSummary summary={buildSummary(data, choices)} year={formatWorkingYear(year)} nl={nl} />}
+      {data.dossiers.length > 0 && (
+        <BoSummaryToggle nl={nl}>
+          <BoSummary summary={buildSummary(data, choices)} year={formatWorkingYear(year)} nl={nl} />
+        </BoSummaryToggle>
+      )}
 
       <AdminDisclosure
         defaultOpen={!hasFolder}

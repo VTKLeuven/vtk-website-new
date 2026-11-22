@@ -162,7 +162,7 @@ export function BoSummary({ summary, year, nl }: { summary: Summary; year: strin
         })}
       </div>
       {summary.outOfPlan.length > 0 && (
-        <p className="vtk-bo-sum-foot">
+        <p className="vtk-bo-sum-foot vtk-bo-sum-foot-begr">
           <b>{nl ? "Buiten de begroting: " : "Left out of the plan: "}</b>
           {summary.outOfPlan.map((o, i) => (
             <Fragment key={o.key}>
@@ -175,8 +175,13 @@ export function BoSummary({ summary, year, nl }: { summary: Summary; year: strin
       )}
       <p className="vtk-bo-sum-foot">
         {nl
-          ? "Budgetten: op een BO die al plaatsvond, of schriftelijk goedgekeurd. Percentage: daarvan met een resultaat. Rood onder 50%, oranje onder 100%, groen wanneer alles binnen is; een streepje: nog geen budget gepasseerd. Begroting: per budget het resultaat (of, zolang dat er niet is, het budget) min de regel Begroting in het blad, opgeteld; plus is beter dan begroot. Een blad zonder begroting telt niet mee."
-          : "Budgets: at a meeting that already took place, or approved in writing. Percentage: of those, with a result. Red below 50%, orange below 100%, green when everything is in; a dash: no budget passed yet. vs. plan: per budget the result (or, until there is one, the budget) minus the Begroting line in the sheet, summed; plus is better than planned. A sheet without a Begroting line is left out."}
+          ? "Budgetten: op een BO die al plaatsvond, of schriftelijk goedgekeurd. Percentage: daarvan met een resultaat. Rood onder 50%, oranje onder 100%, groen wanneer alles binnen is; een streepje: nog geen budget gepasseerd."
+          : "Budgets: at a meeting that already took place, or approved in writing. Percentage: of those, with a result. Red below 50%, orange below 100%, green when everything is in; a dash: no budget passed yet."}
+        <span className="vtk-bo-sum-foot-begr">
+          {nl
+            ? " Begroting: per budget het resultaat (of, zolang dat er niet is, het budget) min de regel Begroting in het blad, opgeteld; plus is beter dan begroot. Een blad zonder begroting telt niet mee."
+            : " vs. plan: per budget the result (or, until there is one, the budget) minus the Begroting line in the sheet, summed; plus is better than planned. A sheet without a Begroting line is left out."}
+        </span>
       </p>
     </section>
   );

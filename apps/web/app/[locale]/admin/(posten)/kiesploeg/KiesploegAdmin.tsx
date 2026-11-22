@@ -16,6 +16,10 @@ import {
   saveKiesploegMemberAction,
 } from "./actions";
 
+export type KiesploegFunctionCode = "PRAESES" | "VICE" | "SECRETARIS" | "BEHEER";
+
+const FUNCTIONS: KiesploegFunctionCode[] = ["PRAESES", "VICE", "SECRETARIS", "BEHEER"];
+
 export type KiesploegRow = {
   id: string;
   code: string;
@@ -40,6 +44,7 @@ export type KiesploegRow = {
     name: string;
     postId: string | null;
     role: "MEMBER" | "LEAD";
+    function: KiesploegFunctionCode | null;
     sendFromAlias: boolean;
     forwardTo: string | null;
     googleEmail: string | null;
@@ -107,7 +112,15 @@ export function KiesploegAdmin({
         added: "Toegevoegd.",
         members: "Leden",
         membersHelp:
-          "In het begin ken je enkel de g5; laat de post dan leeg. Vul hem in zodra de verdeling er is.",
+          "In het begin ken je enkel de g5; laat de post dan leeg. Vul hem in zodra de verdeling er is. De functie (praeses, vice, secretaris, beheer) staat los van de post: wie Beheer is, ziet en beheert de rekeningen op de post Ploeg.",
+        function: "Functie",
+        noFunction: "Geen functie",
+        functions: {
+          PRAESES: "Praeses",
+          VICE: "Vice",
+          SECRETARIS: "Secretaris",
+          BEHEER: "Beheer",
+        },
         post: "Post",
         noPost: "(nog geen post)",
         role: "Rol",
@@ -206,7 +219,15 @@ export function KiesploegAdmin({
         added: "Added.",
         members: "Members",
         membersHelp:
-          "At first only the g5 is known; leave the post empty then. Fill it in once the division exists.",
+          "At first only the g5 is known; leave the post empty then. Fill it in once the division exists. The function (president, vice, secretary, finance) is separate from the post: whoever is Finance sees and manages the expenses on the post Ploeg.",
+        function: "Function",
+        noFunction: "No function",
+        functions: {
+          PRAESES: "President",
+          VICE: "Vice",
+          SECRETARIS: "Secretary",
+          BEHEER: "Finance",
+        },
         post: "Post",
         noPost: "(no post yet)",
         role: "Role",
@@ -470,7 +491,14 @@ export function KiesploegAdmin({
                         className="rounded-xl border border-vtk-blue/15 px-3 py-2 text-sm"
                       >
                         <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <span className="font-medium text-vtk-ink">{member.name}</span>
+                          <span className="font-medium text-vtk-ink">
+                            {member.name}
+                            {member.function && (
+                              <span className="ml-2 rounded-full bg-vtk-blue-soft px-2 py-0.5 text-xs font-normal text-vtk-ink">
+                                {t.functions[member.function]}
+                              </span>
+                            )}
+                          </span>
                           <span className="text-xs text-zinc-500">
                             {member.googleEmail ?? t.noAccount}
                             {member.accountState && (
@@ -516,6 +544,17 @@ export function KiesploegAdmin({
                                 {row.posts.map((post) => (
                                   <option key={post.id} value={post.id}>
                                     {post.name}
+                                  </option>
+                                ))}
+                              </Select>
+                            </div>
+                            <div className="w-36">
+                              <Label>{t.function}</Label>
+                              <Select name="function" defaultValue={member.function ?? ""}>
+                                <option value="">{t.noFunction}</option>
+                                {FUNCTIONS.map((code) => (
+                                  <option key={code} value={code}>
+                                    {t.functions[code]}
                                   </option>
                                 ))}
                               </Select>
