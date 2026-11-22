@@ -159,7 +159,9 @@ function makeEvent(overrides: Record<string, unknown> = {}) {
     presaleGroups: [],
     status: "PUBLISHED",
     currency: "EUR",
-    maxTicketsPerOrder: 1,
+    maxTicketsPerAccount: 1,
+    oneTicketPerOrder: false,
+    requireLogin: false,
     honoraryOneTicket: false,
     cardCheckIn: false,
     contactEmail: null,
@@ -212,12 +214,12 @@ function makeEvent(overrides: Record<string, unknown> = {}) {
 
 const futurePublicStart = () => new Date(Date.now() + 24 * 3600_000);
 
-function presaleEvent(maxTicketsPerOrder = 8) {
+function presaleEvent(maxTicketsPerAccount = 8) {
   return makeEvent({
     salesStartAt: futurePublicStart(),
     presaleLeadMinutes: 48 * 60,
-    maxTicketsPerOrder,
-    ticketTypes: [{ ...makeEvent().ticketTypes[0], maxPerOrder: maxTicketsPerOrder }],
+    maxTicketsPerAccount,
+    ticketTypes: [{ ...makeEvent().ticketTypes[0], maxPerOrder: maxTicketsPerAccount }],
   });
 }
 
@@ -244,18 +246,26 @@ function checkout(
 }
 
 describe("accountOrderMax", () => {
-  it("gives the event maximum, or one in presale and for an honorary member with one ticket", () => {
-    expect(accountOrderMax({ maxTicketsPerOrder: 8 })).toBe(8);
-    expect(accountOrderMax({ maxTicketsPerOrder: 8, presaleSelfOnly: true })).toBe(1);
-    expect(accountOrderMax({ maxTicketsPerOrder: 8, honoraryOneTicket: { used: false } })).toBe(1);
-    expect(accountOrderMax({ maxTicketsPerOrder: 0, presaleSelfOnly: true })).toBe(0);
+  it("gives the event maximum, or one in presale, for oneTicketPerOrder, and for honoraryOneTicket", () => {
+    expect(accountOrderMax({ maxTicketsPerAccount: 8 })).toBe(8);
+    expect(accountOrderMax({ maxTicketsPerAccount: 8, oneTicketPerOrder: true })).toBe(1);
+    expect(accountOrderMax({ maxTicketsPerAccount: 8, presaleSelfOnly: true })).toBe(1);
+    expect(accountOrderMax({ maxTicketsPerAccount: 8, honoraryOneTicket: { used: false } })).toBe(1);
+    expect(accountOrderMax({ maxTicketsPerAccount: 0, presaleSelfOnly: true })).toBe(0);
   });
 
-  it("drops to zero once the account holds its one ticket", () => {
-    expect(accountOrderMax({ maxTicketsPerOrder: 1, oneTicketPerAccount: { used: true } })).toBe(0);
-    expect(accountOrderMax({ maxTicketsPerOrder: 8, honoraryOneTicket: { used: true } })).toBe(0);
+  it("caps by remaining room on the account, and drops to zero when reached", () => {
+    expect(accountOrderMax({ maxTicketsPerAccount: 4, accountLimit: { max: 4, held: 1 } })).toBe(3);
     expect(
-      accountOrderMax({ maxTicketsPerOrder: 8, presaleSelfOnly: true, oneTicketPerAccount: { used: true } }),
+      accountOrderMax({ maxTicketsPerAccount: 4, oneTicketPerOrder: true, accountLimit: { max: 4, held: 1 } }),
+    ).toBe(1);
+    expect(
+      accountOrderMax({ maxTicketsPerAccount: 4, oneTicketPerOrder: true, accountLimit: { max: 4, held: 4 } }),
+    ).toBe(0);
+    expect(accountOrderMax({ maxTicketsPerAccount: 1, accountLimit: { max: 1, held: 1 } })).toBe(0);
+    expect(accountOrderMax({ maxTicketsPerAccount: 8, honoraryOneTicket: { used: true } })).toBe(0);
+    expect(
+      accountOrderMax({ maxTicketsPerAccount: 8, presaleSelfOnly: true, accountLimit: { max: 8, held: 1 } }),
     ).toBe(0);
   });
 });
@@ -323,7 +333,7 @@ describe("presale self-only and per-account checkout", () => {
 
     // Een event op max 1, uitgelogd: niets om op te tellen.
     mocks.presaleViewerFor.mockResolvedValue(null);
-    mocks.ticketEventFindUnique.mockResolvedValue(makeEvent({ maxTicketsPerOrder: 1 }));
+    mocks.ticketEventFindUnique.mockResolvedValue(makeEvent({ maxTicketsPerAccount: 1 }));
     await expect(
       checkout({ name: "LBK Gast", email: "gast@example.com" }, [
         { name: "LBK Gast", email: "gast@example.com" },
@@ -331,6 +341,54 @@ describe("presale self-only and per-account checkout", () => {
     ).resolves.toMatchObject({ orderId: expect.any(String) });
 
     expect(mocks.ticketOrderItemCount).not.toHaveBeenCalled();
+  });
+
+  it("blocks logged-out buyers when requireLogin is enabled", async () => {
+    mocks.getSession.mockResolvedValue(null);
+    mocks.userIsMember.mockResolvedValue(false);
+    mocks.presaleViewerFor.mockResolvedValue(null);
+    mocks.ticketEventFindUnique.mockResolvedValue(
+      makeEvent({ maxTicketsPerAccount: 4, requireLogin: true }),
+    );
+
+    await expect(
+      checkout({ name: "LBK Gast", email: "gast@example.com" }, [
+        { name: "LBK Gast", email: "gast@example.com" },
+      ]),
+    ).rejects.toMatchObject({ code: "LOGIN_REQUIRED" });
+  });
+
+  it("enforces maxTicketsPerAccount across orders and oneTicketPerOrder per order", async () => {
+    const event = makeEvent({
+      maxTicketsPerAccount: 4,
+      oneTicketPerOrder: true,
+      ticketTypes: [{ ...makeEvent().ticketTypes[0], maxPerOrder: 4 }],
+    });
+    mocks.ticketEventFindUnique.mockResolvedValue(event);
+
+    // 2 tickets in één bestelling mag niet met oneTicketPerOrder
+    await expect(
+      checkout({ name: "Driek Rediers", email: "driek.rediers@student.kuleuven.be" }, [
+        { name: "Vriend 1", email: "vriend1@example.com" },
+        { name: "Vriend 2", email: "vriend2@example.com" },
+      ]),
+    ).rejects.toMatchObject({ code: "INVALID_QUANTITY" });
+
+    // 1 ticket terwijl het account er al 3 heeft (max 4): mag nog net
+    mocks.ticketOrderItemCount.mockResolvedValue(3);
+    await expect(
+      checkout({ name: "Driek Rediers", email: "driek.rediers@student.kuleuven.be" }, [
+        { name: "Vriend 4", email: "vriend4@example.com" },
+      ]),
+    ).resolves.toMatchObject({ orderId: expect.any(String) });
+
+    // 1 ticket terwijl het account er al 4 heeft: geblokkeerd
+    mocks.ticketOrderItemCount.mockResolvedValue(4);
+    await expect(
+      checkout({ name: "Driek Rediers", email: "driek.rediers@student.kuleuven.be" }, [
+        { name: "Vriend 5", email: "vriend5@example.com" },
+      ]),
+    ).rejects.toMatchObject({ code: "ACCOUNT_TICKET_LIMIT" });
   });
 });
 
@@ -345,20 +403,36 @@ describe("what the shop learns about the account limit", () => {
     mocks.ticketOrderItemCount.mockResolvedValue(0);
   });
 
-  it("marks a max-1 event as one per account (used or not), and a higher maximum as unlimited", async () => {
-    mocks.ticketEventFindUnique.mockResolvedValue(makeEvent({ maxTicketsPerOrder: 1 }));
+  it("exposes accountLimit (max and held) for every logged-in buyer", async () => {
+    mocks.ticketEventFindUnique.mockResolvedValue(makeEvent({ maxTicketsPerAccount: 1 }));
     mocks.ticketOrderItemCount.mockResolvedValue(1);
     const dto = await getPublishedTicketEventBySlug("wijvenschijvencantus3", "nl");
-    expect(dto).toMatchObject({ oneTicketPerAccount: { used: true }, presaleSelfOnly: false });
+    expect(dto).toMatchObject({ accountLimit: { max: 1, held: 1 }, presaleSelfOnly: false });
 
-    mocks.ticketEventFindUnique.mockResolvedValue(makeEvent({ maxTicketsPerOrder: 8 }));
+    mocks.ticketEventFindUnique.mockResolvedValue(makeEvent({ maxTicketsPerAccount: 8, oneTicketPerOrder: true }));
+    mocks.ticketOrderItemCount.mockResolvedValue(2);
     const open = await getPublishedTicketEventBySlug("wijvenschijvencantus3", "nl");
-    expect(open).toMatchObject({ oneTicketPerAccount: null, presaleSelfOnly: false });
+    expect(open).toMatchObject({
+      accountLimit: { max: 8, held: 2 },
+      oneTicketPerOrder: true,
+      presaleSelfOnly: false,
+    });
   });
 
-  it("marks a logged-in presale buyer as self-only with one per account", async () => {
+  it("marks a logged-in presale buyer as self-only with their held count", async () => {
     mocks.ticketEventFindUnique.mockResolvedValue(presaleEvent());
     const dto = await getPublishedTicketEventBySlug("wijvenschijvencantus3", "nl");
-    expect(dto).toMatchObject({ oneTicketPerAccount: { used: false }, presaleSelfOnly: true });
+    expect(dto).toMatchObject({ accountLimit: { max: 8, held: 0 }, presaleSelfOnly: true });
+  });
+
+  it("requires login in the shop for a public event when requireLogin is enabled", async () => {
+    mocks.getSession.mockResolvedValue(null);
+    mocks.userIsMember.mockResolvedValue(false);
+    mocks.presaleViewerFor.mockResolvedValue(null);
+    mocks.ticketEventFindUnique.mockResolvedValue(
+      makeEvent({ maxTicketsPerAccount: 4, requireLogin: true }),
+    );
+    const dto = await getPublishedTicketEventBySlug("wijvenschijvencantus3", "nl");
+    expect(dto).toMatchObject({ requiresLogin: true, ticketTypes: [], accountLimit: null });
   });
 });

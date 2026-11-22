@@ -526,6 +526,36 @@ function TemplateEditor({
               </label>
             </div>
             <div className="ticket-admin-field" data-span="2">
+              <label className="ticket-admin-check" htmlFor={field("one-per-order")}>
+                <input type="hidden" name="oneTicketPerOrder" value="false" />
+                <input
+                  id={field("one-per-order")}
+                  name="oneTicketPerOrder"
+                  type="checkbox"
+                  value="true"
+                  defaultChecked={template.oneTicketPerOrder}
+                />
+                {nl
+                  ? "Max. 1 ticket per bestelling (drukke ticketdrops)"
+                  : "Max. 1 ticket per order (busy ticket drops)"}
+              </label>
+            </div>
+            <div className="ticket-admin-field" data-span="2">
+              <label className="ticket-admin-check" htmlFor={field("require-login")}>
+                <input type="hidden" name="requireLogin" value="false" />
+                <input
+                  id={field("require-login")}
+                  name="requireLogin"
+                  type="checkbox"
+                  value="true"
+                  defaultChecked={template.requireLogin}
+                />
+                {nl
+                  ? "Inloggen verplicht om te kopen"
+                  : "Require sign-in to buy"}
+              </label>
+            </div>
+            <div className="ticket-admin-field" data-span="2">
               <label className="ticket-admin-check" htmlFor={field("honorary-one")}>
                 <input type="hidden" name="honoraryOneTicket" value="false" />
                 <input
@@ -572,7 +602,7 @@ function TemplateEditor({
             poolsName="poolsData"
             initialTypes={template.types}
             initialPools={template.pools}
-            orderMax={{ name: "maxTicketsPerOrder", defaultValue: template.maxTicketsPerOrder }}
+            orderMax={{ name: "maxTicketsPerAccount", defaultValue: template.maxTicketsPerAccount }}
             mode="template"
             locale={locale}
           />

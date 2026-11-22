@@ -75,7 +75,11 @@ export type BuiltinTicketTemplate = {
   durationMinutes?: number;
   salesOpensMinutesBefore?: number | null;
   salesClosesMinutesBefore?: number | null;
-  maxTicketsPerOrder?: number;
+  maxTicketsPerAccount?: number;
+  /** Hoogstens één ticket per bestelling (drukke ticketdrop); zie `TicketEvent.oneTicketPerOrder`. */
+  oneTicketPerOrder?: boolean;
+  /** Inloggen verplicht om te kopen; zie `TicketEvent.requireLogin`. */
+  requireLogin?: boolean;
   /** Ereleden kopen hoogstens één ticket; zie `TicketEvent.honoraryOneTicket`. */
   honoraryOneTicket?: boolean;
   contactEmail?: string;
@@ -110,9 +114,9 @@ export const BUILTIN_TICKET_EVENT_TEMPLATES: BuiltinTicketTemplate[] = [
     durationMinutes: 300,
     salesOpensMinutesBefore: 3 * DAY,
     salesClosesMinutesBefore: 0,
-    // Een cantusticket staat op naam: één per bestelling, zodat niemand een
+    // Een cantusticket staat op naam: één per account, zodat niemand een
     // rij tickets koopt en de zaal via via volloopt.
-    maxTicketsPerOrder: 1,
+    maxTicketsPerAccount: 1,
     contactEmail: "activiteiten@vtk.be",
     capacity: 160,
     descriptionNl: `Vul hier de sfeertekst van deze cantus in.

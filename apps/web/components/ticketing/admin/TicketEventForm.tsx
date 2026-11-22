@@ -105,7 +105,9 @@ type TicketEventFormValue = {
   presaleHonorary?: boolean;
   presaleGroupIds?: readonly string[];
   status?: string;
-  maxTicketsPerOrder?: number;
+  maxTicketsPerAccount?: number;
+  oneTicketPerOrder?: boolean;
+  requireLogin?: boolean;
   honoraryOneTicket?: boolean;
   cardCheckIn?: boolean;
   openScanning?: boolean;
@@ -683,27 +685,67 @@ export function TicketEventForm({
               bestaand event staan in een eigen blok. */}
           {isEdit ? (
             <div className="ticket-admin-field">
-              <label htmlFor="ticket-max-order">
+              <label htmlFor="ticket-max-account">
                 {locale === "nl"
-                  ? "Max. tickets per bestelling, alle tickets samen"
-                  : "Max. tickets per order, all tickets together"}
+                  ? "Max. tickets per account, alle tickets samen"
+                  : "Max. tickets per account, all tickets together"}
               </label>
               <input
-                id="ticket-max-order"
-                name="maxTicketsPerOrder"
+                id="ticket-max-account"
+                name="maxTicketsPerAccount"
                 type="number"
                 min="1"
                 max="50"
-                defaultValue={event.maxTicketsPerOrder ?? 8}
+                defaultValue={event.maxTicketsPerAccount ?? 8}
                 required
               />
               <span className="ticket-admin-help">
                 {locale === "nl"
-                  ? "Bovenop het maximum van elk ticket (bij Tickettypes). De shop toont het kleinste van de twee; bij 1 ticket geldt dat per account."
-                  : "On top of each ticket's own maximum (under Ticket types). The shop shows whichever is lower; at 1 ticket, the limit applies per account."}
+                  ? "Maximum per ingelogd account voor dit event, over alle bestellingen heen. Voor uitgelogde kopers geldt dit per bestelling."
+                  : "Maximum per signed-in account for this event, across all orders. For guest buyers this applies per order."}
               </span>
             </div>
           ) : null}
+          <div className="ticket-admin-field" data-span="2">
+            <label className="ticket-admin-check" htmlFor="ticket-one-per-order">
+              <input type="hidden" name="oneTicketPerOrder" value="false" />
+              <input
+                id="ticket-one-per-order"
+                type="checkbox"
+                name="oneTicketPerOrder"
+                value="true"
+                defaultChecked={event.oneTicketPerOrder ?? false}
+              />
+              {nl
+                ? "Max. 1 ticket per bestelling"
+                : "Max. 1 ticket per order"}
+            </label>
+            <span className="ticket-admin-help">
+              {nl
+                ? "Voor drukke ticketdrops: elke bestelling bevat hoogstens één ticket, zodat iedereen evenveel kans krijgt. Wie nog ruimte heeft binnen het maximum per account, kan daarna opnieuw bestellen."
+                : "For busy ticket drops: each order can contain at most one ticket so everyone gets a fair chance. Buyers with room left in their account limit can place another order afterwards."}
+            </span>
+          </div>
+          <div className="ticket-admin-field" data-span="2">
+            <label className="ticket-admin-check" htmlFor="ticket-require-login">
+              <input type="hidden" name="requireLogin" value="false" />
+              <input
+                id="ticket-require-login"
+                type="checkbox"
+                name="requireLogin"
+                value="true"
+                defaultChecked={event.requireLogin ?? false}
+              />
+              {nl
+                ? "Inloggen verplicht om te kopen"
+                : "Require sign-in to buy"}
+            </label>
+            <span className="ticket-admin-help">
+              {nl
+                ? "Blokkeert uitgelogd bestellen, ook voor publieke tickets. Handig wanneer het maximum per account voor elke koper moet gelden."
+                : "Blocks guest checkout, even for public tickets. Useful when the per-account limit must apply to every buyer."}
+            </span>
+          </div>
           <div className="ticket-admin-field" data-span="2">
             <label className="ticket-admin-check" htmlFor="ticket-card-checkin">
               <input type="hidden" name="cardCheckIn" value="false" />
@@ -840,7 +882,7 @@ export function TicketEventForm({
             poolsName="poolsData"
             initialTypes={template?.types ?? [firstTicketRow(locale)]}
             initialPools={template?.pools ?? [defaultTicketPool(100)]}
-            orderMax={{ name: "maxTicketsPerOrder", defaultValue: event.maxTicketsPerOrder ?? 8 }}
+            orderMax={{ name: "maxTicketsPerAccount", defaultValue: event.maxTicketsPerAccount ?? 8 }}
             fromTemplate={Boolean(template)}
             locale={locale}
           />

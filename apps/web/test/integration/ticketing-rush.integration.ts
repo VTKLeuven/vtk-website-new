@@ -50,7 +50,7 @@ describe("ticket rush", () => {
         startsAt: new Date("2027-10-12T16:00:00.000Z"),
         endsAt: new Date("2027-10-12T23:00:00.000Z"),
         status: "PUBLISHED",
-        maxTicketsPerOrder: 1,
+        maxTicketsPerAccount: 1,
         createdById: ids.user,
       },
     });

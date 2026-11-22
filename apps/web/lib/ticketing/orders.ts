@@ -261,7 +261,10 @@ export async function createTicketCheckout(
   if (!isWithinWindow(now, viewerSalesStart(event, presaleBuyer), event.salesEndAt)) {
     throw new TicketCheckoutError("EVENT_NOT_ON_SALE");
   }
-  if (input.items.length > event.maxTicketsPerOrder) {
+  if (event.requireLogin && !session) {
+    throw new TicketCheckoutError("LOGIN_REQUIRED");
+  }
+  if (input.items.length > event.maxTicketsPerAccount) {
     throw new TicketCheckoutError("INVALID_QUANTITY", "items");
   }
   // Tijdens de voorverkoop koopt een ingelogd account hoogstens één ticket,
@@ -287,6 +290,9 @@ export async function createTicketCheckout(
     ) {
       throw new TicketCheckoutError("PRESALE_SELF_ONLY");
     }
+  }
+  if (event.oneTicketPerOrder && input.items.length > 1) {
+    throw new TicketCheckoutError("INVALID_QUANTITY", "items");
   }
 
   const typeById = new Map(event.ticketTypes.map((type) => [type.id, type]));
@@ -427,10 +433,6 @@ export async function createTicketCheckout(
   if (honoraryOneTicket && normalizedItems.length > 1) {
     throw new TicketCheckoutError("HONORARY_TICKET_LIMIT");
   }
-  // Staat het event op 1 ticket per bestelling, of zitten we in voorverkoop,
-  // dan geldt voor wie ingelogd is ook over de bestellingen heen: hoogstens één
-  // ticket per account.
-  const oneTicketPerAccount = (event.maxTicketsPerOrder === 1 || presaleSelfOnly) && session !== null;
 
   // Enkel de eerste bestelregel draagt het r-nummer: het is dat van de koper, en
   // een r-nummer kan per event maar aan één ticket hangen.
@@ -493,36 +495,41 @@ export async function createTicketCheckout(
           });
           if (used > 0) throw new TicketCheckoutError("HONORARY_PRICE_USED");
         }
-        // Dezelfde telling voor de grens van één ticket in totaal, zowel bij
-        // `honoraryOneTicket` als bij een event met max. 1 ticket per account.
-        if ((honoraryOneTicket || oneTicketPerAccount) && session) {
+        // Dezelfde telling voor de per-accountgrens: over alle bestellingen heen
+        // binnen het slot op deze koper, zodat gelijktijdige bestellingen samen
+        // nooit over het maximum gaan.
+        if (session) {
           const held = await tx.ticketOrderItem.count({
             where: accountHeldTicketsWhere(event.id, session.user.id),
           });
-          if (held > 0) {
-            throw new TicketCheckoutError(
-              honoraryOneTicket ? "HONORARY_TICKET_LIMIT" : "ACCOUNT_TICKET_LIMIT",
-            );
+          if (honoraryOneTicket && held > 0) {
+            throw new TicketCheckoutError("HONORARY_TICKET_LIMIT");
           }
-        }
-        if (totalCents === 0 && session) {
-          // Bestelregels en geen tickets: een gratis bestelling krijgt haar
-          // tickets pas in een tweede transactie, na dit slot. Telden we
-          // tickets, dan zag een tweede gelijktijdige bestelling van dezelfde
-          // koper er nog geen en kwam ze over het maximum.
-          const validFreeTickets = await tx.ticketOrderItem.count({
-            where: {
-              eventId: event.id,
-              order: {
-                buyerUserId: session.user.id,
-                totalCents: 0,
-                status: { in: ["PENDING_PAYMENT", "PAID", "PARTIALLY_REFUNDED"] },
+          if (presaleSelfOnly && held > 0) {
+            throw new TicketCheckoutError("ACCOUNT_TICKET_LIMIT");
+          }
+          if (totalCents === 0) {
+            // Bestelregels en geen tickets: een gratis bestelling krijgt haar
+            // tickets pas in een tweede transactie, na dit slot. Telden we
+            // tickets, dan zag een tweede gelijktijdige bestelling van dezelfde
+            // koper er nog geen en kwam ze over het maximum.
+            const validFreeTickets = await tx.ticketOrderItem.count({
+              where: {
+                eventId: event.id,
+                order: {
+                  buyerUserId: session.user.id,
+                  totalCents: 0,
+                  status: { in: ["PENDING_PAYMENT", "PAID", "PARTIALLY_REFUNDED"] },
+                },
+                OR: [{ ticket: null }, { ticket: { status: "VALID" } }],
               },
-              OR: [{ ticket: null }, { ticket: { status: "VALID" } }],
-            },
-          });
-          if (validFreeTickets + normalizedItems.length > event.maxTicketsPerOrder) {
-            throw new TicketCheckoutError("FREE_TICKET_LIMIT");
+            });
+            if (validFreeTickets + normalizedItems.length > event.maxTicketsPerAccount) {
+              throw new TicketCheckoutError("FREE_TICKET_LIMIT");
+            }
+          }
+          if (held + normalizedItems.length > event.maxTicketsPerAccount) {
+            throw new TicketCheckoutError("ACCOUNT_TICKET_LIMIT");
           }
         }
 

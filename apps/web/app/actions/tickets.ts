@@ -742,7 +742,15 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
         endsAt,
         salesStartAt,
         salesEndAt,
-        maxTicketsPerOrder: boundedIntegerValue(formData, "maxTicketsPerOrder", 8, 1, 50),
+        maxTicketsPerAccount: boundedIntegerValue(
+          formData,
+          formData.has("maxTicketsPerAccount") ? "maxTicketsPerAccount" : "maxTicketsPerOrder",
+          8,
+          1,
+          50,
+        ),
+        oneTicketPerOrder: checkboxValue(formData, "oneTicketPerOrder"),
+        requireLogin: checkboxValue(formData, "requireLogin"),
         honoraryOneTicket: checkboxValue(formData, "honoraryOneTicket"),
         cardCheckIn: checkboxValue(formData, "cardCheckIn"),
         openScanning: checkboxValue(formData, "openScanning"),
@@ -953,10 +961,10 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
     : (dateValue(formData, "startsAt") ?? event.startsAt);
   const endsAt = followsCalendar ? linked.end : (dateValue(formData, "endsAt") ?? event.endsAt);
   if (endsAt <= startsAt) throw new Error("INVALID_EVENT_DATES");
-  const maxTicketsPerOrder = boundedIntegerValue(
+  const maxTicketsPerAccount = boundedIntegerValue(
     formData,
-    "maxTicketsPerOrder",
-    event.maxTicketsPerOrder,
+    formData.has("maxTicketsPerAccount") ? "maxTicketsPerAccount" : "maxTicketsPerOrder",
+    event.maxTicketsPerAccount,
     1,
     50
   );
@@ -1007,7 +1015,9 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
         presaleHelpers,
         presaleHonorary,
         status,
-        maxTicketsPerOrder,
+        maxTicketsPerAccount,
+        oneTicketPerOrder: checkboxValue(formData, "oneTicketPerOrder"),
+        requireLogin: checkboxValue(formData, "requireLogin"),
         honoraryOneTicket: checkboxValue(formData, "honoraryOneTicket"),
         cardCheckIn: checkboxValue(formData, "cardCheckIn"),
         contactEmail: emailValue(formData, "contactEmail"),
@@ -1435,7 +1445,7 @@ export async function createTicketTypeAction(
   const maxPerOrder = boundedIntegerValue(
     formData,
     "maxPerOrder",
-    event.maxTicketsPerOrder,
+    event.maxTicketsPerAccount,
     1,
     50
   );

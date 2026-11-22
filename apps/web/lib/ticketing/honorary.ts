@@ -7,9 +7,9 @@ import type { Prisma } from "@prisma/client";
  *
  * Eén bron voor de checkout en de shop, voor alle drie de per-accountgrenzen:
  * één ticket aan de ereledenprijs (met `honoraryPrice: true` erbij), één ticket
- * in totaal voor een erelid (`TicketEvent.honoraryOneTicket`), en één ticket
- * per account bij een event met `maxTicketsPerOrder === 1`. Zo laat de shop
- * niets kiezen wat de checkout daarna weigert.
+ * in totaal voor een erelid (`TicketEvent.honoraryOneTicket`), en het maximum
+ * per account (`TicketEvent.maxTicketsPerAccount`, of 1 tijdens voorverkoop).
+ * Zo laat de shop niets kiezen wat de checkout daarna weigert.
  */
 export function accountHeldTicketsWhere(
   eventId: string,

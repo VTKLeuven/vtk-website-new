@@ -806,7 +806,7 @@ describe("ticket payments", () => {
         startsAt: new Date("2027-10-20T16:00:00.000Z"),
         endsAt: new Date("2027-10-20T18:00:00.000Z"),
         status: "PUBLISHED",
-        maxTicketsPerOrder: 2,
+        maxTicketsPerAccount: 2,
         createdById: ids.user,
       },
     });

@@ -10581,16 +10581,21 @@ opengaat, valt dit weg en koopt hij zoals iedereen.
   die net voor anderen kopen. Wie met de link koopt terwijl hij ingelogd is,
   heeft wel een account en krijgt dezelfde grens.
 
-**Staat een event op 1 ticket per bestelling, dan is dat één ticket per
-account**, over alle bestellingen heen. Zonder die regel kon wie ingelogd is
-gewoon tien keer na elkaar één ticket bestellen. Het geldt ook voor events die
-al op 1 stonden: wie daar al een ticket heeft, kan geen tweede meer kopen.
+**Het eventmaximum geldt per account (`maxTicketsPerAccount`), over alle
+bestellingen heen.** Wie al tickets kocht voor dit event (ook tijdens de
+voorverkoop), kan na de ticketdrop enkel nog het resterende deel bijkopen;
+bij `1` is een tweede bestelling dus altijd geblokkeerd (`ACCOUNT_TICKET_LIMIT`).
 
-- **Uitgelogd geldt het niet.** Een event met enkel publieke tickets kan je
-  uitgelogd blijven kopen, net zoals een erelid uitgelogd iedereen is. Enkel
-  een ticket dat inloggen vraagt (een ledenticket, een ereledenticket, een
-  doelgroep of een gratis ticket, zie `ticketTypeRequiresLogin`) houdt het
-  echt bij één per persoon.
+- **Los daarvan staat het vinkje "Max. 1 ticket per bestelling"
+  (`oneTicketPerOrder`).** Bedoeld voor drukke ticketdrops, zodat iedereen bij
+  de start evenveel kans krijgt en niemand met één klik de zaal leegkoopt. Wie
+  nog ruimte heeft binnen `maxTicketsPerAccount`, kan daarna gewoon opnieuw
+  bestellen.
+- **Uitgelogd geldt het accountmaximum per bestelling, tenzij `requireLogin`
+  aanstaat.** Een event met enkel publieke tickets kan je standaard uitgelogd
+  blijven kopen; zet een beheerder "Inloggen verplicht om te kopen" aan, dan
+  blokkeert de shop en checkout ook publieke tickets zonder account zodat de
+  accountgrens voor elke koper telt.
 - **Dezelfde telling als bij de ereleden** (`accountHeldTicketsWhere` in
   `lib/ticketing/honorary.ts`): een bestelling die nog op betaling wacht telt
   mee, een vervallen bestelling of een terugbetaald ticket niet. Wie de

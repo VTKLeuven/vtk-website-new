@@ -113,7 +113,9 @@ export type PublicTicketEvent = {
    */
   presale?: { publicStart: string | Date } | null;
   status: string;
-  maxTicketsPerOrder: number;
+  maxTicketsPerAccount: number;
+  oneTicketPerOrder?: boolean;
+  requireLogin?: boolean;
   currency: string;
   ownerGroupName?: string | null;
   contactEmail?: string | null;
@@ -140,11 +142,11 @@ export type PublicTicketEvent = {
    */
   honoraryOneTicket?: { used: boolean } | null;
   /**
-   * Dit event staat op max. 1 ticket per bestelling, en de bezoeker is
-   * ingelogd: die grens geldt dan ook over alle bestellingen van dat account
-   * heen. `used` zegt of het account al een ticket heeft.
+   * Voor een ingelogd account: het maximum aantal tickets voor dit event over
+   * alle bestellingen heen (`max`) en hoeveel tickets dit account al heeft
+   * (`held`). Null voor uitgelogde bezoekers.
    */
-  oneTicketPerAccount?: { used: boolean } | null;
+  accountLimit?: { max: number; held: number } | null;
   /**
    * De bezoeker is ingelogd en koopt nu in de voorverkoop: hoogstens één
    * ticket, op de naam en het adres van zijn account. De checkout weigert al

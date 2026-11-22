@@ -199,7 +199,7 @@ function checkoutErrorMessage(
     SOLD_OUT: { nl: "Deze tickets zijn net uitverkocht.", en: "These tickets have just sold out." },
     HONORARY_PRICE_USED: { nl: "Je erelidticket voor dit event heb je al. Kies de gewone prijs.", en: "You already have your honorary ticket for this event. Choose the regular price." },
     HONORARY_TICKET_LIMIT: { nl: "Als erelid koop je voor dit event één ticket, en dat heb je al.", en: "As an honorary member you can buy one ticket for this event, and you already have it." },
-    ACCOUNT_TICKET_LIMIT: { nl: "Je hebt voor dit event al een ticket op je account.", en: "You already have a ticket for this event on your account." },
+    ACCOUNT_TICKET_LIMIT: { nl: "Je hebt het maximum aantal tickets voor dit event op je account bereikt.", en: "You have reached the ticket limit for this event on your account." },
     PRESALE_SELF_ONLY: { nl: "Tijdens de voorverkoop koop je hoogstens één ticket, enkel op je eigen naam.", en: "During presale you can buy at most one ticket, in your own name only." },
     PAYMENT_UNAVAILABLE: { nl: "De betaalpagina is tijdelijk niet bereikbaar. Probeer straks opnieuw.", en: "The payment page is temporarily unavailable. Try again shortly." },
     REQUEST_BODY_TOO_LARGE: { nl: "De bestelling bevat te veel gegevens.", en: "The order contains too much data." },
@@ -592,10 +592,15 @@ export function TicketShop({
   // enkel voor zichzelf (op eigen naam en e-mail).
   const presaleSelfOnly = !preview && Boolean(event.presaleSelfOnly && event.viewer);
   // Een erelid op een event met `honoraryOneTicket`, of elk ingelogd account
-  // op een event met `maxTicketsPerOrder === 1` of in voorverkoop, koopt één
-  // ticket in totaal, en geen meer wanneer het er al een heeft.
-  const accountLimitUsed =
-    Boolean(event.honoraryOneTicket?.used) || Boolean(event.oneTicketPerAccount?.used);
+  // dat zijn grens bereikte (tijdens voorverkoop 1, daarbuiten `maxTicketsPerAccount`),
+  // kan geen extra tickets meer kiezen.
+  const accountLimitReached = Boolean(
+    event.accountLimit &&
+      (presaleSelfOnly
+        ? event.accountLimit.held > 0
+        : event.accountLimit.held >= event.accountLimit.max),
+  );
+  const accountLimitUsed = Boolean(event.honoraryOneTicket?.used) || accountLimitReached;
   const orderMax = accountOrderMax({ ...event, presaleSelfOnly });
   // Wat één bestelling hier echt kan tellen: het maximum van het event, of
   // minder wanneer de tickets elk een lager maximum hebben.
@@ -1097,7 +1102,7 @@ export function TicketShop({
     const low = remaining > 0 && remaining <= LOW_STOCK;
     // Enkel wanneer dit ticket strenger is dan de kop: die zegt al hoeveel er
     // samen in één bestelling passen.
-    const typeLimit = type.maxPerOrder ?? event.maxTicketsPerOrder;
+    const typeLimit = type.maxPerOrder ?? event.maxTicketsPerAccount;
     const maximum = typeLimit < limit
       ? locale === "nl"
         ? `Max. ${typeLimit} per bestelling`
@@ -1670,11 +1675,17 @@ export function TicketShop({
             <h2 id="ticket-types-heading">Tickets</h2>
             {lines.length > 0 && !accountLimitUsed ? (
               <small>
-                {event.oneTicketPerAccount
+                {presaleSelfOnly || (event.accountLimit && event.accountLimit.max === 1)
                   ? "Max. 1 per account"
-                  : locale === "nl"
-                    ? `Max. ${limit} per bestelling`
-                    : `Max. ${limit} per order`}
+                  : event.oneTicketPerOrder
+                    ? locale === "nl"
+                      ? "Max. 1 per bestelling"
+                      : "Max. 1 per order"
+                    : event.accountLimit && event.accountLimit.held === 0
+                      ? `Max. ${limit} per account`
+                      : locale === "nl"
+                        ? `Max. ${limit} per bestelling`
+                        : `Max. ${limit} per order`}
               </small>
             ) : null}
           </div>
@@ -1809,11 +1820,35 @@ export function TicketShop({
                       ? "Als erelid koop je voor dit event één ticket."
                       : "As an honorary member you can buy one ticket for this event."}
                 </p>
-              ) : event.oneTicketPerAccount?.used ? (
+              ) : accountLimitReached && event.accountLimit ? (
+                <p className="tshop-hint">
+                  {presaleSelfOnly || event.accountLimit.max === 1
+                    ? locale === "nl"
+                      ? "Je hebt voor dit event al een ticket op je account."
+                      : "You already have a ticket for this event on your account."
+                    : locale === "nl"
+                      ? `Je hebt het maximum van ${event.accountLimit.max} tickets voor dit event op je account bereikt.`
+                      : `You have reached the limit of ${event.accountLimit.max} tickets for this event on your account.`}
+                </p>
+              ) : event.oneTicketPerOrder && !presaleSelfOnly ? (
+                <p className="tshop-hint">
+                  {event.accountLimit
+                    ? event.accountLimit.held > 0
+                      ? locale === "nl"
+                        ? `Je bestelt hoogstens 1 ticket per keer (nog ${Math.max(0, event.accountLimit.max - event.accountLimit.held)} van ${event.accountLimit.max} over op je account).`
+                        : `You can order at most 1 ticket at a time (${Math.max(0, event.accountLimit.max - event.accountLimit.held)} of ${event.accountLimit.max} left on your account).`
+                      : locale === "nl"
+                        ? `Je bestelt hoogstens 1 ticket per keer, tot ${event.accountLimit.max} in totaal op je account.`
+                        : `You can order at most 1 ticket at a time, up to ${event.accountLimit.max} in total on your account.`
+                    : locale === "nl"
+                      ? "Je bestelt hoogstens 1 ticket per keer."
+                      : "You can order at most 1 ticket at a time."}
+                </p>
+              ) : event.accountLimit && event.accountLimit.held > 0 && !presaleSelfOnly ? (
                 <p className="tshop-hint">
                   {locale === "nl"
-                    ? "Je hebt voor dit event al een ticket op je account."
-                    : "You already have a ticket for this event on your account."}
+                    ? `Je hebt al ${event.accountLimit.held} van de max. ${event.accountLimit.max} tickets op je account (nog ${Math.max(0, event.accountLimit.max - event.accountLimit.held)} over).`
+                    : `You already have ${event.accountLimit.held} of max. ${event.accountLimit.max} tickets on your account (${Math.max(0, event.accountLimit.max - event.accountLimit.held)} left).`}
                 </p>
               ) : event.honoraryPriceUsed ? (
                 <p className="tshop-hint">

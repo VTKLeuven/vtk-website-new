@@ -134,7 +134,11 @@ export type TicketEventTemplate = {
   durationMinutes: number;
   salesOpensMinutesBefore: number | null;
   salesClosesMinutesBefore: number | null;
-  maxTicketsPerOrder: number;
+  maxTicketsPerAccount: number;
+  /** Hoogstens één ticket per bestelling (drukke ticketdrop); zie `TicketEvent.oneTicketPerOrder`. */
+  oneTicketPerOrder: boolean;
+  /** Inloggen verplicht om te kopen; zie `TicketEvent.requireLogin`. */
+  requireLogin: boolean;
   /** Ereleden kopen hoogstens één ticket; zie `TicketEvent.honoraryOneTicket`. */
   honoraryOneTicket: boolean;
   contactEmail: string | null;
@@ -555,7 +559,9 @@ export function blankTicketTemplate(): TicketEventTemplate {
     durationMinutes: 300,
     salesOpensMinutesBefore: 3 * DAY_MINUTES,
     salesClosesMinutesBefore: 0,
-    maxTicketsPerOrder: 8,
+    maxTicketsPerAccount: 8,
+    oneTicketPerOrder: false,
+    requireLogin: false,
     honoraryOneTicket: false,
     contactEmail: null,
     cardCheckIn: false,

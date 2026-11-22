@@ -155,7 +155,9 @@ function publicEventDto(
       ? { publicStart: event.salesStartAt as Date }
       : null,
     status: event.status,
-    maxTicketsPerOrder: event.maxTicketsPerOrder,
+    maxTicketsPerAccount: event.maxTicketsPerAccount,
+    oneTicketPerOrder: event.oneTicketPerOrder,
+    requireLogin: event.requireLogin,
     currency: event.currency,
     contactEmail: event.contactEmail,
     termsUrl: ticketTermsPath(locale),
@@ -394,7 +396,7 @@ export async function listPublishedTicketEvents(
     );
     const ticketTypes = selectableTypes.filter(
       (type) =>
-        (Boolean(session) || !ticketTypeRequiresLogin(type)) &&
+        (Boolean(session) || (!event.requireLogin && !ticketTypeRequiresLogin(type))) &&
         !ticketTypeNeedsMembership(type, isMember)
     );
     // De verkoop van het event kan al lopen terwijl er voor deze bezoeker nog
@@ -418,7 +420,9 @@ export async function listPublishedTicketEvents(
       requiresLogin:
         !session &&
         ticketTypes.length === 0 &&
-        (selectableTypes.some(ticketTypeRequiresLogin) || loginHint.length > 0),
+        ((event.requireLogin && selectableTypes.length > 0) ||
+          selectableTypes.some(ticketTypeRequiresLogin) ||
+          loginHint.length > 0),
       audienceLoginHint: loginHint,
       requiresMembership:
         Boolean(session) &&
@@ -452,22 +456,19 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
   );
   const ticketTypes = visibleTypes.filter(
     (type) =>
-      (Boolean(session) || !ticketTypeRequiresLogin(type)) &&
+      (Boolean(session) || (!event.requireLogin && !ticketTypeRequiresLogin(type))) &&
       !ticketTypeNeedsMembership(type, isMember)
   );
   const honoraryUsed =
     session && profile.honorary && ticketTypes.some((type) => type.honoraryPriceCents !== null)
       ? await honoraryPriceUsed(event.id, session.user.id)
       : false;
-  // Een erelid op een event met `honoraryOneTicket`, of elk ingelogd account
-  // op een event met `maxTicketsPerOrder === 1` of tijdens de voorverkoop:
-  // één ticket in totaal. Dezelfde telling als de checkout, zodat de shop
-  // niets laat kiezen wat daar afketst.
+  // Hoeveel tickets dit ingelogde account al heeft voor dit event, over alle
+  // bestellingen heen. Dezelfde telling als de checkout, zodat de shop niets
+  // laat kiezen wat daar afketst (voor `maxTicketsPerAccount`, de voorverkoop
+  // en `honoraryOneTicket`).
   const inPresale = dto.presale !== null;
-  const checkAccountHeld =
-    session !== null &&
-    ((profile.honorary && event.honoraryOneTicket) || event.maxTicketsPerOrder === 1 || inPresale);
-  const accountHeldCount = checkAccountHeld
+  const accountHeldCount = session
     ? await prisma.ticketOrderItem.count({
         where: accountHeldTicketsWhere(event.id, session.user.id),
       })
@@ -476,17 +477,16 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
     session && profile.honorary && event.honoraryOneTicket
       ? { used: accountHeldCount > 0 }
       : null;
-  const oneTicketPerAccount =
-    session && (event.maxTicketsPerOrder === 1 || inPresale)
-      ? { used: accountHeldCount > 0 }
-      : null;
+  const accountLimit = session
+    ? { max: event.maxTicketsPerAccount, held: accountHeldCount }
+    : null;
   return {
     ...dto,
     ticketTypes: forViewer(ticketTypes, isMember, profile.honorary && !honoraryUsed),
     // Enkel om het te kunnen zeggen; voor wie geen erelid is, altijd false.
     honoraryPriceUsed: honoraryUsed,
     honoraryOneTicket,
-    oneTicketPerAccount,
+    accountLimit,
     // Dezelfde voorwaarde als `presaleSelfOnly` in de checkout: ingelogd en nu
     // in de voorverkoop. Wie met een privélink zonder account koopt, valt erbuiten.
     presaleSelfOnly: session !== null && inPresale,
@@ -494,7 +494,9 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
     requiresLogin:
       !session &&
       ticketTypes.length === 0 &&
-      (visibleTypes.some(ticketTypeRequiresLogin) || loginHint.length > 0),
+      ((event.requireLogin && visibleTypes.length > 0) ||
+        visibleTypes.some(ticketTypeRequiresLogin) ||
+        loginHint.length > 0),
     audienceLoginHint: loginHint,
     requiresMembership:
       Boolean(session) &&

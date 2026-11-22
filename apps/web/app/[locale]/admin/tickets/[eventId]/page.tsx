@@ -147,7 +147,22 @@ export default async function TicketEventDashboard({
             <div><dt>{locale === "nl" ? "Verkoop start" : "Sales start"}</dt><dd>{formatDateTime(event.salesStartAt, locale)}</dd></div>
             <div><dt>{locale === "nl" ? "Verkoop einde" : "Sales end"}</dt><dd>{formatDateTime(event.salesEndAt, locale)}</dd></div>
             <div><dt>{locale === "nl" ? "Evenement" : "Event"}</dt><dd>{formatDateTime(event.startsAt, locale)}</dd></div>
-            <div><dt>{locale === "nl" ? "Limiet per order" : "Limit per order"}</dt><dd>{formatNumber(event.maxTicketsPerOrder, locale)}</dd></div>
+            <div>
+              <dt>{locale === "nl" ? "Limiet per account" : "Limit per account"}</dt>
+              <dd>
+                {[
+                  formatNumber(event.maxTicketsPerAccount, locale),
+                  event.oneTicketPerOrder
+                    ? locale === "nl" ? "max. 1 per bestelling" : "max. 1 per order"
+                    : null,
+                  event.requireLogin
+                    ? locale === "nl" ? "inloggen verplicht" : "sign-in required"
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </dd>
+            </div>
             {/* Wanneer dit event online kwam, en of er een voorverkoop voor
                 liep. Allebei enkel na te kijken, niet aan te passen: precies
                 waar je naar zoekt als je wil controleren of de instellingen van

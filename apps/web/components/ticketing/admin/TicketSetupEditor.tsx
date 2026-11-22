@@ -720,7 +720,7 @@ export function TicketSetupEditor({
 
         <div className="ticket-admin-field ticket-setup-order-max">
           <label htmlFor={field("order-max")}>
-            {nl ? "Max. tickets per bestelling, alle tickets samen" : "Max. tickets per order, all tickets together"}
+            {nl ? "Max. tickets per account, alle tickets samen" : "Max. tickets per account, all tickets together"}
           </label>
           <input type="hidden" name={orderMax.name} value={maxPerOrder ?? 1} />
           <CountInput
@@ -732,8 +732,8 @@ export function TicketSetupEditor({
           />
           <span className="ticket-admin-help">
             {nl
-              ? "Bovenop het maximum van elk ticket. De shop toont het kleinste van de twee; bij 1 ticket geldt dat per account."
-              : "On top of each ticket's own maximum. The shop shows whichever is lower; at 1 ticket, the limit applies per account."}
+              ? "Maximum per ingelogd account voor dit event, over alle bestellingen heen. Voor uitgelogde kopers geldt dit per bestelling."
+              : "Maximum per signed-in account for this event, across all orders. For guest buyers this applies per order."}
           </span>
         </div>
       </div>

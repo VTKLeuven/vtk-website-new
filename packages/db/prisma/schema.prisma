@@ -2658,7 +2658,17 @@ model TicketEvent {
   privateToken          String?           @unique
   status                TicketEventStatus @default(DRAFT)
   currency              String            @default("EUR")
-  maxTicketsPerOrder    Int               @default(8)
+  // Maximum aantal tickets per ingelogd account voor dit event, over alle
+  // bestellingen heen. Voor een uitgelogde koper geldt dit getal per bestelling
+  // (tenzij `requireLogin` of `oneTicketPerOrder` het verder inperkt).
+  maxTicketsPerAccount  Int               @default(8)
+  // Voor drukke ticketdrops: elke bestelling bevat hoogstens één ticket, zodat
+  // iedereen bij de drop evenveel kans krijgt. Wie nog ruimte heeft binnen
+  // `maxTicketsPerAccount`, kan daarna gewoon een volgende bestelling plaatsen.
+  oneTicketPerOrder     Boolean           @default(false)
+  // Blokkeert uitgelogd bestellen voor dit event, ook bij publieke tickettypes,
+  // zodat `maxTicketsPerAccount` voor elke koper afgedwongen wordt.
+  requireLogin          Boolean           @default(false)
   // Een erelid koopt voor dit event hoogstens één ticket in totaal: over alle
   // tickettypes en al zijn bestellingen heen, aan welke prijs ook. Zonder dit
   // vinkje geldt enkel de grens op de ereledenprijs (`TicketType.honoraryPriceCents`)
@@ -3338,7 +3348,12 @@ model TicketEventTemplate {
   salesOpensMinutesBefore  Int?
   salesClosesMinutesBefore Int?
 
-  maxTicketsPerOrder    Int     @default(8)
+  /// Zie `TicketEvent.maxTicketsPerAccount`.
+  maxTicketsPerAccount  Int     @default(8)
+  /// Zie `TicketEvent.oneTicketPerOrder`.
+  oneTicketPerOrder     Boolean @default(false)
+  /// Zie `TicketEvent.requireLogin`.
+  requireLogin          Boolean @default(false)
   /// Zie `TicketEvent.honoraryOneTicket`.
   honoraryOneTicket     Boolean @default(false)
   contactEmail          String?

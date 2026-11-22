@@ -112,7 +112,7 @@ describe("ticketing database invariants", () => {
         startsAt: new Date("2027-05-20T19:00:00.000Z"),
         endsAt: new Date("2027-05-21T01:00:00.000Z"),
         status: "PUBLISHED",
-        maxTicketsPerOrder: 8,
+        maxTicketsPerAccount: 8,
         createdById: ids.user,
       },
     });
@@ -693,7 +693,7 @@ describe("ticketing database invariants", () => {
       data: {
         salesStartAt: new Date(Date.now() + 24 * 3600_000),
         presaleLeadMinutes: 48 * 60,
-        maxTicketsPerOrder: 8,
+        maxTicketsPerAccount: 8,
       },
     });
     try {
@@ -732,11 +732,11 @@ describe("ticketing database invariants", () => {
       );
       await expirePendingOrder(open.orderId);
 
-      // 3. Bij maxTicketsPerOrder=1 in de publieke verkoop: de eerste lukt, een
+      // 3. Bij maxTicketsPerAccount=1 in de publieke verkoop: de eerste lukt, een
       // tweede bestelling op hetzelfde account wordt geweigerd.
       await prisma.ticketEvent.update({
         where: { id: ids.rateEvent },
-        data: { maxTicketsPerOrder: 1 },
+        data: { maxTicketsPerAccount: 1 },
       });
       await expect(order("Single Ticket Account", accountEmail, 1)).resolves.toMatchObject({
         orderId: expect.any(String),
@@ -748,7 +748,7 @@ describe("ticketing database invariants", () => {
       vi.mocked(getSession).mockResolvedValue(null);
       await prisma.ticketEvent.update({
         where: { id: ids.rateEvent },
-        data: { salesStartAt: null, presaleLeadMinutes: null, maxTicketsPerOrder: 8 },
+        data: { salesStartAt: null, presaleLeadMinutes: null, maxTicketsPerAccount: 8 },
       });
     }
   });
