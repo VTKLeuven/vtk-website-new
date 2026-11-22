@@ -4,7 +4,7 @@
  *
  *   1. met de hand (raakt deze functie nooit: de beller slaat die over);
  *   2. een betaling van de site, op haar betaal-ID;
- *   3. een boekhoudcode in de omschrijving, de referentie of de `bulk_id`;
+ *   3. een boekhoudcode in de omschrijving, de referentie of de bulk-ID (`bulk_id` of `bulkId`);
  *   4. een kassa die het toestel had, met haar code;
  *   5. een tekst die Beheer onthield;
  *   6. de standaardcode van het kanaal;
@@ -168,7 +168,7 @@ export function codeAtStart(text: string | null, codes: ReadonlyMap<string, Code
   return codes.get(match[1]) ?? null;
 }
 
-/** Een veld dat enkel een code is (de `reference` of `bulk_id` van Bancontact). */
+/** Een veld dat enkel een code is (de `reference` of de bulk-ID van Bancontact). */
 function codeAlone(text: string | null, codes: ReadonlyMap<string, CodeSnapshot>): CodeSnapshot | null {
   if (!text || !/^[\d\s.]+$/.test(text)) return null;
   return codes.get(codeKey(text)) ?? null;

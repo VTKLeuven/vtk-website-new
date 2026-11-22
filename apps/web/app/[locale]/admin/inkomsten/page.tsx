@@ -382,8 +382,7 @@ export default async function IncomeOverviewPage({
                                 <span className="font-semibold">{formatEuro(payout.total, locale)}</span>
                                 {payout.providerAmount !== null && payout.providerAmount !== payout.total ? (
                                   <span className="block text-xs text-vtk-warn">
-                                    {nl ? "Mollie: " : "Mollie: "}
-                                    {formatEuro(payout.providerAmount, locale)}
+                                    {SOURCE_LABELS[payout.source]}: {formatEuro(payout.providerAmount, locale)}
                                   </span>
                                 ) : null}
                               </td>

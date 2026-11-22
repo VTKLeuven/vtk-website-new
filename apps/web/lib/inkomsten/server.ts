@@ -1014,7 +1014,14 @@ export async function loadIncomeOverview(from: string, to: string): Promise<Inco
   // Elke uitbetaling met een regel in de periode, met al haar regels: een
   // SumUp-verkoop telt in haar eigen maand, dus een uitbetaling kan over de
   // rand van een periode lopen, terwijl ze op het uittreksel één bedrag is.
-  const references = [...new Set(rows.flatMap((row) => (row.payoutReference ? [row.payoutReference] : [])))];
+  //
+  // Payconiq niet (nog): sinds de export met `payoutId` kent een regel wel zijn
+  // uitbetaling, maar niet de dag of het bedrag ervan. Tot de bankafschriften
+  // die bevestigen, stond elke dag als een open uitbetaling in de lijst en
+  // kleurde de controlestap rood.
+  const references = [
+    ...new Set(rows.flatMap((row) => (row.payoutReference && row.source !== "PAYCONIQ" ? [row.payoutReference] : []))),
+  ];
   const [payoutRows, checkRows, providerRows] = references.length
     ? await Promise.all([
         prisma.incomeTransaction.findMany({

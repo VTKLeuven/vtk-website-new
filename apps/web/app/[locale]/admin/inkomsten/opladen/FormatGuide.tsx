@@ -15,12 +15,12 @@ const GUIDES: Guide[] = [
     format: "payconiq",
     title: { nl: "Payconiq", en: "Payconiq" },
     what: {
-      nl: "De transactie-export van een Payconiq-account, met alle stickers samen.",
-      en: "The transaction export of a Payconiq account, with all stickers together.",
+      nl: "De transactie-export van een Payconiq-account, met alle stickers samen. De gewone export (shop_name, bulk_id) en die met payoutId (shopName, bulkId) worden allebei herkend.",
+      en: "The transaction export of a Payconiq account, with all stickers together. Both the usual export (shop_name, bulk_id) and the one with payoutId (shopName, bulkId) are recognised.",
     },
     counts: {
-      nl: "Telt: status SUCCEEDED, type DEBIT als terugbetaling. Het kanaal is shop_name. Datum en uur op de Brusselse klok.",
-      en: "Counts: status SUCCEEDED, type DEBIT as a refund. The channel is shop_name. Date and time on the Brussels clock.",
+      nl: "Telt: status SUCCEEDED, type DEBIT als terugbetaling. Het kanaal is de shop. Datum en uur op de Brusselse klok. De payoutId wordt bewaard, maar Payconiq staat nog niet in de lijst per uitbetaling.",
+      en: "Counts: status SUCCEEDED, type DEBIT as a refund. The channel is the shop. Date and time on the Brussels clock. The payoutId is kept, but Payconiq is not in the list per payout yet.",
     },
   },
   {

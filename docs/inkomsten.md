@@ -58,11 +58,27 @@ rekening- en kaartnummers), leest de site niet. Een bestand is van een formaat
 wanneer elke verplichte kolom er is. Voeg je een kolom toe of verander je wat
 een parser met een regel doet, pas dan ook de zinnen in `FormatGuide` aan.
 
-**Payconiq** (CSV met `;`): `id`, `date` (`dd/mm/jjjj`), `time`, `amount`,
-`status`, `type`, `description`, `reference`, `shop_name`, `bulk_id`. Enkel
-`SUCCEEDED` telt; `DEBIT` is een terugbetaling. `shop_name` is het kanaal: een
-sticker, of `Ticketsysteem` voor betalingen via de site (en het printkrediet van
-Cudi, dat over hetzelfde profiel loopt).
+**Payconiq**: `id`, `date` (`dd/mm/jjjj`), `time`, `amount`, `status`, `type`,
+`description`, `reference`, de shop en de bulk-ID. Het portaal geeft twee
+exports, en de site herkent ze allebei: de gewone, met `shop_name` en `bulk_id`
+(meestal met `;`), en een tweede, met `shopName`, `bulkId` en `payoutId`, in
+een andere volgorde (meestal met `,`). Het scheidingsteken raadt de site zelf
+(`detectDelimiter`). Enkel `SUCCEEDED` telt; `DEBIT` is een terugbetaling. De
+shop is het kanaal: een sticker, of de shop van het ticketsysteem voor
+betalingen via de site (`Ticketsysteem`, sinds november 2026 `VTK Tickets`;
+ook het printkrediet van Cudi loopt over dat profiel).
+
+De `payoutId` is de uitbetaling waarin Payconiq de betaling stortte; de site
+bewaart hem als `payoutReference`, zoals het nummer van een SumUp-uitbetaling.
+Enkel die tweede export heeft hem, en enkel hij laat een Payconiq-regel op het
+bankafschrift terugvinden: in de mededeling staat `JJJJMMDD-PA...`. De gewone
+export rekent geen uitbetaling terug, want Payconiq telt een sticker per dag in
+UTC en het ticketsysteem van middag tot middag. Payconiq staat nog niet in de
+lijst per uitbetaling en de controlestap Uitbetalingen: de export zegt niet op
+welke dag en voor welk bedrag een uitbetaling vertrok, dus elke dag zou er open
+staan. Dat komt met de bankafschriften. Een bestand dat al opgeladen was,
+opnieuw opladen in de tweede opmaak, vult de `payoutId` aan (behalve in een
+afgesloten maand) en meldt die regels als "nu uitbetaald".
 
 **Mollie**: de betalingenexport, met Engelse of Nederlandse koppen (zoals het
 tabblad van Beheer, dat er drie eigen kolommen voor zet; die worden genegeerd).
@@ -188,8 +204,8 @@ In `matchTransaction`, de eerste die past wint. Enkel voor `PAYMENT` en `REFUND`
    Nagekeken op live: 389 van 389 Payconiq-betalingen van de site, en elke
    Mollie-betaling van de site. SumUp en Europabank gebruikt de site niet.
 3. **Code in de tekst** (`CODE_IN_TEXT`): de Mollie-omschrijving begint met een
-   code uit het register ("700100 10001 ..." of aaneen), of `reference` of
-   `bulk_id` is er een.
+   code uit het register ("700100 10001 ..." of aaneen), of `reference` of de
+   bulk-ID (`bulk_id`, `bulkId`) is er een.
 4. **Een kassa** (`CASH_REGISTER`): het kanaal is een toestel van de kassa's
    (zie De kassacontrole), en een aanvaarde kassa met een code had dat toestel
    (`kassaAt`, met de kassa's uit `cashRegisterContext`). De transactie

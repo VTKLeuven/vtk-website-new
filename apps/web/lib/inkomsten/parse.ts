@@ -231,17 +231,22 @@ const may = (...names: string[]): ExportColumn => ({ names, required: false });
  * betalingenexport.
  */
 export const EXPORT_COLUMNS = {
+  // Twee exports van hetzelfde portaal: de gewone (`shop_name`, `bulk_id`) en
+  // een tweede (`shopName`, `bulkId`) die ook de uitbetaling noemt
+  // (`payoutId`). Enkel die laatste laat een uitbetaling op het afschrift
+  // terugvinden.
   payconiq: {
     id: need("id"),
     date: need("date"),
     time: need("time"),
     amount: need("amount"),
     status: need("status"),
-    shop: need("shop_name"),
+    shop: need("shop_name", "shopName"),
     type: may("type"),
     description: may("description"),
     reference: may("reference"),
-    bulkId: may("bulk_id"),
+    bulkId: may("bulk_id", "bulkId"),
+    payout: may("payoutId", "payout_id"),
   },
   "mollie-balance": {
     date: need("Date"),
@@ -356,7 +361,10 @@ function parsePayconiq(rows: string[][], columns: Columns): IncomeParseResult {
       description: cleanDescription(get(c.description)),
       reference: emptyToNull(get(c.reference)),
       bulkId: emptyToNull(get(c.bulkId)),
-      payoutReference: null,
+      // Bewaard zoals in de export, ook al toont de lijst per uitbetaling
+      // Payconiq nog niet: later invullen kan enkel door opnieuw te uploaden,
+      // en nooit meer in een afgesloten maand.
+      payoutReference: emptyToNull(get(c.payout)),
       channel: get(c.shop).trim() || "(zonder naam)",
     });
   }

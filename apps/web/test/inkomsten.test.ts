@@ -34,6 +34,16 @@ const PAYCONIQ = [
   "txaaaaaaaaaaaaaaaaaaaaa4;02/10/2026;10:00:00;3.00;SUCCEEDED;WERO;DEBIT;terug;;BE00000000000004;PERSOON D;A: Theokot;",
 ].join("\n");
 
+// De tweede export van het portaal: andere koppen, andere volgorde, komma's,
+// en per betaling haar uitbetaling (`payoutId`).
+const PAYCONIQ_2026 = [
+  "id,date,time,amount,type,status,shopName,technology,description,reference,debtorIban,debtorName,bulkId,payoutId",
+  "txbbbbbbbbbbbbbbbbbbbbb1,13/10/2026,19:31:42,12.00,CREDIT,SUCCEEDED,VTK Tickets,WERO,1 ticket Cantus,700100 10001,BE00000000000011,PERSOON Z,700100 10001,PAAAAAAAAAAAAAAAAAAAAAAAAAA1",
+  "txbbbbbbbbbbbbbbbbbbbbb2,13/10/2026,20:15:59,1.20,CREDIT,SUCCEEDED,A: Evenement 3,BANCONTACT,,,BE00000000000012,PERSOON Y,,PAAAAAAAAAAAAAAAAAAAAAAAAAA2",
+  "txbbbbbbbbbbbbbbbbbbbbb3,13/10/2026,20:16:00,4.80,CREDIT,FAILED,A: Evenement 3,WERO,,,BE00000000000013,PERSOON X,,",
+  "txbbbbbbbbbbbbbbbbbbbbb4,14/10/2026,10:00:00,3.00,DEBIT,SUCCEEDED,A: Theokot,WERO,terug,,BE00000000000014,PERSOON W,,PAAAAAAAAAAAAAAAAAAAAAAAAAA3",
+].join("\n");
+
 const MOLLIE_EN = [
   'Date,"Payment method",Currency,Amount,Status,ID,Description,"Consumer name","Consumer bank account","Consumer BIC","Settlement currency","Settlement amount","Settlement reference","Amount refunded"',
   '"2026-09-30 22:10:00",creditcard,EUR,55.00,paidout,tr_test1,"700100 10001 Cantus der Cantussen",,BE00000000000005,TESTBEBB,EUR,55.00,12345678.2610.01,0.00',
@@ -152,6 +162,53 @@ describe("Payconiq", () => {
     const text = JSON.stringify(rowsOf(PAYCONIQ));
     expect(text).not.toContain("PERSOON");
     expect(text).not.toContain("BE00000000000001");
+  });
+
+  it("de gewone export kent geen uitbetaling", () => {
+    expect(rowsOf(PAYCONIQ).map((row) => row.payoutReference)).toEqual([null, null, null]);
+  });
+
+  describe("de export met payoutId", () => {
+    it("leest dezelfde soorten, bedragen en kanalen als de gewone", () => {
+      const result = parseIncomeExport(PAYCONIQ_2026);
+      expect(result.ok && result.format).toBe("payconiq");
+      if (!result.ok) return;
+      expect(result.total).toBe(4);
+      expect(result.skipped).toBe(1);
+      expect(result.payouts).toEqual([]);
+      expect(result.rows.map((row) => [row.kind, row.amountCents, row.channel])).toEqual([
+        ["PAYMENT", 1200, "VTK Tickets"],
+        ["PAYMENT", 120, "A: Evenement 3"],
+        ["REFUND", -300, "A: Theokot"],
+      ]);
+    });
+
+    it("leest bulkId, de referentie en de uitbetaling", () => {
+      const [ticket, sticker, refund] = rowsOf(PAYCONIQ_2026);
+      expect(ticket.reference).toBe("700100 10001");
+      expect(ticket.bulkId).toBe("700100 10001");
+      expect(ticket.externalKey).toBe("PAYMENT:txbbbbbbbbbbbbbbbbbbbbb1");
+      expect([ticket, sticker, refund].map((row) => row.payoutReference)).toEqual([
+        "PAAAAAAAAAAAAAAAAAAAAAAAAAA1",
+        "PAAAAAAAAAAAAAAAAAAAAAAAAAA2",
+        "PAAAAAAAAAAAAAAAAAAAAAAAAAA3",
+      ]);
+    });
+
+    it("bewaart geen namen of rekeningnummers van wie betaalde", () => {
+      const text = JSON.stringify(rowsOf(PAYCONIQ_2026));
+      expect(text).not.toContain("PERSOON");
+      expect(text).not.toContain("BE000000000000");
+    });
+
+    it("leest ze ook met puntkomma's en met een BOM", () => {
+      const expected = rowsOf(PAYCONIQ_2026);
+      const semicolons = PAYCONIQ_2026.split("\n")
+        .map((line) => line.replaceAll(",", ";"))
+        .join("\n");
+      expect(rowsOf(semicolons)).toEqual(expected);
+      expect(rowsOf(`﻿${PAYCONIQ_2026}`)).toEqual(expected);
+    });
   });
 });
 
