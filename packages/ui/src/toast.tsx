@@ -102,10 +102,17 @@ export function ToastProvider({ children, labels = DUTCH }: { children: ReactNod
   return (
     <ToastContext.Provider value={showToast}>
       {children}
-      <div className="vtk-toast-viewport" role="region" aria-live="polite" aria-label={labels.region}>
+      <div className="vtk-toast-viewport" role="region" aria-label={labels.region}>
         {toasts.map((toast) => (
-          <div key={toast.id} className={`vtk-toast vtk-toast-${toast.variant}`} role="status">
-            <span className="vtk-toast-message">{toast.message}</span>
+          <div key={toast.id} className={`vtk-toast vtk-toast-${toast.variant}`}>
+            {/* Een fout onderbreekt de schermlezer, al de rest wacht beleefd (f844aafe). */}
+            <div
+              className="vtk-toast-message"
+              role={toast.variant === 'error' ? 'alert' : 'status'}
+              aria-live={toast.variant === 'error' ? 'assertive' : 'polite'}
+            >
+              {toast.message}
+            </div>
             {toast.action ? (
               <button
                 type="button"

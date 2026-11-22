@@ -407,6 +407,7 @@
   --toast-warn: var(--warn);
   --toast-warn-soft: var(--warn-soft);
   --toast-warn-line: var(--warn-line);
+  --toast-info: var(--ink);
   --toast-info-soft: var(--info-soft);
   --toast-info-line: var(--info-line);
 }

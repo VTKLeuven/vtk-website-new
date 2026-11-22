@@ -9,11 +9,12 @@
 .vtk-toast-viewport {
   position: fixed;
   /* Val onder de header; --vtk-header-height wordt door de site gezet (fallback
-     als de variabele ontbreekt). z-index net onder de header (50) zodat een
-     eventuele overlap achter de header tuckt i.p.v. erover. */
+     als de variabele ontbreekt). De z-index ligt boven de header en een open
+     dialoog (WCAG 2.2, f844aafe): een melding verdwijnt nooit achter iets
+     anders. */
   top: calc(var(--vtk-header-height, 0px) + 16px);
   right: 16px;
-  z-index: 40;
+  z-index: 140;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -28,7 +29,7 @@
   align-items: flex-start;
   gap: 10px;
   padding: 12px 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--toast-line, rgba(14, 26, 54, 0.5));
   border-radius: 14px;
   background: var(--toast-surface, #fff);
   color: var(--ink);
@@ -68,41 +69,59 @@
   cursor: pointer;
 }
 
+/* Minstens 28 px en een zichtbare focus (WCAG 2.2, f844aafe). */
 .vtk-toast-close {
   flex: none;
-  padding: 0 2px;
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  min-height: 28px;
+  margin: -4px -4px -4px 0;
+  padding: 0;
   border: 0;
+  border-radius: 8px;
   background: transparent;
-  color: inherit;
-  opacity: 0.6;
+  color: currentColor;
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
 }
 
 .vtk-toast-close:hover {
-  opacity: 1;
+  background: var(--toast-close-hover, rgba(10, 15, 31, 0.08));
+}
+
+.vtk-toast-close:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
 }
 
 .vtk-toast-success {
-  border-color: var(--toast-success-line, #b8dec1);
+  border-color: var(--toast-success-line, #2f6f33);
   background: var(--toast-success-soft, #eef8ea);
   color: var(--toast-success, #2f6f33);
 }
 
 .vtk-toast-error {
-  border-color: var(--toast-danger-line, #f0c6bd);
+  border-color: var(--toast-danger-line, #b42318);
   background: var(--toast-danger-soft, #fff0ed);
   color: var(--toast-danger, #9d2f1f);
 }
 
 .vtk-toast-warning {
-  border-color: var(--toast-warn-line, #f0d76d);
+  border-color: var(--toast-warn-line, #966900);
   background: var(--toast-warn-soft, #fff7cf);
-  color: var(--toast-warn, var(--ink));
+  color: var(--toast-warn, #5c4200);
 }
 
 .vtk-toast-info {
-  border-color: var(--toast-info-line, #c9d5ff);
+  border-color: var(--toast-info-line, #3a5fc4);
   background: var(--toast-info-soft, #eef2ff);
+  color: var(--toast-info, #1e3a8a);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vtk-toast {
+    animation: none;
+  }
 }
