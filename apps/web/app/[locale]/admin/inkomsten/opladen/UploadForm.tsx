@@ -9,7 +9,9 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import type { SaveAction } from "@/lib/saveState";
 import { combineImportSummaries } from "@/lib/inkomsten/importSummary";
 import type { ImportFilePreview, ImportPreviewState } from "@/app/actions/inkomsten";
+import Link from "@/components/ui/Link";
 import { SOURCE_LABELS } from "../shared";
+import { formatTitle } from "./FormatGuide";
 
 /**
  * Eén of meer exports kiezen of slepen, eerst zien wat opladen zou doen, en pas
@@ -34,9 +36,14 @@ export function UploadForm({
   const [pending, startTransition] = useTransition();
   const number = (value: number) => value.toLocaleString(nl ? "nl-BE" : "en-GB");
   const day = (value: Date | null) => (value ? new Date(value).toLocaleDateString(nl ? "nl-BE" : "en-GB") : "");
+  const closestText = (closest: NonNullable<Extract<ImportFilePreview, { ok: false }>["closest"]>) =>
+    nl
+      ? ` Het lijkt op ${formatTitle(closest.format, nl)}, maar mist ${closest.missing.join(", ")}.`
+      : ` It looks like ${formatTitle(closest.format, nl)}, but lacks ${closest.missing.join(", ")}.`;
   const cannotRead = (file: Extract<ImportFilePreview, { ok: false }>) =>
     (errorMessages[file.code] ?? (nl ? "Dat bestand kan de site niet lezen." : "The site cannot read that file.")) +
-    (file.detail ? ` (${file.detail})` : "");
+    (file.detail ? ` (${file.detail})` : "") +
+    (file.closest ? closestText(file.closest) : "");
 
   function onFiles(files: FileList | null) {
     if (!files || files.length === 0) {
@@ -201,9 +208,11 @@ export function UploadForm({
             <p className="mt-2 text-vtk-muted">
               {nl ? (totals.newChannels.length === 1 ? "Nieuw kanaal: " : "Nieuwe kanalen: ") : totals.newChannels.length === 1 ? "New channel: " : "New channels: "}
               {totals.newChannels.join(", ")}.{" "}
-              {nl
-                ? "Stel de rekening, en eventueel een standaardcode, in bij Instellingen."
-                : "Set the account, and a default code if needed, under Settings."}
+              {nl ? "Zonder rekening staat het onder \"Rekening niet ingesteld\". Stel de rekening, en eventueel een standaardcode, in bij " : "Without an account it shows under \"Account not set\". Set the account, and a default code if needed, under "}
+              <Link href={`${nl ? "" : "/en"}/admin/inkomsten/instellingen`} className="font-medium underline">
+                {nl ? "Instellingen" : "Settings"}
+              </Link>
+              .
             </p>
           ) : null}
           {totals.mollieWithoutFees ? (

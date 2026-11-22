@@ -4,6 +4,7 @@ import {
   SUMUP_CHANNEL,
   cleanDescription,
   compactTime,
+  headerKey,
   parseDecimalCents,
   parseIncomeExport,
   parseLocalDateTime,
@@ -133,6 +134,50 @@ describe("bedragen, datums en tekst", () => {
   it("haalt e-mailadressen uit een omschrijving", () => {
     expect(cleanDescription("Uniflow Printer Credit: iemand@student.kuleuven.be")).toBe("Uniflow Printer Credit");
     expect(cleanDescription("  ")).toBeNull();
+  });
+});
+
+describe("de kolomkoppen", () => {
+  it("vergelijkt koppen zonder hoofdletters, spaties, underscores of accenten", () => {
+    expect(headerKey("shop_name")).toBe(headerKey("shopName"));
+    expect(headerKey("Commissie (EUR)")).toBe(headerKey("commissie  (eur)"));
+    expect(headerKey("\uFEFFDatum")).toBe("datum");
+    expect(headerKey("Résultat")).toBe("resultat");
+    expect(headerKey("E-mail")).not.toBe(headerKey("email"));
+  });
+
+  it("herkent elk testbestand nog als zijn eigen formaat", () => {
+    const cases: Array<[string, string]> = [
+      [PAYCONIQ, "payconiq"],
+      [PAYCONIQ_2026, "payconiq"],
+      [MOLLIE_EN, "mollie"],
+      [MOLLIE_NL, "mollie"],
+      [MOLLIE_BALANCE, "mollie-balance"],
+      [SUMUP, "sumup"],
+      [EUROPABANK_OUD, "europabank"],
+      [EUROPABANK_NIEUW, "europabank"],
+    ];
+    for (const [text, format] of cases) {
+      const result = parseIncomeExport(text);
+      expect(result.ok && result.format).toBe(format);
+    }
+  });
+
+  it("leest koppen die een portaal anders schrijft", () => {
+    const shouting = PAYCONIQ.replace(/^[^\n]*/, (header) => header.toUpperCase().replaceAll("_", " "));
+    expect(rowsOf(shouting)).toEqual(rowsOf(PAYCONIQ));
+  });
+
+  it("zegt bij een onbekend bestand waar het op lijkt en wat er ontbreekt", () => {
+    const withoutShop = PAYCONIQ.replace("shop_name", "winkel");
+    const result = parseIncomeExport(withoutShop);
+    expect(result).toMatchObject({ ok: false, error: "UNKNOWN_FORMAT", closest: { format: "payconiq", missing: ["shop_name"] } });
+  });
+
+  it("noemt niets wanneer een bestand op geen enkel formaat lijkt", () => {
+    const result = parseIncomeExport("a;b;c\n1;2;3");
+    expect(result).toMatchObject({ ok: false, error: "UNKNOWN_FORMAT" });
+    expect(!result.ok && result.closest).toBeUndefined();
   });
 });
 
@@ -369,7 +414,11 @@ describe("SumUp", () => {
     const required = Object.values(EXPORT_COLUMNS.sumup).filter((column) => column.required);
     expect(required.map((column) => column.names[0])).toContain("Transactie-ID");
     const withoutId = SUMUP.replace("Transactie-ID", "Nummer");
-    expect(parseIncomeExport(withoutId)).toEqual({ ok: false, error: "UNKNOWN_FORMAT" });
+    expect(parseIncomeExport(withoutId)).toEqual({
+      ok: false,
+      error: "UNKNOWN_FORMAT",
+      closest: { format: "sumup", missing: ["Transactie-ID"] },
+    });
   });
 
   it("bewaart geen kaartgegevens of autorisatiecodes", () => {

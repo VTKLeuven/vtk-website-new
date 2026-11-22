@@ -18,6 +18,7 @@
  */
 import type { Cell, CellObject, SheetData } from "write-excel-file/node";
 import { brusselsMinutesOfDay, brusselsYMD } from "@/lib/brussels";
+import { postName } from "./labels";
 import { codeKey } from "./match";
 import type { IncomeKindCode, IncomeSourceCode } from "./parse";
 
@@ -219,7 +220,7 @@ function quarterLayout(model: WorkbookModel): QuarterLayout {
     const [main, analytic = ""] = code.split(" ");
     return {
       key: code,
-      post: analytic ? (names.get(code) ?? "") : (model.mainNames.get(main) ?? names.get(code) ?? ""),
+      post: postName(code, names.get(code) ?? null, (name) => model.mainNames.get(name)),
       main: /^\d+$/.test(main) ? Number(main) : main,
       analytic,
     };

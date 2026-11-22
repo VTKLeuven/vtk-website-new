@@ -13842,6 +13842,12 @@ had.
   derde kwartaal van 2026 per uitbetaling exact wat SumUp overschreef. Een
   verkoop blijft wel in de maand van de verkoop tellen, zoals het rekenblad:
   enkel het afvinken gaat per uitbetaling.
+- **Post is de hoofdrekening, overal.** Beheer vroeg het in de review van
+  november 2026: de kolom Post noemt "Activiteiten opbrengsten", niet
+  "Cantussen". De boekhouder boekt op de hoofdrekening; de analytische code
+  staat er in een eigen kolom bij. "Overal" lezen we als het kwartaalblad en het
+  overzicht op het scherm; waar je één transactie ziet of een code kiest, blijft
+  de eigen naam van de code, want daar herken je er de subcode aan.
 - **De boekhouder krijgt het kwartaalblad, met zijn kleuren.** Hij wil het zoals
   de Excel: kolommen per bron en per rekening, het totaalblok per rekening, de
   kleuren en de euronotatie van het tabblad "4e Kwartaal". Dezelfde redenering

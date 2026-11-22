@@ -53,7 +53,11 @@ kostencode).
 De kolommen per formaat staan één keer, in `EXPORT_COLUMNS`: het herkennen
 (`recognises`) en het lezen gebruiken ze, en de "i" naast elke bron bij het
 opladen (`FormatGuide`) toont dezelfde lijst. Een kolom wordt op naam gelezen,
-hoofdletters en volgorde maken niet uit; wat niet in de lijst staat (namen,
+en hoofdletters, spaties, underscores, accenten en volgorde maken niet uit
+(`headerKey`: `shop_name` is `shopName`); staat een kop er twee keer, dan telt
+de eerste. Herkent de site een bestand niet, dan zegt ze op welk formaat het
+het meest lijkt en welke verplichte kolommen het mist, als het er minstens de
+helft van heeft (`closestFormat`); wat niet in de lijst staat (namen,
 rekening- en kaartnummers), leest de site niet. Een bestand is van een formaat
 wanneer elke verplichte kolom er is. Voeg je een kolom toe of verander je wat
 een parser met een regel doet, pas dan ook de zinnen in `FormatGuide` aan.
@@ -451,6 +455,15 @@ Het overzicht heeft twee downloads, beide xlsx met `write-excel-file`:
   en het verschil, afgerond op de cent. Dat verschil hoort nul te zijn.
   Nagerekend in de preview met de Python-bibliotheek `formulas`: nul bij alle
   vier.
+
+De kolom Post noemt de hoofdrekening, ook bij een regel met een analytische
+code: "Activiteiten opbrengsten", niet "Cantussen" (`postName` in
+`lib/inkomsten/labels.ts`). De analytische code staat ernaast in haar eigen
+kolom. Het overzicht op het scherm gebruikt dezelfde functie, zodat de lijnen
+daar heten zoals in het bestand. Waar je één transactie ziet of een code kiest
+(Transacties, Na te kijken, de codekiezer, de tabbladen per transactie in het
+controlebestand), blijft de eigen naam van de code staan: daaraan herken je de
+subcode.
 
 De regel van een transactie in het kwartaalblad is `quarterLineKey`, en die
 sleutel staat ook in kolom I van Transacties. Zo geeft elke formule exact het

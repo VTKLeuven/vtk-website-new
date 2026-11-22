@@ -89,7 +89,12 @@ export type IncomeParseResult =
       /** De uitbetalingen die het bestand noemt. */
       payouts: ParsedPayout[];
     }
-  | { ok: false; error: IncomeParseError; detail?: string };
+  | IncomeParseFailure;
+
+/** Het formaat waar een onbekend bestand het meest op lijkt, en welke verplichte kolommen het mist. */
+export type ClosestFormat = { format: IncomeFormat; missing: string[] };
+
+export type IncomeParseFailure = { ok: false; error: IncomeParseError; detail?: string; closest?: ClosestFormat };
 
 // -----------------------------------------------------------------------------
 // CSV
@@ -294,21 +299,65 @@ export const EXPORT_COLUMNS = {
 
 type Columns = Map<string, number>;
 
+/**
+ * Een kolomkop zoals de site hem vergelijkt: zonder hoofdletters, spaties,
+ * underscores of accenten. Zo is `shop_name` dezelfde kolom als `shopName`,
+ * en `Commissie (EUR)` dezelfde als `commissie (eur)`: een portaal dat zijn
+ * koppen anders schrijft, maakt een export niet onleesbaar.
+ */
+export function headerKey(name: string): string {
+  return name
+    .replace(/^\uFEFF/, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[\s_]+/g, "");
+}
+
+/** De kolommen van een bestand; staat een kop er twee keer, dan telt de eerste. */
 function columnsOf(header: string[]): Columns {
-  return new Map(header.map((name, index) => [name.trim().toLowerCase(), index]));
+  const columns: Columns = new Map();
+  header.forEach((name, index) => {
+    const key = headerKey(name);
+    if (!columns.has(key)) columns.set(key, index);
+  });
+  return columns;
 }
 
 /** Waar elke kolom van een formaat staat; `undefined` als het bestand ze niet heeft. */
 function indexes<T extends Record<string, ExportColumn>>(columns: Columns, spec: T): { [K in keyof T]: number | undefined } {
   const found = {} as { [K in keyof T]: number | undefined };
   for (const key of Object.keys(spec) as Array<keyof T>) {
-    found[key] = spec[key].names.map((name) => columns.get(name.toLowerCase())).find((index) => index !== undefined);
+    found[key] = spec[key].names.map((name) => columns.get(headerKey(name))).find((index) => index !== undefined);
   }
   return found;
 }
 
+/** De verplichte kolommen van een formaat die het bestand niet heeft, bij hun eerste naam. */
+function missingColumns(columns: Columns, spec: Record<string, ExportColumn>): { missing: string[]; required: number } {
+  const required = Object.values(spec).filter((column) => column.required);
+  const missing = required.filter((column) => !column.names.some((name) => columns.has(headerKey(name))));
+  return { missing: missing.map((column) => column.names[0]), required: required.length };
+}
+
 function recognises(columns: Columns, spec: Record<string, ExportColumn>): boolean {
-  return Object.values(spec).every((column) => !column.required || column.names.some((name) => columns.has(name.toLowerCase())));
+  return missingColumns(columns, spec).missing.length === 0;
+}
+
+/**
+ * Het formaat waar een onbekend bestand het meest op lijkt: dat met het
+ * grootste deel van zijn verplichte kolommen, als dat minstens de helft is.
+ * Zo zegt de fout "lijkt op Payconiq, maar mist shop_name" in plaats van
+ * enkel dat de site het bestand niet kent.
+ */
+function closestFormat(columns: Columns): ClosestFormat | undefined {
+  let best: (ClosestFormat & { share: number }) | undefined;
+  for (const format of Object.keys(EXPORT_COLUMNS) as IncomeFormat[]) {
+    const { missing, required } = missingColumns(columns, EXPORT_COLUMNS[format]);
+    const share = (required - missing.length) / required;
+    if (share >= 0.5 && (!best || share > best.share)) best = { format, missing, share };
+  }
+  return best ? { format: best.format, missing: best.missing } : undefined;
 }
 
 /** Lees een export: herken het formaat aan de kolomkoppen. */
@@ -322,7 +371,7 @@ export function parseIncomeExport(text: string): IncomeParseResult {
   if (recognises(columns, EXPORT_COLUMNS.mollie)) return parseMollie(rows, columns);
   if (recognises(columns, EXPORT_COLUMNS.sumup)) return parseSumUp(rows, columns);
   if (recognises(columns, EXPORT_COLUMNS.europabank)) return parseEuropabank(rows, columns);
-  return { ok: false, error: "UNKNOWN_FORMAT" };
+  return { ok: false, error: "UNKNOWN_FORMAT", closest: closestFormat(columns) };
 }
 
 function ymdOf(local: LocalDateTime): string {

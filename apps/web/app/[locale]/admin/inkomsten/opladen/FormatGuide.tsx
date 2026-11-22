@@ -73,6 +73,12 @@ const GUIDES: Guide[] = [
   },
 ];
 
+/** De naam van een formaat zoals de "i" hem toont ("Mollie, balansrapport"). */
+export function formatTitle(format: IncomeFormat, nl: boolean): string {
+  const guide = GUIDES.find((entry) => entry.format === format);
+  return guide ? guide.title[nl ? "nl" : "en"] : format;
+}
+
 function ColumnList({ columns, nl }: { columns: readonly ExportColumn[]; nl: boolean }) {
   return (
     <ul className="flex flex-wrap gap-1">

@@ -186,7 +186,7 @@ export default async function IncomeOverviewPage({
               <thead>
                 <tr className="border-b border-vtk-blue/12 text-left text-xs uppercase tracking-wide text-vtk-muted">
                   <th className="px-3 py-2">{nl ? "Code" : "Code"}</th>
-                  <th className="px-3 py-2">{nl ? "Naam" : "Name"}</th>
+                  <th className="px-3 py-2">Post</th>
                   {data.sources.map((source) => (
                     <th key={source} className="px-3 py-2 text-right">
                       {SOURCE_LABELS[source]}

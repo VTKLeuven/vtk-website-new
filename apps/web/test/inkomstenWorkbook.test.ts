@@ -11,6 +11,7 @@ import {
   type WorkbookTransaction,
 } from "@/lib/inkomsten/workbook";
 import { computeIncomeChecks, groupPayouts, monthsBetween, payoutState } from "@/lib/inkomsten/overview";
+import { postName } from "@/lib/inkomsten/labels";
 
 // Verzonnen gegevens: geen echte namen, rekeningnummers of betaal-ID's.
 
@@ -99,7 +100,7 @@ describe("het kwartaalblad", () => {
     const sheet = quarterSheet(sample, { formulas: false });
     const lines = sheet.data.slice(3).map((row) => [text(row[0]), text(row[1]), text(row[2])]);
     expect(lines).toEqual([
-      ["Cantussen", 700100, "10001"],
+      ["Activiteiten opbrengsten", 700100, "10001"],
       ["Cultuur opbrengsten", 700110, ""],
       ["Financiële kosten", 657000, ""],
       ["Wijziging dynamische reserve", "x", ""],
@@ -192,6 +193,22 @@ describe("het kwartaalblad", () => {
 
   it("noemt kolommen zoals Excel", () => {
     expect([0, 25, 26, 27].map(columnLetter)).toEqual(["A", "Z", "AA", "AB"]);
+  });
+});
+
+describe("de kolom Post", () => {
+  const mains = new Map([["700100", "Activiteiten opbrengsten"]]);
+  const mainOf = (main: string) => mains.get(main);
+
+  it("noemt de hoofdrekening, ook bij een analytische code", () => {
+    expect(postName("700100 10001", "Cantussen", mainOf)).toBe("Activiteiten opbrengsten");
+    expect(postName("700100", "Activiteiten opbrengsten", mainOf)).toBe("Activiteiten opbrengsten");
+  });
+
+  it("valt terug op de eigen naam, en anders op de code", () => {
+    expect(postName("709999 00001", "Iets anders", mainOf)).toBe("Iets anders");
+    expect(postName("709999", null, mainOf)).toBe("709999");
+    expect(postName("709999", "", mainOf)).toBe("709999");
   });
 });
 

@@ -6,7 +6,7 @@ import { requirePermission } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { getCashRegisterConfig } from "@/lib/kassas/server";
-import { monthToDate, parseIncomeExport, parseMonth } from "@/lib/inkomsten/parse";
+import { monthToDate, parseIncomeExport, parseMonth, type ClosestFormat } from "@/lib/inkomsten/parse";
 import {
   assignChannelDay,
   assignUnassignedGroup,
@@ -80,7 +80,7 @@ async function readFiles(formData: FormData): Promise<Array<{ text: string; name
 /** Wat opladen met één bestand zou doen, of waarom de site het niet kan lezen. */
 export type ImportFilePreview =
   | { fileName: string; ok: true; summary: ImportSummary }
-  | { fileName: string; ok: false; code: IncomeErrorCode; detail?: string };
+  | { fileName: string; ok: false; code: IncomeErrorCode; detail?: string; closest?: ClosestFormat };
 
 export type ImportPreviewState =
   | { status: "idle" }
@@ -103,7 +103,7 @@ export async function previewIncomeImportAction(formData: FormData): Promise<Imp
     results.push(
       outcome.ok
         ? { fileName: file.name, ok: true, summary: outcome.summary }
-        : { fileName: file.name, ok: false, code: outcome.error, detail: outcome.detail },
+        : { fileName: file.name, ok: false, code: outcome.error, detail: outcome.detail, closest: outcome.closest },
     );
   }
   return { status: "preview", files: results };
@@ -120,7 +120,7 @@ export async function importIncomeAction(_prev: SaveState, formData: FormData): 
   if ("error" in files) return saveError(files.error);
   for (const file of files) {
     const parsed = parseIncomeExport(file.text);
-    if (!parsed.ok) return saveError(parsed.error);
+    if (!parsed.ok) return saveError(parsed.error, parsed.detail);
   }
 
   let created = 0;
@@ -129,7 +129,7 @@ export async function importIncomeAction(_prev: SaveState, formData: FormData): 
   let open = 0;
   for (const file of files) {
     const outcome = await importIncomeExport(file.text, file.name, { dryRun: false, userId: session.user.id });
-    if (!outcome.ok) return saveError(outcome.error);
+    if (!outcome.ok) return saveError(outcome.error, outcome.detail);
     const { summary } = outcome;
     await logAudit({
       action: "import",

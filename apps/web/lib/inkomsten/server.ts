@@ -35,7 +35,7 @@ import {
   type PayoutGroup,
   type PayoutState,
 } from "./overview";
-import { periodLabel } from "./labels";
+import { periodLabel, postName } from "./labels";
 import {
   deviceKey,
   deviceWindow,
@@ -54,7 +54,7 @@ import {
   monthToDate,
   parseIncomeExport,
   type IncomeFormat,
-  type IncomeParseError,
+  type IncomeParseFailure,
   type IncomeSourceCode,
   type ParsedIncomeRow,
 } from "./parse";
@@ -324,7 +324,7 @@ async function mollieFeeMonthsOutsideBalance(months: readonly string[]): Promise
   return new Set(rows.flatMap((row) => (row.periodMonth ? [dateToMonth(row.periodMonth)] : [])));
 }
 
-export type ImportOutcome = { ok: true; summary: ImportSummary; importId: string | null } | { ok: false; error: IncomeParseError; detail?: string };
+export type ImportOutcome = { ok: true; summary: ImportSummary; importId: string | null } | IncomeParseFailure;
 
 /**
  * Een export lezen en, zonder `dryRun`, bewaren. Dezelfde berekening voor de
@@ -959,7 +959,7 @@ export type IncomeOverviewData = {
 };
 
 export async function loadIncomeOverview(from: string, to: string): Promise<IncomeOverviewData> {
-  const [rows, channels, { order }, pending, feeCode, closedPeriods, sources] = await Promise.all([
+  const [rows, channels, { codes, order }, pending, feeCode, closedPeriods, sources] = await Promise.all([
     prisma.incomeTransaction.findMany({
       where: { periodMonth: { gte: monthToDate(from), lte: monthToDate(to) } },
       select: {
@@ -1009,7 +1009,15 @@ export async function loadIncomeOverview(from: string, to: string): Promise<Inco
       ? accountOn(accountsByChannel.get(row.channelId) ?? [], ymdKey(brusselsYMD(row.occurredAt)))
       : null,
   }));
-  const overview = computeIncomeOverview(withAccount, order);
+  const computed = computeIncomeOverview(withAccount, order);
+  // De kolom Post: de naam van de hoofdrekening, zoals in het kwartaalblad.
+  const overview: IncomeOverview = {
+    ...computed,
+    codes: computed.codes.map((row) => ({
+      ...row,
+      name: postName(row.code, row.name, (main) => codes.get(codeKey(main))?.name),
+    })),
+  };
 
   // Elke uitbetaling met een regel in de periode, met al haar regels: een
   // SumUp-verkoop telt in haar eigen maand, dus een uitbetaling kan over de

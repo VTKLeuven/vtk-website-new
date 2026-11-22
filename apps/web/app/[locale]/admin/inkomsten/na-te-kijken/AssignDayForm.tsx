@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Label, Select } from "@vtk/ui";
 import { AccountingCodePicker } from "@/components/admin/AccountingCodePicker";
@@ -31,8 +31,15 @@ export function AssignDayForm({
   const nl = locale === "nl";
   const router = useRouter();
   const uid = useId();
+  // Na een geslaagde opslag een vers formulier: de codekiezer houdt zijn
+  // waarde in zijn eigen state, dus een `reset()` van het formulier liet die
+  // staan (en kanaal en dag ook, met `resetOnSuccess={false}`). Een nieuwe
+  // `key` tekent alles leeg. Geen reset-luisteraar in de kiezer zelf: een kaal
+  // `<form action>` elders reset na elke opslag en zette de kiezer dan terug.
+  const [round, setRound] = useState(0);
   return (
     <SaveForm
+      key={round}
       action={action}
       submitLabel={nl ? "Toewijzen" : "Assign"}
       submitSize="sm"
@@ -54,7 +61,10 @@ export function AssignDayForm({
         },
       }}
       resetOnSuccess={false}
-      onSuccess={() => router.refresh()}
+      onSuccess={() => {
+        setRound((current) => current + 1);
+        router.refresh();
+      }}
       className="flex flex-wrap items-end gap-3"
     >
       <div className="w-56">
