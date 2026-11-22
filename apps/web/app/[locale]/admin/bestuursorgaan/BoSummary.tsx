@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, type CSSProperties } from "react";
 import type { Stats } from "@/lib/bo/dossiers";
 import { SECTIONS } from "@/lib/bo/explorer";
 import type { Summary, SummaryRow } from "@/lib/bo/summary";
@@ -7,15 +7,19 @@ import type { Summary, SummaryRow } from "@/lib/bo/summary";
  * "Resultaten per post": het overzicht onderaan /admin/bestuursorgaan, gemaakt
  * om er elke week een schermafbeelding van op een slide te zetten. Daarom één
  * kader dat alles draagt (titel, datum, totalen, alle posten) en in de kolom
- * van 900 px op één scherm past: de vakken staan in twee kolommen. De kleuren
- * zijn die van het rekenblad waarmee Groep 5 dit vroeger bijhield: rood onder
- * 50%, oranje onder 100%, groen wanneer alles binnen is.
+ * van 900 px op één scherm past: de vakken staan in twee kolommen.
  */
 
-export function tone(pct: number | null): "down" | "low" | "ok" | undefined {
+/**
+ * De kleur van een percentage loopt door: donkerrood bij 0%, oranje rond 50%,
+ * donkergroen bij 100%. Met drie vaste kleuren (zoals het oude rekenblad: rood
+ * onder 50%, oranje onder 100%) stond 90% even oranje als 50%, terwijl een post
+ * met 9 van 10 resultaten het goed doet. De menging zelf staat in de CSS
+ * (`.vtk-bo-pct-scale` in `vtk-admin.css`); hier komt enkel het getal mee.
+ */
+export function pctScale(pct: number | null): CSSProperties | undefined {
   if (pct === null) return undefined;
-  if (pct >= 1) return "ok";
-  return pct >= 0.5 ? "low" : "down";
+  return { "--pct": Math.min(1, Math.max(0, pct)) } as CSSProperties;
 }
 
 const pctText = (pct: number | null) => (pct === null ? "–" : `${Math.round(pct * 100)}%`);
@@ -86,7 +90,7 @@ export function BoSummary({ summary, year, nl }: { summary: Summary; year: strin
         <span aria-hidden="true"> · </span>
         <b>{s.done}</b> {nl ? (s.done === 1 ? "resultaat" : "resultaten") : s.done === 1 ? "result" : "results"}
       </span>
-      <span className="vtk-bo-sum-pct" data-tone={tone(s.pct)}>
+      <span className="vtk-bo-sum-pct vtk-bo-pct-scale" style={pctScale(s.pct)}>
         {pctText(s.pct)}
       </span>
       <span className="b">
@@ -113,7 +117,7 @@ export function BoSummary({ summary, year, nl }: { summary: Summary; year: strin
             –
           </span>
         ) : (
-          <span className="vtk-bo-sum-pct" data-tone={tone(r.pct)}>
+          <span className="vtk-bo-sum-pct vtk-bo-pct-scale" style={pctScale(r.pct)}>
             {pctText(r.pct)}
           </span>
         )}
@@ -175,8 +179,8 @@ export function BoSummary({ summary, year, nl }: { summary: Summary; year: strin
       )}
       <p className="vtk-bo-sum-foot">
         {nl
-          ? "Budgetten: op een BO die al plaatsvond, of schriftelijk goedgekeurd. Percentage: daarvan met een resultaat. Rood onder 50%, oranje onder 100%, groen wanneer alles binnen is; een streepje: nog geen budget gepasseerd."
-          : "Budgets: at a meeting that already took place, or approved in writing. Percentage: of those, with a result. Red below 50%, orange below 100%, green when everything is in; a dash: no budget passed yet."}
+          ? "Budgetten: op een BO die al plaatsvond, of schriftelijk goedgekeurd. Percentage: daarvan met een resultaat. De kleur loopt van donkerrood bij 0% over oranje rond 50% naar donkergroen bij 100%; een streepje: nog geen budget gepasseerd."
+          : "Budgets: at a meeting that already took place, or approved in writing. Percentage: of those, with a result. The colour runs from dark red at 0% through orange around 50% to dark green at 100%; a dash: no budget passed yet."}
         <span className="vtk-bo-sum-foot-begr">
           {nl
             ? " Begroting: per budget het resultaat (of, zolang dat er niet is, het budget) min de regel Begroting in het blad, opgeteld; plus is beter dan begroot. Een blad zonder begroting telt niet mee."

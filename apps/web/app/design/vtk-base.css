@@ -48,6 +48,15 @@
   --low-ink: #7a4e05;
   --full-bg: var(--paper-2);
   --full-ink: var(--muted);
+  /* De doorlopende schaal van een percentage resultaten (/admin/bestuursorgaan):
+     donkerrood bij 0%, oranje rond 50%, donkergroen bij 100%. De menging staat
+     in `.vtk-bo-pct-scale`; elk eindpunt haalt minstens 5,5:1. */
+  --score-0-bg: #fbe2df;
+  --score-0-ink: #8f1d14;
+  --score-50-bg: #fde3c8;
+  --score-50-ink: #93430a;
+  --score-100-bg: #d5ecdd;
+  --score-100-ink: #0d5530;
   /* Een handeling die iets terugdraait, zoals uitschrijven. */
   --danger-bg: #fdecea;
   --danger-ink: #b42318;

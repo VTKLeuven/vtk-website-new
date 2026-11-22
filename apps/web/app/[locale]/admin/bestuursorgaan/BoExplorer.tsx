@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { findDossier, SECTIONS, vtkPartCents, type ExplorerData, type Stats, type XDossier, type XMeeting, type XPost } from "@/lib/bo/explorer";
 import { BegrotingExcludedNote, dossierNotes, Files, HideDossierButton, PotButton, PotNote, Lines, linesOf, PostLinks, StatusNote, statusNote, StatusPill, Tiles, Timeline, useFormat, type Fmt, type Locale, type Sheet } from "./BoParts";
 import { ChangePosts, type PostChoice } from "./BoReview";
+import { pctScale } from "./BoSummary";
 
 /*
  * De verkenner van /admin/bestuursorgaan: drie panelen naast elkaar.
@@ -361,14 +362,14 @@ export function BoExplorer({
 
 /**
  * Rechts in de rij van een post: hoeveel resultaten binnen zijn van wat al
- * voorbij is ("3/4"), in de kleuren van het overzicht onderaan (rood onder 50%,
- * oranje onder 100%, groen als alles binnen is), of een streepje als er nog
- * niets voorbij is.
+ * voorbij is ("3/4"), in de doorlopende kleur van het overzicht onderaan
+ * (`pctScale`: donkerrood bij 0%, oranje rond 50%, donkergroen bij 100%), of een
+ * streepje als er nog niets voorbij is.
  */
 function PostMark({ stats: s, nl }: { stats: Stats; nl: boolean }) {
   if (s.due === 0) return <span className="vtk-bo-prow-none" aria-label={nl ? "nog niets voorbij" : "nothing past yet"}>–</span>;
   return (
-    <span className="vtk-bo-pill tabular-nums" data-tone={s.pct === null ? undefined : s.pct >= 1 ? "ok" : s.pct >= 0.5 ? "low" : "down"}>
+    <span className="vtk-bo-pill vtk-bo-pct-scale tabular-nums" style={pctScale(s.pct)}>
       {s.done}/{s.due}
     </span>
   );

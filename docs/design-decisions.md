@@ -13103,8 +13103,7 @@ BO ruimer dan een `Group`. Wat Groep 5 vroeg, en waarom het zo gebouwd is:
 - **De linkerkolom van de verkenner is één regel per post, per vak** (Groep 5,
   Posten, Werkgroepen, Jaarwerkingen en overige, Niet herkend), met rechts
   "3/4": hoeveel resultaten binnen zijn van wat al voorbij is, in dezelfde
-  kleuren als het overzicht per post (rood onder 50%, oranje onder 100%, groen
-  als alles binnen is), of een streepje als er nog niets voorbij is. Twee
+  kleur als het overzicht per post, of een streepje als er nog niets voorbij is. Twee
   regels met een balkje waren te druk; "2 open" alleen zei te weinig, want 2
   van 3 is iets anders dan 2 van 20.
 - **De stand is altijd een van vier woorden**: Open, Komt nog, Afgerond, Geen
@@ -13115,9 +13114,14 @@ BO ruimer dan een `Group`. Wat Groep 5 vroeg, en waarom het zo gebouwd is:
 - **Onderaan staat "Resultaten per post"**, gemaakt voor een schermafbeelding
   op de wekelijkse slide waarmee Groep 5 posten aanspreekt. Het volgt het oude
   rekenblad: per post de gepasseerde budgetten, de resultaten, wat mist en het
-  percentage in rood, oranje of groen, elke post ook zonder budget, en
+  percentage in kleur, elke post ook zonder budget, en
   bovenaan de totalen voor VTK en voor de werkgroepen. Alles staat in één
   kader, met de datum en de laatste BO erin, zodat één schermafbeelding volstaat.
+- **De kleur van een percentage loopt door**: donkerrood bij 0%, oranje rond
+  50%, donkergroen bij 100% (`pctScale` en `.vtk-bo-pct-scale`). Het oude
+  rekenblad had drie vaste kleuren (rood onder 50%, oranje onder 100%, groen bij
+  100%), en dan stond een post met 9 van 10 resultaten even oranje als een met
+  5 van 10. Op de slide las 90% daardoor als slecht, terwijl dat al goed is.
 - **De afwijking staat niet in de balk met de cijfers van het jaar.** Een som
   van meevallers en tegenvallers over alle posten zei Groep 5 niets; per
   activiteit en per post staat ze er wel.

@@ -3663,7 +3663,7 @@ a.vtk-shortcut-tile:hover {
   color: var(--muted);
 }
 
-/* De percentages in de kleuren van het oude rekenblad. */
+/* De percentages: een pil waarvan de kleur meeloopt met het percentage. */
 .vtk-bo-sum-pct {
   display: inline-block;
   min-width: 48px;
@@ -3677,19 +3677,25 @@ a.vtk-shortcut-tile:hover {
   text-align: center;
 }
 
-.vtk-bo-sum-pct[data-tone='down'] {
-  background: var(--danger-bg);
-  color: var(--danger-ink);
-}
-
-.vtk-bo-sum-pct[data-tone='low'] {
-  background: var(--low-bg);
-  color: var(--low-ink);
-}
-
-.vtk-bo-sum-pct[data-tone='ok'] {
-  background: var(--ok-bg);
-  color: var(--ok-ink);
+/* Doorlopend van donkerrood (0%) over oranje (50%) naar donkergroen (100%),
+   uit `--pct` (0 tot 1, gezet door `pctScale`). Twee mengingen na elkaar: de
+   eerste van rood naar oranje over de onderste helft, de tweede van dat
+   resultaat naar groen over de bovenste. In oklch, zodat de tussentinten even
+   donker blijven als de eindpunten en de tekst leesbaar blijft. Zonder `--pct`
+   (geen percentage) blijft de neutrale pil staan. */
+.vtk-bo-pct-scale[style*='--pct'] {
+  --pct-lo: clamp(0%, calc(var(--pct) * 200%), 100%);
+  --pct-hi: clamp(0%, calc((var(--pct) - 0.5) * 200%), 100%);
+  background: color-mix(
+    in oklch,
+    var(--score-100-bg) var(--pct-hi),
+    color-mix(in oklch, var(--score-50-bg) var(--pct-lo), var(--score-0-bg))
+  );
+  color: color-mix(
+    in oklch,
+    var(--score-100-ink) var(--pct-hi),
+    color-mix(in oklch, var(--score-50-ink) var(--pct-lo), var(--score-0-ink))
+  );
 }
 
 /* Twee kolommen vakken, zodat alle posten op één scherm passen. */
