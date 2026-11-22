@@ -8,6 +8,7 @@ import { appErrorResponse, appJson } from "@/lib/app-api/respond";
 import { earnedShiftReward } from "@/lib/shift/rewards";
 import { praesidiumYears } from "@/lib/shift/voucherEligibility";
 import { canBeReplaceable, canReplace, visibleParticipants } from "@/lib/shift/replace";
+import { ROSTER_PARTICIPANT_SELECT, toRoster } from "@/lib/shift/roster";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,7 +52,7 @@ export async function GET(request: Request) {
         where: { endTime: { gte: now }, manualGrantId: null },
         orderBy: { startTime: "asc" },
         include: {
-          participants: { select: { userId: true, registeredAt: true, replaceable: true } },
+          participants: { select: { ...ROSTER_PARTICIPANT_SELECT, replaceable: true } },
         },
       }),
       praesidiumYears([session.user.id]),
@@ -66,9 +67,10 @@ export async function GET(request: Request) {
       // Zoals op /shift: wie een vervangbaar praesidiumlid kan vervangen, ziet
       // die plaats als vrij, en de inschrijving neemt ze dan over
       // (`lib/shift/replace.ts`). Wie zelf ingeschreven is, telt altijd mee.
-      const taken = own
-        ? shift.participants.length
-        : visibleParticipants(shift.participants, canReplace(session.user.id, shift, praesidium)).length;
+      const visible = own
+        ? shift.participants
+        : visibleParticipants(shift.participants, canReplace(session.user.id, shift, praesidium));
+      const taken = visible.length;
 
       const startsWithinLock = shift.startTime.getTime() - now.getTime() < UNREGISTER_LOCK_MS;
       const withinGrace = own
@@ -94,6 +96,8 @@ export async function GET(request: Request) {
         canRegister: !own && taken < shift.maxParticipants && shift.startTime > now,
         replaceableOption: canBeReplaceable(session.user.id, shift, praesidium),
         replaceable: own?.replaceable ?? false,
+        // Dezelfde namen als op /shift: wie meetelt in `takenSpots`, en enkel de naam.
+        roster: toRoster(visible, session.user.id),
       };
 
       if (own) mine.push(dto);

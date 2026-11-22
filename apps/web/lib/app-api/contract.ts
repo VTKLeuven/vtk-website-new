@@ -900,12 +900,55 @@ export type AppShift = {
   replaceableOption?: boolean;
   /** Je eigen keuze daarvoor, op een shift waarop je ingeschreven staat. */
   replaceable?: boolean;
+  /**
+   * Wie er al op staat, in de volgorde waarin ze zich inschreven: enkel de naam,
+   * zoals op /shift (`lib/shift/roster.ts`). Een vervangbaar praesidiumlid wiens
+   * plaats jij kan innemen, staat er niet bij, net zoals het niet meetelt in
+   * `takenSpots`. Ontbreekt bij een server van voor november 2026.
+   */
+  roster?: AppShiftRosterEntry[];
+};
+
+export type AppShiftRosterEntry = {
+  name: string;
+  /** Dat ben jij. */
+  isSelf: boolean;
 };
 
 export type AppShifts = {
   /** Waar je voor ingeschreven staat, eerst. */
   mine: AppShift[];
   available: AppShift[];
+};
+
+/** Een titel op de ladder van /shift/history (`lib/shift/tiers.ts`). */
+export type AppShiftTier = {
+  /** Vanaf zoveel shiften in een werkingsjaar. */
+  min: number;
+  name: string;
+};
+
+/**
+ * Je werkingsjaar in shiften: hoeveel, welke titel, en wat de volgende is. Dezelfde
+ * telling als /shift/history (`buildShiftHistory`): een shift telt zodra ze
+ * voorbij is, afgenomen shiften gaan eraf.
+ */
+export type AppShiftYear = {
+  /** "2026-2027". */
+  label: string;
+  count: number;
+  /** Wat die shiften opleverden; nul in een praesidiumjaar. */
+  vouchers: number;
+  /** Dat werkingsjaar in een praesidiumpost: shiften tellen, maar leveren niets op. */
+  praesidium: boolean;
+  tier: AppShiftTier | null;
+  next: AppShiftTier | null;
+  /** Alle titels, van laag naar hoog. */
+  tiers: AppShiftTier[];
+  /** Vanaf zoveel shiften zit je in de voorverkoop (`PRESALE_SHIFT_THRESHOLD`). */
+  presaleAt: number;
+  /** Zit nu in een praesidiumpost, en dus al in de voorverkoop. */
+  inPraesidiumNow: boolean;
 };
 
 /** Waarom een inschrijving geweigerd werd. Codes van `/api/shift/register`. */
@@ -1208,6 +1251,15 @@ export type AppVouchers = {
   balance: number;
   /** Hoeveel je er dit academiejaar bij verdiend hebt. */
   earnedThisYear: number;
+  /**
+   * Alles wat ooit verdiend werd, en wat daarvan al gebruikt is (opgehaald,
+   * betaald of uitbetaald). `earned - used = balance`, ook voor wat `history`
+   * niet kent. Ontbreekt bij een server van voor november 2026.
+   */
+  earned?: number;
+  used?: number;
+  /** Je shiften van dit werkingsjaar en je titel, zoals bovenaan /shift/history. */
+  shiftYear?: AppShiftYear;
   history: AppVoucherEntry[];
   /**
    * De inhoud van de QR die je aan een balie toont. Kortlevend en ondertekend;
