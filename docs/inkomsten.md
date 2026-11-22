@@ -542,7 +542,10 @@ stemt per rekening af.
 
 - **Enkel de regels van providers.** `parseBankStatement` herkent SumUp,
   Payconiq (`BANCONTACT COMPANY NV`), Mollie en Europabank aan de naam van de
-  tegenpartij, nooit aan de mededeling (die typt een lid zelf), en houdt van
+  tegenpartij, nooit aan de mededeling (die typt een lid zelf). Enkel de naam
+  van het bedrijf telt (`STICHTING MOLLIE PAYMENTS`, `SumUp Limited`,
+  `EUROPABANK N.V.`), niet het woord alleen: een lid dat Mollie heet, is geen
+  provider (`PROVIDER_NAMES`). De site houdt van
   die regels enkel de dag, het bedrag en de referentie van de uitbetaling over.
   Al de rest (leden, leveranciers, interne overschrijvingen) en het bestand
   zelf bewaart de site niet. `IncomeBankStatement` onthoudt per afschrift de
@@ -909,7 +912,12 @@ fouten), dan opladen.
   Na te kijken in plaats van bij de vorige kassa.
 - **Een bankafschrift bevat leden.** Herken een provider aan de naam van de
   tegenpartij, nooit aan de mededeling: een lid kan "MOLLIE" in zijn
-  mededeling typen. Geef de parser geen kolom mee die je niet nodig hebt.
+  mededeling typen. En aan de volledige naam van het bedrijf, niet aan het
+  woord: een lid dat Mollie heet, telde anders als overschrijving van Mollie,
+  en de afstemming per rekening toonde een vals verschil. Komt een provider
+  onder een nieuwe naam op het afschrift, dan staat die regel nergens: zet de
+  naam erbij in `PROVIDER_NAMES`. Geef de parser geen kolom mee die je niet
+  nodig hebt.
 - **KBC eindigt een regel soms op een losse CR.** Wie de eerste regel op `\n`
   splitst, telt het scheidingsteken over het hele bestand (`detectDelimiter`).
 - **`node:crypto` hoort niet in de browser.** De "i" bij Uploaden toont de

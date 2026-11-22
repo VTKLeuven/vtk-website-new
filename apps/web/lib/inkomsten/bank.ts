@@ -34,18 +34,30 @@ export function normaliseAccount(raw: string): string {
   return raw.replace(/[\s.]/g, "").toUpperCase();
 }
 
+/** De rechtsvorm achter de naam van een bedrijf: "N.V.", "B.V.", "Limited". */
+const COMPANY = String.raw`(?:n\.?\s?v\.?|b\.?\s?v\.?|s\.?a\.?|ltd\.?|limited)`;
+
+/**
+ * De namen waaronder de providers op een afschrift van KBC staan: telkens de
+ * naam van het bedrijf, nooit enkel het woord. Een lid dat Mollie of Sumup
+ * heet, is zo geen provider: anders telde zijn overschrijving als een regel
+ * van Mollie, en gaf de afstemming per rekening een vals verschil.
+ */
+const PROVIDER_NAMES: ReadonlyArray<[BankProvider, RegExp]> = [
+  ["MOLLIE", new RegExp(String.raw`^(?:stichting\s+mollie\s+payments|mollie\s+(?:payments|${COMPANY}))(?:\s+${COMPANY})?$`)],
+  ["SUMUP", new RegExp(String.raw`^sumup(?:\s+payments)?\s+${COMPANY}$`)],
+  ["PAYCONIQ", new RegExp(String.raw`^(?:bancontact\s+company|payconiq\s+(?:international|belgium))(?:\s+${COMPANY})?$`)],
+  ["EUROPABANK", new RegExp(String.raw`^europabank(?:\s+${COMPANY})?$`)],
+];
+
 /**
  * Van welke provider een regel komt, op de naam van de tegenpartij. Enkel
  * kennis over de providers, niets over de kring.
  */
 export function bankProviderOf(counterparty: string): BankProvider | null {
-  const name = counterparty.trim().toLowerCase();
+  const name = counterparty.replace(/\s+/g, " ").trim().toLowerCase();
   if (!name) return null;
-  if (/\bmollie\b/.test(name)) return "MOLLIE";
-  if (/\bsumup\b/.test(name)) return "SUMUP";
-  if (/^bancontact company\b|\bpayconiq\b/.test(name)) return "PAYCONIQ";
-  if (/^europabank\b/.test(name)) return "EUROPABANK";
-  return null;
+  return PROVIDER_NAMES.find(([, pattern]) => pattern.test(name))?.[0] ?? null;
 }
 
 /**

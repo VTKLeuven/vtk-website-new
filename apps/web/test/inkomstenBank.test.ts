@@ -118,15 +118,35 @@ describe("een bankafschrift lezen", () => {
   });
 
   it("herkent een provider aan de naam, niet aan de mededeling", () => {
+    expect(bankProviderOf("STICHTING MOLLIE PAYMENTS")).toBe("MOLLIE");
+    expect(bankProviderOf("Mollie B.V.")).toBe("MOLLIE");
+    expect(bankProviderOf("Mollie Payments")).toBe("MOLLIE");
     expect(bankProviderOf("SumUp Limited")).toBe("SUMUP");
+    expect(bankProviderOf("SUMUP PAYMENTS LTD")).toBe("SUMUP");
     expect(bankProviderOf("BANCONTACT COMPANY NV")).toBe("PAYCONIQ");
+    expect(bankProviderOf("Payconiq International S.A.")).toBe("PAYCONIQ");
     expect(bankProviderOf("EUROPABANK N.V.")).toBe("EUROPABANK");
+    expect(bankProviderOf("EUROPABANK  NV")).toBe("EUROPABANK");
     expect(bankProviderOf("PERSOON A")).toBeNull();
-    // Een lid dat "Mollie" in de mededeling zet, blijft een lid: de mededeling telt niet.
+  });
+
+  it("ziet een lid dat Mollie of Sumup heet, niet als provider", () => {
+    // Het woord alleen volstaat niet: enkel de naam van het bedrijf telt.
+    expect(bankProviderOf("JAN MOLLIE")).toBeNull();
+    expect(bankProviderOf("MOLLIE AN")).toBeNull();
+    expect(bankProviderOf("Mollie Peeters-Janssens")).toBeNull();
+    expect(bankProviderOf("SUMUP JAN")).toBeNull();
+    expect(bankProviderOf("PAYCONIQ PIETERS")).toBeNull();
+    expect(bankProviderOf("EUROPABANK FAN CLUB")).toBeNull();
     const member = parseBankStatement(
-      [HEADER, line({ date: "05/08/2026", amount: "5,00", name: "PERSOON C", message: "REF T12345678.2608.01 MOLLIE" })].join("\r"),
+      [HEADER, line({ date: "05/08/2026", amount: "25,00", name: "JAN MOLLIE", bic: "KREDBEBB", message: "inschrijving" })].join("\r"),
     );
     expect(member.ok && member.lines).toEqual([]);
+    // Een lid dat "Mollie" in de mededeling zet, blijft een lid: de mededeling telt niet.
+    const message = parseBankStatement(
+      [HEADER, line({ date: "05/08/2026", amount: "5,00", name: "PERSOON C", message: "REF T12345678.2608.01 MOLLIE" })].join("\r"),
+    );
+    expect(message.ok && message.lines).toEqual([]);
   });
 
   it("leest Windows-1252 als UTF-8 niet lukt", () => {
