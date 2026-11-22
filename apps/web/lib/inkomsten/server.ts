@@ -51,11 +51,14 @@ import { INCOME_CONFIG_KEY, lineRulesOf, parseIncomeConfig, type IncomeConfig } 
 import { isSeparateFee, quarterLineKey, type LineRules } from "./lines";
 import { computeMollieReserve, type MollieCompleteness, type MollieReserve } from "./reserve";
 import { MANUAL_FORMAT } from "./transfer";
+import { normaliseAccount, payoutKey, type BankProvider } from "./bank";
+import { coveredOn, expectedBankDay, loadBankCoverage, loadBankLines, loadBankOverview, type BankOverview } from "./bankServer";
 import type { WorkbookGroup, WorkbookModel, WorkbookTransaction } from "./workbook";
 import { ASSIGNABLE_KINDS, transactionWhere, type TransactionFilter } from "./transactionFilter";
 import {
   BALANCE_KEY,
   MOLLIE_CHANNEL,
+  nextMonth,
   dateToMonth,
   monthToDate,
   parseIncomeExport,
@@ -965,6 +968,12 @@ export type PayoutWithCheck = PayoutGroup & {
   paidOn: Date | null;
   /** Wat de provider zegt dat hij overschreef (de overschrijving van Mollie). */
   providerAmount: number | null;
+  /** De regel(s) op een opgeladen bankafschrift: de eerste dag, en het bedrag samen. */
+  bank: { bookedOn: string; amountCents: number; account: string } | null;
+  /** De rekening waarop de uitbetaling verwacht wordt (van het kanaal), genormaliseerd. */
+  account: string | null;
+  /** Of een afschrift van die rekening de dag dekt waarop ze verwacht wordt, zonder dat ze erop staat. */
+  missingOnStatement: boolean;
   state: PayoutState;
 };
 
@@ -1052,6 +1061,8 @@ export type IncomeOverviewData = {
   closed: ClosedPeriod[];
   payouts: PayoutWithCheck[];
   checks: IncomeCheck[];
+  /** Per rekening tegen de bankafschriften; null zonder enig afschrift. */
+  bank: BankOverview | null;
 };
 
 export async function loadIncomeOverview(from: string, to: string): Promise<IncomeOverviewData> {
@@ -1153,18 +1164,14 @@ export async function loadIncomeOverview(from: string, to: string): Promise<Inco
   // SumUp-verkoop telt in haar eigen maand, dus een uitbetaling kan over de
   // rand van een periode lopen, terwijl ze op het uittreksel één bedrag is.
   //
-  // Payconiq niet (nog): sinds de export met `payoutId` kent een regel wel zijn
-  // uitbetaling, maar niet de dag of het bedrag ervan. Tot de bankafschriften
-  // die bevestigen, stond elke dag als een open uitbetaling in de lijst en
-  // kleurde de controlestap rood.
-  const references = [
-    ...new Set(rows.flatMap((row) => (row.payoutReference && row.source !== "PAYCONIQ" ? [row.payoutReference] : []))),
-  ];
+  // Ook Payconiq (de export met `payoutId`) en Europabank (de OV-ref): hun
+  // uitbetaling noemt geen bedrag, maar een bankafschrift bevestigt ze.
+  const references = [...new Set(rows.flatMap((row) => (row.payoutReference && row.source !== "TRANSFER" ? [row.payoutReference] : [])))];
   const [payoutRows, checkRows, providerRows] = references.length
     ? await Promise.all([
         prisma.incomeTransaction.findMany({
           where: { payoutReference: { in: references } },
-          select: { source: true, payoutReference: true, kind: true, amountCents: true, occurredAt: true },
+          select: { source: true, payoutReference: true, kind: true, amountCents: true, occurredAt: true, channelId: true },
         }),
         prisma.incomePayoutCheck.findMany({
           where: { payoutReference: { in: references } },
@@ -1185,16 +1192,56 @@ export async function loadIncomeOverview(from: string, to: string): Promise<Inco
   );
   const checksByReference = new Map(checkRows.map((check) => [check.payoutReference, check]));
   const providerByKey = new Map(providerRows.map((payout) => [`${payout.source}|${payout.reference}`, payout]));
+
+  // De bankafschriften: de regels die bij een uitbetaling van de periode horen
+  // (die kan tot een paar weken na de periode op de bank komen), en wat
+  // afschriften dekken. Enkel lezen: niets hiervan verandert wat meetelt.
+  const [bankLines, coverage, bank] = await Promise.all([
+    loadBankLines(`${monthsBefore(from, 1)}-01`, `${lastDayOf(nextMonth(to))}`),
+    loadBankCoverage(),
+    loadBankOverview(from, to),
+  ]);
+  const bankByPayout = new Map<string, { bookedOn: string; amountCents: number; account: string }>();
+  for (const line of bankLines) {
+    if (!line.payoutKey) continue;
+    const known = bankByPayout.get(line.payoutKey);
+    if (known) {
+      known.amountCents += line.amountCents;
+      if (line.bookedOn < known.bookedOn) known.bookedOn = line.bookedOn;
+    } else {
+      bankByPayout.set(line.payoutKey, { bookedOn: line.bookedOn, amountCents: line.amountCents, account: line.account });
+    }
+  }
+  const normalisedAccounts = new Map(
+    [...accountsByChannel].map(([id, entries]) => [id, entries.map((entry) => ({ from: entry.from, bankAccount: normaliseAccount(entry.bankAccount) }))]),
+  );
+  const firstChannel = new Map<string, { channelId: string | null; occurredAt: Date }>();
+  for (const row of payoutRows) {
+    const key = `${row.source}|${row.payoutReference}`;
+    if (!firstChannel.has(key)) firstChannel.set(key, { channelId: row.channelId, occurredAt: row.occurredAt });
+  }
   const payoutsWithCheck: PayoutWithCheck[] = payouts.map((payout) => {
     const check = checksByReference.get(payout.reference);
     const provider = providerByKey.get(`${payout.source}|${payout.reference}`);
     const providerAmount = provider?.amountCents ?? null;
+    const onBank = bankByPayout.get(payoutKey(payout.source as BankProvider, payout.reference)) ?? null;
+    const expected = expectedBankDay(provider?.paidOn ?? null, payout.lastAt);
+    const first = firstChannel.get(`${payout.source}|${payout.reference}`);
+    const account =
+      payout.source === "MOLLIE"
+        ? accountOn(mollieAccounts.map((entry) => ({ from: entry.from, bankAccount: normaliseAccount(entry.bankAccount) })), expected.day)
+        : first?.channelId
+          ? accountOn(normalisedAccounts.get(first.channelId) ?? [], ymdKey(brusselsYMD(first.occurredAt)))
+          : null;
     return {
       ...payout,
       check: check ? { amountCents: check.amountCents, checkedAt: check.checkedAt, checkedByName: check.checkedBy?.name ?? null } : null,
       paidOn: provider?.paidOn ?? null,
       providerAmount,
-      state: payoutState(payout.total, check?.amountCents ?? null, providerAmount),
+      bank: onBank,
+      account,
+      missingOnStatement: !onBank && coveredOn(coverage, account, expected.day),
+      state: payoutState(payout.total, check?.amountCents ?? null, providerAmount, onBank?.amountCents ?? null),
     };
   });
   // In de volgorde van het uittreksel: per bron op de dag van de overschrijving.
@@ -1241,6 +1288,7 @@ export async function loadIncomeOverview(from: string, to: string): Promise<Inco
       total: payout.total,
       checkedAmount: payout.check?.amountCents ?? null,
       providerAmount: payout.providerAmount,
+      bankAmount: payout.bank?.amountCents ?? null,
     })),
     open: {
       count: overview.unassigned.count,
@@ -1265,6 +1313,7 @@ export async function loadIncomeOverview(from: string, to: string): Promise<Inco
     closed: closedPeriods.filter((period) => period.from <= to && from <= period.to),
     payouts: payoutsWithCheck,
     checks,
+    bank,
   };
 }
 
@@ -1948,8 +1997,18 @@ export async function loadIncomeWorkbookModel(from: string, to: string, nl: bool
       reserve: payout.reserve,
       total: payout.total,
       providerAmount: payout.providerAmount,
+      bankOn: payout.bank ? new Date(`${payout.bank.bookedOn}T00:00:00Z`) : null,
+      bankAmount: payout.bank?.amountCents ?? null,
       checked:
-        payout.state === "checked" && payout.check
+        payout.state === "bank"
+          ? nl
+            ? "ja, op het uittreksel"
+            : "yes, on the statement"
+          : payout.state === "bankDiffers"
+            ? nl
+              ? "nee, ander bedrag op de bank"
+              : "no, another amount on the bank"
+            : payout.state === "checked" && payout.check
           ? `${nl ? "ja" : "yes"}, ${payoutDate(payout.check.checkedAt)}${payout.check.checkedByName ? `, ${payout.check.checkedByName}` : ""}`
           : payout.state === "changed" && payout.check
             ? nl

@@ -15,7 +15,7 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
     TOO_MANY_FILES: "Dat zijn meer dan 250 bestanden. Upload ze in delen, bijvoorbeeld per maand.",
     EMPTY: "Dat bestand heeft geen regels.",
     UNKNOWN_FORMAT:
-      "Dat bestand herkent de site niet. Upload een CSV-export van Payconiq, Mollie, SumUp of Europabank, met de kolomkoppen zoals ze uit het portaal komen; de i naast elke bron zegt welke kolommen er moeten zijn.",
+      "Dat bestand herkent de site niet. Upload een CSV-export van Payconiq, Mollie, SumUp of Europabank, of een CSV-afschrift van KBC, met de kolomkoppen zoals ze uit het portaal komen; de i naast elke bron zegt welke kolommen er moeten zijn.",
     BAD_ROW: "Een regel in dat bestand is niet te lezen (datum of bedrag). Er is niets geüpload.",
     NOT_FOUND: "Dat bestaat niet meer; ververs de pagina.",
     CODE_NOT_FOUND: "Die boekhoudcode bestaat niet meer; ververs de pagina.",
@@ -27,6 +27,7 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
     PERIOD_OVERLAP: "Een deel van die periode is al afgesloten.",
     BAD_DATE: "Die datum bestaat niet.",
     LENDING_ORDER: "De laatste dag ligt voor de eerste.",
+    MIXED_ACCOUNTS: "Dat afschrift heeft regels van meer dan één rekening. Download het per rekening uit KBC.",
     BAD_AMOUNT: "Dat bedrag is niet te lezen. Tik het zoals 12,50; een terugbetaling met een min ervoor (-12,50).",
     LENDING_TOO_LONG: "Een uitlening van meer dan een jaar is wellicht een tikfout in het jaartal.",
     LENDING_OVERLAP:
@@ -44,7 +45,7 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
     TOO_MANY_FILES: "That is more than 250 files. Upload them in parts, for example per month.",
     EMPTY: "That file has no rows.",
     UNKNOWN_FORMAT:
-      "The site does not recognise that file. Upload a CSV export from Payconiq, Mollie, SumUp or Europabank, with the column headings as they come from the portal; the i next to each source says which columns must be there.",
+      "The site does not recognise that file. Upload a CSV export from Payconiq, Mollie, SumUp or Europabank, or a KBC CSV statement, with the column headings as they come from the portal; the i next to each source says which columns must be there.",
     BAD_ROW: "A row in that file cannot be read (date or amount). Nothing was uploaded.",
     NOT_FOUND: "That no longer exists; refresh the page.",
     CODE_NOT_FOUND: "That accounting code no longer exists; refresh the page.",
@@ -56,6 +57,7 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
     PERIOD_OVERLAP: "Part of that period is already closed.",
     BAD_DATE: "That date does not exist.",
     LENDING_ORDER: "The last day comes before the first.",
+    MIXED_ACCOUNTS: "That statement has lines of more than one account. Download it per account from KBC.",
     BAD_AMOUNT: "That amount cannot be read. Type it like 12.50; a refund with a minus in front (-12.50).",
     LENDING_TOO_LONG: "A lending of more than a year is probably a typo in the year.",
     LENDING_OVERLAP: "That device is already lent out on one of those days (see the list below). Change that lending, or choose other days.",

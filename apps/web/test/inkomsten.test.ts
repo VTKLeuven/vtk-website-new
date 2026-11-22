@@ -486,6 +486,16 @@ describe("Europabank", () => {
     expect(rowsOf(fromSheet)[0].occurredAt.toISOString()).toBe("2026-03-05T08:30:15.000Z");
   });
 
+  it("neemt de OV-ref als uitbetaling, met de Boekingsdatum, ook voor de commissie", () => {
+    const parsed = parseIncomeExport(EUROPABANK_OUD);
+    if (!parsed.ok) throw new Error("niet gelezen");
+    expect(parsed.payouts).toEqual([{ reference: "100", paidOn: "2026-03-06", amountCents: null }]);
+    expect(parsed.rows.map((row) => [row.kind, row.payoutReference])).toEqual([
+      ["PAYMENT", "100"],
+      ["FEE", "100"],
+    ]);
+  });
+
   it("bewaart geen kaartgegevens", () => {
     const text = JSON.stringify([...rowsOf(EUROPABANK_OUD), ...rowsOf(EUROPABANK_NIEUW)]);
     expect(text).not.toContain("******");

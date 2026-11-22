@@ -23,7 +23,11 @@ import {
 import { paramGetter, parseTransactionFilter } from "@/lib/inkomsten/transactionFilter";
 import { deleteChannelLending, saveChannelLending, takeOverChannelLending } from "@/lib/inkomsten/lendingServer";
 import { deleteTransfer, saveTransfer } from "@/lib/inkomsten/transferServer";
+import { parseBankStatement, recognisesBankStatement } from "@/lib/inkomsten/bank";
+import { deleteBankStatement, importBankStatement, type BankImportSummary } from "@/lib/inkomsten/bankServer";
+import { displayAccount } from "@/lib/inkomsten/labels";
 import { formatEuro } from "@/lib/rekeningen/expenses";
+import { decodeUpload } from "@/lib/csv";
 import type { LendingDays } from "@/lib/inkomsten/lending";
 import { CHANNEL_FROM_START } from "@/lib/inkomsten/overview";
 
@@ -47,6 +51,7 @@ export type IncomeErrorCode =
   | "LENDING_TOO_LONG"
   | "LENDING_OVERLAP"
   | "BAD_AMOUNT"
+  | "MIXED_ACCOUNTS"
   | "ACCOUNT_REQUIRED"
   | "DEVICE_NOT_FOUND"
   | "FILTER_CHANGED"
@@ -77,7 +82,8 @@ async function readFiles(formData: FormData): Promise<Array<{ text: string; name
   if (files.length > MAX_FILES) return { error: "TOO_MANY_FILES" };
   const total = files.reduce((sum, file) => sum + file.size, 0);
   if (files.some((file) => file.size > MAX_FILE_BYTES) || total > MAX_TOTAL_BYTES) return { error: "FILE_TOO_LARGE" };
-  return Promise.all(files.map(async (file) => ({ text: await file.text(), name: file.name })));
+  // Een bankafschrift kan in Windows-1252 komen; `file.text()` las dat als UTF-8.
+  return Promise.all(files.map(async (file) => ({ text: decodeUpload(await file.arrayBuffer()), name: file.name })));
 }
 
 // -----------------------------------------------------------------------------
@@ -86,7 +92,8 @@ async function readFiles(formData: FormData): Promise<Array<{ text: string; name
 
 /** Wat opladen met één bestand zou doen, of waarom de site het niet kan lezen. */
 export type ImportFilePreview =
-  | { fileName: string; ok: true; summary: ImportSummary }
+  | { fileName: string; ok: true; kind: "income"; summary: ImportSummary }
+  | { fileName: string; ok: true; kind: "bank"; bank: BankImportSummary }
   | { fileName: string; ok: false; code: IncomeErrorCode; detail?: string; closest?: ClosestFormat };
 
 export type ImportPreviewState =
@@ -106,10 +113,16 @@ export async function previewIncomeImportAction(formData: FormData): Promise<Imp
   const seen = new Set<string>();
   const results: ImportFilePreview[] = [];
   for (const file of files) {
+    // Een bankafschrift eerst: geen export heeft de kolommen van KBC.
+    if (recognisesBankStatement(file.text)) {
+      const bank = await importBankStatement(file.text, file.name, { dryRun: true, userId: null, seen });
+      results.push(bank.ok ? { fileName: file.name, ok: true, kind: "bank", bank: bank.summary } : { fileName: file.name, ok: false, code: bank.error, detail: bank.detail });
+      continue;
+    }
     const outcome = await importIncomeExport(file.text, file.name, { dryRun: true, userId: null, seen });
     results.push(
       outcome.ok
-        ? { fileName: file.name, ok: true, summary: outcome.summary }
+        ? { fileName: file.name, ok: true, kind: "income", summary: outcome.summary }
         : { fileName: file.name, ok: false, code: outcome.error, detail: outcome.detail, closest: outcome.closest },
     );
   }
@@ -125,8 +138,9 @@ export async function importIncomeAction(_prev: SaveState, formData: FormData): 
   const session = await requirePermission("income.manage");
   const files = await readFiles(formData);
   if ("error" in files) return saveError(files.error);
-  for (const file of files) {
-    const parsed = parseIncomeExport(file.text);
+  const isBank = files.map((file) => recognisesBankStatement(file.text));
+  for (const [index, file] of files.entries()) {
+    const parsed = isBank[index] ? parseBankStatement(file.text, file.name) : parseIncomeExport(file.text);
     if (!parsed.ok) return saveError(parsed.error, parsed.detail);
   }
 
@@ -134,7 +148,23 @@ export async function importIncomeAction(_prev: SaveState, formData: FormData): 
   let duplicates = 0;
   let updated = 0;
   let open = 0;
-  for (const file of files) {
+  let statements = 0;
+  let bankLines = 0;
+  for (const [index, file] of files.entries()) {
+    if (isBank[index]) {
+      const bank = await importBankStatement(file.text, file.name, { dryRun: false, userId: session.user.id });
+      if (!bank.ok) return saveError(bank.error, bank.detail);
+      await logAudit({
+        action: "import",
+        entity: "incomeBankStatement",
+        entityId: bank.statementId ?? undefined,
+        target: `${displayAccount(bank.summary.account)} · ${bank.summary.coveredFrom} tot ${bank.summary.coveredTo}`,
+        summary: `${bank.summary.providerLines} regels van providers, ${bank.summary.lineCount - bank.summary.providerLines} andere niet bewaard`,
+      });
+      statements += 1;
+      bankLines += bank.summary.created;
+      continue;
+    }
     const outcome = await importIncomeExport(file.text, file.name, { dryRun: false, userId: session.user.id });
     if (!outcome.ok) return saveError(outcome.error, outcome.detail);
     const { summary } = outcome;
@@ -151,11 +181,31 @@ export async function importIncomeAction(_prev: SaveState, formData: FormData): 
     open += summary.rules.OPEN;
   }
   revalidate();
-  const parts = [`${transactions(created)} nieuw`];
+  const parts: string[] = [];
+  if (statements < files.length) parts.push(`${transactions(created)} nieuw`);
   if (duplicates) parts.push(`${duplicates} al gekend`);
   if (updated) parts.push(`${updated} nu uitbetaald`);
   if (open) parts.push(`${open} na te kijken`);
+  if (statements) parts.push(`${statements === 1 ? "1 bankafschrift" : `${statements} bankafschriften`} met ${bankLines} nieuwe ${bankLines === 1 ? "regel" : "regels"} van providers`);
   return saveOk(`Opgeladen${files.length > 1 ? ` (${files.length} bestanden)` : ""}: ${parts.join(", ")}.`);
+}
+
+/**
+ * Een bankafschrift wegdoen, met zijn regels van providers. Mag ook in een
+ * afgesloten periode: het verandert geen transactie, code of maand.
+ */
+export async function deleteBankStatementAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("income.manage");
+  const outcome = await deleteBankStatement(String(formData.get("id") ?? ""));
+  if (!outcome.ok) return saveError("NOT_FOUND");
+  await logAudit({
+    action: "delete",
+    entity: "incomeBankStatement",
+    target: `${displayAccount(outcome.account)} · ${outcome.coveredFrom} tot ${outcome.coveredTo}`,
+    summary: `${outcome.lines} regels van providers weg`,
+  });
+  revalidate();
+  return saveOk();
 }
 
 /** Een import wegdoen, met alles wat ze aanmaakte. Niet in een afgesloten periode. */

@@ -91,6 +91,9 @@ export type WorkbookPayout = {
   total: number;
   /** Wat de provider zegt dat hij overschreef (Mollie); null als de export het niet zegt. */
   providerAmount: number | null;
+  /** De dag en het bedrag op een opgeladen bankafschrift; null zonder. */
+  bankOn: Date | null;
+  bankAmount: number | null;
   checked: string;
 };
 
@@ -641,8 +644,8 @@ export function payoutsSheet(model: WorkbookModel): SheetSpec {
   const data: SheetData = [
     headerRow(
       nl
-        ? ["Bron", "Uitbetaling", "Overgeschreven op", "Eerste regel", "Laatste regel", "Betalingen", "Terugbetalingen", "Kosten", "Reserve", "Totaal", "Volgens de provider", "Afgevinkt"]
-        : ["Source", "Payout", "Transferred on", "First row", "Last row", "Payments", "Refunds", "Fees", "Reserve", "Total", "According to the provider", "Checked"],
+        ? ["Bron", "Uitbetaling", "Overgeschreven op", "Eerste regel", "Laatste regel", "Betalingen", "Terugbetalingen", "Kosten", "Reserve", "Totaal", "Volgens de provider", "Op de bank op", "Bedrag op de bank", "Afgevinkt"]
+        : ["Source", "Payout", "Transferred on", "First row", "Last row", "Payments", "Refunds", "Fees", "Reserve", "Total", "According to the provider", "On the bank on", "Amount on the bank", "Checked"],
     ),
   ];
   for (const payout of model.payouts) {
@@ -658,13 +661,15 @@ export function payoutsSheet(model: WorkbookModel): SheetSpec {
       euro(payout.reserve),
       euro(payout.total, { fontWeight: "bold" }),
       payout.providerAmount === null ? "" : euro(payout.providerAmount),
+      payout.bankOn ? { value: payout.bankOn, type: Date, format: DATE } : "",
+      payout.bankAmount === null ? "" : euro(payout.bankAmount),
       payout.checked,
     ]);
   }
   return {
     sheet: nl ? "Per uitbetaling" : "Per payout",
     data,
-    columns: [12, 20, 16, 14, 14, 13, 15, 12, 12, 13, 18, 36].map((width) => ({ width })),
+    columns: [12, 20, 16, 14, 14, 13, 15, 12, 12, 13, 18, 14, 16, 36].map((width) => ({ width })),
     stickyRowsCount: 1,
   };
 }

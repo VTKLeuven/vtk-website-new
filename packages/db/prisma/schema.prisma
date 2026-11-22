@@ -920,6 +920,7 @@ model User {
   incomePayoutChecks     IncomePayoutCheck[]  @relation("IncomePayoutCheckedBy")
   incomeLendingsCreated  IncomeChannelLending[] @relation("IncomeLendingCreatedBy")
   incomeLendingsUpdated  IncomeChannelLending[] @relation("IncomeLendingUpdatedBy")
+  incomeBankStatements   IncomeBankStatement[] @relation("IncomeBankImportedBy")
   expenseViews           ExpenseView[]
 
   requestedLesbezoeken           Lesbezoek[]              @relation("LesbezoekRequester")
@@ -9376,6 +9377,58 @@ model IncomePeriod {
   closedBy User? @relation("IncomePeriodClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
 
   @@index([fromMonth, toMonth])
+}
+
+/// Een opgeladen bankafschrift (CSV van KBC) van één rekening. Het bestand
+/// zelf wordt niet bewaard, en van zijn regels enkel die van SumUp, Payconiq,
+/// Mollie en Europabank (`IncomeBankLine`): een afschrift bevat namen,
+/// rekeningnummers en mededelingen van leden. Wat het afschrift dekt, staat
+/// hier, zodat de afstemming weet voor welke dagen ze een oordeel mag geven.
+model IncomeBankStatement {
+  id             String   @id @default(cuid())
+  /// De eigen rekening uit het bestand: hoofdletters, zonder spaties. Vergeleken
+  /// met de rekeningen van de kanalen in Instellingen, nooit met de code.
+  account        String
+  fileName       String
+  /// De eerste en de laatste dag die het afschrift dekt.
+  coveredFrom    DateTime @db.Date
+  coveredTo      DateTime @db.Date
+  /// Regels in het bestand, ook die van leden (die niet bewaard worden).
+  lineCount      Int
+  /// Bewaarde regels van providers.
+  providerCount  Int
+  importedById   String?
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  importedBy User?            @relation("IncomeBankImportedBy", fields: [importedById], references: [id], onDelete: SetNull)
+  lines      IncomeBankLine[]
+
+  @@index([account, coveredFrom])
+}
+
+/// Eén overschrijving van een provider op een bankafschrift: de dag, het
+/// bedrag en de referentie van de uitbetaling uit de mededeling. Geen naam,
+/// rekening of de mededeling zelf. Twee afschriften die elkaar overlappen,
+/// hebben elk hun eigen regel met dezelfde `externalKey`; wie ze leest, telt
+/// die één keer. Aan welke uitbetaling een regel hoort, rekent de site bij het
+/// lezen uit (`matchBankLine`): zo veroudert het nooit wanneer een export of
+/// afschrift wegvalt.
+model IncomeBankLine {
+  id          String       @id @default(cuid())
+  statementId String
+  account     String
+  bookedOn    DateTime     @db.Date
+  amountCents Int
+  provider    IncomeSource
+  reference   String?
+  externalKey String
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+
+  statement IncomeBankStatement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+
+  @@unique([statementId, externalKey])
+  @@index([account, bookedOn])
+  @@index([reference])
 }
 
 /// Een uitbetaling zoals de provider ze noemt: een overschrijving naar de

@@ -13875,6 +13875,23 @@ had.
   betaler niet over, haalt e-mailadressen uit omschrijvingen en bewaart het
   bestand niet. Daardoor hoort deze tabel niet bij de gegevensexport of de
   accountwissing.
+- **Van een bankafschrift enkel de regels van providers** (Beheer, november
+  2026, punt 8). Een afschrift van KBC staat vol met leden; de site leest het
+  om uitbetalingen te bevestigen en per rekening af te stemmen, en houdt
+  daarvoor enkel SumUp, Payconiq, Mollie en Europabank over: dag, bedrag en
+  referentie. Het bestand en elke andere regel bewaart ze niet.
+  - **Een bevestiging van de bank wordt afgeleid, niet bewaard.** Staat de
+    uitbetaling met hetzelfde bedrag op een afschrift, dan is ze in orde; een
+    vinkje met de hand gaat altijd voor. Verdwijnt het afschrift, dan staat ze
+    weer open.
+  - **De laatste dag van een periode hoort bij het volgende afschrift**
+    (Beheer: "de laatste dag mag niet in rekening gebracht worden"). Een
+    verkoop telt in de periode van haar dag, haar geld komt de volgende
+    bankdag; de afstemming toont dat als twee regels die geen verschil zijn.
+    De volgende bankdag en niet de volgende kalenderdag: op de afschriften van
+    het derde kwartaal kwam een verkoop van vrijdag tot zondag maandag binnen.
+  - **De afstemming verandert nooit wat meetelt.** Ze leest; het overzicht, het
+    kwartaalblad en `quarterLineKey` blijven zoals ze zijn.
 - **Het balansrapport van Mollie naast de betalingenexport, niet in de plaats
   ervan.** Daarin staat bij een betaling niet in welke uitbetaling ze zit, dus
   de betalingen blijven uit de betalingenexport komen. Wat het balansrapport

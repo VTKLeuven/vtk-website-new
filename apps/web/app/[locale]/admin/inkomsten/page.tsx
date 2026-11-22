@@ -14,6 +14,8 @@ import { CheckIcon, InfoIcon } from "@/components/ui/icons";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { AdminDisclosure } from "@/components/admin/AdminDisclosure";
 import { PayoutCheckButton } from "./PayoutCheckButton";
+import { BankSection } from "./BankSection";
+import { displayAccount } from "@/lib/inkomsten/labels";
 import { incomeErrorMessages } from "./messages";
 import { SOURCE_LABELS, checkText, periodLabel, quarterOptions } from "./shared";
 
@@ -47,6 +49,7 @@ export default async function IncomeOverviewPage({
   const data = await loadIncomeOverview(from, to);
   const { overview } = data;
   const money = (cents: number) => (cents === 0 ? "" : formatEuro(cents, locale));
+  const ymdLabel = (value: string) => new Date(`${value}T12:00:00Z`).toLocaleDateString(nl ? "nl-BE" : "en-GB", { timeZone: "UTC" });
   const transactionsHref = (extra: Record<string, string>) =>
     `${base}/admin/inkomsten/transacties?${new URLSearchParams({ van: from, tot: to, ...extra }).toString()}`;
   const exportHref = (soort: "boekhouder" | "controle") =>
@@ -379,8 +382,13 @@ export default async function IncomeOverviewPage({
               </p>
               <p>
                 {nl
-                  ? "SumUp: elke verkoop zegt in welke uitbetaling ze zat. De som van de verkopen min hun kosten is het bedrag dat SumUp overschreef; vink het af wanneer het op het uittreksel staat."
-                  : "SumUp: every sale says which payout it was in. The sum of the sales minus their fees is what SumUp transferred; check it off when it is on the bank statement."}
+                  ? "SumUp: elke verkoop zegt in welke uitbetaling ze zat. De som van de verkopen min hun kosten is het bedrag dat SumUp overschreef. Europabank: de OV-ref, één per kaartmerk en dag, het bruto min de commissie. Payconiq: enkel met de export die de payoutId noemt."
+                  : "SumUp: every sale says which payout it was in. The sum of the sales minus their fees is what SumUp transferred. Europabank: the OV-ref, one per card brand and day, gross minus commission. Payconiq: only with the export that lists the payoutId."}
+              </p>
+              <p>
+                {nl
+                  ? "Bankafschrift: staat de uitbetaling op een opgeladen afschrift met hetzelfde bedrag, dan is ze in orde zonder vinkje. Bij Mollie volstaat dat de overschrijving zelf op de bank staat. Een vinkje met de hand gaat altijd voor."
+                  : "Bank statement: if the payout is on an uploaded statement with the same amount, it is fine without a tick. For Mollie it is enough that the transfer itself is on the bank. A tick by hand always wins."}
               </p>
             </InfoTip>
           </div>
@@ -389,8 +397,9 @@ export default async function IncomeOverviewPage({
               .filter((source) => data.payouts.some((payout) => payout.source === source))
               .map((source) => {
                 const payouts = data.payouts.filter((payout) => payout.source === source);
-                const done = payouts.filter((payout) => payout.state === "checked" || payout.state === "provider" || payout.state === "differs").length;
+                const done = payouts.filter((payout) => ["checked", "bank", "provider", "differs"].includes(payout.state)).length;
                 const differs = payouts.filter((payout) => payout.state === "changed").length;
+                const bankDiffers = payouts.filter((payout) => payout.state === "bankDiffers").length;
                 return (
                   <AdminDisclosure
                     key={source}
@@ -405,6 +414,7 @@ export default async function IncomeOverviewPage({
                             ? `${payouts.length === 1 ? "1 uitbetaling" : `${payouts.length} uitbetalingen`}, ${done} in orde`
                             : `${payouts.length === 1 ? "1 payout" : `${payouts.length} payouts`}, ${done} done`}
                           {differs ? (nl ? `, ${differs} veranderd na het afvinken` : `, ${differs} changed after checking`) : ""}
+                          {bankDiffers ? (nl ? `, ${bankDiffers} met een ander bedrag op de bank` : `, ${bankDiffers} with another amount on the bank`) : ""}
                         </span>
                       </>
                     }
@@ -426,7 +436,12 @@ export default async function IncomeOverviewPage({
                           {payouts.map((payout) => (
                             <tr key={payout.reference} className="border-b border-vtk-blue/8 align-top last:border-0">
                               <td className="px-3 py-2 whitespace-nowrap tabular-nums">
-                                {payout.reference}
+                                <Link
+                                  href={`${base}/admin/inkomsten/transacties?${new URLSearchParams({ bron: payout.source.toLowerCase(), q: payout.reference }).toString()}`}
+                                  className="underline-offset-2 hover:underline"
+                                >
+                                  {payout.reference}
+                                </Link>
                                 <span className="block text-xs text-vtk-muted">
                                   {payout.paidOn
                                     ? `${nl ? "overgeschreven" : "transferred"} ${payout.paidOn.toLocaleDateString(nl ? "nl-BE" : "en-GB", { timeZone: "UTC" })}`
@@ -454,8 +469,27 @@ export default async function IncomeOverviewPage({
                                     locale={locale}
                                     errorMessages={errorMessages}
                                   />
-                                  <span className={`text-xs ${payout.state === "changed" ? "text-vtk-warn" : "text-vtk-muted"}`}>
-                                    {payout.state === "changed" && payout.check
+                                  <span className={`text-xs ${payout.state === "changed" || payout.state === "bankDiffers" ? "text-vtk-warn" : "text-vtk-muted"}`}>
+                                    {payout.state === "bank" && payout.bank ? (
+                                      <>
+                                        {nl ? "Op het uittreksel van " : "On the statement of "}
+                                        {ymdLabel(payout.bank.bookedOn)}
+                                        {payout.account && payout.bank.account !== payout.account
+                                          ? nl
+                                            ? `, op ${displayAccount(payout.bank.account)}: een andere rekening dan bij het kanaal`
+                                            : `, on ${displayAccount(payout.bank.account)}: another account than the channel's`
+                                          : ""}
+                                      </>
+                                    ) : payout.state === "bankDiffers" && payout.bank ? (
+                                      nl ? (
+                                        `Op de bank ${ymdLabel(payout.bank.bookedOn)}: ${formatEuro(payout.bank.amountCents, locale)}, ${formatEuro(payout.bank.amountCents - payout.total, locale)} verschil`
+                                      ) : (
+                                        `On the bank ${ymdLabel(payout.bank.bookedOn)}: ${formatEuro(payout.bank.amountCents, locale)}, ${formatEuro(payout.bank.amountCents - payout.total, locale)} difference`
+                                      )
+                                    ) : null}
+                                    {payout.state === "bank" || payout.state === "bankDiffers"
+                                      ? null
+                                      : payout.state === "changed" && payout.check
                                       ? nl
                                         ? `Afgevinkt op ${formatEuro(payout.check.amountCents, locale)}, nu anders`
                                         : `Checked at ${formatEuro(payout.check.amountCents, locale)}, now different`
@@ -474,6 +508,12 @@ export default async function IncomeOverviewPage({
                                                 ? `${formatEuro(payout.providerAmount - payout.total, locale)} meer overgeschreven (vrijgegeven reserve)`
                                                 : `${formatEuro(payout.providerAmount - payout.total, locale)} more transferred (released reserve)`
                                             : null}
+                                    {payout.missingOnStatement && payout.state !== "checked" ? (
+                                      <span className="block text-vtk-warn">
+                                        {nl ? "Niet op het afschrift van " : "Not on the statement of "}
+                                        {payout.account ? displayAccount(payout.account) : ""}
+                                      </span>
+                                    ) : null}
                                   </span>
                                 </div>
                               </td>
@@ -488,6 +528,8 @@ export default async function IncomeOverviewPage({
           </div>
         </section>
       ) : null}
+
+      {data.bank ? <BankSection bank={data.bank} nl={nl} locale={locale} base={base} from={from} to={to} /> : null}
 
       {overview.accounts.length > 0 ? (
         <section className="rounded-2xl border border-vtk-blue/12 bg-white p-5">

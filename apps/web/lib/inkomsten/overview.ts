@@ -213,16 +213,28 @@ export function groupPayouts(rows: readonly PayoutRow[]): PayoutGroup[] {
 /**
  * Of een uitbetaling klopt met de bank. Met een vinkje: afgevinkt op het
  * bedrag van nu (`checked`), of op een ander (`changed`: een latere export
- * veranderde de som). Zonder vinkje kan het bedrag van de provider zelf het
- * zeggen: de overschrijving in het balansrapport van Mollie is het bedrag op
- * het uittreksel, dus gelijk is klaar (`provider`). Anders (`differs`) hield
+ * veranderde de som); een vinkje met de hand gaat altijd voor.
+ *
+ * Staat ze op een opgeladen bankafschrift, dan zegt dat het: hetzelfde bedrag
+ * als de som, of bij Mollie als de overschrijving, is in orde (`bank`); een
+ * ander bedrag is een verschil om na te kijken (`bankDiffers`).
+ *
+ * Zonder afschrift kan het bedrag van de provider zelf het zeggen: de
+ * overschrijving in het balansrapport van Mollie is het bedrag op het
+ * uittreksel, dus gelijk is klaar (`provider`). Anders (`differs`) hield
  * Mollie iets bij of gaf iets vrij: dat verschil zit in de berekende wijziging
  * van de dynamische reserve, dus ook dat is in orde, als informatie.
  */
-export type PayoutState = "checked" | "provider" | "changed" | "differs" | "open";
+export type PayoutState = "checked" | "bank" | "provider" | "changed" | "bankDiffers" | "differs" | "open";
 
-export function payoutState(total: number, checkedAmount: number | null, providerAmount: number | null): PayoutState {
+export function payoutState(
+  total: number,
+  checkedAmount: number | null,
+  providerAmount: number | null,
+  bankAmount: number | null = null,
+): PayoutState {
   if (checkedAmount !== null) return checkedAmount === total ? "checked" : "changed";
+  if (bankAmount !== null) return bankAmount === total || bankAmount === providerAmount ? "bank" : "bankDiffers";
   if (providerAmount !== null) return providerAmount === total ? "provider" : "differs";
   return "open";
 }
@@ -265,7 +277,7 @@ export type IncomeCheck =
   | { key: "mollieFees"; ok: boolean; months: string[] }
   /** Maanden met Mollie-kosten uit twee soorten bestanden: twee keer hetzelfde geld. */
   | { key: "mollieFeesTwice"; ok: boolean; months: string[] }
-  | { key: "payouts"; ok: boolean; total: number; checked: number; changed: number; differs: number }
+  | { key: "payouts"; ok: boolean; total: number; checked: number; changed: number; differs: number; bankDiffers: number; bank: number }
   /**
    * Of de site de wijziging van de dynamische reserve van Mollie kent: de
    * betalingenexport en het balansrapport noemen dezelfde betalingen.
@@ -296,7 +308,7 @@ export type IncomeCheckInput = {
   mollieFeeMonths: ReadonlySet<string>;
   /** Maanden met kosten uit beide soorten bestanden. */
   mollieFeeMonthsTwice: ReadonlySet<string>;
-  payouts: ReadonlyArray<{ total: number; checkedAmount: number | null; providerAmount: number | null }>;
+  payouts: ReadonlyArray<{ total: number; checkedAmount: number | null; providerAmount: number | null; bankAmount?: number | null }>;
   open: { count: number; cents: number };
   withoutAccount: { count: number; cents: number };
   hasFees: boolean;
@@ -327,10 +339,11 @@ export function computeIncomeChecks(input: IncomeCheckInput): IncomeCheck[] {
   }
   const feeMonths = input.months.filter((month) => input.molliePaymentMonths.has(month) && !input.mollieFeeMonths.has(month));
   const twice = input.months.filter((month) => input.mollieFeeMonthsTwice.has(month));
-  const states = input.payouts.map((payout) => payoutState(payout.total, payout.checkedAmount, payout.providerAmount));
+  const states = input.payouts.map((payout) => payoutState(payout.total, payout.checkedAmount, payout.providerAmount, payout.bankAmount ?? null));
   const count = (...wanted: PayoutState[]) => states.filter((state) => wanted.includes(state)).length;
   // Een verschil met de overschrijving van Mollie is in orde: het zit in de reserve.
-  const checked = count("checked", "provider", "differs");
+  // Op het afschrift met hetzelfde bedrag ook.
+  const checked = count("checked", "bank", "provider", "differs");
   const reserve = input.mollieReserve;
   const reserveCheck: IncomeCheck[] =
     reserve.status === "none"
@@ -352,6 +365,8 @@ export function computeIncomeChecks(input: IncomeCheckInput): IncomeCheck[] {
       checked,
       changed: count("changed"),
       differs: count("differs"),
+      bankDiffers: count("bankDiffers"),
+      bank: count("bank"),
     },
     { key: "open", ok: input.open.count === 0, ...input.open },
     { key: "accounts", ok: input.withoutAccount.count === 0, ...input.withoutAccount },

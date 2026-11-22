@@ -28,6 +28,9 @@ per rij of voor veel rijen tegelijk.
 | `lib/inkomsten/match.ts` | De koppelregels als pure functie (`matchTransaction`), de kassa die een toestel had (`kassaAt`), de uitlening van een dag (`lendingOn`), en de onthouden tekst (`incomeRuleText`). |
 | `lib/inkomsten/lending.ts` | De dagen van een uitlening nakijken (`checkLendingDays`, `overlappingLending`). Puur. |
 | `lib/inkomsten/lendingServer.ts` | De uitleningen: lijst, bewaren, verwijderen, overnemen wat met de hand gezet werd. |
+| `lib/inkomsten/columns.ts` | De kolommen die de site leest, per export (`EXPORT_COLUMNS`) en van het afschrift (`BANK_COLUMNS`). Zonder afhankelijkheden: de "i" bij Uploaden toont ze in de browser. |
+| `lib/inkomsten/bank.ts` | Een afschrift van KBC lezen (enkel de regels van providers), een regel aan haar uitbetaling koppelen (`matchBankLine`), de volgende bankdag, en per rekening afstemmen (`reconcileAccounts`). Puur. |
+| `lib/inkomsten/bankServer.ts` | De afschriften: opladen (met voorvertoning), de lijst, verwijderen, en wat het overzicht toont (`loadBankLines`, `loadBankOverview`). |
 | `lib/inkomsten/transfer.ts` | Een overschrijving met de hand nakijken (`checkTransfer`, `parseTransferAmount`) en haar moment (`transferMoment`). Puur. |
 | `lib/inkomsten/transferServer.ts` | De overschrijvingen met de hand: lijst, de gekende rekeningen, bewaren, verwijderen. |
 | `lib/inkomsten/lines.ts` | `quarterLineKey`: op welke regel een transactie telt, of niet. Het overzicht en beide bestanden rekenen ermee. Puur. |
@@ -46,13 +49,16 @@ per rij of voor veel rijen tegelijk.
 | `app/api/admin/inkomsten/export/route.ts` | De twee xlsx-bestanden, voor `?van=2026-07&tot=2026-09` en `?soort=boekhouder` of `?soort=controle`. |
 | `lib/accounting/import.ts` | De lijst van boekhoudcodes als CSV lezen, en plannen wat opladen doet. Puur. |
 | `lib/csv.ts` | De CSV-lezer die beide gebruiken: scheidingsteken raden, aanhalingstekens volgens RFC 4180. |
-| `test/inkomsten.test.ts`, `test/inkomstenWorkbook.test.ts`, `test/inkomstenTransactionFilter.test.ts`, `test/inkomstenLending.test.ts`, `test/inkomstenTransfer.test.ts`, `test/accountingCodesImport.test.ts` | Parsers, koppelregels, overzicht, controlelijst, de xlsx, de dagen van een uitlening, de overschrijvingen en de codelijst, zonder database, met verzonnen gegevens. |
+| `test/inkomsten.test.ts`, `test/inkomstenWorkbook.test.ts`, `test/inkomstenTransactionFilter.test.ts`, `test/inkomstenLending.test.ts`, `test/inkomstenTransfer.test.ts`, `test/inkomstenBank.test.ts`, `test/accountingCodesImport.test.ts` | Parsers, koppelregels, overzicht, controlelijst, de xlsx, de dagen van een uitlening, de overschrijvingen, de bankafschriften en de codelijst, zonder database, met verzonnen gegevens. |
 | `test/integration/inkomsten-uitlening.integration.ts` | Een uitlening tegen een echte database: bewaren, later opladen, aanpassen, overlappen, afgesloten, overnemen en verwijderen. |
+| `test/integration/inkomsten-bankafschrift.integration.ts` | Bankafschriften tegen een echte database: voorvertoning, enkel providers, overlappende afschriften, later koppelen, verwijderen. |
 | `test/integration/inkomsten-overschrijving.integration.ts` | Een overschrijving tegen een echte database: toevoegen, in het overzicht, niet bij Uploaden, niet terug naar de regels, aanpassen, afgesloten, verwijderen. |
 
 Tabellen: `IncomeImport`, `IncomeChannel`, `IncomeChannelAccount` (de rekening
 vanaf een dag), `IncomeChannelCode` (de standaardcode vanaf een dag),
 `IncomeChannelLending` (een uitlening van het toestel, van dag tot dag),
+`IncomeBankStatement` en `IncomeBankLine` (een bankafschrift en zijn regels van
+providers),
 `IncomeTransaction`, `IncomeNameRule`, `IncomePeriod`, `IncomePayout` (een
 uitbetaling zoals de provider ze noemt), `IncomePayoutCheck`.
 Op de kassa: `CashRegister.accountingCodeId`, en `IncomeTransaction.cashRegisterId`
@@ -89,10 +95,10 @@ bewaart hem als `payoutReference`, zoals het nummer van een SumUp-uitbetaling.
 Enkel die tweede export heeft hem, en enkel hij laat een Payconiq-regel op het
 bankafschrift terugvinden: in de mededeling staat `JJJJMMDD-PA...`. De gewone
 export rekent geen uitbetaling terug, want Payconiq telt een sticker per dag in
-UTC en het ticketsysteem van middag tot middag. Payconiq staat nog niet in de
-lijst per uitbetaling en de controlestap Uitbetalingen: de export zegt niet op
-welke dag en voor welk bedrag een uitbetaling vertrok, dus elke dag zou er open
-staan. Dat komt met de bankafschriften. Een bestand dat al opgeladen was,
+UTC en het ticketsysteem van middag tot middag. Met payoutId staat elke
+Payconiq-uitbetaling in de lijst per uitbetaling en de controlestap
+Uitbetalingen; de export zegt niet op welke dag en voor welk bedrag ze
+vertrok, dus een bankafschrift bevestigt ze (zie "Bankafschriften"). Een bestand dat al opgeladen was,
 opnieuw opladen in de tweede opmaak, vult de `payoutId` aan (behalve in een
 afgesloten maand) en meldt die regels als "nu uitbetaald".
 
@@ -256,6 +262,11 @@ valt; de uitsplitsing per koppelregel staat onder "Details per koppelregel".
 - Komen de Mollie-kosten van een maand al uit de export per uitbetaling
   ("Withheld fees"), dan slaat het balansrapport zijn factuur van die maand
   over (`ignored`). Omgekeerd ziet de controlelijst het.
+- Een bankafschrift van KBC mag in dezelfde keuze: de site herkent het eerst
+  (`recognisesBankStatement`), anders is het een export. Zie
+  "Bankafschriften".
+- Een bestand wordt gelezen als UTF-8, en anders als Windows-1252
+  (`decodeUpload`).
 
 ## Koppelregels
 
@@ -522,6 +533,69 @@ het tabblad Overschrijvingen (`/admin/inkomsten/overschrijvingen`).
   negeren ze (geen `payoutReference`), en de tussenlaag "Per groep" van het
   controlebestand slaat ze over.
 
+## Bankafschriften
+
+Het CSV-uittreksel van één rekening uit KBC (`Rekeningnummer;...;vrije
+mededeling`, met een `;` achteraan elke regel en soms losse CR als regeleinde),
+opgeladen bij Uploaden. Het telt nergens mee: het bevestigt uitbetalingen en
+stemt per rekening af.
+
+- **Enkel de regels van providers.** `parseBankStatement` herkent SumUp,
+  Payconiq (`BANCONTACT COMPANY NV`), Mollie en Europabank aan de naam van de
+  tegenpartij, nooit aan de mededeling (die typt een lid zelf), en houdt van
+  die regels enkel de dag, het bedrag en de referentie van de uitbetaling over.
+  Al de rest (leden, leveranciers, interne overschrijvingen) en het bestand
+  zelf bewaart de site niet. `IncomeBankStatement` onthoudt per afschrift de
+  rekening en de dagen die het dekt (uit de bestandsnaam
+  `..._01-08-2026_tot_30-09-2026.csv`, anders uit de regels).
+- **De eigen rekening komt uit het bestand** en wordt vergeleken met de
+  rekeningen van de kanalen in Instellingen (`normaliseAccount`: hoofdletters,
+  zonder spaties). Een rekening die bij geen kanaal staat, mag; de
+  voorvertoning en de lijst zeggen het.
+- **Koppelen op de referentie, nooit op dag en bedrag** (`matchBankLine`):
+  - SumUp: de hele mededeling ("MDA PID1317737") is het Uitbetalingsnummer;
+  - Mollie: `REF T<referentie> MOLLIE`, de overschrijving uit het
+    balansrapport;
+  - Payconiq: `YYYYMMDD-PA...-NONE-...`, de `payoutId` van de export die hem
+    noemt. Met de gewone export (zonder payoutId) kan het niet: wanneer
+    Payconiq een dag afsluit, hangt af van de soort winkel (Ticketsysteem van
+    middag tot middag, de stickers per UTC-dag);
+  - Europabank: `OV.REF.<n>`, de OV-ref van de export, die sinds deze versie
+    de uitbetaling is (één per kaartmerk en dag, het bruto min de commissie,
+    op de Boekingsdatum).
+- **De koppeling wordt bij het lezen berekend**, niet bewaard: een export of
+  afschrift dat later komt of weggaat, verandert ze vanzelf.
+- **Overlappende afschriften** houden elk hun eigen regels (uniek per afschrift
+  op `externalKey`); wie leest, telt een regel één keer (`loadBankLines`). Zo
+  haalt het verwijderen van één afschrift geen regel weg die een ander ook
+  heeft. Verwijderen mag ook in een afgesloten periode: het verandert geen
+  transactie, code of maand.
+- **Per uitbetaling** toont het overzicht de dag op het afschrift, of een
+  verschil. Een uitbetaling die op een gedekte dag van haar rekening
+  verwacht werd maar er niet staat, krijgt "Niet op het afschrift".
+- **Tegen de bankafschriften** (`reconcileAccounts`): per rekening wat de site
+  in de periode op de bank verwacht, naast de regels van providers:
+
+      verwacht = verkocht in de periode
+               - verkocht in de periode, op de bank erna
+               + verkocht ervoor, op de bank in de periode
+               + de overschrijvingen van Mollie in de periode
+
+  Per regel en niet per uitbetaling: één uitbetaling kan verkopen van twee
+  periodes dragen (SumUp betaalde op 3 augustus juli uit). De dag op de bank
+  is die van de gekoppelde bankregel, anders die van de uitbetaling in de
+  export (SumUp, Europabank), en anders de volgende bankdag
+  (`nextBankingDay`: geen weekend en geen sluitingsdag van TARGET2), als
+  schatting, schuin op het scherm. Alles telt, ook wat niet meetelt en de
+  kosten met een aparte factuur: het geld kwam toch op de bank. Een verschil
+  staat er enkel voor een rekening waarvan afschriften elke dag van de periode
+  dekken. Overschrijvingen met de hand staan er ter info bij.
+- Op de afschriften van het derde kwartaal van 2026 (augustus en september):
+  Mollie 9 van 9, SumUp 18 van 19 op de cent (de 19de, 3 augustus bij Fakbar,
+  betaalde ook verkopen die niet in de export staan), Theokot afgestemd op
+  € 0,00. Payconiq (26) wacht op de export met payoutId, Europabank (31) op
+  de export van die terminal.
+
 ## Kanalen en rekeningen
 
 Een kanaal (`IncomeChannel`) ontstaat bij de eerste import die het noemt. Beheer
@@ -675,11 +749,13 @@ plus wat niet meetelt", wat nul hoort te zijn.
 4. de site kent de wijziging van de dynamische reserve: de betalingenexport en
    het balansrapport noemen dezelfde betalingen (`mollieReserve`). Zo niet,
    dan zegt de stap hoeveel betalingen aan welke kant ontbreken;
-5. elke uitbetaling van Mollie en SumUp klopt: afgevinkt tegen het uittreksel,
-   of een overschrijving van Mollie (`payoutState`). Bij Mollie is een verschil
-   tussen de som van de betalingen en de overschrijving in orde: dat verschil
-   zit in de reserve, en staat er ter informatie bij. De stap linkt naar "Per
-   uitbetaling";
+5. elke uitbetaling klopt: afgevinkt tegen het uittreksel, op een opgeladen
+   bankafschrift met hetzelfde bedrag (`bank`), of een overschrijving van
+   Mollie (`payoutState`). Bij Mollie is een verschil tussen de som van de
+   betalingen en de overschrijving in orde: dat verschil zit in de reserve, en
+   staat er ter informatie bij; op het afschrift volstaat de overschrijving.
+   Een ander bedrag op de bank (`bankDiffers`) is niet in orde. De stap linkt
+   naar "Per uitbetaling";
 6. Na te kijken staat op nul;
 7. elk kanaal heeft een rekening;
 8. er is een kostencode, als er kosten zijn.
@@ -831,6 +907,17 @@ fouten), dan opladen.
   loopt een kassa op een gedeeld toestel hoogstens tot 9:00 de ochtend na haar
   einde (`reviewDay`). Een evenement dagen later zonder kassa belandt zo bij
   Na te kijken in plaats van bij de vorige kassa.
+- **Een bankafschrift bevat leden.** Herken een provider aan de naam van de
+  tegenpartij, nooit aan de mededeling: een lid kan "MOLLIE" in zijn
+  mededeling typen. Geef de parser geen kolom mee die je niet nodig hebt.
+- **KBC eindigt een regel soms op een losse CR.** Wie de eerste regel op `\n`
+  splitst, telt het scheidingsteken over het hele bestand (`detectDelimiter`).
+- **`node:crypto` hoort niet in de browser.** De "i" bij Uploaden toont de
+  kolommen in een clientcomponent; daarom staan ze in `columns.ts`, zonder
+  afhankelijkheden, en niet in `parse.ts` of `bank.ts`.
+- **Payconiq zonder payoutId** is niet aan de bank te koppelen, en de
+  afstemming schat er de dag van: aan de rand van een periode wijkt ze dan af.
+  Vraag de export met payoutId.
 - **Een overschrijving is geen export.** Ze heeft een `IncomeImport` om de
   database eenvoudig te houden, maar geen bestand: wie een lijst van imports
   toont, filtert op `format` (`MANUAL_FORMAT`). En een maand zonder

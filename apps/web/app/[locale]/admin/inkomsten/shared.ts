@@ -111,7 +111,7 @@ export function checkText(
             href: `${base}/admin/inkomsten/opladen`,
           };
     case "payouts":
-      if (check.total === 0) return { ok: true, text: nl ? "Geen uitbetalingen van Mollie of SumUp in deze periode." : "No Mollie or SumUp payouts in this period." };
+      if (check.total === 0) return { ok: true, text: nl ? "Geen uitbetalingen in deze periode." : "No payouts in this period." };
       return check.ok
         ? {
             ok: true,
@@ -119,6 +119,7 @@ export function checkText(
               (nl
                 ? `${check.total === 1 ? "De uitbetaling klopt" : `Alle ${check.total} uitbetalingen kloppen`} met het uittreksel of met de overschrijving van Mollie`
                 : `All ${check.total} payouts match the bank statement or the Mollie transfer`) +
+              (check.bank ? (nl ? ` (${check.bank} gevonden op een opgeladen afschrift)` : ` (${check.bank} found on an uploaded statement)`) : "") +
               (check.differs
                 ? nl
                   ? `; bij ${check.differs} wijkt de som van de betalingen af van wat Mollie overschreef, en dat verschil zit in de reserve.`
@@ -129,13 +130,21 @@ export function checkText(
             ok: false,
             text:
               (nl
-                ? `${check.checked} van de ${check.total} uitbetalingen afgevinkt of gelijk aan de overschrijving`
-                : `${check.checked} of ${check.total} payouts checked or equal to the transfer`) +
+                ? `${check.checked} van de ${check.total} uitbetalingen afgevinkt, op een afschrift of gelijk aan de overschrijving`
+                : `${check.checked} of ${check.total} payouts checked, on a statement or equal to the transfer`) +
               (check.changed
                 ? nl
-                  ? `; bij ${check.changed} veranderde het bedrag na het afvinken.`
-                  : `; ${check.changed} changed after checking.`
-                : "."),
+                  ? `; bij ${check.changed} veranderde het bedrag na het afvinken`
+                  : `; ${check.changed} changed after checking`
+                : "") +
+              (check.bankDiffers
+                ? nl
+                  ? `; ${check.bankDiffers} met een ander bedrag op de bank`
+                  : `; ${check.bankDiffers} with another amount on the bank`
+                : "") +
+              (nl
+                ? ". Upload het bankafschrift van de rekening, dan vinkt de site af wat erop staat."
+                : ". Upload the account's bank statement, and the site checks off what is on it."),
             href: "#per-uitbetaling",
           };
     case "mollieReserve": {

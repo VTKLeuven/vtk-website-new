@@ -221,87 +221,10 @@ function rowHash(parts: string[]): string {
 // Formaten
 // -----------------------------------------------------------------------------
 
-/**
- * Een kolom zoals de export ze noemt. Meer dan één naam: Engelse en
- * Nederlandse koppen, of de oude en de nieuwe opmaak. De site leest op naam:
- * hoofdletters en de volgorde van de kolommen maken niet uit.
- */
-export type ExportColumn = { names: readonly string[]; required: boolean };
+export { EXPORT_COLUMNS, may, need, type ExportColumn } from "./columns";
+import { EXPORT_COLUMNS, type ExportColumn } from "./columns";
 
-const need = (...names: string[]): ExportColumn => ({ names, required: true });
-const may = (...names: string[]): ExportColumn => ({ names, required: false });
-
-/**
- * De kolommen die de site leest, per formaat. Een bestand is van een formaat
- * wanneer het elke verplichte kolom heeft; de andere leest ze als ze er zijn.
- * Wat hier niet staat (namen en rekeningnummers van wie betaalde,
- * kaartnummers, autorisatiecodes), leest de site niet. De volgorde is die
- * waarin `parseIncomeExport` herkent: het balansrapport van Mollie vóór de
- * betalingenexport.
- */
-export const EXPORT_COLUMNS = {
-  // Twee exports van hetzelfde portaal: de gewone (`shop_name`, `bulk_id`) en
-  // een tweede (`shopName`, `bulkId`) die ook de uitbetaling noemt
-  // (`payoutId`). Enkel die laatste laat een uitbetaling op het afschrift
-  // terugvinden.
-  payconiq: {
-    id: need("id"),
-    date: need("date"),
-    time: need("time"),
-    amount: need("amount"),
-    status: need("status"),
-    shop: need("shop_name", "shopName"),
-    type: may("type"),
-    description: may("description"),
-    reference: may("reference"),
-    bulkId: may("bulk_id", "bulkId"),
-    payout: may("payoutId", "payout_id"),
-  },
-  "mollie-balance": {
-    date: need("Date"),
-    type: need("Transaction type"),
-    reference: need("Transaction reference"),
-    amount: need("Settlement amount"),
-    description: may("Description"),
-  },
-  mollie: {
-    id: need("ID"),
-    date: need("Date", "Datum"),
-    status: need("Status"),
-    amount: need("Amount", "Bedrag"),
-    settlementReference: need("Settlement reference", "Uitbetalingsreferentie"),
-    settlementAmount: may("Settlement amount", "Uitbetalingsbedrag"),
-    method: may("Payment method", "Betaalmethode"),
-    description: may("Description", "Omschrijving"),
-    refunded: may("Amount refunded", "Teruggestort bedrag"),
-  },
-  sumup: {
-    date: need("Datum"),
-    id: need("Transactie-ID"),
-    type: need("Transactietype"),
-    status: need("Status"),
-    amount: need("Totaal bedrag"),
-    account: may("email", "E-mail", "E-mailadres", "Account"),
-    fee: may("Transactiekosten"),
-    payout: may("Uitbetalingsnummer"),
-    payoutDate: may("Uitbetaling datum"),
-    description: may("Beschrijving"),
-    reference: may("Kenmerk"),
-  },
-  europabank: {
-    date: need("Datum"),
-    time: need("Tijd"),
-    terminal: need("Terminal"),
-    result: need("Resultaat"),
-    amount: need("Origineel bedrag (EUR)", "Bedrag"),
-    type: may("Transactietype"),
-    commission: may("Commissie (EUR)"),
-    authorisation: may("Autorisatie nr", "Authorisatie nr"),
-    reference: may("Uw ref", "Ticket/Uw ref"),
-  },
-} as const satisfies Record<IncomeFormat, Record<string, ExportColumn>>;
-
-type Columns = Map<string, number>;
+export type Columns = Map<string, number>;
 
 /**
  * Een kolomkop zoals de site hem vergelijkt: zonder hoofdletters, spaties,
@@ -319,7 +242,7 @@ export function headerKey(name: string): string {
 }
 
 /** De kolommen van een bestand; staat een kop er twee keer, dan telt de eerste. */
-function columnsOf(header: string[]): Columns {
+export function columnsOf(header: string[]): Columns {
   const columns: Columns = new Map();
   header.forEach((name, index) => {
     const key = headerKey(name);
@@ -329,7 +252,7 @@ function columnsOf(header: string[]): Columns {
 }
 
 /** Waar elke kolom van een formaat staat; `undefined` als het bestand ze niet heeft. */
-function indexes<T extends Record<string, ExportColumn>>(columns: Columns, spec: T): { [K in keyof T]: number | undefined } {
+export function indexes<T extends Record<string, ExportColumn>>(columns: Columns, spec: T): { [K in keyof T]: number | undefined } {
   const found = {} as { [K in keyof T]: number | undefined };
   for (const key of Object.keys(spec) as Array<keyof T>) {
     found[key] = spec[key].names.map((name) => columns.get(headerKey(name))).find((index) => index !== undefined);
@@ -344,7 +267,7 @@ function missingColumns(columns: Columns, spec: Record<string, ExportColumn>): {
   return { missing: missing.map((column) => column.names[0]), required: required.length };
 }
 
-function recognises(columns: Columns, spec: Record<string, ExportColumn>): boolean {
+export function recognises(columns: Columns, spec: Record<string, ExportColumn>): boolean {
   return missingColumns(columns, spec).missing.length === 0;
 }
 
@@ -779,6 +702,7 @@ function parseEuropabank(rows: string[][], columns: Columns): IncomeParseResult 
   const referenceCol = c.reference;
 
   const result: ParsedIncomeRow[] = [];
+  const payouts = new Map<string, ParsedPayout>();
   const seenHashes = new Map<string, number>();
   let skipped = 0;
 
@@ -812,6 +736,13 @@ function parseEuropabank(rows: string[][], columns: Columns): IncomeParseResult 
     seenHashes.set(base, seen + 1);
     const key = `eb:${base}:${seen}`;
 
+    // De OV-ref is de overschrijving naar de bank: één per kaartmerk en dag,
+    // het bruto min de commissie, op de Boekingsdatum. Ze staat ook in de
+    // mededeling op het afschrift. Zonder voorloopnullen, zoals daar.
+    const ovRef = get(c.payout).trim().replace(/\.0+$/, "").replace(/^0+(?=\d)/, "") || null;
+    const booked = ovRef ? parseLocalDateTime(get(c.payoutDate).trim().split(/[ T]/)[0]) : null;
+    if (ovRef && booked && !payouts.has(ovRef)) payouts.set(ovRef, { reference: ovRef, paidOn: ymdOf(booked), amountCents: null });
+
     const payment: ParsedIncomeRow = {
       source: "EUROPABANK",
       kind,
@@ -824,13 +755,22 @@ function parseEuropabank(rows: string[][], columns: Columns): IncomeParseResult 
       description: null,
       reference: emptyToNull(get(referenceCol)),
       bulkId: null,
-      payoutReference: null,
+      payoutReference: ovRef,
       channel: terminal,
     };
     result.push(payment);
     if (commission) result.push(feeRow(payment, key, commission));
   }
-  return { ok: true, format: "europabank", source: "EUROPABANK", rows: result, skipped, ignored: 0, total: rows.length - 1, payouts: [] };
+  return {
+    ok: true,
+    format: "europabank",
+    source: "EUROPABANK",
+    rows: result,
+    skipped,
+    ignored: 0,
+    total: rows.length - 1,
+    payouts: [...payouts.values()],
+  };
 }
 
 // -----------------------------------------------------------------------------

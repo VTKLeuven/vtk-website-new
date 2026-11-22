@@ -198,6 +198,12 @@ de sectie "Vallen"; de kringkeuzes staan in `docs/design-decisions.md`.
   per stuk en één kanaal per rekening. Een lijst van imports filtert op dat
   formaat, en wat "elke maand een export" verwacht, loopt over `EXPORT_SOURCES`,
   niet over `INCOME_SOURCES`. Bewaar er geen naam of rekening van wie stortte.
+- **Een bankafschrift bewaart enkel regels van providers**, herkend aan de naam
+  van de tegenpartij en nooit aan de mededeling; nooit het bestand of een regel
+  van een lid. De eigen rekening komt uit het bestand en wordt vergeleken met
+  Instellingen, nooit met een rekeningnummer in de code. Wat de browser nodig
+  heeft (de kolommen), staat in `columns.ts`: `parse.ts` en `bank.ts` mogen
+  niet in een clientbundel belanden.
 
 # Bestuursorgaan
 

@@ -10,6 +10,7 @@ import type { SaveAction } from "@/lib/saveState";
 import { combineImportSummaries } from "@/lib/inkomsten/importSummary";
 import type { ImportFilePreview, ImportPreviewState } from "@/app/actions/inkomsten";
 import Link from "@/components/ui/Link";
+import { displayAccount } from "@/lib/inkomsten/labels";
 import { SOURCE_LABELS } from "../shared";
 import { formatTitle } from "./FormatGuide";
 
@@ -59,13 +60,19 @@ export function UploadForm({
   }
 
   const files = preview.status === "preview" ? preview.files : [];
-  const good = files.flatMap((file) => (file.ok ? [file.summary] : []));
+  const good = files.flatMap((file) => (file.ok && file.kind === "income" ? [file.summary] : []));
+  const banks = files.flatMap((file) => (file.ok && file.kind === "bank" ? [file.bank] : []));
   const failed = files.flatMap((file) => (file.ok ? [] : [file]));
   const several = files.length > 1;
   const totals = good.length > 0 ? combineImportSummaries(good) : null;
   // Iets dat opladen de moeite waard maakt. Een balansrapport dat al geüpload
   // was, brengt soms enkel de betalingen om na te kijken: ook dat telt.
-  const hasNews = totals !== null && totals.created + totals.updated + totals.payouts + totals.balancePayments > 0;
+  // Een afschrift is nieuws met nieuwe regels, of met dagen die nog geen
+  // afschrift van die rekening dekte (een maand zonder provider telt ook).
+  const hasNews =
+    (totals !== null && totals.created + totals.updated + totals.payouts + totals.balancePayments > 0) ||
+    banks.some((bank) => bank.created > 0 || bank.newCoverage);
+  const ymdLabel = (ymd: string) => new Date(`${ymd}T12:00:00Z`).toLocaleDateString(nl ? "nl-BE" : "en-GB", { timeZone: "UTC" });
   const matched = totals
     ? totals.rules.WEBSITE +
       totals.rules.CODE_IN_TEXT +
@@ -83,7 +90,7 @@ export function UploadForm({
       savedMessage={nl ? "Geüpload." : "Uploaded."}
       errorMessages={errorMessages}
       fallbackErrorMessage={nl ? "Uploaden mislukt." : "Upload failed."}
-      submitDisabled={pending || !totals || failed.length > 0 || !hasNews}
+      submitDisabled={pending || (!totals && banks.length === 0) || failed.length > 0 || !hasNews}
       onSuccess={() => {
         setPreview({ status: "idle" });
         router.refresh();
@@ -99,8 +106,8 @@ export function UploadForm({
         chooseLabel={nl ? "Exports kiezen" : "Choose exports"}
         hint={
           nl
-            ? "Eén of meer CSV's van Payconiq, Mollie, SumUp of Europabank, gerust allemaal tegelijk; slepen kan ook."
-            : "One or more CSVs from Payconiq, Mollie, SumUp or Europabank, all at once if you like; dragging works too."
+            ? "Eén of meer CSV's van Payconiq, Mollie, SumUp of Europabank, en de afschriften van KBC, gerust allemaal tegelijk; slepen kan ook."
+            : "One or more CSVs from Payconiq, Mollie, SumUp or Europabank, and the KBC statements, all at once if you like; dragging works too."
         }
         onChange={onFiles}
       />
@@ -135,6 +142,46 @@ export function UploadForm({
           ) : (
             <p>{cannotRead(failed[0])}</p>
           )}
+        </div>
+      ) : null}
+
+      {banks.length > 0 && !pending ? (
+        <div className="rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/40 px-4 py-3 text-sm">
+          <p className="font-medium">
+            {banks.length === 1 ? (nl ? "Bankafschrift" : "Bank statement") : nl ? `${banks.length} bankafschriften` : `${banks.length} bank statements`}
+          </p>
+          <ul className="mt-1 space-y-2">
+            {banks.map((bank) => (
+              <li key={bank.fileName}>
+                <p>
+                  <span className="font-medium tabular-nums">{displayAccount(bank.account)}</span>
+                  <span className="text-vtk-muted">
+                    {" "}
+                    · {ymdLabel(bank.coveredFrom)} {nl ? "tot en met" : "to"} {ymdLabel(bank.coveredTo)}
+                  </span>
+                </p>
+                <p className="text-vtk-muted">
+                  {nl
+                    ? `${number(bank.providerLines)} ${bank.providerLines === 1 ? "regel" : "regels"} van providers (${number(bank.created)} nieuw, ${number(bank.matched)} met een uitbetaling op de site). De ${number(bank.lineCount - bank.providerLines)} andere regels en het bestand zelf bewaart de site niet.`
+                    : `${number(bank.providerLines)} provider ${bank.providerLines === 1 ? "line" : "lines"} (${number(bank.created)} new, ${number(bank.matched)} with a payout on the site). The site keeps neither the ${number(bank.lineCount - bank.providerLines)} other lines nor the file.`}
+                </p>
+                {!bank.knownAccount ? (
+                  <p className="text-vtk-warn">
+                    {nl
+                      ? "Deze rekening staat bij geen enkel kanaal. Uploaden kan, maar vul ze in bij "
+                      : "No channel has this account. Uploading works, but set it under "}
+                    <Link href={`${nl ? "" : "/en"}/admin/inkomsten/instellingen`} className="font-medium underline">
+                      {nl ? "Instellingen" : "Settings"}
+                    </Link>
+                    {nl ? ", anders kan de site ze niet per rekening afstemmen." : ", otherwise the site cannot reconcile it per account."}
+                  </p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          {!totals && !hasNews ? (
+            <p className="mt-2 text-vtk-muted">{nl ? "Er is niets nieuws in dit afschrift." : "There is nothing new in this statement."}</p>
+          ) : null}
         </div>
       ) : null}
 

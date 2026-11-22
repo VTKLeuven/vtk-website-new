@@ -29,3 +29,8 @@ export function postName(code: string, ownName: string | null, mainNameOf: (main
   const main = code.split(" ")[0];
   return mainNameOf(main) || ownName || code;
 }
+
+/** Een rekening zoals het scherm ze toont: per vier tekens, zoals op een afschrift. */
+export function displayAccount(account: string): string {
+  return /^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(account) ? account.replace(/(.{4})(?=.)/g, "$1 ") : account;
+}

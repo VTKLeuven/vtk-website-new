@@ -1,7 +1,18 @@
 import { InfoTip } from "@/components/ui/InfoTip";
-import { EXPORT_COLUMNS, type ExportColumn, type IncomeFormat } from "@/lib/inkomsten/parse";
+import { BANK_COLUMNS, EXPORT_COLUMNS, type ExportColumn } from "@/lib/inkomsten/columns";
+import type { IncomeFormat } from "@/lib/inkomsten/parse";
 
-type Guide = { format: IncomeFormat; title: { nl: string; en: string }; what: { nl: string; en: string }; counts: { nl: string; en: string } };
+type Guide = {
+  format: IncomeFormat | "bank";
+  title: { nl: string; en: string };
+  what: { nl: string; en: string };
+  counts: { nl: string; en: string };
+};
+
+/** De kolommen van een formaat, zoals de parser ze leest. */
+function columnsOf(format: Guide["format"]): ExportColumn[] {
+  return Object.values(format === "bank" ? BANK_COLUMNS : EXPORT_COLUMNS[format]) as ExportColumn[];
+}
 
 /**
  * Wat de site per bron verwacht, in de volgorde waarin ze een bestand herkent.
@@ -19,8 +30,8 @@ const GUIDES: Guide[] = [
       en: "The transaction export of a Payconiq account, with all stickers together. Both the usual export (shop_name, bulk_id) and the one with payoutId (shopName, bulkId) are recognised.",
     },
     counts: {
-      nl: "Telt: status SUCCEEDED, type DEBIT als terugbetaling. Het kanaal is de shop. Datum en uur op de Brusselse klok. De payoutId wordt bewaard, maar Payconiq staat nog niet in de lijst per uitbetaling.",
-      en: "Counts: status SUCCEEDED, type DEBIT as a refund. The channel is the shop. Date and time on the Brussels clock. The payoutId is kept, but Payconiq is not in the list per payout yet.",
+      nl: "Telt: status SUCCEEDED, type DEBIT als terugbetaling. Het kanaal is de shop. Datum en uur op de Brusselse klok. Met payoutId staat elke uitbetaling in de lijst per uitbetaling, en vindt een bankafschrift ze terug; zonder kan dat niet.",
+      en: "Counts: status SUCCEEDED, type DEBIT as a refund. The channel is the shop. Date and time on the Brussels clock. With payoutId every payout is in the list per payout, and a bank statement finds it; without, it cannot.",
     },
   },
   {
@@ -67,14 +78,26 @@ const GUIDES: Guide[] = [
       en: "The transactions of one terminal, as the portal gives them per day: choose the files of a month all at once. The layout until March 2026 and the one after.",
     },
     counts: {
-      nl: "Telt: resultaat Sale of Goedgekeurd; de commissie wordt een kost. Het uur komt uit Tijd (103804 is 10:38:04).",
-      en: "Counts: result Sale or Goedgekeurd; the commission becomes a fee. The time comes from Tijd (103804 is 10:38:04).",
+      nl: "Telt: resultaat Sale of Goedgekeurd; de commissie wordt een kost. Het uur komt uit Tijd (103804 is 10:38:04). De OV-ref is de uitbetaling (één per kaartmerk en dag), op de Boekingsdatum.",
+      en: "Counts: result Sale or Goedgekeurd; the commission becomes a fee. The time comes from Tijd (103804 is 10:38:04). The OV-ref is the payout (one per card brand and day), on the Boekingsdatum.",
+    },
+  },
+  {
+    format: "bank",
+    title: { nl: "Bankafschrift (KBC)", en: "Bank statement (KBC)" },
+    what: {
+      nl: "Het CSV-uittreksel van één rekening uit KBC Business, het liefst van een hele periode (de dagen in de bestandsnaam).",
+      en: "The CSV statement of one account from KBC Business, preferably of a whole period (the days in the file name).",
+    },
+    counts: {
+      nl: "Telt niet mee in het overzicht. De site bewaart enkel de overschrijvingen van SumUp, Payconiq, Mollie en Europabank (dag, bedrag en de referentie van de uitbetaling), vindt ze terug bij hun uitbetaling, en stemt per rekening af. Al de rest, en het bestand zelf, bewaart ze niet.",
+      en: "Does not count in the overview. The site keeps only the transfers from SumUp, Payconiq, Mollie and Europabank (day, amount and payout reference), finds them with their payout, and reconciles per account. Everything else, and the file itself, is not kept.",
     },
   },
 ];
 
 /** De naam van een formaat zoals de "i" hem toont ("Mollie, balansrapport"). */
-export function formatTitle(format: IncomeFormat, nl: boolean): string {
+export function formatTitle(format: Guide["format"], nl: boolean): string {
   const guide = GUIDES.find((entry) => entry.format === format);
   return guide ? guide.title[nl ? "nl" : "en"] : format;
 }
@@ -97,7 +120,7 @@ export function FormatGuide({ nl }: { nl: boolean }) {
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
       <span className="text-vtk-muted">{nl ? "Wat de site verwacht:" : "What the site expects:"}</span>
       {GUIDES.map((guide) => {
-        const columns = Object.values(EXPORT_COLUMNS[guide.format]) as ExportColumn[];
+        const columns = columnsOf(guide.format);
         const title = nl ? guide.title.nl : guide.title.en;
         return (
           <span key={guide.format} className="inline-flex items-center gap-1">
