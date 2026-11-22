@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { createPortal } from "react-dom";
-import { CheckCircle2, Clock3, Download, XCircle } from "lucide-react";
+import { CheckCircle2, Clock3, Download, Printer, XCircle } from "lucide-react";
 import type { PublicTicket } from "./types";
 import { formatTicketDate, formatTicketMoment } from "./types";
 
@@ -334,20 +334,38 @@ export function TicketQrModal({
             {nl ? "Sluiten" : "Close"}
           </button>
           {ticket.pdfUrl && (valid || checkedIn) ? (
-            <a
-              className="ticket-primary-button"
-              href={ticket.pdfUrl}
-              target="_blank"
-              rel="noreferrer"
-              aria-label={
-                nl
-                  ? `Open ticket voor ${ticketDescriptor}`
-                  : `Open ticket for ${ticketDescriptor}`
-              }
-            >
-              <Download size={16} aria-hidden="true" />
-              {nl ? "Open ticket" : "Open ticket"}
-            </a>
+            <>
+              <a
+                className="ticket-primary-button"
+                href={ticket.pdfUrl}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={
+                  nl
+                    ? `Download ticket voor ${ticketDescriptor}`
+                    : `Download ticket for ${ticketDescriptor}`
+                }
+              >
+                <Download size={16} aria-hidden="true" />
+                {nl ? "Download ticket" : "Download ticket"}
+              </a>
+              {ticket.printPdfUrl ? (
+                <a
+                  className="ticket-secondary-button"
+                  href={ticket.printPdfUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={
+                    nl
+                      ? `Printversie in zwart-wit voor ${ticketDescriptor}`
+                      : `Black-and-white print version for ${ticketDescriptor}`
+                  }
+                >
+                  <Printer size={16} aria-hidden="true" />
+                  {nl ? "Printversie" : "Print version"}
+                </a>
+              ) : null}
+            </>
           ) : null}
         </div>
       </div>

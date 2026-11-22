@@ -209,7 +209,7 @@ function ticketOrderPreview(): MailPreview {
     orderNumber: "VTK-26-VOORBEELD",
     ticketCount: 2,
     orderUrl: "https://vtk.be/tickets/toegang?orderId=voorbeeld#access=voorbeeld",
-    contents: { pdf: true, applePasses: 2, googleLinks: [] },
+    contents: { pdf: true, printPdf: true, applePasses: 2, googleLinks: [] },
     event: {
       startsAt: SAMPLE_START,
       timeZone: "Europe/Brussels",

@@ -895,8 +895,72 @@
 
 .ticket-design-message.is-error { color: var(--ticket-red); }
 
+/* De ontwerpeditor in groepen (TicketDesignManager): een kop per groep over
+   de volle breedte, met een haarlijn erboven behalve bij de eerste. */
+.ticket-design-section-title {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ticket-design-section-title:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.ticket-design-grid > .ticket-admin-help[data-span="2"] {
+  grid-column: 1 / -1;
+  margin: -6px 0 0;
+}
+
+/* De vorm van de affiche: vier kleine kaarten in plaats van drie grote. */
+.ticket-design-templates[data-count="4"] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.ticket-design-templates[data-count="4"] label {
+  min-height: 0;
+}
+
+/* Kleur of print in het voorbeeld: een schakelaar zoals Verkenner/Lijst. */
+.ticket-design-variants {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.ticket-design-variants button {
+  min-height: 26px;
+  padding: 3px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.ticket-design-variants button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--surface);
+}
+
 @media (max-width: 680px) {
   .ticket-design-templates { grid-template-columns: 1fr; }
+  .ticket-design-templates[data-count="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* Vorm + live voorbeeld naast elkaar vanaf een brede admin-kolom; op smal

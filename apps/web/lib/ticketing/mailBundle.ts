@@ -12,7 +12,8 @@ import {
 } from "./wallet";
 
 /**
- * De bijlagen bij de bevestigingsmail: de pdf met alle tickets, en per ticket
+ * De bijlagen bij de bevestigingsmail: de pdf met alle tickets (in kleur en
+ * als printversie), en per ticket
  * een pas voor Apple Wallet. Google Wallet kan geen bestand zijn (een pas komt
  * daar via een save-link), dus die gaat als knop in de mail.
  *
@@ -116,41 +117,48 @@ export async function orderMailBundle(
 ): Promise<{ attachments: MailAttachment[]; contents: OrderMailContents }> {
   const tickets = attachableTickets(order);
   const attachments: MailAttachment[] = [];
-  const contents: OrderMailContents = { pdf: false, applePasses: 0, googleLinks: [] };
+  const contents: OrderMailContents = { pdf: false, printPdf: false, applePasses: 0, googleLinks: [] };
   if (tickets.length === 0) return { attachments, contents };
 
   const slug = safeFilename(order.event.slug);
 
-  try {
-    const pdf = await generateTicketsPdf({
-      orderNumber: order.reference,
-      currency: order.currency,
-      event: {
-        id: order.event.id,
-        title: eventTitle(order),
-        startsAt: order.event.startsAt,
-        location: order.event.location,
-      },
-      tickets: tickets.map((entry) => ({
-        publicId: entry.ticket.publicCode,
-        qrVersion: entry.ticket.credentialVersion,
-        attendeeName: entry.item.attendeeName,
-        typeName: entry.item.ticketTypeName,
-        unitPriceCents: entry.item.totalCents,
-        status: entry.ticket.status,
-        designSnapshot: entry.ticket.designSnapshot,
-      })),
-    });
-    if (withinBudget(attachments, pdf.length)) {
+  // Twee pdf's: de kleurversie om te tonen, en de printversie voor een
+  // zwart-witprinter (zie docs/design-decisions.md, "De ticket-PDF in twee
+  // versies"). Elk apart best effort: mislukt de ene, dan gaat de andere mee.
+  const pdfInput = {
+    orderNumber: order.reference,
+    currency: order.currency,
+    locale: order.locale === "EN" ? ("en" as const) : ("nl" as const),
+    event: {
+      id: order.event.id,
+      title: eventTitle(order),
+      startsAt: order.event.startsAt,
+      location: order.event.location,
+    },
+    tickets: tickets.map((entry) => ({
+      publicId: entry.ticket.publicCode,
+      qrVersion: entry.ticket.credentialVersion,
+      attendeeName: entry.item.attendeeName,
+      typeName: entry.item.ticketTypeName,
+      unitPriceCents: entry.item.totalCents,
+      status: entry.ticket.status,
+      designSnapshot: entry.ticket.designSnapshot,
+    })),
+  };
+  for (const variant of ["colour", "print"] as const) {
+    try {
+      const pdf = await generateTicketsPdf({ ...pdfInput, variant });
+      if (!withinBudget(attachments, pdf.length)) continue;
       attachments.push({
-        filename: safeFilename(`${slug}-${order.reference}.pdf`),
+        filename: safeFilename(`${slug}-${order.reference}${variant === "print" ? "-print" : ""}.pdf`),
         content: Buffer.from(pdf),
         contentType: "application/pdf",
       });
-      contents.pdf = true;
+      if (variant === "print") contents.printPdf = true;
+      else contents.pdf = true;
+    } catch (error) {
+      console.error(`[ticket-mail] ${variant}-pdf mislukt voor ${order.reference}:`, error);
     }
-  } catch (error) {
-    console.error(`[ticket-mail] pdf-bijlage mislukt voor ${order.reference}:`, error);
   }
 
   if (tickets.length > MAX_WALLET_PASSES) return { attachments, contents };

@@ -54,6 +54,8 @@ export async function sendMail(message: MailMessage): Promise<string> {
 export type OrderMailContents = {
   /** De pdf met alle geldige tickets van de bestelling. */
   pdf: boolean;
+  /** Dezelfde tickets als printversie voor een zwart-witprinter. */
+  printPdf?: boolean;
   /** Aantal `.pkpass`-bijlagen (Apple Wallet), één per ticket. */
   applePasses: number;
   /** Google Wallet kan enkel een link zijn, geen bestand. */
@@ -97,22 +99,31 @@ export type OrderMailSummary = {
 /** Eén regel over de bijlagen, of niets wanneer er geen zijn. */
 export function attachmentLine(contents: OrderMailContents, nl: boolean): string {
   const apple = contents.applePasses > 0;
-  if (!contents.pdf && !apple) return "";
+  // Zonder de kleurversie telt de printversie gewoon als "de pdf".
+  const pdf = contents.pdf || Boolean(contents.printPdf);
+  const both = contents.pdf && Boolean(contents.printPdf);
+  if (!pdf && !apple) return "";
   if (nl) {
-    if (contents.pdf && apple) {
+    const asPdf = both
+      ? "als pdf om te tonen, met een printversie in zwart-wit erbij"
+      : "als pdf om te tonen of af te drukken";
+    if (pdf && apple) {
       return contents.applePasses === 1
-        ? "Je ticket zit in bijlage: als pdf om te tonen of af te drukken, en als pas voor je Apple Wallet."
-        : "Je tickets zitten in bijlage: als pdf om te tonen of af te drukken, en als pas per ticket voor je Apple Wallet.";
+        ? `Je ticket zit in bijlage: ${asPdf}, en als pas voor je Apple Wallet.`
+        : `Je tickets zitten in bijlage: ${asPdf}, en als pas per ticket voor je Apple Wallet.`;
     }
-    if (contents.pdf) return "Je tickets zitten als pdf in bijlage, om te tonen of af te drukken.";
+    if (both) return "Je tickets zitten als pdf in bijlage: een versie om te tonen, en een printversie in zwart-wit.";
+    if (pdf) return "Je tickets zitten als pdf in bijlage, om te tonen of af te drukken.";
     return "Je tickets zitten in bijlage als pas voor je Apple Wallet.";
   }
-  if (contents.pdf && apple) {
+  const asPdf = both ? "as a PDF to show, with a black-and-white print version" : "as a PDF to show or print";
+  if (pdf && apple) {
     return contents.applePasses === 1
-      ? "Your ticket is attached: as a PDF to show or print, and as a pass for Apple Wallet."
-      : "Your tickets are attached: as a PDF to show or print, and as one pass per ticket for Apple Wallet.";
+      ? `Your ticket is attached: ${asPdf}, and as a pass for Apple Wallet.`
+      : `Your tickets are attached: ${asPdf}, and as one pass per ticket for Apple Wallet.`;
   }
-  if (contents.pdf) return "Your tickets are attached as a PDF, to show or print.";
+  if (both) return "Your tickets are attached as PDFs: one to show, and a black-and-white print version.";
+  if (pdf) return "Your tickets are attached as a PDF, to show or print.";
   return "Your tickets are attached as passes for Apple Wallet.";
 }
 

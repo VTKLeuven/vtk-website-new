@@ -174,6 +174,8 @@ export type PublicTicket = {
   checkedInAt?: string | Date | null;
   credential?: string | null;
   pdfUrl?: string | null;
+  /** Dezelfde tickets als printversie voor een zwart-witprinter. */
+  printPdfUrl?: string | null;
   walletAppleUrl?: string | null;
   walletGoogleUrl?: string | null;
 };

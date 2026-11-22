@@ -6881,7 +6881,7 @@ PDF. Code in `apps/web/lib/ticketing/wallet/`.
   foutmelding geeft: ontbreekt de configuratie, dan bestaat de knop gewoon niet, net
   als de ticketmail die in dev stil wegvalt zonder `SMTP_HOST`.
 - **Wat er van het ticketontwerp meegaat: kleuren, logo, footer en de hero-foto.**
-  Het *sjabloon* (Classic / Poster / Gesplitst) gaat bewust niet mee: een walletpas
+  Het *sjabloon* (vroeger Classic / Poster / Gesplitst, nu kleur en print) gaat bewust niet mee: een walletpas
   heeft een vaste, door iOS/Android opgelegde indeling, dus "foto bovenaan" versus
   "foto ernaast" bestaat daar niet. De foto zelf heeft wel een vaste plek in beide
   formaten (Apple's strip-afbeelding, Google's `heroImage`) en wordt daar gebruikt.
@@ -7456,10 +7456,56 @@ inhoud is bewust een lijst van *personen*, niet van posten.
 
 ---
 
+## De ticket-PDF in twee versies (november 2026)
+
+De oude ticket-PDF had een eigen huisstijl (het schild, warm papier, een ander
+geel) en drie sjablonen (Classic, Poster, Gesplitst). Ze werd vervangen door twee
+versies uit één ontwerp, gekozen uit acht richtingen op een ontwerpbord:
+
+- **Kleur**: de evenementtegel van /kalender. De affiche bovenaan, de gele
+  datumpin over de onderrand, de titel met de gele streep die precies zo breed is
+  als de titel, en de QR in een witte kaart met de accentrand van een uitgelichte
+  kaart. Zonder affiche: het navy vlak van de paginakop met het technische
+  patroon en het logo, niet het gestreepte vak van de site (op papier leest dat
+  als een fout).
+- **Print**: wit papier, het technische patroon als dunne grijze lijnen in de kop,
+  en verder enkel lijnen en tekst. De meeste tickets worden in zwart-wit
+  afgedrukt; de kleurversie is daar inktverspilling. Het enige vlak inkt is de
+  QR-code. Tekst in de kop krijgt een wit vlak achter zich, zodat geen lijn van
+  het patroon door een letter loopt.
+
+Wat erbij hoort:
+
+- **Beide versies komen overal mee**: als twee bijlagen in de bevestigingsmail,
+  en als "Download ticket" en "Printversie" op de ticketpagina
+  (`/api/tickets/[id]/pdf?variant=print`). De app krijgt enkel de kleurversie:
+  een tweede link vraagt een wijziging aan het app-contract.
+- **Eén ontwerp, veel knoppen.** Per event kiest de organisator de kleuren, de
+  affiche en haar focuspunt, de vorm van de affiche (16:9 zoals de kalender,
+  3:2, 2:1 of een smalle band van 3:1), of de datumpin er staat, een eventlogo,
+  een sponsorlogo, of locatie, prijs en bestelnummer op het ticket staan, een
+  eigen tekst onder "Aan de ingang" (vervangt de standaardtekst over het
+  scannen), een voettekst, en voor de printversie of het patroon en de
+  accentstreep er staan. Het oude sjabloonveld blijft in het schema voor
+  uitgegeven tickets, maar de renderer kijkt er niet meer naar.
+- **Een uitgegeven ticket houdt zijn ontwerp, maar niet de oude
+  standaardkleuren.** Wie de kleuren nooit koos, had `#F8F8F5` en `#F2B632` in
+  zijn momentopname; die worden bij het tekenen de kleuren van de site
+  (`withCurrentDefaultColours`). Een bewust gekozen kleur blijft staan.
+- **De labels volgen de taal van de bestelling**, niet meer "TOEGANGSTICKET /
+  ADMISSION" in beide talen tegelijk.
+- **Helvetica, nog geen Inter.** Inter inbedden vraagt `@pdf-lib/fontkit` en dus
+  een nieuwe afhankelijkheid met een volledig herberekende lockfile. Helvetica is
+  het standaardlettertype van PDF dat er het dichtst bij ligt. Een naam met een
+  teken buiten WinAnsi (ł, een emoji) liet pdf-lib vroeger gooien, waarna er geen
+  enkel ticket kwam; zo'n teken verliest nu zijn accent of valt weg
+  (`safeText`).
+
 ## De tickets zitten in de bevestigingsmail
 
 De bevestigingsmail bevat naast de link naar de ticketpagina ook de tickets zelf:
-één pdf met alle tickets van de bestelling, en per ticket een pas voor Apple
+één pdf met alle tickets van de bestelling (in kleur, en sinds november 2026 ook
+als printversie, zie "De ticket-PDF in twee versies"), en per ticket een pas voor Apple
 Wallet. Google Wallet kan geen bijlage zijn (een pas komt daar altijd via een
 save-link binnen), dus die staat als knop in de mail.
 

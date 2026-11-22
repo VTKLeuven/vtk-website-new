@@ -29,7 +29,8 @@ setup (env, webhook, SMTP).
    `fulfillPaidOrder` -> tickets issued, confirmation mail enqueued in the same
    transaction.
 4. **Mail**: the confirmation carries the tickets themselves: one PDF with every
-   valid ticket of the order, one Apple Wallet pass per ticket, and a Google
+   valid ticket of the order (twice: in colour, and a black-and-white print
+   version, see `lib/ticketing/pdf.ts`), one Apple Wallet pass per ticket, and a Google
    Wallet save button per ticket (Google passes can only be links). The link to
    the ticket page stays the primary route; the attachments are the fallback at
    the door. See `docs/design-decisions.md` for the limits and the failure mode.

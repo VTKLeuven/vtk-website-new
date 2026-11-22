@@ -1195,8 +1195,16 @@ dialog.ticket-dialog .ticket-dialog-close:focus-visible,
   line-height: 1.4;
 }
 
+/* Sluiten, het ticket en de printversie: drie knoppen in een venster van
+   480px. Ze breken af onder de tip in plaats van over de rand te lopen. */
+.ticket-dialog-foot {
+  flex-wrap: wrap;
+}
+
 .ticket-dialog-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
   margin-left: auto;
 }

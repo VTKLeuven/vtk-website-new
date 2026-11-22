@@ -5,6 +5,7 @@ import {
   parseTicketDesignDraft,
   publishedTicketDesign,
   ticketDesignSnapshot,
+  withCurrentDefaultColours,
 } from "@/lib/ticketing/design";
 import { A4_PORTRAIT_POINTS, generateTicketsPdf } from "@/lib/ticketing/pdf";
 
@@ -56,24 +57,54 @@ describe("ticket design validation", () => {
   });
 });
 
+describe("de twee versies van het ontwerp", () => {
+  it("gebruikt de kleuren van de site als standaard", () => {
+    expect(DEFAULT_TICKET_DESIGN).toMatchObject({ backgroundColor: "#EFF2F8", accentColor: "#FFD23F", posterRatio: "16:9", showDatePin: true, printPattern: true });
+  });
+
+  it("leest een momentopname van voor de nieuwe opties met hun standaard", () => {
+    const old = ticketDesignSnapshot({
+      template: "POSTER_ARTWORK",
+      backgroundColor: "#F8F8F5",
+      accentColor: "#F2B632",
+      textColor: "#0A0F1F",
+      revision: 4,
+      publishedAt: "2026-01-01T00:00:00.000Z",
+    }, "event-1");
+    expect(old).toMatchObject({ revision: 4, showPrice: true, showOrderNumber: true, showLocation: true, posterRatio: "16:9" });
+  });
+
+  it("vervangt de oude standaardkleuren, maar geen bewust gekozen kleur", () => {
+    expect(withCurrentDefaultColours({ backgroundColor: "#F8F8F5", accentColor: "#f2b632" })).toEqual({ backgroundColor: "#EFF2F8", accentColor: "#FFD23F" });
+    expect(withCurrentDefaultColours({ backgroundColor: "#112233", accentColor: "#AABBCC" })).toEqual({ backgroundColor: "#112233", accentColor: "#AABBCC" });
+  });
+});
+
 describe("A4 ticket PDF", () => {
-  it.each(["CLASSIC", "POSTER_ARTWORK", "SPLIT_ARTWORK"] as const)("renders the %s template at A4 portrait size", async (template) => {
+  const cases = [
+    { variant: "colour" as const, posterRatio: "16:9" as const },
+    { variant: "colour" as const, posterRatio: "3:2" as const },
+    { variant: "colour" as const, posterRatio: "3:1" as const },
+    { variant: "print" as const, posterRatio: "16:9" as const },
+  ];
+  it.each(cases)("tekent de $variant-versie ($posterRatio) op A4", async ({ variant, posterRatio }) => {
     const bytes = await generateTicketsPdf({
       orderNumber: "VTK-DESIGN-TEST",
       currency: "EUR",
-      event: { id: "event-1", title: "Ontwerptest", startsAt: new Date("2027-04-03T18:00:00Z"), location: "Leuven" },
+      variant,
+      event: { id: "event-1", title: "Een ontwerptest met een titel die over twee regels moet lopen", startsAt: new Date("2027-04-03T18:00:00Z"), location: "Leuven" },
       tickets: [{
-        publicId: `ticket-${template}`,
+        publicId: `ticket-${variant}`,
         qrVersion: 1,
-        attendeeName: "Alex Voorbeeld",
+        // Een teken buiten WinAnsi liet pdf-lib vroeger gooien: geen ticket.
+        attendeeName: "Łukasz Żółć 🎉",
         typeName: "Standaard",
         unitPriceCents: 1_500,
         designSnapshot: {
           ...DEFAULT_TICKET_DESIGN,
-          template,
-          backgroundColor: "#EEDDCC",
-          accentColor: "#123456",
-          textColor: "#102030",
+          posterRatio,
+          noteNl: "Deuren open om 19:30.",
+          footerNl: "Met dank aan onze partners.",
           revision: 2,
           publishedAt: "2027-01-01T00:00:00.000Z",
         },
@@ -84,5 +115,6 @@ describe("A4 ticket PDF", () => {
     expect(width).toBeCloseTo(A4_PORTRAIT_POINTS.width, 2);
     expect(height).toBeCloseTo(A4_PORTRAIT_POINTS.height, 2);
     expect(pdf.getSubject()).toBe("A4 admission ticket");
-  });
+    expect(pdf.getTitle()).toContain(variant === "print" ? "(print)" : "VTK-DESIGN-TEST");
+  }, 20_000);
 });

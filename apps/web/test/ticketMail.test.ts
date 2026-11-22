@@ -50,6 +50,15 @@ describe("wat de mail over zijn bijlagen zegt", () => {
     );
   });
 
+  it("noemt de printversie wanneer die erbij zit", () => {
+    expect(attachmentLine({ pdf: true, printPdf: true, applePasses: 0, googleLinks: [] }, true)).toBe(
+      "Je tickets zitten als pdf in bijlage: een versie om te tonen, en een printversie in zwart-wit."
+    );
+    expect(attachmentLine({ pdf: true, printPdf: true, applePasses: 1, googleLinks: [] }, false)).toBe(
+      "Your ticket is attached: as a PDF to show, with a black-and-white print version, and as a pass for Apple Wallet."
+    );
+  });
+
   it("schrijft in het Engels voor een Engelstalige bestelling", () => {
     const line = attachmentLine({ pdf: true, applePasses: 3, googleLinks: [] }, false);
     expect(line).toContain("one pass per ticket for Apple Wallet");

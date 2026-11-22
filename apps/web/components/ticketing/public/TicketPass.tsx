@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { CheckCircle2, Clock3, Download, Maximize2, QrCode, XCircle } from "lucide-react";
+import { CheckCircle2, Clock3, Download, Maximize2, Printer, QrCode, XCircle } from "lucide-react";
 import type { PublicTicket } from "./types";
 import { TicketQrModal } from "./TicketQrModal";
 
@@ -121,13 +121,29 @@ export function TicketPass({
               rel="noreferrer"
               aria-label={
                 nl
-                  ? `Open ticket voor ${ticketDescriptor}`
-                  : `Open ticket for ${ticketDescriptor}`
+                  ? `Download ticket voor ${ticketDescriptor}`
+                  : `Download ticket for ${ticketDescriptor}`
               }
             >
               <Download size={17} aria-hidden="true" />
-              {nl ? "Open ticket" : "Open ticket"}
+              {nl ? "Download ticket" : "Download ticket"}
             </a>
+            {ticket.printPdfUrl ? (
+              <a
+                className="ticket-secondary-button"
+                href={ticket.printPdfUrl}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={
+                  nl
+                    ? `Printversie in zwart-wit voor ${ticketDescriptor}`
+                    : `Black-and-white print version for ${ticketDescriptor}`
+                }
+              >
+                <Printer size={17} aria-hidden="true" />
+                {nl ? "Printversie" : "Print version"}
+              </a>
+            ) : null}
             {SHOW_WALLET_BUTTONS && ticket.walletAppleUrl ? (
               <a className="ticket-secondary-button" href={ticket.walletAppleUrl}>
                 Apple Wallet

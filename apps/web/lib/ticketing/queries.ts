@@ -634,6 +634,7 @@ function orderDto(order: OrderRecord, authenticatedOwner: boolean) {
       /** Voor een ondertekende downloadlink (`signedTicketPath`), zoals de app die krijgt. */
       credentialVersion: item.ticket.credentialVersion,
       pdfUrl: `/api/tickets/${item.ticket.id}/pdf`,
+      printPdfUrl: `/api/tickets/${item.ticket.id}/pdf?variant=print`,
       walletAppleUrl: isAppleWalletAvailable() ? `/api/tickets/${item.ticket.id}/wallet/apple` : null,
       walletGoogleUrl: isGoogleWalletAvailable() ? `/api/tickets/${item.ticket.id}/wallet/google` : null,
     })),
