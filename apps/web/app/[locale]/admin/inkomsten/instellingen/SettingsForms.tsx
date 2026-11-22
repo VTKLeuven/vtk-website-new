@@ -7,6 +7,9 @@ import { AccountingCodePicker } from "@/components/admin/AccountingCodePicker";
 import { SaveForm } from "@/components/ui/SaveForm";
 import type { AccountingCodeOption } from "@/lib/accounting/codes";
 import type { SaveAction } from "@/lib/saveState";
+import { SOURCES_WITH_FEES } from "@/lib/inkomsten/config";
+import type { IncomeSourceCode } from "@/lib/inkomsten/parse";
+import { SOURCE_LABELS } from "../shared";
 
 type Common = { locale: "nl" | "en"; action: SaveAction; errorMessages: Record<string, string> };
 
@@ -34,15 +37,25 @@ function FromField({ nl, first }: { nl: boolean; first: boolean }) {
   );
 }
 
-/** De code waaronder de kosten van Mollie, SumUp en Europabank vallen. */
-export function FeeCodeForm({ locale, action, errorMessages, codes, value }: Common & { codes: AccountingCodeOption[]; value: string | null }) {
+/**
+ * De code waaronder de kosten van Mollie, SumUp en Europabank vallen, en welke
+ * van die bronnen hun kosten op een aparte factuur sturen.
+ */
+export function FeeCodeForm({
+  locale,
+  action,
+  errorMessages,
+  codes,
+  value,
+  separateFeeSources,
+}: Common & { codes: AccountingCodeOption[]; value: string | null; separateFeeSources: readonly IncomeSourceCode[] }) {
   const nl = locale === "nl";
   const router = useRouter();
   const t = texts(nl);
   return (
     <SaveForm
       action={action}
-      submitLabel={nl ? "Kostencode opslaan" : "Save fee code"}
+      submitLabel={nl ? "Opslaan" : "Save"}
       savingLabel={t.saving}
       savedMessage={t.saved}
       errorMessages={errorMessages}
@@ -60,6 +73,25 @@ export function FeeCodeForm({ locale, action, errorMessages, codes, value }: Com
           noneLabel={nl ? "Nog geen code" : "No code yet"}
         />
       </div>
+      <fieldset>
+        <legend className="mb-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-vtk-muted">
+          {nl ? "Kosten met een aparte factuur" : "Fees on a separate invoice"}
+        </legend>
+        <div className="flex flex-wrap gap-x-6 gap-y-1.5">
+          {SOURCES_WITH_FEES.map((source) => (
+            <label key={source} className="flex min-h-6 items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="separateFeeSources"
+                value={source}
+                defaultChecked={separateFeeSources.includes(source)}
+                className="size-4 accent-vtk-ink"
+              />
+              {SOURCE_LABELS[source]}
+            </label>
+          ))}
+        </div>
+      </fieldset>
     </SaveForm>
   );
 }

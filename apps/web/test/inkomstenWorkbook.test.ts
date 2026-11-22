@@ -4,7 +4,6 @@ import {
   SHEET_STYLE,
   columnLetter,
   controlWorkbook,
-  quarterLineKey,
   quarterSheet,
   wallClock,
   type WorkbookModel,
@@ -12,6 +11,7 @@ import {
 } from "@/lib/inkomsten/workbook";
 import { computeIncomeChecks, groupPayouts, monthsBetween, payoutState } from "@/lib/inkomsten/overview";
 import { postName } from "@/lib/inkomsten/labels";
+import { NO_SEPARATE_FEES, quarterLineKey } from "@/lib/inkomsten/lines";
 
 // Verzonnen gegevens: geen echte namen, rekeningnummers of betaal-ID's.
 
@@ -45,6 +45,8 @@ const model = (transactions: WorkbookTransaction[]): WorkbookModel => ({
     ["700100", "Activiteiten opbrengsten"],
     ["700110", "Cultuur opbrengsten"],
   ]),
+  lineRules: NO_SEPARATE_FEES,
+  mollieTransfers: null,
   feeCode: { code: "657000", name: "Financiële kosten" },
   groups: [],
   payouts: [],
@@ -65,10 +67,28 @@ const text = (cell: unknown) => (cell && typeof cell === "object" ? (cell as Cel
 
 describe("het kwartaalblad", () => {
   it("telt enkel wat meetelt, onder de juiste regel", () => {
-    expect(quarterLineKey(tx({ accountingCode: "700100" }))).toBe("700100");
-    expect(quarterLineKey(tx({ kind: "FEE" }))).toBe("Kosten");
-    expect(quarterLineKey(tx({}))).toBe("Na te kijken");
-    expect(quarterLineKey(tx({ excluded: true }))).toBeNull();
+    expect(quarterLineKey(tx({ accountingCode: "700100" }), NO_SEPARATE_FEES)).toBe("700100");
+    expect(quarterLineKey(tx({ kind: "FEE" }), NO_SEPARATE_FEES)).toBe("Kosten");
+    expect(quarterLineKey(tx({}), NO_SEPARATE_FEES)).toBe("Na te kijken");
+    expect(quarterLineKey(tx({ excluded: true }), NO_SEPARATE_FEES)).toBeNull();
+  });
+
+  it("laat de kosten met een aparte factuur weg, enkel van die bron", () => {
+    const rules = { separateFeeSources: new Set(["SUMUP"] as const) };
+    expect(quarterLineKey(tx({ kind: "FEE", source: "SUMUP" }), rules)).toBeNull();
+    expect(quarterLineKey(tx({ kind: "FEE", source: "MOLLIE" }), rules)).toBe("Kosten");
+    expect(quarterLineKey(tx({ kind: "PAYMENT", source: "SUMUP", accountingCode: "700160" }), rules)).toBe("700160");
+
+    const sheet = quarterSheet(
+      { ...model([
+        tx({ accountingCode: "700110", amountCents: 1000, source: "SUMUP", channel: "kassa@voorbeeld.be" }),
+        tx({ kind: "FEE", amountCents: -17, source: "SUMUP", channel: "kassa@voorbeeld.be" }),
+      ]), lineRules: rules },
+      { formulas: false },
+    );
+    // Geen regel Kosten, en het totaal is enkel de verkoop.
+    expect(sheet.data.some((row) => text(row[0]) === "Financiële kosten")).toBe(false);
+    expect(text(sheet.data.at(-1)![3])).toBe(10);
   });
 
   it("zet de kolommen per bron en per rekening, Mollie eerst, en een totaalblok per rekening", () => {
@@ -103,7 +123,7 @@ describe("het kwartaalblad", () => {
       ["Activiteiten opbrengsten", 700100, "10001"],
       ["Cultuur opbrengsten", 700110, ""],
       ["Financiële kosten", 657000, ""],
-      ["Wijziging dynamische reserve", "x", ""],
+      ["Wijziging dynamische reserve", "", ""],
       ["Na te kijken (nog geen code)", "", ""],
       ["", "TOTAAL GEHEEL", ""],
     ]);
@@ -269,6 +289,7 @@ describe("de controlelijst", () => {
     withoutAccount: { count: 2, cents: 450 },
     hasFees: true,
     feeCodeChosen: false,
+    mollieReserve: { status: "none" as const },
   };
 
   it("vindt een vergeten maand, ontbrekende kosten en uitbetalingen die niet afgevinkt zijn", () => {
@@ -281,7 +302,8 @@ describe("de controlelijst", () => {
       ],
     });
     expect(checks.mollieFees).toMatchObject({ ok: false, months: ["2026-08"] });
-    expect(checks.payouts).toMatchObject({ ok: false, total: 5, checked: 2, changed: 1, differs: 1 });
+    // Een verschil met de overschrijving van Mollie telt als in orde: het zit in de reserve.
+    expect(checks.payouts).toMatchObject({ ok: false, total: 5, checked: 3, changed: 1, differs: 1 });
     expect(checks.mollieFeesTwice).toMatchObject({ ok: true });
     expect(checks.open).toMatchObject({ ok: true });
     expect(checks.accounts).toMatchObject({ ok: false, count: 2 });

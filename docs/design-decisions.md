@@ -13748,18 +13748,34 @@ Fase 3 (oktober 2026): SumUp en Europabank. Fase 2 (oktober 2026): de
 kassacontrole, de code van een kassa en de koppeling op de kassa die een toestel
 had.
 
-- **Rekenen zoals het rekenblad.** Mollie telt in de maand van de uitbetaling
-  (de maand in de uitbetalingsreferentie), de rest in de maand van de betaling.
-  Zo rekende Beheer al, en zo is het Mollie-totaal van een periode wat er in die
-  periode op de bank kwam. Kosten en reserve staan als eigen rij. Een betaling
-  met status "refunded" telt voor haar volle bedrag en de terugbetaling als eigen
-  regel, ook zoals in het rekenblad. Op het vierde kwartaal van 2025 komt de
-  site tot op de cent uit op het kwartaalblad. De eigen poging van Beheer
-  (augustus en september 2026) telde Mollie op de betaaldatum, met het verschil
-  als "wijziging dynamische reserve". De site bleef bij de uitbetaling
-  (oktober 2026): een betaling van eind september komt soms pas in oktober op
-  de bank, en zo klopt elk kwartaal met de uittreksels. Wat nog niet
-  uitbetaald is, toont het overzicht apart.
+- **Alles in de maand van de betaling, ook Mollie, met een berekende reserve.**
+  Beheer vroeg het in de review van 18 november 2026: per kwartaal moet elke
+  betaling in haar categorie geboekt worden in het kwartaal van de betaling,
+  ook wanneer Mollie ze pas later uitbetaalt. Tot dan telde Mollie in de maand
+  van de uitbetaling, zoals het rekenblad (oktober 2026: zo klopte elk kwartaal
+  met de uittreksels, en wat nog niet uitbetaald was, stond apart). Dat
+  zette een betaling van 30 september in het vierde kwartaal, terwijl ze in het
+  derde gebeurde. Nu telt ze in september, en het verschil met wat Mollie
+  overschreef staat op de regel "Wijziging dynamische reserve", die de site
+  zelf uitrekent: overgeschreven min alles van Mollie in de periode. Zo is de
+  Mollie-kolom nog steeds gelijk aan wat op de bank kwam. Dat is precies hoe
+  Beheer het in de eigen poging voor het derde kwartaal van 2026 deed
+  (€ −226,89); de "x"-regel van het rekenblad hield onder de oude regel enkel
+  Mollies eigen reserveregels. De reserve telt mee in TOTAAL GEHEEL en heeft
+  geen boekhoudcode: het is geld dat Mollie nog bijhoudt (Beheer). De site
+  kent ze enkel wanneer de betalingenexport en het balansrapport dezelfde
+  betalingen noemen, want een ontbrekende betaling zou er stil in verdwijnen.
+  Een betaling met status "refunded" telt voor haar volle bedrag en de
+  terugbetaling als eigen regel, in de maand van de terugbetaling.
+- **Kosten met een aparte factuur tellen niet in het overzicht.** De
+  transactiekosten van SumUp komen op een factuur die de boekhouder zelf
+  inboekt; stonden ze ook in het kwartaalblad, dan boekte hij ze twee keer
+  (Beheer, november 2026). Dat is een instelling per bron en geen regel in de
+  code, want hoe de boekhouder de factuur van een provider boekt, is een keuze
+  van de kring. Europabank stuurt geen factuur, dus haar commissie blijft
+  erin; Payconiq houdt niets in; voor Mollie vraagt Beheer het na bij de
+  boekhouder. De kostenregels blijven bewaard en tellen in de som per
+  uitbetaling, want wat op de bank komt, is na de kosten.
 - **Alles over VTK zelf is data, niets staat in de code.** Welke stickers er
   zijn, op welke rekening ze storten en vanaf wanneer, onder welke code een
   sticker standaard valt, welke code de kosten krijgen, welke teksten onder
@@ -13833,10 +13849,11 @@ had.
   In het derde kwartaal van 2026 kwam de som per uitbetaling uit de
   betalingenexport niet uit op de overschrijving, in beide richtingen. Dat kan
   ook niet: Mollie houdt per uitbetaling kosten en reserve in en geeft oudere
-  reserve vrij, en dat staat enkel in de export per uitbetaling. Gelijk is in
-  orde zonder vinkje; anders staan beide er met het verschil, en beslist
-  Beheer met het uittreksel. Een vinkje gaat voor op de overschrijving. Wie
-  zonder verschil wil afvinken, laadt de export per uitbetaling op.
+  reserve vrij, en dat staat enkel in de export per uitbetaling. De
+  overschrijving is het bedrag op het uittreksel, dus een uitbetaling van
+  Mollie is in orde zonder vinkje. Is de som van de betalingen anders, dan
+  staat het verschil erbij als informatie: sinds november 2026 zit het in de
+  berekende wijziging van de dynamische reserve. Een vinkje gaat voor.
 - **SumUp per uitbetaling, zoals Mollie.** Elke verkoop zegt in welke
   uitbetaling ze zat, en de som van de verkopen min hun kosten was in het
   derde kwartaal van 2026 per uitbetaling exact wat SumUp overschreef. Een
@@ -13906,8 +13923,10 @@ had.
   kost (geen interchange of schemakost), zoals de formules van Beheer. Anders
   dan het rekenblad telt de site enkel SumUp-betalingen die lukten: de formule
   van Beheer nam ook mislukte pogingen mee (€ 104,60 in het vierde kwartaal
-  van 2025). En de transactiekosten van SumUp tellen als kost; het rekenblad
-  had ze niet, omdat de SumUp van Theokot er niet in stond. Alle kosten staan
+  van 2025). De transactiekosten van SumUp telden eerst als kost; het
+  rekenblad had ze niet, omdat de SumUp van Theokot er niet in stond. Sinds
+  november 2026 staan ze er niet meer in, omdat er een aparte factuur van komt
+  (zie "Kosten met een aparte factuur"). Alle kosten staan
   op één regel, onder de ene kostencode die Beheer kiest, zoals "Financiële
   kosten" in het kwartaalblad. De terminal van evenementen krijgt geen
   standaardcode: wat erop binnenkomt, krijgt de code van de kassa die ze had,

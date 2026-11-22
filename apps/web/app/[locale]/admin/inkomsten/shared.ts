@@ -113,9 +113,15 @@ export function checkText(
       return check.ok
         ? {
             ok: true,
-            text: nl
-              ? `${check.total === 1 ? "De uitbetaling klopt" : `Alle ${check.total} uitbetalingen kloppen`} met het uittreksel of met de overschrijving van Mollie.`
-              : `All ${check.total} payouts match the bank statement or the Mollie transfer.`,
+            text:
+              (nl
+                ? `${check.total === 1 ? "De uitbetaling klopt" : `Alle ${check.total} uitbetalingen kloppen`} met het uittreksel of met de overschrijving van Mollie`
+                : `All ${check.total} payouts match the bank statement or the Mollie transfer`) +
+              (check.differs
+                ? nl
+                  ? `; bij ${check.differs} wijkt de som van de betalingen af van wat Mollie overschreef, en dat verschil zit in de reserve.`
+                  : `; for ${check.differs} the sum of the payments differs from what Mollie transferred, and that difference is in the reserve.`
+                : "."),
           }
         : {
             ok: false,
@@ -123,11 +129,6 @@ export function checkText(
               (nl
                 ? `${check.checked} van de ${check.total} uitbetalingen afgevinkt of gelijk aan de overschrijving`
                 : `${check.checked} of ${check.total} payouts checked or equal to the transfer`) +
-              (check.differs
-                ? nl
-                  ? `; bij ${check.differs} verschilt de som van de site van wat Mollie overschreef`
-                  : `; for ${check.differs} the site's sum differs from what Mollie transferred`
-                : "") +
               (check.changed
                 ? nl
                   ? `; bij ${check.changed} veranderde het bedrag na het afvinken.`
@@ -135,6 +136,41 @@ export function checkText(
                 : "."),
             href: "#per-uitbetaling",
           };
+    case "mollieReserve": {
+      if (check.ok) {
+        return {
+          ok: true,
+          text: nl
+            ? `De wijziging van de dynamische reserve is berekend uit ${check.transferCount === 1 ? "1 overschrijving" : `${check.transferCount} overschrijvingen`} van Mollie; de betalingenexport en het balansrapport noemen dezelfde betalingen.`
+            : `The change in the rolling reserve is computed from ${check.transferCount === 1 ? "1 Mollie transfer" : `${check.transferCount} Mollie transfers`}; the payments export and the balance report list the same payments.`,
+        };
+      }
+      const payments = (n: number) => (nl ? (n === 1 ? "1 betaling" : `${n} betalingen`) : n === 1 ? "1 payment" : `${n} payments`);
+      const parts: string[] = [];
+      if (check.missingInBalance.count) {
+        parts.push(
+          nl
+            ? `${payments(check.missingInBalance.count)} uit de betalingenexport (${euro(check.missingInBalance.cents)}) ${check.missingInBalance.count === 1 ? "staat" : "staan"} in geen enkel balansrapport: upload het balansrapport van Mollie voor de hele periode`
+            : `${payments(check.missingInBalance.count)} from the payments export (${euro(check.missingInBalance.cents)}) ${check.missingInBalance.count === 1 ? "is" : "are"} in no balance report: upload the Mollie balance report for the whole period`,
+        );
+      }
+      if (check.missingInExport.count) {
+        parts.push(
+          nl
+            ? `${payments(check.missingInExport.count)} uit het balansrapport (${euro(check.missingInExport.cents)}) ${check.missingInExport.count === 1 ? "staat" : "staan"} niet in de betalingenexport: upload de betalingenexport van Mollie voor de hele periode`
+            : `${payments(check.missingInExport.count)} from the balance report (${euro(check.missingInExport.cents)}) ${check.missingInExport.count === 1 ? "is" : "are"} not in the payments export: upload the Mollie payments export for the whole period`,
+        );
+      }
+      return {
+        ok: false,
+        text:
+          parts.join("; ") +
+          (nl
+            ? ". Tot dan kent de site de wijziging van de dynamische reserve niet, en is de Mollie-kolom niet gelijk aan wat Mollie overschreef."
+            : ". Until then the site does not know the change in the rolling reserve, and the Mollie column does not equal what Mollie transferred."),
+        href: `${base}/admin/inkomsten/opladen`,
+      };
+    }
     case "open":
       return check.ok
         ? { ok: true, text: nl ? "Niets meer na te kijken." : "Nothing left to review." }

@@ -23,8 +23,11 @@ per rij of voor veel rijen tegelijk.
 
 | Bestand | Wat |
 |---|---|
-| `lib/inkomsten/parse.ts` | De exports van Payconiq, Mollie (betalingen en balansrapport), SumUp en Europabank lezen: de kolommen per formaat (`EXPORT_COLUMNS`), CSV, bedragen, datums op de Brusselse klok, Mollie-uitbetalingsmaand, kosten per betaling, de uitbetalingen. Puur. |
+| `lib/inkomsten/parse.ts` | De exports van Payconiq, Mollie (betalingen en balansrapport), SumUp en Europabank lezen: de kolommen per formaat (`EXPORT_COLUMNS`), CSV, bedragen, datums op de Brusselse klok, kosten per betaling, de uitbetalingen en de betalingen in het balansrapport. Puur. |
 | `lib/inkomsten/match.ts` | De koppelregels als pure functie (`matchTransaction`), de kassa die een toestel had (`kassaAt`), en de onthouden tekst (`incomeRuleText`). |
+| `lib/inkomsten/lines.ts` | `quarterLineKey`: op welke regel een transactie telt, of niet. Het overzicht en beide bestanden rekenen ermee. Puur. |
+| `lib/inkomsten/reserve.ts` | De berekende wijziging van de dynamische reserve van Mollie (`computeMollieReserve`). Puur. |
+| `lib/inkomsten/config.ts` | De instellingen (`income.config`) en wat meetelt (`lineRulesOf`). Puur. |
 | `lib/inkomsten/overview.ts` | Het overzicht als pure som, de rekening op een dag, de dag in Na te kijken (`reviewDay`), per uitbetaling (`groupPayouts`, `payoutState`), de controlelijst (`computeIncomeChecks`). |
 | `lib/inkomsten/workbook.ts` | Het kwartaalblad en het controlebestand als bladen voor `write-excel-file`. Puur. |
 | `lib/inkomsten/server.ts` | Database: opladen (met voorvertoning), opnieuw koppelen, Na te kijken, codes met de hand (`changeTransactions`), overzicht, uitbetalingen afvinken, het model voor de xlsx, lijsten. |
@@ -95,10 +98,14 @@ tabblad van Beheer, dat er drie eigen kolommen voor zet; die worden genegeerd).
 | Reserve | omschrijving bevat "rolling reserve", of betaalmethode `rollingreserve` | `RESERVE` |
 | De rest | vervallen, geannuleerd, mislukt | overgeslagen |
 
-Een betaling telt in de **maand van haar uitbetaling**, uit de referentie
-(`12345678.2510.03` is oktober 2025), zoals het rekenblad. Zonder uitbetaling
-telt ze nog nergens; wordt ze later opnieuw opgeladen met een uitbetaling, dan
-krijgt ze die alsnog. Alles van Payconiq telt in de maand van de betaling.
+Een betaling telt in de **maand van de betaling**, op de Brusselse klok, zoals
+elke bron (Beheer, november 2026). Tot dan telde ze in de maand van haar
+uitbetaling, zoals het rekenblad; de migratie
+`20261122010000_online_income_mollie_payment_month` zette de bestaande rijen
+om. De referentie van de uitbetaling (`12345678.2510.03`) blijft erbij: die zet
+de betaling bij haar overschrijving in de lijst per uitbetaling. Een betaling
+zonder uitbetaling telt gewoon in haar maand; het verschil met wat Mollie
+overschreef, is de wijziging van de dynamische reserve (zie verder).
 
 Het **balansrapport** van Mollie (`Transaction type`, `Settlement amount`) is
 elke beweging op het Mollie-saldo (`parseMollieBalance`):
@@ -106,7 +113,7 @@ elke beweging op het Mollie-saldo (`parseMollieBalance`):
 | Regel | Soort |
 |---|---|
 | `transfer` | een uitbetaling (`IncomePayout`): de referentie, de dag en het bedrag dat naar de bank ging |
-| `payment` | overgeslagen (`ignored`): zonder uitbetaling, en de betalingenexport heeft ze al |
+| `payment` | telt niet (`ignored`): de betalingenexport heeft ze al. Haar ID, maand en bedrag gaan naar `IncomeMollieBalancePayment`, om na te kijken dat die export volledig is |
 | `invoice` | `FEE`: de maandfactuur van Mollie, en een correctie van een paar cent; in haar eigen maand |
 | `rolling reserves` | `RESERVE`, in haar eigen maand |
 | `refund`, `chargeback` | `REFUND` |
@@ -118,17 +125,62 @@ die maand al af: Mollie houdt kosten en reserve wekelijks in op elke
 overschrijving, en de export per uitbetaling toont ze zo, met het nummer van
 de factuur van die maand ("Withheld fees MOL-NL-R2025.0001113445" van 4
 augustus tot 8 september 2025). Het balansrapport zet ze nog eens als één
-regel per maand. Een **terugbetaling** gaat wel mee met de eerstvolgende
-overschrijving in het bestand, zoals in de export per uitbetaling; staat er
-nog geen na, dan wacht ze zonder maand. Een kost uit het balansrapport heeft
-een sleutel die met `FEE:bal:` begint (`BALANCE_KEY`).
+regel per maand. Een **terugbetaling** telt in haar eigen maand en krijgt de
+eerstvolgende overschrijving in het bestand als uitbetaling, zoals in de
+export per uitbetaling; staat er nog geen na, dan heeft ze (nog) geen
+uitbetaling. Een kost uit het balansrapport heeft een sleutel die met
+`FEE:bal:` begint (`BALANCE_KEY`).
 
 Nagekeken op het balansrapport van het derde kwartaal van 2026: kosten
 −43,39 in augustus en −98,62 in september, samen −142,01, zoals de eigen
 poging van Beheer (−142,17 zonder de twee compensaties van +0,16).
 
 Nagekeken op het tabblad van Beheer voor het vierde kwartaal van 2025: totaal
-€ 40.523,51, kosten −1.434,27, reserve −984,72, exact het kwartaalblad.
+€ 40.523,51, kosten −1.434,27, reserve −984,72, exact het kwartaalblad. Dat
+was onder de oude regel (Mollie in de maand van de uitbetaling); onder de
+nieuwe is het derde kwartaal van 2026 de toets, zie "De wijziging van de
+dynamische reserve".
+
+### De wijziging van de dynamische reserve
+
+Mollie telt in de maand van de betaling, maar wat Mollie in een periode
+overschrijft, is iets anders: een overschrijving betaalt de betalingen van de
+week ervoor uit, min kosten, en Mollie houdt een deel bij of geeft het later
+vrij. Het verschil is de **wijziging van de dynamische reserve**, en de site
+rekent het zelf uit (`computeMollieReserve` in `lib/inkomsten/reserve.ts`):
+
+    overgeschreven in de periode − alles van Mollie in de periode
+
+- **Teken**: negatief wanneer Mollie geld bijhield (betalingen van eind
+  september die pas in oktober overgeschreven worden), positief wanneer Mollie
+  meer overschreef dan er binnenkwam. Over twee periodes heen valt het weg.
+- **Alles van Mollie** is elke Mollie-regel van de periode: wat meetelt, wat met
+  de hand niet meetelt en de kosten met een aparte factuur. Zo komt een
+  uitgesloten betaling niet als reserve terug. De Mollie-kolom is dan gelijk
+  aan de overschrijvingen, min wat niet meetelt.
+- **De regel in het overzicht** is Mollies eigen reserveregels ("rolling
+  reserve") plus het berekende bedrag. Ze heeft geen boekhoudcode: het is geld
+  dat Mollie nog bijhoudt (Beheer, november 2026). Ze telt mee in TOTAAL
+  GEHEEL.
+- **Per rekening**: de overschrijvingen op de rekening van Mollie op hun dag
+  (`IncomeChannelAccount`), de regels op de rekening van hun dag.
+- **Nooit bewaard**: het overzicht en de twee Excel-bestanden rekenen ze uit
+  dezelfde aanroep (`loadIncomeOverview`, en `loadIncomeWorkbookModel`
+  hergebruikt die). In het controlebestand staat ze als een berekende regel in
+  Transacties, met "Waarom" = de berekening, zodat de formules sluiten.
+- **Enkel met volledige bestanden.** Een ontbrekende betaling zou stil in het
+  verschil verdwijnen. Daarom kent de site de reserve pas wanneer de
+  betalingenexport en het balansrapport dezelfde betalingen noemen
+  (`mollieCompleteness`): elke betaling van de periode uit de export staat in
+  een balansrapport, en omgekeerd, in welke maand ook (de twee bestanden zetten
+  een betaling soms een seconde anders). Anders staat er "onbekend", met de
+  stap in de controlelijst.
+
+Nagekeken op het derde kwartaal van 2026 van Beheer
+(`test/inkomstenQ3Beheer.test.ts`): betalingen € 9.130,50, kosten € −142,01,
+reserve € −226,89, Mollie-kolom € 8.761,60, de negen overschrijvingen samen.
+Beheer kwam zelf op € 8.761,44: het script liet de twee compensaties (+0,16)
+weg uit de kosten maar telde ze in de reserve.
 
 **SumUp** (CSV, één per account): `Datum`, `Transactie-ID`, `Transactietype`,
 `Status`, `Totaal bedrag`, `Transactiekosten`, en het account (`email`), dat het
@@ -465,10 +517,28 @@ daar heten zoals in het bestand. Waar je één transactie ziet of een code kiest
 controlebestand), blijft de eigen naam van de code staan: daaraan herken je de
 subcode.
 
-De regel van een transactie in het kwartaalblad is `quarterLineKey`, en die
-sleutel staat ook in kolom I van Transacties. Zo geeft elke formule exact het
-bedrag van het blad voor de boekhouder; nagerekend in de preview (18 cellen,
-geen verschil).
+De regel van een transactie in het kwartaalblad is `quarterLineKey` (in
+`lib/inkomsten/lines.ts`), en die sleutel staat ook in kolom I van
+Transacties. Zo geeft elke formule exact het bedrag van het blad voor de
+boekhouder; nagerekend in de preview (18 cellen, geen verschil). Het overzicht
+op het scherm telt met dezelfde functie (`computeIncomeOverview`).
+
+**Kosten met een aparte factuur** (Instellingen, `separateFeeSources` in
+`income.config`): een bron waarvan de kosten op een factuur komen die de
+boekhouder zelf inboekt (SumUp, volgens Beheer in november 2026). Hun
+kostenregels blijven in de database en in de som per uitbetaling (wat op de
+bank kwam, is na de kosten), maar `quarterLineKey` geeft er null voor: niet in
+het overzicht, niet in de twee bestanden, anders boekt de boekhouder ze twee
+keer. In Transacties heten ze "Kosten, aparte factuur", en het tabblad "Telt
+niet mee" laat ze weg (dat zijn enkel de uitsluitingen met de hand). Payconiq
+heeft geen kostenregels; Europabank stuurt geen factuur. Of Mollie aangevinkt
+moet worden, vraagt Beheer na bij de boekhouder: dan is de Mollie-kolom de
+overschrijvingen plus die kosten.
+
+De regel "Wijziging dynamische reserve" heeft geen boekhoudcode meer (het
+rekenblad zette er "x"). In het controlebestand krijgt het tabblad van Mollie
+twee regels extra: wat Mollie overschreef, en "kwartaalblad min overgeschreven,
+plus wat niet meetelt", wat nul hoort te zijn.
 
 ## De controlelijst
 
@@ -482,12 +552,17 @@ geen verschil).
 2. elke maand met Mollie-betalingen heeft ook kostenregels;
 3. geen maand heeft Mollie-kosten uit het balansrapport én uit de export per
    uitbetaling;
-4. elke uitbetaling van Mollie en SumUp klopt: afgevinkt tegen het uittreksel,
-   of gelijk aan de overschrijving van Mollie (`payoutState`). De stap linkt
-   naar "Per uitbetaling";
-5. Na te kijken staat op nul;
-6. elk kanaal heeft een rekening;
-7. er is een kostencode, als er kosten zijn.
+4. de site kent de wijziging van de dynamische reserve: de betalingenexport en
+   het balansrapport noemen dezelfde betalingen (`mollieReserve`). Zo niet,
+   dan zegt de stap hoeveel betalingen aan welke kant ontbreken;
+5. elke uitbetaling van Mollie en SumUp klopt: afgevinkt tegen het uittreksel,
+   of een overschrijving van Mollie (`payoutState`). Bij Mollie is een verschil
+   tussen de som van de betalingen en de overschrijving in orde: dat verschil
+   zit in de reserve, en staat er ter informatie bij. De stap linkt naar "Per
+   uitbetaling";
+6. Na te kijken staat op nul;
+7. elk kanaal heeft een rekening;
+8. er is een kostencode, als er kosten zijn.
 
 Op het scherm staan de open stappen bovenaan, met hun link onderlijnd; wat in
 orde is, staat er grijs onder.
@@ -501,10 +576,10 @@ bevestiging noemt ze.
 **Per uitbetaling** op het overzicht: elke uitbetaling met een regel in de
 periode, met al haar regels, ook die van buiten de periode (een
 SumUp-verkoop telt in haar eigen maand, dus een uitbetaling kan over de rand
-lopen). Zonder vinkje is een uitbetaling van Mollie in orde wanneer de som van
-de site gelijk is aan de overschrijving uit het balansrapport (`provider`);
-anders staat het verschil erbij (`differs`). Een vinkje gaat voor: Beheer zag
-het uittreksel. Bij SumUp is de som van de verkopen min hun kosten het bedrag
+lopen). Zonder vinkje is een uitbetaling van Mollie in orde met de
+overschrijving uit het balansrapport: gelijk (`provider`), of anders
+(`differs`), en dan staat erbij hoeveel Mollie bijhield of meer overschreef.
+Een vinkje gaat voor: Beheer zag het uittreksel. Bij SumUp is de som van de verkopen min hun kosten het bedrag
 dat SumUp overschreef (in het derde kwartaal van 2026 per uitbetaling exact);
 daar blijft het afvinken met de hand.
 
@@ -576,8 +651,23 @@ fouten), dan opladen.
   Bancontact-betalingen voor € 385,00 en € 382,27 overgeschreven, € 2,73 of
   7 × € 0,39 kosten; bij 2608.04 € 1.045,00 betaald en € 1.191,39
   overgeschreven, oudere reserve die vrijkwam. De site zet beide naast elkaar
-  en noemt het verschil; het uittreksel blijft het bewijs. Wie zonder verschil
-  wil afvinken, laadt de export per uitbetaling op, zoals het rekenblad.
+  en noemt het verschil als informatie: het zit in de berekende wijziging van
+  de dynamische reserve, dus de uitbetaling is in orde zonder vinkje.
+- **Zonder balansrapport geen reserve.** De reserve is een verschil, en een
+  ontbrekende betaling zou er stil in verdwijnen. Daarom kent de site ze pas
+  wanneer de betalingenexport en het balansrapport dezelfde betalingen noemen.
+  Download ze dus samen, voor de hele periode. De betalingen in het
+  balansrapport las de site voor november 2026 niet: wie een periode van
+  daarvoor bekijkt, uploadt het balansrapport één keer opnieuw (de knop
+  Uploaden blijft dan actief, met "betalingen om de Mollie-export na te
+  kijken").
+- **De omzetting naar de maand van de betaling en afgesloten periodes.** De
+  migratie `online_income_mollie_payment_month` laat een Mollie-regel staan
+  wanneer zijn oude of nieuwe maand in een afgesloten periode valt. Heropen zo'n
+  periode eerst en voer de `UPDATE` uit de migratie opnieuw uit; hij is
+  idempotent. Een overschrijving van Mollie in een afgesloten maand wordt bij
+  een import ook niet meer toegevoegd of gewijzigd: ze bepaalt de reserve van
+  die maand.
 - **De maandfactuur van Mollie staat na de laatste overschrijving.** Op de
   laatste seconde van de maand, dus aan de volgende overschrijving gehangen
   schoof ze een maand op, en die van de laatste maand van een kwartaal kreeg

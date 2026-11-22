@@ -102,8 +102,8 @@ export default async function IncomeTransactionsPage({
         <h2 className="text-lg font-semibold">{nl ? "Transacties" : "Transactions"}</h2>
         <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
           {nl
-            ? "Elke regel uit de geüploade exports, met de code en de regel die ze gaf. Klik op een rij om de code te veranderen, of vink er meer aan om ze samen een code te geven. De periode is die van het overzicht: bij Mollie de maand van de uitbetaling."
-            : "Every row from the uploaded exports, with the code and the rule that gave it. Click a row to change its code, or tick several to give them a code together. The period is the one of the overview: for Mollie the month of the payout."}
+            ? "Elke regel uit de geüploade exports, met de code en de regel die ze gaf. Klik op een rij om de code te veranderen, of vink er meer aan om ze samen een code te geven. De periode is die van het overzicht: de maand van de betaling."
+            : "Every row from the uploaded exports, with the code and the rule that gave it. Click a row to change its code, or tick several to give them a code together. The period is the one of the overview: the month of the payment."}
         </p>
       </header>
 

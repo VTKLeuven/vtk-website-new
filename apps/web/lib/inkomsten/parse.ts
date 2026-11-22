@@ -31,8 +31,11 @@ export type ParsedIncomeRow = {
   externalKey: string;
   providerId: string | null;
   occurredAt: Date;
-  /** "2026-10": waar de regel in het overzicht telt. Null bij Mollie zonder uitbetaling. */
-  periodMonth: string | null;
+  /**
+   * "2026-10": waar de regel in het overzicht telt. De maand van de transactie
+   * op de Brusselse klok, voor elke bron, ook Mollie (Beheer, november 2026).
+   */
+  periodMonth: string;
   amountCents: number;
   refundedCents: number;
   description: string | null;
@@ -71,6 +74,9 @@ export type ParsedPayout = {
   amountCents: number | null;
 };
 
+/** Een betaling zoals het balansrapport van Mollie ze noemt; geen naam of rekening. */
+export type ParsedBalancePayment = { paymentId: string; month: string; amountCents: number };
+
 export type IncomeParseResult =
   | {
       ok: true;
@@ -88,6 +94,12 @@ export type IncomeParseResult =
       total: number;
       /** De uitbetalingen die het bestand noemt. */
       payouts: ParsedPayout[];
+      /**
+       * Wat het balansrapport van Mollie over elke betaling zegt (ID, maand,
+       * bedrag): de controle dat de betalingenexport volledig is. Enkel bij
+       * `mollie-balance`.
+       */
+      balancePayments?: ParsedBalancePayment[];
     }
   | IncomeParseFailure;
 
@@ -174,19 +186,6 @@ function toInstant(local: LocalDateTime): Date {
 
 function monthKey(year: number, month: number): string {
   return `${year}-${String(month).padStart(2, "0")}`;
-}
-
-/**
- * De maand van een Mollie-uitbetaling uit haar referentie: in
- * "12345678.2510.03" staat 2510, oktober 2025. Zo rekent ook het rekenblad van
- * Beheer (`MID(referentie; 10; 4)`).
- */
-export function payoutMonth(reference: string | null | undefined): string | null {
-  const match = /^\d+\.(\d{2})(\d{2})\.\d+$/.exec((reference ?? "").trim());
-  if (!match) return null;
-  const month = Number(match[2]);
-  if (month < 1 || month > 12) return null;
-  return monthKey(2000 + Number(match[1]), month);
 }
 
 const EMAIL = /[^\s:;,<>()"']+@[^\s:;,<>()"']+\.[a-z]{2,}/gi;
@@ -496,7 +495,7 @@ function parseMollie(rows: string[][], columns: Columns): IncomeParseResult {
       externalKey,
       providerId: id || null,
       occurredAt: toInstant(local),
-      periodMonth: payoutMonth(payoutReference),
+      periodMonth: monthKey(local.year, local.month),
       amountCents: amount,
       refundedCents: Math.abs(parseDecimalCents(get(refundedCol)) ?? 0),
       description: cleanDescription(rawDescription),
@@ -531,22 +530,21 @@ function balanceKind(type: string): IncomeKindCode | null {
  * ("transfer", met de referentie van de uitbetaling en het bedrag dat op het
  * uittreksel staat), de kosten die Mollie per maand factureert ("invoice"),
  * de reserve en de terugbetalingen. De betalingen staan er ook in, maar zonder
- * uitbetaling: die komen uit de betalingenexport, dus hier slaat de site ze
- * over.
+ * uitbetaling: die komen uit de betalingenexport, dus hier tellen ze niet.
+ * Hun ID, maand en bedrag gaan wel mee (`balancePayments`): zo ziet de site of
+ * de betalingenexport volledig is, en daar hangt de berekende reserve van af.
  *
- * De maandfactuur en de reserve tellen in hun eigen maand, zonder
- * uitbetaling. Mollie zet ze op de laatste seconde van de maand, na de laatste
+ * Elke regel telt in haar eigen maand, zoals de betalingen. De maandfactuur en
+ * de reserve staan op de laatste seconde van de maand, na de laatste
  * overschrijving, maar het geld ging er al die maand af: Mollie houdt de
  * kosten en de reserve wekelijks in op elke overschrijving (in de export per
  * uitbetaling staan ze zo, met het nummer van de factuur van die maand), en
- * zet ze in het balansrapport nog eens als één regel per maand. Aan de
- * volgende overschrijving gehangen, schoof de factuur een maand op, en die van
- * de laatste maand van een kwartaal kreeg nooit een maand: een balansrapport
- * van het volgende kwartaal begint pas de dag erna.
+ * zet ze in het balansrapport nog eens als één regel per maand.
  *
- * Een terugbetaling gaat wel mee met de eerstvolgende overschrijving, zoals in
- * de export per uitbetaling: ze krijgt die uitbetaling en haar maand. Staat er
- * in het bestand nog geen overschrijving na, dan wacht ze.
+ * Een terugbetaling krijgt de eerstvolgende overschrijving als uitbetaling,
+ * zoals in de export per uitbetaling, zodat de lijst per uitbetaling ze bij
+ * die overschrijving zet. Staat er in het bestand nog geen overschrijving na,
+ * dan heeft ze (nog) geen uitbetaling.
  */
 function parseMollieBalance(rows: string[][], columns: Columns): IncomeParseResult {
   const c = indexes(columns, EXPORT_COLUMNS["mollie-balance"]);
@@ -582,12 +580,18 @@ function parseMollieBalance(rows: string[][], columns: Columns): IncomeParseResu
 
   const result: ParsedIncomeRow[] = [];
   const payouts: ParsedPayout[] = [];
+  const balancePayments: ParsedBalancePayment[] = [];
   const seenHashes = new Map<string, number>();
   let skipped = 0;
   let ignored = 0;
   for (const line of lines) {
     if (line.type === "payment") {
+      // Telt niet: de betaling komt uit de betalingenexport. Haar ID en bedrag
+      // gaan wel mee, om na te kijken dat die export volledig is.
       ignored++;
+      if (line.reference) {
+        balancePayments.push({ paymentId: line.reference, month: monthKey(line.local.year, line.local.month), amountCents: line.amount });
+      }
       continue;
     }
     if (line.type === "transfer") {
@@ -612,15 +616,16 @@ function parseMollieBalance(rows: string[][], columns: Columns): IncomeParseResu
       seenHashes.set(base, seen + 1);
       externalKey = `${kind}:${BALANCE_KEY}:${base}:${seen}`;
     }
-    const ownMonth = kind !== "REFUND";
-    const payoutReference = ownMonth ? null : (nextTransfer.get(line) ?? null);
+    // Een terugbetaling gaat mee met de eerstvolgende overschrijving (zo groepeert
+    // de lijst per uitbetaling ze), maar telt zoals elke regel in haar eigen maand.
+    const payoutReference = kind === "REFUND" ? (nextTransfer.get(line) ?? null) : null;
     result.push({
       source: "MOLLIE",
       kind,
       externalKey,
       providerId: kind === "REFUND" ? line.reference || null : null,
       occurredAt: line.at,
-      periodMonth: ownMonth ? monthKey(line.local.year, line.local.month) : payoutMonth(payoutReference),
+      periodMonth: monthKey(line.local.year, line.local.month),
       amountCents: line.amount,
       refundedCents: 0,
       description: cleanDescription(line.description),
@@ -630,7 +635,7 @@ function parseMollieBalance(rows: string[][], columns: Columns): IncomeParseResu
       channel: MOLLIE_CHANNEL,
     });
   }
-  return { ok: true, format: "mollie-balance", source: "MOLLIE", rows: result, skipped, ignored, total: rows.length - 1, payouts };
+  return { ok: true, format: "mollie-balance", source: "MOLLIE", rows: result, skipped, ignored, total: rows.length - 1, payouts, balancePayments };
 }
 
 

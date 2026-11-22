@@ -9166,9 +9166,10 @@ model IncomeImport {
   importedById   String?
   createdAt      DateTime     @default(now()) @db.Timestamptz(3)
 
-  importedBy   User?               @relation("IncomeImportedBy", fields: [importedById], references: [id], onDelete: SetNull)
-  transactions IncomeTransaction[]
-  payouts      IncomePayout[]
+  importedBy      User?                        @relation("IncomeImportedBy", fields: [importedById], references: [id], onDelete: SetNull)
+  transactions    IncomeTransaction[]
+  payouts         IncomePayout[]
+  balancePayments IncomeMollieBalancePayment[]
 
   @@index([createdAt])
 }
@@ -9241,9 +9242,11 @@ model IncomeTransaction {
   /// De ID van de provider, zoals in de export (`tr_...`, `tx...`).
   providerId      String?
   occurredAt      DateTime     @db.Timestamptz(3)
-  /// De maand waarin de regel in het overzicht telt (de eerste dag). Bij Mollie
-  /// die van de uitbetaling, en NULL zolang ze niet uitbetaald is; anders die
-  /// van de transactie, op de Brusselse klok.
+  /// De maand waarin de regel in het overzicht telt (de eerste dag): die van de
+  /// transactie, op de Brusselse klok, voor elke bron. Tot november 2026 telde
+  /// Mollie in de maand van de uitbetaling, en was dit NULL zolang ze niet
+  /// uitbetaald was; de migratie `online_income_mollie_payment_month` zette dat
+  /// recht, behalve in een afgesloten periode.
   periodMonth     DateTime?    @db.Date
   amountCents     Int
   /// Bij Mollie: wat ervan teruggestort werd. Informatief; het overzicht telt
@@ -9343,6 +9346,27 @@ model IncomePayout {
   import IncomeImport? @relation(fields: [importId], references: [id], onDelete: SetNull)
 
   @@id([source, reference])
+  @@index([importId])
+}
+
+/// Wat het balansrapport van Mollie over één betaling zegt: haar ID, maand en
+/// bedrag. De betaling zelf telt uit de betalingenexport (`IncomeTransaction`);
+/// dit is enkel de controle dat die export volledig is. De wijziging van de
+/// dynamische reserve is het verschil tussen wat Mollie overschreef en wat er
+/// binnenkwam, en vangt een ontbrekende betaling dus stil op: met deze lijst
+/// ziet de controlelijst ze. Geen naam of rekening van wie betaalde. Een
+/// balansrapport opnieuw uploaden zet de rijen van die import.
+model IncomeMollieBalancePayment {
+  /// De ID van de betaling bij Mollie (`tr_...`).
+  paymentId   String   @id
+  /// De maand van de regel in het balansrapport, op de Brusselse klok.
+  month       DateTime @db.Date
+  amountCents Int
+  importId    String
+
+  import IncomeImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@index([month])
   @@index([importId])
 }
 

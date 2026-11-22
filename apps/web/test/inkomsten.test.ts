@@ -8,11 +8,11 @@ import {
   parseDecimalCents,
   parseIncomeExport,
   parseLocalDateTime,
-  payoutMonth,
   type ParsedIncomeRow,
 } from "@/lib/inkomsten/parse";
 import { codeAtStart, deviceAt, incomeRuleText, matchTransaction, nameRuleKey, type MatchContext } from "@/lib/inkomsten/match";
 import { accountOn, computeIncomeOverview, reviewDay, type OverviewTransaction } from "@/lib/inkomsten/overview";
+import { NO_SEPARATE_FEES } from "@/lib/inkomsten/lines";
 import { combineImportSummaries } from "@/lib/inkomsten/importSummary";
 import {
   controlSpanLabel,
@@ -123,12 +123,6 @@ describe("bedragen, datums en tekst", () => {
     expect(parseLocalDateTime("4-8-2025 6:14:00")).toEqual({ year: 2025, month: 8, day: 4, minutes: 374, seconds: 0 });
     expect(parseLocalDateTime("5/3/2026")).toEqual({ year: 2026, month: 3, day: 5, minutes: 0, seconds: 0 });
     expect(parseLocalDateTime("31/02/20026")).toBeNull();
-  });
-
-  it("haalt de maand uit een Mollie-uitbetalingsreferentie", () => {
-    expect(payoutMonth("12345678.2510.03")).toBe("2025-10");
-    expect(payoutMonth("")).toBeNull();
-    expect(payoutMonth("12345678.2513.01")).toBeNull();
   });
 
   it("haalt e-mailadressen uit een omschrijving", () => {
@@ -264,16 +258,26 @@ describe("Mollie", () => {
     if (!result.ok) return;
     expect(result.skipped).toBe(1);
     expect(result.rows.map((row) => [row.kind, row.amountCents, row.periodMonth])).toEqual([
-      ["PAYMENT", 5500, "2026-10"],
-      ["FEE", -4342, "2026-09"],
-      ["RESERVE", -1100, "2026-09"],
-      ["PAYMENT", 1000, null],
+      ["PAYMENT", 5500, "2026-09"],
+      ["FEE", -4342, "2026-08"],
+      ["RESERVE", -1100, "2026-08"],
+      ["PAYMENT", 1000, "2026-09"],
     ]);
   });
 
-  it("telt een betaling in de maand van haar uitbetaling", () => {
-    // Betaald op 30 september, uitbetaald in oktober: telt in oktober, zoals het rekenblad.
-    expect(rowsOf(MOLLIE_EN)[0].periodMonth).toBe("2026-10");
+  it("telt een betaling in de maand van de betaling, niet in die van haar uitbetaling", () => {
+    // Betaald op 30 september, uitbetaald in oktober: telt in september (Beheer,
+    // november 2026). De uitbetaling blijft erbij, voor de lijst per uitbetaling.
+    const [paid, , , unpaid] = rowsOf(MOLLIE_EN);
+    expect([paid.periodMonth, paid.payoutReference]).toEqual(["2026-09", "12345678.2610.01"]);
+    // Nog niet uitbetaald: telt toch in haar eigen maand.
+    expect([unpaid.periodMonth, unpaid.payoutReference]).toEqual(["2026-09", null]);
+  });
+
+  it("rekent de maand op de Brusselse klok: 1 oktober 00:18 is oktober", () => {
+    const rows = rowsOf([MOLLIE_EN.split("\n")[0], '"2026-10-01 00:18:00",kbc,EUR,12.00,paidout,tr_test9,"Iets",,,,EUR,12.00,12345678.2610.01,0.00'].join("\n"));
+    expect(rows[0].periodMonth).toBe("2026-10");
+    expect(rows[0].occurredAt.toISOString()).toBe("2026-09-30T22:18:00.000Z");
   });
 
   it("leest de Nederlandse koppen van het tabblad van Beheer", () => {
@@ -325,6 +329,14 @@ describe("Mollie", () => {
         { reference: "12345678.2609.01", paidOn: "2026-09-07", amountCents: 181335 },
         { reference: "12345678.2608.01", paidOn: "2026-08-03", amountCents: 21955 },
       ]);
+    });
+
+    it("geeft de betalingen door om de betalingenexport na te kijken, zonder naam of rekening", () => {
+      const result = parseIncomeExport(MOLLIE_BALANCE);
+      if (!result.ok) throw new Error(result.error);
+      expect(result.balancePayments).toEqual([{ paymentId: "tr_test7", month: "2026-08", amountCents: 5000 }]);
+      expect(JSON.stringify(result)).not.toContain("PERSOON");
+      expect(JSON.stringify(result)).not.toContain("BE00000000000007");
     });
 
     it("telt de maandfactuur en de reserve in hun eigen maand, en een terugbetaling bij de eerstvolgende overschrijving", () => {
@@ -657,6 +669,7 @@ describe("overzicht", () => {
         tx({ kind: "RESERVE", amountCents: -22689 }),
       ],
       new Map(),
+      NO_SEPARATE_FEES,
     );
     expect(overview.totals.bySource.MOLLIE).toBe(876160);
     expect(overview.fees.total).toBe(-14201);
@@ -675,6 +688,7 @@ describe("overzicht", () => {
         ["70010010001", 0],
         ["700110", 1],
       ]),
+      NO_SEPARATE_FEES,
     );
     expect(overview.codes.map((row) => row.code)).toEqual(["700100 10001", "700110"]);
     expect(overview.unassigned.total).toBe(50);
@@ -691,11 +705,30 @@ describe("overzicht", () => {
         tx({ source: "EUROPABANK", kind: "FEE", amountCents: -2 }),
       ],
       new Map(),
+      NO_SEPARATE_FEES,
     );
     expect(overview.codes[0].bySource.SUMUP).toBe(340);
     expect(overview.unassigned.bySource.EUROPABANK).toBe(230);
     expect(overview.fees.bySource).toMatchObject({ SUMUP: -3, EUROPABANK: -2 });
     expect(overview.totals.total).toBe(565);
+  });
+
+  it("laat de kosten met een aparte factuur uit het totaal en uit de rekeningen", () => {
+    const overview = computeIncomeOverview(
+      [
+        tx({ source: "SUMUP", accountingCode: "700110", accountingCodeName: "Cultuur", amountCents: 340 }),
+        tx({ source: "SUMUP", kind: "FEE", amountCents: -3 }),
+        tx({ source: "EUROPABANK", amountCents: 230 }),
+        tx({ source: "EUROPABANK", kind: "FEE", amountCents: -2 }),
+      ],
+      new Map(),
+      { separateFeeSources: new Set(["SUMUP"] as const) },
+    );
+    expect(overview.separateFees.bySource.SUMUP).toBe(-3);
+    expect(overview.fees.bySource).toMatchObject({ SUMUP: 0, EUROPABANK: -2 });
+    expect(overview.totals.total).toBe(568);
+    expect(overview.accounts).toEqual([{ bankAccount: "…6140", total: 568 }]);
+    expect(overview.excluded.count).toBe(0);
   });
 
   it("telt ook mee wat op de rekening van een post binnenkomt, met een totaal per rekening", () => {
@@ -705,6 +738,7 @@ describe("overzicht", () => {
         tx({ accountingCode: "700110", accountingCodeName: "Cultuur", amountCents: 250, source: "PAYCONIQ", bankAccount: "…9348" }),
       ],
       new Map(),
+      NO_SEPARATE_FEES,
     );
     expect(overview.totals.total).toBe(750);
     expect(overview.accounts).toEqual([
@@ -744,6 +778,7 @@ describe("meerdere bestanden tegelijk opladen", () => {
     lastAt: null,
     newChannels: [],
     payouts: 0,
+    balancePayments: 0,
     ...partial,
   });
 

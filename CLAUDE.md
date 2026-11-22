@@ -176,11 +176,15 @@ de sectie "Vallen"; de kringkeuzes staan in `docs/design-decisions.md`.
   in `lib/inkomsten` staat enkel kennis over de bestanden. Zet er geen
   terminalnummer, rekeningnummer of code in, ook niet als standaard, in een
   seed of in een hint bij een veld.
-- **Rekenen zoals het rekenblad**: Mollie op de maand van de uitbetaling, de
-  rest op de maand van de betaling, elk uur op de Brusselse klok. Een wijziging
-  daaraan toets je opnieuw aan een kwartaal van Beheer.
+- **Alles op de maand van de betaling**, ook Mollie, elk uur op de Brusselse
+  klok. Bij Mollie maakt de berekende wijziging van de dynamische reserve
+  (`lib/inkomsten/reserve.ts`) de kolom gelijk aan wat Mollie overschreef; ze
+  wordt nooit bewaard, en de site kent ze enkel wanneer de betalingenexport en
+  het balansrapport dezelfde betalingen noemen. Een wijziging daaraan toets je
+  opnieuw aan een kwartaal van Beheer (`test/inkomstenQ3Beheer.test.ts`).
 - **Het blad voor de boekhouder en het controlebestand delen één sleutel**
-  (`quarterLineKey` in `lib/inkomsten/workbook.ts`). Verander je in welke regel
+  (`quarterLineKey` in `lib/inkomsten/lines.ts`), en het overzicht op het
+  scherm telt ermee. Verander je in welke regel
   een transactie valt, doe het daar; anders tellen de formules van het
   controlebestand iets anders op dan het blad dat naar de boekhouder gaat.
 

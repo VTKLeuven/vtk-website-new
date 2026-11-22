@@ -63,6 +63,9 @@ export function UploadForm({
   const failed = files.flatMap((file) => (file.ok ? [] : [file]));
   const several = files.length > 1;
   const totals = good.length > 0 ? combineImportSummaries(good) : null;
+  // Iets dat opladen de moeite waard maakt. Een balansrapport dat al geüpload
+  // was, brengt soms enkel de betalingen om na te kijken: ook dat telt.
+  const hasNews = totals !== null && totals.created + totals.updated + totals.payouts + totals.balancePayments > 0;
   const matched = totals
     ? totals.rules.WEBSITE + totals.rules.CODE_IN_TEXT + totals.rules.CASH_REGISTER + totals.rules.NAME_RULE + totals.rules.CHANNEL_DEFAULT
     : 0;
@@ -75,7 +78,7 @@ export function UploadForm({
       savedMessage={nl ? "Geüpload." : "Uploaded."}
       errorMessages={errorMessages}
       fallbackErrorMessage={nl ? "Uploaden mislukt." : "Upload failed."}
-      submitDisabled={pending || !totals || failed.length > 0 || totals.created + totals.updated + totals.payouts === 0}
+      submitDisabled={pending || !totals || failed.length > 0 || !hasNews}
       onSuccess={() => {
         setPreview({ status: "idle" });
         router.refresh();
@@ -167,6 +170,12 @@ export function UploadForm({
               {totals.feeRows ? <Stat label={nl ? "Kosten en reserve" : "Fees and reserve"} value={number(totals.feeRows)} /> : null}
               {totals.updated ? <Stat label={nl ? "Nu uitbetaald" : "Now paid out"} value={number(totals.updated)} /> : null}
               {totals.payouts ? <Stat label={nl ? "Uitbetalingen, nieuw of gewijzigd" : "Payouts, new or changed"} value={number(totals.payouts)} /> : null}
+              {totals.balancePayments ? (
+                <Stat
+                  label={nl ? "Betalingen om de Mollie-export na te kijken" : "Payments to check the Mollie export"}
+                  value={number(totals.balancePayments)}
+                />
+              ) : null}
               <Stat label={nl ? "Telt niet mee (mislukt, vervallen, geweigerd)" : "Does not count (failed, expired, denied)"} value={number(totals.skipped)} />
               {totals.ignored ? (
                 <Stat
@@ -222,7 +231,7 @@ export function UploadForm({
                 : "A Mollie file has no fee or reserve rows. The payments get a code, but the Mollie total will not match the bank until the fees are in too: upload the balance report as well."}
             </p>
           ) : null}
-          {totals.created + totals.updated + totals.payouts === 0 ? (
+          {!hasNews ? (
             <p className="mt-2 text-vtk-muted">
               {nl ? (several ? "Er is niets nieuws in deze bestanden." : "Er is niets nieuws in dit bestand.") : several ? "There is nothing new in these files." : "There is nothing new in this file."}
             </p>

@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { getCashRegisterConfig } from "@/lib/kassas/server";
+import { parseIncomeConfig } from "@/lib/inkomsten/config";
 import { monthToDate, parseIncomeExport, parseMonth, type ClosestFormat } from "@/lib/inkomsten/parse";
 import {
   assignChannelDay,
@@ -391,8 +392,23 @@ export async function saveIncomeSettingsAction(_prev: SaveState, formData: FormD
     const code = await prisma.accountingCode.findUnique({ where: { id: raw }, select: { id: true } });
     if (!code) return saveError("CODE_NOT_FOUND");
   }
-  await saveIncomeConfig({ feeAccountingCodeId: raw || null });
-  await logAudit({ action: "update", entity: "incomeSettings", target: "Kostencode", summary: raw ? "kostencode gekozen" : "kostencode leeggemaakt" });
+  // Door de parser, zodat enkel bekende bronnen met kosten overblijven.
+  const config = parseIncomeConfig({
+    feeAccountingCodeId: raw || null,
+    separateFeeSources: formData.getAll("separateFeeSources").map(String),
+  });
+  await saveIncomeConfig(config);
+  await logAudit({
+    action: "update",
+    entity: "incomeSettings",
+    target: "Kosten",
+    summary: [
+      raw ? "kostencode gekozen" : "geen kostencode",
+      config.separateFeeSources.length
+        ? `aparte factuur: ${config.separateFeeSources.join(", ")}`
+        : "geen kosten met een aparte factuur",
+    ].join("; "),
+  });
   revalidate();
   return saveOk();
 }

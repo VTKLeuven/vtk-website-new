@@ -31,8 +31,8 @@ const GUIDES: Guide[] = [
       en: "The payments export, or the export per payout (with the \"Withheld fees\", \"Balance correction\" and \"rolling reserve\" rows). English or Dutch headings. Only the export per payout has the fees and reserve per payout; with the payments export the sum per payout does not come to the transfer.",
     },
     counts: {
-      nl: "Telt: status paid, paidout of refunded, in de maand van de uitbetaling (de referentie zegt welke: 12345678.2608.01 is augustus 2026). Zonder uitbetaling wacht een betaling tot een latere export ze noemt.",
-      en: "Counts: status paid, paidout or refunded, in the month of the payout (the reference says which: 12345678.2608.01 is August 2026). Without a payout a payment waits until a later export lists it.",
+      nl: "Telt: status paid, paidout of refunded, in de maand van de betaling op de Brusselse klok, zoals de andere bronnen. De referentie van de uitbetaling zet ze bij haar overschrijving in de lijst per uitbetaling.",
+      en: "Counts: status paid, paidout or refunded, in the month of the payment on the Brussels clock, like the other sources. The payout reference puts it with its transfer in the list per payout.",
     },
   },
   {
@@ -43,8 +43,8 @@ const GUIDES: Guide[] = [
       en: "Every movement on the Mollie balance: the transfers to the bank (transfer), the monthly invoice (invoice) and the reserve.",
     },
     counts: {
-      nl: "De betalingen erin slaat de site over: die komen uit de betalingenexport. De maandfactuur en de reserve staan op de laatste seconde van de maand en tellen in die maand; een terugbetaling gaat mee met de eerstvolgende overschrijving. Een overschrijving is het bedrag op het uittreksel.",
-      en: "The site skips the payments in it: those come from the payments export. The monthly invoice and the reserve sit on the last second of the month and count in that month; a refund goes with the next transfer. A transfer is the amount on the bank statement.",
+      nl: "De betalingen erin tellen niet (die komen uit de betalingenexport), maar de site kijkt er wel mee na of die export volledig is. Elke regel telt in haar eigen maand; een terugbetaling staat bij de eerstvolgende overschrijving. Een overschrijving is het bedrag op het uittreksel, en daaruit berekent de site de wijziging van de dynamische reserve: upload het balansrapport van de hele periode.",
+      en: "The payments in it do not count (those come from the payments export), but the site uses them to check that export is complete. Every row counts in its own month; a refund sits with the next transfer. A transfer is the amount on the bank statement, and from those the site computes the change in the rolling reserve: upload the balance report of the whole period.",
     },
   },
   {
