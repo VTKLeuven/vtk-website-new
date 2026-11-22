@@ -14,15 +14,17 @@ import { CheckIcon, InfoIcon } from "@/components/ui/icons";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { AdminDisclosure } from "@/components/admin/AdminDisclosure";
 import { PayoutCheckButton } from "./PayoutCheckButton";
+import { BankSection } from "./BankSection";
+import { displayAccount } from "@/lib/inkomsten/labels";
 import { incomeErrorMessages } from "./messages";
 import { SOURCE_LABELS, checkText, periodLabel, quarterOptions } from "./shared";
 
 /**
  * Het overzicht dat het rekenblad "Oriëntatie Online Inkomsten" vervangt: per
  * boekhoudcode wat er in een periode via Payconiq, Mollie, SumUp en Europabank
- * binnenkwam, met een kolom per bron die ooit opgeladen werd. Mollie telt in de
- * maand van de uitbetaling, zoals in het rekenblad; de rest in de maand van de
- * betaling.
+ * binnenkwam, met een kolom per bron die ooit opgeladen werd. Alles telt in de
+ * maand van de betaling; bij Mollie maakt de berekende wijziging van de
+ * dynamische reserve de kolom gelijk aan wat Mollie overschreef.
  */
 export default async function IncomeOverviewPage({
   params,
@@ -47,6 +49,7 @@ export default async function IncomeOverviewPage({
   const data = await loadIncomeOverview(from, to);
   const { overview } = data;
   const money = (cents: number) => (cents === 0 ? "" : formatEuro(cents, locale));
+  const ymdLabel = (value: string) => new Date(`${value}T12:00:00Z`).toLocaleDateString(nl ? "nl-BE" : "en-GB", { timeZone: "UTC" });
   const transactionsHref = (extra: Record<string, string>) =>
     `${base}/admin/inkomsten/transacties?${new URLSearchParams({ van: from, tot: to, ...extra }).toString()}`;
   const exportHref = (soort: "boekhouder" | "controle") =>
@@ -59,6 +62,10 @@ export default async function IncomeOverviewPage({
   const errorMessages = incomeErrorMessages(locale);
   const day = (value: Date) =>
     value.toLocaleDateString(nl ? "nl-BE" : "en-GB", { day: "numeric", month: "short", timeZone: "Europe/Brussels" });
+  /** "2026-09-28" als "28 sep." */
+  const dayOf = (ymd: string) => new Date(`${ymd}T00:00:00Z`).toLocaleDateString(nl ? "nl-BE" : "en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+  const reserve = data.mollieReserve;
+  const separateFeeSources = data.sources.filter((source) => overview.separateFees.bySource[source] !== 0);
 
   // Een bedrag linkt naar zijn rijen in Transacties, waar het totaal bovenaan
   // hetzelfde bedrag is; zonder `filter` (het totaal) linkt niets.
@@ -84,8 +91,8 @@ export default async function IncomeOverviewPage({
       <header>
         <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
           {nl
-            ? "Wat er via Payconiq, Mollie, SumUp en Europabank binnenkwam, per boekhoudcode. Mollie telt in de maand van de uitbetaling, de rest in de maand van de betaling."
-            : "What came in through Payconiq, Mollie, SumUp and Europabank, per accounting code. Mollie counts in the month of the payout, the rest in the month of the payment."}
+            ? "Wat er via Payconiq, Mollie, SumUp en Europabank binnenkwam, per boekhoudcode, in de maand van de betaling. Bij Mollie maakt de wijziging van de dynamische reserve de kolom gelijk aan wat Mollie overschreef."
+            : "What came in through Payconiq, Mollie, SumUp and Europabank, per accounting code, in the month of the payment. For Mollie the change in the rolling reserve makes the column equal to what Mollie transferred."}
         </p>
       </header>
 
@@ -186,7 +193,7 @@ export default async function IncomeOverviewPage({
               <thead>
                 <tr className="border-b border-vtk-blue/12 text-left text-xs uppercase tracking-wide text-vtk-muted">
                   <th className="px-3 py-2">{nl ? "Code" : "Code"}</th>
-                  <th className="px-3 py-2">{nl ? "Naam" : "Name"}</th>
+                  <th className="px-3 py-2">Post</th>
                   {data.sources.map((source) => (
                     <th key={source} className="px-3 py-2 text-right">
                       {SOURCE_LABELS[source]}
@@ -231,11 +238,57 @@ export default async function IncomeOverviewPage({
                     {lineCells(overview.fees, { soort: "kosten" })}
                   </tr>
                 ) : null}
-                {overview.reserve.count > 0 ? (
+                {overview.reserve.count > 0 || reserve.status === "unknown" ? (
                   <tr className="border-b border-vtk-blue/8">
                     <td className="px-3 py-2" />
-                    <td className="px-3 py-2">{nl ? "Wijziging dynamische reserve" : "Change in rolling reserve"}</td>
-                    {lineCells(overview.reserve, { soort: "reserve" })}
+                    <td className="px-3 py-2">
+                      <span className="inline-flex items-center gap-1">
+                        {nl ? "Wijziging dynamische reserve" : "Change in rolling reserve"}
+                        {reserve.status === "known" ? (
+                          <InfoTip label={nl ? "Hoe de site de reserve berekent" : "How the site computes the reserve"}>
+                            <p>
+                              {nl
+                                ? "Wat Mollie in de periode naar de bank overschreef, min alles van Mollie in de periode. Negatief: Mollie hield geld bij dat nog niet overgeschreven is. Positief: Mollie schreef ook betalingen van eind vorige periode over. Zo is de Mollie-kolom gelijk aan wat Mollie overschreef, op wat niet meetelt na."
+                                : "What Mollie transferred to the bank in the period, minus everything from Mollie in the period. Negative: Mollie kept money it has not transferred yet. Positive: Mollie also transferred payments from the end of the previous period. That makes the Mollie column equal to what Mollie transferred, except for what does not count."}
+                            </p>
+                            {reserve.accounts.map((account) => (
+                              <p key={account.bankAccount ?? "none"}>
+                                {account.bankAccount ?? (nl ? "Rekening niet ingesteld" : "Account not set")}
+                                {": "}
+                                {nl
+                                  ? `overgeschreven ${formatEuro(account.transfersCents, locale)} in ${account.transferCount === 1 ? "1 overschrijving" : `${account.transferCount} overschrijvingen`}${account.lastTransferOn ? ` (de laatste op ${dayOf(account.lastTransferOn)})` : ""}; betalingen ${formatEuro(account.paymentsCents, locale)}${account.refundsCents ? `, terugbetalingen ${formatEuro(account.refundsCents, locale)}` : ""}, kosten ${formatEuro(account.feesCents, locale)}${account.storedReserveCents ? `, reserveregels van Mollie ${formatEuro(account.storedReserveCents, locale)}` : ""}. Wijziging: ${formatEuro(account.lineCents, locale)}.`
+                                  : `transferred ${formatEuro(account.transfersCents, locale)} in ${account.transferCount === 1 ? "1 transfer" : `${account.transferCount} transfers`}${account.lastTransferOn ? ` (the last on ${dayOf(account.lastTransferOn)})` : ""}; payments ${formatEuro(account.paymentsCents, locale)}${account.refundsCents ? `, refunds ${formatEuro(account.refundsCents, locale)}` : ""}, fees ${formatEuro(account.feesCents, locale)}${account.storedReserveCents ? `, Mollie's own reserve rows ${formatEuro(account.storedReserveCents, locale)}` : ""}. Change: ${formatEuro(account.lineCents, locale)}.`}
+                                {account.notCountedCents
+                                  ? nl
+                                    ? ` Wat niet meetelt (${formatEuro(account.notCountedCents, locale)}, uitgesloten of kosten met een aparte factuur) zit er ook in, dus de kolom wijkt daarmee af van de overschrijvingen.`
+                                    : ` What does not count (${formatEuro(account.notCountedCents, locale)}, excluded or fees on a separate invoice) is in it too, so the column differs from the transfers by that.`
+                                  : ""}
+                              </p>
+                            ))}
+                          </InfoTip>
+                        ) : null}
+                      </span>
+                    </td>
+                    {reserve.status === "unknown" ? (
+                      <>
+                        {data.sources.map((source) => (
+                          <td key={source} className="px-3 py-2 text-right whitespace-nowrap tabular-nums">
+                            {source === "MOLLIE" ? (
+                              <Link href={`${base}/admin/inkomsten/opladen`} className="text-vtk-warn underline">
+                                {nl ? "onbekend" : "unknown"}
+                              </Link>
+                            ) : (
+                              money(overview.reserve.bySource[source])
+                            )}
+                          </td>
+                        ))}
+                        <td className="px-3 py-2" />
+                      </>
+                    ) : (
+                      // De berekende reserve heeft geen rijen in Transacties: een link
+                      // zou er een ander totaal tonen dan hier.
+                      lineCells(overview.reserve, reserve.status === "known" ? undefined : { soort: "reserve" })
+                    )}
                   </tr>
                 ) : null}
                 <tr className="font-semibold">
@@ -249,15 +302,24 @@ export default async function IncomeOverviewPage({
         )}
 
         <ul className="mt-4 space-y-1 text-sm text-vtk-muted">
-          {data.molliePending.count > 0 ? (
+          {separateFeeSources.length > 0 ? (
             <li>
-              {data.molliePending.count === 1
-                ? nl
-                  ? `1 Mollie-betaling (${formatEuro(data.molliePending.cents, locale)}) is nog niet uitbetaald. Ze telt mee in de maand van haar uitbetaling, zodra een export die vermeldt.`
-                  : `1 Mollie payment (${formatEuro(data.molliePending.cents, locale)}) not paid out yet. It counts in the month of its payout, once an export lists it.`
-                : nl
-                  ? `${data.molliePending.count} Mollie-betalingen (${formatEuro(data.molliePending.cents, locale)}) zijn nog niet uitbetaald. Ze tellen mee in de maand van hun uitbetaling, zodra een export die vermeldt.`
-                  : `${data.molliePending.count} Mollie payments (${formatEuro(data.molliePending.cents, locale)}) not paid out yet. They count in the month of their payout, once an export lists it.`}
+              {nl ? "De kosten van " : "The fees of "}
+              {separateFeeSources.map((source, index) => (
+                <span key={source}>
+                  {index > 0 ? (index === separateFeeSources.length - 1 ? (nl ? " en " : " and ") : ", ") : ""}
+                  <Link href={transactionsHref({ soort: "kosten", bron: source.toLowerCase() })} className="underline">
+                    {SOURCE_LABELS[source]} ({formatEuro(overview.separateFees.bySource[source], locale)})
+                  </Link>
+                </span>
+              ))}
+              {nl
+                ? " staan niet in het overzicht: daar komt een aparte factuur van ("
+                : " are not in the overview: they come on a separate invoice ("}
+              <Link href={`${base}/admin/inkomsten/instellingen`} className="underline">
+                {nl ? "Instellingen" : "Settings"}
+              </Link>
+              {nl ? "). In de uitbetalingen tellen ze wel mee." : "). They do count in the payouts."}
             </li>
           ) : null}
           {overview.excluded.count > 0 ? (
@@ -315,13 +377,18 @@ export default async function IncomeOverviewPage({
               </p>
               <p>
                 {nl
-                  ? "Mollie: het balansrapport noemt elke overschrijving naar de bank met haar bedrag. Is de som van de site gelijk, dan klopt de uitbetaling zonder vinkje; is ze anders, dan staat het verschil erbij en blijft het uittreksel het bewijs. Met de betalingenexport komt de som zelden uit: Mollie houdt per uitbetaling kosten en reserve in en geeft oudere reserve vrij, en dat staat enkel in de export per uitbetaling."
-                  : "Mollie: the balance report lists every transfer to the bank with its amount. If the site's sum is equal, the payout matches without a check; if not, the difference is shown and the bank statement stays the proof. With the payments export the sum rarely matches: Mollie withholds fees and reserve per payout and releases older reserve, and that is only in the export per payout."}
+                  ? "Mollie: het balansrapport noemt elke overschrijving naar de bank met haar bedrag, en dat is het bedrag op het uittreksel. Is de som van de betalingen anders, dan hield Mollie iets bij (kosten of reserve) of gaf het oudere reserve vrij. Dat verschil zit in de wijziging van de dynamische reserve van het overzicht, dus de uitbetaling is in orde; het verschil staat er ter informatie bij."
+                  : "Mollie: the balance report lists every transfer to the bank with its amount, and that is the amount on the bank statement. If the sum of the payments differs, Mollie kept something (fees or reserve) or released older reserve. That difference is in the change in the rolling reserve of the overview, so the payout is fine; the difference is shown for information."}
               </p>
               <p>
                 {nl
-                  ? "SumUp: elke verkoop zegt in welke uitbetaling ze zat. De som van de verkopen min hun kosten is het bedrag dat SumUp overschreef; vink het af wanneer het op het uittreksel staat."
-                  : "SumUp: every sale says which payout it was in. The sum of the sales minus their fees is what SumUp transferred; check it off when it is on the bank statement."}
+                  ? "SumUp: elke verkoop zegt in welke uitbetaling ze zat. De som van de verkopen min hun kosten is het bedrag dat SumUp overschreef. Europabank: de OV-ref, één per kaartmerk en dag, het bruto min de commissie. Payconiq: enkel met de export die de payoutId noemt."
+                  : "SumUp: every sale says which payout it was in. The sum of the sales minus their fees is what SumUp transferred. Europabank: the OV-ref, one per card brand and day, gross minus commission. Payconiq: only with the export that lists the payoutId."}
+              </p>
+              <p>
+                {nl
+                  ? "Bankafschrift: staat de uitbetaling op een opgeladen afschrift met hetzelfde bedrag, dan is ze in orde zonder vinkje. Bij Mollie volstaat dat de overschrijving zelf op de bank staat. Een vinkje met de hand gaat altijd voor."
+                  : "Bank statement: if the payout is on an uploaded statement with the same amount, it is fine without a tick. For Mollie it is enough that the transfer itself is on the bank. A tick by hand always wins."}
               </p>
             </InfoTip>
           </div>
@@ -330,8 +397,9 @@ export default async function IncomeOverviewPage({
               .filter((source) => data.payouts.some((payout) => payout.source === source))
               .map((source) => {
                 const payouts = data.payouts.filter((payout) => payout.source === source);
-                const done = payouts.filter((payout) => payout.state === "checked" || payout.state === "provider").length;
-                const differs = payouts.filter((payout) => payout.state === "differs" || payout.state === "changed").length;
+                const done = payouts.filter((payout) => ["checked", "bank", "provider", "differs"].includes(payout.state)).length;
+                const differs = payouts.filter((payout) => payout.state === "changed").length;
+                const bankDiffers = payouts.filter((payout) => payout.state === "bankDiffers").length;
                 return (
                   <AdminDisclosure
                     key={source}
@@ -345,7 +413,8 @@ export default async function IncomeOverviewPage({
                           {nl
                             ? `${payouts.length === 1 ? "1 uitbetaling" : `${payouts.length} uitbetalingen`}, ${done} in orde`
                             : `${payouts.length === 1 ? "1 payout" : `${payouts.length} payouts`}, ${done} done`}
-                          {differs ? (nl ? `, ${differs} met een verschil` : `, ${differs} with a difference`) : ""}
+                          {differs ? (nl ? `, ${differs} veranderd na het afvinken` : `, ${differs} changed after checking`) : ""}
+                          {bankDiffers ? (nl ? `, ${bankDiffers} met een ander bedrag op de bank` : `, ${bankDiffers} with another amount on the bank`) : ""}
                         </span>
                       </>
                     }
@@ -367,7 +436,12 @@ export default async function IncomeOverviewPage({
                           {payouts.map((payout) => (
                             <tr key={payout.reference} className="border-b border-vtk-blue/8 align-top last:border-0">
                               <td className="px-3 py-2 whitespace-nowrap tabular-nums">
-                                {payout.reference}
+                                <Link
+                                  href={`${base}/admin/inkomsten/transacties?${new URLSearchParams({ bron: payout.source.toLowerCase(), q: payout.reference }).toString()}`}
+                                  className="underline-offset-2 hover:underline"
+                                >
+                                  {payout.reference}
+                                </Link>
                                 <span className="block text-xs text-vtk-muted">
                                   {payout.paidOn
                                     ? `${nl ? "overgeschreven" : "transferred"} ${payout.paidOn.toLocaleDateString(nl ? "nl-BE" : "en-GB", { timeZone: "UTC" })}`
@@ -381,9 +455,8 @@ export default async function IncomeOverviewPage({
                               <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">
                                 <span className="font-semibold">{formatEuro(payout.total, locale)}</span>
                                 {payout.providerAmount !== null && payout.providerAmount !== payout.total ? (
-                                  <span className="block text-xs text-vtk-warn">
-                                    {nl ? "Mollie: " : "Mollie: "}
-                                    {formatEuro(payout.providerAmount, locale)}
+                                  <span className="block text-xs text-vtk-muted">
+                                    {nl ? "overgeschreven" : "transferred"} {formatEuro(payout.providerAmount, locale)}
                                   </span>
                                 ) : null}
                               </td>
@@ -396,8 +469,27 @@ export default async function IncomeOverviewPage({
                                     locale={locale}
                                     errorMessages={errorMessages}
                                   />
-                                  <span className={`text-xs ${payout.state === "changed" || payout.state === "differs" ? "text-vtk-warn" : "text-vtk-muted"}`}>
-                                    {payout.state === "changed" && payout.check
+                                  <span className={`text-xs ${payout.state === "changed" || payout.state === "bankDiffers" ? "text-vtk-warn" : "text-vtk-muted"}`}>
+                                    {payout.state === "bank" && payout.bank ? (
+                                      <>
+                                        {nl ? "Op het uittreksel van " : "On the statement of "}
+                                        {ymdLabel(payout.bank.bookedOn)}
+                                        {payout.account && payout.bank.account !== payout.account
+                                          ? nl
+                                            ? `, op ${displayAccount(payout.bank.account)}: een andere rekening dan bij het kanaal`
+                                            : `, on ${displayAccount(payout.bank.account)}: another account than the channel's`
+                                          : ""}
+                                      </>
+                                    ) : payout.state === "bankDiffers" && payout.bank ? (
+                                      nl ? (
+                                        `Op de bank ${ymdLabel(payout.bank.bookedOn)}: ${formatEuro(payout.bank.amountCents, locale)}, ${formatEuro(payout.bank.amountCents - payout.total, locale)} verschil`
+                                      ) : (
+                                        `On the bank ${ymdLabel(payout.bank.bookedOn)}: ${formatEuro(payout.bank.amountCents, locale)}, ${formatEuro(payout.bank.amountCents - payout.total, locale)} difference`
+                                      )
+                                    ) : null}
+                                    {payout.state === "bank" || payout.state === "bankDiffers"
+                                      ? null
+                                      : payout.state === "changed" && payout.check
                                       ? nl
                                         ? `Afgevinkt op ${formatEuro(payout.check.amountCents, locale)}, nu anders`
                                         : `Checked at ${formatEuro(payout.check.amountCents, locale)}, now different`
@@ -408,10 +500,20 @@ export default async function IncomeOverviewPage({
                                             ? "Gelijk aan de overschrijving van Mollie"
                                             : "Equal to the Mollie transfer"
                                           : payout.state === "differs" && payout.providerAmount !== null
-                                            ? nl
-                                              ? `${formatEuro(payout.total - payout.providerAmount, locale)} verschil met de overschrijving`
-                                              : `${formatEuro(payout.total - payout.providerAmount, locale)} off from the transfer`
+                                            ? payout.total > payout.providerAmount
+                                              ? nl
+                                                ? `${formatEuro(payout.total - payout.providerAmount, locale)} hield Mollie bij (in de reserve)`
+                                                : `${formatEuro(payout.total - payout.providerAmount, locale)} kept by Mollie (in the reserve)`
+                                              : nl
+                                                ? `${formatEuro(payout.providerAmount - payout.total, locale)} meer overgeschreven (vrijgegeven reserve)`
+                                                : `${formatEuro(payout.providerAmount - payout.total, locale)} more transferred (released reserve)`
                                             : null}
+                                    {payout.missingOnStatement && payout.state !== "checked" ? (
+                                      <span className="block text-vtk-warn">
+                                        {nl ? "Niet op het afschrift van " : "Not on the statement of "}
+                                        {payout.account ? displayAccount(payout.account) : ""}
+                                      </span>
+                                    ) : null}
                                   </span>
                                 </div>
                               </td>
@@ -427,9 +529,18 @@ export default async function IncomeOverviewPage({
         </section>
       ) : null}
 
+      {data.bank ? <BankSection bank={data.bank} nl={nl} locale={locale} base={base} from={from} to={to} /> : null}
+
       {overview.accounts.length > 0 ? (
         <section className="rounded-2xl border border-vtk-blue/12 bg-white p-5">
           <h2 className="text-lg font-semibold">{nl ? "Per bankrekening" : "Per bank account"}</h2>
+          {separateFeeSources.length > 0 ? (
+            <p className="mt-1 text-sm text-vtk-muted">
+              {nl
+                ? "Zoals geboekt: zonder de kosten met een aparte factuur. Op de bank kwam dat bedrag minder binnen."
+                : "As booked: without the fees on a separate invoice. The bank received that much less."}
+            </p>
+          ) : null}
           <table className="mt-3 text-sm">
             <tbody>
               {overview.accounts.map((account) => (

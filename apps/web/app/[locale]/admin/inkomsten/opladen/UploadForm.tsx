@@ -9,7 +9,10 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import type { SaveAction } from "@/lib/saveState";
 import { combineImportSummaries } from "@/lib/inkomsten/importSummary";
 import type { ImportFilePreview, ImportPreviewState } from "@/app/actions/inkomsten";
+import Link from "@/components/ui/Link";
+import { displayAccount } from "@/lib/inkomsten/labels";
 import { SOURCE_LABELS } from "../shared";
+import { formatTitle } from "./FormatGuide";
 
 /**
  * Eén of meer exports kiezen of slepen, eerst zien wat opladen zou doen, en pas
@@ -34,9 +37,14 @@ export function UploadForm({
   const [pending, startTransition] = useTransition();
   const number = (value: number) => value.toLocaleString(nl ? "nl-BE" : "en-GB");
   const day = (value: Date | null) => (value ? new Date(value).toLocaleDateString(nl ? "nl-BE" : "en-GB") : "");
+  const closestText = (closest: NonNullable<Extract<ImportFilePreview, { ok: false }>["closest"]>) =>
+    nl
+      ? ` Het lijkt op ${formatTitle(closest.format, nl)}, maar mist ${closest.missing.join(", ")}.`
+      : ` It looks like ${formatTitle(closest.format, nl)}, but lacks ${closest.missing.join(", ")}.`;
   const cannotRead = (file: Extract<ImportFilePreview, { ok: false }>) =>
     (errorMessages[file.code] ?? (nl ? "Dat bestand kan de site niet lezen." : "The site cannot read that file.")) +
-    (file.detail ? ` (${file.detail})` : "");
+    (file.detail ? ` (${file.detail})` : "") +
+    (file.closest ? closestText(file.closest) : "");
 
   function onFiles(files: FileList | null) {
     if (!files || files.length === 0) {
@@ -52,12 +60,26 @@ export function UploadForm({
   }
 
   const files = preview.status === "preview" ? preview.files : [];
-  const good = files.flatMap((file) => (file.ok ? [file.summary] : []));
+  const good = files.flatMap((file) => (file.ok && file.kind === "income" ? [file.summary] : []));
+  const banks = files.flatMap((file) => (file.ok && file.kind === "bank" ? [file.bank] : []));
   const failed = files.flatMap((file) => (file.ok ? [] : [file]));
   const several = files.length > 1;
   const totals = good.length > 0 ? combineImportSummaries(good) : null;
+  // Iets dat opladen de moeite waard maakt. Een balansrapport dat al geüpload
+  // was, brengt soms enkel de betalingen om na te kijken: ook dat telt.
+  // Een afschrift is nieuws met nieuwe regels, of met dagen die nog geen
+  // afschrift van die rekening dekte (een maand zonder provider telt ook).
+  const hasNews =
+    (totals !== null && totals.created + totals.updated + totals.payouts + totals.balancePayments > 0) ||
+    banks.some((bank) => bank.created > 0 || bank.newCoverage);
+  const ymdLabel = (ymd: string) => new Date(`${ymd}T12:00:00Z`).toLocaleDateString(nl ? "nl-BE" : "en-GB", { timeZone: "UTC" });
   const matched = totals
-    ? totals.rules.WEBSITE + totals.rules.CODE_IN_TEXT + totals.rules.CASH_REGISTER + totals.rules.NAME_RULE + totals.rules.CHANNEL_DEFAULT
+    ? totals.rules.WEBSITE +
+      totals.rules.CODE_IN_TEXT +
+      totals.rules.CASH_REGISTER +
+      totals.rules.NAME_RULE +
+      totals.rules.CHANNEL_LENDING +
+      totals.rules.CHANNEL_DEFAULT
     : 0;
 
   return (
@@ -68,7 +90,7 @@ export function UploadForm({
       savedMessage={nl ? "Geüpload." : "Uploaded."}
       errorMessages={errorMessages}
       fallbackErrorMessage={nl ? "Uploaden mislukt." : "Upload failed."}
-      submitDisabled={pending || !totals || failed.length > 0 || totals.created + totals.updated + totals.payouts === 0}
+      submitDisabled={pending || (!totals && banks.length === 0) || failed.length > 0 || !hasNews}
       onSuccess={() => {
         setPreview({ status: "idle" });
         router.refresh();
@@ -84,8 +106,8 @@ export function UploadForm({
         chooseLabel={nl ? "Exports kiezen" : "Choose exports"}
         hint={
           nl
-            ? "Eén of meer CSV's van Payconiq, Mollie, SumUp of Europabank, gerust allemaal tegelijk; slepen kan ook."
-            : "One or more CSVs from Payconiq, Mollie, SumUp or Europabank, all at once if you like; dragging works too."
+            ? "Eén of meer CSV's van Payconiq, Mollie, SumUp of Europabank, en de afschriften van KBC, gerust allemaal tegelijk; slepen kan ook."
+            : "One or more CSVs from Payconiq, Mollie, SumUp or Europabank, and the KBC statements, all at once if you like; dragging works too."
         }
         onChange={onFiles}
       />
@@ -123,6 +145,46 @@ export function UploadForm({
         </div>
       ) : null}
 
+      {banks.length > 0 && !pending ? (
+        <div className="rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/40 px-4 py-3 text-sm">
+          <p className="font-medium">
+            {banks.length === 1 ? (nl ? "Bankafschrift" : "Bank statement") : nl ? `${banks.length} bankafschriften` : `${banks.length} bank statements`}
+          </p>
+          <ul className="mt-1 space-y-2">
+            {banks.map((bank) => (
+              <li key={bank.fileName}>
+                <p>
+                  <span className="font-medium tabular-nums">{displayAccount(bank.account)}</span>
+                  <span className="text-vtk-muted">
+                    {" "}
+                    · {ymdLabel(bank.coveredFrom)} {nl ? "tot en met" : "to"} {ymdLabel(bank.coveredTo)}
+                  </span>
+                </p>
+                <p className="text-vtk-muted">
+                  {nl
+                    ? `${number(bank.providerLines)} ${bank.providerLines === 1 ? "regel" : "regels"} van providers (${number(bank.created)} nieuw, ${number(bank.matched)} met een uitbetaling op de site). De ${number(bank.lineCount - bank.providerLines)} andere regels en het bestand zelf bewaart de site niet.`
+                    : `${number(bank.providerLines)} provider ${bank.providerLines === 1 ? "line" : "lines"} (${number(bank.created)} new, ${number(bank.matched)} with a payout on the site). The site keeps neither the ${number(bank.lineCount - bank.providerLines)} other lines nor the file.`}
+                </p>
+                {!bank.knownAccount ? (
+                  <p className="text-vtk-warn">
+                    {nl
+                      ? "Deze rekening staat bij geen enkel kanaal. Uploaden kan, maar vul ze in bij "
+                      : "No channel has this account. Uploading works, but set it under "}
+                    <Link href={`${nl ? "" : "/en"}/admin/inkomsten/instellingen`} className="font-medium underline">
+                      {nl ? "Instellingen" : "Settings"}
+                    </Link>
+                    {nl ? ", anders kan de site ze niet per rekening afstemmen." : ", otherwise the site cannot reconcile it per account."}
+                  </p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          {!totals && !hasNews ? (
+            <p className="mt-2 text-vtk-muted">{nl ? "Er is niets nieuws in dit afschrift." : "There is nothing new in this statement."}</p>
+          ) : null}
+        </div>
+      ) : null}
+
       {totals && !pending ? (
         <div className="rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/40 px-4 py-3 text-sm">
           <p className="font-medium">
@@ -154,12 +216,21 @@ export function UploadForm({
                 <Stat label={nl ? "Een kassa" : "A cash register"} value={number(totals.rules.CASH_REGISTER)} />
               ) : null}
               <Stat label={nl ? "Onthouden tekst" : "Remembered text"} value={number(totals.rules.NAME_RULE)} />
+              {totals.rules.CHANNEL_LENDING ? (
+                <Stat label={nl ? "Uitlening van het toestel" : "Lending of the device"} value={number(totals.rules.CHANNEL_LENDING)} />
+              ) : null}
               {totals.rules.CHANNEL_DEFAULT ? (
                 <Stat label={nl ? "Standaardcode van het kanaal" : "Default code of the channel"} value={number(totals.rules.CHANNEL_DEFAULT)} />
               ) : null}
               {totals.feeRows ? <Stat label={nl ? "Kosten en reserve" : "Fees and reserve"} value={number(totals.feeRows)} /> : null}
               {totals.updated ? <Stat label={nl ? "Nu uitbetaald" : "Now paid out"} value={number(totals.updated)} /> : null}
               {totals.payouts ? <Stat label={nl ? "Uitbetalingen, nieuw of gewijzigd" : "Payouts, new or changed"} value={number(totals.payouts)} /> : null}
+              {totals.balancePayments ? (
+                <Stat
+                  label={nl ? "Betalingen om de Mollie-export na te kijken" : "Payments to check the Mollie export"}
+                  value={number(totals.balancePayments)}
+                />
+              ) : null}
               <Stat label={nl ? "Telt niet mee (mislukt, vervallen, geweigerd)" : "Does not count (failed, expired, denied)"} value={number(totals.skipped)} />
               {totals.ignored ? (
                 <Stat
@@ -201,9 +272,11 @@ export function UploadForm({
             <p className="mt-2 text-vtk-muted">
               {nl ? (totals.newChannels.length === 1 ? "Nieuw kanaal: " : "Nieuwe kanalen: ") : totals.newChannels.length === 1 ? "New channel: " : "New channels: "}
               {totals.newChannels.join(", ")}.{" "}
-              {nl
-                ? "Stel de rekening, en eventueel een standaardcode, in bij Instellingen."
-                : "Set the account, and a default code if needed, under Settings."}
+              {nl ? "Zonder rekening staat het onder \"Rekening niet ingesteld\". Stel de rekening, en eventueel een standaardcode, in bij " : "Without an account it shows under \"Account not set\". Set the account, and a default code if needed, under "}
+              <Link href={`${nl ? "" : "/en"}/admin/inkomsten/instellingen`} className="font-medium underline">
+                {nl ? "Instellingen" : "Settings"}
+              </Link>
+              .
             </p>
           ) : null}
           {totals.mollieWithoutFees ? (
@@ -213,7 +286,7 @@ export function UploadForm({
                 : "A Mollie file has no fee or reserve rows. The payments get a code, but the Mollie total will not match the bank until the fees are in too: upload the balance report as well."}
             </p>
           ) : null}
-          {totals.created + totals.updated + totals.payouts === 0 ? (
+          {!hasNews ? (
             <p className="mt-2 text-vtk-muted">
               {nl ? (several ? "Er is niets nieuws in deze bestanden." : "Er is niets nieuws in dit bestand.") : several ? "There is nothing new in these files." : "There is nothing new in this file."}
             </p>

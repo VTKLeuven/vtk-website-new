@@ -1,8 +1,8 @@
 import "server-only";
 
 import { prisma } from "@vtk/db";
-import type { IncomeKind, IncomeRule, IncomeSource } from "@prisma/client";
-import { brusselsWallClockMinutes, brusselsYMD, parseYMD, shiftYMD, ymdKey } from "@/lib/brussels";
+import type { IncomeKind, IncomeRule, IncomeSource, Prisma } from "@prisma/client";
+import { brusselsWallClockMinutes, brusselsYMD, ymdKey } from "@/lib/brussels";
 import { listAccountingCodes } from "@/lib/accounting/server";
 import {
   codeKey,
@@ -14,6 +14,7 @@ import {
   type ChannelCodeEntry,
   type CodeSnapshot,
   type KassaSpan,
+  type LendingSpan,
   type MatchContext,
   type MatchResult,
   type WebsitePayment,
@@ -23,7 +24,6 @@ import {
   INCOME_SOURCES,
   accountOn,
   EXPORT_PER_CHANNEL,
-  REVIEW_DAY_START_HOUR,
   computeIncomeChecks,
   computeIncomeOverview,
   groupPayouts,
@@ -32,10 +32,11 @@ import {
   reviewDay,
   type IncomeCheck,
   type IncomeOverview,
+  type OverviewTransaction,
   type PayoutGroup,
   type PayoutState,
 } from "./overview";
-import { periodLabel } from "./labels";
+import { periodLabel, postName } from "./labels";
 import {
   deviceKey,
   deviceWindow,
@@ -46,15 +47,23 @@ import {
   type KassaControlState,
   type KassaImportAmount,
 } from "./kassa";
-import { quarterLineKey, type WorkbookGroup, type WorkbookModel, type WorkbookTransaction } from "./workbook";
+import { INCOME_CONFIG_KEY, lineRulesOf, parseIncomeConfig, type IncomeConfig } from "./config";
+import { isSeparateFee, quarterLineKey, type LineRules } from "./lines";
+import { computeMollieReserve, type MollieCompleteness, type MollieReserve } from "./reserve";
+import { MANUAL_FORMAT } from "./transfer";
+import { normaliseAccount, payoutKey, type BankProvider } from "./bank";
+import { coveredOn, expectedBankDay, loadBankCoverage, loadBankLines, loadBankOverview, type BankOverview } from "./bankServer";
+import type { WorkbookGroup, WorkbookModel, WorkbookTransaction } from "./workbook";
 import { ASSIGNABLE_KINDS, transactionWhere, type TransactionFilter } from "./transactionFilter";
 import {
   BALANCE_KEY,
+  MOLLIE_CHANNEL,
+  nextMonth,
   dateToMonth,
   monthToDate,
   parseIncomeExport,
   type IncomeFormat,
-  type IncomeParseError,
+  type IncomeParseFailure,
   type IncomeSourceCode,
   type ParsedIncomeRow,
 } from "./parse";
@@ -67,7 +76,7 @@ import {
 
 const CHUNK = 1000;
 
-function chunks<T>(items: readonly T[], size = CHUNK): T[][] {
+export function chunks<T>(items: readonly T[], size = CHUNK): T[][] {
   const result: T[][] = [];
   for (let i = 0; i < items.length; i += size) result.push(items.slice(i, i + size));
   return result;
@@ -77,20 +86,11 @@ function chunks<T>(items: readonly T[], size = CHUNK): T[][] {
 // Instellingen (Setting `income.config`)
 // -----------------------------------------------------------------------------
 
-export const INCOME_CONFIG_KEY = "income.config";
-
-export type IncomeConfig = {
-  /**
-   * De code voor de kosten van Mollie, SumUp en Europabank. Geen
-   * standaard: Beheer kiest ze, net als elke andere code van de kring.
-   */
-  feeAccountingCodeId: string | null;
-};
+export { INCOME_CONFIG_KEY, type IncomeConfig };
 
 export async function getIncomeConfig(): Promise<IncomeConfig> {
   const row = await prisma.setting.findUnique({ where: { key: INCOME_CONFIG_KEY } });
-  const value = (row?.value ?? {}) as Record<string, unknown>;
-  return { feeAccountingCodeId: typeof value.feeAccountingCodeId === "string" ? value.feeAccountingCodeId : null };
+  return parseIncomeConfig(row?.value);
 }
 
 export async function saveIncomeConfig(config: IncomeConfig): Promise<void> {
@@ -252,6 +252,28 @@ async function cashRegisterContext(): Promise<Map<string, KassaSpan[]>> {
   return result;
 }
 
+/**
+ * De uitleningen per kanaal (regel 6), met hun code. Een uitlening waarvan de
+ * code uit het register verdween, staat erin zonder code: ze koppelt dan niets.
+ */
+export async function channelLendingContext(): Promise<Map<string, LendingSpan[]>> {
+  const rows = await prisma.incomeChannelLending.findMany({
+    select: { id: true, channelId: true, fromDay: true, toDay: true, accountingCode: { select: { code: true, name: true } } },
+  });
+  const result = new Map<string, LendingSpan[]>();
+  for (const row of rows) {
+    const spans = result.get(row.channelId) ?? [];
+    spans.push({ id: row.id, from: ymdOf(row.fromDay), to: ymdOf(row.toDay), code: row.accountingCode });
+    result.set(row.channelId, spans);
+  }
+  return result;
+}
+
+/** Een `@db.Date` als "2026-09-16". */
+function ymdOf(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
 async function nameRuleContext(): Promise<Map<string, CodeSnapshot>> {
   const rules = await prisma.incomeNameRule.findMany({
     select: { source: true, text: true, accountingCode: { select: { code: true, name: true } } },
@@ -303,6 +325,12 @@ export type ImportSummary = {
    * uitbetalingsnummers van SumUp.
    */
   payouts: number;
+  /**
+   * Betalingen uit het balansrapport van Mollie die de site nog niet kende om
+   * de betalingenexport na te kijken. Ze tellen nergens; ze maken een balans-
+   * rapport dat al geüpload was, het opnieuw uploaden waard.
+   */
+  balancePayments: number;
 };
 
 /**
@@ -324,7 +352,7 @@ async function mollieFeeMonthsOutsideBalance(months: readonly string[]): Promise
   return new Set(rows.flatMap((row) => (row.periodMonth ? [dateToMonth(row.periodMonth)] : [])));
 }
 
-export type ImportOutcome = { ok: true; summary: ImportSummary; importId: string | null } | { ok: false; error: IncomeParseError; detail?: string };
+export type ImportOutcome = { ok: true; summary: ImportSummary; importId: string | null } | IncomeParseFailure;
 
 /**
  * Een export lezen en, zonder `dryRun`, bewaren. Dezelfde berekening voor de
@@ -414,13 +442,30 @@ export async function importIncomeExport(
   const payouts = parsed.payouts.filter((payout) => {
     if (options.seen?.has(`payout:${source}:${payout.reference}`)) return false;
     const known = payoutsByReference.get(payout.reference);
-    return (
+    const changed =
       !known ||
       known.paidOn.toISOString().slice(0, 10) !== payout.paidOn ||
-      (payout.amountCents !== null && known.amountCents !== payout.amountCents)
-    );
+      (payout.amountCents !== null && known.amountCents !== payout.amountCents);
+    if (!changed) return false;
+    // Een overschrijving van Mollie bepaalt mee de reserve van haar maand: in
+    // een afgesloten maand komt er geen bij en verandert er geen.
+    if (isLocked(payout.paidOn.slice(0, 7)) || (known && isLocked(known.paidOn.toISOString().slice(0, 7)))) {
+      locked++;
+      return false;
+    }
+    return true;
   });
   for (const payout of payouts) options.seen?.add(`payout:${source}:${payout.reference}`);
+
+  // Betalingen volgens het balansrapport die de site nog niet heeft.
+  const balancePayments = (parsed.balancePayments ?? []).filter((payment) => !options.seen?.has(`balance:${payment.paymentId}`));
+  const knownBalancePayments = new Set<string>();
+  for (const ids of chunks(balancePayments.map((payment) => payment.paymentId))) {
+    const found = await prisma.incomeMollieBalancePayment.findMany({ where: { paymentId: { in: ids } }, select: { paymentId: true } });
+    for (const row of found) knownBalancePayments.add(row.paymentId);
+  }
+  const newBalancePayments = balancePayments.filter((payment) => !knownBalancePayments.has(payment.paymentId)).length;
+  for (const payment of balancePayments) options.seen?.add(`balance:${payment.paymentId}`);
 
   // De kanalen eerst: de standaardcode van een kanaal bepaalt mee de
   // koppeling. Een nieuw kanaal heeft er nog geen.
@@ -432,20 +477,29 @@ export async function importIncomeExport(
   const channelIds = new Map(knownChannels.map((channel) => [channel.identifier, channel.id]));
   const newChannels = channelNames.filter((name) => !channelIds.has(name));
 
-  const [{ codes }, nameRules, website, channelCodes, cashRegisters] = await Promise.all([
+  const [{ codes }, nameRules, website, channelCodes, cashRegisters, channelLendings] = await Promise.all([
     codeContext(),
     nameRuleContext(),
     websitePayments(source, fresh.flatMap((row) => (row.providerId ? [row.providerId] : []))),
     channelCodeContext(),
     cashRegisterContext(),
+    channelLendingContext(),
   ]);
-  const context: MatchContext = { codes, nameRules, website, channelCodes, cashRegisters };
+  const context: MatchContext = { codes, nameRules, website, channelCodes, cashRegisters, channelLendings };
   const matched = fresh.map((row) => ({
     row,
     match: matchTransaction({ ...row, channelId: channelIds.get(row.channel) ?? null }, context),
   }));
 
-  const rules: ImportRuleCounts = { WEBSITE: 0, CODE_IN_TEXT: 0, CASH_REGISTER: 0, NAME_RULE: 0, CHANNEL_DEFAULT: 0, OPEN: 0 };
+  const rules: ImportRuleCounts = {
+    WEBSITE: 0,
+    CODE_IN_TEXT: 0,
+    CASH_REGISTER: 0,
+    NAME_RULE: 0,
+    CHANNEL_LENDING: 0,
+    CHANNEL_DEFAULT: 0,
+    OPEN: 0,
+  };
   for (const { row, match } of matched) {
     if (row.kind !== "PAYMENT" && row.kind !== "REFUND") continue;
     rules[match.rule ?? "OPEN"]++;
@@ -475,6 +529,7 @@ export async function importIncomeExport(
     lastAt,
     newChannels,
     payouts: payouts.length,
+    balancePayments: newBalancePayments,
   };
   if (options.dryRun) return { ok: true, summary, importId: null };
 
@@ -529,6 +584,7 @@ export async function importIncomeExport(
         membershipPaymentId: match.membershipPaymentId,
         uitleenPaymentId: match.uitleenPaymentId,
         cashRegisterId: match.cashRegisterId,
+        channelLendingId: match.channelLendingId,
       })),
       skipDuplicates: true,
     });
@@ -555,6 +611,24 @@ export async function importIncomeExport(
     });
   }
 
+  // De betalingen volgens het balansrapport: ook wanneer het bestand al eens
+  // geüpload werd, want voor november 2026 las de site ze niet. De nieuwste
+  // import zet ze; ze tellen nergens, ze dienen enkel om na te kijken.
+  for (const batch of chunks(balancePayments)) {
+    await prisma.$transaction([
+      prisma.incomeMollieBalancePayment.deleteMany({ where: { paymentId: { in: batch.map((payment) => payment.paymentId) } } }),
+      prisma.incomeMollieBalancePayment.createMany({
+        data: batch.map((payment) => ({
+          paymentId: payment.paymentId,
+          month: monthToDate(payment.month),
+          amountCents: payment.amountCents,
+          importId: created.id,
+        })),
+        skipDuplicates: true,
+      }),
+    ]);
+  }
+
   return { ok: true, summary, importId: created.id };
 }
 
@@ -562,94 +636,124 @@ export async function importIncomeExport(
 // Opnieuw koppelen
 // -----------------------------------------------------------------------------
 
-/**
- * Alle koppelingen die niet met de hand gezet zijn, opnieuw berekenen: na een
- * onthouden tekst, een nieuwe of gewijzigde code in het register, een
- * verwijderde regel, of een kassa die aanvaard, gewijzigd of verwijderd werd. Een afgesloten periode
- * blijft zoals ze is. Geeft het aantal wijzigingen terug.
- */
-export async function rematchOpenTransactions(): Promise<number> {
-  const isLocked = lockedMonthTest(await listClosedPeriods());
-  const rows = await prisma.incomeTransaction.findMany({
-    where: {
-      kind: { in: ["PAYMENT", "REFUND"] },
-      excluded: false,
-      OR: [{ rule: null }, { rule: { not: "MANUAL" } }],
-    },
-    select: {
-      id: true,
-      source: true,
-      kind: true,
-      providerId: true,
-      description: true,
-      reference: true,
-      bulkId: true,
-      channelId: true,
-      occurredAt: true,
-      periodMonth: true,
-      accountingCode: true,
-      accountingCodeName: true,
-      rule: true,
-      ticketPaymentId: true,
-      membershipPaymentId: true,
-      uitleenPaymentId: true,
-      cashRegisterId: true,
-    },
-  });
-  const open = rows.filter((row) => !isLocked(row.periodMonth ? dateToMonth(row.periodMonth) : null));
+/** Wat opnieuw koppelen van een transactie leest. */
+export const REMATCH_SELECT = {
+  id: true,
+  source: true,
+  kind: true,
+  providerId: true,
+  description: true,
+  reference: true,
+  bulkId: true,
+  channelId: true,
+  occurredAt: true,
+  periodMonth: true,
+  amountCents: true,
+  excluded: true,
+  accountingCode: true,
+  accountingCodeName: true,
+  rule: true,
+  ticketPaymentId: true,
+  membershipPaymentId: true,
+  uitleenPaymentId: true,
+  cashRegisterId: true,
+  channelLendingId: true,
+} satisfies Prisma.IncomeTransactionSelect;
 
-  const [{ codes }, nameRules, channelCodes, cashRegisters, websites] = await Promise.all([
+export type RematchRow = Prisma.IncomeTransactionGetPayload<{ select: typeof REMATCH_SELECT }>;
+
+/**
+ * De koppelregels voor een reeks transacties: per rij de context van haar bron.
+ * Met `channelLendings` rekent het met andere uitleningen dan die in de
+ * database, om te zien wat een gewijzigde uitlening zou doen voor ze bewaard
+ * is.
+ */
+export async function matchContextsFor(
+  rows: readonly RematchRow[],
+  options: { channelLendings?: Map<string, LendingSpan[]> } = {},
+): Promise<(row: RematchRow) => MatchContext> {
+  const [{ codes }, nameRules, channelCodes, cashRegisters, channelLendings, websites] = await Promise.all([
     codeContext(),
     nameRuleContext(),
     channelCodeContext(),
     cashRegisterContext(),
+    options.channelLendings ?? channelLendingContext(),
     Promise.all(
       INCOME_SOURCES.map(async (source) => {
-        const ids = open.flatMap((row) => (row.source === source && row.providerId ? [row.providerId] : []));
+        const ids = rows.flatMap((row) => (row.source === source && row.providerId ? [row.providerId] : []));
         return [source, await websitePayments(source, ids)] as const;
       }),
     ),
   ]);
-  const websiteBySource = new Map(websites);
+  const contexts = new Map(
+    websites.map(([source, website]) => [source, { codes, nameRules, channelCodes, cashRegisters, channelLendings, website }]),
+  );
+  return (row) => contexts.get(row.source)!;
+}
+
+/** Wat koppelen aan een rij verandert, of null als alles al zo stond. */
+export function matchUpdateOf(row: RematchRow, match: MatchResult): MatchUpdate | null {
+  const same =
+    match.rule === row.rule &&
+    (match.code?.code ?? null) === row.accountingCode &&
+    // Ook de naam: een hernoemde code in het register geeft haar nieuwe naam door.
+    (match.code?.name ?? null) === row.accountingCodeName &&
+    match.ticketPaymentId === row.ticketPaymentId &&
+    match.membershipPaymentId === row.membershipPaymentId &&
+    match.uitleenPaymentId === row.uitleenPaymentId &&
+    match.cashRegisterId === row.cashRegisterId &&
+    match.channelLendingId === row.channelLendingId;
+  if (same) return null;
+  return {
+    rule: match.rule,
+    accountingCode: match.code?.code ?? null,
+    accountingCodeName: match.code?.name ?? null,
+    ticketPaymentId: match.ticketPaymentId,
+    membershipPaymentId: match.membershipPaymentId,
+    uitleenPaymentId: match.uitleenPaymentId,
+    cashRegisterId: match.cashRegisterId,
+    channelLendingId: match.channelLendingId,
+  };
+}
+
+/** Wat opnieuw koppelen raakt: een betaling of terugbetaling die meetelt en niet met de hand gezet is. */
+export const REMATCHABLE: Prisma.IncomeTransactionWhereInput = {
+  kind: { in: ["PAYMENT", "REFUND"] },
+  excluded: false,
+  OR: [{ rule: null }, { rule: { not: "MANUAL" } }],
+};
+
+/**
+ * Alle koppelingen die niet met de hand gezet zijn, opnieuw berekenen: na een
+ * onthouden tekst, een nieuwe of gewijzigde code in het register, een
+ * verwijderde regel, een uitlening, of een kassa die aanvaard, gewijzigd of
+ * verwijderd werd. Een afgesloten periode blijft zoals ze is. Geeft het aantal
+ * wijzigingen terug.
+ */
+export async function rematchOpenTransactions(): Promise<number> {
+  const isLocked = lockedMonthTest(await listClosedPeriods());
+  const rows = await prisma.incomeTransaction.findMany({ where: REMATCHABLE, select: REMATCH_SELECT });
+  const open = rows.filter((row) => !isLocked(row.periodMonth ? dateToMonth(row.periodMonth) : null));
+  const contextOf = await matchContextsFor(open);
 
   // Eén `updateMany` per wijziging, niet één query per rij: een nieuwe
   // standaardcode raakt zo duizenden betalingen van een SumUp-account.
   const updates = new Map<string, { data: MatchUpdate; ids: string[] }>();
   for (const row of open) {
-    const match = matchTransaction(row, {
-      codes,
-      nameRules,
-      channelCodes,
-      cashRegisters,
-      website: websiteBySource.get(row.source) ?? new Map(),
-    });
-    const same =
-      match.rule === row.rule &&
-      (match.code?.code ?? null) === row.accountingCode &&
-      // Ook de naam: een hernoemde code in het register geeft haar nieuwe naam door.
-      (match.code?.name ?? null) === row.accountingCodeName &&
-      match.ticketPaymentId === row.ticketPaymentId &&
-      match.membershipPaymentId === row.membershipPaymentId &&
-      match.uitleenPaymentId === row.uitleenPaymentId &&
-      match.cashRegisterId === row.cashRegisterId;
-    if (same) continue;
-    const data: MatchUpdate = {
-      rule: match.rule,
-      accountingCode: match.code?.code ?? null,
-      accountingCodeName: match.code?.name ?? null,
-      ticketPaymentId: match.ticketPaymentId,
-      membershipPaymentId: match.membershipPaymentId,
-      uitleenPaymentId: match.uitleenPaymentId,
-      cashRegisterId: match.cashRegisterId,
-    };
+    const data = matchUpdateOf(row, matchTransaction(row, contextOf(row)));
+    if (!data) continue;
     const key = JSON.stringify(data);
     const update = updates.get(key);
     if (update) update.ids.push(row.id);
     else updates.set(key, { data, ids: [row.id] });
   }
+  return applyMatchUpdates(updates.values());
+}
 
+/** Groepen rijen die dezelfde wijziging krijgen, wegschrijven. Geeft het aantal rijen terug. */
+export async function applyMatchUpdates(updates: Iterable<{ data: MatchUpdate; ids: string[] }>): Promise<number> {
   let changed = 0;
-  for (const { data, ids } of updates.values()) {
+  for (const { data, ids } of updates) {
     for (const batch of chunks(ids)) {
       await prisma.incomeTransaction.updateMany({ where: { id: { in: batch } }, data });
     }
@@ -658,7 +762,7 @@ export async function rematchOpenTransactions(): Promise<number> {
   return changed;
 }
 
-type MatchUpdate = {
+export type MatchUpdate = {
   rule: MatchResult["rule"];
   accountingCode: string | null;
   accountingCodeName: string | null;
@@ -666,6 +770,7 @@ type MatchUpdate = {
   membershipPaymentId: string | null;
   uitleenPaymentId: string | null;
   cashRegisterId: string | null;
+  channelLendingId: string | null;
 };
 
 // -----------------------------------------------------------------------------
@@ -746,7 +851,12 @@ async function openRows(): Promise<Array<GroupRow & { channelName: string }>> {
 }
 
 export async function listUnassignedGroups(): Promise<UnassignedGroup[]> {
-  const [rows, channelCodes, cashRegisters] = await Promise.all([openRows(), channelCodeContext(), cashRegisterContext()]);
+  const [rows, channelCodes, cashRegisters, channelLendings] = await Promise.all([
+    openRows(),
+    channelCodeContext(),
+    cashRegisterContext(),
+    channelLendingContext(),
+  ]);
   const groups = new Map<string, UnassignedGroup>();
   const kassaIds = new Map<string, Set<string>>();
   for (const row of rows) {
@@ -772,7 +882,7 @@ export async function listUnassignedGroups(): Promise<UnassignedGroup[]> {
       kassaIds.set(key, new Set());
     }
     // Een kassa had het toestel, maar nog geen code: dan valt de betaling door.
-    const { kassa } = deviceAt(row, { channelCodes, cashRegisters });
+    const { kassa } = deviceAt(row, { channelCodes, cashRegisters, channelLendings });
     if (kassa && !kassa.code) kassaIds.get(key)!.add(kassa.id);
     group.count++;
     group.totalCents += row.amountCents;
@@ -848,82 +958,6 @@ export async function assignUnassignedGroup(
   return { ok: true, count: ids.length };
 }
 
-export type DayOutcome =
-  | { ok: true; count: number; channel: string }
-  | { ok: false; error: "NOT_FOUND" | "CODE_NOT_FOUND" | "BAD_DATE" | "LOCKED" };
-
-/**
- * Eén dag van een kanaal met de hand een code geven, ook wat de standaardcode
- * van het kanaal al kreeg: de cursusdienst die een dag de SumUp van Theokot
- * leende. Wat een exacte regel koppelde (de site, een code in de tekst, een
- * onthouden tekst, een kassa), blijft: die weet het beter dan de dag. Een dag
- * loopt van 9:00 tot 9:00, zoals in Na te kijken.
- *
- * Met `reset` gaat wat op die dag met de hand gezet werd, terug naar de
- * koppelregels; dat is ook wat in Na te kijken voor die dag gekozen werd.
- */
-export async function assignChannelDay(
-  channelId: string,
-  day: string,
-  choice: { accountingCodeId: string } | { reset: true },
-  userId: string | null,
-): Promise<DayOutcome> {
-  const ymd = parseYMD(day);
-  if (!ymd) return { ok: false, error: "BAD_DATE" };
-  const channel = await prisma.incomeChannel.findUnique({ where: { id: channelId }, select: { identifier: true, label: true } });
-  if (!channel) return { ok: false, error: "NOT_FOUND" };
-  const start = brusselsWallClockMinutes(ymd, REVIEW_DAY_START_HOUR * 60);
-  const end = brusselsWallClockMinutes(shiftYMD(ymd, 1), REVIEW_DAY_START_HOUR * 60);
-  const reset = "reset" in choice;
-  const rows = await prisma.incomeTransaction.findMany({
-    where: {
-      channelId,
-      kind: { in: ["PAYMENT", "REFUND"] },
-      occurredAt: { gte: start, lt: end },
-      ...(reset ? { rule: "MANUAL" as const } : { OR: [{ rule: null }, { rule: { in: ["CHANNEL_DEFAULT" as const, "MANUAL" as const] } }] }),
-    },
-    select: { id: true, periodMonth: true },
-  });
-  const isLocked = lockedMonthTest(await listClosedPeriods());
-  const open = rows.filter((row) => !isLocked(row.periodMonth ? dateToMonth(row.periodMonth) : null));
-  if (open.length === 0) return { ok: false, error: rows.length > 0 ? "LOCKED" : "NOT_FOUND" };
-  const ids = open.map((row) => row.id);
-  const name = channel.label || channel.identifier;
-
-  if (reset) {
-    for (const batch of chunks(ids)) {
-      await prisma.incomeTransaction.updateMany({
-        where: { id: { in: batch } },
-        data: { rule: null, excluded: false, accountingCode: null, accountingCodeName: null, assignedById: null, assignedAt: null },
-      });
-    }
-    await rematchOpenTransactions();
-    return { ok: true, count: ids.length, channel: name };
-  }
-
-  const code = await prisma.accountingCode.findUnique({ where: { id: choice.accountingCodeId }, select: { code: true, name: true } });
-  if (!code) return { ok: false, error: "CODE_NOT_FOUND" };
-  const now = new Date();
-  for (const batch of chunks(ids)) {
-    await prisma.incomeTransaction.updateMany({
-      where: { id: { in: batch } },
-      data: {
-        rule: "MANUAL",
-        excluded: false,
-        accountingCode: code.code,
-        accountingCodeName: code.name,
-        ticketPaymentId: null,
-        membershipPaymentId: null,
-        uitleenPaymentId: null,
-        cashRegisterId: null,
-        assignedById: userId,
-        assignedAt: now,
-      },
-    });
-  }
-  return { ok: true, count: ids.length, channel: name };
-}
-
 // -----------------------------------------------------------------------------
 // Overzicht
 // -----------------------------------------------------------------------------
@@ -934,6 +968,12 @@ export type PayoutWithCheck = PayoutGroup & {
   paidOn: Date | null;
   /** Wat de provider zegt dat hij overschreef (de overschrijving van Mollie). */
   providerAmount: number | null;
+  /** De regel(s) op een opgeladen bankafschrift: de eerste dag, en het bedrag samen. */
+  bank: { bookedOn: string; amountCents: number; account: string } | null;
+  /** De rekening waarop de uitbetaling verwacht wordt (van het kanaal), genormaliseerd. */
+  account: string | null;
+  /** Of een afschrift van die rekening de dag dekt waarop ze verwacht wordt, zonder dat ze erop staat. */
+  missingOnStatement: boolean;
   state: PayoutState;
 };
 
@@ -944,22 +984,89 @@ function monthsBefore(month: string, count: number): string {
   return `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, "0")}`;
 }
 
+/** De laatste dag van een maand: "2026-09" -> "2026-09-30". */
+function lastDayOf(month: string): string {
+  const [year, m] = month.split("-").map(Number);
+  return new Date(Date.UTC(year, m, 0)).toISOString().slice(0, 10);
+}
+
+/**
+ * Of de betalingenexport en het balansrapport van Mollie dezelfde betalingen
+ * noemen, voor de betalingen van de periode. Een ID telt als gevonden wanneer
+ * hij aan de andere kant staat, in welke maand ook: de twee bestanden zetten een
+ * betaling soms een seconde anders, en rond middernacht is dat een andere maand.
+ */
+async function mollieCompleteness(
+  from: string,
+  to: string,
+  exportPayments: ReadonlyArray<{ id: string; amountCents: number }>,
+): Promise<MollieCompleteness> {
+  const balance = await prisma.incomeMollieBalancePayment.findMany({
+    where: { month: { gte: monthToDate(from), lte: monthToDate(to) } },
+    select: { paymentId: true, amountCents: true },
+  });
+  const inBalance = new Set<string>();
+  for (const ids of chunks(exportPayments.map((payment) => payment.id))) {
+    const found = await prisma.incomeMollieBalancePayment.findMany({ where: { paymentId: { in: ids } }, select: { paymentId: true } });
+    for (const row of found) inBalance.add(row.paymentId);
+  }
+  const inExport = new Set<string>();
+  for (const ids of chunks(balance.map((payment) => payment.paymentId))) {
+    const found = await prisma.incomeTransaction.findMany({
+      where: { source: "MOLLIE", kind: "PAYMENT", providerId: { in: ids } },
+      select: { providerId: true },
+    });
+    for (const row of found) if (row.providerId) inExport.add(row.providerId);
+  }
+  const sum = (items: ReadonlyArray<{ amountCents: number }>) => ({
+    count: items.length,
+    cents: items.reduce((total, item) => total + item.amountCents, 0),
+  });
+  return {
+    missingInBalance: sum(exportPayments.filter((payment) => !inBalance.has(payment.id))),
+    missingInExport: sum(balance.filter((payment) => !inExport.has(payment.paymentId))),
+  };
+}
+
+/**
+ * De berekende reserve als regels voor het overzicht: één per rekening van
+ * Mollie. Ze bestaan enkel in het geheugen en worden nooit bewaard.
+ */
+function reserveOverviewRows(reserve: MollieReserve): OverviewTransaction[] {
+  if (reserve.status !== "known") return [];
+  return reserve.accounts
+    .filter((account) => account.cents !== 0)
+    .map((account) => ({
+      source: "MOLLIE",
+      kind: "RESERVE",
+      accountingCode: null,
+      accountingCodeName: null,
+      excluded: false,
+      amountCents: account.cents,
+      bankAccount: account.bankAccount,
+    }));
+}
+
 export type IncomeOverviewData = {
   overview: IncomeOverview;
   /** De bronnen waarvan ooit iets opgeladen werd, in de volgorde van de kolommen. */
   sources: IncomeSourceCode[];
-  /** Mollie-betalingen zonder uitbetaling: die tellen pas in de maand van hun uitbetaling. */
-  molliePending: { count: number; cents: number };
+  /** De berekende wijziging van de dynamische reserve van Mollie (`reserve.ts`). */
+  mollieReserve: MollieReserve;
+  /** Wat meetelt (Instellingen), voor de schermen en de Excel-bestanden. */
+  lineRules: LineRules;
   /** Of er in de periode Mollie-betalingen staan, maar geen enkele kostenregel. */
   mollieWithoutFees: boolean;
   feeCode: CodeSnapshot | null;
   closed: ClosedPeriod[];
   payouts: PayoutWithCheck[];
   checks: IncomeCheck[];
+  /** Per rekening tegen de bankafschriften; null zonder enig afschrift. */
+  bank: BankOverview | null;
 };
 
 export async function loadIncomeOverview(from: string, to: string): Promise<IncomeOverviewData> {
-  const [rows, channels, { order }, pending, feeCode, closedPeriods, sources] = await Promise.all([
+  const [rows, channels, { codes, order }, config, feeCode, closedPeriods, sources, transfers] = await Promise.all([
     prisma.incomeTransaction.findMany({
       where: { periodMonth: { gte: monthToDate(from), lte: monthToDate(to) } },
       select: {
@@ -974,19 +1081,28 @@ export async function loadIncomeOverview(from: string, to: string): Promise<Inco
         periodMonth: true,
         payoutReference: true,
         externalKey: true,
+        providerId: true,
       },
     }),
-    prisma.incomeChannel.findMany({ select: { id: true, accounts: { select: { from: true, bankAccount: true } } } }),
-    codeContext(),
-    prisma.incomeTransaction.aggregate({
-      where: { source: "MOLLIE", kind: "PAYMENT", periodMonth: null },
-      _count: true,
-      _sum: { amountCents: true },
+    prisma.incomeChannel.findMany({
+      select: { id: true, source: true, identifier: true, accounts: { select: { from: true, bankAccount: true } } },
     }),
+    codeContext(),
+    getIncomeConfig(),
     feeAccountingCode(),
     listClosedPeriods(),
     prisma.incomeImport.findMany({ distinct: ["source"], select: { source: true } }),
+    // De overschrijvingen van Mollie naar de bank in de periode, op hun eigen dag.
+    prisma.incomePayout.findMany({
+      where: {
+        source: "MOLLIE",
+        amountCents: { not: null },
+        paidOn: { gte: monthToDate(from), lte: new Date(`${lastDayOf(to)}T00:00:00Z`) },
+      },
+      select: { reference: true, paidOn: true, amountCents: true },
+    }),
   ]);
+  const rules = lineRulesOf(config);
   const activeChannels = await prisma.incomeTransaction.findMany({
     where: {
       source: { in: [...EXPORT_PER_CHANNEL] },
@@ -1009,17 +1125,53 @@ export async function loadIncomeOverview(from: string, to: string): Promise<Inco
       ? accountOn(accountsByChannel.get(row.channelId) ?? [], ymdKey(brusselsYMD(row.occurredAt)))
       : null,
   }));
-  const overview = computeIncomeOverview(withAccount, order);
+
+  // De wijziging van de dynamische reserve, per rekening van Mollie; zie reserve.ts.
+  const mollieAccounts = accountsByChannel.get(
+    (channels.find((channel) => channel.source === "MOLLIE" && channel.identifier === MOLLIE_CHANNEL) ??
+      channels.find((channel) => channel.source === "MOLLIE"))?.id ?? "",
+  ) ?? [];
+  const mollieRows = withAccount.filter((row) => row.source === "MOLLIE");
+  const mollieReserve = computeMollieReserve({
+    rows: mollieRows.map((row) => ({
+      kind: row.kind,
+      amountCents: row.amountCents,
+      bankAccount: row.bankAccount,
+      notCounted: quarterLineKey(row, rules) === null,
+    })),
+    transfers: transfers.map((transfer) => {
+      const paidOn = transfer.paidOn.toISOString().slice(0, 10);
+      return { reference: transfer.reference, paidOn, amountCents: transfer.amountCents ?? 0, bankAccount: accountOn(mollieAccounts, paidOn) };
+    }),
+    completeness: await mollieCompleteness(
+      from,
+      to,
+      mollieRows.flatMap((row) => (row.kind === "PAYMENT" && row.providerId ? [{ id: row.providerId, amountCents: row.amountCents }] : [])),
+    ),
+  });
+
+  const computed = computeIncomeOverview([...withAccount, ...reserveOverviewRows(mollieReserve)], order, rules);
+  // De kolom Post: de naam van de hoofdrekening, zoals in het kwartaalblad.
+  const overview: IncomeOverview = {
+    ...computed,
+    codes: computed.codes.map((row) => ({
+      ...row,
+      name: postName(row.code, row.name, (main) => codes.get(codeKey(main))?.name),
+    })),
+  };
 
   // Elke uitbetaling met een regel in de periode, met al haar regels: een
   // SumUp-verkoop telt in haar eigen maand, dus een uitbetaling kan over de
   // rand van een periode lopen, terwijl ze op het uittreksel één bedrag is.
-  const references = [...new Set(rows.flatMap((row) => (row.payoutReference ? [row.payoutReference] : [])))];
+  //
+  // Ook Payconiq (de export met `payoutId`) en Europabank (de OV-ref): hun
+  // uitbetaling noemt geen bedrag, maar een bankafschrift bevestigt ze.
+  const references = [...new Set(rows.flatMap((row) => (row.payoutReference && row.source !== "TRANSFER" ? [row.payoutReference] : [])))];
   const [payoutRows, checkRows, providerRows] = references.length
     ? await Promise.all([
         prisma.incomeTransaction.findMany({
           where: { payoutReference: { in: references } },
-          select: { source: true, payoutReference: true, kind: true, amountCents: true, occurredAt: true },
+          select: { source: true, payoutReference: true, kind: true, amountCents: true, occurredAt: true, channelId: true },
         }),
         prisma.incomePayoutCheck.findMany({
           where: { payoutReference: { in: references } },
@@ -1040,16 +1192,56 @@ export async function loadIncomeOverview(from: string, to: string): Promise<Inco
   );
   const checksByReference = new Map(checkRows.map((check) => [check.payoutReference, check]));
   const providerByKey = new Map(providerRows.map((payout) => [`${payout.source}|${payout.reference}`, payout]));
+
+  // De bankafschriften: de regels die bij een uitbetaling van de periode horen
+  // (die kan tot een paar weken na de periode op de bank komen), en wat
+  // afschriften dekken. Enkel lezen: niets hiervan verandert wat meetelt.
+  const [bankLines, coverage, bank] = await Promise.all([
+    loadBankLines(`${monthsBefore(from, 1)}-01`, `${lastDayOf(nextMonth(to))}`),
+    loadBankCoverage(),
+    loadBankOverview(from, to),
+  ]);
+  const bankByPayout = new Map<string, { bookedOn: string; amountCents: number; account: string }>();
+  for (const line of bankLines) {
+    if (!line.payoutKey) continue;
+    const known = bankByPayout.get(line.payoutKey);
+    if (known) {
+      known.amountCents += line.amountCents;
+      if (line.bookedOn < known.bookedOn) known.bookedOn = line.bookedOn;
+    } else {
+      bankByPayout.set(line.payoutKey, { bookedOn: line.bookedOn, amountCents: line.amountCents, account: line.account });
+    }
+  }
+  const normalisedAccounts = new Map(
+    [...accountsByChannel].map(([id, entries]) => [id, entries.map((entry) => ({ from: entry.from, bankAccount: normaliseAccount(entry.bankAccount) }))]),
+  );
+  const firstChannel = new Map<string, { channelId: string | null; occurredAt: Date }>();
+  for (const row of payoutRows) {
+    const key = `${row.source}|${row.payoutReference}`;
+    if (!firstChannel.has(key)) firstChannel.set(key, { channelId: row.channelId, occurredAt: row.occurredAt });
+  }
   const payoutsWithCheck: PayoutWithCheck[] = payouts.map((payout) => {
     const check = checksByReference.get(payout.reference);
     const provider = providerByKey.get(`${payout.source}|${payout.reference}`);
     const providerAmount = provider?.amountCents ?? null;
+    const onBank = bankByPayout.get(payoutKey(payout.source as BankProvider, payout.reference)) ?? null;
+    const expected = expectedBankDay(provider?.paidOn ?? null, payout.lastAt);
+    const first = firstChannel.get(`${payout.source}|${payout.reference}`);
+    const account =
+      payout.source === "MOLLIE"
+        ? accountOn(mollieAccounts.map((entry) => ({ from: entry.from, bankAccount: normaliseAccount(entry.bankAccount) })), expected.day)
+        : first?.channelId
+          ? accountOn(normalisedAccounts.get(first.channelId) ?? [], ymdKey(brusselsYMD(first.occurredAt)))
+          : null;
     return {
       ...payout,
       check: check ? { amountCents: check.amountCents, checkedAt: check.checkedAt, checkedByName: check.checkedBy?.name ?? null } : null,
       paidOn: provider?.paidOn ?? null,
       providerAmount,
-      state: payoutState(payout.total, check?.amountCents ?? null, providerAmount),
+      bank: onBank,
+      account,
+      missingOnStatement: !onBank && coveredOn(coverage, account, expected.day),
+      state: payoutState(payout.total, check?.amountCents ?? null, providerAmount, onBank?.amountCents ?? null),
     };
   });
   // In de volgorde van het uittreksel: per bron op de dag van de overschrijving.
@@ -1077,7 +1269,7 @@ export async function loadIncomeOverview(from: string, to: string): Promise<Inco
       (row.externalKey.startsWith(`FEE:${BALANCE_KEY}:`) ? mollieBalanceFeeMonths : mollieOtherFeeMonths).add(month);
     }
   }
-  const counted = withAccount.filter((row) => !row.excluded);
+  const counted = withAccount.filter((row) => quarterLineKey(row, rules) !== null);
   const inUse = new Set(sources.map((row) => row.source));
   const today = brusselsYMD(new Date());
   const checks = computeIncomeChecks({
@@ -1096,6 +1288,7 @@ export async function loadIncomeOverview(from: string, to: string): Promise<Inco
       total: payout.total,
       checkedAmount: payout.check?.amountCents ?? null,
       providerAmount: payout.providerAmount,
+      bankAmount: payout.bank?.amountCents ?? null,
     })),
     open: {
       count: overview.unassigned.count,
@@ -1107,17 +1300,20 @@ export async function loadIncomeOverview(from: string, to: string): Promise<Inco
     },
     hasFees: overview.fees.count > 0,
     feeCodeChosen: feeCode !== null,
+    mollieReserve,
   });
 
   return {
     overview,
     sources: INCOME_SOURCES.filter((source) => inUse.has(source)),
-    molliePending: { count: pending._count, cents: pending._sum.amountCents ?? 0 },
+    mollieReserve,
+    lineRules: rules,
     mollieWithoutFees: molliePaymentMonths.size > 0 && mollieFeeMonths.size === 0,
     feeCode,
     closed: closedPeriods.filter((period) => period.from <= to && from <= period.to),
     payouts: payoutsWithCheck,
     checks,
+    bank,
   };
 }
 
@@ -1256,6 +1452,7 @@ export async function changeTransactions(
     where,
     select: {
       id: true,
+      source: true,
       rule: true,
       periodMonth: true,
       ticketPaymentId: true,
@@ -1276,7 +1473,9 @@ export async function changeTransactions(
   if (open.length === 0) return { ok: false, error: "LOCKED" };
 
   if ("reset" in choice) {
-    const manual = open.filter((row) => row.rule === "MANUAL");
+    // Een overschrijving heeft geen koppelregel: zonder de hand stond ze bij Na
+    // te kijken. Ze blijft zoals ze is; aanpassen gaat bij Overschrijvingen.
+    const manual = open.filter((row) => row.rule === "MANUAL" && row.source !== "TRANSFER");
     for (const batch of chunks(manual.map((row) => row.id))) {
       await prisma.incomeTransaction.updateMany({
         where: { id: { in: batch } },
@@ -1308,6 +1507,7 @@ export async function changeTransactions(
         membershipPaymentId: null,
         uitleenPaymentId: null,
         cashRegisterId: null,
+        channelLendingId: null,
         assignedById: userId,
         assignedAt: now,
       },
@@ -1322,6 +1522,8 @@ export async function changeTransactions(
 
 export async function listIncomeImports() {
   const imports = await prisma.incomeImport.findMany({
+    // Een overschrijving met de hand is geen bestand: die staat bij Overschrijvingen.
+    where: { format: { not: MANUAL_FORMAT } },
     orderBy: { createdAt: "desc" },
     take: 100,
     select: {
@@ -1508,8 +1710,14 @@ export async function kassaControlList(year: number | "all"): Promise<KassaContr
   }));
 }
 
-export async function listIncomeChannels() {
+/**
+ * De kanalen van de exports. Met `transfers` ook de rekeningen van de
+ * overschrijvingen: Instellingen en de uitleningen hebben daar niets aan (hun
+ * rekening ligt vast), de filter van Transacties wel.
+ */
+export async function listIncomeChannels(options: { transfers?: boolean } = {}) {
   return prisma.incomeChannel.findMany({
+    where: options.transfers ? {} : { source: { not: "TRANSFER" } },
     orderBy: [{ source: "asc" }, { identifier: "asc" }],
     select: {
       id: true,
@@ -1547,8 +1755,17 @@ export async function countUnassigned(): Promise<number> {
 // De Excel-bestanden
 // -----------------------------------------------------------------------------
 
+const SOURCE_NAME: Record<IncomeSourceCode, string> = {
+  PAYCONIQ: "Payconiq",
+  MOLLIE: "Mollie",
+  SUMUP: "SumUp",
+  EUROPABANK: "Europabank",
+  TRANSFER: "Overschrijvingen",
+};
+
 /** Waarom een transactie haar code kreeg, in woorden: de kolom "Waarom" van het controlebestand. */
 function reasonOf(
+  rules: LineRules,
   tx: {
     source: IncomeSource;
     kind: IncomeKind;
@@ -1560,6 +1777,7 @@ function reasonOf(
     channel: { identifier: string; label: string | null } | null;
     ticketPayment: { order: { event: { titleNl: string } } } | null;
     cashRegister: { activity: string; postLabel: string; date: Date } | null;
+    channelLending: { fromDay: Date; toDay: Date } | null;
     membershipPaymentId: string | null;
     uitleenPaymentId: string | null;
   },
@@ -1569,12 +1787,20 @@ function reasonOf(
   const byWhom = [tx.assignedBy?.name ? `${nl ? "door" : "by"} ${tx.assignedBy.name}` : null, when ? `${nl ? "op" : "on"} ${when}` : null]
     .filter(Boolean)
     .join(" ");
+  if (tx.kind === "FEE" && isSeparateFee(tx, rules)) {
+    return nl
+      ? `Kosten van ${SOURCE_NAME[tx.source]}, aparte factuur (Instellingen): telt niet mee`
+      : `${SOURCE_NAME[tx.source]} fees, separate invoice (Settings): does not count`;
+  }
   if (tx.kind === "FEE") {
     if (tx.source === "SUMUP") return nl ? "Transactiekosten van SumUp, op de betaling" : "SumUp transaction fee, on the payment";
     if (tx.source === "EUROPABANK") return nl ? "Commissie van Europabank, op de betaling" : "Europabank commission, on the payment";
     return nl ? "Kosten die Mollie inhield" : "Fees withheld by Mollie";
   }
   if (tx.kind === "RESERVE") return nl ? "Reserve van Mollie" : "Mollie rolling reserve";
+  if (tx.source === "TRANSFER" && !tx.excluded) {
+    return `${nl ? "Overschrijving, met de hand ingevoerd" : "Transfer, entered by hand"}${byWhom ? ` ${byWhom}` : ""}`;
+  }
   if (tx.excluded) return `${nl ? "Telt niet mee, met de hand" : "Does not count, by hand"}${byWhom ? ` ${byWhom}` : ""}`;
   switch (tx.rule) {
     case "MANUAL":
@@ -1589,6 +1815,14 @@ function reasonOf(
       return `${nl ? "Onthouden tekst" : "Remembered text"} "${incomeRuleText(tx.description) ?? ""}"`;
     case "CHANNEL_DEFAULT":
       return `${nl ? "Standaardcode van" : "Default code of"} ${tx.channel?.label || tx.channel?.identifier || "?"}`;
+    case "CHANNEL_LENDING": {
+      const channel = tx.channel?.label || tx.channel?.identifier || "?";
+      if (!tx.channelLending) return `${nl ? "Uitlening van" : "Lending of"} ${channel}`;
+      const day = (value: Date) => value.toLocaleDateString(nl ? "nl-BE" : "en-GB", { timeZone: "UTC" });
+      return nl
+        ? `Uitlening van ${channel}, ${day(tx.channelLending.fromDay)} tot en met ${day(tx.channelLending.toDay)}`
+        : `Lending of ${channel}, ${day(tx.channelLending.fromDay)} to ${day(tx.channelLending.toDay)}`;
+    }
     case "CASH_REGISTER":
       return tx.cashRegister
         ? `${nl ? "Kassa" : "Cash register"} ${tx.cashRegister.activity} (${tx.cashRegister.postLabel}), ${tx.cashRegister.date.toLocaleDateString(nl ? "nl-BE" : "en-GB", { timeZone: "UTC" })}`
@@ -1634,6 +1868,7 @@ export async function loadIncomeWorkbookModel(from: string, to: string, nl: bool
         channel: { select: { identifier: true, label: true } },
         ticketPayment: { select: { order: { select: { event: { select: { titleNl: true } } } } } },
         cashRegister: { select: { activity: true, postLabel: true, date: true } },
+        channelLending: { select: { fromDay: true, toDay: true } },
       },
     }),
     prisma.incomeChannel.findMany({ select: { id: true, accounts: { select: { from: true, bankAccount: true } } } }),
@@ -1642,6 +1877,7 @@ export async function loadIncomeWorkbookModel(from: string, to: string, nl: bool
     loadIncomeOverview(from, to),
   ]);
 
+  const rules = overviewData.lineRules;
   const accountsByChannel = new Map(
     channels.map((channel) => [
       channel.id,
@@ -1661,13 +1897,14 @@ export async function loadIncomeWorkbookModel(from: string, to: string, nl: bool
     accountingCode: row.accountingCode,
     accountingCodeName: row.accountingCodeName,
     excluded: row.excluded,
-    reason: reasonOf(row, nl),
+    reason: reasonOf(rules, row, nl),
   }));
 
   // De tussenlaag: dezelfde groepen als Na te kijken, maar voor alles van de periode.
   const groups = new Map<string, WorkbookGroup & { codeSet: Set<string>; reasonSet: Set<string> }>();
   rows.forEach((row, index) => {
-    if (row.kind !== "PAYMENT" && row.kind !== "REFUND") return;
+    // Een overschrijving staat er per stuk al: Na te kijken groepeert ze nooit.
+    if ((row.kind !== "PAYMENT" && row.kind !== "REFUND") || row.source === "TRANSFER") return;
     const { key, type, day } = groupKeyOf(row);
     let group = groups.get(key);
     if (!group) {
@@ -1689,16 +1926,47 @@ export async function loadIncomeWorkbookModel(from: string, to: string, nl: bool
     group.count += 1;
     group.cents += row.amountCents;
     if (row.occurredAt > group.lastAt) group.lastAt = row.occurredAt;
-    const line = quarterLineKey(transactions[index]);
+    const line = quarterLineKey(transactions[index], rules);
     group.codeSet.add(line ?? (nl ? "telt niet mee" : "does not count"));
     group.reasonSet.add(transactions[index].reason);
   });
+
+  // De berekende reserve, dezelfde als op het overzicht: als regel in Transacties,
+  // zodat de formules van het kwartaalblad en het controleblok van Mollie sluiten.
+  const reserve = overviewData.mollieReserve;
+  if (reserve.status === "known") {
+    const [toYear, toMonth] = to.split("-").map(Number);
+    const lastDay = Number(lastDayOf(to).slice(8));
+    const endOfPeriod = new Date(brusselsWallClockMinutes({ year: toYear, month: toMonth, day: lastDay }, 23 * 60 + 59).getTime() + 59_000);
+    const euro = (cents: number) => (cents / 100).toLocaleString(nl ? "nl-BE" : "en-GB", { style: "currency", currency: "EUR" });
+    for (const account of reserve.accounts) {
+      if (account.cents === 0) continue;
+      transactions.push({
+        occurredAt: endOfPeriod,
+        source: "MOLLIE",
+        kind: "RESERVE",
+        channel: MOLLIE_CHANNEL,
+        description: nl ? "Wijziging dynamische reserve (berekend)" : "Change in rolling reserve (computed)",
+        amountCents: account.cents,
+        periodMonth: to,
+        payoutReference: null,
+        bankAccount: account.bankAccount,
+        accountingCode: null,
+        accountingCodeName: null,
+        excluded: false,
+        reason: nl
+          ? `Berekend: overgeschreven ${euro(account.transfersCents)} in ${account.transferCount} overschrijvingen, min alles van Mollie in de periode (${euro(account.transfersCents - account.cents)})`
+          : `Computed: transferred ${euro(account.transfersCents)} in ${account.transferCount} transfers, minus everything from Mollie in the period (${euro(account.transfersCents - account.cents)})`,
+      });
+    }
+  }
 
   const payoutDate = (date: Date) => date.toLocaleDateString(nl ? "nl-BE" : "en-GB", { timeZone: "Europe/Brussels" });
   const importCounts = new Map<string, number>();
   for (const row of rows) importCounts.set(row.importId, (importCounts.get(row.importId) ?? 0) + 1);
   const imports = await prisma.incomeImport.findMany({
-    where: { id: { in: [...importCounts.keys()] } },
+    // Een overschrijving is geen bestand.
+    where: { id: { in: [...importCounts.keys()] }, format: { not: MANUAL_FORMAT } },
     orderBy: { createdAt: "asc" },
     select: { id: true, fileName: true, source: true, createdAt: true, importedBy: { select: { name: true } } },
   });
@@ -1709,6 +1977,8 @@ export async function loadIncomeWorkbookModel(from: string, to: string, nl: bool
     transactions,
     codeOrder: new Map(codeList.map((code, index) => [codeKey(code.code), index])),
     mainNames: new Map(codeList.filter((code) => code.depth === 0).map((code) => [code.code, code.name])),
+    lineRules: rules,
+    mollieTransfers: reserve.status === "known" ? { cents: reserve.transfersCents, count: reserve.transferCount } : null,
     feeCode,
     groups: [...groups.values()].map(({ codeSet, reasonSet, ...group }) => ({
       ...group,
@@ -1727,8 +1997,18 @@ export async function loadIncomeWorkbookModel(from: string, to: string, nl: bool
       reserve: payout.reserve,
       total: payout.total,
       providerAmount: payout.providerAmount,
+      bankOn: payout.bank ? new Date(`${payout.bank.bookedOn}T00:00:00Z`) : null,
+      bankAmount: payout.bank?.amountCents ?? null,
       checked:
-        payout.state === "checked" && payout.check
+        payout.state === "bank"
+          ? nl
+            ? "ja, op het uittreksel"
+            : "yes, on the statement"
+          : payout.state === "bankDiffers"
+            ? nl
+              ? "nee, ander bedrag op de bank"
+              : "no, another amount on the bank"
+            : payout.state === "checked" && payout.check
           ? `${nl ? "ja" : "yes"}, ${payoutDate(payout.check.checkedAt)}${payout.check.checkedByName ? `, ${payout.check.checkedByName}` : ""}`
           : payout.state === "changed" && payout.check
             ? nl

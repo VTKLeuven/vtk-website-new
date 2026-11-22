@@ -1,6 +1,6 @@
 import type { YMD } from "@/lib/brussels";
 import type { IncomeKindCode, IncomeSourceCode } from "@/lib/inkomsten/parse";
-import type { IncomeRuleCode } from "@/lib/inkomsten/transactionFilter";
+import type { IncomeRuleCode } from "@/lib/inkomsten/match";
 import type { IncomeCheck } from "@/lib/inkomsten/overview";
 import { formatEuro } from "@/lib/rekeningen/expenses";
 import { monthLabel } from "@/lib/inkomsten/labels";
@@ -11,6 +11,7 @@ export const SOURCE_LABELS: Record<IncomeSourceCode, string> = {
   MOLLIE: "Mollie",
   SUMUP: "SumUp",
   EUROPABANK: "Europabank",
+  TRANSFER: "Overschrijvingen",
 };
 
 export { monthLabel, periodLabel } from "@/lib/inkomsten/labels";
@@ -21,6 +22,7 @@ export const RULE_LABELS: Record<IncomeRuleCode, { nl: string; en: string }> = {
   WEBSITE: { nl: "Betaling van de site", en: "Payment from the site" },
   CODE_IN_TEXT: { nl: "Code in de tekst", en: "Code in the text" },
   NAME_RULE: { nl: "Onthouden tekst", en: "Remembered text" },
+  CHANNEL_LENDING: { nl: "Uitlening van het toestel", en: "Lending of the device" },
   CHANNEL_DEFAULT: { nl: "Standaardcode van het kanaal", en: "Default code of the channel" },
   CASH_REGISTER: { nl: "Kassa", en: "Cash register" },
 };
@@ -109,32 +111,77 @@ export function checkText(
             href: `${base}/admin/inkomsten/opladen`,
           };
     case "payouts":
-      if (check.total === 0) return { ok: true, text: nl ? "Geen uitbetalingen van Mollie of SumUp in deze periode." : "No Mollie or SumUp payouts in this period." };
+      if (check.total === 0) return { ok: true, text: nl ? "Geen uitbetalingen in deze periode." : "No payouts in this period." };
       return check.ok
         ? {
             ok: true,
-            text: nl
-              ? `${check.total === 1 ? "De uitbetaling klopt" : `Alle ${check.total} uitbetalingen kloppen`} met het uittreksel of met de overschrijving van Mollie.`
-              : `All ${check.total} payouts match the bank statement or the Mollie transfer.`,
+            text:
+              (nl
+                ? `${check.total === 1 ? "De uitbetaling klopt" : `Alle ${check.total} uitbetalingen kloppen`} met het uittreksel of met de overschrijving van Mollie`
+                : `All ${check.total} payouts match the bank statement or the Mollie transfer`) +
+              (check.bank ? (nl ? ` (${check.bank} gevonden op een opgeladen afschrift)` : ` (${check.bank} found on an uploaded statement)`) : "") +
+              (check.differs
+                ? nl
+                  ? `; bij ${check.differs} wijkt de som van de betalingen af van wat Mollie overschreef, en dat verschil zit in de reserve.`
+                  : `; for ${check.differs} the sum of the payments differs from what Mollie transferred, and that difference is in the reserve.`
+                : "."),
           }
         : {
             ok: false,
             text:
               (nl
-                ? `${check.checked} van de ${check.total} uitbetalingen afgevinkt of gelijk aan de overschrijving`
-                : `${check.checked} of ${check.total} payouts checked or equal to the transfer`) +
-              (check.differs
-                ? nl
-                  ? `; bij ${check.differs} verschilt de som van de site van wat Mollie overschreef`
-                  : `; for ${check.differs} the site's sum differs from what Mollie transferred`
-                : "") +
+                ? `${check.checked} van de ${check.total} uitbetalingen afgevinkt, op een afschrift of gelijk aan de overschrijving`
+                : `${check.checked} of ${check.total} payouts checked, on a statement or equal to the transfer`) +
               (check.changed
                 ? nl
-                  ? `; bij ${check.changed} veranderde het bedrag na het afvinken.`
-                  : `; ${check.changed} changed after checking.`
-                : "."),
+                  ? `; bij ${check.changed} veranderde het bedrag na het afvinken`
+                  : `; ${check.changed} changed after checking`
+                : "") +
+              (check.bankDiffers
+                ? nl
+                  ? `; ${check.bankDiffers} met een ander bedrag op de bank`
+                  : `; ${check.bankDiffers} with another amount on the bank`
+                : "") +
+              (nl
+                ? ". Upload het bankafschrift van de rekening, dan vinkt de site af wat erop staat."
+                : ". Upload the account's bank statement, and the site checks off what is on it."),
             href: "#per-uitbetaling",
           };
+    case "mollieReserve": {
+      if (check.ok) {
+        return {
+          ok: true,
+          text: nl
+            ? `De wijziging van de dynamische reserve is berekend uit ${check.transferCount === 1 ? "1 overschrijving" : `${check.transferCount} overschrijvingen`} van Mollie; de betalingenexport en het balansrapport noemen dezelfde betalingen.`
+            : `The change in the rolling reserve is computed from ${check.transferCount === 1 ? "1 Mollie transfer" : `${check.transferCount} Mollie transfers`}; the payments export and the balance report list the same payments.`,
+        };
+      }
+      const payments = (n: number) => (nl ? (n === 1 ? "1 betaling" : `${n} betalingen`) : n === 1 ? "1 payment" : `${n} payments`);
+      const parts: string[] = [];
+      if (check.missingInBalance.count) {
+        parts.push(
+          nl
+            ? `${payments(check.missingInBalance.count)} uit de betalingenexport (${euro(check.missingInBalance.cents)}) ${check.missingInBalance.count === 1 ? "staat" : "staan"} in geen enkel balansrapport: upload het balansrapport van Mollie voor de hele periode`
+            : `${payments(check.missingInBalance.count)} from the payments export (${euro(check.missingInBalance.cents)}) ${check.missingInBalance.count === 1 ? "is" : "are"} in no balance report: upload the Mollie balance report for the whole period`,
+        );
+      }
+      if (check.missingInExport.count) {
+        parts.push(
+          nl
+            ? `${payments(check.missingInExport.count)} uit het balansrapport (${euro(check.missingInExport.cents)}) ${check.missingInExport.count === 1 ? "staat" : "staan"} niet in de betalingenexport: upload de betalingenexport van Mollie voor de hele periode`
+            : `${payments(check.missingInExport.count)} from the balance report (${euro(check.missingInExport.cents)}) ${check.missingInExport.count === 1 ? "is" : "are"} not in the payments export: upload the Mollie payments export for the whole period`,
+        );
+      }
+      return {
+        ok: false,
+        text:
+          parts.join("; ") +
+          (nl
+            ? ". Tot dan kent de site de wijziging van de dynamische reserve niet, en is de Mollie-kolom niet gelijk aan wat Mollie overschreef."
+            : ". Until then the site does not know the change in the rolling reserve, and the Mollie column does not equal what Mollie transferred."),
+        href: `${base}/admin/inkomsten/opladen`,
+      };
+    }
     case "open":
       return check.ok
         ? { ok: true, text: nl ? "Niets meer na te kijken." : "Nothing left to review." }

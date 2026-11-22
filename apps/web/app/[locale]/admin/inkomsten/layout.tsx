@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { ClipboardList, LayoutList, ListOrdered, Settings2, Upload } from "lucide-react";
+import { ArrowRightLeft, ClipboardList, LayoutList, ListOrdered, Settings2, Upload } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import { countUnassigned } from "@/lib/inkomsten/server";
@@ -35,6 +35,12 @@ export default async function AdminIncomeLayout({
       segments: ["na-te-kijken"],
     },
     { href: `${base}/transacties`, label: nl ? "Transacties" : "Transactions", icon: <ListOrdered {...ICON} />, segments: ["transacties"] },
+    {
+      href: `${base}/overschrijvingen`,
+      label: nl ? "Overschrijvingen" : "Transfers",
+      icon: <ArrowRightLeft {...ICON} />,
+      segments: ["overschrijvingen"],
+    },
     { href: `${base}/instellingen`, label: nl ? "Instellingen" : "Settings", icon: <Settings2 {...ICON} />, segments: ["instellingen"] },
   ];
 

@@ -4,11 +4,19 @@
  *
  *   1. met de hand (raakt deze functie nooit: de beller slaat die over);
  *   2. een betaling van de site, op haar betaal-ID;
- *   3. een boekhoudcode in de omschrijving, de referentie of de `bulk_id`;
+ *   3. een boekhoudcode in de omschrijving, de referentie of de bulk-ID (`bulk_id` of `bulkId`);
  *   4. een kassa die het toestel had, met haar code;
  *   5. een tekst die Beheer onthield;
- *   6. de standaardcode van het kanaal;
- *   7. anders: Na te kijken (`null`).
+ *   6. een uitlening van het toestel op die dag;
+ *   7. de standaardcode van het kanaal;
+ *   8. anders: Na te kijken (`null`).
+ *
+ * Een uitlening (6) staat onder wat exact koppelt (de site, een code in de
+ * tekst, een kassa tijdens haar uren, een onthouden tekst): die weten het beter
+ * dan de datum. Ze staat boven de standaardcode, want dat is net wat ze
+ * vervangt. Een uitlening gaat over dagen van 9:00 tot 9:00 (`reviewDay`), de
+ * standaardcode over kalenderdagen (`channelCodeOn`): een standaardcode wisselt
+ * om middernacht, een uitlening dekt een avond tot 3 uur mee.
  *
  * Zie docs/inkomsten.md.
  */
@@ -27,7 +35,15 @@ export function reviewDay(at: Date): string {
   return new Date(Date.UTC(ymd.year, ymd.month - 1, ymd.day - 1)).toISOString().slice(0, 10);
 }
 
-export type IncomeRuleCode = "MANUAL" | "WEBSITE" | "CODE_IN_TEXT" | "NAME_RULE" | "CHANNEL_DEFAULT" | "CASH_REGISTER";
+/** De regel die een transactie haar code gaf, zoals `IncomeRule` in de database. */
+export type IncomeRuleCode =
+  | "MANUAL"
+  | "WEBSITE"
+  | "CODE_IN_TEXT"
+  | "NAME_RULE"
+  | "CHANNEL_LENDING"
+  | "CHANNEL_DEFAULT"
+  | "CASH_REGISTER";
 
 export type CodeSnapshot = { code: string; name: string };
 
@@ -39,6 +55,13 @@ export type ChannelCodeEntry = { from: string; code: CodeSnapshot | null };
  * zonder uren) en haar code. `code` null: Beheer koos er nog geen.
  */
 export type KassaSpan = { id: string; start: Date; end: Date; code: CodeSnapshot | null };
+
+/**
+ * Een uitlening van het toestel van een kanaal: de eerste en de laatste dag
+ * ("2026-09-16", beide inbegrepen, van 9:00 tot 9:00) en haar code. `code`
+ * null: de code werd uit het register verwijderd, en dan koppelt ze niets.
+ */
+export type LendingSpan = { id: string; from: string; to: string; code: CodeSnapshot | null };
 
 /** Een betaling van de site, met de code die in haar betaalinfo stond. */
 export type WebsitePayment = {
@@ -60,6 +83,8 @@ export type MatchContext = {
   channelCodes: ReadonlyMap<string, readonly ChannelCodeEntry[]>;
   /** Per kanaal-id met een toestel: de aanvaarde kassa's met dat toestel. */
   cashRegisters: ReadonlyMap<string, readonly KassaSpan[]>;
+  /** Per kanaal-id de uitleningen van dat toestel. */
+  channelLendings: ReadonlyMap<string, readonly LendingSpan[]>;
 };
 
 export type MatchInput = {
@@ -82,6 +107,8 @@ export type MatchResult = {
   uitleenPaymentId: string | null;
   /** De kassa waarvan de code komt (regel 4). */
   cashRegisterId: string | null;
+  /** De uitlening waarvan de code komt (regel 6). */
+  channelLendingId: string | null;
 };
 
 /** De sleutel waarop het register een code opzoekt: enkel cijfers. */
@@ -100,6 +127,19 @@ export function channelCodeOn(entries: readonly ChannelCodeEntry[], day: string)
     if (entry.from <= day && (!best || entry.from > best.from)) best = entry;
   }
   return best?.code ?? null;
+}
+
+/**
+ * De uitlening die een dag dekt ("2026-09-16", een dag van 9:00 tot 9:00).
+ * Uitleningen van één kanaal overlappen niet (de server weigert dat); mocht het
+ * toch, dan wint de laatst begonnen.
+ */
+export function lendingOn(spans: readonly LendingSpan[], day: string): LendingSpan | null {
+  let best: LendingSpan | null = null;
+  for (const span of spans) {
+    if (span.from <= day && day <= span.to && (!best || span.from > best.from)) best = span;
+  }
+  return best;
 }
 
 /**
@@ -168,7 +208,7 @@ export function codeAtStart(text: string | null, codes: ReadonlyMap<string, Code
   return codes.get(match[1]) ?? null;
 }
 
-/** Een veld dat enkel een code is (de `reference` of `bulk_id` van Bancontact). */
+/** Een veld dat enkel een code is (de `reference` of de bulk-ID van Bancontact). */
 function codeAlone(text: string | null, codes: ReadonlyMap<string, CodeSnapshot>): CodeSnapshot | null {
   if (!text || !/^[\d\s.]+$/.test(text)) return null;
   return codes.get(codeKey(text)) ?? null;
@@ -176,18 +216,27 @@ function codeAlone(text: string | null, codes: ReadonlyMap<string, CodeSnapshot>
 
 /**
  * Wat het toestel van een betaling op dat moment was: de kassa die het had
- * (regel 4, ook een zonder code) en de standaardcode van het kanaal die dag
- * (regel 6). Na te kijken gebruikt de kassa zonder code als hint.
+ * (regel 4, ook een zonder code), de uitlening van die dag (regel 6, enkel met
+ * een code) en de standaardcode van het kanaal die dag (regel 7). Na te kijken
+ * gebruikt de kassa zonder code als hint.
+ *
+ * Een uitgeleend toestel telt die dagen als toestel van een post: een kassa
+ * die er een avond op stond, houdt enkel haar uren, en daarna geldt de
+ * uitlening weer (en niet de uitloop tot 9:00 van een gedeeld toestel). De
+ * uitlening zegt immers wie het toestel die dagen had.
  */
 export function deviceAt(
   input: Pick<MatchInput, "channelId" | "occurredAt">,
-  context: Pick<MatchContext, "channelCodes" | "cashRegisters">,
-): { kassa: KassaSpan | null; channelCode: CodeSnapshot | null } {
+  context: Pick<MatchContext, "channelCodes" | "cashRegisters" | "channelLendings">,
+): { kassa: KassaSpan | null; lending: LendingSpan | null; channelCode: CodeSnapshot | null } {
   const entries = input.channelId ? context.channelCodes.get(input.channelId) : undefined;
   const channelCode = entries ? channelCodeOn(entries, ymdKey(brusselsYMD(input.occurredAt))) : null;
+  const lendings = input.channelId ? context.channelLendings.get(input.channelId) : undefined;
+  const found = lendings?.length ? lendingOn(lendings, reviewDay(input.occurredAt)) : null;
+  const lending = found?.code ? found : null;
   const spans = input.channelId ? context.cashRegisters.get(input.channelId) : undefined;
-  const kassa = spans?.length ? kassaAt(spans, input.occurredAt, channelCode !== null) : null;
-  return { kassa, channelCode };
+  const kassa = spans?.length ? kassaAt(spans, input.occurredAt, (lending?.code ?? channelCode) !== null) : null;
+  return { kassa, lending, channelCode };
 }
 
 export function matchTransaction(input: MatchInput, context: MatchContext): MatchResult {
@@ -198,6 +247,7 @@ export function matchTransaction(input: MatchInput, context: MatchContext): Matc
     membershipPaymentId: null,
     uitleenPaymentId: null,
     cashRegisterId: null,
+    channelLendingId: null,
   };
   if (input.kind !== "PAYMENT" && input.kind !== "REFUND") return none;
 
@@ -209,6 +259,7 @@ export function matchTransaction(input: MatchInput, context: MatchContext): Matc
     membershipPaymentId: website?.membershipPaymentId ?? null,
     uitleenPaymentId: website?.uitleenPaymentId ?? null,
     cashRegisterId: null,
+    channelLendingId: null,
   };
   if (website?.code) {
     return { ...links, rule: "WEBSITE", code: { code: website.code, name: website.name ?? website.code } };
@@ -223,7 +274,7 @@ export function matchTransaction(input: MatchInput, context: MatchContext): Matc
 
   // 4. Een kassa die het toestel had. Een kassa zonder code koppelt niets: wat
   // ze had, valt door naar de regels hieronder.
-  const { kassa, channelCode } = deviceAt(input, context);
+  const { kassa, lending, channelCode } = deviceAt(input, context);
   if (kassa?.code) return { ...links, rule: "CASH_REGISTER", code: kassa.code, cashRegisterId: kassa.id };
 
   // 5. Een onthouden tekst.
@@ -231,7 +282,10 @@ export function matchTransaction(input: MatchInput, context: MatchContext): Matc
   const remembered = text ? context.nameRules.get(nameRuleKey(input.source, text)) : undefined;
   if (remembered) return { ...links, rule: "NAME_RULE", code: remembered };
 
-  // 6. De standaardcode van het kanaal op de dag van de betaling.
+  // 6. Een uitlening van het toestel op die dag (van 9:00 tot 9:00).
+  if (lending?.code) return { ...links, rule: "CHANNEL_LENDING", code: lending.code, channelLendingId: lending.id };
+
+  // 7. De standaardcode van het kanaal op de dag van de betaling.
   if (channelCode) return { ...links, rule: "CHANNEL_DEFAULT", code: channelCode };
 
   return { ...none, ...links };

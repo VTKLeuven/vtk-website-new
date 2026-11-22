@@ -176,13 +176,34 @@ de sectie "Vallen"; de kringkeuzes staan in `docs/design-decisions.md`.
   in `lib/inkomsten` staat enkel kennis over de bestanden. Zet er geen
   terminalnummer, rekeningnummer of code in, ook niet als standaard, in een
   seed of in een hint bij een veld.
-- **Rekenen zoals het rekenblad**: Mollie op de maand van de uitbetaling, de
-  rest op de maand van de betaling, elk uur op de Brusselse klok. Een wijziging
-  daaraan toets je opnieuw aan een kwartaal van Beheer.
+- **Alles op de maand van de betaling**, ook Mollie, elk uur op de Brusselse
+  klok. Bij Mollie maakt de berekende wijziging van de dynamische reserve
+  (`lib/inkomsten/reserve.ts`) de kolom gelijk aan wat Mollie overschreef; ze
+  wordt nooit bewaard, en de site kent ze enkel wanneer de betalingenexport en
+  het balansrapport dezelfde betalingen noemen. Een wijziging daaraan toets je
+  opnieuw aan een kwartaal van Beheer (`test/inkomstenQ3Beheer.test.ts`).
 - **Het blad voor de boekhouder en het controlebestand delen één sleutel**
-  (`quarterLineKey` in `lib/inkomsten/workbook.ts`). Verander je in welke regel
+  (`quarterLineKey` in `lib/inkomsten/lines.ts`), en het overzicht op het
+  scherm telt ermee. Verander je in welke regel
   een transactie valt, doe het daar; anders tellen de formules van het
   controlebestand iets anders op dan het blad dat naar de boekhouder gaat.
+- **Een uitlening van een toestel is een koppelregel** (regel 6,
+  `IncomeChannelLending`), geen eenmalige update: wat later opgeladen wordt,
+  krijgt ze ook. Ze verandert enkel de code, nooit de maand, en wat met de hand
+  gezet werd, blijft. Een nieuwe regel komt in `matchTransaction` én in de drie
+  plaatsen die een context bouwen (opladen, `matchContextsFor`,
+  `listUnassignedGroups`), anders koppelen import en opnieuw koppelen anders.
+- **Overschrijvingen zijn een bron zonder export** (`TRANSFER`, met de hand op
+  /admin/inkomsten/overschrijvingen): één `IncomeImport` met formaat `manual`
+  per stuk en één kanaal per rekening. Een lijst van imports filtert op dat
+  formaat, en wat "elke maand een export" verwacht, loopt over `EXPORT_SOURCES`,
+  niet over `INCOME_SOURCES`. Bewaar er geen naam of rekening van wie stortte.
+- **Een bankafschrift bewaart enkel regels van providers**, herkend aan de naam
+  van de tegenpartij en nooit aan de mededeling; nooit het bestand of een regel
+  van een lid. De eigen rekening komt uit het bestand en wordt vergeleken met
+  Instellingen, nooit met een rekeningnummer in de code. Wat de browser nodig
+  heeft (de kolommen), staat in `columns.ts`: `parse.ts` en `bank.ts` mogen
+  niet in een clientbundel belanden.
 
 # Bestuursorgaan
 

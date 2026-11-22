@@ -81,13 +81,33 @@ export default async function IncomeSettingsPage({ params }: { params: Promise<{
       </header>
 
       <section className="rounded-2xl border border-vtk-blue/12 bg-white p-5">
-        <h2 className="text-lg font-semibold">{nl ? "Kostencode" : "Fee code"}</h2>
-        <p className="mt-1 mb-3 max-w-3xl text-sm text-vtk-muted">
-          {nl
-            ? "De boekhoudcode voor de kosten: wat Mollie inhoudt (\"Withheld fees\"), de transactiekosten van SumUp en de commissie van Europabank. Samen vormen ze de regel met de kosten in het kwartaalblad. Staat de code nog niet in de lijst, voeg ze dan eerst toe bij Boekhoudcodes."
-            : "The accounting code for the fees: what Mollie withholds (\"Withheld fees\"), the SumUp transaction fees and the Europabank commission. Together they are the line with the fees in the quarter sheet. If the code is not in the list yet, add it under Accounting codes first."}
-        </p>
-        <FeeCodeForm {...common} action={saveIncomeSettingsAction} codes={codes} value={config.feeAccountingCodeId} />
+        <h2 className="text-lg font-semibold">{nl ? "Kosten" : "Fees"}</h2>
+        <div className="mt-1 mb-3 flex max-w-3xl items-start gap-1">
+          <p className="text-sm text-vtk-muted">
+            {nl
+              ? "De boekhoudcode voor de kosten: wat Mollie inhoudt (\"Withheld fees\"), de transactiekosten van SumUp en de commissie van Europabank. Samen vormen ze de regel met de kosten in het kwartaalblad. Staat de code nog niet in de lijst, voeg ze dan eerst toe bij Boekhoudcodes."
+              : "The accounting code for the fees: what Mollie withholds (\"Withheld fees\"), the SumUp transaction fees and the Europabank commission. Together they are the line with the fees in the quarter sheet. If the code is not in the list yet, add it under Accounting codes first."}
+          </p>
+          <InfoTip label={nl ? "Wat \"kosten met een aparte factuur\" doet" : "What \"fees on a separate invoice\" does"}>
+            <p>
+              {nl
+                ? "Vink een bron aan als jullie van haar kosten een aparte factuur krijgen die de boekhouder zelf inboekt. Die kosten blijven dan uit het overzicht en uit de twee Excel-bestanden, anders boekt de boekhouder ze twee keer."
+                : "Tick a source when its fees come on a separate invoice that the accountant books. Those fees then stay out of the overview and both Excel files, otherwise the accountant books them twice."}
+            </p>
+            <p>
+              {nl
+                ? "In de lijst per uitbetaling tellen ze wel mee: wat op de bank komt, is na de kosten. Bij Mollie is de kolom dan niet meer gelijk aan wat Mollie overschreef, maar aan dat bedrag plus de kosten op de factuur."
+                : "In the list per payout they still count: what reaches the bank is after the fees. For Mollie the column then no longer equals what Mollie transferred, but that amount plus the fees on the invoice."}
+            </p>
+          </InfoTip>
+        </div>
+        <FeeCodeForm
+          {...common}
+          action={saveIncomeSettingsAction}
+          codes={codes}
+          value={config.feeAccountingCodeId}
+          separateFeeSources={config.separateFeeSources}
+        />
       </section>
 
       <section className="rounded-2xl border border-vtk-blue/12 bg-white p-5">

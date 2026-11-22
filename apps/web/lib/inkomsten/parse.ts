@@ -15,7 +15,12 @@ import { createHash } from "node:crypto";
 import { brusselsWallClockMinutes } from "@/lib/brussels";
 import { detectDelimiter, parseCsv } from "@/lib/csv";
 
-export type IncomeSourceCode = "PAYCONIQ" | "MOLLIE" | "SUMUP" | "EUROPABANK";
+/**
+ * Een bron van inkomsten: de vier exports, en de overschrijvingen die Beheer
+ * met de hand invoert (`TRANSFER`, zie `transfers.ts`). De parser hier geeft
+ * enkel de vier exports terug.
+ */
+export type IncomeSourceCode = "PAYCONIQ" | "MOLLIE" | "SUMUP" | "EUROPABANK" | "TRANSFER";
 export type IncomeKindCode = "PAYMENT" | "REFUND" | "FEE" | "RESERVE";
 
 /** Het kanaal van Mollie: één profiel, dus één naam. */
@@ -31,8 +36,11 @@ export type ParsedIncomeRow = {
   externalKey: string;
   providerId: string | null;
   occurredAt: Date;
-  /** "2026-10": waar de regel in het overzicht telt. Null bij Mollie zonder uitbetaling. */
-  periodMonth: string | null;
+  /**
+   * "2026-10": waar de regel in het overzicht telt. De maand van de transactie
+   * op de Brusselse klok, voor elke bron, ook Mollie (Beheer, november 2026).
+   */
+  periodMonth: string;
   amountCents: number;
   refundedCents: number;
   description: string | null;
@@ -71,6 +79,9 @@ export type ParsedPayout = {
   amountCents: number | null;
 };
 
+/** Een betaling zoals het balansrapport van Mollie ze noemt; geen naam of rekening. */
+export type ParsedBalancePayment = { paymentId: string; month: string; amountCents: number };
+
 export type IncomeParseResult =
   | {
       ok: true;
@@ -88,8 +99,19 @@ export type IncomeParseResult =
       total: number;
       /** De uitbetalingen die het bestand noemt. */
       payouts: ParsedPayout[];
+      /**
+       * Wat het balansrapport van Mollie over elke betaling zegt (ID, maand,
+       * bedrag): de controle dat de betalingenexport volledig is. Enkel bij
+       * `mollie-balance`.
+       */
+      balancePayments?: ParsedBalancePayment[];
     }
-  | { ok: false; error: IncomeParseError; detail?: string };
+  | IncomeParseFailure;
+
+/** Het formaat waar een onbekend bestand het meest op lijkt, en welke verplichte kolommen het mist. */
+export type ClosestFormat = { format: IncomeFormat; missing: string[] };
+
+export type IncomeParseFailure = { ok: false; error: IncomeParseError; detail?: string; closest?: ClosestFormat };
 
 // -----------------------------------------------------------------------------
 // CSV
@@ -171,19 +193,6 @@ function monthKey(year: number, month: number): string {
   return `${year}-${String(month).padStart(2, "0")}`;
 }
 
-/**
- * De maand van een Mollie-uitbetaling uit haar referentie: in
- * "12345678.2510.03" staat 2510, oktober 2025. Zo rekent ook het rekenblad van
- * Beheer (`MID(referentie; 10; 4)`).
- */
-export function payoutMonth(reference: string | null | undefined): string | null {
-  const match = /^\d+\.(\d{2})(\d{2})\.\d+$/.exec((reference ?? "").trim());
-  if (!match) return null;
-  const month = Number(match[2]);
-  if (month < 1 || month > 12) return null;
-  return monthKey(2000 + Number(match[1]), month);
-}
-
 const EMAIL = /[^\s:;,<>()"']+@[^\s:;,<>()"']+\.[a-z]{2,}/gi;
 
 /**
@@ -212,98 +221,70 @@ function rowHash(parts: string[]): string {
 // Formaten
 // -----------------------------------------------------------------------------
 
-/**
- * Een kolom zoals de export ze noemt. Meer dan één naam: Engelse en
- * Nederlandse koppen, of de oude en de nieuwe opmaak. De site leest op naam:
- * hoofdletters en de volgorde van de kolommen maken niet uit.
- */
-export type ExportColumn = { names: readonly string[]; required: boolean };
+export { EXPORT_COLUMNS, may, need, type ExportColumn } from "./columns";
+import { EXPORT_COLUMNS, type ExportColumn } from "./columns";
 
-const need = (...names: string[]): ExportColumn => ({ names, required: true });
-const may = (...names: string[]): ExportColumn => ({ names, required: false });
+export type Columns = Map<string, number>;
 
 /**
- * De kolommen die de site leest, per formaat. Een bestand is van een formaat
- * wanneer het elke verplichte kolom heeft; de andere leest ze als ze er zijn.
- * Wat hier niet staat (namen en rekeningnummers van wie betaalde,
- * kaartnummers, autorisatiecodes), leest de site niet. De volgorde is die
- * waarin `parseIncomeExport` herkent: het balansrapport van Mollie vóór de
- * betalingenexport.
+ * Een kolomkop zoals de site hem vergelijkt: zonder hoofdletters, spaties,
+ * underscores of accenten. Zo is `shop_name` dezelfde kolom als `shopName`,
+ * en `Commissie (EUR)` dezelfde als `commissie (eur)`: een portaal dat zijn
+ * koppen anders schrijft, maakt een export niet onleesbaar.
  */
-export const EXPORT_COLUMNS = {
-  payconiq: {
-    id: need("id"),
-    date: need("date"),
-    time: need("time"),
-    amount: need("amount"),
-    status: need("status"),
-    shop: need("shop_name"),
-    type: may("type"),
-    description: may("description"),
-    reference: may("reference"),
-    bulkId: may("bulk_id"),
-  },
-  "mollie-balance": {
-    date: need("Date"),
-    type: need("Transaction type"),
-    reference: need("Transaction reference"),
-    amount: need("Settlement amount"),
-    description: may("Description"),
-  },
-  mollie: {
-    id: need("ID"),
-    date: need("Date", "Datum"),
-    status: need("Status"),
-    amount: need("Amount", "Bedrag"),
-    settlementReference: need("Settlement reference", "Uitbetalingsreferentie"),
-    settlementAmount: may("Settlement amount", "Uitbetalingsbedrag"),
-    method: may("Payment method", "Betaalmethode"),
-    description: may("Description", "Omschrijving"),
-    refunded: may("Amount refunded", "Teruggestort bedrag"),
-  },
-  sumup: {
-    date: need("Datum"),
-    id: need("Transactie-ID"),
-    type: need("Transactietype"),
-    status: need("Status"),
-    amount: need("Totaal bedrag"),
-    account: may("email", "E-mail", "E-mailadres", "Account"),
-    fee: may("Transactiekosten"),
-    payout: may("Uitbetalingsnummer"),
-    payoutDate: may("Uitbetaling datum"),
-    description: may("Beschrijving"),
-    reference: may("Kenmerk"),
-  },
-  europabank: {
-    date: need("Datum"),
-    time: need("Tijd"),
-    terminal: need("Terminal"),
-    result: need("Resultaat"),
-    amount: need("Origineel bedrag (EUR)", "Bedrag"),
-    type: may("Transactietype"),
-    commission: may("Commissie (EUR)"),
-    authorisation: may("Autorisatie nr", "Authorisatie nr"),
-    reference: may("Uw ref", "Ticket/Uw ref"),
-  },
-} as const satisfies Record<IncomeFormat, Record<string, ExportColumn>>;
+export function headerKey(name: string): string {
+  return name
+    .replace(/^\uFEFF/, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[\s_]+/g, "");
+}
 
-type Columns = Map<string, number>;
-
-function columnsOf(header: string[]): Columns {
-  return new Map(header.map((name, index) => [name.trim().toLowerCase(), index]));
+/** De kolommen van een bestand; staat een kop er twee keer, dan telt de eerste. */
+export function columnsOf(header: string[]): Columns {
+  const columns: Columns = new Map();
+  header.forEach((name, index) => {
+    const key = headerKey(name);
+    if (!columns.has(key)) columns.set(key, index);
+  });
+  return columns;
 }
 
 /** Waar elke kolom van een formaat staat; `undefined` als het bestand ze niet heeft. */
-function indexes<T extends Record<string, ExportColumn>>(columns: Columns, spec: T): { [K in keyof T]: number | undefined } {
+export function indexes<T extends Record<string, ExportColumn>>(columns: Columns, spec: T): { [K in keyof T]: number | undefined } {
   const found = {} as { [K in keyof T]: number | undefined };
   for (const key of Object.keys(spec) as Array<keyof T>) {
-    found[key] = spec[key].names.map((name) => columns.get(name.toLowerCase())).find((index) => index !== undefined);
+    found[key] = spec[key].names.map((name) => columns.get(headerKey(name))).find((index) => index !== undefined);
   }
   return found;
 }
 
-function recognises(columns: Columns, spec: Record<string, ExportColumn>): boolean {
-  return Object.values(spec).every((column) => !column.required || column.names.some((name) => columns.has(name.toLowerCase())));
+/** De verplichte kolommen van een formaat die het bestand niet heeft, bij hun eerste naam. */
+function missingColumns(columns: Columns, spec: Record<string, ExportColumn>): { missing: string[]; required: number } {
+  const required = Object.values(spec).filter((column) => column.required);
+  const missing = required.filter((column) => !column.names.some((name) => columns.has(headerKey(name))));
+  return { missing: missing.map((column) => column.names[0]), required: required.length };
+}
+
+export function recognises(columns: Columns, spec: Record<string, ExportColumn>): boolean {
+  return missingColumns(columns, spec).missing.length === 0;
+}
+
+/**
+ * Het formaat waar een onbekend bestand het meest op lijkt: dat met het
+ * grootste deel van zijn verplichte kolommen, als dat minstens de helft is.
+ * Zo zegt de fout "lijkt op Payconiq, maar mist shop_name" in plaats van
+ * enkel dat de site het bestand niet kent.
+ */
+function closestFormat(columns: Columns): ClosestFormat | undefined {
+  let best: (ClosestFormat & { share: number }) | undefined;
+  for (const format of Object.keys(EXPORT_COLUMNS) as IncomeFormat[]) {
+    const { missing, required } = missingColumns(columns, EXPORT_COLUMNS[format]);
+    const share = (required - missing.length) / required;
+    if (share >= 0.5 && (!best || share > best.share)) best = { format, missing, share };
+  }
+  return best ? { format: best.format, missing: best.missing } : undefined;
 }
 
 /** Lees een export: herken het formaat aan de kolomkoppen. */
@@ -317,7 +298,7 @@ export function parseIncomeExport(text: string): IncomeParseResult {
   if (recognises(columns, EXPORT_COLUMNS.mollie)) return parseMollie(rows, columns);
   if (recognises(columns, EXPORT_COLUMNS.sumup)) return parseSumUp(rows, columns);
   if (recognises(columns, EXPORT_COLUMNS.europabank)) return parseEuropabank(rows, columns);
-  return { ok: false, error: "UNKNOWN_FORMAT" };
+  return { ok: false, error: "UNKNOWN_FORMAT", closest: closestFormat(columns) };
 }
 
 function ymdOf(local: LocalDateTime): string {
@@ -356,7 +337,10 @@ function parsePayconiq(rows: string[][], columns: Columns): IncomeParseResult {
       description: cleanDescription(get(c.description)),
       reference: emptyToNull(get(c.reference)),
       bulkId: emptyToNull(get(c.bulkId)),
-      payoutReference: null,
+      // Bewaard zoals in de export, ook al toont de lijst per uitbetaling
+      // Payconiq nog niet: later invullen kan enkel door opnieuw te uploaden,
+      // en nooit meer in een afgesloten maand.
+      payoutReference: emptyToNull(get(c.payout)),
       channel: get(c.shop).trim() || "(zonder naam)",
     });
   }
@@ -439,7 +423,7 @@ function parseMollie(rows: string[][], columns: Columns): IncomeParseResult {
       externalKey,
       providerId: id || null,
       occurredAt: toInstant(local),
-      periodMonth: payoutMonth(payoutReference),
+      periodMonth: monthKey(local.year, local.month),
       amountCents: amount,
       refundedCents: Math.abs(parseDecimalCents(get(refundedCol)) ?? 0),
       description: cleanDescription(rawDescription),
@@ -474,22 +458,21 @@ function balanceKind(type: string): IncomeKindCode | null {
  * ("transfer", met de referentie van de uitbetaling en het bedrag dat op het
  * uittreksel staat), de kosten die Mollie per maand factureert ("invoice"),
  * de reserve en de terugbetalingen. De betalingen staan er ook in, maar zonder
- * uitbetaling: die komen uit de betalingenexport, dus hier slaat de site ze
- * over.
+ * uitbetaling: die komen uit de betalingenexport, dus hier tellen ze niet.
+ * Hun ID, maand en bedrag gaan wel mee (`balancePayments`): zo ziet de site of
+ * de betalingenexport volledig is, en daar hangt de berekende reserve van af.
  *
- * De maandfactuur en de reserve tellen in hun eigen maand, zonder
- * uitbetaling. Mollie zet ze op de laatste seconde van de maand, na de laatste
+ * Elke regel telt in haar eigen maand, zoals de betalingen. De maandfactuur en
+ * de reserve staan op de laatste seconde van de maand, na de laatste
  * overschrijving, maar het geld ging er al die maand af: Mollie houdt de
  * kosten en de reserve wekelijks in op elke overschrijving (in de export per
  * uitbetaling staan ze zo, met het nummer van de factuur van die maand), en
- * zet ze in het balansrapport nog eens als één regel per maand. Aan de
- * volgende overschrijving gehangen, schoof de factuur een maand op, en die van
- * de laatste maand van een kwartaal kreeg nooit een maand: een balansrapport
- * van het volgende kwartaal begint pas de dag erna.
+ * zet ze in het balansrapport nog eens als één regel per maand.
  *
- * Een terugbetaling gaat wel mee met de eerstvolgende overschrijving, zoals in
- * de export per uitbetaling: ze krijgt die uitbetaling en haar maand. Staat er
- * in het bestand nog geen overschrijving na, dan wacht ze.
+ * Een terugbetaling krijgt de eerstvolgende overschrijving als uitbetaling,
+ * zoals in de export per uitbetaling, zodat de lijst per uitbetaling ze bij
+ * die overschrijving zet. Staat er in het bestand nog geen overschrijving na,
+ * dan heeft ze (nog) geen uitbetaling.
  */
 function parseMollieBalance(rows: string[][], columns: Columns): IncomeParseResult {
   const c = indexes(columns, EXPORT_COLUMNS["mollie-balance"]);
@@ -525,12 +508,18 @@ function parseMollieBalance(rows: string[][], columns: Columns): IncomeParseResu
 
   const result: ParsedIncomeRow[] = [];
   const payouts: ParsedPayout[] = [];
+  const balancePayments: ParsedBalancePayment[] = [];
   const seenHashes = new Map<string, number>();
   let skipped = 0;
   let ignored = 0;
   for (const line of lines) {
     if (line.type === "payment") {
+      // Telt niet: de betaling komt uit de betalingenexport. Haar ID en bedrag
+      // gaan wel mee, om na te kijken dat die export volledig is.
       ignored++;
+      if (line.reference) {
+        balancePayments.push({ paymentId: line.reference, month: monthKey(line.local.year, line.local.month), amountCents: line.amount });
+      }
       continue;
     }
     if (line.type === "transfer") {
@@ -555,15 +544,16 @@ function parseMollieBalance(rows: string[][], columns: Columns): IncomeParseResu
       seenHashes.set(base, seen + 1);
       externalKey = `${kind}:${BALANCE_KEY}:${base}:${seen}`;
     }
-    const ownMonth = kind !== "REFUND";
-    const payoutReference = ownMonth ? null : (nextTransfer.get(line) ?? null);
+    // Een terugbetaling gaat mee met de eerstvolgende overschrijving (zo groepeert
+    // de lijst per uitbetaling ze), maar telt zoals elke regel in haar eigen maand.
+    const payoutReference = kind === "REFUND" ? (nextTransfer.get(line) ?? null) : null;
     result.push({
       source: "MOLLIE",
       kind,
       externalKey,
       providerId: kind === "REFUND" ? line.reference || null : null,
       occurredAt: line.at,
-      periodMonth: ownMonth ? monthKey(line.local.year, line.local.month) : payoutMonth(payoutReference),
+      periodMonth: monthKey(line.local.year, line.local.month),
       amountCents: line.amount,
       refundedCents: 0,
       description: cleanDescription(line.description),
@@ -573,7 +563,7 @@ function parseMollieBalance(rows: string[][], columns: Columns): IncomeParseResu
       channel: MOLLIE_CHANNEL,
     });
   }
-  return { ok: true, format: "mollie-balance", source: "MOLLIE", rows: result, skipped, ignored, total: rows.length - 1, payouts };
+  return { ok: true, format: "mollie-balance", source: "MOLLIE", rows: result, skipped, ignored, total: rows.length - 1, payouts, balancePayments };
 }
 
 
@@ -712,6 +702,7 @@ function parseEuropabank(rows: string[][], columns: Columns): IncomeParseResult 
   const referenceCol = c.reference;
 
   const result: ParsedIncomeRow[] = [];
+  const payouts = new Map<string, ParsedPayout>();
   const seenHashes = new Map<string, number>();
   let skipped = 0;
 
@@ -745,6 +736,13 @@ function parseEuropabank(rows: string[][], columns: Columns): IncomeParseResult 
     seenHashes.set(base, seen + 1);
     const key = `eb:${base}:${seen}`;
 
+    // De OV-ref is de overschrijving naar de bank: één per kaartmerk en dag,
+    // het bruto min de commissie, op de Boekingsdatum. Ze staat ook in de
+    // mededeling op het afschrift. Zonder voorloopnullen, zoals daar.
+    const ovRef = get(c.payout).trim().replace(/\.0+$/, "").replace(/^0+(?=\d)/, "") || null;
+    const booked = ovRef ? parseLocalDateTime(get(c.payoutDate).trim().split(/[ T]/)[0]) : null;
+    if (ovRef && booked && !payouts.has(ovRef)) payouts.set(ovRef, { reference: ovRef, paidOn: ymdOf(booked), amountCents: null });
+
     const payment: ParsedIncomeRow = {
       source: "EUROPABANK",
       kind,
@@ -757,13 +755,22 @@ function parseEuropabank(rows: string[][], columns: Columns): IncomeParseResult 
       description: null,
       reference: emptyToNull(get(referenceCol)),
       bulkId: null,
-      payoutReference: null,
+      payoutReference: ovRef,
       channel: terminal,
     };
     result.push(payment);
     if (commission) result.push(feeRow(payment, key, commission));
   }
-  return { ok: true, format: "europabank", source: "EUROPABANK", rows: result, skipped, ignored: 0, total: rows.length - 1, payouts: [] };
+  return {
+    ok: true,
+    format: "europabank",
+    source: "EUROPABANK",
+    rows: result,
+    skipped,
+    ignored: 0,
+    total: rows.length - 1,
+    payouts: [...payouts.values()],
+  };
 }
 
 // -----------------------------------------------------------------------------

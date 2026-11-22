@@ -6,9 +6,9 @@ import { requirePermission } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { getCashRegisterConfig } from "@/lib/kassas/server";
-import { monthToDate, parseIncomeExport, parseMonth } from "@/lib/inkomsten/parse";
+import { parseIncomeConfig } from "@/lib/inkomsten/config";
+import { monthToDate, parseIncomeExport, parseMonth, type ClosestFormat } from "@/lib/inkomsten/parse";
 import {
-  assignChannelDay,
   assignUnassignedGroup,
   importIncomeExport,
   listClosedPeriods,
@@ -21,6 +21,14 @@ import {
   type TransactionSelection,
 } from "@/lib/inkomsten/server";
 import { paramGetter, parseTransactionFilter } from "@/lib/inkomsten/transactionFilter";
+import { deleteChannelLending, saveChannelLending, takeOverChannelLending } from "@/lib/inkomsten/lendingServer";
+import { deleteTransfer, saveTransfer } from "@/lib/inkomsten/transferServer";
+import { parseBankStatement, recognisesBankStatement } from "@/lib/inkomsten/bank";
+import { deleteBankStatement, importBankStatement, type BankImportSummary } from "@/lib/inkomsten/bankServer";
+import { displayAccount } from "@/lib/inkomsten/labels";
+import { formatEuro } from "@/lib/rekeningen/expenses";
+import { decodeUpload } from "@/lib/csv";
+import type { LendingDays } from "@/lib/inkomsten/lending";
 import { CHANNEL_FROM_START } from "@/lib/inkomsten/overview";
 
 /** Foutcodes die /admin/inkomsten zelf vertaalt (`messages.ts`). */
@@ -39,7 +47,11 @@ export type IncomeErrorCode =
   | "BAD_PERIOD"
   | "PERIOD_OVERLAP"
   | "BAD_DATE"
-  | "DAY_EMPTY"
+  | "LENDING_ORDER"
+  | "LENDING_TOO_LONG"
+  | "LENDING_OVERLAP"
+  | "BAD_AMOUNT"
+  | "MIXED_ACCOUNTS"
   | "ACCOUNT_REQUIRED"
   | "DEVICE_NOT_FOUND"
   | "FILTER_CHANGED"
@@ -70,7 +82,8 @@ async function readFiles(formData: FormData): Promise<Array<{ text: string; name
   if (files.length > MAX_FILES) return { error: "TOO_MANY_FILES" };
   const total = files.reduce((sum, file) => sum + file.size, 0);
   if (files.some((file) => file.size > MAX_FILE_BYTES) || total > MAX_TOTAL_BYTES) return { error: "FILE_TOO_LARGE" };
-  return Promise.all(files.map(async (file) => ({ text: await file.text(), name: file.name })));
+  // Een bankafschrift kan in Windows-1252 komen; `file.text()` las dat als UTF-8.
+  return Promise.all(files.map(async (file) => ({ text: decodeUpload(await file.arrayBuffer()), name: file.name })));
 }
 
 // -----------------------------------------------------------------------------
@@ -79,8 +92,9 @@ async function readFiles(formData: FormData): Promise<Array<{ text: string; name
 
 /** Wat opladen met één bestand zou doen, of waarom de site het niet kan lezen. */
 export type ImportFilePreview =
-  | { fileName: string; ok: true; summary: ImportSummary }
-  | { fileName: string; ok: false; code: IncomeErrorCode; detail?: string };
+  | { fileName: string; ok: true; kind: "income"; summary: ImportSummary }
+  | { fileName: string; ok: true; kind: "bank"; bank: BankImportSummary }
+  | { fileName: string; ok: false; code: IncomeErrorCode; detail?: string; closest?: ClosestFormat };
 
 export type ImportPreviewState =
   | { status: "idle" }
@@ -99,11 +113,17 @@ export async function previewIncomeImportAction(formData: FormData): Promise<Imp
   const seen = new Set<string>();
   const results: ImportFilePreview[] = [];
   for (const file of files) {
+    // Een bankafschrift eerst: geen export heeft de kolommen van KBC.
+    if (recognisesBankStatement(file.text)) {
+      const bank = await importBankStatement(file.text, file.name, { dryRun: true, userId: null, seen });
+      results.push(bank.ok ? { fileName: file.name, ok: true, kind: "bank", bank: bank.summary } : { fileName: file.name, ok: false, code: bank.error, detail: bank.detail });
+      continue;
+    }
     const outcome = await importIncomeExport(file.text, file.name, { dryRun: true, userId: null, seen });
     results.push(
       outcome.ok
-        ? { fileName: file.name, ok: true, summary: outcome.summary }
-        : { fileName: file.name, ok: false, code: outcome.error, detail: outcome.detail },
+        ? { fileName: file.name, ok: true, kind: "income", summary: outcome.summary }
+        : { fileName: file.name, ok: false, code: outcome.error, detail: outcome.detail, closest: outcome.closest },
     );
   }
   return { status: "preview", files: results };
@@ -118,18 +138,35 @@ export async function importIncomeAction(_prev: SaveState, formData: FormData): 
   const session = await requirePermission("income.manage");
   const files = await readFiles(formData);
   if ("error" in files) return saveError(files.error);
-  for (const file of files) {
-    const parsed = parseIncomeExport(file.text);
-    if (!parsed.ok) return saveError(parsed.error);
+  const isBank = files.map((file) => recognisesBankStatement(file.text));
+  for (const [index, file] of files.entries()) {
+    const parsed = isBank[index] ? parseBankStatement(file.text, file.name) : parseIncomeExport(file.text);
+    if (!parsed.ok) return saveError(parsed.error, parsed.detail);
   }
 
   let created = 0;
   let duplicates = 0;
   let updated = 0;
   let open = 0;
-  for (const file of files) {
+  let statements = 0;
+  let bankLines = 0;
+  for (const [index, file] of files.entries()) {
+    if (isBank[index]) {
+      const bank = await importBankStatement(file.text, file.name, { dryRun: false, userId: session.user.id });
+      if (!bank.ok) return saveError(bank.error, bank.detail);
+      await logAudit({
+        action: "import",
+        entity: "incomeBankStatement",
+        entityId: bank.statementId ?? undefined,
+        target: `${displayAccount(bank.summary.account)} · ${bank.summary.coveredFrom} tot ${bank.summary.coveredTo}`,
+        summary: `${bank.summary.providerLines} regels van providers, ${bank.summary.lineCount - bank.summary.providerLines} andere niet bewaard`,
+      });
+      statements += 1;
+      bankLines += bank.summary.created;
+      continue;
+    }
     const outcome = await importIncomeExport(file.text, file.name, { dryRun: false, userId: session.user.id });
-    if (!outcome.ok) return saveError(outcome.error);
+    if (!outcome.ok) return saveError(outcome.error, outcome.detail);
     const { summary } = outcome;
     await logAudit({
       action: "import",
@@ -144,11 +181,31 @@ export async function importIncomeAction(_prev: SaveState, formData: FormData): 
     open += summary.rules.OPEN;
   }
   revalidate();
-  const parts = [`${transactions(created)} nieuw`];
+  const parts: string[] = [];
+  if (statements < files.length) parts.push(`${transactions(created)} nieuw`);
   if (duplicates) parts.push(`${duplicates} al gekend`);
   if (updated) parts.push(`${updated} nu uitbetaald`);
   if (open) parts.push(`${open} na te kijken`);
+  if (statements) parts.push(`${statements === 1 ? "1 bankafschrift" : `${statements} bankafschriften`} met ${bankLines} nieuwe ${bankLines === 1 ? "regel" : "regels"} van providers`);
   return saveOk(`Opgeladen${files.length > 1 ? ` (${files.length} bestanden)` : ""}: ${parts.join(", ")}.`);
+}
+
+/**
+ * Een bankafschrift wegdoen, met zijn regels van providers. Mag ook in een
+ * afgesloten periode: het verandert geen transactie, code of maand.
+ */
+export async function deleteBankStatementAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("income.manage");
+  const outcome = await deleteBankStatement(String(formData.get("id") ?? ""));
+  if (!outcome.ok) return saveError("NOT_FOUND");
+  await logAudit({
+    action: "delete",
+    entity: "incomeBankStatement",
+    target: `${displayAccount(outcome.account)} · ${outcome.coveredFrom} tot ${outcome.coveredTo}`,
+    summary: `${outcome.lines} regels van providers weg`,
+  });
+  revalidate();
+  return saveOk();
 }
 
 /** Een import wegdoen, met alles wat ze aanmaakte. Niet in een afgesloten periode. */
@@ -213,33 +270,151 @@ export async function assignIncomeGroupAction(_prev: SaveState, formData: FormDa
   );
 }
 
+// -----------------------------------------------------------------------------
+// Uitleningen van een toestel
+// -----------------------------------------------------------------------------
+
+/** "16 tot en met 23 september 2026", of "op 16 september 2026" voor één dag. */
+function lendingDaysText(days: LendingDays): string {
+  const day = (ymd: string, withYear: boolean) =>
+    new Date(`${ymd}T12:00:00Z`).toLocaleDateString("nl-BE", {
+      day: "numeric",
+      month: "long",
+      ...(withYear ? { year: "numeric" as const } : {}),
+      timeZone: "UTC",
+    });
+  if (days.from === days.to) return `op ${day(days.from, true)}`;
+  return `${day(days.from, days.from.slice(0, 4) !== days.to.slice(0, 4))} tot en met ${day(days.to, true)}`;
+}
+
 /**
- * Een hele dag van een kanaal met de hand een code geven, of wat er die dag met
- * de hand gezet werd terug aan de koppelregels laten (`intent=reset`).
+ * Een uitlening bewaren (`id` leeg: een nieuwe). Daarna koppelt de site
+ * opnieuw; wat met de hand gezet werd, blijft.
  */
-export async function assignIncomeDayAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+export async function saveIncomeLendingAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   const session = await requirePermission("income.manage");
-  const channelId = String(formData.get("channelId") ?? "");
-  const day = String(formData.get("day") ?? "");
-  const reset = formData.get("intent") === "reset";
   const accountingCodeId = String(formData.get("accountingCodeId") ?? "");
-  if (!reset && !accountingCodeId) return saveError("CODE_REQUIRED");
+  if (!accountingCodeId) return saveError("CODE_REQUIRED");
+  const outcome = await saveChannelLending(
+    {
+      id: String(formData.get("id") ?? "") || null,
+      channelId: String(formData.get("channelId") ?? ""),
+      fromDay: String(formData.get("fromDay") ?? ""),
+      toDay: String(formData.get("toDay") ?? ""),
+      accountingCodeId,
+    },
+    session.user.id,
+  );
+  if (!outcome.ok) return saveError(outcome.error);
 
-  const outcome = await assignChannelDay(channelId, day, reset ? { reset: true } : { accountingCodeId }, session.user.id);
-  if (!outcome.ok) return saveError(outcome.error === "NOT_FOUND" ? "DAY_EMPTY" : outcome.error);
-
+  const days = lendingDaysText(outcome.days);
+  const code = `${outcome.code.code} ${outcome.code.name}`;
   await logAudit({
-    action: "update",
-    entity: "incomeTransaction",
-    target: `${outcome.channel} · ${day}`,
-    summary: reset ? `${transactions(outcome.count)} terug naar de koppelregels` : `${transactions(outcome.count)} met de hand toegewezen`,
+    action: outcome.created ? "create" : "update",
+    entity: "incomeChannelLending",
+    target: `${outcome.channel} · ${outcome.days.from} tot ${outcome.days.to}`,
+    summary: `${code}; ${transactions(outcome.count)}${outcome.manualKept ? `, ${outcome.manualKept} met de hand blijven` : ""}`,
+  });
+  revalidate();
+  const kept = outcome.manualKept
+    ? ` ${outcome.manualKept} die met de hand een code ${outcome.manualKept === 1 ? "kreeg, blijft zoals ze is" : "kregen, blijven zoals ze zijn"}; met dezelfde code neem je ze over in de uitlening (klik erop in de lijst).`
+    : "";
+  const done = outcome.created ? "Uitlening bewaard" : "Uitlening aangepast";
+  return saveOk(
+    outcome.count === 0
+      ? `${done}: van ${outcome.channel} ${days} is nog niets opgeladen dat de regels aan de uitlening geven; wat later binnenkomt, krijgt ${code}.${kept}`
+      : `${done}: ${transactions(outcome.count)} van ${outcome.channel} ${days} ${outcome.count === 1 ? "krijgt" : "krijgen"} ${code}.${kept}`,
+  );
+}
+
+/** Een uitlening verwijderen; haar transacties gaan terug naar de koppelregels. */
+export async function deleteIncomeLendingAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("income.manage");
+  const outcome = await deleteChannelLending(String(formData.get("id") ?? ""));
+  if (!outcome.ok) return saveError(outcome.error);
+  await logAudit({
+    action: "delete",
+    entity: "incomeChannelLending",
+    target: `${outcome.channel} · ${outcome.days.from} tot ${outcome.days.to}`,
+    summary: `${transactions(outcome.count)} terug naar de koppelregels`,
   });
   revalidate();
   return saveOk(
-    reset
-      ? `${transactions(outcome.count)} van ${outcome.channel} terug naar de koppelregels.`
-      : `${transactions(outcome.count)} van ${outcome.channel} toegewezen.`,
+    `Uitlening verwijderd; ${transactions(outcome.count)} ${outcome.count === 1 ? "gaat" : "gaan"} terug naar de koppelregels.`,
   );
+}
+
+/**
+ * Wat op de dagen van een uitlening met de hand dezelfde code kreeg, in de
+ * uitlening zetten. De code verandert niet, dus geen enkel totaal.
+ */
+export async function takeOverIncomeLendingAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("income.manage");
+  const outcome = await takeOverChannelLending(String(formData.get("id") ?? ""));
+  if (!outcome.ok) return saveError(outcome.error);
+  await logAudit({
+    action: "update",
+    entity: "incomeChannelLending",
+    target: `${outcome.channel} · ${outcome.days.from} tot ${outcome.days.to}`,
+    summary: `${transactions(outcome.count)} overgenomen van met de hand${outcome.kept ? `, ${outcome.kept} blijven met de hand` : ""}`,
+  });
+  revalidate();
+  const kept = outcome.kept ? ` ${outcome.kept} ${outcome.kept === 1 ? "blijft" : "blijven"} met de hand.` : "";
+  return saveOk(`${transactions(outcome.count)} overgenomen in de uitlening van ${outcome.channel}; de code bleef dezelfde.${kept}`);
+}
+
+// -----------------------------------------------------------------------------
+// Overschrijvingen met de hand
+// -----------------------------------------------------------------------------
+
+/** "16 september 2026" */
+function longDay(ymd: string): string {
+  return new Date(`${ymd}T12:00:00Z`).toLocaleDateString("nl-BE", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+}
+
+/** Een overschrijving bewaren (`id` leeg: een nieuwe). */
+export async function saveIncomeTransferAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const session = await requirePermission("income.manage");
+  const accountingCodeId = String(formData.get("accountingCodeId") ?? "");
+  if (!accountingCodeId) return saveError("CODE_REQUIRED");
+  const outcome = await saveTransfer(
+    {
+      id: String(formData.get("id") ?? "") || null,
+      day: String(formData.get("day") ?? ""),
+      amount: String(formData.get("amount") ?? ""),
+      bankAccount: String(formData.get("bankAccount") ?? ""),
+      description: String(formData.get("description") ?? ""),
+      accountingCodeId,
+    },
+    session.user.id,
+  );
+  if (!outcome.ok) return saveError(outcome.error);
+  const amount = formatEuro(outcome.amountCents);
+  await logAudit({
+    action: outcome.created ? "create" : "update",
+    entity: "incomeTransfer",
+    target: `${outcome.bankAccount} · ${outcome.day}`,
+    summary: `${amount} op ${outcome.code.code} ${outcome.code.name}`,
+  });
+  revalidate();
+  return saveOk(
+    `${outcome.created ? "Overschrijving toegevoegd" : "Overschrijving aangepast"}: ${amount} op ${outcome.bankAccount}, ${longDay(outcome.day)}, onder ${outcome.code.code} ${outcome.code.name}.`,
+  );
+}
+
+/** Een overschrijving verwijderen; ze verdwijnt uit het overzicht van haar maand. */
+export async function deleteIncomeTransferAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("income.manage");
+  const outcome = await deleteTransfer(String(formData.get("id") ?? ""));
+  if (!outcome.ok) return saveError(outcome.error);
+  await logAudit({
+    action: "delete",
+    entity: "incomeTransfer",
+    target: `${outcome.bankAccount} · ${outcome.day}`,
+    summary: formatEuro(outcome.amountCents),
+  });
+  revalidate();
+  return saveOk(`Overschrijving van ${formatEuro(outcome.amountCents)} op ${longDay(outcome.day)} verwijderd.`);
 }
 
 /** Meer dan een pagina aanvinken kan niet; "alles wat aan de filter voldoet" gaat via `scope=filter`. */
@@ -391,8 +566,23 @@ export async function saveIncomeSettingsAction(_prev: SaveState, formData: FormD
     const code = await prisma.accountingCode.findUnique({ where: { id: raw }, select: { id: true } });
     if (!code) return saveError("CODE_NOT_FOUND");
   }
-  await saveIncomeConfig({ feeAccountingCodeId: raw || null });
-  await logAudit({ action: "update", entity: "incomeSettings", target: "Kostencode", summary: raw ? "kostencode gekozen" : "kostencode leeggemaakt" });
+  // Door de parser, zodat enkel bekende bronnen met kosten overblijven.
+  const config = parseIncomeConfig({
+    feeAccountingCodeId: raw || null,
+    separateFeeSources: formData.getAll("separateFeeSources").map(String),
+  });
+  await saveIncomeConfig(config);
+  await logAudit({
+    action: "update",
+    entity: "incomeSettings",
+    target: "Kosten",
+    summary: [
+      raw ? "kostencode gekozen" : "geen kostencode",
+      config.separateFeeSources.length
+        ? `aparte factuur: ${config.separateFeeSources.join(", ")}`
+        : "geen kosten met een aparte factuur",
+    ].join("; "),
+  });
   revalidate();
   return saveOk();
 }
@@ -424,8 +614,9 @@ export async function saveIncomeChannelAction(_prev: SaveState, formData: FormDa
 
   if (!bankAccount) return saveError("ACCOUNT_REQUIRED");
 
+  // Het kanaal van een overschrijving heeft een vaste rekening: dat past enkel Overschrijvingen aan.
   const channel = await prisma.incomeChannel.findUnique({
-    where: { id },
+    where: { id, source: { not: "TRANSFER" } },
     include: {
       accounts: { orderBy: { from: "asc" } },
       codes: { orderBy: { from: "asc" } },
@@ -537,7 +728,10 @@ export async function addIncomeChannelCodeAction(_prev: SaveState, formData: For
   const fromRaw = channelFrom(String(formData.get("from") ?? "").trim());
   const codeId = String(formData.get("accountingCodeId") ?? "") || null;
   if (!fromRaw) return saveError("BAD_DATE");
-  const channel = await prisma.incomeChannel.findUnique({ where: { id: channelId }, select: { identifier: true } });
+  const channel = await prisma.incomeChannel.findUnique({
+    where: { id: channelId, source: { not: "TRANSFER" } },
+    select: { identifier: true },
+  });
   if (!channel) return saveError("NOT_FOUND");
   let code: { code: string; name: string } | null = null;
   if (codeId) {
@@ -592,7 +786,7 @@ export async function saveIncomeChannelDeviceAction(_prev: SaveState, formData: 
   const id = String(formData.get("id") ?? "");
   const raw = String(formData.get("device") ?? "");
   const channel = await prisma.incomeChannel.findUnique({
-    where: { id },
+    where: { id, source: { not: "TRANSFER" } },
     select: { identifier: true, source: true, cashMethod: true, cashTerminal: true },
   });
   if (!channel) return saveError("NOT_FOUND");
@@ -639,7 +833,10 @@ export async function addIncomeChannelAccountAction(_prev: SaveState, formData: 
   const bankAccount = String(formData.get("bankAccount") ?? "").trim().replace(/\s+/g, " ").slice(0, 60);
   if (!bankAccount) return saveError("ACCOUNT_REQUIRED");
   if (!fromRaw) return saveError("BAD_DATE");
-  const channel = await prisma.incomeChannel.findUnique({ where: { id: channelId }, select: { identifier: true } });
+  const channel = await prisma.incomeChannel.findUnique({
+    where: { id: channelId, source: { not: "TRANSFER" } },
+    select: { identifier: true },
+  });
   if (!channel) return saveError("NOT_FOUND");
 
   const from = new Date(`${fromRaw}T00:00:00Z`);

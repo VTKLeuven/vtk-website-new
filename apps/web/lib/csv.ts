@@ -4,9 +4,13 @@
  * inkomsten (`lib/inkomsten`) en van boekhoudcodes (`lib/accounting`).
  */
 
-/** Het scheidingsteken: Payconiq gebruikt `;`, Mollie en Google Sheets `,`. */
+/**
+ * Het scheidingsteken: Payconiq en KBC gebruiken `;`, Mollie en Google Sheets
+ * `,`. De eerste regel eindigt op `\r\n`, `\n` of, bij een bankafschrift van
+ * KBC, op een losse `\r`: wie enkel op `\n` splitst, telt over het hele bestand.
+ */
 export function detectDelimiter(text: string): "," | ";" {
-  const firstLine = text.replace(/^\uFEFF/, "").split(/\r?\n/, 1)[0] ?? "";
+  const firstLine = text.replace(/^\uFEFF/, "").split(/\r\n|\r|\n/, 1)[0] ?? "";
   const count = (char: string) => firstLine.split(char).length - 1;
   return count(";") > count(",") ? ";" : ",";
 }
@@ -53,3 +57,16 @@ export function parseCsv(text: string, delimiter: "," | ";"): string[][] {
   return rows.filter((r) => r.some((value) => value.trim() !== ""));
 }
 
+
+/**
+ * Een opgeladen bestand als tekst: UTF-8, en anders Windows-1252 (een export
+ * uit een Belgische bank of een oud rekenblad). Een ongeldige UTF-8-reeks valt
+ * zo niet stil weg als vervangteken.
+ */
+export function decodeUpload(bytes: ArrayBuffer): string {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return new TextDecoder("windows-1252").decode(bytes);
+  }
+}

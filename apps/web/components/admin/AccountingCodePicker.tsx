@@ -36,6 +36,24 @@ function scrollWithin(list: HTMLElement | null, item: HTMLElement | null, mode: 
   }
 }
 
+/** Hoe hoog de open lijst ongeveer is: tot 360 px codes, plus het zoekveld. */
+const POPOVER_HEIGHT = 400;
+
+/**
+ * Het stuk van het scherm waarin de open lijst te zien is: het venster, of de
+ * dichtste voorouder die afsnijdt (de scrollende inhoud van een modal).
+ * `getBoundingClientRect` en `innerHeight` zijn allebei zichtbare pixels, dus
+ * de zoom van 90% op een laptop doet hier niets.
+ */
+function visibleBounds(element: HTMLElement): { top: number; bottom: number; clipped: boolean } {
+  for (let node = element.parentElement; node && node !== document.body; node = node.parentElement) {
+    if (getComputedStyle(node).overflowY === "visible") continue;
+    const rect = node.getBoundingClientRect();
+    return { top: Math.max(0, rect.top), bottom: Math.min(window.innerHeight, rect.bottom), clipped: true };
+  }
+  return { top: 0, bottom: window.innerHeight, clipped: false };
+}
+
 /** Eén kiesbare rij in de lijst zoals ze nu getoond wordt; "" = geen code. */
 type Row = { key: string; value: string };
 
@@ -91,6 +109,10 @@ export function AccountingCodePicker({
     defaultValue && codes.some((code) => code.id === defaultValue) ? defaultValue : "",
   );
   const [open, setOpen] = useState(false);
+  // Boven de knop openen wanneer eronder geen plaats is, zoals SearchPicker:
+  // in de bulkbalk onderaan Transacties viel de lijst anders onder de rand van
+  // het scherm.
+  const [placement, setPlacement] = useState<"bottom" | "top">("bottom");
   const [query, setQuery] = useState("");
   const [highlighted, setHighlighted] = useState(0);
   const [invalid, setInvalid] = useState(false);
@@ -144,6 +166,18 @@ export function AccountingCodePicker({
     setQuery("");
     const current = rows.findIndex((row) => row.value === value);
     setHighlighted(current >= 0 ? current : 0);
+    const root = rootRef.current;
+    if (root) {
+      const rect = root.getBoundingClientRect();
+      const bounds = visibleBounds(root);
+      const below = bounds.bottom - rect.bottom;
+      const above = rect.top - bounds.top;
+      // In een scrollende container (het detail van een transactie) is wat
+      // eronder valt nog te bereiken, wat erboven valt niet: daar enkel naar
+      // boven wanneer de hele lijst er past.
+      const up = below < POPOVER_HEIGHT && above > below && (!bounds.clipped || above >= POPOVER_HEIGHT);
+      setPlacement(up ? "top" : "bottom");
+    }
     setOpen(true);
     requestAnimationFrame(() => {
       searchRef.current?.focus();
@@ -171,7 +205,10 @@ export function AccountingCodePicker({
 
   function onSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Escape") {
+      // Enkel de lijst sluiten: een modal eromheen (het detail van een
+      // transactie) luistert op `window` en zou anders mee dichtgaan.
       event.preventDefault();
+      event.stopPropagation();
       close(true);
       return;
     }
@@ -272,7 +309,7 @@ export function AccountingCodePicker({
       ) : null}
 
       {open ? (
-        <div className="vtk-code-picker-popover">
+        <div className="vtk-code-picker-popover" data-placement={placement}>
           <div className="vtk-code-picker-search">
             <Search aria-hidden="true" size={16} />
             <input

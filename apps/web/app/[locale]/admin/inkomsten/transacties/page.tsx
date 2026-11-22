@@ -5,17 +5,23 @@ import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import { formatEuro } from "@/lib/rekeningen/expenses";
 import { listAccountingCodes } from "@/lib/accounting/server";
+import { brusselsYMD } from "@/lib/brussels";
+import { InfoTip } from "@/components/ui/InfoTip";
 import { dateToMonth } from "@/lib/inkomsten/parse";
 import { INCOME_SOURCES, REVIEW_DAY_START_HOUR } from "@/lib/inkomsten/overview";
 import { listIncomeChannels, listIncomeTransactions, TRANSACTION_PAGE } from "@/lib/inkomsten/server";
+import { describeChannelLending } from "@/lib/inkomsten/lendingServer";
 import { KIND_PARAMS, paramGetter, parseTransactionFilter, STATE_PARAMS } from "@/lib/inkomsten/transactionFilter";
 import { changeIncomeTransactionsAction } from "@/app/actions/inkomsten";
 import { incomeErrorMessages } from "../messages";
-import { KIND_LABELS, monthLabel, RULE_LABELS, SOURCE_LABELS } from "../shared";
+import { KIND_LABELS, monthLabel, quarterOptions, RULE_LABELS, SOURCE_LABELS } from "../shared";
 import { TransactionTable, type TransactionRow } from "./TransactionTable";
 
 /** De parameters die de filter vormen; `pagina` hoort er niet bij. */
-const FILTER_KEYS = ["bron", "kanaal", "status", "soort", "van", "tot", "dag", "code", "q"] as const;
+const FILTER_KEYS = ["bron", "kanaal", "status", "soort", "van", "tot", "van-dag", "tot-dag", "dag", "uitlening", "code", "q"] as const;
+
+/** Wat een snelkeuze vervangt: de maanden en elke filter op dagen. */
+const PERIOD_KEYS = ["van", "tot", "van-dag", "tot-dag", "dag"] as const;
 
 /** De volledige lijst, te filteren en per pagina; een cel van het overzicht linkt hiernaartoe. */
 export default async function IncomeTransactionsPage({
@@ -46,11 +52,46 @@ export default async function IncomeTransactionsPage({
     return `${base}/admin/inkomsten/transacties${search ? `?${search}` : ""}`;
   };
 
-  const [{ rows, total, totalCents, assignable }, codes, channels] = await Promise.all([
+  const [{ rows, total, totalCents, assignable }, codes, channels, lending] = await Promise.all([
     listIncomeTransactions(filter, page),
     listAccountingCodes(),
-    listIncomeChannels(),
+    listIncomeChannels({ transfers: true }),
+    filter.lendingId ? describeChannelLending(filter.lendingId) : null,
   ]);
+
+  // Een filter zonder een van zijn parameters: om de dag of de uitlening te wissen.
+  const withoutHref = (...keys: string[]) => {
+    const next = new URLSearchParams(filterParams);
+    for (const key of keys) next.delete(key);
+    const search = next.toString();
+    return `${base}/admin/inkomsten/transacties${search ? `?${search}` : ""}`;
+  };
+  // Snelkeuzes op de maand waarin iets telt: die van het overzicht, zodat een
+  // kwartaal hier hetzelfde totaal geeft als daar.
+  const today = brusselsYMD(new Date());
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const thisMonth = `${today.year}-${pad(today.month)}`;
+  const lastMonth = today.month === 1 ? `${today.year - 1}-12` : `${today.year}-${pad(today.month - 1)}`;
+  const shortcuts = [
+    { from: thisMonth, to: thisMonth, label: nl ? "Deze maand" : "This month" },
+    { from: lastMonth, to: lastMonth, label: nl ? "Vorige maand" : "Last month" },
+    ...quarterOptions(today),
+  ].map((option) => {
+    const next = new URLSearchParams(filterParams);
+    for (const key of PERIOD_KEYS) next.delete(key);
+    next.set("van", option.from);
+    next.set("tot", option.to);
+    const current = filter.from === option.from && filter.to === option.to && !filter.day && !filter.dayFrom && !filter.dayTo;
+    return { ...option, href: `${base}/admin/inkomsten/transacties?${next.toString()}`, current };
+  });
+  const dayName = (ymd: string) =>
+    new Date(`${ymd}T12:00:00Z`).toLocaleDateString(nl ? "nl-BE" : "en-GB", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
   const pages = Math.max(1, Math.ceil(total / TRANSACTION_PAGE));
   const errorMessages = incomeErrorMessages(locale);
   const dateTime = (value: Date) =>
@@ -91,6 +132,10 @@ export default async function IncomeTransactionsPage({
       : null,
     linked: Boolean(row.ticketPayment || row.cashRegister || row.membershipPaymentId || row.uitleenPaymentId),
     locked: row.locked,
+    transferHref:
+      row.source === "TRANSFER" && row.periodMonth
+        ? `${base}/admin/inkomsten/overschrijvingen?van=${dateToMonth(row.periodMonth)}&tot=${dateToMonth(row.periodMonth)}`
+        : null,
   }));
 
   const field = "rounded-lg border border-vtk-blue/15 px-2 py-1.5";
@@ -102,8 +147,8 @@ export default async function IncomeTransactionsPage({
         <h2 className="text-lg font-semibold">{nl ? "Transacties" : "Transactions"}</h2>
         <p className="mt-1 max-w-3xl text-sm text-vtk-muted">
           {nl
-            ? "Elke regel uit de geüploade exports, met de code en de regel die ze gaf. Klik op een rij om de code te veranderen, of vink er meer aan om ze samen een code te geven. De periode is die van het overzicht: bij Mollie de maand van de uitbetaling."
-            : "Every row from the uploaded exports, with the code and the rule that gave it. Click a row to change its code, or tick several to give them a code together. The period is the one of the overview: for Mollie the month of the payout."}
+            ? "Elke regel uit de geüploade exports, met de code en de regel die ze gaf. Klik op een rij om de code te veranderen, of vink er meer aan om ze samen een code te geven. De periode is die van het overzicht: de maand van de betaling."
+            : "Every row from the uploaded exports, with the code and the rule that gave it. Click a row to change its code, or tick several to give them a code together. The period is the one of the overview: the month of the payment."}
         </p>
       </header>
 
@@ -167,17 +212,43 @@ export default async function IncomeTransactionsPage({
           </select>
         </label>
         <label>
-          <span className="block text-xs text-vtk-muted">{nl ? "Van" : "From"}</span>
+          <span className="block text-xs text-vtk-muted">{nl ? "Telt in maand van" : "Counts in month from"}</span>
           <input type="month" name="van" defaultValue={filter.from ?? ""} className="rounded-lg border border-vtk-blue/15 px-2 py-1" />
         </label>
         <label>
-          <span className="block text-xs text-vtk-muted">{nl ? "Tot en met" : "Up to"}</span>
+          <span className="block text-xs text-vtk-muted">{nl ? "tot en met" : "up to"}</span>
           <input type="month" name="tot" defaultValue={filter.to ?? ""} className="rounded-lg border border-vtk-blue/15 px-2 py-1" />
         </label>
-        <label title={nl ? `Van ${REVIEW_DAY_START_HOUR}:00 tot ${REVIEW_DAY_START_HOUR}:00 de ochtend erna, zoals Na te kijken` : `From ${REVIEW_DAY_START_HOUR}:00 to ${REVIEW_DAY_START_HOUR}:00 the next morning, as in To review`}>
-          <span className="block text-xs text-vtk-muted">{nl ? "Dag" : "Day"}</span>
-          <input type="date" name="dag" defaultValue={filter.day ?? ""} className="rounded-lg border border-vtk-blue/15 px-2 py-1" />
+        <label>
+          <span className="block text-xs text-vtk-muted">{nl ? "Betaald van" : "Paid from"}</span>
+          <input type="date" name="van-dag" defaultValue={filter.dayFrom ?? ""} className="rounded-lg border border-vtk-blue/15 px-2 py-1" />
         </label>
+        <label>
+          <span className="block text-xs text-vtk-muted">{nl ? "tot en met" : "up to"}</span>
+          <input type="date" name="tot-dag" defaultValue={filter.dayTo ?? ""} className="rounded-lg border border-vtk-blue/15 px-2 py-1" />
+        </label>
+        <span className="self-center">
+          <InfoTip label={nl ? "Telt in maand of betaald op een dag" : "Counts in month, or paid on a day"}>
+            <p>
+              {nl
+                ? "Telt in maand is de maand waarin een transactie in het overzicht telt: die van de betaling, op de Brusselse klok. Daarmee geeft een kwartaal hier hetzelfde totaal als het overzicht."
+                : "Counts in month is the month in which a transaction counts in the overview: that of the payment, on the Brussels clock. A quarter here therefore gives the same total as the overview."}
+            </p>
+            <p>
+              {nl
+                ? `Betaald van en tot en met gaat over dagen zoals in Na te kijken: van ${REVIEW_DAY_START_HOUR}:00 tot ${REVIEW_DAY_START_HOUR}:00 de ochtend erna, zodat een avond tot 3 uur bij de dag blijft waarop ze begon.`
+                : `Paid from and up to works in days as in To review: from ${REVIEW_DAY_START_HOUR}:00 to ${REVIEW_DAY_START_HOUR}:00 the next morning, so an evening until 3 am stays with the day it started.`}
+            </p>
+            <p>
+              {nl
+                ? "Daarom valt de grens van een maand anders: een betaling om 0:30 op 1 oktober staat bij betaald tot en met 30 september, maar telt in oktober."
+                : "That is why the edge of a month differs: a payment at 0:30 on 1 October shows under paid up to 30 September, but counts in October."}
+            </p>
+          </InfoTip>
+        </span>
+        {/* De dag uit Na te kijken: geen eigen veld meer, maar ze blijft bij Filteren. */}
+        {filter.day ? <input type="hidden" name="dag" value={filter.day} /> : null}
+        {filter.lendingId ? <input type="hidden" name="uitlening" value={filter.lendingId} /> : null}
         <label>
           <span className="block text-xs text-vtk-muted">{nl ? "Code" : "Code"}</span>
           <input name="code" defaultValue={filter.code ?? ""} placeholder={nl ? "nummer of naam" : "number or name"} className="w-40 rounded-lg border border-vtk-blue/15 px-2 py-1" />
@@ -195,6 +266,49 @@ export default async function IncomeTransactionsPage({
           </Link>
         ) : null}
       </form>
+
+      <nav aria-label={nl ? "Snelkeuze van een periode" : "Period shortcuts"} className="-mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+        <span className="text-xs text-vtk-muted">{nl ? "Telt in:" : "Counts in:"}</span>
+        {shortcuts.map((option) => (
+          <Link
+            key={option.label}
+            href={option.href}
+            aria-current={option.current ? "true" : undefined}
+            className={option.current ? "font-semibold text-vtk-ink" : "text-vtk-navy underline underline-offset-2"}
+          >
+            {option.label}
+          </Link>
+        ))}
+      </nav>
+
+      {filter.day || filter.lendingId ? (
+        <div className="space-y-1 text-sm">
+          {filter.day ? (
+            <p>
+              {nl
+                ? `Enkel de dag zoals in Na te kijken: ${dayName(filter.day)}, van ${REVIEW_DAY_START_HOUR}:00 tot ${REVIEW_DAY_START_HOUR}:00 de ochtend erna.`
+                : `Only the day as in To review: ${dayName(filter.day)}, from ${REVIEW_DAY_START_HOUR}:00 to ${REVIEW_DAY_START_HOUR}:00 the next morning.`}{" "}
+              <Link href={withoutHref("dag")} className="text-vtk-navy underline underline-offset-2">
+                {nl ? "Deze dag wissen" : "Clear this day"}
+              </Link>
+            </p>
+          ) : null}
+          {filter.lendingId ? (
+            <p>
+              {lending
+                ? nl
+                  ? `Enkel wat de uitlening van ${SOURCE_LABELS[lending.source]} · ${lending.channel} koppelt, ${dayName(lending.days.from)} tot en met ${dayName(lending.days.to)}.`
+                  : `Only what the lending of ${SOURCE_LABELS[lending.source]} · ${lending.channel} matches, ${dayName(lending.days.from)} to ${dayName(lending.days.to)}.`
+                : nl
+                  ? "Enkel wat een uitlening koppelde die niet meer bestaat."
+                  : "Only what a lending matched that no longer exists."}{" "}
+              <Link href={withoutHref("uitlening")} className="text-vtk-navy underline underline-offset-2">
+                {nl ? "Uitlening wissen" : "Clear lending"}
+              </Link>
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <section className="rounded-2xl border border-vtk-blue/12 bg-white p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">

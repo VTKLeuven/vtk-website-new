@@ -5,6 +5,7 @@ import { useTransition } from "react";
 import { IconButton } from "@/components/ui/IconButton";
 import { CheckIcon, UndoIcon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
+import { UNSENT, unsentGuard } from "@/components/ui/unsentGuard";
 import type { SaveState } from "@/lib/saveState";
 
 /**
@@ -35,7 +36,9 @@ export function PayoutCheckButton({
     form.append("reference", reference);
     form.append("checked", checked ? "0" : "1");
     startTransition(async () => {
-      const result = await action(form);
+      const result = await unsentGuard.run(() => action(form));
+      // Niet bij de server geraakt: de melding staat er al, het vinkje blijft zoals het was.
+      if (result === UNSENT) return;
       if (result.status === "error") {
         showToast({
           message: errorMessages[result.code] ?? result.detail ?? (nl ? "Dat lukte niet." : "That did not work."),

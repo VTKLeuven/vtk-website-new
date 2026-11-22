@@ -15,7 +15,7 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
     TOO_MANY_FILES: "Dat zijn meer dan 250 bestanden. Upload ze in delen, bijvoorbeeld per maand.",
     EMPTY: "Dat bestand heeft geen regels.",
     UNKNOWN_FORMAT:
-      "Dat bestand herkent de site niet. Upload een CSV-export van Payconiq, Mollie, SumUp of Europabank, met de kolomkoppen zoals ze uit het portaal komen; de i naast elke bron zegt welke kolommen er moeten zijn.",
+      "Dat bestand herkent de site niet. Upload een CSV-export van Payconiq, Mollie, SumUp of Europabank, of een CSV-afschrift van KBC, met de kolomkoppen zoals ze uit het portaal komen; de i naast elke bron zegt welke kolommen er moeten zijn.",
     BAD_ROW: "Een regel in dat bestand is niet te lezen (datum of bedrag). Er is niets geüpload.",
     NOT_FOUND: "Dat bestaat niet meer; ververs de pagina.",
     CODE_NOT_FOUND: "Die boekhoudcode bestaat niet meer; ververs de pagina.",
@@ -26,8 +26,12 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
     BAD_PERIOD: "Kies een geldige periode: de eerste maand mag niet na de laatste vallen.",
     PERIOD_OVERLAP: "Een deel van die periode is al afgesloten.",
     BAD_DATE: "Die datum bestaat niet.",
-    DAY_EMPTY:
-      "Dat kanaal heeft die dag (van 9:00 tot 9:00 de ochtend erna) geen betaling die met de hand een code kan krijgen, of niets wat met de hand gezet werd. Een betaling van de site, een code in de tekst, een onthouden tekst of een kassa blijft zoals ze is.",
+    LENDING_ORDER: "De laatste dag ligt voor de eerste.",
+    MIXED_ACCOUNTS: "Dat afschrift heeft regels van meer dan één rekening. Download het per rekening uit KBC.",
+    BAD_AMOUNT: "Dat bedrag is niet te lezen. Tik het zoals 12,50; een terugbetaling met een min ervoor (-12,50).",
+    LENDING_TOO_LONG: "Een uitlening van meer dan een jaar is wellicht een tikfout in het jaartal.",
+    LENDING_OVERLAP:
+      "Dat toestel is op een van die dagen al uitgeleend (zie de lijst eronder). Pas die uitlening aan, of kies andere dagen.",
     ACCOUNT_REQUIRED: "Vul de rekening in.",
     DEVICE_NOT_FOUND:
       "Dat toestel staat niet (meer) in de instellingen van de kassa's, of past niet bij dit kanaal; ververs de pagina.",
@@ -41,7 +45,7 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
     TOO_MANY_FILES: "That is more than 250 files. Upload them in parts, for example per month.",
     EMPTY: "That file has no rows.",
     UNKNOWN_FORMAT:
-      "The site does not recognise that file. Upload a CSV export from Payconiq, Mollie, SumUp or Europabank, with the column headings as they come from the portal; the i next to each source says which columns must be there.",
+      "The site does not recognise that file. Upload a CSV export from Payconiq, Mollie, SumUp or Europabank, or a KBC CSV statement, with the column headings as they come from the portal; the i next to each source says which columns must be there.",
     BAD_ROW: "A row in that file cannot be read (date or amount). Nothing was uploaded.",
     NOT_FOUND: "That no longer exists; refresh the page.",
     CODE_NOT_FOUND: "That accounting code no longer exists; refresh the page.",
@@ -52,8 +56,11 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
     BAD_PERIOD: "Choose a valid period: the first month cannot come after the last.",
     PERIOD_OVERLAP: "Part of that period is already closed.",
     BAD_DATE: "That date does not exist.",
-    DAY_EMPTY:
-      "That channel has no payment that day (from 9:00 to 9:00 the next morning) that can get a code by hand, or nothing that was set by hand. A payment from the site, a code in the text, a remembered text or a cash register stays as it is.",
+    LENDING_ORDER: "The last day comes before the first.",
+    MIXED_ACCOUNTS: "That statement has lines of more than one account. Download it per account from KBC.",
+    BAD_AMOUNT: "That amount cannot be read. Type it like 12.50; a refund with a minus in front (-12.50).",
+    LENDING_TOO_LONG: "A lending of more than a year is probably a typo in the year.",
+    LENDING_OVERLAP: "That device is already lent out on one of those days (see the list below). Change that lending, or choose other days.",
     ACCOUNT_REQUIRED: "Fill in the account.",
     DEVICE_NOT_FOUND: "That device is not (or no longer) in the cash register settings, or does not fit this channel; refresh the page.",
     FILTER_CHANGED:

@@ -18,6 +18,8 @@
  */
 import type { Cell, CellObject, SheetData } from "write-excel-file/node";
 import { brusselsMinutesOfDay, brusselsYMD } from "@/lib/brussels";
+import { postName } from "./labels";
+import { isSeparateFee, quarterLineKey, type LineRules } from "./lines";
 import { codeKey } from "./match";
 import type { IncomeKindCode, IncomeSourceCode } from "./parse";
 
@@ -32,13 +34,17 @@ export const SHEET_STYLE = {
   euro: "[$€-2]\\ #,##0.00",
 } as const;
 
-/** De volgorde van de bronnen in het rekenblad: Europabank, SumUp, Mollie, dan Payconiq. */
-const SOURCE_ORDER: readonly IncomeSourceCode[] = ["EUROPABANK", "SUMUP", "MOLLIE", "PAYCONIQ"];
+/**
+ * De volgorde van de bronnen in het rekenblad: Europabank, SumUp, Mollie,
+ * Payconiq, en de Overschrijvingen achteraan, zoals in het oude rekenblad.
+ */
+const SOURCE_ORDER: readonly IncomeSourceCode[] = ["EUROPABANK", "SUMUP", "MOLLIE", "PAYCONIQ", "TRANSFER"];
 const SOURCE_NAMES: Record<IncomeSourceCode, string> = {
   EUROPABANK: "Europabank",
   SUMUP: "SumUp",
   MOLLIE: "Mollie",
   PAYCONIQ: "Payconiq",
+  TRANSFER: "Overschrijvingen",
 };
 
 export type WorkbookTransaction = {
@@ -85,6 +91,9 @@ export type WorkbookPayout = {
   total: number;
   /** Wat de provider zegt dat hij overschreef (Mollie); null als de export het niet zegt. */
   providerAmount: number | null;
+  /** De dag en het bedrag op een opgeladen bankafschrift; null zonder. */
+  bankOn: Date | null;
+  bankAmount: number | null;
   checked: string;
 };
 
@@ -104,6 +113,13 @@ export type WorkbookModel = {
   codeOrder: ReadonlyMap<string, number>;
   /** De naam van een hoofdrekening ("700100" -> "Activiteiten opbrengsten"). */
   mainNames: ReadonlyMap<string, string>;
+  /** Wat meetelt: dezelfde regels als het overzicht. */
+  lineRules: LineRules;
+  /**
+   * Wat Mollie in de periode overschreef, wanneer de site de reserve kent: het
+   * controleblok van Mollie zet het naast de kolom van het kwartaalblad.
+   */
+  mollieTransfers: { cents: number; count: number } | null;
   feeCode: { code: string; name: string } | null;
   groups: readonly WorkbookGroup[];
   payouts: readonly WorkbookPayout[];
@@ -157,18 +173,12 @@ function euro(cents: number, style: CellObject = {}): CellObject {
 // Het kwartaalblad
 // -----------------------------------------------------------------------------
 
-/** De regel van het kwartaalblad waarin een transactie telt, of null als ze niet meetelt. */
-export function quarterLineKey(tx: Pick<WorkbookTransaction, "kind" | "accountingCode" | "excluded">): string | null {
-  if (tx.excluded) return null;
-  if (tx.kind === "FEE") return "Kosten";
-  if (tx.kind === "RESERVE") return "Reserve";
-  return tx.accountingCode ?? "Na te kijken";
-}
-
 /** De naam van een rij in het Transacties-tabblad, ook voor wat niet meetelt. */
-function lineLabel(tx: WorkbookTransaction, nl: boolean): string {
+function lineLabel(tx: WorkbookTransaction, model: WorkbookModel): string {
+  const { nl } = model;
   if (tx.excluded) return nl ? "Telt niet mee" : "Does not count";
-  return quarterLineKey(tx) ?? "";
+  if (isSeparateFee(tx, model.lineRules)) return nl ? "Kosten, aparte factuur" : "Fees, separate invoice";
+  return quarterLineKey(tx, model.lineRules) ?? "";
 }
 
 type QuarterColumn = { source: IncomeSourceCode; account: string };
@@ -195,7 +205,7 @@ type QuarterLayout = {
 
 function quarterLayout(model: WorkbookModel): QuarterLayout {
   const { nl } = model;
-  const counted = model.transactions.filter((tx) => quarterLineKey(tx) !== null);
+  const counted = model.transactions.filter((tx) => quarterLineKey(tx, model.lineRules) !== null);
 
   // Kolommen: per bron en per rekening; daarna het totaalblok per rekening.
   const columnKeys = new Map<string, QuarterColumn>();
@@ -219,7 +229,7 @@ function quarterLayout(model: WorkbookModel): QuarterLayout {
     const [main, analytic = ""] = code.split(" ");
     return {
       key: code,
-      post: analytic ? (names.get(code) ?? "") : (model.mainNames.get(main) ?? names.get(code) ?? ""),
+      post: postName(code, names.get(code) ?? null, (name) => model.mainNames.get(name)),
       main: /^\d+$/.test(main) ? Number(main) : main,
       analytic,
     };
@@ -235,9 +245,11 @@ function quarterLayout(model: WorkbookModel): QuarterLayout {
     });
   }
   if (hasKind("RESERVE")) {
-    lines.push({ key: "Reserve", post: nl ? "Wijziging dynamische reserve" : "Change in rolling reserve", main: "x", analytic: "" });
+    // Zonder boekhoudcode: het is geld dat Mollie nog bijhoudt, geen opbrengst
+    // van een post (Beheer, november 2026). Het rekenblad zette er "x".
+    lines.push({ key: "Reserve", post: nl ? "Wijziging dynamische reserve" : "Change in rolling reserve", main: "", analytic: "" });
   }
-  if (counted.some((tx) => quarterLineKey(tx) === "Na te kijken")) {
+  if (counted.some((tx) => quarterLineKey(tx, model.lineRules) === "Na te kijken")) {
     lines.push({ key: "Na te kijken", post: nl ? "Na te kijken (nog geen code)" : "To review (no code yet)", main: "", analytic: "" });
   }
   return { counted, columns, accounts, lines };
@@ -254,7 +266,7 @@ export function quarterSheet(model: WorkbookModel, options: { formulas: boolean 
 
   const sums = new Map<string, number>();
   for (const tx of counted) {
-    const key = `${quarterLineKey(tx)}|${tx.source}|${accountName(tx.bankAccount, nl)}`;
+    const key = `${quarterLineKey(tx, model.lineRules)}|${tx.source}|${accountName(tx.bankAccount, nl)}`;
     sums.set(key, (sums.get(key) ?? 0) + tx.amountCents);
   }
 
@@ -439,7 +451,7 @@ export function transactionsSheet(model: WorkbookModel): SheetSpec {
   ];
   const sorted = [...model.transactions].sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
   for (const tx of sorted) {
-    const counts = quarterLineKey(tx) !== null;
+    const counts = quarterLineKey(tx, model.lineRules) !== null;
     data.push([
       { value: wallClock(tx.occurredAt), type: Date, format: DATE_TIME },
       SOURCE_NAMES[tx.source],
@@ -449,7 +461,7 @@ export function transactionsSheet(model: WorkbookModel): SheetSpec {
       tx.periodMonth ?? "",
       tx.payoutReference ?? "",
       accountName(tx.bankAccount, nl),
-      lineLabel(tx, nl),
+      lineLabel(tx, model),
       tx.accountingCode ?? "",
       tx.accountingCodeName ?? "",
       kindLabel(tx.kind, nl),
@@ -512,7 +524,7 @@ export function sourceSheet(model: WorkbookModel, source: IncomeSourceCode, quar
     RESERVE: ["Reserve", "Reserve"],
   };
   for (const kind of ["PAYMENT", "REFUND", "FEE", "RESERVE"] as const) {
-    if (!rows.some((tx) => tx.kind === kind && quarterLineKey(tx) !== null)) continue;
+    if (!rows.some((tx) => tx.kind === kind && quarterLineKey(tx, model.lineRules) !== null)) continue;
     summary.push([
       kindTotals[kind][nl ? 0 : 1],
       formula(`SUMIFS(${amounts},${kinds},${quote(kindLabel(kind, nl))},${counts},${quote(yes)})`),
@@ -520,7 +532,9 @@ export function sourceSheet(model: WorkbookModel, source: IncomeSourceCode, quar
   }
   const countedRow = 2 + summary.length;
   summary.push([nl ? "Telt mee" : "Counts", formula(`SUMIFS(${amounts},${counts},${quote(yes)})`, { fontWeight: "bold" })]);
-  if (rows.some((tx) => quarterLineKey(tx) === null)) {
+  let notCountedRow: number | null = null;
+  if (rows.some((tx) => quarterLineKey(tx, model.lineRules) === null)) {
+    notCountedRow = 2 + summary.length;
     summary.push([nl ? "Telt niet mee" : "Does not count", formula(`SUMIFS(${amounts},${counts},${quote(no)})`)]);
   }
   const quarterRow = 2 + summary.length;
@@ -536,6 +550,19 @@ export function sourceSheet(model: WorkbookModel, source: IncomeSourceCode, quar
     nl ? "Verschil (hoort 0 te zijn)" : "Difference (should be 0)",
     formula(`ROUND(P${countedRow}-P${quarterRow},2)`, { fontWeight: "bold" }),
   ]);
+  // Mollie: met de berekende reserve is de kolom wat Mollie overschreef, min wat
+  // niet meetelt. Een tweede controle die nul hoort te zijn.
+  if (source === "MOLLIE" && model.mollieTransfers) {
+    const transfersRow = 2 + summary.length;
+    summary.push([
+      nl ? `Overgeschreven (${model.mollieTransfers.count})` : `Transferred (${model.mollieTransfers.count})`,
+      euro(model.mollieTransfers.cents),
+    ]);
+    summary.push([
+      nl ? "Kwartaalblad min overgeschreven, plus wat niet meetelt (hoort 0 te zijn)" : "Quarter sheet minus transferred, plus what does not count (should be 0)",
+      formula(`ROUND(P${quarterRow}-P${transfersRow}${notCountedRow ? `+P${notCountedRow}` : ""},2)`, { fontWeight: "bold" }),
+    ]);
+  }
 
   const data: SheetData = [
     [
@@ -562,11 +589,11 @@ export function sourceSheet(model: WorkbookModel, source: IncomeSourceCode, quar
             tx.periodMonth ?? "",
             tx.payoutReference ?? "",
             accountName(tx.bankAccount, nl),
-            lineLabel(tx, nl),
+            lineLabel(tx, model),
             tx.accountingCode ?? "",
             tx.accountingCodeName ?? "",
             kindLabel(tx.kind, nl),
-            quarterLineKey(tx) !== null ? yes : no,
+            quarterLineKey(tx, model.lineRules) !== null ? yes : no,
             tx.reason,
           ]
         : Array<Cell>(13).fill(null)),
@@ -617,8 +644,8 @@ export function payoutsSheet(model: WorkbookModel): SheetSpec {
   const data: SheetData = [
     headerRow(
       nl
-        ? ["Bron", "Uitbetaling", "Overgeschreven op", "Eerste regel", "Laatste regel", "Betalingen", "Terugbetalingen", "Kosten", "Reserve", "Totaal", "Volgens de provider", "Afgevinkt"]
-        : ["Source", "Payout", "Transferred on", "First row", "Last row", "Payments", "Refunds", "Fees", "Reserve", "Total", "According to the provider", "Checked"],
+        ? ["Bron", "Uitbetaling", "Overgeschreven op", "Eerste regel", "Laatste regel", "Betalingen", "Terugbetalingen", "Kosten", "Reserve", "Totaal", "Volgens de provider", "Op de bank op", "Bedrag op de bank", "Afgevinkt"]
+        : ["Source", "Payout", "Transferred on", "First row", "Last row", "Payments", "Refunds", "Fees", "Reserve", "Total", "According to the provider", "On the bank on", "Amount on the bank", "Checked"],
     ),
   ];
   for (const payout of model.payouts) {
@@ -634,13 +661,15 @@ export function payoutsSheet(model: WorkbookModel): SheetSpec {
       euro(payout.reserve),
       euro(payout.total, { fontWeight: "bold" }),
       payout.providerAmount === null ? "" : euro(payout.providerAmount),
+      payout.bankOn ? { value: payout.bankOn, type: Date, format: DATE } : "",
+      payout.bankAmount === null ? "" : euro(payout.bankAmount),
       payout.checked,
     ]);
   }
   return {
     sheet: nl ? "Per uitbetaling" : "Per payout",
     data,
-    columns: [12, 20, 16, 14, 14, 13, 15, 12, 12, 13, 18, 36].map((width) => ({ width })),
+    columns: [12, 20, 16, 14, 14, 13, 15, 12, 12, 13, 18, 14, 16, 36].map((width) => ({ width })),
     stickyRowsCount: 1,
   };
 }
@@ -649,7 +678,9 @@ export function payoutsSheet(model: WorkbookModel): SheetSpec {
 export function filteredSheet(model: WorkbookModel, which: "open" | "excluded"): SheetSpec {
   const { nl } = model;
   const rows = model.transactions.filter((tx) =>
-    which === "open" ? quarterLineKey(tx) === "Na te kijken" : quarterLineKey(tx) === null,
+    // "Telt niet mee" is wat met de hand uitgesloten werd; de kosten met een
+    // aparte factuur zijn honderden regels die elk zo horen, die staan hier niet.
+    which === "open" ? quarterLineKey(tx, model.lineRules) === "Na te kijken" : tx.excluded,
   );
   const data: SheetData = [
     headerRow(nl ? ["Datum", "Bron", "Kanaal", "Omschrijving", "Bedrag", "Waarom"] : ["Date", "Source", "Channel", "Description", "Amount", "Why"]),

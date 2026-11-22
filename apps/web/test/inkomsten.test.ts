@@ -4,14 +4,15 @@ import {
   SUMUP_CHANNEL,
   cleanDescription,
   compactTime,
+  headerKey,
   parseDecimalCents,
   parseIncomeExport,
   parseLocalDateTime,
-  payoutMonth,
   type ParsedIncomeRow,
 } from "@/lib/inkomsten/parse";
-import { codeAtStart, deviceAt, incomeRuleText, matchTransaction, nameRuleKey, type MatchContext } from "@/lib/inkomsten/match";
+import { codeAtStart, deviceAt, incomeRuleText, lendingOn, matchTransaction, nameRuleKey, type MatchContext, type MatchInput } from "@/lib/inkomsten/match";
 import { accountOn, computeIncomeOverview, reviewDay, type OverviewTransaction } from "@/lib/inkomsten/overview";
+import { NO_SEPARATE_FEES } from "@/lib/inkomsten/lines";
 import { combineImportSummaries } from "@/lib/inkomsten/importSummary";
 import {
   controlSpanLabel,
@@ -32,6 +33,16 @@ const PAYCONIQ = [
   "txaaaaaaaaaaaaaaaaaaaaa2;13/09/2026;20:15:59;4.80;FAILED;WERO;CREDIT;;;BE00000000000002;PERSOON B;A: Evenement 3;",
   "txaaaaaaaaaaaaaaaaaaaaa3;01/10/2026;00:18:00;12.00;SUCCEEDED;BANCONTACT;CREDIT;1 ticket Cantus;700100 10001;BE00000000000003;PERSOON C;Ticketsysteem;700100 10001",
   "txaaaaaaaaaaaaaaaaaaaaa4;02/10/2026;10:00:00;3.00;SUCCEEDED;WERO;DEBIT;terug;;BE00000000000004;PERSOON D;A: Theokot;",
+].join("\n");
+
+// De tweede export van het portaal: andere koppen, andere volgorde, komma's,
+// en per betaling haar uitbetaling (`payoutId`).
+const PAYCONIQ_2026 = [
+  "id,date,time,amount,type,status,shopName,technology,description,reference,debtorIban,debtorName,bulkId,payoutId",
+  "txbbbbbbbbbbbbbbbbbbbbb1,13/10/2026,19:31:42,12.00,CREDIT,SUCCEEDED,VTK Tickets,WERO,1 ticket Cantus,700100 10001,BE00000000000011,PERSOON Z,700100 10001,PAAAAAAAAAAAAAAAAAAAAAAAAAA1",
+  "txbbbbbbbbbbbbbbbbbbbbb2,13/10/2026,20:15:59,1.20,CREDIT,SUCCEEDED,A: Evenement 3,BANCONTACT,,,BE00000000000012,PERSOON Y,,PAAAAAAAAAAAAAAAAAAAAAAAAAA2",
+  "txbbbbbbbbbbbbbbbbbbbbb3,13/10/2026,20:16:00,4.80,CREDIT,FAILED,A: Evenement 3,WERO,,,BE00000000000013,PERSOON X,,",
+  "txbbbbbbbbbbbbbbbbbbbbb4,14/10/2026,10:00:00,3.00,DEBIT,SUCCEEDED,A: Theokot,WERO,terug,,BE00000000000014,PERSOON W,,PAAAAAAAAAAAAAAAAAAAAAAAAAA3",
 ].join("\n");
 
 const MOLLIE_EN = [
@@ -114,15 +125,53 @@ describe("bedragen, datums en tekst", () => {
     expect(parseLocalDateTime("31/02/20026")).toBeNull();
   });
 
-  it("haalt de maand uit een Mollie-uitbetalingsreferentie", () => {
-    expect(payoutMonth("12345678.2510.03")).toBe("2025-10");
-    expect(payoutMonth("")).toBeNull();
-    expect(payoutMonth("12345678.2513.01")).toBeNull();
-  });
-
   it("haalt e-mailadressen uit een omschrijving", () => {
     expect(cleanDescription("Uniflow Printer Credit: iemand@student.kuleuven.be")).toBe("Uniflow Printer Credit");
     expect(cleanDescription("  ")).toBeNull();
+  });
+});
+
+describe("de kolomkoppen", () => {
+  it("vergelijkt koppen zonder hoofdletters, spaties, underscores of accenten", () => {
+    expect(headerKey("shop_name")).toBe(headerKey("shopName"));
+    expect(headerKey("Commissie (EUR)")).toBe(headerKey("commissie  (eur)"));
+    expect(headerKey("\uFEFFDatum")).toBe("datum");
+    expect(headerKey("Résultat")).toBe("resultat");
+    expect(headerKey("E-mail")).not.toBe(headerKey("email"));
+  });
+
+  it("herkent elk testbestand nog als zijn eigen formaat", () => {
+    const cases: Array<[string, string]> = [
+      [PAYCONIQ, "payconiq"],
+      [PAYCONIQ_2026, "payconiq"],
+      [MOLLIE_EN, "mollie"],
+      [MOLLIE_NL, "mollie"],
+      [MOLLIE_BALANCE, "mollie-balance"],
+      [SUMUP, "sumup"],
+      [EUROPABANK_OUD, "europabank"],
+      [EUROPABANK_NIEUW, "europabank"],
+    ];
+    for (const [text, format] of cases) {
+      const result = parseIncomeExport(text);
+      expect(result.ok && result.format).toBe(format);
+    }
+  });
+
+  it("leest koppen die een portaal anders schrijft", () => {
+    const shouting = PAYCONIQ.replace(/^[^\n]*/, (header) => header.toUpperCase().replaceAll("_", " "));
+    expect(rowsOf(shouting)).toEqual(rowsOf(PAYCONIQ));
+  });
+
+  it("zegt bij een onbekend bestand waar het op lijkt en wat er ontbreekt", () => {
+    const withoutShop = PAYCONIQ.replace("shop_name", "winkel");
+    const result = parseIncomeExport(withoutShop);
+    expect(result).toMatchObject({ ok: false, error: "UNKNOWN_FORMAT", closest: { format: "payconiq", missing: ["shop_name"] } });
+  });
+
+  it("noemt niets wanneer een bestand op geen enkel formaat lijkt", () => {
+    const result = parseIncomeExport("a;b;c\n1;2;3");
+    expect(result).toMatchObject({ ok: false, error: "UNKNOWN_FORMAT" });
+    expect(!result.ok && result.closest).toBeUndefined();
   });
 });
 
@@ -153,6 +202,53 @@ describe("Payconiq", () => {
     expect(text).not.toContain("PERSOON");
     expect(text).not.toContain("BE00000000000001");
   });
+
+  it("de gewone export kent geen uitbetaling", () => {
+    expect(rowsOf(PAYCONIQ).map((row) => row.payoutReference)).toEqual([null, null, null]);
+  });
+
+  describe("de export met payoutId", () => {
+    it("leest dezelfde soorten, bedragen en kanalen als de gewone", () => {
+      const result = parseIncomeExport(PAYCONIQ_2026);
+      expect(result.ok && result.format).toBe("payconiq");
+      if (!result.ok) return;
+      expect(result.total).toBe(4);
+      expect(result.skipped).toBe(1);
+      expect(result.payouts).toEqual([]);
+      expect(result.rows.map((row) => [row.kind, row.amountCents, row.channel])).toEqual([
+        ["PAYMENT", 1200, "VTK Tickets"],
+        ["PAYMENT", 120, "A: Evenement 3"],
+        ["REFUND", -300, "A: Theokot"],
+      ]);
+    });
+
+    it("leest bulkId, de referentie en de uitbetaling", () => {
+      const [ticket, sticker, refund] = rowsOf(PAYCONIQ_2026);
+      expect(ticket.reference).toBe("700100 10001");
+      expect(ticket.bulkId).toBe("700100 10001");
+      expect(ticket.externalKey).toBe("PAYMENT:txbbbbbbbbbbbbbbbbbbbbb1");
+      expect([ticket, sticker, refund].map((row) => row.payoutReference)).toEqual([
+        "PAAAAAAAAAAAAAAAAAAAAAAAAAA1",
+        "PAAAAAAAAAAAAAAAAAAAAAAAAAA2",
+        "PAAAAAAAAAAAAAAAAAAAAAAAAAA3",
+      ]);
+    });
+
+    it("bewaart geen namen of rekeningnummers van wie betaalde", () => {
+      const text = JSON.stringify(rowsOf(PAYCONIQ_2026));
+      expect(text).not.toContain("PERSOON");
+      expect(text).not.toContain("BE000000000000");
+    });
+
+    it("leest ze ook met puntkomma's en met een BOM", () => {
+      const expected = rowsOf(PAYCONIQ_2026);
+      const semicolons = PAYCONIQ_2026.split("\n")
+        .map((line) => line.replaceAll(",", ";"))
+        .join("\n");
+      expect(rowsOf(semicolons)).toEqual(expected);
+      expect(rowsOf(`﻿${PAYCONIQ_2026}`)).toEqual(expected);
+    });
+  });
 });
 
 describe("Mollie", () => {
@@ -162,16 +258,26 @@ describe("Mollie", () => {
     if (!result.ok) return;
     expect(result.skipped).toBe(1);
     expect(result.rows.map((row) => [row.kind, row.amountCents, row.periodMonth])).toEqual([
-      ["PAYMENT", 5500, "2026-10"],
-      ["FEE", -4342, "2026-09"],
-      ["RESERVE", -1100, "2026-09"],
-      ["PAYMENT", 1000, null],
+      ["PAYMENT", 5500, "2026-09"],
+      ["FEE", -4342, "2026-08"],
+      ["RESERVE", -1100, "2026-08"],
+      ["PAYMENT", 1000, "2026-09"],
     ]);
   });
 
-  it("telt een betaling in de maand van haar uitbetaling", () => {
-    // Betaald op 30 september, uitbetaald in oktober: telt in oktober, zoals het rekenblad.
-    expect(rowsOf(MOLLIE_EN)[0].periodMonth).toBe("2026-10");
+  it("telt een betaling in de maand van de betaling, niet in die van haar uitbetaling", () => {
+    // Betaald op 30 september, uitbetaald in oktober: telt in september (Beheer,
+    // november 2026). De uitbetaling blijft erbij, voor de lijst per uitbetaling.
+    const [paid, , , unpaid] = rowsOf(MOLLIE_EN);
+    expect([paid.periodMonth, paid.payoutReference]).toEqual(["2026-09", "12345678.2610.01"]);
+    // Nog niet uitbetaald: telt toch in haar eigen maand.
+    expect([unpaid.periodMonth, unpaid.payoutReference]).toEqual(["2026-09", null]);
+  });
+
+  it("rekent de maand op de Brusselse klok: 1 oktober 00:18 is oktober", () => {
+    const rows = rowsOf([MOLLIE_EN.split("\n")[0], '"2026-10-01 00:18:00",kbc,EUR,12.00,paidout,tr_test9,"Iets",,,,EUR,12.00,12345678.2610.01,0.00'].join("\n"));
+    expect(rows[0].periodMonth).toBe("2026-10");
+    expect(rows[0].occurredAt.toISOString()).toBe("2026-09-30T22:18:00.000Z");
   });
 
   it("leest de Nederlandse koppen van het tabblad van Beheer", () => {
@@ -223,6 +329,14 @@ describe("Mollie", () => {
         { reference: "12345678.2609.01", paidOn: "2026-09-07", amountCents: 181335 },
         { reference: "12345678.2608.01", paidOn: "2026-08-03", amountCents: 21955 },
       ]);
+    });
+
+    it("geeft de betalingen door om de betalingenexport na te kijken, zonder naam of rekening", () => {
+      const result = parseIncomeExport(MOLLIE_BALANCE);
+      if (!result.ok) throw new Error(result.error);
+      expect(result.balancePayments).toEqual([{ paymentId: "tr_test7", month: "2026-08", amountCents: 5000 }]);
+      expect(JSON.stringify(result)).not.toContain("PERSOON");
+      expect(JSON.stringify(result)).not.toContain("BE00000000000007");
     });
 
     it("telt de maandfactuur en de reserve in hun eigen maand, en een terugbetaling bij de eerstvolgende overschrijving", () => {
@@ -312,7 +426,11 @@ describe("SumUp", () => {
     const required = Object.values(EXPORT_COLUMNS.sumup).filter((column) => column.required);
     expect(required.map((column) => column.names[0])).toContain("Transactie-ID");
     const withoutId = SUMUP.replace("Transactie-ID", "Nummer");
-    expect(parseIncomeExport(withoutId)).toEqual({ ok: false, error: "UNKNOWN_FORMAT" });
+    expect(parseIncomeExport(withoutId)).toEqual({
+      ok: false,
+      error: "UNKNOWN_FORMAT",
+      closest: { format: "sumup", missing: ["Transactie-ID"] },
+    });
   });
 
   it("bewaart geen kaartgegevens of autorisatiecodes", () => {
@@ -368,6 +486,16 @@ describe("Europabank", () => {
     expect(rowsOf(fromSheet)[0].occurredAt.toISOString()).toBe("2026-03-05T08:30:15.000Z");
   });
 
+  it("neemt de OV-ref als uitbetaling, met de Boekingsdatum, ook voor de commissie", () => {
+    const parsed = parseIncomeExport(EUROPABANK_OUD);
+    if (!parsed.ok) throw new Error("niet gelezen");
+    expect(parsed.payouts).toEqual([{ reference: "100", paidOn: "2026-03-06", amountCents: null }]);
+    expect(parsed.rows.map((row) => [row.kind, row.payoutReference])).toEqual([
+      ["PAYMENT", "100"],
+      ["FEE", "100"],
+    ]);
+  });
+
   it("bewaart geen kaartgegevens", () => {
     const text = JSON.stringify([...rowsOf(EUROPABANK_OUD), ...rowsOf(EUROPABANK_NIEUW)]);
     expect(text).not.toContain("******");
@@ -413,6 +541,19 @@ describe("koppelregels", () => {
         "kanaal-post",
         [{ id: "kassa-caraoke", start: new Date("2026-10-02T16:00:00Z"), end: new Date("2026-10-03T02:00:00Z"), code: { code: "700100 10001", name: "Cantussen" } }],
       ],
+      [
+        // Een uitgeleende sticker met een avondkassa op de tweede dag.
+        "kanaal-uitgeleend",
+        [{ id: "kassa-uitleen", start: new Date("2026-11-11T17:00:00Z"), end: new Date("2026-11-11T21:00:00Z"), code: { code: "700100", name: "Activiteiten" } }],
+      ],
+    ]),
+    channelLendings: new Map([
+      // De SumUp van een post een week aan de cursusdienst geleend.
+      ["kanaal-post", [{ id: "uitlening-week", from: "2026-11-02", to: "2026-11-06", code: { code: "700000", name: "Cursusdienst" } }]],
+      // Een gedeelde sticker (geen standaardcode), twee dagen uitgeleend.
+      ["kanaal-uitgeleend", [{ id: "uitlening-sticker", from: "2026-11-10", to: "2026-11-11", code: { code: "700000", name: "Cursusdienst" } }]],
+      // Een uitlening waarvan de code uit het register verdween.
+      ["kanaal-zonder-code", [{ id: "uitlening-weg", from: "2026-11-01", to: "2026-11-30", code: null }]],
     ]),
   };
   const base = {
@@ -513,6 +654,74 @@ describe("koppelregels", () => {
     expect(result).toMatchObject({ rule: "CODE_IN_TEXT", cashRegisterId: null });
   });
 
+  describe("uitlening van een toestel", () => {
+    const at = (channelId: string, iso: string, extra: Partial<MatchInput> = {}) =>
+      matchTransaction({ ...base, source: "SUMUP", channelId, occurredAt: new Date(iso), ...extra }, context);
+
+    it("gaat voor de standaardcode op haar dagen, niet ervoor of erna", () => {
+      expect(at("kanaal-post", "2026-11-03T12:00:00Z")).toMatchObject({
+        rule: "CHANNEL_LENDING",
+        code: { code: "700000" },
+        channelLendingId: "uitlening-week",
+      });
+      expect(at("kanaal-post", "2026-11-01T12:00:00Z")).toMatchObject({ rule: "CHANNEL_DEFAULT", code: { code: "700110" }, channelLendingId: null });
+      expect(at("kanaal-post", "2026-11-07T12:00:00Z")).toMatchObject({ rule: "CHANNEL_DEFAULT", channelLendingId: null });
+      // Een terugbetaling op die dagen hoort er ook bij.
+      expect(at("kanaal-post", "2026-11-03T12:00:00Z", { kind: "REFUND" }).rule).toBe("CHANNEL_LENDING");
+    });
+
+    it("loopt van 9:00 op de eerste dag tot 9:00 na de laatste, op de Brusselse klok", () => {
+      // 2 november 2026 is wintertijd (UTC+1): 8:59 hoort nog bij 1 november.
+      expect(at("kanaal-post", "2026-11-02T07:59:00Z").rule).toBe("CHANNEL_DEFAULT");
+      expect(at("kanaal-post", "2026-11-02T08:00:00Z").rule).toBe("CHANNEL_LENDING");
+      // 3:00 in de nacht na de laatste dag hoort nog bij de uitlening, 9:00 niet meer.
+      expect(at("kanaal-post", "2026-11-07T02:00:00Z").rule).toBe("CHANNEL_LENDING");
+      expect(at("kanaal-post", "2026-11-07T08:00:00Z").rule).toBe("CHANNEL_DEFAULT");
+    });
+
+    it("laat de site, een code in de tekst en een onthouden tekst voorgaan", () => {
+      expect(at("kanaal-post", "2026-11-03T12:00:00Z", { providerId: "tr_site" }).rule).toBe("WEBSITE");
+      expect(at("kanaal-post", "2026-11-03T12:00:00Z", { source: "PAYCONIQ", reference: "700100 10001" }).rule).toBe("CODE_IN_TEXT");
+      expect(at("kanaal-post", "2026-11-03T12:00:00Z", { source: "MOLLIE", description: "VTK uitleendienst - 3F9A21BC" }).rule).toBe(
+        "NAME_RULE",
+      );
+    });
+
+    it("geeft een kassa enkel haar uren: daarna geldt de uitlening, niet de uitloop tot 9:00", () => {
+      expect(at("kanaal-uitgeleend", "2026-11-11T19:00:00Z")).toMatchObject({ rule: "CASH_REGISTER", cashRegisterId: "kassa-uitleen" });
+      // Op een gedeeld toestel zonder uitlening hield de kassa het tot 9:00;
+      // de uitlening zegt wie het toestel die nacht had.
+      expect(at("kanaal-uitgeleend", "2026-11-11T23:30:00Z")).toMatchObject({
+        rule: "CHANNEL_LENDING",
+        channelLendingId: "uitlening-sticker",
+        cashRegisterId: null,
+      });
+      expect(deviceAt({ channelId: "kanaal-uitgeleend", occurredAt: new Date("2026-11-11T23:30:00Z") }, context).kassa).toBeNull();
+      // Na de uitlening, zonder kassa en zonder standaardcode: Na te kijken.
+      expect(at("kanaal-uitgeleend", "2026-11-12T12:00:00Z").rule).toBeNull();
+    });
+
+    it("koppelt niets zonder code, en dan geldt wat eronder staat", () => {
+      expect(at("kanaal-zonder-code", "2026-11-03T12:00:00Z")).toMatchObject({ rule: null, channelLendingId: null });
+      expect(deviceAt({ channelId: "kanaal-zonder-code", occurredAt: new Date("2026-11-03T12:00:00Z") }, context).lending).toBeNull();
+    });
+
+    it("koppelt geen kosten", () => {
+      expect(at("kanaal-post", "2026-11-03T12:00:00Z", { kind: "FEE" }).rule).toBeNull();
+    });
+
+    it("vindt de uitlening van een dag", () => {
+      const spans = [
+        { id: "a", from: "2026-09-16", to: "2026-09-23", code: null },
+        { id: "b", from: "2026-10-01", to: "2026-10-01", code: null },
+      ];
+      expect(lendingOn(spans, "2026-09-16")?.id).toBe("a");
+      expect(lendingOn(spans, "2026-09-23")?.id).toBe("a");
+      expect(lendingOn(spans, "2026-09-24")).toBeNull();
+      expect(lendingOn(spans, "2026-10-01")?.id).toBe("b");
+    });
+  });
+
   it("laat een kanaal zonder standaardcode na te kijken", () => {
     const result = matchTransaction({ ...base, source: "PAYCONIQ", channelId: "kanaal-zonder-code", description: "broodje" }, context);
     expect(result).toMatchObject({ rule: null, code: null });
@@ -551,6 +760,7 @@ describe("overzicht", () => {
         tx({ kind: "RESERVE", amountCents: -22689 }),
       ],
       new Map(),
+      NO_SEPARATE_FEES,
     );
     expect(overview.totals.bySource.MOLLIE).toBe(876160);
     expect(overview.fees.total).toBe(-14201);
@@ -569,6 +779,7 @@ describe("overzicht", () => {
         ["70010010001", 0],
         ["700110", 1],
       ]),
+      NO_SEPARATE_FEES,
     );
     expect(overview.codes.map((row) => row.code)).toEqual(["700100 10001", "700110"]);
     expect(overview.unassigned.total).toBe(50);
@@ -585,11 +796,30 @@ describe("overzicht", () => {
         tx({ source: "EUROPABANK", kind: "FEE", amountCents: -2 }),
       ],
       new Map(),
+      NO_SEPARATE_FEES,
     );
     expect(overview.codes[0].bySource.SUMUP).toBe(340);
     expect(overview.unassigned.bySource.EUROPABANK).toBe(230);
     expect(overview.fees.bySource).toMatchObject({ SUMUP: -3, EUROPABANK: -2 });
     expect(overview.totals.total).toBe(565);
+  });
+
+  it("laat de kosten met een aparte factuur uit het totaal en uit de rekeningen", () => {
+    const overview = computeIncomeOverview(
+      [
+        tx({ source: "SUMUP", accountingCode: "700110", accountingCodeName: "Cultuur", amountCents: 340 }),
+        tx({ source: "SUMUP", kind: "FEE", amountCents: -3 }),
+        tx({ source: "EUROPABANK", amountCents: 230 }),
+        tx({ source: "EUROPABANK", kind: "FEE", amountCents: -2 }),
+      ],
+      new Map(),
+      { separateFeeSources: new Set(["SUMUP"] as const) },
+    );
+    expect(overview.separateFees.bySource.SUMUP).toBe(-3);
+    expect(overview.fees.bySource).toMatchObject({ SUMUP: 0, EUROPABANK: -2 });
+    expect(overview.totals.total).toBe(568);
+    expect(overview.accounts).toEqual([{ bankAccount: "…6140", total: 568 }]);
+    expect(overview.excluded.count).toBe(0);
   });
 
   it("telt ook mee wat op de rekening van een post binnenkomt, met een totaal per rekening", () => {
@@ -599,6 +829,7 @@ describe("overzicht", () => {
         tx({ accountingCode: "700110", accountingCodeName: "Cultuur", amountCents: 250, source: "PAYCONIQ", bankAccount: "…9348" }),
       ],
       new Map(),
+      NO_SEPARATE_FEES,
     );
     expect(overview.totals.total).toBe(750);
     expect(overview.accounts).toEqual([
@@ -620,7 +851,15 @@ describe("overzicht", () => {
 });
 
 describe("meerdere bestanden tegelijk opladen", () => {
-  const rules = (open: number): ImportSummary["rules"] => ({ WEBSITE: 0, CODE_IN_TEXT: 0, CASH_REGISTER: 0, NAME_RULE: 0, CHANNEL_DEFAULT: 0, OPEN: open });
+  const rules = (open: number): ImportSummary["rules"] => ({
+    WEBSITE: 0,
+    CODE_IN_TEXT: 0,
+    CASH_REGISTER: 0,
+    NAME_RULE: 0,
+    CHANNEL_LENDING: 0,
+    CHANNEL_DEFAULT: 0,
+    OPEN: open,
+  });
   const summary = (partial: Partial<ImportSummary>): ImportSummary => ({
     format: "europabank",
     source: "EUROPABANK",
@@ -638,6 +877,7 @@ describe("meerdere bestanden tegelijk opladen", () => {
     lastAt: null,
     newChannels: [],
     payouts: 0,
+    balancePayments: 0,
     ...partial,
   });
 
