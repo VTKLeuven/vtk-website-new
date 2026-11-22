@@ -1,8 +1,9 @@
 # Online inkomsten (`/admin/inkomsten`)
 
 De opvolger van het rekenblad "Oriëntatie Online Inkomsten" van Beheer: wat er
-via Payconiq, Mollie, SumUp en Europabank binnenkwam, per boekhoudcode en per
-bankrekening, voor de boekhouder. De kringkeuzes staan in
+via Payconiq, Mollie, SumUp en Europabank binnenkwam, en wat iemand
+rechtstreeks overschreef, per boekhoudcode en per bankrekening, voor de
+boekhouder. De kringkeuzes staan in
 `docs/design-decisions.md` ("Online inkomsten"); dit is de technische
 referentie.
 
@@ -27,6 +28,8 @@ per rij of voor veel rijen tegelijk.
 | `lib/inkomsten/match.ts` | De koppelregels als pure functie (`matchTransaction`), de kassa die een toestel had (`kassaAt`), de uitlening van een dag (`lendingOn`), en de onthouden tekst (`incomeRuleText`). |
 | `lib/inkomsten/lending.ts` | De dagen van een uitlening nakijken (`checkLendingDays`, `overlappingLending`). Puur. |
 | `lib/inkomsten/lendingServer.ts` | De uitleningen: lijst, bewaren, verwijderen, overnemen wat met de hand gezet werd. |
+| `lib/inkomsten/transfer.ts` | Een overschrijving met de hand nakijken (`checkTransfer`, `parseTransferAmount`) en haar moment (`transferMoment`). Puur. |
+| `lib/inkomsten/transferServer.ts` | De overschrijvingen met de hand: lijst, de gekende rekeningen, bewaren, verwijderen. |
 | `lib/inkomsten/lines.ts` | `quarterLineKey`: op welke regel een transactie telt, of niet. Het overzicht en beide bestanden rekenen ermee. Puur. |
 | `lib/inkomsten/reserve.ts` | De berekende wijziging van de dynamische reserve van Mollie (`computeMollieReserve`). Puur. |
 | `lib/inkomsten/config.ts` | De instellingen (`income.config`) en wat meetelt (`lineRulesOf`). Puur. |
@@ -38,13 +41,14 @@ per rij of voor veel rijen tegelijk.
 | `lib/inkomsten/kassa.ts` | De kassacontrole: het venster van een kassa (`kassaControlWindow`) en het ingetikte bedrag naast de import (`kassaCheck`). Puur; het optellen is `kassaImportAmounts` in `server.ts`. |
 | `app/actions/inkomsten.ts` | Server actions, allemaal achter `income.manage`. |
 | `app/[locale]/admin/kassas/` | De code van een kassa (`AcceptForm`, `CodeForm`) en de kassacontrole in het telformulier (`CountForm`); de acties in `app/actions/kassas.ts`. |
-| `app/[locale]/admin/inkomsten/` | Overzicht (met de controlelijst en de uitbetalingen), Opladen (met `FormatGuide`, de kolommen per bron), Na te kijken (met de uitleningen: `LendingForm`, `LendingList`), Transacties (met `TransactionTable`: het detail per rij en de vinkjes), Instellingen. |
+| `app/[locale]/admin/inkomsten/` | Overzicht (met de controlelijst en de uitbetalingen), Opladen (met `FormatGuide`, de kolommen per bron), Na te kijken (met de uitleningen: `LendingForm`, `LendingList`), Transacties (met `TransactionTable`: het detail per rij en de vinkjes), Overschrijvingen (`TransferForm`, `TransferList`), Instellingen. |
 | `components/ui/InfoTip.tsx` | De "i" met uitleg erachter: hoveren opent, klikken zet vast (ook op een telefoon). |
 | `app/api/admin/inkomsten/export/route.ts` | De twee xlsx-bestanden, voor `?van=2026-07&tot=2026-09` en `?soort=boekhouder` of `?soort=controle`. |
 | `lib/accounting/import.ts` | De lijst van boekhoudcodes als CSV lezen, en plannen wat opladen doet. Puur. |
 | `lib/csv.ts` | De CSV-lezer die beide gebruiken: scheidingsteken raden, aanhalingstekens volgens RFC 4180. |
-| `test/inkomsten.test.ts`, `test/inkomstenWorkbook.test.ts`, `test/inkomstenTransactionFilter.test.ts`, `test/inkomstenLending.test.ts`, `test/accountingCodesImport.test.ts` | Parsers, koppelregels, overzicht, controlelijst, de xlsx, de dagen van een uitlening en de codelijst, zonder database, met verzonnen gegevens. |
+| `test/inkomsten.test.ts`, `test/inkomstenWorkbook.test.ts`, `test/inkomstenTransactionFilter.test.ts`, `test/inkomstenLending.test.ts`, `test/inkomstenTransfer.test.ts`, `test/accountingCodesImport.test.ts` | Parsers, koppelregels, overzicht, controlelijst, de xlsx, de dagen van een uitlening, de overschrijvingen en de codelijst, zonder database, met verzonnen gegevens. |
 | `test/integration/inkomsten-uitlening.integration.ts` | Een uitlening tegen een echte database: bewaren, later opladen, aanpassen, overlappen, afgesloten, overnemen en verwijderen. |
+| `test/integration/inkomsten-overschrijving.integration.ts` | Een overschrijving tegen een echte database: toevoegen, in het overzicht, niet bij Uploaden, niet terug naar de regels, aanpassen, afgesloten, verwijderen. |
 
 Tabellen: `IncomeImport`, `IncomeChannel`, `IncomeChannelAccount` (de rekening
 vanaf een dag), `IncomeChannelCode` (de standaardcode vanaf een dag),
@@ -469,6 +473,9 @@ kan de balk onderaan "alle die aan de filter voldoen" kiezen. Alles gaat door
   mee weg: wie de code met de hand zet, zegt dat die koppeling fout was, en de
   kassacontrole telt de betaling dan niet meer mee. Het detail en de
   bevestiging zeggen het vooraf, de toast achteraf hoeveel.
+- **Terug naar de regels** slaat een overschrijving met de hand over: die heeft
+  geen koppelregel en stond anders bij Na te kijken. Het detail van zo'n rij
+  linkt naar Overschrijvingen.
 - **Terug naar de regels** wist enkel wat `MANUAL` is en koppelt opnieuw; dat
   legt ook een losgemaakte koppeling terug.
 - Kosten en reserve krijgen geen vinkje en geen code: die hebben hun eigen
@@ -479,6 +486,41 @@ kan de balk onderaan "alle die aan de filter voldoen" kiezen. Alles gaat door
   Kwam er sindsdien iets bij of ging er iets weg, dan weigert ze met
   `FILTER_CHANGED` en verandert er niets: anders raakt de keuze iets anders dan
   wat de bevestiging noemde.
+
+## Overschrijvingen
+
+Geld dat iemand rechtstreeks op een rekening van de kring stortte: "de
+Overschrijvingen" van het oude rekenblad (Beheer, vraag 12 van de review van
+november 2026). Er is geen export voor, en een lijn van een lid op een
+bankafschrift bewaart de site bewust niet, dus voert Beheer ze per stuk in op
+het tabblad Overschrijvingen (`/admin/inkomsten/overschrijvingen`).
+
+- **Een eigen bron**, `IncomeSource` `TRANSFER` ("Overschrijvingen"), als
+  laatste in `INCOME_SOURCES` en in het kwartaalblad. `EXPORT_SOURCES` zijn de
+  vier exports: de controlelijst verwacht enkel daarvan elke maand een regel.
+- **Een gewone transactie**: soort `PAYMENT` (negatief ingevuld: `REFUND`),
+  regel `MANUAL`, de code, `externalKey` `TRANSFER:<import-id>`, het moment
+  12:00 Brusselse tijd op de dag (`transferMoment`, zodat de maand nooit
+  verschuift) en een korte omschrijving. Geen naam of rekeningnummer van wie
+  stortte.
+- **Eén `IncomeImport` per overschrijving**, met formaat `manual`
+  (`MANUAL_FORMAT`): zo blijven het verwijderen (cascade) en elke query die een
+  import verwacht, werken. `listIncomeImports` en het tabblad Bestanden van het
+  controlebestand laten ze weg.
+- **Eén kanaal per rekening** (`identifier` is de rekening), met die rekening
+  vanaf het begin in `IncomeChannelAccount`. Het kwartaalblad maakt zo vanzelf
+  een kolom per rekening onder "Overschrijvingen", en de controle per bron in
+  het controlebestand sluit zoals bij de exports. Instellingen en de
+  uitleningen tonen die kanalen niet (`listIncomeChannels` zonder
+  `transfers`), en de acties op een kanaal weigeren ze: hun rekening ligt vast.
+- **De rekening kies je uit wat de site kent** (`knownBankAccounts`: de
+  rekeningen van de kanalen in Instellingen en van eerdere overschrijvingen),
+  zodat er geen rekeningnummer in de code staat.
+- **Afgesloten**: een overschrijving in een afgesloten maand, of een aanpassing
+  van of naar zo'n maand, weigert de site met `LOCKED`; verwijderen ook.
+- Na te kijken toont ze nooit (ze hebben altijd een code), de uitbetalingen
+  negeren ze (geen `payoutReference`), en de tussenlaag "Per groep" van het
+  controlebestand slaat ze over.
 
 ## Kanalen en rekeningen
 
@@ -789,6 +831,11 @@ fouten), dan opladen.
   loopt een kassa op een gedeeld toestel hoogstens tot 9:00 de ochtend na haar
   einde (`reviewDay`). Een evenement dagen later zonder kassa belandt zo bij
   Na te kijken in plaats van bij de vorige kassa.
+- **Een overschrijving is geen export.** Ze heeft een `IncomeImport` om de
+  database eenvoudig te houden, maar geen bestand: wie een lijst van imports
+  toont, filtert op `format` (`MANUAL_FORMAT`). En een maand zonder
+  overschrijving is geen vergeten bestand: de controlelijst kijkt enkel naar
+  `EXPORT_SOURCES`.
 - **Een uitlening is geen periode.** `IncomePeriod` is een afgesloten reeks
   maanden; een uitlening (`IncomeChannelLending`) zegt wie een toestel een paar
   dagen had. Het scherm zegt dus altijd "uitlening", nooit "periode", en de

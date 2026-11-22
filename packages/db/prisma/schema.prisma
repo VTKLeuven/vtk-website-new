@@ -9125,6 +9125,11 @@ enum IncomeSource {
   MOLLIE
   SUMUP
   EUROPABANK
+  /// Een overschrijving die iemand rechtstreeks op een rekening van de kring
+  /// deed, met de hand ingevoerd op /admin/inkomsten/overschrijvingen ("de
+  /// Overschrijvingen" van het oude rekenblad). Geen export: per overschrijving
+  /// één `IncomeImport` met formaat "manual", één kanaal per rekening.
+  TRANSFER
 }
 
 /// Wat een regel uit een export is. Enkel een betaling of terugbetaling krijgt
@@ -9158,7 +9163,9 @@ model IncomeImport {
   id             String       @id @default(cuid())
   source         IncomeSource
   fileName       String
-  /// Welk formaat de parser herkende ("payconiq", "mollie", "sumup", "europabank").
+  /// Welk formaat de parser herkende ("payconiq", "mollie", "sumup", "europabank"),
+  /// of "manual" voor een overschrijving die met de hand ingevoerd werd: die
+  /// staat niet in de lijst van Uploaden.
   format         String
   /// Regels in het bestand, nieuw bewaard, al gekend, en niet meegeteld
   /// (vervallen of mislukt, of in een afgesloten periode).

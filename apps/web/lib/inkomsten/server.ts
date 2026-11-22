@@ -50,6 +50,7 @@ import {
 import { INCOME_CONFIG_KEY, lineRulesOf, parseIncomeConfig, type IncomeConfig } from "./config";
 import { isSeparateFee, quarterLineKey, type LineRules } from "./lines";
 import { computeMollieReserve, type MollieCompleteness, type MollieReserve } from "./reserve";
+import { MANUAL_FORMAT } from "./transfer";
 import type { WorkbookGroup, WorkbookModel, WorkbookTransaction } from "./workbook";
 import { ASSIGNABLE_KINDS, transactionWhere, type TransactionFilter } from "./transactionFilter";
 import {
@@ -1402,6 +1403,7 @@ export async function changeTransactions(
     where,
     select: {
       id: true,
+      source: true,
       rule: true,
       periodMonth: true,
       ticketPaymentId: true,
@@ -1422,7 +1424,9 @@ export async function changeTransactions(
   if (open.length === 0) return { ok: false, error: "LOCKED" };
 
   if ("reset" in choice) {
-    const manual = open.filter((row) => row.rule === "MANUAL");
+    // Een overschrijving heeft geen koppelregel: zonder de hand stond ze bij Na
+    // te kijken. Ze blijft zoals ze is; aanpassen gaat bij Overschrijvingen.
+    const manual = open.filter((row) => row.rule === "MANUAL" && row.source !== "TRANSFER");
     for (const batch of chunks(manual.map((row) => row.id))) {
       await prisma.incomeTransaction.updateMany({
         where: { id: { in: batch } },
@@ -1469,6 +1473,8 @@ export async function changeTransactions(
 
 export async function listIncomeImports() {
   const imports = await prisma.incomeImport.findMany({
+    // Een overschrijving met de hand is geen bestand: die staat bij Overschrijvingen.
+    where: { format: { not: MANUAL_FORMAT } },
     orderBy: { createdAt: "desc" },
     take: 100,
     select: {
@@ -1655,8 +1661,14 @@ export async function kassaControlList(year: number | "all"): Promise<KassaContr
   }));
 }
 
-export async function listIncomeChannels() {
+/**
+ * De kanalen van de exports. Met `transfers` ook de rekeningen van de
+ * overschrijvingen: Instellingen en de uitleningen hebben daar niets aan (hun
+ * rekening ligt vast), de filter van Transacties wel.
+ */
+export async function listIncomeChannels(options: { transfers?: boolean } = {}) {
   return prisma.incomeChannel.findMany({
+    where: options.transfers ? {} : { source: { not: "TRANSFER" } },
     orderBy: [{ source: "asc" }, { identifier: "asc" }],
     select: {
       id: true,
@@ -1694,7 +1706,13 @@ export async function countUnassigned(): Promise<number> {
 // De Excel-bestanden
 // -----------------------------------------------------------------------------
 
-const SOURCE_NAME: Record<IncomeSourceCode, string> = { PAYCONIQ: "Payconiq", MOLLIE: "Mollie", SUMUP: "SumUp", EUROPABANK: "Europabank" };
+const SOURCE_NAME: Record<IncomeSourceCode, string> = {
+  PAYCONIQ: "Payconiq",
+  MOLLIE: "Mollie",
+  SUMUP: "SumUp",
+  EUROPABANK: "Europabank",
+  TRANSFER: "Overschrijvingen",
+};
 
 /** Waarom een transactie haar code kreeg, in woorden: de kolom "Waarom" van het controlebestand. */
 function reasonOf(
@@ -1731,6 +1749,9 @@ function reasonOf(
     return nl ? "Kosten die Mollie inhield" : "Fees withheld by Mollie";
   }
   if (tx.kind === "RESERVE") return nl ? "Reserve van Mollie" : "Mollie rolling reserve";
+  if (tx.source === "TRANSFER" && !tx.excluded) {
+    return `${nl ? "Overschrijving, met de hand ingevoerd" : "Transfer, entered by hand"}${byWhom ? ` ${byWhom}` : ""}`;
+  }
   if (tx.excluded) return `${nl ? "Telt niet mee, met de hand" : "Does not count, by hand"}${byWhom ? ` ${byWhom}` : ""}`;
   switch (tx.rule) {
     case "MANUAL":
@@ -1833,7 +1854,8 @@ export async function loadIncomeWorkbookModel(from: string, to: string, nl: bool
   // De tussenlaag: dezelfde groepen als Na te kijken, maar voor alles van de periode.
   const groups = new Map<string, WorkbookGroup & { codeSet: Set<string>; reasonSet: Set<string> }>();
   rows.forEach((row, index) => {
-    if (row.kind !== "PAYMENT" && row.kind !== "REFUND") return;
+    // Een overschrijving staat er per stuk al: Na te kijken groepeert ze nooit.
+    if ((row.kind !== "PAYMENT" && row.kind !== "REFUND") || row.source === "TRANSFER") return;
     const { key, type, day } = groupKeyOf(row);
     let group = groups.get(key);
     if (!group) {
@@ -1894,7 +1916,8 @@ export async function loadIncomeWorkbookModel(from: string, to: string, nl: bool
   const importCounts = new Map<string, number>();
   for (const row of rows) importCounts.set(row.importId, (importCounts.get(row.importId) ?? 0) + 1);
   const imports = await prisma.incomeImport.findMany({
-    where: { id: { in: [...importCounts.keys()] } },
+    // Een overschrijving is geen bestand.
+    where: { id: { in: [...importCounts.keys()] }, format: { not: MANUAL_FORMAT } },
     orderBy: { createdAt: "asc" },
     select: { id: true, fileName: true, source: true, createdAt: true, importedBy: { select: { name: true } } },
   });

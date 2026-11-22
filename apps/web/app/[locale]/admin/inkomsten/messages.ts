@@ -27,6 +27,7 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
     PERIOD_OVERLAP: "Een deel van die periode is al afgesloten.",
     BAD_DATE: "Die datum bestaat niet.",
     LENDING_ORDER: "De laatste dag ligt voor de eerste.",
+    BAD_AMOUNT: "Dat bedrag is niet te lezen. Tik het zoals 12,50; een terugbetaling met een min ervoor (-12,50).",
     LENDING_TOO_LONG: "Een uitlening van meer dan een jaar is wellicht een tikfout in het jaartal.",
     LENDING_OVERLAP:
       "Dat toestel is op een van die dagen al uitgeleend (zie de lijst eronder). Pas die uitlening aan, of kies andere dagen.",
@@ -55,6 +56,7 @@ export function incomeErrorMessages(locale: Locale): Record<string, string> {
     PERIOD_OVERLAP: "Part of that period is already closed.",
     BAD_DATE: "That date does not exist.",
     LENDING_ORDER: "The last day comes before the first.",
+    BAD_AMOUNT: "That amount cannot be read. Type it like 12.50; a refund with a minus in front (-12.50).",
     LENDING_TOO_LONG: "A lending of more than a year is probably a typo in the year.",
     LENDING_OVERLAP: "That device is already lent out on one of those days (see the list below). Change that lending, or choose other days.",
     ACCOUNT_REQUIRED: "Fill in the account.",

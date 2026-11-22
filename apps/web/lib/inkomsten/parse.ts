@@ -15,7 +15,12 @@ import { createHash } from "node:crypto";
 import { brusselsWallClockMinutes } from "@/lib/brussels";
 import { detectDelimiter, parseCsv } from "@/lib/csv";
 
-export type IncomeSourceCode = "PAYCONIQ" | "MOLLIE" | "SUMUP" | "EUROPABANK";
+/**
+ * Een bron van inkomsten: de vier exports, en de overschrijvingen die Beheer
+ * met de hand invoert (`TRANSFER`, zie `transfers.ts`). De parser hier geeft
+ * enkel de vier exports terug.
+ */
+export type IncomeSourceCode = "PAYCONIQ" | "MOLLIE" | "SUMUP" | "EUROPABANK" | "TRANSFER";
 export type IncomeKindCode = "PAYMENT" | "REFUND" | "FEE" | "RESERVE";
 
 /** Het kanaal van Mollie: één profiel, dus één naam. */

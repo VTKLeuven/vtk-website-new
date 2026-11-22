@@ -13831,6 +13831,21 @@ had.
     geen einde, staat onder de onthouden tekst op de plaats van de
     standaardcode, en hoort bij Instellingen; een uitlening is werk van Na te
     kijken, met een eigen lijst.
+- **Overschrijvingen voert Beheer per stuk in, met de rekening en de code**
+  (Beheer, november 2026, vraag 12: "voor mensen die rechtstreeks op een
+  rekening betalen"). Het oude rekenblad had er een tabblad voor. Een export
+  bestaat er niet voor, en de lijnen van leden op een bankafschrift bewaart de
+  site bewust niet (namen en rekeningnummers), dus kan ze ze niet zelf vinden.
+  - **Een eigen bron, "Overschrijvingen"**, achteraan in het overzicht en het
+    kwartaalblad, met een kolom per rekening: zo ziet de boekhouder ze zoals
+    in het rekenblad, en elke rekening kan naast haar uittreksel.
+  - **Zonder naam of rekeningnummer van wie stortte.** De omschrijving zegt
+    waarvoor het geld was; wie het was, hoort niet in deze module.
+  - **Een terugbetaling per overschrijving vul je negatief in**, zodat ook die
+    een plaats heeft; de exports bevatten ze niet.
+  - **Ze telt in de maand van haar dag**, zoals elke bron. Een overschrijving
+    heeft geen uur, dus staat ze op 12:00: dan schuift ze nooit naar een
+    andere maand of een andere dag in Na te kijken.
 - **Transacties filtert ook op de dag van de betaling, van 9:00 tot 9:00**
   (Beheer, november 2026: "9:00 tot 9:00 lijkt best"). Zo blijft een avond
   bij de dag waarop ze begon, zoals in Na te kijken en bij een uitlening. De

@@ -151,6 +151,7 @@ export const AUDIT_ENTITIES = {
   incomeTransaction: { nl: "Online inkomsten", en: "Online income", group: "accounting" },
   incomeChannel: { nl: "Kanaal online inkomsten", en: "Online income channel", group: "accounting" },
   incomeNameRule: { nl: "Onthouden tekst online inkomsten", en: "Remembered online income text", group: "accounting" },
+  incomeTransfer: { nl: "Overschrijving (online inkomsten)", en: "Transfer (online income)", group: "accounting" },
   incomeChannelLending: { nl: "Uitlening van een toestel (online inkomsten)", en: "Device lending (online income)", group: "accounting" },
   incomePeriod: { nl: "Periode online inkomsten", en: "Online income period", group: "accounting" },
   incomeSettings: { nl: "Instelling online inkomsten", en: "Online income setting", group: "accounting" },

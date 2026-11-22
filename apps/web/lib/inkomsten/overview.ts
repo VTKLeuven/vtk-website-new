@@ -13,7 +13,11 @@ import type { IncomeKindCode, IncomeSourceCode } from "./parse";
 
 export { REVIEW_DAY_START_HOUR, reviewDay };
 
-export const INCOME_SOURCES: readonly IncomeSourceCode[] = ["PAYCONIQ", "MOLLIE", "SUMUP", "EUROPABANK"];
+/** De bronnen met een export om op te laden. */
+export const EXPORT_SOURCES: readonly IncomeSourceCode[] = ["PAYCONIQ", "MOLLIE", "SUMUP", "EUROPABANK"];
+
+/** Elke bron, in de volgorde van de kolommen: de exports, dan de overschrijvingen met de hand. */
+export const INCOME_SOURCES: readonly IncomeSourceCode[] = [...EXPORT_SOURCES, "TRANSFER"];
 
 export type OverviewTransaction = {
   source: IncomeSourceCode;
@@ -47,7 +51,7 @@ export type IncomeOverview = {
 };
 
 function emptyAmounts(): SourceAmounts {
-  return { PAYCONIQ: 0, MOLLIE: 0, SUMUP: 0, EUROPABANK: 0 };
+  return { PAYCONIQ: 0, MOLLIE: 0, SUMUP: 0, EUROPABANK: 0, TRANSFER: 0 };
 }
 
 function emptyLine(): OverviewLine {
@@ -304,7 +308,9 @@ export type IncomeCheckInput = {
 export function computeIncomeChecks(input: IncomeCheckInput): IncomeCheck[] {
   const missing: Array<{ source: IncomeSourceCode; month: string; channel: string | null }> = [];
   const past = input.months.filter((month) => month < input.currentMonth);
-  for (const source of INCOME_SOURCES) {
+  // Enkel de exports: een maand zonder overschrijving is gewoon een maand
+  // waarin niemand rechtstreeks stortte, geen vergeten bestand.
+  for (const source of EXPORT_SOURCES) {
     if (!input.sourcesInUse.has(source)) continue;
     if (EXPORT_PER_CHANNEL.has(source)) {
       for (const channel of input.channelsInUse) {

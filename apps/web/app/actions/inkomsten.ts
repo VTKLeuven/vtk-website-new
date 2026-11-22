@@ -22,6 +22,8 @@ import {
 } from "@/lib/inkomsten/server";
 import { paramGetter, parseTransactionFilter } from "@/lib/inkomsten/transactionFilter";
 import { deleteChannelLending, saveChannelLending, takeOverChannelLending } from "@/lib/inkomsten/lendingServer";
+import { deleteTransfer, saveTransfer } from "@/lib/inkomsten/transferServer";
+import { formatEuro } from "@/lib/rekeningen/expenses";
 import type { LendingDays } from "@/lib/inkomsten/lending";
 import { CHANNEL_FROM_START } from "@/lib/inkomsten/overview";
 
@@ -44,6 +46,7 @@ export type IncomeErrorCode =
   | "LENDING_ORDER"
   | "LENDING_TOO_LONG"
   | "LENDING_OVERLAP"
+  | "BAD_AMOUNT"
   | "ACCOUNT_REQUIRED"
   | "DEVICE_NOT_FOUND"
   | "FILTER_CHANGED"
@@ -310,6 +313,60 @@ export async function takeOverIncomeLendingAction(formData: FormData): Promise<S
   return saveOk(`${transactions(outcome.count)} overgenomen in de uitlening van ${outcome.channel}; de code bleef dezelfde.${kept}`);
 }
 
+// -----------------------------------------------------------------------------
+// Overschrijvingen met de hand
+// -----------------------------------------------------------------------------
+
+/** "16 september 2026" */
+function longDay(ymd: string): string {
+  return new Date(`${ymd}T12:00:00Z`).toLocaleDateString("nl-BE", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+}
+
+/** Een overschrijving bewaren (`id` leeg: een nieuwe). */
+export async function saveIncomeTransferAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const session = await requirePermission("income.manage");
+  const accountingCodeId = String(formData.get("accountingCodeId") ?? "");
+  if (!accountingCodeId) return saveError("CODE_REQUIRED");
+  const outcome = await saveTransfer(
+    {
+      id: String(formData.get("id") ?? "") || null,
+      day: String(formData.get("day") ?? ""),
+      amount: String(formData.get("amount") ?? ""),
+      bankAccount: String(formData.get("bankAccount") ?? ""),
+      description: String(formData.get("description") ?? ""),
+      accountingCodeId,
+    },
+    session.user.id,
+  );
+  if (!outcome.ok) return saveError(outcome.error);
+  const amount = formatEuro(outcome.amountCents);
+  await logAudit({
+    action: outcome.created ? "create" : "update",
+    entity: "incomeTransfer",
+    target: `${outcome.bankAccount} · ${outcome.day}`,
+    summary: `${amount} op ${outcome.code.code} ${outcome.code.name}`,
+  });
+  revalidate();
+  return saveOk(
+    `${outcome.created ? "Overschrijving toegevoegd" : "Overschrijving aangepast"}: ${amount} op ${outcome.bankAccount}, ${longDay(outcome.day)}, onder ${outcome.code.code} ${outcome.code.name}.`,
+  );
+}
+
+/** Een overschrijving verwijderen; ze verdwijnt uit het overzicht van haar maand. */
+export async function deleteIncomeTransferAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("income.manage");
+  const outcome = await deleteTransfer(String(formData.get("id") ?? ""));
+  if (!outcome.ok) return saveError(outcome.error);
+  await logAudit({
+    action: "delete",
+    entity: "incomeTransfer",
+    target: `${outcome.bankAccount} · ${outcome.day}`,
+    summary: formatEuro(outcome.amountCents),
+  });
+  revalidate();
+  return saveOk(`Overschrijving van ${formatEuro(outcome.amountCents)} op ${longDay(outcome.day)} verwijderd.`);
+}
+
 /** Meer dan een pagina aanvinken kan niet; "alles wat aan de filter voldoet" gaat via `scope=filter`. */
 const MAX_SELECTED = 1000;
 
@@ -507,8 +564,9 @@ export async function saveIncomeChannelAction(_prev: SaveState, formData: FormDa
 
   if (!bankAccount) return saveError("ACCOUNT_REQUIRED");
 
+  // Het kanaal van een overschrijving heeft een vaste rekening: dat past enkel Overschrijvingen aan.
   const channel = await prisma.incomeChannel.findUnique({
-    where: { id },
+    where: { id, source: { not: "TRANSFER" } },
     include: {
       accounts: { orderBy: { from: "asc" } },
       codes: { orderBy: { from: "asc" } },
@@ -620,7 +678,10 @@ export async function addIncomeChannelCodeAction(_prev: SaveState, formData: For
   const fromRaw = channelFrom(String(formData.get("from") ?? "").trim());
   const codeId = String(formData.get("accountingCodeId") ?? "") || null;
   if (!fromRaw) return saveError("BAD_DATE");
-  const channel = await prisma.incomeChannel.findUnique({ where: { id: channelId }, select: { identifier: true } });
+  const channel = await prisma.incomeChannel.findUnique({
+    where: { id: channelId, source: { not: "TRANSFER" } },
+    select: { identifier: true },
+  });
   if (!channel) return saveError("NOT_FOUND");
   let code: { code: string; name: string } | null = null;
   if (codeId) {
@@ -675,7 +736,7 @@ export async function saveIncomeChannelDeviceAction(_prev: SaveState, formData: 
   const id = String(formData.get("id") ?? "");
   const raw = String(formData.get("device") ?? "");
   const channel = await prisma.incomeChannel.findUnique({
-    where: { id },
+    where: { id, source: { not: "TRANSFER" } },
     select: { identifier: true, source: true, cashMethod: true, cashTerminal: true },
   });
   if (!channel) return saveError("NOT_FOUND");
@@ -722,7 +783,10 @@ export async function addIncomeChannelAccountAction(_prev: SaveState, formData: 
   const bankAccount = String(formData.get("bankAccount") ?? "").trim().replace(/\s+/g, " ").slice(0, 60);
   if (!bankAccount) return saveError("ACCOUNT_REQUIRED");
   if (!fromRaw) return saveError("BAD_DATE");
-  const channel = await prisma.incomeChannel.findUnique({ where: { id: channelId }, select: { identifier: true } });
+  const channel = await prisma.incomeChannel.findUnique({
+    where: { id: channelId, source: { not: "TRANSFER" } },
+    select: { identifier: true },
+  });
   if (!channel) return saveError("NOT_FOUND");
 
   const from = new Date(`${fromRaw}T00:00:00Z`);

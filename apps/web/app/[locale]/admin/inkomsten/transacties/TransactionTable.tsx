@@ -40,6 +40,8 @@ export type TransactionRow = {
   /** Hangt aan iets wat de site kent (kassa, ticketverkoop, lidgeld, uitleendienst). */
   linked: boolean;
   locked: boolean;
+  /** Een overschrijving met de hand: aanpassen gaat bij Overschrijvingen, hier enkel de link. */
+  transferHref: string | null;
 };
 
 const assignable = (row: TransactionRow) => (row.kind === "PAYMENT" || row.kind === "REFUND") && !row.locked;
@@ -469,6 +471,16 @@ function TransactionDetail({
             {nl
               ? "Deze maand is afgesloten en verandert niet meer. Heropen de periode bij Instellingen om iets te veranderen."
               : "This month is closed and no longer changes. Reopen the period under Settings to change something."}
+          </p>
+        ) : row.transferHref ? (
+          <p className="text-sm text-vtk-muted">
+            {nl
+              ? "Een overschrijving met de hand heeft geen koppelregel. Pas de dag, het bedrag, de rekening of de code aan bij "
+              : "A transfer entered by hand has no matching rule. Change its day, amount, account or code under "}
+            <Link href={row.transferHref} className="underline">
+              {nl ? "Overschrijvingen" : "Transfers"}
+            </Link>
+            .
           </p>
         ) : row.kind === "FEE" || row.kind === "RESERVE" ? (
           <p className="text-sm text-vtk-muted">

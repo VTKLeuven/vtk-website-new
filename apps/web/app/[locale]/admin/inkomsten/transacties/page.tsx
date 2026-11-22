@@ -55,7 +55,7 @@ export default async function IncomeTransactionsPage({
   const [{ rows, total, totalCents, assignable }, codes, channels, lending] = await Promise.all([
     listIncomeTransactions(filter, page),
     listAccountingCodes(),
-    listIncomeChannels(),
+    listIncomeChannels({ transfers: true }),
     filter.lendingId ? describeChannelLending(filter.lendingId) : null,
   ]);
 
@@ -132,6 +132,10 @@ export default async function IncomeTransactionsPage({
       : null,
     linked: Boolean(row.ticketPayment || row.cashRegister || row.membershipPaymentId || row.uitleenPaymentId),
     locked: row.locked,
+    transferHref:
+      row.source === "TRANSFER" && row.periodMonth
+        ? `${base}/admin/inkomsten/overschrijvingen?van=${dateToMonth(row.periodMonth)}&tot=${dateToMonth(row.periodMonth)}`
+        : null,
   }));
 
   const field = "rounded-lg border border-vtk-blue/15 px-2 py-1.5";

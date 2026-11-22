@@ -193,6 +193,11 @@ de sectie "Vallen"; de kringkeuzes staan in `docs/design-decisions.md`.
   gezet werd, blijft. Een nieuwe regel komt in `matchTransaction` én in de drie
   plaatsen die een context bouwen (opladen, `matchContextsFor`,
   `listUnassignedGroups`), anders koppelen import en opnieuw koppelen anders.
+- **Overschrijvingen zijn een bron zonder export** (`TRANSFER`, met de hand op
+  /admin/inkomsten/overschrijvingen): één `IncomeImport` met formaat `manual`
+  per stuk en één kanaal per rekening. Een lijst van imports filtert op dat
+  formaat, en wat "elke maand een export" verwacht, loopt over `EXPORT_SOURCES`,
+  niet over `INCOME_SOURCES`. Bewaar er geen naam of rekening van wie stortte.
 
 # Bestuursorgaan
 

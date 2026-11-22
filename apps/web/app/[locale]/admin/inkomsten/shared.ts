@@ -11,6 +11,7 @@ export const SOURCE_LABELS: Record<IncomeSourceCode, string> = {
   MOLLIE: "Mollie",
   SUMUP: "SumUp",
   EUROPABANK: "Europabank",
+  TRANSFER: "Overschrijvingen",
 };
 
 export { monthLabel, periodLabel } from "@/lib/inkomsten/labels";
