@@ -53,8 +53,10 @@ export type ChannelCodeEntry = { from: string; code: CodeSnapshot | null };
 /**
  * Een aanvaarde kassa op het toestel van een kanaal: haar uren (of de hele dag
  * zonder uren) en haar code. `code` null: Beheer koos er nog geen.
+ * `wholeDay`: de kassa heeft geen uren (van voor oktober 2026) en krijgt dus
+ * ook geen marge (`KASSA_MARGIN_MINUTES`).
  */
-export type KassaSpan = { id: string; start: Date; end: Date; code: CodeSnapshot | null };
+export type KassaSpan = { id: string; start: Date; end: Date; code: CodeSnapshot | null; wholeDay?: boolean };
 
 /**
  * Een uitlening van het toestel van een kanaal: de eerste en de laatste dag
@@ -143,16 +145,49 @@ export function lendingOn(spans: readonly LendingSpan[], day: string): LendingSp
 }
 
 /**
- * De kassa die het toestel had op een moment. Een toestel van een post (een
- * kanaal met een standaardcode op die dag: de SumUp van Theokot) hoort enkel
- * tijdens haar uren bij een kassa; daarvoor en daarna geldt de standaardcode
- * weer. Een gedeeld toestel (de stickers en de terminal van evenementen) hoort
- * bij een kassa tijdens haar uren plus de uitloop van diezelfde avond/nacht
- * (tot 9:00 de ochtend erna, zolang er geen volgende kassa begon). Wat op een
- * andere dag buiten een kassa binnenkomt, gaat naar Na te kijken.
+ * De marge rond de uren van een kassa (Beheer, november 2026: "pak 2u"). Een
+ * kassa vult haar begin- en einduur meestal exact in, maar mensen betalen soms
+ * vroeger of later. De koppeling (`kassaAt`) en de kassacontrole
+ * (`kassaControlWindow` in `kassa.ts`) rekenen met dezelfde marge.
+ */
+export const KASSA_MARGIN_MINUTES = 120;
+const KASSA_MARGIN_MS = KASSA_MARGIN_MINUTES * 60_000;
+
+/**
+ * De kassa die binnen de marge het dichtst bij een moment ligt, of null. Twee
+ * kassa's op hetzelfde toestel met minder dan twee keer de marge ertussen
+ * delen het gat zo in het midden, net als de kassacontrole.
+ */
+function nearestKassa(spans: readonly KassaSpan[], at: Date): KassaSpan | null {
+  let best: KassaSpan | null = null;
+  let bestDistance = Infinity;
+  for (const span of spans) {
+    if (span.wholeDay) continue;
+    const distance = at < span.start ? span.start.getTime() - at.getTime() : at.getTime() - span.end.getTime();
+    if (distance >= 0 && distance <= KASSA_MARGIN_MS && distance < bestDistance) {
+      best = span;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+/**
+ * De kassa die het toestel had op een moment: tijdens haar uren, of binnen 2
+ * uur ervoor of erna (`KASSA_MARGIN_MINUTES`), want niet iedereen betaalt
+ * tijdens de uren die op de kassa staan. Valt een moment binnen de marge van
+ * twee kassa's, dan wint de dichtste; de uren van een kassa gaan altijd voor.
+ *
+ * Een toestel van een post (een kanaal met een standaardcode op die dag: de
+ * SumUp van Theokot) hoort enkel tijdens haar uren en de marge bij een kassa;
+ * daarvoor en daarna geldt de standaardcode weer. Een gedeeld toestel (de
+ * stickers en de terminal van evenementen) hoort bij een kassa ook nog tijdens
+ * de uitloop van diezelfde avond/nacht (tot 9:00 de ochtend erna, zolang er
+ * geen volgende kassa begon). Wat op een andere dag buiten een kassa
+ * binnenkomt, gaat naar Na te kijken.
  */
 export function kassaAt(spans: readonly KassaSpan[], at: Date, postDevice: boolean): KassaSpan | null {
-  const active = spans.find((span) => span.start <= at && at < span.end);
+  const active = spans.find((span) => span.start <= at && at < span.end) ?? nearestKassa(spans, at);
   if (active || postDevice) return active ?? null;
   let latest: KassaSpan | null = null;
   for (const span of spans) {

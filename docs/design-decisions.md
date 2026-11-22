@@ -14141,6 +14141,16 @@ had.
   verschijnt. Op een toestel van een post geldt de kassa enkel tijdens haar
   uren; daarvoor en daarna neemt de standaardcode van de eigenaar het weer
   over. Een code in de omschrijving gaat altijd voor op de kassa.
+- **Een kassa krijgt 2 uur marge rond haar uren, bij het koppelen en bij de
+  kassacontrole.** Beheer vroeg het in de review van november 2026 ("pak 2u"):
+  mensen betalen soms voor de kassa opent of nadat ze sloot, en die betalingen
+  kregen dan de standaardcode van het toestel of stonden bij Na te kijken. Een
+  marge alleen bij het koppelen zou een betaling bij een kassa zetten zonder
+  dat de kassacontrole ze meetelt, dus beide rekenen met dezelfde marge. Twee
+  kassa's met hetzelfde toestel delen het gat ertussen in het midden, zodat een
+  betaling nooit bij beide hoort; de uren van een kassa gaan voor op de marge
+  van een andere. Een kassa zonder uren (van voor oktober 2026) dekt al de
+  hele dag en krijgt geen marge.
 - **Veel bestanden tegelijk, elk een eigen import.** Europabank laat enkel per
   dag downloaden, dus een kwartaal van één terminal is een negentigtal
   bestanden. Beheer kiest ze samen; de site toont wat ze samen en per bestand
