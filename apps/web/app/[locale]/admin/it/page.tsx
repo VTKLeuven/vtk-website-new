@@ -221,7 +221,7 @@ export default async function AdminIT({
           <summary className="flex cursor-pointer items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-3">
-                <h2 className="text-lg font-semibold">AI translation (admin forms)</h2>
+                <h2 className="text-lg font-semibold">External LLM (vLLM / OpenAI API)</h2>
                 <span className="rounded-full border border-vtk-blue/15 px-2 py-0.5 text-xs text-zinc-500">
                   {aiStatus.source === "database"
                     ? "Database"
@@ -231,8 +231,8 @@ export default async function AdminIT({
                 </span>
               </div>
               <p className="mt-1 text-sm text-zinc-500 line-clamp-1 group-open:line-clamp-none">
-                Translates bilingual NL/EN fields in admin forms using vLLM / Open WebUI on kenny.
-                Translate buttons appear automatically on all bilingual admin forms once configured.
+                Connection to an OpenAI-compatible LLM endpoint (such as vLLM or Open WebUI on
+                kenny). Currently used for bilingual NL/EN translation in admin forms.
               </p>
             </div>
             <span className="text-zinc-400 group-open:rotate-180 transition-transform duration-200 shrink-0">
@@ -244,9 +244,9 @@ export default async function AdminIT({
           <div className="mt-6 space-y-6 border-t border-vtk-blue/10 pt-5">
             <AiConfigForm status={aiStatus} />
             <div className="border-t border-vtk-blue/10 pt-5">
-              <h3 className="text-sm font-semibold">Test translation</h3>
+              <h3 className="text-sm font-semibold">Test LLM connection</h3>
               <p className="mt-1 mb-3 text-xs text-zinc-500">
-                Sends a short test phrase to the configured OpenAI-compatible endpoint.
+                Sends a short test request to the configured OpenAI-compatible endpoint.
               </p>
               <AiTestButton />
             </div>

@@ -531,10 +531,10 @@ export async function saveAiConfigAction(
   await logAudit({
     action: "update",
     entity: "itConfig",
-    target: "AI translation",
+    target: "External LLM",
     summary: value.apiUrl
-      ? `AI-vertaling bijgewerkt (${value.apiUrl}, model ${value.model})`
-      : "AI-vertaling uitgeschakeld",
+      ? `Externe LLM-configuratie bijgewerkt (${value.apiUrl}, model ${value.model})`
+      : "Externe LLM-koppeling uitgeschakeld",
   });
 
   revalidatePath("/admin", "layout");

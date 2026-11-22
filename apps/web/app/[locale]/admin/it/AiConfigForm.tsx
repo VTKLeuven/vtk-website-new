@@ -24,7 +24,7 @@ export function AiConfigForm({ status }: { status: AiStatus }) {
       ? "stored in the database (managed here)"
       : status.source === "environment"
         ? "coming from the environment variables"
-        : "not configured yet — translate buttons stay hidden in admin forms";
+        : "not configured yet — LLM features (such as admin translation) stay hidden";
 
   return (
     <div className="space-y-4">
@@ -35,11 +35,11 @@ export function AiConfigForm({ status }: { status: AiStatus }) {
 
       <SaveForm
         action={saveAiConfigAction}
-        submitLabel="Save AI config"
+        submitLabel="Save LLM config"
         savingLabel="Saving..."
-        savedMessage="AI translation config saved."
+        savedMessage="External LLM config saved."
         errorMessages={errorMessages}
-        fallbackErrorMessage="Could not save the AI config."
+        fallbackErrorMessage="Could not save the LLM config."
         resetOnSuccess={false}
         onSuccess={() => {
           setApiKey("");

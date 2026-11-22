@@ -31,10 +31,10 @@ export function AiTestButton() {
           start(async () => setResult(await testAiConnectionAction()));
         }}
       >
-        {pending ? "Testing..." : "Test translation"}
+        {pending ? "Testing..." : "Test LLM connection"}
       </Button>
       <p className="text-xs text-zinc-500">
-        Tests the saved configuration with a short NL &rarr; EN sample, so save any changes first.
+        Tests the saved configuration with a short sample request, so save any changes first.
       </p>
       {result?.ok && (
         <p className="text-sm text-emerald-700">
