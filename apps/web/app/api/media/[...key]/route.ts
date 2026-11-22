@@ -1,4 +1,4 @@
-import { getObjectStream, mediaResponseInit, objectResponse } from "@vtk/storage";
+import { getObjectStream, isPublicMediaKey, mediaResponseInit, objectResponse } from "@vtk/storage";
 
 /**
  * Serveert opgeslagen objecten (logo's, afbeeldingen, pagina-bijlagen, foto's)
@@ -13,6 +13,11 @@ import { getObjectStream, mediaResponseInit, objectResponse } from "@vtk/storage
  * hoeft niet publiek te zijn en zijn host hoeft niet bereikbaar te zijn vanuit
  * de browser. De keys zijn onraadbare random hex, dus het toegangsmodel blijft
  * gelijk aan de vorige publieke-URL-aanpak.
+ *
+ * Twee uitzonderingen, allebei in `@vtk/storage` (`serve.ts`): een private map
+ * (bonnetjes, formulierbestanden) gaat hier nooit naar buiten, want die heeft
+ * een eigen leesroute met rechten; en enkel een type uit de allowlist opent in
+ * de browser, al de rest is een download in een sandbox.
  */
 export async function GET(
   request: Request,
@@ -20,7 +25,8 @@ export async function GET(
 ) {
   const { key: segments } = await context.params;
   const key = segments.join("/");
-  if (!key) return new Response("Not found", { status: 404 });
+  // 404 en geen 403: een private key hoort er voor deze route niet te zijn.
+  if (!isPublicMediaKey(key)) return new Response("Not found", { status: 404 });
 
   // Range doorgeven aan S3: een PDF-lezer haalt zo enkel de stukken op die hij
   // nodig heeft, in plaats van het hele bestand voor bladzijde 1.
@@ -28,7 +34,7 @@ export async function GET(
 
   try {
     const object = await getObjectStream(key, range);
-    // De headers (range, ETag, sandbox voor SVG/HTML, downloads) staan in
+    // De headers (range, ETag, sandbox buiten de allowlist, downloads) staan in
     // @vtk/storage, gedeeld met de uitleendienst. `files/` gaat hier altijd
     // als download.
     return objectResponse(request, object.stream, () =>

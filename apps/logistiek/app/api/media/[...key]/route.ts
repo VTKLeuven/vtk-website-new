@@ -1,4 +1,11 @@
-import { getObjectBuffer, getObjectStream, mediaResponseInit, objectResponse, putObject } from '@vtk/storage';
+import {
+  getObjectBuffer,
+  getObjectStream,
+  isPublicMediaKey,
+  mediaResponseInit,
+  objectResponse,
+  putObject,
+} from '@vtk/storage';
 import { originalOfThumb } from '@/lib/photo-url';
 import { makeThumb } from '@/lib/upload';
 
@@ -9,15 +16,18 @@ export const runtime = 'nodejs';
  * browser enkel met deze origin praat. Keys zijn onraadbare random hex, dus het
  * toegangsmodel blijft gelijk.
  *
- * Dezelfde headers als vtk.be (`mediaResponseInit` in @vtk/storage): Range voor
- * een pdf-lezer, ETag, `nosniff`, en een sandbox plus download voor een type dat
- * in de browser code kan draaien. Die laatste stond hier niet, en een upload
- * bewaarde tot november 2026 ruwe bytes onder het type dat de browser opgaf.
+ * Deze app deelt de bucket met vtk.be, dus dezelfde regels (`@vtk/storage`): een
+ * private map (bonnetjes, formulierbestanden) gaat hier nooit naar buiten
+ * (`isPublicMediaKey`), en `mediaResponseInit` geeft dezelfde headers: Range voor
+ * een pdf-lezer, ETag, `nosniff`, en een sandbox plus download voor elk type
+ * buiten de allowlist. Zonder die regels opende een formulierbestand met
+ * `text/html` hier als pagina, in een origin die de sessiecookie van `.vtk.be`
+ * deelt.
  */
 export async function GET(request: Request, context: { params: Promise<{ key: string[] }> }) {
   const { key: segments } = await context.params;
   const key = segments.join('/');
-  if (!key) return new Response('Not found', { status: 404 });
+  if (!isPublicMediaKey(key)) return new Response('Not found', { status: 404 });
 
   try {
     const object = await getObjectStream(key, request.headers.get('range'));

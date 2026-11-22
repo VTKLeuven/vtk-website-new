@@ -20,6 +20,7 @@ export {
   normalizeContentType,
   uploadContentType,
 } from "./serve";
+import { SANDBOX_CSP, isInlineSafeContentType } from "./serve";
 
 export type S3Config = {
   endpoint: string;
@@ -241,9 +242,6 @@ export function contentDisposition(type: "inline" | "attachment", filename: stri
   return `${type}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
 }
 
-/** Types die in de browser code kunnen draaien wanneer ze inline geopend worden. */
-const UNSAFE_INLINE_TYPE = /(?:svg\+xml|text\/html|application\/(?:xhtml\+xml|xml)|text\/xml)/i;
-
 /**
  * Status en headers voor een object uit de bucket, voor de `/api/media`-route
  * van elke app (vtk.be en de uitleendienst delen ze).
@@ -252,9 +250,10 @@ const UNSAFE_INLINE_TYPE = /(?:svg\+xml|text\/html|application\/(?:xhtml\+xml|xm
  *   nodig heeft, met een echte 206.
  * - ETag en Last-Modified gaan mee, en de keys zijn onraadbare random hex en dus
  *   onveranderlijk: hard cachen.
- * - Een type dat in de browser code kan draaien (SVG, HTML, XML) krijgt een
- *   sandbox-CSP en gaat als download: een oud object van voor de uploadcontrole
- *   kan zo nooit uitvoeren in de origin van de site.
+ * - Enkel een type uit de allowlist van `serve.ts` opent in de browser; al de
+ *   rest krijgt een sandbox-CSP en gaat als download. Een denylist miste
+ *   `application/atom+xml` en co, die een browser als XHTML met script uitvoert.
+ *   Of de key zelf naar buiten mag (`isPublicMediaKey`), toetst de route vooraf.
  * - `?download` forceert een download, `?filename=` geeft de naam mee.
  *   `attachmentPrefixes` zijn mappen die altijd downloaden (op vtk.be `files/`).
  *
@@ -284,17 +283,15 @@ export function mediaResponseInit(
   headers.set("accept-ranges", "bytes");
   headers.set("x-content-type-options", "nosniff");
   headers.set("referrer-policy", "no-referrer");
-  const unsafeInlineType = UNSAFE_INLINE_TYPE.test(type);
-  if (unsafeInlineType) {
-    headers.set("content-security-policy", "sandbox; default-src 'none'; style-src 'unsafe-inline'");
-  }
+  const inlineSafe = isInlineSafeContentType(type);
+  if (!inlineSafe) headers.set("content-security-policy", SANDBOX_CSP);
   const url = new URL(request.url);
   const requestedFilename = url.searchParams.get("filename")?.trim();
   const forceDownload = url.searchParams.has("download");
   const filename = requestedFilename || key.split("/").at(-1) || "download";
   const alwaysAttachment = (options.attachmentPrefixes ?? []).some((prefix) => key.startsWith(prefix));
 
-  if (alwaysAttachment || unsafeInlineType || forceDownload) {
+  if (alwaysAttachment || !inlineSafe || forceDownload) {
     headers.set("content-disposition", contentDisposition("attachment", filename));
   } else if (requestedFilename) {
     headers.set("content-disposition", contentDisposition("inline", filename));
