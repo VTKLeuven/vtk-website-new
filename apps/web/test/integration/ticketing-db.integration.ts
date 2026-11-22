@@ -948,6 +948,8 @@ describe("ticketing database invariants", () => {
     );
   });
 
+  // Maakt de ticket-PDF's aan: op de CI-runner al ~4 s, dicht bij de 5 s van
+  // vitest. Een ruimere grens, zodat een trage runner geen valse fout geeft.
   it("issues a free order atomically and supports a complete refund", async () => {
     const expires = new Date("2027-04-20T00:00:00.000Z");
     const access = createOrderAccessToken(ids.issuedOrder, expires);
@@ -1052,7 +1054,7 @@ describe("ticketing database invariants", () => {
     expect(await prisma.ticketOutboxMessage.findUnique({ where: { id: message.id } })).toMatchObject({
       status: "SENT",
     });
-  });
+  }, 20_000);
 
   it("removes one attendee of a multi-ticket order and leaves the others valid", async () => {
     const poolId = randomUUID();
