@@ -9,8 +9,42 @@
  * afleest, en een verschil is een waarschuwing. Zie docs/inkomsten.md.
  */
 import { intervalsOverlap, registerInterval, timeInputValue, type PaymentMethod } from "@/lib/kassas/kassa";
+import { KASSA_MARGIN_MINUTES } from "./match";
 
-export type ControlWindow = { start: Date; end: Date; wholeDay: boolean };
+/**
+ * `hours`: de uren van de kassa waarrond de marge ligt, om te tonen; null bij
+ * de hele dag.
+ */
+export type ControlWindow = { start: Date; end: Date; wholeDay: boolean; hours?: { start: Date; end: Date } | null };
+
+type Interval = { start: Date; end: Date };
+
+const MARGIN_MS = KASSA_MARGIN_MINUTES * 60_000;
+
+/**
+ * De uren van een kassa met de marge ervoor en erna (`KASSA_MARGIN_MINUTES`).
+ * Een andere kassa op hetzelfde toestel begrenst ze: ligt die er minder dan
+ * twee keer de marge naast, dan delen ze het gat in het midden, zoals de
+ * koppeling (`kassaAt`); overlappen ze, dan komt er aan die kant geen marge
+ * bij. Zo telt een betaling nooit bij twee kassa's.
+ */
+export function withKassaMargin(own: Interval, others: readonly Interval[]): Interval {
+  let start = own.start.getTime() - MARGIN_MS;
+  let end = own.end.getTime() + MARGIN_MS;
+  const ownStart = own.start.getTime();
+  const ownEnd = own.end.getTime();
+  for (const other of others) {
+    const otherStart = other.start.getTime();
+    const otherEnd = other.end.getTime();
+    if (otherEnd <= ownStart) start = Math.max(start, Math.floor((otherEnd + ownStart) / 2));
+    else if (otherStart >= ownEnd) end = Math.min(end, Math.floor((ownEnd + otherStart) / 2));
+    else {
+      if (otherStart < ownStart) start = Math.max(start, ownStart);
+      if (otherEnd > ownEnd) end = Math.min(end, ownEnd);
+    }
+  }
+  return { start: new Date(start), end: new Date(end) };
+}
 
 /** Wat de import op één toestel zag binnen het venster van een kassa. */
 export type KassaImportAmount = {
@@ -27,21 +61,27 @@ export type KassaImportAmount = {
 /**
  * Over welke tijd de controle een toestel van een kassa optelt. Beheer leest
  * het toestel af voor en na een evenement, of neemt het dagtotaal wanneer dat
- * evenement het enige was die dag. Dus de uren van de kassa wanneer een andere
- * kassa dat toestel dezelfde dag had, en anders de hele dag, tot het einde van
- * de kassa als die over middernacht loopt. Een kassa zonder uren (van voor
- * oktober 2026) telt altijd de hele dag.
+ * evenement het enige was die dag. Dus de uren van de kassa met 2 uur marge
+ * ervoor en erna (`withKassaMargin`) wanneer een andere kassa dat toestel
+ * dezelfde dag had, en anders de hele dag, tot het einde van de marge als de
+ * kassa over middernacht loopt. Een kassa zonder uren (van voor oktober 2026)
+ * telt altijd de hele dag, zonder marge.
+ *
+ * `others`: de uren van de andere kassa's met hetzelfde toestel, die de marge
+ * begrenzen.
  */
 export function kassaControlWindow(
   register: { date: Date; startsAt: Date | null; endsAt: Date | null },
   sharedThatDay: boolean,
+  others: readonly Interval[] = [],
 ): ControlWindow {
-  if (sharedThatDay && register.startsAt && register.endsAt) {
-    return { start: register.startsAt, end: register.endsAt, wholeDay: false };
-  }
+  const hours = register.startsAt && register.endsAt ? { start: register.startsAt, end: register.endsAt } : null;
+  const margin = hours ? withKassaMargin(hours, others) : null;
+  if (sharedThatDay && hours && margin) return { start: margin.start, end: margin.end, wholeDay: false, hours };
   const day = registerInterval({ date: register.date, startsAt: null, endsAt: null });
-  const end = register.endsAt && register.endsAt > day.end ? register.endsAt : day.end;
-  return { start: day.start, end, wholeDay: true };
+  const start = margin && margin.start < day.start ? margin.start : day.start;
+  const end = margin && margin.end > day.end ? margin.end : day.end;
+  return { start, end, wholeDay: true, hours: null };
 }
 
 export type KassaCheck =
@@ -65,7 +105,14 @@ export function controlSpanLabel(amount: Pick<KassaImportAmount, "window" | "sha
   }
   const start = timeInputValue(new Date(amount.window.start));
   const end = timeInputValue(new Date(amount.window.end));
-  return nl ? `van ${start} tot ${end}` : `from ${start} to ${end}`;
+  const hours = amount.window.hours;
+  if (!hours) return nl ? `van ${start} tot ${end}` : `from ${start} to ${end}`;
+  // De uren van de kassa, en waarover er met de marge echt geteld werd.
+  const from = timeInputValue(new Date(hours.start));
+  const to = timeInputValue(new Date(hours.end));
+  return nl
+    ? `van ${from} tot ${to}, met marge van ${start} tot ${end}`
+    : `from ${from} to ${to}, with margin from ${start} to ${end}`;
 }
 
 /** "1 betaling", "3 betalingen". */
@@ -115,18 +162,18 @@ export function deviceWindow(
   terminal: string,
   uses: readonly DeviceUse[],
 ): { window: ControlWindow; sharedThatDay: boolean } {
-  const wholeDay = kassaControlWindow(register, false);
-  const sharedThatDay = uses.some(
-    (use) =>
-      use.registerId !== register.id &&
-      use.method === method &&
-      use.terminal === terminal &&
-      intervalsOverlap(
-        wholeDay,
-        registerInterval({ date: use.date, startsAt: use.startsAt ?? null, endsAt: use.endsAt ?? null }),
-      ),
-  );
-  return { window: kassaControlWindow(register, sharedThatDay), sharedThatDay };
+  // De andere kassa's met dit toestel. Een kassa zonder uren heeft er geen om
+  // de marge mee te begrenzen.
+  const others = uses
+    .filter((use) => use.registerId !== register.id && use.method === method && use.terminal === terminal)
+    .map((use) => ({
+      interval: registerInterval({ date: use.date, startsAt: use.startsAt ?? null, endsAt: use.endsAt ?? null }),
+      hasHours: Boolean(use.startsAt && use.endsAt),
+    }));
+  const wholeDay = registerInterval({ date: register.date, startsAt: null, endsAt: null });
+  const sharedThatDay = others.some((other) => intervalsOverlap(wholeDay, other.interval));
+  const bounds = others.filter((other) => other.hasHours).map((other) => other.interval);
+  return { window: kassaControlWindow(register, sharedThatDay, bounds), sharedThatDay };
 }
 
 /**

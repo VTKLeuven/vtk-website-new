@@ -289,15 +289,22 @@ In `matchTransaction`, de eerste die past wint. Enkel voor `PAYMENT` en `REFUND`
    hangt af van de soort toestel:
    - **Een toestel van een post**, een kanaal met op die dag een standaardcode
      (de SumUp van Theokot), of een toestel met een uitlening op die dag: enkel
-     tijdens de uren van de kassa. Daarvoor en daarna neemt regel 6 of 7 het
-     weer over.
+     tijdens de uren van de kassa en de marge. Daarvoor en daarna neemt regel 6
+     of 7 het weer over.
    - **Een gedeeld toestel**, een kanaal zonder standaardcode (Evenementen 2,
-     de terminal van evenementen): tijdens de uren van de kassa plus de
-     uitloop van diezelfde avond/nacht (tot 9:00 de ochtend erna, zolang er
-     geen volgende kassa met dat toestel begon). Wat op een andere dag buiten
-     elke kassa valt, blijft voor Na te kijken.
+     de terminal van evenementen): tijdens de uren van de kassa en de marge,
+     plus de uitloop van diezelfde avond/nacht (tot 9:00 de ochtend erna,
+     zolang er geen volgende kassa met dat toestel begon). Wat op een andere dag
+     buiten elke kassa valt, blijft voor Na te kijken.
+   - **De marge**: 2 uur voor en na de uren van een kassa
+     (`KASSA_MARGIN_MINUTES` in `match.ts`), want niet iedereen betaalt tijdens
+     de uren die op de kassa staan. Valt een betaling in de marge van twee
+     kassa's met hetzelfde toestel, dan wint de dichtste; de uren van een kassa
+     gaan altijd voor op de marge van een andere. De kassacontrole rekent met
+     dezelfde marge (`withKassaMargin` in `kassa.ts`), zodat een betaling bij
+     dezelfde kassa koppelt als waar ze geteld wordt.
    - Een kassa zonder uren loopt van middernacht tot middernacht van haar dag
-     (`registerInterval`).
+     (`registerInterval`), zonder marge (`KassaSpan.wholeDay`).
    - Een kassa zonder code koppelt niets: wat in haar venster valt, gaat door
      naar regel 5 tot 7. Op een gedeeld toestel sluit ze wel de kassa ervoor af.
 5. **Onthouden tekst** (`NAME_RULE`): `incomeRuleText` van de omschrijving
@@ -324,11 +331,11 @@ staat na regel 3: een betaling die zelf haar code draagt, weet het beter dan
 het uur waarop ze viel.
 
 Regel 6 staat onder wat exact koppelt (de site, een code in de tekst, een
-kassa tijdens haar uren, een onthouden tekst): die weten het beter dan de
-datum. Ze staat boven de standaardcode, want die vervangt ze net. Een
+kassa tijdens haar uren en de marge, een onthouden tekst): die weten het beter
+dan de datum. Ze staat boven de standaardcode, want die vervangt ze net. Een
 uitgeleend toestel telt die dagen als toestel van een post (`deviceAt`): een
-kassa die er een avond op stond, houdt enkel haar uren, en daarna geldt de
-uitlening weer, niet de uitloop tot 9:00 van een gedeeld toestel. De uitlening
+kassa die er een avond op stond, houdt enkel haar uren en de marge, en daarna
+geldt de uitlening weer, niet de uitloop tot 9:00 van een gedeeld toestel. De uitlening
 zegt wie het toestel die dagen had.
 
 **Twee klokken.** Een uitlening gaat over dagen van 9:00 tot 9:00, zodat een
@@ -637,11 +644,16 @@ elke aanvaarde kassa van een werkingsjaar, per toestel een rij.
   Payconiq-rekening, een SumUp-account of Europabank-terminal een
   Bancontact-bakje, met de naam uit de instellingen van de kassa's. Meerdere
   kanalen kunnen één toestel zijn (de twee terminals van Cudi).
-- **Het venster** (`kassaControlWindow`): de uren van de kassa wanneer een
-  andere kassa dat toestel dezelfde dag had, en anders de hele dag, tot het
-  einde van een kassa die over middernacht loopt. Zo leest Beheer af: voor en
-  na een evenement, of het dagtotaal als dat evenement het enige was. Een kassa
-  zonder uren telt altijd de hele dag.
+- **Het venster** (`kassaControlWindow`): de uren van de kassa met 2 uur marge
+  ervoor en erna wanneer een andere kassa dat toestel dezelfde dag had, en
+  anders de hele dag, tot het einde van de marge als die voorbij middernacht
+  loopt. Zo leest Beheer af: voor en na een evenement, of het dagtotaal als dat
+  evenement het enige was. Een andere kassa met hetzelfde toestel begrenst de
+  marge (`withKassaMargin`): ligt ze minder dan 4 uur ervandaan, dan delen ze
+  het gat in het midden, en waar ze overlappen, komt er geen marge bij. Zo telt
+  een betaling nooit bij twee kassa's. Een kassa zonder uren telt altijd de
+  hele dag, zonder marge. Het telformulier en de lijst tonen beide: "van 20:00
+  tot 03:00, met marge van 18:00 tot 05:00" (`controlSpanLabel`).
 - **Wat telt**: alle betalingen en terugbetalingen op die kanalen in dat
   venster, ook wat "telt niet mee" kreeg: dit is wat er op het toestel
   binnenkwam.
@@ -910,6 +922,14 @@ fouten), dan opladen.
   loopt een kassa op een gedeeld toestel hoogstens tot 9:00 de ochtend na haar
   einde (`reviewDay`). Een evenement dagen later zonder kassa belandt zo bij
   Na te kijken in plaats van bij de vorige kassa.
+- **De marge geldt pas na opnieuw koppelen.** Wat al gekoppeld was, houdt zijn
+  regel tot de volgende keer dat de site opnieuw koppelt (een upload, een
+  kassa die verandert, "Opnieuw koppelen" op Na te kijken). Dan krijgt een
+  betaling tot 2 uur voor of na een kassa de code van die kassa in plaats van
+  de standaardcode, ook in een open maand die Beheer al bekeek. Een afgesloten
+  periode blijft zoals ze is. De marge koppelt en telt met dezelfde regel: wie
+  hem aanpast, past `KASSA_MARGIN_MINUTES` aan, niet `kassaAt` of
+  `withKassaMargin` apart.
 - **Een bankafschrift bevat leden.** Herken een provider aan de naam van de
   tegenpartij, nooit aan de mededeling: een lid kan "MOLLIE" in zijn
   mededeling typen. En aan de volledige naam van het bedrijf, niet aan het

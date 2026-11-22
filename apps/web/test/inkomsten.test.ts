@@ -10,7 +10,7 @@ import {
   parseLocalDateTime,
   type ParsedIncomeRow,
 } from "@/lib/inkomsten/parse";
-import { codeAtStart, deviceAt, incomeRuleText, lendingOn, matchTransaction, nameRuleKey, type MatchContext, type MatchInput } from "@/lib/inkomsten/match";
+import { codeAtStart, deviceAt, incomeRuleText, kassaAt, lendingOn, matchTransaction, nameRuleKey, type MatchContext, type MatchInput } from "@/lib/inkomsten/match";
 import { accountOn, computeIncomeOverview, reviewDay, type OverviewTransaction } from "@/lib/inkomsten/overview";
 import { NO_SEPARATE_FEES } from "@/lib/inkomsten/lines";
 import { combineImportSummaries } from "@/lib/inkomsten/importSummary";
@@ -21,6 +21,7 @@ import {
   kassaCheck,
   kassaControlState,
   kassaControlWindow,
+  withKassaMargin,
   type DeviceUse,
 } from "@/lib/inkomsten/kassa";
 import type { ImportSummary } from "@/lib/inkomsten/server";
@@ -646,6 +647,36 @@ describe("koppelregels", () => {
     expect(at("2026-10-03T08:00:00Z")).toMatchObject({ rule: "CHANNEL_DEFAULT", code: { code: "700110" }, cashRegisterId: null });
   });
 
+  it("geeft een kassa ook 2 uur voor en na haar uren, en daarbuiten niet meer", () => {
+    const post = (iso: string) =>
+      matchTransaction({ ...base, source: "PAYCONIQ", channelId: "kanaal-post", occurredAt: new Date(iso) }, context);
+    // kassa-caraoke loopt van 18:00 tot 04:00 in Brussel.
+    expect(post("2026-10-02T14:30:00Z")).toMatchObject({ rule: "CASH_REGISTER", cashRegisterId: "kassa-caraoke" });
+    expect(post("2026-10-02T13:30:00Z")).toMatchObject({ rule: "CHANNEL_DEFAULT", cashRegisterId: null });
+    expect(post("2026-10-03T03:30:00Z")).toMatchObject({ rule: "CASH_REGISTER", cashRegisterId: "kassa-caraoke" });
+    expect(post("2026-10-03T04:30:00Z")).toMatchObject({ rule: "CHANNEL_DEFAULT", cashRegisterId: null });
+    // Op een gedeeld toestel: wie net voor de eerste kassa betaalt, hoort er al bij.
+    const shared = (iso: string) =>
+      matchTransaction({ ...base, source: "PAYCONIQ", channelId: "kanaal-gedeeld", occurredAt: new Date(iso) }, context);
+    expect(shared("2026-10-01T14:30:00Z")).toMatchObject({ rule: "CASH_REGISTER", cashRegisterId: "kassa-td" });
+    expect(shared("2026-10-01T13:30:00Z").rule).toBeNull();
+  });
+
+  it("kiest binnen de marge de dichtste kassa, en geeft een kassa zonder uren geen marge", () => {
+    const code = { code: "700100", name: "Activiteiten" };
+    const spans = [
+      { id: "eerste", start: new Date("2026-10-07T16:00:00Z"), end: new Date("2026-10-07T18:00:00Z"), code },
+      { id: "tweede", start: new Date("2026-10-07T19:00:00Z"), end: new Date("2026-10-07T21:00:00Z"), code },
+    ];
+    expect(kassaAt(spans, new Date("2026-10-07T18:20:00Z"), true)?.id).toBe("eerste");
+    expect(kassaAt(spans, new Date("2026-10-07T18:40:00Z"), true)?.id).toBe("tweede");
+    expect(kassaAt(spans, new Date("2026-10-07T23:00:00Z"), true)?.id).toBe("tweede");
+    expect(kassaAt(spans, new Date("2026-10-07T23:01:00Z"), true)).toBeNull();
+    const day = [{ id: "dag", start: new Date("2026-10-06T22:00:00Z"), end: new Date("2026-10-07T22:00:00Z"), code, wholeDay: true }];
+    expect(kassaAt(day, new Date("2026-10-07T21:00:00Z"), true)?.id).toBe("dag");
+    expect(kassaAt(day, new Date("2026-10-07T23:00:00Z"), true)).toBeNull();
+  });
+
   it("laat een code in de tekst voorgaan op de kassa", () => {
     const result = matchTransaction(
       { ...base, source: "PAYCONIQ", channelId: "kanaal-gedeeld", reference: "700100 10001", occurredAt: new Date("2026-10-01T17:00:00Z") },
@@ -930,21 +961,57 @@ describe("de kassacontrole", () => {
   const startsAt = new Date("2026-10-07T18:00:00Z"); // 20:00
   const endsAt = new Date("2026-10-08T01:00:00Z"); // 03:00 de dag erna
 
-  it("telt de uren van de kassa wanneer een andere kassa het toestel dezelfde dag had", () => {
-    expect(kassaControlWindow({ date, startsAt, endsAt }, true)).toEqual({ start: startsAt, end: endsAt, wholeDay: false });
+  it("telt de uren van de kassa met 2 uur marge wanneer een andere kassa het toestel dezelfde dag had", () => {
+    expect(kassaControlWindow({ date, startsAt, endsAt }, true)).toEqual({
+      start: new Date("2026-10-07T16:00:00Z"), // 18:00
+      end: new Date("2026-10-08T03:00:00Z"), // 05:00
+      wholeDay: false,
+      hours: { start: startsAt, end: endsAt },
+    });
   });
 
-  it("telt anders de hele dag, tot het einde van een kassa die over middernacht loopt", () => {
+  it("telt anders de hele dag, tot het einde van de marge van een kassa die laat eindigt", () => {
     const night = kassaControlWindow({ date, startsAt, endsAt }, false);
     expect(night.wholeDay).toBe(true);
     expect(night.start.toISOString()).toBe("2026-10-06T22:00:00.000Z"); // 00:00 in Brussel
-    expect(night.end).toEqual(endsAt);
+    expect(night.end.toISOString()).toBe("2026-10-08T03:00:00.000Z"); // 03:00 plus 2 uur
+    // Tot 23:00: de marge loopt tot 01:00, voorbij het einde van de dag.
     const evening = kassaControlWindow({ date, startsAt, endsAt: new Date("2026-10-07T21:00:00Z") }, false);
-    expect(evening.end.toISOString()).toBe("2026-10-07T22:00:00.000Z"); // 24:00 in Brussel
+    expect(evening.end.toISOString()).toBe("2026-10-07T23:00:00.000Z");
+    // Tot 18:00: de dag loopt langer dan de marge.
+    const afternoon = kassaControlWindow(
+      { date, startsAt: new Date("2026-10-07T12:00:00Z"), endsAt: new Date("2026-10-07T16:00:00Z") },
+      false,
+    );
+    expect(afternoon.end.toISOString()).toBe("2026-10-07T22:00:00.000Z"); // 24:00 in Brussel
   });
 
-  it("telt een kassa zonder uren altijd de hele dag", () => {
-    expect(kassaControlWindow({ date, startsAt: null, endsAt: null }, true).wholeDay).toBe(true);
+  it("telt een kassa zonder uren altijd de hele dag, zonder marge", () => {
+    const day = kassaControlWindow({ date, startsAt: null, endsAt: null }, true);
+    expect(day).toMatchObject({ wholeDay: true, hours: null });
+    expect(day.start.toISOString()).toBe("2026-10-06T22:00:00.000Z");
+    expect(day.end.toISOString()).toBe("2026-10-07T22:00:00.000Z");
+  });
+
+  it("deelt het gat met een andere kassa op hetzelfde toestel in het midden, en geeft geen marge waar ze overlappen", () => {
+    const own = { start: new Date("2026-10-07T18:00:00Z"), end: new Date("2026-10-07T21:00:00Z") };
+    // Een uur ertussen aan beide kanten: elk een half uur.
+    expect(
+      withKassaMargin(own, [
+        { start: new Date("2026-10-07T14:00:00Z"), end: new Date("2026-10-07T17:00:00Z") },
+        { start: new Date("2026-10-07T22:00:00Z"), end: new Date("2026-10-07T23:00:00Z") },
+      ]),
+    ).toEqual({ start: new Date("2026-10-07T17:30:00Z"), end: new Date("2026-10-07T21:30:00Z") });
+    // Verder dan twee keer de marge weg: de volle 2 uur.
+    expect(withKassaMargin(own, [{ start: new Date("2026-10-07T08:00:00Z"), end: new Date("2026-10-07T12:00:00Z") }])).toEqual({
+      start: new Date("2026-10-07T16:00:00Z"),
+      end: new Date("2026-10-07T23:00:00Z"),
+    });
+    // Een kassa die erover loopt: geen marge aan die kant.
+    expect(withKassaMargin(own, [{ start: new Date("2026-10-07T17:00:00Z"), end: new Date("2026-10-07T19:00:00Z") }])).toEqual({
+      start: own.start,
+      end: new Date("2026-10-07T23:00:00Z"),
+    });
   });
 
   it("zet het ingetikte bedrag naast de import, zonder het te wijzigen", () => {
@@ -970,7 +1037,11 @@ describe("de kassacontrole", () => {
 
     it("telt enkel de uren wanneer een andere kassa hetzelfde toestel die dag had, ook als die de dag ervoor begon", () => {
       const placed = deviceWindow(avond, "BANCONTACT", "Evenementen", [use("kassa-avond", "Evenementen"), use("kassa-middag", "Evenementen")]);
-      expect(placed).toEqual({ window: { start: startsAt, end: endsAt, wholeDay: false }, sharedThatDay: true });
+      // Een kassa zonder uren begrenst de marge niet.
+      expect(placed).toEqual({
+        window: { start: new Date("2026-10-07T16:00:00Z"), end: new Date("2026-10-08T03:00:00Z"), wholeDay: false, hours: { start: startsAt, end: endsAt } },
+        sharedThatDay: true,
+      });
       // Zoals 24UL Eetstandje (20/10 20:00 tot 21/10 19:00) en Overwinningsfeestje (21/10 22:00 tot 22/10 05:00).
       const eetstand: DeviceUse = {
         registerId: "kassa-24ul",
@@ -980,8 +1051,9 @@ describe("de kassacontrole", () => {
         method: "BANCONTACT",
         terminal: "Evenementen",
       };
+      // Een uur ertussen: de marge van het feestje begint een half uur ervoor.
       expect(deviceWindow(avond, "BANCONTACT", "Evenementen", [eetstand])).toEqual({
-        window: { start: startsAt, end: endsAt, wholeDay: false },
+        window: { start: new Date("2026-10-07T17:30:00Z"), end: new Date("2026-10-08T03:00:00Z"), wholeDay: false, hours: { start: startsAt, end: endsAt } },
         sharedThatDay: true,
       });
     });
@@ -1005,14 +1077,17 @@ describe("de kassacontrole", () => {
         { channelId: "terminal-2", occurredAt: new Date("2026-10-07T23:30:00Z"), amountCents: 800 },
         // Een terugbetaling telt af.
         { channelId: "terminal-1", occurredAt: new Date("2026-10-07T20:00:00Z"), amountCents: -300 },
-        // Het begin telt mee, het einde niet.
-        { channelId: "terminal-2", occurredAt: startsAt, amountCents: 100 },
-        { channelId: "terminal-2", occurredAt: endsAt, amountCents: 5000 },
-        // Voor de kassa, en op een ander toestel.
+        // In de marge, ervoor en erna.
+        { channelId: "terminal-1", occurredAt: new Date("2026-10-07T16:30:00Z"), amountCents: 200 },
+        { channelId: "terminal-2", occurredAt: new Date("2026-10-08T02:00:00Z"), amountCents: 400 },
+        // Het begin van het venster telt mee, het einde niet.
+        { channelId: "terminal-2", occurredAt: new Date("2026-10-07T16:00:00Z"), amountCents: 100 },
+        { channelId: "terminal-2", occurredAt: new Date("2026-10-08T03:00:00Z"), amountCents: 5000 },
+        // Voor de marge, en op een ander toestel.
         { channelId: "terminal-1", occurredAt: new Date("2026-10-07T15:00:00Z"), amountCents: 7000 },
         { channelId: "sticker-theo", occurredAt: new Date("2026-10-07T19:00:00Z"), amountCents: 450 },
       ]);
-      expect(amount).toMatchObject({ method: "BANCONTACT", terminal: "Evenementen", cents: 1850, count: 4, sharedThatDay: true });
+      expect(amount).toMatchObject({ method: "BANCONTACT", terminal: "Evenementen", cents: 2450, count: 6, sharedThatDay: true });
     });
 
     it("geeft een toestel zonder kanaal een eigen stand", () => {
@@ -1028,12 +1103,20 @@ describe("de kassacontrole", () => {
 
     it("zegt over welke tijd het telde, op de Brusselse klok", () => {
       const hours = deviceWindow(avond, "BANCONTACT", "Evenementen", [use("kassa-middag", "Evenementen")]);
-      expect(controlSpanLabel(hours, true)).toBe("van 20:00 tot 03:00");
+      expect(controlSpanLabel(hours, true)).toBe("van 20:00 tot 03:00, met marge van 18:00 tot 05:00");
       const day = deviceWindow({ ...avond, startsAt: null, endsAt: null }, "BANCONTACT", "Evenementen", [use("kassa-middag", "Evenementen")]);
       expect(controlSpanLabel(day, true)).toBe("de hele dag, ook die van een andere kassa");
       // Zoals ze in de browser aankomt: als tekst.
-      const travelled = { ...hours, window: { ...hours.window, start: hours.window.start.toISOString() as unknown as Date } };
-      expect(controlSpanLabel(travelled, false)).toBe("from 20:00 to 03:00");
+      const asText = (at: Date) => at.toISOString() as unknown as Date;
+      const travelled = {
+        ...hours,
+        window: {
+          ...hours.window,
+          start: asText(hours.window.start),
+          hours: hours.window.hours && { start: asText(hours.window.hours.start), end: asText(hours.window.hours.end) },
+        },
+      };
+      expect(controlSpanLabel(travelled, false)).toBe("from 20:00 to 03:00, with margin from 18:00 to 05:00");
     });
   });
 });
