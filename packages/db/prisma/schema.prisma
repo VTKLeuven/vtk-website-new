@@ -918,6 +918,8 @@ model User {
   incomeNameRules        IncomeNameRule[]     @relation("IncomeNameRuleCreatedBy")
   incomePeriodsClosed    IncomePeriod[]       @relation("IncomePeriodClosedBy")
   incomePayoutChecks     IncomePayoutCheck[]  @relation("IncomePayoutCheckedBy")
+  incomeLendingsCreated  IncomeChannelLending[] @relation("IncomeLendingCreatedBy")
+  incomeLendingsUpdated  IncomeChannelLending[] @relation("IncomeLendingUpdatedBy")
   expenseViews           ExpenseView[]
 
   requestedLesbezoeken           Lesbezoek[]              @relation("LesbezoekRequester")
@@ -2562,6 +2564,8 @@ model AccountingCode {
   incomeNameRules IncomeNameRule[]
   /// De kanalen die deze code als standaardcode hebben, vanaf een dag.
   incomeChannelCodes IncomeChannelCode[]
+  /// De uitleningen van een toestel onder deze code.
+  incomeChannelLendings IncomeChannelLending[]
   /// De kassa's die deze code kregen, voor de online inkomsten.
   cashRegisters   CashRegister[]
 
@@ -9144,6 +9148,8 @@ enum IncomeRule {
   NAME_RULE
   CHANNEL_DEFAULT
   CASH_REGISTER
+  /// Een uitlening van het toestel (`IncomeChannelLending`), regel 6.
+  CHANNEL_LENDING
 }
 
 /// Eén opgeladen export. Het bestand zelf wordt niet bewaard: het bevat namen
@@ -9196,6 +9202,7 @@ model IncomeChannel {
 
   accounts     IncomeChannelAccount[]
   codes        IncomeChannelCode[]
+  lendings     IncomeChannelLending[]
   transactions IncomeTransaction[]
 
   @@unique([source, identifier])
@@ -9228,6 +9235,40 @@ model IncomeChannelCode {
   accountingCode AccountingCode? @relation(fields: [accountingCodeId], references: [id], onDelete: SetNull)
 
   @@id([channelId, from])
+  @@index([accountingCodeId])
+}
+
+/// Een toestel dat een paar dagen voor iets anders diende dan gewoonlijk: de
+/// SumUp van Theokot die de cursusdienst een week leende (koppelregel 6). Elke
+/// betaling en terugbetaling van het kanaal op die dagen krijgt de code, ook
+/// wat later nog opgeladen wordt, tenzij een exactere regel (de site, een code
+/// in de tekst, een kassa tijdens haar uren, een onthouden tekst) ze al
+/// koppelde. Wat met de hand een code kreeg, blijft.
+///
+/// De dagen lopen van 9:00 tot 9:00 de ochtend erna, zoals in Na te kijken:
+/// een avond tot 3 uur hoort bij de dag waarop ze begon. Het is geen
+/// afgesloten periode (`IncomePeriod`), en de uitlening verandert enkel de
+/// code, nooit de maand waarin een betaling telt. Een verwijderde code laat de
+/// uitlening staan, zonder code: dan koppelt ze niets meer.
+model IncomeChannelLending {
+  id               String   @id @default(cuid())
+  channelId        String
+  /// De eerste en de laatste dag, beide inbegrepen.
+  fromDay          DateTime @db.Date
+  toDay            DateTime @db.Date
+  accountingCodeId String?
+  createdById      String?
+  updatedById      String?
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @db.Timestamptz(3)
+
+  channel        IncomeChannel       @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  accountingCode AccountingCode?     @relation(fields: [accountingCodeId], references: [id], onDelete: SetNull)
+  createdBy      User?               @relation("IncomeLendingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy      User?               @relation("IncomeLendingUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  transactions   IncomeTransaction[]
+
+  @@index([channelId, fromDay])
   @@index([accountingCodeId])
 }
 
@@ -9272,6 +9313,8 @@ model IncomeTransaction {
   uitleenPaymentId    String?
   /// De kassa die het toestel had, als de code van haar komt (regel 4).
   cashRegisterId      String?
+  /// De uitlening waarvan de code komt (regel 6).
+  channelLendingId    String?
   assignedById        String?
   assignedAt          DateTime?   @db.Timestamptz(3)
   createdAt           DateTime    @default(now()) @db.Timestamptz(3)
@@ -9283,6 +9326,7 @@ model IncomeTransaction {
   membershipPayment MembershipPayment? @relation(fields: [membershipPaymentId], references: [id], onDelete: SetNull)
   uitleenPayment    UitleenPayment?    @relation(fields: [uitleenPaymentId], references: [id], onDelete: SetNull)
   cashRegister      CashRegister?      @relation(fields: [cashRegisterId], references: [id], onDelete: SetNull)
+  channelLending    IncomeChannelLending? @relation(fields: [channelLendingId], references: [id], onDelete: SetNull)
   assignedBy        User?              @relation("IncomeAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
 
   @@unique([source, externalKey])
@@ -9294,6 +9338,7 @@ model IncomeTransaction {
   @@index([membershipPaymentId])
   @@index([uitleenPaymentId])
   @@index([cashRegisterId])
+  @@index([channelLendingId])
 }
 
 /// "Deze tekst hoort altijd onder deze code" (koppelregel 5).

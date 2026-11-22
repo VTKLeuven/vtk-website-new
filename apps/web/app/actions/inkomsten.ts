@@ -9,7 +9,6 @@ import { getCashRegisterConfig } from "@/lib/kassas/server";
 import { parseIncomeConfig } from "@/lib/inkomsten/config";
 import { monthToDate, parseIncomeExport, parseMonth, type ClosestFormat } from "@/lib/inkomsten/parse";
 import {
-  assignChannelDay,
   assignUnassignedGroup,
   importIncomeExport,
   listClosedPeriods,
@@ -22,6 +21,8 @@ import {
   type TransactionSelection,
 } from "@/lib/inkomsten/server";
 import { paramGetter, parseTransactionFilter } from "@/lib/inkomsten/transactionFilter";
+import { deleteChannelLending, saveChannelLending, takeOverChannelLending } from "@/lib/inkomsten/lendingServer";
+import type { LendingDays } from "@/lib/inkomsten/lending";
 import { CHANNEL_FROM_START } from "@/lib/inkomsten/overview";
 
 /** Foutcodes die /admin/inkomsten zelf vertaalt (`messages.ts`). */
@@ -40,7 +41,9 @@ export type IncomeErrorCode =
   | "BAD_PERIOD"
   | "PERIOD_OVERLAP"
   | "BAD_DATE"
-  | "DAY_EMPTY"
+  | "LENDING_ORDER"
+  | "LENDING_TOO_LONG"
+  | "LENDING_OVERLAP"
   | "ACCOUNT_REQUIRED"
   | "DEVICE_NOT_FOUND"
   | "FILTER_CHANGED"
@@ -214,33 +217,97 @@ export async function assignIncomeGroupAction(_prev: SaveState, formData: FormDa
   );
 }
 
+// -----------------------------------------------------------------------------
+// Uitleningen van een toestel
+// -----------------------------------------------------------------------------
+
+/** "16 tot en met 23 september 2026", of "op 16 september 2026" voor één dag. */
+function lendingDaysText(days: LendingDays): string {
+  const day = (ymd: string, withYear: boolean) =>
+    new Date(`${ymd}T12:00:00Z`).toLocaleDateString("nl-BE", {
+      day: "numeric",
+      month: "long",
+      ...(withYear ? { year: "numeric" as const } : {}),
+      timeZone: "UTC",
+    });
+  if (days.from === days.to) return `op ${day(days.from, true)}`;
+  return `${day(days.from, days.from.slice(0, 4) !== days.to.slice(0, 4))} tot en met ${day(days.to, true)}`;
+}
+
 /**
- * Een hele dag van een kanaal met de hand een code geven, of wat er die dag met
- * de hand gezet werd terug aan de koppelregels laten (`intent=reset`).
+ * Een uitlening bewaren (`id` leeg: een nieuwe). Daarna koppelt de site
+ * opnieuw; wat met de hand gezet werd, blijft.
  */
-export async function assignIncomeDayAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+export async function saveIncomeLendingAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   const session = await requirePermission("income.manage");
-  const channelId = String(formData.get("channelId") ?? "");
-  const day = String(formData.get("day") ?? "");
-  const reset = formData.get("intent") === "reset";
   const accountingCodeId = String(formData.get("accountingCodeId") ?? "");
-  if (!reset && !accountingCodeId) return saveError("CODE_REQUIRED");
+  if (!accountingCodeId) return saveError("CODE_REQUIRED");
+  const outcome = await saveChannelLending(
+    {
+      id: String(formData.get("id") ?? "") || null,
+      channelId: String(formData.get("channelId") ?? ""),
+      fromDay: String(formData.get("fromDay") ?? ""),
+      toDay: String(formData.get("toDay") ?? ""),
+      accountingCodeId,
+    },
+    session.user.id,
+  );
+  if (!outcome.ok) return saveError(outcome.error);
 
-  const outcome = await assignChannelDay(channelId, day, reset ? { reset: true } : { accountingCodeId }, session.user.id);
-  if (!outcome.ok) return saveError(outcome.error === "NOT_FOUND" ? "DAY_EMPTY" : outcome.error);
-
+  const days = lendingDaysText(outcome.days);
+  const code = `${outcome.code.code} ${outcome.code.name}`;
   await logAudit({
-    action: "update",
-    entity: "incomeTransaction",
-    target: `${outcome.channel} · ${day}`,
-    summary: reset ? `${transactions(outcome.count)} terug naar de koppelregels` : `${transactions(outcome.count)} met de hand toegewezen`,
+    action: outcome.created ? "create" : "update",
+    entity: "incomeChannelLending",
+    target: `${outcome.channel} · ${outcome.days.from} tot ${outcome.days.to}`,
+    summary: `${code}; ${transactions(outcome.count)}${outcome.manualKept ? `, ${outcome.manualKept} met de hand blijven` : ""}`,
+  });
+  revalidate();
+  const kept = outcome.manualKept
+    ? ` ${outcome.manualKept} die met de hand een code ${outcome.manualKept === 1 ? "kreeg, blijft zoals ze is" : "kregen, blijven zoals ze zijn"}; met dezelfde code neem je ze over in de uitlening (klik erop in de lijst).`
+    : "";
+  const done = outcome.created ? "Uitlening bewaard" : "Uitlening aangepast";
+  return saveOk(
+    outcome.count === 0
+      ? `${done}: van ${outcome.channel} ${days} is nog niets opgeladen dat de regels aan de uitlening geven; wat later binnenkomt, krijgt ${code}.${kept}`
+      : `${done}: ${transactions(outcome.count)} van ${outcome.channel} ${days} ${outcome.count === 1 ? "krijgt" : "krijgen"} ${code}.${kept}`,
+  );
+}
+
+/** Een uitlening verwijderen; haar transacties gaan terug naar de koppelregels. */
+export async function deleteIncomeLendingAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("income.manage");
+  const outcome = await deleteChannelLending(String(formData.get("id") ?? ""));
+  if (!outcome.ok) return saveError(outcome.error);
+  await logAudit({
+    action: "delete",
+    entity: "incomeChannelLending",
+    target: `${outcome.channel} · ${outcome.days.from} tot ${outcome.days.to}`,
+    summary: `${transactions(outcome.count)} terug naar de koppelregels`,
   });
   revalidate();
   return saveOk(
-    reset
-      ? `${transactions(outcome.count)} van ${outcome.channel} terug naar de koppelregels.`
-      : `${transactions(outcome.count)} van ${outcome.channel} toegewezen.`,
+    `Uitlening verwijderd; ${transactions(outcome.count)} ${outcome.count === 1 ? "gaat" : "gaan"} terug naar de koppelregels.`,
   );
+}
+
+/**
+ * Wat op de dagen van een uitlening met de hand dezelfde code kreeg, in de
+ * uitlening zetten. De code verandert niet, dus geen enkel totaal.
+ */
+export async function takeOverIncomeLendingAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("income.manage");
+  const outcome = await takeOverChannelLending(String(formData.get("id") ?? ""));
+  if (!outcome.ok) return saveError(outcome.error);
+  await logAudit({
+    action: "update",
+    entity: "incomeChannelLending",
+    target: `${outcome.channel} · ${outcome.days.from} tot ${outcome.days.to}`,
+    summary: `${transactions(outcome.count)} overgenomen van met de hand${outcome.kept ? `, ${outcome.kept} blijven met de hand` : ""}`,
+  });
+  revalidate();
+  const kept = outcome.kept ? ` ${outcome.kept} ${outcome.kept === 1 ? "blijft" : "blijven"} met de hand.` : "";
+  return saveOk(`${transactions(outcome.count)} overgenomen in de uitlening van ${outcome.channel}; de code bleef dezelfde.${kept}`);
 }
 
 /** Meer dan een pagina aanvinken kan niet; "alles wat aan de filter voldoet" gaat via `scope=filter`. */

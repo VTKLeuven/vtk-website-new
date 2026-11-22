@@ -10,7 +10,7 @@ import {
   parseLocalDateTime,
   type ParsedIncomeRow,
 } from "@/lib/inkomsten/parse";
-import { codeAtStart, deviceAt, incomeRuleText, matchTransaction, nameRuleKey, type MatchContext } from "@/lib/inkomsten/match";
+import { codeAtStart, deviceAt, incomeRuleText, lendingOn, matchTransaction, nameRuleKey, type MatchContext, type MatchInput } from "@/lib/inkomsten/match";
 import { accountOn, computeIncomeOverview, reviewDay, type OverviewTransaction } from "@/lib/inkomsten/overview";
 import { NO_SEPARATE_FEES } from "@/lib/inkomsten/lines";
 import { combineImportSummaries } from "@/lib/inkomsten/importSummary";
@@ -531,6 +531,19 @@ describe("koppelregels", () => {
         "kanaal-post",
         [{ id: "kassa-caraoke", start: new Date("2026-10-02T16:00:00Z"), end: new Date("2026-10-03T02:00:00Z"), code: { code: "700100 10001", name: "Cantussen" } }],
       ],
+      [
+        // Een uitgeleende sticker met een avondkassa op de tweede dag.
+        "kanaal-uitgeleend",
+        [{ id: "kassa-uitleen", start: new Date("2026-11-11T17:00:00Z"), end: new Date("2026-11-11T21:00:00Z"), code: { code: "700100", name: "Activiteiten" } }],
+      ],
+    ]),
+    channelLendings: new Map([
+      // De SumUp van een post een week aan de cursusdienst geleend.
+      ["kanaal-post", [{ id: "uitlening-week", from: "2026-11-02", to: "2026-11-06", code: { code: "700000", name: "Cursusdienst" } }]],
+      // Een gedeelde sticker (geen standaardcode), twee dagen uitgeleend.
+      ["kanaal-uitgeleend", [{ id: "uitlening-sticker", from: "2026-11-10", to: "2026-11-11", code: { code: "700000", name: "Cursusdienst" } }]],
+      // Een uitlening waarvan de code uit het register verdween.
+      ["kanaal-zonder-code", [{ id: "uitlening-weg", from: "2026-11-01", to: "2026-11-30", code: null }]],
     ]),
   };
   const base = {
@@ -629,6 +642,74 @@ describe("koppelregels", () => {
       context,
     );
     expect(result).toMatchObject({ rule: "CODE_IN_TEXT", cashRegisterId: null });
+  });
+
+  describe("uitlening van een toestel", () => {
+    const at = (channelId: string, iso: string, extra: Partial<MatchInput> = {}) =>
+      matchTransaction({ ...base, source: "SUMUP", channelId, occurredAt: new Date(iso), ...extra }, context);
+
+    it("gaat voor de standaardcode op haar dagen, niet ervoor of erna", () => {
+      expect(at("kanaal-post", "2026-11-03T12:00:00Z")).toMatchObject({
+        rule: "CHANNEL_LENDING",
+        code: { code: "700000" },
+        channelLendingId: "uitlening-week",
+      });
+      expect(at("kanaal-post", "2026-11-01T12:00:00Z")).toMatchObject({ rule: "CHANNEL_DEFAULT", code: { code: "700110" }, channelLendingId: null });
+      expect(at("kanaal-post", "2026-11-07T12:00:00Z")).toMatchObject({ rule: "CHANNEL_DEFAULT", channelLendingId: null });
+      // Een terugbetaling op die dagen hoort er ook bij.
+      expect(at("kanaal-post", "2026-11-03T12:00:00Z", { kind: "REFUND" }).rule).toBe("CHANNEL_LENDING");
+    });
+
+    it("loopt van 9:00 op de eerste dag tot 9:00 na de laatste, op de Brusselse klok", () => {
+      // 2 november 2026 is wintertijd (UTC+1): 8:59 hoort nog bij 1 november.
+      expect(at("kanaal-post", "2026-11-02T07:59:00Z").rule).toBe("CHANNEL_DEFAULT");
+      expect(at("kanaal-post", "2026-11-02T08:00:00Z").rule).toBe("CHANNEL_LENDING");
+      // 3:00 in de nacht na de laatste dag hoort nog bij de uitlening, 9:00 niet meer.
+      expect(at("kanaal-post", "2026-11-07T02:00:00Z").rule).toBe("CHANNEL_LENDING");
+      expect(at("kanaal-post", "2026-11-07T08:00:00Z").rule).toBe("CHANNEL_DEFAULT");
+    });
+
+    it("laat de site, een code in de tekst en een onthouden tekst voorgaan", () => {
+      expect(at("kanaal-post", "2026-11-03T12:00:00Z", { providerId: "tr_site" }).rule).toBe("WEBSITE");
+      expect(at("kanaal-post", "2026-11-03T12:00:00Z", { source: "PAYCONIQ", reference: "700100 10001" }).rule).toBe("CODE_IN_TEXT");
+      expect(at("kanaal-post", "2026-11-03T12:00:00Z", { source: "MOLLIE", description: "VTK uitleendienst - 3F9A21BC" }).rule).toBe(
+        "NAME_RULE",
+      );
+    });
+
+    it("geeft een kassa enkel haar uren: daarna geldt de uitlening, niet de uitloop tot 9:00", () => {
+      expect(at("kanaal-uitgeleend", "2026-11-11T19:00:00Z")).toMatchObject({ rule: "CASH_REGISTER", cashRegisterId: "kassa-uitleen" });
+      // Op een gedeeld toestel zonder uitlening hield de kassa het tot 9:00;
+      // de uitlening zegt wie het toestel die nacht had.
+      expect(at("kanaal-uitgeleend", "2026-11-11T23:30:00Z")).toMatchObject({
+        rule: "CHANNEL_LENDING",
+        channelLendingId: "uitlening-sticker",
+        cashRegisterId: null,
+      });
+      expect(deviceAt({ channelId: "kanaal-uitgeleend", occurredAt: new Date("2026-11-11T23:30:00Z") }, context).kassa).toBeNull();
+      // Na de uitlening, zonder kassa en zonder standaardcode: Na te kijken.
+      expect(at("kanaal-uitgeleend", "2026-11-12T12:00:00Z").rule).toBeNull();
+    });
+
+    it("koppelt niets zonder code, en dan geldt wat eronder staat", () => {
+      expect(at("kanaal-zonder-code", "2026-11-03T12:00:00Z")).toMatchObject({ rule: null, channelLendingId: null });
+      expect(deviceAt({ channelId: "kanaal-zonder-code", occurredAt: new Date("2026-11-03T12:00:00Z") }, context).lending).toBeNull();
+    });
+
+    it("koppelt geen kosten", () => {
+      expect(at("kanaal-post", "2026-11-03T12:00:00Z", { kind: "FEE" }).rule).toBeNull();
+    });
+
+    it("vindt de uitlening van een dag", () => {
+      const spans = [
+        { id: "a", from: "2026-09-16", to: "2026-09-23", code: null },
+        { id: "b", from: "2026-10-01", to: "2026-10-01", code: null },
+      ];
+      expect(lendingOn(spans, "2026-09-16")?.id).toBe("a");
+      expect(lendingOn(spans, "2026-09-23")?.id).toBe("a");
+      expect(lendingOn(spans, "2026-09-24")).toBeNull();
+      expect(lendingOn(spans, "2026-10-01")?.id).toBe("b");
+    });
   });
 
   it("laat een kanaal zonder standaardcode na te kijken", () => {
@@ -760,7 +841,15 @@ describe("overzicht", () => {
 });
 
 describe("meerdere bestanden tegelijk opladen", () => {
-  const rules = (open: number): ImportSummary["rules"] => ({ WEBSITE: 0, CODE_IN_TEXT: 0, CASH_REGISTER: 0, NAME_RULE: 0, CHANNEL_DEFAULT: 0, OPEN: open });
+  const rules = (open: number): ImportSummary["rules"] => ({
+    WEBSITE: 0,
+    CODE_IN_TEXT: 0,
+    CASH_REGISTER: 0,
+    NAME_RULE: 0,
+    CHANNEL_LENDING: 0,
+    CHANNEL_DEFAULT: 0,
+    OPEN: open,
+  });
   const summary = (partial: Partial<ImportSummary>): ImportSummary => ({
     format: "europabank",
     source: "EUROPABANK",

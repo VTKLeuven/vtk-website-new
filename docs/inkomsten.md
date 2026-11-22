@@ -14,7 +14,7 @@ boekhoudcodes kunnen als CSV opgeladen worden in `/admin/boekhoudcodes`. Van
 fase 2 staan de kassacontrole met de lijst met afwijkingen, de code van een
 kassa en koppelregel 4. Van de verfijningen: het balansrapport van Mollie,
 SumUp per uitbetaling, de controlelijst per account, een dag van 9:00 tot 9:00
-in Na te kijken, een hele dag met de hand, de code van de gekoppelde
+in Na te kijken, uitleningen van een toestel, de code van de gekoppelde
 ticketverkoop als voorstel bij een kassa, bij het opladen per bron een "i"
 met de kolommen die de site verwacht, en in Transacties elke code verbeteren,
 per rij of voor veel rijen tegelijk.
@@ -24,31 +24,36 @@ per rij of voor veel rijen tegelijk.
 | Bestand | Wat |
 |---|---|
 | `lib/inkomsten/parse.ts` | De exports van Payconiq, Mollie (betalingen en balansrapport), SumUp en Europabank lezen: de kolommen per formaat (`EXPORT_COLUMNS`), CSV, bedragen, datums op de Brusselse klok, kosten per betaling, de uitbetalingen en de betalingen in het balansrapport. Puur. |
-| `lib/inkomsten/match.ts` | De koppelregels als pure functie (`matchTransaction`), de kassa die een toestel had (`kassaAt`), en de onthouden tekst (`incomeRuleText`). |
+| `lib/inkomsten/match.ts` | De koppelregels als pure functie (`matchTransaction`), de kassa die een toestel had (`kassaAt`), de uitlening van een dag (`lendingOn`), en de onthouden tekst (`incomeRuleText`). |
+| `lib/inkomsten/lending.ts` | De dagen van een uitlening nakijken (`checkLendingDays`, `overlappingLending`). Puur. |
+| `lib/inkomsten/lendingServer.ts` | De uitleningen: lijst, bewaren, verwijderen, overnemen wat met de hand gezet werd. |
 | `lib/inkomsten/lines.ts` | `quarterLineKey`: op welke regel een transactie telt, of niet. Het overzicht en beide bestanden rekenen ermee. Puur. |
 | `lib/inkomsten/reserve.ts` | De berekende wijziging van de dynamische reserve van Mollie (`computeMollieReserve`). Puur. |
 | `lib/inkomsten/config.ts` | De instellingen (`income.config`) en wat meetelt (`lineRulesOf`). Puur. |
 | `lib/inkomsten/overview.ts` | Het overzicht als pure som, de rekening op een dag, de dag in Na te kijken (`reviewDay`), per uitbetaling (`groupPayouts`, `payoutState`), de controlelijst (`computeIncomeChecks`). |
 | `lib/inkomsten/workbook.ts` | Het kwartaalblad en het controlebestand als bladen voor `write-excel-file`. Puur. |
-| `lib/inkomsten/server.ts` | Database: opladen (met voorvertoning), opnieuw koppelen, Na te kijken, codes met de hand (`changeTransactions`), overzicht, uitbetalingen afvinken, het model voor de xlsx, lijsten. |
+| `lib/inkomsten/server.ts` | Database: opladen (met voorvertoning), opnieuw koppelen (`rematchOpenTransactions`, met `matchContextsFor` en `matchUpdateOf` die de uitleningen ook gebruiken), Na te kijken, codes met de hand (`changeTransactions`), overzicht, uitbetalingen afvinken, het model voor de xlsx, lijsten. |
 | `lib/inkomsten/transactionFilter.ts` | De filter van Transacties uit de URL (`parseTransactionFilter`) en als Prisma-where (`transactionWhere`). Puur; de lijst en "alles wat aan de filter voldoet" gebruiken dezelfde. |
 | `lib/inkomsten/importSummary.ts` | De voorvertoning van meerdere gekozen bestanden samen (`combineImportSummaries`). Puur. |
 | `lib/inkomsten/kassa.ts` | De kassacontrole: het venster van een kassa (`kassaControlWindow`) en het ingetikte bedrag naast de import (`kassaCheck`). Puur; het optellen is `kassaImportAmounts` in `server.ts`. |
 | `app/actions/inkomsten.ts` | Server actions, allemaal achter `income.manage`. |
 | `app/[locale]/admin/kassas/` | De code van een kassa (`AcceptForm`, `CodeForm`) en de kassacontrole in het telformulier (`CountForm`); de acties in `app/actions/kassas.ts`. |
-| `app/[locale]/admin/inkomsten/` | Overzicht (met de controlelijst en de uitbetalingen), Opladen (met `FormatGuide`, de kolommen per bron), Na te kijken (met `AssignDayForm`), Transacties (met `TransactionTable`: het detail per rij en de vinkjes), Instellingen. |
+| `app/[locale]/admin/inkomsten/` | Overzicht (met de controlelijst en de uitbetalingen), Opladen (met `FormatGuide`, de kolommen per bron), Na te kijken (met de uitleningen: `LendingForm`, `LendingList`), Transacties (met `TransactionTable`: het detail per rij en de vinkjes), Instellingen. |
 | `components/ui/InfoTip.tsx` | De "i" met uitleg erachter: hoveren opent, klikken zet vast (ook op een telefoon). |
 | `app/api/admin/inkomsten/export/route.ts` | De twee xlsx-bestanden, voor `?van=2026-07&tot=2026-09` en `?soort=boekhouder` of `?soort=controle`. |
 | `lib/accounting/import.ts` | De lijst van boekhoudcodes als CSV lezen, en plannen wat opladen doet. Puur. |
 | `lib/csv.ts` | De CSV-lezer die beide gebruiken: scheidingsteken raden, aanhalingstekens volgens RFC 4180. |
-| `test/inkomsten.test.ts`, `test/inkomstenWorkbook.test.ts`, `test/inkomstenTransactionFilter.test.ts`, `test/accountingCodesImport.test.ts` | Parsers, koppelregels, overzicht, controlelijst, de xlsx en de codelijst, zonder database, met verzonnen gegevens. |
+| `test/inkomsten.test.ts`, `test/inkomstenWorkbook.test.ts`, `test/inkomstenTransactionFilter.test.ts`, `test/inkomstenLending.test.ts`, `test/accountingCodesImport.test.ts` | Parsers, koppelregels, overzicht, controlelijst, de xlsx, de dagen van een uitlening en de codelijst, zonder database, met verzonnen gegevens. |
+| `test/integration/inkomsten-uitlening.integration.ts` | Een uitlening tegen een echte database: bewaren, later opladen, aanpassen, overlappen, afgesloten, overnemen en verwijderen. |
 
 Tabellen: `IncomeImport`, `IncomeChannel`, `IncomeChannelAccount` (de rekening
 vanaf een dag), `IncomeChannelCode` (de standaardcode vanaf een dag),
+`IncomeChannelLending` (een uitlening van het toestel, van dag tot dag),
 `IncomeTransaction`, `IncomeNameRule`, `IncomePeriod`, `IncomePayout` (een
 uitbetaling zoals de provider ze noemt), `IncomePayoutCheck`.
 Op de kassa: `CashRegister.accountingCodeId`, en `IncomeTransaction.cashRegisterId`
-voor de kassa die de code gaf. Instelling: `Setting` `income.config` (de
+voor de kassa die de code gaf; `IncomeTransaction.channelLendingId` voor de
+uitlening die ze gaf. Instelling: `Setting` `income.config` (de
 kostencode).
 
 ## Wat de site leest
@@ -101,7 +106,7 @@ tabblad van Beheer, dat er drie eigen kolommen voor zet; die worden genegeerd).
 Een betaling telt in de **maand van de betaling**, op de Brusselse klok, zoals
 elke bron (Beheer, november 2026). Tot dan telde ze in de maand van haar
 uitbetaling, zoals het rekenblad; de migratie
-`20261122010000_online_income_mollie_payment_month` zette de bestaande rijen
+`20261122110000_online_income_mollie_payment_month` zette de bestaande rijen
 om. De referentie van de uitbetaling (`12345678.2510.03`) blijft erbij: die zet
 de betaling bij haar overschrijving in de lijst per uitbetaling. Een betaling
 zonder uitbetaling telt gewoon in haar maand; het verschil met wat Mollie
@@ -268,8 +273,9 @@ In `matchTransaction`, de eerste die past wint. Enkel voor `PAYMENT` en `REFUND`
    onthoudt de kassa (`cashRegisterId`). Wanneer een kassa het toestel had,
    hangt af van de soort toestel:
    - **Een toestel van een post**, een kanaal met op die dag een standaardcode
-     (de SumUp van Theokot): enkel tijdens de uren van de kassa. Daarvoor en
-     daarna neemt regel 6 het weer over.
+     (de SumUp van Theokot), of een toestel met een uitlening op die dag: enkel
+     tijdens de uren van de kassa. Daarvoor en daarna neemt regel 6 of 7 het
+     weer over.
    - **Een gedeeld toestel**, een kanaal zonder standaardcode (Evenementen 2,
      de terminal van evenementen): tijdens de uren van de kassa plus de
      uitloop van diezelfde avond/nacht (tot 9:00 de ochtend erna, zolang er
@@ -278,26 +284,46 @@ In `matchTransaction`, de eerste die past wint. Enkel voor `PAYMENT` en `REFUND`
    - Een kassa zonder uren loopt van middernacht tot middernacht van haar dag
      (`registerInterval`).
    - Een kassa zonder code koppelt niets: wat in haar venster valt, gaat door
-     naar regel 5 en 6. Op een gedeeld toestel sluit ze wel de kassa ervoor af.
+     naar regel 5 tot 7. Op een gedeeld toestel sluit ze wel de kassa ervoor af.
 5. **Onthouden tekst** (`NAME_RULE`): `incomeRuleText` van de omschrijving
    (kleine letters, zonder ordernummer, zonder e-mailadres) staat in
    `IncomeNameRule` voor die bron.
-6. **Standaardcode van het kanaal** (`CHANNEL_DEFAULT`): het kanaal heeft op
+6. **Uitlening van het toestel** (`CHANNEL_LENDING`): het kanaal heeft een
+   uitlening (`IncomeChannelLending`) met een code op de dag van de transactie,
+   een dag van 9:00 tot 9:00 zoals in Na te kijken (`lendingOn` op
+   `reviewDay`). De transactie onthoudt de uitlening (`channelLendingId`). Een
+   uitlening waarvan de code uit het register verdween, koppelt niets. Zie
+   "Uitleningen" onder Na te kijken.
+7. **Standaardcode van het kanaal** (`CHANNEL_DEFAULT`): het kanaal heeft op
    de dag van de transactie een standaardcode (`IncomeChannelCode`: de laatste
    regel op of voor die Brusselse dag, `channelCodeOn`), zoals de QR-code en de
    SumUp van Theokot onder de code van Theokot, of de terminals van Cudi onder
    die van Cudi. Een regel zonder code betekent: vanaf die dag geen. Zo'n
    transactie telt mee zoals elke andere, ook wanneer het kanaal op de eigen
    rekening van een post stort.
-7. **Anders**: `rule` blijft `NULL`, en de transactie staat bij Na te kijken.
+8. **Anders**: `rule` blijft `NULL`, en de transactie staat bij Na te kijken.
 
-Regel 4 staat vóór regel 6, zodat een activiteit van een andere post op de
+Regel 4 staat vóór regel 7, zodat een activiteit van een andere post op de
 QR-code van Theokot haar eigen code krijgt in plaats van die van Theokot. Ze
 staat na regel 3: een betaling die zelf haar code draagt, weet het beter dan
 het uur waarop ze viel.
 
+Regel 6 staat onder wat exact koppelt (de site, een code in de tekst, een
+kassa tijdens haar uren, een onthouden tekst): die weten het beter dan de
+datum. Ze staat boven de standaardcode, want die vervangt ze net. Een
+uitgeleend toestel telt die dagen als toestel van een post (`deviceAt`): een
+kassa die er een avond op stond, houdt enkel haar uren, en daarna geldt de
+uitlening weer, niet de uitloop tot 9:00 van een gedeeld toestel. De uitlening
+zegt wie het toestel die dagen had.
+
+**Twee klokken.** Een uitlening gaat over dagen van 9:00 tot 9:00, zodat een
+avond tot 3 uur bij de dag blijft waarop ze begon. De standaardcode gaat over
+kalenderdagen (`channelCodeOn` op de Brusselse dag): ze wisselt om middernacht,
+zoals een rekening. De maand waarin een transactie telt, is altijd de
+kalendermaand van de betaling; geen van beide verandert die.
+
 Na een onthouden tekst, een vergeten tekst, een gewiste toewijzing, een
-gewijzigde standaardcode of een ander toestel bij een kanaal loopt
+gewijzigde standaardcode, een uitlening of een ander toestel bij een kanaal loopt
 `rematchOpenTransactions` opnieuw over alles wat niet met de hand gezet is,
 buiten de afgesloten periodes. Een kassa doet hetzelfde wanneer ze aanvaard,
 gewijzigd, geteld of verwijderd wordt, of een andere code krijgt
@@ -332,13 +358,47 @@ een avond tot 4 uur is één groep, onder de dag waarop ze begon. Enkel het
 groeperen verandert; de maand van een transactie niet. De tussenlaag "Per
 groep" in het controlebestand gebruikt dezelfde groepen.
 
-**Een hele dag van een kanaal** (`assignChannelDay`, onderaan Na te kijken):
-elke betaling van dat kanaal op die dag krijgt met de hand een code, ook wat de
-standaardcode al had. Wat een exacte regel koppelde (de site, een code in de
-tekst, een onthouden tekst, een kassa), blijft. "Terug naar de regels" zet wat
-er die dag met de hand gezet werd, terug aan de koppelregels; ook wat in Na te
-kijken voor die dag gekozen werd. Zo hoeft een dag die de cursusdienst de SumUp
-van Theokot leende, geen twee regels met een standaardcode meer.
+### Uitleningen
+
+Onderaan Na te kijken: een toestel dat een of meer dagen voor iets anders
+diende (de cursusdienst die een week de SumUp van Theokot leende). Het woord is
+dat van Beheer; "toewijzen" is al de actie met de hand in Transacties.
+
+- **Een uitlening is koppelregel 6, geen eenmalige wijziging.** Bewaren,
+  aanpassen en verwijderen koppelen opnieuw (`rematchOpenTransactions`), en een
+  import koppelt met de uitleningen zoals ze dan staan: wat later opgeladen
+  wordt, krijgt ze ook. Enkel de code verandert, nooit de maand.
+- **Het formulier**: kanaal, eerste dag, laatste dag (leeg is één dag) en code.
+  Het is daarna leeg (een nieuwe `key`). Nagekeken in `checkLendingDays` en
+  `saveChannelLending`: de dagen in volgorde (`LENDING_ORDER`), hoogstens 366
+  (`LENDING_TOO_LONG`), en geen dag die een andere uitlening van hetzelfde
+  kanaal al heeft (`LENDING_OVERLAP`).
+- **De lijst** toont per uitlening het kanaal, de dagen, de code, hoeveel
+  transacties ze koppelt en voor hoeveel (een link naar Transacties met
+  `uitlening=<id>`), wie ze zette en wie ze aanpaste. Een klik op de rij opent
+  de modal om ze aan te passen of te verwijderen. Verwijderen zegt wat er
+  teruggaat naar de koppelregels.
+- **Wat met de hand gezet werd, blijft.** `rematchOpenTransactions` slaat
+  `MANUAL` over, dus ook een uitlening raakt het niet. De lijst toont hoeveel
+  er op die dagen met de hand gezet werd, met een link naar Transacties
+  (`status=met-de-hand`, `kanaal`, `van-dag`, `tot-dag`).
+- **Overnemen.** Wat met de hand dezelfde code kreeg als de uitlening, kan in
+  haar opgaan: de knop "Neem over in deze uitlening" in de modal
+  (`takeOverChannelLending`). De code verandert niet, dus geen enkel totaal;
+  enkel de regel. Enkel rijen die de koppelregels zelf aan deze uitlening
+  zouden geven (`canTakeOver`), anders veranderden ze bij het volgende koppelen
+  alsnog. Een andere code koos iemand bewust: die blijft met de hand. Zo zet
+  Beheer de dagen om die met het oude formulier "Een hele dag van een kanaal
+  anders toewijzen" (`assignChannelDay`, tot november 2026) gezet werden: maak
+  een uitlening voor die dagen met die code en neem over. De migratie zet
+  niets om; welke `MANUAL`-rijen van dat formulier kwamen, staat enkel in de
+  auditlog.
+- **Afgesloten.** Bewaren weigert met `LOCKED` wanneer de wijziging een
+  transactie in een afgesloten periode een andere koppeling zou geven
+  (`changesClosedMonths`: de koppeling met de oude en met de nieuwe
+  uitleningen naast elkaar); verwijderen wanneer een gekoppelde transactie er
+  ligt. Anders bleef er een rij achter met een uitlening die er niet meer is.
+  Overnemen slaat een afgesloten maand over.
 
 **Het aantal op een groep linkt naar haar rijen** in Transacties, om ze te zien
 of er een deel van aan te vinken (een sticker die 's middags en 's avonds voor
@@ -365,12 +425,30 @@ reserve) en zijn bron, zodat dat totaal hetzelfde bedrag is als de cel.
 De filter staat in de URL en `parseTransactionFilter` leest ze: `bron`,
 `kanaal` (een `IncomeChannel.id`), `status` (een stand: `na-te-kijken`,
 `gekoppeld`, `telt-niet-mee`, of de regel die de code gaf: `met-de-hand`,
-`site`, `code-in-tekst`, `onthouden-tekst`, `kassa`, `standaardcode`), `soort`
-(`betaling`, `terugbetaling`, `kosten`, `reserve`), `van`, `tot` (op de maand
-waarin een transactie telt), `dag`, `code` en `q`. `pagina` hoort er niet bij.
+`site`, `code-in-tekst`, `onthouden-tekst`, `kassa`, `uitlening`,
+`standaardcode`), `soort` (`betaling`, `terugbetaling`, `kosten`, `reserve`),
+`van`, `tot` (op de maand waarin een transactie telt), `van-dag`, `tot-dag`,
+`dag`, `uitlening`, `code` en `q`. `pagina` hoort er niet bij.
 
+- `van` en `tot` ("Telt in maand van, tot en met") gaan op `periodMonth`: de
+  maand waarin het overzicht een transactie telt. De snelkeuzes onder het
+  formulier (deze maand, vorige maand, de kwartalen) zetten die, zodat een
+  kwartaal hier hetzelfde totaal geeft als de cel van het overzicht. Ze wissen
+  de filters op dagen, anders snijden de twee elkaar.
+- `van-dag` en `tot-dag` ("Betaald van, tot en met", "2026-10-01") gaan op het
+  moment van de betaling, in dagen zoals in Na te kijken: van 9:00 op de eerste
+  dag tot 9:00 na de laatste (`reviewDaysWhere`), op wens van Beheer. Een
+  betaling om 0:30 op 1 oktober staat dus bij "tot en met 30 september" en telt
+  in oktober; de "i" naast de velden zegt het. Omgekeerd ingevuld draait de
+  site ze om. Een grens mag ontbreken.
 - `dag` ("2026-10-09") is de dag zoals in Na te kijken, van 9:00 tot 9:00 de
   ochtend erna, op het moment van de betaling en niet op de maand waarin ze telt.
+  Ze heeft geen eigen veld meer: de link van een groep in Na te kijken zet ze,
+  en boven de lijst staat welke dag het is, met een link om ze te wissen. `dag`
+  en de reeks staan beide in de `AND` van `transactionWhere`, zodat de ene de
+  andere niet overschrijft.
+- `uitlening` (een `IncomeChannelLending.id`) toont wat die uitlening koppelt,
+  met het toestel en de dagen boven de lijst.
 - `code` (`codeWhere`): een volledige code ("700100" of "700100 10002") is die
   code en niet haar subcodes. Zo linkt een rij van het overzicht, en 700100 en
   700100 10002 kunnen elk een eigen rij hebben; het totaal bovenaan moet dan
@@ -698,8 +776,9 @@ fouten), dan opladen.
   volgende. Gebruikt een andere post het toestel een tijd, dan zijn het twee
   regels: vanaf die dag zonder code, vanaf de dag erna weer met. In september
   2026 gebruikte de cursusdienst zo een week de SumUp van Theokot
-  (€ 41.228,86). Een dag waarop beide posten het toestel gebruikten, lost de
-  standaardcode niet op; een kassa met een code op dat toestel wel, want die
+  (€ 41.228,86). Daarvoor is nu een uitlening (regel 6): één regel met een
+  begin en een einde. Een dag waarop beide posten het toestel gebruikten, lost
+  de standaardcode niet op; een kassa met een code op dat toestel wel, want die
   gaat tijdens haar uren voor (regel 4). Een regel opslaan of verwijderen
   koppelt opnieuw, buiten de afgesloten periodes. Geef een sticker die van
   evenement tot evenement doorgaat geen standaardcode.
@@ -710,6 +789,16 @@ fouten), dan opladen.
   loopt een kassa op een gedeeld toestel hoogstens tot 9:00 de ochtend na haar
   einde (`reviewDay`). Een evenement dagen later zonder kassa belandt zo bij
   Na te kijken in plaats van bij de vorige kassa.
+- **Een uitlening is geen periode.** `IncomePeriod` is een afgesloten reeks
+  maanden; een uitlening (`IncomeChannelLending`) zegt wie een toestel een paar
+  dagen had. Het scherm zegt dus altijd "uitlening", nooit "periode", en de
+  foutcodes heten `LENDING_*`, niet `PERIOD_OVERLAP`.
+- **Een uitlening verandert de code, nooit de maand.** Ze raakt `periodMonth`
+  niet, dus ook niet de regel van het kwartaalblad of het totaal van een bron:
+  enkel welke code een bedrag krijgt.
+- **Een uitlening op een hernoemd kanaal.** Een sticker met een andere naam in
+  de export is een nieuw kanaal (zie Payconiq), en een uitlening hangt aan het
+  kanaal: op het oude gaat ze niet mee.
 - **Een toestel hernoemen.** Regel 4 en de kassacontrole vergelijken de naam van
   het bakje of de rekening op de kassa met die op het kanaal. Een hernoemd
   toestel in de instellingen van de kassa's verandert niets aan oude kassa's,

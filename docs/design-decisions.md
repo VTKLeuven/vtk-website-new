@@ -13804,16 +13804,43 @@ had.
   de dag waarop ze begon. Enkel het groeperen: een betaling om 2 uur op 1
   oktober telt nog altijd in oktober, want de boekhouder rekent op de
   kalender.
-- **Een hele dag van een kanaal kan met de hand, maar enkel over wat
-  afgeleid is.** Leent een post een dag het toestel van een andere (de
-  cursusdienst met de SumUp van Theokot), dan geeft Beheer die dag één code in
-  plaats van twee regels met een standaardcode. Wat exact gekoppeld is (een
-  betaling van de site, een code in de tekst, een onthouden tekst, een kassa),
-  blijft: dat weet het beter dan de dag.
+- **Een uitgeleend toestel is een koppelregel met een begin en een einde, geen
+  eenmalige wijziging** (Beheer, november 2026, review "Opmerkingen versie 1",
+  punt 3). Leent een post een paar dagen het toestel van een andere (de
+  cursusdienst een week met de SumUp van Theokot), dan maakt Beheer één
+  uitlening: kanaal, eerste en laatste dag, code. Het vorige formulier gaf één
+  dag tegelijk met de hand een code; daarvan bleef niets bewaard, er was niets
+  om terug te zien, en wat later voor die dag opgeladen werd, kreeg de
+  standaardcode. Een uitlening staat in een lijst met haar transacties, en
+  wat later binnenkomt, krijgt ze ook.
+  - **Ze staat onder wat exact koppelt en boven de standaardcode** (regel 6).
+    Een betaling van de site, een code in de tekst, een kassa tijdens haar uren
+    en een onthouden tekst weten het beter dan de datum; de standaardcode is
+    net wat ze vervangt. Na de uren van een kassa geldt de uitlening weer, ook
+    op een gedeeld toestel: zij zegt wie het toestel die nacht had.
+  - **Wat met de hand een code kreeg, blijft.** Een regel die bij elk koppelen
+    over een keuze van een mens heen schrijft, verrast. Wat met de hand
+    dezelfde code kreeg (de dagen van het oude formulier), neemt Beheer met een
+    knop over in de uitlening; dat verandert enkel de regel, geen totaal. Zo
+    werden de zeven dagen van september 2026 één uitlening, op vraag van
+    Beheer. Een andere code blijft met de hand: daar koos iemand bewust.
+  - **Haar dagen lopen van 9:00 tot 9:00**, zoals in Na te kijken, zodat een
+    avond tot 3 uur bij haar dag hoort. De standaardcode blijft op
+    kalenderdagen. Geen van beide verandert de maand waarin iets telt.
+  - **Niet als standaardcode met een einddatum.** `IncomeChannelCode` heeft
+    geen einde, staat onder de onthouden tekst op de plaats van de
+    standaardcode, en hoort bij Instellingen; een uitlening is werk van Na te
+    kijken, met een eigen lijst.
+- **Transacties filtert ook op de dag van de betaling, van 9:00 tot 9:00**
+  (Beheer, november 2026: "9:00 tot 9:00 lijkt best"). Zo blijft een avond
+  bij de dag waarop ze begon, zoals in Na te kijken en bij een uitlening. De
+  snelkeuzes (deze maand, vorige maand, de kwartalen) gaan wel op de maand
+  waarin iets telt: dat is wat het overzicht en de boekhouder optellen, en
+  een kwartaal moet hier hetzelfde totaal geven als daar.
 - **Elke code is te verbeteren, zoals een cel in het rekenblad.** In de Excel
   tikte Beheer over een foute code heen; in Transacties opent een klik op een
   rij de code, en vinkjes geven veel rijen samen een code, tot "alles wat aan
-  de filter voldoet". Anders dan bij een hele dag gaat dat ook over een exacte
+  de filter voldoet". Anders dan bij een uitlening gaat dat ook over een exacte
   koppeling: wie één rij bekijkt en de code verandert, weet dat de kassa of de
   betaling van de site het hier mis had. De koppeling met die kassa of verkoop
   gaat dan mee weg, zodat de kassacontrole die betaling niet meer meetelt;

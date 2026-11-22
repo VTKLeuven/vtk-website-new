@@ -6,15 +6,23 @@ import { requirePermission } from "@/lib/session";
 import { formatEuro } from "@/lib/rekeningen/expenses";
 import { listAccountingCodes } from "@/lib/accounting/server";
 import { listIncomeChannels, listUnassignedGroups, type UnassignedGroup } from "@/lib/inkomsten/server";
+import { listChannelLendings, type ChannelLendingItem } from "@/lib/inkomsten/lendingServer";
 import { REVIEW_DAY_START_HOUR } from "@/lib/inkomsten/overview";
-import { assignIncomeDayAction, assignIncomeGroupAction, rematchIncomeAction } from "@/app/actions/inkomsten";
+import {
+  assignIncomeGroupAction,
+  deleteIncomeLendingAction,
+  rematchIncomeAction,
+  saveIncomeLendingAction,
+  takeOverIncomeLendingAction,
+} from "@/app/actions/inkomsten";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { AdminDisclosure } from "@/components/admin/AdminDisclosure";
 import { incomeErrorMessages } from "../messages";
 import { SOURCE_LABELS } from "../shared";
-import { AssignDayForm } from "./AssignDayForm";
 import { AssignGroupForm } from "./AssignGroupForm";
+import { LendingForm } from "./LendingForm";
+import { LendingList, type LendingListItem } from "./LendingList";
 
 /**
  * Wat geen koppelregel kon plaatsen, gegroepeerd zodat één keuze veel
@@ -30,7 +38,12 @@ export default async function IncomeReviewPage({ params }: { params: Promise<{ l
   const base = nl ? "" : "/en";
   await requirePermission("income.manage");
 
-  const [groups, codes, channels] = await Promise.all([listUnassignedGroups(), listAccountingCodes(), listIncomeChannels()]);
+  const [groups, codes, channels, lendings] = await Promise.all([
+    listUnassignedGroups(),
+    listAccountingCodes(),
+    listIncomeChannels(),
+    listChannelLendings(),
+  ]);
   const errorMessages = incomeErrorMessages(locale);
   const time = (value: Date) =>
     value.toLocaleTimeString(nl ? "nl-BE" : "en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Brussels" });
@@ -78,7 +91,61 @@ export default async function IncomeReviewPage({ params }: { params: Promise<{ l
       </p>
     </>
   );
-  const dayTip = <InfoTip label={nl ? "Waarom een dag om 9:00 begint" : "Why a day starts at 9:00"}>{dayText}</InfoTip>;
+
+  // De uitleningen: de teksten hier, op de server, zodat de lijst in de browser
+  // niet met een andere maandafkorting verspringt.
+  const shortDay = (ymd: string, withYear: boolean) =>
+    new Date(`${ymd}T12:00:00Z`).toLocaleDateString(nl ? "nl-BE" : "en-GB", {
+      day: "numeric",
+      month: "short",
+      ...(withYear ? { year: "numeric" as const } : {}),
+      timeZone: "UTC",
+    });
+  const daysLabel = (from: string, to: string) =>
+    from === to
+      ? shortDay(from, true)
+      : `${shortDay(from, from.slice(0, 4) !== to.slice(0, 4))} ${nl ? "tot en met" : "to"} ${shortDay(to, true)}`;
+  const setOn = (value: Date) =>
+    value.toLocaleDateString(nl ? "nl-BE" : "en-GB", { day: "numeric", month: "short", timeZone: "Europe/Brussels" });
+  const counted = (count: number, cents: number, one: string, many: string) =>
+    // Het bedrag breekt niet tussen het euroteken en het getal.
+    `${count} ${count === 1 ? one : many} (${formatEuro(cents, locale).replace(" ", "\u00a0")})`;
+  const lendingItem = (lending: ChannelLendingItem): LendingListItem => {
+    const manual = new URLSearchParams({
+      kanaal: lending.channelId,
+      status: "met-de-hand",
+      "van-dag": lending.days.from,
+      "tot-dag": lending.days.to,
+    });
+    const edited = lending.updatedAt.getTime() - lending.createdAt.getTime() > 2000;
+    return {
+      id: lending.id,
+      channelId: lending.channelId,
+      channel: `${SOURCE_LABELS[lending.source]} · ${lending.channel}`,
+      from: lending.days.from,
+      to: lending.days.to,
+      daysLabel: daysLabel(lending.days.from, lending.days.to),
+      code: lending.code ? { id: lending.code.id, label: `${lending.code.code} ${lending.code.name}` } : null,
+      linkedCount: lending.linkedCount,
+      linkedLabel: counted(lending.linkedCount, lending.linkedCents, nl ? "transactie" : "transaction", nl ? "transacties" : "transactions"),
+      transactionsHref: `${base}/admin/inkomsten/transacties?uitlening=${encodeURIComponent(lending.id)}`,
+      manualCount: lending.manualCount,
+      manualHref: `${base}/admin/inkomsten/transacties?${manual.toString()}`,
+      takeOverCount: lending.takeOverCount,
+      takeOverLabel: counted(lending.takeOverCount, lending.takeOverCents, nl ? "betaling" : "payment", nl ? "betalingen" : "payments"),
+      setBy: [
+        [lending.createdBy, setOn(lending.createdAt)].filter(Boolean).join(", "),
+        edited ? `${nl ? "aangepast door" : "edited by"} ${[lending.updatedBy ?? "?", setOn(lending.updatedAt)].join(", ")}` : null,
+      ]
+        .filter(Boolean)
+        .join("; "),
+      locked: lending.locked,
+    };
+  };
+  const lendingChannels = channels.map((channel) => ({
+    id: channel.id,
+    label: `${SOURCE_LABELS[channel.source]} · ${channel.label || channel.identifier}`,
+  }));
 
   return (
     <div className="space-y-5">
@@ -199,35 +266,74 @@ export default async function IncomeReviewPage({ params }: { params: Promise<{ l
       )}
 
       <AdminDisclosure
+        defaultOpen={lendings.length === 0}
         summary={
           <>
-            <span className="font-medium">{nl ? "Een hele dag van een kanaal anders toewijzen" : "Assign a whole day of a channel differently"}</span>
+            <span className="font-medium">
+              {nl ? "Uitleningen van een toestel" : "Device lendings"}
+              {lendings.length > 0 ? <span className="font-normal text-vtk-muted"> ({lendings.length})</span> : null}
+            </span>
             <span className="block text-sm text-vtk-muted">
               {nl
-                ? "Voor een dag die de standaardcode kreeg maar voor iets anders was, zoals een SumUp die een dag uitgeleend werd."
-                : "For a day that got the default code but was for something else, like a SumUp lent out for a day."}
+                ? "Voor een toestel dat een of meer dagen voor iets anders diende, zoals een SumUp die een week uitgeleend werd."
+                : "For a device that served something else for one or more days, like a SumUp lent out for a week."}
             </span>
           </>
         }
       >
-        <div className="mb-3 flex items-start gap-1">
-          <p className="text-sm text-vtk-muted">
-            {nl
-              ? "Elke betaling van dat kanaal die dag krijgt de code, ook wat de standaardcode al had of wat nog na te kijken was. Een betaling van de site, een code in de tekst, een onthouden tekst of een kassa blijft zoals ze is: die weten het beter dan de dag."
-              : "Every payment on that channel that day gets the code, including what already had the default code or was still to review. A payment from the site, a code in the text, a remembered text or a cash register stays as it is: those know better than the day."}
-          </p>
-          {dayTip}
+        <div className="space-y-5">
+          <div className="flex items-start gap-1">
+            <p className="text-sm text-vtk-muted">
+              {nl
+                ? "Elke betaling van dat toestel op die dagen krijgt de code, ook wat je later nog oplaadt."
+                : "Every payment on that device on those days gets the code, including what you upload later."}
+            </p>
+            <InfoTip label={nl ? "Hoe een uitlening koppelt" : "How a lending matches"}>
+              <p>
+                {nl
+                  ? `Een dag loopt van ${REVIEW_DAY_START_HOUR}:00 tot ${REVIEW_DAY_START_HOUR}:00 de ochtend erna, zoals de groepen hierboven: een avond tot 3 uur hoort bij de dag waarop ze begon. Zonder laatste dag is het één dag.`
+                  : `A day runs from ${REVIEW_DAY_START_HOUR}:00 to ${REVIEW_DAY_START_HOUR}:00 the next morning, like the groups above: an evening until 3 am belongs to the day it started. Without a last day it is one day.`}
+              </p>
+              <p>
+                {nl
+                  ? "Een betaling van de site, een code in de tekst, een kassa tijdens haar uren en een onthouden tekst blijven zoals ze zijn: die weten het beter dan de datum. Na de uren van een kassa geldt de uitlening weer."
+                  : "A payment from the site, a code in the text, a cash register during its hours and a remembered text stay as they are: those know better than the date. After a register's hours the lending applies again."}
+              </p>
+              <p>
+                {nl
+                  ? "Wat met de hand een code kreeg, blijft. Kreeg het dezelfde code (met het oude formulier voor een hele dag), open dan de uitlening en neem het over."
+                  : "What got a code by hand stays. If it got the same code (with the old form for a whole day), open the lending and take it over."}
+              </p>
+              <p>
+                {nl
+                  ? "Enkel de code verandert: de dagen tellen in dezelfde maand als ervoor. Verwijder je een uitlening, dan gaan haar transacties terug naar de koppelregels."
+                  : "Only the code changes: the days count in the same month as before. Delete a lending, and its transactions go back to the matching rules."}
+              </p>
+            </InfoTip>
+          </div>
+          <LendingForm
+            channels={lendingChannels}
+            codes={codes}
+            locale={locale}
+            action={saveIncomeLendingAction}
+            errorMessages={errorMessages}
+          />
+          <section aria-labelledby="uitleningen">
+            <h3 id="uitleningen" className="mb-2 text-sm font-semibold">
+              {nl ? "Uitleningen" : "Lendings"}
+            </h3>
+            <LendingList
+              items={lendings.map(lendingItem)}
+              channels={lendingChannels}
+              codes={codes}
+              locale={locale}
+              saveAction={saveIncomeLendingAction}
+              deleteAction={deleteIncomeLendingAction}
+              takeOverAction={takeOverIncomeLendingAction}
+              errorMessages={errorMessages}
+            />
+          </section>
         </div>
-        <AssignDayForm
-          channels={channels.map((channel) => ({
-            id: channel.id,
-            label: `${SOURCE_LABELS[channel.source]} · ${channel.label || channel.identifier}`,
-          }))}
-          codes={codes}
-          locale={locale}
-          action={assignIncomeDayAction}
-          errorMessages={errorMessages}
-        />
       </AdminDisclosure>
     </div>
   );

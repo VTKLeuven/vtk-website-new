@@ -6,9 +6,8 @@
 import type { Prisma } from "@prisma/client";
 import { brusselsWallClockMinutes, parseYMD, shiftYMD, ymdKey } from "@/lib/brussels";
 import { INCOME_SOURCES, REVIEW_DAY_START_HOUR } from "./overview";
+import type { IncomeRuleCode } from "./match";
 import { monthToDate, parseMonth, type IncomeKindCode, type IncomeSourceCode } from "./parse";
-
-export type IncomeRuleCode = "MANUAL" | "WEBSITE" | "CODE_IN_TEXT" | "NAME_RULE" | "CHANNEL_DEFAULT" | "CASH_REGISTER";
 
 /** Een stand ("na te kijken") of de regel die de code gaf; samen één keuzelijst. */
 export type TransactionState =
@@ -23,10 +22,21 @@ export type TransactionFilter = {
   channelId: string | null;
   state: TransactionState;
   kind: IncomeKindCode | null;
+  /** De maand waarin een transactie telt (`periodMonth`), van en tot en met: wat het overzicht telt. */
   from: string | null;
   to: string | null;
   /** "2026-10-09": de dag zoals in Na te kijken, van 9:00 tot 9:00 de ochtend erna. */
   day: string | null;
+  /**
+   * Betaald van en tot en met ("2026-10-01"), op dezelfde dagen van 9:00 tot
+   * 9:00: een avond tot 3 uur blijft bij de dag waarop ze begon. Dat is niet de
+   * maand waarin iets telt: een betaling om 0:30 op 1 oktober staat bij "tot en
+   * met 30 september" en telt in oktober.
+   */
+  dayFrom: string | null;
+  dayTo: string | null;
+  /** Enkel de transacties die een uitlening koppelde (`IncomeChannelLending.id`). */
+  lendingId: string | null;
   /** Een volledige code, het begin van een nummer, of een stuk van de naam: zie `codeWhere`. */
   code: string | null;
   query: string | null;
@@ -42,6 +52,7 @@ export const STATE_PARAMS: Record<string, TransactionState> = {
   "code-in-tekst": { type: "rule", rule: "CODE_IN_TEXT" },
   "onthouden-tekst": { type: "rule", rule: "NAME_RULE" },
   kassa: { type: "rule", rule: "CASH_REGISTER" },
+  uitlening: { type: "rule", rule: "CHANNEL_LENDING" },
   standaardcode: { type: "rule", rule: "CHANNEL_DEFAULT" },
 };
 
@@ -59,6 +70,10 @@ export const ASSIGNABLE_KINDS: readonly IncomeKindCode[] = ["PAYMENT", "REFUND"]
 /** De filter uit de parameters van de URL, of uit de velden van een formulier. */
 export function parseTransactionFilter(get: (key: string) => string): TransactionFilter {
   const source = get("bron").toUpperCase();
+  let dayFrom = dayParam(get("van-dag"));
+  let dayTo = dayParam(get("tot-dag"));
+  // Omgekeerd ingevuld: een tikfout, die toch iets toont.
+  if (dayFrom && dayTo && dayFrom > dayTo) [dayFrom, dayTo] = [dayTo, dayFrom];
   return {
     source: INCOME_SOURCES.find((candidate) => candidate === source) ?? null,
     channelId: get("kanaal").trim() || null,
@@ -67,6 +82,9 @@ export function parseTransactionFilter(get: (key: string) => string): Transactio
     from: parseMonth(get("van")),
     to: parseMonth(get("tot")),
     day: dayParam(get("dag")),
+    dayFrom,
+    dayTo,
+    lendingId: get("uitlening").trim() || null,
     code: get("code").trim() || null,
     query: get("q").trim().slice(0, 100) || null,
   };
@@ -119,14 +137,19 @@ export function codeWhere(value: string): Prisma.IncomeTransactionWhereInput {
   return { accountingCode: { startsWith: spaced } };
 }
 
-/** Een dag zoals in Na te kijken: van 9:00 tot 9:00 de ochtend erna, op de Brusselse klok. */
-function dayWhere(day: string): Prisma.IncomeTransactionWhereInput {
-  const ymd = parseYMD(day);
-  if (!ymd) return {};
+/**
+ * Dagen zoals in Na te kijken: van 9:00 op de eerste tot 9:00 de ochtend na de
+ * laatste, op de Brusselse klok. Een grens die ontbreekt, begrenst niet. De
+ * filter "Dag", "Betaald van/tot en met" en een uitlening rekenen alle drie zo.
+ */
+export function reviewDaysWhere(from: string | null, to: string | null): Prisma.IncomeTransactionWhereInput {
+  const first = from ? parseYMD(from) : null;
+  const last = to ? parseYMD(to) : null;
+  if (!first && !last) return {};
   return {
     occurredAt: {
-      gte: brusselsWallClockMinutes(ymd, REVIEW_DAY_START_HOUR * 60),
-      lt: brusselsWallClockMinutes(shiftYMD(ymd, 1), REVIEW_DAY_START_HOUR * 60),
+      ...(first ? { gte: brusselsWallClockMinutes(first, REVIEW_DAY_START_HOUR * 60) } : {}),
+      ...(last ? { lt: brusselsWallClockMinutes(shiftYMD(last, 1), REVIEW_DAY_START_HOUR * 60) } : {}),
     },
   };
 }
@@ -134,8 +157,14 @@ function dayWhere(day: string): Prisma.IncomeTransactionWhereInput {
 export function transactionWhere(filter: TransactionFilter): Prisma.IncomeTransactionWhereInput {
   return {
     // Een stand en een soort samen ("na te kijken" en "kosten") moeten allebei
-    // gelden; in één object zou de ene `kind` de andere overschrijven.
-    AND: [stateWhere(filter.state), filter.kind ? { kind: filter.kind } : {}],
+    // gelden; in één object zou de ene `kind` de andere overschrijven. Zo ook
+    // de dag en de reeks van dagen, die allebei `occurredAt` begrenzen.
+    AND: [
+      stateWhere(filter.state),
+      filter.kind ? { kind: filter.kind } : {},
+      filter.day ? reviewDaysWhere(filter.day, filter.day) : {},
+      reviewDaysWhere(filter.dayFrom, filter.dayTo),
+    ],
     ...(filter.source ? { source: filter.source } : {}),
     ...(filter.channelId ? { channelId: filter.channelId } : {}),
     ...(filter.from || filter.to
@@ -146,7 +175,7 @@ export function transactionWhere(filter: TransactionFilter): Prisma.IncomeTransa
           },
         }
       : {}),
-    ...(filter.day ? dayWhere(filter.day) : {}),
+    ...(filter.lendingId ? { channelLendingId: filter.lendingId } : {}),
     ...(filter.code ? codeWhere(filter.code) : {}),
     ...(filter.query
       ? {

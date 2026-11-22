@@ -8,7 +8,7 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import { Modal } from "../../admin-table";
 import type { AccountingCodeOption } from "@/lib/accounting/codes";
 import type { IncomeKindCode } from "@/lib/inkomsten/parse";
-import type { IncomeRuleCode } from "@/lib/inkomsten/transactionFilter";
+import type { IncomeRuleCode } from "@/lib/inkomsten/match";
 import { formatEuro } from "@/lib/rekeningen/expenses";
 import type { SaveAction } from "@/lib/saveState";
 import { KIND_LABELS, RULE_LABELS } from "../shared";

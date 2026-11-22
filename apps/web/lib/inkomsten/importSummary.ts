@@ -45,7 +45,7 @@ export function combineImportSummaries(summaries: readonly ImportSummary[]): Com
     updated: 0,
     locked: 0,
     feeRows: 0,
-    rules: { WEBSITE: 0, CODE_IN_TEXT: 0, CASH_REGISTER: 0, NAME_RULE: 0, CHANNEL_DEFAULT: 0, OPEN: 0 },
+    rules: { WEBSITE: 0, CODE_IN_TEXT: 0, CASH_REGISTER: 0, NAME_RULE: 0, CHANNEL_LENDING: 0, CHANNEL_DEFAULT: 0, OPEN: 0 },
     firstAt: null,
     lastAt: null,
     newChannels: [],
@@ -65,7 +65,7 @@ export function combineImportSummaries(summaries: readonly ImportSummary[]): Com
     totals.feeRows += summary.feeRows;
     totals.payouts += summary.payouts;
     totals.balancePayments += summary.balancePayments ?? 0;
-    for (const key of Object.keys(totals.rules) as Array<keyof ImportSummary["rules"]>) totals.rules[key] += summary.rules[key];
+    for (const key of Object.keys(totals.rules) as Array<keyof ImportSummary["rules"]>) totals.rules[key] += summary.rules[key] ?? 0;
     const first = summary.firstAt ? new Date(summary.firstAt) : null;
     const last = summary.lastAt ? new Date(summary.lastAt) : null;
     if (first && (!totals.firstAt || first < totals.firstAt)) totals.firstAt = first;

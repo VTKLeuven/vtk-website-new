@@ -40,6 +40,12 @@ type Common = {
    * kunnen beslissen (een verkoopdag en haar shiften).
    */
   option?: ConfirmOption;
+  /**
+   * De bevestigknop in de kleur van gevaar; standaard aan. Zet uit voor een
+   * actie die niets weggooit (iets overnemen, afvinken): een rode knop doet
+   * daar schrikken.
+   */
+  destructive?: boolean;
 };
 
 export type ConfirmOption = {
@@ -193,6 +199,7 @@ function Dialog({
   confirmLabel,
   cancelLabel,
   option,
+  destructive,
   open,
   pending,
   onConfirm,
@@ -235,6 +242,7 @@ function Dialog({
       }
       confirmLabel={confirmLabel}
       cancelLabel={cancelLabel}
+      destructive={destructive}
       pending={pending}
       onConfirm={onConfirm}
       onCancel={onCancel}

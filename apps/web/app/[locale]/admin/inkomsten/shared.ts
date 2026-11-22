@@ -1,6 +1,6 @@
 import type { YMD } from "@/lib/brussels";
 import type { IncomeKindCode, IncomeSourceCode } from "@/lib/inkomsten/parse";
-import type { IncomeRuleCode } from "@/lib/inkomsten/transactionFilter";
+import type { IncomeRuleCode } from "@/lib/inkomsten/match";
 import type { IncomeCheck } from "@/lib/inkomsten/overview";
 import { formatEuro } from "@/lib/rekeningen/expenses";
 import { monthLabel } from "@/lib/inkomsten/labels";
@@ -21,6 +21,7 @@ export const RULE_LABELS: Record<IncomeRuleCode, { nl: string; en: string }> = {
   WEBSITE: { nl: "Betaling van de site", en: "Payment from the site" },
   CODE_IN_TEXT: { nl: "Code in de tekst", en: "Code in the text" },
   NAME_RULE: { nl: "Onthouden tekst", en: "Remembered text" },
+  CHANNEL_LENDING: { nl: "Uitlening van het toestel", en: "Lending of the device" },
   CHANNEL_DEFAULT: { nl: "Standaardcode van het kanaal", en: "Default code of the channel" },
   CASH_REGISTER: { nl: "Kassa", en: "Cash register" },
 };

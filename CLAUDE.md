@@ -187,6 +187,12 @@ de sectie "Vallen"; de kringkeuzes staan in `docs/design-decisions.md`.
   scherm telt ermee. Verander je in welke regel
   een transactie valt, doe het daar; anders tellen de formules van het
   controlebestand iets anders op dan het blad dat naar de boekhouder gaat.
+- **Een uitlening van een toestel is een koppelregel** (regel 6,
+  `IncomeChannelLending`), geen eenmalige update: wat later opgeladen wordt,
+  krijgt ze ook. Ze verandert enkel de code, nooit de maand, en wat met de hand
+  gezet werd, blijft. Een nieuwe regel komt in `matchTransaction` én in de drie
+  plaatsen die een context bouwen (opladen, `matchContextsFor`,
+  `listUnassignedGroups`), anders koppelen import en opnieuw koppelen anders.
 
 # Bestuursorgaan
 

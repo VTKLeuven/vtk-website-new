@@ -67,7 +67,12 @@ export function UploadForm({
   // was, brengt soms enkel de betalingen om na te kijken: ook dat telt.
   const hasNews = totals !== null && totals.created + totals.updated + totals.payouts + totals.balancePayments > 0;
   const matched = totals
-    ? totals.rules.WEBSITE + totals.rules.CODE_IN_TEXT + totals.rules.CASH_REGISTER + totals.rules.NAME_RULE + totals.rules.CHANNEL_DEFAULT
+    ? totals.rules.WEBSITE +
+      totals.rules.CODE_IN_TEXT +
+      totals.rules.CASH_REGISTER +
+      totals.rules.NAME_RULE +
+      totals.rules.CHANNEL_LENDING +
+      totals.rules.CHANNEL_DEFAULT
     : 0;
 
   return (
@@ -164,6 +169,9 @@ export function UploadForm({
                 <Stat label={nl ? "Een kassa" : "A cash register"} value={number(totals.rules.CASH_REGISTER)} />
               ) : null}
               <Stat label={nl ? "Onthouden tekst" : "Remembered text"} value={number(totals.rules.NAME_RULE)} />
+              {totals.rules.CHANNEL_LENDING ? (
+                <Stat label={nl ? "Uitlening van het toestel" : "Lending of the device"} value={number(totals.rules.CHANNEL_LENDING)} />
+              ) : null}
               {totals.rules.CHANNEL_DEFAULT ? (
                 <Stat label={nl ? "Standaardcode van het kanaal" : "Default code of the channel"} value={number(totals.rules.CHANNEL_DEFAULT)} />
               ) : null}
