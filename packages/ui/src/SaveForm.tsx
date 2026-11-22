@@ -9,6 +9,7 @@ import {
   type ComponentProps,
   type FormEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 import { Button } from "./Button";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -17,6 +18,28 @@ import { FormBusyProvider, useFormBusy } from "./formBusy";
 import { SAVE_IDLE, saveError, type SaveAction, type SaveState } from "./saveState";
 import { UNSENT_SAVE_CODES, unsentSaveReason } from "./unsentSave";
 import { useUnsentGuard } from "./unsentGuard";
+
+/** Wat `header` en `footer` meekrijgen om de knoppen zelf te plaatsen. */
+type SaveFormChrome = {
+  pending: boolean;
+  disabled: boolean;
+  submitButton: ReactNode;
+  secondaryButtons: ReactNode;
+  /** Wat een app via `extension.extraButton` toevoegt; anders `null`. */
+  extraButton: ReactNode;
+  confirmDialog: ReactNode;
+};
+
+/**
+ * Voor een app die iets aan elk formulier toevoegt zonder dat dit pakket het
+ * kent (vtk.be: de AI-vertaalknop, in `apps/web/components/ui/SaveForm.tsx`).
+ */
+export type SaveFormExtension = {
+  /** Omhult de hele inhoud van het formulier, bv. met een provider waar velden zich bij aanmelden. */
+  wrap?: (content: ReactNode) => ReactNode;
+  /** Komt na de opslaanknoppen, en zit als `extraButton` in wat `header` en `footer` krijgen. */
+  extraButton?: (props: { pending: boolean; formRef: RefObject<HTMLFormElement | null> }) => ReactNode;
+};
 
 type SecondarySubmit = {
   name: string;
@@ -62,6 +85,7 @@ export function SaveForm({
   secondarySubmit,
   header,
   footer,
+  extension,
   className,
   children,
 }: {
@@ -120,26 +144,15 @@ export function SaveForm({
    * De submitknop blijft de eerste submit in het formulier, ook hierboven: die
    * bepaalt wat Enter in een tekstveld doet.
    */
-  header?: (props: {
-    pending: boolean;
-    disabled: boolean;
-    submitButton: ReactNode;
-    secondaryButtons: ReactNode;
-    confirmDialog: ReactNode;
-  }) => ReactNode;
+  header?: (props: SaveFormChrome) => ReactNode;
   /**
    * Vervangt de standaard knoppenrij onderaan door een eigen footer (zoals de
    * sticky actiebalk van het evenementenformulier). Krijgt de actieknoppen en
    * de bevestigingsdialoog mee zodat de submit-, toestand- en dialooglogica van
    * `SaveForm` intact blijft.
    */
-  footer?: (props: {
-    pending: boolean;
-    disabled: boolean;
-    submitButton: ReactNode;
-    secondaryButtons: ReactNode;
-    confirmDialog: ReactNode;
-  }) => ReactNode;
+  footer?: (props: SaveFormChrome) => ReactNode;
+  extension?: SaveFormExtension;
   className?: string;
   /**
    * Een functie in plaats van vaste inhoud wanneer het formulier zelf op de
@@ -324,16 +337,19 @@ export function SaveForm({
     />
   ) : null;
 
-  const chrome = {
+  const extraButton = extension?.extraButton?.({ pending, formRef }) ?? null;
+
+  const chrome: SaveFormChrome = {
     pending,
     disabled: pending || submitDisabled || busy,
     submitButton,
     secondaryButtons,
+    extraButton,
     confirmDialog,
   };
 
-  return (
-    <form ref={formRef} onSubmit={onSubmit} className={className}>
+  const content = (
+    <>
       {header ? header(chrome) : null}
       <FormBusyProvider register={register}>
         {typeof children === "function" ? children(state) : children}
@@ -345,10 +361,17 @@ export function SaveForm({
           <div className="flex flex-wrap items-center gap-3">
             {submitButton}
             {secondaryButtons}
+            {extraButton}
           </div>
           {confirmDialog}
         </>
       )}
+    </>
+  );
+
+  return (
+    <form ref={formRef} onSubmit={onSubmit} className={className}>
+      {extension?.wrap ? extension.wrap(content) : content}
     </form>
   );
 }

@@ -1,376 +1,54 @@
 "use client";
 
-import {
-  startTransition,
-  useActionState,
-  useEffect,
-  useRef,
-  useState,
-  type ComponentProps,
-  type FormEvent,
-  type ReactNode,
-} from "react";
-import { Button, ConfirmDialog } from "@vtk/ui";
-import { useToast } from "@/components/ui/toast";
-import { FormBusyProvider, useFormBusy } from "@/components/ui/formBusy";
+import type { ComponentProps } from "react";
+import { SaveForm as SharedSaveForm } from "@vtk/ui/save-form";
 import {
   FormTranslateControl,
   FormTranslateProvider,
   useFormTranslateRegistry,
 } from "@/components/ui/formTranslate";
-import { SAVE_IDLE, saveError, type SaveAction, type SaveState } from "@/lib/saveState";
-import { UNSENT_SAVE_CODES, unsentSaveReason } from "@/lib/unsentSave";
-import { useUnsentGuard } from "@/components/ui/unsentGuard";
-
-type SecondarySubmit = {
-  name: string;
-  value: string;
-  label: string;
-  /**
-   * Vraagt eerst een bevestiging. Voor een knop die iets doet wat de bezoeker
-   * van de site meteen merkt (een evenement offline halen), maar die niet als
-   * "verwijderen" gelabeld staat en dus niet vanzelf argwaan wekt.
-   */
-  confirm?: {
-    title: string;
-    description: string;
-    confirmLabel: string;
-    cancelLabel: string;
-  };
-};
 
 /**
- * Formulier dat de uitkomst van zijn opslaan-actie als toast meldt: groen bij
- * succes, rood bij een fout. Dit is de standaardmanier om iets op te slaan (zie
- * CLAUDE.md); gebruik geen kaal `<form action={...}>` zonder feedback.
+ * Formulier dat de uitkomst van zijn opslaan-actie als toast meldt. De basis staat
+ * sinds november 2026 in `@vtk/ui/save-form`, gedeeld met de uitleendienst; dit
+ * blijft het adres voor vtk.be (zie CLAUDE.md, "Opslaan meldt altijd zijn uitkomst").
  *
- * De velden komen als children binnen en mogen server-gerenderd zijn; enkel deze
- * schil is client. De submitknop hoort erbij en toont de bezig-toestand.
+ * Wat enkel vtk.be heeft, komt er hier bij als `extension`: de AI-vertaalknop
+ * (`formTranslate.tsx`). Velden melden zich aan bij de provider rond het
+ * formulier, en de knop staat na de opslaanknoppen, tenzij een tweetalig blok zijn
+ * eigen knop heeft of `disableAutoTranslate` aan staat.
  */
 export function SaveForm({
-  action,
-  submitLabel,
-  submitVariant,
-  submitSize,
-  confirmSubmit,
-  savingLabel,
-  savedMessage,
-  errorMessages,
-  fallbackErrorMessage,
-  onSuccess,
-  resetOnSuccess = true,
-  submitDisabled = false,
   disableAutoTranslate = false,
-  secondarySubmit,
-  header,
-  footer,
-  className,
-  children,
-}: {
-  action: SaveAction;
-  submitLabel: string;
-  /**
-   * Uitzicht van de submitknop, voor een opslaan-actie die naast een zwaardere
-   * knop staat (een "ban opheffen" onder het opslaan van diezelfde ban). De
-   * standaard blijft de volle primaire knop.
-   */
-  submitVariant?: ComponentProps<typeof Button>["variant"];
-  submitSize?: ComponentProps<typeof Button>["size"];
-  /**
-   * Vraagt een bevestiging voor de gewone opslaan-knop. Voor een formulier dat
-   * bij het opslaan iets onomkeerbaars doet waar de gebruiker niet om vroeg (het
-   * aanbod verlagen schrapt bestellingen). Laat weg wanneer opslaan gewoon
-   * opslaan is; de tekst hoort te zeggen wát er weg is, niet enkel "zeker?".
-   */
-  confirmSubmit?: {
-    title: string;
-    description: ReactNode;
-    confirmLabel: string;
-    cancelLabel: string;
-    /**
-     * Rode bevestigknop (standaard). Uit voor een vraag die niets weggooit maar
-     * een keuze laat maken, zoals welke dagen van een verkoopweek shiften krijgen.
-     */
-    destructive?: boolean;
-  } | null;
-  savingLabel: string;
-  savedMessage: string;
-  /** Foutcode uit de action -> vertaalde melding. Onbekende codes vallen terug. */
-  errorMessages?: Record<string, string>;
-  fallbackErrorMessage: string;
-  /** Loopt na een geslaagde opslag, bv. om een net aangemaakt item te sluiten. */
-  onSuccess?: () => void;
-  /** Uit voor bewerkformulieren die hun gecontroleerde waarden moeten behouden. */
-  resetOnSuccess?: boolean;
-  /** Extra voorwaarde bovenop "bezig met opslaan", bv. een verplichte upload. */
-  submitDisabled?: boolean;
+  ...props
+}: Omit<ComponentProps<typeof SharedSaveForm>, "extension"> & {
   /** Verberg de automatische AI-vertaalknop voor dit formulier. */
   disableAutoTranslate?: boolean;
-  /**
-   * Alternatieve opslaanknoppen die hetzelfde formulier versturen met een extra
-   * waarde mee, zodat de action een andere intentie kent (bv. als concept
-   * bewaren of na het opslaan tickets toevoegen). Bewust submits en geen aparte
-   * links: het formulier moet eerst bewaard worden.
-   */
-  /** Eén of meer alternatieve submitacties met elk hun eigen name/value. */
-  secondarySubmit?: SecondarySubmit | SecondarySubmit[];
-  /**
-   * Zet een eigen balk vóór de velden, met de actieknoppen erin (zoals de
-   * meescrollende kop van het evenementenformulier). Krijgt dezelfde knoppen en
-   * dialoog mee als `footer`, en vervangt net als `footer` de standaard
-   * knoppenrij onderaan; geef er hoogstens één van de twee de knoppen, anders
-   * staat dezelfde submitknop twee keer in het formulier.
-   *
-   * De submitknop blijft de eerste submit in het formulier, ook hierboven: die
-   * bepaalt wat Enter in een tekstveld doet.
-   */
-  header?: (props: {
-    pending: boolean;
-    disabled: boolean;
-    submitButton: ReactNode;
-    secondaryButtons: ReactNode;
-    translateButton: ReactNode;
-    confirmDialog: ReactNode;
-  }) => ReactNode;
-  /**
-   * Vervangt de standaard knoppenrij onderaan door een eigen footer (zoals de
-   * sticky actiebalk van het evenementenformulier). Krijgt de actieknoppen en
-   * de bevestigingsdialoog mee zodat de submit-, toestand- en dialooglogica van
-   * `SaveForm` intact blijft.
-   */
-  footer?: (props: {
-    pending: boolean;
-    disabled: boolean;
-    submitButton: ReactNode;
-    secondaryButtons: ReactNode;
-    translateButton: ReactNode;
-    confirmDialog: ReactNode;
-  }) => ReactNode;
-  className?: string;
-  children?: ReactNode;
 }) {
-  const showToast = useToast();
-  const unsent = useUnsentGuard();
-  /**
-   * De toast vertrekt zodra de action antwoordt, niet pas in een effect na het
-   * hertekenen. Een formulier dat door zijn eigen succes verdwijnt (een aanvraag
-   * sluiten haalt ze uit de lijst, een sessie annuleren haalt het
-   * annuleerformulier weg), is dan al weg wanneer dat effect zou lopen, en de
-   * toast ging stil verloren. De toastprovider staat hoger en blijft.
-   */
-  async function actionWithToast(previous: SaveState, data: FormData): Promise<SaveState> {
-    let result: SaveState;
-    try {
-      result = await action(previous, data);
-    } catch (error) {
-      // Een opslag die de server nooit verwerkte (een pagina van vóór de
-      // laatste deploy, of geen verbinding) wordt een gewone rode toast, en het
-      // formulier blijft staan zoals het was. Doorgooien liet de error boundary
-      // het hele scherm vervangen, met alles wat er ingevuld was. Al de rest,
-      // ook een `redirect()` uit de action, gaat door zoals voordien.
-      const reason = unsentSaveReason(error);
-      if (!reason || !unsent.report(error)) throw error;
-      return saveError(UNSENT_SAVE_CODES[reason]);
-    }
-    if (result.status === "success") {
-      showToast({ message: result.detail ?? savedMessage, variant: "success" });
-    } else if (result.status === "error") {
-      // Blijft staan tot het lid ze wegklikt: een foutmelding die na vier
-      // seconden verdwijnt kan je net missen.
-      showToast({
-        message: errorMessages?.[result.code] ?? result.detail ?? fallbackErrorMessage,
-        variant: "error",
-        duration: 0,
-      });
-    }
-    return result;
-  }
-  const [state, formAction, pending] = useActionState(actionWithToast, SAVE_IDLE);
-  // Een veld kan nog bezig zijn (een upload die pas achteraf zijn key kent).
-  // Verzenden zou dan een lege waarde bewaren onder een groene toast.
-  const { busy, register } = useFormBusy();
-  const {
-    fieldsRef: translatableFieldsRef,
-    version: translateRegistryVersion,
-    hasInlineTranslate,
-    register: registerTranslatableField,
-    markInlinePresent,
-  } = useFormTranslateRegistry();
-  // Per submit één keer resetten en `onSuccess`, ook als de component om een
-  // andere reden hertekent met dezelfde state.
-  const handled = useRef<number | null>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-  const secondarySubmits = secondarySubmit
-    ? Array.isArray(secondarySubmit)
-      ? secondarySubmit
-      : [secondarySubmit]
-    : [];
-  // Welke secundaire knop op een bevestiging staat te wachten. De knop zelf mag
-  // het formulier dan niet verzenden; dat gebeurt pas in de dialoog.
-  const [confirming, setConfirming] = useState<SecondarySubmit | null>(null);
-  // Bevestiging op de gewone opslaan-knop staat los van die op een secundaire
-  // knop: die tweede draagt een name/value mee, deze niet.
-  const [confirmingSubmit, setConfirmingSubmit] = useState(false);
-
-  /**
-   * Verstuurt het formulier alsof er op `submit` geklikt was. Nodig omdat de
-   * bevestigingsdialoog buiten het formulier staat: `requestSubmit` met een
-   * submitter uit de dialoog kan niet, dus zetten we de name/value zelf in de
-   * FormData.
-   */
-  function submitWith(submit: SecondarySubmit) {
-    const form = formRef.current;
-    if (!form) return;
-    const data = new FormData(form);
-    data.set(submit.name, submit.value);
-    setConfirming(null);
-    startTransition(() => formAction(data));
-  }
-
-  /**
-   * Zelf verzenden in plaats van `<form action={formAction}>`.
-   *
-   * React leegt een uncontrolled formulier na élke afgelopen form action, dus
-   * ook na een geweigerde opslag: je typte twintig velden, één e-mailadres had
-   * een tikfout, en alles stond weer op de oude waarde onder een rode toast.
-   * Via een eigen submit gebeurt dat niet, en resetten we hieronder enkel na
-   * succes; daar rekenen de "toevoegen"-formulieren op, die na een geslaagde
-   * toevoeging leeg horen te zijn.
-   *
-   * De submitter moet mee in de FormData, anders verliest `secondarySubmit`
-   * zijn name/value en weet de action niet op welke knop je klikte.
-   */
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    // Alleen een echte submitknop mag als submitter mee; iets anders laat de
-    // FormData-constructor met een TypeError afgaan.
-    const submitter = (event.nativeEvent as SubmitEvent).submitter;
-    const data = new FormData(
-      form,
-      submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement
-        ? submitter
-        : null
-    );
-    startTransition(() => formAction(data));
-  }
-
-  // De toast staat al in `actionWithToast`; hier enkel wat het formulier zelf
-  // nog moet doen, en dat kan enkel zolang het er is.
-  useEffect(() => {
-    if (state.status === "idle" || handled.current === state.nonce) return;
-    handled.current = state.nonce;
-    if (state.status === "success") {
-      if (resetOnSuccess) formRef.current?.reset();
-      onSuccess?.();
-    }
-  }, [state, onSuccess, resetOnSuccess]);
-
-  /** Verstuurt het formulier zoals het staat, zonder extra name/value. */
-  function submitPlain() {
-    const form = formRef.current;
-    if (!form) return;
-    const data = new FormData(form);
-    setConfirmingSubmit(false);
-    startTransition(() => formAction(data));
-  }
-
-  const submitButton = (
-    <Button
-      type={confirmSubmit ? "button" : "submit"}
-      variant={submitVariant}
-      size={submitSize}
-      onClick={confirmSubmit ? () => setConfirmingSubmit(true) : undefined}
-      disabled={pending || submitDisabled || busy}
-    >
-      {pending ? savingLabel : submitLabel}
-    </Button>
-  );
-
-  const secondaryButtons = secondarySubmits.map((submit) => (
-    // `name`/`value` op de knop: die waarde komt enkel mee wanneer je op
-    // déze knop klikt, zodat de action ziet welke van de twee je gebruikte.
-    // Staat er een bevestiging op, dan is het een gewone knop en gaat de
-    // waarde pas mee wanneer de dialoog bevestigd wordt.
-    <Button
-      key={`${submit.name}:${submit.value}`}
-      type={submit.confirm ? "button" : "submit"}
-      variant="secondary"
-      {...(submit.confirm ? {} : { name: submit.name, value: submit.value })}
-      onClick={submit.confirm ? () => setConfirming(submit) : undefined}
-      disabled={pending || submitDisabled || busy}
-    >
-      {submit.label}
-    </Button>
-  ));
-
-  const confirmDialog = confirming?.confirm ? (
-    <ConfirmDialog
-      open
-      title={confirming.confirm.title}
-      description={confirming.confirm.description}
-      confirmLabel={confirming.confirm.confirmLabel}
-      cancelLabel={confirming.confirm.cancelLabel}
-      pending={pending}
-      onConfirm={() => submitWith(confirming)}
-      onCancel={() => setConfirming(null)}
-    />
-  ) : confirmSubmit && confirmingSubmit ? (
-    <ConfirmDialog
-      open
-      title={confirmSubmit.title}
-      description={confirmSubmit.description}
-      confirmLabel={confirmSubmit.confirmLabel}
-      cancelLabel={confirmSubmit.cancelLabel}
-      destructive={confirmSubmit.destructive}
-      pending={pending}
-      onConfirm={submitPlain}
-      onCancel={() => setConfirmingSubmit(false)}
-    />
-  ) : null;
-
-  const translateButton =
-    disableAutoTranslate || hasInlineTranslate ? null : (
-      <FormTranslateControl
-        formRef={formRef}
-        registeredFieldsRef={translatableFieldsRef}
-        registryVersion={translateRegistryVersion}
-        disabled={pending}
-      />
-    );
-
-  const chrome = {
-    pending,
-    disabled: pending || submitDisabled || busy,
-    submitButton,
-    secondaryButtons,
-    translateButton,
-    confirmDialog,
-  };
+  const { fieldsRef, version, hasInlineTranslate, register, markInlinePresent } =
+    useFormTranslateRegistry();
 
   return (
-    <form ref={formRef} onSubmit={onSubmit} className={className}>
-      <FormBusyProvider register={register}>
-        <FormTranslateProvider
-          register={registerTranslatableField}
-          markInlinePresent={markInlinePresent}
-        >
-          {header ? header(chrome) : null}
-          {children}
-          {footer ? (
-            footer(chrome)
-          ) : header ? null : (
-            <>
-              <div className="flex flex-wrap items-center gap-3">
-                {submitButton}
-                {secondaryButtons}
-                {translateButton}
-              </div>
-              {confirmDialog}
-            </>
-          )}
-        </FormTranslateProvider>
-      </FormBusyProvider>
-    </form>
+    <SharedSaveForm
+      {...props}
+      extension={{
+        wrap: (content) => (
+          <FormTranslateProvider register={register} markInlinePresent={markInlinePresent}>
+            {content}
+          </FormTranslateProvider>
+        ),
+        extraButton:
+          disableAutoTranslate || hasInlineTranslate
+            ? undefined
+            : ({ pending, formRef }) => (
+                <FormTranslateControl
+                  formRef={formRef}
+                  registeredFieldsRef={fieldsRef}
+                  registryVersion={version}
+                  disabled={pending}
+                />
+              ),
+      }}
+    />
   );
 }
