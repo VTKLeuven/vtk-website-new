@@ -2,6 +2,7 @@ import { generateTicketsPdf } from "@/lib/ticketing/pdf";
 import { isTicketPdfVariant, parseTicketDesignDraft } from "@/lib/ticketing/design";
 import { readLimitedJson, RequestBodyTooLargeError } from "@/lib/ticketing/http";
 import { requireTicketEventCapability } from "@/lib/ticketing/authorization";
+import { ticketPdfBanner } from "@/lib/ticketing/pdfBanner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,15 +17,17 @@ export async function POST(
     const body = await readLimitedJson(request, 32 * 1024);
     const design = parseTicketDesignDraft(body, eventId);
     const requested = new URL(request.url).searchParams.get("variant");
+    const variant = isTicketPdfVariant(requested) ? requested : "colour";
     const pdf = await generateTicketsPdf({
       orderNumber: "VTK-00-VOORBEELD",
       currency: event.currency,
-      variant: isTicketPdfVariant(requested) ? requested : "colour",
+      variant,
       event: {
         id: event.id,
         title: event.titleNl,
         startsAt: event.startsAt,
         location: event.location,
+        banner: variant === "colour" && !design.artwork ? await ticketPdfBanner(event.id) : null,
       },
       tickets: [{
         publicId: "voorbeeld-ticket",

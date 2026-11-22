@@ -14,6 +14,7 @@ import {
   setCharacterSpacing,
   type RGB,
 } from "pdf-lib";
+import sharp from "sharp";
 import { getObjectBuffer } from "@vtk/storage";
 import { createStyledVtkQrPng } from "@/lib/shortlink-qr";
 import { createTicketCredential } from "./crypto";
@@ -30,8 +31,9 @@ import { formatMoney } from "./money";
  * De ticket-PDF, in twee versies uit één ontwerp (zie `lib/ticketing/design.ts`
  * en docs/design-decisions.md, "De ticket-PDF in twee versies"):
  *
- * - **kleur**: de evenementtegel van /kalender. De affiche bovenaan (of, zonder
- *   affiche, een navy vlak met het technische patroon), de gele datumpin over
+ * - **kleur**: de evenementtegel van /kalender. De affiche bovenaan (zonder
+ *   affiche de banner van het ticketevent, en zonder banner een navy vlak met
+ *   het technische patroon), de gele datumpin over
  *   de onderrand, de titel met de gele streep, en de QR in een witte kaart met
  *   de accentrand.
  * - **print**: wit papier, het technische patroon als dunne lijnen in de kop,
@@ -47,6 +49,9 @@ import { formatMoney } from "./money";
 
 export const A4_PORTRAIT_POINTS = { width: 595.28, height: 841.89 } as const;
 
+/** De banner van het ticketevent, met het focuspunt in procent zoals de affiche. */
+export type TicketPdfBanner = { key: string; focalX: number; focalY: number };
+
 export type TicketPdfInput = {
   orderNumber: string;
   currency: string;
@@ -59,6 +64,9 @@ export type TicketPdfInput = {
     title: string;
     startsAt: Date;
     location: string | null;
+    /** De banner van het ticketevent (`ticketPdfBanner`): die staat bovenaan
+     * de kleurversie wanneer het ontwerp geen eigen affiche heeft. */
+    banner?: TicketPdfBanner | null;
   };
   /** Each ticket keeps the design which was current when it was issued. */
   tickets: Array<{
@@ -324,6 +332,27 @@ async function loadAsset(document: PdfDoc, key: string | undefined) {
   }
 }
 
+/**
+ * De banner van het ticketevent komt van de gewone uploader, en die bewaart ook
+ * WebP of SVG; pdf-lib kent enkel PNG en JPEG. Daarom gaat ze eerst langs sharp,
+ * en meteen begrensd, zodat een foto van 20 MB de mailbijlage niet opblaast.
+ */
+async function loadBanner(document: PdfDoc, key: string | undefined) {
+  if (!key) return null;
+  try {
+    const jpeg = await sharp(await getObjectBuffer(key))
+      .rotate()
+      .resize({ width: 2000, height: 2000, fit: "inside", withoutEnlargement: true })
+      .flatten({ background: "#ffffff" })
+      .jpeg({ quality: 85, mozjpeg: true })
+      .toBuffer();
+    return await document.embedJpg(jpeg);
+  } catch (error) {
+    console.warn("Ticket banner unavailable", { key, error });
+    return null;
+  }
+}
+
 /** Een bestand uit `public/`, één keer per document ingebed. Ontbreekt het, dan tekent de PDF verder zonder. */
 async function loadPublic(document: PdfDoc, path: string): Promise<PdfImage | null> {
   try {
@@ -363,7 +392,8 @@ type Content = {
   revision: string;
 };
 
-type Assets = { artwork: PdfImage | null; eventLogo: PdfImage | null; sponsorLogo: PdfImage | null };
+/** `artwork` is de affiche van het ontwerp of, zonder affiche, de banner van het event; `focal` hoort erbij. */
+type Assets = { artwork: PdfImage | null; focal: { x: number; y: number }; eventLogo: PdfImage | null; sponsorLogo: PdfImage | null };
 
 const RATIO: Record<TicketPosterRatio, number> = { "16:9": 16 / 9, "3:2": 3 / 2, "2:1": 2, "3:1": 3 };
 
@@ -517,9 +547,9 @@ function drawColourTicket(p: Painter, design: TicketDesignSnapshot, assets: Asse
 
   rounded(p, cardX, cardTop, cardWidth, cardHeight, radius, { color: WHITE });
   if (assets.artwork) {
-    drawCover(p, assets.artwork, cardX, cardTop, cardWidth, posterHeight, design.artwork?.focalX ?? 50, design.artwork?.focalY ?? 50);
+    drawCover(p, assets.artwork, cardX, cardTop, cardWidth, posterHeight, assets.focal.x, assets.focal.y);
   } else {
-    // Zonder affiche het navy vlak van de paginakop, met het patroon erover.
+    // Zonder affiche en zonder banner het navy vlak van de paginakop, met het patroon erover.
     rect(p, cardX, cardTop, cardWidth, posterHeight, { color: NAVY });
     if (brand.patternWhite) drawPattern(p, brand.patternWhite, cardX, cardTop, cardWidth, posterHeight, 0.2, { x: 120, y: 60 });
     if (brand.logoLight) {
@@ -657,6 +687,9 @@ export async function generateTicketsPdf(input: TicketPdfInput): Promise<Uint8Ar
     variant === "print" ? loadPublic(document, "ticket-pdf/pattern-ink.png") : Promise.resolve(null),
   ]);
   const brand: Brand = { logoLight, logoInk, patternWhite, patternInk };
+  // Eén keer per document: elk ticket zonder eigen affiche krijgt dezelfde banner.
+  let banner: Promise<PdfImage | null> | null = null;
+  const eventBanner = () => (banner ??= loadBanner(document, input.event.banner?.key));
   const safe = (value: string) => safeText(regular, value);
 
   const startsAt = input.event.startsAt;
@@ -671,7 +704,7 @@ export async function generateTicketsPdf(input: TicketPdfInput): Promise<Uint8Ar
     const design = withCurrentDefaultColours(ticketDesignSnapshot(ticket.designSnapshot, input.event.id ?? "legacy"));
     const page = document.addPage([A4_PORTRAIT_POINTS.width, A4_PORTRAIT_POINTS.height]);
     const painter: Painter = { page, H: page.getSize().height, fonts: { regular, bold } };
-    const [artwork, eventLogo, sponsorLogo] = await Promise.all([
+    const [poster, eventLogo, sponsorLogo] = await Promise.all([
       variant === "colour" ? loadAsset(document, design.artwork?.key) : Promise.resolve(null),
       loadAsset(document, design.eventLogoKey),
       loadAsset(document, design.sponsorLogoKey),
@@ -698,7 +731,12 @@ export async function generateTicketsPdf(input: TicketPdfInput): Promise<Uint8Ar
       revision: labels.revision(design.revision),
     };
 
-    const assets: Assets = { artwork, eventLogo, sponsorLogo };
+    // De affiche van het ontwerp wint; anders de banner van het ticketevent.
+    // Ook een affiche die niet te laden is, valt terug op de banner.
+    const fallback = !poster && variant === "colour" && input.event.banner ? await eventBanner() : null;
+    const assets: Assets = poster
+      ? { artwork: poster, focal: { x: design.artwork?.focalX ?? 50, y: design.artwork?.focalY ?? 50 }, eventLogo, sponsorLogo }
+      : { artwork: fallback, focal: { x: input.event.banner?.focalX ?? 50, y: input.event.banner?.focalY ?? 50 }, eventLogo, sponsorLogo };
     if (variant === "print") drawPrintTicket(painter, design, assets, brand, labels, content);
     else drawColourTicket(painter, design, assets, brand, labels, content);
   }

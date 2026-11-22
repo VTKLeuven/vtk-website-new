@@ -3,6 +3,7 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import type { MailAttachment, OrderMailContents } from "./mail";
 import { generateTicketsPdf } from "./pdf";
+import { ticketPdfBanner } from "./pdfBanner";
 import {
   getAppleWalletPass,
   getGoogleWalletSaveUrl,
@@ -134,6 +135,7 @@ export async function orderMailBundle(
       title: eventTitle(order),
       startsAt: order.event.startsAt,
       location: order.event.location,
+      banner: await ticketPdfBanner(order.event.id).catch(() => null),
     },
     tickets: tickets.map((entry) => ({
       publicId: entry.ticket.publicCode,

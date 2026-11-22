@@ -7465,9 +7465,13 @@ versies uit één ontwerp, gekozen uit acht richtingen op een ontwerpbord:
 - **Kleur**: de evenementtegel van /kalender. De affiche bovenaan, de gele
   datumpin over de onderrand, de titel met de gele streep die precies zo breed is
   als de titel, en de QR in een witte kaart met de accentrand van een uitgelichte
-  kaart. Zonder affiche: het navy vlak van de paginakop met het technische
-  patroon en het logo, niet het gestreepte vak van de site (op papier leest dat
-  als een fout).
+  kaart. Zonder affiche: de banner van het ticketevent, dezelfde als in de shop
+  en op /tickets (`ticketPosterImage`, dus ook de themabanner of de foto van het
+  kalenderevent). De affiche in het ticketontwerp overschrijft die enkel wanneer
+  er een is opgeladen. De banner zit niet in de momentopname van het ticket:
+  wie ze op het event aanpast, ziet ze ook op een al uitgegeven ticket. Zonder
+  banner: het navy vlak van de paginakop met het technische patroon en het
+  logo, niet het gestreepte vak van de site (op papier leest dat als een fout).
 - **Print**: wit papier, het technische patroon als dunne grijze lijnen in de kop,
   en verder enkel lijnen en tekst. De meeste tickets worden in zwart-wit
   afgedrukt; de kleurversie is daar inktverspilling. Het enige vlak inkt is de

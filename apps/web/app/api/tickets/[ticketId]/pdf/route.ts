@@ -1,6 +1,7 @@
 import { resolveAuthorizedTicket } from "@/lib/ticketing/ticketAccess";
 import { generateTicketsPdf } from "@/lib/ticketing/pdf";
 import { isTicketPdfVariant } from "@/lib/ticketing/design";
+import { ticketPdfBanner } from "@/lib/ticketing/pdfBanner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export async function GET(
       title: order.locale === "EN" && ticket.event.titleEn ? ticket.event.titleEn : ticket.event.titleNl,
       startsAt: ticket.event.startsAt,
       location: ticket.event.location,
+      banner: variant === "colour" ? await ticketPdfBanner(ticket.event.id) : null,
     },
     tickets: [
       {
