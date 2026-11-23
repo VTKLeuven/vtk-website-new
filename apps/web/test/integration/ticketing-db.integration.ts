@@ -522,7 +522,23 @@ describe("ticketing database invariants", () => {
       });
       expect(created.items.map((item) => [item.unitPriceCents, item.memberSeat])).toEqual([[60, true]]);
 
-      // Zonder ledenprijs neemt een lid een ledenplaats en wacht het niet.
+      // Zonder ledenprijs neemt een lid een ledenplaats en wacht het niet. Met een
+      // eigen lid: `ids.user` kocht hierboven al zijn ene ticket in de
+      // voorverkoop, en sinds de limiet per account (`accountOrderMax`) weigert
+      // een tweede bestelling in de voorverkoop terecht met ACCOUNT_TICKET_LIMIT.
+      const plainMember = randomUUID();
+      await prisma.user.create({
+        data: {
+          id: plainMember,
+          name: "Plain Member",
+          email: `${plainMember}@example.test`,
+          active: true,
+          firwStudent: true,
+        },
+      });
+      vi.mocked(getSession).mockResolvedValue({
+        user: { id: plainMember, name: "Plain Member", email: `${plainMember}@example.test`, isSuperAdmin: false },
+      } as never);
       await prisma.ticketType.update({ where: { id: ids.rateType }, data: { memberPriceCents: null } });
       await expect(order("delay-member-plain@example.test", [{}])).resolves.toMatchObject({
         orderId: expect.any(String),
@@ -539,6 +555,20 @@ describe("ticketing database invariants", () => {
   });
 
   it("sells one ticket at the honorary price per honorary member", async () => {
+    // Een eigen account, zoals de test hieronder: `ids.user` heeft op dit event
+    // al tickets uit de tests hierboven, en die tellen sinds `maxTicketsPerAccount`
+    // mee (per account, over de bestellingen heen). Twee tickets erbij kwamen dan
+    // boven het maximum van acht, en de bestelling faalde op ACCOUNT_TICKET_LIMIT
+    // in plaats van te tonen wat deze test nagaat.
+    const honoraryUser = randomUUID();
+    await prisma.user.create({
+      data: {
+        id: honoraryUser,
+        name: "Honorary Buyer",
+        email: `${honoraryUser}@example.test`,
+        active: true,
+      },
+    });
     const honoraryOrder = (email: string, flag: "honoraryPrice" | "honoraryFree") =>
       createTicketCheckout(
         {
@@ -558,7 +588,7 @@ describe("ticketing database invariants", () => {
 
     await prisma.ticketType.update({ where: { id: ids.rateType }, data: { honoraryPriceCents: 40 } });
     vi.mocked(getSession).mockResolvedValue({
-      user: { id: ids.user, name: "Integration Admin", email: `${ids.user}@example.test`, isSuperAdmin: false },
+      user: { id: honoraryUser, name: "Honorary Buyer", email: `${honoraryUser}@example.test`, isSuperAdmin: false },
     } as never);
     try {
       // Geen erelid: de prijs bestaat voor hem niet.
@@ -566,7 +596,7 @@ describe("ticketing database invariants", () => {
         code: "INVALID_TICKET_TYPE",
       });
 
-      await prisma.user.update({ where: { id: ids.user }, data: { honoraryMember: true } });
+      await prisma.user.update({ where: { id: honoraryUser }, data: { honoraryMember: true } });
       const checkout = await honoraryOrder("honorary-first@example.test", "honoraryPrice");
       const order = await prisma.ticketOrder.findUniqueOrThrow({
         where: { id: checkout.orderId },
@@ -590,7 +620,6 @@ describe("ticketing database invariants", () => {
       });
     } finally {
       vi.mocked(getSession).mockResolvedValue(null);
-      await prisma.user.update({ where: { id: ids.user }, data: { honoraryMember: false } });
       await prisma.ticketType.update({ where: { id: ids.rateType }, data: { honoraryPriceCents: null } });
     }
   });
