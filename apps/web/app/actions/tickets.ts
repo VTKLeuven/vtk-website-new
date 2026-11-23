@@ -29,6 +29,7 @@ import {
   type TicketChangedPayload,
 } from "@/lib/ticketing/outbox";
 import { issueManualTicket, ManualTicketError } from "@/lib/ticketing/orders";
+import { queueConfirmationResend } from "@/lib/ticketing/resendConfirmation";
 import { CHANGE_TYPE_ERRORS, changeTicketType } from "@/lib/ticketing/changeTicketType";
 import { pickRecipients } from "@/lib/ticketing/attendeeRecipients";
 import { recipientCandidates } from "@/lib/ticketing/attendeeRecipientsServer";
@@ -2315,36 +2316,32 @@ export async function revokeTicketScanDeviceAction(formData: FormData): Promise<
   revalidatePath(localePath(locale, `/admin/tickets/${eventId}/toegang`));
 }
 
-export async function resendTicketOrderConfirmationAction(formData: FormData): Promise<void> {
+/**
+ * Zet de bevestigingsmail opnieuw klaar, hoogstens één tegelijk en niet binnen
+ * twee minuten na de vorige (`queueConfirmationResend`). Een klik die niets
+ * doet, zegt waarom: zonder melding bleef een beheerder klikken, en kreeg een
+ * koper dezelfde mail 132 keer.
+ */
+export async function resendTicketOrderConfirmationAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
   const eventId = value(formData, "eventId");
   const orderId = value(formData, "orderId");
   const locale = localeSchema.parse(value(formData, "locale") || "nl");
   const { session } = await requireTicketEventCapability(eventId, "MANAGE_ORDERS");
   const order = await prisma.ticketOrder.findFirst({ where: { id: orderId, eventId } });
   if (!order || !["PAID", "PARTIALLY_REFUNDED", "REFUNDED"].includes(order.status)) {
-    throw new Error("ORDER_NOT_DELIVERABLE");
+    return saveError("ORDER_NOT_DELIVERABLE");
   }
-  await prisma.$transaction([
-    prisma.ticketOutboxMessage.create({
-      data: {
-        eventId,
-        orderId,
-        type: "ORDER_CONFIRMATION",
-        dedupeKey: `order-confirmation:${orderId}:manual:${randomBytes(10).toString("hex")}`,
-        recipient: order.buyerEmail,
-        payload: { orderId, requestedById: session.user.id },
-      },
-    }),
-    prisma.ticketAuditLog.create({
-      data: {
-        eventId,
-        actorUserId: session.user.id,
-        action: "ORDER_CONFIRMATION_QUEUED",
-        entityType: "TicketOrder",
-        entityId: orderId,
-      },
-    }),
-  ]);
+  const decision = await queueConfirmationResend({
+    eventId,
+    orderId,
+    recipient: order.buyerEmail,
+    actorUserId: session.user.id,
+  });
+  if (decision.kind === "alreadyQueued") return saveError("CONFIRMATION_ALREADY_QUEUED");
+  if (decision.kind === "recentlySent") return saveError("CONFIRMATION_RECENTLY_SENT");
   await logAudit({
     action: "send",
     entity: "ticketOrder",
@@ -2353,6 +2350,7 @@ export async function resendTicketOrderConfirmationAction(formData: FormData): P
     summary: `bevestigingsmail opnieuw verstuurd voor ${await ticketEventTitle(eventId)}`,
   });
   revalidatePath(localePath(locale, `/admin/tickets/${eventId}/bestellingen`));
+  return saveOk();
 }
 
 export async function refundTicketsAction(formData: FormData): Promise<void> {

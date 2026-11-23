@@ -1,4 +1,3 @@
-import { ActionForm } from "@/components/ui/unsentGuard";
 import { InteractiveRow } from "@/components/ticketing/admin/InteractiveRow";
 import Link from "@/components/ui/Link";
 import { notFound } from "next/navigation";
@@ -10,7 +9,6 @@ import {
   CircleDollarSign,
   Download,
   Filter,
-  MailPlus,
   ReceiptText,
   RotateCcw,
   Search,
@@ -18,10 +16,7 @@ import {
   Timer,
 } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
-import {
-  markTicketPaymentRefundedAction,
-  resendTicketOrderConfirmationAction,
-} from "@/app/actions/tickets";
+import { markTicketPaymentRefundedAction } from "@/app/actions/tickets";
 import { requireTicketEventCapability } from "@/lib/ticketing/authorization";
 import { awaitingManualRefund, notSetAside } from "@/lib/ticketing/paymentFlags";
 import { refundsManually } from "@/lib/ticketing/refunds";
@@ -31,6 +26,7 @@ import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
 import { AdminMetric } from "@/components/ticketing/admin/AdminMetric";
 import { RefundAccount } from "@/components/ticketing/admin/RefundAccount";
 import { RefundOrderForm } from "@/components/ticketing/admin/RefundOrderForm";
+import { ResendConfirmationForm } from "@/components/ticketing/admin/ResendConfirmationForm";
 import { StatusBadge } from "@/components/ticketing/admin/StatusBadge";
 import {
   formatDateTime,
@@ -402,15 +398,12 @@ export default async function TicketOrdersPage({
 
                             {canResendConfirmation ? (
                               <div className="ticket-admin-detail-actions">
-                                <ActionForm action={resendTicketOrderConfirmationAction}>
-                                  <input type="hidden" name="locale" value={locale} />
-                                  <input type="hidden" name="eventId" value={eventId} />
-                                  <input type="hidden" name="orderId" value={order.id} />
-                                  <button className="ticket-admin-button" type="submit">
-                                    <MailPlus aria-hidden="true" size={15} />
-                                    {locale === "nl" ? "Bevestiging opnieuw versturen" : "Resend confirmation"}
-                                  </button>
-                                </ActionForm>
+                                <ResendConfirmationForm
+                                  eventId={eventId}
+                                  orderId={order.id}
+                                  buyerEmail={order.buyerEmail}
+                                  locale={locale}
+                                />
                               </div>
                             ) : null}
 
