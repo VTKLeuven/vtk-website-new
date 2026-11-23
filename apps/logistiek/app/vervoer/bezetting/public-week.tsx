@@ -9,6 +9,7 @@ import { TripInspector } from '@/components/transport-calendar/trip-inspector';
 import type { CalendarVehicle, TripBlock } from '@/components/transport-calendar/types';
 import type { TransportFilters } from '@/lib/transport-filters';
 import type { LogistiekLocale } from '@/lib/i18n-shared';
+import type { PlannerPrefs } from '@/components/transport-calendar/prefs';
 import { TripCard, type BezettingTrip } from './trip-card';
 
 /**
@@ -49,6 +50,7 @@ export function PublicWeek({
   filterPosts,
   canFilterRequester,
   nav,
+  initialPrefs,
 }: {
   days: string[];
   vehicles: CalendarVehicle[];
@@ -80,6 +82,8 @@ export function PublicWeek({
   /** Filteren op post/werkgroep/extern; enkel voor wie de aanvrager al ziet. */
   canFilterRequester: boolean;
   nav: { previousHref: string; nextHref: string; todayHref: string };
+  /** De kijkvoorkeuren uit de cookie; zie `components/transport-calendar/prefs.ts`. */
+  initialPrefs?: PlannerPrefs | null;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const openTrip = trips?.find((trip) => trip.id === openId) ?? null;
@@ -87,6 +91,7 @@ export function PublicWeek({
   return (
     <TransportCalendar
       locale={locale}
+      initialPrefs={initialPrefs}
       view="week"
       anchor={anchor}
       days={days}

@@ -1,7 +1,12 @@
 'use client';
 
 import type { CSSProperties, ReactNode } from 'react';
-import { driverColorVar, vehiclePatternClass, type DriverColorOverrides } from '@/lib/driver-colors';
+import {
+  driverColorVar,
+  driverToneVar,
+  vehiclePatternClass,
+  type DriverColorOverrides,
+} from '@/lib/driver-colors';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { vehicleIconName } from '@/lib/vehicle-icon';
 import { DEFAULT_TRIP_FIELDS, type CalendarVehicle, type TripBlock, type TripFields } from './types';
@@ -130,6 +135,8 @@ export function BlockContent({
   fields = DEFAULT_TRIP_FIELDS,
   /** Bij overlap is er geen plaats voor een heel bereik; dan enkel het beginuur. */
   compact = false,
+  driverColors,
+  maxLines,
 }: {
   block: TripBlock;
   vehicle: CalendarVehicle | null;
@@ -141,65 +148,173 @@ export function BlockContent({
   continuesAfter: boolean;
   fields?: TripFields;
   compact?: boolean;
+  /** Voor de kleur van het bolletje met de initialen; zie {@link DriverChip}. */
+  driverColors?: DriverColorOverrides;
+  /**
+   * Hoeveel regels er volledig in het blok passen. Weglaten toont alles, zoals
+   * op een telefoon en in een test. Met een getal valt de rest weg in plaats van
+   * half afgesneden te worden: een regel waarvan je de onderste helft mist,
+   * leest als een fout. Past er maar één regel, dan komt de titel achter het uur.
+   */
+  maxLines?: number;
 }): ReactNode {
   const t = useCalendarCopy();
-  return (
-    <>
-      {/* Het uur blijft de regel die zegt dát dit blok ergens over gaat: staat
-          het uit én is er verder niets aangevinkt, dan is een blok een lege
-          rechthoek. De pijlen voor een rit over middernacht horen bij het uur en
-          verdwijnen dus mee; de hoogte van het blok zegt de rest. */}
-      {fields.time ? (
-        <span className="block truncate font-semibold tabular-nums">
+  const oneLine = maxLines === 1;
+  // Het bolletje volgt het vinkje Chauffeur in "Weergave", en `showDriver` (op
+  // het publieke overzicht staan geen namen, dus ook geen initialen).
+  const chip =
+    showDriver && fields.driver ? (
+      <DriverChip driver={block.driver} awaitsDriver={awaitsDriver} driverColors={driverColors} />
+    ) : null;
+  const lines: ReactNode[] = [];
+
+  // Het uur blijft de regel die zegt dát dit blok ergens over gaat: staat het
+  // uit én is er verder niets aangevinkt, dan is een blok een lege rechthoek. De
+  // pijlen voor een rit over middernacht horen bij het uur en verdwijnen dus
+  // mee; de hoogte van het blok zegt de rest.
+  if (fields.time) {
+    lines.push(
+      <span key="time" className="flex min-w-0 items-center gap-1 font-semibold tabular-nums">
+        <span className="shrink-0">
           {continuesBefore ? '↑ ' : ''}
           {formatTime(start)}
           {compact ? '' : `-${formatTime(end)}`}
           {continuesAfter ? ' ↓' : ''}
         </span>
-      ) : null}
-      {fields.title ? <span className="block truncate">{block.title}</span> : null}
-      {fields.event && block.eventName ? (
-        <span className="block truncate font-medium text-vtk-navy">{block.eventName}</span>
-      ) : null}
-      {/* De post of werkgroep. Standaard uit, en enkel wanneer ze er is: op het
-          publieke overzicht staat er geen aanvrager in het blok. */}
-      {fields.requester && block.subtitle ? (
-        <span className="block truncate text-vtk-muted">{block.subtitle}</span>
-      ) : null}
-      {/* Bij een conflict altijd, ook als "Weergave" het voertuig uit heeft staan
-          (F6.1): het voertuig is de reden van de botsing. */}
-      {(fields.vehicle || block.conflict) && vehicle ? (
-        <span className="flex items-center gap-1">
-          <LogisticsIcon name={vehicleIconName(vehicle)} className="h-3 w-3 shrink-0" />
-          <span className="truncate">{vehicle.name}</span>
+        {oneLine && fields.title ? (
+          <span className="min-w-0 truncate font-medium">{block.title}</span>
+        ) : null}
+        {chip ? <span className="ml-auto flex shrink-0">{chip}</span> : null}
+      </span>
+    );
+  }
+  if (fields.title && !(oneLine && fields.time)) {
+    lines.push(
+      <span key="title" className="block truncate">
+        {block.title}
+      </span>
+    );
+  }
+  if (fields.event && block.eventName) {
+    lines.push(
+      <span key="event" className="block truncate font-medium text-vtk-navy">
+        {block.eventName}
+      </span>
+    );
+  }
+  // De post of werkgroep. Standaard uit, en enkel wanneer ze er is: op het
+  // publieke overzicht staat er geen aanvrager in het blok.
+  if (fields.requester && block.subtitle) {
+    lines.push(
+      <span key="requester" className="block truncate text-vtk-muted">
+        {block.subtitle}
+      </span>
+    );
+  }
+  // Bij een conflict altijd, ook als "Weergave" het voertuig uit heeft staan
+  // (F6.1): het voertuig is de reden van de botsing.
+  if ((fields.vehicle || block.conflict) && vehicle) {
+    lines.push(
+      <span key="vehicle" className="flex items-center gap-1">
+        <LogisticsIcon name={vehicleIconName(vehicle)} className="h-3 w-3 shrink-0" />
+        <span className="truncate">{vehicle.name}</span>
+      </span>
+    );
+  }
+  // `showDriver` én het vinkje: het eerste is een serverbeslissing (op het
+  // publieke overzicht staan geen namen), het tweede een voorkeur.
+  if (showDriver && fields.driver) {
+    lines.push(
+      block.driver ? (
+        <span key="driver" className="block truncate font-medium">
+          {block.driver.name}
         </span>
-      ) : null}
-      {/* `showDriver` én het vinkje: het eerste is een serverbeslissing (op het
-          publieke overzicht staan geen namen), het tweede een voorkeur. */}
-      {showDriver && fields.driver ? (
-        block.driver ? (
-          <span className="block truncate font-medium">{block.driver.name}</span>
-        ) : awaitsDriver ? (
-          <span className="block truncate font-semibold text-vtk-danger">{t.noDriver}</span>
-        ) : (
-          // De aanvrager rijdt zelf (bakfiets): dat is geen ontbrekende
-          // chauffeur, dus het staat er gewoon en niet in het rood.
-          <span className="block truncate text-vtk-muted">{t.drivesThemselves}</span>
-        )
-      ) : null}
-      {/* Een pijl ervoor, want "Zaal Alma 3" op een eigen regel is niet van
-          "Doopcantus" te onderscheiden zodra de titel erboven wegvalt. */}
-      {fields.destination && block.destination ? (
-        <span className="block truncate text-vtk-muted">
-          <span aria-hidden>→ </span>
-          {block.destination}
+      ) : awaitsDriver ? (
+        <span key="driver" className="block truncate font-semibold text-vtk-danger">
+          {t.noDriver}
         </span>
-      ) : null}
-      {fields.cargo && block.cargoNote ? (
-        <span className="block truncate text-vtk-muted">{block.cargoNote}</span>
-      ) : null}
-    </>
-  );
+      ) : (
+        // De aanvrager rijdt zelf (bakfiets): dat is geen ontbrekende
+        // chauffeur, dus het staat er gewoon en niet in het rood.
+        <span key="driver" className="block truncate text-vtk-muted">
+          {t.drivesThemselves}
+        </span>
+      )
+    );
+  }
+  // Een pijl ervoor, want "Zaal Alma 3" op een eigen regel is niet van
+  // "Doopcantus" te onderscheiden zodra de titel erboven wegvalt.
+  if (fields.destination && block.destination) {
+    lines.push(
+      <span key="destination" className="block truncate text-vtk-muted">
+        <span aria-hidden>→ </span>
+        {block.destination}
+      </span>
+    );
+  }
+  if (fields.cargo && block.cargoNote) {
+    lines.push(
+      <span key="cargo" className="block truncate text-vtk-muted">
+        {block.cargoNote}
+      </span>
+    );
+  }
+
+  return <>{maxLines ? lines.slice(0, Math.max(1, maxLines)) : lines}</>;
+}
+
+/**
+ * De initialen van wie rijdt, in een bolletje rechts op de regel met het uur.
+ *
+ * De vulkleur van een blok zegt al wie rijdt, maar het palet telt veertig
+ * pastels en twee daarvan houd je op een drukke week niet uit elkaar. De
+ * initialen zeggen het ook in een blok van een kwartier, waar de regel met de
+ * naam niet meer past. Zonder chauffeur een leeg bolletje met een plus: daar
+ * moet nog iemand op. `aria-hidden`, want de tooltip en het label noemen de naam
+ * al voluit.
+ */
+function DriverChip({
+  driver,
+  awaitsDriver,
+  driverColors,
+}: {
+  driver: TripBlock['driver'];
+  awaitsDriver: boolean;
+  driverColors?: DriverColorOverrides;
+}) {
+  if (driver) {
+    return (
+      <span
+        aria-hidden
+        className="trip-chip"
+        style={{ backgroundColor: driverToneVar(driver.id, driverColors) }}
+      >
+        {initials(driver.name)}
+      </span>
+    );
+  }
+  if (awaitsDriver) {
+    return (
+      <span aria-hidden className="trip-chip trip-chip-open">
+        +
+      </span>
+    );
+  }
+  return null;
+}
+
+/**
+ * "Arne Janssens" wordt AJ, "Lotte" wordt LO. Wat tussen haakjes staat telt niet
+ * mee: de testprofielen heten "Alice (test logistiek)".
+ */
+export function initials(name: string): string {
+  const words = name
+    .replace(/\([^)]*\)/g, ' ')
+    .split(/\s+/)
+    .filter((word) => /\p{L}/u.test(word));
+  if (words.length === 0) return '?';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
 }
 
 /**

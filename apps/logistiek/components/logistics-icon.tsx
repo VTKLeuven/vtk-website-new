@@ -33,7 +33,8 @@ export type IconName =
   | 'note'
   | 'people'
   | 'alert'
-  | 'search';
+  | 'search'
+  | 'moon';
 
 export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElement> & { name: IconName }) {
   const paths = {
@@ -256,6 +257,8 @@ export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElem
         <path d="m16 16 4.5 4.5" />
       </>
     ),
+    // De nacht in de transportplanning: in- en uitklappen van 00:00 tot 06:00.
+    moon: <path d="M19.5 14.5A7.5 7.5 0 0 1 9.5 4.5a7.5 7.5 0 1 0 10 10Z" />,
   } satisfies Record<IconName, ReactNode>;
 
   return (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import Link from '@vtk/ui/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { DriverColorOverrides } from '@/lib/driver-colors';
@@ -21,14 +21,11 @@ import { TimeGrid, timeGridColumns } from './time-grid';
 import { vehicleIconName } from '@/lib/vehicle-icon';
 import {
   DEFAULT_TRIP_FIELDS,
-  TRIP_FIELDS_STORAGE_KEY,
   ZOOM_MAX,
   ZOOM_MIN,
   ZOOM_STEP,
-  ZOOM_STORAGE_KEY,
   clampZoom,
   hourPxFor,
-  parseTripFields,
   wheelPixels,
   zoomByWheel,
   type AvailabilityBand,
@@ -38,6 +35,7 @@ import {
 } from './types';
 import type { LogistiekLocale } from '@/lib/i18n-shared';
 import { CalendarCopyProvider, useCalendarCopy } from './copy';
+import { legacyPlannerPrefs, updatePlannerPrefs, type PlannerPrefs } from './prefs';
 
 /**
  * De transportplanning: dag, week of maand, met de navigatie erboven.
@@ -83,6 +81,11 @@ function TransportCalendarShell({
   nav,
   views = true,
   children,
+  initialPrefs,
+  header,
+  availability,
+  bandsAs,
+  foldNight = false,
 }: {
   view: CalendarView;
   /** De dag waar de weergave op staat, als ISO-string van UTC-middernacht. */
@@ -138,6 +141,31 @@ function TransportCalendarShell({
    * van de bezoeker mee. Zie `copy.tsx`.
    */
   locale?: LogistiekLocale;
+  /**
+   * De kijkvoorkeuren uit de cookie, gelezen door de server (zie `prefs.ts`).
+   * Daarmee staat de eerste render meteen op de juiste zoom en met de juiste
+   * regels. `null` of weggelaten: nog geen cookie, en dan neemt de browser één
+   * keer over wat hij nog in `localStorage` had.
+   */
+  initialPrefs?: PlannerPrefs | null;
+  /**
+   * Wat boven de werkbalk komt: de titel van de periode, de navigatie en de
+   * tellers. In de shell en niet erboven, zodat het in volledig scherm blijft
+   * staan; daar is de pagina eromheen weg.
+   */
+  header?: ReactNode;
+  /**
+   * De knop Beschikbaarheid in de werkbalk, met de stand die de pagina bijhoudt.
+   * Weglaten laat de knop weg, zoals op het bezettingsoverzicht.
+   */
+  availability?: { on: boolean; onToggle: () => void };
+  /** Hoe de banden er staan; zie `TimeGrid`. */
+  bandsAs?: 'background' | 'tracks';
+  /**
+   * De nacht (00:00 tot 06:00) als strook die je openklapt, in de dag- en
+   * weekweergave. Enkel in de planning van het team.
+   */
+  foldNight?: boolean;
 }) {
   const t = useCalendarCopy();
   const router = useRouter();
@@ -173,38 +201,51 @@ function TransportCalendarShell({
   /**
    * Zoom, als factor op "de hele dag past in beeld" (zie `types.ts`).
    *
-   * In een effect en niet als beginwaarde, om dezelfde reden als de nu-lijn: op
-   * de server bestaat `localStorage` niet, en een andere eerste render dan de
-   * server geeft een hydratiefout. Lezen én schrijven in een try/catch, want in
-   * een privévenster gooit de accessor zelf.
+   * Als beginwaarde uit de cookie die de server las (`initialPrefs`), en niet in
+   * een effect uit `localStorage`: zo staat de eerste render meteen op de
+   * bewaarde zoom. Uit `localStorage` lezen kon pas na de hydratie, en dan
+   * verscheen de week eerst op "hele dag" en sprong ze daarna naar je zoom.
    */
-  const [zoom, setZoom] = useState(ZOOM_MIN);
+  const [zoom, setZoom] = useState(initialPrefs?.zoom ?? ZOOM_MIN);
 
   /**
-   * Wat er in een rit-blok staat (R7).
-   *
-   * Naast de zoom en om precies dezelfde reden in een effect: op de server
-   * bestaat `localStorage` niet, en een andere eerste render dan de server is
-   * een hydratiefout. De standaard is de weergave zoals ze altijd was, dus wie
-   * niets instelt merkt niets.
+   * Wat er in een rit-blok staat (R7). Om dezelfde reden als de zoom uit de
+   * cookie. De standaard is de weergave zoals ze altijd was, dus wie niets
+   * instelt merkt niets.
    */
-  const [fields, setFields] = useState<TripFields>(DEFAULT_TRIP_FIELDS);
+  const [fields, setFields] = useState<TripFields>(initialPrefs?.fields ?? DEFAULT_TRIP_FIELDS);
+
+  /** De nacht open of ingeklapt (`foldNight`); onthouden zoals de zoom. */
+  const [nightOpen, setNightOpen] = useState(initialPrefs?.nightOpen ?? false);
+
+  /**
+   * Nog geen cookie: één keer overnemen wat deze browser in `localStorage` had
+   * van voor de cookie, en dan meteen een cookie schrijven, zodat de server het
+   * de volgende keer weet. Dit is de enige keer dat de kalender na het laden nog
+   * van zoom verandert.
+   */
   useEffect(() => {
-    try {
-      setFields(parseTripFields(window.localStorage.getItem(TRIP_FIELDS_STORAGE_KEY)));
-    } catch {
-      /* privévenster: dan de standaard */
+    if (initialPrefs) return;
+    const legacy = legacyPlannerPrefs();
+    if (legacy) {
+      setZoom(legacy.zoom);
+      setFields(legacy.fields);
     }
+    updatePlannerPrefs(legacy ?? {});
+    // Enkel bij het openen; daarna houdt de cookie het bij.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const chooseFields = useCallback((next: TripFields) => {
     setFields(next);
-    try {
-      window.localStorage.setItem(TRIP_FIELDS_STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      /* niet kunnen onthouden is geen reden om niets te tonen */
-    }
+    updatePlannerPrefs({ fields: next });
   }, []);
+
+  const toggleNight = useCallback(() => {
+    const next = !nightOpen;
+    setNightOpen(next);
+    updatePlannerPrefs({ nightOpen: next });
+  }, [nightOpen]);
 
   const scroller = useRef<HTMLDivElement>(null);
   const metrics = useRef({ fitHourPx: 0, headHeight: 0 });
@@ -224,15 +265,8 @@ function TransportCalendarShell({
   const zoomApplied = useRef(zoom);
   /** Het uur dat na deze render weer op zijn plek moet komen. */
   const pendingAnchor = useRef<{ hours: number; anchor: number } | null>(null);
-
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(ZOOM_STORAGE_KEY);
-      if (saved !== null) setZoom(clampZoom(Number(saved)));
-    } catch {
-      /* privévenster: dan gewoon op passend */
-    }
-  }, []);
+  /** Staat de kalender er al? Pas dan is een zoomwijziging iets om te onthouden. */
+  const zoomMounted = useRef(false);
 
   /**
    * Zoomen mét anker: het uur dat je vasthoudt, blijft staan waar het staat.
@@ -261,11 +295,6 @@ function TransportCalendarShell({
 
     zoomTarget.current = value;
     setZoom(value);
-    try {
-      window.localStorage.setItem(ZOOM_STORAGE_KEY, String(value));
-    } catch {
-      /* niet kunnen onthouden is geen reden om niet te zoomen */
-    }
   }, []);
 
   /**
@@ -281,6 +310,11 @@ function TransportCalendarShell({
   useLayoutEffect(() => {
     zoomApplied.current = zoom;
     zoomTarget.current = zoom;
+    // Onthouden per getekende stand en niet per wieltik: een trackpad stuurt er
+    // dertig per gebaar, en enkel de laatste telt. Niet bij het openen: dan is
+    // dit de stand die net uit de cookie kwam.
+    if (zoomMounted.current) updatePlannerPrefs({ zoom });
+    zoomMounted.current = true;
     const pending = pendingAnchor.current;
     pendingAnchor.current = null;
     const node = scroller.current;
@@ -404,10 +438,17 @@ function TransportCalendarShell({
    * effect, want op de server bestaat `window` niet en een andere eerste render
    * dan de server is een hydratiefout.
    */
-  const [narrow, setNarrow] = useState(false);
+  // Begint bij wat de cookie de vorige keer zag, zodat een telefoon meteen de
+  // werkbalk van een telefoon krijgt in plaats van eerst die van een laptop.
+  const [narrow, setNarrow] = useState(initialPrefs?.narrow ?? false);
   useEffect(() => {
     const query = window.matchMedia('(max-width: 700px)');
-    const apply = () => setNarrow(query.matches);
+    const apply = () => {
+      setNarrow(query.matches);
+      // De server leest dit bij het volgende bezoek: dan opent een telefoon
+      // meteen op één dag (zie de pagina) en hoeft er niets meer te wisselen.
+      updatePlannerPrefs({ narrow: query.matches });
+    };
     apply();
     query.addEventListener('change', apply);
     return () => query.removeEventListener('change', apply);
@@ -415,11 +456,12 @@ function TransportCalendarShell({
 
   // Op een telefoon opent de planning op één dag (M2): zeven kolommen van vijftig
   // pixels lezen daar niet. Enkel zolang er geen keuze in de URL staat; wie zelf
-  // "Week" kiest, houdt de week.
+  // "Week" kiest, houdt de week. Staat de dag er al (de server wist uit de
+  // cookie dat dit een telefoon is), dan valt er niets te wisselen.
   useEffect(() => {
-    if (!narrow || !views || params.get('weergave')) return;
+    if (!narrow || !views || view === 'dag' || params.get('weergave')) return;
     router.replace(hrefFor({ weergave: 'dag' }), { scroll: false });
-  }, [narrow, views, params, router, hrefFor]);
+  }, [narrow, views, view, params, router, hrefFor]);
 
   useEffect(() => {
     function onChange() {
@@ -584,12 +626,16 @@ function TransportCalendarShell({
               {/* Het zoomniveau in woorden, want een knop die uitgrijst zonder
                   te zeggen waarom, leest als kapot. "Hele dag" is zoom 1: dan
                   past de dag exact en valt er niets meer uit te zoomen. */}
+              {/* Een vaste breedte: "Hele dag" is breder dan "125%", en een
+                  knop die bij elke zoomstap van breedte verandert, liet de hele
+                  werkbalk herschikken. Op een venster van 1536px sprong ze dan van
+                  twee rijen naar één en schoof de kalender 40px onder je muis. */}
               <button
                 type="button"
                 onClick={() => zoomAround(ZOOM_MIN)}
                 disabled={zoom <= ZOOM_MIN}
                 title={t.backToWholeDay}
-                className="rounded-full border border-vtk-navy/15 px-2.5 py-1 text-xs font-medium tabular-nums text-vtk-ink transition hover:border-vtk-navy/40 disabled:opacity-40"
+                className="w-[5.5rem] rounded-full border border-vtk-navy/15 py-1 text-center text-xs font-medium tabular-nums text-vtk-ink transition-colors hover:border-vtk-navy/40 disabled:opacity-40"
               >
                 {zoom <= ZOOM_MIN ? t.wholeDay : `${Math.round(zoom * 100)}%`}
               </button>
@@ -637,8 +683,32 @@ function TransportCalendarShell({
           </button>
   );
 
+  // De knop Beschikbaarheid: aan of uit in één klik, met een schakelaartje dat
+  // zegt in welke stand hij staat. Niet in de maandweergave: daar tekent de
+  // kalender geen uren, en een knop die niets doet, leert mensen knoppen te
+  // negeren. Op een telefoon enkel het icoon en de schakelaar; de naam blijft
+  // voor de screenreader.
+  const availabilityButton =
+    availability && view !== 'maand' ? (
+      <button
+        type="button"
+        onClick={availability.onToggle}
+        aria-pressed={availability.on}
+        title={t.availabilityHint}
+        className={`tg-avail-toggle${availability.on ? ' is-on' : ''}`}
+      >
+        <LogisticsIcon name="people" className="h-4 w-4 shrink-0" />
+        <span className={narrow ? 'sr-only' : undefined}>{t.availability}</span>
+        <span aria-hidden className="tg-switch" />
+      </button>
+    ) : null;
+
   return (
     <div ref={shell} className="transport-calendar grid gap-3" data-fullscreen={fullscreen || undefined}>
+      {/* De kop en de werkbalk samen: in volledig scherm plakken ze samen bovenaan
+          (zie `.transport-calendar-top` in planner.css). */}
+      <div className="transport-calendar-top grid gap-3">
+      {header}
       <div className="transport-calendar-toolbar relative flex flex-wrap items-center gap-2">
         {narrow ? (
           // Op een telefoon één rij (M2): wat de pagina zelf meegeeft (vooruit,
@@ -647,6 +717,7 @@ function TransportCalendarShell({
           // halverwege het scherm.
           <>
             {toolbarExtra}
+            {availabilityButton}
             {/* Het paneel hangt aan de werkbalk en niet aan de knop: waar "Meer"
                 na het afbreken van de rij staat, verschilt per telefoon. */}
             <details>
@@ -668,6 +739,7 @@ function TransportCalendarShell({
             {viewSegments}
             {daysSelect}
             {toolbarExtra}
+            {availabilityButton}
             {toolbarMenu}
             {fieldPicker}
             {/* Zoom en volledig scherm helemaal rechts: het zijn kijkinstellingen en
@@ -679,6 +751,7 @@ function TransportCalendarShell({
             </div>
           </>
         )}
+      </div>
       </div>
 
       {view === 'maand' ? (
@@ -716,6 +789,8 @@ function TransportCalendarShell({
           onCreateRange={onCreateRange}
           draft={draft}
           bands={bands}
+          bandsAs={bandsAs}
+          nightFold={foldNight ? { open: nightOpen, onToggle: toggleNight } : undefined}
           above={
             events && events.length > 0 ? (
               <EventBars

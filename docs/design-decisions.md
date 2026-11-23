@@ -4333,6 +4333,101 @@ Wat daarbij vastligt:
   rit van 00:30 belandde op de dag ervoor. `lib/week-lanes.ts` rekent de dagrand
   daarom om, en `test/week-lanes.test.ts` houdt dat vast.
 
+### De weekplanning staat stil (november 2026)
+
+De transportplanning "trilde": de kalender sprong onder je muis, het kaartje van
+een rit beefde naast zijn blok, en de strook "Wie kan er rijden" schudde bij het
+zoomen. Uit drie voorstellen koos Logistiek de rustigste: dezelfde week, maar
+opgepoetst en stilgezet. Wat er trilde, en wat er nu vastligt:
+
+- **Elke knop heeft een vaste plek.** De werkbalk liep over twee rijen, en het
+  zoomlabel ("Hele dag" tegen "125%") en de teller met botsingen (die verscheen en
+  verdween) veranderden van breedte. Op een venster van 1536px (een 1080p-laptop
+  op 125%) sprong de werkbalk bij één klik op + van twee rijen naar één en schoof
+  de hele kalender 40px; bij ctrl+scrollen wipte ze op en neer. Nu heeft het
+  zoomlabel een vaste breedte en staan de tellers als vaste vakjes naast de titel
+  (`week-summary.tsx`): te beslissen, zonder chauffeur, botsingen. Ze tonen 0 in
+  plaats van te verdwijnen, en een klik springt naar de volgende rit van die
+  soort. Gemeten op 31 breedtes van 1280 tot 1760px: zoomen en de knop
+  Beschikbaarheid verschuiven de kalender nergens meer.
+- **Beschikbaarheid is een knop, geen filter.** Ze zat als vinkje achter
+  "Filters", terwijl wie een rit wil verdelen geen filter zoekt maar wil zien wie
+  kan, en er verdwijnt ook niets. Nu staat ze als schakelaar in de werkbalk
+  (geel wanneer hij aanstaat) en tekent ze per dag een smal **spoor per
+  chauffeur**, links in de kolom, in zijn kleur, met de arcering van "liever
+  niet" en "nood" zoals overal. De band over de hele kolom die het was, toonde
+  van vier mensen die kunnen één gearceerd blok.
+  - De sporen staan op naam, in elke kolom op dezelfde plek, met de namen in een
+    legende onder de kalender. Hoogstens tien pixels per spoor en samen
+    hoogstens een derde van de kolom (`trackGeometry`, in CSS en niet gemeten),
+    zodat tien chauffeurs de ritten niet wegduwen. Enkel een dag met sporen
+    schuift haar ritten op.
+  - Klik je een rit aan, dan vallen de sporen die haar niet dekken weg en staat
+    er een kader over haar uren: wie daar een spoor heeft dat het kader vult, kan.
+  - De kleur is die van de chauffeur op een vaste middentoon
+    (`driverToneVar`, `--driver-tone-l`): een pastel van acht pixels breed zie je
+    op wit niet. Mengen met `--ink` werd geprobeerd en trok elke warme pastel naar
+    hetzelfde mauve.
+  - Onthouden per persoon in de cookie (hieronder). Een oude link met
+    `?beschikbaar=1` zet ze nog aan; omzetten haalt die parameter uit de URL,
+    en de navigatie naar een andere week draagt hem niet mee, anders zette elke
+    klik op "volgende week" de knop terug aan. In het filterpaneel en in de
+    teller op "Filters" staat ze niet meer. Niet in de maandweergave, die geen
+    uren tekent, en niet op het bezettingsoverzicht.
+- **"Wie kan er rijden?" in het paneel van een rit.** De chauffeurs op volgorde
+  van hoe hun opgegeven uren bij die rit passen (`lib/driver-fit.ts`): kan,
+  liever niet, enkel in nood, deels, geen uren gekend, niet op dit uur, rijdt
+  dan al. Aaneensluitende vensters tellen samen, en het zwakste stuk telt. Elk
+  met een tijdlijntje van drie uur rond de rit. Van wie geen uren gekend zijn,
+  staat in één zin en niet als rij: dat is iets anders dan niet kunnen, maar ook
+  geen reden om de lijst te vullen. "Geen uren gekend" en niet "gaf niets door":
+  enkel karchauffeurs kunnen hun uren invullen.
+  - Een knop "Kies" enkel bij een **goedgekeurde** rit. Bij een aanvraag kies je
+    de chauffeur bij het goedkeuren, en dat formulier wist een chauffeur die je
+    ernaast al toewees (het goedkeuren zet `driverId` uit zijn eigen
+    keuzelijst). Daar staat de volgorde wel, en beide keuzelijsten zetten
+    hetzelfde woord achter elke naam ("Arne (kan)").
+- **De nacht staat ingeklapt.** 00:00 tot 06:00 is één strook boven het rooster,
+  met de ritten van die uren als pil; de maan klapt ze open en dicht, en dat
+  wordt onthouden. Een derde van "hele dag" was nacht. Met de nacht dicht is
+  zoom 1 van 06:00 tot 24:00, en dan valt er bij het openen niets meer te
+  scrollen, dus ook geen sprong naar de eerste rit. De grens ligt vast en beweegt
+  niet met de ritten, om de reden van "Het rooster loopt altijd van 00:00 tot
+  24:00" hierboven. Een rit in de nacht verslepen vraagt eerst openklappen: in de
+  strook is er geen tijdas om op te slepen. Enkel in de planning van het team;
+  het bezettingsoverzicht en het intekenscherm voor de beschikbaarheid tonen de
+  hele dag.
+- **Het kaartje van een rit woont in de kalender** en scrolt daardoor vanzelf mee
+  (zie "Een rit opent als kaartje naast zijn blok").
+- **Wat de eerste render moet weten, leest de server.** Zoom, de regels in een
+  blok, de nacht, de beschikbaarheid en of het scherm de vorige keer smal was,
+  staan in de cookie `logistiek-planning` (`prefs.ts`) en niet meer in
+  `localStorage`. Daaruit lezen kon pas na de hydratie: de week verscheen op
+  "hele dag" en sprong dan naar je zoom, en op een telefoon wisselde de week
+  daarna nog eens naar een dag. Wat er nog in `localStorage` stond, wordt één
+  keer overgenomen. Het meten van de pane en de scroll naar de eerste rit lopen
+  in een layout-effect, vóór de browser schildert.
+- **Hover verandert enkel een schaduw.** `hover:brightness-95` animeerde een
+  filter op elk blok, en een filter zet het blok op een eigen laag en tekent de
+  tekst opnieuw: die verspringt dan onder je muis.
+- **Op een telefoon is de pane in `svh` en niet in `dvh`.** `dvh` verandert
+  terwijl de adresbalk in- en uitschuift, de kalender meet dat, en dan rekte de
+  dag op en neer onder je duim.
+- **Een blok toont enkel regels die volledig passen**; past er maar één, dan komt
+  de titel achter het uur. Een half afgesneden regel las als een fout. Rechts op
+  de regel met het uur staan de initialen van wie rijdt in een bolletje (een plus
+  zonder chauffeur): veertig pastels houd je op een drukke week niet uit elkaar,
+  en in een blok van een kwartier past de naam niet.
+- **De kop van een dag** draagt het nummer groot, vandaag in het geel, en het
+  aantal ritten. De dagen staan tegen elkaar met een haarlijn in plaats van als
+  grijze kolommen met een gat ertussen; het weekend krijgt een lichte tint.
+- **De strook "Wie kan er rijden" schudt niet meer bij het zoomen.** De breedte
+  animeerde terwijl een `requestAnimationFrame` de scroll al herberekende, die
+  correctie zat in de updater van `setZoom`, en de zoom werd op tienden
+  afgerond. Nu dezelfde aanpak als de kalender (anker in een layout-effect, geen
+  animatie), knijpen via pointer-events zodat de pagina niet meezoomt, en de
+  details van een balk onder de balken in plaats van erboven.
+
 ### Een rit leest op twee assen: kleur is wie, arcering is wat
 
 Ronde 3 vroeg om "kleurcodering of arcering om voertuigen te onderscheiden",
@@ -4459,7 +4554,10 @@ Wat daarbij vastligt:
 - **Het rooster loopt altijd van 00:00 tot 24:00**, en niet van de vroegste tot
   de laatste rit. Een venster dat met de data meebeweegt, verspringt zodra iemand
   een rit om 6:00 toevoegt, en dan staat de week er de volgende ochtend anders
-  bij zonder dat je iets veranderd hebt.
+  bij zonder dat je iets veranderd hebt. In de planning van het team staat de
+  nacht (00:00 tot 06:00) sinds november 2026 ingeklapt tot één strook; de dag
+  is er nog heel, met een vaste grens, en zoom 1 is daar 06:00 tot 24:00. Zie
+  "De weekplanning staat stil".
 - **Scrollen zoomt rond de muis**, zoals in een kaart: het uur onder de cursor
   blijft onder de cursor staan. Zonder dat anker springt de week weg op het
   moment dat je inzoomt om iets van dichtbij te bekijken. De kop wordt daarbij
@@ -4530,11 +4628,13 @@ keuze maakt dus telkens iemand anders ongelijk.
   standaard.
 - **De standaard is de oude weergave.** Post, bestemming en lading staan uit. Wie
   niets instelt, hoort niets te merken.
-- **In `localStorage` en niet in de URL**, anders dan de filters. Die staan er
+- **Een voorkeur en niet in de URL**, anders dan de filters. Die staan er
   omdat een gefilterde week deelbaar hoort te zijn en de server enkel ophaalt wat
   je ziet; dit verandert niets aan de query, het is een voorkeur van één persoon,
   en zeven extra parameters maken een gedeelde link naar een bepaalde week
-  onleesbaar. Het volgt dus de zoom en niet de filters.
+  onleesbaar. Het volgt dus de zoom en niet de filters. Het stond in
+  `localStorage`; sinds november 2026 in de cookie `logistiek-planning`, die de
+  server leest (zie "De weekplanning staat stil").
 - **Een voorkeur per browser en geen teaminstelling.** Twee mensen kijken op
   hetzelfde moment naar dezelfde week met een andere vraag in hun hoofd; een
   instelling in /beheer/instellingen zou de ene laten kiezen voor de andere. Het
@@ -4599,9 +4699,13 @@ Wat daarbij vastligt:
   drie plaatsen dezelfde meetcode dragen. Loopt een rit over middernacht, dan
   staan er twee blokken met dezelfde id en wint het eerste; dat is de dag waarop
   de rit begint.
-- **Het volgt mee bij scrollen**, met een luisteraar in de capture-fase: de
-  kalender scrolt binnen zijn eigen doos, en zonder capture horen we die scroll
-  niet en blijft het kaartje achter terwijl zijn blok wegschuift.
+- **Het scrolt mee omdat het ín de kalender staat**, in de laag met
+  `data-inspector-host="grid"`, en niet omdat JavaScript het verplaatst. Het was
+  vast in het venster met een scroll-luisteraar in de capture-fase, en die liep
+  altijd een beeld achter op de scroll van de browser: bij een trackpad beefde het
+  kaartje naast zijn blok. Een kaartje bij een evenement of een nachtrit hangt in
+  de pane (`data-inspector-host="pane"`), want die staan in de vastgeplakte kop.
+  Zonder blok (een nieuwe rit) staat het nog vast rechts in het venster.
 - **Het plaatsen gebeurt in een layout-effect**, zodat het niet één frame
   linksboven verschijnt en dan naar zijn plek springt.
 - **De feitenrijen gaan van vier naar twee kolommen in het kaartje**
@@ -5830,7 +5934,8 @@ team ziet dat als lichte band achter de transportplanning.
   als een gaatje dat er niet is. Van een andere soort niet; zie hieronder.
 - **De band staat standaard uit** in de planning. Ze is nuttig op het moment dat
   je chauffeurs toewijst, en de rest van de tijd een extra laag kleur over de
-  week.
+  week. Sinds november 2026 is dat de knop Beschikbaarheid in de werkbalk, met een
+  spoor per chauffeur in plaats van een band; zie "De weekplanning staat stil".
 - **De chauffeur beheert ze zelf**, ook het team niet voor hem: de acties staan
   in `app/actions/uitleen.ts` en niet in `beheer.ts`, want een chauffeur heeft
   geen `logistiek.manage`.

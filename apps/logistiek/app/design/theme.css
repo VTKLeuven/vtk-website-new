@@ -196,6 +196,11 @@
   --driver-l0: 0.94;
   --driver-l1: 0.7;
   --driver-c-max: 0.13;
+  /* De helderheid van een spoor van de beschikbaarheid en van het bolletje met
+     initialen (`driverToneVar`): een middentoon, in beide modi dezelfde, zodat
+     het spoor 3:1 haalt op het witte en op het donkere rooster, en de donkere
+     tekst erop 4.5:1. */
+  --driver-tone-l: 0.64;
   --driver-ink: #0a0f1f; /* tekst in een blok */
   --driver-edge: rgba(14, 26, 54, 0.45); /* streepjesrand "nog geen chauffeur" */
   --driver-pattern: rgba(14, 26, 54, 0.13); /* arcering per voertuig */
@@ -348,6 +353,7 @@
   --driver-l0: 0.26;
   --driver-l1: 0.36;
   --driver-c-max: 0.11;
+  --driver-tone-l: 0.64;
   --driver-ink: #f2f6ff;
   --driver-edge: rgba(255, 255, 255, 0.45);
   --driver-pattern: rgba(255, 255, 255, 0.16);

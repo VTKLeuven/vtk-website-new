@@ -86,7 +86,12 @@ export function TransportFilterBar({
   const [open, setOpen] = useState(false);
   const panel = useRef<HTMLDivElement>(null);
 
-  const active = countActiveFilters(filters);
+  // Staat de beschikbaarheid niet in dit paneel (de planning heeft er een eigen
+  // knop voor in de werkbalk), dan telt ze ook niet mee: de teller op de knop
+  // Filters zou anders veranderen telkens je die knop omzet.
+  const availabilityHere = shown?.availability ?? true;
+  const active =
+    countActiveFilters(filters) - (!availabilityHere && filters.showAvailability ? 1 : 0);
 
   /**
    * De filters uit de vorige keer terugzetten, maar enkel wanneer je zonder één
@@ -121,6 +126,10 @@ export function TransportFilterBar({
     // Een post van vorig jaar die er niet meer is, filtert anders alles weg
     // zonder dat je ziet waarom; dezelfde reden als bij de twee hierboven.
     keep('post', (posts ?? []).map((post) => post.id));
+    // Een bewaarde `beschikbaar=1` van toen dit nog een filter was, zou de knop
+    // in de werkbalk overrulen (de URL wint van de cookie). Waar het geen filter
+    // meer is, gaat ze dus niet mee terug in de URL.
+    if (!availabilityHere) stored.delete('beschikbaar');
     const query = stored.toString();
     if (!query) return;
     router.replace(`${pathname}?${query}`);

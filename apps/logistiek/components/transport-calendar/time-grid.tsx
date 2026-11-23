@@ -1,18 +1,30 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { AVAILABILITY_KIND_LABEL, availabilityFillClass } from '@/lib/availability-kinds';
-import { driverColorVar, type DriverColorOverrides } from '@/lib/driver-colors';
+import { driverColorVar, driverToneVar, type DriverColorOverrides } from '@/lib/driver-colors';
 import { clockLabel } from '@/lib/quarter-time';
 import { clashingWith } from '@/lib/transport-conflicts';
 import { minutesOfDay, placeForDay, startOfBrusselsDay, type Placed } from '@/lib/week-lanes';
+import { LogisticsIcon } from '@/components/logistics-icon';
 import { BlockContent, blockLabel, blockLook, formatTime } from './trip-block';
 import {
   DAY_HOURS,
   DEFAULT_TRIP_FIELDS,
+  NIGHT_FOLD_END_HOUR,
   ZOOM_MIN,
   hourPxFor,
   laneBox,
+  trackDriverOrder,
+  trackGeometry,
   type AvailabilityBand,
   type CalendarVehicle,
   type TripBlock,
@@ -52,13 +64,22 @@ import { byLocale, useCalendarCopy } from './copy';
 const DAYTIME_FROM_MINUTES = 6 * 60;
 
 const WEEKDAY = byLocale({ timeZone: 'Europe/Brussels', weekday: 'short' });
-const DAY_NUMBER = byLocale({ timeZone: 'Europe/Brussels', day: 'numeric', month: 'short' });
+const DAY_OF_MONTH = byLocale({ timeZone: 'Europe/Brussels', day: 'numeric' });
+const MONTH_SHORT = byLocale({ timeZone: 'Europe/Brussels', month: 'short' });
+const FULL_DAY = byLocale({ timeZone: 'Europe/Brussels', weekday: 'long', day: 'numeric', month: 'long' });
 const dayKeyFormatter = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Europe/Brussels',
   year: 'numeric',
   month: '2-digit',
   day: '2-digit',
 });
+
+/** Het weekend krijgt een tint, zodat je de week leest zonder de namen te lezen. */
+const weekdayKeyFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Europe/Brussels',
+  weekday: 'short',
+});
+const WEEKEND = new Set(['Sat', 'Sun']);
 
 /**
  * Minimale breedte van een dagkolom.
@@ -99,9 +120,12 @@ export function timeGridColumns(dayCount: number): string {
  * Een uitgerekende breedte en geen `min-width: max-content`: dat laatste laat
  * elke lange evenementnaam in de strook erboven de kolommen meerekken, en dan
  * wordt de week breder naarmate er een event met een lange naam in staat.
+ *
+ * Zonder tussenruimte: de dagen staan tegen elkaar met een haarlijn ertussen,
+ * en de kop, de evenementen en de nacht gebruiken exact dezelfde kolommen.
  */
 export function timeGridMinWidth(dayCount: number): string {
-  return `calc(3.25rem + ${dayCount} * ${DAY_MIN_WIDTH} + ${dayCount} * 0.25rem)`;
+  return `calc(3.25rem + ${dayCount} * ${DAY_MIN_WIDTH})`;
 }
 
 /**
@@ -256,8 +280,10 @@ export function TimeGrid({
   above,
   bands,
   bandsProminent = false,
+  bandsAs = 'background',
   draft,
   dayStartHour = 0,
+  nightFold,
 }: {
   /** De dagen, als ISO-strings van UTC-middernacht (date-only). */
   days: string[];
@@ -334,6 +360,23 @@ export function TimeGrid({
    */
   bandsProminent?: boolean;
   /**
+   * Hoe de banden er staan (niet op je eigen beschikbaarheidsscherm, dat
+   * `bandsProminent` gebruikt).
+   *
+   * - `background`: een lichte band over de hele kolom, achter de ritten. Van
+   *   vier mensen die kunnen, zie je zo één gearceerd blok.
+   * - `tracks`: één smal spoor per chauffeur links in elke kolom, in zijn kleur,
+   *   met de ritten ernaast. Zo zie je wíé er kan, en is het een knop in de
+   *   planning in plaats van een filter (zie de knop Beschikbaarheid).
+   */
+  bandsAs?: 'background' | 'tracks';
+  /**
+   * De nacht (00:00 tot `NIGHT_FOLD_END_HOUR`) als strook in plaats van zes uur
+   * rooster, met een knop om ze open te klappen. Enkel met `dayStartHour` 0.
+   * Weglaten toont de hele dag, zoals op het bezettingsoverzicht.
+   */
+  nightFold?: { open: boolean; onToggle: () => void };
+  /**
    * Vanaf welk uur een dagkolom begint (F4.2).
    *
    * De planning laat dit op 0: een rit om 02:00 staat op de datum waarop hij
@@ -387,8 +430,50 @@ export function TimeGrid({
   // lang; enkel wáár ze begint verschilt (zie `dayStartHour`). De blokken
   // gebruiken `firstHour` als nulpunt, dus op het beschikbaarheidsscherm lopen
   // de uren van 5 tot 29 en staat er onderaan 04:00 van de ochtend erna.
-  const firstHour = dayStartHour;
-  const lastHour = dayStartHour + DAY_HOURS;
+  //
+  // Met de nacht ingeklapt (`nightFold`) begint het rooster om 06:00; wat ervoor
+  // valt, staat als pil in de strook in de kop. De dag is dan nog altijd heel,
+  // enkel anders verdeeld.
+  const folded = Boolean(nightFold && !nightFold.open && dayStartHour === 0);
+  const firstHour = folded ? NIGHT_FOLD_END_HOUR : dayStartHour;
+  const lastHour = folded ? DAY_HOURS : dayStartHour + DAY_HOURS;
+  const visibleHours = lastHour - firstHour;
+
+  /**
+   * Wat er in het rooster staat: alles wat na het eerste getoonde uur eindigt,
+   * afgeknipt op dat uur. Een afgeknipt blok krijgt `continuesBefore`, met
+   * dezelfde gevolgen als een rit van gisteren: een pijl voor het uur, niet te
+   * verslepen (je ziet niet de hele rit) en geen greep aan de bovenrand.
+   */
+  const gridPerDay = useMemo(
+    () =>
+      placedPerDay.map((day) =>
+        day
+          .filter((block) => block.to > firstHour * 60)
+          .map((block) =>
+            block.from < firstHour * 60
+              ? { ...block, from: firstHour * 60, continuesBefore: true }
+              : block
+          )
+      ),
+    [firstHour, placedPerDay]
+  );
+
+  /** De ritten die (ook) in de ingeklapte nacht vallen, als pil in de strook. */
+  const nightPerDay = useMemo(
+    () =>
+      placedPerDay.map((day) => (folded ? day.filter((block) => block.from < firstHour * 60) : [])),
+    [firstHour, folded, placedPerDay]
+  );
+
+  /**
+   * De sporen van de beschikbaarheid (`bandsAs="tracks"`): wie welk spoor krijgt,
+   * en wat ze samen links van elke kolom innemen. Zonder banden is dat niets, en
+   * staan de ritten waar ze altijd stonden.
+   */
+  const tracks = bandsAs === 'tracks' && !bandsProminent && bands && bands.length > 0;
+  const trackOrder = useMemo(() => (tracks && bands ? trackDriverOrder(bands) : []), [bands, tracks]);
+  const trackShape = trackGeometry(trackOrder.length);
 
   /**
    * De uurhoogte waarbij de hele dag precies in de pane past, gemeten aan de
@@ -403,7 +488,11 @@ export function TimeGrid({
   const [paneHeight, setPaneHeight] = useState(0);
   const [headHeight, setHeadHeight] = useState(0);
 
-  useEffect(() => {
+  // Een layout-effect en geen gewoon effect: de eerste meting moet er staan
+  // vóór de browser schildert. Met een gewoon effect tekende de kalender eerst
+  // met een gegokte hoogte (640px) en verschoof daarna alles naar de echte; dat
+  // was een van de sprongen bij het openen.
+  useLayoutEffect(() => {
     const node = scroller.current;
     const headNode = head.current;
     if (!node || !headNode) return;
@@ -438,7 +527,9 @@ export function TimeGrid({
    * bijna-goed waar je naar blijft kijken.
    */
   const usable = Math.max(0, (paneHeight || 640) - headHeight);
-  const fitHourPx = usable / DAY_HOURS;
+  // Gedeeld door de uren die er staan: met de nacht ingeklapt zijn dat er
+  // achttien, en "hele dag" is dan 06:00 tot 24:00 zonder scrollen.
+  const fitHourPx = usable / visibleHours;
   const hourPx = hourPxFor(fitHourPx, zoom);
 
   useEffect(() => {
@@ -452,37 +543,38 @@ export function TimeGrid({
    * werkbalk het anker vast, en dan mag dit er niet overheen springen.
    */
   const scrolledFor = useRef<string | null>(null);
-  useEffect(() => {
+  // In een layout-effect, ná de meting hierboven: dan staat het rooster al op
+  // zijn echte hoogte en kan de scroll meteen goed, vóór er iets geschilderd
+  // is. Het waren twee `requestAnimationFrame`s, en die maakten het zichtbaar:
+  // de week verscheen eerst op 00:00 en sprong dan naar de eerste rit, ook bij
+  // elke klik op vorige of volgende week.
+  useLayoutEffect(() => {
     const node = scroller.current;
     if (!node || paneHeight === 0) return;
     const key = days.join('|');
     if (scrolledFor.current === key) return;
+    scrolledFor.current = key;
 
     // De eerste rit overdag (V2). Een nachtrit (de terugrit van een fuif om
     // 01:00) trok anders de hele week naar middernacht, en dan opende de
     // planning op tien lege nachturen. Zonder rit overdag: 07:00.
+    //
+    // "Overdag" is vanaf 06:00 na het begin van de kolom, en nooit vóór het
+    // eerste uur dat er staat: met de nacht ingeklapt begint het rooster zelf om
+    // 06:00, en op "hele dag" valt er dan niets te scrollen.
+    const daytime = Math.max(firstHour * 60, dayStartHour * 60 + DAYTIME_FROM_MINUTES);
     let earliest = 8 * 60;
-    for (const day of placedPerDay) {
+    for (const day of gridPerDay) {
       for (const block of day) {
-        if (block.from >= firstHour * 60 + DAYTIME_FROM_MINUTES) earliest = Math.min(earliest, block.from);
+        if (block.from >= daytime) earliest = Math.min(earliest, block.from);
       }
     }
     // Gerekend vanaf het eerste uur van de kolom, niet vanaf middernacht: op het
     // beschikbaarheidsscherm begint de kolom om 05:00, en dan scrolde dit vijf
     // uur te ver.
     const target = Math.max(0, ((earliest - firstHour * 60) / 60 - 1) * hourPx);
-    // Twee frames later: bij de eerste meting staat het rooster soms nog niet op
-    // zijn volle hoogte, en dan knipte de bovengrens het doel af tot bijna nul.
-    let frame = requestAnimationFrame(() => {
-      frame = requestAnimationFrame(() => {
-        node.scrollTop = Math.min(target, Math.max(0, node.scrollHeight - node.clientHeight));
-        // Pas nu als gedaan aanduiden: een tussentijdse hertekening annuleert
-        // de frames hierboven, en dan moet de volgende het nog doen.
-        scrolledFor.current = key;
-      });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [days, firstHour, hourPx, paneHeight, placedPerDay, scroller]);
+    node.scrollTop = Math.min(target, Math.max(0, node.scrollHeight - node.clientHeight));
+  }, [dayStartHour, days, firstHour, gridPerDay, hourPx, paneHeight, scroller]);
 
   /**
    * Wat er op dit moment versleept wordt.
@@ -902,6 +994,11 @@ export function TimeGrid({
     : null;
   const nowRaw = now ? minutesOfDay(now) : 0;
   const nowMinutes = nowRaw < firstHour * 60 ? nowRaw + DAY_HOURS * 60 : nowRaw;
+  const nowShown =
+    todayKey !== null &&
+    parsedDays.some((day) => dayKeyFormatter.format(day) === todayKey) &&
+    nowMinutes >= firstHour * 60 &&
+    nowMinutes <= lastHour * 60;
 
   // Het rooster blijft staan wanneer er niets is. Vroeger kwam er één zin in de
   // plaats, en dat was een kalender die verdween precies op de dag waarop je er
@@ -914,13 +1011,26 @@ export function TimeGrid({
     // gepositioneerd is en zonder dit op de pagina ankert in plaats van op het
     // raster; dat liet een telefoon het hele scherm uitzoomen om dat ene
     // onzichtbare pixel te tonen.
-    <div className="tg-pane relative rounded-[16px] border border-vtk-navy/10 bg-vtk-surface">
+    //
+    // `data-inspector-host`: hier hangt het kaartje van een evenement of een
+    // nachtrit aan (zie `TripInspector`). Die staan in de vastgeplakte kop, dus
+    // ten opzichte van de pane bewegen ze niet wanneer de uren scrollen.
+    <div
+      data-inspector-host="pane"
+      className="tg-pane relative rounded-[16px] border border-vtk-navy/10 bg-vtk-surface"
+    >
       {/* Geen `padding-top` op de scroller. Een `sticky top-0`-kop plakt aan de
           bovenrand van het scrollvenster, niet onder de padding: die acht pixels
           bleven dus onbedekt, en daar schoven de ritten doorheen boven de
           dagnamen. Dat is wat er "los" uitzag. De lucht bovenaan zit nu in de
           kop zelf, die meeschuift en alles eronder afdekt. */}
-      <div ref={scroller} className="tg-scroller relative h-full overflow-auto pb-2 pr-2">
+      <div
+        ref={scroller}
+        className="tg-scroller relative h-full overflow-auto pb-2 pr-2"
+        // De hoogte van de vastgeplakte kop, voor `scroll-margin-top`: wie naar
+        // een rit springt, landt er niet onder (zie planner.css).
+        style={{ '--tg-head-h': `${headHeight}px` } as React.CSSProperties}
+      >
         {/* De kop plakt bovenaan de scroller: de dagen en de evenementenstrook
             blijven staan terwijl je door de uren scrolt. Eén `sticky` blok en
             niet twee, want twee sticky elementen met een eigen `top` schuiven
@@ -931,10 +1041,108 @@ export function TimeGrid({
             zweven in plaats van erop te staan. */}
         <div
           ref={head}
-          className="tg-head sticky top-0 z-30 border-b border-vtk-navy/10 bg-vtk-surface pb-1.5 pt-2"
+          className="tg-head sticky top-0 z-30 border-b border-vtk-navy/10 bg-vtk-surface"
           style={{ minWidth }}
         >
+          {/* De dagen eerst, dan de evenementen, dan de nacht: van de rij die
+              zegt welke kolom welke dag is, naar wat er die dag speelt, naar het
+              rooster. Zo staat de dagnaam recht boven zijn kolom, zoals in elke
+              agenda, en niet boven een rij evenementen. */}
+          <div className="grid" style={{ gridTemplateColumns: columns }}>
+            {/* De hoek linksboven. Dezelfde rand als de urenkolom eronder,
+                anders breekt de scheidingslijn af ter hoogte van de kop. Met de
+                nacht open staat hier de knop om ze weer in te klappen; dicht
+                staat die knop in de strook zelf, bij de nacht waar hij over gaat. */}
+            <span className="sticky left-0 z-20 flex items-end justify-center border-r border-vtk-navy/10 bg-vtk-surface pb-1.5">
+              {nightFold && dayStartHour === 0 && nightFold.open ? (
+                <button
+                  type="button"
+                  onClick={nightFold.onToggle}
+                  aria-expanded
+                  title={t.nightHide}
+                  className="tg-night-toggle"
+                >
+                  <LogisticsIcon name="moon" className="h-4 w-4" />
+                  <span className="sr-only">{t.nightHide}</span>
+                </button>
+              ) : null}
+            </span>
+            {parsedDays.map((day, index) => {
+              const isToday = todayKey !== null && dayKeyFormatter.format(day) === todayKey;
+              const dayNumber = DAY_OF_MONTH[t.locale].format(day);
+              // De maand bij de eerste kolom en op de eerste van een maand:
+              // "komende dagen" loopt soms over een maandgrens, en dan is "1"
+              // zonder maand een raadsel.
+              const showMonth = index === 0 || dayNumber === '1';
+              const count = bandsProminent
+                ? null
+                : placedPerDay[index].filter((block) => !block.continuesBefore).length;
+              return (
+                <span
+                  key={days[index]}
+                  className={`tg-dayhead${isToday ? ' is-today' : ''}`}
+                  title={FULL_DAY[t.locale].format(day)}
+                >
+                  <span className="tg-dayhead-name">{WEEKDAY[t.locale].format(day)}</span>
+                  <span className="tg-dayhead-num">{dayNumber}</span>
+                  {showMonth ? (
+                    <span className="tg-dayhead-month">{MONTH_SHORT[t.locale].format(day)}</span>
+                  ) : null}
+                  {count !== null ? <span className="tg-dayhead-count">{t.tripCount(count)}</span> : null}
+                </span>
+              );
+            })}
+          </div>
+
           {above}
+
+          {/* De ingeklapte nacht: één strook met de ritten van 00:00 tot 06:00
+              als pil. Een pil opent de rit zoals een blok; slepen kan hier niet,
+              daarvoor klap je de nacht open. */}
+          {folded ? (
+            <div
+              className="grid border-t border-vtk-navy/10 bg-vtk-paper/60"
+              style={{ gridTemplateColumns: columns }}
+            >
+              <span className="sticky left-0 z-20 border-r border-vtk-navy/10 bg-vtk-paper">
+                <button
+                  type="button"
+                  onClick={nightFold?.onToggle}
+                  aria-expanded={false}
+                  title={t.nightShow}
+                  className="tg-night-label"
+                >
+                  <LogisticsIcon name="moon" className="h-3.5 w-3.5 shrink-0" />
+                  <span aria-hidden>00-{String(NIGHT_FOLD_END_HOUR).padStart(2, '0')}</span>
+                  <span className="sr-only">{t.nightShow}</span>
+                </button>
+              </span>
+              {parsedDays.map((day, index) => {
+                const draftPiece = draftPerDay[index];
+                return (
+                  <div key={days[index]} className="tg-night-cell">
+                    {nightPerDay[index].map((block) => (
+                      <NightPill
+                        key={`${block.id}-${days[index]}`}
+                        block={block}
+                        vehicle={vehicleById.get(block.vehicleId) ?? null}
+                        onSelect={onSelect}
+                        selected={selectedId === block.id}
+                        showDriver={showDriver}
+                        driverColors={driverColors}
+                      />
+                    ))}
+                    {draftPiece && draftPiece.from < firstHour * 60 ? (
+                      <span aria-hidden className="trip-draft tg-night-pill tabular-nums">
+                        {formatTime(momentOn(day, draftPiece.from))}-
+                        {formatTime(momentOn(day, draftPiece.to))}
+                      </span>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
 
           {/* Ook de banden tellen mee voor "leeg": op het
               beschikbaarheidsscherm staan er nooit ritten, en dan bleef er
@@ -954,30 +1162,18 @@ export function TimeGrid({
             </p>
           ) : null}
 
-          <div className="grid gap-1" style={{ gridTemplateColumns: columns }}>
-            {/* De hoek linksboven. Dezelfde rand als de urenkolom eronder,
-                anders breekt de scheidingslijn af ter hoogte van de kop. */}
-            <span className="sticky left-0 z-20 border-r border-vtk-navy/10 bg-vtk-surface" />
-            {parsedDays.map((day, index) => {
-              const isToday = todayKey !== null && dayKeyFormatter.format(day) === todayKey;
-              return (
-                <span
-                  key={days[index]}
-                  className={`truncate px-1 text-xs ${isToday ? 'text-vtk-navy' : 'text-vtk-muted'}`}
-                >
-                  <span
-                    className={`font-semibold capitalize ${isToday ? 'text-vtk-navy' : 'text-vtk-ink'}`}
-                  >
-                    {WEEKDAY[t.locale].format(day)}
-                  </span>{' '}
-                  {DAY_NUMBER[t.locale].format(day)}
-                </span>
-              );
-            })}
-          </div>
         </div>
 
-        <div className="grid gap-1" style={{ gridTemplateColumns: columns, minWidth }}>
+        {/* `data-inspector-host="grid"`: het kaartje van een rit wordt hierin
+            gezet (zie `TripInspector`), zodat het mee scrolt met zijn blok
+            zonder dat JavaScript het bij elke scroll moet verplaatsen. Dat
+            verplaatsen liep een beeld achter, en dan beefde het kaartje naast
+            zijn blok. */}
+        <div
+          data-inspector-host="grid"
+          className="relative grid"
+          style={{ gridTemplateColumns: columns, minWidth }}
+        >
           {/* De urenkolom, vastgeplakt links: scrol je horizontaal door de week,
               dan blijft de klok staan waar ze hoort. */}
           <div
@@ -986,6 +1182,17 @@ export function TimeGrid({
             style={{ height }}
           >
             <div className="relative h-full">
+              {/* Het uur van nu als pil in de urenkolom, op de hoogte van de
+                  rode lijn: zo lees je de lijn zonder te tellen. */}
+              {now && nowShown ? (
+                <span
+                  aria-hidden
+                  className="tg-now-pill"
+                  style={{ top: ((nowMinutes - firstHour * 60) / 60) * hourPx }}
+                >
+                  {formatTime(now)}
+                </span>
+              ) : null}
               {/* Elk uur hangt gecentreerd op zijn lijn, behalve het eerste: dat
                   staat op de bovenrand, en half omhoog zou het onder de dagkop
                   verdwijnen. Het stond er daarom eerst rechtop onder, maar dan
@@ -1006,6 +1213,17 @@ export function TimeGrid({
 
           {parsedDays.map((day, dayIndex) => {
             const isToday = todayKey !== null && dayKeyFormatter.format(day) === todayKey;
+            const isWeekend = WEEKEND.has(weekdayKeyFormatter.format(day));
+            /** De aangeklikte rit op deze dag: de sporen die ze niet dekken, gaan lichter. */
+            const selectedPiece = selectedId
+              ? gridPerDay[dayIndex].find((block) => block.id === selectedId)
+              : undefined;
+            // Enkel een dag met sporen schuift haar ritten op; op een dag waarop
+            // niemand iets opgaf, houden de ritten de hele breedte.
+            const dayInset =
+              tracks && bandsPerDay[dayIndex].some((band) => band.to > firstHour * 60)
+                ? trackShape.inset
+                : '0px';
             return (
               <div
                 key={days[dayIndex]}
@@ -1013,9 +1231,9 @@ export function TimeGrid({
                   columns_.current[dayIndex] = node;
                 }}
                 onPointerDown={(event) => beginCreate(event, dayIndex)}
-                className={`tg-day relative rounded-[10px] ${isToday ? 'bg-vtk-yellow/10' : 'bg-vtk-paper/70'} ${
-                  onCreateRange ? 'cursor-copy' : ''
-                }`}
+                className={`tg-day relative border-l border-vtk-navy/[0.07] ${
+                  isToday ? 'bg-vtk-yellow/[0.07]' : isWeekend ? 'bg-vtk-paper/45' : ''
+                } ${onCreateRange ? 'cursor-copy' : ''}`}
                 style={{ height }}
               >
                 {/* Uurlijnen, zodat je een blok op de klok kan leggen.
@@ -1027,17 +1245,68 @@ export function TimeGrid({
                 {hours.map((hour, index) => (
                   <span
                     key={hour}
-                    className="pointer-events-none absolute inset-x-0 border-t border-vtk-navy/10"
+                    className="pointer-events-none absolute inset-x-0 border-t border-vtk-navy/[0.07]"
                     style={{ top: index * hourPx }}
                     aria-hidden
                   />
                 ))}
 
+                {/* De sporen van de beschikbaarheid (knop Beschikbaarheid in de
+                    planning): één per chauffeur, links in de kolom, in zijn
+                    kleur. Vol is beschikbaar, de arcering zegt "liever niet" of
+                    "enkel in nood", zoals overal. Een sleep die op een spoor
+                    begint, tekent gewoon een rit: het spoor geeft hem door aan
+                    de kolom en houdt enkel de tooltip met de naam. */}
+                {tracks
+                  ? bandsPerDay[dayIndex]
+                      .filter((band) => band.to > firstHour * 60)
+                      .map((band) => {
+                        const track = trackOrder.findIndex((driver) => driver.id === band.driverId);
+                        const from = Math.max(band.from, firstHour * 60);
+                        const dim =
+                          selectedPiece !== undefined &&
+                          !(band.from <= selectedPiece.from && band.to >= selectedPiece.to);
+                        return (
+                          <span
+                            key={`${band.id}-${days[dayIndex]}`}
+                            title={`${band.driverName}: ${AVAILABILITY_KIND_LABEL[band.kind].toLowerCase()}, ${clockLabel(band.from)} tot ${clockLabel(band.to)}${band.note ? ` (${band.note})` : ''}`}
+                            onPointerDown={(event) => beginCreate(event, dayIndex)}
+                            className={`tg-track ${availabilityFillClass(band.kind)}`}
+                            style={{
+                              top: ((from - firstHour * 60) / 60) * hourPx,
+                              height: Math.max(4, ((band.to - from) / 60) * hourPx),
+                              left: `calc(4px + ${trackShape.step} * ${track})`,
+                              width: `calc(${trackShape.step} - 2px)`,
+                              backgroundColor: driverToneVar(band.driverId, driverColors),
+                              opacity: dim ? 0.28 : undefined,
+                            }}
+                          />
+                        );
+                      })
+                  : null}
+                {tracks && selectedPiece ? (
+                  // Waar de aangeklikte rit valt, over de sporen heen: wie daar
+                  // een spoor heeft dat de hele kader vult, kan haar rijden.
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute z-[2] rounded-[7px] border-[1.5px] border-vtk-navy"
+                    style={{
+                      left: 1,
+                      width: `calc(${trackShape.area} + 6px)`,
+                      top: ((selectedPiece.from - firstHour * 60) / 60) * hourPx - 2,
+                      height: ((selectedPiece.to - selectedPiece.from) / 60) * hourPx + 4,
+                    }}
+                  />
+                ) : null}
+
                 {/* De beschikbaarheid van de chauffeurs (V1), helemaal onderaan
                     de stapel: het is context waarbinnen je plant, geen afspraak
                     die met een rit kan concurreren om je aandacht. */}
-                {bandsPerDay[dayIndex].map((band) => {
-                  const height = Math.max(4, ((band.to - band.from) / 60) * hourPx);
+                {(tracks ? [] : bandsPerDay[dayIndex])
+                  .filter((band) => band.to > firstHour * 60)
+                  .map((band) => {
+                  const bandFrom = Math.max(band.from, firstHour * 60);
+                  const height = Math.max(4, ((band.to - bandFrom) / 60) * hourPx);
                   return (
                     <span
                       key={`${band.id}-${days[dayIndex]}`}
@@ -1060,7 +1329,7 @@ export function TimeGrid({
                           : 'opacity-30'
                       }`}
                       style={{
-                        top: ((band.from - firstHour * 60) / 60) * hourPx,
+                        top: ((bandFrom - firstHour * 60) / 60) * hourPx,
                         height,
                         backgroundColor: driverColorVar(band.driverId, driverColors),
                         opacity: draggedOpacity(band.id, dayIndex),
@@ -1134,8 +1403,8 @@ export function TimeGrid({
                       // dat intussen verborgen staat; anders over de hele kolom,
                       // zoals een band ook loopt.
                       ...(drag.kind === 'resize' && drag.target === 'block'
-                        ? laneBox(drag.lane, drag.lanes)
-                        : { left: 0, right: 0 }),
+                        ? laneBox(drag.lane, drag.lanes, dayInset)
+                        : { left: `calc(${dayInset})`, right: 0 }),
                     }}
                   >
                     {formatTime(dragRange(drag, day).start)}
@@ -1150,16 +1419,22 @@ export function TimeGrid({
                 {/* De rit in wording. Onder de echte blokken (`z-10` tegen
                     hun eigen stapel) zodat ze niets afdekt, maar boven de
                     uurlijnen zodat ze als blok leest en niet als arcering. */}
-                {draftPerDay[dayIndex] ? (
+                {draftPerDay[dayIndex] && draftPerDay[dayIndex]!.to > firstHour * 60 ? (
                   <div
                     aria-hidden
-                    className="trip-draft pointer-events-none absolute inset-x-0 z-10 rounded-[8px] px-1.5 py-1 text-[11px] font-semibold tabular-nums"
+                    className="trip-draft pointer-events-none absolute right-0 z-10 rounded-[8px] px-1.5 py-1 text-[11px] font-semibold tabular-nums"
                     style={{
+                      left: `calc(${dayInset})`,
                       top:
-                        ((draftPerDay[dayIndex]!.from - firstHour * 60) / 60) * hourPx,
+                        ((Math.max(draftPerDay[dayIndex]!.from, firstHour * 60) - firstHour * 60) /
+                          60) *
+                        hourPx,
                       height: Math.max(
                         18,
-                        ((draftPerDay[dayIndex]!.to - draftPerDay[dayIndex]!.from) / 60) * hourPx -
+                        ((draftPerDay[dayIndex]!.to -
+                          Math.max(draftPerDay[dayIndex]!.from, firstHour * 60)) /
+                          60) *
+                          hourPx -
                           2
                       ),
                     }}
@@ -1170,13 +1445,15 @@ export function TimeGrid({
                   </div>
                 ) : null}
 
-                {placedPerDay[dayIndex].map((block) => (
+                {gridPerDay[dayIndex].map((block) => (
                   <TimeBlock
                     key={`${block.id}-${days[dayIndex]}`}
                     block={block}
                     vehicle={vehicleById.get(block.vehicleId) ?? null}
+                    inset={dayInset}
                     firstHour={firstHour}
                     hourPx={hourPx}
+                    gridHeight={height}
                     onSelect={onSelect}
                     selected={selectedId === block.id}
                     showDriver={showDriver}
@@ -1204,11 +1481,75 @@ export function TimeGrid({
   );
 }
 
+/**
+ * Een rit in de ingeklapte nacht: één regel in de strook boven het rooster,
+ * met dezelfde look als een blok (vulkleur, arcering, rand). Aanklikken opent de
+ * rit zoals een blok dat doet; `data-trip` zodat het kaartje er naast kan staan.
+ */
+function NightPill({
+  block,
+  vehicle,
+  onSelect,
+  selected,
+  showDriver,
+  driverColors,
+}: {
+  block: Placed<TripBlock>;
+  vehicle: CalendarVehicle | null;
+  onSelect?: (blockId: string) => void;
+  selected: boolean;
+  showDriver: boolean;
+  driverColors?: DriverColorOverrides;
+}) {
+  const t = useCalendarCopy();
+  const look = blockLook({ block, vehicle, showDriver, driverColors, selected });
+  const label = blockLabel({
+    block,
+    vehicle,
+    showDriver,
+    awaitsDriver: look.awaitsDriver,
+    start: block.start,
+    end: block.end,
+    t,
+  });
+  const text = (
+    <>
+      <span className="shrink-0 font-semibold tabular-nums">
+        {block.continuesBefore ? '↑ ' : ''}
+        {formatTime(block.start)}-{formatTime(block.end)}
+      </span>
+      <span className="min-w-0 truncate">{block.title}</span>
+    </>
+  );
+  if (!onSelect) {
+    return (
+      <span className={`tg-night-pill ${look.className}`} style={look.style} title={label}>
+        {text}
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      data-trip={block.id}
+      onClick={() => onSelect(block.id)}
+      title={label}
+      aria-label={label}
+      className={`tg-night-pill transition-shadow hover:shadow-md ${look.className}`}
+      style={look.style}
+    >
+      {text}
+    </button>
+  );
+}
+
 function TimeBlock({
   block,
   vehicle,
+  inset,
   firstHour,
   hourPx,
+  gridHeight,
   onSelect,
   selected,
   showDriver,
@@ -1222,8 +1563,12 @@ function TimeBlock({
 }: {
   block: Placed<TripBlock>;
   vehicle: CalendarVehicle | null;
+  /** Wat de sporen van de beschikbaarheid links innemen; zie `trackGeometry`. */
+  inset: string;
   firstHour: number;
   hourPx: number;
+  /** De hoogte van de dagkolom: een kort blok om 23:45 schuift erbinnen. */
+  gridHeight: number;
   onSelect?: (blockId: string) => void;
   selected: boolean;
   showDriver: boolean;
@@ -1243,15 +1588,28 @@ function TimeBlock({
   const look = blockLook({ block, vehicle, showDriver, driverColors, selected });
   // Minimaal 24px: een kwartierrit moet aanklikbaar blijven, ook uitgezoomd.
   const height = Math.max(24, rawHeight - 2);
+  /**
+   * Hoeveel regels er volledig in passen: 11px tekst met `leading-tight` is
+   * 13,75px per regel, de bovenste regel draagt het bolletje met de initialen en
+   * is 16px, en daarboven en -onder zit padding en een rand (een dikkere voor
+   * "te beslissen", "geen chauffeur" en een botsing).
+   */
+  const chrome =
+    11 +
+    (block.status === 'REQUESTED' ? 2 : 0) +
+    (look.awaitsDriver || block.conflict ? 2 : 0);
+  const maxLines = Math.max(1, 1 + Math.floor((height - chrome - 16) / 13.75));
 
   const style: React.CSSProperties = {
     ...look.style,
-    top: Math.max(0, top),
+    // Binnen de kolom: een rit van een kwartier om 23:45 is 24px hoog en liep
+    // anders onder de dag uit, waardoor "hele dag" toch een scrollbalk kreeg.
+    top: Math.max(0, Math.min(top, gridHeight - height)),
     height,
     // Met de strook rechts van de kolom vrij: zie `BLOCK_GUTTER_PX`. Zonder die
     // strook is er op het uur van een rit geen lege plek meer om een tweede rit
     // op te tekenen.
-    ...laneBox(block.lane, block.lanes),
+    ...laneBox(block.lane, block.lanes, inset),
     opacity: dragOpacity ?? look.style.opacity,
   };
 
@@ -1279,6 +1637,8 @@ function TimeBlock({
       continuesBefore={block.continuesBefore}
       continuesAfter={block.continuesAfter}
       compact={block.lanes > 1}
+      driverColors={driverColors}
+      maxLines={maxLines}
     />
   );
 
@@ -1313,7 +1673,11 @@ function TimeBlock({
         onSelect(block.id);
       }}
       onPointerDown={movable ? onMoveStart : undefined}
-      className={`group absolute transition hover:brightness-95 ${movable ? 'cursor-grab' : ''} ${look.className}`}
+      // Hover tilt het blok met een schaduw, en niets anders. Het was
+      // `hover:brightness-95` met `transition`: een filter die animeert, zet het
+      // blok op een eigen laag en tekent de tekst opnieuw, en dan verspringt de
+      // tekst onder je muis telkens je over de week beweegt.
+      className={`group absolute transition-shadow hover:z-[15] hover:shadow-md ${movable ? 'cursor-grab' : ''} ${look.className}`}
       style={style}
       title={label}
       aria-label={label}

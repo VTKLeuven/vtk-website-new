@@ -46,15 +46,18 @@
    ding: de pane moet een échte hoogte hebben, want een `overflow: auto` op een
    doos die met haar inhoud meegroeit, scrolt nooit.
 
-   Buiten volledig scherm is dat een stuk van het scherm (`dvh` en niet `vh`: op
-   een telefoon telt `vh` de adresbalk mee, en dan valt de onderrand eronder). In
-   volledig scherm neemt ze wat er overblijft onder de werkbalk. */
+   Buiten volledig scherm is dat een stuk van het scherm, in `svh`: de hoogte met
+   de adresbalk van een telefoon zichtbaar. Niet `vh` (dat telt de adresbalk mee,
+   en dan valt de onderrand eronder) en ook niet meer `dvh`: die verandert terwijl
+   je de pagina scrolt en de adresbalk in- of uitschuift, de kalender meet dat, en
+   dan rekte de hele dag op en neer onder je duim. `svh` ligt vast. In volledig
+   scherm neemt ze wat er overblijft onder de werkbalk. */
 /* De hoogte staat op de pane zelf en niet enkel op de planning: het publieke
    bezettingsoverzicht en het beschikbaarheidsscherm gebruiken hetzelfde rooster
    zonder die shell eromheen, en zonder hoogte scrolt een `overflow: auto`-doos
    nooit. Wie ze wil bijstellen, zet `--tg-height` op een ouder. */
 .tg-pane {
-  height: var(--tg-height, clamp(22rem, 68dvh, 60rem));
+  height: var(--tg-height, clamp(22rem, 68svh, 60rem));
   min-width: 0;
 }
 
@@ -67,7 +70,7 @@
    dagweergave. */
 @media (min-width: 860px) {
   .tg-pane {
-    height: var(--tg-height, clamp(36rem, 68dvh, 60rem));
+    height: var(--tg-height, clamp(36rem, 68svh, 60rem));
   }
 }
 
@@ -112,7 +115,7 @@
    schuift de dag waar je op mikt eronder. */
 @media (max-width: 700px) {
   .tg-pane {
-    height: var(--tg-height, clamp(24rem, 78dvh, 60rem));
+    height: var(--tg-height, clamp(24rem, 78svh, 60rem));
   }
 
   .tg-scroller {
@@ -598,8 +601,8 @@
    werkbalk (weergave, navigatie, zoom, sluiten) mee naar boven verdwijnen. Die
    blijft dus staan; de knop waarmee je er weer uit komt, hoort altijd zichtbaar
    te zijn. */
-.transport-calendar:fullscreen .transport-calendar-toolbar,
-.transport-calendar[data-fullscreen='fallback'] .transport-calendar-toolbar {
+.transport-calendar:fullscreen .transport-calendar-top,
+.transport-calendar[data-fullscreen='fallback'] .transport-calendar-top {
   position: sticky;
   top: -1rem;
   z-index: 40;
@@ -684,4 +687,281 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
   border: 2px dashed var(--driver-edge);
   background: var(--driver-none);
   color: var(--driver-ink);
+}
+
+/* De weekplanning (voorstel A, november 2026): een rustige week.
+
+   Alles hieronder verandert enkel kleur, rand en schaduw bij hover of selectie,
+   nooit `filter` of `transform` op tekst: die zetten een element op een eigen
+   laag en tekenen de tekst opnieuw, en dan verspringt ze onder je muis. Zie
+   "De weekplanning staat stil" in docs/design-decisions.md. */
+
+/* De kop van een dag: de dagnaam klein, het nummer groot, vandaag in het geel.
+   Rechts het aantal ritten, dat naar een eigen regel zakt als de kolom smal is
+   (dat hangt enkel van de vensterbreedte af, dus het springt niet). */
+.tg-dayhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.375rem;
+  min-width: 0;
+  padding: 0.45rem 0.5rem 0.4rem;
+  border-left: 1px solid color-mix(in srgb, var(--emphasis) 7%, transparent);
+}
+
+.tg-dayhead-name {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tg-dayhead-num {
+  color: var(--ink);
+  font-size: 1.125rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1.75rem;
+}
+
+.tg-dayhead.is-today .tg-dayhead-num {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--on-yellow);
+  font-size: 0.95rem;
+}
+
+.tg-dayhead-month,
+.tg-dayhead-count {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.tg-dayhead-count {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* De knop met de maan: de nacht weer inklappen. Dicht staat de knop in de
+   strook zelf (`.tg-night-label`), bij de nacht waar hij over gaat. */
+.tg-night-toggle {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--line-2);
+  border-radius: 0.625rem;
+  background: var(--surface);
+  color: var(--body);
+  transition: border-color 0.15s;
+}
+
+.tg-night-toggle:hover {
+  border-color: color-mix(in srgb, var(--emphasis) 40%, transparent);
+}
+
+.tg-night-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  width: 100%;
+  height: 100%;
+  min-height: 2.125rem;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.tg-night-label:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.tg-night-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.3rem 0.25rem;
+  border-left: 1px solid color-mix(in srgb, var(--emphasis) 7%, transparent);
+}
+
+/* Een rit in de ingeklapte nacht. Gewone CSS en geen utility, en dat is met
+   opzet: het blok draagt de klassen van `blockLook` (padding, hoogte voor een
+   blok in het rooster), en een regel hier wint van een Tailwind-utility uit een
+   `@layer`. */
+.tg-night-pill {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+  max-width: 100%;
+  height: 1.5rem;
+  padding: 0 0.4rem;
+  overflow: hidden;
+  border-radius: 0.4375rem;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Het uur van nu als pil in de urenkolom, op de hoogte van de rode lijn. */
+.tg-now-pill {
+  position: absolute;
+  right: 0.125rem;
+  z-index: 3;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--now-line);
+  color: var(--surface);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  line-height: 1rem;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+/* Een spoor van de beschikbaarheid: één chauffeur, één venster. De kleur komt
+   uit `driverToneVar` (de vulkleur, krachtiger gemengd), de arcering van
+   "liever niet" en "enkel in nood" uit dezelfde klassen als overal. */
+.tg-track {
+  position: absolute;
+  z-index: 1;
+  border-radius: 999px;
+}
+
+.tg-track-sample {
+  display: inline-block;
+  width: 0.5rem;
+  height: 1.1rem;
+  border-radius: 999px;
+}
+
+/* De initialen van wie rijdt, rechts op de regel met het uur. Tekst in
+   `--on-yellow`: donker in beide modi, en de gemengde kleur eronder is in beide
+   modi een middentoon (zie `driverToneVar`). */
+.trip-chip {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  color: var(--on-yellow);
+  font-size: 8px;
+  font-variant-numeric: normal;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+.trip-chip-lg {
+  width: 1.375rem;
+  height: 1.375rem;
+  font-size: 9.5px;
+}
+
+/* Nog niemand: een leeg bolletje met een plus. */
+.trip-chip-open {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.25px var(--driver-edge);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* De knop Beschikbaarheid: een schakelaar, geel wanneer hij aanstaat, zoals een
+   actieve pil elders op de site. Even hoog als de andere knoppen in de werkbalk,
+   zodat de rij niet verspringt wanneer hij omgaat. */
+.tg-avail-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.125rem;
+  padding: 0 0.5rem 0 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--emphasis) 15%, transparent);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.tg-avail-toggle:hover {
+  border-color: color-mix(in srgb, var(--emphasis) 40%, transparent);
+}
+
+.tg-avail-toggle.is-on {
+  border-color: var(--yellow-dark);
+  background: var(--yellow);
+  color: var(--on-yellow);
+}
+
+.tg-switch {
+  position: relative;
+  flex: none;
+  width: 1.75rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--emphasis) 22%, transparent);
+  transition: background-color 0.15s;
+}
+
+.tg-switch::after {
+  position: absolute;
+  top: 0.125rem;
+  left: 0.125rem;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--line);
+  content: '';
+  transition: transform 0.15s;
+}
+
+.tg-avail-toggle.is-on .tg-switch {
+  background: var(--on-yellow);
+}
+
+.tg-avail-toggle.is-on .tg-switch::after {
+  background: var(--yellow);
+  transform: translateX(0.75rem);
+}
+
+.tg-avail-toggle:focus-visible,
+.tg-night-toggle:focus-visible,
+.tg-night-label:focus-visible,
+.tg-night-pill:focus-visible {
+  outline: 2px solid var(--emphasis);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tg-switch,
+  .tg-switch::after {
+    transition: none;
+  }
+}
+
+/* Naar een rit springen (de tellers boven de kalender) zet ze niet onder de
+   vastgeplakte kop of achter de urenkolom: de kop meet zichzelf en zet zijn
+   hoogte in `--tg-head-h` op de scroller. */
+[data-inspector-host='grid'] [data-trip] {
+  scroll-margin-top: calc(var(--tg-head-h, 0px) + 0.5rem);
+  scroll-margin-left: 3.5rem;
 }

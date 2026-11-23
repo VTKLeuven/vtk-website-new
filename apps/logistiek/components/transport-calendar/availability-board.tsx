@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AVAILABILITY_KINDS, type AvailabilityKind } from '@/lib/availability-day';
 import {
   AVAILABILITY_KIND_HINT,
@@ -11,7 +11,13 @@ import type { DriverColorOverrides } from '@/lib/driver-colors';
 import { driverColorVar } from '@/lib/driver-colors';
 import { isoWeekNumber } from '@/lib/uitleen';
 import { startOfBrusselsDay } from '@/lib/week-lanes';
-import type { AvailabilityBand } from './types';
+import { wheelPixels, type AvailabilityBand } from './types';
+
+/** Hoe ver de strook inzoomt: vijf keer de breedte, een kwartier wordt dan leesbaar. */
+const BOARD_ZOOM_MAX = 5;
+/** Zoom per gescrolde pixel, en de grens per gebeurtenis; zie `zoomByWheel` in types.ts. */
+const BOARD_ZOOM_PER_PX = 0.003;
+const BOARD_ZOOM_MAX_PX = 60;
 
 /**
  * Wie kan er wanneer rijden, deze week (V1).
@@ -127,7 +133,14 @@ export function AvailabilityBoard({
   const [selectedBar, setSelectedBar] = useState<Bar | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const touchState = useRef<{ initialDist: number; initialZoom: number; midX: number } | null>(null);
+  /**
+   * Waar de zoom naartoe gaat, los van wat er getekend staat: een trackpad
+   * stuurt tientallen gebeurtenissen per gebaar, en de volgende moet verder
+   * tellen vanaf de vorige, niet vanaf de laatste render.
+   */
+  const zoomTarget = useRef(1);
+  /** Het punt dat na deze render weer onder de muis (of de vingers) moet staan. */
+  const pendingAnchor = useRef<{ ratio: number; x: number } | null>(null);
 
   const parsedDays = useMemo(() => days.map((day) => new Date(day)), [days]);
 
@@ -143,81 +156,120 @@ export function AvailabilityBoard({
   /**
    * Geankerd zoomen: het tijdstip dat nu gecentreerd is (of onder de muis ligt)
    * blijft op dezelfde plek na de schaling.
+   *
+   * Dit schudde. Drie oorzaken, alle drie weg:
+   *
+   * - De breedte animeerde (`transition-all`), terwijl een `requestAnimationFrame`
+   *   de scroll al herberekende op een breedte die nog onderweg was. Elke
+   *   wieltik trok de strook zo even naar links en terug.
+   * - Die correctie zat ín de updater van `setZoom`; React mag een updater twee
+   *   keer draaien, en elke gebeurtenis plande er een eigen frame bij.
+   * - De zoom werd afgerond op tienden, dus een rustig knijpgebaar bleef hangen
+   *   en sprong dan een tiende.
+   *
+   * Nu dezelfde aanpak als de kalender erboven: de verhouding onder het anker
+   * wordt bij de gebeurtenis gemeten (op wat er getekend staat), en teruggezet in
+   * een layout-effect, ná de nieuwe breedte en vóór de browser schildert.
    */
-  const setZoomAnchored = useCallback(
-    (nextZoomOrUpdater: number | ((prev: number) => number), clientAnchorX?: number) => {
-      const container = containerRef.current;
-      setZoom((prev) => {
-        const target =
-          typeof nextZoomOrUpdater === 'function' ? nextZoomOrUpdater(prev) : nextZoomOrUpdater;
-        const next = Math.min(5, Math.max(1, Math.round(target * 10) / 10));
-        if (next === prev) return prev;
+  const setZoomAnchored = useCallback((next: number, clientAnchorX?: number) => {
+    const value = Math.min(BOARD_ZOOM_MAX, Math.max(1, next));
+    const container = containerRef.current;
+    if (container) {
+      const rect = container.getBoundingClientRect();
+      const anchorX = clientAnchorX !== undefined ? clientAnchorX - rect.left : container.clientWidth / 2;
+      pendingAnchor.current = {
+        ratio: (container.scrollLeft + anchorX) / Math.max(1, container.scrollWidth),
+        x: anchorX,
+      };
+    }
+    zoomTarget.current = value;
+    setZoom(value);
+  }, []);
 
-        if (container) {
-          const rect = container.getBoundingClientRect();
-          const anchorX =
-            clientAnchorX !== undefined ? clientAnchorX - rect.left : container.clientWidth / 2;
-          const oldScroll = container.scrollLeft;
-          const oldContentWidth = container.scrollWidth;
-          const anchorRatio = (oldScroll + anchorX) / Math.max(1, oldContentWidth);
+  useLayoutEffect(() => {
+    zoomTarget.current = zoom;
+    const pending = pendingAnchor.current;
+    pendingAnchor.current = null;
+    const container = containerRef.current;
+    if (!pending || !container) return;
+    container.scrollLeft = pending.ratio * container.scrollWidth - pending.x;
+  }, [zoom]);
 
-          requestAnimationFrame(() => {
-            if (containerRef.current) {
-              const newContentWidth = containerRef.current.scrollWidth;
-              containerRef.current.scrollLeft = anchorRatio * newContentWidth - anchorX;
-            }
-          });
-        }
-
-        return next;
-      });
-    },
-    []
-  );
-
+  // Ctrl/⌘ + scrollen zoomt; een gewone scroll blijft een scroll. Niet via
+  // `onWheel`: React hangt dat passief op, en dan mag `preventDefault()` niet en
+  // zoomt de browser de hele pagina mee.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
     const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const delta = e.deltaY;
-        const zoomDelta = -delta * 0.005;
-        setZoomAnchored((current) => current * (1 + zoomDelta), e.clientX);
-      }
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const pixels = Math.max(-BOARD_ZOOM_MAX_PX, Math.min(BOARD_ZOOM_MAX_PX, wheelPixels(e)));
+      setZoomAnchored(zoomTarget.current * Math.exp(-pixels * BOARD_ZOOM_PER_PX), e.clientX);
     };
 
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
   }, [setZoomAnchored]);
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      const t1 = e.touches[0];
-      const t2 = e.touches[1];
-      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-      const midX = (t1.clientX + t2.clientX) / 2;
-      touchState.current = { initialDist: dist, initialZoom: zoom, midX };
-    }
-  };
+  /**
+   * Knijpen op een telefoon, zoals in de kalender: met pointer-events op het
+   * element zelf en niet met React's `onTouchMove`. Dat laatste is passief, kan
+   * de browser dus niet tegenhouden, en dan zoomden de pagina en de strook
+   * tegelijk: twee zooms die elkaar onder je vingers wegduwden. `touch-action`
+   * staat op `pan-x pan-y` (gewoon vegen blijft native) en gaat tijdens het
+   * knijpen op `none`. Het gebaar is absoluut (tegen de zoom bij het neerzetten
+   * van de tweede vinger), zodat de strook niet wegkruipt terwijl je stilhoudt.
+   */
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const points = new Map<number, { x: number; y: number }>();
+    let pinch: { distance: number; zoom: number } | null = null;
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length === 2 && touchState.current) {
-      const t1 = e.touches[0];
-      const t2 = e.touches[1];
-      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-      if (touchState.current.initialDist > 10) {
-        const factor = dist / touchState.current.initialDist;
-        const newZoom = touchState.current.initialZoom * factor;
-        setZoomAnchored(newZoom, touchState.current.midX);
+    const spread = () => {
+      const [a, b] = [...points.values()];
+      if (!a || !b) return null;
+      return { distance: Math.hypot(a.x - b.x, a.y - b.y), midX: (a.x + b.x) / 2 };
+    };
+    const onDown = (event: PointerEvent) => {
+      if (event.pointerType === 'mouse') return;
+      points.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      const now = spread();
+      if (points.size === 2 && now && now.distance > 10) {
+        pinch = { distance: now.distance, zoom: zoomTarget.current };
+        el.style.touchAction = 'none';
       }
-    }
-  };
+    };
+    const onMove = (event: PointerEvent) => {
+      if (!points.has(event.pointerId)) return;
+      points.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (!pinch || points.size !== 2) return;
+      const now = spread();
+      if (!now || now.distance <= 0) return;
+      event.preventDefault();
+      setZoomAnchored((pinch.zoom * now.distance) / pinch.distance, now.midX);
+    };
+    const onUp = (event: PointerEvent) => {
+      points.delete(event.pointerId);
+      if (points.size < 2 && pinch) {
+        pinch = null;
+        el.style.touchAction = '';
+      }
+    };
 
-  const handleTouchEnd = () => {
-    touchState.current = null;
-  };
+    el.addEventListener('pointerdown', onDown);
+    window.addEventListener('pointermove', onMove, { passive: false });
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      el.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+  }, [setZoomAnchored]);
 
   /**
    * De vensters per chauffeur, geknipt op het venster van de weergave.
@@ -442,7 +494,7 @@ export function AvailabilityBoard({
           <div className="flex items-center gap-1 rounded-full border border-vtk-navy/15 bg-vtk-paper/60 p-0.5">
             <button
               type="button"
-              onClick={() => setZoomAnchored((z) => Math.max(1, z - 0.5))}
+              onClick={() => setZoomAnchored(zoomTarget.current - 0.5)}
               disabled={zoom <= 1}
               className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-vtk-ink transition hover:bg-vtk-surface disabled:opacity-30"
               title="Uitzoomen"
@@ -455,8 +507,8 @@ export function AvailabilityBoard({
             </span>
             <button
               type="button"
-              onClick={() => setZoomAnchored((z) => Math.min(5, z + 0.5))}
-              disabled={zoom >= 5}
+              onClick={() => setZoomAnchored(zoomTarget.current + 0.5)}
+              disabled={zoom >= BOARD_ZOOM_MAX}
               className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-vtk-ink transition hover:bg-vtk-surface disabled:opacity-30"
               title="Inzoomen"
               aria-label="Inzoomen"
@@ -538,57 +590,16 @@ export function AvailabilityBoard({
         })}
       </div>
 
-      {selectedBar && (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-vtk-navy/15 bg-vtk-paper/80 p-3 text-xs shadow-sm">
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              aria-hidden
-              className="h-3 w-3 shrink-0 rounded-full border border-vtk-navy/20"
-              style={{ backgroundColor: driverColorVar(selectedBar.driverId, driverColors) }}
-            />
-            <span className="font-semibold text-vtk-ink">{selectedBar.driverName}</span>
-            <span className="text-vtk-muted">·</span>
-            <span className="capitalize font-medium text-vtk-ink">{selectedBar.fullDate}</span>
-            <span className="text-vtk-muted">·</span>
-            <span className="font-semibold tabular-nums text-vtk-ink">{selectedBar.timeRange}</span>
-            <span className="text-vtk-muted">({selectedBar.duration})</span>
-            <span
-              className={`ml-2 inline-flex items-center rounded-full border border-vtk-navy/20 px-2 py-0.5 text-[11px] font-medium ${availabilityFillClass(
-                selectedBar.kind
-              )}`}
-            >
-              {AVAILABILITY_KIND_LABEL[selectedBar.kind]}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {selectedBar.note && (
-              <span className="rounded border border-vtk-navy/10 bg-vtk-surface px-2 py-0.5 text-[11px] italic text-vtk-body">
-                "{selectedBar.note}"
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => setSelectedBar(null)}
-              className="rounded-full px-2 py-0.5 text-xs text-vtk-muted hover:bg-vtk-surface hover:text-vtk-ink transition"
-              title="Detail sluiten"
-              aria-label="Detail sluiten"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
-
       <div
         className="mt-3 min-w-0 overflow-x-auto select-none rounded-[12px] border border-vtk-navy/10 bg-vtk-surface"
         ref={containerRef}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        // Gewoon vegen blijft native; enkel het knijpen is van ons (zie hierboven).
+        style={{ touchAction: 'pan-x pan-y' }}
       >
         <div
-          className="relative min-w-[32rem] p-3 transition-all duration-75"
+          // Zonder `transition`: een breedte die animeert, schoof onder de
+          // scrollcorrectie door en liet de strook bij elke wieltik schudden.
+          className="relative min-w-[32rem] p-3"
           style={{ width: `${Math.max(100, zoom * 100)}%` }}
         >
           <div className="flex items-end gap-2 pb-2 border-b border-vtk-navy/10">
@@ -683,10 +694,13 @@ export function AvailabilityBoard({
                           key={bar.id}
                           onClick={() => setSelectedBar((curr) => (curr?.id === bar.id ? null : bar))}
                           title={bar.title}
-                          className={`absolute inset-y-1 flex items-center overflow-hidden rounded-[6px] border border-vtk-navy/20 px-1.5 text-[10px] font-semibold tabular-nums text-vtk-ink transition cursor-pointer text-left ${
+                          // Hover en selectie met een schaduw en een ring, niet met
+                          // `brightness`: een filter die animeert, tekent de tekst
+                          // opnieuw en laat ze verspringen.
+                          className={`absolute inset-y-1 flex items-center overflow-hidden rounded-[6px] border border-vtk-navy/20 px-1.5 text-[10px] font-semibold tabular-nums text-vtk-ink transition-shadow cursor-pointer text-left ${
                             isSelected
-                              ? 'ring-2 ring-vtk-ink ring-offset-1 z-10 brightness-105'
-                              : 'hover:brightness-95 hover:z-10'
+                              ? 'ring-2 ring-vtk-ink ring-offset-1 z-10'
+                              : 'hover:z-10 hover:shadow-md'
                           } ${availabilityFillClass(bar.kind)}`}
                           style={{
                             left: `${bar.left}%`,
@@ -760,6 +774,52 @@ export function AvailabilityBoard({
           ) : null}
         </div>
       </div>
+
+      {/* Onder de balken en niet erboven: erboven duwde het paneel de hele
+          strook naar beneden op het moment dat je klikte, en dan stond de
+          balk waar je op klikte niet meer onder je muis. */}
+      {selectedBar && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-vtk-navy/15 bg-vtk-paper/80 p-3 text-xs shadow-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              aria-hidden
+              className="h-3 w-3 shrink-0 rounded-full border border-vtk-navy/20"
+              style={{ backgroundColor: driverColorVar(selectedBar.driverId, driverColors) }}
+            />
+            <span className="font-semibold text-vtk-ink">{selectedBar.driverName}</span>
+            <span className="text-vtk-muted">·</span>
+            <span className="capitalize font-medium text-vtk-ink">{selectedBar.fullDate}</span>
+            <span className="text-vtk-muted">·</span>
+            <span className="font-semibold tabular-nums text-vtk-ink">{selectedBar.timeRange}</span>
+            <span className="text-vtk-muted">({selectedBar.duration})</span>
+            <span
+              className={`ml-2 inline-flex items-center rounded-full border border-vtk-navy/20 px-2 py-0.5 text-[11px] font-medium ${availabilityFillClass(
+                selectedBar.kind
+              )}`}
+            >
+              {AVAILABILITY_KIND_LABEL[selectedBar.kind]}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {selectedBar.note && (
+              <span className="rounded border border-vtk-navy/10 bg-vtk-surface px-2 py-0.5 text-[11px] italic text-vtk-body">
+                "{selectedBar.note}"
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setSelectedBar(null)}
+              className="rounded-full px-2 py-0.5 text-xs text-vtk-muted hover:bg-vtk-surface hover:text-vtk-ink transition"
+              title="Detail sluiten"
+              aria-label="Detail sluiten"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
     </section>
   );
 }

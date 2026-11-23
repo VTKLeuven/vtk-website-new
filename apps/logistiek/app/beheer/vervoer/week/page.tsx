@@ -1,5 +1,6 @@
-import Link from '@vtk/ui/link';
+import { cookies } from 'next/headers';
 import { requireManage } from '@/lib/session';
+import { PLANNER_PREFS_COOKIE, parsePlannerPrefs } from '@/components/transport-calendar/prefs';
 import {
   canDeleteTransport,
   chargesRequester,
@@ -118,10 +119,22 @@ export default async function VervoerWeekPage({
   const session = await requireManage();
   const query = await searchParams;
   const { weergave, datum, week } = query;
+  // Hoe deze persoon de planning de vorige keer bekeek (zoom, velden, nacht,
+  // beschikbaarheid, telefoon of niet). Op de server gelezen, zodat de eerste
+  // render meteen klopt; zie components/transport-calendar/prefs.ts.
+  const prefs = parsePlannerPrefs((await cookies()).get(PLANNER_PREFS_COOKIE)?.value);
 
-  const view = parseCalendarView(weergave);
+  // Zonder keuze in de URL opent een telefoon op één dag (M2). Dat wist de
+  // browser pas na het laden, en dan wisselde de week zichtbaar naar een dag;
+  // nu weet de cookie het al van de vorige keer.
+  const view = parseCalendarView(weergave ?? (prefs?.narrow ? 'dag' : undefined));
   const daysCount = parseDaysCount(query.aantal);
   const filters = parseTransportFilters(query);
+  // De beschikbaarheid is een knop en geen filter meer: wat de cookie zegt, of
+  // een oude link met `?beschikbaar=1`. De vensters worden hoe dan ook
+  // opgehaald (zie hieronder), dus omzetten vraagt niets aan de server.
+  const showAvailability = filters.showAvailability || (prefs?.availability ?? false);
+  const realFilters = { ...filters, showAvailability: false };
   // `?week=` is de oude parameter van het weekoverzicht; links en bladwijzers uit
   // die tijd blijven werken in plaats van op deze week uit te komen.
   const anchor = (datum && parseDateOnly(datum)) || (week && parseDateOnly(week)) || todayDateOnly();
@@ -206,8 +219,10 @@ export default async function VervoerWeekPage({
   ]);
 
   // De filters blijven staan wanneer je van week naar week bladert: ze horen bij
-  // waar je naar kijkt, niet bij wanneer.
-  const filterQuery = new URLSearchParams(filtersToQuery(filters)).toString();
+  // waar je naar kijkt, niet bij wanneer. Zonder `beschikbaar`: die staat in de
+  // cookie, en een link die ze meedraagt, zou de knop bij de volgende week weer
+  // aanzetten nadat je ze uitzette.
+  const filterQuery = new URLSearchParams(filtersToQuery(realFilters)).toString();
   const hrefFor = (target: Date) =>
     `/beheer/vervoer/week?weergave=${view}&datum=${toDateInputValue(target)}${
       view === 'dagen' ? `&aantal=${daysCount}` : ''
@@ -357,34 +372,18 @@ export default async function VervoerWeekPage({
 
   return (
     <div className="grid gap-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
-            {periodTitle(view, anchor, daysCount)}
-          </h2>
-          <p className="text-sm text-vtk-muted">
-            {view === 'dag'
-              ? `${bookings.length} ${bookings.length === 1 ? 'rit' : 'ritten'}`
-              : formatDateRange(days[0], new Date(to.getTime() - DAY_MS))}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <Link
-            href="/beheer/vervoer"
-            className="font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
-          >
-            Lijst
-          </Link>
-          <Link
-            href="/vervoer/bezetting"
-            className="font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
-          >
-            Bezetting
-          </Link>
-        </div>
-      </div>
-
+      {/* De titel, de navigatie, de links en de tellers staan in de kop van de
+          kalender zelf (`heading`), zodat ze in volledig scherm blijven staan. */}
       <TransportPlanner
+        heading={{
+          title: periodTitle(view, anchor, daysCount),
+          subtitle:
+            view === 'dag'
+              ? `${bookings.length} ${bookings.length === 1 ? 'rit' : 'ritten'}`
+              : formatDateRange(days[0], new Date(to.getTime() - DAY_MS)),
+        }}
+        initialPrefs={prefs}
+        initialAvailability={showAvailability}
         view={view}
         anchor={anchor.toISOString()}
         days={days.map((day) => day.toISOString())}
@@ -401,7 +400,7 @@ export default async function VervoerWeekPage({
         drivers={drivers}
         driverColors={driverColors}
         filters={filters}
-        hiddenNote={describeFilters(filters, {
+        hiddenNote={describeFilters(realFilters, {
           vehicles: new Map(vehicles.map((vehicle) => [vehicle.id, vehicle.nameNl])),
           drivers: new Map(drivers.map((driver) => [driver.id, driver.name])),
           groups: new Map(groups.map((group) => [group.id, group.nameNl])),

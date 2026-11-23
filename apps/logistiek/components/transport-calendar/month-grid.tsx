@@ -241,7 +241,10 @@ export function MonthGrid({
                           title={label}
                           aria-label={label}
                           style={style}
-                          className={`pointer-events-auto mx-0.5 flex items-center transition hover:brightness-95 ${look.className}`}
+                          // Een schaduw bij hover en geen `brightness`: een filter
+                          // die animeert, tekent de tekst opnieuw en laat ze
+                          // verspringen (zie `TimeBlock`).
+                          className={`pointer-events-auto mx-0.5 flex items-center transition-shadow hover:shadow-md ${look.className}`}
                         >
                           {content}
                         </button>

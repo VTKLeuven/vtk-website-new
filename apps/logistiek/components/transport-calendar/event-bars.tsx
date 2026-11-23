@@ -74,10 +74,13 @@ export function EventBars({
   const canToggle = totalLanes > VISIBLE_LANES;
 
   return (
-    <div className="grid gap-1 pb-1" style={{ gridTemplateColumns: columns }}>
+    // Zonder tussenruimte, net als het rooster eronder: de dagen staan tegen
+    // elkaar met een haarlijn, en een `gap` hier zou de balken een paar pixels
+    // naast hun dag laten beginnen. De lucht tussen twee balken zit in hun marge.
+    <div className="grid border-t border-vtk-navy/10 py-1" style={{ gridTemplateColumns: columns }}>
       {/* Een label in de urenkolom, zodat de strook niet als een zwevende rij
           balken leest. Meescrollend vastgezet, net als de uren eronder. */}
-      <span className="sticky left-0 z-20 self-start bg-vtk-surface pt-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-vtk-muted">
+      <span className="sticky left-0 z-20 -my-1 self-stretch border-r border-vtk-navy/10 bg-vtk-surface px-1 pt-1.5 text-center text-[10px] font-semibold uppercase tracking-[0.06em] text-vtk-muted">
         {t.events}
       </span>
       <div
@@ -88,7 +91,7 @@ export function EventBars({
         }}
       >
         <div
-          className="grid gap-1"
+          className="grid"
           style={{
             height: lanes * BAR_PX,
             gridTemplateColumns: `repeat(${parsedDays.length}, minmax(0, 1fr))`,
@@ -119,7 +122,7 @@ export function EventBars({
               gridRow: bar.lane + 1,
               height: BAR_PX - 4,
             };
-            const className = `flex items-center overflow-hidden rounded-[6px] border border-vtk-navy/20 bg-vtk-paper-2 px-2 text-[11px] leading-none text-vtk-navy ${
+            const className = `mx-0.5 flex items-center overflow-hidden rounded-[6px] border border-vtk-navy/20 bg-vtk-paper-2 px-2 text-[11px] leading-none text-vtk-navy ${
               selectedId === bar.id ? 'ring-2 ring-vtk-navy ring-offset-1' : ''
             }`;
             return onSelect ? (
@@ -131,7 +134,7 @@ export function EventBars({
                 title={label}
                 aria-label={label}
                 style={style}
-                className={`${className} transition hover:border-vtk-navy/50`}
+                className={`${className} transition-colors hover:border-vtk-navy/50`}
               >
                 {content}
               </button>

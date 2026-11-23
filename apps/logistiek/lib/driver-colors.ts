@@ -201,6 +201,26 @@ export function driverColorVar(
 }
 
 /**
+ * Dezelfde kleur, maar krachtig genoeg voor een dun spoor of een bolletje met
+ * initialen: de vulling van een blok is een pastel, en een spoor van acht pixels
+ * in een pastel op een wit rooster zie je niet (1,3:1 tegen de 3:1 die een
+ * grafisch element moet halen).
+ *
+ * Dezelfde tint, op een vaste helderheid (`--driver-tone-l` in theme.css) en met
+ * meer kleur. Een vaste helderheid en geen menging met `--ink`: mengen trok elke
+ * warme pastel naar hetzelfde mauve, en dan waren twee chauffeurs niet meer uit
+ * elkaar te houden, precies waar de sporen voor dienen. Op een middentoon haalt
+ * het spoor 3:1 op het witte rooster én op het donkere van de donkere modus, en
+ * tekst in `--on-yellow` (donker in beide modi) haalt erop 4.5:1.
+ */
+export function driverToneVar(
+  driverId: string | null | undefined,
+  overrides?: DriverColorOverrides
+): string {
+  return `oklch(from ${driverColorVar(driverId, overrides)} var(--driver-tone-l) calc(c * 1.8 + 0.02) h)`;
+}
+
+/**
  * De arceringen van een voertuig: de opgeslagen waarde (`UitleenVehicle.pattern`)
  * en het achtervoegsel van de CSS-klasse. `none` is hetzelfde als `null`, maar
  * geeft het beheerscherm een keuze "geen".

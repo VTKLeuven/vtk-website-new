@@ -48,6 +48,7 @@ export function TransportDecisionForms({
   needsDriver = true,
   needsVanDriver = false,
   sameDayBookings = [],
+  driverNotes,
 }: {
   bookingId: string;
   /** De rit zelf, of beide helften van een heen-en-terugaanvraag. */
@@ -61,6 +62,13 @@ export function TransportDecisionForms({
   needsVanDriver?: boolean;
   /** Andere goedgekeurde ritten met datzelfde voertuig die dag, om naar te schuiven. */
   sameDayBookings?: string[];
+  /**
+   * Hoe elke chauffeur bij deze rit past, achter zijn naam in de keuzelijst.
+   * Hier en niet als knop "Kies" in het paneel: bij een aanvraag kies je de
+   * chauffeur bij het goedkeuren, en een chauffeur die je ernaast toewijst, zou
+   * het goedkeuren met een lege keuzelijst weer wissen.
+   */
+  driverNotes?: Record<string, string>;
 }) {
   // Meerdere ritten in één aanvraag: heen en terug (V12), meerdere voertuigen
   // (V1), of allebei. Standaard beslist het team over alles samen; wie enkel
@@ -170,7 +178,7 @@ export function TransportDecisionForms({
                 defaultValue=""
               >
                 <option value="">{needsDriver ? 'Nog geen chauffeur' : 'Geen chauffeur nodig'}</option>
-                <DriverOptions drivers={drivers} needsVanDriver={needsVanDriver} />
+                <DriverOptions drivers={drivers} needsVanDriver={needsVanDriver} notes={driverNotes} />
               </select>
             </label>
             {charged ? (

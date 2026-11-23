@@ -33,6 +33,7 @@ export function TransportControls({
   groups,
   assignedGroupId,
   showComplete = true,
+  driverNotes,
 }: {
   bookingId: string;
   vehicleId: string;
@@ -55,6 +56,8 @@ export function TransportControls({
    * hoort bij de lijst, waar je er bewust naartoe gaat.
    */
   showComplete?: boolean;
+  /** Hoe elke chauffeur bij deze rit past, achter zijn naam in de keuzelijst. */
+  driverNotes?: Record<string, string>;
 }) {
   const router = useRouter();
   const showToast = useToast();
@@ -119,6 +122,7 @@ export function TransportControls({
               drivers={drivers}
               current={driver}
               needsVanDriver={needsVanDriver}
+              notes={driverNotes}
             />
           </select>
         </label>

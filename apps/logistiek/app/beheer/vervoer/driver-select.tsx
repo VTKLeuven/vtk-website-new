@@ -18,12 +18,22 @@ export function DriverOptions({
   drivers,
   current,
   needsVanDriver = false,
+  notes,
 }: {
   drivers: DriverOption[];
   /** De chauffeur die nu op de rit staat, voor het geval die uit de lijst is gehaald. */
   current?: { id: string; name: string } | null;
   needsVanDriver?: boolean;
+  /**
+   * Een woord achter de naam, per chauffeur-id: hoe zijn opgegeven
+   * beschikbaarheid bij deze rit past ("kan", "liever niet"; zie
+   * `lib/driver-fit.ts`). Zo kies je ook in de keuzelijst iemand die kan, zonder
+   * naar de kalender terug te moeten.
+   */
+  notes?: Record<string, string>;
 }) {
+  const label = (driver: DriverOption) =>
+    notes?.[driver.id] ? `${driver.name} (${notes[driver.id]})` : driver.name;
   // Een toegewezen rit blijft staan als de chauffeur uit de lijst gaat. Zonder
   // deze optie zou de keuzelijst "Nog geen" tonen terwijl er wel iemand rijdt.
   const removed = current && !drivers.some((driver) => driver.id === current.id) ? current : null;
@@ -43,7 +53,7 @@ export function DriverOptions({
           <optgroup label="Rijdt met de kar">
             {withVan.map((driver) => (
               <option key={driver.id} value={driver.id}>
-                {driver.name}
+                {label(driver)}
               </option>
             ))}
           </optgroup>
@@ -52,7 +62,7 @@ export function DriverOptions({
           <optgroup label="Niet met de kar">
             {without.map((driver) => (
               <option key={driver.id} value={driver.id}>
-                {driver.name}
+                {label(driver)}
               </option>
             ))}
           </optgroup>
@@ -71,7 +81,7 @@ export function DriverOptions({
         <optgroup label="Post Logistiek">
           {fromPost.map((driver) => (
             <option key={driver.id} value={driver.id}>
-              {driver.name}
+              {label(driver)}
             </option>
           ))}
         </optgroup>
@@ -80,7 +90,7 @@ export function DriverOptions({
         <optgroup label="Toegevoegde chauffeurs">
           {extra.map((driver) => (
             <option key={driver.id} value={driver.id}>
-              {driver.name}
+              {label(driver)}
             </option>
           ))}
         </optgroup>

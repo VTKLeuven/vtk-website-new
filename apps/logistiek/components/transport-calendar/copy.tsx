@@ -71,6 +71,12 @@ const COPY = {
     addTripOnDay: 'Rit toevoegen op deze dag',
     chooseDay: 'Dag kiezen',
     swipeHint: 'Veeg voor een andere dag, knijp om de uren groter te maken.',
+    availability: 'Beschikbaarheid',
+    availabilityHint: 'Toon wanneer elke chauffeur kan rijden: een spoor per chauffeur in elke dag',
+    nightShow: 'Nacht tonen (00:00 tot 06:00)',
+    nightHide: 'Nacht inklappen',
+    night: 'Nacht',
+    tripCount: (count: number) => (count === 0 ? 'vrij' : count === 1 ? '1 rit' : `${count} ritten`),
     status: { REQUESTED: 'Te beslissen', APPROVED: 'Goedgekeurd', COMPLETED: 'Afgerond' } satisfies Record<
       TripStatus,
       string
@@ -141,6 +147,12 @@ const COPY = {
     addTripOnDay: 'Add a trip on this day',
     chooseDay: 'Choose a day',
     swipeHint: 'Swipe for another day, pinch to make the hours bigger.',
+    availability: 'Availability',
+    availabilityHint: 'Show when each driver can drive: one track per driver in every day',
+    nightShow: 'Show the night (00:00 to 06:00)',
+    nightHide: 'Fold the night',
+    night: 'Night',
+    tripCount: (count: number) => (count === 0 ? 'free' : count === 1 ? '1 trip' : `${count} trips`),
     status: { REQUESTED: 'To decide', APPROVED: 'Approved', COMPLETED: 'Completed' } satisfies Record<
       TripStatus,
       string

@@ -153,6 +153,18 @@ export const MAX_HOUR_PX = 320;
 export const DAY_HOURS = 24;
 
 /**
+ * Tot welk uur de nacht ingeklapt staat in de planning van het team.
+ *
+ * Ingeklapt is 00:00 tot 06:00 één strook boven het rooster, met de ritten van
+ * die uren erin als pil; het rooster zelf loopt dan van 06:00 tot 24:00. Op
+ * "hele dag" past dat zonder te scrollen, en dan hoeft de kalender bij het
+ * openen ook niet meer naar de eerste rit te springen. De grens ligt vast en
+ * beweegt niet mee met de ritten: een venster dat met de data meeschuift,
+ * verspringt zodra iemand iets vroeger inplant. Zie docs/design-decisions.md.
+ */
+export const NIGHT_FOLD_END_HOUR = 6;
+
+/**
  * De strook rechts in elke dagkolom die vrij blijft, zodat je naast een rit nog
  * een tweede kan tekenen: slepen start enkel op de kolom zelf
  * (`beginCreate`). Eén keer per kolom, na de laatste baan, en niet per blok;
@@ -163,14 +175,56 @@ export const BLOCK_GUTTER_PX = 14;
 /** De naad tussen twee ritten naast elkaar, even smal als die tussen twee onder elkaar. */
 export const LANE_GAP_PX = 2;
 
-/** Plaats en breedte van een blok in een kolom met `lanes` banen, na aftrek van de strook rechts. */
-export function laneBox(lane: number, lanes: number): { left: string; width: string } {
-  const share = `(100% - ${BLOCK_GUTTER_PX}px) / ${lanes}`;
+/**
+ * Plaats en breedte van een blok in een kolom met `lanes` banen, na aftrek van de
+ * strook rechts. `inset` is wat er links bezet is (de sporen van de
+ * beschikbaarheid, zie {@link trackGeometry}), als CSS-lengte.
+ */
+export function laneBox(lane: number, lanes: number, inset = '0px'): { left: string; width: string } {
+  const share = `(100% - ${inset} - ${BLOCK_GUTTER_PX}px) / ${lanes}`;
   const last = lane === lanes - 1;
   return {
-    left: `calc(${share} * ${lane})`,
+    left: `calc(${inset} + ${share} * ${lane})`,
     width: last ? `calc(${share})` : `calc(${share} - ${LANE_GAP_PX}px)`,
   };
+}
+
+/**
+ * De sporen van de beschikbaarheid links in elke dagkolom: één per chauffeur,
+ * hoogstens tien pixels breed, en samen nooit meer dan een derde van de kolom.
+ *
+ * In CSS en niet in pixels uitgerekend: de kolom is een `1fr` die met het venster
+ * meegroeit, en een breedte die JavaScript eerst moet meten, tekent de eerste
+ * keer verkeerd. Met tien chauffeurs op een smalle laptop worden de sporen
+ * dunner in plaats van de ritten weg te duwen.
+ */
+export const TRACK_STEP_MAX_PX = 10;
+export const TRACK_AREA_SHARE = 34;
+
+export function trackGeometry(count: number): { inset: string; step: string; area: string } {
+  if (count === 0) return { inset: '0px', step: '0px', area: '0px' };
+  const area = `min(${count * TRACK_STEP_MAX_PX}px, ${TRACK_AREA_SHARE}%)`;
+  return {
+    area,
+    step: `min(${TRACK_STEP_MAX_PX}px, ${TRACK_AREA_SHARE}% / ${count})`,
+    // Tussen haakjes, want het komt in een `calc()` terecht met een minteken ervoor.
+    inset: `(${area} + 6px)`,
+  };
+}
+
+/**
+ * Welke chauffeur welk spoor krijgt: iedereen met een venster in beeld, op naam.
+ * Op naam en niet in de volgorde van de vensters, zodat Arne in elke dagkolom en
+ * in de legende op dezelfde plek staat.
+ */
+export function trackDriverOrder(
+  bands: readonly Pick<AvailabilityBand, 'driverId' | 'driverName'>[]
+): Array<{ id: string; name: string }> {
+  const seen = new Map<string, string>();
+  for (const band of bands) if (!seen.has(band.driverId)) seen.set(band.driverId, band.driverName);
+  return [...seen]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'nl'));
 }
 
 /**

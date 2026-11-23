@@ -54,6 +54,10 @@ import type {
   UitleenTransportBookingStatus,
 } from '@prisma/client';
 import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
+import { updatePlannerPrefs, type PlannerPrefs } from '@/components/transport-calendar/prefs';
+import { AvailabilityLegend } from './availability-legend';
+import { DriverFitList, driverNotesFor } from './driver-fit-list';
+import { WeekSummary, type SummaryKind } from './week-summary';
 
 /**
  * De transportplanning waarop de verantwoordelijke werkt (T7, P1, P4).
@@ -180,6 +184,9 @@ export function TransportPlanner({
   filters,
   hiddenNote,
   nav,
+  heading,
+  initialPrefs,
+  initialAvailability,
 }: {
   view: CalendarView;
   anchor: string;
@@ -226,6 +233,15 @@ export function TransportPlanner({
     isToday: boolean;
     label: string;
   };
+  /** "Week 47" met het datumbereik eronder; staat in de kop van de kalender. */
+  heading: { title: string; subtitle: string };
+  /** De kijkvoorkeuren uit de cookie; zie `components/transport-calendar/prefs.ts`. */
+  initialPrefs: PlannerPrefs | null;
+  /**
+   * Staat de beschikbaarheid aan bij het openen: de cookie, of een oude link met
+   * `?beschikbaar=1` (toen was het een filter).
+   */
+  initialAvailability: boolean;
 }) {
   const router = useRouter();
   const showToast = useToast();
@@ -238,7 +254,45 @@ export function TransportPlanner({
   const tripDriverPhone = trip?.driverId
     ? (drivers.find((driver) => driver.id === trip.driverId)?.phone ?? null)
     : null;
+  /** "kan", "liever niet" achter elke naam in de keuzelijsten van deze rit. */
+  const tripDriverNotes = trip ? driverNotesFor(trip, drivers, availability, trips) : undefined;
   const openEvent = events.find((entry) => entry.id === openEventId) ?? null;
+
+  /**
+   * De knop Beschikbaarheid in de werkbalk: de sporen van de chauffeurs in de
+   * week, aan of uit in één klik.
+   *
+   * Het was een vinkje achter "Filters", en dat werkte niet: wie een rit wil
+   * verdelen, zoekt geen filter maar wil zien wie kan. Een filter is het ook
+   * niet; er verdwijnt niets. Daarom een knop, en een voorkeur van één persoon
+   * (in de cookie, zie `prefs.ts`) in plaats van een stuk van de URL. De
+   * vensters zelf komen altijd mee met de pagina (de strook "Wie kan er rijden"
+   * eronder gebruikt ze ook), dus omzetten vraagt niets aan de server en is
+   * meteen zichtbaar.
+   *
+   * Komt de pagina opnieuw van de server met een andere beginstand (een oude
+   * link met `?beschikbaar=1`), dan volgt de knop die; zie de React-handleiding
+   * over state aanpassen wanneer een prop verandert.
+   */
+  const [showAvailability, setShowAvailability] = useState(initialAvailability);
+  const [availabilityProp, setAvailabilityProp] = useState(initialAvailability);
+  if (availabilityProp !== initialAvailability) {
+    setAvailabilityProp(initialAvailability);
+    setShowAvailability(initialAvailability);
+  }
+  const toggleAvailability = useCallback(() => {
+    const next = !showAvailability;
+    setShowAvailability(next);
+    updatePlannerPrefs({ availability: next });
+    // Een oude link met `?beschikbaar=1` zou bij het herladen de knop overrulen
+    // (de URL wint van de cookie). Zonder verzoek aan de server: Next volgt
+    // `history.replaceState` zelf.
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('beschikbaar')) {
+      url.searchParams.delete('beschikbaar');
+      window.history.replaceState(null, '', `${url.pathname}${url.search}`);
+    }
+  }, [showAvailability]);
 
   const eventBars: CalendarEventBar[] | undefined = filters.showEvents
     ? events.map((event) => ({
@@ -343,27 +397,49 @@ export function TransportPlanner({
     );
 
   /**
-   * De ritten die op dit moment botsen, en een knop om ze af te gaan.
+   * Wat er nog moet gebeuren, met een knop per soort om het af te gaan: te
+   * beslissen, zonder chauffeur, en de ritten die botsen.
    *
    * Botsen mag sinds kort tijdelijk, en dat is enkel verantwoord zolang je het
    * niet kan vergeten: een rood blok in een week waar je niet naar kijkt, ziet
-   * niemand. Deze teller staat naast de navigatie en loopt bij elke klik naar de
-   * volgende botsende rit, zodat "twee dingen nog rechtzetten" een lijstje is dat
-   * je afwerkt in plaats van een kleur die je moet opmerken.
+   * niemand. Elke teller loopt bij elke klik naar de volgende rit van zijn soort,
+   * zodat "twee dingen nog rechtzetten" een lijstje is dat je afwerkt in plaats
+   * van een kleur die je moet opmerken. De teller voor botsingen stond eerst
+   * alleen, in de werkbalk; zie `WeekSummary` waarom hij daar weg is.
    *
    * Enkel wat in deze weergave zichtbaar is: verder kijken dan het venster zou
    * een teller opleveren die naar iets wijst wat niet op het scherm staat.
+   * "Zonder chauffeur" telt de goedgekeurde ritten; een aanvraag krijgt haar
+   * chauffeur bij het beslissen en staat al bij "te beslissen".
    */
-  const clashing = trips.filter((entry) => entry.conflictsWith.length > 0);
-  const [clashCursor, setClashCursor] = useState(0);
-  const nextClash = useCallback(() => {
-    if (clashing.length === 0) return;
-    const index = clashCursor % clashing.length;
-    setClashCursor(index + 1);
-    setDraft(null);
-    setOpenEventId(null);
-    setOpenId(clashing[index].id);
-  }, [clashCursor, clashing]);
+  const byStart = (a: PlannerTrip, b: PlannerTrip) => a.startAt.localeCompare(b.startAt);
+  const toDecide = trips.filter((entry) => entry.status === 'REQUESTED').sort(byStart);
+  const withoutDriver = trips
+    .filter((entry) => entry.status === 'APPROVED' && !entry.driverId && entry.needsDriver)
+    .sort(byStart);
+  const clashing = trips.filter((entry) => entry.conflictsWith.length > 0).sort(byStart);
+  const [cursor, setCursor] = useState<Record<SummaryKind, number>>({ req: 0, nod: 0, clash: 0 });
+  const step = useCallback(
+    (kind: SummaryKind) => {
+      const list = kind === 'req' ? toDecide : kind === 'nod' ? withoutDriver : clashing;
+      if (list.length === 0) return;
+      const index = cursor[kind] % list.length;
+      setCursor((current) => ({ ...current, [kind]: index + 1 }));
+      const id = list[index].id;
+      // Eerst in beeld en dan openen: het kaartje legt zich naast het blok op de
+      // plek waar het op dat moment staat. Het blok in het rooster als het er
+      // is, anders de pil in de ingeklapte nacht of de balk in de maand.
+      const selector = `[data-trip="${CSS.escape(id)}"]`;
+      const block =
+        document.querySelector<HTMLElement>(`[data-inspector-host="grid"] ${selector}`) ??
+        document.querySelector<HTMLElement>(selector);
+      block?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      setDraft(null);
+      setOpenEventId(null);
+      setOpenId(id);
+    },
+    [clashing, cursor, toDecide, withoutDriver]
+  );
 
   const createRange = useCallback(
     (startAt: Date, endAt: Date) => {
@@ -437,7 +513,46 @@ export function TransportPlanner({
           setOpenId(id);
         }}
         events={eventBars}
-        bands={filters.showAvailability ? availability : undefined}
+        bands={showAvailability ? availability : undefined}
+        bandsAs="tracks"
+        availability={{ on: showAvailability, onToggle: toggleAvailability }}
+        foldNight
+        initialPrefs={initialPrefs}
+        header={
+          // De periode, de navigatie en wat er nog moet gebeuren. In de kop van
+          // de kalender en niet erboven, zodat het in volledig scherm blijft
+          // staan.
+          <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+            <div className="flex flex-wrap items-end gap-x-5 gap-y-2">
+              <div>
+                <h2 className="text-xl font-semibold tracking-tight text-vtk-ink">{heading.title}</h2>
+                <p className="flex flex-wrap items-baseline gap-x-3 text-sm text-vtk-muted">
+                  <span>{heading.subtitle}</span>
+                  <Link
+                    href="/beheer/vervoer"
+                    className="font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
+                  >
+                    Lijst
+                  </Link>
+                  <Link
+                    href="/vervoer/bezetting"
+                    className="font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
+                  >
+                    Bezetting
+                  </Link>
+                </p>
+              </div>
+              <CalendarNav {...nav} />
+            </div>
+            <WeekSummary
+              total={view === 'dag' ? null : trips.length}
+              toDecide={toDecide.length}
+              noDriver={withoutDriver.length}
+              clashes={clashing.length}
+              onStep={step}
+            />
+          </div>
+        }
         selectedEventId={openEventId}
         onSelectEvent={(id) => {
           setDraft(null);
@@ -458,7 +573,6 @@ export function TransportPlanner({
         }
         toolbarExtra={
           <>
-            <CalendarNav {...nav} />
             {/* Ook als knop en niet enkel als sleep: op een touchscreen is
                 verticaal vegen scrollen, dus daar valt er niets in te tekenen. */}
             <button
@@ -478,24 +592,17 @@ export function TransportPlanner({
           </>
         }
         toolbarMenu={
-          <>
-            <TransportFilterBar
-              filters={filters}
-              vehicles={vehicles.map((vehicle) => ({ id: vehicle.id, name: vehicle.name }))}
-              drivers={drivers.map((driver) => ({ id: driver.id, name: driver.name }))}
-              posts={groups}
-              driverColors={driverColors}
-            />
-            {clashing.length > 0 ? (
-              <button
-                type="button"
-                onClick={nextClash}
-                className="rounded-full border border-vtk-danger-line bg-vtk-danger-soft px-3 py-1.5 text-sm font-semibold text-vtk-danger transition hover:bg-vtk-danger-fill"
-              >
-                {clashing.length} {clashing.length === 1 ? 'botsing' : 'botsingen'}
-              </button>
-            ) : null}
-          </>
+          // De beschikbaarheid staat niet meer in dit paneel: ze heeft een eigen
+          // knop in de werkbalk. Daarom gaat ze hier als "uit" mee, anders
+          // schreef elke filterwijziging een oude `beschikbaar=1` terug in de URL.
+          <TransportFilterBar
+            filters={{ ...filters, showAvailability: false }}
+            vehicles={vehicles.map((vehicle) => ({ id: vehicle.id, name: vehicle.name }))}
+            drivers={drivers.map((driver) => ({ id: driver.id, name: driver.name }))}
+            posts={groups}
+            driverColors={driverColors}
+            groups={{ availability: false }}
+          />
         }
       >
         {/* Wat er niet staat, zodat een gefilterde week niet als een lege week
@@ -520,11 +627,15 @@ export function TransportPlanner({
             showDriver
             showConflict
           />
+          {showAvailability ? (
+            <AvailabilityLegend bands={availability} driverColors={driverColors} />
+          ) : null}
           <p className="tg-hint text-xs text-vtk-muted">
             Kleuren stel je in bij Chauffeurs, arceringen bij Instellingen. Een botsing mag
-            tijdelijk: plan gerust in wat mensen vragen en schuif het daarna passend; de teller boven
-            de kalender houdt bij wat er nog dubbel staat. Klik een rit aan om ze te beslissen of aan
-            te passen.
+            tijdelijk: plan gerust in wat mensen vragen en schuif het daarna passend; de tellers boven
+            de kalender houden bij wat er nog dubbel staat of op een chauffeur wacht. Klik een rit aan
+            om ze te beslissen of aan te passen; "Wie kan er rijden?" zet de chauffeurs daar op
+            volgorde van hun beschikbaarheid.
           </p>
         </div>
 
@@ -645,6 +756,22 @@ export function TransportPlanner({
                   waarvoor je een rit openklikt: de eerste vraag bij het plannen
                   is wie hem doet. Bij een aanvraag die nog beslist moet worden
                   staat hier de beslissing zelf, want dat is dan de eerste vraag. */}
+              {/* Wie er kan, op volgorde van zijn beschikbaarheid, met een knop
+                  per chauffeur. Boven de keuzelijsten: dit is de vraag waarmee je
+                  een rit zonder chauffeur openklikt. Niet bij een voertuig dat de
+                  aanvrager zelf meeneemt, en niet bij een afgeronde rit. */}
+              {trip.needsDriver && trip.status !== 'COMPLETED' ? (
+                <DriverFitList
+                  trip={trip}
+                  needsVanDriver={trip.needsVanDriver}
+                  canAssign={trip.status === 'APPROVED'}
+                  drivers={drivers}
+                  windows={availability}
+                  trips={trips}
+                  driverColors={driverColors}
+                />
+              ) : null}
+
               <section>
                 {trip.status === 'REQUESTED' ? (
                   <TransportDecisionForms
@@ -656,6 +783,7 @@ export function TransportPlanner({
                     needsDriver={trip.needsDriver}
                     needsVanDriver={trip.needsVanDriver}
                     sameDayBookings={trip.sameDayBookings}
+                    driverNotes={tripDriverNotes}
                   />
                 ) : (
                   <TransportControls
@@ -671,6 +799,7 @@ export function TransportPlanner({
                     groups={groups}
                     assignedGroupId={trip.assignedGroupId}
                     showComplete={false}
+                    driverNotes={tripDriverNotes}
                   />
                 )}
               </section>

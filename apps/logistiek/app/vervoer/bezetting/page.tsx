@@ -1,4 +1,6 @@
 import Link from '@vtk/ui/link';
+import { cookies } from 'next/headers';
+import { PLANNER_PREFS_COOKIE, parsePlannerPrefs } from '@/components/transport-calendar/prefs';
 import type { UitleenRequesterType } from '@prisma/client';
 import { PageShell } from '@/components/page-shell';
 import { PublicWeek } from './public-week';
@@ -92,7 +94,15 @@ export default async function VervoerBezettingPage({
     aanvrager?: string;
   }>;
 }) {
-  const [query, locale, session] = await Promise.all([searchParams, getLocale(), getSession()]);
+  const [query, locale, session, cookieStore] = await Promise.all([
+    searchParams,
+    getLocale(),
+    getSession(),
+    cookies(),
+  ]);
+  // Dezelfde kijkvoorkeuren als de planning van het team (zoom, wat er in een
+  // blok staat), op de server gelezen zodat de week meteen goed verschijnt.
+  const prefs = parsePlannerPrefs(cookieStore.get(PLANNER_PREFS_COOKIE)?.value);
   const { week } = query;
   // Dezelfde filters als de planning van het team, uit dezelfde queryparameters:
   // een gefilterde week blijft zo een deelbare link, en de terugknop werkt.
@@ -466,6 +476,7 @@ export default async function VervoerBezettingPage({
       ) : (
         <div className="mt-5 grid gap-5">
           <PublicWeek
+            initialPrefs={prefs}
             days={days}
             vehicles={vehicles.map((vehicle) => ({
               id: vehicle.id,
