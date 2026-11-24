@@ -120,9 +120,14 @@ export function paymentsLabel(count: number, nl: boolean): string {
   return nl ? `${count} ${count === 1 ? "betaling" : "betalingen"}` : `${count} ${count === 1 ? "payment" : "payments"}`;
 }
 
-/** Het ingetikte bedrag (`null` = leeg) naast wat de import zag. */
+/**
+ * Het ingetikte bedrag (`null` = leeg) naast wat de import zag. Zag de import
+ * niets en tikte Beheer 0 in, dan klopt het (Beheer, november 2026): het
+ * toestel stond op de kassa, maar niemand betaalde ermee. Een ander bedrag
+ * naast niets blijft "niets in de import": wellicht ontbreekt de export.
+ */
 export function kassaCheck(typedCents: number | null, amount: Pick<KassaImportAmount, "cents" | "count">): KassaCheck {
-  if (amount.count === 0) return { state: "nothing" };
+  if (amount.count === 0) return typedCents === 0 ? { state: "match", importCents: 0 } : { state: "nothing" };
   if (typedCents === null) return { state: "empty", importCents: amount.cents };
   if (typedCents === amount.cents) return { state: "match", importCents: amount.cents };
   return { state: "differs", importCents: amount.cents, typedCents, differenceCents: typedCents - amount.cents };

@@ -14158,7 +14158,11 @@ had.
   bij de kassa's zet elke kassa met een verschil onder elkaar, zodat Beheer na
   het opladen van een kwartaal niet elke kassa moet openen. Wat daar staat,
   past Beheer aan op de kassa zelf, niet in de lijst: een bedrag aanpassen
-  blijft een bewuste stap per kassa.
+  blijft een bewuste stap per kassa. Zag de import niets en tikte Beheer 0
+  in, dan staat de kassa bij "klopt" en niet bij "niets in de import" (Beheer,
+  november 2026): een toestel dat niemand gebruikte, is in orde. Een ander
+  bedrag naast niets blijft een waarschuwing, want dan ontbreekt wellicht de
+  export.
 - **Beheer kiest de code van een kassa, bij het aanvaarden.** Niet de post in
   haar aanvraag. In het rekenblad tikte Beheer per evenement de post, de
   periode en de code in, en het overzicht van de kassa's had geen kolom voor

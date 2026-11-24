@@ -1016,6 +1016,10 @@ describe("de kassacontrole", () => {
 
   it("zet het ingetikte bedrag naast de import, zonder het te wijzigen", () => {
     expect(kassaCheck(null, { cents: 0, count: 0 })).toEqual({ state: "nothing" });
+    // 0 ingetikt en niets in de import: het toestel werd niet gebruikt, dus het klopt.
+    expect(kassaCheck(0, { cents: 0, count: 0 })).toEqual({ state: "match", importCents: 0 });
+    // Een bedrag naast niets: wellicht ontbreekt de export van die dag.
+    expect(kassaCheck(1250, { cents: 0, count: 0 })).toEqual({ state: "nothing" });
     expect(kassaCheck(null, { cents: 51240, count: 132 })).toEqual({ state: "empty", importCents: 51240 });
     expect(kassaCheck(51240, { cents: 51240, count: 132 })).toEqual({ state: "match", importCents: 51240 });
     expect(kassaCheck(49840, { cents: 51240, count: 132 })).toEqual({
@@ -1099,6 +1103,10 @@ describe("de kassacontrole", () => {
       expect(kassaControlState(2000, amount)).toBe("differs");
       expect(kassaControlState(2050, amount)).toBe("match");
       expect(kassaControlState(null, amount)).toBe("empty");
+      // Niets op het toestel en 0 ingetikt: in de lijst bij Klopt, niet bij Niets in de import.
+      const unused = importAmountOf("PAYCONIQ", "Evenementen 2", placed, ["sticker-2"], []);
+      expect(kassaControlState(0, unused)).toBe("match");
+      expect(kassaControlState(null, unused)).toBe("nothing");
     });
 
     it("zegt over welke tijd het telde, op de Brusselse klok", () => {

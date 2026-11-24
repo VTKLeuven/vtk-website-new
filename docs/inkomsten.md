@@ -668,7 +668,9 @@ elke aanvaarde kassa van een werkingsjaar, per toestel een rij.
   anders zeggen.
 - **De standen in de lijst**: verschil, niet afgelezen (de import kent een
   bedrag, het veld is leeg), niets in de import (wellicht ontbreekt de export
-  van die dag), geen kanaal (geen kanaal is dat toestel) en klopt. Standaard
+  van die dag), geen kanaal (geen kanaal is dat toestel) en klopt. Zag de
+  import niets en tikte Beheer 0 in, dan klopt het (`kassaCheck`): het toestel
+  stond op de kassa, maar niemand betaalde ermee. Standaard
   staat de lijst op "verschil"; een rij opent het telformulier van die kassa
   (`#tellen`).
 - Enkel voor wie de kassa's beheert en ook `income.manage` heeft
