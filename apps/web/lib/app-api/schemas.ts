@@ -128,6 +128,13 @@ export const appStudyGoalSchema = z.object({
  */
 const planningId = z.string().min(1).max(255);
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+/** "course:<id>" of "name:<naam>", zoals de sleutels in `subjects`. */
+const planningSubject = z.string().trim().min(1).max(210);
+const planningExamInput = z.object({ subject: planningSubject, date: isoDate, time: hhmm.nullable() });
+const planningTaskInput = z
+  .object({ date: isoDate, subject: planningSubject.nullable(), title: z.string().trim().max(200) })
+  .refine((task) => task.subject !== null || task.title !== "", { message: "Een taak heeft een vak of een titel." });
 
 export const appPlanningOperationSchema = z.discriminatedUnion("op", [
   z.object({ op: z.enum(["done", "hide", "mandatory"]), uid: planningId, value: z.boolean() }),
@@ -149,6 +156,47 @@ export const appPlanningOperationSchema = z.discriminatedUnion("op", [
     }),
   }),
   z.object({ op: z.enum(["addVtkEvent", "removeVtkEvent"]), vtkEventId: z.string().min(1).max(64) }),
+  // De blokkalender. Burgieclan kijkt het vak na ("course:<id>" moet bestaan).
+  z.object({ op: z.literal("addExam"), exam: planningExamInput }),
+  z.object({ op: z.literal("updateExam"), id: planningId, exam: planningExamInput }),
+  z.object({ op: z.literal("deleteExam"), id: planningId }),
+  z.object({ op: z.literal("addTask"), task: planningTaskInput }),
+  z.object({ op: z.literal("updateTask"), id: planningId, task: planningTaskInput }),
+  z.object({ op: z.literal("deleteTask"), id: planningId }),
+  z.object({ op: z.literal("taskDone"), id: planningId, value: z.boolean() }),
+  z.object({ op: z.literal("catchUp"), date: isoDate }),
+  z.object({ op: z.literal("freeDay"), date: isoDate, value: z.boolean() }),
 ]);
 
 export const appPlanningSubscriptionSchema = z.object({ icsUrl: z.string().trim().min(1).max(1000) });
+
+/**
+ * Een gebruiksrapport van de app (`AppUsageReport`). Ruim begrensd: dit is
+ * statistiek, en een rapport dat er net naast zit, wordt liever ingekort dan
+ * geweigerd. Wat niet past, valt weg in `lib/app-api/usage.ts`.
+ */
+const shortText = (max: number) => z.string().trim().max(max);
+export const appUsageReportSchema = z.object({
+  installId: z.string().regex(/^[A-Za-z0-9-]{8,64}$/),
+  platform: z.enum(["ios", "android"]),
+  osVersion: shortText(40).nullable().catch(null),
+  deviceModel: shortText(80).nullable().catch(null),
+  appVersion: shortText(40).nullable().catch(null),
+  runtimeVersion: shortText(60).nullable().catch(null),
+  updateId: shortText(64).nullable().catch(null),
+  channel: shortText(40).nullable().catch(null),
+  expoGo: z.boolean().catch(false),
+  locale: z.enum(["nl", "en"]).catch("nl"),
+  pushEnabled: z.boolean().nullable().catch(null),
+  sessionId: z.string().regex(/^[A-Za-z0-9-]{8,64}$/),
+  sessionStartedAt: z.string().datetime({ offset: true }),
+  activeSeconds: z.number().int().min(0).max(86_400).catch(0),
+  screens: z
+    .array(z.object({ screen: shortText(80).min(1), tab: shortText(20).nullable(), views: z.number().int().min(1).max(10_000) }))
+    .max(200)
+    .catch([]),
+  events: z
+    .array(z.object({ kind: z.string().regex(/^[a-z0-9_:.-]{1,40}$/), at: z.string().datetime({ offset: true }) }))
+    .max(200)
+    .catch([]),
+});

@@ -808,6 +808,9 @@ model User {
 
   appPushDevices          AppPushDevice[]             @relation("AppPushDeviceUser")
   appNotificationPrefs    AppNotificationPreference[] @relation("AppNotificationPrefUser")
+  appInstalls             AppInstall[]                @relation("AppInstallUser")
+  appSessions             AppSession[]                @relation("AppSessionUser")
+  appActions              AppAction[]                 @relation("AppActionUser")
   /// De weergave die iemand koos op een beheerscherm met meer dan één weergave.
   viewPreferences         UserViewPreference[]
   calendarInterests       CalendarEventInterest[]     @relation("CalendarInterestUser")
@@ -8368,6 +8371,101 @@ model AppPushDevice {
 enum AppPushPlatform {
   ios
   android
+}
+
+/// Eén installatie van de VTK-app, voor de statistieken onder Admin › Website ›
+/// App. De sleutel is een willekeurige id die de app bij haar eerste start maakt
+/// (`AppUsageDevice.installId` in lib/app-api/contract.ts), geen toestel-id van
+/// Apple of Google: wie de app opnieuw installeert, is een nieuwe installatie.
+///
+/// Toestel en versie zijn de laatste stand; een update van de app overschrijft
+/// ze. `userId` is wie er het laatst mee ingelogd was, en blijft staan na het
+/// uitloggen, zodat "hoeveel leden hebben de app" niet daalt telkens iemand
+/// uitlogt. Zie docs/app-gebruik.md.
+model AppInstall {
+  id             String          @id
+  platform       AppPushPlatform
+  osVersion      String?
+  deviceModel    String?
+  appVersion     String?
+  runtimeVersion String?
+  /// De EAS Update die draaide bij het laatste rapport; null voor de build zelf.
+  updateId       String?
+  channel        String?
+  expoGo         Boolean         @default(false)
+  locale         String          @default("nl")
+  /// Meldingen toegestaan; null zolang het niet gevraagd is.
+  pushEnabled    Boolean?
+  userId         String?
+  firstSeenAt    DateTime        @default(now()) @db.Timestamptz(3)
+  lastSeenAt     DateTime        @default(now()) @db.Timestamptz(3)
+
+  user     User?          @relation("AppInstallUser", fields: [userId], references: [id], onDelete: SetNull)
+  sessions AppSession[]
+  screens  AppScreenDay[]
+
+  @@index([firstSeenAt])
+  @@index([lastSeenAt])
+  @@index([userId])
+}
+
+/// Eén sessie: gebruik van de app zonder pauze van een halfuur of langer. De id
+/// komt van de app; elk rapport telt de seconden op de voorgrond erbij.
+model AppSession {
+  id            String   @id
+  installId     String
+  /// Ingelogd tijdens deze sessie (het laatste rapport telt).
+  userId        String?
+  startedAt     DateTime @db.Timestamptz(3)
+  lastSeenAt    DateTime @db.Timestamptz(3)
+  activeSeconds Int      @default(0)
+  screenViews   Int      @default(0)
+  appVersion    String?
+
+  install AppInstall @relation(fields: [installId], references: [id], onDelete: Cascade)
+  user    User?      @relation("AppSessionUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([startedAt])
+  @@index([installId, startedAt])
+}
+
+/// Hoe vaak een installatie een scherm opende, per dag in Brussel. Een rij per
+/// dag, installatie en scherm in plaats van een rij per opening: zo blijft de
+/// tabel klein en kan je toch zien hoeveel mensen een scherm gebruiken.
+model AppScreenDay {
+  day       DateTime @db.Date
+  installId String
+  /// Het routepatroon ("evenement/[id]") of een tabblad ("kalender:planning").
+  screen    String
+  /// De tab waarin het scherm stond; leeg voor een modal of een scherm buiten de tabs.
+  tab       String   @default("")
+  views     Int
+
+  install AppInstall @relation(fields: [installId], references: [id], onDelete: Cascade)
+
+  @@id([day, installId, screen, tab])
+  @@index([day])
+}
+
+/// Iets wat iemand in de app deed en waarvan de site wil weten dat het uit de
+/// app kwam: een bestelling bij het Theokot of de cursusdienst, een shift, een
+/// pianoreservatie, een tik op een pushbericht. `refId` wijst naar de rij die
+/// het maakte (een `TheokotOrder`, een `PianoReservation`, ...), zodat de
+/// statistieken app en website naast elkaar kunnen zetten. Een ticket staat hier
+/// niet: dat draagt het zelf, in `TicketOrder.source` = "app".
+model AppAction {
+  id        String   @id @default(cuid())
+  kind      String
+  refId     String?
+  /// Uit de kop `X-VTK-Install`; null bij een app van voor die kop.
+  installId String?
+  userId    String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  user User? @relation("AppActionUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([kind, createdAt])
+  @@index([refId])
 }
 
 // -----------------------------------------------------------------------------

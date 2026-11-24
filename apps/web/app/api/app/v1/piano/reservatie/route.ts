@@ -8,6 +8,7 @@ import {
 } from "@/lib/piano-reservations";
 import { requireSession } from "@/lib/session";
 import { appError, appErrorResponse, appJson, readAppJson } from "@/lib/app-api/respond";
+import { recordAppAction } from "@/lib/app-api/usage";
 
 export const runtime = "nodejs";
 
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
     const { startsAt } = reserveSchema.parse(await readAppJson(request));
 
     const slot = await reservePianoSlot(session.user.id, new Date(startsAt));
+    await recordAppAction(request, "piano_reservation", { userId: session.user.id, force: true });
     return appJson(
       request,
       { startsAt: slot.startsAt.toISOString(), endsAt: slot.endsAt.toISOString() },

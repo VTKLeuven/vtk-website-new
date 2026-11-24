@@ -1706,6 +1706,43 @@ export type AppPlanningVtkEvent = {
   occurrences: AppPlanningOccurrence[];
 };
 
+/**
+ * Een examen in de blokkalender van Burgieclan. `subject` is "course:<id>" voor
+ * een vak uit de catalogus van Burgieclan, of "name:<naam>" voor een vak dat
+ * iemand zelf intypte; dezelfde sleutels als `subjects` in de planning.
+ */
+export type AppPlanningExam = {
+  id: string;
+  subject: string;
+  subjectLabel: string;
+  date: string;
+  /** "HH:MM", of null wanneer er geen uur ingevuld is. */
+  time: string | null;
+};
+
+/** Wat iemand op een dag van de blok wil doen; voorbij en niet afgevinkt = in te halen. */
+export type AppPlanningTask = {
+  id: string;
+  date: string;
+  /** null voor een taak die bij geen vak in het bijzonder hoort. */
+  subject: string | null;
+  subjectLabel: string | null;
+  title: string;
+  done: boolean;
+};
+
+/**
+ * De blokkalender van Burgieclan (het tabblad Blok in de planner): examens,
+ * per dag wat je wil doen, en vrije dagen. Die vult iemand zelf in; er wordt
+ * niets voor hem gepland, en ze werkt ook zonder lessenrooster. De studietimer
+ * van Burgieclan staat er niet bij: in de app is dat Samen blokken.
+ */
+export type AppPlanningBlock = {
+  exams: AppPlanningExam[];
+  tasks: AppPlanningTask[];
+  freeDays: string[];
+};
+
 export type AppPlanning = {
   /**
    * `false` wanneer deze site niet met Burgieclan gekoppeld is (geen
@@ -1733,7 +1770,17 @@ export type AppPlanning = {
   sessions: AppPlanningSession[];
   items: AppPlanningItem[];
   vtkEvents: AppPlanningVtkEvent[];
+  /**
+   * De blokkalender. Optioneel: een server van voor november 2026 stuurt ze
+   * niet mee, en de app toont het tabblad Blok dan leeg.
+   */
+  block?: AppPlanningBlock;
 };
+
+/** Een vak bij een examen of een taak: "course:<id>" of "name:<naam>". */
+export type AppPlanningExamInput = { subject: string; date: string; time: string | null };
+/** `subject` null en een lege titel mag niet; een vak zonder titel wordt de naam van het vak. */
+export type AppPlanningTaskInput = { date: string; subject: string | null; title: string };
 
 /**
  * Eén wijziging aan de planning (`POST /planning/operations`). Dezelfde
@@ -1758,7 +1805,18 @@ export type AppPlanningOperation =
         note: string;
       };
     }
-  | { op: "addVtkEvent" | "removeVtkEvent"; vtkEventId: string };
+  | { op: "addVtkEvent" | "removeVtkEvent"; vtkEventId: string }
+  // De blokkalender (sinds november 2026).
+  | { op: "addExam"; exam: AppPlanningExamInput }
+  | { op: "updateExam"; id: string; exam: AppPlanningExamInput }
+  | { op: "deleteExam"; id: string }
+  | { op: "addTask"; task: AppPlanningTaskInput }
+  | { op: "updateTask"; id: string; task: AppPlanningTaskInput }
+  | { op: "deleteTask"; id: string }
+  | { op: "taskDone"; id: string; value: boolean }
+  /** Zet elke taak die voorbij is en niet afgevinkt, op `date`. */
+  | { op: "catchUp"; date: string }
+  | { op: "freeDay"; date: string; value: boolean };
 
 // -----------------------------------------------------------------------------
 // Beheer: de admin in de app, voor wie er toegang toe heeft
@@ -2206,3 +2264,64 @@ export type AppAlma = {
   dates: string[];
   restaurants: AppAlmaRestaurant[];
 };
+
+// -----------------------------------------------------------------------------
+// Gebruik: hoe de app gebruikt wordt, voor Admin › Website › App
+// -----------------------------------------------------------------------------
+
+/**
+ * Welk toestel en welke versie dit is. De app stuurt het mee met elk rapport;
+ * de site bewaart enkel de laatste stand per installatie.
+ *
+ * `installId` is een willekeurige id die de app bij de eerste start maakt en
+ * bewaart. Geen toestel-id van Apple of Google: een herinstallatie is dus een
+ * nieuwe installatie, en de id zegt buiten deze site niets.
+ */
+export type AppUsageDevice = {
+  installId: string;
+  platform: "ios" | "android";
+  /** "18.1", "15". */
+  osVersion: string | null;
+  /** Enkel op Android bekend ("Pixel 8"); iOS geeft het model niet zonder extra module. */
+  deviceModel: string | null;
+  /** De versie uit app.config.ts ("1.2.0"). */
+  appVersion: string | null;
+  runtimeVersion: string | null;
+  /** De EAS Update die nu draait; null voor wat in de build zelf zat. */
+  updateId: string | null;
+  /** Het kanaal van EAS Update ("preview", "production"). */
+  channel: string | null;
+  /** Draait in Expo Go in plaats van in een eigen build. */
+  expoGo: boolean;
+  locale: AppLocale;
+  /** Heeft de gebruiker meldingen toegestaan? null wanneer dat niet gevraagd is. */
+  pushEnabled: boolean | null;
+};
+
+/**
+ * Wat de app sinds het vorige rapport deed (`POST /api/app/v1/gebruik`). De app
+ * stuurt er een bij de start, wanneer ze naar de achtergrond gaat en om de
+ * minuut zolang er iets te melden is. Lukt het niet, dan probeert ze het met het
+ * volgende rapport opnieuw; er gaat niets naar schijf.
+ *
+ * Een sessie is een stuk gebruik zonder pauze van een halfuur of langer. Ze
+ * begint bij een koude start of wanneer de app na zo'n pauze terug op de
+ * voorgrond komt.
+ */
+export type AppUsageReport = AppUsageDevice & {
+  /** Willekeurig, gemaakt door de app aan het begin van de sessie. */
+  sessionId: string;
+  /** Wanneer de sessie begon (ISO). */
+  sessionStartedAt: string;
+  /** Seconden op de voorgrond sinds het vorige rapport. */
+  activeSeconds: number;
+  /**
+   * Schermen die geopend werden, per routepatroon ("evenement/[id]",
+   * "kalender:planning"), met hoe vaak. `tab` is de tab waarin het scherm stond.
+   */
+  screens: { screen: string; tab: string | null; views: number }[];
+  /** Losse gebeurtenissen in de app zelf, zoals "push_open". */
+  events: { kind: string; at: string }[];
+};
+
+export type AppUsageResult = { ok: true };

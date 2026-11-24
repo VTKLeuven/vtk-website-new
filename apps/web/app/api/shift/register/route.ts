@@ -12,6 +12,7 @@ import { praesidiumYears } from '@/lib/shift/voucherEligibility';
 import { canBeReplaceable, canReplace, pickReplaced, shiftReplacedMail } from '@/lib/shift/replace';
 import { sendMail } from '@/lib/email';
 import { preferredEmail } from '@/lib/brevo/contacts';
+import { recordAppAction } from '@/lib/app-api/usage';
 
 /** Binnen dit venster voor de start kan een user zichzelf niet meer uitschrijven. */
 const UNREGISTER_LOCK_MS = 24 * 60 * 60 * 1000;
@@ -191,6 +192,9 @@ export async function POST(request: Request) {
   if (registration.replacedUserId) {
     await mailReplacedParticipant(registration.replacedUserId, registration.shift);
   }
+
+  // De site en de app delen deze route; enkel een aanvraag van de app telt.
+  await recordAppAction(request, 'shift_register', { refId: `${id}:${session.user.id}`, userId: session.user.id });
 
   return NextResponse.json({ success: true }, { status: 201 });
 }

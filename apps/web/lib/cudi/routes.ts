@@ -19,6 +19,7 @@ import { serviceStatus } from "@/lib/app-api/serviceStatus";
 import { getCursusdienstHours } from "@/lib/cursusdienstHours";
 import { requireSession } from "@/lib/session";
 import { CudiError, CudiUnreachableError, cudiConfig, cudiRequest, type CudiConfig } from "./client";
+import { recordAppAction } from "@/lib/app-api/usage";
 
 /**
  * De cursusdienst in de app (`/api/app/v1/cudi/*`). De site beslist hier niets:
@@ -151,7 +152,10 @@ export function placeOrderRoute(request: Request): Promise<Response> {
     request,
     async (config, userId, locale) => {
       const body = orderInput.parse(await readAppJson(request));
-      return cudiRequest<AppCudiOrderResult>(config, userId, "POST", "orders", { body, locale });
+      const result = await cudiRequest<AppCudiOrderResult>(config, userId, "POST", "orders", { body, locale });
+      // Deze route is enkel voor de app: elke geplaatste reservatie komt uit de app.
+      if (result.ok) await recordAppAction(request, "cudi_order", { refId: result.orderId, userId, force: true });
+      return result;
     },
     () => null,
   );

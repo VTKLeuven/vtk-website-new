@@ -8,6 +8,7 @@ import {
 } from "@/lib/app-api/schemas";
 import { appErrorResponse, appJson, readAppJson } from "@/lib/app-api/respond";
 import { orderErrorResponse } from "@/lib/app-api/theokotErrors";
+import { recordAppAction } from "@/lib/app-api/usage";
 
 export const runtime = "nodejs";
 
@@ -28,6 +29,8 @@ export async function POST(request: Request) {
     const input = appTheokotOrderSchema.parse(await readAppJson(request));
 
     const order = await placeOrder(session.user.id, input.sessionId, input.lines);
+    // Deze route is enkel voor de app; ook een app zonder de kop telt dus mee.
+    await recordAppAction(request, "theokot_order", { refId: order.orderId, userId: session.user.id, force: true });
     return appJson(request, order, 201);
   } catch (error) {
     return orderErrorResponse(request, error) ?? appErrorResponse(request, error);

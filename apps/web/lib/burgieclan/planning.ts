@@ -3,6 +3,7 @@ import "server-only";
 import type {
   AppLocale,
   AppPlanning,
+  AppPlanningBlock,
   AppPlanningMark,
   AppPlanningOccurrence,
   AppPlanningOperation,
@@ -49,6 +50,30 @@ function emptyPlanning(available: boolean, config: BurgieclanConfig | null): App
     sessions: [],
     items: [],
     vtkEvents: [],
+    block: { exams: [], tasks: [], freeDays: [] },
+  };
+}
+
+/** De blokkalender: examens, taken en vrije dagen, zoals Burgieclan ze bewaart. */
+function toBlock(raw: unknown): AppPlanningBlock {
+  const block = typeof raw === "object" && raw !== null ? (raw as Raw) : {};
+  return {
+    exams: list(block.exams).map((e) => ({
+      id: str(e.id),
+      subject: str(e.subject),
+      subjectLabel: str(e.subjectLabel),
+      date: str(e.date),
+      time: strOrNull(e.time),
+    })),
+    tasks: list(block.tasks).map((t) => ({
+      id: str(t.id),
+      date: str(t.date),
+      subject: strOrNull(t.subject),
+      subjectLabel: strOrNull(t.subjectLabel),
+      title: str(t.title),
+      done: t.done === true,
+    })),
+    freeDays: Array.isArray(block.freeDays) ? block.freeDays.filter((d): d is string => typeof d === "string") : [],
   };
 }
 
@@ -103,6 +128,7 @@ export function toAppPlanning(raw: Raw, config: BurgieclanConfig, locale: AppLoc
       note: str(i.note),
       done: typeof i.done === "string" && i.done !== "",
     })),
+    block: toBlock(raw.block),
     vtkEvents: list(raw.vtkEvents).map((v) => ({
       id: str(v.id),
       title: (locale === "en" ? strOrNull(v.titleEn) : null) ?? str(v.titleNl),
@@ -215,7 +241,7 @@ export function planningErrorResponse(request: Request, error: unknown): Respons
     default:
       if (error.status >= 400 && error.status < 500) {
         return appError(request, APP_ERROR.invalidRequest, 400, {
-          message: error.detail ?? "Burgieclan aanvaardde die wijziging niet.",
+          message: dutchDetail(error.detail) ?? "Burgieclan aanvaardde die wijziging niet.",
         });
       }
       console.error("[planning] Burgieclan gaf een fout", error.status, error.detail);
@@ -223,4 +249,19 @@ export function planningErrorResponse(request: Request, error: unknown): Respons
         message: "Burgieclan gaf een fout. Probeer het straks opnieuw.",
       });
   }
+}
+
+/**
+ * De meldingen van de blokkalender die een lid zelf kan oplossen, in het
+ * Nederlands. Al de rest gaat zoals Burgieclan het zegt.
+ */
+function dutchDetail(detail: string | null | undefined): string | null {
+  if (!detail) return null;
+  if (detail === "Unknown course.") return "Dat vak kent Burgieclan niet. Kies het uit de lijst of typ zelf een naam.";
+  if (detail === "An exam needs a course.") return "Kies een vak voor het examen.";
+  const exams = /at most (\d+) exams/.exec(detail);
+  if (exams) return `Je kan hoogstens ${exams[1]} examens invullen.`;
+  const tasks = /at most (\d+) tasks/.exec(detail);
+  if (tasks) return `Je kan hoogstens ${tasks[1]} taken invullen.`;
+  return detail;
 }

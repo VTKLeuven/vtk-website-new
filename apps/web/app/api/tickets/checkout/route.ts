@@ -9,12 +9,20 @@ import {
 } from "@/lib/ticketing/http";
 import { createTicketCheckout, TicketCheckoutError } from "@/lib/ticketing/orders";
 import { isTransientDatabaseError } from "@/lib/ticketing/transactions";
+import { isAppRequest } from "@/lib/app-api/usage";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
-    const input = await readLimitedJson(request, 256 * 1024);
+    const raw = await readLimitedJson(request, 256 * 1024);
+    // Een bestelling uit de VTK-app heeft als herkomst altijd "app", wat de app
+    // zelf ook meestuurt: zo telt ze in de ticketstatistieken en op Admin ›
+    // Website › App als app-bestelling, ook bij een app die `source` nog niet kent.
+    const input =
+      isAppRequest(request) && raw !== null && typeof raw === "object" && !Array.isArray(raw)
+        ? { ...(raw as Record<string, unknown>), source: "app", sourceCampaign: null }
+        : raw;
     const fingerprint = createRequestFingerprint(trustedClientIp(request));
     const checkout = await createTicketCheckout(input, fingerprint);
     const response = NextResponse.json(
