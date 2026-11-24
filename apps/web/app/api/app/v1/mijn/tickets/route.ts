@@ -38,6 +38,7 @@ export async function GET(request: Request) {
         title: order.event.title,
         startsAt: order.event.startsAt.toISOString(),
         location: order.event.location,
+        imageUrl: order.event.poster ? absoluteUrl(request, order.event.poster.src) : null,
       },
       tickets: order.tickets.map((ticket) => {
         const sign = (path: string) => signedTicketPath(path, ticket.id, ticket.credentialVersion);

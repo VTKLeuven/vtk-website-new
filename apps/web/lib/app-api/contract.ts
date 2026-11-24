@@ -650,6 +650,11 @@ export type AppMyOrder = {
     title: string;
     startsAt: string;
     location: string | null;
+    /**
+     * De banner van het event, dezelfde als in de shop; `null` zonder. Optioneel
+     * voor een oudere server: de app toont dan het ticket zonder banner.
+     */
+    imageUrl?: string | null;
   };
   tickets: AppMyTicket[];
 };
