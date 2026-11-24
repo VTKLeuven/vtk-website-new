@@ -94,13 +94,14 @@ export async function burgieclanIdentity(userId: string, config: BurgieclanConfi
  * Eén aanvraag naar Burgieclan namens `userId`. Geeft de JSON terug, of `null`
  * bij een leeg antwoord (204 na het ontkoppelen).
  *
- * Enkel paden onder `/api/study_planner`: Burgieclan aanvaardt de handtekening
- * nergens anders, zodat een gelekt geheim niet de hele site openzet.
+ * Enkel paden onder `/api/study_planner` en `/api/vtk_app` (vakken, documenten
+ * en favoriete vakken voor de app): Burgieclan aanvaardt de handtekening nergens
+ * anders, zodat een gelekt geheim niet de hele site openzet.
  */
 export async function burgieclanRequest<T>(
   config: BurgieclanConfig,
   userId: string,
-  method: "GET" | "POST" | "DELETE",
+  method: "GET" | "POST" | "PUT" | "DELETE",
   path: string,
   body?: unknown,
 ): Promise<T | null> {
@@ -114,7 +115,8 @@ export async function burgieclanRequest<T>(
         // API Platform spreekt daar enkel JSON-LD; de velden zelf zijn gewone JSON.
         Accept: "application/ld+json",
         ...(body === undefined ? {} : { "Content-Type": "application/ld+json" }),
-        ...burgieclanAuthHeaders({ secret: config.secret, method, path, body: raw, identity }),
+        // Symfony tekent het pad zonder querystring na (`getPathInfo()`), dus wij ook.
+        ...burgieclanAuthHeaders({ secret: config.secret, method, path: path.split("?")[0], body: raw, identity }),
       },
       body: body === undefined ? undefined : raw,
       cache: "no-store",

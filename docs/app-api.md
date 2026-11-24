@@ -588,3 +588,79 @@ bekende gevallen (onbekende link, te snel, onbekend evenement) een Nederlandse
 melding van. Een 401 van Burgieclan is een configuratiefout (het geheim klopt
 niet) en komt als 502 naar buiten, met de reden in de logs.
 
+## Studies: Burgieclan en de cursusdienst
+
+Onder Studies in de app staan, naast samen blokken, de documenten van je vakken
+(Burgieclan) en de cursusdienst (cudi.vtk.be). Net als de planning bewaart deze
+site er niets van: elke route geeft de aanvraag ondertekend door en zet het
+antwoord om naar het contract. Zonder koppeling op deze server antwoorden de
+lijstroutes met `available: false`, de andere met 404; de app zegt dan dat de
+koppeling er niet is. `bootstrap.abilities.burgieclan` en `.cudi` zeggen het
+vooraf.
+
+### `GET /api/app/v1/burgieclan/vakken`, `/vakken/zoeken?q=`, `/vakken/[id]`
+
+Je vakken op Burgieclan ("Mijn vakken" daar, `AppBurgieclanCourses`), zoeken op
+naam of code (minstens twee tekens), en één vak met zijn documenten
+(`AppBurgieclanCourseDetail`): goedgekeurde voor iedereen, een eigen document
+dat nog op moderatie wacht enkel voor wie het oplaadde, zoals op Burgieclan.
+
+### `PUT`/`DELETE /api/app/v1/burgieclan/vakken/[id]/favoriet` en `GET /burgieclan/documenten/[id]/bestand`
+
+Een vak bij je vakken zetten of eruit halen, en een link naar het bestand van
+een document, tien minuten geldig en zonder cookie te openen. Burgieclan beslist
+wie wat mag zien (`DocumentFileVoter`). Zie `burgieclan-planning.md`, "Vakken en
+documenten in de app".
+
+### `GET /api/app/v1/cudi` en `/cudi/catalogus`
+
+`AppCudiOverview`: je bestellingen bij de cursusdienst met dezelfde status als
+"Mijn bestellingen" op cudi, of er nu besteld kan worden (en hoe er betaald
+wordt), en de uren van deze week (`AppServiceStatus`, zoals op Home).
+`AppCudiCatalog`: de cursussen van de vakken op je cudi-profiel plus het
+algemene materiaal, met je prijs, de voorraad zoals cudi die toont, en wat je dit
+jaar al met een artikel deed. `gate` zegt wanneer er eerst iets op cudi zelf moet
+(de voorwaarden aanvaarden); de app opent die pagina dan.
+
+### `POST /api/app/v1/cudi/bestellen`, `/cudi/annuleren`, `/cudi/betalen`
+
+Reserveren (`AppCudiOrderInput`), één regel annuleren (`{ orderItemId }`) en een
+bestelling alsnog online betalen (`{ orderId }`). Cudi doet het werk met
+**dezelfde functies als zijn webshop** (`placeOrderForUser`,
+`cancelStudentOrderItemForUser`, `createShopCheckoutForOrder`). Een verwachte
+weigering (niet bij je vakken, uitverkocht, buiten het semester) komt terug als
+`{ ok: false, code, message, articleIds }` met status 200; de app haalt die
+artikels uit het mandje. Moet er online betaald worden, dan geeft `bestellen`
+meteen `checkoutUrl` mee. Zie `cursusdienst-integratie.md`, "7. De VTK-app".
+
+## Beheer en transport
+
+### `GET /api/app/v1/beheer` en `POST /beheer/deur`
+
+De admin voor de app (`AppAdminDashboard`), voor wie de link "Beheer" op de site
+ook krijgt (een recht of superadmin, `abilities.admin`): de tegels van het
+dashboard met hun pictogram als SVG-pad en hun chipkleur, of je de deur op
+afstand mag openen, de resultaten die je post nog naar het BO moet brengen, en
+de zijbalk van /admin als groepen met absolute links. De zijbalk komt uit
+`visibleAdminNav` (`lib/admin-nav-visible.ts`), dezelfde functie als de layout
+van /admin, dus de app toont nooit een onderdeel dat de site verbergt. Een
+onderdeel opent de app als pagina in een WebView; die zet `data-vtk-app` op
+`<html>`, en `vtk-site-chrome.css` en `vtk-admin.css` laten dan de kop, de voet
+en de zijbalk weg.
+
+`/beheer/deur` is `openDoorRemoteAction` als route: `door.remoteOpen`, een regel
+in het deurlogboek, en bij een fout de code van de site (`not_configured`,
+`unreachable`, `pi_error`) als `error`.
+
+### `GET /api/app/v1/vervoer?week=YYYY-MM-DD`
+
+De transportplanning van Logistiek voor de week waarin die dag valt
+(`AppTransportWeek`), standaard deze week. Enkel voor het praesidium,
+werkgroepen, jaarwerkingen, `logistiek.manage` en `logistiek.helpers`
+(`canSeeTransport`, dezelfde regel als `canSeeTripDetails` in apps/logistiek);
+een gewone student krijgt 403 en `abilities.transport` is voor hem onwaar. De
+projectie is die van `transportWeekForPraesidium`: geen telefoonnummers, geen
+ophaaladres, geen nota's. apps/web kan de code van apps/logistiek niet
+importeren, dus de query staat opnieuw in `lib/app-api/transport.ts`; houd ze
+gelijk.
+

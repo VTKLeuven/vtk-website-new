@@ -1,6 +1,9 @@
 import "server-only";
 
 import { burgieclanConfig } from "@/lib/burgieclan/client";
+import { cudiConfig } from "@/lib/cudi/client";
+import { canUseAdmin } from "./admin";
+import { canSeeTransport } from "./transport";
 import { getCurrentSession } from "@/lib/session";
 import { hasScannableTicketEvent } from "@/lib/ticketing/authorization";
 import type { AppAbilities } from "./contract";
@@ -34,5 +37,9 @@ export async function appAbilities(): Promise<AppAbilities | null> {
     acceptVouchers: has("shift.rewardRedeem"),
     theokotPickup: has("theokot.pickup"),
     planning: burgieclanConfig() !== null,
+    admin: canUseAdmin(session),
+    transport: canSeeTransport(session),
+    cudi: cudiConfig() !== null,
+    burgieclan: burgieclanConfig() !== null,
   };
 }

@@ -766,3 +766,15 @@ body:has(.vtk-preview-bar) .vtk-cookie-consent-positioner {
     padding: 12px 0;
   }
 }
+
+/*
+ * In de VTK-app. De app opent de admin in een WebView en zet vóór de pagina
+ * laadt `data-vtk-app` op <html> (zie `AdminWebView` in vtk-app). De app tekent
+ * zelf de kop en de navigatie, dus de site laat de hare weg: een tweede menu en
+ * een footer onderaan een telefoonscherm maken van een scherm een website.
+ */
+html[data-vtk-app] .vtk-site-header,
+html[data-vtk-app] .vtk-site-footer,
+html[data-vtk-app] .vtk-skip-link {
+  display: none !important;
+}

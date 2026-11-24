@@ -89,6 +89,27 @@ Zie `app-api.md`, "Planning". Kort: `GET`/`DELETE /planning`, `POST
 `/planning/feed-token`. Elke aanvraag antwoordt met de hele `AppPlanning`, net
 als bij Burgieclan, dus de app vraagt nooit twee keer.
 
+## Vakken en documenten in de app
+
+Sinds november 2026 toont de app onder Studies › Burgieclan ook je vakken en hun
+documenten. Hetzelfde stramien als de planning: de site spreekt ondertekend
+namens het lid (`lib/burgieclan/courses.ts`), Burgieclan antwoordt vanuit
+`VtkAppController` (`/api/vtk_app/*`). De routes in de app staan in `app-api.md`,
+"Studies".
+
+**Waarom een eigen controller en niet de API Platform-routes.** De handtekening
+mocht tot dan enkel op `/api/study_planner`, met als reden dat een gelekt geheim
+de rest van de API (uploaden, stemmen, moderatie) niet in iemands naam mag
+openen. Dat blijft zo: `VtkServiceAuthenticator` aanvaardt de handtekening nu ook
+op `/api/vtk_app/`, en daar staat bewust enkel wat de app toont: vakken lezen en
+zoeken, de documenten van een vak (goedgekeurd, plus je eigen nog niet
+goedgekeurde), een kortlevende link naar een bestand (`DocumentFileVoter`), en
+een vak als favoriet zetten of weghalen. De API Platform-routes blijven dicht
+voor de handtekening (`VtkAppTest::testRestOfTheApiStaysClosed`).
+
+**De querystring wordt niet getekend.** Symfony tekent `getPathInfo()` na, zonder
+`?q=...`; `burgieclanRequest` tekent daarom enkel het pad.
+
 ## Peilingen
 
 Ook de POC-peilingen staan op Burgieclan, als tab in de zijbalk die er enkel is

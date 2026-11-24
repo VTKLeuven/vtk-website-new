@@ -229,6 +229,8 @@ Rooktest:
 | `POST /api/integrations/cudi/shifts` | main | `Bearer CUDI_SYNC_SECRET` | Shift-definities spiegelen (upsert + prune) |
 | `POST /api/integrations/main/registrations` | cudi | `Bearer MAIN_SITE_SHIFT_SYNC_SECRET` | Roster schrijven (`register`/`unregister`/`reconcile`) |
 | `POST /api/integrations/cudi/sync-registrations` | main | `Bearer CUDI_SYNC_SECRET` | Vangnet: volledige roster-reconcile (cron) |
+| `GET /api/integrations/vtk-app/overview`, `/catalog` | cudi | HMAC `VTK_APP_SECRET` | De VTK-app: bestellingen en catalogus van een student (zie 7) |
+| `POST /api/integrations/vtk-app/orders`, `/orders/cancel`, `/orders/checkout` | cudi | HMAC `VTK_APP_SECRET` | De VTK-app: reserveren, annuleren, online betalen (zie 7) |
 
 ### Environment variabelen
 
@@ -239,6 +241,9 @@ Rooktest:
 | `MAIN_SITE_SHIFT_SYNC_SECRET` | cudi | (geen) | Zelfde gedeelde secret; autoriseert uitgaande shift-mirror en verifieert inkomende roster-writes. Leeg = brug uit |
 | `MAIN_SITE_ORIGIN` | cudi | `https://vtk.be` | Basis-URL van de main site (shift-mirror) |
 | `MAIN_SITE_ASSOCIATION_SLUG` | cudi | `vtk` | Welke kring naar de main site spiegelt |
+| `CUDI_APP_SECRET` | main | (geen) | De VTK-app: tekent aanvragen namens een student, minstens 32 tekens. Leeg = cursusdienst in de app uit |
+| `CUDI_ASSOCIATION` | main | `vtk` | De kring op cudi waarvoor de app reserveert |
+| `VTK_APP_SECRET` | cudi | (geen) | Zelfde geheim als `CUDI_APP_SECRET`. Leeg = elke aanvraag van de app krijgt 401 |
 
 ### Belangrijke bestanden
 
@@ -261,3 +266,56 @@ Rooktest:
 | Inschrijven faalt met "Could not sync with cursusdienst" | cudi onbereikbaar, secret-mismatch (401), of de shift bestaat niet (meer) op cudi (stale mirror; wacht op de volgende reconcile of triggert stap 4). |
 | Cudi-roster loopt achter | Gemiste per-actie-push; trigger de reconcile (stap 4). |
 | Openingsuren tonen "momenteel niet beschikbaar" | cudi onbereikbaar én geen gecachte waarde (bv. koude cache vlak na een deploy). Herstelt zich zodra cudi weer antwoordt. |
+
+---
+
+## 7. De VTK-app
+
+Sinds november 2026 staat de cursusdienst als native scherm in de VTK-app
+(Studies › Cursusdienst): de uren van deze week, wat er voor je klaarligt, de
+cursussen van je vakken, reserveren, annuleren en online betalen. De app praat
+enkel met vtk.be; vtk.be spreekt namens de student met cudi.
+
+```
+app ──cookie──▶ vtk.be /api/app/v1/cudi/*          (lib/cudi/ op de main site)
+                  │  ondertekend: X-Vtk-User / -Timestamp / -Signature
+                  ▼
+               cudi /api/integrations/vtk-app/*     (lib/vtk-app/ bij cudi)
+```
+
+**De handtekening** is die van de Burgieclan-koppeling: HMAC-SHA256 over
+`METHODE\nPAD\nTIJDSTIP\nGEBRUIKER\nBODY`, vijf minuten geldig, het pad zonder
+querystring. `GEBRUIKER` is base64url-JSON met `sub`, `email`, `name`,
+`firstName`, `lastName` en `rNumber`. Een vaste testvector staat aan beide
+kanten (`test/cudiApp.test.ts` hier, `tests/unit/vtk-app-signature.test.ts` bij
+cudi). **Een eigen geheim** (`CUDI_APP_SECRET` = `VTK_APP_SECRET`) en niet dat
+van de shiftbrug: dit laat bestellen namens een student toe.
+
+**De student** zoekt cudi op r-nummer, dan op e-mail (`findVtkMemberUserId` in
+`lib/vtk-member-provisioning.ts`). **Lezen maakt niets aan**: een lid zonder
+account bij cudi, of dat de voorwaarden nog niet aanvaardde, krijgt een `gate`.
+De app opent dan `/{kring}/onboarding` op cudi in een WebView; daar logt het lid
+in met zijn VTK-account (de SSO maakt het account, zoals altijd) en aanvaardt het
+de voorwaarden. Tot dan antwoordt reserveren 409. Een tab openen levert dus geen
+account en geen privacymail op; de shiftbrug provisioneert wel stil, want daar
+schreef het lid zich effectief in. Wie wel een account heeft maar geen rol bij de
+kring, krijgt `STUDENT`, zoals na een SSO-login.
+
+**Dezelfde regels als de webshop.** Reserveren roept `placeOrderForUser`
+(`lib/student-order-place.ts`, daarvoor uit `app/actions/order.ts` gehaald;
+een geëxporteerde functie met een `userId` in een `"use server"`-bestand zou
+zelf een aanroepbare action worden), annuleren `cancelStudentOrderItemForUser`
+en betalen `createShopCheckoutForOrder`. Zonder cudi-sessie beslist
+`viewerMayShowAllSubjects` zoals voor een student, dus de app is nooit soepeler
+dan de shop. Enkel de catalogus is apart samengesteld (`loadCatalog` in
+`lib/vtk-app/service.ts`), omdat de shoppagina dat in haar JSX doet; die lijst
+toont enkel, en elk artikel wordt bij het reserveren opnieuw getoetst.
+
+**Bewust niet in de app:** het vinkje "ik wil lid worden", "alle vakken tonen",
+zoeken in het hele aanbod, tijdsloten, tweedehands en printen. De app linkt
+ernaar.
+
+**Opzetten:** genereer een geheim (`openssl rand -base64 32`), zet het als
+`CUDI_APP_SECRET` op vtk.be en als `VTK_APP_SECRET` op cudi, en herstart beide.
+Lokaal: `CURSUSDIENST_ORIGIN=http://localhost:3001` op vtk.be.
+

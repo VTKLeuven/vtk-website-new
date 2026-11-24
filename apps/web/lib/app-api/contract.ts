@@ -1403,6 +1403,22 @@ export type AppAbilities = {
    * en dan toont de app het tabblad niet.
    */
   planning?: boolean;
+  /**
+   * De admin: het dashboard en de onderdelen die deze persoon in het beheer
+   * ziet. Enkel voor wie er minstens één onderdeel van mag openen; dat is
+   * dezelfde regel als de zijbalk op /admin. Optioneel voor een oudere server.
+   */
+  admin?: boolean;
+  /**
+   * De transportplanning van Logistiek, met wat elke rit is. Dezelfde laag als
+   * op logistiek.vtk.be/vervoer/bezetting: het praesidium, werkgroepen,
+   * jaarwerkingen en het team. Een gewone student ziet ze niet.
+   */
+  transport?: boolean;
+  /** Deze server is gekoppeld met cudi, dus de cursusdienst onder Studies werkt. */
+  cudi?: boolean;
+  /** Deze server is gekoppeld met Burgieclan, dus vakken en documenten onder Studies werken. */
+  burgieclan?: boolean;
 };
 
 // -----------------------------------------------------------------------------
@@ -1738,3 +1754,292 @@ export type AppPlanningOperation =
       };
     }
   | { op: "addVtkEvent" | "removeVtkEvent"; vtkEventId: string };
+
+// -----------------------------------------------------------------------------
+// Beheer: de admin in de app, voor wie er toegang toe heeft
+// -----------------------------------------------------------------------------
+
+/**
+ * Een onderdeel van de admin. `url` is absoluut: de app opent het in een
+ * WebView zonder de kop en de voet van de site (`html[data-vtk-app]`), met de
+ * sessie die ze al heeft. Een extern adres (`external`) opent in de browser.
+ */
+export type AppAdminLink = {
+  key: string;
+  label: string;
+  url: string;
+  external: boolean;
+};
+
+/** Dezelfde groepen en volgorde als de zijbalk op /admin, gefilterd op jouw rechten. */
+export type AppAdminSection = {
+  key: string;
+  /** `null` voor een los item zonder groep. */
+  label: string | null;
+  links: AppAdminLink[];
+};
+
+/** Een tegel van het dashboard: gedeeld, van je post, of je eigen. */
+export type AppAdminTile = {
+  id: string;
+  label: string;
+  url: string;
+  external: boolean;
+  /**
+   * Het pictogram als SVG-pad (24x24, lijn van 1.6), zoals het dashboard het
+   * tekent; de set is eigen aan de site en zit niet in lucide.
+   */
+  iconPath: string;
+  /** De chip van de tegel, in de kleur die de maker koos uit het palet van de site. */
+  chip: { background: string; foreground: string };
+  /** Een geüpload logo in plaats van het pictogram, of null. */
+  imageUrl: string | null;
+  /** "Voor iedereen", de naam van je post, of "Van jou". */
+  section: string;
+};
+
+/** Een resultaat dat je post nog naar het bestuursorgaan moet brengen. */
+export type AppAdminBoDue = {
+  post: string;
+  activity: string;
+  /** "budget op BO 3 · 12 dagen open", zoals op het dashboard. */
+  detail: string;
+  /** Het rekenblad in Drive, of Mijn budgetten. */
+  url: string;
+};
+
+export type AppAdminDashboard = {
+  /** De admin zelf, voor "Openen op de site". */
+  adminUrl: string;
+  /** Deze persoon mag de voordeur op afstand openen (`door.remoteOpen`). */
+  canOpenDoor: boolean;
+  tiles: AppAdminTile[];
+  boDue: AppAdminBoDue[];
+  sections: AppAdminSection[];
+};
+
+/** Waarom de deur niet openging; dezelfde codes als `openDoorRemoteAction`. */
+export type AppDoorErrorCode = "not_configured" | "unreachable" | "pi_error";
+
+// -----------------------------------------------------------------------------
+// Transportplanning van Logistiek
+// -----------------------------------------------------------------------------
+
+export type AppTransportVehicle = {
+  id: string;
+  name: string;
+  /** De bestelwagen vraagt een chauffeur met dat rijbewijs; de bakfiets geen chauffeur. */
+  needsDriver: boolean;
+};
+
+export type AppTransportStatus = "REQUESTED" | "APPROVED" | "COMPLETED";
+
+/**
+ * Eén rit, met wat een post erover hoort te weten. **Geen** telefoonnummers,
+ * ophaaladres of nota's: die zijn van een persoon of het werkblad van Logistiek
+ * (zie `transportWeekForPraesidium` in apps/logistiek).
+ */
+export type AppTransportTrip = {
+  id: string;
+  vehicleId: string;
+  start: string;
+  end: string;
+  status: AppTransportStatus;
+  /** "HEEN" of "TERUG" bij een rit in twee delen, anders null. */
+  leg: "HEEN" | "TERUG" | null;
+  /** De naam van het evenement, of het doel als er geen evenement is. */
+  title: string;
+  purpose: string | null;
+  cargo: string | null;
+  destination: string | null;
+  /** De post die de rit aanvroeg, of de naam van een externe aanvrager. */
+  requester: string | null;
+  /** Wie de aanvraag indiende. */
+  submittedBy: string | null;
+  driver: string | null;
+  helpers: string[];
+  /** Deze rit is van jou of van je post. */
+  mine: boolean;
+};
+
+export type AppTransportWeek = {
+  /** Maandag van de week, "YYYY-MM-DD" in Brussel. */
+  weekStart: string;
+  vehicles: AppTransportVehicle[];
+  trips: AppTransportTrip[];
+  /** logistiek.vtk.be/vervoer, om een rit aan te vragen of te wijzigen. */
+  logistiekUrl: string;
+};
+
+// -----------------------------------------------------------------------------
+// Burgieclan: je vakken en hun documenten
+// -----------------------------------------------------------------------------
+
+export type AppBurgieclanCourse = {
+  id: number;
+  code: string;
+  name: string;
+  credits: number | null;
+  /** Zoals Burgieclan ze kent, bv. ["Semester 1"]. */
+  semesters: string[];
+  professors: string[];
+  documentCount: number;
+  favorite: boolean;
+  /** De vakpagina op Burgieclan, om iets op te laden of te bespreken. */
+  url: string;
+};
+
+export type AppBurgieclanDocument = {
+  id: number;
+  name: string;
+  category: string;
+  /** Academiejaar, bv. "2024 - 2025". */
+  year: string | null;
+  author: string | null;
+  fileSize: number | null;
+  hasFile: boolean;
+  /** Nog niet goedgekeurd; enkel zichtbaar omdat het van jou is. */
+  underReview: boolean;
+  createdAt: string;
+};
+
+export type AppBurgieclanCourses = {
+  /** `false` wanneer deze site niet met Burgieclan gekoppeld is. */
+  available: boolean;
+  courses: AppBurgieclanCourse[];
+  /** Burgieclan zelf. */
+  burgieclanUrl: string;
+};
+
+export type AppBurgieclanCourseDetail = {
+  course: AppBurgieclanCourse;
+  documents: AppBurgieclanDocument[];
+};
+
+/** Een link naar het bestand, tien minuten geldig. */
+export type AppBurgieclanFile = { url: string; expiresInMinutes: number };
+
+// -----------------------------------------------------------------------------
+// Cursusdienst (cudi.vtk.be): reserveren en je bestellingen
+// -----------------------------------------------------------------------------
+
+/**
+ * Iets wat eerst op cudi zelf moet gebeuren: de voorwaarden aanvaarden (een
+ * juridische stap, dus in een WebView op cudi), of de kring heeft de shop
+ * dichtgezet.
+ */
+export type AppCudiGate = { kind: "TERMS" | "SHOP_HIDDEN"; url: string };
+
+export type AppCudiOrdering = {
+  open: boolean;
+  /** Waarom er nu niet besteld kan worden, of null. */
+  message: string | null;
+  /** ONSITE_ONLY: betalen bij het afhalen. ONLINE_ONLY: meteen online. BOTH: de student kiest. */
+  paymentMode: "ONSITE_ONLY" | "ONLINE_ONLY" | "BOTH";
+  onlineCheckout: boolean;
+};
+
+export type AppCudiArticleMine = {
+  kind: "ASSIGNED" | "BOOKED" | "SOLD";
+  quantity: number;
+  pickupDeadline: string | null;
+};
+
+export type AppCudiArticle = {
+  id: string;
+  title: string;
+  author: string | null;
+  publisher: string | null;
+  type: string;
+  /** Wat jij betaalt, met ledenkorting als je lid bent. */
+  price: number;
+  listPrice: number;
+  memberPrice: boolean;
+  mandatory: boolean;
+  /** Null wanneer de kring de voorraad niet toont. */
+  stock: { label: string; tone: "green" | "amber" | "red" } | null;
+  /** Er ligt nu een exemplaar klaar; anders kom je op de wachtlijst. */
+  availableNow: boolean;
+  orderable: boolean;
+  note: string | null;
+  coverUrl: string | null;
+  /**
+   * Hoeveel je er nog kan reserveren: het maximum van cudi per student per
+   * academiejaar, min wat je al had. Optioneel voor een oudere cudi.
+   */
+  maxQuantity?: number;
+  /** Wat je dit academiejaar al met dit artikel deed. */
+  mine: AppCudiArticleMine[];
+};
+
+export type AppCudiCatalog = {
+  available: boolean;
+  gate: AppCudiGate | null;
+  ordering: AppCudiOrdering;
+  /** Je vakken op cudi; zonder vakken is er enkel algemeen materiaal. */
+  hasProfileSubjects: boolean;
+  /** De pagina op cudi om je vakken aan te duiden. */
+  subjectsUrl: string;
+  subjects: { id: string; code: string | null; name: string; articles: AppCudiArticle[] }[];
+  general: { type: string; articles: AppCudiArticle[] }[];
+};
+
+export type AppCudiOrderStatus = "POS_COMPLETED" | "ONLINE_PAID" | "READY" | "PENDING" | "EXPIRED" | "CANCELLED";
+
+export type AppCudiOrderLine = {
+  id: string;
+  title: string;
+  quantity: number;
+  price: number;
+  /** BOOKED (wachtlijst), ASSIGNED (ligt klaar), SOLD, CANCELLED, EXPIRED, ... */
+  status: string;
+  pickupDeadline: string | null;
+  cancelable: boolean;
+};
+
+export type AppCudiOrder = {
+  id: string;
+  number: number;
+  createdAt: string;
+  status: AppCudiOrderStatus;
+  /** Vraagt nog iets van je: afhalen, afrekenen of wachten op levering. */
+  open: boolean;
+  total: number;
+  paidOnline: boolean;
+  membershipFee: number | null;
+  lines: AppCudiOrderLine[];
+};
+
+export type AppCudiOverview = {
+  /** `false` wanneer deze site niet met cudi gekoppeld is. */
+  available: boolean;
+  gate: AppCudiGate | null;
+  ordering: AppCudiOrdering;
+  orders: AppCudiOrder[];
+  /** De openingsuren van deze week, zoals op Home. */
+  hours: AppServiceStatus | null;
+  shopUrl: string;
+};
+
+export type AppCudiOrderInput = {
+  items: { articleId: string; quantity: number }[];
+  paymentChoice?: "ONSITE" | "ONLINE";
+};
+
+export type AppCudiOrderResult =
+  | {
+      ok: true;
+      orderId: string;
+      nextStep: "DONE" | "CHECKOUT_ONLINE";
+      /** Bij `CHECKOUT_ONLINE`: de betaalpagina, te openen in de browser. */
+      checkoutUrl: string | null;
+      items: { articleId: string; title: string; quantity: number; price: number; status: "ASSIGNED" | "BOOKED" }[];
+    }
+  | {
+      ok: false;
+      code: "ARTICLES_UNAVAILABLE" | "NOT_IN_PROFILE_SUBJECTS" | "OUT_OF_STOCK" | "PAYMENT_CHOICE_REQUIRED" | "REJECTED";
+      message: string;
+      articleIds: string[];
+    };
+
+export type AppCudiCancelResult = { ok: true } | { ok: false; code: string; message: string };

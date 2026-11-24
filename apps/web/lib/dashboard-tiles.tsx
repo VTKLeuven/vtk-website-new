@@ -670,6 +670,15 @@ const ICON_PATHS: Record<string, ReactNode> = Object.fromEntries(
   ICONS.map((i) => [i.key, <path d={i.path} key={i.key} />]),
 );
 
+/**
+ * Het pad van een pictogram als tekst (24x24, lijn van 1.6), voor wie het zelf
+ * tekent: de VTK-app zet het in een eigen SVG, zodat een tegel er in de app
+ * hetzelfde uitziet als op het dashboard.
+ */
+export function tileIconPath(name: string): string {
+  return (ICONS.find((icon) => icon.key === name) ?? ICONS.find((icon) => icon.key === "link")!).path;
+}
+
 export function TileIcon({
   name,
   size = 22,

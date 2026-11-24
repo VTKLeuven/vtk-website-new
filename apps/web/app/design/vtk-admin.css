@@ -7831,3 +7831,18 @@ button.vtk-bud-dot {
     grid-column: 1 / -1;
   }
 }
+
+/*
+ * In de VTK-app: de lijst van onderdelen staat native in de app (Meer > Beheer),
+ * dus de zijbalk valt weg en de inhoud krijgt de volle breedte, met minder rand
+ * bovenaan. Zie `html[data-vtk-app]` in vtk-site-chrome.css.
+ */
+html[data-vtk-app] .vtk-admin-surface-inner {
+  grid-template-columns: minmax(0, 1fr) !important;
+  padding-top: 16px;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+html[data-vtk-app] .vtk-admin-surface-inner > aside {
+  display: none !important;
+}
