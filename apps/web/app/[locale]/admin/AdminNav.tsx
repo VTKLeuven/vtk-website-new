@@ -405,6 +405,13 @@ const icons: Record<string, ReactNode> = {
       <path d="M12 6v7" />
     </Svg>
   ),
+  // appLinks: telefoon (de links naar de app in de winkels)
+  appLinks: (
+    <Svg>
+      <rect width="14" height="20" x="5" y="2" rx="2" />
+      <path d="M12 18h.01" />
+    </Svg>
+  ),
   // appPush: bel met meldingssignalen (pushberichten)
   appPush: (
     <Svg>

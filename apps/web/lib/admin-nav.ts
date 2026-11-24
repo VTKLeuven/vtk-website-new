@@ -206,6 +206,8 @@ export function getAdminNav(): NavEntry[] {
       item('pages', '/paginas', { anyPerm: ['pages.edit', 'pages.editAll'] }),
       item('partners', '/partners', { perm: 'partners.manage' }),
       item('shortlinks', '/links', { perm: 'shortlinks.manage' }),
+      // De links naar de app in de winkels, voor vtk.be/app en de QR-code op de affiches.
+      item('appLinks', '/app', { perm: 'home.edit' }),
       item('forms', '/formulieren', { forms: true }),
       item('shift', '/shiften', {
         anyPerm: ['shift.edit', 'shift.editAll', 'shift.reward', 'shift.ranking', 'shift.templates', 'shift.manual'],

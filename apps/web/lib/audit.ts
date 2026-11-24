@@ -77,6 +77,7 @@ export const AUDIT_ENTITIES = {
   linkPage: { nl: "Linktree", en: "Linktree", group: "home" },
   partner: { nl: "Partner", en: "Partner", group: "home" },
   shortLink: { nl: "Verkorte link", en: "Short link", group: "shortlinks" },
+  appLinks: { nl: "Links naar de app", en: "App links", group: "home" },
   media: { nl: "Mediapagina", en: "Media page", group: "media" },
   photoAlbum: { nl: "Fotoalbum", en: "Photo album", group: "media" },
   photoAlbumShareLink: { nl: "Privélink naar een album", en: "Private album link", group: "media" },
