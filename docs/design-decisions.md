@@ -943,6 +943,38 @@ standaardaanbod).
   broodje terug naar de studenten. Dat is bewust: het bureau kreeg zijn broodje al,
   en een student die nog wil bestellen, heeft er dan een.
 
+### Vriendjesbureau: wie een vriendje meeneemt, duidt het zelf aan
+
+Op een vriendjesbureau (eerst op 3 december 2026) krijgen wie een vriendje meeneemt
+en dat vriendje allebei iets. Een vriendje is iemand die nog nooit of maar één keer
+op bureau was. Onderwijs zet het per bureau aan met het vinkje **Vriendjesbureau**
+(`Meeting.friendsBureau`), en wil vooraf weten hoeveel het er moet voorzien.
+
+- **Eén vraag, drie keuzes** bij het inschrijven: "Ik kom gewoon", "Ik neem een
+  vriendje mee" of "Ik ben een vriendje van iemand" (`MeetingReservation.friendRole`,
+  leeg = komt gewoon). Bewust geen koppeling tussen wie meeneemt en wie meekomt, en
+  geen naam van het vriendje: IT vroeg om een gewone vraag, en een vriendje schrijft
+  zich toch zelf in.
+- **Enkel voor de faculteit, aan beide kanten.** Wie volgens de KU Leuven-login niet
+  aan de faculteit studeert (`User.firwStudent`, de faculteitsstatus van
+  "Lidmaatschap van de kring"), ziet de vraag niet maar kan zich wel gewoon
+  inschrijven, met één zin waarom. De server zet het antwoord dan leeg, ook als het
+  verborgen veld toch werd meegestuurd (`friendRoleFromForm`). Niet `kulStudent`:
+  dat zegt enkel dat het een studentenaccount is, niet van welke faculteit.
+- **"Nooit of één keer" houdt de site niet tegen.** Inschrijvingen bestaan pas sinds
+  augustus 2026, en ingeschreven is niet hetzelfde als gekomen, dus een harde grens
+  zou mensen weren die er recht op hebben. Het beheer toont per vriendje op hoeveel
+  eerdere bureaus die ingeschreven stond (alle jaren, elke status), en markeert het
+  in woorden vanaf twee. Onderwijs beslist op de avond zelf.
+- **Wat ze krijgen, staat in de toelichting van het bureau**, niet in de code: het
+  kan elke keer iets anders zijn.
+- **Het vinkje uitzetten wist geen antwoorden.** Zonder vraag laat de action
+  `friendRole` staan, en het beheer toont ze niet zolang het vinkje uit staat. Gaat
+  het weer aan, dan zijn ze er terug.
+- **In het beheer**: een kaart "Vriendjes" met de twee aantallen en hun som (dat is
+  wat Onderwijs moet voorzien) en de namen, en bij "Per persoon" en op het
+  uitdeelscherm een regel onder de naam, zodat je aan de deur ziet wie iets krijgt.
+
 ### Deadline
 
 Aanpassen of annuleren kan tot **dezelfde deadline als voor studenten**: het moment
@@ -1074,6 +1106,15 @@ geen herkomst per persoon in "Wie komt".
 - **Terugkerend** = stond dit werkingsjaar (vanaf 15 juli, `Meeting.year`) al
   ingeschreven op een eerder bureau. Het eerste bureau van het jaar heeft dus
   enkel nieuwe mensen.
+- **Een vriendjesbureau krijgt een vierde blok** (`friendsOutcome`): hoeveel er
+  een vriendje meebrachten, als vriendje kwamen en gewoon kwamen, en of de
+  vriendjes daarna dit werkingsjaar nog op een bureau ingeschreven stonden. Naast
+  hen staan de andere mensen die op dat bureau voor het eerst dit jaar kwamen,
+  want zonder vergelijking zegt "4 van de 10 kwamen terug" niets over het
+  vriendjesbureau. Zolang er na dat bureau geen bureau met inschrijvingen is,
+  staat er een zin in plaats van een nul. In het jaaroverzicht en in de
+  keuzelijst staat "vriendjesbureau" bij de datum. Verder blijft "Bewust niet
+  meer" gelden: geen richting of studiejaar.
 - **"Rechtstreeks" ligt te hoog, en dat is gekend.** Wie uitgelogd binnenkomt,
   gaat langs de login; `?via=` reist mee (`landingQuery`), maar de referrer
   niet, dus wie zonder link met kanaal kwam, komt terug als `direct`. Het

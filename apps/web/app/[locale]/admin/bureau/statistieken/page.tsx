@@ -11,6 +11,7 @@ import {
   UNMEASURED,
   cumulativeCurve,
   curveIndex,
+  friendsOutcome,
   meetingCurve,
   seriesKeys,
   sourceRows,
@@ -29,8 +30,9 @@ const UNMEASURED_COLOR = 'color-mix(in srgb, var(--chart-context) 45%, var(--sur
 /**
  * Statistieken van de VTK Bureaus van dit werkingsjaar: langs welk kanaal de
  * inschrijvingen binnenkwamen, voor één bureau en voor het jaar. Voor Onderwijs,
- * om te zien wat een mail of een story doet. Bewust drie blokken en niet meer;
- * zie docs/design-decisions.md ("Statistieken van het VTK Bureau").
+ * om te zien wat een mail of een story doet. Bewust drie blokken en niet meer,
+ * plus een vierde wanneer het gekozen bureau een vriendjesbureau is; zie
+ * docs/design-decisions.md ("Statistieken van het VTK Bureau").
  *
  * Telt wie nu ingeschreven is (`ACTIVE`), hetzelfde getal als "Ingeschreven"
  * op de tab Beheer. Wie annuleerde, is weg: annuleren wist de rij.
@@ -71,6 +73,7 @@ export default async function AdminBureauStatsPage({
     [
       `${dateLabel.format(meeting.startsAt)}, ${timeLabel.format(meeting.startsAt)}`,
       meeting.location,
+      meeting.friendsBureau ? (nl ? 'vriendjesbureau' : 'friends bureau') : null,
       `${meeting.reservations.length} ${nl ? 'ingeschreven' : 'registered'}`,
     ]
       .filter(Boolean)
@@ -186,6 +189,10 @@ export default async function AdminBureauStatsPage({
   const origins = selected ? sourceRows(selected.reservations) : [];
   const year = yearOverview(meetings);
   const yearHasRegistrations = year.meetings.some((meeting) => meeting.total > 0);
+  const friends = selected ? friendsOutcome(meetings, selected.id) : null;
+  const friendsBureaus = new Set(meetings.filter((meeting) => meeting.friendsBureau).map((meeting) => meeting.id));
+  const cameBack = (group: { count: number; cameBack: number }) =>
+    group.count === 0 ? '0' : `${group.cameBack} (${percent.format(group.cameBack / group.count)})`;
 
   return (
     <div className="space-y-5">
@@ -351,6 +358,53 @@ export default async function AdminBureauStatsPage({
             </Card>
           ) : null}
 
+          {friends ? (
+            <Card className="p-5">
+              <h2 className="mb-1 text-lg font-semibold">{nl ? 'Vriendjesbureau' : 'Friends bureau'}</h2>
+              <p className="mb-4 text-sm text-[#5c667f]">
+                {nl
+                  ? `${friends.bringers} ${friends.bringers === 1 ? 'bracht' : 'brachten'} een vriendje mee, ${friends.friends.count} ${friends.friends.count === 1 ? 'kwam' : 'kwamen'} als vriendje en ${friends.others} ${friends.others === 1 ? 'kwam' : 'kwamen'} gewoon. Daaronder of de vriendjes later dit werkingsjaar nog op een bureau ingeschreven stonden, naast de andere mensen die op dit bureau voor het eerst dit jaar kwamen.`
+                  : `${friends.bringers} brought a friend, ${friends.friends.count} came as a friend and ${friends.others} just came. Below: whether the friends registered for a later bureau this working year, next to the other people who came for the first time this year at this bureau.`}
+              </p>
+              {friends.laterBureaus === 0 ? (
+                <p className="text-sm text-[#5c667f]">
+                  {nl
+                    ? 'Er is nog geen later bureau met inschrijvingen. Wie terugkomt, zie je hier vanaf het volgende bureau.'
+                    : 'There is no later bureau with registrations yet. Who comes back shows up here from the next bureau on.'}
+                </p>
+              ) : (
+                <div className="relative overflow-x-auto">
+                  <table className="w-full min-w-[24rem] text-sm">
+                    <thead>
+                      <tr className="text-left text-xs font-semibold uppercase tracking-wide text-[#5c667f]">
+                        <th className="py-1 pr-3">{nl ? 'Groep' : 'Group'}</th>
+                        <th className="py-1 pr-3 text-right">{nl ? 'Aantal' : 'Count'}</th>
+                        <th className="py-1 text-right">{nl ? 'Daarna nog ingeschreven' : 'Registered again later'}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-t border-vtk-blue/10">
+                        <td className="py-1.5 pr-3 font-medium">{nl ? 'Vriendjes' : 'Friends'}</td>
+                        <td className="py-1.5 pr-3 text-right tabular-nums">{friends.friends.count}</td>
+                        <td className="py-1.5 text-right tabular-nums">{cameBack(friends.friends)}</td>
+                      </tr>
+                      <tr className="border-t border-vtk-blue/10">
+                        <td className="py-1.5 pr-3 font-medium">{nl ? 'Andere nieuwe' : 'Other newcomers'}</td>
+                        <td className="py-1.5 pr-3 text-right tabular-nums">{friends.otherNewcomers.count}</td>
+                        <td className="py-1.5 text-right tabular-nums">{cameBack(friends.otherNewcomers)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <p className="mt-2 text-xs text-[#5c667f]">
+                    {nl
+                      ? `Over ${friends.laterBureaus} later(e) bureau(s) met inschrijvingen.`
+                      : `Across ${friends.laterBureaus} later bureau(s) with registrations.`}
+                  </p>
+                </div>
+              )}
+            </Card>
+          ) : null}
+
           <Card className="p-5">
             <h2 className="mb-1 text-lg font-semibold">
               {nl ? `Het jaar ${formatWorkingYear(workingYear)}` : `The year ${formatWorkingYear(workingYear)}`}
@@ -387,6 +441,11 @@ export default async function AdminBureauStatsPage({
                         <tr key={meeting.id} className="border-t border-vtk-blue/10">
                           <td className="py-1.5 pr-3 whitespace-nowrap">
                             {shortDate.format(startsAt.get(meeting.id))}
+                            {friendsBureaus.has(meeting.id) && (
+                              <span className="block text-xs text-[#5c667f]">
+                                {nl ? 'vriendjesbureau' : 'friends bureau'}
+                              </span>
+                            )}
                           </td>
                           <td className="py-1.5 pr-3 text-right tabular-nums">{meeting.newcomers}</td>
                           <td className="py-1.5 text-right tabular-nums">{meeting.returning}</td>

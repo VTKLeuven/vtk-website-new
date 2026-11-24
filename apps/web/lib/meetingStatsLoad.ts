@@ -18,9 +18,10 @@ export async function loadBureauStatsMeetings(workingYear: number): Promise<Stat
       startsAt: true,
       opensAt: true,
       location: true,
+      friendsBureau: true,
       reservations: {
         where: { status: 'ACTIVE' },
-        select: { userId: true, createdAt: true, source: true, sourceCampaign: true },
+        select: { userId: true, createdAt: true, source: true, sourceCampaign: true, friendRole: true },
       },
     },
   });

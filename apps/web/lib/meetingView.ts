@@ -32,7 +32,16 @@ type MeetingWithOptions = Meeting & { options: MeetingOption[] };
 export async function buildMeetingCard(
   meeting: MeetingWithOptions,
   reservation: MeetingReservation | null,
-  options: { locale: Locale; drinks: MeetingDrinks; now?: Date },
+  options: {
+    locale: Locale;
+    drinks: MeetingDrinks;
+    now?: Date;
+    /**
+     * Studeert de bezoeker aan de faculteit (`User.firwStudent`)? Enkel nodig op
+     * een vriendjesbureau: daar beslist het of de vriendjesvraag verschijnt.
+     */
+    facultyStudent?: boolean;
+  },
 ): Promise<MeetingCardView> {
   const { locale, drinks } = options;
   const now = options.now ?? new Date();
@@ -85,6 +94,12 @@ export async function buildMeetingCard(
     })),
     drinks,
     askComment: meeting.kind === "BUREAU",
+    friendQuestion:
+      meeting.kind === "BUREAU" && meeting.friendsBureau
+        ? options.facultyStudent
+          ? "ASK"
+          : "NOT_ELIGIBLE"
+        : null,
     showPrices: meetingPricesVisible(meeting.kind),
     // Zonder verkoopdag komt het aanbod uit de catalogus; wat er die week echt
     // ligt, beslist Theokot pas bij het aanmaken van de week.
@@ -97,6 +112,7 @@ export async function buildMeetingCard(
             : null,
           drink: reservation.drinkName,
           comment: reservation.comment,
+          friendRole: reservation.friendRole,
           totalCents: reservation.itemPriceCents + reservation.drinkPriceCents,
           invalidReason: reservation.status === "INVALIDATED" ? reservation.invalidatedReason : null,
         }

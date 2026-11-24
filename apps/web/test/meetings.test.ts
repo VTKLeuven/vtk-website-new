@@ -4,6 +4,7 @@ import {
   chooseBureauSupply,
   DEFAULT_DRINK_PRICE_CENTS,
   DEFAULT_MEETING_DRINKS,
+  friendRoleFromForm,
   hasMeetingOrder,
   isBigBureau,
   isoWeekNumber,
@@ -24,6 +25,33 @@ import {
   suggestedMeetingDays,
   sumReservationTotals,
 } from "@/lib/meetings";
+
+describe("friendRoleFromForm", () => {
+  const friendsBureau = { kind: "BUREAU" as const, friendsBureau: true, facultyStudent: true };
+
+  it("laat het antwoord staan waar geen vraag is", () => {
+    expect(friendRoleFromForm("IS_FRIEND", { ...friendsBureau, kind: "GROCOMEET" })).toBeUndefined();
+    expect(friendRoleFromForm("IS_FRIEND", { ...friendsBureau, friendsBureau: false })).toBeUndefined();
+    expect(friendRoleFromForm(null, { ...friendsBureau, friendsBureau: false })).toBeUndefined();
+  });
+
+  it("neemt een geldige rol over van een student van de faculteit", () => {
+    expect(friendRoleFromForm("BRINGS_FRIEND", friendsBureau)).toBe("BRINGS_FRIEND");
+    expect(friendRoleFromForm("IS_FRIEND", friendsBureau)).toBe("IS_FRIEND");
+  });
+
+  it("maakt van komt gewoon en van onzin een leeg antwoord", () => {
+    expect(friendRoleFromForm("", friendsBureau)).toBeNull();
+    expect(friendRoleFromForm(null, friendsBureau)).toBeNull();
+    expect(friendRoleFromForm("is_friend", friendsBureau)).toBeNull();
+    expect(friendRoleFromForm("ADMIN", friendsBureau)).toBeNull();
+  });
+
+  it("zet het leeg voor wie niet aan de faculteit studeert, ook met een nagemaakt veld", () => {
+    expect(friendRoleFromForm("BRINGS_FRIEND", { ...friendsBureau, facultyStudent: false })).toBeNull();
+    expect(friendRoleFromForm("IS_FRIEND", { ...friendsBureau, facultyStudent: false })).toBeNull();
+  });
+});
 
 describe("semesters", () => {
   it("legt semester 1 in het kalenderjaar van het werkingsjaar en semester 2 erna", () => {

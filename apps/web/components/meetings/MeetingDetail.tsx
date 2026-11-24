@@ -4,7 +4,7 @@ import { useCallback, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
 import { ArrowLeft } from "lucide-react";
 import Link from "@/components/ui/Link";
-import type { MeetingKind } from "@prisma/client";
+import type { MeetingFriendRole, MeetingKind } from "@prisma/client";
 import { Button, Card, Input, Label } from "@vtk/ui";
 import { BilingualGroup, BilingualInput, BilingualTextarea } from "@/components/admin/BilingualField";
 import { SaveForm } from "@/components/ui/SaveForm";
@@ -14,7 +14,15 @@ import { IconButton } from "@/components/ui/IconButton";
 import { CheckIcon, MaximizeIcon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
 import { formatEuro } from "@/lib/theokot";
-import { handoutCounts, personEntries, type CountRow } from "./meetingPeople";
+import {
+  FRIEND_EARLIER_LIMIT,
+  friendGroups,
+  friendRoleTag,
+  handoutCounts,
+  personEntries,
+  type CountRow,
+  type FriendGroups,
+} from "./meetingPeople";
 import { PersonSummary } from "./PersonSummary";
 import {
   deleteMeetingAction,
@@ -45,6 +53,13 @@ export type MeetingReservationRow = {
   extra: boolean;
   /** Er is een broodje of een drankje besteld; anders komt die persoon enkel. */
   hasOrder: boolean;
+  /** Vriendjesbureau: neemt een vriendje mee of is er een. Leeg op elk ander moment. */
+  friendRole: MeetingFriendRole | null;
+  /**
+   * Bij een vriendje: op hoeveel eerdere bureaus die ingeschreven stond, over
+   * alle jaren. Een vriendje hoort er hoogstens één te hebben.
+   */
+  earlierBureaus: number | null;
 };
 
 /**
@@ -76,6 +91,8 @@ export type MeetingAdminView = {
   /** Levert Theokot maar de eerste `theokotLimit` broodjes? */
   bigBureau: boolean;
   theokotLimit: number | null;
+  /** Wie zich inschrijft, krijgt de vraag of die een vriendje meeneemt of er een is. */
+  friendsBureau: boolean;
   /** Broodjes die van Theokot komen (geldige, met een broodje). */
   theokotCount: number;
   /** Broodjes uit de bureauvoorraad: Theokot maakt ze bovenop het aanbod. */
@@ -125,12 +142,14 @@ export function MeetingDetail({
 }) {
   const [useTheokot, setUseTheokot] = useState(meeting.useTheokot);
   const [bigBureau, setBigBureau] = useState(meeting.bigBureau);
+  const [friendsBureau, setFriendsBureau] = useState(meeting.friendsBureau);
   const [personView, setPersonView] = useState<"columns" | "table">("columns");
   const [handoutOpen, setHandoutOpen] = useState(false);
   const closeHandout = useCallback(() => setHandoutOpen(false), []);
   const invalidCount = meeting.reservations.filter((row) => row.invalid).length;
   const externalCount = meeting.externalItems.reduce((total, row) => total + row.count, 0);
   const handout = handoutCounts(meeting);
+  const friends = friendGroups(meeting);
 
   return (
     <div className="space-y-5">
@@ -151,6 +170,10 @@ export function MeetingDetail({
                   : `${meeting.theokotCount} from Theokot · ${externalCount} external · `)}
               {meeting.extraCount > 0 &&
                 `${meeting.extraCount} ${nl ? "uit de bureauvoorraad" : "from the bureau stock"} · `}
+              {meeting.friendsBureau &&
+                (nl
+                  ? `${friends.bringers.length} met een vriendje · ${friends.friends.length} vriendje(s) · `
+                  : `${friends.bringers.length} bringing a friend · ${friends.friends.length} friend(s) · `)}
               {meeting.theokotOrders.length > 0 &&
                 `${meeting.theokotOrders.length} ${nl ? "zelf bij Theokot" : "ordered at Theokot"} · `}
               <span className="tabular-nums">{formatEuro(meeting.totalCents)}</span>
@@ -228,6 +251,8 @@ export function MeetingDetail({
           </div>
         )}
       </Card>
+
+      {meeting.friendsBureau && <FriendsCard nl={nl} groups={friends} />}
 
       <Card className="p-5">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -439,6 +464,26 @@ export function MeetingDetail({
               </div>
             )}
 
+            {meeting.kind === "BUREAU" && (
+              <label className="flex items-start gap-2 text-sm text-[#34405e]">
+                <input
+                  type="checkbox"
+                  name="friendsBureau"
+                  checked={friendsBureau}
+                  onChange={(event) => setFriendsBureau(event.target.checked)}
+                  className="mt-1"
+                />
+                <span>
+                  {nl ? "Vriendjesbureau" : "Friends bureau"}
+                  <span className="block text-xs text-[#5c667f]">
+                    {nl
+                      ? "Wie zich inschrijft, duidt aan of die een vriendje meeneemt (iemand die nog nooit of maar één keer op bureau was) of er een is. Enkel studenten van de faculteit krijgen die vraag. Wat ze ervoor krijgen, zet je in de toelichting."
+                      : "People who register indicate whether they bring a friend (someone who has been to a bureau never or only once) or are one. Only students of the faculty get that question. What they get for it goes in the note."}
+                  </span>
+                </span>
+              </label>
+            )}
+
             <BilingualGroup locale={nl ? "nl" : "en"} layout="side-by-side">
               <BilingualTextarea
                 label={nl ? "Toelichting" : "Note"}
@@ -528,6 +573,78 @@ function CountTable({
   );
 }
 
+/**
+ * Vriendjesbureau: hoeveel er iets krijgen (wie een vriendje meeneemt en elk
+ * vriendje), en wie. De regel "nog nooit of maar één keer op bureau" houdt de
+ * site niet tegen; bij elk vriendje staat op hoeveel eerdere bureaus die
+ * ingeschreven stond, en vanaf {@link FRIEND_EARLIER_LIMIT} in woorden gemarkeerd.
+ */
+function FriendsCard({ nl, groups }: { nl: boolean; groups: FriendGroups }) {
+  const { bringers, friends } = groups;
+  const total = bringers.length + friends.length;
+  return (
+    <Card className="p-5">
+      <h3 className="mb-1 text-base font-semibold">{nl ? "Vriendjes" : "Friends"}</h3>
+      <p className="mb-4 text-sm text-[#5c667f]">
+        {nl
+          ? `${bringers.length} ${bringers.length === 1 ? "neemt" : "nemen"} een vriendje mee en ${friends.length} ${friends.length === 1 ? "komt" : "komen"} als vriendje: samen ${total}. Zelf aangeduid en niet aan elkaar gekoppeld; een vriendje schrijft zich zelf in.`
+          : `${bringers.length} ${bringers.length === 1 ? "brings" : "bring"} a friend and ${friends.length} ${friends.length === 1 ? "comes" : "come"} as a friend: ${total} in total. Self-reported and not linked to each other; a friend registers on their own.`}
+      </p>
+      {total === 0 ? (
+        <p className="text-sm text-[#5c667f]">{nl ? "Nog niemand aangeduid." : "Nobody has indicated anything yet."}</p>
+      ) : (
+        <div className="grid items-start gap-6 sm:grid-cols-2">
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-[#5c667f]">
+              {nl ? `Nemen een vriendje mee (${bringers.length})` : `Bringing a friend (${bringers.length})`}
+            </h4>
+            <ul className="mt-1 text-sm">
+              {bringers.map((row) => (
+                <li key={row.id} className="border-t border-vtk-blue/10 py-1.5">
+                  {row.name}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-[#5c667f]">
+              {nl ? `Vriendjes (${friends.length})` : `Friends (${friends.length})`}
+            </h4>
+            <ul className="mt-1 text-sm">
+              {friends.map((row) => {
+                const earlier = row.earlierBureaus ?? 0;
+                const label =
+                  earlier === 0
+                    ? nl
+                      ? "eerste bureau"
+                      : "first bureau"
+                    : nl
+                      ? `${earlier} keer eerder ingeschreven`
+                      : `registered ${earlier} time(s) before`;
+                return (
+                  <li
+                    key={row.id}
+                    className="flex flex-wrap items-baseline justify-between gap-x-3 border-t border-vtk-blue/10 py-1.5"
+                  >
+                    <span>{row.name}</span>
+                    {earlier >= FRIEND_EARLIER_LIMIT ? (
+                      <span className="rounded-full border border-amber-300 bg-amber-50 px-2 text-xs text-amber-900">
+                        {label}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-[#5c667f]">{label}</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 /** Per persoon, alfabetisch, in twee kolommen (zie `personEntries`). */
 function PersonColumns({ nl, meeting }: { nl: boolean; meeting: MeetingAdminView }) {
   const sorted = personEntries(meeting);
@@ -592,6 +709,9 @@ function PersonTables({ nl, meeting }: { nl: boolean; meeting: MeetingAdminView 
                 <tr key={row.id} className="border-t border-vtk-blue/10 align-top">
                   <td className="py-1.5 pr-3">
                     {row.name}
+                    {row.friendRole && (
+                      <span className="block text-xs text-[#34405e]">{friendRoleTag(row.friendRole, nl)}</span>
+                    )}
                     {row.comment && <span className="block text-xs text-[#5c667f]">“{row.comment}”</span>}
                   </td>
                   <td className="py-1.5 pr-3">

@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import type { MeetingFriendRole } from "@prisma/client";
 import { Card, Label, Textarea } from "@vtk/ui";
+import Link from "@/components/ui/Link";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { useLandingSource } from "@/components/ticketing/public/useLandingSource";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
@@ -28,6 +30,8 @@ export type MeetingReservationView = {
   choiceLabel: string | null;
   drink: string | null;
   comment: string | null;
+  /** Vriendjesbureau: wat er aangeduid staat; leeg = komt gewoon. */
+  friendRole: MeetingFriendRole | null;
   totalCents: number;
   invalidReason: string | null;
 };
@@ -44,6 +48,12 @@ export type MeetingCardView = {
   drinks: { priceCents: number; items: string[] };
   askComment: boolean;
   /**
+   * Vriendjesbureau: `ASK` toont de vraag of je een vriendje meeneemt of er een
+   * bent; `NOT_ELIGIBLE` zegt in één regel waarom niet (enkel voor studenten van
+   * de faculteit); `null` bij een gewoon bureau of een GM.
+   */
+  friendQuestion: "ASK" | "NOT_ELIGIBLE" | null;
+  /**
    * Prijzen (per broodje, per drankje en het totaal) tonen. Bij een VTK Bureau
    * is de bestelling gratis voor de student — Onderwijs betaalt — dus daar
    * blijven die bedragen weg. Zie `meetingPricesVisible` in `lib/meetings.ts`.
@@ -55,6 +65,13 @@ export type MeetingCardView = {
 };
 
 const NONE = "";
+
+/** Hoe een antwoord op de vriendjesvraag leest, ook na de deadline. */
+export function friendRoleLabel(role: MeetingFriendRole | null, nl: boolean): string {
+  if (role === "BRINGS_FRIEND") return nl ? "Ik neem een vriendje mee" : "I'm bringing a friend";
+  if (role === "IS_FRIEND") return nl ? "Ik ben een vriendje van iemand" : "I'm someone's friend";
+  return nl ? "Ik kom gewoon" : "Just coming";
+}
 
 /**
  * De regel onder een broodje: de prijs, de resterende voorraad, of allebei.
@@ -108,6 +125,7 @@ export function MeetingReservationCard({
   const reservation = meeting.reservation;
   const [choice, setChoice] = useState(reservation?.choiceKey ?? NONE);
   const [drink, setDrink] = useState(reservation?.drink ?? NONE);
+  const [friendRole, setFriendRole] = useState<string>(reservation?.friendRole ?? NONE);
   // Langs waar dit bezoek binnenkwam (`?via=`, `?c=` of de referrer). Haalt de
   // parameters uit de adresbalk, zodat een doorgestuurde link ze niet meeneemt.
   const landing = useLandingSource() ?? serverLanding;
@@ -130,6 +148,20 @@ export function MeetingReservationCard({
       // Wel tonen, niet kiesbaar; behalve wanneer het al je eigen keuze is.
       disabled: option.remaining !== null && option.remaining <= 0 && option.key !== reservation?.choiceKey,
     })),
+  ];
+
+  const friendOptions: ExclusiveChoice[] = [
+    { value: NONE, label: friendRoleLabel(null, nl) },
+    {
+      value: "BRINGS_FRIEND",
+      label: friendRoleLabel("BRINGS_FRIEND", nl),
+      description: nl ? "Je vriendje schrijft zich hier zelf ook in." : "Your friend registers here as well.",
+    },
+    {
+      value: "IS_FRIEND",
+      label: friendRoleLabel("IS_FRIEND", nl),
+      description: nl ? "Je was nog nooit of maar één keer op bureau." : "You have been to a bureau never or only once.",
+    },
   ];
 
   const drinkOptions = [
@@ -260,6 +292,28 @@ export function MeetingReservationCard({
             />
           </div>
 
+          {meeting.friendQuestion === "ASK" && (
+            <div>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-vtk-muted">
+                {nl ? "Vriendjesbureau" : "Friends bureau"}
+              </span>
+              <p className="mb-2 text-sm text-[#34405e]">
+                {nl
+                  ? "Neem je iemand mee die nog nooit of maar één keer op bureau was, of ben jij dat vriendje?"
+                  : "Are you bringing someone who has been to a bureau never or only once, or are you that friend?"}
+              </p>
+              <ExclusiveChoiceGroup
+                name="friendRole"
+                value={friendRole}
+                onChange={setFriendRole}
+                options={friendOptions}
+                columns={3}
+                ariaLabel={nl ? "Vriendjesbureau" : "Friends bureau"}
+              />
+            </div>
+          )}
+          {meeting.friendQuestion === "NOT_ELIGIBLE" && <FriendsNotEligible nl={nl} />}
+
           {meeting.askComment && (
             <div>
               <Label htmlFor={`comment-${meeting.id}`}>
@@ -321,6 +375,27 @@ export function MeetingReservationCard({
 }
 
 /**
+ * Op een vriendjesbureau, voor wie niet aan de faculteit studeert volgens de
+ * KU Leuven-login (`User.firwStudent`): waarom de vraag er niet staat, en wat te
+ * doen wie er wel studeert maar met een ander account inlogde. Een koppeling op
+ * /account zet de status pas bij de volgende KU Leuven-login, dus de zin vraagt
+ * beide.
+ */
+function FriendsNotEligible({ nl }: { nl: boolean }) {
+  return (
+    <p className="text-sm text-[#5c667f]">
+      {nl
+        ? "Dit is een vriendjesbureau. Een vriendje meenemen of er een zijn kan enkel voor studenten van de faculteit Ingenieurswetenschappen; inschrijven kan je wel gewoon. Studeer je hier toch? Log dan in met KU Leuven, en koppel die login eerst op "
+        : "This is a friends bureau. Bringing a friend or being one is only for students of the Faculty of Engineering Science; you can still register as usual. Studying here after all? Log in with KU Leuven, and if you use another account, link that login first on "}
+      <Link href={`${nl ? "" : "/en"}/account#kul`} className="underline">
+        {nl ? "je account" : "your account"}
+      </Link>
+      {nl ? " als je een ander account gebruikt." : "."}
+    </p>
+  );
+}
+
+/**
  * Wat er te zien is wanneer er (nog) niet ingeschreven of gewijzigd kan worden.
  * Een bestaande inschrijving blijft staan, ook zonder broodje of drankje: dat is
  * dan de bevestiging dat je op de lijst staat.
@@ -351,6 +426,12 @@ function ClosedSummary({ nl, meeting }: { nl: boolean; meeting: MeetingCardView 
             {nl ? "Drankje" : "Drink"}:{" "}
             <span className="font-medium">{reservation.drink ?? (nl ? "geen" : "none")}</span>
           </li>
+          {meeting.friendQuestion === "ASK" && (
+            <li>
+              {nl ? "Vriendjesbureau" : "Friends bureau"}:{" "}
+              <span className="font-medium">{friendRoleLabel(reservation.friendRole, nl)}</span>
+            </li>
+          )}
           {meeting.showPrices && (
             <li className="mt-1 border-t border-vtk-blue/10 pt-1">
               {nl ? "Totaal" : "Total"}:{" "}

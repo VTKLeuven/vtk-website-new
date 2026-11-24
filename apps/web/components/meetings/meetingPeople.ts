@@ -1,4 +1,31 @@
+import type { MeetingFriendRole } from "@prisma/client";
 import type { MeetingAdminView, MeetingReservationRow, MeetingTheokotOrderRow } from "./MeetingDetail";
+
+export type FriendGroups = { bringers: MeetingReservationRow[]; friends: MeetingReservationRow[] };
+
+/**
+ * Vriendjesbureau: wie een vriendje meeneemt en wie er een is, alfabetisch.
+ * Een ongeldig broodje telt mee: die persoon staat nog altijd ingeschreven.
+ */
+export function friendGroups(meeting: MeetingAdminView): FriendGroups {
+  const byName = (a: MeetingReservationRow, b: MeetingReservationRow) => a.name.localeCompare(b.name, "nl");
+  return {
+    bringers: meeting.reservations.filter((row) => row.friendRole === "BRINGS_FRIEND").sort(byName),
+    friends: meeting.reservations.filter((row) => row.friendRole === "IS_FRIEND").sort(byName),
+  };
+}
+
+/**
+ * Vanaf zoveel eerdere bureaus is een vriendje het nakijken waard: een vriendje
+ * was nog nooit of maar één keer op bureau.
+ */
+export const FRIEND_EARLIER_LIMIT = 2;
+
+/** Het woord achter een naam in "Per persoon" en op het uitdeelscherm. */
+export function friendRoleTag(role: MeetingFriendRole, nl: boolean): string {
+  if (role === "BRINGS_FRIEND") return nl ? "neemt een vriendje mee" : "brings a friend";
+  return nl ? "vriendje" : "friend";
+}
 
 export type CountRow = { name: string; count: number; external: number };
 

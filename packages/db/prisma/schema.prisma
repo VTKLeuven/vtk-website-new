@@ -303,6 +303,13 @@ enum MeetingReservationStatus {
   INVALIDATED // het gekozen broodje staat niet (meer) op het aanbod van die dag
 }
 
+/// Antwoord op de vraag van een vriendjesbureau (`Meeting.friendsBureau`). Leeg
+/// op de reservatie = komt gewoon, of de vraag werd niet gesteld.
+enum MeetingFriendRole {
+  BRINGS_FRIEND // neemt een vriendje mee
+  IS_FRIEND // is het vriendje van iemand
+}
+
 enum UitleenReservationStatus {
   REQUESTED // aangevraagd, wacht op beslissing van Logistiek
   APPROVED // goedgekeurd; telt mee voor de voorraad
@@ -4603,6 +4610,12 @@ model Meeting {
   /// wanneer er al besteld is: `rebalanceMeetingSupply` verdeelt dan opnieuw.
   theokotLimit Int?
 
+  /// Vriendjesbureau: wie zich inschrijft, krijgt de vraag of die een vriendje
+  /// meeneemt of er een is (`MeetingReservation.friendRole`). Enkel bij een
+  /// bureau, en de vraag enkel voor studenten van de faculteit
+  /// (`User.firwStudent`). Zie docs/design-decisions.md, "Vriendjesbureau".
+  friendsBureau Boolean @default(false)
+
   /// Vrije toelichting boven het reservatieformulier.
   noteNl String?
   noteEn String?
@@ -4705,6 +4718,12 @@ model MeetingReservation {
 
   /// Opmerking bij een bureau (onderwijsfeedback vooraf).
   comment String?
+
+  /// Vriendjesbureau: neemt een vriendje mee, of is er een. Leeg = komt gewoon,
+  /// of de vraag werd niet gesteld (een gewoon bureau, iemand van buiten de
+  /// faculteit, of een inschrijving van voor het vinkje). Zelf aangeduid, niet
+  /// gekoppeld aan wie het vriendje meebracht.
+  friendRole MeetingFriendRole?
 
   /// Langs welk kanaal de eerste inschrijving binnenkwam (`?via=mail`), zoals
   /// `TicketOrder.source`. Enkel gezet bij het aanmaken van de rij: een
