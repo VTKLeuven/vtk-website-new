@@ -26,6 +26,8 @@ export type StatsReservation = {
   createdAt: Date;
   source: string | null;
   sourceCampaign: string | null;
+  /** Vriendjesbureau: wat er aangeduid staat. Telt enkel bij een bureau met `friendsBureau`. */
+  friendRole?: 'BRINGS_FRIEND' | 'IS_FRIEND' | null;
 };
 
 export type StatsMeeting = {
@@ -34,6 +36,8 @@ export type StatsMeeting = {
   opensAt: Date | null;
   /** Enkel voor het label in de keuzelijst; de rekenkant gebruikt het niet. */
   location?: string | null;
+  /** Vriendjesbureau: wie zich inschreef, kreeg de vriendjesvraag. */
+  friendsBureau?: boolean;
   reservations: StatsReservation[];
 };
 
@@ -280,4 +284,64 @@ export function yearOverview(meetings: StatsMeeting[]): YearOverview {
   });
 
   return { meetings: perMeeting, series: seriesFor(seriesKeys(all), days, rows) };
+}
+
+/** Hoeveel mensen in een groep, en hoeveel daarvan op een later bureau ingeschreven staan. */
+export type ReturnCount = { count: number; cameBack: number };
+
+export type FriendsOutcome = {
+  /** Duidden aan dat ze een vriendje meenemen. */
+  bringers: number;
+  /** Kwamen als vriendje. */
+  friends: ReturnCount;
+  /**
+   * De vergelijking: wie op dit bureau nieuw was dit werkingsjaar (zoals "Nieuw"
+   * in het jaaroverzicht) zonder vriendje te zijn. Zo zie je of vriendjes
+   * vaker terugkomen dan andere nieuwe mensen.
+   */
+  otherNewcomers: ReturnCount;
+  /** Kwamen gewoon. */
+  others: number;
+  /**
+   * Hoeveel latere bureaus dit werkingsjaar al inschrijvingen hebben. Nul
+   * betekent "nog niet te zien", niet "niemand kwam terug".
+   */
+  laterBureaus: number;
+};
+
+/**
+ * Werkte een vriendjesbureau? Wie er kwam, en of de vriendjes daarna nog op een
+ * bureau ingeschreven stonden, naast de andere nieuwe mensen van datzelfde
+ * bureau. "Later" en "nieuw" gelden binnen de lijst die de beller meegeeft (één
+ * werkingsjaar, zoals {@link yearOverview}); `null` wanneer dit bureau geen
+ * vriendjesbureau is of niet in de lijst staat.
+ */
+export function friendsOutcome(meetings: StatsMeeting[], meetingId: string): FriendsOutcome | null {
+  const ordered = [...meetings].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+  const index = ordered.findIndex((meeting) => meeting.id === meetingId);
+  const meeting = ordered[index];
+  if (!meeting?.friendsBureau) return null;
+
+  const usersOf = (list: StatsMeeting[]) =>
+    new Set(list.flatMap((item) => item.reservations.map((reservation) => reservation.userId)));
+  const earlier = usersOf(ordered.slice(0, index));
+  const laterMeetings = ordered.slice(index + 1).filter((item) => item.reservations.length > 0);
+  const later = usersOf(laterMeetings);
+
+  const friends: ReturnCount = { count: 0, cameBack: 0 };
+  const otherNewcomers: ReturnCount = { count: 0, cameBack: 0 };
+  let bringers = 0;
+  let others = 0;
+  for (const reservation of meeting.reservations) {
+    const role = reservation.friendRole ?? null;
+    if (role === 'BRINGS_FRIEND') bringers += 1;
+    else if (role === null) others += 1;
+
+    const group = role === 'IS_FRIEND' ? friends : earlier.has(reservation.userId) ? null : otherNewcomers;
+    if (!group) continue;
+    group.count += 1;
+    if (later.has(reservation.userId)) group.cameBack += 1;
+  }
+
+  return { bringers, friends, otherNewcomers, others, laterBureaus: laterMeetings.length };
 }

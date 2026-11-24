@@ -9,7 +9,7 @@
  * maken + mail) staat in `lib/meetings-server.ts`.
  */
 
-import type { MeetingKind } from '@prisma/client';
+import type { MeetingFriendRole, MeetingKind } from '@prisma/client';
 
 import { brusselsTimeOnDay, brusselsYMD, isoWeekday, isoWeekKey, parseYMD, ymdKey } from './brussels';
 
@@ -270,6 +270,36 @@ export function reservationTotalCents(reservation: ReservationAmounts): number {
 
 export function sumReservationTotals(reservations: ReservationAmounts[]): number {
   return reservations.reduce((total, r) => total + reservationTotalCents(r), 0);
+}
+
+// -----------------------------------------------------------------------------
+// Vriendjesbureau
+//
+// Wie een vriendje meeneemt (iemand die nog nooit of maar één keer op bureau
+// was), en dat vriendje, krijgen allebei iets. Enkel voor studenten van de
+// faculteit, aan beide kanten. Zie docs/design-decisions.md, "Vriendjesbureau".
+// -----------------------------------------------------------------------------
+
+export const MEETING_FRIEND_ROLES = ['BRINGS_FRIEND', 'IS_FRIEND'] as const satisfies readonly MeetingFriendRole[];
+
+/**
+ * Wat de action met het veld `friendRole` uit het formulier doet:
+ *
+ * - `undefined`: niet aanraken. Geen bureau of geen vriendjesbureau; zo blijft
+ *   een antwoord bewaard wanneer het vinkje even uit en weer aan gaat.
+ * - `null`: komt gewoon, of iemand van buiten de faculteit. Die krijgt de vraag
+ *   niet, maar een verborgen veld is na te maken, dus de server zet het leeg.
+ * - een rol: wat de student aanduidde.
+ */
+export function friendRoleFromForm(
+  raw: FormDataEntryValue | null,
+  meeting: { kind: MeetingKind; friendsBureau: boolean; facultyStudent: boolean },
+): MeetingFriendRole | null | undefined {
+  if (meeting.kind !== 'BUREAU' || !meeting.friendsBureau) return undefined;
+  if (!meeting.facultyStudent) return null;
+  return (MEETING_FRIEND_ROLES as readonly string[]).includes(String(raw ?? ''))
+    ? (raw as MeetingFriendRole)
+    : null;
 }
 
 // -----------------------------------------------------------------------------

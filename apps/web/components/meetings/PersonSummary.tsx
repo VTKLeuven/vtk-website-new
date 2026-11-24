@@ -1,4 +1,4 @@
-import type { PersonEntry } from "./meetingPeople";
+import { friendRoleTag, type PersonEntry } from "./meetingPeople";
 
 /**
  * Eén persoon zoals in "Per persoon" › "Twee kolommen": de naam vet, daaronder
@@ -13,6 +13,8 @@ export function PersonSummary({ nl, entry }: { nl: boolean; entry: PersonEntry }
   return (
     <>
       <span className="block font-semibold text-vtk-ink">{entry.name}</span>
+      {/* Vriendjesbureau: bij het uitdelen zie je zo meteen wie iets krijgt. */}
+      {row?.friendRole && <span className="block text-[#34405e]">{friendRoleTag(row.friendRole, nl)}</span>}
       {row && (
         <span className={`block ${row.invalid ? "text-red-600" : "text-[#34405e]"}`}>
           {row.hasOrder ? (

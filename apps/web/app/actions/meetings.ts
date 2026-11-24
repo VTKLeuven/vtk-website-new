@@ -13,6 +13,7 @@ import { sanitizeSourceKey } from "@/lib/ticketing/source";
 import {
   bureauStockFor,
   chooseBureauSupply,
+  friendRoleFromForm,
   isBigBureau,
   meetingCloseAt,
   meetingWindowState,
@@ -372,6 +373,7 @@ export async function saveMeetingAction(_prev: SaveState, formData: FormData): P
   if (!startsAt) return saveError("INVALID_DATE");
   const opensAt = parseLocalDateTime(String(formData.get("opensAt") ?? ""));
   const useTheokot = formData.get("useTheokot") === "on";
+  const friendsBureau = meeting.kind === "BUREAU" && formData.get("friendsBureau") === "on";
 
   let theokotLimit: number | null = null;
   if (meeting.kind === "BUREAU" && useTheokot && formData.get("bigBureau") === "on") {
@@ -398,6 +400,7 @@ export async function saveMeetingAction(_prev: SaveState, formData: FormData): P
           opensAt,
           useTheokot,
           theokotLimit,
+          friendsBureau,
           noteNl: String(formData.get("noteNl") ?? "").trim() || null,
           noteEn: String(formData.get("noteEn") ?? "").trim() || null,
         },
@@ -421,6 +424,9 @@ export async function saveMeetingAction(_prev: SaveState, formData: FormData): P
         ? "big bureau uitgezet: alle broodjes weer van Theokot"
         : `big bureau: Theokot levert de eerste ${theokotLimit} broodje(s)`,
     );
+  }
+  if (meeting.friendsBureau !== friendsBureau) {
+    changes.push(friendsBureau ? "vriendjesbureau aangezet" : "vriendjesbureau uitgezet");
   }
   await logAudit({
     action: "update",
@@ -758,6 +764,20 @@ export async function saveMeetingReservationAction(
         }
       : {};
 
+  // Vriendjesbureau: enkel een student van de faculteit kan een vriendje
+  // meenemen of er een zijn. Die status staat niet in de sessie, dus één lezing,
+  // en enkel wanneer de vraag er is.
+  const asksFriend = meeting.kind === "BUREAU" && meeting.friendsBureau;
+  const facultyStudent = asksFriend
+    ? ((await prisma.user.findUnique({ where: { id: userId }, select: { firwStudent: true } }))?.firwStudent ??
+      false)
+    : false;
+  const friendRole = friendRoleFromForm(formData.get("friendRole"), {
+    kind: meeting.kind,
+    friendsBureau: meeting.friendsBureau,
+    facultyStudent,
+  });
+
   const drinks = await getMeetingDrinks();
   if (drinkName && !drinks.items.includes(drinkName)) return saveError("UNKNOWN_DRINK");
 
@@ -825,6 +845,8 @@ export async function saveMeetingReservationAction(
         drinkName: drinkName || null,
         drinkPriceCents: drinkName ? drinks.priceCents : 0,
         comment,
+        // Zonder vraag blijft wat er stond (zie `friendRoleFromForm`).
+        ...(friendRole === undefined ? {} : { friendRole }),
         invalidatedAt: null,
         invalidatedReason: null,
       };

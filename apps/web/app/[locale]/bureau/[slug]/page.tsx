@@ -52,14 +52,22 @@ export default async function BureauPage({
     );
   }
 
-  const [reservation, drinks] = await Promise.all([
+  const [reservation, drinks, user] = await Promise.all([
     prisma.meetingReservation.findUnique({
       where: { meetingId_userId: { meetingId: meeting.id, userId: session.user.id } },
     }),
     getMeetingDrinks(),
+    // Enkel een vriendjesbureau vraagt naar de faculteit; die staat niet in de sessie.
+    meeting.friendsBureau
+      ? prisma.user.findUnique({ where: { id: session.user.id }, select: { firwStudent: true } })
+      : null,
   ]);
 
-  const card = await buildMeetingCard(meeting, reservation, { locale, drinks });
+  const card = await buildMeetingCard(meeting, reservation, {
+    locale,
+    drinks,
+    facultyStudent: user?.firwStudent ?? false,
+  });
 
   return (
     <div className="vtk-page">

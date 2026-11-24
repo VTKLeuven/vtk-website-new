@@ -3,6 +3,7 @@ import {
   OTHER,
   cumulativeCurve,
   curveIndex,
+  friendsOutcome,
   UNMEASURED,
   meetingCurve,
   seriesKeys,
@@ -290,5 +291,65 @@ describe('curveIndex', () => {
     const curve = cumulativeCurve(base, now, [later]);
     expect(curve.keys.at(-1)).toBe('2026-10-13T12:00:00.000Z');
     expect(curveIndex(curve, later)).toBeNull();
+  });
+});
+
+describe('friendsOutcome', () => {
+  const people = (startsAt: string, users: Array<[string, StatsReservation['friendRole']]>): StatsReservation[] =>
+    users.map(([userId, friendRole]) => reservation(startsAt, 'direct', { userId, friendRole }));
+  const bureau = (id: string, startsAt: string, users: Array<[string, StatsReservation['friendRole']]>, friendsBureau = false) =>
+    meeting({ id, friendsBureau, startsAt: new Date(startsAt), reservations: people(startsAt, users) });
+  const year = (friendsBureau = true): StatsMeeting[] => [
+    bureau('b1', '2026-11-19T11:30:00Z', [
+      ['vera', null],
+      ['wim', null],
+    ]),
+    bureau(
+      'vb',
+      '2026-12-03T11:30:00Z',
+      [
+        ['vera', 'BRINGS_FRIEND'],
+        ['anna', 'IS_FRIEND'],
+        ['bert', 'IS_FRIEND'],
+        ['wim', 'IS_FRIEND'],
+        ['carl', null],
+        ['dirk', null],
+      ],
+      friendsBureau,
+    ),
+    bureau('b3', '2026-12-17T11:30:00Z', [
+      ['anna', null],
+      ['carl', null],
+      ['vera', null],
+    ]),
+  ];
+
+  it('telt wie kwam en wie daarna nog ingeschreven stond, naast de andere nieuwe', () => {
+    expect(friendsOutcome(year(), 'vb')).toEqual({
+      bringers: 1,
+      // Enkel anna staat op b3. wim stond op b1 (eerder), niet op b3: dat is
+      // geen terugkomen. Als vriendje telt hij wel mee.
+      friends: { count: 3, cameBack: 1 },
+      // carl en dirk waren nieuw dit jaar en geen vriendje; vera was er al.
+      otherNewcomers: { count: 2, cameBack: 1 },
+      others: 2,
+      laterBureaus: 1,
+    });
+  });
+
+  it('zegt nul latere bureaus zolang er na het vriendjesbureau niemand ingeschreven is', () => {
+    const [b1, vb, b3] = year();
+    expect(friendsOutcome([b1, vb, { ...b3, reservations: [] }], 'vb')?.laterBureaus).toBe(0);
+    expect(friendsOutcome([b1, vb], 'vb')).toMatchObject({ laterBureaus: 0, friends: { count: 3, cameBack: 0 } });
+  });
+
+  it('volgt de datum, niet de volgorde van de lijst', () => {
+    const [b1, vb, b3] = year();
+    expect(friendsOutcome([b3, vb, b1], 'vb')).toEqual(friendsOutcome([b1, vb, b3], 'vb'));
+  });
+
+  it('geeft niets voor een gewoon bureau of een onbekend bureau', () => {
+    expect(friendsOutcome(year(false), 'vb')).toBeNull();
+    expect(friendsOutcome(year(), 'bestaat-niet')).toBeNull();
   });
 });

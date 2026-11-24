@@ -102,6 +102,34 @@ export async function loadMeetingAdmin(
       : [];
   const sessionByDay = new Map(sessions.map((session) => [ymdKey(brusselsYMD(session.date)), session]));
 
+  // Vriendjesbureau: een vriendje was nog nooit of maar één keer op bureau. De
+  // site houdt dat niet tegen (inschrijvingen bestaan pas sinds augustus 2026,
+  // en ingeschreven is niet hetzelfde als gekomen), maar toont per vriendje op
+  // hoeveel eerdere bureaus die ingeschreven stond, over alle jaren heen.
+  const earlierByMeeting = new Map(
+    await Promise.all(
+      meetings
+        .filter((meeting) => meeting.kind === "BUREAU" && meeting.friendsBureau)
+        .map(async (meeting) => {
+          const friendIds = meeting.reservations
+            .filter((reservation) => reservation.friendRole === "IS_FRIEND")
+            .map((reservation) => reservation.userId);
+          const rows =
+            friendIds.length > 0
+              ? await prisma.meetingReservation.groupBy({
+                  by: ["userId"],
+                  where: {
+                    userId: { in: friendIds },
+                    meeting: { kind: "BUREAU", startsAt: { lt: meeting.startsAt } },
+                  },
+                  _count: { _all: true },
+                })
+              : [];
+          return [meeting.id, new Map(rows.map((row) => [row.userId, row._count._all]))] as const;
+        }),
+    ),
+  );
+
   const dateTime = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
     timeZone: "Europe/Brussels",
     weekday: "long",
@@ -115,6 +143,7 @@ export async function loadMeetingAdmin(
 
   const views: MeetingAdminView[] = meetings.map((meeting) => {
     const session = sessionByDay.get(ymdKey(brusselsYMD(meeting.startsAt)));
+    const earlier = earlierByMeeting.get(meeting.id);
     const reservations = meeting.reservations.map((reservation) => ({
       id: reservation.id,
       name: reservation.user.name,
@@ -133,6 +162,13 @@ export async function loadMeetingAdmin(
         itemName: reservation.itemNameNl,
         drinkName: reservation.drinkName,
       }),
+      // Enkel op een vriendjesbureau: een antwoord van toen het vinkje nog aan
+      // stond, telt niet meer mee wanneer het uit staat.
+      friendRole: meeting.friendsBureau ? reservation.friendRole : null,
+      earlierBureaus:
+        meeting.friendsBureau && reservation.friendRole === "IS_FRIEND"
+          ? earlier?.get(reservation.userId) ?? 0
+          : null,
     }));
 
     const theokotOrders = meeting.theokotOrders.map((order) => {
@@ -174,6 +210,7 @@ export async function loadMeetingAdmin(
       useTheokot: meeting.useTheokot,
       bigBureau: isBigBureau(meeting),
       theokotLimit: meeting.theokotLimit,
+      friendsBureau: meeting.kind === "BUREAU" && meeting.friendsBureau,
       theokotCount,
       extraCount: reservations.filter((row) => row.extra && !row.invalid).length,
       externalItems: [...externalItems.entries()]
