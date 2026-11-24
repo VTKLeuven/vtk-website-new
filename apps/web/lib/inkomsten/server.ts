@@ -239,7 +239,13 @@ async function cashRegisterContext(): Promise<Map<string, KassaSpan[]>> {
     const spans = byDevice.get(key) ?? [];
     if (!spans.some((span) => span.id === payment.register.id)) {
       const interval = registerInterval(payment.register);
-      spans.push({ id: payment.register.id, start: interval.start, end: interval.end, code: payment.register.accountingCode });
+      spans.push({
+        id: payment.register.id,
+        start: interval.start,
+        end: interval.end,
+        code: payment.register.accountingCode,
+        wholeDay: !(payment.register.startsAt && payment.register.endsAt),
+      });
     }
     byDevice.set(key, spans);
   }
