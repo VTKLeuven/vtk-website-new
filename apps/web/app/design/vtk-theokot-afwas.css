@@ -1,0 +1,712 @@
+/* Theokot: afwas (/admin/theokot/afwas, `AfwasPlanner`).
+   Per werkweek een rij van vijf namiddagen. Vrij is een witte kaart die je
+   aanklikt, geboekt draagt de naam van de groep (de eigen groep met de gele
+   rail van een uitgelichte kaart), dicht is het gestreepte patroon van "er is
+   hier niets". Elke toestand staat er ook in woorden, zodat de kleur nooit de
+   enige drager is. Zie docs/design-decisions.md, "Theokot: afwasbeurten". */
+
+.tk-aw {
+  display: grid;
+  gap: 18px;
+}
+
+.tk-aw-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.tk-aw-nav-label {
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.tk-aw-today {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--line-2);
+  text-underline-offset: 4px;
+}
+
+.tk-aw-hours {
+  font-size: 14px;
+  color: var(--body);
+}
+
+.tk-aw-hours strong {
+  color: var(--ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Een blok op de pagina: de lijst, de namiddagen, wat onlangs afgevinkt werd. */
+.tk-aw-section {
+  display: grid;
+  gap: 12px;
+}
+
+.tk-aw-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.tk-aw-section-head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.tk-aw-small-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.tk-aw-empty {
+  margin: 0;
+  font-size: 14px;
+}
+
+.tk-aw-line {
+  display: block;
+}
+
+.tk-aw-muted {
+  color: var(--muted);
+}
+
+/* Nog af te wassen: de kolommen van de Excel. De wrapper is het positie-anker
+   voor `sr-only` (zie de regel over brede tabellen in vtk-admin.css). */
+.tk-aw-table-wrap {
+  position: relative;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.tk-aw-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.tk-aw-table th {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tk-aw-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  color: var(--body);
+  /* Niet `anywhere`: dat laat een kolom smaller worden dan haar langste woord,
+     en dan staat er "Internationa-al". */
+  overflow-wrap: break-word;
+}
+
+.tk-aw-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* De eigen groep: de gele rail van een uitgelichte kaart. */
+.tk-aw-table tr[data-own='true'] td:first-child {
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.tk-aw-table-group {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* Geen `white-space: nowrap`: de bevestigingsdialoog van annuleren staat in
+   deze cel en erft dat, en dan liep haar uitleg op één regel van het scherm. */
+.tk-aw-table-actions {
+  width: 1%;
+}
+
+/* Onlangs afgevinkt: een register, zodat een vergissing terug te zetten is. */
+.tk-aw-done {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tk-aw-done li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 14px;
+  color: var(--body);
+}
+
+.tk-aw-done-group {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* De namiddagen: bij "Namiddag kiezen" scrolt de pagina hierheen, en dan mag de
+   kop niet onder de sticky sitekop verdwijnen. */
+.tk-aw-plan {
+  scroll-margin-top: 88px;
+}
+
+/* Kiesmodus: wat er gekozen wordt, en een knop om te stoppen. */
+.tk-aw-picking {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: inset 3px 0 0 var(--yellow);
+  font-size: 14px;
+  color: var(--body);
+}
+
+.tk-aw-picking strong {
+  color: var(--ink);
+}
+
+.tk-aw-picking:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* De week na het evenement, in kiesmodus: een tint achter de rij en een woord
+   bij de weekkop, zodat de kleur niet alleen staat. */
+.tk-aw-week[data-suggested='true'] {
+  margin: -6px;
+  padding: 6px;
+  border-radius: 18px;
+  background: var(--paper-2);
+}
+
+.tk-aw-week-hint {
+  justify-self: start;
+  margin-top: 4px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tk-aw-cell[data-picking='true'] .tk-aw-book {
+  text-decoration: underline;
+  text-decoration-color: var(--yellow);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.tk-aw-weeks {
+  display: grid;
+  gap: 14px;
+}
+
+.tk-aw-week {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.tk-aw-week-title {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding-top: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.tk-aw-week-range {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-aw-days {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tk-aw-days > li {
+  display: grid;
+}
+
+.tk-aw-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-height: 96px;
+  padding: 8px 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--body);
+  font: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.tk-aw-cell[data-today='true'] {
+  border-color: var(--ink);
+}
+
+.tk-aw-date {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-aw-today-pin {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Vrij: de hele kaart is de knop. */
+.tk-aw-cell[data-kind='free'] {
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.tk-aw-cell[data-kind='free']:hover {
+  border-color: var(--line-2);
+  background: var(--paper);
+}
+
+.tk-aw-cell[data-kind='free']:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.tk-aw-free-text {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.tk-aw-book {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* De drie uren van een dag, elk een rij: vrij is een knop, geboekt draagt de
+   naam van de groep, voorbij is grijs. */
+.tk-aw-hours-list {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tk-aw-hours-list > li {
+  display: grid;
+}
+
+.tk-aw-hour {
+  display: grid;
+  grid-template-columns: 3.1em minmax(0, 1fr);
+  align-items: baseline;
+  gap: 6px;
+  min-height: 26px;
+  padding: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.3;
+  text-align: left;
+  color: var(--body);
+  background: transparent;
+}
+
+.tk-aw-hour-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.tk-aw-hour[data-kind='free'] {
+  border-color: var(--line);
+  cursor: pointer;
+}
+
+.tk-aw-hour[data-kind='free']:hover {
+  border-color: var(--line-2);
+  background: var(--paper);
+}
+
+.tk-aw-hour[data-kind='free']:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.tk-aw-hour[data-kind='booked'] {
+  background: var(--paper-2);
+}
+
+.tk-aw-hour[data-own='true'] {
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.tk-aw-hour[data-past='true'] {
+  opacity: 0.7;
+}
+
+.tk-aw-hour-group {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.tk-aw-hour-free {
+  color: var(--muted);
+}
+
+.tk-aw-hour[data-picking='true'] .tk-aw-book {
+  text-decoration: underline;
+  text-decoration-color: var(--yellow);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+/* Geboekt. De eigen groep krijgt de gele rail, zoals een uitgelichte kaart. */
+.tk-aw-cell[data-own='true'] {
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.tk-aw-group {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.tk-aw-note,
+.tk-aw-by {
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--body);
+}
+
+.tk-aw-by {
+  color: var(--muted);
+}
+
+.tk-aw-warn {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--low-ink);
+}
+
+.tk-aw-ok {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ok-ink);
+}
+
+/* Voorbij: er valt niets meer te doen, dus geen kaart. */
+.tk-aw-cell[data-kind='past'],
+.tk-aw-cell[data-past='true'] {
+  background: transparent;
+  border-style: dashed;
+}
+
+.tk-aw-cell[data-past='true'] .tk-aw-group {
+  color: var(--body);
+}
+
+/* Dicht: het gestreepte patroon dat de site ook voor een ontbrekende foto gebruikt. */
+.tk-aw-cell[data-kind='closed'] {
+  background: repeating-linear-gradient(135deg, var(--paper-2) 0 8px, var(--paper) 8px 16px);
+}
+
+.tk-aw-closed {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--body);
+}
+
+.tk-aw-legend {
+  display: grid;
+  gap: 6px;
+  max-width: 72ch;
+}
+
+.tk-aw-legend p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Het boekvenster. */
+.tk-aw-dialog {
+  /* De reset van de site zet de marge van elk element op nul, en daarmee ook
+     de `margin: auto` waarmee de browser een modale <dialog> centreert. */
+  margin: auto;
+  width: min(460px, calc(100% - 32px));
+  max-width: none;
+  max-height: calc(100% - 32px);
+  overflow-y: auto;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--body);
+  box-shadow: 0 24px 60px rgba(10, 15, 31, 0.24);
+}
+
+.tk-aw-dialog::backdrop {
+  background: rgba(10, 15, 31, 0.45);
+}
+
+.tk-aw-dialog-body {
+  display: grid;
+  gap: 14px;
+  padding: 20px 22px 22px;
+}
+
+.tk-aw-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tk-aw-dialog-head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.tk-aw-dialog-when {
+  font-size: 14px;
+  color: var(--body);
+}
+
+.tk-aw-dialog-when strong {
+  color: var(--ink);
+}
+
+.tk-aw-form {
+  display: grid;
+  gap: 14px;
+}
+
+.tk-aw-for {
+  font-size: 14px;
+  color: var(--body);
+}
+
+.tk-aw-for strong {
+  color: var(--ink);
+}
+
+.tk-aw-fieldset {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.tk-aw-fieldset legend {
+  margin-bottom: 6px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tk-aw-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+
+.tk-aw-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 24px;
+  font-size: 14px;
+  color: var(--body);
+}
+
+.tk-aw-choice input {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: var(--ink);
+}
+
+.tk-aw-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tk-aw-dialog-warn:empty {
+  display: none;
+}
+
+.tk-aw-dialog-warn {
+  padding: 10px 12px;
+  border-left: 3px solid var(--yellow);
+  border-radius: 0 10px 10px 0;
+  background: var(--paper);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--body);
+}
+
+.tk-aw-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Smal: elke week wordt een lijst, met de week als kop erboven. */
+@media (max-width: 760px) {
+  .tk-aw-week {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .tk-aw-week-title {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding-top: 0;
+  }
+
+  .tk-aw-days {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .tk-aw-cell {
+    min-height: 0;
+  }
+
+  .tk-aw-book {
+    margin-top: 2px;
+  }
+
+  .tk-aw-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* De tabel wordt een lijst van kaartjes, met de kolomnaam bij elke waarde. */
+  .tk-aw-table-wrap {
+    overflow-x: visible;
+  }
+
+  .tk-aw-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .tk-aw-table,
+  .tk-aw-table tbody,
+  .tk-aw-table tr,
+  .tk-aw-table td {
+    display: block;
+  }
+
+  .tk-aw-table tr {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .tk-aw-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .tk-aw-table td {
+    padding: 4px 14px;
+    border-bottom: 0;
+  }
+
+  .tk-aw-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .tk-aw-table tr[data-own='true'] td:first-child {
+    box-shadow: none;
+  }
+
+  .tk-aw-table tr[data-own='true'] {
+    box-shadow: inset 3px 0 0 var(--yellow);
+  }
+
+  .tk-aw-table-actions {
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-aw-cell[data-kind='free'] {
+    transition: none;
+  }
+}

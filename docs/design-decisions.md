@@ -14239,6 +14239,78 @@ week" en "aller tijden". Dat staat sinds november 2026 op
   bonnetjes op en staat niet in de shiftgeschiedenis. Niemand krijgt een mail:
   de verantwoordelijken kijken zelf op deze pagina.
 
+## Theokot: afwasbeurten
+
+Een post die na een evenement vuile bekers, glazen of kommetjes naar de loods
+brengt, moet die in Theokot komen afwassen. Dat liep via een Excel "bekers
+afwassen": links wat er vuil is (post, hoeveel, soort, afgewassen), rechts de
+tijdsloten. Die lijst staat nu op `/admin/theokot/afwas` (`lib/theokotAfwas*.ts`),
+november 2026.
+
+- **Drie uren per werkdag, één groep per uur**, zoals de tabbladen per week in
+  de Excel: 14u-15u, 15u-16u en 16u-17u. Een afwas mag meerdere uren van dezelfde
+  dag nemen (BR deed vaak 14u-16u, Dev eens de hele namiddag), en verschillende
+  groepen delen een dag. Het eerste uur begint waar de namiddagshift uit het
+  sjabloon "Theokot opening" begint (de shift met "namiddag" in de naam, anders
+  de laatste): verschuift Theokot de namiddag in het sjabloon, dan volgt de afwas.
+  Een uur is uniek per dag in de database (`TheokotDishwashHour`), zodat twee
+  groepen die tegelijk boeken niet allebei hetzelfde uur krijgen.
+- **Posten, werkgroepen en jaarwerkingen boeken allemaal**, elk lid voor zijn
+  eigen groep.
+- **Theokot is open tenzij we zeker weten van niet.** Een verkoopweek staat pas
+  de week ervoor online, terwijl een post verder vooruit boekt. Staat er voor
+  een week nog niets, dan telt elke dag als open. Zet Theokot de week online
+  zonder een dag (of zet ze een dag op dicht), dan is die namiddag niet meer te
+  boeken, en krijgt een groep die er al stond één mail om met "Namiddag
+  wijzigen" een andere te kiezen. De boeking blijft staan: "Theokot regelt het
+  als het fout is".
+- **De week na het evenement is een waarschuwing, geen regel.** Logistiek brengt
+  de vuile bekers op de maandag na het evenement naar Theokot en haalt ze de
+  maandag daarna terug, dus de afwas hoort in die week. Wie uren boekt,
+  vult de datum van het evenement in; buiten de week erna zegt het venster dat,
+  en de lijst toont het, maar boeken kan. De Excel zei "max 1 week na het
+  evenement"; Theokot koos ervoor om dat niet af te dwingen, want vijf
+  namiddagen per week raken in een drukke week op.
+- **Wat er vuil is en het tijdslot zijn één regel**, met een namiddag die
+  ontbreken mag. Zo staat wat er in de Excel links stond (soort, hoeveel) in
+  dezelfde rij als het tijdslot rechts.
+- **Eerst noteren, de namiddag later.** "Afwas noteren" is de hoofdingang en
+  vraagt geen namiddag; vaak noteert Logistiek of Theokot het, en kiest de post
+  daarna zelf wanneer ze komt. Dat gebeurt met "Namiddag kiezen" op de regel:
+  het raster gaat in kiesmodus en duidt de week na het evenement aan. Dezelfde
+  knop heet "Namiddag wijzigen" zodra er een namiddag is: verzetten houdt de
+  regel (wat, hoeveel, evenement), waar annuleren en opnieuw boeken alles
+  opnieuw liet intikken. Een vrije namiddag rechtstreeks aanklikken kan nog
+  altijd; heeft de groep een regel zonder namiddag, dan stelt het venster die
+  voor in plaats van een tweede te maken.
+- **Wie iets voor een andere groep noteert, verwittigt die groep.** De leden
+  krijgen meteen een mail (zonder namiddag: kies er een; met namiddag: wanneer).
+  Staat een regel twee dagen later nog zonder namiddag, dan volgt één
+  herinnering; die geldt ook voor wat de groep zelf zonder namiddag noteerde.
+  Twee dagen, omdat Logistiek de bekers op maandag brengt: wie maandag genoteerd
+  wordt, heeft woensdag nog donderdag en vrijdag. Wie een namiddag van een andere
+  groep verzet, stuurt geen aparte mail; de herinnering van de dag ervoor volgt
+  de nieuwe namiddag.
+- **Wie toevoegt, afvinkt en annuleert.** Elk lid van een groep voor zijn eigen
+  groep, met of zonder namiddag. Theokot (`theokot.manage`) en Logistiek
+  (`logistiek.manage`) voor elke groep: Logistiek weet als eerste dat er vuile
+  bekers in de loods liggen. Alle drie vinken af. Een groep annuleert tot het
+  begin van haar namiddag en zolang niets afgevinkt is; Theokot en Logistiek
+  altijd. Annuleren voor een andere groep stuurt geen mail, zoals een verkoopdag
+  verwijderen dat ook niet doet.
+- **Afvinken vraagt geen bevestiging.** Onder de lijst staan de laatste
+  afgevinkte regels met een knop om ze terug te zetten; dat is de weg terug.
+- **Een herinnering de dag ervoor, aan elk lid van de groep**, via de
+  shift-worker, net als de andere drie mails. Niet voor wie binnen de 24 uur
+  boekt, niet op een dag dat Theokot dicht is, en niet wanneer alles al
+  afgevinkt is.
+- **Telt nergens mee.** Geen beurtrol, geen quotum, geen bonnetjes: het is iets
+  wat een post doet omdat haar evenement iets vuil maakte.
+- **De oude regels worden overgetikt, niet geïmporteerd.** Theokot zet de paar
+  regels die in de Excel nog open stonden met de hand op de site, zonder
+  namiddag; de posten krijgen dan de mail om een namiddag te kiezen. Een importknop voor één keer vijftien rijen was meer werk dan het
+  overtikken.
+
 ## Opruiming van de bucket
 
 Wie in de editor een nieuwe PDF uploadt en de link naar de oude weghaalt, liet

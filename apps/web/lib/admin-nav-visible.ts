@@ -79,6 +79,15 @@ export async function visibleAdminNav(session: Session, locale: Locale): Promise
     // zijn eigen post. Een gewoon werkgroeplid en een jaarwerking tellen niet
     // (zie `countsForBo` in lib/bo/own.ts).
     if (guard.post) return session.groups.some(countsForBo);
+    // Afwas Theokot: elke groep voor zichzelf; Theokot en Logistiek zien alles
+    // (zelfde regel als `canManageAfwas` in lib/theokotAfwas-server.ts).
+    if (guard.afwas) {
+      return (
+        session.groups.length > 0 ||
+        session.permissions.includes('theokot.manage') ||
+        session.permissions.includes('logistiek.manage')
+      );
+    }
     if (guard.pocRep) return session.permissions.includes("pocs.manage") || pocRep;
     if (guard.mailGroups) return mailGroupsVisible;
     if (guard.posten) return postenVisible;

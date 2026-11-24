@@ -52,6 +52,8 @@ import { shiftReminderMail } from "@/lib/shift/reminders";
 import { shiftReplacedMail } from "@/lib/shift/replace";
 import { newLesbezoekNotificationMail } from "@/lib/lesbezoeken-server";
 import { newRentalNotificationMail } from "@/lib/theokotVerhuur-server";
+import { describeAfwas } from "@/lib/theokotAfwas";
+import { afwasClosedMail, afwasNotedMail, afwasPickReminderMail, afwasReminderMail } from "@/lib/theokotAfwasMail";
 import {
   attendeeMessageMail,
   orderConfirmationMail,
@@ -151,8 +153,8 @@ export function mailPreviewGroups(): MailPreviewGroup[] {
     {
       id: "theokot",
       title: "Theokot",
-      description: "Broodjes en de verhuur van de zaal.",
-      mails: theokotPreviews(),
+      description: "Broodjes, de verhuur van de zaal, en de afwas die een post na een evenement boekt.",
+      mails: [...theokotPreviews(), ...afwasPreviews()],
     },
     {
       id: "piano",
@@ -1069,6 +1071,82 @@ function theokotPreviews(): MailPreview[] {
       ...rental,
       notes: [
         "De twee links openen een bevestigingsscherm en versturen zelf niets: een mailclient die links vooruitlaadt zou anders een aanvraag kunnen goedkeuren.",
+      ],
+    },
+  ];
+}
+
+function afwasPreviews(): MailPreview[] {
+  // Een dinsdagnamiddag op de uren van de meegeleverde namiddagshift.
+  const input = {
+    name: "Wannes",
+    locale: "NL" as const,
+    groupName: "Activiteiten",
+    start: new Date("2026-10-06T12:00:00.000Z"),
+    end: new Date("2026-10-06T14:00:00.000Z"),
+    what: describeAfwas("3 bakken", ["ECOCUPS", "GLAZEN"], true),
+    note: "Cantus",
+  };
+  const open = {
+    name: input.name,
+    locale: input.locale,
+    groupName: "Onthaal",
+    what: describeAfwas("3 bakken", ["ECOCUPS"], true),
+    note: "Openingsfuif",
+    eventDate: new Date("2026-10-01T10:00:00.000Z"),
+    start: null,
+    end: null,
+  };
+  return [
+    {
+      id: "theokot-afwas-noted",
+      title: "Kies een namiddag om af te wassen",
+      when: "Zodra iemand buiten de groep (Theokot of Logistiek) afwas voor haar noteert, via de shift-worker (elke vijf minuten).",
+      to: "Elk lid van de groep waarvoor de afwas genoteerd werd",
+      source: "theokot",
+      file: "lib/theokotAfwasMail.ts",
+      ...afwasNotedMail({ ...open, notedBy: "Wannes Voorbeeld" }),
+      notes: [
+        "Niet wanneer de groep het zelf noteerde.",
+        "Koos wie noteerde al een namiddag, dan zegt de mail wanneer in plaats van er een te vragen.",
+        "Niet meer wanneer de afwas intussen afgevinkt of geannuleerd is.",
+      ],
+    },
+    {
+      id: "theokot-afwas-pick",
+      title: "Nog geen namiddag gekozen",
+      when: "Twee dagen na het noteren, als er dan nog altijd geen namiddag gekozen is. Eén keer per regel.",
+      to: "Elk lid van de groep",
+      source: "theokot",
+      file: "lib/theokotAfwasMail.ts",
+      ...afwasPickReminderMail(open),
+      notes: ["Ook voor een regel die de groep zelf zonder namiddag noteerde."],
+    },
+    {
+      id: "theokot-afwas-reminder",
+      title: "Morgen afwassen in Theokot",
+      when: "24 uur voor het begin van de afwasnamiddag, via de shift-worker (elke vijf minuten).",
+      to: "Elk lid van de post, werkgroep of jaarwerking die de namiddag boekte, in het werkingsjaar van die dag",
+      source: "theokot",
+      file: "lib/theokotAfwasMail.ts",
+      ...afwasReminderMail(input),
+      notes: [
+        "Wie binnen de 24 uur boekt, krijgt ze niet: wie net boekte, weet dat het morgen is.",
+        "Niet wanneer Theokot die dag dicht is (dan is de melding hieronder al vertrokken), en niet wanneer de afwas al afgevinkt is.",
+        "Het uur komt uit de namiddagshift van het sjabloon \"Theokot opening\", niet uit de boeking.",
+      ],
+    },
+    {
+      id: "theokot-afwas-closed",
+      title: "Theokot is die dag niet open",
+      when: "Zodra Theokot de verkoopweek online zet zonder de geboekte dag (of die dag op dicht zet), via de shift-worker. Eén keer per boeking.",
+      to: "Elk lid van de groep die de namiddag boekte",
+      source: "theokot",
+      file: "lib/theokotAfwasMail.ts",
+      ...afwasClosedMail(input),
+      notes: [
+        "Een week waar nog geen enkele verkoopdag voor online staat, telt als open: verder dan een week vooruit is dat de gewone toestand.",
+        "De regel blijft op de lijst staan met die namiddag; de groep, Theokot of Logistiek annuleert ze en boekt een andere.",
       ],
     },
   ];

@@ -47,6 +47,8 @@ export type NavGuard = {
   jaarwerking?: boolean;
   /** Wie dit werkingsjaar in een post zit of een werkgroep trekt (Mijn budgetten, `countsForBo`). */
   post?: boolean;
+  /** Afwas Theokot: elk lid van een post, werkgroep of jaarwerking, plus `theokot.manage` en `logistiek.manage`. */
+  afwas?: boolean;
   /** Peilingen: de RiVers van dit werkingsjaar, en wie `pocs.manage` heeft. */
   pocRep?: boolean;
   /**
@@ -178,6 +180,11 @@ export function getAdminNav(): NavEntry[] {
       // Het tweede tabblad van Shiften: wie de zaak openhoudt. Verborgen in de
       // zijbalk (het is een tabblad), wel te vinden met Ctrl/Cmd+K.
       item('theokotVerantwoordelijken', '/theokot/shiften/verantwoordelijken', { perm: 'theokot.manage', hidden: true }),
+      // De lijst "bekers afwassen": een post die na een evenement vuile bekers
+      // naar de loods bracht, boekt hier een namiddag om ze in Theokot af te
+      // wassen. Elk lid van een groep ziet het, en Logistiek; wie enkel dit
+      // ziet, krijgt het als losse tab.
+      item('theokotAfwas', '/theokot/afwas', { afwas: true }),
     ]),
     // Google Admin: de groepsadressen, de @vtk.be-accounts en hun
     // organisatie-eenheden, met tabbladen in de pagina zelf. Stond onder
