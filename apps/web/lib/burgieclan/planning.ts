@@ -17,6 +17,7 @@ import {
   burgieclanRequest,
   type BurgieclanConfig,
 } from "./client";
+import { applyPersonalOperation, isPersonalOperation, personalItems, PersonalItemNotFound } from "./personal";
 
 /**
  * De planning van Burgieclan voor de app: elke aanvraag gaat door naar
@@ -51,6 +52,7 @@ function emptyPlanning(available: boolean, config: BurgieclanConfig | null): App
     items: [],
     vtkEvents: [],
     block: { exams: [], tasks: [], freeDays: [] },
+    personal: [],
   };
 }
 
@@ -168,6 +170,12 @@ export async function runPlanning(userId: string, locale: AppLocale, call: Plann
   const config = burgieclanConfig();
   if (!config) return emptyPlanning(false, null);
 
+  // Een privé item gaat niet naar Burgieclan: dat bewaart vtk.be zelf.
+  if (call.kind === "operation" && isPersonalOperation(call.operation)) {
+    await applyPersonalOperation(userId, call.operation);
+    call = { kind: "get" };
+  }
+
   let raw: Raw | null;
   switch (call.kind) {
     case "get":
@@ -192,7 +200,9 @@ export async function runPlanning(userId: string, locale: AppLocale, call: Plann
       raw = await burgieclanRequest<Raw>(config, userId, "POST", "/api/study_planner/operations", call.operation);
       break;
   }
-  return toAppPlanning(raw ?? {}, config, locale);
+  const planning = toAppPlanning(raw ?? {}, config, locale);
+  planning.personal = await personalItems(userId, planning.today);
+  return planning;
 }
 
 /**
@@ -205,6 +215,9 @@ export function planningErrorResponse(request: Request, error: unknown): Respons
     return appError(request, APP_ERROR.serverError, 502, {
       message: "Burgieclan is even niet bereikbaar. Probeer het straks opnieuw.",
     });
+  }
+  if (error instanceof PersonalItemNotFound) {
+    return appError(request, APP_ERROR.notFound, 404, { message: "Dat item staat niet (meer) in je planning." });
   }
   if (!(error instanceof BurgieclanError)) return null;
 

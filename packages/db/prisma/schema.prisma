@@ -811,6 +811,7 @@ model User {
   appInstalls             AppInstall[]                @relation("AppInstallUser")
   appSessions             AppSession[]                @relation("AppSessionUser")
   appActions              AppAction[]                 @relation("AppActionUser")
+  planningPersonal        PlanningPersonalItem[]      @relation("PlanningPersonalUser")
   /// De weergave die iemand koos op een beheerscherm met meer dan één weergave.
   viewPreferences         UserViewPreference[]
   calendarInterests       CalendarEventInterest[]     @relation("CalendarInterestUser")
@@ -8371,6 +8372,33 @@ model AppPushDevice {
 enum AppPushPlatform {
   ios
   android
+}
+
+/// Een eigen, privé item in de planning van de app: een afspraak die bij geen
+/// vak en geen VTK-evenement hoort. De lessen, deadlines en VTK-evenementen
+/// komen van Burgieclan; dit bewaart vtk.be zelf, want Burgieclan kent enkel
+/// items bij een vak. Enkel de eigenaar ziet het (`AppPlanning.personal`).
+///
+/// Wandkloktijd in Leuven, zoals de rest van de planning: een dag en twee uren,
+/// geen tijdstip met tijdzone.
+model PlanningPersonalItem {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  location  String?
+  note      String   @default("")
+  /// "YYYY-MM-DD"
+  date      String
+  allDay    Boolean  @default(false)
+  /// "HH:MM"; leeg bij een hele dag. `end` mag "24:00" zijn.
+  start     String?
+  end       String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  user User @relation("PlanningPersonalUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
 }
 
 /// Eén installatie van de VTK-app, voor de statistieken onder Admin › Website ›

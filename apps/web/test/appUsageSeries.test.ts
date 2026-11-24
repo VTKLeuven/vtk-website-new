@@ -83,3 +83,22 @@ describe("appPlanningOperationSchema, blokkalender", () => {
     expect(() => appPlanningOperationSchema.parse({ op: "addTask", task: { date: "2027-01-02", subject: null, title: " " } })).toThrow();
   });
 });
+
+describe("appPlanningOperationSchema, privé items", () => {
+  const item = { title: "Tandarts", location: "Naamsestraat 1", note: "", date: "2026-12-02", allDay: false, start: "14:00", end: "15:00" };
+
+  it("aanvaardt een item met een begin en een einde, en een hele dag zonder uren", () => {
+    expect(appPlanningOperationSchema.parse({ op: "addPersonal", item }).op).toBe("addPersonal");
+    expect(
+      appPlanningOperationSchema.parse({ op: "addPersonal", item: { ...item, allDay: true, start: null, end: null } }).op,
+    ).toBe("addPersonal");
+    expect(appPlanningOperationSchema.parse({ op: "updatePersonal", id: "abc", item: { ...item, end: "24:00" } }).op).toBe(
+      "updatePersonal",
+    );
+  });
+
+  it("weigert een einde voor het begin en een item zonder titel", () => {
+    expect(() => appPlanningOperationSchema.parse({ op: "addPersonal", item: { ...item, end: "13:00" } })).toThrow();
+    expect(() => appPlanningOperationSchema.parse({ op: "addPersonal", item: { ...item, title: "  " } })).toThrow();
+  });
+});

@@ -1743,6 +1743,37 @@ export type AppPlanningBlock = {
   freeDays: string[];
 };
 
+/**
+ * Een eigen, privé item in de planning: een afspraak die bij geen vak en geen
+ * VTK-evenement hoort ("tandarts", "verjaardag mama"). Het staat op vtk.be en
+ * niet op Burgieclan, en enkel de eigenaar ziet het. Eén dag; `startMin` en
+ * `endMin` zijn minuten sinds middernacht op `date` (0 en 1440 bij `allDay`).
+ */
+export type AppPlanningPersonal = {
+  id: string;
+  title: string;
+  location: string | null;
+  note: string;
+  date: string;
+  allDay: boolean;
+  /** "HH:MM", null bij een hele dag. */
+  start: string | null;
+  end: string | null;
+  startMin: number;
+  endMin: number;
+};
+
+export type AppPlanningPersonalInput = {
+  title: string;
+  location: string | null;
+  note: string;
+  date: string;
+  allDay: boolean;
+  /** Verplicht zonder `allDay`; `end` ligt na `start`, op dezelfde dag. */
+  start: string | null;
+  end: string | null;
+};
+
 export type AppPlanning = {
   /**
    * `false` wanneer deze site niet met Burgieclan gekoppeld is (geen
@@ -1775,6 +1806,8 @@ export type AppPlanning = {
    * niet mee, en de app toont het tabblad Blok dan leeg.
    */
   block?: AppPlanningBlock;
+  /** Je eigen privé items (sinds november 2026); een oudere server stuurt ze niet. */
+  personal?: AppPlanningPersonal[];
 };
 
 /** Een vak bij een examen of een taak: "course:<id>" of "name:<naam>". */
@@ -1816,7 +1849,11 @@ export type AppPlanningOperation =
   | { op: "taskDone"; id: string; value: boolean }
   /** Zet elke taak die voorbij is en niet afgevinkt, op `date`. */
   | { op: "catchUp"; date: string }
-  | { op: "freeDay"; date: string; value: boolean };
+  | { op: "freeDay"; date: string; value: boolean }
+  // Je eigen privé items. Die bewaart vtk.be zelf; Burgieclan ziet ze niet.
+  | { op: "addPersonal"; item: AppPlanningPersonalInput }
+  | { op: "updatePersonal"; id: string; item: AppPlanningPersonalInput }
+  | { op: "deletePersonal"; id: string };
 
 // -----------------------------------------------------------------------------
 // Beheer: de admin in de app, voor wie er toegang toe heeft

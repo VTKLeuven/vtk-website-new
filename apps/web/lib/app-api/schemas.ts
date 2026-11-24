@@ -136,6 +136,21 @@ const planningTaskInput = z
   .object({ date: isoDate, subject: planningSubject.nullable(), title: z.string().trim().max(200) })
   .refine((task) => task.subject !== null || task.title !== "", { message: "Een taak heeft een vak of een titel." });
 
+/** Een privé item: een titel, en een begin en einde op dezelfde dag tenzij het de hele dag duurt. */
+const planningPersonalInput = z
+  .object({
+    title: z.string().trim().min(1).max(200),
+    location: z.string().trim().max(200).nullable(),
+    note: z.string().trim().max(2000),
+    date: isoDate,
+    allDay: z.boolean(),
+    start: hhmm.nullable(),
+    end: z.union([hhmm, z.literal("24:00")]).nullable(),
+  })
+  .refine((item) => item.allDay || (item.start !== null && item.end !== null && item.end > item.start), {
+    message: "Een item heeft een begin en een einde dat erna ligt.",
+  });
+
 export const appPlanningOperationSchema = z.discriminatedUnion("op", [
   z.object({ op: z.enum(["done", "hide", "mandatory"]), uid: planningId, value: z.boolean() }),
   z.object({ op: z.literal("keepOnly"), uid: planningId }),
@@ -166,6 +181,10 @@ export const appPlanningOperationSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("taskDone"), id: planningId, value: z.boolean() }),
   z.object({ op: z.literal("catchUp"), date: isoDate }),
   z.object({ op: z.literal("freeDay"), date: isoDate, value: z.boolean() }),
+  // Je eigen privé items, op vtk.be.
+  z.object({ op: z.literal("addPersonal"), item: planningPersonalInput }),
+  z.object({ op: z.literal("updatePersonal"), id: planningId, item: planningPersonalInput }),
+  z.object({ op: z.literal("deletePersonal"), id: planningId }),
 ]);
 
 export const appPlanningSubscriptionSchema = z.object({ icsUrl: z.string().trim().min(1).max(1000) });
