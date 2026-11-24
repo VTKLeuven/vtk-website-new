@@ -2137,3 +2137,67 @@ export type AppCudiTimeslotResult =
   | ({ ok: true } & AppCudiTimeslots)
   | { ok: false; code: "NOT_FOUND" | "PASSED" | "FULL" | "SAME_DAY" | "ALREADY" | "CUTOFF"; message: string };
 
+
+// -----------------------------------------------------------------------------
+// Alma
+// -----------------------------------------------------------------------------
+
+/**
+ * De vier Alma's op campus Arenberg, zoals alma.be ze toont: het menu van een dag
+ * en de uren van de komende week. Alma heeft geen API; de site leest hun pagina's
+ * (`lib/alma/`) en bewaart ze een half uur. Iedereen mag dit zien, ook zonder
+ * account.
+ */
+export type AppAlmaDish = {
+  id: string;
+  name: string;
+  /**
+   * In eurocent: studenten en personeel van KU Leuven, andere studenten, andere
+   * klanten. `null` waar Alma die prijs niet vermeldt; gratis is 0.
+   */
+  prices: { kuleuven: number | null; student: number | null; other: number | null };
+  diet: "vegan" | "vegetarian" | "meat" | null;
+  /** "Gevogelte", "Rund", "Vis", ... zoals Alma het schrijft, of `null`. */
+  protein: string | null;
+  /** De klimaatimpact die Alma bij een gerecht zet. */
+  climate: "very-low" | "low" | "medium" | "high" | null;
+  imageUrl: string | null;
+};
+
+export type AppAlmaMenuSection = {
+  /** "Warm buffet", "Soep", "Broodjes", ... */
+  title: string;
+  /** "Maaltijd I", "Optioneel", ...; `null` voor een sectie zonder groepen. */
+  groups: { title: string | null; dishes: AppAlmaDish[] }[];
+};
+
+export type AppAlmaRestaurant = {
+  slug: "alma-3" | "alma-quadrivium" | "de-moete" | "esat2";
+  name: string;
+  /** Korter, voor een pil of een smalle regel: "Quadrivium". */
+  shortName: string;
+  address: string | null;
+  location: { lat: number; lng: number } | null;
+  /** De pagina op alma.be. */
+  url: string;
+  openNow: boolean;
+  /** Eén regel: "tot 14:00", "opent 17:30", "morgen 10:00", "gesloten". */
+  detail: string;
+  /** De vensters van vandaag, alle soorten samen, in minuten sinds middernacht. */
+  today: AppHoursWindow[];
+  /** Per soort aanbod ("Warme maaltijden", ...) de komende zeven dagen. */
+  hours: { kind: string; days: { date: string; windows: AppHoursWindow[] }[] }[];
+  /** De dag waarvan `menu` het menu is, of `null` wanneer er geen is. */
+  menuDate: string | null;
+  menu: AppAlmaMenuSection[];
+  /** De pagina kon niet opgehaald of gelezen worden; toon dan geen "gesloten". */
+  unavailable: boolean;
+};
+
+export type AppAlma = {
+  /** De gevraagde dag, of vandaag in Brussel. */
+  date: string;
+  /** De dagen waarvoor minstens één Alma een menu heeft, oplopend. */
+  dates: string[];
+  restaurants: AppAlmaRestaurant[];
+};
