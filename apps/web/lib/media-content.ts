@@ -29,6 +29,13 @@ export type MediaPublication = {
    * streepjesvlak.
    */
   coverKey?: string;
+  /**
+   * Elke bladzijde als JPEG, in volgorde, ook gemaakt op de server
+   * (lib/magazineCover.ts). De app toont ze in haar eigen lezer in plaats van de
+   * pdf aan een browser te geven, die ze op Android enkel kan downloaden. Een
+   * editie zonder bladzijden opent in de app nog als pdf.
+   */
+  pageKeys?: string[];
 };
 
 const DEFAULT_VIDEOS: MediaVideo[] = [
@@ -169,6 +176,17 @@ function readStorageKey(value: unknown): string | undefined {
   return key;
 }
 
+/**
+ * Een lijst sleutels, alles of niets: met één onleesbare ertussen zou de app een
+ * bladzijde overslaan zonder dat iemand het merkt. Dan liever geen lijst, en
+ * maakt de onderhoudstaak ze opnieuw.
+ */
+function readStorageKeys(value: unknown, max = 200): string[] | undefined {
+  if (!Array.isArray(value) || value.length === 0 || value.length > max) return undefined;
+  const keys = value.map(readStorageKey);
+  return keys.every((key): key is string => Boolean(key)) ? keys : undefined;
+}
+
 function readCollection(value: unknown, properties: readonly string[]): ParsedCollection<unknown> {
   if (Array.isArray(value)) return { valid: true, items: value };
   if (!isPlainRecord(value)) return { valid: false, items: [] };
@@ -256,6 +274,7 @@ function parsePublications(value: unknown): ParsedCollection<MediaPublication> {
     const pdfUrl = readUrl(item.pdfUrl, HTTPS_PROTOCOLS);
     const storageKey = readStorageKey(item.storageKey);
     const coverKey = readStorageKey(item.coverKey);
+    const pageKeys = readStorageKeys(item.pageKeys);
     if (!id || usedIds.has(id) || !kind || !titleNl || !issueNl || (!pdfUrl && !storageKey))
       continue;
 
@@ -271,6 +290,7 @@ function parsePublications(value: unknown): ParsedCollection<MediaPublication> {
       ...(pdfUrl ? { pdfUrl } : {}),
       ...(storageKey ? { storageKey } : {}),
       ...(coverKey ? { coverKey } : {}),
+      ...(pageKeys ? { pageKeys } : {}),
     });
   }
 

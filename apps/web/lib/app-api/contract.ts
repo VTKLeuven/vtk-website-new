@@ -827,6 +827,12 @@ export type AppPublication = {
   /** De PDF. Absolute URL. */
   url: string | null;
   /**
+   * Elke bladzijde als JPEG, in volgorde (absolute URL's), voor de lezer in de
+   * app. `null` of afwezig zolang de server ze niet gemaakt heeft, en bij een
+   * oudere server; dan opent de app de pdf uit `url`.
+   */
+  pages?: string[] | null;
+  /**
    * Enkel het nummer ("Week 6 / Semester 2"), zonder de naam van het blad, die
    * in `title` vooraan staat. Optioneel, zoals `publishedAt`: een oudere server
    * stuurt geen van beide, en dan toont de app `title`.

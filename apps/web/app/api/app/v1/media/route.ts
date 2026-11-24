@@ -74,12 +74,17 @@ export async function GET(request: Request) {
           kind: publication.kind,
           // Bladzijde 1, bewaard bij het uploaden (zie lib/magazineCover.ts).
           coverUrl: absoluteUrl(request, publicUrl(publication.coverKey)),
-          // Een magazine staat ofwel bij ons in de opslag, ofwel op een extern
-          // adres; `absoluteUrl` handelt allebei af.
-          url: absoluteUrl(
-            request,
-            publication.storageKey ? publicUrl(publication.storageKey) : (publication.pdfUrl ?? null),
-          ),
+          // Dezelfde route als de plank op /media, die de pdf uit de opslag of
+          // van een oud adres haalt. Niet `publicUrl(storageKey)`: dat gaf
+          // `/api/media/publications/<hash>.pdf`, en dat adres valt onder deze
+          // route (één segment na `publications/`) en niet onder `[...key]`, dus
+          // gaf elk nummer in de app een 404.
+          url: absoluteUrl(request, `/api/media/publications/${encodeURIComponent(publication.id)}`),
+          // Elke bladzijde als JPEG, voor de lezer in de app; `null` tot de
+          // server ze gemaakt heeft (zie lib/magazineCover.ts).
+          pages: publication.pageKeys?.length
+            ? publication.pageKeys.flatMap((key) => absoluteUrl(request, publicUrl(key)) ?? [])
+            : null,
           issue: issue || null,
           publishedAt: publication.publishedAt ?? null,
         };

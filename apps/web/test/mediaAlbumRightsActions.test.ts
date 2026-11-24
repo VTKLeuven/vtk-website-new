@@ -33,7 +33,7 @@ vi.mock("@vtk/db", () => ({
   prisma: { galleryTrashedAlbum: { findFirst: mocks.trashedFindFirst } },
 }));
 vi.mock("@vtk/storage", () => ({ deleteObject: vi.fn(), newStorageKey: vi.fn(), putObject: vi.fn() }));
-vi.mock("@/lib/magazineCover", () => ({ ensureMagazineCover: vi.fn(), renderPdfCover: vi.fn(), storeCover: vi.fn() }));
+vi.mock("@/lib/magazineCover", () => ({ ensureMagazineCover: vi.fn(), ensureMagazinePages: vi.fn(), renderPdfCover: vi.fn(), storeCover: vi.fn() }));
 vi.mock("@/lib/media-content", () => ({ getMediaContent: vi.fn() }));
 vi.mock("@/lib/fakbar-gallery", () => ({
   fakbarGallery: { createAlbum: vi.fn(), albumVisibilityOf: vi.fn(async () => "public") },

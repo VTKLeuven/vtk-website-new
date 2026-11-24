@@ -8,7 +8,7 @@ import { syncPocDiscordRoles } from "@/lib/discord/pocAccess";
 import { processDueLesbezoekScheduledMails } from "@/lib/lesbezoeken-server";
 import { recordMailingListCounts } from "@/lib/mailingListHistory";
 import { processDueNoShows } from "@/lib/theokot-server";
-import { backfillMagazineCovers } from "@/lib/magazineCover";
+import { backfillMagazines } from "@/lib/magazineCover";
 import { processDuePalPlusReminders } from "@/lib/palPlusNotify";
 import { runNightlyStorageCleanup } from "@/lib/storage-cleanup";
 import { refreshDueBudgetPrices } from "@/lib/bo/budget/priceRound";
@@ -59,8 +59,9 @@ export async function POST(request: Request) {
     // De stand van de mailinglijsten van vandaag, voor de grafiek in
     // /admin/mailinglijsten; zie lib/mailingListHistory.ts.
     recordMailingListCounts(now),
-    // Kaften van Bakske en Ir.Reëel die er nog geen hebben; zie lib/magazineCover.ts.
-    backfillMagazineCovers(),
+    // Kaften en bladzijden (voor de lezer in de app) van Bakske en Ir.Reëel die
+    // er nog geen hebben; zie lib/magazineCover.ts.
+    backfillMagazines(),
     // De herinnering van de dag voor een PAL+-sessie; zie lib/palPlusNotify.ts.
     // Hier en niet in de shift-worker: het is één query per ronde, en een eigen
     // worker zou een eigen secret op de server vragen.

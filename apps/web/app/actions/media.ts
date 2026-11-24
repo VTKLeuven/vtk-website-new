@@ -2,12 +2,18 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { prisma } from "@vtk/db";
 import { deleteObject, newStorageKey, putObject } from "@vtk/storage";
 import { requireAnyPermission, requirePermission } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { logAudit } from "@/lib/audit";
-import { ensureMagazineCover, renderPdfCover, storeCover } from "@/lib/magazineCover";
+import {
+  ensureMagazineCover,
+  ensureMagazinePages,
+  renderPdfCover,
+  storeCover,
+} from "@/lib/magazineCover";
 import {
   getMediaContent,
   type MediaPublication,
@@ -152,6 +158,10 @@ export async function saveMagazineAction(
     target: `${titleNl} ${issueNl}`,
     summary: `${kind === "bakske" ? "'t Bakske" : "Ir-Reëel"} toegevoegd aan de mediapagina`,
   });
+  // De bladzijden voor de lezer in de app, na het antwoord: een dik nummer is
+  // tien seconden rekenen, en daar hoeft wie uploadt niet op te wachten. Lukt
+  // het niet, dan pikt de onderhoudstaak het op.
+  after(() => ensureMagazinePages(id));
   return { ok: true };
 }
 
