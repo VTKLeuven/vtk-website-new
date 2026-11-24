@@ -124,6 +124,7 @@ export const AUDIT_ENTITIES = {
   theokotRental: { nl: "Theokotverhuur", en: "Theokot rental", group: "theokot" },
   theokotRentalContract: { nl: "Huurcontract Theokot", en: "Theokot rental contract", group: "theokot" },
   theokotRentalSettings: { nl: "Instelling Theokotverhuur", en: "Theokot rental setting", group: "theokot" },
+  theokotDishwash: { nl: "Afwasbeurt Theokot", en: "Theokot washing-up", group: "theokot" },
   meeting: { nl: "Vergadering", en: "Meeting", group: "meetings" },
   meetingReservation: { nl: "Broodjesreservatie", en: "Sandwich reservation", group: "meetings" },
   lesbezoek: { nl: "Lesbezoek", en: "Classroom visit", group: "lesbezoeken" },

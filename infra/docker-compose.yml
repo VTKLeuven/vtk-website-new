@@ -347,7 +347,8 @@ services:
       start_period: 90s
 
   # Verstuurt de herinneringen voor shiften: een dag vooraf en twee uur vooraf,
-  # per lid uitzetbaar in het profiel. Elke vijf minuten is ruim genoeg voor een
+  # per lid uitzetbaar in het profiel. Ook de mails van de Theokot-afwas
+  # (herinnering de dag ervoor, "Theokot is die dag dicht") lopen hierlangs. Elke vijf minuten is ruim genoeg voor een
   # bericht dat uren op voorhand vertrekt, en houdt de mailserver rustig.
   shift-worker:
     logging: *app-logging

@@ -805,6 +805,8 @@ model User {
   theokotRentalsCreated     TheokotRental[]            @relation("TheokotRentalCreatedBy")
   theokotRentalMessages     TheokotRentalMessage[]     @relation("TheokotRentalMessageSentBy")
   theokotRentalContracts    TheokotRentalContractDoc[] @relation("TheokotRentalContractUploadedBy")
+  theokotDishwashesCreated  TheokotDishwash[]          @relation("TheokotDishwashCreatedBy")
+  theokotDishwashesWashed   TheokotDishwash[]          @relation("TheokotDishwashWashedBy")
 
   appPushDevices          AppPushDevice[]             @relation("AppPushDeviceUser")
   appNotificationPrefs    AppNotificationPreference[] @relation("AppNotificationPrefUser")
@@ -1023,6 +1025,8 @@ model Group {
   tasksFor                 GroupTask[]               @relation("GroupTaskFor")
   /// Privélinks naar een album die enkel de leden van deze werkgroep openen.
   galleryShareLinks        GalleryShareLink[]
+  /// De namiddagen waarop deze groep in Theokot komt afwassen.
+  theokotDishwashes        TheokotDishwash[]
 }
 
 model GroupMembership {
@@ -4768,6 +4772,82 @@ model TheokotBan {
 
   @@index([userId])
   @@index([active])
+}
+
+/// Wat er in Theokot af te wassen valt.
+enum TheokotDishwashKind {
+  ECOCUPS
+  GLAZEN
+  KOMMETJES
+  ANDERS
+}
+
+/// Een afwasbeurt in Theokot: een post, werkgroep of jaarwerking die na een
+/// eigen evenement de vuile bekers, glazen of kommetjes komt afwassen die
+/// Logistiek op maandag naar Theokot bracht. De opvolger van de Excel
+/// "bekers afwassen": de regel (wat, hoeveel, afgewassen) en de tijdsloten in
+/// één rij. Elke werkdag zijn er drie uren, vanaf het begin van de namiddagshift
+/// uit het sjabloon "Theokot opening"; één groep per uur (`TheokotDishwashHour`),
+/// en een afwas mag meerdere uren van dezelfde dag nemen. Telt nergens mee. Zie
+/// docs/design-decisions.md, "Theokot: afwasbeurten".
+model TheokotDishwash {
+  id          String   @id @default(cuid())
+  /// De kalenderdag in Brussel, zonder uur; null = nog geen namiddag gekozen
+  /// (een regel die Theokot of Logistiek zette, of een post die eerst noteert
+  /// wat er vuil is). Het uur komt uit het sjabloon, zodat een ander uur voor
+  /// de namiddagshift ook de geboekte namiddagen volgt.
+  day         DateTime? @db.Date
+  /// Welke uren van `day`; leeg zolang er geen namiddag is.
+  hours       TheokotDishwashHour[]
+  groupId     String
+  group       Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  /// Wat er af te wassen valt; minstens één.
+  kinds       TheokotDishwashKind[]
+  /// Hoeveel, zoals de post het zegt ("3 bakken", "100 cavaglazen").
+  quantity    String
+  /// De dag van het evenement waar het vuil van komt. De namiddag hoort in de
+  /// week erna te vallen; buiten die week waarschuwt het scherm, het weigert niet.
+  eventDate   DateTime? @db.Date
+  /// Welk evenement, of een opmerking. Optioneel.
+  note        String?
+  /// Afgevinkt door de groep zelf, Theokot of Logistiek; null = nog af te wassen.
+  washedAt    DateTime? @db.Timestamptz(3)
+  washedById  String?
+  washedBy    User?    @relation("TheokotDishwashWashedBy", fields: [washedById], references: [id], onDelete: SetNull)
+  createdById String?
+  createdBy   User?    @relation("TheokotDishwashCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  /// De herinnering van de dag ervoor aan de leden van de groep. Geclaimd vóór
+  /// het mailen, zoals bij de shiften: liever geen mail dan twee.
+  reminderSentAt     DateTime? @db.Timestamptz(3)
+  /// De melding dat Theokot die dag toch niet open is (de week staat online
+  /// zonder die dag). Eén keer per namiddag; opnieuw wanneer de namiddag wijzigt.
+  closedNoticeSentAt DateTime? @db.Timestamptz(3)
+  /// De mail aan de groep dat iemand anders (Theokot, Logistiek) afwas voor haar
+  /// noteerde. Zette de groep het zelf, dan staat dit vanaf het aanmaken: daar
+  /// valt niets te melden.
+  noticeSentAt       DateTime? @db.Timestamptz(3)
+  /// De herinnering dat er twee dagen na het noteren nog geen namiddag gekozen is.
+  pickReminderSentAt DateTime? @db.Timestamptz(3)
+
+  @@index([groupId])
+  @@index([washedAt])
+  @@index([day])
+}
+
+/// Eén uur van een afwasnamiddag. De unieke (dag, uur) houdt twee groepen uit
+/// hetzelfde uur, ook wanneer ze op hetzelfde moment boeken.
+model TheokotDishwashHour {
+  id         String          @id @default(cuid())
+  dishwashId String
+  dishwash   TheokotDishwash @relation(fields: [dishwashId], references: [id], onDelete: Cascade)
+  /// Dezelfde dag als `TheokotDishwash.day`.
+  day        DateTime        @db.Date
+  /// 0 is het eerste uur van de namiddag (nu 14:00), 1 het tweede, 2 het derde.
+  hour       Int
+
+  @@unique([day, hour])
+  @@index([dishwashId])
 }
 
 // -----------------------------------------------------------------------------
