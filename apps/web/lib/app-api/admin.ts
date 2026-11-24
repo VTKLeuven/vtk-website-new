@@ -110,6 +110,22 @@ export async function adminDashboard(session: Session, locale: Locale, origin: s
     })),
   );
 
+  const sectionKind = (tile: (typeof merged)[number]) =>
+    tile.source === "personal" ? ("own" as const) : tile.source === "group" ? ("group" as const) : ("global" as const);
+  const sectionHint = (kind: "global" | "group" | "own") =>
+    kind === "global"
+      ? nl ? "door beheerders ingesteld" : "set by admins"
+      : kind === "own"
+        ? nl ? "alleen jij ziet deze" : "only you see these"
+        : nl ? "jouw post" : "your post";
+  const hostOf = (url: string) => {
+    try {
+      return new URL(absolute(url)).host.replace(/^www\./, "");
+    } catch {
+      return "";
+    }
+  };
+
   const sectionLabel = (tile: (typeof merged)[number]) =>
     tile.source === "personal"
       ? nl ? "Van jou" : "Yours"
@@ -130,6 +146,9 @@ export async function adminDashboard(session: Session, locale: Locale, origin: s
         chip: { background: color.chipBg, foreground: color.chipFg },
         imageUrl: tile.imageKey ? absolute(tileImageUrl(tile.imageKey)) : null,
         section: sectionLabel(tile),
+        sectionKind: sectionKind(tile),
+        sectionHint: sectionHint(sectionKind(tile)),
+        host: hostOf(tile.url),
       };
     });
 
@@ -155,6 +174,7 @@ export async function adminDashboard(session: Session, locale: Locale, origin: s
 
   return {
     adminUrl: `${origin}${base}/admin`,
+    tilesUrl: `${origin}${base}/admin/dashboard-tiles`,
     canOpenDoor: hasPermission(session, "door.remoteOpen"),
     tiles,
     boDue,

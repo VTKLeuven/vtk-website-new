@@ -1,6 +1,7 @@
 import "server-only";
 
 import type {
+  AppBurgieclanEvaluations,
   AppBurgieclanCourse,
   AppBurgieclanCourseDetail,
   AppBurgieclanCourses,
@@ -54,6 +55,31 @@ function document(raw: RawDocument): AppBurgieclanDocument {
     hasFile: Boolean(raw.hasFile),
     underReview: Boolean(raw.underReview),
     createdAt: raw.createdAt,
+  };
+}
+
+/** De evaluaties zoals Burgieclan ze stuurt, met enkel de velden van het contract. */
+function evaluations(raw: AppBurgieclanEvaluations): AppBurgieclanEvaluations {
+  return {
+    recentYears: raw.recentYears ?? [],
+    sections: (raw.sections ?? []).map((section) => ({
+      id: section.id,
+      name: section.name,
+      description: section.description ?? null,
+      rated: Boolean(section.rated),
+      lowLabel: section.lowLabel ?? null,
+      highLabel: section.highLabel ?? null,
+      recent: { average: section.recent?.average ?? null, count: section.recent?.count ?? 0 },
+      allTime: { average: section.allTime?.average ?? null, count: section.allTime?.count ?? 0 },
+      comments: (section.comments ?? []).map((comment) => ({
+        id: comment.id,
+        content: comment.content,
+        year: comment.year ?? null,
+        author: comment.author ?? null,
+        createdAt: comment.createdAt,
+        score: comment.score ?? 0,
+      })),
+    })),
   };
 }
 
@@ -138,14 +164,23 @@ export function courseDetailRoute(request: Request, id: string): Promise<Respons
   return route<AppBurgieclanCourseDetail>(
     request,
     async (config, userId, locale) => {
-      const raw = await burgieclanRequest<{ course: RawCourse; documents: RawDocument[] }>(
+      const raw = await burgieclanRequest<{
+        course: RawCourse;
+        documents: RawDocument[];
+        evaluations?: AppBurgieclanEvaluations;
+      }>(
         config,
         userId,
         "GET",
         `/api/vtk_app/courses/${courseId(id)}?${lang(locale)}`,
       );
       if (!raw) throw new BurgieclanError(404, null);
-      return { course: course(config, raw.course, locale), documents: raw.documents.map(document) };
+      return {
+        course: course(config, raw.course, locale),
+        documents: raw.documents.map(document),
+        // Een oudere Burgieclan stuurt ze niet; dan toont de app enkel de documenten.
+        ...(raw.evaluations ? { evaluations: evaluations(raw.evaluations) } : {}),
+      };
     },
     () => null,
   );

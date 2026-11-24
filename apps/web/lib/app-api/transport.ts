@@ -3,8 +3,9 @@ import "server-only";
 import { prisma } from "@vtk/db";
 import { hasPermission, type SessionPayload } from "@vtk/auth";
 import { pick } from "@vtk/i18n";
-import { brusselsWallClockMinutes, brusselsYMD, isoWeekday, parseYMD, shiftYMD, ymdKey } from "@/lib/brussels";
+import { brusselsWallClockMinutes, brusselsYMD, isoWeekday, parseYMD, shiftYMD, ymdKey, type YMD } from "@/lib/brussels";
 import type { AppLocale, AppTransportTrip, AppTransportWeek } from "./contract";
+import { driverColors, driverInitials, vehiclePattern, type DriverChoice } from "./transportColors";
 
 /**
  * De transportplanning van Logistiek in de app.
@@ -60,11 +61,11 @@ export async function transportWeek(
   const from = brusselsWallClockMinutes(monday, 0);
   const to = brusselsWallClockMinutes(shiftYMD(monday, 7), 0);
 
-  const [vehicles, bookings] = await Promise.all([
+  const [vehicles, bookings, choices] = await Promise.all([
     prisma.uitleenVehicle.findMany({
       where: { active: true },
       orderBy: { sortIndex: "asc" },
-      select: { id: true, nameNl: true, nameEn: true, needsDriver: true },
+      select: { id: true, nameNl: true, nameEn: true, needsDriver: true, pattern: true },
     }),
     prisma.uitleenTransportBooking.findMany({
       where: { status: { in: [...PLANNING_STATUSES] }, startAt: { lt: to }, endAt: { gt: from } },
@@ -84,6 +85,7 @@ export async function transportWeek(
         userId: true,
         groupId: true,
         assignedGroupId: true,
+        driverId: true,
         driver: { select: { name: true } },
         user: { select: { name: true } },
         group: { select: { nameNl: true, nameEn: true } },
@@ -91,7 +93,15 @@ export async function transportWeek(
       },
       orderBy: { startAt: "asc" },
     }),
+    // De kleur die het team voor een chauffeur koos (`driverColorOverrides` in logistiek).
+    prisma.uitleenDriver.findMany({
+      where: { OR: [{ colorIndex: { not: null } }, { customColor: { not: null } }] },
+      select: { userId: true, colorIndex: true, customColor: true },
+    }),
   ]);
+  const choiceOf = new Map<string, DriverChoice>(
+    choices.map((row) => [row.userId, { colorIndex: row.colorIndex, customColor: row.customColor }]),
+  );
 
   const ownGroups = new Set(session.groups.map((group) => group.id));
   const trips: AppTransportTrip[] = bookings.map((booking) => {
@@ -114,6 +124,8 @@ export async function transportWeek(
         : (booking.requesterName ?? post ?? null),
       submittedBy: booking.user?.name ?? null,
       driver: booking.driver?.name ?? null,
+      driverInitials: booking.driver ? driverInitials(booking.driver.name) : null,
+      ...driverColors(booking.driverId, booking.driverId ? choiceOf.get(booking.driverId) : undefined),
       helpers: booking.helpers.map((helper) => helper.name),
       mine:
         booking.userId === session.user.id ||
@@ -128,8 +140,19 @@ export async function transportWeek(
       id: vehicle.id,
       name: pick(vehicle.nameNl, vehicle.nameEn, locale) ?? vehicle.nameNl,
       needsDriver: vehicle.needsDriver,
+      pattern: vehiclePattern(vehicle.pattern),
     })),
+    weekNumber: isoWeekNumber(monday),
     trips,
     logistiekUrl: `${logistiekUrl()}/vervoer/bezetting?week=${weekStart}`,
   };
 }
+
+/** ISO-weeknummer van een maandag: de donderdag van die week bepaalt het jaar. */
+function isoWeekNumber(monday: YMD): number {
+  const thursday = shiftYMD(monday, 3);
+  const date = Date.UTC(thursday.year, thursday.month - 1, thursday.day);
+  const yearStart = Date.UTC(thursday.year, 0, 1);
+  return Math.floor((date - yearStart) / (7 * 24 * 60 * 60 * 1000)) + 1;
+}
+

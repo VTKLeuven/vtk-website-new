@@ -1796,6 +1796,12 @@ export type AppAdminTile = {
   imageUrl: string | null;
   /** "Voor iedereen", de naam van je post, of "Van jou". */
   section: string;
+  /** Waar de sectie vandaan komt: het bolletje voor de kop is navy, geel of grijs. */
+  sectionKind?: "global" | "group" | "own";
+  /** "door beheerders ingesteld", "jouw post", "alleen jij ziet deze". */
+  sectionHint?: string;
+  /** De host van de link, gedempt onder de naam, zoals op het dashboard. */
+  host?: string;
 };
 
 /** Een resultaat dat je post nog naar het bestuursorgaan moet brengen. */
@@ -1811,6 +1817,8 @@ export type AppAdminBoDue = {
 export type AppAdminDashboard = {
   /** De admin zelf, voor "Openen op de site". */
   adminUrl: string;
+  /** Snelkoppelingen aanpassen (/admin/dashboard-tiles). */
+  tilesUrl?: string;
   /** Deze persoon mag de voordeur op afstand openen (`door.remoteOpen`). */
   canOpenDoor: boolean;
   tiles: AppAdminTile[];
@@ -1830,6 +1838,11 @@ export type AppTransportVehicle = {
   name: string;
   /** De bestelwagen vraagt een chauffeur met dat rijbewijs; de bakfiets geen chauffeur. */
   needsDriver: boolean;
+  /**
+   * De arcering van dit voertuig in de planning (`diagonal`, `vertical`, `dots`,
+   * `grid`), of null. De vulkleur is de chauffeur, het patroon het voertuig.
+   */
+  pattern?: "diagonal" | "vertical" | "dots" | "grid" | null;
 };
 
 export type AppTransportStatus = "REQUESTED" | "APPROVED" | "COMPLETED";
@@ -1857,6 +1870,15 @@ export type AppTransportTrip = {
   /** Wie de aanvraag indiende. */
   submittedBy: string | null;
   driver: string | null;
+  /** "AH": het bolletje in het blok. */
+  driverInitials?: string | null;
+  /**
+   * De kleuren van de chauffeur zoals logistiek.vtk.be ze tekent: de vulling van
+   * het blok en de donkerdere toon van het bolletje. Zonder chauffeur het
+   * neutrale grijs en null.
+   */
+  fill?: string;
+  tone?: string | null;
   helpers: string[];
   /** Deze rit is van jou of van je post. */
   mine: boolean;
@@ -1865,6 +1887,8 @@ export type AppTransportTrip = {
 export type AppTransportWeek = {
   /** Maandag van de week, "YYYY-MM-DD" in Brussel. */
   weekStart: string;
+  /** Het ISO-weeknummer, voor "Week 48". */
+  weekNumber?: number;
   vehicles: AppTransportVehicle[];
   trips: AppTransportTrip[];
   /** logistiek.vtk.be/vervoer, om een rit aan te vragen of te wijzigen. */
@@ -1911,9 +1935,44 @@ export type AppBurgieclanCourses = {
   burgieclanUrl: string;
 };
 
+export type AppBurgieclanComment = {
+  id: number;
+  content: string;
+  /** Academiejaar waarover het gaat, bv. "2024 - 2025". */
+  year: string | null;
+  /** Null wanneer de schrijver anoniem bleef. */
+  author: string | null;
+  createdAt: string;
+  /** Stemmen voor min stemmen tegen. */
+  score: number;
+};
+
+/** Eén rubriek van de vakevaluatie, zoals op de vakpagina van Burgieclan. */
+export type AppBurgieclanEvaluationSection = {
+  id: number;
+  name: string;
+  description: string | null;
+  /** Met sterren (1 tot 5); anders enkel opmerkingen. */
+  rated: boolean;
+  lowLabel: string | null;
+  highLabel: string | null;
+  /** `average` is null onder het minimum aantal scores, zoals op Burgieclan. */
+  recent: { average: number | null; count: number };
+  allTime: { average: number | null; count: number };
+  comments: AppBurgieclanComment[];
+};
+
+export type AppBurgieclanEvaluations = {
+  /** De academiejaren die als "recent" tellen. */
+  recentYears: string[];
+  sections: AppBurgieclanEvaluationSection[];
+};
+
 export type AppBurgieclanCourseDetail = {
   course: AppBurgieclanCourse;
   documents: AppBurgieclanDocument[];
+  /** Optioneel: een oudere server stuurt geen evaluaties. */
+  evaluations?: AppBurgieclanEvaluations;
 };
 
 /** Een link naar het bestand, tien minuten geldig. */
@@ -1976,6 +2035,10 @@ export type AppCudiCatalog = {
   available: boolean;
   gate: AppCudiGate | null;
   ordering: AppCudiOrdering;
+  /** De zoekterm waarop gefilterd is (`?q=`), of null. */
+  query?: string | null;
+  /** Gezocht in het hele aanbod; anders enkel in de vakken van je profiel. */
+  searchedAll?: boolean;
   /** Je vakken op cudi; zonder vakken is er enkel algemeen materiaal. */
   hasProfileSubjects: boolean;
   /** De pagina op cudi om je vakken aan te duiden. */
@@ -2043,3 +2106,34 @@ export type AppCudiOrderResult =
     };
 
 export type AppCudiCancelResult = { ok: true } | { ok: false; code: string; message: string };
+
+/** Een tijdslot om af te halen, zoals op *Tijdslot reserveren* bij cudi. */
+export type AppCudiTimeslot = {
+  id: string;
+  start: string;
+  end: string;
+  taken: number;
+  capacity: number;
+  full: boolean;
+  mine: boolean;
+  /** Je hebt al een ander slot die dag, en de cursusdienst laat er maar één toe. */
+  blockedByOtherSlot: boolean;
+};
+
+export type AppCudiTimeslots = {
+  available: boolean;
+  gate: AppCudiGate | null;
+  /** De cursusdienst werkt met tijdsloten. Anders kom je gewoon binnen tijdens de uren. */
+  enabled: boolean;
+  oneTimeslotPerDay: boolean;
+  /** Vanaf zoveel uur voor de start staat een reservatie vast; 0 is altijd vrij te geven. */
+  cutoffHours: number;
+  mine: { registrationId: string; timeslotId: string; start: string; end: string; cancelable: boolean }[];
+  /** Per dag ("YYYY-MM-DD"), in volgorde. */
+  days: { date: string; slots: AppCudiTimeslot[] }[];
+};
+
+export type AppCudiTimeslotResult =
+  | ({ ok: true } & AppCudiTimeslots)
+  | { ok: false; code: "NOT_FOUND" | "PASSED" | "FULL" | "SAME_DAY" | "ALREADY" | "CUTOFF"; message: string };
+

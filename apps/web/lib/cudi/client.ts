@@ -79,14 +79,16 @@ export async function cudiRequest<T>(
   userId: string,
   method: "GET" | "POST",
   path: string,
-  options: { body?: unknown; locale?: "nl" | "en" } = {},
+  options: { body?: unknown; locale?: "nl" | "en"; query?: Record<string, string> } = {},
 ): Promise<T> {
   const fullPath = `/api/integrations/vtk-app/${path}`;
   const raw = options.body === undefined ? "" : JSON.stringify(options.body);
   const user = await identityFor(userId);
   const timestamp = Math.floor(Date.now() / 1000);
   const lang = options.locale ?? "nl";
-  const url = `${config.origin}${fullPath}?association=${encodeURIComponent(config.association)}&lang=${lang}`;
+  const search = new URLSearchParams({ association: config.association, lang, ...(options.query ?? {}) });
+  // De querystring wordt niet getekend; cudi tekent enkel het pad na.
+  const url = `${config.origin}${fullPath}?${search.toString()}`;
 
   let response: Response;
   try {

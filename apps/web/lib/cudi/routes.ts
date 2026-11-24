@@ -9,6 +9,8 @@ import {
   type AppCudiCatalog,
   type AppCudiOrderResult,
   type AppCudiOverview,
+  type AppCudiTimeslotResult,
+  type AppCudiTimeslots,
   type AppLocale,
   type AppServiceStatus,
 } from "@/lib/app-api/contract";
@@ -117,7 +119,11 @@ export function catalogRoute(request: Request): Promise<Response> {
   return route<AppCudiCatalog>(
     request,
     async (config, userId, locale) => {
-      const raw = await cudiRequest<Omit<AppCudiCatalog, "available">>(config, userId, "GET", "catalog", { locale });
+      const q = (new URL(request.url).searchParams.get("q") ?? "").trim().slice(0, 100);
+      const raw = await cudiRequest<Omit<AppCudiCatalog, "available">>(config, userId, "GET", "catalog", {
+        locale,
+        query: q.length >= 2 ? { q } : undefined,
+      });
       return { available: true, ...raw };
     },
     () => ({
@@ -176,3 +182,43 @@ export function checkoutRoute(request: Request): Promise<Response> {
     () => null,
   );
 }
+
+export function timeslotsRoute(request: Request): Promise<Response> {
+  return route<AppCudiTimeslots>(
+    request,
+    async (config, userId, locale) => {
+      const raw = await cudiRequest<Omit<AppCudiTimeslots, "available">>(config, userId, "GET", "timeslots", { locale });
+      return { available: true, ...raw };
+    },
+    () => ({ available: false, gate: null, enabled: false, oneTimeslotPerDay: true, cutoffHours: 0, mine: [], days: [] }),
+  );
+}
+
+const reserveInput = z.object({ timeslotId: z.string().min(1).max(64) });
+
+export function reserveTimeslotRoute(request: Request): Promise<Response> {
+  return route<AppCudiTimeslotResult>(
+    request,
+    async (config, userId, locale) => {
+      const body = reserveInput.parse(await readAppJson(request));
+      const raw = await cudiRequest<AppCudiTimeslotResult>(config, userId, "POST", "timeslots", { body, locale });
+      return raw.ok ? { ...raw, available: true } : raw;
+    },
+    () => null,
+  );
+}
+
+const releaseInput = z.object({ registrationId: z.string().min(1).max(64) });
+
+export function releaseTimeslotRoute(request: Request): Promise<Response> {
+  return route<AppCudiTimeslotResult>(
+    request,
+    async (config, userId, locale) => {
+      const body = releaseInput.parse(await readAppJson(request));
+      const raw = await cudiRequest<AppCudiTimeslotResult>(config, userId, "POST", "timeslots/cancel", { body, locale });
+      return raw.ok ? { ...raw, available: true } : raw;
+    },
+    () => null,
+  );
+}
+
