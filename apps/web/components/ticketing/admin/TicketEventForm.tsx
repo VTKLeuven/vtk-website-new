@@ -317,6 +317,16 @@ export function TicketEventForm({
   // beide bepalen welke velden er verder nog gevraagd worden.
   const [calendarId, setCalendarId] = useState(event.calendarEventId ?? linkedCalendarEvent?.id ?? "");
   const [ownTimes, setOwnTimes] = useState(event.ownTimes ?? false);
+  // Gekoppeld van buiten dit formulier (de knop "Koppelen" in de waarschuwing
+  // erboven, `TicketCalendarLinkHint`): dan volgen de keuzelijst en de eigen
+  // uren. Zonder dit bleef de lijst op "Niet gekoppeld" staan, en koppelde
+  // "Wijzigingen opslaan" de verkoop meteen weer los.
+  const [syncedLink, setSyncedLink] = useState(event.calendarEventId ?? null);
+  if ((event.calendarEventId ?? null) !== syncedLink) {
+    setSyncedLink(event.calendarEventId ?? null);
+    setCalendarId(event.calendarEventId ?? "");
+    setOwnTimes(event.ownTimes ?? false);
+  }
   // Het grootste formulier van de tickets: een opslag die de server niet haalt
   // (een deploy terwijl dit openstond, of geen verbinding), laat alles staan.
   const unsent = useUnsentGuard();

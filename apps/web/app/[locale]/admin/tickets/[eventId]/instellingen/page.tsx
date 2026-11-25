@@ -22,6 +22,11 @@ import { readTicketDesignSettings } from "@/lib/ticketing/design";
 import { listTicketBannerCategories } from "@/lib/ticketing/bannerCategories";
 import { publicUrl } from "@/lib/storage";
 import { listAccountingCodes } from "@/lib/accounting/server";
+import {
+  SUGGESTION_WINDOW_DAYS,
+  suggestCalendarEvents,
+} from "@/lib/ticketing/calendarSuggestion";
+import type { CalendarLinkOption } from "@/components/ticketing/admin/TicketCalendarLinkHint";
 
 export default async function TicketEventSettingsPage({
   params,
@@ -104,6 +109,10 @@ export default async function TicketEventSettingsPage({
   // betaalpoging en een bezoeker aan.
   const orderCount = canManageEvent ? await prisma.ticketOrder.count({ where: { eventId } }) : 0;
   const accountingCodes = canManageEvent ? await listAccountingCodes() : [];
+  const calendarLinkOptions =
+    canManageEvent && !event.calendarEventId && !event.isPrivate
+      ? await calendarLinkOptionsFor(event, locale)
+      : null;
 
   return (
     <div className="ticket-admin-page">
@@ -127,6 +136,7 @@ export default async function TicketEventSettingsPage({
             isPrivate={event.isPrivate}
             hasActiveTicketType={event.ticketTypes.some((ticketType) => ticketType.active)}
             hasAccountingCode={event.accountingCodeId !== null}
+            calendarLinkOptions={calendarLinkOptions}
             locale={locale}
           />
           <TicketEventForm
@@ -311,4 +321,72 @@ export default async function TicketEventSettingsPage({
       ) : null}
     </div>
   );
+}
+
+/**
+ * De kalenderevents die bij een verkoop zonder koppeling lijken te horen, met
+ * wat koppelen eraan verandert (zie `linkTicketEventToCalendarAction`). Enkel
+ * van de eigen post: koppelen kan niet over posten heen, dus een voorstel
+ * daarbuiten zou op een fout uitkomen.
+ */
+async function calendarLinkOptionsFor(
+  event: {
+    ownerGroupId: string;
+    titleNl: string;
+    titleEn: string | null;
+    descriptionNl: string | null;
+    labelNl: string | null;
+    startsAt: Date;
+    endsAt: Date;
+  },
+  locale: AdminLocale,
+): Promise<CalendarLinkOption[]> {
+  const windowMs = SUGGESTION_WINDOW_DAYS * 86_400_000;
+  const candidates = await prisma.calendarEvent.findMany({
+    where: {
+      groupId: event.ownerGroupId,
+      OR: [
+        {
+          start: {
+            gte: new Date(event.startsAt.getTime() - windowMs),
+            lte: new Date(event.startsAt.getTime() + windowMs),
+          },
+        },
+        // Een event over meerdere dagen dat al liep: de 12u, een weekend.
+        { start: { lte: event.startsAt }, end: { gte: event.startsAt } },
+      ],
+    },
+    select: {
+      id: true,
+      titleNl: true,
+      titleEn: true,
+      descriptionNl: true,
+      start: true,
+      end: true,
+      publishedAt: true,
+    },
+    orderBy: { start: "asc" },
+    take: 200,
+  });
+  const byId = new Map(candidates.map((candidate) => [candidate.id, candidate]));
+  return suggestCalendarEvents(event, candidates).map((match) => {
+    const candidate = byId.get(match.id)!;
+    const ownDescription = event.descriptionNl?.trim() ?? "";
+    return {
+      id: match.id,
+      title: (locale === "en" && match.titleEn) || match.titleNl,
+      start: match.start,
+      published: match.publishedAt !== null,
+      sameDay: match.sameDay,
+      similarTitle: match.similarTitle,
+      dayDistance: match.dayDistance,
+      later: match.start.getTime() > event.startsAt.getTime(),
+      keepsOwnTimes:
+        event.startsAt.getTime() !== match.start.getTime() ||
+        event.endsAt.getTime() !== match.end.getTime(),
+      titleAsLabel: event.labelNl ?? (event.titleNl !== match.titleNl ? event.titleNl : null),
+      replacesDescription:
+        ownDescription !== "" && ownDescription !== (candidate.descriptionNl?.trim() ?? ""),
+    };
+  });
 }

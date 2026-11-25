@@ -11324,6 +11324,36 @@ zijbalk** gekozen, met tabs voor meerdere verkopen.
 - De ontwerpen staan in een canvas met de drie richtingen; de keuze is A met de
   tabs uit de rij "meerdere ticketpagina's".
 
+### Een verkoop zonder kalenderevent: waarschuwen en een event voorstellen
+
+De vraag was of tickets online kunnen staan zonder op de eventpagina van de
+activiteit te verschijnen. Dat kan: de eventpagina toont enkel verkopen met een
+`calendarEventId`, de koppeling is optioneel, en publiceren vroeg er niet naar.
+Wie een verkoop via /admin/tickets/new aanmaakte en de keuzelijst liet staan,
+stond live op /tickets en nergens op `/kalender/<slug>`. Sinds november 2026
+staat onder de publiceerbalk een waarschuwing met de events die erbij lijken te
+horen (`TicketCalendarLinkHint`, `lib/ticketing/calendarSuggestion.ts`).
+
+- **Een waarschuwing, geen blokkade.** Niet elke verkoop hoort bij een
+  activiteit in de kalender. Publiceren blijft dus kunnen.
+- **In concept altijd, live enkel met een voorstel.** In concept valt het nog
+  recht te zetten voor iemand het merkt. Een live verkoop zonder enig event dat
+  erop lijkt, hoort meestal bij geen activiteit, en een blijvende waarschuwing
+  is daar enkel ruis. Een privéverkoop krijgt geen waarschuwing: die hoort
+  bewust niet op de eventpagina.
+- **Voorgesteld wordt op datum en titel, binnen de eigen post.** Een event op
+  dezelfde dag komt altijd in aanmerking; een andere dag enkel met een
+  gelijkaardige titel en binnen 45 dagen. Hoogstens drie, het beste eerst, met
+  erbij waarom ("zelfde dag, gelijkaardige titel"). Enkel van de eigen post,
+  omdat koppelen over posten heen niet kan: een voorstel daarbuiten zou op een
+  fout uitkomen. Een nacht na middernacht hoort bij de avond ervoor.
+- **Koppelen gaat met één knop, na een bevestiging die zegt wat er verandert**:
+  titel, beschrijving en locatie komen van het event, de eigen titel blijft de
+  naam op de eventpagina, en een eigen beschrijving vervalt. Twee dingen
+  veranderen bewust niet: de verkoop houdt haar eigen pagina (de eventpagina
+  krijgt een knop, `onEventPage` uit) en, als ze afwijken, haar eigen uren. Wie
+  de tickets in het paneel van de eventpagina wil, zet dat daarna zelf aan.
+
 ## De bestelpagina: je bestelling in het paneel waar je mandje stond
 
 `/tickets/bestelling/[orderId]` was het enige scherm van de ticketreeks zonder

@@ -1963,6 +1963,85 @@
   color: #b42318;
 }
 
+/* Een verkoop zonder kalenderevent: de waarschuwing hangt direct onder de
+   publiceerbalk, met de voorgestelde events als rijen en per rij "Koppelen".
+   Zie TicketCalendarLinkHint en lib/ticketing/calendarSuggestion.ts. */
+.ticket-admin-publish-bar:has(+ .ticket-admin-calendar-hint) {
+  margin-bottom: 0;
+}
+
+.ticket-admin-calendar-hint {
+  margin-bottom: 2px;
+}
+
+.ticket-admin-calendar-hint > svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.ticket-admin-calendar-hint-body {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 4px;
+  line-height: 1.45;
+}
+
+.ticket-admin-calendar-hint-list {
+  display: grid;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ticket-admin-calendar-hint-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px solid color-mix(in srgb, var(--ticket-amber) 22%, transparent);
+}
+
+.ticket-admin-calendar-hint-list li:last-child {
+  padding-bottom: 0;
+}
+
+.ticket-admin-calendar-hint-list li > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.ticket-admin-calendar-hint-list strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.ticket-admin-calendar-hint-list span {
+  overflow-wrap: anywhere;
+}
+
+.ticket-admin-calendar-hint-list .ticket-admin-button {
+  min-height: 34px;
+  padding: 7px 12px;
+}
+
+.ticket-admin-calendar-hint-effects {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+
+@media (max-width: 560px) {
+  .ticket-admin-calendar-hint-list li {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
 /* ---------------------------------------------------------------------------
    Soort antwoord bij een deelnemersvraag.
 

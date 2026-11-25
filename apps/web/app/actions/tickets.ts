@@ -1147,6 +1147,90 @@ export async function publishTicketEventAction(
 }
 
 /**
+ * Hangt een verkoop zonder kalenderevent aan het event dat het ticketbeheer
+ * voorstelt (`lib/ticketing/calendarSuggestion.ts`), met één klik vanuit de
+ * publiceerbalk.
+ *
+ * Doet wat het formulier doet bij een nieuwe koppeling (titel, beschrijving en
+ * locatie komen voortaan van het event; de eigen titel wordt de naam op de
+ * eventpagina wanneer die verschilt), met twee keuzes die niets aan de
+ * ticketpagina zelf veranderen: de verkoop houdt haar eigen pagina
+ * (`onEventPage` uit, de eventpagina krijgt een knop) en, wanneer haar uren
+ * afwijken, haar eigen uren. Wie de tickets op de eventpagina zelf wil, zet dat
+ * daarna aan bij Basisinformatie.
+ */
+export async function linkTicketEventToCalendarAction(
+  formData: FormData,
+): Promise<PublishTicketEventResult> {
+  const eventId = value(formData, "eventId");
+  const calendarEventId = value(formData, "calendarEventId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  try {
+    const { session, event } = await requireTicketEventCapability(eventId, "MANAGE_EVENT");
+    // Intussen al gekoppeld (een tweede tabblad, een collega): niets overschrijven.
+    if (event.calendarEventId) return { ok: false, error: "ALREADY_LINKED" };
+    const linked = calendarEventId
+      ? await prisma.calendarEvent.findUnique({ where: { id: calendarEventId } })
+      : null;
+    if (!linked || linked.groupId !== event.ownerGroupId) {
+      return { ok: false, error: "INVALID_CALENDAR_EVENT" };
+    }
+
+    const sameTimes =
+      event.startsAt.getTime() === linked.start.getTime() &&
+      event.endsAt.getTime() === linked.end.getTime();
+    const labelNl =
+      event.labelNl ?? (event.titleNl !== linked.titleNl ? event.titleNl : null);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.ticketEvent.update({
+        where: { id: eventId },
+        data: {
+          calendarEventId: linked.id,
+          onEventPage: false,
+          ownTimes: !sameTimes,
+          labelNl,
+          titleNl: linked.titleNl,
+          titleEn: linked.titleEn,
+          descriptionNl: linked.descriptionNl,
+          descriptionEn: linked.descriptionEn,
+          location: linked.location,
+        },
+      });
+      await tx.ticketAuditLog.create({
+        data: {
+          eventId,
+          actorUserId: session.user.id,
+          action: "EVENT_UPDATED",
+          entityType: "TicketEvent",
+          entityId: eventId,
+          metadata: { calendarEventId: linked.id },
+        },
+      });
+    });
+    await logAudit({
+      action: "update",
+      entity: "ticketEvent",
+      entityId: eventId,
+      target: event.titleNl,
+      summary: `gekoppeld aan kalenderevent ${linked.titleNl}`,
+    });
+    refreshTicketEvent(locale, eventId);
+    revalidatePath(localePath(locale, `/admin/tickets/${eventId}/instellingen`));
+    revalidatePath(localePath(locale, `/tickets/${event.slug}`));
+    revalidatePath("/kalender/[slugOrId]", "page");
+    revalidatePath("/kalender");
+    return { ok: true };
+  } catch (error) {
+    unstable_rethrow(error);
+    const code = error instanceof Error ? error.message : "";
+    if (code === "FORBIDDEN") return { ok: false, error: code };
+    console.error("Linking ticket event to calendar failed", error);
+    throw error;
+  }
+}
+
+/**
  * De uitkomst van een verwijderactie in het ticketbeheer.
  *
  * Bewust een teruggegeven code en geen gegooide fout: "er is intussen al

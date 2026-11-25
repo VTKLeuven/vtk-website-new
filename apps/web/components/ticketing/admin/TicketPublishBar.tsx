@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { AlertTriangle, CheckCircle2, Eye, LoaderCircle, Rocket } from "lucide-react";
 import { publishTicketEventAction } from "@/app/actions/tickets";
 import type { AdminLocale } from "./format";
+import { TicketCalendarLinkHint, type CalendarLinkOption } from "./TicketCalendarLinkHint";
 
 const T = {
   nl: {
@@ -64,6 +65,7 @@ export function TicketPublishBar({
   isPrivate,
   hasActiveTicketType,
   hasAccountingCode,
+  calendarLinkOptions,
   locale,
 }: {
   eventId: string;
@@ -75,6 +77,12 @@ export function TicketPublishBar({
   hasActiveTicketType: boolean;
   /** Zonder boekhoudcode gaat er niets live: zie `TicketEvent.accountingCodeId`. */
   hasAccountingCode: boolean;
+  /**
+   * De kalenderevents die bij deze verkoop lijken te horen; `null` wanneer ze al
+   * gekoppeld is of privé staat (een privéverkoop hoort bewust niet op de
+   * eventpagina).
+   */
+  calendarLinkOptions: CalendarLinkOption[] | null;
   locale: AdminLocale;
 }) {
   const t = T[locale];
@@ -125,6 +133,17 @@ export function TicketPublishBar({
     </div>
   );
 
+  // Niet gekoppeld: de eventpagina weet niets van deze tickets. In concept altijd
+  // gezegd, ook zonder voorstel, want dan valt het nog recht te zetten voor
+  // iemand het merkt. Live enkel met een voorstel: zonder is het meestal een
+  // verkoop die bij geen activiteit hoort, en dan is een blijvende waarschuwing
+  // enkel ruis.
+  const calendarHint =
+    calendarLinkOptions &&
+    (status === "DRAFT" || (status === "PUBLISHED" && calendarLinkOptions.length > 0)) ? (
+      <TicketCalendarLinkHint eventId={eventId} options={calendarLinkOptions} locale={locale} />
+    ) : null;
+
   if (status === "PUBLISHED") {
     return (
       <>
@@ -139,6 +158,7 @@ export function TicketPublishBar({
           </span>
         </div>
         {codeWarning}
+        {calendarHint}
       </>
     );
   }
@@ -157,46 +177,49 @@ export function TicketPublishBar({
   }
 
   return (
-    <div className="ticket-admin-publish-bar">
-      <div className="ticket-admin-publish-text">
-        <strong>{t.draft}</strong>
-        {/* De blokkade staat er vóór je klikt, niet als foutmelding erna. */}
-        {!hasActiveTicketType ? <span>{t.needsType}</span> : null}
-        {!hasAccountingCode ? <span>{t.needsCode}</span> : null}
-        {error ? (
-          <span className="ticket-admin-publish-error" role="alert">
-            <AlertTriangle aria-hidden="true" size={14} />
-            {error}
-          </span>
-        ) : null}
+    <>
+      <div className="ticket-admin-publish-bar">
+        <div className="ticket-admin-publish-text">
+          <strong>{t.draft}</strong>
+          {/* De blokkade staat er vóór je klikt, niet als foutmelding erna. */}
+          {!hasActiveTicketType ? <span>{t.needsType}</span> : null}
+          {!hasAccountingCode ? <span>{t.needsCode}</span> : null}
+          {error ? (
+            <span className="ticket-admin-publish-error" role="alert">
+              <AlertTriangle aria-hidden="true" size={14} />
+              {error}
+            </span>
+          ) : null}
+        </div>
+        <div className="ticket-admin-publish-actions">
+          {/* Nakijken voor je publiceert: de pagina zelf, niet nog een samenvatting
+              van de velden. De voorbeeldbalk daar linkt terug naar dit scherm. */}
+          <a
+            className="ticket-admin-button"
+            href={`${base}/tickets/${slug}?preview=1`}
+            title={t.previewHint}
+          >
+            <Eye aria-hidden="true" size={16} />
+            {t.preview}
+          </a>
+          <button
+            type="button"
+            className="ticket-admin-button"
+            data-variant="primary"
+            onClick={publish}
+            disabled={pending || !hasActiveTicketType || !hasAccountingCode}
+            title={!hasActiveTicketType ? t.needsType : !hasAccountingCode ? t.needsCode : undefined}
+          >
+            {pending ? (
+              <LoaderCircle className="is-spinning" aria-hidden="true" size={16} />
+            ) : (
+              <Rocket aria-hidden="true" size={16} />
+            )}
+            {pending ? t.publishing : t.publish}
+          </button>
+        </div>
       </div>
-      <div className="ticket-admin-publish-actions">
-        {/* Nakijken voor je publiceert: de pagina zelf, niet nog een samenvatting
-            van de velden. De voorbeeldbalk daar linkt terug naar dit scherm. */}
-        <a
-          className="ticket-admin-button"
-          href={`${base}/tickets/${slug}?preview=1`}
-          title={t.previewHint}
-        >
-          <Eye aria-hidden="true" size={16} />
-          {t.preview}
-        </a>
-        <button
-          type="button"
-          className="ticket-admin-button"
-          data-variant="primary"
-          onClick={publish}
-          disabled={pending || !hasActiveTicketType || !hasAccountingCode}
-          title={!hasActiveTicketType ? t.needsType : !hasAccountingCode ? t.needsCode : undefined}
-        >
-          {pending ? (
-            <LoaderCircle className="is-spinning" aria-hidden="true" size={16} />
-          ) : (
-            <Rocket aria-hidden="true" size={16} />
-          )}
-          {pending ? t.publishing : t.publish}
-        </button>
-      </div>
-    </div>
+      {calendarHint}
+    </>
   );
 }
