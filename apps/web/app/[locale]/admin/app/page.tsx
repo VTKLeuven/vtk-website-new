@@ -19,15 +19,12 @@ import {
 import type { Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
-import { getAppLinks } from "@/lib/appLinks";
 import { loadAppUsageStats, COHORT_WEEKS, type ChannelStats } from "@/lib/app-usage-stats";
 import { screenLabel, tabLabel } from "@/lib/app-usage-labels";
 import { currentWorkingYear, formatWorkingYear, workingYearStart } from "@/lib/workingYear";
-import { SaveForm } from "@/components/ui/SaveForm";
 import { DailyChart } from "@/components/admin/DailyChart";
 import { AdminMetric } from "@/components/ticketing/admin/AdminMetric";
 import { formatMoney, formatNumber, formatPercent } from "@/components/ticketing/admin/format";
-import { saveAppLinksAction } from "./actions";
 
 import "@/app/design/vtk-ticket-admin.css";
 
@@ -54,17 +51,14 @@ function SectionHead({ id, icon: Icon, title, intro }: { id: string; icon: Lucid
 }
 
 /**
- * Admin › Website › App: hoe de VTK-app gebruikt wordt, en de links naar de app
- * in de winkels.
+ * Admin › Website › App › Statistieken: hoe de VTK-app gebruikt wordt. Wie de
+ * app heeft en de links naar de winkels zijn de andere tabbladen.
  *
  * De statistieken beantwoorden de vraag of de app een succes is: hoeveel mensen
  * hebben ze, openen ze ze ook, komen ze terug, wat doen ze erin, en hoeveel van
  * wat er besteld wordt, komt uit de app in plaats van van de website. Wat
  * gemeten wordt en hoe, staat in docs/app-gebruik.md; het rekenwerk in
  * `lib/app-usage-stats.ts`.
- *
- * De links: `vtk.be/app` leest ze; de QR-code op de affiches wijst naar dat
- * adres en blijft dus dezelfde, wat er hier ook verandert.
  */
 export default async function AdminApp({
   params,
@@ -94,7 +88,7 @@ export default async function AdminApp({
           : period === "jaar"
             ? workingYearStart(year)
             : null;
-  const [links, stats] = await Promise.all([getAppLinks(), loadAppUsageStats({ from, to: now }, now)]);
+  const stats = await loadAppUsageStats({ from, to: now }, now);
 
   const periods: Array<{ key: Period; label: string }> = [
     { key: "7d", label: t("Laatste 7 dagen", "Last 7 days") },
@@ -126,15 +120,12 @@ export default async function AdminApp({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">App</h1>
-        <p className="mt-1 max-w-3xl text-sm text-zinc-500">
-          {t(
-            "Hoe de VTK-app gebruikt wordt: hoeveel mensen ze hebben, hoe vaak ze ze openen, of ze terugkomen, wat ze erin doen en hoeveel er via de app besteld wordt in plaats van via de website. Onderaan staan de links naar de app in de winkels.",
-            "How the VTK app is used: how many people have it, how often they open it, whether they come back, what they do in it and how much is ordered through the app instead of the website. The store links are at the bottom.",
-          )}
-        </p>
-      </div>
+      <p className="max-w-3xl text-sm text-zinc-500">
+        {t(
+          "Hoe de VTK-app gebruikt wordt: hoeveel mensen ze hebben, hoe vaak ze ze openen, of ze terugkomen, wat ze erin doen en hoeveel er via de app besteld wordt in plaats van via de website.",
+          "How the VTK app is used: how many people have it, how often they open it, whether they come back, what they do in it and how much is ordered through the app instead of the website.",
+        )}
+      </p>
 
       <nav className="flex flex-wrap gap-2" aria-label={t("Periode", "Period")}>
         {periods.map((option) => (
@@ -163,68 +154,6 @@ export default async function AdminApp({
           )}
         </p>
       )}
-
-      <section className="max-w-2xl space-y-3" aria-labelledby="app-links">
-        <div>
-          <h2 id="app-links" className="text-lg font-semibold">
-            {t("Links naar de winkels", "Store links")}
-          </h2>
-          <p className="mt-1 text-sm text-zinc-500">
-            {t(
-              "Waar de VTK-app te downloaden is. vtk.be/app stuurt een iPhone naar de App Store en een Android-toestel naar Google Play; een computer krijgt een pagina met beide knoppen. Zet dat adres in een QR-code op een affiche: het blijft geldig, ook als de links hier veranderen.",
-              "Where to download the VTK app. vtk.be/app sends an iPhone to the App Store and an Android device to Google Play; a computer gets a page with both buttons. Put that address in a QR code on a poster: it stays valid, even when the links here change.",
-            )}
-          </p>
-        </div>
-
-        <SaveForm
-          action={saveAppLinksAction}
-          submitLabel={t("Opslaan", "Save")}
-          savingLabel={t("Bezig met opslaan", "Saving")}
-          savedMessage={t("De links zijn opgeslagen.", "The links are saved.")}
-          errorMessages={{
-            INVALID_LINK: t(
-              "Een link moet een volledig adres zijn dat met https:// begint.",
-              "A link has to be a full address starting with https://.",
-            ),
-          }}
-          fallbackErrorMessage={t("Opslaan lukte niet.", "Saving failed.")}
-          resetOnSuccess={false}
-          className="space-y-5 rounded-2xl border border-zinc-200 bg-white p-5"
-        >
-          <label className="block space-y-1.5">
-            <span className="text-sm font-medium">App Store (iPhone)</span>
-            <input
-              name="ios"
-              type="url"
-              inputMode="url"
-              defaultValue={links.ios ?? ""}
-              placeholder="https://apps.apple.com/be/app/vtk-leuven/id..."
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-sm font-medium">Google Play (Android)</span>
-            <input
-              name="android"
-              type="url"
-              inputMode="url"
-              defaultValue={links.android ?? ""}
-              placeholder="https://play.google.com/store/apps/details?id=..."
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <p className="text-sm text-zinc-500">
-            {t("Leeg laten mag: dan toont vtk.be/app enkel de andere winkel.", "You can leave one empty: vtk.be/app then only shows the other store.")}
-          </p>
-        </SaveForm>
-
-        <p className="text-sm">
-          <a href={`/${locale === "en" ? "en/" : ""}app?toon=1`} className="underline">
-            {t("Bekijk vtk.be/app zoals een computer hem ziet", "Preview vtk.be/app as a computer sees it")}
-          </a>
-        </p>
-      </section>
     </div>
   );
 

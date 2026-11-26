@@ -7846,3 +7846,47 @@ html[data-vtk-app] .vtk-admin-surface-inner {
 html[data-vtk-app] .vtk-admin-surface-inner > aside {
   display: none !important;
 }
+
+/* Wie heeft de app (/admin/app/gebruikers), smal scherm: elke persoon een blok
+   met de kolomkop als label per waarde, zoals de kassa's. In een horizontale
+   scroller viel net de kolom App weg, en die is waarvoor je de lijst opent.
+   --------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .vtk-appusers-table thead {
+    display: none;
+  }
+
+  .vtk-appusers-table,
+  .vtk-appusers-table tbody,
+  .vtk-appusers-table tr,
+  .vtk-appusers-table td {
+    display: block;
+    width: 100% !important;
+  }
+
+  .vtk-appusers-table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    padding: 8px 0;
+  }
+
+  .vtk-appusers-table tbody td[data-wide] {
+    grid-column: 1 / -1;
+  }
+
+  .vtk-admin-main .vtk-appusers-table td {
+    padding: 6px 16px;
+    text-align: left;
+  }
+
+  .vtk-appusers-table tbody td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+}

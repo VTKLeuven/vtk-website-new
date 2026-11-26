@@ -14760,4 +14760,25 @@ het statische `MCP_API_TOKEN` voor coding agents.
   of logs blijft dicht tenzij `MCP_OAUTH_ALLOW_PII_READS="true"` expliciet wordt
   gezet.
 
+## Wie heeft de app
 
+Admin › Website › App toonde enkel totalen, bewust "nooit een lijst van wie wat
+deed". Sinds eind november 2026 is er een tabblad bij dat per persoon
+toont of die de app heeft, zodat je weet wie van het praesidium of de leden je
+nog moet aanspreken.
+
+- **Of iemand de app heeft, wel; wat iemand erin doet, niet.** Per persoon: het
+  toestel, sinds wanneer, laatst geopend, de versie en of meldingen aan staan.
+  Schermen, sessies en bestellingen per persoon blijven weg; die staan enkel in
+  de totalen.
+- **Standaard het praesidium van dit werkingsjaar**: dat is de groep die de app
+  zeker hoort te hebben, en een lijst van negentig mensen leest beter dan een van
+  duizenden. De leden van dit academiejaar en elk account met de app zijn een
+  klik verder. "Elk account zonder de app" bestaat niet: dat is elk account op
+  de site.
+- **Wie de app niet heeft, staat bovenaan**: dat is wie je zoekt.
+- **`users.view` naast `home.edit`**: het is een lijst van namen en
+  e-mailadressen, en wie de homepagina beheert, mag die niet vanzelf zien.
+- Statistieken, wie heeft de app en de links naar de winkels zijn drie
+  tabbladen (`ModuleAdminShell`); de links stonden eerst onderaan de
+  statistieken.

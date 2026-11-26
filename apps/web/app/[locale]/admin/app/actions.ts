@@ -33,7 +33,7 @@ export async function saveAppLinksAction(_prev: SaveState, formData: FormData): 
     summary: [ios ? "App Store" : null, android ? "Google Play" : null].filter(Boolean).join(" en ") || "gewist",
   });
 
-  revalidatePath("/[locale]/admin/app", "page");
+  revalidatePath("/[locale]/admin/app/links", "page");
   revalidatePath("/[locale]/app", "page");
   return saveOk();
 }

@@ -1,6 +1,6 @@
 # Hoe de VTK-app gebruikt wordt
 
-Admin › Website › App toont of de app een succes is: hoeveel mensen ze hebben,
+Admin › Website › App › Statistieken toont of de app een succes is: hoeveel mensen ze hebben,
 hoe vaak ze ze openen, of ze terugkomen, wat ze erin doen, en hoeveel van wat er
 besteld wordt uit de app komt in plaats van van de website. Sinds 24 november
 2026.
@@ -29,8 +29,26 @@ en om de minuut zolang er iets te melden is. Het rapport draagt:
   `AppAction`.
 
 Wie ingelogd is, krijgt zijn `userId` bij de installatie en de sessie. Zo kan het
-beheer "hoeveel leden hebben de app" tellen. Het beheer toont enkel totalen, nooit
-een lijst van wie wat deed.
+beheer "hoeveel leden hebben de app" tellen. De statistieken tonen enkel totalen,
+nooit een lijst van wie wat deed.
+
+## Wie heeft de app
+
+Het tabblad Wie heeft de app (`/admin/app/gebruikers`, `lib/app-users.ts`) toont
+per persoon óf die de app heeft: op welk toestel, sinds wanneer, wanneer laatst
+geopend, de appversie en of meldingen aan staan. Voor het praesidium van dit
+werkingsjaar (standaard), de leden van dit academiejaar, of elk account met de
+app. Wie de app niet heeft, staat bovenaan.
+
+- **De app hebben is ooit ingelogd in de app.** Een installatie zonder login is
+  van niemand; die persoon staat bij "zonder de app".
+- **Twee bronnen**: `AppInstall` (sinds 24 november 2026, houdt de laatste
+  `userId` ook na uitloggen) en `AppPushDevice` (ook van voor die update). Wie de
+  app eerder had en de update nog niet opende, staat enkel in die tweede.
+- **Wat iemand in de app deed (schermen, sessies, bestellingen), staat hier
+  niet.** Dat blijft bij de totalen van de statistieken.
+- Het tabblad vraagt `users.view` naast `home.edit`: het toont namen en
+  e-mailadressen. Zie `docs/design-decisions.md`, "Wie heeft de app".
 
 Een rapport dat niet aankomt, gaat met het volgende mee; er gaat niets naar
 schijf. Lukt ook dat niet (geen netwerk tot de app sluit), dan is dat stuk
