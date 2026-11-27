@@ -7846,6 +7846,11 @@ html[data-vtk-app] .vtk-admin-surface-inner {
 html[data-vtk-app] .vtk-admin-surface-inner > aside {
   display: none !important;
 }
+/* De titel van het onderdeel staat al in de gele kop van de app, naast de
+   terugknop; hier nog eens de h1 erboven las als een dubbele titel. */
+html[data-vtk-app] .vtk-admin-surface-inner h1 {
+  display: none !important;
+}
 
 /* Wie heeft de app (/admin/app/gebruikers), smal scherm: elke persoon een blok
    met de kolomkop als label per waarde, zoals de kassa's. In een horizontale
