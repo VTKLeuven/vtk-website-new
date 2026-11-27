@@ -525,9 +525,11 @@ overzicht terug, zodat de app na een tik niets extra hoeft op te halen.
 - `POST` met `{ subject?, subjectHidden? }` start. Loopt er al een sessie, dan
   gebeurt er niets en krijg je die terug: twee keer op de knop hoort geen tweede
   sessie te maken.
-- `PATCH` met `{ action: "pause" | "resume" | "heartbeat" }`. Het levensteken is
-  geen beleefdheid maar meting: blijft het weg, dan telt de server de sessie tot
-  het laatste moment waarop hij wist dat ze liep.
+- `PATCH` met `{ action: "pause" | "resume" | "heartbeat" }`. De app pauzeert
+  niet meer wanneer je haar verlaat (sinds november 2026): de teller loopt door
+  met de telefoon weg. Het levensteken is geen beleefdheid maar meting: blijft
+  het langer dan drie uur weg (`STUDY_AWAY_SECONDS`), dan telt de server de
+  sessie tot drie uur na het laatste en sluit ze daar.
 - `DELETE` sluit af en geeft `{ finishedSeconds, subject, overview }`.
 
 Het rekenwerk staat in `lib/app-api/study.ts`; de regels erachter (pauzemarge,
@@ -551,6 +553,14 @@ Hernoemen of het groepsdoel zetten (enkel wie de groep maakte, anders
 ### `PATCH /api/app/v1/studeren/doel`
 
 `{ dailyGoalMinutes }`. Bepaalt wat de reeks telt en wanneer een dag "gehaald" is.
+
+### `PUT /api/app/v1/studeren/vakken`
+
+`{ subjects: string[] }`. De vakken onder "Waaraan werk je?", de hele lijst in
+één keer en in die volgorde; de server kuist ze op (ingekort, zonder dubbele, hoogstens 20).
+Vanaf dan geeft `subjects` in het overzicht deze lijst, en komt een nieuw
+ingetikt vak er vooraan bij. Wie dit nooit deed, krijgt de vakken van zijn
+laatste sessies, zoals voordien.
 
 ## Planning
 

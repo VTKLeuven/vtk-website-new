@@ -5,7 +5,8 @@ import type { AppAlma, AppAlmaRestaurant, AppHoursWindow, AppLocale } from "@/li
 import { parseAlmaPage, type AlmaHoursKind, type AlmaPage, type AlmaWindow } from "./parse";
 
 /**
- * De Alma's op campus Arenberg, voor `/api/app/v1/alma`.
+ * De Alma's in Leuven, voor `/api/app/v1/alma`: de vier op campus Arenberg, en
+ * op vraag (`?alle=1`) ook Alma 1, Alma 2 en Gasthuisberg.
  *
  * Elke pagina van alma.be gaat door de Next data-cache met een half uur
  * `revalidate`: zo vraagt de site Alma hooguit twee keer per uur per restaurant
@@ -17,12 +18,21 @@ import { parseAlmaPage, type AlmaHoursKind, type AlmaPage, type AlmaWindow } fro
  * Het lezen zelf staat in `parse.ts`.
  */
 
+/**
+ * `arenberg` zegt wie er standaard bij is. Home toont "Alma vandaag" voor de
+ * campus waar ingenieurs les hebben; de andere drie staan enkel op het
+ * Alma-scherm, dat erom vraagt. Een oudere app vraagt er niet om en krijgt dus
+ * niet ineens zeven rijen op Home.
+ */
 export const ALMA_RESTAURANTS = [
-  { slug: "alma-3", name: "Alma 3", shortName: "Alma 3" },
-  { slug: "alma-quadrivium", name: "Alma Quadrivium", shortName: "Quadrivium" },
-  { slug: "de-moete", name: "De Moete", shortName: "De Moete" },
-  { slug: "esat2", name: "ESAT2", shortName: "ESAT2" },
-] as const satisfies readonly Pick<AppAlmaRestaurant, "slug" | "name" | "shortName">[];
+  { slug: "alma-3", name: "Alma 3", shortName: "Alma 3", arenberg: true },
+  { slug: "alma-quadrivium", name: "Alma Quadrivium", shortName: "Quadrivium", arenberg: true },
+  { slug: "de-moete", name: "De Moete", shortName: "De Moete", arenberg: true },
+  { slug: "esat2", name: "ESAT2", shortName: "ESAT2", arenberg: true },
+  { slug: "alma-1", name: "Alma 1", shortName: "Alma 1", arenberg: false },
+  { slug: "alma-2", name: "Alma 2", shortName: "Alma 2", arenberg: false },
+  { slug: "alma-gasthuisberg", name: "Alma Gasthuisberg", shortName: "Gasthuisberg", arenberg: false },
+] as const satisfies readonly (Pick<AppAlmaRestaurant, "slug" | "name" | "shortName"> & { arenberg: boolean })[];
 
 const ORIGIN = process.env.ALMA_ORIGIN || "https://www.alma.be";
 
@@ -110,16 +120,22 @@ export function almaStatus(
 }
 
 /**
- * Alle vier, met het menu van `date` (of van vandaag). Eén aanvraag per
- * restaurant: de pagina met `?date=` draagt naast dat menu ook de uren en het
- * adres, die niet van de gekozen dag afhangen.
+ * De vier van Arenberg (met `all` alle zeven), met het menu van `date` (of van
+ * vandaag). Eén aanvraag per restaurant: de pagina met `?date=` draagt naast dat
+ * menu ook de uren en het adres, die niet van de gekozen dag afhangen.
  */
-export async function loadAlma(locale: AppLocale, requestedDate: string | null, now = new Date()): Promise<AppAlma> {
+export async function loadAlma(
+  locale: AppLocale,
+  requestedDate: string | null,
+  now = new Date(),
+  { all = false }: { all?: boolean } = {},
+): Promise<AppAlma> {
   const today = ymdKey(brusselsYMD(now));
   const date = requestedDate && parseYMD(requestedDate) ? requestedDate : today;
 
   const pages = await Promise.all(
-    ALMA_RESTAURANTS.map(async (restaurant) => {
+    ALMA_RESTAURANTS.filter((entry) => all || entry.arenberg).map(async ({ slug, name, shortName }) => {
+      const restaurant = { slug, name, shortName };
       const html = await fetchPage(pageUrl(restaurant.slug, locale, date));
       return { restaurant, page: html ? parseAlmaPage(html, today) : null };
     }),

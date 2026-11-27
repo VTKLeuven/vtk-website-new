@@ -302,7 +302,8 @@ export async function studyOverview(
     streak: streakFrom(totals, dailyGoalMinutes * 60, now),
     dailyGoalMinutes,
     week,
-    subjects: recentSubjects(mine),
+    // De lijst die het lid zelf beheert, en tot dan wat het laatst intikte.
+    subjects: profile?.subjectsSetAt ? profile.subjects : recentSubjects(mine),
     groups,
   };
 }

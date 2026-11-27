@@ -1538,7 +1538,11 @@ export type AppStudyOverview = {
   dailyGoalMinutes: number;
   /** De laatste zeven dagen, oudste eerst. */
   week: AppStudyDay[];
-  /** Wat je eerder als vak intikte, meest recent eerst. */
+  /**
+   * De vakken onder "Waaraan werk je?": de lijst die je zelf beheert
+   * (`PUT /studeren/vakken`), en zolang je dat nooit deed wat je eerder als vak
+   * intikte, meest recent eerst.
+   */
   subjects: string[];
   groups: AppStudyGroup[];
 };
@@ -2278,7 +2282,8 @@ export type AppCudiTimeslotResult =
 // -----------------------------------------------------------------------------
 
 /**
- * De vier Alma's op campus Arenberg, zoals alma.be ze toont: het menu van een dag
+ * De Alma's, zoals alma.be ze toont (de vier op campus Arenberg, en met
+ * `?alle=1` ook Alma 1, Alma 2 en Gasthuisberg): het menu van een dag
  * en de uren van de komende week. Alma heeft geen API; de site leest hun pagina's
  * (`lib/alma/`) en bewaart ze een half uur. Iedereen mag dit zien, ook zonder
  * account.
@@ -2307,7 +2312,7 @@ export type AppAlmaMenuSection = {
 };
 
 export type AppAlmaRestaurant = {
-  slug: "alma-3" | "alma-quadrivium" | "de-moete" | "esat2";
+  slug: "alma-3" | "alma-quadrivium" | "de-moete" | "esat2" | "alma-1" | "alma-2" | "alma-gasthuisberg";
   name: string;
   /** Korter, voor een pil of een smalle regel: "Quadrivium". */
   shortName: string;

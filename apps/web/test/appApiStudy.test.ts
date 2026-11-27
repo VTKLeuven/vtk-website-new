@@ -14,6 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@vtk/db", () => ({ prisma: {} }));
 
 import {
+  STUDY_AWAY_SECONDS,
   STUDY_MAX_SECONDS,
   isLive,
   netSeconds,
@@ -48,12 +49,22 @@ describe("een lopende sessie", () => {
     expect(isLive(session(), NOW)).toBe(true);
   });
 
-  it("telt tot het laatste levensteken wanneer de app zweeg", () => {
-    // De telefoon viel om 11:00 stil; om 12:00 kijken we opnieuw. Dat mag één uur
-    // opleveren en niet twee, anders levert een lege batterij een nachtshift op.
-    const dead = session({ lastSeenAt: new Date("2026-08-25T11:00:00.000Z") });
-    expect(isLive(dead, NOW)).toBe(false);
-    expect(netSeconds(dead, NOW)).toBe(60 * 60);
+  it("telt door wanneer de app dicht is: de telefoon ligt weg", () => {
+    // Om 11:00 meldde de app zich laatst; om 12:00 studeert die nog altijd.
+    const away = session({ lastSeenAt: new Date("2026-08-25T11:00:00.000Z") });
+    expect(isLive(away, NOW)).toBe(true);
+    expect(netSeconds(away, NOW)).toBe(2 * 60 * 60);
+  });
+
+  it("houdt op na de grens zonder levensteken", () => {
+    // De app zweeg om 06:00 en niemand stopte; om 12:00 telt dat tot 09:00 en
+    // niet tot nu, anders levert een vergeten teller een nachtshift op.
+    const forgotten = session({
+      startedAt: new Date("2026-08-25T05:00:00.000Z"),
+      lastSeenAt: new Date("2026-08-25T06:00:00.000Z"),
+    });
+    expect(isLive(forgotten, NOW)).toBe(false);
+    expect(netSeconds(forgotten, NOW)).toBe(60 * 60 + STUDY_AWAY_SECONDS);
   });
 
   it("trekt een pauze af, maar pas na de marge van een minuut", () => {

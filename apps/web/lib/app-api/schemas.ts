@@ -121,6 +121,11 @@ export const appStudyGoalSchema = z.object({
   dailyGoalMinutes: z.number().int().min(15).max(1440),
 });
 
+/** De vakken onder "Waaraan werk je?"; `cleanSubjects` kuist ze daarna nog op. */
+export const appStudySubjectsSchema = z.object({
+  subjects: z.array(z.string().max(200)).max(50),
+});
+
 /**
  * De planning van Burgieclan (`AppPlanningOperation`). Burgieclan valideert
  * alles zelf nog eens; dit houdt enkel een onzinnige body weg voor hij de deur

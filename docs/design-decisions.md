@@ -8990,14 +8990,14 @@ voor niemand anders; stap je eruit, dan ben je weg uit die lijst. Het vak waaraa
 je werkt mag je bovendien per sessie verbergen: dan telt de tijd wel mee maar
 staat er niet bij waarvoor.
 
-**Weg uit de app is pauze.** Een teller die doorloopt terwijl je op iets anders
-zit, meet niets, en dan is de hele lijst een grap. Maar streng afkappen straft
-wie even iets moet opzoeken. Daarom pauzeert de sessie zodra de app naar de
-achtergrond gaat, en telt een pauze korter dan een minuut niet mee. Blijft het
-levensteken van de app helemaal weg, dan telt de sessie tot het laatste moment
-waarop de server wist dat ze liep; anders levert een telefoon die 's avonds
-leegloopt de volgende ochtend veertien uur op. Boven de acht uur netto wordt een
-sessie afgekapt.
+**De teller loopt door buiten de app** (november 2026; tot dan was weg uit de
+app pauze). Wie gaat studeren, legt zijn telefoon weg, en een teller die dan
+stilvalt meet net het studeren niet. Een pauze neem je nu met de knop, en een
+pauze korter dan een minuut telt niet mee. Wat het misbruik tegenhoudt, is het
+levensteken: blijft de app langer dan drie uur dicht, dan telt de sessie tot drie
+uur na het laatste levensteken en sluit ze daar. Anders levert een telefoon die
+'s avonds leegloopt, of een teller die iemand vergat, de volgende ochtend een
+nacht op. Boven de acht uur netto wordt een sessie afgekapt.
 
 **Een sessie hoort bij de dag waarop ze begon.** Wie om half twaalf 's avonds
 begint en tot twee uur doorgaat, heeft dat op één avond gedaan. Die tijd over twee

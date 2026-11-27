@@ -415,8 +415,8 @@ export async function sendStudyGroupStartPush(
     if (group.startPushAt && group.startPushAt >= dayStarted) continue;
 
     // Zit er al iemand anders, dan ben jij niet de eerste en is er niets aan te
-    // kondigen. `isLive` is dezelfde regel als in de zaal zelf: open, en de app
-    // meldde zich net nog.
+    // kondigen. `isLive` is dezelfde regel als in de zaal zelf: open, en het
+    // laatste levensteken is niet te lang geleden.
     const active = await prisma.studySession.findMany({
       where: { userId: { in: others }, endedAt: null },
       select: {

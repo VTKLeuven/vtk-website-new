@@ -8981,6 +8981,12 @@ model StudyProfile {
   userId           String @id
   /// Het dagdoel in minuten; de reeks telt de dagen waarop je dat haalde.
   dailyGoalMinutes Int    @default(240)
+  /// De vakken onder "Waaraan werk je?" in de app, zoals het lid ze zelf
+  /// beheert (toevoegen, hernoemen, verwijderen), in die volgorde.
+  subjects         String[] @default([])
+  /// Wanneer het lid die lijst voor het laatst zelf bewaarde. `null` = nooit, en
+  /// dan toont de app de vakken van zijn laatste sessies, zoals voordien.
+  subjectsSetAt    DateTime? @db.Timestamptz(3)
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)

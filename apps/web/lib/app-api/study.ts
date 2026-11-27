@@ -12,30 +12,33 @@ import { brusselsYMD, brusselsWallClockMinutes, shiftYMD, ymdKey, type YMD } fro
  * veld dat ergens opgeteld wordt. Pas bij het afsluiten legt `seconds` de uitkomst
  * vast; daarna verandert er niets meer aan.
  *
- * **Het levensteken doet het echte werk.** De app meldt zich elke minuut zolang
- * ze open is. Blijft dat weg, dan is de sessie niet "nog bezig" maar afgebroken,
- * en telt ze tot het laatste teken van leven. Zonder die regel levert een telefoon
- * die 's avonds leegloopt de volgende ochtend veertien uur studietijd op, en dan
- * is de hele ranglijst een grap.
+ * **De teller loopt door buiten de app.** Sinds november 2026: wie begint, legt
+ * zijn telefoon weg, en dat is net de bedoeling. Tot dan pauzeerde de app zodra
+ * je haar verliet, en stond je na een uur studeren met een vergrendeld scherm op
+ * nul. De app meldt zich nog elke minuut zolang ze open is, en dat levensteken
+ * beslist nog altijd hoever een sessie mag lopen.
  *
- * **De marge van een minuut is met opzet.** Wie de app verlaat, pauzeert; maar een
- * pauze korter dan een minuut telt niet mee als pauze. Even een bericht lezen mag,
- * en een teller die daarop hapert voelt als een straf voor iets dat niemand
- * bedoeld heeft. Langer wegblijven is gewoon niet studeren.
+ * **Maar een vergeten teller levert geen nacht op.** Zonder levensteken telt een
+ * sessie hoogstens `STUDY_AWAY_SECONDS` door na het laatste; daarna sluit ze
+ * vanzelf op dat punt. Wie de app tussendoor even opent, schuift die grens op.
+ * Zonder die regel levert een telefoon die 's avonds leegloopt de volgende
+ * ochtend acht uur studietijd op, en dan is de hele ranglijst een grap.
+ *
+ * **De marge van een minuut is met opzet.** Een pauze (met de knop) korter dan
+ * een minuut telt niet mee als pauze; een teller die daarop hapert voelt als een
+ * straf voor iets dat niemand bedoeld heeft.
  */
 
-/** Zonder levensteken binnen deze tijd is iemand niet meer "nu bezig". */
-export const STUDY_STALE_SECONDS = 180;
+/**
+ * Zo lang telt een sessie door zonder dat de app zich meldt: de telefoon ligt
+ * weg terwijl je studeert. Daarna is ze afgebroken, op dit punt na het laatste
+ * levensteken.
+ */
+export const STUDY_AWAY_SECONDS = 3 * 60 * 60;
 /** Een pauze korter dan dit telt niet. Even iets opzoeken is geen pauze. */
 export const STUDY_PAUSE_GRACE_SECONDS = 60;
 /** Netto maximum per sessie. Wie langer zit, splitst maar. */
 export const STUDY_MAX_SECONDS = 8 * 60 * 60;
-/**
- * Hoelang een sessie zonder levensteken open mag blijven staan voor we ze zelf
- * afsluiten. Ruim genoeg om een tunnel of een lege batterij te overleven zonder
- * je sessie kwijt te spelen, kort genoeg om niet dagen open te blijven staan.
- */
-const STUDY_ABANDON_SECONDS = 30 * 60;
 
 export type StudySessionRow = {
   id: string;
@@ -50,23 +53,28 @@ export type StudySessionRow = {
   seconds: number | null;
 };
 
-/** Of deze sessie nu echt loopt: open, en de app heeft zich net nog gemeld. */
+/** Of deze sessie nu loopt: open, en het laatste levensteken is niet te lang geleden. */
 export function isLive(session: StudySessionRow, now: Date): boolean {
   if (session.endedAt) return false;
-  return now.getTime() - session.lastSeenAt.getTime() <= STUDY_STALE_SECONDS * 1000;
+  return now.getTime() - session.lastSeenAt.getTime() <= STUDY_AWAY_SECONDS * 1000;
+}
+
+/** Waar een sessie zonder levensteken ophoudt met tellen. */
+function awayLimit(session: StudySessionRow): Date {
+  return new Date(session.lastSeenAt.getTime() + STUDY_AWAY_SECONDS * 1000);
 }
 
 /**
  * De netto seconden van een sessie op dit moment.
  *
  * Voor een afgesloten sessie is dat gewoon het vastgelegde getal. Voor een
- * lopende sessie rekenen we tot nu; voor een sessie waarvan het levensteken
- * wegbleef tot het laatste teken van leven, want daarna weten we niets meer.
+ * lopende sessie rekenen we tot nu; voor een sessie waarvan het levensteken te
+ * lang wegbleef tot `STUDY_AWAY_SECONDS` na het laatste (`cutoffFor`).
  */
 export function netSeconds(session: StudySessionRow, now: Date): number {
   if (session.seconds !== null) return session.seconds;
 
-  const cutoff = session.endedAt ?? (isLive(session, now) ? now : session.lastSeenAt);
+  const cutoff = cutoffFor(session, now);
   const gross = (cutoff.getTime() - session.startedAt.getTime()) / 1000;
 
   let paused = session.pausedSeconds;
@@ -107,7 +115,7 @@ export async function closeAbandonedSessions(userId: string, now: Date): Promise
   if (open.length === 0) return;
 
   for (const [index, session] of open.entries()) {
-    const stale = now.getTime() - session.lastSeenAt.getTime() > STUDY_ABANDON_SECONDS * 1000;
+    const stale = !isLive(session, now);
     const seconds = netSeconds(session, now);
     const overCap = seconds >= STUDY_MAX_SECONDS;
     // Er hoort er hoogstens één open te staan. Staat er toch meer dan één (twee
@@ -120,7 +128,7 @@ export async function closeAbandonedSessions(userId: string, now: Date): Promise
     await prisma.studySession.update({
       where: { id: session.id },
       data: {
-        endedAt: stale || duplicate ? session.lastSeenAt : now,
+        endedAt: duplicate ? session.lastSeenAt : cutoffFor(session, now),
         seconds,
         endedReason: overCap ? "cap" : "timeout",
         pausedAt: null,
@@ -172,7 +180,8 @@ export function streakFrom(totals: Map<string, number>, goalSeconds: number, now
 }
 
 /**
- * Tot waar deze sessie meetelt: haar eindtijd, nu, of het laatste levensteken.
+ * Tot waar deze sessie meetelt: haar eindtijd, nu, of de grens na het laatste
+ * levensteken.
  *
  * Eén plek, want `netSeconds` en het afsluiten moeten exact hetzelfde moment
  * gebruiken. Liepen ze uiteen, dan zou de stand op het scherm een andere zijn dan
@@ -180,7 +189,7 @@ export function streakFrom(totals: Map<string, number>, goalSeconds: number, now
  * ooit terugvindt.
  */
 export function cutoffFor(session: StudySessionRow, now: Date): Date {
-  return session.endedAt ?? (isLive(session, now) ? now : session.lastSeenAt);
+  return session.endedAt ?? (isLive(session, now) ? now : awayLimit(session));
 }
 
 /** De open sessie van dit lid, of `null`. */
@@ -209,6 +218,7 @@ export async function startStudySession(
   if (existing) return { session: existing, started: false };
 
   const subject = input.subject?.trim();
+  if (subject) await rememberSubject(userId, subject);
   const session = await prisma.studySession.create({
     data: {
       userId,
@@ -286,9 +296,8 @@ export async function updateStudySession(
  * Opstaan.
  *
  * `lastSeenAt` wordt hier met opzet **niet** bijgewerkt voor het rekenen. Wie zijn
- * app twee uur geleden wegklikte en nu op stoppen drukt, hoort die twee uur niet
- * te krijgen; de sessie telt tot het laatste moment waarop we wisten dat ze nog
- * liep.
+ * app vijf uur geleden wegklikte en nu op stoppen drukt, krijgt er drie
+ * (`STUDY_AWAY_SECONDS`) en niet vijf.
  */
 export async function stopStudySession(
   userId: string,
@@ -311,6 +320,52 @@ export async function stopStudySession(
   });
 
   return { seconds, subject: session.subject };
+}
+
+/** Zoveel vakken mag de lijst onder "Waaraan werk je?" hebben. */
+export const STUDY_MAX_SUBJECTS = 20;
+
+/**
+ * Een lijst vakken opgekuist: ingekort, zonder lege en zonder dubbele (los van
+ * hoofdletters, de eerste wint), en niet langer dan het maximum.
+ */
+export function cleanSubjects(subjects: readonly string[]): string[] {
+  const kept: string[] = [];
+  for (const raw of subjects) {
+    const subject = raw.trim().replace(/\s+/g, " ").slice(0, 60);
+    if (!subject) continue;
+    if (kept.some((other) => other.toLowerCase() === subject.toLowerCase())) continue;
+    kept.push(subject);
+    if (kept.length >= STUDY_MAX_SUBJECTS) break;
+  }
+  return kept;
+}
+
+/**
+ * De vakken onder "Waaraan werk je?" bewaren, zoals het lid ze in de app beheert.
+ * Vanaf dan is dat de lijst, en niet langer wat er in de laatste sessies stond.
+ */
+export async function setStudySubjects(userId: string, subjects: readonly string[], now = new Date()): Promise<void> {
+  const clean = cleanSubjects(subjects);
+  await prisma.studyProfile.upsert({
+    where: { userId },
+    update: { subjects: clean, subjectsSetAt: now },
+    create: { userId, subjects: clean, subjectsSetAt: now },
+  });
+}
+
+/**
+ * Een nieuw ingetikt vak komt vooraan in een lijst die het lid zelf beheert; wie
+ * nooit iets beheerde, krijgt het toch al te zien via zijn laatste sessies.
+ */
+async function rememberSubject(userId: string, subject: string): Promise<void> {
+  const profile = await prisma.studyProfile.findUnique({ where: { userId } });
+  if (!profile?.subjectsSetAt) return;
+  if (profile.subjects.some((other) => other.toLowerCase() === subject.toLowerCase())) return;
+  await prisma.studyProfile.update({
+    where: { userId },
+    data: { subjects: cleanSubjects([subject, ...profile.subjects]) },
+  });
 }
 
 /** Het dagdoel van dit lid, in minuten. */
