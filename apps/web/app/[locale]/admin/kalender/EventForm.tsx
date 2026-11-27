@@ -59,6 +59,11 @@ type Event = {
   imageFocusMobileY?: number | null;
   imageZoomMobile?: number | null;
   imageRatioMobile?: number | null;
+  /** De eigen uitsnede in de app; alle leeg = volgt de telefoon. */
+  imageFocusAppX?: number | null;
+  imageFocusAppY?: number | null;
+  imageZoomApp?: number | null;
+  imageRatioApp?: number | null;
   publishedAt?: Date | null;
   categoryIds?: string[];
   /** Hangt er al een logistiek-evenement aan? Zie `UitleenEvent.calendarEventId`. */
@@ -713,6 +718,12 @@ export function EventForm({
             event.imageFocusMobileY,
             event.imageZoomMobile,
             event.imageRatioMobile,
+          )}
+          defaultAppCrop={mobileCropFrom(
+            event.imageFocusAppX,
+            event.imageFocusAppY,
+            event.imageZoomApp,
+            event.imageRatioApp,
           )}
           locale={locale}
           fallbackUrl={fallbackTheme?.bannerUrl ?? siteDefaultImage}

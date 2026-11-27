@@ -11,6 +11,7 @@ import { getCurrentSession } from "@/lib/session";
 import { appLocaleFrom, type AppCalendar } from "@/lib/app-api/contract";
 import { followedCategorySlugs, interestedEventIds } from "@/lib/app-api/interest";
 import { absoluteMediaUrl } from "@/lib/app-api/media";
+import { appImageCrop } from "@/lib/app-api/imageCrop";
 import { appErrorResponse, appJson } from "@/lib/app-api/respond";
 import { organiserName } from "@/lib/calendar/organiser";
 import { eventAsOfNow, MOMENT_SELECT } from "@/lib/calendar/moments";
@@ -149,6 +150,7 @@ export async function GET(request: Request) {
         allDay: event.allDay,
         location: event.location,
         imageUrl: absoluteMediaUrl(request, event.imageKey),
+        imageCrop: appImageCrop(row, event),
         groupName: organiserName(event.organiserName, event.group, locale),
         groupSlug: event.group.slug,
         categories: event.categories.map(({ category }) => ({

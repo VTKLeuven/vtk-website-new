@@ -2200,6 +2200,14 @@ model CalendarEvent {
   /// `object-fit` alleen (dat snijdt altijd evenveel af); de pagina rekent de
   /// afmetingen van de foto zelf uit, en heeft daar deze verhouding voor nodig.
   imageRatioMobile  Float?
+  /// Een eigen uitsnede in de app, waar Home en de eventpagina de foto bovenaan
+  /// tonen in een kader van ongeveer 6/5, hoger dan elk kader op de site. Zelfde
+  /// vorm als de telefoonuitsnede. Alle `null` = de app volgt de
+  /// telefoonuitsnede, en anders `imageFocusX/Y`. Zie `lib/app-api/imageCrop.ts`.
+  imageFocusAppX Float?
+  imageFocusAppY Float?
+  imageZoomApp   Float?
+  imageRatioApp  Float?
   groupId       String
   /// Wie het evenement organiseert, wanneer dat niet de groep is die het beheert.
   ///

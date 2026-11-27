@@ -18,6 +18,7 @@ import {
   interestTotal,
 } from "@/lib/calendar/interest";
 import { absoluteMediaUrl, absoluteUrl } from "@/lib/app-api/media";
+import { appImageCrop } from "@/lib/app-api/imageCrop";
 import { appErrorResponse, appJson, appNotFound } from "@/lib/app-api/respond";
 import { organiserName } from "@/lib/calendar/organiser";
 import { eventLinkLabel } from "@/lib/calendar/eventLink";
@@ -98,6 +99,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       allDay: event.allDay,
       location: shown.location,
       imageUrl,
+      imageCrop: appImageCrop(event, shown),
       groupName: organiserName(event.organiserName, event.group, locale),
       groupSlug: event.group.slug,
       categories: event.categories.map(({ category }) => ({

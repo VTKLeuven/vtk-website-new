@@ -24,6 +24,7 @@ import {
 } from "@/lib/app-api/contract";
 import { interestedEventIds } from "@/lib/app-api/interest";
 import { absoluteMediaUrl, absoluteUrl } from "@/lib/app-api/media";
+import { appImageCrop } from "@/lib/app-api/imageCrop";
 import { appErrorResponse, appJson } from "@/lib/app-api/respond";
 import { serviceStatus } from "@/lib/app-api/serviceStatus";
 import { voucherBalance } from "@/lib/app-api/vouchers";
@@ -139,6 +140,7 @@ export async function GET(request: Request) {
           request,
           defaultEventImageFor(defaultEventImages, eventCategorySlugs(event.categories)),
         ),
+      imageCrop: appImageCrop(row, event),
       groupName: organiserName(event.organiserName, event.group, locale),
       groupSlug: event.group.slug,
       categories: event.categories.map(({ category }) => ({

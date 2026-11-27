@@ -76,6 +76,10 @@ const EVENT_FIELD_LABELS: Record<string, string> = {
   imageFocusMobileY: "uitsnede op een telefoon",
   imageZoomMobile: "zoom op een telefoon",
   imageRatioMobile: "zoom op een telefoon",
+  imageFocusAppX: "uitsnede in de app",
+  imageFocusAppY: "uitsnede in de app",
+  imageZoomApp: "zoom in de app",
+  imageRatioApp: "zoom in de app",
   publishedAt: "publicatiestatus",
   moments: "momenten",
 };
@@ -134,6 +138,8 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
   // De eigen uitsnede op een telefoon; uit (of een ouder formulier) wist ze, en
   // dan volgt de telefoon de gewone uitsnede.
   const mobileCrop = readMobileCrop(formData);
+  // Hetzelfde voor de grote foto bovenaan in de app (Home, de eventpagina).
+  const appCrop = readMobileCrop(formData, "imageFocusApp");
   if (!parsed.success || image.kind === "invalid") return saveError("INVALID_INPUT");
   const input = parsed.data;
   const categoryIds = formData.getAll("categoryIds").map(String).filter(Boolean);
@@ -210,6 +216,10 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     imageFocusMobileY: mobileCrop?.focus.y ?? null,
     imageZoomMobile: mobileCrop?.zoom ?? null,
     imageRatioMobile: mobileCrop?.ratio ?? null,
+    imageFocusAppX: appCrop?.focus.x ?? null,
+    imageFocusAppY: appCrop?.focus.y ?? null,
+    imageZoomApp: appCrop?.zoom ?? null,
+    imageRatioApp: appCrop?.ratio ?? null,
     createdById: session.user.id,
   };
 

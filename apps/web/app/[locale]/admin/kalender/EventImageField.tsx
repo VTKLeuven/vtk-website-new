@@ -28,6 +28,11 @@ import { CENTER_FOCUS, focusPosition, type ImageCrop, type ImageFocus } from "@/
  * logo's; een punt verleggen haalt er hoogstens één terug, uitzoomen beide.
  * Standaard uit: dan volgt de telefoon de gewone uitsnede, zoals voordien.
  *
+ * En de app krijgt er een derde (`imageFocusAppX/Y`, `imageZoomApp`): Home en de
+ * eventpagina in de app tonen de foto bovenaan over de volle breedte in ongeveer
+ * 6/5, hoger dan elk kader op de site. Ook standaard uit: dan volgt de app de
+ * telefoonuitsnede, en anders het gewone punt (`lib/app-api/imageCrop.ts`).
+ *
  * `fallbackUrl` is de foto die dit evenement zónder upload krijgt: de
  * standaardbanner van zijn thema, en anders de sitebrede. Ze verandert dus mee
  * met de aangevinkte thema's; de preview toont dan wat er echt komt te staan in
@@ -37,6 +42,7 @@ export function EventImageField({
   defaultKey,
   defaultFocus,
   defaultMobileCrop,
+  defaultAppCrop,
   locale,
   fallbackUrl,
   fallbackHint,
@@ -45,6 +51,8 @@ export function EventImageField({
   defaultFocus?: ImageFocus | null;
   /** De telefoonuitsnede, of `null` wanneer de telefoon de gewone volgt. */
   defaultMobileCrop?: ImageCrop | null;
+  /** De uitsnede in de app, of `null` wanneer de app de telefoon volgt. */
+  defaultAppCrop?: ImageCrop | null;
   locale: "nl" | "en";
   fallbackUrl: string;
   /** Waar die foto vandaan komt ("Standaardfoto Cantus"), als label op de preview. */
@@ -57,8 +65,10 @@ export function EventImageField({
   // tegenspreken.
   const [focus, setFocus] = useState<ImageFocus>(defaultFocus ?? CENTER_FOCUS);
   const [ownMobileCrop, setOwnMobileCrop] = useState(Boolean(defaultMobileCrop));
+  const [ownAppCrop, setOwnAppCrop] = useState(Boolean(defaultAppCrop));
   const imageUrl = key ? `/api/media/${storageKeyPath(key)}` : null;
   const phonePreview = { label: nl ? "Telefoon" : "Phone", ratio: "4 / 3" };
+  const appPreview = { label: "App", ratio: "6 / 5" };
 
   return (
     <div className="space-y-4">
@@ -92,6 +102,8 @@ export function EventImageField({
           // Met een eigen telefoonuitsnede staat de telefoon hieronder, bij
           // die uitsnede; hier zou ze tonen wat er niet meer komt te staan.
           ...(ownMobileCrop ? [] : [phonePreview]),
+          // Zo ook de app, die zonder eigen uitsnede die van de telefoon volgt.
+          ...(ownMobileCrop || ownAppCrop ? [] : [appPreview]),
         ]}
         onChange={setFocus}
       />
@@ -134,7 +146,45 @@ export function EventImageField({
               ? "Het kader op de foto is wat een telefoon toont. Zoom uit om meer van de randen te tonen; wat de foto dan niet vult, vult de site met een vervaagde kopie."
               : "The frame on the photo is what a phone shows. Zoom out to show more of the edges; whatever the photo then leaves empty, the site fills with a blurred copy."
           }
-          previews={[phonePreview]}
+          previews={ownAppCrop ? [phonePreview] : [phonePreview, appPreview]}
+        />
+      ) : null}
+
+      {/* Uit wist de app-uitsnede; dan volgt de app de telefoon. */}
+      <input type="hidden" name="imageFocusAppOn" value={imageUrl && ownAppCrop ? "true" : "false"} />
+      {imageUrl ? (
+        <label className="vtk-ef-check">
+          <input
+            type="checkbox"
+            checked={ownAppCrop}
+            onChange={(changed) => setOwnAppCrop(changed.target.checked)}
+          />
+          <span>
+            <b>{nl ? "Andere uitsnede in de app" : "Different crop in the app"}</b>
+            <small>
+              {nl
+                ? "Home en de eventpagina in de app tonen de foto bovenaan over de volle breedte, in een kader dat hoger is dan op de site (ongeveer 6/5). Kies er een eigen middelpunt en zoom voor. Uit: de app volgt de uitsnede op een telefoon."
+                : "Home and the event page in the app show the photo full width at the top, in a frame taller than anywhere on the site (about 6/5). Pick its own centre and zoom. Off: the app follows the crop on a phone."}
+            </small>
+          </span>
+        </label>
+      ) : null}
+      {imageUrl && ownAppCrop ? (
+        <ImageFocusField
+          name="imageFocusApp"
+          withZoom
+          imageUrl={imageUrl}
+          // Wie het aanzet, begint van wat de app nu toont.
+          defaultFocus={defaultAppCrop?.focus ?? defaultMobileCrop?.focus ?? focus}
+          defaultZoom={defaultAppCrop?.zoom ?? defaultMobileCrop?.zoom ?? 1}
+          locale={locale}
+          label={nl ? "Uitsnede in de app" : "Crop in the app"}
+          helpText={
+            nl
+              ? "Het kader op de foto is wat de app toont. Bovenaan staan de groet en de knoppen, en onderaan schuift de titel er een stukje over: houd de tekst van een affiche iets van de randen. Zoom uit om meer te tonen; de rest vult de app met een vervaagde kopie."
+              : "The frame on the photo is what the app shows. The greeting and buttons sit at the top and the title slides over the bottom a little: keep a poster's text away from the edges. Zoom out to show more; the app fills the rest with a blurred copy."
+          }
+          previews={[appPreview]}
         />
       ) : null}
     </div>

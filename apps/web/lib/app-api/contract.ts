@@ -338,6 +338,13 @@ export type AppCalendarEvent = {
   location: string | null;
   imageUrl: string | null;
   /**
+   * Hoe `imageUrl` bijgesneden wordt. Afwezig of `null`: rond het midden, zonder
+   * zoom (een oudere server, of de standaardfoto van een thema).
+   *
+   * Optioneel omdat een oudere server het veld niet meestuurt.
+   */
+  imageCrop?: AppImageCrop | null;
+  /**
    * Wie het evenement organiseert, zoals het getoond hoort te worden: de
    * `organiserName` van het evenement wanneer die ingevuld is (een crossover of
    * een evenement van een partner), anders de naam van de beherende groep.
@@ -377,6 +384,28 @@ export type AppCalendarEvent = {
    */
   moments?: AppEventMoment[];
 };
+
+/**
+ * De uitsnede van een eventfoto, door de redactie gekozen in het beheer. Punten
+ * lopen van 0 tot 1 met (0, 0) linksboven, zoals CSS `object-position`.
+ *
+ * - `focus` is het punt dat in een breed kader in beeld blijft (een kaart in
+ *   16/9, een duimnagel): dat van de site.
+ * - `hero` is voor de grote foto bovenaan (Home, de eventpagina), een kader van
+ *   ongeveer 6/5. De eigen app-uitsnede, en anders die van een telefoon, en
+ *   anders `focus` zonder zoom; de server heeft die keuze al gemaakt.
+ *
+ * `zoom` is een factor op "het kader net gevuld" (1). Kleiner zoomt uit: de foto
+ * vult het kader dan niet meer, en de rest wordt een vervaagde kopie. Dat kan
+ * enkel met `ratio` (breedte gedeeld door hoogte van de foto); zonder ratio is
+ * de zoom 1. Zie `lib/imageFocus.ts` (`cropBox`) op de site.
+ */
+export type AppImageCrop = {
+  focus: AppImagePoint;
+  hero: AppImagePoint & { zoom: number; ratio: number | null };
+};
+
+export type AppImagePoint = { x: number; y: number };
 
 /** Eén moment uit een reeks. Locatie leeg: die van het evenement. */
 export type AppEventMoment = {
