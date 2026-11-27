@@ -1919,6 +1919,11 @@ export type AppAdminLink = {
   label: string;
   url: string;
   external: boolean;
+  /**
+   * Het pictogram uit de zijbalk van /admin als `<svg>`-tekst (24x24, lijn in
+   * `currentColor`); zie `lib/admin-nav-icons.tsx`. Ontbreekt bij een oudere server.
+   */
+  icon?: string;
 };
 
 /** Dezelfde groepen en volgorde als de zijbalk op /admin, gefilterd op jouw rechten. */
@@ -1926,6 +1931,8 @@ export type AppAdminSection = {
   key: string;
   /** `null` voor een los item zonder groep. */
   label: string | null;
+  /** Het pictogram van de groep, zoals bij `AppAdminLink.icon`; `null` zonder groep. */
+  icon?: string | null;
   links: AppAdminLink[];
 };
 

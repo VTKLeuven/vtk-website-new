@@ -9,6 +9,7 @@ import { loadOwnBo } from "@/lib/bo/overview";
 import { openResults } from "@/lib/bo/own";
 import { brusselsYMD, ymdKey } from "@/lib/brussels";
 import { visibleAdminNav } from "@/lib/admin-nav-visible";
+import { adminNavIconMarkup } from "@/lib/admin-nav-icons";
 import { isExternalUrl } from "@/lib/href";
 import type { requireSession } from "@/lib/session";
 import type { AppAdminBoDue, AppAdminDashboard, AppAdminSection, AppAdminTile } from "./contract";
@@ -40,12 +41,15 @@ export async function adminDashboard(session: Session, locale: Locale, origin: s
         label: item.label,
         url: absolute(item.href),
         external: isExternalUrl(item.href),
+        icon: adminNavIconMarkup(item.key),
       }));
-      if (links.length > 0) sections.push({ key: node.key, label: node.label, links });
+      if (links.length > 0) {
+        sections.push({ key: node.key, label: node.label, icon: adminNavIconMarkup(node.key), links });
+      }
     } else if (!node.item.hidden) {
       // Losse items na elkaar komen samen in één blok zonder kop, zoals in de zijbalk.
       if (!loose) {
-        loose = { key: `los-${sections.length}`, label: null, links: [] };
+        loose = { key: `los-${sections.length}`, label: null, icon: null, links: [] };
         sections.push(loose);
       }
       loose.links.push({
@@ -53,6 +57,7 @@ export async function adminDashboard(session: Session, locale: Locale, origin: s
         label: node.item.label,
         url: absolute(node.item.href),
         external: isExternalUrl(node.item.href),
+        icon: adminNavIconMarkup(node.item.key),
       });
     }
   }
