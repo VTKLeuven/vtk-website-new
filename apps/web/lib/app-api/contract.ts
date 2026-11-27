@@ -647,7 +647,18 @@ export type AppTicketEventDetail = AppTicketEvent & {
   /** Pad naar de verkoopvoorwaarden op de site. */
   termsUrl: string;
   ticketTypes: AppTicketType[];
+  /**
+   * De betaalwijzen die aan staan, in de volgorde van de bestelpagina voor deze
+   * taal (`paymentMethodChoice`): in het Nederlands Bancontact eerst, in het
+   * Engels Mollie. De app kiest de eerste standaard en start de betaling zelf
+   * via `POST /api/tickets/orders/<id>/pay`. Optioneel voor een oudere server;
+   * zonder kiest de app op de bestelpagina van de site.
+   */
+  paymentMethods?: AppPaymentMethod[];
 };
+
+/** Een betaalwijze, zoals `POST /api/tickets/orders/<id>/pay` ze aanvaardt. */
+export type AppPaymentMethod = "mollie" | "bancontact" | "mock";
 
 /** Eén ticket in "mijn tickets". */
 export type AppMyTicket = {

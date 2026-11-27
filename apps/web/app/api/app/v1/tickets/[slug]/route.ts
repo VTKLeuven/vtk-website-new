@@ -1,6 +1,7 @@
 import { corsPreflight } from "@/lib/cors";
 import { getPublishedTicketEventBySlug } from "@/lib/ticketing/queries";
 import { accountOrderMax } from "@/lib/ticketing/accountLimit";
+import { paymentMethodChoice } from "@/lib/ticketing/paymentMethods";
 import {
   appLocaleFrom,
   type AppTicketEventDetail,
@@ -70,6 +71,8 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
           options: question.options,
         })),
       })),
+      // Dezelfde keuze en volgorde als de bestelpagina van de site.
+      paymentMethods: paymentMethodChoice(locale).options.map((option) => option.provider),
     };
 
     return appJson(request, payload);
