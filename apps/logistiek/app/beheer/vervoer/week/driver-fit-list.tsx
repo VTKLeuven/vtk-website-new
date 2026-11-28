@@ -25,11 +25,11 @@ import type { DriverOption } from '@/lib/uitleen-server';
  *   chauffeur bij het goedkeuren (het formulier eronder). Een knop hier zou een
  *   chauffeur toewijzen die het goedkeuren met een lege keuzelijst meteen weer
  *   wist. De volgorde staat er wel, en de keuzelijst krijgt dezelfde woorden.
- * - **Van wie geen uren gekend zijn, krijgt geen rij** maar staat in één zin
- *   eronder: dat je het niet weet, is iets anders dan dat hij niet kan, maar het
- *   is ook geen reden om de lijst ermee te vullen. "Geen uren gekend" en niet
- *   "gaf niets door": enkel karchauffeurs kunnen hun uren invullen, en de planning
- *   haalt ook enkel die op (`availabilityInRange`). De keuzelijst eronder blijft
+ * - **Enkel wie kan of deels kan, of dan al rijdt.** Van wie geen uren gekend
+ *   zijn of wie op dit uur niet kan, staat niets: geen rij en ook geen zin met
+ *   namen eronder. Die zin is er geweest ("Geen uren gekend: …", "Niet op dit
+ *   uur: …") en werd op vraag van Logistiek weggehaald; met twintig chauffeurs
+ *   was het een alinea namen die niemand las. De keuzelijst eronder blijft
  *   iedereen aanbieden.
  * - **Voor de kar enkel wie met de kar mag rijden**, zoals de keuzelijst ze ook
  *   bovenaan zet.
@@ -159,10 +159,6 @@ export function DriverFitList({
         fit.level === 'nood' ||
         fit.level === 'deels' ||
         (fit.level === 'bezet' && fit.window !== null))
-  );
-  const unknown = ranked.filter((fit) => fit.driverId !== current && fit.level === 'onbekend');
-  const notNow = ranked.filter(
-    (fit) => fit.driverId !== current && (fit.level === 'niet' || (fit.level === 'bezet' && fit.window === null))
   );
   const currentFit = current ? ranked.find((fit) => fit.driverId === current) : undefined;
 
@@ -298,23 +294,6 @@ export function DriverFitList({
           keuzelijst hieronder heeft de hele lijst.
         </p>
       )}
-
-      {unknown.length > 0 || notNow.length > 0 ? (
-        <p className="text-xs leading-5 text-vtk-muted">
-          {unknown.length > 0 ? (
-            <>
-              <span className="font-medium text-vtk-body">Geen uren gekend:</span>{' '}
-              {unknown.map((fit) => nameOf(fit.driverId)).join(', ')}.{' '}
-            </>
-          ) : null}
-          {notNow.length > 0 ? (
-            <>
-              <span className="font-medium text-vtk-body">Niet op dit uur:</span>{' '}
-              {notNow.map((fit) => nameOf(fit.driverId)).join(', ')}.
-            </>
-          ) : null}
-        </p>
-      ) : null}
 
       {!canAssign ? (
         <p className="text-xs text-vtk-muted">

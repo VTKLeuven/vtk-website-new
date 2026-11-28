@@ -14,3 +14,4 @@ export * from './uitleen-server/evenementen';
 export * from './uitleen-server/instellingen';
 export * from './uitleen-server/overzicht';
 export * from './uitleen-server/shared';
+export * from './uitleen-server/bijrijdshift';

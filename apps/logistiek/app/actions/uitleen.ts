@@ -55,6 +55,7 @@ import {
   type Range,
 } from '@/lib/availability-day';
 import { writeAudit } from '@/lib/audit';
+import { mayCreateTripShift, parseTripShiftInput, shiftMatchesTrip, tripShiftData } from '@/lib/bijrijdshift';
 import {
   notifyDriversOfCancellation,
   notifyReservation,
@@ -1889,6 +1890,142 @@ async function removeTripHelperActionImpl(helperId: string): Promise<ActionResul
 }
 
 /**
+ * Een bijrijdshift aanmaken vanuit de rit: een shift op vtk.be/shift waarop een
+ * lid zich inschrijft om mee te rijden (`lib/bijrijdshift.ts`).
+ *
+ * **Wie mag**: het team, de aanvrager en de leden van de post die de rit
+ * aanvroeg (`mayCreateTripShift`). Een andere post niet, ook niet die waaraan de
+ * rit doorgegeven is: een shift telt voor een post, en die zet een andere post
+ * niet.
+ *
+ * **Enkel een goedgekeurde rit die nog moet vertrekken.** Een aanvraag kan nog
+ * afgewezen worden of andere uren krijgen, en dan stonden er leden ingeschreven
+ * voor een rit die niet doorgaat. Eén shift per rit: wie meer bijrijders zoekt,
+ * zet er meer plaatsen op, en een dubbele klik maakt er geen twee.
+ *
+ * Schrijft ook in het logboek van vtk.be (`AdminAuditLog`), zoals elke shift die
+ * daar ontstaat (`createShift` in apps/web/lib/shift/server.ts).
+ */
+async function createTripShiftActionImpl(bookingId: string, input: unknown): Promise<ActionResult> {
+  const session = await requireSession();
+  const parsed = parseTripShiftInput(input);
+  if (!parsed.ok) return { ok: false, error: parsed.error };
+
+  const trip = await prisma.uitleenTransportBooking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true,
+      userId: true,
+      groupId: true,
+      status: true,
+      purpose: true,
+      startAt: true,
+      endAt: true,
+      pickupAddress: true,
+      destination: true,
+      vehicle: { select: { nameNl: true, nameEn: true } },
+      group: { select: { code: true, nameNl: true, nameEn: true } },
+      _count: { select: { shifts: true } },
+    },
+  });
+  if (!trip || !mayCreateTripShift(viewerOf(session), trip)) {
+    return { ok: false, error: 'Je kan deze rit niet aanpassen.' };
+  }
+  if (trip.status !== 'APPROVED') {
+    return { ok: false, error: 'Een bijrijdshift kan zodra Logistiek de rit goedkeurt.' };
+  }
+  if (trip.startAt.getTime() <= Date.now()) {
+    return { ok: false, error: 'Deze rit is al vertrokken.' };
+  }
+  if (trip._count.shifts > 0) {
+    return { ok: false, error: 'Deze rit heeft al een bijrijdshift.' };
+  }
+
+  const data = tripShiftData(trip, parsed.value);
+  await prisma.$transaction(async (tx) => {
+    const shift = await tx.shift.create({ data });
+    await tx.adminAuditLog.create({
+      data: {
+        actorId: session.user.id,
+        actorName: session.user.name.slice(0, 200),
+        action: 'create',
+        entity: 'shift',
+        entityId: shift.id,
+        target: shift.name.slice(0, 200),
+        summary: `${shift.maxParticipants} plaats(en), ${shift.reward} bonnetje(s), vanuit de uitleendienst`,
+      },
+    });
+  });
+
+  revalidateTripShift();
+  return { ok: true, message: 'Bijrijdshift staat op vtk.be/shift.' };
+}
+
+/**
+ * De uren van de rit opnieuw op haar bijrijdshift zetten. De shift volgt een
+ * verschoven rit niet vanzelf (`shiftMatchesTrip`); het blok bij de rit toont
+ * het verschil en deze knop.
+ */
+async function syncTripShiftActionImpl(shiftId: string): Promise<ActionResult> {
+  const session = await requireSession();
+  const shift = await prisma.shift.findUnique({
+    where: { id: shiftId },
+    select: {
+      id: true,
+      name: true,
+      startTime: true,
+      endTime: true,
+      transportBooking: { select: { id: true, userId: true, groupId: true, startAt: true, endAt: true } },
+    },
+  });
+  const trip = shift?.transportBooking;
+  if (!shift || !trip) return { ok: false, error: 'Deze bijrijdshift bestaat niet (meer).' };
+  if (!mayCreateTripShift(viewerOf(session), trip)) {
+    return { ok: false, error: 'Je kan deze rit niet aanpassen.' };
+  }
+  if (shiftMatchesTrip({ startAt: shift.startTime, endAt: shift.endTime }, trip)) {
+    return { ok: true, message: 'De shift staat al op de uren van de rit.' };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.shift.update({
+      where: { id: shift.id },
+      data: { startTime: trip.startAt, endTime: trip.endAt },
+    });
+    await tx.adminAuditLog.create({
+      data: {
+        actorId: session.user.id,
+        actorName: session.user.name.slice(0, 200),
+        action: 'update',
+        entity: 'shift',
+        entityId: shift.id,
+        target: shift.name.slice(0, 200),
+        summary: 'uren gelijkgezet met de rit, vanuit de uitleendienst',
+      },
+    });
+  });
+
+  revalidateTripShift();
+  return { ok: true, message: 'De shift staat weer op de uren van de rit.' };
+}
+
+function viewerOf(session: Awaited<ReturnType<typeof requireSession>>) {
+  return {
+    userId: session.user.id,
+    groupIds: session.groups.map((group) => group.id),
+    manages: canManage(session),
+  };
+}
+
+function revalidateTripShift() {
+  revalidateMember();
+  revalidatePath('/vervoer/[id]', 'page');
+  revalidatePath('/ritten');
+  revalidatePath('/beheer/vervoer');
+  revalidatePath('/beheer/vervoer/week');
+}
+
+/**
  * De chauffeur van een rit die aan jouw post doorgegeven is.
  *
  * De tegenhanger van `assignTripGroupAction` in het beheer: Logistiek geeft een
@@ -2105,6 +2242,14 @@ export async function addTripHelperAction(...args: Parameters<typeof addTripHelp
 
 export async function removeTripHelperAction(...args: Parameters<typeof removeTripHelperActionImpl>): ReturnType<typeof removeTripHelperActionImpl> {
   return guarded(args, () => removeTripHelperActionImpl(...args));
+}
+
+export async function createTripShiftAction(...args: Parameters<typeof createTripShiftActionImpl>): ReturnType<typeof createTripShiftActionImpl> {
+  return guarded(args, () => createTripShiftActionImpl(...args));
+}
+
+export async function syncTripShiftAction(...args: Parameters<typeof syncTripShiftActionImpl>): ReturnType<typeof syncTripShiftActionImpl> {
+  return guarded(args, () => syncTripShiftActionImpl(...args));
 }
 
 export async function setGroupTripDriverAction(...args: Parameters<typeof setGroupTripDriverActionImpl>): ReturnType<typeof setGroupTripDriverActionImpl> {

@@ -9,6 +9,7 @@ import { Avatar } from '@/components/person-avatar';
 import { PhoneLink } from '@/components/phone-link';
 import { useToast } from '@vtk/ui/toast';
 import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
+import type { TripPostMembers } from '@/lib/trip-post-members';
 
 /**
  * De bijrijders van een rit (V2): wie er meerijdt en op welk nummer.
@@ -35,6 +36,9 @@ export type TripHelper = {
   removable?: boolean;
 };
 
+/** Zoveel leden staan er zonder "Meer"; een post telt er gauw vijftien. */
+const VISIBLE_POST_MEMBERS = 3;
+
 export function TripHelpers({
   bookingId,
   helpers,
@@ -42,6 +46,7 @@ export function TripHelpers({
   canEdit,
   locale = 'nl',
   variant = 'list',
+  postMembers = null,
 }: {
   bookingId: string;
   helpers: TripHelper[];
@@ -55,12 +60,51 @@ export function TripHelpers({
    * daar staat het blok al onder "Mensen".
    */
   variant?: 'list' | 'people';
+  postMembers?: TripPostMembers | null;
 }) {
   const en = locale === 'en';
   const showToast = useToast();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState({ name: '', phone: '' });
+  // Met de rit erbij: in de planning blijft dit blok staan wanneer je een andere
+  // rit aanklikt, en die hoort weer met drie te beginnen.
+  const [expandedFor, setExpandedFor] = useState<string | null>(null);
+
+  // Enkel zolang er niemand staat, ook geen oude vrije tekst: die zegt al wie er
+  // meegaat, en dan is een lijst van de hele post ruis.
+  const members =
+    helpers.length === 0 && !legacyNote && postMembers && postMembers.members.length > 0
+      ? postMembers
+      : null;
+  const expanded = expandedFor === bookingId;
+  const shownMembers = members
+    ? expanded
+      ? members.members
+      : members.members.slice(0, VISIBLE_POST_MEMBERS)
+    : [];
+  const hiddenMembers = members ? members.members.length - VISIBLE_POST_MEMBERS : 0;
+  const membersIntro = members
+    ? en
+      ? `No passenger yet. Members of ${members.groupName}:`
+      : `Nog geen bijrijder. Leden van ${members.groupName}:`
+    : null;
+  const membersId = `trip-post-members-${bookingId}`;
+
+  function moreButton(className: string) {
+    if (hiddenMembers <= 0) return null;
+    return (
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={membersId}
+        onClick={() => setExpandedFor(expanded ? null : bookingId)}
+        className={className}
+      >
+        {expanded ? (en ? 'Less' : 'Minder') : `${en ? 'More' : 'Meer'} (${hiddenMembers})`}
+      </button>
+    );
+  }
 
   function add() {
     startTransition(async () => {
@@ -142,6 +186,41 @@ export function TripHelpers({
   if (variant === 'people') {
     return (
       <>
+        {members ? (
+          <>
+            <p className="trips-quiet">{membersIntro}</p>
+            <ul className="trips-people" id={membersId}>
+              {shownMembers.map((member) => {
+                const call = member.phone ? `${en ? 'Call' : 'Bel'} ${member.name.split(' ')[0]}: ${member.phone}` : '';
+                const role = en ? `Member of ${members.groupName}` : `Lid van ${members.groupName}`;
+                return (
+                  <li key={member.id} className="trips-person">
+                    <Avatar name={member.name} />
+                    <span className="trips-person-text">
+                      <span className="trips-person-name">{member.name}</span>
+                      <span className="trips-person-role">
+                        {member.phone ? role : `${role}, ${en ? 'no number' : 'geen nummer'}`}
+                      </span>
+                    </span>
+                    <span className="trips-person-actions">
+                      {member.phone ? (
+                        <a
+                          href={`tel:${member.phone.replace(/[^\d+]/g, '')}`}
+                          className="trips-round"
+                          title={call}
+                          aria-label={call}
+                        >
+                          <LogisticsIcon name="phone" className="h-4 w-4" strokeWidth={2} />
+                        </a>
+                      ) : null}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+            {moreButton('trips-add')}
+          </>
+        ) : null}
         {helpers.length > 0 || legacyNote ? (
           <ul className="trips-people">
             {helpers.map((helper) => {
@@ -199,7 +278,26 @@ export function TripHelpers({
         {en ? 'Passengers' : 'Bijrijders'}
       </p>
 
-      {helpers.length === 0 && !legacyNote ? (
+      {members ? (
+        <>
+          <p className="text-sm text-vtk-muted">{membersIntro}</p>
+          <ul className="grid gap-1.5" id={membersId}>
+            {shownMembers.map((member) => (
+              <li key={member.id} className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="font-medium text-vtk-ink">{member.name}</span>
+                {member.phone ? (
+                  <PhoneLink number={member.phone} />
+                ) : (
+                  <span className="text-xs text-vtk-muted">{en ? 'no number' : 'geen nummer'}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+          {moreButton(
+            'justify-self-start text-sm font-medium text-vtk-navy underline decoration-vtk-yellow underline-offset-4'
+          )}
+        </>
+      ) : helpers.length === 0 && !legacyNote ? (
         <p className="text-sm text-vtk-muted">
           {en ? 'Nobody yet.' : 'Nog niemand.'}
           {canEdit

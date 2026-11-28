@@ -509,6 +509,7 @@ function TripItem({
                 canEdit={trip.canEditHelpers}
                 locale={locale}
                 variant="people"
+                postMembers={trip.postMembers}
               />
             </section>
 

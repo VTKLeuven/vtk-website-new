@@ -10,11 +10,13 @@ import {
   isEmailish,
   isTripHandoverMode,
   NOTIFY_KINDS,
+  STATS_MAX_TRIP_HOURS_RANGE,
   parseNotifyEmails,
   type TripHandoverMode,
 } from '@/lib/uitleen';
 import type { ActionResult } from '@/app/actions/uitleen';
 import { parseEuroToCents, revalidateBeheer } from './shared';
+import { PLANNING_SHORTCUT_SCREEN } from '@/lib/uitleen-server';
 
 // ---------------------------------------------------------------------------
 // Instellingen
@@ -95,6 +97,15 @@ export async function saveLogistiekSettingsAction(_prev: SaveState, formData: Fo
   if (!Number.isFinite(lastMinuteDays) || lastMinuteDays < 1 || lastMinuteDays > 90) {
     return saveError('LAST_MINUTE_INVALID');
   }
+  // Langer dan dit telt een rit niet mee in de statistieken (`countsInStats`).
+  const statsMaxTripHours = Number.parseInt(String(formData.get('statsMaxTripHours') ?? ''), 10);
+  if (
+    !Number.isFinite(statsMaxTripHours) ||
+    statsMaxTripHours < STATS_MAX_TRIP_HOURS_RANGE.min ||
+    statsMaxTripHours > STATS_MAX_TRIP_HOURS_RANGE.max
+  ) {
+    return saveError('STATS_MAX_INVALID');
+  }
   // Per soort een lijst adressen (M1). Komma-gescheiden in het formulier, want
   // dat is hoe het meelezende adres op een aanvraag er ook uitziet; dezelfde
   // parser, dus dezelfde regels over wat een adres is.
@@ -124,6 +135,7 @@ export async function saveLogistiekSettingsAction(_prev: SaveState, formData: Fo
     externalRequestsOpen,
     notifyEmails,
     tripHandover,
+    statsMaxTripHours,
   };
   await prisma.setting.upsert({
     where: { key: LOGISTIEK_SETTINGS_KEY },
@@ -138,5 +150,30 @@ export async function saveLogistiekSettingsAction(_prev: SaveState, formData: Fo
   revalidatePath('/materiaal');
   revalidatePath('/flesserke');
   revalidatePath('/vervoer');
+  revalidatePath('/beheer/statistieken');
   return saveOk();
+}
+
+/**
+ * "Bezetting opent de weekplanning" aan of uit, voor wie dit zelf instelt.
+ *
+ * Enkel voor wie logistiek beheert: voor een ander lid bestaat de weekplanning
+ * niet. De kop van elke pagina leest de keuze, dus de hele layout wordt
+ * opnieuw opgebouwd.
+ */
+export async function setBezettingOpensPlanningAction(on: boolean): Promise<ActionResult> {
+  const session = await requireManage();
+  const view = on ? 'planning' : 'bezetting';
+  await prisma.userViewPreference.upsert({
+    where: { userId_screen: { userId: session.user.id, screen: PLANNING_SHORTCUT_SCREEN } },
+    update: { view },
+    create: { userId: session.user.id, screen: PLANNING_SHORTCUT_SCREEN, view },
+  });
+  revalidatePath('/', 'layout');
+  return {
+    ok: true,
+    message: on
+      ? '"Bezetting" in de kop opent nu de weekplanning.'
+      : '"Bezetting" in de kop opent weer het bezettingsoverzicht.',
+  };
 }

@@ -94,6 +94,8 @@ export async function vanBookingForMember(id: string, userId: string, groupIds: 
       vehicle: { select: { nameNl: true, nameEn: true } },
       user: { select: { id: true, name: true } },
       assignedGroup: { select: { id: true, nameNl: true, nameEn: true } },
+      // Voor wie een bijrijdshift telt (`TripShift`).
+      group: { select: { id: true, nameNl: true, nameEn: true } },
       helpers: { orderBy: { createdAt: 'asc' }, select: { id: true, name: true, phone: true } },
     },
   });

@@ -4374,6 +4374,83 @@ Wat daarbij vastligt:
   rit van 00:30 belandde op de dag ervoor. `lib/week-lanes.ts` rekent de dagrand
   daarom om, en `test/week-lanes.test.ts` houdt dat vast.
 
+### Een eigen bereik: "Aangepast"
+
+Naast Dag, Week, Komende dagen en Maand kiest het team in de planning een eigen
+bereik: `?weergave=aangepast&van=...&tot=...`, met `tot` inbegrepen, hetzelfde
+woord en dezelfde parameters als de aangepaste periode op de statistieken.
+
+- **Het segment schuift open, in de werkbalk zelf.** Een klik op Aangepast zet
+  de planning meteen op een eigen bereik: wat je op dat moment ziet (een week
+  blijft dezelfde week, een maand de dagen van die maand; vanuit één dag twee
+  weken). Het segment kleurt blauw en schuift open met twee datums als knopje
+  ("23 nov", zonder jaar en zonder icoon: het jaar staat in de titel). Een klik
+  opent de kalender van de browser onder het knopje (`showPicker()` op een
+  onzichtbaar datumveld op dezelfde plek), op een telefoon de datumkiezer van het
+  toestel; een datum kiezen laadt meteen, zonder knop.
+- **Geen apart venster.** Een paneel met twee maanden om in te klikken,
+  snelkeuzes en een icoontje, en daarna een venstertje met "Toon", zijn allebei
+  gebouwd en op vraag vervangen door de velden in het segment. Bouw ze niet
+  opnieuw.
+- **Schuift het begin voorbij het einde, dan schuift het einde mee** met dezelfde
+  lengte; anders draaide de server het om en werd een week vooruit een bereik van
+  achteren naar voren.
+- **Tot veertien dagen als tijdrooster, langer als raster van weken.** Veertien
+  kolommen is ook de grens van "Komende dagen"; daarboven leest een rooster met
+  uren niet meer, en een maandraster wel. In het raster vervagen de dagen van de
+  eerste en de laatste week die buiten het bereik vallen, zoals de dagen van een
+  andere maand.
+- **Hoogstens 92 dagen.** Daarboven is het een muur van weken waarin je niets
+  terugvindt. Een langer of omgekeerd bereik in de URL wordt ingekort of
+  omgedraaid in plaats van geweigerd (`parseCustomRange`).
+- **Vorige en volgende schuiven het hele bereik op**, zodat het volgende venster
+  aansluit; "Vandaag" zet het bereik met dezelfde lengte op vandaag, en staat
+  actief zolang vandaag erin ligt.
+- **Op een telefoon** staan de weergaven in het menu "Meer" als losse pillen die
+  mogen afbreken (vijf segmenten op één regel pasten niet meer), en daar breken
+  de twee datums onder het woord Aangepast af.
+
+### "Bezetting" kan de weekplanning openen, per teamlid
+
+Wie logistiek beheert, kan bij Beheer › Instellingen › Voor jezelf aanzetten dat
+"Bezetting" in de kop meteen de weekplanning opent in plaats van het
+bezettingsoverzicht.
+
+- **Per persoon, niet voor het team.** Wie de hele dag plant, wil met die link in
+  de planning landen; een collega die de bezetting opzoekt om iemand te
+  antwoorden, niet. Bewaard in `UserViewPreference` (scherm
+  `logistiek.bezetting`, weergave `planning`), dus per account en op elk toestel
+  gelijk, zoals de weergavekeuze van het Bestuursorgaan op vtk.be. Geen rij
+  betekent uit.
+- **Enkel de link verandert, er is geen doorverwijzing.** De bezetting blijft
+  bereikbaar, en de weekplanning linkt er zelf naartoe; een doorverwijzing op
+  `/vervoer/bezetting` zou die link in een lus laten lopen.
+- **Een schakelaar die meteen bewaart**, met een melding, zoals Beschikbaarheid
+  in de planning: één keuze heeft geen "Opslaan" nodig.
+
+### Het filterpaneel: twee kolommen, de posten apart
+
+Het paneel achter "Filters" (planning en bezetting, `components/transport-calendar/filters.tsx`)
+was één kolom pillen onder elkaar, met de posten als een muur van vijfentwintig
+pillen in het midden; je vond er niets in terug.
+
+- **Een kop, twee kolommen, een voet.** Bovenaan hoeveel filters er aanstaan en
+  "Alles wissen"; daaronder "Wat rijdt en wie" (voertuig met zijn icoon,
+  chauffeur met zijn kleur) naast "Welke ritten" (status, aanvrager); onderaan de
+  evenementenstrook als schakelaar en "Klaar". Op een telefoon onder elkaar.
+- **De posten in een eigen blok**, met een zoekveld en vinkjes in drie kolommen,
+  gesplitst in posten, werkgroepen en jaarwerkingen (`Group.type`). Wat gekozen
+  is, staat erboven als pillen die je met één klik weghaalt. Op een breed scherm
+  scrolt de lijst in haar vak; op een telefoon loopt ze door, want twee
+  scrollvakken in elkaar zijn niet te bedienen.
+- **Gekozen is gevuld, met een vinkje.** Het lichte randje van voordien las als
+  "niet gekozen". De knop draagt het aantal in een geel bolletje.
+- **De keuze staat meteen om.** Een filter leeft in de URL, en die komt pas na
+  het herladen terug; tot dan toont het paneel wat je net koos, zodat twee
+  snelle klikken allebei tellen.
+- **Het paneel lijnt rechts uit wanneer het links niet past**: de knop staat vaak
+  rechts in de werkbalk, en het paneel is breder dan de knop.
+
 ### De weekplanning staat stil (november 2026)
 
 De transportplanning "trilde": de kalender sprong onder je muis, het kaartje van
@@ -4419,10 +4496,12 @@ opgepoetst en stilgezet. Wat er trilde, en wat er nu vastligt:
   van hoe hun opgegeven uren bij die rit passen (`lib/driver-fit.ts`): kan,
   liever niet, enkel in nood, deels, geen uren gekend, niet op dit uur, rijdt
   dan al. Aaneensluitende vensters tellen samen, en het zwakste stuk telt. Elk
-  met een tijdlijntje van drie uur rond de rit. Van wie geen uren gekend zijn,
-  staat in één zin en niet als rij: dat is iets anders dan niet kunnen, maar ook
-  geen reden om de lijst te vullen. "Geen uren gekend" en niet "gaf niets door":
-  enkel karchauffeurs kunnen hun uren invullen.
+  met een tijdlijntje van drie uur rond de rit. Enkel wie kan, deels kan of dan
+  al rijdt, krijgt een rij. Van wie geen uren gekend zijn of wie op dat uur niet
+  kan, staat niets: die stonden eerst als twee zinnen met namen onder de lijst
+  ("Geen uren gekend: …", "Niet op dit uur: …"), en Logistiek vroeg ze weg te
+  halen. Met twintig chauffeurs was dat een alinea namen die niemand las, en wie
+  iemand anders wil vragen, vindt iedereen in de keuzelijst eronder.
   - Een knop "Kies" enkel bij een **goedgekeurde** rit. Bij een aanvraag kies je
     de chauffeur bij het goedkeuren, en dat formulier wist een chauffeur die je
     ernaast al toewees (het goedkeuren zet `driverId` uit zijn eigen
@@ -4644,6 +4723,14 @@ Wat daarbij vastligt:
   raster.
 - **De maandweergave rekt haar weekrijen uit in volledig scherm**, in plaats van
   bovenaan samen te klitten met een half leeg scherm eronder.
+- **Een volle week in de maand schuift open.** Een dagcel heeft vier banen;
+  past een week er niet in, dan is de vierde baan "+n meer" onder elke dag waar
+  iets wegvalt, en een klik daarop maakt die ene week zo hoog als nodig, met
+  "Minder tonen" eronder. Geen venstertje met een lijst per dag: dan liep een rit
+  van drie dagen niet meer als één balk, en die balk is waarom de maand er is.
+  Ook niet de hele maand hoger: een drukke week mag de andere niet uitrekken. De
+  tekst "+n meer" stond eerst onderaan de cel, over de vierde rit heen, en was
+  geen knop; wie de rest wilde zien, moest naar de dagweergave.
 
 Volledig scherm heeft twee vormen, want `requestFullscreen()` bestaat niet op een
 `div` in Safari op iOS: lukt de echte API, dan zorgt `:fullscreen` voor de
@@ -5575,14 +5662,18 @@ wat mensen vragen, dan schuiven tot het past. Zolang een botsing hard geweigerd
 werd, moest het probleem al opgelost zijn voor je het mocht invoeren, en dat is
 precies de verkeerde volgorde.
 
-- **Botsen mag, maar enkel bewust.** Goedkeuren, inplannen, aanpassen en een
-  voertuig wisselen weigeren nog altijd, mét de naam van de rit waarmee het
-  botst. Pas dan verschijnt de tweede knop ("Toch inplannen", "Toch goedkeuren").
-  Dat vinkje staat er niet standaard: een knop die er altijd staat, wordt de knop
-  waarop je klikt.
-- **Slepen forceert wel meteen.** Slepen ís het schuiven waarvoor dit bestaat; een
-  bevestigingsvraag per sleep zou het gebaar breken dat het probleem oplost. De
-  melding blijft wel staan tot je ze wegklikt.
+- **Botsen mag, maar enkel bewust.** Goedkeuren, inplannen en de uren aanpassen
+  weigeren nog altijd, mét de naam van de rit waarmee het botst. Pas dan
+  verschijnt de tweede knop ("Toch inplannen", "Toch goedkeuren", "Toch
+  verschuiven"). Dat vinkje staat er niet standaard: een knop die er altijd
+  staat, wordt de knop waarop je klikt.
+- **Slepen en een voertuig kiezen forceren wel meteen.** Slepen ís het schuiven
+  waarvoor dit bestaat; een bevestigingsvraag per sleep zou het gebaar breken dat
+  het probleem oplost. Een voertuig kies je bij naam uit een lijst, en dat is al
+  de bewuste keuze waar de tweede knop elders om vraagt; een "Toch wisselen"
+  daarna is in november 2026 gebouwd en als overbodig teruggedraaid. In beide
+  gevallen blijft de melding staan tot je ze wegklikt, met "Ongedaan maken" voor
+  een misgreep.
 - **Waarom hier wel en bij materiaal niet.** Twee ritten op dezelfde kar zijn een
   agendaprobleem: er ís een oplossing, en die is een halfuur schuiven. Twee
   aanvragen voor dertig stoelen waarvan er twintig bestaan, zijn dat niet; daar
@@ -5944,6 +6035,16 @@ naam en een optioneel nummer.
 - **Het nummer mag leeg.** Soms weet je wel wie meegaat en nog niet zijn gsm.
   Half ingevuld is beter dan niets ingevuld: de chauffeur weet dan tenminste op
   wie hij staat te wachten.
+- **Zonder bijrijder staan de leden van de post er.** Staat er geen bijrijder
+  (en geen oude vrije tekst), dan toont het blok de leden van de post van de rit
+  dit werkingsjaar, op dezelfde manier als een bijrijder, met het nummer uit
+  dezelfde bronnen als dat van een chauffeur (`postMembersWithPhones`). Eerst wie
+  een nummer heeft, dan de verantwoordelijken; drie, en "Meer" voor de rest,
+  want een post telt er gauw vijftien. De aanvrager staat er niet bij: die staat
+  al als contactpersoon bij de rit. **Enkel voor het team en de chauffeur van de
+  rit** (het beheer en "Mijn ritten"), niet op de bezettingskaart en niet voor de
+  post zelf: de nummers van een rit blijven bij haar post en bij wie ze rijdt, en
+  een post kent haar eigen leden.
 - **Ze hangen aan de boeking en niet aan de tripgroep.** Heen en terug kunnen
   andere bijrijders hebben, en dat is net het geval waarin je het wil weten. Bij
   het aanvragen krijgen beide helften dezelfde rijen; daarna leiden ze hun eigen
@@ -7417,6 +7518,80 @@ en twee uur vooraf. Beide zijn per lid uitzetbaar in het profiel.
   `ticket-worker`: een klemgelopen mailserver mag de ticketbevestigingen niet
   meesleuren. Leeg `SHIFT_MAINTENANCE_SECRET` = geen herinneringen, de rest van de
   shiften werkt gewoon door.
+
+---
+
+## Een bijrijdshift kent haar rit
+
+Een bijrijdshift (zoals C&G) is een shift op vtk.be waarvoor je meerijdt met een
+rit van de uitleendienst. Wie zo'n shift opnam, wist niet wie er reed en moest
+het nummer van de chauffeur navragen. Nu hangt de shift aan haar rit
+(`Shift.transportBookingId`), en wie ingeschreven is, ziet de chauffeur met zijn
+nummer in het detailvenster op /shift en in beide herinneringsmails.
+
+- **Een koppeling, geen nummer op de shift.** De chauffeur staat op de rit en niet
+  op de shift: zet Logistiek er iemand anders op, dan volgt de shift vanzelf, ook
+  in een mail die pas daarna vertrekt. Een vrij veld "chauffeur en nummer" op de
+  shift liep na de eerste wissel achter, en moest bij elke C&G-shift opnieuw.
+- **Gekozen, niet geraden.** In /admin/shiften kies je de rit uit de ritten op de
+  dag van de shift (`GET /api/shift/trips`). De site zoekt niet zelf een rit op
+  hetzelfde uur: twee ritten tegelijk of een verschoven rit zou het verkeerde
+  nummer geven, en een verkeerd nummer is erger dan geen. Om dezelfde reden is er
+  geen backfill: welke oude shift bij welke rit hoorde, staat nergens.
+- **Enkel voor wie op de shift staat.** Het nummer gaat mee in `registeredShifts`
+  en enkel wanneer je je eigen shiften bekijkt; wie de shift nog kan opnemen, of
+  een beheerder die de shiften van iemand anders opvraagt, krijgt het niet. De
+  keuzelijst in het beheer toont wie er rijdt, maar geen nummers.
+- **Hetzelfde nummer als in de uitleendienst.** Het komt uit `driverPhones` in
+  `@vtk/db` (team, profiel, historiek, zie "Het nummer van een chauffeur"), dat
+  daarvoor uit de uitleendienst naar het gedeelde pakket verhuisde.
+- **Nog geen chauffeur is ook een antwoord.** Staat er nog niemand op de rit, dan
+  zegt het venster "nog niet gekend" en de mail dat je het op vtk.be/shift vindt
+  zodra Logistiek iemand kiest. Een afgewezen of geannuleerde rit noemt geen
+  chauffeur.
+- **Aan de rit verandert niets.** De kolom staat op `Shift`; een verwijderde rit
+  laat de shift met haar inschrijvingen staan (`SetNull`).
+- **De app volgt dezelfde regel.** `AppShift.ride` komt enkel mee op een shift
+  waarop je zelf staat (`/api/app/v1/shiften`); de app toont de chauffeur met een
+  belknop in de details van die shift. Een oudere app kent het veld niet en toont
+  niets, een oudere server stuurt het niet.
+
+### Een bijrijdshift aanmaken vanuit de rit
+
+Wie een rit plant, weet het eerst dat er iemand mee moet. Daarom staat er onder
+de bijrijders van een rit een blok **Bijrijdshift**, in de weekplanning en het
+ritpaneel van Logistiek en op de ritpagina van de post (`/vervoer/<id>`). Zonder
+shift is het een knop "+ Bijrijdshift" die openschuift met twee velden, plaatsen
+en bonnetjes; met shift zegt het blok hoeveel plaatsen er ingenomen zijn en door
+wie, met een link naar vtk.be/shift. De code staat in
+`apps/logistiek/lib/bijrijdshift.ts` en `components/trip-shift.tsx`.
+
+- **Wie mag: het team, de aanvrager en de leden van de aanvragende post.** Een
+  shift telt voor een post (`Shift.post`), en een andere post zet die niet. Ook
+  niet de post waaraan Logistiek de rit doorgaf (`assignedGroupId`): die rijdt
+  ze, maar de shift telt voor wie ze aanvroeg. Dat is strenger dan bij de
+  bijrijders, waar elk praesidiumlid iemand mag toevoegen. Het hangt niet aan
+  `shift.edit`: dat recht maakt op vtk.be enkel shiften voor je eigen post, en
+  Logistiek zet ze hier voor de post van de rit.
+- **Enkel op een goedgekeurde rit die nog moet vertrekken.** Een aanvraag kan
+  nog afgewezen worden of andere uren krijgen, en dan staan er leden ingeschreven
+  voor een rit die niet doorgaat. Bij een aanvraag zegt het blok wel dat het kan
+  zodra Logistiek goedkeurt.
+- **Eén shift per rit.** Wie meer bijrijders zoekt, zet meer plaatsen; een dubbele
+  klik maakt er geen twee. Een tweede shift koppelen kan nog in /admin/shiften.
+- **Alles behalve plaatsen en bonnetjes volgt uit de rit**: de uren (van vertrek
+  tot terugkeer), de post, de vertrekplaats (laadadres, anders de bestemming),
+  een naam "Bijrijden: <doel>" en een korte uitleg, ook in het Engels. Standaard
+  één plaats en één bonnetje. Wie meer wil aanpassen, doet dat daarna in
+  /admin/shiften: hier gaat het om een rit die morgen vertrekt.
+- **De shift verschuift niet vanzelf mee.** Een rit verschuift op tien plaatsen
+  (slepen, aanpassen, goedkeuren met andere uren), en wie al ingeschreven is,
+  rekent op de uren waarvoor hij tekende. Ligt de shift niet meer op de uren van
+  de rit, dan zegt het blok dat, met een knop "Shift meeverschuiven".
+- **In het logboek van vtk.be**, zoals elke shift die daar ontstaat: de
+  uitleendienst schrijft zelf een regel in `AdminAuditLog` ("vanuit de
+  uitleendienst"), want `createShift` en `logAudit` van vtk.be kan een andere app
+  niet importeren.
 
 ---
 
@@ -11504,7 +11679,7 @@ en mist hij de tweede rit, waar geen mail meer voor vertrekt.
 
 "Bel de chauffeur" mag niet beginnen met "vraag eerst zijn nummer aan iemand".
 `driverPhones` legt daarom drie bronnen samen en neemt de sterkste die iets
-heeft (`resolveDriverPhones` in apps/logistiek/lib/driver-phones.ts):
+heeft (`resolveDriverPhones` in packages/db/src/driverPhones.ts, gedeeld met vtk.be):
 
 1. **Het team.** Wat Logistiek zelf invulde bij Chauffeurs
    (`UitleenDriver.phone`). Dat is nagekeken en wint van alles.
@@ -11569,6 +11744,50 @@ toont, staat dat woord erbij.
 het type aanvrager (`chargesRequester`) en staat bij de rit zelf; een
 jaartotaal per post naast een bedrag zou gelezen worden als een factuur die
 niemand zo bedoeld heeft.
+
+**Lange ritten tellen niet mee.** Een rit langer dan een grens (standaard 5 uur,
+in te stellen bij Beheer › Instellingen › Algemeen, `statsMaxTripHours`) staat in
+geen enkel getal: niet in de ritten, de uren, het gemiddelde, per chauffeur, per
+post, per week, in de drukteweergave of in de vorige periode voor de trendpijl.
+Zo lang rijdt niemand; een langer venster is een voertuig dat een dag of een
+weekend weg was, en precies omdat de uren het geboekte venster zijn, gaf één zo'n
+rit een chauffeur meer uren dan een maand gewone ritten.
+
+- **Weglaten, niet afkappen.** Een weekend als vijf uur tellen, zou een rit
+  verzinnen die niemand zo reed; het venster zegt niets over de tijd achter het
+  stuur, dus er valt niets eerlijks uit te halen.
+- **Niet stil.** De kop van het scherm en de tegel Ritten zeggen hoeveel ritten
+  er zo wegvallen, en in de lijst onderaan (en de CSV) staan ze nog, met "telt
+  niet mee: langer dan 5 u". Wie de lijst optelt, weet zo waarom hij op iets
+  anders uitkomt dan de tegel.
+- **Precies op de grens telt nog mee** (`countsInStats`): een rit van 14:00 tot
+  19:00 is een gewone avondrit.
+- **Een instelling, geen filter op het scherm.** Het is een afspraak over wat een
+  rit is, en die hoort voor iedereen die het scherm opent dezelfde te zijn; een
+  filter in de URL gaf twee teamleden twee jaartotalen. Een instelling van voor
+  deze grens krijgt de standaard van vijf uur, niet "geen grens".
+- **Enkel de statistieken.** De planning, "Mijn ritten" en de chauffeurslijst
+  tonen elke rit; daar gaat het over wat er gebeurt, niet over wat er geteld
+  wordt.
+
+**Tellen in uren of in ritten.** Boven de grafieken staat één schakelaar, Uren of
+Ritten (standaard Uren). Wie de meeste uren reed, is niet altijd wie het vaakst
+reed: één lange rit naar de Ardennen weegt in uren zwaarder dan tien keer de kar
+naar Gasthuisberg, en wie de chauffeurs wil bedanken, telt die tien keer.
+
+- **Eén schakelaar voor alle grafieken, geen knop per grafiek.** Anders telt de
+  ene balk uren en de andere ritten zonder dat je het merkt. De tegels bovenaan
+  tonen allebei al, en de lijst onderaan toont per rit de duur; die volgen de
+  schakelaar niet.
+- **Een rit telt één keer, op het uur en de weekdag waarop ze vertrekt.** In
+  uren telt een rit van drie uur in drie vakjes van de drukteweergave; in ritten
+  zou dat er drie ritten van maken. Daarom heet die weergave in ritten "Wanneer
+  de ritten vertrekken", en tellen de vakjes op tot het aantal ritten.
+- **Ritten zijn hele getallen**: de as van "Wanneer er gereden wordt" loopt dan
+  tot een even getal, zodat het middelste streepje geen halve rit is.
+- **Niet onthouden.** Het is een vraag die je even stelt, geen voorkeur; wie het
+  scherm opent, ziet uren, zoals de tegels en de lijst.
+
 ## Archiveren en verwijderen in het ticketbeheer
 
 Alles in het ticketbeheer kon enkel gearchiveerd worden: een tickettype, een

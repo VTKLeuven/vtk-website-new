@@ -1,7 +1,7 @@
 'use client';
 
 import Link from '@vtk/ui/link';
-import { useMemo, useState } from 'react';
+import { createContext, useContext, useMemo, useState } from 'react';
 import type { DriverStat, GroupStat, StatsRow, TransportStats } from '@/lib/uitleen-stats';
 import {
   driverHourChart,
@@ -37,15 +37,12 @@ import {
 const SERIES = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)'] as const;
 const SERIES_REST = 'var(--chart-rest)';
 
-/** Eén tint, licht naar donker: de schaal van de drukteweergave. */
-const RAMP = [
-  'var(--chart-ramp-1)',
-  'var(--chart-ramp-2)',
-  'var(--chart-ramp-3)',
-  'var(--chart-ramp-4)',
-  'var(--chart-ramp-5)',
-  'var(--chart-ramp-6)',
-] as const;
+/**
+ * Eén tint, licht naar donker: de schaal van de drukteweergave. De eerste is
+ * "niets"; daarna negen stappen. Het waren er vijf, en dan las een week als
+ * drie kleuren: leeg, lichtblauw en het ene drukste uur.
+ */
+const RAMP = Array.from({ length: 10 }, (_, index) => `var(--chart-ramp-${index + 1})`);
 
 const MUTED = 'var(--muted)';
 const GRID = 'var(--chart-grid)';
@@ -55,6 +52,52 @@ const WEEKDAYS_LONG = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag',
 
 function hours(value: number): string {
   return `${value.toLocaleString('nl-BE', { maximumFractionDigits: 1 })} u`;
+}
+
+/**
+ * Waarin de grafieken tellen: uren (het geboekte venster) of ritten.
+ *
+ * Eén keuze voor alle grafieken samen, bovenaan: per grafiek een eigen knop gaf
+ * een scherm waarin de ene balk uren en de andere ritten telt zonder dat je het
+ * merkt. De tegels bovenaan tonen allebei al; de lijst onderaan blijft per rit
+ * de duur tonen.
+ */
+type Measure = 'hours' | 'trips';
+
+function trips(value: number): string {
+  const count = value.toLocaleString('nl-BE', { maximumFractionDigits: 1 });
+  return `${count} ${value === 1 ? 'rit' : 'ritten'}`;
+}
+
+/** Hoe een getal in de grafieken leest: "4,5 u" of "3 ritten". */
+const FormatContext = createContext<(value: number) => string>(hours);
+const useFormat = () => useContext(FormatContext);
+/** De gekozen maat zelf, voor de zinnen die anders lezen ("Uren per weekdag"). */
+const MeasureContext = createContext<Measure>('hours');
+
+/**
+ * Een chauffeur zoals de grafieken hem lezen, in de gekozen maat. De grafieken
+ * en `lib/driver-hours.ts` lezen `hours`, `perVehicle`, `perHour` en `heat`; in
+ * de stand "Ritten" staan daar de ritten in, zodat er niets dubbel moet bestaan.
+ */
+function inMeasure(driver: DriverStat, measure: Measure): DriverStat {
+  if (measure === 'hours') return driver;
+  return {
+    ...driver,
+    hours: driver.trips,
+    perVehicle: driver.perVehicleTrips,
+    perHour: driver.perHourTrips,
+    heat: driver.heatTrips,
+  };
+}
+
+/**
+ * De top van een as in de gekozen maat. Ritten zijn hele getallen, en de as
+ * toont ook de helft: dan geen 7,5 rit, maar een even getal.
+ */
+function axisCeiling(value: number, measure: Measure): number {
+  const ceiling = niceCeiling(value);
+  return measure === 'trips' ? Math.max(2, 2 * Math.ceil(ceiling / 2)) : ceiling;
 }
 
 function niceCeiling(value: number): number {
@@ -222,6 +265,8 @@ function DriverLeaderboard({
   selected: string | null;
   onPickDriver: (driverId: string | null) => void;
 }) {
+  const fmt = useFormat();
+  const measure = useContext(MeasureContext);
   const [shown, setShown] = useState(10);
   const top = drivers.slice(0, shown);
   const max = niceCeiling(drivers[0]?.hours ?? 1);
@@ -270,7 +315,7 @@ function DriverLeaderboard({
                     return (
                       <span
                         key={vehicle.id}
-                        title={`${driver.name} · ${vehicle.name}: ${hours(value)}`}
+                        title={`${driver.name} · ${vehicle.name}: ${fmt(value)}`}
                         className="h-full first:rounded-l-[4px] last:rounded-r-[4px]"
                         style={{
                           width: `${(value / driver.hours) * 100}%`,
@@ -282,7 +327,7 @@ function DriverLeaderboard({
                   })}
                 </span>
               </span>
-              <span className="text-right text-sm tabular-nums text-vtk-body">{hours(driver.hours)}</span>
+              <span className="text-right text-sm tabular-nums text-vtk-body">{fmt(driver.hours)}</span>
             </button>
           </li>
         ))}
@@ -296,9 +341,12 @@ function DriverLeaderboard({
           Alle {drivers.length} chauffeurs tonen
         </button>
       ) : null}
+      {/* In ritten staat het aantal ritten ook in `hours`: dan geen tweede kolom. */}
       <TableView
-        columns={['Chauffeur', 'Ritten', 'Uren']}
-        rows={drivers.map((driver) => [driver.name, driver.trips, driver.hours])}
+        columns={measure === 'hours' ? ['Chauffeur', 'Ritten', 'Uren'] : ['Chauffeur', 'Ritten']}
+        rows={drivers.map((driver) =>
+          measure === 'hours' ? [driver.name, driver.trips, driver.hours] : [driver.name, driver.trips]
+        )}
       />
     </div>
   );
@@ -313,6 +361,10 @@ function DriverLeaderboard({
  * stelt.
  */
 function GroupBars({ groups, onPickGroup }: { groups: GroupStat[]; onPickGroup: (groupKey: string | null) => void }) {
+  const fmt = useFormat();
+  const measure = useContext(MeasureContext);
+  // In ritten is "10× · 10 ritten" twee keer hetzelfde; dan enkel het getal.
+  const label = (count: number, value: number) => (measure === 'trips' ? fmt(value) : `${count}× · ${fmt(value)}`);
   const [open, setOpen] = useState<string | null>(null);
   const max = niceCeiling(groups[0]?.hours ?? 1);
 
@@ -339,7 +391,7 @@ function GroupBars({ groups, onPickGroup }: { groups: GroupStat[]; onPickGroup: 
                 />
               </span>
               <span className="text-right text-sm tabular-nums text-vtk-body">
-                {group.trips}× · {hours(group.hours)}
+                {label(group.trips, group.hours)}
               </span>
             </button>
             {open === group.key ? (
@@ -352,7 +404,7 @@ function GroupBars({ groups, onPickGroup }: { groups: GroupStat[]; onPickGroup: 
                       <li key={driver.id} className="flex items-center justify-between gap-3">
                         <span className="truncate">{driver.name}</span>
                         <span className="shrink-0 tabular-nums">
-                          {driver.trips}× · {hours(driver.hours)}
+                          {label(driver.trips, driver.hours)}
                         </span>
                       </li>
                     ))}
@@ -371,8 +423,10 @@ function GroupBars({ groups, onPickGroup }: { groups: GroupStat[]; onPickGroup: 
         ))}
       </ul>
       <TableView
-        columns={['Post of werkgroep', 'Ritten', 'Uren']}
-        rows={groups.map((group) => [group.name, group.trips, group.hours])}
+        columns={measure === 'hours' ? ['Post of werkgroep', 'Ritten', 'Uren'] : ['Post of werkgroep', 'Ritten']}
+        rows={groups.map((group) =>
+          measure === 'hours' ? [group.name, group.trips, group.hours] : [group.name, group.trips]
+        )}
       />
     </div>
   );
@@ -395,10 +449,13 @@ function Heatmap({
   focusName?: string | null;
   onClearFocus?: () => void;
 }) {
+  const fmt = useFormat();
   const max = Math.max(1, ...heatmap.flat());
+  // Elke stap een even groot stuk van de schaal; de donkerste is het laatste
+  // negende tot en met het drukste uur, en niet enkel het drukste uur zelf.
   const step = (value: number) => {
     if (value <= 0) return RAMP[0];
-    const index = Math.min(RAMP.length - 1, 1 + Math.floor((value / max) * (RAMP.length - 2)));
+    const index = Math.min(RAMP.length - 1, Math.max(1, Math.ceil((value / max) * (RAMP.length - 1))));
     return RAMP[index];
   };
 
@@ -429,7 +486,7 @@ function Heatmap({
                     {WEEKDAYS_LONG[cell.day]} {String(cell.hour).padStart(2, '0')}:00-
                     {String(cell.hour + 1).padStart(2, '0')}:00
                   </span>
-                  <span className="tabular-nums text-vtk-ink">{hours(cell.value)}</span>
+                  <span className="tabular-nums text-vtk-ink">{fmt(cell.value)}</span>
                 </li>
               ))}
             </ol>
@@ -465,12 +522,12 @@ function Heatmap({
                 {row.map((value, hour) => (
                   <td
                     key={hour}
-                    title={`${WEEKDAYS[day]} ${String(hour).padStart(2, '0')}:00 · ${hours(value)}`}
+                    title={`${WEEKDAYS[day]} ${String(hour).padStart(2, '0')}:00 · ${fmt(value)}`}
                     className="h-5 rounded-[3px]"
                     style={{ backgroundColor: step(value) }}
                   >
                     <span className="sr-only">
-                      {WEEKDAYS[day]} {hour}u: {hours(value)}
+                      {WEEKDAYS[day]} {hour}u: {fmt(value)}
                     </span>
                   </td>
                 ))}
@@ -501,7 +558,7 @@ function Heatmap({
             style={{ backgroundColor: color }}
           />
         ))}
-        <span>meer ({hours(max)} op het drukste uur)</span>
+        <span>meer ({fmt(max)} op het drukste uur)</span>
       </div>
     </div>
   );
@@ -568,12 +625,14 @@ function ToggleGroup<T extends string>({
  * profielen naast elkaar te vergelijken zijn.
  */
 function ProfileGrid({ profiles }: { profiles: DriverProfiles }) {
+  const fmt = useFormat();
+  const measure = useContext(MeasureContext);
   if (profiles.rows.length === 0) return null;
-  const ceiling = niceCeiling(profiles.max);
+  const ceiling = axisCeiling(profiles.max, measure);
   return (
     <div className="mt-3">
       <p className="text-xs text-vtk-muted">
-        Elke chauffeur op dezelfde schaal, tot {hours(ceiling)} per kolom.
+        Elke chauffeur op dezelfde schaal, tot {fmt(ceiling)} per kolom.
       </p>
       <ul className="mt-2 grid gap-3 sm:grid-cols-2">
         {profiles.rows.map((row) => (
@@ -583,7 +642,7 @@ function ProfileGrid({ profiles }: { profiles: DriverProfiles }) {
                 <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: row.color }} />
                 <span className="truncate">{row.name}</span>
               </span>
-              <span className="shrink-0 text-xs tabular-nums text-vtk-muted">{hours(row.hours)}</span>
+              <span className="shrink-0 text-xs tabular-nums text-vtk-muted">{fmt(row.hours)}</span>
             </div>
             <div className="relative mt-2 h-14">
               <span aria-hidden className="absolute inset-x-0 bottom-0 border-t border-vtk-navy/20" />
@@ -591,7 +650,7 @@ function ProfileGrid({ profiles }: { profiles: DriverProfiles }) {
                 {row.values.map((value, index) => (
                   <span
                     key={profiles.columns[index].key}
-                    title={`${row.name} · ${profiles.columns[index].rangeLabel}: ${hours(value)}`}
+                    title={`${row.name} · ${profiles.columns[index].rangeLabel}: ${fmt(value)}`}
                     className="block flex-1 rounded-t-[2px]"
                     style={{
                       height: `${ceiling > 0 ? (value / ceiling) * 100 : 0}%`,
@@ -603,7 +662,7 @@ function ProfileGrid({ profiles }: { profiles: DriverProfiles }) {
                     }}
                   >
                     <span className="sr-only">
-                      {profiles.columns[index].rangeLabel}: {hours(value)}
+                      {profiles.columns[index].rangeLabel}: {fmt(value)}
                     </span>
                   </span>
                 ))}
@@ -634,6 +693,8 @@ function HourOfDay({
   hoursWithoutDriver: number;
   onClearFocus: () => void;
 }) {
+  const fmt = useFormat();
+  const measure = useContext(MeasureContext);
   const [bucket, setBucket] = useState<HourBucket>(1);
   // Wat op de x-as staat (F6.4) en hoe de chauffeurs getekend worden (F6.5).
   const [by, setBy] = useState<'hour' | 'weekday'>('hour');
@@ -670,7 +731,7 @@ function HourOfDay({
     return <p className="text-sm text-vtk-muted">Niemand reed in deze periode.</p>;
   }
 
-  const max = niceCeiling(Math.max(...chart.columns.map((column) => column.hours)));
+  const max = axisCeiling(Math.max(...chart.columns.map((column) => column.hours)), measure);
 
   return (
     <div>
@@ -714,7 +775,9 @@ function HourOfDay({
       {/* `position: relative` op de scroller, zoals bij elke tabel hier: de
           sr-only tekst per balk is absoluut gepositioneerd en ankert anders op
           de pagina in plaats van op de grafiek. */}
-      <div className={`relative mt-3 overflow-x-auto ${layout === 'stack' ? '' : 'hidden'}`}>
+      {/* `pt-2`: het bovenste getal van de as hangt half boven de grafiek, en de
+          scroller knipt anders zijn bovenkant af. */}
+      <div className={`relative mt-1 overflow-x-auto pt-2 ${layout === 'stack' ? '' : 'hidden'}`}>
         <div
           className="grid grid-cols-[2.25rem_1fr] gap-x-1"
           style={{ minWidth: by === 'hour' && bucket === 1 ? '22rem' : undefined }}
@@ -743,11 +806,11 @@ function HourOfDay({
               {chart.columns.map((column) => (
                 <div
                   key={column.key}
-                  title={`${column.rangeLabel}: ${hours(column.hours)}`}
+                  title={`${column.rangeLabel}: ${fmt(column.hours)}`}
                   className="flex h-full flex-1 flex-col justify-end"
                 >
                   <span className="sr-only">
-                    {column.rangeLabel}: {hours(column.hours)}
+                    {column.rangeLabel}: {fmt(column.hours)}
                   </span>
                   {/* Van boven naar onder tekenen: het eerste segment uit de
                       data hoort onderaan te staan, en een kolom vult van boven
@@ -755,7 +818,7 @@ function HourOfDay({
                   {[...column.segments].reverse().map((segment) => (
                     <span
                       key={segment.key}
-                      title={`${segment.name} · ${column.rangeLabel}: ${hours(segment.hours)}`}
+                      title={`${segment.name} · ${column.rangeLabel}: ${fmt(segment.hours)}`}
                       className="block w-full shrink-0 first:rounded-t-[3px]"
                       style={{
                         height: `${(segment.hours / max) * 100}%`,
@@ -783,12 +846,18 @@ function HourOfDay({
       </div>
 
       <p className="mt-2 text-xs text-vtk-muted">
-        {by === 'hour' ? 'Het beginuur staat onder de balk; uren in Belgische tijd.' : 'Uren per weekdag, maandag eerst.'}
+        {by === 'hour'
+          ? measure === 'trips'
+            ? 'Het beginuur staat onder de balk; een rit telt op het uur waarop ze vertrekt, in Belgische tijd.'
+            : 'Het beginuur staat onder de balk; uren in Belgische tijd.'
+          : measure === 'trips'
+            ? 'Ritten per weekdag waarop ze vertrekken, maandag eerst.'
+            : 'Uren per weekdag, maandag eerst.'}
         {hoursWithoutDriver > 0 ? (
           <span>
             {' '}
-            {hours(hoursWithoutDriver)} staat hier niet bij: ritten waar geen chauffeur op staat, bijvoorbeeld op een
-            voertuig dat er geen nodig heeft.
+            Niet meegeteld: {measure === 'trips' ? fmt(hoursWithoutDriver) : `${fmt(hoursWithoutDriver)} van ritten`}{' '}
+            waar geen chauffeur op staat, bijvoorbeeld op een voertuig dat er geen nodig heeft.
           </span>
         ) : null}
       </p>
@@ -820,14 +889,14 @@ function HourOfDay({
       ) : null}
 
       <TableView
-        columns={[by === 'hour' ? 'Uur' : 'Weekdag', 'Uren', 'Wie']}
+        columns={[by === 'hour' ? 'Uur' : 'Weekdag', measure === 'hours' ? 'Uren' : 'Ritten', 'Wie']}
         align={['left', 'right', 'left']}
         rows={chart.columns
           .filter((column) => column.hours > 0)
           .map((column) => [
             column.rangeLabel,
-            hours(column.hours),
-            column.segments.map((segment) => `${segment.name} ${hours(segment.hours)}`).join(', '),
+            fmt(column.hours),
+            column.segments.map((segment) => `${segment.name} ${fmt(segment.hours)}`).join(', '),
           ])}
       />
     </div>
@@ -936,6 +1005,18 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED: 'Geannuleerd',
 };
 
+/**
+ * De status zoals de lijst ze toont. Een gereden rit die langer duurde dan de
+ * grens, zegt waarom ze in geen enkel getal hierboven zit; anders telt wie de
+ * lijst nakijkt de uren op en komt hij op iets anders uit dan de tegel.
+ */
+function statusLabel(row: StatsRow, maxTripHours: number): string {
+  // Een harde spatie tussen getal en eenheid: in de smalle kolom brak "u" anders
+  // alleen naar de volgende regel.
+  if (row.excluded) return `Telt niet mee: langer dan ${maxTripHours}\u00a0u`;
+  return STATUS_LABELS[row.status] ?? row.status;
+}
+
 type SortKey = 'date' | 'hours' | 'driver' | 'group';
 
 /**
@@ -956,6 +1037,7 @@ function TripTable({
   filterLabel,
   onClearFilters,
   periodLabel,
+  maxTripHours,
 }: {
   rows: StatsRow[];
   driverFilter: string | null;
@@ -963,6 +1045,8 @@ function TripTable({
   filterLabel: string | null;
   onClearFilters: () => void;
   periodLabel: string;
+  /** De grens voor de statistieken; zie `statusLabel`. */
+  maxTripHours: number;
 }) {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortKey>('date');
@@ -1015,7 +1099,7 @@ function TripTable({
           row.driverName,
           row.groupName,
           row.purpose,
-          STATUS_LABELS[row.status] ?? row.status,
+          statusLabel(row, maxTripHours),
         ]
           .map(escape)
           .join(';')
@@ -1092,7 +1176,9 @@ function TripTable({
             <p className="text-sm text-vtk-body">{row.purpose}</p>
             <p className="text-xs text-vtk-muted">
               {row.vehicleName}, chauffeur {row.driverName || 'nog geen'}, voor {row.groupName}
-              {row.status === 'COMPLETED' ? '' : `, ${(STATUS_LABELS[row.status] ?? row.status).toLowerCase()}`}
+              {row.status === 'COMPLETED' && !row.excluded
+                ? ''
+                : `, ${statusLabel(row, maxTripHours).charAt(0).toLowerCase()}${statusLabel(row, maxTripHours).slice(1)}`}
             </p>
           </li>
         ))}
@@ -1145,7 +1231,9 @@ function TripTable({
                 <td className="py-1.5 pr-3 text-vtk-ink">{row.driverName || '—'}</td>
                 <td className="py-1.5 pr-3 text-vtk-body">{row.groupName}</td>
                 <td className="py-1.5 pr-3 text-vtk-body">{row.purpose}</td>
-                <td className="py-1.5 text-vtk-muted">{STATUS_LABELS[row.status] ?? row.status}</td>
+                <td className={`py-1.5 ${row.excluded ? 'font-medium text-vtk-warn' : 'text-vtk-muted'}`}>
+                  {statusLabel(row, maxTripHours)}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -1159,9 +1247,36 @@ function TripTable({
 export function TransportCharts({ stats, periodLabel }: { stats: TransportStats; periodLabel: string }) {
   const [driverFilter, setDriverFilter] = useState<string | null>(null);
   const [groupFilter, setGroupFilter] = useState<string | null>(null);
+  const [measure, setMeasure] = useState<Measure>('hours');
+  const format = measure === 'trips' ? trips : hours;
+
+  // De chauffeurs en de posten in de gekozen maat, en daarop gerangschikt: wie
+  // de meeste uren reed, is niet altijd wie het vaakst reed.
+  const drivers = useMemo(
+    () =>
+      stats.perDriver
+        .map((driver) => inMeasure(driver, measure))
+        .sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name, 'nl')),
+    [stats.perDriver, measure]
+  );
+  const groups = useMemo(
+    () =>
+      measure === 'hours'
+        ? stats.perGroup
+        : stats.perGroup
+            .map((group) => ({
+              ...group,
+              hours: group.trips,
+              drivers: group.drivers
+                .map((driver) => ({ ...driver, hours: driver.trips }))
+                .sort((a, b) => b.hours - a.hours),
+            }))
+            .sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name, 'nl')),
+    [stats.perGroup, measure]
+  );
 
   const busiest = stats.perGroup[0] ?? null;
-  const focusedDriver = stats.perDriver.find((driver) => driver.id === driverFilter) ?? null;
+  const focusedDriver = drivers.find((driver) => driver.id === driverFilter) ?? null;
   const focusedGroup = stats.perGroup.find((group) => group.key === groupFilter) ?? null;
   const filterLabel = focusedDriver
     ? `enkel die van ${focusedDriver.name}`
@@ -1193,7 +1308,14 @@ export function TransportCharts({ stats, periodLabel }: { stats: TransportStats;
         <StatTile
           label="Ritten"
           value={String(stats.totals.trips)}
-          sub={`${stats.totals.cancelled + stats.totals.rejected} geannuleerd of afgewezen`}
+          sub={[
+            `${stats.totals.cancelled + stats.totals.rejected} geannuleerd of afgewezen`,
+            stats.totals.tooLong > 0
+              ? `${stats.totals.tooLong} langer dan ${stats.maxTripHours}\u00a0u, telt niet mee`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(', ')}
           previous={{ value: stats.previous.trips, now: stats.totals.trips }}
         />
         <StatTile
@@ -1231,54 +1353,82 @@ export function TransportCharts({ stats, periodLabel }: { stats: TransportStats;
         />
       </div>
 
-      <Panel
-        title="Wie reed het meest"
-        hint="Uren per chauffeur, opgesplitst per voertuig. Klik iemand aan om enkel zijn uren en zijn ritten te zien, hieronder en in de tabel onderaan."
-      >
-        <DriverLeaderboard
-          drivers={stats.perDriver}
-          vehicles={stats.vehicles}
-          selected={driverFilter}
-          onPickDriver={(id) => {
-            setDriverFilter(id);
-            setGroupFilter(null);
-          }}
-        />
-      </Panel>
+      <MeasureContext.Provider value={measure}>
+        <FormatContext.Provider value={format}>
+          {/* Eén keuze voor alle grafieken hieronder. */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <ToggleGroup
+              label="Tellen in"
+              value={measure}
+              onChange={setMeasure}
+              options={[
+                { value: 'hours', label: 'Uren' },
+                { value: 'trips', label: 'Ritten' },
+              ]}
+            />
+            <span className="text-xs text-vtk-muted">
+              {measure === 'hours'
+                ? 'Het geboekte venster van elke rit.'
+                : 'Elke rit één keer, op het uur en de dag waarop ze vertrekt.'}
+            </span>
+          </div>
 
-      <Panel title="Voor wie er gereden werd" hint="Klik een post open om te zien wie er voor hen reed.">
-        <GroupBars
-          groups={stats.perGroup}
-          onPickGroup={(key) => {
-            setGroupFilter(key);
-            setDriverFilter(null);
-            showTable();
-          }}
-        />
-      </Panel>
+          <Panel
+            title="Wie reed het meest"
+            hint={`${measure === 'hours' ? 'Uren' : 'Ritten'} per chauffeur, opgesplitst per voertuig. Klik iemand aan om enkel zijn uren en zijn ritten te zien, hieronder en in de tabel onderaan.`}
+          >
+            <DriverLeaderboard
+              drivers={drivers}
+              vehicles={stats.vehicles}
+              selected={driverFilter}
+              onPickDriver={(id) => {
+                setDriverFilter(id);
+                setGroupFilter(null);
+              }}
+            />
+          </Panel>
 
-      <Panel
-        title="Wanneer de voertuigen weg zijn"
-        hint="Bezette uren per weekdag en uur van de dag, over de hele periode opgeteld. Klik bij Wie reed het meest iemand aan om enkel zijn weekdagen en uren te zien."
-      >
-        <Heatmap
-          heatmap={heatmapFor(stats.heatmap, focusedDriver)}
-          focusName={focusedDriver?.name}
-          onClearFocus={() => setDriverFilter(null)}
-        />
-      </Panel>
+          <Panel title="Voor wie er gereden werd" hint="Klik een post open om te zien wie er voor hen reed.">
+            <GroupBars
+              groups={groups}
+              onPickGroup={(key) => {
+                setGroupFilter(key);
+                setDriverFilter(null);
+                showTable();
+              }}
+            />
+          </Panel>
 
-      <Panel
-        title="Wanneer er gereden wordt"
-        hint="Uren per uur van de dag of per weekdag. Gestapeld toont wie er samen reed; Per chauffeur zet elke chauffeur op dezelfde schaal, zodat je profielen kan vergelijken."
-      >
-        <HourOfDay
-          drivers={stats.perDriver}
-          focus={focusedDriver}
-          hoursWithoutDriver={stats.totals.hoursWithoutDriver}
-          onClearFocus={() => setDriverFilter(null)}
-        />
-      </Panel>
+          <Panel
+            title={measure === 'hours' ? 'Wanneer de voertuigen weg zijn' : 'Wanneer de ritten vertrekken'}
+            hint={`${
+              measure === 'hours'
+                ? 'Bezette uren per weekdag en uur van de dag'
+                : 'Vertrekkende ritten per weekdag en uur van de dag'
+            }, over de hele periode opgeteld. Klik bij Wie reed het meest iemand aan om enkel zijn weekdagen en uren te zien.`}
+          >
+            <Heatmap
+              heatmap={heatmapFor(measure === 'hours' ? stats.heatmap : stats.heatmapTrips, focusedDriver)}
+              focusName={focusedDriver?.name}
+              onClearFocus={() => setDriverFilter(null)}
+            />
+          </Panel>
+
+          <Panel
+            title="Wanneer er gereden wordt"
+            hint={`${measure === 'hours' ? 'Uren' : 'Ritten'} per uur van de dag of per weekdag. Gestapeld toont wie er samen reed; Per chauffeur zet elke chauffeur op dezelfde schaal, zodat je profielen kan vergelijken.`}
+          >
+            <HourOfDay
+              drivers={drivers}
+              focus={focusedDriver}
+              hoursWithoutDriver={
+                measure === 'hours' ? stats.totals.hoursWithoutDriver : stats.totals.tripsWithoutDriver
+              }
+              onClearFocus={() => setDriverFilter(null)}
+            />
+          </Panel>
+        </FormatContext.Provider>
+      </MeasureContext.Provider>
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Panel title="Ritten per week">
@@ -1312,6 +1462,7 @@ export function TransportCharts({ stats, periodLabel }: { stats: TransportStats;
             setGroupFilter(null);
           }}
           periodLabel={periodLabel}
+          maxTripHours={stats.maxTripHours}
         />
       </Panel>
     </div>

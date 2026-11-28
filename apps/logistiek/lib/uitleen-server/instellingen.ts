@@ -2,7 +2,9 @@ import 'server-only';
 import { prisma } from '@vtk/db';
 import {
   DEFAULT_LAST_MINUTE_DAYS,
+  DEFAULT_STATS_MAX_TRIP_HOURS,
   NOTIFY_KINDS,
+  STATS_MAX_TRIP_HOURS_RANGE,
   isTripHandoverMode,
   type LogistiekNotifyEmails,
   type NotifyKind,
@@ -42,6 +44,12 @@ export type LogistiekSettings = {
    * en dat scherm is de melding geworden. Zie `TripHandoverNotify`.
    */
   tripHandover: TripHandoverNotify;
+  /**
+   * Een rit langer dan zoveel uur telt niet mee in de statistieken
+   * (`countsInStats`). Standaard 5: zo lang rijdt niemand, dus een langer
+   * venster is een voertuig dat ergens bleef staan.
+   */
+  statsMaxTripHours: number;
 };
 
 /**
@@ -58,13 +66,23 @@ export async function getLogistiekSettings(): Promise<LogistiekSettings> {
     externalRequestsOpen?: boolean;
     notifyEmails?: Partial<Record<NotifyKind, unknown>>;
     tripHandover?: { mode?: unknown; email?: unknown };
+    statsMaxTripHours?: number;
   } | null;
   const days = Number(value?.lastMinuteDays);
+  const maxTripHours = Number(value?.statsMaxTripHours);
   const handoverMode = value?.tripHandover?.mode;
   return {
     showRentPrices: Boolean(value?.showRentPrices),
     lastMinuteDays: Number.isFinite(days) && days > 0 ? Math.floor(days) : DEFAULT_LAST_MINUTE_DAYS,
     externalRequestsOpen: Boolean(value?.externalRequestsOpen),
+    // Een instelling van voor deze grens heeft het veld niet, en krijgt dus de
+    // standaard: vijf uur, niet "geen grens".
+    statsMaxTripHours:
+      Number.isFinite(maxTripHours) &&
+      maxTripHours >= STATS_MAX_TRIP_HOURS_RANGE.min &&
+      maxTripHours <= STATS_MAX_TRIP_HOURS_RANGE.max
+        ? Math.floor(maxTripHours)
+        : DEFAULT_STATS_MAX_TRIP_HOURS,
     tripHandover: {
       // Een onbekende of ontbrekende waarde wordt "niemand", net zoals hierboven:
       // dit is een instelling en geen invoer. Stil naar de verantwoordelijken
@@ -81,4 +99,27 @@ export async function getLogistiekSettings(): Promise<LogistiekSettings> {
       })
     ) as LogistiekNotifyEmails,
   };
+}
+
+/**
+ * Het scherm in `UserViewPreference` voor de keuze "Bezetting opent de
+ * weekplanning". Een eigen sleutel per scherm, zoals "bestuursorgaan" op
+ * vtk.be; `view` is "planning" wanneer het aanstaat.
+ */
+export const PLANNING_SHORTCUT_SCREEN = 'logistiek.bezetting';
+
+/**
+ * Opent "Bezetting" in de kop voor deze persoon de weekplanning?
+ *
+ * Een keuze per teamlid en niet voor heel het team: wie de hele dag plant, wil
+ * met die link in de planning landen, maar een collega die er de bezetting zoekt
+ * om iemand te antwoorden, niet. Per account bewaard, dus op elk toestel gelijk.
+ * Standaard uit: zonder rij opent "Bezetting" gewoon de bezetting.
+ */
+export async function bezettingOpensPlanning(userId: string): Promise<boolean> {
+  const row = await prisma.userViewPreference.findUnique({
+    where: { userId_screen: { userId, screen: PLANNING_SHORTCUT_SCREEN } },
+    select: { view: true },
+  });
+  return row?.view === 'planning';
 }

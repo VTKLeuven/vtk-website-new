@@ -1,6 +1,6 @@
 import Link from '@vtk/ui/link';
 import { requireManage } from '@/lib/session';
-import { activeGroups, adminVehicles } from '@/lib/uitleen-server';
+import { activeGroups, adminVehicles, getLogistiekSettings } from '@/lib/uitleen-server';
 import {
   resolvePeriod,
   transportStats,
@@ -62,8 +62,15 @@ export default async function StatistiekenPage({
     to: query.tot ? parseDateOnly(query.tot) : null,
   });
 
+  const settings = await getLogistiekSettings();
   const [stats, vehicles, groups] = await Promise.all([
-    transportStats({ from: period.from, to: period.to, vehicleIds, groupIds }),
+    transportStats({
+      from: period.from,
+      to: period.to,
+      vehicleIds,
+      groupIds,
+      maxTripHours: settings.statsMaxTripHours,
+    }),
     adminVehicles(),
     activeGroups(),
   ]);
@@ -112,7 +119,20 @@ export default async function StatistiekenPage({
         <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">Statistieken</h2>
         <p className="text-sm text-vtk-muted">
           {period.label} · {stats.totals.trips} ritten. De uren zijn het geboekte venster van een
-          rit, niet de tijd achter het stuur.
+          rit, niet de tijd achter het stuur. Een rit langer dan {stats.maxTripHours} uur telt niet
+          mee, want zo lang rijdt niemand
+          {stats.totals.tooLong === 1
+            ? '; dat is er 1 in deze periode, en die staat onderaan met "telt niet mee"'
+            : stats.totals.tooLong > 1
+              ? `; dat zijn er ${stats.totals.tooLong} in deze periode, en ze staan onderaan met "telt niet mee"`
+              : ''}
+          .{' '}
+          <Link
+            href="/beheer/instellingen"
+            className="font-medium text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
+          >
+            Grens aanpassen
+          </Link>
         </p>
       </div>
 

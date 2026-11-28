@@ -2,7 +2,7 @@ import Image from 'next/image';
 import Link from '@vtk/ui/link';
 import { canManage, canUseTestLogin, getSession } from '@/lib/session';
 import { copy, getLocale } from '@/lib/i18n';
-import { driverStatus, showsMyTrips } from '@/lib/uitleen-server';
+import { bezettingOpensPlanning, driverStatus, showsMyTrips } from '@/lib/uitleen-server';
 import { HeaderMenu } from './header-menu';
 import { LanguageSwitcher } from './language-switcher';
 import { ProfileMenu } from './profile-menu';
@@ -39,6 +39,11 @@ export async function SiteHeader() {
   // de KU Leuven-login op de hoofdsite; enkel voor wie er iets mee kan, anders is
   // het een menu-item dat 404 geeft. Zie lib/session.ts.
   const testMode = await canUseTestLogin();
+  // Wie logistiek beheert, kan "Bezetting" de weekplanning laten openen
+  // (Beheer › Instellingen). Enkel de link verandert: de bezetting zelf blijft
+  // bereikbaar, en de planning linkt er zelf naartoe.
+  const planningShortcut =
+    session && canManage(session) ? await bezettingOpensPlanning(session.user.id) : false;
   const publicUrl = process.env.LOGISTIEK_PUBLIC_URL || 'https://logistiek.vtk.be';
   const loginHref = testMode
     ? '/test-login'
@@ -50,7 +55,7 @@ export async function SiteHeader() {
     { href: '/vervoer', label: t.navVan },
     // Voor iedereen: zonder login toont de pagina enkel voertuig, dag en uur,
     // dus ook wie niet ingelogd is, ziet of de kar vrij is.
-    { href: '/vervoer/bezetting', label: t.navPlanning },
+    { href: planningShortcut ? '/beheer/vervoer/week' : '/vervoer/bezetting', label: t.navPlanning },
     ...(session && session.groups.length > 0 ? [{ href: '/flesserke', label: t.navFlesserke }] : []),
     ...(session ? [{ href: '/reservaties', label: t.navReservations }] : []),
     // Enkel voor wie bij een groep hoort: een externe heeft geen evenementen en

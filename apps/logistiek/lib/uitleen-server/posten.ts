@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@vtk/db';
 import { currentWorkingYear } from '@vtk/auth';
+import { driverPhones } from './chauffeurs';
 import { logistiekTeamMembers } from './shared';
 
 /**
@@ -111,4 +112,79 @@ export async function groupMemberOptions(groupId: string) {
     .map((membership) => membership.user)
     .filter((user) => pool.has(user.id))
     .sort((a, b) => a.name.localeCompare(b.name, 'nl'));
+}
+
+/** Een lid van de post van een rit, met het nummer waarop het bereikbaar is. */
+export type PostMemberContact = { id: string; name: string; phone: string | null };
+
+/**
+ * Wie je kan bellen over een rit zonder bijrijder: de leden van haar post.
+ *
+ * Een rit zonder bijrijder liet de chauffeur en Logistiek enkel de aanvrager
+ * over, en wie er de dag zelf meegaat, is vaak iemand anders van dezelfde post.
+ * Het bijrijdersblok toont dan deze leden, op dezelfde manier als een bijrijder.
+ *
+ * Per groep in één keer, want de planning toont ritten van een handvol posten
+ * tegelijk. Dit werkingsjaar en enkel actieve accounts, dus de lijst loopt mee
+ * met de 15-juli-wissel. Het nummer komt uit `driverPhones` (team, profiel,
+ * historiek), dezelfde bron als het nummer van een chauffeur.
+ *
+ * Volgorde: eerst wie een nummer heeft (het blok toont er maar drie zonder
+ * "Meer"), dan de verantwoordelijken en de volgorde die de post zelf koos, zoals
+ * op /praesidium, dan de naam.
+ *
+ * **Enkel voor wie de rit al mag bellen**: het team en de chauffeur. De nummers
+ * van een rit blijven bij haar post (zie "Een praesidiumlid mag bij elke rit een
+ * bijrijder toevoegen" in docs/design-decisions.md), dus de bezettingskaart van
+ * een andere post krijgt dit niet.
+ */
+export async function postMembersWithPhones(
+  groupIds: Array<string | null | undefined>
+): Promise<Map<string, PostMemberContact[]>> {
+  const ids = [...new Set(groupIds.filter((id): id is string => Boolean(id)))];
+  if (ids.length === 0) return new Map();
+
+  const memberships = await prisma.groupMembership.findMany({
+    where: {
+      groupId: { in: ids },
+      year: currentWorkingYear(),
+      user: { active: true, deletedAt: null },
+    },
+    select: {
+      groupId: true,
+      role: true,
+      displayOrder: true,
+      user: { select: { id: true, name: true } },
+    },
+  });
+  const phones = await driverPhones(memberships.map((membership) => membership.user.id));
+
+  const byGroup = new Map<string, Array<PostMemberContact & { lead: boolean; order: number }>>();
+  for (const membership of memberships) {
+    const list = byGroup.get(membership.groupId) ?? [];
+    list.push({
+      id: membership.user.id,
+      name: membership.user.name,
+      phone: phones.get(membership.user.id)?.number ?? null,
+      lead: membership.role === 'LEAD',
+      order: membership.displayOrder,
+    });
+    byGroup.set(membership.groupId, list);
+  }
+
+  const result = new Map<string, PostMemberContact[]>();
+  for (const [groupId, members] of byGroup) {
+    members.sort(
+      (a, b) =>
+        Number(b.phone !== null) - Number(a.phone !== null) ||
+        Number(b.lead) - Number(a.lead) ||
+        a.order - b.order ||
+        a.name.localeCompare(b.name, 'nl')
+    );
+    result.set(
+      groupId,
+      members.map(({ id, name, phone }) => ({ id, name, phone }))
+    );
+  }
+  return result;
 }

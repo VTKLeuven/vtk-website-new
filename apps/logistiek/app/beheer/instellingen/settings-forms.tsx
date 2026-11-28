@@ -6,6 +6,7 @@ import {
   formatEuro,
   NOTIFY_KINDS,
   PRICING_MODE_LABELS,
+  STATS_MAX_TRIP_HOURS_RANGE,
   TRIP_HANDOVER_MODES,
   type LogistiekNotifyEmails,
   type NotifyKind,
@@ -336,6 +337,7 @@ const GENERAL_ERRORS = {
     'Een van de meldingsadressen ziet er niet uit als een adres. Splits meerdere adressen met een komma.',
   HANDOVER_EMAIL_INVALID:
     'Vul het vaste adres in waar de melding over een doorgegeven rit naartoe moet, of kies een andere ontvanger.',
+  STATS_MAX_INVALID: `De grens voor de statistieken moet een aantal uren tussen ${STATS_MAX_TRIP_HOURS_RANGE.min} en ${STATS_MAX_TRIP_HOURS_RANGE.max} zijn.`,
 };
 
 /** Wat elke keuze doet wanneer Logistiek een rit aan een post doorgeeft (F4.8b). */
@@ -429,12 +431,14 @@ export function GeneralSettings({
   externalRequestsOpen,
   notifyEmails,
   tripHandover,
+  statsMaxTripHours,
 }: {
   showRentPrices: boolean;
   lastMinuteDays: number;
   externalRequestsOpen: boolean;
   notifyEmails: LogistiekNotifyEmails;
   tripHandover: TripHandoverNotify;
+  statsMaxTripHours: number;
 }) {
   // Wat er nu ingesteld staat, in de kop van het dichtgeklapte blok (M4). Een
   // soort zonder meldingsadres staat erbij: dat is de instelling die stil iets
@@ -446,6 +450,7 @@ export function GeneralSettings({
     showRentPrices ? 'Huurprijzen zichtbaar' : 'Enkel waarborg zichtbaar',
     `last minute ${lastMinuteDays} ${lastMinuteDays === 1 ? 'dag' : 'dagen'}`,
     externalRequestsOpen ? 'externen kunnen aanvragen' : 'externen kunnen niet aanvragen',
+    `statistieken tot ${statsMaxTripHours} u per rit`,
     silent.length > 0 ? `geen melding voor ${silent.join(' en ')}` : null,
   ]
     .filter(Boolean)
@@ -500,6 +505,24 @@ export function GeneralSettings({
           Staat dit uit, dan kan iemand die dit werkingsjaar bij geen enkele post of werkgroep hoort
           de catalogus en de voertuigen wel bekijken, maar niets indienen; hij krijgt in de plaats van
           het formulier het mailadres van Logistiek te zien. Posten en werkgroepen merken er niets van.
+        </p>
+
+        <label className="mt-2 grid gap-1 text-xs font-medium text-vtk-muted sm:max-w-[24rem]">
+          Statistieken: ritten langer dan (uren) tellen niet mee
+          <input
+            type="number"
+            name="statsMaxTripHours"
+            min={STATS_MAX_TRIP_HOURS_RANGE.min}
+            max={STATS_MAX_TRIP_HOURS_RANGE.max}
+            defaultValue={statsMaxTripHours}
+            className={inputClass}
+          />
+        </label>
+        <p className="text-xs text-vtk-muted">
+          Zo lang rijdt niemand: een langer venster is een voertuig dat een dag of een weekend weg was, en
+          dat blaast de uren per chauffeur en de drukte op. Zulke ritten staan nog in de lijst onderaan
+          de statistieken, met &quot;telt niet mee&quot;, maar niet in de cijfers. Precies op de grens telt
+          een rit nog mee.
         </p>
 
         {/* M1: wie er gewaarschuwd wordt bij een nieuwe aanvraag. Per soort, want

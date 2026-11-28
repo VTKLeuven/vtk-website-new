@@ -1079,6 +1079,33 @@ export function transportDeleteDescription(
  */
 export const DEFAULT_LAST_MINUTE_DAYS = 7;
 
+/**
+ * Vanaf hoeveel uur een rit niet meer meetelt in de statistieken. Vijf uur: zo
+ * lang rijdt niemand een rit voor de kring, dus een langer venster is een
+ * voertuig dat een dag of een weekend weg was (een verhuurde bus, een kar die
+ * bij een evenement blijft staan). Zulke ritten bliezen de uren per chauffeur
+ * en de drukteweergave op. Het team past dit aan op /beheer/instellingen.
+ */
+export const DEFAULT_STATS_MAX_TRIP_HOURS = 5;
+
+/** De grenzen van die instelling: minstens een uur, hoogstens een week. */
+export const STATS_MAX_TRIP_HOURS_RANGE = { min: 1, max: 168 } as const;
+
+/**
+ * Telt deze rit mee in de statistieken?
+ *
+ * Precies op de grens telt nog mee: "langer dan vijf uur" valt weg, een rit van
+ * 14:00 tot 19:00 niet. Het gaat over het geboekte venster, net als elk ander
+ * getal op dat scherm.
+ */
+export function countsInStats(
+  startAt: Date,
+  endAt: Date,
+  maxHours: number = DEFAULT_STATS_MAX_TRIP_HOURS
+): boolean {
+  return endAt.getTime() - startAt.getTime() <= maxHours * 60 * 60 * 1000;
+}
+
 /** Deadline-signaal: de afhaaldag valt binnen `days` na het moment van aanvragen. */
 export function isLastMinute(
   pickupDate: Date,

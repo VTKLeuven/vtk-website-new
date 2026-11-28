@@ -118,12 +118,19 @@
   --chart-rest: #5c667f;
   --chart-grid: rgba(14, 26, 54, 0.12);
   --chart-seam: #ffffff; /* de naad tussen twee segmenten van een balk */
+  /* De drukteweergave op de statistieken: ramp-1 is leeg, ramp-2 tot ramp-10
+     negen stappen van weinig naar veel, gelijkmatig in OKLab, zodat elke stap
+     voor het oog even groot is. */
   --chart-ramp-1: #eff2f8;
-  --chart-ramp-2: #d3e0f0;
-  --chart-ramp-3: #a8c2e2;
-  --chart-ramp-4: #6e93c9;
-  --chart-ramp-5: #3a63a4;
-  --chart-ramp-6: #1f3f77;
+  --chart-ramp-2: #dbe6f4;
+  --chart-ramp-3: #c1d4eb;
+  --chart-ramp-4: #a8c2e2;
+  --chart-ramp-5: #83a4d1;
+  --chart-ramp-6: #5f86c0;
+  --chart-ramp-7: #456ca7;
+  --chart-ramp-8: #2c528f;
+  --chart-ramp-9: #1f3e71;
+  --chart-ramp-10: #132b55;
 
   /* --- Chauffeurskleuren voor de transportplanning (B4, T7, K1) ---------
      Vierentwintig tinten in plaats van acht, want acht was op een drukke week
@@ -296,12 +303,19 @@
   --chart-rest: #97a1ba;
   --chart-grid: rgba(255, 255, 255, 0.14);
   --chart-seam: #05070d;
+  /* De drukteweergave op de statistieken: ramp-1 is leeg, ramp-2 tot ramp-10
+     negen stappen van weinig naar veel, gelijkmatig in OKLab, zodat elke stap
+     voor het oog even groot is. */
   --chart-ramp-1: #131a2b;
-  --chart-ramp-2: #1c2a47;
-  --chart-ramp-3: #2a4370;
-  --chart-ramp-4: #3b5f9c;
-  --chart-ramp-5: #5b85c8;
-  --chart-ramp-6: #8fb4e8;
+  --chart-ramp-2: #1a2640;
+  --chart-ramp-3: #223457;
+  --chart-ramp-4: #2a4370;
+  --chart-ramp-5: #385a91;
+  --chart-ramp-6: #4672b4;
+  --chart-ramp-7: #628cca;
+  --chart-ramp-8: #7ea6e0;
+  --chart-ramp-9: #a0c0ed;
+  --chart-ramp-10: #c3dbfa;
 
   /* --- Chauffeurskleuren ------------------------------------------------ */
   /* Dezelfde tinten in dezelfde volgorde, donker in plaats van licht. De

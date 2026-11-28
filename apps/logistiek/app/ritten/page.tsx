@@ -21,6 +21,7 @@ import {
   groupMemberOptions,
   isDriver,
   isVanDriver,
+  postMembersWithPhones,
   tripNotesFor,
   tripsForDriver,
   tripsForGroups,
@@ -29,6 +30,7 @@ import {
 import { vehicleIconName } from '@/lib/vehicle-icon';
 import type { TripMonth, TripView, TripWeek } from './trip-view';
 import { TripsAgenda } from './trips-agenda';
+import { withoutRequester } from '@/lib/trip-post-members';
 import { localizedTitle } from '@/lib/page-title';
 
 export const generateMetadata = localizedTitle({ nl: copy.nl.navTrips, en: copy.en.navTrips });
@@ -137,7 +139,12 @@ export default async function RittenPage({ searchParams }: { searchParams: Promi
     ),
   ];
   const viewer = { userId, groupIds: myGroupIds };
-  const [phones, membersPerGroup, notesPerTrip, colors] = await Promise.all([
+  // Wie de chauffeur kan bellen over een rit zonder bijrijder: de leden van de
+  // post die hem vroeg. Enkel bij wat je zelf nog rijdt; de nummers van een rit
+  // blijven bij haar post en bij wie ze rijdt, en een post kent haar eigen leden.
+  const withoutHelpers = (trip: DriverTrip) =>
+    trip.driverId === userId && trip.helpers.length === 0 && !trip.helpersNote && !trip.helpersPhone;
+  const [phones, membersPerGroup, notesPerTrip, colors, postMembers] = await Promise.all([
     driverPhones(otherDriverIds),
     Promise.all(
       assignedGroupIds.map(async (groupId) => [groupId, await groupMemberOptions(groupId)] as const)
@@ -154,6 +161,7 @@ export default async function RittenPage({ searchParams }: { searchParams: Promi
     // Dezelfde kleur als in de planning, zodat een chauffeur er overal hetzelfde
     // uitziet. Enkel nodig wanneer iemand anders dan jij rijdt.
     otherDriverIds.length > 0 ? driverColorOverrides() : Promise.resolve({}),
+    postMembersWithPhones(upcoming.filter(withoutHelpers).map((trip) => trip.groupId)),
   ]);
 
   const words = dateWords(locale);
@@ -212,6 +220,10 @@ export default async function RittenPage({ searchParams }: { searchParams: Promi
       driver: driverView,
       helpers: trip.helpers,
       helpersLegacy: [trip.helpersNote, trip.helpersPhone].filter(Boolean).join(' · ') || null,
+      postMembers:
+        !isPast && withoutHelpers(trip) && trip.groupId && requesterGroup
+          ? withoutRequester(requesterGroup, postMembers.get(trip.groupId), trip.userId)
+          : null,
       // Dezelfde regel als `canEditHelpers` op de server: je eigen post, of een
       // rit die aan je post doorgegeven is. Een gereden rit niet meer.
       canEditHelpers: post && !isPast && trip.status === 'APPROVED',

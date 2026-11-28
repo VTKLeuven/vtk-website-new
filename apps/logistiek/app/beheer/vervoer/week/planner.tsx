@@ -21,6 +21,9 @@ import type { TransportFilters } from '@/lib/transport-filters';
 import { AuditTimeline } from '@/components/audit-timeline';
 import { PhoneLink } from '@/components/phone-link';
 import { TripHelpers } from '@/components/trip-helpers';
+import { TripShift } from '@/components/trip-shift';
+import type { TripShiftView } from '@/lib/uitleen-server/bijrijdshift';
+import { withoutRequester, type TripPostMembers } from '@/lib/trip-post-members';
 import { TripNotes, type TripNoteView } from '@/components/trip-notes';
 import { EventLink } from '@/components/event-link';
 import type { SelectableEvent } from '@/components/event-picker';
@@ -58,6 +61,7 @@ import { updatePlannerPrefs, type PlannerPrefs } from '@/components/transport-ca
 import { AvailabilityLegend } from './availability-legend';
 import { DriverFitList, driverNotesFor } from './driver-fit-list';
 import { WeekSummary, type SummaryKind } from './week-summary';
+import { vehicleIconName } from '@/lib/vehicle-icon';
 
 /**
  * De transportplanning waarop de verantwoordelijke werkt (T7, P1, P4).
@@ -106,6 +110,8 @@ export type PlannerTrip = {
   event: { id: string; name: string } | null;
   reservationId: string | null;
   requesterLabel: string;
+  /** De aanvrager; enkel om die uit de ledenlijst bij de bijrijders te laten. */
+  userId: string;
   userName: string;
   contactPhone: string | null;
   pickupAddress: string | null;
@@ -113,6 +119,8 @@ export type PlannerTrip = {
   helpers: Array<{ id: string; name: string; phone: string | null }>;
   helpersNote: string | null;
   helpersPhone: string | null;
+  /** De bijrijdshiften op vtk.be die op deze rit meerijden (`TripShift`). */
+  shifts: TripShiftView[];
   memberNote: string | null;
   adminNote: string | null;
   notifyEmail: string | null;
@@ -171,6 +179,8 @@ export function TransportPlanner({
   vehicles,
   blocks,
   trips,
+  postMembers,
+  shiftUrl,
   drivers,
   vehicleOptions,
   groups,
@@ -187,17 +197,35 @@ export function TransportPlanner({
   heading,
   initialPrefs,
   initialAvailability,
+  layout,
+  focus,
+  customRange,
 }: {
   view: CalendarView;
   anchor: string;
   days: string[];
+  /** Tijdrooster of raster van weken; zie `CalendarRange.layout`. */
+  layout: 'time' | 'month';
+  /** Bij een raster: de dagen van het bereik zelf, de rest vervaagt. */
+  focus: { from: string; to: string } | null;
+  /** Bij "Aangepast": het gekozen bereik, als `YYYY-MM-DD`, voor de keuze. */
+  customRange: { first: string; last: string } | null;
   vehicles: CalendarVehicle[];
   blocks: TripBlock[];
   trips: PlannerTrip[];
+  /**
+   * Per post de leden met hun nummer, voor het bijrijdersblok van een rit
+   * zonder bijrijder. Eén keer per post en niet per rit: een week telt vaak
+   * vijf ritten van dezelfde post.
+   */
+  postMembers: Record<string, TripPostMembers['members']>;
+  /** vtk.be/shift, voor de link bij een bijrijdshift. */
+  shiftUrl: string;
   drivers: DriverOption[];
   vehicleOptions: Array<{ id: string; name: string; needsVanDriver: boolean; needsDriver?: boolean }>;
   /** Posten en werkgroepen waarvoor het team zelf een rit kan inplannen. */
-  groups: Array<{ id: string; name: string }>;
+  /** `kind` zet ze in het filterpaneel bij de posten, werkgroepen of jaarwerkingen. */
+  groups: Array<{ id: string; name: string; kind?: 'PRAESIDIUM' | 'WERKGROEP' | 'JAARWERKING' }>;
   /**
    * Wie er een mail krijgt wanneer je de rit aan een post doorgeeft (F4.8b).
    * Het formulier zegt dat ter plaatse, want die instelling staat twee schermen
@@ -497,6 +525,9 @@ export function TransportPlanner({
         view={view}
         anchor={anchor}
         days={days}
+        layout={layout}
+        focus={focus}
+        customRange={customRange}
         nav={nav}
         // De selectie blijft op het rooster staan zolang het formulier
         // openstaat, en volgt de uren die je erin aanpast. Het zijn
@@ -568,7 +599,9 @@ export function TransportPlanner({
               ? 'Geen ritten deze maand'
               : view === 'dagen'
                 ? 'Geen ritten in deze dagen'
-                : 'Geen ritten deze week') +
+                : view === 'aangepast'
+                  ? 'Geen ritten in dit bereik'
+                  : 'Geen ritten deze week') +
           (hiddenNote.length > 0 ? ` met deze filters (${hiddenNote.join('; ')}).` : '.')
         }
         toolbarExtra={
@@ -597,7 +630,11 @@ export function TransportPlanner({
           // schreef elke filterwijziging een oude `beschikbaar=1` terug in de URL.
           <TransportFilterBar
             filters={{ ...filters, showAvailability: false }}
-            vehicles={vehicles.map((vehicle) => ({ id: vehicle.id, name: vehicle.name }))}
+            vehicles={vehicles.map((vehicle) => ({
+              id: vehicle.id,
+              name: vehicle.name,
+              icon: vehicleIconName(vehicle),
+            }))}
             drivers={drivers.map((driver) => ({ id: driver.id, name: driver.name }))}
             posts={groups}
             driverColors={driverColors}
@@ -915,7 +952,22 @@ export function TransportPlanner({
                 helpers={trip.helpers}
                 legacyNote={trip.helpersNote}
                 canEdit={trip.status === 'REQUESTED' || trip.status === 'APPROVED'}
+                postMembers={
+                  trip.requesterGroup
+                    ? withoutRequester(trip.requesterGroup.name, postMembers[trip.requesterGroup.id], trip.userId)
+                    : null
+                }
               />
+              <div className="empty:hidden">
+                <TripShift
+                  bookingId={trip.id}
+                  trip={{ status: trip.status, startAt: trip.startAt, endAt: trip.endAt }}
+                  shifts={trip.shifts}
+                  canCreate
+                  groupName={trip.requesterGroup?.name ?? null}
+                  shiftUrl={shiftUrl}
+                />
+              </div>
 
               <section>
                 <h3 className="text-sm font-semibold text-vtk-ink">Rit aanpassen</h3>

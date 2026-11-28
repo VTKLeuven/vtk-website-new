@@ -6,11 +6,16 @@ import type { ShiftInput } from "@/lib/shift";
 /**
  * Maakt één shift aan.
  *
- * Dit is de enige plek waar een shift ontstaat. `POST /api/shift` gebruikt het
- * (en daarmee ook het sjabloonscherm, dat die route per shift aanroept), en het
- * aanmaken van een Theokot-verkoopweek gebruikt het rechtstreeks. Komt er ooit
- * iets bij het aanmaken van een shift, dan hoort het hier en krijgt elke weg het
- * vanzelf mee.
+ * Dit is de enige plek op vtk.be waar een shift ontstaat. `POST /api/shift`
+ * gebruikt het (en daarmee ook het sjabloonscherm, dat die route per shift
+ * aanroept), en het aanmaken van een Theokot-verkoopweek gebruikt het
+ * rechtstreeks. Komt er ooit iets bij het aanmaken van een shift, dan hoort het
+ * hier en krijgt elke weg het vanzelf mee.
+ *
+ * **Eén weg buiten vtk.be**: de uitleendienst zet een bijrijdshift op een rit
+ * (`createTripShiftAction` in apps/logistiek/app/actions/uitleen.ts, de inhoud in
+ * apps/logistiek/lib/bijrijdshift.ts). Een andere app kan deze functie niet
+ * importeren; komt er hier iets bij, kijk dan of het daar ook moet.
  *
  * De invoer is al door {@link parseShift} gegaan; deze functie valideert niet
  * opnieuw.

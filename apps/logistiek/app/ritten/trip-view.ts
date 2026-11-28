@@ -1,4 +1,5 @@
 import type { TripHelper } from '@/components/trip-helpers';
+import type { TripPostMembers } from '@/lib/trip-post-members';
 import type { TripNoteView } from '@/components/trip-notes';
 import type { VehicleIcon } from '@/lib/vehicle-icon';
 
@@ -47,6 +48,8 @@ export type TripView = {
   /** De vrije tekst van vóór V2 over helpers, met het nummer erbij. */
   helpersLegacy: string | null;
   canEditHelpers: boolean;
+  /** Zonder bijrijder en jij rijdt: de leden van de post, om te bellen. */
+  postMembers: TripPostMembers | null;
   notes: TripNoteView[];
   /** Jij rijdt deze rit. */
   mine: boolean;

@@ -25,8 +25,11 @@ import {
 } from '@/lib/uitleen';
 import {
   calendarRange,
+  customRangeLength,
+  dateParam,
   isCurrentPeriod,
   parseCalendarView,
+  parseCustomRange,
   parseDaysCount,
   shiftAnchor,
   type CalendarView,
@@ -40,6 +43,8 @@ import {
   driverOptions,
   eventsInRange,
   getLogistiekSettings,
+  postMembersWithPhones,
+  tripShifts,
   selectableEvents,
   seriesPositions,
   teamEditsForTransport,
@@ -95,9 +100,12 @@ function endOfDay(moment: Date): Date {
 }
 
 /** De kop boven de kalender: "Week 36", "september 2026" of de dag zelf. */
-function periodTitle(view: CalendarView, anchor: Date, count: number): string {
+function periodTitle(view: CalendarView, anchor: Date, count: number, customLast?: Date): string {
   if (view === 'dag') return formatDateOnly(anchor);
   if (view === 'dagen') return `Komende ${count} dagen`;
+  // Een eigen bereik heet naar zijn datums: dat is wat je koos, en "Aangepast"
+  // zegt niet waar je naar kijkt.
+  if (view === 'aangepast' && customLast) return formatDateRange(anchor, customLast);
   if (view === 'maand') return monthFormatter.format(anchor);
   return `Week ${isoWeekNumber(anchor)}`;
 }
@@ -110,6 +118,8 @@ export default async function VervoerWeekPage({
     datum?: string;
     week?: string;
     aantal?: string;
+    van?: string;
+    tot?: string;
     voertuig?: string;
     chauffeur?: string;
     status?: string;
@@ -137,8 +147,14 @@ export default async function VervoerWeekPage({
   const realFilters = { ...filters, showAvailability: false };
   // `?week=` is de oude parameter van het weekoverzicht; links en bladwijzers uit
   // die tijd blijven werken in plaats van op deze week uit te komen.
-  const anchor = (datum && parseDateOnly(datum)) || (week && parseDateOnly(week)) || todayDateOnly();
-  const { days, from, to } = calendarRange(view, anchor, daysCount);
+  //
+  // Een eigen bereik draagt zijn eigen begin en einde (`van`, `tot`); de rest
+  // kent enkel een anker.
+  const custom = view === 'aangepast' ? parseCustomRange(query.van, query.tot) : null;
+  const customLength = custom ? customRangeLength(custom) : 0;
+  const anchor =
+    custom?.first ?? ((datum && parseDateOnly(datum)) || (week && parseDateOnly(week)) || todayDateOnly());
+  const { days, from, to, layout, focus } = calendarRange(view, anchor, daysCount, custom?.last);
 
   const [
     bookings,
@@ -197,7 +213,7 @@ export default async function VervoerWeekPage({
   const viewer = { userId: session.user.id, groupIds: session.groups.map((group) => group.id) };
   // Vier queries die enkel de ritten van hierboven nodig hebben, en elkaar niet:
   // samen in plaats van na elkaar (P4).
-  const [history, teamEdits, seriesPlaces, notesPerTrip] = await Promise.all([
+  const [history, teamEdits, seriesPlaces, notesPerTrip, postMembers, shiftsPerTrip] = await Promise.all([
     // De historiek van de getoonde ritten in één query; ze staat ingeklapt in
     // het paneel, maar wordt hier server-side gerenderd, zoals op /beheer/vervoer.
     transportAuditLogsByBooking(bookings.map((booking) => booking.id)),
@@ -216,6 +232,15 @@ export default async function VervoerWeekPage({
         logistiek: true,
       }
     ),
+    // Wie je kan bellen over een rit zonder bijrijder: de leden van haar post.
+    // Enkel voor die ritten, want bij een rit met bijrijders staat de lijst er
+    // niet.
+    postMembersWithPhones(
+      bookings
+        .filter((booking) => booking.helpers.length === 0 && !booking.helpersNote && !booking.helpersPhone)
+        .map((booking) => booking.groupId)
+    ),
+    tripShifts(bookings.map((booking) => booking.id)),
   ]);
 
   // De filters blijven staan wanneer je van week naar week bladert: ze horen bij
@@ -223,10 +248,17 @@ export default async function VervoerWeekPage({
   // cookie, en een link die ze meedraagt, zou de knop bij de volgende week weer
   // aanzetten nadat je ze uitzette.
   const filterQuery = new URLSearchParams(filtersToQuery(realFilters)).toString();
+  // Een eigen bereik verschuift als geheel: dezelfde lengte, vanaf een andere
+  // eerste dag.
   const hrefFor = (target: Date) =>
-    `/beheer/vervoer/week?weergave=${view}&datum=${toDateInputValue(target)}${
-      view === 'dagen' ? `&aantal=${daysCount}` : ''
-    }${filterQuery ? `&${filterQuery}` : ''}`;
+    custom
+      ? `/beheer/vervoer/week?weergave=aangepast&van=${dateParam(target)}&tot=${dateParam(
+          new Date(target.getTime() + (customLength - 1) * DAY_MS)
+        )}${filterQuery ? `&${filterQuery}` : ''}`
+      : `/beheer/vervoer/week?weergave=${view}&datum=${toDateInputValue(target)}${
+          view === 'dagen' ? `&aantal=${daysCount}` : ''
+        }${filterQuery ? `&${filterQuery}` : ''}`;
+  const step = custom ? customLength : daysCount;
 
   const blocks: TripBlock[] = bookings.map((booking) => ({
     id: booking.id,
@@ -277,6 +309,7 @@ export default async function VervoerWeekPage({
       event: booking.event,
       reservationId: booking.reservationId,
       requesterLabel: requesterLabel(booking),
+      userId: booking.userId,
       userName: booking.user.name,
       contactPhone: booking.contactPhone,
       pickupAddress: booking.pickupAddress,
@@ -284,6 +317,7 @@ export default async function VervoerWeekPage({
       helpers: booking.helpers,
       helpersNote: booking.helpersNote,
       helpersPhone: booking.helpersPhone,
+      shifts: shiftsPerTrip.get(booking.id) ?? [],
       memberNote: booking.memberNote,
       adminNote: booking.adminNote,
       notifyEmail: booking.notifyEmail,
@@ -376,12 +410,17 @@ export default async function VervoerWeekPage({
           kalender zelf (`heading`), zodat ze in volledig scherm blijven staan. */}
       <TransportPlanner
         heading={{
-          title: periodTitle(view, anchor, daysCount),
+          title: periodTitle(view, anchor, daysCount, custom?.last),
           subtitle:
             view === 'dag'
               ? `${bookings.length} ${bookings.length === 1 ? 'rit' : 'ritten'}`
-              : formatDateRange(days[0], new Date(to.getTime() - DAY_MS)),
+              : custom
+                ? `${customLength} dagen, ${layout === 'month' ? 'in weken' : 'per dag'}`
+                : formatDateRange(days[0], new Date(to.getTime() - DAY_MS)),
         }}
+        layout={layout}
+        focus={focus ? { from: focus.from.toISOString(), to: focus.to.toISOString() } : null}
+        customRange={custom ? { first: dateParam(custom.first), last: dateParam(custom.last) } : null}
         initialPrefs={prefs}
         initialAvailability={showAvailability}
         view={view}
@@ -397,6 +436,8 @@ export default async function VervoerWeekPage({
         }))}
         blocks={blocks}
         trips={trips}
+        postMembers={Object.fromEntries(postMembers)}
+        shiftUrl={`${process.env.VTK_MAIN_URL || 'https://vtk.be'}/shift`}
         drivers={drivers}
         driverColors={driverColors}
         filters={filters}
@@ -413,7 +454,7 @@ export default async function VervoerWeekPage({
             needsVanDriver: vehicle.needsVanDriver,
             needsDriver: vehicle.needsDriver,
           }))}
-        groups={groups.map((group) => ({ id: group.id, name: group.nameNl }))}
+        groups={groups.map((group) => ({ id: group.id, name: group.nameNl, kind: group.type }))}
         handoverNotify={settings.tripHandover.mode}
         availability={availability.map((window) => ({
           id: window.id,
@@ -462,11 +503,11 @@ export default async function VervoerWeekPage({
           };
         })}
         nav={{
-          previousHref: hrefFor(shiftAnchor(view, anchor, -1, daysCount)),
-          nextHref: hrefFor(shiftAnchor(view, anchor, 1, daysCount)),
+          previousHref: hrefFor(shiftAnchor(view, anchor, -1, step)),
+          nextHref: hrefFor(shiftAnchor(view, anchor, 1, step)),
           todayHref: hrefFor(todayDateOnly()),
-          isToday: isCurrentPeriod(view, anchor),
-          label: view === 'dagen' ? `${daysCount} dagen` : view,
+          isToday: isCurrentPeriod(view, anchor, new Date(), custom?.last),
+          label: view === 'dagen' || custom ? `${step} dagen` : view,
         }}
       />
     </div>

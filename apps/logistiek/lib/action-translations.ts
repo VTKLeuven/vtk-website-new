@@ -98,6 +98,14 @@ const EN: Record<string, string> = {
   'Bijrijder toegevoegd.': 'Passenger added.',
   'Deze bijrijder staat er niet (meer).': 'This passenger is not on the trip (anymore).',
   'Bijrijder weggehaald.': 'Passenger removed.',
+  'Een bijrijdshift kan zodra Logistiek de rit goedkeurt.':
+    'A ride-along shift is possible once Logistics approves the trip.',
+  'Deze rit is al vertrokken.': 'This trip has already left.',
+  'Deze rit heeft al een bijrijdshift.': 'This trip already has a ride-along shift.',
+  'Bijrijdshift staat op vtk.be/shift.': 'The ride-along shift is on vtk.be/shift.',
+  'Deze bijrijdshift bestaat niet (meer).': 'This ride-along shift does not exist (anymore).',
+  'De shift staat al op de uren van de rit.': 'The shift already has the hours of the trip.',
+  'De shift staat weer op de uren van de rit.': 'The shift has the hours of the trip again.',
   'Deze rit is niet aan jouw post doorgegeven.': 'This trip was not handed to your post.',
   'Kies iemand van je eigen post, of iemand uit de chauffeurslijst.':
     'Choose someone from your own post, or someone from the driver list.',
@@ -138,6 +146,8 @@ const EN_PATTERNS: Array<[RegExp, (...groups: string[]) => string]> = [
     `Template "${name}" saved. Everyone can choose it now.`],
   [/^(\d+) vensters van vorige week overgenomen\.$/, (count) => `Copied ${count} windows from last week.`],
   [/^(.+) rijdt deze rit\.$/, (name) => `${name} drives this trip.`],
+  [/^Kies tussen (\d+) en (\d+) plaatsen\.$/, (min, max) => `Choose between ${min} and ${max} places.`],
+  [/^Kies tussen (\d+) en (\d+) bonnetjes\.$/, (min, max) => `Choose between ${min} and ${max} vouchers.`],
 ];
 
 /** De Engelse versie van een Nederlandse melding, of de melding zelf. */

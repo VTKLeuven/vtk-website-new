@@ -17,6 +17,7 @@ import { EventBars, type CalendarEventBar } from './event-bars';
 import { TripFieldPicker } from './field-picker';
 import { MobileCalendar } from './mobile-calendar';
 import { MonthGrid } from './month-grid';
+import { RangeFields } from './range-picker';
 import { TimeGrid, timeGridColumns } from './time-grid';
 import { vehicleIconName } from '@/lib/vehicle-icon';
 import {
@@ -86,8 +87,21 @@ function TransportCalendarShell({
   availability,
   bandsAs,
   foldNight = false,
+  layout,
+  focus,
+  customRange,
 }: {
   view: CalendarView;
+  /**
+   * Tijdrooster of raster van weken (`CalendarRange.layout`). Weggelaten volgt
+   * het de weergave: enkel de maand is een raster. Een eigen bereik van meer dan
+   * twee weken is dat ook, en dat weet enkel de server.
+   */
+  layout?: 'time' | 'month';
+  /** Bij een raster: de dagen van het bereik zelf, als ISO; de rest vervaagt. */
+  focus?: { from: string; to: string } | null;
+  /** Het eigen bereik waar de planning op staat (`YYYY-MM-DD`), voor de keuze. */
+  customRange?: { first: string; last: string } | null;
   /** De dag waar de weergave op staat, als ISO-string van UTC-middernacht. */
   anchor: string;
   days: string[];
@@ -186,9 +200,26 @@ function TransportCalendarShell({
 
   /** Dezelfde URL met een andere weergave of datum; de rest van de query blijft. */
   const hrefFor = useCallback(
-    (next: { weergave?: CalendarView; datum?: string | null; aantal?: number }) => {
+    (next: {
+      weergave?: CalendarView;
+      datum?: string | null;
+      aantal?: number;
+      van?: string;
+      tot?: string;
+    }) => {
       const query = new URLSearchParams(params.toString());
       if (next.weergave) query.set('weergave', next.weergave);
+      // Een eigen bereik en een anker sluiten elkaar uit: wie van het ene naar het
+      // andere gaat, mag de parameters van het vorige niet meeslepen.
+      if (next.weergave === 'aangepast') {
+        query.delete('datum');
+        query.delete('aantal');
+      } else if (next.weergave) {
+        query.delete('van');
+        query.delete('tot');
+      }
+      if (next.van) query.set('van', next.van);
+      if (next.tot) query.set('tot', next.tot);
       if (next.aantal) query.set('aantal', String(next.aantal));
       if (next.datum === null) query.delete('datum');
       else if (next.datum) query.set('datum', next.datum);
@@ -196,6 +227,55 @@ function TransportCalendarShell({
       return search ? `${pathname}?${search}` : pathname;
     },
     [params, pathname]
+  );
+
+  /** Het raster van weken in plaats van het tijdrooster: de maand, of een lang eigen bereik. */
+  const asMonth = (layout ?? (view === 'maand' ? 'month' : 'time')) === 'month';
+
+  /**
+   * "Aangepast" net aangeklikt, terwijl de server het bereik nog laadt.
+   *
+   * Het segment kleurt meteen en schuift open, ook al staat de URL nog op de
+   * vorige weergave; gekoppeld aan die URL, zodat het vanzelf vervalt zodra de
+   * nieuwe binnen is (of je met "terug" ergens anders belandt).
+   */
+  const [customPendingFor, setCustomPendingFor] = useState<string | null>(null);
+  const urlKey = params.toString();
+  const customActive = view === 'aangepast' || customPendingFor === urlKey;
+
+  /**
+   * Het bereik waarmee "Aangepast" begint: wat je op dat moment ziet. Een week
+   * blijft dezelfde week, een maand de dagen van die maand; enkel vanuit één dag
+   * wordt het twee weken, want een eigen bereik van één dag is de dagweergave.
+   */
+  const startRange = useCallback((): { van: string; tot: string } => {
+    const iso = (date: Date) => date.toISOString().slice(0, 10);
+    const first = new Date(days[0] ?? anchor);
+    const lastShown = new Date(days[days.length - 1] ?? anchor);
+    if (view === 'maand') {
+      const month = new Date(anchor);
+      const start = new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth(), 1));
+      const end = new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth() + 1, 0));
+      return { van: iso(start), tot: iso(end) };
+    }
+    if (days.length < 2) {
+      return { van: iso(first), tot: iso(new Date(first.getTime() + 13 * 24 * 60 * 60 * 1000)) };
+    }
+    return { van: iso(first), tot: iso(lastShown) };
+  }, [anchor, days, view]);
+
+  const openCustom = useCallback(() => {
+    if (view === 'aangepast') return;
+    setCustomPendingFor(urlKey);
+    router.push(hrefFor({ weergave: 'aangepast', ...startRange() }), { scroll: false });
+  }, [hrefFor, router, startRange, urlKey, view]);
+
+  /** Een datum aangepast: meteen laden, zonder een stap in de geschiedenis per veld. */
+  const changeCustom = useCallback(
+    (van: string, tot: string) => {
+      router.replace(hrefFor({ weergave: 'aangepast', van, tot }), { scroll: false });
+    },
+    [hrefFor, router]
   );
 
   /**
@@ -526,7 +606,7 @@ function TransportCalendarShell({
    * De maandweergave houdt haar raster; daar is één dag geen antwoord op "hoe
    * ziet de maand eruit".
    */
-  const phoneFullscreen = Boolean(fullscreen) && narrow && view !== 'maand';
+  const phoneFullscreen = Boolean(fullscreen) && narrow && !asMonth;
 
   if (phoneFullscreen) {
     return (
@@ -563,28 +643,77 @@ function TransportCalendarShell({
   // De onderdelen van de werkbalk, één keer gebouwd en per schermbreedte anders
   // geschikt (zie de werkbalk hieronder).
   const viewSegments = views ? (
+          // Op een breed scherm één aaneengesloten balk; in het menu op een
+          // telefoon losse pillen die mogen afbreken. Vijf segmenten op één
+          // regel pasten daar niet: "Aangepast" viel weg achter de rand.
           <div
-            className="inline-flex overflow-hidden rounded-full border border-vtk-navy/15"
+            className={
+              narrow
+                ? 'flex flex-wrap gap-1.5'
+                : 'inline-flex overflow-hidden rounded-full border border-vtk-navy/15'
+            }
             role="group"
             aria-label={t.view}
           >
-            {CALENDAR_VIEWS.map((option) => (
-              <Link
-                key={option}
-                // "Komende dagen" begint bij vandaag, niet bij de dag waar je net
-                // op stond: anders zie je na het wisselen een venster dat mogelijk
-                // helemaal in het verleden ligt.
-                href={hrefFor({ weergave: option, ...(option === 'dagen' ? { datum: null } : {}) })}
-                aria-current={option === view ? 'true' : undefined}
-                className={`px-3.5 py-1.5 text-sm font-medium transition ${
-                  option === view
-                    ? 'bg-vtk-navy text-vtk-on-emphasis'
-                    : 'text-vtk-ink hover:bg-vtk-navy/5'
-                }`}
-              >
-                {CALENDAR_VIEW_LABELS[option]}
-              </Link>
-            ))}
+            {CALENDAR_VIEWS.map((option) =>
+              option === 'aangepast' ? (
+                // Een knop en geen link: ze zet de planning op wat je nu ziet en
+                // schuift open met de twee datums, in het segment zelf. Een
+                // datum aanklikken laadt meteen; er is geen apart venster.
+                // Op een telefoon mogen de datums onder het woord afbreken: naast
+                // elkaar liepen ze uit het menu.
+                <span
+                  key={option}
+                  className={`flex items-center transition-colors ${
+                    narrow
+                      ? customActive
+                        ? 'flex-wrap rounded-[18px] border border-vtk-navy/15 pb-1.5'
+                        : 'rounded-full border border-vtk-navy/15'
+                      : ''
+                  } ${customActive ? 'bg-vtk-navy text-vtk-on-emphasis' : 'text-vtk-ink'}`}
+                >
+                  <button
+                    type="button"
+                    aria-current={customActive ? 'true' : undefined}
+                    aria-expanded={customActive}
+                    title={t.range.open}
+                    onClick={openCustom}
+                    className={`px-3.5 py-1.5 text-sm font-medium transition ${
+                      customActive ? '' : 'hover:bg-vtk-navy/5'
+                    } ${narrow ? 'rounded-full' : ''}`}
+                  >
+                    {CALENDAR_VIEW_LABELS[option]}
+                  </button>
+                  {customActive ? (
+                    <span className={`range-slide flex items-center ${narrow ? 'px-1.5' : 'pr-1.5'}`}>
+                      <RangeFields
+                        first={customRange?.first ?? startRange().van}
+                        last={customRange?.last ?? startRange().tot}
+                        onChange={changeCustom}
+                      />
+                    </span>
+                  ) : null}
+                </span>
+              ) : (
+                <Link
+                  key={option}
+                  // "Komende dagen" begint bij vandaag, niet bij de dag waar je net
+                  // op stond: anders zie je na het wisselen een venster dat mogelijk
+                  // helemaal in het verleden ligt.
+                  href={hrefFor({ weergave: option, ...(option === 'dagen' ? { datum: null } : {}) })}
+                  aria-current={option === view && !customActive ? 'true' : undefined}
+                  className={`px-3.5 py-1.5 text-sm font-medium transition ${
+                    narrow ? 'rounded-full border border-vtk-navy/15' : ''
+                  } ${
+                    option === view && !customActive
+                      ? 'bg-vtk-navy text-vtk-on-emphasis'
+                      : 'text-vtk-ink hover:bg-vtk-navy/5'
+                  }`}
+                >
+                  {CALENDAR_VIEW_LABELS[option]}
+                </Link>
+              )
+            )}
           </div>
         ) : null;
   // Hoeveel dagen "komende dagen" toont (F6.3). Een keuzelijst en geen
@@ -689,7 +818,7 @@ function TransportCalendarShell({
   // negeren. Op een telefoon enkel het icoon en de schakelaar; de naam blijft
   // voor de screenreader.
   const availabilityButton =
-    availability && view !== 'maand' ? (
+    availability && !asMonth ? (
       <button
         type="button"
         onClick={availability.onToggle}
@@ -729,7 +858,7 @@ function TransportCalendarShell({
                 {daysSelect}
                 {toolbarMenu}
                 {fieldPicker}
-                {view === 'maand' ? null : <div className="flex items-center gap-1.5">{zoomButtons}</div>}
+                {asMonth ? null : <div className="flex items-center gap-1.5">{zoomButtons}</div>}
               </div>
             </details>
             <div className="ml-auto">{fullscreenButton}</div>
@@ -746,7 +875,7 @@ function TransportCalendarShell({
                 geen acties op de planning. In de maandweergave is de uurhoogte
                 betekenisloos, dus daar staat de zoom er niet. */}
             <div className="ml-auto flex items-center gap-1.5">
-              {view === 'maand' ? null : zoomButtons}
+              {asMonth ? null : zoomButtons}
               {fullscreenButton}
             </div>
           </>
@@ -754,10 +883,11 @@ function TransportCalendarShell({
       </div>
       </div>
 
-      {view === 'maand' ? (
+      {asMonth ? (
         <MonthGrid
           days={days}
           anchor={anchor}
+          focus={focus ?? null}
           vehicles={vehicles}
           blocks={blocks}
           onSelect={onSelect}

@@ -5,7 +5,7 @@ import { currentWorkingYear, FIRST_WORKING_YEAR } from '@vtk/auth';
 import type { Prisma } from '@prisma/client';
 import { driverColorVar } from './driver-colors';
 import { driverColorOverrides } from './uitleen-server';
-import { tripTitle } from './uitleen';
+import { countsInStats, tripTitle } from './uitleen';
 
 /**
  * De cijfers achter de transportplanning: wie reed wanneer, hoelang en voor wie.
@@ -24,6 +24,13 @@ import { tripTitle } from './uitleen';
  * een knop duwde, is geen jaaroverzicht. Afgewezen en geannuleerde ritten tellen
  * apart, als eigen getal.
  *
+ * **En niet te lang.** Een rit langer dan `maxTripHours` (standaard 5, in te
+ * stellen op /beheer/instellingen) telt nergens mee: zo lang rijdt niemand, dus
+ * zo'n venster is een voertuig dat een dag of een weekend weg was. Eén zulke rit
+ * van 48 uur gaf een chauffeur meer uren dan een maand gewone ritten en kleurde
+ * de drukteweergave voor twee dagen rood. Ze verdwijnen niet stil: `tooLong`
+ * zegt hoeveel het er zijn, en in de lijst onderaan staan ze met `excluded`.
+ *
  * **En wat "uren" betekent.** Het geboekte venster, niet de tijd achter het
  * stuur: de app weet niet wanneer de motor startte. Dat venster is wél precies
  * wat het voertuig bezet hield, en dat is de vraag die dit scherm beantwoordt.
@@ -41,6 +48,8 @@ export type StatsFilters = {
   vehicleIds: string[];
   /** Leeg = alle posten en werkgroepen. */
   groupIds: string[];
+  /** Langer dan zoveel uur telt een rit niet mee (`countsInStats`). */
+  maxTripHours: number;
 };
 
 /** Een post, een werkgroep, een externe of Logistiek zelf, als één noemer. */
@@ -122,6 +131,12 @@ export type StatsRow = {
   groupName: string;
   purpose: string;
   status: string;
+  /**
+   * Gereden, maar langer dan de grens: staat in deze lijst en in geen enkel
+   * getal erboven. Een afgewezen of geannuleerde rit is dit nooit; die telde al
+   * niet mee om een andere reden.
+   */
+  excluded: boolean;
 };
 
 export type DriverStat = {
@@ -149,6 +164,16 @@ export type DriverStat = {
    * vroeg of laat uiteen.
    */
   heat: number[];
+  /**
+   * Hetzelfde in ritten in plaats van uren, voor de keuze "Tellen in: Ritten".
+   * Een rit telt één keer, op het voertuig, het uur en de weekdag waarop ze
+   * vertrekt; zo tellen de uren en de weekdagen samen precies `trips` op, net
+   * zoals `perHour` en `heat` samen `hours` geven. Een rit van vier uur vier keer
+   * tellen, gaf een "aantal ritten" dat niemand kon terugvinden.
+   */
+  perVehicleTrips: Record<string, number>;
+  perHourTrips: number[];
+  heatTrips: number[];
   /**
    * De kleur van deze chauffeur in de planning, als CSS-waarde (een paletkleur
    * of een eigen kleur).
@@ -185,15 +210,23 @@ export type TransportStats = {
      * er buiten valt.
      */
     hoursWithoutDriver: number;
+    /** Hetzelfde in ritten: gereden ritten zonder chauffeur, ook waar er geen nodig was. */
+    tripsWithoutDriver: number;
     cancelled: number;
     rejected: number;
+    /** Gereden ritten die langer duurden dan de grens en dus nergens meetellen. */
+    tooLong: number;
   };
+  /** De grens zelf, zodat het scherm kan zeggen waarom die ritten wegvallen. */
+  maxTripHours: number;
   /** Dezelfde getallen over de even lange periode ervoor, voor de trendpijl. */
   previous: { trips: number; hours: number; drivers: number; averageHours: number };
   perDriver: DriverStat[];
   perGroup: GroupStat[];
   /** Uren bezetting per weekdag (0 = maandag) en uur van de dag. */
   heatmap: number[][];
+  /** Vertrekkende ritten per weekdag en uur; zie `DriverStat.heatTrips`. */
+  heatmapTrips: number[][];
   weeks: Array<{ key: string; label: string; trips: number; hours: number }>;
   rows: StatsRow[];
 };
@@ -281,7 +314,7 @@ export async function transportStats(filters: StatsFilters): Promise<TransportSt
         status: { in: [...DRIVEN] },
       },
       select: { startAt: true, endAt: true, driverId: true },
-    }),
+    }).then((rows) => rows.filter((row) => countsInStats(row.startAt, row.endAt, filters.maxTripHours))),
     prisma.uitleenVehicle.findMany({
       orderBy: { sortIndex: 'asc' },
       select: { id: true, nameNl: true },
@@ -289,22 +322,35 @@ export async function transportStats(filters: StatsFilters): Promise<TransportSt
     driverColorOverrides(),
   ]);
 
-  const driven = bookings.filter((booking) => (DRIVEN as readonly string[]).includes(booking.status));
+  const isDriven = (booking: StatsBooking) => (DRIVEN as readonly string[]).includes(booking.status);
+  const isCounted = (booking: StatsBooking) => countsInStats(booking.startAt, booking.endAt, filters.maxTripHours);
+  // Gereden en niet te lang: alles hieronder telt enkel deze. De vorige periode
+  // (voor de trendpijl) laat dezelfde ritten weg, anders vergelijkt de pijl twee
+  // verschillende dingen.
+  const driven = bookings.filter((booking) => isDriven(booking) && isCounted(booking));
+  const tooLong = bookings.filter((booking) => isDriven(booking) && !isCounted(booking)).length;
 
   const perDriver = new Map<string, DriverStat>();
   const perGroup = new Map<string, GroupStat>();
   const perWeek = new Map<string, { trips: number; hours: number }>();
   const heatmap = Array.from({ length: 7 }, () => new Array<number>(24).fill(0));
+  const heatmapTrips = Array.from({ length: 7 }, () => new Array<number>(24).fill(0));
 
   let hours = 0;
   let hoursWithoutDriver = 0;
+  let tripsWithoutDriver = 0;
   let withoutDriver = 0;
 
   for (const booking of driven) {
     const duration = hoursBetween(booking.startAt, booking.endAt);
+    const departure = brusselsCell(booking.startAt);
     hours += duration;
+    heatmapTrips[departure.day][departure.hour] += 1;
     if (!booking.driverId && booking.vehicle.needsDriver) withoutDriver += 1;
-    if (!booking.driverId) hoursWithoutDriver += duration;
+    if (!booking.driverId) {
+      hoursWithoutDriver += duration;
+      tripsWithoutDriver += 1;
+    }
 
     let driverEntry: DriverStat | null = null;
     if (booking.driverId) {
@@ -317,11 +363,17 @@ export async function transportStats(filters: StatsFilters): Promise<TransportSt
         perVehicle: {},
         perHour: new Array<number>(24).fill(0),
         heat: new Array<number>(24 * 7).fill(0),
+        perVehicleTrips: {},
+        perHourTrips: new Array<number>(24).fill(0),
+        heatTrips: new Array<number>(24 * 7).fill(0),
         color: driverColorVar(booking.driverId, colors),
       };
       entry.trips += 1;
       entry.hours += duration;
       entry.perVehicle[booking.vehicleId] = (entry.perVehicle[booking.vehicleId] ?? 0) + duration;
+      entry.perVehicleTrips[booking.vehicleId] = (entry.perVehicleTrips[booking.vehicleId] ?? 0) + 1;
+      entry.perHourTrips[departure.hour] += 1;
+      entry.heatTrips[departure.day * 24 + departure.hour] += 1;
       perDriver.set(booking.driverId, entry);
       driverEntry = entry;
     }
@@ -391,6 +443,7 @@ export async function transportStats(filters: StatsFilters): Promise<TransportSt
       groupName: requester.name,
       purpose: tripTitle(booking),
       status: booking.status,
+      excluded: isDriven(booking) && !isCounted(booking),
     };
   });
 
@@ -405,9 +458,12 @@ export async function transportStats(filters: StatsFilters): Promise<TransportSt
       averageHours: driven.length > 0 ? round(hours / driven.length) : 0,
       withoutDriver,
       hoursWithoutDriver: round(hoursWithoutDriver),
+      tripsWithoutDriver,
       cancelled: bookings.filter((booking) => booking.status === 'CANCELLED').length,
       rejected: bookings.filter((booking) => booking.status === 'REJECTED').length,
+      tooLong,
     },
+    maxTripHours: filters.maxTripHours,
     previous: {
       trips: previousBookings.length,
       hours: round(previousHours),
@@ -435,6 +491,7 @@ export async function transportStats(filters: StatsFilters): Promise<TransportSt
       }))
       .sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name, 'nl')),
     heatmap: heatmap.map((row) => row.map(round)),
+    heatmapTrips,
     weeks: [...perWeek.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, value]) => ({

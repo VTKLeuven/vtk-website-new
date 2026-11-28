@@ -45,6 +45,7 @@ import {
 import { filtersToQuery, parseTransportFilters } from '@/lib/transport-filters';
 import type { BezettingTrip } from './trip-card';
 import { localizedTitle } from '@/lib/page-title';
+import { vehicleIconName } from '@/lib/vehicle-icon';
 
 /**
  * Wanneer is een voertuig vrij? (T8)
@@ -498,11 +499,13 @@ export default async function VervoerBezettingPage({
             filterVehicles={vehicles.map((vehicle) => ({
               id: vehicle.id,
               name: en ? vehicle.nameEn : vehicle.nameNl,
+              icon: vehicleIconName(vehicle),
             }))}
             filterDrivers={drivers.map((driver) => ({ id: driver.id, name: driver.name }))}
             filterPosts={groups.map((group) => ({
               id: group.id,
               name: en ? group.nameEn : group.nameNl,
+              kind: group.type,
             }))}
             canFilterRequester={team || praesidium}
             nav={{ previousHref, nextHref, todayHref: thisWeekHref }}

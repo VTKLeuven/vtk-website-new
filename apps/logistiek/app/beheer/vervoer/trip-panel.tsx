@@ -7,6 +7,9 @@ import { LogisticsIcon } from '@/components/logistics-icon';
 import { PhoneLink } from '@/components/phone-link';
 import { VanStatusBadge } from '@/components/status-badge';
 import { TripHelpers } from '@/components/trip-helpers';
+import { TripShift } from '@/components/trip-shift';
+import type { TripShiftView } from '@/lib/uitleen-server/bijrijdshift';
+import { withoutRequester, type TripPostMembers } from '@/lib/trip-post-members';
 import {
   canDeleteTransport,
   chargesRequester,
@@ -24,10 +27,14 @@ import {
   approvedSameDay,
   driverOptions,
   hasSucceededPayment,
+  postMembersWithPhones,
   selectableEvents,
   teamEditsForTransport,
   transportAuditLogsByBooking,
+  tripShifts,
 } from '@/lib/uitleen-server';
+
+const SHIFT_URL = `${process.env.VTK_MAIN_URL || 'https://vtk.be'}/shift`;
 import { PanelEscape } from './panel-escape';
 import { TransportControls } from './transport-controls';
 import { TransportDecisionForms } from './transport-decision-forms';
@@ -65,7 +72,7 @@ export async function TripPanel({ id, closeHref }: { id: string; closeHref: stri
   const legs = selected.status === 'REQUESTED' ? group.filter((leg) => leg.status === 'REQUESTED') : [selected];
   const [first] = legs;
   const ids = legs.map((leg) => leg.id);
-  const [drivers, vehicles, groups, events, auditLogs, teamEdits, sameDay] = await Promise.all([
+  const [drivers, vehicles, groups, events, auditLogs, teamEdits, sameDay, postMembers, shifts] = await Promise.all([
     driverOptions(),
     adminVehicles(),
     activeGroups(),
@@ -73,7 +80,15 @@ export async function TripPanel({ id, closeHref }: { id: string; closeHref: stri
     transportAuditLogsByBooking(ids),
     teamEditsForTransport(legs.map((leg) => ({ id: leg.id, userId: leg.userId }))),
     first.status === 'REQUESTED' ? approvedSameDay(first.vehicleId, first.startAt, ids) : Promise.resolve([]),
+    // Beide helften rijden voor dezelfde post; welke helft geen bijrijder heeft,
+    // beslist `TripHelpers` zelf.
+    postMembersWithPhones([first.groupId]),
+    tripShifts(ids),
   ]);
+  const postContacts: TripPostMembers | null =
+    first.groupId && first.group
+      ? withoutRequester(first.group.nameNl, postMembers.get(first.groupId), first.userId)
+      : null;
   const eventChoices = eventOptions(events);
   const vehicle = vehicles.find((entry) => entry.id === first.vehicleId);
   // Heen en terug gaan samen weg, dus telt de hele groep (R1).
@@ -94,6 +109,8 @@ export async function TripPanel({ id, closeHref }: { id: string; closeHref: stri
           showLegLabel={legs.length > 1}
           driverPhone={leg.driverId ? (drivers.find((driver) => driver.id === leg.driverId)?.phone ?? null) : null}
           eventChoices={eventChoices}
+          postMembers={postContacts}
+          shifts={shifts.get(leg.id) ?? []}
         />
       ))}
 
@@ -193,11 +210,15 @@ function LegFacts({
   showLegLabel,
   driverPhone,
   eventChoices,
+  postMembers,
+  shifts,
 }: {
   leg: DetailLeg;
   showLegLabel: boolean;
   driverPhone: string | null;
   eventChoices: ReturnType<typeof eventOptions>;
+  postMembers: TripPostMembers | null;
+  shifts: TripShiftView[];
 }) {
   const lines: Array<[string, ReactNode]> = [
     ['Wanneer', `${dateLabel(leg.startAt)} · ${hoursLabel(leg)}`],
@@ -274,6 +295,18 @@ function LegFacts({
           helpers={leg.helpers}
           legacyNote={leg.helpersNote}
           canEdit={leg.status === 'REQUESTED' || leg.status === 'APPROVED'}
+          postMembers={postMembers}
+        />
+      </div>
+      {/* Het team mag op elke rit een bijrijdshift zetten. */}
+      <div className="mt-3 empty:hidden">
+        <TripShift
+          bookingId={leg.id}
+          trip={{ status: leg.status, startAt: leg.startAt.toISOString(), endAt: leg.endAt.toISOString() }}
+          shifts={shifts}
+          canCreate
+          groupName={leg.group?.nameNl ?? null}
+          shiftUrl={SHIFT_URL}
         />
       </div>
     </section>

@@ -69,25 +69,57 @@ export function TransportControls({
   // door te geven aan een post (F6.10).
   const needsDriver = vehicles.find((v) => v.id === vehicleId)?.needsDriver ?? true;
 
-  function run(
-    action: () => Promise<{ ok: boolean; message?: string; error?: string; warning?: boolean }>
-  ) {
+  type Outcome = { ok: boolean; message?: string; error?: string; warning?: boolean };
+
+  function report(result: Outcome, undo?: { label: string; onClick: () => void }) {
+    if (result.ok) {
+      // Gelukt met een staartje ("die chauffeur gaf 'liever niet' op", "het
+      // voertuig staat nu dubbel"): dan blijft de melding staan tot je ze
+      // wegklikt, want ze vraagt nog iets van je.
+      showToast({
+        message: result.message ?? 'Opgeslagen.',
+        variant: 'success',
+        duration: result.warning ? 0 : undefined,
+        action: undo,
+      });
+      router.refresh();
+    } else {
+      showToast({ message: result.error ?? 'Er ging iets mis.', variant: 'error', duration: 0 });
+    }
+  }
+
+  function run(action: () => Promise<Outcome>) {
     startTransition(async () => {
       const result = await unsentGuard.run(() => action());
       if (result === UNSENT) return;
-      if (result.ok) {
-        // Gelukt met een staartje ("die chauffeur gaf 'liever niet' op", "het
-        // voertuig staat nu dubbel"): dan blijft de melding staan tot je ze
-        // wegklikt, want ze vraagt nog iets van je.
-        showToast({
-          message: result.message ?? 'Opgeslagen.',
-          variant: 'success',
-          duration: result.warning ? 0 : undefined,
-        });
-        router.refresh();
-      } else {
-        showToast({ message: result.error ?? 'Er ging iets mis.', variant: 'error', duration: 0 });
-      }
+      report(result);
+    });
+  }
+
+  /**
+   * Voertuig wisselen, ook naar een voertuig dat op dat moment al rijdt.
+   *
+   * Zonder tussenvraag, zoals slepen in de planning: een voertuig kies je bij
+   * naam uit een lijst, en dat is al de bewuste keuze waar "Toch goedkeuren"
+   * elders om vraagt. Stil gebeurt het niet: de melding zegt waarmee het nu
+   * botst en blijft staan, beide blokken worden rood, en de historiek krijgt
+   * "bewust ingepland over ...". Voordien weigerde deze lijst een bezet
+   * voertuig zonder uitweg, terwijl slepen en goedkeuren het wel toelieten.
+   *
+   * "Ongedaan maken" zet het vorige voertuig terug: een keuzelijst verspring je
+   * makkelijk met een pijltje of een scrollwiel.
+   */
+  function changeVehicle(target: string, undoing = false) {
+    const previous = vehicleId;
+    startTransition(async () => {
+      const result = await unsentGuard.run(() => changeVehicleAction(bookingId, target, true));
+      if (result === UNSENT) return;
+      report(
+        // Botst ook het oude voertuig intussen, dan is dat het nieuws en niet
+        // dat het teruggezet is.
+        undoing && result.ok && !result.warning ? { ...result, message: 'Voertuig teruggezet.' } : result,
+        undoing ? undefined : { label: 'Ongedaan maken', onClick: () => changeVehicle(previous, true) }
+      );
     });
   }
 
@@ -99,7 +131,7 @@ export function TransportControls({
           <select
             value={vehicleId}
             disabled={pending}
-            onChange={(e) => run(() => changeVehicleAction(bookingId, e.target.value))}
+            onChange={(e) => changeVehicle(e.target.value)}
             className={selectClass}
           >
             {vehicles.map((v) => (

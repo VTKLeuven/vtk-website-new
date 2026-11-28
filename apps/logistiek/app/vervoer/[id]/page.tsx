@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation';
 import Link from '@vtk/ui/link';
 import { cancelVanBookingAction } from '@/app/actions/uitleen';
 import { TripHelpers } from '@/components/trip-helpers';
+import { TripShift } from '@/components/trip-shift';
+import { mayCreateTripShift } from '@/lib/bijrijdshift';
 import { EditTripForm } from './edit-trip-form';
 import { CancelButton } from '@/components/cancel-button';
 import { LoginGate } from '@/components/login-gate';
@@ -11,12 +13,14 @@ import { PayButton } from '@/components/pay-button';
 import { VanStatusBadge } from '@/components/status-badge';
 import { reconcilePayments } from '@/lib/payments';
 import { getLocale } from '@/lib/i18n';
-import { getSession } from '@/lib/session';
+import { canManage, getSession } from '@/lib/session';
 import { formatDateTime, formatPriceCents, toDatetimeLocalValue } from '@/lib/uitleen';
-import { hasSucceededPayment, teamEditsForTransport, vanBookingForMember } from '@/lib/uitleen-server';
+import { hasSucceededPayment, teamEditsForTransport, tripShifts, vanBookingForMember } from '@/lib/uitleen-server';
 import { localizedTitle } from '@/lib/page-title';
 
 export const generateMetadata = localizedTitle({ nl: 'Ritaanvraag', en: 'Trip request' });
+
+const SHIFT_URL = `${process.env.VTK_MAIN_URL || 'https://vtk.be'}/shift`;
 
 export default async function VanBookingDetailPage({
   params,
@@ -49,8 +53,18 @@ export default async function VanBookingDetailPage({
 
   // Wat Logistiek aan deze aanvraag veranderde (F6.11). Voor wie ze indiende: een
   // collega ziet haar enkel, en wat hij zelf wijzigde telt niet mee.
-  const teamChanges =
-    (await teamEditsForTransport([{ id: booking.id, userId: booking.user.id }])).get(booking.id) ?? [];
+  const [teamEditMap, shiftMap] = await Promise.all([
+    teamEditsForTransport([{ id: booking.id, userId: booking.user.id }]),
+    tripShifts([booking.id]),
+  ]);
+  const teamChanges = teamEditMap.get(booking.id) ?? [];
+  const shifts = shiftMap.get(booking.id) ?? [];
+  // De shift telt voor de post die de rit aanvroeg; een post waaraan ze enkel
+  // doorgegeven is, ziet de rit wel maar zet er geen shift op.
+  const canCreateShift = mayCreateTripShift(
+    { userId: session.user.id, groupIds: session.groups.map((group) => group.id), manages: canManage(session) },
+    { userId: booking.user.id, groupId: booking.groupId }
+  );
 
   const paid = hasSucceededPayment(booking.payments) || booking.paidOfflineAt !== null;
   const cancellable =
@@ -208,6 +222,21 @@ export default async function VanBookingDetailPage({
                 canEdit
                 locale={locale}
               />
+              <div className="mt-4 empty:hidden">
+                <TripShift
+                  bookingId={booking.id}
+                  trip={{
+                    status: booking.status,
+                    startAt: booking.startAt.toISOString(),
+                    endAt: booking.endAt.toISOString(),
+                  }}
+                  shifts={shifts}
+                  canCreate={canCreateShift}
+                  groupName={booking.group ? (en ? booking.group.nameEn : booking.group.nameNl) : null}
+                  shiftUrl={SHIFT_URL}
+                  locale={locale}
+                />
+              </div>
             </div>
           ) : null}
 

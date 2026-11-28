@@ -4,7 +4,7 @@ import Link from '@vtk/ui/link';
 import { useState } from 'react';
 import { type DriverColorOverrides } from '@/lib/driver-colors';
 import { TransportCalendar } from '@/components/transport-calendar/transport-calendar';
-import { TransportFilterBar } from '@/components/transport-calendar/filters';
+import { TransportFilterBar, type FilterOption } from '@/components/transport-calendar/filters';
 import { TripInspector } from '@/components/transport-calendar/trip-inspector';
 import type { CalendarVehicle, TripBlock } from '@/components/transport-calendar/types';
 import type { TransportFilters } from '@/lib/transport-filters';
@@ -66,7 +66,7 @@ export function PublicWeek({
   /** De maandag van deze week, als ISO-string; de shell wil een ankerdag. */
   anchor: string;
   filters: TransportFilters;
-  filterVehicles: Array<{ id: string; name: string }>;
+  filterVehicles: FilterOption[];
   /**
    * De chauffeurs om op te filteren. Leeg zonder login: dan staat er geen naam
    * op het rooster, en een filterlijst met namen erin zou precies prijsgeven wat
@@ -78,7 +78,7 @@ export function PublicWeek({
    * dezelfde reden als de chauffeurs: wie geen aanvrager op het rooster ziet,
    * hoort er ook niet op te kunnen filteren.
    */
-  filterPosts: Array<{ id: string; name: string }>;
+  filterPosts: FilterOption[];
   /** Filteren op post/werkgroep/extern; enkel voor wie de aanvrager al ziet. */
   canFilterRequester: boolean;
   nav: { previousHref: string; nextHref: string; todayHref: string };

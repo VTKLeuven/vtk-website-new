@@ -79,6 +79,7 @@ export {
   saveVehicleAction,
   setVehicleActiveAction,
   saveLogistiekSettingsAction,
+  setBezettingOpensPlanningAction,
 } from './beheer/instellingen';
 export {
   createFeedTokenAction,

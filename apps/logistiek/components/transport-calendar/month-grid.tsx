@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { DriverColorOverrides } from '@/lib/driver-colors';
 import { isInMonth } from '@/lib/calendar-range';
 import { placeForWeekRow, weekRows } from '@/lib/month-lanes';
@@ -22,6 +22,14 @@ import { byLocale, useCalendarCopy } from './copy';
  * Het raster loopt over hele weken (zie `calendarRange`), dus de eerste en de
  * laatste rij dragen dagen van de buurmaand. Die staan vervaagd: ze horen bij de
  * planning, maar niet bij de maand waar je naar kijkt.
+ *
+ * **Een volle week schuift open.** Een dagcel toont vier banen. Past een week
+ * daar niet in, dan wordt de vierde baan "+n meer" onder elke dag waar iets
+ * wegvalt, en een klik daarop maakt die ene week zo hoog als nodig, met alle
+ * ritten en "Minder tonen" eronder. Geen venstertje met een lijst: dan liep een
+ * rit van drie dagen niet meer als één balk, en die balk is waarom de maand er
+ * is. De andere weken blijven even hoog. "+n meer" stond eerst onderaan de cel,
+ * over de vierde rit heen, en was geen knop.
  */
 
 const WEEKDAY = byLocale({ timeZone: 'Europe/Brussels', weekday: 'short' });
@@ -34,8 +42,12 @@ const dayKeyFormatter = new Intl.DateTimeFormat('en-CA', {
 
 /** Hoogte van één balk plus de ruimte eronder. */
 const BAR_PX = 20;
-/** Hoeveel balken er in een dagcel passen voor er "+n meer" verschijnt. */
+/** Hoeveel banen een dagcel heeft; past het niet, dan is de laatste "+n meer". */
 const MAX_LANES = 4;
+/** Een baan in de laag met balken: de balk zelf (BAR_PX - 3) en de `gap-1`. */
+const LANE_PX = BAR_PX - 3 + 4;
+/** Van de bovenkant van de cel tot de eerste balk (`top-[26px]`). */
+const BARS_TOP_PX = 26;
 
 export function MonthGrid({
   days,
@@ -49,11 +61,17 @@ export function MonthGrid({
   showDriver = true,
   driverColors,
   now,
+  focus = null,
 }: {
   /** De dagen van het raster, als ISO-strings van UTC-middernacht. */
   days: string[];
   /** De maand waar je naar kijkt, als ISO-string; bepaalt welke dagen vervagen. */
   anchor: string;
+  /**
+   * Een eigen bereik in plaats van een maand: de dagen van `from` tot (zonder)
+   * `to` staan vol, de rest van de eerste en de laatste week vervaagt.
+   */
+  focus?: { from: string; to: string } | null;
   vehicles: CalendarVehicle[];
   blocks: TripBlock[];
   onSelect?: (blockId: string) => void;
@@ -68,6 +86,10 @@ export function MonthGrid({
   const t = useCalendarCopy();
   const parsedDays = useMemo(() => days.map((day) => new Date(day)), [days]);
   const parsedAnchor = useMemo(() => new Date(anchor), [anchor]);
+  const focusRange = useMemo(
+    () => (focus ? { from: new Date(focus.from).getTime(), to: new Date(focus.to).getTime() } : null),
+    [focus]
+  );
   const rows = useMemo(() => weekRows(parsedDays), [parsedDays]);
   const placedPerRow = useMemo(
     () => rows.map((row) => placeForWeekRow(blocks, row)),
@@ -96,6 +118,38 @@ export function MonthGrid({
 
   const todayKey = now ? dayKeyFormatter.format(now) : null;
 
+  /**
+   * De weken die openstaan, met de kolom waar je "+n meer" aanklikte: daar komt
+   * "Minder tonen", zodat de knop om dicht te doen onder je muis ligt. Op de
+   * eerste dag van de week, zodat een andere maand niet per ongeluk dezelfde rij
+   * openzet.
+   */
+  const [openRows, setOpenRows] = useState<ReadonlyMap<string, number>>(new Map());
+  const toggleRow = (key: string, col: number | null) =>
+    setOpenRows((current) => {
+      const next = new Map(current);
+      if (col === null) next.delete(key);
+      else next.set(key, col);
+      return next;
+    });
+
+  /** Per weekrij: hoeveel banen ze gebruikt, en of ze openstaat. */
+  const rowState = rows.map((row, rowIndex) => {
+    const key = row[0].toISOString();
+    const used = placedPerRow[rowIndex].reduce((most, bar) => Math.max(most, bar.lane + 1), 0);
+    const openCol = used > MAX_LANES ? openRows.get(key) : undefined;
+    return { key, used, overflows: used > MAX_LANES, openCol };
+  });
+  // Een open week is zo hoog als haar banen plus de regel "Minder tonen"; de
+  // andere houden de hoogte van de drukste dichte week.
+  const rowTemplate = rowState
+    .map((state) =>
+      state.openCol !== undefined
+        ? `minmax(${BARS_TOP_PX + (state.used + 1) * LANE_PX + 6}px, auto)`
+        : `minmax(${28 + lanes * BAR_PX}px, 1fr)`
+    )
+    .join(' ');
+
   return (
     // `tg-pane` zodat de maand in volledig scherm meegroeit in plaats van klein
     // bovenaan te blijven staan; buiten fullscreen groeit ze met haar rijen mee
@@ -123,27 +177,31 @@ export function MonthGrid({
           ))}
         </div>
 
-        <div
-          className="grid flex-1 gap-1"
-          style={{ gridAutoRows: `minmax(${28 + lanes * BAR_PX}px, 1fr)` }}
-        >
+        <div className="grid flex-1 gap-1" style={{ gridTemplateRows: rowTemplate }}>
           {rows.map((row, rowIndex) => {
             const bars = placedPerRow[rowIndex];
+            const { key, overflows, openCol, used } = rowState[rowIndex];
+            const open = openCol !== undefined;
+            // Dicht en te vol: drie banen ritten, de vierde is "+n meer".
+            const shownLanes = open ? used : overflows ? MAX_LANES - 1 : MAX_LANES;
             /** Wat er per dag niet meer paste, om als "+n meer" te tonen. */
-            const hiddenPerDay = row.map(
-              (_, col) =>
-                bars.filter(
-                  (bar) => bar.lane >= MAX_LANES && bar.col <= col && bar.col + bar.span > col
-                ).length
+            const hiddenPerDay = row.map((_, col) =>
+              open
+                ? 0
+                : bars.filter(
+                    (bar) => bar.lane >= shownLanes && bar.col <= col && bar.col + bar.span > col
+                  ).length
             );
 
             return (
-              <div key={row[0].toISOString()} className="relative">
+              <div key={key} className="relative">
                 {/* De dagcellen: het raster waar de balken overheen liggen. */}
                 <div className="grid h-full grid-cols-7 gap-1">
                   {row.map((day) => {
                     const iso = day.toISOString();
-                    const inMonth = isInMonth(day, parsedAnchor);
+                    const inMonth = focusRange
+                      ? day.getTime() >= focusRange.from && day.getTime() < focusRange.to
+                      : isInMonth(day, parsedAnchor);
                     const isToday = todayKey !== null && dayKeyFormatter.format(day) === todayKey;
                     return (
                       <div
@@ -189,9 +247,12 @@ export function MonthGrid({
                 {/* De balken, absoluut over de cellen heen: alleen zo kan één
                     balk over meerdere dagen lopen. `pointer-events-none` op de
                     laag zelf, zodat de dagnummers eronder aanklikbaar blijven. */}
-                <div className="pointer-events-none absolute inset-x-0 top-[26px] grid grid-cols-7 gap-1">
+                <div
+                  className="pointer-events-none absolute inset-x-0 top-[26px] grid grid-cols-7 gap-1"
+                  style={{ gridAutoRows: `${BAR_PX - 3}px` }}
+                >
                   {bars
-                    .filter((bar) => bar.lane < MAX_LANES)
+                    .filter((bar) => bar.lane < shownLanes)
                     .map((bar) => {
                       const vehicle = vehicleById.get(bar.vehicleId) ?? null;
                       const look = blockLook({
@@ -259,25 +320,37 @@ export function MonthGrid({
                         </div>
                       );
                     })}
-                </div>
 
-                {/* "+2 meer" onder de cel waar er iets wegvalt. Zonder deze regel
-                    leest een volle dag als een rustige dag, en dat is precies de
-                    dag waarop je niet verrast wil worden. */}
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 grid grid-cols-7 gap-1">
+                  {/* "+2 meer" op de laatste baan van de dag waar er iets
+                      wegvalt. Zonder deze regel leest een volle dag als een
+                      rustige dag, en dat is precies de dag waarop je niet
+                      verrast wil worden. */}
                   {hiddenPerDay.map((count, col) =>
                     count > 0 ? (
-                      <span
-                        key={col}
-                        style={{ gridColumn: col + 1 }}
-                        className="pointer-events-auto px-1.5 text-[10px] font-semibold text-vtk-navy"
+                      <button
+                        key={`meer-${col}`}
+                        type="button"
+                        onClick={() => toggleRow(key, col)}
+                        aria-expanded={false}
+                        style={{ gridColumn: col + 1, gridRow: shownLanes + 1 }}
+                        className="pointer-events-auto mx-0.5 flex items-center rounded-full px-1.5 text-left text-[11px] font-semibold text-vtk-navy transition hover:bg-vtk-navy/10"
                       >
-                        +{count} meer
-                      </span>
-                    ) : (
-                      <span key={col} style={{ gridColumn: col + 1 }} />
-                    )
+                        {t.more(count)}
+                        <span className="sr-only">: {t.moreInWeek}</span>
+                      </button>
+                    ) : null
                   )}
+                  {open ? (
+                    <button
+                      type="button"
+                      onClick={() => toggleRow(key, null)}
+                      aria-expanded
+                      style={{ gridColumn: openCol + 1, gridRow: used + 1 }}
+                      className="pointer-events-auto mx-0.5 flex items-center rounded-full px-1.5 text-left text-[11px] font-semibold text-vtk-navy transition hover:bg-vtk-navy/10"
+                    >
+                      {t.showLess}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             );
