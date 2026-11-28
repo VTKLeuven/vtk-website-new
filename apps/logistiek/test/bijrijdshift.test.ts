@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   TRIP_SHIFT_PLACES,
   mayCreateTripShift,
+  mayRemoveTripShift,
   parseTripShiftInput,
   shiftMatchesTrip,
   tripShiftData,
@@ -81,5 +82,25 @@ describe('mayCreateTripShift', () => {
   it('een andere post niet, ook niet zonder post op de rit', () => {
     expect(mayCreateTripShift({ userId: 'x', groupIds: ['cultuur'], manages: false }, ofSport)).toBe(false);
     expect(mayCreateTripShift({ userId: 'x', groupIds: ['cultuur'], manages: false }, { userId: 'y', groupId: null })).toBe(false);
+  });
+});
+
+describe('mayRemoveTripShift', () => {
+  const tripStartAt = '2026-11-26T17:30:00.000Z';
+  const before = new Date('2026-11-26T12:00:00Z');
+  const after = new Date('2026-11-26T20:00:00Z');
+
+  it('tot de rit vertrekt altijd, ook met leden erop: dan is het een vergissing', () => {
+    expect(mayRemoveTripShift({ tripStartAt, participants: 0 }, before)).toBe(true);
+    expect(mayRemoveTripShift({ tripStartAt, participants: 2 }, before)).toBe(true);
+  });
+
+  it('na vertrek blijft een shift met leden staan, voor hun bonnetjes', () => {
+    expect(mayRemoveTripShift({ tripStartAt, participants: 1 }, after)).toBe(false);
+    expect(mayRemoveTripShift({ tripStartAt, participants: 1 }, new Date(tripStartAt))).toBe(false);
+  });
+
+  it('een lege shift mag na vertrek nog weg', () => {
+    expect(mayRemoveTripShift({ tripStartAt, participants: 0 }, after)).toBe(true);
   });
 });

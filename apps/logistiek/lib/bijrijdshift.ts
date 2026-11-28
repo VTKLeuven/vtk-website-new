@@ -130,6 +130,22 @@ export function shiftMatchesTrip(
 }
 
 /**
+ * Mag de bijrijdshift nog weg vanuit de rit? Tot de rit vertrekt altijd: dan is
+ * het een vergissing die je rechtzet. Daarna enkel zolang niemand zich
+ * inschreef, want dan staat op de shift wie meereed en bonnetjes verdiende.
+ * Wie het toch wil, verwijdert ze in /admin/shiften.
+ *
+ * Wie het mag, beslist `mayCreateTripShift`; dit gaat enkel over wanneer.
+ */
+export function mayRemoveTripShift(
+  shift: { tripStartAt: string | Date; participants: number },
+  now: Date | number
+): boolean {
+  const departed = new Date(shift.tripStartAt).getTime() <= new Date(now).getTime();
+  return !departed || shift.participants === 0;
+}
+
+/**
  * Mag deze persoon een bijrijdshift zetten op deze rit? Het team, de aanvrager,
  * of een lid van de post die de rit aanvroeg. Strenger dan de bijrijders: een
  * post waaraan de rit doorgegeven is (`assignedGroupId`) rijdt ze, maar de shift
@@ -142,4 +158,3 @@ export function mayCreateTripShift(
   if (viewer.manages || trip.userId === viewer.userId) return true;
   return trip.groupId !== null && viewer.groupIds.includes(trip.groupId);
 }
-

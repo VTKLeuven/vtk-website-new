@@ -4,8 +4,10 @@ import { useState, useTransition } from 'react';
 import { Button } from '@vtk/ui';
 import { useToast } from '@vtk/ui/toast';
 import { UNSENT, unsentGuard } from '@vtk/ui/unsent-guard';
-import { createTripShiftAction, syncTripShiftAction } from '@/app/actions/uitleen';
-import { TRIP_SHIFT_PLACES, TRIP_SHIFT_REWARD, shiftMatchesTrip } from '@/lib/bijrijdshift';
+import { createTripShiftAction, deleteTripShiftAction, syncTripShiftAction } from '@/app/actions/uitleen';
+import { LogisticsIcon } from '@/components/logistics-icon';
+import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
+import { TRIP_SHIFT_PLACES, TRIP_SHIFT_REWARD, mayRemoveTripShift, shiftMatchesTrip } from '@/lib/bijrijdshift';
 import type { TripShiftView } from '@/lib/uitleen-server/bijrijdshift';
 
 /**
@@ -15,9 +17,10 @@ import type { TripShiftView } from '@/lib/uitleen-server/bijrijdshift';
  *
  * **Twee velden, in het blok zelf.** De knop schuift open met plaatsen en
  * bonnetjes; de rest (uren, post, vertrekplaats) volgt uit de rit
- * (`lib/bijrijdshift.ts`). Geen apart scherm en geen "weet je het zeker": de
- * shift staat daarna gewoon in /admin/shiften, waar ze aan te passen of weg te
- * halen is.
+ * (`lib/bijrijdshift.ts`). Geen apart scherm en geen "weet je het zeker" bij
+ * het aanmaken: wie zich vergiste, haalt de shift met de vuilbak weer weg en
+ * zet een nieuwe. Dat weghalen vraagt wel een bevestiging, want wie al
+ * ingeschreven stond, verliest zijn plaats (`deleteTripShiftAction`).
  *
  * Ligt de shift niet meer op de uren van de rit (de rit werd verschoven), dan
  * zegt het blok dat, met een knop om de shift mee te nemen. Dat gebeurt niet
@@ -35,6 +38,27 @@ const dayFormatter = new Intl.DateTimeFormat('nl-BE', {
   day: 'numeric',
   month: 'short',
 });
+
+/**
+ * Wat er weg is en wat blijft. Wie ingeschreven stond, krijgt geen bericht (net
+ * als bij verwijderen in /admin/shiften), dus de dialoog noemt hen bij naam.
+ */
+function removeDescription(name: string, participants: string[], en: boolean): string {
+  const list = new Intl.ListFormat(en ? 'en' : 'nl-BE', { type: 'conjunction' }).format(participants);
+  const one = participants.length === 1;
+  if (en) {
+    const who =
+      participants.length === 0
+        ? 'Nobody had signed up yet.'
+        : `${list} ${one ? 'loses their' : 'lose their'} registration and ${one ? 'gets' : 'get'} no message about it, so let them know yourself.`;
+    return `"${name}" disappears from vtk.be/shift. ${who} The trip and its passengers stay as they are.`;
+  }
+  const who =
+    participants.length === 0
+      ? 'Er stond nog niemand op.'
+      : `${list} ${one ? 'verliest' : 'verliezen'} de inschrijving en ${one ? 'krijgt' : 'krijgen'} daar geen bericht van, dus laat het zelf weten.`;
+  return `"${name}" verdwijnt van vtk.be/shift. ${who} De rit en de bijrijders blijven zoals ze zijn.`;
+}
 
 function timeRange(startAt: string, endAt: string): string {
   return `${dayFormatter.format(new Date(startAt))} ${timeFormatter.format(new Date(startAt))} tot ${timeFormatter.format(new Date(endAt))}`;
@@ -110,20 +134,36 @@ export function TripShift({
       {shifts.map((shift) => {
         const taken = shift.participants.length;
         const inSync = shiftMatchesTrip(shift, trip);
+        const removable = canCreate && mayRemoveTripShift({ tripStartAt: trip.startAt, participants: taken }, loadedAt);
         return (
           <div key={shift.id} className="grid gap-1 text-sm">
-            <p className="text-vtk-body">
-              <span className="font-medium text-vtk-ink">
-                {en
-                  ? `${taken} of ${shift.places} ${shift.places === 1 ? 'place' : 'places'} taken`
-                  : `${taken} van ${shift.places} ${shift.places === 1 ? 'plaats' : 'plaatsen'} ingenomen`}
-              </span>
-              {taken > 0 ? `: ${shift.participants.join(', ')}` : ''}
-              {'. '}
-              <a href={shiftUrl} target="_blank" rel="noreferrer" className={linkClass}>
-                {en ? 'On vtk.be' : 'Op vtk.be'}
-              </a>
-            </p>
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-vtk-body">
+                <span className="font-medium text-vtk-ink">
+                  {en
+                    ? `${taken} of ${shift.places} ${shift.places === 1 ? 'place' : 'places'} taken`
+                    : `${taken} van ${shift.places} ${shift.places === 1 ? 'plaats' : 'plaatsen'} ingenomen`}
+                </span>
+                {taken > 0 ? `: ${shift.participants.join(', ')}` : ''}
+                {'. '}
+                <a href={shiftUrl} target="_blank" rel="noreferrer" className={linkClass}>
+                  {en ? 'On vtk.be' : 'Op vtk.be'}
+                </a>
+              </p>
+              {removable ? (
+                <ConfirmActionButton
+                  label={`${en ? 'Remove shift' : 'Shift weghalen'}: ${shift.name}`}
+                  confirmLabel={en ? 'Remove' : 'Weghalen'}
+                  cancelLabel={en ? 'Cancel' : 'Annuleren'}
+                  icon={<LogisticsIcon name="trash" className="h-3.5 w-3.5" />}
+                  action={deleteTripShiftAction.bind(null, shift.id)}
+                  successMessage={en ? 'Shift removed.' : 'Bijrijdshift weggehaald.'}
+                  destructive
+                  dialogTitle={en ? 'Remove ride-along shift?' : 'Bijrijdshift weghalen?'}
+                  dialogDescription={removeDescription(shift.name, shift.participants, en)}
+                />
+              ) : null}
+            </div>
             {!inSync ? (
               <div className="grid gap-1.5 rounded-[10px] bg-vtk-warn-soft px-3 py-2 text-sm text-vtk-body">
                 <p>

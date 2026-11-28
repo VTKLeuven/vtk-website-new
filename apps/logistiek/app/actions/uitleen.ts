@@ -55,7 +55,13 @@ import {
   type Range,
 } from '@/lib/availability-day';
 import { writeAudit } from '@/lib/audit';
-import { mayCreateTripShift, parseTripShiftInput, shiftMatchesTrip, tripShiftData } from '@/lib/bijrijdshift';
+import {
+  mayCreateTripShift,
+  mayRemoveTripShift,
+  parseTripShiftInput,
+  shiftMatchesTrip,
+  tripShiftData,
+} from '@/lib/bijrijdshift';
 import {
   notifyDriversOfCancellation,
   notifyReservation,
@@ -2009,6 +2015,62 @@ async function syncTripShiftActionImpl(shiftId: string): Promise<ActionResult> {
   return { ok: true, message: 'De shift staat weer op de uren van de rit.' };
 }
 
+/**
+ * De bijrijdshift van een rit weer weghalen, bv. wanneer ze op de verkeerde rit
+ * of met te veel plaatsen gezet werd. Wie haar mocht zetten, mag haar weghalen
+ * (`mayCreateTripShift`); zonder dit kon dat enkel in /admin/shiften, en daar
+ * heeft Logistiek meestal geen recht.
+ *
+ * **Na vertrek blijft een shift met ingeschreven leden staan**
+ * (`mayRemoveTripShift`): ze is dan de enige plek waar staat wie meereed en
+ * bonnetjes verdiende. Een lege shift mag dan nog wel weg.
+ *
+ * Wie ingeschreven is, verliest de inschrijving (`ShiftParticipant` met
+ * `onDelete: Cascade`) en krijgt geen bericht, net als bij verwijderen in
+ * /admin/shiften. De bevestiging in het blok noemt hen bij naam.
+ */
+async function deleteTripShiftActionImpl(shiftId: string): Promise<ActionResult> {
+  const session = await requireSession();
+  const shift = await prisma.shift.findUnique({
+    where: { id: shiftId },
+    select: {
+      id: true,
+      name: true,
+      _count: { select: { participants: true } },
+      transportBooking: { select: { id: true, userId: true, groupId: true, startAt: true } },
+    },
+  });
+  const trip = shift?.transportBooking;
+  if (!shift || !trip) return { ok: false, error: 'Deze bijrijdshift bestaat niet (meer).' };
+  if (!mayCreateTripShift(viewerOf(session), trip)) {
+    return { ok: false, error: 'Je kan deze rit niet aanpassen.' };
+  }
+  if (!mayRemoveTripShift({ tripStartAt: trip.startAt, participants: shift._count.participants }, new Date())) {
+    return {
+      ok: false,
+      error: 'De rit is al vertrokken en er stonden leden op de shift; ze blijft staan voor hun bonnetjes.',
+    };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.shift.delete({ where: { id: shift.id } });
+    await tx.adminAuditLog.create({
+      data: {
+        actorId: session.user.id,
+        actorName: session.user.name.slice(0, 200),
+        action: 'delete',
+        entity: 'shift',
+        entityId: shift.id,
+        target: shift.name.slice(0, 200),
+        summary: `shift verwijderd vanuit de uitleendienst; ${shift._count.participants} ingeschreven lid/leden staan er niet meer op`,
+      },
+    });
+  });
+
+  revalidateTripShift();
+  return { ok: true, message: 'Bijrijdshift weggehaald van vtk.be/shift.' };
+}
+
 function viewerOf(session: Awaited<ReturnType<typeof requireSession>>) {
   return {
     userId: session.user.id,
@@ -2250,6 +2312,10 @@ export async function createTripShiftAction(...args: Parameters<typeof createTri
 
 export async function syncTripShiftAction(...args: Parameters<typeof syncTripShiftActionImpl>): ReturnType<typeof syncTripShiftActionImpl> {
   return guarded(args, () => syncTripShiftActionImpl(...args));
+}
+
+export async function deleteTripShiftAction(...args: Parameters<typeof deleteTripShiftActionImpl>): ReturnType<typeof deleteTripShiftActionImpl> {
+  return guarded(args, () => deleteTripShiftActionImpl(...args));
 }
 
 export async function setGroupTripDriverAction(...args: Parameters<typeof setGroupTripDriverActionImpl>): ReturnType<typeof setGroupTripDriverActionImpl> {

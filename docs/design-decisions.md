@@ -7579,6 +7579,14 @@ wie, met een link naar vtk.be/shift. De code staat in
   zodra Logistiek goedkeurt.
 - **Eén shift per rit.** Wie meer bijrijders zoekt, zet meer plaatsen; een dubbele
   klik maakt er geen twee. Een tweede shift koppelen kan nog in /admin/shiften.
+- **Weghalen kan in hetzelfde blok**, met de vuilbak naast de shift, voor
+  dezelfde mensen die haar mochten zetten. Eerst verwees het blok naar
+  /admin/shiften, maar daar heeft Logistiek meestal geen recht: een shift op de
+  verkeerde rit of met te veel plaatsen bleef dan staan. De bevestiging noemt wie
+  ingeschreven stond, want die krijgen geen bericht (net als bij verwijderen in
+  /admin/shiften). **Na vertrek blijft een shift met leden staan**
+  (`mayRemoveTripShift`): ze is dan de enige plek waar staat wie meereed en
+  bonnetjes verdiende. Een lege shift mag dan nog wel weg.
 - **Alles behalve plaatsen en bonnetjes volgt uit de rit**: de uren (van vertrek
   tot terugkeer), de post, de vertrekplaats (laadadres, anders de bestemming),
   een naam "Bijrijden: <doel>" en een korte uitleg, ook in het Engels. Standaard
