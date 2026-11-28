@@ -106,6 +106,9 @@ const EN: Record<string, string> = {
   'Deze bijrijdshift bestaat niet (meer).': 'This ride-along shift does not exist (anymore).',
   'De shift staat al op de uren van de rit.': 'The shift already has the hours of the trip.',
   'De shift staat weer op de uren van de rit.': 'The shift has the hours of the trip again.',
+  'De rit is al vertrokken en er stonden leden op de shift; ze blijft staan voor hun bonnetjes.':
+    'The trip has left and members were on the shift; it stays for their vouchers.',
+  'Bijrijdshift weggehaald van vtk.be/shift.': 'Ride-along shift removed from vtk.be/shift.',
   'Deze rit is niet aan jouw post doorgegeven.': 'This trip was not handed to your post.',
   'Kies iemand van je eigen post, of iemand uit de chauffeurslijst.':
     'Choose someone from your own post, or someone from the driver list.',
