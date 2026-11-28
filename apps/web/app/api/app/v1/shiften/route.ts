@@ -9,6 +9,7 @@ import { earnedShiftReward } from "@/lib/shift/rewards";
 import { praesidiumYears } from "@/lib/shift/voucherEligibility";
 import { canBeReplaceable, canReplace, visibleParticipants } from "@/lib/shift/replace";
 import { ROSTER_PARTICIPANT_SELECT, toRoster } from "@/lib/shift/roster";
+import { shiftRides } from "@/lib/shift/driver";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,6 +59,14 @@ export async function GET(request: Request) {
       praesidiumYears([session.user.id]),
     ]);
 
+    // Wie er rijdt op een bijrijdshift, enkel voor de shiften waarop je zelf
+    // staat: het nummer is voor wie meerijdt (zie /shift en lib/shift/driver.ts).
+    const rides = await shiftRides(
+      shifts
+        .filter((shift) => shift.participants.some((participant) => participant.userId === session.user.id))
+        .map((shift) => shift.transportBookingId),
+    );
+
     const mine: AppShift[] = [];
     const available: AppShift[] = [];
 
@@ -98,6 +107,7 @@ export async function GET(request: Request) {
         replaceable: own?.replaceable ?? false,
         // Dezelfde namen als op /shift: wie meetelt in `takenSpots`, en enkel de naam.
         roster: toRoster(visible, session.user.id),
+        ride: own && shift.transportBookingId ? (rides.get(shift.transportBookingId) ?? null) : null,
       };
 
       if (own) mine.push(dto);

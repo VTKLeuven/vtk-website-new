@@ -644,6 +644,14 @@ function shiftPreviews(): MailPreview[] {
   const dayBefore = shiftReminderMail("dayBefore", { name: "Wannes", locale: "NL" }, shift);
   const soon = shiftReminderMail("soon", { name: "Wannes", locale: "NL" }, shift);
   const replaced = shiftReplacedMail({ name: "Wannes", locale: "NL" }, shift);
+  const ride = shiftReminderMail("dayBefore", { name: "Wannes", locale: "NL" }, {
+    name: "C&G: bijrijden",
+    startTime: SAMPLE_START,
+    endTime: new Date(SAMPLE_START.getTime() + 2 * 60 * 60 * 1000),
+    location: "Loods Logistiek",
+    reward: 1,
+    ride: { driver: { name: "Arne Janssens", phone: "0470 12 34 56" } },
+  });
   return [
     {
       id: "shift-day-before",
@@ -656,6 +664,20 @@ function shiftPreviews(): MailPreview[] {
       notes: [
         "Wie zich later dan het venster inschrijft, krijgt die herinnering niet meer: anders leest ze als \"morgen\" terwijl de shift straks begint.",
         "Elk lid kan de twee herinneringen apart uitzetten in zijn profiel.",
+      ],
+    },
+    {
+      id: "shift-day-before-ride",
+      title: "Morgen sta je ingepland, op een bijrijdshift",
+      when: "Zoals de herinnering hierboven, voor een shift die in /admin/shiften aan een rit van de uitleendienst hangt.",
+      to: "Wie voor de shift ingeschreven is en de herinnering aan heeft staan",
+      source: "shifts",
+      file: "lib/shift/reminders.ts",
+      ...ride,
+      notes: [
+        "De chauffeur en zijn nummer komen van de rit, op het moment dat de mail vertrekt; zette Logistiek intussen iemand anders op de rit, dan staat die erin.",
+        "Staat er nog geen chauffeur op de rit, dan zegt de mail dat het nog niet gekend is en verwijst ze naar vtk.be/shift.",
+        "Ook de mail van twee uur vooraf draagt deze regel.",
       ],
     },
     {

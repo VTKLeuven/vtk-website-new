@@ -10,6 +10,7 @@ import { RewardCoins } from "@/components/shift/RewardCoins";
 import { LangTabs, type Lang } from "../kalender/LangTabs";
 import { utcToLocalDateTime } from "@/lib/ticketing/time";
 import type { AdminParticipant, AdminShift } from "./ShiftAdmin";
+import type { ShiftTripOption } from "@/lib/shift/tripOptions";
 
 type SearchUser = {
   id: string;
@@ -75,6 +76,21 @@ export function ShiftEditModal({
   const [nameEn, setNameEn] = useState(shift?.nameEn ?? "");
   const [descriptionEn, setDescriptionEn] = useState(shift?.descriptionEn ?? "");
   const [instructionsEn, setInstructionsEn] = useState(shift?.instructionsEn ?? "");
+  // Een bijrijdshift hangt aan een rit van de uitleendienst; wie ingeschreven
+  // is, ziet dan de chauffeur en zijn nummer (lib/shift/driver.ts).
+  const [transportBookingId, setTransportBookingId] = useState<string | null>(
+    shift?.transportBooking?.id ?? null,
+  );
+  const shiftDay = start.slice(0, 10);
+  // Het antwoord met zijn dag erbij: zolang de dag niet die van de shift is,
+  // laadt de lijst nog (`trips === null`), zonder state te wissen in het effect.
+  const [loadedTrips, setLoadedTrips] = useState<{
+    day: string;
+    trips: ShiftTripOption[];
+    failed: boolean;
+  } | null>(null);
+  const trips = loadedTrips?.day === shiftDay ? loadedTrips.trips : null;
+  const tripsFailed = loadedTrips?.day === shiftDay && loadedTrips.failed;
   const [participants, setParticipants] = useState<AdminParticipant[]>(shift?.participants ?? []);
   const [addSearch, setAddSearch] = useState("");
   const [results, setResults] = useState<SearchUser[]>([]);
@@ -110,6 +126,36 @@ export function ShiftEditModal({
       controller.abort();
     };
   }, [addSearch]);
+
+  // De ritten van de dag van de shift. Opnieuw bij een andere dag: een C&G-reeks
+  // rijdt elke week, en de rit van vorige week is niet die van deze shift.
+  useEffect(() => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(shiftDay)) return;
+    const controller = new AbortController();
+    fetch(`/api/shift/trips?date=${shiftDay}`, { signal: controller.signal })
+      .then(async (resp) => {
+        if (!resp.ok) throw new Error(String(resp.status));
+        const list = (await resp.json()) as ShiftTripOption[];
+        setLoadedTrips({ day: shiftDay, trips: list, failed: false });
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return;
+        console.error("[shift] ritten laden mislukt", err);
+        setLoadedTrips({ day: shiftDay, trips: [], failed: true });
+      });
+    return () => controller.abort();
+  }, [shiftDay]);
+
+  // De gekoppelde rit blijft te zien, ook wanneer ze niet op de gekozen dag
+  // valt: anders verdwijnt ze stil uit de lijst en weet je niet meer dat de
+  // shift eraan hangt.
+  const tripChoices = useMemo(() => {
+    const linked = shift?.transportBooking ?? null;
+    const list = (trips ?? []).map((trip) => ({ trip, otherDay: false }));
+    return linked && !list.some(({ trip }) => trip.id === linked.id)
+      ? [{ trip: linked, otherDay: true }, ...list]
+      : list;
+  }, [shift, trips]);
 
   // Al toegevoegde deelnemers niet opnieuw tonen.
   const addable = useMemo(() => {
@@ -154,6 +200,7 @@ export function ShiftEditModal({
       nameEn: nameEn.trim() === "" ? null : nameEn,
       descriptionEn: descriptionEn.trim() === "" ? null : descriptionEn,
       instructionsEn: instructionsEn.trim() === "" ? null : instructionsEn,
+      transportBookingId,
     };
 
     try {
@@ -332,6 +379,82 @@ export function ShiftEditModal({
               </span>
             </label>
           </div>
+
+          <fieldset className="sm:col-span-2">
+            <legend className="text-sm font-medium">
+              {nl ? "Rit van de uitleendienst" : "Logistics trip"}
+            </legend>
+            <p className="mb-2 mt-1 text-xs text-vtk-muted">
+              {nl
+                ? "Voor een bijrijdshift, zoals C&G. Wie ingeschreven is, ziet dan wie er rijdt en op welk nummer, op de shiftpagina en in de herinneringsmail. Anderen zien het niet. De ritten van de dag van de shift:"
+                : "For a ride-along shift, such as C&G. Whoever signs up then sees who drives and their number, on the shift page and in the reminder mail. Nobody else does. The trips on the day of the shift:"}
+            </p>
+            {/* Keuzerondjes en geen keuzelijst: een rit is een uur, een doel, een
+                voertuig en een chauffeur, en die horen in kolommen en niet met
+                puntjes op één regel. Een dag telt er zelden meer dan vijf. */}
+            <div className="grid gap-1.5">
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-vtk-navy/10 px-3 py-2 text-sm has-[:checked]:border-vtk-navy has-[:checked]:bg-vtk-blue-soft">
+                <input
+                  type="radio"
+                  name="shift-trip"
+                  checked={transportBookingId === null}
+                  onChange={() => setTransportBookingId(null)}
+                />
+                <span>{nl ? "Geen rit: geen bijrijdshift" : "No trip: not a ride-along shift"}</span>
+              </label>
+              {tripChoices.map(({ trip, otherDay }) => (
+                <label
+                  key={trip.id}
+                  className="grid cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 rounded-xl border border-vtk-navy/10 px-3 py-2 text-sm has-[:checked]:border-vtk-navy has-[:checked]:bg-vtk-blue-soft sm:grid-cols-[auto_6rem_minmax(0,1fr)_6rem_8rem]"
+                >
+                  <input
+                    type="radio"
+                    name="shift-trip"
+                    className="mt-1"
+                    checked={transportBookingId === trip.id}
+                    onChange={() => setTransportBookingId(trip.id)}
+                  />
+                  <span className="font-medium tabular-nums">
+                    {otherDay ? <span className="block text-xs font-normal text-vtk-muted">{trip.day}</span> : null}
+                    {trip.start}–{trip.end}
+                  </span>
+                  <span className="col-start-2 min-w-0 sm:col-start-auto">
+                    {trip.purpose}
+                    {trip.requester || trip.requested ? (
+                      <span className="block text-xs text-vtk-muted">
+                        {trip.requester}
+                        {trip.requester && trip.requested ? ", " : ""}
+                        {trip.requested ? (nl ? "nog niet goedgekeurd" : "not approved yet") : ""}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="col-start-2 sm:col-start-auto">
+                    <span className="block text-xs text-vtk-muted">{nl ? "Voertuig" : "Vehicle"}</span>
+                    {trip.vehicle}
+                  </span>
+                  <span className="col-start-2 sm:col-start-auto">
+                    <span className="block text-xs text-vtk-muted">{nl ? "Chauffeur" : "Driver"}</span>
+                    {trip.driver ?? (nl ? "nog niemand" : "nobody yet")}
+                  </span>
+                </label>
+              ))}
+              {trips === null ? (
+                <p className="text-sm text-vtk-muted">{nl ? "Ritten laden..." : "Loading trips..."}</p>
+              ) : tripsFailed ? (
+                <p className="text-sm text-vtk-danger" role="alert">
+                  {nl
+                    ? "De ritten van deze dag konden niet geladen worden. Probeer het venster opnieuw te openen."
+                    : "The trips for this day could not be loaded. Try opening the dialog again."}
+                </p>
+              ) : trips.length === 0 ? (
+                <p className="text-sm text-vtk-muted">
+                  {nl
+                    ? "Op deze dag staat er geen rit bij de uitleendienst. Kies eerst de juiste dag hierboven, of vraag Logistiek de rit in te plannen."
+                    : "There is no logistics trip on this day. Pick the right day above first, or ask Logistiek to plan the trip."}
+                </p>
+              ) : null}
+            </div>
+          </fieldset>
 
           <div className="sm:col-span-2">
             <div className="vtk-ef-field-head">

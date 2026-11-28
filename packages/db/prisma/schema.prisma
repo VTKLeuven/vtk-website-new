@@ -3903,6 +3903,18 @@ model Shift {
   theokotSessionId String?
   theokotSession   TheokotSession? @relation(fields: [theokotSessionId], references: [id], onDelete: SetNull)
 
+  /// De rit van de uitleendienst waarop deze shift meerijdt (een bijrijdshift,
+  /// zoals C&G). Gezet in /admin/shiften; wie ingeschreven is, ziet dan op /shift
+  /// en in de herinneringsmail wie er rijdt en op welk nummer. Het nummer volgt
+  /// de chauffeur die Logistiek op de rit zet, ook als die later wijzigt.
+  ///
+  /// `NULL` = geen bijrijdshift, en dat is wat elke shift van voor november 2026
+  /// heeft. `SetNull`: verdwijnt de rit, dan blijft de shift met haar
+  /// inschrijvingen staan, enkel zonder chauffeur. Zie docs/design-decisions.md,
+  /// "Een bijrijdshift kent haar rit".
+  transportBookingId String?
+  transportBooking   UitleenTransportBooking? @relation(fields: [transportBookingId], references: [id], onDelete: SetNull)
+
   /// Wanneer deze shift voor het laatst gewijzigd is.
   ///
   /// Bestaat voor de agendafeed. Die vult `LAST-MODIFIED` en `SEQUENCE` van een
@@ -3916,6 +3928,7 @@ model Shift {
   @@unique([sourceSystem, sourceId])
   @@index([manualGrantId])
   @@index([theokotSessionId])
+  @@index([transportBookingId])
 }
 
 model ShiftParticipant {
@@ -6073,6 +6086,9 @@ model UitleenTransportBooking {
   auditLogs UitleenAuditLog[]
   helpers   UitleenTransportHelper[]
   notes     UitleenTransportNote[]
+  /// Bijrijdshiften op vtk.be die op deze rit meerijden (`Shift.transportBookingId`).
+  /// Een relatie en geen kolom: aan de rit zelf verandert niets.
+  shifts    Shift[]
 
   @@index([userId])
   @@index([status, startAt])

@@ -1257,6 +1257,28 @@ dialog.vtk-shift-dialog .vtk-shift-dialog-close:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+/* De chauffeur van een bijrijdshift: naam, en het nummer eronder als link. Het
+   linkkleur van de site (navy met de gele onderstreping), want dit is het enige
+   in de feitenlijst waarop je tikt. */
+.vtk-shift-driver {
+  display: grid;
+  gap: 2px;
+}
+
+.vtk-shift-driver a {
+  justify-self: start;
+  color: var(--navy);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--yellow);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.vtk-shift-driver-unknown {
+  color: var(--muted);
+}
+
 .vtk-shift-sec {
   display: grid;
   gap: 9px;

@@ -1,5 +1,5 @@
 import 'server-only';
-import { prisma, searchUsers } from '@vtk/db';
+import { driverPhones as sharedDriverPhones, prisma, searchUsers } from '@vtk/db';
 import type { GroupType, UitleenAvailabilityKind } from '@prisma/client';
 import { currentWorkingYear } from '@vtk/auth';
 import {
@@ -7,7 +7,7 @@ import {
   type CustomDriverColor,
   type DriverColorChoice,
 } from '@/lib/driver-colors';
-import { resolveDriverPhones, type DriverPhone, type DriverPhoneSource } from '@/lib/driver-phones';
+import type { DriverPhone, DriverPhoneSource } from '@/lib/driver-phones';
 import { isFeedTokenExpired } from '@/lib/calendar/feed-token';
 import { logistiekTeamMembers } from './shared';
 
@@ -288,39 +288,9 @@ export async function driverOptions(): Promise<DriverOption[]> {
  * je de gegevens niet meer kan verklaren.
  */
 export async function driverPhones(userIds: string[]): Promise<Map<string, DriverPhone>> {
-  const ids = [...new Set(userIds.filter(Boolean))];
-  if (ids.length === 0) return new Map();
-
-  const [team, profile, bookings, reservations] = await Promise.all([
-    prisma.uitleenDriver.findMany({
-      where: { userId: { in: ids }, phone: { not: null } },
-      select: { userId: true, phone: true },
-    }),
-    prisma.user.findMany({
-      where: { id: { in: ids }, phone: { not: null } },
-      select: { id: true, phone: true },
-    }),
-    prisma.uitleenTransportBooking.findMany({
-      where: { userId: { in: ids }, contactPhone: { not: null } },
-      select: { userId: true, contactPhone: true, createdAt: true },
-      orderBy: { createdAt: 'desc' },
-    }),
-    prisma.uitleenReservation.findMany({
-      where: { userId: { in: ids }, contactPhone: { not: null } },
-      select: { userId: true, contactPhone: true, createdAt: true },
-      orderBy: { createdAt: 'desc' },
-    }),
-  ]);
-
-  return resolveDriverPhones({
-    team,
-    profile: profile.map((row) => ({ userId: row.id, phone: row.phone })),
-    history: [...bookings, ...reservations].map((row) => ({
-      userId: row.userId,
-      phone: row.contactPhone,
-      createdAt: row.createdAt,
-    })),
-  });
+  // De query staat in `@vtk/db`, gedeeld met vtk.be (een bijrijdshift toont het
+  // nummer van haar chauffeur); deze naam blijft voor de uitleendienst.
+  return sharedDriverPhones(userIds);
 }
 
 export type DriverPoolEntry = DriverOption & {

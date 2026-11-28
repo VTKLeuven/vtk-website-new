@@ -958,6 +958,18 @@ export type AppShift = {
    * `takenSpots`. Ontbreekt bij een server van voor november 2026.
    */
   roster?: AppShiftRosterEntry[];
+  /**
+   * Bij een bijrijdshift (zoals C&G) waarop je zelf staat: wie er rijdt en op
+   * welk nummer (`lib/shift/driver.ts`). `null` of weggelaten = geen
+   * bijrijdshift, of niet de jouwe: wie de shift nog niet opnam, krijgt het
+   * nummer nooit mee. Ontbreekt bij een server van voor eind november 2026.
+   */
+  ride?: AppShiftRide | null;
+};
+
+/** De rit van een bijrijdshift; `driver` is `null` zolang Logistiek niemand koos. */
+export type AppShiftRide = {
+  driver: { name: string; phone: string | null } | null;
 };
 
 export type AppShiftRosterEntry = {

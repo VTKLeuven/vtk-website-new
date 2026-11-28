@@ -25,7 +25,9 @@ vi.mock('@vtk/db', () => ({
       }),
       updateMany: vi.fn(),
     },
+    uitleenTransportBooking: { findMany: vi.fn(async () => []) },
   },
+  driverPhones: vi.fn(async () => new Map()),
 }));
 
 const HOUR = 60 * 60 * 1000;
@@ -182,5 +184,82 @@ describe('de mail zelf', () => {
   it('schrijft één bonnetje in het enkelvoud', () => {
     const mail = shiftReminderMail('soon', { name: 'Jonas', locale: 'NL' }, { ...shift, reward: 1 });
     expect(mail.text).toContain('1 bonnetje ');
+  });
+});
+
+describe('een bijrijdshift', () => {
+  const ride = { driver: { name: 'Arne Janssens', phone: '0470 12 34 56' } };
+
+  it('zegt met wie je meerijdt en op welk nummer', () => {
+    const mail = shiftReminderMail('dayBefore', { name: 'Jonas', locale: 'NL' }, { ...shift, ride });
+    expect(mail.text).toContain('Je rijdt mee met Arne Janssens, bereikbaar op 0470 12 34 56.');
+    expect(mail.html).toContain('Arne Janssens');
+    // Belbaar vanuit de mail, zonder spaties in de link.
+    expect(mail.html).toContain('href="tel:0470123456"');
+  });
+
+  it('zegt dat de chauffeur nog niet gekend is, in plaats van niets', () => {
+    const mail = shiftReminderMail('dayBefore', { name: 'Jonas', locale: 'NL' }, { ...shift, ride: { driver: null } });
+    expect(mail.text).toContain('Wie er rijdt, is nog niet gekend');
+    expect(mail.html).toContain('nog niet gekend');
+  });
+
+  it('zegt niets over een chauffeur bij een gewone shift', () => {
+    const mail = shiftReminderMail('dayBefore', { name: 'Jonas', locale: 'NL' }, shift);
+    expect(mail.text).not.toContain('rijdt');
+    expect(mail.html).not.toContain('Chauffeur');
+  });
+
+  it('haalt de chauffeur van de rit op wanneer de mail vertrekt', async () => {
+    const { prisma, driverPhones } = await import('@vtk/db');
+    const user = {
+      name: 'Jonas',
+      locale: 'NL' as const,
+      email: 'jonas@student.kuleuven.be',
+      personalEmail: null,
+      emailPreference: 'UNIVERSITY' as const,
+    };
+    vi.mocked(prisma.shiftParticipant.findMany)
+      .mockResolvedValueOnce([
+        { shiftId: 's1', userId: 'u1', shift: { ...shift, transportBookingId: 't1' }, user },
+      ] as never)
+      .mockResolvedValueOnce([]);
+    vi.mocked(prisma.shiftParticipant.updateMany).mockResolvedValue({ count: 1 });
+    vi.mocked(prisma.uitleenTransportBooking.findMany).mockResolvedValueOnce([
+      { id: 't1', status: 'APPROVED', driver: { id: 'd1', name: 'Arne Janssens' } },
+    ] as never);
+    vi.mocked(driverPhones).mockResolvedValueOnce(new Map([['d1', { number: '0470 12 34 56', source: 'PROFILE' }]]));
+    sendMail.mockClear();
+
+    await processDueShiftReminders(now);
+
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    expect(sendMail.mock.calls[0][0].text).toContain('Je rijdt mee met Arne Janssens, bereikbaar op 0470 12 34 56.');
+  });
+
+  it('noemt geen chauffeur van een rit die niet meer rijdt', async () => {
+    const { prisma } = await import('@vtk/db');
+    const user = {
+      name: 'Jonas',
+      locale: 'NL' as const,
+      email: 'jonas@student.kuleuven.be',
+      personalEmail: null,
+      emailPreference: 'UNIVERSITY' as const,
+    };
+    vi.mocked(prisma.shiftParticipant.findMany)
+      .mockResolvedValueOnce([
+        { shiftId: 's1', userId: 'u1', shift: { ...shift, transportBookingId: 't1' }, user },
+      ] as never)
+      .mockResolvedValueOnce([]);
+    vi.mocked(prisma.shiftParticipant.updateMany).mockResolvedValue({ count: 1 });
+    vi.mocked(prisma.uitleenTransportBooking.findMany).mockResolvedValueOnce([
+      { id: 't1', status: 'CANCELLED', driver: { id: 'd1', name: 'Arne Janssens' } },
+    ] as never);
+    sendMail.mockClear();
+
+    await processDueShiftReminders(now);
+
+    expect(sendMail.mock.calls[0][0].text).not.toContain('Arne');
+    expect(sendMail.mock.calls[0][0].text).toContain('nog niet gekend');
   });
 });

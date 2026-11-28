@@ -259,6 +259,9 @@ export function HomeShiftBand({
                 sourceId: null,
                 manualGrantId: null,
                 theokotSessionId: null,
+                // De homepagina toont geen chauffeur; die staat enkel bij je
+                // eigen shiften op /shift.
+                transportBookingId: null,
                 // Al in de taal van de pagina (`localizeShift` op de server).
                 nameEn: null,
                 descriptionEn: null,

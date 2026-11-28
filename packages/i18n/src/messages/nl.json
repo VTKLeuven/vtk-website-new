@@ -828,6 +828,9 @@
       "post": "Post",
       "reward": "Beloning",
       "spots": "Plaatsen",
+      "driver": "Chauffeur",
+      "driverUnknown": "Nog niet gekend",
+      "callDriver": "Bel {name}: {phone}",
       "description": "Beschrijving",
       "open": "Toon details",
       "close": "Verberg details"

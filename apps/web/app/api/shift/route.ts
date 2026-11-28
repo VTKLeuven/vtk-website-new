@@ -73,6 +73,13 @@ async function postHandler(request: Request) {
     );
   }
 
+  if (await unknownTrip(data.transportBookingId)) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: ['Die rit bestaat niet meer bij de uitleendienst.'] },
+      { status: 400 }
+    );
+  }
+
   const shift = await createShift(data);
 
   return NextResponse.json(shift, { status: 201 });
@@ -141,7 +148,21 @@ const SHIFT_FIELD_KEYS = [
   'nameEn',
   'descriptionEn',
   'instructionsEn',
+  'transportBookingId',
 ];
+
+/**
+ * Bestaat de rit waaraan deze shift moet hangen? Een nette 400 in plaats van een
+ * foreign-key-fout, en een rit die intussen verwijderd werd, is een invoerfout.
+ */
+async function unknownTrip(transportBookingId: string | null | undefined): Promise<boolean> {
+  if (!transportBookingId) return false;
+  const trip = await prisma.uitleenTransportBooking.findUnique({
+    where: { id: transportBookingId },
+    select: { id: true },
+  });
+  return trip === null;
+}
 
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((v) => typeof v === 'string');
@@ -229,6 +250,13 @@ async function patchHandler(request: Request) {
         { status: 403 }
       );
     }
+  }
+
+  if (await unknownTrip(patch.transportBookingId)) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: ['Die rit bestaat niet meer bij de uitleendienst.'] },
+      { status: 400 }
+    );
   }
 
   if (hasFieldChanges) {
@@ -333,6 +361,7 @@ async function patchHandler(request: Request) {
         post: 'post',
         openToInternationals: 'open voor internationals',
         instructions: 'instructies',
+        transportBookingId: 'rit van de uitleendienst',
       })
     : null;
   const people = [

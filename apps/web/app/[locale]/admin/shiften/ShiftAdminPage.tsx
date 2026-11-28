@@ -10,6 +10,7 @@ import { shiftDeductions } from "@/lib/shift/deductions";
 import { praesidiumYears } from "@/lib/shift/voucherEligibility";
 import { loadPalPlusRewardRows } from "@/lib/shift/rewards.server";
 import { ShiftAdmin, type ShiftAdminTab } from "./ShiftAdmin";
+import { SHIFT_TRIP_SELECT, toShiftTripOption } from "@/lib/shift/tripOptions";
 
 /** Het pad van elk tabblad onder /admin/shiften. */
 export const SHIFT_TAB_PATHS: Record<ShiftAdminTab, string> = {
@@ -105,6 +106,7 @@ export async function ShiftAdminPage({
                 user: { select: { name: true, email: true, rNumber: true, phone: true } },
               },
             },
+            transportBooking: { select: SHIFT_TRIP_SELECT },
           },
         })
       : Promise.resolve([]),
@@ -172,6 +174,7 @@ export async function ShiftAdminPage({
     nameEn: s.nameEn,
     descriptionEn: s.descriptionEn,
     instructionsEn: s.instructionsEn,
+    transportBooking: s.transportBooking ? toShiftTripOption(s.transportBooking) : null,
     participants: s.participants.map((p) => ({
       userId: p.userId,
       name: p.user.name,

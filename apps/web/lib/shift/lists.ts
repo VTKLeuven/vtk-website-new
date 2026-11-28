@@ -5,6 +5,7 @@ import { ROSTER_PARTICIPANT_SELECT, toRoster } from '@/lib/shift/roster';
 import { earnedShiftReward, type PraesidiumYears } from '@/lib/shift/rewards';
 import { praesidiumYears } from '@/lib/shift/voucherEligibility';
 import { canBeReplaceable, canReplace, visibleParticipants } from '@/lib/shift/replace';
+import { shiftRides } from '@/lib/shift/driver';
 
 /*
  * De twee lijsten op /shift. Eén bron voor de API-routes (`GET /api/shift` en
@@ -99,6 +100,14 @@ export async function registeredShifts(targetUserId: string, viewerId: string) {
     praesidiumYears([targetUserId]),
   ]);
 
+  // Wie er rijdt op een bijrijdshift, enkel voor wie er zelf op staat. Kijkt een
+  // beheerder naar de shiften van iemand anders, dan gaat het nummer niet mee:
+  // het is voor wie met de chauffeur meerijdt.
+  const rides =
+    targetUserId === viewerId
+      ? await shiftRides(shifts.map((shift) => shift.transportBookingId))
+      : new Map();
+
   // `registeredAt` van deze user apart meegeven: de tabel bepaalt daarmee of de
   // bedenktijd nog loopt en of de uitschrijfknop dus actief mag zijn. De namen
   // gaan enkel via `roster` mee, niet in `participants`.
@@ -127,6 +136,7 @@ export async function registeredShifts(targetUserId: string, viewerId: string) {
         false,
       replaceableOption: canBeReplaceable(targetUserId, shift, praesidium),
       roster: toRoster(participants, viewerId),
+      ride: shift.transportBookingId ? (rides.get(shift.transportBookingId) ?? null) : null,
     };
   });
 }

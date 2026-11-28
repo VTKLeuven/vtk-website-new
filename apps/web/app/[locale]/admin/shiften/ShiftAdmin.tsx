@@ -4,6 +4,7 @@ import { ShiftManage } from "./ShiftManage";
 import { ShiftRanking } from "./ShiftRanking";
 import { ShiftRewards } from "./ShiftRewards";
 import { ShiftManual, type ManualGrantRow } from "./ShiftManual";
+import type { ShiftTripOption } from "@/lib/shift/tripOptions";
 
 export type AdminParticipant = {
   userId: string;
@@ -29,6 +30,8 @@ export type AdminShift = {
   nameEn: string | null;
   descriptionEn: string | null;
   instructionsEn: string | null;
+  /** De rit waarop deze bijrijdshift meerijdt, zoals het venster hem toont. */
+  transportBooking: ShiftTripOption | null;
   participants: AdminParticipant[];
 };
 export type RankingRow = { userId: string; name: string; post: string; count: number };

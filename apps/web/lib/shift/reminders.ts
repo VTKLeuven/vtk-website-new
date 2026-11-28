@@ -4,6 +4,8 @@ import { preferredEmail } from '@/lib/brevo/contacts';
 import { sendShiftReminderPush } from '@/lib/app-api/notifications';
 import { earnedShiftReward } from '@/lib/shift/rewards';
 import { praesidiumYears } from '@/lib/shift/voucherEligibility';
+import { shiftRides } from '@/lib/shift/driver';
+import type { ShiftRide } from '@/lib/shift';
 
 /**
  * Herinneringen voor een shift.
@@ -102,7 +104,32 @@ export type ReminderShift = {
   endTime: Date;
   location: string;
   reward: number;
+  /**
+   * Bij een bijrijdshift: wie er rijdt en op welk nummer (`lib/shift/driver.ts`).
+   * Weggelaten of null = geen bijrijdshift, en dan zegt de mail er niets over.
+   */
+  ride?: ShiftRide | null;
 };
+
+/**
+ * De zin over de chauffeur, of null bij een gewone shift. Eén keer opgebouwd
+ * voor de tekst- en de html-versie, zodat ze niet uit elkaar lopen.
+ */
+function rideSentence(ride: ShiftRide | null | undefined, nl: boolean): string | null {
+  if (!ride) return null;
+  const driver = ride.driver;
+  if (!driver) {
+    return nl
+      ? 'Wie er rijdt, is nog niet gekend. Je vindt het op vtk.be/shift zodra Logistiek iemand op de rit zet.'
+      : 'The driver is not known yet. You will find it on vtk.be/shift as soon as Logistiek assigns someone.';
+  }
+  if (!driver.phone) {
+    return nl ? `Je rijdt mee met ${driver.name}.` : `You ride along with ${driver.name}.`;
+  }
+  return nl
+    ? `Je rijdt mee met ${driver.name}, bereikbaar op ${driver.phone}.`
+    : `You ride along with ${driver.name}, reachable at ${driver.phone}.`;
+}
 
 /**
  * De mail zelf. Puur, zodat de tekst getest kan worden zonder database of
@@ -116,6 +143,7 @@ export function shiftReminderMail(
   const nl = user.locale !== 'EN';
   const when = (nl ? dateTimeFormat : dateTimeFormatEn).format(shift.startTime);
   const until = timeFormat.format(shift.endTime);
+  const ride = rideSentence(shift.ride, nl);
 
   const subject = nl
     ? lead === 'dayBefore'
@@ -136,6 +164,7 @@ export function shiftReminderMail(
         `${shift.name}`,
         `${when} tot ${until}`,
         `Waar: ${shift.location}`,
+        ...(ride ? [ride] : []),
         ...(shift.reward > 0
           ? [`Je verdient er ${shift.reward} ${shift.reward === 1 ? 'bonnetje' : 'bonnetjes'} mee.`]
           : []),
@@ -157,6 +186,7 @@ export function shiftReminderMail(
         `${shift.name}`,
         `${when} until ${until}`,
         `Where: ${shift.location}`,
+        ...(ride ? [ride] : []),
         ...(shift.reward > 0
           ? [`It earns you ${shift.reward} ${shift.reward === 1 ? 'token' : 'tokens'}.`]
           : []),
@@ -206,7 +236,7 @@ export function shiftReminderMail(
     when,
   )}</strong> ${nl ? 'tot' : 'until'} <strong>${escapeHtml(until)}</strong><br>${
     nl ? 'Locatie:' : 'Location:'
-  } ${escapeHtml(shift.location)}</div>${
+  } ${escapeHtml(shift.location)}${driverHtml(shift.ride, nl)}</div>${
     rewardLabel ? `<div style="margin-top:10px">${mailPill(rewardLabel, 'yellow')}</div>` : ''
   }</td></tr></table>`;
 
@@ -224,7 +254,7 @@ export function shiftReminderMail(
           : nl
             ? 'Straks begint je shift bij VTK:'
             : 'Your VTK shift starts soon:',
-      )}${card}${mailNoticeBox(noticeText, nl ? 'Aandachtspunt' : 'Important')}<div style="margin-top:22px">${mailButton(
+      )}${card}${ride && !shift.ride?.driver ? mailParagraph(ride) : ''}${mailNoticeBox(noticeText, nl ? 'Aandachtspunt' : 'Important')}<div style="margin-top:22px">${mailButton(
         'https://vtk.be/shift',
         nl ? 'Bekijk je shiften' : 'View your shifts',
       )}</div>`,
@@ -236,6 +266,20 @@ export function shiftReminderMail(
   });
 
   return { subject, text: lines.join('\n'), html };
+}
+
+/**
+ * De chauffeur in de kaart van de mail, onder de locatie: naam en een belbare
+ * link. Zonder chauffeur staat de uitleg als alinea onder de kaart, want "nog niet
+ * gekend" is geen feit maar een zin.
+ */
+function driverHtml(ride: ShiftRide | null | undefined, nl: boolean): string {
+  const driver = ride?.driver;
+  if (!driver) return '';
+  const phone = driver.phone
+    ? `, <a href="tel:${escapeHtml(driver.phone.replace(/[^\d+]/g, ''))}" style="color:${MAIL_COLOR.ink};font-weight:600">${escapeHtml(driver.phone)}</a>`
+    : '';
+  return `<br>${nl ? 'Chauffeur:' : 'Driver:'} ${escapeHtml(driver.name)}${phone}`;
 }
 
 const FROM = 'VTK Shiften <shiften@vtk.be>';
@@ -281,7 +325,14 @@ async function candidatesFor(lead: ReminderLead, now: Date): Promise<Candidate[]
       shiftId: true,
       userId: true,
       shift: {
-        select: { name: true, startTime: true, endTime: true, location: true, reward: true },
+        select: {
+          name: true,
+          startTime: true,
+          endTime: true,
+          location: true,
+          reward: true,
+          transportBookingId: true,
+        },
       },
       user: {
         select: {
@@ -298,9 +349,16 @@ async function candidatesFor(lead: ReminderLead, now: Date): Promise<Candidate[]
   // de shift in het praesidium zit (`earnedShiftReward`): dan zegt de mail niets
   // over bonnetjes.
   const praesidium = await praesidiumYears(rows.map((row) => row.userId));
-  return rows.map((row) => ({
+  // Bij een bijrijdshift wie er rijdt, op het moment dat de mail vertrekt: zette
+  // Logistiek intussen iemand anders op de rit, dan staat die erin.
+  const rides = await shiftRides(rows.map((row) => row.shift.transportBookingId));
+  return rows.map(({ shift: { transportBookingId, ...shift }, ...row }) => ({
     ...row,
-    shift: { ...row.shift, reward: earnedShiftReward({ userId: row.userId, ...row.shift }, praesidium) },
+    shift: {
+      ...shift,
+      reward: earnedShiftReward({ userId: row.userId, ...shift }, praesidium),
+      ride: transportBookingId ? (rides.get(transportBookingId) ?? null) : null,
+    },
   })) as Candidate[];
 }
 

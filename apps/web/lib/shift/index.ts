@@ -28,6 +28,11 @@ export type ShiftInput = {
   nameEn?: string | null;
   descriptionEn?: string | null;
   instructionsEn?: string | null;
+  /**
+   * De rit van de uitleendienst waarop deze shift meerijdt (een bijrijdshift);
+   * null of weggelaten = geen. Of de rit bestaat, kijkt de API-route na.
+   */
+  transportBookingId?: string | null;
 };
 
 /**
@@ -96,6 +101,7 @@ export function parseShift(value: unknown): ShiftInput {
     nameEn,
     descriptionEn,
     instructionsEn,
+    transportBookingId,
   } = value as Record<string, unknown>;
 
   const errors: string[] = [];
@@ -148,6 +154,10 @@ export function parseShift(value: unknown): ShiftInput {
     }
   }
 
+  if (transportBookingId !== undefined && transportBookingId !== null && typeof transportBookingId !== 'string') {
+    errors.push('transportBookingId must be a string or null');
+  }
+
   if (errors.length > 0) {
     throw new ShiftValidationError(errors);
   }
@@ -166,6 +176,7 @@ export function parseShift(value: unknown): ShiftInput {
     nameEn: emptyToNull(nameEn as string | null | undefined),
     descriptionEn: emptyToNull(descriptionEn as string | null | undefined),
     instructionsEn: emptyToNull(instructionsEn as string | null | undefined),
+    transportBookingId: emptyToNull(transportBookingId as string | null | undefined),
   };
 }
 
@@ -203,6 +214,19 @@ export type ShiftResponse = Shift & {
    * het praesidium van het werkingsjaar van de shift (`lib/shift/replace.ts`).
    */
   replaceableOption?: boolean;
+  /**
+   * Enkel op je eigen shiften, en enkel bij een bijrijdshift: wie er rijdt en op
+   * welk nummer. Wie de shift nog niet opnam, krijgt dit nooit mee.
+   */
+  ride?: ShiftRide | null;
+};
+
+/**
+ * De rit van een bijrijdshift, zoals wie erop staat ze ziet (`lib/shift/driver.ts`).
+ * `driver` is null zolang Logistiek nog niemand op de rit zette.
+ */
+export type ShiftRide = {
+  driver: { name: string; phone: string | null } | null;
 };
 
 /**
@@ -471,6 +495,15 @@ export function parsePartialShift(value: unknown): Partial<ShiftInput> {
       errors.push(`${key} must be a string or null`);
     } else {
       result[key] = emptyToNull(english as string | null);
+    }
+  }
+
+  if ('transportBookingId' in src) {
+    const id = src.transportBookingId;
+    if (id !== null && typeof id !== 'string') {
+      errors.push('transportBookingId must be a string or null');
+    } else {
+      result.transportBookingId = emptyToNull(id as string | null);
     }
   }
 

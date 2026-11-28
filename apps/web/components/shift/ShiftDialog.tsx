@@ -308,6 +308,34 @@ export function ShiftDialog({
 
         <dl className="vtk-shift-facts">
           <Detail k={t.detail.location} v={shift.location} />
+          {/* Enkel bij een bijrijdshift die je zelf opnam: `ride` komt enkel mee
+              op je eigen shiften (lib/shift/lists.ts). Het nummer onder de naam
+              en niet erachter: op een telefoon tik je het aan. */}
+          {shift.ride ? (
+            <div>
+              <dt>{t.detail.driver}</dt>
+              <dd className="vtk-shift-driver">
+                {shift.ride.driver ? (
+                  <>
+                    <span>{shift.ride.driver.name}</span>
+                    {shift.ride.driver.phone ? (
+                      <a
+                        href={`tel:${shift.ride.driver.phone.replace(/[^\d+]/g, '')}`}
+                        aria-label={fill(t.detail.callDriver, {
+                          name: shift.ride.driver.name,
+                          phone: shift.ride.driver.phone,
+                        })}
+                      >
+                        {shift.ride.driver.phone}
+                      </a>
+                    ) : null}
+                  </>
+                ) : (
+                  <span className="vtk-shift-driver-unknown">{t.detail.driverUnknown}</span>
+                )}
+              </dd>
+            </div>
+          ) : null}
           {shift.post ? <Detail k={t.detail.post} v={postLabel(shift.post, postNames)} /> : null}
           <Detail k={t.detail.reward} v={viewerRewardLabel(shift, t)} />
           <Detail

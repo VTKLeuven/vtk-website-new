@@ -828,6 +828,9 @@
       "post": "Group",
       "reward": "Reward",
       "spots": "Spots",
+      "driver": "Driver",
+      "driverUnknown": "Not known yet",
+      "callDriver": "Call {name}: {phone}",
       "description": "Description",
       "open": "Show details",
       "close": "Hide details"

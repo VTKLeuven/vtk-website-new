@@ -26,3 +26,4 @@ if (process.env.NODE_ENV !== "production") {
 
 export { HEADER_TABS } from "./groups";
 export { searchUsers, type SearchUserResult, type SearchUserOptions } from "./userSearch";
+export { driverPhones } from "./driverPhoneQuery";
