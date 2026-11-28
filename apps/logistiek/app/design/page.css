@@ -182,18 +182,6 @@
   transform: translateY(-1px);
 }
 
-/* Een beheerscherm dat uit velden bestaat, houdt een leesbreedte (F4.6).
-
-   Zonder `--max` krijgt elk scherm het volle venster, en dat is precies wat een
-   rooster, een tabel of een lijst kaarten nodig heeft. Een formulier niet: een
-   tekstvak van negenhonderd pixels voor één zin is geen ruimte maar leegte, en
-   je oog moet van het label helemaal naar rechts en weer terug. 1100px is de
-   breedte die deze schermen vóór F4.6 hadden (1440 min de kop, de zijbalk en de
-   kloof ertussen), dus ze zien er nog uit zoals toen. */
-.logistics-form-width {
-  max-width: 1100px;
-}
-
 .logistics-admin-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

@@ -85,7 +85,7 @@ export default async function VanBookingDetailPage({
 
       {/* `items-start`: zonder dat rekt de linkerkaart mee met de zijbalk, en
           bij een korte rit is dat een half scherm leeg wit. */}
-      <div className="logistics-form-width grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{booking.purpose}</h2>
@@ -93,28 +93,28 @@ export default async function VanBookingDetailPage({
           </div>
 
           <dl className="mt-4 space-y-2 text-sm">
-            <div className="flex justify-between gap-4">
+            <div className="flex justify-between gap-4 sm:grid sm:grid-cols-[10rem_minmax(0,1fr)]">
               <dt className="text-vtk-muted">{en ? 'Vehicle' : 'Voertuig'}</dt>
-              <dd className="text-right font-medium text-vtk-ink">
+              <dd className="text-right font-medium text-vtk-ink sm:text-left">
                 {en ? booking.vehicle.nameEn : booking.vehicle.nameNl}
               </dd>
             </div>
             {booking.pickupAddress ? (
-              <div className="flex justify-between gap-4">
+              <div className="flex justify-between gap-4 sm:grid sm:grid-cols-[10rem_minmax(0,1fr)]">
                 <dt className="text-vtk-muted">{en ? 'Loading address' : 'Laadadres'}</dt>
-                <dd className="text-right font-medium text-vtk-ink">{booking.pickupAddress}</dd>
+                <dd className="text-right font-medium text-vtk-ink sm:text-left">{booking.pickupAddress}</dd>
               </div>
             ) : null}
             {booking.destination ? (
-              <div className="flex justify-between gap-4">
+              <div className="flex justify-between gap-4 sm:grid sm:grid-cols-[10rem_minmax(0,1fr)]">
                 <dt className="text-vtk-muted">{en ? 'Destination' : 'Bestemming'}</dt>
-                <dd className="text-right font-medium text-vtk-ink">{booking.destination}</dd>
+                <dd className="text-right font-medium text-vtk-ink sm:text-left">{booking.destination}</dd>
               </div>
             ) : null}
             {booking.driver ? (
-              <div className="flex justify-between gap-4">
+              <div className="flex justify-between gap-4 sm:grid sm:grid-cols-[10rem_minmax(0,1fr)]">
                 <dt className="text-vtk-muted">{en ? 'Driver' : 'Chauffeur'}</dt>
-                <dd className="text-right font-medium text-vtk-ink">{booking.driver.name}</dd>
+                <dd className="text-right font-medium text-vtk-ink sm:text-left">{booking.driver.name}</dd>
               </div>
             ) : null}
           </dl>

@@ -15,8 +15,10 @@ body {
    smaller tot je moet inzoomen om een naam te lezen. Logistiek vroeg precies
    dat: "die zijkanten mogen opgevuld worden, zodat ik niet hoef in te zoomen."
    De zijmarge blijft wel bestaan (`.logistics-gutter`), dus de inhoud plakt
-   nooit tegen de vensterrand, en wat wél een leesbreedte nodig heeft, zet die
-   met `.logistics-form-width` op zijn eigen blok in plaats van op de hele app.
+   nooit tegen de vensterrand. Ook een formulier loopt tot die marge: een
+   leesbreedte van 1100px voor de instellingen en het aanvraagformulier liet die
+   tabs halverwege het scherm stoppen. Een alinea uitleg houdt wel haar eigen
+   `max-w-2xl`, op de alinea zelf.
    De styleguide in CLAUDE.md pint die 1240px voor vtk.be en noemt deze
    uitzondering. */
 :root {

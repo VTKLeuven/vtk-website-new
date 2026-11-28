@@ -115,7 +115,7 @@ export default async function ReservatieDetailPage({
           overbodig (R5). Enkel voor je eigen aanvraag. */}
       {isOwner ? <MarkSeen target="reservation" id={reservation.id} /> : null}
 
-      <div className="logistics-form-width grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{en ? 'Request' : 'Aanvraag'}</h2>
@@ -123,48 +123,48 @@ export default async function ReservatieDetailPage({
           </div>
 
           <dl className="mt-4 grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
-            <div className="flex justify-between gap-4">
+            <div className="flex justify-between gap-4 sm:grid sm:grid-cols-[10rem_minmax(0,1fr)]">
               <dt className="text-vtk-muted">{en ? 'On behalf of' : 'Namens'}</dt>
-              <dd className="text-right font-medium text-vtk-ink">{requesterLabel}</dd>
+              <dd className="text-right font-medium text-vtk-ink sm:text-left">{requesterLabel}</dd>
             </div>
-            <div className="flex justify-between gap-4">
+            <div className="flex justify-between gap-4 sm:grid sm:grid-cols-[10rem_minmax(0,1fr)]">
               <dt className="text-vtk-muted">{en ? 'Type' : 'Type'}</dt>
-              <dd className="text-right font-medium text-vtk-ink">
+              <dd className="text-right font-medium text-vtk-ink sm:text-left">
                 {requesterTypeLabel(reservation.requesterType, locale)}
               </dd>
             </div>
             {reservation.eventLocation ? (
-              <div className="flex justify-between gap-4">
+              <div className="flex justify-between gap-4 sm:grid sm:grid-cols-[10rem_minmax(0,1fr)]">
                 <dt className="text-vtk-muted">{en ? 'Location' : 'Locatie'}</dt>
-                <dd className="text-right font-medium text-vtk-ink">{reservation.eventLocation}</dd>
+                <dd className="text-right font-medium text-vtk-ink sm:text-left">{reservation.eventLocation}</dd>
               </div>
             ) : null}
             {reservation.eventStart ? (
-              <div className="flex justify-between gap-4">
+              <div className="flex justify-between gap-4 sm:grid sm:grid-cols-[10rem_minmax(0,1fr)]">
                 <dt className="text-vtk-muted">{en ? 'Event start' : 'Startuur'}</dt>
-                <dd className="text-right font-medium text-vtk-ink">
+                <dd className="text-right font-medium text-vtk-ink sm:text-left">
                   {formatDateTime(reservation.eventStart, locale)}
                 </dd>
               </div>
             ) : null}
             {reservation.expectedAttendance != null ? (
-              <div className="flex justify-between gap-4">
+              <div className="flex justify-between gap-4 sm:grid sm:grid-cols-[10rem_minmax(0,1fr)]">
                 <dt className="text-vtk-muted">{en ? 'Expected attendance' : 'Verwachte opkomst'}</dt>
-                <dd className="text-right font-medium text-vtk-ink">{reservation.expectedAttendance}</dd>
+                <dd className="text-right font-medium text-vtk-ink sm:text-left">{reservation.expectedAttendance}</dd>
               </div>
             ) : null}
             {reservation.contactName || reservation.contactPhone ? (
-              <div className="flex justify-between gap-4">
+              <div className="flex justify-between gap-4 sm:grid sm:grid-cols-[10rem_minmax(0,1fr)]">
                 <dt className="text-vtk-muted">{en ? 'Contact' : 'Contact'}</dt>
-                <dd className="text-right font-medium text-vtk-ink">
+                <dd className="text-right font-medium text-vtk-ink sm:text-left">
                   {[reservation.contactName, reservation.contactPhone].filter(Boolean).join(' · ')}
                 </dd>
               </div>
             ) : null}
             {reservation.delivery ? (
-              <div className="flex justify-between gap-4">
+              <div className="flex justify-between gap-4 sm:grid sm:grid-cols-[10rem_minmax(0,1fr)]">
                 <dt className="text-vtk-muted">{en ? 'Delivery' : 'Levering'}</dt>
-                <dd className="text-right font-medium text-vtk-ink">
+                <dd className="text-right font-medium text-vtk-ink sm:text-left">
                   {reservation.deliveryNote || (en ? 'Yes' : 'Ja')}
                 </dd>
               </div>

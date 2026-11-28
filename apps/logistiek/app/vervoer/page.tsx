@@ -42,7 +42,7 @@ export default async function VervoerPage() {
         </>
       }
     >
-      <div className="logistics-form-width grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         {blocked ? (
           <ExternClosed locale={locale} />
         ) : (

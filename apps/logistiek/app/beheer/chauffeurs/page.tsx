@@ -12,7 +12,7 @@ export default async function BeheerChauffeursPage() {
   const [drivers, groups] = await Promise.all([driverPool(), driversPerGroup()]);
 
   return (
-    <div className="logistics-form-width grid gap-6">
+    <div className="grid gap-6">
       <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
         <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">Chauffeurs</h2>
         <p className="mt-1 max-w-2xl text-sm text-vtk-muted">

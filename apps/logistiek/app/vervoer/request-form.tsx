@@ -546,7 +546,9 @@ export function VanRequestForm({
             </button>
           ) : null}
         </fieldset>
-        <label className="grid gap-1 text-sm sm:col-span-2">
+        {/* Telefoon en kopie naast elkaar: over de volle breedte van het venster
+            werd elk een balk van 1400px voor één nummer of adres. */}
+        <label className="grid content-start gap-1 text-sm">
           <span className="font-medium text-vtk-ink">
             {en ? 'Your phone number (optional)' : 'Jouw telefoonnummer (optioneel)'}
           </span>
@@ -563,7 +565,7 @@ export function VanRequestForm({
               : 'De chauffeur belt dit nummer wanneer er onderweg iets wijzigt.'}
           </span>
         </label>
-        <label className="grid gap-1 text-sm sm:col-span-2">
+        <label className="grid content-start gap-1 text-sm">
           <span className="font-medium text-vtk-ink">
             {en ? 'Email in copy (optional)' : 'E-mail in kopie (optioneel)'}
           </span>

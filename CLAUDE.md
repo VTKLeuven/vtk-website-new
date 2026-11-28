@@ -445,8 +445,10 @@ the design language into the application instead of copying mockup content.
     (`clamp(20px, 3vw, 36px)`, de klasse `.logistics-gutter`), omdat dat geen
     leestekst is maar een werkblad: een week met zeven dagkolommen en een
     beheertabel met zeven kolommen worden in een kolom van 1240px smaller tot je
-    moet inzoomen. Wat er wél als tekst leest (een formulier, een detailkaart)
-    houdt daar zijn eigen leesbreedte met `.logistics-form-width`. Zie
+    moet inzoomen. Ook formulieren en detailkaarten lopen tot die marge; enkel
+    een alinea uitleg houdt een eigen `max-w-2xl`. Een kort veld rekt daar niet
+    uit tot een balk over het hele scherm: zet twee korte velden naast elkaar,
+    en geef een `dl` een vaste labelkolom in plaats van `justify-between`. Zie
     `docs/design-decisions.md`.
 - Shape: cards and panels should be softly rounded, usually 16-22px. Small
   controls can be pill-shaped when they are CTAs or filters.

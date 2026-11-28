@@ -12051,14 +12051,24 @@ De zijmarge blijft wel bestaan (`clamp(20px, 3vw, 36px)`, de klasse
 ook het enige wat de koptekst, de pagina, het beheerblad en de voettekst nog onder
 elkaar uitlijnt; daarvoor deed de gedeelde kolombreedte dat vanzelf.
 
-**Wat er wél als tekst leest, houdt zijn leesbreedte** (`.logistics-form-width`,
-1100px): de instellingen, de teksten, de chauffeurs, de sjablonen, het
-aanvraagformulier voor een rit en de detailkaart van een rit of een aanvraag.
-Een invoerveld van negenhonderd pixels voor één zin is geen ruimte maar leegte,
-en een opslaanknop die over de hele breedte loopt, ziet er niet uit als een knop.
-Die 1100px is precies wat die schermen vóór deze beslissing hadden, dus ze zijn
-er niet op achteruit gegaan; enkel de roosters, de tabellen en de lijsten hebben
-er iets bij gekregen.
+**Ook de formulieren lopen tot de rand.** Eerst hielden de instellingen, de
+teksten, de chauffeurs, de sjablonen, het aanvraagformulier voor een rit en de
+detailkaart van een rit of een aanvraag een leesbreedte van 1100px
+(`.logistics-form-width`), omdat een invoerveld van negenhonderd pixels voor één
+zin leegte is. In november 2026 vroeg Logistiek die grens weg: naast de
+weekplanning en de ritlijsten, die tot de marge liepen, stopten die tabs
+halverwege het scherm, en dat las als een fout en niet als een keuze.
+
+Wat er tegen de leegte beschermt, zit sindsdien in het formulier zelf en niet in
+de breedte van de pagina:
+
+- Een alinea uitleg houdt haar eigen `max-w-2xl`; die wordt niet breder.
+- Twee korte velden staan naast elkaar (telefoon en e-mail in kopie bij een
+  rit), in plaats van elk als balk over de volle breedte.
+- Een `dl` op een detailkaart krijgt vanaf `sm` een vaste labelkolom
+  (`sm:grid-cols-[10rem_minmax(0,1fr)]`), met de waarde links. Met
+  `justify-between` stonden "Voertuig" en "Bakfiets" 1400px uit elkaar. In een
+  smalle zijkolom (340px) mag `justify-between` blijven.
 
 Dit is de enige plek waar de uitleendienst van de huisstijl afwijkt. Alles
 anders (het palet, de donkere paginakop, de kaarten, de typografie) blijft

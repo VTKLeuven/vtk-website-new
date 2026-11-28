@@ -106,7 +106,6 @@
    telefoon liepen de kaarten op Chauffeurs, Ritten en Instellingen over de rand
    (tot 377px op een scherm van 360). `min-width: 0` laat de kolom krimpen en de
    inhoud binnenin wrappen. Gemeten op 320 en 360px: de overloop is weg. */
-main .grid > *,
-main [class*='logistics-form-width'] > * {
+main .grid > * {
   min-width: 0;
 }
