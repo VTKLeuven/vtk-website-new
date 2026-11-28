@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+# syntax=docker/dockerfile:1@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183
 # De `RUN --mount=type=cache` hieronder heeft de BuildKit-frontend nodig; die
 # regel bovenaan pint ze expliciet in plaats van op de ingebouwde versie van de
 # daemon te vertrouwen.
