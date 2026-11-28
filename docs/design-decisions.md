@@ -4385,9 +4385,22 @@ woord en dezelfde parameters als de aangepaste periode op de statistieken.
   blijft dezelfde week, een maand de dagen van die maand; vanuit één dag twee
   weken). Het segment kleurt blauw en schuift open met twee datums als knopje
   ("23 nov", zonder jaar en zonder icoon: het jaar staat in de titel). Een klik
-  opent de kalender van de browser onder het knopje (`showPicker()` op een
-  onzichtbaar datumveld op dezelfde plek), op een telefoon de datumkiezer van het
-  toestel; een datum kiezen laadt meteen, zonder knop.
+  opent een kleine kalender van één maand onder het knopje; een datum kiezen laadt
+  meteen, zonder knop.
+- **Die kalender toont de hele periode, niet enkel de ene datum.** Eerst was het
+  de kalender van de browser (`showPicker()` op een onzichtbaar datumveld), en die
+  kent maar één datum: wie op "4 dec" klikte, zag niet dat de periode op 23
+  november begon. Nu staat de periode als band in de maand, met het uiteinde van
+  het aangeklikte knopje omcirkeld, en toont de band onder de muis al wat een
+  klik zou geven, met het aantal dagen eronder. Een einde vóór het begin of
+  voorbij 92 dagen is niet aan te klikken. Het is een `popover`, zodat het
+  afgeronde segment hem niet afknipt (`range-picker.tsx`, de rekening in
+  `lib/range-calendar.ts`).
+- **Het segment schuift open tot de breedte van de datums.** Een CSS-animatie
+  van `max-width: 0` naar `24rem` liet de datums in de eerste beelden onder
+  elkaar afbreken, zodat de hele werkbalk even een regel hoger sprong, en was na
+  een derde van haar tijd al op breedte. `RangeSlide` meet zijn eigen breedte en
+  schuift precies zo ver; de datums staan op één regel (`w-max`).
 - **Geen apart venster.** Een paneel met twee maanden om in te klikken,
   snelkeuzes en een icoontje, en daarna een venstertje met "Toon", zijn allebei
   gebouwd en op vraag vervangen door de velden in het segment. Bouw ze niet

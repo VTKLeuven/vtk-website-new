@@ -17,7 +17,7 @@ import { EventBars, type CalendarEventBar } from './event-bars';
 import { TripFieldPicker } from './field-picker';
 import { MobileCalendar } from './mobile-calendar';
 import { MonthGrid } from './month-grid';
-import { RangeFields } from './range-picker';
+import { RangeFields, RangeSlide } from './range-picker';
 import { TimeGrid, timeGridColumns } from './time-grid';
 import { vehicleIconName } from '@/lib/vehicle-icon';
 import {
@@ -685,13 +685,13 @@ function TransportCalendarShell({
                     {CALENDAR_VIEW_LABELS[option]}
                   </button>
                   {customActive ? (
-                    <span className={`range-slide flex items-center ${narrow ? 'px-1.5' : 'pr-1.5'}`}>
+                    <RangeSlide narrow={narrow} className={`flex items-center ${narrow ? 'px-1.5' : 'pr-1.5'}`}>
                       <RangeFields
                         first={customRange?.first ?? startRange().van}
                         last={customRange?.last ?? startRange().tot}
                         onChange={changeCustom}
                       />
-                    </span>
+                    </RangeSlide>
                   ) : null}
                 </span>
               ) : (

@@ -966,23 +966,19 @@ body[data-focus-mine='true'] .trip-block:not(.trip-mine) {
   scroll-margin-left: 3.5rem;
 }
 
-/* "Aangepast": het segment schuift open met de twee datums. De breedte groeit
-   van niets naar haar inhoud; enkel wie geen minder beweging vroeg, anders
-   staan ze er meteen. */
-@keyframes range-slide-open {
+/* "Aangepast": de kalender onder een datum verschijnt met een korte fade. Het
+   openschuiven van het segment zelf gebeurt in `RangeSlide`, dat zijn eigen
+   breedte meet; een CSS-animatie naar een vaste `max-width` schokte. */
+@keyframes range-calendar-open {
   from {
-    max-width: 0;
     opacity: 0;
-  }
-  to {
-    max-width: 24rem;
-    opacity: 1;
+    transform: translateY(-4px) scale(0.98);
   }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .range-slide {
-    overflow: hidden;
-    animation: range-slide-open 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  .range-calendar:popover-open {
+    animation: range-calendar-open 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 }
+
